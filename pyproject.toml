@@ -1,0 +1,21 @@
+ [project]
+ name = "ta_lab2"
+ version = "0.1.0"
+ requires-python = ">=3.10"
+ dependencies = [
+-    # your runtime deps here
++    "pandas",
++    "pyyaml",
+ ]
+ 
++[project.optional-dependencies]
++dev = [
++    "pytest",
++    "mypy",
++    "ruff",
++    "pytest-benchmark",
++    "hypothesis",
++]
++
++[project.scripts]
++ta-lab2 = "ta_lab2.cli:main"

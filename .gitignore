@@ -1,0 +1,126 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Oct 31 16:48:10 2025
+
+@author: asafi
+"""
+
+# ===========================================
+#  Python / Data Science Project: ta_lab2
+# ===========================================
+
+# --- Byte-compiled / cache files ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- C extensions ---
+*.so
+
+# --- Distribution / packaging ---
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# --- Virtual environments ---
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# --- PyInstaller ---
+*.manifest
+*.spec
+
+# --- Unit test / coverage reports ---
+.coverage
+.tox/
+.nox/
+.pytest_cache/
+htmlcov/
+coverage.xml
+
+# --- IDE / Editor specific ---
+.vscode/
+.idea/
+.spyproject/
+*.sublime-project
+*.sublime-workspace
+
+# --- OS files ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Logs & temp ---
+*.log
+logs/
+*.tmp
+*.bak
+*.swp
+*.lock
+
+# --- Jupyter Notebooks ---
+.ipynb_checkpoints/
+*.ipynb_checkpoints/
+*.nbconvert/
+**/.ipynb_checkpoints/
+
+# --- Spyder-specific ---
+.spyproject/
+.spyderproject
+.spyderworkspace
+__pycache__/
+*.autosave
+*.bak
+*.spydata
+.history/
+
+# --- Data & analysis outputs ---
+data/
+out/
+*.csv
+*.xlsx
+*.xls
+*.parquet
+*.feather
+*.pkl
+*.npy
+*.npz
+*.h5
+
+# --- Generated documentation & helper scripts ---
+structure.txt
+structure.md
+API_MAP.md
+src_structure.json
+generate_structure_docs.py~
+API_MAP.old.md
+
+# --- Hatch / Poetry / pip wheel metadata ---
+.hatch/
+*.lock
+pip-wheel-metadata/
+
+# --- Notebook export artifacts ---
+*.html
+*.pdf
+
+# --- Misc local or temp dirs ---
+__temp__/
+.tmp/
+temp/
+backup/
+cache/
