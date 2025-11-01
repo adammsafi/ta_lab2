@@ -1,0 +1,2612 @@
+diff --git a/.github/.release-please-manifest.json b/.github/.release-please-manifest.json
+new file mode 100644
+index 0000000..466df71
+--- /dev/null
++++ b/.github/.release-please-manifest.json
+@@ -0,0 +1,3 @@
++{
++  ".": "0.1.0"
++}
+diff --git a/.github/release-please-config.json b/.github/release-please-config.json
+new file mode 100644
+index 0000000..5e20aea
+--- /dev/null
++++ b/.github/release-please-config.json
+@@ -0,0 +1,12 @@
++{
++  "release-type": "python",
++  "package-name": "ta_lab2",
++  "changelog-path": "CHANGELOG.md",
++  "skip-github-release": true,
++  "include-v-in-tag": true,
++  "bump-minor-pre-major": true,
++  "extra-files": [
++    "pyproject.toml",
++    "src/ta_lab2/__init__.py"
++  ]
++}
+diff --git a/.github/workflows/publish-release.yml b/.github/workflows/publish-release.yml
+new file mode 100644
+index 0000000..877728c
+--- /dev/null
++++ b/.github/workflows/publish-release.yml
+@@ -0,0 +1,32 @@
++      - name: Generate release notes
++        id: notes
++        run: |
++          VERSION="${GITHUB_REF_NAME}"   # e.g., v0.1.0
++          DATE="$(date +'%B %e, %Y')"
++
++          cat > notes.md <<'EOF'
++## 🚀 **ta_lab2 v0.1.0 — First Major Release**
++
++### 🧭 Overview
++This release marks the first full, modular version of **ta_lab2**, a Python toolkit for technical analysis and regime detection.  
++It introduces a unified configuration system, expanded feature library, and an advanced volatility engine designed for large-scale analytics.
++
++---
++
++### ⚙️ Core Refactor
++- Moved configuration logic from `src/ta_lab2/config.py` → root-level `config.py`.
++- Added `project_root()` to auto-detect the repo root for path normalization.
++- Centralized settings in `config/default.yaml` for portable project setup.
++
++---
++
++### 📦 Packaging & CLI
++... (all your Markdown body above) ...
++
++---
++
++**Tag:** ${{ github.ref_name }}  
++**Release Date:** ${DATE}
++EOF
++
++          echo "notes_file=notes.md" >> $GITHUB_OUTPUT
+diff --git a/.github/workflows/release-please.yml b/.github/workflows/release-please.yml
+new file mode 100644
+index 0000000..474c5c5
+--- /dev/null
++++ b/.github/workflows/release-please.yml
+@@ -0,0 +1,21 @@
++name: release-please
++
++on:
++  push:
++    branches: [ main ]
++  workflow_dispatch:
++
++permissions:
++  contents: write
++  pull-requests: write
++
++jobs:
++  release-please:
++    runs-on: ubuntu-latest
++    steps:
++      - name: Run release-please
++        uses: google-github-actions/release-please-action@v4
++        with:
++          command: manifest
++          config-file: .github/release-please-config.json
++          manifest-file: .github/.release-please-manifest.json
+diff --git a/changelog.md b/changelog.md
+new file mode 100644
+index 0000000..64a2fe2
+--- /dev/null
++++ b/changelog.md
+@@ -0,0 +1,48 @@
++# 🧾 Changelog
++
++All notable changes to **ta_lab2** will be documented here.
++
++---
++
++## [0.1.0] - 2025-11-01
++### 🎯 Overview
++First major update of `ta_lab2`: introduces a modular configuration system, full volatility suite, and technical indicator + correlation modules.
++
++---
++
++### ⚙️ Core Refactor
++- Moved configuration logic from `src/ta_lab2/config.py` to top-level `config.py`.
++- Added path resolution via `project_root()` for robust portability.
++- Introduced root-level YAML file (`config/default.yaml`) for user settings.
++
++### 📦 Packaging & CLI
++- Added proper `pyproject.toml` build system (setuptools ≥ 68).
++- Added `ta-lab2` command-line entry point via `[project.scripts]`.
++- CLI now loads settings from root-level config and runs the BTC pipeline modularly.
++
++### 📈 Features
++- Introduced **technical indicators** (`rsi`, `macd`, `stoch_kd`, `bollinger`, `adx`, `obv`, `mfi`).
++- Added **correlation utilities** (`acf`, `pacf_yw`, `rolling_autocorr`, `xcorr`).
++
++### 📊 Volatility Module Overhaul
++- Rewrote `vol.py` to include:
++  - Parkinson, Rogers–Satchell, and Garman–Klass volatility estimators.
++  - Rolling realized volatility (annualized and multi-window).
++  - Rolling historical volatility from log or percent returns.
++  - Unified `add_volatility_features()` orchestrator for one-call analysis.
++
++### 🧠 Pipeline Improvements
++- Simplified `run_btc_pipeline()` — removed hardcoded paths, made fully callable.
++- Prepares project for composable feature + regime detection pipeline.
++
++### 🧪 Developer Experience
++- Added dev dependencies: `pytest`, `mypy`, `ruff`, `hypothesis`, `pytest-benchmark`.
++- Normalized project structure for testing and CI/CD compatibility.
++
++---
++
++## [Unreleased]
++- Add rolling correlation matrices
++- Implement feature-store export
++- Integrate regime clustering and labeling
++- Add unit tests for volatility and indicator modules
+diff --git a/config.py b/config.py
+new file mode 100644
+index 0000000..d511080
+--- /dev/null
++++ b/config.py
+@@ -0,0 +1,41 @@
++# config.py (at repo root)
++from __future__ import annotations
++from dataclasses import dataclass, field
++from pathlib import Path
++from typing import Any
++import yaml
++
++@dataclass
++class Settings:
++    # required
++    data_csv: str
++    # optional
++    out_dir: str = "out"
++    ema_windows: list[int] = field(default_factory=lambda: [21, 50, 100])
++    resample: dict[str, Any] = field(default_factory=lambda: {"weekly": "W-SUN", "monthly": "MS"})
++    indicators: dict[str, Any] | None = None
++    correlations: dict[str, Any] | None = None
++
++def project_root(start: str | Path | None = None) -> Path:
++    """Walk up from 'start' (or this file) until we find a folder containing pyproject.toml."""
++    cur = Path(start or __file__).resolve()
++    for p in [cur, *cur.parents]:
++        if (p / "pyproject.toml").exists():
++            return p
++    # fallback: repo root is parent of this file
++    return Path(__file__).resolve().parent
++
++def load_settings(yaml_path: str | Path) -> Settings:
++    """Load YAML into Settings, then normalize relative paths against the project root."""
++    root = project_root()
++    p = (root / yaml_path).resolve() if not Path(yaml_path).is_absolute() else Path(yaml_path)
++    data = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
++
++    # Build Settings
++    s = Settings(**data)
++
++    # Normalize paths (make absolute, anchored to repo root)
++    s.data_csv = str((root / s.data_csv).resolve()) if not Path(s.data_csv).is_absolute() else s.data_csv
++    s.out_dir  = str((root / s.out_dir).resolve())  if not Path(s.out_dir).is_absolute()  else s.out_dir
++
++    return s
+diff --git a/config/default.yaml b/config/default.yaml
+new file mode 100644
+index 0000000..ea337c4
+--- /dev/null
++++ b/config/default.yaml
+@@ -0,0 +1,23 @@
++data_csv: data/Bitcoin_01_1_2016-10_26_2025_historical_data_coinmarketcap.csv
++out_dir: out
++ema_windows: [21, 50, 100]
++resample:
++  weekly: "W-SUN"
++  monthly: "MS"
++
++indicators:
++  rsi: [14, 28]
++  macd: {fast: 12, slow: 26, signal: 9}
++  stoch: {k: 14, d: 3}
++  bollinger: {window: 20, n_sigma: 2}
++  atr: [14]
++  adx: [14]
++  obv: true
++  mfi: [14]
++
++correlations:
++  acf: {nlags: 40, on: "returns"}   # "returns" or "close"
++  pacf: {nlags: 20, on: "returns"}
++  rolling_autocorr:
++    - {lag: 1, window: 100, on: "returns"}
++    - {lag: 5, window: 100, on: "returns"}
+diff --git a/diff.txt b/diff.txt
+new file mode 100644
+index 0000000..91280df
+--- /dev/null
++++ b/diff.txt
+@@ -0,0 +1,863 @@
++diff --git a/config.py b/config.py
++new file mode 100644
++index 0000000..d511080
++--- /dev/null
+++++ b/config.py
++@@ -0,0 +1,41 @@
+++# config.py (at repo root)
+++from __future__ import annotations
+++from dataclasses import dataclass, field
+++from pathlib import Path
+++from typing import Any
+++import yaml
+++
+++@dataclass
+++class Settings:
+++    # required
+++    data_csv: str
+++    # optional
+++    out_dir: str = "out"
+++    ema_windows: list[int] = field(default_factory=lambda: [21, 50, 100])
+++    resample: dict[str, Any] = field(default_factory=lambda: {"weekly": "W-SUN", "monthly": "MS"})
+++    indicators: dict[str, Any] | None = None
+++    correlations: dict[str, Any] | None = None
+++
+++def project_root(start: str | Path | None = None) -> Path:
+++    """Walk up from 'start' (or this file) until we find a folder containing pyproject.toml."""
+++    cur = Path(start or __file__).resolve()
+++    for p in [cur, *cur.parents]:
+++        if (p / "pyproject.toml").exists():
+++            return p
+++    # fallback: repo root is parent of this file
+++    return Path(__file__).resolve().parent
+++
+++def load_settings(yaml_path: str | Path) -> Settings:
+++    """Load YAML into Settings, then normalize relative paths against the project root."""
+++    root = project_root()
+++    p = (root / yaml_path).resolve() if not Path(yaml_path).is_absolute() else Path(yaml_path)
+++    data = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+++
+++    # Build Settings
+++    s = Settings(**data)
+++
+++    # Normalize paths (make absolute, anchored to repo root)
+++    s.data_csv = str((root / s.data_csv).resolve()) if not Path(s.data_csv).is_absolute() else s.data_csv
+++    s.out_dir  = str((root / s.out_dir).resolve())  if not Path(s.out_dir).is_absolute()  else s.out_dir
+++
+++    return s
++diff --git a/config/default.yaml b/config/default.yaml
++new file mode 100644
++index 0000000..ea337c4
++--- /dev/null
+++++ b/config/default.yaml
++@@ -0,0 +1,23 @@
+++data_csv: data/Bitcoin_01_1_2016-10_26_2025_historical_data_coinmarketcap.csv
+++out_dir: out
+++ema_windows: [21, 50, 100]
+++resample:
+++  weekly: "W-SUN"
+++  monthly: "MS"
+++
+++indicators:
+++  rsi: [14, 28]
+++  macd: {fast: 12, slow: 26, signal: 9}
+++  stoch: {k: 14, d: 3}
+++  bollinger: {window: 20, n_sigma: 2}
+++  atr: [14]
+++  adx: [14]
+++  obv: true
+++  mfi: [14]
+++
+++correlations:
+++  acf: {nlags: 40, on: "returns"}   # "returns" or "close"
+++  pacf: {nlags: 20, on: "returns"}
+++  rolling_autocorr:
+++    - {lag: 1, window: 100, on: "returns"}
+++    - {lag: 5, window: 100, on: "returns"}
++diff --git a/pyproject.toml b/pyproject.toml
++index 9a6a43d..96032a0 100644
++--- a/pyproject.toml
+++++ b/pyproject.toml
++@@ -1,21 +1,34 @@
++- [project]
++- name = "ta_lab2"
++- version = "0.1.0"
++- requires-python = ">=3.10"
++- dependencies = [
++--    # your runtime deps here
++-+    "pandas",
++-+    "pyyaml",
++- ]
++- 
++-+[project.optional-dependencies]
++-+dev = [
++-+    "pytest",
++-+    "mypy",
++-+    "ruff",
++-+    "pytest-benchmark",
++-+    "hypothesis",
++-+]
++-+
++-+[project.scripts]
++-+ta-lab2 = "ta_lab2.cli:main"
+++[build-system]
+++requires = ["setuptools>=68", "wheel"]
+++build-backend = "setuptools.build_meta"
+++
+++[project]
+++name = "ta_lab2"
+++version = "0.1.0"
+++description = "Technical analysis & regime-detection toolkit"
+++readme = "README.md"
+++requires-python = ">=3.10"
+++dependencies = [
+++  "pandas",
+++  "pyyaml",
+++]
+++
+++[project.optional-dependencies]
+++dev = [
+++  "pytest",
+++  "mypy",
+++  "ruff",
+++  "pytest-benchmark",
+++  "hypothesis",
+++]
+++
+++[project.scripts]
+++ta-lab2 = "ta_lab2.cli:main"
+++
+++# Tell setuptools to find packages under src/
+++[tool.setuptools.packages.find]
+++where = ["src"]
+++
+++# Also install the top-level config.py module (so `from config import ...` works)
+++[tool.setuptools]
+++py-modules = ["config"]
++diff --git a/src/ta_lab2/__init__.py b/src/ta_lab2/__init__.py
++index 7840e43..1bdc623 100644
++--- a/src/ta_lab2/__init__.py
+++++ b/src/ta_lab2/__init__.py
++@@ -1,5 +1,4 @@
++--# current content
++-+from .regimes.run_btc_pipeline import run_btc_pipeline
++-+
++-+__all__ = ["run_btc_pipeline"]
++-+__version__ = "0.1.0"
+++from .regimes.run_btc_pipeline import run_btc_pipeline
+++
+++__all__ = ["run_btc_pipeline"]
+++__version__ = "0.1.0"
++diff --git a/src/ta_lab2/cli.py b/src/ta_lab2/cli.py
++index 3131e8d..1b8350c 100644
++--- a/src/ta_lab2/cli.py
+++++ b/src/ta_lab2/cli.py
++@@ -1,27 +1,39 @@
++ from __future__ import annotations
++ import argparse
++ from pathlib import Path
++-from .config import load_settings, project_root
++-from .regimes.run_btc_pipeline import run_btc_pipeline
+++
+++# Import from root-level config.py, not from ta_lab2.config
+++from config import load_settings, project_root
+++from ta_lab2.regimes.run_btc_pipeline import run_btc_pipeline
+++
++ 
++ def main(argv: list[str] | None = None) -> int:
++     ap = argparse.ArgumentParser(prog="ta-lab2", description="ta_lab2 CLI")
++-    ap.add_argument("--config", "-c", default="configs/default.yaml",
++-                    help="Path to YAML config relative to project root")
+++    ap.add_argument(
+++        "--config", "-c",
+++        default="config/default.yaml",
+++        help="Path to YAML config relative to project root (default: config/default.yaml)"
+++    )
++     args = ap.parse_args(argv)
++ 
++-    root = project_root()
++-    cfg_path = (root / args.config).resolve()
++-    settings = load_settings(cfg_path)
+++    # Load settings from YAML via the root-level config.py
+++    settings = load_settings(args.config)
++ 
++-    csv = (root / settings.data_csv).resolve()
++-    out_dir = (root / settings.out_dir).resolve()
+++    # Resolve absolute paths for input and output
+++    csv = Path(settings.data_csv)
+++    out_dir = Path(settings.out_dir)
+++
+++    # Run main pipeline
+++    result = run_btc_pipeline(
+++        csv_path=csv,
+++        out_dir=out_dir,
+++        ema_windows=settings.ema_windows,
+++        resample=settings.resample
+++    )
++ 
++-    result = run_btc_pipeline(csv_path=csv, out_dir=out_dir,
++-                              ema_windows=settings.ema_windows,
++-                              resample=settings.resample)
++     print("Pipeline complete:", result)
++     return 0
++ 
+++
++ if __name__ == "__main__":
++     raise SystemExit(main())
++diff --git a/src/ta_lab2/config.py b/src/ta_lab2/config.py
++deleted file mode 100644
++index b1797bd..0000000
++--- a/src/ta_lab2/config.py
+++++ /dev/null
++@@ -1,24 +0,0 @@
++-from __future__ import annotations
++-from dataclasses import dataclass, field
++-from pathlib import Path
++-import yaml
++-
++-@dataclass
++-class Settings:
++-    data_csv: str
++-    out_dir: str = "out"
++-    ema_windows: list[int] = field(default_factory=lambda: [21, 50, 100])
++-    resample: dict = field(default_factory=lambda: {"weekly": "W-SUN", "monthly": "MS"})
++-
++-def load_settings(path: str | Path) -> Settings:
++-    p = Path(path)
++-    data = yaml.safe_load(p.read_text(encoding="utf-8"))
++-    return Settings(**data)
++-
++-def project_root(start: str | Path | None = None) -> Path:
++-    # walk up until we find pyproject.toml
++-    cur = Path(start or __file__).resolve()
++-    for ancestor in [cur, *cur.parents]:
++-        if (ancestor / "pyproject.toml").exists():
++-            return ancestor
++-    return cur  # fallback
++diff --git a/src/ta_lab2/config/default.yaml b/src/ta_lab2/config/default.yaml
++deleted file mode 100644
++index 4da5e13..0000000
++--- a/src/ta_lab2/config/default.yaml
+++++ /dev/null
++@@ -1,9 +0,0 @@
++-# Paths are relative to the project root (where pyproject.toml lives)
++-data_csv: data/Bitcoin_01_1_2016-10_26_2025_historical_data_coinmarketcap.csv
++-out_dir: out
++-
++-# Pipeline parameters (example—extend as your code supports)
++-ema_windows: [21, 50, 100]
++-resample:
++-  weekly: "W-SUN"
++-  monthly: "MS"
++\ No newline at end of file
++diff --git a/src/ta_lab2/features/__init__.py b/src/ta_lab2/features/__init__.py
++index 9fa317e..b169b79 100644
++--- a/src/ta_lab2/features/__init__.py
+++++ b/src/ta_lab2/features/__init__.py
++@@ -2,3 +2,23 @@ from .calendar import expand_datetime_features_inplace
++ from .ema import add_ema_columns, add_ema_d1, add_ema_d2
++ from .returns import add_returns
++ from .vol import add_atr
+++
+++# New imports for technical indicators
+++from .indicators import rsi, macd, stoch_kd, bollinger, atr, adx, obv, mfi
+++
+++# New imports for correlation-based features
+++from .correlation import acf, pacf_yw, rolling_autocorr, xcorr
+++
+++
+++__all__ = [
+++    # Core features
+++    "expand_datetime_features_inplace",
+++    "add_ema_columns", "add_ema_d1", "add_ema_d2",
+++    "add_returns", "add_atr",
+++
+++    # Technical indicators
+++    "rsi", "macd", "stoch_kd", "bollinger", "atr", "adx", "obv", "mfi",
+++
+++    # Correlation utilities
+++    "acf", "pacf_yw", "rolling_autocorr", "xcorr",
+++]
++diff --git a/src/ta_lab2/features/correlation.py b/src/ta_lab2/features/correlation.py
++new file mode 100644
++index 0000000..bd96500
++--- /dev/null
+++++ b/src/ta_lab2/features/correlation.py
++@@ -0,0 +1,63 @@
+++from __future__ import annotations
+++import numpy as np
+++import pandas as pd
+++
+++def acf(x: pd.Series, nlags: int = 40, demean: bool = True) -> pd.Series:
+++    s = pd.Series(x).dropna().astype(float)
+++    if len(s) == 0:
+++        return pd.Series([np.nan]*(nlags+1), index=range(nlags+1), name="acf")
+++    if demean:
+++        s = s - s.mean()
+++    var = (s**2).sum()
+++    ac = [1.0]
+++    for k in range(1, nlags + 1):
+++        cov = (s.iloc[k:] * s.iloc[:-k]).sum()
+++        ac.append(float(cov / var) if var != 0 else np.nan)
+++    return pd.Series(ac, index=range(0, nlags + 1), name="acf")
+++
+++def pacf_yw(x: pd.Series, nlags: int = 20) -> pd.Series:
+++    s = pd.Series(x).dropna().astype(float)
+++    if len(s) == 0:
+++        return pd.Series([np.nan]*(nlags+1), index=range(nlags+1), name="pacf")
+++    s = s - s.mean()
+++    # autocov sequence
+++    gamma = np.array([
+++        (s[:len(s)-k] @ s[k:]) / len(s) if k > 0 else (s @ s) / len(s)
+++        for k in range(0, nlags+1)
+++    ])
+++    pac = np.zeros(nlags+1)
+++    pac[0] = 1.0
+++    phi = np.zeros((nlags+1, nlags+1))
+++    var = gamma[0]
+++    for k in range(1, nlags+1):
+++        num = gamma[k] - np.sum(phi[k-1,1:k] * gamma[1:k][::-1])
+++        den = var - np.sum(phi[k-1,1:k] * gamma[1:k])
+++        phi[k,k] = num / den if den != 0 else np.nan
+++        for j in range(1, k):
+++            phi[k,j] = phi[k-1,j] - phi[k,k]*phi[k-1,k-j]
+++        pac[k] = phi[k,k]
+++    return pd.Series(pac, index=range(0, nlags+1), name="pacf")
+++
+++def rolling_autocorr(s: pd.Series, lag: int = 1, window: int = 100) -> pd.Series:
+++    return s.rolling(window).corr(s.shift(lag)).rename(f"roll_ac_{lag}_{window}")
+++
+++def xcorr(a: pd.Series, b: pd.Series, max_lag: int = 20, demean: bool = True) -> pd.Series:
+++    A = pd.Series(a).astype(float)
+++    B = pd.Series(b).astype(float)
+++    A, B = A.align(B, join="inner")
+++    if len(A) == 0:
+++        return pd.Series([np.nan]*(2*max_lag+1), index=range(-max_lag, max_lag+1), name="xcorr")
+++    if demean:
+++        A, B = A - A.mean(), B - B.mean()
+++    var = np.sqrt((A**2).sum() * (B**2).sum())
+++    vals = []
+++    lags = range(-max_lag, max_lag + 1)
+++    for k in lags:
+++        if k < 0:
+++            cov = (A[:k] * B[-k:]).sum()
+++        elif k > 0:
+++            cov = (A[k:] * B[:-k]).sum()
+++        else:
+++            cov = (A * B).sum()
+++        vals.append(float(cov / var) if var != 0 else np.nan)
+++    return pd.Series(vals, index=list(lags), name="xcorr")
++diff --git a/src/ta_lab2/features/indicators.py b/src/ta_lab2/features/indicators.py
++new file mode 100644
++index 0000000..a71a0a4
++--- /dev/null
+++++ b/src/ta_lab2/features/indicators.py
++@@ -0,0 +1,94 @@
+++from __future__ import annotations
+++import numpy as np
+++import pandas as pd
+++
+++# ---- helpers ----
+++def _ema(s: pd.Series, span: int) -> pd.Series:
+++    return s.ewm(span=span, adjust=False).mean()
+++
+++def _sma(s: pd.Series, window: int) -> pd.Series:
+++    return s.rolling(window, min_periods=window).mean()
+++
+++def _tr(high: pd.Series, low: pd.Series, close: pd.Series) -> pd.Series:
+++    prev_close = close.shift(1)
+++    return pd.concat([
+++        (high - low).abs(),
+++        (high - prev_close).abs(),
+++        (low - prev_close).abs()
+++    ], axis=1).max(axis=1)
+++
+++# ---- indicators ----
+++def rsi(close: pd.Series, window: int = 14) -> pd.Series:
+++    delta = close.diff()
+++    gain = delta.clip(lower=0)
+++    loss = -delta.clip(upper=0)
+++    avg_gain = gain.ewm(alpha=1/window, adjust=False).mean()
+++    avg_loss = loss.ewm(alpha=1/window, adjust=False).mean()
+++    rs = avg_gain / (avg_loss.replace(0, np.nan))
+++    out = 100 - (100 / (1 + rs))
+++    return out.rename(f"rsi_{window}")
+++
+++def macd(close: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9) -> pd.DataFrame:
+++    ema_fast = _ema(close, fast)
+++    ema_slow = _ema(close, slow)
+++    macd_line = ema_fast - ema_slow
+++    signal_line = _ema(macd_line, signal)
+++    hist = macd_line - signal_line
+++    return pd.DataFrame({
+++        f"macd_{fast}_{slow}": macd_line,
+++        f"macd_signal_{signal}": signal_line,
+++        f"macd_hist_{fast}_{slow}_{signal}": hist
+++    })
+++
+++def stoch_kd(high: pd.Series, low: pd.Series, close: pd.Series, k: int = 14, d: int = 3) -> pd.DataFrame:
+++    lowest = low.rolling(k, min_periods=k).min()
+++    highest = high.rolling(k, min_periods=k).max()
+++    k_line = 100 * (close - lowest) / (highest - lowest)
+++    d_line = k_line.rolling(d, min_periods=d).mean()
+++    return pd.DataFrame({f"stoch_k_{k}": k_line, f"stoch_d_{d}": d_line})
+++
+++def bollinger(close: pd.Series, window: int = 20, n_sigma: float = 2.0) -> pd.DataFrame:
+++    ma = _sma(close, window)
+++    std = close.rolling(window, min_periods=window).std()
+++    upper = ma + n_sigma * std
+++    lower = ma - n_sigma * std
+++    bw = (upper - lower) / ma
+++    return pd.DataFrame({
+++        f"bb_ma_{window}": ma,
+++        f"bb_up_{window}_{n_sigma}": upper,
+++        f"bb_lo_{window}_{n_sigma}": lower,
+++        f"bb_width_{window}": bw
+++    })
+++
+++def atr(high: pd.Series, low: pd.Series, close: pd.Series, window: int = 14) -> pd.Series:
+++    tr = _tr(high, low, close)
+++    out = tr.rolling(window, min_periods=window).mean()
+++    return out.rename(f"atr_{window}")
+++
+++def adx(high: pd.Series, low: pd.Series, close: pd.Series, window: int = 14) -> pd.Series:
+++    up = high.diff()
+++    dn = -low.diff()
+++    plus_dm  = np.where((up > dn) and isinstance(up, pd.Series) and (up > 0), up, 0.0)
+++    minus_dm = np.where((dn > up) and isinstance(dn, pd.Series) and (dn > 0), dn, 0.0)
+++    tr = _tr(high, low, close)
+++    atr_ = tr.rolling(window, min_periods=window).mean()
+++    plus_di  = 100 * pd.Series(plus_dm, index=high.index).rolling(window, min_periods=window).sum() / atr_
+++    minus_di = 100 * pd.Series(minus_dm, index=high.index).rolling(window, min_periods=window).sum() / atr_
+++    dx = ((plus_di - minus_di).abs() / (plus_di + minus_di)) * 100
+++    adx_ = dx.rolling(window, min_periods=window).mean()
+++    return adx_.rename(f"adx_{window}")
+++
+++def obv(close: pd.Series, volume: pd.Series) -> pd.Series:
+++    direction = np.sign(close.diff().fillna(0))
+++    return (direction * volume).fillna(0).cumsum().rename("obv")
+++
+++def mfi(high: pd.Series, low: pd.Series, close: pd.Series, volume: pd.Series, window: int = 14) -> pd.Series:
+++    tp = (high + low + close) / 3.0
+++    raw = tp * volume
+++    pos = raw.where(tp.diff() > 0, 0.0)
+++    neg = raw.where(tp.diff() < 0, 0.0)
+++    mr = pos.rolling(window, min_periods=window).sum() / (
+++        neg.rolling(window, min_periods=window).sum().replace(0, np.nan)
+++    )
+++    out = 100 - (100 / (1 + mr))
+++    return out.rename(f"mfi_{window}")
++diff --git a/src/ta_lab2/features/vol.py b/src/ta_lab2/features/vol.py
++index 64a9858..50a0575 100644
++--- a/src/ta_lab2/features/vol.py
+++++ b/src/ta_lab2/features/vol.py
++@@ -1,15 +1,306 @@
++-
++-import pandas as pd
+++# src/ta_lab2/features/vol.py
++ import numpy as np
+++import pandas as pd
+++from typing import Iterable, Literal, Sequence
++ 
++-def add_atr(df: pd.DataFrame, period: int = 14,
++-            high_col="high", low_col="low", close_col="close"):
+++
+++# =============================================================================
+++# Single-bar realized volatility estimators
+++# =============================================================================
+++
+++def add_atr(
+++    df: pd.DataFrame,
+++    period: int = 14,
+++    high_col: str = "high",
+++    low_col: str = "low",
+++    close_col: str = "close",
+++) -> pd.DataFrame:
+++    """
+++    Average True Range (Wilder EMA smoothing).
+++    """
++     high = df[high_col].astype(float)
++-    low  = df[low_col].astype(float)
+++    low = df[low_col].astype(float)
++     close = df[close_col].astype(float)
++     prev_close = close.shift(1)
+++
++     tr = (high - low).abs()
++     tr = np.maximum(tr, (high - prev_close).abs())
++     tr = np.maximum(tr, (low - prev_close).abs())
++-    df[f"atr_{period}"] = tr.ewm(alpha=1/period, adjust=False).mean()
+++
+++    df[f"atr_{period}"] = tr.ewm(alpha=1 / period, adjust=False).mean()
+++    return df
+++
+++
+++def add_parkinson_vol(
+++    df: pd.DataFrame,
+++    high_col: str = "high",
+++    low_col: str = "low",
+++    out_col: str = "vol_parkinson",
+++) -> pd.DataFrame:
+++    """
+++    σ_P = sqrt( (1 / (4 * ln(2))) * (ln(H/L))^2 )
+++    """
+++    hl2 = np.log(df[high_col] / df[low_col]) ** 2
+++    df[out_col] = np.sqrt((1.0 / (4.0 * np.log(2.0))) * hl2)
+++    return df
+++
+++
+++def add_rogers_satchell_vol(
+++    df: pd.DataFrame,
+++    open_col: str = "open",
+++    high_col: str = "high",
+++    low_col: str = "low",
+++    close_col: str = "close",
+++    out_col: str = "vol_rs",
+++) -> pd.DataFrame:
+++    """
+++    σ_RS = sqrt( ln(H/C)ln(H/O) + ln(L/C)ln(L/O) )
+++    """
+++    term = (
+++        np.log(df[high_col] / df[close_col]) * np.log(df[high_col] / df[open_col])
+++        + np.log(df[low_col] / df[close_col]) * np.log(df[low_col] / df[open_col])
+++    ).clip(lower=0)
+++    df[out_col] = np.sqrt(term)
+++    return df
+++
+++
+++def add_garman_klass_vol(
+++    df: pd.DataFrame,
+++    open_col: str = "open",
+++    high_col: str = "high",
+++    low_col: str = "low",
+++    close_col: str = "close",
+++    out_col: str = "vol_gk",
+++) -> pd.DataFrame:
+++    """
+++    σ_GK = sqrt( 0.5(ln(H/L))^2 - (2ln2 - 1)(ln(C/O))^2 )
+++    """
+++    term1 = 0.5 * (np.log(df[high_col] / df[low_col])) ** 2
+++    term2 = (2 * np.log(2) - 1) * (np.log(df[close_col] / df[open_col])) ** 2
+++    inner = term1 - term2
+++    df[out_col] = np.sqrt(np.abs(inner))
+++    return df
+++
+++
+++# =============================================================================
+++# Rolling volatility from returns (log / percent / both) — batch
+++# =============================================================================
+++
+++def add_rolling_vol_from_returns_batch(
+++    df: pd.DataFrame,
+++    *,
+++    close_col: str = "close",
+++    windows: Sequence[int] = (20, 63, 126),
+++    types: Literal["log", "pct", "both"] = "log",
+++    annualize: bool = True,
+++    periods_per_year: int = 252,
+++    ddof: int = 0,
+++    prefix: str = "vol",
+++) -> pd.DataFrame:
+++    """
+++    Compute rolling historical volatility from (log|pct) returns
+++    for multiple windows and (optionally) both return types.
+++
+++    Adds columns:
+++      - f"{prefix}_log_roll_{W}" for log returns (if types includes "log")
+++      - f"{prefix}_pct_roll_{W}" for pct returns (if types includes "pct")
+++    """
+++    px = df[close_col].astype(float)
+++    r_log = np.log(px / px.shift(1))
+++    r_pct = px.pct_change()
+++
+++    need_log = types in ("log", "both")
+++    need_pct = types in ("pct", "both")
+++
+++    for w in windows:
+++        if need_log:
+++            vol = r_log.rolling(w, min_periods=w).std(ddof=ddof)
+++            if annualize:
+++                vol = vol * np.sqrt(periods_per_year)
+++            df[f"{prefix}_log_roll_{w}"] = vol
+++
+++        if need_pct:
+++            vol = r_pct.rolling(w, min_periods=w).std(ddof=ddof)
+++            if annualize:
+++                vol = vol * np.sqrt(periods_per_year)
+++            df[f"{prefix}_pct_roll_{w}"] = vol
+++
+++    return df
+++
+++
+++# =============================================================================
+++# Rolling realized volatility (Parkinson / RS / GK) — batch
+++# =============================================================================
+++
+++def add_rolling_parkinson(
+++    df: pd.DataFrame,
+++    *,
+++    high_col: str = "high",
+++    low_col: str = "low",
+++    window: int = 20,
+++    annualize: bool = True,
+++    periods_per_year: int = 252,
+++    out_col: str | None = None,
+++) -> pd.DataFrame:
+++    if out_col is None:
+++        out_col = f"vol_parkinson_roll_{window}"
+++    hl2 = (np.log(df[high_col] / df[low_col])) ** 2
+++    base = (1.0 / (4.0 * np.log(2.0))) * hl2
+++    vol = base.rolling(window, min_periods=window).mean().pow(0.5)
+++    if annualize:
+++        vol = vol * np.sqrt(periods_per_year)
+++    df[out_col] = vol
+++    return df
+++
+++
+++def add_rolling_rogers_satchell(
+++    df: pd.DataFrame,
+++    *,
+++    open_col: str = "open",
+++    high_col: str = "high",
+++    low_col: str = "low",
+++    close_col: str = "close",
+++    window: int = 20,
+++    annualize: bool = True,
+++    periods_per_year: int = 252,
+++    out_col: str | None = None,
+++) -> pd.DataFrame:
+++    if out_col is None:
+++        out_col = f"vol_rs_roll_{window}"
+++    term = (
+++        np.log(df[high_col] / df[close_col]) * np.log(df[high_col] / df[open_col])
+++        + np.log(df[low_col] / df[close_col]) * np.log(df[low_col] / df[open_col])
+++    ).clip(lower=0)
+++    vol = term.rolling(window, min_periods=window).mean().pow(0.5)
+++    if annualize:
+++        vol = vol * np.sqrt(periods_per_year)
+++    df[out_col] = vol
+++    return df
+++
+++
+++def add_rolling_garman_klass(
+++    df: pd.DataFrame,
+++    *,
+++    open_col: str = "open",
+++    high_col: str = "high",
+++    low_col: str = "low",
+++    close_col: str = "close",
+++    window: int = 20,
+++    annualize: bool = True,
+++    periods_per_year: int = 252,
+++    out_col: str | None = None,
+++) -> pd.DataFrame:
+++    if out_col is None:
+++        out_col = f"vol_gk_roll_{window}"
+++    term1 = 0.5 * (np.log(df[high_col] / df[low_col])) ** 2
+++    term2 = (2 * np.log(2) - 1) * (np.log(df[close_col] / df[open_col])) ** 2
+++    inner = term1 - term2
+++    mean_inner = inner.rolling(window, min_periods=window).mean()
+++    vol = (mean_inner.clip(lower=0)).pow(0.5)
+++    if annualize:
+++        vol = vol * np.sqrt(periods_per_year)
+++    df[out_col] = vol
+++    return df
+++
+++
+++def add_rolling_realized_batch(
+++    df: pd.DataFrame,
+++    *,
+++    windows: Sequence[int] = (20, 63, 126),
+++    which: Iterable[Literal["parkinson", "rs", "gk"]] = ("parkinson", "rs", "gk"),
+++    annualize: bool = True,
+++    periods_per_year: int = 252,
+++    open_col: str = "open",
+++    high_col: str = "high",
+++    low_col: str = "low",
+++    close_col: str = "close",
+++) -> pd.DataFrame:
+++    """
+++    Batch helper for rolling realized-vol estimators across many windows.
+++    """
+++    for w in windows:
+++        if "parkinson" in which:
+++            add_rolling_parkinson(
+++                df, high_col=high_col, low_col=low_col,
+++                window=w, annualize=annualize, periods_per_year=periods_per_year,
+++            )
+++        if "rs" in which:
+++            add_rolling_rogers_satchell(
+++                df, open_col=open_col, high_col=high_col, low_col=low_col, close_col=close_col,
+++                window=w, annualize=annualize, periods_per_year=periods_per_year,
+++            )
+++        if "gk" in which:
+++            add_rolling_garman_klass(
+++                df, open_col=open_col, high_col=high_col, low_col=low_col, close_col=close_col,
+++                window=w, annualize=annualize, periods_per_year=periods_per_year,
+++            )
+++    return df
+++
+++
+++# =============================================================================
+++# One-call orchestrator (optional convenience)
+++# =============================================================================
+++
+++def add_volatility_features(
+++    df: pd.DataFrame,
+++    *,
+++    # single-bar toggles
+++    do_atr: bool = True,
+++    do_parkinson: bool = True,
+++    do_rs: bool = True,
+++    do_gk: bool = True,
+++    atr_period: int = 14,
+++
+++    # rolling returns vol
+++    ret_windows: Sequence[int] = (20, 63, 126),
+++    ret_types: Literal["log", "pct", "both"] = "both",
+++    ret_annualize: bool = True,
+++    ret_periods_per_year: int = 252,
+++    ret_ddof: int = 0,
+++    ret_prefix: str = "vol",
+++
+++    # rolling realized vol
+++    rv_windows: Sequence[int] = (20, 63, 126),
+++    rv_which: Iterable[Literal["parkinson", "rs", "gk"]] = ("parkinson", "rs", "gk"),
+++    rv_annualize: bool = True,
+++    rv_periods_per_year: int = 252,
+++
+++    # column names
+++    open_col: str = "open",
+++    high_col: str = "high",
+++    low_col: str = "low",
+++    close_col: str = "close",
+++) -> pd.DataFrame:
+++    """
+++    Add single-bar and rolling volatility features in one call.
+++    """
+++    if do_parkinson:
+++        add_parkinson_vol(df, high_col=high_col, low_col=low_col)
+++    if do_rs:
+++        add_rogers_satchell_vol(df, open_col=open_col, high_col=high_col, low_col=low_col, close_col=close_col)
+++    if do_gk:
+++        add_garman_klass_vol(df, open_col=open_col, high_col=high_col, low_col=low_col, close_col=close_col)
+++    if do_atr:
+++        add_atr(df, period=atr_period, high_col=high_col, low_col=low_col, close_col=close_col)
+++
+++    add_rolling_vol_from_returns_batch(
+++        df,
+++        close_col=close_col,
+++        windows=ret_windows,
+++        types=ret_types,
+++        annualize=ret_annualize,
+++        periods_per_year=ret_periods_per_year,
+++        ddof=ret_ddof,
+++        prefix=ret_prefix,
+++    )
+++
+++    add_rolling_realized_batch(
+++        df,
+++        windows=rv_windows,
+++        which=rv_which,
+++        annualize=rv_annualize,
+++        periods_per_year=rv_periods_per_year,
+++        open_col=open_col, high_col=high_col, low_col=low_col, close_col=close_col,
+++    )
+++
++     return df
++diff --git a/src/ta_lab2/regimes/run_btc_pipeline.py b/src/ta_lab2/regimes/run_btc_pipeline.py
++index e620e67..dceb8d2 100644
++--- a/src/ta_lab2/regimes/run_btc_pipeline.py
+++++ b/src/ta_lab2/regimes/run_btc_pipeline.py
++@@ -1,56 +1,36 @@
++-@@
++--# ---- load your CSV ---------------------------------------------------------
++--csv_path = r"C:/Users/asafi/Downloads/ta_lab2/Bitcoin_01_1_2016-10_26_2025_historical_data_coinmarketcap.csv"
++--df2 = pd.read_csv(csv_path)
++--# Normalize headers to stable names
++--df2.columns = _clean_headers(df2.columns)
++--...   # (rest of pipeline at import time)
++-+from pathlib import Path
++-+import pandas as pd
++-+import logging
++-+
++-+log = logging.getLogger(__name__)
++-+
++-+def run_btc_pipeline(csv_path: str | Path, out_dir: str | Path, **kwargs) -> dict:
++-+    """
++-+    Run the BTC pipeline.
++-+    Parameters
++-+    ----------
++-+    csv_path : path to source CSV
++-+    out_dir  : output directory for artifacts (parquet/csv)
++-+    kwargs   : optional tuning params (ema windows, resample rules, etc.)
++-+    Returns
++-+    -------
++-+    dict with key outputs, e.g. file paths or small result stats
++-+    """
++-+    csv_path = Path(csv_path)
++-+    out_dir = Path(out_dir)
++-+    out_dir.mkdir(parents=True, exist_ok=True)
++-+
++-+    if not csv_path.exists():
++-+        raise FileNotFoundError(f"Input CSV not found: {csv_path}")
++-+
++-+    log.info("Loading data from %s", csv_path)
++-+    df2 = pd.read_csv(csv_path)
++-+    df2.columns = _clean_headers(df2.columns)  # your existing helper
++-+
++-+    # ... your existing transforms/features/resampling/regimes here ...
++-+    # write outputs to out_dir
++-+    # e.g., (keep your current filenames, just write relative to out_dir)
++-+    # df_daily.to_parquet(out_dir / "daily_en.parquet")
++-+    # df_weekly.to_parquet(out_dir / "weekly_en.parquet")
++-+    # stats.to_csv(out_dir / "regime_stats.csv", index=False)
++-+
++-+    return {
++-+        "input": str(csv_path),
++-+        "out_dir": str(out_dir),
++-+        # "n_rows": len(df2),
++-+        # "artifacts": [str(out_dir / "daily_en.parquet"), ...]
++-+    }
++-+
++-+if __name__ == "__main__":
++-+    # Local manual run (kept for convenience)
++-+    DEFAULT_ROOT = Path(__file__).resolve().parents[3]
++-+    csv = DEFAULT_ROOT / "data" / "Bitcoin_01_1_2016-10_26_2025_historical_data_coinmarketcap.csv"
++-+    out_ = DEFAULT_ROOT / "out"
++-+    run_btc_pipeline(csv_path=csv, out_dir=out_)
+++from __future__ import annotations
+++from pathlib import Path
+++import pandas as pd
+++
+++def run_btc_pipeline(
+++    csv_path: str | Path,
+++    out_dir: str | Path,
+++    ema_windows: list[int] | None = None,
+++    resample: dict | None = None,
+++):
+++    """
+++    Orchestrate the BTC pipeline:
+++      1) load CSV (from csv_path)
+++      2) compute features / regimes (call your existing helpers)
+++      3) write outputs to out_dir
+++    """
+++    csv_path = Path(csv_path)
+++    out_dir = Path(out_dir)
+++    out_dir.mkdir(parents=True, exist_ok=True)
+++
+++    # ---- 1) Load data (NO hard-coded paths) ----
+++    df = pd.read_csv(csv_path)
+++
+++    # TODO: call your existing feature/resample/regime functions here, e.g.:
+++    # df = add_base_features(df, ema_windows=ema_windows, resample=resample)
+++    # regimes = compute_regimes(df)
+++    # Save outputs:
+++    # df.to_parquet(out_dir / "daily_en.parquet")
+++    # regimes.to_parquet(out_dir / "daily_regimes.parquet")
+++
+++    # For now just return a tiny status so CLI works:
+++    return {"rows": len(df), "out_dir": str(out_dir)}
+++
+++if __name__ == "__main__":
+++    # Optional: ad-hoc local test; never runs during import.
+++    raise SystemExit("Use the CLI or call run_btc_pipeline() from code.")
+diff --git a/pyproject.toml b/pyproject.toml
+index 9a6a43d..80c8849 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -1,21 +1,37 @@
+- [project]
+- name = "ta_lab2"
+- version = "0.1.0"
+- requires-python = ">=3.10"
+- dependencies = [
+--    # your runtime deps here
+-+    "pandas",
+-+    "pyyaml",
+- ]
+- 
+-+[project.optional-dependencies]
+-+dev = [
+-+    "pytest",
+-+    "mypy",
+-+    "ruff",
+-+    "pytest-benchmark",
+-+    "hypothesis",
+-+]
+-+
+-+[project.scripts]
+-+ta-lab2 = "ta_lab2.cli:main"
++[build-system]
++requires = ["setuptools>=68", "wheel"]
++build-backend = "setuptools.build_meta"
++
++[project]
++name = "ta_lab2"
++version = "0.1.0"
++description = "Technical analysis & regime-detection toolkit"
++readme = "README.md"
++requires-python = ">=3.10"
++dependencies = [
++  "pandas",
++  "pyyaml",
++]
++
++[project.optional-dependencies]
++dev = [
++  "pytest",
++  "mypy",
++  "ruff",
++  "pytest-benchmark",
++  "hypothesis",
++]
++
++[project.scripts]
++ta-lab2 = "ta_lab2.cli:main"
++
++# Tell setuptools to find packages under src/
++[tool.setuptools.packages.find]
++where = ["src"]
++
++# Also install the top-level config.py module (so `from config import ...` works)
++[tool.setuptools]
++py-modules = ["config"]
++
++[project.optional-dependencies]
++viz = ["matplotlib>=3.6"]
+\ No newline at end of file
+diff --git a/src/ta_lab2/__init__.py b/src/ta_lab2/__init__.py
+index 7840e43..b09a473 100644
+--- a/src/ta_lab2/__init__.py
++++ b/src/ta_lab2/__init__.py
+@@ -1,5 +1,43 @@
+--# current content
+-+from .regimes.run_btc_pipeline import run_btc_pipeline
+-+
+-+__all__ = ["run_btc_pipeline"]
+-+__version__ = "0.1.0"
++# src/ta_lab2/__init__.py
++"""
++ta_lab2
++--------
++
++Technical Analysis and Regime Detection Lab
++Modular feature extraction, volatility analytics, and visualization toolkit.
++"""
++
++from .regimes.run_btc_pipeline import run_btc_pipeline
++
++# === Feature Modules ===
++from .features.calendar import (
++    expand_datetime_features_inplace,
++    expand_multiple_timestamps,
++)
++from .features.trend import compute_trend_labels
++from .features.segments import build_flip_segments
++
++# === Visualization ===
++from .viz.all_plots import (
++    plot_ema_with_trend,
++    plot_consolidated_emas_like,
++    plot_realized_vol,
++)
++
++__version__ = "0.1.0"
++
++__all__ = [
++    # Core pipeline
++    "run_btc_pipeline",
++
++    # Features
++    "expand_datetime_features_inplace",
++    "expand_multiple_timestamps",
++    "compute_trend_labels",
++    "build_flip_segments",
++
++    # Visualization
++    "plot_ema_with_trend",
++    "plot_consolidated_emas_like",
++    "plot_realized_vol",
++]
+diff --git a/src/ta_lab2/cli.py b/src/ta_lab2/cli.py
+index 3131e8d..1b8350c 100644
+--- a/src/ta_lab2/cli.py
++++ b/src/ta_lab2/cli.py
+@@ -1,27 +1,39 @@
+ from __future__ import annotations
+ import argparse
+ from pathlib import Path
+-from .config import load_settings, project_root
+-from .regimes.run_btc_pipeline import run_btc_pipeline
++
++# Import from root-level config.py, not from ta_lab2.config
++from config import load_settings, project_root
++from ta_lab2.regimes.run_btc_pipeline import run_btc_pipeline
++
+ 
+ def main(argv: list[str] | None = None) -> int:
+     ap = argparse.ArgumentParser(prog="ta-lab2", description="ta_lab2 CLI")
+-    ap.add_argument("--config", "-c", default="configs/default.yaml",
+-                    help="Path to YAML config relative to project root")
++    ap.add_argument(
++        "--config", "-c",
++        default="config/default.yaml",
++        help="Path to YAML config relative to project root (default: config/default.yaml)"
++    )
+     args = ap.parse_args(argv)
+ 
+-    root = project_root()
+-    cfg_path = (root / args.config).resolve()
+-    settings = load_settings(cfg_path)
++    # Load settings from YAML via the root-level config.py
++    settings = load_settings(args.config)
+ 
+-    csv = (root / settings.data_csv).resolve()
+-    out_dir = (root / settings.out_dir).resolve()
++    # Resolve absolute paths for input and output
++    csv = Path(settings.data_csv)
++    out_dir = Path(settings.out_dir)
++
++    # Run main pipeline
++    result = run_btc_pipeline(
++        csv_path=csv,
++        out_dir=out_dir,
++        ema_windows=settings.ema_windows,
++        resample=settings.resample
++    )
+ 
+-    result = run_btc_pipeline(csv_path=csv, out_dir=out_dir,
+-                              ema_windows=settings.ema_windows,
+-                              resample=settings.resample)
+     print("Pipeline complete:", result)
+     return 0
+ 
++
+ if __name__ == "__main__":
+     raise SystemExit(main())
+diff --git a/src/ta_lab2/config.py b/src/ta_lab2/config.py
+deleted file mode 100644
+index b1797bd..0000000
+--- a/src/ta_lab2/config.py
++++ /dev/null
+@@ -1,24 +0,0 @@
+-from __future__ import annotations
+-from dataclasses import dataclass, field
+-from pathlib import Path
+-import yaml
+-
+-@dataclass
+-class Settings:
+-    data_csv: str
+-    out_dir: str = "out"
+-    ema_windows: list[int] = field(default_factory=lambda: [21, 50, 100])
+-    resample: dict = field(default_factory=lambda: {"weekly": "W-SUN", "monthly": "MS"})
+-
+-def load_settings(path: str | Path) -> Settings:
+-    p = Path(path)
+-    data = yaml.safe_load(p.read_text(encoding="utf-8"))
+-    return Settings(**data)
+-
+-def project_root(start: str | Path | None = None) -> Path:
+-    # walk up until we find pyproject.toml
+-    cur = Path(start or __file__).resolve()
+-    for ancestor in [cur, *cur.parents]:
+-        if (ancestor / "pyproject.toml").exists():
+-            return ancestor
+-    return cur  # fallback
+diff --git a/src/ta_lab2/config/default.yaml b/src/ta_lab2/config/default.yaml
+deleted file mode 100644
+index 4da5e13..0000000
+--- a/src/ta_lab2/config/default.yaml
++++ /dev/null
+@@ -1,9 +0,0 @@
+-# Paths are relative to the project root (where pyproject.toml lives)
+-data_csv: data/Bitcoin_01_1_2016-10_26_2025_historical_data_coinmarketcap.csv
+-out_dir: out
+-
+-# Pipeline parameters (example—extend as your code supports)
+-ema_windows: [21, 50, 100]
+-resample:
+-  weekly: "W-SUN"
+-  monthly: "MS"
+\ No newline at end of file
+diff --git a/src/ta_lab2/features/__init__.py b/src/ta_lab2/features/__init__.py
+index 9fa317e..b169b79 100644
+--- a/src/ta_lab2/features/__init__.py
++++ b/src/ta_lab2/features/__init__.py
+@@ -2,3 +2,23 @@ from .calendar import expand_datetime_features_inplace
+ from .ema import add_ema_columns, add_ema_d1, add_ema_d2
+ from .returns import add_returns
+ from .vol import add_atr
++
++# New imports for technical indicators
++from .indicators import rsi, macd, stoch_kd, bollinger, atr, adx, obv, mfi
++
++# New imports for correlation-based features
++from .correlation import acf, pacf_yw, rolling_autocorr, xcorr
++
++
++__all__ = [
++    # Core features
++    "expand_datetime_features_inplace",
++    "add_ema_columns", "add_ema_d1", "add_ema_d2",
++    "add_returns", "add_atr",
++
++    # Technical indicators
++    "rsi", "macd", "stoch_kd", "bollinger", "atr", "adx", "obv", "mfi",
++
++    # Correlation utilities
++    "acf", "pacf_yw", "rolling_autocorr", "xcorr",
++]
+diff --git a/src/ta_lab2/features/calendar.py b/src/ta_lab2/features/calendar.py
+index 350c794..6bdaf81 100644
+--- a/src/ta_lab2/features/calendar.py
++++ b/src/ta_lab2/features/calendar.py
+@@ -1,4 +1,5 @@
+-
++# src/ta_lab2/features/calendar.py
++from __future__ import annotations
+ import numpy as np
+ import pandas as pd
+ 
+@@ -8,6 +9,22 @@ try:
+ except Exception:
+     _HAS_ASTRONOMY = False
+ 
++
++def _session_bucket(hour: int) -> str:
++    """
++    Example bucketizer for trading-style sessions (UTC-based):
++    - 01-08: 'pre'
++    - 09-20: 'regular'
++    - 21-24/00: 'after'
++    Tweak to your venue/timezone as needed.
++    """
++    if 1 <= hour <= 8:
++        return "pre"
++    if 9 <= hour <= 20:
++        return "regular"
++    return "after"
++
++
+ def expand_datetime_features_inplace(
+     df: pd.DataFrame,
+     base_timestamp_col: str,
+@@ -20,7 +37,10 @@ def expand_datetime_features_inplace(
+     if base_timestamp_col not in df.columns:
+         print(f"Warning: Column '{base_timestamp_col}' not found. Skipping.")
+         return
++
+     dt = pd.to_datetime(df[base_timestamp_col], errors="coerce")
++
++    # Normalize to UTC for deterministic astronomy calcs
+     if getattr(dt.dt, "tz", None) is not None:
+         if to_utc:
+             dt = dt.dt.tz_convert("UTC")
+@@ -29,34 +49,83 @@ def expand_datetime_features_inplace(
+             dt = dt.dt.tz_localize("UTC", nonexistent="NaT", ambiguous="NaT")
+         except Exception:
+             dt = dt.dt.tz_localize("UTC")
++
+     if prefix is None:
+         prefix = base_timestamp_col
+     valid = dt.notna()
+ 
+-    # Day-of-week numbering
++    # US vs ISO weekday numbering
+     if us_week_start_sunday:
+-        dow_num = ((dt.dt.dayofweek + 1) % 7 + 1).astype("Int64")   # Sun=1..Sat=7
++        # Sun=1..Sat=7
++        dow_num = ((dt.dt.dayofweek + 1) % 7 + 1).astype("Int64")
++        week_of_year = dt.dt.isocalendar().week.astype("Int64")  # still ISO for comparability
++        iso_year = dt.dt.isocalendar().year.astype("Int64")
+     else:
+-        dow_num = dt.dt.isocalendar().day.astype("Int64")           # Mon=1..Sun=7
++        # Mon=1..Sun=7 (ISO)
++        dow_num = dt.dt.isocalendar().day.astype("Int64")
++        week_of_year = dt.dt.isocalendar().week.astype("Int64")
++        iso_year = dt.dt.isocalendar().year.astype("Int64")
+ 
++    # Unix seconds
+     unix_ns = dt.astype("int64")
+     unix_ns = pd.Series(unix_ns, index=df.index).where(valid)
+     unix_s  = (unix_ns // 10**9).astype("Int64")
+ 
++    # Days in month and nth day of month
++    # (via month boundaries difference)
++    month_start = dt.dt.to_period("M").dt.start_time
++    month_end   = dt.dt.to_period("M").dt.end_time
++    # careful: end_time is end-of-month at 23:59:59; use normalize for date arith
++    days_in_month = (month_end.dt.normalize() - month_start.dt.normalize()).dt.days.add(1).astype("Int64")
++    nth_day_of_month = dt.dt.day.astype("Int64")
++
++    # Week-of-month (1..5): 1st week = week number of first day baseline
++    wom = (
++        (dt.dt.day.add((dt.dt.to_period("M").dt.start_time.dt.dayofweek + 1) % 7) + 6) // 7
++    ).astype("Int64")
++
+     out = {
+         f"{prefix}_date": dt.dt.date,
+         f"{prefix}_time": dt.dt.time,
+-        f"{prefix}_year": dt.dt.year.astype("Int64"),
+-        f"{prefix}_month": dt.dt.month.astype("Int64"),
+-        f"{prefix}_day": dt.dt.day.astype("Int64"),
++
++        f"{prefix}_year":   dt.dt.year.astype("Int64"),
++        f"{prefix}_month":  dt.dt.month.astype("Int64"),
++        f"{prefix}_day":    dt.dt.day.astype("Int64"),
++
+         f"{prefix}_day_name": dt.dt.day_name(),
+-        f"{prefix}_day_of_week_num": dow_num,
+-        f"{prefix}_hour": dt.dt.hour.astype("Int64"),
++        f"{prefix}_day_of_week_num": dow_num,         # Sun=1..Sat=7 or Mon=1..Sun=7 (ISO)
++        f"{prefix}_iso_year": iso_year,               # ISO year (useful around New Year)
++        f"{prefix}_week_of_year": week_of_year,       # ISO weeks 1..53
++        f"{prefix}_week_of_month": wom,               # 1..5 (approx, aligns well in practice)
++
++        f"{prefix}_hour":   dt.dt.hour.astype("Int64"),
+         f"{prefix}_minute": dt.dt.minute.astype("Int64"),
+         f"{prefix}_second": dt.dt.second.astype("Int64"),
++
+         f"{prefix}_unix": unix_s,
+-        f"{prefix}_quarter": dt.dt.quarter.astype("Int64"),
++
++        f"{prefix}_quarter":   dt.dt.quarter.astype("Int64"),
+         f"{prefix}_year_half": ((dt.dt.quarter - 1) // 2 + 1).astype("Int64"),
++
++        # Boundary flags
++        f"{prefix}_is_month_start": dt.dt.is_month_start.astype("Int8"),
++        f"{prefix}_is_month_end":   dt.dt.is_month_end.astype("Int8"),
++        f"{prefix}_is_quarter_start": dt.dt.is_quarter_start.astype("Int8"),
++        f"{prefix}_is_quarter_end":   dt.dt.is_quarter_end.astype("Int8"),
++        f"{prefix}_is_year_start":    dt.dt.is_year_start.astype("Int8"),
++        f"{prefix}_is_year_end":      dt.dt.is_year_end.astype("Int8"),
++
++        # Day-of-year and business-day flag (Mon–Fri, not holiday-aware)
++        f"{prefix}_day_of_year": dt.dt.dayofyear.astype("Int64"),
++        f"{prefix}_is_business_day": pd.Series(
++            np.is_busday(dt.dt.date.astype("datetime64[D]"), weekmask='Mon Tue Wed Thu Fri'),
++            index=df.index
++        ).astype("Int8"),
++
++        # Session bucket (example; adjust to your venue)
++        f"{prefix}_session": dt.dt.hour.map(_session_bucket),
++        f"{prefix}_days_in_month": days_in_month,
++        f"{prefix}_nth_day_of_month": nth_day_of_month,
+     }
+ 
+     # Seasons (exact if astronomy present; else approx)
+@@ -72,13 +141,15 @@ def expand_datetime_features_inplace(
+         )
+ 
+     if _HAS_ASTRONOMY:
+-        cache = {}
++        cache: dict[int, dict[str, object]] = {}
+         def _season_exact(ts: pd.Timestamp):
+             if pd.isna(ts): return np.nan
+             y = ts.year
+-            if y not in cache:
+-                cache[y] = _season_boundaries(y)
+-            b = cache[y]; d = ts.date()
++            b = cache.get(y)
++            if b is None:
++                b = _season_boundaries(y)
++                cache[y] = b
++            d = ts.date()
+             if b["spring"] <= d < b["summer"]: return "Spring"
+             if b["summer"] <= d < b["fall"]:   return "Summer"
+             if b["fall"]   <= d < b["winter"]: return "Fall"
+@@ -127,3 +198,23 @@ def expand_datetime_features_inplace(
+         out[f"{prefix}_moon_illum_frac"] = moon_deg.apply(_illum)
+ 
+     df[list(out.keys())] = pd.DataFrame(out, index=df.index)
++
++
++def expand_multiple_timestamps(
++    df: pd.DataFrame,
++    cols: list[str],
++    *,
++    to_utc: bool = True,
++    add_moon: bool = True,
++    us_week_start_sunday: bool = True
++) -> None:
++    """
++    Convenience wrapper to expand several timestamp columns at once,
++    using each column name as its own prefix.
++    """
++    for c in cols:
++        expand_datetime_features_inplace(
++            df, base_timestamp_col=c, prefix=c,
++            to_utc=to_utc, add_moon=add_moon,
++            us_week_start_sunday=us_week_start_sunday
++        )
+diff --git a/src/ta_lab2/features/correlation.py b/src/ta_lab2/features/correlation.py
+new file mode 100644
+index 0000000..bd96500
+--- /dev/null
++++ b/src/ta_lab2/features/correlation.py
+@@ -0,0 +1,63 @@
++from __future__ import annotations
++import numpy as np
++import pandas as pd
++
++def acf(x: pd.Series, nlags: int = 40, demean: bool = True) -> pd.Series:
++    s = pd.Series(x).dropna().astype(float)
++    if len(s) == 0:
++        return pd.Series([np.nan]*(nlags+1), index=range(nlags+1), name="acf")
++    if demean:
++        s = s - s.mean()
++    var = (s**2).sum()
++    ac = [1.0]
++    for k in range(1, nlags + 1):
++        cov = (s.iloc[k:] * s.iloc[:-k]).sum()
++        ac.append(float(cov / var) if var != 0 else np.nan)
++    return pd.Series(ac, index=range(0, nlags + 1), name="acf")
++
++def pacf_yw(x: pd.Series, nlags: int = 20) -> pd.Series:
++    s = pd.Series(x).dropna().astype(float)
++    if len(s) == 0:
++        return pd.Series([np.nan]*(nlags+1), index=range(nlags+1), name="pacf")
++    s = s - s.mean()
++    # autocov sequence
++    gamma = np.array([
++        (s[:len(s)-k] @ s[k:]) / len(s) if k > 0 else (s @ s) / len(s)
++        for k in range(0, nlags+1)
++    ])
++    pac = np.zeros(nlags+1)
++    pac[0] = 1.0
++    phi = np.zeros((nlags+1, nlags+1))
++    var = gamma[0]
++    for k in range(1, nlags+1):
++        num = gamma[k] - np.sum(phi[k-1,1:k] * gamma[1:k][::-1])
++        den = var - np.sum(phi[k-1,1:k] * gamma[1:k])
++        phi[k,k] = num / den if den != 0 else np.nan
++        for j in range(1, k):
++            phi[k,j] = phi[k-1,j] - phi[k,k]*phi[k-1,k-j]
++        pac[k] = phi[k,k]
++    return pd.Series(pac, index=range(0, nlags+1), name="pacf")
++
++def rolling_autocorr(s: pd.Series, lag: int = 1, window: int = 100) -> pd.Series:
++    return s.rolling(window).corr(s.shift(lag)).rename(f"roll_ac_{lag}_{window}")
++
++def xcorr(a: pd.Series, b: pd.Series, max_lag: int = 20, demean: bool = True) -> pd.Series:
++    A = pd.Series(a).astype(float)
++    B = pd.Series(b).astype(float)
++    A, B = A.align(B, join="inner")
++    if len(A) == 0:
++        return pd.Series([np.nan]*(2*max_lag+1), index=range(-max_lag, max_lag+1), name="xcorr")
++    if demean:
++        A, B = A - A.mean(), B - B.mean()
++    var = np.sqrt((A**2).sum() * (B**2).sum())
++    vals = []
++    lags = range(-max_lag, max_lag + 1)
++    for k in lags:
++        if k < 0:
++            cov = (A[:k] * B[-k:]).sum()
++        elif k > 0:
++            cov = (A[k:] * B[:-k]).sum()
++        else:
++            cov = (A * B).sum()
++        vals.append(float(cov / var) if var != 0 else np.nan)
++    return pd.Series(vals, index=list(lags), name="xcorr")
+diff --git a/src/ta_lab2/features/indicators.py b/src/ta_lab2/features/indicators.py
+new file mode 100644
+index 0000000..a71a0a4
+--- /dev/null
++++ b/src/ta_lab2/features/indicators.py
+@@ -0,0 +1,94 @@
++from __future__ import annotations
++import numpy as np
++import pandas as pd
++
++# ---- helpers ----
++def _ema(s: pd.Series, span: int) -> pd.Series:
++    return s.ewm(span=span, adjust=False).mean()
++
++def _sma(s: pd.Series, window: int) -> pd.Series:
++    return s.rolling(window, min_periods=window).mean()
++
++def _tr(high: pd.Series, low: pd.Series, close: pd.Series) -> pd.Series:
++    prev_close = close.shift(1)
++    return pd.concat([
++        (high - low).abs(),
++        (high - prev_close).abs(),
++        (low - prev_close).abs()
++    ], axis=1).max(axis=1)
++
++# ---- indicators ----
++def rsi(close: pd.Series, window: int = 14) -> pd.Series:
++    delta = close.diff()
++    gain = delta.clip(lower=0)
++    loss = -delta.clip(upper=0)
++    avg_gain = gain.ewm(alpha=1/window, adjust=False).mean()
++    avg_loss = loss.ewm(alpha=1/window, adjust=False).mean()
++    rs = avg_gain / (avg_loss.replace(0, np.nan))
++    out = 100 - (100 / (1 + rs))
++    return out.rename(f"rsi_{window}")
++
++def macd(close: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9) -> pd.DataFrame:
++    ema_fast = _ema(close, fast)
++    ema_slow = _ema(close, slow)
++    macd_line = ema_fast - ema_slow
++    signal_line = _ema(macd_line, signal)
++    hist = macd_line - signal_line
++    return pd.DataFrame({
++        f"macd_{fast}_{slow}": macd_line,
++        f"macd_signal_{signal}": signal_line,
++        f"macd_hist_{fast}_{slow}_{signal}": hist
++    })
++
++def stoch_kd(high: pd.Series, low: pd.Series, close: pd.Series, k: int = 14, d: int = 3) -> pd.DataFrame:
++    lowest = low.rolling(k, min_periods=k).min()
++    highest = high.rolling(k, min_periods=k).max()
++    k_line = 100 * (close - lowest) / (highest - lowest)
++    d_line = k_line.rolling(d, min_periods=d).mean()
++    return pd.DataFrame({f"stoch_k_{k}": k_line, f"stoch_d_{d}": d_line})
++
++def bollinger(close: pd.Series, window: int = 20, n_sigma: float = 2.0) -> pd.DataFrame:
++    ma = _sma(close, window)
++    std = close.rolling(window, min_periods=window).std()
++    upper = ma + n_sigma * std
++    lower = ma - n_sigma * std
++    bw = (upper - lower) / ma
++    return pd.DataFrame({
++        f"bb_ma_{window}": ma,
++        f"bb_up_{window}_{n_sigma}": upper,
++        f"bb_lo_{window}_{n_sigma}": lower,
++        f"bb_width_{window}": bw
++    })
++
++def atr(high: pd.Series, low: pd.Series, close: pd.Series, window: int = 14) -> pd.Series:
++    tr = _tr(high, low, close)
++    out = tr.rolling(window, min_periods=window).mean()
++    return out.rename(f"atr_{window}")
++
++def adx(high: pd.Series, low: pd.Series, close: pd.Series, window: int = 14) -> pd.Series:
++    up = high.diff()
++    dn = -low.diff()
++    plus_dm  = np.where((up > dn) and isinstance(up, pd.Series) and (up > 0), up, 0.0)
++    minus_dm = np.where((dn > up) and isinstance(dn, pd.Series) and (dn > 0), dn, 0.0)
++    tr = _tr(high, low, close)
++    atr_ = tr.rolling(window, min_periods=window).mean()
++    plus_di  = 100 * pd.Series(plus_dm, index=high.index).rolling(window, min_periods=window).sum() / atr_
++    minus_di = 100 * pd.Series(minus_dm, index=high.index).rolling(window, min_periods=window).sum() / atr_
++    dx = ((plus_di - minus_di).abs() / (plus_di + minus_di)) * 100
++    adx_ = dx.rolling(window, min_periods=window).mean()
++    return adx_.rename(f"adx_{window}")
++
++def obv(close: pd.Series, volume: pd.Series) -> pd.Series:
++    direction = np.sign(close.diff().fillna(0))
++    return (direction * volume).fillna(0).cumsum().rename("obv")
++
++def mfi(high: pd.Series, low: pd.Series, close: pd.Series, volume: pd.Series, window: int = 14) -> pd.Series:
++    tp = (high + low + close) / 3.0
++    raw = tp * volume
++    pos = raw.where(tp.diff() > 0, 0.0)
++    neg = raw.where(tp.diff() < 0, 0.0)
++    mr = pos.rolling(window, min_periods=window).sum() / (
++        neg.rolling(window, min_periods=window).sum().replace(0, np.nan)
++    )
++    out = 100 - (100 / (1 + mr))
++    return out.rename(f"mfi_{window}")
+diff --git a/src/ta_lab2/features/vol.py b/src/ta_lab2/features/vol.py
+index 64a9858..945ce28 100644
+--- a/src/ta_lab2/features/vol.py
++++ b/src/ta_lab2/features/vol.py
+@@ -1,15 +1,264 @@
+-
+-import pandas as pd
++from __future__ import annotations
+ import numpy as np
++import pandas as pd
++from typing import Sequence, Iterable, Literal
++
++# =========================================================
++# ---- Core Volatility Estimators (single-bar + rolling) ---
++# =========================================================
++
++def add_parkinson_vol(
++    df: pd.DataFrame,
++    high_col: str = "high",
++    low_col: str = "low",
++    windows: Sequence[int] = (20, 63, 126),
++    annualize: bool = True,
++    periods_per_year: int = 252,
++) -> pd.DataFrame:
++    """Parkinson (1980) range-based volatility estimator."""
++    high, low = df[high_col].astype(float), df[low_col].astype(float)
++    coef = 1.0 / (4.0 * np.log(2.0))
++    hl = (np.log(high / low)) ** 2
++    for w in windows:
++        vol = np.sqrt(coef * hl.rolling(w, min_periods=w).mean())
++        if annualize:
++            vol *= np.sqrt(periods_per_year)
++        df[f"vol_parkinson_{w}"] = vol
++    return df
++
++
++def add_garman_klass_vol(
++    df: pd.DataFrame,
++    open_col: str = "open",
++    high_col: str = "high",
++    low_col: str = "low",
++    close_col: str = "close",
++    windows: Sequence[int] = (20, 63, 126),
++    annualize: bool = True,
++    periods_per_year: int = 252,
++) -> pd.DataFrame:
++    """Garman–Klass (1980) volatility estimator."""
++    o, h, l, c = [df[k].astype(float) for k in (open_col, high_col, low_col, close_col)]
++    rs = 0.5 * (np.log(h/l))**2 - (2*np.log(2)-1) * (np.log(c/o))**2
++    for w in windows:
++        vol = np.sqrt(rs.rolling(w, min_periods=w).mean())
++        if annualize:
++            vol *= np.sqrt(periods_per_year)
++        df[f"vol_gk_{w}"] = vol
++    return df
+ 
+-def add_atr(df: pd.DataFrame, period: int = 14,
+-            high_col="high", low_col="low", close_col="close"):
+-    high = df[high_col].astype(float)
+-    low  = df[low_col].astype(float)
+-    close = df[close_col].astype(float)
+-    prev_close = close.shift(1)
+-    tr = (high - low).abs()
+-    tr = np.maximum(tr, (high - prev_close).abs())
+-    tr = np.maximum(tr, (low - prev_close).abs())
++
++def add_rogers_satchell_vol(
++    df: pd.DataFrame,
++    open_col: str = "open",
++    high_col: str = "high",
++    low_col: str = "low",
++    close_col: str = "close",
++    windows: Sequence[int] = (20, 63, 126),
++    annualize: bool = True,
++    periods_per_year: int = 252,
++) -> pd.DataFrame:
++    """Rogers–Satchell (1991) volatility estimator."""
++    o, h, l, c = [df[k].astype(float) for k in (open_col, high_col, low_col, close_col)]
++    rs = (np.log(h/c) * np.log(h/o) + np.log(l/c) * np.log(l/o))
++    for w in windows:
++        vol = np.sqrt(rs.rolling(w, min_periods=w).mean())
++        if annualize:
++            vol *= np.sqrt(periods_per_year)
++        df[f"vol_rs_{w}"] = vol
++    return df
++
++
++def add_atr(
++    df: pd.DataFrame,
++    period: int = 14,
++    open_col: str = "open",
++    high_col: str = "high",
++    low_col: str = "low",
++    close_col: str = "close",
++) -> pd.DataFrame:
++    """Average True Range (Wilder)."""
++    h, l, c = df[high_col].astype(float), df[low_col].astype(float), df[close_col].astype(float)
++    prev_close = c.shift(1)
++    tr = (h - l).abs()
++    tr = np.maximum(tr, (h - prev_close).abs())
++    tr = np.maximum(tr, (l - prev_close).abs())
+     df[f"atr_{period}"] = tr.ewm(alpha=1/period, adjust=False).mean()
+     return df
++
++
++def add_logret_stdev_vol(
++    df: pd.DataFrame,
++    logret_cols: Sequence[str] = ("close_log_delta",),
++    windows: Sequence[int] = (20, 63, 126),
++    annualize: bool = True,
++    periods_per_year: int = 252,
++    ddof: int = 0,
++    prefix: str = "vol",
++) -> pd.DataFrame:
++    """Rolling std of log returns."""
++    for name in logret_cols:
++        if name not in df.columns:
++            continue
++        r = df[name].astype(float)
++        for w in windows:
++            vol = r.rolling(w, min_periods=w).std(ddof=ddof)
++            if annualize:
++                vol *= np.sqrt(periods_per_year)
++            df[f"{prefix}_{name}_stdev_{w}"] = vol
++    return df
++
++
++def add_rolling_realized_batch(
++    df: pd.DataFrame,
++    windows: Sequence[int] = (20, 63, 126),
++    which: Iterable[Literal["parkinson", "rs", "gk"]] = ("parkinson", "rs", "gk"),
++    annualize: bool = True,
++    periods_per_year: int = 252,
++    open_col: str = "open",
++    high_col: str = "high",
++    low_col: str = "low",
++    close_col: str = "close",
++) -> pd.DataFrame:
++    """Compute realized vol (Parkinson, RS, GK) across windows."""
++    if "parkinson" in which:
++        add_parkinson_vol(df, high_col=high_col, low_col=low_col, windows=windows,
++                          annualize=annualize, periods_per_year=periods_per_year)
++    if "rs" in which:
++        add_rogers_satchell_vol(df, open_col=open_col, high_col=high_col, low_col=low_col, close_col=close_col,
++                                windows=windows, annualize=annualize, periods_per_year=periods_per_year)
++    if "gk" in which:
++        add_garman_klass_vol(df, open_col=open_col, high_col=high_col, low_col=low_col, close_col=close_col,
++                             windows=windows, annualize=annualize, periods_per_year=periods_per_year)
++    return df
++
++
++# =========================================================
++# -------------- Compatibility Shims ----------------------
++# =========================================================
++
++def add_rolling_vol_from_returns_batch(
++    df: pd.DataFrame,
++    *,
++    # New API
++    close_col: str = "close",
++    windows: Sequence[int] = (20, 63, 126),
++    types: Literal["log", "pct", "both"] = "log",
++    annualize: bool = True,
++    periods_per_year: int = 252,
++    ddof: int = 0,
++    prefix: str = "vol",
++    # Legacy API
++    price_col: str | None = None,
++    modes: Iterable[str] | None = None,
++    direction: str | None = None,
++) -> pd.DataFrame:
++    """Rolling historical volatility (new + legacy API)."""
++    # --- Backward compat mapping ---
++    if price_col is not None:
++        close_col = price_col
++    if modes is not None:
++        modes = tuple(str(m).lower() for m in modes)
++        if "log" in modes and "pct" in modes:
++            types = "both"
++        elif "pct" in modes:
++            types = "pct"
++        else:
++            types = "log"
++
++    px = df[close_col].astype(float)
++    r_log = np.log(px / px.shift(1))
++    r_pct = px.pct_change()
++
++    if types in ("log", "both"):
++        for w in windows:
++            vol = r_log.rolling(w, min_periods=w).std(ddof=ddof)
++            if annualize:
++                vol *= np.sqrt(periods_per_year)
++            df[f"{prefix}_log_roll_{w}"] = vol
++
++    if types in ("pct", "both"):
++        for w in windows:
++            vol = r_pct.rolling(w, min_periods=w).std(ddof=ddof)
++            if annualize:
++                vol *= np.sqrt(periods_per_year)
++            df[f"{prefix}_pct_roll_{w}"] = vol
++
++    return df
++
++
++def add_volatility_features(
++    df: pd.DataFrame,
++    *,
++    # single-bar
++    do_atr: bool = True,
++    do_parkinson: bool = True,
++    do_rs: bool = True,
++    do_gk: bool = True,
++    atr_period: int = 14,
++    # rolling returns vol
++    ret_windows: Sequence[int] = (20, 63, 126),
++    ret_types: Literal["log", "pct", "both"] = "both",
++    ret_annualize: bool = True,
++    ret_periods_per_year: int = 252,
++    ret_ddof: int = 0,
++    ret_prefix: str = "vol",
++    # rolling realized vol
++    rv_windows: Sequence[int] = (20, 63, 126),
++    rv_which: Iterable[Literal["parkinson", "rs", "gk"]] = ("parkinson", "rs", "gk"),
++    rv_annualize: bool = True,
++    rv_periods_per_year: int = 252,
++    # column names
++    open_col: str = "open",
++    high_col: str = "high",
++    low_col: str = "low",
++    close_col: str = "close",
++    # Legacy API
++    rolling_windows: Sequence[int] | None = None,
++    direction: str | None = None,
++) -> pd.DataFrame:
++    """Unified volatility orchestrator with legacy support."""
++    # ---- Backward compatibility ----
++    if rolling_windows is not None:
++        ret_windows = tuple(rolling_windows)
++        rv_windows = tuple(rolling_windows)
++    # (direction accepted but unused; kept for API continuity)
++
++    # ---- Single-bar ----
++    if do_parkinson:
++        add_parkinson_vol(df, high_col=high_col, low_col=low_col, windows=(1,))
++    if do_rs:
++        add_rogers_satchell_vol(df, open_col=open_col, high_col=high_col, low_col=low_col,
++                                close_col=close_col, windows=(1,))
++    if do_gk:
++        add_garman_klass_vol(df, open_col=open_col, high_col=high_col, low_col=low_col,
++                             close_col=close_col, windows=(1,))
++    if do_atr:
++        add_atr(df, period=atr_period, high_col=high_col, low_col=low_col, close_col=close_col)
++
++    # ---- Rolling from returns ----
++    add_rolling_vol_from_returns_batch(
++        df,
++        close_col=close_col,
++        windows=ret_windows,
++        types=ret_types,
++        annualize=ret_annualize,
++        periods_per_year=ret_periods_per_year,
++        ddof=ret_ddof,
++        prefix=ret_prefix,
++    )
++
++    # ---- Rolling realized batch ----
++    add_rolling_realized_batch(
++        df,
++        windows=rv_windows,
++        which=rv_which,
++        annualize=rv_annualize,
++        periods_per_year=rv_periods_per_year,
++        open_col=open_col,
++        high_col=high_col,
++        low_col=low_col,
++        close_col=close_col,
++    )
++
++    return df
+diff --git a/src/ta_lab2/pipelines/btc_pipeline.py b/src/ta_lab2/pipelines/btc_pipeline.py
+index 26e2182..2876637 100644
+--- a/src/ta_lab2/pipelines/btc_pipeline.py
++++ b/src/ta_lab2/pipelines/btc_pipeline.py
+@@ -1,188 +1,161 @@
+-# -*- coding: utf-8 -*-
+-"""
+-Created on Fri Oct 31 16:05:09 2025
+-
+-@author: asafi
+-"""
+-
+-import os, re, argparse
++from __future__ import annotations
+ import pandas as pd
+-import numpy as np
+ 
+-from ta_lab2.resample import bin_by_calendar
+ from ta_lab2.features.calendar import expand_datetime_features_inplace
+-from ta_lab2.features.ema import add_ema_columns, add_ema_d1, add_ema_d2
+-from ta_lab2.features.returns import add_returns
+-from ta_lab2.features.vol import add_atr
+-from ta_lab2.regimes.comovement import build_alignment_frame, sign_agreement, rolling_agreement
+-from ta_lab2.regimes.flips import (
+-    sign_from_series, detect_flips, label_regimes_from_flips,
+-    attach_regimes, regime_stats
++from ta_lab2.features.ema import add_ema_columns, add_ema_d1, add_ema_d2, prepare_ema_helpers
++from ta_lab2.features.returns import b2t_pct_delta, b2t_log_delta
++from ta_lab2.features.vol import (
++    add_volatility_features,            # shim (see vol.py update)
++    add_rolling_vol_from_returns_batch, # shim (see vol.py update)
+ )
+-
+-# -------- utils --------
+-
+-def _clean_headers(cols):
+-    return [re.sub(r"\s+", " ", c.strip().lower()).replace(" ", "_") for c in cols]
+-
+-def _to_num(s):
+-    return pd.to_numeric(
+-        pd.Series(s).astype(str).str.replace(",", "", regex=False).replace({"-": None, "": None}),
+-        errors="coerce"
+-    )
+-
+-def _parse_epoch_series(x: pd.Series) -> pd.Series:
+-    x = pd.to_numeric(x, errors="coerce")
+-    if x.dropna().median() > 10_000_000_000:
+-        return pd.to_datetime(x, unit="ms", utc=True, errors="coerce")
+-    return pd.to_datetime(x, unit="s", utc=True, errors="coerce")
+-
+-def _scal(s):
+-    return s.iloc[0] if hasattr(s, "iloc") else s
+-
+-# -------- IO + cleaning --------
+-
+-def load_clean_csv(csv_path: str) -> pd.DataFrame:
++from ta_lab2.features.indicators import rsi, macd, bollinger  # lightweight stubs
++from ta_lab2.regimes.comovement import (
++    compute_ema_comovement_stats,
++    compute_ema_comovement_hierarchy,
++)
++from ta_lab2.regimes.segments import build_flip_segments  # thin wrapper
++
++
++def _infer_timestamp_col(df: pd.DataFrame, fallback: str = "timestamp") -> str:
++    if fallback in df.columns:
++        return fallback
++    for c in df.columns:
++        if "time" in str(c).lower():
++            return c
++    return fallback
++
++
++def run_btc_pipeline(
++    csv_path: str,
++    price_cols=("open", "high", "low", "close"),
++    timestamp_col="timestamp",
++    ema_windows=(21, 50, 100, 200),
++    resample: str | None = None,   # e.g., "1H", "1D"
++    returns_modes=("log", "pct"),
++    returns_windows=(30, 60, 90),
++) -> dict:
++    """
++    End-to-end, testable pipeline aligned to the modular ta_lab2 layout.
++    Returns a dict of key tables for downstream use.
++    """
+     df = pd.read_csv(csv_path)
+-    df.columns = _clean_headers(df.columns)
+-
+-    # Build timeopen (prefer timeopen; fallback to epoch timestamp)
+-    if "timeopen" in df.columns:
+-        dt = pd.to_datetime(df["timeopen"], errors="coerce", utc=True)
+-    else:
+-        dt = pd.NaT
+-
+-    if dt.isna().mean() > 0.5 and "timestamp" in df.columns:
+-        ts_dt = _parse_epoch_series(df["timestamp"])
+-        if ts_dt.notna().sum() > dt.notna().sum():
+-            dt = ts_dt
+-
+-    if pd.isna(dt).all():
+-        raise KeyError("Could not parse timestamps from 'timeOpen' or 'timestamp'.")
+-
+-    df["timeopen"] = dt
+-    for col in ["open", "high", "low", "close", "volume", "marketcap"]:
+-        if col in df.columns:
+-            df[col] = _to_num(df[col])
+-
+-    df = df.dropna(subset=["timeopen"]).sort_values("timeopen").reset_index(drop=True)
+-
+-    print("Loaded rows:", len(df))
+-    print("Date range:", df["timeopen"].min(), "→", df["timeopen"].max())
+-    print("Columns now:", list(df.columns))
+-    return df
+-
+-# -------- timeframes --------
+-
+-def build_timeframes(df: pd.DataFrame):
+-    expand_datetime_features_inplace(df, "timeopen", prefix="timeopen")
+-
+-    weekly = bin_by_calendar(df, "timeopen", "W-SUN").rename(columns={"period_end": "date"})
+-    weekly["timeframe"] = "1W"
+-
+-    monthly = bin_by_calendar(df, "timeopen", "MS").rename(columns={"period_end": "date"})
+-    monthly["timeframe"] = "1M"
+-
+-    daily = df.rename(columns={"timeopen": "date"})[["date","open","high","low","close","volume"]].copy()
+-    daily["timeframe"] = "1D"
+-
+-    for d in (daily, weekly, monthly):
+-        d["symbol"] = "BTC-USD"
+-
+-    return daily, weekly, monthly
+-
+-# -------- enrichment --------
+-
+-def enrich(bars: pd.DataFrame) -> pd.DataFrame:
+-    add_returns(bars, close_col="close")  # local impl: creates close_ret_1
+-    add_ema_columns(bars, ["close"], [21,50,100,200])
+-    add_ema_d1(bars, ["close"], [21,50,100,200])
+-    add_ema_d2(bars, ["close"], [21,50,100,200])
+-    add_atr(bars, period=14, high_col="high", low_col="low", close_col="close")
+-    return bars
+-
+-def enrich_all(daily, weekly, monthly):
+-    return enrich(daily.copy()), enrich(weekly.copy()), enrich(monthly.copy())
+-
+-# -------- diagnostics --------
+-
+-def print_ema21_agreement(daily_en: pd.DataFrame, weekly_en: pd.DataFrame):
+-    d = daily_en[["date","close_ema_21_d1"]].sort_values("date")
+-    w = weekly_en[["date","close_ema_21_d1"]].sort_values("date").rename(columns={"close_ema_21_d1":"close_ema_21_d1_w"})
+-    cmp = pd.merge_asof(d, w, on="date", direction="backward")
+-    cmp["ema21_d1_agree"] = (cmp["close_ema_21_d1"] * cmp["close_ema_21_d1_w"]) > 0
+-    print("Daily vs Weekly EMA21 slope agreement:", f"{cmp['ema21_d1_agree'].mean():.2%}")
+-
+-def boundary_check(daily, weekly, monthly, dates_utc):
+-    for dt_str in dates_utc:
+-        dt = pd.Timestamp(dt_str, tz="UTC")
+-        drow = daily.loc[daily["date"] == dt]
+-        wrow = weekly.loc[weekly["date"] == dt]
+-        mrow = monthly.loc[monthly["date"] == dt]
+-        if not drow.empty and not wrow.empty:
+-            print("WEEK check:", dt_str, "daily open:", float(_scal(drow["open"])), "weekly open:", float(_scal(wrow["open"])))
+-        if not drow.empty and not mrow.empty:
+-            print("MONTH check:", dt_str, "daily open:", float(_scal(drow["open"])), "monthly open:", float(_scal(mrow["open"])))
+-
+-# -------- regimes --------
+-
+-def compute_regimes(daily_en: pd.DataFrame):
+-    daily_sig = sign_from_series(daily_en.copy(), "close_ema_21_d1", out_col="d_slope_sign")
+-
+-    if "close_ret_1" not in daily_sig.columns:
+-        add_returns(daily_sig, close_col="close")
+-
+-    flips = detect_flips(daily_sig, "d_slope_sign", min_separation=2)
+-    regime_ids = label_regimes_from_flips(len(daily_sig), flips["idx"].tolist())
+-    daily_reg = attach_regimes(daily_sig, regime_ids, col="regime_id")
+-
+-    if "close_ret_1" not in daily_reg.columns:
+-        # fallback: compute forward simple return
+-        daily_reg["close_ret_1"] = (daily_reg["close"].shift(-1) / daily_reg["close"]) - 1
+-
+-    stats = regime_stats(daily_reg, regime_col="regime_id", ret_col="close_ret_1")
+-    return daily_reg, stats
+-
+-# -------- comovement --------
+-
+-def compute_comovement(daily_en: pd.DataFrame, weekly_en: pd.DataFrame):
+-    al = build_alignment_frame(
+-        daily_en, weekly_en,
+-        on="date", low_cols=["close_ema_21_d1"], high_cols=["close_ema_21_d1"]
+-    ).rename(columns={"close_ema_21_d1": "d_slope", "close_ema_21_d1_w": "w_slope"})
+-    al, pct = sign_agreement(al, "d_slope", "w_slope", out_col="agree")
+-    al = rolling_agreement(al, "d_slope", "w_slope", window=63)
+-    return al, pct
+-
+-# -------- main --------
+-
+-def main(argv=None):
+-    ap = argparse.ArgumentParser()
+-    ap.add_argument("--csv", required=True, help="Path to BTC CSV (CoinMarketCap export).")
+-    ap.add_argument("--outdir", default="", help="Optional directory to save artifacts.")
+-    ap.add_argument("--check", nargs="*", help="Optional UTC dates to boundary-check, e.g. 2015-01-01 2015-02-01")
+-    args = ap.parse_args(argv)
+-
+-    df = load_clean_csv(args.csv)
+-    daily, weekly, monthly = build_timeframes(df)
+-    daily_en, weekly_en, monthly_en = enrich_all(daily, weekly, monthly)
++    df.columns = [str(c).strip().lower() for c in df.columns]
++    timestamp_col = _infer_timestamp_col(df, timestamp_col)
++    df = df.rename(columns={timestamp_col: "timestamp"})
++
++    # NOTE: new API name is base_timestamp_col (not ts_col)
++    expand_datetime_features_inplace(df, base_timestamp_col="timestamp")
++
++    # Optional resample (OHLCV)
++    if resample:
++        agg = {"open": "first", "high": "max", "low": "min", "close": "last", "volume": "sum"}
++        have = {k: v for k, v in agg.items() if k in df.columns}
++        if have:
++            df = (
++                df.set_index("timestamp")
++                  .resample(resample)
++                  .agg(have)
++                  .dropna()
++                  .reset_index()
++            )
++            expand_datetime_features_inplace(df, base_timestamp_col="timestamp")
++
++    # Indicators (simple stubs to keep imports working)
++    if "close" in df.columns:
++        out = rsi(df, period=14, price_col="close")
++        df[out.name] = out
++        df = df.join(macd(df, price_col="close"))
++        df = df.join(bollinger(df, price_col="close"))
++
++    # Quick engineered columns
++    if all(k in df.columns for k in ("high", "low", "close", "open")):
++        df["close-open"] = df["close"].astype(float) - df["open"].astype(float)
++        df["range"] = df["high"].astype(float) - df["low"].astype(float)
++
++    # Bar-to-bar deltas (percent + log)
++    b2t_pct_delta(
++        df,
++        cols=list(price_cols) + ["close-open"],
++        extra_cols=["range"],
++        round_places=6,
++        direction="newest_top",
++        open_col="open",
++        close_col="close",
++    )
++    b2t_log_delta(
++        df,
++        cols=list(price_cols) + ["close-open"],
++        extra_cols=["range"],
++        prefix="_log_delta",
++        round_places=6,
++        add_intraday=True,
++        open_col="open",
++        close_col="close",
++    )
+ 
+-    print_ema21_agreement(daily_en, weekly_en)
++    # Volatility (single-bar + rolling realized) via shims
++    df = add_volatility_features(
++        df,
++        do_atr=True, do_parkinson=True, do_rs=True, do_gk=True,
++        rolling_windows=tuple(returns_windows),
++        direction="newest_top",
++    )
++    df = add_rolling_vol_from_returns_batch(
++        df,
++        price_col="close",
++        modes=returns_modes,
++        windows=tuple(returns_windows),
++        annualize=True,
++        direction="newest_top",
++    )
+ 
+-    if args.check:
+-        boundary_check(daily, weekly, monthly, args.check)
++    # EMAs + slopes
++    base_cols = list(price_cols)
++    add_ema_columns(df, base_cols, list(ema_windows))
++    add_ema_d1(df, base_cols, list(ema_windows), direction="newest_top", overwrite=False, round_places=6)
++    add_ema_d2(df, base_cols, list(ema_windows), direction="newest_top", overwrite=False, round_places=6)
++    prepare_ema_helpers(df, base_cols, list(ema_windows), direction="newest_top", scale="bps")
++
++    # Regime labels (close) and segments between EMA-slope sign flips
++    _, labeled = compute_ema_comovement_stats(
++        df.copy(),
++        periods=list(ema_windows),
++        direction="newest_top",
++        close_col="close",
++        return_col="close_pct_delta",
++    )
++    df["trend_state"] = labeled["regime_label"]
++
++    segments, seg_summary, seg_by_year = build_flip_segments(
++        df,
++        base_cols=("close",),
++        periods=list(ema_windows),
++        direction="newest_top",
++        scale="bps",
++        date_col="timestamp",
++        ema_name_fmt="{field}_ema_{period}",
++    )
+ 
+-    daily_reg, stats = compute_regimes(daily_en)
+-    print(stats.head())
+-
+-    al, pct = compute_comovement(daily_en, weekly_en)
++    major_stats, sub_stats, sub_stats_mixsum = compute_ema_comovement_hierarchy(
++        df,
++        periods=list(ema_windows),
++        close_col="close",
++        direction="newest_top",
++        return_col="close_pct_delta",
++    )
+ 
+-    if args.outdir:
+-        os.makedirs(args.outdir, exist_ok=True)
+-        daily_en.to_parquet(os.path.join(args.outdir, "daily_en.parquet"), index=False)
+-        weekly_en.to_parquet(os.path.join(args.outdir, "weekly_en.parquet"), index=False)
+-        monthly_en.to_parquet(os.path.join(args.outdir, "monthly_en.parquet"), index=False)
+-        daily_reg.to_parquet(os.path.join(args.outdir, "daily_regimes.parquet"), index=False)
+-        stats.to_csv(os.path.join(args.outdir, "regime_stats.csv"), index=False)
+-        al.to_parquet(os.path.join(args.outdir, "alignment.parquet"), index=False)
+-        print(f"Saved outputs to: {args.outdir}")
++    summary = {
++        "n_rows": int(len(df)),
++        "n_segments": int(len(segments)),
++        "mean_seg_return": float(segments["ret_close_to_close"].mean()) if len(segments) else 0.0,
++        "mean_seg_len": float(segments["bars"].mean()) if len(segments) else 0.0,
++    }
++    return {
++        "data": df,
++        "segments": segments,
++        "segment_summary": seg_summary,
++        "segment_by_year": seg_by_year,
++        "regime_major": major_stats,
++        "regime_sub": sub_stats_mixsum,
++        "summary": summary,
++    }
+diff --git a/src/ta_lab2/regimes/run_btc_pipeline.py b/src/ta_lab2/regimes/run_btc_pipeline.py
+index e620e67..dceb8d2 100644
+--- a/src/ta_lab2/regimes/run_btc_pipeline.py
++++ b/src/ta_lab2/regimes/run_btc_pipeline.py
+@@ -1,56 +1,36 @@
+-@@
+--# ---- load your CSV ---------------------------------------------------------
+--csv_path = r"C:/Users/asafi/Downloads/ta_lab2/Bitcoin_01_1_2016-10_26_2025_historical_data_coinmarketcap.csv"
+--df2 = pd.read_csv(csv_path)
+--# Normalize headers to stable names
+--df2.columns = _clean_headers(df2.columns)
+--...   # (rest of pipeline at import time)
+-+from pathlib import Path
+-+import pandas as pd
+-+import logging
+-+
+-+log = logging.getLogger(__name__)
+-+
+-+def run_btc_pipeline(csv_path: str | Path, out_dir: str | Path, **kwargs) -> dict:
+-+    """
+-+    Run the BTC pipeline.
+-+    Parameters
+-+    ----------
+-+    csv_path : path to source CSV
+-+    out_dir  : output directory for artifacts (parquet/csv)
+-+    kwargs   : optional tuning params (ema windows, resample rules, etc.)
+-+    Returns
+-+    -------
+-+    dict with key outputs, e.g. file paths or small result stats
+-+    """
+-+    csv_path = Path(csv_path)
+-+    out_dir = Path(out_dir)
+-+    out_dir.mkdir(parents=True, exist_ok=True)
+-+
+-+    if not csv_path.exists():
+-+        raise FileNotFoundError(f"Input CSV not found: {csv_path}")
+-+
+-+    log.info("Loading data from %s", csv_path)
+-+    df2 = pd.read_csv(csv_path)
+-+    df2.columns = _clean_headers(df2.columns)  # your existing helper
+-+
+-+    # ... your existing transforms/features/resampling/regimes here ...
+-+    # write outputs to out_dir
+-+    # e.g., (keep your current filenames, just write relative to out_dir)
+-+    # df_daily.to_parquet(out_dir / "daily_en.parquet")
+-+    # df_weekly.to_parquet(out_dir / "weekly_en.parquet")
+-+    # stats.to_csv(out_dir / "regime_stats.csv", index=False)
+-+
+-+    return {
+-+        "input": str(csv_path),
+-+        "out_dir": str(out_dir),
+-+        # "n_rows": len(df2),
+-+        # "artifacts": [str(out_dir / "daily_en.parquet"), ...]
+-+    }
+-+
+-+if __name__ == "__main__":
+-+    # Local manual run (kept for convenience)
+-+    DEFAULT_ROOT = Path(__file__).resolve().parents[3]
+-+    csv = DEFAULT_ROOT / "data" / "Bitcoin_01_1_2016-10_26_2025_historical_data_coinmarketcap.csv"
+-+    out_ = DEFAULT_ROOT / "out"
+-+    run_btc_pipeline(csv_path=csv, out_dir=out_)
++from __future__ import annotations
++from pathlib import Path
++import pandas as pd
++
++def run_btc_pipeline(
++    csv_path: str | Path,
++    out_dir: str | Path,
++    ema_windows: list[int] | None = None,
++    resample: dict | None = None,
++):
++    """
++    Orchestrate the BTC pipeline:
++      1) load CSV (from csv_path)
++      2) compute features / regimes (call your existing helpers)
++      3) write outputs to out_dir
++    """
++    csv_path = Path(csv_path)
++    out_dir = Path(out_dir)
++    out_dir.mkdir(parents=True, exist_ok=True)
++
++    # ---- 1) Load data (NO hard-coded paths) ----
++    df = pd.read_csv(csv_path)
++
++    # TODO: call your existing feature/resample/regime functions here, e.g.:
++    # df = add_base_features(df, ema_windows=ema_windows, resample=resample)
++    # regimes = compute_regimes(df)
++    # Save outputs:
++    # df.to_parquet(out_dir / "daily_en.parquet")
++    # regimes.to_parquet(out_dir / "daily_regimes.parquet")
++
++    # For now just return a tiny status so CLI works:
++    return {"rows": len(df), "out_dir": str(out_dir)}
++
++if __name__ == "__main__":
++    # Optional: ad-hoc local test; never runs during import.
++    raise SystemExit("Use the CLI or call run_btc_pipeline() from code.")
+diff --git a/src/ta_lab2/viz/all_plots.py b/src/ta_lab2/viz/all_plots.py
+new file mode 100644
+index 0000000..667df9a
+--- /dev/null
++++ b/src/ta_lab2/viz/all_plots.py
+@@ -0,0 +1,195 @@
++from __future__ import annotations
++import pandas as pd
++import numpy as np
++import matplotlib.pyplot as plt
++
++# --- small utility: choose a time column if present ---
++def _pick_time_index(d: pd.DataFrame) -> pd.Index:
++    for c in ("timestamp", "timeclose", "date", "timeopen"):
++        if c in d.columns:
++            return pd.to_datetime(d[c], errors="coerce")
++    return d.index
++
++# --- Price + EMAs (+ optional slopes & flips), newest bar on the right ---
++def plot_ema_with_trend(
++    df: pd.DataFrame,
++    price_col: str = "close",
++    ema_cols=None,
++    trend_col: str = "trend_state",
++    *,
++    include_slopes: bool = True,
++    include_flips: bool = True,
++    n: int = 1000
++):
++    d = df.tail(n).copy()
++    # If caller didn’t pass explicit EMA cols, auto-detect like <base>_ema_<p>
++    if ema_cols is None:
++        ema_cols = [c for c in d.columns if c.lower().startswith(("open_ema_","high_ema_","low_ema_","close_ema_"))]
++        if not ema_cols:  # fall back to any column starting with "ema_"
++            ema_cols = [c for c in d.columns if c.lower().startswith("ema_")]
++
++    x = np.arange(len(d))  # newest-on-top visual: invert x later
++    t = _pick_time_index(d)
++
++    fig, ax = plt.subplots(figsize=(12, 6))
++    ax.plot(x, d[price_col].to_numpy(), lw=1.3, label=price_col)
++
++    # left axis: EMAs
++    for c in ema_cols:
++        if c in d:
++            ax.plot(x, d[c].to_numpy(), lw=1.0, label=c)
++
++    ax2 = None
++    if include_slopes:
++        # try to find slope columns that match attached helpers: *_d1_bps / *_d1_norm
++        slope_cols = [c for c in d.columns if c.endswith("_d1_bps") or c.endswith("_d1_norm")]
++        if slope_cols:
++            ax2 = ax.twinx()
++            for sc in slope_cols:
++                ax2.plot(x, d[sc].to_numpy(), lw=0.8, alpha=0.8, label=sc)
++            ax2.axhline(0, ls="--", lw=1, alpha=0.8)
++
++            # match attached “sensible y-lims from all drawn slope series”
++            right_vals = np.concatenate([d[c].to_numpy()[~np.isnan(d[c].to_numpy())] for c in slope_cols if c in d])
++            if right_vals.size:
++                qlo, qhi = np.percentile(right_vals, [1, 99])
++                span = qhi - qlo
++                pad = (span * 0.25) if np.isfinite(span) and span > 0 else 10
++                ax2.set_ylim(qlo - pad, qhi + pad)
++
++    # optional flip markers (columns named like <base>_ema_<p>_flip), as in your attached utils
++    if include_flips:
++        flip_cols = [c for c in d.columns if c.endswith("_ema_21_flip") or c.endswith("_flip")]
++        # de-dup to avoid plotting tons of labels
++        plotted = False
++        for fc in flip_cols:
++            if fc in d:
++                idx = np.where(d[fc].to_numpy())[0]
++                if idx.size:
++                    # mark flips on the shortest EMA series available for better alignment
++                    base_for_mark = ema_cols[0] if ema_cols else price_col
++                    ax.scatter(idx, d[base_for_mark].to_numpy()[idx], c="k", marker="x", s=40,
++                               label=("flip" if not plotted else None))
++                    plotted = True
++
++    # optional trend track (your custom column)
++    if trend_col in d.columns:
++        ax3 = ax.twinx()
++        ax3.spines.right.set_position(("axes", 1.08))
++        ax3.plot(x, d[trend_col].to_numpy(), lw=0.8, alpha=0.25)
++        ax3.set_yticks([-1, 0, 1])
++        ax3.set_ylabel("trend")
++
++    # newest bar on the RIGHT to match your figures
++    ax.invert_xaxis()
++    ax.set_xticks(np.linspace(0, len(d)-1, 6, dtype=int))
++    ax.set_xticklabels(pd.to_datetime(t).astype("datetime64[ns]").to_series().iloc[ax.get_xticks().astype(int)].dt.date.astype(str), rotation=0)
++
++    ax.set_title("Price + EMAs + Slopes/Flips (newest on right)")
++    ax.set_xlabel("bars")
++    ax.legend(loc="upper left")
++    if include_slopes and ax2:
++        ax2.legend(loc="upper right")
++    plt.tight_layout()
++    return ax
++
++# --- Consolidated EMAs view (mirrors daf.plot_consolidated_emas) ---
++def plot_consolidated_emas_like(
++    df: pd.DataFrame,
++    base_col: str = "close",
++    periods=(21, 50, 100, 200),
++    *,
++    include_slopes: bool = True,
++    include_flips: bool = True,
++    n: int = 1000
++):
++    d = df.tail(n).copy()
++    x = np.arange(len(d))
++    t = _pick_time_index(d)
++
++    fig, ax = plt.subplots(figsize=(12, 6))
++
++    # all EMAs for this base on left axis
++    for p in periods:
++        ema = f"{base_col}_ema_{p}"
++        if ema not in d:
++            continue
++        ax.plot(x, d[ema].to_numpy(), lw=1.2, label=ema)
++
++    ax.invert_xaxis()
++    ax.set_title(f"{base_col.upper()} EMAs {', '.join(map(str, periods))}")
++    ax.set_xlabel("bars (newest on right)")
++    ax.legend(loc="upper left")
++
++    if include_slopes:
++        ax2 = ax.twinx()
++        right_series = []
++        for p in periods:
++            bps = f"{base_col}_ema_{p}_d1_bps"
++            pct = f"{base_col}_ema_{p}_d1_norm"
++            if bps in d:
++                ax2.plot(x, d[bps].to_numpy(), alpha=0.5, lw=0.9, label=f"slope bps (p={p})")
++                right_series.append(d[bps].to_numpy())
++            if pct in d:
++                ax2.plot(x, d[pct].to_numpy(), alpha=0.5, lw=0.9, label=f"slope % (p={p})")
++                right_series.append(d[pct].to_numpy())
++
++            if include_flips:
++                flip = f"{base_col}_ema_{p}_flip"
++                if flip in d:
++                    idx = np.where(d[flip].to_numpy())[0]
++                    if idx.size:
++                        ax.scatter(idx, d[f"{base_col}_ema_{p}"].to_numpy()[idx],
++                                   c="k", marker="x", s=40, label=f"flip {p}")
++        ax2.axhline(0, ls="--", lw=1, alpha=0.8)
++        ax2.legend(loc="upper right")
++
++        if right_series:
++            rs = np.concatenate([r[~np.isnan(r)] for r in right_series if r.size])
++            if rs.size:
++                qlo, qhi = np.percentile(rs, [1, 99])
++                span = qhi - qlo
++                pad = (span * 0.25) if np.isfinite(span) and span > 0 else 10
++                ax2.set_ylim(qlo - pad, qhi + pad)
++
++    plt.tight_layout()
++    return ax
++
++# --- Realized volatility panel: Parkinson, GK, RS (+ optional stdev of log returns) ---
++def plot_realized_vol(
++    df: pd.DataFrame,
++    *,
++    windows=(30, 60, 90),
++    include_logret_stdev: bool = True,
++    n: int = 1000
++):
++    d = df.tail(n).copy()
++    x = np.arange(len(d))
++    t = _pick_time_index(d)
++
++    fig, ax = plt.subplots(figsize=(12, 4))
++    plotted = False
++
++    # match generated names: parkinson_vol_<w>, gk_vol_<w> (or gk_vol_<w>), rs_vol_<w>
++    for w in windows:
++        for name in (f"parkinson_vol_{w}", f"gk_vol_{w}", f"rs_vol_{w}"):
++            if name in d.columns:
++                ax.plot(x, d[name].to_numpy(), lw=1.0, label=name)
++                plotted = True
++
++    # optional: rolling stdev of log returns (add_logret_stdev_vol)
++    if include_logret_stdev:
++        stdev_cols = [c for c in d.columns if c.endswith(tuple(f"_vol_stdev_{w}" for w in windows))]
++        for c in stdev_cols:
++            ax.plot(x, d[c].to_numpy(), lw=0.9, alpha=0.8, label=c)
++
++    if not plotted and not [c for c in d.columns if c.endswith("_vol_stdev_")]:
++        print("[plot skipped] No realized-vol columns found.")
++        return ax
++
++    ax.invert_xaxis()
++    ax.set_title("Realized Volatility (rolling)")
++    ax.set_xlabel("bars (newest on right)")
++    ax.legend(loc="upper left", ncol=2)
++    plt.tight_layout()
++    return ax

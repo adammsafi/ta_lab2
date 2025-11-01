@@ -8,17 +8,22 @@ from .ema import (
     add_ema_columns,
     add_ema_d1,
     add_ema_d2,
-    add_ema,  # legacy wrapper shim
+    add_ema,                # legacy wrapper shim
+    prepare_ema_helpers,    # NEW: helper scalers/normalizers used by pipeline/tests
 )
 
 from .returns import (
     add_returns,
     b2t_pct_delta,
     b2t_log_delta,
-    add_rolling_vol_from_returns_batch,
 )
 
-from .vol import add_atr
+# Volatility helpers live in vol.py (realized-vol + single-bar)
+from .vol import (
+    add_volatility_features,
+    add_rolling_vol_from_returns_batch,  # FIX: import from vol, not returns
+    add_atr,
+)
 
 # Technical indicators
 from .indicators import (
@@ -40,15 +45,17 @@ __all__ = [
     "add_ema_columns",
     "add_ema_d1",
     "add_ema_d2",
-    "add_ema",  # legacy
+    "add_ema",               # legacy
+    "prepare_ema_helpers",   # NEW
 
-    # Returns / deltas / rolling vol
+    # Returns / deltas
     "add_returns",
     "b2t_pct_delta",
     "b2t_log_delta",
-    "add_rolling_vol_from_returns_batch",
 
-    # Single-bar vol
+    # Volatility
+    "add_volatility_features",
+    "add_rolling_vol_from_returns_batch",
     "add_atr",
 
     # Indicators

@@ -236,6 +236,100 @@ def add_ema(df, col: str = "close", windows=(21, 50, 100, 200), prefix: str = "e
     add_ema_columns(df, cols, list(windows))
     return df
 
+# -----------------------------------------------------------------------------
+# EMA helper scalers/normalizers used downstream (e.g., pipeline/tests)
+# -----------------------------------------------------------------------------
+def prepare_ema_helpers(
+    df: pd.DataFrame,
+    base_price_cols: Sequence[str] | None,
+    ema_windows: Sequence[int] | None,
+    *,
+    direction: str = "oldest_top",
+    scale: str = "bps",              # {"raw","pct","bps"}
+    overwrite: bool = False,
+    round_places: Optional[int] = 6,
+    # legacy aliases tolerated
+    price_cols: Sequence[str] | None = None,
+    periods: Sequence[int] | None = None,
+    **kwargs,
+) -> pd.DataFrame:
+    """
+    Ensure first/second EMA diffs exist, then add scaled helper columns for each
+    <col, period> pair:
+
+      - {col}_ema_{w}_d1   (1st diff)       [ensured]
+      - {col}_ema_{w}_d2   (2nd diff)       [ensured]
+      - {col}_ema_{w}_slope    (scaled d1)
+      - {col}_ema_{w}_accel    (scaled d2)
+
+    Scaling:
+      raw  -> slope = d1,                 accel = d2
+      pct  -> slope = d1 / ema,           accel = d2 / ema
+      bps  -> slope = 1e4 * d1 / ema,     accel = 1e4 * d2 / ema
+
+    Function is safe to call multiple times and ignores unknown kwargs.
+    """
+    if base_price_cols is None:
+        base_price_cols = price_cols or []
+    if ema_windows is None:
+        ema_windows = periods or []
+
+    base_price_cols = _ensure_list(base_price_cols)
+    ema_windows = [int(w) for w in ema_windows]
+
+    # Make sure ema, d1, d2 exist (don’t clobber unless overwrite=True)
+    add_ema_columns(df, base_price_cols, ema_windows, direction=direction, overwrite=overwrite)
+    add_ema_d1(df, base_price_cols, ema_windows, direction=direction, overwrite=overwrite)
+    add_ema_d2(df, base_price_cols, ema_windows, direction=direction, overwrite=overwrite)
+
+    scale = (scale or "raw").lower()
+    if scale not in {"raw", "pct", "bps"}:
+        scale = "bps"  # sensible default for TA
+
+    new_cols: dict[str, pd.Series] = {}
+
+    for col in base_price_cols:
+        for w in ema_windows:
+            ema_col = f"{col}_ema_{w}"
+            d1_col  = f"{ema_col}_d1"
+            d2_col  = f"{ema_col}_d2"
+
+            if ema_col not in df.columns:
+                # If caller passed a base price without EMA (unlikely after add_ema_columns),
+                # compute minimally to proceed.
+                if col in df.columns:
+                    df[ema_col] = compute_ema(df[col].astype(float), w)
+                else:
+                    continue
+
+            ema = df[ema_col].astype(float)
+            d1  = df[d1_col].astype(float) if d1_col in df.columns else ema.diff()
+            d2  = df[d2_col].astype(float) if d2_col in df.columns else ema.diff().diff()
+
+            if scale == "raw":
+                slope = d1
+                accel = d2
+            elif scale == "pct":
+                slope = d1 / ema.replace(0.0, np.nan)
+                accel = d2 / ema.replace(0.0, np.nan)
+            else:  # "bps"
+                slope = 1e4 * d1 / ema.replace(0.0, np.nan)
+                accel = 1e4 * d2 / ema.replace(0.0, np.nan)
+
+            slope_name = f"{col}_ema_{w}_slope"
+            accel_name = f"{col}_ema_{w}_accel"
+
+            if overwrite or slope_name not in df.columns:
+                new_cols[slope_name] = _maybe_round(slope.astype(float), round_places)
+            if overwrite or accel_name not in df.columns:
+                new_cols[accel_name] = _maybe_round(accel.astype(float), round_places)
+
+    if new_cols:
+        df[list(new_cols.keys())] = pd.DataFrame(new_cols, index=df.index)
+
+    return df
+
+
 # make sure it's exported
 try:
     __all__.append("add_ema")  # if __all__ exists

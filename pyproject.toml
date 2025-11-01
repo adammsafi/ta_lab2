@@ -8,30 +8,42 @@ version = "0.1.0"
 description = "Technical analysis & regime-detection toolkit"
 readme = "README.md"
 requires-python = ">=3.10"
+
+# Core runtime deps used across the package
 dependencies = [
   "pandas",
   "pyyaml",
-]
-
-[project.optional-dependencies]
-dev = [
-  "pytest",
-  "mypy",
-  "ruff",
-  "pytest-benchmark",
-  "hypothesis",
+  "numpy",
 ]
 
 [project.scripts]
 ta-lab2 = "ta_lab2.cli:main"
 
-# Tell setuptools to find packages under src/
+# ---------- Optional dependency groups (ALL IN ONE BLOCK) ----------
+[project.optional-dependencies]
+# Dev / CI convenience
+dev = [
+  "pytest>=8.0",
+  "pytest-benchmark",
+  "hypothesis",
+  "ruff>=0.1.5",
+  "mypy>=1.8",
+]
+
+# Plotting (used by viz/all_plots.py and CLI optional plots)
+viz = [
+  "matplotlib>=3.6",
+]
+
+# Astronomy extras for exact seasons/moon in calendar features
+astro = [
+  "astronomy-engine>=2.2.0",
+]
+
+# ---------- Setuptools (src/ layout + root module) ----------
 [tool.setuptools.packages.find]
 where = ["src"]
 
-# Also install the top-level config.py module (so `from config import ...` works)
+# Also install the top-level config.py so `from config import load_settings` works
 [tool.setuptools]
 py-modules = ["config"]
-
-[project.optional-dependencies]
-viz = ["matplotlib>=3.6"]
