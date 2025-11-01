@@ -67,3 +67,6 @@ def build_flip_segments(
         segs = segs.join(gb_t, on="seg_id")
 
     return segs
+
+
+__all__ = ["build_flip_segments"]
