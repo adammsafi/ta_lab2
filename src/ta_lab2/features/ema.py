@@ -224,3 +224,20 @@ def add_ema_d2(
     if new_cols:
         df[list(new_cols.keys())] = pd.DataFrame(new_cols, index=df.index)
     return df
+
+
+# ---- Legacy compatibility shims ----
+def add_ema(df, col: str = "close", windows=(21, 50, 100, 200), prefix: str = "ema"):
+    """
+    Legacy wrapper: adds EMA columns for one price column.
+    Mirrors old API but delegates to the new add_ema_columns.
+    """
+    cols = [col]
+    add_ema_columns(df, cols, list(windows))
+    return df
+
+# make sure it's exported
+try:
+    __all__.append("add_ema")  # if __all__ exists
+except NameError:
+    __all__ = ["add_ema"]
