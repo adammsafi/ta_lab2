@@ -2,10 +2,11 @@
 """
 Return/Delta utilities.
 
-b2t_pct_delta: percentage change over N bars
-b2t_log_delta: log-return over N bars
+- b2t_pct_delta: percentage change over N bars
+- b2t_log_delta: log-return over N bars
+- add_returns:   convenience orchestrator used by tests/pipeline
 
-Both write columns into df and return df for chaining.
+All functions operate in-place and return `df` for chaining.
 """
 
 from __future__ import annotations
@@ -65,3 +66,42 @@ def b2t_log_delta(
         if fill_method:
             df[col] = df[col].fillna(method=fill_method)
     return df
+
+
+def add_returns(
+    df: pd.DataFrame,
+    *,
+    price_col: str = "close",
+    modes: tuple[str, ...] | list[str] = ("log", "pct"),
+    windows: tuple[int, ...] | list[int] = (1, 5, 10),
+    fill_method: str | None = None,
+) -> pd.DataFrame:
+    """
+    Convenience orchestrator used by tests/pipeline.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input OHLCV DataFrame.
+    price_col : str, default "close"
+        Column to compute returns on.
+    modes : list/tuple of {"log","pct"}, default ("log","pct")
+        Which return styles to compute.
+    windows : list/tuple[int], default (1,5,10)
+        Horizons to compute for each mode.
+    fill_method : str or None
+        Optional pandas fillna(method=...) to apply to each new column.
+
+    Returns
+    -------
+    pd.DataFrame (same object, mutated)
+    """
+    modes = tuple(m.lower() for m in modes)
+    if "pct" in modes:
+        b2t_pct_delta(df, price_col=price_col, periods=tuple(windows), fill_method=fill_method)
+    if "log" in modes:
+        b2t_log_delta(df, price_col=price_col, periods=tuple(windows), fill_method=fill_method)
+    return df
+
+
+__all__ = ["b2t_pct_delta", "b2t_log_delta", "add_returns"]
