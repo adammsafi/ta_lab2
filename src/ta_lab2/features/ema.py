@@ -23,25 +23,11 @@ def compute_ema(
     adjust: bool = False,
     min_periods: Optional[int] = None,
     name: Optional[str] = None,
+    **kwargs,  # swallow legacy extras
 ) -> pd.Series:
     """
     Series EMA with a Pandas-backed implementation.
-
-    Parameters
-    ----------
-    s : pd.Series
-    window : int
-        EMA span.
-    adjust : bool
-        Pass-through to pandas ewm(adjust=...).
-    min_periods : Optional[int]
-        Pass-through to pandas ewm(min_periods=...).
-    name : Optional[str]
-        Optional name for the returned Series.
-
-    Returns
-    -------
-    pd.Series
+    Accepts extra kwargs for backward-compatibility (ignored).
     """
     out = (
         s.astype(float)
@@ -63,7 +49,8 @@ def _flip_for_direction(obj: pd.DataFrame | pd.Series, direction: str):
     to flip back afterwards.
     """
     if direction not in ("oldest_top", "newest_top"):
-        raise ValueError("direction must be 'oldest_top' or 'newest_top'")
+        # be forgiving; treat unknown as oldest_top
+        return obj, False
     if direction == "newest_top":
         return obj.iloc[::-1], True
     return obj, False
@@ -78,30 +65,41 @@ def _ensure_list(x: Sequence[str] | Iterable[str]) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# Column builders (in-place, return df)
+# Column builders (in-place, return df) — tolerant to extra kwargs
 # ---------------------------------------------------------------------------
 
 def add_ema_columns(
     df: pd.DataFrame,
-    base_price_cols: Sequence[str],
-    ema_windows: Sequence[int],
+    base_price_cols: Sequence[str] | None,
+    ema_windows: Sequence[int] | None,
     *,
     direction: str = "oldest_top",
     overwrite: bool = False,
     round_places: Optional[int] = None,
     adjust: bool = False,
     min_periods: Optional[int] = None,
+    # Back-compat knobs we ignore but accept
+    price_cols: Sequence[str] | None = None,
+    ema_periods: Sequence[int] | None = None,
+    **kwargs,
 ) -> pd.DataFrame:
     """
     For each `col` in base_price_cols and each `w` in ema_windows, add:
       `{col}_ema_{w}`
 
-    Supports `direction='newest_top'` (flip -> compute -> flip back).
+    Accepts legacy kwargs and aliases:
+      - price_cols (alias of base_price_cols)
+      - ema_periods (alias of ema_windows)
+      - arbitrary **kwargs (ignored)
     """
+    if base_price_cols is None:
+        base_price_cols = price_cols or []
+    if ema_windows is None:
+        ema_windows = ema_periods or []
+
     base_price_cols = _ensure_list(base_price_cols)
     ema_windows = [int(w) for w in ema_windows]
 
-    # Work on a view with optional flip for direction; we’ll copy results back.
     work, flipped = _flip_for_direction(df, direction)
 
     new_cols: dict[str, pd.Series] = {}
@@ -126,19 +124,28 @@ def add_ema_columns(
 
 def add_ema_d1(
     df: pd.DataFrame,
-    base_price_cols: Sequence[str],
-    ema_windows: Sequence[int],
+    base_price_cols: Sequence[str] | None,
+    ema_windows: Sequence[int] | None,
     *,
     direction: str = "oldest_top",
     overwrite: bool = False,
     round_places: Optional[int] = None,
+    # legacy aliases/kwargs tolerated
+    price_cols: Sequence[str] | None = None,
+    ema_periods: Sequence[int] | None = None,
+    **kwargs,
 ) -> pd.DataFrame:
     """
     First difference of EMA:
       `{col}_ema_{w}_d1 = diff({col}_ema_{w})`
 
-    Respects `direction='newest_top'` by flipping for chronological diff.
+    Accepts and ignores unknown kwargs; supports direction flipping.
     """
+    if base_price_cols is None:
+        base_price_cols = price_cols or []
+    if ema_windows is None:
+        ema_windows = ema_periods or []
+
     base_price_cols = _ensure_list(base_price_cols)
     ema_windows = [int(w) for w in ema_windows]
 
@@ -149,7 +156,6 @@ def add_ema_d1(
         for w in ema_windows:
             ema_col = f"{col}_ema_{w}"
             if ema_col not in work.columns:
-                # compute on-the-fly if missing
                 if col in work.columns:
                     work[ema_col] = compute_ema(work[col].astype(float), w)
                 else:
@@ -170,17 +176,28 @@ def add_ema_d1(
 
 def add_ema_d2(
     df: pd.DataFrame,
-    base_price_cols: Sequence[str],
-    ema_windows: Sequence[int],
+    base_price_cols: Sequence[str] | None,
+    ema_windows: Sequence[int] | None,
     *,
     direction: str = "oldest_top",
     overwrite: bool = False,
     round_places: Optional[int] = None,
+    # legacy aliases/kwargs tolerated
+    price_cols: Sequence[str] | None = None,
+    ema_periods: Sequence[int] | None = None,
+    **kwargs,
 ) -> pd.DataFrame:
     """
     Second difference of EMA:
       `{col}_ema_{w}_d2 = diff(diff({col}_ema_{w}))`
+
+    Accepts and ignores unknown kwargs; supports direction flipping.
     """
+    if base_price_cols is None:
+        base_price_cols = price_cols or []
+    if ema_windows is None:
+        ema_windows = ema_periods or []
+
     base_price_cols = _ensure_list(base_price_cols)
     ema_windows = [int(w) for w in ema_windows]
 
