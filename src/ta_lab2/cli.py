@@ -1,27 +1,39 @@
 from __future__ import annotations
 import argparse
 from pathlib import Path
-from .config import load_settings, project_root
-from .regimes.run_btc_pipeline import run_btc_pipeline
+
+# Import from root-level config.py, not from ta_lab2.config
+from config import load_settings, project_root
+from ta_lab2.regimes.run_btc_pipeline import run_btc_pipeline
+
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="ta-lab2", description="ta_lab2 CLI")
-    ap.add_argument("--config", "-c", default="configs/default.yaml",
-                    help="Path to YAML config relative to project root")
+    ap.add_argument(
+        "--config", "-c",
+        default="config/default.yaml",
+        help="Path to YAML config relative to project root (default: config/default.yaml)"
+    )
     args = ap.parse_args(argv)
 
-    root = project_root()
-    cfg_path = (root / args.config).resolve()
-    settings = load_settings(cfg_path)
+    # Load settings from YAML via the root-level config.py
+    settings = load_settings(args.config)
 
-    csv = (root / settings.data_csv).resolve()
-    out_dir = (root / settings.out_dir).resolve()
+    # Resolve absolute paths for input and output
+    csv = Path(settings.data_csv)
+    out_dir = Path(settings.out_dir)
 
-    result = run_btc_pipeline(csv_path=csv, out_dir=out_dir,
-                              ema_windows=settings.ema_windows,
-                              resample=settings.resample)
+    # Run main pipeline
+    result = run_btc_pipeline(
+        csv_path=csv,
+        out_dir=out_dir,
+        ema_windows=settings.ema_windows,
+        resample=settings.resample
+    )
+
     print("Pipeline complete:", result)
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

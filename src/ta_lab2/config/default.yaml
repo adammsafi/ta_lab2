@@ -1,9 +1,0 @@
-# Paths are relative to the project root (where pyproject.toml lives)
-data_csv: data/Bitcoin_01_1_2016-10_26_2025_historical_data_coinmarketcap.csv
-out_dir: out
-
-# Pipeline parameters (example—extend as your code supports)
-ema_windows: [21, 50, 100]
-resample:
-  weekly: "W-SUN"
-  monthly: "MS"
