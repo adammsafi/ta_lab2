@@ -2,16 +2,15 @@
 """
 Comovement utilities (no-loss merged module)
 
-This module preserves all original functionality:
+Preserves original helpers:
 - _ensure_sorted, build_alignment_frame
 - sign_agreement, rolling_agreement
 - forward_return_split
 - lead_lag_max_corr
 
-And adds:
-- compute_ema_comovement_stats: correlations + sign-agreement across EMA columns.
-
-All functions are pure DataFrame utilities and operate in-place where noted.
+Adds:
+- compute_ema_comovement_stats: correlation + sign-agreement across EMA columns
+- compute_ema_comovement_hierarchy: derives an ordered “hierarchy” from EMA corr
 """
 
 from __future__ import annotations
@@ -45,11 +44,6 @@ def build_alignment_frame(
 ) -> pd.DataFrame:
     """
     Merge-asof align low timeframe rows with the most recent high timeframe row.
-
-    low_df:  typically daily/enriched data
-    high_df: typically weekly/monthly enriched data
-    on:      timestamp column present in both dataframes (tz-aware OK)
-    direction: 'backward' means use the last high-row <= low-row timestamp
     """
     low_cols = list(low_cols or [])
     high_cols = list(high_cols or [])
@@ -57,7 +51,6 @@ def build_alignment_frame(
     a = _ensure_sorted(low_df[[on] + low_cols].copy(), on)
     b = _ensure_sorted(high_df[[on] + high_cols].copy(), on)
 
-    # apply suffixes (keep the 'on' column name intact)
     if suffix_low:
         a = a.rename(columns={c: f"{c}{suffix_low}" for c in low_cols})
     if suffix_high:
@@ -74,10 +67,7 @@ def sign_agreement(
     *,
     out_col: str = "agree",
 ) -> tuple[pd.DataFrame, float]:
-    """
-    Mark True where signs of two series match (strictly > 0).
-    Returns the modified df and the agreement rate.
-    """
+    """Mark True where signs of two series match (strictly > 0)."""
     s = (np.sign(df[col_a]) * np.sign(df[col_b])) > 0
     df[out_col] = s
     return df, float(np.nanmean(s.astype(float)))
@@ -92,9 +82,7 @@ def rolling_agreement(
     out_col: Optional[str] = None,
     min_periods: Optional[int] = None,
 ) -> pd.DataFrame:
-    """
-    Rolling share of days where signs match over a window.
-    """
+    """Rolling share of days where signs match over a window."""
     if out_col is None:
         out_col = f"agree_{window}"
     if min_periods is None:
@@ -105,20 +93,15 @@ def rolling_agreement(
     return df
 
 
-def forward_return_split(
-    df: pd.DataFrame,
-    agree_col: str,
-    fwd_ret_col: str,
-) -> pd.DataFrame:
-    """
-    Compare forward returns when agree==True vs False.
-    """
+def forward_return_split(df: pd.DataFrame, agree_col: str, fwd_ret_col: str) -> pd.DataFrame:
+    """Compare forward returns when agree==True vs False."""
     sub = df[[agree_col, fwd_ret_col]].dropna()
-    return (sub
-            .groupby(agree_col)[fwd_ret_col]
-            .agg(count="count", mean="mean", median="median", std="std")
-            .reset_index()
-            .rename(columns={agree_col: "agree"}))
+    return (
+        sub.groupby(agree_col)[fwd_ret_col]
+        .agg(count="count", mean="mean", median="median", std="std")
+        .reset_index()
+        .rename(columns={agree_col: "agree"})
+    )
 
 
 def lead_lag_max_corr(
@@ -148,7 +131,7 @@ def lead_lag_max_corr(
 
 
 # ---------------------------------------------------------------------
-# New EMA comovement stats (ADDED, backward-compatible)
+# New EMA comovement stats (ADDED)
 # ---------------------------------------------------------------------
 def _find_ema_columns(df: pd.DataFrame, token: str = "_ema_") -> list[str]:
     """Auto-detect EMA columns by substring token (default: '_ema_')."""
@@ -174,9 +157,9 @@ def compute_ema_comovement_stats(
     diff_window: int = 1,
 ) -> Dict[str, pd.DataFrame]:
     """
-    Compute simple co-movement stats among EMA series.
+    Compute co-movement stats among EMA series.
 
-    Returns a dict with:
+    Returns dict:
       - 'corr':  correlation matrix over EMA levels
       - 'agree': pairwise agreement of sign(dEMA) over `diff_window`
       - 'meta':  one-row metadata (n_ema, method, diff_window)
@@ -208,8 +191,41 @@ def compute_ema_comovement_stats(
         agree_df = pd.DataFrame(columns=["a", "b", "agree_rate"], dtype=float)
 
     meta = pd.DataFrame([{"n_ema": len(ema_cols), "method": method, "diff_window": diff_window}])
-
     return {"corr": corr, "agree": agree_df, "meta": meta}
+
+
+def compute_ema_comovement_hierarchy(
+    df: pd.DataFrame,
+    *,
+    ema_cols: Sequence[str] | None = None,
+    method: str = "spearman",
+) -> Dict[str, object]:
+    """
+    Build a simple ordering (“hierarchy”) of EMA columns from the correlation matrix.
+
+    - If scipy is not available (default), we derive an order by sorting columns
+      on mean absolute correlation (highest first). This is lightweight and
+      dependency-free.
+    - Returns dictionary with:
+        * 'corr'   : correlation matrix among EMA columns
+        * 'order'  : list of column names sorted by mean |corr|
+        * 'scores' : DataFrame with per-column mean_abs_corr used for ordering
+    """
+    if ema_cols is None:
+        ema_cols = _find_ema_columns(df)
+    ema_cols = [c for c in ema_cols if c in df.columns]
+
+    corr = df[ema_cols].corr(method=method) if len(ema_cols) >= 2 else pd.DataFrame(index=ema_cols, columns=ema_cols)
+    if corr.empty:
+        return {"corr": corr, "order": ema_cols, "scores": pd.DataFrame({"col": ema_cols, "mean_abs_corr": []})}
+
+    # Mean absolute correlation per EMA column (ignore self-corr on the diagonal)
+    abs_corr = corr.abs()
+    np.fill_diagonal(abs_corr.values, np.nan)
+    scores = abs_corr.mean(skipna=True).rename("mean_abs_corr").to_frame()
+    order = list(scores.sort_values("mean_abs_corr", ascending=False).index)
+
+    return {"corr": corr, "order": order, "scores": scores.reset_index().rename(columns={"index": "col"})}
 
 
 __all__ = [
@@ -220,6 +236,7 @@ __all__ = [
     "rolling_agreement",
     "forward_return_split",
     "lead_lag_max_corr",
-    # new
+    # added
     "compute_ema_comovement_stats",
+    "compute_ema_comovement_hierarchy",
 ]
