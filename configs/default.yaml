@@ -1,0 +1,124 @@
+# configs/default.yaml
+# -----------------------------------------------------------------------------
+# ta_lab2 default configuration
+# - Keeps legacy knobs (adx/obv/mfi, bar-to-bar return settings, etc.)
+# - Adds explicit sections for volatility, rolling vol, EMA slopes/helpers,
+#   regime/comovement, and segment building.
+# - All keys line up with the shims + pipeline so callers can override selectively.
+# -----------------------------------------------------------------------------
+
+# --- IO / paths ---
+data_csv: data/btcusd.csv         # relative to repo root; tests place a placeholder file here
+out_dir: artifacts                # where to write plots/exports (if/when used)
+
+# --- Sampling ---
+resample: null                    # e.g. "1H", "4H", "1D", or null to keep native frequency
+
+# --- Core price columns used across pipeline ---
+price_cols: [open, high, low, close]
+
+# --- EMA windows (used for trend/segments/comovement) ---
+ema_windows: [21, 50, 100, 200]
+
+# --- Indicators (all optional; pipeline only joins what is enabled) ---
+indicators:
+  enabled: [rsi, macd, bollinger, adx, obv, mfi]  # restore full list
+  rsi:
+    period: 14
+    price_col: close
+  macd:
+    fast: 12
+    slow: 26
+    signal: 9
+    price_col: close
+  bollinger:
+    window: 20
+    stdev: 2
+    price_col: close
+  adx:
+    periods: [14]              # legacy support; vectorized internally
+  obv: true                     # boolean toggle; uses volume + price
+  mfi:
+    periods: [14]               # Money Flow Index windows
+
+# --- Bar-to-bar returns (shims accept legacy kwargs) ---
+bar_to_bar:
+  round_places: 6
+  direction: newest_top         # legacy-friendly default
+  open_col: open
+  close_col: close
+  pct:
+    cols: []                    # if empty, pipeline will compute for price_cols + ["close-open"] when present
+    extra_cols: []              # "range" is auto-added by pipeline when available
+  log:
+    cols: []                    # same behavior as pct
+    extra_cols: []
+    prefix: _log_delta          # legacy prefix kept
+    add_intraday: true          # keep old behavior
+
+# --- Rolling returns (used for realized volatility) ---
+returns:
+  modes: [log, pct]             # compute both log and pct by default
+  windows: [10, 21, 50]         # short/mid/long examples
+
+# --- Single-bar + Parkinson/RS/GK + ATR (vectorized) ---
+volatility:
+  atr:
+    periods: [14]
+  parkinson: true               # high/low based
+  rogers_satchell: true         # aka RS
+  garman_klass: true            # aka GK
+
+# --- Realized volatility from returns (annualized) ---
+rolling_vol:
+  price_col: close
+  modes: [log, pct]
+  windows: [10, 21, 50]
+  annualize: true
+  direction: newest_top
+
+# --- EMA derivatives & helpers ---
+ema:
+  slopes:
+    d1: true
+    d2: true
+    round_places: 6
+    direction: newest_top
+    overwrite: false
+  helpers:
+    scale: bps                   # provides *_bps helper cols for comovement/segments
+
+# --- Regime detection via EMA co-movement ---
+regimes:
+  comovement:
+    periods: [21, 50, 100, 200]
+    close_col: close
+    return_col: close_pct_delta  # produced by bar_to_bar pct shim
+    direction: newest_top
+
+# --- Segments from EMA slope sign-flips (thin wrapper around features.segments) ---
+segments:
+  fields: [close]                # base field(s) to build EMA ladders for
+  periods: [21, 50, 100, 200]
+  date_col: timestamp
+  scale: bps
+  direction: newest_top
+  ema_name_fmt: "{field}_ema_{period}"
+
+# --- Pipeline-level defaults / toggles (nothing removed) ---
+pipeline:
+  resample: null                 # overrides top-level resample if provided
+  returns_modes: [log, pct]
+  returns_windows: [10, 21, 50]
+  # Stage toggles (set false to skip stage)
+  do_calendar: true
+  do_indicators: true
+  do_returns: true
+  do_volatility: true
+  do_ema: true
+  do_regimes: true
+  do_segments: true
+
+# --- Output / labeling ---
+labels:
+  trend_label_col: trend_state   # column where regime label is stored
