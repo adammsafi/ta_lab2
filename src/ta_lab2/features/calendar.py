@@ -1,3 +1,4 @@
+# src/ta_lab2/features/calendar.py
 """
 Calendar/date-time feature expansion utilities.
 
@@ -92,7 +93,7 @@ def expand_datetime_features_inplace(
     month_start = dt.dt.to_period("M").dt.start_time
     month_end = dt.dt.to_period("M").dt.end_time
 
-    # Business-day flag (pandas dtype fix: normalize -> numpy datetime64[D] -> is_busday)
+    # Business-day flag
     bd_array = np.full(len(df), np.nan, dtype="float64")
     if len(df) > 0:
         norm_days = dt.dt.normalize().values.astype("datetime64[D]")
@@ -237,20 +238,6 @@ def expand_multiple_timestamps(
 ) -> None:
     """
     Expand several timestamp columns in one call (legacy test helper).
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-    cols : iterable/sequence of column names to expand.
-    to_utc : bool
-        Forwarded to `expand_datetime_features_inplace`.
-    add_moon : bool
-        Forwarded to `expand_datetime_features_inplace`.
-
-    Notes
-    -----
-    - Uses each column name as the prefix (matches previous behavior).
-    - Skips columns that are not present in the DataFrame (no error).
     """
     for c in cols:
         if c in df.columns:

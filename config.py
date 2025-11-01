@@ -3,9 +3,14 @@
 Central configuration loader for ta_lab2.
 
 - Reads config/default.yaml (or any YAML path)
-- Normalizes relative paths to project root
+- Normalizes paths against project root
 - Converts nested mappings into typed dataclasses
 - Supports safe forward-compatibility (unknown keys ignored)
+
+Note:
+- If `data_csv` or `out_dir` are inside the project root, we now store them
+  as **relative paths** (so `(project_root() / cfg.data_csv)` works cleanly).
+  If they are outside the project, we keep them absolute.
 """
 
 from __future__ import annotations
@@ -133,9 +138,9 @@ def _as(obj: Any, cls: Any):
     return cls()
 
 
-def load_settings(yaml_path: str | Path = "config/default.yaml") -> Settings:
+def load_settings(yaml_path: str | Path = "configs/default.yaml") -> Settings:
     """
-    Load YAML into Settings, normalize paths to project root,
+    Load YAML into Settings, normalize paths relative to project root,
     and coerce nested mappings into typed dataclasses.
     Also merges environment overrides if set (DATA_CSV, OUT_DIR).
 
@@ -158,7 +163,7 @@ def load_settings(yaml_path: str | Path = "config/default.yaml") -> Settings:
         else:
             raise FileNotFoundError(f"Configuration file not found: {p}")
 
-    data = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+    data = yaml.safe_load(p.read_text(encoding="utf-8")) | {}
 
     # --- Environment variable overrides ---
     if os.getenv("DATA_CSV"):
@@ -197,11 +202,23 @@ def load_settings(yaml_path: str | Path = "config/default.yaml") -> Settings:
         pipeline=pipeline,
     )
 
-    # --- Normalize paths ---
+    # --- Normalize paths (now relative-if-inside-root) ---
     dc = Path(settings.data_csv)
-    settings.data_csv = str((root / dc).resolve()) if not dc.is_absolute() else str(dc)
+    pabs_dc = (root / dc).resolve() if not dc.is_absolute() else dc.resolve()
+    try:
+        # Store relative when under project root (fixes tests expecting root / cfg.data_csv)
+        settings.data_csv = pabs_dc.relative_to(root).as_posix()
+    except ValueError:
+        # Outside project root -> keep absolute
+        settings.data_csv = str(pabs_dc)
+
     od = Path(settings.out_dir)
-    settings.out_dir = str((root / od).resolve()) if not od.is_absolute() else str(od)
+    pabs_od = (root / od).resolve() if not od.is_absolute() else od.resolve()
+    try:
+        settings.out_dir = pabs_od.relative_to(root).as_posix()
+    except ValueError:
+        settings.out_dir = str(pabs_od)
+
     return settings
 
 
