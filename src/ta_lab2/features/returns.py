@@ -1,7 +1,7 @@
 # src/ta_lab2/features/returns.py
 from __future__ import annotations
 
-from typing import Iterable, Sequence, Optional, Union
+from typing import Sequence, Optional, Union
 import numpy as np
 import pandas as pd
 
@@ -100,31 +100,21 @@ def b2t_pct_delta(
     direction: str = "oldest_top",  # or "newest_top"
     open_col: str = "open",         # kept for compatibility; not required here
     close_col: str = "close",       # kept for compatibility; not required here
+    **kwargs,                       # swallow legacy args like prefix, add_intraday
 ) -> pd.DataFrame:
     """
     Add bar-to-bar **percent** change columns for each requested column.
 
-    The function mutates `df` in place and also returns `df`.
+    Mutates `df` in place and returns `df`.
 
-    Parameters
-    ----------
-    df : DataFrame
-    cols / columns : list[str] or str
-        Columns to compute b2b deltas for.
-    extra_cols : list[str], optional
-        Additional columns to include.
-    round_places : int or None
-        Decimal places to round to; None disables rounding.
-    direction : {"oldest_top", "newest_top"}
-        If your data is sorted with newest row on top, pass "newest_top".
-    open_col, close_col : str
-        Preserved for legacy call sites; not used by this implementation.
+    Notes
+    -----
+    Accepts/ignores legacy kwargs (e.g. `prefix`, `add_intraday`) for compatibility.
     """
     base = _coerce_cols(columns if columns is not None else cols)
     extras = _coerce_cols(extra_cols)
 
     if not base and not extras:
-        # Nothing to do; no-op but keep compatibility
         return df
 
     return _apply_b2b(
@@ -148,11 +138,16 @@ def b2t_log_delta(
     direction: str = "oldest_top",
     open_col: str = "open",   # kept for compatibility; not required here
     close_col: str = "close", # kept for compatibility; not required here
+    **kwargs,                 # swallow legacy args like prefix, add_intraday
 ) -> pd.DataFrame:
     """
     Add bar-to-bar **log** change columns for each requested column.
 
     Mutates `df` in place and returns `df`.
+
+    Notes
+    -----
+    Accepts/ignores legacy kwargs (e.g. `prefix`, `add_intraday`) for compatibility.
     """
     base = _coerce_cols(columns if columns is not None else cols)
     extras = _coerce_cols(extra_cols)
@@ -181,13 +176,10 @@ def add_returns(
     direction: str = "oldest_top",
     open_col: str = "open",                    # preserved for old call sites
     close_col: str = "close",                  # preserved for old call sites
+    **kwargs,                                   # swallow legacy extras
 ) -> pd.DataFrame:
     """
-    Backward-compatible wrapper that mirrors the original API:
-
-        add_returns(df, cols=[...], extra_cols=[...], round_places=6, direction="newest_top")
-
-    It adds BOTH percent and log bar-to-bar deltas:
+    Backward-compatible wrapper that mirrors the original API and adds BOTH:
       - `{col}_b2t_pct`
       - `{col}_b2t_log`
 
@@ -196,7 +188,6 @@ def add_returns(
     base = _coerce_cols(columns if columns is not None else cols)
     extras = _coerce_cols(extra_cols)
 
-    # pct and log changes
     b2t_pct_delta(
         df,
         cols=base,
@@ -205,6 +196,7 @@ def add_returns(
         direction=direction,
         open_col=open_col,
         close_col=close_col,
+        **kwargs,
     )
     b2t_log_delta(
         df,
@@ -214,5 +206,6 @@ def add_returns(
         direction=direction,
         open_col=open_col,
         close_col=close_col,
+        **kwargs,
     )
     return df
