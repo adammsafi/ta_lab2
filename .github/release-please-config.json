@@ -1,0 +1,12 @@
+{
+  "release-type": "python",
+  "package-name": "ta_lab2",
+  "changelog-path": "CHANGELOG.md",
+  "skip-github-release": true,
+  "include-v-in-tag": true,
+  "bump-minor-pre-major": true,
+  "extra-files": [
+    "pyproject.toml",
+    "src/ta_lab2/__init__.py"
+  ]
+}

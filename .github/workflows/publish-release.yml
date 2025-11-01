@@ -1,0 +1,32 @@
+      - name: Generate release notes
+        id: notes
+        run: |
+          VERSION="${GITHUB_REF_NAME}"   # e.g., v0.1.0
+          DATE="$(date +'%B %e, %Y')"
+
+          cat > notes.md <<'EOF'
+## 🚀 **ta_lab2 v0.1.0 — First Major Release**
+
+### 🧭 Overview
+This release marks the first full, modular version of **ta_lab2**, a Python toolkit for technical analysis and regime detection.  
+It introduces a unified configuration system, expanded feature library, and an advanced volatility engine designed for large-scale analytics.
+
+---
+
+### ⚙️ Core Refactor
+- Moved configuration logic from `src/ta_lab2/config.py` → root-level `config.py`.
+- Added `project_root()` to auto-detect the repo root for path normalization.
+- Centralized settings in `config/default.yaml` for portable project setup.
+
+---
+
+### 📦 Packaging & CLI
+... (all your Markdown body above) ...
+
+---
+
+**Tag:** ${{ github.ref_name }}  
+**Release Date:** ${DATE}
+EOF
+
+          echo "notes_file=notes.md" >> $GITHUB_OUTPUT
