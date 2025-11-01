@@ -44,12 +44,16 @@ def _ensure_series(obj, *, col: str | None = None) -> pd.Series:
         return obj[col]
     raise TypeError("Expected a pandas Series or DataFrame.")
 
-def _maybe_assign(df_or_series, series: pd.Series, out_col: str):
-    """If df passed, assign series to df[out_col] and return df; else return Series."""
-    if isinstance(df_or_series, pd.DataFrame):
-        df_or_series[out_col] = series
-        return df_or_series
-    return series.rename(out_col)
+def _return(obj, series: pd.Series, out_col: str, *, inplace: bool):
+    """
+    Default behavior: return a **Series** (named).
+    If inplace=True and obj is a DataFrame, assign column and return the df.
+    """
+    series = series.rename(out_col)
+    if inplace and isinstance(obj, pd.DataFrame):
+        obj[out_col] = series
+        return obj
+    return series
 
 # -------------------------
 # indicators
@@ -61,12 +65,13 @@ def rsi(
     period: int | None = None,        # alias for window
     price_col: str = "close",
     out_col: str | None = None,
+    inplace: bool = False,
 ):
     """
     RSI (Wilder). Back-compat:
       - Accepts Series or DataFrame.
       - `period` is an alias for `window`.
-      - If a DataFrame is passed, returns the same df with the new column added.
+      - By default returns a **Series**; set `inplace=True` to assign to df and return df.
     """
     if window is None and period is not None:
         window = period
@@ -83,8 +88,7 @@ def rsi(
     avg_loss = loss.ewm(alpha=1 / window, adjust=False).mean()
     rs = avg_gain / avg_loss.replace(0.0, np.nan)
     rsi_series = 100.0 - (100.0 / (1.0 + rs))
-    return _maybe_assign(obj, rsi_series.astype(float), out_col)
-
+    return _return(obj, rsi_series.astype(float), out_col, inplace=inplace)
 
 def macd(
     obj,  # Series or DataFrame
@@ -94,11 +98,12 @@ def macd(
     slow: int = 26,
     signal: int = 9,
     out_cols: tuple[str, str, str] | None = None,
+    inplace: bool = False,
 ):
     """
     MACD (12/26/9 by default).
-    - Series -> returns DataFrame with 3 cols.
-    - DataFrame -> adds 3 cols and returns df.
+    Default: return DataFrame with 3 series (macd, signal, hist).
+    If `inplace=True` and obj is a DataFrame, assign all three cols and return df.
     """
     if out_cols is None:
         out_cols = (f"macd_{fast}_{slow}", f"macd_signal_{signal}", f"macd_hist_{fast}_{slow}_{signal}")
@@ -111,15 +116,14 @@ def macd(
     hist = macd_line - signal_line
     out = pd.DataFrame({out_cols[0]: macd_line, out_cols[1]: signal_line, out_cols[2]: hist})
 
-    if isinstance(obj, pd.DataFrame):
+    if inplace and isinstance(obj, pd.DataFrame):
         for c in out.columns:
             obj[c] = out[c]
         return obj
     return out
 
-
 def stoch_kd(
-    obj,  # DataFrame or (Series trio via kwargs)
+    obj,  # DataFrame
     *,
     high_col: str = "high",
     low_col: str = "low",
@@ -127,33 +131,33 @@ def stoch_kd(
     k: int = 14,
     d: int = 3,
     out_cols: tuple[str, str] | None = None,
+    inplace: bool = False,
 ):
     """
-    Stochastic %K/%D. Accepts df (with column names) or individual series via kwargs.
+    Stochastic %K/%D (df input expected).
+    Default: return DataFrame with K and D. If `inplace=True`, assign and return df.
     """
     if out_cols is None:
         out_cols = (f"stoch_k_{k}", f"stoch_d_{d}")
 
-    if isinstance(obj, pd.DataFrame):
-        high = _ensure_series(obj, col=high_col)
-        low = _ensure_series(obj, col=low_col)
-        close = _ensure_series(obj, col=close_col)
-    else:
-        # allow passing series via kwargs names
+    if not isinstance(obj, pd.DataFrame):
         raise TypeError("stoch_kd expects a DataFrame; pass high/low/close columns via high_col/low_col/close_col.")
+
+    high = _ensure_series(obj, col=high_col)
+    low = _ensure_series(obj, col=low_col)
+    close = _ensure_series(obj, col=close_col)
 
     lowest = low.rolling(k, min_periods=k).min()
     highest = high.rolling(k, min_periods=k).max()
     k_line = 100.0 * (close - lowest) / (highest - lowest)
     d_line = k_line.rolling(d, min_periods=d).mean()
 
-    if isinstance(obj, pd.DataFrame):
-        obj[out_cols[0]] = k_line.astype(float)
-        obj[out_cols[1]] = d_line.astype(float)
+    out = pd.DataFrame({out_cols[0]: k_line.astype(float), out_cols[1]: d_line.astype(float)})
+    if inplace:
+        for c in out.columns:
+            obj[c] = out[c]
         return obj
-
-    return pd.DataFrame({out_cols[0]: k_line, out_cols[1]: d_line})
-
+    return out
 
 def bollinger(
     obj,  # Series or DataFrame
@@ -162,11 +166,12 @@ def bollinger(
     price_col: str = "close",
     n_sigma: float = 2.0,
     out_cols: tuple[str, str, str, str] | None = None,
+    inplace: bool = False,
 ):
     """
     Bollinger Bands.
-    Series -> DataFrame with ma/up/lo/width.
-    DataFrame -> adds those columns and returns df.
+    Default: return DataFrame with ma/up/lo/width.
+    If `inplace=True` and obj is a DataFrame, assign and return df.
     """
     if out_cols is None:
         out_cols = (f"bb_ma_{window}", f"bb_up_{window}_{n_sigma}", f"bb_lo_{window}_{n_sigma}", f"bb_width_{window}")
@@ -179,15 +184,14 @@ def bollinger(
     bw = (upper - lower) / ma
 
     out = pd.DataFrame({out_cols[0]: ma, out_cols[1]: upper, out_cols[2]: lower, out_cols[3]: bw})
-    if isinstance(obj, pd.DataFrame):
+    if inplace and isinstance(obj, pd.DataFrame):
         for c in out.columns:
             obj[c] = out[c].astype(float)
         return obj
     return out
 
-
 def atr(
-    obj,  # DataFrame or (high,low,close) Series via kwargs
+    obj,  # DataFrame
     window: int | None = 14,
     *,
     period: int | None = None,   # alias for window
@@ -195,10 +199,11 @@ def atr(
     low_col: str = "low",
     close_col: str = "close",
     out_col: str | None = None,
+    inplace: bool = False,
 ):
     """
     Average True Range (simple rolling mean of TR, matching your original).
-    Accepts df or series triplet via column names.
+    Default: return Series; if `inplace=True`, assign to df and return df.
     """
     if window is None and period is not None:
         window = period
@@ -207,20 +212,19 @@ def atr(
     if out_col is None:
         out_col = f"atr_{window}"
 
-    if isinstance(obj, pd.DataFrame):
-        high = _ensure_series(obj, col=high_col)
-        low = _ensure_series(obj, col=low_col)
-        close = _ensure_series(obj, col=close_col)
-    else:
+    if not isinstance(obj, pd.DataFrame):
         raise TypeError("atr expects a DataFrame; pass high/low/close columns via high_col/low_col/close_col.")
+
+    high = _ensure_series(obj, col=high_col)
+    low = _ensure_series(obj, col=low_col)
+    close = _ensure_series(obj, col=close_col)
 
     tr = _tr(high, low, close)
     out = tr.rolling(window, min_periods=window).mean().astype(float)
-    return _maybe_assign(obj, out, out_col)
-
+    return _return(obj, out, out_col, inplace=inplace)
 
 def adx(
-    obj,  # DataFrame or (high,low,close) Series via kwargs
+    obj,  # DataFrame
     window: int | None = 14,
     *,
     period: int | None = None,  # alias for window
@@ -228,11 +232,11 @@ def adx(
     low_col: str = "low",
     close_col: str = "close",
     out_col: str | None = None,
+    inplace: bool = False,
 ):
     """
-    ADX (your original logic with vectorized conditions; preserves behavior).
-    Accepts df, returns df with adx column; or returns Series if passed Series triplet
-    (but in practice we expect DataFrame usage).
+    ADX (vectorized conditions, preserves original behavior).
+    Default: return Series; if `inplace=True`, assign and return df.
     """
     if window is None and period is not None:
         window = period
@@ -241,17 +245,16 @@ def adx(
     if out_col is None:
         out_col = f"adx_{window}"
 
-    if isinstance(obj, pd.DataFrame):
-        high = _ensure_series(obj, col=high_col)
-        low = _ensure_series(obj, col=low_col)
-        close = _ensure_series(obj, col=close_col)
-    else:
+    if not isinstance(obj, pd.DataFrame):
         raise TypeError("adx expects a DataFrame; pass high/low/close columns via high_col/low_col/close_col.")
+
+    high = _ensure_series(obj, col=high_col)
+    low = _ensure_series(obj, col=low_col)
+    close = _ensure_series(obj, col=close_col)
 
     up = high.diff()
     dn = -low.diff()
 
-    # Vectorized conditions (replacement for Python 'and' on arrays)
     plus_dm = np.where((up > dn) & (up > 0), up, 0.0)
     minus_dm = np.where((dn > up) & (dn > 0), dn, 0.0)
 
@@ -263,35 +266,32 @@ def adx(
 
     dx = ((plus_di - minus_di).abs() / (plus_di + minus_di).replace(0.0, np.nan)) * 100.0
     adx_series = dx.rolling(window, min_periods=window).mean().astype(float)
-    return _maybe_assign(obj, adx_series, out_col)
-
+    return _return(obj, adx_series, out_col, inplace=inplace)
 
 def obv(
-    obj,  # DataFrame or Series + volume
+    obj,  # DataFrame
     *,
     price_col: str = "close",
     volume_col: str = "volume",
     out_col: str = "obv",
+    inplace: bool = False,
 ):
     """
     On-Balance Volume.
-    Series path preserved; DataFrame path assigns new column.
+    Default: return Series; if `inplace=True`, assign and return df.
     """
-    if isinstance(obj, pd.DataFrame):
-        close = _ensure_series(obj, col=price_col)
-        volume = _ensure_series(obj, col=volume_col).astype(float)
-    elif isinstance(obj, pd.Series):
-        raise TypeError("obv requires both price and volume; pass a DataFrame with price_col and volume_col.")
-    else:
-        raise TypeError("Expected a DataFrame for OBV.")
+    if not isinstance(obj, pd.DataFrame):
+        raise TypeError("obv requires a DataFrame with price_col and volume_col.")
+
+    close = _ensure_series(obj, col=price_col)
+    volume = _ensure_series(obj, col=volume_col).astype(float)
 
     direction = np.sign(close.diff().fillna(0.0))
     obv_series = (direction * volume).fillna(0.0).cumsum().astype(float)
-    return _maybe_assign(obj, obv_series, out_col)
-
+    return _return(obj, obv_series, out_col, inplace=inplace)
 
 def mfi(
-    obj,  # DataFrame or (series) via kwargs
+    obj,  # DataFrame
     window: int | None = 14,
     *,
     period: int | None = None,   # alias for window
@@ -300,10 +300,10 @@ def mfi(
     close_col: str = "close",
     volume_col: str = "volume",
     out_col: str | None = None,
+    inplace: bool = False,
 ):
     """
-    Money Flow Index. Back-compat: `period` alias for `window`.
-    Accepts DataFrame and adds the column; returns df.
+    Money Flow Index. Default: return Series; if `inplace=True`, assign and return df.
     """
     if window is None and period is not None:
         window = period
@@ -312,13 +312,13 @@ def mfi(
     if out_col is None:
         out_col = f"mfi_{window}"
 
-    if isinstance(obj, pd.DataFrame):
-        high = _ensure_series(obj, col=high_col)
-        low = _ensure_series(obj, col=low_col)
-        close = _ensure_series(obj, col=close_col)
-        volume = _ensure_series(obj, col=volume_col).astype(float)
-    else:
+    if not isinstance(obj, pd.DataFrame):
         raise TypeError("mfi expects a DataFrame; pass high/low/close/volume via *_col params.")
+
+    high = _ensure_series(obj, col=high_col)
+    low = _ensure_series(obj, col=low_col)
+    close = _ensure_series(obj, col=close_col)
+    volume = _ensure_series(obj, col=volume_col).astype(float)
 
     tp = (high.astype(float) + low.astype(float) + close.astype(float)) / 3.0
     raw = tp * volume
@@ -329,5 +329,5 @@ def mfi(
     nmf = (-neg).rolling(window, min_periods=window).sum()
     mr = pmf / nmf.replace(0.0, np.nan)
 
-    out = 100.0 - (100.0 / (1.0 + mr))
-    return _maybe_assign(obj, out.astype(float), out_col)
+    out = (100.0 - (100.0 / (1.0 + mr))).astype(float)
+    return _return(obj, out, out_col, inplace=inplace)
