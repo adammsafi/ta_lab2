@@ -1,24 +1,59 @@
-from .calendar import expand_datetime_features_inplace
-from .ema import add_ema_columns, add_ema_d1, add_ema_d2
-from .returns import add_returns
+from .calendar import (
+    expand_datetime_features_inplace,
+    expand_multiple_timestamps,
+)
+
+from .ema import (
+    compute_ema,
+    add_ema_columns,
+    add_ema_d1,
+    add_ema_d2,
+    add_ema,  # legacy wrapper shim
+)
+
+from .returns import (
+    add_returns,
+    b2t_pct_delta,
+    b2t_log_delta,
+    add_rolling_vol_from_returns_batch,
+)
+
 from .vol import add_atr
 
-# New imports for technical indicators
-from .indicators import rsi, macd, stoch_kd, bollinger, atr, adx, obv, mfi
+# Technical indicators
+from .indicators import (
+    rsi, macd, stoch_kd, bollinger, atr, adx, obv, mfi
+)
 
-# New imports for correlation-based features
-from .correlation import acf, pacf_yw, rolling_autocorr, xcorr
-
+# Correlation utilities
+from .correlation import (
+    acf, pacf_yw, rolling_autocorr, xcorr
+)
 
 __all__ = [
-    # Core features
+    # Calendar/date features
     "expand_datetime_features_inplace",
-    "add_ema_columns", "add_ema_d1", "add_ema_d2",
-    "add_returns", "add_atr",
+    "expand_multiple_timestamps",
 
-    # Technical indicators
+    # EMA family
+    "compute_ema",
+    "add_ema_columns",
+    "add_ema_d1",
+    "add_ema_d2",
+    "add_ema",  # legacy
+
+    # Returns / deltas / rolling vol
+    "add_returns",
+    "b2t_pct_delta",
+    "b2t_log_delta",
+    "add_rolling_vol_from_returns_batch",
+
+    # Single-bar vol
+    "add_atr",
+
+    # Indicators
     "rsi", "macd", "stoch_kd", "bollinger", "atr", "adx", "obv", "mfi",
 
-    # Correlation utilities
+    # Correlation helpers
     "acf", "pacf_yw", "rolling_autocorr", "xcorr",
 ]
