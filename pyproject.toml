@@ -32,3 +32,6 @@ where = ["src"]
 # Also install the top-level config.py module (so `from config import ...` works)
 [tool.setuptools]
 py-modules = ["config"]
+
+[project.optional-dependencies]
+viz = ["matplotlib>=3.6"]

@@ -1,188 +1,161 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Fri Oct 31 16:05:09 2025
-
-@author: asafi
-"""
-
-import os, re, argparse
+from __future__ import annotations
 import pandas as pd
-import numpy as np
 
-from ta_lab2.resample import bin_by_calendar
 from ta_lab2.features.calendar import expand_datetime_features_inplace
-from ta_lab2.features.ema import add_ema_columns, add_ema_d1, add_ema_d2
-from ta_lab2.features.returns import add_returns
-from ta_lab2.features.vol import add_atr
-from ta_lab2.regimes.comovement import build_alignment_frame, sign_agreement, rolling_agreement
-from ta_lab2.regimes.flips import (
-    sign_from_series, detect_flips, label_regimes_from_flips,
-    attach_regimes, regime_stats
+from ta_lab2.features.ema import add_ema_columns, add_ema_d1, add_ema_d2, prepare_ema_helpers
+from ta_lab2.features.returns import b2t_pct_delta, b2t_log_delta
+from ta_lab2.features.vol import (
+    add_volatility_features,            # shim (see vol.py update)
+    add_rolling_vol_from_returns_batch, # shim (see vol.py update)
 )
+from ta_lab2.features.indicators import rsi, macd, bollinger  # lightweight stubs
+from ta_lab2.regimes.comovement import (
+    compute_ema_comovement_stats,
+    compute_ema_comovement_hierarchy,
+)
+from ta_lab2.regimes.segments import build_flip_segments  # thin wrapper
 
-# -------- utils --------
 
-def _clean_headers(cols):
-    return [re.sub(r"\s+", " ", c.strip().lower()).replace(" ", "_") for c in cols]
+def _infer_timestamp_col(df: pd.DataFrame, fallback: str = "timestamp") -> str:
+    if fallback in df.columns:
+        return fallback
+    for c in df.columns:
+        if "time" in str(c).lower():
+            return c
+    return fallback
 
-def _to_num(s):
-    return pd.to_numeric(
-        pd.Series(s).astype(str).str.replace(",", "", regex=False).replace({"-": None, "": None}),
-        errors="coerce"
+
+def run_btc_pipeline(
+    csv_path: str,
+    price_cols=("open", "high", "low", "close"),
+    timestamp_col="timestamp",
+    ema_windows=(21, 50, 100, 200),
+    resample: str | None = None,   # e.g., "1H", "1D"
+    returns_modes=("log", "pct"),
+    returns_windows=(30, 60, 90),
+) -> dict:
+    """
+    End-to-end, testable pipeline aligned to the modular ta_lab2 layout.
+    Returns a dict of key tables for downstream use.
+    """
+    df = pd.read_csv(csv_path)
+    df.columns = [str(c).strip().lower() for c in df.columns]
+    timestamp_col = _infer_timestamp_col(df, timestamp_col)
+    df = df.rename(columns={timestamp_col: "timestamp"})
+
+    # NOTE: new API name is base_timestamp_col (not ts_col)
+    expand_datetime_features_inplace(df, base_timestamp_col="timestamp")
+
+    # Optional resample (OHLCV)
+    if resample:
+        agg = {"open": "first", "high": "max", "low": "min", "close": "last", "volume": "sum"}
+        have = {k: v for k, v in agg.items() if k in df.columns}
+        if have:
+            df = (
+                df.set_index("timestamp")
+                  .resample(resample)
+                  .agg(have)
+                  .dropna()
+                  .reset_index()
+            )
+            expand_datetime_features_inplace(df, base_timestamp_col="timestamp")
+
+    # Indicators (simple stubs to keep imports working)
+    if "close" in df.columns:
+        out = rsi(df, period=14, price_col="close")
+        df[out.name] = out
+        df = df.join(macd(df, price_col="close"))
+        df = df.join(bollinger(df, price_col="close"))
+
+    # Quick engineered columns
+    if all(k in df.columns for k in ("high", "low", "close", "open")):
+        df["close-open"] = df["close"].astype(float) - df["open"].astype(float)
+        df["range"] = df["high"].astype(float) - df["low"].astype(float)
+
+    # Bar-to-bar deltas (percent + log)
+    b2t_pct_delta(
+        df,
+        cols=list(price_cols) + ["close-open"],
+        extra_cols=["range"],
+        round_places=6,
+        direction="newest_top",
+        open_col="open",
+        close_col="close",
+    )
+    b2t_log_delta(
+        df,
+        cols=list(price_cols) + ["close-open"],
+        extra_cols=["range"],
+        prefix="_log_delta",
+        round_places=6,
+        add_intraday=True,
+        open_col="open",
+        close_col="close",
     )
 
-def _parse_epoch_series(x: pd.Series) -> pd.Series:
-    x = pd.to_numeric(x, errors="coerce")
-    if x.dropna().median() > 10_000_000_000:
-        return pd.to_datetime(x, unit="ms", utc=True, errors="coerce")
-    return pd.to_datetime(x, unit="s", utc=True, errors="coerce")
+    # Volatility (single-bar + rolling realized) via shims
+    df = add_volatility_features(
+        df,
+        do_atr=True, do_parkinson=True, do_rs=True, do_gk=True,
+        rolling_windows=tuple(returns_windows),
+        direction="newest_top",
+    )
+    df = add_rolling_vol_from_returns_batch(
+        df,
+        price_col="close",
+        modes=returns_modes,
+        windows=tuple(returns_windows),
+        annualize=True,
+        direction="newest_top",
+    )
 
-def _scal(s):
-    return s.iloc[0] if hasattr(s, "iloc") else s
+    # EMAs + slopes
+    base_cols = list(price_cols)
+    add_ema_columns(df, base_cols, list(ema_windows))
+    add_ema_d1(df, base_cols, list(ema_windows), direction="newest_top", overwrite=False, round_places=6)
+    add_ema_d2(df, base_cols, list(ema_windows), direction="newest_top", overwrite=False, round_places=6)
+    prepare_ema_helpers(df, base_cols, list(ema_windows), direction="newest_top", scale="bps")
 
-# -------- IO + cleaning --------
+    # Regime labels (close) and segments between EMA-slope sign flips
+    _, labeled = compute_ema_comovement_stats(
+        df.copy(),
+        periods=list(ema_windows),
+        direction="newest_top",
+        close_col="close",
+        return_col="close_pct_delta",
+    )
+    df["trend_state"] = labeled["regime_label"]
 
-def load_clean_csv(csv_path: str) -> pd.DataFrame:
-    df = pd.read_csv(csv_path)
-    df.columns = _clean_headers(df.columns)
+    segments, seg_summary, seg_by_year = build_flip_segments(
+        df,
+        base_cols=("close",),
+        periods=list(ema_windows),
+        direction="newest_top",
+        scale="bps",
+        date_col="timestamp",
+        ema_name_fmt="{field}_ema_{period}",
+    )
 
-    # Build timeopen (prefer timeopen; fallback to epoch timestamp)
-    if "timeopen" in df.columns:
-        dt = pd.to_datetime(df["timeopen"], errors="coerce", utc=True)
-    else:
-        dt = pd.NaT
+    major_stats, sub_stats, sub_stats_mixsum = compute_ema_comovement_hierarchy(
+        df,
+        periods=list(ema_windows),
+        close_col="close",
+        direction="newest_top",
+        return_col="close_pct_delta",
+    )
 
-    if dt.isna().mean() > 0.5 and "timestamp" in df.columns:
-        ts_dt = _parse_epoch_series(df["timestamp"])
-        if ts_dt.notna().sum() > dt.notna().sum():
-            dt = ts_dt
-
-    if pd.isna(dt).all():
-        raise KeyError("Could not parse timestamps from 'timeOpen' or 'timestamp'.")
-
-    df["timeopen"] = dt
-    for col in ["open", "high", "low", "close", "volume", "marketcap"]:
-        if col in df.columns:
-            df[col] = _to_num(df[col])
-
-    df = df.dropna(subset=["timeopen"]).sort_values("timeopen").reset_index(drop=True)
-
-    print("Loaded rows:", len(df))
-    print("Date range:", df["timeopen"].min(), "→", df["timeopen"].max())
-    print("Columns now:", list(df.columns))
-    return df
-
-# -------- timeframes --------
-
-def build_timeframes(df: pd.DataFrame):
-    expand_datetime_features_inplace(df, "timeopen", prefix="timeopen")
-
-    weekly = bin_by_calendar(df, "timeopen", "W-SUN").rename(columns={"period_end": "date"})
-    weekly["timeframe"] = "1W"
-
-    monthly = bin_by_calendar(df, "timeopen", "MS").rename(columns={"period_end": "date"})
-    monthly["timeframe"] = "1M"
-
-    daily = df.rename(columns={"timeopen": "date"})[["date","open","high","low","close","volume"]].copy()
-    daily["timeframe"] = "1D"
-
-    for d in (daily, weekly, monthly):
-        d["symbol"] = "BTC-USD"
-
-    return daily, weekly, monthly
-
-# -------- enrichment --------
-
-def enrich(bars: pd.DataFrame) -> pd.DataFrame:
-    add_returns(bars, close_col="close")  # local impl: creates close_ret_1
-    add_ema_columns(bars, ["close"], [21,50,100,200])
-    add_ema_d1(bars, ["close"], [21,50,100,200])
-    add_ema_d2(bars, ["close"], [21,50,100,200])
-    add_atr(bars, period=14, high_col="high", low_col="low", close_col="close")
-    return bars
-
-def enrich_all(daily, weekly, monthly):
-    return enrich(daily.copy()), enrich(weekly.copy()), enrich(monthly.copy())
-
-# -------- diagnostics --------
-
-def print_ema21_agreement(daily_en: pd.DataFrame, weekly_en: pd.DataFrame):
-    d = daily_en[["date","close_ema_21_d1"]].sort_values("date")
-    w = weekly_en[["date","close_ema_21_d1"]].sort_values("date").rename(columns={"close_ema_21_d1":"close_ema_21_d1_w"})
-    cmp = pd.merge_asof(d, w, on="date", direction="backward")
-    cmp["ema21_d1_agree"] = (cmp["close_ema_21_d1"] * cmp["close_ema_21_d1_w"]) > 0
-    print("Daily vs Weekly EMA21 slope agreement:", f"{cmp['ema21_d1_agree'].mean():.2%}")
-
-def boundary_check(daily, weekly, monthly, dates_utc):
-    for dt_str in dates_utc:
-        dt = pd.Timestamp(dt_str, tz="UTC")
-        drow = daily.loc[daily["date"] == dt]
-        wrow = weekly.loc[weekly["date"] == dt]
-        mrow = monthly.loc[monthly["date"] == dt]
-        if not drow.empty and not wrow.empty:
-            print("WEEK check:", dt_str, "daily open:", float(_scal(drow["open"])), "weekly open:", float(_scal(wrow["open"])))
-        if not drow.empty and not mrow.empty:
-            print("MONTH check:", dt_str, "daily open:", float(_scal(drow["open"])), "monthly open:", float(_scal(mrow["open"])))
-
-# -------- regimes --------
-
-def compute_regimes(daily_en: pd.DataFrame):
-    daily_sig = sign_from_series(daily_en.copy(), "close_ema_21_d1", out_col="d_slope_sign")
-
-    if "close_ret_1" not in daily_sig.columns:
-        add_returns(daily_sig, close_col="close")
-
-    flips = detect_flips(daily_sig, "d_slope_sign", min_separation=2)
-    regime_ids = label_regimes_from_flips(len(daily_sig), flips["idx"].tolist())
-    daily_reg = attach_regimes(daily_sig, regime_ids, col="regime_id")
-
-    if "close_ret_1" not in daily_reg.columns:
-        # fallback: compute forward simple return
-        daily_reg["close_ret_1"] = (daily_reg["close"].shift(-1) / daily_reg["close"]) - 1
-
-    stats = regime_stats(daily_reg, regime_col="regime_id", ret_col="close_ret_1")
-    return daily_reg, stats
-
-# -------- comovement --------
-
-def compute_comovement(daily_en: pd.DataFrame, weekly_en: pd.DataFrame):
-    al = build_alignment_frame(
-        daily_en, weekly_en,
-        on="date", low_cols=["close_ema_21_d1"], high_cols=["close_ema_21_d1"]
-    ).rename(columns={"close_ema_21_d1": "d_slope", "close_ema_21_d1_w": "w_slope"})
-    al, pct = sign_agreement(al, "d_slope", "w_slope", out_col="agree")
-    al = rolling_agreement(al, "d_slope", "w_slope", window=63)
-    return al, pct
-
-# -------- main --------
-
-def main(argv=None):
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--csv", required=True, help="Path to BTC CSV (CoinMarketCap export).")
-    ap.add_argument("--outdir", default="", help="Optional directory to save artifacts.")
-    ap.add_argument("--check", nargs="*", help="Optional UTC dates to boundary-check, e.g. 2015-01-01 2015-02-01")
-    args = ap.parse_args(argv)
-
-    df = load_clean_csv(args.csv)
-    daily, weekly, monthly = build_timeframes(df)
-    daily_en, weekly_en, monthly_en = enrich_all(daily, weekly, monthly)
-
-    print_ema21_agreement(daily_en, weekly_en)
-
-    if args.check:
-        boundary_check(daily, weekly, monthly, args.check)
-
-    daily_reg, stats = compute_regimes(daily_en)
-    print(stats.head())
-
-    al, pct = compute_comovement(daily_en, weekly_en)
-
-    if args.outdir:
-        os.makedirs(args.outdir, exist_ok=True)
-        daily_en.to_parquet(os.path.join(args.outdir, "daily_en.parquet"), index=False)
-        weekly_en.to_parquet(os.path.join(args.outdir, "weekly_en.parquet"), index=False)
-        monthly_en.to_parquet(os.path.join(args.outdir, "monthly_en.parquet"), index=False)
-        daily_reg.to_parquet(os.path.join(args.outdir, "daily_regimes.parquet"), index=False)
-        stats.to_csv(os.path.join(args.outdir, "regime_stats.csv"), index=False)
-        al.to_parquet(os.path.join(args.outdir, "alignment.parquet"), index=False)
-        print(f"Saved outputs to: {args.outdir}")
+    summary = {
+        "n_rows": int(len(df)),
+        "n_segments": int(len(segments)),
+        "mean_seg_return": float(segments["ret_close_to_close"].mean()) if len(segments) else 0.0,
+        "mean_seg_len": float(segments["bars"].mean()) if len(segments) else 0.0,
+    }
+    return {
+        "data": df,
+        "segments": segments,
+        "segment_summary": seg_summary,
+        "segment_by_year": seg_by_year,
+        "regime_major": major_stats,
+        "regime_sub": sub_stats_mixsum,
+        "summary": summary,
+    }
