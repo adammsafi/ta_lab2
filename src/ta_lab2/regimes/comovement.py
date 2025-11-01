@@ -1,10 +1,29 @@
-# ta_lab2/regimes/comovement.py
+# src/ta_lab2/regimes/comovement.py
+"""
+Comovement utilities (no-loss merged module)
+
+This module preserves all original functionality:
+- _ensure_sorted, build_alignment_frame
+- sign_agreement, rolling_agreement
+- forward_return_split
+- lead_lag_max_corr
+
+And adds:
+- compute_ema_comovement_stats: correlations + sign-agreement across EMA columns.
+
+All functions are pure DataFrame utilities and operate in-place where noted.
+"""
+
 from __future__ import annotations
-from typing import Optional, Dict, Iterable
+from typing import Optional, Dict, Iterable, Sequence, Iterable as _Iterable
+import itertools
 import numpy as np
 import pandas as pd
 
 
+# ---------------------------------------------------------------------
+# Original utilities (PRESERVED)
+# ---------------------------------------------------------------------
 def _ensure_sorted(df: pd.DataFrame, on: str) -> pd.DataFrame:
     if on not in df.columns:
         raise KeyError(f"Column '{on}' not found in DataFrame.")
@@ -18,8 +37,8 @@ def build_alignment_frame(
     high_df: pd.DataFrame,
     *,
     on: str = "date",
-    low_cols: Optional[Iterable[str]] = None,
-    high_cols: Optional[Iterable[str]] = None,
+    low_cols: Optional[_Iterable[str]] = None,
+    high_cols: Optional[_Iterable[str]] = None,
     suffix_low: str = "",
     suffix_high: str = "_w",
     direction: str = "backward",
@@ -86,8 +105,6 @@ def rolling_agreement(
     return df
 
 
-# ---- optional extras (nice to have) -----------------------------------------
-
 def forward_return_split(
     df: pd.DataFrame,
     agree_col: str,
@@ -128,3 +145,81 @@ def lead_lag_max_corr(
     s = pd.Series(corrs).dropna()
     best_lag = int(s.abs().idxmax()) if not s.empty else 0
     return {"best_lag": best_lag, "best_corr": float(s.loc[best_lag]) if not s.empty else np.nan, "corr_by_lag": s}
+
+
+# ---------------------------------------------------------------------
+# New EMA comovement stats (ADDED, backward-compatible)
+# ---------------------------------------------------------------------
+def _find_ema_columns(df: pd.DataFrame, token: str = "_ema_") -> list[str]:
+    """Auto-detect EMA columns by substring token (default: '_ema_')."""
+    cols = [c for c in df.columns if token in c]
+    def _tail_int(name: str) -> int:
+        try:
+            return int(name.split("_")[-1])
+        except Exception:
+            return 10**9
+    return sorted(cols, key=_tail_int)
+
+
+def _pairwise(cols: Sequence[str]) -> Iterable[tuple[str, str]]:
+    return itertools.combinations(cols, 2)
+
+
+def compute_ema_comovement_stats(
+    df: pd.DataFrame,
+    *,
+    ema_cols: Sequence[str] | None = None,
+    method: str = "spearman",      # "pearson" | "spearman"
+    agree_on_sign_of_diff: bool = True,
+    diff_window: int = 1,
+) -> Dict[str, pd.DataFrame]:
+    """
+    Compute simple co-movement stats among EMA series.
+
+    Returns a dict with:
+      - 'corr':  correlation matrix over EMA levels
+      - 'agree': pairwise agreement of sign(dEMA) over `diff_window`
+      - 'meta':  one-row metadata (n_ema, method, diff_window)
+    """
+    if ema_cols is None:
+        ema_cols = _find_ema_columns(df)
+
+    ema_cols = [c for c in ema_cols if c in df.columns]
+    if len(ema_cols) < 2:
+        return {
+            "corr": pd.DataFrame(index=ema_cols, columns=ema_cols, dtype=float),
+            "agree": pd.DataFrame(columns=["a", "b", "agree_rate"], dtype=float),
+            "meta": pd.DataFrame([{"n_ema": len(ema_cols)}]),
+        }
+
+    corr = df[ema_cols].corr(method=method)
+
+    if agree_on_sign_of_diff:
+        diffs = df[ema_cols].diff(diff_window)
+        signs = np.sign(diffs)
+        rows = []
+        for a, b in _pairwise(list(ema_cols)):
+            s_a, s_b = signs[a], signs[b]
+            valid = s_a.notna() & s_b.notna()
+            agree = float((s_a[valid] == s_b[valid]).mean()) if valid.any() else np.nan
+            rows.append({"a": a, "b": b, "agree_rate": agree})
+        agree_df = pd.DataFrame(rows)
+    else:
+        agree_df = pd.DataFrame(columns=["a", "b", "agree_rate"], dtype=float)
+
+    meta = pd.DataFrame([{"n_ema": len(ema_cols), "method": method, "diff_window": diff_window}])
+
+    return {"corr": corr, "agree": agree_df, "meta": meta}
+
+
+__all__ = [
+    # original
+    "_ensure_sorted",
+    "build_alignment_frame",
+    "sign_agreement",
+    "rolling_agreement",
+    "forward_return_split",
+    "lead_lag_max_corr",
+    # new
+    "compute_ema_comovement_stats",
+]
