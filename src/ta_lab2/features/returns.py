@@ -5,7 +5,7 @@ from typing import Iterable, Sequence, Optional, Union
 import numpy as np
 import pandas as pd
 
-__all__ = ["b2t_pct_delta", "b2t_log_delta"]
+__all__ = ["b2t_pct_delta", "b2t_log_delta", "add_returns"]
 
 Number = Union[int, float, np.number]
 
@@ -169,3 +169,50 @@ def b2t_log_delta(
         round_places=round_places,
         direction=direction,
     )
+
+
+def add_returns(
+    df: pd.DataFrame,
+    *,
+    cols: Optional[Sequence[str]] = None,
+    columns: Optional[Sequence[str]] = None,   # legacy alias
+    extra_cols: Optional[Sequence[str]] = None,
+    round_places: Optional[int] = 6,
+    direction: str = "oldest_top",
+    open_col: str = "open",                    # preserved for old call sites
+    close_col: str = "close",                  # preserved for old call sites
+) -> pd.DataFrame:
+    """
+    Backward-compatible wrapper that mirrors the original API:
+
+        add_returns(df, cols=[...], extra_cols=[...], round_places=6, direction="newest_top")
+
+    It adds BOTH percent and log bar-to-bar deltas:
+      - `{col}_b2t_pct`
+      - `{col}_b2t_log`
+
+    Mutates `df` in place and returns it.
+    """
+    base = _coerce_cols(columns if columns is not None else cols)
+    extras = _coerce_cols(extra_cols)
+
+    # pct and log changes
+    b2t_pct_delta(
+        df,
+        cols=base,
+        extra_cols=extras,
+        round_places=round_places,
+        direction=direction,
+        open_col=open_col,
+        close_col=close_col,
+    )
+    b2t_log_delta(
+        df,
+        cols=base,
+        extra_cols=extras,
+        round_places=round_places,
+        direction=direction,
+        open_col=open_col,
+        close_col=close_col,
+    )
+    return df
