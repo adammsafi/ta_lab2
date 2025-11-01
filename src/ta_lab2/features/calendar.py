@@ -115,18 +115,24 @@ def expand_datetime_features_inplace(
         f"{prefix}_is_year_start":    dt.dt.is_year_start.astype("Int8"),
         f"{prefix}_is_year_end":      dt.dt.is_year_end.astype("Int8"),
 
-        # Day-of-year and business-day flag (Mon–Fri, not holiday-aware)
+        # Day-of-year
         f"{prefix}_day_of_year": dt.dt.dayofyear.astype("Int64"),
-        f"{prefix}_is_business_day": pd.Series(
-            np.is_busday(dt.dt.date.astype("datetime64[D]"), weekmask='Mon Tue Wed Thu Fri'),
-            index=df.index
-        ).astype("Int8"),
-
-        # Session bucket (example; adjust to your venue)
-        f"{prefix}_session": dt.dt.hour.map(_session_bucket),
-        f"{prefix}_days_in_month": days_in_month,
-        f"{prefix}_nth_day_of_month": nth_day_of_month,
     }
+
+    # --- business-day (Mon..Fri) flag, NumPy path avoids pandas' astype errors ---
+    try:
+        # to_numpy with dtype yields a NumPy datetime64[D] array (tz dropped intentionally)
+        _dates_d = dt.dt.date.to_numpy(dtype="datetime64[D]")
+        bus = np.is_busday(_dates_d, weekmask="Mon Tue Wed Thu Fri")
+        out[f"{prefix}_is_business_day"] = pd.Series(bus, index=df.index).astype("Int8")
+    except Exception:
+        # Fallback: safe-but-slower pure-Pandas path (no NumPy dtype casting)
+        out[f"{prefix}_is_business_day"] = (~dt.dt.day_name().isin(["Saturday", "Sunday"])).astype("Int8")
+
+    # Session bucket (example; adjust to your venue)
+    out[f"{prefix}_session"] = dt.dt.hour.map(_session_bucket)
+    out[f"{prefix}_days_in_month"] = days_in_month
+    out[f"{prefix}_nth_day_of_month"] = nth_day_of_month
 
     # Seasons (exact if astronomy present; else approx)
     def _season_boundaries(year: int):
