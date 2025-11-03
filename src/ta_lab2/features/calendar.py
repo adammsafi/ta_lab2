@@ -85,13 +85,17 @@ def expand_datetime_features_inplace(
     us_dow = ((dt.dt.dayofweek + 1) % 7 + 1).astype("Int64")  # Sun=1..Sat=7
 
     # unix seconds (preserve NaT -> <NA>)
-    unix_ns = dt.view("int64")
+    unix_ns = dt.astype("int64")
     unix_ns = pd.Series(unix_ns, index=df.index).where(valid)
     unix_s = (unix_ns // 10**9).astype("Int64")
 
     # Month boundaries (tz drop warnings are harmless for derived features)
-    month_start = dt.dt.to_period("M").dt.start_time
-    month_end = dt.dt.to_period("M").dt.end_time
+    _naive = dt.dt.tz_localize(None)
+    month_start = _naive.dt.to_period("M").dt.start_time
+    month_end   = _naive.dt.to_period("M").dt.end_time
+    # (optional) add tz back if you rely on tz-aware outputs:
+    # month_start = month_start.dt.tz_localize("UTC")
+    # month_end   = month_end.dt.tz_localize("UTC")
 
     # Business-day flag
     bd_array = np.full(len(df), np.nan, dtype="float64")

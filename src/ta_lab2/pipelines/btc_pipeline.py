@@ -1,9 +1,10 @@
-# src/ta_lab2/pipelines/btc_pipeline.py
 from __future__ import annotations
 
 from dataclasses import asdict, is_dataclass
 from typing import Iterable, Mapping, Dict, Any
 import inspect
+import os
+import glob
 import numpy as np
 import pandas as pd
 
@@ -18,8 +19,8 @@ from ta_lab2.features.ema import (
 from ta_lab2.features.indicators import rsi, macd, bollinger
 from ta_lab2.features.returns import b2t_pct_delta, b2t_log_delta
 from ta_lab2.features.vol import (
-    add_volatility_features,            # single-bar + Parkinson/RS/GK + ATR
-    add_rolling_vol_from_returns_batch, # realized vol from returns
+    add_volatility_features,
+    add_rolling_vol_from_returns_batch,
 )
 
 # --- Regimes / segments ---
@@ -40,21 +41,14 @@ def _filter_kwargs(func, kwargs: Dict[str, Any]) -> Dict[str, Any]:
     return {k: v for k, v in kwargs.items() if k in sig.parameters}
 
 def _try_call_with_windows(func, df: pd.DataFrame, ema_windows, **kwargs):
-    """
-    For comovement/hierarchy funcs that accept a windows argument.
-    Tries periods=, windows=, ema_windows=, then positional.
-    """
     fk = _filter_kwargs(func, kwargs)
     psig = inspect.signature(func).parameters
-
     for key in ("periods", "windows", "ema_windows"):
         try:
             if key in psig:
                 return func(df, **{key: list(ema_windows)}, **fk)
         except TypeError:
             pass
-
-    # Positional windows
     try:
         return func(df, list(ema_windows), **fk)
     except TypeError:
@@ -83,32 +77,21 @@ def _call_ema_hierarchy(df: pd.DataFrame, ema_windows, **kwargs):
     return _try_call_with_windows(func, df, ema_windows, **kw2)
 
 def _call_build_segments(df: pd.DataFrame, *, price_col="close", state_col="trend_state", date_col="timestamp"):
-    """
-    Robust caller for features.segments.build_flip_segments (no windows here).
-    Only pass kwargs the function accepts; map alternate param names if present.
-    """
     func = build_flip_segments
     psig = inspect.signature(func).parameters
     kwargs: Dict[str, Any] = {}
-
-    # price column
     for k in ("price_col", "field", "col"):
         if k in psig:
             kwargs[k] = price_col
             break
-
-    # state column
     for k in ("state_col", "label_col", "trend_col"):
         if k in psig:
             kwargs[k] = state_col
             break
-
-    # timestamp column
     for k in ("timestamp_col", "date_col", "time_col", "ts_col"):
         if k in psig:
             kwargs[k] = date_col
             break
-
     kwargs = _filter_kwargs(func, kwargs)
     return func(df, **kwargs)
 
@@ -145,6 +128,25 @@ def _maybe_from_config(value, default):
         return value
     return value
 
+def _find_default_csv() -> str | None:
+    """Best-effort discovery of a BTC price CSV in common spots."""
+    candidates = [
+        "data/btc.csv",
+        "data/BTC.csv",
+        "data/btcusd.csv",
+        "data/btc_usd.csv",
+        "data/price.csv",
+        "btc.csv",
+    ]
+    for p in candidates:
+        if os.path.exists(p):
+            return p
+    # Heuristics: look for any csv with 'btc' in its name under data/
+    for pat in ("data/*btc*.csv", "data/*.csv", "*.csv"):
+        for p in glob.glob(pat):
+            return p
+    return None
+
 
 # ===========================
 # Main pipeline
@@ -152,16 +154,11 @@ def _maybe_from_config(value, default):
 def run_btc_pipeline(
     csv_path: str | pd.DataFrame,
     *,
-    # Columns & windows
     price_cols: Iterable[str] = ("open", "high", "low", "close"),
     ema_windows: Iterable[int] = (21, 50, 100, 200),
     returns_modes: Iterable[str] = ("log", "pct"),
     returns_windows: Iterable[int] = (30, 60, 90),
-
-    # Optional resample (e.g., "1H", "1D")
     resample: str | None = None,
-
-    # Feature-stage toggles
     do_calendar: bool = True,
     do_indicators: bool = True,
     do_returns: bool = True,
@@ -169,8 +166,6 @@ def run_btc_pipeline(
     do_ema: bool = True,
     do_regimes: bool = True,
     do_segments: bool = True,
-
-    # Optional config override
     config: Mapping | object | None = None,
 ) -> dict:
     """End-to-end, testable pipeline aligned to the modular ta_lab2 layout."""
@@ -183,7 +178,6 @@ def run_btc_pipeline(
             returns_modes   = tuple(cfg.get("returns_modes",   returns_modes))
             returns_windows = tuple(cfg.get("returns_windows", returns_windows))
             resample        = cfg.get("resample",              resample)
-
             do_calendar   = cfg.get("do_calendar",   do_calendar)
             do_indicators = cfg.get("do_indicators", do_indicators)
             do_returns    = cfg.get("do_returns",    do_returns)
@@ -204,9 +198,7 @@ def run_btc_pipeline(
         agg = {"open": "first", "high": "max", "low": "min", "close": "last", "volume": "sum"}
         have = {k: v for k, v in agg.items() if k in df.columns}
         if have:
-            df = (
-                df.set_index("timestamp").resample(resample).agg(have).dropna().reset_index()
-            )
+            df = df.set_index("timestamp").resample(resample).agg(have).dropna().reset_index()
             if do_calendar:
                 expand_datetime_features_inplace(df, base_timestamp_col="timestamp")
 
@@ -222,7 +214,7 @@ def run_btc_pipeline(
         df["close-open"] = df["close"].astype(float) - df["open"].astype(float)
         df["range"] = df["high"].astype(float) - df["low"].astype(float)
 
-    # --- Returns (pct + log) ---
+    # --- Returns ---
     if do_returns:
         b2t_pct_delta(
             df,
@@ -289,9 +281,7 @@ def run_btc_pipeline(
             elif len(res) == 1:
                 major_stats = res[0]
         elif isinstance(res, dict):
-            major_stats = res  # dict (corr/agree/meta)
-
-        # If no labeled regimes returned, synthesize a minimal trend_state from EMA slope
+            major_stats = res
         if isinstance(labeled, pd.DataFrame) and "regime_label" in labeled.columns:
             df["trend_state"] = labeled["regime_label"]
         else:
@@ -309,13 +299,7 @@ def run_btc_pipeline(
     seg_summary = pd.DataFrame()
     seg_by_year = pd.DataFrame()
     if do_segments:
-        seg_res = _call_build_segments(
-            df,
-            price_col="close",
-            state_col="trend_state",
-            date_col="timestamp",
-        )
-        # Accept DataFrame, (segments, summary), or (segments, summary, by_year)
+        seg_res = _call_build_segments(df, price_col="close", state_col="trend_state", date_col="timestamp")
         if isinstance(seg_res, pd.DataFrame):
             segments = seg_res
         elif isinstance(seg_res, tuple):
@@ -330,17 +314,12 @@ def run_btc_pipeline(
             seg_summary = seg_res.get("summary", pd.DataFrame())
             seg_by_year = seg_res.get("by_year", pd.DataFrame())
 
-    # --- Hierarchy (major/sub) ---
+    # --- Hierarchy ---
     h_major = pd.DataFrame()
     h_scores = pd.DataFrame()
     if do_regimes:
-        hres = _call_ema_hierarchy(
-            df,
-            ema_windows,
-            close_col="close",
-            direction="newest_top",
-            return_col="close_pct_delta",
-        )
+        hres = _call_ema_hierarchy(df, ema_windows, close_col="close",
+                                   direction="newest_top", return_col="close_pct_delta")
         if isinstance(hres, tuple):
             if len(hres) == 3:
                 h_major, _, h_scores = hres
@@ -352,12 +331,11 @@ def run_btc_pipeline(
             h_major = hres.get("corr", pd.DataFrame())
             h_scores = hres.get("scores", pd.DataFrame())
 
-    # --- Summary (robust to different segment schemas) ---
+    # --- Summary ---
     ret_col = next((c for c in ("ret_close_to_close", "seg_return", "return", "ret")
                     if c in segments.columns), None)
     len_col = next((c for c in ("bars", "seg_len", "length", "len")
                     if c in segments.columns), None)
-
     mean_seg_return = float(segments[ret_col].mean()) if ret_col else 0.0
     mean_seg_len    = float(segments[len_col].mean()) if len_col else 0.0
 
@@ -377,3 +355,49 @@ def run_btc_pipeline(
         "regime_sub": h_scores,
         "summary": summary,
     }
+
+
+# ===========================
+# CLI / Spyder entrypoint
+# ===========================
+def main(csv_path: str | None = None, config_path: str | None = None, save_artifacts: bool = True):
+    """
+    Run the BTC pipeline end-to-end and (optionally) write artifacts.
+    Returns the final DataFrame so Spyder can inspect it.
+
+    Parameters
+    ----------
+    csv_path : optional explicit path to input CSV. If None, the pipeline will
+               try common defaults (e.g., data/btc.csv) and a few heuristics.
+    config_path : optional YAML config path for the loader (if your project uses one).
+    save_artifacts : write artifacts/btc.parquet (parquet preferred, csv fallback)
+    """
+    # Load config if available
+    cfg = None
+    try:
+        from ta_lab2.config import load_config
+        cfg = load_config(config_path)
+    except Exception:
+        cfg = None
+
+    # Discover CSV if not given
+    if csv_path is None:
+        csv_path = _find_default_csv()
+        if csv_path is None:
+            raise FileNotFoundError(
+                "No input CSV found. Put a file at data/btc.csv (recommended) "
+                "or pass an explicit path via main(csv_path=...) or the CLI --csv flag."
+            )
+
+    out = run_btc_pipeline(csv_path, config=cfg)
+    df = out["data"]
+
+    if save_artifacts:
+        os.makedirs("artifacts", exist_ok=True)
+        try:
+            df.to_parquet("artifacts/btc.parquet")
+        except Exception:
+            df.to_csv("artifacts/btc.csv", index=False)
+        print("Pipeline complete → artifacts/")
+
+    return df
