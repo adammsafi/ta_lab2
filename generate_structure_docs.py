@@ -180,8 +180,8 @@ def emit_hybrid_markdown(
 # ---------- Main (side-effects live here) ----------
 
 if __name__ == "__main__":
-    ROOT = r"C:\Users\asafi\Downloads\ta_lab2"
-    PKG  = "ta_lab2"
+    ROOT = r"C:\Users\asafi\Downloads\fedtools2"
+    PKG  = "fedtools2"
 
     # 1) Tree (txt + md)
     structure_txt = os.path.join(ROOT, "structure.txt")
