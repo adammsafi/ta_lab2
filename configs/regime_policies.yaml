@@ -1,0 +1,43 @@
+# configs/regime_policies.yaml
+# Overlay rules that merge over DEFAULT_POLICY_TABLE in code.
+# Matching is substring-based: every token in "match" must appear in the regime key.
+rules:
+  - match: "Up-Normal-Normal"
+    size_mult: 1.05
+    stop_mult: 1.45
+    orders: mixed
+    setups: ["breakout","pullback"]
+    gross_cap: 1.0
+    pyramids: true
+
+  - match: "Up-High-"
+    size_mult: 0.70
+    stop_mult: 1.85
+    orders: conservative
+    setups: ["pullback"]
+    pyramids: false
+
+  - match: "Sideways-Low-"
+    size_mult: 0.65
+    stop_mult: 1.30
+    orders: passive
+    setups: ["mean_revert"]
+
+  - match: "Sideways-High-"
+    size_mult: 0.35
+    stop_mult: 2.10
+    orders: passive
+    setups: ["stand_down","mean_revert"]
+    pyramids: false
+
+  - match: "Down-"
+    size_mult: 0.55
+    stop_mult: 1.70
+    orders: mixed
+    setups: ["short_rallies","hedge"]
+
+  - match: "-Stressed"
+    size_mult: 0.55
+    stop_mult: 1.30
+    orders: passive
+    pyramids: false
