@@ -1,0 +1,352 @@
+{
+  "package": "ta_lab2",
+  "root": "C:\\Users\\asafi\\Downloads\\ta_lab2\\src\\ta_lab2",
+  "modules": [
+    {
+      "module": "ta_lab2.cli",
+      "classes": [],
+      "functions": [
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.compare",
+      "classes": [],
+      "functions": [
+        "prep_for_stats",
+        "build_timeframe"
+      ]
+    },
+    {
+      "module": "ta_lab2.config",
+      "classes": [],
+      "functions": []
+    },
+    {
+      "module": "ta_lab2.io",
+      "classes": [],
+      "functions": [
+        "write_parquet",
+        "read_parquet"
+      ]
+    },
+    {
+      "module": "ta_lab2.logging_setup",
+      "classes": [],
+      "functions": [
+        "setup_logging"
+      ]
+    },
+    {
+      "module": "ta_lab2.resample",
+      "classes": [],
+      "functions": [
+        "_ensure_datetime_index",
+        "_apply_ohlcv_agg",
+        "_flatten_agg_columns",
+        "_auto_label_closed",
+        "bin_by_calendar",
+        "_season_id_from_exact_row",
+        "bin_by_season"
+      ]
+    },
+    {
+      "module": "ta_lab2.__init__",
+      "classes": [],
+      "functions": [
+        "add_rolling_vol_from_returns_batch"
+      ]
+    },
+    {
+      "module": "ta_lab2.analysis.feature_eval",
+      "classes": [],
+      "functions": [
+        "corr_matrix",
+        "redundancy_report",
+        "future_return",
+        "binarize_target",
+        "quick_logit_feature_weights",
+        "feature_target_correlations"
+      ]
+    },
+    {
+      "module": "ta_lab2.analysis.parameter_sweep",
+      "classes": [],
+      "functions": [
+        "grid",
+        "random_search"
+      ]
+    },
+    {
+      "module": "ta_lab2.analysis.performance",
+      "classes": [],
+      "functions": [
+        "pct_change",
+        "log_returns",
+        "equity_from_returns",
+        "_annualize_scale",
+        "sharpe",
+        "sortino",
+        "max_drawdown",
+        "calmar",
+        "annual_return",
+        "hit_rate",
+        "turnover",
+        "position_returns",
+        "evaluate_signals"
+      ]
+    },
+    {
+      "module": "ta_lab2.analysis.regime_eval",
+      "classes": [],
+      "functions": [
+        "metrics_by_regime",
+        "regime_transition_pnl"
+      ]
+    },
+    {
+      "module": "ta_lab2.analysis.__init__",
+      "classes": [],
+      "functions": []
+    },
+    {
+      "module": "ta_lab2.features.calendar",
+      "classes": [],
+      "functions": [
+        "expand_datetime_features_inplace",
+        "expand_multiple_timestamps"
+      ]
+    },
+    {
+      "module": "ta_lab2.features.correlation",
+      "classes": [],
+      "functions": [
+        "acf",
+        "pacf_yw",
+        "rolling_autocorr",
+        "xcorr"
+      ]
+    },
+    {
+      "module": "ta_lab2.features.ema",
+      "classes": [],
+      "functions": [
+        "compute_ema",
+        "_flip_for_direction",
+        "_maybe_round",
+        "_ensure_list",
+        "add_ema_columns",
+        "add_ema_d1",
+        "add_ema_d2",
+        "add_ema",
+        "prepare_ema_helpers"
+      ]
+    },
+    {
+      "module": "ta_lab2.features.feature_pack",
+      "classes": [],
+      "functions": [
+        "_annualization",
+        "attach_core_features"
+      ]
+    },
+    {
+      "module": "ta_lab2.features.indicators",
+      "classes": [],
+      "functions": [
+        "_ema",
+        "_sma",
+        "_tr",
+        "_ensure_series",
+        "_return",
+        "rsi",
+        "macd",
+        "stoch_kd",
+        "bollinger",
+        "atr",
+        "adx",
+        "obv",
+        "mfi"
+      ]
+    },
+    {
+      "module": "ta_lab2.features.resample",
+      "classes": [],
+      "functions": [
+        "_normalize",
+        "_normalize_freq",
+        "_season_from_month",
+        "resample_one",
+        "resample_many",
+        "add_season_label",
+        "seasonal_summary"
+      ]
+    },
+    {
+      "module": "ta_lab2.features.returns",
+      "classes": [],
+      "functions": [
+        "_coerce_cols",
+        "_as_float_series",
+        "_b2b_change",
+        "_apply_b2b",
+        "b2t_pct_delta",
+        "b2t_log_delta",
+        "add_returns"
+      ]
+    },
+    {
+      "module": "ta_lab2.features.segments",
+      "classes": [],
+      "functions": [
+        "build_flip_segments"
+      ]
+    },
+    {
+      "module": "ta_lab2.features.trend",
+      "classes": [],
+      "functions": [
+        "compute_trend_labels"
+      ]
+    },
+    {
+      "module": "ta_lab2.features.vol",
+      "classes": [],
+      "functions": [
+        "add_parkinson_vol",
+        "add_garman_klass_vol",
+        "add_rogers_satchell_vol",
+        "add_atr",
+        "add_logret_stdev_vol",
+        "add_rolling_realized_batch",
+        "add_rolling_vol_from_returns_batch",
+        "add_volatility_features"
+      ]
+    },
+    {
+      "module": "ta_lab2.features.__init__",
+      "classes": [],
+      "functions": []
+    },
+    {
+      "module": "ta_lab2.pipelines.btc_pipeline",
+      "classes": [],
+      "functions": [
+        "_filter_kwargs",
+        "_try_call_with_windows",
+        "_call_ema_comovement",
+        "_call_ema_hierarchy",
+        "_call_build_segments",
+        "_infer_timestamp_col",
+        "_coerce_df",
+        "_maybe_from_config",
+        "_find_default_csv",
+        "run_btc_pipeline",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.pipelines.__init__",
+      "classes": [],
+      "functions": []
+    },
+    {
+      "module": "ta_lab2.regimes.comovement",
+      "classes": [],
+      "functions": [
+        "_ensure_sorted",
+        "build_alignment_frame",
+        "sign_agreement",
+        "rolling_agreement",
+        "forward_return_split",
+        "lead_lag_max_corr",
+        "_find_ema_columns",
+        "_pairwise",
+        "compute_ema_comovement_stats",
+        "compute_ema_comovement_hierarchy"
+      ]
+    },
+    {
+      "module": "ta_lab2.regimes.flips",
+      "classes": [],
+      "functions": [
+        "sign_from_series",
+        "detect_flips",
+        "label_regimes_from_flips",
+        "attach_regimes",
+        "regime_stats"
+      ]
+    },
+    {
+      "module": "ta_lab2.regimes.old_run_btc_pipeline",
+      "classes": [],
+      "functions": [
+        "_clean_headers",
+        "_to_num",
+        "_parse_epoch_series",
+        "enrich",
+        "_scal",
+        "check_boundary"
+      ]
+    },
+    {
+      "module": "ta_lab2.regimes.run_btc_pipeline",
+      "classes": [],
+      "functions": [
+        "run_btc_pipeline"
+      ]
+    },
+    {
+      "module": "ta_lab2.regimes.segments",
+      "classes": [],
+      "functions": []
+    },
+    {
+      "module": "ta_lab2.regimes.__init__",
+      "classes": [],
+      "functions": []
+    },
+    {
+      "module": "ta_lab2.signals.generator",
+      "classes": [],
+      "functions": [
+        "generate_signals",
+        "attach_signals_from_config"
+      ]
+    },
+    {
+      "module": "ta_lab2.signals.rules",
+      "classes": [],
+      "functions": [
+        "ema_crossover_long",
+        "ema_crossover_short",
+        "rsi_ok_long",
+        "rsi_ok_short",
+        "volatility_filter"
+      ]
+    },
+    {
+      "module": "ta_lab2.signals.__init__",
+      "classes": [],
+      "functions": []
+    },
+    {
+      "module": "ta_lab2.utils.cache",
+      "classes": [],
+      "functions": [
+        "_key",
+        "disk_cache"
+      ]
+    },
+    {
+      "module": "ta_lab2.viz.all_plots",
+      "classes": [],
+      "functions": [
+        "_pick_time_index",
+        "plot_ema_with_trend",
+        "plot_consolidated_emas_like",
+        "plot_realized_vol"
+      ]
+    }
+  ]
+}

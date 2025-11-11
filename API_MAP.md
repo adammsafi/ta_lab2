@@ -1,0 +1,261 @@
+# ta_lab2 – File & Symbol Map
+_Generated: 2025-11-04T18:58:43_
+
+### `__init__.py`
+**Functions**
+- `add_rolling_vol_from_returns_batch(df, *, price_col, modes, windows, annualize, direction)` — Fallback shim: delegates to the project implementation if present,
+
+### `cli.py`
+**Functions**
+- `main(argv)`
+
+### `compare.py`
+**Functions**
+- `prep_for_stats(df, time_col, newest_first)`
+- `build_timeframe(symbol, base_daily, tf, dt_col)`
+
+### `config.py`
+_(no top-level classes or functions)_
+
+### `io.py`
+**Functions**
+- `write_parquet(df, path, partition_cols)`
+- `read_parquet(path)`
+
+### `logging_setup.py`
+**Functions**
+- `setup_logging(level)`
+
+### `resample.py`
+**Functions**
+- `_ensure_datetime_index(df, dt_col)`
+- `_apply_ohlcv_agg(w, ohlc_cols, sum_cols, extra_aggs)` — Return a flat agg mapping suitable for pandas >= 1.5.
+- `_flatten_agg_columns(r)`
+- `_auto_label_closed(freq, label, closed)` — Start-anchored (MS, QS, AS, BMS, W-<DAY>) -> ('left','left')
+- `bin_by_calendar(df, dt_col, freq, *, ohlc_cols, sum_cols, extra_aggs, label, closed)`
+- `_season_id_from_exact_row(ts, season_label)`
+- `bin_by_season(df, dt_col, *, season_col_exact, season_col_approx, n, ohlc_cols, sum_cols, extra_aggs)`
+
+## `ta_lab2/analysis`
+
+### `analysis/__init__.py`
+_(no top-level classes or functions)_
+
+### `analysis/feature_eval.py`
+**Functions**
+- `corr_matrix(df, columns)` — Pearson correlation among selected feature columns.
+- `redundancy_report(df, columns, thresh)` — Flag highly correlated pairs (> thresh).
+- `future_return(close, horizon, log)` — Compute forward return over N bars (target).
+- `binarize_target(y, threshold)` — Label up/down based on threshold (e.g., future return > 0).
+- `quick_logit_feature_weights(df, feature_cols, close_col, horizon, log_ret)` — If sklearn is available: fit a simple logit predicting (fwd_return > 0).
+- `feature_target_correlations(df, feature_cols, close_col, horizon, log_ret)` — Rank features by absolute correlation with forward returns.
+
+### `analysis/parameter_sweep.py`
+**Functions**
+- `grid(param_grid, run, freq, costs_bps)` — Exhaustive grid search over param_grid.
+- `random_search(space, run, n_samples, seed, freq, costs_bps)` — Randomly sample combinations from a parameter space.
+
+### `analysis/performance.py`
+**Functions**
+- `pct_change(close, periods)` — Simple % returns (no log).
+- `log_returns(close)` — Log returns (safer additive over time).
+- `equity_from_returns(returns, start_equity)` — Cumulative equity curve from returns.
+- `_annualize_scale(freq)` — Return periods-per-year scaling for common frequencies.
+- `sharpe(returns, risk_free, freq)` — Annualized Sharpe; risk_free given as per-period rate.
+- `sortino(returns, risk_free, freq)` — Annualized Sortino using downside std.
+- `max_drawdown(equity)` — Max drawdown (as a negative fraction).
+- `calmar(returns, freq)` — Calmar = annualized return / |MaxDD|.
+- `annual_return(returns, freq)` — CAGR-like annualized return from per-period returns.
+- `hit_rate(returns)` — Fraction of positive-return periods.
+- `turnover(position)` — Average absolute change in position between bars.
+- `position_returns(close, position, costs_bps)` — Convert price series + position into strategy returns.
+- `evaluate_signals(df, close_col, position_col, costs_bps, freq)` — Compute a compact metrics dict from a signal DataFrame containing close and position.
+
+### `analysis/regime_eval.py`
+**Functions**
+- `metrics_by_regime(df, regime_col, close_col, position_col, costs_bps, freq)` — Group evaluation by regime values; returns one row per regime.
+- `regime_transition_pnl(df, regime_col, close_col, position_col, costs_bps)` — Evaluate performance around regime switches (entering/leaving states).
+
+## `ta_lab2/features`
+
+### `features/__init__.py`
+_(no top-level classes or functions)_
+
+### `features/calendar.py`
+**Functions**
+- `expand_datetime_features_inplace(df, base_timestamp_col, prefix, *, to_utc, add_moon)` — One-call datetime feature expansion.
+- `expand_multiple_timestamps(df, cols, *, to_utc, add_moon)` — Expand several timestamp columns in one call (legacy test helper).
+
+### `features/correlation.py`
+**Functions**
+- `acf(x, nlags, demean)`
+- `pacf_yw(x, nlags)`
+- `rolling_autocorr(s, lag, window)`
+- `xcorr(a, b, max_lag, demean)`
+
+### `features/ema.py`
+**Functions**
+- `compute_ema(s, window, *, adjust, min_periods, name, **kwargs)` — Series EMA with a Pandas-backed implementation.
+- `_flip_for_direction(obj, direction)` — If data are newest-first, flip to chronological for diff/EMA, and tell caller
+- `_maybe_round(s, round_places)`
+- `_ensure_list(x)`
+- `add_ema_columns(df, base_price_cols, ema_windows, *, direction, overwrite, round_places, adjust, min_periods, price_cols, ema_periods, **kwargs)` — For each `col` in base_price_cols and each `w` in ema_windows, add:
+- `add_ema_d1(df, base_price_cols, ema_windows, *, direction, overwrite, round_places, price_cols, ema_periods, **kwargs)` — First difference of EMA:
+- `add_ema_d2(df, base_price_cols, ema_windows, *, direction, overwrite, round_places, price_cols, ema_periods, **kwargs)` — Second difference of EMA:
+- `add_ema(df, col, windows, prefix)` — Legacy wrapper: adds EMA columns for one price column.
+- `prepare_ema_helpers(df, base_price_cols, ema_windows, *, direction, scale, overwrite, round_places, price_cols, periods, **kwargs)` — Ensure first/second EMA diffs exist, then add scaled helper columns for each
+
+### `features/feature_pack.py`
+**Functions**
+- `_annualization(freq)`
+- `attach_core_features(df, freq, ema_periods, vol_windows, acorr_lags)` — df must be a single-timeframe OHLCV frame with a monotonic UTC 'timestamp'.
+
+### `features/indicators.py`
+**Functions**
+- `_ema(s, span)`
+- `_sma(s, window)`
+- `_tr(high, low, close)`
+- `_ensure_series(obj, *, col)` — Return a Series from either a Series or DataFrame+col.
+- `_return(obj, series, out_col, *, inplace)` — Default behavior: return a **Series** (named).
+- `rsi(obj, window, *, period, price_col, out_col, inplace)` — RSI (Wilder). Back-compat:
+- `macd(obj, *, price_col, fast, slow, signal, out_cols, inplace)` — MACD (12/26/9 by default).
+- `stoch_kd(obj, *, high_col, low_col, close_col, k, d, out_cols, inplace)` — Stochastic %K/%D (df input expected).
+- `bollinger(obj, window, *, price_col, n_sigma, out_cols, inplace)` — Bollinger Bands.
+- `atr(obj, window, *, period, high_col, low_col, close_col, out_col, inplace)` — Average True Range (simple rolling mean of TR, matching your original).
+- `adx(obj, window, *, period, high_col, low_col, close_col, out_col, inplace)` — ADX (vectorized conditions, preserves original behavior).
+- `obv(obj, *, price_col, volume_col, out_col, inplace)` — On-Balance Volume.
+- `mfi(obj, window, *, period, high_col, low_col, close_col, volume_col, out_col, inplace)` — Money Flow Index. Default: return Series; if `inplace=True`, assign and return df.
+
+### `features/resample.py`
+**Functions**
+- `_normalize(df)`
+- `_normalize_freq(freq)` — Map deprecated aliases to current ones for resample():
+- `_season_from_month(m)` — Meteorological seasons derived from month number:
+- `resample_one(df, freq, agg, align_to)` — Resample a daily (or finer) dataframe with OHLCV into a target frequency.
+- `resample_many(df, freqs, agg, outdir, overwrite)` — Build multiple timeframe views and (optionally) persist as parquet/csv.
+- `add_season_label(df, column)` — Ensure a 'season' column exists (DJF/MAM/JJA/SON). Will attempt to use
+- `seasonal_summary(df, price_col, ret_kind)` — Aggregate returns by season across years.
+
+### `features/returns.py`
+**Functions**
+- `_coerce_cols(cols)` — Normalize None / str / sequence -> list[str].
+- `_as_float_series(df, col)`
+- `_b2b_change(s, *, mode, direction)` — Compute bar-to-bar change for a single Series.
+- `_apply_b2b(df, *, cols, mode, suffix, extra_cols, round_places, direction)`
+- `b2t_pct_delta(df, *, cols, columns, extra_cols, round_places, direction, open_col, close_col, **kwargs)` — Add bar-to-bar **percent** change columns for each requested column.
+- `b2t_log_delta(df, *, cols, columns, extra_cols, round_places, direction, open_col, close_col, **kwargs)` — Add bar-to-bar **log** change columns for each requested column.
+- `add_returns(df, *, cols, columns, extra_cols, round_places, direction, open_col, close_col, **kwargs)` — Backward-compatible wrapper that mirrors the original API and adds BOTH:
+
+### `features/segments.py`
+**Functions**
+- `build_flip_segments(df, price_col, state_col, timestamp_col)` — Build contiguous segments of identical trend states.
+
+### `features/trend.py`
+**Functions**
+- `compute_trend_labels(df, price_col, window, mode, flat_thresh, label_col)` — Compute trend labels for a given price series.
+
+### `features/vol.py`
+**Functions**
+- `add_parkinson_vol(df, high_col, low_col, windows, annualize, periods_per_year)` — Parkinson (1980) range-based volatility estimator.
+- `add_garman_klass_vol(df, open_col, high_col, low_col, close_col, windows, annualize, periods_per_year)` — Garman–Klass (1980) volatility estimator.
+- `add_rogers_satchell_vol(df, open_col, high_col, low_col, close_col, windows, annualize, periods_per_year)` — Rogers–Satchell (1991) volatility estimator.
+- `add_atr(df, period, open_col, high_col, low_col, close_col)` — Average True Range (Wilder).
+- `add_logret_stdev_vol(df, logret_cols, windows, annualize, periods_per_year, ddof, prefix)` — Rolling std of log returns.
+- `add_rolling_realized_batch(df, windows, which, annualize, periods_per_year, open_col, high_col, low_col, close_col)` — Compute realized vol (Parkinson, RS, GK) across windows.
+- `add_rolling_vol_from_returns_batch(df, *, close_col, windows, types, annualize, periods_per_year, ddof, prefix, price_col, modes, direction)` — Rolling historical volatility (new + legacy API).
+- `add_volatility_features(df, *, do_atr, do_parkinson, do_rs, do_gk, atr_period, ret_windows, ret_types, ret_annualize, ret_periods_per_year, ret_ddof, ret_prefix, rv_windows, rv_which, rv_annualize, rv_periods_per_year, open_col, high_col, low_col, close_col, rolling_windows, direction)` — Unified volatility orchestrator with legacy support.
+
+## `ta_lab2/pipelines`
+
+### `pipelines/__init__.py`
+_(no top-level classes or functions)_
+
+### `pipelines/btc_pipeline.py`
+**Functions**
+- `_filter_kwargs(func, kwargs)`
+- `_try_call_with_windows(func, df, ema_windows, **kwargs)`
+- `_call_ema_comovement(df, ema_windows, **kwargs)`
+- `_call_ema_hierarchy(df, ema_windows, **kwargs)`
+- `_call_build_segments(df, *, price_col, state_col, date_col)`
+- `_infer_timestamp_col(df, fallback)`
+- `_coerce_df(df_or_path)`
+- `_maybe_from_config(value, default)`
+- `_find_default_csv()` — Best-effort discovery of a BTC price CSV in common spots.
+- `run_btc_pipeline(csv_path, *, price_cols, ema_windows, returns_modes, returns_windows, resample, do_calendar, do_indicators, do_returns, do_volatility, do_ema, do_regimes, do_segments, config)` — End-to-end, testable pipeline aligned to the modular ta_lab2 layout.
+- `main(csv_path, config_path, save_artifacts)` — Run the BTC pipeline end-to-end and (optionally) write artifacts.
+
+## `ta_lab2/regimes`
+
+### `regimes/__init__.py`
+_(no top-level classes or functions)_
+
+### `regimes/comovement.py`
+**Functions**
+- `_ensure_sorted(df, on)`
+- `build_alignment_frame(low_df, high_df, *, on, low_cols, high_cols, suffix_low, suffix_high, direction)` — Merge-asof align low timeframe rows with the most recent high timeframe row.
+- `sign_agreement(df, col_a, col_b, *, out_col)` — Mark True where signs of two series match (strictly > 0).
+- `rolling_agreement(df, col_a, col_b, *, window, out_col, min_periods)` — Rolling share of days where signs match over a window.
+- `forward_return_split(df, agree_col, fwd_ret_col)` — Compare forward returns when agree==True vs False.
+- `lead_lag_max_corr(df, col_a, col_b, lags)` — Find lag that maximizes Pearson correlation between two columns.
+- `_find_ema_columns(df, token)` — Auto-detect EMA columns by substring token (default: '_ema_').
+- `_pairwise(cols)`
+- `compute_ema_comovement_stats(df, *, ema_cols, method, agree_on_sign_of_diff, diff_window)` — Compute co-movement stats among EMA series.
+- `compute_ema_comovement_hierarchy(df, *, ema_cols, method)` — Build a simple ordering (“hierarchy”) of EMA columns from the correlation matrix.
+
+### `regimes/flips.py`
+**Functions**
+- `sign_from_series(df, src_col, out_col)` — Make a {-1,0,+1} sign column from a numeric series.
+- `detect_flips(df, sign_col, min_separation)` — Return indices where the sign changes, enforcing a minimum bar gap.
+- `label_regimes_from_flips(n_rows, flip_idx, start_regime)` — Convert flip indices to piecewise-constant regime IDs: 0,1,2,...
+- `attach_regimes(df, regime_ids, col)` — Attach regime IDs to a dataframe (length must match).
+- `regime_stats(df, regime_col, ret_col)` — Per-regime summary: n_bars, start/end timestamps, duration, cumulative & average returns.
+
+### `regimes/old_run_btc_pipeline.py`
+**Functions**
+- `_clean_headers(cols)` — Strip spaces, lower, collapse internal spaces -> single underscores.
+- `_to_num(s)` — Coerce numeric fields (remove commas, turn '-'/'' to NaN).
+- `_parse_epoch_series(x)` — Try seconds vs milliseconds automatically.
+- `enrich(bars)`
+- `_scal(s)`
+- `check_boundary(dt_str)`
+
+### `regimes/run_btc_pipeline.py`
+**Functions**
+- `run_btc_pipeline(csv_path, out_dir, ema_windows, resample, *, do_calendar, do_indicators, do_returns, do_volatility, do_ema, do_regimes, do_segments, config)` — Orchestrate the BTC pipeline end-to-end.
+
+### `regimes/segments.py`
+_(no top-level classes or functions)_
+
+## `ta_lab2/signals`
+
+### `signals/__init__.py`
+_(no top-level classes or functions)_
+
+### `signals/generator.py`
+**Functions**
+- `generate_signals(df, *, close_col, fast_ema, slow_ema, rsi_col, atr_col, use_rsi_filter, use_vol_filter, rsi_min_long, rsi_max_short, min_atr_pct, allow_shorts, cooldown_bars)` — Combine indicator-based rules into directional trading signals.
+- `attach_signals_from_config(df, cfg)` — Read YAML-style config and attach signals.
+
+### `signals/rules.py`
+**Functions**
+- `ema_crossover_long(df, fast, slow)` — True when fast EMA crosses ABOVE slow EMA.
+- `ema_crossover_short(df, fast, slow)` — True when fast EMA crosses BELOW slow EMA.
+- `rsi_ok_long(df, rsi_col, min_long)` — Allow long entries only when RSI >= min_long.
+- `rsi_ok_short(df, rsi_col, max_short)` — Allow short entries only when RSI <= max_short.
+- `volatility_filter(df, atr_col, close_col, min_atr_pct)` — Require ATR/close >= threshold to avoid low-volatility conditions.
+
+## `ta_lab2/utils`
+
+### `utils/cache.py`
+**Functions**
+- `_key(name, params)`
+- `disk_cache(name, compute_fn, **params)`
+
+## `ta_lab2/viz`
+
+### `viz/all_plots.py`
+**Functions**
+- `_pick_time_index(d)`
+- `plot_ema_with_trend(df, price_col, ema_cols, trend_col, *, include_slopes, include_flips, n)`
+- `plot_consolidated_emas_like(df, base_col, periods, *, include_slopes, include_flips, n)`
+- `plot_realized_vol(df, *, windows, include_logret_stdev, n)`

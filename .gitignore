@@ -1,126 +1,125 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Fri Oct 31 16:48:10 2025
-
-@author: asafi
-"""
-
-# ===========================================
-#  Python / Data Science Project: ta_lab2
-# ===========================================
-
-# --- Byte-compiled / cache files ---
+# =========================
+# Python (bytecode, caches)
+# =========================
 __pycache__/
 *.py[cod]
 *$py.class
+.pytest_cache/
+.hypothesis/
+.mypy_cache/
+.pyre/
+.pytype/
+.ruff_cache/
+.black/
 
-# --- C extensions ---
-*.so
-
-# --- Distribution / packaging ---
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-parts/
-sdist/
-var/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# --- Virtual environments ---
-.env
-.venv
-env/
+# =========================
+# Virtual environments
+# =========================
+.venv*/
 venv/
+env/
 ENV/
-env.bak/
-venv.bak/
+pip-wheel-metadata/
+pip-wheel-house/
 
-# --- PyInstaller ---
-*.manifest
-*.spec
+# =========================
+# Packaging / build outputs
+# =========================
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+MANIFEST
 
-# --- Unit test / coverage reports ---
-.coverage
+# =========================
+# Test / coverage outputs
+# =========================
 .tox/
 .nox/
-.pytest_cache/
-htmlcov/
+.coverage
+.coverage.*
 coverage.xml
+htmlcov/
+junit.xml
 
-# --- IDE / Editor specific ---
+# =========================
+# Notebooks & checkpoints
+# =========================
+.ipynb_checkpoints/
+
+# =========================
+# Editors / IDEs
+# =========================
 .vscode/
 .idea/
-.spyproject/
+*.code-workspace
 *.sublime-project
 *.sublime-workspace
 
-# --- OS files ---
+# =========================
+# OS junk
+# =========================
 .DS_Store
+.DS_Store?
 Thumbs.db
-desktop.ini
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
 
-# --- Logs & temp ---
+# =========================
+# Logs / scratch / caches
+# =========================
 *.log
 logs/
-*.tmp
-*.bak
-*.swp
-*.lock
+tmp/
+temp/
+.cache/
+**/.cache/
 
-# --- Jupyter Notebooks ---
-.ipynb_checkpoints/
-*.ipynb_checkpoints/
-*.nbconvert/
-**/.ipynb_checkpoints/
-
-# --- Spyder-specific ---
-.spyproject/
-.spyderproject
-.spyderworkspace
-__pycache__/
-*.autosave
-*.bak
-*.spydata
-.history/
-
-# --- Data & analysis outputs ---
-data/
-out/
-*.csv
-*.xlsx
-*.xls
+# =========================
+# Data & artifacts (local)
+# =========================
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
 *.parquet
 *.feather
-*.pkl
-*.npy
-*.npz
 *.h5
+*.hdf5
+*.pkl
+*.pickle
+*.npz
+*.npy
+*.csv.gz
+*.zip
+*.gz
+artifacts/
+data/
+datasets/
+outputs/
+reports/
 
-# --- Generated documentation & helper scripts ---
-structure.txt
-structure.md
-API_MAP.md
-src_structure.json
-generate_structure_docs.py~
-API_MAP.old.md
+# =========================
+# Docs sites (Sphinx/MkDocs/etc.)
+# =========================
+docs/_build/
+site/
+_site/
 
-# --- Hatch / Poetry / pip wheel metadata ---
-.hatch/
-*.lock
-pip-wheel-metadata/
+# =========================
+# Node bits (if present for docs/UI)
+# =========================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# --- Notebook export artifacts ---
-*.html
-*.pdf
-
-# --- Misc local or temp dirs ---
-__temp__/
-.tmp/
-temp/
-backup/
-cache/
+# =========================
+# Env files (local-only variants)
+# =========================
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
