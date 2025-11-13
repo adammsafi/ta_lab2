@@ -1,0 +1,26 @@
+name: "New feature / strategy idea"
+description: "New capability for ta_lab2"
+labels: ["enhancement"]
+body:
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      placeholder: "Add basic RSI mean-reversion strategy backtest"
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: Why this feature is important.
+    validations:
+      required: true
+
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: Any concrete requirements, configs, or example usage.
+      render: markdown

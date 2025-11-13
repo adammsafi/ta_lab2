@@ -1,0 +1,43 @@
+name: "Tech task / refactor"
+description: "Internal improvement (performance, refactor, tests, infra)"
+labels: ["enhancement"]
+body:
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      placeholder: "Refactor ema feature calculation into reusable helper"
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context / motivation
+      description: Why this matters now (debt, reliability, performance).
+      placeholder: |
+        - Current implementation is duplicated in 3 places
+        - Hard to test; no single source of truth
+    validations:
+      required: true
+
+  - type: textarea
+    id: plan
+    attributes:
+      label: Proposed plan
+      placeholder: |
+        - Introduce ta_lab2.features.ema module
+        - Move existing code
+        - Add unit tests
+    validations:
+      required: false
+
+  - type: textarea
+    id: dod
+    attributes:
+      label: Definition of Done
+      placeholder: |
+        - Existing CI passes
+        - New tests present for edge cases
+    validations:
+      required: true

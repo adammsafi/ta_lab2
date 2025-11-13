@@ -1,0 +1,8 @@
+# Default owner for everything
+* @adammsafi
+
+# Future: per-area ownership
+# src/ta_lab2/core/        @adammsafi
+# src/ta_lab2/pipelines/   @adammsafi
+# src/ta_lab2/regimes/     @adammsafi
+# docs/                    @adammsafi
