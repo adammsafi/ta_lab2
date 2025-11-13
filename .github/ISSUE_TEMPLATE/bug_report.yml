@@ -1,0 +1,52 @@
+name: "Bug report"
+description: "Something is broken in ta_lab2"
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug. Please fill in as much as you can.
+
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      description: One sentence description of the bug.
+      placeholder: "BTC pipeline crashes when ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Exact steps/commands to trigger the bug.
+      placeholder: |
+        1. Clone repo
+        2. Run `python -m ta_lab2.pipeline ...`
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      placeholder: "Pipeline completes and writes OHLCV rows to db ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      placeholder: "Stack trace, error message, incorrect output, etc."
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Extra context
+      description: Env details (OS, Python, db URL), logs, screenshots.
+      render: shell
