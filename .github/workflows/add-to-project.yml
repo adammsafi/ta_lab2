@@ -1,0 +1,24 @@
+name: Add issues and PRs to ta_lab2 project
+
+on:
+  issues:
+    types: [opened]
+  pull_request_target:
+    types: [opened, reopened]
+
+permissions:
+  issues: write
+  pull-requests: write
+  contents: read
+  repository-projects: write
+
+jobs:
+  add-to-project:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Add item to ta_lab2 project
+        uses: actions/add-to-project@v0.5.0
+        with:
+          project-url: https://github.com/users/adammsafi/projects/2
+          github-token: ${{ secrets.TALABPROJECTAUTOMATIONTOKEN }}
