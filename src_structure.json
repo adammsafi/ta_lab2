@@ -6,6 +6,12 @@
       "module": "ta_lab2.cli",
       "classes": [],
       "functions": [
+        "_read_df",
+        "_default_policy_yaml",
+        "cmd_pipeline",
+        "_ensure_feats_if_possible",
+        "cmd_regime_inspect",
+        "build_parser",
         "main"
       ]
     },
@@ -110,6 +116,87 @@
       "functions": []
     },
     {
+      "module": "ta_lab2.backtests.btpy_runner",
+      "classes": [
+        "BTResult"
+      ],
+      "functions": [
+        "_make_strategy_class",
+        "run_bt"
+      ]
+    },
+    {
+      "module": "ta_lab2.backtests.costs",
+      "classes": [
+        "CostModel"
+      ],
+      "functions": []
+    },
+    {
+      "module": "ta_lab2.backtests.metrics",
+      "classes": [],
+      "functions": [
+        "cagr",
+        "max_drawdown",
+        "sharpe",
+        "sortino",
+        "mar",
+        "psr_placeholder",
+        "summarize"
+      ]
+    },
+    {
+      "module": "ta_lab2.backtests.orchestrator",
+      "classes": [
+        "MultiResult"
+      ],
+      "functions": [
+        "_leaderboard",
+        "run_multi_strategy"
+      ]
+    },
+    {
+      "module": "ta_lab2.backtests.reports",
+      "classes": [],
+      "functions": [
+        "save_table",
+        "equity_plot",
+        "leaderboard"
+      ]
+    },
+    {
+      "module": "ta_lab2.backtests.splitters",
+      "classes": [
+        "Split"
+      ],
+      "functions": [
+        "expanding_walk_forward",
+        "fixed_date_splits"
+      ]
+    },
+    {
+      "module": "ta_lab2.backtests.vbt_runner",
+      "classes": [
+        "SignalFunc",
+        "CostModel",
+        "Split",
+        "ResultRow",
+        "ResultBundle"
+      ],
+      "functions": [
+        "_cagr",
+        "_max_drawdown",
+        "_sharpe",
+        "run_vbt_on_split",
+        "sweep_grid"
+      ]
+    },
+    {
+      "module": "ta_lab2.backtests.__init__",
+      "classes": [],
+      "functions": []
+    },
+    {
       "module": "ta_lab2.features.calendar",
       "classes": [],
       "functions": [
@@ -140,6 +227,18 @@
         "add_ema_d2",
         "add_ema",
         "prepare_ema_helpers"
+      ]
+    },
+    {
+      "module": "ta_lab2.features.ensure",
+      "classes": [],
+      "functions": [
+        "ensure_close",
+        "ensure_ema",
+        "ensure_rsi",
+        "ensure_macd",
+        "ensure_adx",
+        "ensure_obv"
       ]
     },
     {
@@ -267,6 +366,26 @@
       ]
     },
     {
+      "module": "ta_lab2.regimes.data_budget",
+      "classes": [
+        "DataBudgetContext"
+      ],
+      "functions": [
+        "_count",
+        "assess_data_budget"
+      ]
+    },
+    {
+      "module": "ta_lab2.regimes.feature_utils",
+      "classes": [],
+      "functions": [
+        "_ema",
+        "add_ema_pack",
+        "add_atr14",
+        "ensure_regime_features"
+      ]
+    },
+    {
       "module": "ta_lab2.regimes.flips",
       "classes": [],
       "functions": [
@@ -275,6 +394,21 @@
         "label_regimes_from_flips",
         "attach_regimes",
         "regime_stats"
+      ]
+    },
+    {
+      "module": "ta_lab2.regimes.labels",
+      "classes": [],
+      "functions": [
+        "label_trend_basic",
+        "_percentile_series",
+        "label_vol_bucket",
+        "label_liquidity_bucket",
+        "compose_regime_key",
+        "label_layer_monthly",
+        "label_layer_weekly",
+        "label_layer_daily",
+        "label_layer_intraday"
       ]
     },
     {
@@ -290,6 +424,47 @@
       ]
     },
     {
+      "module": "ta_lab2.regimes.policy_loader",
+      "classes": [],
+      "functions": [
+        "_default_policy_yaml_path",
+        "load_policy_table"
+      ]
+    },
+    {
+      "module": "ta_lab2.regimes.proxies",
+      "classes": [
+        "ProxyInputs",
+        "ProxyOutcome"
+      ],
+      "functions": [
+        "_is_weekly_up_normal",
+        "infer_cycle_proxy",
+        "infer_weekly_macro_proxy"
+      ]
+    },
+    {
+      "module": "ta_lab2.regimes.regime_inspect",
+      "classes": [],
+      "functions": [
+        "_read_df",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.regimes.resolver",
+      "classes": [
+        "TightenOnlyPolicy"
+      ],
+      "functions": [
+        "_match_policy",
+        "apply_hysteresis",
+        "_tighten",
+        "resolve_policy_from_table",
+        "resolve_policy"
+      ]
+    },
+    {
       "module": "ta_lab2.regimes.run_btc_pipeline",
       "classes": [],
       "functions": [
@@ -302,16 +477,139 @@
       "functions": []
     },
     {
+      "module": "ta_lab2.regimes.telemetry",
+      "classes": [
+        "RegimeSnapshot"
+      ],
+      "functions": [
+        "append_snapshot"
+      ]
+    },
+    {
       "module": "ta_lab2.regimes.__init__",
       "classes": [],
       "functions": []
     },
     {
+      "module": "ta_lab2.research.queries.opt_cf_ema",
+      "classes": [],
+      "functions": [
+        "_norm_cols",
+        "load_df",
+        "ensure_ema",
+        "build_grid",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.research.queries.opt_cf_ema_refine",
+      "classes": [],
+      "functions": [
+        "_norm_cols",
+        "load_df",
+        "ensure_ema",
+        "refine_ranges",
+        "build_grid",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.research.queries.opt_cf_ema_sensitivity",
+      "classes": [],
+      "functions": [
+        "_norm_cols",
+        "load_df",
+        "ensure_ema",
+        "build_grid",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.research.queries.opt_cf_generic",
+      "classes": [],
+      "functions": [
+        "_norm_cols",
+        "load_df",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.research.queries.run_ema_50_100",
+      "classes": [],
+      "functions": [
+        "_normalize_cols",
+        "_find_ts_col",
+        "_find_close_col",
+        "load_price_df",
+        "ensure_ema",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.research.queries.wf_validate_ema",
+      "classes": [],
+      "functions": [
+        "_norm_cols",
+        "load_df",
+        "ensure_ema",
+        "rolling_train_test_splits",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.signals.breakout_atr",
+      "classes": [],
+      "functions": [
+        "_rolling_high",
+        "_rolling_low",
+        "make_signals"
+      ]
+    },
+    {
+      "module": "ta_lab2.signals.ema_trend",
+      "classes": [],
+      "functions": [
+        "make_signals"
+      ]
+    },
+    {
       "module": "ta_lab2.signals.generator",
       "classes": [],
       "functions": [
-        "generate_signals",
-        "attach_signals_from_config"
+        "generate_signals"
+      ]
+    },
+    {
+      "module": "ta_lab2.signals.position_sizing",
+      "classes": [],
+      "functions": [
+        "clamp_size",
+        "ema_smooth",
+        "volatility_size_pct",
+        "target_dollar_position",
+        "fixed_fractional",
+        "inverse_volatility"
+      ]
+    },
+    {
+      "module": "ta_lab2.signals.registry",
+      "classes": [],
+      "functions": [
+        "get_strategy",
+        "_ensure_close",
+        "_ensure_ema",
+        "_ensure_rsi",
+        "_ensure_macd",
+        "_ensure_atr",
+        "ensure_for",
+        "grid_for"
+      ]
+    },
+    {
+      "module": "ta_lab2.signals.rsi_mean_revert",
+      "classes": [],
+      "functions": [
+        "make_signals"
       ]
     },
     {
@@ -328,7 +626,9 @@
     {
       "module": "ta_lab2.signals.__init__",
       "classes": [],
-      "functions": []
+      "functions": [
+        "attach_signals_from_config"
+      ]
     },
     {
       "module": "ta_lab2.utils.cache",
