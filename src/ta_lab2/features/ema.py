@@ -18,25 +18,48 @@ __all__ = [
 
 def compute_ema(
     s: pd.Series,
-    window: int,
+    period: int | None = None,
     *,
     adjust: bool = False,
     min_periods: Optional[int] = None,
     name: Optional[str] = None,
+    window: int | None = None,
     **kwargs,  # swallow legacy extras
 ) -> pd.Series:
     """
     Series EMA with a Pandas-backed implementation.
-    Accepts extra kwargs for backward-compatibility (ignored).
+
+    Parameters
+    ----------
+    s : pd.Series
+        Input series.
+    period : int | None
+        EMA period. Canonical argument.
+    window : int | None
+        Backwards-compatible alias for `period`.
+    adjust, min_periods, name :
+        Passed through to `Series.ewm`.
+
+    Any extra **kwargs are accepted for backward-compatibility and ignored.
     """
+    # Allow either `period` or `window`
+    if period is None and window is None:
+        raise TypeError("compute_ema() requires either `period` or `window`")
+
+    if period is None:
+        period = int(window)
+    else:
+        period = int(period)
+
     out = (
         s.astype(float)
-         .ewm(span=int(window), adjust=adjust, min_periods=min_periods)
+         .ewm(span=period, adjust=adjust, min_periods=min_periods)
          .mean()
     )
     if name is not None:
         out = out.rename(name)
     return out
+
 
 
 # ---------------------------------------------------------------------------
@@ -71,7 +94,7 @@ def _ensure_list(x: Sequence[str] | Iterable[str]) -> list[str]:
 def add_ema_columns(
     df: pd.DataFrame,
     base_price_cols: Sequence[str] | None,
-    ema_windows: Sequence[int] | None,
+    ema_periods: Sequence[int] | None,
     *,
     direction: str = "oldest_top",
     overwrite: bool = False,
@@ -80,25 +103,24 @@ def add_ema_columns(
     min_periods: Optional[int] = None,
     # Back-compat knobs we ignore but accept
     price_cols: Sequence[str] | None = None,
-    ema_periods: Sequence[int] | None = None,
     **kwargs,
 ) -> pd.DataFrame:
     """
-    For each `col` in base_price_cols and each `w` in ema_windows, add:
+    For each `col` in base_price_cols and each `w` in ema_periods, add:
       `{col}_ema_{w}`
 
     Accepts legacy kwargs and aliases:
       - price_cols (alias of base_price_cols)
-      - ema_periods (alias of ema_windows)
+      - ema_periods (alias of ema_periods)
       - arbitrary **kwargs (ignored)
     """
     if base_price_cols is None:
         base_price_cols = price_cols or []
-    if ema_windows is None:
-        ema_windows = ema_periods or []
+    if ema_periods is None:
+        ema_periods = ema_periods or []
 
     base_price_cols = _ensure_list(base_price_cols)
-    ema_windows = [int(w) for w in ema_windows]
+    ema_periods = [int(w) for w in ema_periods]
 
     work, flipped = _flip_for_direction(df, direction)
 
@@ -107,7 +129,7 @@ def add_ema_columns(
         if col not in work.columns:
             continue
         s = work[col].astype(float)
-        for w in ema_windows:
+        for w in ema_periods:
             out_name = f"{col}_ema_{w}"
             if not overwrite and out_name in df.columns:
                 continue
@@ -125,14 +147,13 @@ def add_ema_columns(
 def add_ema_d1(
     df: pd.DataFrame,
     base_price_cols: Sequence[str] | None,
-    ema_windows: Sequence[int] | None,
+    ema_periods: Sequence[int] | None,
     *,
     direction: str = "oldest_top",
     overwrite: bool = False,
     round_places: Optional[int] = None,
     # legacy aliases/kwargs tolerated
     price_cols: Sequence[str] | None = None,
-    ema_periods: Sequence[int] | None = None,
     **kwargs,
 ) -> pd.DataFrame:
     """
@@ -143,17 +164,17 @@ def add_ema_d1(
     """
     if base_price_cols is None:
         base_price_cols = price_cols or []
-    if ema_windows is None:
-        ema_windows = ema_periods or []
+    if ema_periods is None:
+        ema_periods = ema_periods or []
 
     base_price_cols = _ensure_list(base_price_cols)
-    ema_windows = [int(w) for w in ema_windows]
+    ema_periods = [int(w) for w in ema_periods]
 
     work, flipped = _flip_for_direction(df, direction)
 
     new_cols: dict[str, pd.Series] = {}
     for col in base_price_cols:
-        for w in ema_windows:
+        for w in ema_periods:
             ema_col = f"{col}_ema_{w}"
             if ema_col not in work.columns:
                 if col in work.columns:
@@ -177,14 +198,13 @@ def add_ema_d1(
 def add_ema_d2(
     df: pd.DataFrame,
     base_price_cols: Sequence[str] | None,
-    ema_windows: Sequence[int] | None,
+    ema_periods: Sequence[int] | None,
     *,
     direction: str = "oldest_top",
     overwrite: bool = False,
     round_places: Optional[int] = None,
     # legacy aliases/kwargs tolerated
     price_cols: Sequence[str] | None = None,
-    ema_periods: Sequence[int] | None = None,
     **kwargs,
 ) -> pd.DataFrame:
     """
@@ -195,17 +215,17 @@ def add_ema_d2(
     """
     if base_price_cols is None:
         base_price_cols = price_cols or []
-    if ema_windows is None:
-        ema_windows = ema_periods or []
+    if ema_periods is None:
+        ema_periods = ema_periods or []
 
     base_price_cols = _ensure_list(base_price_cols)
-    ema_windows = [int(w) for w in ema_windows]
+    ema_periods = [int(w) for w in ema_periods]
 
     work, flipped = _flip_for_direction(df, direction)
 
     new_cols: dict[str, pd.Series] = {}
     for col in base_price_cols:
-        for w in ema_windows:
+        for w in ema_periods:
             ema_col = f"{col}_ema_{w}"
             if ema_col not in work.columns:
                 if col in work.columns:
@@ -227,13 +247,13 @@ def add_ema_d2(
 
 
 # ---- Legacy compatibility shims ----
-def add_ema(df, col: str = "close", windows=(21, 50, 100, 200), prefix: str = "ema"):
+def add_ema(df, col: str = "close", periods=(21, 50, 100, 200), prefix: str = "ema"):
     """
     Legacy wrapper: adds EMA columns for one price column.
     Mirrors old API but delegates to the new add_ema_columns.
     """
     cols = [col]
-    add_ema_columns(df, cols, list(windows))
+    add_ema_columns(df, cols, list(periods))
     return df
 
 # -----------------------------------------------------------------------------
@@ -242,7 +262,7 @@ def add_ema(df, col: str = "close", windows=(21, 50, 100, 200), prefix: str = "e
 def prepare_ema_helpers(
     df: pd.DataFrame,
     base_price_cols: Sequence[str] | None,
-    ema_windows: Sequence[int] | None,
+    ema_periods: Sequence[int] | None,
     *,
     direction: str = "oldest_top",
     scale: str = "bps",              # {"raw","pct","bps"}
@@ -271,16 +291,16 @@ def prepare_ema_helpers(
     """
     if base_price_cols is None:
         base_price_cols = price_cols or []
-    if ema_windows is None:
-        ema_windows = periods or []
+    if ema_periods is None:
+        ema_periods = periods or []
 
     base_price_cols = _ensure_list(base_price_cols)
-    ema_windows = [int(w) for w in ema_windows]
+    ema_periods = [int(w) for w in ema_periods]
 
     # Make sure ema, d1, d2 exist (don’t clobber unless overwrite=True)
-    add_ema_columns(df, base_price_cols, ema_windows, direction=direction, overwrite=overwrite)
-    add_ema_d1(df, base_price_cols, ema_windows, direction=direction, overwrite=overwrite)
-    add_ema_d2(df, base_price_cols, ema_windows, direction=direction, overwrite=overwrite)
+    add_ema_columns(df, base_price_cols, ema_periods, direction=direction, overwrite=overwrite)
+    add_ema_d1(df, base_price_cols, ema_periods, direction=direction, overwrite=overwrite)
+    add_ema_d2(df, base_price_cols, ema_periods, direction=direction, overwrite=overwrite)
 
     scale = (scale or "raw").lower()
     if scale not in {"raw", "pct", "bps"}:
@@ -289,7 +309,7 @@ def prepare_ema_helpers(
     new_cols: dict[str, pd.Series] = {}
 
     for col in base_price_cols:
-        for w in ema_windows:
+        for w in ema_periods:
             ema_col = f"{col}_ema_{w}"
             d1_col  = f"{ema_col}_d1"
             d2_col  = f"{ema_col}_d2"
