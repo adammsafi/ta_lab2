@@ -1,5 +1,5 @@
 # ta_lab2 – File & Symbol Map
-_Generated: 2025-11-04T18:58:43_
+_Generated: 2025-11-13T15:36:47_
 
 ### `__init__.py`
 **Functions**
@@ -7,6 +7,12 @@ _Generated: 2025-11-04T18:58:43_
 
 ### `cli.py`
 **Functions**
+- `_read_df(path)` — Minimal CSV reader for regime-inspect.
+- `_default_policy_yaml()` — Default overlay location matches your repo layout:
+- `cmd_pipeline(args)` — Original behavior: load YAML config and run the BTC pipeline.
+- `_ensure_feats_if_possible(df, tf)`
+- `cmd_regime_inspect(args)` — Print multi-TF regime labels and the resolved policy.
+- `build_parser()`
 - `main(argv)`
 
 ### `compare.py`
@@ -76,6 +82,70 @@ _(no top-level classes or functions)_
 - `metrics_by_regime(df, regime_col, close_col, position_col, costs_bps, freq)` — Group evaluation by regime values; returns one row per regime.
 - `regime_transition_pnl(df, regime_col, close_col, position_col, costs_bps)` — Evaluate performance around regime switches (entering/leaving states).
 
+## `ta_lab2/backtests`
+
+### `backtests/__init__.py`
+_(no top-level classes or functions)_
+
+### `backtests/btpy_runner.py`
+**Classes**
+- `BTResult`
+
+**Functions**
+- `_make_strategy_class(stop_pct, trail_pct)` — Create a Strategy subclass that uses precomputed entry/exit columns.
+- `run_bt(df, entries, exits, fee_bps, slippage_bps, stop_pct, trail_pct)` — Run Backtesting.py using precomputed boolean signals.
+
+### `backtests/costs.py`
+**Classes**
+- `CostModel`
+
+### `backtests/metrics.py`
+**Functions**
+- `cagr(equity, freq_per_year)`
+- `max_drawdown(equity)`
+- `sharpe(returns, rf, freq_per_year)`
+- `sortino(returns, rf, freq_per_year)`
+- `mar(cagr_value, mdd_value)`
+- `psr_placeholder(returns, rf, freq_per_year)` — Placeholder Probabilistic Sharpe Ratio (PSR).
+- `summarize(equity, returns, freq_per_year)`
+
+### `backtests/orchestrator.py`
+**Classes**
+- `MultiResult`
+
+**Functions**
+- `_leaderboard(df)` — Rank rows by MAR, then Sharpe, then CAGR (desc).
+- `run_multi_strategy(df, strategies, splits, cost, price_col, freq_per_year)` — Orchestrate backtests for multiple strategies.
+
+### `backtests/reports.py`
+**Functions**
+- `save_table(df, out_path)`
+- `equity_plot(equity, title, out_path)`
+- `leaderboard(results, group_cols)` — Rank parameter sets inside each split by MAR, then Sharpe, then CAGR.
+
+### `backtests/splitters.py`
+**Classes**
+- `Split`
+
+**Functions**
+- `expanding_walk_forward(index, insample_years, oos_years)` — Build expanding-window walk-forward splits by calendar years.
+- `fixed_date_splits(windows, prefix)` — Build splits from explicit date windows (inclusive).
+
+### `backtests/vbt_runner.py`
+**Classes**
+- `SignalFunc` — Callable that turns a price DataFrame + params into (entries, exits, size).
+- `CostModel` — Costs in basis points; funding is daily bps applied to gross position value.
+- `Split`
+- `ResultRow`
+- `ResultBundle`
+
+**Functions**
+- `_cagr(equity, freq_per_year)`
+- `_max_drawdown(equity)`
+- `_sharpe(returns, rf, freq_per_year)`
+- `run_vbt_on_split(df, entries, exits, size, cost, split, price_col, freq_per_year)` — Run vectorbt on a single time split and compute core metrics.
+- `sweep_grid(df, signal_func, param_grid, splits, cost, price_col, freq_per_year)` — Run many parameter sets across many splits; return a tidy table.
+
 ## `ta_lab2/features`
 
 ### `features/__init__.py`
@@ -104,6 +174,15 @@ _(no top-level classes or functions)_
 - `add_ema_d2(df, base_price_cols, ema_windows, *, direction, overwrite, round_places, price_cols, ema_periods, **kwargs)` — Second difference of EMA:
 - `add_ema(df, col, windows, prefix)` — Legacy wrapper: adds EMA columns for one price column.
 - `prepare_ema_helpers(df, base_price_cols, ema_windows, *, direction, scale, overwrite, round_places, price_cols, periods, **kwargs)` — Ensure first/second EMA diffs exist, then add scaled helper columns for each
+
+### `features/ensure.py`
+**Functions**
+- `ensure_close(df)`
+- `ensure_ema(df, span)`
+- `ensure_rsi(df, n, col)`
+- `ensure_macd(df, fast, slow, signal)`
+- `ensure_adx(df, n)`
+- `ensure_obv(df)`
 
 ### `features/feature_pack.py`
 **Functions**
@@ -165,6 +244,10 @@ _(no top-level classes or functions)_
 - `add_rolling_vol_from_returns_batch(df, *, close_col, windows, types, annualize, periods_per_year, ddof, prefix, price_col, modes, direction)` — Rolling historical volatility (new + legacy API).
 - `add_volatility_features(df, *, do_atr, do_parkinson, do_rs, do_gk, atr_period, ret_windows, ret_types, ret_annualize, ret_periods_per_year, ret_ddof, ret_prefix, rv_windows, rv_which, rv_annualize, rv_periods_per_year, open_col, high_col, low_col, close_col, rolling_windows, direction)` — Unified volatility orchestrator with legacy support.
 
+## `ta_lab2/io`
+
+## `ta_lab2/live`
+
 ## `ta_lab2/pipelines`
 
 ### `pipelines/__init__.py`
@@ -202,6 +285,21 @@ _(no top-level classes or functions)_
 - `compute_ema_comovement_stats(df, *, ema_cols, method, agree_on_sign_of_diff, diff_window)` — Compute co-movement stats among EMA series.
 - `compute_ema_comovement_hierarchy(df, *, ema_cols, method)` — Build a simple ordering (“hierarchy”) of EMA columns from the correlation matrix.
 
+### `regimes/data_budget.py`
+**Classes**
+- `DataBudgetContext`
+
+**Functions**
+- `_count(df)`
+- `assess_data_budget(*, monthly, weekly, daily, intraday)`
+
+### `regimes/feature_utils.py`
+**Functions**
+- `_ema(s, n)`
+- `add_ema_pack(df, *, tf, price_col)` — Add the EMA set used by our labelers per time frame.
+- `add_atr14(df, *, price_col)` — Adds a lightweight ATR(14) column named 'atr14'.
+- `ensure_regime_features(df, *, tf, price_col)` — One-shot: add EMAs + ATR columns appropriate for this TF.
+
 ### `regimes/flips.py`
 **Functions**
 - `sign_from_series(df, src_col, out_col)` — Make a {-1,0,+1} sign column from a numeric series.
@@ -209,6 +307,18 @@ _(no top-level classes or functions)_
 - `label_regimes_from_flips(n_rows, flip_idx, start_regime)` — Convert flip indices to piecewise-constant regime IDs: 0,1,2,...
 - `attach_regimes(df, regime_ids, col)` — Attach regime IDs to a dataframe (length must match).
 - `regime_stats(df, regime_col, ret_col)` — Per-regime summary: n_bars, start/end timestamps, duration, cumulative & average returns.
+
+### `regimes/labels.py`
+**Functions**
+- `label_trend_basic(df, *, price_col, ema_fast, ema_mid, ema_slow, adx_col, adx_floor, confirm_bars)` — Up if price>slow and fast>mid for confirm_bars; Down if inverse; else Sideways.
+- `_percentile_series(x)`
+- `label_vol_bucket(df, *, atr_col, price_col, window, mode, low_cutoff, high_cutoff)`
+- `label_liquidity_bucket(df, *, spread_col, slip_col, window)` — If spread/slippage columns exist, compare to rolling medians.
+- `compose_regime_key(trend, vol, liq)`
+- `label_layer_monthly(monthly, *, mode, price_col, ema_fast, ema_mid, ema_slow)`
+- `label_layer_weekly(weekly, *, mode, price_col, ema_fast, ema_mid, ema_slow)`
+- `label_layer_daily(daily, *, mode, price_col, ema_fast, ema_mid, ema_slow)`
+- `label_layer_intraday(intraday, *, price_col, ema_fast, ema_mid, ema_slow)`
 
 ### `regimes/old_run_btc_pipeline.py`
 **Functions**
@@ -219,6 +329,37 @@ _(no top-level classes or functions)_
 - `_scal(s)`
 - `check_boundary(dt_str)`
 
+### `regimes/policy_loader.py`
+**Functions**
+- `_default_policy_yaml_path()` — Default expected location: <repo_root>/configs/regime_policies.yaml
+- `load_policy_table(yaml_path)` — Load a policy overlay from YAML and merge it over DEFAULT_POLICY_TABLE.
+
+### `regimes/proxies.py`
+**Classes**
+- `ProxyInputs`
+- `ProxyOutcome`
+
+**Functions**
+- `_is_weekly_up_normal(weekly)`
+- `infer_cycle_proxy(inp)` — If the asset lacks L0 history, use a broad market proxy to *tighten* net exposure caps.
+- `infer_weekly_macro_proxy(inp)` — If child has <52 weekly bars, borrow the parent regime to *tighten* size.
+
+### `regimes/regime_inspect.py`
+**Functions**
+- `_read_df(path)`
+- `main()`
+
+### `regimes/resolver.py`
+**Classes**
+- `TightenOnlyPolicy`
+
+**Functions**
+- `_match_policy(regime_key, table)`
+- `apply_hysteresis(prev_key, new_key, *, min_change)` — Minimal form: if prev == new or min_change==0 -> accept.
+- `_tighten(dst, src)`
+- `resolve_policy_from_table(policy_table, *, L0, L1, L2, L3, L4, base)` — Combine layer regimes into a single tighten-only policy using the provided policy_table.
+- `resolve_policy(*, L0, L1, L2, L3, L4, base)` — Back-compat wrapper that uses the in-code DEFAULT_POLICY_TABLE.
+
 ### `regimes/run_btc_pipeline.py`
 **Functions**
 - `run_btc_pipeline(csv_path, out_dir, ema_windows, resample, *, do_calendar, do_indicators, do_returns, do_volatility, do_ema, do_regimes, do_segments, config)` — Orchestrate the BTC pipeline end-to-end.
@@ -226,15 +367,110 @@ _(no top-level classes or functions)_
 ### `regimes/segments.py`
 _(no top-level classes or functions)_
 
+### `regimes/telemetry.py`
+**Classes**
+- `RegimeSnapshot`
+
+**Functions**
+- `append_snapshot(path, snap, extra)` — Append one row (creating the file with header if new). Extras (e.g., pnl) can be included.
+
+## `ta_lab2/research`
+
+## `ta_lab2/research/notebooks`
+
+## `ta_lab2/research/queries`
+
+### `research/queries/opt_cf_ema.py`
+**Functions**
+- `_norm_cols(df)`
+- `load_df(p)`
+- `ensure_ema(df, span)`
+- `build_grid(fasts, slows, delta)`
+- `main()`
+
+### `research/queries/opt_cf_ema_refine.py`
+**Functions**
+- `_norm_cols(df)`
+- `load_df(p)`
+- `ensure_ema(df, span)`
+- `refine_ranges(tops, f_pad, s_pad, f_min, f_max, s_min, s_max)`
+- `build_grid(fasts, slows, delta)`
+- `main()`
+
+### `research/queries/opt_cf_ema_sensitivity.py`
+**Functions**
+- `_norm_cols(df)`
+- `load_df(p)`
+- `ensure_ema(df, span)`
+- `build_grid(f, s, f_pad, s_pad, delta)`
+- `main()`
+
+### `research/queries/opt_cf_generic.py`
+**Functions**
+- `_norm_cols(df)`
+- `load_df(path)`
+- `main()`
+
+### `research/queries/run_ema_50_100.py`
+**Functions**
+- `_normalize_cols(df)`
+- `_find_ts_col(cols)`
+- `_find_close_col(cols)`
+- `load_price_df(csv_path)`
+- `ensure_ema(df, span, out_col)`
+- `main()`
+
+### `research/queries/wf_validate_ema.py`
+**Functions**
+- `_norm_cols(df)`
+- `load_df(path)`
+- `ensure_ema(df, span)`
+- `rolling_train_test_splits(start, end, train_days, test_days, step_days)` — Yield (TRAIN_i, TEST_i) Split pairs from [start, end].
+- `main()`
+
 ## `ta_lab2/signals`
 
 ### `signals/__init__.py`
-_(no top-level classes or functions)_
+**Functions**
+- `attach_signals_from_config(df, strategy, **params)` — Back-compat helper.
+
+### `signals/breakout_atr.py`
+**Functions**
+- `_rolling_high(s, n)`
+- `_rolling_low(s, n)`
+- `make_signals(df, lookback, atr_col, price_cols, confirm_close, exit_on_channel_crossback, use_trailing_atr_stop, trail_atr_mult, risk_pct, size_smoothing_ema, max_leverage)` — Breakout strategy:
+
+### `signals/ema_trend.py`
+**Functions**
+- `make_signals(df, *, fast_ema, slow_ema, rsi_col, atr_col, use_rsi_filter, use_vol_filter, rsi_min_long, rsi_max_short, min_atr_pct, allow_shorts, cooldown_bars)` — EMA crossover adapter.
 
 ### `signals/generator.py`
 **Functions**
-- `generate_signals(df, *, close_col, fast_ema, slow_ema, rsi_col, atr_col, use_rsi_filter, use_vol_filter, rsi_min_long, rsi_max_short, min_atr_pct, allow_shorts, cooldown_bars)` — Combine indicator-based rules into directional trading signals.
-- `attach_signals_from_config(df, cfg)` — Read YAML-style config and attach signals.
+- `generate_signals(df, *, close_col, fast_ema, slow_ema, rsi_col, atr_col, use_rsi_filter, use_vol_filter, rsi_min_long, rsi_max_short, min_atr_pct, allow_shorts, cooldown_bars)` — Compose primitive rules into a full signal dataframe.
+
+### `signals/position_sizing.py`
+**Functions**
+- `clamp_size(size, max_abs)` — Clamp position size to +/- max_abs (e.g., leverage cap).
+- `ema_smooth(series, span)` — Smooth a sizing series to reduce churn.
+- `volatility_size_pct(price, atr, risk_pct, atr_mult, equity)` — Position sizing based on risk parity vs ATR:
+- `target_dollar_position(equity, size_fraction)` — Convert a size fraction (relative to equity) to notional dollars.
+- `fixed_fractional(price, fraction)` — Simple constant fraction sizing (e.g., 50% of equity).
+- `inverse_volatility(vol, target, min_size, max_size, eps)` — Size inversely to a volatility proxy (e.g., ATR% or rolling stdev).
+
+### `signals/registry.py`
+**Functions**
+- `get_strategy(name)` — Safe getter used by research scripts; keeps existing orchestrator behavior intact.
+- `_ensure_close(df)`
+- `_ensure_ema(df, span)`
+- `_ensure_rsi(df, n)` — Minimal Wilder-style RSI (EMA smoothing) on 'close'.
+- `_ensure_macd(df, fast, slow, signal)`
+- `_ensure_atr(df, n)` — Minimal ATR (Wilder). Requires high/low/close. If missing, silently skip.
+- `ensure_for(name, df, params)` — Compute required columns for a given strategy+params, if missing.
+- `grid_for(name)` — Small default grids to kick off coarse scans.
+
+### `signals/rsi_mean_revert.py`
+**Functions**
+- `make_signals(df, rsi_col, lower, upper, confirm_cross, allow_shorts, atr_col, risk_pct, atr_mult_stop, price_col, max_leverage)` — RSI mean-revert:
 
 ### `signals/rules.py`
 **Functions**

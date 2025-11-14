@@ -124,4 +124,4 @@ __all__ = [
     # Correlation (if present)
     "acf", "pacf_yw", "rolling_autocorr", "xcorr",
 ]
-__version__ = "0.3.0" 
+__version__ = "0.3.1" 
