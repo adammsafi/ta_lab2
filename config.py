@@ -2,18 +2,19 @@
 """
 Central configuration loader for ta_lab2.
 
-- Reads config/default.yaml (or any YAML path)
+- Reads configs/default.yaml (or any YAML path)
 - Normalizes paths against project root
 - Converts nested mappings into typed dataclasses
 - Supports safe forward-compatibility (unknown keys ignored)
 
 Note:
-- If `data_csv` or `out_dir` are inside the project root, we now store them
+- If `data_csv` or `out_dir` are inside the project root, we store them
   as **relative paths** (so `(project_root() / cfg.data_csv)` works cleanly).
   If they are outside the project, we keep them absolute.
 """
 
 from __future__ import annotations
+
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -79,6 +80,27 @@ class PipelineSettings:
     returns_windows: list[int] = field(default_factory=lambda: [10, 21, 50])
 
 
+# --- New: marketdata config blocks ---
+
+
+@dataclass
+class MarketdataTables:
+    """Logical → physical table names for the marketdata database."""
+    ohlcv_daily: str = "cmc_price_histories7"
+    da_ids: str = "cmc_da_ids"
+    da_info: str = "cmc_da_info"
+    exchange_info: str = "cmc_exchange_info"
+    exchange_map: str = "cmc_exchange_map"
+
+
+@dataclass
+class MarketdataConfig:
+    """Connection + schema/table config for the marketdata database."""
+    db_url_env: str = "MARKETDATA_DB_URL"
+    schema: str = "public"
+    tables: MarketdataTables = field(default_factory=MarketdataTables)
+
+
 # -----------------------------
 # Top-level Settings
 # -----------------------------
@@ -105,6 +127,9 @@ class Settings:
     segments: SegmentsSettings = field(default_factory=SegmentsSettings)
     pipeline: PipelineSettings = field(default_factory=PipelineSettings)
 
+    # New: marketdata block (optional)
+    marketdata: MarketdataConfig | None = None
+
 
 # -----------------------------
 # Helpers
@@ -125,8 +150,10 @@ def _as(obj: Any, cls: Any):
     Minimal recursive 'constructor' to turn nested dicts into dataclass instances.
     Ignores unknown keys so YAML can be slightly ahead of code.
     """
-    if obj is None or isinstance(obj, cls):
-        return obj if obj is not None else cls()
+    if obj is None:
+        return cls()
+    if isinstance(obj, cls):
+        return obj
     if isinstance(obj, dict):
         hints = {f.name for f in cls.__dataclass_fields__.values()}
         kwargs = {k: v for k, v in obj.items() if k in hints}
@@ -144,7 +171,7 @@ def load_settings(yaml_path: str | Path = "configs/default.yaml") -> Settings:
     and coerce nested mappings into typed dataclasses.
     Also merges environment overrides if set (DATA_CSV, OUT_DIR).
 
-    Gracefully accepts either 'config/default.yaml' or 'configs/default.yaml'.
+    Gracefully accepts either 'configs/default.yaml' or 'config/default.yaml'.
     """
     root = project_root()
     yml = Path(yaml_path)
@@ -163,7 +190,7 @@ def load_settings(yaml_path: str | Path = "configs/default.yaml") -> Settings:
         else:
             raise FileNotFoundError(f"Configuration file not found: {p}")
 
-    data = yaml.safe_load(p.read_text(encoding="utf-8")) | {}
+    data = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
 
     # --- Environment variable overrides ---
     if os.getenv("DATA_CSV"):
@@ -174,7 +201,7 @@ def load_settings(yaml_path: str | Path = "configs/default.yaml") -> Settings:
     # --- Top-level scalars ---
     data_csv = data.get("data_csv")
     if not data_csv:
-        raise ValueError("`data_csv` is required in config/default.yaml")
+        raise ValueError("`data_csv` is required in configs/default.yaml")
 
     out_dir = data.get("out_dir", "artifacts")
     ema_windows = data.get("ema_windows", [21, 50, 100, 200])
@@ -187,6 +214,7 @@ def load_settings(yaml_path: str | Path = "configs/default.yaml") -> Settings:
     trend = _as(data.get("trend"), TrendSettings)
     segments = _as(data.get("segments"), SegmentsSettings)
     pipeline = _as(data.get("pipeline"), PipelineSettings)
+    marketdata = _as(data.get("marketdata"), MarketdataConfig) if data.get("marketdata") is not None else None
 
     # --- Build Settings object ---
     settings = Settings(
@@ -200,13 +228,14 @@ def load_settings(yaml_path: str | Path = "configs/default.yaml") -> Settings:
         trend=trend,
         segments=segments,
         pipeline=pipeline,
+        marketdata=marketdata,
     )
 
     # --- Normalize paths (now relative-if-inside-root) ---
     dc = Path(settings.data_csv)
     pabs_dc = (root / dc).resolve() if not dc.is_absolute() else dc.resolve()
     try:
-        # Store relative when under project root (fixes tests expecting root / cfg.data_csv)
+        # Store relative when under project root
         settings.data_csv = pabs_dc.relative_to(root).as_posix()
     except ValueError:
         # Outside project root -> keep absolute
@@ -237,5 +266,5 @@ def preview_settings(settings: Settings) -> None:
     }
     pprint.pprint(flat)
     print("Nested groups:")
-    for grp in ["volatility", "calendar", "trend", "segments"]:
+    for grp in ["volatility", "calendar", "trend", "segments", "marketdata"]:
         print(f"  - {grp}: {getattr(settings, grp)}")

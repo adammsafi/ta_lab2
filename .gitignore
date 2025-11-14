@@ -123,3 +123,15 @@ yarn-error.log*
 .env.development.local
 .env.test.local
 .env.production.local
+
+# =========================
+# Local DB secrets
+# =========================
+db_config.env
+
+# =========================
+# Local dev logs / scratch
+# =========================
+diff.txt
+full_diff.patch
+full_git_log.txt

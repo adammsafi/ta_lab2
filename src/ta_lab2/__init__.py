@@ -1,6 +1,13 @@
 # src/ta_lab2/__init__.py
 from __future__ import annotations
 import importlib, sys
+from .config import load_local_env
+
+
+# Load db_config.env from the project root if present
+load_local_env()
+
+__version__ = "0.3.1"
 
 # --- Expose feature submodules at top level for backward compatibility ---
 # e.g., allow: from ta_lab2.calendar import expand_datetime_features_inplace

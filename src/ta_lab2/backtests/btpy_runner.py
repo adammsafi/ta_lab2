@@ -10,10 +10,12 @@ from typing import Any, Dict, Optional, Tuple
 import numpy as np
 import pandas as pd
 
+# Soft import: allow module to be imported even if backtesting is not installed.
 try:
     from backtesting import Backtest, Strategy
-except ImportError as e:
-    raise ImportError("Please `pip install Backtesting` (package name: backtesting)") from e
+except ImportError:  # pragma: no cover
+    Backtest = None  # type: ignore[assignment]
+    Strategy = None  # type: ignore[assignment]
 
 
 @dataclass
@@ -22,14 +24,29 @@ class BTResult:
     equity: pd.Series
 
 
-def _make_strategy_class(stop_pct: Optional[float] = None, trail_pct: Optional[float] = None):
+def _ensure_backtesting_available() -> None:
+    """Raise a clear error if Backtesting.py is not installed."""
+    if Backtest is None or Strategy is None:
+        raise ImportError(
+            "Backtesting.py is required for ta_lab2.backtests.btpy_runner. "
+            "Please `pip install backtesting` (package name: backtesting) to use this runner."
+        )
+
+
+def _make_strategy_class(
+    stop_pct: Optional[float] = None,
+    trail_pct: Optional[float] = None,
+):
     """Create a Strategy subclass that uses precomputed entry/exit columns."""
-    class SignalStrategy(Strategy):
+    _ensure_backtesting_available()
+
+    class SignalStrategy(Strategy):  # type: ignore[misc]
         # parameters can be tuned if desired
         stop_loss_pct = stop_pct
         trailing_stop_pct = trail_pct
 
         def init(self):
+            # No indicators; we rely purely on precomputed signals
             pass
 
         def next(self):
@@ -59,8 +76,18 @@ def run_bt(
     trail_pct: Optional[float] = None,
 ) -> BTResult:
     """Run Backtesting.py using precomputed boolean signals."""
+    _ensure_backtesting_available()
+
     data = df.copy()
-    data = data.rename(columns={"open": "Open", "high": "High", "low": "Low", "close": "Close", "volume": "Volume"})
+    data = data.rename(
+        columns={
+            "open": "Open",
+            "high": "High",
+            "low": "Low",
+            "close": "Close",
+            "volume": "Volume",
+        }
+    )
     data["entry"] = entries.astype(bool)
     data["exit"] = exits.astype(bool)
 

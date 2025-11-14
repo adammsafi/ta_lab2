@@ -13,8 +13,8 @@ import pandas as pd
 
 try:
     import vectorbt as vbt
-except ImportError as e:
-    raise ImportError("Please `pip install vectorbt`") from e
+except ImportError:  # pragma: no cover
+    vbt = None  # type: ignore[assignment]
 
 
 # ---------- Protocols & dataclasses ----------
@@ -166,6 +166,11 @@ def sweep_grid(
     price_col: str = "close",
     freq_per_year: int = 365,
 ) -> ResultBundle:
+    if vbt is None:
+        raise ImportError(
+            "vectorbt is required for ta_lab2.backtests; please `pip install vectorbt` "
+            "to use the backtest runner."
+        )
     """Run many parameter sets across many splits; return a tidy table."""
     rows: List[ResultRow] = []
     for params in param_grid:
