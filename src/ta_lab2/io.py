@@ -3,14 +3,15 @@ from __future__ import annotations
 import os
 from typing import Mapping, Any, Sequence, Optional
 
+import os
+from typing import Mapping, Any, Sequence, Optional
+
+import pathlib
 import pandas as pd
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
 from .config import load_settings
-
-import pandas as pd
-import pathlib
 
 
 def write_parquet(df: pd.DataFrame, path: str, partition_cols=None):
@@ -128,7 +129,7 @@ def _get_marketdata_tables() -> Mapping[str, str]:
         "da_info": m.get("da_info", "cmc_da_info"),
         "exchange_info": m.get("exchange_info", "cmc_exchange_info"),
         "exchange_map": m.get("exchange_map", "cmc_exchange_map"),
-        # New: indicator table defaults
+        # indicator table defaults
         "ema_daily": m.get("ema_daily", "cmc_ema_daily"),
     }
 
@@ -168,14 +169,16 @@ def load_cmc_ohlcv_daily(
     Load daily OHLCV time series from the cmc_price_histories7 table
     (or whatever is configured as marketdata.tables.ohlcv_daily).
 
+    NOTE: ts is derived from timeclose to align with bar close dates.
+
     Parameters
     ----------
     ids :
         Sequence of CoinMarketCap IDs to load (e.g. [1, 1027, 5426, ...]).
     start :
-        Optional lower bound (inclusive) on time/timestamp column.
+        Optional lower bound (inclusive) on timeclose.
     end :
-        Optional upper bound (exclusive) on time/timestamp column.
+        Optional upper bound (exclusive) on timeclose.
     db_url :
         Optional DB URL override. If omitted, uses settings/env resolution.
     tz :
@@ -187,7 +190,7 @@ def load_cmc_ohlcv_daily(
         MultiIndex (id, ts) with columns:
         ['open', 'high', 'low', 'close', 'volume'].
 
-        'ts' is a tz-aware pandas.Timestamp.
+        'ts' is a tz-aware pandas.Timestamp derived from timeclose.
     """
     if not ids:
         raise ValueError("ids must be a non-empty sequence of CMC IDs")
@@ -200,11 +203,11 @@ def load_cmc_ohlcv_daily(
     params: dict[str, object] = {"ids": list(ids)}
 
     if start is not None:
-        where_clauses.append("timeopen >= :start")
+        where_clauses.append("timeclose >= :start")
         params["start"] = pd.to_datetime(start).to_pydatetime()
 
     if end is not None:
-        where_clauses.append("timeopen < :end")
+        where_clauses.append("timeclose < :end")
         params["end"] = pd.to_datetime(end).to_pydatetime()
 
     where_sql = " AND ".join(where_clauses)
@@ -213,7 +216,7 @@ def load_cmc_ohlcv_daily(
         f"""
         SELECT
             id,
-            timeopen AS ts,
+            timeclose AS ts,
             open,
             high,
             low,
@@ -270,7 +273,7 @@ def load_close_panel(
     Returns
     -------
     DataFrame
-        Index: ts (tz-aware)
+        Index: ts (tz-aware, from timeclose)
         Columns: one column per asset id
         Values: close prices.
     """
@@ -345,29 +348,39 @@ def _compute_ema_long_from_close_panel(
     """
     Compute EMAs over a wide close panel and return a long-format DataFrame.
 
+    Important behavior:
+    - EMAs are only defined where there is an actual close price.
+      If an asset stops trading on 2025-10-26 but other assets
+      continue to 2025-11-10, its EMA will stop at 2025-10-26.
+      No rows are emitted for that asset after its last close.
+
     Parameters
     ----------
     close_panel :
         DataFrame with index=ts and columns=id, values=close prices.
-    period :
+    periods :
         Iterable of EMA window lengths (ints).
 
     Returns
     -------
     DataFrame
         Columns: ['id', 'ts', 'period', 'ema']
-        Types:
-            id: asset id (same dtype as columns of close_panel)
-            ts: timestamp (index)
-            period: int (EMA window)
-            ema: float
     """
     if close_panel.empty:
         return pd.DataFrame(columns=["id", "ts", "period", "ema"])
 
     frames: list[pd.DataFrame] = []
     for p in periods:
-        ema_wide = close_panel.ewm(span=p, adjust=False).mean()
+        # Raw EMA (extends through trailing NaNs)
+        ema_wide = close_panel.ewm(
+            span=p, 
+            adjust=False,
+            min_periods=p,
+        ).mean()
+        # Only keep EMA where we actually have a close price;
+        # this makes EMA NaN wherever close is NaN.
+        ema_wide = ema_wide.where(close_panel.notna())
+        # stack() drops NaNs → no rows at all where close was NaN.
         ema_long = ema_wide.stack().rename("ema").reset_index()
         # ema_long columns: ['ts', 'id', 'ema']
         ema_long["period"] = int(p)
@@ -394,7 +407,7 @@ def write_ema_daily_to_db(
     Table schema (recommended) for ema_daily / cmc_ema_daily:
 
         id      INT          -- CoinMarketCap asset id
-        ts      TIMESTAMPTZ  -- timestamp (daily bar open/close)
+        ts      TIMESTAMPTZ  -- timestamp (daily bar close)
         period  INT          -- EMA window length
         ema     DOUBLE PRECISION
         ingested_at TIMESTAMPTZ DEFAULT now()
@@ -409,7 +422,7 @@ def write_ema_daily_to_db(
     ----------
     ids :
         Sequence of CoinMarketCap ids to process.
-    period :
+    periods :
         Sequence of EMA window lengths (ints).
     start, end :
         Optional date bounds passed through to load_cmc_ohlcv_daily().
@@ -471,4 +484,3 @@ def write_ema_daily_to_db(
             conn.execute(stmt, batch)
 
     return total
-

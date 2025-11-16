@@ -16,214 +16,240 @@ _DEFAULT_AGG = {
     "volume": "sum",
 }
 
-# Helpful note:
-# - 'W' in pandas ends weeks on Sunday by default. For markets, 'W-FRI' often aligns better.
-# - 'M' = month-end (deprecated in newer pandas; use 'ME' internally), 'MS' = month-start
-# - 'Q', 'A' (deprecated) ~ quarter/year end; use 'QE', 'YE' internally.
-# - 'B' = business-day frequency (e.g., 5B ≈ trading week); 'D' = calendar days.
 
-
-# ---------------------------
-# Internal helpers
-# ---------------------------
-
-def _normalize(df: pd.DataFrame) -> pd.DataFrame:
-    d = df.copy()
-    d.columns = [str(c).strip().lower() for c in d.columns]
-    if "timestamp" not in d.columns:
-        # best guess
-        ts = next((c for c in d.columns if "time" in c or "date" in c), None)
-        if ts:
-            d = d.rename(columns={ts: "timestamp"})
-        else:
-            raise ValueError("No timestamp column found.")
-    d["timestamp"] = pd.to_datetime(d["timestamp"], utc=True, errors="coerce")
-    d = d.dropna(subset=["timestamp"]).sort_values("timestamp")
-    return d
-
-
-def _normalize_freq(freq: str) -> str:
+def _validate_ohlcv_columns(df: pd.DataFrame) -> None:
     """
-    Map deprecated aliases to current ones for resample():
-      - 'M' -> 'ME' (month end)
-      - 'A' -> 'YE' (year end)
-    Pass everything else through as-is.
+    Ensure that a DataFrame has the standard OHLCV columns.
     """
-    if freq == "M":
-        return "ME"
-    if freq == "A":
-        return "YE"
-    return freq
+    required = {"open", "high", "low", "close", "volume"}
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"DataFrame is missing required OHLCV columns: {missing}")
 
 
-def _season_from_month(m: pd.Series) -> pd.Series:
-    """
-    Meteorological seasons derived from month number:
-      DJF (12,1,2), MAM (3,4,5), JJA (6,7,8), SON (9,10,11)
-    """
-    m = pd.to_numeric(m, errors="coerce").astype("Int64")
-    out = pd.Series(index=m.index, dtype="object")
-    out[m.isin([12, 1, 2])]  = "DJF"
-    out[m.isin([3, 4, 5])]   = "MAM"
-    out[m.isin([6, 7, 8])]   = "JJA"
-    out[m.isin([9, 10, 11])] = "SON"
-    return out
-
-
-# ---------------------------
-# Public API
-# ---------------------------
-
-def resample_one(
+def _ensure_ts_index(
     df: pd.DataFrame,
-    freq: str,
-    agg: Optional[dict] = None,
-    align_to: Optional[str] = None,
+    ts_col: str = "ts",
+    copy: bool = True,
 ) -> pd.DataFrame:
     """
-    Resample a daily (or finer) dataframe with OHLCV into a target frequency.
+    Ensure df has a DatetimeIndex based on ts_col.
+    """
+    if copy:
+        df = df.copy()
+
+    if ts_col not in df.columns and not isinstance(df.index, pd.DatetimeIndex):
+        raise ValueError(
+            f"_ensure_ts_index(): expected '{ts_col}' column "
+            "or a DatetimeIndex."
+        )
+
+    if not isinstance(df.index, pd.DatetimeIndex):
+        df[ts_col] = pd.to_datetime(df[ts_col], utc=True)
+        df = df.set_index(ts_col)
+
+    if df.index.tz is None:
+        # Coerce to UTC if naive
+        df.index = df.index.tz_localize("UTC")
+
+    df = df.sort_index()
+    return df
+
+
+def resample_ohlcv(
+    df: pd.DataFrame,
+    freq: str,
+    agg: Optional[Dict[str, str]] = None,
+    label: str = "right",
+    closed: str = "right",
+    strict: bool = True,
+) -> pd.DataFrame:
+    """
+    Generic OHLCV resampler.
 
     Parameters
     ----------
-    df : DataFrame with columns timestamp, open/high/low/close/volume
-    freq : pandas offset alias, e.g. '2D','3D','5D','10D','25D','45D','W','W-FRI','2W','3W','M','2M','3M','6M','A'
-    agg  : dict of column -> aggregation; defaults to OHLCV-safe _DEFAULT_AGG
-    align_to : optional tz name (e.g., 'UTC') if you need explicit tz conversion
+    df :
+        DataFrame with DatetimeIndex and columns: open, high, low, close, volume.
+    freq :
+        Resample frequency (e.g. '2D', '1W', '3M').
+    agg :
+        Optional custom aggregation mapping. If None, uses _DEFAULT_AGG.
+    label, closed :
+        Passed to pandas.DataFrame.resample.
+    strict :
+        If True, drop any buckets whose end is after the max input timestamp.
 
     Returns
     -------
-    DataFrame with same OHLCV schema at the new timeframe, plus calendar fields and 'tfreq'.
+    DataFrame
+        Resampled OHLCV with DatetimeIndex.
     """
-    d = _normalize(df)
-    if align_to:
-        # d['timestamp'] is tz-aware UTC from _normalize, but we still honor explicit requests
-        d["timestamp"] = d["timestamp"].dt.tz_convert(align_to)
+    if not isinstance(df.index, pd.DatetimeIndex):
+        raise ValueError("resample_ohlcv(): df must have a DatetimeIndex")
 
-    _freq = _normalize_freq(freq)  # avoid pandas deprecation warnings
-    a = {k: v for k, v in (agg or _DEFAULT_AGG).items() if k in d.columns}
+    _validate_ohlcv_columns(df)
 
-    out = (
-        d.set_index("timestamp")
-         .resample(_freq)          # use normalized frequency
-         .agg(a)
-         .dropna(how="any")
-         .reset_index()
+    agg = agg or _DEFAULT_AGG
+
+    r = (
+        df.resample(freq, label=label, closed=closed)
+        .agg(agg)
+        .dropna(how="any")
     )
 
-    # Attach calendar fields (year, month, week, season, etc.)
-    try:
-        expand_datetime_features_inplace(out, "timestamp")
-    except Exception:
-        # If calendar expansion fails for any reason, proceed with a bare frame
-        pass
+    if strict:
+        max_ts = df.index.max()
+        r = r[r.index <= max_ts]
 
-    out["tfreq"] = _freq
-    return out
+    return r
 
 
-def resample_many(
+# ---------------------------------------------------------------------
+# Timeframe normalization helpers
+# ---------------------------------------------------------------------
+
+
+TIMEFRAME_FREQS: Dict[str, str] = {
+    # Daily-ish
+    "2D": "2D",
+    "3D": "3D",
+    "4D": "4D",
+    "5D": "5D",
+    "10D": "10D",
+    "15D": "15D",
+    "20D": "20D",
+    "25D": "25D",
+    "45D": "45D",
+    "100D": "100D",
+
+    # Weekly-ish
+    "1W": "1W",
+    "2W": "2W",
+    "3W": "3W",
+    "4W": "28D",
+    "6W": "42D",
+    "8W": "56D",
+    "10W": "70D",
+
+    # Monthly-ish
+    "1M": "1ME",
+    "2M": "2ME",
+    "3M": "3ME",
+    "6M": "6ME",
+    "9M": "9ME",
+    "12M": "12ME",
+}
+
+
+def normalize_timeframe_label(tf: str) -> str:
+    """
+    Normalize a human-readable timeframe key to a pandas offset alias.
+
+    Examples
+    --------
+    '2D' -> '2D'
+    '1W' -> '1W'
+    '1M' -> '1ME'
+    """
+    key = tf.upper()
+    if key not in TIMEFRAME_FREQS:
+        raise KeyError(f"Unknown timeframe label: {tf}")
+    return TIMEFRAME_FREQS[key]
+
+
+def add_calendar_features(
     df: pd.DataFrame,
-    freqs: Iterable[str],
-    agg: Optional[dict] = None,
-    outdir: Optional[str | Path] = "artifacts/frames",
-    overwrite: bool = True,
-) -> Dict[str, pd.DataFrame]:
-    """
-    Build multiple timeframe views and (optionally) persist as parquet/csv.
-
-    Returns
-    -------
-    dict: {original_freq_string -> DataFrame}
-    """
-    outdir = Path(outdir) if outdir else None
-    if outdir:
-        outdir.mkdir(parents=True, exist_ok=True)
-
-    frames: Dict[str, pd.DataFrame] = {}
-    for f in freqs:
-        view = resample_one(df, f, agg=agg)
-        frames[f] = view
-        if outdir:
-            # Persist using the original frequency string in the filename for continuity
-            path = outdir / f"{f}.parquet"
-            if overwrite or not path.exists():
-                try:
-                    view.to_parquet(path)
-                except Exception:
-                    view.to_csv(path.with_suffix(".csv"), index=False)
-    return frames
-
-
-def add_season_label(df: pd.DataFrame, column: str = "season") -> pd.DataFrame:
-    """
-    Ensure a 'season' column exists (DJF/MAM/JJA/SON). Will attempt to use
-    expand_datetime_features_inplace; if not present, derives from month.
-    """
-    d = _normalize(df).copy()
-    # Try calendar expansion first (adds 'season' if implemented in calendar.py)
-    try:
-        expand_datetime_features_inplace(d, "timestamp")
-    except Exception:
-        pass
-
-    # If still missing, derive from month manually
-    if column not in d.columns or d[column].isna().all():
-        month = pd.to_datetime(d["timestamp"], utc=True, errors="coerce").dt.month
-        d[column] = _season_from_month(month)
-
-    return d
-
-
-def seasonal_summary(
-    df: pd.DataFrame,
-    price_col: str = "close",
-    ret_kind: str = "arith",  # 'arith' or 'geom'
+    ts_col: str = "ts",
+    inplace: bool = False,
 ) -> pd.DataFrame:
     """
-    Aggregate returns by season across years.
+    Expand calendar features in-place using the shared calendar utilities.
 
-    'arith': within each (year, season), return = last/first - 1
-    'geom' : within each (year, season), product(1+r_d) - 1 using daily 'close_pct_delta' if present;
-             otherwise falls back to arithmetic.
+    This is mostly a thin wrapper around expand_datetime_features_inplace.
     """
-    d = _normalize(df).copy()
+    if not inplace:
+        df = df.copy()
 
-    # Attach calendar fields when available, but don't require them
-    try:
-        expand_datetime_features_inplace(d, "timestamp")
-    except Exception:
-        pass
+    expand_datetime_features_inplace(df, ts_col=ts_col)
+    return df
 
-    # Ensure 'year' and 'season'
-    ts = pd.to_datetime(d["timestamp"], utc=True, errors="coerce")
-    if "year" not in d.columns:
-        d["year"] = ts.dt.year
-    if "season" not in d.columns or d["season"].isna().all():
-        d["season"] = _season_from_month(ts.dt.month)
 
-    d = d.dropna(subset=["season"]).sort_values("timestamp")
+# ---------------------------------------------------------------------
+# Simple file-based resample helper (not used by EMA, but kept)
+# ---------------------------------------------------------------------
 
-    if ret_kind == "geom" and "close_pct_delta" in d.columns:
-        rel = d["close_pct_delta"].fillna(0).add(1.0)
 
-        def _geo(g: pd.DataFrame) -> float:
-            # product of relatives minus 1
-            return rel.loc[g.index].prod() - 1.0
+def resample_parquet_file(
+    input_path: Path,
+    output_path: Path,
+    freq: str,
+    *,
+    ts_col: str = "ts",
+    strict: bool = True,
+    label: str = "right",
+    closed: str = "right",
+) -> None:
+    """
+    Load a parquet file, resample OHLCV, and write out another parquet file.
+    """
+    df = pd.read_parquet(input_path)
+    df = _ensure_ts_index(df, ts_col=ts_col)
+    df = resample_ohlcv(df, freq=freq, strict=strict, label=label, closed=closed)
+    df.to_parquet(output_path)
 
-        season_ret = d.groupby(["year", "season"], sort=False).apply(_geo)
-    else:
-        def _arith(g: pd.DataFrame) -> float:
-            c = pd.to_numeric(g[price_col], errors="coerce").dropna()
-            return (c.iloc[-1] / c.iloc[0] - 1.0) if len(c) >= 2 else np.nan
 
-        season_ret = d.groupby(["year", "season"], sort=False).apply(_arith)
+# ---------------------------------------------------------------------
+# Compatibility wrapper used by ema_multi_timeframe.py
+# ---------------------------------------------------------------------
 
-    out = season_ret.rename("return").reset_index()
 
-    # overall average by season
-    overall = (
-        out.groupby("season", as_index=False)["return"]
-           .mean()
-           .rename(columns={"return": "avg_return_by_season"})
+def resample_to_tf(
+    df: pd.DataFrame,
+    freq: str,
+    *,
+    strict: bool = True,
+    label: str = "right",
+    closed: str = "right",
+) -> pd.DataFrame:
+    """
+    Compatibility wrapper used by ema_multi_timeframe.py.
+
+    Expects `df` with columns:
+        ts, open, high, low, close, volume
+
+    Returns an OHLCV frame at the target frequency with:
+        ts, open, high, low, close, volume
+
+    If strict=True, drop any buckets whose end is after the max original ts
+    (to avoid future extension).
+    """
+    required_cols = {"ts", "open", "high", "low", "close", "volume"}
+    missing = required_cols - set(df.columns)
+    if missing:
+        raise ValueError(f"resample_to_tf(): missing required columns: {missing}")
+
+    d = df.copy()
+    d["ts"] = pd.to_datetime(d["ts"], utc=True)
+    d = d.sort_values("ts").set_index("ts")
+
+    agg_spec = {
+        "open": "first",
+        "high": "max",
+        "low": "min",
+        "close": "last",
+        "volume": "sum",
+    }
+
+    out = (
+        d.resample(freq, label=label, closed=closed)
+        .agg(agg_spec)
+        .dropna(how="any")
     )
-    return out.merge(overall, on="season", how="left")
+
+    if strict:
+        max_ts = d.index.max()
+        out = out[out.index <= max_ts]
+
+    out = out.reset_index()  # index name 'ts' becomes a column
+    return out
