@@ -1,15 +1,23 @@
 # src/ta_lab2/config.py
 """
 Shim so callers can do:
-    from ta_lab2.config import load_settings, project_root, Settings
-while the real loader lives at the project root (./config.py).
 
-We explicitly add the project root to sys.path so that importing this module
-works even when Python resolves from inside the installed package path.
+    from ta_lab2.config import load_settings, project_root, Settings, load_local_env, TARGET_DB_URL
 
-This module also provides a small helper, `load_local_env()`, which loads
-KEY=VALUE pairs from a local env file (e.g. db_config.env) in the project root
-and injects them into os.environ if they are not already set.
+while the "real" config lives at the project root (./config.py).
+
+This module:
+
+- Locates the project root (two levels above src/ta_lab2).
+- Imports the root-level config.py if present and re-exports:
+    - Settings
+    - load_settings
+    - project_root
+    - load_local_env
+- Loads environment variables from db_config.env (if present).
+- Exposes TARGET_DB_URL, taken from:
+    1) environment (after loading db_config.env), or
+    2) root config.TARGET_DB_URL if defined.
 """
 
 from __future__ import annotations
@@ -17,64 +25,105 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
-from importlib import import_module as _imp
+from typing import Any, Callable, Optional
 
-# This file lives at <repo>/src/ta_lab2/config.py
-# -> project root is two parents above: <repo>
+# ---------------------------------------------------------------------------
+# Locate project root and import root config.py (if it exists)
+# ---------------------------------------------------------------------------
+
+# src/ta_lab2/config.py -> src/ta_lab2 -> src -> project_root
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+# Make sure project root is on sys.path so `import config` finds the root file
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-# Import the real root-level config.py
-_cfg = _imp("config")
-
-# Re-export key symbols from the root config module
-load_settings = _cfg.load_settings
-project_root = _cfg.project_root
-Settings = _cfg.Settings  # type: ignore[attr-defined]
+try:
+    import config as _root_cfg  # type: ignore[attr-defined]
+except Exception:  # pragma: no cover - very defensive
+    _root_cfg = None
 
 
-def load_local_env(filename: str = "db_config.env") -> None:
-    """
-    Load simple KEY=VALUE pairs from a local env file in the project root.
+# ---------------------------------------------------------------------------
+# Re-export Settings, load_settings, project_root, load_local_env
+# ---------------------------------------------------------------------------
 
-    This is intended for local secrets like database URLs that should not be
-    committed to version control. It only sets variables that are not already
-    present in os.environ.
-
-    Expected format (one per line):
-        KEY=VALUE
-        # comments and blank lines are ignored
-
-    Parameters
-    ----------
-    filename :
-        Name of the env file in the project root. Defaults to ``db_config.env``.
-    """
-    path = _PROJECT_ROOT / filename
-    if not path.exists():
-        return
-
-    text = path.read_text(encoding="utf-8")
-    for line in text.splitlines():
-        line = line.strip()
-        if not line or line.startswith("#"):
-            continue
-
-        key, sep, value = line.partition("=")
-        if not sep:
-            # Not a KEY=VALUE line; skip it.
-            continue
-
-        key = key.strip()
-        value = value.strip()
-
-        if not key:
-            continue
-
-        # Do not override existing environment variables.
-        if key not in os.environ:
-            os.environ[key] = value
+# Settings
+if _root_cfg is not None and hasattr(_root_cfg, "Settings"):
+    Settings = _root_cfg.Settings  # type: ignore[assignment]
+else:
+    # Fallback minimal Settings class so imports don't explode in odd environments
+    class Settings:  # type: ignore[no-redef]
+        def __init__(self, **kwargs: Any) -> None:
+            self.__dict__.update(kwargs)
 
 
-__all__ = ["load_settings", "project_root", "Settings", "load_local_env"]
+# load_settings
+if _root_cfg is not None and hasattr(_root_cfg, "load_settings"):
+    def load_settings() -> Settings:  # type: ignore[no-redef]
+        return _root_cfg.load_settings()  # type: ignore[no-any-return]
+else:
+    def load_settings() -> Settings:  # type: ignore[no-redef]
+        return Settings()  # empty settings as a safe default
+
+
+# project_root
+if _root_cfg is not None and hasattr(_root_cfg, "project_root"):
+    # Use the project_root symbol defined in the root config if present
+    project_root = _root_cfg.project_root  # type: ignore[assignment]
+else:
+    # Simple function returning the resolved project root
+    def project_root() -> Path:  # type: ignore[no-redef]
+        return _PROJECT_ROOT
+
+
+# load_local_env
+if _root_cfg is not None and hasattr(_root_cfg, "load_local_env"):
+    load_local_env = _root_cfg.load_local_env  # type: ignore[assignment]
+else:
+    def load_local_env(env_filename: str = "db_config.env") -> None:  # type: ignore[no-redef]
+        """
+        Minimal fallback: load KEY=VALUE lines from an env file at project root.
+        Values are only set if the key is not already in os.environ.
+        """
+        env_path = _PROJECT_ROOT / env_filename
+        if not env_path.exists():
+            return
+
+        for raw_line in env_path.read_text().splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            if key and key not in os.environ:
+                os.environ[key] = value
+
+
+# ---------------------------------------------------------------------------
+# Load env + expose TARGET_DB_URL
+# ---------------------------------------------------------------------------
+
+# Load env file (if any) before we compute TARGET_DB_URL
+try:
+    load_local_env()  # type: ignore[misc]
+except Exception:
+    # Fail-soft; we still allow pure-env or root-config only
+    pass
+
+_env_db_url = os.environ.get("TARGET_DB_URL") or os.environ.get("DB_URL")
+_cfg_db_url = getattr(_root_cfg, "TARGET_DB_URL", None) if _root_cfg is not None else None
+
+# This is what ema_multi_timeframe.py imports
+TARGET_DB_URL: Optional[str] = _env_db_url or _cfg_db_url
+
+__all__ = [
+    "Settings",
+    "load_settings",
+    "project_root",
+    "load_local_env",
+    "TARGET_DB_URL",
+]
