@@ -64,13 +64,13 @@ def test_import_root_and_key_modules():
     import ta_lab2.pipelines
     import ta_lab2.pipelines.btc_pipeline
 
-    # research
-    import ta_lab2.research.queries.opt_cf_ema
-    import ta_lab2.research.queries.opt_cf_ema_refine
-    import ta_lab2.research.queries.opt_cf_ema_sensitivity
-    import ta_lab2.research.queries.opt_cf_generic
-    import ta_lab2.research.queries.run_ema_50_100
-    import ta_lab2.research.queries.wf_validate_ema
+    # research (moved under scripts.research.queries)
+    import ta_lab2.scripts.research.queries.opt_cf_ema
+    import ta_lab2.scripts.research.queries.opt_cf_ema_refine
+    import ta_lab2.scripts.research.queries.opt_cf_ema_sensitivity
+    import ta_lab2.scripts.research.queries.opt_cf_generic
+    import ta_lab2.scripts.research.queries.run_ema_50_100
+    import ta_lab2.scripts.research.queries.wf_validate_ema
 
     # viz + utils
     import ta_lab2.viz.all_plots
@@ -79,4 +79,3 @@ def test_import_root_and_key_modules():
     # basic sanity assertions (just to silence linters)
     assert ta_lab2 is not None
     assert feat_resample is not None
- 
