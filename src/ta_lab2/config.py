@@ -60,10 +60,24 @@ else:
 
 # load_settings
 if _root_cfg is not None and hasattr(_root_cfg, "load_settings"):
-    def load_settings() -> Settings:  # type: ignore[no-redef]
-        return _root_cfg.load_settings()  # type: ignore[no-any-return]
+    def load_settings(*args: Any, **kwargs: Any) -> Settings:  # type: ignore[no-redef]
+        """
+        Thin wrapper around root-level config.load_settings.
+
+        Accepts arbitrary positional/keyword arguments so callers can do either:
+
+            load_settings()
+            load_settings(path_to_yaml)
+
+        without this shim causing a TypeError.
+        """
+        return _root_cfg.load_settings(*args, **kwargs)  # type: ignore[no-any-return]
 else:
-    def load_settings() -> Settings:  # type: ignore[no-redef]
+    def load_settings(*args: Any, **kwargs: Any) -> Settings:  # type: ignore[no-redef]
+        """
+        Fallback: ignore any arguments and return an empty Settings
+        instance so imports still succeed in minimal environments.
+        """
         return Settings()  # empty settings as a safe default
 
 
