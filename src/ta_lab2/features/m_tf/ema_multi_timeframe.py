@@ -3,19 +3,38 @@ from __future__ import annotations
 """
 Multi-timeframe EMA builder for cmc_ema_multi_tf.
 
-Behavior:
+Behavior (updated to preview-style roll):
 
-- EMA is a smooth, rolling series updated on EVERY daily ts.
-- We approximate a "tf-period EMA" by scaling the period by tf_days:
+- We work on a DAILY grid, but the canonical EMA is defined on
+  higher-timeframe (TF) closes (3D, 1W, 1M, etc).
 
-      effective_period = period * tf_days[tf]
+- For each (id, tf, period=p):
 
-  e.g. 10-period 3D EMA ≈ 30-day EMA.
+    * We first compute the EMA on TRUE TF closes using `period=p` TF bars.
+      This is the canonical series and is stored on rows where roll = FALSE.
+
+          ema_bar_{k} = alpha_bar * close_bar_{k}
+                        + (1 - alpha_bar) * ema_bar_{k-1}
+
+      where alpha_bar = 2 / (p + 1).
+
+    * On DAILY intraperiod rows, we compute a **preview** EMA:
+
+          ema_preview_t = alpha_bar * close_t
+                          + (1 - alpha_bar) * ema_prev_bar
+
+      where ema_prev_bar is the EMA of the last completed TF bar.
+      These preview values DO NOT feed into future bar EMA; only the
+      canonical bar-closing EMA advances the state.
+
+- The `ema` column therefore contains:
+    * canonical TF-bar EMA on roll = FALSE rows
+    * preview EMA on roll = TRUE rows
 
 - `roll` flag:
     * roll = FALSE → this ts is a TRUE higher-TF close
-                     (end of the 3D / 1W / 1M bar).
-    * roll = TRUE  → intrabar / rolling value.
+                     (end of the 3D / 1W / 1M bar), canonical EMA
+    * roll = TRUE  → intrabar / preview EMA
 
 - `d1`, `d2` (closing-only):
     first and second differences of EMA, but only on rows where roll = FALSE.
@@ -33,7 +52,7 @@ Expected schema for public.cmc_ema_multi_tf:
     period    int
     ema       double precision
     tf_days   int
-    roll      boolean               -- FALSE = true close, TRUE = rolling
+    roll      boolean               -- FALSE = true close, TRUE = preview / rolling
     d1        double precision      -- closing-only
     d2        double precision      -- closing-only
     d1_roll   double precision      -- rolling per-day
@@ -269,19 +288,34 @@ def build_multi_timeframe_ema_frame(
     """
     Build a longform DataFrame of multi-timeframe EMAs on a DAILY grid.
 
-    For each (id, tf, period):
+    UPDATED BEHAVIOR (preview-style roll):
 
-    - `ema` is a rolling EMA updated on *every* daily ts.
-      We scale the effective period by tf_days:
+    For each (id, tf, period=p):
 
-          effective_period = period * tf_days[tf]
+    - We identify TRUE TF closes using the daily timestamps of the last
+      bar in each resample bucket.
 
-      so a "10-period 3D EMA" is approximately a 30-day EMA, etc.
+    - On those closes we compute the canonical EMA using `period=p`
+      TF bars (no tf_days scaling):
 
-    - `roll` is a boolean:
-        * roll = FALSE → this ts is a TRUE higher-TF close
-                         (end of the 3D / 1W / 1M bar)
-        * roll = TRUE  → intrabar / rolling value
+          ema_bar = EMA( close_TF , span = p )
+
+      This canonical series is stored on rows where roll = FALSE.
+
+    - On non-closing daily rows we compute a preview EMA:
+
+          ema_preview_t = alpha_bar * close_t
+                          + (1 - alpha_bar) * ema_prev_bar
+
+      where ema_prev_bar is the EMA from the last completed TF bar and
+      alpha_bar = 2 / (p + 1).
+
+      These preview values do NOT feed back into future ema_bar; only the
+      canonical TF closes advance the EMA state.
+
+    - `ema` column:
+        canonical TF-bar EMA on roll = FALSE rows,
+        preview intraperiod EMA on roll = TRUE rows.
 
     - `d1`, `d2` (closing-only):
         changes between EMA values on closing rows only.
@@ -315,34 +349,70 @@ def build_multi_timeframe_ema_frame(
         tf_day_value = TF_DAYS[tf_label]
 
         # 1) Detect TRUE closes for this timeframe per asset id
-        #    using the *actual daily timestamps* that are the last bar
-        #    in each resample bucket.
         closes_by_asset = _compute_tf_closes_by_asset(daily, ids, freq=freq)
 
-        # 2) Compute DAILY rolling EMAs with effective period
+        # 2) For each asset and EMA period, compute canonical TF-bar EMA
+        #    and preview-style daily EMA.
         for asset_id in ids:
             df_id = daily[daily["id"] == asset_id].copy()
             if df_id.empty:
                 continue
 
             df_id = df_id.sort_values("ts").reset_index(drop=True)
-            close = df_id["close"].astype(float)
+            df_id["close"] = df_id["close"].astype(float)
             closes_ts = closes_by_asset.get(asset_id)
 
-            for p in ema_periods:
-                effective_period = p * tf_day_value
+            # If we have no detected closes for this asset/timeframe, skip it.
+            if closes_ts is None or len(closes_ts) == 0:
+                continue
 
-                ema_series = compute_ema(
-                    close,
-                    period=effective_period,
+            # Subset to the TRUE TF closes for canonical EMA
+            df_closes = df_id[df_id["ts"].isin(closes_ts)].copy()
+            if df_closes.empty:
+                continue
+
+            for p in ema_periods:
+                # 2a) Canonical EMA on higher-TF closes using period=p TF bars
+                ema_bar = compute_ema(
+                    df_closes["close"],
+                    period=p,
                     adjust=False,
-                    min_periods=effective_period,
+                    min_periods=p,
                 )
 
-                out = df_id[["ts"]].copy()
-                out["ema"] = ema_series
+                bar_df = df_closes[["ts"]].copy()
+                bar_df["ema_bar"] = ema_bar
+                # Only keep rows where EMA is defined (after we have p bars)
+                bar_df = bar_df[bar_df["ema_bar"].notna()]
+                if bar_df.empty:
+                    continue
 
-                # drop rows where EMA isn't defined yet
+                alpha_bar = 2.0 / (p + 1.0)
+
+                # 2b) Build DAILY preview EMA driven only by last completed bar EMA
+                out = df_id[["ts", "close"]].copy()
+
+                # Attach canonical EMA at true closes
+                out = out.merge(bar_df, on="ts", how="left")
+
+                # ema_prev_bar: EMA of the last *completed* TF bar
+                # We want the previous bar's EMA even on the bar-close row,
+                # so we forward-fill and then shift by 1 row.
+                out["ema_prev_bar"] = out["ema_bar"].ffill().shift(1)
+
+                # Preview EMA for every daily row where we have a previous bar EMA
+                out["ema_preview"] = alpha_bar * out["close"] + (1.0 - alpha_bar) * out[
+                    "ema_prev_bar"
+                ]
+
+                # Final EMA:
+                # - On TF closes: use canonical ema_bar (TF-bar EMA)
+                # - On non-closes: use preview EMA
+                out["ema"] = out["ema_preview"]
+                mask_bar = out["ema_bar"].notna()
+                out.loc[mask_bar, "ema"] = out.loc[mask_bar, "ema_bar"]
+
+                # Drop rows where EMA is still undefined (before first valid bar EMA)
                 out = out[out["ema"].notna()]
                 if out.empty:
                     continue
@@ -353,15 +423,10 @@ def build_multi_timeframe_ema_frame(
                 out["tf_days"] = tf_day_value
 
                 # roll flag:
-                #   roll = FALSE → ts is a true higher-TF close
-                #   roll = TRUE  → rolling / intrabar
-                if closes_ts is not None and len(closes_ts) > 0:
-                    is_close = out["ts"].isin(closes_ts)
-                    out["roll"] = ~is_close
-                else:
-                    # If for some reason we have no detected closes, treat
-                    # everything as rolling. (d1/d2 will remain NaN.)
-                    out["roll"] = True
+                #   roll = FALSE → ts is a true higher-TF close (canonical EMA)
+                #   roll = TRUE  → preview / intrabar EMA
+                is_close = out["ts"].isin(bar_df["ts"])
+                out["roll"] = ~is_close
 
                 frames.append(
                     out[
@@ -449,17 +514,30 @@ def write_multi_timeframe_ema_to_db(
     schema: str = "public",
     price_table: str = "cmc_price_histories7",  # kept for API compatibility; not used here
     out_table: str = "cmc_ema_multi_tf",
+    update_existing: bool = True,
 ) -> int:
     """
-    Compute rolling multi-timeframe EMAs and upsert into cmc_ema_multi_tf.
+    Compute multi-timeframe EMAs with preview-style roll and upsert into
+    cmc_ema_multi_tf.
 
     Columns written:
 
         id, tf, ts, period, ema, tf_days, roll, d1, d2, d1_roll, d2_roll
 
     Assumes UNIQUE (id, tf, ts, period) on the target table.
+
+    Parameters
+    ----------
+    ids : iterable of int
+        Asset ids to compute.
+    start, end : str or None
+        Date range passed through to the EMA builder.
+    update_existing : bool, default True
+        If True, existing EMA rows in [start, end] are UPDATED on conflict.
+        If False, ON CONFLICT DO NOTHING is used, so only new timestamps
+        are inserted and existing rows are left unchanged.
     """
-    engine = _get_engine(db_url=db_url)
+    engine = _get_engine(db_url)
 
     df = build_multi_timeframe_ema_frame(
         ids=ids,
@@ -468,6 +546,7 @@ def write_multi_timeframe_ema_to_db(
         ema_periods=ema_periods,
         tfs=tfs,
         db_url=db_url,
+        # price_table is intentionally NOT passed; the builder uses load_cmc_ohlcv_daily
     )
 
     if df.empty:
@@ -477,20 +556,24 @@ def write_multi_timeframe_ema_to_db(
     tmp_table = f"{out_table}_tmp"
 
     with engine.begin() as conn:
-        # Drop any leftover temp with same name
         conn.execute(text(f"DROP TABLE IF EXISTS {schema}.{tmp_table};"))
 
-        # Create a TEMP table with the same structure as the target
         conn.execute(
             text(
                 f"""
             CREATE TEMP TABLE {tmp_table} AS
             SELECT
-                id, tf, ts, period,
-                ema, tf_days,
+                id,
+                tf,
+                ts,
+                period,
+                ema,
+                tf_days,
                 roll,
-                d1, d2,
-                d1_roll, d2_roll
+                d1,
+                d2,
+                d1_roll,
+                d2_roll
             FROM {schema}.{out_table}
             LIMIT 0;
             """
@@ -507,6 +590,20 @@ def write_multi_timeframe_ema_to_db(
         )
 
         # Upsert into real table
+        if update_existing:
+            conflict_sql = """
+        DO UPDATE SET
+            ema      = EXCLUDED.ema,
+            tf_days  = EXCLUDED.tf_days,
+            roll     = EXCLUDED.roll,
+            d1       = EXCLUDED.d1,
+            d2       = EXCLUDED.d2,
+            d1_roll  = EXCLUDED.d1_roll,
+            d2_roll  = EXCLUDED.d2_roll
+        """
+        else:
+            conflict_sql = "DO NOTHING"
+
         sql = f"""
         INSERT INTO {schema}.{out_table} AS t
             (id, tf, ts, period, ema, tf_days, roll, d1, d2, d1_roll, d2_roll)
@@ -518,14 +615,7 @@ def write_multi_timeframe_ema_to_db(
             d1_roll, d2_roll
         FROM {tmp_table}
         ON CONFLICT (id, tf, ts, period)
-        DO UPDATE SET
-            ema      = EXCLUDED.ema,
-            tf_days  = EXCLUDED.tf_days,
-            roll     = EXCLUDED.roll,
-            d1       = EXCLUDED.d1,
-            d2       = EXCLUDED.d2,
-            d1_roll  = EXCLUDED.d1_roll,
-            d2_roll  = EXCLUDED.d2_roll;
+        {conflict_sql};
         """
         res = conn.execute(text(sql))
         return res.rowcount

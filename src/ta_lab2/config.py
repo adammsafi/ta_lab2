@@ -128,10 +128,16 @@ except Exception:
     # Fail-soft; we still allow pure-env or root-config only
     pass
 
-_env_db_url = os.environ.get("TARGET_DB_URL") or os.environ.get("DB_URL")
+# Prefer explicit TARGET_DB_URL / DB_URL, but fall back to MARKETDATA_DB_URL.
+_env_db_url = (
+    os.environ.get("TARGET_DB_URL")
+    or os.environ.get("DB_URL")
+    or os.environ.get("MARKETDATA_DB_URL")
+)
+
 _cfg_db_url = getattr(_root_cfg, "TARGET_DB_URL", None) if _root_cfg is not None else None
 
-# This is what ema_multi_timeframe.py imports
+# This is what ema_multi_timeframe.py (and your stats scripts) import
 TARGET_DB_URL: Optional[str] = _env_db_url or _cfg_db_url
 
 __all__ = [
