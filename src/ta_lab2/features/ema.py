@@ -433,7 +433,173 @@ def add_ema_diffs_longform(
 
 
 # -----------------------------------------------------------------------------
-# Daily EMA → cmc_ema_daily with tf_days = 1
+# Daily EMA incremental tail builder from seeds
+# -----------------------------------------------------------------------------
+
+
+def build_daily_ema_tail_from_seeds(
+    df: pd.DataFrame,
+    *,
+    asset_id: int,
+    seeds: dict[int, dict[str, float]],
+    tf_label: str = "1D",
+    tf_days: int = 1,
+) -> pd.DataFrame:
+    """
+    Build an *incremental* daily EMA tail for a single asset id, given
+    the last known EMA state from the DB.
+
+    Parameters
+    ----------
+    df : DataFrame
+        New daily price rows for this asset only, with at least columns
+        ['ts', 'close'], sorted ascending by ts, and strictly later than
+        the last timestamp used to produce the seed EMAs.
+    asset_id : int
+        Asset id for these rows.
+    seeds : dict[int, dict[str, float]]
+        Mapping: period -> {'ema': float, 'd1_roll': float, 'd2_roll': float}
+        taken from the last existing row in cmc_ema_daily for this id/period.
+    tf_label : str
+        Timeframe label to assign (default '1D').
+    tf_days : int
+        Timeframe length in days (default 1).
+
+    Returns
+    -------
+    DataFrame with the standard cmc_ema_daily columns for the *new* rows:
+        id, tf, ts, period, ema, tf_days, roll, d1, d2, d1_roll, d2_roll
+    """
+    if df.empty or not seeds:
+        return pd.DataFrame(
+            columns=[
+                "id",
+                "tf",
+                "ts",
+                "period",
+                "ema",
+                "tf_days",
+                "roll",
+                "d1",
+                "d2",
+                "d1_roll",
+                "d2_roll",
+            ]
+        )
+
+    work = df.copy()
+    if "timestamp" in work.columns and "ts" not in work.columns:
+        work = work.rename(columns={"timestamp": "ts"})
+    if "ts" not in work.columns or "close" not in work.columns:
+        raise ValueError(
+            "build_daily_ema_tail_from_seeds() requires 'ts' and 'close' columns"
+        )
+
+    work["ts"] = pd.to_datetime(work["ts"], utc=True)
+    work = work.sort_values("ts").reset_index(drop=True)
+
+    frames: list[pd.DataFrame] = []
+    for period, state in seeds.items():
+        ema_prev = float(state.get("ema"))
+        d1_prev = state.get("d1_roll") if state.get("d1_roll") is not None else state.get("d1")
+        if d1_prev is not None:
+            d1_prev = float(d1_prev)
+        else:
+            d1_prev = np.nan
+
+        alpha = 2.0 / (float(period) + 1.0)
+
+        closes = work["close"].astype(float).to_numpy()
+        n = closes.shape[0]
+
+        ema_vals = np.empty(n, dtype="float64")
+        d1_vals = np.empty(n, dtype="float64")
+        d2_vals = np.empty(n, dtype="float64")
+
+        prev_ema = ema_prev
+        prev_d1 = d1_prev
+
+        for i in range(n):
+            close_t = closes[i]
+            # EMA recursion seeded from previous EMA
+            ema_t = alpha * close_t + (1.0 - alpha) * prev_ema
+
+            # First diff (rolling)
+            if np.isnan(prev_ema):
+                d1_t = np.nan
+            else:
+                d1_t = ema_t - prev_ema
+
+            # Second diff (rolling)
+            if np.isnan(prev_d1):
+                d2_t = np.nan
+            else:
+                d2_t = d1_t - prev_d1
+
+            ema_vals[i] = ema_t
+            d1_vals[i] = d1_t
+            d2_vals[i] = d2_t
+
+            prev_ema = ema_t
+            prev_d1 = d1_t
+
+        out = work[["ts"]].copy()
+        out["id"] = asset_id
+        out["tf"] = tf_label
+        out["period"] = int(period)
+        out["tf_days"] = int(tf_days)
+        out["roll"] = False  # daily closes are all 'true' closes
+
+        # For daily, closing-only diffs and rolling diffs are identical.
+        out["ema"] = ema_vals
+        out["d1_roll"] = d1_vals
+        out["d2_roll"] = d2_vals
+        out["d1"] = d1_vals
+        out["d2"] = d2_vals
+
+        frames.append(
+            out[
+                [
+                    "id",
+                    "tf",
+                    "ts",
+                    "period",
+                    "ema",
+                    "tf_days",
+                    "roll",
+                    "d1",
+                    "d2",
+                    "d1_roll",
+                    "d2_roll",
+                ]
+            ]
+        )
+
+    if not frames:
+        return pd.DataFrame(
+            columns=[
+                "id",
+                "tf",
+                "ts",
+                "period",
+                "ema",
+                "tf_days",
+                "roll",
+                "d1",
+                "d2",
+                "d1_roll",
+                "d2_roll",
+            ]
+        )
+
+    out_all = pd.concat(frames, ignore_index=True)
+    out_all["ts"] = pd.to_datetime(out_all["ts"], utc=True)
+    out_all = out_all.sort_values(["id", "tf", "period", "ts"]).reset_index(drop=True)
+    return out_all
+
+
+# -----------------------------------------------------------------------------
+# Daily EMA → cmc_ema_daily with tf_days = 1, tf = '1D'
 # -----------------------------------------------------------------------------
 
 
@@ -455,12 +621,14 @@ def build_daily_ema_frame(
     """
     Build a longform daily EMA DataFrame suitable for cmc_ema_daily:
 
-        id, ts, period, ema, d1, d2, tf_days
+        id, tf, ts, period, ema, tf_days, roll, d1, d2, d1_roll, d2_roll
 
     - Uses closing prices from the canonical daily OHLCV loader.
     - Drops initial NaN EMA values for each (id, period).
-    - Sets tf_days = 1 for all rows (daily timeframe).
-    - d1, d2 are first and second differences of ema per (id, period).
+    - Sets tf = '1D' and tf_days = 1 for all rows (daily timeframe).
+    - roll = FALSE for all rows (true daily closes).
+    - d1/d2 are diffs on closing-only rows.
+    - d1_roll/d2_roll are diffs on the full series.
     """
     ema_periods = [int(p) for p in ema_periods]
     ids = list(ids)
@@ -478,6 +646,7 @@ def build_daily_ema_frame(
         if "id" in idx_names and "ts" in idx_names:
             daily = daily.reset_index()
 
+    # Standardize timestamp column name
     if "timestamp" in daily.columns and "ts" not in daily.columns:
         daily = daily.rename(columns={"timestamp": "ts"})
 
@@ -496,6 +665,7 @@ def build_daily_ema_frame(
         if df_id.empty:
             continue
 
+        df_id = df_id.sort_values("ts").reset_index(drop=True)
         close = df_id["close"].astype(float)
 
         for p in ema_periods:
@@ -506,13 +676,8 @@ def build_daily_ema_frame(
                 min_periods=p,
             )
 
-            d1 = ema.diff()
-            d2 = d1.diff()
-
             out = df_id[["ts"]].copy()
             out["ema"] = ema
-            out["d1"] = d1
-            out["d2"] = d2
 
             # Keep only rows where EMA is defined
             out = out[out["ema"].notna()]
@@ -521,19 +686,83 @@ def build_daily_ema_frame(
 
             out["id"] = asset_id
             out["period"] = p
-            out["tf_days"] = 1  # daily timeframe
+            out["tf"] = "1D"      # daily timeframe label
+            out["tf_days"] = 1    # daily timeframe in days
+            out["roll"] = False   # true daily closes
 
-            frames.append(out[["id", "ts", "period", "ema", "d1", "d2", "tf_days"]])
+            frames.append(
+                out[
+                    [
+                        "id",
+                        "tf",
+                        "ts",
+                        "period",
+                        "ema",
+                        "tf_days",
+                        "roll",
+                    ]
+                ]
+            )
 
     if not frames:
         return pd.DataFrame(
-            columns=["id", "ts", "period", "ema", "d1", "d2", "tf_days"]
+            columns=[
+                "id",
+                "tf",
+                "ts",
+                "period",
+                "ema",
+                "tf_days",
+                "roll",
+                "d1",
+                "d2",
+                "d1_roll",
+                "d2_roll",
+            ]
         )
 
     result = pd.concat(frames, ignore_index=True)
     result["ts"] = pd.to_datetime(result["ts"], utc=True)
-    return result
 
+    # Sort for group-wise diffs
+    result = result.sort_values(["id", "tf", "period", "ts"])
+
+    # 1) Rolling per-day diffs: d1_roll, d2_roll
+    g_full = result.groupby(["id", "tf", "period"], sort=False)
+    result["d1_roll"] = g_full["ema"].diff()
+    result["d2_roll"] = g_full["d1_roll"].diff()
+
+    # 2) Closing-only diffs: d1, d2 (only where roll = FALSE)
+    result["d1"] = np.nan
+    result["d2"] = np.nan
+
+    mask_close = ~result["roll"]
+    if mask_close.any():
+        close_df = result.loc[mask_close].copy()
+        g_close = close_df.groupby(["id", "tf", "period"], sort=False)
+        close_df["d1"] = g_close["ema"].diff()
+        close_df["d2"] = g_close["d1"].diff()
+
+        # Write back only on closing rows
+        result.loc[close_df.index, "d1"] = close_df["d1"]
+        result.loc[close_df.index, "d2"] = close_df["d2"]
+
+    # Final column order
+    return result[
+        [
+            "id",
+            "tf",
+            "ts",
+            "period",
+            "ema",
+            "tf_days",
+            "roll",
+            "d1",
+            "d2",
+            "d1_roll",
+            "d2_roll",
+        ]
+    ]
 
 
 def write_daily_ema_to_db(
@@ -545,14 +774,26 @@ def write_daily_ema_to_db(
     db_url: str | None = None,
     schema: str = "public",
     out_table: str = "cmc_ema_daily",
+    update_existing: bool = True,
 ) -> int:
     """
     Compute daily EMAs for the given ids and upsert into cmc_ema_daily
     with columns:
 
-        id, ts, period, ema, d1, d2, tf_days
+        id, tf, ts, period, ema, tf_days, roll, d1, d2, d1_roll, d2_roll
 
     Assumes UNIQUE (id, ts, period) on the target table.
+
+    Parameters
+    ----------
+    ids : iterable of int
+        Asset ids to compute.
+    start, end : str or None
+        Date range passed through to build_daily_ema_frame.
+    update_existing : bool, default True
+        If True, existing EMA rows in [start, end] are UPDATED on conflict.
+        If False, ON CONFLICT DO NOTHING is used, so only new timestamps
+        are inserted and existing rows are left unchanged.
     """
     engine = _get_engine(db_url)
 
@@ -571,19 +812,33 @@ def write_daily_ema_to_db(
     tmp_table = f"{out_table}_tmp"
 
     with engine.begin() as conn:
+        # Ensure a temp table with the correct structure exists
         conn.execute(text(f"DROP TABLE IF EXISTS {schema}.{tmp_table};"))
 
+        # Mirror structure of the target table
         conn.execute(
             text(
                 f"""
-            CREATE TEMP TABLE {tmp_table} AS
-            SELECT id, ts, period, ema, d1, d2, tf_days
-            FROM {schema}.{out_table}
-            LIMIT 0;
-            """
+                CREATE TEMP TABLE {tmp_table} AS
+                SELECT
+                    id,
+                    tf,
+                    ts,
+                    period,
+                    ema,
+                    tf_days,
+                    roll,
+                    d1,
+                    d2,
+                    d1_roll,
+                    d2_roll
+                FROM {schema}.{out_table}
+                LIMIT 0;
+                """
             )
         )
 
+        # Load data into the temp table
         df.to_sql(
             tmp_table,
             conn,
@@ -592,20 +847,44 @@ def write_daily_ema_to_db(
             method="multi",
         )
 
-        sql = f"""
-        INSERT INTO {schema}.{out_table} AS t (id, ts, period, ema, d1, d2, tf_days)
-        SELECT id, ts, period, ema, d1, d2, tf_days
-        FROM {tmp_table}
-        ON CONFLICT (id, ts, period)
-        DO UPDATE SET
-            ema     = EXCLUDED.ema,
-            d1      = EXCLUDED.d1,
-            d2      = EXCLUDED.d2,
-            tf_days = EXCLUDED.tf_days;
-        """
-        res = conn.execute(text(sql))
-        return res.rowcount
+        if update_existing:
+            conflict_sql = """
+            DO UPDATE SET
+                ema      = EXCLUDED.ema,
+                tf_days  = EXCLUDED.tf_days,
+                roll     = EXCLUDED.roll,
+                d1       = EXCLUDED.d1,
+                d2       = EXCLUDED.d2,
+                d1_roll  = EXCLUDED.d1_roll,
+                d2_roll  = EXCLUDED.d2_roll
+            """
+        else:
+            conflict_sql = "DO NOTHING"
 
+        sql = f"""
+            INSERT INTO {schema}.{out_table} AS t
+                (id, tf, ts, period, ema, tf_days, roll, d1, d2, d1_roll, d2_roll)
+            SELECT
+                id,
+                tf,
+                ts,
+                period,
+                ema,
+                tf_days,
+                roll,
+                d1,
+                d2,
+                d1_roll,
+                d2_roll
+            FROM {tmp_table}
+            ON CONFLICT (id, ts, period)
+            {conflict_sql};
+        """
+
+        res = conn.execute(text(sql))
+        rowcount = res.rowcount or 0
+
+    return rowcount
 
 
 # export legacy + new helpers
@@ -615,6 +894,8 @@ except NameError:
     __all__ = ["add_ema"]
 
 try:
-    __all__.extend(["build_daily_ema_frame", "write_daily_ema_to_db"])
+    __all__.extend(
+        ["build_daily_ema_frame", "write_daily_ema_to_db", "build_daily_ema_tail_from_seeds"]
+    )
 except NameError:
-    __all__ = ["build_daily_ema_frame", "write_daily_ema_to_db"]
+    __all__ = ["build_daily_ema_frame", "write_daily_ema_to_db", "build_daily_ema_tail_from_seeds"]
