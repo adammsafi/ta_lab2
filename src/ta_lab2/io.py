@@ -1,10 +1,7 @@
 from __future__ import annotations
 
 import os
-from typing import Mapping, Any, Sequence, Optional
-
-import os
-from typing import Mapping, Any, Sequence, Optional
+from typing import Iterable, Mapping, Any, Sequence, Optional
 
 import pathlib
 import pandas as pd
@@ -12,7 +9,24 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
 from .config import load_settings
+from ta_lab2.config import TARGET_DB_URL
 
+__all__ = [
+    # make sure get_engine is exported
+    "get_engine",
+    "load_cmc_ohlcv_daily",
+    # ... keep whatever else you already have here ...
+]
+
+def get_engine(db_url: str | None = None):
+    """
+    Backwards-compatible helper to create a SQLAlchemy engine.
+
+    If db_url is None, uses TARGET_DB_URL from ta_lab2.config.
+    This exists so older scripts like refresh_cmc_emas.py that import
+    `get_engine` continue to work.
+    """
+    return create_engine(db_url or TARGET_DB_URL)
 
 def write_parquet(df: pd.DataFrame, path: str, partition_cols=None):
     path = pathlib.Path(path)

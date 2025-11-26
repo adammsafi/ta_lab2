@@ -1,42 +1,47 @@
 # src/ta_lab2/scripts/refresh_ema_daily_stats.py
 from __future__ import annotations
 
-"""
-Run data quality checks for cmc_ema_daily and store results in cmc_data_stats.
+r"""
+Run data quality checks for cmc_ema_daily and store results in ema_daily_stats.
 
 Assumptions
 -----------
 - cmc_ema_daily has (at least): id, ts, period, ema, roll.
 - Daily timeframe => tf_days = 1.
-- Canonical vs preview semantics (adjust if needed):
-    * Canonical rows: roll = false
-    * Preview rows : roll = true
-    * Canonical anchors occur where:
-          offset_days = (ts::date - min(ts)::date)
-          offset_days % (1 * period) = 0
 
-Tests implemented
------------------
+Tests
+-----
+
+We compute a small set of repeatable "stats" and persist them to ema_daily_stats
+so that we can track them over time:
 
 1) ema_daily_vs_price_row_count  (table_name = 'cmc_ema_daily')
 
    For each (id, period):
-     - price_n  = rows in cmc_price_histories7 for that id.
-     - ema_n    = rows in cmc_ema_daily for that (id, period), all rolls.
-     - expected_n = max(price_n - period + 1, 0).
-     - missing_from_expected = expected_n - ema_n.
+     - n_price_rows = COUNT(*) from cmc_price_histories7 for that id.
+     - n_ema_rows   = COUNT(*) from cmc_ema_daily for that (id, period).
+     - expected_n   = n_price_rows - warmup_days
+       where warmup_days = period - 1 (min_periods = period).
 
    Status:
-     - PASS if missing_from_expected = 0.
-     - WARN if -5 <= missing_from_expected <= 5.
-     - FAIL otherwise or if price_n is NULL.
+     - PASS if n_ema_rows = expected_n
+     - WARN if |n_ema_rows - expected_n| between 1 and 5
+     - FAIL otherwise
+
+   extra JSON includes:
+     - price_n
+     - ema_n
+     - expected_n
+     - missing_from_expected (ema_n - expected_n)
+     - max_ema_ts, min_ema_ts
+     - max_price_ts, min_price_ts
 
 2) ema_daily_max_ts_vs_price  (table_name = 'cmc_ema_daily')
 
    For each (id, period):
-     - price_max_ts = max(timestamp) from cmc_price_histories7 for that id.
-     - max_ema_ts   = max(ts) from cmc_ema_daily for that (id, period).
-     - lag_days = (price_max_ts::date - max_ema_ts::date).
+     - price_max_ts = MAX(timestamp) from cmc_price_histories7 for that id.
+     - max_ema_ts   = MAX(ts)        from cmc_ema_daily for that (id, period).
+     - lag_days     = DATE(price_max_ts) - DATE(max_ema_ts)
 
    Status:
      - PASS if 0 <= lag_days <= 2.
@@ -45,22 +50,21 @@ Tests implemented
 
 3) ema_daily_roll_flag_consistency  (table_name = 'cmc_ema_daily')
 
+   Current design for cmc_ema_daily:
+     - roll is expected to always be FALSE (no preview/canonical semantics yet).
+   This test simply verifies that there are no rows with roll = TRUE.
+
    For each (id, period):
-     - min_date = min(ts::date) within that group.
-     - offset_days = (ts::date - min_date).
-     - block_size_days = period * 1 (tf_days = 1).
-
-   Expected pattern (based on assumption above):
-     - If block_size_days <= 0 or period is NULL → pattern unknown, WARN.
-     - If offset_days % block_size_days = 0 → row should be canonical → roll = false.
-     - Else                                  → row should be preview   → roll = true.
-
-   We count mismatches for each (id, period).
+     - n_rows  = total rows
+     - n_true  = count of rows where roll = TRUE
 
    Status:
-     - PASS if n_mismatches = 0.
-     - WARN if 1 <= n_mismatches <= 5.
-     - FAIL if n_mismatches > 5 or block_size_days is NULL.
+     - PASS if n_true = 0
+     - FAIL if n_true > 0
+
+   extra JSON includes:
+     - n_rows
+     - n_true
 
 ---------------------------------------------------------------------------
 USAGE EXAMPLES
@@ -68,34 +72,16 @@ USAGE EXAMPLES
 
 1) PowerShell (from repo root, using TARGET_DB_URL in ta_lab2.config):
 
-    PS C:\\Users\\asafi\\Downloads\\ta_lab2> python -m ta_lab2.scripts.refresh_ema_daily_stats
+    PS C:\Users\asafi\Downloads\ta_lab2> python -m ta_lab2.scripts.refresh_ema_daily_stats
 
-   Or overriding DB URL:
+2) Passing an explicit DB URL:
 
-    PS C:\\Users\\asafi\\Downloads\\ta_lab2> python -m ta_lab2.scripts.refresh_ema_daily_stats `
-        --db-url "postgresql://user:pass@localhost:5432/ta_lab2"
-
-2) Spyder (IPython console):
-
-   Option A: run the script file directly
-
-       %runfile C:/Users/asafi/Downloads/ta_lab2/src/ta_lab2/scripts/refresh_ema_daily_stats.py \
-           --wdir C:/Users/asafi/Downloads/ta_lab2
-
-   Option B: import and call main() manually
-
-       from ta_lab2.scripts.refresh_ema_daily_stats import main
-
-       # Use TARGET_DB_URL from ta_lab2.config
-       main()
-
-       # Or with an explicit DB URL:
-       main(db_url="postgresql://user:pass@localhost:5432/ta_lab2")
+    PS C:\Users\asafi\Downloads\ta_lab2> python -m ta_lab2.scripts.refresh_ema_daily_stats --db-url "postgresql://user:pass@localhost:5432/ta_lab2"
 
 After running, inspect recent non-PASS results:
 
     SELECT *
-    FROM cmc_data_stats
+    FROM ema_daily_stats
     WHERE checked_at > now() - interval '1 hour'
       AND status <> 'PASS'
     ORDER BY checked_at DESC;
@@ -114,7 +100,7 @@ from ta_lab2.config import TARGET_DB_URL
 # ---------------------------------------------------------------------------
 
 DDL_STATS_TABLE = """
-CREATE TABLE IF NOT EXISTS cmc_data_stats (
+CREATE TABLE IF NOT EXISTS ema_daily_stats (
     stat_id        BIGSERIAL PRIMARY KEY,
     table_name     TEXT        NOT NULL,   -- e.g. 'cmc_ema_daily'
     test_name      TEXT        NOT NULL,   -- e.g. 'ema_daily_vs_price_row_count'
@@ -135,7 +121,7 @@ CREATE TABLE IF NOT EXISTS cmc_data_stats (
 # ---------------------------------------------------------------------------
 
 SQL_TEST_EMA_DAILY_VS_PRICE = """
-INSERT INTO cmc_data_stats (
+INSERT INTO ema_daily_stats (
     table_name, test_name, asset_id, period,
     status, actual, expected, extra
 )
@@ -185,20 +171,14 @@ FROM (
     SELECT
         e.asset_id,
         e.period,
+        p.price_n,
         e.ema_n,
+        GREATEST(p.price_n - (e.period - 1), 0) AS expected_n,
+        e.ema_n - GREATEST(p.price_n - (e.period - 1), 0) AS missing_from_expected,
         e.min_ema_ts,
         e.max_ema_ts,
-        p.price_n,
         p.min_price_ts,
-        p.max_price_ts,
-        CASE
-            WHEN p.price_n IS NULL THEN NULL
-            ELSE GREATEST(p.price_n - e.period + 1, 0)
-        END AS expected_n,
-        CASE
-            WHEN p.price_n IS NULL THEN NULL
-            ELSE GREATEST(p.price_n - e.period + 1, 0) - e.ema_n
-        END AS missing_from_expected
+        p.max_price_ts
     FROM ema_counts e
     LEFT JOIN price_counts p
       ON p.asset_id = e.asset_id
@@ -207,11 +187,11 @@ FROM (
 
 
 # ---------------------------------------------------------------------------
-# Test 2: EMA daily max ts vs price max timestamp
+# Test 2: EMA daily max ts vs price max ts
 # ---------------------------------------------------------------------------
 
 SQL_TEST_EMA_DAILY_MAX_TS = """
-INSERT INTO cmc_data_stats (
+INSERT INTO ema_daily_stats (
     table_name, test_name, asset_id, period,
     status, actual, expected, extra
 )
@@ -252,8 +232,8 @@ FROM (
     SELECT
         e.asset_id,
         e.period,
-        e.max_ema_ts,
         p.price_max_ts,
+        e.max_ema_ts,
         CASE
             WHEN p.price_max_ts IS NULL OR e.max_ema_ts IS NULL THEN NULL
             ELSE (p.price_max_ts::date - e.max_ema_ts::date)
@@ -268,12 +248,11 @@ FROM (
 # ---------------------------------------------------------------------------
 # Test 3: EMA daily roll flag consistency
 # ---------------------------------------------------------------------------
-#
-# tf_days for daily = 1.
-# block_size_days = period * tf_days = period.
-#
+
+# For cmc_ema_daily we expect roll to always be FALSE.
+# This test simply checks that there are no TRUE roll flags.
 SQL_TEST_EMA_DAILY_ROLL_FLAG = """
-INSERT INTO cmc_data_stats (
+INSERT INTO ema_daily_stats (
     table_name, test_name, asset_id, period,
     status, actual, expected, extra
 )
@@ -283,61 +262,39 @@ SELECT
     g.asset_id,
     g.period,
     CASE
-        WHEN g.block_size_days IS NULL OR g.block_size_days <= 0 THEN 'WARN'
-        WHEN g.n_mismatches = 0 THEN 'PASS'
-        WHEN g.n_mismatches BETWEEN 1 AND 5 THEN 'WARN'
+        WHEN g.n_true = 0 THEN 'PASS'
         ELSE 'FAIL'
     END AS status,
-    g.n_mismatches::NUMERIC  AS actual,    -- number of flag mismatches
-    0::NUMERIC               AS expected,  -- ideally zero mismatches
+    g.n_true::NUMERIC AS actual,   -- number of rows with roll = TRUE
+    0::NUMERIC        AS expected, -- we expect zero TRUE roll flags
     jsonb_build_object(
-        'n_rows',          g.n_rows,
-        'n_mismatches',    g.n_mismatches,
-        'block_size_days', g.block_size_days
+        'n_rows', g.n_rows,
+        'n_true', g.n_true
     ) AS extra
 FROM (
-    WITH base AS (
-        SELECT
-            id          AS asset_id,
-            period,
-            roll,
-            ts::date    AS ts_date,
-            MIN(ts::date) OVER (PARTITION BY id, period) AS min_date
-        FROM cmc_ema_daily
-    )
     SELECT
-        asset_id,
+        id      AS asset_id,
         period,
         COUNT(*) AS n_rows,
-        MAX(period) AS block_size_days,
         SUM(
             CASE
-                WHEN period IS NULL OR period <= 0 THEN 0
-                ELSE
-                    CASE
-                        -- offset_days multiple of block_size_days => canonical => roll should be false
-                        WHEN ((ts_date - min_date) % period = 0 AND roll = false) THEN 0
-                        -- non-multiple => preview => roll should be true
-                        WHEN ((ts_date - min_date) % period <> 0 AND roll = true) THEN 0
-                        ELSE 1
-                    END
+                WHEN roll = TRUE THEN 1
+                ELSE 0
             END
-        ) AS n_mismatches
-    FROM base
-    GROUP BY asset_id, period
+        ) AS n_true
+    FROM cmc_ema_daily
+    GROUP BY id, period
 ) AS g;
 """
 
 
 # ---------------------------------------------------------------------------
-# Helper: engine + runner
+# Helpers
 # ---------------------------------------------------------------------------
 
 def get_engine(db_url: Optional[str] = None):
     """
-    Return a SQLAlchemy engine.
-
-    If db_url is None, use TARGET_DB_URL from ta_lab2.config.
+    Create a SQLAlchemy engine using either the provided URL or TARGET_DB_URL.
     """
     return create_engine(db_url or TARGET_DB_URL)
 

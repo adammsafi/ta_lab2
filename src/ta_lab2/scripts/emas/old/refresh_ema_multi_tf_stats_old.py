@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 """
-Run data quality checks for cmc_ema_multi_tf and store results in cmc_data_stats.
+Run data quality checks for cmc_ema_multi_tf and store results in ema_multi_tf_stats.
 
 Assumptions
 -----------
@@ -94,25 +94,15 @@ USAGE EXAMPLES
 
 2) Spyder (IPython console):
 
-   Option A: run the script file directly
+   Run the script file directly:
 
        %runfile C:/Users/asafi/Downloads/ta_lab2/src/ta_lab2/scripts/refresh_ema_multi_tf_stats.py \
            --wdir C:/Users/asafi/Downloads/ta_lab2
 
-   Option B: import and call main() manually
-
-       from ta_lab2.scripts.refresh_ema_multi_tf_stats import main
-
-       # Use TARGET_DB_URL from ta_lab2.config
-       main()
-
-       # Or with explicit DB URL:
-       main(db_url="postgresql://user:pass@localhost:5432/ta_lab2")
-
 After running, inspect recent non-PASS results:
 
     SELECT *
-    FROM cmc_data_stats
+    FROM ema_multi_tf_stats
     WHERE checked_at > now() - interval '1 hour'
       AND status <> 'PASS'
     ORDER BY checked_at DESC;
@@ -131,7 +121,7 @@ from ta_lab2.config import TARGET_DB_URL
 # ---------------------------------------------------------------------------
 
 DDL_STATS_TABLE = """
-CREATE TABLE IF NOT EXISTS cmc_data_stats (
+CREATE TABLE IF NOT EXISTS ema_multi_tf_stats (
     stat_id        BIGSERIAL PRIMARY KEY,
     table_name     TEXT        NOT NULL,
     test_name      TEXT        NOT NULL,
@@ -152,7 +142,7 @@ CREATE TABLE IF NOT EXISTS cmc_data_stats (
 # ---------------------------------------------------------------------------
 
 SQL_TEST_ROWCOUNT_ROLL_FALSE = """
-INSERT INTO cmc_data_stats (
+INSERT INTO ema_multi_tf_stats (
     table_name, test_name, asset_id, tf, period,
     status, actual, expected, extra
 )
@@ -213,7 +203,7 @@ FROM (
 """
 
 SQL_TEST_ROWCOUNT_ROLL_TRUE = """
-INSERT INTO cmc_data_stats (
+INSERT INTO ema_multi_tf_stats (
     table_name, test_name, asset_id, tf, period,
     status, actual, expected, extra
 )
@@ -279,7 +269,7 @@ FROM (
 # ---------------------------------------------------------------------------
 
 SQL_TEST_GAP_ROLL_FALSE = """
-INSERT INTO cmc_data_stats (
+INSERT INTO ema_multi_tf_stats (
     table_name, test_name, asset_id, tf, period,
     status, actual, expected, extra
 )
@@ -338,7 +328,7 @@ FROM (
 """
 
 SQL_TEST_GAP_ROLL_TRUE = """
-INSERT INTO cmc_data_stats (
+INSERT INTO ema_multi_tf_stats (
     table_name, test_name, asset_id, tf, period,
     status, actual, expected, extra
 )
@@ -402,7 +392,7 @@ FROM (
 # ---------------------------------------------------------------------------
 
 SQL_TEST_ROLL_FLAG_CONSISTENCY = """
-INSERT INTO cmc_data_stats (
+INSERT INTO ema_multi_tf_stats (
     table_name, test_name, asset_id, tf, period,
     status, actual, expected, extra
 )
