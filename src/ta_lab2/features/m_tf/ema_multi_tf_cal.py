@@ -1,50 +1,29 @@
 from __future__ import annotations
 
 """
-Multi-timeframe EMA builder for cmc_ema_multi_tf.
+Calendar-aligned multi-timeframe EMA builder for cmc_ema_multi_tf_cal.
 
-Behavior (updated to preview-style roll):
+This is a variant of ema_multi_timeframe.py that:
 
-- We work on a DAILY grid, but the canonical EMA is defined on
-  higher-timeframe (TF) closes (3D, 1W, 1M, etc).
+- Uses explicit calendar-aligned timeframes, especially for weeks:
+    * 1W, 2W, 3W, 4W, 6W, 8W, 10W → W-SAT anchored
+      (weeks end on Saturday; closes should be Saturday daily bars).
 
-- For each (id, tf, period=p):
+- Keeps the same preview-style roll semantics:
 
-    * We first compute the EMA on TRUE TF closes using `period=p` TF bars.
-      This is the canonical series and is stored on rows where roll = FALSE.
+    * For each (id, tf, period=p):
 
-          ema_bar_{k} = alpha_bar * close_bar_{k}
-                        + (1 - alpha_bar) * ema_bar_{k-1}
+        - Compute the canonical EMA on TRUE higher-TF closes using
+          period = p TF bars. These rows have roll = FALSE.
 
-      where alpha_bar = 2 / (p + 1).
+        - On daily rows between closes, compute a preview EMA that
+          uses the last completed TF-bar EMA but does NOT feed into
+          future bar EMA. These rows have roll = TRUE.
 
-    * On DAILY intraperiod rows, we compute a **preview** EMA:
+- Output columns match cmc_ema_multi_tf, but this module is intended
+  to write into a separate table: cmc_ema_multi_tf_cal.
 
-          ema_preview_t = alpha_bar * close_t
-                          + (1 - alpha_bar) * ema_prev_bar
-
-      where ema_prev_bar is the EMA of the last completed TF bar.
-      These preview values DO NOT feed into future bar EMA; only the
-      canonical bar-closing EMA advances the state.
-
-- The `ema` column therefore contains:
-    * canonical TF-bar EMA on roll = FALSE rows
-    * preview EMA on roll = TRUE rows
-
-- `roll` flag:
-    * roll = FALSE → this ts is a TRUE higher-TF close
-                     (end of the 3D / 1W / 1M bar), canonical EMA
-    * roll = TRUE  → intrabar / preview EMA
-
-- `d1`, `d2` (closing-only):
-    first and second differences of EMA, but only on rows where roll = FALSE.
-    Non-closing rows get NULL for d1/d2.
-
-- `d1_roll`, `d2_roll` (rolling per-day):
-    first and second differences of EMA on the FULL daily grid
-    (rolling series, step-free).
-
-Expected schema for public.cmc_ema_multi_tf:
+Expected schema for public.cmc_ema_multi_tf_cal:
 
     id        int
     tf        text
@@ -52,7 +31,7 @@ Expected schema for public.cmc_ema_multi_tf:
     period    int
     ema       double precision
     tf_days   int
-    roll      boolean               -- FALSE = true close, TRUE = preview / rolling
+    roll      boolean               -- FALSE = true close, TRUE = preview
     d1        double precision      -- closing-only
     d2        double precision      -- closing-only
     d1_roll   double precision      -- rolling per-day
@@ -71,19 +50,19 @@ from ta_lab2.io import _get_marketdata_engine as _get_engine, load_cmc_ohlcv_dai
 from ta_lab2.features.ema import compute_ema
 
 __all__ = [
-    "TIMEFRAME_FREQS",
+    "TIMEFRAME_FREQS_CAL",
     "TF_DAYS",
-    "build_multi_timeframe_ema_frame",
-    "write_multi_timeframe_ema_to_db",
+    "build_multi_timeframe_ema_cal_frame",
+    "write_multi_timeframe_ema_cal_to_db",
 ]
 
-
 # ---------------------------------------------------------------------------
-# Timeframe configuration
+# Timeframe configuration (calendar-aligned)
 # ---------------------------------------------------------------------------
 
 # Label → pandas resample frequency
-TIMEFRAME_FREQS: Dict[str, str] = {
+# Weekly timeframes are anchored to SATURDAY ends: W-SAT, 2W-SAT, etc.
+TIMEFRAME_FREQS_CAL: Dict[str, str] = {
     "2D": "2D",
     "3D": "3D",
     "4D": "4D",
@@ -94,13 +73,14 @@ TIMEFRAME_FREQS: Dict[str, str] = {
     "25D": "25D",
     "45D": "45D",
     "100D": "100D",
-    "1W": "1W",
-    "2W": "2W",
-    "3W": "3W",
-    "4W": "4W",
-    "6W": "6W",
-    "8W": "8W",
-    "10W": "10W",
+    # week-end SATURDAY
+    "1W": "W-SAT",
+    "2W": "2W-SAT",
+    "3W": "3W-SAT",
+    "4W": "4W-SAT",
+    "6W": "6W-SAT",
+    "8W": "8W-SAT",
+    "10W": "10W-SAT",
     # month-end anchored (use ME to avoid FutureWarning)
     "1M": "1ME",
     "2M": "2ME",
@@ -110,7 +90,7 @@ TIMEFRAME_FREQS: Dict[str, str] = {
     "12M": "12ME",
 }
 
-# Approximate number of days for ordering / scaling
+# Same tf_days mapping as the main EMA module
 TF_DAYS: Dict[str, int] = {
     "2D": 2,
     "3D": 3,
@@ -188,58 +168,6 @@ def _normalize_daily(daily: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def _resample_ohlcv_for_tf(
-    df_id: pd.DataFrame,
-    freq: str,
-) -> pd.DataFrame:
-    """
-    Simple local OHLCV resampler for a single asset's daily data.
-
-    Parameters
-    ----------
-    df_id : DataFrame with columns ts, open, high, low, close, volume
-    freq : pandas offset alias, e.g. '2D','3D','1W','1ME', etc.
-
-    Returns
-    -------
-    DataFrame with columns ts, open, high, low, close, volume
-    at the higher timeframe, labeled at the bar end (right/closed-right),
-    and not extending beyond the max ts in df_id.
-
-    NOTE: This is kept for potential future use where you want actual
-    higher-TF OHLC bars. For the roll/d1/d2 logic we instead rely on
-    the original daily timestamps of the last bar in each group
-    (see _compute_tf_closes_by_asset).
-    """
-    if df_id.empty:
-        return df_id.head(0)
-
-    d = df_id[["ts", "open", "high", "low", "close", "volume"]].copy()
-    d["ts"] = pd.to_datetime(d["ts"], utc=True)
-    d = d.set_index("ts").sort_index()
-
-    agg = d.resample(freq, label="right", closed="right").agg(
-        {
-            "open": "first",
-            "high": "max",
-            "low": "min",
-            "close": "last",
-            "volume": "sum",
-        }
-    )
-
-    # Drop periods where we never had any data (close is NaN)
-    agg = agg.dropna(subset=["close"])
-
-    if agg.empty:
-        return agg.reset_index().rename(columns={"index": "ts"})
-
-    max_ts = d.index.max()
-    agg = agg[agg.index <= max_ts]
-
-    return agg.reset_index().rename(columns={"index": "ts"})
-
-
 def _compute_tf_closes_by_asset(
     daily: pd.DataFrame,
     ids: Iterable[int],
@@ -286,7 +214,7 @@ def _compute_tf_closes_by_asset(
 
 
 
-def build_multi_timeframe_ema_frame(
+def build_multi_timeframe_ema_cal_frame(
     ids: Iterable[int],
     start: str | None = "2010-01-01",
     end: str | None = None,
@@ -296,32 +224,19 @@ def build_multi_timeframe_ema_frame(
     db_url: str | None = None,
 ) -> pd.DataFrame:
     """
-    Build a longform DataFrame of multi-timeframe EMAs on a DAILY grid.
+    Build a longform DataFrame of calendar-aligned multi-timeframe EMAs
+    on a DAILY grid.
 
-    UPDATED BEHAVIOR (preview-style roll + seeded history):
-
-    - We always load *full* daily history (or at least from a fixed early
-      date) so that EMA periods (10, 21, 50, 100, 200) have enough TF-bar
-      history to be well-defined, even when `start` is near "today".
-
-    - The `start` / `end` arguments now control the *output window* only:
-        * we compute EMAs using full history
-        * then filter the final result to ts in [start, end] if provided.
+    Updated so that we always load sufficient history for EMA stability,
+    and only restrict the *output* to [start, end].
     """
-    tfs = tfs or TIMEFRAME_FREQS
+    tfs = tfs or TIMEFRAME_FREQS_CAL
     ema_periods = [int(p) for p in ema_periods]
     ids = list(ids)
     if not ids:
         raise ValueError("ids must be a non-empty iterable of asset ids")
 
-    # --- NEW: decouple load window from output window --------------------
-    # We need enough historical daily data to compute higher-TF EMAs with
-    # min_periods = p. If we only load from `start` (which in incremental
-    # mode is often "last_multi_ts.date()"), we end up with too few TF bars
-    # and all EMA values stay NaN.
-    #
-    # So we always load from a fixed early date (or None if you prefer),
-    # and later restrict the *returned* frame to [start, end].
+    # Same logic as non-cal: decouple load vs output windows.
     load_start = "2010-01-01"
     daily = load_cmc_ohlcv_daily(
         ids=ids,
@@ -335,14 +250,14 @@ def build_multi_timeframe_ema_frame(
     frames: List[pd.DataFrame] = []
 
     for tf_label, freq in tfs.items():
-        print(f"Processing timeframe {tf_label} (freq={freq})...")
+        print(f"[CAL] Processing timeframe {tf_label} (freq={freq})...")
 
         if tf_label not in TF_DAYS:
             raise KeyError(f"No tf_days mapping defined for timeframe '{tf_label}'")
 
         tf_day_value = TF_DAYS[tf_label]
 
-        # 1) Detect TRUE closes for this timeframe per asset id
+        # 1) Detect TRUE closes for this calendar-aligned timeframe per asset id
         closes_by_asset = _compute_tf_closes_by_asset(daily, ids, freq=freq)
 
         # 2) For each asset and EMA period, compute canonical TF-bar EMA
@@ -390,8 +305,6 @@ def build_multi_timeframe_ema_frame(
                 out = out.merge(bar_df, on="ts", how="left")
 
                 # ema_prev_bar: EMA of the last *completed* TF bar
-                # We want the previous bar's EMA even on the bar-close row,
-                # so we forward-fill and then shift by 1 row.
                 out["ema_prev_bar"] = out["ema_bar"].ffill().shift(1)
 
                 # Preview EMA for every daily row where we have a previous bar EMA
@@ -480,7 +393,7 @@ def build_multi_timeframe_ema_frame(
         result_df.loc[close_df.index, "d1"] = close_df["d1"]
         result_df.loc[close_df.index, "d2"] = close_df["d2"]
 
-    # --- NEW: output window restriction ---------------------------------
+    # Output window restriction
     if start is not None:
         start_ts = pd.to_datetime(start, utc=True)
         result_df = result_df[result_df["ts"] >= start_ts]
@@ -506,7 +419,7 @@ def build_multi_timeframe_ema_frame(
 
 
 
-def write_multi_timeframe_ema_to_db(
+def write_multi_timeframe_ema_cal_to_db(
     ids: Iterable[int],
     start: str = "2010-01-01",
     end: str | None = None,
@@ -516,12 +429,12 @@ def write_multi_timeframe_ema_to_db(
     db_url: str | None = None,
     schema: str = "public",
     price_table: str = "cmc_price_histories7",  # kept for API compatibility; not used here
-    out_table: str = "cmc_ema_multi_tf",
+    out_table: str = "cmc_ema_multi_tf_cal",
     update_existing: bool = True,
 ) -> int:
     """
-    Compute multi-timeframe EMAs with preview-style roll and upsert into
-    cmc_ema_multi_tf.
+    Compute calendar-aligned multi-timeframe EMAs with preview-style roll
+    and upsert into cmc_ema_multi_tf_cal.
 
     Columns written:
 
@@ -542,18 +455,17 @@ def write_multi_timeframe_ema_to_db(
     """
     engine = _get_engine(db_url)
 
-    df = build_multi_timeframe_ema_frame(
+    df = build_multi_timeframe_ema_cal_frame(
         ids=ids,
         start=start,
         end=end,
         ema_periods=ema_periods,
         tfs=tfs,
         db_url=db_url,
-        # price_table is intentionally NOT passed; the builder uses load_cmc_ohlcv_daily
     )
 
     if df.empty:
-        print("No multi-timeframe EMA rows generated.")
+        print("No calendar-aligned multi-timeframe EMA rows generated.")
         return 0
 
     tmp_table = f"{out_table}_tmp"
