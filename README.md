@@ -215,3 +215,84 @@ If you want to use this in a commercial setting, reach out first so terms can be
 ```perl
  ​:contentReference[oaicite:0]{index=0}​
 ```
+
+### EMA views
+
+These views standardize all EMA calculations and make them easier to join to prices and use in analysis.
+
+#### `all_emas`
+
+Logical union of all EMA tables:
+
+- `cmc_ema_daily`
+- `cmc_ema_multi_tf`
+- `cmc_ema_multi_tf_cal`
+
+Schema (simplified):
+
+- `id` – asset id (matches `cmc_price_histories7.id`)
+- `ts` – bar timestamp (daily close)
+- `tf` – timeframe label, for example `1D`, `2D`, `1W`, `1M`
+- `tf_days` – timeframe length in days, for example `1`, `2`, `7`, `30`
+- `period` – EMA span in bars for that timeframe
+- `ema` – EMA value
+- `d1`, `d2` – one step and two step EMA deltas in EMA space
+- `d1_close`, `d2_close` – one step and two step deltas in close-price space
+- `roll` – `true` on canonical bars for that timeframe, `false` on preview / in-between bars
+
+Use this view when you want to work directly with EMAs and their slopes across any timeframe, without caring which base table they came from.
+
+Example:
+
+```sql
+SELECT *
+FROM all_emas
+WHERE id = 1
+  AND tf = '1W'
+  AND period = 21
+ORDER BY ts;
+```
+
+#### `cmc_price_with_emas`
+
+Daily OHLCV joined to a single EMA layer from `all_emas`.
+
+Key points:
+
+- One row per `(id, ts)` daily bar from `cmc_price_histories7`
+- Includes price columns plus a selected EMA configuration
+- Designed for charting, simple indicators, and single-timeframe backtests
+
+Typical usage is to point charting tools or quick analyses at this view instead of hand-writing joins.
+
+Example:
+
+```sql
+SELECT id, ts, close, ema
+FROM cmc_price_with_emas
+WHERE id = 1
+ORDER BY ts;
+```
+
+#### `cmc_price_with_emas_d1d2`
+
+Same as `cmc_price_with_emas`, plus the slope and delta fields from `all_emas`:
+
+- `d1`, `d2`
+- `d1_close`, `d2_close`
+- `roll`
+
+Use this view when you need price plus EMA shape information in one place, for example:
+
+- building regime labels based on EMA slope
+- testing rules that depend on `roll` or multi-step EMA moves
+- feeding signals into backtests that care about both price and EMA dynamics
+
+Example:
+
+```sql
+SELECT id, ts, close, ema, d1, d2, roll
+FROM cmc_price_with_emas_d1d2
+WHERE id = 1
+ORDER BY ts;
+```
