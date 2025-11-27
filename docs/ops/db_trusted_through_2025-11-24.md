@@ -123,3 +123,19 @@ When you run a future refresh and want a new cutoff document:
    - Trusted-through timestamp
    - Table row counts and per-id tables
    - Any relevant notes about pipeline changes for that run.
+
+
+## all_emas view (daily + multi_tf + multi_tf_cal)
+
+- Source tables:
+  - cmc_ema_daily
+  - cmc_ema_multi_tf
+  - cmc_ema_multi_tf_cal
+
+- Unified schema:
+  - id, ts, tf, tf_days, period, ema, d1, d2, d1_close, d2_close, roll
+
+- Conventions:
+  - d1, d2  = EMA deltas on the **canonical roll bars**
+  - d1_close, d2_close = raw EMA deltas on the underlying close
+  - roll = TRUE only on canonical bars for each (id, tf, period)
