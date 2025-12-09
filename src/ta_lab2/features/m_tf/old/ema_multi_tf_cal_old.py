@@ -25,25 +25,17 @@ This is a variant of ema_multi_timeframe.py that:
 
 Expected schema for public.cmc_ema_multi_tf_cal:
 
-    id              int
-    tf              text
-    ts              timestamptz
-    period          int
-    ema             double precision
-    tf_days         int
-    roll            boolean               -- FALSE = true close, TRUE = preview
-    d1              double precision      -- closing-only (non-bar, from ema)
-    d2              double precision      -- closing-only (non-bar, from ema)
-    d1_roll         double precision      -- rolling per-day (non-bar, from ema)
-    d2_roll         double precision      -- rolling per-day (non-bar, from ema)
-
-    ema_bar         double precision      -- bar-space EMA on TF closes,
-                                           -- daily-propagated between bars
-    d1_bar          double precision      -- bar-space closing-only (from ema_bar)
-    d2_bar          double precision      -- bar-space closing-only (from ema_bar)
-    roll_bar        boolean               -- FALSE = TF close, TRUE = non-close
-    d1_roll_bar     double precision      -- per-day diff(ema_bar)
-    d2_roll_bar     double precision      -- per-day diff(d1_roll_bar)
+    id        int
+    tf        text
+    ts        timestamptz
+    period    int
+    ema       double precision
+    tf_days   int
+    roll      boolean               -- FALSE = true close, TRUE = preview
+    d1        double precision      -- closing-only
+    d2        double precision      -- closing-only
+    d1_roll   double precision      -- rolling per-day
+    d2_roll   double precision      -- rolling per-day
 
 UNIQUE (id, tf, ts, period)
 """
@@ -282,6 +274,7 @@ def _compute_monthly_canonical_closes(
     return pd.DatetimeIndex(sorted(closes))
 
 
+
 def _compute_tf_closes_by_asset(
     daily: pd.DataFrame,
     ids: Iterable[int],
@@ -355,15 +348,6 @@ def build_multi_timeframe_ema_cal_frame(
     Build a longform DataFrame of calendar-aligned multi-timeframe EMAs
     on a DAILY grid.
 
-    ema:
-        - A pure daily EMA using the daily-equivalent alpha for (tf, period),
-          with NO resets at bar closes.
-
-    ema_bar:
-        - A bar-space EMA on higher-TF closes (period = p TF bars, min_periods = p),
-          reset to canonical values at TF closes, and propagated between closes
-          using the same daily-equivalent alpha.
-
     We always load sufficient history for EMA stability, and only
     restrict the *output* to [start, end].
     """
@@ -397,7 +381,8 @@ def build_multi_timeframe_ema_cal_frame(
         # 1) Detect TRUE closes for this calendar-aligned timeframe per asset id
         closes_by_asset = _compute_tf_closes_by_asset(daily, ids, tf_label, freq)
 
-        # 2) For each asset and EMA period, compute daily EMA and bar-space EMA.
+        # 2) For each asset and EMA period, compute canonical TF-bar EMA
+        #    and preview-style daily EMA.
         for asset_id in ids:
             df_id = daily[daily["id"] == asset_id].copy()
             if df_id.empty:
@@ -417,32 +402,8 @@ def build_multi_timeframe_ema_cal_frame(
                 continue
 
             for p in ema_periods:
-                # Daily-equivalent alpha for this (tf, p):
-                # Effective days = tf_days * period.
-                effective_days = tf_day_value * p
-                alpha_daily_eq = 2.0 / (effective_days + 1.0)
-
-                # 2a) Daily EMA (non-bar), NO resets on bar closes.
-                out = df_id[["ts", "close"]].copy()
-
-                ema_daily_values: List[float] = []
-                ema_prev: float | None = None
-                for close_val in out["close"].to_numpy():
-                    close_val_f = float(close_val)
-                    if ema_prev is None:
-                        ema_today = close_val_f
-                    else:
-                        ema_today = (
-                            alpha_daily_eq * close_val_f
-                            + (1.0 - alpha_daily_eq) * ema_prev
-                        )
-                    ema_daily_values.append(ema_today)
-                    ema_prev = ema_today
-
-                out["ema"] = ema_daily_values
-
-                # 2b) Canonical bar-space EMA on higher-TF closes using period=p TF bars.
-                ema_bar_canon = compute_ema(
+                # 2a) Canonical EMA on higher-TF closes using period=p TF bars
+                ema_bar = compute_ema(
                     df_closes["close"],
                     period=p,
                     adjust=False,
@@ -450,47 +411,37 @@ def build_multi_timeframe_ema_cal_frame(
                 )
 
                 bar_df = df_closes[["ts"]].copy()
-                bar_df["ema_bar_close"] = ema_bar_canon
-                # Only keep rows where canonical bar EMA is defined (after we have p bars)
-                bar_df = bar_df[bar_df["ema_bar_close"].notna()]
+                bar_df["ema_bar"] = ema_bar
+                # Only keep rows where EMA is defined (after we have p bars)
+                bar_df = bar_df[bar_df["ema_bar"].notna()]
                 if bar_df.empty:
                     continue
 
-                # Daily-propagated ema_bar, reset on bar closes.
-                bar_close_map = dict(
-                    zip(bar_df["ts"].to_numpy(), bar_df["ema_bar_close"].to_numpy())
-                )
+                alpha_bar = 2.0 / (p + 1.0)
 
-                ema_bar_values: List[float] = []
-                ema_last_day: float | None = None
+                # 2b) Build DAILY preview EMA driven only by last completed bar EMA
+                out = df_id[["ts", "close"]].copy()
 
-                for ts_val, close_val in zip(
-                    out["ts"].to_numpy(), out["close"].to_numpy()
-                ):
-                    close_val_f = float(close_val)
-                    canonical = bar_close_map.get(ts_val)
+                # Attach canonical EMA at true closes
+                out = out.merge(bar_df, on="ts", how="left")
 
-                    if canonical is not None:
-                        # True TF close: reset to canonical bar EMA.
-                        ema_today = float(canonical)
-                        ema_last_day = ema_today
-                    elif ema_last_day is not None:
-                        # Interior daily row: propagate using daily-equivalent alpha.
-                        ema_today = (
-                            alpha_daily_eq * close_val_f
-                            + (1.0 - alpha_daily_eq) * ema_last_day
-                        )
-                        ema_last_day = ema_today
-                    else:
-                        # Before first completed TF bar EMA
-                        ema_today = np.nan
+                # ema_prev_bar: EMA of the last *completed* TF bar
+                out["ema_prev_bar"] = out["ema_bar"].ffill().shift(1)
 
-                    ema_bar_values.append(ema_today)
+                # Preview EMA for every daily row where we have a previous bar EMA
+                out["ema_preview"] = alpha_bar * out["close"] + (1.0 - alpha_bar) * out[
+                    "ema_prev_bar"
+                ]
 
-                out["ema_bar"] = ema_bar_values
+                # Final EMA:
+                # - On TF closes: use canonical ema_bar (TF-bar EMA)
+                # - On non-closes: use preview EMA
+                out["ema"] = out["ema_preview"]
+                mask_bar = out["ema_bar"].notna()
+                out.loc[mask_bar, "ema"] = out.loc[mask_bar, "ema_bar"]
 
-                # We only keep rows where ema_bar is defined (after p TF closes).
-                out = out[out["ema_bar"].notna()]
+                # Drop rows where EMA is still undefined (before first valid bar EMA)
+                out = out[out["ema"].notna()]
                 if out.empty:
                     continue
 
@@ -499,14 +450,11 @@ def build_multi_timeframe_ema_cal_frame(
                 out["period"] = p
                 out["tf_days"] = tf_day_value
 
-                # Helper: mark true bar closes so we can derive roll_bar later.
-                is_bar_close = out["ts"].isin(bar_df["ts"])
-                out["is_bar_close"] = is_bar_close
-
                 # roll flag:
-                #   roll = FALSE → ts is a true higher-TF close (canonical bar)
-                #   roll = TRUE  → interior / intrabar
-                out["roll"] = ~is_bar_close
+                #   roll = FALSE → ts is a true higher-TF close (canonical EMA)
+                #   roll = TRUE  → preview / intrabar EMA
+                is_close = out["ts"].isin(bar_df["ts"])
+                out["roll"] = ~is_close
 
                 frames.append(
                     out[
@@ -518,14 +466,10 @@ def build_multi_timeframe_ema_cal_frame(
                             "ema",
                             "tf_days",
                             "roll",
-                            "ema_bar",
-                            "is_bar_close",
                         ]
                     ]
                 )
-    # ------------------------------------------------------------------
-    # After per-tf / per-id loops: combine all frames
-    # ------------------------------------------------------------------
+
     if not frames:
         return pd.DataFrame(
             columns=[
@@ -540,12 +484,6 @@ def build_multi_timeframe_ema_cal_frame(
                 "d2",
                 "d1_roll",
                 "d2_roll",
-                "ema_bar",
-                "d1_bar",
-                "d2_bar",
-                "roll_bar",
-                "d1_roll_bar",
-                "d2_roll_bar",
             ]
         )
 
@@ -556,16 +494,12 @@ def build_multi_timeframe_ema_cal_frame(
     sort_cols = ["id", "tf", "period", "ts"]
     result_df = result_df.sort_values(sort_cols)
 
-    # ------------------------------------------------------------------
-    # 1) Rolling per-day diffs on smooth daily EMA: d1_roll, d2_roll
-    # ------------------------------------------------------------------
+    # 1) Rolling per-day diffs: d1_roll, d2_roll
     g_full = result_df.groupby(["id", "tf", "period"], sort=False)
     result_df["d1_roll"] = g_full["ema"].diff()
     result_df["d2_roll"] = g_full["d1_roll"].diff()
 
-    # ------------------------------------------------------------------
-    # 2) Closing-only diffs: d1, d2 (only where roll = FALSE) on daily ema
-    # ------------------------------------------------------------------
+    # 2) Closing-only diffs: d1, d2 (only where roll = FALSE)
     result_df["d1"] = np.nan
     result_df["d2"] = np.nan
 
@@ -574,49 +508,13 @@ def build_multi_timeframe_ema_cal_frame(
         close_df = result_df.loc[mask_close].copy()
         g_close = close_df.groupby(["id", "tf", "period"], sort=False)
         close_df["d1"] = g_close["ema"].diff()
-        close_df["d2"] = close_df["d1"].diff()
+        close_df["d2"] = g_close["d1"].diff()
 
         # Write back only on closing rows
         result_df.loc[close_df.index, "d1"] = close_df["d1"]
         result_df.loc[close_df.index, "d2"] = close_df["d2"]
 
-    # ------------------------------------------------------------------
-    # 3) _bar fields (bar-space EMA and derivatives; from ema_bar)
-    # ------------------------------------------------------------------
-
-    # roll_bar: FALSE on true TF closes, TRUE on interior daily rows.
-    result_df["roll_bar"] = ~result_df["is_bar_close"]
-
-    # Initialize bar-derivative columns
-    result_df["d1_bar"] = np.nan
-    result_df["d2_bar"] = np.nan
-    result_df["d1_roll_bar"] = np.nan
-    result_df["d2_roll_bar"] = np.nan
-
-    # Bar-only derivatives, defined only on TF closes
-    mask_bar_close = result_df["is_bar_close"]
-    if mask_bar_close.any():
-        bar_close_df = result_df.loc[mask_bar_close].copy()
-        g_bar_close = bar_close_df.groupby(["id", "tf", "period"], sort=False)
-
-        # bar-to-bar diffs on ema_bar at bar closes
-        bar_close_df["d1_bar"] = g_bar_close["ema_bar"].diff()
-        bar_close_df["d2_bar"] = bar_close_df["d1_bar"].diff()
-
-        # write back only on bar-close rows
-        result_df.loc[bar_close_df.index, "d1_bar"] = bar_close_df["d1_bar"]
-        result_df.loc[bar_close_df.index, "d2_bar"] = bar_close_df["d2_bar"]
-
-    # Full daily derivatives of ema_bar across every row
-    result_df["d1_roll_bar"] = g_full["ema_bar"].diff()
-    result_df["d2_roll_bar"] = g_full["d1_roll_bar"].diff()
-
-    # Drop helper
-    result_df = result_df.drop(columns=["is_bar_close"])
-
-    # ------------------------------------------------------------------
     # Output window restriction
-    # ------------------------------------------------------------------
     if start is not None:
         start_ts = pd.to_datetime(start, utc=True)
         result_df = result_df[result_df["ts"] >= start_ts]
@@ -637,26 +535,21 @@ def build_multi_timeframe_ema_cal_frame(
             "d2",
             "d1_roll",
             "d2_roll",
-            "ema_bar",
-            "d1_bar",
-            "d2_bar",
-            "roll_bar",
-            "d1_roll_bar",
-            "d2_roll_bar",
         ]
     ]
 
 
 def write_multi_timeframe_ema_cal_to_db(
-    engine,
-    ids,
-    start=None,
-    end=None,
-    update_existing=True,
-    ema_periods=(10, 21, 50, 100, 200),
-    tfs=None,
+    ids: Iterable[int],
+    start: str = "2010-01-01",
+    end: str | None = None,
+    ema_periods: Iterable[int] = (10, 21, 50, 100, 200),
+    tfs: Dict[str, str] | None = None,
+    db_url: str | None = None,
     schema: str = "public",
+    price_table: str = "cmc_price_histories7",  # kept for API compatibility; not used here
     out_table: str = "cmc_ema_multi_tf_cal",
+    update_existing: bool = True,
 ) -> int:
     """
     Compute calendar-aligned multi-timeframe EMAs with preview-style roll
@@ -664,57 +557,22 @@ def write_multi_timeframe_ema_cal_to_db(
 
     Columns written:
 
-        id, tf, ts, period,
-        ema, tf_days, roll,
-        d1, d2, d1_roll, d2_roll,
-        ema_bar, d1_bar, d2_bar,
-        roll_bar, d1_roll_bar, d2_roll_bar
+        id, tf, ts, period, ema, tf_days, roll, d1, d2, d1_roll, d2_roll
 
     Assumes UNIQUE (id, tf, ts, period) on the target table.
 
     Parameters
     ----------
-    engine :
-        An existing SQLAlchemy Engine pointing at the MARKETDATA DB.
-        This is created by refresh_cmc_emas._get_engine() and passed in.
     ids : iterable of int
         Asset ids to compute.
     start, end : str or None
-        Date range passed through to the EMA builder (for output window).
+        Date range passed through to the EMA builder.
     update_existing : bool, default True
         If True, existing EMA rows in [start, end] are UPDATED on conflict.
         If False, ON CONFLICT DO NOTHING is used, so only new timestamps
         are inserted and existing rows are left unchanged.
     """
-    # Derive a DB URL string from the engine so that the frame builder
-    # (via load_cmc_ohlcv_daily) hits the *same* database, including
-    # any --db-url overrides. We must avoid the SQLAlchemy 2.x behavior
-    # where str(engine.url) masks the password as '***'.
-    try:
-        url_obj = engine.url
-
-        # SQLAlchemy 1.4 / 2.x: preferred, preserves quoting and password.
-        if hasattr(url_obj, "render_as_string"):
-            db_url = url_obj.render_as_string(hide_password=False)
-        else:
-            # Fallback: reconstruct from URL components.
-            drivername = url_obj.drivername or "postgresql+psycopg2"
-            username = url_obj.username or ""
-            password = url_obj.password or ""
-            host = url_obj.host or "localhost"
-            port = f":{url_obj.port}" if url_obj.port else ""
-            database = url_obj.database or ""
-
-            if username and password:
-                db_url = f"{drivername}://{username}:{password}@{host}{port}/{database}"
-            elif username:
-                db_url = f"{drivername}://{username}@{host}{port}/{database}"
-            else:
-                db_url = f"{drivername}://{host}{port}/{database}"
-    except Exception:
-        # As a last resort, fall back to the default _get_marketdata_engine()
-        # behavior inside load_cmc_ohlcv_daily.
-        db_url = None
+    engine = _get_engine(db_url)
 
     df = build_multi_timeframe_ema_cal_frame(
         ids=ids,
@@ -732,10 +590,7 @@ def write_multi_timeframe_ema_cal_to_db(
     tmp_table = f"{out_table}_tmp"
 
     with engine.begin() as conn:
-        # Always recreate temp table.
-        # IMPORTANT: do NOT qualify with schema here, so this also drops
-        # any existing TEMP table in pg_temp for this session.
-        conn.execute(text(f"DROP TABLE IF EXISTS {tmp_table};"))
+        conn.execute(text(f"DROP TABLE IF EXISTS {schema}.{tmp_table};"))
 
         conn.execute(
             text(
@@ -752,13 +607,7 @@ def write_multi_timeframe_ema_cal_to_db(
                 d1,
                 d2,
                 d1_roll,
-                d2_roll,
-                ema_bar,
-                d1_bar,
-                d2_bar,
-                roll_bar,
-                d1_roll_bar,
-                d2_roll_bar
+                d2_roll
             FROM {schema}.{out_table}
             LIMIT 0;
             """
@@ -778,38 +627,26 @@ def write_multi_timeframe_ema_cal_to_db(
         if update_existing:
             conflict_sql = """
         DO UPDATE SET
-            ema          = EXCLUDED.ema,
-            tf_days      = EXCLUDED.tf_days,
-            roll         = EXCLUDED.roll,
-            d1           = EXCLUDED.d1,
-            d2           = EXCLUDED.d2,
-            d1_roll      = EXCLUDED.d1_roll,
-            d2_roll      = EXCLUDED.d2_roll,
-            ema_bar      = EXCLUDED.ema_bar,
-            d1_bar       = EXCLUDED.d1_bar,
-            d2_bar       = EXCLUDED.d2_bar,
-            roll_bar     = EXCLUDED.roll_bar,
-            d1_roll_bar  = EXCLUDED.d1_roll_bar,
-            d2_roll_bar  = EXCLUDED.d2_roll_bar
+            ema      = EXCLUDED.ema,
+            tf_days  = EXCLUDED.tf_days,
+            roll     = EXCLUDED.roll,
+            d1       = EXCLUDED.d1,
+            d2       = EXCLUDED.d2,
+            d1_roll  = EXCLUDED.d1_roll,
+            d2_roll  = EXCLUDED.d2_roll
         """
         else:
             conflict_sql = "DO NOTHING"
 
         sql = f"""
         INSERT INTO {schema}.{out_table} AS t
-            (id, tf, ts, period,
-             ema, tf_days, roll,
-             d1, d2, d1_roll, d2_roll,
-             ema_bar, d1_bar, d2_bar,
-             roll_bar, d1_roll_bar, d2_roll_bar)
+            (id, tf, ts, period, ema, tf_days, roll, d1, d2, d1_roll, d2_roll)
         SELECT
             id, tf, ts, period,
             ema, tf_days,
             roll,
             d1, d2,
-            d1_roll, d2_roll,
-            ema_bar, d1_bar, d2_bar,
-            roll_bar, d1_roll_bar, d2_roll_bar
+            d1_roll, d2_roll
         FROM {tmp_table}
         ON CONFLICT (id, tf, ts, period)
         {conflict_sql};
