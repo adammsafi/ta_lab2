@@ -296,3 +296,16 @@ FROM cmc_price_with_emas_d1d2
 WHERE id = 1
 ORDER BY ts;
 ```
+## Refreshing EMAs (daily + multi-timeframe)
+
+# Daily only
+python -m ta_lab2.scripts.emas.refresh_cmc_ema_daily_only --ids all
+
+# Multi-TF (trading-aligned)
+python -m ta_lab2.scripts.emas.refresh_cmc_ema_multi_tf_only --ids all
+
+# Multi-TF (calendar-aligned)
+python -m ta_lab2.scripts.emas.refresh_cmc_ema_multi_tf_cal_only --ids all
+
+# Or full stack
+python -m ta_lab2.scripts.emas.refresh_cmc_emas --ids all

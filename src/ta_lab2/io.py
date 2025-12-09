@@ -209,7 +209,12 @@ def load_cmc_ohlcv_daily(
     if not ids:
         raise ValueError("ids must be a non-empty sequence of CMC IDs")
 
-    engine = _get_marketdata_engine(db_url=db_url)
+    # FIXED: properly indented db_url handling
+    if db_url:
+        engine = create_engine(db_url)
+    else:
+        engine = _get_marketdata_engine()
+
     schema, tables = _get_marketdata_schema_and_tables()
     table = _qualify_table(schema, tables["ohlcv_daily"])
 
@@ -387,7 +392,7 @@ def _compute_ema_long_from_close_panel(
     for p in periods:
         # Raw EMA (extends through trailing NaNs)
         ema_wide = close_panel.ewm(
-            span=p, 
+            span=p,
             adjust=False,
             min_periods=p,
         ).mean()

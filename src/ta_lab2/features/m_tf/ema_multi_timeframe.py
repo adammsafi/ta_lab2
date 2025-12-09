@@ -101,14 +101,15 @@ TIMEFRAME_FREQS: Dict[str, str] = {
     "6W": "6W",
     "8W": "8W",
     "10W": "10W",
-    # month-end anchored (use ME to avoid FutureWarning)
-    "1M": "1ME",
-    "2M": "2ME",
-    "3M": "3ME",
-    "6M": "6ME",
-    "9M": "9ME",
-    "12M": "12ME",
+    # tf_day-style “months”: approximate by fixed-day windows
+    "1M": "30D",
+    "2M": "60D",
+    "3M": "90D",
+    "6M": "180D",
+    "9M": "270D",
+    "12M": "360D",
 }
+
 
 # Approximate number of days for ordering / scaling
 TF_DAYS: Dict[str, int] = {
