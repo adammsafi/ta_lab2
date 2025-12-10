@@ -7,31 +7,45 @@ ema_multi_tf_cal_stats.
 Assumptions
 -----------
 - cmc_ema_multi_tf_cal has (at least):
-    id, ts, tf, tf_days, period, ema, roll
+    id, ts, tf, tf_days, period,
+    ema, roll,                      -- daily EMA + preview semantics
+    ema_bar, roll_bar               -- bar-space EMA on TF closes
+
 - Canonical vs preview semantics:
-    * Canonical rows: roll = false
-    * Preview rows : roll = true
+
+    * For the DAILY EMA (ema):
+        - roll = FALSE → true higher-TF closes
+        - roll = TRUE  → daily preview rows between closes
+
+    * For the BAR-SPACE EMA (ema_bar):
+        - roll_bar = FALSE → true TF closes (same timestamps as roll = FALSE)
+        - roll_bar = TRUE  → non-close daily rows
 
 Tests implemented
 -----------------
 
 1) ema_multi_tf_cal_row_count_vs_span_roll_false
-   For canonical rows (roll = false), check row count vs span/tf_days.
+   For canonical rows (roll = false), check row count vs span / tf_days.
 
 2) ema_multi_tf_cal_row_count_vs_span_roll_true
    For preview rows (roll = true), check preview density vs canonical,
    with tf-dependent thresholds (same scheme as ema_multi_tf).
 
 3) ema_multi_tf_cal_max_gap_vs_tf_days_roll_false
-   For canonical rows, check max gap vs tf_days.
+   For canonical rows (roll = false), check max gap vs tf_days.
 
 4) ema_multi_tf_cal_max_gap_vs_tf_days_roll_true
-   Same, but for preview rows.
+   Same, but for preview rows (roll = true).
 
 5) ema_multi_tf_cal_roll_flag_consistency
    For each (asset_id, tf, period), enforce:
        - At most one canonical row (roll = false) per ts_date.
-   This matches the ema_multi_tf roll-flag semantics.
+
+6) ema_multi_tf_cal_roll_bar_flag_consistency
+   Same as (5), but for roll_bar on ema_bar.
+
+7) ema_multi_tf_cal_roll_vs_roll_bar_match
+   For each row, require roll == roll_bar (by construction in ema_multi_tf_cal).
 """
 
 import argparse
@@ -87,12 +101,12 @@ SELECT
     g.n_rows::NUMERIC     AS actual,
     g.expected_n::NUMERIC AS expected,
     jsonb_build_object(
-        'min_date',             g.min_date,
-        'max_date',             g.max_date,
-        'tf_days',              g.tf_days,
-        'n_rows',               g.n_rows,
-        'expected_n',           g.expected_n,
-        'missing_from_expected',g.missing_from_expected
+        'min_date',              g.min_date,
+        'max_date',              g.max_date,
+        'tf_days',               g.tf_days,
+        'n_rows',                g.n_rows,
+        'expected_n',            g.expected_n,
+        'missing_from_expected', g.missing_from_expected
     ) AS extra
 FROM (
     WITH groups AS (
@@ -117,18 +131,22 @@ FROM (
         min_date,
         max_date,
         CASE
-            WHEN tf_days IS NULL OR tf_days <= 0 OR min_date IS NULL OR max_date IS NULL THEN NULL
+            WHEN tf_days IS NULL OR tf_days <= 0
+                 OR min_date IS NULL OR max_date IS NULL
+            THEN NULL
             ELSE ((max_date - min_date)::numeric / tf_days) + 1
         END AS expected_n,
         CASE
-            WHEN tf_days IS NULL OR tf_days <= 0 OR min_date IS NULL OR max_date IS NULL THEN NULL
+            WHEN tf_days IS NULL OR tf_days <= 0
+                 OR min_date IS NULL OR max_date IS NULL
+            THEN NULL
             ELSE ((max_date - min_date)::numeric / tf_days) + 1 - n_rows
         END AS missing_from_expected
     FROM groups
 ) AS g;
 """
 
-# NEW: density-based test for roll = true (preview rows) with tf-level thresholds
+# Density-based test for roll = true (preview rows) with tf-level thresholds
 SQL_TEST_ROWCOUNT_ROLL_TRUE_CAL = """
 INSERT INTO ema_multi_tf_cal_stats (
     table_name, test_name, asset_id, tf, period,
@@ -151,7 +169,7 @@ SELECT
                  WHEN p.tf_days <= 7   THEN 10     -- very short tf
                  WHEN p.tf_days <= 31  THEN 20     -- up to ~1M
                  WHEN p.tf_days <= 90  THEN 50     -- up to ~3M
-                 ELSE 100                          -- 3M+ (9M, 12M, etc.)
+                 ELSE 100                          -- 3M+ (6M, 9M, 12M)
              END
         THEN 'PASS'
 
@@ -169,12 +187,12 @@ SELECT
     p.n_preview::NUMERIC   AS actual,   -- number of preview rows
     p.n_canonical::NUMERIC AS expected, -- number of canonical rows (context)
     jsonb_build_object(
-        'min_date',                    p.min_date,
-        'max_date',                    p.max_date,
-        'tf_days',                     p.tf_days,
-        'n_preview',                   p.n_preview,
-        'n_canonical',                 p.n_canonical,
-        'preview_to_canonical_ratio',  p.preview_to_canonical_ratio
+        'min_date',                   p.min_date,
+        'max_date',                   p.max_date,
+        'tf_days',                    p.tf_days,
+        'n_preview',                  p.n_preview,
+        'n_canonical',                p.n_canonical,
+        'preview_to_canonical_ratio', p.preview_to_canonical_ratio
     ) AS extra
 FROM (
     WITH previews AS (
@@ -401,6 +419,100 @@ FROM (
 
 
 # ---------------------------------------------------------------------------
+# Test 6: roll_bar flag consistency – at most one canonical per ts_date
+# ---------------------------------------------------------------------------
+
+SQL_TEST_ROLL_BAR_FLAG_CONSISTENCY_CAL = """
+INSERT INTO ema_multi_tf_cal_stats (
+    table_name, test_name, asset_id, tf, period,
+    status, actual, expected, extra
+)
+SELECT
+    'cmc_ema_multi_tf_cal' AS table_name,
+    'ema_multi_tf_cal_roll_bar_flag_consistency' AS test_name,
+    g.asset_id,
+    g.tf,
+    g.period,
+    CASE
+        WHEN g.n_problem_timestamps = 0 THEN 'PASS'
+        WHEN g.n_problem_timestamps BETWEEN 1 AND 5 THEN 'WARN'
+        ELSE 'FAIL'
+    END AS status,
+    g.n_problem_timestamps::NUMERIC AS actual,   -- timestamps with >1 bar-canonical row
+    0::NUMERIC                       AS expected,
+    jsonb_build_object(
+        'n_rows',               g.n_rows,
+        'n_problem_timestamps', g.n_problem_timestamps,
+        'n_canonical_rows',     g.n_canonical_rows,
+        'n_preview_rows',       g.n_preview_rows
+    ) AS extra
+FROM (
+    WITH per_ts AS (
+        SELECT
+            id        AS asset_id,
+            tf,
+            period,
+            ts::date AS ts_date,
+            SUM(CASE WHEN roll_bar = false THEN 1 ELSE 0 END) AS n_canonical_at_ts,
+            SUM(CASE WHEN roll_bar = true  THEN 1 ELSE 0 END) AS n_preview_at_ts,
+            COUNT(*) AS n_rows_at_ts
+        FROM cmc_ema_multi_tf_cal
+        GROUP BY id, tf, period, ts::date
+    )
+    SELECT
+        asset_id,
+        tf,
+        period,
+        SUM(n_rows_at_ts) AS n_rows,
+        SUM(CASE WHEN n_canonical_at_ts > 1 THEN 1 ELSE 0 END) AS n_problem_timestamps,
+        SUM(n_canonical_at_ts) AS n_canonical_rows,
+        SUM(n_preview_at_ts)   AS n_preview_rows
+    FROM per_ts
+    GROUP BY asset_id, tf, period
+) AS g;
+"""
+
+
+# ---------------------------------------------------------------------------
+# Test 7: roll vs roll_bar match – they should be identical
+# ---------------------------------------------------------------------------
+
+SQL_TEST_ROLL_VS_ROLL_BAR_MATCH_CAL = """
+INSERT INTO ema_multi_tf_cal_stats (
+    table_name, test_name, asset_id, tf, period,
+    status, actual, expected, extra
+)
+SELECT
+    'cmc_ema_multi_tf_cal' AS table_name,
+    'ema_multi_tf_cal_roll_vs_roll_bar_match' AS test_name,
+    g.asset_id,
+    g.tf,
+    g.period,
+    CASE
+        WHEN g.n_mismatch = 0 THEN 'PASS'
+        WHEN g.n_mismatch BETWEEN 1 AND 5 THEN 'WARN'
+        ELSE 'FAIL'
+    END AS status,
+    g.n_mismatch::NUMERIC AS actual,   -- number of rows with roll != roll_bar
+    0::NUMERIC             AS expected,
+    jsonb_build_object(
+        'n_rows',     g.n_rows,
+        'n_mismatch', g.n_mismatch
+    ) AS extra
+FROM (
+    SELECT
+        id   AS asset_id,
+        tf,
+        period,
+        COUNT(*) AS n_rows,
+        SUM(CASE WHEN roll IS DISTINCT FROM roll_bar THEN 1 ELSE 0 END) AS n_mismatch
+    FROM cmc_ema_multi_tf_cal
+    GROUP BY id, tf, period
+) AS g;
+"""
+
+
+# ---------------------------------------------------------------------------
 # Helper: engine + runner
 # ---------------------------------------------------------------------------
 
@@ -428,8 +540,14 @@ def run_all_tests(engine) -> None:
         conn.execute(text(SQL_TEST_GAP_ROLL_FALSE_CAL))
         conn.execute(text(SQL_TEST_GAP_ROLL_TRUE_CAL))
 
-        # Roll-flag consistency
+        # Roll-flag consistency (daily EMA layer)
         conn.execute(text(SQL_TEST_ROLL_FLAG_CONSISTENCY_CAL))
+
+        # Roll-bar consistency (bar-space EMA layer)
+        conn.execute(text(SQL_TEST_ROLL_BAR_FLAG_CONSISTENCY_CAL))
+
+        # roll vs roll_bar alignment
+        conn.execute(text(SQL_TEST_ROLL_VS_ROLL_BAR_MATCH_CAL))
 
 
 # ---------------------------------------------------------------------------
@@ -462,5 +580,5 @@ def main(db_url: Optional[str] = None) -> None:
 
 if __name__ == "__main__":
     # Preferred from repo root:
-    #   python -m ta_lab2.scripts.refresh_ema_multi_tf_cal_stats
+    #   python -m ta_lab2.scripts.emas.stats.refresh_ema_multi_tf_cal_stats
     main()

@@ -15,8 +15,15 @@ __all__ = [
     # make sure get_engine is exported
     "get_engine",
     "load_cmc_ohlcv_daily",
+    "load_close_panel",
+    "load_da_ids",
+    "load_exchange_info",
+    "write_ema_daily_to_db",
+    # NEW: time-dimension helper
+    "load_dim_timeframe",
     # ... keep whatever else you already have here ...
 ]
+
 
 def get_engine(db_url: str | None = None):
     """
@@ -27,6 +34,7 @@ def get_engine(db_url: str | None = None):
     `get_engine` continue to work.
     """
     return create_engine(db_url or TARGET_DB_URL)
+
 
 def write_parquet(df: pd.DataFrame, path: str, partition_cols=None):
     path = pathlib.Path(path)
@@ -355,6 +363,49 @@ def load_exchange_info(
 
     stmt = text(f"SELECT * FROM {table}")
     return pd.read_sql(stmt, engine)
+
+
+# --------- NEW: Time-dimension loader (dim_timeframe) --------- #
+
+
+def load_dim_timeframe(
+    *,
+    db_url: str | None = None,
+    schema: str | None = "public",
+    table: str = "dim_timeframe",
+    index_cols: Sequence[str] | None = None,
+) -> pd.DataFrame:
+    """
+    Load the dim_timeframe reference table.
+
+    Parameters
+    ----------
+    db_url :
+        Optional DB URL override. Defaults to TARGET_DB_URL via get_engine().
+    schema :
+        Optional schema name; defaults to 'public'. Use None for search_path.
+    table :
+        Table name; defaults to 'dim_timeframe'.
+    index_cols :
+        Optional sequence of column names to set as the index (for example,
+        ('tf',) or ('tf', 'alignment_type')). If None, the frame is returned
+        with a default RangeIndex.
+
+    Returns
+    -------
+    DataFrame
+        Contents of dim_timeframe, optionally indexed.
+    """
+    engine = get_engine(db_url=db_url)
+    full_table = f"{schema}.{table}" if schema else table
+
+    stmt = text(f"SELECT * FROM {full_table}")
+    df = pd.read_sql(stmt, engine)
+
+    if index_cols:
+        df = df.set_index(list(index_cols))
+
+    return df
 
 
 # ----------------- Indicator persistence (EMA) ----------------- #
