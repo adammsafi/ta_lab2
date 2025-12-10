@@ -29,3 +29,11 @@ from ta_lab2.scripts.emas.stats.multi_tf_cal.refresh_ema_multi_tf_cal_stats impo
 if __name__ == "__main__":
     # Let refresh_ema_multi_tf_cal_stats.main() handle any --db-url CLI arg.
     main()
+
+"""
+runfile(
+    'C:/Users/asafi/Downloads/ta_lab2/src/ta_lab2/scripts/emas/stats/multi_tf_cal/run_refresh_ema_multi_tf_cal_stats.py',
+    wdir='C:/Users/asafi/Downloads/ta_lab2'
+)
+
+"""
