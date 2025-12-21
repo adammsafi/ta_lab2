@@ -418,28 +418,25 @@ def load_anchor_specs_from_dim_timeframe(db_url: str) -> list[AnchorSpec]:
       - allow_partial_end   = TRUE
       - base_unit IN ('W','M','Y')
     """
-    sql = text(
-        """
-        SELECT
-            tf,
-            base_unit,
-            tf_qty,
-            sort_order
+    sql = text(r"""
+        SELECT tf, base_unit, tf_qty, sort_order
         FROM public.dim_timeframe
-        WHERE
-            alignment_type = 'calendar'
+        WHERE alignment_type = 'calendar'
+            AND calendar_anchor = TRUE
             AND roll_policy = 'calendar_anchor'
             AND allow_partial_start = TRUE
             AND allow_partial_end   = TRUE
             AND base_unit IN ('W','M','Y')
             AND (
-                (base_unit = 'W' AND calendar_scheme = 'ISO' AND tf LIKE '%_CAL_ANCHOR_ISO')
+                -- ISO anchored weeks: *_CAL_ANCHOR_ISO
+                (base_unit = 'W' AND calendar_scheme = 'ISO' AND tf ~ '_CAL_ANCHOR_ISO$')
                 OR
-                (base_unit IN ('M','Y') AND tf LIKE '%_CAL_ANCHOR%')
-            )
-        ORDER BY sort_order, tf
-        """
-    )
+                -- Anchored months/years: *_CAL_ANCHOR (scheme-agnostic)
+                (base_unit IN ('M','Y') AND tf ~ '_CAL_ANCHOR$')
+                )
+        ORDER BY sort_order, tf;
+        """)
+
 
     eng = get_engine(db_url)
     with eng.connect() as conn:

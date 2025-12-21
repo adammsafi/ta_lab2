@@ -304,31 +304,30 @@ class CalIsoSpec:
     tf: str
 
 
-def load_cal_iso_specs_from_dim_timeframe(db_url: str):
+def load_cal_specs_from_dim_timeframe(db_url: str):
     """
     Load calendar-aligned, FULL-PERIOD (non-anchor) ISO timeframes.
 
-    Inclusion:
-      * ISO calendar weeks:
-          - base_unit = 'W'
-          - calendar_scheme = 'ISO'
-
-      * Calendar months / years:
-          - base_unit IN ('M','Y')
-          - calendar_anchor IN ('EOM','EOQ','EOY')
-
-    Excludes partial/anchored families via allow_partial_* flags.
+    dim_timeframe.calendar_anchor is boolean:
+      - FALSE => CAL (non-anchor)
+      - TRUE  => CAL_ANCHOR
     """
-    sql = text("""
+    sql = text(r"""
       SELECT tf, base_unit, tf_qty, sort_order
       FROM public.dim_timeframe
       WHERE alignment_type = 'calendar'
         AND allow_partial_start = FALSE
         AND allow_partial_end   = FALSE
+        AND calendar_anchor     = FALSE
+        AND tf NOT LIKE '%\_CAL\_ANCHOR\_%' ESCAPE '\'
+        AND tf NOT LIKE '%\_ANCHOR%' ESCAPE '\'
         AND (
-              (base_unit = 'W' AND calendar_scheme = 'ISO')
-           OR (base_unit IN ('M','Y') AND calendar_anchor IN ('EOM','EOQ','EOY'))
-        )
+              -- ISO weeks: e.g. 1W_CAL_ISO, 2W_CAL_ISO, ...
+              (base_unit = 'W' AND tf ~ '_CAL_ISO$')
+              OR
+              -- Scheme-agnostic months/years: e.g. 1M_CAL, 2M_CAL, 1Y_CAL, ...
+              (base_unit IN ('M','Y') AND tf ~ '_CAL$' AND tf !~ '_CAL_')
+            )
       ORDER BY sort_order, tf;
     """)
 
@@ -339,20 +338,20 @@ def load_cal_iso_specs_from_dim_timeframe(db_url: str):
     if not rows:
         raise RuntimeError(
             "No CAL_ISO timeframes found in dim_timeframe. "
-            "Expected ISO calendar weeks and calendar months/years with full-period rules."
+            "Expected ISO week CAL (_CAL_ISO) plus scheme-agnostic M/Y (_CAL) with calendar_anchor=FALSE."
         )
 
     specs = []
     for r in rows:
         specs.append(
-            CalIsoSpec(
+            CalSpec(
                 n=int(r["tf_qty"]),
                 unit=str(r["base_unit"]),
                 tf=str(r["tf"]),
             )
         )
-
     return specs
+
 
 # =============================================================================
 # Calendar math helpers (ISO week = Monday..Sunday) in NY-local date logic

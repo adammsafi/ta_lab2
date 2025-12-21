@@ -336,25 +336,25 @@ def load_anchor_specs_from_dim_timeframe(db_url: str) -> list[AnchorSpec]:
         base_unit in ('M','Y')
       and we exclude ISO-labeled TF names to avoid pulling ISO variants.
     """
-    sql = text("""
-      SELECT tf, base_unit, tf_qty, sort_order
-      FROM public.dim_timeframe
-      WHERE alignment_type = 'calendar'
-        AND roll_policy = 'calendar_anchor'
-        AND allow_partial_start = TRUE
-        AND allow_partial_end   = TRUE
-        AND base_unit IN ('W','M','Y')
-        AND (
-              -- US weeks only
-              (base_unit = 'W' AND calendar_scheme = 'US')
-              OR
-              -- Month/year anchored families: scheme is often NULL/blank in your table
-              (base_unit IN ('M','Y') AND COALESCE(NULLIF(calendar_scheme,''), 'US') = 'US')
-            )
-        -- Safety: do not accidentally pull ISO variants into the US builder
-        AND tf NOT ILIKE '%ISO%'
-      ORDER BY sort_order, tf;
-    """)
+    sql = text(r"""
+        SELECT tf, base_unit, tf_qty, sort_order
+        FROM public.dim_timeframe
+        WHERE alignment_type = 'calendar'
+            AND calendar_anchor = TRUE
+            AND roll_policy = 'calendar_anchor'
+            AND allow_partial_start = TRUE
+            AND allow_partial_end   = TRUE
+            AND base_unit IN ('W','M','Y')
+            AND (
+                -- US anchored weeks: *_CAL_ANCHOR_US
+                (base_unit = 'W' AND calendar_scheme = 'US' AND tf ~ '_CAL_ANCHOR_US$')
+                OR
+                -- Anchored months/years: *_CAL_ANCHOR (scheme-agnostic)
+                (base_unit IN ('M','Y') AND tf ~ '_CAL_ANCHOR$')
+                )
+        ORDER BY sort_order, tf;
+        """)
+
     eng = get_engine(db_url)
     with eng.connect() as conn:
         rows = conn.execute(sql).mappings().all()

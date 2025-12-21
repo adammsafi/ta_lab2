@@ -437,34 +437,27 @@ def load_cal_specs_from_dim_timeframe(db_url: str):
     """
     Load calendar-aligned, FULL-PERIOD (non-anchor) US timeframes.
 
-    Rules (matched to dim_timeframe reality):
-      - alignment_type = 'calendar'
-      - allow_partial_start = FALSE
-      - allow_partial_end   = FALSE
-
-    Inclusion:
-      * US calendar weeks:
-          - base_unit = 'W'
-          - calendar_scheme = 'US'
-
-      * Calendar months / years:
-          - base_unit IN ('M','Y')
-          - calendar_anchor IN ('EOM','EOQ','EOY')
-
-    Exclusions:
-      - *_CAL_ANCHOR_* (partial bars)
-      - Any partial-start or partial-end families
+    Now that dim_timeframe.calendar_anchor is boolean:
+      - calendar_anchor = FALSE  => calendar-aligned (non-anchor) CAL
+      - calendar_anchor = TRUE   => CAL_ANCHOR
+    We also defensively exclude *_CAL_ANCHOR* by TF name.
     """
-    sql = text("""
+    sql = text(r"""
       SELECT tf, base_unit, tf_qty, sort_order
       FROM public.dim_timeframe
       WHERE alignment_type = 'calendar'
         AND allow_partial_start = FALSE
         AND allow_partial_end   = FALSE
+        AND calendar_anchor     = FALSE
+        AND tf NOT LIKE '%\_CAL\_ANCHOR\_%' ESCAPE '\'
+        AND tf NOT LIKE '%\_ANCHOR%' ESCAPE '\'
         AND (
-              (base_unit = 'W' AND calendar_scheme = 'US')
-           OR (base_unit IN ('M','Y') AND calendar_anchor IN ('EOM','EOQ','EOY'))
-        )
+              -- US weeks: e.g. 1W_CAL_US, 2W_CAL_US, ...
+              (base_unit = 'W' AND tf ~ '_CAL_US$')
+              OR
+              -- Scheme-agnostic months/years: e.g. 1M_CAL, 2M_CAL, 1Y_CAL, ...
+              (base_unit IN ('M','Y') AND tf ~ '_CAL$' AND tf !~ '_CAL_')
+            )
       ORDER BY sort_order, tf;
     """)
 
@@ -475,7 +468,7 @@ def load_cal_specs_from_dim_timeframe(db_url: str):
     if not rows:
         raise RuntimeError(
             "No CAL_US timeframes found in dim_timeframe. "
-            "Expected US calendar weeks and calendar months/years with full-period rules."
+            "Expected US week CAL (_CAL_US) plus scheme-agnostic M/Y (_CAL) with calendar_anchor=FALSE."
         )
 
     specs = []
@@ -487,8 +480,8 @@ def load_cal_specs_from_dim_timeframe(db_url: str):
                 tf=str(r["tf"]),
             )
         )
-
     return specs
+
 
 # =============================================================================
 # Calendar math helpers (NY-local date logic)
