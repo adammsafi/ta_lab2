@@ -5,7 +5,7 @@ import argparse
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Callable, cast, Protocol, Sequence
 
 # ----------------------------
 # Optional imports (keep CLI usable even if some modules aren't present)
@@ -103,7 +103,9 @@ def cmd_pipeline(args: argparse.Namespace) -> int:
         print("[ta-lab2 pipeline] pipeline entrypoint not available.")
         return 2
 
-    settings = load_settings(str(args.config))
+    settings_raw = load_settings(str(args.config))  # type: ignore[misc]
+    settings = cast(PipelineSettings, settings_raw)
+
     return int(
         run_btc_pipeline(
             csv_path=settings.data_csv,
@@ -112,6 +114,7 @@ def cmd_pipeline(args: argparse.Namespace) -> int:
             resample=settings.resample,
         )
     )
+
 
 
 @dataclass(frozen=True)
@@ -123,6 +126,11 @@ class RegimePolicy:
     gross_cap: float = 1.0
     setups: str = "default"
 
+class PipelineSettings(Protocol):
+    data_csv: str
+    out_dir: str
+    ema_windows: Sequence[int]
+    resample: str
 
 def _detect_repo_root(start: Path) -> Path:
     """Walk upward looking for pyproject.toml or .git. Fall back to start."""
@@ -176,16 +184,24 @@ def _read_df(path: Path) -> Any:
         raise RuntimeError("pandas is not available; cannot read CSV for regime labeling fallback.")
     return pd.read_csv(path)
 
+ensure_regime_features: Optional[Callable[..., Any]]
+try:
+    from ta_lab2.regimes.feature_utils import ensure_regime_features  # type: ignore
+except Exception:
+    ensure_regime_features = None  # type: ignore
 
 def _ensure_feats_if_possible(df: Any, tag: str) -> Any:
-    if df is None:
-        return None
-    if ensure_regime_features is None:
+    if df is None or ensure_regime_features is None:
         return df
+    fn = cast(Callable[..., Any], ensure_regime_features)
     try:
-        return ensure_regime_features(df, tag=tag)
+        return fn(df, tag=tag)
+    except TypeError:
+        # Handles "unexpected keyword arg 'tag'" if the real signature doesn't support it
+        return fn(df)
     except Exception:
         return df
+
 
 
 def _maybe_load_policy_table(policy_path: Optional[Path], repo_root: Path) -> Optional[Any]:
@@ -715,16 +731,13 @@ def main(argv: Optional[list[str]] = None) -> int:
     ap = build_parser()
     args = ap.parse_args(argv)
 
-    # Back-compat path: no subcommand provided -> run pipeline with top-level --config
-    if args.cmd is None:
-        shim = argparse.Namespace(config=args.config)
-        return cmd_pipeline(shim)
+    func = getattr(args, "func", None)
+    if func is None:
+        ap.print_help()
+        return 2
 
-    if hasattr(args, "func") and callable(args.func):
-        return int(args.func(args))
-
-    ap.print_help()
-    return 2
+    func = cast(Callable[[argparse.Namespace], int], func)
+    return int(func(args))
 
 
 if __name__ == "__main__":
