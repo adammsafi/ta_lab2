@@ -1,584 +1,838 @@
 from __future__ import annotations
 
-"""
-Run data quality checks for cmc_ema_multi_tf_cal and store results in
-ema_multi_tf_cal_stats.
+r"""
+refresh_ema_multi_tf_cal_stats.py
 
-Assumptions
------------
-- cmc_ema_multi_tf_cal has (at least):
-    id, ts, tf, tf_days, period,
-    ema, roll,                      -- daily EMA + preview semantics
-    ema_bar, roll_bar               -- bar-space EMA on TF closes
+Calendar-aware EMA CAL stats using public.dim_timeframe.
 
-- Canonical vs preview semantics:
+Targets (defaults):
+- public.cmc_ema_multi_tf_cal_us
+- public.cmc_ema_multi_tf_cal_iso
 
-    * For the DAILY EMA (ema):
-        - roll = FALSE → true higher-TF closes
-        - roll = TRUE  → daily preview rows between closes
+Incremental behavior:
+- Uses public.ema_multi_tf_cal_stats_state as a per-table watermark store:
+    last_ingested_at = MAX(ingested_at) processed last time for that EMA table.
+- On each run (default incremental):
+    * If no new rows (max_ingested_at <= last_ingested_at): skip stats work for that table.
+    * If new rows exist: recompute stats ONLY for impacted (id, tf, period) keys
+      that have rows with ingested_at > last_ingested_at.
+    * TF-level tests run only for impacted TFs.
+    * Updates watermark at end for each processed table.
 
-    * For the BAR-SPACE EMA (ema_bar):
-        - roll_bar = FALSE → true TF closes (same timestamps as roll = FALSE)
-        - roll_bar = TRUE  → non-close daily rows
+Heartbeat behavior (state only):
+- Regardless of whether any stats work is performed, if the EMA table is non-empty,
+  we update state.updated_at to reflect "script ran for this table".
+- This does NOT advance last_ingested_at unless we actually ran tests successfully.
 
-Tests implemented
------------------
+Full refresh option:
+- --full-refresh:
+    * Truncates public.ema_multi_tf_cal_stats
+    * Clears public.ema_multi_tf_cal_stats_state
+    * Recomputes stats for all keys for each requested table
+    * Resets watermarks
 
-1) ema_multi_tf_cal_row_count_vs_span_roll_false
-   For canonical rows (roll = false), check row count vs span / tf_days.
+Assumptions:
+- EMA tables have ingested_at column (timestamptz).
+- EMA tables have roll (boolean), roll_bar (boolean), ts (timestamptz).
 
-2) ema_multi_tf_cal_row_count_vs_span_roll_true
-   For preview rows (roll = true), check preview density vs canonical,
-   with tf-dependent thresholds (same scheme as ema_multi_tf).
-
-3) ema_multi_tf_cal_max_gap_vs_tf_days_roll_false
-   For canonical rows (roll = false), check max gap vs tf_days.
-
-4) ema_multi_tf_cal_max_gap_vs_tf_days_roll_true
-   Same, but for preview rows (roll = true).
-
-5) ema_multi_tf_cal_roll_flag_consistency
-   For each (asset_id, tf, period), enforce:
-       - At most one canonical row (roll = false) per ts_date.
-
-6) ema_multi_tf_cal_roll_bar_flag_consistency
-   Same as (5), but for roll_bar on ema_bar.
-
-7) ema_multi_tf_cal_roll_vs_roll_bar_match
-   For each row, require roll == roll_bar (by construction in ema_multi_tf_cal).
+Spyder runfile():
+runfile(
+    r"C:\Users\asafi\Downloads\ta_lab2\src\ta_lab2\scripts\emas\stats\multi_tf_cal\refresh_ema_multi_tf_cal_stats.py",
+    wdir=r"C:\Users\asafi\Downloads\ta_lab2",
+    args="--tables public.cmc_ema_multi_tf_cal_us public.cmc_ema_multi_tf_cal_iso"
+)
 """
 
 import argparse
-from typing import Optional
+import logging
+import sys
+from typing import Iterable, Optional
 
 from sqlalchemy import create_engine, text
+from sqlalchemy.engine import Engine
 
 from ta_lab2.config import TARGET_DB_URL
 
+STATS_TABLE = "public.ema_multi_tf_cal_stats"
+STATE_TABLE = "public.ema_multi_tf_cal_stats_state"
 
-# ---------------------------------------------------------------------------
-# DDL: stats table for cmc_ema_multi_tf_cal
-# ---------------------------------------------------------------------------
 
-DDL_STATS_TABLE_CAL = """
-CREATE TABLE IF NOT EXISTS ema_multi_tf_cal_stats (
-    stat_id        BIGSERIAL PRIMARY KEY,
-    table_name     TEXT        NOT NULL,
-    test_name      TEXT        NOT NULL,
-    asset_id       INTEGER,
-    tf             TEXT,
-    period         INTEGER,
-    status         TEXT        NOT NULL,
-    actual         NUMERIC,
-    expected       NUMERIC,
-    extra          JSONB,
-    checked_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+# ----------------------------
+# Logging
+# ----------------------------
+
+def _setup_logging(level: str = "INFO") -> logging.Logger:
+    logger = logging.getLogger("ema_cal_stats")
+    if logger.handlers:
+        return logger  # already configured (Spyder autoreload etc.)
+
+    lvl = getattr(logging, level.upper(), logging.INFO)
+    logger.setLevel(lvl)
+
+    h = logging.StreamHandler(stream=sys.stdout)
+    h.setLevel(lvl)
+    fmt = logging.Formatter("[%(levelname)s] %(message)s")
+    h.setFormatter(fmt)
+    logger.addHandler(h)
+    logger.propagate = False
+    return logger
+
+
+# ----------------------------
+# Create tables if needed (no drops)
+# ----------------------------
+
+DDL_CREATE_STATS_IF_NEEDED = f"""
+CREATE TABLE IF NOT EXISTS {STATS_TABLE} (
+    stat_id          BIGSERIAL PRIMARY KEY,
+    table_name       TEXT        NOT NULL,
+    test_name        TEXT        NOT NULL,
+
+    asset_id         INTEGER,
+    tf               TEXT,
+    period           INTEGER,
+
+    alignment_type   TEXT,
+    base_unit        TEXT,
+    tf_qty           INTEGER,
+    calendar_scheme  TEXT,
+    calendar_anchor  BOOLEAN,
+
+    status           TEXT        NOT NULL,
+    actual           NUMERIC,
+    expected         NUMERIC,
+    extra            JSONB,
+    checked_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+"""
+
+DDL_CREATE_STATE_IF_NEEDED = f"""
+CREATE TABLE IF NOT EXISTS {STATE_TABLE} (
+    table_name        TEXT PRIMARY KEY,
+    last_ingested_at  TIMESTAMPTZ,
+    updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 """
 
 
-# ---------------------------------------------------------------------------
-# Test 1 & 2: row count vs span for roll = false and roll = true
-# ---------------------------------------------------------------------------
+# ----------------------------
+# dim_timeframe projection
+# ----------------------------
 
-SQL_TEST_ROWCOUNT_ROLL_FALSE_CAL = """
-INSERT INTO ema_multi_tf_cal_stats (
-    table_name, test_name, asset_id, tf, period,
+DIM_TF_COLS = """
+    dt.alignment_type,
+    dt.base_unit,
+    dt.tf_qty,
+    dt.calendar_scheme,
+    dt.calendar_anchor,
+    dt.tf_days_nominal,
+    dt.tf_days_min,
+    dt.tf_days_max,
+    dt.allow_partial_start,
+    dt.allow_partial_end
+"""
+
+
+# ----------------------------
+# Incremental temp tables
+# ----------------------------
+
+DDL_TEMP_IMPACTED_KEYS = """
+CREATE TEMP TABLE IF NOT EXISTS _impacted_keys (
+    asset_id integer NOT NULL,
+    tf       text    NOT NULL,
+    period   integer NOT NULL
+) ON COMMIT DROP;
+
+TRUNCATE TABLE _impacted_keys;
+"""
+
+SQL_IMPACTED_KEYS_SINCE = """
+SELECT DISTINCT e.id AS asset_id, e.tf, e.period
+FROM {table} e
+WHERE e.ingested_at > :last_ingested_at;
+"""
+
+SQL_ALL_KEYS = """
+SELECT DISTINCT e.id AS asset_id, e.tf, e.period
+FROM {table} e
+WHERE e.roll = false;
+"""
+
+SQL_MAX_INGESTED_AT = """
+SELECT MAX(ingested_at) AS max_ingested_at
+FROM {table};
+"""
+
+SQL_GET_STATE = f"""
+SELECT last_ingested_at
+FROM {STATE_TABLE}
+WHERE table_name = :table_name;
+"""
+
+SQL_UPSERT_STATE = f"""
+INSERT INTO {STATE_TABLE}(table_name, last_ingested_at)
+VALUES (:table_name, :last_ingested_at)
+ON CONFLICT (table_name)
+DO UPDATE SET last_ingested_at = EXCLUDED.last_ingested_at,
+              updated_at = now();
+"""
+
+# State-only heartbeat: bump updated_at without changing last_ingested_at.
+# Uses UPSERT so it creates the state row if missing, and NEVER overwrites last_ingested_at on conflict.
+SQL_TOUCH_STATE = f"""
+INSERT INTO {STATE_TABLE}(table_name, last_ingested_at, updated_at)
+VALUES (:table_name, NULL, now())
+ON CONFLICT (table_name)
+DO UPDATE SET updated_at = now();
+"""
+
+SQL_CLEAR_STATE = f"TRUNCATE TABLE {STATE_TABLE};"
+SQL_TRUNCATE_STATS = f"TRUNCATE TABLE {STATS_TABLE};"
+
+
+# ----------------------------
+# Delete old stats for impacted scope (latest-only)
+# ----------------------------
+
+SQL_DELETE_STATS_FOR_KEYS = f"""
+DELETE FROM {STATS_TABLE} s
+USING _impacted_keys k
+WHERE s.table_name = :table_name
+  AND s.test_name = :test_name
+  AND s.asset_id = k.asset_id
+  AND s.tf = k.tf
+  AND s.period = k.period;
+"""
+
+SQL_DELETE_STATS_FOR_TFS = f"""
+DELETE FROM {STATS_TABLE} s
+USING (SELECT DISTINCT tf FROM _impacted_keys) tfs
+WHERE s.table_name = :table_name
+  AND s.test_name = :test_name
+  AND s.tf = tfs.tf;
+"""
+
+
+# ----------------------------
+# Tests (incremental filtered by _impacted_keys)
+# ----------------------------
+
+SQL_TEST_TF_MEMBERSHIP = f"""
+INSERT INTO {STATS_TABLE} (
+    table_name, test_name,
+    tf,
+    alignment_type, base_unit, tf_qty, calendar_scheme, calendar_anchor,
     status, actual, expected, extra
 )
+WITH tfs AS (
+  SELECT DISTINCT tf FROM _impacted_keys
+),
+j AS (
+  SELECT
+    t.tf,
+    dt.alignment_type,
+    dt.base_unit,
+    dt.tf_qty,
+    dt.calendar_scheme,
+    dt.calendar_anchor,
+    (dt.tf IS NOT NULL) AS in_dim
+  FROM tfs t
+  LEFT JOIN public.dim_timeframe dt
+    ON dt.tf = t.tf
+)
 SELECT
-    'cmc_ema_multi_tf_cal' AS table_name,
-    'ema_multi_tf_cal_row_count_vs_span_roll_false' AS test_name,
-    g.asset_id,
-    g.tf,
-    g.period,
+  :table_name AS table_name,
+  'tf_membership_in_dim_timeframe' AS test_name,
+  tf,
+  alignment_type, base_unit, tf_qty, calendar_scheme, calendar_anchor,
+  CASE WHEN in_dim THEN 'PASS' ELSE 'FAIL' END AS status,
+  CASE WHEN in_dim THEN 0 ELSE 1 END::numeric AS actual,
+  0::numeric AS expected,
+  jsonb_build_object('missing_in_dim_timeframe', (NOT in_dim)) AS extra
+FROM j;
+"""
+
+# TF-scoped audit: bounds must be internally consistent (min <= max).
+# Align behavior with anchor-style: if dim row missing, WARN (membership test is the authoritative FAIL).
+SQL_TEST_DIM_BOUNDS_MIN_LE_MAX = f"""
+INSERT INTO {STATS_TABLE} (
+    table_name, test_name,
+    tf,
+    alignment_type, base_unit, tf_qty, calendar_scheme, calendar_anchor,
+    status, actual, expected, extra
+)
+WITH tfs AS (
+  SELECT DISTINCT tf FROM _impacted_keys
+),
+j AS (
+  SELECT
+    t.tf,
+    {DIM_TF_COLS},
+    (dt.tf IS NOT NULL) AS in_dim
+  FROM tfs t
+  LEFT JOIN public.dim_timeframe dt
+    ON dt.tf = t.tf
+),
+chk AS (
+  SELECT
+    tf,
+    alignment_type, base_unit, tf_qty, calendar_scheme, calendar_anchor,
+    tf_days_min, tf_days_max, tf_days_nominal, in_dim,
     CASE
-        WHEN g.expected_n IS NULL THEN 'WARN'
-        WHEN g.missing_from_expected = 0 THEN 'PASS'
-        WHEN g.missing_from_expected BETWEEN -2 AND 2 THEN 'WARN'
-        ELSE 'FAIL'
+      WHEN NOT in_dim THEN 'WARN'
+      WHEN tf_days_min IS NULL OR tf_days_max IS NULL THEN 'WARN'
+      WHEN tf_days_min <= tf_days_max THEN 'PASS'
+      ELSE 'FAIL'
     END AS status,
-    g.n_rows::NUMERIC     AS actual,
-    g.expected_n::NUMERIC AS expected,
+    CASE
+      WHEN tf_days_min IS NULL OR tf_days_max IS NULL THEN NULL
+      ELSE (tf_days_min - tf_days_max)::numeric
+    END AS actual,
+    0::numeric AS expected,
     jsonb_build_object(
-        'min_date',              g.min_date,
-        'max_date',              g.max_date,
-        'tf_days',               g.tf_days,
-        'n_rows',                g.n_rows,
-        'expected_n',            g.expected_n,
-        'missing_from_expected', g.missing_from_expected
+      'in_dim_timeframe', in_dim,
+      'tf_days_min', tf_days_min,
+      'tf_days_max', tf_days_max,
+      'tf_days_nominal', tf_days_nominal
     ) AS extra
-FROM (
-    WITH groups AS (
-        SELECT
-            id AS asset_id,
-            tf,
-            tf_days,
-            period,
-            MIN(ts::date) AS min_date,
-            MAX(ts::date) AS max_date,
-            COUNT(*)      AS n_rows
-        FROM cmc_ema_multi_tf_cal
-        WHERE roll = false
-        GROUP BY id, tf, tf_days, period
-    )
+  FROM j
+)
+SELECT
+  :table_name AS table_name,
+  'dim_timeframe_bounds_min_le_max' AS test_name,
+  tf,
+  alignment_type, base_unit, tf_qty, calendar_scheme, calendar_anchor,
+  status, actual, expected, extra
+FROM chk;
+"""
+
+# TF-scoped audit: nominal should be "reasonable".
+# Update CAL to match anchor convention:
+# - Months: expected nominal = 30 * qty (30/360 convention), with small tolerance
+# - Years: expected nominal = 365 * qty, with small tolerance
+# - Weeks: expected nominal = 7 * qty (exact)
+# - Days: expected nominal = qty (exact)
+# If dim row missing -> WARN (membership test is the authoritative FAIL).
+SQL_TEST_DIM_NOMINAL_REASONABLE = f"""
+INSERT INTO {STATS_TABLE} (
+    table_name, test_name,
+    tf,
+    alignment_type, base_unit, tf_qty, calendar_scheme, calendar_anchor,
+    status, actual, expected, extra
+)
+WITH tfs AS (
+  SELECT DISTINCT tf FROM _impacted_keys
+),
+j AS (
+  SELECT
+    t.tf,
+    {DIM_TF_COLS},
+    (dt.tf IS NOT NULL) AS in_dim
+  FROM tfs t
+  LEFT JOIN public.dim_timeframe dt
+    ON dt.tf = t.tf
+),
+calc AS (
+  SELECT
+    *,
+    CASE
+      WHEN base_unit = 'D' AND tf_qty IS NOT NULL THEN tf_qty
+      WHEN base_unit = 'W' AND tf_qty IS NOT NULL THEN 7 * tf_qty
+      WHEN base_unit = 'M' AND tf_qty IS NOT NULL THEN 30 * tf_qty   -- 30/360 convention
+      WHEN base_unit = 'Y' AND tf_qty IS NOT NULL THEN 365 * tf_qty  -- business convention
+      ELSE NULL
+    END AS expected_nominal,
+    CASE
+      WHEN base_unit = 'D' THEN 0
+      WHEN base_unit = 'W' THEN 0
+      WHEN base_unit = 'M' THEN 2   -- allow small wiggle (still PASS for 180/360)
+      WHEN base_unit = 'Y' THEN 5   -- allow small wiggle
+      ELSE 7
+    END AS tol_days
+  FROM j
+)
+SELECT
+  :table_name AS table_name,
+  'dim_timeframe_nominal_reasonable' AS test_name,
+  tf,
+  alignment_type, base_unit, tf_qty, calendar_scheme, calendar_anchor,
+  CASE
+    WHEN NOT in_dim THEN 'WARN'
+    WHEN tf_days_nominal IS NULL OR expected_nominal IS NULL THEN 'WARN'
+    WHEN abs(tf_days_nominal - expected_nominal) <= tol_days THEN 'PASS'
+    ELSE 'WARN'
+  END AS status,
+  tf_days_nominal::numeric AS actual,
+  expected_nominal::numeric AS expected,
+  jsonb_build_object(
+    'in_dim_timeframe', in_dim,
+    'tf_days_nominal', tf_days_nominal,
+    'expected_nominal', expected_nominal,
+    'tol_days', tol_days,
+    'tf_days_min', tf_days_min,
+    'tf_days_max', tf_days_max
+  ) AS extra
+FROM calc;
+"""
+
+SQL_TEST_CANONICAL_ROWCOUNT = f"""
+INSERT INTO {STATS_TABLE} (
+    table_name, test_name,
+    asset_id, tf, period,
+    alignment_type, base_unit, tf_qty, calendar_scheme, calendar_anchor,
+    status, actual, expected, extra
+)
+WITH groups AS (
     SELECT
-        asset_id,
-        tf,
-        tf_days,
-        period,
-        n_rows,
-        min_date,
-        max_date,
+        e.id AS asset_id,
+        e.tf,
+        e.period,
+        MIN(e.ts::date) AS min_date,
+        MAX(e.ts::date) AS max_date,
+        COUNT(*)        AS n_rows
+    FROM {{table}} e
+    JOIN _impacted_keys k
+      ON k.asset_id = e.id AND k.tf = e.tf AND k.period = e.period
+    WHERE e.roll = false
+    GROUP BY e.id, e.tf, e.period
+),
+joined AS (
+    SELECT
+        g.*,
+        {DIM_TF_COLS},
+        (g.max_date - g.min_date) AS span_days,
+
         CASE
-            WHEN tf_days IS NULL OR tf_days <= 0
-                 OR min_date IS NULL OR max_date IS NULL
-            THEN NULL
-            ELSE ((max_date - min_date)::numeric / tf_days) + 1
-        END AS expected_n,
+            WHEN dt.base_unit IN ('D','W')
+                 AND dt.tf_days_nominal IS NOT NULL
+                 AND dt.tf_days_nominal > 0
+                 AND g.min_date IS NOT NULL
+                 AND g.max_date IS NOT NULL
+            THEN ((g.max_date - g.min_date)::numeric / dt.tf_days_nominal::numeric) + 1
+            ELSE NULL
+        END AS expected_n_dw,
+
         CASE
-            WHEN tf_days IS NULL OR tf_days <= 0
-                 OR min_date IS NULL OR max_date IS NULL
-            THEN NULL
-            ELSE ((max_date - min_date)::numeric / tf_days) + 1 - n_rows
-        END AS missing_from_expected
-    FROM groups
-) AS g;
-"""
+            WHEN dt.base_unit = 'M'
+                 AND dt.tf_qty IS NOT NULL
+                 AND dt.tf_qty > 0
+                 AND g.min_date IS NOT NULL
+                 AND g.max_date IS NOT NULL
+            THEN (
+                SELECT COUNT(*)
+                FROM (
+                    SELECT date_trunc('month', dd)::date AS m
+                    FROM generate_series(
+                        date_trunc('month', g.min_date)::date,
+                        date_trunc('month', g.max_date)::date,
+                        interval '1 month'
+                    ) AS dd
+                ) months
+                WHERE (
+                    (EXTRACT(YEAR FROM months.m)::int * 12 + EXTRACT(MONTH FROM months.m)::int)
+                    - (EXTRACT(YEAR FROM date_trunc('month', g.min_date)::date)::int * 12
+                       + EXTRACT(MONTH FROM date_trunc('month', g.min_date)::date)::int)
+                ) % dt.tf_qty = 0
+            )
+            ELSE NULL
+        END AS expected_n_m,
 
-# Density-based test for roll = true (preview rows) with tf-level thresholds
-SQL_TEST_ROWCOUNT_ROLL_TRUE_CAL = """
-INSERT INTO ema_multi_tf_cal_stats (
-    table_name, test_name, asset_id, tf, period,
-    status, actual, expected, extra
-)
-SELECT
-    'cmc_ema_multi_tf_cal' AS table_name,
-    'ema_multi_tf_cal_row_count_vs_span_roll_true' AS test_name,
-    p.asset_id,
-    p.tf,
-    p.period,
-    CASE
-        WHEN p.n_preview IS NULL OR p.n_preview = 0 THEN 'WARN'
-        WHEN p.n_canonical IS NULL OR p.n_canonical = 0 THEN 'WARN'
-        WHEN p.tf_days IS NULL OR p.tf_days <= 0 THEN 'WARN'
-
-        -- Per-tf thresholds based on tf_days (same scheme as ema_multi_tf)
-        WHEN p.preview_to_canonical_ratio <=
-             CASE
-                 WHEN p.tf_days <= 7   THEN 10     -- very short tf
-                 WHEN p.tf_days <= 31  THEN 20     -- up to ~1M
-                 WHEN p.tf_days <= 90  THEN 50     -- up to ~3M
-                 ELSE 100                          -- 3M+ (6M, 9M, 12M)
-             END
-        THEN 'PASS'
-
-        WHEN p.preview_to_canonical_ratio <=
-             CASE
-                 WHEN p.tf_days <= 7   THEN 50
-                 WHEN p.tf_days <= 31  THEN 100
-                 WHEN p.tf_days <= 90  THEN 200
-                 ELSE 400
-             END
-        THEN 'WARN'
-
-        ELSE 'FAIL'
-    END AS status,
-    p.n_preview::NUMERIC   AS actual,   -- number of preview rows
-    p.n_canonical::NUMERIC AS expected, -- number of canonical rows (context)
-    jsonb_build_object(
-        'min_date',                   p.min_date,
-        'max_date',                   p.max_date,
-        'tf_days',                    p.tf_days,
-        'n_preview',                  p.n_preview,
-        'n_canonical',                p.n_canonical,
-        'preview_to_canonical_ratio', p.preview_to_canonical_ratio
-    ) AS extra
-FROM (
-    WITH previews AS (
-        SELECT
-            id AS asset_id,
-            tf,
-            tf_days,
-            period,
-            MIN(ts::date) AS min_date,
-            MAX(ts::date) AS max_date,
-            COUNT(*)      AS n_preview
-        FROM cmc_ema_multi_tf_cal
-        WHERE roll = true
-        GROUP BY id, tf, tf_days, period
-    ),
-    canonicals AS (
-        SELECT
-            id AS asset_id,
-            tf,
-            period,
-            COUNT(*) AS n_canonical
-        FROM cmc_ema_multi_tf_cal
-        WHERE roll = false
-        GROUP BY id, tf, period
-    )
-    SELECT
-        p.asset_id,
-        p.tf,
-        p.tf_days,
-        p.period,
-        p.min_date,
-        p.max_date,
-        p.n_preview,
-        c.n_canonical,
         CASE
-            WHEN c.n_canonical IS NULL OR c.n_canonical = 0 THEN NULL
-            ELSE (p.n_preview::numeric / c.n_canonical::numeric)
-        END AS preview_to_canonical_ratio
-    FROM previews p
-    LEFT JOIN canonicals c
-      ON c.asset_id = p.asset_id
-     AND c.tf       = p.tf
-     AND c.period   = p.period
-) AS p;
-"""
-
-
-# ---------------------------------------------------------------------------
-# Test 3 & 4: max gap vs tf_days for roll = false and roll = true
-# ---------------------------------------------------------------------------
-
-SQL_TEST_GAP_ROLL_FALSE_CAL = """
-INSERT INTO ema_multi_tf_cal_stats (
-    table_name, test_name, asset_id, tf, period,
-    status, actual, expected, extra
-)
-SELECT
-    'cmc_ema_multi_tf_cal' AS table_name,
-    'ema_multi_tf_cal_max_gap_vs_tf_days_roll_false' AS test_name,
-    g.asset_id,
-    g.tf,
-    g.period,
-    CASE
-        WHEN g.tf_days IS NULL OR g.tf_days <= 0 THEN 'WARN'
-        WHEN g.max_gap_days <= g.tf_days THEN 'PASS'
-        WHEN g.max_gap_days <= g.tf_days * 2 THEN 'WARN'
-        ELSE 'FAIL'
-    END AS status,
-    g.max_gap_days::NUMERIC AS actual,   -- observed worst-case gap
-    g.tf_days::NUMERIC      AS expected, -- target gap
-    jsonb_build_object(
-        'tf_days',      g.tf_days,
-        'max_gap_days', g.max_gap_days,
-        'n_rows',       g.n_rows
-    ) AS extra
-FROM (
-    WITH ordered AS (
-        SELECT
-            id AS asset_id,
-            tf,
-            tf_days,
-            period,
-            ts::date AS ts_date,
-            LAG(ts::date) OVER (
-                PARTITION BY id, tf, period
-                ORDER BY ts
-            ) AS prev_date
-        FROM cmc_ema_multi_tf_cal
-        WHERE roll = false
-    ),
-    gaps AS (
-        SELECT
-            asset_id,
-            tf,
-            tf_days,
-            period,
-            COUNT(*) AS n_rows,
-            MAX(
-                CASE
-                    WHEN prev_date IS NULL THEN 0
-                    ELSE (ts_date - prev_date)
-                END
-            ) AS max_gap_days
-        FROM ordered
-        GROUP BY asset_id, tf, tf_days, period
-    )
-    SELECT * FROM gaps
-) AS g;
-"""
-
-SQL_TEST_GAP_ROLL_TRUE_CAL = """
-INSERT INTO ema_multi_tf_cal_stats (
-    table_name, test_name, asset_id, tf, period,
-    status, actual, expected, extra
-)
-SELECT
-    'cmc_ema_multi_tf_cal' AS table_name,
-    'ema_multi_tf_cal_max_gap_vs_tf_days_roll_true' AS test_name,
-    g.asset_id,
-    g.tf,
-    g.period,
-    CASE
-        WHEN g.tf_days IS NULL OR g.tf_days <= 0 THEN 'WARN'
-        WHEN g.max_gap_days <= g.tf_days THEN 'PASS'
-        WHEN g.max_gap_days <= g.tf_days * 2 THEN 'WARN'
-        ELSE 'FAIL'
-    END AS status,
-    g.max_gap_days::NUMERIC AS actual,
-    g.tf_days::NUMERIC      AS expected,
-    jsonb_build_object(
-        'tf_days',      g.tf_days,
-        'max_gap_days', g.max_gap_days,
-        'n_rows',       g.n_rows
-    ) AS extra
-FROM (
-    WITH ordered AS (
-        SELECT
-            id AS asset_id,
-            tf,
-            tf_days,
-            period,
-            ts::date AS ts_date,
-            LAG(ts::date) OVER (
-                PARTITION BY id, tf, period
-                ORDER BY ts
-            ) AS prev_date
-        FROM cmc_ema_multi_tf_cal
-        WHERE roll = true
-    ),
-    gaps AS (
-        SELECT
-            asset_id,
-            tf,
-            tf_days,
-            period,
-            COUNT(*) AS n_rows,
-            MAX(
-                CASE
-                    WHEN prev_date IS NULL THEN 0
-                    ELSE (ts_date - prev_date)
-                END
-            ) AS max_gap_days
-        FROM ordered
-        GROUP BY asset_id, tf, tf_days, period
-    )
-    SELECT * FROM gaps
-) AS g;
-"""
-
-
-# ---------------------------------------------------------------------------
-# Test 5: roll flag consistency – at most one canonical per ts_date
-# ---------------------------------------------------------------------------
-
-SQL_TEST_ROLL_FLAG_CONSISTENCY_CAL = """
-INSERT INTO ema_multi_tf_cal_stats (
-    table_name, test_name, asset_id, tf, period,
-    status, actual, expected, extra
-)
-SELECT
-    'cmc_ema_multi_tf_cal' AS table_name,
-    'ema_multi_tf_cal_roll_flag_consistency' AS test_name,
-    g.asset_id,
-    g.tf,
-    g.period,
-    CASE
-        WHEN g.n_problem_timestamps = 0 THEN 'PASS'
-        WHEN g.n_problem_timestamps BETWEEN 1 AND 5 THEN 'WARN'
-        ELSE 'FAIL'
-    END AS status,
-    g.n_problem_timestamps::NUMERIC AS actual,   -- timestamps with >1 canonical row
-    0::NUMERIC                       AS expected,
-    jsonb_build_object(
-        'n_rows',               g.n_rows,
-        'n_problem_timestamps', g.n_problem_timestamps,
-        'n_canonical_rows',     g.n_canonical_rows,
-        'n_preview_rows',       g.n_preview_rows
-    ) AS extra
-FROM (
-    WITH per_ts AS (
-        SELECT
-            id        AS asset_id,
-            tf,
-            period,
-            ts::date AS ts_date,
-            SUM(CASE WHEN roll = false THEN 1 ELSE 0 END) AS n_canonical_at_ts,
-            SUM(CASE WHEN roll = true  THEN 1 ELSE 0 END) AS n_preview_at_ts,
-            COUNT(*) AS n_rows_at_ts
-        FROM cmc_ema_multi_tf_cal
-        GROUP BY id, tf, period, ts::date
-    )
+            WHEN dt.base_unit = 'Y'
+                 AND dt.tf_qty IS NOT NULL
+                 AND dt.tf_qty > 0
+                 AND g.min_date IS NOT NULL
+                 AND g.max_date IS NOT NULL
+            THEN (
+                SELECT COUNT(*)
+                FROM (
+                    SELECT date_trunc('year', dd)::date AS y
+                    FROM generate_series(
+                        date_trunc('year', g.min_date)::date,
+                        date_trunc('year', g.max_date)::date,
+                        interval '1 year'
+                    ) AS dd
+                ) years
+                WHERE (EXTRACT(YEAR FROM years.y)::int - EXTRACT(YEAR FROM date_trunc('year', g.min_date)::date)::int) % dt.tf_qty = 0
+            )
+            ELSE NULL
+        END AS expected_n_y
+    FROM groups g
+    LEFT JOIN public.dim_timeframe dt
+      ON dt.tf = g.tf
+),
+final AS (
     SELECT
-        asset_id,
-        tf,
-        period,
-        SUM(n_rows_at_ts) AS n_rows,
-        SUM(CASE WHEN n_canonical_at_ts > 1 THEN 1 ELSE 0 END) AS n_problem_timestamps,
-        SUM(n_canonical_at_ts) AS n_canonical_rows,
-        SUM(n_preview_at_ts)   AS n_preview_rows
-    FROM per_ts
-    GROUP BY asset_id, tf, period
-) AS g;
-"""
-
-
-# ---------------------------------------------------------------------------
-# Test 6: roll_bar flag consistency – at most one canonical per ts_date
-# ---------------------------------------------------------------------------
-
-SQL_TEST_ROLL_BAR_FLAG_CONSISTENCY_CAL = """
-INSERT INTO ema_multi_tf_cal_stats (
-    table_name, test_name, asset_id, tf, period,
-    status, actual, expected, extra
+        *,
+        COALESCE(expected_n_dw, expected_n_m, expected_n_y) AS expected_n,
+        CASE
+            WHEN COALESCE(expected_n_dw, expected_n_m, expected_n_y) IS NULL THEN NULL
+            ELSE (COALESCE(expected_n_dw, expected_n_m, expected_n_y) - n_rows)
+        END AS diff_expected_minus_actual
+    FROM joined
 )
 SELECT
-    'cmc_ema_multi_tf_cal' AS table_name,
-    'ema_multi_tf_cal_roll_bar_flag_consistency' AS test_name,
-    g.asset_id,
-    g.tf,
-    g.period,
+    :table_name AS table_name,
+    'canonical_row_count_vs_expected_dim_timeframe' AS test_name,
+    asset_id, tf, period,
+    alignment_type, base_unit, tf_qty, calendar_scheme, calendar_anchor,
+
     CASE
-        WHEN g.n_problem_timestamps = 0 THEN 'PASS'
-        WHEN g.n_problem_timestamps BETWEEN 1 AND 5 THEN 'WARN'
+        WHEN expected_n IS NULL THEN 'WARN'
+        WHEN diff_expected_minus_actual = 0 THEN 'PASS'
+        WHEN calendar_anchor IS TRUE AND diff_expected_minus_actual BETWEEN -5 AND 5 THEN 'WARN'
+        WHEN calendar_anchor IS NOT TRUE AND diff_expected_minus_actual BETWEEN -2 AND 2 THEN 'WARN'
         ELSE 'FAIL'
     END AS status,
-    g.n_problem_timestamps::NUMERIC AS actual,   -- timestamps with >1 bar-canonical row
-    0::NUMERIC                       AS expected,
+
+    n_rows::numeric AS actual,
+    expected_n::numeric AS expected,
     jsonb_build_object(
-        'n_rows',               g.n_rows,
-        'n_problem_timestamps', g.n_problem_timestamps,
-        'n_canonical_rows',     g.n_canonical_rows,
-        'n_preview_rows',       g.n_preview_rows
+        'min_date', min_date,
+        'max_date', max_date,
+        'span_days', span_days,
+        'tf_days_nominal', tf_days_nominal,
+        'tf_days_min', tf_days_min,
+        'tf_days_max', tf_days_max,
+        'allow_partial_start', allow_partial_start,
+        'allow_partial_end', allow_partial_end,
+        'expected_n_dw', expected_n_dw,
+        'expected_n_m', expected_n_m,
+        'expected_n_y', expected_n_y,
+        'expected_n', expected_n,
+        'diff_expected_minus_actual', diff_expected_minus_actual
     ) AS extra
-FROM (
-    WITH per_ts AS (
-        SELECT
-            id        AS asset_id,
-            tf,
-            period,
-            ts::date AS ts_date,
-            SUM(CASE WHEN roll_bar = false THEN 1 ELSE 0 END) AS n_canonical_at_ts,
-            SUM(CASE WHEN roll_bar = true  THEN 1 ELSE 0 END) AS n_preview_at_ts,
-            COUNT(*) AS n_rows_at_ts
-        FROM cmc_ema_multi_tf_cal
-        GROUP BY id, tf, period, ts::date
-    )
-    SELECT
-        asset_id,
-        tf,
-        period,
-        SUM(n_rows_at_ts) AS n_rows,
-        SUM(CASE WHEN n_canonical_at_ts > 1 THEN 1 ELSE 0 END) AS n_problem_timestamps,
-        SUM(n_canonical_at_ts) AS n_canonical_rows,
-        SUM(n_preview_at_ts)   AS n_preview_rows
-    FROM per_ts
-    GROUP BY asset_id, tf, period
-) AS g;
+FROM final;
 """
 
-
-# ---------------------------------------------------------------------------
-# Test 7: roll vs roll_bar match – they should be identical
-# ---------------------------------------------------------------------------
-
-SQL_TEST_ROLL_VS_ROLL_BAR_MATCH_CAL = """
-INSERT INTO ema_multi_tf_cal_stats (
-    table_name, test_name, asset_id, tf, period,
+SQL_TEST_CANONICAL_MAX_GAP = f"""
+INSERT INTO {STATS_TABLE} (
+    table_name, test_name,
+    asset_id, tf, period,
+    alignment_type, base_unit, tf_qty, calendar_scheme, calendar_anchor,
     status, actual, expected, extra
 )
-SELECT
-    'cmc_ema_multi_tf_cal' AS table_name,
-    'ema_multi_tf_cal_roll_vs_roll_bar_match' AS test_name,
-    g.asset_id,
-    g.tf,
-    g.period,
-    CASE
-        WHEN g.n_mismatch = 0 THEN 'PASS'
-        WHEN g.n_mismatch BETWEEN 1 AND 5 THEN 'WARN'
-        ELSE 'FAIL'
-    END AS status,
-    g.n_mismatch::NUMERIC AS actual,   -- number of rows with roll != roll_bar
-    0::NUMERIC             AS expected,
-    jsonb_build_object(
-        'n_rows',     g.n_rows,
-        'n_mismatch', g.n_mismatch
-    ) AS extra
-FROM (
+WITH ordered AS (
     SELECT
-        id   AS asset_id,
-        tf,
-        period,
+        e.id AS asset_id,
+        e.tf,
+        e.period,
+        e.ts::date AS ts_date,
+        LAG(e.ts::date) OVER (PARTITION BY e.id, e.tf, e.period ORDER BY e.ts) AS prev_date
+    FROM {{table}} e
+    JOIN _impacted_keys k
+      ON k.asset_id = e.id AND k.tf = e.tf AND k.period = e.period
+    WHERE e.roll = false
+),
+gaps AS (
+    SELECT
+        asset_id, tf, period,
         COUNT(*) AS n_rows,
-        SUM(CASE WHEN roll IS DISTINCT FROM roll_bar THEN 1 ELSE 0 END) AS n_mismatch
-    FROM cmc_ema_multi_tf_cal
-    GROUP BY id, tf, period
-) AS g;
+        MAX(CASE WHEN prev_date IS NULL THEN 0 ELSE (ts_date - prev_date) END) AS max_gap_days
+    FROM ordered
+    GROUP BY asset_id, tf, period
+),
+joined AS (
+    SELECT
+        g.*,
+        {DIM_TF_COLS}
+    FROM gaps g
+    LEFT JOIN public.dim_timeframe dt
+      ON dt.tf = g.tf
+),
+final AS (
+    SELECT
+        *,
+        CASE WHEN calendar_anchor IS TRUE THEN 7 ELSE 2 END AS tol_days
+    FROM joined
+)
+SELECT
+    :table_name AS table_name,
+    'canonical_max_gap_vs_dim_timeframe_bounds' AS test_name,
+    asset_id, tf, period,
+    alignment_type, base_unit, tf_qty, calendar_scheme, calendar_anchor,
+    CASE
+        WHEN tf_days_max IS NULL OR tf_days_max <= 0 THEN 'WARN'
+        WHEN max_gap_days <= tf_days_max THEN 'PASS'
+        WHEN max_gap_days <= (tf_days_max + tol_days) THEN 'WARN'
+        ELSE 'FAIL'
+    END AS status,
+    max_gap_days::numeric AS actual,
+    tf_days_max::numeric AS expected,
+    jsonb_build_object(
+        'n_rows', n_rows,
+        'max_gap_days', max_gap_days,
+        'tf_days_min', tf_days_min,
+        'tf_days_max', tf_days_max,
+        'tf_days_nominal', tf_days_nominal,
+        'tol_days', tol_days
+    ) AS extra
+FROM final;
+"""
+
+SQL_TEST_CANONICAL_TS_MATCH = f"""
+INSERT INTO {STATS_TABLE} (
+    table_name, test_name,
+    asset_id, tf, period,
+    alignment_type, base_unit, tf_qty, calendar_scheme, calendar_anchor,
+    status, actual, expected, extra
+)
+WITH a AS (
+  SELECT e.id AS asset_id, e.tf, e.period, e.ts
+  FROM {{table}} e
+  JOIN _impacted_keys k
+    ON k.asset_id = e.id AND k.tf = e.tf AND k.period = e.period
+  WHERE e.roll = false
+),
+b AS (
+  SELECT e.id AS asset_id, e.tf, e.period, e.ts
+  FROM {{table}} e
+  JOIN _impacted_keys k
+    ON k.asset_id = e.id AND k.tf = e.tf AND k.period = e.period
+  WHERE e.roll_bar = false
+),
+j AS (
+  SELECT
+    COALESCE(a.asset_id, b.asset_id) AS asset_id,
+    COALESCE(a.tf, b.tf) AS tf,
+    COALESCE(a.period, b.period) AS period,
+    CASE WHEN a.ts IS NULL THEN 1 ELSE 0 END AS bar_not_roll,
+    CASE WHEN b.ts IS NULL THEN 1 ELSE 0 END AS roll_not_bar
+  FROM a
+  FULL OUTER JOIN b USING (asset_id, tf, period, ts)
+),
+m AS (
+  SELECT
+    asset_id, tf, period,
+    SUM(bar_not_roll) AS n_bar_not_roll,
+    SUM(roll_not_bar) AS n_roll_not_bar
+  FROM j
+  GROUP BY 1,2,3
+),
+joined AS (
+  SELECT
+    m.*,
+    {DIM_TF_COLS},
+    (m.n_bar_not_roll + m.n_roll_not_bar) AS n_mismatch
+  FROM m
+  LEFT JOIN public.dim_timeframe dt
+    ON dt.tf = m.tf
+)
+SELECT
+  :table_name AS table_name,
+  'canonical_ts_match_roll_false_vs_roll_bar_false' AS test_name,
+  asset_id, tf, period,
+  alignment_type, base_unit, tf_qty, calendar_scheme, calendar_anchor,
+  CASE
+    WHEN n_mismatch = 0 THEN 'PASS'
+    WHEN n_mismatch BETWEEN 1 AND 5 THEN 'WARN'
+    ELSE 'FAIL'
+  END AS status,
+  n_mismatch::numeric AS actual,
+  0::numeric AS expected,
+  jsonb_build_object(
+    'n_bar_not_roll', n_bar_not_roll,
+    'n_roll_not_bar', n_roll_not_bar
+  ) AS extra
+FROM joined;
+"""
+
+# IMPORTANT: do NOT Python-format this SQL (it contains :expected_scheme bind param)
+SQL_TEST_WEEK_SCHEME_ALIGNMENT = f"""
+INSERT INTO {STATS_TABLE} (
+    table_name, test_name,
+    tf,
+    alignment_type, base_unit, tf_qty, calendar_scheme, calendar_anchor,
+    status, actual, expected, extra
+)
+WITH tfs AS (
+  SELECT DISTINCT tf FROM _impacted_keys
+),
+j AS (
+  SELECT
+    t.tf,
+    {DIM_TF_COLS}
+  FROM tfs t
+  LEFT JOIN public.dim_timeframe dt
+    ON dt.tf = t.tf
+),
+chk AS (
+  SELECT
+    tf,
+    alignment_type, base_unit, tf_qty, calendar_scheme, calendar_anchor,
+    CASE
+      WHEN base_unit <> 'W' THEN 'PASS'
+      WHEN calendar_scheme IS NULL OR calendar_scheme = '' THEN 'WARN'
+      WHEN :expected_scheme = 'US' AND calendar_scheme = 'US' THEN 'PASS'
+      WHEN :expected_scheme = 'ISO' AND calendar_scheme = 'ISO' THEN 'PASS'
+      ELSE 'FAIL'
+    END AS status,
+    CASE
+      WHEN base_unit = 'W'
+       AND calendar_scheme IS NOT NULL AND calendar_scheme <> ''
+       AND calendar_scheme <> :expected_scheme
+      THEN 1 ELSE 0
+    END::numeric AS actual,
+    0::numeric AS expected,
+    jsonb_build_object('expected_scheme', :expected_scheme) AS extra
+  FROM j
+)
+SELECT
+  :table_name AS table_name,
+  'week_calendar_scheme_matches_table_family' AS test_name,
+  tf,
+  alignment_type, base_unit, tf_qty, calendar_scheme, calendar_anchor,
+  status, actual, expected, extra
+FROM chk;
 """
 
 
-# ---------------------------------------------------------------------------
-# Helper: engine + runner
-# ---------------------------------------------------------------------------
-
-def get_engine(db_url: Optional[str] = None):
-    """
-    Return a SQLAlchemy engine.
-
-    If db_url is None, use TARGET_DB_URL from ta_lab2.config.
-    """
+def get_engine(db_url: Optional[str] = None) -> Engine:
     return create_engine(db_url or TARGET_DB_URL)
 
 
-def run_all_tests(engine) -> None:
-    """
-    Run all cmc_ema_multi_tf_cal tests in a single transaction.
-    """
+def infer_expected_scheme(table: str) -> Optional[str]:
+    t = table.lower()
+    if t.endswith("_us"):
+        return "US"
+    if t.endswith("_iso"):
+        return "ISO"
+    return None
+
+
+def run(engine: Engine, tables: Iterable[str], full_refresh: bool = False, log_level: str = "INFO") -> None:
+    logger = _setup_logging(log_level)
+    tables = list(tables)
+    if not tables:
+        raise ValueError("No tables provided.")
+
+    logger.info("Starting CAL stats run. full_refresh=%s", full_refresh)
+    logger.info("Stats table: %s", STATS_TABLE)
+    logger.info("State table: %s", STATE_TABLE)
+    logger.info("Tables: %s", ", ".join(tables))
+
     with engine.begin() as conn:
-        conn.execute(text(DDL_STATS_TABLE_CAL))
+        conn.execute(text(DDL_CREATE_STATS_IF_NEEDED))
+        conn.execute(text(DDL_CREATE_STATE_IF_NEEDED))
 
-        # Rowcount vs span / density tests
-        conn.execute(text(SQL_TEST_ROWCOUNT_ROLL_FALSE_CAL))
-        conn.execute(text(SQL_TEST_ROWCOUNT_ROLL_TRUE_CAL))
+        if full_refresh:
+            logger.warning("FULL REFRESH: truncating stats + clearing state.")
+            conn.execute(text(SQL_TRUNCATE_STATS))
+            conn.execute(text(SQL_CLEAR_STATE))
 
-        # Gap vs tf_days tests
-        conn.execute(text(SQL_TEST_GAP_ROLL_FALSE_CAL))
-        conn.execute(text(SQL_TEST_GAP_ROLL_TRUE_CAL))
+    for table in tables:
+        table_name = table  # schema-qualified input
 
-        # Roll-flag consistency (daily EMA layer)
-        conn.execute(text(SQL_TEST_ROLL_FLAG_CONSISTENCY_CAL))
+        with engine.begin() as conn:
+            last_ing = conn.execute(text(SQL_GET_STATE), {"table_name": table_name}).scalar()
+            max_ing = conn.execute(text(SQL_MAX_INGESTED_AT.format(table=table_name))).scalar()
 
-        # Roll-bar consistency (bar-space EMA layer)
-        conn.execute(text(SQL_TEST_ROLL_BAR_FLAG_CONSISTENCY_CAL))
+            if max_ing is None:
+                logger.warning("Table empty, skipping: %s", table_name)
+                continue
 
-        # roll vs roll_bar alignment
-        conn.execute(text(SQL_TEST_ROLL_VS_ROLL_BAR_MATCH_CAL))
+            logger.info("Table=%s max_ingested_at=%s state_last=%s", table_name, max_ing, last_ing)
+
+            # Always bump state.updated_at for non-empty tables to show "script ran"
+            conn.execute(text(SQL_TOUCH_STATE), {"table_name": table_name})
+
+            # If no new ingested_at, do nothing else (do NOT advance watermark, do NOT touch stats)
+            if (not full_refresh) and (last_ing is not None) and (max_ing <= last_ing):
+                logger.info("No new ingested_at since last run. Skipping tests: %s", table_name)
+                continue
+
+            conn.execute(text(DDL_TEMP_IMPACTED_KEYS))
+
+            if full_refresh or last_ing is None:
+                logger.info("Building impacted keys: ALL canonical keys (roll=false) for %s", table_name)
+                impacted = conn.execute(text(SQL_ALL_KEYS.format(table=table_name))).fetchall()
+            else:
+                logger.info("Building impacted keys: ingested_at > %s for %s", last_ing, table_name)
+                impacted = conn.execute(
+                    text(SQL_IMPACTED_KEYS_SINCE.format(table=table_name)),
+                    {"last_ingested_at": last_ing},
+                ).fetchall()
+
+            if not impacted:
+                logger.info("No impacted keys found for %s; leaving watermark unchanged.", table_name)
+                continue
+
+            # Insert impacted keys into temp table
+            conn.execute(
+                text("INSERT INTO _impacted_keys(asset_id, tf, period) VALUES (:asset_id, :tf, :period)"),
+                [dict(r._mapping) for r in impacted],
+            )
+            logger.info("Impacted keys inserted: %s rows for %s", len(impacted), table_name)
+
+            # Delete + recompute latest-only for impacted scope
+            tests_keyed = [
+                "canonical_row_count_vs_expected_dim_timeframe",
+                "canonical_max_gap_vs_dim_timeframe_bounds",
+                "canonical_ts_match_roll_false_vs_roll_bar_false",
+            ]
+            for tn in tests_keyed:
+                conn.execute(text(SQL_DELETE_STATS_FOR_KEYS), {"table_name": table_name, "test_name": tn})
+            logger.info("Cleared keyed test rows for impacted scope: %s", ", ".join(tests_keyed))
+
+            tests_tf = [
+                "tf_membership_in_dim_timeframe",
+                "week_calendar_scheme_matches_table_family",
+                "dim_timeframe_bounds_min_le_max",
+                "dim_timeframe_nominal_reasonable",
+            ]
+            for tn in tests_tf:
+                conn.execute(text(SQL_DELETE_STATS_FOR_TFS), {"table_name": table_name, "test_name": tn})
+            logger.info("Cleared TF-scoped test rows for impacted TFs: %s", ", ".join(tests_tf))
+
+            # Run tests
+            logger.info("Running tests for %s ...", table_name)
+            conn.execute(text(SQL_TEST_TF_MEMBERSHIP), {"table_name": table_name})
+            conn.execute(text(SQL_TEST_DIM_BOUNDS_MIN_LE_MAX), {"table_name": table_name})
+            conn.execute(text(SQL_TEST_DIM_NOMINAL_REASONABLE), {"table_name": table_name})
+
+            conn.execute(text(SQL_TEST_CANONICAL_ROWCOUNT.format(table=table_name)), {"table_name": table_name})
+            conn.execute(text(SQL_TEST_CANONICAL_MAX_GAP.format(table=table_name)), {"table_name": table_name})
+            conn.execute(text(SQL_TEST_CANONICAL_TS_MATCH.format(table=table_name)), {"table_name": table_name})
+
+            exp = infer_expected_scheme(table_name)
+            if exp is not None:
+                conn.execute(
+                    text(SQL_TEST_WEEK_SCHEME_ALIGNMENT),
+                    {"table_name": table_name, "expected_scheme": exp},
+                )
+
+            # Advance watermark ONLY after tests succeed
+            conn.execute(text(SQL_UPSERT_STATE), {"table_name": table_name, "last_ingested_at": max_ing})
+            logger.info("Updated watermark for %s to %s", table_name, max_ing)
+
+    logger.info("Done.")
 
 
-# ---------------------------------------------------------------------------
-# CLI entrypoint
-# ---------------------------------------------------------------------------
+def main(db_url: Optional[str] = None, tables: Optional[Iterable[str]] = None) -> None:
+    parser = argparse.ArgumentParser(description="Calendar-aware EMA CAL stats (incremental via stats_state).")
+    parser.add_argument("--db-url", help="Override TARGET_DB_URL from ta_lab2.config")
+    parser.add_argument(
+        "--tables",
+        nargs="+",
+        default=["public.cmc_ema_multi_tf_cal_us", "public.cmc_ema_multi_tf_cal_iso"],
+        help="Schema-qualified EMA tables to audit.",
+    )
+    parser.add_argument(
+        "--full-refresh",
+        action="store_true",
+        help="Truncate stats + clear state, then recompute all keys for each table.",
+    )
+    parser.add_argument(
+        "--log-level",
+        default="INFO",
+        help="Logging level (DEBUG, INFO, WARNING, ERROR). Default INFO.",
+    )
+    args = parser.parse_args()
 
-def main(db_url: Optional[str] = None) -> None:
-    """
-    Main entrypoint for both CLI and programmatic use.
-
-    Parameters
-    ----------
-    db_url : str, optional
-        If provided, overrides TARGET_DB_URL.
-    """
-    if db_url is None:
-        parser = argparse.ArgumentParser(
-            description="Run EMA multi-timeframe CAL data quality stats for cmc_ema_multi_tf_cal."
-        )
-        parser.add_argument(
-            "--db-url",
-            help="Override TARGET_DB_URL from ta_lab2.config",
-        )
-        args = parser.parse_args()
-        db_url = args.db_url
-
-    engine = get_engine(db_url)
-    run_all_tests(engine)
+    engine = get_engine(args.db_url or db_url)
+    run(engine, args.tables if tables is None else list(tables), full_refresh=args.full_refresh, log_level=args.log_level)
 
 
 if __name__ == "__main__":
-    # Preferred from repo root:
-    #   python -m ta_lab2.scripts.emas.stats.refresh_ema_multi_tf_cal_stats
     main()
