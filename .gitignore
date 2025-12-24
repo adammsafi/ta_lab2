@@ -145,3 +145,7 @@ full_git_log.txt
 # Any directory named "old" anywhere in the repo
 old/
 **/old/
+
+# allow the default config fixture CSV used by tests
+!data/
+!data/btcusd.csv
