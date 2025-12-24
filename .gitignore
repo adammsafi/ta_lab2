@@ -136,3 +136,12 @@ openai_config.env
 diff.txt
 full_diff.patch
 full_git_log.txt
+
+# =========================
+# CSVs + old folders
+# =========================
+*.csv
+
+# Any directory named "old" anywhere in the repo
+old/
+**/old/
