@@ -1,0 +1,55 @@
+{
+  "meta": {
+    "repo_root": "C:\\repo\\ta_lab2",
+    "db_url_redacted": "postgresql://postgres:***@localhost:5432/marketdata",
+    "statement_timeout_ms": 15000,
+    "idle_in_transaction_session_timeout_ms": 15000,
+    "default_row_limit": 200,
+    "psycopg_v3": false
+  },
+  "schemas": ["public"],
+  "tables": {
+    "public.table_with_pg_stats": {
+      "schema": "public",
+      "table": "table_with_pg_stats",
+      "approx_rows": 500000
+    },
+    "public.table_missing_pg_stats": {
+      "schema": "public",
+      "table": "table_missing_pg_stats",
+      "approx_rows": 10
+    }
+  },
+  "table_stats": {
+    "public.table_with_pg_stats": {
+      "total_bytes": 1000,
+      "table_bytes": 700,
+      "index_bytes": 300,
+      "last_vacuum": null,
+      "last_autovacuum": null,
+      "last_analyze": null,
+      "last_autoanalyze": null
+    },
+    "public.table_missing_pg_stats": {
+      "total_bytes": 9999,
+      "table_bytes": 9000,
+      "index_bytes": 999,
+      "last_vacuum": null,
+      "last_autovacuum": null,
+      "last_analyze": null,
+      "last_autoanalyze": null
+    }
+  },
+  "top_col_stats": {
+    "public.table_with_pg_stats": [
+      {
+        "column": "id",
+        "null_frac": 0.0,
+        "n_distinct": -1.0,
+        "most_common_vals": ["1", "2"],
+        "most_common_freqs": [0.5, 0.2]
+      }
+    ],
+    "public.table_missing_pg_stats": []
+  }
+}
