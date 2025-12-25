@@ -9,7 +9,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 # Prefer psycopg (v3). Fall back to psycopg2 if needed.
 try:
@@ -316,7 +316,7 @@ def table_stats_sql() -> str:
     return r"""
 SELECT
   n.nspname AS schema,
-  c.relname AS table,
+  c.relname AS table_name,
   pg_total_relation_size(c.oid)::bigint AS total_bytes,
   pg_relation_size(c.oid)::bigint AS table_bytes,
   pg_indexes_size(c.oid)::bigint AS index_bytes,
@@ -355,7 +355,7 @@ def col_stats_sql() -> str:
     return r"""
 SELECT
   schemaname AS schema,
-  tablename  AS table,
+  tablename  AS table_name,
   attname    AS column_name,
   null_frac,
   n_distinct,
@@ -376,21 +376,32 @@ def list_tables_sql(schema: Optional[str]) -> str:
     if schema:
         return r"""
 SELECT
-  schemaname AS schema,
-  tablename  AS table,
-  COALESCE(n_live_tup, 0)::bigint AS approx_rows
-FROM pg_stat_user_tables
-WHERE schemaname = %s
-ORDER BY schemaname, tablename;
+  n.nspname AS schema,
+  c.relname AS table_name,
+  COALESCE(NULLIF(s.n_live_tup, 0), c.reltuples::bigint, 0)::bigint AS approx_rows
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+LEFT JOIN pg_stat_user_tables s
+  ON s.schemaname = n.nspname AND s.relname = c.relname
+WHERE n.nspname = %s
+  AND c.relkind IN ('r','p')
+ORDER BY n.nspname, c.relname;
 """.strip()
+
     return r"""
 SELECT
-  schemaname AS schema,
-  tablename  AS table,
-  COALESCE(n_live_tup, 0)::bigint AS approx_rows
-FROM pg_stat_user_tables
-ORDER BY schemaname, tablename;
+  n.nspname AS schema,
+  c.relname AS table_name,
+  COALESCE(NULLIF(s.n_live_tup, 0), c.reltuples::bigint, 0)::bigint AS approx_rows
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+LEFT JOIN pg_stat_user_tables s
+  ON s.schemaname = n.nspname AND s.relname = c.relname
+WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
+  AND c.relkind IN ('r','p')
+ORDER BY n.nspname, c.relname;
 """.strip()
+
 
 
 def describe_table_sql(schema: str, table: str) -> str:
@@ -450,7 +461,7 @@ def keys_sql(schema: str, table: str) -> str:
 WITH c AS (
   SELECT
     n.nspname AS schema,
-    t.relname AS table,
+    t.relname AS table_name,
     con.conname AS constraint_name,
     con.contype AS contype,
     array_agg(a.attname ORDER BY u.ord) AS columns
@@ -466,7 +477,7 @@ WITH c AS (
 )
 SELECT
   schema,
-  table,
+  table_name,
   CASE contype WHEN 'p' THEN 'PRIMARY KEY' WHEN 'u' THEN 'UNIQUE' ELSE contype::text END AS key_type,
   constraint_name,
   columns
@@ -735,6 +746,134 @@ def agg_sql(
 # -----------------------
 # Snapshot (existing)
 # -----------------------
+
+def _safe_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except Exception:
+        return default
+
+
+def _parse_snapshot_ts(value: Any) -> Optional[datetime]:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        dt = value
+    else:
+        s = str(value).strip()
+        if not s:
+            return None
+        try:
+            dt = datetime.fromisoformat(s)
+        except Exception:
+            return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def _human_bytes(n: Any) -> str:
+    try:
+        x = float(n)
+    except Exception:
+        return "None"
+    if x < 0:
+        return str(n)
+    units = ["B", "KB", "MB", "GB", "TB", "PB"]
+    i = 0
+    while x >= 1024.0 and i < len(units) - 1:
+        x /= 1024.0
+        i += 1
+    if i == 0:
+        return f"{int(x)} {units[i]}"
+    return f"{x:.2f} {units[i]}"
+
+
+def _snapshot_check_summary(
+    snap: Dict[str, Any],
+    source: str,
+    stale_days: int,
+    min_rows: int,
+    top_n: int,
+    meta: Dict[str, Any],
+) -> Dict[str, Any]:
+    tables: Dict[str, Any] = snap.get("tables", {}) or {}
+    table_stats: Dict[str, Any] = snap.get("table_stats", {}) or {}
+    top_col_stats: Dict[str, Any] = snap.get("top_col_stats", {}) or {}
+
+    warnings: List[str] = []
+    top_by_bytes: List[Dict[str, Any]] = []
+    top_by_rows: List[Dict[str, Any]] = []
+
+    now = datetime.now(timezone.utc)
+    stale_cutoff = now - timedelta(days=int(stale_days))
+
+    for fq, tinfo in tables.items():
+        if not isinstance(tinfo, dict):
+            tinfo = {}
+        approx_rows = _safe_int(tinfo.get("approx_rows", 0))
+
+        stats = table_stats.get(fq, {}) or {}
+        if not isinstance(stats, dict):
+            stats = {}
+        total_bytes = _safe_int(stats.get("total_bytes", 0))
+
+        last_analyze = _parse_snapshot_ts(stats.get("last_analyze"))
+        last_autoanalyze = _parse_snapshot_ts(stats.get("last_autoanalyze"))
+
+        col_stats = top_col_stats.get(fq, [])
+        has_col_stats = isinstance(col_stats, list) and len(col_stats) > 0
+
+        if approx_rows >= min_rows:
+            if not has_col_stats:
+                warnings.append(f"{fq}: pg_stats missing")
+            if approx_rows >= min_rows:
+                if not has_col_stats:
+                    warnings.append(f"{fq}: pg_stats missing")
+
+                    if last_analyze is None and last_autoanalyze is None:
+                        warnings.append(f"{fq}: no analyze timestamps")
+                    else:
+                        latest = max(x for x in (last_analyze, last_autoanalyze) if x is not None)
+                        if latest < stale_cutoff:
+                            warnings.append(f"{fq}: stale analyze")
+
+        top_by_bytes.append(
+            {"table": fq, "total_bytes": total_bytes, "human": _human_bytes(total_bytes)}
+        )
+        top_by_rows.append({"table": fq, "approx_rows": approx_rows})
+
+    top_by_bytes.sort(key=lambda x: x.get("total_bytes", 0), reverse=True)
+    top_by_rows.sort(key=lambda x: x.get("approx_rows", 0), reverse=True)
+    warnings = list(dict.fromkeys(warnings))
+
+    return {
+        "meta": meta,
+        "ok": True,
+        "source": source,
+        "warnings": warnings,
+        "top_tables_by_total_bytes": top_by_bytes[: max(0, int(top_n))],
+        "top_tables_by_rows": top_by_rows[: max(0, int(top_n))],
+    }
+
+def _rows_to_dicts(out: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    Normalize _execute_sql output rows to list[dict] for both psycopg v3 (tuples)
+    and psycopg2 RealDictCursor (dicts).
+    """
+    rows = out.get("rows") or []
+    if not rows:
+        return []
+    if isinstance(rows[0], dict):
+        return rows  # type: ignore[return-value]
+
+    cols = out.get("columns") or []
+    out_rows: List[Dict[str, Any]] = []
+    for row in rows:
+        d = {cols[i]: row[i] for i in range(min(len(cols), len(row)))}
+        out_rows.append(d)
+    return out_rows
+
 def _snapshot_db(cfg: DbConfig, repo_root: Path) -> Dict[str, Any]:
     """
     Build a schema snapshot across all non-system schemas.
@@ -765,7 +904,8 @@ def _snapshot_db(cfg: DbConfig, repo_root: Path) -> Dict[str, Any]:
         snap["error"] = sch.get("error")
         return snap
 
-    schemas = [r["schema"] for r in (sch.get("rows") or [])]
+    sch_rows = _rows_to_dicts(sch)
+    schemas: List[str] = [x for x in (r.get("schema") for r in sch_rows) if isinstance(x, str)]
     snap["schemas"] = schemas
 
     tbls = _execute_sql(cfg, list_tables_sql(None))
@@ -773,11 +913,13 @@ def _snapshot_db(cfg: DbConfig, repo_root: Path) -> Dict[str, Any]:
         snap["error"] = tbls.get("error")
         return snap
 
+    tbl_rows = _rows_to_dicts(tbls)
+
     pairs: List[Tuple[str, str, int]] = []
-    for r in (tbls.get("rows") or []):
+    for r in tbl_rows:
         s = r.get("schema")
-        t = r.get("table")
-        if s in schemas and isinstance(t, str):
+        t = r.get("table_name")
+        if isinstance(s, str) and isinstance(t, str) and s in schemas:
             pairs.append((s, t, int(r.get("approx_rows", 0) or 0)))
 
     # ---- table_stats (one query across all tables) ----
@@ -787,14 +929,14 @@ def _snapshot_db(cfg: DbConfig, repo_root: Path) -> Dict[str, Any]:
             # psycopg2 RealDictCursor returns dict-like rows; psycopg v3 may return tuples
             if isinstance(row, dict):
                 schema = row.get("schema")
-                table = row.get("table")
+                table = row.get("table_name")
                 fq = f"{schema}.{table}"
                 snap["table_stats"][fq] = row
             else:
                 cols = ts_out.get("columns", []) or []
                 d = {cols[i]: row[i] for i in range(min(len(cols), len(row)))}
                 schema = d.get("schema")
-                table = d.get("table")
+                table = d.get("table_name")
                 fq = f"{schema}.{table}"
                 snap["table_stats"][fq] = d
     else:
@@ -809,7 +951,7 @@ def _snapshot_db(cfg: DbConfig, repo_root: Path) -> Dict[str, Any]:
         snap["tables"][key] = {"schema": s, "table": t, "approx_rows": approx_rows}
 
         desc = _execute_sql(cfg, describe_table_sql(s, t), params=[s, t])
-        snap["columns"][key] = desc.get("rows") if desc.get("ok") else {"error": desc.get("error")}
+        snap["columns"][key] = _rows_to_dicts(desc) if desc.get("ok") else {"error": desc.get("error")}
 
         # ---- col_stats (pg_stats) per table ----
         cs_out = _execute_sql(cfg, col_stats_sql(), params=[s, t, COL_STATS_LIMIT])
@@ -826,13 +968,13 @@ def _snapshot_db(cfg: DbConfig, repo_root: Path) -> Dict[str, Any]:
             snap["top_col_stats"][key] = {"error": cs_out.get("error")}
 
         idx = _execute_sql(cfg, indexes_detail_sql(s, t), params=[s, t])
-        snap["indexes"][key] = idx.get("rows") if idx.get("ok") else {"error": idx.get("error")}
+        snap["indexes"][key] = _rows_to_dicts(idx) if idx.get("ok") else {"error": idx.get("error")}
 
         con = _execute_sql(cfg, constraints_sql(s, t), params=[s, t])
-        snap["constraints"][key] = con.get("rows") if con.get("ok") else {"error": con.get("error")}
+        snap["constraints"][key] = _rows_to_dicts(con) if con.get("ok") else {"error": con.get("error")}
 
         k = _execute_sql(cfg, keys_sql(s, t), params=[s, t])
-        snap["keys"][key] = k.get("rows") if k.get("ok") else {"error": k.get("error")}
+        snap["keys"][key] = _rows_to_dicts(k) if k.get("ok") else {"error": k.get("error")}
 
     return snap
 
@@ -860,6 +1002,8 @@ def _render_snapshot_md(snap: Dict[str, Any]) -> str:
     indexes: Dict[str, Any] = snap.get("indexes", {}) or {}
     constraints: Dict[str, Any] = snap.get("constraints", {}) or {}
     keys: Dict[str, Any] = snap.get("keys", {}) or {}
+    table_stats: Dict[str, Any] = snap.get("table_stats", {}) or {}
+    top_col_stats: Dict[str, Any] = snap.get("top_col_stats", {}) or {}
 
     def sort_key(fq: str) -> tuple[str, str]:
         if "." in fq:
@@ -868,8 +1012,8 @@ def _render_snapshot_md(snap: Dict[str, Any]) -> str:
         return ("", fq)
 
     def _anchor(fq: str) -> str:
-        # GitHub-style-ish anchor: "public.cmc_ema" -> "publiccmc_ema"
-        # (We will use explicit <a id="..."> anyway to avoid renderer differences.)
+        # GitHub-style-ish anchor: "public.cmc_ema" -> "public-cmc-ema"
+        # We also emit explicit <a id="..."> to avoid renderer differences.
         return re.sub(r"[^a-z0-9]+", "-", fq.lower()).strip("-")
 
     def _schema_of(fq: str) -> str:
@@ -877,6 +1021,50 @@ def _render_snapshot_md(snap: Dict[str, Any]) -> str:
 
     def _table_of(fq: str) -> str:
         return fq.split(".", 1)[1] if "." in fq else fq
+
+    def _human_bytes(n: Any) -> str:
+        try:
+            x = float(n)
+        except Exception:
+            return "None"
+        if x < 0:
+            return str(n)
+        units = ["B", "KB", "MB", "GB", "TB", "PB"]
+        i = 0
+        while x >= 1024.0 and i < len(units) - 1:
+            x /= 1024.0
+            i += 1
+        if i == 0:
+            return f"{int(x)} {units[i]}"
+        return f"{x:.2f} {units[i]}"
+
+    def _fmt_ts(v: Any) -> str:
+        if v is None:
+            return "None"
+        return str(v)
+
+    def _top_values(mcv: Any, n: int = 5, max_len: int = 80) -> str:
+        if mcv is None:
+            return ""
+        vals: List[str] = []
+
+        # If it’s already a list/tuple, use it
+        if isinstance(mcv, (list, tuple)):
+            vals = [str(x) for x in mcv[:n]]
+        else:
+            s = str(mcv).strip()
+            # If it looks like "{...}", try to split on commas
+            if s.startswith("{") and s.endswith("}"):
+                inner = s[1:-1].strip()
+                if inner:
+                    vals = [x.strip().strip('"') for x in inner.split(",")[:n]]
+            else:
+                vals = [s[:max_len]]
+
+        out = ", ".join(vals)
+        if len(out) > max_len:
+            out = out[: max_len - 3] + "..."
+        return out
 
     # -------------------------
     # 1) Header + metadata
@@ -995,10 +1183,66 @@ def _render_snapshot_md(snap: Dict[str, Any]) -> str:
         approx = tinfo.get("approx_rows", None)
 
         a = _anchor(fq)
-        lines.append(f"## `{_md_escape(fq)}`")
+        # Put the explicit anchor BEFORE the header (more renderer-proof)
         lines.append(f'<a id="{a}"></a>')
+        lines.append(f"## `{_md_escape(fq)}`")
+
         if approx is not None:
             lines.append(f"- approx_rows: `{_md_escape(str(approx))}`")
+
+        # -------------------------
+        # Shape (sizes + analyze/vacuum)
+        # -------------------------
+        lines.append("### Shape")
+        lines.append("")
+        ts = table_stats.get(fq)
+
+        if isinstance(ts, dict) and ts.get("error"):
+            lines.append(f"- error: `{_md_escape(str(ts.get('error')) )}`")
+        elif isinstance(ts, dict) and ts:
+            total_b = ts.get("total_bytes")
+            table_b = ts.get("table_bytes")
+            index_b = ts.get("index_bytes")
+
+            lines.append(f"- total_bytes: `{_md_escape(str(total_b))}` ({_md_escape(_human_bytes(total_b))})")
+            lines.append(f"- table_bytes: `{_md_escape(str(table_b))}` ({_md_escape(_human_bytes(table_b))})")
+            lines.append(f"- index_bytes: `{_md_escape(str(index_b))}` ({_md_escape(_human_bytes(index_b))})")
+            lines.append("")
+            lines.append(f"- last_analyze: `{_md_escape(_fmt_ts(ts.get('last_analyze')) )}`")
+            lines.append(f"- last_autoanalyze: `{_md_escape(_fmt_ts(ts.get('last_autoanalyze')) )}`")
+            lines.append(f"- last_vacuum: `{_md_escape(_fmt_ts(ts.get('last_vacuum')) )}`")
+            lines.append(f"- last_autovacuum: `{_md_escape(_fmt_ts(ts.get('last_autovacuum')) )}`")
+        else:
+            lines.append("_None_")
+
+        lines.append("")
+
+        # -------------------------
+        # Column stats (pg_stats)
+        # -------------------------
+        lines.append("### Column stats (pg_stats)")
+        lines.append("")
+
+        cs = top_col_stats.get(fq)
+        if isinstance(cs, dict) and cs.get("error"):
+            lines.append(f"- error: `{_md_escape(str(cs.get('error')) )}`")
+        elif isinstance(cs, list) and cs:
+            lines.append("| column_name | null_frac | n_distinct | top_values |")
+            lines.append("|---|---:|---:|---|")
+            for r in cs:
+                col = str(r.get("column_name", ""))
+                null_frac = r.get("null_frac", "")
+                n_distinct = r.get("n_distinct", "")
+                top_vals = _top_values(r.get("most_common_vals"), n=5, max_len=80)
+                # Normalize newlines so the markdown table doesn't break
+                top_vals = top_vals.replace("\n", " ").replace("\r", " ")
+                lines.append(
+                    f"| `{_md_escape(col)}` | `{_md_escape(str(null_frac))}` | `{_md_escape(str(n_distinct))}` | `{_md_escape(top_vals)}` |"
+                )
+        else:
+            lines.append("_None_")
+
+        lines.append("")
         lines.append("")
 
         # Keys (PK / unique constraints + columns)
@@ -1048,7 +1292,7 @@ def _render_snapshot_md(snap: Dict[str, Any]) -> str:
             lines.append("|---|---|---|---|---|---|")
             for r in ix:
                 # Support both old/new shapes
-                predicate = r.get("predicate", r.get("indpred", ""))  # if you store it later
+                predicate = r.get("predicate", r.get("indpred", ""))
                 lines.append(
                     f"| `{_md_escape(str(r.get('index_name','')) )}`"
                     f" | `{_md_escape(str(r.get('index_method','')) )}`"
@@ -1192,6 +1436,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         help="Optional input JSON snapshot path (if omitted, snapshot is generated live from DB)",
     )
     sp_snap_md.add_argument("--out", type=str, required=True, help="Output Markdown path (e.g., artifacts/db_schema_snapshot.md)")
+    sp_snap_check = sub.add_parser("snapshot-check", help="Read a snapshot JSON and emit a compact health summary")
+    sp_snap_check.add_argument("--in-path", dest="in_path", type=str, required=True, help="Input JSON snapshot path")
+    sp_snap_check.add_argument("--stale-days", type=int, default=30, help="Warn if analyze older than N days (default: 30)")
+    sp_snap_check.add_argument("--min-rows", type=int, default=100000, help="Row threshold for warnings (default: 100000)")
+    sp_snap_check.add_argument("--top-n", type=int, default=20, help="Top N tables for size/row summaries (default: 20)")
 
     args = p.parse_args(argv)
 
@@ -1206,12 +1455,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(json.dumps(obj, indent=2, default=str))
 
     meta = {
-        "repo_root": str(repo_root),
-        "db_url_redacted": _redact_url(cfg.url),
-        "timeout_ms": cfg.statement_timeout_ms,
-        "idle_in_tx_timeout_ms": cfg.idle_in_tx_timeout_ms,
-        "row_limit": cfg.row_limit,
-        "psycopg_v3": _PSYCOPG_V3,
+    "repo_root": str(repo_root),
+    "db_url_redacted": _redact_url(cfg.url),
+    "statement_timeout_ms": cfg.statement_timeout_ms,
+    "idle_in_transaction_session_timeout_ms": cfg.idle_in_tx_timeout_ms,
+    "default_row_limit": cfg.row_limit,
+    "psycopg_v3": _PSYCOPG_V3,
     }
 
     if args.cmd == "schemas":
@@ -1331,6 +1580,27 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         out_path.write_text(md, encoding="utf-8")
 
         dump({"meta": meta, "ok": True, "source": src, "wrote": str(out_path)})
+        return 0
+
+    if args.cmd == "snapshot-check":
+        in_path = Path(args.in_path)
+        if not in_path.exists():
+            dump({"meta": meta, "ok": False, "error": {"type": "FileNotFoundError", "message": str(in_path)}})
+            return 2
+        try:
+            snap = json.loads(in_path.read_text(encoding="utf-8"))
+        except Exception as e:
+            dump({"meta": meta, "ok": False, "error": {"type": type(e).__name__, "message": str(e)}})
+            return 2
+        out = _snapshot_check_summary(
+            snap,
+            source=str(in_path),
+            stale_days=int(args.stale_days),
+            min_rows=int(args.min_rows),
+            top_n=int(args.top_n),
+            meta=meta,
+        )
+        dump(out)
         return 0
 
     raise RuntimeError(f"Unknown cmd: {args.cmd}")

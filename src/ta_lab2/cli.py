@@ -494,8 +494,13 @@ def cmd_db(args: argparse.Namespace) -> int:
             if getattr(args, "order_by", None):
                 argv += ["--order-by", args.order_by]
 
-    elif args.db_cmd in ("query", "explain"):
-        argv += ["--sql", args.sql]
+    elif args.db_cmd == "query":
+        # dbtool's query expects positional sql (NOT --sql)
+        argv += [args.sql]
+
+    elif args.db_cmd == "explain":
+        # dbtool's explain expects positional sql (NOT --sql)
+        argv += [args.sql]
 
     elif args.db_cmd == "agg":
         argv += [args.schema, args.table]
@@ -518,6 +523,15 @@ def cmd_db(args: argparse.Namespace) -> int:
         if getattr(args, "in_path", None):
             argv += ["--in-path", args.in_path]
         argv += ["--out", args.out]
+
+    elif args.db_cmd == "snapshot-check":
+        argv += ["--in-path", args.in_path]
+        if getattr(args, "stale_days", None) is not None:
+            argv += ["--stale-days", str(args.stale_days)]
+        if getattr(args, "min_rows", None) is not None:
+            argv += ["--min-rows", str(args.min_rows)]
+        if getattr(args, "top_n", None) is not None:
+            argv += ["--top-n", str(args.top_n)]
 
     return int(dbtool_main(argv))
 
@@ -568,7 +582,7 @@ def build_parser() -> argparse.ArgumentParser:
         "db",
         help=(
             "Read-only Postgres helper "
-            "(schemas/tables/describe/indexes/constraints/keys/query/explain/profile/profile-cols/profile-time/dupes/agg/snapshot/snapshot-md)"
+            "(schemas/tables/describe/indexes/constraints/keys/query/explain/profile/profile-cols/profile-time/dupes/agg/snapshot/snapshot-md/snapshot-check)"
         ),
     )
     p_db.add_argument("--timeout-ms", type=int, default=15_000, help="statement_timeout in ms (default: 15000)")
@@ -716,6 +730,20 @@ def build_parser() -> argparse.ArgumentParser:
         help="Output Markdown path (e.g., artifacts/db_schema_snapshot.md)",
     )
     p_db_snap_md.set_defaults(func=cmd_db)
+
+    p_db_snap_check = db_sub.add_parser("snapshot-check", help="Read a snapshot JSON and emit a compact health summary")
+    _db_add_limit(p_db_snap_check)
+    p_db_snap_check.add_argument(
+        "--in-path",
+        dest="in_path",
+        type=str,
+        required=True,
+        help="Input JSON snapshot path",
+    )
+    p_db_snap_check.add_argument("--stale-days", type=int, default=30, help="Warn if analyze older than N days (default: 30)")
+    p_db_snap_check.add_argument("--min-rows", type=int, default=100000, help="Row threshold for warnings (default: 100000)")
+    p_db_snap_check.add_argument("--top-n", type=int, default=20, help="Top N tables for size/row summaries (default: 20)")
+    p_db_snap_check.set_defaults(func=cmd_db)
 
     # Back-compat: if no subcommand is given, behave like old CLI (run pipeline)
     ap.add_argument(
