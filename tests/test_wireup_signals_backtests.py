@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+import pytest
+pytest.importorskip("vectorbt")
+
 # C:\Users\asafi\Downloads\ta_lab2\tests\test_wireup_signals_backtests.py
 # -*- coding: utf-8 -*-
 """
@@ -9,7 +14,6 @@ Wire-up test: signals ↔ backtests (vectorbt) integration for ta_lab2.
 - Imports research query modules (guarded by if __name__ == "__main__")
 """
 
-from __future__ import annotations
 import sys
 import numpy as np
 import pandas as pd
