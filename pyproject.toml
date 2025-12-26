@@ -16,6 +16,7 @@ dependencies = [
   "numpy",
   "SQLAlchemy>=2.0",
   "psycopg2-binary>=2.9",
+  "matplotlib>=3.8"
 ]
 
 [project.scripts]
