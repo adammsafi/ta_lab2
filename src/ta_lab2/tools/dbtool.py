@@ -827,16 +827,15 @@ def _snapshot_check_summary(
         if approx_rows >= min_rows:
             if not has_col_stats:
                 warnings.append(f"{fq}: pg_stats missing")
-            if approx_rows >= min_rows:
-                if not has_col_stats:
-                    warnings.append(f"{fq}: pg_stats missing")
 
-                    if last_analyze is None and last_autoanalyze is None:
-                        warnings.append(f"{fq}: no analyze timestamps")
-                    else:
-                        latest = max(x for x in (last_analyze, last_autoanalyze) if x is not None)
-                        if latest < stale_cutoff:
-                            warnings.append(f"{fq}: stale analyze")
+                # IMPORTANT: Option B (low noise)
+                # Only care about analyze timestamps when pg_stats is missing.
+                if last_analyze is None and last_autoanalyze is None:
+                    warnings.append(f"{fq}: no analyze timestamps")
+                else:
+                    latest = max(x for x in (last_analyze, last_autoanalyze) if x is not None)
+                    if latest < stale_cutoff:
+                        warnings.append(f"{fq}: stale analyze")
 
         top_by_bytes.append(
             {"table": fq, "total_bytes": total_bytes, "human": _human_bytes(total_bytes)}
@@ -846,6 +845,7 @@ def _snapshot_check_summary(
     top_by_bytes.sort(key=lambda x: x.get("total_bytes", 0), reverse=True)
     top_by_rows.sort(key=lambda x: x.get("approx_rows", 0), reverse=True)
     warnings = list(dict.fromkeys(warnings))
+    warnings.sort()
 
     return {
         "meta": meta,
@@ -1444,16 +1444,66 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     args = p.parse_args(argv)
 
-    DBLESS_CMDS = {"snapshot-check"}
-    if args.cmd in DBLESS_CMDS:
-        return args.func(args)
+    def dump(obj: Any) -> None:
+        print(json.dumps(obj, indent=2, default=str))
 
-    # snapshot-md is db-less if --in-path is provided
+    # -----------------------
+    # DB-less commands
+    # -----------------------
+    meta_dbless = {
+        "repo_root": str(repo_root),
+        "db_url_redacted": None,
+        "statement_timeout_ms": int(args.timeout_ms),
+        "idle_in_transaction_session_timeout_ms": int(args.idle_tx_timeout_ms),
+        "default_row_limit": int(args.limit),
+        "psycopg_v3": _PSYCOPG_V3,
+    }
+
+    if args.cmd == "snapshot-check":
+        in_path = Path(args.in_path)
+        if not in_path.exists():
+            dump({"meta": meta_dbless, "ok": False, "error": {"type": "FileNotFoundError", "message": str(in_path)}})
+            return 2
+        try:
+            snap = json.loads(in_path.read_text(encoding="utf-8"))
+        except Exception as e:
+            dump({"meta": meta_dbless, "ok": False, "error": {"type": type(e).__name__, "message": str(e)}})
+            return 2
+
+        out = _snapshot_check_summary(
+            snap,
+            source=str(in_path),
+            stale_days=int(args.stale_days),
+            min_rows=int(args.min_rows),
+            top_n=int(args.top_n),
+            meta=meta_dbless,
+        )
+        dump(out)
+        return 0
+
+    # snapshot-md can run from JSON without DB access if --in-path is provided
     if args.cmd == "snapshot-md" and getattr(args, "in_path", None):
-        return args.func(args)
+        in_path = Path(args.in_path)
+        if not in_path.exists():
+            dump({"meta": meta_dbless, "ok": False, "error": {"type": "FileNotFoundError", "message": str(in_path)}})
+            return 2
+        try:
+            snap = json.loads(in_path.read_text(encoding="utf-8"))
+        except Exception as e:
+            dump({"meta": meta_dbless, "ok": False, "error": {"type": type(e).__name__, "message": str(e)}})
+            return 2
 
-# otherwise require DB config and proceed
+        md = _render_snapshot_md(snap)
+        out_path = Path(args.out)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(md, encoding="utf-8")
 
+        dump({"meta": meta_dbless, "ok": True, "source": str(in_path), "wrote": str(out_path)})
+        return 0
+
+    # -----------------------
+    # DB-required commands
+    # -----------------------
     cfg = DbConfig(
         url=_resolve_db_url(),
         statement_timeout_ms=args.timeout_ms,
@@ -1461,17 +1511,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         row_limit=args.limit,
     )
 
-    def dump(obj: Any) -> None:
-        print(json.dumps(obj, indent=2, default=str))
-
     meta = {
-    "repo_root": str(repo_root),
-    "db_url_redacted": _redact_url(cfg.url),
-    "statement_timeout_ms": cfg.statement_timeout_ms,
-    "idle_in_transaction_session_timeout_ms": cfg.idle_in_tx_timeout_ms,
-    "default_row_limit": cfg.row_limit,
-    "psycopg_v3": _PSYCOPG_V3,
+        "repo_root": str(repo_root),
+        "db_url_redacted": _redact_url(cfg.url),
+        "statement_timeout_ms": cfg.statement_timeout_ms,
+        "idle_in_transaction_session_timeout_ms": cfg.idle_in_tx_timeout_ms,
+        "default_row_limit": cfg.row_limit,
+        "psycopg_v3": _PSYCOPG_V3,
     }
+
 
     if args.cmd == "schemas":
         out = _execute_sql(cfg, schema_overview_sql())
@@ -1590,27 +1638,6 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         out_path.write_text(md, encoding="utf-8")
 
         dump({"meta": meta, "ok": True, "source": src, "wrote": str(out_path)})
-        return 0
-
-    if args.cmd == "snapshot-check":
-        in_path = Path(args.in_path)
-        if not in_path.exists():
-            dump({"meta": meta, "ok": False, "error": {"type": "FileNotFoundError", "message": str(in_path)}})
-            return 2
-        try:
-            snap = json.loads(in_path.read_text(encoding="utf-8"))
-        except Exception as e:
-            dump({"meta": meta, "ok": False, "error": {"type": type(e).__name__, "message": str(e)}})
-            return 2
-        out = _snapshot_check_summary(
-            snap,
-            source=str(in_path),
-            stale_days=int(args.stale_days),
-            min_rows=int(args.min_rows),
-            top_n=int(args.top_n),
-            meta=meta,
-        )
-        dump(out)
         return 0
 
     raise RuntimeError(f"Unknown cmd: {args.cmd}")
