@@ -532,9 +532,10 @@ def cmd_db(args: argparse.Namespace) -> int:
             argv += ["--min-rows", str(args.min_rows)]
         if getattr(args, "top_n", None) is not None:
             argv += ["--top-n", str(args.top_n)]
+        if getattr(args, "format", None) is not None:
+            argv += ["--format", str(args.format)]
 
     return int(dbtool_main(argv))
-
 
 # ----------------------------
 # Main / Parser
@@ -743,6 +744,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_db_snap_check.add_argument("--stale-days", type=int, default=30, help="Warn if analyze older than N days (default: 30)")
     p_db_snap_check.add_argument("--min-rows", type=int, default=100000, help="Row threshold for warnings (default: 100000)")
     p_db_snap_check.add_argument("--top-n", type=int, default=20, help="Top N tables for size/row summaries (default: 20)")
+    p_db_snap_check.add_argument(
+        "--format",
+        choices=["json", "text"],
+        default="json",
+        help="Output format (default: json). Use 'text' for a quick terminal summary.",
+    )
     p_db_snap_check.set_defaults(func=cmd_db)
 
     # Back-compat: if no subcommand is given, behave like old CLI (run pipeline)

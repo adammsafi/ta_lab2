@@ -305,6 +305,33 @@ GROUP BY 1
 ORDER BY 1;
 """.strip()
 
+def _render_snapshot_check_text(out: dict) -> str:
+    lines = []
+    warnings = out.get("warnings") or []
+    topb = out.get("top_tables_by_total_bytes") or []
+    topr = out.get("top_tables_by_rows") or []
+
+    lines.append(f"ok: {out.get('ok')}")
+    lines.append(f"source: {out.get('source')}")
+    lines.append(f"warnings: {len(warnings)}")
+    for w in warnings[:20]:
+        lines.append(f"  - {w}")
+
+    lines.append("")
+    lines.append("top tables by total bytes:")
+    for x in topb:
+        human = x.get("human")
+        tb = x.get("total_bytes")
+        lines.append(f"  - {x.get('table')}: {human or tb}")
+
+    lines.append("")
+    lines.append("top tables by rows:")
+    for x in topr:
+        lines.append(f"  - {x.get('table')}: {x.get('approx_rows')}")
+
+    return "\n".join(lines)
+
+
 def table_stats_sql() -> str:
     """
     Fast table-level "shape" stats (no full scans):
@@ -1467,6 +1494,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     sp_snap_diff = sub.add_parser("snapshot-diff", help="Diff two snapshot JSON files (offline; no DB access)")
     sp_snap_diff.add_argument("--a", required=True, help="Path to older snapshot JSON")
     sp_snap_diff.add_argument("--b", required=True, help="Path to newer snapshot JSON")
+    sp_snap_check.add_argument(
+        "--format",
+        choices=["json", "text"],
+        default="json",
+        help="Output format (default: json). Use 'text' for a quick terminal summary.",
+    )
     sp_snap_diff.add_argument("--top-n", type=int, default=25, help="Top N tables by abs byte delta (default: 25)")
     sp_snap_diff.add_argument("--out-json", default=None, help="Write diff JSON to this path (otherwise prints to stdout)")
     sp_snap_diff.add_argument("--out-md", default=None, help="Also write a Markdown report to this path")
@@ -1501,14 +1534,18 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             return 2
 
         out = _snapshot_check_summary(
-            snap,
-            source=str(in_path),
-            stale_days=int(args.stale_days),
-            min_rows=int(args.min_rows),
-            top_n=int(args.top_n),
-            meta=meta_dbless,
+        snap,
+        source=str(in_path),
+        stale_days=int(args.stale_days),
+        min_rows=int(args.min_rows),
+        top_n=int(args.top_n),
+        meta=meta_dbless,
         )
-        dump(out)
+
+        if getattr(args, "format", "json") == "text":
+            print(_render_snapshot_check_text(out))
+        else:
+            dump(out)
         return 0
     
     if args.cmd == "snapshot-diff":
