@@ -1444,6 +1444,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     args = p.parse_args(argv)
 
+    DBLESS_CMDS = {"snapshot-check"}
+    if args.cmd in DBLESS_CMDS:
+        return args.func(args)
+
+    # snapshot-md is db-less if --in-path is provided
+    if args.cmd == "snapshot-md" and getattr(args, "in_path", None):
+        return args.func(args)
+
+# otherwise require DB config and proceed
+
     cfg = DbConfig(
         url=_resolve_db_url(),
         statement_timeout_ms=args.timeout_ms,
