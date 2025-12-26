@@ -19,6 +19,28 @@ def _human_bytes(n: int) -> str:
     return f"{x:.2f} {units[i]}"
 
 
+def _norm_rows(x: Any) -> Optional[int]:
+    """Normalize approx row counts.
+
+    Snapshots sometimes store unknown estimates as -1 or as strings like 'unknown'.
+    Treat those as None so we don't compute bogus deltas.
+    """
+    if isinstance(x, bool):
+        return None
+    if isinstance(x, int):
+        return x if x >= 0 else None
+    if isinstance(x, str):
+        s = x.strip().lower()
+        if not s or s in {"unknown", "n/a", "na", "none", "null"}:
+            return None
+        try:
+            v = int(s)
+            return v if v >= 0 else None
+        except Exception:
+            return None
+    return None
+
+
 def _table_key(schema: str, table: str) -> str:
     return f"{schema}.{table}"
 
@@ -62,7 +84,7 @@ def load_snapshot(path: str | Path) -> NormSnapshot:
         for k, t in tables_obj.items():
             schema = t.get("schema") or k.split(".", 1)[0]
             table = t.get("table") or k.split(".", 1)[1]
-            approx_rows = t.get("approx_rows")
+            approx_rows = _norm_rows(t.get("approx_rows"))
             ts = table_stats.get(_table_key(schema, table), {}) or {}
 
             nt = NormTable(
@@ -87,7 +109,7 @@ def load_snapshot(path: str | Path) -> NormSnapshot:
             if not schema or not table:
                 continue
 
-            approx_rows = t.get("approx_rows")
+            approx_rows = _norm_rows(t.get("approx_rows"))
 
             # Columns could be list of dicts or list of names
             cols: Set[str] = set()
@@ -154,6 +176,15 @@ def diff_snapshots(a: NormSnapshot, b: NormSnapshot, *, top_n: int = 25) -> Dict
     added_tables = sorted(b_keys - a_keys)
     removed_tables = sorted(a_keys - b_keys)
     common = sorted(a_keys & b_keys)
+
+    # Meta diffs (small, high-signal fields). We don't include volatile timestamps.
+    meta_deltas: Dict[str, Dict[str, Any]] = {}
+    meta_keys = sorted(set(a.meta.keys()) | set(b.meta.keys()))
+    for k_meta in meta_keys:
+        va = a.meta.get(k_meta)
+        vb = b.meta.get(k_meta)
+        if va != vb:
+            meta_deltas[k_meta] = {"a": va, "b": vb}
 
     def _bytes(x: Optional[int]) -> int:
         return int(x) if isinstance(x, int) else 0
@@ -222,9 +253,11 @@ def diff_snapshots(a: NormSnapshot, b: NormSnapshot, *, top_n: int = 25) -> Dict
     return {
         "ok": True,
         "summary": {
+            "meta_deltas": meta_deltas,
             "tables_added": len(added_tables),
             "tables_removed": len(removed_tables),
             "tables_common": len(common),
+            "meta_changed": len(meta_deltas),
             "tables_with_size_or_row_change": len(table_deltas),
             "tables_with_shape_change": len(shape_deltas),
         },
@@ -246,6 +279,21 @@ def render_diff_md(diff: Dict[str, Any], *, title: str = "Snapshot diff") -> str
     lines.append(f"- Tables removed: **{s.get('tables_removed', 0)}**")
     lines.append(f"- Tables changed (bytes/rows): **{s.get('tables_with_size_or_row_change', 0)}**")
     lines.append(f"- Tables changed (shape): **{s.get('tables_with_shape_change', 0)}**")
+
+    # FIX: meta_deltas lives under diff["summary"]["meta_deltas"] in diff_snapshots()
+    meta_deltas = (diff.get("summary", {}) or {}).get("meta_deltas") or {}
+    if meta_deltas:
+        lines.append("## Meta changes")
+        lines.append("")
+        lines.append("| key | a | b |")
+        lines.append("|---|---|---|")
+        for k in sorted(meta_deltas.keys()):
+            va = meta_deltas[k].get("a")
+            vb = meta_deltas[k].get("b")
+            # keep it compact and readable
+            lines.append(f"| `{k}` | `{va}` | `{vb}` |")
+        lines.append("")
+
     lines.append("")
 
     added = diff.get("tables_added") or []
