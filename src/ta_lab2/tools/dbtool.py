@@ -837,6 +837,7 @@ def _snapshot_check_summary(
                     if latest < stale_cutoff:
                         warnings.append(f"{fq}: stale analyze")
 
+
         top_by_bytes.append(
             {"table": fq, "total_bytes": total_bytes, "human": _human_bytes(total_bytes)}
         )
@@ -1324,6 +1325,28 @@ def _render_snapshot_md(snap: Dict[str, Any]) -> str:
 
     return "\n".join(lines) + "\n"
 
+def cmd_snapshot_diff(args) -> int:
+    from pathlib import Path
+    import json
+
+    from ta_lab2.tools.snapshot_diff import load_snapshot, diff_snapshots, render_diff_md
+
+    a = load_snapshot(args.a)
+    b = load_snapshot(args.b)
+    d = diff_snapshots(a, b, top_n=args.top_n)
+
+    # default: print JSON to stdout
+    if args.out_json:
+        Path(args.out_json).write_text(json.dumps(d, indent=2), encoding="utf-8")
+    else:
+        print(json.dumps(d, indent=2))
+
+    if args.out_md:
+        md = render_diff_md(d, title="ta_lab2 snapshot diff")
+        Path(args.out_md).write_text(md, encoding="utf-8")
+
+    return 0
+
 # -----------------------
 # CLI
 # -----------------------
@@ -1441,6 +1464,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     sp_snap_check.add_argument("--stale-days", type=int, default=30, help="Warn if analyze older than N days (default: 30)")
     sp_snap_check.add_argument("--min-rows", type=int, default=100000, help="Row threshold for warnings (default: 100000)")
     sp_snap_check.add_argument("--top-n", type=int, default=20, help="Top N tables for size/row summaries (default: 20)")
+    sp_snap_diff = sub.add_parser("snapshot-diff", help="Diff two snapshot JSON files (offline; no DB access)")
+    sp_snap_diff.add_argument("--a", required=True, help="Path to older snapshot JSON")
+    sp_snap_diff.add_argument("--b", required=True, help="Path to newer snapshot JSON")
+    sp_snap_diff.add_argument("--top-n", type=int, default=25, help="Top N tables by abs byte delta (default: 25)")
+    sp_snap_diff.add_argument("--out-json", default=None, help="Write diff JSON to this path (otherwise prints to stdout)")
+    sp_snap_diff.add_argument("--out-md", default=None, help="Also write a Markdown report to this path")
+    sp_snap_diff.set_defaults(func=cmd_snapshot_diff)
 
     args = p.parse_args(argv)
 
@@ -1480,6 +1510,19 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         )
         dump(out)
         return 0
+    
+    if args.cmd == "snapshot-diff":
+        a_path = Path(args.a)
+        b_path = Path(args.b)
+
+        if not a_path.exists():
+            dump({"meta": meta_dbless, "ok": False, "error": {"type": "FileNotFoundError", "message": str(a_path)}})
+            return 2
+        if not b_path.exists():
+            dump({"meta": meta_dbless, "ok": False, "error": {"type": "FileNotFoundError", "message": str(b_path)}})
+            return 2
+
+        return cmd_snapshot_diff(args)
 
     # snapshot-md can run from JSON without DB access if --in-path is provided
     if args.cmd == "snapshot-md" and getattr(args, "in_path", None):
