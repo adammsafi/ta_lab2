@@ -4,13 +4,23 @@
   "modules": [
     {
       "module": "ta_lab2.cli",
-      "classes": [],
+      "classes": [
+        "RegimePolicy",
+        "PipelineSettings"
+      ],
       "functions": [
-        "_read_df",
-        "_default_policy_yaml",
         "cmd_pipeline",
+        "_detect_repo_root",
+        "_load_regime_policy",
+        "_read_df",
         "_ensure_feats_if_possible",
+        "_maybe_load_policy_table",
+        "_coerce_label",
+        "_merge_policy_overrides",
+        "_present_regime_result_text",
+        "_present_regime_result_json",
         "cmd_regime_inspect",
+        "cmd_db",
         "build_parser",
         "main"
       ]
@@ -32,8 +42,23 @@
       "module": "ta_lab2.io",
       "classes": [],
       "functions": [
+        "get_engine",
         "write_parquet",
-        "read_parquet"
+        "read_parquet",
+        "_as_mapping",
+        "_get_attr_or_key",
+        "_get_marketdata_config",
+        "_get_marketdata_engine",
+        "_get_marketdata_tables",
+        "_get_marketdata_schema_and_tables",
+        "_qualify_table",
+        "load_cmc_ohlcv_daily",
+        "load_close_panel",
+        "load_da_ids",
+        "load_exchange_info",
+        "load_dim_timeframe",
+        "_compute_ema_long_from_close_panel",
+        "write_ema_daily_to_db"
       ]
     },
     {
@@ -121,6 +146,7 @@
         "BTResult"
       ],
       "functions": [
+        "_ensure_backtesting_available",
         "_make_strategy_class",
         "run_bt"
       ]
@@ -159,6 +185,7 @@
       "module": "ta_lab2.backtests.reports",
       "classes": [],
       "functions": [
+        "_require_matplotlib",
         "save_table",
         "equity_plot",
         "leaderboard"
@@ -226,7 +253,12 @@
         "add_ema_d1",
         "add_ema_d2",
         "add_ema",
-        "prepare_ema_helpers"
+        "prepare_ema_helpers",
+        "add_ema_diffs_longform",
+        "build_daily_ema_tail_from_seeds",
+        "_get_engine",
+        "build_daily_ema_frame",
+        "write_daily_ema_to_db"
       ]
     },
     {
@@ -272,13 +304,13 @@
       "module": "ta_lab2.features.resample",
       "classes": [],
       "functions": [
-        "_normalize",
-        "_normalize_freq",
-        "_season_from_month",
-        "resample_one",
-        "resample_many",
-        "add_season_label",
-        "seasonal_summary"
+        "_validate_ohlcv_columns",
+        "_ensure_ts_index",
+        "resample_ohlcv",
+        "normalize_timeframe_label",
+        "add_calendar_features",
+        "resample_parquet_file",
+        "resample_to_tf"
       ]
     },
     {
@@ -326,6 +358,314 @@
       "module": "ta_lab2.features.__init__",
       "classes": [],
       "functions": []
+    },
+    {
+      "module": "ta_lab2.features.m_tf.ema_multi_tf_cal",
+      "classes": [
+        "CalTfSpec"
+      ],
+      "functions": [
+        "_load_alpha_lookup",
+        "_normalize_daily",
+        "_load_calendar_tf_specs",
+        "_bars_table_for_scheme",
+        "_load_canonical_closes_from_bars",
+        "_compute_bar_ema_on_closes",
+        "build_multi_timeframe_ema_cal_frame",
+        "write_multi_timeframe_ema_cal_to_db"
+      ]
+    },
+    {
+      "module": "ta_lab2.features.m_tf.ema_multi_tf_cal_anchor",
+      "classes": [
+        "TimeframeSpec"
+      ],
+      "functions": [
+        "_engine",
+        "_table_has_column",
+        "_load_timeframes_from_dim_timeframe",
+        "_load_daily_close",
+        "_load_anchor_bars",
+        "_ema",
+        "_alpha_daily_equivalent",
+        "_canonical_subset_diff",
+        "_infer_is_canonical_bar_row",
+        "_build_one_id_tf",
+        "write_multi_timeframe_ema_cal_anchor_to_db"
+      ]
+    },
+    {
+      "module": "ta_lab2.features.m_tf.ema_multi_tf_v2",
+      "classes": [
+        "TfUniverse"
+      ],
+      "functions": [
+        "resolve_tf_universe_v2",
+        "compute_daily_ema",
+        "compute_multi_tf_v2_for_asset",
+        "load_daily_prices",
+        "load_last_ts_by_key",
+        "refresh_cmc_ema_multi_tf_v2_incremental",
+        "refresh_cmc_ema_multi_tf_v2"
+      ]
+    },
+    {
+      "module": "ta_lab2.features.m_tf.ema_multi_timeframe",
+      "classes": [],
+      "functions": [
+        "_normalize_daily",
+        "_resolve_tf_day_timeframes",
+        "_load_bar_closes",
+        "_synthetic_tf_day_bars_from_daily",
+        "build_multi_timeframe_ema_frame",
+        "write_multi_timeframe_ema_to_db"
+      ]
+    },
+    {
+      "module": "ta_lab2.features.m_tf.views",
+      "classes": [],
+      "functions": []
+    },
+    {
+      "module": "ta_lab2.features.m_tf.__init__",
+      "classes": [],
+      "functions": []
+    },
+    {
+      "module": "ta_lab2.features.m_tf.ema_research.mutli_tf_v1_vs_v2",
+      "classes": [],
+      "functions": [
+        "get_ema_series"
+      ]
+    },
+    {
+      "module": "ta_lab2.features.m_tf.old.ema_multi_tf_cal_all_bar_alpha",
+      "classes": [],
+      "functions": [
+        "_normalize_daily",
+        "_compute_monthly_canonical_closes",
+        "_compute_tf_closes_by_asset",
+        "build_multi_timeframe_ema_cal_frame",
+        "write_multi_timeframe_ema_cal_to_db"
+      ]
+    },
+    {
+      "module": "ta_lab2.features.m_tf.old.ema_multi_tf_cal_AM20251208_jumpsOnEma",
+      "classes": [],
+      "functions": [
+        "_normalize_daily",
+        "_compute_monthly_canonical_closes",
+        "_compute_tf_closes_by_asset",
+        "build_multi_timeframe_ema_cal_frame",
+        "write_multi_timeframe_ema_cal_to_db"
+      ]
+    },
+    {
+      "module": "ta_lab2.features.m_tf.old.ema_multi_tf_cal_anchor_pre-bars",
+      "classes": [],
+      "functions": [
+        "_resolve_calendar_timeframes_anchor",
+        "_normalize_daily",
+        "_compute_monthly_canonical_closes_anchor",
+        "_compute_tf_closes_by_asset_anchor",
+        "build_multi_timeframe_ema_cal_anchor_frame",
+        "write_multi_timeframe_ema_cal_anchor_to_db"
+      ]
+    },
+    {
+      "module": "ta_lab2.features.m_tf.old.ema_multi_tf_cal_anchor_pre-dim",
+      "classes": [],
+      "functions": [
+        "_normalize_daily",
+        "_compute_monthly_canonical_closes_anchor",
+        "_compute_tf_closes_by_asset_anchor",
+        "build_multi_timeframe_ema_cal_anchor_frame",
+        "write_multi_timeframe_ema_cal_anchor_to_db"
+      ]
+    },
+    {
+      "module": "ta_lab2.features.m_tf.old.ema_multi_tf_cal_anchor_predimUpdate20251219",
+      "classes": [
+        "TimeframeSpec"
+      ],
+      "functions": [
+        "_engine",
+        "_table_has_column",
+        "_load_timeframes_from_dim_timeframe",
+        "_load_daily_close",
+        "_load_anchor_bars",
+        "_ema",
+        "_alpha_daily_equivalent",
+        "_canonical_subset_diff",
+        "_infer_is_canonical_bar_row",
+        "_build_one_id_tf",
+        "write_multi_timeframe_ema_cal_anchor_to_db"
+      ]
+    },
+    {
+      "module": "ta_lab2.features.m_tf.old.ema_multi_tf_cal_old",
+      "classes": [],
+      "functions": [
+        "_normalize_daily",
+        "_compute_monthly_canonical_closes",
+        "_compute_tf_closes_by_asset",
+        "build_multi_timeframe_ema_cal_frame",
+        "write_multi_timeframe_ema_cal_to_db"
+      ]
+    },
+    {
+      "module": "ta_lab2.features.m_tf.old.ema_multi_tf_cal_old_2",
+      "classes": [],
+      "functions": [
+        "_normalize_daily",
+        "_compute_monthly_canonical_closes",
+        "_compute_tf_closes_by_asset",
+        "build_multi_timeframe_ema_cal_frame",
+        "write_multi_timeframe_ema_cal_to_db"
+      ]
+    },
+    {
+      "module": "ta_lab2.features.m_tf.old.ema_multi_tf_cal_PM20251207_774_lines",
+      "classes": [],
+      "functions": [
+        "_normalize_daily",
+        "_compute_monthly_canonical_closes",
+        "_compute_tf_closes_by_asset",
+        "build_multi_timeframe_ema_cal_frame",
+        "write_multi_timeframe_ema_cal_to_db"
+      ]
+    },
+    {
+      "module": "ta_lab2.features.m_tf.old.ema_multi_tf_cal_post-dim",
+      "classes": [],
+      "functions": [
+        "_resolve_calendar_timeframes",
+        "_normalize_daily",
+        "_compute_monthly_canonical_closes",
+        "_compute_tf_closes_by_asset",
+        "build_multi_timeframe_ema_cal_frame",
+        "write_multi_timeframe_ema_cal_to_db"
+      ]
+    },
+    {
+      "module": "ta_lab2.features.m_tf.old.ema_multi_tf_cal_pre-bars",
+      "classes": [],
+      "functions": [
+        "_load_alpha_lookup",
+        "_normalize_daily",
+        "_compute_monthly_canonical_closes",
+        "_compute_tf_closes_by_asset",
+        "build_multi_timeframe_ema_cal_frame",
+        "write_multi_timeframe_ema_cal_to_db"
+      ]
+    },
+    {
+      "module": "ta_lab2.features.m_tf.old.ema_multi_tf_cal_pre-dim",
+      "classes": [],
+      "functions": [
+        "_normalize_daily",
+        "_compute_monthly_canonical_closes",
+        "_compute_tf_closes_by_asset",
+        "build_multi_timeframe_ema_cal_frame",
+        "write_multi_timeframe_ema_cal_to_db"
+      ]
+    },
+    {
+      "module": "ta_lab2.features.m_tf.old.ema_multi_tf_cal_predimUpdate20251219",
+      "classes": [
+        "CalTfSpec"
+      ],
+      "functions": [
+        "_load_alpha_lookup",
+        "_normalize_daily",
+        "_load_calendar_tf_specs",
+        "_bars_table_for_scheme",
+        "_load_canonical_closes_from_bars",
+        "_compute_bar_ema_on_closes",
+        "build_multi_timeframe_ema_cal_frame",
+        "write_multi_timeframe_ema_cal_to_db"
+      ]
+    },
+    {
+      "module": "ta_lab2.features.m_tf.old.ema_multi_tf_v2_oldasof_20251219",
+      "classes": [
+        "TfUniverse"
+      ],
+      "functions": [
+        "resolve_tf_universe_v2",
+        "compute_daily_ema",
+        "compute_multi_tf_v2_for_asset",
+        "load_daily_prices",
+        "load_last_ts_by_key",
+        "refresh_cmc_ema_multi_tf_v2_incremental",
+        "refresh_cmc_ema_multi_tf_v2"
+      ]
+    },
+    {
+      "module": "ta_lab2.features.m_tf.old.ema_multi_tf_v2_pre-bar",
+      "classes": [
+        "CliArgs"
+      ],
+      "functions": [
+        "_resolve_timeframe_tf_days",
+        "compute_daily_ema",
+        "compute_multi_tf_v2_for_asset",
+        "parse_args",
+        "load_daily_prices",
+        "load_last_ts_by_id",
+        "refresh_cmc_ema_multi_tf_v2_incremental",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.features.m_tf.old.ema_multi_tf_v2_pre-dim",
+      "classes": [
+        "CliArgs"
+      ],
+      "functions": [
+        "compute_daily_ema",
+        "compute_multi_tf_v2_for_asset",
+        "parse_args",
+        "load_daily_prices",
+        "load_last_ts_by_id",
+        "refresh_cmc_ema_multi_tf_v2_incremental",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.features.m_tf.old.ema_multi_timeframe_pre-bars",
+      "classes": [],
+      "functions": [
+        "_normalize_daily",
+        "_resample_ohlcv_for_tf",
+        "_compute_tf_closes_by_asset",
+        "_resolve_timeframes_from_dim_timeframe",
+        "build_multi_timeframe_ema_frame",
+        "write_multi_timeframe_ema_to_db"
+      ]
+    },
+    {
+      "module": "ta_lab2.features.m_tf.old.ema_multi_timeframe_pre-dim_tf",
+      "classes": [],
+      "functions": [
+        "_normalize_daily",
+        "_resample_ohlcv_for_tf",
+        "_compute_tf_closes_by_asset",
+        "build_multi_timeframe_ema_frame",
+        "write_multi_timeframe_ema_to_db"
+      ]
+    },
+    {
+      "module": "ta_lab2.features.m_tf.old.ema_multi_timeframe_predimUpdate20251219",
+      "classes": [],
+      "functions": [
+        "_normalize_daily",
+        "_resolve_tf_day_timeframes",
+        "_load_bar_closes",
+        "_synthetic_tf_day_bars_from_daily",
+        "build_multi_timeframe_ema_frame",
+        "write_multi_timeframe_ema_to_db"
+      ]
     },
     {
       "module": "ta_lab2.pipelines.btc_pipeline",
@@ -491,7 +831,1035 @@
       "functions": []
     },
     {
-      "module": "ta_lab2.research.queries.opt_cf_ema",
+      "module": "ta_lab2.scripts.figure out",
+      "classes": [],
+      "functions": [
+        "get_all_asset_ids",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.open_ai_script",
+      "classes": [],
+      "functions": [
+        "load_stats_csv",
+        "ask_chatgpt_about_stats"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.__init__",
+      "classes": [],
+      "functions": []
+    },
+    {
+      "module": "ta_lab2.scripts.bars.audit_price_bars_integrity",
+      "classes": [
+        "TfSpec"
+      ],
+      "functions": [
+        "_log",
+        "get_engine",
+        "parse_ids",
+        "table_exists",
+        "get_columns",
+        "best_ts_col",
+        "_load_dim_timeframe",
+        "tfs_for_family",
+        "run_coverage",
+        "audit_table_summary",
+        "run_audit",
+        "load_tf_specs",
+        "fetch_canonical_closes",
+        "spacing_eval",
+        "barseq_continuity_eval",
+        "run_spacing",
+        "get_tf_pairs",
+        "pick_sample_cols",
+        "sample_group",
+        "run_samples",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.bars.audit_price_bars_samples",
+      "classes": [],
+      "functions": [
+        "_log",
+        "get_engine",
+        "parse_ids",
+        "table_exists",
+        "get_columns",
+        "get_tf_list",
+        "pick_cols",
+        "best_ts_col",
+        "sample_group",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.bars.audit_price_bars_tables",
+      "classes": [],
+      "functions": [
+        "_log",
+        "get_engine",
+        "parse_ids",
+        "table_exists",
+        "get_columns",
+        "audit_table",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.bars.refresh_cmc_price_bars_multi_tf",
+      "classes": [],
+      "functions": [
+        "resolve_db_url",
+        "get_engine",
+        "load_all_ids",
+        "parse_ids",
+        "load_daily_min_max",
+        "load_daily_prices_for_id",
+        "delete_bars_for_id_tf",
+        "load_last_snapshot_info",
+        "load_last_bar_snapshot_row",
+        "ensure_state_table",
+        "load_state",
+        "upsert_state",
+        "load_tf_list_from_dim_timeframe",
+        "_make_day_time_open",
+        "_has_missing_days",
+        "_count_missing_days",
+        "build_snapshots_for_id",
+        "build_all_snapshots",
+        "make_upsert_sql",
+        "upsert_bars",
+        "refresh_incremental",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.bars.refresh_cmc_price_bars_multi_tf_cal_anchor_iso",
+      "classes": [
+        "AnchorSpec"
+      ],
+      "functions": [
+        "resolve_db_url",
+        "get_engine",
+        "load_all_ids",
+        "parse_ids",
+        "ensure_state_table",
+        "load_state",
+        "upsert_state",
+        "load_daily_min_max",
+        "_validate_daily_required_cols",
+        "load_daily_prices_for_id",
+        "delete_bars_for_id_tf",
+        "load_last_snapshot_info_for_id_tfs",
+        "load_last_snapshot_row",
+        "load_anchor_specs_from_dim_timeframe",
+        "_last_day_of_month",
+        "_add_months",
+        "_week_start_iso_monday",
+        "_week_index_iso",
+        "_week_group_bounds_iso",
+        "_month_group_bounds_anchored",
+        "_year_group_bounds_anchored",
+        "anchor_window_for_day",
+        "_months_diff",
+        "bar_seq_for_window_start",
+        "_expected_days",
+        "_count_days_remaining",
+        "_missing_days_stats",
+        "_lookback_days_for_spec",
+        "_make_day_time_open",
+        "_assert_one_row_per_local_day",
+        "_build_snapshots_full_history_for_id_spec",
+        "_build_incremental_snapshots_for_id_spec",
+        "upsert_bars",
+        "refresh_incremental",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.bars.refresh_cmc_price_bars_multi_tf_cal_anchor_iso_pre-partial-end",
+      "classes": [
+        "AnchorSpec"
+      ],
+      "functions": [
+        "resolve_db_url",
+        "get_engine",
+        "load_all_ids",
+        "parse_ids",
+        "ensure_state_table",
+        "load_state",
+        "upsert_state",
+        "load_daily_min_max",
+        "load_daily_prices_for_id",
+        "load_last_bar_info_for_id_tfs",
+        "load_time_close_for_bar_seq",
+        "delete_bars_for_id_tf",
+        "delete_bars_for_id_tf_from_seq",
+        "load_anchor_specs_from_dim_timeframe",
+        "_last_day_of_month",
+        "_month_start",
+        "_add_months",
+        "_week_start_iso_monday",
+        "_week_index_iso",
+        "_week_group_bounds_iso",
+        "_month_group_bounds_anchored",
+        "_year_group_bounds_anchored",
+        "_bounds_for_date",
+        "_iter_anchor_windows_from",
+        "_make_day_time_open",
+        "_assert_one_row_per_local_day",
+        "_build_bars_from_windows",
+        "_build_full_history_for_id_spec",
+        "upsert_bars",
+        "refresh_incremental",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.bars.refresh_cmc_price_bars_multi_tf_cal_anchor_us",
+      "classes": [
+        "AnchorSpec"
+      ],
+      "functions": [
+        "resolve_db_url",
+        "get_engine",
+        "load_all_ids",
+        "parse_ids",
+        "ensure_state_table",
+        "load_state",
+        "upsert_state",
+        "load_daily_min_max",
+        "load_daily_prices_for_id",
+        "delete_bars_for_id_tf",
+        "load_last_snapshot_info_for_id_tfs",
+        "load_last_snapshot_row",
+        "load_anchor_specs_from_dim_timeframe",
+        "_last_day_of_month",
+        "_add_months",
+        "_week_start_us_sunday",
+        "_week_index_us",
+        "_week_group_bounds_us",
+        "_month_group_bounds_anchored",
+        "_year_group_bounds_anchored",
+        "anchor_window_for_day",
+        "_months_diff",
+        "bar_seq_for_window_start",
+        "_expected_days",
+        "_lookback_days_for_spec",
+        "_make_day_time_open",
+        "_assert_one_row_per_local_day",
+        "_missing_days_stats",
+        "_count_days_remaining",
+        "_build_snapshots_full_history_for_id_spec",
+        "_build_incremental_snapshots_for_id_spec",
+        "upsert_bars",
+        "refresh_incremental",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.bars.refresh_cmc_price_bars_multi_tf_cal_anchor_us_pre-partial-end",
+      "classes": [
+        "AnchorSpec"
+      ],
+      "functions": [
+        "resolve_db_url",
+        "get_engine",
+        "load_all_ids",
+        "parse_ids",
+        "ensure_state_table",
+        "load_state",
+        "upsert_state",
+        "load_daily_min_max",
+        "load_daily_prices_for_id",
+        "load_last_bar_info_for_id_tfs",
+        "delete_bars_for_id_tf",
+        "delete_bars_for_id_tf_from_seq",
+        "load_anchor_specs_from_dim_timeframe",
+        "_last_day_of_month",
+        "_month_start",
+        "_add_months",
+        "_year_start",
+        "_week_start_us_sunday",
+        "_week_index_us",
+        "_week_group_bounds_us",
+        "_month_group_bounds_anchored",
+        "_year_group_bounds_anchored",
+        "anchor_window_for_day",
+        "_make_day_time_open",
+        "_assert_one_row_per_local_day",
+        "_iter_anchor_windows_intersecting",
+        "_build_bars_for_id_spec_full",
+        "_build_bars_for_id_spec_from_window_start",
+        "upsert_bars",
+        "refresh_incremental",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.bars.refresh_cmc_price_bars_multi_tf_cal_iso",
+      "classes": [
+        "CalIsoSpec"
+      ],
+      "functions": [
+        "resolve_db_url",
+        "get_engine",
+        "load_all_ids",
+        "parse_ids",
+        "ensure_state_table",
+        "load_state",
+        "upsert_state",
+        "load_daily_min_max",
+        "load_daily_prices_for_id",
+        "delete_bars_for_id_tf",
+        "load_last_snapshot_info_for_id_tfs",
+        "load_last_snapshot_row",
+        "load_cal_specs_from_dim_timeframe",
+        "_last_day_of_month",
+        "_add_months",
+        "_month_start",
+        "_year_start",
+        "_week_start_monday",
+        "_compute_anchor_start",
+        "_bar_end_for_start",
+        "_expected_days",
+        "_months_diff",
+        "_bar_index_for_day",
+        "_bar_start_for_index",
+        "_missing_days_metrics",
+        "_make_day_time_open",
+        "_assert_one_row_per_local_day",
+        "_build_snapshots_full_history_for_id_spec",
+        "_build_incremental_snapshots_for_id_spec",
+        "upsert_bars",
+        "refresh_incremental",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.bars.refresh_cmc_price_bars_multi_tf_cal_iso_pre-partial-end",
+      "classes": [
+        "CalSpec"
+      ],
+      "functions": [
+        "resolve_db_url",
+        "get_engine",
+        "load_all_ids",
+        "parse_ids",
+        "ensure_state_table",
+        "load_state",
+        "upsert_state",
+        "load_daily_min_max",
+        "load_daily_prices_for_id",
+        "load_last_bar_info_for_id_tfs",
+        "delete_bars_for_id_tf",
+        "load_cal_specs_from_dim_timeframe",
+        "_last_day_of_month",
+        "_add_months",
+        "_month_start",
+        "_year_start",
+        "_week_start_monday",
+        "_compute_anchor_start",
+        "_bar_end_for_start",
+        "_expected_days",
+        "_advance_start",
+        "_make_day_time_open",
+        "_assert_one_row_per_local_day",
+        "_build_full_history_for_id_spec",
+        "_build_incremental_new_bars_for_id_spec",
+        "upsert_bars",
+        "refresh_incremental",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.bars.refresh_cmc_price_bars_multi_tf_cal_us",
+      "classes": [
+        "CalSpec"
+      ],
+      "functions": [
+        "resolve_db_url",
+        "get_engine",
+        "load_all_ids",
+        "parse_ids",
+        "ensure_state_table",
+        "load_state",
+        "upsert_state",
+        "load_daily_min_max",
+        "load_daily_prices_for_id",
+        "delete_bars_for_id_tf",
+        "load_last_snapshot_info_for_id_tfs",
+        "load_last_snapshot_row",
+        "load_cal_specs_from_dim_timeframe",
+        "_last_day_of_month",
+        "_add_months",
+        "_month_start",
+        "_year_start",
+        "_week_start_sunday",
+        "_compute_anchor_start",
+        "_bar_end_for_start",
+        "_expected_days",
+        "_months_diff",
+        "_bar_index_for_day",
+        "_bar_start_for_index",
+        "_missing_days_metrics",
+        "_make_day_time_open",
+        "_assert_one_row_per_local_day",
+        "_build_snapshots_full_history_for_id_spec",
+        "_build_incremental_snapshots_for_id_spec",
+        "upsert_bars",
+        "refresh_incremental",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.bars.refresh_cmc_price_bars_multi_tf_cal_us_pre-partial-end",
+      "classes": [
+        "CalSpec"
+      ],
+      "functions": [
+        "resolve_db_url",
+        "get_engine",
+        "load_all_ids",
+        "parse_ids",
+        "ensure_state_table",
+        "load_state",
+        "upsert_state",
+        "load_daily_min_max",
+        "load_daily_prices_for_id",
+        "load_last_bar_info",
+        "load_last_bar_info_for_id_tfs",
+        "delete_bars_for_id_tf",
+        "load_cal_specs_from_dim_timeframe",
+        "_last_day_of_month",
+        "_add_months",
+        "_month_start",
+        "_year_start",
+        "_week_start_sunday",
+        "_compute_anchor_start",
+        "_bar_end_for_start",
+        "_expected_days",
+        "_advance_start",
+        "_make_day_time_open",
+        "_assert_one_row_per_local_day",
+        "_build_full_history_for_id_spec",
+        "_build_incremental_new_bars_for_id_spec",
+        "upsert_bars",
+        "refresh_incremental",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.bars.refresh_cmc_price_bars_multi_tf_pre-partial-end",
+      "classes": [],
+      "functions": [
+        "resolve_db_url",
+        "get_engine",
+        "load_all_ids",
+        "parse_ids",
+        "load_daily_min_max",
+        "load_daily_prices",
+        "load_daily_prices_for_id",
+        "load_last_bar_info",
+        "delete_bars_for_id_tf",
+        "ensure_state_table",
+        "load_state",
+        "upsert_state",
+        "load_tf_list_from_dim_timeframe",
+        "_make_day_time_open",
+        "_enforce_bar_continuity",
+        "build_bars_for_id",
+        "_build_incremental_new_bars_for_id",
+        "build_bars",
+        "make_upsert_sql",
+        "upsert_bars",
+        "refresh_incremental",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.bars.old.refresh_cmc_price_bars_multi_tf_hardcoded_tfs",
+      "classes": [],
+      "functions": [
+        "resolve_db_url",
+        "get_engine",
+        "load_all_ids",
+        "parse_ids",
+        "load_daily_prices",
+        "_make_day_time_open",
+        "_enforce_bar_continuity",
+        "build_bars_for_id",
+        "build_bars",
+        "upsert_bars",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.emas.audit_ema_expected_coverage",
+      "classes": [],
+      "functions": [
+        "_log",
+        "get_engine",
+        "parse_ids",
+        "load_periods",
+        "load_tfs",
+        "actual_combos",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.emas.audit_ema_integrity",
+      "classes": [
+        "TfSpec"
+      ],
+      "functions": [
+        "_log",
+        "get_engine",
+        "parse_ids",
+        "load_periods",
+        "load_tfs",
+        "table_exists",
+        "get_columns",
+        "actual_combos",
+        "run_coverage",
+        "audit_table",
+        "run_audit",
+        "load_dim_timeframe_specs",
+        "fetch_canonical_ts",
+        "spacing_eval_for_group",
+        "run_spacing",
+        "pick_sample_cols",
+        "get_group_keys",
+        "sample_group",
+        "run_samples",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.emas.audit_ema_samples",
+      "error": "(unicode error) 'unicodeescape' codec can't decode bytes in position 335-336: truncated \\UXXXXXXXX escape (audit_ema_samples.py, line 4)"
+    },
+    {
+      "module": "ta_lab2.scripts.emas.audit_ema_tables",
+      "classes": [],
+      "functions": [
+        "_log",
+        "get_engine",
+        "parse_ids",
+        "table_exists",
+        "get_columns",
+        "audit_table",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.emas.refresh_cmc_ema_multi_tf_cal_anchor_from_bars",
+      "classes": [],
+      "functions": [
+        "_in_ipython",
+        "_resolve_db_url",
+        "_load_ids",
+        "_load_periods_from_lut",
+        "_get_table_columns",
+        "_pick_ts_column",
+        "_require_output_schema",
+        "_ensure_state_table",
+        "_load_state",
+        "_compute_dirty_start",
+        "_update_state_anchor",
+        "_parse_args",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.emas.refresh_cmc_ema_multi_tf_cal_from_bars",
+      "classes": [],
+      "functions": [
+        "_resolve_db_url",
+        "_parse_ids",
+        "_parse_int_list",
+        "_load_all_ids",
+        "_load_periods_from_lut",
+        "_ensure_state_table",
+        "_load_state",
+        "_update_state",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.emas.refresh_cmc_ema_multi_tf_from_bars",
+      "classes": [],
+      "functions": [
+        "build_parser",
+        "_resolve_db_url",
+        "_resolve_ids",
+        "_load_periods",
+        "_load_tf_day_canonical",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.emas.refresh_cmc_ema_multi_tf_v2",
+      "classes": [],
+      "functions": [
+        "_resolve_db_url",
+        "_parse_ids",
+        "_parse_int_list",
+        "_load_periods_from_lut",
+        "build_parser",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.emas.run_all_ema_refreshes",
+      "classes": [
+        "Step"
+      ],
+      "functions": [
+        "_require_env",
+        "_run_script",
+        "build_steps",
+        "parse_args",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.emas.sync_cmc_ema_multi_tf_u",
+      "classes": [],
+      "functions": [
+        "_log",
+        "get_engine",
+        "split_schema_table",
+        "table_exists",
+        "get_columns",
+        "alignment_source_from_table",
+        "get_watermark",
+        "build_select_expr",
+        "insert_new_rows",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.emas.__init__",
+      "classes": [],
+      "functions": []
+    },
+    {
+      "module": "ta_lab2.scripts.emas.old.refresh_all_emas_view_only",
+      "classes": [],
+      "functions": [
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.emas.old.refresh_cmc_emas",
+      "classes": [],
+      "functions": [
+        "_get_engine",
+        "_ensure_refresh_state_table",
+        "_load_all_ids",
+        "_parse_ids",
+        "_get_load_ts_bounds_for_id",
+        "_get_dirty_window_for_id",
+        "_upsert_refresh_state",
+        "_get_daily_bounds_for_id",
+        "_get_multi_tf_max_ts_for_id",
+        "_get_cal_multi_tf_max_ts_for_id",
+        "_get_cal_anchor_multi_tf_max_ts_for_id",
+        "refresh",
+        "_parse_args"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.emas.old.refresh_cmc_emas_asOf_EOD_20251207",
+      "classes": [],
+      "functions": [
+        "_get_engine",
+        "_ensure_refresh_state_table",
+        "_load_all_ids",
+        "_parse_ids",
+        "_get_load_ts_bounds_for_id",
+        "_get_dirty_window_for_id",
+        "_upsert_refresh_state",
+        "_get_daily_bounds_for_id",
+        "_get_multi_tf_max_ts_for_id",
+        "_get_cal_multi_tf_max_ts_for_id",
+        "refresh",
+        "_parse_args"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.emas.old.refresh_cmc_emas_old",
+      "classes": [],
+      "functions": [
+        "_get_engine",
+        "_load_all_ids",
+        "_parse_ids",
+        "refresh",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.emas.old.refresh_cmc_emas_old1",
+      "classes": [],
+      "functions": [
+        "_get_engine",
+        "_load_all_ids",
+        "_parse_ids",
+        "refresh",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.emas.old.refresh_cmc_emas_old2",
+      "classes": [],
+      "functions": [
+        "_get_engine",
+        "_ensure_refresh_state_table",
+        "_load_all_ids",
+        "_parse_ids",
+        "_get_refresh_state_for_id",
+        "_get_changed_window",
+        "_upsert_refresh_state",
+        "_get_daily_bounds_for_id",
+        "_get_max_ema_ts_for_id",
+        "_get_max_load_ts_for_id",
+        "refresh",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.emas.old.refresh_cmc_ema_daily_only",
+      "classes": [],
+      "functions": [
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.emas.old.refresh_cmc_ema_multi_tf_cal_anchor_from_bars_old",
+      "classes": [],
+      "functions": [
+        "_in_ipython",
+        "_load_ids",
+        "_parse_args",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.emas.old.refresh_cmc_ema_multi_tf_cal_anchor_only",
+      "classes": [],
+      "functions": [
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.emas.old.refresh_cmc_ema_multi_tf_cal_from_bars_old",
+      "classes": [],
+      "functions": [
+        "_resolve_db_url",
+        "_parse_ids",
+        "_parse_int_list",
+        "_load_all_ids",
+        "_ensure_state_table",
+        "_load_state",
+        "_update_state",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.emas.old.refresh_cmc_ema_multi_tf_cal_only",
+      "classes": [],
+      "functions": [
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.emas.old.refresh_cmc_ema_multi_tf_cal_only_v2_old",
+      "classes": [],
+      "functions": [
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.emas.old.refresh_cmc_ema_multi_tf_only",
+      "classes": [],
+      "functions": [
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.emas.old.refresh_cmc_ema_multi_tf_v2_from_bars_old",
+      "classes": [],
+      "functions": [
+        "_resolve_db_url",
+        "_parse_ids",
+        "_parse_int_list",
+        "build_parser",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.emas.old.refresh_cmc_ema_multi_tf_v2_only",
+      "classes": [],
+      "functions": [
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.emas.old.refresh_cmc_price_with_emas_d1d2_view_only",
+      "classes": [],
+      "functions": [
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.emas.old.refresh_cmc_price_with_emas_view_only",
+      "classes": [],
+      "functions": [
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.emas.old.refresh_ema_multi_tf_stats_old",
+      "classes": [],
+      "functions": [
+        "get_engine",
+        "run_all_tests",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.emas.old.run_ema_refresh_examples",
+      "classes": [],
+      "functions": [
+        "get_engine",
+        "get_all_ids",
+        "_get_table_snapshot",
+        "_summarize_table_changes",
+        "_snapshot_all_targets",
+        "_summarize_all_targets",
+        "_build_cli_args",
+        "_refresh_insert_only_all_targets",
+        "example_incremental_all_ids_all_targets"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.emas.stats.__init__",
+      "classes": [],
+      "functions": []
+    },
+    {
+      "module": "ta_lab2.scripts.emas.stats.daily.refresh_ema_daily_stats",
+      "classes": [],
+      "functions": [
+        "get_engine",
+        "run_all_tests",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.emas.stats.daily.run_refresh_ema_daily_stats",
+      "classes": [],
+      "functions": []
+    },
+    {
+      "module": "ta_lab2.scripts.emas.stats.daily.__init__",
+      "classes": [],
+      "functions": []
+    },
+    {
+      "module": "ta_lab2.scripts.emas.stats.multi_tf.refresh_ema_multi_tf_stats",
+      "classes": [],
+      "functions": [
+        "_setup_logging",
+        "get_engine",
+        "run",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.emas.stats.multi_tf.__init__",
+      "classes": [],
+      "functions": []
+    },
+    {
+      "module": "ta_lab2.scripts.emas.stats.multi_tf.old.refresh_ema_multi_tf_stats_old",
+      "classes": [],
+      "functions": [
+        "get_engine",
+        "run_all_tests",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.emas.stats.multi_tf.old.run_refresh_ema_multi_tf_stats_old",
+      "classes": [],
+      "functions": []
+    },
+    {
+      "module": "ta_lab2.scripts.emas.stats.multi_tf_cal.refresh_ema_multi_tf_cal_stats",
+      "classes": [],
+      "functions": [
+        "_setup_logging",
+        "get_engine",
+        "infer_expected_scheme",
+        "run",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.emas.stats.multi_tf_cal.__init__",
+      "classes": [],
+      "functions": []
+    },
+    {
+      "module": "ta_lab2.scripts.emas.stats.multi_tf_cal.old.refresh_ema_multi_tf_cal_stats_old",
+      "classes": [],
+      "functions": [
+        "get_engine",
+        "run_all_tests",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.emas.stats.multi_tf_cal.old.run_refresh_ema_multi_tf_cal_stats_old",
+      "classes": [],
+      "functions": []
+    },
+    {
+      "module": "ta_lab2.scripts.emas.stats.multi_tf_cal_anchor.refresh_ema_multi_tf_cal_anchor_stats",
+      "classes": [],
+      "functions": [
+        "_setup_logging",
+        "get_engine",
+        "infer_expected_scheme",
+        "run",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.emas.stats.multi_tf_cal_anchor.old.refresh_ema_multi_tf_cal_anchor_stats_old",
+      "classes": [],
+      "functions": [
+        "_mask_url",
+        "_get_engine",
+        "_ensure_stats_table",
+        "_insert_daily_row_span",
+        "_insert_roll_false_spacing",
+        "_insert_roll_false_count_vs_span",
+        "_insert_non_null_ema",
+        "_insert_non_decreasing_ts",
+        "_insert_roll_boolean",
+        "refresh",
+        "_normalize_ids_arg",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.emas.stats.multi_tf_cal_anchor.old.run_refresh_ema_multi_tf_cal_anchor_stats_old",
+      "classes": [],
+      "functions": [
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.emas.stats.multi_tf_v2.refresh_ema_multi_tf_v2_stats",
+      "classes": [],
+      "functions": [
+        "_setup_logging",
+        "get_engine",
+        "run",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.emas.stats.multi_tf_v2.__init__",
+      "classes": [],
+      "functions": []
+    },
+    {
+      "module": "ta_lab2.scripts.emas.stats.multi_tf_v2.old.refresh_ema_multi_tf_v2_stats_old",
+      "classes": [],
+      "functions": [
+        "_resolve_db_url",
+        "_get_engine",
+        "_load_all_ids",
+        "_normalize_ids_arg",
+        "_delete_existing_for_ids",
+        "_insert_daily_row_span",
+        "_insert_roll_false_spacing",
+        "refresh",
+        "_build_arg_parser",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.emas.stats.multi_tf_v2.old.run_refresh_ema_multi_tf_v2_stats_old",
+      "classes": [],
+      "functions": [
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.etl.backfill_ema_diffs",
+      "classes": [],
+      "functions": [
+        "_resolve_group_cols",
+        "_resolve_time_col",
+        "backfill_table",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.etl.update_cmc_history",
+      "classes": [],
+      "functions": []
+    },
+    {
+      "module": "ta_lab2.scripts.pipeline.run_go_forward_daily_refresh",
+      "classes": [
+        "Step"
+      ],
+      "functions": [
+        "_log",
+        "_require_env",
+        "get_engine",
+        "ensure_state_table",
+        "get_last_state",
+        "set_last_state",
+        "get_daily_max_ts",
+        "run_step",
+        "build_steps",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.prices.refresh_price_histories7_stats",
+      "classes": [],
+      "functions": [
+        "get_engine",
+        "run_all_tests",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.prices.run_refresh_price_histories7_stats",
+      "classes": [],
+      "functions": [
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.prices.__init__",
+      "classes": [],
+      "functions": []
+    },
+    {
+      "module": "ta_lab2.scripts.research.queries.opt_cf_ema",
       "classes": [],
       "functions": [
         "_norm_cols",
@@ -502,7 +1870,7 @@
       ]
     },
     {
-      "module": "ta_lab2.research.queries.opt_cf_ema_refine",
+      "module": "ta_lab2.scripts.research.queries.opt_cf_ema_refine",
       "classes": [],
       "functions": [
         "_norm_cols",
@@ -514,7 +1882,7 @@
       ]
     },
     {
-      "module": "ta_lab2.research.queries.opt_cf_ema_sensitivity",
+      "module": "ta_lab2.scripts.research.queries.opt_cf_ema_sensitivity",
       "classes": [],
       "functions": [
         "_norm_cols",
@@ -525,7 +1893,7 @@
       ]
     },
     {
-      "module": "ta_lab2.research.queries.opt_cf_generic",
+      "module": "ta_lab2.scripts.research.queries.opt_cf_generic",
       "classes": [],
       "functions": [
         "_norm_cols",
@@ -534,7 +1902,7 @@
       ]
     },
     {
-      "module": "ta_lab2.research.queries.run_ema_50_100",
+      "module": "ta_lab2.scripts.research.queries.run_ema_50_100",
       "classes": [],
       "functions": [
         "_normalize_cols",
@@ -546,13 +1914,338 @@
       ]
     },
     {
-      "module": "ta_lab2.research.queries.wf_validate_ema",
+      "module": "ta_lab2.scripts.research.queries.wf_validate_ema",
       "classes": [],
       "functions": [
         "_norm_cols",
         "load_df",
         "ensure_ema",
         "rolling_train_test_splits",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.returns.audit_returns_bars_multi_tf_cal_anchor_iso_integrity",
+      "classes": [],
+      "functions": [
+        "_print",
+        "_get_engine",
+        "_df",
+        "_write_csv",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.returns.audit_returns_bars_multi_tf_cal_anchor_us_integrity",
+      "classes": [],
+      "functions": [
+        "_print",
+        "_get_engine",
+        "_df",
+        "_write_csv",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.returns.audit_returns_bars_multi_tf_cal_iso_integrity",
+      "classes": [],
+      "functions": [
+        "_print",
+        "_get_engine",
+        "_df",
+        "_write_csv",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.returns.audit_returns_bars_multi_tf_cal_us_integrity",
+      "classes": [],
+      "functions": [
+        "_print",
+        "_get_engine",
+        "_df",
+        "_write_csv",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.returns.audit_returns_bars_multi_tf_integrity",
+      "classes": [],
+      "functions": [
+        "_print",
+        "_get_engine",
+        "_df",
+        "_write_csv",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.returns.audit_returns_d1_integrity",
+      "classes": [
+        "AuditConfig"
+      ],
+      "functions": [
+        "_print",
+        "_get_engine",
+        "_df",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.returns.audit_returns_ema_multi_tf_cal_anchor_integrity",
+      "classes": [
+        "SchemeSpec"
+      ],
+      "functions": [
+        "_print",
+        "_get_engine",
+        "_df",
+        "_write_csv",
+        "_today_yyyymmdd",
+        "_resolve_out_base",
+        "_schemes",
+        "_fail_or_warn",
+        "_audit_one",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.returns.audit_returns_ema_multi_tf_cal_integrity",
+      "classes": [],
+      "functions": [
+        "_print",
+        "_get_engine",
+        "_df",
+        "_write_csv",
+        "_today_yyyymmdd",
+        "_resolve_out_name",
+        "_fail_or_warn",
+        "expand_scheme",
+        "expand_series",
+        "_audit_one",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.returns.audit_returns_ema_multi_tf_integrity",
+      "classes": [],
+      "functions": [
+        "_print",
+        "_get_engine",
+        "_df",
+        "_write_csv",
+        "_today_yyyymmdd",
+        "_resolve_out_name",
+        "_fail_or_warn",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.returns.audit_returns_ema_multi_tf_u_integrity",
+      "classes": [],
+      "functions": [
+        "_print",
+        "_get_engine",
+        "_df",
+        "_write_csv",
+        "_today_yyyymmdd",
+        "_resolve_out_name",
+        "_fail_or_warn",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.returns.audit_returns_ema_multi_tf_v2_integrity",
+      "classes": [],
+      "functions": [
+        "_print",
+        "_get_engine",
+        "_df",
+        "_write_csv",
+        "_today_yyyymmdd",
+        "_resolve_out_name",
+        "_fail_or_warn",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.returns.refresh_cmc_returns_bars_multi_tf",
+      "classes": [
+        "RunnerConfig"
+      ],
+      "functions": [
+        "_print",
+        "_get_engine",
+        "_load_all_ids",
+        "_load_all_tfs",
+        "_load_pairs",
+        "_ensure_state_rows",
+        "_full_refresh",
+        "_run_one_pair",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.returns.refresh_cmc_returns_bars_multi_tf_cal_anchor_iso",
+      "classes": [
+        "Key"
+      ],
+      "functions": [
+        "_print",
+        "_get_engine",
+        "ensure_tables",
+        "drop_tables",
+        "load_keys",
+        "get_last_time_close",
+        "upsert_state",
+        "process_key",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.returns.refresh_cmc_returns_bars_multi_tf_cal_anchor_us",
+      "classes": [
+        "Key"
+      ],
+      "functions": [
+        "_print",
+        "_get_engine",
+        "ensure_tables",
+        "drop_tables",
+        "load_keys",
+        "get_last_time_close",
+        "upsert_state",
+        "process_key",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.returns.refresh_cmc_returns_bars_multi_tf_cal_iso",
+      "classes": [
+        "Key"
+      ],
+      "functions": [
+        "_print",
+        "_get_engine",
+        "ensure_tables",
+        "drop_tables",
+        "load_keys",
+        "get_last_time_close",
+        "upsert_state",
+        "process_key",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.returns.refresh_cmc_returns_bars_multi_tf_cal_us",
+      "error": "(unicode error) 'unicodeescape' codec can't decode bytes in position 875-876: truncated \\UXXXXXXXX escape (refresh_cmc_returns_bars_multi_tf_cal_us.py, line 3)"
+    },
+    {
+      "module": "ta_lab2.scripts.returns.refresh_cmc_returns_d1",
+      "classes": [
+        "RunnerConfig"
+      ],
+      "functions": [
+        "_print",
+        "_get_engine",
+        "_load_all_ids",
+        "_ensure_state_rows",
+        "_full_refresh",
+        "_run_one_id",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.returns.refresh_cmc_returns_ema_multi_tf",
+      "classes": [
+        "RunnerConfig"
+      ],
+      "functions": [
+        "_print",
+        "_get_engine",
+        "expand_roll_mode",
+        "_ensure_tables",
+        "_parse_ids",
+        "_load_keys",
+        "_ensure_state_rows",
+        "_full_refresh",
+        "_run_one_key",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.returns.refresh_cmc_returns_ema_multi_tf_cal",
+      "classes": [
+        "RunnerConfig"
+      ],
+      "functions": [
+        "_print",
+        "_get_engine",
+        "_parse_ids",
+        "expand_scheme",
+        "expand_series",
+        "expand_roll_mode",
+        "_load_keys",
+        "_ensure_state_rows",
+        "_full_refresh",
+        "_run_one_key",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.returns.refresh_cmc_returns_ema_multi_tf_cal_anchor",
+      "classes": [
+        "RunnerConfig"
+      ],
+      "functions": [
+        "_print",
+        "_get_engine",
+        "_parse_ids",
+        "expand_roll_mode",
+        "expand_series_mode",
+        "expand_scheme",
+        "_tables_for_scheme",
+        "_load_keys_for_one_table",
+        "_ensure_state_rows",
+        "_full_refresh",
+        "_run_one_key",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.returns.refresh_cmc_returns_ema_multi_tf_u",
+      "classes": [
+        "RunnerConfig"
+      ],
+      "functions": [
+        "_print",
+        "_get_engine",
+        "_parse_ids_arg",
+        "_expand_series",
+        "_expand_roll_mode",
+        "_load_keys",
+        "_ensure_state_rows",
+        "_run_one_key",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.scripts.returns.refresh_cmc_returns_ema_multi_tf_v2",
+      "classes": [
+        "RunnerConfig"
+      ],
+      "functions": [
+        "_print",
+        "_get_engine",
+        "expand_roll_mode",
+        "_ensure_tables",
+        "_parse_ids",
+        "_load_keys",
+        "_ensure_state_rows",
+        "_read_state_for_keys",
+        "_full_refresh",
+        "_run_one_key",
+        "_upsert_state_bulk_unnest",
         "main"
       ]
     },
@@ -631,9 +2324,146 @@
       ]
     },
     {
+      "module": "ta_lab2.time.dim_sessions",
+      "classes": [
+        "SessionKey",
+        "SessionMeta",
+        "DimSessions"
+      ],
+      "functions": [
+        "_resolve_db_url"
+      ]
+    },
+    {
+      "module": "ta_lab2.time.dim_timeframe",
+      "classes": [
+        "TFMeta",
+        "DimTimeframe"
+      ],
+      "functions": [
+        "_get_dim",
+        "get_tf_days",
+        "get_alignment_type",
+        "list_tfs",
+        "get_tf_days_bounds",
+        "get_tf_days_bounds_or_nominal",
+        "allows_partial",
+        "get_calendar_scheme",
+        "realized_tf_days_ok"
+      ]
+    },
+    {
+      "module": "ta_lab2.time.qa",
+      "classes": [
+        "QAReason",
+        "QAViolation",
+        "QARunResult"
+      ],
+      "functions": [
+        "_make_engine",
+        "_count_by_reason",
+        "_tf_days_bounds_violations",
+        "_partial_policy_violations",
+        "run_bars_qa",
+        "summarize_qa"
+      ]
+    },
+    {
+      "module": "ta_lab2.time.specs",
+      "classes": [
+        "CalendarScheme",
+        "TimeframeFamily",
+        "PartialPolicy",
+        "TimeframeSpec",
+        "TableSpec",
+        "TimeSpecStore"
+      ],
+      "functions": [
+        "default_bars_table_registry",
+        "_make_engine",
+        "load_time_specs",
+        "require_specs_for_tfs",
+        "assert_table_tf_invariants"
+      ]
+    },
+    {
+      "module": "ta_lab2.time.__init__",
+      "classes": [],
+      "functions": []
+    },
+    {
+      "module": "ta_lab2.tools.dbtool",
+      "classes": [
+        "DbConfig"
+      ],
+      "functions": [
+        "_normalize_db_url",
+        "_find_repo_root",
+        "_load_env_file_if_present",
+        "_resolve_db_url",
+        "_normalize_sql",
+        "_enforce_read_only",
+        "_ensure_limit",
+        "_redact_url",
+        "_quote_ident",
+        "_validate_simple_ident",
+        "_validate_sql_fragment",
+        "_connect_v3",
+        "_connect_v2",
+        "_apply_safety_session_settings",
+        "_execute_sql",
+        "schema_overview_sql",
+        "_render_snapshot_check_text",
+        "table_stats_sql",
+        "col_stats_sql",
+        "list_tables_sql",
+        "describe_table_sql",
+        "indexes_detail_sql",
+        "constraints_sql",
+        "keys_sql",
+        "profile_table_queries",
+        "explain_sql",
+        "column_profile_sql",
+        "time_profile_sql",
+        "dupes_sql",
+        "agg_sql",
+        "_safe_int",
+        "_parse_snapshot_ts",
+        "_human_bytes",
+        "_snapshot_check_summary",
+        "_rows_to_dicts",
+        "_snapshot_db",
+        "_md_escape",
+        "_render_snapshot_md",
+        "cmd_snapshot_diff",
+        "main"
+      ]
+    },
+    {
+      "module": "ta_lab2.tools.snapshot_diff",
+      "classes": [
+        "NormTable",
+        "NormSnapshot"
+      ],
+      "functions": [
+        "_human_bytes",
+        "_norm_rows",
+        "_table_key",
+        "load_snapshot",
+        "diff_snapshots",
+        "render_diff_md"
+      ]
+    },
+    {
+      "module": "ta_lab2.tools.__init__",
+      "classes": [],
+      "functions": []
+    },
+    {
       "module": "ta_lab2.utils.cache",
       "classes": [],
       "functions": [
+        "_ensure_joblib_available",
         "_key",
         "disk_cache"
       ]
