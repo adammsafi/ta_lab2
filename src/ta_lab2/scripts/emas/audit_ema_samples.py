@@ -1,7 +1,7 @@
 from __future__ import annotations
 # -*- coding: utf-8 -*-
 
-"""
+r"""
 audit_ema_samples.py
 
 Creates a small human-eyeball sample CSV to spot-check EMA tables.

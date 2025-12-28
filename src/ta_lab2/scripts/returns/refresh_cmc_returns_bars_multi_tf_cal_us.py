@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""
+r"""
 refresh_cmc_returns_bars_multi_tf_cal_us.py
 
 Incremental bar-returns builder from:
