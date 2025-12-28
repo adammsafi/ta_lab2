@@ -54,22 +54,50 @@ Ad-hoc, experimental, or temporary queries that support current development work
 
 ## Categorization Methodology
 
-1. **Is this a reusable skeleton?**  
-   - Yes → `sql/templates/`  
-   - No → continue.
+1. **Is this a reusable skeleton or template?**  
+   - Yes -> `sql/templates/`  
+   - No -> continue.
 
-2. **Does this define a stable view that is part of the schema?**  
-   - Yes → `sql/views/`  
-   - No → continue.
+2. **Is this core schema DDL (tables, indexes, constraints, types)?**  
+   - Yes -> `sql/ddl/`  
+   - No -> continue.
 
-3. **Does this define/seed a small, mostly-static lookup table?**  
-   - Yes → `sql/lookups/`  
-   - No → continue.
+3. **Is this a versioned schema change to apply in sequence?**  
+   - Yes -> `sql/migration/`  
+   - No -> continue.
 
-4. **Is this a healthcheck, coverage, or validation query?**  
-   - Yes → `sql/metrics/`  
-   - No → continue.
+4. **Does this define or alter a stable view/materialized view?**  
+   - Yes -> `sql/views/`  
+   - No -> continue.
 
-5. **Is this an ad-hoc or WIP query that may change or be deleted later?**  
-   - Yes → `sql/dev/`  
-   - If none of the above fit, default to `sql/dev/` until its role is clearer.
+5. **Does this define or seed a lookup/reference table?**  
+   - Yes -> `sql/lookups/`  
+   - No -> continue.
+
+6. **Is this a dimension table seed or dimension-specific maintenance?**  
+   - Yes -> `sql/dim/`  
+   - No -> continue.
+
+7. **Is this a feature-engineering or feature-specific query?**  
+   - Yes -> `sql/features/`  
+   - No -> continue.
+
+8. **Is this a data quality, coverage, validation, or comparison query?**  
+   - Yes -> `sql/metrics/` or `sql/checks/`  
+   - No -> continue.
+
+9. **Is this QA-only validation or audit?**  
+   - Yes -> `sql/qa/`  
+   - No -> continue.
+
+10. **Is this a gating/guardrail query used in pipelines?**  
+    - Yes -> `sql/gates/`  
+    - No -> continue.
+
+11. **Is this snapshot creation or snapshot comparison?**  
+    - Yes -> `sql/snapshots/`  
+    - No -> continue.
+
+12. **Is this ad-hoc, experimental, or temporary?**  
+    - Yes -> `sql/dev/`  
+    - If none of the above fit, default to `sql/dev/` until its role is clearer.

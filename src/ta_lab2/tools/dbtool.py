@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 from datetime import datetime, timezone, timedelta
+import json
+from ta_lab2.tools.snapshot_diff import load_snapshot, diff_snapshots, render_diff_md
 
 # Prefer psycopg (v3). Fall back to psycopg2 if needed.
 try:
@@ -1353,11 +1355,6 @@ def _render_snapshot_md(snap: Dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 def cmd_snapshot_diff(args) -> int:
-    from pathlib import Path
-    import json
-
-    from ta_lab2.tools.snapshot_diff import load_snapshot, diff_snapshots, render_diff_md
-
     a = load_snapshot(args.a)
     b = load_snapshot(args.b)
     d = diff_snapshots(a, b, top_n=args.top_n)
