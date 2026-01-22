@@ -148,4 +148,4 @@ old/
 
 # allow the default config fixture CSV used by tests
 !data/
-!data/btcusd.csv
+!data/btcusd.csv.planning/intel/
