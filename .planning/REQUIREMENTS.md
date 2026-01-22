@@ -108,19 +108,57 @@ Explicitly excluded from v1. Documented to prevent scope creep.
 
 ## Traceability
 
-Which requirements map to which phases. Will be updated during roadmap creation.
+Which requirements map to which phases.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| MEMO-01 | TBD | Pending |
-| MEMO-02 | TBD | Pending |
-| ... | ... | ... |
+| ORCH-05 | Phase 1 | Pending |
+| ORCH-11 | Phase 1 | Pending |
+| MEMO-01 | Phase 2 | Pending |
+| MEMO-02 | Phase 2 | Pending |
+| MEMO-03 | Phase 2 | Pending |
+| MEMO-04 | Phase 2 | Pending |
+| MEMO-07 | Phase 2 | Pending |
+| MEMO-05 | Phase 3 | Pending |
+| MEMO-06 | Phase 3 | Pending |
+| MEMO-08 | Phase 3 | Pending |
+| ORCH-01 | Phase 4 | Pending |
+| ORCH-02 | Phase 4 | Pending |
+| ORCH-03 | Phase 4 | Pending |
+| ORCH-04 | Phase 5 | Pending |
+| ORCH-06 | Phase 5 | Pending |
+| ORCH-07 | Phase 5 | Pending |
+| ORCH-08 | Phase 5 | Pending |
+| ORCH-09 | Phase 5 | Pending |
+| ORCH-10 | Phase 5 | Pending |
+| ORCH-12 | Phase 5 | Pending |
+| TIME-01 | Phase 6 | Pending |
+| TIME-02 | Phase 6 | Pending |
+| TIME-03 | Phase 6 | Pending |
+| TIME-04 | Phase 6 | Pending |
+| TIME-05 | Phase 6 | Pending |
+| TIME-06 | Phase 6 | Pending |
+| TIME-07 | Phase 6 | Pending |
+| FEAT-01 | Phase 7 | Pending |
+| FEAT-02 | Phase 7 | Pending |
+| FEAT-03 | Phase 7 | Pending |
+| FEAT-04 | Phase 7 | Pending |
+| FEAT-05 | Phase 7 | Pending |
+| FEAT-06 | Phase 7 | Pending |
+| FEAT-07 | Phase 7 | Pending |
+| SIG-01 | Phase 8 | Pending |
+| SIG-02 | Phase 8 | Pending |
+| SIG-03 | Phase 9 | Pending |
+| SIG-04 | Phase 10 | Pending |
+| SIG-05 | Phase 10 | Pending |
+| SIG-06 | Phase 10 | Pending |
+| SIG-07 | Phase 10 | Pending |
 
 **Coverage:**
 - v1 requirements: 41 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 41 ⚠️
+- Mapped to phases: 41
+- Unmapped: 0
 
 ---
 *Requirements defined: 2025-01-22*
-*Last updated: 2025-01-22 after initial definition*
+*Last updated: 2025-01-22 (traceability added after roadmap creation)*
