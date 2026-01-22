@@ -34,10 +34,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. Pre-flight adapter validation prevents routing to unimplemented adapters
   3. Infrastructure dependencies (Mem0, Vertex AI, platform SDKs) installed and verified
   4. Development environment supports parallel work on memory/orchestrator/ta_lab2 tracks
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] TBD (to be planned)
+- [ ] 01-01-PLAN.md — Infrastructure setup & SDK validation (Wave 1)
+- [ ] 01-02-PLAN.md — Quota system enhancement with persistence, alerts, reservation (Wave 1)
+- [ ] 01-03-PLAN.md — Pre-flight validation & smoke tests (Wave 2)
 
 ### Phase 2: Memory Core
 **Goal**: 2847 existing memories ingested and searchable across all AI platforms
@@ -155,7 +157,7 @@ Plans:
   2. TF alignment tests confirm calculations use correct timeframes
   3. Roll alignment tests validate calendar boundary handling
   4. Orchestrator successfully coordinates ta_lab2 feature refresh tasks via memory context
-  5. End-to-end workflow: user submits task → orchestrator routes → memory provides context → ta_lab2 executes → results stored
+  5. End-to-end workflow: user submits task -> orchestrator routes -> memory provides context -> ta_lab2 executes -> results stored
 **Plans**: TBD
 
 Plans:
@@ -179,11 +181,11 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation & Quota Management | 0/TBD | Not started | - |
+| 1. Foundation & Quota Management | 0/3 | Planned | - |
 | 2. Memory Core | 0/TBD | Not started | - |
 | 3. Memory Advanced | 0/TBD | Not started | - |
 | 4. Orchestrator Adapters | 0/TBD | Not started | - |
@@ -196,4 +198,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2025-01-22 (initial roadmap)*
+*Last updated: 2025-01-22 (Phase 1 planned: 3 plans in 2 waves)*
