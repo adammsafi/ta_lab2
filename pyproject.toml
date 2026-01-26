@@ -43,6 +43,29 @@ astro = [
   "astronomy-engine>=2.2.0",
 ]
 
+# AI orchestrator SDKs and dependencies
+orchestrator = [
+  "anthropic>=0.40.0",
+  "openai>=1.50.0",
+  "google-generativeai>=0.8.0",
+  "mem0ai>=0.1.0",
+  "python-dotenv>=1.0.0",
+]
+
+# Combined group for development + orchestrator
+all = [
+  "pytest>=8.0",
+  "pytest-benchmark",
+  "hypothesis",
+  "ruff>=0.1.5",
+  "mypy>=1.8",
+  "anthropic>=0.40.0",
+  "openai>=1.50.0",
+  "google-generativeai>=0.8.0",
+  "mem0ai>=0.1.0",
+  "python-dotenv>=1.0.0",
+]
+
 # ---------- Setuptools (src/ layout + root module) ----------
 [tool.setuptools.packages.find]
 where = ["src"]
