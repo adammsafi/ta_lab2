@@ -51,10 +51,12 @@ Plans:
   3. Context injection system retrieves top-K memories for AI prompts
   4. Claude, ChatGPT, and Gemini can all read from ChromaDB memory layer
   5. Incremental update pipeline adds new memories without breaking existing embeddings
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] TBD (to be planned)
+- [ ] 02-01-PLAN.md — ChromaDB client wrapper & integrity validation (Wave 1)
+- [ ] 02-02-PLAN.md — Semantic search API & context injection (Wave 1)
+- [ ] 02-03-PLAN.md — Incremental updates & cross-platform REST API (Wave 2)
 
 ### Phase 3: Memory Advanced (Mem0 Migration)
 **Goal**: Memory system migrated to Mem0 + Vertex AI with self-maintenance and conflict detection
@@ -187,7 +189,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation & Quota Management | 3/3 | Complete | 2026-01-27 |
-| 2. Memory Core | 0/TBD | Not started | - |
+| 2. Memory Core | 0/3 | Planned | - |
 | 3. Memory Advanced | 0/TBD | Not started | - |
 | 4. Orchestrator Adapters | 0/TBD | Not started | - |
 | 5. Orchestrator Coordination | 0/TBD | Not started | - |
@@ -199,4 +201,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-01-27 (Phase 1 complete: 3/3 plans, goal verified)*
+*Last updated: 2026-01-27 (Phase 2 planned: 3 plans in 2 waves)*
