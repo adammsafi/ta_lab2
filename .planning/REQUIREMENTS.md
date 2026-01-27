@@ -112,8 +112,8 @@ Which requirements map to which phases.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ORCH-05 | Phase 1 | Pending |
-| ORCH-11 | Phase 1 | Pending |
+| ORCH-05 | Phase 1 | Complete |
+| ORCH-11 | Phase 1 | Complete |
 | MEMO-01 | Phase 2 | Pending |
 | MEMO-02 | Phase 2 | Pending |
 | MEMO-03 | Phase 2 | Pending |
