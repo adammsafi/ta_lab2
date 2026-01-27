@@ -2,7 +2,7 @@
 
 ## Overview
 
-Build trustworthy quant trading infrastructure 3x faster by creating AI coordination that remembers context across platforms. Start with quota management and memory infrastructure, layer in multi-platform orchestration with cost optimization, then accelerate ta_lab2 development (time model, features, signals) through the coordinated AI system. Parallel tracks converge at integration phase where memory + orchestrator + ta_lab2 prove the unified vision.
+Build trustworthy quant trading infrastructure 3x faster by creating AI coordination that remembers context across platforms. Start with quota management and memory infrastructure (integrate existing 3,763 memories in ChromaDB), layer in multi-platform orchestration with cost optimization, migrate to hybrid Mem0 + Vertex AI architecture, then accelerate ta_lab2 development (time model, features, signals) through the coordinated AI system. Parallel tracks converge at integration phase where memory + orchestrator + ta_lab2 prove the unified vision.
 
 ## Phases
 
@@ -13,8 +13,8 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Foundation & Quota Management** - Infrastructure validation and quota tracking foundation
-- [ ] **Phase 2: Memory Core** - Ingest memories and enable semantic search
-- [ ] **Phase 3: Memory Advanced** - Conflict resolution, health monitoring, metadata
+- [ ] **Phase 2: Memory Core (ChromaDB Integration)** - Integrate existing 3,763 memories and enable semantic search
+- [ ] **Phase 3: Memory Advanced (Mem0 Migration)** - Migrate to Mem0 + Vertex AI, add conflict resolution and health monitoring
 - [ ] **Phase 4: Orchestrator Adapters** - Claude, ChatGPT, Gemini platform integrations
 - [ ] **Phase 5: Orchestrator Coordination** - Routing, handoffs, parallel execution, cost tracking
 - [ ] **Phase 6: ta_lab2 Time Model** - Dimension tables and EMA unification
@@ -41,30 +41,31 @@ Plans:
 - [x] 01-02-PLAN.md — Quota system enhancement with persistence, alerts, reservation (Wave 1)
 - [x] 01-03-PLAN.md — Pre-flight validation & smoke tests (Wave 2)
 
-### Phase 2: Memory Core
-**Goal**: 2847 existing memories ingested and searchable across all AI platforms
+### Phase 2: Memory Core (ChromaDB Integration)
+**Goal**: Existing ChromaDB memory store (3,763 memories) integrated with orchestrator
 **Depends on**: Phase 1
 **Requirements**: MEMO-01, MEMO-02, MEMO-03, MEMO-04, MEMO-07
 **Success Criteria** (what must be TRUE):
-  1. All 2847 memories successfully ingested into Mem0 + Vertex AI Memory Bank
-  2. Semantic search returns relevant memories with threshold >0.7
+  1. ChromaDB memory store (3,763 embedded memories) validated and accessible
+  2. Semantic search API exposed from ChromaDB with threshold >0.7
   3. Context injection system retrieves top-K memories for AI prompts
-  4. Claude, ChatGPT, and Gemini can all read from unified memory layer
-  5. Batch ingestion pipeline handles failures with checkpoints and resume capability
+  4. Claude, ChatGPT, and Gemini can all read from ChromaDB memory layer
+  5. Incremental update pipeline adds new memories without breaking existing embeddings
 **Plans**: TBD
 
 Plans:
 - [ ] TBD (to be planned)
 
-### Phase 3: Memory Advanced
-**Goal**: Memory system is self-maintaining and prevents context pollution
+### Phase 3: Memory Advanced (Mem0 Migration)
+**Goal**: Memory system migrated to Mem0 + Vertex AI with self-maintenance and conflict detection
 **Depends on**: Phase 2
-**Requirements**: MEMO-05, MEMO-06, MEMO-08
+**Requirements**: MEMO-09, MEMO-05, MEMO-06, MEMO-08
 **Success Criteria** (what must be TRUE):
-  1. Conflicting memories detected and resolved (no contradictory context)
-  2. Stale memories flagged with deprecated_since timestamp
-  3. Memory health monitoring detects outdated context before it poisons decisions
-  4. All memories have metadata (created_at, last_verified, deprecated_since)
+  1. All 3,763 memories successfully migrated from ChromaDB → Mem0 + Vertex AI Memory Bank
+  2. Conflicting memories detected and resolved (no contradictory context)
+  3. Stale memories flagged with deprecated_since timestamp
+  4. Memory health monitoring detects outdated context before it poisons decisions
+  5. All memories have enhanced metadata (created_at, last_verified, deprecated_since)
 **Plans**: TBD
 
 Plans:
