@@ -9,13 +9,17 @@ Target: 6 weeks (12-week plan accelerated through AI orchestration)
 
 ### Memory Infrastructure
 
-- [ ] **MEMO-01**: Ingest 2847 existing memories into Mem0 + Vertex AI Memory Bank
-- [ ] **MEMO-02**: Implement semantic search across all memories (relevance threshold >0.7)
+**Phase 2 (ChromaDB Integration):**
+- [ ] **MEMO-01**: Integrate existing ChromaDB memory store (3,763 memories already embedded)
+- [ ] **MEMO-02**: Expose semantic search API from ChromaDB (relevance threshold >0.7)
 - [ ] **MEMO-03**: Build context injection system (retrieve top-K relevant memories for AI prompts)
-- [ ] **MEMO-04**: Enable cross-platform memory sharing (Claude/ChatGPT/Gemini read unified memory)
+- [ ] **MEMO-04**: Enable cross-platform memory sharing (Claude/ChatGPT/Gemini read from ChromaDB)
+- [ ] **MEMO-07**: Validate ChromaDB integrity and implement incremental update pipeline
+
+**Phase 3 (Mem0 Migration & Advanced Features):**
+- [ ] **MEMO-09**: Migrate ChromaDB → Mem0 + Vertex AI Memory Bank (3,763 memories)
 - [ ] **MEMO-05**: Implement conflict detection and resolution for contradictory memories
 - [ ] **MEMO-06**: Build memory health monitoring (detect stale/deprecated memories)
-- [ ] **MEMO-07**: Implement batch ingestion pipeline with checkpoints (resume on failure)
 - [ ] **MEMO-08**: Add memory metadata (created_at, last_verified, deprecated_since)
 
 ### Orchestrator
@@ -119,6 +123,7 @@ Which requirements map to which phases.
 | MEMO-03 | Phase 2 | Pending |
 | MEMO-04 | Phase 2 | Pending |
 | MEMO-07 | Phase 2 | Pending |
+| MEMO-09 | Phase 3 | Pending |
 | MEMO-05 | Phase 3 | Pending |
 | MEMO-06 | Phase 3 | Pending |
 | MEMO-08 | Phase 3 | Pending |
@@ -155,10 +160,10 @@ Which requirements map to which phases.
 | SIG-07 | Phase 10 | Pending |
 
 **Coverage:**
-- v1 requirements: 41 total
-- Mapped to phases: 41
+- v1 requirements: 42 total
+- Mapped to phases: 42
 - Unmapped: 0
 
 ---
 *Requirements defined: 2025-01-22*
-*Last updated: 2025-01-22 (traceability added after roadmap creation)*
+*Last updated: 2026-01-27 (updated memory count to 3,763, added MEMO-09 for Mem0 migration, restructured Phase 2/3 for ChromaDB → Mem0 approach)*
