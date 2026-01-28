@@ -56,12 +56,27 @@ from .api import (
     ContextInjectionRequest,
     ContextInjectionResponse,
 )
+from .mem0_config import (
+    Mem0Config,
+    create_mem0_config
+)
+from .mem0_client import (
+    Mem0Client,
+    get_mem0_client,
+    reset_mem0_client as reset_mem0_client_singleton
+)
 
 __all__ = [
     # Client
     "MemoryClient",
     "get_memory_client",
     "reset_memory_client",
+    # Mem0 Integration
+    "Mem0Config",
+    "create_mem0_config",
+    "Mem0Client",
+    "get_mem0_client",
+    "reset_mem0_client_singleton",
     # Validation
     "MemoryValidationResult",
     "validate_memory_store",
