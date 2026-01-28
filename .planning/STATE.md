@@ -10,28 +10,29 @@ See: .planning/PROJECT.md (updated 2025-01-22)
 ## Current Position
 
 Phase: 2 of 10 (Memory Core)
-Plan: 0 of TBD
-Status: Ready to plan
-Last activity: 2026-01-27 - Phase 1 verified and complete (3/3 plans, ORCH-05 & ORCH-11 satisfied)
+Plan: 1 of 4
+Status: In progress
+Last activity: 2026-01-28 - Completed 02-01-PLAN.md (ChromaDB Client & Validation)
 
-Progress: [█░░░░░░░░░] 10%
+Progress: [█░░░░░░░░░] 13%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
-- Average duration: 8 min
-- Total execution time: 0.38 hours
+- Total plans completed: 4
+- Average duration: 10 min
+- Total execution time: 0.63 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-foundation-quota-management | 3 | 23 min | 8 min |
+| 02-memory-core-chromadb-integration | 1 | 15 min | 15 min |
 
 **Recent Trend:**
-- Last 5 plans: 8min (01-01), 4min (01-02), 11min (01-03)
-- Trend: Consistent (5-11 min range)
+- Last 5 plans: 4min (01-02), 11min (01-03), 15min (02-01)
+- Trend: Consistent (4-15 min range)
 
 *Updated after each plan completion*
 
@@ -58,6 +59,10 @@ Recent decisions affecting current work:
 - **Runtime implementation status** (01-03): Adapters report is_implemented property for dynamic validation, not config-based
 - **Helpful validation errors** (01-03): Errors list available platforms and requirements for debugging
 - **Parallel track stubs** (01-03): Memory, orchestrator, ta_lab2 have stub implementations for independent development
+- **ChromaDB singleton pattern** (02-01): MemoryClient uses factory function with reset capability for testing
+- **Lazy collection loading** (02-01): Collections loaded on first access for better performance
+- **L2 distance acceptable with warning** (02-01): Validation recommends cosine but doesn't fail on L2 (existing data compatibility)
+- **Validation dataclass pattern** (02-01): Structured results with is_valid flag, issues list, and readable __str__
 
 ### Pending Todos
 
@@ -69,10 +74,10 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-01-26
-Stopped at: Completed 01-03-PLAN.md (Validation & parallel tracks) - Phase 1 complete
+Last session: 2026-01-28
+Stopped at: Completed 02-01-PLAN.md (ChromaDB Client & Validation)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-01-26 (completed Phase 1: Foundation & Quota Management)*
+*Last updated: 2026-01-28 (completed 02-01: ChromaDB Client & Validation)*
