@@ -62,19 +62,24 @@ Plans:
 - [ ] 02-05-PLAN.md — Fix semantic search embedding dimension mismatch (Gap closure)
 
 ### Phase 3: Memory Advanced (Mem0 Migration)
-**Goal**: Memory system migrated to Mem0 + Vertex AI with self-maintenance and conflict detection
+**Goal**: Memory system migrated to Mem0 with self-maintenance and conflict detection
 **Depends on**: Phase 2
 **Requirements**: MEMO-09, MEMO-05, MEMO-06, MEMO-08
 **Success Criteria** (what must be TRUE):
-  1. All 3,763 memories successfully migrated from ChromaDB → Mem0 + Vertex AI Memory Bank
+  1. All 3,763 memories successfully migrated from ChromaDB → Mem0 (using ChromaDB as backend)
   2. Conflicting memories detected and resolved (no contradictory context)
   3. Stale memories flagged with deprecated_since timestamp
   4. Memory health monitoring detects outdated context before it poisons decisions
   5. All memories have enhanced metadata (created_at, last_verified, deprecated_since)
-**Plans**: TBD
+**Plans**: 6 plans
 
 Plans:
-- [ ] TBD (to be planned)
+- [ ] 03-01-PLAN.md — Mem0 integration with ChromaDB backend (Wave 1)
+- [ ] 03-02-PLAN.md — Enhanced metadata schema and migration (Wave 2)
+- [ ] 03-03-PLAN.md — Conflict detection and resolution (Wave 2)
+- [ ] 03-04-PLAN.md — Memory health monitoring (Wave 3)
+- [ ] 03-05-PLAN.md — REST API update with health and conflict endpoints (Wave 4)
+- [ ] 03-06-PLAN.md — Full migration execution and validation (Wave 5)
 
 ### Phase 4: Orchestrator Adapters
 **Goal**: All three AI platforms (Claude, ChatGPT, Gemini) accessible via unified adapter interface
@@ -193,7 +198,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 |-------|----------------|--------|-----------|
 | 1. Foundation & Quota Management | 3/3 | Complete | 2026-01-27 |
 | 2. Memory Core | 4/5 | Gap closure | - |
-| 3. Memory Advanced | 0/TBD | Not started | - |
+| 3. Memory Advanced | 0/6 | Planned | - |
 | 4. Orchestrator Adapters | 0/TBD | Not started | - |
 | 5. Orchestrator Coordination | 0/TBD | Not started | - |
 | 6. ta_lab2 Time Model | 0/TBD | Not started | - |
@@ -204,4 +209,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-01-28 (Phase 2 gap closure: added 02-05-PLAN.md to fix embedding dimension mismatch)*
+*Last updated: 2026-01-28 (Phase 3 planned: 6 plans for Mem0 migration, conflict detection, health monitoring)*
