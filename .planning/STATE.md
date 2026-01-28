@@ -10,29 +10,29 @@ See: .planning/PROJECT.md (updated 2025-01-22)
 ## Current Position
 
 Phase: 2 of 10 (Memory Core)
-Plan: 1 of 4
+Plan: 2 of 4
 Status: In progress
-Last activity: 2026-01-28 - Completed 02-01-PLAN.md (ChromaDB Client & Validation)
+Last activity: 2026-01-28 - Completed 02-02-PLAN.md (Semantic Search API & Context Injection)
 
-Progress: [█░░░░░░░░░] 13%
+Progress: [█░░░░░░░░░] 17%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4
-- Average duration: 10 min
-- Total execution time: 0.63 hours
+- Total plans completed: 5
+- Average duration: 9 min
+- Total execution time: 0.73 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-foundation-quota-management | 3 | 23 min | 8 min |
-| 02-memory-core-chromadb-integration | 1 | 15 min | 15 min |
+| 02-memory-core-chromadb-integration | 2 | 21 min | 11 min |
 
 **Recent Trend:**
-- Last 5 plans: 4min (01-02), 11min (01-03), 15min (02-01)
-- Trend: Consistent (4-15 min range)
+- Last 5 plans: 11min (01-03), 15min (02-01), 6min (02-02)
+- Trend: Accelerating (15min → 6min in phase 2)
 
 *Updated after each plan completion*
 
@@ -63,6 +63,10 @@ Recent decisions affecting current work:
 - **Lazy collection loading** (02-01): Collections loaded on first access for better performance
 - **L2 distance acceptable with warning** (02-01): Validation recommends cosine but doesn't fail on L2 (existing data compatibility)
 - **Validation dataclass pattern** (02-01): Structured results with is_valid flag, issues list, and readable __str__
+- **Distance to similarity conversion** (02-02): similarity = 1 - distance for intuitive scoring (assumes cosine distance)
+- **Default 0.7 similarity threshold** (02-02): Per MEMO-02 requirement for relevance filtering
+- **Token estimation heuristic** (02-02): ~4 characters per token approximation for context budgeting
+- **Max context length 4000 chars** (02-02): Default balances comprehensive context with token limits
 
 ### Pending Todos
 
@@ -75,9 +79,9 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-28
-Stopped at: Completed 02-01-PLAN.md (ChromaDB Client & Validation)
+Stopped at: Completed 02-02-PLAN.md (Semantic Search API & Context Injection)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-01-28 (completed 02-01: ChromaDB Client & Validation)*
+*Last updated: 2026-01-28 (completed 02-02: Semantic Search API & Context Injection)*
