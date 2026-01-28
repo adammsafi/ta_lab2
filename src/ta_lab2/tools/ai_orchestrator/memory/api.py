@@ -66,6 +66,67 @@ class ContextInjectionResponse(BaseModel):
     estimated_tokens: int
 
 
+class HealthReportResponse(BaseModel):
+    """Response from health monitoring endpoint."""
+    total_memories: int
+    healthy: int
+    stale: int
+    deprecated: int
+    missing_metadata: int
+    age_distribution: dict[str, int]
+    scan_timestamp: str
+
+
+class StaleMemoryResponse(BaseModel):
+    """Individual stale memory for review."""
+    id: str
+    content_preview: str
+    last_verified: Optional[str]
+    age_days: Optional[int]
+
+
+class RefreshRequest(BaseModel):
+    """Request to refresh verification timestamps."""
+    memory_ids: List[str] = Field(..., min_items=1, max_items=100)
+
+
+class ConflictCheckRequest(BaseModel):
+    """Request to check for conflicts."""
+    content: str = Field(..., min_length=1, max_length=10000)
+    user_id: str = Field(default="orchestrator")
+    similarity_threshold: float = Field(default=0.85, ge=0.5, le=1.0)
+
+
+class PotentialConflict(BaseModel):
+    """Individual potential conflict."""
+    memory_id: str
+    content: str
+    similarity: float
+    metadata: Optional[dict] = None
+
+
+class ConflictCheckResponse(BaseModel):
+    """Response from conflict check endpoint."""
+    has_conflicts: bool
+    conflicts: List[PotentialConflict]
+
+
+class AddWithConflictRequest(BaseModel):
+    """Request to add memory with conflict resolution."""
+    content: str = Field(..., min_length=1, max_length=10000)
+    user_id: str = Field(default="orchestrator")
+    metadata: Optional[dict] = None
+    role: str = Field(default="user")
+
+
+class ConflictResolutionResponse(BaseModel):
+    """Response from add with conflict resolution."""
+    memory_id: str
+    operation: str
+    confidence: float
+    reason: str
+
+
 def create_memory_api() -> FastAPI:
     """Create FastAPI application for memory API.
 
@@ -183,6 +244,110 @@ def create_memory_api() -> FastAPI:
             return {"types": types, "count": len(types)}
         except Exception as e:
             logger.error(f"Get types failed: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/api/v1/memory/health", response_model=HealthReportResponse)
+    async def get_memory_health(staleness_days: int = 90):
+        """Generate memory health report showing stale and deprecated memories."""
+        try:
+            from .health import MemoryHealthMonitor
+            monitor = MemoryHealthMonitor(staleness_days=staleness_days)
+            report = monitor.generate_health_report()
+            return HealthReportResponse(
+                total_memories=report.total_memories,
+                healthy=report.healthy,
+                stale=report.stale,
+                deprecated=report.deprecated,
+                missing_metadata=report.missing_metadata,
+                age_distribution=report.age_distribution,
+                scan_timestamp=report.scan_timestamp
+            )
+        except Exception as e:
+            logger.error(f"Health report failed: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/api/v1/memory/health/stale", response_model=List[StaleMemoryResponse])
+    async def get_stale_memories(staleness_days: int = 90, limit: int = 50):
+        """Get list of stale memories for review."""
+        try:
+            from .health import scan_stale_memories
+            stale = scan_stale_memories(staleness_days=staleness_days)[:limit]
+            return [
+                StaleMemoryResponse(
+                    id=m["id"],
+                    content_preview=m["content"][:100],
+                    last_verified=m.get("last_verified"),
+                    age_days=m["age_days"]
+                )
+                for m in stale
+            ]
+        except Exception as e:
+            logger.error(f"Get stale memories failed: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/api/v1/memory/health/refresh")
+    async def refresh_verification(request: RefreshRequest):
+        """Mark memories as verified (refreshes last_verified timestamp)."""
+        try:
+            from .health import MemoryHealthMonitor
+            monitor = MemoryHealthMonitor()
+            count = monitor.refresh_verification(request.memory_ids)
+            return {"refreshed": count, "memory_ids": request.memory_ids}
+        except Exception as e:
+            logger.error(f"Refresh verification failed: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/api/v1/memory/conflict/check", response_model=ConflictCheckResponse)
+    async def check_conflicts(request: ConflictCheckRequest):
+        """Check if content conflicts with existing memories."""
+        try:
+            from .conflict import detect_conflicts
+            conflicts = detect_conflicts(
+                content=request.content,
+                user_id=request.user_id,
+                similarity_threshold=request.similarity_threshold
+            )
+            return ConflictCheckResponse(
+                has_conflicts=len(conflicts) > 0,
+                conflicts=[
+                    PotentialConflict(
+                        memory_id=c["memory_id"],
+                        content=c["content"],
+                        similarity=c["similarity"],
+                        metadata=c.get("metadata")
+                    )
+                    for c in conflicts
+                ]
+            )
+        except Exception as e:
+            logger.error(f"Conflict check failed: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/api/v1/memory/conflict/add", response_model=ConflictResolutionResponse)
+    async def add_with_conflict_resolution(request: AddWithConflictRequest):
+        """Add memory with automatic conflict detection and resolution."""
+        try:
+            from .conflict import add_with_conflict_check
+
+            # Format as message for Mem0
+            messages = [
+                {"role": request.role, "content": request.content}
+            ]
+
+            result = add_with_conflict_check(
+                messages=messages,
+                user_id=request.user_id,
+                metadata=request.metadata
+            )
+
+            return ConflictResolutionResponse(
+                memory_id=result["memory_id"],
+                operation=result["operation"],
+                confidence=result["confidence"],
+                reason=result["reason"]
+            )
+        except Exception as e:
+            logger.error(f"Add with conflict resolution failed: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
     return app
