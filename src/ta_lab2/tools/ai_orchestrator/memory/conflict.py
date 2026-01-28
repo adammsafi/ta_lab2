@@ -105,7 +105,7 @@ def detect_conflicts(
 
         # Filter by similarity threshold
         potential_conflicts = []
-        for result in results:
+        for result in results.get('results', []):
             # Mem0 search returns dict with 'id', 'memory', 'metadata', 'score'
             # Score is typically 0-1 where higher = more similar
             similarity = result.get("score", 0.0)
