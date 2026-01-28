@@ -10,29 +10,29 @@ See: .planning/PROJECT.md (updated 2025-01-22)
 ## Current Position
 
 Phase: 2 of 10 (Memory Core)
-Plan: 2 of 4
+Plan: 3 of 4
 Status: In progress
-Last activity: 2026-01-28 - Completed 02-02-PLAN.md (Semantic Search API & Context Injection)
+Last activity: 2026-01-28 - Completed 02-03-PLAN.md (Incremental Memory Update Pipeline)
 
-Progress: [█░░░░░░░░░] 17%
+Progress: [████░░░░░░] 43%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5
-- Average duration: 9 min
-- Total execution time: 0.73 hours
+- Total plans completed: 6
+- Average duration: 8 min
+- Total execution time: 0.80 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-foundation-quota-management | 3 | 23 min | 8 min |
-| 02-memory-core-chromadb-integration | 2 | 21 min | 11 min |
+| 02-memory-core-chromadb-integration | 3 | 25 min | 8 min |
 
 **Recent Trend:**
-- Last 5 plans: 11min (01-03), 15min (02-01), 6min (02-02)
-- Trend: Accelerating (15min → 6min in phase 2)
+- Last 5 plans: 15min (02-01), 6min (02-02), 4min (02-03)
+- Trend: Accelerating (15min → 4min in phase 2)
 
 *Updated after each plan completion*
 
@@ -67,6 +67,11 @@ Recent decisions affecting current work:
 - **Default 0.7 similarity threshold** (02-02): Per MEMO-02 requirement for relevance filtering
 - **Token estimation heuristic** (02-02): ~4 characters per token approximation for context budgeting
 - **Max context length 4000 chars** (02-02): Default balances comprehensive context with token limits
+- **OpenAI text-embedding-3-small for consistency** (02-03): Uses same model as existing 3,763 memories for embedding consistency
+- **Batch size 50 for efficiency** (02-03): Balances API efficiency with memory usage and error isolation
+- **ChromaDB upsert for duplicates** (02-03): Handles duplicate memory IDs gracefully by updating instead of failing
+- **Embedding dimension validation** (02-03): Validates 1536 dimensions before insertion to prevent corruption
+- **Batch error isolation** (02-03): Individual batch failures don't stop entire operation
 
 ### Pending Todos
 
@@ -79,9 +84,9 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-28
-Stopped at: Completed 02-02-PLAN.md (Semantic Search API & Context Injection)
+Stopped at: Completed 02-03-PLAN.md (Incremental Memory Update Pipeline)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-01-28 (completed 02-02: Semantic Search API & Context Injection)*
+*Last updated: 2026-01-28 (completed 02-03: Incremental Memory Update Pipeline)*
