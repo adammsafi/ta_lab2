@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2025-01-22)
 ## Current Position
 
 Phase: 3 of 10 (Memory Advanced - Mem0 Migration)
-Plan: 1 of 4
+Plan: 3 of 4
 Status: In progress
-Last activity: 2026-01-28 - Completed 03-01-PLAN.md (Mem0 Integration)
+Last activity: 2026-01-28 - Completed 03-03-PLAN.md (Conflict Detection), 03-02-PLAN.md (Metadata & Migration)
 
-Progress: [██████░░░░] 53% (8/15 plans)
+Progress: [███████░░░] 67% (10/15 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8
-- Average duration: 14 min
-- Total execution time: 1.90 hours
+- Total plans completed: 10
+- Average duration: 16 min
+- Total execution time: 2.58 hours
 
 **By Phase:**
 
@@ -29,11 +29,11 @@ Progress: [██████░░░░] 53% (8/15 plans)
 |-------|-------|-------|----------|
 | 01-foundation-quota-management | 3 | 23 min | 8 min |
 | 02-memory-core-chromadb-integration | 4 | 29 min | 7 min |
-| 03-memory-advanced-mem0-migration | 1 | 63 min | 63 min |
+| 03-memory-advanced-mem0-migration | 3 | 103 min | 34 min |
 
 **Recent Trend:**
-- Last 5 plans: 6min (02-02), 4min (02-03), 4min (02-04), 63min (03-01)
-- Trend: Phase 3 plan 1 took longer due to blocking issue (mem0ai ChromaDB support)
+- Last 5 plans: 4min (02-03), 4min (02-04), 63min (03-01), 30min (03-02), 10min (03-03)
+- Trend: Phase 3 average high due to 03-01 blocking issue, Wave 2 plans faster (10-30min)
 
 *Updated after each plan completion*
 
@@ -83,6 +83,13 @@ Recent decisions affecting current work:
 - **infer=True by default** (03-01): Enable LLM conflict detection on all add() operations by default
 - **Mock _memory attribute in tests** (03-01): Property decorator prevents patch.object, mock private attribute directly
 - **text-embedding-3-small for Mem0** (03-01): Match Phase 2 embeddings (1536-dim) for compatibility
+- **ISO 8601 timestamps for metadata** (03-02): created_at, last_verified use ISO 8601 format for parsing and comparison
+- **Mark deprecated, don't delete** (03-02): Soft deletion via deprecated_since timestamp preserves audit trail
+- **Migration validation threshold 95%** (03-02): Require 95% success rate for metadata migration to pass validation
+- **LLM-powered resolution over rules** (03-03): Mem0 infer=True uses GPT-4o-mini for context-aware conflict detection (26% accuracy improvement)
+- **Similarity threshold 0.85 for conflicts** (03-03): High threshold reduces false positives while catching semantic conflicts
+- **Metadata scoping for context-dependent truths** (03-03): Same fact with different metadata (e.g., asset_class) not flagged as conflict
+- **JSONL audit log format** (03-03): Append-only conflict_log.jsonl provides grep-friendly audit trail
 
 ### Pending Todos
 
@@ -95,12 +102,17 @@ None yet.
 - Qdrant: New Mem0 storage (conflict detection, intelligence)
 - Consider: Keep both, migrate ChromaDB→Qdrant, or wait for mem0ai ChromaDB support
 
+**Metadata migration not yet run (03-02):**
+- Migration script ready but not executed on production memories
+- Recommend dry-run first to preview changes
+- Consider running during low-traffic period
+
 ## Session Continuity
 
 Last session: 2026-01-28
-Stopped at: Completed 03-01-PLAN.md (Mem0 Integration) - Phase 3 plan 1 complete
+Stopped at: Completed 03-03-PLAN.md (Conflict Detection) and 03-02-PLAN.md (Metadata & Migration) - Wave 2 complete
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-01-28 (completed 03-01: Mem0 Integration with Qdrant backend)*
+*Last updated: 2026-01-28 (completed Wave 2: 03-02 Metadata/Migration, 03-03 Conflict Detection)*
