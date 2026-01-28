@@ -1,7 +1,10 @@
 """Mem0 client wrapper for intelligent memory operations.
 
 Wraps mem0.Memory with singleton pattern, providing LLM-powered conflict
-detection, duplicate prevention, and CRUD operations on existing ChromaDB.
+detection, duplicate prevention, and CRUD operations with Qdrant vector store.
+
+NOTE: mem0ai 1.0.2 uses Qdrant (not ChromaDB) as vector backend. Mem0 provides
+the intelligence layer while Qdrant handles vector storage.
 """
 import logging
 from typing import Optional, Any
@@ -14,11 +17,11 @@ _mem0_client: Optional["Mem0Client"] = None
 
 
 class Mem0Client:
-    """Singleton wrapper for Mem0 Memory with ChromaDB backend.
+    """Singleton wrapper for Mem0 Memory with Qdrant vector backend.
 
     Provides intelligent memory operations including conflict detection,
-    duplicate prevention, and semantic search on existing 3,763 memories
-    from Phase 2.
+    duplicate prevention, and semantic search using Mem0's LLM-powered
+    intelligence layer on top of Qdrant persistent storage.
 
     Use get_mem0_client() factory function for access.
 
@@ -227,22 +230,23 @@ class Mem0Client:
 
     @property
     def memory_count(self) -> int:
-        """Get total memory count from underlying ChromaDB collection.
+        """Get total memory count from underlying Qdrant collection.
 
         Returns:
             Number of memories in collection
         """
         try:
-            # Access underlying ChromaDB collection
+            # Access underlying Qdrant collection
             # Mem0 stores collection in memory.vector_store.client
-            collection = self.memory.vector_store.client.get_collection(
-                name=self._config["vector_store"]["config"]["collection_name"]
+            collection_name = self._config["vector_store"]["config"]["collection_name"]
+            collection_info = self.memory.vector_store.client.get_collection(
+                collection_name=collection_name
             )
-            count = collection.count()
+            count = collection_info.points_count if hasattr(collection_info, 'points_count') else 0
             return count
         except Exception as e:
-            logger.error(f"Failed to get memory count: {e}")
-            # Fallback: return 0 if count fails
+            logger.warning(f"Failed to get memory count: {e}")
+            # Fallback: return 0 if count fails (collection may not exist yet)
             return 0
 
 

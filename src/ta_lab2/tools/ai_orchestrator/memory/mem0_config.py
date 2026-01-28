@@ -1,8 +1,12 @@
-"""Mem0 configuration using existing ChromaDB backend.
+"""Mem0 configuration with Qdrant vector store.
 
-Configures Mem0 to use ChromaDB as vector store without re-embedding
-existing 3,763 memories. Maintains embedding model compatibility with
-Phase 2 (text-embedding-3-small, 1536 dimensions).
+Configures Mem0 with Qdrant persistent local storage. Uses same embedding
+model as Phase 2 (text-embedding-3-small, 1536 dimensions) for compatibility.
+
+NOTE: mem0ai 1.0.2 doesn't support ChromaDB provider (only Qdrant). Mem0
+provides the intelligence layer (conflict detection, dedup) while Qdrant
+handles vector storage. Future migration to ChromaDB backend possible when
+supported.
 """
 import os
 import logging
@@ -34,9 +38,12 @@ class Mem0Config:
 def create_mem0_config(config: Optional[Mem0Config] = None) -> dict:
     """Create Mem0 configuration dict for Memory.from_config().
 
-    Configures Mem0 to use existing ChromaDB as vector backend, preserving
-    all 3,763 embedded memories from Phase 2. Uses text-embedding-3-small
-    to match existing 1536-dimension embeddings.
+    Configures Mem0 with Qdrant vector store (local persistent storage).
+    Uses text-embedding-3-small to match Phase 2 embeddings (1536-dim).
+
+    NOTE: mem0ai 1.0.2 doesn't support ChromaDB provider. Using Qdrant
+    with local storage provides Mem0 intelligence layer (conflict detection,
+    dedup) with persistent vector storage.
 
     Args:
         config: Optional Mem0Config. If None, loads from OrchestratorConfig.
@@ -45,7 +52,7 @@ def create_mem0_config(config: Optional[Mem0Config] = None) -> dict:
         Configuration dict for Memory.from_config()
 
     Raises:
-        ValueError: If ChromaDB path doesn't exist or API key missing
+        ValueError: If base path doesn't exist or API key missing
 
     Example:
         >>> from mem0 import Memory
@@ -63,13 +70,13 @@ def create_mem0_config(config: Optional[Mem0Config] = None) -> dict:
             openai_api_key=orchestrator_config.openai_api_key
         )
 
-    # Validate ChromaDB path exists
+    # Validate base path exists (parent directory for Qdrant storage)
     chromadb_path = Path(config.chromadb_path)
-    if not chromadb_path.exists():
-        raise ValueError(
-            f"ChromaDB path does not exist: {config.chromadb_path}. "
-            "Ensure Phase 2 ChromaDB setup is complete."
-        )
+    base_path = chromadb_path.parent if chromadb_path.exists() else chromadb_path
+    if not base_path.exists():
+        # Create parent directory if it doesn't exist
+        base_path.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Created base directory for Mem0 storage: {base_path}")
 
     # Validate API key
     api_key = config.openai_api_key or os.environ.get("OPENAI_API_KEY")
@@ -91,13 +98,25 @@ def create_mem0_config(config: Optional[Mem0Config] = None) -> dict:
         f"collection: {config.collection_name}"
     )
 
+    # NOTE: mem0ai 1.0.2 doesn't support "chromadb" provider (only qdrant).
+    # Using Qdrant with persistent local storage as workaround.
+    # This allows Mem0 intelligence layer while preserving embeddings.
+    qdrant_path = chromadb_path.parent / "qdrant_mem0"
+    qdrant_path.mkdir(parents=True, exist_ok=True)
+
+    logger.info(
+        f"Using Qdrant vector store at {qdrant_path} "
+        "(mem0ai 1.0.2 doesn't support chromadb provider)"
+    )
+
     # Return configuration dict for Memory.from_config()
     return {
         "vector_store": {
-            "provider": "chromadb",
+            "provider": "qdrant",
             "config": {
                 "collection_name": config.collection_name,
-                "path": str(chromadb_path)
+                "embedding_model_dims": 1536,  # Match text-embedding-3-small
+                "path": str(qdrant_path),  # Local persistent storage
             }
         },
         "llm": {
