@@ -82,6 +82,11 @@ from .migration import (
     migrate_metadata,
     validate_migration
 )
+from .health import (
+    HealthReport,
+    MemoryHealthMonitor,
+    scan_stale_memories
+)
 
 __all__ = [
     # Client
@@ -107,6 +112,10 @@ __all__ = [
     "MigrationResult",
     "migrate_metadata",
     "validate_migration",
+    # Health Monitoring
+    "HealthReport",
+    "MemoryHealthMonitor",
+    "scan_stale_memories",
     # Validation
     "MemoryValidationResult",
     "validate_memory_store",
