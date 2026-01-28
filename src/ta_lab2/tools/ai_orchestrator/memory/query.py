@@ -82,6 +82,9 @@ def search_memories(
 
     collection = client.collection
 
+    # Lazy import to avoid circular dependency
+    from .update import get_embedding
+
     # Build metadata filter
     where_filter = None
     if memory_type:
@@ -89,10 +92,14 @@ def search_memories(
     elif metadata_filter:
         where_filter = metadata_filter
 
-    # Query ChromaDB
+    # Generate query embedding using same model as collection (1536-dim text-embedding-3-small)
+    # This ensures dimension compatibility with stored embeddings
+    query_embedding = get_embedding([query])[0]
+
+    # Query ChromaDB with query_embeddings (NOT query_texts)
     # Note: ChromaDB returns distance, not similarity
     raw_results = collection.query(
-        query_texts=[query],
+        query_embeddings=[query_embedding],
         n_results=max_results,
         where=where_filter,
         include=["documents", "metadatas", "distances"]
