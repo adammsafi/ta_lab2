@@ -52,13 +52,14 @@ Plans:
   4. Claude, ChatGPT, and Gemini can all read from ChromaDB memory layer (via HTTP API)
   5. Incremental update pipeline adds new memories without breaking existing embeddings
 **Required Dependencies**: fastapi, uvicorn (for MEMO-04 cross-platform access)
-**Plans**: 4 plans
+**Plans**: 5 plans (4 original + 1 gap closure)
 
 Plans:
-- [ ] 02-01-PLAN.md — ChromaDB client wrapper & integrity validation (Wave 1)
-- [ ] 02-02-PLAN.md — Semantic search API & context injection (Wave 1)
-- [ ] 02-03-PLAN.md — Incremental update pipeline (Wave 2)
-- [ ] 02-04-PLAN.md — Cross-platform REST API for memory access (Wave 2)
+- [x] 02-01-PLAN.md — ChromaDB client wrapper & integrity validation (Wave 1)
+- [x] 02-02-PLAN.md — Semantic search API & context injection (Wave 2)
+- [x] 02-03-PLAN.md — Incremental update pipeline (Wave 2)
+- [x] 02-04-PLAN.md — Cross-platform REST API for memory access (Wave 3)
+- [ ] 02-05-PLAN.md — Fix semantic search embedding dimension mismatch (Gap closure)
 
 ### Phase 3: Memory Advanced (Mem0 Migration)
 **Goal**: Memory system migrated to Mem0 + Vertex AI with self-maintenance and conflict detection
@@ -191,7 +192,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation & Quota Management | 3/3 | Complete | 2026-01-27 |
-| 2. Memory Core | 0/4 | Planned | - |
+| 2. Memory Core | 4/5 | Gap closure | - |
 | 3. Memory Advanced | 0/TBD | Not started | - |
 | 4. Orchestrator Adapters | 0/TBD | Not started | - |
 | 5. Orchestrator Coordination | 0/TBD | Not started | - |
@@ -203,4 +204,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-01-27 (Phase 2 revised: 4 plans in 2 waves - split API into separate plan)*
+*Last updated: 2026-01-28 (Phase 2 gap closure: added 02-05-PLAN.md to fix embedding dimension mismatch)*
