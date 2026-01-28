@@ -10,28 +10,28 @@ See: .planning/PROJECT.md (updated 2025-01-22)
 ## Current Position
 
 Phase: 2 of 10 (Memory Core)
-Plan: 3 of 4
-Status: In progress
-Last activity: 2026-01-28 - Completed 02-03-PLAN.md (Incremental Memory Update Pipeline)
+Plan: 4 of 4
+Status: Phase complete
+Last activity: 2026-01-28 - Completed 02-04-PLAN.md (Cross-platform REST API)
 
-Progress: [████░░░░░░] 43%
+Progress: [█████░░░░░] 50%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 6
-- Average duration: 8 min
-- Total execution time: 0.80 hours
+- Total plans completed: 7
+- Average duration: 7 min
+- Total execution time: 0.85 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-foundation-quota-management | 3 | 23 min | 8 min |
-| 02-memory-core-chromadb-integration | 3 | 25 min | 8 min |
+| 02-memory-core-chromadb-integration | 4 | 29 min | 7 min |
 
 **Recent Trend:**
-- Last 5 plans: 15min (02-01), 6min (02-02), 4min (02-03)
+- Last 5 plans: 15min (02-01), 6min (02-02), 4min (02-03), 4min (02-04)
 - Trend: Accelerating (15min → 4min in phase 2)
 
 *Updated after each plan completion*
@@ -72,6 +72,11 @@ Recent decisions affecting current work:
 - **ChromaDB upsert for duplicates** (02-03): Handles duplicate memory IDs gracefully by updating instead of failing
 - **Embedding dimension validation** (02-03): Validates 1536 dimensions before insertion to prevent corruption
 - **Batch error isolation** (02-03): Individual batch failures don't stop entire operation
+- **FastAPI for cross-platform access** (02-04): REST API required for Claude/ChatGPT/Gemini to query ChromaDB (cloud services need HTTP)
+- **Factory pattern for API** (02-04): create_memory_api() returns configured FastAPI app for testing and customization
+- **Lazy imports in endpoints** (02-04): Imports inside endpoint functions reduce startup overhead and avoid circular dependencies
+- **Pydantic validation** (02-04): Field constraints provide automatic bounds checking with clear error messages
+- **Mock patch paths target definitions** (02-04): Test patches target where functions are defined, not where imported
 
 ### Pending Todos
 
@@ -84,9 +89,9 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-28
-Stopped at: Completed 02-03-PLAN.md (Incremental Memory Update Pipeline)
+Stopped at: Completed 02-04-PLAN.md (Cross-platform REST API) - Phase 2 complete
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-01-28 (completed 02-03: Incremental Memory Update Pipeline)*
+*Last updated: 2026-01-28 (completed 02-04: Cross-platform REST API - Phase 2 Memory Core complete)*
