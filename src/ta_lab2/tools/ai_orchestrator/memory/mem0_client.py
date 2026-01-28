@@ -204,11 +204,11 @@ class Mem0Client:
             logger.error(f"Failed to delete memory {memory_id}: {e}")
             raise
 
-    def get_all(self, user_id: Optional[str] = None) -> list:
+    def get_all(self, user_id: str = "orchestrator") -> list:
         """Get all memories for a user.
 
         Args:
-            user_id: Optional user ID for filtering
+            user_id: User ID for filtering (default: "orchestrator")
 
         Returns:
             List of all memory dicts
@@ -217,11 +217,9 @@ class Mem0Client:
             >>> memories = client.get_all(user_id="orchestrator")
         """
         try:
-            get_kwargs = {}
-            if user_id:
-                get_kwargs["user_id"] = user_id
-
-            results = self.memory.get_all(**get_kwargs)
+            response = self.memory.get_all(user_id=user_id)
+            # Mem0 get_all() returns {'results': [...]} dict, extract list
+            results = response.get("results", []) if isinstance(response, dict) else response
             logger.info(f"Retrieved {len(results)} memories")
             return results
         except Exception as e:

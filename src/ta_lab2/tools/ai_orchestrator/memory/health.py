@@ -106,7 +106,7 @@ class MemoryHealthMonitor:
 
         try:
             # Get all memories
-            all_memories = self.client.get_all()
+            all_memories = self.client.get_all(user_id="orchestrator")
             logger.info(f"Scanning {len(all_memories)} memories for staleness")
 
             for memory in all_memories:
@@ -162,7 +162,7 @@ class MemoryHealthMonitor:
             >>> print(f"Age distribution: {report.age_distribution}")
         """
         try:
-            all_memories = self.client.get_all()
+            all_memories = self.client.get_all(user_id="orchestrator")
             total = len(all_memories)
 
             healthy = 0
@@ -297,7 +297,7 @@ class MemoryHealthMonitor:
 
                 try:
                     # Get current memory to update metadata
-                    all_memories = self.client.get_all()
+                    all_memories = self.client.get_all(user_id="orchestrator")
                     current_memory = next((m for m in all_memories if m.get("id") == memory_id), None)
 
                     if current_memory:
@@ -342,7 +342,7 @@ class MemoryHealthMonitor:
         refreshed = 0
 
         try:
-            all_memories = self.client.get_all()
+            all_memories = self.client.get_all(user_id="orchestrator")
 
             for memory_id in memory_ids:
                 try:

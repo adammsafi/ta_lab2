@@ -92,8 +92,8 @@ def migrate_metadata(
     error_ids = []
 
     try:
-        # Get all memories
-        memories = client.get_all()
+        # Get all memories for orchestrator user
+        memories = client.get_all(user_id="orchestrator")
         total = len(memories)
         logger.info(f"Found {total} memories to process")
 
@@ -199,8 +199,8 @@ def validate_migration(
         client = get_mem0_client()
 
     try:
-        # Get all memories
-        memories = client.get_all()
+        # Get all memories for orchestrator user
+        memories = client.get_all(user_id="orchestrator")
         total_count = len(memories)
 
         if total_count == 0:
