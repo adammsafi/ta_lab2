@@ -1,7 +1,23 @@
 """Memory integration for AI orchestrator.
 
-Provides ChromaDB client, semantic search, and context injection
-for RAG (Retrieval-Augmented Generation) with AI platforms.
+Provides ChromaDB client, semantic search, context injection,
+incremental updates, and REST API for cross-platform access.
+
+Quick start:
+    from ta_lab2.tools.ai_orchestrator.memory import (
+        search_memories,
+        inject_memory_context,
+        validate_memory_store
+    )
+
+    # Search memories
+    results = search_memories("EMA calculation")
+
+    # Get formatted context for AI prompt
+    context = inject_memory_context("How do I backtest?")
+
+Run API server:
+    uvicorn ta_lab2.tools.ai_orchestrator.memory.api:app --port 8080
 """
 from .client import MemoryClient, get_memory_client, reset_memory_client
 from .validation import (
@@ -31,6 +47,14 @@ from .injection import (
     inject_memory_context,
     build_augmented_prompt,
     estimate_context_tokens
+)
+from .api import (
+    create_memory_api,
+    MemorySearchRequest,
+    MemorySearchResponse,
+    MemoryStatsResponse,
+    ContextInjectionRequest,
+    ContextInjectionResponse,
 )
 
 __all__ = [
@@ -62,4 +86,11 @@ __all__ = [
     "inject_memory_context",
     "build_augmented_prompt",
     "estimate_context_tokens",
+    # API
+    "create_memory_api",
+    "MemorySearchRequest",
+    "MemorySearchResponse",
+    "MemoryStatsResponse",
+    "ContextInjectionRequest",
+    "ContextInjectionResponse",
 ]

@@ -20,6 +20,7 @@ from .routing import TaskRouter
 from .quota import QuotaTracker, QuotaLimit, QuotaAlert
 from .persistence import QuotaPersistence, load_quota_state, save_quota_state
 from .validation import AdapterValidator, ValidationResult, validate_adapters, pre_flight_check
+from . import memory  # Expose memory submodule
 
 __all__ = [
     "Orchestrator",
@@ -40,4 +41,5 @@ __all__ = [
     "ValidationResult",
     "validate_adapters",
     "pre_flight_check",
+    "memory",  # Memory submodule
 ]
