@@ -65,6 +65,23 @@ from .mem0_client import (
     get_mem0_client,
     reset_mem0_client as reset_mem0_client_singleton
 )
+from .conflict import (
+    ConflictResult,
+    detect_conflicts,
+    resolve_conflict,
+    add_with_conflict_check
+)
+from .metadata import (
+    MemoryMetadata,
+    create_metadata,
+    validate_metadata,
+    mark_deprecated
+)
+from .migration import (
+    MigrationResult,
+    migrate_metadata,
+    validate_migration
+)
 
 __all__ = [
     # Client
@@ -77,6 +94,19 @@ __all__ = [
     "Mem0Client",
     "get_mem0_client",
     "reset_mem0_client_singleton",
+    # Conflict Detection
+    "ConflictResult",
+    "detect_conflicts",
+    "resolve_conflict",
+    "add_with_conflict_check",
+    # Metadata & Migration
+    "MemoryMetadata",
+    "create_metadata",
+    "validate_metadata",
+    "mark_deprecated",
+    "MigrationResult",
+    "migrate_metadata",
+    "validate_migration",
     # Validation
     "MemoryValidationResult",
     "validate_memory_store",
