@@ -34,6 +34,12 @@ class OrchestratorConfig:
     vertex_ai_project: Optional[str] = None
     vertex_ai_location: str = "us-central1"
 
+    # ChromaDB Configuration
+    chromadb_path: str = "C:/Users/asafi/Documents/ProjectTT/ChatGPT/20251228/out/chromadb"
+    chromadb_collection_name: str = "project_memories"
+    expected_memory_count: int = 3763
+    embedding_dimensions: int = 1536
+
 
 def load_config() -> OrchestratorConfig:
     """Load configuration from environment variables.
@@ -71,6 +77,10 @@ def load_config() -> OrchestratorConfig:
         mem0_storage_path=os.environ.get("MEM0_STORAGE_PATH", "./.memory/mem0"),
         vertex_ai_project=os.environ.get("VERTEX_AI_PROJECT"),
         vertex_ai_location=os.environ.get("VERTEX_AI_LOCATION", "us-central1"),
+        chromadb_path=os.environ.get("CHROMADB_PATH", "C:/Users/asafi/Documents/ProjectTT/ChatGPT/20251228/out/chromadb"),
+        chromadb_collection_name=os.environ.get("CHROMADB_COLLECTION_NAME", "project_memories"),
+        expected_memory_count=int(os.environ.get("EXPECTED_MEMORY_COUNT", "3763")),
+        embedding_dimensions=int(os.environ.get("EMBEDDING_DIMENSIONS", "1536")),
     )
 
     # Log warnings for missing optional keys
@@ -82,6 +92,11 @@ def load_config() -> OrchestratorConfig:
         logger.warning("GOOGLE_APPLICATION_CREDENTIALS not set - Gemini adapter may not work")
     if not config.vertex_ai_project:
         logger.debug("VERTEX_AI_PROJECT not set - Memory Bank cloud storage not configured")
+
+    # Validate ChromaDB path exists
+    chromadb_path = Path(config.chromadb_path)
+    if not chromadb_path.exists():
+        logger.warning(f"CHROMADB_PATH does not exist: {config.chromadb_path}")
 
     return config
 
