@@ -87,7 +87,7 @@ class StaleMemoryResponse(BaseModel):
 
 class RefreshRequest(BaseModel):
     """Request to refresh verification timestamps."""
-    memory_ids: List[str] = Field(..., min_items=1, max_items=100)
+    memory_ids: List[str] = Field(..., min_length=1, max_length=100)
 
 
 class ConflictCheckRequest(BaseModel):
