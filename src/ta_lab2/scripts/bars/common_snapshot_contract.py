@@ -14,6 +14,7 @@ Option B contract decisions:
 - shared code must NOT encode rolling/calendar semantics (no tf_days logic, no mode-specific math)
 """
 
+import argparse
 from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any, Callable, Iterable, Literal, Mapping, Optional, Sequence
@@ -793,6 +794,117 @@ def get_columns(engine: Engine, full_name: str) -> list[str]:
     with engine.connect() as conn:
         result = conn.execute(q, {"schema": schema, "table": table})
         return [row[0] for row in result.fetchall()]
+
+
+def create_bar_builder_argument_parser(
+    description: str,
+    *,
+    default_daily_table: str,
+    default_bars_table: str,
+    default_state_table: str,
+    default_tz: str = "America/New_York",
+    include_tz: bool = True,
+    include_fail_on_gaps: bool = False,
+) -> argparse.ArgumentParser:
+    """
+    Create standard argument parser for bar builders.
+
+    Eliminates CLI parsing duplication across all 5 bar builders.
+    Extracted Jan 2026 to save ~50 lines × 5 builders = 250 lines.
+
+    Args:
+        description: Script description for help text
+        default_daily_table: Default daily price table name
+        default_bars_table: Default output bars table name
+        default_state_table: Default state tracking table name
+        default_tz: Default timezone for calendar builders
+        include_tz: Add --tz flag (for calendar builders)
+        include_fail_on_gaps: Add --fail-on-internal-gaps (for anchored builders)
+
+    Returns:
+        Configured ArgumentParser with standard bar builder arguments
+
+    Example:
+        >>> ap = create_bar_builder_argument_parser(
+        ...     description="Build multi-TF bars",
+        ...     default_daily_table="public.cmc_price_histories7",
+        ...     default_bars_table="public.cmc_price_bars_multi_tf",
+        ...     default_state_table="public.cmc_price_bars_multi_tf_state",
+        ...     include_tz=False,
+        ... )
+        >>> args = ap.parse_args()
+    """
+    import argparse
+
+    ap = argparse.ArgumentParser(description=description)
+
+    # Required arguments
+    ap.add_argument(
+        "--ids",
+        nargs="+",
+        required=True,
+        help="'all' or list of ids (space/comma separated)."
+    )
+
+    # Optional DB/table arguments
+    ap.add_argument(
+        "--db-url",
+        default=None,
+        help="Optional DB URL override. Defaults to TARGET_DB_URL env."
+    )
+    ap.add_argument(
+        "--daily-table",
+        default=default_daily_table,
+        help=f"Daily price table (default: {default_daily_table})"
+    )
+    ap.add_argument(
+        "--bars-table",
+        default=default_bars_table,
+        help=f"Output bars table (default: {default_bars_table})"
+    )
+    ap.add_argument(
+        "--state-table",
+        default=default_state_table,
+        help=f"State tracking table (default: {default_state_table})"
+    )
+
+    # Optional timezone argument (for calendar builders)
+    if include_tz:
+        ap.add_argument(
+            "--tz",
+            default=default_tz,
+            help=f"Timezone for calendar alignment (default: {default_tz})"
+        )
+
+    # Optional processing arguments
+    ap.add_argument(
+        "--num-processes",
+        type=int,
+        default=None,
+        help="Worker processes (default: auto-detect, max 6)"
+    )
+    ap.add_argument(
+        "--full-rebuild",
+        action="store_true",
+        help="If set, delete+rebuild snapshots for all requested ids/tfs."
+    )
+
+    # Optional fail-on-gaps argument (for anchored builders)
+    if include_fail_on_gaps:
+        ap.add_argument(
+            "--fail-on-internal-gaps",
+            action="store_true",
+            help="Fail if missing-days occur in the interior of a window."
+        )
+
+    # Legacy compatibility flag
+    ap.add_argument(
+        "--parallel",
+        action="store_true",
+        help="(Legacy/no-op) Kept for pipeline compatibility"
+    )
+
+    return ap
 
 
 def load_periods(

@@ -218,6 +218,7 @@ from ta_lab2.scripts.bars.common_snapshot_contract import (
     delete_bars_for_id_tf,
     load_last_snapshot_row,
     load_last_snapshot_info_for_id_tfs,
+    create_bar_builder_argument_parser,
 )
 from ta_lab2.orchestration import (
     MultiprocessingOrchestrator,
@@ -1178,18 +1179,16 @@ def refresh_incremental(
 # =============================================================================
 
 def main(argv: Sequence[str] | None = None) -> None:
-    ap = argparse.ArgumentParser(
-        description="Build calendar-aligned US price bars into public.cmc_price_bars_multi_tf_cal_us (append-only snapshots, incremental)."
+    # Use shared CLI parser
+    ap = create_bar_builder_argument_parser(
+        description="Build calendar-aligned US price bars into public.cmc_price_bars_multi_tf_cal_us (append-only snapshots, incremental).",
+        default_daily_table=DEFAULT_DAILY_TABLE,
+        default_bars_table=DEFAULT_BARS_TABLE,
+        default_state_table=DEFAULT_STATE_TABLE,
+        default_tz=DEFAULT_TZ,
+        include_tz=True,
+        include_fail_on_gaps=False,
     )
-    ap.add_argument("--ids", nargs="+", required=True, help="'all' or list of ids (space/comma separated).")
-    ap.add_argument("--db-url", default=None, help="Optional DB URL override. Defaults to TARGET_DB_URL env.")
-    ap.add_argument("--daily-table", default=DEFAULT_DAILY_TABLE)
-    ap.add_argument("--bars-table", default=DEFAULT_BARS_TABLE)
-    ap.add_argument("--state-table", default=DEFAULT_STATE_TABLE)
-    ap.add_argument("--tz", default=DEFAULT_TZ, help="Timezone for calendar alignment (default America/New_York).")
-    ap.add_argument("--num-processes", type=int, default=6, help="Worker processes (default 6; use 1 for serial).")
-    ap.add_argument("--full-rebuild", action="store_true", help="If set, delete+rebuild snapshots for all requested ids/tfs.")
-    ap.add_argument("--parallel", action="store_true", help="(Legacy/no-op) Kept for pipeline compatibility")
     args = ap.parse_args(list(argv) if argv is not None else None)
 
     db_url = resolve_db_url(args.db_url)

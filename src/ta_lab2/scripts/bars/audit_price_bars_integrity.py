@@ -56,6 +56,13 @@ import pandas as pd
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
+from ta_lab2.scripts.bars.common_snapshot_contract import (
+    get_engine,
+    resolve_db_url,
+    parse_ids,
+    load_all_ids,
+)
+
 
 # ----------------------------
 # Tables / Defaults
@@ -89,31 +96,6 @@ DIM_TF_COLS = [
 
 def _log(msg: str) -> None:
     print(f"[bars_integrity] {msg}")
-
-
-def get_engine() -> Engine:
-    db_url = os.environ.get("TARGET_DB_URL")
-    if not db_url:
-        raise RuntimeError("TARGET_DB_URL env var is required.")
-    _log("Using DB URL from TARGET_DB_URL env.")
-    return create_engine(db_url, future=True)
-
-
-def parse_ids(engine: Engine, ids_arg: str, daily_table: str) -> List[int]:
-    if ids_arg.strip().lower() == "all":
-        df = pd.read_sql(text(f"SELECT DISTINCT id FROM {daily_table} ORDER BY id"), engine)
-        ids = [int(x) for x in df["id"].tolist()]
-        _log(f"Loaded ALL ids from {daily_table}: {len(ids)}")
-        return ids
-
-    ids: List[int] = []
-    for part in ids_arg.split(","):
-        part = part.strip()
-        if part:
-            ids.append(int(part))
-    if not ids:
-        raise ValueError("No ids parsed. Use --ids all or --ids 1,52,...")
-    return ids
 
 
 def table_exists(engine: Engine, full_name: str) -> bool:
@@ -729,8 +711,14 @@ def main() -> None:
 
     args = ap.parse_args()
 
-    engine = get_engine()
-    ids = parse_ids(engine, args.ids, args.daily_table)
+    db_url = resolve_db_url(None)
+    engine = get_engine(db_url)
+
+    ids_result = parse_ids(args.ids)
+    if ids_result == "all":
+        ids = load_all_ids(db_url, args.daily_table)
+    else:
+        ids = ids_result
 
     run_set = {s.strip().lower() for s in (args.run.split(",") if args.run else []) if s.strip()}
     if "all" in run_set or not run_set:
