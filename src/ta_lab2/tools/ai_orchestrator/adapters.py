@@ -984,12 +984,12 @@ class AsyncChatGPTAdapter(AsyncBasePlatformAdapter):
 
     async def get_result(self, task_id: str, timeout: float = 300) -> Result:
         """Get complete result, waiting if necessary."""
-        from .core import TaskStatus, Platform
+        from .core import TaskStatus, Platform, Task as CoreTask
 
         if task_id not in self._pending_tasks:
             # Return error result for unknown task
             return Result(
-                task=Task(type=TaskType.CODE_GENERATION, prompt=""),
+                task=CoreTask(type=TaskType.CODE_GENERATION, prompt=""),
                 platform=Platform.CHATGPT,
                 output="",
                 success=False,
@@ -1005,7 +1005,7 @@ class AsyncChatGPTAdapter(AsyncBasePlatformAdapter):
             return result
         except asyncio.TimeoutError:
             return Result(
-                task=Task(type=TaskType.CODE_GENERATION, prompt=""),
+                task=CoreTask(type=TaskType.CODE_GENERATION, prompt=""),
                 platform=Platform.CHATGPT,
                 output="",
                 success=False,
@@ -1293,11 +1293,11 @@ class AsyncGeminiAdapter(AsyncBasePlatformAdapter):
 
     async def get_result(self, task_id: str, timeout: float = 300) -> Result:
         """Get complete result, waiting if necessary."""
-        from .core import TaskStatus, Platform
+        from .core import TaskStatus, Platform, Task as CoreTask
 
         if task_id not in self._pending_tasks:
             return Result(
-                task=Task(type=TaskType.CODE_GENERATION, prompt=""),
+                task=CoreTask(type=TaskType.CODE_GENERATION, prompt=""),
                 platform=Platform.GEMINI,
                 output="",
                 success=False,
@@ -1313,7 +1313,7 @@ class AsyncGeminiAdapter(AsyncBasePlatformAdapter):
             return result
         except asyncio.TimeoutError:
             return Result(
-                task=Task(type=TaskType.CODE_GENERATION, prompt=""),
+                task=CoreTask(type=TaskType.CODE_GENERATION, prompt=""),
                 platform=Platform.GEMINI,
                 output="",
                 success=False,
