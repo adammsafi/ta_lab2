@@ -201,8 +201,8 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 |-------|----------------|--------|-----------|
 | 1. Foundation & Quota Management | 3/3 | Complete | 2026-01-27 |
 | 2. Memory Core | 4/5 | Gap closure | - |
-| 3. Memory Advanced | 0/6 | Planned | - |
-| 4. Orchestrator Adapters | 0/4 | Planned | - |
+| 3. Memory Advanced | 6/6 | Complete | 2026-01-28 |
+| 4. Orchestrator Adapters | 4/4 | Complete | 2026-01-29 |
 | 5. Orchestrator Coordination | 0/TBD | Not started | - |
 | 6. ta_lab2 Time Model | 0/TBD | Not started | - |
 | 7. ta_lab2 Feature Pipeline | 0/TBD | Not started | - |
