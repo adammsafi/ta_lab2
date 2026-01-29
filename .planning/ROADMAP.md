@@ -93,10 +93,10 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 04-01-PLAN.md — Base async infrastructure (Task, Result, AsyncBasePlatformAdapter) (Wave 1)
-- [ ] 04-02-PLAN.md — ChatGPT async adapter with OpenAI API (Wave 2)
-- [ ] 04-03-PLAN.md — Claude Code async adapter with subprocess (Wave 2)
-- [ ] 04-04-PLAN.md — Gemini async adapter with quota integration (Wave 2)
+- [x] 04-01-PLAN.md — Base async infrastructure (Task, Result, AsyncBasePlatformAdapter) (Wave 1)
+- [x] 04-02-PLAN.md — ChatGPT async adapter with OpenAI API (Wave 2)
+- [x] 04-03-PLAN.md — Claude Code async adapter with subprocess (Wave 2)
+- [x] 04-04-PLAN.md — Gemini async adapter with quota integration (Wave 2)
 
 ### Phase 5: Orchestrator Coordination
 **Goal**: Tasks route intelligently across platforms with cost optimization and parallel execution
@@ -110,10 +110,15 @@ Plans:
   5. Per-task cost tracking records token usage and API pricing
   6. Orchestrator CLI accepts task submissions and returns results
   7. Result aggregation combines outputs from parallel tasks
-**Plans**: TBD
+**Plans**: 6 plans
 
 Plans:
-- [ ] TBD (to be planned)
+- [ ] 05-01-PLAN.md — Cost-optimized routing with COST_TIERS priority (Wave 1)
+- [ ] 05-02-PLAN.md — AsyncOrchestrator parallel execution engine (Wave 1)
+- [ ] 05-03-PLAN.md — AI-to-AI handoffs with memory integration (Wave 2)
+- [ ] 05-04-PLAN.md — Cost tracking with SQLite persistence (Wave 2)
+- [ ] 05-05-PLAN.md — Error handling with retries and fallback routing (Wave 3)
+- [ ] 05-06-PLAN.md — Orchestrator CLI for task submission and status (Wave 4)
 
 ### Phase 6: ta_lab2 Time Model
 **Goal**: Time handling unified across ta_lab2 with formal dimension tables
@@ -203,7 +208,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 2. Memory Core | 4/5 | Gap closure | - |
 | 3. Memory Advanced | 6/6 | Complete | 2026-01-28 |
 | 4. Orchestrator Adapters | 4/4 | Complete | 2026-01-29 |
-| 5. Orchestrator Coordination | 0/TBD | Not started | - |
+| 5. Orchestrator Coordination | 0/6 | Planned | - |
 | 6. ta_lab2 Time Model | 0/TBD | Not started | - |
 | 7. ta_lab2 Feature Pipeline | 0/TBD | Not started | - |
 | 8. ta_lab2 Signals | 0/TBD | Not started | - |
@@ -212,4 +217,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-01-29 (Phase 4 planned: 4 plans for async adapters - ChatGPT, Claude Code, Gemini)*
+*Last updated: 2026-01-29 (Phase 5 planned: 6 plans for orchestrator coordination)*
