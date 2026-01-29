@@ -213,6 +213,11 @@ from ta_lab2.scripts.bars.common_snapshot_contract import (
     upsert_state,
     upsert_bars,
     resolve_num_processes,
+    # Bar builder DB utilities (extracted)
+    load_daily_prices_for_id,
+    delete_bars_for_id_tf,
+    load_last_snapshot_row,
+    load_last_snapshot_info_for_id_tfs,
 )
 from ta_lab2.orchestration import (
     MultiprocessingOrchestrator,
@@ -241,131 +246,8 @@ class CalSpec:
     qty: int
 
 # =============================================================================
-# DB helpers
+# DB helpers (now imported from common_snapshot_contract)
 # =============================================================================
-
-def load_daily_prices_for_id(
-    *,
-    db_url: str,
-    daily_table: str,
-    id_: int,
-    ts_start: pd.Timestamp | None = None,
-    tz: str = DEFAULT_TZ,
-) -> pd.DataFrame:
-    """
-    Load daily rows for a single id, optionally from ts_start onward.
-
-    CONTRACT:
-    - Enforces exactly 1 row per local day using assert_one_row_per_local_day from contract module.
-    """
-    if ts_start is None:
-        where = "WHERE id = :id"
-        params = {"id": int(id_)}
-    else:
-        where = 'WHERE id = :id AND "timestamp" >= :ts_start'
-        params = {"id": int(id_), "ts_start": ts_start}
-
-    sql = text(
-        f"""
-        SELECT
-            id,
-            "timestamp" AS ts,
-            timehigh,
-            timelow,
-            open,
-            high,
-            low,
-            close,
-            volume,
-            marketcap AS market_cap
-        FROM {daily_table}
-        {where}
-        ORDER BY "timestamp";
-        """
-    )
-
-    eng = get_engine(db_url)
-    with eng.connect() as conn:
-        df = pd.read_sql(sql, conn, params=params)
-
-    if df.empty:
-        return df
-
-    # Timestamp normalization
-    # Keep everything tz-aware UTC so downstream tz_convert(tz) works.
-    df["ts"] = pd.to_datetime(df["ts"], utc=True, errors="raise")
-
-    # Normalize other timestamp columns (if present) to tz-aware UTC as well.
-    for col in ["timehigh", "timelow", "timeopen", "timeclose", "timestamp"]:
-        if col in df.columns:
-            df[col] = pd.to_datetime(df[col], utc=True, errors="coerce")
-
-    # Hard invariant (shared contract)
-    assert_one_row_per_local_day(df, ts_col="ts", tz=tz, id_col="id")
-
-    return df
-
-
-def delete_bars_for_id_tf(db_url: str, bars_table: str, id_: int, tf: str) -> None:
-    eng = get_engine(db_url)
-    with eng.begin() as conn:
-        conn.execute(
-            text(f"DELETE FROM {bars_table} WHERE id=:id AND tf=:tf;"),
-            {"id": int(id_), "tf": tf},
-        )
-
-
-def load_last_snapshot_info_for_id_tfs(
-    db_url: str,
-    bars_table: str,
-    id_: int,
-    tfs: list[str],
-) -> dict[str, dict]:
-    """Batch-load latest snapshot info for a single id across multiple tfs."""
-    if not tfs:
-        return {}
-
-    sql = text(f"""
-      SELECT DISTINCT ON (tf)
-        tf,
-        bar_seq AS last_bar_seq,
-        time_close AS last_time_close
-      FROM {bars_table}
-      WHERE id = :id AND tf = ANY(:tfs)
-      ORDER BY tf, time_close DESC;
-    """)
-    
-    eng = get_engine(db_url)
-    with eng.connect() as conn:
-        rows = conn.execute(sql, {"id": int(id_), "tfs": list(tfs)}).mappings().all()
-
-    out: dict[str, dict] = {}
-    for r in rows:
-        tf = str(r["tf"])
-        out[tf] = {
-            "last_bar_seq": int(r["last_bar_seq"]),
-            "last_time_close": pd.to_datetime(r["last_time_close"], utc=True),
-        }
-    return out
-
-
-def load_last_snapshot_row(db_url: str, bars_table: str, id_: int, tf: str) -> dict | None:
-    """Load the very last snapshot row for (id, tf) by time_close."""
-    eng = get_engine(db_url)
-    with eng.connect() as conn:
-        row = conn.execute(
-            text(
-                f"""
-                SELECT *
-                FROM {bars_table}
-                WHERE id = :id AND tf = :tf
-                ORDER BY time_close DESC
-                LIMIT 1;
-                """
-            ),
-            {"id": int(id_), "tf": tf},
-        ).mappings().first()
-    return dict(row) if row else None
 
 
 # =============================================================================

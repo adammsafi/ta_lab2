@@ -73,9 +73,15 @@ from ta_lab2.scripts.bars.common_snapshot_contract import (
     ensure_state_table,
     load_state,
     upsert_state,
+    resolve_num_processes,
     # Shared write pipeline
     upsert_bars,
     enforce_ohlc_sanity,
+    # Bar builder DB utilities (extracted)
+    load_daily_prices_for_id,
+    delete_bars_for_id_tf,
+    load_last_snapshot_row,
+    load_last_snapshot_info_for_id_tfs,
 )
 from ta_lab2.orchestration import (
     MultiprocessingOrchestrator,
@@ -148,72 +154,8 @@ def load_tf_list_from_dim_timeframe(
 
 
 # =============================================================================
-# Bar building helpers
+# Bar building helpers (now imported from common_snapshot_contract)
 # =============================================================================
-def load_daily_prices_for_id(
-    db_url: str,
-    daily_table: str,
-    id_: int,
-    ts_start: Optional[datetime] = None,
-) -> pd.DataFrame:
-    """
-    Load daily OHLCV rows for a single id from the daily table.
-
-    - If ts_start is provided, only loads rows with timestamp >= ts_start.
-    - Returns rows ordered ascending by "timestamp".
-    - Normalizes to include a 'ts' column (contract expects ts_col="ts").
-    """
-    engine = create_engine(db_url, future=True)
-
-    if ts_start is None:
-        q = text(f"""
-            SELECT *
-            FROM {daily_table}
-            WHERE id = :id
-            ORDER BY "timestamp" ASC
-        """)
-        df = pd.read_sql(q, engine, params={"id": int(id_)})
-    else:
-        q = text(f"""
-            SELECT *
-            FROM {daily_table}
-            WHERE id = :id
-              AND "timestamp" >= :ts_start
-            ORDER BY "timestamp" ASC
-        """)
-        df = pd.read_sql(q, engine, params={"id": int(id_), "ts_start": ts_start})
-
-    # --- contract normalization ---
-    # Column name normalization for downstream code consistency
-    if "market_cap" not in df.columns and "marketcap" in df.columns:
-        df = df.rename(columns={"marketcap": "market_cap"})
-
-    # Ensure a 'ts' column exists
-    if "ts" not in df.columns:
-        if "timestamp" in df.columns:
-            df["ts"] = df["timestamp"]
-        else:
-            raise ValueError("Daily table is missing required 'timestamp' column (needed to derive 'ts').")
-
-    # Force datetimelike + normalize timezone handling consistently:
-    # - make it UTC-aware first
-    # - then convert to tz-naive (naive UTC)
-    df["ts"] = pd.to_datetime(df["ts"], utc=True, errors="raise").dt.tz_convert(None)
-
-    # Optional: normalize other datetime columns too (prevents later .dt crashes)
-    for col in ("timeopen", "timeclose", "timehigh", "timelow", "timestamp"):
-        if col in df.columns and not df[col].isna().all():
-            df[col] = pd.to_datetime(df[col], utc=True, errors="coerce").dt.tz_convert(None)
-
-    return df
-
-
-def delete_bars_for_id_tf(db_url: str, bars_table: str, id_: int, tf: str) -> None:
-    """Delete all bar rows for a single (id, tf). Used by full rebuild path."""
-    engine = create_engine(db_url, future=True)
-    q = text(f"DELETE FROM {bars_table} WHERE id = :id AND tf = :tf;")
-    with engine.begin() as conn:
-        conn.execute(q, {"id": int(id_), "tf": tf})
 
 
 def delete_state_for_id_tf(db_url: str, state_table: str, id_: int, tf: str) -> None:
@@ -953,19 +895,6 @@ def refresh_incremental(
 # =============================================================================
 
 
-def _resolve_num_processes(n: int | None) -> int:
-    """Cap worker count to a sane range, defaulting to 6."""
-    if n is None:
-        n = 6
-    try:
-        n2 = int(n)
-    except Exception:
-        n2 = 6
-    n2 = max(1, n2)
-    n2 = min(n2, cpu_count() or 1)
-    return n2
-
-
 def _process_single_id_with_all_specs(args) -> tuple[list[dict], dict[str, int]]:
     (
         id_,
@@ -1345,7 +1274,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         )
         return
 
-    nproc = _resolve_num_processes(args.num_processes)
+    nproc = resolve_num_processes(args.num_processes)
     if nproc > 1:
         refresh_incremental_parallel(
             db_url=db_url,

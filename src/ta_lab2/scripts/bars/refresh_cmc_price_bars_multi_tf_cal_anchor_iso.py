@@ -52,6 +52,10 @@ from ta_lab2.scripts.bars.common_snapshot_contract import (
     load_state,
     upsert_state,
     upsert_bars,
+    load_daily_prices_for_id,
+    delete_bars_for_id_tf,
+    load_last_snapshot_row,
+    load_last_snapshot_info_for_id_tfs,
 )
 from ta_lab2.orchestration import (
     MultiprocessingOrchestrator,
@@ -966,96 +970,8 @@ def _build_incremental_snapshots_for_id_spec(
 
 
 # =============================================================================
-# DB reads/writes specific to this builder (kept consistent with anchor_us)
+# DB reads/writes (now imported from common_snapshot_contract)
 # =============================================================================
-
-def load_daily_prices_for_id(
-    *,
-    db_url: str,
-    daily_table: str,
-    id_: int,
-    ts_start: pd.Timestamp | None = None,
-    tz: str = DEFAULT_TZ,
-) -> pd.DataFrame:
-    """
-    Load daily rows for a single id, optionally from ts_start onward.
-
-    CONTRACT:
-    - Enforces exactly 1 row per local day using assert_one_row_per_local_day from contract module.
-    """
-    if ts_start is None:
-        where = "WHERE id = :id"
-        params = {"id": int(id_)}
-    else:
-        where = 'WHERE id = :id AND "timestamp" >= :ts_start'
-        params = {"id": int(id_), "ts_start": ts_start}
-
-    sql = text(
-        f"""
-        SELECT
-            id,
-            "timestamp" AS ts,
-            timehigh,
-            timelow,
-            open,
-            high,
-            low,
-            close,
-            volume,
-            marketcap AS market_cap
-        FROM {daily_table}
-        {where}
-        ORDER BY "timestamp";
-        """
-    )
-
-    eng = get_engine(db_url)
-    with eng.connect() as conn:
-        df = pd.read_sql(sql, conn, params=params)
-
-    if df.empty:
-        return df
-
-    # Timestamp normalization (safe pattern from multi_tf)
-    # 1. Ensure ts column exists (already done in SELECT above)
-
-    # 2. Normalize ts to tz-naive (convert to tz-aware FIRST, then to naive)
-    df["ts"] = pd.to_datetime(df["ts"], utc=True, errors="raise").dt.tz_convert(None)
-
-    # 3. Normalize other timestamp columns (if present)
-    for col in ["timehigh", "timelow", "timeopen", "timeclose", "timestamp"]:
-        if col in df.columns:
-            df[col] = pd.to_datetime(df[col], utc=True, errors="coerce").dt.tz_convert(None)
-
-    # Hard invariant (shared contract)
-    assert_one_row_per_local_day(df, ts_col="ts", tz=tz, id_col="id")
-
-    return df
-
-
-def delete_bars_for_id_tf(db_url: str, bars_table: str, *, id_: int, tf: str) -> None:
-    eng = get_engine(db_url)
-    with eng.begin() as conn:
-        conn.execute(
-            text(f"DELETE FROM {bars_table} WHERE id = :id AND tf = :tf;"),
-            {"id": int(id_), "tf": tf},
-        )
-
-
-def load_last_snapshot_row(db_url: str, bars_table: str, *, id_: int, tf: str) -> dict | None:
-    eng = get_engine(db_url)
-    sql = text(
-        f"""
-        SELECT *
-        FROM {bars_table}
-        WHERE id = :id AND tf = :tf
-        ORDER BY time_close DESC
-        LIMIT 1;
-        """
-    )
-    with eng.connect() as conn:
-        row = conn.execute(sql, {"id": int(id_), "tf": tf}).mappings().first()
-    return dict(row) if row else None
 
 
 # =============================================================================
