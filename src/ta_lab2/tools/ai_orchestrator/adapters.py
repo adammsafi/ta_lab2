@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from .core import Task, Result, Platform, TaskStatus
 
 from .core import Result, Platform as Plat, TaskStatus, TaskType
+from .quota import QuotaTracker
 
 
 class BasePlatformAdapter(ABC):
@@ -872,3 +873,296 @@ class AsyncClaudeCodeAdapter(AsyncBasePlatformAdapter):
                 error=str(e),
                 duration_seconds=time.time() - start_time,
             )
+
+
+class AsyncChatGPTAdapter(AsyncBasePlatformAdapter):
+    """
+    Async adapter for ChatGPT via OpenAI API.
+
+    Features:
+    - Async API calls with openai.AsyncOpenAI
+    - Streaming support via async generators
+    - Token tracking from API responses
+    - Retry on rate limits with exponential backoff
+    """
+
+    def __init__(
+        self,
+        api_key: str | None = None,
+        model: str = "gpt-4o-mini",
+        timeout: float = 60.0,
+    ):
+        """
+        Initialize ChatGPT adapter.
+
+        Args:
+            api_key: OpenAI API key (defaults to OPENAI_API_KEY env var)
+            model: Default model to use (default: gpt-4o-mini for cost efficiency)
+            timeout: Default timeout for API calls in seconds
+        """
+        super().__init__()
+        self._api_key = api_key or os.environ.get("OPENAI_API_KEY")
+        self._model = model
+        self._timeout = timeout
+        self._client = None
+        self._pending_tasks: dict[str, asyncio.Task] = {}
+
+    async def __aenter__(self):
+        """Initialize async client."""
+        if not self._api_key:
+            raise ValueError("OPENAI_API_KEY not set")
+
+        from openai import AsyncOpenAI
+        self._client = AsyncOpenAI(api_key=self._api_key, timeout=self._timeout)
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Cleanup client."""
+        if self._client:
+            await self._client.close()
+            self._client = None
+
+    @property
+    def is_implemented(self) -> bool:
+        """Check if adapter is usable."""
+        return bool(self._api_key)
+
+    @property
+    def implementation_status(self) -> str:
+        """Return implementation status."""
+        if not self._api_key:
+            return "unavailable"
+        return "working"
+
+    def get_adapter_status(self) -> dict:
+        """Return comprehensive adapter status."""
+        return {
+            "name": "ChatGPT (Async)",
+            "is_implemented": self.is_implemented,
+            "status": self.implementation_status,
+            "model": self._model,
+            "capabilities": [
+                "OpenAI API integration",
+                "Streaming responses",
+                "Token tracking",
+                "Retry on rate limits",
+            ],
+            "requirements": [
+                f"OPENAI_API_KEY {'(set)' if self._api_key else '(missing)'}"
+            ],
+        }
+
+    async def submit_task(self, task: Task) -> str:
+        """Submit task and return task_id."""
+        from .core import TaskStatus
+
+        task_id = self._generate_task_id(task)
+        task.task_id = task_id
+
+        # Create background task for execution
+        self._pending_tasks[task_id] = asyncio.create_task(
+            self._execute_internal(task)
+        )
+
+        return task_id
+
+    async def get_status(self, task_id: str) -> TaskStatus:
+        """Get task status."""
+        from .core import TaskStatus
+
+        if task_id not in self._pending_tasks:
+            return TaskStatus.UNKNOWN
+
+        task_obj = self._pending_tasks[task_id]
+        if task_obj.done():
+            if task_obj.cancelled():
+                return TaskStatus.CANCELLED
+            if task_obj.exception():
+                return TaskStatus.FAILED
+            return TaskStatus.COMPLETED
+        return TaskStatus.RUNNING
+
+    async def get_result(self, task_id: str, timeout: float = 300) -> Result:
+        """Get complete result, waiting if necessary."""
+        from .core import TaskStatus, Platform
+
+        if task_id not in self._pending_tasks:
+            # Return error result for unknown task
+            return Result(
+                task=Task(type=TaskType.CODE_GENERATION, prompt=""),
+                platform=Platform.CHATGPT,
+                output="",
+                success=False,
+                status=TaskStatus.UNKNOWN,
+                error=f"Unknown task_id: {task_id}",
+            )
+
+        try:
+            result = await asyncio.wait_for(
+                self._pending_tasks[task_id],
+                timeout=timeout
+            )
+            return result
+        except asyncio.TimeoutError:
+            return Result(
+                task=Task(type=TaskType.CODE_GENERATION, prompt=""),
+                platform=Platform.CHATGPT,
+                output="",
+                success=False,
+                status=TaskStatus.FAILED,
+                error=f"Task timed out after {timeout}s",
+            )
+        except asyncio.CancelledError:
+            raise  # Re-raise cancellation
+
+    async def stream_result(self, task_id: str) -> AsyncIterator[str]:
+        """Stream result chunks."""
+        # For simplicity, execute inline for streaming
+        # A production implementation would track streaming tasks separately
+        if task_id not in self._pending_tasks:
+            return
+
+        task_obj = self._pending_tasks.get(task_id)
+        if task_obj and not task_obj.done():
+            # Task still running - can't stream a background task
+            # This is a limitation - streaming needs direct execution
+            return
+
+        # Fallback: yield the complete result
+        result = await self.get_result(task_id)
+        if result.output:
+            yield result.output
+
+    async def cancel_task(self, task_id: str) -> bool:
+        """Cancel a running task."""
+        if task_id not in self._pending_tasks:
+            return False
+
+        task_obj = self._pending_tasks[task_id]
+        if task_obj.done():
+            return False
+
+        task_obj.cancel()
+        try:
+            await task_obj
+        except asyncio.CancelledError:
+            pass
+        return True
+
+    async def _execute_internal(self, task: Task) -> Result:
+        """Internal execution with retry logic."""
+        from .core import TaskStatus, Platform
+        from .retry import retry_on_rate_limit
+        import time
+
+        start_time = time.time()
+
+        if not self._client:
+            return Result(
+                task=task,
+                platform=Platform.CHATGPT,
+                output="",
+                success=False,
+                status=TaskStatus.FAILED,
+                error="Client not initialized. Use 'async with' context manager.",
+            )
+
+        try:
+            # Build messages
+            messages = [{"role": "user", "content": task.prompt}]
+
+            # Add context if provided
+            if task.context:
+                context_str = "\n".join(
+                    f"{k}: {v}" for k, v in task.context.items()
+                )
+                messages.insert(0, {
+                    "role": "system",
+                    "content": f"Context:\n{context_str}"
+                })
+
+            # Determine model
+            model = task.constraints.model if task.constraints and task.constraints.model else self._model
+
+            # Apply retry decorator dynamically
+            @retry_on_rate_limit()
+            async def make_request():
+                return await self._client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    max_tokens=task.constraints.max_tokens if task.constraints else None,
+                    temperature=task.constraints.temperature if task.constraints else None,
+                )
+
+            response = await make_request()
+
+            # Extract output and token usage
+            output = response.choices[0].message.content or ""
+            tokens_used = response.usage.total_tokens if response.usage else 0
+
+            # Calculate cost (approximate for gpt-4o-mini)
+            # Input: $0.15/1M tokens, Output: $0.60/1M tokens
+            input_tokens = response.usage.prompt_tokens if response.usage else 0
+            output_tokens = response.usage.completion_tokens if response.usage else 0
+            cost = (input_tokens * 0.15 + output_tokens * 0.60) / 1_000_000
+
+            return Result(
+                task=task,
+                platform=Platform.CHATGPT,
+                output=output,
+                success=True,
+                status=TaskStatus.COMPLETED,
+                tokens_used=tokens_used,
+                cost=cost,
+                duration_seconds=time.time() - start_time,
+                metadata={
+                    "model": model,
+                    "input_tokens": input_tokens,
+                    "output_tokens": output_tokens,
+                },
+            )
+
+        except asyncio.CancelledError:
+            raise  # Always re-raise CancelledError
+        except Exception as e:
+            return Result(
+                task=task,
+                platform=Platform.CHATGPT,
+                output="",
+                success=False,
+                status=TaskStatus.FAILED,
+                error=str(e),
+                duration_seconds=time.time() - start_time,
+            )
+
+    async def execute_streaming(self, task: Task) -> AsyncIterator[str]:
+        """Execute task with streaming response."""
+        from .retry import retry_on_rate_limit
+
+        if not self._client:
+            raise RuntimeError("Client not initialized. Use 'async with' context manager.")
+
+        # Build messages
+        messages = [{"role": "user", "content": task.prompt}]
+        if task.context:
+            context_str = "\n".join(f"{k}: {v}" for k, v in task.context.items())
+            messages.insert(0, {"role": "system", "content": f"Context:\n{context_str}"})
+
+        model = task.constraints.model if task.constraints and task.constraints.model else self._model
+
+        @retry_on_rate_limit()
+        async def make_streaming_request():
+            return await self._client.chat.completions.create(
+                model=model,
+                messages=messages,
+                max_tokens=task.constraints.max_tokens if task.constraints else None,
+                temperature=task.constraints.temperature if task.constraints else None,
+                stream=True,
+                stream_options={"include_usage": True},
+            )
+
+        stream = await make_streaming_request()
+
+        async for chunk in stream:
+            if chunk.choices and chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
