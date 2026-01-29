@@ -29,6 +29,32 @@ class Platform(Enum):
     GEMINI = "gemini"
 
 
+class TaskStatus(Enum):
+    """Execution status for async task lifecycle."""
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+    UNKNOWN = "unknown"
+
+
+@dataclass
+class TaskConstraints:
+    """Execution constraints for tasks.
+
+    Attributes:
+        max_tokens: Token limit for task execution
+        timeout_seconds: Maximum execution time (default 300s / 5 minutes)
+        temperature: Model temperature for response randomness
+        model: Specific model to use (platform-specific)
+    """
+    max_tokens: Optional[int] = None
+    timeout_seconds: float = 300.0
+    temperature: Optional[float] = None
+    model: Optional[str] = None
+
+
 @dataclass
 class Task:
     """
@@ -37,11 +63,15 @@ class Task:
     Attributes:
         type: Type of task (code_generation, research, etc.)
         prompt: The actual instruction/question for the AI
-        context: Optional additional context (files, data, etc.)
+        context: Memory context, previous task outputs, additional data
         platform_hint: Optional hint for which platform to use
         priority: Task priority (0=highest, 10=lowest)
         requires_gsd: Whether this task needs GSD workflow
         metadata: Additional task-specific data
+        created_at: When task was created
+        files: File paths for Claude Code operations or file attachments
+        constraints: Execution constraints (tokens, timeout, temperature, model)
+        task_id: Unique identifier assigned when submitted (UUID format)
     """
     type: TaskType
     prompt: str
@@ -51,6 +81,9 @@ class Task:
     requires_gsd: bool = False
     metadata: dict[str, Any] = field(default_factory=dict)
     created_at: datetime = field(default_factory=datetime.utcnow)
+    files: list[str] = field(default_factory=list)
+    constraints: Optional[TaskConstraints] = None
+    task_id: Optional[str] = None
 
 
 @dataclass
@@ -68,6 +101,10 @@ class Result:
         tokens_used: Approximate tokens consumed
         duration_seconds: How long the task took
         metadata: Platform-specific result data
+        completed_at: When task execution finished
+        status: Execution state (for async lifecycle)
+        files_created: Output files generated during execution
+        partial_output: Partial results for streaming or cancellation
     """
     task: Task
     platform: Platform
@@ -79,6 +116,9 @@ class Result:
     duration_seconds: float = 0.0
     metadata: dict[str, Any] = field(default_factory=dict)
     completed_at: datetime = field(default_factory=datetime.utcnow)
+    status: TaskStatus = TaskStatus.COMPLETED
+    files_created: list[str] = field(default_factory=list)
+    partial_output: Optional[str] = None
 
 
 class Orchestrator:
