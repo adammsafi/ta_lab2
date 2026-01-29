@@ -66,7 +66,7 @@ Plans:
 **Depends on**: Phase 2
 **Requirements**: MEMO-09, MEMO-05, MEMO-06, MEMO-08
 **Success Criteria** (what must be TRUE):
-  1. All 3,763 memories successfully migrated from ChromaDB → Mem0 (using ChromaDB as backend)
+  1. All 3,763 memories successfully migrated from ChromaDB -> Mem0 (using ChromaDB as backend)
   2. Conflicting memories detected and resolved (no contradictory context)
   3. Stale memories flagged with deprecated_since timestamp
   4. Memory health monitoring detects outdated context before it poisons decisions
@@ -90,10 +90,13 @@ Plans:
   2. ChatGPT adapter executes tasks via OpenAI API integration
   3. Gemini adapter executes tasks via gcloud CLI + API with quota tracking
   4. All adapters implement common interface for task submission and result retrieval
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] TBD (to be planned)
+- [ ] 04-01-PLAN.md — Base async infrastructure (Task, Result, AsyncBasePlatformAdapter) (Wave 1)
+- [ ] 04-02-PLAN.md — ChatGPT async adapter with OpenAI API (Wave 2)
+- [ ] 04-03-PLAN.md — Claude Code async adapter with subprocess (Wave 2)
+- [ ] 04-04-PLAN.md — Gemini async adapter with quota integration (Wave 2)
 
 ### Phase 5: Orchestrator Coordination
 **Goal**: Tasks route intelligently across platforms with cost optimization and parallel execution
@@ -199,7 +202,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 1. Foundation & Quota Management | 3/3 | Complete | 2026-01-27 |
 | 2. Memory Core | 4/5 | Gap closure | - |
 | 3. Memory Advanced | 0/6 | Planned | - |
-| 4. Orchestrator Adapters | 0/TBD | Not started | - |
+| 4. Orchestrator Adapters | 0/4 | Planned | - |
 | 5. Orchestrator Coordination | 0/TBD | Not started | - |
 | 6. ta_lab2 Time Model | 0/TBD | Not started | - |
 | 7. ta_lab2 Feature Pipeline | 0/TBD | Not started | - |
@@ -209,4 +212,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-01-28 (Phase 3 planned: 6 plans for Mem0 migration, conflict detection, health monitoring)*
+*Last updated: 2026-01-29 (Phase 4 planned: 4 plans for async adapters - ChatGPT, Claude Code, Gemini)*
