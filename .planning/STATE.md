@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2025-01-22)
 ## Current Position
 
 Phase: 4 of 10 (Orchestrator Adapters)
-Plan: 1 of 4
+Plan: 3 of 4
 Status: In progress
-Last activity: 2026-01-29 - Completed 04-01-PLAN.md (Async base infrastructure)
+Last activity: 2026-01-29 - Completed 04-03-PLAN.md (Claude Code async adapter)
 
-Progress: [█████████░] 93% (14/15 plans)
+Progress: [█████████░] 94% (15/16 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 14
-- Average duration: 16 min
-- Total execution time: 4.0 hours
+- Total plans completed: 15
+- Average duration: 15 min
+- Total execution time: 4.1 hours
 
 **By Phase:**
 
@@ -30,11 +30,11 @@ Progress: [█████████░] 93% (14/15 plans)
 | 01-foundation-quota-management | 3 | 23 min | 8 min |
 | 02-memory-core-chromadb-integration | 5 | 29 min | 6 min |
 | 03-memory-advanced-mem0-migration | 6 | 193 min | 32 min |
-| 04-orchestrator-adapters | 1 | 9 min | 9 min |
+| 04-orchestrator-adapters | 2 | 17 min | 9 min |
 
 **Recent Trend:**
-- Last 5 plans: 33min (03-04), 12min (03-05), 45min (03-06), 9min (04-01)
-- Trend: Phase 4 started - 04-01 quick infrastructure setup (9min)
+- Last 5 plans: 12min (03-05), 45min (03-06), 9min (04-01), 8min (04-03)
+- Trend: Phase 4 maintaining quick pace - avg 9min per plan
 
 *Updated after each plan completion*
 
@@ -106,6 +106,10 @@ Recent decisions affecting current work:
 - **TaskConstraints default timeout: 300 seconds** (04-01): Balances reasonable wait time for most tasks (5 minutes) with preventing indefinite hangs
 - **StreamingResult saves partial results on cancellation** (04-01): Critical for debugging and resumption - cancellation shouldn't lose all progress
 - **Backward compatibility with default values** (04-01): New Task/Result fields all optional with defaults so existing sync code continues working unchanged
+- **asyncio.create_subprocess_exec for Claude adapter** (04-03): Non-blocking subprocess execution prevents event loop blocking
+- **CLI auto-detection via shutil.which** (04-03): Checks "claude" and "claude-code" binaries automatically for convenience
+- **JSON output with graceful fallback** (04-03): Parses JSON output from --output-format flag, falls back to raw text on parse error
+- **Process reference tracking for cancellation** (04-03): Stores process references to enable subprocess killing on timeout/cancellation
 
 ### Pending Todos
 
@@ -118,9 +122,9 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-01-29
-Stopped at: Completed 04-01-PLAN.md (Async base infrastructure for platform adapters) - Phase 4 plan 1
+Stopped at: Completed 04-03-PLAN.md (Claude Code async adapter with subprocess execution) - Phase 4 plan 3
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-01-29 (Phase 4 plan 1: Async base infrastructure with comprehensive tests)*
+*Last updated: 2026-01-29 (Phase 4 plan 3: Claude Code async adapter with 17 comprehensive tests)*
