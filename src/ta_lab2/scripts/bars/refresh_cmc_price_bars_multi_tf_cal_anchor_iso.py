@@ -56,6 +56,7 @@ from ta_lab2.scripts.bars.common_snapshot_contract import (
     delete_bars_for_id_tf,
     load_last_snapshot_row,
     load_last_snapshot_info_for_id_tfs,
+    create_bar_builder_argument_parser,
 )
 from ta_lab2.orchestration import (
     MultiprocessingOrchestrator,
@@ -1085,28 +1086,17 @@ def refresh_incremental(
 # =============================================================================
 
 def main(argv: Sequence[str] | None = None) -> None:
-    p = argparse.ArgumentParser(description="Build ISO calendar-anchored bars (append-only daily snapshots).")
-    p.add_argument("--db-url", type=str, default=None, help="Database URL (otherwise uses TARGET_DB_URL env var).")
-    p.add_argument("--ids", nargs="+", required=True, help="IDs to process, or 'all'.")
-    p.add_argument("--daily-table", type=str, default=DEFAULT_DAILY_TABLE)
-    p.add_argument("--bars-table", type=str, default=DEFAULT_BARS_TABLE)
-    p.add_argument("--state-table", type=str, default=DEFAULT_STATE_TABLE)
-    p.add_argument("--tz", type=str, default=DEFAULT_TZ)
-    p.add_argument(
-        "--num-processes",
-        type=int,
-        default=None,
-        help="Number of worker processes (default 6, capped to CPU count).",
+    # Use shared CLI parser
+    ap = create_bar_builder_argument_parser(
+        description="Build ISO calendar-anchored bars (append-only daily snapshots).",
+        default_daily_table=DEFAULT_DAILY_TABLE,
+        default_bars_table=DEFAULT_BARS_TABLE,
+        default_state_table=DEFAULT_STATE_TABLE,
+        default_tz=DEFAULT_TZ,
+        include_tz=True,
+        include_fail_on_gaps=True,
     )
-    p.add_argument(
-        "--fail-on-internal-gaps",
-        action="store_true",
-        help="If set, raise if missing-days occur in the *interior* of a window (not just partial-start).",
-    )
-    p.add_argument("--full-rebuild", action="store_true", help="If set, delete+rebuild snapshots for all requested ids/tfs.")
-    p.add_argument("--parallel", action="store_true", help="(Legacy/no-op) Kept for pipeline compatibility")
-
-    args = p.parse_args(list(argv) if argv is not None else None)
+    args = ap.parse_args(list(argv) if argv is not None else None)
 
     db_url = resolve_db_url(args.db_url)
     num_processes = resolve_num_processes(args.num_processes, default=6)

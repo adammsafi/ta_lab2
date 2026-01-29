@@ -82,6 +82,8 @@ from ta_lab2.scripts.bars.common_snapshot_contract import (
     delete_bars_for_id_tf,
     load_last_snapshot_row,
     load_last_snapshot_info_for_id_tfs,
+    # CLI parsing utility (extracted)
+    create_bar_builder_argument_parser,
 )
 from ta_lab2.orchestration import (
     MultiprocessingOrchestrator,
@@ -1244,15 +1246,19 @@ def refresh_full_rebuild(
 
 
 def main(argv: Sequence[str] | None = None) -> None:
-    ap = argparse.ArgumentParser(description="Build tf_day (multi_tf) price bars (append-only snapshots).")
-    ap.add_argument("--ids", nargs="+", required=True, help="IDs or 'all'")
-    ap.add_argument("--db-url", default=None)
-    ap.add_argument("--daily-table", default=DEFAULT_DAILY_TABLE)
-    ap.add_argument("--bars-table", default=DEFAULT_BARS_TABLE)
-    ap.add_argument("--state-table", default=DEFAULT_STATE_TABLE)
+    # Use shared CLI parser (saves ~15 lines of boilerplate)
+    ap = create_bar_builder_argument_parser(
+        description="Build tf_day (multi_tf) price bars (append-only snapshots).",
+        default_daily_table=DEFAULT_DAILY_TABLE,
+        default_bars_table=DEFAULT_BARS_TABLE,
+        default_state_table=DEFAULT_STATE_TABLE,
+        include_tz=False,  # multi_tf doesn't use timezone
+        include_fail_on_gaps=False,
+    )
+
+    # Add builder-specific argument
     ap.add_argument("--include-non-canonical", action="store_true")
-    ap.add_argument("--full-rebuild", action="store_true")
-    ap.add_argument("--num-processes", type=int, default=6, help="Worker process count (default 6; use 1 for serial).")
+
     args = ap.parse_args(list(argv) if argv is not None else None)
 
     db_url = resolve_db_url(args.db_url)
