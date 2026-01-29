@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2025-01-22)
 ## Current Position
 
 Phase: 5 of 10 (Orchestrator Coordination)
-Plan: 2 of 6
+Plan: 4 of 6
 Status: In progress
-Last activity: 2026-01-29 - Completed 05-02-PLAN.md (Parallel execution engine)
+Last activity: 2026-01-29 - Completed 05-04-PLAN.md (Cost tracking with SQLite)
 
-Progress: [█████████░] 100% (18/18 plans)
+Progress: [█████████░] 100% (19/19 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 18
-- Average duration: 13 min
-- Total execution time: 4.6 hours
+- Total plans completed: 19
+- Average duration: 12 min
+- Total execution time: 4.7 hours
 
 **By Phase:**
 
@@ -31,11 +31,11 @@ Progress: [█████████░] 100% (18/18 plans)
 | 02-memory-core-chromadb-integration | 5 | 29 min | 6 min |
 | 03-memory-advanced-mem0-migration | 6 | 193 min | 32 min |
 | 04-orchestrator-adapters | 4 | 61 min | 15 min |
-| 05-orchestrator-coordination | 2 | 17 min | 9 min |
+| 05-orchestrator-coordination | 3 | 21 min | 7 min |
 
 **Recent Trend:**
-- Last 5 plans: 18min (04-04), 7min (05-01), 10min (05-02)
-- Trend: Phase 5 execution engine complete - AsyncOrchestrator with parallel execution and semaphore control
+- Last 5 plans: 7min (05-01), 10min (05-02), 4min (05-04)
+- Trend: Phase 5 Wave 2 complete - Cost tracking with SQLite persistence
 
 *Updated after each plan completion*
 
@@ -124,6 +124,11 @@ Recent decisions affecting current work:
 - **Semaphore for concurrency control** (05-02): Default 10 concurrent tasks (configurable) prevents quota exhaustion during parallel execution
 - **Result ordering preservation** (05-02): Results[i] corresponds to Tasks[i] regardless of completion order for predictable mapping
 - **Adaptive concurrency scaling** (05-02): min(max_concurrent, available_quota // 2) with minimum of 1 prevents mid-batch quota exhaustion
+- **SQLite storage at .memory/cost_tracking.db** (05-04): Consistent with Phase 1 quota tracking location, unified .memory/ directory for orchestrator state
+- **PRICING constant structure** (05-04): Separate input/output token costs for accurate calculation, USD per 1M tokens
+- **Multi-level cost aggregation** (05-04): Per-task, per-chain, per-platform totals, session summaries for flexible cost reporting
+- **Cost estimation threshold: 10k tokens** (05-04): should_warn_cost() warns for prompts >10k tokens to catch expensive operations
+- **Database indexes on chain_id, platform, timestamp** (05-04): Optimize common query patterns for fast aggregation
 
 ### Pending Todos
 
@@ -136,9 +141,9 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-01-29
-Stopped at: Completed 05-02-PLAN.md (Parallel execution engine) - Phase 5 plan 2 complete
+Stopped at: Completed 05-04-PLAN.md (Cost tracking with SQLite) - Phase 5 plan 4 complete
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-01-29 (Phase 5 plan 2: Parallel execution engine)*
+*Last updated: 2026-01-29 (Phase 5 plan 4: Cost tracking with SQLite)*
