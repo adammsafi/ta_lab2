@@ -188,7 +188,6 @@ import os
 import time
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
-from multiprocessing import Pool, cpu_count
 from typing import Sequence
 
 import numpy as np
@@ -214,6 +213,11 @@ from ta_lab2.scripts.bars.common_snapshot_contract import (
     upsert_state,
     upsert_bars,
     resolve_num_processes,
+)
+from ta_lab2.orchestration import (
+    MultiprocessingOrchestrator,
+    OrchestratorConfig,
+    ProgressTracker,
 )
 
 
@@ -1253,33 +1257,26 @@ def refresh_incremental(
 
     nproc = resolve_num_processes(num_processes)
 
-    all_state_updates: list[dict] = []
-    totals = {"upserted": 0, "rebuilds": 0, "appends": 0, "noops": 0, "errors": 0}
-
     if not args_list:
         print("[bars_cal_us] Nothing to do (no ids with daily data).")
         return
 
-    if nproc > 1:
-        print(f"[bars_cal_us] Processing {len(args_list)} ids with {nproc} workers (parallel)...")
-        with Pool(processes=nproc, maxtasksperchild=50) as pool:
-            for state_updates, stats in pool.imap_unordered(_process_single_id_with_all_specs, args_list):
-                all_state_updates.extend(state_updates)
-                totals["upserted"] += int(stats.get("upserted", 0))
-                totals["rebuilds"] += int(stats.get("rebuilds", 0))
-                totals["appends"] += int(stats.get("appends", 0))
-                totals["noops"] += int(stats.get("noops", 0))
-                totals["errors"] += int(stats.get("errors", 0))
-    else:
-        print(f"[bars_cal_us] Processing {len(args_list)} ids (serial)...")
-        for args in args_list:
-            state_updates, stats = _process_single_id_with_all_specs(args)
-            all_state_updates.extend(state_updates)
-            totals["upserted"] += int(stats.get("upserted", 0))
-            totals["rebuilds"] += int(stats.get("rebuilds", 0))
-            totals["appends"] += int(stats.get("appends", 0))
-            totals["noops"] += int(stats.get("noops", 0))
-            totals["errors"] += int(stats.get("errors", 0))
+    mode = "parallel" if nproc > 1 else "serial"
+    print(f"[bars_cal_us] Processing {len(args_list)} ids with {nproc} workers ({mode})...")
+
+    # Use orchestrator for both parallel and serial execution with progress tracking
+    config = OrchestratorConfig(num_processes=nproc, maxtasksperchild=50, use_imap_unordered=True)
+    progress = ProgressTracker(total=len(args_list), log_interval=5, prefix="[bars_cal_us]")
+    orchestrator = MultiprocessingOrchestrator(
+        worker_fn=_process_single_id_with_all_specs,
+        config=config,
+        progress_callback=progress.update,
+    )
+
+    all_state_updates, totals = orchestrator.execute(
+        args_list,
+        stats_template={"upserted": 0, "rebuilds": 0, "appends": 0, "noops": 0, "errors": 0}
+    )
 
 
     upsert_state(db_url, state_table, all_state_updates, with_tz=False)
