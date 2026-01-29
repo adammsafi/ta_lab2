@@ -98,7 +98,35 @@ out = compact_output_types(out)
 
 ### Available Functions
 
-#### `normalize_timestamps_for_polars(df)`
+#### Database Loading Utilities (from common_snapshot_contract.py)
+
+**NEW: These utilities were extracted from all 5 builders (Jan 2026)**
+
+##### `load_daily_prices_for_id(*, db_url, daily_table, id_, ts_start=None, tz="America/New_York")`
+Load daily OHLCV rows for a single cryptocurrency with validation.
+- Enforces 1-row-per-local-day invariant
+- Normalizes timestamp columns to UTC
+- Optionally filters by start timestamp
+- **Identical across all 5 builders** - extracted to eliminate duplication
+
+##### `delete_bars_for_id_tf(db_url, bars_table, *, id_, tf)`
+Delete all bar snapshots for a specific (id, tf) combination.
+- Used in full rebuild mode
+
+##### `load_last_snapshot_row(db_url, bars_table, *, id_, tf)`
+Load the most recent snapshot row for (id, tf).
+- Returns dict or None
+- Used for incremental updates
+
+##### `load_last_snapshot_info_for_id_tfs(db_url, bars_table, *, id_, tfs)`
+**Batch-load** latest snapshot info for multiple timeframes in 1 query.
+- Uses PostgreSQL `DISTINCT ON` for efficiency
+- Returns: `{tf: {last_bar_seq, last_time_close}}`
+- **Critical for performance**: 1 query instead of N queries
+
+#### Polars Bar Operations
+
+##### `normalize_timestamps_for_polars(df)`
 Converts timestamps to UTC and strips timezone info for Polars compatibility.
 
 #### `apply_ohlcv_cumulative_aggregations(pl_df, group_col="bar_seq")`
