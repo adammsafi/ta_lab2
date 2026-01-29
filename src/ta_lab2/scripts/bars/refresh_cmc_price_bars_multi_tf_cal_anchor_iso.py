@@ -30,7 +30,6 @@ import os
 import time
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
-from multiprocessing import Pool, cpu_count
 from typing import Sequence
 
 import numpy as np
@@ -53,6 +52,11 @@ from ta_lab2.scripts.bars.common_snapshot_contract import (
     load_state,
     upsert_state,
     upsert_bars,
+)
+from ta_lab2.orchestration import (
+    MultiprocessingOrchestrator,
+    OrchestratorConfig,
+    ProgressTracker,
 )
 
 
@@ -1133,16 +1137,19 @@ def refresh_incremental(
 
     print(f"[bars_anchor_iso] Processing ids={len(args_list)} with num_processes={num_processes}")
 
-    all_state_updates: list[dict] = []
-    agg_stats = {"upserted": 0, "rebuilds": 0, "appends": 0, "noops": 0, "errors": 0}
+    # Use orchestrator for parallel execution with progress tracking
+    config = OrchestratorConfig(num_processes=num_processes, maxtasksperchild=50)
+    progress = ProgressTracker(total=len(args_list), log_interval=5, prefix="[bars_anchor_iso]")
+    orchestrator = MultiprocessingOrchestrator(
+        worker_fn=_process_single_id_with_all_specs,
+        config=config,
+        progress_callback=progress.update,
+    )
 
-    with Pool(processes=num_processes, maxtasksperchild=50) as pool:
-        results = pool.map(_process_single_id_with_all_specs, args_list)
-
-    for state_updates, stats in results:
-        all_state_updates.extend(state_updates)
-        for k in agg_stats:
-            agg_stats[k] += int(stats.get(k, 0))
+    all_state_updates, agg_stats = orchestrator.execute(
+        args_list,
+        stats_template={"upserted": 0, "rebuilds": 0, "appends": 0, "noops": 0, "errors": 0}
+    )
 
     if all_state_updates:
         upsert_state(db_url, state_table, all_state_updates, with_tz=True)
