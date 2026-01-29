@@ -2,21 +2,24 @@
 
 from __future__ import annotations
 
+import asyncio
 import subprocess
 import time
+import uuid
 from abc import ABC, abstractmethod
+from datetime import datetime, timezone
 from pathlib import Path
 import shutil
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, AsyncIterator
 
 if TYPE_CHECKING:
-    from .core import Task, Result, Platform
+    from .core import Task, Result, Platform, TaskStatus
 
-from .core import Result, Platform as Plat
+from .core import Result, Platform as Plat, TaskStatus
 
 
 class BasePlatformAdapter(ABC):
-    """Base class for all platform adapters."""
+    """Base class for all platform adapters (sync version for backward compatibility)."""
 
     @abstractmethod
     def execute(self, task: Task) -> Result:
@@ -44,6 +47,178 @@ class BasePlatformAdapter(ABC):
             dict with keys: name, is_implemented, status, capabilities, requirements
         """
         pass
+
+
+class AsyncBasePlatformAdapter(ABC):
+    """
+    Base class for async platform adapters.
+
+    Provides comprehensive task lifecycle management with async execution model.
+    Supports task submission, status tracking, result retrieval, streaming, and cancellation.
+    """
+
+    def __init__(self):
+        self._pending_tasks: dict[str, Task] = {}
+
+    # Abstract async methods - must be implemented by subclasses
+
+    @abstractmethod
+    async def submit_task(self, task: Task) -> str:
+        """
+        Submit a task for execution and return task ID.
+
+        Args:
+            task: Task to execute
+
+        Returns:
+            task_id: Unique identifier for tracking this task
+
+        Raises:
+            RuntimeError: If adapter is not available or task cannot be submitted
+        """
+        pass
+
+    @abstractmethod
+    async def get_status(self, task_id: str) -> TaskStatus:
+        """
+        Check execution status of a task.
+
+        Args:
+            task_id: Task identifier returned from submit_task
+
+        Returns:
+            TaskStatus: Current execution state
+
+        Raises:
+            KeyError: If task_id is not found
+        """
+        pass
+
+    @abstractmethod
+    async def get_result(self, task_id: str, timeout: float = 300) -> Result:
+        """
+        Get complete result from a task (blocks until done or timeout).
+
+        Args:
+            task_id: Task identifier
+            timeout: Maximum time to wait in seconds (default 5 minutes)
+
+        Returns:
+            Result: Complete task result
+
+        Raises:
+            asyncio.TimeoutError: If task doesn't complete within timeout
+            KeyError: If task_id is not found
+        """
+        pass
+
+    @abstractmethod
+    async def stream_result(self, task_id: str) -> AsyncIterator[str]:
+        """
+        Stream partial results as they become available.
+
+        Args:
+            task_id: Task identifier
+
+        Yields:
+            str: Partial output chunks
+
+        Raises:
+            KeyError: If task_id is not found
+            NotImplementedError: If platform doesn't support streaming
+        """
+        pass
+
+    @abstractmethod
+    async def cancel_task(self, task_id: str) -> bool:
+        """
+        Attempt to cancel a running task.
+
+        Args:
+            task_id: Task identifier
+
+        Returns:
+            bool: True if cancellation succeeded, False otherwise
+
+        Raises:
+            KeyError: If task_id is not found
+        """
+        pass
+
+    # Property methods (keep from existing)
+
+    @property
+    @abstractmethod
+    def is_implemented(self) -> bool:
+        """Return True if adapter is fully implemented and usable."""
+        pass
+
+    @property
+    @abstractmethod
+    def implementation_status(self) -> str:
+        """Return implementation status: 'working', 'partial', 'stub', 'unavailable', 'error'."""
+        pass
+
+    @abstractmethod
+    def get_adapter_status(self) -> dict:
+        """
+        Return comprehensive adapter status.
+
+        Returns:
+            dict with keys: name, is_implemented, status, capabilities, requirements
+        """
+        pass
+
+    # Async context manager support
+
+    async def __aenter__(self):
+        """Enter async context."""
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Exit async context and cleanup resources."""
+        pass
+
+    # Utility methods
+
+    def _generate_task_id(self, task: Task) -> str:
+        """
+        Generate unique task ID.
+
+        Format: {platform}_{timestamp}_{uuid8}
+        Example: claude_code_20260129_a1b2c3d4
+
+        Args:
+            task: Task to generate ID for
+
+        Returns:
+            str: Unique task identifier
+        """
+        platform_name = task.platform_hint.value if task.platform_hint else "unknown"
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d")
+        uuid_short = str(uuid.uuid4())[:8]
+        return f"{platform_name}_{timestamp}_{uuid_short}"
+
+    async def _wait_with_timeout(self, coro, timeout: float):
+        """
+        Wrapper for asyncio.wait_for with proper CancelledError handling.
+
+        Args:
+            coro: Coroutine to execute
+            timeout: Timeout in seconds
+
+        Returns:
+            Result from coroutine
+
+        Raises:
+            asyncio.TimeoutError: If timeout exceeded
+            asyncio.CancelledError: If cancelled (re-raised after cleanup)
+        """
+        try:
+            return await asyncio.wait_for(coro, timeout=timeout)
+        except asyncio.CancelledError:
+            # Re-raise CancelledError after any cleanup
+            raise
 
 
 class ClaudeCodeAdapter(BasePlatformAdapter):
