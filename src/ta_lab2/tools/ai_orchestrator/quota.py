@@ -235,6 +235,57 @@ class QuotaTracker:
         if self.persistence_path:
             self._save_state()
 
+    def check_and_reserve(self, platform: str, amount: int = 1) -> tuple[bool, str]:
+        """
+        Check quota availability and reserve if available.
+
+        Convenience method for adapters to check quota before execution
+        and reserve to prevent overcommit.
+
+        Args:
+            platform: Platform name (e.g., 'gemini')
+            amount: Amount to reserve (default: 1 request)
+
+        Returns:
+            Tuple of (success: bool, message: str)
+            - success: True if quota available and reserved
+            - message: Status message or error reason
+        """
+        # Check availability first
+        if not self.can_use(platform, amount):
+            quota_key = self._platform_to_quota_key(platform)
+            quota = self.limits.get(quota_key)
+            if quota:
+                remaining = quota.limit - quota.used - quota.reserved if quota.limit else 0
+                return False, f"Quota exhausted for {platform}. Used: {quota.used}/{quota.limit}, Reserved: {quota.reserved}, Remaining: {remaining}"
+            return False, f"Unknown platform: {platform}"
+
+        # Reserve quota
+        if not self.reserve(platform, amount):
+            return False, f"Could not reserve quota for {platform}"
+
+        return True, f"Reserved {amount} request(s) for {platform}"
+
+    def release_and_record(self, platform: str, tokens: int = 1, cost: float = 0.0, amount_reserved: int = 1):
+        """
+        Release reservation and record actual usage.
+
+        Use after task completion to convert reservation to actual usage.
+
+        Args:
+            platform: Platform name
+            tokens: Actual tokens used
+            cost: Actual cost
+            amount_reserved: Amount that was reserved (to release)
+        """
+        # Release first (record_usage will also release matching reservation)
+        # This handles the case where reservation != actual usage
+        if amount_reserved > tokens:
+            self.release(platform, amount_reserved - tokens)
+
+        # Record actual usage
+        self.record_usage(platform, tokens, cost)
+
     def get_daily_summary(self) -> Dict[str, Dict[str, Any]]:
         """
         Get daily summary of quota usage.
