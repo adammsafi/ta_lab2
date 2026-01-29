@@ -79,6 +79,12 @@ try:
 except Exception:
     dbtool_main = None
 
+# Orchestrator CLI (optional)
+try:
+    from ta_lab2.tools.ai_orchestrator.cli import main as orchestrator_main  # type: ignore
+except Exception:
+    orchestrator_main = None
+
 
 # ----------------------------
 # Commands
@@ -537,6 +543,60 @@ def cmd_db(args: argparse.Namespace) -> int:
 
     return int(dbtool_main(argv))
 
+
+def cmd_orchestrator(args: argparse.Namespace) -> int:
+    """
+    AI Orchestrator for multi-platform task execution.
+
+    Delegates to orchestrator CLI module.
+    """
+    if orchestrator_main is None:
+        print("[ta-lab2 orchestrator] Orchestrator not available. Check ai_orchestrator module.")
+        return 2
+
+    # Build argv for orchestrator CLI
+    argv: list[str] = []
+
+    if hasattr(args, "orch_cmd") and args.orch_cmd:
+        argv.append(args.orch_cmd)
+
+        # Pass through subcommand-specific args
+        if args.orch_cmd == "submit":
+            if getattr(args, "prompt", None):
+                argv += ["--prompt", args.prompt]
+            if getattr(args, "type", None):
+                argv += ["--type", args.type]
+            if getattr(args, "platform", None):
+                argv += ["--platform", args.platform]
+            if getattr(args, "chain_id", None):
+                argv += ["--chain-id", args.chain_id]
+            if getattr(args, "timeout", None):
+                argv += ["--timeout", str(args.timeout)]
+            if getattr(args, "output", None):
+                argv += ["--output", args.output]
+
+        elif args.orch_cmd == "batch":
+            if getattr(args, "input", None):
+                argv += ["--input", args.input]
+            if getattr(args, "output", None):
+                argv += ["--output", args.output]
+            if getattr(args, "parallel", None):
+                argv += ["--parallel", str(args.parallel)]
+            if getattr(args, "fallback", False):
+                argv.append("--fallback")
+
+        elif args.orch_cmd in ("status", "costs", "quota"):
+            if getattr(args, "format", None):
+                argv += ["--format", args.format]
+            if args.orch_cmd == "costs":
+                if getattr(args, "chain_id", None):
+                    argv += ["--chain-id", args.chain_id]
+                if getattr(args, "date", None):
+                    argv += ["--date", args.date]
+
+    return int(orchestrator_main(argv))
+
+
 # ----------------------------
 # Main / Parser
 # ----------------------------
@@ -751,6 +811,45 @@ def build_parser() -> argparse.ArgumentParser:
         help="Output format (default: json). Use 'text' for a quick terminal summary.",
     )
     p_db_snap_check.set_defaults(func=cmd_db)
+
+    # Subcommand: orchestrator
+    p_orch = sub.add_parser("orchestrator", help="AI Orchestrator for multi-platform task execution")
+    orch_sub = p_orch.add_subparsers(dest="orch_cmd")
+
+    # orchestrator submit
+    p_orch_submit = orch_sub.add_parser("submit", help="Submit a task for execution")
+    p_orch_submit.add_argument("--prompt", "-p", required=True, help="Task prompt")
+    p_orch_submit.add_argument("--type", "-t", default="code_generation", help="Task type")
+    p_orch_submit.add_argument("--platform", help="Platform hint")
+    p_orch_submit.add_argument("--chain-id", help="Workflow chain ID")
+    p_orch_submit.add_argument("--timeout", type=int, default=300, help="Timeout in seconds")
+    p_orch_submit.add_argument("--output", "-o", help="Output file")
+    p_orch_submit.set_defaults(func=cmd_orchestrator)
+
+    # orchestrator batch
+    p_orch_batch = orch_sub.add_parser("batch", help="Execute batch from JSON")
+    p_orch_batch.add_argument("--input", "-i", required=True, help="Input JSON file")
+    p_orch_batch.add_argument("--output", "-o", help="Output JSON file")
+    p_orch_batch.add_argument("--parallel", type=int, default=5, help="Max parallel tasks")
+    p_orch_batch.add_argument("--fallback", action="store_true", help="Enable fallback routing")
+    p_orch_batch.set_defaults(func=cmd_orchestrator)
+
+    # orchestrator status
+    p_orch_status = orch_sub.add_parser("status", help="Show orchestrator status")
+    p_orch_status.add_argument("--format", choices=["text", "json"], default="text")
+    p_orch_status.set_defaults(func=cmd_orchestrator)
+
+    # orchestrator costs
+    p_orch_costs = orch_sub.add_parser("costs", help="Show cost summary")
+    p_orch_costs.add_argument("--chain-id", help="Filter by chain ID")
+    p_orch_costs.add_argument("--date", help="Date (YYYY-MM-DD)")
+    p_orch_costs.add_argument("--format", choices=["text", "json"], default="text")
+    p_orch_costs.set_defaults(func=cmd_orchestrator)
+
+    # orchestrator quota
+    p_orch_quota = orch_sub.add_parser("quota", help="Show quota status")
+    p_orch_quota.add_argument("--format", choices=["text", "json"], default="text")
+    p_orch_quota.set_defaults(func=cmd_orchestrator)
 
     # Back-compat: if no subcommand is given, behave like old CLI (run pipeline)
     ap.add_argument(
