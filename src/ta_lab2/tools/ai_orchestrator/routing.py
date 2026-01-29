@@ -43,6 +43,20 @@ COST_PRIORITY = [
     {"platform": "openai", "method": "api", "quota_key": "openai_api", "cost": "variable"},
 ]
 
+# Cost tiers with Platform enum and priority structure for route_cost_optimized
+COST_TIERS = [
+    # Tier 1: Gemini CLI free tier (1500 req/day) - ALWAYS try first
+    {"platform": Plat.GEMINI, "quota_key": "gemini_cli", "cost_per_req": 0.0, "priority": 1},
+
+    # Tier 2: Subscription-included (already paid, effectively free)
+    {"platform": Plat.CLAUDE_CODE, "quota_key": "claude_code", "cost_per_req": 0.0, "priority": 2},
+    {"platform": Plat.CHATGPT, "quota_key": "chatgpt_plus", "cost_per_req": 0.0, "priority": 2},
+
+    # Tier 3: Paid APIs (last resort)
+    {"platform": Plat.GEMINI, "quota_key": "gemini_api", "cost_per_req": 0.0001, "priority": 3},
+    {"platform": Plat.CHATGPT, "quota_key": "openai_api", "cost_per_req": 0.002, "priority": 3},
+]
+
 
 class TaskRouter:
     """Routes tasks to optimal AI platforms."""
@@ -142,3 +156,71 @@ class TaskRouter:
 
         # Default to first available candidate
         return available[0]
+
+    def route_cost_optimized(self, task: Task, quota_tracker: QuotaTracker) -> Platform:
+        """
+        Route to cheapest available platform per ROADMAP success criteria #1.
+
+        Priority:
+        1. Honor platform_hint if specified and available (advisory - fallback allowed)
+        2. Try Gemini CLI free tier first
+        3. Fall back to subscriptions (Claude Code, ChatGPT Plus)
+        4. Last resort: paid APIs
+
+        Args:
+            task: Task to route
+            quota_tracker: QuotaTracker instance
+
+        Returns:
+            Platform enum for cheapest available platform
+
+        Raises:
+            RuntimeError: If no platforms available (all quotas exhausted)
+        """
+        # Priority 1: Honor platform_hint if specified and available
+        if task.platform_hint:
+            if quota_tracker.can_use(task.platform_hint.value):
+                return task.platform_hint
+
+        # Sort by priority (lower number = higher priority)
+        sorted_tiers = sorted(COST_TIERS, key=lambda t: t["priority"])
+
+        # Priority 2-4: Iterate through cost tiers
+        for tier in sorted_tiers:
+            platform = tier["platform"]
+            quota_key = tier["quota_key"]
+
+            # Check if quota available for this tier
+            if quota_tracker.can_use(quota_key):
+                return platform
+
+        # No platforms available - all quotas exhausted
+        raise RuntimeError(
+            "No platforms available - all quotas exhausted. "
+            "Please wait for quota reset or enable paid APIs."
+        )
+
+    def warn_quota_threshold(self, quota_tracker: QuotaTracker, threshold: int = 90) -> list[str]:
+        """
+        Return warning messages for quotas above threshold percent.
+
+        Args:
+            quota_tracker: QuotaTracker instance
+            threshold: Percentage threshold (default 90)
+
+        Returns:
+            List of warning messages
+        """
+        warnings = []
+        summary = quota_tracker.get_daily_summary()
+
+        for platform, status in summary.items():
+            if status["limit"] != "unlimited":
+                percent_used = status.get("percent_used", 0.0)
+                if percent_used >= threshold:
+                    warnings.append(
+                        f"WARNING: {platform} quota at {percent_used:.1f}% "
+                        f"({status['used']}/{status['limit']})"
+                    )
+
+        return warnings
