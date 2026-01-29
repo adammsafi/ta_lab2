@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2025-01-22)
 ## Current Position
 
 Phase: 4 of 10 (Orchestrator Adapters)
-Plan: 3 of 4
+Plan: 2 of 4
 Status: In progress
-Last activity: 2026-01-29 - Completed 04-03-PLAN.md (Claude Code async adapter)
+Last activity: 2026-01-29 - Completed 04-02-PLAN.md (ChatGPT async adapter)
 
 Progress: [█████████░] 94% (15/16 plans)
 
@@ -30,11 +30,11 @@ Progress: [█████████░] 94% (15/16 plans)
 | 01-foundation-quota-management | 3 | 23 min | 8 min |
 | 02-memory-core-chromadb-integration | 5 | 29 min | 6 min |
 | 03-memory-advanced-mem0-migration | 6 | 193 min | 32 min |
-| 04-orchestrator-adapters | 2 | 17 min | 9 min |
+| 04-orchestrator-adapters | 2 | 25 min | 13 min |
 
 **Recent Trend:**
-- Last 5 plans: 12min (03-05), 45min (03-06), 9min (04-01), 8min (04-03)
-- Trend: Phase 4 maintaining quick pace - avg 9min per plan
+- Last 5 plans: 45min (03-06), 9min (04-01), 16min (04-02)
+- Trend: Phase 4 avg 13min per plan - ChatGPT adapter with comprehensive tests
 
 *Updated after each plan completion*
 
@@ -106,10 +106,10 @@ Recent decisions affecting current work:
 - **TaskConstraints default timeout: 300 seconds** (04-01): Balances reasonable wait time for most tasks (5 minutes) with preventing indefinite hangs
 - **StreamingResult saves partial results on cancellation** (04-01): Critical for debugging and resumption - cancellation shouldn't lose all progress
 - **Backward compatibility with default values** (04-01): New Task/Result fields all optional with defaults so existing sync code continues working unchanged
-- **asyncio.create_subprocess_exec for Claude adapter** (04-03): Non-blocking subprocess execution prevents event loop blocking
-- **CLI auto-detection via shutil.which** (04-03): Checks "claude" and "claude-code" binaries automatically for convenience
-- **JSON output with graceful fallback** (04-03): Parses JSON output from --output-format flag, falls back to raw text on parse error
-- **Process reference tracking for cancellation** (04-03): Stores process references to enable subprocess killing on timeout/cancellation
+- **Tenacity for retry logic** (04-02): Mature library with exponential backoff, jitter, and before_sleep logging for API retries
+- **Default model: gpt-4o-mini** (04-02): Cost efficiency - $0.15/$0.60 per 1M tokens vs gpt-4 $30/$60 per 1M (20x cost savings)
+- **Retry on RateLimitError and APIError** (04-02): 5 attempts, 1s->32s exponential backoff with 3s jitter per OpenAI best practices
+- **Pending tasks as asyncio.Task** (04-02): Enables status tracking (RUNNING/COMPLETED/CANCELLED) and cancellation support
 
 ### Pending Todos
 
@@ -122,9 +122,9 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-01-29
-Stopped at: Completed 04-03-PLAN.md (Claude Code async adapter with subprocess execution) - Phase 4 plan 3
+Stopped at: Completed 04-02-PLAN.md (ChatGPT async adapter with OpenAI API integration) - Phase 4 plan 2
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-01-29 (Phase 4 plan 3: Claude Code async adapter with 17 comprehensive tests)*
+*Last updated: 2026-01-29 (Phase 4 plan 2: ChatGPT async adapter with retry logic and 13 comprehensive tests)*
