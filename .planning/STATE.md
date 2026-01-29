@@ -98,7 +98,8 @@ Recent decisions affecting current work:
 - **Separate stale endpoint** (03-05): /api/v1/memory/health/stale separate from /health for detailed list without full report overhead
 - **Pydantic min_length/max_length** (03-05): Use min_length/max_length instead of deprecated min_items/max_items for V2 compatibility
 - **Mem0 search returns dict with 'results' key** (03-06): search() returns {'results': [...]} not list directly, requires .get('results', [])
-- **Qdrant local storage has persistence limitations** (03-06): Local storage suitable for testing but not production; use Qdrant server mode or cloud for reliable persistence
+- **Qdrant server mode for production** (03-06): Docker container with volume mount provides reliable persistence; auto-restart enabled; all 3,763 memories verified persisting across restarts
+- **QDRANT_SERVER_MODE environment variable** (03-06): Defaults to true for server mode (localhost:6333); set to false for local embedded mode (testing only)
 
 ### Pending Todos
 
@@ -106,13 +107,7 @@ None yet.
 
 ### Blockers/Concerns
 
-**Qdrant local storage persistence issue (03-06):**
-- Qdrant local storage doesn't reliably persist data across Python process restarts
-- Migration logs confirm 3,763 memories successfully migrated within same process
-- API shows 0 memories after process restart (file lock + persistence timing)
-- Impact: Development/testing functional, production requires Qdrant server mode or cloud
-- Resolution: For production, deploy Qdrant server or use Qdrant Cloud, then re-run idempotent migration
-- Decision: Continue to Phase 4 with this known limitation documented
+None currently.
 
 ## Session Continuity
 
