@@ -47,7 +47,7 @@ import os
 import re
 import time
 from datetime import datetime
-from multiprocessing import Pool, cpu_count
+from multiprocessing import cpu_count
 from typing import Sequence, Optional
 
 import numpy as np
@@ -76,6 +76,12 @@ from ta_lab2.scripts.bars.common_snapshot_contract import (
     # Shared write pipeline
     upsert_bars,
     enforce_ohlc_sanity,
+)
+from ta_lab2.orchestration import (
+    MultiprocessingOrchestrator,
+    OrchestratorConfig,
+    ProgressTracker,
+    create_resilient_worker,
 )
 
 # =============================================================================
@@ -1206,15 +1212,20 @@ def refresh_incremental_parallel(
         )
 
     print(f"[bars_multi_tf] Processing {len(tasks)} IDs with {num_processes} workers...")
-    with Pool(processes=num_processes, maxtasksperchild=50) as pool:
-        results = pool.map(_process_single_id_with_all_specs, tasks)
 
-    all_state_updates: list[dict] = []
-    totals = {"upserted": 0, "rebuilds": 0, "appends": 0, "noops": 0, "errors": 0}
-    for state_updates, stats in results:
-        all_state_updates.extend(state_updates)
-        for k in totals:
-            totals[k] += int(stats.get(k, 0))
+    # Use orchestrator for parallel execution with progress tracking
+    config = OrchestratorConfig(num_processes=num_processes, maxtasksperchild=50)
+    progress = ProgressTracker(total=len(tasks), log_interval=5, prefix="[bars_multi_tf]")
+    orchestrator = MultiprocessingOrchestrator(
+        worker_fn=_process_single_id_with_all_specs,
+        config=config,
+        progress_callback=progress.update,
+    )
+
+    all_state_updates, totals = orchestrator.execute(
+        tasks,
+        stats_template={"upserted": 0, "rebuilds": 0, "appends": 0, "noops": 0, "errors": 0}
+    )
 
     upsert_state(db_url, state_table, all_state_updates, with_tz=False)
 
