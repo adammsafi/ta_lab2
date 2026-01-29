@@ -99,25 +99,44 @@ def create_mem0_config(config: Optional[Mem0Config] = None) -> dict:
     )
 
     # NOTE: mem0ai 1.0.2 doesn't support "chromadb" provider (only qdrant).
-    # Using Qdrant with persistent local storage as workaround.
+    # Using Qdrant with persistent server storage for reliable persistence.
     # This allows Mem0 intelligence layer while preserving embeddings.
-    qdrant_path = chromadb_path.parent / "qdrant_mem0"
-    qdrant_path.mkdir(parents=True, exist_ok=True)
 
-    logger.info(
-        f"Using Qdrant vector store at {qdrant_path} "
-        "(mem0ai 1.0.2 doesn't support chromadb provider)"
-    )
+    # Check for QDRANT_HOST environment variable (server mode)
+    qdrant_host = os.environ.get("QDRANT_HOST", "localhost")
+    qdrant_port = int(os.environ.get("QDRANT_PORT", "6333"))
+    use_server_mode = os.environ.get("QDRANT_SERVER_MODE", "true").lower() == "true"
+
+    if use_server_mode:
+        logger.info(
+            f"Using Qdrant server mode at {qdrant_host}:{qdrant_port} "
+            "(reliable persistence)"
+        )
+        qdrant_config = {
+            "collection_name": config.collection_name,
+            "embedding_model_dims": 1536,  # Match text-embedding-3-small
+            "host": qdrant_host,
+            "port": qdrant_port,
+        }
+    else:
+        # Fallback to local embedded mode (has persistence limitations on Windows)
+        qdrant_path = chromadb_path.parent / "qdrant_mem0"
+        qdrant_path.mkdir(parents=True, exist_ok=True)
+        logger.warning(
+            f"Using Qdrant local embedded mode at {qdrant_path} "
+            "(has persistence limitations - use server mode for production)"
+        )
+        qdrant_config = {
+            "collection_name": config.collection_name,
+            "embedding_model_dims": 1536,
+            "path": str(qdrant_path),
+        }
 
     # Return configuration dict for Memory.from_config()
     return {
         "vector_store": {
             "provider": "qdrant",
-            "config": {
-                "collection_name": config.collection_name,
-                "embedding_model_dims": 1536,  # Match text-embedding-3-small
-                "path": str(qdrant_path),  # Local persistent storage
-            }
+            "config": qdrant_config
         },
         "llm": {
             "provider": "openai",
