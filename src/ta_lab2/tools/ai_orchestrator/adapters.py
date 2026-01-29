@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import subprocess
 import time
 import uuid
@@ -15,7 +16,7 @@ from typing import TYPE_CHECKING, AsyncIterator
 if TYPE_CHECKING:
     from .core import Task, Result, Platform, TaskStatus
 
-from .core import Result, Platform as Plat, TaskStatus
+from .core import Result, Platform as Plat, TaskStatus, TaskType
 
 
 class BasePlatformAdapter(ABC):
@@ -569,3 +570,305 @@ Prompt: {task.prompt}
 Gemini API integration pending.
 For now, use gcloud CLI or Gemini web UI.
 """
+
+
+class AsyncClaudeCodeAdapter(AsyncBasePlatformAdapter):
+    """
+    Async adapter for Claude Code CLI.
+
+    Executes tasks via:
+    - Async subprocess with JSON output parsing
+    - Context file passing via --file flags
+    - Proper timeout and cancellation handling
+
+    NOTE: This requires Claude Code CLI to be installed and accessible.
+    The CLI binary is typically named 'claude' or 'claude-code'.
+    """
+
+    def __init__(
+        self,
+        cli_path: str | None = None,
+        timeout: float = 300.0,
+        output_format: str = "json",
+    ):
+        """
+        Initialize Claude Code adapter.
+
+        Args:
+            cli_path: Path to Claude Code CLI binary (auto-detected if None)
+            timeout: Default timeout for CLI execution in seconds (default: 5 min)
+            output_format: Output format (json, text, or stream-json)
+        """
+        self._cli_path = cli_path or self._find_cli()
+        self._timeout = timeout
+        self._output_format = output_format
+        self._pending_tasks: dict[str, asyncio.Task] = {}
+        self._processes: dict[str, asyncio.subprocess.Process] = {}
+
+    def _find_cli(self) -> str | None:
+        """Find Claude Code CLI binary."""
+        import shutil
+
+        # Try common names
+        for name in ["claude", "claude-code"]:
+            path = shutil.which(name)
+            if path:
+                return path
+        return None
+
+    @property
+    def is_implemented(self) -> bool:
+        """Check if CLI is available."""
+        return self._cli_path is not None
+
+    @property
+    def implementation_status(self) -> str:
+        """Return implementation status."""
+        if not self._cli_path:
+            return "unavailable"
+        return "working"
+
+    def get_adapter_status(self) -> dict:
+        """Return comprehensive adapter status."""
+        return {
+            "name": "Claude Code (Async)",
+            "is_implemented": self.is_implemented,
+            "status": self.implementation_status,
+            "cli_path": self._cli_path,
+            "capabilities": [
+                "Async subprocess execution",
+                "JSON output parsing",
+                "Context file passing",
+                "GSD workflow support (via current session)",
+            ],
+            "requirements": [
+                f"Claude Code CLI {'(found: ' + self._cli_path + ')' if self._cli_path else '(not found)'}"
+            ],
+        }
+
+    async def __aenter__(self):
+        """Enter context - verify CLI exists."""
+        if not self._cli_path:
+            raise RuntimeError("Claude Code CLI not found. Install from https://code.claude.com")
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Exit context - cleanup any running processes."""
+        # Cancel all pending tasks
+        for task_id in list(self._pending_tasks.keys()):
+            await self.cancel_task(task_id)
+
+    async def submit_task(self, task: Task) -> str:
+        """Submit task and return task_id."""
+        task_id = self._generate_task_id(task)
+        task.task_id = task_id
+
+        # Create background task for execution
+        self._pending_tasks[task_id] = asyncio.create_task(
+            self._execute_internal(task, task_id)
+        )
+
+        return task_id
+
+    async def get_status(self, task_id: str) -> TaskStatus:
+        """Get task status."""
+        from .core import TaskStatus
+
+        if task_id not in self._pending_tasks:
+            return TaskStatus.UNKNOWN
+
+        task_obj = self._pending_tasks[task_id]
+        if task_obj.done():
+            if task_obj.cancelled():
+                return TaskStatus.CANCELLED
+            if task_obj.exception():
+                return TaskStatus.FAILED
+            return TaskStatus.COMPLETED
+        return TaskStatus.RUNNING
+
+    async def get_result(self, task_id: str, timeout: float = 300) -> Result:
+        """Get complete result, waiting if necessary."""
+        from .core import TaskStatus, Platform, TaskType, Task
+
+        if task_id not in self._pending_tasks:
+            return Result(
+                task=Task(type=TaskType.CODE_GENERATION, prompt=""),
+                platform=Platform.CLAUDE_CODE,
+                output="",
+                success=False,
+                status=TaskStatus.UNKNOWN,
+                error=f"Unknown task_id: {task_id}",
+            )
+
+        try:
+            result = await asyncio.wait_for(
+                self._pending_tasks[task_id],
+                timeout=timeout
+            )
+            return result
+        except asyncio.TimeoutError:
+            # Try to kill the process if still running
+            if task_id in self._processes:
+                self._processes[task_id].kill()
+            return Result(
+                task=Task(type=TaskType.CODE_GENERATION, prompt=""),
+                platform=Platform.CLAUDE_CODE,
+                output="",
+                success=False,
+                status=TaskStatus.FAILED,
+                error=f"Task timed out after {timeout}s",
+            )
+        except asyncio.CancelledError:
+            raise  # Always re-raise
+
+    async def stream_result(self, task_id: str) -> AsyncIterator[str]:
+        """Stream result - not fully supported for subprocess."""
+        # Claude CLI can output stream-json format, but parsing is complex
+        # For now, yield complete result
+        result = await self.get_result(task_id)
+        if result.output:
+            yield result.output
+
+    async def cancel_task(self, task_id: str) -> bool:
+        """Cancel a running task."""
+        if task_id not in self._pending_tasks:
+            return False
+
+        task_obj = self._pending_tasks[task_id]
+        if task_obj.done():
+            return False
+
+        # Kill subprocess if running
+        if task_id in self._processes:
+            process = self._processes[task_id]
+            try:
+                process.kill()
+                await process.wait()
+            except ProcessLookupError:
+                pass  # Process already dead
+
+        # Cancel the asyncio task
+        task_obj.cancel()
+        try:
+            await task_obj
+        except asyncio.CancelledError:
+            pass
+
+        return True
+
+    async def _execute_internal(self, task: Task, task_id: str) -> Result:
+        """Execute task via subprocess."""
+        from .core import TaskStatus, Platform
+        import json
+        import time
+
+        start_time = time.time()
+
+        try:
+            # Build command
+            cmd = [self._cli_path, "--output-format", self._output_format]
+
+            # Add context files if provided
+            if task.files:
+                for file_path in task.files:
+                    cmd.extend(["--file", str(file_path)])
+
+            # Create subprocess
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+
+            # Store process reference for cancellation
+            self._processes[task_id] = process
+
+            # Determine timeout
+            timeout = task.constraints.timeout_seconds if task.constraints and task.constraints.timeout_seconds else self._timeout
+
+            try:
+                # Send prompt via stdin and wait for response
+                stdout, stderr = await asyncio.wait_for(
+                    process.communicate(input=task.prompt.encode("utf-8")),
+                    timeout=timeout
+                )
+            finally:
+                # Clean up process reference
+                if task_id in self._processes:
+                    del self._processes[task_id]
+
+            # Check return code
+            if process.returncode != 0:
+                return Result(
+                    task=task,
+                    platform=Platform.CLAUDE_CODE,
+                    output="",
+                    success=False,
+                    status=TaskStatus.FAILED,
+                    error=f"CLI exited with code {process.returncode}: {stderr.decode('utf-8', errors='replace')}",
+                    duration_seconds=time.time() - start_time,
+                )
+
+            # Parse output
+            output_text = stdout.decode("utf-8", errors="replace")
+            files_created = []
+            metadata = {}
+
+            if self._output_format == "json":
+                try:
+                    output_data = json.loads(output_text)
+                    # Extract relevant fields from JSON
+                    output_text = output_data.get("response", output_data.get("content", output_text))
+                    files_created = output_data.get("files_created", [])
+                    metadata = {
+                        "raw_json": output_data,
+                        "model": output_data.get("model"),
+                    }
+                except json.JSONDecodeError:
+                    # If JSON parsing fails, use raw output
+                    metadata["parse_error"] = "Could not parse JSON output"
+
+            return Result(
+                task=task,
+                platform=Platform.CLAUDE_CODE,
+                output=output_text,
+                success=True,
+                status=TaskStatus.COMPLETED,
+                duration_seconds=time.time() - start_time,
+                files_created=files_created,
+                metadata=metadata,
+            )
+
+        except asyncio.TimeoutError:
+            # Kill process on timeout
+            if task_id in self._processes:
+                self._processes[task_id].kill()
+                del self._processes[task_id]
+            return Result(
+                task=task,
+                platform=Platform.CLAUDE_CODE,
+                output="",
+                success=False,
+                status=TaskStatus.FAILED,
+                error=f"Execution timed out after {self._timeout}s",
+                duration_seconds=time.time() - start_time,
+            )
+
+        except asyncio.CancelledError:
+            # Clean up and re-raise
+            if task_id in self._processes:
+                self._processes[task_id].kill()
+                del self._processes[task_id]
+            raise
+
+        except Exception as e:
+            return Result(
+                task=task,
+                platform=Platform.CLAUDE_CODE,
+                output="",
+                success=False,
+                status=TaskStatus.FAILED,
+                error=str(e),
+                duration_seconds=time.time() - start_time,
+            )
