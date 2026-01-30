@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2025-01-22)
 ## Current Position
 
 Phase: 6 of 10 (TA Lab2 Time Model)
-Plan: 3 of 6
+Plan: 5 of 6
 Status: In progress
-Last activity: 2026-01-30 - Completed 06-03-PLAN.md (EMA script integration validation)
+Last activity: 2026-01-30 - Completed 06-05-PLAN.md (Incremental refresh infrastructure validation)
 
-Progress: [█████████░] 126% (24/19 plans)
+Progress: [█████████░] 132% (25/19 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 24
+- Total plans completed: 25
 - Average duration: 9 min
-- Total execution time: 5.2 hours
+- Total execution time: 5.3 hours
 
 **By Phase:**
 
@@ -32,11 +32,11 @@ Progress: [█████████░] 126% (24/19 plans)
 | 03-memory-advanced-mem0-migration | 6 | 193 min | 32 min |
 | 04-orchestrator-adapters | 4 | 61 min | 15 min |
 | 05-orchestrator-coordination | 6 | 34 min | 6 min |
-| 06-ta-lab2-time-model | 3 | 23 min | 8 min |
+| 06-ta-lab2-time-model | 5 | 28 min | 6 min |
 
 **Recent Trend:**
-- Last 5 plans: 6min (05-06), 7min (06-01), 8min (06-02), 8min (06-03)
-- Trend: Phase 6 at 50% - EMA script integration validated
+- Last 5 plans: 7min (06-01), 8min (06-02), 8min (06-03), 5min (06-05)
+- Trend: Phase 6 at 83% - SUCCESS CRITERION #6 validated (incremental refresh)
 
 *Updated after each plan completion*
 
@@ -147,6 +147,10 @@ Recent decisions affecting current work:
 - **Test for evidence of state usage, not just imports** (06-03): Check for method calls, config usage, state table references to ensure state management is wired and functional
 - **Static analysis for code validation** (06-03): File content inspection validates architectural patterns without database connection (<2s execution)
 - **ASCII markers instead of Unicode checkmarks** (06-02): Windows console doesn't support ✓/✗, use [OK]/[ERROR] for compatibility (prevents charmap encoding errors)
+- **Unit tests use unittest.mock for database-free testing** (06-05): MagicMock enables testing database-dependent code without actual database connection
+- **Integration tests skip gracefully without database** (06-05): pytest.mark.skipif(not TARGET_DB_URL) allows test suite to run in environments without full infrastructure
+- **Watermarking per alignment_source** (06-05): get_watermark() validates incremental sync correctly handles different alignment sources independently
+- **Idempotency verification via dry-run** (06-05): Running sync twice with same watermark state produces identical candidate counts, proving incremental logic works
 
 ### Pending Todos
 
@@ -159,9 +163,9 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-01-30
-Stopped at: Completed 06-03-PLAN.md (EMA script integration validation) - Phase 6 plan 3 of 6
+Stopped at: Completed 06-05-PLAN.md (Incremental refresh infrastructure validation) - Phase 6 plan 5 of 6
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-01-30 (Phase 6 plan 3: EMA script integration validation - SUCCESS CRITERION #4 and blocker #6 confirmed)*
+*Last updated: 2026-01-30 (Phase 6 plan 5: Incremental refresh validation - SUCCESS CRITERION #6 confirmed)*
