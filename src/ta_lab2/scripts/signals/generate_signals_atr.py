@@ -222,18 +222,26 @@ class ATRSignalGenerator:
         # Group by ID to compute per-asset channels
         df = df.copy()
 
-        def compute_channels(group):
-            group['channel_high'] = group['high'].rolling(
+        # Compute channel levels per group
+        channel_highs = []
+        channel_lows = []
+
+        for id_ in df['id'].unique():
+            mask = df['id'] == id_
+            group_high = df.loc[mask, 'high'].rolling(
                 window=lookback,
                 min_periods=lookback
             ).max()
-            group['channel_low'] = group['low'].rolling(
+            group_low = df.loc[mask, 'low'].rolling(
                 window=lookback,
                 min_periods=lookback
             ).min()
-            return group
 
-        df = df.groupby('id', group_keys=False).apply(compute_channels)
+            channel_highs.extend(group_high.tolist())
+            channel_lows.extend(group_low.tolist())
+
+        df['channel_high'] = channel_highs
+        df['channel_low'] = channel_lows
 
         return df
 
@@ -339,8 +347,8 @@ class ATRSignalGenerator:
 
                     # Compute feature hash for reproducibility
                     feature_cols = ['close', 'high', 'low', 'atr_14', 'channel_high', 'channel_low']
-                    # Create single-row DataFrame for hashing
-                    hash_df = df_asset.loc[[idx], feature_cols].copy()
+                    # Create single-row DataFrame for hashing (include 'ts' for sorting)
+                    hash_df = df_asset.loc[[idx], ['ts'] + feature_cols].copy()
                     feature_hash = compute_feature_hash(hash_df, feature_cols)
 
                     records.append({
@@ -383,7 +391,7 @@ class ATRSignalGenerator:
                     }
 
                     feature_cols = ['close', 'high', 'low', 'atr_14', 'channel_high', 'channel_low']
-                    hash_df = df_asset.loc[[idx], feature_cols].copy()
+                    hash_df = df_asset.loc[[idx], ['ts'] + feature_cols].copy()
                     feature_hash = compute_feature_hash(hash_df, feature_cols)
 
                     records.append({
