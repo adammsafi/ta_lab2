@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2025-01-22)
 ## Current Position
 
 Phase: 7 of 10 (TA Lab2 Feature Pipeline)
-Plan: 3 of ? (in progress)
+Plan: 5 of ? (in progress)
 Status: In progress
-Last activity: 2026-01-30 - Completed 07-03-PLAN.md (Returns features)
+Last activity: 2026-01-30 - Completed 07-05-PLAN.md (TA indicators)
 
-Progress: [█████████░] 153% (29/19 plans)
+Progress: [██████████] 163% (31/19 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 29
+- Total plans completed: 31
 - Average duration: 7 min
-- Total execution time: 5.8 hours
+- Total execution time: 6.0 hours
 
 **By Phase:**
 
@@ -33,11 +33,11 @@ Progress: [█████████░] 153% (29/19 plans)
 | 04-orchestrator-adapters | 4 | 61 min | 15 min |
 | 05-orchestrator-coordination | 6 | 34 min | 6 min |
 | 06-ta-lab2-time-model | 6 | 37 min | 6 min |
-| 07-ta_lab2-feature-pipeline | 3 | 21 min | 7 min |
+| 07-ta_lab2-feature-pipeline | 5 | 39 min | 8 min |
 
 **Recent Trend:**
-- Last 5 plans: 9min (06-06), 6min (07-01), 10min (07-02), 5min (07-03)
-- Trend: Phase 7 progressing - Returns features complete, velocity steady
+- Last 5 plans: 10min (07-02), 5min (07-03), 8min (07-04), 9min (07-05)
+- Trend: Phase 7 progressing - Feature modules complete (returns, vol, TA), consistent 8min avg
 
 *Updated after each plan completion*
 
@@ -168,6 +168,11 @@ Recent decisions affecting current work:
 - **Selective z-score normalization** (07-03): Only key windows (1D, 7D, 30D) get z-scores to reduce storage overhead
 - **Single is_outlier flag** (07-03): OR across key windows instead of per-window flags, simplifies queries
 - **Per-asset chronological processing** (07-03): Returns require groupby('id') then sort for correct shift-based calculations
+- **Database-driven indicator configuration** (07-05): dim_indicators with JSONB params enables adding new indicators without code changes
+- **Multiple indicator parameter sets** (07-05): RSI (7,14,21), MACD (12/26/9, 8/17/9), Stoch (14/3), BB (20/2), ATR (14), ADX (14)
+- **Reuse indicators.py with inplace=True** (07-05): Avoid DataFrame copies for efficiency in TAFeature computation
+- **Dynamic schema based on active indicators** (07-05): get_feature_columns() queries dim_indicators for runtime flexibility
+- **CLI --indicators flag** (07-05): Filter which indicators to compute without code changes, enables selective computation for debugging
 
 ### Pending Todos
 
@@ -180,9 +185,9 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-01-30
-Stopped at: Completed 07-03-PLAN.md (Returns features) - Phase 7 progressing (3/? plans)
+Stopped at: Completed 07-05-PLAN.md (TA indicators) - Phase 7 progressing (5/? plans)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-01-30 (Phase 7 plan 3: Returns features - Multi-lookback returns, z-score normalization, 16 tests passing)*
+*Last updated: 2026-01-30 (Phase 7 plan 5: TA indicators - RSI, MACD, Stoch, BB, ATR, ADX with database-driven config complete)*
