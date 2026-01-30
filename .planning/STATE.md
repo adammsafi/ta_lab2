@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2025-01-22)
 ## Current Position
 
 Phase: 9 of 10 (Integration & Observability)
-Plan: 1 of 6 (Observability Infrastructure)
+Plan: 2 of 6 (Integration Test Infrastructure)
 Status: In progress
-Last activity: 2026-01-30 - Completed 09-01-PLAN.md (Observability Infrastructure)
+Last activity: 2026-01-30 - Completed 09-02-PLAN.md (Integration Test Infrastructure)
 
-Progress: [█████████░] 85% (8.17/10 phases complete)
+Progress: [█████████░] 87% (8.33/10 phases complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 44 (across 8 complete phases + 1 in progress)
-- Average duration: 7 min
-- Total execution time: 7.8 hours
+- Total plans completed: 45 (across 8 complete phases + 2 in progress)
+- Average duration: 8 min
+- Total execution time: 8.6 hours
 
 **By Phase:**
 
@@ -35,7 +35,7 @@ Progress: [█████████░] 85% (8.17/10 phases complete)
 | 06-ta-lab2-time-model | 6 | 37 min | 6 min | ✓ Complete |
 | 07-ta_lab2-feature-pipeline | 7 | 45 min | 6 min | ✓ Complete |
 | 08-ta_lab2-signals | 6 | 49 min | 8 min | ✓ Complete |
-| 09-integration-observability | 1 | 5 min | 5 min | In progress (1/6) |
+| 09-integration-observability | 2 | 55 min | 28 min | In progress (2/6) |
 
 **Recent Trend:**
 - Last 5 phases: 34min (05), 37min (06), 45min (07), 49min (08), 5min (09 partial)
@@ -217,6 +217,10 @@ Recent decisions affecting current work:
 - **Kubernetes probe pattern** (09-01): Separate liveness (process alive), readiness (dependencies healthy), startup (initialized) following K8s best practices
 - **Month-partitioned metrics table** (09-01): observability.metrics partitioned by recorded_at for scalability with high-frequency recording
 - **32-char hex correlation IDs** (09-01): Uses OpenTelemetry trace context when available, UUID fallback for cross-system request tracing
+- **Three-tier test pattern** (09-02): real_deps (full infrastructure), mixed_deps (real DB/mocked AI), mocked_deps (CI/CD) via pytest markers
+- **Session-scoped database fixtures** (09-02): database_engine session-scoped for efficiency, clean_database function-scoped with transaction rollback for isolation
+- **Graceful test skip pattern** (09-02): Tests skip with informative messages when infrastructure unavailable instead of hard failures
+- **pytest-mock for infrastructure mocking** (09-02): Standard pytest plugin provides mocker fixture for test doubles across all tiers
 
 ### Pending Todos
 
@@ -229,9 +233,9 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-01-30
-Stopped at: Completed 09-01-PLAN.md (Observability Infrastructure) - Phase 9 plan 1/6 complete
+Stopped at: Completed 09-02-PLAN.md (Integration Test Infrastructure) - Phase 9 plan 2/6 complete
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-01-30 (Phase 9 IN PROGRESS: 1/6 plans complete - Observability infrastructure with OpenTelemetry tracing, PostgreSQL-backed metrics, Kubernetes health probes, and workflow state tracking)*
+*Last updated: 2026-01-30 (Phase 9 IN PROGRESS: 2/6 plans complete - Observability infrastructure and three-tier integration test framework with pytest markers, shared fixtures, and CI/CD support)*
