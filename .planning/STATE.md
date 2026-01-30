@@ -146,6 +146,7 @@ Recent decisions affecting current work:
 - **Calendar scripts use dim_timeframe indirectly** (06-03): Calendar EMAs query dim_timeframe via SQL in feature modules, not directly in refresh scripts - architecturally sound separation
 - **Test for evidence of state usage, not just imports** (06-03): Check for method calls, config usage, state table references to ensure state management is wired and functional
 - **Static analysis for code validation** (06-03): File content inspection validates architectural patterns without database connection (<2s execution)
+- **ASCII markers instead of Unicode checkmarks** (06-02): Windows console doesn't support ✓/✗, use [OK]/[ERROR] for compatibility (prevents charmap encoding errors)
 
 ### Pending Todos
 
