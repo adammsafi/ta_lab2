@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2025-01-22)
 ## Current Position
 
 Phase: 7 of 10 (TA Lab2 Feature Pipeline)
-Plan: 2 of ? (in progress)
+Plan: 3 of ? (in progress)
 Status: In progress
-Last activity: 2026-01-30 - Completed 07-02-PLAN.md (BaseFeature & utilities)
+Last activity: 2026-01-30 - Completed 07-03-PLAN.md (Returns features)
 
-Progress: [█████████░] 147% (28/19 plans)
+Progress: [█████████░] 153% (29/19 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 28
-- Average duration: 8 min
-- Total execution time: 5.7 hours
+- Total plans completed: 29
+- Average duration: 7 min
+- Total execution time: 5.8 hours
 
 **By Phase:**
 
@@ -33,11 +33,11 @@ Progress: [█████████░] 147% (28/19 plans)
 | 04-orchestrator-adapters | 4 | 61 min | 15 min |
 | 05-orchestrator-coordination | 6 | 34 min | 6 min |
 | 06-ta-lab2-time-model | 6 | 37 min | 6 min |
-| 07-ta_lab2-feature-pipeline | 2 | 16 min | 8 min |
+| 07-ta_lab2-feature-pipeline | 3 | 21 min | 7 min |
 
 **Recent Trend:**
-- Last 5 plans: 5min (06-05), 9min (06-06), 6min (07-01), 10min (07-02)
-- Trend: Phase 7 progressing - Base feature infrastructure complete
+- Last 5 plans: 9min (06-06), 6min (07-01), 10min (07-02), 5min (07-03)
+- Trend: Phase 7 progressing - Returns features complete, velocity steady
 
 *Updated after each plan completion*
 
@@ -163,6 +163,11 @@ Recent decisions affecting current work:
 - **Z-score rolling window normalization** (07-02): Default 252 days (1 trading year), handles std=0 with NaN for constant values
 - **Flag but keep outlier approach** (07-02): Per CONTEXT.md, outliers marked via is_outlier column but original values preserved for analysis transparency
 - **Dual outlier detection methods** (07-02): zscore (default 4 sigma) for normal distributions, IQR (default 1.5x IQR) for robust detection with skewed data
+- **Reuse existing returns.py functions** (07-03): b2t_pct_delta and b2t_log_delta from ta_lab2.features.returns for bar-to-bar calculations, avoids duplication
+- **Multi-day returns via pct_change(periods=n)** (07-03): Simple pandas built-in for multi-day percent returns, mathematically correct
+- **Selective z-score normalization** (07-03): Only key windows (1D, 7D, 30D) get z-scores to reduce storage overhead
+- **Single is_outlier flag** (07-03): OR across key windows instead of per-window flags, simplifies queries
+- **Per-asset chronological processing** (07-03): Returns require groupby('id') then sort for correct shift-based calculations
 
 ### Pending Todos
 
@@ -175,9 +180,9 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-01-30
-Stopped at: Completed 07-02-PLAN.md (BaseFeature & utilities) - Phase 7 progressing (2/? plans)
+Stopped at: Completed 07-03-PLAN.md (Returns features) - Phase 7 progressing (3/? plans)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-01-30 (Phase 7 plan 2: BaseFeature & utilities - Template pattern, null handling, normalization, outlier detection complete)*
+*Last updated: 2026-01-30 (Phase 7 plan 3: Returns features - Multi-lookback returns, z-score normalization, 16 tests passing)*
