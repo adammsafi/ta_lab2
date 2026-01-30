@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2025-01-22)
 
 ## Current Position
 
-Phase: 8 of 10 (TA Lab2 Signals)
-Plan: 6 of 6 (Reproducibility Validation)
-Status: Phase complete
-Last activity: 2026-01-30 - Completed 08-06-PLAN.md (Reproducibility Validation & Orchestrated Pipeline)
+Phase: 9 of 10 (Integration & Observability)
+Plan: 1 of 6 (Observability Infrastructure)
+Status: In progress
+Last activity: 2026-01-30 - Completed 09-01-PLAN.md (Observability Infrastructure)
 
-Progress: [████████░░] 80% (8/10 phases complete)
+Progress: [█████████░] 85% (8.17/10 phases complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 43 (across 8 complete phases)
+- Total plans completed: 44 (across 8 complete phases + 1 in progress)
 - Average duration: 7 min
-- Total execution time: 7.7 hours
+- Total execution time: 7.8 hours
 
 **By Phase:**
 
@@ -35,10 +35,11 @@ Progress: [████████░░] 80% (8/10 phases complete)
 | 06-ta-lab2-time-model | 6 | 37 min | 6 min | ✓ Complete |
 | 07-ta_lab2-feature-pipeline | 7 | 45 min | 6 min | ✓ Complete |
 | 08-ta_lab2-signals | 6 | 49 min | 8 min | ✓ Complete |
+| 09-integration-observability | 1 | 5 min | 5 min | In progress (1/6) |
 
 **Recent Trend:**
-- Last 5 phases: 61min (04), 34min (05), 37min (06), 45min (07), 49min (08)
-- Trend: Consistent 6-8 min/plan velocity maintained
+- Last 5 phases: 34min (05), 37min (06), 45min (07), 49min (08), 5min (09 partial)
+- Trend: Consistent 5-8 min/plan velocity maintained
 
 *Updated after each plan completion*
 
@@ -211,6 +212,11 @@ Recent decisions affecting current work:
 - **Three validation modes: strict/warn/trust** (08-06): strict (fail on hash mismatch), warn (log warning, proceed), trust (skip validation) for different use cases
 - **Partial failure handling as default** (08-06): Pipeline continues when one signal type fails (logs error, continues with partial results), --fail-fast to exit immediately
 - **compare_backtest_runs for historical analysis** (08-06): Compare runs from database via feature hash to detect data changes and enable cache invalidation
+- **PostgreSQL-backed observability** (09-01): Store metrics, traces, workflow state in database for SQL queryability instead of external tools
+- **Graceful OpenTelemetry degradation** (09-01): Tracing works without opentelemetry-api via no-op classes, observability doesn't block development
+- **Kubernetes probe pattern** (09-01): Separate liveness (process alive), readiness (dependencies healthy), startup (initialized) following K8s best practices
+- **Month-partitioned metrics table** (09-01): observability.metrics partitioned by recorded_at for scalability with high-frequency recording
+- **32-char hex correlation IDs** (09-01): Uses OpenTelemetry trace context when available, UUID fallback for cross-system request tracing
 
 ### Pending Todos
 
@@ -223,9 +229,9 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-01-30
-Stopped at: Completed 08-06-PLAN.md (Reproducibility Validation & Orchestrated Pipeline) - Phase 8 complete
+Stopped at: Completed 09-01-PLAN.md (Observability Infrastructure) - Phase 9 plan 1/6 complete
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-01-30 (Phase 8 COMPLETE: 6 plans delivered - Reproducibility validation module with backtest determinism verification, orchestrated pipeline with parallel execution and partial failure handling, 105 total tests passing)*
+*Last updated: 2026-01-30 (Phase 9 IN PROGRESS: 1/6 plans complete - Observability infrastructure with OpenTelemetry tracing, PostgreSQL-backed metrics, Kubernetes health probes, and workflow state tracking)*
