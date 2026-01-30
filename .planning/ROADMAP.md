@@ -173,10 +173,15 @@ Plans:
   1. cmc_signals_daily generates EMA crossovers, RSI mean reversion, ATR breakout signals
   2. Backtest integration v1 references cmc_daily_features and produces PnL
   3. Backtest reruns produce identical signals and PnL (reproducibility validated)
-**Plans**: TBD
+**Plans**: 6 plans
 
 Plans:
-- [ ] TBD (to be planned)
+- [ ] 08-01-PLAN.md — Signal infrastructure: dim_signals, SignalStateManager, signal tables (Wave 1)
+- [ ] 08-02-PLAN.md — EMA crossover signal generation from cmc_daily_features (Wave 2)
+- [ ] 08-03-PLAN.md — RSI mean reversion signal generation with adaptive thresholds (Wave 2)
+- [ ] 08-04-PLAN.md — ATR breakout signal generation with channel tracking (Wave 2)
+- [ ] 08-05-PLAN.md — Backtest integration: SignalBacktester with result storage (Wave 3)
+- [ ] 08-06-PLAN.md — Reproducibility validation and orchestrated pipeline (Wave 4)
 
 ### Phase 9: Integration & Observability
 **Goal**: Cross-system validation proves memory + orchestrator + ta_lab2 work together
@@ -216,16 +221,16 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation & Quota Management | 3/3 | Complete | 2026-01-27 |
-| 2. Memory Core | 4/5 | Gap closure | - |
+| 2. Memory Core | 5/5 | Complete | 2026-01-28 |
 | 3. Memory Advanced | 6/6 | Complete | 2026-01-28 |
 | 4. Orchestrator Adapters | 4/4 | Complete | 2026-01-29 |
 | 5. Orchestrator Coordination | 6/6 | Complete | 2026-01-29 |
 | 6. ta_lab2 Time Model | 6/6 | Complete | 2026-01-30 |
-| 7. ta_lab2 Feature Pipeline | 0/7 | Planned | - |
-| 8. ta_lab2 Signals | 0/TBD | Not started | - |
+| 7. ta_lab2 Feature Pipeline | 7/7 | Complete | 2026-01-30 |
+| 8. ta_lab2 Signals | 0/6 | Planned | - |
 | 9. Integration & Observability | 0/TBD | Not started | - |
 | 10. Release Validation | 0/TBD | Not started | - |
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-01-30 (Phase 7 planned: 7 plans in 4 waves)*
+*Last updated: 2026-01-30 (Phase 8 planned: 6 plans in 4 waves)*
