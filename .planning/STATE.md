@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2025-01-22)
 ## Current Position
 
 Phase: 8 of 10 (TA Lab2 Signals)
-Plan: 4 of 6 (ATR Breakout Signal Generation)
+Plan: 5 of 6 (Backtest Execution)
 Status: In progress
-Last activity: 2026-01-30 - Completed 08-04-PLAN.md (ATR Breakout Signal Generation)
+Last activity: 2026-01-30 - Completed 08-05-PLAN.md (Backtest Execution)
 
-Progress: [███████░░░] 74% (7/10 phases complete, 4/6 plans in phase 8)
+Progress: [███████░░░] 75% (7/10 phases complete, 5/6 plans in phase 8)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 41 (across 7 complete phases + 4 in phase 8)
+- Total plans completed: 42 (across 7 complete phases + 5 in phase 8)
 - Average duration: 7 min
-- Total execution time: 7.4 hours
+- Total execution time: 7.6 hours
 
 **By Phase:**
 
@@ -34,11 +34,11 @@ Progress: [███████░░░] 74% (7/10 phases complete, 4/6 plans 
 | 05-orchestrator-coordination | 6 | 34 min | 6 min | ✓ Complete |
 | 06-ta-lab2-time-model | 6 | 37 min | 6 min | ✓ Complete |
 | 07-ta_lab2-feature-pipeline | 7 | 45 min | 6 min | ✓ Complete |
-| 08-ta_lab2-signals | 4/6 | 30 min | 8 min | In progress |
+| 08-ta_lab2-signals | 5/6 | 41 min | 8 min | In progress |
 
 **Recent Trend:**
-- Last 5 phases: 29min (02), 193min (03), 61min (04), 34min (05), 37min (06), 45min (07), 30min (08-01 through 08-04)
-- Trend: Phase 8 in progress - ATR breakout signal generation complete, 6min for plan 4
+- Last 5 phases: 29min (02), 193min (03), 61min (04), 34min (05), 37min (06), 45min (07), 41min (08-01 through 08-05)
+- Trend: Phase 8 in progress - Backtest execution complete, 11min for plan 5
 
 *Updated after each plan completion*
 
@@ -201,6 +201,11 @@ Recent decisions affecting current work:
 - **Feature hash requires 'ts' column** (08-04): compute_feature_hash sorts by 'ts', pattern: hash_df = df_asset.loc[[idx], ['ts'] + feature_cols]
 - **Breakout type classification** (08-04): channel_break (Donchian), atr_expansion (volatility spike), or both - enables performance analysis per trigger
 - **Channel levels in feature snapshot** (08-04): channel_high, channel_low captured in JSONB for audit trail and backtest validation
+- **Backtest from stored signals** (08-05): Reads signals from database (not on-the-fly generation) for reproducibility and auditability
+- **Clean vs realistic PnL modes** (08-05): Clean mode (no costs) for theoretical analysis, realistic mode with configurable fees/slippage for practical evaluation
+- **Atomic transaction for multi-table storage** (08-05): engine.begin() ensures runs/trades/metrics all succeed or all fail for consistency
+- **Comprehensive metrics extraction** (08-05): 15 metrics from vectorbt Portfolio (Sharpe, Sortino, Calmar, VaR, CVaR, profit factor, win rate, etc.) for multi-dimensional strategy evaluation
+- **Feature/params hashing for reproducibility** (08-05): SHA256 hash (first 16 chars) of signal params detects configuration changes that invalidate backtest comparisons
 
 ### Pending Todos
 
@@ -213,9 +218,9 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-01-30
-Stopped at: Completed 08-04-PLAN.md (ATR Breakout Signal Generation) - 4 of 6 plans in Phase 8
+Stopped at: Completed 08-05-PLAN.md (Backtest Execution) - 5 of 6 plans in Phase 8
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-01-30 (Phase 8 IN PROGRESS: Plan 08-04 complete - ATR breakout signal generation with Donchian channels and breakout classification, 12 tests passing)*
+*Last updated: 2026-01-30 (Phase 8 IN PROGRESS: Plan 08-05 complete - Backtest execution with vectorbt integration, clean/realistic PnL modes, comprehensive metrics, 11 tests passing)*
