@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2025-01-22)
 ## Current Position
 
 Phase: 7 of 10 (TA Lab2 Feature Pipeline)
-Plan: 5 of ? (in progress)
+Plan: 6 of ? (in progress)
 Status: In progress
-Last activity: 2026-01-30 - Completed 07-05-PLAN.md (TA indicators)
+Last activity: 2026-01-30 - Completed 07-06-PLAN.md (unified feature store)
 
-Progress: [██████████] 163% (31/19 plans)
+Progress: [██████████] 168% (32/19 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 31
+- Total plans completed: 32
 - Average duration: 7 min
-- Total execution time: 6.0 hours
+- Total execution time: 6.1 hours
 
 **By Phase:**
 
@@ -33,11 +33,11 @@ Progress: [██████████] 163% (31/19 plans)
 | 04-orchestrator-adapters | 4 | 61 min | 15 min |
 | 05-orchestrator-coordination | 6 | 34 min | 6 min |
 | 06-ta-lab2-time-model | 6 | 37 min | 6 min |
-| 07-ta_lab2-feature-pipeline | 5 | 39 min | 8 min |
+| 07-ta_lab2-feature-pipeline | 6 | 46 min | 8 min |
 
 **Recent Trend:**
-- Last 5 plans: 10min (07-02), 5min (07-03), 8min (07-04), 9min (07-05)
-- Trend: Phase 7 progressing - Feature modules complete (returns, vol, TA), consistent 8min avg
+- Last 5 plans: 5min (07-03), 8min (07-04), 9min (07-05), 7min (07-06)
+- Trend: Phase 7 progressing - Feature pipeline complete (returns, vol, TA, unified store), consistent 7-8min avg
 
 *Updated after each plan completion*
 
@@ -173,6 +173,11 @@ Recent decisions affecting current work:
 - **Reuse indicators.py with inplace=True** (07-05): Avoid DataFrame copies for efficiency in TAFeature computation
 - **Dynamic schema based on active indicators** (07-05): get_feature_columns() queries dim_indicators for runtime flexibility
 - **CLI --indicators flag** (07-05): Filter which indicators to compute without code changes, enables selective computation for debugging
+- **Materialized table for feature store** (07-06): cmc_daily_features implemented as table (not view) for ML query performance
+- **Source watermark tracking** (07-06): MIN of all source table watermarks determines dirty window start for conservative incremental refresh
+- **LEFT JOINs for graceful degradation** (07-06): Optional sources use LEFT JOIN resulting in NULL columns when missing, never fail entire refresh
+- **EMA pivot from long to wide** (07-06): Select specific periods (9,10,21,50,200) from cmc_ema_multi_tf_u for 1D timeframe
+- **Asset class from dim_sessions** (07-06): Includes asset_class column for market-type filtering in ML queries
 
 ### Pending Todos
 
@@ -185,9 +190,9 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-01-30
-Stopped at: Completed 07-05-PLAN.md (TA indicators) - Phase 7 progressing (5/? plans)
+Stopped at: Completed 07-06-PLAN.md (unified feature store) - Phase 7 progressing (6/? plans)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-01-30 (Phase 7 plan 5: TA indicators - RSI, MACD, Stoch, BB, ATR, ADX with database-driven config complete)*
+*Last updated: 2026-01-30 (Phase 7 plan 6: Unified daily features store - cmc_daily_features with source watermark tracking complete)*
