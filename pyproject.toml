@@ -76,6 +76,18 @@ all = [
   "python-dotenv>=1.0.0",
 ]
 
+# ---------- Pytest configuration ----------
+[tool.pytest.ini_options]
+markers = [
+    "real_deps: Tests requiring real infrastructure (database, Qdrant, OpenAI)",
+    "mixed_deps: Tests with real database/Qdrant, mocked AI APIs",
+    "mocked_deps: Tests with all external dependencies mocked (CI/CD)",
+    "integration: Integration tests (cross-component)",
+    "observability: Observability infrastructure tests",
+    "validation: Gap and alignment validation tests",
+    "slow: Tests that take >10 seconds",
+]
+
 # ---------- Setuptools (src/ layout + root module) ----------
 [tool.setuptools.packages.find]
 where = ["src"]
