@@ -13,9 +13,9 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Foundation & Quota Management** - Infrastructure validation and quota tracking foundation
-- [ ] **Phase 2: Memory Core (ChromaDB Integration)** - Integrate existing 3,763 memories and enable semantic search
-- [ ] **Phase 3: Memory Advanced (Mem0 Migration)** - Migrate to Mem0 + Vertex AI, add conflict resolution and health monitoring
-- [ ] **Phase 4: Orchestrator Adapters** - Claude, ChatGPT, Gemini platform integrations
+- [x] **Phase 2: Memory Core (ChromaDB Integration)** - Integrate existing 3,763 memories and enable semantic search
+- [x] **Phase 3: Memory Advanced (Mem0 Migration)** - Migrate to Mem0 + Vertex AI, add conflict resolution and health monitoring
+- [x] **Phase 4: Orchestrator Adapters** - Claude, ChatGPT, Gemini platform integrations
 - [x] **Phase 5: Orchestrator Coordination** - Routing, handoffs, parallel execution, cost tracking
 - [x] **Phase 6: ta_lab2 Time Model** - Dimension tables and EMA unification
 - [x] **Phase 7: ta_lab2 Feature Pipeline** - Returns, volatility, technical indicators
@@ -59,7 +59,7 @@ Plans:
 - [x] 02-02-PLAN.md — Semantic search API & context injection (Wave 2)
 - [x] 02-03-PLAN.md — Incremental update pipeline (Wave 2)
 - [x] 02-04-PLAN.md — Cross-platform REST API for memory access (Wave 3)
-- [ ] 02-05-PLAN.md — Fix semantic search embedding dimension mismatch (Gap closure)
+- [x] 02-05-PLAN.md — Fix semantic search embedding dimension mismatch (Gap closure)
 
 ### Phase 3: Memory Advanced (Mem0 Migration)
 **Goal**: Memory system migrated to Mem0 with self-maintenance and conflict detection
@@ -74,12 +74,12 @@ Plans:
 **Plans**: 6 plans
 
 Plans:
-- [ ] 03-01-PLAN.md — Mem0 integration with ChromaDB backend (Wave 1)
-- [ ] 03-02-PLAN.md — Enhanced metadata schema and migration (Wave 2)
-- [ ] 03-03-PLAN.md — Conflict detection and resolution (Wave 2)
-- [ ] 03-04-PLAN.md — Memory health monitoring (Wave 3)
-- [ ] 03-05-PLAN.md — REST API update with health and conflict endpoints (Wave 4)
-- [ ] 03-06-PLAN.md — Full migration execution and validation (Wave 5)
+- [x] 03-01-PLAN.md — Mem0 integration with ChromaDB backend (Wave 1)
+- [x] 03-02-PLAN.md — Enhanced metadata schema and migration (Wave 2)
+- [x] 03-03-PLAN.md — Conflict detection and resolution (Wave 2)
+- [x] 03-04-PLAN.md — Memory health monitoring (Wave 3)
+- [x] 03-05-PLAN.md — REST API update with health and conflict endpoints (Wave 4)
+- [x] 03-06-PLAN.md — Full migration execution and validation (Wave 5)
 
 ### Phase 4: Orchestrator Adapters
 **Goal**: All three AI platforms (Claude, ChatGPT, Gemini) accessible via unified adapter interface
