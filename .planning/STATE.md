@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2025-01-22)
 ## Current Position
 
 Phase: 7 of 10 (TA Lab2 Feature Pipeline)
-Plan: 1 of ? (in progress)
+Plan: 2 of ? (in progress)
 Status: In progress
-Last activity: 2026-01-30 - Completed 07-01-PLAN.md (Feature pipeline infrastructure)
+Last activity: 2026-01-30 - Completed 07-02-PLAN.md (BaseFeature & utilities)
 
-Progress: [█████████░] 142% (27/19 plans)
+Progress: [█████████░] 147% (28/19 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 27
+- Total plans completed: 28
 - Average duration: 8 min
-- Total execution time: 5.5 hours
+- Total execution time: 5.7 hours
 
 **By Phase:**
 
@@ -33,11 +33,11 @@ Progress: [█████████░] 142% (27/19 plans)
 | 04-orchestrator-adapters | 4 | 61 min | 15 min |
 | 05-orchestrator-coordination | 6 | 34 min | 6 min |
 | 06-ta-lab2-time-model | 6 | 37 min | 6 min |
-| 07-ta_lab2-feature-pipeline | 1 | 6 min | 6 min |
+| 07-ta_lab2-feature-pipeline | 2 | 16 min | 8 min |
 
 **Recent Trend:**
-- Last 5 plans: 8min (06-03), 5min (06-05), 9min (06-06), 6min (07-01)
-- Trend: Phase 7 started - Feature pipeline infrastructure complete
+- Last 5 plans: 5min (06-05), 9min (06-06), 6min (07-01), 10min (07-02)
+- Trend: Phase 7 progressing - Base feature infrastructure complete
 
 *Updated after each plan completion*
 
@@ -159,6 +159,10 @@ Recent decisions affecting current work:
 - **Feature state schema: (id, feature_type, feature_name) PRIMARY KEY** (07-01): Extends EMA pattern with feature dimensions for unified tracking across returns, volatility, and TA features
 - **Three null handling strategies** (07-01): skip (returns - preserves gaps), forward_fill (vol - smooth estimates), interpolate (TA - smooth signals) configured per feature in dim_features
 - **get_null_strategy() defaults to 'skip'** (07-01): Most conservative strategy when feature not found in dim_features, preserves data integrity
+- **BaseFeature template method pattern** (07-02): Following BaseEMAFeature structure, compute_for_ids defines flow: load -> null handling -> compute -> normalize -> flag outliers -> write
+- **Z-score rolling window normalization** (07-02): Default 252 days (1 trading year), handles std=0 with NaN for constant values
+- **Flag but keep outlier approach** (07-02): Per CONTEXT.md, outliers marked via is_outlier column but original values preserved for analysis transparency
+- **Dual outlier detection methods** (07-02): zscore (default 4 sigma) for normal distributions, IQR (default 1.5x IQR) for robust detection with skewed data
 
 ### Pending Todos
 
@@ -171,9 +175,9 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-01-30
-Stopped at: Completed 07-01-PLAN.md (Feature pipeline infrastructure) - Phase 7 started (1/? plans)
+Stopped at: Completed 07-02-PLAN.md (BaseFeature & utilities) - Phase 7 progressing (2/? plans)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-01-30 (Phase 7 plan 1: Feature pipeline infrastructure - FeatureStateManager and dim_features created)*
+*Last updated: 2026-01-30 (Phase 7 plan 2: BaseFeature & utilities - Template pattern, null handling, normalization, outlier detection complete)*
