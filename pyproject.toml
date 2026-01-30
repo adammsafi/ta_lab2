@@ -12,6 +12,7 @@ requires-python = ">=3.10"
 # Core runtime deps used across the package
 dependencies = [
   "pandas",
+  "polars>=0.19.0",
   "pyyaml",
   "numpy",
   "SQLAlchemy>=2.0",
