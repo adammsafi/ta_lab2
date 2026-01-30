@@ -17,7 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 3: Memory Advanced (Mem0 Migration)** - Migrate to Mem0 + Vertex AI, add conflict resolution and health monitoring
 - [ ] **Phase 4: Orchestrator Adapters** - Claude, ChatGPT, Gemini platform integrations
 - [x] **Phase 5: Orchestrator Coordination** - Routing, handoffs, parallel execution, cost tracking
-- [ ] **Phase 6: ta_lab2 Time Model** - Dimension tables and EMA unification
+- [x] **Phase 6: ta_lab2 Time Model** - Dimension tables and EMA unification
 - [ ] **Phase 7: ta_lab2 Feature Pipeline** - Returns, volatility, technical indicators
 - [ ] **Phase 8: ta_lab2 Signals** - Signal generation and backtest integration
 - [ ] **Phase 9: Integration & Observability** - Cross-system validation and monitoring
@@ -135,12 +135,12 @@ Plans:
 **Plans**: 6 plans
 
 Plans:
-- [ ] 06-01-PLAN.md — Validate dimension tables exist and populated (Wave 1)
-- [ ] 06-02-PLAN.md — Validate EMA unification infrastructure (Wave 1)
-- [ ] 06-03-PLAN.md — Validate EMA refresh scripts use dim_timeframe (Wave 1)
-- [ ] 06-04-PLAN.md — Time alignment and DST validation tests (Wave 2)
-- [ ] 06-05-PLAN.md — Incremental refresh infrastructure validation (Wave 2)
-- [ ] 06-06-PLAN.md — Rowcount validation script and tests (Wave 3)
+- [x] 06-01-PLAN.md — Validate dimension tables exist and populated (Wave 1)
+- [x] 06-02-PLAN.md — Validate EMA unification infrastructure (Wave 1)
+- [x] 06-03-PLAN.md — Validate EMA refresh scripts use dim_timeframe (Wave 1)
+- [x] 06-04-PLAN.md — Time alignment and DST validation tests (Wave 2)
+- [x] 06-05-PLAN.md — Incremental refresh infrastructure validation (Wave 2)
+- [x] 06-06-PLAN.md — Rowcount validation script and tests (Wave 3)
 
 ### Phase 7: ta_lab2 Feature Pipeline
 **Goal**: Returns, volatility, and technical indicators calculated correctly from unified time model
@@ -154,10 +154,16 @@ Plans:
   5. Null handling strategy implemented and validated
   6. Incremental refresh works for all feature tables
   7. Data consistency checks detect gaps, anomalies, and outliers
-**Plans**: TBD
+**Plans**: 7 plans
 
 Plans:
-- [ ] TBD (to be planned)
+- [ ] 07-01-PLAN.md — Feature infrastructure: FeatureStateManager and dim_features (Wave 1)
+- [ ] 07-02-PLAN.md — BaseFeature class and null handling utilities (Wave 1)
+- [ ] 07-03-PLAN.md — cmc_returns_daily with lookbacks from dim_timeframe (Wave 2)
+- [ ] 07-04-PLAN.md — cmc_vol_daily with Parkinson, GK, RS estimators (Wave 2)
+- [ ] 07-05-PLAN.md — cmc_ta_daily with RSI, MACD, indicators from dim_indicators (Wave 2)
+- [ ] 07-06-PLAN.md — cmc_daily_features unified feature store (Wave 3)
+- [ ] 07-07-PLAN.md — Data consistency validation and pipeline orchestration (Wave 4)
 
 ### Phase 8: ta_lab2 Signals
 **Goal**: Trading signals generated and backtestable with reproducible results
@@ -215,11 +221,11 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 4. Orchestrator Adapters | 4/4 | Complete | 2026-01-29 |
 | 5. Orchestrator Coordination | 6/6 | Complete | 2026-01-29 |
 | 6. ta_lab2 Time Model | 6/6 | Complete | 2026-01-30 |
-| 7. ta_lab2 Feature Pipeline | 0/TBD | Not started | - |
+| 7. ta_lab2 Feature Pipeline | 0/7 | Planned | - |
 | 8. ta_lab2 Signals | 0/TBD | Not started | - |
 | 9. Integration & Observability | 0/TBD | Not started | - |
 | 10. Release Validation | 0/TBD | Not started | - |
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-01-30 (Phase 6 complete: time model infrastructure validated)*
+*Last updated: 2026-01-30 (Phase 7 planned: 7 plans in 4 waves)*
