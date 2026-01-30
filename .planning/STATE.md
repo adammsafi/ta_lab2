@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2025-01-22)
 ## Current Position
 
 Phase: 6 of 10 (TA Lab2 Time Model)
-Plan: 1 of 6
+Plan: 3 of 6
 Status: In progress
-Last activity: 2026-01-30 - Completed 06-01-PLAN.md (Dimension table validation)
+Last activity: 2026-01-30 - Completed 06-03-PLAN.md (EMA script integration validation)
 
-Progress: [█████████░] 115% (22/19 plans)
+Progress: [█████████░] 126% (24/19 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 22
-- Average duration: 10 min
-- Total execution time: 5.0 hours
+- Total plans completed: 24
+- Average duration: 9 min
+- Total execution time: 5.2 hours
 
 **By Phase:**
 
@@ -32,11 +32,11 @@ Progress: [█████████░] 115% (22/19 plans)
 | 03-memory-advanced-mem0-migration | 6 | 193 min | 32 min |
 | 04-orchestrator-adapters | 4 | 61 min | 15 min |
 | 05-orchestrator-coordination | 6 | 34 min | 6 min |
-| 06-ta-lab2-time-model | 1 | 7 min | 7 min |
+| 06-ta-lab2-time-model | 3 | 23 min | 8 min |
 
 **Recent Trend:**
-- Last 5 plans: 7min (05-03), 4min (05-05), 6min (05-06), 7min (06-01)
-- Trend: Phase 6 started - Dimension table validation complete
+- Last 5 plans: 6min (05-06), 7min (06-01), 8min (06-02), 8min (06-03)
+- Trend: Phase 6 at 50% - EMA script integration validated
 
 *Updated after each plan completion*
 
@@ -143,6 +143,9 @@ Recent decisions affecting current work:
 - **Inline dim_sessions creation** (06-01): CREATE TABLE + INSERT in Python for simpler session management (default CRYPTO/EQUITY sessions)
 - **Optional columns for Python compatibility** (06-01): ALTER TABLE adds is_canonical, calendar_scheme, allow_partial_*, tf_days_min/max after SQL creation
 - **Tests skip gracefully without database** (06-01): pytest.mark.skipif(not TARGET_DB_URL) prevents test failures in environments without database
+- **Calendar scripts use dim_timeframe indirectly** (06-03): Calendar EMAs query dim_timeframe via SQL in feature modules, not directly in refresh scripts - architecturally sound separation
+- **Test for evidence of state usage, not just imports** (06-03): Check for method calls, config usage, state table references to ensure state management is wired and functional
+- **Static analysis for code validation** (06-03): File content inspection validates architectural patterns without database connection (<2s execution)
 
 ### Pending Todos
 
@@ -155,9 +158,9 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-01-30
-Stopped at: Completed 06-01-PLAN.md (Dimension table validation) - Phase 6 plan 1 of 6
+Stopped at: Completed 06-03-PLAN.md (EMA script integration validation) - Phase 6 plan 3 of 6
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-01-30 (Phase 6 plan 1: Dimension table validation)*
+*Last updated: 2026-01-30 (Phase 6 plan 3: EMA script integration validation - SUCCESS CRITERION #4 and blocker #6 confirmed)*
