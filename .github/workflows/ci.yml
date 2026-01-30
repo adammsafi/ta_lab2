@@ -30,8 +30,7 @@ jobs:
       - name: Install
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e .
-          python -m pip install pytest
+          python -m pip install -e ".[orchestrator,dev]"
 
       - name: Run tests
         run: |
