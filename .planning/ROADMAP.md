@@ -132,10 +132,15 @@ Plans:
   5. Time alignment validation tests pass (TF windows, calendar rolls, session boundaries)
   6. Incremental EMA refresh computes only new rows
   7. Rowcount validation confirms actual counts match tf-defined expectations
-**Plans**: TBD
+**Plans**: 6 plans
 
 Plans:
-- [ ] TBD (to be planned)
+- [ ] 06-01-PLAN.md — Validate dimension tables exist and populated (Wave 1)
+- [ ] 06-02-PLAN.md — Validate EMA unification infrastructure (Wave 1)
+- [ ] 06-03-PLAN.md — Validate EMA refresh scripts use dim_timeframe (Wave 1)
+- [ ] 06-04-PLAN.md — Time alignment and DST validation tests (Wave 2)
+- [ ] 06-05-PLAN.md — Incremental refresh infrastructure validation (Wave 2)
+- [ ] 06-06-PLAN.md — Rowcount validation script and tests (Wave 3)
 
 ### Phase 7: ta_lab2 Feature Pipeline
 **Goal**: Returns, volatility, and technical indicators calculated correctly from unified time model
@@ -209,7 +214,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 3. Memory Advanced | 6/6 | Complete | 2026-01-28 |
 | 4. Orchestrator Adapters | 4/4 | Complete | 2026-01-29 |
 | 5. Orchestrator Coordination | 6/6 | Complete | 2026-01-29 |
-| 6. ta_lab2 Time Model | 0/TBD | Not started | - |
+| 6. ta_lab2 Time Model | 0/6 | Planned | - |
 | 7. ta_lab2 Feature Pipeline | 0/TBD | Not started | - |
 | 8. ta_lab2 Signals | 0/TBD | Not started | - |
 | 9. Integration & Observability | 0/TBD | Not started | - |
@@ -217,4 +222,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-01-29 (Phase 5 planned: 6 plans for orchestrator coordination)*
+*Last updated: 2026-01-29 (Phase 6 planned: 6 plans for time model validation)*
