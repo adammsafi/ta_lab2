@@ -27,15 +27,15 @@ Target: 6 weeks (12-week plan accelerated through AI orchestration)
 - [ ] **ORCH-01**: Implement Claude Code adapter (subprocess execution + file parsing)
 - [ ] **ORCH-02**: Implement ChatGPT adapter (OpenAI API integration)
 - [ ] **ORCH-03**: Implement Gemini adapter (gcloud CLI + API with quota tracking)
-- [ ] **ORCH-04**: Build cost-optimized routing (Gemini CLI free → subscriptions → paid APIs)
-- [ ] **ORCH-05**: Implement quota tracking system (Gemini 1500/day, reset at UTC midnight)
-- [ ] **ORCH-06**: Build parallel execution engine (asyncio for independent tasks)
-- [ ] **ORCH-07**: Implement AI-to-AI handoffs (Task A writes to memory → spawns Task B with context pointer)
-- [ ] **ORCH-08**: Add error handling with retries and fallback routing
-- [ ] **ORCH-09**: Implement per-task cost tracking (token counting + API pricing)
-- [ ] **ORCH-10**: Create orchestrator CLI interface for task submission
-- [ ] **ORCH-11**: Add pre-flight adapter validation (check implementation before routing)
-- [ ] **ORCH-12**: Implement result aggregation for parallel tasks
+- [x] **ORCH-04**: Build cost-optimized routing (Gemini CLI free → subscriptions → paid APIs)
+- [x] **ORCH-05**: Implement quota tracking system (Gemini 1500/day, reset at UTC midnight)
+- [x] **ORCH-06**: Build parallel execution engine (asyncio for independent tasks)
+- [x] **ORCH-07**: Implement AI-to-AI handoffs (Task A writes to memory → spawns Task B with context pointer)
+- [x] **ORCH-08**: Add error handling with retries and fallback routing
+- [x] **ORCH-09**: Implement per-task cost tracking (token counting + API pricing)
+- [x] **ORCH-10**: Create orchestrator CLI interface for task submission)
+- [x] **ORCH-11**: Add pre-flight adapter validation (check implementation before routing)
+- [x] **ORCH-12**: Implement result aggregation for parallel tasks
 
 ### ta_lab2 Time Model (Weeks 1-4)
 
