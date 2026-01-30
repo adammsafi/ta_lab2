@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2025-01-22)
 ## Current Position
 
 Phase: 8 of 10 (TA Lab2 Signals)
-Plan: 5 of 6 (Backtest Execution)
-Status: In progress
-Last activity: 2026-01-30 - Completed 08-05-PLAN.md (Backtest Execution)
+Plan: 6 of 6 (Reproducibility Validation)
+Status: Phase complete
+Last activity: 2026-01-30 - Completed 08-06-PLAN.md (Reproducibility Validation & Orchestrated Pipeline)
 
-Progress: [███████░░░] 75% (7/10 phases complete, 5/6 plans in phase 8)
+Progress: [████████░░] 80% (8/10 phases complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 42 (across 7 complete phases + 5 in phase 8)
+- Total plans completed: 43 (across 8 complete phases)
 - Average duration: 7 min
-- Total execution time: 7.6 hours
+- Total execution time: 7.7 hours
 
 **By Phase:**
 
@@ -34,11 +34,11 @@ Progress: [███████░░░] 75% (7/10 phases complete, 5/6 plans 
 | 05-orchestrator-coordination | 6 | 34 min | 6 min | ✓ Complete |
 | 06-ta-lab2-time-model | 6 | 37 min | 6 min | ✓ Complete |
 | 07-ta_lab2-feature-pipeline | 7 | 45 min | 6 min | ✓ Complete |
-| 08-ta_lab2-signals | 5/6 | 41 min | 8 min | In progress |
+| 08-ta_lab2-signals | 6 | 49 min | 8 min | ✓ Complete |
 
 **Recent Trend:**
-- Last 5 phases: 29min (02), 193min (03), 61min (04), 34min (05), 37min (06), 45min (07), 41min (08-01 through 08-05)
-- Trend: Phase 8 in progress - Backtest execution complete, 11min for plan 5
+- Last 5 phases: 61min (04), 34min (05), 37min (06), 45min (07), 49min (08)
+- Trend: Consistent 6-8 min/plan velocity maintained
 
 *Updated after each plan completion*
 
@@ -206,6 +206,11 @@ Recent decisions affecting current work:
 - **Atomic transaction for multi-table storage** (08-05): engine.begin() ensures runs/trades/metrics all succeed or all fail for consistency
 - **Comprehensive metrics extraction** (08-05): 15 metrics from vectorbt Portfolio (Sharpe, Sortino, Calmar, VaR, CVaR, profit factor, win rate, etc.) for multi-dimensional strategy evaluation
 - **Feature/params hashing for reproducibility** (08-05): SHA256 hash (first 16 chars) of signal params detects configuration changes that invalidate backtest comparisons
+- **Triple-layer reproducibility** (08-06): Deterministic timestamp queries + feature hashing + version tracking ensures backtest determinism
+- **validate_backtest_reproducibility runs twice** (08-06): Gold standard test - run identical backtest twice, compare PnL/metrics/trade counts with tolerance (default 1e-10)
+- **Three validation modes: strict/warn/trust** (08-06): strict (fail on hash mismatch), warn (log warning, proceed), trust (skip validation) for different use cases
+- **Partial failure handling as default** (08-06): Pipeline continues when one signal type fails (logs error, continues with partial results), --fail-fast to exit immediately
+- **compare_backtest_runs for historical analysis** (08-06): Compare runs from database via feature hash to detect data changes and enable cache invalidation
 
 ### Pending Todos
 
@@ -218,9 +223,9 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-01-30
-Stopped at: Completed 08-05-PLAN.md (Backtest Execution) - 5 of 6 plans in Phase 8
+Stopped at: Completed 08-06-PLAN.md (Reproducibility Validation & Orchestrated Pipeline) - Phase 8 complete
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-01-30 (Phase 8 IN PROGRESS: Plan 08-05 complete - Backtest execution with vectorbt integration, clean/realistic PnL modes, comprehensive metrics, 11 tests passing)*
+*Last updated: 2026-01-30 (Phase 8 COMPLETE: 6 plans delivered - Reproducibility validation module with backtest determinism verification, orchestrated pipeline with parallel execution and partial failure handling, 105 total tests passing)*
