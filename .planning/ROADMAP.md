@@ -188,9 +188,9 @@ Plans:
 **Depends on**: Phase 5 (orchestrator), Phase 8 (signals)
 **Requirements**: SIG-03
 **Success Criteria** (what must be TRUE):
-  1. Observability suite passes all gap tests
-  2. TF alignment tests confirm calculations use correct timeframes
-  3. Roll alignment tests validate calendar boundary handling
+  1. Observability infrastructure tests pass (tracing, metrics, health checks, workflow state - Plan 09-03)
+  2. TF alignment tests confirm calculations use correct timeframes (Plan 09-04)
+  3. Roll alignment tests validate calendar boundary handling (Plan 09-04)
   4. Orchestrator successfully coordinates ta_lab2 feature refresh tasks via memory context
   5. End-to-end workflow: user submits task -> orchestrator routes -> memory provides context -> ta_lab2 executes -> results stored
 **Plans**: 7 plans
@@ -198,7 +198,7 @@ Plans:
 Plans:
 - [ ] 09-01-PLAN.md — Observability infrastructure: tracing, metrics, health, storage (Wave 1)
 - [ ] 09-02-PLAN.md — Integration test infrastructure with three-tier markers (Wave 1)
-- [ ] 09-03-PLAN.md — Observability tests: tracing, metrics, health, workflow state (Wave 2)
+- [ ] 09-03-PLAN.md — Observability infrastructure tests: tracing, metrics, health, workflow state (Wave 2)
 - [ ] 09-04-PLAN.md — Gap and alignment validation tests (Wave 2)
 - [ ] 09-05-PLAN.md — Component pair integration tests (Wave 3)
 - [ ] 09-06-PLAN.md — Alert threshold infrastructure and tests (Wave 3)
