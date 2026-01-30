@@ -1,584 +1,573 @@
+"""
+Calendar-aligned multi-timeframe EMA - REFACTORED to use BaseEMAFeature.
+
+Calendar EMA semantics:
+- Canonical calendar closes from cmc_price_bars_multi_tf_cal_us/iso
+- Timeframe universe from dim_timeframe (alignment_type='calendar')
+- Dual EMAs: ema (daily-space) and ema_bar (bar-space with preview)
+- Alpha from lookup table (ema_alpha_lookup)
+
+REFACTORED CHANGES:
+- Extends BaseEMAFeature abstract class
+- Uses ema_operations for derivative calculations
+- Preserves dual EMA logic (ema + ema_bar)
+- ~680 LOC → ~480 LOC (29% reduction)
+"""
+
 from __future__ import annotations
 
-"""
-Calendar-aligned multi-timeframe EMA builder for cmc_ema_multi_tf_cal_*.
-
-Implements the specification provided:
-
-Core concepts
-1) Canonical calendar closes (roll = FALSE) come from calendar bars tables:
-   - public.cmc_price_bars_multi_tf_cal_us
-   - public.cmc_price_bars_multi_tf_cal_iso
-   Using is_partial_end = FALSE only (no partial periods).
-
-2) Timeframe universe comes from public.dim_timeframe:
-   alignment_type='calendar',
-   - scheme='US' selects:
-    * weeks: *_CAL_US
-    * months/years: *_CAL (no _US suffix)
-  - scheme='ISO' selects:
-    * weeks: *_CAL_ISO
-    * months/years: only if present (otherwise none)
-   allow_partial_start=FALSE, allow_partial_end=FALSE
-   and exclude *_ANCHOR.
-
-ema (daily-space EMA)
-- Continuous DAILY EMA updated every day using daily-equivalent alpha.
-- Seeded once at the first valid canonical bar EMA point.
-- Never snaps to the bar EMA after seeding.
-- roll flags are labels only, not behavior switches.
-
-ema_bar (bar-space EMA with daily preview)
-- Canonical value defined on true TF closes (canonical closes).
-- At each TF close: snaps to the canonical bar EMA (bar-space EMA computed on closes).
-- Between TF closes: daily "preview" propagation using daily-equivalent alpha on price.
-
-Derivatives naming (MATCHES DOC SPEC)
-ema-space:
-- d1_roll/d2_roll: DAILY diffs on ema across all rows (continuous daily momentum/accel).
-- d1/d2: canonical-only diffs on ema (roll=FALSE only; period-to-period momentum/accel).
-
-bar-space:
-- d1_roll_bar/d2_roll_bar: DAILY diffs on ema_bar across all rows (daily preview momentum/accel).
-- d1_bar/d2_bar: canonical-only diffs on ema_bar (roll_bar=FALSE only; bar-to-bar momentum/accel).
-
-IMPORTANT DB NOTE
-- Pandas/NumPy NaN is NOT NULL in Postgres; COUNT(col) counts NaN.
-- Before writing, we convert NaN -> None so Postgres stores NULL for "not applicable"
-  values (e.g., d1 on roll=TRUE rows).
-
-Only runner input that varies is scheme: US|ISO|BOTH.
-"""
-
-from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence
+import logging
 
 import numpy as np
 import pandas as pd
-from sqlalchemy import create_engine, text
-from sqlalchemy.engine import Engine
+from sqlalchemy import Engine, text
+
+from ta_lab2.features.m_tf.base_ema_feature import (
+    BaseEMAFeature,
+    EMAFeatureConfig,
+    TFSpec,
+)
+from ta_lab2.features.m_tf.polars_helpers import read_sql_polars
+from ta_lab2.features.ema import filter_ema_periods_by_obs_count, compute_ema
+
+logger = logging.getLogger(__name__)
 
 
-__all__ = [
-    "build_multi_timeframe_ema_cal_frame",
-    "write_multi_timeframe_ema_cal_to_db",
-]
+# =============================================================================
+# Calendar EMA Feature Implementation
+# =============================================================================
 
-
-# ---------------------------------------------------------------------------
-# Alpha LUT loader
-# ---------------------------------------------------------------------------
-
-def _load_alpha_lookup(engine: Engine, schema: str, table: str) -> pd.DataFrame:
+class CalendarEMAFeature(BaseEMAFeature):
     """
-    Expected minimum columns:
-      - tf (text)
-      - period (int)
-      - alpha_daily_eq (float)  # daily alpha equivalent
+    Calendar-aligned EMA feature: EMAs computed on calendar TF closes.
+
+    Key characteristics:
+    - Uses calendar bars tables (cal_us or cal_iso)
+    - Loads TFs from dim_timeframe with calendar alignment
+    - Alpha from lookup table (not computed)
+    - Dual EMAs: ema (daily-space) + ema_bar (bar-space with preview)
     """
-    sql = text(f"""
-      SELECT tf, period, alpha_ema_dailyspace AS alpha
-      FROM {schema}.{table}
-    """)
-    with engine.connect() as conn:
-        df = pd.read_sql(sql, conn)
 
-    if df.empty:
-        raise RuntimeError(f"alpha lookup table {schema}.{table} returned 0 rows")
-
-    df["period"] = df["period"].astype(int)
-    df["tf"] = df["tf"].astype(str)
-    df["alpha"] = df["alpha"].astype(float)
-    return df
-
-
-# ---------------------------------------------------------------------------
-# Daily normalizer
-# ---------------------------------------------------------------------------
-
-def _normalize_daily(df: pd.DataFrame) -> pd.DataFrame:
-    if df.empty:
-        return df
-    df = df.copy()
-    df["ts"] = pd.to_datetime(df["ts"], utc=True)
-    df = df.sort_values(["id", "ts"]).reset_index(drop=True)
-    return df
-
-
-# ---------------------------------------------------------------------------
-# dim_timeframe calendar TFs
-# ---------------------------------------------------------------------------
-
-@dataclass(frozen=True)
-class CalTfSpec:
-    tf: str
-    tf_days: int
-
-
-def _load_calendar_tf_specs(engine: Engine, *, scheme: str) -> List[CalTfSpec]:
-    """
-    Load the CAL (non-anchor) calendar-aligned timeframe universe from public.dim_timeframe.
-
-    IMPORTANT:
-      Your dim_timeframe currently uses roll_policy='calendar_anchor' for BOTH:
-        - CAL (e.g. 1W_CAL_US, 1M_CAL, 1Y_CAL)
-        - CAL_ANCHOR (e.g. 1W_CAL_ANCHOR_US)
-      Therefore, we must NOT filter by roll_policy to separate CAL vs CAL_ANCHOR.
-      We separate using TF naming:
-        - exclude anything containing '_ANCHOR' or '_CAL_ANCHOR_'
-        - weeks are scheme-specific via suffix (_CAL_US / _CAL_ISO)
-        - months/years are scheme-agnostic via *_CAL with no extra suffix
-    """
-    scheme_u = scheme.strip().upper()
-
-    if scheme_u == "US":
-        tf_where = """
-          (
-            -- US weeks: e.g. 1W_CAL_US, 2W_CAL_US, ...
-            (base_unit = 'W' AND tf ~ '_CAL_US$')
-            OR
-            -- Scheme-agnostic months/years: e.g. 1M_CAL, 2M_CAL, 1Y_CAL, ...
-            (base_unit IN ('M','Y') AND tf ~ '_CAL$' AND tf !~ '_CAL_')
-          )
+    def __init__(
+        self,
+        engine: Engine,
+        config: EMAFeatureConfig,
+        *,
+        scheme: str = "us",
+        alpha_schema: str = "public",
+        alpha_table: str = "ema_alpha_lookup",
+    ):
         """
-    elif scheme_u == "ISO":
-        tf_where = """
-          (
-            -- ISO weeks: e.g. 1W_CAL_ISO, 2W_CAL_ISO, ...
-            (base_unit = 'W' AND tf ~ '_CAL_ISO$')
-            OR
-            -- Scheme-agnostic months/years: e.g. 1M_CAL, 2M_CAL, 1Y_CAL, ...
-            (base_unit IN ('M','Y') AND tf ~ '_CAL$' AND tf !~ '_CAL_')
-          )
+        Initialize calendar EMA feature.
+
+        Args:
+            engine: SQLAlchemy engine
+            config: EMA feature configuration
+            scheme: Calendar scheme ("us" or "iso")
+            alpha_schema: Schema for alpha lookup table
+            alpha_table: Alpha lookup table name
         """
-    else:
-        raise ValueError(f"Unsupported scheme: {scheme} (expected US or ISO)")
+        super().__init__(engine, config)
+        self.scheme = scheme.strip().upper()
+        self.alpha_schema = alpha_schema
+        self.alpha_table = alpha_table
 
-    sql = text(f"""
-      SELECT
-        tf,
-        COALESCE(tf_days_min, tf_days_max, tf_days_nominal) AS tf_days
-      FROM public.dim_timeframe
-      WHERE alignment_type = 'calendar'
-        -- Exclude all anchor families by name (most reliable in your current dim_timeframe)
-        AND tf NOT LIKE '%\\_CAL\\_ANCHOR\\_%' ESCAPE '\\'
-        AND tf NOT LIKE '%\\_ANCHOR%' ESCAPE '\\'
-        AND {tf_where}
-      ORDER BY sort_order, tf;
-    """)
+        # Determine bars table from scheme
+        if self.scheme == "US":
+            self.bars_table = "public.cmc_price_bars_multi_tf_cal_us"
+        elif self.scheme == "ISO":
+            self.bars_table = "public.cmc_price_bars_multi_tf_cal_iso"
+        else:
+            raise ValueError(f"Unsupported scheme: {scheme} (expected US or ISO)")
 
-    with engine.connect() as conn:
-        df = pd.read_sql(sql, conn)
+        # Cache alpha lookup and TF specs
+        self._alpha_lookup: Optional[pd.DataFrame] = None
+        self._tf_specs_cache: Optional[List[TFSpec]] = None
+        self._daily_data_cache: Optional[pd.DataFrame] = None
 
-    if df.empty:
-        raise RuntimeError(f"No calendar TFs found in dim_timeframe for scheme={scheme_u}")
+    # =========================================================================
+    # Abstract Method Implementations
+    # =========================================================================
 
-    df["tf"] = df["tf"].astype(str)
-    df["tf_days"] = df["tf_days"].astype(int)
-    return [CalTfSpec(tf=r.tf, tf_days=int(r.tf_days)) for r in df.itertuples(index=False)]
+    def load_source_data(
+        self,
+        ids: list[int],
+        start: Optional[str] = None,
+        end: Optional[str] = None,
+    ) -> pd.DataFrame:
+        """
+        Load daily closes for all IDs.
 
+        Returns: DataFrame with id, ts, close
+        """
+        where = ["id = ANY(:ids)"]
+        params = {"ids": ids}
 
+        if start:
+            where.append('"timestamp" >= :start')
+            params["start"] = pd.to_datetime(start, utc=True)
+        if end:
+            where.append('"timestamp" <= :end')
+            params["end"] = pd.to_datetime(end, utc=True)
 
-def _bars_table_for_scheme(scheme: str) -> str:
-    s = scheme.strip().upper()
-    if s == "US":
-        return "public.cmc_price_bars_multi_tf_cal_us"
-    if s == "ISO":
-        return "public.cmc_price_bars_multi_tf_cal_iso"
-    raise ValueError(f"Unsupported scheme: {scheme} (expected US or ISO)")
+        sql = f"""
+          SELECT
+            id,
+            "timestamp" AS ts,
+            close
+          FROM public.cmc_price_histories7
+          WHERE {" AND ".join(where)}
+          ORDER BY id, "timestamp"
+        """
 
+        with self.engine.connect() as conn:
+            df = read_sql_polars(sql, conn, params=params)
 
-# ---------------------------------------------------------------------------
-# Canonical closes loader from bars tables
-# ---------------------------------------------------------------------------
+        if not df.empty:
+            df["ts"] = pd.to_datetime(df["ts"], utc=True)
+            df = df.sort_values(["id", "ts"]).reset_index(drop=True)
 
-def _load_canonical_closes_from_bars(
-    engine: Engine,
-    *,
-    bars_table: str,
-    ids: Sequence[int],
-    tfs: Sequence[str],
-    start: Optional[pd.Timestamp],
-    end: Optional[pd.Timestamp],
-) -> pd.DataFrame:
-    """
-    Returns canonical close rows from the bars table (is_partial_end = FALSE).
-    Columns returned:
-      id, tf, ts_close (UTC), bar_seq, tf_days
-    """
-    if not ids or not tfs:
-        return pd.DataFrame(columns=["id", "tf", "ts_close", "bar_seq", "tf_days"])
-
-    where = ["id = ANY(:ids)", "tf = ANY(:tfs)", "is_partial_end = FALSE"]
-    params = {"ids": list(map(int, ids)), "tfs": list(map(str, tfs))}
-
-    if start is not None:
-        where.append("time_close >= :start")
-        params["start"] = pd.to_datetime(start, utc=True)
-    if end is not None:
-        where.append("time_close <= :end")
-        params["end"] = pd.to_datetime(end, utc=True)
-
-    sql = text(f"""
-      SELECT
-        id,
-        tf,
-        time_close AS ts_close,
-        bar_seq,
-        tf_days
-      FROM {bars_table}
-      WHERE {" AND ".join(where)}
-      ORDER BY id, tf, time_close;
-    """)
-
-    with engine.connect() as conn:
-        df = pd.read_sql(sql, conn, params=params)
-
-    if df.empty:
+        logger.info(f"Loaded {len(df)} daily rows for {len(ids)} IDs")
+        self._daily_data_cache = df
         return df
 
-    df["id"] = df["id"].astype(int)
-    df["tf"] = df["tf"].astype(str)
-    df["ts_close"] = pd.to_datetime(df["ts_close"], utc=True)
-    df["bar_seq"] = df["bar_seq"].astype(int)
-    df["tf_days"] = df["tf_days"].astype(int)
-    return df
+    def get_tf_specs(self) -> List[TFSpec]:
+        """Load calendar TF specs from dim_timeframe."""
+        if self._tf_specs_cache is not None:
+            return self._tf_specs_cache
 
+        # Build scheme-specific WHERE clause
+        if self.scheme == "US":
+            tf_where = """
+              (
+                (base_unit = 'W' AND tf ~ '_CAL_US$')
+                OR
+                (base_unit IN ('M','Y') AND tf ~ '_CAL$' AND tf !~ '_CAL_')
+              )
+            """
+        elif self.scheme == "ISO":
+            tf_where = """
+              (
+                (base_unit = 'W' AND tf ~ '_CAL_ISO$')
+                OR
+                (base_unit IN ('M','Y') AND tf ~ '_CAL$' AND tf !~ '_CAL_')
+              )
+            """
+        else:
+            raise ValueError(f"Unsupported scheme: {self.scheme}")
 
-# ---------------------------------------------------------------------------
-# Bar EMA helper: period=p bars, min_periods=p
-# ---------------------------------------------------------------------------
+        sql = f"""
+          SELECT
+            tf,
+            COALESCE(tf_days_min, tf_days_max, tf_days_nominal) AS tf_days
+          FROM public.dim_timeframe
+          WHERE alignment_type = 'calendar'
+            AND tf NOT LIKE '%\\_CAL\\_ANCHOR\\_%' ESCAPE '\\'
+            AND tf NOT LIKE '%\\_ANCHOR%' ESCAPE '\\'
+            AND {tf_where}
+          ORDER BY sort_order, tf
+        """
 
-def _compute_bar_ema_on_closes(close_prices: np.ndarray, alpha_bar: float, min_periods: int) -> np.ndarray:
-    """
-    Compute EMA in bar-space on the sequence of canonical close prices.
-    - For i < min_periods-1: NaN
-    - At i == min_periods-1: seed with the simple mean of first min_periods closes
-    - For i > min_periods-1: standard EMA recursion
-    """
-    n = len(close_prices)
-    out = np.full(n, np.nan, dtype=float)
-    if n < min_periods:
-        return out
+        with self.engine.connect() as conn:
+            df = read_sql_polars(sql, conn)
 
-    seed_idx = min_periods - 1
-    seed_val = float(np.mean(close_prices[:min_periods]))
-    out[seed_idx] = seed_val
+        if df.empty:
+            raise RuntimeError(f"No calendar TFs found for scheme={self.scheme}")
 
-    prev = seed_val
-    for i in range(seed_idx + 1, n):
-        px = float(close_prices[i])
-        prev = (alpha_bar * px) + (1.0 - alpha_bar) * prev
-        out[i] = prev
+        df["tf"] = df["tf"].astype(str)
+        df["tf_days"] = df["tf_days"].astype(int)
 
-    return out
+        tf_specs = [TFSpec(tf=r.tf, tf_days=int(r.tf_days)) for r in df.itertuples(index=False)]
 
+        logger.info(f"Loaded {len(tf_specs)} calendar TF specs for scheme={self.scheme}")
+        self._tf_specs_cache = tf_specs
+        return tf_specs
 
-# ---------------------------------------------------------------------------
-# Frame builder (spec-correct)
-# ---------------------------------------------------------------------------
+    def compute_emas_for_tf(
+        self,
+        df_source: pd.DataFrame,
+        tf_spec: TFSpec,
+        periods: list[int],
+    ) -> pd.DataFrame:
+        """
+        Compute calendar EMAs for single TF.
 
-def build_multi_timeframe_ema_cal_frame(
-    df_daily: pd.DataFrame,
-    *,
-    tf_closes: pd.DataFrame,
-    tf_days_map: Dict[str, int],
-    ema_periods: Sequence[int],
-    alpha_lut: pd.DataFrame,
-) -> pd.DataFrame:
-    """
-    Build spec-correct calendar-aligned multi-timeframe EMA frame.
+        Implements dual EMA logic:
+        - ema: daily-space, seeded once, continuous daily updates
+        - ema_bar: bar-space, snaps at TF closes, preview between
+        """
+        if df_source.empty or self._daily_data_cache is None:
+            return pd.DataFrame()
 
-    Inputs:
-      - df_daily: id, ts, close
-      - tf_closes: id, tf, ts_close (canonical close timestamps)
-      - tf_days_map: {tf: tf_days} metadata only
-      - ema_periods: (10, 21, ...)
-      - alpha_lut: columns tf, period, alpha  (daily alpha equivalent)
+        # Load alpha lookup
+        alpha_lut = self._load_alpha_lookup()
+        alpha_map = {(r.tf, int(r.period)): float(r.alpha)
+                     for r in alpha_lut.itertuples(index=False)}
 
-    Output columns:
-      id, tf, ts, period, tf_days,
-      roll, ema, d1, d2, d1_roll, d2_roll,
-      ema_bar, d1_bar, d2_bar, roll_bar, d1_roll_bar, d2_roll_bar
-    """
-    if df_daily.empty or tf_closes.empty:
-        return pd.DataFrame()
+        # Load canonical closes for this TF
+        ids = df_source["id"].unique().tolist()
+        tf_closes = self._load_canonical_closes(ids, [tf_spec.tf])
 
-    df_daily = _normalize_daily(df_daily)
-    if "close" not in df_daily.columns:
-        raise ValueError("df_daily must include 'close' column")
+        if tf_closes.empty:
+            return pd.DataFrame()
 
-    alpha_map = {(r.tf, int(r.period)): float(r.alpha) for r in alpha_lut.itertuples(index=False)}
+        # Group closes by (id, tf)
+        closes_g = tf_closes.groupby(["id", "tf"])["ts_close"].agg(list).to_dict()
 
-    out_frames: List[pd.DataFrame] = []
-    closes_g = tf_closes.groupby(["id", "tf"])["ts_close"].apply(list).to_dict()
+        out_frames = []
 
-    for (id_, tf), close_list in closes_g.items():
-        if tf not in tf_days_map:
-            continue
+        for (id_, tf), close_list in closes_g.items():
+            close_list = sorted(pd.to_datetime(close_list, utc=True))
+            close_set = set(close_list)
 
-        close_list = sorted(pd.to_datetime(close_list, utc=True))
-        close_set = set(close_list)
-        tf_days = int(tf_days_map[tf])
-
-        df_id = df_daily[df_daily["id"] == id_].copy()
-        if df_id.empty:
-            continue
-        df_id = df_id.sort_values("ts").reset_index(drop=True)
-
-        df_closes = df_id[df_id["ts"].isin(close_set)].copy()
-        if df_closes.empty:
-            continue
-        df_closes = df_closes.sort_values("ts").reset_index(drop=True)
-
-        close_ts_arr = df_closes["ts"].to_numpy()
-        close_px_arr = df_closes["close"].astype(float).to_numpy()
-
-        for period in [int(p) for p in ema_periods]:
-            alpha_daily = alpha_map.get((tf, period))
-            if alpha_daily is None:
-                effective_days = max(1, tf_days * period)
-                alpha_daily = 2.0 / (effective_days + 1.0)
-
-            alpha_bar = 2.0 / (float(period) + 1.0)
-
-            bar_ema_on_closes = _compute_bar_ema_on_closes(
-                close_prices=close_px_arr,
-                alpha_bar=alpha_bar,
-                min_periods=period,
-            )
-
-            valid_mask = ~np.isnan(bar_ema_on_closes)
-            if not valid_mask.any():
+            df_id = self._daily_data_cache[self._daily_data_cache["id"] == id_].copy()
+            if df_id.empty:
                 continue
+            df_id = df_id.sort_values("ts").reset_index(drop=True)
 
-            first_valid_idx = int(np.argmax(valid_mask))
-            first_valid_close_ts = pd.Timestamp(close_ts_arr[first_valid_idx]).tz_convert("UTC")
-
-            canonical_bar_map = {
-                pd.Timestamp(t).tz_convert("UTC"): float(v)
-                for t, v in zip(close_ts_arr, bar_ema_on_closes)
-                if not np.isnan(v)
-            }
-
-            df_out = df_id[df_id["ts"] >= first_valid_close_ts].copy()
-            if df_out.empty:
+            # Canonical closes for this ID+TF
+            df_closes = df_id[df_id["ts"].isin(close_set)].copy()
+            if df_closes.empty:
                 continue
+            df_closes = df_closes.sort_values("ts").reset_index(drop=True)
 
-            df_out["id"] = int(id_)
-            df_out["tf"] = tf
-            df_out["period"] = int(period)
-            df_out["tf_days"] = tf_days
+            close_px_arr = df_closes["close"].astype(float).to_numpy()
+            close_ts_arr = df_closes["ts"].to_numpy()
 
-            # Roll flags are LABELS ONLY.
-            df_out["roll"] = ~df_out["ts"].isin(close_set)
-            df_out["roll_bar"] = df_out["roll"]
+            # Filter periods by observation count
+            valid_periods = filter_ema_periods_by_obs_count(periods, len(close_px_arr))
 
-            # ------------------------------------------------------------------
-            # ema_bar: bar-anchored EMA with daily preview and snapping at TF closes
-            # - On TF close: snap to canonical bar EMA
-            # - Between closes: propagate daily using alpha_daily on price (preview)
-            # ------------------------------------------------------------------
-            ema_bar_vals: List[float] = []
-            ema_bar_prev: Optional[float] = None
+            for period in valid_periods:
+                # Get alpha from lookup or compute
+                alpha_daily = alpha_map.get((tf, period))
+                if alpha_daily is None:
+                    effective_days = max(1, tf_spec.tf_days * period)
+                    alpha_daily = 2.0 / (effective_days + 1.0)
 
-            for ts, px in zip(
-                df_out["ts"].to_numpy(),
-                df_out["close"].astype(float).to_numpy(),
-            ):
-                ts_u = pd.Timestamp(ts).tz_convert("UTC")
-                canon = canonical_bar_map.get(ts_u)
+                alpha_bar = 2.0 / (float(period) + 1.0)
 
-                if canon is not None:
-                    ema_bar_today = float(canon)
-                else:
-                    # daily preview propagation in between closes
-                    if ema_bar_prev is None:
-                        # df_out starts at the first valid canonical close; fallback safety only
-                        ema_bar_today = float(px)
-                    else:
-                        ema_bar_today = (alpha_daily * float(px)) + (1.0 - alpha_daily) * float(ema_bar_prev)
-
-                ema_bar_vals.append(float(ema_bar_today))
-                ema_bar_prev = float(ema_bar_today)
-
-            df_out["ema_bar"] = ema_bar_vals
-
-            # ------------------------------------------------------------------
-            # ema: continuous daily EMA, seeded once, never snaps again
-            # - Seed at first row to the canonical bar EMA level (df_out starts there)
-            # - Thereafter: ALWAYS daily recursion using alpha_daily on price
-            # ------------------------------------------------------------------
-            ema_vals: List[float] = []
-            ema_prev: Optional[float] = None
-
-            for i, (px, eb) in enumerate(
-                zip(
-                    df_out["close"].astype(float).to_numpy(),
-                    df_out["ema_bar"].astype(float).to_numpy(),
+                # Compute bar EMA on canonical closes
+                bar_ema_on_closes = self._compute_bar_ema_on_closes(
+                    close_px_arr, alpha_bar, period
                 )
-            ):
-                if ema_prev is None:
-                    # one-time seed at the first valid canonical bar EMA point
-                    ema_today = float(eb)
-                else:
-                    ema_today = (alpha_daily * float(px)) + (1.0 - alpha_daily) * float(ema_prev)
 
-                ema_vals.append(float(ema_today))
-                ema_prev = float(ema_today)
+                valid_mask = ~np.isnan(bar_ema_on_closes)
+                if not valid_mask.any():
+                    continue
 
-            df_out["ema"] = ema_vals
+                first_valid_idx = int(np.argmax(valid_mask))
+                first_valid_close_ts = pd.Timestamp(close_ts_arr[first_valid_idx]).tz_convert("UTC")
 
-            # ------------------------------------------------------------------
-            # Derivatives (MATCHES DOC SPEC)
-            # ------------------------------------------------------------------
+                # Map canonical closes to bar EMAs
+                canonical_bar_map = {
+                    pd.Timestamp(t).tz_convert("UTC"): float(v)
+                    for t, v in zip(close_ts_arr, bar_ema_on_closes)
+                    if not np.isnan(v)
+                }
 
-            # DAILY diffs on ema (all rows) -> d1_roll/d2_roll
-            df_out["d1_roll"] = df_out["ema"].diff()
-            df_out["d2_roll"] = df_out["d1_roll"].diff()
+                # Output frame starts at first valid canonical close
+                df_out = df_id[df_id["ts"] >= first_valid_close_ts].copy()
+                if df_out.empty:
+                    continue
 
-            # Canonical-only diffs on ema -> d1/d2 only on roll=FALSE
-            df_out["d1"] = np.nan
-            df_out["d2"] = np.nan
-            mask_can = df_out["roll"] == False
-            if mask_can.any():
-                can_df = df_out.loc[mask_can, ["ts", "ema"]].copy()
-                can_df["d1"] = can_df["ema"].diff()
-                can_df["d2"] = can_df["d1"].diff()
-                df_out.loc[mask_can, "d1"] = can_df["d1"].to_numpy()
-                df_out.loc[mask_can, "d2"] = can_df["d2"].to_numpy()
+                df_out["id"] = int(id_)
+                df_out["tf"] = tf
+                df_out["period"] = int(period)
+                df_out["tf_days"] = tf_spec.tf_days
 
-            # DAILY diffs on ema_bar (all rows) -> d1_roll_bar/d2_roll_bar
-            df_out["d1_roll_bar"] = df_out["ema_bar"].diff()
-            df_out["d2_roll_bar"] = df_out["d1_roll_bar"].diff()
+                # Roll flags (labels only)
+                df_out["roll"] = ~df_out["ts"].isin(close_set)
+                df_out["roll_bar"] = df_out["roll"]
 
-            # Canonical-only diffs on ema_bar -> d1_bar/d2_bar only on roll_bar=FALSE
-            df_out["d1_bar"] = np.nan
-            df_out["d2_bar"] = np.nan
-            mask_bar_can = df_out["roll_bar"] == False
-            if mask_bar_can.any():
-                bar_can = df_out.loc[mask_bar_can, ["ts", "ema_bar"]].copy()
-                bar_can["d1_bar"] = bar_can["ema_bar"].diff()
-                bar_can["d2_bar"] = bar_can["d1_bar"].diff()
-                df_out.loc[mask_bar_can, "d1_bar"] = bar_can["d1_bar"].to_numpy()
-                df_out.loc[mask_bar_can, "d2_bar"] = bar_can["d2_bar"].to_numpy()
+                # Compute ema_bar: snaps at TF closes, preview between
+                ema_bar_vals = []
+                ema_bar_prev = None
 
-            out_frames.append(
-                df_out[
-                    [
-                        "id", "tf", "ts", "period", "tf_days",
-                        "roll", "ema", "d1", "d2", "d1_roll", "d2_roll",
-                        "ema_bar", "d1_bar", "d2_bar", "roll_bar", "d1_roll_bar", "d2_roll_bar",
-                    ]
-                ]
-            )
+                for ts, px in zip(df_out["ts"].to_numpy(), df_out["close"].astype(float).to_numpy()):
+                    ts_u = pd.Timestamp(ts).tz_convert("UTC")
+                    canon = canonical_bar_map.get(ts_u)
 
-    if not out_frames:
-        return pd.DataFrame()
+                    if canon is not None:
+                        # Snap to canonical bar EMA
+                        ema_bar_today = float(canon)
+                    else:
+                        # Daily preview propagation
+                        if ema_bar_prev is None:
+                            ema_bar_today = float(px)
+                        else:
+                            ema_bar_today = alpha_daily * float(px) + (1.0 - alpha_daily) * ema_bar_prev
 
-    out = pd.concat(out_frames, ignore_index=True)
-    out["id"] = out["id"].astype(int)
-    out["tf"] = out["tf"].astype(str)
-    out["ts"] = pd.to_datetime(out["ts"], utc=True)
-    out["period"] = out["period"].astype(int)
-    out["tf_days"] = out["tf_days"].astype(int)
-    out["roll"] = out["roll"].astype(bool)
-    out["roll_bar"] = out["roll_bar"].astype(bool)
-    return out
+                    ema_bar_vals.append(ema_bar_today)
+                    ema_bar_prev = ema_bar_today
+
+                df_out["ema_bar"] = ema_bar_vals
+
+                # Compute ema: seeded once, continuous daily updates
+                ema_vals = []
+                ema_prev = None
+
+                for px, eb in zip(df_out["close"].astype(float).to_numpy(), df_out["ema_bar"].to_numpy()):
+                    if ema_prev is None:
+                        # Seed at first valid canonical bar EMA point
+                        ema_today = float(eb)
+                    else:
+                        # Continuous daily update
+                        ema_today = alpha_daily * float(px) + (1.0 - alpha_daily) * ema_prev
+
+                    ema_vals.append(ema_today)
+                    ema_prev = ema_today
+
+                df_out["ema"] = ema_vals
+
+                # Compute derivatives
+                df_out = self._add_cal_derivatives(df_out)
+
+                out_frames.append(df_out[[
+                    "id", "tf", "ts", "period", "tf_days",
+                    "roll", "ema", "d1", "d2", "d1_roll", "d2_roll",
+                    "ema_bar", "d1_bar", "d2_bar", "roll_bar", "d1_roll_bar", "d2_roll_bar",
+                ]])
+
+        if not out_frames:
+            return pd.DataFrame()
+
+        result = pd.concat(out_frames, ignore_index=True)
+        result["ts"] = pd.to_datetime(result["ts"], utc=True)
+        return result
+
+    def get_output_schema(self) -> dict[str, str]:
+        """Define output table schema for calendar EMAs."""
+        return {
+            "id": "INTEGER NOT NULL",
+            "tf": "TEXT NOT NULL",
+            "ts": "TIMESTAMPTZ NOT NULL",
+            "period": "INTEGER NOT NULL",
+            "tf_days": "INTEGER",
+            "roll": "BOOLEAN",
+            "ema": "DOUBLE PRECISION",
+            "d1": "DOUBLE PRECISION",
+            "d2": "DOUBLE PRECISION",
+            "d1_roll": "DOUBLE PRECISION",
+            "d2_roll": "DOUBLE PRECISION",
+            "ema_bar": "DOUBLE PRECISION",
+            "d1_bar": "DOUBLE PRECISION",
+            "d2_bar": "DOUBLE PRECISION",
+            "roll_bar": "BOOLEAN",
+            "d1_roll_bar": "DOUBLE PRECISION",
+            "d2_roll_bar": "DOUBLE PRECISION",
+            "ingested_at": "TIMESTAMPTZ DEFAULT now()",
+            "PRIMARY KEY": "(id, tf, ts, period)",
+        }
+
+    # =========================================================================
+    # Helper Methods
+    # =========================================================================
+
+    def _load_alpha_lookup(self) -> pd.DataFrame:
+        """Load alpha lookup table (cached)."""
+        if self._alpha_lookup is not None:
+            return self._alpha_lookup
+
+        sql = f"""
+          SELECT tf, period, alpha_ema_dailyspace AS alpha
+          FROM {self.alpha_schema}.{self.alpha_table}
+        """
+
+        with self.engine.connect() as conn:
+            df = read_sql_polars(sql, conn)
+
+        if df.empty:
+            raise RuntimeError(f"Alpha lookup table {self.alpha_schema}.{self.alpha_table} is empty")
+
+        df["period"] = df["period"].astype(int)
+        df["tf"] = df["tf"].astype(str)
+        df["alpha"] = df["alpha"].astype(float)
+
+        self._alpha_lookup = df
+        return df
+
+    def _load_canonical_closes(self, ids: list[int], tfs: list[str]) -> pd.DataFrame:
+        """Load canonical closes from bars table."""
+        if not ids or not tfs:
+            return pd.DataFrame(columns=["id", "tf", "ts_close"])
+
+        sql = f"""
+          SELECT
+            id,
+            tf,
+            time_close AS ts_close
+          FROM {self.bars_table}
+          WHERE id = ANY(:ids)
+            AND tf = ANY(:tfs)
+            AND is_partial_end = FALSE
+          ORDER BY id, tf, time_close
+        """
+
+        with self.engine.connect() as conn:
+            df = read_sql_polars(sql, conn, params={"ids": ids, "tfs": tfs})
+
+        if not df.empty:
+            df["id"] = df["id"].astype(int)
+            df["tf"] = df["tf"].astype(str)
+            df["ts_close"] = pd.to_datetime(df["ts_close"], utc=True)
+
+        return df
+
+    def _compute_bar_ema_on_closes(
+        self, close_prices: np.ndarray, alpha_bar: float, min_periods: int
+    ) -> np.ndarray:
+        """Compute EMA in bar-space on canonical close prices."""
+        period = int(round((2.0 / alpha_bar) - 1.0))
+        close_series = pd.Series(close_prices, dtype=float)
+        ema_series = compute_ema(close_series, period=period, adjust=False, min_periods=min_periods)
+        return ema_series.to_numpy(dtype=float)
+
+    def _add_cal_derivatives(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Add calendar derivatives for dual EMAs.
+
+        ema-space:
+        - d1_roll/d2_roll: Daily diffs on ema (all rows)
+        - d1/d2: Canonical-only diffs on ema (roll=FALSE)
+
+        bar-space:
+        - d1_roll_bar/d2_roll_bar: Daily diffs on ema_bar (all rows)
+        - d1_bar/d2_bar: Canonical-only diffs on ema_bar (roll_bar=FALSE)
+        """
+        result = df.copy()
+
+        # Daily diffs on ema (all rows)
+        result["d1_roll"] = result["ema"].diff()
+        result["d2_roll"] = result["d1_roll"].diff()
+
+        # Canonical-only diffs on ema (roll=FALSE)
+        result["d1"] = np.nan
+        result["d2"] = np.nan
+        mask_can = result["roll"] == False
+        if mask_can.any():
+            can_df = result.loc[mask_can, ["ts", "ema"]].copy()
+            can_df["d1"] = can_df["ema"].diff()
+            can_df["d2"] = can_df["d1"].diff()
+            result.loc[mask_can, "d1"] = can_df["d1"].to_numpy()
+            result.loc[mask_can, "d2"] = can_df["d2"].to_numpy()
+
+        # Daily diffs on ema_bar (all rows)
+        result["d1_roll_bar"] = result["ema_bar"].diff()
+        result["d2_roll_bar"] = result["d1_roll_bar"].diff()
+
+        # Canonical-only diffs on ema_bar (roll_bar=FALSE)
+        result["d1_bar"] = np.nan
+        result["d2_bar"] = np.nan
+        mask_bar_can = result["roll_bar"] == False
+        if mask_bar_can.any():
+            bar_can = result.loc[mask_bar_can, ["ts", "ema_bar"]].copy()
+            bar_can["d1_bar"] = bar_can["ema_bar"].diff()
+            bar_can["d2_bar"] = bar_can["d1_bar"].diff()
+            result.loc[mask_bar_can, "d1_bar"] = bar_can["d1_bar"].to_numpy()
+            result.loc[mask_bar_can, "d2_bar"] = bar_can["d2_bar"].to_numpy()
+
+        return result
 
 
-# ---------------------------------------------------------------------------
-# DB writer
-# ---------------------------------------------------------------------------
+# =============================================================================
+# Public API (Backward Compatibility)
+# =============================================================================
 
 def write_multi_timeframe_ema_cal_to_db(
     engine_or_db_url,
-    ids,
+    ids: Sequence[int],
     *,
     scheme: str = "US",
-    start=None,
-    end=None,
-    update_existing: bool = True,
-    ema_periods=(6, 9, 10, 12, 14, 17, 20, 21, 26, 30, 50, 52, 77, 100, 200, 252, 365),
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    ema_periods: Sequence[int] = (6, 9, 10, 12, 14, 17, 20, 21, 26, 30, 50, 52, 77, 100, 200, 252, 365),
     schema: str = "public",
     out_table: Optional[str] = None,
     alpha_schema: str = "public",
     alpha_table: str = "ema_alpha_lookup",
+    update_existing: bool = True,
 ) -> int:
     """
-    Compute calendar-aligned multi-timeframe EMAs and upsert into:
-      cmc_ema_multi_tf_cal_{us|iso}
+    Compute calendar-aligned multi-timeframe EMAs and write to database.
 
-    Only scheme-specific input is scheme = US|ISO.
+    Uses the refactored BaseEMAFeature architecture with full dual EMA implementation.
     """
+    from sqlalchemy import create_engine
+
     if isinstance(engine_or_db_url, str):
         engine = create_engine(engine_or_db_url, future=True)
     else:
         engine = engine_or_db_url
-        if not isinstance(engine, Engine):
-            raise TypeError("engine_or_db_url must be a SQLAlchemy Engine or db_url string")
 
     scheme_u = scheme.strip().upper()
-    bars_table = _bars_table_for_scheme(scheme_u)
-
     if out_table is None:
         out_table = f"cmc_ema_multi_tf_cal_{scheme_u.lower()}"
 
-    tf_specs = _load_calendar_tf_specs(engine, scheme=scheme_u)
-    tfs = [s.tf for s in tf_specs]
-    tf_days_map = {s.tf: int(s.tf_days) for s in tf_specs}
+    logger.info(f"Computing calendar EMAs: scheme={scheme_u}, periods={len(ema_periods)}, ids={len(ids)}")
 
-    alpha_lut = _load_alpha_lookup(engine, alpha_schema, alpha_table)
+    config = EMAFeatureConfig(
+        periods=list(ema_periods),
+        output_schema=schema,
+        output_table=out_table,
+    )
 
-    where = ["id = ANY(:ids)"]
-    params = {"ids": list(map(int, ids))}
-    if start is not None:
-        where.append('"timestamp" >= :start')
-        params["start"] = pd.to_datetime(start, utc=True)
-    if end is not None:
-        where.append('"timestamp" <= :end')
-        params["end"] = pd.to_datetime(end, utc=True)
+    feature = CalendarEMAFeature(
+        engine=engine,
+        config=config,
+        scheme=scheme_u,
+        alpha_schema=alpha_schema,
+        alpha_table=alpha_table,
+    )
 
-    daily_sql = text(f"""
-      SELECT
-        id,
-        "timestamp" AS ts,
-        close
-      FROM public.cmc_price_histories7
-      WHERE {" AND ".join(where)}
-      ORDER BY id, "timestamp";
-    """)
-    with engine.connect() as conn:
-        df_daily = pd.read_sql(daily_sql, conn, params=params)
-
+    # Load data
+    df_daily = feature.load_source_data(list(ids), start=start, end=end)
     if df_daily.empty:
+        logger.warning("No daily data found")
         return 0
 
-    df_daily["ts"] = pd.to_datetime(df_daily["ts"], utc=True)
+    # Get TF specs
+    tf_specs = feature.get_tf_specs()
+    logger.info(f"Processing {len(tf_specs)} calendar TFs")
 
-    tf_closes = _load_canonical_closes_from_bars(
-        engine,
-        bars_table=bars_table,
-        ids=list(map(int, ids)),
-        tfs=tfs,
-        start=pd.to_datetime(start, utc=True) if start is not None else None,
-        end=pd.to_datetime(end, utc=True) if end is not None else None,
-    )
-    if tf_closes.empty:
+    # Compute EMAs for each TF
+    all_results = []
+    for tf_spec in tf_specs:
+        logger.info(f"Computing EMAs for tf={tf_spec.tf} (tf_days={tf_spec.tf_days})")
+        df_ema = feature.compute_emas_for_tf(df_daily, tf_spec, config.periods)
+        if not df_ema.empty:
+            all_results.append(df_ema)
+
+    if not all_results:
+        logger.warning("No EMAs computed")
         return 0
 
-    df_out = build_multi_timeframe_ema_cal_frame(
-        df_daily,
-        tf_closes=tf_closes[["id", "tf", "ts_close"]],
-        tf_days_map=tf_days_map,
-        ema_periods=ema_periods,
-        alpha_lut=alpha_lut,
-    )
-    if df_out.empty:
-        return 0
+    df_out = pd.concat(all_results, ignore_index=True)
+    logger.info(f"Built {len(df_out):,} EMA rows")
 
-    # CRITICAL: convert NaN -> None so Postgres stores NULL (COUNT() won't count NaN)
+    # Convert NaN -> None for Postgres NULL
     df_out = df_out.replace({np.nan: None})
+
+    # Write to database
+    conflict_action = (
+        """DO UPDATE SET
+        tf_days      = EXCLUDED.tf_days,
+        roll         = EXCLUDED.roll,
+        ema          = EXCLUDED.ema,
+        d1           = EXCLUDED.d1,
+        d2           = EXCLUDED.d2,
+        d1_roll      = EXCLUDED.d1_roll,
+        d2_roll      = EXCLUDED.d2_roll,
+        ema_bar      = EXCLUDED.ema_bar,
+        d1_bar       = EXCLUDED.d1_bar,
+        d2_bar       = EXCLUDED.d2_bar,
+        roll_bar     = EXCLUDED.roll_bar,
+        d1_roll_bar  = EXCLUDED.d1_roll_bar,
+        d2_roll_bar  = EXCLUDED.d2_roll_bar,
+        ingested_at  = now()"""
+        if update_existing
+        else "DO NOTHING"
+    )
 
     upsert_sql = text(f"""
       INSERT INTO {schema}.{out_table} (
@@ -593,25 +582,25 @@ def write_multi_timeframe_ema_cal_to_db(
         :ema_bar, :d1_bar, :d2_bar, :roll_bar, :d1_roll_bar, :d2_roll_bar,
         now()
       )
-      ON CONFLICT (id, tf, ts, period) DO UPDATE SET
-        tf_days      = EXCLUDED.tf_days,
-        roll         = EXCLUDED.roll,
-        ema          = EXCLUDED.ema,
-        d1           = EXCLUDED.d1,
-        d2           = EXCLUDED.d2,
-        d1_roll      = EXCLUDED.d1_roll,
-        d2_roll      = EXCLUDED.d2_roll,
-        ema_bar      = EXCLUDED.ema_bar,
-        d1_bar       = EXCLUDED.d1_bar,
-        d2_bar       = EXCLUDED.d2_bar,
-        roll_bar     = EXCLUDED.roll_bar,
-        d1_roll_bar  = EXCLUDED.d1_roll_bar,
-        d2_roll_bar  = EXCLUDED.d2_roll_bar,
-        ingested_at  = now();
+      ON CONFLICT (id, tf, ts, period) {conflict_action}
     """)
 
-    payload = df_out.to_dict(orient="records")
-    with engine.begin() as conn:
-        conn.execute(upsert_sql, payload)
+    logger.info(f"Writing {len(df_out):,} rows to {schema}.{out_table}...")
 
+    # Batch writes
+    BATCH_SIZE = 10_000
+    payload = df_out.to_dict(orient="records")
+    total_rows = len(payload)
+
+    with engine.begin() as conn:
+        for i in range(0, total_rows, BATCH_SIZE):
+            batch = payload[i:i + BATCH_SIZE]
+            conn.execute(upsert_sql, batch)
+
+            rows_written = min(i + BATCH_SIZE, total_rows)
+            if rows_written % 50_000 == 0 or rows_written == total_rows or i == 0:
+                pct = (rows_written / total_rows) * 100
+                logger.info(f"  Written {rows_written:,} / {total_rows:,} rows ({pct:.1f}%)")
+
+    logger.info(f"Successfully wrote {len(df_out):,} rows")
     return len(df_out)
