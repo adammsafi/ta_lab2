@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2025-01-22)
 
 ## Current Position
 
-Phase: 7 of 10 (TA Lab2 Feature Pipeline)
-Plan: COMPLETE (7/7 plans)
-Status: Verified and complete
-Last activity: 2026-01-30 - Completed Phase 7 (Feature Pipeline) with 156 tests passing
+Phase: 8 of 10 (TA Lab2 Signals)
+Plan: 1 of 6 (Signal Infrastructure)
+Status: In progress
+Last activity: 2026-01-30 - Completed 08-01-PLAN.md (Signal Infrastructure)
 
-Progress: [███████░░░] 70% (7/10 phases complete)
+Progress: [███████░░░] 70% (7/10 phases complete, 1/6 plans in phase 8)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 37 (across 7 complete phases)
+- Total plans completed: 38 (across 7 complete phases + 1 in phase 8)
 - Average duration: 7 min
-- Total execution time: 6.9 hours
+- Total execution time: 7.0 hours
 
 **By Phase:**
 
@@ -34,10 +34,11 @@ Progress: [███████░░░] 70% (7/10 phases complete)
 | 05-orchestrator-coordination | 6 | 34 min | 6 min | ✓ Complete |
 | 06-ta-lab2-time-model | 6 | 37 min | 6 min | ✓ Complete |
 | 07-ta_lab2-feature-pipeline | 7 | 45 min | 6 min | ✓ Complete |
+| 08-ta_lab2-signals | 1/6 | 8 min | 8 min | In progress |
 
 **Recent Trend:**
-- Last 5 phases: 23min (01), 29min (02), 193min (03), 61min (04), 34min (05), 37min (06), 45min (07)
-- Trend: Phase 7 complete - Feature pipeline with unified feature store and validation, 6min avg per plan
+- Last 5 phases: 29min (02), 193min (03), 61min (04), 34min (05), 37min (06), 45min (07), 8min (08-01)
+- Trend: Phase 8 started - Signal infrastructure with state management and reproducibility utilities, 8min for plan 1
 
 *Updated after each plan completion*
 
@@ -186,6 +187,11 @@ Recent decisions affecting current work:
 - **Parallel phase 1 execution** (07-07): returns/vol/ta run concurrently (same dependency on bars), ThreadPoolExecutor max_workers=3 for 3x speedup
 - **Graceful degradation on partial failure** (07-07): One table failure doesn't stop pipeline, daily_features continues with LEFT JOINs
 - **Validation after refresh by default** (07-07): --validate flag default True, ensures data quality without manual step
+- **Database-driven signal configuration** (08-01): dim_signals table with JSONB params for signal strategies, follows dim_indicators pattern
+- **Signal tables separate by type** (08-01): Three separate tables (ema_crossover, rsi_mean_revert, atr_breakout) for type-specific columns without schema bloat
+- **SignalStateManager for position lifecycle** (08-01): Tracks open positions and dirty windows per (id, signal_type, signal_id) extending FeatureStateManager pattern
+- **SHA256 feature hashing for reproducibility** (08-01): First 16 chars of hash balances uniqueness and readability for backtest validation
+- **State manager queries signal table** (08-01): load_open_positions queries signal table (not state table) for full context including entry_price, feature_snapshot
 
 ### Pending Todos
 
@@ -198,9 +204,9 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-01-30
-Stopped at: Completed Phase 7 (Feature Pipeline) - All 7 plans executed, verified, and complete
+Stopped at: Completed 08-01-PLAN.md (Signal Infrastructure) - 1 of 6 plans in Phase 8
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-01-30 (Phase 7 COMPLETE: Feature Pipeline - Returns/volatility/TA features with unified store and validation, 156 tests passing)*
+*Last updated: 2026-01-30 (Phase 8 IN PROGRESS: Plan 08-01 complete - Signal infrastructure with dim_signals, state management, feature hashing, 19 tests passing)*
