@@ -193,10 +193,16 @@ Plans:
   3. Roll alignment tests validate calendar boundary handling
   4. Orchestrator successfully coordinates ta_lab2 feature refresh tasks via memory context
   5. End-to-end workflow: user submits task -> orchestrator routes -> memory provides context -> ta_lab2 executes -> results stored
-**Plans**: TBD
+**Plans**: 7 plans
 
 Plans:
-- [ ] TBD (to be planned)
+- [ ] 09-01-PLAN.md — Observability infrastructure: tracing, metrics, health, storage (Wave 1)
+- [ ] 09-02-PLAN.md — Integration test infrastructure with three-tier markers (Wave 1)
+- [ ] 09-03-PLAN.md — Observability tests: tracing, metrics, health, workflow state (Wave 2)
+- [ ] 09-04-PLAN.md — Gap and alignment validation tests (Wave 2)
+- [ ] 09-05-PLAN.md — Component pair integration tests (Wave 3)
+- [ ] 09-06-PLAN.md — Alert threshold infrastructure and tests (Wave 3)
+- [ ] 09-07-PLAN.md — E2E workflow integration tests (Wave 4)
 
 ### Phase 10: Release Validation
 **Goal**: v0.4.0 release ready with full documentation and validation
@@ -228,9 +234,9 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 6. ta_lab2 Time Model | 6/6 | Complete | 2026-01-30 |
 | 7. ta_lab2 Feature Pipeline | 7/7 | Complete | 2026-01-30 |
 | 8. ta_lab2 Signals | 6/6 | Complete | 2026-01-30 |
-| 9. Integration & Observability | 0/TBD | Not started | - |
+| 9. Integration & Observability | 0/7 | Planned | - |
 | 10. Release Validation | 0/TBD | Not started | - |
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-01-30 (Phase 8 planned: 6 plans in 4 waves)*
+*Last updated: 2026-01-30 (Phase 9 planned: 7 plans in 4 waves)*
