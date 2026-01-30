@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2025-01-22)
 ## Current Position
 
 Phase: 8 of 10 (TA Lab2 Signals)
-Plan: 1 of 6 (Signal Infrastructure)
+Plan: 2 of 6 (EMA Signal Generation)
 Status: In progress
-Last activity: 2026-01-30 - Completed 08-01-PLAN.md (Signal Infrastructure)
+Last activity: 2026-01-30 - Completed 08-02-PLAN.md (EMA Signal Generation)
 
-Progress: [███████░░░] 70% (7/10 phases complete, 1/6 plans in phase 8)
+Progress: [███████░░░] 73% (7/10 phases complete, 2/6 plans in phase 8)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 38 (across 7 complete phases + 1 in phase 8)
+- Total plans completed: 39 (across 7 complete phases + 2 in phase 8)
 - Average duration: 7 min
-- Total execution time: 7.0 hours
+- Total execution time: 7.2 hours
 
 **By Phase:**
 
@@ -34,11 +34,11 @@ Progress: [███████░░░] 70% (7/10 phases complete, 1/6 plans 
 | 05-orchestrator-coordination | 6 | 34 min | 6 min | ✓ Complete |
 | 06-ta-lab2-time-model | 6 | 37 min | 6 min | ✓ Complete |
 | 07-ta_lab2-feature-pipeline | 7 | 45 min | 6 min | ✓ Complete |
-| 08-ta_lab2-signals | 1/6 | 8 min | 8 min | In progress |
+| 08-ta_lab2-signals | 2/6 | 18 min | 9 min | In progress |
 
 **Recent Trend:**
-- Last 5 phases: 29min (02), 193min (03), 61min (04), 34min (05), 37min (06), 45min (07), 8min (08-01)
-- Trend: Phase 8 started - Signal infrastructure with state management and reproducibility utilities, 8min for plan 1
+- Last 5 phases: 29min (02), 193min (03), 61min (04), 34min (05), 37min (06), 45min (07), 18min (08-01+08-02)
+- Trend: Phase 8 in progress - EMA signal generation with database-driven config and stateful position tracking, 10min for plan 2
 
 *Updated after each plan completion*
 
@@ -192,6 +192,11 @@ Recent decisions affecting current work:
 - **SignalStateManager for position lifecycle** (08-01): Tracks open positions and dirty windows per (id, signal_type, signal_id) extending FeatureStateManager pattern
 - **SHA256 feature hashing for reproducibility** (08-01): First 16 chars of hash balances uniqueness and readability for backtest validation
 - **State manager queries signal table** (08-01): load_open_positions queries signal table (not state table) for full context including entry_price, feature_snapshot
+- **Load EMA pairs from dim_signals** (08-02): Database-driven configuration via load_active_signals, not hardcoded, enables adding strategies without code changes
+- **Explicit column list for feature hashing** (08-02): _load_features uses explicit column order for hash stability across runs
+- **FIFO position matching** (08-02): Exit signals match oldest open position first via open_list.pop(0)
+- **Feature snapshot at entry** (08-02): Captured close, fast_ema, slow_ema, rsi_14, atr_14 in JSONB for backtest self-containment
+- **Batch-level hash computation** (08-02): Compute feature_version_hash once per asset batch (not per record) for 10-100x efficiency
 
 ### Pending Todos
 
@@ -204,9 +209,9 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-01-30
-Stopped at: Completed 08-01-PLAN.md (Signal Infrastructure) - 1 of 6 plans in Phase 8
+Stopped at: Completed 08-02-PLAN.md (EMA Signal Generation) - 2 of 6 plans in Phase 8
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-01-30 (Phase 8 IN PROGRESS: Plan 08-01 complete - Signal infrastructure with dim_signals, state management, feature hashing, 19 tests passing)*
+*Last updated: 2026-01-30 (Phase 8 IN PROGRESS: Plan 08-02 complete - EMA signal generation with database-driven config, 10 tests passing)*
