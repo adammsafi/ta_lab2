@@ -1,0 +1,356 @@
+from __future__ import annotations
+
+"""
+Incremental refresh runner for calendar-aligned EMA tables with state tracking.
+
+Targets:
+  - public.cmc_ema_multi_tf_cal_us
+  - public.cmc_ema_multi_tf_cal_iso
+
+State tables:
+  - public.cmc_ema_multi_tf_cal_us_state
+  - public.cmc_ema_multi_tf_cal_iso_state
+
+Incremental logic:
+  - Track last canonical close per (id, tf, period)
+  - Back up N canonical bars (N = period) to form dirty window
+  - Recompute forward only
+"""
+"""
+Incremental-ish refresh runner for calendar-aligned EMA tables:
+  - public.cmc_ema_multi_tf_cal_us
+  - public.cmc_ema_multi_tf_cal_iso
+
+This runner mirrors the style of refresh_cmc_ema_multi_tf_v2_from_bars.py:
+- resolves DB URL from --db-url or TARGET_DB_URL
+- supports --ids all / comma list
+- supports --periods override
+- supports --scheme us|iso|both (ONLY scheme toggle)
+- delegates all EMA math to ta_lab2.features.ema_multi_tf_cal
+- adds state-backed incremental refresh via per-scheme state tables:
+    public.cmc_ema_multi_tf_cal_us_state
+    public.cmc_ema_multi_tf_cal_iso_state
+
+Example (Spyder):
+
+    runfile(
+      r"C:\\Users\\asafi\\Downloads\\ta_lab2\\src\\ta_lab2\\scripts\\emas\\refresh_cmc_ema_multi_tf_cal_from_bars.py",
+      wdir=r"C:\\Users\\asafi\\Downloads\\ta_lab2",
+      args="--ids all --scheme both"
+    )
+"""
+
+
+import argparse
+import os
+from multiprocessing import Pool, cpu_count
+from typing import List, Optional, Sequence, Tuple
+
+import pandas as pd
+from sqlalchemy import create_engine, text
+from sqlalchemy.pool import NullPool
+
+from ta_lab2.features.m_tf.ema_multi_tf_cal import write_multi_timeframe_ema_cal_to_db
+from ta_lab2.scripts.bars.common_snapshot_contract import (
+    resolve_db_url,
+    get_engine,
+    parse_ids,
+    load_all_ids,
+    load_periods,
+)
+from ta_lab2.scripts.emas.logging_config import setup_logging, add_logging_args, get_worker_logger
+from ta_lab2.scripts.emas.state_management import (
+    ensure_ema_state_table,
+    load_ema_state,
+    update_ema_state_from_output,
+)
+
+
+DEFAULT_PERIODS = (6, 9, 10, 12, 14, 17, 20, 21, 26, 30, 50, 52, 77, 100, 200, 252, 365)
+DIRTY_BACK_BARS_MULTIPLIER = 1  # period * multiplier
+
+
+# ---------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------
+
+def _filter_ids_by_bar_availability(
+    engine,
+    ids: List[int],
+    scheme: str,
+    min_bars_required: int,
+    logger,
+) -> List[int]:
+    """
+    Filter IDs to only those with sufficient canonical bars for the given scheme.
+
+    Returns: List of IDs that have >= min_bars_required canonical bars in at least one TF
+    """
+    bars_table = f"cmc_price_bars_multi_tf_cal_{scheme.lower()}"
+
+    sql = text(f"""
+        SELECT DISTINCT id
+        FROM public.{bars_table}
+        WHERE id = ANY(:ids)
+          AND is_partial_end = FALSE
+        GROUP BY id, tf
+        HAVING COUNT(*) >= :min_bars
+    """)
+
+    with engine.connect() as conn:
+        result = pd.read_sql(sql, conn, params={
+            "ids": ids,
+            "min_bars": min_bars_required
+        })
+
+    if result.empty:
+        logger.warning(f"No IDs have >= {min_bars_required} canonical bars in {bars_table}")
+        return []
+
+    valid_ids = sorted(set(int(row.id) for row in result.itertuples(index=False)))
+
+    filtered_count = len(ids) - len(valid_ids)
+    if filtered_count > 0:
+        logger.info(f"Filtered out {filtered_count} IDs with insufficient data")
+    logger.info(f"Processing {len(valid_ids)} IDs with >= {min_bars_required} canonical bars")
+
+    return valid_ids
+
+
+# ---------------------------------------------------------------------
+# State handling
+# ---------------------------------------------------------------------
+
+# State management functions moved to state_management.py module
+
+
+# ---------------------------------------------------------------------
+# Worker
+# ---------------------------------------------------------------------
+
+def _process_id_scheme_worker(args_tuple: Tuple) -> int:
+    """
+    Worker function for parallel processing of (id, scheme) combinations.
+
+    Returns: Number of rows upserted
+    """
+    (id_, scheme, resolved_db_url, periods, start, end, schema, out_table,
+     alpha_schema, alpha_table, log_level, log_file) = args_tuple
+
+    # Each worker gets its own logger with unique name for tracking
+    worker_id = f"{id_}-{scheme}"
+    logger = get_worker_logger(
+        name="ema_cal",
+        worker_id=worker_id,
+        log_level=log_level,
+        log_file=log_file,
+    )
+
+    try:
+        logger.info(f"Starting EMA computation for id={id_}, scheme={scheme}")
+
+        # Create engine with NullPool for worker (avoid connection pooling issues)
+        engine = create_engine(resolved_db_url, poolclass=NullPool, future=True)
+
+        n = write_multi_timeframe_ema_cal_to_db(
+            engine,
+            [id_],
+            scheme=scheme,
+            start=start,
+            end=end,
+            ema_periods=periods,
+            schema=schema,
+            out_table=out_table,
+            alpha_schema=alpha_schema,
+            alpha_table=alpha_table,
+        )
+
+        engine.dispose()
+
+        logger.info(f"Completed: {n:,} rows written")
+        return int(n or 0)
+
+    except Exception as e:
+        error_msg = str(e).lower()
+        if "too many clients" in error_msg or "max_connections" in error_msg:
+            logger.error(
+                f"DATABASE CONNECTION LIMIT REACHED. "
+                f"Solutions: (1) Reduce --num-processes, (2) Increase Postgres max_connections. "
+                f"Error: {e}"
+            )
+        else:
+            logger.error(f"Worker failed: {e}", exc_info=True)
+        return 0
+
+
+# ---------------------------------------------------------------------
+# Runner
+# ---------------------------------------------------------------------
+
+def main():
+    p = argparse.ArgumentParser(
+        description="Incremental refresh for calendar-aligned EMAs (US/ISO)",
+        epilog="""
+CONNECTION LIMITS: This script uses multiprocessing. Each worker needs database connections.
+If you see "too many clients already" errors:
+  1. Reduce --num-processes (default: 4, safe for most setups)
+  2. Increase Postgres max_connections in postgresql.conf
+  3. Check for other processes holding connections (pg_stat_activity)
+        """
+    )
+    p.add_argument("--db-url", default=None)
+    p.add_argument("--ids", default="all")
+    p.add_argument("--periods", default=None, help="Comma-separated periods, or 'lut' to load from ema_alpha_lookup")
+    p.add_argument("--scheme", default="us")
+    p.add_argument("--start", default=None)
+    p.add_argument("--end", default=None)
+    p.add_argument("--full-refresh", action="store_true")
+
+    p.add_argument("--schema", default="public")
+    p.add_argument("--out-us", default="cmc_ema_multi_tf_cal_us")
+    p.add_argument("--out-iso", default="cmc_ema_multi_tf_cal_iso")
+    p.add_argument("--alpha-schema", default="public")
+    p.add_argument("--alpha-table", default="ema_alpha_lookup")
+    p.add_argument(
+        "--num-processes",
+        type=int,
+        default=None,
+        help="Number of parallel processes. Default: min(cpu_count(), 4) to avoid connection exhaustion"
+    )
+
+    add_logging_args(p)
+    args = p.parse_args()
+
+    # Setup logging
+    import logging
+
+    # Configure root logger first to catch all ta_lab2 module logs
+    logging.basicConfig(
+        level=args.log_level,
+        format='%(asctime)s [%(levelname)-8s] [%(name)s] %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+
+    logger = setup_logging(
+        name="ema_cal",
+        level=args.log_level,
+        log_file=args.log_file,
+        quiet=args.quiet,
+        debug=args.debug,
+    )
+
+    db_url = resolve_db_url(args.db_url)
+    engine = get_engine(db_url)
+
+    try:
+        ids_result = parse_ids(args.ids)
+        if ids_result == "all":
+            ids = load_all_ids(db_url, "public.cmc_price_histories7")
+        else:
+            ids = ids_result
+
+        if args.periods and str(args.periods).strip().lower() == 'lut':
+            periods = load_periods(engine, "lut", lut_table=f"{args.alpha_schema}.{args.alpha_table}")
+        elif args.periods:
+            periods = [int(x.strip()) for x in str(args.periods).split(",") if x.strip()]
+        else:
+            periods = list(DEFAULT_PERIODS)
+        schemes = ["US", "ISO"] if args.scheme.lower() == "both" else [args.scheme.upper()]
+
+        # Determine number of parallel processes
+        if args.num_processes:
+            num_processes = args.num_processes
+        else:
+            num_processes = min(cpu_count(), 4)
+            logger.info(f"Auto-limited parallel processes to {num_processes} (to avoid connection exhaustion)")
+
+        for scheme in schemes:
+            out_table = args.out_us if scheme == "US" else args.out_iso
+            state_table = f"{out_table}_state"
+
+            logger.info(f"Processing scheme={scheme}")
+
+            # Filter IDs by bar availability for this scheme
+            min_bars_required = min(periods)
+            logger.info(f"Filtering IDs with >= {min_bars_required} canonical bars in scheme={scheme}...")
+            valid_ids = _filter_ids_by_bar_availability(
+                engine=engine,
+                ids=ids,
+                scheme=scheme,
+                min_bars_required=min_bars_required,
+                logger=logger,
+            )
+
+            if not valid_ids:
+                logger.warning(f"No valid IDs found for scheme={scheme}. Skipping.")
+                continue
+
+            ensure_ema_state_table(engine, args.schema, state_table)
+
+            # Load state for incremental refresh
+            state_df = pd.DataFrame()
+            if not args.full_refresh:
+                state_df = load_ema_state(engine, args.schema, state_table)
+                if state_df.empty:
+                    logger.info("No existing state found - running full refresh from --start")
+                else:
+                    logger.info(f"Loaded state with {len(state_df)} records")
+
+            # Build work items for each ID with individual start_ts from state
+            work_items = []
+            for id_ in valid_ids:
+                # Compute incremental start for this ID
+                if args.full_refresh:
+                    start_ts = args.start
+                elif state_df.empty:
+                    start_ts = args.start
+                else:
+                    # Find minimum last_canonical_ts for this ID across all TFs/periods
+                    id_state = state_df[state_df["id"] == id_]
+                    if id_state.empty:
+                        start_ts = args.start
+                    else:
+                        min_ts = id_state["last_canonical_ts"].min()
+                        start_ts = min_ts
+                        logger.debug(f"ID {id_}: incremental start={start_ts}")
+
+                work_items.append(
+                    (id_, scheme, db_url, periods, start_ts, args.end,
+                     args.schema, out_table, args.alpha_schema, args.alpha_table,
+                     args.log_level, args.log_file)
+                )
+
+            logger.info(f"Processing {len(work_items)} IDs in parallel (scheme={scheme})")
+
+            # Execute in parallel
+            with Pool(processes=num_processes) as pool:
+                results = pool.map(_process_id_scheme_worker, work_items)
+
+            total_rows = sum(results)
+            logger.info(f"Total upserted rows for scheme={scheme}: {total_rows:,}")
+
+            # Update state table
+            logger.info("Updating state table...")
+            bars_table = f"cmc_price_bars_multi_tf_cal_{scheme.lower()}"
+            update_ema_state_from_output(
+                engine,
+                args.schema,
+                state_table,
+                out_table,
+                use_canonical_ts=True,
+                ts_column="ts",
+                roll_filter="roll = FALSE",
+                bars_table=bars_table,
+                bars_schema=args.schema,
+                bars_partial_filter="is_partial_end = FALSE"
+            )
+            logger.info(f"State updated in {state_table}")
+
+        logger.info("Calendar EMA refresh complete")
+
+    finally:
+        engine.dispose()
+
+
+if __name__ == "__main__":
+    main()

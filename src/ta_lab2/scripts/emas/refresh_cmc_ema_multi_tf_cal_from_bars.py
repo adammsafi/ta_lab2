@@ -1,230 +1,348 @@
-from __future__ import annotations
-
 """
-Incremental refresh runner for calendar-aligned EMA tables with state tracking.
+Refresh calendar-aligned EMA tables using BaseEMARefresher architecture.
 
 Targets:
   - public.cmc_ema_multi_tf_cal_us
   - public.cmc_ema_multi_tf_cal_iso
 
-State tables:
-  - public.cmc_ema_multi_tf_cal_us_state
-  - public.cmc_ema_multi_tf_cal_iso_state
+REFACTORED VERSION - Uses new base class for:
+- Standardized CLI parsing
+- State management via EMAStateManager
+- Parallel execution via EMAComputationOrchestrator
+- Reduced code duplication
 
-Incremental logic:
-  - Track last canonical close per (id, tf, period)
-  - Back up N canonical bars (N = period) to form dirty window
-  - Recompute forward only
-"""
-"""
-Incremental-ish refresh runner for calendar-aligned EMA tables:
-  - public.cmc_ema_multi_tf_cal_us
-  - public.cmc_ema_multi_tf_cal_iso
-
-This runner mirrors the style of refresh_cmc_ema_multi_tf_v2_from_bars.py:
-- resolves DB URL from --db-url or TARGET_DB_URL
-- supports --ids all / comma list
-- supports --periods override
-- supports --scheme us|iso|both (ONLY scheme toggle)
-- delegates all EMA math to ta_lab2.features.ema_multi_tf_cal
-- adds state-backed incremental refresh via per-scheme state tables:
-    public.cmc_ema_multi_tf_cal_us_state
-    public.cmc_ema_multi_tf_cal_iso_state
-
-Example (Spyder):
-
-    runfile(
-      r"C:\\Users\\asafi\\Downloads\\ta_lab2\\src\\ta_lab2\\scripts\\emas\\refresh_cmc_ema_multi_tf_cal_from_bars.py",
-      wdir=r"C:\\Users\\asafi\\Downloads\\ta_lab2",
-      args="--ids all --scheme both"
-    )
+Migrated from: refresh_cmc_ema_multi_tf_cal_from_bars.py
 """
 
+from __future__ import annotations
 
 import argparse
-import os
-from typing import List, Optional, Sequence
+from typing import Optional
 
-import pandas as pd
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
+from sqlalchemy.pool import NullPool
 
 from ta_lab2.features.m_tf.ema_multi_tf_cal import write_multi_timeframe_ema_cal_to_db
+from ta_lab2.scripts.bars.common_snapshot_contract import resolve_db_url, get_engine
+from ta_lab2.scripts.emas.base_ema_refresher import (
+    BaseEMARefresher,
+    EMARefresherConfig,
+)
+from ta_lab2.scripts.emas.ema_state_manager import EMAStateConfig
+from ta_lab2.scripts.emas.ema_computation_orchestrator import WorkerTask
+from ta_lab2.scripts.emas.logging_config import get_worker_logger
 
 
-DEFAULT_PERIODS = (6, 9, 10, 12, 14, 17, 20, 21, 26, 30, 50, 52, 77, 100, 200, 252, 365)
-DIRTY_BACK_BARS_MULTIPLIER = 1  # period * multiplier
+# Default EMA periods for calendar EMAs
+DEFAULT_PERIODS = [6, 9, 10, 12, 14, 17, 20, 21, 26, 30, 50, 52, 77, 100, 200, 252, 365]
 
 
-# ---------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------
+# =============================================================================
+# Worker Function (Module-level for pickling)
+# =============================================================================
 
-def _resolve_db_url(cli_db_url: Optional[str]) -> str:
-    if cli_db_url:
-        return cli_db_url
-    env = os.getenv("TARGET_DB_URL")
-    if env:
-        print("[ema_cal] Using DB URL from TARGET_DB_URL env.")
-        return env
-    raise ValueError("No DB URL provided.")
-
-
-def _parse_ids(arg: str) -> Optional[Sequence[int]]:
-    if arg.lower() == "all":
-        return None
-    return [int(x.strip()) for x in arg.split(",") if x.strip()]
-
-
-def _parse_int_list(arg: Optional[str]) -> Optional[Sequence[int]]:
-    if not arg:
-        return None
-    return [int(x.strip()) for x in arg.split(",") if x.strip()]
-
-
-def _load_all_ids(engine) -> List[int]:
-    sql = text("SELECT DISTINCT id FROM public.cmc_price_histories7 ORDER BY id;")
-    with engine.connect() as conn:
-        return [int(r[0]) for r in conn.execute(sql)]
-
-
-def _load_periods_from_lut(engine, schema: str, table: str) -> List[int]:
-    sql = text(f"SELECT DISTINCT period FROM {schema}.{table} ORDER BY 1;")
-    with engine.connect() as conn:
-        return [int(r[0]) for r in conn.execute(sql)]
-
-
-
-# ---------------------------------------------------------------------
-# State handling
-# ---------------------------------------------------------------------
-
-def _ensure_state_table(engine, schema: str, table: str):
-    sql = f"""
-    CREATE TABLE IF NOT EXISTS {schema}.{table} (
-        id INTEGER NOT NULL,
-        tf TEXT NOT NULL,
-        period INTEGER NOT NULL,
-        last_canonical_ts TIMESTAMPTZ NOT NULL,
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-        PRIMARY KEY (id, tf, period)
-    );
+def _process_id_worker(task: WorkerTask) -> int:
     """
-    with engine.begin() as conn:
-        conn.execute(text(sql))
+    Worker function for parallel processing of individual IDs.
 
+    Creates own engine with NullPool to avoid connection pooling issues.
 
-def _load_state(engine, schema: str, table: str) -> pd.DataFrame:
-    sql = text(f"SELECT id, tf, period, last_canonical_ts FROM {schema}.{table};")
-    with engine.connect() as conn:
-        try:
-            return pd.read_sql(sql, conn)
-        except Exception:
-            return pd.DataFrame(columns=["id", "tf", "period", "last_canonical_ts"])
+    Args:
+        task: WorkerTask containing id, db_url, periods, start, extra_config
 
-
-def _update_state(engine, schema: str, table: str, out_table: str):
+    Returns:
+        Number of rows inserted/updated
     """
-    After EMA write, update state table with latest canonical ts per (id, tf, period).
-    """
-    sql = f"""
-    INSERT INTO {schema}.{table} (id, tf, period, last_canonical_ts, updated_at)
-    SELECT
-        id,
-        tf,
-        period,
-        max(ts) AS last_canonical_ts,
-        now()
-    FROM {schema}.{out_table}
-    WHERE roll = FALSE
-    GROUP BY id, tf, period
-    ON CONFLICT (id, tf, period) DO UPDATE
-      SET last_canonical_ts = EXCLUDED.last_canonical_ts,
-          updated_at = now();
-    """
-    with engine.begin() as conn:
-        conn.execute(text(sql))
-
-
-# ---------------------------------------------------------------------
-# Runner
-# ---------------------------------------------------------------------
-
-def main():
-    p = argparse.ArgumentParser()
-    p.add_argument("--db-url", default=None)
-    p.add_argument("--ids", default="all")
-    p.add_argument("--periods", default=None, help="Comma-separated periods, or 'lut' to load from ema_alpha_lookup")
-    p.add_argument("--scheme", default="us")
-    p.add_argument("--start", default=None)
-    p.add_argument("--end", default=None)
-    p.add_argument("--full-refresh", action="store_true")
-
-    p.add_argument("--schema", default="public")
-    p.add_argument("--out-us", default="cmc_ema_multi_tf_cal_us")
-    p.add_argument("--out-iso", default="cmc_ema_multi_tf_cal_iso")
-    p.add_argument("--alpha-schema", default="public")
-    p.add_argument("--alpha-table", default="ema_alpha_lookup")
-
-    args = p.parse_args()
-
-    db_url = _resolve_db_url(args.db_url)
-    engine = create_engine(db_url)
+    scheme = task.extra_config.get("scheme", "us")
+    worker_id = f"{task.id_}-{scheme}"
+    logger = get_worker_logger(
+        name="ema_cal",
+        worker_id=worker_id,
+        log_level="INFO",
+        log_file=None,
+    )
 
     try:
-        ids = _parse_ids(args.ids)
-        if ids is None:
-            ids = _load_all_ids(engine)
+        logger.info(f"Starting EMA computation for id={task.id_}, scheme={scheme}")
 
-        periods = (_load_periods_from_lut(engine, args.alpha_schema, args.alpha_table)
-                   if (args.periods and str(args.periods).strip().lower() == 'lut')
-                   else (_parse_int_list(args.periods) or list(DEFAULT_PERIODS)))
-        schemes = ["US", "ISO"] if args.scheme.lower() == "both" else [args.scheme.upper()]
+        # Create engine with NullPool for worker
+        engine = create_engine(task.db_url, poolclass=NullPool, future=True)
 
-        for scheme in schemes:
-            out_table = args.out_us if scheme == "US" else args.out_iso
-            state_table = f"{out_table}_state"
+        # Extract configuration
+        schema = task.extra_config.get("schema", "public")
+        out_table = task.extra_config.get("out_table")
+        alpha_schema = task.extra_config.get("alpha_schema", "public")
+        alpha_table = task.extra_config.get("alpha_table", "ema_alpha_lookup")
 
-            print(f"[ema_cal] === scheme={scheme} ===")
+        n = write_multi_timeframe_ema_cal_to_db(
+            engine,
+            [task.id_],
+            scheme=scheme,
+            start=task.start,
+            end=task.end,
+            ema_periods=task.periods,
+            schema=schema,
+            out_table=out_table,
+            alpha_schema=alpha_schema,
+            alpha_table=alpha_table,
+        )
 
-            _ensure_state_table(engine, args.schema, state_table)
-
-            if args.full_refresh:
-                print("[ema_cal] FULL REFRESH enabled.")
-                start_ts = args.start
-            else:
-                state_df = _load_state(engine, args.schema, state_table)
-
-                if state_df.empty:
-                    print("[ema_cal] No state found, running full history.")
-                    start_ts = args.start
-                else:
-                    # Conservative dirty window: back up period bars
-                    min_ts = state_df["last_canonical_ts"].min()
-                    start_ts = min_ts
-                    print(f"[ema_cal] Dirty window start = {start_ts}")
-
-            n = write_multi_timeframe_ema_cal_to_db(
-                engine,
-                ids,
-                scheme=scheme,
-                start=start_ts,
-                end=args.end,
-                ema_periods=periods,
-                schema=args.schema,
-                out_table=out_table,
-                alpha_schema=args.alpha_schema,
-                alpha_table=args.alpha_table,
-            )
-
-            print(f"[ema_cal] wrote/upserted {n} rows")
-
-            _update_state(engine, args.schema, state_table, out_table)
-
-            print(f"[ema_cal] state updated -> {state_table}")
-
-    finally:
         engine.dispose()
+        logger.info(f"Completed EMA computation for id={task.id_}: {n} rows")
+        return int(n or 0)
 
+    except Exception as e:
+        logger.error(f"Worker failed for id={task.id_}: {e}", exc_info=True)
+        return 0
+
+
+# =============================================================================
+# Refresher Implementation
+# =============================================================================
+
+class CalEMARefresher(BaseEMARefresher):
+    """
+    EMA refresher for calendar-aligned EMAs (US/ISO schemes).
+
+    Uses:
+    - cmc_price_bars_multi_tf_cal_us or cmc_price_bars_multi_tf_cal_iso
+    - Calendar-aligned timeframes
+    - Separate output and state tables per scheme
+    """
+
+    DEFAULT_PERIODS = DEFAULT_PERIODS
+
+    def __init__(
+        self,
+        config: EMARefresherConfig,
+        state_config: EMAStateConfig,
+        engine,
+        scheme: str,
+    ):
+        super().__init__(config, state_config, engine)
+        self.scheme = scheme
+        self.bars_table = f"cmc_price_bars_multi_tf_cal_{scheme}"
+        self.bars_schema = "public"
+
+    # =========================================================================
+    # Abstract Method Implementations
+    # =========================================================================
+
+    def get_timeframes(self) -> list[str]:
+        """
+        Load calendar timeframes from bars table.
+
+        Note: Calendar scripts don't use dim_timeframe - timeframes are
+        implicit from the bars table structure.
+        """
+        # For calendar EMAs, timeframes are loaded from bars table
+        # The feature module handles this internally
+        return []  # Not needed for cal scripts
+
+    def compute_emas_for_id(
+        self,
+        id_: int,
+        periods: list[int],
+        start: Optional[str] = None,
+        end: Optional[str] = None,
+        **extra_args,
+    ) -> int:
+        """
+        Compute calendar EMAs for single ID.
+
+        Note: This method is not used by the parallel execution flow,
+        but is provided for testing and direct invocation.
+        """
+        n = write_multi_timeframe_ema_cal_to_db(
+            self.engine,
+            [id_],
+            scheme=self.scheme,
+            start=start or "2010-01-01",
+            end=end,
+            ema_periods=periods,
+            schema=self.config.output_schema,
+            out_table=self.config.output_table,
+            alpha_schema=extra_args.get("alpha_schema", "public"),
+            alpha_table=extra_args.get("alpha_table", "ema_alpha_lookup"),
+        )
+        return int(n or 0)
+
+    def get_source_table_info(self) -> dict[str, str]:
+        """Return source bars table information."""
+        return {
+            "bars_table": self.bars_table,
+            "bars_schema": self.bars_schema,
+        }
+
+    @staticmethod
+    def get_worker_function():
+        """Return module-level worker function for multiprocessing."""
+        return _process_id_worker
+
+    # =========================================================================
+    # CLI Integration
+    # =========================================================================
+
+    @classmethod
+    def create_argument_parser(cls) -> argparse.ArgumentParser:
+        """Create argument parser with calendar-specific arguments."""
+        p = argparse.ArgumentParser(
+            description="Refresh calendar-aligned EMAs (US/ISO schemes) - refactored.",
+        )
+
+        # Add base arguments manually
+        p.add_argument("--db-url", default=None)
+        p.add_argument("--ids", default="all")
+        p.add_argument("--periods", default=None)
+        p.add_argument("--schema", default="public")
+        p.add_argument("--full-refresh", action="store_true")
+        p.add_argument("--num-processes", type=int, default=None)
+
+        # Calendar-specific arguments
+        p.add_argument(
+            "--scheme",
+            default="us",
+            choices=["us", "iso", "both"],
+            help="Calendar scheme: us, iso, or both. Default: us",
+        )
+        p.add_argument("--out-us", default="cmc_ema_multi_tf_cal_us")
+        p.add_argument("--out-iso", default="cmc_ema_multi_tf_cal_iso")
+        p.add_argument("--alpha-schema", default="public")
+        p.add_argument("--alpha-table", default="ema_alpha_lookup")
+
+        # Logging arguments
+        from ta_lab2.scripts.emas.logging_config import add_logging_args
+        add_logging_args(p)
+
+        return p
+
+    @classmethod
+    def from_cli_args(cls, args: argparse.Namespace) -> "CalEMARefresher":
+        """
+        Create refresher instance from CLI arguments.
+
+        Note: If --scheme both, this creates and runs two separate refreshers.
+        """
+        # This method is called per scheme, not for "both"
+        # The main() method handles the "both" case
+        raise NotImplementedError(
+            "Use from_cli_args_for_scheme() instead. "
+            "The main() method handles --scheme both by creating two refreshers."
+        )
+
+    @classmethod
+    def from_cli_args_for_scheme(
+        cls,
+        args: argparse.Namespace,
+        scheme: str,
+    ) -> "CalEMARefresher":
+        """Create refresher instance for a specific scheme."""
+        # Resolve database URL
+        db_url = resolve_db_url(args.db_url)
+
+        # Create engine
+        engine = get_engine(db_url)
+
+        # Determine output and state tables for this scheme
+        out_table = args.out_us if scheme == "us" else args.out_iso
+        state_table = f"{out_table}_state"
+
+        # Create temporary instance to use helper methods
+        temp_config = EMARefresherConfig(
+            db_url=db_url,
+            ids=[],
+            periods=[],
+            output_schema=args.schema,
+            output_table=out_table,
+            state_table=state_table,
+            num_processes=args.num_processes,
+            full_refresh=args.full_refresh,
+            log_level=args.log_level,
+            log_file=args.log_file,
+            quiet=args.quiet,
+            debug=args.debug,
+            extra_config={},
+        )
+
+        temp_state_config = EMAStateConfig(
+            state_schema=args.schema,
+            state_table=state_table,
+            ts_column="canonical_ts",
+            roll_filter="roll = FALSE",
+            use_canonical_ts=True,
+            bars_table=f"cmc_price_bars_multi_tf_cal_{scheme}",
+            bars_schema="public",
+            bars_partial_filter="is_partial_end = FALSE",
+        )
+
+        temp_instance = cls(temp_config, temp_state_config, engine, scheme)
+
+        # Load IDs and periods using helper methods
+        ids = temp_instance.load_ids(args.ids)
+        periods = temp_instance.load_periods(args.periods)
+
+        # Create final config
+        final_config = EMARefresherConfig(
+            db_url=db_url,
+            ids=ids,
+            periods=periods,
+            output_schema=args.schema,
+            output_table=out_table,
+            state_table=state_table,
+            num_processes=args.num_processes,
+            full_refresh=args.full_refresh,
+            log_level=args.log_level,
+            log_file=args.log_file,
+            quiet=args.quiet,
+            debug=args.debug,
+            extra_config={
+                "scheme": scheme,
+                "schema": args.schema,
+                "out_table": out_table,
+                "alpha_schema": args.alpha_schema,
+                "alpha_table": args.alpha_table,
+            },
+        )
+
+        state_config = EMAStateConfig(
+            state_schema=args.schema,
+            state_table=state_table,
+            ts_column="canonical_ts",
+            roll_filter="roll = FALSE",
+            use_canonical_ts=True,
+            bars_table=f"cmc_price_bars_multi_tf_cal_{scheme}",
+            bars_schema="public",
+            bars_partial_filter="is_partial_end = FALSE",
+        )
+
+        return cls(final_config, state_config, engine, scheme)
+
+    @classmethod
+    def main_for_schemes(cls, argv=None) -> None:
+        """
+        CLI entry point that handles --scheme both by running two refreshers.
+        """
+        parser = cls.create_argument_parser()
+        args = parser.parse_args(argv)
+
+        schemes_to_run = []
+        if args.scheme == "both":
+            schemes_to_run = ["us", "iso"]
+        else:
+            schemes_to_run = [args.scheme]
+
+        for scheme in schemes_to_run:
+            print(f"\n{'='*80}")
+            print(f"Running calendar EMA refresh for scheme: {scheme.upper()}")
+            print(f"{'='*80}\n")
+
+            refresher = cls.from_cli_args_for_scheme(args, scheme)
+            refresher.run()
+
+
+# =============================================================================
+# Entry Point
+# =============================================================================
 
 if __name__ == "__main__":
-    main()
+    CalEMARefresher.main_for_schemes()

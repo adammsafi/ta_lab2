@@ -1,0 +1,501 @@
+from __future__ import annotations
+
+"""
+Refresh cmc_ema_multi_tf using:
+
+- dim_timeframe (alignment_type='tf_day', canonical_only=True) for which tfs to compute
+- persisted tf_day bars (default public.cmc_price_bars_multi_tf) for canonical closes
+- daily closes (cmc_price_histories7) for preview EMA between closes
+
+MEMORY-SAFE + INCREMENTAL VERSION:
+- Executes per (id, tf) to avoid large in-memory DataFrames
+- State-based incremental refresh: tracks last processed timestamp per (id, tf)
+- Dirty window: backs up from last state to ensure EMA recalculation from stable point
+- Parallel execution: multi-core processing of (id, tf) chunks
+
+UPDATED (2026-01-28):
+- Added state table support for incremental refresh
+- Keeps parallelization for fast processing
+"""
+
+import os
+import argparse
+from multiprocessing import Pool, cpu_count
+from typing import List, Tuple, Dict
+
+import pandas as pd
+from sqlalchemy import text, create_engine
+from sqlalchemy.pool import NullPool
+
+from ta_lab2.io import _get_marketdata_engine as _get_engine
+from ta_lab2.features.m_tf.ema_multi_timeframe import write_multi_timeframe_ema_to_db
+from ta_lab2.scripts.bars.common_snapshot_contract import (
+    resolve_db_url,
+    get_engine,
+    parse_ids,
+    load_all_ids,
+    load_periods,
+)
+from ta_lab2.scripts.emas.logging_config import setup_logging, add_logging_args, get_worker_logger
+from ta_lab2.scripts.emas.state_management import (
+    ensure_ema_state_table,
+    load_ema_state,
+)
+
+
+DEFAULT_PERIODS = "6,9,10,12,14,17,20,21,26,30,50,52,77,100,200,252,365"
+
+
+def build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        description="Refresh cmc_ema_multi_tf from tf_day bars (memory-safe).",
+        epilog="""
+CONNECTION LIMITS: This script uses multiprocessing. Each worker needs database connections.
+If you see "too many clients already" errors:
+  1. Reduce --num-processes (default: 4, safe for most setups)
+  2. Increase Postgres max_connections in postgresql.conf
+  3. Check for other processes holding connections (pg_stat_activity)
+        """
+    )
+    p.add_argument("--db-url", default=None, help="SQLAlchemy DB URL. Defaults to TARGET_DB_URL env.")
+    p.add_argument("--ids", default="all", help="Comma list (e.g., 1,52) or 'all'. Default: all")
+    p.add_argument("--start", default="2010-01-01", help="Output start (inclusive). Default: 2010-01-01")
+    p.add_argument("--end", default=None, help="Output end (inclusive). Default: None")
+    p.add_argument(
+        "--periods",
+        default=DEFAULT_PERIODS,
+        help="EMA periods CSV, or 'lut' to load from public.ema_alpha_lookup",
+    )
+    p.add_argument("--tfs", default=None, help="Optional TF subset CSV (e.g., 2D,3D,5D). Default: all tf_day canonical")
+    p.add_argument("--out-table", default="cmc_ema_multi_tf", help="Output table. Default: cmc_ema_multi_tf")
+    p.add_argument("--schema", default="public", help="Schema for output table. Default: public")
+    p.add_argument("--bars-schema", default="public", help="Schema for bars table. Default: public")
+    p.add_argument(
+        "--bars-table",
+        default="cmc_price_bars_multi_tf",
+        help="Bars table for tf_day closes. Default: cmc_price_bars_multi_tf",
+    )
+    p.add_argument("--no-update", action="store_true", help="If set, ON CONFLICT does nothing.")
+    p.add_argument(
+        "--num-processes",
+        type=int,
+        default=None,
+        help="Number of parallel processes. Default: min(cpu_count(), 4) to avoid connection exhaustion"
+    )
+
+    # State-based incremental refresh
+    p.add_argument(
+        "--state-table",
+        default="cmc_ema_multi_tf_state",
+        help="State table name for incremental refresh. Default: cmc_ema_multi_tf_state",
+    )
+    p.add_argument(
+        "--full-refresh",
+        action="store_true",
+        help="Ignore state and run full refresh from --start.",
+    )
+
+    add_logging_args(p)
+
+    return p
+
+
+
+
+def _load_tf_day_canonical(engine) -> List[str]:
+    with engine.begin() as conn:
+        rows = conn.execute(
+            text(
+                """
+                SELECT tf
+                FROM public.dim_timeframe
+                WHERE alignment_type = 'tf_day'
+                  AND is_canonical = TRUE
+                ORDER BY display_order, sort_order, tf;
+                """
+            )
+        ).fetchall()
+    return [r[0] for r in rows]
+
+
+def _compute_dirty_window_start(
+    state_df: pd.DataFrame,
+    id_: int,
+    tf: str,
+    default_start: str,
+) -> str:
+    """
+    Compute incremental start timestamp for (id, tf) based on state.
+
+    If state exists: start from last_time_close (already stable EMA point)
+    If no state: start from default_start (full history)
+    """
+    if state_df.empty:
+        return default_start
+
+    # Filter to this (id, tf)
+    mask = (state_df["id"] == id_) & (state_df["tf"] == tf)
+    state_rows = state_df[mask]
+
+    if state_rows.empty:
+        return default_start
+
+    # Get last_time_close
+    last_close = state_rows["last_time_close"].iloc[0]
+    if pd.isna(last_close):
+        return default_start
+
+    # Return as ISO string for the writer
+    return pd.to_datetime(last_close, utc=True).isoformat()
+
+
+def _update_state_from_output(
+    db_url: str,
+    state_table: str,
+    schema: str,
+    out_table: str,
+    id_tf_pairs: List[Tuple[int, str]],
+    logger,
+    bars_schema: str = "public",
+    bars_table: str = "cmc_price_bars_multi_tf",
+) -> None:
+    """
+    Update unified state table with complete state tracking per (id, tf, period).
+
+    Uses pure SQL INSERT...SELECT to avoid pandas NaT/NaN conversion issues.
+    Only updates state for the specific (id, tf) pairs that were actually processed.
+
+    State tracks (unified schema):
+    - daily_min_seen: MIN(time_open) from source bars (per id, tf - same for all periods)
+    - daily_max_seen: MAX(time_close) from source bars (per id, tf - same for all periods)
+    - last_bar_seq: MAX(bar_seq) for canonical bars (per id, tf - same for all periods)
+    - last_time_close: MAX(ts) from EMA output where roll = FALSE (per id, tf, period)
+    - last_canonical_ts: Same as last_time_close (per id, tf, period)
+    """
+    if not id_tf_pairs:
+        logger.warning("No (id, tf) pairs to update in state")
+        return
+
+    engine = get_engine(db_url)
+
+    # Build VALUES clause for exact (id, tf) matching
+    # This prevents cross-product issues from using id=ANY() AND tf=ANY()
+    values_list = ", ".join([f"({id_}, '{tf}')" for id_, tf in id_tf_pairs])
+
+    # Pure SQL approach - PostgreSQL handles NULLs natively, no pandas conversion needed
+    # Bar state is per (id, tf), but we need to populate per (id, tf, period)
+    # so we cross join with periods from the output table
+    sql = f"""
+    INSERT INTO {state_table} (id, tf, period, daily_min_seen, daily_max_seen, last_bar_seq, last_time_close, last_canonical_ts, updated_at)
+    WITH valid_pairs AS (
+        SELECT * FROM (VALUES {values_list}) AS v(id, tf)
+    ),
+    bar_state AS (
+        SELECT
+            b.id,
+            b.tf,
+            MIN(b.time_open) AS daily_min_seen,
+            MAX(b.time_close) AS daily_max_seen,
+            MAX(CASE WHEN b.is_partial_end = FALSE THEN b.bar_seq END) AS last_bar_seq
+        FROM {bars_schema}.{bars_table} b
+        INNER JOIN valid_pairs vp ON b.id = vp.id AND b.tf = vp.tf
+        GROUP BY b.id, b.tf
+    ),
+    ema_state AS (
+        SELECT
+            e.id,
+            e.tf,
+            e.period,
+            MAX(e.ts) AS last_time_close,
+            MAX(e.ts) AS last_canonical_ts
+        FROM {schema}.{out_table} e
+        INNER JOIN valid_pairs vp ON e.id = vp.id AND e.tf = vp.tf
+        WHERE e.roll = FALSE
+        GROUP BY e.id, e.tf, e.period
+    )
+    SELECT
+        COALESCE(b.id, e.id) AS id,
+        COALESCE(b.tf, e.tf) AS tf,
+        e.period,
+        b.daily_min_seen,
+        b.daily_max_seen,
+        b.last_bar_seq,
+        e.last_time_close,
+        e.last_canonical_ts,
+        now() AS updated_at
+    FROM ema_state e
+    LEFT JOIN bar_state b
+        ON e.id = b.id AND e.tf = b.tf
+    ON CONFLICT (id, tf, period) DO UPDATE
+      SET daily_min_seen = EXCLUDED.daily_min_seen,
+          daily_max_seen = EXCLUDED.daily_max_seen,
+          last_bar_seq = EXCLUDED.last_bar_seq,
+          last_time_close = EXCLUDED.last_time_close,
+          last_canonical_ts = EXCLUDED.last_canonical_ts,
+          updated_at = now();
+    """
+
+    with engine.begin() as conn:
+        result = conn.execute(text(sql))
+        row_count = result.rowcount
+
+    logger.info(f"Updated {row_count} (id, tf) state records in {state_table}")
+
+
+def _filter_id_tf_by_bar_availability(
+    db_url: str,
+    ids: List[int],
+    tfs: List[str],
+    min_bars_required: int,
+    bars_schema: str,
+    bars_table: str,
+    logger,
+) -> List[Tuple[int, str]]:
+    """
+    Filter (id, tf) combinations to only those with enough canonical bars.
+
+    Returns: List of (id, tf) tuples that have >= min_bars_required canonical bars
+    """
+    engine = get_engine(db_url)
+
+    sql = text(f"""
+        SELECT
+            id,
+            tf,
+            COUNT(*) AS bar_count
+        FROM {bars_schema}.{bars_table}
+        WHERE id = ANY(:ids)
+          AND tf = ANY(:tfs)
+          AND is_partial_end = FALSE
+        GROUP BY id, tf
+        HAVING COUNT(*) >= :min_bars
+        ORDER BY id, tf
+    """)
+
+    with engine.connect() as conn:
+        result = pd.read_sql(sql, conn, params={
+            "ids": ids,
+            "tfs": tfs,
+            "min_bars": min_bars_required
+        })
+
+    if result.empty:
+        logger.warning(f"No (id, tf) combinations have >= {min_bars_required} canonical bars")
+        return []
+
+    valid_combinations = [(int(row.id), str(row.tf)) for row in result.itertuples(index=False)]
+
+    logger.info(f"Filtered to {len(valid_combinations)} (id, tf) combinations with >= {min_bars_required} bars")
+    logger.debug(f"Valid combinations: {valid_combinations[:10]}..." if len(valid_combinations) > 10 else f"Valid combinations: {valid_combinations}")
+
+    return valid_combinations
+
+
+def _process_id_tf_worker(args_tuple: Tuple) -> int:
+    """
+    Worker function for parallel processing of (id, tf) combinations.
+
+    Returns: Number of rows upserted
+    """
+    (id_, tf, resolved_db_url, periods, start, end, schema, out_table,
+     update_existing, bars_schema, bars_table, log_level, log_file) = args_tuple
+
+    # Each worker gets its own logger with unique name for tracking
+    worker_id = f"{id_}-{tf}"
+    logger = get_worker_logger(
+        name="ema_multi_tf",
+        worker_id=worker_id,
+        log_level=log_level,
+        log_file=log_file,
+    )
+
+    try:
+        logger.info(f"Starting EMA computation for id={id_}, tf={tf}")
+
+        # Special handling for 1D: use cmc_price_bars_1d (validated bars) instead of multi_tf
+        actual_bars_table = "cmc_price_bars_1d" if tf == "1D" else bars_table
+
+        if tf == "1D":
+            logger.debug(f"Using validated 1D bars table: {actual_bars_table}")
+
+        n = write_multi_timeframe_ema_to_db(
+            ids=[id_],
+            start=start,
+            end=end,
+            ema_periods=periods,
+            tf_subset=[tf],
+            db_url=resolved_db_url,
+            schema=schema,
+            out_table=out_table,
+            update_existing=update_existing,
+            bars_schema=bars_schema,
+            bars_table_tf_day=actual_bars_table,
+        )
+        logger.info(f"Completed: {n:,} rows written")
+        return int(n or 0)
+    except Exception as e:
+        # Check if it's a connection limit error and provide helpful message
+        error_msg = str(e).lower()
+        if "too many clients" in error_msg or "max_connections" in error_msg:
+            logger.error(
+                f"DATABASE CONNECTION LIMIT REACHED. "
+                f"Solutions: (1) Reduce --num-processes, (2) Increase Postgres max_connections. "
+                f"Error: {e}"
+            )
+        else:
+            logger.error(f"Worker failed: {e}", exc_info=True)
+        return 0
+
+
+def main() -> None:
+    args = build_parser().parse_args()
+
+    # Setup logging
+    logger = setup_logging(
+        name="ema_multi_tf",
+        level=args.log_level,
+        log_file=args.log_file,
+        quiet=args.quiet,
+        debug=args.debug,
+    )
+
+    resolved_db_url = resolve_db_url(args.db_url)
+    engine = get_engine(resolved_db_url)
+
+    raw = str(args.ids).strip().lower()
+    if raw == "all":
+        ids_result = "all"
+    elif "," in raw:
+        ids_result = [int(x.strip()) for x in raw.split(",") if x.strip()]
+    else:
+        ids_result = parse_ids(args.ids)
+
+    # IMPORTANT: define `ids`, because the rest of the script uses it
+    if ids_result == "all":
+        ids = load_all_ids(resolved_db_url, "public.cmc_price_histories7")
+    else:
+        ids = ids_result
+
+    periods = load_periods(engine, str(args.periods))
+
+    if args.tfs is None:
+        tf_list = _load_tf_day_canonical(engine)
+    else:
+        tf_list = [x.strip() for x in str(args.tfs).split(",") if x.strip()]
+
+    # Limit parallel processes to avoid Postgres connection exhaustion
+    # Default: min(cpu_count, 4) to be conservative with DB connections
+    if args.num_processes:
+        num_processes = args.num_processes
+    else:
+        num_processes = min(cpu_count(), 4)
+        logger.info(f"Auto-limited parallel processes to {num_processes} (to avoid connection exhaustion)")
+
+    # State table setup for incremental refresh
+    state_table_fq = f"{args.schema}.{args.state_table}"
+    engine = get_engine(resolved_db_url)
+    ensure_ema_state_table(engine, args.schema, args.state_table)
+
+    logger.info("Configuration:")
+    logger.info(f"  IDs: {ids if args.ids != 'all' else 'ALL'}")
+    logger.info(f"  Periods: {periods}")
+    logger.info(f"  Timeframes: {tf_list}")
+    logger.info(f"  Source bars: {args.bars_schema}.{args.bars_table}")
+    logger.info(f"  Target table: {args.schema}.{args.out_table}")
+    logger.info(f"  State table: {state_table_fq}")
+    logger.info(f"  Full refresh: {args.full_refresh}")
+    logger.info(f"  Parallel processes: {num_processes}")
+
+    # Filter (id, tf) combinations by bar availability
+    min_bars_required = min(periods)
+    logger.info(f"Filtering (id, tf) combinations with >= {min_bars_required} canonical bars...")
+    valid_id_tf_pairs = _filter_id_tf_by_bar_availability(
+        db_url=resolved_db_url,
+        ids=ids,
+        tfs=tf_list,
+        min_bars_required=min_bars_required,
+        bars_schema=args.bars_schema,
+        bars_table=args.bars_table,
+        logger=logger,
+    )
+
+    if not valid_id_tf_pairs:
+        logger.warning("No valid (id, tf) combinations found. Exiting.")
+        return
+
+    # Load state for incremental refresh
+    state_df = pd.DataFrame()
+    if not args.full_refresh:
+        state_df = load_ema_state(engine, args.schema, args.state_table)
+        if not state_df.empty:
+            logger.info(f"Loaded {len(state_df)} existing state records for incremental refresh")
+        else:
+            logger.info("No existing state found - running full refresh from --start")
+
+    # Build work items with per-(id, tf) dirty window start (only for valid combinations)
+    work_items = []
+    for id_, tf in valid_id_tf_pairs:
+        # Compute incremental start for this (id, tf)
+        if args.full_refresh:
+            start_ts = args.start
+        else:
+            start_ts = _compute_dirty_window_start(
+                state_df=state_df,
+                id_=id_,
+                tf=tf,
+                default_start=args.start,
+            )
+
+        work_items.append(
+            (id_, tf, resolved_db_url, periods, start_ts, args.end,
+             args.schema, args.out_table, (not args.no_update),
+             args.bars_schema, args.bars_table, args.log_level, args.log_file)
+        )
+
+    logger.info(f"Processing {len(work_items)} (id, tf) combinations in parallel")
+
+    # Execute in parallel
+    with Pool(processes=num_processes) as pool:
+        results = pool.map(_process_id_tf_worker, work_items)
+
+    total_rows = sum(results)
+    logger.info(f"Total upserted rows: {total_rows:,}")
+
+    # Update state table with complete state tracking (only for processed id/tf combinations)
+    # Split into 1D (from cmc_price_bars_1d) and non-1D (from cmc_price_bars_multi_tf)
+    logger.info("Updating state table with complete state tracking...")
+
+    pairs_1d = [(id_, tf) for id_, tf in valid_id_tf_pairs if tf == "1D"]
+    pairs_non_1d = [(id_, tf) for id_, tf in valid_id_tf_pairs if tf != "1D"]
+
+    if pairs_1d:
+        logger.info(f"Updating state for {len(pairs_1d)} 1D pairs from cmc_price_bars_1d...")
+        _update_state_from_output(
+            db_url=resolved_db_url,
+            state_table=state_table_fq,
+            schema=args.schema,
+            out_table=args.out_table,
+            id_tf_pairs=pairs_1d,
+            logger=logger,
+            bars_schema=args.bars_schema,
+            bars_table="cmc_price_bars_1d",  # Use 1D bars table for 1D timeframe
+        )
+
+    if pairs_non_1d:
+        logger.info(f"Updating state for {len(pairs_non_1d)} non-1D pairs from {args.bars_table}...")
+        _update_state_from_output(
+            db_url=resolved_db_url,
+            state_table=state_table_fq,
+            schema=args.schema,
+            out_table=args.out_table,
+            id_tf_pairs=pairs_non_1d,
+            logger=logger,
+            bars_schema=args.bars_schema,
+            bars_table=args.bars_table,  # Use multi_tf bars table for other timeframes
+        )
+
+    logger.info("Multi-timeframe EMA refresh complete")
+
+
+if __name__ == "__main__":
+    main()

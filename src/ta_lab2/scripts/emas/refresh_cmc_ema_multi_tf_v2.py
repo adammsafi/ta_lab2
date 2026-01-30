@@ -1,178 +1,323 @@
+"""
+Refresh cmc_ema_multi_tf_v2 using BaseEMARefresher architecture.
+
+Key differences from other refreshers:
+- Uses cmc_price_bars_1d (validated bars) exclusively
+- Computes all TFs from daily data (no multi-tf bars needed)
+- Loads TFs dynamically from dim_timeframe
+- Incremental watermark is per (id, tf, period)
+
+REFACTORED VERSION - Uses new base class for:
+- Standardized CLI parsing
+- State management via EMAStateManager
+- Parallel execution via EMAComputationOrchestrator
+- Reduced code duplication
+
+Migrated from: refresh_cmc_ema_multi_tf_v2.py
+"""
+
 from __future__ import annotations
 
-"""
-Incremental refresh runner for public.cmc_ema_multi_tf_v2.
-
-Key guarantee (with the UPDATED ema_multi_tf_v2 feature module):
-- Incremental watermark is per (id, tf, period), not per id.
-- Therefore this runner WILL pick up and backfill:
-    * new periods (e.g., adding 10)
-    * new TFs from dim_timeframe (e.g., adding 28D, 1D, etc.)
-  even when there are no new daily timestamps.
-
-Mirrors the style of other ta_lab2 refresh scripts:
-- resolves DB URL from --db-url or TARGET_DB_URL
-- supports --ids all / comma list
-- supports --periods override (incl. 'lut')
-- delegates all EMA math to ta_lab2.features.m_tf.ema_multi_tf_v2
-
-Example (Spyder):
-
-    runfile(
-      r"C:\\Users\\asafi\\Downloads\\ta_lab2\\src\\ta_lab2\\scripts\\emas\\refresh_cmc_ema_multi_tf_v2.py",
-      wdir=r"C:\\Users\\asafi\\Downloads\\ta_lab2",
-      args="--ids all --periods lut --alignment-type tf_day"
-    )
-"""
-
 import argparse
-import os
-from typing import List, Optional, Sequence
+from typing import Optional
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
+from sqlalchemy.pool import NullPool
 
-from ta_lab2.features.m_tf.ema_multi_tf_v2 import (
-    DEFAULT_PERIODS,
-    refresh_cmc_ema_multi_tf_v2_incremental,
+from ta_lab2.features.m_tf.ema_multi_tf_v2 import refresh_cmc_ema_multi_tf_v2_incremental
+from ta_lab2.scripts.bars.common_snapshot_contract import resolve_db_url, get_engine
+from ta_lab2.scripts.emas.base_ema_refresher import (
+    BaseEMARefresher,
+    EMARefresherConfig,
 )
+from ta_lab2.scripts.emas.ema_state_manager import EMAStateConfig
+from ta_lab2.scripts.emas.ema_computation_orchestrator import WorkerTask
+from ta_lab2.scripts.emas.logging_config import get_worker_logger
 
 
-def _resolve_db_url(cli_db_url: Optional[str]) -> str:
-    """Priority: --db-url, then TARGET_DB_URL env, then MARKETDATA_DB_URL env."""
-    if cli_db_url and cli_db_url.strip():
-        return cli_db_url.strip()
+# Default EMA periods
+DEFAULT_PERIODS = [9, 10, 21, 50, 100, 200]
 
-    env_db_url = os.getenv("TARGET_DB_URL")
-    if env_db_url and env_db_url.strip():
-        print("[multi_tf_v2] Using DB URL from TARGET_DB_URL env.")
-        return env_db_url.strip()
 
-    env_db_url = os.getenv("MARKETDATA_DB_URL")
-    if env_db_url and env_db_url.strip():
-        print("[multi_tf_v2] Using DB URL from MARKETDATA_DB_URL env.")
-        return env_db_url.strip()
+# =============================================================================
+# Worker Function (Module-level for pickling)
+# =============================================================================
 
-    raise ValueError(
-        "No DB URL provided. Pass --db-url or set TARGET_DB_URL (preferred) / MARKETDATA_DB_URL in your environment."
+def _process_id_worker(task: WorkerTask) -> int:
+    """
+    Worker function for parallel processing of individual IDs.
+
+    Creates own engine with NullPool to avoid connection pooling issues.
+
+    Args:
+        task: WorkerTask containing id, db_url, periods, start, extra_config
+
+    Returns:
+        Number of rows inserted/updated (always 0 - v2 doesn't report row count)
+    """
+    worker_id = str(task.id_)
+    logger = get_worker_logger(
+        name="ema_v2",
+        worker_id=worker_id,
+        log_level="INFO",
+        log_file=None,
     )
-
-
-def _parse_ids(ids_arg: str) -> Optional[Sequence[int]]:
-    if ids_arg.strip().lower() == "all":
-        return None
-    out: List[int] = []
-    for part in ids_arg.split(","):
-        part = part.strip()
-        if part:
-            out.append(int(part))
-    return out
-
-
-def _parse_int_list(arg: Optional[str]) -> Optional[Sequence[int]]:
-    if arg is None:
-        return None
-    arg = arg.strip()
-    if not arg:
-        return None
-    out: List[int] = []
-    for part in arg.split(","):
-        part = part.strip()
-        if part:
-            out.append(int(part))
-    return out
-
-
-def _load_periods_from_lut(engine) -> Sequence[int]:
-    """Load distinct EMA periods from public.ema_alpha_lookup."""
-    with engine.begin() as conn:
-        rows = conn.execute(text("SELECT DISTINCT period FROM public.ema_alpha_lookup ORDER BY 1;")).fetchall()
-    return [int(r[0]) for r in rows]
-
-
-def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="Incrementally refresh cmc_ema_multi_tf_v2 (TFs from dim_timeframe).")
-    p.add_argument("--db-url", default=None, help="SQLAlchemy DB URL (or TARGET_DB_URL / MARKETDATA_DB_URL env).")
-    p.add_argument("--ids", default="all", help="Comma list of ids (e.g., 1,52) or 'all' (default).")
-    p.add_argument(
-        "--periods",
-        default=None,
-        help=(
-            "Comma list of EMA periods, or 'lut' to load distinct periods from public.ema_alpha_lookup "
-            f"(default: {','.join(map(str, DEFAULT_PERIODS))})."
-        ),
-    )
-    p.add_argument(
-        "--alignment-type",
-        default="tf_day",
-        help="dim_timeframe.alignment_type used to select TFs (default: tf_day).",
-    )
-    p.add_argument(
-        "--include-noncanonical",
-        action="store_true",
-        help="If set, include non-canonical TFs from dim_timeframe (canonical_only=False).",
-    )
-    p.add_argument("--price-schema", default="public")
-    p.add_argument("--price-table", default="cmc_price_histories7")
-    p.add_argument("--out-schema", default="public")
-    p.add_argument("--out-table", default="cmc_ema_multi_tf_v2")
-    return p
-
-
-def main() -> None:
-    args = build_parser().parse_args()
-
-    db_url = _resolve_db_url(args.db_url)
-    ids = _parse_ids(args.ids)
-
-    engine = create_engine(db_url)
 
     try:
-        # Resolve periods:
-        #   - if --periods is omitted => DEFAULT_PERIODS
-        #   - if --periods 'lut'      => load distinct periods from public.ema_alpha_lookup
-        #   - else                    => parse comma-separated ints
-        periods_arg = args.periods.strip().lower() if args.periods else ""
-        if periods_arg == "lut":
-            periods = list(_load_periods_from_lut(engine))
-        else:
-            periods = _parse_int_list(args.periods)
-            if periods is None:
-                periods = list(DEFAULT_PERIODS)
+        logger.info(f"Starting EMA computation for id={task.id_}")
 
-        periods = [int(p) for p in periods if int(p) > 0]
+        # Create engine with NullPool for worker
+        engine = create_engine(task.db_url, poolclass=NullPool, future=True)
+
+        # Extract configuration
+        alignment_type = task.extra_config.get("alignment_type", "tf_day")
+        canonical_only = task.extra_config.get("canonical_only", True)
+        price_schema = task.extra_config.get("price_schema", "public")
+        price_table = task.extra_config.get("price_table", "cmc_price_bars_1d")
+        out_schema = task.extra_config.get("out_schema", "public")
+        out_table = task.extra_config.get("out_table", "cmc_ema_multi_tf_v2")
+
+        # V2 feature module handles incremental refresh internally
+        refresh_cmc_ema_multi_tf_v2_incremental(
+            engine,
+            periods=task.periods,
+            ids=[task.id_],
+            alignment_type=alignment_type,
+            canonical_only=canonical_only,
+            price_schema=price_schema,
+            price_table=price_table,
+            out_schema=out_schema,
+            out_table=out_table,
+        )
+
+        engine.dispose()
+        logger.info(f"Completed EMA computation for id={task.id_}")
+        return 0  # V2 doesn't report row count
+
+    except Exception as e:
+        logger.error(f"Worker failed for id={task.id_}: {e}", exc_info=True)
+        return 0
+
+
+# =============================================================================
+# Refresher Implementation
+# =============================================================================
+
+class V2EMARefresher(BaseEMARefresher):
+    """
+    V2 EMA refresher using daily bars with dynamic TF computation.
+
+    Key differences from other refreshers:
+    - Uses cmc_price_bars_1d (validated bars) exclusively
+    - Computes all TFs from daily data (no multi-tf bars needed)
+    - Loads TFs dynamically from dim_timeframe
+    - Feature module handles incremental logic internally
+    """
+
+    DEFAULT_PERIODS = DEFAULT_PERIODS
+
+    def __init__(
+        self,
+        config: EMARefresherConfig,
+        state_config: EMAStateConfig,
+        engine,
+    ):
+        super().__init__(config, state_config, engine)
+        self.alignment_type = config.extra_config.get("alignment_type", "tf_day")
+        self.canonical_only = config.extra_config.get("canonical_only", True)
+        self.price_schema = config.extra_config.get("price_schema", "public")
+        self.price_table = config.extra_config.get("price_table", "cmc_price_bars_1d")
+
+    # =========================================================================
+    # Abstract Method Implementations
+    # =========================================================================
+
+    def get_timeframes(self) -> list[str]:
+        """Load timeframes from dim_timeframe."""
+        from ta_lab2.time.dim_timeframe import list_tfs
+
+        tfs = list_tfs(
+            db_url=self.config.db_url,
+            alignment_type=self.alignment_type,
+            canonical_only=self.canonical_only,
+        )
+        return tfs
+
+    def compute_emas_for_id(
+        self,
+        id_: int,
+        periods: list[int],
+        start: Optional[str] = None,
+        end: Optional[str] = None,
+        **extra_args,
+    ) -> int:
+        """
+        Compute V2 EMAs for single ID.
+
+        Note: V2 feature module handles incremental refresh internally,
+        so start/end parameters are not used.
+        """
+        refresh_cmc_ema_multi_tf_v2_incremental(
+            self.engine,
+            periods=periods,
+            ids=[id_],
+            alignment_type=self.alignment_type,
+            canonical_only=self.canonical_only,
+            price_schema=self.price_schema,
+            price_table=self.price_table,
+            out_schema=self.config.output_schema,
+            out_table=self.config.output_table,
+        )
+        return 0  # V2 doesn't report row count
+
+    def get_source_table_info(self) -> dict[str, str]:
+        """Return source bars table information."""
+        return {
+            "bars_table": self.price_table,
+            "bars_schema": self.price_schema,
+        }
+
+    @staticmethod
+    def get_worker_function():
+        """Return module-level worker function for multiprocessing."""
+        return _process_id_worker
+
+    # =========================================================================
+    # CLI Integration
+    # =========================================================================
+
+    @classmethod
+    def create_argument_parser(cls) -> argparse.ArgumentParser:
+        """Create argument parser with V2-specific arguments."""
+        p = argparse.ArgumentParser(
+            description="Refresh cmc_ema_multi_tf_v2 from 1D bars (refactored).",
+        )
+
+        # Add base arguments manually
+        p.add_argument("--db-url", default=None)
+        p.add_argument("--ids", default="all")
+        p.add_argument("--periods", default=None)
+        p.add_argument("--out-schema", default="public")
+        p.add_argument("--out-table", default="cmc_ema_multi_tf_v2")
+        p.add_argument("--state-table", default="cmc_ema_multi_tf_v2_state")
+        p.add_argument("--full-refresh", action="store_true")
+        p.add_argument("--num-processes", type=int, default=None)
+
+        # V2-specific arguments
+        p.add_argument(
+            "--alignment-type",
+            default="tf_day",
+            help="dim_timeframe.alignment_type for TF selection. Default: tf_day",
+        )
+        p.add_argument(
+            "--include-noncanonical",
+            action="store_true",
+            help="Include non-canonical TFs from dim_timeframe.",
+        )
+        p.add_argument("--price-schema", default="public")
+        p.add_argument(
+            "--price-table",
+            default="cmc_price_bars_1d",
+            help="1D bars table (validated data). Default: cmc_price_bars_1d",
+        )
+
+        # Logging arguments
+        from ta_lab2.scripts.emas.logging_config import add_logging_args
+        add_logging_args(p)
+
+        return p
+
+    @classmethod
+    def from_cli_args(cls, args: argparse.Namespace) -> "V2EMARefresher":
+        """Create refresher instance from CLI arguments."""
+        # Resolve database URL
+        db_url = resolve_db_url(args.db_url)
+
+        # Create engine
+        engine = get_engine(db_url)
 
         canonical_only = not args.include_noncanonical
 
-        print(
-            "[multi_tf_v2] Runner config:"
-            f" ids={'ALL' if ids is None else ids},"
-            f" periods={periods},"
-            f" alignment_type={args.alignment_type!r},"
-            f" canonical_only={canonical_only},"
-            f" price={args.price_schema}.{args.price_table},"
-            f" out={args.out_schema}.{args.out_table}"
-        )
-        print(
-            "[multi_tf_v2] Incremental semantics: watermark is per (id, tf, period). "
-            "New TFs or new periods will be backfilled even with no new daily timestamps."
-        )
-
-        refresh_cmc_ema_multi_tf_v2_incremental(
-            engine=engine,
+        # Create temporary instance to use helper methods
+        temp_config = EMARefresherConfig(
             db_url=db_url,
-            periods=periods,
-            ids=ids,
-            alignment_type=args.alignment_type,
-            canonical_only=canonical_only,
-            price_schema=args.price_schema,
-            price_table=args.price_table,
-            out_schema=args.out_schema,
-            out_table=args.out_table,
+            ids=[],
+            periods=[],
+            output_schema=args.out_schema,
+            output_table=args.out_table,
+            state_table=args.state_table,
+            num_processes=args.num_processes,
+            full_refresh=args.full_refresh,
+            log_level=args.log_level,
+            log_file=args.log_file,
+            quiet=args.quiet,
+            debug=args.debug,
+            extra_config={
+                "alignment_type": args.alignment_type,
+                "canonical_only": canonical_only,
+                "price_schema": args.price_schema,
+                "price_table": args.price_table,
+            },
         )
-    finally:
-        # Ensure pooled connections are released in long Spyder sessions
-        engine.dispose()
 
+        temp_state_config = EMAStateConfig(
+            state_schema=args.out_schema,
+            state_table=args.state_table,
+            ts_column="ts",
+            roll_filter="roll = FALSE",
+            use_canonical_ts=True,
+            bars_table=args.price_table,
+            bars_schema=args.price_schema,
+            bars_partial_filter="is_partial_end = FALSE",
+        )
+
+        temp_instance = cls(temp_config, temp_state_config, engine)
+
+        # Load IDs and periods using helper methods
+        ids = temp_instance.load_ids(args.ids)
+        periods = temp_instance.load_periods(args.periods)
+
+        # Create final config
+        final_config = EMARefresherConfig(
+            db_url=db_url,
+            ids=ids,
+            periods=periods,
+            output_schema=args.out_schema,
+            output_table=args.out_table,
+            state_table=args.state_table,
+            num_processes=args.num_processes,
+            full_refresh=args.full_refresh,
+            log_level=args.log_level,
+            log_file=args.log_file,
+            quiet=args.quiet,
+            debug=args.debug,
+            extra_config={
+                "alignment_type": args.alignment_type,
+                "canonical_only": canonical_only,
+                "price_schema": args.price_schema,
+                "price_table": args.price_table,
+                "out_schema": args.out_schema,
+                "out_table": args.out_table,
+            },
+        )
+
+        state_config = EMAStateConfig(
+            state_schema=args.out_schema,
+            state_table=args.state_table,
+            ts_column="ts",
+            roll_filter="roll = FALSE",
+            use_canonical_ts=True,
+            bars_table=args.price_table,
+            bars_schema=args.price_schema,
+            bars_partial_filter="is_partial_end = FALSE",
+        )
+
+        return cls(final_config, state_config, engine)
+
+
+# =============================================================================
+# Entry Point
+# =============================================================================
 
 if __name__ == "__main__":
-    main()
+    V2EMARefresher.main()
