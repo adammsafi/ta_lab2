@@ -155,9 +155,9 @@ def ensure_cmc_ema_multi_tf_u(engine: Engine, sql_dir: Path, dry_run: bool = Fal
         # Verify alignment_source column exists
         if column_exists(engine, schema, table_name, "alignment_source"):
             result["has_alignment_source"] = True
-            _log("✓ alignment_source column present")
+            _log("[OK] alignment_source column present")
         else:
-            _log("✗ alignment_source column MISSING")
+            _log("[ERROR] alignment_source column MISSING")
             _log("  This is a schema defect - table needs migration")
 
         return result
@@ -175,18 +175,18 @@ def ensure_cmc_ema_multi_tf_u(engine: Engine, sql_dir: Path, dry_run: bool = Fal
     try:
         execute_sql_file(engine, ddl_file)
         result["created"] = True
-        _log(f"✓ Table {schema}.{table_name} created successfully")
+        _log(f"[OK] Table {schema}.{table_name} created successfully")
 
         # Verify alignment_source column in newly created table
         if column_exists(engine, schema, table_name, "alignment_source"):
             result["has_alignment_source"] = True
-            _log("✓ alignment_source column present in new table")
+            _log("[OK] alignment_source column present in new table")
         else:
-            _log("✗ alignment_source column MISSING in new table")
+            _log("[ERROR] alignment_source column MISSING in new table")
             _log("  DDL file may need updating")
 
     except Exception as e:
-        _log(f"✗ Failed to create table: {e}")
+        _log(f"[ERROR] Failed to create table: {e}")
         raise RuntimeError(f"Table creation failed: {e}") from e
 
     return result
@@ -265,9 +265,9 @@ Examples:
                     check=True,
                     cwd=Path.cwd()
                 )
-                _log("✓ Sync completed successfully")
+                _log("[OK] Sync completed successfully")
             except subprocess.CalledProcessError as e:
-                _log(f"✗ Sync failed: {e}")
+                _log(f"[ERROR] Sync failed: {e}")
                 sys.exit(1)
         else:
             _log("Skipping sync - table was not created and did not exist")
