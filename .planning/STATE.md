@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2025-01-22)
 
 ## Current Position
 
-Phase: 6 of 10 (TA Lab2 Time Model)
-Plan: 6 of 6
-Status: Phase complete
-Last activity: 2026-01-30 - Completed 06-06-PLAN.md (Rowcount validation with Telegram alerts)
+Phase: 7 of 10 (TA Lab2 Feature Pipeline)
+Plan: 1 of ? (in progress)
+Status: In progress
+Last activity: 2026-01-30 - Completed 07-01-PLAN.md (Feature pipeline infrastructure)
 
-Progress: [█████████░] 137% (26/19 plans)
+Progress: [█████████░] 142% (27/19 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 26
+- Total plans completed: 27
 - Average duration: 8 min
-- Total execution time: 5.4 hours
+- Total execution time: 5.5 hours
 
 **By Phase:**
 
@@ -33,10 +33,11 @@ Progress: [█████████░] 137% (26/19 plans)
 | 04-orchestrator-adapters | 4 | 61 min | 15 min |
 | 05-orchestrator-coordination | 6 | 34 min | 6 min |
 | 06-ta-lab2-time-model | 6 | 37 min | 6 min |
+| 07-ta_lab2-feature-pipeline | 1 | 6 min | 6 min |
 
 **Recent Trend:**
-- Last 5 plans: 8min (06-02), 8min (06-03), 5min (06-05), 9min (06-06)
-- Trend: Phase 6 COMPLETE - All 7 SUCCESS CRITERIA validated
+- Last 5 plans: 8min (06-03), 5min (06-05), 9min (06-06), 6min (07-01)
+- Trend: Phase 7 started - Feature pipeline infrastructure complete
 
 *Updated after each plan completion*
 
@@ -155,6 +156,9 @@ Recent decisions affecting current work:
 - **Graceful degradation when Telegram not configured** (06-06): Validation should work without alerts - just log warnings
 - **Conservative expected count calculation** (06-06): tf_days-based division for expected counts - simple and works for most TFs
 - **Validation warns but doesn't fail pipeline** (06-06): Data quality issues should be investigated but not block refreshes
+- **Feature state schema: (id, feature_type, feature_name) PRIMARY KEY** (07-01): Extends EMA pattern with feature dimensions for unified tracking across returns, volatility, and TA features
+- **Three null handling strategies** (07-01): skip (returns - preserves gaps), forward_fill (vol - smooth estimates), interpolate (TA - smooth signals) configured per feature in dim_features
+- **get_null_strategy() defaults to 'skip'** (07-01): Most conservative strategy when feature not found in dim_features, preserves data integrity
 
 ### Pending Todos
 
@@ -167,9 +171,9 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-01-30
-Stopped at: Completed 06-06-PLAN.md (Rowcount validation with Telegram alerts) - Phase 6 COMPLETE (6/6 plans)
+Stopped at: Completed 07-01-PLAN.md (Feature pipeline infrastructure) - Phase 7 started (1/? plans)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-01-30 (Phase 6 plan 6: Rowcount validation - Phase 6 COMPLETE, all 7 SUCCESS CRITERIA validated)*
+*Last updated: 2026-01-30 (Phase 7 plan 1: Feature pipeline infrastructure - FeatureStateManager and dim_features created)*
