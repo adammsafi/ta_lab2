@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2025-01-22)
 ## Current Position
 
 Phase: 8 of 10 (TA Lab2 Signals)
-Plan: 2 of 6 (EMA Signal Generation)
+Plan: 4 of 6 (ATR Breakout Signal Generation)
 Status: In progress
-Last activity: 2026-01-30 - Completed 08-02-PLAN.md (EMA Signal Generation)
+Last activity: 2026-01-30 - Completed 08-04-PLAN.md (ATR Breakout Signal Generation)
 
-Progress: [███████░░░] 73% (7/10 phases complete, 2/6 plans in phase 8)
+Progress: [███████░░░] 74% (7/10 phases complete, 4/6 plans in phase 8)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 39 (across 7 complete phases + 2 in phase 8)
+- Total plans completed: 41 (across 7 complete phases + 4 in phase 8)
 - Average duration: 7 min
-- Total execution time: 7.2 hours
+- Total execution time: 7.4 hours
 
 **By Phase:**
 
@@ -34,11 +34,11 @@ Progress: [███████░░░] 73% (7/10 phases complete, 2/6 plans 
 | 05-orchestrator-coordination | 6 | 34 min | 6 min | ✓ Complete |
 | 06-ta-lab2-time-model | 6 | 37 min | 6 min | ✓ Complete |
 | 07-ta_lab2-feature-pipeline | 7 | 45 min | 6 min | ✓ Complete |
-| 08-ta_lab2-signals | 2/6 | 18 min | 9 min | In progress |
+| 08-ta_lab2-signals | 4/6 | 30 min | 8 min | In progress |
 
 **Recent Trend:**
-- Last 5 phases: 29min (02), 193min (03), 61min (04), 34min (05), 37min (06), 45min (07), 18min (08-01+08-02)
-- Trend: Phase 8 in progress - EMA signal generation with database-driven config and stateful position tracking, 10min for plan 2
+- Last 5 phases: 29min (02), 193min (03), 61min (04), 34min (05), 37min (06), 45min (07), 30min (08-01 through 08-04)
+- Trend: Phase 8 in progress - ATR breakout signal generation complete, 6min for plan 4
 
 *Updated after each plan completion*
 
@@ -197,6 +197,10 @@ Recent decisions affecting current work:
 - **FIFO position matching** (08-02): Exit signals match oldest open position first via open_list.pop(0)
 - **Feature snapshot at entry** (08-02): Captured close, fast_ema, slow_ema, rsi_14, atr_14 in JSONB for backtest self-containment
 - **Batch-level hash computation** (08-02): Compute feature_version_hash once per asset batch (not per record) for 10-100x efficiency
+- **Iterative channel computation** (08-04): Loop over asset IDs for Donchian channels instead of groupby().apply() to avoid pandas FutureWarning and preserve 'id' column
+- **Feature hash requires 'ts' column** (08-04): compute_feature_hash sorts by 'ts', pattern: hash_df = df_asset.loc[[idx], ['ts'] + feature_cols]
+- **Breakout type classification** (08-04): channel_break (Donchian), atr_expansion (volatility spike), or both - enables performance analysis per trigger
+- **Channel levels in feature snapshot** (08-04): channel_high, channel_low captured in JSONB for audit trail and backtest validation
 
 ### Pending Todos
 
@@ -209,9 +213,9 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-01-30
-Stopped at: Completed 08-02-PLAN.md (EMA Signal Generation) - 2 of 6 plans in Phase 8
+Stopped at: Completed 08-04-PLAN.md (ATR Breakout Signal Generation) - 4 of 6 plans in Phase 8
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-01-30 (Phase 8 IN PROGRESS: Plan 08-02 complete - EMA signal generation with database-driven config, 10 tests passing)*
+*Last updated: 2026-01-30 (Phase 8 IN PROGRESS: Plan 08-04 complete - ATR breakout signal generation with Donchian channels and breakout classification, 12 tests passing)*
