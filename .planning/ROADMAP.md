@@ -19,7 +19,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 5: Orchestrator Coordination** - Routing, handoffs, parallel execution, cost tracking
 - [x] **Phase 6: ta_lab2 Time Model** - Dimension tables and EMA unification
 - [x] **Phase 7: ta_lab2 Feature Pipeline** - Returns, volatility, technical indicators
-- [ ] **Phase 8: ta_lab2 Signals** - Signal generation and backtest integration
+- [x] **Phase 8: ta_lab2 Signals** - Signal generation and backtest integration
 - [ ] **Phase 9: Integration & Observability** - Cross-system validation and monitoring
 - [ ] **Phase 10: Release Validation** - Final tests, documentation, v0.4.0 tag
 
@@ -176,12 +176,12 @@ Plans:
 **Plans**: 6 plans
 
 Plans:
-- [ ] 08-01-PLAN.md — Signal infrastructure: dim_signals, SignalStateManager, signal tables (Wave 1)
-- [ ] 08-02-PLAN.md — EMA crossover signal generation from cmc_daily_features (Wave 2)
-- [ ] 08-03-PLAN.md — RSI mean reversion signal generation with adaptive thresholds (Wave 2)
-- [ ] 08-04-PLAN.md — ATR breakout signal generation with channel tracking (Wave 2)
-- [ ] 08-05-PLAN.md — Backtest integration: SignalBacktester with result storage (Wave 3)
-- [ ] 08-06-PLAN.md — Reproducibility validation and orchestrated pipeline (Wave 4)
+- [x] 08-01-PLAN.md — Signal infrastructure: dim_signals, SignalStateManager, signal tables (Wave 1)
+- [x] 08-02-PLAN.md — EMA crossover signal generation from cmc_daily_features (Wave 2)
+- [x] 08-03-PLAN.md — RSI mean reversion signal generation with adaptive thresholds (Wave 2)
+- [x] 08-04-PLAN.md — ATR breakout signal generation with channel tracking (Wave 2)
+- [x] 08-05-PLAN.md — Backtest integration: SignalBacktester with result storage (Wave 3)
+- [x] 08-06-PLAN.md — Reproducibility validation and orchestrated pipeline (Wave 4)
 
 ### Phase 9: Integration & Observability
 **Goal**: Cross-system validation proves memory + orchestrator + ta_lab2 work together
@@ -227,7 +227,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 5. Orchestrator Coordination | 6/6 | Complete | 2026-01-29 |
 | 6. ta_lab2 Time Model | 6/6 | Complete | 2026-01-30 |
 | 7. ta_lab2 Feature Pipeline | 7/7 | Complete | 2026-01-30 |
-| 8. ta_lab2 Signals | 0/6 | Planned | - |
+| 8. ta_lab2 Signals | 6/6 | Complete | 2026-01-30 |
 | 9. Integration & Observability | 0/TBD | Not started | - |
 | 10. Release Validation | 0/TBD | Not started | - |
 
