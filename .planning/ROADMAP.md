@@ -18,7 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 4: Orchestrator Adapters** - Claude, ChatGPT, Gemini platform integrations
 - [x] **Phase 5: Orchestrator Coordination** - Routing, handoffs, parallel execution, cost tracking
 - [x] **Phase 6: ta_lab2 Time Model** - Dimension tables and EMA unification
-- [ ] **Phase 7: ta_lab2 Feature Pipeline** - Returns, volatility, technical indicators
+- [x] **Phase 7: ta_lab2 Feature Pipeline** - Returns, volatility, technical indicators
 - [ ] **Phase 8: ta_lab2 Signals** - Signal generation and backtest integration
 - [ ] **Phase 9: Integration & Observability** - Cross-system validation and monitoring
 - [ ] **Phase 10: Release Validation** - Final tests, documentation, v0.4.0 tag
@@ -157,13 +157,13 @@ Plans:
 **Plans**: 7 plans
 
 Plans:
-- [ ] 07-01-PLAN.md — Feature infrastructure: FeatureStateManager and dim_features (Wave 1)
-- [ ] 07-02-PLAN.md — BaseFeature class and null handling utilities (Wave 1)
-- [ ] 07-03-PLAN.md — cmc_returns_daily with lookbacks from dim_timeframe (Wave 2)
-- [ ] 07-04-PLAN.md — cmc_vol_daily with Parkinson, GK, RS estimators (Wave 2)
-- [ ] 07-05-PLAN.md — cmc_ta_daily with RSI, MACD, indicators from dim_indicators (Wave 2)
-- [ ] 07-06-PLAN.md — cmc_daily_features unified feature store (Wave 3)
-- [ ] 07-07-PLAN.md — Data consistency validation and pipeline orchestration (Wave 4)
+- [x] 07-01-PLAN.md — Feature infrastructure: FeatureStateManager and dim_features (Wave 1)
+- [x] 07-02-PLAN.md — BaseFeature class and null handling utilities (Wave 1)
+- [x] 07-03-PLAN.md — cmc_returns_daily with lookbacks from dim_timeframe (Wave 2)
+- [x] 07-04-PLAN.md — cmc_vol_daily with Parkinson, GK, RS estimators (Wave 2)
+- [x] 07-05-PLAN.md — cmc_ta_daily with RSI, MACD, indicators from dim_indicators (Wave 2)
+- [x] 07-06-PLAN.md — cmc_daily_features unified feature store (Wave 3)
+- [x] 07-07-PLAN.md — Data consistency validation and pipeline orchestration (Wave 4)
 
 ### Phase 8: ta_lab2 Signals
 **Goal**: Trading signals generated and backtestable with reproducible results
