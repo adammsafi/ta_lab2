@@ -39,13 +39,13 @@ Target: 6 weeks (12-week plan accelerated through AI orchestration)
 
 ### ta_lab2 Time Model (Weeks 1-4)
 
-- [ ] **TIME-01**: Create dim_timeframe table with all TF definitions (1D, 3D, 5D, 1W, 1M, 3M, etc.)
-- [ ] **TIME-02**: Create dim_sessions table (trading hours, DST handling, session boundaries)
-- [ ] **TIME-03**: Unify cmc_ema_multi_tf + cmc_ema_multi_tf_cal into single table
-- [ ] **TIME-04**: Update all EMA refresh scripts to reference dim_timeframe
-- [ ] **TIME-05**: Build time alignment validation tests (TF windows, calendar rolls, session boundaries)
-- [ ] **TIME-06**: Implement incremental EMA refresh (only compute new rows)
-- [ ] **TIME-07**: Add rowcount validation (actual vs tf-defined expected counts)
+- [x] **TIME-01**: Create dim_timeframe table with all TF definitions (1D, 3D, 5D, 1W, 1M, 3M, etc.)
+- [x] **TIME-02**: Create dim_sessions table (trading hours, DST handling, session boundaries)
+- [x] **TIME-03**: Unify cmc_ema_multi_tf + cmc_ema_multi_tf_cal into single table
+- [x] **TIME-04**: Update all EMA refresh scripts to reference dim_timeframe
+- [x] **TIME-05**: Build time alignment validation tests (TF windows, calendar rolls, session boundaries)
+- [x] **TIME-06**: Implement incremental EMA refresh (only compute new rows)
+- [x] **TIME-07**: Add rowcount validation (actual vs tf-defined expected counts)
 
 ### ta_lab2 Feature Pipeline (Weeks 5-8)
 
@@ -137,13 +137,13 @@ Which requirements map to which phases.
 | ORCH-09 | Phase 5 | Pending |
 | ORCH-10 | Phase 5 | Pending |
 | ORCH-12 | Phase 5 | Pending |
-| TIME-01 | Phase 6 | Pending |
-| TIME-02 | Phase 6 | Pending |
-| TIME-03 | Phase 6 | Pending |
-| TIME-04 | Phase 6 | Pending |
-| TIME-05 | Phase 6 | Pending |
-| TIME-06 | Phase 6 | Pending |
-| TIME-07 | Phase 6 | Pending |
+| TIME-01 | Phase 6 | Complete |
+| TIME-02 | Phase 6 | Complete |
+| TIME-03 | Phase 6 | Complete |
+| TIME-04 | Phase 6 | Complete |
+| TIME-05 | Phase 6 | Complete |
+| TIME-06 | Phase 6 | Complete |
+| TIME-07 | Phase 6 | Complete |
 | FEAT-01 | Phase 7 | Pending |
 | FEAT-02 | Phase 7 | Pending |
 | FEAT-03 | Phase 7 | Pending |
