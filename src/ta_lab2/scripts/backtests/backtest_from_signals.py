@@ -154,8 +154,15 @@ class SignalBacktester:
 
         # Mark entry and exit timestamps as True
         for row in rows:
-            entry_ts = pd.Timestamp(row[0], tz='UTC')
-            exit_ts = pd.Timestamp(row[1], tz='UTC') if row[1] else None
+            entry_ts = pd.Timestamp(row[0])
+            if entry_ts.tz is None:
+                entry_ts = entry_ts.tz_localize('UTC')
+
+            exit_ts = None
+            if row[1]:
+                exit_ts = pd.Timestamp(row[1])
+                if exit_ts.tz is None:
+                    exit_ts = exit_ts.tz_localize('UTC')
 
             # Set entry if timestamp exists in index
             if entry_ts in entries.index:
@@ -579,10 +586,15 @@ class SignalBacktester:
                 trades_to_insert = result.trades_df.copy()
                 trades_to_insert['run_id'] = result.run_id
 
-                # Convert timestamps to timezone-aware
+                # Ensure timestamps are timezone-aware (localize if naive, otherwise keep as-is)
                 for col in ['entry_ts', 'exit_ts']:
                     if col in trades_to_insert.columns:
-                        trades_to_insert[col] = pd.to_datetime(trades_to_insert[col]).dt.tz_localize('UTC', ambiguous='NaT')
+                        ts_series = pd.to_datetime(trades_to_insert[col])
+                        # Only localize if not already tz-aware
+                        if ts_series.dt.tz is None:
+                            trades_to_insert[col] = ts_series.dt.tz_localize('UTC', ambiguous='NaT')
+                        else:
+                            trades_to_insert[col] = ts_series
 
                 trades_to_insert.to_sql(
                     'cmc_backtest_trades',
