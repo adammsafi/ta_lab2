@@ -31,20 +31,15 @@ def mock_orchestrator(mocker):
     Returns a MagicMock with AsyncMock for async methods.
     """
     from ta_lab2.tools.ai_orchestrator.execution import AsyncOrchestrator
-    from ta_lab2.tools.ai_orchestrator.core import Result, ResultStatus
 
     mock = mocker.MagicMock(spec=AsyncOrchestrator)
 
-    # Mock async execute_single
-    async def mock_execute():
-        return Result(
-            task_id="test_task",
-            status=ResultStatus.COMPLETED,
-            output="Test output",
-            error=None,
-        )
-
-    mock.execute_single = mocker.AsyncMock(return_value=mock_execute())
+    # Mock async execute_single with AsyncMock
+    mock.execute_single = mocker.AsyncMock(return_value=mocker.MagicMock(
+        output="Test output",
+        success=True,
+        error=None,
+    ))
 
     return mock
 
