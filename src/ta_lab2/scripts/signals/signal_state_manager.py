@@ -275,6 +275,10 @@ class SignalStateManager:
                 # Table doesn't exist yet
                 return {id_: None for id_ in ids}
 
+        # If state_df is empty, return None for all IDs
+        if state_df.empty:
+            return {id_: None for id_ in ids}
+
         result = {}
         for id_ in ids:
             id_state = state_df[state_df["id"] == id_]
