@@ -314,7 +314,6 @@ If you see "too many clients already" errors:
 
     p.add_argument("--no-update", action="store_true", help="Passes through to scripts that support it")
     p.add_argument("--full-refresh", action="store_true", help="For CAL runner: ignore state and run full/args.start")
-    p.add_argument("--quiet", action="store_true", help="Reduce output where supported")
     p.add_argument("--continue-on-error", action="store_true")
 
     # v2-specific knobs
