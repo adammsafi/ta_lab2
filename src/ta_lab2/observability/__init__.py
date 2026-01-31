@@ -6,7 +6,7 @@ Provides:
 - Metrics collection (counter, gauge, histogram)
 - Health checks (liveness, readiness, startup)
 - Workflow state tracking
-- Alert storage
+- Alert threshold checking and delivery
 
 Usage:
     from ta_lab2.observability import (
@@ -14,6 +14,7 @@ Usage:
         MetricsCollector,
         HealthChecker,
         WorkflowStateTracker,
+        AlertThresholdChecker,
         HealthStatus,
     )
 
@@ -43,10 +44,17 @@ Usage:
         workflow_type="ema_refresh"
     )
     tracker.transition(workflow_id, "running", "success")
+
+    # Alerts
+    checker = AlertThresholdChecker(engine)
+    alert = checker.check_integration_failure("component", "error message", 1)
+    if alert:
+        print(f"Alert: {alert.message}")
 """
 
 from __future__ import annotations
 
+from ta_lab2.observability.alerts import Alert, AlertSeverity, AlertThresholdChecker, AlertType, check_all_thresholds
 from ta_lab2.observability.health import HealthChecker, HealthStatus
 from ta_lab2.observability.metrics import Metric, MetricsCollector
 from ta_lab2.observability.storage import WorkflowStateTracker, ensure_observability_tables
@@ -67,4 +75,10 @@ __all__ = [
     # Storage
     "WorkflowStateTracker",
     "ensure_observability_tables",
+    # Alerts
+    "Alert",
+    "AlertType",
+    "AlertSeverity",
+    "AlertThresholdChecker",
+    "check_all_thresholds",
 ]
