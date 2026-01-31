@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2025-01-22)
 ## Current Position
 
 Phase: 9 of 10 (Integration & Observability)
-Plan: 3 of 6 (Observability Infrastructure Tests)
+Plan: 4 of 6 (Gap and Alignment Validation Tests)
 Status: In progress
-Last activity: 2026-01-31 - Completed 09-03-PLAN.md (Observability Infrastructure Tests)
+Last activity: 2026-01-30 - Completed 09-04-PLAN.md (Gap and Alignment Validation Tests)
 
-Progress: [█████████░] 88% (8.5/10 phases complete)
+Progress: [█████████░] 89% (8.67/10 phases complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 46 (across 8 complete phases + 3 in progress)
-- Average duration: 9 min
-- Total execution time: 8.9 hours
+- Total plans completed: 47 (across 8 complete phases + 4 in progress)
+- Average duration: 11 min
+- Total execution time: 11.3 hours
 
 **By Phase:**
 
@@ -35,7 +35,7 @@ Progress: [█████████░] 88% (8.5/10 phases complete)
 | 06-ta-lab2-time-model | 6 | 37 min | 6 min | ✓ Complete |
 | 07-ta_lab2-feature-pipeline | 7 | 45 min | 6 min | ✓ Complete |
 | 08-ta_lab2-signals | 6 | 49 min | 8 min | ✓ Complete |
-| 09-integration-observability | 3 | 71 min | 24 min | In progress (3/6) |
+| 09-integration-observability | 4 | 212 min | 53 min | In progress (4/6) |
 
 **Recent Trend:**
 - Last 5 phases: 34min (05), 37min (06), 45min (07), 49min (08), 5min (09 partial)
@@ -225,6 +225,10 @@ Recent decisions affecting current work:
 - **8-column workflow results** (09-03): Workflow state queries return 8-tuple (workflow_id, correlation_id, type, phase, status, created_at, updated_at, metadata)
 - **Boolean memory health check** (09-03): Memory service health_check() returns boolean, not dict, for consistent health probe interface
 - **Manual startup_complete flag** (09-03): HealthChecker.startup() returns status but doesn't set startup_complete property - caller must set explicitly
+- **Patch _get_dim for timeframe tests** (09-04): Mock _get_dim instead of database for cleaner timeframe testing without SQLAlchemy URL parsing
+- **pytest parametrize for timeframe coverage** (09-04): Single test function covers multiple timeframes (1D-365D) reducing duplication
+- **Separate validation test classes** (09-04): TestStandardTimeframes, TestCalendarTimeframes, TestTradingSessionAlignment improve test organization by validation dimension
+- **All validation tests use mocked_deps** (09-04): 49 validation tests run in CI/CD without infrastructure dependencies
 
 ### Pending Todos
 
@@ -236,10 +240,10 @@ None currently.
 
 ## Session Continuity
 
-Last session: 2026-01-31
-Stopped at: Completed 09-03-PLAN.md (Observability Infrastructure Tests) - Phase 9 plan 3/6 complete
+Last session: 2026-01-30
+Stopped at: Completed 09-04-PLAN.md (Gap and Alignment Validation Tests) - Phase 9 plan 4/6 complete
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-01-31 (Phase 9 IN PROGRESS: 3/6 plans complete - Observability infrastructure and tests complete, integration test framework established, 25 passing tests for tracing/metrics/health/workflow)*
+*Last updated: 2026-01-30 (Phase 9 IN PROGRESS: 4/6 plans complete - Comprehensive validation test suite with 49 mocked_deps tests for timeframe alignment, calendar boundaries, gap detection, and strict rowcount validation)*
