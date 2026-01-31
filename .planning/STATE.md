@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2025-01-22)
 ## Current Position
 
 Phase: 9 of 10 (Integration & Observability)
-Plan: 6 of 6 (Alert Thresholds and Delivery)
+Plan: 7 of 7 (E2E Workflow Integration)
 Status: Phase complete
-Last activity: 2026-01-31 - Completed 09-06-PLAN.md (Alert Thresholds and Delivery)
+Last activity: 2026-01-31 - Completed 09-07-PLAN.md (E2E Workflow Integration)
 
 Progress: [█████████░] 90% (9/10 phases complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 48 (across 9 complete phases)
+- Total plans completed: 49 (across 9 complete phases)
 - Average duration: 12 min
-- Total execution time: 12.0 hours
+- Total execution time: 12.1 hours
 
 **By Phase:**
 
@@ -35,11 +35,11 @@ Progress: [█████████░] 90% (9/10 phases complete)
 | 06-ta-lab2-time-model | 6 | 37 min | 6 min | ✓ Complete |
 | 07-ta_lab2-feature-pipeline | 7 | 45 min | 6 min | ✓ Complete |
 | 08-ta_lab2-signals | 6 | 49 min | 8 min | ✓ Complete |
-| 09-integration-observability | 6 | 255 min | 43 min | ✓ Complete |
+| 09-integration-observability | 7 | 260 min | 37 min | ✓ Complete |
 
 **Recent Trend:**
-- Last 5 phases: 37min (06), 45min (07), 49min (08), 255min (09), ?min (10)
-- Trend: Phase 09 comprehensive testing infrastructure (6 plans)
+- Last 5 phases: 37min (06), 45min (07), 49min (08), 260min (09), ?min (10)
+- Trend: Phase 09 comprehensive testing infrastructure (7 plans)
 
 *Updated after each plan completion*
 
@@ -233,6 +233,8 @@ Recent decisions affecting current work:
 - **Strict data quality thresholds (0% tolerance)** (09-06): Gap/alignment/rowcount thresholds set to 0 for strict validation - any missing row is a real issue for crypto 24/7 data
 - **Dual delivery pattern for alerts** (09-06): Telegram for immediate notification + database for historical tracking, both attempted on every alert with graceful degradation
 - **Severity escalation rules** (09-06): Integration failures CRITICAL after >3 errors, resource exhaustion CRITICAL at ≥95%, data quality CRITICAL with >10 issues
+- **E2E tests organized by tier** (09-07): TestE2EWorkflowMocked, TestE2EWorkflowVariants, TestE2EObservability for flexible infrastructure requirements
+- **Observability module exports** (09-07): All observability components (tracing, metrics, health, storage, alerts) exportable from single ta_lab2.observability import
 
 ### Pending Todos
 
@@ -245,9 +247,9 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Completed 09-06-PLAN.md (Alert Thresholds and Delivery) - Phase 9 complete (6/6 plans)
+Stopped at: Completed 09-07-PLAN.md (E2E Workflow Integration) - Phase 9 complete (7/7 plans)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-01-31 (Phase 9 COMPLETE: Alert infrastructure with 4 threshold types, dual delivery (Telegram + database), strict 0% data quality thresholds, 11 mocked_deps tests - Integration & Observability phase complete)*
+*Last updated: 2026-01-31 (Phase 9 COMPLETE: E2E workflow tests validate orchestrator → memory → ta_lab2 integration, 9 new tests (39 total integration mocked_deps tests), observability module complete - Integration & Observability phase complete)*
