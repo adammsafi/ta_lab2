@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2025-01-22)
 
 ## Current Position
 
-Phase: 9 of 10 (Integration & Observability)
-Plan: 7 of 7 (E2E Workflow Integration)
-Status: Phase complete
-Last activity: 2026-01-31 - Completed 09-07-PLAN.md (E2E Workflow Integration)
+Phase: 10 of 10 (Release Validation)
+Plan: 1 of 7 (CI Validation Infrastructure)
+Status: In progress
+Last activity: 2026-02-01 - Completed 10-01-PLAN.md (CI Validation Infrastructure)
 
-Progress: [█████████░] 90% (9/10 phases complete)
+Progress: [█████████░] 90% (50/57 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 49 (across 9 complete phases)
+- Total plans completed: 50 (across 9 complete phases + 1 in progress)
 - Average duration: 12 min
-- Total execution time: 12.1 hours
+- Total execution time: 12.15 hours
 
 **By Phase:**
 
@@ -36,10 +36,11 @@ Progress: [█████████░] 90% (9/10 phases complete)
 | 07-ta_lab2-feature-pipeline | 7 | 45 min | 6 min | ✓ Complete |
 | 08-ta_lab2-signals | 6 | 49 min | 8 min | ✓ Complete |
 | 09-integration-observability | 7 | 260 min | 37 min | ✓ Complete |
+| 10-release-validation | 1 | 3 min | 3 min | In progress |
 
 **Recent Trend:**
-- Last 5 phases: 37min (06), 45min (07), 49min (08), 260min (09), ?min (10)
-- Trend: Phase 09 comprehensive testing infrastructure (7 plans)
+- Last 5 phases: 45min (07), 49min (08), 260min (09), 3min (10-01), ?min (10)
+- Trend: Phase 10 starting with quick infrastructure setup
 
 *Updated after each plan completion*
 
@@ -235,6 +236,10 @@ Recent decisions affecting current work:
 - **Severity escalation rules** (09-06): Integration failures CRITICAL after >3 errors, resource exhaustion CRITICAL at ≥95%, data quality CRITICAL with >10 issues
 - **E2E tests organized by tier** (09-07): TestE2EWorkflowMocked, TestE2EWorkflowVariants, TestE2EObservability for flexible infrastructure requirements
 - **Observability module exports** (09-07): All observability components (tracing, metrics, health, storage, alerts) exportable from single ta_lab2.observability import
+- **PostgreSQL 16 service container for CI validation** (10-01): No mock mode for validation gates - all three validation types require real database per CONTEXT.md
+- **Coverage threshold 70%** (10-01): Fail build if coverage drops below 70%, balances quality bar with pragmatic testing for v0.4.0 release
+- **Session-scoped db_engine, function-scoped db_session** (10-01): db_engine created once per test session for efficiency, db_session with transaction rollback for test isolation
+- **ensure_schema fixture for automatic setup** (10-01): Checks for dim_timeframe/dim_sessions tables, calls ensure_dim_tables if missing for reduced test setup friction
 
 ### Pending Todos
 
@@ -246,10 +251,10 @@ None currently.
 
 ## Session Continuity
 
-Last session: 2026-01-31
-Stopped at: Completed 09-07-PLAN.md (E2E Workflow Integration) - Phase 9 complete (7/7 plans)
+Last session: 2026-02-01
+Stopped at: Completed 10-01-PLAN.md (CI Validation Infrastructure) - Phase 10 plan 1/7
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-01-31 (Phase 9 COMPLETE: E2E workflow tests validate orchestrator → memory → ta_lab2 integration, 9 new tests (39 total integration mocked_deps tests), observability module complete - Integration & Observability phase complete)*
+*Last updated: 2026-02-01 (Phase 10 IN PROGRESS: CI validation infrastructure complete - GitHub Actions workflow with PostgreSQL service, database fixtures for validation tests, coverage configuration (70% threshold) - ready for validation test implementation)*
