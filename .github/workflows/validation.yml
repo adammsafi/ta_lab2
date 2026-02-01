@@ -1,0 +1,70 @@
+name: Validation Gates
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  validation:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ta_lab2_validation
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[orchestrator,dev]" pytest-cov pytest-json-report
+
+      - name: Create reports directory
+        run: mkdir -p reports
+
+      - name: Run validation tests
+        env:
+          TARGET_DB_URL: postgresql://postgres:postgres@localhost:5432/ta_lab2_validation
+        run: |
+          pytest tests/validation/ \
+            --maxfail=1 \
+            -v \
+            --cov=src/ta_lab2 \
+            --cov-report=json:reports/coverage.json \
+            --cov-report=markdown:reports/coverage.md \
+            --cov-fail-under=70 \
+            --json-report \
+            --json-report-file=reports/validation.json
+
+      - name: Upload coverage and validation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-reports
+          path: |
+            reports/coverage.json
+            reports/coverage.md
+            reports/validation.json
