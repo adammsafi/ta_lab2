@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ta_lab2"
-version = "0.3.1"
+version = "0.4.0"
 description = "Technical analysis & regime-detection toolkit"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -61,7 +61,13 @@ orchestrator = [
   "python-dotenv>=1.0.0",
 ]
 
-# Combined group for development + orchestrator
+# Documentation generation
+docs = [
+  "mkdocs-material>=9.0",
+  "mkdocstrings[python]>=1.0",
+]
+
+# Combined group for development + orchestrator + docs
 all = [
   "pytest>=8.0",
   "pytest-asyncio>=0.21.0",
@@ -78,6 +84,8 @@ all = [
   "fastapi>=0.104.0",
   "pydantic>=2.0.0",
   "python-dotenv>=1.0.0",
+  "mkdocs-material>=9.0",
+  "mkdocstrings[python]>=1.0",
 ]
 
 # ---------- Pytest configuration ----------
