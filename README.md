@@ -1,208 +1,457 @@
-# ta_lab2 — Multi-timescale Technical Analysis Lab
+# ta_lab2 v0.4.0
 
-A small, modular package for:
+Multi-timescale Technical Analysis Lab with AI Orchestration
 
-- Resampling OHLCV into flexible bins (days, weeks, months, quarters, years, seasons, and n-sized variants)
-- Computing features (calendar metadata, EMAs and derivatives, returns, volatility estimators)
-- Building regimes / segments and comparing behavior across timeframes
-- Producing simple “policy” objects that can guide sizing and risk for strategies
-
-> **Status:** Early preview. Expect breaking changes and sharp edges.
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
 ---
 
-## Project layout
+## Quick Start
 
-High level structure (conceptual):
-
-- `src/ta_lab2/`
-  - `io.py` – load/save helpers, partition helpers
-  - `resample.py` – calendar and seasonal binning
-  - `features/` – calendar (exact seasons, lunar calendar), EMA, returns, volatility, and related utilities
-  - `regimes/` – regime / segment labeling utilities and helpers to plug in your own logic  
-    - `feature_utils.py` – helpers to ensure required regime features exist
-  - `signals/` – signal definitions and registry (for example RSI/EMA-style strategies)
-  - `compare.py` – helpers to run the same pipeline on multiple timeframes and compare
-  - `cli.py` – command line entry point (multi-command CLI)
-- `tests/` – pytest suite, including lightweight smoke tests
-- `.github/` – CI, issue templates, PR templates, CODEOWNERS, etc.
-
-Over time this will grow into a more opinionated stack around BTC and related assets; the core is intentionally modular.
-
----
-
-## Installation
-
-From a clone of the repo:
+### Installation
 
 ```bash
-git clone https://github.com/<your-username>/ta_lab2.git
+git clone https://github.com/your-username/ta_lab2.git
 cd ta_lab2
-
-# Create and activate a virtualenv however you prefer, then:
-pip install --upgrade pip
-pip install -e .
+pip install -e ".[orchestrator]"
 ```
 
-For development, you will also want pytest:
+For development with AI orchestration features, install the optional `orchestrator` dependency group which includes OpenAI, Anthropic, and Google AI SDKs.
+
+### Basic Usage
 
 ```bash
-pip install pytest
+# Set database URL
+export TARGET_DB_URL="postgresql://user:pass@localhost:5432/ta_lab2"
+
+# Windows (PowerShell)
+$env:TARGET_DB_URL="postgresql://user:pass@localhost:5432/ta_lab2"
+
+# Initialize time model (dim_timeframe and dim_sessions)
+python -m ta_lab2.scripts.time.ensure_dim_tables
+
+# Run feature pipeline
+python -m ta_lab2.scripts.features.ta_feature refresh --all
+
+# Generate trading signals
+python -m ta_lab2.scripts.signals.run_all_signal_refreshes
+
+# Run backtest
+python -m ta_lab2.scripts.signals.run_backtest --signal-type ema_crossover
 ```
+
+For detailed setup instructions, see [ops/deployment.md](docs/ops/) and [Time Model Documentation](docs/time/time_model_overview.md).
 
 ---
 
-## Environment / configuration
+## Overview
 
-If you are using a Postgres database for data (CoinMarketCap, FRED, etc.), configure the database URL via an environment variable:
+**ta_lab2** is a production-ready technical analysis and quantitative trading infrastructure designed for multi-timescale feature engineering, signal generation, and backtesting. The v0.4.0 release introduces AI orchestration capabilities with persistent memory, cost-optimized routing across multiple LLM providers, and comprehensive observability.
 
-```bash
-export TA_LAB2_DB_URL="postgresql://user:pass@localhost:5432/ta_lab2"
-```
+**Key Capabilities:**
+- Multi-timeframe EMA calculations (daily, calendar, trading-day aligned) across 199 timeframes
+- Feature pipeline for returns, volatility estimators, and technical indicators (RSI, MACD, Bollinger Bands, ATR, ADX)
+- Trading signal generation (EMA crossovers, RSI mean reversion, ATR breakouts) with database-driven configuration
+- Vectorbt-based backtesting with reproducibility validation and performance metrics
+- AI memory system with 3,763+ memories for context persistence across sessions
+- Multi-platform AI orchestrator with cost-optimized routing (Gemini free tier → subscriptions → paid APIs)
+- PostgreSQL-backed observability (metrics, tracing, health checks, alerts)
 
-On Windows (PowerShell):
-
-```powershell
-$env:TA_LAB2_DB_URL="postgresql://user:pass@localhost:5432/ta_lab2"
-```
-
-Many scripts and pipelines will fall back gracefully if this is not set, but anything that needs DB access will expect it.
+For architectural details and system design, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ---
 
-## Quickstart
+## Components
 
-This is intentionally minimal. The idea is:
+<details>
+<summary><strong>Time Model</strong> (dim_timeframe, dim_sessions)</summary>
 
-1. Load time series data into a DataFrame (for example BTC daily and weekly bars).
-2. Ensure the required features for regimes exist.
-3. Assess how much data you have at each timeframe.
-4. Label regimes at each layer.
-5. Resolve a “policy” object that can guide position sizing and risk.
+The time model provides unified timeframe definitions and trading session calendars for consistent multi-timeframe analysis.
 
-### Example: regime policy from weekly + daily data
+**Features:**
+- 199 timeframes in `dim_timeframe` (1D to 365D, including calendar and trading-day variants)
+- CRYPTO (24/7) and EQUITY (trading days only) sessions in `dim_sessions`
+- Calendar vs trading-day alignment for accurate feature calculations
+- Watermarking and state management for incremental refresh
 
+**Tables:**
+- `dim_timeframe`: Canonical timeframe definitions with metadata (tf_days, is_calendar, anchor_hour, etc.)
+- `dim_sessions`: Trading session schedules per asset class (CRYPTO, EQUITY)
+
+**Usage:**
+```bash
+# Initialize time model tables
+python -m ta_lab2.scripts.time.ensure_dim_tables
+
+# View timeframes
+SELECT * FROM dim_timeframe ORDER BY tf_days;
+
+# View sessions
+SELECT * FROM dim_sessions;
+```
+
+See [Time Model Documentation](docs/time/time_model_overview.md) for details.
+
+</details>
+
+<details>
+<summary><strong>Feature Pipeline</strong> (EMAs, returns, volatility, technical indicators)</summary>
+
+Multi-stage feature calculation pipeline for technical analysis across multiple timeframes.
+
+**Feature Types:**
+- **EMAs**: Multi-timeframe exponential moving averages (daily, calendar, trading-day aligned)
+  - Tables: `cmc_ema_daily`, `cmc_ema_multi_tf`, `cmc_ema_multi_tf_cal`, `cmc_ema_multi_tf_v2`, `cmc_ema_multi_tf_cal_anchor`
+  - Unified view: `all_emas` (logical union of all EMA tables)
+  - Periods: 5, 9, 10, 21, 50, 100, 200
+- **Returns**: Bar-to-bar and multi-day percentage/log returns
+  - Table: `cmc_returns_daily`
+  - Lookbacks: 1D, 2D, 3D, 5D, 7D, 14D, 21D, 30D, 60D, 90D, 180D, 365D
+- **Volatility**: Parkinson, Garman-Klass, Rogers-Satchell estimators
+  - Table: `cmc_vol_daily`
+- **Technical Indicators**: RSI (7, 14, 21), MACD (12/26/9, 8/17/9), Stochastic (14/3), Bollinger Bands (20/2), ATR (14), ADX (14)
+  - Table: `cmc_daily_features` (materialized feature store with all indicators)
+
+**Pipeline Execution:**
+```bash
+# Refresh all features (parallel execution)
+python -m ta_lab2.scripts.pipeline.run_go_forward_daily_refresh
+
+# Refresh individual feature types
+python -m ta_lab2.scripts.emas.refresh_cmc_emas --ids all
+python -m ta_lab2.scripts.features.returns_feature refresh --all
+python -m ta_lab2.scripts.features.volatility_feature refresh --all
+python -m ta_lab2.scripts.features.ta_feature refresh --all
+
+# Refresh materialized feature store
+python -m ta_lab2.scripts.features.daily_features_refresh
+```
+
+**State Management:**
+- State tables track watermarks per (id, feature_type, feature_name) for incremental refresh
+- Null handling strategies: skip (returns), forward_fill (volatility), interpolate (TA indicators)
+- Outlier detection: Z-score (4 sigma) and IQR (1.5x) methods with `is_outlier` flag
+
+See [EMA State Standardization](docs/EMA_STATE_STANDARDIZATION.md) for implementation details.
+
+</details>
+
+<details>
+<summary><strong>Signal System</strong> (crossovers, reversions, breakouts)</summary>
+
+Database-driven trading signal generation with position lifecycle tracking and feature hashing for reproducibility.
+
+**Signal Types:**
+- **EMA Crossover**: Fast/slow EMA crossover signals (9/21, 21/50, 50/200)
+  - Table: `cmc_signals_ema_crossover`
+  - Direction: LONG (fast > slow), SHORT (fast < slow)
+- **RSI Mean Reversion**: Oversold/overbought RSI signals
+  - Table: `cmc_signals_rsi_mean_revert`
+  - Thresholds: Oversold (<30), Overbought (>70)
+- **ATR Breakout**: Donchian channel + ATR expansion breakouts
+  - Table: `cmc_signals_atr_breakout`
+  - Types: channel_break, atr_expansion, or both
+
+**Configuration:**
+- `dim_signals`: Database-driven signal configuration with JSONB params
+- No code changes needed to add new signal parameter sets
+- Example: Add new RSI period via INSERT into dim_signals
+
+**Position Tracking:**
+- `SignalStateManager`: Tracks open positions and dirty windows per (id, signal_type, signal_id)
+- Feature snapshot at entry (close, EMAs, RSI, ATR) for backtest self-containment
+- FIFO position matching for exit signals
+
+**Reproducibility:**
+- SHA256 feature hashing (first 16 chars) for deterministic backtest validation
+- Feature version hash computed from explicit column order
+- Hash mismatch detection prevents stale backtest comparisons
+
+**Usage:**
+```bash
+# Generate all signals
+python -m ta_lab2.scripts.signals.run_all_signal_refreshes
+
+# Generate specific signal type
+python -m ta_lab2.scripts.signals.ema_crossover_refresh
+python -m ta_lab2.scripts.signals.rsi_mean_revert_refresh
+python -m ta_lab2.scripts.signals.atr_breakout_refresh
+```
+
+</details>
+
+<details>
+<summary><strong>Memory System</strong> (Mem0 + Qdrant)</summary>
+
+AI context persistence with semantic search, conflict detection, and health monitoring.
+
+**Architecture:**
+- **Mem0**: Logic layer for memory operations (add, search, update, delete)
+- **Qdrant**: Vector database backend (localhost:6333 in server mode)
+- **OpenAI text-embedding-3-small**: 1536-dimensional embeddings for consistency
+- **REST API**: FastAPI endpoints for cross-platform access (`/api/v1/memory/*`)
+
+**Features:**
+- 3,763+ memories in vector store with semantic search
+- Similarity threshold: 0.7 for relevance filtering
+- LLM-powered conflict detection (GPT-4o-mini) with 26% accuracy improvement over rules
+- Metadata scoping for context-dependent truths (e.g., asset_class)
+- Staleness tracking: 90-day threshold with `last_verified` refresh pattern
+- JSONL audit log for conflict resolution history
+
+**Health Monitoring:**
+- `/api/v1/memory/health`: Overall health status with nested component checks
+- `/api/v1/memory/health/stale`: List memories not verified in 90+ days
+- Age distribution buckets: 0-30d, 30-60d, 60-90d, 90+d
+
+**Usage:**
+```bash
+# Start Qdrant server (required)
+docker run -d -p 6333:6333 -v qdrant_data:/qdrant/storage qdrant/qdrant
+
+# Set environment variables
+export QDRANT_SERVER_MODE=true
+export OPENAI_API_KEY="sk-..."
+
+# Query memory API
+curl http://localhost:8000/api/v1/memory/health
+curl http://localhost:8000/api/v1/memory/search?query="EMA calculation"
+```
+
+**Python API:**
 ```python
-import pandas as pd
+from ta_lab2.tools.ai_orchestrator.memory import MemoryService
 
-from ta_lab2.regimes import (
-    assess_data_budget,
-    label_layer_monthly,
-    label_layer_weekly,
-    label_layer_daily,
-    label_layer_intraday,
-    resolve_policy,
-)
-from ta_lab2.regimes.feature_utils import ensure_regime_features
-
-# Suppose df_w and df_d are your weekly and daily OHLCV DataFrames
-# with at least: index as Timestamp, columns: ["open", "high", "low", "close", "volume"]
-
-df_w = ensure_regime_features(df_w, tf="W")
-df_d = ensure_regime_features(df_d, tf="D")
-
-ctx = assess_data_budget(weekly=df_w, daily=df_d)
-
-L1 = label_layer_weekly(df_w, mode=ctx.feature_tier).iloc[-1] if ctx.enabled_layers["L1"] else None
-L2 = label_layer_daily(df_d,  mode=ctx.feature_tier).iloc[-1] if ctx.enabled_layers["L2"] else None
-
-policy = resolve_policy(L1=L1, L2=L2)
-
-print("Size multiplier:", policy.size_mult)
-print("Stop multiplier:", policy.stop_mult)
-print("Allowed orders:", policy.orders)
-print("Setups:", policy.setups)
-print("Gross cap:", policy.gross_cap)
-print("Pyramids:", policy.pyramids)
+memory = MemoryService()
+memory.add("Multi-timeframe EMAs use dim_timeframe for alignment", metadata={"component": "features"})
+results = memory.search("How are EMAs calculated?", limit=5)
 ```
 
-The `policy` object is meant to be a thin adapter between the regime stack and whatever execution / backtest engine you use.
+</details>
 
----
+<details>
+<summary><strong>Orchestrator</strong> (Claude, ChatGPT, Gemini)</summary>
 
-## CLI usage
+Multi-platform AI coordination with cost-optimized routing, parallel execution, and AI-to-AI handoffs.
 
-There is a small CLI focused on repeatable pipelines and inspection.
+**Platform Adapters:**
+- **ClaudeAdapter**: Anthropic Claude (gpt-4-class reasoning)
+- **ChatGPTAdapter**: OpenAI GPT-4o-mini (default for cost efficiency: $0.15/$0.60 per 1M tokens)
+- **GeminiAdapter**: Google Gemini (free tier: 1500 requests/day)
 
-From the repo root:
+**Cost-Optimized Routing:**
+1. Gemini free tier (priority=1, lowest cost)
+2. Subscriptions (priority=2, ChatGPT Plus, Claude Pro)
+3. Paid APIs (priority=3, OpenAI/Anthropic pay-as-you-go)
+4. RuntimeError on exhaustion with clear error message
 
+**Features:**
+- **Parallel Execution**: TaskGroup (Python 3.11+) with semaphore-based concurrency control (default: 10 concurrent tasks)
+- **Quota Management**: Request-based tracking with 50%/80%/90% alert thresholds
+- **AI-to-AI Handoffs**: Hybrid (pointer + summary) pattern for context sharing via memory
+- **Retry Logic**: Exponential backoff (1s → 32s) with 3s jitter, 5 attempts for rate limits/timeouts
+- **Platform Fallback**: Automatic fallback to next platform on failure with full retry cycle
+
+**Handoff Pattern:**
+- Full context stored in memory with unique ID
+- Brief summary (max 500 chars) passed inline for quick reference
+- Fail-fast memory lookup: RuntimeError if context not found
+
+**Usage:**
 ```bash
-python -m ta_lab2.cli --help
+# Run single task
+python -m ta_lab2.tools.ai_orchestrator.cli task "Explain EMA calculation" --platform gemini
+
+# Run batch with parallel execution
+python -m ta_lab2.tools.ai_orchestrator.cli batch tasks.json --parallel 5
+
+# Check quota status
+python -m ta_lab2.tools.ai_orchestrator.cli quota status
+
+# View cost tracker
+python -m ta_lab2.tools.ai_orchestrator.cli cost report
 ```
 
-Example subcommands you might expose (names may evolve):
+**Python API:**
+```python
+from ta_lab2.tools.ai_orchestrator import Orchestrator, Platform, Task
 
+orchestrator = Orchestrator()
+task = Task(prompt="Summarize backtest results", platform_hint=Platform.GEMINI)
+result = await orchestrator.execute_task(task)
+```
+
+</details>
+
+<details>
+<summary><strong>Observability</strong> (metrics, tracing, health checks, alerts)</summary>
+
+PostgreSQL-backed production monitoring with correlation ID tracing and alert delivery.
+
+**Metrics Storage:**
+- Table: `observability.metrics` (month-partitioned by `recorded_at`)
+- Dimensions: component, metric_name, value, tags (JSONB)
+- Queryable via SQL for custom dashboards and analysis
+
+**Tracing:**
+- 32-char hex correlation IDs for cross-system request tracing
+- OpenTelemetry trace context when available, UUID fallback
+- Propagated through headers and logs for end-to-end visibility
+
+**Health Checks:**
+- **Kubernetes probe pattern**: Separate liveness, readiness, startup endpoints
+- **Liveness**: Process alive (always returns 200 after startup)
+- **Readiness**: Dependencies healthy (database, memory service, external APIs)
+- **Startup**: Initialization complete (dim_timeframe/dim_sessions exist)
+- **Nested details**: `details['checks']['database']` for organized component status
+
+**Alert Thresholds:**
+- **Baseline + percentage approach**: p50 from last 7 days, trigger when current >2x baseline
+- **Strict data quality**: 0% tolerance for gaps/alignment/rowcount issues (crypto 24/7 data)
+- **Severity escalation**: Integration failures CRITICAL after >3 errors, resource exhaustion CRITICAL at ≥95%
+- **Dual delivery**: Telegram for immediate notification + database for historical tracking
+
+**Usage:**
 ```bash
-# Run a data or feature pipeline over a given asset / timeframe
-python -m ta_lab2.cli pipeline --asset BTC --tf D --start 2017-01-01
+# Check health
+curl http://localhost:8000/health/liveness
+curl http://localhost:8000/health/readiness
+curl http://localhost:8000/health/startup
 
-# Inspect current regime labels or policies for a given dataset
-python -m ta_lab2.cli regime-inspect --asset BTC --tf D --limit 100
+# Query metrics
+SELECT * FROM observability.metrics
+WHERE component = 'feature_pipeline'
+  AND recorded_at > NOW() - INTERVAL '1 day'
+ORDER BY recorded_at DESC;
+
+# View workflow traces
+SELECT * FROM observability.workflow_state
+WHERE correlation_id = 'abc123...'
+ORDER BY created_at;
 ```
 
-If you add a console script entry point in `pyproject.toml`, you can instead run:
+**Python API:**
+```python
+from ta_lab2.observability import MetricsCollector, HealthChecker, record_trace
 
-```bash
-ta-lab2 pipeline ...
-ta-lab2 regime-inspect ...
+# Record metrics
+metrics = MetricsCollector()
+metrics.record("feature_refresh_duration", 45.2, tags={"feature": "ema"})
+
+# Health checks
+health = HealthChecker()
+status = health.readiness()  # Returns HealthStatus with nested details
+
+# Tracing
+@record_trace("ema_calculation")
+async def calculate_emas(ids):
+    # Automatically records correlation_id, duration, errors
+    pass
 ```
 
-For now, the CLI is mainly for personal workflows and is not considered stable.
+</details>
 
 ---
 
 ## Development
 
-### Running tests
-
-From the repo root:
+### Running Tests
 
 ```bash
+# Run all tests
 pytest
+
+# Run with coverage
+pytest --cov=ta_lab2 --cov-report=html
+
+# Run specific test tiers
+pytest -m mocked_deps       # Unit tests (no infrastructure)
+pytest -m mixed_deps        # Integration tests (real DB, mocked AI)
+pytest -m real_deps         # E2E tests (full infrastructure)
+
+# Run validation tests (requires database)
+pytest -m validation
 ```
 
-If you have smoke tests marked with `@pytest.mark.smoke`, you can run a fast subset:
+**Test Tiers:**
+- `mocked_deps`: Unit tests with all dependencies mocked (fast, CI-friendly)
+- `mixed_deps`: Real database + mocked AI adapters (for database logic testing)
+- `real_deps`: Full infrastructure including Qdrant, LLM APIs (for E2E validation)
+
+**Coverage Threshold:** 70% minimum (enforced in CI)
+
+### Code Quality
 
 ```bash
-pytest -m "smoke" -q
+# Format code
+black src/ tests/
+
+# Lint
+ruff check src/ tests/
+
+# Type checking
+mypy src/
 ```
 
-Try to keep smoke tests lightweight and representative; CI is usually configured to run them first.
+### Database Migrations
 
-### Style and design
+```bash
+# Create new migration
+alembic revision -m "Add new feature table"
 
-There is no strict formatter requirement yet. General preferences:
+# Apply migrations
+alembic upgrade head
 
-- Small, composable functions.
-- Indicator and feature logic as pure as possible (minimal side effects).
-- Explicit timeframe names (`tf="D"`, `"W"`, `"H1"`, etc.).
-- Avoid baking exchange-specific assumptions into core features or regimes.
+# View migration history
+alembic history
+```
 
 ---
 
 ## Contributing
 
-This project is primarily a personal research lab, but contributions, issue reports, and design discussion are welcome.
+This project welcomes contributions for bug fixes, feature enhancements, and documentation improvements.
 
-- See `CONTRIBUTING.md` for:
-  - Branch and commit style
-  - How to propose and structure changes
-  - How to run tests and CLI commands before opening a PR
-- Use the GitHub issue templates:
-  - **Bug report** – for broken behavior or unclear errors
-  - **Feature request** – for new signals, regimes, CLI enhancements, or data utilities
+**Guidelines:**
+- Follow existing code patterns and naming conventions
+- Add tests for new features (aim for 70%+ coverage)
+- Update documentation (docstrings, README, ARCHITECTURE) for significant changes
+- Use conventional commit format: `type(scope): description`
+  - Types: `feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `style`, `chore`
+  - Scopes: component names (e.g., `ema`, `signals`, `orchestrator`, `memory`)
 
-Keep issues focused and small when possible. Larger design questions are better captured as “meta” issues or GitHub Discussions.
+**Branch Strategy:**
+- `main`: Stable releases (protected, requires PR + CI green)
+- `feature/*`: New features
+- `fix/*`: Bug fixes
+- `docs/*`: Documentation updates
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed contribution guidelines.
 
 ---
 
 ## Security
 
-If you believe you have found a security issue (for example around credential handling, database connections, or deployment configs), do not open a public GitHub issue.
+If you discover a security issue (credential handling, database access, API key exposure), do not open a public GitHub issue.
 
-Instead, follow the process in `SECURITY.md` to report it privately.
+Follow the process in [SECURITY.md](SECURITY.md) to report it privately.
 
-Never commit secrets, private keys, or real API tokens. Use `.env` files and environment variables, and make sure `.gitignore` excludes them.
+**Security Best Practices:**
+- Never commit secrets, API keys, or database credentials
+- Use `.env` files for sensitive configuration (ensure `.gitignore` excludes them)
+- Rotate API keys regularly
+- Use read-only database users where possible
+- Enable SSL/TLS for database connections in production
+
+---
+
+## Links
+
+- [Architecture Documentation](ARCHITECTURE.md) - System design and implementation details
+- [EMA State Standardization](docs/EMA_STATE_STANDARDIZATION.md) - EMA calculation and state management
+- [Time Model Overview](docs/time/time_model_overview.md) - Timeframe and session definitions
+- [Operations Guide](docs/ops/) - Deployment and infrastructure setup
+- [QA Documentation](docs/qa/) - Testing and validation procedures
 
 ---
 
@@ -212,100 +461,15 @@ TBD. Until an explicit license is added, treat this as **source-available for pe
 
 If you want to use this in a commercial setting, reach out first so terms can be clarified once the project is more mature.
 
-```perl
- ​:contentReference[oaicite:0]{index=0}​
-```
+---
 
-### EMA views
+## Changelog
 
-These views standardize all EMA calculations and make them easier to join to prices and use in analysis.
+See [CHANGELOG.md](CHANGELOG.md) for release history and upgrade notes.
 
-#### `all_emas`
-
-Logical union of all EMA tables:
-
-- `cmc_ema_daily`
-- `cmc_ema_multi_tf`
-- `cmc_ema_multi_tf_cal`
-
-Schema (simplified):
-
-- `id` – asset id (matches `cmc_price_histories7.id`)
-- `ts` – bar timestamp (daily close)
-- `tf` – timeframe label, for example `1D`, `2D`, `1W`, `1M`
-- `tf_days` – timeframe length in days, for example `1`, `2`, `7`, `30`
-- `period` – EMA span in bars for that timeframe
-- `ema` – EMA value
-- `d1`, `d2` – one step and two step EMA deltas in EMA space
-- `d1_close`, `d2_close` – one step and two step deltas in close-price space
-- `roll` – `true` on canonical bars for that timeframe, `false` on preview / in-between bars
-
-Use this view when you want to work directly with EMAs and their slopes across any timeframe, without caring which base table they came from.
-
-Example:
-
-```sql
-SELECT *
-FROM all_emas
-WHERE id = 1
-  AND tf = '1W'
-  AND period = 21
-ORDER BY ts;
-```
-
-#### `cmc_price_with_emas`
-
-Daily OHLCV joined to a single EMA layer from `all_emas`.
-
-Key points:
-
-- One row per `(id, ts)` daily bar from `cmc_price_histories7`
-- Includes price columns plus a selected EMA configuration
-- Designed for charting, simple indicators, and single-timeframe backtests
-
-Typical usage is to point charting tools or quick analyses at this view instead of hand-writing joins.
-
-Example:
-
-```sql
-SELECT id, ts, close, ema
-FROM cmc_price_with_emas
-WHERE id = 1
-ORDER BY ts;
-```
-
-#### `cmc_price_with_emas_d1d2`
-
-Same as `cmc_price_with_emas`, plus the slope and delta fields from `all_emas`:
-
-- `d1`, `d2`
-- `d1_close`, `d2_close`
-- `roll`
-
-Use this view when you need price plus EMA shape information in one place, for example:
-
-- building regime labels based on EMA slope
-- testing rules that depend on `roll` or multi-step EMA moves
-- feeding signals into backtests that care about both price and EMA dynamics
-
-Example:
-
-```sql
-SELECT id, ts, close, ema, d1, d2, roll
-FROM cmc_price_with_emas_d1d2
-WHERE id = 1
-ORDER BY ts;
-```
-## Refreshing EMAs (daily + multi-timeframe)
-
-# Daily only
-python -m ta_lab2.scripts.emas.refresh_cmc_ema_daily_only --ids all
-
-# Multi-TF (trading-aligned)
-python -m ta_lab2.scripts.emas.refresh_cmc_ema_multi_tf_only --ids all
-
-# Multi-TF (calendar-aligned)
-python -m ta_lab2.scripts.emas.refresh_cmc_ema_multi_tf_cal_only --ids all
-
-# Or full stack
-python -m ta_lab2.scripts.emas.refresh_cmc_emas --ids all
+**Latest Release:** v0.4.0 (2026-02-01)
+- AI orchestration with Mem0 + Qdrant memory system
+- Multi-platform LLM coordination (Claude, ChatGPT, Gemini)
+- Trading signal system with reproducibility validation
+- PostgreSQL-backed observability and health monitoring
+- Comprehensive validation tests (70+ tests for time alignment, data consistency, backtest reproducibility)
