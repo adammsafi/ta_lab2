@@ -1,0 +1,64 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install documentation dependencies
+        run: |
+          pip install mkdocs-material "mkdocstrings[python]"
+
+      - name: Build documentation bundle
+        run: |
+          # Create docs/index.md from README if not exists
+          if [ ! -f docs/index.md ]; then
+            cp README.md docs/index.md
+          fi
+          # Copy root docs to docs/ for MkDocs
+          cp CHANGELOG.md docs/ 2>/dev/null || true
+          cp ARCHITECTURE.md docs/ 2>/dev/null || true
+          # Build site
+          mkdocs build
+          # Create zip bundle
+          cd site && zip -r ../ta_lab2-docs-${{ github.ref_name }}.zip . && cd ..
+
+      - name: Extract release notes from CHANGELOG
+        id: notes
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          # Extract section for this version
+          sed -n "/## \[${VERSION}\]/,/## \[/p" CHANGELOG.md | sed '$d' > release-notes.md
+          # If empty, use default message
+          if [ ! -s release-notes.md ]; then
+            echo "## ta_lab2 ${{ github.ref_name }}" > release-notes.md
+            echo "" >> release-notes.md
+            echo "See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details." >> release-notes.md
+          fi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: release-notes.md
+          files: |
+            ta_lab2-docs-${{ github.ref_name }}.zip
+          fail_on_unmatched_files: true
+          draft: false
+          prerelease: false
+          generate_release_notes: false
