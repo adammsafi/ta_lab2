@@ -1,169 +1,77 @@
-# Requirements: ta_lab2 AI-Accelerated Quant Platform
+# ta_lab2 v1 Requirements Validation
 
-**Defined:** 2025-01-22
-**Core Value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
+**Version:** 0.4.0
+**Validated:** 2026-02-01
 
-## v1 Requirements
+## Summary
 
-Target: 6 weeks (12-week plan accelerated through AI orchestration)
+- **Total Requirements:** 42
+- **Complete:** 42
+- **Pending:** 0
+- **Coverage:** 100%
 
-### Memory Infrastructure
+## Orchestrator Requirements (ORCH-01 to ORCH-12)
 
-**Phase 2 (ChromaDB Integration):**
-- [ ] **MEMO-01**: Integrate existing ChromaDB memory store (3,763 memories already embedded)
-- [ ] **MEMO-02**: Expose semantic search API from ChromaDB (relevance threshold >0.7)
-- [ ] **MEMO-03**: Build context injection system (retrieve top-K relevant memories for AI prompts)
-- [ ] **MEMO-04**: Enable cross-platform memory sharing (Claude/ChatGPT/Gemini read from ChromaDB)
-- [ ] **MEMO-07**: Validate ChromaDB integrity and implement incremental update pipeline
+- [x] **ORCH-01**: Claude Code adapter - Phase 4 (04-03)
+- [x] **ORCH-02**: ChatGPT adapter - Phase 4 (04-02)
+- [x] **ORCH-03**: Gemini adapter - Phase 4 (04-04)
+- [x] **ORCH-04**: Cost-optimized routing - Phase 5 (05-01)
+- [x] **ORCH-05**: Quota tracking - Phase 1 (01-02)
+- [x] **ORCH-06**: Parallel execution - Phase 5 (05-02)
+- [x] **ORCH-07**: AI-to-AI handoffs - Phase 5 (05-03)
+- [x] **ORCH-08**: Error handling with retries - Phase 5 (05-05)
+- [x] **ORCH-09**: Per-task cost tracking - Phase 5 (05-04)
+- [x] **ORCH-10**: Orchestrator CLI - Phase 5 (05-06)
+- [x] **ORCH-11**: Infrastructure validation - Phase 1 (01-01, 01-03)
+- [x] **ORCH-12**: Result aggregation - Phase 5 (05-02)
 
-**Phase 3 (Mem0 Migration & Advanced Features):**
-- [ ] **MEMO-09**: Migrate ChromaDB → Mem0 + Vertex AI Memory Bank (3,763 memories)
-- [ ] **MEMO-05**: Implement conflict detection and resolution for contradictory memories
-- [ ] **MEMO-06**: Build memory health monitoring (detect stale/deprecated memories)
-- [ ] **MEMO-08**: Add memory metadata (created_at, last_verified, deprecated_since)
+## Memory Requirements (MEMO-01 to MEMO-09)
 
-### Orchestrator
+- [x] **MEMO-01**: ChromaDB integration - Phase 2 (02-01)
+- [x] **MEMO-02**: Semantic search threshold >0.7 - Phase 2 (02-02)
+- [x] **MEMO-03**: Context injection - Phase 2 (02-02)
+- [x] **MEMO-04**: Cross-platform REST API - Phase 2 (02-04)
+- [x] **MEMO-05**: Conflict detection - Phase 3 (03-03)
+- [x] **MEMO-06**: Stale memory flagging - Phase 3 (03-04)
+- [x] **MEMO-07**: Incremental updates - Phase 2 (02-03)
+- [x] **MEMO-08**: Health monitoring - Phase 3 (03-04, 03-05)
+- [x] **MEMO-09**: Mem0 migration - Phase 3 (03-01, 03-06)
 
-- [ ] **ORCH-01**: Implement Claude Code adapter (subprocess execution + file parsing)
-- [ ] **ORCH-02**: Implement ChatGPT adapter (OpenAI API integration)
-- [ ] **ORCH-03**: Implement Gemini adapter (gcloud CLI + API with quota tracking)
-- [x] **ORCH-04**: Build cost-optimized routing (Gemini CLI free → subscriptions → paid APIs)
-- [x] **ORCH-05**: Implement quota tracking system (Gemini 1500/day, reset at UTC midnight)
-- [x] **ORCH-06**: Build parallel execution engine (asyncio for independent tasks)
-- [x] **ORCH-07**: Implement AI-to-AI handoffs (Task A writes to memory → spawns Task B with context pointer)
-- [x] **ORCH-08**: Add error handling with retries and fallback routing
-- [x] **ORCH-09**: Implement per-task cost tracking (token counting + API pricing)
-- [x] **ORCH-10**: Create orchestrator CLI interface for task submission)
-- [x] **ORCH-11**: Add pre-flight adapter validation (check implementation before routing)
-- [x] **ORCH-12**: Implement result aggregation for parallel tasks
+## Time Model Requirements (TIME-01 to TIME-07)
 
-### ta_lab2 Time Model (Weeks 1-4)
+- [x] **TIME-01**: dim_timeframe table - Phase 6 (06-01)
+- [x] **TIME-02**: dim_sessions table - Phase 6 (06-01)
+- [x] **TIME-03**: Unified EMA table - Phase 6 (06-02)
+- [x] **TIME-04**: EMA scripts use dim_timeframe - Phase 6 (06-03)
+- [x] **TIME-05**: Time alignment validation - Phase 6 (06-04)
+- [x] **TIME-06**: Incremental EMA refresh - Phase 6 (06-05)
+- [x] **TIME-07**: Rowcount validation - Phase 6 (06-06)
 
-- [x] **TIME-01**: Create dim_timeframe table with all TF definitions (1D, 3D, 5D, 1W, 1M, 3M, etc.)
-- [x] **TIME-02**: Create dim_sessions table (trading hours, DST handling, session boundaries)
-- [x] **TIME-03**: Unify cmc_ema_multi_tf + cmc_ema_multi_tf_cal into single table
-- [x] **TIME-04**: Update all EMA refresh scripts to reference dim_timeframe
-- [x] **TIME-05**: Build time alignment validation tests (TF windows, calendar rolls, session boundaries)
-- [x] **TIME-06**: Implement incremental EMA refresh (only compute new rows)
-- [x] **TIME-07**: Add rowcount validation (actual vs tf-defined expected counts)
+## Feature Requirements (FEAT-01 to FEAT-07)
 
-### ta_lab2 Feature Pipeline (Weeks 5-8)
+- [x] **FEAT-01**: Returns with dim_timeframe lookbacks - Phase 7 (07-03)
+- [x] **FEAT-02**: Volatility estimators - Phase 7 (07-04)
+- [x] **FEAT-03**: Technical indicators - Phase 7 (07-05)
+- [x] **FEAT-04**: Unified feature view - Phase 7 (07-06)
+- [x] **FEAT-05**: Null handling strategy - Phase 7 (07-01, 07-02)
+- [x] **FEAT-06**: Feature incremental refresh - Phase 7 (07-06)
+- [x] **FEAT-07**: Data consistency validation - Phase 7 (07-07)
 
-- [ ] **FEAT-01**: Implement cmc_returns_daily (lookbacks from dim_timeframe)
-- [ ] **FEAT-02**: Implement cmc_vol_daily (Parkinson, GK volatility measures)
-- [ ] **FEAT-03**: Implement cmc_ta_daily (RSI, MACD, indicators respecting sessions)
-- [ ] **FEAT-04**: Create unified cmc_daily_features view (join prices, EMAs, returns, vol, TA)
-- [ ] **FEAT-05**: Implement null handling strategy and validation
-- [ ] **FEAT-06**: Add incremental refresh for all feature tables
-- [ ] **FEAT-07**: Build data consistency checks (gaps, anomalies, outliers)
+## Signal Requirements (SIG-01 to SIG-07)
 
-### ta_lab2 Signals & Validation (Weeks 9-12)
+- [x] **SIG-01**: Signal generation - Phase 8 (08-02, 08-03, 08-04)
+- [x] **SIG-02**: Backtest integration - Phase 8 (08-05)
+- [x] **SIG-03**: Cross-system validation - Phase 9 (09-05, 09-07)
+- [x] **SIG-04**: Time alignment validation - Phase 10 (10-02)
+- [x] **SIG-05**: Data consistency validation - Phase 10 (10-02)
+- [x] **SIG-06**: Backtest reproducibility - Phase 10 (10-03)
+- [x] **SIG-07**: v0.4.0 release - Phase 10 (10-06, 10-08)
 
-- [ ] **SIG-01**: Implement cmc_signals_daily (EMA crossovers, RSI mean reversion, ATR breakout)
-- [ ] **SIG-02**: Build backtest integration v1 (reference cmc_daily_features)
-- [ ] **SIG-03**: Create observability suite (gap tests, TF alignment tests, roll alignment tests)
-- [ ] **SIG-04**: Pass time alignment validation (all calculations use correct TF from dim_timeframe)
-- [ ] **SIG-05**: Pass data consistency validation (no gaps, rowcounts match, EMAs calculate correctly)
-- [ ] **SIG-06**: Pass backtest reproducibility validation (identical signals/PnL on re-runs)
-- [ ] **SIG-07**: Tag release v0.4.0 with full documentation
+## Validation Summary
 
-## v2 Requirements
+All requirements validated via:
+1. Code implementation (verified by tests)
+2. Documentation (DESIGN.md, ARCHITECTURE.md, API docs)
+3. CI/CD integration (validation workflow)
 
-Deferred to future release. Tracked but not in current scope.
-
-### Live Trading
-
-- **LIVE-01**: Order routing and execution engine
-- **LIVE-02**: Position tracking and PnL calculation
-- **LIVE-03**: Real capital deployment with risk controls
-
-### Derivatives
-
-- **DERIV-01**: Perpetual swaps support (funding capture in backtests)
-- **DERIV-02**: Options on crypto, equities, ETFs
-- **DERIV-03**: Margin models and liquidation buffers
-
-### ML/AI Models
-
-- **ML-01**: Feature ranking and selection
-- **ML-02**: Regime tagging with ML
-- **ML-03**: Strategy parameter optimization
-
-### Advanced Orchestration
-
-- **ADV-01**: Workflow templates for common patterns
-- **ADV-02**: Autonomous task decomposition (break complex goals into subtasks)
-- **ADV-03**: Platform-specific prompt optimization
-
-## Out of Scope
-
-Explicitly excluded from v1. Documented to prevent scope creep.
-
-| Feature | Reason |
-|---------|--------|
-| Live trading execution | Infrastructure validation first - no real capital until system proven trustworthy |
-| Derivatives (perps/options) | Spot only until risk controls proven and validated |
-| ML/AI model training | Classical technical analysis sufficient for v1 - defer ML to Year 2-3 |
-| Cloud deployment | Local/VM only for v1 - avoid cloud migration costs and complexity |
-| External data vendors beyond CMC | Cost optimization - CMC data sufficient for crypto validation |
-| Real-time/streaming data | Batch processing sufficient for v1 - real-time in Year 2 |
-| Web UI/dashboard | CLI-first for v1 - UI adds complexity without immediate value |
-| Outside capital management | Proprietary trading only - fund/MA structure requires proven track record (Year 5+) |
-
-## Traceability
-
-Which requirements map to which phases.
-
-| Requirement | Phase | Status |
-|-------------|-------|--------|
-| ORCH-05 | Phase 1 | Complete |
-| ORCH-11 | Phase 1 | Complete |
-| MEMO-01 | Phase 2 | Pending |
-| MEMO-02 | Phase 2 | Pending |
-| MEMO-03 | Phase 2 | Pending |
-| MEMO-04 | Phase 2 | Pending |
-| MEMO-07 | Phase 2 | Pending |
-| MEMO-09 | Phase 3 | Pending |
-| MEMO-05 | Phase 3 | Pending |
-| MEMO-06 | Phase 3 | Pending |
-| MEMO-08 | Phase 3 | Pending |
-| ORCH-01 | Phase 4 | Pending |
-| ORCH-02 | Phase 4 | Pending |
-| ORCH-03 | Phase 4 | Pending |
-| ORCH-04 | Phase 5 | Pending |
-| ORCH-06 | Phase 5 | Pending |
-| ORCH-07 | Phase 5 | Pending |
-| ORCH-08 | Phase 5 | Pending |
-| ORCH-09 | Phase 5 | Pending |
-| ORCH-10 | Phase 5 | Pending |
-| ORCH-12 | Phase 5 | Pending |
-| TIME-01 | Phase 6 | Complete |
-| TIME-02 | Phase 6 | Complete |
-| TIME-03 | Phase 6 | Complete |
-| TIME-04 | Phase 6 | Complete |
-| TIME-05 | Phase 6 | Complete |
-| TIME-06 | Phase 6 | Complete |
-| TIME-07 | Phase 6 | Complete |
-| FEAT-01 | Phase 7 | Pending |
-| FEAT-02 | Phase 7 | Pending |
-| FEAT-03 | Phase 7 | Pending |
-| FEAT-04 | Phase 7 | Pending |
-| FEAT-05 | Phase 7 | Pending |
-| FEAT-06 | Phase 7 | Pending |
-| FEAT-07 | Phase 7 | Pending |
-| SIG-01 | Phase 8 | Pending |
-| SIG-02 | Phase 8 | Pending |
-| SIG-03 | Phase 9 | Pending |
-| SIG-04 | Phase 10 | Pending |
-| SIG-05 | Phase 10 | Pending |
-| SIG-06 | Phase 10 | Pending |
-| SIG-07 | Phase 10 | Pending |
-
-**Coverage:**
-- v1 requirements: 42 total
-- Mapped to phases: 42
-- Unmapped: 0
-
----
-*Requirements defined: 2025-01-22*
-*Last updated: 2026-01-27 (updated memory count to 3,763, added MEMO-09 for Mem0 migration, restructured Phase 2/3 for ChromaDB → Mem0 approach)*
+**Ready for v0.4.0 release.**
