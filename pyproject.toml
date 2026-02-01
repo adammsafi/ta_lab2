@@ -32,6 +32,8 @@ dev = [
   "pytest-asyncio>=0.21.0",
   "pytest-mock>=3.12.0",
   "pytest-benchmark",
+  "pytest-cov>=4.0.0",
+  "pytest-json-report>=1.5.0",
   "hypothesis",
   "ruff>=0.1.5",
   "mypy>=1.8",
@@ -87,6 +89,7 @@ markers = [
     "integration: Integration tests (cross-component)",
     "observability: Observability infrastructure tests",
     "validation: Gap and alignment validation tests",
+    "validation_gate: CI validation gate tests (require real database)",
     "slow: Tests that take >10 seconds",
 ]
 
@@ -97,3 +100,22 @@ where = ["src"]
 # Also install the top-level config.py so `from config import load_settings` works
 [tool.setuptools]
 py-modules = ["config"]
+
+# ---------- Coverage configuration ----------
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "*/tests/*",
+    "*/migrations/*",
+    "*/__pycache__/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
