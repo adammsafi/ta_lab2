@@ -1,189 +1,60 @@
-# 🧾 Changelog
+# Changelog
 
-All notable changes to **ta_lab2** will be documented in this file.
+All notable changes to this project will be documented in this file.
 
-A changelog is a human-readable history of releases. Each section below describes
-what changed in that version so you (and future contributors) don’t need to
-reverse-engineer it from git logs.
-
-- When you cut a new version (e.g. `0.1.1`, `0.2.0`), add a new section.
-- Keep entries focused on user-visible behaviour: features, fixes, breaking changes, and tooling that affects how the project is used or developed.
-
----
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Changes that have been merged into `main` but not yet released as a tagged version.
+## [0.4.0] - 2026-02-01
 
-- (Add new changes here as you work on them.)
+### Added
+- **Time Model**: Unified dim_timeframe (199 TFs) and dim_sessions tables for multi-timeframe architecture
+- **Feature Pipeline**: Returns (1D-365D), volatility (Parkinson, GK, RS), technical indicators (RSI, MACD, BB, ATR, ADX, Stochastic)
+- **Signal System**: EMA crossover, RSI mean reversion, ATR breakout signal generation with database-driven configuration (dim_signals)
+- **Backtest Integration**: SignalBacktester with triple-layer reproducibility validation (deterministic queries, feature hashing, version tracking)
+- **Memory System**: Mem0 + Qdrant integration with 3,763+ memories, LLM-powered conflict detection, health monitoring, staleness tracking
+- **AI Orchestrator**: Multi-platform coordination (Claude, ChatGPT, Gemini) with cost-optimized routing and quota management
+- **Observability**: PostgreSQL-backed metrics, distributed tracing, health checks (liveness/readiness/startup), alert infrastructure with Telegram integration
+- **Validation Gates**: CI blockers for time alignment, data consistency (zero-tolerance for duplicates/orphans), backtest reproducibility
+- **Documentation**: DESIGN.md (system overview), deployment.md (full deployment guide), tiered README with quick-start, expanded ARCHITECTURE.md (1,233 lines)
 
----
+### Changed
+- EMA tables unified under time model with dim_timeframe foreign key references
+- Test infrastructure upgraded to three-tier pattern (real_deps, mixed_deps, mocked_deps) with pytest markers
+- Quota management enhanced with reservation system, auto-release on usage, and 50%/80%/90% alert thresholds
+- README restructured with tiered quick-start-first approach and 6 collapsible component sections
+
+### Fixed
+- EMA calculation edge cases in multi-timeframe scenarios with calendar alignment
+- Memory embedding dimension validation (1536-dim) prevents corruption before ChromaDB/Qdrant insertion
+- Database connection handling improvements with graceful degradation patterns
 
 ## [0.3.1] - 2025-11-13
 
-> Initial structured release of **ta_lab2** as a real Python package with
-> features → regimes → signals → pipelines → backtests → analysis/viz.
+### Added
+- Initial EMA multi-timeframe support
+- Basic CLI for pipeline execution
+- Package structure under src/ta_lab2 with features, regimes, signals, pipelines, backtests
+- Core library modules: features, regimes, signals, pipelines, backtests, analysis, viz
+- Price-based indicators: EMA, MACD, RSI, Stochastic, MFI, OBV, ADX, Bollinger Bands
+- Returns and volatility calculations: arithmetic/log returns, Parkinson/Garman-Klass/Rogers-Satchell volatility, ATR
+- Configuration system with config.py and YAML-based runtime options
+- Testing infrastructure with pytest and GitHub Actions CI workflow
+- Documentation: README.md with layer stack overview, ARCHITECTURE.md with data flows
 
-This release retroactively covers everything from the first commit to the point
-where versioning (`0.1.0`) and release automation were introduced.
+### Fixed
+- Database connection handling improvements
 
-> 🔧 **Note:** If your project version is bumped (e.g. to `0.3.1`), you can rename this
-> section header to match that version.
+## [0.3.0] - 2025-12-XX
 
-### 🎯 High-level
+### Added
+- Core ta_lab2 package structure
+- Regime detection framework
+- Basic EMA calculations
 
-- Converted an ad-hoc BTC analysis notebook + scripts into a reusable **Python package**.
-- Formalized the **package structure** under `src/ta_lab2` with clear layers:
-  **features → regimes → signals → pipelines → backtests → analysis/viz → CLI**.
-- Added configuration, tests, and GitHub workflows so the project behaves like a
-  real library rather than a one-off experiment.
-
----
-
-### 📦 Packaging & Configuration
-
-- Added `pyproject.toml` using **setuptools** and a `src/` layout so `ta_lab2` can be installed with `pip`.
-- Introduced a top-level `config.py` with:
-  - `project_root()` to reliably resolve paths regardless of where the code is run.
-  - A central `load_config()` wired to a new YAML file.
-- Added `config/default.yaml` to hold runtime options (paths, assets, pipeline settings) in a single place.
-- Created `.github/.release-please-manifest.json` and `release-please-config.json` to enable automated, tag-based releases.
-
----
-
-### 🧱 Core Library Structure
-
-- Created the main package under `src/ta_lab2/`, including:
-
-  - `features/` – indicator & feature engineering:
-    - **Price-based indicators**: EMA, MACD, RSI, stochastic, MFI, OBV, ADX, Bollinger bands.
-    - **Returns & volatility**: arithmetic/log returns, Parkinson/Garman-Klass/Rogers-Satchell vols, ATR, rolling realized vol.
-    - **Trend & segmentation**: basic trend labels and flip-segment builders.
-    - **Calendar features**: day-of-week, week-of-year, month, etc.
-    - **Feature packs**: helpers to attach a standard “core feature set” in one call.
-    - **Ensure helpers**: `ensure_close`, `ensure_ema`, `ensure_rsi`, `ensure_adx`, `ensure_obv`, etc.
-
-  - `regimes/` – regime and policy logic:
-    - Multi-timeframe labelers (`label_layer_monthly`, `weekly`, `daily`, `intraday`).
-    - EMA **comovement & alignment** stats for higher-order regime classification.
-    - Flip-based regime labelling and regime statistics.
-    - **Data budget** assessment to decide which layers are safe to compute.
-    - Policy table loader (`policy_loader`) and resolver (`resolver`) that map
-      regime keys → policy objects (size multipliers, stop multipliers, allowed order types).
-    - Proxy inputs/outcomes for cycle/macro approximations, and telemetry
-      helpers for logging regime snapshots.
-
-  - `signals/` – trading signals and sizing:
-    - Strategy families:
-      - `breakout_atr` – ATR-based breakout strategy.
-      - `ema_trend` – EMA trend-following entries/exits.
-      - `rsi_mean_revert` – RSI mean-reversion signals.
-    - `rules.py` with reusable filters (EMA crossovers, RSI filters, vol filters).
-    - `position_sizing.py` with fixed-fractional, inverse-vol, and
-      volatility-scaled sizing utilities.
-    - `registry.py` to register and retrieve strategies by name.
-    - `generator.py` to attach signals to a DataFrame based on configuration.
-
-  - `pipelines/` – end-to-end workflows:
-    - `btc_pipeline.py` which:
-      - Loads BTC OHLCV data from CSV.
-      - Attaches core features (returns, vol, indicators).
-      - Applies regime logic (labels + policy).
-      - Generates signals via the strategy registry.
-      - Produces a summarized result suitable for analysis or backtests.
-
-  - `backtests/` – performance and evaluation:
-    - `btpy_runner` – a simple backtest loop.
-    - `vbt_runner` – **vectorbt** integration with grid search/sweeps.
-    - `splitters` – train/test and walk-forward splitting utilities.
-    - `metrics` – core performance metrics: CAGR, max drawdown, Sharpe, Sortino, MAR, hit rate, etc.
-    - `reports` – leaderboard tables and equity curve plots.
-    - `costs` – cost models for slippage/fees.
-    - `orchestrator` – multi-strategy backtest coordination and result bundling.
-
-  - `analysis/` – evaluation helpers:
-    - Performance decompositions, feature importance/redun­dancy tools, and
-      parameter sweep utilities for quick research iterations.
-    - Regime evaluation helpers to slice PnL by regime and inspect transitions.
-
-  - `viz/`:
-    - `viz/all_plots.py` providing a centralized place for Matplotlib-based
-      plots (price + EMA overlays, regime visualizations, realized vol charts).
-
-  - `research/queries/`:
-    - Script-style modules for EMA optimizations, sensitivity studies, and walk-forward validation.
-    - Kept intentionally separate from the main library to preserve a clean public API.
-
----
-
-### 🖥️ CLI & IO
-
-- Added `ta_lab2.cli`:
-  - Top-level `main()` that builds an argument parser.
-  - Subcommands for:
-    - Running the BTC pipeline from the command line.
-    - Inspecting regimes with convenient CSV/Parquet inputs.
-  - Internal helpers for default config + feature attachment.
-
-- Added `io.py` with simple `read_parquet` / `write_parquet` helpers as a stepping
-  stone toward DB-backed IO.
-
-- Introduced `resample.py` and `features.resample` for:
-  - Calendar/timeframe resampling (e.g., D → W).
-  - Seasonal binning and summary statistics over calendar buckets.
-
----
-
-### 📚 Documentation & Introspection
-
-- Added a richer `README.md`:
-  - Project overview and goals.
-  - Explanation of the layer stack (features → regimes → signals → pipelines → backtests).
-  - Basic usage and CLI examples.
-
-- Added `ARCHITECTURE.md` describing:
-  - Each major subpackage and its responsibilities.
-  - Typical data flows (e.g., CSV/DB → features → regimes → signals → backtests).
-
-- Added helper tooling to introspect the codebase:
-  - `tree_structure.py` generates:
-    - `structure.txt` / `structure.md` / `structure.json` / `structure.csv` for directory trees.
-    - `API_MAP.md` and `src_structure.json` for class/function listings via AST.
-    - All scripts updated to ignore `.venv` / `.venv311`.
-  - `generate_function_map_with_purpose.py` builds a CSV with:
-    - Module path, qualified name, basic signature info.
-    - First docstring line or inferred “purpose”.
-    - A short code snippet for each function/method.
-
----
-
-### ✅ Testing & CI
-
-- Introduced a `tests/` suite with:
-  - Calendar feature tests (e.g., quarter/week-of-year/day-of-year expansions).
-  - A minimal **BTC pipeline smoke test** that exercises `run_btc_pipeline`
-    on a tiny synthetic CSV and asserts basic output shape.
-- Added a **smoke import test** (`tests/test_smoke_imports.py`) that imports:
-  - `ta_lab2` and all major submodules (features, regimes, signals, pipelines,
-    backtests, analysis, viz, research) as a packaging canary.
-- Added a GitHub Actions **CI workflow** that:
-  - Installs the package from `pyproject.toml`.
-  - Runs `pytest` (skipping the heaviest backtest if needed).
-
----
-
-### 🛠️ Repo Hygiene & Tooling
-
-- Added/updated:
-  - `.gitignore` to exclude virtualenvs (`.venv`, `.venv311`), build artifacts, and cache directories.
-  - `.gitattributes` for consistent line endings and diff behaviour.
-  - `.github/ISSUE_TEMPLATE` files for bugs and feature requests.
-  - `.github/pull_request_template.md` with a checklist (tests/docs/CHANGELOG).
-  - `CODEOWNERS` for default ownership.
-  - `SECURITY.md` for responsible disclosure instructions.
-
-- Improved developer tooling:
-  - Added dev dependencies such as `pytest`, `mypy`, `ruff`, `hypothesis`, `pytest-benchmark`.
-  - Normalized folder layout and entry points so local development, CI, and releases all use the same structure.
-
----
+[Unreleased]: https://github.com/your-username/ta_lab2/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/your-username/ta_lab2/compare/v0.3.1...v0.4.0
+[0.3.1]: https://github.com/your-username/ta_lab2/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/your-username/ta_lab2/releases/tag/v0.3.0
