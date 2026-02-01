@@ -1,0 +1,76 @@
+site_name: ta_lab2 v0.4.0
+site_description: Multi-timescale Technical Analysis Lab with AI Orchestration
+site_url: https://your-username.github.io/ta_lab2/
+
+repo_name: your-username/ta_lab2
+repo_url: https://github.com/your-username/ta_lab2
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - content.code.copy
+    - content.code.annotate
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Quick Start: index.md#quick-start
+    - Installation: deployment.md#installation
+  - Design:
+    - Overview: DESIGN.md
+    - Architecture: ARCHITECTURE.md
+  - Components:
+    - Time Model: time/time_model_overview.md
+    - Features: time/returns_volatility.md
+    - Signals: time/regime_integration.md
+  - Deployment: deployment.md
+  - API Reference:
+    - Memory API: api/memory.md
+    - Orchestrator CLI: api/orchestrator.md
+  - Changelog: CHANGELOG.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - toc:
+      permalink: true
+  - attr_list
+  - md_in_html
+
+extra:
+  version:
+    provider: mike
