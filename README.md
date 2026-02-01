@@ -40,7 +40,7 @@ python -m ta_lab2.scripts.signals.run_all_signal_refreshes
 python -m ta_lab2.scripts.signals.run_backtest --signal-type ema_crossover
 ```
 
-For detailed setup instructions, see [ops/deployment.md](docs/ops/) and [Time Model Documentation](docs/time/time_model_overview.md).
+For detailed setup instructions, see [Deployment Guide](docs/deployment.md) and [Time Model Documentation](docs/time/time_model_overview.md).
 
 ---
 
@@ -57,7 +57,7 @@ For detailed setup instructions, see [ops/deployment.md](docs/ops/) and [Time Mo
 - Multi-platform AI orchestrator with cost-optimized routing (Gemini free tier → subscriptions → paid APIs)
 - PostgreSQL-backed observability (metrics, tracing, health checks, alerts)
 
-For architectural details and system design, see [ARCHITECTURE.md](ARCHITECTURE.md).
+For architectural details and system design, see [ARCHITECTURE.md](ARCHITECTURE.md) and [DESIGN.md](docs/DESIGN.md).
 
 ---
 
@@ -447,10 +447,11 @@ Follow the process in [SECURITY.md](SECURITY.md) to report it privately.
 
 ## Links
 
-- [Architecture Documentation](ARCHITECTURE.md) - System design and implementation details
+- [DESIGN.md](docs/DESIGN.md) - High-level system design, concepts, and data flow
+- [Architecture Documentation](ARCHITECTURE.md) - Implementation details, schemas, and APIs
+- [Deployment Guide](docs/deployment.md) - Infrastructure setup and operations
 - [EMA State Standardization](docs/EMA_STATE_STANDARDIZATION.md) - EMA calculation and state management
 - [Time Model Overview](docs/time/time_model_overview.md) - Timeframe and session definitions
-- [Operations Guide](docs/ops/) - Deployment and infrastructure setup
 - [QA Documentation](docs/qa/) - Testing and validation procedures
 
 ---
