@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2025-01-22)
 ## Current Position
 
 Phase: 10 of 10 (Release Validation)
-Plan: 3 of 7 (Backtest Reproducibility Validation)
+Plan: 2 of 7 (Validation Tests)
 Status: In progress
-Last activity: 2026-02-01 - Completed 10-03-PLAN.md (Backtest Reproducibility Validation)
+Last activity: 2026-02-01 - Completed 10-02-PLAN.md (Validation Tests)
 
-Progress: [█████████░] 91% (52/57 plans complete)
+Progress: [█████████░] 89% (51/57 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 52 (across 9 complete phases + 1 in progress)
+- Total plans completed: 51 (across 9 complete phases + 1 in progress)
 - Average duration: 12 min
-- Total execution time: 12.21 hours
+- Total execution time: 12.13 hours
 
 **By Phase:**
 
@@ -36,11 +36,11 @@ Progress: [█████████░] 91% (52/57 plans complete)
 | 07-ta_lab2-feature-pipeline | 7 | 45 min | 6 min | ✓ Complete |
 | 08-ta_lab2-signals | 6 | 49 min | 8 min | ✓ Complete |
 | 09-integration-observability | 7 | 260 min | 37 min | ✓ Complete |
-| 10-release-validation | 3 | 9 min | 3 min | In progress |
+| 10-release-validation | 2 | 7 min | 4 min | In progress |
 
 **Recent Trend:**
-- Last 5 phases: 45min (07), 49min (08), 260min (09), 9min (10-partial), ?min (10)
-- Trend: Phase 10 maintaining rapid execution (3 min/plan average)
+- Last 5 phases: 45min (07), 49min (08), 260min (09), 7min (10-partial), ?min (10)
+- Trend: Phase 10 maintaining rapid execution (3.5 min/plan average)
 
 *Updated after each plan completion*
 
@@ -240,10 +240,10 @@ Recent decisions affecting current work:
 - **Coverage threshold 70%** (10-01): Fail build if coverage drops below 70%, balances quality bar with pragmatic testing for v0.4.0 release
 - **Session-scoped db_engine, function-scoped db_session** (10-01): db_engine created once per test session for efficiency, db_session with transaction rollback for test isolation
 - **ensure_schema fixture for automatic setup** (10-01): Checks for dim_timeframe/dim_sessions tables, calls ensure_dim_tables if missing for reduced test setup friction
-- **Wrap existing validate_reproducibility.py into pytest** (10-03): Reuse Phase 8 reproducibility infrastructure instead of rewriting, reduces duplication and ensures consistency
-- **Strict mode for feature hash validation** (10-03): Hash mismatch is FAILURE not warning, ensures backtests reflect current feature data for reproducibility guarantee
-- **Zero tolerance for reproducibility failures** (10-03): 1e-10 floating point tolerance, exact trade count match, blocks release on any difference
-- **Dual-output validation reporting** (10-03): JSON from pytest-json-report + markdown from pytest_sessionfinish for both automated metrics and human review
+- **Zero tolerance for orphan timeframes** (10-02): All EMA tables must reference valid dim_timeframe entries, no orphans allowed (critical data integrity)
+- **Zero tolerance for duplicates and NULL EMAs** (10-02): Each (id, ts, tf, period) unique, all EMAs non-NULL (data corruption indicators)
+- **Tolerance-based for operational variations** (10-02): 5% rowcount (delisted assets/gaps), 10% tf_days cadence (holidays), 1% price-EMA alignment (weekends)
+- **Graceful table existence checks** (10-02): Query information_schema before validation, pytest.skip for optional tables (cmc_ema_multi_tf_cal, cmc_returns_daily, cmc_vol_daily)
 
 ### Pending Todos
 
@@ -256,9 +256,9 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-02-01
-Stopped at: Completed 10-03-PLAN.md (Backtest Reproducibility Validation) - Phase 10 plan 3/7
+Stopped at: Completed 10-02-PLAN.md (Validation Tests) - Phase 10 plan 2/7
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-01 (Phase 10 IN PROGRESS: 3/7 plans complete - CI infrastructure, time alignment validation, backtest reproducibility validation all complete with 62 total validation tests ready for CI execution - dual-output reporting configured for release gates)*
+*Last updated: 2026-02-01 (Phase 10 IN PROGRESS: 2/7 plans complete - CI infrastructure and validation tests (SIG-04 time alignment + SIG-05 data consistency) complete with 70 total validation tests ready for CI execution - zero tolerance for critical issues, tolerance-based for operational variations)*
