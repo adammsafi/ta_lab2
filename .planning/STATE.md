@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2025-01-22)
 ## Current Position
 
 Phase: 10 of 10 (Release Validation)
-Plan: 5 of 7 (Documentation Update)
+Plan: 6 of 7 (Release Automation)
 Status: In progress
-Last activity: 2026-02-01 - Completed 10-05-PLAN.md (Documentation Update)
+Last activity: 2026-02-01 - Completed 10-06-PLAN.md (Release Automation)
 
-Progress: [█████████░] 93% (53/57 plans complete)
+Progress: [█████████░] 95% (54/57 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 53 (across 9 complete phases + 1 in progress)
+- Total plans completed: 54 (across 9 complete phases + 1 in progress)
 - Average duration: 12 min
-- Total execution time: 12.38 hours
+- Total execution time: 12.45 hours
 
 **By Phase:**
 
@@ -36,7 +36,7 @@ Progress: [█████████░] 93% (53/57 plans complete)
 | 07-ta_lab2-feature-pipeline | 7 | 45 min | 6 min | ✓ Complete |
 | 08-ta_lab2-signals | 6 | 49 min | 8 min | ✓ Complete |
 | 09-integration-observability | 7 | 260 min | 37 min | ✓ Complete |
-| 10-release-validation | 5 | 22 min | 4 min | In progress |
+| 10-release-validation | 6 | 26 min | 4 min | In progress |
 
 **Recent Trend:**
 - Last 5 phases: 45min (07), 49min (08), 260min (09), 22min (10-partial), ?min (10)
@@ -244,6 +244,9 @@ Recent decisions affecting current work:
 - **Zero tolerance for duplicates and NULL EMAs** (10-02): Each (id, ts, tf, period) unique, all EMAs non-NULL (data corruption indicators)
 - **Tolerance-based for operational variations** (10-02): 5% rowcount (delisted assets/gaps), 10% tf_days cadence (holidays), 1% price-EMA alignment (weekends)
 - **Graceful table existence checks** (10-02): Query information_schema before validation, pytest.skip for optional tables (cmc_ema_multi_tf_cal, cmc_returns_daily, cmc_vol_daily)
+- **Keep a Changelog format for release notes** (10-06): Industry-standard format with Added/Changed/Fixed sections, more user-friendly than generated commit logs
+- **MkDocs Material for documentation site** (10-06): Modern theme with navigation tabs, dark/light mode, mkdocstrings for API docs, mike for versioning
+- **Automated release on version tag push** (10-06): GitHub Actions workflow triggers on v*.*.*, extracts CHANGELOG notes, builds docs bundle, creates release
 
 ### Pending Todos
 
@@ -256,9 +259,9 @@ None currently.
 ## Session Continuity
 
 Last session: 2026-02-01
-Stopped at: Completed 10-05-PLAN.md (Documentation Update) - Phase 10 plan 5/7
+Stopped at: Completed 10-06-PLAN.md (Release Automation) - Phase 10 plan 6/7
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-01 (Phase 10 IN PROGRESS: 5/7 plans complete - CI infrastructure, validation tests (70 tests), backtest reproducibility validation, documentation suite (DESIGN.md + deployment.md), and README/ARCHITECTURE updates complete - README restructured with tiered quick-start-first approach and 6 collapsible component sections, ARCHITECTURE expanded to 1,233 lines covering v0.4.0 systems - ready for API reference and release artifacts)*
+*Last updated: 2026-02-01 (Phase 10 IN PROGRESS: 6/7 plans complete - CI infrastructure, validation tests (70 tests), backtest reproducibility validation, documentation suite (DESIGN.md + deployment.md), README/ARCHITECTURE updates, and release automation complete - CHANGELOG.md in Keep a Changelog format, MkDocs Material configured with navigation/API docs, GitHub Actions release workflow ready - final validation (10-07) remaining)*
