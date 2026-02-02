@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 ## Current Position
 
 Phase: 11 of 19 (Memory Preparation)
-Plan: 3 of TBD in current phase
+Plan: 2 of 7 in current phase
 Status: In progress
-Last activity: 2026-02-02 - Completed 11-03-PLAN.md (External Directories Snapshot)
+Last activity: 2026-02-02 - Completed 11-02-PLAN.md (ta_lab2 Snapshot)
 
 Progress: [##########] 100% v0.4.0 | [██        ] ~29% v0.5.0 (2/7 plans complete in Phase 11)
 
@@ -42,11 +42,11 @@ Progress: [##########] 100% v0.4.0 | [██        ] ~29% v0.5.0 (2/7 plans com
 
 | Phase | Plans | Total | Avg/Plan | Status |
 |-------|-------|-------|----------|--------|
-| 11-memory-preparation | 2 | 12 min | 6 min | In progress |
+| 11-memory-preparation | 2 | 17 min | 8.5 min | In progress |
 
 **Recent Trend:**
 - v0.4.0 complete: 10 phases, 56 plans, 12.55 hours total
-- v0.5.0 in progress: Phase 11 (2/7 plans complete, 12 min total)
+- v0.5.0 in progress: Phase 11 (2/7 plans complete, 17 min total)
 
 *Updated after each plan completion*
 
@@ -64,8 +64,9 @@ Recent decisions affecting current work:
 - **Disable LLM conflict detection for bulk** (11-01): Use infer=False in batch_add_memories() for performance
 - **Dual tagging strategy** (11-01): Snapshot memories use simple tags + structured metadata for filtering
 - **Graceful untracked file handling** (11-01): Git metadata extraction returns tracked=False instead of errors
-- **Reuse infrastructure for external dirs** (11-03): Same extract_codebase/batch_indexer for all directories
-- **Graceful directory validation** (11-03): Validate directories before processing, skip missing with warnings
+- **Use existing API key configuration** (11-02): Source OPENAI_API_KEY from openai_config.env for snapshot execution
+- **Include snapshot script in snapshot** (11-02): Self-documenting - run_ta_lab2_snapshot.py indexed as part of snapshot
+- **Store git commit hash in snapshots** (11-02): Capture commit hash at snapshot time for version traceability
 
 ### Pending Todos
 
@@ -77,10 +78,10 @@ None currently.
 
 ## Session Continuity
 
-Last session: 2026-02-02T16:52:07Z
-Stopped at: Completed 11-03-PLAN.md (External Directories Snapshot)
+Last session: 2026-02-02T11:55:51Z
+Stopped at: Completed 11-02-PLAN.md (ta_lab2 Snapshot)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-02 (Completed Phase 11 Plan 03: External Directories Snapshot)*
+*Last updated: 2026-02-02 (Completed Phase 11 Plan 02: ta_lab2 Snapshot)*
