@@ -217,14 +217,14 @@ Plans:
 **Plans**: 8 plans
 
 Plans:
-- [ ] 10-01-PLAN.md — CI validation infrastructure with PostgreSQL service (Wave 1)
-- [ ] 10-02-PLAN.md — Time alignment and data consistency validation tests (Wave 2)
-- [ ] 10-03-PLAN.md — Backtest reproducibility validation tests (Wave 2)
-- [ ] 10-04-PLAN.md — DESIGN.md and deployment guide documentation (Wave 3)
-- [ ] 10-05-PLAN.md — README and ARCHITECTURE.md update for v0.4.0 (Wave 3)
-- [ ] 10-06-PLAN.md — CHANGELOG, MkDocs, and release workflow (Wave 4)
-- [ ] 10-07-PLAN.md — API reference documentation (Wave 4)
-- [ ] 10-08-PLAN.md — Final validation and version bump (Wave 5)
+- [x] 10-01-PLAN.md — CI validation infrastructure with PostgreSQL service (Wave 1)
+- [x] 10-02-PLAN.md — Time alignment and data consistency validation tests (Wave 2)
+- [x] 10-03-PLAN.md — Backtest reproducibility validation tests (Wave 2)
+- [x] 10-04-PLAN.md — DESIGN.md and deployment guide documentation (Wave 3)
+- [x] 10-05-PLAN.md — README and ARCHITECTURE.md update for v0.4.0 (Wave 3)
+- [x] 10-06-PLAN.md — CHANGELOG, MkDocs, and release workflow (Wave 4)
+- [x] 10-07-PLAN.md — API reference documentation (Wave 4)
+- [x] 10-08-PLAN.md — Final validation and version bump (Wave 5)
 
 ## Progress
 
@@ -242,7 +242,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 7. ta_lab2 Feature Pipeline | 7/7 | Complete | 2026-01-30 |
 | 8. ta_lab2 Signals | 6/6 | Complete | 2026-01-30 |
 | 9. Integration & Observability | 7/7 | Complete | 2026-01-30 |
-| 10. Release Validation | 0/8 | Not started | - |
+| 10. Release Validation | 8/8 | Complete | 2026-02-01 |
 
 ---
 *Created: 2025-01-22*
