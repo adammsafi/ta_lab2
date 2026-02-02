@@ -51,32 +51,51 @@ def extract_conversation(jsonl_path: Path) -> list[dict]:
                 try:
                     entry = json.loads(line)
 
-                    # Extract user messages
-                    if entry.get("type") == "user-message":
+                    # Extract user messages (format: type="user", message.content)
+                    if entry.get("type") == "user":
+                        message_obj = entry.get("message", {})
+                        content = message_obj.get("content", "")
+                        # Handle string content or list content
+                        if isinstance(content, list):
+                            # Extract text from content blocks
+                            content = " ".join([
+                                block.get("text", "") if isinstance(block, dict) else str(block)
+                                for block in content
+                            ])
                         messages.append({
                             "role": "user",
-                            "content": entry.get("text", ""),
+                            "content": content,
                             "timestamp": entry.get("timestamp"),
-                            "message_id": entry.get("messageId")
+                            "message_id": entry.get("uuid")
                         })
 
-                    # Extract assistant messages
-                    elif entry.get("type") == "assistant-message":
-                        messages.append({
-                            "role": "assistant",
-                            "content": entry.get("text", ""),
-                            "timestamp": entry.get("timestamp"),
-                            "message_id": entry.get("messageId")
-                        })
+                    # Extract assistant messages (format: type="assistant", message.content)
+                    elif entry.get("type") == "assistant":
+                        message_obj = entry.get("message", {})
+                        content = message_obj.get("content", [])
+                        # Extract text from content blocks (skip thinking blocks)
+                        text_parts = []
+                        if isinstance(content, list):
+                            for block in content:
+                                if isinstance(block, dict):
+                                    if block.get("type") == "text":
+                                        text_parts.append(block.get("text", ""))
+                                    elif block.get("type") == "thinking":
+                                        # Skip thinking blocks for now
+                                        pass
+                                else:
+                                    text_parts.append(str(block))
+                        else:
+                            text_parts.append(str(content))
 
-                    # Extract tool usage
-                    elif entry.get("type") == "tool-use":
-                        messages.append({
-                            "role": "tool",
-                            "tool": entry.get("name"),
-                            "input": entry.get("input", {}),
-                            "timestamp": entry.get("timestamp")
-                        })
+                        content_str = " ".join(text_parts)
+                        if content_str:
+                            messages.append({
+                                "role": "assistant",
+                                "content": content_str,
+                                "timestamp": entry.get("timestamp"),
+                                "message_id": entry.get("uuid")
+                            })
 
                 except json.JSONDecodeError as e:
                     logger.warning(f"Skipping malformed JSON at line {line_num} in {jsonl_path}: {e}")
@@ -99,20 +118,37 @@ def extract_conversation(jsonl_path: Path) -> list[dict]:
                     try:
                         entry = json.loads(line)
 
-                        if entry.get("type") == "user-message":
+                        # Same extraction logic as above
+                        if entry.get("type") == "user":
+                            message_obj = entry.get("message", {})
+                            content = message_obj.get("content", "")
+                            if isinstance(content, list):
+                                content = " ".join([
+                                    block.get("text", "") if isinstance(block, dict) else str(block)
+                                    for block in content
+                                ])
                             messages.append({
                                 "role": "user",
-                                "content": entry.get("text", ""),
+                                "content": content,
                                 "timestamp": entry.get("timestamp"),
-                                "message_id": entry.get("messageId")
+                                "message_id": entry.get("uuid")
                             })
-                        elif entry.get("type") == "assistant-message":
-                            messages.append({
-                                "role": "assistant",
-                                "content": entry.get("text", ""),
-                                "timestamp": entry.get("timestamp"),
-                                "message_id": entry.get("messageId")
-                            })
+                        elif entry.get("type") == "assistant":
+                            message_obj = entry.get("message", {})
+                            content = message_obj.get("content", [])
+                            text_parts = []
+                            if isinstance(content, list):
+                                for block in content:
+                                    if isinstance(block, dict) and block.get("type") == "text":
+                                        text_parts.append(block.get("text", ""))
+                            content_str = " ".join(text_parts)
+                            if content_str:
+                                messages.append({
+                                    "role": "assistant",
+                                    "content": content_str,
+                                    "timestamp": entry.get("timestamp"),
+                                    "message_id": entry.get("uuid")
+                                })
                     except json.JSONDecodeError:
                         continue
 
@@ -177,41 +213,54 @@ def extract_phase_boundaries(planning_dir: Path, repo: Optional[Repo] = None) ->
         phase_num = int(phase_match.group(1))
         phase_name = phase_match.group(2)
 
-        # Find SUMMARY.md files (format: NN-NN-SUMMARY.md)
-        summary_files = list(phase_dir.glob("*-SUMMARY.md"))
+        # Find ALL SUMMARY.md files (format: NN-NN-SUMMARY.md)
+        summary_files = sorted(phase_dir.glob("*-SUMMARY.md"))
 
         if not summary_files:
             logger.debug(f"No SUMMARY.md found for phase {phase_num}, skipping")
             continue
 
-        # Use first SUMMARY.md file
-        summary_path = summary_files[0]
+        # Get commits for ALL summary files to find phase start/end
+        all_commit_times = []
+        summary_file_list = []
 
-        try:
-            # Get git commits for this summary file
-            commits = list(repo.iter_commits(paths=str(summary_path), all=True))
+        for summary_path in summary_files:
+            try:
+                # Get git commits for this summary file
+                commits = list(repo.iter_commits(paths=str(summary_path), all=True))
 
-            if not commits:
-                logger.warning(f"No git commits found for {summary_path}")
+                if commits:
+                    # Add all commit times from this file
+                    all_commit_times.extend([c.committed_datetime for c in commits])
+                    summary_file_list.append(str(summary_path))
+
+            except Exception as e:
+                logger.warning(f"Failed to extract git metadata for {summary_path}: {e}")
                 continue
 
-            # Start date = first commit (oldest)
-            start_date = commits[-1].committed_datetime
-
-            # End date = last commit (newest)
-            end_date = commits[0].committed_datetime
-
-            phases[phase_num] = {
-                "name": phase_name,
-                "start": start_date.isoformat(),
-                "end": end_date.isoformat(),
-                "summary_file": str(summary_path),
-                "commits": len(commits)
-            }
-
-        except Exception as e:
-            logger.error(f"Failed to extract git metadata for {summary_path}: {e}")
+        if not all_commit_times:
+            logger.warning(f"No git commits found for any SUMMARY files in phase {phase_num}")
             continue
+
+        # Phase start = earliest commit across all SUMMARY files
+        start_date = min(all_commit_times)
+
+        # Phase end = latest commit across all SUMMARY files
+        end_date = max(all_commit_times)
+
+        phases[phase_num] = {
+            "name": phase_name,
+            "start": start_date.isoformat(),
+            "end": end_date.isoformat(),
+            "summary_file": summary_file_list[0] if summary_file_list else "unknown",
+            "summary_files": summary_file_list,
+            "commits": len(all_commit_times)
+        }
+
+        logger.debug(
+            f"Phase {phase_num}: {len(summary_file_list)} SUMMARY files, "
+            f"{start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}"
+        )
 
     logger.info(f"Extracted {len(phases)} phase boundaries from {phases_dir}")
     return phases
