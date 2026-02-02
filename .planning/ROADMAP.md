@@ -183,7 +183,13 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
   3. All external directories (Data_Tools, ProjectTT, fredtools2, fedtools2) indexed in memory
   4. Pre-integration memories tagged with pre_integration_v0.5.0 metadata
   5. Memory queries can answer "What files exist in directory X?" for all 5 directories
-**Plans**: TBD
+**Plans**: 5 plans
+Plans:
+- [ ] 11-01-PLAN.md - Create extraction and indexing infrastructure
+- [ ] 11-02-PLAN.md - Index ta_lab2 codebase snapshot
+- [ ] 11-03-PLAN.md - Index external directories snapshot
+- [ ] 11-04-PLAN.md - Extract v0.4.0 conversation history
+- [ ] 11-05-PLAN.md - Validate 100% coverage and document state
 
 ### Phase 12: Archive Foundation
 **Goal**: Establish archive structure and preservation patterns before any file moves
@@ -305,7 +311,7 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> 12 -> ...
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 11. Memory Preparation | 0/TBD | Not started | - |
+| 11. Memory Preparation | 0/5 | Planned | - |
 | 12. Archive Foundation | 0/TBD | Not started | - |
 | 13. Documentation Consolidation | 0/TBD | Not started | - |
 | 14. Tools Integration | 0/TBD | Not started | - |
@@ -336,4 +342,4 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> 12 -> ...
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-02 (v0.5.0 roadmap added: 9 phases, 32 requirements)*
+*Last updated: 2026-02-02 (Phase 11 planned: 5 plans in 3 waves)*
