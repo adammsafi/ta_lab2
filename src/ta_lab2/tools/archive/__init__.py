@@ -24,6 +24,15 @@ from ta_lab2.tools.archive.manifest import (
     validate_manifest,
     load_manifest,
 )
+from ta_lab2.tools.archive.validate import (
+    DEFAULT_PATTERNS,
+    EXCLUDE_DIRS,
+    create_snapshot,
+    validate_no_data_loss,
+    save_snapshot,
+    load_snapshot,
+    create_multi_directory_snapshot,
+)
 
 __all__ = [
     # Types
@@ -40,4 +49,12 @@ __all__ = [
     "save_manifest",
     "validate_manifest",
     "load_manifest",
+    # Validation functions
+    "DEFAULT_PATTERNS",
+    "EXCLUDE_DIRS",
+    "create_snapshot",
+    "validate_no_data_loss",
+    "save_snapshot",
+    "load_snapshot",
+    "create_multi_directory_snapshot",
 ]
