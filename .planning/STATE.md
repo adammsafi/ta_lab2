@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 ## Current Position
 
 Phase: 13 of 19 (Documentation Consolidation)
-Plan: 1 of 3 in current phase
+Plan: 2 of 3 in current phase
 Status: In progress
-Last activity: 2026-02-02 - Completed 13-01-PLAN.md (Document Conversion Utilities)
+Last activity: 2026-02-02 - Completed 13-02-PLAN.md (ProjectTT Discovery and Inventory)
 
-Progress: [##########] 100% v0.4.0 | [████████  ] ~82% v0.5.0 (1/3 plans complete in Phase 13)
+Progress: [##########] 100% v0.4.0 | [████████  ] ~83% v0.5.0 (2/3 plans complete in Phase 13)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 65 (56 in v0.4.0, 9 in v0.5.0)
+- Total plans completed: 66 (56 in v0.4.0, 10 in v0.5.0)
 - Average duration: 11 min
-- Total execution time: 13.38 hours
+- Total execution time: 13.43 hours
 
 **By Phase (v0.4.0):**
 
@@ -44,11 +44,11 @@ Progress: [##########] 100% v0.4.0 | [████████  ] ~82% v0.5.0 (1
 |-------|-------|-------|----------|--------|
 | 11-memory-preparation | 5 | 46 min | 9 min | Complete |
 | 12-archive-foundation | 3 | 11 min | 4 min | Complete |
-| 13-documentation-consolidation | 1 | 4 min | 4 min | In progress |
+| 13-documentation-consolidation | 2 | 7 min | 4 min | In progress |
 
 **Recent Trend:**
 - v0.4.0 complete: 10 phases, 56 plans, 12.55 hours total
-- v0.5.0 in progress: Phase 13 started (1/3 plans, 4 min total)
+- v0.5.0 in progress: Phase 13 in progress (2/3 plans, 7 min total)
 
 *Updated after each plan completion*
 
@@ -88,6 +88,9 @@ Recent decisions affecting current work:
 - **ConversionResult pattern** (13-01): Follow ArchiveResult dataclass design for consistency across tooling modules
 - **Media extraction structure** (13-01): Extract images to assets/{stem}/ directory for organized management
 - **YAML front matter** (13-01): Include title, author, created, modified, original_path, original_size_bytes for document metadata
+- **Content-based categorization** (13-02): Categorize ProjectTT docs by content type (Foundational→architecture, Features/EMAs→features/emas), not source location
+- **Priority-based conversion** (13-02): Three-tier system (>100KB or key docs=high, 20-100KB=medium, <20KB=low) determines conversion order
+- **Track existing .txt versions** (13-02): Check for existing .txt conversions to avoid redundant work
 
 ### Pending Todos
 
@@ -99,10 +102,10 @@ None currently.
 
 ## Session Continuity
 
-Last session: 2026-02-02T21:28:58Z
-Stopped at: Completed 13-01-PLAN.md (Document Conversion Utilities)
+Last session: 2026-02-02T21:29:28Z
+Stopped at: Completed 13-02-PLAN.md (ProjectTT Discovery and Inventory)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-02 (Completed Phase 13 Plan 01: Document Conversion Utilities - Phase 13 in progress)*
+*Last updated: 2026-02-02 (Completed Phase 13 Plan 02: ProjectTT Discovery and Inventory - Phase 13 in progress)*
