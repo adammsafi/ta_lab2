@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 
 ## Current Position
 
-Phase: 12 of 19 (Archive Foundation)
-Plan: 3 of 3 in current phase
-Status: Phase complete
-Last activity: 2026-02-02 - Completed 12-03-PLAN.md (Validation Tooling and Pre-Reorganization Baseline)
+Phase: 13 of 19 (Documentation Consolidation)
+Plan: 1 of 3 in current phase
+Status: In progress
+Last activity: 2026-02-02 - Completed 13-01-PLAN.md (Document Conversion Utilities)
 
-Progress: [##########] 100% v0.4.0 | [███████   ] ~80% v0.5.0 (3/3 plans complete in Phase 12)
+Progress: [##########] 100% v0.4.0 | [████████  ] ~82% v0.5.0 (1/3 plans complete in Phase 13)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 64 (56 in v0.4.0, 8 in v0.5.0)
+- Total plans completed: 65 (56 in v0.4.0, 9 in v0.5.0)
 - Average duration: 11 min
-- Total execution time: 13.31 hours
+- Total execution time: 13.38 hours
 
 **By Phase (v0.4.0):**
 
@@ -44,10 +44,11 @@ Progress: [##########] 100% v0.4.0 | [███████   ] ~80% v0.5.0 (3/3
 |-------|-------|-------|----------|--------|
 | 11-memory-preparation | 5 | 46 min | 9 min | Complete |
 | 12-archive-foundation | 3 | 11 min | 4 min | Complete |
+| 13-documentation-consolidation | 1 | 4 min | 4 min | In progress |
 
 **Recent Trend:**
 - v0.4.0 complete: 10 phases, 56 plans, 12.55 hours total
-- v0.5.0 in progress: Phase 12 complete (3/3 plans, 11 min total)
+- v0.5.0 in progress: Phase 13 started (1/3 plans, 4 min total)
 
 *Updated after each plan completion*
 
@@ -83,6 +84,10 @@ Recent decisions affecting current work:
 - **Checksum-based validation not path-based** (12-03): SHA256 checksums track files through moves regardless of path changes
 - **Exclude cache/tooling from snapshots** (12-03): __pycache__, .venv, .git excluded from validation snapshots
 - **Capture entire project baseline** (12-03): 9,620 Python files snapshotted including tests and .venv for complete audit trail
+- **Two-step DOCX conversion** (13-01): pypandoc (DOCX->HTML) then markdownify (HTML->Markdown) for best quality
+- **ConversionResult pattern** (13-01): Follow ArchiveResult dataclass design for consistency across tooling modules
+- **Media extraction structure** (13-01): Extract images to assets/{stem}/ directory for organized management
+- **YAML front matter** (13-01): Include title, author, created, modified, original_path, original_size_bytes for document metadata
 
 ### Pending Todos
 
@@ -94,10 +99,10 @@ None currently.
 
 ## Session Continuity
 
-Last session: 2026-02-02T18:38:01Z
-Stopped at: Completed 12-03-PLAN.md (Validation Tooling and Pre-Reorganization Baseline)
+Last session: 2026-02-02T21:28:58Z
+Stopped at: Completed 13-01-PLAN.md (Document Conversion Utilities)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-02 (Completed Phase 12 Plan 03: Validation Tooling and Pre-Reorganization Baseline - Phase 12 complete)*
+*Last updated: 2026-02-02 (Completed Phase 13 Plan 01: Document Conversion Utilities - Phase 13 in progress)*
