@@ -13,13 +13,10 @@ from ta_lab2.tools.docs.convert_docx import (
     convert_docx_to_markdown,
     ConversionResult,
 )
-
-# Excel conversion will be added in future plan
-# from ta_lab2.tools.docs.convert_excel import (
-#     convert_excel_to_markdown,
-#     batch_convert_excel,
-# )
-
+from ta_lab2.tools.docs.convert_excel import (
+    convert_excel_to_markdown,
+    batch_convert_excel,
+)
 from ta_lab2.tools.docs.discover_projecttt import (
     discover_projecttt,
     categorize_document,
@@ -32,9 +29,9 @@ __all__ = [
     "extract_docx_metadata",
     "convert_docx_to_markdown",
     "ConversionResult",
-    # Excel conversion (future)
-    # "convert_excel_to_markdown",
-    # "batch_convert_excel",
+    # Excel conversion
+    "convert_excel_to_markdown",
+    "batch_convert_excel",
     # ProjectTT discovery
     "discover_projecttt",
     "categorize_document",
