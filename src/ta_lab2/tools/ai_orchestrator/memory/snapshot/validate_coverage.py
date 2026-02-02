@@ -96,12 +96,24 @@ def test_directory_inventory_query(client, directory: str) -> dict:
 
     try:
         # Search with directory filter
-        results = client.search(
+        # Note: Remove filters parameter - Qdrant filter syntax is complex
+        # Just use semantic search and check results
+        search_results = client.search(
             query=query,
             user_id="orchestrator",
-            filters={"source": {"$eq": directory}},
-            limit=10
+            limit=20
         )
+
+        # Extract results list from response dict
+        results = search_results.get("results", []) if isinstance(search_results, dict) else search_results
+
+        # Filter results to only those from the target directory
+        filtered_results = [
+            r for r in results
+            if directory.lower() in r.get("memory", "").lower() or
+               r.get("metadata", {}).get("directory") == directory
+        ]
+        results = filtered_results
 
         sample_files = []
         for r in results[:5]:
@@ -141,12 +153,23 @@ def test_function_lookup_query(client, directory: str) -> dict:
     query = f"Functions in {directory}"
 
     try:
-        results = client.search(
+        # Search for functions in directory
+        search_results = client.search(
             query=query,
             user_id="orchestrator",
-            filters={"source": {"$eq": directory}},
-            limit=5
+            limit=10
         )
+
+        # Extract results list from response dict
+        results = search_results.get("results", []) if isinstance(search_results, dict) else search_results
+
+        # Filter results to only those from the target directory
+        filtered_results = [
+            r for r in results
+            if r.get("metadata", {}).get("directory") == directory or
+               directory.lower() in r.get("memory", "").lower()
+        ]
+        results = filtered_results
 
         # Check if results contain function information
         has_functions = any("Functions:" in r.get("memory", "") for r in results)
@@ -181,14 +204,25 @@ def test_tag_filtering_query(client, tag: str) -> dict:
     query = f"{tag} snapshot files"
 
     try:
-        results = client.search(
+        search_results = client.search(
             query=query,
             user_id="orchestrator",
             limit=10
         )
 
+        # Extract results list from response dict
+        results = search_results.get("results", []) if isinstance(search_results, dict) else search_results
+
         # Check if results have the tag
-        tagged_results = [r for r in results if tag in r.get("metadata", {}).get("tags", [])]
+        # Results can be dict or other format - handle both
+        tagged_results = []
+        for r in results:
+            if isinstance(r, dict):
+                tags = r.get("metadata", {}).get("tags", [])
+                if isinstance(tags, list) and tag in tags:
+                    tagged_results.append(r)
+            elif isinstance(r, str) and tag in r:
+                tagged_results.append(r)
 
         return {
             "query": query,
@@ -222,7 +256,8 @@ def test_cross_reference_query(client) -> dict:
     query = "What functions use extract_codebase?"
 
     try:
-        results = client.search(query=query, user_id="orchestrator", limit=5)
+        search_results = client.search(query=query, user_id="orchestrator", limit=5)
+        results = search_results.get("results", []) if isinstance(search_results, dict) else search_results
 
         return {
             "query": query,
@@ -266,11 +301,12 @@ def validate_file_coverage(client, expected_files: list[str], sample_size: int =
         filename = Path(file_path).name if "\\" in file_path or "/" in file_path else file_path
 
         try:
-            results = client.search(
+            search_results = client.search(
                 query=f"File {filename}",
                 user_id="orchestrator",
                 limit=3
             )
+            results = search_results.get("results", []) if isinstance(search_results, dict) else search_results
 
             # Check if any result mentions this file
             file_found = any(filename in r.get("memory", "") for r in results)
