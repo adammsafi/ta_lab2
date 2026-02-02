@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 ## Current Position
 
 Phase: 12 of 19 (Archive Foundation)
-Plan: 2 of 3 in current phase
-Status: In progress
-Last activity: 2026-02-02 - Completed 12-02-PLAN.md (Archive Tooling Foundation)
+Plan: 3 of 3 in current phase
+Status: Phase complete
+Last activity: 2026-02-02 - Completed 12-03-PLAN.md (Validation Tooling and Pre-Reorganization Baseline)
 
-Progress: [##########] 100% v0.4.0 | [██████    ] ~75% v0.5.0 (2/3 plans complete in Phase 12)
+Progress: [##########] 100% v0.4.0 | [███████   ] ~80% v0.5.0 (3/3 plans complete in Phase 12)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 63 (56 in v0.4.0, 7 in v0.5.0)
+- Total plans completed: 64 (56 in v0.4.0, 8 in v0.5.0)
 - Average duration: 11 min
-- Total execution time: 13.23 hours
+- Total execution time: 13.31 hours
 
 **By Phase (v0.4.0):**
 
@@ -43,11 +43,11 @@ Progress: [##########] 100% v0.4.0 | [██████    ] ~75% v0.5.0 (2/3 p
 | Phase | Plans | Total | Avg/Plan | Status |
 |-------|-------|-------|----------|--------|
 | 11-memory-preparation | 5 | 46 min | 9 min | Complete |
-| 12-archive-foundation | 2 | 6 min | 3 min | In progress |
+| 12-archive-foundation | 3 | 11 min | 4 min | Complete |
 
 **Recent Trend:**
 - v0.4.0 complete: 10 phases, 56 plans, 12.55 hours total
-- v0.5.0 in progress: Phase 12 (2/3 plans complete, 6 min total)
+- v0.5.0 in progress: Phase 12 complete (3/3 plans, 11 min total)
 
 *Updated after each plan completion*
 
@@ -80,6 +80,9 @@ Recent decisions affecting current work:
 - **Use hashlib.file_digest() for checksums** (12-02): Python 3.11+ optimization bypassing buffers for 2-10x faster SHA256 computation
 - **$schema versioning for manifests** (12-02): JSON Schema best practice with version URLs for forward compatibility and validation tooling
 - **Follow MigrationResult pattern** (12-02): Archive dataclasses follow proven memory/migration.py design for consistency
+- **Checksum-based validation not path-based** (12-03): SHA256 checksums track files through moves regardless of path changes
+- **Exclude cache/tooling from snapshots** (12-03): __pycache__, .venv, .git excluded from validation snapshots
+- **Capture entire project baseline** (12-03): 9,620 Python files snapshotted including tests and .venv for complete audit trail
 
 ### Pending Todos
 
@@ -91,10 +94,10 @@ None currently.
 
 ## Session Continuity
 
-Last session: 2026-02-02T18:29:22Z
-Stopped at: Completed 12-02-PLAN.md (Archive Tooling Foundation)
+Last session: 2026-02-02T18:38:01Z
+Stopped at: Completed 12-03-PLAN.md (Validation Tooling and Pre-Reorganization Baseline)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-02 (Completed Phase 12 Plan 02: Archive Tooling Foundation)*
+*Last updated: 2026-02-02 (Completed Phase 12 Plan 03: Validation Tooling and Pre-Reorganization Baseline - Phase 12 complete)*
