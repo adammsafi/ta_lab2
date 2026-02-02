@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 ## Current Position
 
 Phase: 12 of 19 (Archive Foundation)
-Plan: 1 of 3 in current phase
+Plan: 2 of 3 in current phase
 Status: In progress
-Last activity: 2026-02-02 - Completed 12-01-PLAN.md (Archive Structure and Verification)
+Last activity: 2026-02-02 - Completed 12-02-PLAN.md (Archive Tooling Foundation)
 
-Progress: [##########] 100% v0.4.0 | [█████     ] ~73% v0.5.0 (1/3 plans complete in Phase 12)
+Progress: [##########] 100% v0.4.0 | [██████    ] ~75% v0.5.0 (2/3 plans complete in Phase 12)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 62 (56 in v0.4.0, 6 in v0.5.0)
+- Total plans completed: 63 (56 in v0.4.0, 7 in v0.5.0)
 - Average duration: 11 min
-- Total execution time: 13.20 hours
+- Total execution time: 13.23 hours
 
 **By Phase (v0.4.0):**
 
@@ -43,11 +43,11 @@ Progress: [##########] 100% v0.4.0 | [█████     ] ~73% v0.5.0 (1/3 pla
 | Phase | Plans | Total | Avg/Plan | Status |
 |-------|-------|-------|----------|--------|
 | 11-memory-preparation | 5 | 46 min | 9 min | Complete |
-| 12-archive-foundation | 1 | 3 min | 3 min | In progress |
+| 12-archive-foundation | 2 | 6 min | 3 min | In progress |
 
 **Recent Trend:**
 - v0.4.0 complete: 10 phases, 56 plans, 12.55 hours total
-- v0.5.0 in progress: Phase 12 (1/3 plans complete, 3 min total)
+- v0.5.0 in progress: Phase 12 (2/3 plans complete, 6 min total)
 
 *Updated after each plan completion*
 
@@ -77,6 +77,9 @@ Recent decisions affecting current work:
 - **Category-first archive structure** (12-01): .archive/{category}/YYYY-MM-DD/ chosen over date-first for browsing by type
 - **Manifest per category** (12-01): One manifest.json per category tracking all files across dates for simpler querying
 - **Git mv pure move requirement** (12-01): Pure move commits (no content changes) required for git log --follow history preservation
+- **Use hashlib.file_digest() for checksums** (12-02): Python 3.11+ optimization bypassing buffers for 2-10x faster SHA256 computation
+- **$schema versioning for manifests** (12-02): JSON Schema best practice with version URLs for forward compatibility and validation tooling
+- **Follow MigrationResult pattern** (12-02): Archive dataclasses follow proven memory/migration.py design for consistency
 
 ### Pending Todos
 
@@ -88,10 +91,10 @@ None currently.
 
 ## Session Continuity
 
-Last session: 2026-02-02T18:26:55Z
-Stopped at: Completed 12-01-PLAN.md (Archive Structure and Verification)
+Last session: 2026-02-02T18:29:22Z
+Stopped at: Completed 12-02-PLAN.md (Archive Tooling Foundation)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-02 (Completed Phase 12 Plan 01: Archive Structure and Verification)*
+*Last updated: 2026-02-02 (Completed Phase 12 Plan 02: Archive Tooling Foundation)*
