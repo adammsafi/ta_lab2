@@ -18,7 +18,7 @@ import json
 import logging
 from pathlib import Path
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 logging.basicConfig(
     level=logging.INFO,
@@ -98,6 +98,7 @@ def test_directory_inventory_query(client, directory: str) -> dict:
         # Search with directory filter
         results = client.search(
             query=query,
+            user_id="orchestrator",
             filters={"source": {"$eq": directory}},
             limit=10
         )
@@ -142,6 +143,7 @@ def test_function_lookup_query(client, directory: str) -> dict:
     try:
         results = client.search(
             query=query,
+            user_id="orchestrator",
             filters={"source": {"$eq": directory}},
             limit=5
         )
@@ -181,6 +183,7 @@ def test_tag_filtering_query(client, tag: str) -> dict:
     try:
         results = client.search(
             query=query,
+            user_id="orchestrator",
             limit=10
         )
 
@@ -219,7 +222,7 @@ def test_cross_reference_query(client) -> dict:
     query = "What functions use extract_codebase?"
 
     try:
-        results = client.search(query=query, limit=5)
+        results = client.search(query=query, user_id="orchestrator", limit=5)
 
         return {
             "query": query,
@@ -265,6 +268,7 @@ def validate_file_coverage(client, expected_files: list[str], sample_size: int =
         try:
             results = client.search(
                 query=f"File {filename}",
+                user_id="orchestrator",
                 limit=3
             )
 
@@ -372,7 +376,7 @@ def validate_memory_coverage(snapshots_dir: Path, sample_size: int = 50) -> dict
     success = overall_coverage_percentage >= 95.0  # Allow 5% tolerance
 
     return {
-        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "timestamp": datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
         "total_memories": total_memories,
         "directories_validated": directories,
         "directory_results": directory_results,
