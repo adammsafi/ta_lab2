@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 ## Current Position
 
 Phase: 11 of 19 (Memory Preparation)
-Plan: 1 of TBD in current phase
+Plan: 3 of TBD in current phase
 Status: In progress
-Last activity: 2026-02-02 - Completed 11-01-PLAN.md (Infrastructure)
+Last activity: 2026-02-02 - Completed 11-03-PLAN.md (External Directories Snapshot)
 
-Progress: [##########] 100% v0.4.0 | [█         ] ~14% v0.5.0 (1/7 plans complete in Phase 11)
+Progress: [##########] 100% v0.4.0 | [██        ] ~29% v0.5.0 (2/7 plans complete in Phase 11)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 57 (56 in v0.4.0, 1 in v0.5.0)
+- Total plans completed: 58 (56 in v0.4.0, 2 in v0.5.0)
 - Average duration: 11 min
-- Total execution time: 12.63 hours
+- Total execution time: 12.75 hours
 
 **By Phase (v0.4.0):**
 
@@ -42,11 +42,11 @@ Progress: [##########] 100% v0.4.0 | [█         ] ~14% v0.5.0 (1/7 plans compl
 
 | Phase | Plans | Total | Avg/Plan | Status |
 |-------|-------|-------|----------|--------|
-| 11-memory-preparation | 1 | 5 min | 5 min | In progress |
+| 11-memory-preparation | 2 | 12 min | 6 min | In progress |
 
 **Recent Trend:**
 - v0.4.0 complete: 10 phases, 56 plans, 12.55 hours total
-- v0.5.0 in progress: Phase 11 (1/7 plans complete, 5 min total)
+- v0.5.0 in progress: Phase 11 (2/7 plans complete, 12 min total)
 
 *Updated after each plan completion*
 
@@ -64,6 +64,8 @@ Recent decisions affecting current work:
 - **Disable LLM conflict detection for bulk** (11-01): Use infer=False in batch_add_memories() for performance
 - **Dual tagging strategy** (11-01): Snapshot memories use simple tags + structured metadata for filtering
 - **Graceful untracked file handling** (11-01): Git metadata extraction returns tracked=False instead of errors
+- **Reuse infrastructure for external dirs** (11-03): Same extract_codebase/batch_indexer for all directories
+- **Graceful directory validation** (11-03): Validate directories before processing, skip missing with warnings
 
 ### Pending Todos
 
@@ -75,10 +77,10 @@ None currently.
 
 ## Session Continuity
 
-Last session: 2026-02-02T16:40:23Z
-Stopped at: Completed 11-01-PLAN.md (Infrastructure)
+Last session: 2026-02-02T16:52:07Z
+Stopped at: Completed 11-03-PLAN.md (External Directories Snapshot)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-02 (Completed Phase 11 Plan 01: Infrastructure)*
+*Last updated: 2026-02-02 (Completed Phase 11 Plan 03: External Directories Snapshot)*
