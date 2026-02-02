@@ -1,29 +1,53 @@
 # Roadmap: ta_lab2 AI-Accelerated Quant Platform
 
+## Milestones
+
+- v0.4.0 Memory Infrastructure & Orchestrator (Phases 1-10) - SHIPPED 2026-02-01
+- v0.5.0 Ecosystem Reorganization (Phases 11-19) - IN PROGRESS
+
 ## Overview
 
-Build trustworthy quant trading infrastructure 3x faster by creating AI coordination that remembers context across platforms. Start with quota management and memory infrastructure (integrate existing 3,763 memories in ChromaDB), layer in multi-platform orchestration with cost optimization, migrate to hybrid Mem0 + Vertex AI architecture, then accelerate ta_lab2 development (time model, features, signals) through the coordinated AI system. Parallel tracks converge at integration phase where memory + orchestrator + ta_lab2 prove the unified vision.
+Build trustworthy quant trading infrastructure 3x faster by creating AI coordination that remembers context across platforms. v0.4.0 established quota management, memory infrastructure (3,763 memories in Qdrant via Mem0), multi-platform orchestration with cost optimization, and ta_lab2 development (time model, features, signals). v0.5.0 consolidates four external project directories (ProjectTT, Data_Tools, fredtools2, fedtools2) into the unified ta_lab2 structure with memory-first auditability and zero deletion.
 
 ## Phases
 
 **Phase Numbering:**
-- Integer phases (1, 2, 3): Planned milestone work
-- Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
+- Phases 1-10: v0.4.0 (complete)
+- Phases 11-19: v0.5.0 (current milestone)
+- Decimal phases (11.1, 12.1): Urgent insertions if needed
 
-Decimal phases appear between their surrounding integers in numeric order.
+<details>
+<summary>v0.4.0 Memory Infrastructure & Orchestrator (Phases 1-10) - SHIPPED 2026-02-01</summary>
 
 - [x] **Phase 1: Foundation & Quota Management** - Infrastructure validation and quota tracking foundation
 - [x] **Phase 2: Memory Core (ChromaDB Integration)** - Integrate existing 3,763 memories and enable semantic search
-- [x] **Phase 3: Memory Advanced (Mem0 Migration)** - Migrate to Mem0 + Vertex AI, add conflict resolution and health monitoring
+- [x] **Phase 3: Memory Advanced (Mem0 Migration)** - Migrate to Mem0 + Qdrant, add conflict resolution and health monitoring
 - [x] **Phase 4: Orchestrator Adapters** - Claude, ChatGPT, Gemini platform integrations
 - [x] **Phase 5: Orchestrator Coordination** - Routing, handoffs, parallel execution, cost tracking
 - [x] **Phase 6: ta_lab2 Time Model** - Dimension tables and EMA unification
 - [x] **Phase 7: ta_lab2 Feature Pipeline** - Returns, volatility, technical indicators
 - [x] **Phase 8: ta_lab2 Signals** - Signal generation and backtest integration
 - [x] **Phase 9: Integration & Observability** - Cross-system validation and monitoring
-- [ ] **Phase 10: Release Validation** - Final tests, documentation, v0.4.0 tag
+- [x] **Phase 10: Release Validation** - Final tests, documentation, v0.4.0 tag
+
+</details>
+
+### v0.5.0 Ecosystem Reorganization (Phases 11-19) - IN PROGRESS
+
+- [ ] **Phase 11: Memory Preparation** - Initialize memory state before any file moves (BLOCKER)
+- [ ] **Phase 12: Archive Foundation** - Establish .archive/ structure and preservation patterns
+- [ ] **Phase 13: Documentation Consolidation** - Convert and integrate ProjectTT docs with memory tracking
+- [ ] **Phase 14: Tools Integration** - Migrate Data_Tools scripts with memory updates
+- [ ] **Phase 15: Economic Data Strategy** - Evaluate and integrate fredtools2/fedtools2 with memory updates
+- [ ] **Phase 16: Repository Cleanup** - Clean root directory with memory updates
+- [ ] **Phase 17: Verification & Validation** - Validate imports, dependencies, and structure
+- [ ] **Phase 18: Structure Documentation** - Document final structure and migration decisions
+- [ ] **Phase 19: Memory Validation & Release** - Final memory validation and milestone release
 
 ## Phase Details
+
+<details>
+<summary>v0.4.0 Phase Details (Phases 1-10) - COMPLETE</summary>
 
 ### Phase 1: Foundation & Quota Management
 **Goal**: Quota tracking system operational and infrastructure validated for parallel development
@@ -34,12 +58,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. Pre-flight adapter validation prevents routing to unimplemented adapters
   3. Infrastructure dependencies (Mem0, Vertex AI, platform SDKs) installed and verified
   4. Development environment supports parallel work on memory/orchestrator/ta_lab2 tracks
-**Plans**: 3 plans
-
-Plans:
-- [x] 01-01-PLAN.md — Infrastructure setup & SDK validation (Wave 1)
-- [x] 01-02-PLAN.md — Quota system enhancement with persistence, alerts, reservation (Wave 1)
-- [x] 01-03-PLAN.md — Pre-flight validation & smoke tests (Wave 2)
+**Plans**: 3/3 complete
 
 ### Phase 2: Memory Core (ChromaDB Integration)
 **Goal**: Existing ChromaDB memory store (3,763 memories) integrated with orchestrator
@@ -51,35 +70,19 @@ Plans:
   3. Context injection system retrieves top-K memories for AI prompts
   4. Claude, ChatGPT, and Gemini can all read from ChromaDB memory layer (via HTTP API)
   5. Incremental update pipeline adds new memories without breaking existing embeddings
-**Required Dependencies**: fastapi, uvicorn (for MEMO-04 cross-platform access)
-**Plans**: 5 plans (4 original + 1 gap closure)
-
-Plans:
-- [x] 02-01-PLAN.md — ChromaDB client wrapper & integrity validation (Wave 1)
-- [x] 02-02-PLAN.md — Semantic search API & context injection (Wave 2)
-- [x] 02-03-PLAN.md — Incremental update pipeline (Wave 2)
-- [x] 02-04-PLAN.md — Cross-platform REST API for memory access (Wave 3)
-- [x] 02-05-PLAN.md — Fix semantic search embedding dimension mismatch (Gap closure)
+**Plans**: 5/5 complete
 
 ### Phase 3: Memory Advanced (Mem0 Migration)
 **Goal**: Memory system migrated to Mem0 with self-maintenance and conflict detection
 **Depends on**: Phase 2
 **Requirements**: MEMO-09, MEMO-05, MEMO-06, MEMO-08
 **Success Criteria** (what must be TRUE):
-  1. All 3,763 memories successfully migrated from ChromaDB -> Mem0 (using ChromaDB as backend)
+  1. All 3,763 memories successfully migrated from ChromaDB -> Mem0 (using Qdrant as backend)
   2. Conflicting memories detected and resolved (no contradictory context)
   3. Stale memories flagged with deprecated_since timestamp
   4. Memory health monitoring detects outdated context before it poisons decisions
   5. All memories have enhanced metadata (created_at, last_verified, deprecated_since)
-**Plans**: 6 plans
-
-Plans:
-- [x] 03-01-PLAN.md — Mem0 integration with ChromaDB backend (Wave 1)
-- [x] 03-02-PLAN.md — Enhanced metadata schema and migration (Wave 2)
-- [x] 03-03-PLAN.md — Conflict detection and resolution (Wave 2)
-- [x] 03-04-PLAN.md — Memory health monitoring (Wave 3)
-- [x] 03-05-PLAN.md — REST API update with health and conflict endpoints (Wave 4)
-- [x] 03-06-PLAN.md — Full migration execution and validation (Wave 5)
+**Plans**: 6/6 complete
 
 ### Phase 4: Orchestrator Adapters
 **Goal**: All three AI platforms (Claude, ChatGPT, Gemini) accessible via unified adapter interface
@@ -90,13 +93,7 @@ Plans:
   2. ChatGPT adapter executes tasks via OpenAI API integration
   3. Gemini adapter executes tasks via gcloud CLI + API with quota tracking
   4. All adapters implement common interface for task submission and result retrieval
-**Plans**: 4 plans
-
-Plans:
-- [x] 04-01-PLAN.md — Base async infrastructure (Task, Result, AsyncBasePlatformAdapter) (Wave 1)
-- [x] 04-02-PLAN.md — ChatGPT async adapter with OpenAI API (Wave 2)
-- [x] 04-03-PLAN.md — Claude Code async adapter with subprocess (Wave 2)
-- [x] 04-04-PLAN.md — Gemini async adapter with quota integration (Wave 2)
+**Plans**: 4/4 complete
 
 ### Phase 5: Orchestrator Coordination
 **Goal**: Tasks route intelligently across platforms with cost optimization and parallel execution
@@ -110,15 +107,7 @@ Plans:
   5. Per-task cost tracking records token usage and API pricing
   6. Orchestrator CLI accepts task submissions and returns results
   7. Result aggregation combines outputs from parallel tasks
-**Plans**: 6 plans
-
-Plans:
-- [x] 05-01-PLAN.md — Cost-optimized routing with COST_TIERS priority (Wave 1)
-- [x] 05-02-PLAN.md — AsyncOrchestrator parallel execution engine (Wave 1)
-- [x] 05-03-PLAN.md — AI-to-AI handoffs with memory integration (Wave 2)
-- [x] 05-04-PLAN.md — Cost tracking with SQLite persistence (Wave 2)
-- [x] 05-05-PLAN.md — Error handling with retries and fallback routing (Wave 3)
-- [x] 05-06-PLAN.md — Orchestrator CLI for task submission and status (Wave 4)
+**Plans**: 6/6 complete
 
 ### Phase 6: ta_lab2 Time Model
 **Goal**: Time handling unified across ta_lab2 with formal dimension tables
@@ -132,15 +121,7 @@ Plans:
   5. Time alignment validation tests pass (TF windows, calendar rolls, session boundaries)
   6. Incremental EMA refresh computes only new rows
   7. Rowcount validation confirms actual counts match tf-defined expectations
-**Plans**: 6 plans
-
-Plans:
-- [x] 06-01-PLAN.md — Validate dimension tables exist and populated (Wave 1)
-- [x] 06-02-PLAN.md — Validate EMA unification infrastructure (Wave 1)
-- [x] 06-03-PLAN.md — Validate EMA refresh scripts use dim_timeframe (Wave 1)
-- [x] 06-04-PLAN.md — Time alignment and DST validation tests (Wave 2)
-- [x] 06-05-PLAN.md — Incremental refresh infrastructure validation (Wave 2)
-- [x] 06-06-PLAN.md — Rowcount validation script and tests (Wave 3)
+**Plans**: 6/6 complete
 
 ### Phase 7: ta_lab2 Feature Pipeline
 **Goal**: Returns, volatility, and technical indicators calculated correctly from unified time model
@@ -154,16 +135,7 @@ Plans:
   5. Null handling strategy implemented and validated
   6. Incremental refresh works for all feature tables
   7. Data consistency checks detect gaps, anomalies, and outliers
-**Plans**: 7 plans
-
-Plans:
-- [x] 07-01-PLAN.md — Feature infrastructure: FeatureStateManager and dim_features (Wave 1)
-- [x] 07-02-PLAN.md — BaseFeature class and null handling utilities (Wave 1)
-- [x] 07-03-PLAN.md — cmc_returns_daily with lookbacks from dim_timeframe (Wave 2)
-- [x] 07-04-PLAN.md — cmc_vol_daily with Parkinson, GK, RS estimators (Wave 2)
-- [x] 07-05-PLAN.md — cmc_ta_daily with RSI, MACD, indicators from dim_indicators (Wave 2)
-- [x] 07-06-PLAN.md — cmc_daily_features unified feature store (Wave 3)
-- [x] 07-07-PLAN.md — Data consistency validation and pipeline orchestration (Wave 4)
+**Plans**: 7/7 complete
 
 ### Phase 8: ta_lab2 Signals
 **Goal**: Trading signals generated and backtestable with reproducible results
@@ -173,36 +145,19 @@ Plans:
   1. cmc_signals_daily generates EMA crossovers, RSI mean reversion, ATR breakout signals
   2. Backtest integration v1 references cmc_daily_features and produces PnL
   3. Backtest reruns produce identical signals and PnL (reproducibility validated)
-**Plans**: 6 plans
-
-Plans:
-- [x] 08-01-PLAN.md — Signal infrastructure: dim_signals, SignalStateManager, signal tables (Wave 1)
-- [x] 08-02-PLAN.md — EMA crossover signal generation from cmc_daily_features (Wave 2)
-- [x] 08-03-PLAN.md — RSI mean reversion signal generation with adaptive thresholds (Wave 2)
-- [x] 08-04-PLAN.md — ATR breakout signal generation with channel tracking (Wave 2)
-- [x] 08-05-PLAN.md — Backtest integration: SignalBacktester with result storage (Wave 3)
-- [x] 08-06-PLAN.md — Reproducibility validation and orchestrated pipeline (Wave 4)
+**Plans**: 6/6 complete
 
 ### Phase 9: Integration & Observability
 **Goal**: Cross-system validation proves memory + orchestrator + ta_lab2 work together
 **Depends on**: Phase 5 (orchestrator), Phase 8 (signals)
 **Requirements**: SIG-03
 **Success Criteria** (what must be TRUE):
-  1. Observability infrastructure tests pass (tracing, metrics, health checks, workflow state - Plan 09-03)
-  2. TF alignment tests confirm calculations use correct timeframes (Plan 09-04)
-  3. Roll alignment tests validate calendar boundary handling (Plan 09-04)
+  1. Observability infrastructure tests pass (tracing, metrics, health checks, workflow state)
+  2. TF alignment tests confirm calculations use correct timeframes
+  3. Roll alignment tests validate calendar boundary handling
   4. Orchestrator successfully coordinates ta_lab2 feature refresh tasks via memory context
   5. End-to-end workflow: user submits task -> orchestrator routes -> memory provides context -> ta_lab2 executes -> results stored
-**Plans**: 7 plans
-
-Plans:
-- [x] 09-01-PLAN.md — Observability infrastructure: tracing, metrics, health, storage (Wave 1)
-- [x] 09-02-PLAN.md — Integration test infrastructure with three-tier markers (Wave 1)
-- [x] 09-03-PLAN.md — Observability infrastructure tests: tracing, metrics, health, workflow state (Wave 2)
-- [x] 09-04-PLAN.md — Gap and alignment validation tests (Wave 2)
-- [x] 09-05-PLAN.md — Component pair integration tests (Wave 3)
-- [x] 09-06-PLAN.md — Alert threshold infrastructure and tests (Wave 3)
-- [x] 09-07-PLAN.md — E2E workflow integration tests (Wave 4)
+**Plans**: 7/7 complete
 
 ### Phase 10: Release Validation
 **Goal**: v0.4.0 release ready with full documentation and validation
@@ -213,23 +168,125 @@ Plans:
   2. Data consistency validation passes (no gaps, rowcounts match, EMAs calculate correctly)
   3. Backtest reproducibility validation passes (identical results on reruns)
   4. Release v0.4.0 tagged with full documentation (README, ARCHITECTURE, API docs)
-  5. All 41 v1 requirements validated and marked complete
-**Plans**: 8 plans
+  5. All 42 v1 requirements validated and marked complete
+**Plans**: 8/8 complete
 
-Plans:
-- [x] 10-01-PLAN.md — CI validation infrastructure with PostgreSQL service (Wave 1)
-- [x] 10-02-PLAN.md — Time alignment and data consistency validation tests (Wave 2)
-- [x] 10-03-PLAN.md — Backtest reproducibility validation tests (Wave 2)
-- [x] 10-04-PLAN.md — DESIGN.md and deployment guide documentation (Wave 3)
-- [x] 10-05-PLAN.md — README and ARCHITECTURE.md update for v0.4.0 (Wave 3)
-- [x] 10-06-PLAN.md — CHANGELOG, MkDocs, and release workflow (Wave 4)
-- [x] 10-07-PLAN.md — API reference documentation (Wave 4)
-- [x] 10-08-PLAN.md — Final validation and version bump (Wave 5)
+</details>
+
+### Phase 11: Memory Preparation
+**Goal**: Capture current state of all codebases in memory before any file moves
+**Depends on**: Phase 10 (v0.4.0 complete)
+**Requirements**: MEMO-10, MEMO-11, MEMO-12
+**Success Criteria** (what must be TRUE):
+  1. Memory contains v0.4.0 completion context and current project state
+  2. ta_lab2 codebase has baseline memory snapshot with pre_reorg_v0.5.0 tag
+  3. All external directories (Data_Tools, ProjectTT, fredtools2, fedtools2) indexed in memory
+  4. Pre-integration memories tagged with pre_integration_v0.5.0 metadata
+  5. Memory queries can answer "What files exist in directory X?" for all 5 directories
+**Plans**: TBD
+
+### Phase 12: Archive Foundation
+**Goal**: Establish archive structure and preservation patterns before any file moves
+**Depends on**: Phase 11
+**Requirements**: ARCH-01, ARCH-02, ARCH-03, ARCH-04
+**Success Criteria** (what must be TRUE):
+  1. .archive/ directory exists with timestamped subdirectories and category structure
+  2. 00-README.md documents archive contents and retrieval instructions
+  3. manifest.json template created for tracking archived files
+  4. git mv verified to preserve history (git log --follow works for test file)
+  5. Pre-reorganization file counts recorded for validation
+**Plans**: TBD
+
+### Phase 13: Documentation Consolidation
+**Goal**: Convert ProjectTT documentation and integrate into docs/ structure
+**Depends on**: Phase 12
+**Requirements**: DOC-01, DOC-02, DOC-03, MEMO-13, MEMO-14
+**Success Criteria** (what must be TRUE):
+  1. ProjectTT .docx files converted to Markdown in docs/
+  2. docs/index.md serves as documentation home page
+  3. Original Excel/Word files preserved in .archive/documentation/
+  4. Memory updated with moved_to relationships for each file
+  5. Phase-level memory snapshot created with phase 13 tag
+**Plans**: TBD
+
+### Phase 14: Tools Integration
+**Goal**: Migrate Data_Tools scripts into ta_lab2/tools/ with working imports
+**Depends on**: Phase 13
+**Requirements**: TOOL-01, TOOL-02, TOOL-03, MEMO-13, MEMO-14
+**Success Criteria** (what must be TRUE):
+  1. Data_Tools scripts moved to src/ta_lab2/tools/data_tools/
+  2. All import paths updated (no hardcoded paths remain)
+  3. pytest smoke tests pass for migrated scripts
+  4. Memory updated with moved_to relationships for each file
+  5. Phase-level memory snapshot created with phase 14 tag
+**Plans**: TBD
+
+### Phase 15: Economic Data Strategy
+**Goal**: Evaluate fredtools2/fedtools2 and implement integration decision
+**Depends on**: Phase 14
+**Requirements**: ECON-01, ECON-02, ECON-03, MEMO-13, MEMO-14
+**Success Criteria** (what must be TRUE):
+  1. Function inventory complete for both packages
+  2. Decision documented: merge into ta_lab2, keep as optional deps, or archive
+  3. If integrating: packages accessible via pip install ta_lab2[economic-data]
+  4. If archiving: packages in .archive/economic_data/ with documentation
+  5. Memory updated with integration decision and file locations
+**Plans**: TBD
+
+### Phase 16: Repository Cleanup
+**Goal**: Clean root directory and consolidate duplicate files
+**Depends on**: Phase 15
+**Requirements**: CLEAN-01, CLEAN-02, CLEAN-03, CLEAN-04, MEMO-13, MEMO-14
+**Success Criteria** (what must be TRUE):
+  1. Root directory contains only essential files (README, pyproject.toml, core configs)
+  2. Temp files, *_refactored.py, *.original archived with manifest
+  3. Loose .md files moved to appropriate docs/ subdirectories
+  4. Exact duplicates identified via SHA256 and archived
+  5. Similar functions (85%+ threshold) flagged for review
+**Plans**: TBD
+
+### Phase 17: Verification & Validation
+**Goal**: Validate all imports work and no data was lost
+**Depends on**: Phase 16
+**Requirements**: VAL-01, VAL-02, VAL-03, VAL-04
+**Success Criteria** (what must be TRUE):
+  1. All ta_lab2 modules importable without errors
+  2. No circular dependencies detected (pycycle/import-linter clean)
+  3. CI tests validate organization rules (no .py in root, manifest integrity)
+  4. Pre-commit hooks installed preventing future disorganization
+  5. File count validation: pre + archived = post (zero data loss)
+**Plans**: TBD
+
+### Phase 18: Structure Documentation
+**Goal**: Document final structure and migration decisions for future reference
+**Depends on**: Phase 17
+**Requirements**: STRUCT-01, STRUCT-02, STRUCT-03
+**Success Criteria** (what must be TRUE):
+  1. docs/REORGANIZATION.md explains what moved where and why
+  2. README updated with new ecosystem structure and component links
+  3. YAML/JSON manifest tracks rationale for each major decision
+  4. Before/after directory tree diagrams included
+  5. Migration guide enables finding moved files
+**Plans**: TBD
+
+### Phase 19: Memory Validation & Release
+**Goal**: Validate memory completeness and release v0.5.0
+**Depends on**: Phase 18
+**Requirements**: MEMO-15, MEMO-16, MEMO-17, MEMO-18
+**Success Criteria** (what must be TRUE):
+  1. Function-level memories exist for significant functions
+  2. Memory relationship types complete (contains, calls, imports, moved_to, similar_to)
+  3. Duplicate functions detected and documented (95%+, 85-95%, 70-85% thresholds)
+  4. Memory graph validation passes (no orphans, all relationships linked)
+  5. Memory queries work: function lookup, cross-reference, edit impact analysis
+**Plans**: TBD
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
+Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> 12 -> ... -> 19 (v0.5.0)
+
+### v0.4.0 Progress (Complete)
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -244,6 +301,39 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 9. Integration & Observability | 7/7 | Complete | 2026-01-30 |
 | 10. Release Validation | 8/8 | Complete | 2026-02-01 |
 
+### v0.5.0 Progress (Current)
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 11. Memory Preparation | 0/TBD | Not started | - |
+| 12. Archive Foundation | 0/TBD | Not started | - |
+| 13. Documentation Consolidation | 0/TBD | Not started | - |
+| 14. Tools Integration | 0/TBD | Not started | - |
+| 15. Economic Data Strategy | 0/TBD | Not started | - |
+| 16. Repository Cleanup | 0/TBD | Not started | - |
+| 17. Verification & Validation | 0/TBD | Not started | - |
+| 18. Structure Documentation | 0/TBD | Not started | - |
+| 19. Memory Validation & Release | 0/TBD | Not started | - |
+
+## Requirement Coverage
+
+### v0.5.0 Requirements (32 total)
+
+| Category | Requirements | Phase(s) | Count |
+|----------|--------------|----------|-------|
+| Memory Integration | MEMO-10, MEMO-11, MEMO-12 | Phase 11 | 3 |
+| Memory Integration | MEMO-13, MEMO-14 | Phases 13-16 | 2 (used in 4 phases) |
+| Memory Integration | MEMO-15, MEMO-16, MEMO-17, MEMO-18 | Phase 19 | 4 |
+| Archive Management | ARCH-01, ARCH-02, ARCH-03, ARCH-04 | Phase 12 | 4 |
+| Documentation | DOC-01, DOC-02, DOC-03 | Phase 13 | 3 |
+| Tools Integration | TOOL-01, TOOL-02, TOOL-03 | Phase 14 | 3 |
+| Economic Data | ECON-01, ECON-02, ECON-03 | Phase 15 | 3 |
+| Repository Cleanup | CLEAN-01, CLEAN-02, CLEAN-03, CLEAN-04 | Phase 16 | 4 |
+| Verification | VAL-01, VAL-02, VAL-03, VAL-04 | Phase 17 | 4 |
+| Structure Docs | STRUCT-01, STRUCT-02, STRUCT-03 | Phase 18 | 3 |
+
+**Coverage:** 32/32 requirements mapped (100%)
+
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-01 (Phase 10 planned: 8 plans in 5 waves)*
+*Last updated: 2026-02-02 (v0.5.0 roadmap added: 9 phases, 32 requirements)*
