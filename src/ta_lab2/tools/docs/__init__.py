@@ -1,40 +1,17 @@
-"""Document conversion utilities for ProjectTT documentation migration.
+"""Documentation tools for Phase 13 consolidation."""
 
-Provides utilities for converting DOCX and Excel files to Markdown format
-with metadata extraction and YAML front matter support.
-
-Example:
-    >>> from ta_lab2.tools.docs import convert_docx_to_markdown, extract_docx_metadata
-    >>> metadata = extract_docx_metadata(Path("doc.docx"))
-    >>> result = convert_docx_to_markdown(Path("doc.docx"), Path("output.md"))
-"""
-from ta_lab2.tools.docs.convert_docx import (
-    extract_docx_metadata,
-    convert_docx_to_markdown,
-    ConversionResult,
-)
-from ta_lab2.tools.docs.convert_excel import (
-    convert_excel_to_markdown,
-    batch_convert_excel,
-)
-from ta_lab2.tools.docs.discover_projecttt import (
-    discover_projecttt,
-    categorize_document,
-    generate_inventory_report,
-    DocumentInfo,
+from ta_lab2.tools.docs.update_doc_memory import (
+    DocConversionRecord,
+    extract_sections_from_markdown,
+    update_memory_for_doc,
+    batch_update_memories,
+    create_phase_snapshot
 )
 
 __all__ = [
-    # DOCX conversion
-    "extract_docx_metadata",
-    "convert_docx_to_markdown",
-    "ConversionResult",
-    # Excel conversion
-    "convert_excel_to_markdown",
-    "batch_convert_excel",
-    # ProjectTT discovery
-    "discover_projecttt",
-    "categorize_document",
-    "generate_inventory_report",
-    "DocumentInfo",
+    "DocConversionRecord",
+    "extract_sections_from_markdown",
+    "update_memory_for_doc",
+    "batch_update_memories",
+    "create_phase_snapshot"
 ]
