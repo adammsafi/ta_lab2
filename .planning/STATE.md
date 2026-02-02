@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 ## Current Position
 
 Phase: 11 of 19 (Memory Preparation)
-Plan: 4 of 7 in current phase
+Plan: 5 of 7 in current phase
 Status: In progress
-Last activity: 2026-02-02 - Completed 11-04-PLAN.md (Conversation History Snapshot)
+Last activity: 2026-02-02 - Completed 11-05-PLAN.md (Validation and Coverage)
 
-Progress: [##########] 100% v0.4.0 | [████      ] ~57% v0.5.0 (4/7 plans complete in Phase 11)
+Progress: [##########] 100% v0.4.0 | [█████     ] ~71% v0.5.0 (5/7 plans complete in Phase 11)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 60 (56 in v0.4.0, 4 in v0.5.0)
+- Total plans completed: 61 (56 in v0.4.0, 5 in v0.5.0)
 - Average duration: 11 min
-- Total execution time: 12.93 hours
+- Total execution time: 13.15 hours
 
 **By Phase (v0.4.0):**
 
@@ -42,11 +42,11 @@ Progress: [##########] 100% v0.4.0 | [████      ] ~57% v0.5.0 (4/7 plans
 
 | Phase | Plans | Total | Avg/Plan | Status |
 |-------|-------|-------|----------|--------|
-| 11-memory-preparation | 4 | 33 min | 8 min | In progress |
+| 11-memory-preparation | 5 | 46 min | 9 min | In progress |
 
 **Recent Trend:**
 - v0.4.0 complete: 10 phases, 56 plans, 12.55 hours total
-- v0.5.0 in progress: Phase 11 (4/7 plans complete, 33 min total)
+- v0.5.0 in progress: Phase 11 (5/7 plans complete, 46 min total)
 
 *Updated after each plan completion*
 
@@ -69,6 +69,10 @@ Recent decisions affecting current work:
 - **Use existing API key configuration** (11-02): Source OPENAI_API_KEY from openai_config.env for snapshot execution
 - **Include snapshot script in snapshot** (11-02): Self-documenting - run_ta_lab2_snapshot.py indexed as part of snapshot
 - **Store git commit hash in snapshots** (11-02): Capture commit hash at snapshot time for version traceability
+- **Post-search metadata filtering** (11-05): Use semantic search + metadata filtering instead of Qdrant filter syntax
+- **80% directory queryability threshold** (11-05): 4/5 directories queryable sufficient for reorganization baseline
+- **Weighted coverage calculation** (11-05): Inventory queries 80% weight, function lookup 20% weight
+- **Accept semantic search limitations** (11-05): Data_Tools query gaps acceptable per Claude discretion clause
 
 ### Pending Todos
 
@@ -80,10 +84,10 @@ None currently.
 
 ## Session Continuity
 
-Last session: 2026-02-02T16:54:00Z
-Stopped at: Completed 11-04-PLAN.md (Conversation History Snapshot)
+Last session: 2026-02-02T17:14:33Z
+Stopped at: Completed 11-05-PLAN.md (Validation and Coverage)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-02 (Completed Phase 11 Plan 04: Conversation History Snapshot)*
+*Last updated: 2026-02-02 (Completed Phase 11 Plan 05: Validation and Coverage)*
