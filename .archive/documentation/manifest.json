@@ -1,9 +1,507 @@
 {
   "$schema": "https://ta_lab2.local/schemas/archive-manifest/v1.0.0",
-  "version": "1.0.0",
+  "archive_date": "2026-02-02",
   "category": "documentation",
-  "created_at": "2026-02-02T18:23:40Z",
-  "total_files": 0,
-  "total_size_bytes": 0,
-  "files": []
+  "created_at": "2026-02-02T21:41:22.129853+00:00",
+  "files": [
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\CoreComponents.docx",
+      "original_path": "ProjectTT\\Foundational\\CoreComponents.docx",
+      "sha256_checksum": "481be902b1596053a3355ab8ccb533c5ba460e63bc821a75eb782fb209daf84b",
+      "size_bytes": 18383,
+      "timestamp": "2026-02-02T21:41:21.184647+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\KeyTerms.docx",
+      "original_path": "ProjectTT\\Foundational\\KeyTerms.docx",
+      "sha256_checksum": "6eaf4b71210f6d88ccab2a530131c7ffed20cacd8cf2bcbe4de16428be194860",
+      "size_bytes": 26386,
+      "timestamp": "2026-02-02T21:41:21.196767+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\ta_lab2_GenesisFiles_Summary.docx",
+      "original_path": "ProjectTT\\Foundational\\ta_lab2_GenesisFiles_Summary.docx",
+      "sha256_checksum": "6888190633a33bcefa77403b1c7360cac16754ca26ca75aa2aa98dea87ae2e4a",
+      "size_bytes": 23306,
+      "timestamp": "2026-02-02T21:41:21.210352+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\Schemas_20260114.xlsx",
+      "original_path": "ProjectTT\\Schemas_20260114.xlsx",
+      "sha256_checksum": "01bac5ed819d20b7ce73e9243996b7d5a66441a6cc44596b5ec0f38060f06894",
+      "size_bytes": 183412,
+      "timestamp": "2026-02-02T21:41:21.224039+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\db_schemas_keys.xlsx",
+      "original_path": "ProjectTT\\db_schemas_keys.xlsx",
+      "sha256_checksum": "70dca3285914ff2680dc4d3e9e6449ec35afaea25f0cbaa9bbff69b5689883ca",
+      "size_bytes": 31562,
+      "timestamp": "2026-02-02T21:41:21.239793+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\ta_lab2 Workspace v.1.1.docx",
+      "original_path": "ProjectTT\\ta_lab2 Workspace v.1.1.docx",
+      "sha256_checksum": "ff558d608fadc61cce00ee5d0a5e9a2521dac0102b44e55d573a2241a59b560d",
+      "size_bytes": 363177,
+      "timestamp": "2026-02-02T21:41:21.253168+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\Hysteresis.docx",
+      "original_path": "ProjectTT\\Foundational\\Hysteresis.docx",
+      "sha256_checksum": "6ead19ad75ea4f1ccb194cae79efd6146946751b52259ad5a029f6ee15806106",
+      "size_bytes": 22823,
+      "timestamp": "2026-02-02T21:41:21.275520+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\RegimesInDepth.docx",
+      "original_path": "ProjectTT\\Foundational\\RegimesInDepth.docx",
+      "sha256_checksum": "522e8956f2d99f61e0d5d1c3f8634604c025e5836b8c23d7769f91f5960ec6f3",
+      "size_bytes": 26256,
+      "timestamp": "2026-02-02T21:41:21.292364+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\TimeFrames.docx",
+      "original_path": "ProjectTT\\Foundational\\TimeFrames.docx",
+      "sha256_checksum": "01751f8d581651f9c1766f191c9dca9c62f59188fc6de31d58c95609e009f1aa",
+      "size_bytes": 26916,
+      "timestamp": "2026-02-02T21:41:21.306069+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\feddata_inDepthSummary_20251110.docx",
+      "original_path": "ProjectTT\\Foundational\\feddata_inDepthSummary_20251110.docx",
+      "sha256_checksum": "0934ad7694345fe4a08a93c758946b502125787b23c9d0dbecefe00198630a76",
+      "size_bytes": 32558,
+      "timestamp": "2026-02-02T21:41:21.317795+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\ChatGPT_VisionQuestions.docx",
+      "original_path": "ProjectTT\\Foundational\\ChatGPT_VisionQuestions.docx",
+      "sha256_checksum": "82107fdb17ffa5c9af5c1a49ce84dc6bc6de1df31a72bbf0c0bccf2ef775e811",
+      "size_bytes": 18911,
+      "timestamp": "2026-02-02T21:41:21.329405+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\Project Plan.docx",
+      "original_path": "ProjectTT\\Foundational\\Project Plan.docx",
+      "sha256_checksum": "6debc4c912d90ed81525e286d23dca53889c3e4059b836e483eb6101179a66e4",
+      "size_bytes": 20205,
+      "timestamp": "2026-02-02T21:41:21.346200+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\V1 Project Plan.docx",
+      "original_path": "ProjectTT\\Foundational\\V1 Project Plan.docx",
+      "sha256_checksum": "a688dc34b065cf0a812464cf567a90b68c2c91f3a25808108bb5e799103a3c21",
+      "size_bytes": 15350,
+      "timestamp": "2026-02-02T21:41:21.358787+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\ta_lab2_Vision_Draft_20251111.docx",
+      "original_path": "ProjectTT\\Foundational\\ta_lab2_Vision_Draft_20251111.docx",
+      "sha256_checksum": "7f226dd1a7fb1363ae1309100f7b66931b3845172a00df7c078c0cc93174ef9b",
+      "size_bytes": 19669,
+      "timestamp": "2026-02-02T21:41:21.370737+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\bar_tf_analysis.xlsx",
+      "original_path": "ProjectTT\\Features\\Bars\\Studies&Scraps\\bar_tf_analysis.xlsx",
+      "sha256_checksum": "f9a5898b8c54ff8cab905e00a23ae0a212edbb8b565b1523aa4e090a4ebfb6de",
+      "size_bytes": 154882,
+      "timestamp": "2026-02-02T21:41:21.386329+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\cmc_ema_multi_tf_cal_us_1W_21P_Approval_20260127.xlsx",
+      "original_path": "ProjectTT\\Features\\EMAs\\Studies&Scraps\\cmc_ema_multi_tf_cal_us_1W_21P_Approval_20260127.xlsx",
+      "sha256_checksum": "f8499d7a6f2c242cce6589a2422ab0829db87a604593c34935ff8fd365d6055b",
+      "size_bytes": 327589,
+      "timestamp": "2026-02-02T21:41:21.402807+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\dim_tf&ema_alpha_LUT.xlsx",
+      "original_path": "ProjectTT\\Features\\EMAs\\Studies&Scraps\\dim_tf&ema_alpha_LUT.xlsx",
+      "sha256_checksum": "9127038a9af22e1a3a67e06b114ad2d0a9becb97bfc8a66d100279aa5d62bfd1",
+      "size_bytes": 726290,
+      "timestamp": "2026-02-02T21:41:21.419173+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\ema_alpha_lookup_20251219.xlsx",
+      "original_path": "ProjectTT\\Features\\EMAs\\Studies&Scraps\\ema_alpha_lookup_20251219.xlsx",
+      "sha256_checksum": "545a5c9414cff6fd452ac8b5f397fb29043a787354de1ea032ae473c03ff9af1",
+      "size_bytes": 193014,
+      "timestamp": "2026-02-02T21:41:21.438318+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\ema_analysis_look.xlsx",
+      "original_path": "ProjectTT\\Features\\EMAs\\Studies&Scraps\\ema_analysis_look.xlsx",
+      "sha256_checksum": "1c3144a381d029fa6118e55e53f913b464a56da515656432e782977635bd6c49",
+      "size_bytes": 499205,
+      "timestamp": "2026-02-02T21:41:21.456009+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\ema_analysis_review.xlsx",
+      "original_path": "ProjectTT\\Features\\EMAs\\Studies&Scraps\\ema_analysis_review.xlsx",
+      "sha256_checksum": "e1c6056b0ae9e087082486963157439ab45c3f92bc15f18edcbafc591686b3cd",
+      "size_bytes": 329110,
+      "timestamp": "2026-02-02T21:41:21.477261+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\bar_creation.docx",
+      "original_path": "ProjectTT\\Features\\Bars\\DesriptiveDocuments\\bar_creation.docx",
+      "sha256_checksum": "fd617b000bbf3a9389483d51168ca337e5d1fb242c691f37c3ff60c14381716a",
+      "size_bytes": 46446,
+      "timestamp": "2026-02-02T21:41:21.494399+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\bar_implementation.docx",
+      "original_path": "ProjectTT\\Features\\Bars\\DesriptiveDocuments\\bar_implementation.docx",
+      "sha256_checksum": "65fca97a6822bfea791cec26eb86dc15ab97f1f5a2da9991e8a6cde0d8b1a9bd",
+      "size_bytes": 29724,
+      "timestamp": "2026-02-02T21:41:21.509041+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\bar_analysis_20260108.xlsx",
+      "original_path": "ProjectTT\\Features\\Bars\\Studies&Scraps\\bar_analysis_20260108.xlsx",
+      "sha256_checksum": "d7dc65395a303ef77ce751bf40658a7dbbe5dd5d35299a4189ffbf648716cf71",
+      "size_bytes": 26108,
+      "timestamp": "2026-02-02T21:41:21.521793+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\ema_multi_tf.docx",
+      "original_path": "ProjectTT\\Features\\EMAs\\DesriptiveDocuments\\ema_multi_tf.docx",
+      "sha256_checksum": "8533c75d8fd72a11e69257abf59e1a715150cc104d7376ebdbdec2a19514d6bf",
+      "size_bytes": 34603,
+      "timestamp": "2026-02-02T21:41:21.534396+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\ema_multi_tf_cal.docx",
+      "original_path": "ProjectTT\\Features\\EMAs\\DesriptiveDocuments\\ema_multi_tf_cal.docx",
+      "sha256_checksum": "6bcc915d513cdbd64854f8ba19ad41df093fa7a5a5343183ed3982a58cd7f165",
+      "size_bytes": 31894,
+      "timestamp": "2026-02-02T21:41:21.548240+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\ema_multi_tf_cal_anchor.docx",
+      "original_path": "ProjectTT\\Features\\EMAs\\DesriptiveDocuments\\ema_multi_tf_cal_anchor.docx",
+      "sha256_checksum": "743fd6f879773f51f67c84639bdf6cc42b018ad4caa121492c284cff5e5c573a",
+      "size_bytes": 29565,
+      "timestamp": "2026-02-02T21:41:21.560701+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\ema_overview.docx",
+      "original_path": "ProjectTT\\Features\\EMAs\\DesriptiveDocuments\\ema_overview.docx",
+      "sha256_checksum": "7a27412d005cbd2ee3a617e5f581a2cbef12b70b8246d682fc8f1e5892783fcb",
+      "size_bytes": 33741,
+      "timestamp": "2026-02-02T21:41:21.572919+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\ema_possible_next_steps.docx",
+      "original_path": "ProjectTT\\Features\\EMAs\\DesriptiveDocuments\\ema_possible_next_steps.docx",
+      "sha256_checksum": "bd73e9bd39c8314ca352089cd999d0cb9e88d54e741befd9ff8a8d6672820d49",
+      "size_bytes": 21168,
+      "timestamp": "2026-02-02T21:41:21.587111+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\Memory Model.docx",
+      "original_path": "ProjectTT\\Features\\Memory\\Memory Model.docx",
+      "sha256_checksum": "d7fe1454c61838f21228449a7a501c3ba0dea3f64190bc3ca9746c5701a40414",
+      "size_bytes": 21541,
+      "timestamp": "2026-02-02T21:41:21.599155+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\bar_data_analysis.xlsx",
+      "original_path": "ProjectTT\\Features\\Bars\\Studies&Scraps\\bar_data_analysis.xlsx",
+      "sha256_checksum": "f72bfa443db18dd967d2668ea41424b766404f5ea986f20cd4f9acf8a050b002",
+      "size_bytes": 17526,
+      "timestamp": "2026-02-02T21:41:21.610519+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\ema_comparisson_chart&values.xlsx",
+      "original_path": "ProjectTT\\Features\\EMAs\\DesriptiveDocuments\\ema_comparisson_chart&values.xlsx",
+      "sha256_checksum": "456355d1c62ae39842947d3163fb7308e3d6939b71d264ec95ca482c8a001a35",
+      "size_bytes": 14036,
+      "timestamp": "2026-02-02T21:41:21.623265+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\ema_daily.docx",
+      "original_path": "ProjectTT\\Features\\EMAs\\DesriptiveDocuments\\ema_daily.docx",
+      "sha256_checksum": "48379a072cf826e1745214d16261b122088d1bf37da93654f660a2e7f697199d",
+      "size_bytes": 14654,
+      "timestamp": "2026-02-02T21:41:21.635483+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\EMA_loo.docx",
+      "original_path": "ProjectTT\\Features\\EMAs\\EMA_loo.docx",
+      "sha256_checksum": "afd36a661e4439e276dc556cb6ca30c18c19e3f767f09cf331ddf780be85a15f",
+      "size_bytes": 17139,
+      "timestamp": "2026-02-02T21:41:21.646707+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\EMA_thoughts.docx",
+      "original_path": "ProjectTT\\Features\\EMAs\\EMA_thoughts.docx",
+      "sha256_checksum": "6661827bea3945b56ee576d1e3478a9dc43296b1580b0c176ca2a066d083eea9",
+      "size_bytes": 20465,
+      "timestamp": "2026-02-02T21:41:21.663424+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\cmcVSbitstampEMAs.xlsx",
+      "original_path": "ProjectTT\\Features\\EMAs\\Studies&Scraps\\cmcVSbitstampEMAs.xlsx",
+      "sha256_checksum": "3875d1ca8ecbc1c6340d7227d2cae8d2aa88e1bae19b79f98e532123d55c6d0d",
+      "size_bytes": 13079,
+      "timestamp": "2026-02-02T21:41:21.678566+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\TV_DataExportPlay.xlsx",
+      "original_path": "ProjectTT\\TV_DataExportPlay.xlsx",
+      "sha256_checksum": "72fae7f9ae2fcdf7143fb236cca9140c0905921a5a919289ea7ac3ce260852f4",
+      "size_bytes": 1491874,
+      "timestamp": "2026-02-02T21:41:21.699906+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\ChatGPT_Convos_Manually_Desc.xlsx",
+      "original_path": "ProjectTT\\ChatGPT_Convos_Manually_Desc.xlsx",
+      "sha256_checksum": "ecf9ef7e572ce45379e6d1ec28041f90fde572757d341633cca50b7fedb4a322",
+      "size_bytes": 29609,
+      "timestamp": "2026-02-02T21:41:21.723862+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\ChatGPT_Convos_Manually_Desc2.xlsx",
+      "original_path": "ProjectTT\\ChatGPT_Convos_Manually_Desc2.xlsx",
+      "sha256_checksum": "fa84173d03d37871be8e402ea486f3c82dc0934f97eaac2fd3a77f0ee001fa36",
+      "size_bytes": 29496,
+      "timestamp": "2026-02-02T21:41:21.738332+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\EMA_Alpha_LUT_Comparisson.xlsx",
+      "original_path": "ProjectTT\\EMA_Alpha_LUT_Comparisson.xlsx",
+      "sha256_checksum": "88288e00a37f634b848036e1641fbdf249d75418429ad26f16377f0481c464c3",
+      "size_bytes": 88294,
+      "timestamp": "2026-02-02T21:41:21.752724+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\Chat Gpt Export Processing \u2013 End-to-end Process.docx",
+      "original_path": "ProjectTT\\ProcessDocuments\\Chat Gpt Export Processing \u2013 End-to-end Process.docx",
+      "sha256_checksum": "44684969dc0076d7973b57e7bd44b7412a449af1ad28559db164c00aae2108f5",
+      "size_bytes": 27278,
+      "timestamp": "2026-02-02T21:41:21.769981+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\Updating Price Data Rough.docx",
+      "original_path": "ProjectTT\\ProcessDocuments\\Updating Price Data Rough.docx",
+      "sha256_checksum": "866d71022ee576fcc267d622861d721e1c8f7cc72f834306bec614a70ab9339d",
+      "size_bytes": 23392,
+      "timestamp": "2026-02-02T21:41:21.783484+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\memories.docx",
+      "original_path": "ProjectTT\\ProcessDocuments\\memories.docx",
+      "sha256_checksum": "5d9d54311d1066bf4ae1c681e5e3d26aad747ad857747d64f0199598fb542a2c",
+      "size_bytes": 23996,
+      "timestamp": "2026-02-02T21:41:21.797740+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\assets_exchanges_info.xlsx",
+      "original_path": "ProjectTT\\assets_exchanges_info.xlsx",
+      "sha256_checksum": "0773ffaa42e6fc9e5278db729ccf21a1566a88b69e32c3a410c17fe9df88e1d4",
+      "size_bytes": 20762,
+      "timestamp": "2026-02-02T21:41:21.810411+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\compare_3_emas'.xlsx",
+      "original_path": "ProjectTT\\compare_3_emas'.xlsx",
+      "sha256_checksum": "f629c6087d11afcc520b6874f647186732da93a9312735939ee01442b25f1431",
+      "size_bytes": 38238,
+      "timestamp": "2026-02-02T21:41:21.824803+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\review_refreshMethods_20251201.docx",
+      "original_path": "ProjectTT\\review_refreshMethods_20251201.docx",
+      "sha256_checksum": "8b55d5930964bf6a6b6695c6c4b663121d8cce90df1a6e1c0c55af6baf81c533",
+      "size_bytes": 22895,
+      "timestamp": "2026-02-02T21:41:21.838660+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\Look.xlsx",
+      "original_path": "ProjectTT\\ChatGPT\\Look.xlsx",
+      "sha256_checksum": "96f585b2e9200d28ca81cb46f36449445140f2b4be3e2c0d6a76cc50cdcfbcc8",
+      "size_bytes": 10544,
+      "timestamp": "2026-02-02T21:41:21.851810+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\analysis_look.xlsx",
+      "original_path": "ProjectTT\\ChatGPT\\analysis_look.xlsx",
+      "sha256_checksum": "60d0f26f69670e4bc0bc9fa67c7ea5a1b85bd63be9ca8d6bbb6612d821e26d49",
+      "size_bytes": 17495,
+      "timestamp": "2026-02-02T21:41:21.865561+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\Update_DB.docx",
+      "original_path": "ProjectTT\\ProcessDocuments\\Update_DB.docx",
+      "sha256_checksum": "572f616c4c80ac1aa1a3cfe1f26992ef61bba08bf80ac9da6ad5e044f5393643",
+      "size_bytes": 18865,
+      "timestamp": "2026-02-02T21:41:21.877883+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\docs_Need_Work_20251128.xlsx",
+      "original_path": "ProjectTT\\docs_Need_Work_20251128.xlsx",
+      "sha256_checksum": "721a01da60e87555975ef4de42cc0f2ab66cd91498e24edf2918fbff5372f2fa",
+      "size_bytes": 9425,
+      "timestamp": "2026-02-02T21:41:21.889787+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\github_code_frequency.xlsx",
+      "original_path": "ProjectTT\\github_code_frequency.xlsx",
+      "sha256_checksum": "0d2f88887db4d55ee526f6df3221eab301f9d145ce2c5087bf7fbb655aa7c01d",
+      "size_bytes": 10219,
+      "timestamp": "2026-02-02T21:41:21.903583+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\ta_lab2_TimeFramesChart_20251111.xlsx",
+      "original_path": "ProjectTT\\ta_lab2_TimeFramesChart_20251111.xlsx",
+      "sha256_checksum": "6f8cfba5073c2e0d74d7064da247be0df1ed74d802a300f052c17b6fa474d465",
+      "size_bytes": 9901,
+      "timestamp": "2026-02-02T21:41:21.917008+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\time_scrap.xlsx",
+      "original_path": "ProjectTT\\time_scrap.xlsx",
+      "sha256_checksum": "5288ae0a3a4db0502a9cba29c9585e0cdd24f8a0f83ac443e23d2df8919e8ea1",
+      "size_bytes": 18243,
+      "timestamp": "2026-02-02T21:41:21.931370+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\new_12wk_plan_doc.docx",
+      "original_path": "ProjectTT\\Plans&Status\\new_12wk_plan_doc.docx",
+      "sha256_checksum": "f37983b1c21b0b72a380e5368e7b00c844172424303544025e77591f7edcb15c",
+      "size_bytes": 26588,
+      "timestamp": "2026-02-02T21:41:21.946536+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\new_12wk_plan_doc_v2.docx",
+      "original_path": "ProjectTT\\Plans&Status\\new_12wk_plan_doc_v2.docx",
+      "sha256_checksum": "8b5ee48a4321933788e6b295339b190efcb8bdca9f080fc61e1732858dd9ccd0",
+      "size_bytes": 28295,
+      "timestamp": "2026-02-02T21:41:21.960075+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\soFarInMyOwnWords.docx",
+      "original_path": "ProjectTT\\Plans&Status\\soFarInMyOwnWords.docx",
+      "sha256_checksum": "e322c6aa7f354866d2122fcd4860efaf9901a6a9bf5c85caa3c6c8eba9e0d287",
+      "size_bytes": 25836,
+      "timestamp": "2026-02-02T21:41:21.976935+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\soFar_20251108.docx",
+      "original_path": "ProjectTT\\Plans&Status\\soFar_20251108.docx",
+      "sha256_checksum": "5bd627e4c7455e35e081be71407353d5ec6e960b8bdd4d11e46f3c129bdfaaeb",
+      "size_bytes": 32231,
+      "timestamp": "2026-02-02T21:41:21.994839+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\status_20251113.docx",
+      "original_path": "ProjectTT\\Plans&Status\\status_20251113.docx",
+      "sha256_checksum": "dd2040794012b9972337ff373b6a4de18404b5d9140f5b634ec7ee6646eaf272",
+      "size_bytes": 21736,
+      "timestamp": "2026-02-02T21:41:22.009266+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\updates_soFar_20251108 .docx",
+      "original_path": "ProjectTT\\Plans&Status\\updates_soFar_20251108 .docx",
+      "sha256_checksum": "9274e4396f246e2d7077d357691c4a1222aaa87e65883c1d944be0bc7c1fd8f6",
+      "size_bytes": 26048,
+      "timestamp": "2026-02-02T21:41:22.036509+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\new_12wk_plan_table.xlsx",
+      "original_path": "ProjectTT\\Plans&Status\\new_12wk_plan_table.xlsx",
+      "sha256_checksum": "beace0f16086741d4d3c4f75053c6a7b4d77c30735c4e0e65e4502bfce3694ee",
+      "size_bytes": 14236,
+      "timestamp": "2026-02-02T21:41:22.058491+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\ta_lab2_NextSteps_NeedReview_20251111.docx",
+      "original_path": "ProjectTT\\Plans&Status\\ta_lab2_NextSteps_NeedReview_20251111.docx",
+      "sha256_checksum": "eab6d2074fba62a71180d242a00c4fdd1dd07816e9355f5cc69bd8121e3c8202",
+      "size_bytes": 17254,
+      "timestamp": "2026-02-02T21:41:22.079770+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\ta_lab2_Status&ToDos_Review_20251111.docx",
+      "original_path": "ProjectTT\\Plans&Status\\ta_lab2_Status&ToDos_Review_20251111.docx",
+      "sha256_checksum": "2446a899473ce7350be4cfcb5fc5d41926275702514c1111cfd124dd25bd9c88",
+      "size_bytes": 18220,
+      "timestamp": "2026-02-02T21:41:22.098124+00:00"
+    },
+    {
+      "action": "migrated",
+      "archive_path": ".archive\\documentation\\2026-02-02\\ta_lab2_someNextStepsToReview_20251111.docx",
+      "original_path": "ProjectTT\\Plans&Status\\ta_lab2_someNextStepsToReview_20251111.docx",
+      "sha256_checksum": "f1bfa8fa58bb025c229b0e6f07727fbc0ce48af63f5b7640b823adbad80bdcfc",
+      "size_bytes": 15466,
+      "timestamp": "2026-02-02T21:41:22.113053+00:00"
+    }
+  ],
+  "total_files": 62,
+  "total_size_bytes": 5547129,
+  "version": "1.0.0"
 }
