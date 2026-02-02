@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2025-01-22)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** Phase 3 complete - Ready for Phase 4 (Orchestrator Adapters)
+**Current focus:** v0.5.0 Ecosystem Reorganization - Consolidating 4 directories without deletion
 
 ## Current Position
 
-Phase: 10 of 10 (Release Validation)
-Plan: 8 of 8 (Final Release Validation)
-Status: PROJECT COMPLETE ✓
-Last activity: 2026-02-01 - Completed 10-08-PLAN.md (Final Release Validation)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements for v0.5.0 Ecosystem Reorganization
+Last activity: 2026-02-02 — Milestone v0.5.0 started
 
-Progress: [██████████] 100% (56/56 plans complete)
+Progress: [          ] 0% (0/0 plans complete - roadmap pending)
 
 ## Performance Metrics
 

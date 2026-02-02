@@ -8,6 +8,21 @@ A systematic crypto trading platform with integrated AI orchestration and persis
 
 Build trustworthy quant trading infrastructure 3x faster by creating AI coordination that remembers context, routes work optimally, and eliminates redundant context-setting across sessions and platforms.
 
+## Current Milestone: v0.5.0 Ecosystem Reorganization
+
+**Goal:** Consolidate scattered project directories (ta_lab2, ProjectTT, Data_Tools, fredtools2, fedtools2) into unified structure without deleting anything.
+
+**Target features:**
+- Archive Management: Move backup artifacts to .archive/ structure
+- Documentation Consolidation: Integrate ProjectTT docs into ta_lab2
+- Tools Integration: Migrate Data_Tools scripts to ta_lab2/tools/
+- Economic Data Strategy: Evaluate and integrate fredtools2/fedtools2
+- Root Directory Cleanup: Organize clutter while preserving in git
+- Structure Documentation: Create reorganization guide
+- Verification: Validate imports work, nothing lost
+
+**Critical Constraint:** NO DELETION - everything preserved in git history + .archive/
+
 ## Requirements
 
 ### Validated
@@ -38,46 +53,58 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 - ✓ Adapter architecture (Claude/ChatGPT/Gemini) — existing
 - ✓ Quota tracking design — existing
 
-### Active
+### Active (v0.5.0 Milestone)
 
-**Memory Infrastructure Integration**
-- [ ] Ingest generated memories into Mem0
-- [ ] Set up Vertex AI Agent Engine Memory Bank
-- [ ] Connect Mem0 (logic layer) to Memory Bank (storage layer)
-- [ ] Implement memory retrieval for AI context injection
-- [ ] Test memory search and relevance scoring
-- [ ] Build memory update and conflict resolution
+**Ecosystem Reorganization**
+- [ ] Archive backup artifacts (.original files, *_refactored.py)
+- [ ] Consolidate ProjectTT documentation into ta_lab2
+- [ ] Migrate Data_Tools scripts into ta_lab2/tools/
+- [ ] Integrate or reference fredtools2/fedtools2 economic data projects
+- [ ] Clean up root directory clutter (preserve in .archive/)
+- [ ] Document new structure and migration decisions
+- [ ] Verify all imports work after reorganization
+- [ ] Update README with ecosystem structure
 
-**Orchestrator Implementation**
-- [ ] Implement Claude Code adapter (subprocess + file parsing)
-- [ ] Implement Gemini adapter (gcloud CLI + API)
-- [ ] Implement ChatGPT adapter (API integration)
-- [ ] Build task routing engine with cost optimization
-- [ ] Implement quota tracking for free tiers
-- [ ] Build parallel task execution (asyncio)
-- [ ] Create orchestrator CLI interface
-- [ ] Test direct handoffs (Task A → write to Memory → spawn Task B with context)
+### Complete (v0.4.0 Milestone)
 
-**ta_lab2 Time Model (Week 2-4)**
-- [ ] Create dim_timeframe table (TF definitions: 1D, 3D, 5D, 1W, 1M, etc.)
-- [ ] Create dim_sessions table (trading hours, DST handling)
-- [ ] Unify cmc_ema_multi_tf + cmc_ema_multi_tf_cal into single table
-- [ ] Update all refresh scripts to reference dimension tables
-- [ ] Build time alignment validation tests
+**Memory Infrastructure Integration** ✓
+- ✓ Ingest generated memories into Mem0
+- ✓ Set up Qdrant backend for Mem0
+- ✓ Connect Mem0 (logic layer) to Qdrant (storage layer)
+- ✓ Implement memory retrieval for AI context injection
+- ✓ Test memory search and relevance scoring
+- ✓ Build memory update and conflict resolution
 
-**ta_lab2 Feature Pipeline (Week 5-8)**
-- [ ] Implement cmc_returns_daily (using dim_timeframe lookbacks)
-- [ ] Implement cmc_vol_daily (Parkinson, GK volatility measures)
-- [ ] Implement cmc_ta_daily (RSI, MACD, indicators)
-- [ ] Create unified cmc_daily_features view
-- [ ] Validate null handling and data consistency
+**Orchestrator Implementation** ✓
+- ✓ Implement Claude Code adapter (subprocess + file parsing)
+- ✓ Implement Gemini adapter (gcloud CLI + API)
+- ✓ Implement ChatGPT adapter (API integration)
+- ✓ Build task routing engine with cost optimization
+- ✓ Implement quota tracking for free tiers
+- ✓ Build parallel task execution (asyncio)
+- ✓ Create orchestrator CLI interface
+- ✓ Test direct handoffs (Task A → write to Memory → spawn Task B with context)
 
-**ta_lab2 Signals & Validation (Week 9-12)**
-- [ ] Implement cmc_signals_daily (EMA crossovers, RSI MR, ATR breakout)
-- [ ] Build backtest integration v1 (reference daily features)
-- [ ] Create observability suite (gap tests, TF alignment, roll alignment)
-- [ ] Pass all three validation layers (time alignment, data consistency, backtest reproducibility)
-- [ ] Tag release v0.4.0
+**ta_lab2 Time Model** ✓
+- ✓ Create dim_timeframe table (TF definitions: 1D, 3D, 5D, 1W, 1M, etc.)
+- ✓ Create dim_sessions table (trading hours, DST handling)
+- ✓ Unify cmc_ema_multi_tf + cmc_ema_multi_tf_cal into single table
+- ✓ Update all refresh scripts to reference dimension tables
+- ✓ Build time alignment validation tests
+
+**ta_lab2 Feature Pipeline** ✓
+- ✓ Implement cmc_returns_daily (using dim_timeframe lookbacks)
+- ✓ Implement cmc_vol_daily (Parkinson, GK volatility measures)
+- ✓ Implement cmc_ta_daily (RSI, MACD, indicators)
+- ✓ Create unified cmc_daily_features view
+- ✓ Validate null handling and data consistency
+
+**ta_lab2 Signals & Validation** ✓
+- ✓ Implement cmc_signals_daily (EMA crossovers, RSI MR, ATR breakout)
+- ✓ Build backtest integration v1 (reference daily features)
+- ✓ Create observability suite (gap tests, TF alignment, roll alignment)
+- ✓ Pass all three validation layers (time alignment, data consistency, backtest reproducibility)
+- ✓ Tag release v0.4.0
 
 ### Out of Scope
 
@@ -118,4 +145,4 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 | Backtest/live parity as success criterion | System is only trustworthy if backtests use identical logic to live trading - reproducibility is mandatory | — Pending |
 
 ---
-*Last updated: 2025-01-22 after project initialization*
+*Last updated: 2026-02-02 after v0.5.0 milestone initialization*
