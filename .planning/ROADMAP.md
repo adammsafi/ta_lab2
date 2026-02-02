@@ -237,7 +237,18 @@ Plans:
   3. pytest smoke tests pass for migrated scripts
   4. Memory updated with moved_to relationships for each file
   5. Phase-level memory snapshot created with phase 14 tag
-**Plans**: TBD
+**Plans**: 10 plans
+Plans:
+- [ ] 14-01-PLAN.md - Discover and categorize Data_Tools scripts
+- [ ] 14-02-PLAN.md - Create data_tools package structure
+- [ ] 14-03-PLAN.md - Migrate analysis tools (generate_function_map, tree_structure)
+- [ ] 14-04-PLAN.md - Migrate database utilities (write_*_emas, upsert_*)
+- [ ] 14-05-PLAN.md - Migrate memory/embedding tools
+- [ ] 14-06-PLAN.md - Migrate ChatGPT export/processing tools
+- [ ] 14-07-PLAN.md - Migrate generator and context tools
+- [ ] 14-08-PLAN.md - Archive excluded scripts (prototypes, one-offs)
+- [ ] 14-09-PLAN.md - Create validation tests (smoke tests + path validation)
+- [ ] 14-10-PLAN.md - Update memory with migration relationships and phase snapshot
 
 ### Phase 15: Economic Data Strategy
 **Goal**: Evaluate fredtools2/fedtools2 and implement integration decision
@@ -326,7 +337,7 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> 12 -> ...
 | 11. Memory Preparation | 5/5 | Complete | 2026-02-02 |
 | 12. Archive Foundation | 3/3 | Complete | 2026-02-02 |
 | 13. Documentation Consolidation | 7/7 | Complete | 2026-02-02 |
-| 14. Tools Integration | 0/TBD | Not started | - |
+| 14. Tools Integration | 0/10 | Planned | - |
 | 15. Economic Data Strategy | 0/TBD | Not started | - |
 | 16. Repository Cleanup | 0/TBD | Not started | - |
 | 17. Verification & Validation | 0/TBD | Not started | - |
@@ -354,4 +365,4 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> 12 -> ...
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-02 (Phase 13 gap closure plan created: 13-07-PLAN.md)*
+*Last updated: 2026-02-02 (Phase 14 planned: 10 plans in 6 waves)*
