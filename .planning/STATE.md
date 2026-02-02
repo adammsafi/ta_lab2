@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 
 ## Current Position
 
-Phase: 11 of 19 (Memory Preparation)
-Plan: 5 of 7 in current phase
+Phase: 12 of 19 (Archive Foundation)
+Plan: 1 of 3 in current phase
 Status: In progress
-Last activity: 2026-02-02 - Completed 11-05-PLAN.md (Validation and Coverage)
+Last activity: 2026-02-02 - Completed 12-01-PLAN.md (Archive Structure and Verification)
 
-Progress: [##########] 100% v0.4.0 | [█████     ] ~71% v0.5.0 (5/7 plans complete in Phase 11)
+Progress: [##########] 100% v0.4.0 | [█████     ] ~73% v0.5.0 (1/3 plans complete in Phase 12)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 61 (56 in v0.4.0, 5 in v0.5.0)
+- Total plans completed: 62 (56 in v0.4.0, 6 in v0.5.0)
 - Average duration: 11 min
-- Total execution time: 13.15 hours
+- Total execution time: 13.20 hours
 
 **By Phase (v0.4.0):**
 
@@ -42,11 +42,12 @@ Progress: [##########] 100% v0.4.0 | [█████     ] ~71% v0.5.0 (5/7 pla
 
 | Phase | Plans | Total | Avg/Plan | Status |
 |-------|-------|-------|----------|--------|
-| 11-memory-preparation | 5 | 46 min | 9 min | In progress |
+| 11-memory-preparation | 5 | 46 min | 9 min | Complete |
+| 12-archive-foundation | 1 | 3 min | 3 min | In progress |
 
 **Recent Trend:**
 - v0.4.0 complete: 10 phases, 56 plans, 12.55 hours total
-- v0.5.0 in progress: Phase 11 (5/7 plans complete, 46 min total)
+- v0.5.0 in progress: Phase 12 (1/3 plans complete, 3 min total)
 
 *Updated after each plan completion*
 
@@ -73,6 +74,9 @@ Recent decisions affecting current work:
 - **80% directory queryability threshold** (11-05): 4/5 directories queryable sufficient for reorganization baseline
 - **Weighted coverage calculation** (11-05): Inventory queries 80% weight, function lookup 20% weight
 - **Accept semantic search limitations** (11-05): Data_Tools query gaps acceptable per Claude discretion clause
+- **Category-first archive structure** (12-01): .archive/{category}/YYYY-MM-DD/ chosen over date-first for browsing by type
+- **Manifest per category** (12-01): One manifest.json per category tracking all files across dates for simpler querying
+- **Git mv pure move requirement** (12-01): Pure move commits (no content changes) required for git log --follow history preservation
 
 ### Pending Todos
 
@@ -84,10 +88,10 @@ None currently.
 
 ## Session Continuity
 
-Last session: 2026-02-02T17:14:33Z
-Stopped at: Completed 11-05-PLAN.md (Validation and Coverage)
+Last session: 2026-02-02T18:26:55Z
+Stopped at: Completed 12-01-PLAN.md (Archive Structure and Verification)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-02 (Completed Phase 11 Plan 05: Validation and Coverage)*
+*Last updated: 2026-02-02 (Completed Phase 12 Plan 01: Archive Structure and Verification)*
