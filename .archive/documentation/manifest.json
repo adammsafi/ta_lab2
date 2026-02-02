@@ -1,0 +1,9 @@
+{
+  "$schema": "https://ta_lab2.local/schemas/archive-manifest/v1.0.0",
+  "version": "1.0.0",
+  "category": "documentation",
+  "created_at": "2026-02-02T18:23:40Z",
+  "total_files": 0,
+  "total_size_bytes": 0,
+  "files": []
+}
