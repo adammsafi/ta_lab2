@@ -423,6 +423,83 @@ alembic history
 
 ---
 
+## Project Documentation
+
+Documentation converted from ProjectTT (original files preserved in `.archive/documentation/`).
+
+### Architecture
+
+Core system design, components, and terminology.
+
+- [Workspace Overview](architecture/ta-lab2-workspace-v.1.1.md) - Main project architecture and design (v1.1)
+- [Core Components](architecture/corecomponents.md) - Foundational system components
+- [Key Terms](architecture/keyterms.md) - Terminology and definitions
+- [Database Schemas](architecture/schemas.md) - Database table definitions
+- [Database Keys](architecture/db-keys.md) - Primary and foreign key relationships
+- [Genesis Files Summary](architecture/ta-lab2-genesisfiles-summary.md) - Project origins and evolution
+- [Vision Draft](architecture/ta-lab2-vision-draft-20251111.md) - Strategic vision and goals
+- [Project Plan](architecture/project-plan.md) - Original project plan
+- [V1 Project Plan](architecture/v1-project-plan.md) - Version 1 planning
+- [ChatGPT Vision Questions](architecture/chatgpt-visionquestions.md) - Strategic questions
+- [Timeframes](architecture/timeframes.md) - Timeframe concepts and design
+- [Regimes In Depth](architecture/regimesindepth.md) - Market regime detection
+- [Hysteresis](architecture/hysteresis.md) - Hysteresis in technical indicators
+- [Fed Data Summary](architecture/feddata-indepthsummary-20251110.md) - Federal Reserve data integration
+
+### Features
+
+Feature implementations and technical analysis components.
+
+**EMAs (Exponential Moving Averages):**
+- [EMA Overview](features/ema-overview.md) - Overview of EMA calculations
+- [EMA Daily](features/ema-daily.md) - Daily EMA calculations
+- [EMA Multi-Timeframe](features/ema-multi-tf.md) - Multi-timeframe EMA system
+- [EMA Multi-Timeframe Calendar](features/ema-multi-tf-cal.md) - Calendar-aligned EMAs
+- [EMA Multi-Timeframe Calendar Anchor](features/ema-multi-tf-cal-anchor.md) - Anchor-based calendar EMAs
+- [EMA Study](features/emas/ema-study.md) - EMA research and analysis
+- [EMA Alpha Comparison](features/emas/ema-alpha-comparison.md) - Alpha calculation comparison
+- [EMA Thoughts](features/ema-thoughts.md) - Design considerations
+- [EMA Possible Next Steps](features/ema-possible-next-steps.md) - Future enhancements
+- [EMA Loo](features/ema-loo.md) - EMA implementation details
+
+**Bars (Price Bars):**
+- [Bar Creation](features/bar-creation.md) - Price bar construction
+- [Bar Implementation](features/bar-implementation.md) - Bar processing implementation
+
+**Memory System:**
+- [Memory Model](features/memory-model.md) - AI memory architecture
+
+### Planning
+
+Project planning, status reports, and roadmaps.
+
+- [12-Week Plan (v1)](planning/new-12wk-plan-doc.md) - Original 12-week plan
+- [12-Week Plan (v2)](planning/new-12wk-plan-doc-v2.md) - Updated 12-week plan
+- [12-Week Plan Table](planning/12-week-plan-table.md) - Plan summary table
+- [Status 20251113](planning/status-20251113.md) - Status report November 13
+- [So Far 20251108](planning/sofar-20251108.md) - Progress summary November 8
+- [So Far In My Own Words](planning/sofarinmyownwords.md) - Narrative progress summary
+- [Updates So Far 20251108](planning/updates-sofar-20251108.md) - Update summary November 8
+- [Next Steps](planning/ta-lab2-nextsteps-needreview-20251111.md) - Planned next steps
+- [Some Next Steps](planning/ta-lab2-somenextstepstoreview-20251111.md) - Additional next steps
+- [Status & ToDos](planning/ta-lab2-status-todos-review-20251111.md) - Status and todo list
+
+### Reference
+
+Reference materials, processes, and supporting documentation.
+
+- [Timeframes Chart](reference/timeframes-chart.md) - Timeframe definitions and relationships
+- [Exchange Info](reference/exchanges-info.md) - Supported exchanges and assets
+- [ChatGPT Export Processing](reference/chat-gpt-export-processing-end-to-end-process.md) - ChatGPT conversation export process
+- [Memories](reference/memories.md) - Memory system documentation
+- [Update DB](reference/update-db.md) - Database update procedures
+- [Updating Price Data](reference/updating-price-data-rough.md) - Price data refresh process
+- [Refresh Methods Review](reference/review-refreshmethods-20251201.md) - Review of refresh methods
+
+> **Note:** Original Word and Excel files are preserved in `.archive/documentation/` with full git history and SHA256 checksums for integrity verification.
+
+---
+
 ## Contributing
 
 This project welcomes contributions for bug fixes, feature enhancements, and documentation improvements.
