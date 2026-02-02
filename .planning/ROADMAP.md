@@ -217,7 +217,14 @@ Plans:
   3. Original Excel/Word files preserved in .archive/documentation/
   4. Memory updated with moved_to relationships for each file
   5. Phase-level memory snapshot created with phase 13 tag
-**Plans**: TBD
+**Plans**: 6 plans
+Plans:
+- [ ] 13-01-PLAN.md - Create conversion infrastructure (convert_docx.py, convert_excel.py)
+- [ ] 13-02-PLAN.md - Discover and categorize ProjectTT documents
+- [ ] 13-03-PLAN.md - Convert DOCX files to Markdown
+- [ ] 13-04-PLAN.md - Convert Excel files to Markdown tables
+- [ ] 13-05-PLAN.md - Archive originals and update docs/index.md
+- [ ] 13-06-PLAN.md - Update memory with document relationships and phase snapshot
 
 ### Phase 14: Tools Integration
 **Goal**: Migrate Data_Tools scripts into ta_lab2/tools/ with working imports
@@ -317,7 +324,7 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> 12 -> ...
 |-------|----------------|--------|-----------|
 | 11. Memory Preparation | 5/5 | Complete | 2026-02-02 |
 | 12. Archive Foundation | 3/3 | Complete | 2026-02-02 |
-| 13. Documentation Consolidation | 0/TBD | Not started | - |
+| 13. Documentation Consolidation | 0/6 | Not started | - |
 | 14. Tools Integration | 0/TBD | Not started | - |
 | 15. Economic Data Strategy | 0/TBD | Not started | - |
 | 16. Repository Cleanup | 0/TBD | Not started | - |
@@ -346,4 +353,4 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> 12 -> ...
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-02 (Phase 12 planned: 3 plans in 2 waves)*
+*Last updated: 2026-02-02 (Phase 13 planned: 6 plans in 4 waves)*
