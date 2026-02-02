@@ -7,8 +7,8 @@
 ## Summary
 
 - **Total Requirements:** 32
-- **Complete:** 0
-- **Pending:** 32
+- **Complete:** 4
+- **Pending:** 28
 - **Coverage:** 32/32 mapped to phases (100%)
 
 ## Memory Integration Requirements (MEMO-10 to MEMO-18) - CRITICAL BLOCKER
@@ -67,21 +67,21 @@
 
 ## Archive Management Requirements (ARCH-01 to ARCH-04)
 
-- [ ] **ARCH-01**: Create .archive/ directory structure
+- [x] **ARCH-01**: Create .archive/ directory structure
   - Timestamped subdirectories (.archive/YYYY-MM-DD/category/)
   - Categories: backup_artifacts, root_files, deprecated_scripts, documentation
 
-- [ ] **ARCH-02**: Git history preservation
+- [x] **ARCH-02**: Git history preservation
   - Use `git mv` for all file moves (preserves git blame/log)
   - Verify `git log --follow` works for moved files
   - Never use OS-level moves or deletions
 
-- [ ] **ARCH-03**: File inventory manifest system
+- [x] **ARCH-03**: File inventory manifest system
   - Create manifest.json for each archive operation
   - Track: original_path, new_path (or archive_path), action, timestamp, sha256_checksum
   - Enable queries: "Where did file X go?" and "What files were archived in phase Y?"
 
-- [ ] **ARCH-04**: Zero data loss guarantee
+- [x] **ARCH-04**: Zero data loss guarantee
   - Pre-reorganization file count and size
   - Post-reorganization file count and size (active + archive)
   - Validation: counts match, no files disappeared
