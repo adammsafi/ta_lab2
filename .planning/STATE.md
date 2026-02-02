@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 ## Current Position
 
 Phase: 13 of 19 (Documentation Consolidation)
-Plan: 3 of 6 in current phase
+Plan: 5 of 6 in current phase
 Status: In progress
-Last activity: 2026-02-02 - Completed 13-03-PLAN.md (ProjectTT DOCX Conversion)
+Last activity: 2026-02-02 - Completed 13-05-PLAN.md (Archive ProjectTT Files & Update Index)
 
-Progress: [##########] 100% v0.4.0 | [████████  ] ~86% v0.5.0 (3/6 plans complete in Phase 13)
+Progress: [##########] 100% v0.4.0 | [████████  ] ~88% v0.5.0 (5/6 plans complete in Phase 13)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 69 (56 in v0.4.0, 13 in v0.5.0)
+- Total plans completed: 71 (56 in v0.4.0, 15 in v0.5.0)
 - Average duration: 11 min
-- Total execution time: 13.65 hours
+- Total execution time: 13.71 hours
 
 **By Phase (v0.4.0):**
 
@@ -44,11 +44,11 @@ Progress: [##########] 100% v0.4.0 | [████████  ] ~86% v0.5.0 (3
 |-------|-------|-------|----------|--------|
 | 11-memory-preparation | 5 | 46 min | 9 min | Complete |
 | 12-archive-foundation | 3 | 11 min | 4 min | Complete |
-| 13-documentation-consolidation | 3 | 16 min | 5 min | In progress |
+| 13-documentation-consolidation | 5 | 22 min | 4 min | In progress |
 
 **Recent Trend:**
 - v0.4.0 complete: 10 phases, 56 plans, 12.55 hours total
-- v0.5.0 in progress: Phase 13 in progress (3/6 plans, 16 min total)
+- v0.5.0 in progress: Phase 13 in progress (5/6 plans, 22 min total)
 
 *Updated after each plan completion*
 
@@ -93,6 +93,8 @@ Recent decisions affecting current work:
 - **Track existing .txt versions** (13-02): Check for existing .txt conversions to avoid redundant work
 - **Use fallback table format** (13-04): Proceed with basic pipe-separated tables when tabulate library unavailable, don't block on library installation
 - **Skip data exports and tracking files** (13-04): TV_DataExportPlay.xlsx (data export), compare_3_emas' (charts), github_code_frequency/time_scrap/ChatGPT_Convos (tracking)
+- **Copy external files not git mv** (13-05): ProjectTT files external to repo - use cp then git add to create fresh git history
+- **Category-based docs index** (13-05): Organize by content type (Architecture/Features/Planning/Reference) not source location
 
 ### Pending Todos
 
@@ -104,10 +106,10 @@ None currently.
 
 ## Session Continuity
 
-Last session: 2026-02-02T21:36:57Z
-Stopped at: Completed 13-03-PLAN.md (ProjectTT DOCX Conversion)
+Last session: 2026-02-02T21:42:58Z
+Stopped at: Completed 13-05-PLAN.md (Archive ProjectTT Files & Update Index)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-02 (Completed Phase 13 Plan 04: Excel to Markdown Conversion - Phase 13 in progress)*
+*Last updated: 2026-02-02 (Completed Phase 13 Plan 05: Archive ProjectTT Files & Update Index - Phase 13 in progress)*
