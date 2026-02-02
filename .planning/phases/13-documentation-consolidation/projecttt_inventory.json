@@ -1,0 +1,1370 @@
+{
+  "total_files": 64,
+  "total_size_bytes": 5666754,
+  "docx_count": 38,
+  "xlsx_count": 26,
+  "by_category": {
+    "architecture": [
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\EMA Study.xlsx",
+        "name": "EMA Study.xlsx",
+        "size_bytes": 104465,
+        "extension": "xlsx",
+        "subdirectory": "root",
+        "category": "architecture",
+        "priority": 1,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Foundational\\CoreComponents.docx",
+        "name": "CoreComponents.docx",
+        "size_bytes": 18383,
+        "extension": "docx",
+        "subdirectory": "Foundational",
+        "category": "architecture",
+        "priority": 1,
+        "has_txt_version": true
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Foundational\\KeyTerms.docx",
+        "name": "KeyTerms.docx",
+        "size_bytes": 26386,
+        "extension": "docx",
+        "subdirectory": "Foundational",
+        "category": "architecture",
+        "priority": 1,
+        "has_txt_version": true
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Foundational\\ta_lab2_GenesisFiles_Summary.docx",
+        "name": "ta_lab2_GenesisFiles_Summary.docx",
+        "size_bytes": 23306,
+        "extension": "docx",
+        "subdirectory": "Foundational",
+        "category": "architecture",
+        "priority": 1,
+        "has_txt_version": true
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Schemas_20260114.xlsx",
+        "name": "Schemas_20260114.xlsx",
+        "size_bytes": 183412,
+        "extension": "xlsx",
+        "subdirectory": "root",
+        "category": "architecture",
+        "priority": 1,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\db_schemas_keys.xlsx",
+        "name": "db_schemas_keys.xlsx",
+        "size_bytes": 31562,
+        "extension": "xlsx",
+        "subdirectory": "root",
+        "category": "architecture",
+        "priority": 1,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\ta_lab2 Workspace v.1.1.docx",
+        "name": "ta_lab2 Workspace v.1.1.docx",
+        "size_bytes": 363177,
+        "extension": "docx",
+        "subdirectory": "root",
+        "category": "architecture",
+        "priority": 1,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Foundational\\Hysteresis.docx",
+        "name": "Hysteresis.docx",
+        "size_bytes": 22823,
+        "extension": "docx",
+        "subdirectory": "Foundational",
+        "category": "architecture",
+        "priority": 2,
+        "has_txt_version": true
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Foundational\\RegimesInDepth.docx",
+        "name": "RegimesInDepth.docx",
+        "size_bytes": 26256,
+        "extension": "docx",
+        "subdirectory": "Foundational",
+        "category": "architecture",
+        "priority": 2,
+        "has_txt_version": true
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Foundational\\TimeFrames.docx",
+        "name": "TimeFrames.docx",
+        "size_bytes": 26916,
+        "extension": "docx",
+        "subdirectory": "Foundational",
+        "category": "architecture",
+        "priority": 2,
+        "has_txt_version": true
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Foundational\\feddata_inDepthSummary_20251110.docx",
+        "name": "feddata_inDepthSummary_20251110.docx",
+        "size_bytes": 32558,
+        "extension": "docx",
+        "subdirectory": "Foundational",
+        "category": "architecture",
+        "priority": 2,
+        "has_txt_version": true
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Foundational\\ChatGPT_VisionQuestions.docx",
+        "name": "ChatGPT_VisionQuestions.docx",
+        "size_bytes": 18911,
+        "extension": "docx",
+        "subdirectory": "Foundational",
+        "category": "architecture",
+        "priority": 3,
+        "has_txt_version": true
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Foundational\\Project Plan.docx",
+        "name": "Project Plan.docx",
+        "size_bytes": 20205,
+        "extension": "docx",
+        "subdirectory": "Foundational",
+        "category": "architecture",
+        "priority": 3,
+        "has_txt_version": true
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Foundational\\V1 Project Plan.docx",
+        "name": "V1 Project Plan.docx",
+        "size_bytes": 15350,
+        "extension": "docx",
+        "subdirectory": "Foundational",
+        "category": "architecture",
+        "priority": 3,
+        "has_txt_version": true
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Foundational\\ta_lab2_Vision_Draft_20251111.docx",
+        "name": "ta_lab2_Vision_Draft_20251111.docx",
+        "size_bytes": 19669,
+        "extension": "docx",
+        "subdirectory": "Foundational",
+        "category": "architecture",
+        "priority": 3,
+        "has_txt_version": true
+      }
+    ],
+    "features": [
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\Bars\\Studies&Scraps\\bar_tf_analysis.xlsx",
+        "name": "bar_tf_analysis.xlsx",
+        "size_bytes": 154882,
+        "extension": "xlsx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 1,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\Studies&Scraps\\cmc_ema_multi_tf_cal_us_1W_21P_Approval_20260127.xlsx",
+        "name": "cmc_ema_multi_tf_cal_us_1W_21P_Approval_20260127.xlsx",
+        "size_bytes": 327589,
+        "extension": "xlsx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 1,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\Studies&Scraps\\dim_tf&ema_alpha_LUT.xlsx",
+        "name": "dim_tf&ema_alpha_LUT.xlsx",
+        "size_bytes": 726290,
+        "extension": "xlsx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 1,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\Studies&Scraps\\ema_alpha_lookup_20251219.xlsx",
+        "name": "ema_alpha_lookup_20251219.xlsx",
+        "size_bytes": 193014,
+        "extension": "xlsx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 1,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\Studies&Scraps\\ema_analysis_look.xlsx",
+        "name": "ema_analysis_look.xlsx",
+        "size_bytes": 499205,
+        "extension": "xlsx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 1,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\Studies&Scraps\\ema_analysis_review.xlsx",
+        "name": "ema_analysis_review.xlsx",
+        "size_bytes": 329110,
+        "extension": "xlsx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 1,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\Bars\\DesriptiveDocuments\\bar_creation.docx",
+        "name": "bar_creation.docx",
+        "size_bytes": 46446,
+        "extension": "docx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 2,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\Bars\\DesriptiveDocuments\\bar_implementation.docx",
+        "name": "bar_implementation.docx",
+        "size_bytes": 29724,
+        "extension": "docx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 2,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\Bars\\Studies&Scraps\\bar_analysis_20260108.xlsx",
+        "name": "bar_analysis_20260108.xlsx",
+        "size_bytes": 26108,
+        "extension": "xlsx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 2,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\DesriptiveDocuments\\ema_multi_tf.docx",
+        "name": "ema_multi_tf.docx",
+        "size_bytes": 34603,
+        "extension": "docx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 2,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\DesriptiveDocuments\\ema_multi_tf_cal.docx",
+        "name": "ema_multi_tf_cal.docx",
+        "size_bytes": 31894,
+        "extension": "docx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 2,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\DesriptiveDocuments\\ema_multi_tf_cal_anchor.docx",
+        "name": "ema_multi_tf_cal_anchor.docx",
+        "size_bytes": 29565,
+        "extension": "docx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 2,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\DesriptiveDocuments\\ema_overview.docx",
+        "name": "ema_overview.docx",
+        "size_bytes": 33741,
+        "extension": "docx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 2,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\DesriptiveDocuments\\ema_possible_next_steps.docx",
+        "name": "ema_possible_next_steps.docx",
+        "size_bytes": 21168,
+        "extension": "docx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 2,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\Memory\\Memory Model.docx",
+        "name": "Memory Model.docx",
+        "size_bytes": 21541,
+        "extension": "docx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 2,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\Bars\\Studies&Scraps\\bar_data_analysis.xlsx",
+        "name": "bar_data_analysis.xlsx",
+        "size_bytes": 17526,
+        "extension": "xlsx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 3,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\DesriptiveDocuments\\ema_comparisson_chart&values.xlsx",
+        "name": "ema_comparisson_chart&values.xlsx",
+        "size_bytes": 14036,
+        "extension": "xlsx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 3,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\DesriptiveDocuments\\ema_daily.docx",
+        "name": "ema_daily.docx",
+        "size_bytes": 14654,
+        "extension": "docx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 3,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\EMA_loo.docx",
+        "name": "EMA_loo.docx",
+        "size_bytes": 17139,
+        "extension": "docx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 3,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\EMA_thoughts.docx",
+        "name": "EMA_thoughts.docx",
+        "size_bytes": 20465,
+        "extension": "docx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 3,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\Studies&Scraps\\cmcVSbitstampEMAs.xlsx",
+        "name": "cmcVSbitstampEMAs.xlsx",
+        "size_bytes": 13079,
+        "extension": "xlsx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 3,
+        "has_txt_version": false
+      }
+    ],
+    "reference": [
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\TV_DataExportPlay.xlsx",
+        "name": "TV_DataExportPlay.xlsx",
+        "size_bytes": 1491874,
+        "extension": "xlsx",
+        "subdirectory": "root",
+        "category": "reference",
+        "priority": 1,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\ChatGPT_Convos_Manually_Desc.xlsx",
+        "name": "ChatGPT_Convos_Manually_Desc.xlsx",
+        "size_bytes": 29609,
+        "extension": "xlsx",
+        "subdirectory": "root",
+        "category": "reference",
+        "priority": 2,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\ChatGPT_Convos_Manually_Desc2.xlsx",
+        "name": "ChatGPT_Convos_Manually_Desc2.xlsx",
+        "size_bytes": 29496,
+        "extension": "xlsx",
+        "subdirectory": "root",
+        "category": "reference",
+        "priority": 2,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\EMA_Alpha_LUT_Comparisson.xlsx",
+        "name": "EMA_Alpha_LUT_Comparisson.xlsx",
+        "size_bytes": 88294,
+        "extension": "xlsx",
+        "subdirectory": "root",
+        "category": "reference",
+        "priority": 2,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\ProcessDocuments\\Chat Gpt Export Processing \u2013 End-to-end Process.docx",
+        "name": "Chat Gpt Export Processing \u2013 End-to-end Process.docx",
+        "size_bytes": 27278,
+        "extension": "docx",
+        "subdirectory": "ProcessDocuments",
+        "category": "reference",
+        "priority": 2,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\ProcessDocuments\\Updating Price Data Rough.docx",
+        "name": "Updating Price Data Rough.docx",
+        "size_bytes": 23392,
+        "extension": "docx",
+        "subdirectory": "ProcessDocuments",
+        "category": "reference",
+        "priority": 2,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\ProcessDocuments\\memories.docx",
+        "name": "memories.docx",
+        "size_bytes": 23996,
+        "extension": "docx",
+        "subdirectory": "ProcessDocuments",
+        "category": "reference",
+        "priority": 2,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\assets_exchanges_info.xlsx",
+        "name": "assets_exchanges_info.xlsx",
+        "size_bytes": 20762,
+        "extension": "xlsx",
+        "subdirectory": "root",
+        "category": "reference",
+        "priority": 2,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\compare_3_emas'.xlsx",
+        "name": "compare_3_emas'.xlsx",
+        "size_bytes": 38238,
+        "extension": "xlsx",
+        "subdirectory": "root",
+        "category": "reference",
+        "priority": 2,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\review_refreshMethods_20251201.docx",
+        "name": "review_refreshMethods_20251201.docx",
+        "size_bytes": 22895,
+        "extension": "docx",
+        "subdirectory": "root",
+        "category": "reference",
+        "priority": 2,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Chat Gpt Export Processing \u2013 End-to-end Process.docx",
+        "name": "Chat Gpt Export Processing \u2013 End-to-end Process.docx",
+        "size_bytes": 15160,
+        "extension": "docx",
+        "subdirectory": "root",
+        "category": "reference",
+        "priority": 3,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\ChatGPT\\Look.xlsx",
+        "name": "Look.xlsx",
+        "size_bytes": 10544,
+        "extension": "xlsx",
+        "subdirectory": "ChatGPT",
+        "category": "reference",
+        "priority": 3,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\ChatGPT\\analysis_look.xlsx",
+        "name": "analysis_look.xlsx",
+        "size_bytes": 17495,
+        "extension": "xlsx",
+        "subdirectory": "ChatGPT",
+        "category": "reference",
+        "priority": 3,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\ProcessDocuments\\Update_DB.docx",
+        "name": "Update_DB.docx",
+        "size_bytes": 18865,
+        "extension": "docx",
+        "subdirectory": "ProcessDocuments",
+        "category": "reference",
+        "priority": 3,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\docs_Need_Work_20251128.xlsx",
+        "name": "docs_Need_Work_20251128.xlsx",
+        "size_bytes": 9425,
+        "extension": "xlsx",
+        "subdirectory": "root",
+        "category": "reference",
+        "priority": 3,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\github_code_frequency.xlsx",
+        "name": "github_code_frequency.xlsx",
+        "size_bytes": 10219,
+        "extension": "xlsx",
+        "subdirectory": "root",
+        "category": "reference",
+        "priority": 3,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\ta_lab2_TimeFramesChart_20251111.xlsx",
+        "name": "ta_lab2_TimeFramesChart_20251111.xlsx",
+        "size_bytes": 9901,
+        "extension": "xlsx",
+        "subdirectory": "root",
+        "category": "reference",
+        "priority": 3,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\time_scrap.xlsx",
+        "name": "time_scrap.xlsx",
+        "size_bytes": 18243,
+        "extension": "xlsx",
+        "subdirectory": "root",
+        "category": "reference",
+        "priority": 3,
+        "has_txt_version": false
+      }
+    ],
+    "planning": [
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Plans&Status\\new_12wk_plan_doc.docx",
+        "name": "new_12wk_plan_doc.docx",
+        "size_bytes": 26588,
+        "extension": "docx",
+        "subdirectory": "Plans&Status",
+        "category": "planning",
+        "priority": 2,
+        "has_txt_version": true
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Plans&Status\\new_12wk_plan_doc_v2.docx",
+        "name": "new_12wk_plan_doc_v2.docx",
+        "size_bytes": 28295,
+        "extension": "docx",
+        "subdirectory": "Plans&Status",
+        "category": "planning",
+        "priority": 2,
+        "has_txt_version": true
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Plans&Status\\soFarInMyOwnWords.docx",
+        "name": "soFarInMyOwnWords.docx",
+        "size_bytes": 25836,
+        "extension": "docx",
+        "subdirectory": "Plans&Status",
+        "category": "planning",
+        "priority": 2,
+        "has_txt_version": true
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Plans&Status\\soFar_20251108.docx",
+        "name": "soFar_20251108.docx",
+        "size_bytes": 32231,
+        "extension": "docx",
+        "subdirectory": "Plans&Status",
+        "category": "planning",
+        "priority": 2,
+        "has_txt_version": true
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Plans&Status\\status_20251113.docx",
+        "name": "status_20251113.docx",
+        "size_bytes": 21736,
+        "extension": "docx",
+        "subdirectory": "Plans&Status",
+        "category": "planning",
+        "priority": 2,
+        "has_txt_version": true
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Plans&Status\\updates_soFar_20251108 .docx",
+        "name": "updates_soFar_20251108 .docx",
+        "size_bytes": 26048,
+        "extension": "docx",
+        "subdirectory": "Plans&Status",
+        "category": "planning",
+        "priority": 2,
+        "has_txt_version": true
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Plans&Status\\new_12wk_plan_table.xlsx",
+        "name": "new_12wk_plan_table.xlsx",
+        "size_bytes": 14236,
+        "extension": "xlsx",
+        "subdirectory": "Plans&Status",
+        "category": "planning",
+        "priority": 3,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Plans&Status\\ta_lab2_NextSteps_NeedReview_20251111.docx",
+        "name": "ta_lab2_NextSteps_NeedReview_20251111.docx",
+        "size_bytes": 17254,
+        "extension": "docx",
+        "subdirectory": "Plans&Status",
+        "category": "planning",
+        "priority": 3,
+        "has_txt_version": true
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Plans&Status\\ta_lab2_Status&ToDos_Review_20251111.docx",
+        "name": "ta_lab2_Status&ToDos_Review_20251111.docx",
+        "size_bytes": 18220,
+        "extension": "docx",
+        "subdirectory": "Plans&Status",
+        "category": "planning",
+        "priority": 3,
+        "has_txt_version": true
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Plans&Status\\ta_lab2_someNextStepsToReview_20251111.docx",
+        "name": "ta_lab2_someNextStepsToReview_20251111.docx",
+        "size_bytes": 15466,
+        "extension": "docx",
+        "subdirectory": "Plans&Status",
+        "category": "planning",
+        "priority": 3,
+        "has_txt_version": true
+      }
+    ]
+  },
+  "by_priority": {
+    "1": [
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\EMA Study.xlsx",
+        "name": "EMA Study.xlsx",
+        "size_bytes": 104465,
+        "extension": "xlsx",
+        "subdirectory": "root",
+        "category": "architecture",
+        "priority": 1,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\Bars\\Studies&Scraps\\bar_tf_analysis.xlsx",
+        "name": "bar_tf_analysis.xlsx",
+        "size_bytes": 154882,
+        "extension": "xlsx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 1,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\Studies&Scraps\\cmc_ema_multi_tf_cal_us_1W_21P_Approval_20260127.xlsx",
+        "name": "cmc_ema_multi_tf_cal_us_1W_21P_Approval_20260127.xlsx",
+        "size_bytes": 327589,
+        "extension": "xlsx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 1,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\Studies&Scraps\\dim_tf&ema_alpha_LUT.xlsx",
+        "name": "dim_tf&ema_alpha_LUT.xlsx",
+        "size_bytes": 726290,
+        "extension": "xlsx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 1,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\Studies&Scraps\\ema_alpha_lookup_20251219.xlsx",
+        "name": "ema_alpha_lookup_20251219.xlsx",
+        "size_bytes": 193014,
+        "extension": "xlsx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 1,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\Studies&Scraps\\ema_analysis_look.xlsx",
+        "name": "ema_analysis_look.xlsx",
+        "size_bytes": 499205,
+        "extension": "xlsx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 1,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\Studies&Scraps\\ema_analysis_review.xlsx",
+        "name": "ema_analysis_review.xlsx",
+        "size_bytes": 329110,
+        "extension": "xlsx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 1,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Foundational\\CoreComponents.docx",
+        "name": "CoreComponents.docx",
+        "size_bytes": 18383,
+        "extension": "docx",
+        "subdirectory": "Foundational",
+        "category": "architecture",
+        "priority": 1,
+        "has_txt_version": true
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Foundational\\KeyTerms.docx",
+        "name": "KeyTerms.docx",
+        "size_bytes": 26386,
+        "extension": "docx",
+        "subdirectory": "Foundational",
+        "category": "architecture",
+        "priority": 1,
+        "has_txt_version": true
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Foundational\\ta_lab2_GenesisFiles_Summary.docx",
+        "name": "ta_lab2_GenesisFiles_Summary.docx",
+        "size_bytes": 23306,
+        "extension": "docx",
+        "subdirectory": "Foundational",
+        "category": "architecture",
+        "priority": 1,
+        "has_txt_version": true
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Schemas_20260114.xlsx",
+        "name": "Schemas_20260114.xlsx",
+        "size_bytes": 183412,
+        "extension": "xlsx",
+        "subdirectory": "root",
+        "category": "architecture",
+        "priority": 1,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\TV_DataExportPlay.xlsx",
+        "name": "TV_DataExportPlay.xlsx",
+        "size_bytes": 1491874,
+        "extension": "xlsx",
+        "subdirectory": "root",
+        "category": "reference",
+        "priority": 1,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\db_schemas_keys.xlsx",
+        "name": "db_schemas_keys.xlsx",
+        "size_bytes": 31562,
+        "extension": "xlsx",
+        "subdirectory": "root",
+        "category": "architecture",
+        "priority": 1,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\ta_lab2 Workspace v.1.1.docx",
+        "name": "ta_lab2 Workspace v.1.1.docx",
+        "size_bytes": 363177,
+        "extension": "docx",
+        "subdirectory": "root",
+        "category": "architecture",
+        "priority": 1,
+        "has_txt_version": false
+      }
+    ],
+    "2": [
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\ChatGPT_Convos_Manually_Desc.xlsx",
+        "name": "ChatGPT_Convos_Manually_Desc.xlsx",
+        "size_bytes": 29609,
+        "extension": "xlsx",
+        "subdirectory": "root",
+        "category": "reference",
+        "priority": 2,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\ChatGPT_Convos_Manually_Desc2.xlsx",
+        "name": "ChatGPT_Convos_Manually_Desc2.xlsx",
+        "size_bytes": 29496,
+        "extension": "xlsx",
+        "subdirectory": "root",
+        "category": "reference",
+        "priority": 2,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\EMA_Alpha_LUT_Comparisson.xlsx",
+        "name": "EMA_Alpha_LUT_Comparisson.xlsx",
+        "size_bytes": 88294,
+        "extension": "xlsx",
+        "subdirectory": "root",
+        "category": "reference",
+        "priority": 2,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\Bars\\DesriptiveDocuments\\bar_creation.docx",
+        "name": "bar_creation.docx",
+        "size_bytes": 46446,
+        "extension": "docx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 2,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\Bars\\DesriptiveDocuments\\bar_implementation.docx",
+        "name": "bar_implementation.docx",
+        "size_bytes": 29724,
+        "extension": "docx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 2,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\Bars\\Studies&Scraps\\bar_analysis_20260108.xlsx",
+        "name": "bar_analysis_20260108.xlsx",
+        "size_bytes": 26108,
+        "extension": "xlsx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 2,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\DesriptiveDocuments\\ema_multi_tf.docx",
+        "name": "ema_multi_tf.docx",
+        "size_bytes": 34603,
+        "extension": "docx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 2,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\DesriptiveDocuments\\ema_multi_tf_cal.docx",
+        "name": "ema_multi_tf_cal.docx",
+        "size_bytes": 31894,
+        "extension": "docx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 2,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\DesriptiveDocuments\\ema_multi_tf_cal_anchor.docx",
+        "name": "ema_multi_tf_cal_anchor.docx",
+        "size_bytes": 29565,
+        "extension": "docx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 2,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\DesriptiveDocuments\\ema_overview.docx",
+        "name": "ema_overview.docx",
+        "size_bytes": 33741,
+        "extension": "docx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 2,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\DesriptiveDocuments\\ema_possible_next_steps.docx",
+        "name": "ema_possible_next_steps.docx",
+        "size_bytes": 21168,
+        "extension": "docx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 2,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\Memory\\Memory Model.docx",
+        "name": "Memory Model.docx",
+        "size_bytes": 21541,
+        "extension": "docx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 2,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Foundational\\Hysteresis.docx",
+        "name": "Hysteresis.docx",
+        "size_bytes": 22823,
+        "extension": "docx",
+        "subdirectory": "Foundational",
+        "category": "architecture",
+        "priority": 2,
+        "has_txt_version": true
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Foundational\\RegimesInDepth.docx",
+        "name": "RegimesInDepth.docx",
+        "size_bytes": 26256,
+        "extension": "docx",
+        "subdirectory": "Foundational",
+        "category": "architecture",
+        "priority": 2,
+        "has_txt_version": true
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Foundational\\TimeFrames.docx",
+        "name": "TimeFrames.docx",
+        "size_bytes": 26916,
+        "extension": "docx",
+        "subdirectory": "Foundational",
+        "category": "architecture",
+        "priority": 2,
+        "has_txt_version": true
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Foundational\\feddata_inDepthSummary_20251110.docx",
+        "name": "feddata_inDepthSummary_20251110.docx",
+        "size_bytes": 32558,
+        "extension": "docx",
+        "subdirectory": "Foundational",
+        "category": "architecture",
+        "priority": 2,
+        "has_txt_version": true
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Plans&Status\\new_12wk_plan_doc.docx",
+        "name": "new_12wk_plan_doc.docx",
+        "size_bytes": 26588,
+        "extension": "docx",
+        "subdirectory": "Plans&Status",
+        "category": "planning",
+        "priority": 2,
+        "has_txt_version": true
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Plans&Status\\new_12wk_plan_doc_v2.docx",
+        "name": "new_12wk_plan_doc_v2.docx",
+        "size_bytes": 28295,
+        "extension": "docx",
+        "subdirectory": "Plans&Status",
+        "category": "planning",
+        "priority": 2,
+        "has_txt_version": true
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Plans&Status\\soFarInMyOwnWords.docx",
+        "name": "soFarInMyOwnWords.docx",
+        "size_bytes": 25836,
+        "extension": "docx",
+        "subdirectory": "Plans&Status",
+        "category": "planning",
+        "priority": 2,
+        "has_txt_version": true
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Plans&Status\\soFar_20251108.docx",
+        "name": "soFar_20251108.docx",
+        "size_bytes": 32231,
+        "extension": "docx",
+        "subdirectory": "Plans&Status",
+        "category": "planning",
+        "priority": 2,
+        "has_txt_version": true
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Plans&Status\\status_20251113.docx",
+        "name": "status_20251113.docx",
+        "size_bytes": 21736,
+        "extension": "docx",
+        "subdirectory": "Plans&Status",
+        "category": "planning",
+        "priority": 2,
+        "has_txt_version": true
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Plans&Status\\updates_soFar_20251108 .docx",
+        "name": "updates_soFar_20251108 .docx",
+        "size_bytes": 26048,
+        "extension": "docx",
+        "subdirectory": "Plans&Status",
+        "category": "planning",
+        "priority": 2,
+        "has_txt_version": true
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\ProcessDocuments\\Chat Gpt Export Processing \u2013 End-to-end Process.docx",
+        "name": "Chat Gpt Export Processing \u2013 End-to-end Process.docx",
+        "size_bytes": 27278,
+        "extension": "docx",
+        "subdirectory": "ProcessDocuments",
+        "category": "reference",
+        "priority": 2,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\ProcessDocuments\\Updating Price Data Rough.docx",
+        "name": "Updating Price Data Rough.docx",
+        "size_bytes": 23392,
+        "extension": "docx",
+        "subdirectory": "ProcessDocuments",
+        "category": "reference",
+        "priority": 2,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\ProcessDocuments\\memories.docx",
+        "name": "memories.docx",
+        "size_bytes": 23996,
+        "extension": "docx",
+        "subdirectory": "ProcessDocuments",
+        "category": "reference",
+        "priority": 2,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\assets_exchanges_info.xlsx",
+        "name": "assets_exchanges_info.xlsx",
+        "size_bytes": 20762,
+        "extension": "xlsx",
+        "subdirectory": "root",
+        "category": "reference",
+        "priority": 2,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\compare_3_emas'.xlsx",
+        "name": "compare_3_emas'.xlsx",
+        "size_bytes": 38238,
+        "extension": "xlsx",
+        "subdirectory": "root",
+        "category": "reference",
+        "priority": 2,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\review_refreshMethods_20251201.docx",
+        "name": "review_refreshMethods_20251201.docx",
+        "size_bytes": 22895,
+        "extension": "docx",
+        "subdirectory": "root",
+        "category": "reference",
+        "priority": 2,
+        "has_txt_version": false
+      }
+    ],
+    "3": [
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Chat Gpt Export Processing \u2013 End-to-end Process.docx",
+        "name": "Chat Gpt Export Processing \u2013 End-to-end Process.docx",
+        "size_bytes": 15160,
+        "extension": "docx",
+        "subdirectory": "root",
+        "category": "reference",
+        "priority": 3,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\ChatGPT\\Look.xlsx",
+        "name": "Look.xlsx",
+        "size_bytes": 10544,
+        "extension": "xlsx",
+        "subdirectory": "ChatGPT",
+        "category": "reference",
+        "priority": 3,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\ChatGPT\\analysis_look.xlsx",
+        "name": "analysis_look.xlsx",
+        "size_bytes": 17495,
+        "extension": "xlsx",
+        "subdirectory": "ChatGPT",
+        "category": "reference",
+        "priority": 3,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\Bars\\Studies&Scraps\\bar_data_analysis.xlsx",
+        "name": "bar_data_analysis.xlsx",
+        "size_bytes": 17526,
+        "extension": "xlsx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 3,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\DesriptiveDocuments\\ema_comparisson_chart&values.xlsx",
+        "name": "ema_comparisson_chart&values.xlsx",
+        "size_bytes": 14036,
+        "extension": "xlsx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 3,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\DesriptiveDocuments\\ema_daily.docx",
+        "name": "ema_daily.docx",
+        "size_bytes": 14654,
+        "extension": "docx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 3,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\EMA_loo.docx",
+        "name": "EMA_loo.docx",
+        "size_bytes": 17139,
+        "extension": "docx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 3,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\EMA_thoughts.docx",
+        "name": "EMA_thoughts.docx",
+        "size_bytes": 20465,
+        "extension": "docx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 3,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\Studies&Scraps\\cmcVSbitstampEMAs.xlsx",
+        "name": "cmcVSbitstampEMAs.xlsx",
+        "size_bytes": 13079,
+        "extension": "xlsx",
+        "subdirectory": "Features",
+        "category": "features",
+        "priority": 3,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Foundational\\ChatGPT_VisionQuestions.docx",
+        "name": "ChatGPT_VisionQuestions.docx",
+        "size_bytes": 18911,
+        "extension": "docx",
+        "subdirectory": "Foundational",
+        "category": "architecture",
+        "priority": 3,
+        "has_txt_version": true
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Foundational\\Project Plan.docx",
+        "name": "Project Plan.docx",
+        "size_bytes": 20205,
+        "extension": "docx",
+        "subdirectory": "Foundational",
+        "category": "architecture",
+        "priority": 3,
+        "has_txt_version": true
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Foundational\\V1 Project Plan.docx",
+        "name": "V1 Project Plan.docx",
+        "size_bytes": 15350,
+        "extension": "docx",
+        "subdirectory": "Foundational",
+        "category": "architecture",
+        "priority": 3,
+        "has_txt_version": true
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Foundational\\ta_lab2_Vision_Draft_20251111.docx",
+        "name": "ta_lab2_Vision_Draft_20251111.docx",
+        "size_bytes": 19669,
+        "extension": "docx",
+        "subdirectory": "Foundational",
+        "category": "architecture",
+        "priority": 3,
+        "has_txt_version": true
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Plans&Status\\new_12wk_plan_table.xlsx",
+        "name": "new_12wk_plan_table.xlsx",
+        "size_bytes": 14236,
+        "extension": "xlsx",
+        "subdirectory": "Plans&Status",
+        "category": "planning",
+        "priority": 3,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Plans&Status\\ta_lab2_NextSteps_NeedReview_20251111.docx",
+        "name": "ta_lab2_NextSteps_NeedReview_20251111.docx",
+        "size_bytes": 17254,
+        "extension": "docx",
+        "subdirectory": "Plans&Status",
+        "category": "planning",
+        "priority": 3,
+        "has_txt_version": true
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Plans&Status\\ta_lab2_Status&ToDos_Review_20251111.docx",
+        "name": "ta_lab2_Status&ToDos_Review_20251111.docx",
+        "size_bytes": 18220,
+        "extension": "docx",
+        "subdirectory": "Plans&Status",
+        "category": "planning",
+        "priority": 3,
+        "has_txt_version": true
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\Plans&Status\\ta_lab2_someNextStepsToReview_20251111.docx",
+        "name": "ta_lab2_someNextStepsToReview_20251111.docx",
+        "size_bytes": 15466,
+        "extension": "docx",
+        "subdirectory": "Plans&Status",
+        "category": "planning",
+        "priority": 3,
+        "has_txt_version": true
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\ProcessDocuments\\Update_DB.docx",
+        "name": "Update_DB.docx",
+        "size_bytes": 18865,
+        "extension": "docx",
+        "subdirectory": "ProcessDocuments",
+        "category": "reference",
+        "priority": 3,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\docs_Need_Work_20251128.xlsx",
+        "name": "docs_Need_Work_20251128.xlsx",
+        "size_bytes": 9425,
+        "extension": "xlsx",
+        "subdirectory": "root",
+        "category": "reference",
+        "priority": 3,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\github_code_frequency.xlsx",
+        "name": "github_code_frequency.xlsx",
+        "size_bytes": 10219,
+        "extension": "xlsx",
+        "subdirectory": "root",
+        "category": "reference",
+        "priority": 3,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\ta_lab2_TimeFramesChart_20251111.xlsx",
+        "name": "ta_lab2_TimeFramesChart_20251111.xlsx",
+        "size_bytes": 9901,
+        "extension": "xlsx",
+        "subdirectory": "root",
+        "category": "reference",
+        "priority": 3,
+        "has_txt_version": false
+      },
+      {
+        "path": "C:\\Users\\asafi\\Documents\\ProjectTT\\time_scrap.xlsx",
+        "name": "time_scrap.xlsx",
+        "size_bytes": 18243,
+        "extension": "xlsx",
+        "subdirectory": "root",
+        "category": "reference",
+        "priority": 3,
+        "has_txt_version": false
+      }
+    ]
+  },
+  "conversion_order": [
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\EMA Study.xlsx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\Bars\\Studies&Scraps\\bar_tf_analysis.xlsx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\Studies&Scraps\\cmc_ema_multi_tf_cal_us_1W_21P_Approval_20260127.xlsx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\Studies&Scraps\\dim_tf&ema_alpha_LUT.xlsx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\Studies&Scraps\\ema_alpha_lookup_20251219.xlsx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\Studies&Scraps\\ema_analysis_look.xlsx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\Studies&Scraps\\ema_analysis_review.xlsx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Foundational\\CoreComponents.docx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Foundational\\KeyTerms.docx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Foundational\\ta_lab2_GenesisFiles_Summary.docx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Schemas_20260114.xlsx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\TV_DataExportPlay.xlsx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\db_schemas_keys.xlsx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\ta_lab2 Workspace v.1.1.docx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\ChatGPT_Convos_Manually_Desc.xlsx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\ChatGPT_Convos_Manually_Desc2.xlsx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\EMA_Alpha_LUT_Comparisson.xlsx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\Bars\\DesriptiveDocuments\\bar_creation.docx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\Bars\\DesriptiveDocuments\\bar_implementation.docx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\Bars\\Studies&Scraps\\bar_analysis_20260108.xlsx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\DesriptiveDocuments\\ema_multi_tf.docx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\DesriptiveDocuments\\ema_multi_tf_cal.docx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\DesriptiveDocuments\\ema_multi_tf_cal_anchor.docx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\DesriptiveDocuments\\ema_overview.docx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\DesriptiveDocuments\\ema_possible_next_steps.docx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\Memory\\Memory Model.docx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Foundational\\Hysteresis.docx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Foundational\\RegimesInDepth.docx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Foundational\\TimeFrames.docx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Foundational\\feddata_inDepthSummary_20251110.docx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Plans&Status\\new_12wk_plan_doc.docx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Plans&Status\\new_12wk_plan_doc_v2.docx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Plans&Status\\soFarInMyOwnWords.docx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Plans&Status\\soFar_20251108.docx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Plans&Status\\status_20251113.docx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Plans&Status\\updates_soFar_20251108 .docx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\ProcessDocuments\\Chat Gpt Export Processing \u2013 End-to-end Process.docx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\ProcessDocuments\\Updating Price Data Rough.docx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\ProcessDocuments\\memories.docx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\assets_exchanges_info.xlsx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\compare_3_emas'.xlsx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\review_refreshMethods_20251201.docx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Chat Gpt Export Processing \u2013 End-to-end Process.docx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\ChatGPT\\Look.xlsx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\ChatGPT\\analysis_look.xlsx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\Bars\\Studies&Scraps\\bar_data_analysis.xlsx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\DesriptiveDocuments\\ema_comparisson_chart&values.xlsx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\DesriptiveDocuments\\ema_daily.docx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\EMA_loo.docx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\EMA_thoughts.docx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Features\\EMAs\\Studies&Scraps\\cmcVSbitstampEMAs.xlsx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Foundational\\ChatGPT_VisionQuestions.docx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Foundational\\Project Plan.docx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Foundational\\V1 Project Plan.docx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Foundational\\ta_lab2_Vision_Draft_20251111.docx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Plans&Status\\new_12wk_plan_table.xlsx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Plans&Status\\ta_lab2_NextSteps_NeedReview_20251111.docx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Plans&Status\\ta_lab2_Status&ToDos_Review_20251111.docx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\Plans&Status\\ta_lab2_someNextStepsToReview_20251111.docx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\ProcessDocuments\\Update_DB.docx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\docs_Need_Work_20251128.xlsx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\github_code_frequency.xlsx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\ta_lab2_TimeFramesChart_20251111.xlsx",
+    "C:\\Users\\asafi\\Documents\\ProjectTT\\time_scrap.xlsx"
+  ]
+}
