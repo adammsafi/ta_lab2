@@ -1,0 +1,125 @@
+{
+  "timestamp": "2026-02-02T17:12:11.029539Z",
+  "total_memories": 4205,
+  "directories_validated": [
+    "ta_lab2",
+    "Data_Tools",
+    "ProjectTT",
+    "fredtools2",
+    "fedtools2"
+  ],
+  "directory_results": {
+    "ta_lab2": {
+      "inventory_query": {
+        "query": "List all files in ta_lab2",
+        "results_count": 20,
+        "sample_files": [],
+        "success": true
+      },
+      "function_lookup": {
+        "query": "Functions in ta_lab2",
+        "found": false,
+        "results_count": 10,
+        "success": false
+      }
+    },
+    "Data_Tools": {
+      "inventory_query": {
+        "query": "List all files in Data_Tools",
+        "results_count": 0,
+        "sample_files": [],
+        "success": false
+      },
+      "function_lookup": {
+        "query": "Functions in Data_Tools",
+        "found": false,
+        "results_count": 0,
+        "success": false
+      }
+    },
+    "ProjectTT": {
+      "inventory_query": {
+        "query": "List all files in ProjectTT",
+        "results_count": 1,
+        "sample_files": [],
+        "success": true
+      },
+      "function_lookup": {
+        "query": "Functions in ProjectTT",
+        "found": false,
+        "results_count": 0,
+        "success": false
+      }
+    },
+    "fredtools2": {
+      "inventory_query": {
+        "query": "List all files in fredtools2",
+        "results_count": 6,
+        "sample_files": [
+          "src\\fredtools2\\cli.py",
+          "src\\fredtools2\\fred_api.py",
+          "src\\fredtools2\\db.py",
+          "src\\fredtools2\\jobs\\releases.py",
+          "src\\fredtools2\\config.py"
+        ],
+        "success": true
+      },
+      "function_lookup": {
+        "query": "Functions in fredtools2",
+        "found": true,
+        "results_count": 6,
+        "success": true
+      }
+    },
+    "fedtools2": {
+      "inventory_query": {
+        "query": "List all files in fedtools2",
+        "results_count": 6,
+        "sample_files": [
+          "src\\fedtools2\\__init__.py",
+          "src\\fedtools2\\etl.py",
+          "src\\fedtools2\\config\\__init__.py",
+          "src\\fedtools2\\utils\\io.py",
+          "src\\fedtools2\\utils\\consolidation.py"
+        ],
+        "success": true
+      },
+      "function_lookup": {
+        "query": "Functions in fedtools2",
+        "found": true,
+        "results_count": 7,
+        "success": true
+      }
+    }
+  },
+  "tag_filtering": {
+    "query": "pre_reorg_v0.5.0 snapshot files",
+    "results_count": 10,
+    "tagged_results": 2,
+    "tag_filter_works": true,
+    "success": true
+  },
+  "cross_reference": {
+    "query": "What functions use extract_codebase?",
+    "results_count": 5,
+    "success": true
+  },
+  "file_coverage": null,
+  "overall_coverage_percentage": 72.0,
+  "success": true,
+  "summary": {
+    "directories_queryable_count": 4,
+    "directories_queryable_percentage": 80.0,
+    "function_lookup_count": 2,
+    "function_lookup_percentage": 40.0,
+    "tag_filtering_working": true,
+    "cross_reference_working": true
+  },
+  "gaps": [
+    "Directory 'ta_lab2' function lookup query did not find function information",
+    "Directory 'Data_Tools' inventory query returned 0 results",
+    "Directory 'Data_Tools' function lookup query did not find function information",
+    "Directory 'ProjectTT' function lookup query did not find function information"
+  ],
+  "gap_analysis": "No significant gaps"
+}
