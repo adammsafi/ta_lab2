@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "schema_version": "1.0.0",
+  "category": "originals",
+  "description": "Manifest tracking .original file archiving (git history provides canonical versions)",
+  "entries": [
+    {
+      "original_path": "src/ta_lab2/features/m_tf/ema_multi_tf_cal.original",
+      "archive_path": ".archive/originals/2026-02-03/ema_multi_tf_cal.original",
+      "action": "archived",
+      "timestamp": "2026-02-03T16:34:12.086711+00:00",
+      "sha256_checksum": "ce069541ec17a806afaf6e82fa216ce38a47181446ef764a2a2cb34fe49722e6",
+      "size_bytes": 21792,
+      "phase_number": "16",
+      "archive_reason": "Git history tracks originals; .original backup files redundant"
+    },
+    {
+      "original_path": "src/ta_lab2/features/m_tf/ema_multi_tf_cal_anchor.original",
+      "archive_path": ".archive/originals/2026-02-03/ema_multi_tf_cal_anchor.original",
+      "action": "archived",
+      "timestamp": "2026-02-03T16:34:12.254168+00:00",
+      "sha256_checksum": "8a87994bc362051e4e1330b653eb5c42ff91dc9eeadbe7f4b349a9b20151a215",
+      "size_bytes": 23845,
+      "phase_number": "16",
+      "archive_reason": "Git history tracks originals; .original backup files redundant"
+    },
+    {
+      "original_path": "src/ta_lab2/features/m_tf/ema_multi_tf_v2.original",
+      "archive_path": ".archive/originals/2026-02-03/ema_multi_tf_v2.original",
+      "action": "archived",
+      "timestamp": "2026-02-03T16:34:12.379526+00:00",
+      "sha256_checksum": "aec43fbe2adc96cedba3b43a576d1d3a5ff66b953099e6c88361811f99fb19e3",
+      "size_bytes": 18241,
+      "phase_number": "16",
+      "archive_reason": "Git history tracks originals; .original backup files redundant"
+    },
+    {
+      "original_path": "src/ta_lab2/features/m_tf/ema_multi_timeframe.original",
+      "archive_path": ".archive/originals/2026-02-03/ema_multi_timeframe.original",
+      "action": "archived",
+      "timestamp": "2026-02-03T16:34:12.677157+00:00",
+      "sha256_checksum": "9eba8c208d5b4079e883996df4f0ef34c1dd9ca9c2800c2eca48fc4c527bf6ff",
+      "size_bytes": 18673,
+      "phase_number": "16",
+      "archive_reason": "Git history tracks originals; .original backup files redundant"
+    },
+    {
+      "original_path": "src/ta_lab2/scripts/emas/refresh_cmc_ema_multi_tf_cal_anchor_from_bars.original",
+      "archive_path": ".archive/originals/2026-02-03/refresh_cmc_ema_multi_tf_cal_anchor_from_bars.original",
+      "action": "archived",
+      "timestamp": "2026-02-03T16:34:12.908396+00:00",
+      "sha256_checksum": "158c4a026f02b2ce2102f51f26cb8eefba1accedc5054c215d183da6b7675abd",
+      "size_bytes": 16089,
+      "phase_number": "16",
+      "archive_reason": "Git history tracks originals; .original backup files redundant"
+    },
+    {
+      "original_path": "src/ta_lab2/scripts/emas/refresh_cmc_ema_multi_tf_cal_from_bars.original",
+      "archive_path": ".archive/originals/2026-02-03/refresh_cmc_ema_multi_tf_cal_from_bars.original",
+      "action": "archived",
+      "timestamp": "2026-02-03T16:34:13.312993+00:00",
+      "sha256_checksum": "95f05b2fa920e5f84b54c265c8f2209e06d0fd9882fa2d7acc32a3b272e5fd28",
+      "size_bytes": 12301,
+      "phase_number": "16",
+      "archive_reason": "Git history tracks originals; .original backup files redundant"
+    },
+    {
+      "original_path": "src/ta_lab2/scripts/emas/refresh_cmc_ema_multi_tf_from_bars.original",
+      "archive_path": ".archive/originals/2026-02-03/refresh_cmc_ema_multi_tf_from_bars.original",
+      "action": "archived",
+      "timestamp": "2026-02-03T16:34:14.084660+00:00",
+      "sha256_checksum": "f389a844dc37b6a019907121e814d6247bcb3ebcdb205ccc11f27691417baf75",
+      "size_bytes": 18172,
+      "phase_number": "16",
+      "archive_reason": "Git history tracks originals; .original backup files redundant"
+    },
+    {
+      "original_path": "src/ta_lab2/scripts/emas/refresh_cmc_ema_multi_tf_v2.original",
+      "archive_path": ".archive/originals/2026-02-03/refresh_cmc_ema_multi_tf_v2.original",
+      "action": "archived",
+      "timestamp": "2026-02-03T16:34:14.221527+00:00",
+      "sha256_checksum": "5b590a6f0db3964dd78228e2799cc579f43cf96138133bc86b25427e8bff680a",
+      "size_bytes": 10874,
+      "phase_number": "16",
+      "archive_reason": "Git history tracks originals; .original backup files redundant"
+    }
+  ]
+}
