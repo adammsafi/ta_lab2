@@ -1,0 +1,19 @@
+{
+  "$schema": "https://ta_lab2.local/schemas/archive-manifest/v1.0.0",
+  "version": "1.0.0",
+  "category": "duplicates",
+  "created": "2026-02-03T17:00:56.306756Z",
+  "description": "Duplicate files archived during repository cleanup",
+  "files": [
+    {
+      "original_path": "ema_multi_timeframe_refactored.py",
+      "archive_path": ".archive/refactored/2026-02-03/ema_multi_timeframe_refactored.py",
+      "action": "duplicate_previously_archived",
+      "timestamp": "2026-02-03T00:00:00Z",
+      "sha256_checksum": "3ef83552da570ee544a0bf0200357c1e9074d15c83ba3aff97745305bc7dfdae",
+      "size_bytes": 20223,
+      "canonical_path": "src/ta_lab2/features/m_tf/ema_multi_timeframe.py",
+      "archive_reason": "Exact duplicate of canonical file at src/ta_lab2/features/m_tf/ema_multi_timeframe.py. Previously archived in plan 16-02 as refactored duplicate."
+    }
+  ]
+}
