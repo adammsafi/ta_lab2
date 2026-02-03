@@ -303,7 +303,13 @@ Plans:
   3. CI tests validate organization rules (no .py in root, manifest integrity)
   4. Pre-commit hooks installed preventing future disorganization
   5. File count validation: pre + archived = post (zero data loss)
-**Plans**: TBD
+**Plans**: 5 plans
+Plans:
+- [ ] 17-01-PLAN.md - Create dynamic import validation test suite
+- [ ] 17-02-PLAN.md - Configure import-linter for circular dependency detection
+- [ ] 17-03-PLAN.md - Enhance CI workflow with import and circular dep checks
+- [ ] 17-04-PLAN.md - Set up pre-commit hooks with Ruff and org rules
+- [ ] 17-05-PLAN.md - Create data loss validation tests with checksum verification
 
 ### Phase 18: Structure Documentation
 **Goal**: Document final structure and migration decisions for future reference
@@ -364,7 +370,7 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> 12 -> ...
 | 14. Tools Integration | 13/13 | Complete | 2026-02-03 |
 | 15. Economic Data Strategy | 0/6 | Planned | - |
 | 16. Repository Cleanup | 0/6 | Planned | - |
-| 17. Verification & Validation | 0/TBD | Not started | - |
+| 17. Verification & Validation | 0/5 | Planned | - |
 | 18. Structure Documentation | 0/4 | Planned | - |
 | 19. Memory Validation & Release | 0/TBD | Not started | - |
 
@@ -389,4 +395,4 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> 12 -> ...
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-03 (Phase 18 planned: 4 plans in 3 waves)*
+*Last updated: 2026-02-03 (Phase 17 planned: 5 plans in 3 waves)*
