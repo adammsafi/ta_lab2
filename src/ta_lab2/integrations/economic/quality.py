@@ -6,9 +6,8 @@ statistical outlier detection, and range validation based on historical norms.
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import List, Dict, Any
 
-import numpy as np
 import pandas as pd
 
 from ta_lab2.integrations.economic.types import EconomicSeries
@@ -19,6 +18,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class QualityIssue:
     """A single data quality issue."""
+
     severity: str  # "error", "warning", "info"
     category: str  # "null", "type", "range", "outlier", "gap"
     message: str
@@ -29,6 +29,7 @@ class QualityIssue:
 @dataclass
 class QualityReport:
     """Quality validation report for a series."""
+
     series_id: str
     is_valid: bool
     issues: List[QualityIssue] = field(default_factory=list)
@@ -68,11 +69,11 @@ class QualityValidator:
 
     # Known reasonable ranges for common economic series
     KNOWN_RANGES = {
-        "FEDFUNDS": (-1.0, 25.0),      # Fed funds rate (can go slightly negative)
-        "UNRATE": (0.0, 30.0),          # Unemployment rate
-        "CPIAUCSL": (0.0, 500.0),       # CPI index
-        "DGS10": (-2.0, 20.0),          # 10-year treasury
-        "DGS2": (-2.0, 20.0),           # 2-year treasury
+        "FEDFUNDS": (-1.0, 25.0),  # Fed funds rate (can go slightly negative)
+        "UNRATE": (0.0, 30.0),  # Unemployment rate
+        "CPIAUCSL": (0.0, 500.0),  # CPI index
+        "DGS10": (-2.0, 20.0),  # 10-year treasury
+        "DGS2": (-2.0, 20.0),  # 2-year treasury
     }
 
     def __init__(
@@ -109,11 +110,13 @@ class QualityValidator:
 
         # Check for empty data
         if len(data) == 0:
-            issues.append(QualityIssue(
-                severity="error",
-                category="null",
-                message="Series has no data",
-            ))
+            issues.append(
+                QualityIssue(
+                    severity="error",
+                    category="null",
+                    message="Series has no data",
+                )
+            )
             return QualityReport(
                 series_id=series.series_id,
                 is_valid=False,
@@ -176,13 +179,15 @@ class QualityValidator:
         if null_pct > 0:
             null_dates = data.index[data.isna()].tolist()
             severity = "error" if null_pct > self.null_threshold else "warning"
-            issues.append(QualityIssue(
-                severity=severity,
-                category="null",
-                message=f"{null_pct*100:.1f}% null values ({data.isna().sum()} of {len(data)})",
-                affected_dates=null_dates[:10],  # Limit to first 10
-                details={"null_percentage": null_pct}
-            ))
+            issues.append(
+                QualityIssue(
+                    severity=severity,
+                    category="null",
+                    message=f"{null_pct*100:.1f}% null values ({data.isna().sum()} of {len(data)})",
+                    affected_dates=null_dates[:10],  # Limit to first 10
+                    details={"null_percentage": null_pct},
+                )
+            )
 
         return issues
 
@@ -194,15 +199,19 @@ class QualityValidator:
             pd.to_numeric(data, errors="raise")
         except (ValueError, TypeError):
             # Find non-numeric values
-            non_numeric = data[pd.to_numeric(data, errors="coerce").isna() & data.notna()]
+            non_numeric = data[
+                pd.to_numeric(data, errors="coerce").isna() & data.notna()
+            ]
             if len(non_numeric) > 0:
-                issues.append(QualityIssue(
-                    severity="error",
-                    category="type",
-                    message=f"{len(non_numeric)} non-numeric values found",
-                    affected_dates=non_numeric.index.tolist()[:10],
-                    details={"sample_values": non_numeric.head().tolist()}
-                ))
+                issues.append(
+                    QualityIssue(
+                        severity="error",
+                        category="type",
+                        message=f"{len(non_numeric)} non-numeric values found",
+                        affected_dates=non_numeric.index.tolist()[:10],
+                        details={"sample_values": non_numeric.head().tolist()},
+                    )
+                )
 
         return issues
 
@@ -220,20 +229,24 @@ class QualityValidator:
         lower_bound = q1 - self.outlier_iqr_multiplier * iqr
         upper_bound = q3 + self.outlier_iqr_multiplier * iqr
 
-        outliers = numeric_data[(numeric_data < lower_bound) | (numeric_data > upper_bound)]
+        outliers = numeric_data[
+            (numeric_data < lower_bound) | (numeric_data > upper_bound)
+        ]
 
         if len(outliers) > 0:
-            issues.append(QualityIssue(
-                severity="warning",
-                category="outlier",
-                message=f"{len(outliers)} statistical outliers detected (IQR method)",
-                affected_dates=outliers.index.tolist()[:10],
-                details={
-                    "lower_bound": lower_bound,
-                    "upper_bound": upper_bound,
-                    "outlier_values": outliers.head().tolist()
-                }
-            ))
+            issues.append(
+                QualityIssue(
+                    severity="warning",
+                    category="outlier",
+                    message=f"{len(outliers)} statistical outliers detected (IQR method)",
+                    affected_dates=outliers.index.tolist()[:10],
+                    details={
+                        "lower_bound": lower_bound,
+                        "upper_bound": upper_bound,
+                        "outlier_values": outliers.head().tolist(),
+                    },
+                )
+            )
 
         return issues
 
@@ -250,17 +263,19 @@ class QualityValidator:
         out_of_range = numeric_data[(numeric_data < min_val) | (numeric_data > max_val)]
 
         if len(out_of_range) > 0:
-            issues.append(QualityIssue(
-                severity="error",
-                category="range",
-                message=f"{len(out_of_range)} values outside expected range [{min_val}, {max_val}]",
-                affected_dates=out_of_range.index.tolist()[:10],
-                details={
-                    "expected_min": min_val,
-                    "expected_max": max_val,
-                    "actual_values": out_of_range.head().tolist()
-                }
-            ))
+            issues.append(
+                QualityIssue(
+                    severity="error",
+                    category="range",
+                    message=f"{len(out_of_range)} values outside expected range [{min_val}, {max_val}]",
+                    affected_dates=out_of_range.index.tolist()[:10],
+                    details={
+                        "expected_min": min_val,
+                        "expected_max": max_val,
+                        "actual_values": out_of_range.head().tolist(),
+                    },
+                )
+            )
 
         return issues
 
@@ -283,20 +298,20 @@ class QualityValidator:
 
         try:
             expected_range = pd.date_range(
-                start=data.index.min(),
-                end=data.index.max(),
-                freq=expected_freq
+                start=data.index.min(), end=data.index.max(), freq=expected_freq
             )
             missing_dates = expected_range.difference(data.index)
 
             if len(missing_dates) > 0:
-                issues.append(QualityIssue(
-                    severity="warning",
-                    category="gap",
-                    message=f"{len(missing_dates)} expected dates missing",
-                    affected_dates=missing_dates.tolist()[:10],
-                    details={"expected_frequency": frequency}
-                ))
+                issues.append(
+                    QualityIssue(
+                        severity="warning",
+                        category="gap",
+                        message=f"{len(missing_dates)} expected dates missing",
+                        affected_dates=missing_dates.tolist()[:10],
+                        details={"expected_frequency": frequency},
+                    )
+                )
         except Exception as e:
             logger.warning(f"Gap check failed: {e}")
 

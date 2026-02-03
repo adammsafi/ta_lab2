@@ -42,7 +42,7 @@ import zipfile
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +53,7 @@ TEXT_KEYS = ("text", "content", "parts", "message", "body")
 # -------------------------
 # Generic helpers
 # -------------------------
+
 
 def sha256_bytes(b: bytes) -> str:
     """Compute SHA256 hash of bytes."""
@@ -112,7 +113,13 @@ def strip_volatile(obj: Any) -> Any:
         for k, v in obj.items():
             if is_timestampish_key(k):
                 continue
-            if k.lower() in ("model", "request_id", "response_id", "metadata", "status"):
+            if k.lower() in (
+                "model",
+                "request_id",
+                "response_id",
+                "metadata",
+                "status",
+            ):
                 continue
             out[k] = strip_volatile(v)
         return out
@@ -134,10 +141,12 @@ def shorten(s: str, n: int = 240) -> str:
 # Export sources (zip or dir)
 # -------------------------
 
+
 @dataclass(frozen=True)
 class EntryMeta:
     """Metadata for a file or directory in an export."""
-    path: str          # normalized posix-like path
+
+    path: str  # normalized posix-like path
     is_dir: bool
     size: int
     mtime_iso: str
@@ -159,12 +168,18 @@ class ExportSource:
 
     def list_entries(self) -> Dict[str, EntryMeta]:
         """List all files and directories in the export."""
-        return self._list_zip_entries() if self.kind == "zip" else self._list_dir_entries()
+        return (
+            self._list_zip_entries() if self.kind == "zip" else self._list_dir_entries()
+        )
 
     def read_bytes(self, relpath: str) -> bytes:
         """Read file contents as bytes."""
         relpath = relpath.replace("\\", "/")
-        return self._read_zip_bytes(relpath) if self.kind == "zip" else self._read_dir_bytes(relpath)
+        return (
+            self._read_zip_bytes(relpath)
+            if self.kind == "zip"
+            else self._read_dir_bytes(relpath)
+        )
 
     def exists(self, relpath: str) -> bool:
         """Check if a relative path exists in the export."""
@@ -212,7 +227,9 @@ class ExportSource:
                 dt = datetime(*info.date_time).isoformat()
 
                 if is_dir:
-                    out[p] = EntryMeta(path=p, is_dir=True, size=0, mtime_iso=dt, sha256="")
+                    out[p] = EntryMeta(
+                        path=p, is_dir=True, size=0, mtime_iso=dt, sha256=""
+                    )
                     continue
 
                 b = z.read(info.filename)
@@ -238,7 +255,7 @@ class ExportSource:
         for dirpath, dirnames, filenames in os.walk(root):
             drel = Path(dirpath).relative_to(root)
             if str(drel) != ".":
-                p = (str(drel).replace("\\", "/") + "/")
+                p = str(drel).replace("\\", "/") + "/"
                 st = os.stat(Path(dirpath))
                 out[p] = EntryMeta(
                     path=p,
@@ -272,6 +289,7 @@ class ExportSource:
 # Tree diff (files + folders)
 # -------------------------
 
+
 def diff_entries(a: Dict[str, EntryMeta], b: Dict[str, EntryMeta]) -> Dict[str, Any]:
     """Compare two export directory trees."""
     a_paths = set(a.keys())
@@ -293,21 +311,27 @@ def diff_entries(a: Dict[str, EntryMeta], b: Dict[str, EntryMeta]) -> Dict[str, 
         if is_dir(p, a) or is_dir(p, b):
             continue
         if a[p].sha256 != b[p].sha256 or a[p].size != b[p].size:
-            changed_files.append({
-                "path": p,
-                "a_size": a[p].size,
-                "b_size": b[p].size,
-                "a_sha256": a[p].sha256,
-                "b_sha256": b[p].sha256,
-                "a_mtime": a[p].mtime_iso,
-                "b_mtime": b[p].mtime_iso,
-            })
+            changed_files.append(
+                {
+                    "path": p,
+                    "a_size": a[p].size,
+                    "b_size": b[p].size,
+                    "a_sha256": a[p].sha256,
+                    "b_sha256": b[p].sha256,
+                    "a_mtime": a[p].mtime_iso,
+                    "b_mtime": b[p].mtime_iso,
+                }
+            )
 
     added_files = [p for p in added if not is_dir(p, b)]
     removed_files = [p for p in removed if not is_dir(p, a)]
 
-    added_folders = sorted({p for p in added if is_dir(p, b)} | derive_folders(added_files))
-    removed_folders = sorted({p for p in removed if is_dir(p, a)} | derive_folders(removed_files))
+    added_folders = sorted(
+        {p for p in added if is_dir(p, b)} | derive_folders(added_files)
+    )
+    removed_folders = sorted(
+        {p for p in removed if is_dir(p, a)} | derive_folders(removed_files)
+    )
 
     return {
         "added_files": added_files,
@@ -331,6 +355,7 @@ def derive_folders(paths: List[str]) -> set:
 # -------------------------
 # conversations.json diffing
 # -------------------------
+
 
 def index_conversations(data: Any) -> Dict[str, Dict[str, Any]]:
     """Index conversations by ID.
@@ -359,7 +384,9 @@ def index_conversations(data: Any) -> Dict[str, Dict[str, Any]]:
             continue
         cid = c.get("id") or c.get("conversation_id") or c.get("uuid")
         if cid is None:
-            cid = sha256_bytes(json.dumps(c, sort_keys=True, ensure_ascii=False).encode("utf-8"))[:16]
+            cid = sha256_bytes(
+                json.dumps(c, sort_keys=True, ensure_ascii=False).encode("utf-8")
+            )[:16]
         idx[str(cid)] = c
     return idx
 
@@ -457,7 +484,9 @@ def unified_message_lines(sig: List[Dict[str, str]]) -> List[str]:
     return lines
 
 
-def diff_one_conversation(a_conv: Dict[str, Any], b_conv: Dict[str, Any], last_n: int) -> Dict[str, Any]:
+def diff_one_conversation(
+    a_conv: Dict[str, Any], b_conv: Dict[str, Any], last_n: int
+) -> Dict[str, Any]:
     """Diff a single conversation between old and new versions."""
     a_sig = convo_sig_list(a_conv)
     b_sig = convo_sig_list(b_conv)
@@ -469,10 +498,10 @@ def diff_one_conversation(a_conv: Dict[str, Any], b_conv: Dict[str, Any], last_n
 
     if is_prefix(a_sig, b_sig) and len(b_sig) > len(a_sig):
         change_type = "append_only"
-        added_msgs = b_sig[len(a_sig):]
+        added_msgs = b_sig[len(a_sig) :]
     elif is_prefix(b_sig, a_sig) and len(a_sig) > len(b_sig):
         change_type = "truncation"
-        removed_msgs = a_sig[len(b_sig):]
+        removed_msgs = a_sig[len(b_sig) :]
     elif a_sig == b_sig:
         change_type = "meta_only"
     else:
@@ -480,9 +509,7 @@ def diff_one_conversation(a_conv: Dict[str, Any], b_conv: Dict[str, Any], last_n
         a_lines = unified_message_lines(a_sig)
         b_lines = unified_message_lines(b_sig)
         ud = difflib.unified_diff(
-            a_lines, b_lines,
-            fromfile="old", tofile="new",
-            lineterm=""
+            a_lines, b_lines, fromfile="old", tofile="new", lineterm=""
         )
         unified_diff = list(ud)
 
@@ -506,7 +533,9 @@ def diff_one_conversation(a_conv: Dict[str, Any], b_conv: Dict[str, Any], last_n
     return patch
 
 
-def diff_conversations(a_idx: Dict[str, Dict[str, Any]], b_idx: Dict[str, Dict[str, Any]], last_n: int) -> Dict[str, Any]:
+def diff_conversations(
+    a_idx: Dict[str, Dict[str, Any]], b_idx: Dict[str, Dict[str, Any]], last_n: int
+) -> Dict[str, Any]:
     """Diff conversations between two exports."""
     a_ids = set(a_idx.keys())
     b_ids = set(b_idx.keys())
@@ -521,20 +550,24 @@ def diff_conversations(a_idx: Dict[str, Dict[str, Any]], b_idx: Dict[str, Dict[s
     for cid in common:
         a_conv = a_idx[cid]
         b_conv = b_idx[cid]
-        ch_content = (convo_content_hash(a_conv) != convo_content_hash(b_conv))
-        ch_meta = (convo_meta_hash(a_conv) != convo_meta_hash(b_conv))
+        ch_content = convo_content_hash(a_conv) != convo_content_hash(b_conv)
+        ch_meta = convo_meta_hash(a_conv) != convo_meta_hash(b_conv)
         if ch_content or ch_meta:
             patch = diff_one_conversation(a_conv, b_conv, last_n=last_n)
-            changed.append({
-                "id": cid,
-                "change_type": patch["change_type"],
-                "title_old": patch["title_old"],
-                "title_new": patch["title_new"],
-                "n_messages_old": patch["n_messages_old"],
-                "n_messages_new": patch["n_messages_new"],
-                "content_hash_changed": patch["content_hash_old"] != patch["content_hash_new"],
-                "meta_hash_changed": patch["meta_hash_old"] != patch["meta_hash_new"],
-            })
+            changed.append(
+                {
+                    "id": cid,
+                    "change_type": patch["change_type"],
+                    "title_old": patch["title_old"],
+                    "title_new": patch["title_new"],
+                    "n_messages_old": patch["n_messages_old"],
+                    "n_messages_new": patch["n_messages_new"],
+                    "content_hash_changed": patch["content_hash_old"]
+                    != patch["content_hash_new"],
+                    "meta_hash_changed": patch["meta_hash_old"]
+                    != patch["meta_hash_new"],
+                }
+            )
         else:
             unchanged_count += 1
 
@@ -559,6 +592,7 @@ def diff_conversations(a_idx: Dict[str, Dict[str, Any]], b_idx: Dict[str, Dict[s
 # Reporting
 # -------------------------
 
+
 def write_json(path: Path, obj: Any) -> None:
     """Write object as JSON."""
     path.write_text(json.dumps(obj, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -569,8 +603,11 @@ def write_text(path: Path, s: str) -> None:
     path.write_text(s, encoding="utf-8")
 
 
-def render_tree_txt(tree: Dict[str, Any], a_label: str, b_label: str, limit: int) -> str:
+def render_tree_txt(
+    tree: Dict[str, Any], a_label: str, b_label: str, limit: int
+) -> str:
     """Render tree diff as human-readable text."""
+
     def take(xs: List[Any]) -> List[Any]:
         return xs[:limit]
 
@@ -628,7 +665,9 @@ def render_conversations_txt(report: Dict[str, Any], limit: int) -> str:
     out.append(f"Unchanged: {report['unchanged_count']}\n\n")
 
     out.append("Changed by type:\n")
-    for k, v in sorted(report.get("changed_by_type", {}).items(), key=lambda kv: (-kv[1], kv[0])):
+    for k, v in sorted(
+        report.get("changed_by_type", {}).items(), key=lambda kv: (-kv[1], kv[0])
+    ):
         out.append(f"  {k}: {v}\n")
 
     out.append(f"\nAdded conversations: {len(report['added_conversation_ids'])}\n")
@@ -649,8 +688,12 @@ def render_conversations_txt(report: Dict[str, Any], limit: int) -> str:
         if ch.get("title_old") != ch.get("title_new"):
             out.append(f"      title: {ch.get('title_old')} -> {ch.get('title_new')}\n")
         out.append(f"      type: {ch['change_type']}\n")
-        out.append(f"      messages: {ch['n_messages_old']} -> {ch['n_messages_new']}\n")
-        out.append(f"      content_changed={ch['content_hash_changed']} meta_changed={ch['meta_hash_changed']}\n")
+        out.append(
+            f"      messages: {ch['n_messages_old']} -> {ch['n_messages_new']}\n"
+        )
+        out.append(
+            f"      content_changed={ch['content_hash_changed']} meta_changed={ch['meta_hash_changed']}\n"
+        )
     if len(report["changed_conversations"]) > limit:
         out.append("  ... (truncated)\n")
 
@@ -690,7 +733,9 @@ def diff_exports(
     tree = diff_entries(a_entries, b_entries)
 
     write_json(out_dir / "tree_diff.json", tree)
-    write_text(out_dir / "tree_diff.txt", render_tree_txt(tree, old_path, new_path, limit))
+    write_text(
+        out_dir / "tree_diff.txt", render_tree_txt(tree, old_path, new_path, limit)
+    )
 
     # ---- conversations.json diff ----
     logger.info("Computing conversations diff...")
@@ -715,7 +760,7 @@ def diff_exports(
         conv_report = diff_conversations(a_idx, b_idx, last_n=last_n)
 
         # Write per-conversation patches for changed convos
-        for ch in conv_report.get("changed_conversations", [])[: max_patches]:
+        for ch in conv_report.get("changed_conversations", [])[:max_patches]:
             cid = ch["id"]
             patch = diff_one_conversation(a_idx[cid], b_idx[cid], last_n=last_n)
 
@@ -733,7 +778,9 @@ def diff_exports(
         conv_report["conversations_json_new_path"] = conv_member_b
 
     write_json(out_dir / "conversations_diff.json", conv_report)
-    write_text(out_dir / "conversations_diff.txt", render_conversations_txt(conv_report, limit))
+    write_text(
+        out_dir / "conversations_diff.txt", render_conversations_txt(conv_report, limit)
+    )
 
     logger.info(f"Wrote outputs to: {out_dir.resolve()}")
 
@@ -748,6 +795,7 @@ def diff_exports(
 # Main
 # -------------------------
 
+
 def main() -> int:
     """CLI entry point."""
     logging.basicConfig(
@@ -760,10 +808,27 @@ def main() -> int:
     )
     ap.add_argument("old", help="Old export (.zip) or unzipped export folder")
     ap.add_argument("new", help="New export (.zip) or unzipped export folder")
-    ap.add_argument("--out", default="diff_report", help="Output directory (will be created)")
-    ap.add_argument("--last-n", type=int, default=8, help="Include last N messages before/after in per-conversation patches")
-    ap.add_argument("--limit", type=int, default=200, help="Max items printed in text reports (files/convos)")
-    ap.add_argument("--max-patches", type=int, default=500, help="Max per-conversation patch files to write")
+    ap.add_argument(
+        "--out", default="diff_report", help="Output directory (will be created)"
+    )
+    ap.add_argument(
+        "--last-n",
+        type=int,
+        default=8,
+        help="Include last N messages before/after in per-conversation patches",
+    )
+    ap.add_argument(
+        "--limit",
+        type=int,
+        default=200,
+        help="Max items printed in text reports (files/convos)",
+    )
+    ap.add_argument(
+        "--max-patches",
+        type=int,
+        default=500,
+        help="Max per-conversation patch files to write",
+    )
     args = ap.parse_args()
 
     out_root = Path(args.out)
@@ -780,7 +845,9 @@ def main() -> int:
     print("Wrote outputs to:", out_root.resolve())
     print("  - tree_diff.json / tree_diff.txt")
     print("  - conversations_diff.json / conversations_diff.txt")
-    print("  - conversation_patches/ (per-conversation patch json + optional unified diffs)")
+    print(
+        "  - conversation_patches/ (per-conversation patch json + optional unified diffs)"
+    )
     return 0
 
 

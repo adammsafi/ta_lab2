@@ -28,6 +28,7 @@ class ValidationResult:
         requirements_met: Dict of requirement checks
         timestamp: When validation occurred
     """
+
     adapter_name: str
     is_valid: bool
     is_implemented: bool
@@ -80,7 +81,7 @@ class AdapterValidator:
                 status="error",
                 message=f"Adapter not found for {platform.value}",
                 requirements_met={},
-                timestamp=datetime.utcnow()
+                timestamp=datetime.utcnow(),
             )
 
         # Get adapter status
@@ -102,16 +103,18 @@ class AdapterValidator:
                 message = f"{status_info['name']} is not yet implemented (status: {impl_status})"
             else:
                 missing = [k for k, v in requirements_met.items() if not v]
-                message = f"{status_info['name']} missing requirements: {', '.join(missing)}"
+                message = (
+                    f"{status_info['name']} missing requirements: {', '.join(missing)}"
+                )
 
             return ValidationResult(
-                adapter_name=status_info['name'],
+                adapter_name=status_info["name"],
                 is_valid=is_valid,
                 is_implemented=is_implemented,
                 status=impl_status,
                 message=message,
                 requirements_met=requirements_met,
-                timestamp=datetime.utcnow()
+                timestamp=datetime.utcnow(),
             )
 
         except Exception as e:
@@ -122,7 +125,7 @@ class AdapterValidator:
                 status="error",
                 message=f"Validation error: {str(e)}",
                 requirements_met={},
-                timestamp=datetime.utcnow()
+                timestamp=datetime.utcnow(),
             )
 
     def validate_all(self) -> dict[Platform, ValidationResult]:
@@ -229,7 +232,7 @@ def pre_flight_check(task: Task, validator: AdapterValidator) -> tuple[bool, str
         return (
             False,
             f"No implemented adapters available. Stubs: {', '.join(unavailable_names)}. "
-            "Please implement at least one adapter to execute tasks."
+            "Please implement at least one adapter to execute tasks.",
         )
 
     # If platform_hint specified, validate it specifically
@@ -240,7 +243,7 @@ def pre_flight_check(task: Task, validator: AdapterValidator) -> tuple[bool, str
             return (
                 False,
                 f"Requested platform {task.platform_hint.value} is not available: {result.message}. "
-                f"Available platforms: {', '.join(available_names)}"
+                f"Available platforms: {', '.join(available_names)}",
             )
 
     # At least one platform is available

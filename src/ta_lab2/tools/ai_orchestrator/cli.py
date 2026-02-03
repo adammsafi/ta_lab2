@@ -16,7 +16,7 @@ def build_orchestrator_parser() -> argparse.ArgumentParser:
     """Build CLI parser for orchestrator commands."""
     ap = argparse.ArgumentParser(
         prog="ta-lab2 orchestrator",
-        description="AI Orchestrator CLI - Route tasks across Claude, ChatGPT, Gemini"
+        description="AI Orchestrator CLI - Route tasks across Claude, ChatGPT, Gemini",
     )
     sub = ap.add_subparsers(dest="orch_cmd", required=True)
 
@@ -24,45 +24,73 @@ def build_orchestrator_parser() -> argparse.ArgumentParser:
     p_submit = sub.add_parser("submit", help="Submit a task for execution")
     p_submit.add_argument("--prompt", "-p", required=True, help="Task prompt")
     p_submit.add_argument(
-        "--type", "-t", default="code_generation",
-        choices=["code_generation", "research", "data_analysis", "refactoring",
-                 "documentation", "code_review", "sql_db_work", "testing",
-                 "debugging", "planning"],
-        help="Task type (default: code_generation)"
+        "--type",
+        "-t",
+        default="code_generation",
+        choices=[
+            "code_generation",
+            "research",
+            "data_analysis",
+            "refactoring",
+            "documentation",
+            "code_review",
+            "sql_db_work",
+            "testing",
+            "debugging",
+            "planning",
+        ],
+        help="Task type (default: code_generation)",
     )
     p_submit.add_argument(
-        "--platform", default=None,
+        "--platform",
+        default=None,
         choices=["claude_code", "chatgpt", "gemini"],
-        help="Platform hint (optional - will use cost-optimized routing if not specified)"
+        help="Platform hint (optional - will use cost-optimized routing if not specified)",
     )
     p_submit.add_argument("--chain-id", default=None, help="Workflow chain ID")
-    p_submit.add_argument("--timeout", type=int, default=300, help="Timeout in seconds (default: 300)")
+    p_submit.add_argument(
+        "--timeout", type=int, default=300, help="Timeout in seconds (default: 300)"
+    )
     p_submit.add_argument("--output", "-o", help="Output file for result")
     p_submit.set_defaults(func=cmd_submit)
 
     # Execute batch from file
     p_batch = sub.add_parser("batch", help="Execute batch of tasks from JSON file")
-    p_batch.add_argument("--input", "-i", required=True, help="Input JSON file with tasks")
+    p_batch.add_argument(
+        "--input", "-i", required=True, help="Input JSON file with tasks"
+    )
     p_batch.add_argument("--output", "-o", help="Output JSON file for results")
-    p_batch.add_argument("--parallel", type=int, default=5, help="Max parallel tasks (default: 5)")
-    p_batch.add_argument("--fallback", action="store_true", help="Enable fallback routing on failures")
+    p_batch.add_argument(
+        "--parallel", type=int, default=5, help="Max parallel tasks (default: 5)"
+    )
+    p_batch.add_argument(
+        "--fallback", action="store_true", help="Enable fallback routing on failures"
+    )
     p_batch.set_defaults(func=cmd_batch)
 
     # Show status
     p_status = sub.add_parser("status", help="Show orchestrator status")
-    p_status.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    p_status.add_argument(
+        "--format", choices=["text", "json"], default="text", help="Output format"
+    )
     p_status.set_defaults(func=cmd_status)
 
     # Show costs
     p_costs = sub.add_parser("costs", help="Show cost summary")
     p_costs.add_argument("--chain-id", help="Filter by chain ID")
-    p_costs.add_argument("--date", help="Date to summarize (YYYY-MM-DD, default: today)")
-    p_costs.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    p_costs.add_argument(
+        "--date", help="Date to summarize (YYYY-MM-DD, default: today)"
+    )
+    p_costs.add_argument(
+        "--format", choices=["text", "json"], default="text", help="Output format"
+    )
     p_costs.set_defaults(func=cmd_costs)
 
     # Quota status
     p_quota = sub.add_parser("quota", help="Show quota status")
-    p_quota.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    p_quota.add_argument(
+        "--format", choices=["text", "json"], default="text", help="Output format"
+    )
     p_quota.set_defaults(func=cmd_quota)
 
     return ap
@@ -72,7 +100,11 @@ def cmd_submit(args: argparse.Namespace) -> int:
     """Submit a single task."""
     from .core import Task, TaskType, Platform, TaskConstraints
     from .execution import AsyncOrchestrator
-    from .adapters import AsyncChatGPTAdapter, AsyncClaudeCodeAdapter, AsyncGeminiAdapter
+    from .adapters import (
+        AsyncChatGPTAdapter,
+        AsyncClaudeCodeAdapter,
+        AsyncGeminiAdapter,
+    )
     from .quota import QuotaTracker
     from .routing import TaskRouter
     from .cost import CostTracker
@@ -142,7 +174,11 @@ def cmd_batch(args: argparse.Namespace) -> int:
     """Execute batch of tasks from JSON file."""
     from .core import Task, TaskType, Platform, TaskConstraints
     from .execution import AsyncOrchestrator
-    from .adapters import AsyncChatGPTAdapter, AsyncClaudeCodeAdapter, AsyncGeminiAdapter
+    from .adapters import (
+        AsyncChatGPTAdapter,
+        AsyncClaudeCodeAdapter,
+        AsyncGeminiAdapter,
+    )
     from .quota import QuotaTracker
     from .routing import TaskRouter
     from .cost import CostTracker
@@ -167,9 +203,9 @@ def cmd_batch(args: argparse.Namespace) -> int:
             prompt=item["prompt"],
             platform_hint=Platform(item["platform"]) if item.get("platform") else None,
             metadata=item.get("metadata", {}),
-            constraints=TaskConstraints(
-                timeout_seconds=item.get("timeout", 300)
-            ) if item.get("timeout") else None,
+            constraints=TaskConstraints(timeout_seconds=item.get("timeout", 300))
+            if item.get("timeout")
+            else None,
         )
         tasks.append(task)
 
@@ -202,7 +238,7 @@ def cmd_batch(args: argparse.Namespace) -> int:
                 cost_tracker.record(result.task, result)
 
             # Display summary
-            print(f"\n=== Batch Complete ===")
+            print("\n=== Batch Complete ===")
             print(f"Total: {len(tasks)} tasks")
             print(f"Success: {aggregated.success_count}")
             print(f"Failed: {aggregated.failure_count}")
@@ -231,7 +267,9 @@ def cmd_batch(args: argparse.Namespace) -> int:
                             "task_id": r.task.task_id,
                             "platform": r.platform.value,
                             "success": r.success,
-                            "output": r.output[:500] + "..." if len(r.output) > 500 else r.output,
+                            "output": r.output[:500] + "..."
+                            if len(r.output) > 500
+                            else r.output,
                             "error": r.error,
                             "cost": r.cost,
                         }
@@ -248,7 +286,11 @@ def cmd_batch(args: argparse.Namespace) -> int:
 
 def cmd_status(args: argparse.Namespace) -> int:
     """Show orchestrator status."""
-    from .adapters import AsyncChatGPTAdapter, AsyncClaudeCodeAdapter, AsyncGeminiAdapter
+    from .adapters import (
+        AsyncChatGPTAdapter,
+        AsyncClaudeCodeAdapter,
+        AsyncGeminiAdapter,
+    )
     from .quota import QuotaTracker
     from .core import Platform
 
@@ -263,10 +305,7 @@ def cmd_status(args: argparse.Namespace) -> int:
 
     if args.format == "json":
         status = {
-            "adapters": {
-                p.value: a.get_adapter_status()
-                for p, a in adapters.items()
-            },
+            "adapters": {p.value: a.get_adapter_status() for p, a in adapters.items()},
             "quota": quota.get_status(),
         }
         print(json.dumps(status, indent=2, default=str))
@@ -296,7 +335,7 @@ def cmd_costs(args: argparse.Namespace) -> int:
         try:
             date = datetime.fromisoformat(args.date)
         except ValueError:
-            print(f"Error: Invalid date format. Use YYYY-MM-DD")
+            print("Error: Invalid date format. Use YYYY-MM-DD")
             return 1
 
     if args.chain_id:

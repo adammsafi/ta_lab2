@@ -47,6 +47,7 @@ logger = logging.getLogger(__name__)
 # Health Status
 # =============================================================================
 
+
 @dataclass
 class HealthStatus:
     """
@@ -73,6 +74,7 @@ class HealthStatus:
 # =============================================================================
 # Health Checker
 # =============================================================================
+
 
 class HealthChecker:
     """
@@ -155,7 +157,7 @@ class HealthChecker:
             healthy=True,
             message="Process is alive",
             checked_at=datetime.utcnow(),
-            details={'probe_type': 'liveness'},
+            details={"probe_type": "liveness"},
         )
 
     def readiness(self) -> HealthStatus:
@@ -173,30 +175,30 @@ class HealthChecker:
         """
         checked_at = datetime.utcnow()
         details: dict[str, Any] = {
-            'probe_type': 'readiness',
-            'checks': {},
+            "probe_type": "readiness",
+            "checks": {},
         }
 
         # Check 1: Database connection
         db_healthy = self._check_database()
-        details['checks']['database'] = {
-            'healthy': db_healthy,
-            'message': 'Connected' if db_healthy else 'Connection failed',
+        details["checks"]["database"] = {
+            "healthy": db_healthy,
+            "message": "Connected" if db_healthy else "Connection failed",
         }
 
         # Check 2: Memory service (if configured)
         if self.memory_client:
             memory_healthy = self._check_memory_service()
-            details['checks']['memory'] = {
-                'healthy': memory_healthy,
-                'message': 'Reachable' if memory_healthy else 'Unreachable',
+            details["checks"]["memory"] = {
+                "healthy": memory_healthy,
+                "message": "Reachable" if memory_healthy else "Unreachable",
             }
         else:
             # Memory not required
             memory_healthy = True
-            details['checks']['memory'] = {
-                'healthy': True,
-                'message': 'Not configured (optional)',
+            details["checks"]["memory"] = {
+                "healthy": True,
+                "message": "Not configured (optional)",
             }
 
         # Overall health: all checks must pass
@@ -205,7 +207,11 @@ class HealthChecker:
         if overall_healthy:
             message = "All dependencies healthy"
         else:
-            failed = [name for name, check in details['checks'].items() if not check['healthy']]
+            failed = [
+                name
+                for name, check in details["checks"].items()
+                if not check["healthy"]
+            ]
             message = f"Dependencies unhealthy: {', '.join(failed)}"
 
         return HealthStatus(
@@ -231,22 +237,22 @@ class HealthChecker:
         """
         checked_at = datetime.utcnow()
         details: dict[str, Any] = {
-            'probe_type': 'startup',
-            'checks': {},
+            "probe_type": "startup",
+            "checks": {},
         }
 
         # Check 1: dim_timeframe populated
-        timeframe_ok = self._check_table_populated('dim_timeframe')
-        details['checks']['dim_timeframe'] = {
-            'healthy': timeframe_ok,
-            'message': 'Populated' if timeframe_ok else 'Empty',
+        timeframe_ok = self._check_table_populated("dim_timeframe")
+        details["checks"]["dim_timeframe"] = {
+            "healthy": timeframe_ok,
+            "message": "Populated" if timeframe_ok else "Empty",
         }
 
         # Check 2: dim_sessions populated
-        sessions_ok = self._check_table_populated('dim_sessions')
-        details['checks']['dim_sessions'] = {
-            'healthy': sessions_ok,
-            'message': 'Populated' if sessions_ok else 'Empty',
+        sessions_ok = self._check_table_populated("dim_sessions")
+        details["checks"]["dim_sessions"] = {
+            "healthy": sessions_ok,
+            "message": "Populated" if sessions_ok else "Empty",
         }
 
         # Overall: both checks must pass
@@ -297,11 +303,11 @@ class HealthChecker:
 
         try:
             # Try calling health_check method if available
-            if hasattr(self.memory_client, 'health_check'):
+            if hasattr(self.memory_client, "health_check"):
                 return self.memory_client.health_check()
 
             # Otherwise, try a simple search
-            if hasattr(self.memory_client, 'search'):
+            if hasattr(self.memory_client, "search"):
                 self.memory_client.search("test", limit=1)
                 return True
 
@@ -325,16 +331,18 @@ class HealthChecker:
         """
         try:
             # Check existence
-            exists_query = text("""
+            exists_query = text(
+                """
                 SELECT EXISTS (
                     SELECT FROM information_schema.tables
                     WHERE table_schema = 'public'
                     AND table_name = :table_name
                 )
-            """)
+            """
+            )
 
             with self.engine.connect() as conn:
-                exists = conn.execute(exists_query, {'table_name': table_name}).scalar()
+                exists = conn.execute(exists_query, {"table_name": table_name}).scalar()
 
                 if not exists:
                     logger.debug(f"Table {table_name} does not exist")

@@ -38,6 +38,7 @@ DEFAULT_PERIODS = [6, 9, 10, 12, 14, 17, 20, 21, 26, 30, 50, 52, 77, 100, 200, 2
 # Worker Function (Module-level for pickling)
 # =============================================================================
 
+
 def _process_id_worker(task: WorkerTask) -> int:
     """
     Worker function for parallel processing of individual IDs.
@@ -117,6 +118,7 @@ def _process_id_worker(task: WorkerTask) -> int:
 # Refresher Implementation
 # =============================================================================
 
+
 class MultiTFEMARefresher(BaseEMARefresher):
     """
     EMA refresher for multi-timeframe EMAs from tf_day bars.
@@ -137,7 +139,9 @@ class MultiTFEMARefresher(BaseEMARefresher):
         engine,
     ):
         super().__init__(config, state_config, engine)
-        self.bars_table = config.extra_config.get("bars_table", "cmc_price_bars_multi_tf")
+        self.bars_table = config.extra_config.get(
+            "bars_table", "cmc_price_bars_multi_tf"
+        )
         self.bars_schema = config.extra_config.get("bars_schema", "public")
 
     # =========================================================================
@@ -231,6 +235,7 @@ class MultiTFEMARefresher(BaseEMARefresher):
 
         # Logging arguments
         from ta_lab2.scripts.emas.logging_config import add_logging_args
+
         add_logging_args(p)
 
         return p

@@ -1,7 +1,6 @@
 """Tests for AI-to-AI handoff mechanism."""
 import pytest
-from unittest.mock import AsyncMock, Mock, patch
-from datetime import datetime, timezone
+from unittest.mock import Mock, patch
 
 from ta_lab2.tools.ai_orchestrator.handoff import (
     HandoffContext,
@@ -125,9 +124,13 @@ class TestSpawnChildTask:
     @pytest.mark.asyncio
     async def test_stores_context_in_memory(self):
         """Full context stored via add_memory."""
-        with patch("ta_lab2.tools.ai_orchestrator.memory.update.add_memory") as mock_add:
+        with patch(
+            "ta_lab2.tools.ai_orchestrator.memory.update.add_memory"
+        ) as mock_add:
             # Create parent result
-            parent_task = Task(type=TaskType.CODE_GENERATION, prompt="Parent", task_id="parent_123")
+            parent_task = Task(
+                type=TaskType.CODE_GENERATION, prompt="Parent", task_id="parent_123"
+            )
             parent_result = Result(
                 task=parent_task,
                 platform=Platform.CLAUDE_CODE,
@@ -147,7 +150,9 @@ class TestSpawnChildTask:
     async def test_truncates_long_summary(self):
         """Summary truncated to max_summary_length."""
         with patch("ta_lab2.tools.ai_orchestrator.memory.update.add_memory"):
-            parent_task = Task(type=TaskType.CODE_GENERATION, prompt="Parent", task_id="parent_123")
+            parent_task = Task(
+                type=TaskType.CODE_GENERATION, prompt="Parent", task_id="parent_123"
+            )
             long_output = "A" * 1000
             parent_result = Result(
                 task=parent_task,
@@ -157,9 +162,7 @@ class TestSpawnChildTask:
             )
 
             child_task, handoff = await spawn_child_task(
-                parent_result,
-                "Child prompt",
-                max_summary_length=100
+                parent_result, "Child prompt", max_summary_length=100
             )
 
             assert len(handoff.summary) == 103  # 100 + "..."
@@ -169,7 +172,9 @@ class TestSpawnChildTask:
     async def test_child_task_has_context_pointer(self):
         """Child task.context has handoff_memory_id."""
         with patch("ta_lab2.tools.ai_orchestrator.memory.update.add_memory"):
-            parent_task = Task(type=TaskType.CODE_GENERATION, prompt="Parent", task_id="parent_123")
+            parent_task = Task(
+                type=TaskType.CODE_GENERATION, prompt="Parent", task_id="parent_123"
+            )
             parent_result = Result(
                 task=parent_task,
                 platform=Platform.CLAUDE_CODE,
@@ -192,7 +197,7 @@ class TestSpawnChildTask:
                 type=TaskType.CODE_GENERATION,
                 prompt="Parent",
                 task_id="parent_123",
-                metadata={"chain_id": "existing_chain"}
+                metadata={"chain_id": "existing_chain"},
             )
             parent_result = Result(
                 task=parent_task,
@@ -207,9 +212,7 @@ class TestSpawnChildTask:
 
             # Should use explicitly provided chain_id
             child_task2, handoff2 = await spawn_child_task(
-                parent_result,
-                "Child prompt",
-                chain_id="explicit_chain"
+                parent_result, "Child prompt", chain_id="explicit_chain"
             )
             assert handoff2.chain_id == "explicit_chain"
 
@@ -220,7 +223,9 @@ class TestLoadHandoffContext:
     @pytest.mark.asyncio
     async def test_retrieves_from_memory(self):
         """Loads context from memory by ID."""
-        with patch("ta_lab2.tools.ai_orchestrator.memory.query.get_memory_by_id") as mock_get:
+        with patch(
+            "ta_lab2.tools.ai_orchestrator.memory.query.get_memory_by_id"
+        ) as mock_get:
             # Mock SearchResult with content attribute
             mock_result = Mock()
             mock_result.content = "Full context"
@@ -246,7 +251,9 @@ class TestLoadHandoffContext:
     @pytest.mark.asyncio
     async def test_raises_if_memory_not_found(self):
         """Raises RuntimeError if memory lookup returns None (fail-fast per CONTEXT.md)."""
-        with patch("ta_lab2.tools.ai_orchestrator.memory.query.get_memory_by_id") as mock_get:
+        with patch(
+            "ta_lab2.tools.ai_orchestrator.memory.query.get_memory_by_id"
+        ) as mock_get:
             mock_get.return_value = None
             task = Task(
                 type=TaskType.CODE_GENERATION,

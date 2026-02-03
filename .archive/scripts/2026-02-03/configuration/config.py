@@ -28,6 +28,7 @@ import yaml
 @dataclass
 class CalendarSettings:
     """Calendar & seasonality feature options."""
+
     expand_columns: list[str] = field(default_factory=lambda: ["timestamp"])
     add_moon: bool = True
     us_week_start_sunday: bool = True
@@ -36,14 +37,16 @@ class CalendarSettings:
 @dataclass
 class TrendSettings:
     """Slope-based trend labeling settings."""
+
     window: int = 21
-    mode: str = "flat_zone"      # "binary" | "three_state" | "flat_zone"
-    flat_thresh: float = 0.0     # 0 => auto percentile threshold
+    mode: str = "flat_zone"  # "binary" | "three_state" | "flat_zone"
+    flat_thresh: float = 0.0  # 0 => auto percentile threshold
 
 
 @dataclass
 class SegmentsSettings:
     """Regime segmentation parameters."""
+
     price_col: str = "close"
     state_col: str = "trend_state"
 
@@ -51,6 +54,7 @@ class SegmentsSettings:
 @dataclass
 class VolRealizedSettings:
     """Range-based (realized) volatility estimators."""
+
     estimators: list[str] = field(
         default_factory=lambda: ["parkinson", "rogers_satchell", "garman_klass", "atr"]
     )
@@ -60,6 +64,7 @@ class VolRealizedSettings:
 @dataclass
 class VolHistoricalSettings:
     """Return-based (historical) volatility parameters."""
+
     modes: list[str] = field(default_factory=lambda: ["log", "pct"])
     windows: list[int] = field(default_factory=lambda: [10, 21, 50])
     annualize: bool = True
@@ -68,6 +73,7 @@ class VolHistoricalSettings:
 @dataclass
 class VolatilitySettings:
     """Combined realized + historical volatility settings."""
+
     realized: VolRealizedSettings = field(default_factory=VolRealizedSettings)
     historical: VolHistoricalSettings = field(default_factory=VolHistoricalSettings)
 
@@ -75,7 +81,8 @@ class VolatilitySettings:
 @dataclass
 class PipelineSettings:
     """Global pipeline options."""
-    resample: str | None = None           # e.g., "1H", "1D"
+
+    resample: str | None = None  # e.g., "1H", "1D"
     returns_modes: list[str] = field(default_factory=lambda: ["log", "pct"])
     returns_windows: list[int] = field(default_factory=lambda: [10, 21, 50])
 
@@ -86,6 +93,7 @@ class PipelineSettings:
 @dataclass
 class MarketdataTables:
     """Logical → physical table names for the marketdata database."""
+
     ohlcv_daily: str = "cmc_price_histories7"
     da_ids: str = "cmc_da_ids"
     da_info: str = "cmc_da_info"
@@ -96,6 +104,7 @@ class MarketdataTables:
 @dataclass
 class MarketdataConfig:
     """Connection + schema/table config for the marketdata database."""
+
     db_url_env: str = "MARKETDATA_DB_URL"
     schema: str = "public"
     tables: MarketdataTables = field(default_factory=MarketdataTables)
@@ -159,7 +168,9 @@ def _as(obj: Any, cls: Any):
         kwargs = {k: v for k, v in obj.items() if k in hints}
         for name, field_info in cls.__dataclass_fields__.items():
             typ = field_info.type
-            if isinstance(kwargs.get(name), dict) and hasattr(typ, "__dataclass_fields__"):
+            if isinstance(kwargs.get(name), dict) and hasattr(
+                typ, "__dataclass_fields__"
+            ):
                 kwargs[name] = _as(kwargs[name], typ)
         return cls(**kwargs)
     return cls()
@@ -214,7 +225,11 @@ def load_settings(yaml_path: str | Path = "configs/default.yaml") -> Settings:
     trend = _as(data.get("trend"), TrendSettings)
     segments = _as(data.get("segments"), SegmentsSettings)
     pipeline = _as(data.get("pipeline"), PipelineSettings)
-    marketdata = _as(data.get("marketdata"), MarketdataConfig) if data.get("marketdata") is not None else None
+    marketdata = (
+        _as(data.get("marketdata"), MarketdataConfig)
+        if data.get("marketdata") is not None
+        else None
+    )
 
     # --- Build Settings object ---
     settings = Settings(
@@ -256,6 +271,7 @@ def preview_settings(settings: Settings) -> None:
     Pretty-print a summary of the current config for debugging / CLI startup.
     """
     import pprint
+
     print("=== ta_lab2 Configuration ===")
     flat = {
         "data_csv": settings.data_csv,

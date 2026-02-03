@@ -5,18 +5,18 @@ from ta_lab2.tools.docs.update_doc_memory import (
     extract_sections_from_markdown,
     update_memory_for_doc,
     batch_update_memories,
-    create_phase_snapshot
+    create_phase_snapshot,
 )
 
 from ta_lab2.tools.docs.convert_docx import (
     ConversionResult,
     convert_docx_to_markdown,
-    extract_docx_metadata
+    extract_docx_metadata,
 )
 
 from ta_lab2.tools.docs.convert_excel import (
     convert_excel_to_markdown,
-    batch_convert_excel
+    batch_convert_excel,
 )
 
 __all__ = [
@@ -32,5 +32,5 @@ __all__ = [
     "extract_docx_metadata",
     # Excel conversion utilities
     "convert_excel_to_markdown",
-    "batch_convert_excel"
+    "batch_convert_excel",
 ]

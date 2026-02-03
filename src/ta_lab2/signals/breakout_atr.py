@@ -15,14 +15,14 @@ def _rolling_low(s: pd.Series, n: int) -> pd.Series:
 
 def make_signals(
     df: pd.DataFrame,
-    lookback: int = 20,            # Donchian breakout window
+    lookback: int = 20,  # Donchian breakout window
     atr_col: str = "atr_14",
     price_cols: tuple[str, str, str, str] = ("open", "high", "low", "close"),
-    confirm_close: bool = True,    # require close breakout vs. intrabar
+    confirm_close: bool = True,  # require close breakout vs. intrabar
     exit_on_channel_crossback: bool = True,
     use_trailing_atr_stop: bool = True,
     trail_atr_mult: float = 2.0,
-    risk_pct: float = 0.5,         # equity risk fraction per trade for sizing
+    risk_pct: float = 0.5,  # equity risk fraction per trade for sizing
     size_smoothing_ema: Optional[int] = 5,
     max_leverage: float = 1.0,
 ) -> Tuple[pd.Series, pd.Series, Optional[pd.Series]]:
@@ -34,11 +34,11 @@ def make_signals(
     """
     o, h, l, c = [df[col].astype(float) for col in price_cols]
     high_n = _rolling_high(h, lookback)
-    low_n  = _rolling_low(l, lookback)
+    low_n = _rolling_low(l, lookback)
 
     if confirm_close:
-        entry_long = c > high_n.shift(1)     # break above prior channel
-        exit_long_cb = c < low_n.shift(1)    # cross back into/below channel
+        entry_long = c > high_n.shift(1)  # break above prior channel
+        exit_long_cb = c < low_n.shift(1)  # cross back into/below channel
     else:
         entry_long = h > high_n.shift(1)
         exit_long_cb = l < low_n.shift(1)
@@ -49,7 +49,9 @@ def make_signals(
         stop_long = c - trail_atr_mult * atr
         # Trailing stop line (max of prior stops)
         trail_line = stop_long.copy()
-        trail_line = pd.Series(np.maximum.accumulate(trail_line.values), index=trail_line.index)
+        trail_line = pd.Series(
+            np.maximum.accumulate(trail_line.values), index=trail_line.index
+        )
         exit_long_ts = c < trail_line
     else:
         exit_long_ts = pd.Series(False, index=df.index)
@@ -57,7 +59,7 @@ def make_signals(
     exit_long = exit_long_cb if exit_on_channel_crossback else exit_long_ts
 
     entries = entry_long.astype(bool)
-    exits   = exit_long.astype(bool)
+    exits = exit_long.astype(bool)
 
     # Volatility-aware size (ATR)
     size = None
@@ -74,7 +76,7 @@ def make_signals(
         size = clamp_size(size, max_abs=max_leverage)
 
     entries = entries.reindex(df.index, fill_value=False)
-    exits   = exits.reindex(df.index, fill_value=False)
+    exits = exits.reindex(df.index, fill_value=False)
     if size is not None:
         size = size.reindex(df.index).fillna(0.0)
 

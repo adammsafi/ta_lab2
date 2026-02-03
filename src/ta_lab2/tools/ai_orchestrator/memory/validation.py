@@ -38,7 +38,7 @@ def validate_memory_store(
     client: Optional[MemoryClient] = None,
     expected_count: int = 3763,
     expected_dimensions: int = 1536,
-    sample_size: int = 10
+    sample_size: int = 10,
 ) -> MemoryValidationResult:
     """Validate ChromaDB memory store integrity.
 
@@ -67,18 +67,21 @@ def validate_memory_store(
     actual_count = collection.count()
     count_valid = actual_count >= expected_count
     if not count_valid:
-        issues.append(f"Count mismatch: expected >={expected_count}, got {actual_count}")
+        issues.append(
+            f"Count mismatch: expected >={expected_count}, got {actual_count}"
+        )
 
     # Check 2: Distance metric
     metadata = collection.metadata or {}
     distance_metric = metadata.get("hnsw:space", "l2")  # ChromaDB defaults to L2
     if distance_metric != "cosine":
-        issues.append(f"Distance metric is '{distance_metric}', recommended 'cosine' for text embeddings")
+        issues.append(
+            f"Distance metric is '{distance_metric}', recommended 'cosine' for text embeddings"
+        )
 
     # Check 3: Sample embedding dimensions
     sample_results = collection.get(
-        limit=sample_size,
-        include=["embeddings", "metadatas", "documents"]
+        limit=sample_size, include=["embeddings", "metadatas", "documents"]
     )
 
     sample_valid = True
@@ -91,7 +94,9 @@ def validate_memory_store(
                 issues.append(f"Sample {i}: embedding is None")
                 sample_valid = False
             elif len(emb) != expected_dimensions:
-                issues.append(f"Sample {i}: dimension {len(emb)}, expected {expected_dimensions}")
+                issues.append(
+                    f"Sample {i}: dimension {len(emb)}, expected {expected_dimensions}"
+                )
                 sample_valid = False
             else:
                 detected_dimensions = len(emb)
@@ -117,8 +122,10 @@ def validate_memory_store(
         sample_valid=sample_valid,
         metadata_complete=metadata_complete,
         distance_metric=distance_metric,
-        embedding_dimensions=detected_dimensions if detected_dimensions else expected_dimensions,
-        issues=issues
+        embedding_dimensions=detected_dimensions
+        if detected_dimensions
+        else expected_dimensions,
+        issues=issues,
     )
 
     logger.info(f"Memory validation complete: {result}")

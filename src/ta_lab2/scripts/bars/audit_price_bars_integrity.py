@@ -47,13 +47,12 @@ Notes:
 """
 
 import argparse
-import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Dict, List, Optional, Sequence, Tuple
 
 import pandas as pd
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
 from ta_lab2.scripts.bars.common_snapshot_contract import (
@@ -143,11 +142,14 @@ def best_ts_col(colset: set[str]) -> Optional[str]:
 # TF selection (expected coverage)
 # ----------------------------
 
+
 def _load_dim_timeframe(engine: Engine, dim_tf: str) -> pd.DataFrame:
     df = pd.read_sql(text(f"SELECT {', '.join(DIM_TF_COLS)} FROM {dim_tf}"), engine)
     missing = [c for c in DIM_TF_COLS if c not in df.columns]
     if missing:
-        raise RuntimeError(f"dim_timeframe missing columns needed for bars integrity audit: {missing}")
+        raise RuntimeError(
+            f"dim_timeframe missing columns needed for bars integrity audit: {missing}"
+        )
     return df
 
 
@@ -172,9 +174,15 @@ def tfs_for_family(df_tf: pd.DataFrame, family: str) -> List[str]:
         scheme = "US" if family == "CAL_US" else "ISO"
         df = df[(df["alignment_type"] == "calendar") & (df["calendar_anchor"] == False)]  # noqa: E712
         # Weeks: scheme-specific suffix
-        weeks = df[(df["base_unit"] == "W") & (df["tf"].astype(str).str.endswith(f"_CAL_{scheme}"))]
+        weeks = df[
+            (df["base_unit"] == "W")
+            & (df["tf"].astype(str).str.endswith(f"_CAL_{scheme}"))
+        ]
         # Months/years: scheme-agnostic "_CAL" without extra suffix
-        my = df[(df["base_unit"].isin(["M", "Y"])) & (df["tf"].astype(str).str.endswith("_CAL"))]
+        my = df[
+            (df["base_unit"].isin(["M", "Y"]))
+            & (df["tf"].astype(str).str.endswith("_CAL"))
+        ]
         my = my[~my["tf"].astype(str).str.contains("_CAL_")]
         out = pd.concat([weeks, my], ignore_index=True)
         return out["tf"].astype(str).tolist()
@@ -182,15 +190,23 @@ def tfs_for_family(df_tf: pd.DataFrame, family: str) -> List[str]:
     if family in {"ANCHOR_US", "ANCHOR_ISO"}:
         scheme = "US" if family == "ANCHOR_US" else "ISO"
         df = df[(df["alignment_type"] == "calendar") & (df["calendar_anchor"] == True)]  # noqa: E712
-        weeks = df[(df["base_unit"] == "W") & (df["tf"].astype(str).str.endswith(f"_CAL_ANCHOR_{scheme}"))]
-        my = df[(df["base_unit"].isin(["M", "Y"])) & (df["tf"].astype(str).str.endswith("_CAL_ANCHOR"))]
+        weeks = df[
+            (df["base_unit"] == "W")
+            & (df["tf"].astype(str).str.endswith(f"_CAL_ANCHOR_{scheme}"))
+        ]
+        my = df[
+            (df["base_unit"].isin(["M", "Y"]))
+            & (df["tf"].astype(str).str.endswith("_CAL_ANCHOR"))
+        ]
         out = pd.concat([weeks, my], ignore_index=True)
         return out["tf"].astype(str).tolist()
 
     raise ValueError(f"Unknown family: {family}")
 
 
-def run_coverage(engine: Engine, ids: List[int], dim_tf: str, out_csv: str) -> pd.DataFrame:
+def run_coverage(
+    engine: Engine, ids: List[int], dim_tf: str, out_csv: str
+) -> pd.DataFrame:
     df_tf = _load_dim_timeframe(engine, dim_tf)
 
     rows = []
@@ -215,7 +231,9 @@ def run_coverage(engine: Engine, ids: List[int], dim_tf: str, out_csv: str) -> p
         tfs = tfs_for_family(df_tf, family)
         in_clause = ",".join(str(int(i)) for i in ids)
         actual = pd.read_sql(
-            text(f"SELECT DISTINCT id::int AS id, tf::text AS tf FROM {table} WHERE id IN ({in_clause})"),
+            text(
+                f"SELECT DISTINCT id::int AS id, tf::text AS tf FROM {table} WHERE id IN ({in_clause})"
+            ),
             engine,
         )
         exp = len(ids) * len(tfs)
@@ -247,6 +265,7 @@ def run_coverage(engine: Engine, ids: List[int], dim_tf: str, out_csv: str) -> p
 # ----------------------------
 # Table audit (summary + dup/final checks when possible)
 # ----------------------------
+
 
 def audit_table_summary(engine: Engine, table: str, ids: Sequence[int]) -> pd.DataFrame:
     """
@@ -287,7 +306,10 @@ def audit_table_summary(engine: Engine, table: str, ids: Sequence[int]) -> pd.Da
     if has_bar_seq:
         select_parts += ["COUNT(DISTINCT bar_seq)::bigint AS n_bar_seq"]
     if has_tf_days:
-        select_parts += ["MIN(tf_days)::int AS tf_days_min", "MAX(tf_days)::int AS tf_days_max"]
+        select_parts += [
+            "MIN(tf_days)::int AS tf_days_min",
+            "MAX(tf_days)::int AS tf_days_max",
+        ]
     if has_is_partial_end:
         select_parts += [
             "SUM(CASE WHEN is_partial_end THEN 1 ELSE 0 END)::bigint AS n_partial_end_true",
@@ -304,7 +326,10 @@ def audit_table_summary(engine: Engine, table: str, ids: Sequence[int]) -> pd.Da
             "SUM(CASE WHEN NOT is_missing_days THEN 1 ELSE 0 END)::bigint AS n_missing_days_false",
         ]
     if has_count_days:
-        select_parts += ["MIN(count_days)::int AS count_days_min", "MAX(count_days)::int AS count_days_max"]
+        select_parts += [
+            "MIN(count_days)::int AS count_days_min",
+            "MAX(count_days)::int AS count_days_max",
+        ]
     if has_count_days_remaining:
         select_parts += [
             "MIN(count_days_remaining)::int AS count_days_remaining_min",
@@ -363,7 +388,9 @@ def audit_table_summary(engine: Engine, table: str, ids: Sequence[int]) -> pd.Da
         dup = pd.read_sql(q_dup, engine)
         df = df.merge(dup, on=["id", "tf"], how="left")
         df["n_dup_snapshot_keys"] = df["n_dup_snapshot_keys"].fillna(0).astype("int64")
-        df["dup_snapshot_key_share"] = (df["n_dup_snapshot_keys"] / df["n_rows"]).round(8)
+        df["dup_snapshot_key_share"] = (df["n_dup_snapshot_keys"] / df["n_rows"]).round(
+            8
+        )
     else:
         df["n_dup_snapshot_keys"] = 0
         df["dup_snapshot_key_share"] = 0.0
@@ -388,7 +415,9 @@ def audit_table_summary(engine: Engine, table: str, ids: Sequence[int]) -> pd.Da
         fin = pd.read_sql(q_final, engine)
         df = df.merge(fin, on=["id", "tf"], how="left")
         df["n_extra_final_rows"] = df["n_extra_final_rows"].fillna(0).astype("int64")
-        df["n_missing_final_barseq"] = df["n_missing_final_barseq"].fillna(0).astype("int64")
+        df["n_missing_final_barseq"] = (
+            df["n_missing_final_barseq"].fillna(0).astype("int64")
+        )
     else:
         df["n_extra_final_rows"] = 0
         df["n_missing_final_barseq"] = 0
@@ -403,7 +432,9 @@ def run_audit(engine: Engine, ids: List[int], out_csv: str) -> pd.DataFrame:
         if not df_t.empty:
             frames.append(df_t)
     if not frames:
-        raise RuntimeError("No audit results. Check table names/schema and permissions.")
+        raise RuntimeError(
+            "No audit results. Check table names/schema and permissions."
+        )
     out_df = pd.concat(frames, ignore_index=True)
     out_df = out_df.sort_values(["table_name", "id", "tf"]).reset_index(drop=True)
     out_df.to_csv(out_csv, index=False)
@@ -414,6 +445,7 @@ def run_audit(engine: Engine, ids: List[int], out_csv: str) -> pd.DataFrame:
 # ----------------------------
 # Spacing + bar_seq continuity (canonical rows)
 # ----------------------------
+
 
 @dataclass(frozen=True)
 class TfSpec:
@@ -431,15 +463,21 @@ def load_tf_specs(engine: Engine, dim_tf: str) -> Dict[str, TfSpec]:
         tf = str(r["tf"])
         out[tf] = TfSpec(
             tf=tf,
-            alignment_type=str(r["alignment_type"]) if pd.notna(r["alignment_type"]) else "",
-            tf_days_nominal=float(r["tf_days_nominal"]) if pd.notna(r["tf_days_nominal"]) else None,
+            alignment_type=str(r["alignment_type"])
+            if pd.notna(r["alignment_type"])
+            else "",
+            tf_days_nominal=float(r["tf_days_nominal"])
+            if pd.notna(r["tf_days_nominal"])
+            else None,
             tf_days_min=float(r["tf_days_min"]) if pd.notna(r["tf_days_min"]) else None,
             tf_days_max=float(r["tf_days_max"]) if pd.notna(r["tf_days_max"]) else None,
         )
     return out
 
 
-def fetch_canonical_closes(engine: Engine, table: str, ids: Sequence[int]) -> pd.DataFrame:
+def fetch_canonical_closes(
+    engine: Engine, table: str, ids: Sequence[int]
+) -> pd.DataFrame:
     cols = get_columns(engine, table)
     colset = set(cols)
     if not {"id", "tf"}.issubset(colset):
@@ -473,7 +511,9 @@ def fetch_canonical_closes(engine: Engine, table: str, ids: Sequence[int]) -> pd
     return pd.read_sql(q, engine)
 
 
-def spacing_eval(ts: pd.Series, spec: Optional[TfSpec]) -> Tuple[int, int, float, float, float]:
+def spacing_eval(
+    ts: pd.Series, spec: Optional[TfSpec]
+) -> Tuple[int, int, float, float, float]:
     if ts.size < 2:
         return (0, 0, float("nan"), float("nan"), 0.0)
     t = pd.to_datetime(ts, utc=True).sort_values()
@@ -489,7 +529,9 @@ def spacing_eval(ts: pd.Series, spec: Optional[TfSpec]) -> Tuple[int, int, float
         bad = (deltas < spec.tf_days_min) | (deltas > spec.tf_days_max)
     elif spec.tf_days_nominal is not None:
         tol = 0.5
-        bad = (deltas < (spec.tf_days_nominal - tol)) | (deltas > (spec.tf_days_nominal + tol))
+        bad = (deltas < (spec.tf_days_nominal - tol)) | (
+            deltas > (spec.tf_days_nominal + tol)
+        )
     else:
         return (0, n, mn, mx, 0.0)
 
@@ -515,7 +557,9 @@ def barseq_continuity_eval(bar_seq: pd.Series) -> Tuple[int, int]:
     return (n_gaps, max_gap)
 
 
-def run_spacing(engine: Engine, ids: List[int], dim_tf: str, out_csv: str) -> pd.DataFrame:
+def run_spacing(
+    engine: Engine, ids: List[int], dim_tf: str, out_csv: str
+) -> pd.DataFrame:
     specs = load_tf_specs(engine, dim_tf)
 
     rows = []
@@ -531,7 +575,9 @@ def run_spacing(engine: Engine, ids: List[int], dim_tf: str, out_csv: str) -> pd
         for (id_, tf), sub in df.groupby(group_cols, sort=True):
             spec = specs.get(str(tf))
             n_bad, n_deltas, mn, mx, bad_share = spacing_eval(sub["ts"], spec)
-            n_gaps, max_gap = barseq_continuity_eval(sub["bar_seq"]) if has_bar_seq else (0, 0)
+            n_gaps, max_gap = (
+                barseq_continuity_eval(sub["bar_seq"]) if has_bar_seq else (0, 0)
+            )
 
             rows.append(
                 dict(
@@ -555,7 +601,9 @@ def run_spacing(engine: Engine, ids: List[int], dim_tf: str, out_csv: str) -> pd
 
     out_df = pd.DataFrame(rows)
     if out_df.empty:
-        raise RuntimeError("No spacing results produced. Check table names/schema and permissions.")
+        raise RuntimeError(
+            "No spacing results produced. Check table names/schema and permissions."
+        )
     out_df = out_df.sort_values(
         ["bad_delta_share", "n_barseq_gaps", "table_name", "id", "tf"],
         ascending=[False, False, True, True, True],
@@ -569,7 +617,10 @@ def run_spacing(engine: Engine, ids: List[int], dim_tf: str, out_csv: str) -> pd
 # Samples (ported from audit_price_bars_samples.py)
 # ----------------------------
 
-def get_tf_pairs(engine: Engine, table: str, ids: Sequence[int], max_tfs_per_id: Optional[int]) -> pd.DataFrame:
+
+def get_tf_pairs(
+    engine: Engine, table: str, ids: Sequence[int], max_tfs_per_id: Optional[int]
+) -> pd.DataFrame:
     in_clause = ",".join(str(int(i)) for i in ids)
     q = text(
         f"""
@@ -595,21 +646,40 @@ def get_tf_pairs(engine: Engine, table: str, ids: Sequence[int], max_tfs_per_id:
 
 def pick_sample_cols(colset: set[str]) -> List[str]:
     preferred = [
-        "id", "tf", "bar_seq",
-        "time_close", "ts", "timestamp",
-        "time_open", "time_high", "time_low",
-        "open", "high", "low", "close", "volume", "market_cap",
+        "id",
+        "tf",
+        "bar_seq",
+        "time_close",
+        "ts",
+        "timestamp",
+        "time_open",
+        "time_high",
+        "time_low",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "market_cap",
         "tf_days",
-        "count_days", "count_days_remaining",
-        "is_partial_start", "is_partial_end", "is_missing_days",
-        "count_missing_days", "count_missing_days_start", "count_missing_days_interior", "count_missing_days_end",
+        "count_days",
+        "count_days_remaining",
+        "is_partial_start",
+        "is_partial_end",
+        "is_missing_days",
+        "count_missing_days",
+        "count_missing_days_start",
+        "count_missing_days_interior",
+        "count_missing_days_end",
         "missing_days_where",
         "ingested_at",
     ]
     return [c for c in preferred if c in colset]
 
 
-def sample_group(engine: Engine, table: str, cols: List[str], id_: int, tf: str, per_group: int) -> pd.DataFrame:
+def sample_group(
+    engine: Engine, table: str, cols: List[str], id_: int, tf: str, per_group: int
+) -> pd.DataFrame:
     colset = set(cols)
     ts_col = best_ts_col(colset)
     has_bar_seq = "bar_seq" in colset
@@ -631,14 +701,22 @@ def sample_group(engine: Engine, table: str, cols: List[str], id_: int, tf: str,
         LIMIT :lim
         """
     )
-    df = pd.read_sql(q, engine, params={"id": int(id_), "tf": str(tf), "lim": int(per_group)})
+    df = pd.read_sql(
+        q, engine, params={"id": int(id_), "tf": str(tf), "lim": int(per_group)}
+    )
     if df.empty:
         return df
     df.insert(0, "table_name", table)
     return df
 
 
-def run_samples(engine: Engine, ids: List[int], per_group: int, max_tfs_per_id: Optional[int], out_csv: str) -> pd.DataFrame:
+def run_samples(
+    engine: Engine,
+    ids: List[int],
+    per_group: int,
+    max_tfs_per_id: Optional[int],
+    out_csv: str,
+) -> pd.DataFrame:
     frames: List[pd.DataFrame] = []
     for table in BAR_TABLES.keys():
         if not table_exists(engine, table):
@@ -660,14 +738,20 @@ def run_samples(engine: Engine, ids: List[int], per_group: int, max_tfs_per_id: 
             _log(f"[samples] No rows for {table} with requested ids.")
             continue
 
-        _log(f"[samples] Sampling {table}: {len(tf_pairs)} (id,tf) groups * {per_group} rows each (max).")
+        _log(
+            f"[samples] Sampling {table}: {len(tf_pairs)} (id,tf) groups * {per_group} rows each (max)."
+        )
         for _, r in tf_pairs.iterrows():
-            df_g = sample_group(engine, table, cols, int(r["id"]), str(r["tf"]), per_group)
+            df_g = sample_group(
+                engine, table, cols, int(r["id"]), str(r["tf"]), per_group
+            )
             if not df_g.empty:
                 frames.append(df_g)
 
     if not frames:
-        raise RuntimeError("No samples produced. Check ids/table names and permissions.")
+        raise RuntimeError(
+            "No samples produced. Check ids/table names and permissions."
+        )
 
     out_df = pd.concat(frames, ignore_index=True)
     out_df["sample_generated_at"] = datetime.now(UTC).isoformat()
@@ -680,7 +764,9 @@ def run_samples(engine: Engine, ids: List[int], per_group: int, max_tfs_per_id: 
             break
 
     if ts_sort:
-        out_df = out_df.sort_values(sort_cols + [ts_sort], ascending=[True, True, True, False]).reset_index(drop=True)
+        out_df = out_df.sort_values(
+            sort_cols + [ts_sort], ascending=[True, True, True, False]
+        ).reset_index(drop=True)
     else:
         out_df = out_df.sort_values(sort_cols).reset_index(drop=True)
 
@@ -693,21 +779,41 @@ def run_samples(engine: Engine, ids: List[int], per_group: int, max_tfs_per_id: 
 # CLI
 # ----------------------------
 
+
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Bars integrity audit (coverage + table metrics + spacing + samples).")
-    ap.add_argument("--ids", required=True, help="all OR comma-separated list like 1,52")
-    ap.add_argument("--daily-table", default=DEFAULT_DAILY_TABLE, help="Used only to resolve --ids all")
+    ap = argparse.ArgumentParser(
+        description="Bars integrity audit (coverage + table metrics + spacing + samples)."
+    )
+    ap.add_argument(
+        "--ids", required=True, help="all OR comma-separated list like 1,52"
+    )
+    ap.add_argument(
+        "--daily-table",
+        default=DEFAULT_DAILY_TABLE,
+        help="Used only to resolve --ids all",
+    )
     ap.add_argument("--dim-tf", default=DEFAULT_DIM_TF)
 
-    ap.add_argument("--run", default="all", help="Comma list: coverage,audit,spacing,samples or 'all' (default)")
+    ap.add_argument(
+        "--run",
+        default="all",
+        help="Comma list: coverage,audit,spacing,samples or 'all' (default)",
+    )
 
     ap.add_argument("--out-coverage", default="price_bars_expected_coverage.csv")
     ap.add_argument("--out-audit", default="price_bars_audit.csv")
     ap.add_argument("--out-spacing", default="price_bars_spacing.csv")
     ap.add_argument("--out-samples", default="price_bars_samples.csv")
 
-    ap.add_argument("--per-group", type=int, default=25, help="Samples: rows per (table,id,tf)")
-    ap.add_argument("--max-tfs-per-id", type=int, default=0, help="Samples: cap TFs per id (0 = no cap)")
+    ap.add_argument(
+        "--per-group", type=int, default=25, help="Samples: rows per (table,id,tf)"
+    )
+    ap.add_argument(
+        "--max-tfs-per-id",
+        type=int,
+        default=0,
+        help="Samples: cap TFs per id (0 = no cap)",
+    )
 
     args = ap.parse_args()
 
@@ -720,7 +826,11 @@ def main() -> None:
     else:
         ids = ids_result
 
-    run_set = {s.strip().lower() for s in (args.run.split(",") if args.run else []) if s.strip()}
+    run_set = {
+        s.strip().lower()
+        for s in (args.run.split(",") if args.run else [])
+        if s.strip()
+    }
     if "all" in run_set or not run_set:
         run_set = {"coverage", "audit", "spacing", "samples"}
 
@@ -735,7 +845,11 @@ def main() -> None:
         run_spacing(engine, ids, args.dim_tf, args.out_spacing)
         ran.append("spacing")
     if "samples" in run_set:
-        max_tfs = args.max_tfs_per_id if args.max_tfs_per_id and args.max_tfs_per_id > 0 else None
+        max_tfs = (
+            args.max_tfs_per_id
+            if args.max_tfs_per_id and args.max_tfs_per_id > 0
+            else None
+        )
         run_samples(engine, ids, args.per_group, max_tfs, args.out_samples)
         ran.append("samples")
 

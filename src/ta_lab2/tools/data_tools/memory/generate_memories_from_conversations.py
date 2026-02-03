@@ -27,7 +27,7 @@ except ImportError:
 logging.basicConfig(
     level=logging.INFO,
     format="[%(asctime)s] %(levelname)s: %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S"
+    datefmt="%Y-%m-%d %H:%M:%S",
 )
 log = logging.getLogger(__name__)
 
@@ -99,9 +99,7 @@ def extract_conversation_text(conversation: Dict[str, Any]) -> str:
 
 
 def extract_memories_from_conversation(
-    client: OpenAI,
-    conversation: Dict[str, Any],
-    model: str = "gpt-4o-mini"
+    client: OpenAI, conversation: Dict[str, Any], model: str = "gpt-4o-mini"
 ) -> List[Dict[str, Any]]:
     """Extract memories from a single conversation using GPT-4."""
 
@@ -118,8 +116,11 @@ def extract_memories_from_conversation(
         response = client.chat.completions.create(
             model=model,
             messages=[
-                {"role": "system", "content": "You are a memory extraction assistant. Extract key technical memories from conversations."},
-                {"role": "user", "content": MEMORY_EXTRACTION_PROMPT + conv_text}
+                {
+                    "role": "system",
+                    "content": "You are a memory extraction assistant. Extract key technical memories from conversations.",
+                },
+                {"role": "user", "content": MEMORY_EXTRACTION_PROMPT + conv_text},
             ],
             temperature=0.3,
         )
@@ -129,7 +130,8 @@ def extract_memories_from_conversation(
         # Extract JSON array from response
         # Try to find JSON array in the response
         import re
-        json_match = re.search(r'\[\s*\{.*\}\s*\]', result_text, re.DOTALL)
+
+        json_match = re.search(r"\[\s*\{.*\}\s*\]", result_text, re.DOTALL)
 
         if json_match:
             memories = json.loads(json_match.group())
@@ -145,9 +147,15 @@ def extract_memories_from_conversation(
 
 def main():
     parser = argparse.ArgumentParser(description="Extract memories from conversations")
-    parser.add_argument("--input-file", required=True, help="Input conversations JSON file")
-    parser.add_argument("--output-file", required=True, help="Output memories JSONL file")
-    parser.add_argument("--batch-size", type=int, default=10, help="Process N conversations at a time")
+    parser.add_argument(
+        "--input-file", required=True, help="Input conversations JSON file"
+    )
+    parser.add_argument(
+        "--output-file", required=True, help="Output memories JSONL file"
+    )
+    parser.add_argument(
+        "--batch-size", type=int, default=10, help="Process N conversations at a time"
+    )
     parser.add_argument("--model", default="gpt-4o-mini", help="OpenAI model to use")
 
     args = parser.parse_args()
@@ -188,7 +196,7 @@ def main():
         memories = extract_memories_from_conversation(client, conv, model=args.model)
 
         if not memories:
-            log.info(f"  No memories extracted")
+            log.info("  No memories extracted")
             continue
 
         log.info(f"  Extracted {len(memories)} memories")
@@ -213,7 +221,9 @@ def main():
         for mem in all_memories:
             f.write(json.dumps(mem) + "\n")
 
-    log.info(f"\nExtracted {len(all_memories)} total memories from {len(conversations)} conversations")
+    log.info(
+        f"\nExtracted {len(all_memories)} total memories from {len(conversations)} conversations"
+    )
     log.info(f"Output: {output_path}")
 
     return 0

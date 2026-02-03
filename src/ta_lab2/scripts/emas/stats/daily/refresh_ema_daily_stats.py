@@ -90,9 +90,11 @@ After running, inspect recent non-PASS results:
 import argparse
 from typing import Optional
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 
-from ta_lab2.config import TARGET_DB_URL
+from ta_lab2.scripts.bars.common_snapshot_contract import (
+    get_engine,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -292,12 +294,6 @@ FROM (
 # Helpers
 # ---------------------------------------------------------------------------
 
-def get_engine(db_url: Optional[str] = None):
-    """
-    Create a SQLAlchemy engine using either the provided URL or TARGET_DB_URL.
-    """
-    return create_engine(db_url or TARGET_DB_URL)
-
 
 def run_all_tests(engine) -> None:
     """
@@ -313,6 +309,7 @@ def run_all_tests(engine) -> None:
 # ---------------------------------------------------------------------------
 # CLI entrypoint
 # ---------------------------------------------------------------------------
+
 
 def main(db_url: Optional[str] = None) -> None:
     """

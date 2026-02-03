@@ -21,4 +21,4 @@ WHERE id = 1
   AND EXTRACT(MONTH FROM "timestamp") IN (6, 12)
 ORDER BY "timestamp";
 
-select 
+select

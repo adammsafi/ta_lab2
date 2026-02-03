@@ -25,10 +25,11 @@ from sqlalchemy.engine import Engine
 from ta_lab2.backtests.vbt_runner import run_vbt_on_split
 from ta_lab2.backtests.costs import CostModel
 from ta_lab2.backtests.splitters import Split
-from ta_lab2.scripts.signals.signal_utils import compute_feature_hash, compute_params_hash
+from ta_lab2.scripts.signals.signal_utils import compute_params_hash
 
 try:
     import vectorbt as vbt
+
     VBT_VERSION = vbt.__version__
 except (ImportError, AttributeError):
     VBT_VERSION = "unknown"
@@ -43,6 +44,7 @@ class BacktestResult:
 
     Contains summary metrics and detailed trade/metric data for database storage.
     """
+
     run_id: str
     signal_type: str
     signal_id: int
@@ -82,6 +84,7 @@ class SignalBacktester:
         engine: SQLAlchemy engine for database operations
         cost_model: CostModel with fee_bps, slippage_bps, funding_bps_day
     """
+
     engine: Engine
     cost_model: CostModel
 
@@ -113,7 +116,8 @@ class SignalBacktester:
         """
         table = f"cmc_signals_{signal_type}"
 
-        sql = text(f"""
+        sql = text(
+            f"""
             SELECT entry_ts, exit_ts, direction, entry_price, exit_price
             FROM public.{table}
             WHERE id = :asset_id
@@ -122,7 +126,8 @@ class SignalBacktester:
               AND entry_ts <= :end_ts
               AND position_state = 'closed'
             ORDER BY entry_ts
-        """)
+        """
+        )
 
         with self.engine.connect() as conn:
             result = conn.execute(
@@ -132,11 +137,13 @@ class SignalBacktester:
                     "signal_id": signal_id,
                     "start_ts": start_ts,
                     "end_ts": end_ts,
-                }
+                },
             )
             rows = result.fetchall()
 
-        logger.info(f"Loaded {len(rows)} closed positions for asset {asset_id}, signal {signal_id}")
+        logger.info(
+            f"Loaded {len(rows)} closed positions for asset {asset_id}, signal {signal_id}"
+        )
 
         # Build complete time index from start to end
         # This ensures we have timestamps for all trading days
@@ -144,7 +151,9 @@ class SignalBacktester:
         if price_df.empty:
             # Return empty series if no price data
             empty_idx = pd.DatetimeIndex([])
-            return pd.Series([], dtype=bool, index=empty_idx), pd.Series([], dtype=bool, index=empty_idx)
+            return pd.Series([], dtype=bool, index=empty_idx), pd.Series(
+                [], dtype=bool, index=empty_idx
+            )
 
         time_index = price_df.index
 
@@ -156,13 +165,13 @@ class SignalBacktester:
         for row in rows:
             entry_ts = pd.Timestamp(row[0])
             if entry_ts.tz is None:
-                entry_ts = entry_ts.tz_localize('UTC')
+                entry_ts = entry_ts.tz_localize("UTC")
 
             exit_ts = None
             if row[1]:
                 exit_ts = pd.Timestamp(row[1])
                 if exit_ts.tz is None:
-                    exit_ts = exit_ts.tz_localize('UTC')
+                    exit_ts = exit_ts.tz_localize("UTC")
 
             # Set entry if timestamp exists in index
             if entry_ts in entries.index:
@@ -193,14 +202,16 @@ class SignalBacktester:
         Returns:
             DataFrame with 'close' column indexed by 'ts' (timestamp)
         """
-        sql = text("""
+        sql = text(
+            """
             SELECT ts, close
             FROM public.cmc_daily_features
             WHERE id = :asset_id
               AND ts >= :start_ts
               AND ts <= :end_ts
             ORDER BY ts
-        """)
+        """
+        )
 
         with self.engine.connect() as conn:
             df = pd.read_sql(
@@ -211,8 +222,8 @@ class SignalBacktester:
                     "start_ts": start_ts,
                     "end_ts": end_ts,
                 },
-                index_col='ts',
-                parse_dates=['ts']
+                index_col="ts",
+                parse_dates=["ts"],
             )
 
         logger.info(f"Loaded {len(df)} price bars for asset {asset_id}")
@@ -259,7 +270,9 @@ class SignalBacktester:
         )
 
         if entries.empty:
-            raise ValueError(f"No signals found for {signal_type}/{signal_id} on asset {asset_id}")
+            raise ValueError(
+                f"No signals found for {signal_type}/{signal_id} on asset {asset_id}"
+            )
 
         # 2. Load prices
         prices = self.load_prices(asset_id, start_ts, end_ts)
@@ -289,8 +302,10 @@ class SignalBacktester:
             logger.error(f"Vectorbt execution failed: {e}")
             raise RuntimeError(f"Backtest execution failed: {e}") from e
 
-        logger.info(f"Backtest complete: {result_row.trades} trades, "
-                   f"return={result_row.total_return:.2%}, sharpe={result_row.sharpe:.2f}")
+        logger.info(
+            f"Backtest complete: {result_row.trades} trades, "
+            f"return={result_row.total_return:.2%}, sharpe={result_row.sharpe:.2f}"
+        )
 
         # 5. Extract detailed trades from vectorbt
         # Rebuild portfolio to extract trade records
@@ -383,38 +398,58 @@ class SignalBacktester:
         """
         if pf.trades.count() == 0:
             # Return empty DataFrame with correct schema
-            return pd.DataFrame(columns=[
-                'entry_ts', 'entry_price', 'exit_ts', 'exit_price',
-                'direction', 'size', 'pnl_pct', 'pnl_dollars',
-                'fees_paid', 'slippage_cost'
-            ])
+            return pd.DataFrame(
+                columns=[
+                    "entry_ts",
+                    "entry_price",
+                    "exit_ts",
+                    "exit_price",
+                    "direction",
+                    "size",
+                    "pnl_pct",
+                    "pnl_dollars",
+                    "fees_paid",
+                    "slippage_cost",
+                ]
+            )
 
         # Extract trade records
         trades = pf.trades.records_readable
 
         # Map to our schema
-        trades_df = pd.DataFrame({
-            'entry_ts': pd.to_datetime(trades['Entry Timestamp']).dt.tz_localize('UTC'),
-            'entry_price': trades['Entry Price'].astype(float),
-            'exit_ts': pd.to_datetime(trades['Exit Timestamp']).dt.tz_localize('UTC'),
-            'exit_price': trades['Exit Price'].astype(float),
-            'direction': trades['Direction'].map({0: 'long', 1: 'short'}),
-            'size': trades['Size'].astype(float),
-            'pnl_pct': trades['Return'].astype(float) * 100,  # Convert to percentage
-            'pnl_dollars': trades['PnL'].astype(float),
-            'fees_paid': trades.get('Fees', 0.0).astype(float) if 'Fees' in trades else 0.0,
-            'slippage_cost': 0.0,  # Vectorbt doesn't separate slippage from fees
-        })
+        trades_df = pd.DataFrame(
+            {
+                "entry_ts": pd.to_datetime(trades["Entry Timestamp"]).dt.tz_localize(
+                    "UTC"
+                ),
+                "entry_price": trades["Entry Price"].astype(float),
+                "exit_ts": pd.to_datetime(trades["Exit Timestamp"]).dt.tz_localize(
+                    "UTC"
+                ),
+                "exit_price": trades["Exit Price"].astype(float),
+                "direction": trades["Direction"].map({0: "long", 1: "short"}),
+                "size": trades["Size"].astype(float),
+                "pnl_pct": trades["Return"].astype(float)
+                * 100,  # Convert to percentage
+                "pnl_dollars": trades["PnL"].astype(float),
+                "fees_paid": trades.get("Fees", 0.0).astype(float)
+                if "Fees" in trades
+                else 0.0,
+                "slippage_cost": 0.0,  # Vectorbt doesn't separate slippage from fees
+            }
+        )
 
         return trades_df
 
     def _load_signal_params(self, signal_id: int) -> dict:
         """Load signal parameters from dim_signals for hashing."""
-        sql = text("""
+        sql = text(
+            """
             SELECT params
             FROM public.dim_signals
             WHERE signal_id = :signal_id
-        """)
+        """
+        )
 
         with self.engine.connect() as conn:
             result = conn.execute(sql, {"signal_id": signal_id})
@@ -443,20 +478,22 @@ class SignalBacktester:
 
         # Basic metrics from result_row
         metrics = {
-            'total_return': result_row.total_return,
-            'cagr': result_row.cagr,
-            'sharpe_ratio': result_row.sharpe,
-            'max_drawdown': result_row.mdd,
-            'calmar_ratio': result_row.mar,
+            "total_return": result_row.total_return,
+            "cagr": result_row.cagr,
+            "sharpe_ratio": result_row.sharpe,
+            "max_drawdown": result_row.mdd,
+            "calmar_ratio": result_row.mar,
         }
 
         # Sortino ratio (downside deviation)
         downside_returns = returns[returns < 0]
         if len(downside_returns) > 0 and downside_returns.std() != 0:
-            sortino = (returns.mean() * np.sqrt(252)) / (downside_returns.std() * np.sqrt(252))
-            metrics['sortino_ratio'] = float(sortino)
+            sortino = (returns.mean() * np.sqrt(252)) / (
+                downside_returns.std() * np.sqrt(252)
+            )
+            metrics["sortino_ratio"] = float(sortino)
         else:
-            metrics['sortino_ratio'] = None
+            metrics["sortino_ratio"] = None
 
         # Drawdown duration
         drawdown_series = pf.drawdown()
@@ -466,62 +503,90 @@ class SignalBacktester:
             dd_groups = (is_dd != is_dd.shift()).cumsum()[is_dd]
             if len(dd_groups) > 0:
                 max_dd_duration = dd_groups.value_counts().max()
-                metrics['max_drawdown_duration_days'] = int(max_dd_duration)
+                metrics["max_drawdown_duration_days"] = int(max_dd_duration)
             else:
-                metrics['max_drawdown_duration_days'] = None
+                metrics["max_drawdown_duration_days"] = None
         else:
-            metrics['max_drawdown_duration_days'] = None
+            metrics["max_drawdown_duration_days"] = None
 
         # Trade statistics
         trades = pf.trades
-        metrics['trade_count'] = int(trades.count())
+        metrics["trade_count"] = int(trades.count())
 
-        if metrics['trade_count'] > 0:
+        if metrics["trade_count"] > 0:
             # Win rate
             winning_trades = (trades.pnl.values > 0).sum()
-            metrics['win_rate'] = float(winning_trades / metrics['trade_count'] * 100)
+            metrics["win_rate"] = float(winning_trades / metrics["trade_count"] * 100)
 
             # Profit factor
-            gross_profit = trades.pnl.values[trades.pnl.values > 0].sum() if (trades.pnl.values > 0).any() else 0
-            gross_loss = abs(trades.pnl.values[trades.pnl.values < 0].sum()) if (trades.pnl.values < 0).any() else 0
+            gross_profit = (
+                trades.pnl.values[trades.pnl.values > 0].sum()
+                if (trades.pnl.values > 0).any()
+                else 0
+            )
+            gross_loss = (
+                abs(trades.pnl.values[trades.pnl.values < 0].sum())
+                if (trades.pnl.values < 0).any()
+                else 0
+            )
 
             if gross_loss > 0:
-                metrics['profit_factor'] = float(gross_profit / gross_loss)
+                metrics["profit_factor"] = float(gross_profit / gross_loss)
             else:
-                metrics['profit_factor'] = None
+                metrics["profit_factor"] = None
 
             # Average win/loss
             winning_pnl = trades.pnl.values[trades.pnl.values > 0]
             losing_pnl = trades.pnl.values[trades.pnl.values < 0]
 
-            metrics['avg_win'] = float((winning_pnl / trades.entry_price.values[trades.pnl.values > 0] * 100).mean()) if len(winning_pnl) > 0 else None
-            metrics['avg_loss'] = float((losing_pnl / trades.entry_price.values[trades.pnl.values < 0] * 100).mean()) if len(losing_pnl) > 0 else None
+            metrics["avg_win"] = (
+                float(
+                    (
+                        winning_pnl
+                        / trades.entry_price.values[trades.pnl.values > 0]
+                        * 100
+                    ).mean()
+                )
+                if len(winning_pnl) > 0
+                else None
+            )
+            metrics["avg_loss"] = (
+                float(
+                    (
+                        losing_pnl
+                        / trades.entry_price.values[trades.pnl.values < 0]
+                        * 100
+                    ).mean()
+                )
+                if len(losing_pnl) > 0
+                else None
+            )
 
             # Average holding period
-            durations = (trades.exit_idx.values - trades.entry_idx.values)
-            metrics['avg_holding_period_days'] = float(durations.mean())
+            durations = trades.exit_idx.values - trades.entry_idx.values
+            metrics["avg_holding_period_days"] = float(durations.mean())
         else:
-            metrics['win_rate'] = None
-            metrics['profit_factor'] = None
-            metrics['avg_win'] = None
-            metrics['avg_loss'] = None
-            metrics['avg_holding_period_days'] = None
+            metrics["win_rate"] = None
+            metrics["profit_factor"] = None
+            metrics["avg_win"] = None
+            metrics["avg_loss"] = None
+            metrics["avg_holding_period_days"] = None
 
         # Risk metrics
         if len(returns) > 0:
             # VaR 95% (5th percentile)
-            metrics['var_95'] = float(np.percentile(returns, 5))
+            metrics["var_95"] = float(np.percentile(returns, 5))
 
             # Expected Shortfall (CVaR) - mean of returns below VaR
-            var_threshold = metrics['var_95']
+            var_threshold = metrics["var_95"]
             tail_returns = returns[returns <= var_threshold]
             if len(tail_returns) > 0:
-                metrics['expected_shortfall'] = float(tail_returns.mean())
+                metrics["expected_shortfall"] = float(tail_returns.mean())
             else:
-                metrics['expected_shortfall'] = None
+                metrics["expected_shortfall"] = None
         else:
-            metrics['var_95'] = None
-            metrics['expected_shortfall'] = None
+            metrics["var_95"] = None
+            metrics["expected_shortfall"] = None
 
         return metrics
 
@@ -542,7 +607,8 @@ class SignalBacktester:
 
         with self.engine.begin() as conn:
             # 1. Insert into cmc_backtest_runs
-            run_sql = text("""
+            run_sql = text(
+                """
                 INSERT INTO public.cmc_backtest_runs
                     (run_id, signal_type, signal_id, asset_id, start_ts, end_ts,
                      cost_model, signal_params_hash, feature_hash,
@@ -559,56 +625,63 @@ class SignalBacktester:
                     max_drawdown = EXCLUDED.max_drawdown,
                     trade_count = EXCLUDED.trade_count,
                     run_timestamp = now()
-            """)
+            """
+            )
 
-            conn.execute(run_sql, {
-                'run_id': result.run_id,
-                'signal_type': result.signal_type,
-                'signal_id': result.signal_id,
-                'asset_id': result.asset_id,
-                'start_ts': result.start_ts,
-                'end_ts': result.end_ts,
-                'cost_model': result.cost_model,  # Dict auto-converted to JSONB
-                'signal_params_hash': result.signal_params_hash,
-                'feature_hash': result.feature_hash,
-                'signal_version': result.signal_version,
-                'vbt_version': result.vbt_version,
-                'total_return': result.total_return,
-                'sharpe_ratio': result.sharpe_ratio,
-                'max_drawdown': result.max_drawdown,
-                'trade_count': result.trade_count,
-            })
+            conn.execute(
+                run_sql,
+                {
+                    "run_id": result.run_id,
+                    "signal_type": result.signal_type,
+                    "signal_id": result.signal_id,
+                    "asset_id": result.asset_id,
+                    "start_ts": result.start_ts,
+                    "end_ts": result.end_ts,
+                    "cost_model": result.cost_model,  # Dict auto-converted to JSONB
+                    "signal_params_hash": result.signal_params_hash,
+                    "feature_hash": result.feature_hash,
+                    "signal_version": result.signal_version,
+                    "vbt_version": result.vbt_version,
+                    "total_return": result.total_return,
+                    "sharpe_ratio": result.sharpe_ratio,
+                    "max_drawdown": result.max_drawdown,
+                    "trade_count": result.trade_count,
+                },
+            )
 
             logger.debug(f"Inserted run record: {result.run_id}")
 
             # 2. Insert trades (batch via DataFrame.to_sql)
             if not result.trades_df.empty:
                 trades_to_insert = result.trades_df.copy()
-                trades_to_insert['run_id'] = result.run_id
+                trades_to_insert["run_id"] = result.run_id
 
                 # Ensure timestamps are timezone-aware (localize if naive, otherwise keep as-is)
-                for col in ['entry_ts', 'exit_ts']:
+                for col in ["entry_ts", "exit_ts"]:
                     if col in trades_to_insert.columns:
                         ts_series = pd.to_datetime(trades_to_insert[col])
                         # Only localize if not already tz-aware
                         if ts_series.dt.tz is None:
-                            trades_to_insert[col] = ts_series.dt.tz_localize('UTC', ambiguous='NaT')
+                            trades_to_insert[col] = ts_series.dt.tz_localize(
+                                "UTC", ambiguous="NaT"
+                            )
                         else:
                             trades_to_insert[col] = ts_series
 
                 trades_to_insert.to_sql(
-                    'cmc_backtest_trades',
+                    "cmc_backtest_trades",
                     conn,
-                    schema='public',
-                    if_exists='append',
+                    schema="public",
+                    if_exists="append",
                     index=False,
-                    method='multi',
+                    method="multi",
                 )
 
                 logger.debug(f"Inserted {len(trades_to_insert)} trade records")
 
             # 3. Insert metrics
-            metrics_sql = text("""
+            metrics_sql = text(
+                """
                 INSERT INTO public.cmc_backtest_metrics
                     (run_id, total_return, cagr, sharpe_ratio, sortino_ratio, calmar_ratio,
                      max_drawdown, max_drawdown_duration_days,
@@ -628,14 +701,12 @@ class SignalBacktester:
                     trade_count = EXCLUDED.trade_count,
                     win_rate = EXCLUDED.win_rate,
                     profit_factor = EXCLUDED.profit_factor
-            """)
+            """
+            )
 
-            conn.execute(metrics_sql, {
-                'run_id': result.run_id,
-                **result.metrics
-            })
+            conn.execute(metrics_sql, {"run_id": result.run_id, **result.metrics})
 
-            logger.debug(f"Inserted metrics record")
+            logger.debug("Inserted metrics record")
 
         logger.info(f"Backtest results saved successfully: {result.run_id}")
         return result.run_id

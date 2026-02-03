@@ -24,6 +24,7 @@ def _normalize_cols(df: pd.DataFrame) -> pd.DataFrame:
     d.columns = [re.sub(r"\s+", " ", c.strip().lower()) for c in d.columns]
     return d
 
+
 def _find_ts_col(cols) -> str:
     for c in ("timestamp", "timeopen", "time open", "date", "timeclose", "time close"):
         if c in cols:
@@ -32,6 +33,7 @@ def _find_ts_col(cols) -> str:
         if ("time" in c) or ("date" in c):
             return c
     raise KeyError(f"No timestamp-like column found. Columns: {list(cols)}")
+
 
 def _find_close_col(cols) -> str:
     for c in ("close", "close usd", "adj close", "adjusted close"):
@@ -44,6 +46,7 @@ def _find_close_col(cols) -> str:
         if c in cols:
             return c
     raise KeyError(f"No close/price-like column found. Columns: {list(cols)}")
+
 
 def load_price_df(csv_path: str) -> pd.DataFrame:
     raw = pd.read_csv(csv_path)
@@ -112,6 +115,7 @@ def main():
     print(f"Final:    $ {final_equity:,.2f}")
     print(f"Gain:     $ {gain:,.2f}")
     print(f"Return:     {pct:.2f}%")
+
 
 if __name__ == "__main__":
     main()

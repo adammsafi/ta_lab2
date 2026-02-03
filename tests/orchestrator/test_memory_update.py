@@ -8,7 +8,6 @@ from ta_lab2.tools.ai_orchestrator.memory.update import (
     add_memories,
     delete_memory,
     get_embedding,
-    EMBEDDING_MODEL,
     EMBEDDING_DIMENSIONS,
 )
 from ta_lab2.tools.ai_orchestrator.memory import reset_memory_client
@@ -34,7 +33,7 @@ class TestMemoryUpdateResult:
 class TestGetEmbedding:
     """Tests for embedding generation."""
 
-    @patch('openai.OpenAI')
+    @patch("openai.OpenAI")
     def test_get_embedding_calls_openai(self, mock_openai_class):
         """Test embedding generation calls OpenAI API."""
         mock_client = MagicMock()
@@ -43,14 +42,14 @@ class TestGetEmbedding:
         mock_client.embeddings.create.return_value = mock_response
         mock_openai_class.return_value = mock_client
 
-        with patch.dict('os.environ', {'OPENAI_API_KEY': 'test-key'}):
+        with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
             embeddings = get_embedding(["test text"])
 
         assert len(embeddings) == 1
         assert len(embeddings[0]) == EMBEDDING_DIMENSIONS
         mock_client.embeddings.create.assert_called_once()
 
-    @patch('openai.OpenAI')
+    @patch("openai.OpenAI")
     def test_get_embedding_validates_dimensions(self, mock_openai_class):
         """Test embedding validation rejects wrong dimensions."""
         mock_client = MagicMock()
@@ -59,7 +58,7 @@ class TestGetEmbedding:
         mock_client.embeddings.create.return_value = mock_response
         mock_openai_class.return_value = mock_client
 
-        with patch.dict('os.environ', {'OPENAI_API_KEY': 'test-key'}):
+        with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
             with pytest.raises(ValueError, match="dimensions"):
                 get_embedding(["test text"])
 
@@ -73,8 +72,8 @@ class TestAddMemories:
     def teardown_method(self):
         reset_memory_client()
 
-    @patch('ta_lab2.tools.ai_orchestrator.memory.update.get_embedding')
-    @patch('ta_lab2.tools.ai_orchestrator.memory.client.get_memory_client')
+    @patch("ta_lab2.tools.ai_orchestrator.memory.update.get_embedding")
+    @patch("ta_lab2.tools.ai_orchestrator.memory.client.get_memory_client")
     def test_add_memories_upserts(self, mock_get_client, mock_get_embedding):
         """Test add_memories uses upsert."""
         mock_client = MagicMock()
@@ -85,11 +84,11 @@ class TestAddMemories:
 
         mock_get_embedding.return_value = [[0.1] * EMBEDDING_DIMENSIONS]
 
-        memories = [MemoryInput(
-            memory_id="test1",
-            content="Test content",
-            metadata={"type": "test"}
-        )]
+        memories = [
+            MemoryInput(
+                memory_id="test1", content="Test content", metadata={"type": "test"}
+            )
+        ]
 
         result = add_memories(memories, client=mock_client)
 
@@ -98,8 +97,8 @@ class TestAddMemories:
         assert result.failed == 0
         mock_collection.upsert.assert_called_once()
 
-    @patch('ta_lab2.tools.ai_orchestrator.memory.update.get_embedding')
-    @patch('ta_lab2.tools.ai_orchestrator.memory.client.get_memory_client')
+    @patch("ta_lab2.tools.ai_orchestrator.memory.update.get_embedding")
+    @patch("ta_lab2.tools.ai_orchestrator.memory.client.get_memory_client")
     def test_add_memories_counts_updates(self, mock_get_client, mock_get_embedding):
         """Test add_memories correctly counts updates vs adds."""
         mock_client = MagicMock()
@@ -112,7 +111,7 @@ class TestAddMemories:
 
         memories = [
             MemoryInput(memory_id="existing1", content="Updated", metadata={}),
-            MemoryInput(memory_id="new1", content="New", metadata={})
+            MemoryInput(memory_id="new1", content="New", metadata={}),
         ]
 
         result = add_memories(memories, client=mock_client)
@@ -120,9 +119,11 @@ class TestAddMemories:
         assert result.added == 1
         assert result.updated == 1
 
-    @patch('ta_lab2.tools.ai_orchestrator.memory.update.get_embedding')
-    @patch('ta_lab2.tools.ai_orchestrator.memory.client.get_memory_client')
-    def test_add_memories_handles_embedding_failure(self, mock_get_client, mock_get_embedding):
+    @patch("ta_lab2.tools.ai_orchestrator.memory.update.get_embedding")
+    @patch("ta_lab2.tools.ai_orchestrator.memory.client.get_memory_client")
+    def test_add_memories_handles_embedding_failure(
+        self, mock_get_client, mock_get_embedding
+    ):
         """Test add_memories handles embedding generation failure."""
         mock_client = MagicMock()
         mock_get_client.return_value = mock_client
@@ -146,8 +147,8 @@ class TestAddMemory:
     def teardown_method(self):
         reset_memory_client()
 
-    @patch('ta_lab2.tools.ai_orchestrator.memory.update.get_embedding')
-    @patch('ta_lab2.tools.ai_orchestrator.memory.client.get_memory_client')
+    @patch("ta_lab2.tools.ai_orchestrator.memory.update.get_embedding")
+    @patch("ta_lab2.tools.ai_orchestrator.memory.client.get_memory_client")
     def test_add_single_memory(self, mock_get_client, mock_get_embedding):
         """Test adding a single memory."""
         mock_client = MagicMock()
@@ -162,7 +163,7 @@ class TestAddMemory:
             memory_id="single1",
             content="Single memory content",
             metadata={"type": "test"},
-            client=mock_client
+            client=mock_client,
         )
 
         assert result.added == 1
@@ -178,7 +179,7 @@ class TestDeleteMemory:
     def teardown_method(self):
         reset_memory_client()
 
-    @patch('ta_lab2.tools.ai_orchestrator.memory.client.get_memory_client')
+    @patch("ta_lab2.tools.ai_orchestrator.memory.client.get_memory_client")
     def test_delete_existing_memory(self, mock_get_client):
         """Test deleting existing memory."""
         mock_client = MagicMock()
@@ -192,7 +193,7 @@ class TestDeleteMemory:
         assert result is True
         mock_collection.delete.assert_called_once_with(ids=["test1"])
 
-    @patch('ta_lab2.tools.ai_orchestrator.memory.client.get_memory_client')
+    @patch("ta_lab2.tools.ai_orchestrator.memory.client.get_memory_client")
     def test_delete_nonexistent_memory(self, mock_get_client):
         """Test deleting non-existent memory returns False."""
         mock_client = MagicMock()
@@ -220,6 +221,6 @@ class TestMemoryInput:
         mem = MemoryInput(
             memory_id="id1",
             content="content",
-            metadata={"type": "insight", "source": "test"}
+            metadata={"type": "insight", "source": "test"},
         )
         assert mem.metadata["type"] == "insight"

@@ -183,26 +183,21 @@ This script intentionally:
 """
 
 
-import argparse
-import os
 import time
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from typing import Sequence
 
 import numpy as np
 import pandas as pd
 import polars as pl
-from sqlalchemy import create_engine, text
-from sqlalchemy.engine import Engine
+from sqlalchemy import text
 
 from ta_lab2.scripts.bars.common_snapshot_contract import (
     # Contract/invariants + shared snapshot mechanics
     assert_one_row_per_local_day,
     compute_missing_days_diagnostics,
     compute_time_high_low,
-    normalize_output_schema,
-    # Shared DB + IO plumbing
     resolve_db_url,
     get_engine,
     parse_ids,
@@ -216,7 +211,6 @@ from ta_lab2.scripts.bars.common_snapshot_contract import (
     # Bar builder DB utilities (extracted)
     load_daily_prices_for_id,
     delete_bars_for_id_tf,
-    load_last_snapshot_row,
     load_last_snapshot_info_for_id_tfs,
     create_bar_builder_argument_parser,
 )
@@ -240,11 +234,13 @@ DEFAULT_STATE_TABLE = "public.cmc_price_bars_multi_tf_cal_us_state"
 # Types
 # =============================================================================
 
+
 @dataclass(frozen=True)
 class CalSpec:
     tf: str
-    unit: str   # 'W' | 'M' | 'Y'
+    unit: str  # 'W' | 'M' | 'Y'
     qty: int
+
 
 # =============================================================================
 # DB helpers (now imported from common_snapshot_contract)
@@ -314,13 +310,13 @@ def ensure_bars_table(db_url: str, bars_table: str) -> None:
 def load_cal_specs_from_dim_timeframe(db_url: str) -> list[CalSpec]:
     """
     Load calendar TF definitions from dim_timeframe.
-    
+
     Filters:
     - alignment_type = 'calendar'
     - allow_partial_start = FALSE
     - allow_partial_end = FALSE
     - base_unit IN ('W', 'M', 'Y')
-    
+
     Additional rules:
     - Weeks: tf LIKE '%_CAL' (US Sunday-start weeks)
     - Months/Years: calendar_scheme = 'CAL'
@@ -373,10 +369,11 @@ def load_cal_specs_from_dim_timeframe(db_url: str) -> list[CalSpec]:
 # Calendar boundary helpers (US weeks: Sunday start)
 # =============================================================================
 
+
 def _compute_anchor_start(first_day: date, unit: str) -> date:
     """
     Compute the first full-period start on or after first_day.
-    
+
     - W: next Sunday on or after first_day (US week convention)
     - M: first day of next month if first_day is not the 1st, else first_day
     - Y: first day of next year if first_day is not Jan 1, else first_day
@@ -387,7 +384,9 @@ def _compute_anchor_start(first_day: date, unit: str) -> date:
         days_until_sunday = (6 - weekday) % 7
         if days_until_sunday == 0 and weekday == 6:
             return first_day  # Already Sunday
-        return first_day + timedelta(days=days_until_sunday if days_until_sunday > 0 else 7)
+        return first_day + timedelta(
+            days=days_until_sunday if days_until_sunday > 0 else 7
+        )
 
     if unit == "M":
         if first_day.day == 1:
@@ -407,7 +406,7 @@ def _compute_anchor_start(first_day: date, unit: str) -> date:
 def _next_boundary(d: date, unit: str, qty: int) -> date:
     """
     Given date d, return the next calendar boundary after d for the given unit/qty.
-    
+
     - W: add qty*7 days
     - M: advance qty months
     - Y: advance qty years
@@ -430,7 +429,7 @@ def _next_boundary(d: date, unit: str, qty: int) -> date:
 def _bar_end_day(bar_start: date, unit: str, qty: int) -> date:
     """
     Compute the last day (inclusive) of a calendar bar starting at bar_start.
-    
+
     Returns the day before the next boundary.
     """
     next_start = _next_boundary(bar_start, unit, qty)
@@ -441,6 +440,7 @@ def _bar_end_day(bar_start: date, unit: str, qty: int) -> date:
 # Polars-based full rebuild (FAST PATH - 5-6x faster)
 # =============================================================================
 
+
 def _build_snapshots_full_history_polars(
     df_id: pd.DataFrame,
     *,
@@ -449,7 +449,7 @@ def _build_snapshots_full_history_polars(
 ) -> pd.DataFrame:
     """
     FAST PATH: Full rebuild using Polars vectorization.
-    
+
     This is 5-6x faster than pandas loops for large datasets.
     Uses cumulative operations (cum_max, cum_min, cum_sum) for aggregations.
     """
@@ -460,7 +460,7 @@ def _build_snapshots_full_history_polars(
     assert_one_row_per_local_day(df_id, ts_col="ts", tz=tz, id_col="id")
 
     df = df_id.sort_values("ts").reset_index(drop=True).copy()
-    
+
     ts_local = df["ts"].dt.tz_convert(tz)
     df["day_date"] = ts_local.dt.date
 
@@ -475,7 +475,9 @@ def _build_snapshots_full_history_polars(
     day_dt = pd.to_datetime(df["day_date"])
     if spec.unit == "W":
         span = 7 * int(spec.qty)
-        bar_idx = ((day_dt - pd.Timestamp(anchor_start)).dt.days // span).astype("int64")
+        bar_idx = ((day_dt - pd.Timestamp(anchor_start)).dt.days // span).astype(
+            "int64"
+        )
     elif spec.unit == "M":
         a = pd.Timestamp(date(anchor_start.year, anchor_start.month, 1))
         y = pd.DatetimeIndex(day_dt).year
@@ -484,7 +486,7 @@ def _build_snapshots_full_history_polars(
         bar_idx = (((y * 12 + mo) - am) // int(spec.qty)).astype("int64")
     elif spec.unit == "Y":
         y = pd.DatetimeIndex(day_dt).year
-        bar_idx = (((y - anchor_start.year) // int(spec.qty))).astype("int64")
+        bar_idx = ((y - anchor_start.year) // int(spec.qty)).astype("int64")
     else:
         raise ValueError(f"Unsupported unit: {spec.unit}")
 
@@ -501,17 +503,23 @@ def _build_snapshots_full_history_polars(
         bar_end = _bar_end_day(bar_start, spec.unit, spec.qty)
         tf_days = (bar_end - bar_start).days + 1
         bar_rows.append((int(bar_seq), bar_start, bar_end, int(tf_days)))
-    
-    df_bar = pd.DataFrame(bar_rows, columns=["bar_seq", "bar_start", "bar_end", "tf_days"])
+
+    df_bar = pd.DataFrame(
+        bar_rows, columns=["bar_seq", "bar_start", "bar_end", "tf_days"]
+    )
     df = df.merge(df_bar, on="bar_seq", how="left")
 
-    df["exp_to_date"] = (pd.to_datetime(df["day_date"]) - pd.to_datetime(df["bar_start"])).dt.days + 1
+    df["exp_to_date"] = (
+        pd.to_datetime(df["day_date"]) - pd.to_datetime(df["bar_start"])
+    ).dt.days + 1
     df["exp_to_date"] = df["exp_to_date"].astype("int64")
 
     # Start-run missing
     min_day = df.groupby("bar_seq")["day_date"].transform("min")
     df["count_missing_days_start"] = (
-        (pd.to_datetime(min_day) - pd.to_datetime(df["bar_start"])).dt.days.clip(lower=0).astype("int64")
+        (pd.to_datetime(min_day) - pd.to_datetime(df["bar_start"]))
+        .dt.days.clip(lower=0)
+        .astype("int64")
     )
 
     # Convert to Polars for fast cumulative operations
@@ -519,11 +527,13 @@ def _build_snapshots_full_history_polars(
 
     # Canonicalize Polars datetime dtype (avoid naive vs tz-aware supertype errors)
     DT_UTC = pl.Datetime(time_unit="us", time_zone="UTC")
-    pl_df = pl_df.with_columns([
-        pl.col("ts").cast(DT_UTC),
-        pl.col("timehigh").cast(DT_UTC),
-        pl.col("timelow").cast(DT_UTC),
-    ])
+    pl_df = pl_df.with_columns(
+        [
+            pl.col("ts").cast(DT_UTC),
+            pl.col("timehigh").cast(DT_UTC),
+            pl.col("timelow").cast(DT_UTC),
+        ]
+    )
 
     from ta_lab2.scripts.bars.polars_bar_operations import (
         compute_day_time_open,
@@ -536,16 +546,26 @@ def _build_snapshots_full_history_polars(
     # Use extracted utilities for common Polars operations
     pl_df = compute_day_time_open(pl_df)
 
-    pl_df = pl_df.with_columns([
-        pl.int_range(1, pl.len() + 1).over("bar_seq").cast(pl.Int64).alias("count_days"),
-        pl.int_range(1, pl.len() + 1).over("bar_seq").cast(pl.Int64).alias("pos_in_bar"),
-    ])
+    pl_df = pl_df.with_columns(
+        [
+            pl.int_range(1, pl.len() + 1)
+            .over("bar_seq")
+            .cast(pl.Int64)
+            .alias("count_days"),
+            pl.int_range(1, pl.len() + 1)
+            .over("bar_seq")
+            .cast(pl.Int64)
+            .alias("pos_in_bar"),
+        ]
+    )
 
-    pl_df = pl_df.with_columns([
-        pl.col("day_time_open").first().over("bar_seq").alias("time_open"),
-        pl.col("ts").alias("time_close"),
-        (pl.col("ts") + one_ms).alias("last_ts_half_open"),
-    ])
+    pl_df = pl_df.with_columns(
+        [
+            pl.col("day_time_open").first().over("bar_seq").alias("time_open"),
+            pl.col("ts").alias("time_close"),
+            (pl.col("ts") + one_ms).alias("last_ts_half_open"),
+        ]
+    )
 
     # Use extracted utility for OHLCV aggregations
     pl_df = apply_ohlcv_cumulative_aggregations(pl_df)
@@ -554,67 +574,82 @@ def _build_snapshots_full_history_polars(
     pl_df = compute_extrema_timestamps_with_new_extreme_detection(pl_df)
 
     # Missing days diagnostics
-    pl_df = pl_df.with_columns([
-        pl.max_horizontal(
-            pl.col("exp_to_date").cast(pl.Int64) - pl.col("count_days").cast(pl.Int64),
-            pl.lit(0, dtype=pl.Int64),
-    ).alias("count_missing_days")
-    ])
+    pl_df = pl_df.with_columns(
+        [
+            pl.max_horizontal(
+                pl.col("exp_to_date").cast(pl.Int64)
+                - pl.col("count_days").cast(pl.Int64),
+                pl.lit(0, dtype=pl.Int64),
+            ).alias("count_missing_days")
+        ]
+    )
 
-    pl_df = pl_df.with_columns([
-        pl.lit(0).cast(pl.Int64).alias("count_missing_days_end"),
-        pl.max_horizontal(
-            pl.col("count_missing_days") - pl.col("count_missing_days_start"),
-            pl.lit(0, dtype=pl.Int64),
-        ).cast(pl.Int64).alias("count_missing_days_interior"),
-        (pl.col("count_missing_days") > 0).alias("is_missing_days"),
-        pl.lit(False).alias("is_partial_start"),
-        (pl.col("day_date") < pl.col("bar_end")).alias("is_partial_end"),
-        (pl.col("tf_days").cast(pl.Int64) - pl.col("exp_to_date").cast(pl.Int64)).cast(pl.Int64).alias("count_days_remaining"),
-        pl.when(pl.col("count_missing_days") > 0).then(pl.lit("interior")).otherwise(pl.lit(None)).alias("missing_days_where"),
-        pl.when(pl.col("count_missing_days") > 0).then(pl.col("day_date")).otherwise(pl.lit(None)).cast(pl.Date).alias("first_missing_day"),
-        pl.when(pl.col("count_missing_days") > 0).then(pl.col("day_date")).otherwise(pl.lit(None)).cast(pl.Date).alias("last_missing_day"),
-    ])
+    pl_df = pl_df.with_columns(
+        [
+            pl.lit(0).cast(pl.Int64).alias("count_missing_days_end"),
+            pl.max_horizontal(
+                pl.col("count_missing_days") - pl.col("count_missing_days_start"),
+                pl.lit(0, dtype=pl.Int64),
+            )
+            .cast(pl.Int64)
+            .alias("count_missing_days_interior"),
+            (pl.col("count_missing_days") > 0).alias("is_missing_days"),
+            pl.lit(False).alias("is_partial_start"),
+            (pl.col("day_date") < pl.col("bar_end")).alias("is_partial_end"),
+            (pl.col("tf_days").cast(pl.Int64) - pl.col("exp_to_date").cast(pl.Int64))
+            .cast(pl.Int64)
+            .alias("count_days_remaining"),
+            pl.when(pl.col("count_missing_days") > 0)
+            .then(pl.lit("interior"))
+            .otherwise(pl.lit(None))
+            .alias("missing_days_where"),
+            pl.when(pl.col("count_missing_days") > 0)
+            .then(pl.col("day_date"))
+            .otherwise(pl.lit(None))
+            .cast(pl.Date)
+            .alias("first_missing_day"),
+            pl.when(pl.col("count_missing_days") > 0)
+            .then(pl.col("day_date"))
+            .otherwise(pl.lit(None))
+            .cast(pl.Date)
+            .alias("last_missing_day"),
+        ]
+    )
 
     # Select final columns
-    out_pl = pl_df.select([
-        pl.col("id").cast(pl.Int64),
-        pl.lit(spec.tf).alias("tf"),
-        pl.col("tf_days").cast(pl.Int64),
-        pl.col("bar_seq").cast(pl.Int64),
-
-        pl.col("time_open"),
-        pl.col("time_close"),
-        pl.col("time_high"),
-        pl.col("time_low"),
-
-        pl.col("open_bar").cast(pl.Float64).alias("open"),
-        pl.col("high_bar").cast(pl.Float64).alias("high"),
-        pl.col("low_bar").cast(pl.Float64).alias("low"),
-        pl.col("close_bar").cast(pl.Float64).alias("close"),
-
-        pl.col("vol_bar").cast(pl.Float64).alias("volume"),
-        pl.col("mc_bar").cast(pl.Float64).alias("market_cap"),
-
-        pl.col("time_close").alias("timestamp"),
-        pl.col("last_ts_half_open"),
-
-        pl.col("pos_in_bar").cast(pl.Int64),
-        pl.col("is_partial_start").cast(pl.Boolean),
-        pl.col("is_partial_end").cast(pl.Boolean),
-        pl.col("count_days_remaining").cast(pl.Int64),
-
-        pl.col("is_missing_days").cast(pl.Boolean),
-        pl.col("count_days").cast(pl.Int64),
-        pl.col("count_missing_days").cast(pl.Int64),
-        pl.col("count_missing_days_start").cast(pl.Int64),
-        pl.col("count_missing_days_end").cast(pl.Int64),
-        pl.col("count_missing_days_interior").cast(pl.Int64),
-
-        pl.col("missing_days_where"),
-        pl.col("first_missing_day").cast(pl.Datetime),
-        pl.col("last_missing_day").cast(pl.Datetime),
-    ])
+    out_pl = pl_df.select(
+        [
+            pl.col("id").cast(pl.Int64),
+            pl.lit(spec.tf).alias("tf"),
+            pl.col("tf_days").cast(pl.Int64),
+            pl.col("bar_seq").cast(pl.Int64),
+            pl.col("time_open"),
+            pl.col("time_close"),
+            pl.col("time_high"),
+            pl.col("time_low"),
+            pl.col("open_bar").cast(pl.Float64).alias("open"),
+            pl.col("high_bar").cast(pl.Float64).alias("high"),
+            pl.col("low_bar").cast(pl.Float64).alias("low"),
+            pl.col("close_bar").cast(pl.Float64).alias("close"),
+            pl.col("vol_bar").cast(pl.Float64).alias("volume"),
+            pl.col("mc_bar").cast(pl.Float64).alias("market_cap"),
+            pl.col("time_close").alias("timestamp"),
+            pl.col("last_ts_half_open"),
+            pl.col("pos_in_bar").cast(pl.Int64),
+            pl.col("is_partial_start").cast(pl.Boolean),
+            pl.col("is_partial_end").cast(pl.Boolean),
+            pl.col("count_days_remaining").cast(pl.Int64),
+            pl.col("is_missing_days").cast(pl.Boolean),
+            pl.col("count_days").cast(pl.Int64),
+            pl.col("count_missing_days").cast(pl.Int64),
+            pl.col("count_missing_days_start").cast(pl.Int64),
+            pl.col("count_missing_days_end").cast(pl.Int64),
+            pl.col("count_missing_days_interior").cast(pl.Int64),
+            pl.col("missing_days_where"),
+            pl.col("first_missing_day").cast(pl.Datetime),
+            pl.col("last_missing_day").cast(pl.Datetime),
+        ]
+    )
 
     from ta_lab2.scripts.bars.polars_bar_operations import compact_output_types
 
@@ -635,6 +670,7 @@ def _build_snapshots_full_history_polars(
 # followed by filtering to new rows. This is faster than the iterrows approach.
 # The functions below are kept for backward compatibility but are not used
 # by the main refresh_incremental code path.
+
 
 def _make_day_time_open(ts: pd.Series) -> pd.Series:
     """Compute day_time_open: prev ts + 1ms, first day: ts - 1 day + 1ms"""
@@ -688,16 +724,23 @@ def _build_incremental_snapshots(
 
         # If start_day is still within this bar, continue it
         if start_day <= bar_end:
-            df_bar = df[(df["local_day"] >= bar_start) & (df["local_day"] <= bar_end) & (df["local_day"] >= start_day)]
+            df_bar = df[
+                (df["local_day"] >= bar_start)
+                & (df["local_day"] <= bar_end)
+                & (df["local_day"] >= start_day)
+            ]
             if not df_bar.empty:
                 df_bar = df_bar.sort_values("ts")
 
                 for i, (idx, row) in enumerate(df_bar.iterrows(), start=1):
                     snapshot_day = row["local_day"]
-                    is_last_day = (snapshot_day == bar_end)
+                    is_last_day = snapshot_day == bar_end
 
                     # Slice up to this day
-                    df_slice_to_day = df[(df["local_day"] >= bar_start) & (df["local_day"] <= snapshot_day)].sort_values("ts")
+                    df_slice_to_day = df[
+                        (df["local_day"] >= bar_start)
+                        & (df["local_day"] <= snapshot_day)
+                    ].sort_values("ts")
 
                     open_val = df_slice_to_day["open"].iloc[0]
                     close_val = df_slice_to_day["close"].iloc[-1]
@@ -713,7 +756,11 @@ def _build_incremental_snapshots(
                     time_high_val, time_low_val = compute_time_high_low(df_slice_to_day)
 
                     observed_to_now = set(df_slice_to_day["local_day"].values)
-                    diag = compute_missing_days_diagnostics(bar_start_day_local=bar_start, snapshot_day_local=snapshot_day, observed_days_local=observed_to_now)
+                    diag = compute_missing_days_diagnostics(
+                        bar_start_day_local=bar_start,
+                        snapshot_day_local=snapshot_day,
+                        observed_days_local=observed_to_now,
+                    )
 
                     if spec.unit == "W":
                         tf_days_val = spec.qty * 7
@@ -741,7 +788,8 @@ def _build_incremental_snapshots(
                             "volume": volume_val,
                             "market_cap": market_cap_val,
                             "timestamp": time_close_val,
-                            "last_ts_half_open": time_close_val + pd.Timedelta(milliseconds=1),
+                            "last_ts_half_open": time_close_val
+                            + pd.Timedelta(milliseconds=1),
                             "pos_in_bar": pos_in_bar,
                             "is_partial_start": False,
                             "is_partial_end": not is_last_day,
@@ -771,7 +819,12 @@ def _build_incremental_snapshots(
     while bar_start <= end_day:
         bar_end = _bar_end_day(bar_start, spec.unit, spec.qty)
 
-        df_bar = df[(df["local_day"] >= bar_start) & (df["local_day"] <= bar_end) & (df["local_day"] >= start_day) & (df["local_day"] <= end_day)]
+        df_bar = df[
+            (df["local_day"] >= bar_start)
+            & (df["local_day"] <= bar_end)
+            & (df["local_day"] >= start_day)
+            & (df["local_day"] <= end_day)
+        ]
         if df_bar.empty:
             bar_start = _next_boundary(bar_start, spec.unit, spec.qty)
             bar_seq += 1
@@ -781,9 +834,11 @@ def _build_incremental_snapshots(
 
         for _, row in df_bar.iterrows():
             snapshot_day = row["local_day"]
-            is_last_day = (snapshot_day == bar_end)
+            is_last_day = snapshot_day == bar_end
 
-            df_slice_to_day = df[(df["local_day"] >= bar_start) & (df["local_day"] <= snapshot_day)].sort_values("ts")
+            df_slice_to_day = df[
+                (df["local_day"] >= bar_start) & (df["local_day"] <= snapshot_day)
+            ].sort_values("ts")
 
             open_val = df_slice_to_day["open"].iloc[0]
             close_val = df_slice_to_day["close"].iloc[-1]
@@ -799,7 +854,11 @@ def _build_incremental_snapshots(
             time_high_val, time_low_val = compute_time_high_low(df_slice_to_day)
 
             observed_to_now = set(df_slice_to_day["local_day"].values)
-            diag = compute_missing_days_diagnostics(bar_start_day_local=bar_start, snapshot_day_local=snapshot_day, observed_days_local=observed_to_now)
+            diag = compute_missing_days_diagnostics(
+                bar_start_day_local=bar_start,
+                snapshot_day_local=snapshot_day,
+                observed_days_local=observed_to_now,
+            )
 
             if spec.unit == "W":
                 tf_days_val = spec.qty * 7
@@ -843,11 +902,16 @@ def _build_incremental_snapshots(
     if not out.empty:
         # Keep dtypes compact but don't assume optional diagnostics columns exist
         for c in [
-            'bar_seq','tf_days','pos_in_bar','count_days','count_days_remaining','count_missing_days',
+            "bar_seq",
+            "tf_days",
+            "pos_in_bar",
+            "count_days",
+            "count_days_remaining",
+            "count_missing_days",
         ]:
             if c in out.columns:
                 out[c] = out[c].astype(np.int32)
-        for c in ['is_partial_start','is_partial_end','is_missing_days']:
+        for c in ["is_partial_start", "is_partial_end", "is_missing_days"]:
             if c in out.columns:
                 out[c] = out[c].astype(bool)
 
@@ -858,10 +922,11 @@ def _build_incremental_snapshots(
 # Multiprocessing worker: process one ID across all specs
 # =============================================================================
 
+
 def _process_single_id_with_all_specs(args: tuple) -> tuple[list[dict], dict[str, int]]:
     """
     Worker function that processes all specs for a single ID.
-    
+
     Returns: (state_updates, stats)
     """
     (
@@ -878,14 +943,25 @@ def _process_single_id_with_all_specs(args: tuple) -> tuple[list[dict], dict[str
     ) = args
 
     state_updates: list[dict] = []
-    stats = {"id": int(id_), "upserted": 0, "rebuilds": 0, "appends": 0, "noops": 0, "errors": 0}
+    stats = {
+        "id": int(id_),
+        "upserted": 0,
+        "rebuilds": 0,
+        "appends": 0,
+        "noops": 0,
+        "errors": 0,
+    }
 
     try:
-        daily_max_day: date = pd.to_datetime(daily_max_ts, utc=True).tz_convert(tz).date()
+        daily_max_day: date = (
+            pd.to_datetime(daily_max_ts, utc=True).tz_convert(tz).date()
+        )
         tfs = [s.tf for s in specs]
-        
+
         # Batch load last snapshot info for all TFs
-        last_snap_map = load_last_snapshot_info_for_id_tfs(db_url, bars_table, id_=int(id_), tfs=tfs)
+        last_snap_map = load_last_snapshot_info_for_id_tfs(
+            db_url, bars_table, id_=int(id_), tfs=tfs
+        )
 
         for spec in specs:
             st = state_map_for_id.get((int(id_), spec.tf))
@@ -904,7 +980,9 @@ def _process_single_id_with_all_specs(args: tuple) -> tuple[list[dict], dict[str
 
             # 1) No state + no bars => full rebuild (POLARS)
             if st is None and last_snap is None:
-                df_full = load_daily_prices_for_id(db_url=db_url, daily_table=daily_table, id_=int(id_), tz=tz)
+                df_full = load_daily_prices_for_id(
+                    db_url=db_url, daily_table=daily_table, id_=int(id_), tz=tz
+                )
                 bars = _build_snapshots_full_history_polars(df_full, spec=spec, tz=tz)
                 if not bars.empty:
                     upsert_bars(bars, db_url=db_url, bars_table=bars_table)
@@ -931,7 +1009,9 @@ def _process_single_id_with_all_specs(args: tuple) -> tuple[list[dict], dict[str
 
             # 2) State exists but bars missing => rebuild (POLARS)
             if last_snap is None:
-                df_full = load_daily_prices_for_id(db_url=db_url, daily_table=daily_table, id_=int(id_), tz=tz)
+                df_full = load_daily_prices_for_id(
+                    db_url=db_url, daily_table=daily_table, id_=int(id_), tz=tz
+                )
                 bars = _build_snapshots_full_history_polars(df_full, spec=spec, tz=tz)
                 if not bars.empty:
                     upsert_bars(bars, db_url=db_url, bars_table=bars_table)
@@ -967,7 +1047,9 @@ def _process_single_id_with_all_specs(args: tuple) -> tuple[list[dict], dict[str
                 )
                 delete_bars_for_id_tf(db_url, bars_table, id_=int(id_), tf=spec.tf)
 
-                df_full = load_daily_prices_for_id(db_url=db_url, daily_table=daily_table, id_=int(id_), tz=tz)
+                df_full = load_daily_prices_for_id(
+                    db_url=db_url, daily_table=daily_table, id_=int(id_), tz=tz
+                )
                 bars = _build_snapshots_full_history_polars(df_full, spec=spec, tz=tz)
                 if not bars.empty:
                     upsert_bars(bars, db_url=db_url, bars_table=bars_table)
@@ -997,8 +1079,12 @@ def _process_single_id_with_all_specs(args: tuple) -> tuple[list[dict], dict[str
                         "id": int(id_),
                         "tf": spec.tf,
                         "tz": tz,
-                        "daily_min_seen": min(daily_min_seen, pd.to_datetime(daily_min_ts, utc=True)),
-                        "daily_max_seen": max(daily_max_seen, pd.to_datetime(daily_max_ts, utc=True)),
+                        "daily_min_seen": min(
+                            daily_min_seen, pd.to_datetime(daily_min_ts, utc=True)
+                        ),
+                        "daily_max_seen": max(
+                            daily_max_seen, pd.to_datetime(daily_max_ts, utc=True)
+                        ),
                         "last_bar_seq": last_bar_seq,
                         "last_time_close": last_time_close,
                     }
@@ -1007,7 +1093,9 @@ def _process_single_id_with_all_specs(args: tuple) -> tuple[list[dict], dict[str
 
             # 5) Forward incremental - FAST PATH using Polars rebuild + filter
             # Instead of slow iterrows, rebuild all snapshots with Polars and filter to new rows
-            df_full = load_daily_prices_for_id(db_url=db_url, daily_table=daily_table, id_=int(id_), tz=tz)
+            df_full = load_daily_prices_for_id(
+                db_url=db_url, daily_table=daily_table, id_=int(id_), tz=tz
+            )
             if df_full.empty:
                 stats["noops"] += 1
                 continue
@@ -1021,8 +1109,12 @@ def _process_single_id_with_all_specs(args: tuple) -> tuple[list[dict], dict[str
                         "id": int(id_),
                         "tf": spec.tf,
                         "tz": tz,
-                        "daily_min_seen": min(daily_min_seen, pd.to_datetime(daily_min_ts, utc=True)),
-                        "daily_max_seen": max(daily_max_seen, pd.to_datetime(daily_max_ts, utc=True)),
+                        "daily_min_seen": min(
+                            daily_min_seen, pd.to_datetime(daily_min_ts, utc=True)
+                        ),
+                        "daily_max_seen": max(
+                            daily_max_seen, pd.to_datetime(daily_max_ts, utc=True)
+                        ),
                         "last_bar_seq": last_bar_seq,
                         "last_time_close": last_time_close,
                     }
@@ -1039,8 +1131,12 @@ def _process_single_id_with_all_specs(args: tuple) -> tuple[list[dict], dict[str
                         "id": int(id_),
                         "tf": spec.tf,
                         "tz": tz,
-                        "daily_min_seen": min(daily_min_seen, pd.to_datetime(daily_min_ts, utc=True)),
-                        "daily_max_seen": max(daily_max_seen, pd.to_datetime(daily_max_ts, utc=True)),
+                        "daily_min_seen": min(
+                            daily_min_seen, pd.to_datetime(daily_min_ts, utc=True)
+                        ),
+                        "daily_max_seen": max(
+                            daily_max_seen, pd.to_datetime(daily_max_ts, utc=True)
+                        ),
                         "last_bar_seq": last_bar_seq,
                         "last_time_close": last_time_close,
                     }
@@ -1059,8 +1155,12 @@ def _process_single_id_with_all_specs(args: tuple) -> tuple[list[dict], dict[str
                     "id": int(id_),
                     "tf": spec.tf,
                     "tz": tz,
-                    "daily_min_seen": min(daily_min_seen, pd.to_datetime(daily_min_ts, utc=True)),
-                    "daily_max_seen": max(daily_max_seen, pd.to_datetime(daily_max_ts, utc=True)),
+                    "daily_min_seen": min(
+                        daily_min_seen, pd.to_datetime(daily_min_ts, utc=True)
+                    ),
+                    "daily_max_seen": max(
+                        daily_max_seen, pd.to_datetime(daily_max_ts, utc=True)
+                    ),
                     "last_bar_seq": last_bar_seq2,
                     "last_time_close": last_time_close2,
                 }
@@ -1077,6 +1177,7 @@ def _process_single_id_with_all_specs(args: tuple) -> tuple[list[dict], dict[str
 # =============================================================================
 # Incremental driver (multiprocessing)
 # =============================================================================
+
 
 def refresh_incremental(
     *,
@@ -1096,7 +1197,9 @@ def refresh_incremental(
     specs = load_cal_specs_from_dim_timeframe(db_url)
     tfs = [s.tf for s in specs]
     total_combinations = len(ids) * len(specs)
-    print(f"[bars_cal_us] Incremental: {len(ids)} IDs × {len(specs)} TFs = {total_combinations:,} combinations (tz={tz})")
+    print(
+        f"[bars_cal_us] Incremental: {len(ids)} IDs × {len(specs)} TFs = {total_combinations:,} combinations (tz={tz})"
+    )
 
     daily_mm = load_daily_min_max(db_url, daily_table, ids)
     if daily_mm.empty:
@@ -1113,7 +1216,7 @@ def refresh_incremental(
 
     # Build per-id state submaps
     state_map_by_id: dict[int, dict[tuple[int, str], dict]] = {int(i): {} for i in ids}
-    for (id_tf, row) in state_map.items():
+    for id_tf, row in state_map.items():
         id_ = int(id_tf[0])
         if id_ in state_map_by_id:
             state_map_by_id[id_][id_tf] = row
@@ -1145,11 +1248,17 @@ def refresh_incremental(
         return
 
     mode = "parallel" if nproc > 1 else "serial"
-    print(f"[bars_cal_us] Processing {len(args_list)} ids with {nproc} workers ({mode})...")
+    print(
+        f"[bars_cal_us] Processing {len(args_list)} ids with {nproc} workers ({mode})..."
+    )
 
     # Use orchestrator for both parallel and serial execution with progress tracking
-    config = OrchestratorConfig(num_processes=nproc, maxtasksperchild=50, use_imap_unordered=True)
-    progress = ProgressTracker(total=len(args_list), log_interval=5, prefix="[bars_cal_us]")
+    config = OrchestratorConfig(
+        num_processes=nproc, maxtasksperchild=50, use_imap_unordered=True
+    )
+    progress = ProgressTracker(
+        total=len(args_list), log_interval=5, prefix="[bars_cal_us]"
+    )
     orchestrator = MultiprocessingOrchestrator(
         worker_fn=_process_single_id_with_all_specs,
         config=config,
@@ -1158,9 +1267,14 @@ def refresh_incremental(
 
     all_state_updates, totals = orchestrator.execute(
         args_list,
-        stats_template={"upserted": 0, "rebuilds": 0, "appends": 0, "noops": 0, "errors": 0}
+        stats_template={
+            "upserted": 0,
+            "rebuilds": 0,
+            "appends": 0,
+            "noops": 0,
+            "errors": 0,
+        },
     )
-
 
     upsert_state(db_url, state_table, all_state_updates, with_tz=False)
 
@@ -1177,6 +1291,7 @@ def refresh_incremental(
 # =============================================================================
 # CLI
 # =============================================================================
+
 
 def main(argv: Sequence[str] | None = None) -> None:
     # Use shared CLI parser
@@ -1202,7 +1317,6 @@ def main(argv: Sequence[str] | None = None) -> None:
     ensure_state_table(db_url, args.state_table, with_tz=False)
     ensure_bars_table(db_url, args.bars_table)
 
-
     if args.full_rebuild:
         start_time = time.time()
         specs = load_cal_specs_from_dim_timeframe(db_url)
@@ -1210,17 +1324,23 @@ def main(argv: Sequence[str] | None = None) -> None:
         running_total = 0
         combo_count = 0
 
-        print(f"[bars_cal_us] Full rebuild: {len(ids)} IDs × {len(specs)} TFs = {total_combinations:,} combinations")
+        print(
+            f"[bars_cal_us] Full rebuild: {len(ids)} IDs × {len(specs)} TFs = {total_combinations:,} combinations"
+        )
 
         # Ensure state table exists (with tz column)
         ensure_state_table(db_url, args.state_table, with_tz=True)
 
         for id_ in ids:
-            df_full = load_daily_prices_for_id(db_url=db_url, daily_table=args.daily_table, id_=int(id_), tz=args.tz)
+            df_full = load_daily_prices_for_id(
+                db_url=db_url, daily_table=args.daily_table, id_=int(id_), tz=args.tz
+            )
             for spec in specs:
                 combo_count += 1
                 delete_bars_for_id_tf(db_url, args.bars_table, id_=int(id_), tf=spec.tf)
-                bars = _build_snapshots_full_history_polars(df_full, spec=spec, tz=args.tz)
+                bars = _build_snapshots_full_history_polars(
+                    df_full, spec=spec, tz=args.tz
+                )
 
                 # Write state for this (id, tf) - ALWAYS if daily data exists
                 if not df_full.empty:
@@ -1235,7 +1355,9 @@ def main(argv: Sequence[str] | None = None) -> None:
                     # Only set last_bar_seq/time_close if bars exist
                     if not bars.empty:
                         state_row["last_bar_seq"] = int(bars["bar_seq"].max())
-                        state_row["last_time_close"] = pd.to_datetime(bars["time_close"].max(), utc=True)
+                        state_row["last_time_close"] = pd.to_datetime(
+                            bars["time_close"].max(), utc=True
+                        )
 
                     upsert_state(db_url, args.state_table, [state_row], with_tz=True)
 
@@ -1247,7 +1369,11 @@ def main(argv: Sequence[str] | None = None) -> None:
                     period_start = bars["time_open"].min().strftime("%Y-%m-%d")
                     period_end = bars["time_close"].max().strftime("%Y-%m-%d")
                     elapsed = time.time() - start_time
-                    pct = (combo_count / total_combinations) * 100 if total_combinations > 0 else 0
+                    pct = (
+                        (combo_count / total_combinations) * 100
+                        if total_combinations > 0
+                        else 0
+                    )
 
                     print(
                         f"[bars_cal_us] ID={id_}, TF={spec.tf}, period={period_start} to {period_end}: "
@@ -1257,7 +1383,9 @@ def main(argv: Sequence[str] | None = None) -> None:
         total_time = time.time() - start_time
         minutes = int(total_time // 60)
         seconds = total_time % 60
-        print(f"[bars_cal_us] Full rebuild complete: {running_total:,} total rows [time: {minutes}m {seconds:.1f}s]")
+        print(
+            f"[bars_cal_us] Full rebuild complete: {running_total:,} total rows [time: {minutes}m {seconds:.1f}s]"
+        )
         return
 
     refresh_incremental(

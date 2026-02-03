@@ -4,7 +4,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import asyncio
 
 from ta_lab2.tools.ai_orchestrator.adapters import AsyncChatGPTAdapter
-from ta_lab2.tools.ai_orchestrator.core import Task, TaskType, TaskStatus, TaskConstraints
+from ta_lab2.tools.ai_orchestrator.core import (
+    Task,
+    TaskType,
+    TaskStatus,
+    TaskConstraints,
+)
 
 
 @pytest.fixture
@@ -81,6 +86,7 @@ class TestAsyncChatGPTAdapterExecution:
     @pytest.mark.asyncio
     async def test_get_status_running(self, mock_openai_client, sample_task):
         """Test status check for running task."""
+
         # Make the API call hang
         async def slow_call(**kwargs):
             await asyncio.sleep(100)  # Very long sleep
@@ -119,6 +125,7 @@ class TestAsyncChatGPTAdapterExecution:
     @pytest.mark.asyncio
     async def test_get_result_timeout(self, sample_task):
         """Test timeout handling."""
+
         # Create adapter with slow mock
         async def slow_call(**kwargs):
             await asyncio.sleep(10)

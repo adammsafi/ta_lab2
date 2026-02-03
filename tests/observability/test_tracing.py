@@ -1,7 +1,6 @@
 """Tests for OpenTelemetry tracing integration."""
 
 import pytest
-from unittest.mock import MagicMock, patch
 
 
 @pytest.mark.observability
@@ -16,7 +15,7 @@ class TestTracingModule:
         cid = generate_correlation_id()
 
         assert len(cid) == 32, f"Expected 32 chars, got {len(cid)}"
-        assert all(c in '0123456789abcdef' for c in cid), "Expected hex chars only"
+        assert all(c in "0123456789abcdef" for c in cid), "Expected hex chars only"
 
     def test_generate_correlation_id_unique(self):
         """Test correlation IDs are unique."""

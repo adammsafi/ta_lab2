@@ -18,6 +18,7 @@ from typing import List, Optional, Set
 @dataclass
 class ImportIssue:
     """An import that needs migration."""
+
     file_path: Path
     line_number: int
     import_text: str
@@ -34,7 +35,6 @@ MIGRATION_MAP = {
     "fredtools2.db": "sqlalchemy or pandas.to_sql",
     "fredtools2.jobs.releases": "ta_lab2.integrations.economic.FredProvider.get_releases",
     "fredtools2.jobs.series": "ta_lab2.integrations.economic.FredProvider.get_series",
-
     # fedtools2 imports
     "fedtools2": "ta_lab2.utils.economic",
     "fedtools2.etl": "ta_lab2.utils.economic (extract TARGET_MID logic manually)",
@@ -58,7 +58,7 @@ def scan_file_for_imports(file_path: Path) -> List[ImportIssue]:
     try:
         content = file_path.read_text(encoding="utf-8")
         tree = ast.parse(content)
-    except (SyntaxError, UnicodeDecodeError) as e:
+    except (SyntaxError, UnicodeDecodeError):
         # Skip files that can't be parsed
         return issues
 
@@ -69,13 +69,15 @@ def scan_file_for_imports(file_path: Path) -> List[ImportIssue]:
                 module_name = alias.name
                 if module_name.startswith(("fredtools2", "fedtools2")):
                     replacement = _get_replacement(module_name)
-                    issues.append(ImportIssue(
-                        file_path=file_path,
-                        line_number=node.lineno,
-                        import_text=f"import {module_name}",
-                        old_module=module_name,
-                        suggested_replacement=replacement,
-                    ))
+                    issues.append(
+                        ImportIssue(
+                            file_path=file_path,
+                            line_number=node.lineno,
+                            import_text=f"import {module_name}",
+                            old_module=module_name,
+                            suggested_replacement=replacement,
+                        )
+                    )
 
         # Check from imports: from fredtools2 import ...
         elif isinstance(node, ast.ImportFrom):
@@ -83,13 +85,15 @@ def scan_file_for_imports(file_path: Path) -> List[ImportIssue]:
                 module_name = node.module
                 replacement = _get_replacement(module_name)
                 names = ", ".join(alias.name for alias in node.names)
-                issues.append(ImportIssue(
-                    file_path=file_path,
-                    line_number=node.lineno,
-                    import_text=f"from {module_name} import {names}",
-                    old_module=module_name,
-                    suggested_replacement=replacement,
-                ))
+                issues.append(
+                    ImportIssue(
+                        file_path=file_path,
+                        line_number=node.lineno,
+                        import_text=f"from {module_name} import {names}",
+                        old_module=module_name,
+                        suggested_replacement=replacement,
+                    )
+                )
 
     return issues
 
@@ -109,9 +113,7 @@ def _get_replacement(module_name: str) -> str:
 
 
 def scan_directory(
-    directory: Path,
-    recursive: bool = True,
-    exclude_patterns: Optional[Set[str]] = None
+    directory: Path, recursive: bool = True, exclude_patterns: Optional[Set[str]] = None
 ) -> List[ImportIssue]:
     """Scan a directory for Python files with old imports.
 
@@ -177,16 +179,18 @@ def format_report(issues: List[ImportIssue], verbose: bool = False) -> str:
             if verbose:
                 lines.append(f"    -> Replace with: {issue.suggested_replacement}")
 
-    lines.extend([
-        "\n" + "=" * 60,
-        "MIGRATION STEPS:",
-        "=" * 60,
-        "1. Install new dependencies: pip install ta_lab2[fred]",
-        "2. Update imports as suggested above",
-        "3. Set FRED_API_KEY environment variable",
-        "4. See docs/migration/ECONOMIC_DATA.md for detailed guide",
-        "",
-    ])
+    lines.extend(
+        [
+            "\n" + "=" * 60,
+            "MIGRATION STEPS:",
+            "=" * 60,
+            "1. Install new dependencies: pip install ta_lab2[fred]",
+            "2. Update imports as suggested above",
+            "3. Set FRED_API_KEY environment variable",
+            "4. See docs/migration/ECONOMIC_DATA.md for detailed guide",
+            "",
+        ]
+    )
 
     return "\n".join(lines)
 
@@ -203,26 +207,22 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         description="Scan code for deprecated fredtools2/fedtools2 imports"
     )
+    parser.add_argument("path", type=Path, help="File or directory to scan")
     parser.add_argument(
-        "path",
-        type=Path,
-        help="File or directory to scan"
-    )
-    parser.add_argument(
-        "-r", "--recursive",
+        "-r",
+        "--recursive",
         action="store_true",
         default=True,
-        help="Scan directories recursively (default: True)"
+        help="Scan directories recursively (default: True)",
     )
     parser.add_argument(
-        "-v", "--verbose",
+        "-v",
+        "--verbose",
         action="store_true",
-        help="Show detailed replacement suggestions"
+        help="Show detailed replacement suggestions",
     )
     parser.add_argument(
-        "--no-recursive",
-        action="store_true",
-        help="Don't scan subdirectories"
+        "--no-recursive", action="store_true", help="Don't scan subdirectories"
     )
 
     args = parser.parse_args(argv)

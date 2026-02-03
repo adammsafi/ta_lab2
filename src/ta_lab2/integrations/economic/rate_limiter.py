@@ -48,13 +48,12 @@ class RateLimiter:
         """Refill tokens based on elapsed time."""
         now = time.monotonic()
         elapsed = now - self._last_refill
-        self._tokens = min(
-            self.max_tokens,
-            self._tokens + elapsed * self.refill_rate
-        )
+        self._tokens = min(self.max_tokens, self._tokens + elapsed * self.refill_rate)
         self._last_refill = now
 
-    def acquire(self, tokens: int = 1, blocking: bool = True, timeout: Optional[float] = None) -> bool:
+    def acquire(
+        self, tokens: int = 1, blocking: bool = True, timeout: Optional[float] = None
+    ) -> bool:
         """Acquire tokens from the bucket.
 
         Args:

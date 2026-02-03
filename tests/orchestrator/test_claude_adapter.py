@@ -5,7 +5,7 @@ import asyncio
 import json
 
 from ta_lab2.tools.ai_orchestrator.adapters import AsyncClaudeCodeAdapter
-from ta_lab2.tools.ai_orchestrator.core import Task, TaskType, TaskStatus, TaskConstraints
+from ta_lab2.tools.ai_orchestrator.core import Task, TaskType, TaskStatus
 
 
 @pytest.fixture
@@ -13,10 +13,9 @@ def mock_process():
     """Create mock asyncio process."""
     process = AsyncMock()
     process.returncode = 0
-    process.communicate = AsyncMock(return_value=(
-        json.dumps({"response": "Test output from Claude"}).encode(),
-        b""
-    ))
+    process.communicate = AsyncMock(
+        return_value=(json.dumps({"response": "Test output from Claude"}).encode(), b"")
+    )
     process.kill = MagicMock()
     process.wait = AsyncMock()
     return process
@@ -95,7 +94,9 @@ class TestAsyncClaudeCodeAdapterExecution:
         """Test handling of CLI failure."""
         mock_proc = AsyncMock()
         mock_proc.returncode = 1
-        mock_proc.communicate = AsyncMock(return_value=(b"", b"Error: something went wrong"))
+        mock_proc.communicate = AsyncMock(
+            return_value=(b"", b"Error: something went wrong")
+        )
         mock_proc.kill = MagicMock()
 
         with patch("asyncio.create_subprocess_exec", return_value=mock_proc):
@@ -110,6 +111,7 @@ class TestAsyncClaudeCodeAdapterExecution:
     async def test_get_result_timeout(self, sample_task):
         """Test timeout handling."""
         mock_proc = AsyncMock()
+
         # Simulate hanging process
         async def slow_communicate(input=None):
             await asyncio.sleep(10)
@@ -131,6 +133,7 @@ class TestAsyncClaudeCodeAdapterExecution:
     async def test_cancel_task(self, sample_task):
         """Test task cancellation."""
         mock_proc = AsyncMock()
+
         async def slow_communicate(input=None):
             await asyncio.sleep(10)
             return b"", b""
@@ -184,7 +187,11 @@ class TestAsyncClaudeCodeAdapterContextManager:
             # After exiting context, task should be cancelled
             status = await adapter.get_status(task_id)
             # Status could be COMPLETED (fast) or CANCELLED
-            assert status in [TaskStatus.COMPLETED, TaskStatus.CANCELLED, TaskStatus.UNKNOWN]
+            assert status in [
+                TaskStatus.COMPLETED,
+                TaskStatus.CANCELLED,
+                TaskStatus.UNKNOWN,
+            ]
 
 
 class TestFileHandling:
@@ -193,7 +200,9 @@ class TestFileHandling:
     @pytest.mark.asyncio
     async def test_files_passed_to_cli(self, mock_process):
         """Test that files are passed as --file flags."""
-        with patch("asyncio.create_subprocess_exec", return_value=mock_process) as mock_exec:
+        with patch(
+            "asyncio.create_subprocess_exec", return_value=mock_process
+        ) as mock_exec:
             adapter = AsyncClaudeCodeAdapter(cli_path="/usr/bin/claude")
 
             task = Task(
@@ -226,10 +235,9 @@ class TestJSONParsing:
 
         mock_proc = AsyncMock()
         mock_proc.returncode = 0
-        mock_proc.communicate = AsyncMock(return_value=(
-            json.dumps(json_response).encode(),
-            b""
-        ))
+        mock_proc.communicate = AsyncMock(
+            return_value=(json.dumps(json_response).encode(), b"")
+        )
 
         with patch("asyncio.create_subprocess_exec", return_value=mock_proc):
             adapter = AsyncClaudeCodeAdapter(cli_path="/usr/bin/claude")
@@ -246,10 +254,7 @@ class TestJSONParsing:
         """Test that invalid JSON is handled gracefully."""
         mock_proc = AsyncMock()
         mock_proc.returncode = 0
-        mock_proc.communicate = AsyncMock(return_value=(
-            b"Not valid JSON output",
-            b""
-        ))
+        mock_proc.communicate = AsyncMock(return_value=(b"Not valid JSON output", b""))
 
         with patch("asyncio.create_subprocess_exec", return_value=mock_proc):
             adapter = AsyncClaudeCodeAdapter(cli_path="/usr/bin/claude")

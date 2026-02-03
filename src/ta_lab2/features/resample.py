@@ -1,18 +1,17 @@
 # src/ta_lab2/features/resample.py
 from __future__ import annotations
 from pathlib import Path
-from typing import Dict, Iterable, Optional
+from typing import Dict, Optional
 import pandas as pd
-import numpy as np
 
 from ta_lab2.features.calendar import expand_datetime_features_inplace
 
 # Default OHLCV aggregations for downsampling
 _DEFAULT_AGG = {
-    "open":   "first",
-    "high":   "max",
-    "low":    "min",
-    "close":  "last",
+    "open": "first",
+    "high": "max",
+    "low": "min",
+    "close": "last",
     "volume": "sum",
 }
 
@@ -40,8 +39,7 @@ def _ensure_ts_index(
 
     if ts_col not in df.columns and not isinstance(df.index, pd.DatetimeIndex):
         raise ValueError(
-            f"_ensure_ts_index(): expected '{ts_col}' column "
-            "or a DatetimeIndex."
+            f"_ensure_ts_index(): expected '{ts_col}' column " "or a DatetimeIndex."
         )
 
     if not isinstance(df.index, pd.DatetimeIndex):
@@ -92,11 +90,7 @@ def resample_ohlcv(
 
     agg = agg or _DEFAULT_AGG
 
-    r = (
-        df.resample(freq, label=label, closed=closed)
-        .agg(agg)
-        .dropna(how="any")
-    )
+    r = df.resample(freq, label=label, closed=closed).agg(agg).dropna(how="any")
 
     if strict:
         max_ts = df.index.max()
@@ -122,7 +116,6 @@ TIMEFRAME_FREQS: Dict[str, str] = {
     "25D": "25D",
     "45D": "45D",
     "100D": "100D",
-
     # Weekly-ish
     "1W": "1W",
     "2W": "2W",
@@ -131,7 +124,6 @@ TIMEFRAME_FREQS: Dict[str, str] = {
     "6W": "42D",
     "8W": "56D",
     "10W": "70D",
-
     # Monthly-ish
     "1M": "1ME",
     "2M": "2ME",
@@ -241,11 +233,7 @@ def resample_to_tf(
         "volume": "sum",
     }
 
-    out = (
-        d.resample(freq, label=label, closed=closed)
-        .agg(agg_spec)
-        .dropna(how="any")
-    )
+    out = d.resample(freq, label=label, closed=closed).agg(agg_spec).dropna(how="any")
 
     if strict:
         max_ts = d.index.max()

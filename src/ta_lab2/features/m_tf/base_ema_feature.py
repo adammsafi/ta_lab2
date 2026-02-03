@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional, Sequence
+from typing import Optional
 
 import pandas as pd
 from sqlalchemy import Engine, text
@@ -26,7 +26,6 @@ from sqlalchemy import Engine, text
 from ta_lab2.features.m_tf.ema_operations import (
     compute_derivatives,
     compute_rolling_derivatives_canonical,
-    add_derivative_columns_vectorized,
     filter_ema_periods_by_obs_count,
 )
 
@@ -34,6 +33,7 @@ from ta_lab2.features.m_tf.ema_operations import (
 # =============================================================================
 # Configuration
 # =============================================================================
+
 
 @dataclass(frozen=True)
 class EMAFeatureConfig:
@@ -46,6 +46,7 @@ class EMAFeatureConfig:
         output_table: Output table name
         min_obs_multiplier: Minimum observations = period * multiplier
     """
+
     periods: list[int]
     output_schema: str
     output_table: str
@@ -61,6 +62,7 @@ class TFSpec:
         tf: Timeframe label (e.g., "7D", "1M", "1W_mon")
         tf_days: Number of days in timeframe (e.g., 7, 30, 7)
     """
+
     tf: str
     tf_days: int
 
@@ -68,6 +70,7 @@ class TFSpec:
 # =============================================================================
 # Base EMA Feature Class
 # =============================================================================
+
 
 class BaseEMAFeature(ABC):
     """
@@ -322,7 +325,9 @@ class BaseEMAFeature(ABC):
                 if d_func == "diff":
                     result[d_col] = result.groupby(group_cols)[ema_col].diff()
                 else:
-                    result[d_col] = result.groupby(group_cols)[ema_col].transform(d_func)
+                    result[d_col] = result.groupby(group_cols)[ema_col].transform(
+                        d_func
+                    )
 
             # Rolling derivatives (same as regular for continuous series)
             result["d1_roll"] = result["d1"]

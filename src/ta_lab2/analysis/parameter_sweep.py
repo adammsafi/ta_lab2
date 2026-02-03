@@ -6,7 +6,7 @@ Goal: quickly test indicator/signal params and rank by performance metrics.
 from __future__ import annotations
 import itertools
 import random
-from typing import Callable, Dict, Iterable, List, Tuple
+from typing import Callable, Dict, Iterable
 import pandas as pd
 
 from .performance import evaluate_signals
@@ -15,7 +15,13 @@ Metrics = Dict[str, float]
 RunFn = Callable[[Dict[str, object]], pd.DataFrame]
 # RunFn: takes a param dict, returns a DataFrame with ['close','position'] at minimum.
 
-def grid(param_grid: Dict[str, Iterable], run: RunFn, freq: str | None = None, costs_bps: float = 0.0) -> pd.DataFrame:
+
+def grid(
+    param_grid: Dict[str, Iterable],
+    run: RunFn,
+    freq: str | None = None,
+    costs_bps: float = 0.0,
+) -> pd.DataFrame:
     """
     Exhaustive grid search over param_grid.
     param_grid example:
@@ -28,7 +34,10 @@ def grid(param_grid: Dict[str, Iterable], run: RunFn, freq: str | None = None, c
         df = run(params)
         metrics = evaluate_signals(df, freq=freq, costs_bps=costs_bps)
         results.append({**params, **metrics})
-    return pd.DataFrame(results).sort_values("sharpe", ascending=False, kind="mergesort")
+    return pd.DataFrame(results).sort_values(
+        "sharpe", ascending=False, kind="mergesort"
+    )
+
 
 def random_search(
     space: Dict[str, Iterable],
@@ -53,4 +62,6 @@ def random_search(
         metrics = evaluate_signals(df, freq=freq, costs_bps=costs_bps)
         results.append({**params, **metrics})
 
-    return pd.DataFrame(results).sort_values("sharpe", ascending=False, kind="mergesort")
+    return pd.DataFrame(results).sort_values(
+        "sharpe", ascending=False, kind="mergesort"
+    )

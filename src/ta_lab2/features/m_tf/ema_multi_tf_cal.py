@@ -16,7 +16,7 @@ REFACTORED CHANGES:
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Sequence
+from typing import List, Optional, Sequence
 import logging
 
 import numpy as np
@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 # Calendar EMA Feature Implementation
 # =============================================================================
+
 
 class CalendarEMAFeature(BaseEMAFeature):
     """
@@ -178,9 +179,13 @@ class CalendarEMAFeature(BaseEMAFeature):
         df["tf"] = df["tf"].astype(str)
         df["tf_days"] = df["tf_days"].astype(int)
 
-        tf_specs = [TFSpec(tf=r.tf, tf_days=int(r.tf_days)) for r in df.itertuples(index=False)]
+        tf_specs = [
+            TFSpec(tf=r.tf, tf_days=int(r.tf_days)) for r in df.itertuples(index=False)
+        ]
 
-        logger.info(f"Loaded {len(tf_specs)} calendar TF specs for scheme={self.scheme}")
+        logger.info(
+            f"Loaded {len(tf_specs)} calendar TF specs for scheme={self.scheme}"
+        )
         self._tf_specs_cache = tf_specs
         return tf_specs
 
@@ -202,8 +207,10 @@ class CalendarEMAFeature(BaseEMAFeature):
 
         # Load alpha lookup
         alpha_lut = self._load_alpha_lookup()
-        alpha_map = {(r.tf, int(r.period)): float(r.alpha)
-                     for r in alpha_lut.itertuples(index=False)}
+        alpha_map = {
+            (r.tf, int(r.period)): float(r.alpha)
+            for r in alpha_lut.itertuples(index=False)
+        }
 
         # Load canonical closes for this TF
         ids = df_source["id"].unique().tolist()
@@ -257,7 +264,9 @@ class CalendarEMAFeature(BaseEMAFeature):
                     continue
 
                 first_valid_idx = int(np.argmax(valid_mask))
-                first_valid_close_ts = pd.Timestamp(close_ts_arr[first_valid_idx]).tz_convert("UTC")
+                first_valid_close_ts = pd.Timestamp(
+                    close_ts_arr[first_valid_idx]
+                ).tz_convert("UTC")
 
                 # Map canonical closes to bar EMAs
                 canonical_bar_map = {
@@ -284,7 +293,9 @@ class CalendarEMAFeature(BaseEMAFeature):
                 ema_bar_vals = []
                 ema_bar_prev = None
 
-                for ts, px in zip(df_out["ts"].to_numpy(), df_out["close"].astype(float).to_numpy()):
+                for ts, px in zip(
+                    df_out["ts"].to_numpy(), df_out["close"].astype(float).to_numpy()
+                ):
                     ts_u = pd.Timestamp(ts).tz_convert("UTC")
                     canon = canonical_bar_map.get(ts_u)
 
@@ -296,7 +307,10 @@ class CalendarEMAFeature(BaseEMAFeature):
                         if ema_bar_prev is None:
                             ema_bar_today = float(px)
                         else:
-                            ema_bar_today = alpha_daily * float(px) + (1.0 - alpha_daily) * ema_bar_prev
+                            ema_bar_today = (
+                                alpha_daily * float(px)
+                                + (1.0 - alpha_daily) * ema_bar_prev
+                            )
 
                     ema_bar_vals.append(ema_bar_today)
                     ema_bar_prev = ema_bar_today
@@ -307,13 +321,18 @@ class CalendarEMAFeature(BaseEMAFeature):
                 ema_vals = []
                 ema_prev = None
 
-                for px, eb in zip(df_out["close"].astype(float).to_numpy(), df_out["ema_bar"].to_numpy()):
+                for px, eb in zip(
+                    df_out["close"].astype(float).to_numpy(),
+                    df_out["ema_bar"].to_numpy(),
+                ):
                     if ema_prev is None:
                         # Seed at first valid canonical bar EMA point
                         ema_today = float(eb)
                     else:
                         # Continuous daily update
-                        ema_today = alpha_daily * float(px) + (1.0 - alpha_daily) * ema_prev
+                        ema_today = (
+                            alpha_daily * float(px) + (1.0 - alpha_daily) * ema_prev
+                        )
 
                     ema_vals.append(ema_today)
                     ema_prev = ema_today
@@ -323,11 +342,29 @@ class CalendarEMAFeature(BaseEMAFeature):
                 # Compute derivatives
                 df_out = self._add_cal_derivatives(df_out)
 
-                out_frames.append(df_out[[
-                    "id", "tf", "ts", "period", "tf_days",
-                    "roll", "ema", "d1", "d2", "d1_roll", "d2_roll",
-                    "ema_bar", "d1_bar", "d2_bar", "roll_bar", "d1_roll_bar", "d2_roll_bar",
-                ]])
+                out_frames.append(
+                    df_out[
+                        [
+                            "id",
+                            "tf",
+                            "ts",
+                            "period",
+                            "tf_days",
+                            "roll",
+                            "ema",
+                            "d1",
+                            "d2",
+                            "d1_roll",
+                            "d2_roll",
+                            "ema_bar",
+                            "d1_bar",
+                            "d2_bar",
+                            "roll_bar",
+                            "d1_roll_bar",
+                            "d2_roll_bar",
+                        ]
+                    ]
+                )
 
         if not out_frames:
             return pd.DataFrame()
@@ -378,7 +415,9 @@ class CalendarEMAFeature(BaseEMAFeature):
             df = read_sql_polars(sql, conn)
 
         if df.empty:
-            raise RuntimeError(f"Alpha lookup table {self.alpha_schema}.{self.alpha_table} is empty")
+            raise RuntimeError(
+                f"Alpha lookup table {self.alpha_schema}.{self.alpha_table} is empty"
+            )
 
         df["period"] = df["period"].astype(int)
         df["tf"] = df["tf"].astype(str)
@@ -420,7 +459,9 @@ class CalendarEMAFeature(BaseEMAFeature):
         """Compute EMA in bar-space on canonical close prices."""
         period = int(round((2.0 / alpha_bar) - 1.0))
         close_series = pd.Series(close_prices, dtype=float)
-        ema_series = compute_ema(close_series, period=period, adjust=False, min_periods=min_periods)
+        ema_series = compute_ema(
+            close_series, period=period, adjust=False, min_periods=min_periods
+        )
         return ema_series.to_numpy(dtype=float)
 
     def _add_cal_derivatives(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -474,6 +515,7 @@ class CalendarEMAFeature(BaseEMAFeature):
 # Public API (Backward Compatibility)
 # =============================================================================
 
+
 def write_multi_timeframe_ema_cal_to_db(
     engine_or_db_url,
     ids: Sequence[int],
@@ -481,7 +523,25 @@ def write_multi_timeframe_ema_cal_to_db(
     scheme: str = "US",
     start: Optional[str] = None,
     end: Optional[str] = None,
-    ema_periods: Sequence[int] = (6, 9, 10, 12, 14, 17, 20, 21, 26, 30, 50, 52, 77, 100, 200, 252, 365),
+    ema_periods: Sequence[int] = (
+        6,
+        9,
+        10,
+        12,
+        14,
+        17,
+        20,
+        21,
+        26,
+        30,
+        50,
+        52,
+        77,
+        100,
+        200,
+        252,
+        365,
+    ),
     schema: str = "public",
     out_table: Optional[str] = None,
     alpha_schema: str = "public",
@@ -504,7 +564,9 @@ def write_multi_timeframe_ema_cal_to_db(
     if out_table is None:
         out_table = f"cmc_ema_multi_tf_cal_{scheme_u.lower()}"
 
-    logger.info(f"Computing calendar EMAs: scheme={scheme_u}, periods={len(ema_periods)}, ids={len(ids)}")
+    logger.info(
+        f"Computing calendar EMAs: scheme={scheme_u}, periods={len(ema_periods)}, ids={len(ids)}"
+    )
 
     config = EMAFeatureConfig(
         periods=list(ema_periods),
@@ -569,7 +631,8 @@ def write_multi_timeframe_ema_cal_to_db(
         else "DO NOTHING"
     )
 
-    upsert_sql = text(f"""
+    upsert_sql = text(
+        f"""
       INSERT INTO {schema}.{out_table} (
         id, tf, ts, period, tf_days,
         roll, ema, d1, d2, d1_roll, d2_roll,
@@ -583,7 +646,8 @@ def write_multi_timeframe_ema_cal_to_db(
         now()
       )
       ON CONFLICT (id, tf, ts, period) {conflict_action}
-    """)
+    """
+    )
 
     logger.info(f"Writing {len(df_out):,} rows to {schema}.{out_table}...")
 
@@ -594,13 +658,15 @@ def write_multi_timeframe_ema_cal_to_db(
 
     with engine.begin() as conn:
         for i in range(0, total_rows, BATCH_SIZE):
-            batch = payload[i:i + BATCH_SIZE]
+            batch = payload[i : i + BATCH_SIZE]
             conn.execute(upsert_sql, batch)
 
             rows_written = min(i + BATCH_SIZE, total_rows)
             if rows_written % 50_000 == 0 or rows_written == total_rows or i == 0:
                 pct = (rows_written / total_rows) * 100
-                logger.info(f"  Written {rows_written:,} / {total_rows:,} rows ({pct:.1f}%)")
+                logger.info(
+                    f"  Written {rows_written:,} / {total_rows:,} rows ({pct:.1f}%)"
+                )
 
     logger.info(f"Successfully wrote {len(df_out):,} rows")
     return len(df_out)

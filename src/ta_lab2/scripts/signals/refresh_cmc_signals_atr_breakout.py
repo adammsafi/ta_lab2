@@ -64,11 +64,13 @@ def _get_all_asset_ids(engine) -> list[int]:
     Returns:
         List of unique asset IDs with feature data
     """
-    sql = text("""
+    sql = text(
+        """
         SELECT DISTINCT id
         FROM public.cmc_daily_features
         ORDER BY id
-    """)
+    """
+    )
 
     with engine.connect() as conn:
         result = conn.execute(sql)
@@ -78,41 +80,41 @@ def _get_all_asset_ids(engine) -> list[int]:
 def main():
     """Main entry point for ATR breakout signal refresh."""
     parser = argparse.ArgumentParser(
-        description='Refresh ATR breakout signals from cmc_daily_features',
+        description="Refresh ATR breakout signals from cmc_daily_features",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
 
     parser.add_argument(
-        '--ids',
+        "--ids",
         type=int,
-        nargs='+',
-        help='Asset IDs to generate signals for (default: all assets with features)',
+        nargs="+",
+        help="Asset IDs to generate signals for (default: all assets with features)",
     )
 
     parser.add_argument(
-        '--signal-id',
+        "--signal-id",
         type=int,
-        help='Specific signal_id from dim_signals to generate (default: all active)',
+        help="Specific signal_id from dim_signals to generate (default: all active)",
     )
 
     parser.add_argument(
-        '--full-refresh',
-        action='store_true',
-        help='Regenerate all signals (default: incremental based on state)',
+        "--full-refresh",
+        action="store_true",
+        help="Regenerate all signals (default: incremental based on state)",
     )
 
     parser.add_argument(
-        '--dry-run',
-        action='store_true',
-        help='Simulate generation without writing to database',
+        "--dry-run",
+        action="store_true",
+        help="Simulate generation without writing to database",
     )
 
     parser.add_argument(
-        '--verbose',
-        '-v',
-        action='store_true',
-        help='Enable verbose logging',
+        "--verbose",
+        "-v",
+        action="store_true",
+        help="Enable verbose logging",
     )
 
     args = parser.parse_args()
@@ -120,12 +122,12 @@ def main():
     # Configure logging
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
-        format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
     logger = logging.getLogger(__name__)
 
     # Check environment
-    db_url = os.environ.get('TARGET_DB_URL')
+    db_url = os.environ.get("TARGET_DB_URL")
     if not db_url:
         logger.error("TARGET_DB_URL environment variable not set")
         sys.exit(1)
@@ -139,7 +141,7 @@ def main():
         sys.exit(1)
 
     # Initialize state manager
-    config = SignalStateConfig(signal_type='atr_breakout')
+    config = SignalStateConfig(signal_type="atr_breakout")
     state_manager = SignalStateManager(engine, config)
 
     try:
@@ -153,14 +155,15 @@ def main():
     try:
         if args.signal_id:
             configs = [
-                c for c in load_active_signals(engine, 'atr_breakout')
-                if c['signal_id'] == args.signal_id
+                c
+                for c in load_active_signals(engine, "atr_breakout")
+                if c["signal_id"] == args.signal_id
             ]
             if not configs:
                 logger.error(f"No active signal found with signal_id={args.signal_id}")
                 sys.exit(1)
         else:
-            configs = load_active_signals(engine, 'atr_breakout')
+            configs = load_active_signals(engine, "atr_breakout")
 
         if not configs:
             logger.warning("No active ATR breakout signals found in dim_signals")
@@ -192,8 +195,8 @@ def main():
     total_signals = 0
 
     for signal_config in configs:
-        signal_id = signal_config['signal_id']
-        signal_name = signal_config['signal_name']
+        signal_id = signal_config["signal_id"]
+        signal_name = signal_config["signal_name"]
 
         logger.info(f"Processing signal: {signal_name} (id={signal_id})")
         logger.debug(f"  Parameters: {signal_config['params']}")
@@ -223,5 +226,5 @@ def main():
     logger.info("=" * 60)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

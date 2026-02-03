@@ -1,7 +1,6 @@
 """Tests for health check probes."""
 
 import pytest
-from unittest.mock import MagicMock
 from datetime import datetime
 
 
@@ -109,7 +108,9 @@ class TestHealthChecker:
         status = checker.startup()
 
         assert status.healthy is False
-        assert checker.startup_complete is False  # Should still be False (initialized to False)
+        assert (
+            checker.startup_complete is False
+        )  # Should still be False (initialized to False)
 
     def test_health_status_dataclass(self):
         """Test HealthStatus dataclass structure."""
@@ -119,7 +120,7 @@ class TestHealthChecker:
             healthy=True,
             message="All systems operational",
             checked_at=datetime.utcnow(),
-            details={"db": True, "memory": True}
+            details={"db": True, "memory": True},
         )
 
         assert status.healthy is True

@@ -14,7 +14,7 @@ import shutil
 from typing import TYPE_CHECKING, AsyncIterator
 
 if TYPE_CHECKING:
-    from .core import Task, Result, Platform, TaskStatus
+    from .core import Task, Result, TaskStatus
 
 from .core import Result, Platform as Plat, TaskStatus, TaskType
 from .quota import QuotaTracker
@@ -255,12 +255,12 @@ class ClaudeCodeAdapter(BasePlatformAdapter):
             "capabilities": [
                 "Interactive execution (current session)",
                 "GSD workflow routing",
-                "Direct file access"
+                "Direct file access",
             ],
             "requirements": [
                 "Running inside Claude Code session",
-                "GSD installed for workflow tasks (optional)"
-            ]
+                "GSD installed for workflow tasks (optional)",
+            ],
         }
 
     def _check_implementation(self) -> bool:
@@ -289,7 +289,7 @@ class ClaudeCodeAdapter(BasePlatformAdapter):
                 output=output,
                 success=True,
                 duration_seconds=time.time() - start,
-                metadata={"method": "gsd" if task.requires_gsd else "subprocess"}
+                metadata={"method": "gsd" if task.requires_gsd else "subprocess"},
             )
 
         except Exception as e:
@@ -382,12 +382,12 @@ class ChatGPTAdapter(BasePlatformAdapter):
             "status": self.implementation_status,
             "capabilities": [
                 "Planned: OpenAI API integration",
-                "Planned: Web UI automation (Selenium)"
+                "Planned: Web UI automation (Selenium)",
             ],
             "requirements": [
                 "OPENAI_API_KEY environment variable (for API mode)",
-                "Selenium/ChromeDriver (for web automation)"
-            ]
+                "Selenium/ChromeDriver (for web automation)",
+            ],
         }
 
     def execute(self, task: Task) -> Result:
@@ -422,7 +422,7 @@ For now, copy the prompt above and paste into ChatGPT web UI.
             success=False,  # Stub, not actually executed
             error="Not implemented",
             duration_seconds=time.time() - start,
-            metadata={"stub": True}
+            metadata={"stub": True},
         )
 
     def _init_api_client(self):
@@ -472,13 +472,18 @@ class GeminiAdapter(BasePlatformAdapter):
             "is_implemented": self.is_implemented,
             "status": self.implementation_status,
             "capabilities": [
-                "gcloud CLI execution (free quota)" if self._gcloud_available else "Planned: gcloud CLI",
-                "Gemini 2.0 Flash model" if self._gcloud_available else "Planned: Gemini API"
+                "gcloud CLI execution (free quota)"
+                if self._gcloud_available
+                else "Planned: gcloud CLI",
+                "Gemini 2.0 Flash model"
+                if self._gcloud_available
+                else "Planned: Gemini API",
             ],
             "requirements": [
-                "gcloud CLI installed and configured" + (" (met)" if self._gcloud_available else " (missing)"),
-                "Google Cloud project with Vertex AI enabled"
-            ]
+                "gcloud CLI installed and configured"
+                + (" (met)" if self._gcloud_available else " (missing)"),
+                "Google Cloud project with Vertex AI enabled",
+            ],
         }
 
     def _check_gcloud_available(self) -> bool:
@@ -513,7 +518,7 @@ class GeminiAdapter(BasePlatformAdapter):
                 output=output,
                 success=True,
                 duration_seconds=time.time() - start,
-                metadata={"method": "cli" if self.prefer_cli else "api"}
+                metadata={"method": "cli" if self.prefer_cli else "api"},
             )
 
         except Exception as e:
@@ -542,10 +547,13 @@ class GeminiAdapter(BasePlatformAdapter):
 
             # Execute with Gemini 2.0 Flash
             cmd = [
-                gcloud_executable, "ai", "models", "generate-content",
+                gcloud_executable,
+                "ai",
+                "models",
+                "generate-content",
                 "--model=gemini-2.0-flash-exp",
                 f"--prompt={task.prompt}",
-                "--format=json"
+                "--format=json",
             ]
 
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
@@ -556,7 +564,9 @@ class GeminiAdapter(BasePlatformAdapter):
             return result.stdout
 
         except FileNotFoundError:
-            raise RuntimeError("gcloud CLI not found. Install: https://cloud.google.com/sdk/docs/install")
+            raise RuntimeError(
+                "gcloud CLI not found. Install: https://cloud.google.com/sdk/docs/install"
+            )
         except subprocess.TimeoutExpired:
             raise RuntimeError("Gemini CLI request timed out")
 
@@ -650,7 +660,9 @@ class AsyncClaudeCodeAdapter(AsyncBasePlatformAdapter):
     async def __aenter__(self):
         """Enter context - verify CLI exists."""
         if not self._cli_path:
-            raise RuntimeError("Claude Code CLI not found. Install from https://code.claude.com")
+            raise RuntimeError(
+                "Claude Code CLI not found. Install from https://code.claude.com"
+            )
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -703,8 +715,7 @@ class AsyncClaudeCodeAdapter(AsyncBasePlatformAdapter):
 
         try:
             result = await asyncio.wait_for(
-                self._pending_tasks[task_id],
-                timeout=timeout
+                self._pending_tasks[task_id], timeout=timeout
             )
             return result
         except asyncio.TimeoutError:
@@ -786,13 +797,17 @@ class AsyncClaudeCodeAdapter(AsyncBasePlatformAdapter):
             self._processes[task_id] = process
 
             # Determine timeout
-            timeout = task.constraints.timeout_seconds if task.constraints and task.constraints.timeout_seconds else self._timeout
+            timeout = (
+                task.constraints.timeout_seconds
+                if task.constraints and task.constraints.timeout_seconds
+                else self._timeout
+            )
 
             try:
                 # Send prompt via stdin and wait for response
                 stdout, stderr = await asyncio.wait_for(
                     process.communicate(input=task.prompt.encode("utf-8")),
-                    timeout=timeout
+                    timeout=timeout,
                 )
             finally:
                 # Clean up process reference
@@ -820,7 +835,9 @@ class AsyncClaudeCodeAdapter(AsyncBasePlatformAdapter):
                 try:
                     output_data = json.loads(output_text)
                     # Extract relevant fields from JSON
-                    output_text = output_data.get("response", output_data.get("content", output_text))
+                    output_text = output_data.get(
+                        "response", output_data.get("content", output_text)
+                    )
                     files_created = output_data.get("files_created", [])
                     metadata = {
                         "raw_json": output_data,
@@ -913,6 +930,7 @@ class AsyncChatGPTAdapter(AsyncBasePlatformAdapter):
             raise ValueError("OPENAI_API_KEY not set")
 
         from openai import AsyncOpenAI
+
         self._client = AsyncOpenAI(api_key=self._api_key, timeout=self._timeout)
         return self
 
@@ -954,15 +972,12 @@ class AsyncChatGPTAdapter(AsyncBasePlatformAdapter):
 
     async def submit_task(self, task: Task) -> str:
         """Submit task and return task_id."""
-        from .core import TaskStatus
 
         task_id = self._generate_task_id(task)
         task.task_id = task_id
 
         # Create background task for execution
-        self._pending_tasks[task_id] = asyncio.create_task(
-            self._execute_internal(task)
-        )
+        self._pending_tasks[task_id] = asyncio.create_task(self._execute_internal(task))
 
         return task_id
 
@@ -999,8 +1014,7 @@ class AsyncChatGPTAdapter(AsyncBasePlatformAdapter):
 
         try:
             result = await asyncio.wait_for(
-                self._pending_tasks[task_id],
-                timeout=timeout
+                self._pending_tasks[task_id], timeout=timeout
             )
             return result
         except asyncio.TimeoutError:
@@ -1073,16 +1087,17 @@ class AsyncChatGPTAdapter(AsyncBasePlatformAdapter):
 
             # Add context if provided
             if task.context:
-                context_str = "\n".join(
-                    f"{k}: {v}" for k, v in task.context.items()
+                context_str = "\n".join(f"{k}: {v}" for k, v in task.context.items())
+                messages.insert(
+                    0, {"role": "system", "content": f"Context:\n{context_str}"}
                 )
-                messages.insert(0, {
-                    "role": "system",
-                    "content": f"Context:\n{context_str}"
-                })
 
             # Determine model
-            model = task.constraints.model if task.constraints and task.constraints.model else self._model
+            model = (
+                task.constraints.model
+                if task.constraints and task.constraints.model
+                else self._model
+            )
 
             # Apply retry decorator dynamically
             @retry_on_rate_limit()
@@ -1090,8 +1105,12 @@ class AsyncChatGPTAdapter(AsyncBasePlatformAdapter):
                 return await self._client.chat.completions.create(
                     model=model,
                     messages=messages,
-                    max_tokens=task.constraints.max_tokens if task.constraints else None,
-                    temperature=task.constraints.temperature if task.constraints else None,
+                    max_tokens=task.constraints.max_tokens
+                    if task.constraints
+                    else None,
+                    temperature=task.constraints.temperature
+                    if task.constraints
+                    else None,
                 )
 
             response = await make_request()
@@ -1140,15 +1159,23 @@ class AsyncChatGPTAdapter(AsyncBasePlatformAdapter):
         from .retry import retry_on_rate_limit
 
         if not self._client:
-            raise RuntimeError("Client not initialized. Use 'async with' context manager.")
+            raise RuntimeError(
+                "Client not initialized. Use 'async with' context manager."
+            )
 
         # Build messages
         messages = [{"role": "user", "content": task.prompt}]
         if task.context:
             context_str = "\n".join(f"{k}: {v}" for k, v in task.context.items())
-            messages.insert(0, {"role": "system", "content": f"Context:\n{context_str}"})
+            messages.insert(
+                0, {"role": "system", "content": f"Context:\n{context_str}"}
+            )
 
-        model = task.constraints.model if task.constraints and task.constraints.model else self._model
+        model = (
+            task.constraints.model
+            if task.constraints and task.constraints.model
+            else self._model
+        )
 
         @retry_on_rate_limit()
         async def make_streaming_request():
@@ -1213,9 +1240,12 @@ class AsyncGeminiAdapter(AsyncBasePlatformAdapter):
         # Import here to avoid hard dependency
         try:
             from google import genai
+
             self._client = genai.Client(api_key=self._api_key)
         except ImportError:
-            raise RuntimeError("google-genai not installed. Run: pip install google-genai")
+            raise RuntimeError(
+                "google-genai not installed. Run: pip install google-genai"
+            )
 
         return self
 
@@ -1269,9 +1299,7 @@ class AsyncGeminiAdapter(AsyncBasePlatformAdapter):
         task.task_id = task_id
 
         # Create background task for execution
-        self._pending_tasks[task_id] = asyncio.create_task(
-            self._execute_internal(task)
-        )
+        self._pending_tasks[task_id] = asyncio.create_task(self._execute_internal(task))
 
         return task_id
 
@@ -1307,8 +1335,7 @@ class AsyncGeminiAdapter(AsyncBasePlatformAdapter):
 
         try:
             result = await asyncio.wait_for(
-                self._pending_tasks[task_id],
-                timeout=timeout
+                self._pending_tasks[task_id], timeout=timeout
             )
             return result
         except asyncio.TimeoutError:
@@ -1393,7 +1420,11 @@ class AsyncGeminiAdapter(AsyncBasePlatformAdapter):
                 prompt = f"Context:\n{context_str}\n\nTask:\n{prompt}"
 
             # Determine model and config
-            model = task.constraints.model if task.constraints and task.constraints.model else self._model
+            model = (
+                task.constraints.model
+                if task.constraints and task.constraints.model
+                else self._model
+            )
             config = {}
             if task.constraints:
                 if task.constraints.max_tokens:
@@ -1412,16 +1443,20 @@ class AsyncGeminiAdapter(AsyncBasePlatformAdapter):
 
             response = await asyncio.wait_for(
                 make_request(),
-                timeout=task.constraints.timeout_seconds if task.constraints and task.constraints.timeout_seconds else self._timeout
+                timeout=task.constraints.timeout_seconds
+                if task.constraints and task.constraints.timeout_seconds
+                else self._timeout,
             )
 
             # Extract output
-            output = response.text if hasattr(response, 'text') else str(response)
+            output = response.text if hasattr(response, "text") else str(response)
 
             # Record usage with quota tracker
             tokens_used = 1  # Gemini API tracks requests, not tokens for free tier
             if self._quota_tracker:
-                self._quota_tracker.release_and_record("gemini", tokens_used, cost=0.0, amount_reserved=1)
+                self._quota_tracker.release_and_record(
+                    "gemini", tokens_used, cost=0.0, amount_reserved=1
+                )
 
             return Result(
                 task=task,
@@ -1471,7 +1506,9 @@ class AsyncGeminiAdapter(AsyncBasePlatformAdapter):
     async def execute_streaming(self, task: Task) -> AsyncIterator[str]:
         """Execute task with streaming response."""
         if not self._client:
-            raise RuntimeError("Client not initialized. Use 'async with' context manager.")
+            raise RuntimeError(
+                "Client not initialized. Use 'async with' context manager."
+            )
 
         # Check quota
         if self._quota_tracker:
@@ -1485,7 +1522,11 @@ class AsyncGeminiAdapter(AsyncBasePlatformAdapter):
                 context_str = "\n".join(f"{k}: {v}" for k, v in task.context.items())
                 prompt = f"Context:\n{context_str}\n\nTask:\n{prompt}"
 
-            model = task.constraints.model if task.constraints and task.constraints.model else self._model
+            model = (
+                task.constraints.model
+                if task.constraints and task.constraints.model
+                else self._model
+            )
 
             # Note: google-genai streaming API may differ - this is a simplified version
             # Production code should use the actual streaming API
@@ -1496,9 +1537,11 @@ class AsyncGeminiAdapter(AsyncBasePlatformAdapter):
 
             # Record usage
             if self._quota_tracker:
-                self._quota_tracker.release_and_record("gemini", 1, cost=0.0, amount_reserved=1)
+                self._quota_tracker.release_and_record(
+                    "gemini", 1, cost=0.0, amount_reserved=1
+                )
 
-            yield response.text if hasattr(response, 'text') else str(response)
+            yield response.text if hasattr(response, "text") else str(response)
 
         except Exception:
             if self._quota_tracker:

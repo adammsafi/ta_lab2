@@ -29,6 +29,7 @@ __all__ = [
 # Null Handling
 # =============================================================================
 
+
 def apply_null_strategy(
     series: pd.Series,
     strategy: str,
@@ -80,24 +81,24 @@ def apply_null_strategy(
         4    5.0
         dtype: float64
     """
-    if strategy not in ('skip', 'forward_fill', 'interpolate'):
+    if strategy not in ("skip", "forward_fill", "interpolate"):
         raise ValueError(
             f"Invalid strategy '{strategy}'. "
             "Must be one of: 'skip', 'forward_fill', 'interpolate'"
         )
 
-    if strategy == 'skip':
+    if strategy == "skip":
         return series
 
-    if strategy == 'forward_fill':
+    if strategy == "forward_fill":
         # Forward fill, then backward fill for leading NULLs
         result = series.ffill(limit=limit)
         result = result.bfill(limit=limit)
         return result
 
-    if strategy == 'interpolate':
+    if strategy == "interpolate":
         # Linear interpolation
-        return series.interpolate(method='linear', limit=limit)
+        return series.interpolate(method="linear", limit=limit)
 
     # Should never reach here due to validation above
     return series
@@ -106,6 +107,7 @@ def apply_null_strategy(
 # =============================================================================
 # Normalization
 # =============================================================================
+
 
 def add_zscore(
     df: pd.DataFrame,
@@ -168,6 +170,7 @@ def add_zscore(
 # Data Quality Validation
 # =============================================================================
 
+
 def validate_min_data_points(
     series: pd.Series,
     min_required: int,
@@ -204,7 +207,7 @@ def flag_outliers(
     series: pd.Series,
     *,
     n_sigma: float = 4.0,
-    method: str = 'zscore',
+    method: str = "zscore",
 ) -> pd.Series:
     """
     Return boolean series marking outliers.
@@ -236,10 +239,10 @@ def flag_outliers(
         >>> outliers_iqr[3]
         True
     """
-    if method not in ('zscore', 'iqr'):
+    if method not in ("zscore", "iqr"):
         raise ValueError(f"Invalid method '{method}'. Must be 'zscore' or 'iqr'")
 
-    if method == 'zscore':
+    if method == "zscore":
         # Z-score method: |z| > n_sigma
         mean = series.mean()
         std = series.std()
@@ -251,7 +254,7 @@ def flag_outliers(
         z_scores = np.abs((series - mean) / std)
         return z_scores > n_sigma
 
-    if method == 'iqr':
+    if method == "iqr":
         # IQR method: x < Q1 - n_sigma*IQR or x > Q3 + n_sigma*IQR
         q1 = series.quantile(0.25)
         q3 = series.quantile(0.75)

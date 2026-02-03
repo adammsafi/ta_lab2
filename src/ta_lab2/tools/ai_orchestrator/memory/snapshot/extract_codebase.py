@@ -39,12 +39,12 @@ def extract_code_structure(file_path: Path) -> dict:
 
     try:
         # Read source code
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             source = f.read()
     except UnicodeDecodeError:
         # Try with fallback encoding
         logger.warning(f"UTF-8 decode failed for {file_path}, trying latin-1")
-        with open(file_path, 'r', encoding='latin-1') as f:
+        with open(file_path, "r", encoding="latin-1") as f:
             source = f.read()
 
     # Parse with AST
@@ -58,38 +58,38 @@ def extract_code_structure(file_path: Path) -> dict:
     functions = []
     for node in ast.walk(tree):
         if isinstance(node, ast.FunctionDef):
-            functions.append({
-                "name": node.name,
-                "line_start": node.lineno,
-                "line_end": node.end_lineno if hasattr(node, 'end_lineno') else node.lineno,
-                "args": [arg.arg for arg in node.args.args],
-                "docstring": ast.get_docstring(node) or ""
-            })
+            functions.append(
+                {
+                    "name": node.name,
+                    "line_start": node.lineno,
+                    "line_end": node.end_lineno
+                    if hasattr(node, "end_lineno")
+                    else node.lineno,
+                    "args": [arg.arg for arg in node.args.args],
+                    "docstring": ast.get_docstring(node) or "",
+                }
+            )
 
     # Extract classes
     classes = []
     for node in ast.walk(tree):
         if isinstance(node, ast.ClassDef):
             methods = [m.name for m in node.body if isinstance(m, ast.FunctionDef)]
-            classes.append({
-                "name": node.name,
-                "line_start": node.lineno,
-                "methods": methods
-            })
+            classes.append(
+                {"name": node.name, "line_start": node.lineno, "methods": methods}
+            )
 
     # Extract imports
     imports = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
-            imports.append({
-                "module": None,
-                "names": [alias.name for alias in node.names]
-            })
+            imports.append(
+                {"module": None, "names": [alias.name for alias in node.names]}
+            )
         elif isinstance(node, ast.ImportFrom):
-            imports.append({
-                "module": node.module,
-                "names": [alias.name for alias in node.names]
-            })
+            imports.append(
+                {"module": node.module, "names": [alias.name for alias in node.names]}
+            )
 
     return {
         "file": str(file_path),
@@ -97,7 +97,7 @@ def extract_code_structure(file_path: Path) -> dict:
         "classes": classes,
         "imports": imports,
         "line_count": len(source.splitlines()),
-        "size_bytes": len(source.encode('utf-8'))
+        "size_bytes": len(source.encode("utf-8")),
     }
 
 
@@ -151,7 +151,7 @@ def get_file_git_metadata(repo_path: Path, file_path: Path) -> dict:
             "author_name": commit.author.name,
             "author_email": commit.author.email,
             "committed_datetime": commit.committed_datetime.isoformat(),
-            "message": commit.message.strip()
+            "message": commit.message.strip(),
         }
 
     except Exception as e:
@@ -160,8 +160,7 @@ def get_file_git_metadata(repo_path: Path, file_path: Path) -> dict:
 
 
 def extract_directory_tree(
-    root_path: Path,
-    exclusions: Optional[list[str]] = None
+    root_path: Path, exclusions: Optional[list[str]] = None
 ) -> list[dict]:
     """Walk directory and extract code structure + git metadata for all Python files.
 
@@ -195,7 +194,7 @@ def extract_directory_tree(
             ".tox",
             "dist",
             "build",
-            ".egg-info"
+            ".egg-info",
         ]
 
     results = []
@@ -237,18 +236,22 @@ def extract_directory_tree(
                 git_metadata = get_file_git_metadata(repo_path, py_file)
 
             # Combine results
-            results.append({
-                "file": str(py_file),
-                "relative_path": str(py_file.relative_to(root_path)),
-                "code_structure": code_structure,
-                "git_metadata": git_metadata
-            })
+            results.append(
+                {
+                    "file": str(py_file),
+                    "relative_path": str(py_file.relative_to(root_path)),
+                    "code_structure": code_structure,
+                    "git_metadata": git_metadata,
+                }
+            )
 
             processed_count += 1
 
             # Log progress
             if processed_count % 50 == 0:
-                logger.info(f"Progress: {processed_count} files processed, {skipped_count} skipped")
+                logger.info(
+                    f"Progress: {processed_count} files processed, {skipped_count} skipped"
+                )
 
         except SyntaxError as e:
             logger.warning(f"Skipping {py_file} due to syntax error: {e}")
@@ -268,8 +271,4 @@ def extract_directory_tree(
     return results
 
 
-__all__ = [
-    "extract_code_structure",
-    "get_file_git_metadata",
-    "extract_directory_tree"
-]
+__all__ = ["extract_code_structure", "get_file_git_metadata", "extract_directory_tree"]

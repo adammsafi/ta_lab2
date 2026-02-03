@@ -1,5 +1,4 @@
 from __future__ import annotations
-from typing import Optional
 import pandas as pd
 import numpy as np
 
@@ -19,9 +18,9 @@ def ema_smooth(series: pd.Series, span: int = 5) -> pd.Series:
 def volatility_size_pct(
     price: pd.Series,
     atr: pd.Series,
-    risk_pct: float = 0.005,   # 0.5% of equity per trade (0.005 as fraction)
-    atr_mult: float = 1.5,     # stop distance in ATRs
-    equity: float = 1.0,       # normalized backtest equity
+    risk_pct: float = 0.005,  # 0.5% of equity per trade (0.005 as fraction)
+    atr_mult: float = 1.5,  # stop distance in ATRs
+    equity: float = 1.0,  # normalized backtest equity
 ) -> pd.Series:
     """
     Position sizing based on risk parity vs ATR:

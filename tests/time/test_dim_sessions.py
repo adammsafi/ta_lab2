@@ -18,8 +18,7 @@ from ta_lab2.time.dim_sessions import DimSessions, SessionKey
 
 # Skip all tests if TARGET_DB_URL is not set
 pytestmark = pytest.mark.skipif(
-    not TARGET_DB_URL,
-    reason="TARGET_DB_URL not set - database tests skipped"
+    not TARGET_DB_URL, reason="TARGET_DB_URL not set - database tests skipped"
 )
 
 
@@ -39,14 +38,16 @@ def engine(db_url):
 
 def test_dim_sessions_table_exists(engine):
     """Verify dim_sessions table exists in public schema."""
-    query = text("""
+    query = text(
+        """
         SELECT EXISTS (
             SELECT 1
             FROM information_schema.tables
             WHERE table_schema = 'public'
             AND table_name = 'dim_sessions'
         )
-    """)
+    """
+    )
 
     with engine.connect() as conn:
         result = conn.execute(query)
@@ -71,12 +72,14 @@ def test_dim_sessions_has_required_columns(engine):
         "is_24h",
     }
 
-    query = text("""
+    query = text(
+        """
         SELECT column_name
         FROM information_schema.columns
         WHERE table_schema = 'public'
         AND table_name = 'dim_sessions'
-    """)
+    """
+    )
 
     with engine.connect() as conn:
         result = conn.execute(query)
@@ -101,19 +104,23 @@ def test_dimsessions_from_db_loads(db_url):
     """Verify DimSessions.from_db loads successfully and has data."""
     dim_sessions = DimSessions.from_db(db_url)
 
-    assert isinstance(dim_sessions, DimSessions), "from_db did not return DimSessions instance"
+    assert isinstance(
+        dim_sessions, DimSessions
+    ), "from_db did not return DimSessions instance"
     assert hasattr(dim_sessions, "_by_key"), "DimSessions missing _by_key attribute"
     assert len(dim_sessions._by_key) > 0, "DimSessions._by_key is empty"
 
 
 def test_crypto_session_is_24h(engine):
     """Verify CRYPTO sessions have is_24h=True."""
-    query = text("""
+    query = text(
+        """
         SELECT is_24h
         FROM dim_sessions
         WHERE asset_class = 'CRYPTO'
         LIMIT 1
-    """)
+    """
+    )
 
     with engine.connect() as conn:
         result = conn.execute(query)
@@ -128,10 +135,12 @@ def test_crypto_session_is_24h(engine):
 
 def test_timezone_is_iana_format(engine):
     """Verify timezone column contains valid IANA timezone names (not numeric offsets)."""
-    query = text("""
+    query = text(
+        """
         SELECT DISTINCT timezone
         FROM dim_sessions
-    """)
+    """
+    )
 
     with engine.connect() as conn:
         result = conn.execute(query)
@@ -167,7 +176,7 @@ def test_dimsessions_get_session_by_key(db_url):
         venue="DEFAULT",
         asset_key_type="symbol",
         asset_key="*",
-        session_type="RTH"
+        session_type="RTH",
     )
 
     session = dim_sessions.get_session_by_key(key)
@@ -175,18 +184,22 @@ def test_dimsessions_get_session_by_key(db_url):
     if session is None:
         pytest.skip("CRYPTO default session not found")
 
-    assert session.timezone == "UTC", f"CRYPTO session timezone is {session.timezone} (expected UTC)"
+    assert (
+        session.timezone == "UTC"
+    ), f"CRYPTO session timezone is {session.timezone} (expected UTC)"
     assert session.is_24h is True, "CRYPTO session should be 24-hour"
 
 
 def test_equity_session_not_24h(engine):
     """Verify US EQUITY sessions have is_24h=False."""
-    query = text("""
+    query = text(
+        """
         SELECT is_24h
         FROM dim_sessions
         WHERE asset_class = 'EQUITY' AND region = 'US'
         LIMIT 1
-    """)
+    """
+    )
 
     with engine.connect() as conn:
         result = conn.execute(query)

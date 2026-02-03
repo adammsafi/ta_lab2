@@ -29,7 +29,7 @@ from ta_lab2.features.m_tf.base_ema_feature import (
     TFSpec,
 )
 from ta_lab2.features.m_tf.polars_helpers import read_sql_polars
-from ta_lab2.features.ema import filter_ema_periods_by_obs_count, compute_ema
+from ta_lab2.features.ema import compute_ema
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 # Calendar Anchor EMA Feature Implementation
 # =============================================================================
+
 
 class CalendarAnchorEMAFeature(BaseEMAFeature):
     """
@@ -90,10 +91,10 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
         params = {"ids": ids}
 
         if start:
-            where.append('timeclose >= :start')
+            where.append("timeclose >= :start")
             params["start"] = start
         if end:
-            where.append('timeclose <= :end')
+            where.append("timeclose <= :end")
             params["end"] = end
 
         sql = f"""
@@ -120,7 +121,7 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
             return self._tf_specs_cache
 
         # Load ANCHOR timeframes from dim_timeframe
-        sql = f"""
+        sql = """
           SELECT
             tf,
             COALESCE(tf_days_min, tf_days_max, tf_days_nominal) AS tf_days
@@ -150,9 +151,13 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
         df["tf"] = df["tf"].astype(str)
         df["tf_days"] = df["tf_days"].astype(int)
 
-        tf_specs = [TFSpec(tf=r.tf, tf_days=int(r.tf_days)) for r in df.itertuples(index=False)]
+        tf_specs = [
+            TFSpec(tf=r.tf, tf_days=int(r.tf_days)) for r in df.itertuples(index=False)
+        ]
 
-        logger.info(f"Loaded {len(tf_specs)} calendar anchor TF specs for scheme={self.scheme}")
+        logger.info(
+            f"Loaded {len(tf_specs)} calendar anchor TF specs for scheme={self.scheme}"
+        )
         self._tf_specs_cache = tf_specs
         return tf_specs
 
@@ -289,7 +294,7 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
         b = b.sort_values(["bar_seq", "ts"]).reset_index(drop=True)
 
         # Identify canonical bar closes (is_partial_end = FALSE)
-        is_canon_row = (b["is_partial_end"] == False)
+        is_canon_row = b["is_partial_end"] == False
         canon_b = b.loc[is_canon_row].copy()
 
         # Dedupe to 1 canonical row per bar_seq (keep last)
@@ -307,17 +312,24 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
         roll = (~is_canonical_day).astype(bool)
 
         # roll_bar from is_partial_end
-        roll_src = b[["ts", "is_partial_end"]].drop_duplicates(subset=["ts"], keep="last")
+        roll_src = b[["ts", "is_partial_end"]].drop_duplicates(
+            subset=["ts"], keep="last"
+        )
         m_roll = df.merge(roll_src, on="ts", how="left")
         roll_bar = m_roll["is_partial_end"].fillna(True).astype(bool)
 
         # Force canonical_ts days to roll_bar FALSE
         if len(canonical_ts) > 0:
-            roll_bar = np.where(df["ts"].isin(canonical_ts.tolist()), False, roll_bar).astype(bool)
+            roll_bar = np.where(
+                df["ts"].isin(canonical_ts.tolist()), False, roll_bar
+            ).astype(bool)
 
         # Canonical bar EMA at anchored closes
         canon_b["ema_close"] = compute_ema(
-            canon_b["close"].astype(float), period=period, adjust=False, min_periods=period
+            canon_b["close"].astype(float),
+            period=period,
+            adjust=False,
+            min_periods=period,
         )
         canon_map = canon_b[["ts", "ema_close"]].drop_duplicates(subset=["ts"])
 
@@ -367,21 +379,36 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
                 x = float(closes[i])
                 ema.iloc[i] = alpha_d * x + (1.0 - alpha_d) * prev
 
-        out = pd.DataFrame({
-            "ts": df["ts"],
-            "roll": roll.astype(bool),
-            "ema": ema.astype(float),
-            "ema_bar": ema_bar.astype(float),
-            "roll_bar": pd.Series(roll_bar, index=df.index).astype(bool),
-        })
+        out = pd.DataFrame(
+            {
+                "ts": df["ts"],
+                "roll": roll.astype(bool),
+                "ema": ema.astype(float),
+                "ema_bar": ema_bar.astype(float),
+                "roll_bar": pd.Series(roll_bar, index=df.index).astype(bool),
+            }
+        )
 
         # Derivatives
         out = self._add_cal_anchor_derivatives(out)
 
-        return out[[
-            "ts", "roll", "ema", "d1", "d2", "d1_roll", "d2_roll",
-            "ema_bar", "d1_bar", "d2_bar", "roll_bar", "d1_roll_bar", "d2_roll_bar",
-        ]]
+        return out[
+            [
+                "ts",
+                "roll",
+                "ema",
+                "d1",
+                "d2",
+                "d1_roll",
+                "d2_roll",
+                "ema_bar",
+                "d1_bar",
+                "d2_bar",
+                "roll_bar",
+                "d1_roll_bar",
+                "d2_roll_bar",
+            ]
+        ]
 
     def _alpha_daily_equivalent(self, tf_days: int, period: int) -> float:
         """
@@ -394,7 +421,9 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
         alpha_bar = 2.0 / (period + 1.0)
         return 1.0 - (1.0 - alpha_bar) ** (1.0 / tf_days)
 
-    def _canonical_subset_diff(self, x: pd.Series, is_canonical: pd.Series) -> pd.Series:
+    def _canonical_subset_diff(
+        self, x: pd.Series, is_canonical: pd.Series
+    ) -> pd.Series:
         """Canonical-only diff computed between canonical rows."""
         is_canonical = is_canonical.astype(bool)
         y = pd.Series(np.nan, index=x.index, dtype=float)
@@ -437,6 +466,7 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
 # Public API (Backward Compatibility)
 # =============================================================================
 
+
 def write_multi_timeframe_ema_cal_anchor_to_db(
     engine_or_db_url,
     ids: Sequence[int],
@@ -444,7 +474,25 @@ def write_multi_timeframe_ema_cal_anchor_to_db(
     scheme: str = "US",
     start: Optional[str] = None,
     end: Optional[str] = None,
-    ema_periods: Sequence[int] = (6, 9, 10, 12, 14, 17, 20, 21, 26, 30, 50, 52, 77, 100, 200, 252, 365),
+    ema_periods: Sequence[int] = (
+        6,
+        9,
+        10,
+        12,
+        14,
+        17,
+        20,
+        21,
+        26,
+        30,
+        50,
+        52,
+        77,
+        100,
+        200,
+        252,
+        365,
+    ),
     schema: str = "public",
     out_table: Optional[str] = None,
     alpha_schema: str = "public",
@@ -467,7 +515,9 @@ def write_multi_timeframe_ema_cal_anchor_to_db(
     if out_table is None:
         out_table = f"cmc_ema_multi_tf_cal_anchor_{scheme_u.lower()}"
 
-    logger.info(f"Computing calendar anchor EMAs: scheme={scheme_u}, periods={len(ema_periods)}, ids={len(ids)}")
+    logger.info(
+        f"Computing calendar anchor EMAs: scheme={scheme_u}, periods={len(ema_periods)}, ids={len(ids)}"
+    )
 
     config = EMAFeatureConfig(
         periods=list(ema_periods),
@@ -532,7 +582,8 @@ def write_multi_timeframe_ema_cal_anchor_to_db(
         else "DO NOTHING"
     )
 
-    upsert_sql = text(f"""
+    upsert_sql = text(
+        f"""
       INSERT INTO {schema}.{out_table} (
         id, tf, ts, period, tf_days,
         roll, ema, d1, d2, d1_roll, d2_roll,
@@ -546,7 +597,8 @@ def write_multi_timeframe_ema_cal_anchor_to_db(
         now()
       )
       ON CONFLICT (id, tf, ts, period) {conflict_action}
-    """)
+    """
+    )
 
     logger.info(f"Writing {len(df_out):,} rows to {schema}.{out_table}...")
 
@@ -557,13 +609,15 @@ def write_multi_timeframe_ema_cal_anchor_to_db(
 
     with engine.begin() as conn:
         for i in range(0, total_rows, BATCH_SIZE):
-            batch = payload[i:i + BATCH_SIZE]
+            batch = payload[i : i + BATCH_SIZE]
             conn.execute(upsert_sql, batch)
 
             rows_written = min(i + BATCH_SIZE, total_rows)
             if rows_written % 50_000 == 0 or rows_written == total_rows or i == 0:
                 pct = (rows_written / total_rows) * 100
-                logger.info(f"  Written {rows_written:,} / {total_rows:,} rows ({pct:.1f}%)")
+                logger.info(
+                    f"  Written {rows_written:,} / {total_rows:,} rows ({pct:.1f}%)"
+                )
 
     logger.info(f"Successfully wrote {len(df_out):,} rows")
     return len(df_out)

@@ -22,13 +22,16 @@ from ta_lab2.scripts.signals.signal_utils import (
 # Feature Hash Tests
 # =============================================================================
 
+
 def test_compute_feature_hash_deterministic():
     """Verify compute_feature_hash produces same hash for same data."""
-    df = pd.DataFrame({
-        "ts": ["2024-01-01", "2024-01-02", "2024-01-03"],
-        "close": [100.0, 101.0, 102.0],
-        "ema_21": [99.5, 100.5, 101.5],
-    })
+    df = pd.DataFrame(
+        {
+            "ts": ["2024-01-01", "2024-01-02", "2024-01-03"],
+            "close": [100.0, 101.0, 102.0],
+            "ema_21": [99.5, 100.5, 101.5],
+        }
+    )
 
     hash1 = compute_feature_hash(df, ["close", "ema_21"])
     hash2 = compute_feature_hash(df, ["close", "ema_21"])
@@ -39,15 +42,19 @@ def test_compute_feature_hash_deterministic():
 
 def test_compute_feature_hash_changes_on_data_change():
     """Verify hash changes when data changes."""
-    df1 = pd.DataFrame({
-        "ts": ["2024-01-01", "2024-01-02"],
-        "close": [100.0, 101.0],
-    })
+    df1 = pd.DataFrame(
+        {
+            "ts": ["2024-01-01", "2024-01-02"],
+            "close": [100.0, 101.0],
+        }
+    )
 
-    df2 = pd.DataFrame({
-        "ts": ["2024-01-01", "2024-01-02"],
-        "close": [100.0, 102.0],  # Different value
-    })
+    df2 = pd.DataFrame(
+        {
+            "ts": ["2024-01-01", "2024-01-02"],
+            "close": [100.0, 102.0],  # Different value
+        }
+    )
 
     hash1 = compute_feature_hash(df1, ["close"])
     hash2 = compute_feature_hash(df2, ["close"])
@@ -57,15 +64,19 @@ def test_compute_feature_hash_changes_on_data_change():
 
 def test_compute_feature_hash_order_independent():
     """Verify hash is same regardless of row order (internally sorted by ts)."""
-    df1 = pd.DataFrame({
-        "ts": ["2024-01-01", "2024-01-02", "2024-01-03"],
-        "close": [100.0, 101.0, 102.0],
-    })
+    df1 = pd.DataFrame(
+        {
+            "ts": ["2024-01-01", "2024-01-02", "2024-01-03"],
+            "close": [100.0, 101.0, 102.0],
+        }
+    )
 
-    df2 = pd.DataFrame({
-        "ts": ["2024-01-03", "2024-01-01", "2024-01-02"],  # Different order
-        "close": [102.0, 100.0, 101.0],
-    })
+    df2 = pd.DataFrame(
+        {
+            "ts": ["2024-01-03", "2024-01-01", "2024-01-02"],  # Different order
+            "close": [102.0, 100.0, 101.0],
+        }
+    )
 
     hash1 = compute_feature_hash(df1, ["close"])
     hash2 = compute_feature_hash(df2, ["close"])
@@ -83,10 +94,12 @@ def test_compute_feature_hash_raises_on_empty_df():
 
 def test_compute_feature_hash_raises_on_missing_column():
     """Verify compute_feature_hash raises KeyError if column missing."""
-    df = pd.DataFrame({
-        "ts": ["2024-01-01"],
-        "close": [100.0],
-    })
+    df = pd.DataFrame(
+        {
+            "ts": ["2024-01-01"],
+            "close": [100.0],
+        }
+    )
 
     with pytest.raises(KeyError):
         compute_feature_hash(df, ["ema_21"])  # Column doesn't exist
@@ -95,6 +108,7 @@ def test_compute_feature_hash_raises_on_missing_column():
 # =============================================================================
 # Params Hash Tests
 # =============================================================================
+
 
 def test_compute_params_hash_sorted_keys():
     """Verify params hash is same regardless of key insertion order."""
@@ -122,6 +136,7 @@ def test_compute_params_hash_changes_on_value_change():
 # =============================================================================
 # load_active_signals Tests (with mocks)
 # =============================================================================
+
 
 def test_load_active_signals_filters_inactive():
     """Verify load_active_signals filters by is_active=TRUE."""
@@ -197,9 +212,10 @@ def test_load_active_signals_filters_by_signal_id():
 # Integration Tests (require database)
 # =============================================================================
 
+
 @pytest.mark.skipif(
     not os.environ.get("TARGET_DB_URL"),
-    reason="No TARGET_DB_URL - skip integration test"
+    reason="No TARGET_DB_URL - skip integration test",
 )
 def test_load_active_signals_integration():
     """Integration test: Load active signals from real database."""

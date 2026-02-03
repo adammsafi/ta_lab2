@@ -9,18 +9,18 @@ import time
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
 # Ensure OPENAI_API_KEY is set
-if not os.environ.get('OPENAI_API_KEY'):
+if not os.environ.get("OPENAI_API_KEY"):
     print("ERROR: OPENAI_API_KEY environment variable not set")
     sys.exit(1)
 
 from ta_lab2.tools.ai_orchestrator.memory.migration import migrate_chromadb_to_mem0
 from ta_lab2.tools.ai_orchestrator.memory.health import MemoryHealthMonitor
+
 
 def main():
     """Execute ChromaDB to Mem0 migration."""
@@ -84,6 +84,7 @@ def main():
         print("=" * 80)
         print(f"Expected {result.total}, found {report.total_memories}")
         print(f"Missing metadata: {report.missing_metadata}")
+
 
 if __name__ == "__main__":
     main()

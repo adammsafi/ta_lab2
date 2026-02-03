@@ -14,17 +14,15 @@ import json
 import logging
 from pathlib import Path
 from datetime import datetime
-from typing import Optional
 
 from ta_lab2.tools.ai_orchestrator.memory.mem0_client import get_mem0_client
 from ta_lab2.tools.ai_orchestrator.memory.snapshot.extract_codebase import (
-    extract_directory_tree
+    extract_directory_tree,
 )
 from ta_lab2.tools.ai_orchestrator.memory.snapshot.batch_indexer import (
     batch_add_memories,
     create_snapshot_metadata,
     format_file_content_for_memory,
-    BatchIndexResult
 )
 
 logger = logging.getLogger(__name__)
@@ -35,23 +33,23 @@ EXTERNAL_DIRS = [
     {
         "name": "Data_Tools",
         "path": Path("C:/Users/asafi/Downloads/Data_Tools"),
-        "description": "Data processing and utility scripts"
+        "description": "Data processing and utility scripts",
     },
     {
         "name": "ProjectTT",
         "path": Path("C:/Users/asafi/Documents/ProjectTT"),
-        "description": "Project documentation, schemas, and planning materials"
+        "description": "Project documentation, schemas, and planning materials",
     },
     {
         "name": "fredtools2",
         "path": Path("C:/Users/asafi/Downloads/fredtools2"),
-        "description": "FRED economic data tools"
+        "description": "FRED economic data tools",
     },
     {
         "name": "fedtools2",
         "path": Path("C:/Users/asafi/Downloads/fedtools2"),
-        "description": "Federal Reserve data tools"
-    }
+        "description": "Federal Reserve data tools",
+    },
 ]
 
 # File patterns to exclude from snapshot
@@ -67,7 +65,7 @@ EXCLUSIONS = [
     "*.egg-info",
     ".csv",
     ".xlsx",
-    ".json"
+    ".json",
 ]
 
 
@@ -94,15 +92,14 @@ def validate_directories() -> list[dict]:
             logger.warning(f"✗ Directory not found: {dir_config['name']} at {dir_path}")
 
     if missing_dirs:
-        logger.info(f"Will skip {len(missing_dirs)} missing directories: {', '.join(missing_dirs)}")
+        logger.info(
+            f"Will skip {len(missing_dirs)} missing directories: {', '.join(missing_dirs)}"
+        )
 
     return valid_dirs
 
 
-def run_external_dir_snapshot(
-    dir_config: dict,
-    dry_run: bool = False
-) -> dict:
+def run_external_dir_snapshot(dir_config: dict, dry_run: bool = False) -> dict:
     """Run snapshot for a single external directory.
 
     Args:
@@ -135,7 +132,7 @@ def run_external_dir_snapshot(
         "files_indexed": 0,
         "errors": 0,
         "total_functions": 0,
-        "total_classes": 0
+        "total_classes": 0,
     }
 
     if dry_run:
@@ -161,7 +158,11 @@ def run_external_dir_snapshot(
             # Determine file type based on directory
             if dir_name == "ProjectTT":
                 # ProjectTT may have documentation files
-                file_type = "documentation" if "docs" in file_info["relative_path"].lower() else "source_code"
+                file_type = (
+                    "documentation"
+                    if "docs" in file_info["relative_path"].lower()
+                    else "source_code"
+                )
             else:
                 file_type = "source_code"
 
@@ -174,20 +175,19 @@ def run_external_dir_snapshot(
                 function_count=len(code_structure.get("functions", [])),
                 class_count=len(code_structure.get("classes", [])),
                 line_count=code_structure.get("line_count", 0),
-                commit_hash=git_metadata.get("commit_hash", "N/A")
+                commit_hash=git_metadata.get("commit_hash", "N/A"),
             )
 
             # Track totals
             stats["total_functions"] += metadata["function_count"]
             stats["total_classes"] += metadata["class_count"]
 
-            memories.append({
-                "content": content,
-                "metadata": metadata
-            })
+            memories.append({"content": content, "metadata": metadata})
 
         except Exception as e:
-            logger.error(f"Failed to create memory for {file_info.get('relative_path', 'unknown')}: {e}")
+            logger.error(
+                f"Failed to create memory for {file_info.get('relative_path', 'unknown')}: {e}"
+            )
             stats["errors"] += 1
 
     # Batch add memories to Mem0
@@ -197,7 +197,9 @@ def run_external_dir_snapshot(
         result = batch_add_memories(client, memories, batch_size=50, delay_seconds=0.5)
         stats["files_indexed"] = result.added
         stats["errors"] += result.errors
-        logger.info(f"Completed {dir_name}: {result.added} files indexed, {result.errors} errors")
+        logger.info(
+            f"Completed {dir_name}: {result.added} files indexed, {result.errors} errors"
+        )
     else:
         logger.warning(f"No memories created for {dir_name}")
 
@@ -230,7 +232,7 @@ def run_all_external_snapshots(dry_run: bool = False) -> dict:
             "directory_stats": [],
             "total_files": 0,
             "total_indexed": 0,
-            "total_errors": 0
+            "total_errors": 0,
         }
 
     # Process each directory
@@ -261,7 +263,7 @@ def run_all_external_snapshots(dry_run: bool = False) -> dict:
         "directory_stats": directory_stats,
         "total_files": total_files,
         "total_indexed": total_indexed,
-        "total_errors": total_errors
+        "total_errors": total_errors,
     }
 
     # Log summary
@@ -295,7 +297,7 @@ def save_external_snapshot_manifest(stats: dict, output_path: Path):
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Write JSON
-    with open(output_path, 'w', encoding='utf-8') as f:
+    with open(output_path, "w", encoding="utf-8") as f:
         json.dump(stats, f, indent=2)
 
     logger.info(f"Snapshot manifest saved to: {output_path}")
@@ -309,19 +311,21 @@ def main():
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Only count files without indexing to memory"
+        help="Only count files without indexing to memory",
     )
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path(".planning/phases/11-memory-preparation/snapshots/external_dirs_snapshot.json"),
-        help="Path to save snapshot manifest (default: .planning/phases/11-memory-preparation/snapshots/external_dirs_snapshot.json)"
+        default=Path(
+            ".planning/phases/11-memory-preparation/snapshots/external_dirs_snapshot.json"
+        ),
+        help="Path to save snapshot manifest (default: .planning/phases/11-memory-preparation/snapshots/external_dirs_snapshot.json)",
     )
     parser.add_argument(
         "--log-level",
         default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
-        help="Logging level (default: INFO)"
+        help="Logging level (default: INFO)",
     )
 
     args = parser.parse_args()
@@ -329,7 +333,7 @@ def main():
     # Configure logging
     logging.basicConfig(
         level=getattr(logging, args.log_level),
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
     # Run snapshot

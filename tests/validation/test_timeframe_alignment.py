@@ -10,8 +10,7 @@ Per CONTEXT.md requirements:
 """
 
 import pytest
-from datetime import datetime, timedelta
-from unittest.mock import MagicMock, patch
+from datetime import datetime
 
 
 @pytest.mark.validation
@@ -19,13 +18,16 @@ from unittest.mock import MagicMock, patch
 class TestStandardTimeframes:
     """Tests for standard rolling timeframes (1D, 7D, 30D)."""
 
-    @pytest.mark.parametrize("tf_code,expected_days", [
-        ("1D", 1),
-        ("7D", 7),
-        ("30D", 30),
-        ("90D", 90),
-        ("365D", 365),
-    ])
+    @pytest.mark.parametrize(
+        "tf_code,expected_days",
+        [
+            ("1D", 1),
+            ("7D", 7),
+            ("30D", 30),
+            ("90D", 90),
+            ("365D", 365),
+        ],
+    )
     def test_rolling_timeframe_days(self, mocker, tf_code, expected_days):
         """Test that rolling TFs have correct tf_days."""
         # Mock the DimTimeframe class
@@ -33,11 +35,11 @@ class TestStandardTimeframes:
         mock_dim.tf_days.return_value = expected_days
 
         # Patch _get_dim to return our mock
-        mocker.patch('ta_lab2.time.dim_timeframe._get_dim', return_value=mock_dim)
+        mocker.patch("ta_lab2.time.dim_timeframe._get_dim", return_value=mock_dim)
 
         from ta_lab2.time.dim_timeframe import get_tf_days
 
-        result = get_tf_days(tf_code, 'mock://db')
+        result = get_tf_days(tf_code, "mock://db")
 
         assert result == expected_days, f"{tf_code} should have {expected_days} days"
 
@@ -160,12 +162,15 @@ class TestTimeframeAlignmentIntegration:
         """Test dim_timeframe contains all expected timeframes."""
         from sqlalchemy import text
 
-        expected_tfs = ['1D', '7D', '30D', '90D', '365D', '1M_cal', '3M_cal', '1Y_cal']
+        expected_tfs = ["1D", "7D", "30D", "90D", "365D", "1M_cal", "3M_cal", "1Y_cal"]
 
         with database_engine.connect() as conn:
-            result = conn.execute(text(
-                "SELECT tf_code FROM ta_lab2.dim_timeframe WHERE tf_code = ANY(:tfs)"
-            ), {"tfs": expected_tfs})
+            result = conn.execute(
+                text(
+                    "SELECT tf_code FROM ta_lab2.dim_timeframe WHERE tf_code = ANY(:tfs)"
+                ),
+                {"tfs": expected_tfs},
+            )
             found = [row[0] for row in result]
 
         missing = set(expected_tfs) - set(found)
@@ -179,4 +184,4 @@ class TestTimeframeAlignmentIntegration:
 
         source = inspect.getsource(ema_multi_tf_cal)
         # Should reference dim_timeframe or use tf_days from it
-        assert 'dim_timeframe' in source.lower() or 'tf_days' in source.lower() or True
+        assert "dim_timeframe" in source.lower() or "tf_days" in source.lower() or True

@@ -2,10 +2,10 @@
   "$schema": "https://ta_lab2.local/schemas/similarity-report/v1.0.0",
   "version": "1.0.0",
   "summary": {
-    "total_matches": 1463,
+    "total_matches": 1497,
     "near_exact": 728,
     "similar": 297,
-    "related": 438
+    "related": 472
   },
   "near_exact": [
     {
@@ -19438,6 +19438,54 @@
     },
     {
       "func1": {
+        "file": "src\\ta_lab2\\features\\m_tf\\ema_multi_tf_cal.py",
+        "name": "__init__",
+        "lineno": 52,
+        "arg_count": 3
+      },
+      "func2": {
+        "file": "src\\ta_lab2\\features\\m_tf\\ema_multi_tf_cal_anchor.py",
+        "name": "__init__",
+        "lineno": 52,
+        "arg_count": 3
+      },
+      "similarity": 0.7931034482758621,
+      "tier": "related"
+    },
+    {
+      "func1": {
+        "file": "src\\ta_lab2\\scripts\\returns\\refresh_cmc_returns_ema_multi_tf.py",
+        "name": "expand_roll_mode",
+        "lineno": 65,
+        "arg_count": 1
+      },
+      "func2": {
+        "file": "src\\ta_lab2\\scripts\\returns\\refresh_cmc_returns_ema_multi_tf_cal.py",
+        "name": "expand_roll_mode",
+        "lineno": 115,
+        "arg_count": 1
+      },
+      "similarity": 0.7925531914893617,
+      "tier": "related"
+    },
+    {
+      "func1": {
+        "file": "src\\ta_lab2\\scripts\\returns\\refresh_cmc_returns_ema_multi_tf_cal.py",
+        "name": "expand_roll_mode",
+        "lineno": 115,
+        "arg_count": 1
+      },
+      "func2": {
+        "file": "src\\ta_lab2\\scripts\\returns\\refresh_cmc_returns_ema_multi_tf_v2.py",
+        "name": "expand_roll_mode",
+        "lineno": 75,
+        "arg_count": 1
+      },
+      "similarity": 0.7925531914893617,
+      "tier": "related"
+    },
+    {
+      "func1": {
         "file": "src\\ta_lab2\\scripts\\bars\\old\\refresh_cmc_price_bars_multi_tf_cal_anchor_us_UPDATED.py",
         "name": "load_daily_prices_for_id",
         "lineno": 204,
@@ -19530,6 +19578,38 @@
         "arg_count": 4
       },
       "similarity": 0.7876664330763841,
+      "tier": "related"
+    },
+    {
+      "func1": {
+        "file": "src\\ta_lab2\\scripts\\returns\\audit_returns_ema_multi_tf_cal_integrity.py",
+        "name": "_resolve_out_name",
+        "lineno": 64,
+        "arg_count": 2
+      },
+      "func2": {
+        "file": "src\\ta_lab2\\scripts\\returns\\audit_returns_ema_multi_tf_v2_integrity.py",
+        "name": "_resolve_out_name",
+        "lineno": 85,
+        "arg_count": 2
+      },
+      "similarity": 0.7868852459016393,
+      "tier": "related"
+    },
+    {
+      "func1": {
+        "file": "src\\ta_lab2\\scripts\\returns\\audit_returns_ema_multi_tf_integrity.py",
+        "name": "_resolve_out_name",
+        "lineno": 77,
+        "arg_count": 2
+      },
+      "func2": {
+        "file": "src\\ta_lab2\\scripts\\returns\\audit_returns_ema_multi_tf_v2_integrity.py",
+        "name": "_resolve_out_name",
+        "lineno": 85,
+        "arg_count": 2
+      },
+      "similarity": 0.7868852459016393,
       "tier": "related"
     },
     {
@@ -19706,6 +19786,22 @@
         "arg_count": 1
       },
       "similarity": 0.7793513019643673,
+      "tier": "related"
+    },
+    {
+      "func1": {
+        "file": "src\\ta_lab2\\scripts\\bars\\common_snapshot_contract.py",
+        "name": "upsert_bars",
+        "lineno": 676,
+        "arg_count": 1
+      },
+      "func2": {
+        "file": "src\\ta_lab2\\scripts\\bars\\old\\common_snapshot_contract_v2.py",
+        "name": "upsert_bars",
+        "lineno": 612,
+        "arg_count": 1
+      },
+      "similarity": 0.7780725022104332,
       "tier": "related"
     },
     {
@@ -20334,6 +20430,22 @@
     },
     {
       "func1": {
+        "file": "src\\ta_lab2\\scripts\\features\\refresh_cmc_returns_daily.py",
+        "name": "main",
+        "lineno": 121,
+        "arg_count": 1
+      },
+      "func2": {
+        "file": "src\\ta_lab2\\scripts\\features\\refresh_cmc_ta_daily.py",
+        "name": "main",
+        "lineno": 127,
+        "arg_count": 1
+      },
+      "similarity": 0.759268413247652,
+      "tier": "related"
+    },
+    {
+      "func1": {
         "file": "src\\ta_lab2\\scripts\\bars\\old\\refresh_cmc_price_bars_multi_tf_cal_anchor_us.py",
         "name": "load_daily_min_max",
         "lineno": 188,
@@ -20830,6 +20942,22 @@
     },
     {
       "func1": {
+        "file": "src\\ta_lab2\\tools\\dbtool.py",
+        "name": "sort_key",
+        "lineno": 1038,
+        "arg_count": 1
+      },
+      "func2": {
+        "file": "src\\ta_lab2\\scripts\\emas\\sync_cmc_ema_multi_tf_u.py",
+        "name": "split_schema_table",
+        "lineno": 65,
+        "arg_count": 1
+      },
+      "similarity": 0.7560975609756098,
+      "tier": "related"
+    },
+    {
+      "func1": {
         "file": "src\\ta_lab2\\scripts\\emas\\old\\refresh_cmc_emas.py",
         "name": "_parse_args",
         "lineno": 975,
@@ -20858,6 +20986,22 @@
         "arg_count": 3
       },
       "similarity": 0.7556859867938371,
+      "tier": "related"
+    },
+    {
+      "func1": {
+        "file": "src\\ta_lab2\\scripts\\returns\\audit_returns_ema_multi_tf_u_integrity.py",
+        "name": "_resolve_out_name",
+        "lineno": 60,
+        "arg_count": 2
+      },
+      "func2": {
+        "file": "src\\ta_lab2\\scripts\\returns\\audit_returns_ema_multi_tf_v2_integrity.py",
+        "name": "_resolve_out_name",
+        "lineno": 85,
+        "arg_count": 2
+      },
+      "similarity": 0.7550200803212851,
       "tier": "related"
     },
     {
@@ -21038,6 +21182,22 @@
     },
     {
       "func1": {
+        "file": "src\\ta_lab2\\scripts\\bars\\audit_price_bars_integrity.py",
+        "name": "load_tf_specs",
+        "lineno": 427,
+        "arg_count": 2
+      },
+      "func2": {
+        "file": "src\\ta_lab2\\scripts\\emas\\audit_ema_integrity.py",
+        "name": "load_dim_timeframe_specs",
+        "lineno": 333,
+        "arg_count": 2
+      },
+      "similarity": 0.7475455820476858,
+      "tier": "related"
+    },
+    {
+      "func1": {
         "file": "src\\ta_lab2\\features\\m_tf\\old\\ema_multi_tf_cal_AM20251208_jumpsOnEma.py",
         "name": "build_multi_timeframe_ema_cal_frame",
         "lineno": 345,
@@ -21050,6 +21210,38 @@
         "arg_count": 5
       },
       "similarity": 0.7473607038123167,
+      "tier": "related"
+    },
+    {
+      "func1": {
+        "file": "src\\ta_lab2\\scripts\\bars\\old\\refresh_cmc_price_bars_multi_tf_cal_anchor_us.py",
+        "name": "_year_group_bounds_anchored",
+        "lineno": 422,
+        "arg_count": 2
+      },
+      "func2": {
+        "file": "src\\ta_lab2\\scripts\\bars\\old\\older-asof_20260104\\refresh_cmc_price_bars_multi_tf_cal_anchor_us_pre-partial-end.py",
+        "name": "_year_group_bounds_anchored",
+        "lineno": 456,
+        "arg_count": 2
+      },
+      "similarity": 0.7473524962178517,
+      "tier": "related"
+    },
+    {
+      "func1": {
+        "file": "src\\ta_lab2\\scripts\\bars\\old\\older-asof_20260104\\refresh_cmc_price_bars_multi_tf_cal_anchor_iso_pre-partial-end.py",
+        "name": "_year_group_bounds_anchored",
+        "lineno": 424,
+        "arg_count": 2
+      },
+      "func2": {
+        "file": "src\\ta_lab2\\scripts\\bars\\old\\older-asof_20260104\\refresh_cmc_price_bars_multi_tf_cal_anchor_us_pre-partial-end.py",
+        "name": "_year_group_bounds_anchored",
+        "lineno": 456,
+        "arg_count": 2
+      },
+      "similarity": 0.7473524962178517,
       "tier": "related"
     },
     {
@@ -21918,6 +22110,22 @@
     },
     {
       "func1": {
+        "file": "src\\ta_lab2\\scripts\\bars\\old\\refresh_cmc_price_bars_multi_tf.py",
+        "name": "upsert_bars",
+        "lineno": 991,
+        "arg_count": 4
+      },
+      "func2": {
+        "file": "src\\ta_lab2\\scripts\\bars\\old\\older-asof_20260104\\refresh_cmc_price_bars_multi_tf_pre-partial-end.py",
+        "name": "upsert_bars",
+        "lineno": 634,
+        "arg_count": 4
+      },
+      "similarity": 0.742296918767507,
+      "tier": "related"
+    },
+    {
+      "func1": {
         "file": "src\\ta_lab2\\scripts\\bars\\old\\refresh_cmc_price_bars_multi_tf_cal_anchor_us_UPDATED.py",
         "name": "load_daily_prices_for_id",
         "lineno": 204,
@@ -21946,6 +22154,22 @@
         "arg_count": 3
       },
       "similarity": 0.7410071942446043,
+      "tier": "related"
+    },
+    {
+      "func1": {
+        "file": "src\\ta_lab2\\tools\\data_tools\\export\\chatgpt_pipeline.py",
+        "name": "_find_by_id",
+        "lineno": 97,
+        "arg_count": 2
+      },
+      "func2": {
+        "file": "src\\ta_lab2\\tools\\data_tools\\export\\extract_kept_chats_from_keepfile.py",
+        "name": "_find_by_id",
+        "lineno": 55,
+        "arg_count": 2
+      },
+      "similarity": 0.7408256880733946,
       "tier": "related"
     },
     {
@@ -22142,6 +22366,22 @@
     },
     {
       "func1": {
+        "file": "src\\ta_lab2\\tools\\ai_orchestrator\\cli.py",
+        "name": "cmd_submit",
+        "lineno": 71,
+        "arg_count": 1
+      },
+      "func2": {
+        "file": "src\\ta_lab2\\tools\\ai_orchestrator\\cli.py",
+        "name": "run",
+        "lineno": 89,
+        "arg_count": 0
+      },
+      "similarity": 0.7346694585701465,
+      "tier": "related"
+    },
+    {
+      "func1": {
         "file": "src\\ta_lab2\\features\\m_tf\\old\\ema_multi_tf_cal_anchor_pre-bars.py",
         "name": "write_multi_timeframe_ema_cal_anchor_to_db",
         "lineno": 771,
@@ -22186,6 +22426,22 @@
         "arg_count": 1
       },
       "similarity": 0.7334083239595051,
+      "tier": "related"
+    },
+    {
+      "func1": {
+        "file": "src\\ta_lab2\\scripts\\bars\\audit_price_bars_tables.py",
+        "name": "main",
+        "lineno": 214,
+        "arg_count": 0
+      },
+      "func2": {
+        "file": "src\\ta_lab2\\scripts\\emas\\audit_ema_tables.py",
+        "name": "main",
+        "lineno": 156,
+        "arg_count": 0
+      },
+      "similarity": 0.7324142806645457,
       "tier": "related"
     },
     {
@@ -22382,6 +22638,38 @@
     },
     {
       "func1": {
+        "file": "src\\ta_lab2\\scripts\\features\\refresh_cmc_returns_daily.py",
+        "name": "load_ids",
+        "lineno": 92,
+        "arg_count": 3
+      },
+      "func2": {
+        "file": "src\\ta_lab2\\scripts\\signals\\refresh_cmc_signals_ema_crossover.py",
+        "name": "load_ids",
+        "lineno": 128,
+        "arg_count": 3
+      },
+      "similarity": 0.7256198347107438,
+      "tier": "related"
+    },
+    {
+      "func1": {
+        "file": "src\\ta_lab2\\scripts\\features\\refresh_cmc_ta_daily.py",
+        "name": "load_ids",
+        "lineno": 98,
+        "arg_count": 3
+      },
+      "func2": {
+        "file": "src\\ta_lab2\\scripts\\signals\\refresh_cmc_signals_ema_crossover.py",
+        "name": "load_ids",
+        "lineno": 128,
+        "arg_count": 3
+      },
+      "similarity": 0.7256198347107438,
+      "tier": "related"
+    },
+    {
+      "func1": {
         "file": "src\\ta_lab2\\features\\m_tf\\old\\ema_multi_tf_cal_anchor_pre-bars.py",
         "name": "write_multi_timeframe_ema_cal_anchor_to_db",
         "lineno": 771,
@@ -22410,6 +22698,54 @@
         "arg_count": 10
       },
       "similarity": 0.7247321844434094,
+      "tier": "related"
+    },
+    {
+      "func1": {
+        "file": "src\\ta_lab2\\scripts\\bars\\common_snapshot_contract.py",
+        "name": "load_last_snapshot_info_for_id_tfs",
+        "lineno": 1117,
+        "arg_count": 2
+      },
+      "func2": {
+        "file": "src\\ta_lab2\\scripts\\bars\\old\\refresh_cmc_price_bars_multi_tf_cal_us.py",
+        "name": "load_last_snapshot_info_for_id_tfs",
+        "lineno": 345,
+        "arg_count": 4
+      },
+      "similarity": 0.7245283018867924,
+      "tier": "related"
+    },
+    {
+      "func1": {
+        "file": "src\\ta_lab2\\scripts\\bars\\old\\older-asof_20260104\\refresh_cmc_price_bars_multi_tf_cal_anchor_iso_pre-partial-end.py",
+        "name": "delete_bars_for_id_tf_from_seq",
+        "lineno": 321,
+        "arg_count": 5
+      },
+      "func2": {
+        "file": "src\\ta_lab2\\scripts\\bars\\old\\older-asof_20260104\\refresh_cmc_price_bars_multi_tf_cal_anchor_us_pre-partial-end.py",
+        "name": "delete_bars_for_id_tf_from_seq",
+        "lineno": 317,
+        "arg_count": 5
+      },
+      "similarity": 0.7236403995560489,
+      "tier": "related"
+    },
+    {
+      "func1": {
+        "file": "src\\ta_lab2\\observability\\storage.py",
+        "name": "__init__",
+        "lineno": 95,
+        "arg_count": 2
+      },
+      "func2": {
+        "file": "src\\ta_lab2\\features\\m_tf\\base_ema_feature.py",
+        "name": "__init__",
+        "lineno": 94,
+        "arg_count": 3
+      },
+      "similarity": 0.7230046948356808,
       "tier": "related"
     },
     {
@@ -22511,6 +22847,86 @@
     {
       "func1": {
         "file": "src\\ta_lab2\\scripts\\bars\\common_snapshot_contract.py",
+        "name": "load_last_snapshot_info_for_id_tfs",
+        "lineno": 1117,
+        "arg_count": 2
+      },
+      "func2": {
+        "file": "src\\ta_lab2\\scripts\\bars\\old\\refresh_cmc_price_bars_multi_tf_cal_iso.py",
+        "name": "load_last_snapshot_info_for_id_tfs",
+        "lineno": 241,
+        "arg_count": 4
+      },
+      "similarity": 0.7210948560641812,
+      "tier": "related"
+    },
+    {
+      "func1": {
+        "file": "src\\ta_lab2\\scripts\\bars\\common_snapshot_contract.py",
+        "name": "load_last_snapshot_info_for_id_tfs",
+        "lineno": 1117,
+        "arg_count": 2
+      },
+      "func2": {
+        "file": "src\\ta_lab2\\scripts\\bars\\old\\refresh_cmc_price_bars_multi_tf_cal_iso_1.py",
+        "name": "load_last_snapshot_info_for_id_tfs",
+        "lineno": 118,
+        "arg_count": 4
+      },
+      "similarity": 0.7210948560641812,
+      "tier": "related"
+    },
+    {
+      "func1": {
+        "file": "src\\ta_lab2\\scripts\\bars\\refresh_cmc_price_bars_multi_tf.py",
+        "name": "_make_day_time_open",
+        "lineno": 170,
+        "arg_count": 1
+      },
+      "func2": {
+        "file": "src\\ta_lab2\\scripts\\bars\\refresh_cmc_price_bars_multi_tf_cal_us.py",
+        "name": "_make_day_time_open",
+        "lineno": 639,
+        "arg_count": 1
+      },
+      "similarity": 0.7209302325581395,
+      "tier": "related"
+    },
+    {
+      "func1": {
+        "file": "src\\ta_lab2\\scripts\\bars\\refresh_cmc_price_bars_multi_tf.py",
+        "name": "_make_day_time_open",
+        "lineno": 170,
+        "arg_count": 1
+      },
+      "func2": {
+        "file": "src\\ta_lab2\\scripts\\bars\\old\\refresh_cmc_price_bars_multi_tf_cal_us.py",
+        "name": "_make_day_time_open",
+        "lineno": 1074,
+        "arg_count": 1
+      },
+      "similarity": 0.7209302325581395,
+      "tier": "related"
+    },
+    {
+      "func1": {
+        "file": "src\\ta_lab2\\scripts\\bars\\old\\refresh_cmc_price_bars_multi_tf.py",
+        "name": "_make_day_time_open",
+        "lineno": 490,
+        "arg_count": 1
+      },
+      "func2": {
+        "file": "src\\ta_lab2\\scripts\\bars\\old\\refresh_cmc_price_bars_multi_tf_cal_us.py",
+        "name": "_make_day_time_open",
+        "lineno": 1074,
+        "arg_count": 1
+      },
+      "similarity": 0.7209302325581395,
+      "tier": "related"
+    },
+    {
+      "func1": {
+        "file": "src\\ta_lab2\\scripts\\bars\\common_snapshot_contract.py",
         "name": "table_exists",
         "lineno": 785,
         "arg_count": 2
@@ -22570,6 +22986,22 @@
         "arg_count": 3
       },
       "similarity": 0.7190226876090751,
+      "tier": "related"
+    },
+    {
+      "func1": {
+        "file": "src\\ta_lab2\\tools\\ai_orchestrator\\cli.py",
+        "name": "cmd_batch",
+        "lineno": 141,
+        "arg_count": 1
+      },
+      "func2": {
+        "file": "src\\ta_lab2\\tools\\ai_orchestrator\\cli.py",
+        "name": "run",
+        "lineno": 178,
+        "arg_count": 0
+      },
+      "similarity": 0.7186504217432053,
       "tier": "related"
     },
     {
@@ -22634,6 +23066,70 @@
         "arg_count": 2
       },
       "similarity": 0.7153284671532847,
+      "tier": "related"
+    },
+    {
+      "func1": {
+        "file": "src\\ta_lab2\\observability\\storage.py",
+        "name": "__init__",
+        "lineno": 95,
+        "arg_count": 2
+      },
+      "func2": {
+        "file": "src\\ta_lab2\\scripts\\features\\base_feature.py",
+        "name": "__init__",
+        "lineno": 83,
+        "arg_count": 3
+      },
+      "similarity": 0.7146171693735499,
+      "tier": "related"
+    },
+    {
+      "func1": {
+        "file": "src\\ta_lab2\\scripts\\returns\\refresh_cmc_returns_bars_multi_tf.py",
+        "name": "_load_all_ids",
+        "lineno": 77,
+        "arg_count": 2
+      },
+      "func2": {
+        "file": "src\\ta_lab2\\scripts\\emas\\stats\\multi_tf_v2\\old\\refresh_ema_multi_tf_v2_stats_old.py",
+        "name": "_load_all_ids",
+        "lineno": 70,
+        "arg_count": 1
+      },
+      "similarity": 0.7145242070116862,
+      "tier": "related"
+    },
+    {
+      "func1": {
+        "file": "src\\ta_lab2\\features\\m_tf\\old\\ema_multi_tf_cal_old.py",
+        "name": "write_multi_timeframe_ema_cal_to_db",
+        "lineno": 542,
+        "arg_count": 10
+      },
+      "func2": {
+        "file": "src\\ta_lab2\\features\\m_tf\\old\\ema_multi_tf_cal_PM20251207_774_lines.py",
+        "name": "write_multi_timeframe_ema_cal_to_db",
+        "lineno": 606,
+        "arg_count": 9
+      },
+      "similarity": 0.7142662116040955,
+      "tier": "related"
+    },
+    {
+      "func1": {
+        "file": "src\\ta_lab2\\features\\m_tf\\old\\ema_multi_tf_cal_old.py",
+        "name": "write_multi_timeframe_ema_cal_to_db",
+        "lineno": 542,
+        "arg_count": 10
+      },
+      "func2": {
+        "file": "src\\ta_lab2\\features\\m_tf\\old\\ema_multi_tf_cal_pre-dim.py",
+        "name": "write_multi_timeframe_ema_cal_to_db",
+        "lineno": 650,
+        "arg_count": 9
+      },
+      "similarity": 0.7142662116040955,
       "tier": "related"
     },
     {
@@ -22778,6 +23274,22 @@
         "arg_count": 3
       },
       "similarity": 0.7129310344827586,
+      "tier": "related"
+    },
+    {
+      "func1": {
+        "file": "src\\ta_lab2\\scripts\\returns\\refresh_cmc_returns_d1.py",
+        "name": "_load_all_ids",
+        "lineno": 65,
+        "arg_count": 2
+      },
+      "func2": {
+        "file": "src\\ta_lab2\\scripts\\emas\\stats\\multi_tf_v2\\old\\refresh_ema_multi_tf_v2_stats_old.py",
+        "name": "_load_all_ids",
+        "lineno": 70,
+        "arg_count": 1
+      },
+      "similarity": 0.7121464226289518,
       "tier": "related"
     },
     {
@@ -23182,6 +23694,22 @@
     },
     {
       "func1": {
+        "file": "src\\ta_lab2\\tools\\data_tools\\memory\\memory_bank_engine_rest.py",
+        "name": "create",
+        "lineno": 111,
+        "arg_count": 1
+      },
+      "func2": {
+        "file": "src\\ta_lab2\\tools\\data_tools\\memory\\memory_bank_rest.py",
+        "name": "create",
+        "lineno": 162,
+        "arg_count": 1
+      },
+      "similarity": 0.704885993485342,
+      "tier": "related"
+    },
+    {
+      "func1": {
         "file": "src\\ta_lab2\\features\\m_tf\\old\\ema_multi_tf_cal_all_bar_alpha.py",
         "name": "build_multi_timeframe_ema_cal_frame",
         "lineno": 344,
@@ -23242,6 +23770,22 @@
         "arg_count": 1
       },
       "similarity": 0.7045951859956237,
+      "tier": "related"
+    },
+    {
+      "func1": {
+        "file": "src\\ta_lab2\\observability\\storage.py",
+        "name": "__init__",
+        "lineno": 325,
+        "arg_count": 2
+      },
+      "func2": {
+        "file": "src\\ta_lab2\\scripts\\emas\\ema_state_manager.py",
+        "name": "__init__",
+        "lineno": 113,
+        "arg_count": 3
+      },
+      "similarity": 0.7041666666666667,
       "tier": "related"
     },
     {

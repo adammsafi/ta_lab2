@@ -26,7 +26,6 @@ import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import text
@@ -41,6 +40,7 @@ logger = logging.getLogger(__name__)
 # Result Types
 # =============================================================================
 
+
 @dataclass
 class RefreshResult:
     """
@@ -53,6 +53,7 @@ class RefreshResult:
         success: Whether refresh succeeded
         error: Error message if failed
     """
+
     table: str
     rows_inserted: int
     duration_seconds: float
@@ -64,7 +65,10 @@ class RefreshResult:
 # Refresh Functions
 # =============================================================================
 
-def refresh_returns(engine, ids: list[int], start: Optional[str], end: Optional[str]) -> RefreshResult:
+
+def refresh_returns(
+    engine, ids: list[int], start: Optional[str], end: Optional[str]
+) -> RefreshResult:
     """
     Refresh cmc_returns_daily table.
 
@@ -79,7 +83,7 @@ def refresh_returns(engine, ids: list[int], start: Optional[str], end: Optional[
     """
     from ta_lab2.scripts.features.returns_feature import ReturnsFeature, ReturnsConfig
 
-    table = 'cmc_returns_daily'
+    table = "cmc_returns_daily"
     t0 = time.time()
 
     try:
@@ -113,7 +117,9 @@ def refresh_returns(engine, ids: list[int], start: Optional[str], end: Optional[
         )
 
 
-def refresh_vol(engine, ids: list[int], start: Optional[str], end: Optional[str]) -> RefreshResult:
+def refresh_vol(
+    engine, ids: list[int], start: Optional[str], end: Optional[str]
+) -> RefreshResult:
     """
     Refresh cmc_vol_daily table.
 
@@ -128,7 +134,7 @@ def refresh_vol(engine, ids: list[int], start: Optional[str], end: Optional[str]
     """
     from ta_lab2.scripts.features.vol_feature import VolFeature, VolConfig
 
-    table = 'cmc_vol_daily'
+    table = "cmc_vol_daily"
     t0 = time.time()
 
     try:
@@ -162,7 +168,9 @@ def refresh_vol(engine, ids: list[int], start: Optional[str], end: Optional[str]
         )
 
 
-def refresh_ta(engine, ids: list[int], start: Optional[str], end: Optional[str]) -> RefreshResult:
+def refresh_ta(
+    engine, ids: list[int], start: Optional[str], end: Optional[str]
+) -> RefreshResult:
     """
     Refresh cmc_ta_daily table.
 
@@ -177,7 +185,7 @@ def refresh_ta(engine, ids: list[int], start: Optional[str], end: Optional[str])
     """
     from ta_lab2.scripts.features.ta_feature import TAFeature, TAConfig
 
-    table = 'cmc_ta_daily'
+    table = "cmc_ta_daily"
     t0 = time.time()
 
     try:
@@ -211,7 +219,9 @@ def refresh_ta(engine, ids: list[int], start: Optional[str], end: Optional[str])
         )
 
 
-def refresh_daily_features(engine, ids: list[int], start: Optional[str], end: Optional[str]) -> RefreshResult:
+def refresh_daily_features(
+    engine, ids: list[int], start: Optional[str], end: Optional[str]
+) -> RefreshResult:
     """
     Refresh cmc_daily_features table.
 
@@ -224,9 +234,11 @@ def refresh_daily_features(engine, ids: list[int], start: Optional[str], end: Op
     Returns:
         RefreshResult
     """
-    from ta_lab2.scripts.features.daily_features_view import refresh_daily_features as refresh_fn
+    from ta_lab2.scripts.features.daily_features_view import (
+        refresh_daily_features as refresh_fn,
+    )
 
-    table = 'cmc_daily_features'
+    table = "cmc_daily_features"
     t0 = time.time()
 
     try:
@@ -258,6 +270,7 @@ def refresh_daily_features(engine, ids: list[int], start: Optional[str], end: Op
 # =============================================================================
 # Orchestration
 # =============================================================================
+
 
 def run_all_refreshes(
     engine,
@@ -293,9 +306,9 @@ def run_all_refreshes(
 
     # Phase 1: Returns, Vol, TA (can run in parallel)
     phase1_tasks = [
-        ('returns', refresh_returns),
-        ('vol', refresh_vol),
-        ('ta', refresh_ta),
+        ("returns", refresh_returns),
+        ("vol", refresh_vol),
+        ("ta", refresh_ta),
     ]
 
     if parallel:
@@ -315,7 +328,9 @@ def run_all_refreshes(
                 results[result.table] = result
 
                 if result.success:
-                    logger.info(f"  {result.table}: {result.rows_inserted} rows in {result.duration_seconds:.1f}s")
+                    logger.info(
+                        f"  {result.table}: {result.rows_inserted} rows in {result.duration_seconds:.1f}s"
+                    )
                 else:
                     logger.error(f"  {result.table}: FAILED - {result.error}")
 
@@ -327,7 +342,9 @@ def run_all_refreshes(
             results[result.table] = result
 
             if result.success:
-                logger.info(f"  {result.table}: {result.rows_inserted} rows in {result.duration_seconds:.1f}s")
+                logger.info(
+                    f"  {result.table}: {result.rows_inserted} rows in {result.duration_seconds:.1f}s"
+                )
             else:
                 logger.error(f"  {result.table}: FAILED - {result.error}")
 
@@ -335,7 +352,9 @@ def run_all_refreshes(
     phase1_failures = [name for name, result in results.items() if not result.success]
     if phase1_failures:
         logger.warning(f"Phase 1 had failures: {phase1_failures}")
-        logger.warning("Continuing to daily_features refresh anyway (graceful degradation)")
+        logger.warning(
+            "Continuing to daily_features refresh anyway (graceful degradation)"
+        )
 
     # Phase 2: Daily features (depends on phase 1)
     logger.info("Phase 2: Running daily_features (unified view)")
@@ -344,7 +363,9 @@ def run_all_refreshes(
     results[result.table] = result
 
     if result.success:
-        logger.info(f"  {result.table}: {result.rows_inserted} rows in {result.duration_seconds:.1f}s")
+        logger.info(
+            f"  {result.table}: {result.rows_inserted} rows in {result.duration_seconds:.1f}s"
+        )
     else:
         logger.error(f"  {result.table}: FAILED - {result.error}")
 
@@ -366,8 +387,12 @@ def run_all_refreshes(
                 logger.info(f"  Validation PASSED: {report.total_checks} checks")
             else:
                 logger.warning(f"  Validation found issues: {report.summary}")
-                logger.warning(f"  Critical issues: {sum(1 for i in report.issues if i.severity == 'critical')}")
-                logger.warning(f"  Warnings: {sum(1 for i in report.issues if i.severity == 'warning')}")
+                logger.warning(
+                    f"  Critical issues: {sum(1 for i in report.issues if i.severity == 'critical')}"
+                )
+                logger.warning(
+                    f"  Warnings: {sum(1 for i in report.issues if i.severity == 'warning')}"
+                )
 
         except Exception as e:
             logger.error(f"  Validation failed with error: {e}", exc_info=True)
@@ -378,6 +403,7 @@ def run_all_refreshes(
 # =============================================================================
 # CLI
 # =============================================================================
+
 
 def load_ids(engine, ids_arg: Optional[str], all_ids: bool) -> list[int]:
     """
@@ -395,11 +421,13 @@ def load_ids(engine, ids_arg: Optional[str], all_ids: bool) -> list[int]:
         return [int(i.strip()) for i in ids_arg.split(",")]
 
     if all_ids:
-        query = text("""
+        query = text(
+            """
             SELECT DISTINCT id
             FROM public.cmc_price_bars_1d
             ORDER BY id
-        """)
+        """
+        )
 
         with engine.connect() as conn:
             result = conn.execute(query)
@@ -503,7 +531,9 @@ def main() -> int:
         logger.error("No IDs to process")
         return 1
 
-    logger.info(f"Processing {len(ids)} IDs: {ids[:10]}{'...' if len(ids) > 10 else ''}")
+    logger.info(
+        f"Processing {len(ids)} IDs: {ids[:10]}{'...' if len(ids) > 10 else ''}"
+    )
 
     # Run refreshes
     try:
@@ -527,11 +557,18 @@ def main() -> int:
     total_duration = 0.0
     failures = []
 
-    for table in ['cmc_returns_daily', 'cmc_vol_daily', 'cmc_ta_daily', 'cmc_daily_features']:
+    for table in [
+        "cmc_returns_daily",
+        "cmc_vol_daily",
+        "cmc_ta_daily",
+        "cmc_daily_features",
+    ]:
         if table in results:
             result = results[table]
             status = "OK" if result.success else "FAILED"
-            print(f"{table:30s} {status:10s} {result.rows_inserted:8d} rows in {result.duration_seconds:6.1f}s")
+            print(
+                f"{table:30s} {status:10s} {result.rows_inserted:8d} rows in {result.duration_seconds:6.1f}s"
+            )
 
             if result.success:
                 total_rows += result.rows_inserted

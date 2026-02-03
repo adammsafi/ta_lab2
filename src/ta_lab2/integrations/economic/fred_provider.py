@@ -8,7 +8,6 @@ Install fredapi with: pip install ta_lab2[fred]
 """
 import logging
 import os
-import time
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 
@@ -20,9 +19,15 @@ from ta_lab2.integrations.economic.types import (
     FetchResult,
     SeriesInfo,
 )
-from ta_lab2.integrations.economic.rate_limiter import get_fred_rate_limiter, RateLimiter
+from ta_lab2.integrations.economic.rate_limiter import (
+    get_fred_rate_limiter,
+    RateLimiter,
+)
 from ta_lab2.integrations.economic.cache import get_economic_cache, EconomicDataCache
-from ta_lab2.integrations.economic.circuit_breaker import CircuitBreaker, CircuitOpenError
+from ta_lab2.integrations.economic.circuit_breaker import (
+    CircuitBreaker,
+    CircuitOpenError,
+)
 from ta_lab2.integrations.economic.quality import QualityValidator, QualityReport
 
 logger = logging.getLogger(__name__)
@@ -30,6 +35,7 @@ logger = logging.getLogger(__name__)
 # Soft import: allow importing module even if fredapi is missing
 try:
     from fredapi import Fred
+
     FREDAPI_AVAILABLE = True
 except ImportError:
     Fred = None  # type: ignore
@@ -68,6 +74,7 @@ class FredProvider(EconomicDataProvider):
         Requires fredapi package: pip install ta_lab2[fred]
         Requires FRED API key: https://fred.stlouisfed.org/docs/api/api_key.html
     """
+
     name = "FRED"
     base_url = "https://api.stlouisfed.org/fred"
 
@@ -98,9 +105,7 @@ class FredProvider(EconomicDataProvider):
         self._rate_limiter: RateLimiter = get_fred_rate_limiter()
         self._cache: EconomicDataCache = get_economic_cache()
         self._circuit_breaker: CircuitBreaker = CircuitBreaker(
-            failure_threshold=5,
-            recovery_timeout=60.0,
-            success_threshold=2
+            failure_threshold=5, recovery_timeout=60.0, success_threshold=2
         )
         self._validator: QualityValidator = QualityValidator()
 
@@ -110,7 +115,7 @@ class FredProvider(EconomicDataProvider):
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
         validate: bool = True,
-        **kwargs
+        **kwargs,
     ) -> FetchResult:
         """Fetch series with rate limiting, caching, circuit breaker, and validation.
 
@@ -168,7 +173,7 @@ class FredProvider(EconomicDataProvider):
                 series_id,
                 observation_start=start_date,
                 observation_end=end_date,
-                **kwargs
+                **kwargs,
             )
             info = self._client.get_series_info(series_id)
             return EconomicSeries(
@@ -179,7 +184,7 @@ class FredProvider(EconomicDataProvider):
                 frequency=info.get("frequency", "Unknown"),
                 source="FRED",
                 last_updated=pd.to_datetime(info.get("last_updated")),
-                metadata=dict(info)
+                metadata=dict(info),
             )
 
         try:
@@ -238,7 +243,7 @@ class FredProvider(EconomicDataProvider):
                 seasonal_adjustment=info.get("seasonal_adjustment", "Unknown"),
                 observation_start=pd.to_datetime(info.get("observation_start")),
                 observation_end=pd.to_datetime(info.get("observation_end")),
-                popularity=info.get("popularity", 0)
+                popularity=info.get("popularity", 0),
             )
         except Exception:
             return None
@@ -265,16 +270,20 @@ class FredProvider(EconomicDataProvider):
 
             series_list = []
             for _, row in results.head(limit).iterrows():
-                series_list.append(SeriesInfo(
-                    series_id=row.get("id", row.name) if hasattr(row, "name") else str(row.get("id", "")),
-                    title=row.get("title", ""),
-                    units=row.get("units", "Unknown"),
-                    frequency=row.get("frequency", "Unknown"),
-                    seasonal_adjustment=row.get("seasonal_adjustment", "Unknown"),
-                    observation_start=pd.to_datetime(row.get("observation_start")),
-                    observation_end=pd.to_datetime(row.get("observation_end")),
-                    popularity=row.get("popularity", 0)
-                ))
+                series_list.append(
+                    SeriesInfo(
+                        series_id=row.get("id", row.name)
+                        if hasattr(row, "name")
+                        else str(row.get("id", "")),
+                        title=row.get("title", ""),
+                        units=row.get("units", "Unknown"),
+                        frequency=row.get("frequency", "Unknown"),
+                        seasonal_adjustment=row.get("seasonal_adjustment", "Unknown"),
+                        observation_start=pd.to_datetime(row.get("observation_start")),
+                        observation_end=pd.to_datetime(row.get("observation_end")),
+                        popularity=row.get("popularity", 0),
+                    )
+                )
             return series_list
 
         except Exception:
@@ -307,10 +316,11 @@ class FredProvider(EconomicDataProvider):
         try:
             # fredapi doesn't expose releases directly, use raw request
             import requests
+
             response = requests.get(
                 f"{self.base_url}/releases",
                 params={"api_key": self.api_key, "file_type": "json", "limit": limit},
-                timeout=30
+                timeout=30,
             )
             response.raise_for_status()
             return response.json().get("releases", [])

@@ -18,6 +18,7 @@ from typing import Iterable
 
 # ---------- Filesystem tree ----------
 
+
 def print_tree(root_dir: str, prefix: str = "", file=None) -> None:
     entries = sorted(os.listdir(root_dir))
     for i, entry in enumerate(entries):
@@ -31,8 +32,10 @@ def print_tree(root_dir: str, prefix: str = "", file=None) -> None:
             extension = "    " if i == len(entries) - 1 else "│   "
             print_tree(path, prefix + extension, file)
 
+
 def save_tree_markdown(root_dir: str, out_file: str) -> None:
     import io
+
     buf = io.StringIO()
     print_tree(root_dir, file=buf)
     with open(out_file, "w", encoding="utf-8") as f:
@@ -40,13 +43,16 @@ def save_tree_markdown(root_dir: str, out_file: str) -> None:
         f.write(buf.getvalue())
         f.write("```\n")
 
+
 # ---------- AST utilities (no imports of your package modules) ----------
+
 
 def _find_pkg_dir(pkg_name: str) -> str:
     spec = importlib.util.find_spec(pkg_name)
     if spec is None or not spec.submodule_search_locations:
         raise ImportError(f"Cannot find package {pkg_name!r}")
     return spec.submodule_search_locations[0]
+
 
 def _param_list_from_funcdef(fn: ast.FunctionDef) -> str:
     """Build a simple parameter list string from AST (names only)."""
@@ -82,6 +88,7 @@ def _param_list_from_funcdef(fn: ast.FunctionDef) -> str:
 
     return "(" + ", ".join(parts) + ")"
 
+
 def describe_package_ast(pkg_name: str) -> dict:
     pkg_dir = _find_pkg_dir(pkg_name)
     result = {"package": pkg_name, "root": pkg_dir, "modules": []}
@@ -112,10 +119,17 @@ def describe_package_ast(pkg_name: str) -> dict:
             )
     return result
 
+
 def emit_hybrid_markdown(
     pkg_name: str,
     out_file: str,
-    ignore_dirs: Iterable[str] = ("__pycache__", "tests", "ta_lab2.egg-info", "out", "data"),
+    ignore_dirs: Iterable[str] = (
+        "__pycache__",
+        "tests",
+        "ta_lab2.egg-info",
+        "out",
+        "data",
+    ),
     include_inits: bool = True,
 ) -> None:
     pkg_dir = _find_pkg_dir(pkg_name)
@@ -177,15 +191,16 @@ def emit_hybrid_markdown(
     with open(out_file, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
 
+
 # ---------- Main (side-effects live here) ----------
 
 if __name__ == "__main__":
     ROOT = r"C:\Users\asafi\Downloads\ta_lab2"
-    PKG  = "ta_lab2"
+    PKG = "ta_lab2"
 
     # 1) Tree (txt + md)
     structure_txt = os.path.join(ROOT, "structure.txt")
-    structure_md  = os.path.join(ROOT, "structure.md")
+    structure_md = os.path.join(ROOT, "structure.md")
     with open(structure_txt, "w", encoding="utf-8") as f:
         print_tree(ROOT, file=f)
     save_tree_markdown(ROOT, structure_md)

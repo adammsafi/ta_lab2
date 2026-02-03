@@ -144,10 +144,11 @@ class TestMultiprocessingOrchestrator:
 
     def test_stats_accumulation(self):
         """Test that stats are accumulated correctly."""
+
         def multi_stats_worker(task: int) -> tuple[List[Dict], Dict[str, int]]:
             return (
                 [{"id": task}],
-                {"upserted": task, "updated": task * 2, "deleted": 1}
+                {"upserted": task, "updated": task * 2, "deleted": 1},
             )
 
         orchestrator = MultiprocessingOrchestrator(worker_fn=multi_stats_worker)
@@ -163,10 +164,11 @@ class TestMultiprocessingOrchestrator:
 
         assert stats["upserted"] == 6  # 1 + 2 + 3
         assert stats["updated"] == 12  # 2 + 4 + 6
-        assert stats["deleted"] == 3   # 1 + 1 + 1
+        assert stats["deleted"] == 3  # 1 + 1 + 1
 
     def test_multiple_state_updates_per_task(self):
         """Test worker returning multiple state updates."""
+
         def multi_update_worker(task: int) -> tuple[List[Dict], Dict[str, int]]:
             updates = [{"id": task, "seq": i} for i in range(3)]
             return (updates, {"upserted": 3, "errors": 0})
@@ -377,6 +379,7 @@ class TestEdgeCases:
 
     def test_worker_returning_empty_state_updates(self):
         """Test worker that returns empty state updates."""
+
         def empty_worker(task: int) -> tuple[List[Dict], Dict[str, int]]:
             return ([], {"upserted": 0, "errors": 0})
 

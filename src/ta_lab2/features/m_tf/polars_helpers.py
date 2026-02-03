@@ -13,6 +13,7 @@ from sqlalchemy.engine import Engine, Connection
 
 try:
     import polars as pl
+
     HAVE_POLARS = True
 except ImportError:
     pl = None
@@ -36,7 +37,11 @@ def read_sql_polars(
     Returns pandas DataFrame for API compatibility.
     """
     # Convert params to None if it's an immutabledict (SQLAlchemy artifact)
-    if params is not None and hasattr(params, '__module__') and 'immutabledict' in str(type(params)):
+    if (
+        params is not None
+        and hasattr(params, "__module__")
+        and "immutabledict" in str(type(params))
+    ):
         params = dict(params) if params else None
 
     # Use pandas fallback if Polars not available
@@ -45,6 +50,7 @@ def read_sql_polars(
         # Both Engine and Connection with params need text() wrapper
         if isinstance(engine_or_conn, Connection):
             from sqlalchemy import text as sql_text
+
             if params:
                 result = engine_or_conn.execute(sql_text(sql), params)
             else:
@@ -54,6 +60,7 @@ def read_sql_polars(
             # Engine
             if params:
                 from sqlalchemy import text as sql_text
+
                 with engine_or_conn.connect() as conn:
                     result = conn.execute(sql_text(sql), params)
                     return pd.DataFrame(result.fetchall(), columns=result.keys())
@@ -68,6 +75,7 @@ def read_sql_polars(
             # Fallback for parameterized queries
             # Both Engine and Connection need text() wrapper for params
             from sqlalchemy import text as sql_text
+
             if isinstance(engine_or_conn, Connection):
                 result = engine_or_conn.execute(sql_text(sql), params)
                 return pd.DataFrame(result.fetchall(), columns=result.keys())
@@ -94,6 +102,7 @@ def read_sql_polars(
             # For Connection objects, execute directly
             try:
                 from sqlalchemy import text as sql_text
+
                 if params:
                     result = engine_or_conn.execute(sql_text(sql), params)
                 else:
@@ -106,6 +115,7 @@ def read_sql_polars(
             # For Engine objects with params, use text() and execute
             if params:
                 from sqlalchemy import text as sql_text
+
                 with engine_or_conn.connect() as conn:
                     result = conn.execute(sql_text(sql), params)
                     return pd.DataFrame(result.fetchall(), columns=result.keys())

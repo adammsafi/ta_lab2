@@ -14,4 +14,3 @@ rows = write_daily_ema_to_db(
 )
 
 print("Daily EMA rows written:", rows)
-

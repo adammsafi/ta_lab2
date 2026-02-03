@@ -5,9 +5,8 @@ Requires: backtesting, pandas, numpy
 """
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional
 
-import numpy as np
 import pandas as pd
 
 # Soft import: allow module to be imported even if backtesting is not installed.

@@ -6,7 +6,7 @@ deprecation support (MEMO-08).
 
 All timestamps are ISO 8601 format for consistent parsing and storage.
 """
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -32,6 +32,7 @@ class MemoryMetadata:
         ...     category="technical_analysis"
         ... )
     """
+
     created_at: str
     last_verified: str
     deprecated_since: Optional[str] = None
@@ -52,7 +53,7 @@ class MemoryMetadata:
 def create_metadata(
     source: str = "manual",
     category: Optional[str] = None,
-    existing: Optional[dict] = None
+    existing: Optional[dict] = None,
 ) -> dict:
     """Create or enrich memory metadata with timestamps.
 
@@ -92,7 +93,7 @@ def create_metadata(
         last_verified=now,  # Always update last_verified
         source=source,
         category=category,
-        migration_version=1
+        migration_version=1,
     )
 
     # Preserve deprecated_since and deprecation_reason if present
@@ -145,12 +146,16 @@ def validate_metadata(metadata: dict) -> tuple[bool, list[str]]:
                 # Try parsing as ISO 8601
                 datetime.fromisoformat(metadata[field])
             except (ValueError, TypeError) as e:
-                issues.append(f"Invalid ISO 8601 timestamp for {field}: {metadata[field]} ({e})")
+                issues.append(
+                    f"Invalid ISO 8601 timestamp for {field}: {metadata[field]} ({e})"
+                )
 
     # Validate migration_version is int
     if "migration_version" in metadata:
         if not isinstance(metadata["migration_version"], int):
-            issues.append(f"migration_version must be int, got {type(metadata['migration_version'])}")
+            issues.append(
+                f"migration_version must be int, got {type(metadata['migration_version'])}"
+            )
 
     # Validate deprecated_since and deprecation_reason consistency
     if metadata.get("deprecated_since") and not metadata.get("deprecation_reason"):
@@ -188,9 +193,4 @@ def mark_deprecated(metadata: dict, reason: str) -> dict:
     return updated
 
 
-__all__ = [
-    "MemoryMetadata",
-    "create_metadata",
-    "validate_metadata",
-    "mark_deprecated"
-]
+__all__ = ["MemoryMetadata", "create_metadata", "validate_metadata", "mark_deprecated"]

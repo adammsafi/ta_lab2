@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, DefaultDict
 from collections import defaultdict
 import logging
-import time
+
 
 def read_jsonl(path: Path) -> Iterable[Dict[str, Any]]:
     """Reads a JSONL file line by line."""
@@ -22,10 +22,11 @@ def read_jsonl(path: Path) -> Iterable[Dict[str, Any]]:
             except Exception as e:
                 raise RuntimeError(f"Invalid JSON on line {i} in {path}: {e}") from e
 
+
 def format_review_memory_as_markdown(mem: Dict[str, Any]) -> str:
     """Formats a single memory from the review queue into a Markdown string."""
     lines: List[str] = []
-    
+
     meta = mem.get("_decision_meta", {})
     title = mem.get("title", "Untitled Memory")
     mem_id = mem.get("memory_id", "N/A")
@@ -39,7 +40,7 @@ def format_review_memory_as_markdown(mem: Dict[str, Any]) -> str:
     lines.append(f"- **Registry Key:** `{reg_key}`")
     lines.append(f"- **Review Reason:** **{review_reason}**")
     lines.append("")
-    
+
     parent_summary = mem.get("parent_summary", "").strip() or "_not available_"
     lines.append(f"**Parent Summary:** {parent_summary}")
     lines.append("")
@@ -58,7 +59,7 @@ def format_review_memory_as_markdown(mem: Dict[str, Any]) -> str:
         lines.append(source_chunk)
         lines.append("```")
         lines.append("")
-    
+
     evidence = meta.get("evidence", {}) or {}
     evidence_sample = evidence.get("sample", [])
     if evidence_sample:
@@ -76,7 +77,7 @@ def format_review_memory_as_markdown(mem: Dict[str, Any]) -> str:
     override_snippet = {
         "registry_key": reg_key,
         "decision": "accept",
-        "note": "Manually reviewed and approved." 
+        "note": "Manually reviewed and approved.",
     }
     lines.append("**To accept this memory, add this to `decision_overrides.jsonl`:**")
     lines.append("```json")
@@ -86,15 +87,26 @@ def format_review_memory_as_markdown(mem: Dict[str, Any]) -> str:
 
     return "\n".join(lines)
 
+
 def main() -> int:
-    logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+    logging.basicConfig(
+        level=logging.INFO,
+        format="[%(asctime)s] %(levelname)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
     log = logging.getLogger()
 
     ap = argparse.ArgumentParser(
         description="Generate a triage report for memories in the review queue."
     )
-    ap.add_argument("--review-file", required=True, help="Path to the review_queue.jsonl file.")
-    ap.add_argument("--output", required=True, help="Path for the output review_triage_report.md file.")
+    ap.add_argument(
+        "--review-file", required=True, help="Path to the review_queue.jsonl file."
+    )
+    ap.add_argument(
+        "--output",
+        required=True,
+        help="Path for the output review_triage_report.md file.",
+    )
     args = ap.parse_args()
 
     review_path = Path(args.review_file)
@@ -113,12 +125,12 @@ def main() -> int:
     for mem in review_memories:
         reason = (mem.get("_decision_meta") or {}).get("reason", "unknown_reason")
         memories_by_reason[reason].append(mem)
-    
+
     log.info(f"Found {len(memories_by_reason)} unique review reasons.")
 
     # Generate Markdown Content
     md_content: List[str] = [
-        f"# Review Triage Report",
+        "# Review Triage Report",
         f"Generated from: `{review_path.name}`",
         f"Total Memories for Review: {len(review_memories)}",
     ]
@@ -127,8 +139,10 @@ def main() -> int:
 
     for reason in sorted_reasons:
         categorized_memories = memories_by_reason[reason]
-        md_content.append(f"\n---\n## Reason: {reason} ({len(categorized_memories)} memories)\n")
-        
+        md_content.append(
+            f"\n---\n## Reason: {reason} ({len(categorized_memories)} memories)\n"
+        )
+
         for mem in categorized_memories:
             md_content.append(format_review_memory_as_markdown(mem))
 
@@ -137,6 +151,7 @@ def main() -> int:
     log.info(f"Successfully generated review triage report at: {out_path}")
 
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

@@ -20,8 +20,8 @@ import logging
 import pandas as pd
 from sqlalchemy import Engine, text
 
-from ta_lab2.scripts.signals.signal_utils import compute_feature_hash, compute_params_hash
-from ta_lab2.scripts.backtests import SignalBacktester, BacktestResult
+from ta_lab2.scripts.signals.signal_utils import compute_feature_hash
+from ta_lab2.scripts.backtests import SignalBacktester
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +44,7 @@ class ReproducibilityReport:
         feature_hash_match: True if feature data hashes match
         differences: List of human-readable difference descriptions
     """
+
     is_reproducible: bool
     run_id_1: str
     run_id_2: str
@@ -117,7 +118,9 @@ def validate_backtest_reproducibility(
         ... )
         >>> assert report.is_reproducible
     """
-    logger.info(f"Validating reproducibility: {signal_type}/{signal_id} on asset {asset_id}")
+    logger.info(
+        f"Validating reproducibility: {signal_type}/{signal_id} on asset {asset_id}"
+    )
     logger.debug(f"  Date range: {start_ts} to {end_ts}")
     logger.debug(f"  Strict mode: {strict}, Tolerance: {tolerance}")
 
@@ -144,16 +147,22 @@ def validate_backtest_reproducibility(
             f"PnL mismatch: {result1.total_return:.6f} vs {result2.total_return:.6f} "
             f"(diff: {diff_pct:.6f}%)"
         )
-        logger.warning(f"PnL differs between runs: {result1.total_return} vs {result2.total_return}")
+        logger.warning(
+            f"PnL differs between runs: {result1.total_return} vs {result2.total_return}"
+        )
 
     # 2. Compare metrics
     metrics_match = _compare_metrics(result1.metrics, result2.metrics, tolerance)
     if not metrics_match:
         # Find specific metric differences
-        metric_diffs = _find_metric_differences(result1.metrics, result2.metrics, tolerance)
+        metric_diffs = _find_metric_differences(
+            result1.metrics, result2.metrics, tolerance
+        )
         for metric, (val1, val2) in metric_diffs.items():
             differences.append(f"Metric '{metric}': {val1} vs {val2}")
-        logger.warning(f"Metrics differ between runs: {len(metric_diffs)} metrics mismatch")
+        logger.warning(
+            f"Metrics differ between runs: {len(metric_diffs)} metrics mismatch"
+        )
 
     # 3. Compare trade counts
     trade_count_match = result1.trade_count == result2.trade_count
@@ -161,7 +170,9 @@ def validate_backtest_reproducibility(
         differences.append(
             f"Trade count mismatch: {result1.trade_count} vs {result2.trade_count}"
         )
-        logger.warning(f"Trade counts differ: {result1.trade_count} vs {result2.trade_count}")
+        logger.warning(
+            f"Trade counts differ: {result1.trade_count} vs {result2.trade_count}"
+        )
 
     # 4. Feature hash (both runs use same data source, should always match)
     feature_hash_match = True
@@ -185,7 +196,9 @@ def validate_backtest_reproducibility(
     if is_reproducible:
         logger.info("✓ Reproducibility validation PASSED")
     else:
-        logger.error(f"✗ Reproducibility validation FAILED: {len(differences)} differences found")
+        logger.error(
+            f"✗ Reproducibility validation FAILED: {len(differences)} differences found"
+        )
 
         if strict:
             raise RuntimeError(
@@ -234,7 +247,7 @@ def compare_backtest_runs(
     run2 = _load_run(engine, run_id_2)
 
     # Compare feature hashes (detects data changes)
-    feature_hash_match = run1['feature_hash'] == run2['feature_hash']
+    feature_hash_match = run1["feature_hash"] == run2["feature_hash"]
     if not feature_hash_match:
         logger.warning(
             f"Feature hashes differ: {run1['feature_hash']} vs {run2['feature_hash']}"
@@ -243,7 +256,7 @@ def compare_backtest_runs(
     # Compare results
     differences = []
 
-    pnl_match = abs(run1['total_return'] - run2['total_return']) < tolerance
+    pnl_match = abs(run1["total_return"] - run2["total_return"]) < tolerance
     if not pnl_match:
         differences.append(
             f"PnL: {run1['total_return']:.6f} vs {run2['total_return']:.6f}"
@@ -284,7 +297,7 @@ def validate_feature_hash_current(
     signal_type: str,
     signal_id: int,
     asset_id: int,
-    mode: str = 'warn',
+    mode: str = "warn",
 ) -> tuple[bool, Optional[str]]:
     """
     Validate that current feature data matches stored hash from signal generation.
@@ -315,11 +328,13 @@ def validate_feature_hash_current(
         >>> if not is_valid:
         ...     print(f"Validation failed: {msg}")
     """
-    if mode == 'trust':
+    if mode == "trust":
         logger.debug("Trust mode: skipping feature hash validation")
         return True, None
 
-    logger.debug(f"Validating feature hash for {signal_type}/{signal_id}, asset {asset_id}")
+    logger.debug(
+        f"Validating feature hash for {signal_type}/{signal_id}, asset {asset_id}"
+    )
 
     # Get stored hash from most recent signal
     stored_hash = _get_latest_feature_hash(engine, signal_type, signal_id, asset_id)
@@ -346,7 +361,7 @@ def validate_feature_hash_current(
         f"Signals may not reflect current feature data."
     )
 
-    if mode == 'strict':
+    if mode == "strict":
         logger.error(f"STRICT MODE: {message}")
         return False, message
 
@@ -358,6 +373,7 @@ def validate_feature_hash_current(
 # =============================================================================
 # Helper functions
 # =============================================================================
+
 
 def _compare_metrics(m1: dict, m2: dict, tolerance: float = 1e-10) -> bool:
     """
@@ -461,7 +477,8 @@ def _load_run(engine: Engine, run_id: str) -> dict:
     Raises:
         ValueError: If run_id not found
     """
-    sql = text("""
+    sql = text(
+        """
         SELECT
             run_id, signal_type, signal_id, asset_id,
             start_ts, end_ts, total_return, sharpe_ratio,
@@ -469,7 +486,8 @@ def _load_run(engine: Engine, run_id: str) -> dict:
             signal_params_hash, signal_version, vbt_version
         FROM public.cmc_backtest_runs
         WHERE run_id = :run_id
-    """)
+    """
+    )
 
     with engine.connect() as conn:
         result = conn.execute(sql, {"run_id": run_id})
@@ -479,20 +497,20 @@ def _load_run(engine: Engine, run_id: str) -> dict:
             raise ValueError(f"Backtest run not found: {run_id}")
 
         return {
-            'run_id': row[0],
-            'signal_type': row[1],
-            'signal_id': row[2],
-            'asset_id': row[3],
-            'start_ts': row[4],
-            'end_ts': row[5],
-            'total_return': row[6],
-            'sharpe_ratio': row[7],
-            'max_drawdown': row[8],
-            'trade_count': row[9],
-            'feature_hash': row[10],
-            'signal_params_hash': row[11],
-            'signal_version': row[12],
-            'vbt_version': row[13],
+            "run_id": row[0],
+            "signal_type": row[1],
+            "signal_id": row[2],
+            "asset_id": row[3],
+            "start_ts": row[4],
+            "end_ts": row[5],
+            "total_return": row[6],
+            "sharpe_ratio": row[7],
+            "max_drawdown": row[8],
+            "trade_count": row[9],
+            "feature_hash": row[10],
+            "signal_params_hash": row[11],
+            "signal_version": row[12],
+            "vbt_version": row[13],
         }
 
 
@@ -507,14 +525,16 @@ def _load_trades(engine: Engine, run_id: str) -> list[dict]:
     Returns:
         List of trade dictionaries
     """
-    sql = text("""
+    sql = text(
+        """
         SELECT
             entry_ts, entry_price, exit_ts, exit_price,
             direction, size, pnl_pct, pnl_dollars
         FROM public.cmc_backtest_trades
         WHERE run_id = :run_id
         ORDER BY entry_ts
-    """)
+    """
+    )
 
     with engine.connect() as conn:
         result = conn.execute(sql, {"run_id": run_id})
@@ -522,14 +542,14 @@ def _load_trades(engine: Engine, run_id: str) -> list[dict]:
 
         return [
             {
-                'entry_ts': row[0],
-                'entry_price': row[1],
-                'exit_ts': row[2],
-                'exit_price': row[3],
-                'direction': row[4],
-                'size': row[5],
-                'pnl_pct': row[6],
-                'pnl_dollars': row[7],
+                "entry_ts": row[0],
+                "entry_price": row[1],
+                "exit_ts": row[2],
+                "exit_price": row[3],
+                "direction": row[4],
+                "size": row[5],
+                "pnl_pct": row[6],
+                "pnl_dollars": row[7],
             }
             for row in rows
         ]
@@ -549,7 +569,8 @@ def _load_metrics(engine: Engine, run_id: str) -> dict:
     Raises:
         ValueError: If run_id not found
     """
-    sql = text("""
+    sql = text(
+        """
         SELECT
             total_return, cagr, sharpe_ratio, sortino_ratio, calmar_ratio,
             max_drawdown, max_drawdown_duration_days,
@@ -557,7 +578,8 @@ def _load_metrics(engine: Engine, run_id: str) -> dict:
             avg_holding_period_days, var_95, expected_shortfall
         FROM public.cmc_backtest_metrics
         WHERE run_id = :run_id
-    """)
+    """
+    )
 
     with engine.connect() as conn:
         result = conn.execute(sql, {"run_id": run_id})
@@ -567,21 +589,21 @@ def _load_metrics(engine: Engine, run_id: str) -> dict:
             raise ValueError(f"Metrics not found for run: {run_id}")
 
         return {
-            'total_return': row[0],
-            'cagr': row[1],
-            'sharpe_ratio': row[2],
-            'sortino_ratio': row[3],
-            'calmar_ratio': row[4],
-            'max_drawdown': row[5],
-            'max_drawdown_duration_days': row[6],
-            'trade_count': row[7],
-            'win_rate': row[8],
-            'profit_factor': row[9],
-            'avg_win': row[10],
-            'avg_loss': row[11],
-            'avg_holding_period_days': row[12],
-            'var_95': row[13],
-            'expected_shortfall': row[14],
+            "total_return": row[0],
+            "cagr": row[1],
+            "sharpe_ratio": row[2],
+            "sortino_ratio": row[3],
+            "calmar_ratio": row[4],
+            "max_drawdown": row[5],
+            "max_drawdown_duration_days": row[6],
+            "trade_count": row[7],
+            "win_rate": row[8],
+            "profit_factor": row[9],
+            "avg_win": row[10],
+            "avg_loss": row[11],
+            "avg_holding_period_days": row[12],
+            "var_95": row[13],
+            "expected_shortfall": row[14],
         }
 
 
@@ -605,20 +627,19 @@ def _get_latest_feature_hash(
     """
     table = f"cmc_signals_{signal_type}"
 
-    sql = text(f"""
+    sql = text(
+        f"""
         SELECT feature_version_hash
         FROM public.{table}
         WHERE id = :asset_id
           AND signal_id = :signal_id
         ORDER BY entry_ts DESC
         LIMIT 1
-    """)
+    """
+    )
 
     with engine.connect() as conn:
-        result = conn.execute(sql, {
-            "asset_id": asset_id,
-            "signal_id": signal_id
-        })
+        result = conn.execute(sql, {"asset_id": asset_id, "signal_id": signal_id})
         row = result.fetchone()
 
         return row[0] if row else None
@@ -647,13 +668,15 @@ def _compute_current_feature_hash(
     feature_cols = _get_feature_columns_for_signal_type(signal_type)
 
     # Load feature data for this asset
-    columns_str = ', '.join(feature_cols)
-    sql = text(f"""
+    columns_str = ", ".join(feature_cols)
+    sql = text(
+        f"""
         SELECT ts, {columns_str}
         FROM public.cmc_daily_features
         WHERE id = :asset_id
         ORDER BY ts
-    """)
+    """
+    )
 
     with engine.connect() as conn:
         df = pd.read_sql(sql, conn, params={"asset_id": asset_id})
@@ -679,21 +702,26 @@ def _get_feature_columns_for_signal_type(signal_type: str) -> list[str]:
         List of column names to include in hash
     """
     # Base columns (always included)
-    base = ['close']
+    base = ["close"]
 
-    if signal_type == 'ema_crossover':
+    if signal_type == "ema_crossover":
         # EMA signals use EMA columns (specific periods loaded from dim_signals)
         # For hash validation, include common EMA periods
         return base + [
-            'ema_9', 'ema_10', 'ema_21', 'ema_50', 'ema_200',
-            'rsi_14', 'atr_14'  # Context features
+            "ema_9",
+            "ema_10",
+            "ema_21",
+            "ema_50",
+            "ema_200",
+            "rsi_14",
+            "atr_14",  # Context features
         ]
-    elif signal_type == 'rsi_mean_revert':
+    elif signal_type == "rsi_mean_revert":
         # RSI signals use RSI and context features
-        return base + ['rsi_14', 'rsi_7', 'rsi_21', 'atr_14', 'ema_21']
-    elif signal_type == 'atr_breakout':
+        return base + ["rsi_14", "rsi_7", "rsi_21", "atr_14", "ema_21"]
+    elif signal_type == "atr_breakout":
         # ATR breakout uses volatility and channel features
-        return base + ['atr_14', 'bb_up_20_2', 'bb_lo_20_2', 'ema_21', 'rsi_14']
+        return base + ["atr_14", "bb_up_20_2", "bb_lo_20_2", "ema_21", "rsi_14"]
     else:
         # Unknown signal type - use all base features
         return base

@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS public.cmc_price_bars_multi_tf_cal_anchor_iso (
 CREATE INDEX IF NOT EXISTS ix_cmc_price_bars_multi_tf_cal_anchor_iso_id_tf_timeclose
   ON public.cmc_price_bars_multi_tf_cal_anchor_iso (id, tf, time_close);
 
-SELECT 
+SELECT
 	DISTINCT(tf),
 	tf_days
 FROM cmc_price_bars_multi_tf_cal_anchor_iso

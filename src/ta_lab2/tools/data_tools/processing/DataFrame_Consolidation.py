@@ -45,6 +45,7 @@ You can map short ↔ verbose using their numbers.
 
 try:
     import pandas as pd
+
     PANDAS_AVAILABLE = True
 except ImportError:
     PANDAS_AVAILABLE = False
@@ -113,10 +114,7 @@ def _prep(df, name: str):
 # STEP 2: Merge All DataFrames & Handle Missing Data
 # ===========================================================
 def combine_timeframes(
-    dfs: List,
-    names: List[str],
-    persist: bool = True,
-    limit: Optional[int] = None
+    dfs: List, names: List[str], persist: bool = True, limit: Optional[int] = None
 ):
     """Merge multiple DataFrames with different time granularities into one unified, aligned DataFrame.
 
@@ -190,18 +188,18 @@ def missing_ranges(mask) -> List[Tuple]:
 
     # (S12) Normalize to pure boolean and handle stray NaNs (treat as not-missing)
     #       (cast to pandas 'boolean' dtype first to avoid FutureWarning on fillna)
-    b = mask.astype('boolean').fillna(False)
+    b = mask.astype("boolean").fillna(False)
 
     # (S13) Detect run starts/ends using shift (no FutureWarnings)
-    starts = (~b.shift(1, fill_value=False)) & b    # False→True
-    ends   = b & (~b.shift(-1, fill_value=False))   # True→False
+    starts = (~b.shift(1, fill_value=False)) & b  # False→True
+    ends = b & (~b.shift(-1, fill_value=False))  # True→False
 
     # (V13) 'starts' marks transitions where a missing block begins;
     # 'ends' marks where it ends. We pair these into intervals.
 
     # (S14) Build (start, end) pairs of missing ranges
     starts_idx = b.index[starts]
-    ends_idx   = b.index[ends]
+    ends_idx = b.index[ends]
     return list(zip(starts_idx, ends_idx))
 
 

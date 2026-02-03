@@ -1,28 +1,26 @@
 """Comprehensive tests for quota tracking system."""
 
-import json
 import tempfile
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
-from ta_lab2.tools.ai_orchestrator.quota import QuotaAlert, QuotaLimit, QuotaTracker
-from ta_lab2.tools.ai_orchestrator.persistence import QuotaPersistence, QuotaState
+from ta_lab2.tools.ai_orchestrator.quota import QuotaAlert, QuotaTracker
 
 
 @pytest.fixture
 def temp_storage_path():
     """Create temporary storage path for isolated tests."""
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
         temp_path = f.name
 
     yield temp_path
 
     # Cleanup
     Path(temp_path).unlink(missing_ok=True)
-    Path(temp_path).with_suffix('.tmp').unlink(missing_ok=True)
+    Path(temp_path).with_suffix(".tmp").unlink(missing_ok=True)
 
 
 @pytest.fixture
@@ -35,6 +33,7 @@ def clean_quota(temp_storage_path):
 # UTC Midnight Reset Tests
 # =============================================================================
 
+
 def test_quota_resets_at_utc_midnight(temp_storage_path):
     """Verify quota resets at UTC midnight."""
     tracker = QuotaTracker(persistence_path=temp_storage_path)
@@ -46,7 +45,7 @@ def test_quota_resets_at_utc_midnight(temp_storage_path):
     # Mock time to be past reset time
     future_time = tracker.limits["gemini_cli"].resets_at + timedelta(hours=1)
 
-    with patch('ta_lab2.tools.ai_orchestrator.quota.datetime') as mock_datetime:
+    with patch("ta_lab2.tools.ai_orchestrator.quota.datetime") as mock_datetime:
         mock_datetime.now.return_value = future_time
         mock_datetime.fromisoformat = datetime.fromisoformat
 
@@ -83,7 +82,7 @@ def test_quota_persists_after_reset(temp_storage_path):
     # Simulate next day
     future_time = tracker.limits["gemini_cli"].resets_at + timedelta(hours=1)
 
-    with patch('ta_lab2.tools.ai_orchestrator.quota.datetime') as mock_datetime:
+    with patch("ta_lab2.tools.ai_orchestrator.quota.datetime") as mock_datetime:
         mock_datetime.now.return_value = future_time
         mock_datetime.fromisoformat = datetime.fromisoformat
 
@@ -101,6 +100,7 @@ def test_quota_persists_after_reset(temp_storage_path):
 # Threshold Alert Tests
 # =============================================================================
 
+
 def test_alert_at_50_percent(temp_storage_path):
     """Verify callback fires at 50% threshold."""
     alerts = []
@@ -111,7 +111,7 @@ def test_alert_at_50_percent(temp_storage_path):
     tracker = QuotaTracker(
         alert_thresholds=[50, 80, 90],
         on_alert=capture_alert,
-        persistence_path=temp_storage_path
+        persistence_path=temp_storage_path,
     )
 
     # Use 750 requests (50% of 1500)
@@ -133,7 +133,7 @@ def test_alert_at_80_percent(temp_storage_path):
     tracker = QuotaTracker(
         alert_thresholds=[50, 80, 90],
         on_alert=capture_alert,
-        persistence_path=temp_storage_path
+        persistence_path=temp_storage_path,
     )
 
     # Use 1200 requests (80% of 1500)
@@ -156,7 +156,7 @@ def test_alert_at_90_percent(temp_storage_path):
     tracker = QuotaTracker(
         alert_thresholds=[50, 80, 90],
         on_alert=capture_alert,
-        persistence_path=temp_storage_path
+        persistence_path=temp_storage_path,
     )
 
     # Use 1350 requests (90% of 1500)
@@ -180,7 +180,7 @@ def test_no_duplicate_alerts(temp_storage_path):
     tracker = QuotaTracker(
         alert_thresholds=[50, 80, 90],
         on_alert=capture_alert,
-        persistence_path=temp_storage_path
+        persistence_path=temp_storage_path,
     )
 
     # Cross 50% threshold
@@ -195,6 +195,7 @@ def test_no_duplicate_alerts(temp_storage_path):
 # =============================================================================
 # Persistence Tests
 # =============================================================================
+
 
 def test_quota_persists_across_restart(temp_storage_path):
     """Save, recreate, verify state persists."""
@@ -214,7 +215,7 @@ def test_quota_persists_across_restart(temp_storage_path):
 def test_corrupted_file_handled(temp_storage_path):
     """Bad JSON doesn't crash."""
     # Write corrupted JSON
-    with open(temp_storage_path, 'w') as f:
+    with open(temp_storage_path, "w") as f:
         f.write("{ invalid json }")
 
     # Should not crash, should start fresh
@@ -236,6 +237,7 @@ def test_missing_file_handled(temp_storage_path):
 # =============================================================================
 # Reservation Tests
 # =============================================================================
+
 
 def test_reserve_blocks_quota(clean_quota):
     """Reserved quota not available."""
@@ -297,6 +299,7 @@ def test_cannot_reserve_beyond_limit(clean_quota):
 # Daily Summary Tests
 # =============================================================================
 
+
 def test_daily_summary_format(clean_quota):
     """Verify summary structure."""
     tracker = clean_quota
@@ -315,8 +318,7 @@ def test_daily_summary_after_usage(temp_storage_path):
     """Accurate counts in summary."""
     alerts = []
     tracker = QuotaTracker(
-        on_alert=lambda a: alerts.append(a),
-        persistence_path=temp_storage_path
+        on_alert=lambda a: alerts.append(a), persistence_path=temp_storage_path
     )
 
     # Use 800 requests (53.3%, triggers 50% alert)
@@ -335,6 +337,7 @@ def test_daily_summary_after_usage(temp_storage_path):
 # Integration Tests
 # =============================================================================
 
+
 def test_full_quota_lifecycle(temp_storage_path):
     """Test complete quota lifecycle: reserve, use, alert, persist, reset."""
     alerts = []
@@ -346,7 +349,7 @@ def test_full_quota_lifecycle(temp_storage_path):
     tracker = QuotaTracker(
         alert_thresholds=[50, 80, 90],
         on_alert=capture_alert,
-        persistence_path=temp_storage_path
+        persistence_path=temp_storage_path,
     )
 
     # Reserve some quota

@@ -93,7 +93,9 @@ def rolling_agreement(
     return df
 
 
-def forward_return_split(df: pd.DataFrame, agree_col: str, fwd_ret_col: str) -> pd.DataFrame:
+def forward_return_split(
+    df: pd.DataFrame, agree_col: str, fwd_ret_col: str
+) -> pd.DataFrame:
     """Compare forward returns when agree==True vs False."""
     sub = df[[agree_col, fwd_ret_col]].dropna()
     return (
@@ -121,13 +123,25 @@ def lead_lag_max_corr(
         if k == 0:
             corrs[k] = x.corr(y)
         elif k > 0:
-            corrs[k] = x.iloc[k:].reset_index(drop=True).corr(y.iloc[:-k].reset_index(drop=True))
+            corrs[k] = (
+                x.iloc[k:]
+                .reset_index(drop=True)
+                .corr(y.iloc[:-k].reset_index(drop=True))
+            )
         else:  # k < 0
             kk = -k
-            corrs[k] = x.iloc[:-kk].reset_index(drop=True).corr(y.iloc[kk:].reset_index(drop=True))
+            corrs[k] = (
+                x.iloc[:-kk]
+                .reset_index(drop=True)
+                .corr(y.iloc[kk:].reset_index(drop=True))
+            )
     s = pd.Series(corrs).dropna()
     best_lag = int(s.abs().idxmax()) if not s.empty else 0
-    return {"best_lag": best_lag, "best_corr": float(s.loc[best_lag]) if not s.empty else np.nan, "corr_by_lag": s}
+    return {
+        "best_lag": best_lag,
+        "best_corr": float(s.loc[best_lag]) if not s.empty else np.nan,
+        "corr_by_lag": s,
+    }
 
 
 # ---------------------------------------------------------------------
@@ -136,11 +150,13 @@ def lead_lag_max_corr(
 def _find_ema_columns(df: pd.DataFrame, token: str = "_ema_") -> list[str]:
     """Auto-detect EMA columns by substring token (default: '_ema_')."""
     cols = [c for c in df.columns if token in c]
+
     def _tail_int(name: str) -> int:
         try:
             return int(name.split("_")[-1])
         except Exception:
             return 10**9
+
     return sorted(cols, key=_tail_int)
 
 
@@ -152,7 +168,7 @@ def compute_ema_comovement_stats(
     df: pd.DataFrame,
     *,
     ema_cols: Sequence[str] | None = None,
-    method: str = "spearman",      # "pearson" | "spearman"
+    method: str = "spearman",  # "pearson" | "spearman"
     agree_on_sign_of_diff: bool = True,
     diff_window: int = 1,
 ) -> Dict[str, pd.DataFrame]:
@@ -190,7 +206,9 @@ def compute_ema_comovement_stats(
     else:
         agree_df = pd.DataFrame(columns=["a", "b", "agree_rate"], dtype=float)
 
-    meta = pd.DataFrame([{"n_ema": len(ema_cols), "method": method, "diff_window": diff_window}])
+    meta = pd.DataFrame(
+        [{"n_ema": len(ema_cols), "method": method, "diff_window": diff_window}]
+    )
     return {"corr": corr, "agree": agree_df, "meta": meta}
 
 
@@ -215,9 +233,17 @@ def compute_ema_comovement_hierarchy(
         ema_cols = _find_ema_columns(df)
     ema_cols = [c for c in ema_cols if c in df.columns]
 
-    corr = df[ema_cols].corr(method=method) if len(ema_cols) >= 2 else pd.DataFrame(index=ema_cols, columns=ema_cols)
+    corr = (
+        df[ema_cols].corr(method=method)
+        if len(ema_cols) >= 2
+        else pd.DataFrame(index=ema_cols, columns=ema_cols)
+    )
     if corr.empty:
-        return {"corr": corr, "order": ema_cols, "scores": pd.DataFrame({"col": ema_cols, "mean_abs_corr": []})}
+        return {
+            "corr": corr,
+            "order": ema_cols,
+            "scores": pd.DataFrame({"col": ema_cols, "mean_abs_corr": []}),
+        }
 
     # Mean absolute correlation per EMA column (ignore self-corr on the diagonal)
     abs_corr = corr.abs()
@@ -225,7 +251,11 @@ def compute_ema_comovement_hierarchy(
     scores = abs_corr.mean(skipna=True).rename("mean_abs_corr").to_frame()
     order = list(scores.sort_values("mean_abs_corr", ascending=False).index)
 
-    return {"corr": corr, "order": order, "scores": scores.reset_index().rename(columns={"index": "col"})}
+    return {
+        "corr": corr,
+        "order": order,
+        "scores": scores.reset_index().rename(columns={"index": "col"}),
+    }
 
 
 __all__ = [

@@ -106,7 +106,8 @@ Examples:
 
     # Verbosity
     parser.add_argument(
-        "-v", "--verbose",
+        "-v",
+        "--verbose",
         action="store_true",
         help="Verbose output",
     )
@@ -123,11 +124,13 @@ def get_all_ids(engine) -> list[int]:
     """
     from sqlalchemy import text
 
-    sql = text("""
+    sql = text(
+        """
         SELECT DISTINCT id
         FROM public.cmc_price_bars_1d
         ORDER BY id
-    """)
+    """
+    )
 
     with engine.connect() as conn:
         result = conn.execute(sql)
@@ -207,7 +210,7 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     # Compute features
     if args.verbose:
-        print(f"Computing volatility features...")
+        print("Computing volatility features...")
         print(f"  IDs: {ids}")
         print(f"  Start: {start_date}")
         print(f"  End: {args.end or 'latest'}")
@@ -237,7 +240,9 @@ def main(argv: Optional[list[str]] = None) -> int:
 
         print(f"[OK] Computed {rows_computed} volatility rows for {len(ids)} IDs")
     else:
-        print(f"[DRY RUN] Would compute {rows_computed} volatility rows for {len(ids)} IDs")
+        print(
+            f"[DRY RUN] Would compute {rows_computed} volatility rows for {len(ids)} IDs"
+        )
 
     return 0
 

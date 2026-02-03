@@ -1,14 +1,20 @@
 """Tests for async execution engine."""
 import asyncio
 import pytest
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock
 
 from ta_lab2.tools.ai_orchestrator.execution import (
     AsyncOrchestrator,
     AggregatedResult,
     aggregate_results,
 )
-from ta_lab2.tools.ai_orchestrator.core import Task, Result, TaskType, Platform, TaskStatus
+from ta_lab2.tools.ai_orchestrator.core import (
+    Task,
+    Result,
+    TaskType,
+    Platform,
+    TaskStatus,
+)
 
 
 class TestAggregatedResult:
@@ -80,9 +86,19 @@ class TestAggregateResults:
         """Total cost is sum of all result costs."""
         task = Task(type=TaskType.CODE_GENERATION, prompt="test")
         results = [
-            Result(task=task, platform=Platform.GEMINI, output="", success=True, cost=0.5),
-            Result(task=task, platform=Platform.CHATGPT, output="", success=True, cost=1.2),
-            Result(task=task, platform=Platform.CLAUDE_CODE, output="", success=True, cost=0.0),
+            Result(
+                task=task, platform=Platform.GEMINI, output="", success=True, cost=0.5
+            ),
+            Result(
+                task=task, platform=Platform.CHATGPT, output="", success=True, cost=1.2
+            ),
+            Result(
+                task=task,
+                platform=Platform.CLAUDE_CODE,
+                output="",
+                success=True,
+                cost=0.0,
+            ),
         ]
 
         agg = aggregate_results(results)
@@ -92,9 +108,27 @@ class TestAggregateResults:
         """Total tokens is sum of all tokens."""
         task = Task(type=TaskType.CODE_GENERATION, prompt="test")
         results = [
-            Result(task=task, platform=Platform.GEMINI, output="", success=True, tokens_used=100),
-            Result(task=task, platform=Platform.CHATGPT, output="", success=True, tokens_used=250),
-            Result(task=task, platform=Platform.CLAUDE_CODE, output="", success=True, tokens_used=50),
+            Result(
+                task=task,
+                platform=Platform.GEMINI,
+                output="",
+                success=True,
+                tokens_used=100,
+            ),
+            Result(
+                task=task,
+                platform=Platform.CHATGPT,
+                output="",
+                success=True,
+                tokens_used=250,
+            ),
+            Result(
+                task=task,
+                platform=Platform.CLAUDE_CODE,
+                output="",
+                success=True,
+                tokens_used=50,
+            ),
         ]
 
         agg = aggregate_results(results)
@@ -144,12 +178,14 @@ class TestAsyncOrchestrator:
         # Mock adapter
         mock_adapter = AsyncMock()
         mock_adapter.submit_task = AsyncMock(return_value="task-123")
-        mock_adapter.get_result = AsyncMock(return_value=Result(
-            task=task,
-            platform=Platform.GEMINI,
-            output="Generated code",
-            success=True,
-        ))
+        mock_adapter.get_result = AsyncMock(
+            return_value=Result(
+                task=task,
+                platform=Platform.GEMINI,
+                output="Generated code",
+                success=True,
+            )
+        )
 
         # Mock router
         mock_router = Mock()
@@ -175,8 +211,7 @@ class TestAsyncOrchestrator:
     async def test_execute_parallel_runs_concurrently(self):
         """Tasks run in parallel, not sequentially."""
         tasks = [
-            Task(type=TaskType.CODE_GENERATION, prompt=f"task {i}")
-            for i in range(3)
+            Task(type=TaskType.CODE_GENERATION, prompt=f"task {i}") for i in range(3)
         ]
 
         # Mock adapter with delay to measure parallelism
@@ -190,7 +225,9 @@ class TestAsyncOrchestrator:
             )
 
         mock_adapter = AsyncMock()
-        mock_adapter.submit_task = AsyncMock(side_effect=lambda t: f"task-{tasks.index(t)}")
+        mock_adapter.submit_task = AsyncMock(
+            side_effect=lambda t: f"task-{tasks.index(t)}"
+        )
         mock_adapter.get_result = AsyncMock(side_effect=mock_execute)
 
         mock_router = Mock()
@@ -204,6 +241,7 @@ class TestAsyncOrchestrator:
 
         # Measure execution time
         import time
+
         start = time.time()
         agg_result = await orchestrator.execute_parallel(tasks)
         duration = time.time() - start
@@ -235,7 +273,9 @@ class TestAsyncOrchestrator:
             )
 
         mock_adapter = AsyncMock()
-        mock_adapter.submit_task = AsyncMock(side_effect=lambda t: f"task-{tasks.index(t)}")
+        mock_adapter.submit_task = AsyncMock(
+            side_effect=lambda t: f"task-{tasks.index(t)}"
+        )
         mock_adapter.get_result = AsyncMock(side_effect=mock_execute)
 
         mock_router = Mock()
@@ -261,8 +301,7 @@ class TestAsyncOrchestrator:
     async def test_semaphore_limits_concurrency(self):
         """Semaphore prevents more than max_concurrent tasks."""
         tasks = [
-            Task(type=TaskType.CODE_GENERATION, prompt=f"task {i}")
-            for i in range(10)
+            Task(type=TaskType.CODE_GENERATION, prompt=f"task {i}") for i in range(10)
         ]
 
         # Track concurrent execution count
@@ -289,7 +328,9 @@ class TestAsyncOrchestrator:
             )
 
         mock_adapter = AsyncMock()
-        mock_adapter.submit_task = AsyncMock(side_effect=lambda t: f"task-{tasks.index(t)}")
+        mock_adapter.submit_task = AsyncMock(
+            side_effect=lambda t: f"task-{tasks.index(t)}"
+        )
         mock_adapter.get_result = AsyncMock(side_effect=mock_execute)
 
         mock_router = Mock()
@@ -305,15 +346,16 @@ class TestAsyncOrchestrator:
         agg_result = await orchestrator.execute_parallel(tasks)
 
         # Verify semaphore worked
-        assert max_concurrent_observed <= 3, f"Exceeded concurrency limit: {max_concurrent_observed}"
+        assert (
+            max_concurrent_observed <= 3
+        ), f"Exceeded concurrency limit: {max_concurrent_observed}"
         assert agg_result.success_count == 10
 
     @pytest.mark.asyncio
     async def test_results_in_original_order(self):
         """Results returned in same order as input tasks."""
         tasks = [
-            Task(type=TaskType.CODE_GENERATION, prompt=f"task {i}")
-            for i in range(5)
+            Task(type=TaskType.CODE_GENERATION, prompt=f"task {i}") for i in range(5)
         ]
 
         # Mock adapter with varying delays
@@ -335,7 +377,9 @@ class TestAsyncOrchestrator:
             )
 
         mock_adapter = AsyncMock()
-        mock_adapter.submit_task = AsyncMock(side_effect=lambda t: f"task-{tasks.index(t)}")
+        mock_adapter.submit_task = AsyncMock(
+            side_effect=lambda t: f"task-{tasks.index(t)}"
+        )
         mock_adapter.get_result = AsyncMock(side_effect=mock_execute)
 
         mock_router = Mock()
@@ -366,7 +410,9 @@ class TestAsyncOrchestrator:
 
         # Mock adapter that raises exception
         mock_adapter = AsyncMock()
-        mock_adapter.submit_task = AsyncMock(side_effect=RuntimeError("Adapter unavailable"))
+        mock_adapter.submit_task = AsyncMock(
+            side_effect=RuntimeError("Adapter unavailable")
+        )
 
         mock_router = Mock()
         mock_router.route_cost_optimized = Mock(return_value=Platform.GEMINI)
@@ -409,7 +455,9 @@ class TestAdaptiveConcurrency:
 
         quota_tracker = QuotaTracker()
         # Simulate Gemini with 100 requests remaining
-        quota_tracker.limits["gemini_cli"].used = 1400  # 1500 limit - 1400 used = 100 remaining
+        quota_tracker.limits[
+            "gemini_cli"
+        ].used = 1400  # 1500 limit - 1400 used = 100 remaining
 
         orchestrator = AsyncOrchestrator(
             quota_tracker=quota_tracker,

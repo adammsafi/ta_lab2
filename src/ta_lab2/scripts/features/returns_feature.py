@@ -32,6 +32,7 @@ from ta_lab2.scripts.features.base_feature import BaseFeature, FeatureConfig
 # Configuration
 # =============================================================================
 
+
 @dataclass(frozen=True)
 class ReturnsConfig(FeatureConfig):
     """
@@ -45,6 +46,7 @@ class ReturnsConfig(FeatureConfig):
         zscore_window: Rolling window for z-score (default 252 days)
         lookback_windows: Return windows to compute (from dim_timeframe)
     """
+
     feature_type: str = "returns"
     output_table: str = "cmc_returns_daily"
     null_strategy: str = "skip"  # Per CONTEXT.md - returns skip NULLs
@@ -58,6 +60,7 @@ class ReturnsConfig(FeatureConfig):
 # =============================================================================
 # ReturnsFeature Implementation
 # =============================================================================
+
 
 class ReturnsFeature(BaseFeature):
     """
@@ -197,7 +200,7 @@ class ReturnsFeature(BaseFeature):
             return pd.DataFrame()
 
         # Ensure ts is datetime
-        df_source['ts'] = pd.to_datetime(df_source['ts'], utc=True)
+        df_source["ts"] = pd.to_datetime(df_source["ts"], utc=True)
 
         # Get valid lookback windows
         lookback_windows = self.get_lookback_windows()
@@ -205,21 +208,21 @@ class ReturnsFeature(BaseFeature):
         # Process each ID separately (returns require chronological order per asset)
         results = []
 
-        for asset_id, df_asset in df_source.groupby('id'):
+        for asset_id, df_asset in df_source.groupby("id"):
             # Sort by timestamp ascending
-            df_asset = df_asset.sort_values('ts').copy()
+            df_asset = df_asset.sort_values("ts").copy()
 
             # Compute bar-to-bar returns using existing functions
             # b2t_pct_delta and b2t_log_delta modify df in-place
-            b2t_pct_delta(df_asset, cols=['close'], direction='oldest_top')
-            b2t_log_delta(df_asset, cols=['close'], direction='oldest_top')
+            b2t_pct_delta(df_asset, cols=["close"], direction="oldest_top")
+            b2t_log_delta(df_asset, cols=["close"], direction="oldest_top")
 
             # Rename to match schema
-            df_asset['ret_1d_pct'] = df_asset['close_b2t_pct']
-            df_asset['ret_1d_log'] = df_asset['close_b2t_log']
+            df_asset["ret_1d_pct"] = df_asset["close_b2t_pct"]
+            df_asset["ret_1d_log"] = df_asset["close_b2t_log"]
 
             # Drop intermediate columns
-            df_asset = df_asset.drop(columns=['close_b2t_pct', 'close_b2t_log'])
+            df_asset = df_asset.drop(columns=["close_b2t_pct", "close_b2t_log"])
 
             # Compute multi-day percent returns
             for window in lookback_windows:
@@ -229,12 +232,12 @@ class ReturnsFeature(BaseFeature):
 
                 # pct_change(periods=n) computes (close[t] - close[t-n]) / close[t-n]
                 col_name = f"ret_{window}d_pct"
-                df_asset[col_name] = df_asset['close'].pct_change(periods=window)
+                df_asset[col_name] = df_asset["close"].pct_change(periods=window)
 
             # Compute gap_days (days since previous observation)
-            df_asset['gap_days'] = (df_asset['ts'] - df_asset['ts'].shift(1)).dt.days
+            df_asset["gap_days"] = (df_asset["ts"] - df_asset["ts"].shift(1)).dt.days
             # First row has no previous, set to NULL
-            df_asset.loc[df_asset.index[0], 'gap_days'] = None
+            df_asset.loc[df_asset.index[0], "gap_days"] = None
 
             results.append(df_asset)
 
@@ -320,13 +323,13 @@ class ReturnsFeature(BaseFeature):
         from ta_lab2.features.feature_utils import add_zscore as add_zscore_util
 
         # Add z-score for key windows only (1D, 7D, 30D)
-        key_windows = ['ret_1d_pct', 'ret_7d_pct', 'ret_30d_pct']
+        key_windows = ["ret_1d_pct", "ret_7d_pct", "ret_30d_pct"]
 
         for col in key_windows:
             if col in df.columns:
                 # Process each asset separately for rolling calculations
                 results = []
-                for asset_id, df_asset in df.groupby('id'):
+                for asset_id, df_asset in df.groupby("id"):
                     df_asset = df_asset.copy()
                     add_zscore_util(
                         df_asset,
@@ -356,17 +359,17 @@ class ReturnsFeature(BaseFeature):
         from ta_lab2.features.feature_utils import flag_outliers
 
         # Start with all False
-        df['is_outlier'] = False
+        df["is_outlier"] = False
 
         # Flag outliers in key windows
-        key_windows = ['ret_1d_pct', 'ret_7d_pct', 'ret_30d_pct']
+        key_windows = ["ret_1d_pct", "ret_7d_pct", "ret_30d_pct"]
 
         for col in key_windows:
             if col in df.columns:
                 # Flag using z-score method (4 sigma threshold)
-                outlier_flags = flag_outliers(df[col], n_sigma=4.0, method='zscore')
+                outlier_flags = flag_outliers(df[col], n_sigma=4.0, method="zscore")
                 # Mark as outlier if ANY window is flagged
-                df['is_outlier'] = df['is_outlier'] | outlier_flags
+                df["is_outlier"] = df["is_outlier"] | outlier_flags
 
         return df
 

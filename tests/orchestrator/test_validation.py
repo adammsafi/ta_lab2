@@ -1,12 +1,11 @@
 """Tests for adapter validation (ORCH-11 double-check pattern)."""
 
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 from src.ta_lab2.tools.ai_orchestrator.core import Task, TaskType, Platform, Result
 from src.ta_lab2.tools.ai_orchestrator.validation import (
     AdapterValidator,
-    ValidationResult,
     pre_flight_check,
 )
 from src.ta_lab2.tools.ai_orchestrator.adapters import (

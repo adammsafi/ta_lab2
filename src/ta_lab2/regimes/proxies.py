@@ -4,24 +4,33 @@ from dataclasses import dataclass
 from typing import Optional
 import pandas as pd
 
+
 @dataclass
 class ProxyInputs:
     child_daily: pd.DataFrame
-    parent_weekly: Optional[pd.DataFrame] = None  # e.g., NDX/sector/BTC weekly with precomputed EMAs/ATR
-    market_weekly: Optional[pd.DataFrame] = None  # broad market weekly (SPX/Total Market)
+    parent_weekly: Optional[
+        pd.DataFrame
+    ] = None  # e.g., NDX/sector/BTC weekly with precomputed EMAs/ATR
+    market_weekly: Optional[
+        pd.DataFrame
+    ] = None  # broad market weekly (SPX/Total Market)
+
 
 @dataclass
 class ProxyOutcome:
     l0_cap: float = 1.0
     l1_size_mult: float = 1.0
 
+
 def _is_weekly_up_normal(weekly: pd.DataFrame) -> bool:
     cols = weekly.columns
-    if {"close","close_ema_20","close_ema_50","close_ema_200"}.issubset(cols):
-        up = (weekly["close"].iloc[-1] > weekly["close_ema_200"].iloc[-1]) and \
-             (weekly["close_ema_20"].iloc[-1] > weekly["close_ema_50"].iloc[-1])
+    if {"close", "close_ema_20", "close_ema_50", "close_ema_200"}.issubset(cols):
+        up = (weekly["close"].iloc[-1] > weekly["close_ema_200"].iloc[-1]) and (
+            weekly["close_ema_20"].iloc[-1] > weekly["close_ema_50"].iloc[-1]
+        )
         return bool(up)
     return False
+
 
 def infer_cycle_proxy(inp: ProxyInputs) -> ProxyOutcome:
     """
@@ -33,6 +42,7 @@ def infer_cycle_proxy(inp: ProxyInputs) -> ProxyOutcome:
     if not _is_weekly_up_normal(inp.market_weekly):
         out.l0_cap = 0.7  # cap net if market not supportive
     return out
+
 
 def infer_weekly_macro_proxy(inp: ProxyInputs) -> ProxyOutcome:
     """

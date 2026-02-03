@@ -28,6 +28,7 @@ class Mem0Config:
         embedder_model: Embedding model (MUST be text-embedding-3-small for compatibility)
         openai_api_key: OpenAI API key for LLM and embeddings
     """
+
     chromadb_path: str
     collection_name: str = "project_memories"
     llm_model: str = "gpt-4o-mini"
@@ -62,12 +63,13 @@ def create_mem0_config(config: Optional[Mem0Config] = None) -> dict:
     if config is None:
         # Load from OrchestratorConfig
         from ta_lab2.tools.ai_orchestrator.config import load_config
+
         orchestrator_config = load_config()
 
         config = Mem0Config(
             chromadb_path=orchestrator_config.chromadb_path,
             collection_name=orchestrator_config.chromadb_collection_name,
-            openai_api_key=orchestrator_config.openai_api_key
+            openai_api_key=orchestrator_config.openai_api_key,
         )
 
     # Validate base path exists (parent directory for Qdrant storage)
@@ -134,24 +136,15 @@ def create_mem0_config(config: Optional[Mem0Config] = None) -> dict:
 
     # Return configuration dict for Memory.from_config()
     return {
-        "vector_store": {
-            "provider": "qdrant",
-            "config": qdrant_config
-        },
+        "vector_store": {"provider": "qdrant", "config": qdrant_config},
         "llm": {
             "provider": "openai",
-            "config": {
-                "model": config.llm_model,
-                "api_key": api_key
-            }
+            "config": {"model": config.llm_model, "api_key": api_key},
         },
         "embedder": {
             "provider": "openai",
-            "config": {
-                "model": config.embedder_model,
-                "api_key": api_key
-            }
-        }
+            "config": {"model": config.embedder_model, "api_key": api_key},
+        },
     }
 
 

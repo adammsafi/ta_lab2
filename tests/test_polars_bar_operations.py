@@ -9,7 +9,6 @@ import pytest
 import pandas as pd
 import numpy as np
 import polars as pl
-from datetime import datetime
 
 from ta_lab2.scripts.bars.polars_bar_operations import (
     apply_ohlcv_cumulative_aggregations,
@@ -62,11 +61,17 @@ def test_extrema_timestamps_new_extreme_reset():
     df = pd.DataFrame(
         {
             "bar_seq": [1, 1, 1, 1],
-            "ts": pd.date_range("2020-01-01", periods=4, freq="D", tz="UTC").tz_localize(None),
+            "ts": pd.date_range(
+                "2020-01-01", periods=4, freq="D", tz="UTC"
+            ).tz_localize(None),
             "high": [100, 110, 105, 120],  # new high on days 2 and 4
             "low": [90, 85, 87, 80],  # new low on days 2 and 4
-            "timehigh": pd.date_range("2020-01-01 14:00", periods=4, freq="D", tz="UTC").tz_localize(None),
-            "timelow": pd.date_range("2020-01-01 10:00", periods=4, freq="D", tz="UTC").tz_localize(None),
+            "timehigh": pd.date_range(
+                "2020-01-01 14:00", periods=4, freq="D", tz="UTC"
+            ).tz_localize(None),
+            "timelow": pd.date_range(
+                "2020-01-01 10:00", periods=4, freq="D", tz="UTC"
+            ).tz_localize(None),
             "high_bar": [100, 110, 110, 120],  # cumulative (pre-computed)
             "low_bar": [90, 85, 85, 80],
         }
@@ -77,16 +82,24 @@ def test_extrema_timestamps_new_extreme_reset():
     out = result.to_pandas()
 
     # Day 1: first extreme
-    assert pd.to_datetime(out.loc[0, "time_high"]) == pd.to_datetime(df.loc[0, "timehigh"])
+    assert pd.to_datetime(out.loc[0, "time_high"]) == pd.to_datetime(
+        df.loc[0, "timehigh"]
+    )
 
     # Day 2: new high, should reset to day 2's timehigh
-    assert pd.to_datetime(out.loc[1, "time_high"]) == pd.to_datetime(df.loc[1, "timehigh"])
+    assert pd.to_datetime(out.loc[1, "time_high"]) == pd.to_datetime(
+        df.loc[1, "timehigh"]
+    )
 
     # Day 3: no new high, should preserve day 2's timehigh
-    assert pd.to_datetime(out.loc[2, "time_high"]) == pd.to_datetime(df.loc[1, "timehigh"])
+    assert pd.to_datetime(out.loc[2, "time_high"]) == pd.to_datetime(
+        df.loc[1, "timehigh"]
+    )
 
     # Day 4: new high again, should reset to day 4's timehigh
-    assert pd.to_datetime(out.loc[3, "time_high"]) == pd.to_datetime(df.loc[3, "timehigh"])
+    assert pd.to_datetime(out.loc[3, "time_high"]) == pd.to_datetime(
+        df.loc[3, "timehigh"]
+    )
 
 
 def test_day_time_open_calculation():
@@ -213,8 +226,12 @@ def test_standard_pipeline_integration():
         {
             "bar_seq": [1, 1, 1, 2, 2],
             "ts": pd.date_range("2020-01-01", periods=5, tz="UTC").tz_localize(None),
-            "timehigh": pd.date_range("2020-01-01 14:00", periods=5, tz="UTC").tz_localize(None),
-            "timelow": pd.date_range("2020-01-01 10:00", periods=5, tz="UTC").tz_localize(None),
+            "timehigh": pd.date_range(
+                "2020-01-01 14:00", periods=5, tz="UTC"
+            ).tz_localize(None),
+            "timelow": pd.date_range(
+                "2020-01-01 10:00", periods=5, tz="UTC"
+            ).tz_localize(None),
             "open": [100, 101, 102, 103, 104],
             "high": [105, 110, 108, 115, 112],
             "low": [95, 98, 96, 100, 99],

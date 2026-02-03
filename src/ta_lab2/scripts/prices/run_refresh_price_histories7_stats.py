@@ -29,7 +29,9 @@ except FileNotFoundError:
     pass
 
 # Import the main function from your stats script
-from ta_lab2.scripts.prices.refresh_price_histories7_stats import main as refresh_price_histories7_stats_main
+from ta_lab2.scripts.prices.refresh_price_histories7_stats import (
+    main as refresh_price_histories7_stats_main,
+)
 
 
 def main() -> None:

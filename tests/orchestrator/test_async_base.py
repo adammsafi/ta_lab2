@@ -2,7 +2,6 @@
 
 import asyncio
 import pytest
-from datetime import datetime, timezone
 
 from src.ta_lab2.tools.ai_orchestrator.core import (
     Task,
@@ -121,6 +120,7 @@ def test_streaming_result_accumulation():
 @pytest.mark.asyncio
 async def test_collect_stream_success():
     """collect_stream collects all chunks successfully."""
+
     async def mock_stream():
         for chunk in ["chunk1", "chunk2", "chunk3"]:
             yield chunk
@@ -136,6 +136,7 @@ async def test_collect_stream_success():
 @pytest.mark.asyncio
 async def test_collect_stream_timeout():
     """collect_stream respects timeout."""
+
     async def slow_stream():
         for i in range(100):
             yield f"chunk{i}"
@@ -148,6 +149,7 @@ async def test_collect_stream_timeout():
 @pytest.mark.asyncio
 async def test_collect_stream_cancellation():
     """collect_stream handles cancellation and saves partial results."""
+
     async def infinite_stream():
         i = 0
         while True:
@@ -179,6 +181,7 @@ def test_async_base_adapter_abstract():
 
 def test_generate_task_id_format():
     """Task ID follows expected format."""
+
     # Create a concrete test adapter
     class TestAdapter(AsyncBasePlatformAdapter):
         @property
@@ -232,6 +235,7 @@ def test_generate_task_id_format():
 @pytest.mark.asyncio
 async def test_async_context_manager():
     """AsyncBasePlatformAdapter supports async context manager."""
+
     class TestAdapter(AsyncBasePlatformAdapter):
         @property
         def is_implemented(self) -> bool:

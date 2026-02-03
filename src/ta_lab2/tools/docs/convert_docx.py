@@ -7,8 +7,6 @@ to separate assets directory.
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
-import shutil
 
 try:
     import pypandoc
@@ -53,6 +51,7 @@ class ConversionResult:
           Errors: 1
           Success Rate: 90.0%
     """
+
     total: int
     converted: int
     skipped: int
@@ -61,7 +60,9 @@ class ConversionResult:
 
     def __str__(self) -> str:
         """Human-readable summary."""
-        success_rate = (self.converted + self.skipped) / self.total * 100 if self.total > 0 else 0
+        success_rate = (
+            (self.converted + self.skipped) / self.total * 100 if self.total > 0 else 0
+        )
         return (
             f"Conversion Result:\n"
             f"  Total: {self.total}\n"
@@ -98,7 +99,9 @@ def extract_docx_metadata(docx_path: Path) -> dict:
             "created": None,
             "modified": None,
             "original_path": str(docx_path),
-            "original_size_bytes": docx_path.stat().st_size if docx_path.exists() else 0,
+            "original_size_bytes": docx_path.stat().st_size
+            if docx_path.exists()
+            else 0,
         }
 
     try:
@@ -118,7 +121,9 @@ def extract_docx_metadata(docx_path: Path) -> dict:
             "created": created,
             "modified": modified,
             "original_path": str(docx_path),
-            "original_size_bytes": docx_path.stat().st_size if docx_path.exists() else 0,
+            "original_size_bytes": docx_path.stat().st_size
+            if docx_path.exists()
+            else 0,
         }
 
         logger.debug(f"Extracted metadata from {docx_path.name}: {metadata}")
@@ -133,7 +138,9 @@ def extract_docx_metadata(docx_path: Path) -> dict:
             "created": None,
             "modified": None,
             "original_path": str(docx_path),
-            "original_size_bytes": docx_path.stat().st_size if docx_path.exists() else 0,
+            "original_size_bytes": docx_path.stat().st_size
+            if docx_path.exists()
+            else 0,
         }
 
 
@@ -141,7 +148,7 @@ def convert_docx_to_markdown(
     docx_path: Path,
     output_path: Path,
     extract_media: bool = True,
-    dry_run: bool = False
+    dry_run: bool = False,
 ) -> dict:
     """Convert DOCX file to Markdown with YAML front matter.
 
@@ -177,7 +184,7 @@ def convert_docx_to_markdown(
             "metadata": {},
             "media_dir": None,
             "media_count": 0,
-            "error": "pypandoc not installed"
+            "error": "pypandoc not installed",
         }
 
     if md is None:
@@ -188,7 +195,7 @@ def convert_docx_to_markdown(
             "metadata": {},
             "media_dir": None,
             "media_count": 0,
-            "error": "markdownify not installed"
+            "error": "markdownify not installed",
         }
 
     if not docx_path.exists():
@@ -199,10 +206,12 @@ def convert_docx_to_markdown(
             "metadata": {},
             "media_dir": None,
             "media_count": 0,
-            "error": "Source file not found"
+            "error": "Source file not found",
         }
 
-    logger.info(f"Converting {docx_path.name} to Markdown{' (dry run)' if dry_run else ''}")
+    logger.info(
+        f"Converting {docx_path.name} to Markdown{' (dry run)' if dry_run else ''}"
+    )
 
     try:
         # Extract metadata
@@ -221,9 +230,9 @@ def convert_docx_to_markdown(
         # Extract media to temp directory if needed
         html_content = pypandoc.convert_file(
             str(docx_path),
-            'html',
-            format='docx',
-            extra_args=['--extract-media=.' if extract_media and media_dir else '']
+            "html",
+            format="docx",
+            extra_args=["--extract-media=." if extract_media and media_dir else ""],
         )
 
         # Step 2: Convert HTML to Markdown using markdownify
@@ -233,9 +242,9 @@ def convert_docx_to_markdown(
         yaml_lines = ["---"]
         yaml_lines.append(f"title: \"{metadata['title']}\"")
         yaml_lines.append(f"author: \"{metadata['author']}\"")
-        if metadata['created']:
+        if metadata["created"]:
             yaml_lines.append(f"created: {metadata['created']}")
-        if metadata['modified']:
+        if metadata["modified"]:
             yaml_lines.append(f"modified: {metadata['modified']}")
         yaml_lines.append(f"original_path: \"{metadata['original_path']}\"")
         yaml_lines.append(f"original_size_bytes: {metadata['original_size_bytes']}")
@@ -248,12 +257,12 @@ def convert_docx_to_markdown(
         # Write output file
         if not dry_run:
             output_path.parent.mkdir(parents=True, exist_ok=True)
-            output_path.write_text(full_content, encoding='utf-8')
+            output_path.write_text(full_content, encoding="utf-8")
             logger.info(f"Converted: {output_path.name}")
 
             # Count media files if extracted
             if media_dir and media_dir.exists():
-                media_count = len(list(media_dir.glob('*')))
+                media_count = len(list(media_dir.glob("*")))
         else:
             logger.info(f"[DRY RUN] Would write: {output_path}")
 
@@ -273,7 +282,7 @@ def convert_docx_to_markdown(
             "metadata": {},
             "media_dir": None,
             "media_count": 0,
-            "error": str(e)
+            "error": str(e),
         }
 
 

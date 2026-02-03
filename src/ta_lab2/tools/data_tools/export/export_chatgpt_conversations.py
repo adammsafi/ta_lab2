@@ -78,8 +78,8 @@ def _safe_filename(s: str, max_len: int = 120) -> str:
     This keeps filenames stable and avoids Windows path issues.
     """
     s = s.strip() or "untitled"
-    s = re.sub(r"[^\w\s\-.]", "", s)   # keep word chars, whitespace, dash/dot
-    s = re.sub(r"\s+", "_", s)         # whitespace -> underscore
+    s = re.sub(r"[^\w\s\-.]", "", s)  # keep word chars, whitespace, dash/dot
+    s = re.sub(r"\s+", "_", s)  # whitespace -> underscore
     return s[:max_len].rstrip("_") or "untitled"
 
 
@@ -189,8 +189,15 @@ def likely_noise(row: Dict[str, Any]) -> bool:
         return True
 
     keywords = [
-        "fix", "error", "import", "npm", "runfile",
-        "new chat", "export", "link", "apply patch",
+        "fix",
+        "error",
+        "import",
+        "npm",
+        "runfile",
+        "new chat",
+        "export",
+        "link",
+        "apply patch",
     ]
     return any(k in title for k in keywords)
 
@@ -233,7 +240,9 @@ def export_conversations(
 
         # Extract all messages from mapping, then keep only user/assistant text
         msgs = _walk_mapping(conv)
-        meaningful = [(t, r, x) for (t, r, x) in msgs if r in {"user", "assistant"} and x.strip()]
+        meaningful = [
+            (t, r, x) for (t, r, x) in msgs if r in {"user", "assistant"} and x.strip()
+        ]
 
         # Skip tiny chats (often junk or accidental)
         if len(meaningful) < min_msgs:
@@ -258,7 +267,7 @@ def export_conversations(
         lines.append("---")
         lines.append("")
 
-        for (t, role, text) in meaningful:
+        for t, role, text in meaningful:
             ts_iso = _ts_to_iso(t)
             role_label = "USER" if role == "user" else "ASSISTANT"
             lines.append(f"## {role_label} ({ts_iso})")
@@ -326,8 +335,12 @@ def main() -> int:
     ap = argparse.ArgumentParser(
         description="Convert ChatGPT conversations.json to per-chat Markdown + index CSV (with likely_noise flag)."
     )
-    ap.add_argument("--in", dest="in_path", required=True, help="Path to conversations.json")
-    ap.add_argument("--out", dest="out_dir", default="out_chatgpt", help="Output folder")
+    ap.add_argument(
+        "--in", dest="in_path", required=True, help="Path to conversations.json"
+    )
+    ap.add_argument(
+        "--out", dest="out_dir", default="out_chatgpt", help="Output folder"
+    )
     ap.add_argument(
         "--min-msgs",
         type=int,

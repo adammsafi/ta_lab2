@@ -40,6 +40,7 @@ def _filter_kwargs(func, kwargs: Dict[str, Any]) -> Dict[str, Any]:
     sig = inspect.signature(func)
     return {k: v for k, v in kwargs.items() if k in sig.parameters}
 
+
 def _try_call_with_windows(func, df: pd.DataFrame, ema_windows, **kwargs):
     fk = _filter_kwargs(func, kwargs)
     psig = inspect.signature(func).parameters
@@ -54,6 +55,7 @@ def _try_call_with_windows(func, df: pd.DataFrame, ema_windows, **kwargs):
     except TypeError:
         return func(df, **fk)
 
+
 def _call_ema_comovement(df: pd.DataFrame, ema_windows, **kwargs):
     func = compute_ema_comovement_stats
     try:
@@ -64,6 +66,7 @@ def _call_ema_comovement(df: pd.DataFrame, ema_windows, **kwargs):
     if "close_col" in kw2 and "price_col" not in kw2:
         kw2["price_col"] = kw2.pop("close_col")
     return _try_call_with_windows(func, df, ema_windows, **kw2)
+
 
 def _call_ema_hierarchy(df: pd.DataFrame, ema_windows, **kwargs):
     func = compute_ema_comovement_hierarchy
@@ -76,7 +79,14 @@ def _call_ema_hierarchy(df: pd.DataFrame, ema_windows, **kwargs):
         kw2["price_col"] = kw2.pop("close_col")
     return _try_call_with_windows(func, df, ema_windows, **kw2)
 
-def _call_build_segments(df: pd.DataFrame, *, price_col="close", state_col="trend_state", date_col="timestamp"):
+
+def _call_build_segments(
+    df: pd.DataFrame,
+    *,
+    price_col="close",
+    state_col="trend_state",
+    date_col="timestamp",
+):
     func = build_flip_segments
     psig = inspect.signature(func).parameters
     kwargs: Dict[str, Any] = {}
@@ -108,6 +118,7 @@ def _infer_timestamp_col(df: pd.DataFrame, fallback: str = "timestamp") -> str:
             return c
     return fallback
 
+
 def _coerce_df(df_or_path: str | pd.DataFrame) -> pd.DataFrame:
     if isinstance(df_or_path, pd.DataFrame):
         df = df_or_path.copy()
@@ -119,6 +130,7 @@ def _coerce_df(df_or_path: str | pd.DataFrame) -> pd.DataFrame:
         df = df.rename(columns={ts: "timestamp"})
     return df
 
+
 def _maybe_from_config(value, default):
     if value is None:
         return default
@@ -127,6 +139,7 @@ def _maybe_from_config(value, default):
     if isinstance(value, Mapping):
         return value
     return value
+
 
 def _find_default_csv() -> str | None:
     """Best-effort discovery of a BTC price CSV in common spots."""
@@ -173,18 +186,18 @@ def run_btc_pipeline(
     if config is not None:
         cfg = _maybe_from_config(config, {})
         if isinstance(cfg, Mapping):
-            price_cols      = tuple(cfg.get("price_cols",      price_cols))
-            ema_windows     = tuple(cfg.get("ema_windows",     ema_windows))
-            returns_modes   = tuple(cfg.get("returns_modes",   returns_modes))
+            price_cols = tuple(cfg.get("price_cols", price_cols))
+            ema_windows = tuple(cfg.get("ema_windows", ema_windows))
+            returns_modes = tuple(cfg.get("returns_modes", returns_modes))
             returns_windows = tuple(cfg.get("returns_windows", returns_windows))
-            resample        = cfg.get("resample",              resample)
-            do_calendar   = cfg.get("do_calendar",   do_calendar)
+            resample = cfg.get("resample", resample)
+            do_calendar = cfg.get("do_calendar", do_calendar)
             do_indicators = cfg.get("do_indicators", do_indicators)
-            do_returns    = cfg.get("do_returns",    do_returns)
+            do_returns = cfg.get("do_returns", do_returns)
             do_volatility = cfg.get("do_volatility", do_volatility)
-            do_ema        = cfg.get("do_ema",        do_ema)
-            do_regimes    = cfg.get("do_regimes",    do_regimes)
-            do_segments   = cfg.get("do_segments",   do_segments)
+            do_ema = cfg.get("do_ema", do_ema)
+            do_regimes = cfg.get("do_regimes", do_regimes)
+            do_segments = cfg.get("do_segments", do_segments)
 
     # --- Load / normalize ---
     df = _coerce_df(csv_path)
@@ -195,10 +208,22 @@ def run_btc_pipeline(
 
     # --- Optional resample ---
     if resample:
-        agg = {"open": "first", "high": "max", "low": "min", "close": "last", "volume": "sum"}
+        agg = {
+            "open": "first",
+            "high": "max",
+            "low": "min",
+            "close": "last",
+            "volume": "sum",
+        }
         have = {k: v for k, v in agg.items() if k in df.columns}
         if have:
-            df = df.set_index("timestamp").resample(resample).agg(have).dropna().reset_index()
+            df = (
+                df.set_index("timestamp")
+                .resample(resample)
+                .agg(have)
+                .dropna()
+                .reset_index()
+            )
             if do_calendar:
                 expand_datetime_features_inplace(df, base_timestamp_col="timestamp")
 
@@ -218,7 +243,8 @@ def run_btc_pipeline(
     if do_returns:
         b2t_pct_delta(
             df,
-            cols=list(price_cols) + (["close-open"] if "close-open" in df.columns else []),
+            cols=list(price_cols)
+            + (["close-open"] if "close-open" in df.columns else []),
             extra_cols=(["range"] if "range" in df.columns else []),
             round_places=6,
             direction="newest_top",
@@ -227,7 +253,8 @@ def run_btc_pipeline(
         )
         b2t_log_delta(
             df,
-            cols=list(price_cols) + (["close-open"] if "close-open" in df.columns else []),
+            cols=list(price_cols)
+            + (["close-open"] if "close-open" in df.columns else []),
             extra_cols=(["range"] if "range" in df.columns else []),
             prefix="_log_delta",
             round_places=6,
@@ -260,9 +287,25 @@ def run_btc_pipeline(
     if do_ema:
         base_cols = list(price_cols)
         add_ema_columns(df, base_cols, list(ema_windows))
-        add_ema_d1(df, base_cols, list(ema_windows), direction="newest_top", overwrite=False, round_places=6)
-        add_ema_d2(df, base_cols, list(ema_windows), direction="newest_top", overwrite=False, round_places=6)
-        prepare_ema_helpers(df, base_cols, list(ema_windows), direction="newest_top", scale="bps")
+        add_ema_d1(
+            df,
+            base_cols,
+            list(ema_windows),
+            direction="newest_top",
+            overwrite=False,
+            round_places=6,
+        )
+        add_ema_d2(
+            df,
+            base_cols,
+            list(ema_windows),
+            direction="newest_top",
+            overwrite=False,
+            round_places=6,
+        )
+        prepare_ema_helpers(
+            df, base_cols, list(ema_windows), direction="newest_top", scale="bps"
+        )
 
     # --- Regimes ---
     major_stats = None
@@ -287,10 +330,18 @@ def run_btc_pipeline(
         else:
             slope_col = "close_ema_21_slope"
             if slope_col in df.columns:
-                df["trend_state"] = np.sign(pd.to_numeric(df[slope_col], errors="coerce")).fillna(0).astype(int)
+                df["trend_state"] = (
+                    np.sign(pd.to_numeric(df[slope_col], errors="coerce"))
+                    .fillna(0)
+                    .astype(int)
+                )
             else:
                 if "close_pct_delta" in df.columns:
-                    df["trend_state"] = np.sign(pd.to_numeric(df["close_pct_delta"], errors="coerce")).fillna(0).astype(int)
+                    df["trend_state"] = (
+                        np.sign(pd.to_numeric(df["close_pct_delta"], errors="coerce"))
+                        .fillna(0)
+                        .astype(int)
+                    )
                 else:
                     df["trend_state"] = 0
 
@@ -299,7 +350,9 @@ def run_btc_pipeline(
     seg_summary = pd.DataFrame()
     seg_by_year = pd.DataFrame()
     if do_segments:
-        seg_res = _call_build_segments(df, price_col="close", state_col="trend_state", date_col="timestamp")
+        seg_res = _call_build_segments(
+            df, price_col="close", state_col="trend_state", date_col="timestamp"
+        )
         if isinstance(seg_res, pd.DataFrame):
             segments = seg_res
         elif isinstance(seg_res, tuple):
@@ -318,8 +371,13 @@ def run_btc_pipeline(
     h_major = pd.DataFrame()
     h_scores = pd.DataFrame()
     if do_regimes:
-        hres = _call_ema_hierarchy(df, ema_windows, close_col="close",
-                                   direction="newest_top", return_col="close_pct_delta")
+        hres = _call_ema_hierarchy(
+            df,
+            ema_windows,
+            close_col="close",
+            direction="newest_top",
+            return_col="close_pct_delta",
+        )
         if isinstance(hres, tuple):
             if len(hres) == 3:
                 h_major, _, h_scores = hres
@@ -332,12 +390,19 @@ def run_btc_pipeline(
             h_scores = hres.get("scores", pd.DataFrame())
 
     # --- Summary ---
-    ret_col = next((c for c in ("ret_close_to_close", "seg_return", "return", "ret")
-                    if c in segments.columns), None)
-    len_col = next((c for c in ("bars", "seg_len", "length", "len")
-                    if c in segments.columns), None)
+    ret_col = next(
+        (
+            c
+            for c in ("ret_close_to_close", "seg_return", "return", "ret")
+            if c in segments.columns
+        ),
+        None,
+    )
+    len_col = next(
+        (c for c in ("bars", "seg_len", "length", "len") if c in segments.columns), None
+    )
     mean_seg_return = float(segments[ret_col].mean()) if ret_col else 0.0
-    mean_seg_len    = float(segments[len_col].mean()) if len_col else 0.0
+    mean_seg_len = float(segments[len_col].mean()) if len_col else 0.0
 
     summary = {
         "n_rows": int(len(df)),
@@ -351,7 +416,9 @@ def run_btc_pipeline(
         "segments": segments,
         "segment_summary": seg_summary,
         "segment_by_year": seg_by_year,
-        "regime_major": (major_stats.get("corr") if isinstance(major_stats, dict) else major_stats),
+        "regime_major": (
+            major_stats.get("corr") if isinstance(major_stats, dict) else major_stats
+        ),
         "regime_sub": h_scores,
         "summary": summary,
     }
@@ -360,7 +427,11 @@ def run_btc_pipeline(
 # ===========================
 # CLI / Spyder entrypoint
 # ===========================
-def main(csv_path: str | None = None, config_path: str | None = None, save_artifacts: bool = True):
+def main(
+    csv_path: str | None = None,
+    config_path: str | None = None,
+    save_artifacts: bool = True,
+):
     """
     Run the BTC pipeline end-to-end and (optionally) write artifacts.
     Returns the final DataFrame so Spyder can inspect it.
@@ -376,6 +447,7 @@ def main(csv_path: str | None = None, config_path: str | None = None, save_artif
     cfg = None
     try:
         from ta_lab2.config import load_config
+
         cfg = load_config(config_path)
     except Exception:
         cfg = None

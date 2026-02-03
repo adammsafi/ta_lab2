@@ -57,16 +57,24 @@ def _df(engine: Engine, sql: str) -> pd.DataFrame:
 
 def main() -> None:
     p = argparse.ArgumentParser(description="Audit integrity for cmc_returns_d1.")
-    p.add_argument("--db-url", default=os.getenv("TARGET_DB_URL", ""), help="DB URL (or set TARGET_DB_URL).")
+    p.add_argument(
+        "--db-url",
+        default=os.getenv("TARGET_DB_URL", ""),
+        help="DB URL (or set TARGET_DB_URL).",
+    )
     p.add_argument("--daily-table", default=DEFAULT_DAILY_TABLE)
     p.add_argument("--ret-table", default=DEFAULT_RET_TABLE)
     args = p.parse_args()
 
     db_url = args.db_url.strip()
     if not db_url:
-        raise SystemExit("ERROR: Missing DB URL. Provide --db-url or set TARGET_DB_URL.")
+        raise SystemExit(
+            "ERROR: Missing DB URL. Provide --db-url or set TARGET_DB_URL."
+        )
 
-    cfg = AuditConfig(db_url=db_url, daily_table=args.daily_table, ret_table=args.ret_table)
+    cfg = AuditConfig(
+        db_url=db_url, daily_table=args.daily_table, ret_table=args.ret_table
+    )
     engine = _get_engine(cfg.db_url)
 
     _print(f"daily={cfg.daily_table}")
@@ -178,7 +186,9 @@ def main() -> None:
     align = _df(engine, align_sql)
     n_missing = int(align.iloc[0]["n_missing"])
     if n_missing != 0:
-        _print(f"FAIL: {n_missing} returns rows have no matching (id,timeclose) in price_histories7.")
+        _print(
+            f"FAIL: {n_missing} returns rows have no matching (id,timeclose) in price_histories7."
+        )
     else:
         _print("PASS: all returns timestamps align to price_histories7.")
 

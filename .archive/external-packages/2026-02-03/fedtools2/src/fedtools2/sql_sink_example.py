@@ -15,7 +15,8 @@ from dotenv import load_dotenv
 @dataclass
 class ConnInfo:
     """Connection parameters parsed from env/.env."""
-    driver: str           # "postgresql+psycopg2" or "sqlite"
+
+    driver: str  # "postgresql+psycopg2" or "sqlite"
     user: str | None = None
     password: str | None = None
     host: str | None = None
@@ -40,7 +41,7 @@ def _load_conn_info_from_env() -> ConnInfo:
     pg_pass = os.getenv("PGPASS")
     pg_host = os.getenv("PGHOST")
     pg_port = os.getenv("PGPORT")
-    pg_db   = os.getenv("PGDB")
+    pg_db = os.getenv("PGDB")
 
     if pg_user or pg_pass or pg_host or pg_port or pg_db:
         # Assume Postgres
@@ -93,12 +94,17 @@ def _ensure_postgres_database(ci: ConnInfo) -> None:
     target_db = ci.database or "feddata"
 
     try:
-        admin_engine = create_engine(admin_url, future=True, isolation_level="AUTOCOMMIT")
+        admin_engine = create_engine(
+            admin_url, future=True, isolation_level="AUTOCOMMIT"
+        )
         with admin_engine.connect() as conn:
-            exists = conn.execute(
-                text("SELECT 1 FROM pg_database WHERE datname = :dbname"),
-                {"dbname": target_db},
-            ).scalar() is not None
+            exists = (
+                conn.execute(
+                    text("SELECT 1 FROM pg_database WHERE datname = :dbname"),
+                    {"dbname": target_db},
+                ).scalar()
+                is not None
+            )
             if not exists:
                 conn.execute(text(f'CREATE DATABASE "{target_db}"'))
                 print(f"✅ Created database: {target_db}")
@@ -112,7 +118,8 @@ def _ensure_postgres_database(ci: ConnInfo) -> None:
 def _ensure_log_table(engine, log_table: str) -> None:
     """Create an append-only run log table if it doesn't exist."""
     # Generic SQL (SQLite variant)
-    create_sql = text(f"""
+    create_sql = text(
+        f"""
         CREATE TABLE IF NOT EXISTS {log_table} (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             run_ts TEXT,
@@ -124,11 +131,13 @@ def _ensure_log_table(engine, log_table: str) -> None:
             package TEXT,
             version TEXT
         )
-    """)
+    """
+    )
 
     # Postgres uses SERIAL instead of AUTOINCREMENT
     if engine.url.get_backend_name().startswith("postgresql"):
-        create_sql = text(f"""
+        create_sql = text(
+            f"""
             CREATE TABLE IF NOT EXISTS {log_table} (
                 id SERIAL PRIMARY KEY,
                 run_ts TIMESTAMP NULL,
@@ -140,7 +149,8 @@ def _ensure_log_table(engine, log_table: str) -> None:
                 package TEXT,
                 version TEXT
             )
-        """)
+        """
+        )
     with engine.begin() as conn:
         conn.execute(create_sql)
 
@@ -201,7 +211,8 @@ def write_dataframe_and_log(
 
     meta = meta or {}
     with engine.begin() as conn:
-        ins = text(f"""
+        ins = text(
+            f"""
             INSERT INTO {log_table} (
                 run_ts, row_count, col_count, min_date, max_date,
                 output_path, package, version
@@ -209,7 +220,8 @@ def write_dataframe_and_log(
                 :run_ts, :row_count, :col_count, :min_date, :max_date,
                 :output_path, :package, :version
             )
-        """)
+        """
+        )
         conn.execute(ins, meta)
 
     print(f"✅ Snapshot written to '{base_table}' and log appended to '{log_table}'.")
@@ -217,11 +229,13 @@ def write_dataframe_and_log(
 
 if __name__ == "__main__":
     # Minimal smoke test
-    df = pd.DataFrame({
-        "date": pd.to_datetime(["2025-11-03", "2025-11-04"]),
-        "TARGET_MID": [5.25, 5.50],
-        "FEDFUNDS": [5.33, 5.33],
-    }).set_index("date")
+    df = pd.DataFrame(
+        {
+            "date": pd.to_datetime(["2025-11-03", "2025-11-04"]),
+            "TARGET_MID": [5.25, 5.50],
+            "FEDFUNDS": [5.33, 5.33],
+        }
+    ).set_index("date")
     write_dataframe_and_log(
         df=df,
         conn_str=None,

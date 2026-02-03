@@ -44,7 +44,6 @@ import argparse
 import logging
 import os
 import sys
-from typing import Optional
 from sqlalchemy import create_engine, text
 
 from ta_lab2.scripts.signals.signal_state_manager import (
@@ -93,39 +92,35 @@ Examples:
 
   # Dry run validation
   %(prog)s --dry-run -v
-        """
+        """,
     )
 
     parser.add_argument(
-        '--ids',
+        "--ids",
         type=int,
-        nargs='+',
-        help='Asset IDs to process (default: all from cmc_daily_features)'
+        nargs="+",
+        help="Asset IDs to process (default: all from cmc_daily_features)",
     )
     parser.add_argument(
-        '--signal-id',
+        "--signal-id",
         type=int,
-        help='Process specific signal_id only (default: all active rsi_mean_revert)'
+        help="Process specific signal_id only (default: all active rsi_mean_revert)",
     )
     parser.add_argument(
-        '--full-refresh',
-        action='store_true',
-        help='Regenerate all signals from scratch (ignore state tracking)'
+        "--full-refresh",
+        action="store_true",
+        help="Regenerate all signals from scratch (ignore state tracking)",
     )
     parser.add_argument(
-        '--dry-run',
-        action='store_true',
-        help='Validate without writing to database'
+        "--dry-run", action="store_true", help="Validate without writing to database"
     )
     parser.add_argument(
-        '--adaptive',
-        action='store_true',
-        help='Use adaptive rolling percentile thresholds instead of static from dim_signals'
+        "--adaptive",
+        action="store_true",
+        help="Use adaptive rolling percentile thresholds instead of static from dim_signals",
     )
     parser.add_argument(
-        '--verbose', '-v',
-        action='store_true',
-        help='Enable debug logging'
+        "--verbose", "-v", action="store_true", help="Enable debug logging"
     )
 
     args = parser.parse_args()
@@ -133,24 +128,26 @@ Examples:
     # Configure logging
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
     # Validate environment
-    db_url = os.environ.get('TARGET_DB_URL')
+    db_url = os.environ.get("TARGET_DB_URL")
     if not db_url:
         logger.error("TARGET_DB_URL environment variable not set")
         sys.exit(1)
 
     try:
         engine = create_engine(db_url)
-        logger.info(f"Connected to database: {db_url.split('@')[-1]}")  # Hide credentials
+        logger.info(
+            f"Connected to database: {db_url.split('@')[-1]}"
+        )  # Hide credentials
     except Exception as e:
         logger.error(f"Failed to connect to database: {e}")
         sys.exit(1)
 
     # Initialize state manager
-    config = SignalStateConfig(signal_type='rsi_mean_revert')
+    config = SignalStateConfig(signal_type="rsi_mean_revert")
     state_manager = SignalStateManager(engine, config)
 
     try:
@@ -164,14 +161,15 @@ Examples:
     try:
         if args.signal_id:
             configs = [
-                c for c in load_active_signals(engine, 'rsi_mean_revert')
-                if c['signal_id'] == args.signal_id
+                c
+                for c in load_active_signals(engine, "rsi_mean_revert")
+                if c["signal_id"] == args.signal_id
             ]
             if not configs:
                 logger.error(f"No active signal found with signal_id={args.signal_id}")
                 sys.exit(1)
         else:
-            configs = load_active_signals(engine, 'rsi_mean_revert')
+            configs = load_active_signals(engine, "rsi_mean_revert")
 
         if not configs:
             logger.warning("No active RSI mean revert signals found in dim_signals")
@@ -203,8 +201,8 @@ Examples:
     total_signals = 0
 
     for config in configs:
-        signal_id = config['signal_id']
-        signal_name = config['signal_name']
+        signal_id = config["signal_id"]
+        signal_name = config["signal_name"]
 
         logger.info(
             f"Processing signal: {signal_name} (id={signal_id}), "
@@ -242,5 +240,5 @@ Examples:
     logger.info("=" * 80)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

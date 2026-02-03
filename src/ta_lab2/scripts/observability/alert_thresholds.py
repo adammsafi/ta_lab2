@@ -21,17 +21,15 @@ logger = logging.getLogger(__name__)
 # Default threshold configuration
 DEFAULT_THRESHOLDS = {
     # Performance thresholds (multiplier of baseline)
-    "task_execution_duration": 2.0,   # Alert if >2x baseline
+    "task_execution_duration": 2.0,  # Alert if >2x baseline
     "memory_search_duration": 2.0,
     "feature_refresh_duration": 2.0,
-
     # Resource thresholds (percentage)
-    "gemini_quota_usage": 90.0,       # Alert at 90%
+    "gemini_quota_usage": 90.0,  # Alert at 90%
     "database_connections": 80.0,
     "memory_usage": 85.0,
-
     # Data quality thresholds (counts)
-    "gap_threshold": 0,               # 0% tolerance (strict)
+    "gap_threshold": 0,  # 0% tolerance (strict)
     "alignment_threshold": 0,
     "rowcount_tolerance": 0,
 }
@@ -69,7 +67,12 @@ def test_alert_delivery(engine) -> bool:
     Returns:
         True if test alert delivered successfully
     """
-    from ta_lab2.observability.alerts import AlertThresholdChecker, Alert, AlertType, AlertSeverity
+    from ta_lab2.observability.alerts import (
+        AlertThresholdChecker,
+        Alert,
+        AlertType,
+        AlertSeverity,
+    )
 
     checker = AlertThresholdChecker(engine)
 
@@ -192,6 +195,7 @@ def main():
         return 1
 
     from sqlalchemy import create_engine
+
     engine = create_engine(TARGET_DB_URL)
 
     if args.test:

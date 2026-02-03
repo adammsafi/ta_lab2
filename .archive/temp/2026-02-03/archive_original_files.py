@@ -5,15 +5,14 @@ Phase 16-02: Resolve refactored/original file pairs.
 
 import hashlib
 import json
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 
 
 def compute_sha256(file_path: Path) -> str:
     """Compute SHA256 checksum of file."""
-    with open(file_path, 'rb') as f:
-        return hashlib.file_digest(f, 'sha256').hexdigest()
+    with open(file_path, "rb") as f:
+        return hashlib.file_digest(f, "sha256").hexdigest()
 
 
 def archive_original_files():
@@ -72,7 +71,7 @@ def archive_original_files():
         "entries": manifest_entries,
     }
 
-    with open(manifest_path, 'w', encoding='utf-8') as f:
+    with open(manifest_path, "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2, ensure_ascii=False)
 
     print(f"MANIFEST: {manifest_path.relative_to(base_dir)}")

@@ -24,13 +24,21 @@ Spyder runfile:
 """
 
 import argparse
-import os
 from datetime import UTC, datetime
-from typing import Dict, List, Sequence
+from typing import List, Sequence
 
 import pandas as pd
-from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
+
+from ta_lab2.scripts.bars.common_snapshot_contract import (
+    get_engine,
+    resolve_db_url,
+    parse_ids,
+    load_all_ids,
+    table_exists,
+    get_columns,
+)
+from ta_lab2.features.m_tf.polars_helpers import read_sql_polars
 
 
 TABLES = [
@@ -47,66 +55,6 @@ DEFAULT_DAILY_TABLE = "public.cmc_price_histories7"
 
 def _log(msg: str) -> None:
     print(f"[ema_audit] {msg}")
-
-
-def get_engine() -> Engine:
-    db_url = os.environ.get("TARGET_DB_URL")
-    if not db_url:
-        raise RuntimeError("TARGET_DB_URL env var is required.")
-    _log("Using DB URL from TARGET_DB_URL env.")
-    return create_engine(db_url, future=True)
-
-
-def parse_ids(engine: Engine, ids_arg: str, daily_table: str) -> List[int]:
-    if ids_arg.strip().lower() == "all":
-        q = text(f"SELECT DISTINCT id FROM {daily_table} ORDER BY id")
-        df = pd.read_sql(q, engine)
-        ids = [int(x) for x in df["id"].tolist()]
-        _log(f"Loaded ALL ids from {daily_table}: {len(ids)}")
-        return ids
-
-    ids: List[int] = []
-    for part in ids_arg.split(","):
-        part = part.strip()
-        if part:
-            ids.append(int(part))
-    if not ids:
-        raise ValueError("No ids parsed. Use --ids all or --ids 1,52,...")
-    return ids
-
-
-def table_exists(engine: Engine, full_name: str) -> bool:
-    if "." in full_name:
-        schema, table = full_name.split(".", 1)
-    else:
-        schema, table = "public", full_name
-    q = text(
-        """
-        SELECT 1
-        FROM information_schema.tables
-        WHERE table_schema = :schema AND table_name = :table
-        LIMIT 1
-        """
-    )
-    df = pd.read_sql(q, engine, params={"schema": schema, "table": table})
-    return not df.empty
-
-
-def get_columns(engine: Engine, full_name: str) -> List[str]:
-    if "." in full_name:
-        schema, table = full_name.split(".", 1)
-    else:
-        schema, table = "public", full_name
-    q = text(
-        """
-        SELECT column_name
-        FROM information_schema.columns
-        WHERE table_schema = :schema AND table_name = :table
-        ORDER BY ordinal_position
-        """
-    )
-    df = pd.read_sql(q, engine, params={"schema": schema, "table": table})
-    return df["column_name"].tolist()
 
 
 def audit_table(engine: Engine, table: str, ids: Sequence[int]) -> pd.DataFrame:
@@ -170,10 +118,11 @@ def audit_table(engine: Engine, table: str, ids: Sequence[int]) -> pd.DataFrame:
 
     # Null shares for numeric columns
     for c in present_cols:
-        select_parts.append(f"SUM(CASE WHEN {c} IS NULL THEN 1 ELSE 0 END)::bigint AS n_{c}_null")
+        select_parts.append(
+            f"SUM(CASE WHEN {c} IS NULL THEN 1 ELSE 0 END)::bigint AS n_{c}_null"
+        )
 
-    q = text(
-        f"""
+    q = f"""
         SELECT
           {", ".join(select_parts)}
         FROM {table}
@@ -181,8 +130,7 @@ def audit_table(engine: Engine, table: str, ids: Sequence[int]) -> pd.DataFrame:
         GROUP BY id, tf, period
         ORDER BY id, tf, period
         """
-    )
-    df = pd.read_sql(q, engine)
+    df = read_sql_polars(q, engine)
     if df.empty:
         return df
 
@@ -206,14 +154,28 @@ def audit_table(engine: Engine, table: str, ids: Sequence[int]) -> pd.DataFrame:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Audit EMA output tables (coverage, duplicates, NULL shares).")
-    ap.add_argument("--ids", required=True, help="all OR comma-separated list like 1,52")
-    ap.add_argument("--daily-table", default=DEFAULT_DAILY_TABLE, help="Used only to resolve --ids all")
+    ap = argparse.ArgumentParser(
+        description="Audit EMA output tables (coverage, duplicates, NULL shares)."
+    )
+    ap.add_argument(
+        "--ids", required=True, help="all OR comma-separated list like 1,52"
+    )
+    ap.add_argument(
+        "--daily-table",
+        default=DEFAULT_DAILY_TABLE,
+        help="Used only to resolve --ids all",
+    )
     ap.add_argument("--out", default="ema_audit.csv", help="Output CSV filename")
     args = ap.parse_args()
 
-    engine = get_engine()
-    ids = parse_ids(engine, args.ids, args.daily_table)
+    db_url = resolve_db_url(None)
+    engine = get_engine(db_url)
+
+    ids_result = parse_ids(args.ids)
+    if ids_result == "all":
+        ids = load_all_ids(db_url, args.daily_table)
+    else:
+        ids = ids_result
 
     frames: List[pd.DataFrame] = []
     for t in TABLES:
@@ -225,7 +187,9 @@ def main() -> None:
         raise RuntimeError("No results. Check table names/schema and permissions.")
 
     out_df = pd.concat(frames, ignore_index=True)
-    out_df = out_df.sort_values(["table_name", "id", "tf", "period"]).reset_index(drop=True)
+    out_df = out_df.sort_values(["table_name", "id", "tf", "period"]).reset_index(
+        drop=True
+    )
 
     out_df.to_csv(args.out, index=False)
     _log(f"Wrote {len(out_df)} rows -> {args.out}")

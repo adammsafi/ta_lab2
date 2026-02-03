@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 @dataclass
 class StreamingResult:
     """Accumulates streaming chunks into final result."""
+
     chunks: list[str] = field(default_factory=list)
     total_tokens: int = 0
     started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
@@ -35,7 +36,9 @@ class StreamingResult:
         return (end - self.started_at).total_seconds()
 
 
-async def collect_stream(stream: AsyncIterator[str], timeout: float = 300) -> StreamingResult:
+async def collect_stream(
+    stream: AsyncIterator[str], timeout: float = 300
+) -> StreamingResult:
     """Collect all chunks from an async stream into a StreamingResult.
 
     Args:

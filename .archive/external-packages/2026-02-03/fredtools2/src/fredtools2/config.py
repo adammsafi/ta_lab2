@@ -1,6 +1,7 @@
 import os
 from dataclasses import dataclass
 
+
 @dataclass
 class PGConfig:
     host: str
@@ -8,6 +9,7 @@ class PGConfig:
     user: str
     password: str
     dbname: str
+
 
 def pg_from_env() -> PGConfig:
     return PGConfig(
@@ -17,6 +19,7 @@ def pg_from_env() -> PGConfig:
         password=os.getenv("PGPASSWORD", ""),
         dbname=os.getenv("PGDATABASE", "freddata"),
     )
+
 
 def fred_api_key() -> str:
     key = os.getenv("FRED_API_KEY")

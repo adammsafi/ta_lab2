@@ -33,6 +33,7 @@ from ta_lab2.features.feature_utils import (
 # Configuration
 # =============================================================================
 
+
 @dataclass(frozen=True)
 class FeatureConfig:
     """
@@ -46,9 +47,10 @@ class FeatureConfig:
         add_zscore: Whether to add z-score normalization columns
         zscore_window: Rolling window for z-score (default 252 = 1 year)
     """
-    feature_type: str           # 'returns', 'vol', 'ta'
+
+    feature_type: str  # 'returns', 'vol', 'ta'
     output_schema: str = "public"
-    output_table: str = ""      # Set by subclass
+    output_table: str = ""  # Set by subclass
     null_strategy: str = "skip"
     add_zscore: bool = True
     zscore_window: int = 252
@@ -57,6 +59,7 @@ class FeatureConfig:
 # =============================================================================
 # Base Feature Class
 # =============================================================================
+
 
 class BaseFeature(ABC):
     """
@@ -198,7 +201,7 @@ class BaseFeature(ABC):
             return 0
 
         # 2. Apply null handling (if not 'skip')
-        if self.config.null_strategy != 'skip':
+        if self.config.null_strategy != "skip":
             df_source = self.apply_null_handling(df_source)
 
         # 3. Compute features
@@ -234,7 +237,7 @@ class BaseFeature(ABC):
         """
         # Identify price columns to apply null handling
         price_cols = []
-        for col in ['open', 'high', 'low', 'close', 'price']:
+        for col in ["open", "high", "low", "close", "price"]:
             if col in df.columns:
                 price_cols.append(col)
 
@@ -291,7 +294,7 @@ class BaseFeature(ABC):
         for col in feature_cols:
             if col in df.columns:
                 # Flag outliers using z-score method (4 sigma threshold)
-                outlier_flags = flag_outliers(df[col], n_sigma=4.0, method='zscore')
+                outlier_flags = flag_outliers(df[col], n_sigma=4.0, method="zscore")
                 df[f"{col}_is_outlier"] = outlier_flags
 
         return df

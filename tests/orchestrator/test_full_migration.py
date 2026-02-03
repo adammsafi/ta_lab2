@@ -10,21 +10,25 @@ Tests are organized by migration stage:
 - Success criteria validation: Validate Phase 3 goals
 """
 import pytest
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 
-from ta_lab2.tools.ai_orchestrator.memory.mem0_client import get_mem0_client, reset_mem0_client
+from ta_lab2.tools.ai_orchestrator.memory.mem0_client import get_mem0_client
 from ta_lab2.tools.ai_orchestrator.memory.migration import (
     migrate_metadata,
     validate_migration,
-    MigrationResult
+    MigrationResult,
 )
-from ta_lab2.tools.ai_orchestrator.memory.health import MemoryHealthMonitor, HealthReport
+from ta_lab2.tools.ai_orchestrator.memory.health import (
+    MemoryHealthMonitor,
+    HealthReport,
+)
 from ta_lab2.tools.ai_orchestrator.memory.conflict import detect_conflicts
 
 
 # ============================================================================
 # Pre-Migration Checks
 # ============================================================================
+
 
 def test_mem0_can_access_chromadb():
     """Test that Mem0 client initializes and connects to backend."""
@@ -44,6 +48,7 @@ def test_chromadb_accessible():
 # ============================================================================
 # Migration Validation
 # ============================================================================
+
 
 def test_migration_dry_run_safe():
     """Test dry run reports counts without making changes."""
@@ -72,11 +77,11 @@ def test_migration_result_structure():
     result = migrate_metadata(dry_run=True, batch_size=50)
 
     # Verify all fields present
-    assert hasattr(result, 'total')
-    assert hasattr(result, 'updated')
-    assert hasattr(result, 'skipped')
-    assert hasattr(result, 'errors')
-    assert hasattr(result, 'error_ids')
+    assert hasattr(result, "total")
+    assert hasattr(result, "updated")
+    assert hasattr(result, "skipped")
+    assert hasattr(result, "errors")
+    assert hasattr(result, "error_ids")
 
     # Verify types
     assert isinstance(result.total, int)
@@ -96,6 +101,7 @@ def test_migration_result_structure():
 # Post-Migration Validation (Integration Tests)
 # ============================================================================
 
+
 @pytest.mark.integration
 def test_all_memories_have_created_at():
     """Test that every memory has created_at metadata after migration."""
@@ -108,9 +114,9 @@ def test_all_memories_have_created_at():
         if not metadata.get("created_at"):
             missing_created_at.append(memory.get("id"))
 
-    assert len(missing_created_at) == 0, (
-        f"{len(missing_created_at)} memories missing created_at: {missing_created_at[:10]}"
-    )
+    assert (
+        len(missing_created_at) == 0
+    ), f"{len(missing_created_at)} memories missing created_at: {missing_created_at[:10]}"
 
 
 @pytest.mark.integration
@@ -125,9 +131,9 @@ def test_all_memories_have_last_verified():
         if not metadata.get("last_verified"):
             missing_last_verified.append(memory.get("id"))
 
-    assert len(missing_last_verified) == 0, (
-        f"{len(missing_last_verified)} memories missing last_verified: {missing_last_verified[:10]}"
-    )
+    assert (
+        len(missing_last_verified) == 0
+    ), f"{len(missing_last_verified)} memories missing last_verified: {missing_last_verified[:10]}"
 
 
 @pytest.mark.integration
@@ -137,9 +143,9 @@ def test_health_report_no_missing_metadata():
     report = monitor.generate_health_report()
 
     assert isinstance(report, HealthReport)
-    assert report.missing_metadata == 0, (
-        f"Expected 0 missing_metadata, got {report.missing_metadata}"
-    )
+    assert (
+        report.missing_metadata == 0
+    ), f"Expected 0 missing_metadata, got {report.missing_metadata}"
 
 
 @pytest.mark.integration
@@ -153,7 +159,9 @@ def test_memory_count_unchanged():
     assert current_count > 0, "Expected memories to exist after migration"
 
     # Count should be reasonable (not corrupted)
-    assert current_count > 100, f"Expected substantial memory count, got {current_count}"
+    assert (
+        current_count > 100
+    ), f"Expected substantial memory count, got {current_count}"
 
 
 @pytest.mark.integration
@@ -187,14 +195,15 @@ def test_metadata_timestamps_valid_iso8601():
             except (ValueError, TypeError):
                 invalid_timestamps.append(f"{memory_id} last_verified: {last_verified}")
 
-    assert len(invalid_timestamps) == 0, (
-        f"Found invalid timestamps: {invalid_timestamps}"
-    )
+    assert (
+        len(invalid_timestamps) == 0
+    ), f"Found invalid timestamps: {invalid_timestamps}"
 
 
 # ============================================================================
 # Success Criteria Validation
 # ============================================================================
+
 
 @pytest.mark.integration
 def test_phase3_criteria_1_migration_complete():
@@ -220,7 +229,7 @@ def test_phase3_criteria_2_conflict_detection_works():
     conflicts = detect_conflicts(
         content="EMA calculation uses 20 periods",
         user_id="test_orchestrator",
-        similarity_threshold=0.85
+        similarity_threshold=0.85,
     )
 
     # Should return a list (even if empty)
@@ -242,14 +251,14 @@ def test_phase3_criteria_3_health_monitoring_works():
 
     # Verify HealthReport structure
     assert isinstance(report, HealthReport)
-    assert hasattr(report, 'total_memories')
-    assert hasattr(report, 'healthy')
-    assert hasattr(report, 'stale')
-    assert hasattr(report, 'deprecated')
-    assert hasattr(report, 'missing_metadata')
-    assert hasattr(report, 'age_distribution')
-    assert hasattr(report, 'stale_memories')
-    assert hasattr(report, 'scan_timestamp')
+    assert hasattr(report, "total_memories")
+    assert hasattr(report, "healthy")
+    assert hasattr(report, "stale")
+    assert hasattr(report, "deprecated")
+    assert hasattr(report, "missing_metadata")
+    assert hasattr(report, "age_distribution")
+    assert hasattr(report, "stale_memories")
+    assert hasattr(report, "scan_timestamp")
 
     # Verify report makes sense
     assert report.total_memories > 0
@@ -318,6 +327,7 @@ def test_migration_validation_function():
 # ============================================================================
 # Cleanup
 # ============================================================================
+
 
 @pytest.fixture(autouse=True)
 def cleanup_after_test():

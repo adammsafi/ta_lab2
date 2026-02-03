@@ -10,15 +10,15 @@ import time
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
 # Ensure OPENAI_API_KEY is set
-if not os.environ.get('OPENAI_API_KEY'):
+if not os.environ.get("OPENAI_API_KEY"):
     print("ERROR: OPENAI_API_KEY environment variable not set")
     sys.exit(1)
+
 
 def main():
     """Execute migration with proper Qdrant persistence."""
@@ -47,9 +47,7 @@ def main():
         print("STEP 2: Execute ChromaDB -> Mem0 migration")
         print("-" * 80)
         result = migrate_chromadb_to_mem0(
-            mem0_client=mem0_client,
-            dry_run=False,
-            batch_size=100
+            mem0_client=mem0_client, dry_run=False, batch_size=100
         )
         print()
         print(result)
@@ -94,6 +92,7 @@ def main():
 
         # Reset singleton
         from ta_lab2.tools.ai_orchestrator.memory.mem0_client import reset_mem0_client
+
         reset_mem0_client()
 
         # Wait a moment
@@ -144,10 +143,11 @@ def main():
     finally:
         # Ensure Qdrant client is properly closed
         try:
-            if 'qdrant_client' in locals():
+            if "qdrant_client" in locals():
                 qdrant_client.close()
         except:
             pass
+
 
 if __name__ == "__main__":
     main()

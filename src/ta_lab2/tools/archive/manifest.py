@@ -53,7 +53,7 @@ def create_file_entry(
     original_path: Path,
     archive_path: Path,
     action: str,
-    project_root: Optional[Path] = None
+    project_root: Optional[Path] = None,
 ) -> FileEntry:
     """Create a FileEntry for a file that has been archived.
 
@@ -107,15 +107,11 @@ def create_file_entry(
         action=action,
         timestamp=datetime.now(timezone.utc).isoformat(),
         sha256_checksum=compute_file_checksum(archive_abs),
-        size_bytes=archive_abs.stat().st_size
+        size_bytes=archive_abs.stat().st_size,
     )
 
 
-def create_manifest(
-    entries: list[FileEntry],
-    archive_date: str,
-    category: str
-) -> dict:
+def create_manifest(entries: list[FileEntry], archive_date: str, category: str) -> dict:
     """Create versioned manifest for archive category.
 
     Creates a JSON-serializable manifest following the archive-manifest
@@ -143,7 +139,7 @@ def create_manifest(
         "created_at": datetime.now(timezone.utc).isoformat(),
         "total_files": len(entries),
         "total_size_bytes": sum(e.size_bytes for e in entries),
-        "files": [asdict(e) for e in entries]
+        "files": [asdict(e) for e in entries],
     }
 
 
@@ -162,9 +158,7 @@ def save_manifest(manifest: dict, manifest_path: Path) -> None:
         >>> save_manifest(manifest, Path(".archive/2026-02-02/deprecated/manifest.json"))
     """
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(
-        json.dumps(manifest, indent=2, sort_keys=True) + "\n"
-    )
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
     logger.info(f"Saved manifest to {manifest_path}")
 
 
@@ -211,7 +205,13 @@ def validate_manifest(manifest_path: Path) -> tuple[bool, list[str]]:
         return False, issues
 
     # Validate each file entry
-    entry_required = ["original_path", "archive_path", "action", "sha256_checksum", "size_bytes"]
+    entry_required = [
+        "original_path",
+        "archive_path",
+        "action",
+        "sha256_checksum",
+        "size_bytes",
+    ]
 
     for idx, entry in enumerate(manifest.get("files", [])):
         # Check required entry fields

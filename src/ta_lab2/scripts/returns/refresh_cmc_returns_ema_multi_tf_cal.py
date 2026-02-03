@@ -65,8 +65,8 @@ DEFAULT_STATE_ISO = "public.cmc_returns_ema_multi_tf_cal_iso_state"
 @dataclass(frozen=True)
 class RunnerConfig:
     db_url: str
-    scheme: str   # us|iso|both
-    series: str   # ema|ema_bar|both
+    scheme: str  # us|iso|both
+    series: str  # ema|ema_bar|both
     roll_mode: str  # canonical|roll|both
     start: str
     full_refresh: bool
@@ -150,18 +150,15 @@ def _load_keys(
         with engine.begin() as cxn:
             rows = cxn.execute(sql, {"rolls": rolls}).fetchall()
     else:
-        sql = (
-            text(
-                f"""
+        sql = text(
+            f"""
                 SELECT DISTINCT id::bigint, tf::text, period::int, {roll_col}::bool AS roll
                 FROM {ema_table}
                 WHERE id IN :ids
                   AND {roll_col} = ANY(:rolls)
                 ORDER BY 1,2,3,4;
                 """
-            )
-            .bindparams(bindparam("ids", expanding=True))
-        )
+        ).bindparams(bindparam("ids", expanding=True))
         with engine.begin() as cxn:
             rows = cxn.execute(sql, {"ids": ids, "rolls": rolls}).fetchall()
 
@@ -185,8 +182,11 @@ def _ensure_state_rows(
         """
     )
     with engine.begin() as cxn:
-        for (i, tf, period, series, roll) in keys:
-            cxn.execute(ins, {"id": i, "tf": tf, "period": period, "series": series, "roll": roll})
+        for i, tf, period, series, roll in keys:
+            cxn.execute(
+                ins,
+                {"id": i, "tf": tf, "period": period, "series": series, "roll": roll},
+            )
 
 
 def _full_refresh(
@@ -198,7 +198,9 @@ def _full_refresh(
     if not keys:
         return
 
-    _print(f"--full-refresh: deleting existing rows for {len(keys)} keys and resetting state.")
+    _print(
+        f"--full-refresh: deleting existing rows for {len(keys)} keys and resetting state."
+    )
 
     del_ret = text(
         f"""
@@ -214,8 +216,14 @@ def _full_refresh(
     )
 
     with engine.begin() as cxn:
-        for (i, tf, period, series, roll) in keys:
-            params = {"id": i, "tf": tf, "period": period, "series": series, "roll": roll}
+        for i, tf, period, series, roll in keys:
+            params = {
+                "id": i,
+                "tf": tf,
+                "period": period,
+                "series": series,
+                "roll": roll,
+            }
             cxn.execute(del_ret, params)
             cxn.execute(del_state, params)
 
@@ -329,14 +337,26 @@ def _run_one_key(
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Unified EMA returns builder for CAL US/ISO (ema + ema_bar).")
-    p.add_argument("--db-url", default=os.getenv("TARGET_DB_URL", ""), help="Postgres DB URL (or set TARGET_DB_URL).")
+    p = argparse.ArgumentParser(
+        description="Unified EMA returns builder for CAL US/ISO (ema + ema_bar)."
+    )
+    p.add_argument(
+        "--db-url",
+        default=os.getenv("TARGET_DB_URL", ""),
+        help="Postgres DB URL (or set TARGET_DB_URL).",
+    )
     p.add_argument("--scheme", default="both", help="us | iso | both")
     p.add_argument("--series", default="both", help="ema | ema_bar | both")
     p.add_argument("--roll-mode", default="both", help="both | canonical | roll")
     p.add_argument("--ids", default="all", help="Comma-separated ids, or 'all'.")
-    p.add_argument("--start", default="2010-01-01", help="Start timestamptz for full history runs.")
-    p.add_argument("--full-refresh", action="store_true", help="Recompute history for selected keys from --start.")
+    p.add_argument(
+        "--start", default="2010-01-01", help="Start timestamptz for full history runs."
+    )
+    p.add_argument(
+        "--full-refresh",
+        action="store_true",
+        help="Recompute history for selected keys from --start.",
+    )
 
     p.add_argument("--ema-us", default=DEFAULT_EMA_CAL_US)
     p.add_argument("--ema-iso", default=DEFAULT_EMA_CAL_ISO)
@@ -349,7 +369,9 @@ def main() -> None:
 
     db_url = args.db_url.strip()
     if not db_url:
-        raise SystemExit("ERROR: Missing DB URL. Provide --db-url or set TARGET_DB_URL.")
+        raise SystemExit(
+            "ERROR: Missing DB URL. Provide --db-url or set TARGET_DB_URL."
+        )
 
     cfg = RunnerConfig(
         db_url=db_url,
@@ -366,7 +388,11 @@ def main() -> None:
         state_iso=args.state_iso,
     )
 
-    _print("Using DB URL from TARGET_DB_URL env." if os.getenv("TARGET_DB_URL") else "Using DB URL from --db-url.")
+    _print(
+        "Using DB URL from TARGET_DB_URL env."
+        if os.getenv("TARGET_DB_URL")
+        else "Using DB URL from --db-url."
+    )
     _print(
         f"Runner config: scheme={cfg.scheme}, series={cfg.series}, roll_mode={cfg.roll_mode}, "
         f"ids={args.ids}, start={cfg.start}, full_refresh={cfg.full_refresh}"
@@ -402,7 +428,9 @@ def main() -> None:
 
             for i, key in enumerate(keys, start=1):
                 one_id, one_tf, one_period, one_series, one_roll = key
-                _print(f"Processing key=({one_id},{one_tf},{one_period},{one_series},roll={one_roll}) ({i}/{len(keys)})")
+                _print(
+                    f"Processing key=({one_id},{one_tf},{one_period},{one_series},roll={one_roll}) ({i}/{len(keys)})"
+                )
                 _run_one_key(engine, ema_table, ret_table, state_table, cfg.start, key)
 
     _print("Done.")

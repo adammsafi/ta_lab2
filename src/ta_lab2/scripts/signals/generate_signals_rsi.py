@@ -31,7 +31,6 @@ from dataclasses import dataclass
 from typing import Optional
 import logging
 import pandas as pd
-import numpy as np
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
@@ -49,6 +48,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 # Adaptive Threshold Utilities
 # =============================================================================
+
 
 def compute_adaptive_thresholds(
     df: pd.DataFrame,
@@ -94,6 +94,7 @@ def compute_adaptive_thresholds(
 # =============================================================================
 # Signal Generator Class
 # =============================================================================
+
 
 @dataclass
 class RSISignalGenerator:
@@ -156,8 +157,8 @@ class RSISignalGenerator:
             df = pd.read_sql(sql, conn, params=params)
 
         # Ensure timestamp is timezone-aware
-        if 'ts' in df.columns:
-            df['ts'] = pd.to_datetime(df['ts'], utc=True)
+        if "ts" in df.columns:
+            df["ts"] = pd.to_datetime(df["ts"], utc=True)
 
         return df
 
@@ -195,8 +196,8 @@ class RSISignalGenerator:
         records = []
 
         # Group by asset ID for stateful processing
-        for id_, group in df_features.groupby('id'):
-            group = group.sort_values('ts').reset_index(drop=True)
+        for id_, group in df_features.groupby("id"):
+            group = group.sort_values("ts").reset_index(drop=True)
 
             # Get entry/exit signals for this asset
             entry_mask = entries.loc[group.index].values
@@ -209,39 +210,43 @@ class RSISignalGenerator:
             for idx in range(len(group)):
                 # Entry signal - open new position
                 if entry_mask[idx] and not position_open:
-                    direction = 'long'  # RSI mean reversion typically trades longs
+                    direction = "long"  # RSI mean reversion typically trades longs
 
                     # Check if short signal (RSI was overbought)
-                    if params.get('allow_shorts', False):
+                    if params.get("allow_shorts", False):
                         rsi_val = group.loc[idx, rsi_col]
-                        if rsi_val >= params.get('upper', 70.0):
-                            direction = 'short'
+                        if rsi_val >= params.get("upper", 70.0):
+                            direction = "short"
 
                     # Create entry record
                     feature_snapshot = {
-                        'close': float(group.loc[idx, 'close']),
+                        "close": float(group.loc[idx, "close"]),
                         rsi_col: float(group.loc[idx, rsi_col]),
-                        'atr_14': float(group.loc[idx, 'atr_14']) if 'atr_14' in group.columns else None,
+                        "atr_14": float(group.loc[idx, "atr_14"])
+                        if "atr_14" in group.columns
+                        else None,
                     }
 
-                    records.append({
-                        'id': int(id_),
-                        'ts': group.loc[idx, 'ts'],
-                        'signal_id': signal_id,
-                        'direction': direction,
-                        'position_state': 'open',
-                        'entry_price': float(group.loc[idx, 'close']),
-                        'entry_ts': group.loc[idx, 'ts'],
-                        'exit_price': None,
-                        'exit_ts': None,
-                        'pnl_pct': None,
-                        'rsi_at_entry': float(group.loc[idx, rsi_col]),
-                        'rsi_at_exit': None,
-                        'feature_snapshot': feature_snapshot,
-                        'signal_version': self.signal_version,
-                        'feature_version_hash': feature_hash,
-                        'params_hash': params_hash,
-                    })
+                    records.append(
+                        {
+                            "id": int(id_),
+                            "ts": group.loc[idx, "ts"],
+                            "signal_id": signal_id,
+                            "direction": direction,
+                            "position_state": "open",
+                            "entry_price": float(group.loc[idx, "close"]),
+                            "entry_ts": group.loc[idx, "ts"],
+                            "exit_price": None,
+                            "exit_ts": None,
+                            "pnl_pct": None,
+                            "rsi_at_entry": float(group.loc[idx, rsi_col]),
+                            "rsi_at_exit": None,
+                            "feature_snapshot": feature_snapshot,
+                            "signal_version": self.signal_version,
+                            "feature_version_hash": feature_hash,
+                            "params_hash": params_hash,
+                        }
+                    )
 
                     position_open = True
                     entry_idx = idx
@@ -251,32 +256,46 @@ class RSISignalGenerator:
                     entry_record = records[-1]  # Last record is the entry
 
                     # Compute PnL
-                    entry_price = entry_record['entry_price']
-                    exit_price = float(group.loc[idx, 'close'])
+                    entry_price = entry_record["entry_price"]
+                    exit_price = float(group.loc[idx, "close"])
 
-                    if entry_record['direction'] == 'long':
+                    if entry_record["direction"] == "long":
                         pnl_pct = ((exit_price - entry_price) / entry_price) * 100.0
                     else:  # short
                         pnl_pct = ((entry_price - exit_price) / entry_price) * 100.0
 
                     # Update entry record to closed
-                    entry_record['position_state'] = 'closed'
-                    entry_record['exit_price'] = exit_price
-                    entry_record['exit_ts'] = group.loc[idx, 'ts']
-                    entry_record['pnl_pct'] = pnl_pct
-                    entry_record['rsi_at_exit'] = float(group.loc[idx, rsi_col])
+                    entry_record["position_state"] = "closed"
+                    entry_record["exit_price"] = exit_price
+                    entry_record["exit_ts"] = group.loc[idx, "ts"]
+                    entry_record["pnl_pct"] = pnl_pct
+                    entry_record["rsi_at_exit"] = float(group.loc[idx, rsi_col])
 
                     position_open = False
                     entry_idx = None
 
         if not records:
             # Return empty DataFrame with correct schema
-            return pd.DataFrame(columns=[
-                'id', 'ts', 'signal_id', 'direction', 'position_state',
-                'entry_price', 'entry_ts', 'exit_price', 'exit_ts', 'pnl_pct',
-                'rsi_at_entry', 'rsi_at_exit', 'feature_snapshot',
-                'signal_version', 'feature_version_hash', 'params_hash',
-            ])
+            return pd.DataFrame(
+                columns=[
+                    "id",
+                    "ts",
+                    "signal_id",
+                    "direction",
+                    "position_state",
+                    "entry_price",
+                    "entry_ts",
+                    "exit_price",
+                    "exit_ts",
+                    "pnl_pct",
+                    "rsi_at_entry",
+                    "rsi_at_exit",
+                    "feature_snapshot",
+                    "signal_version",
+                    "feature_version_hash",
+                    "params_hash",
+                ]
+            )
 
         return pd.DataFrame(records)
 
@@ -310,8 +329,8 @@ class RSISignalGenerator:
             ValueError: If required parameters missing
             KeyError: If required features not in cmc_daily_features
         """
-        signal_id = signal_config['signal_id']
-        params = signal_config['params']
+        signal_id = signal_config["signal_id"]
+        params = signal_config["params"]
 
         logger.info(
             f"Generating RSI signals for {len(ids)} assets, "
@@ -338,11 +357,11 @@ class RSISignalGenerator:
         logger.info(f"Loaded {len(df_features)} feature rows")
 
         # Extract parameters
-        rsi_col = params.get('rsi_col', 'rsi_14')
-        lower = params.get('lower', 30.0)
-        upper = params.get('upper', 70.0)
-        confirm_cross = params.get('confirm_cross', True)
-        allow_shorts = params.get('allow_shorts', False)
+        rsi_col = params.get("rsi_col", "rsi_14")
+        lower = params.get("lower", 30.0)
+        upper = params.get("upper", 70.0)
+        confirm_cross = params.get("confirm_cross", True)
+        allow_shorts = params.get("allow_shorts", False)
 
         # Override with adaptive thresholds if requested
         if use_adaptive:
@@ -351,21 +370,25 @@ class RSISignalGenerator:
             # Group by ID and compute adaptive thresholds per asset
             df_features_adaptive = df_features.copy()
 
-            for id_, group in df_features.groupby('id'):
-                group = group.sort_values('ts')
+            for id_, group in df_features.groupby("id"):
+                group = group.sort_values("ts")
 
                 # Compute adaptive thresholds for this asset
                 adaptive_lower, adaptive_upper = compute_adaptive_thresholds(
                     group,
                     rsi_col=rsi_col,
-                    lookback=params.get('adaptive_lookback', 100),
-                    lower_pct=params.get('adaptive_lower_pct', 20.0),
-                    upper_pct=params.get('adaptive_upper_pct', 80.0),
+                    lookback=params.get("adaptive_lookback", 100),
+                    lower_pct=params.get("adaptive_lower_pct", 20.0),
+                    upper_pct=params.get("adaptive_upper_pct", 80.0),
                 )
 
                 # Store adaptive thresholds in DataFrame for signal generation
-                df_features_adaptive.loc[group.index, 'adaptive_lower'] = adaptive_lower.values
-                df_features_adaptive.loc[group.index, 'adaptive_upper'] = adaptive_upper.values
+                df_features_adaptive.loc[
+                    group.index, "adaptive_lower"
+                ] = adaptive_lower.values
+                df_features_adaptive.loc[
+                    group.index, "adaptive_upper"
+                ] = adaptive_upper.values
 
             # Note: make_signals doesn't support dynamic thresholds per row
             # For now, we use average adaptive thresholds as static override
@@ -374,8 +397,8 @@ class RSISignalGenerator:
                 "Adaptive thresholds computed but using global average. "
                 "Full per-row adaptive logic requires make_signals enhancement."
             )
-            lower = df_features_adaptive['adaptive_lower'].mean()
-            upper = df_features_adaptive['adaptive_upper'].mean()
+            lower = df_features_adaptive["adaptive_lower"].mean()
+            upper = df_features_adaptive["adaptive_upper"].mean()
 
         # Generate signals using existing adapter
         entries, exits, size = make_signals(
@@ -385,17 +408,19 @@ class RSISignalGenerator:
             upper=upper,
             confirm_cross=confirm_cross,
             allow_shorts=allow_shorts,
-            atr_col='atr_14',
-            risk_pct=params.get('risk_pct', 0.5),
-            atr_mult_stop=params.get('atr_mult_stop', 1.5),
-            price_col='close',
-            max_leverage=params.get('max_leverage', 1.0),
+            atr_col="atr_14",
+            risk_pct=params.get("risk_pct", 0.5),
+            atr_mult_stop=params.get("atr_mult_stop", 1.5),
+            price_col="close",
+            max_leverage=params.get("max_leverage", 1.0),
         )
 
-        logger.info(f"Generated {entries.sum()} entry signals, {exits.sum()} exit signals")
+        logger.info(
+            f"Generated {entries.sum()} entry signals, {exits.sum()} exit signals"
+        )
 
         # Compute feature hash for reproducibility
-        feature_cols = ['close', rsi_col, 'atr_14']
+        feature_cols = ["close", rsi_col, "atr_14"]
         feature_hash = compute_feature_hash(df_features, feature_cols)
 
         # Compute params hash
@@ -424,7 +449,7 @@ class RSISignalGenerator:
             signal_table = "cmc_signals_rsi_mean_revert"
 
             # Convert JSONB column to JSON strings for database insertion
-            df_records['feature_snapshot'] = df_records['feature_snapshot'].apply(
+            df_records["feature_snapshot"] = df_records["feature_snapshot"].apply(
                 lambda x: x if pd.isna(x) else x
             )
 
@@ -434,10 +459,10 @@ class RSISignalGenerator:
                 df_records.to_sql(
                     signal_table,
                     conn,
-                    schema='public',
-                    if_exists='append',
+                    schema="public",
+                    if_exists="append",
                     index=False,
-                    method='multi',
+                    method="multi",
                 )
 
             logger.info(f"Inserted {len(df_records)} records into {signal_table}")

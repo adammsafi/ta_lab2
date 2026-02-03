@@ -49,5 +49,6 @@ def read_csv(path: Path) -> pd.DataFrame:
     df = pd.read_csv(path)
     return df
 
+
 def ensure_dir(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)

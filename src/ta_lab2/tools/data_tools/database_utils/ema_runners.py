@@ -92,7 +92,25 @@ def write_multi_tf_emas(
     ids: Sequence[int],
     start: str = "2010-01-01",
     end: str | None = None,
-    ema_periods: Sequence[int] = (6, 9, 10, 12, 14, 17, 20, 21, 26, 30, 50, 52, 77, 100, 200, 252, 365),
+    ema_periods: Sequence[int] = (
+        6,
+        9,
+        10,
+        12,
+        14,
+        17,
+        20,
+        21,
+        26,
+        30,
+        50,
+        52,
+        77,
+        100,
+        200,
+        252,
+        365,
+    ),
     tf_subset: Sequence[str] | None = None,
 ) -> int:
     """
@@ -115,7 +133,9 @@ def write_multi_tf_emas(
         ... )
         >>> print(f"Multi-TF EMA rows written: {total}")
     """
-    logger.info(f"Writing multi-timeframe EMAs for {len(ids)} IDs starting from {start}")
+    logger.info(
+        f"Writing multi-timeframe EMAs for {len(ids)} IDs starting from {start}"
+    )
     total = write_multi_timeframe_ema_to_db(
         ids=ids,
         start=start,
@@ -132,7 +152,25 @@ def write_ema_multi_tf_cal(
     start: str | None = None,
     end: str | None = None,
     scheme: str = "US",
-    ema_periods: Sequence[int] = (6, 9, 10, 12, 14, 17, 20, 21, 26, 30, 50, 52, 77, 100, 200, 252, 365),
+    ema_periods: Sequence[int] = (
+        6,
+        9,
+        10,
+        12,
+        14,
+        17,
+        20,
+        21,
+        26,
+        30,
+        50,
+        52,
+        77,
+        100,
+        200,
+        252,
+        365,
+    ),
     tf_subset: Sequence[str] | None = None,
 ) -> int:
     """
@@ -216,26 +254,40 @@ Examples:
 
   # Incremental upsert for all IDs
   python -m ta_lab2.tools.data_tools.database_utils.ema_runners upsert
-        """
+        """,
     )
 
     subparsers = parser.add_subparsers(dest="command", help="Command to run")
 
     # Daily EMAs
     daily_parser = subparsers.add_parser("daily", help="Write daily EMAs")
-    daily_parser.add_argument("--ids", type=int, nargs="+", required=True, help="CMC coin IDs")
-    daily_parser.add_argument("--start", default="2010-01-01", help="Start date (YYYY-MM-DD)")
+    daily_parser.add_argument(
+        "--ids", type=int, nargs="+", required=True, help="CMC coin IDs"
+    )
+    daily_parser.add_argument(
+        "--start", default="2010-01-01", help="Start date (YYYY-MM-DD)"
+    )
     daily_parser.add_argument("--end", default=None, help="End date (YYYY-MM-DD)")
 
     # Multi-timeframe EMAs
-    multi_tf_parser = subparsers.add_parser("multi-tf", help="Write multi-timeframe EMAs")
-    multi_tf_parser.add_argument("--ids", type=int, nargs="+", required=True, help="CMC coin IDs")
-    multi_tf_parser.add_argument("--start", default="2010-01-01", help="Start date (YYYY-MM-DD)")
+    multi_tf_parser = subparsers.add_parser(
+        "multi-tf", help="Write multi-timeframe EMAs"
+    )
+    multi_tf_parser.add_argument(
+        "--ids", type=int, nargs="+", required=True, help="CMC coin IDs"
+    )
+    multi_tf_parser.add_argument(
+        "--start", default="2010-01-01", help="Start date (YYYY-MM-DD)"
+    )
     multi_tf_parser.add_argument("--end", default=None, help="End date (YYYY-MM-DD)")
 
     # Calendar-aligned multi-TF EMAs
-    cal_parser = subparsers.add_parser("multi-tf-cal", help="Write calendar-aligned multi-TF EMAs")
-    cal_parser.add_argument("--ids", type=int, nargs="+", required=True, help="CMC coin IDs")
+    cal_parser = subparsers.add_parser(
+        "multi-tf-cal", help="Write calendar-aligned multi-TF EMAs"
+    )
+    cal_parser.add_argument(
+        "--ids", type=int, nargs="+", required=True, help="CMC coin IDs"
+    )
     cal_parser.add_argument("--start", default=None, help="Start date (YYYY-MM-DD)")
     cal_parser.add_argument("--end", default=None, help="End date (YYYY-MM-DD)")
     cal_parser.add_argument("--scheme", default="US", help="Calendar scheme")
@@ -248,7 +300,7 @@ Examples:
     # Configure logging
     logging.basicConfig(
         level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
     if args.command == "daily":
@@ -261,10 +313,7 @@ Examples:
 
     elif args.command == "multi-tf-cal":
         total = write_ema_multi_tf_cal(
-            ids=args.ids,
-            start=args.start,
-            end=args.end,
-            scheme=args.scheme
+            ids=args.ids, start=args.start, end=args.end, scheme=args.scheme
         )
         print(f"Calendar-aligned EMA rows written: {total}")
 

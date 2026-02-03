@@ -1,7 +1,7 @@
 """Tests for alert threshold checking and delivery."""
 
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 from datetime import datetime
 
 
@@ -46,7 +46,11 @@ class TestAlertThresholdChecker:
 
     def test_integration_failure_alert(self, mocker):
         """Test integration failure alert creation."""
-        from ta_lab2.observability.alerts import AlertThresholdChecker, AlertType, AlertSeverity
+        from ta_lab2.observability.alerts import (
+            AlertThresholdChecker,
+            AlertType,
+            AlertSeverity,
+        )
 
         mock_engine = mocker.MagicMock()
         checker = AlertThresholdChecker(mock_engine)
@@ -120,7 +124,12 @@ class TestAlertDelivery:
 
     def test_telegram_alert_sent(self, mocker):
         """Test alert sent via Telegram."""
-        from ta_lab2.observability.alerts import AlertThresholdChecker, Alert, AlertType, AlertSeverity
+        from ta_lab2.observability.alerts import (
+            AlertThresholdChecker,
+            Alert,
+            AlertType,
+            AlertSeverity,
+        )
 
         mock_engine = mocker.MagicMock()
         checker = AlertThresholdChecker(mock_engine)
@@ -133,11 +142,11 @@ class TestAlertDelivery:
         )
 
         # Mock Telegram module (imported inside deliver_alert)
-        with patch('ta_lab2.notifications.telegram.send_alert') as mock_telegram:
+        with patch("ta_lab2.notifications.telegram.send_alert") as mock_telegram:
             mock_telegram.return_value = True
 
             # Mock database logging
-            with patch.object(checker, '_log_alert_to_db', return_value=1):
+            with patch.object(checker, "_log_alert_to_db", return_value=1):
                 success = checker.deliver_alert(alert)
 
             # Verify Telegram was called with correct args
@@ -150,7 +159,12 @@ class TestAlertDelivery:
 
     def test_alert_logged_to_database(self, mocker):
         """Test alert logged to database."""
-        from ta_lab2.observability.alerts import AlertThresholdChecker, Alert, AlertType, AlertSeverity
+        from ta_lab2.observability.alerts import (
+            AlertThresholdChecker,
+            Alert,
+            AlertType,
+            AlertSeverity,
+        )
 
         mock_engine = mocker.MagicMock()
         mock_conn = mocker.MagicMock()
@@ -175,7 +189,12 @@ class TestAlertDelivery:
 
     def test_graceful_degradation_no_telegram(self, mocker):
         """Test delivery continues when Telegram not configured."""
-        from ta_lab2.observability.alerts import AlertThresholdChecker, Alert, AlertType, AlertSeverity
+        from ta_lab2.observability.alerts import (
+            AlertThresholdChecker,
+            Alert,
+            AlertType,
+            AlertSeverity,
+        )
 
         mock_engine = mocker.MagicMock()
         mock_conn = mocker.MagicMock()
@@ -192,9 +211,9 @@ class TestAlertDelivery:
         )
 
         # Mock Telegram import failure
-        with patch.dict('sys.modules', {'ta_lab2.notifications.telegram': None}):
+        with patch.dict("sys.modules", {"ta_lab2.notifications.telegram": None}):
             # Should not raise, should log to database
-            with patch.object(checker, '_log_alert_to_db', return_value=1):
+            with patch.object(checker, "_log_alert_to_db", return_value=1):
                 # Delivery should work (database only)
                 pass
 
@@ -206,7 +225,7 @@ class TestAlertQuery:
 
     def test_get_recent_alerts(self, mocker):
         """Test querying recent alerts."""
-        from ta_lab2.observability.alerts import AlertThresholdChecker, AlertType, AlertSeverity
+        from ta_lab2.observability.alerts import AlertThresholdChecker, AlertType
 
         mock_engine = mocker.MagicMock()
         mock_conn = mocker.MagicMock()

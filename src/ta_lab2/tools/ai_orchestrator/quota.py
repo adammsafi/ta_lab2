@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Dict, List, Optional
 
@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class QuotaLimit:
     """Represents a quota limit for a platform/method."""
+
     limit: Optional[int] = None  # Max requests/tokens per period
     used: int = 0
     resets_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
@@ -25,6 +26,7 @@ class QuotaLimit:
 @dataclass
 class QuotaAlert:
     """Represents a quota threshold alert."""
+
     platform: str
     threshold: int  # Percentage (50, 80, 90)
     current_usage: int
@@ -40,7 +42,7 @@ class QuotaTracker:
         self,
         alert_thresholds: List[int] = None,
         on_alert: Optional[Callable[[QuotaAlert], None]] = None,
-        persistence_path: Optional[str] = "./.memory/quota_state.json"
+        persistence_path: Optional[str] = "./.memory/quota_state.json",
     ):
         """
         Initialize quota limits.
@@ -53,24 +55,20 @@ class QuotaTracker:
         self.alert_thresholds = alert_thresholds or [50, 80, 90]
         self.on_alert = on_alert
         self.persistence_path = persistence_path
-        self.triggered_alerts: Dict[str, set] = {}  # Track which thresholds were triggered
+        self.triggered_alerts: Dict[
+            str, set
+        ] = {}  # Track which thresholds were triggered
 
         # Initialize default limits
         self.limits: Dict[str, QuotaLimit] = {
             # Free CLI quotas (reset daily at midnight UTC)
-            "gemini_cli": QuotaLimit(
-                limit=1500,
-                resets_at=self._next_midnight_utc()
-            ),
+            "gemini_cli": QuotaLimit(limit=1500, resets_at=self._next_midnight_utc()),
             "gemini_api_free": QuotaLimit(
-                limit=1500,
-                resets_at=self._next_midnight_utc()
+                limit=1500, resets_at=self._next_midnight_utc()
             ),
-
             # Subscription quotas (effectively unlimited for paid users)
             "claude_code": QuotaLimit(unlimited=True),
             "chatgpt_plus": QuotaLimit(unlimited=True),
-
             # Paid API quotas (pay-per-use, soft limits)
             "claude_api": QuotaLimit(limit=1_000_000, unlimited=False),  # Soft limit
             "openai_api": QuotaLimit(limit=1_000_000, unlimited=False),  # Soft limit
@@ -256,8 +254,13 @@ class QuotaTracker:
             quota_key = self._platform_to_quota_key(platform)
             quota = self.limits.get(quota_key)
             if quota:
-                remaining = quota.limit - quota.used - quota.reserved if quota.limit else 0
-                return False, f"Quota exhausted for {platform}. Used: {quota.used}/{quota.limit}, Reserved: {quota.reserved}, Remaining: {remaining}"
+                remaining = (
+                    quota.limit - quota.used - quota.reserved if quota.limit else 0
+                )
+                return (
+                    False,
+                    f"Quota exhausted for {platform}. Used: {quota.used}/{quota.limit}, Reserved: {quota.reserved}, Remaining: {remaining}",
+                )
             return False, f"Unknown platform: {platform}"
 
         # Reserve quota
@@ -266,7 +269,13 @@ class QuotaTracker:
 
         return True, f"Reserved {amount} request(s) for {platform}"
 
-    def release_and_record(self, platform: str, tokens: int = 1, cost: float = 0.0, amount_reserved: int = 1):
+    def release_and_record(
+        self,
+        platform: str,
+        tokens: int = 1,
+        cost: float = 0.0,
+        amount_reserved: int = 1,
+    ):
         """
         Release reservation and record actual usage.
 
@@ -302,7 +311,7 @@ class QuotaTracker:
                     "limit": "unlimited",
                     "remaining": "unlimited",
                     "percent_used": 0.0,
-                    "alerts_triggered": []
+                    "alerts_triggered": [],
                 }
             else:
                 remaining = quota.limit - quota.used
@@ -315,7 +324,7 @@ class QuotaTracker:
                     "remaining": remaining,
                     "reserved": quota.reserved,
                     "percent_used": round(percent_used, 1),
-                    "alerts_triggered": alerts
+                    "alerts_triggered": alerts,
                 }
 
         return summary
@@ -336,12 +345,16 @@ class QuotaTracker:
             else:
                 percent = (quota.used / quota.limit * 100) if quota.limit else 0
                 bar_length = 30
-                filled = int(bar_length * quota.used / quota.limit) if quota.limit else 0
+                filled = (
+                    int(bar_length * quota.used / quota.limit) if quota.limit else 0
+                )
                 bar = "█" * filled + "░" * (bar_length - filled)
 
                 lines.append(f"\n{key}:")
                 lines.append(f"  [{bar}] {percent:.1f}%")
-                lines.append(f"  Used: {quota.used}/{quota.limit} (Reserved: {quota.reserved})")
+                lines.append(
+                    f"  Used: {quota.used}/{quota.limit} (Reserved: {quota.reserved})"
+                )
 
                 # Show reset time for daily quotas
                 if quota.resets_at:
@@ -385,7 +398,10 @@ class QuotaTracker:
 
         # Check each threshold
         for threshold in self.alert_thresholds:
-            if percent_used >= threshold and threshold not in self.triggered_alerts[quota_key]:
+            if (
+                percent_used >= threshold
+                and threshold not in self.triggered_alerts[quota_key]
+            ):
                 # Threshold crossed for first time
                 self.triggered_alerts[quota_key].add(threshold)
 
@@ -394,7 +410,7 @@ class QuotaTracker:
                     threshold=threshold,
                     current_usage=quota.used,
                     limit=quota.limit,
-                    message=f"Quota at {threshold}% for {quota_key}: {quota.used}/{quota.limit}"
+                    message=f"Quota at {threshold}% for {quota_key}: {quota.used}/{quota.limit}",
                 )
 
                 # Call callback if provided
@@ -413,12 +429,14 @@ class QuotaTracker:
                 for key, limit_data in state.limits.items():
                     if key in self.limits:
                         quota = self.limits[key]
-                        quota.used = limit_data.get('used', 0)
-                        quota.reserved = limit_data.get('reserved', 0)
+                        quota.used = limit_data.get("used", 0)
+                        quota.reserved = limit_data.get("reserved", 0)
 
                         # Parse resets_at
-                        if 'resets_at' in limit_data and limit_data['resets_at']:
-                            quota.resets_at = datetime.fromisoformat(limit_data['resets_at'])
+                        if "resets_at" in limit_data and limit_data["resets_at"]:
+                            quota.resets_at = datetime.fromisoformat(
+                                limit_data["resets_at"]
+                            )
 
                 logger.debug(f"Loaded quota state from {self.persistence_path}")
         except Exception as e:
@@ -431,16 +449,17 @@ class QuotaTracker:
             limits_data = {}
             for key, quota in self.limits.items():
                 limits_data[key] = {
-                    'limit': quota.limit,
-                    'used': quota.used,
-                    'reserved': quota.reserved,
-                    'resets_at': quota.resets_at.isoformat() if quota.resets_at else None,
-                    'unlimited': quota.unlimited
+                    "limit": quota.limit,
+                    "used": quota.used,
+                    "reserved": quota.reserved,
+                    "resets_at": quota.resets_at.isoformat()
+                    if quota.resets_at
+                    else None,
+                    "unlimited": quota.unlimited,
                 }
 
             state = QuotaState(
-                limits=limits_data,
-                last_updated=datetime.now(timezone.utc).isoformat()
+                limits=limits_data, last_updated=datetime.now(timezone.utc).isoformat()
             )
 
             save_quota_state(state, self.persistence_path)

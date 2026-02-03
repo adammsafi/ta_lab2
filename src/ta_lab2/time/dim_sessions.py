@@ -33,7 +33,9 @@ class SessionMeta:
 def _resolve_db_url(db_url: Optional[str]) -> str:
     url = db_url or TARGET_DB_URL
     if not url:
-        raise RuntimeError("No DB URL provided AND TARGET_DB_URL missing in ta_lab2.config.")
+        raise RuntimeError(
+            "No DB URL provided AND TARGET_DB_URL missing in ta_lab2.config."
+        )
     return url
 
 
@@ -176,7 +178,9 @@ class DimSessions:
     ) -> pd.DataFrame:
         s = self.get_session(asset_id)
         if s is None:
-            raise KeyError(f"asset_id={asset_id} not found in dim_sessions (or asset_id is NULL)")
+            raise KeyError(
+                f"asset_id={asset_id} not found in dim_sessions (or asset_id is NULL)"
+            )
 
         sql = text(
             """

@@ -48,10 +48,13 @@ import logging
 import sys
 from typing import Iterable, Optional
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
-from ta_lab2.config import TARGET_DB_URL
+from ta_lab2.scripts.bars.common_snapshot_contract import (
+    get_engine,
+)
+
 
 STATS_TABLE = "public.ema_multi_tf_cal_anchor_stats"
 STATE_TABLE = "public.ema_multi_tf_cal_anchor_stats_state"
@@ -60,6 +63,7 @@ STATE_TABLE = "public.ema_multi_tf_cal_anchor_stats_state"
 # ----------------------------
 # Logging
 # ----------------------------
+
 
 def _setup_logging(level: str = "INFO") -> logging.Logger:
     logger = logging.getLogger("ema_cal_anchor_stats")
@@ -687,10 +691,6 @@ FROM chk;
 """
 
 
-def get_engine(db_url: Optional[str] = None) -> Engine:
-    return create_engine(db_url or TARGET_DB_URL)
-
-
 def infer_expected_scheme(table: str) -> Optional[str]:
     t = table.lower()
     if t.endswith("_us"):
@@ -700,7 +700,12 @@ def infer_expected_scheme(table: str) -> Optional[str]:
     return None
 
 
-def run(engine: Engine, tables: Iterable[str], full_refresh: bool = False, log_level: str = "INFO") -> None:
+def run(
+    engine: Engine,
+    tables: Iterable[str],
+    full_refresh: bool = False,
+    log_level: str = "INFO",
+) -> None:
     logger = _setup_logging(log_level)
     tables = list(tables)
     if not tables:
@@ -724,44 +729,71 @@ def run(engine: Engine, tables: Iterable[str], full_refresh: bool = False, log_l
         table_name = table  # schema-qualified input
 
         with engine.begin() as conn:
-            last_ing = conn.execute(text(SQL_GET_STATE), {"table_name": table_name}).scalar()
-            max_ing = conn.execute(text(SQL_MAX_INGESTED_AT.format(table=table_name))).scalar()
+            last_ing = conn.execute(
+                text(SQL_GET_STATE), {"table_name": table_name}
+            ).scalar()
+            max_ing = conn.execute(
+                text(SQL_MAX_INGESTED_AT.format(table=table_name))
+            ).scalar()
 
             if max_ing is None:
                 logger.warning("Table empty, skipping: %s", table_name)
                 continue
 
-            logger.info("Table=%s max_ingested_at=%s state_last=%s", table_name, max_ing, last_ing)
+            logger.info(
+                "Table=%s max_ingested_at=%s state_last=%s",
+                table_name,
+                max_ing,
+                last_ing,
+            )
 
             # Always bump state.updated_at for non-empty tables to show "script ran"
             conn.execute(text(SQL_TOUCH_STATE), {"table_name": table_name})
 
             # If no new ingested_at, do nothing else (do NOT advance watermark, do NOT touch stats)
             if (not full_refresh) and (last_ing is not None) and (max_ing <= last_ing):
-                logger.info("No new ingested_at since last run. Skipping tests: %s", table_name)
+                logger.info(
+                    "No new ingested_at since last run. Skipping tests: %s", table_name
+                )
                 continue
 
             conn.execute(text(DDL_TEMP_IMPACTED_KEYS))
 
             if full_refresh or last_ing is None:
-                logger.info("Building impacted keys: ALL canonical keys (roll=false) for %s", table_name)
-                impacted = conn.execute(text(SQL_ALL_KEYS.format(table=table_name))).fetchall()
+                logger.info(
+                    "Building impacted keys: ALL canonical keys (roll=false) for %s",
+                    table_name,
+                )
+                impacted = conn.execute(
+                    text(SQL_ALL_KEYS.format(table=table_name))
+                ).fetchall()
             else:
-                logger.info("Building impacted keys: ingested_at > %s for %s", last_ing, table_name)
+                logger.info(
+                    "Building impacted keys: ingested_at > %s for %s",
+                    last_ing,
+                    table_name,
+                )
                 impacted = conn.execute(
                     text(SQL_IMPACTED_KEYS_SINCE.format(table=table_name)),
                     {"last_ingested_at": last_ing},
                 ).fetchall()
 
             if not impacted:
-                logger.info("No impacted keys found for %s; leaving watermark unchanged.", table_name)
+                logger.info(
+                    "No impacted keys found for %s; leaving watermark unchanged.",
+                    table_name,
+                )
                 continue
 
             conn.execute(
-                text("INSERT INTO _impacted_keys(asset_id, tf, period) VALUES (:asset_id, :tf, :period)"),
+                text(
+                    "INSERT INTO _impacted_keys(asset_id, tf, period) VALUES (:asset_id, :tf, :period)"
+                ),
                 [dict(r._mapping) for r in impacted],
             )
-            logger.info("Impacted keys inserted: %s rows for %s", len(impacted), table_name)
+            logger.info(
+                "Impacted keys inserted: %s rows for %s", len(impacted), table_name
+            )
 
             # Delete + recompute latest-only for impacted scope
             tests_keyed = [
@@ -770,8 +802,13 @@ def run(engine: Engine, tables: Iterable[str], full_refresh: bool = False, log_l
                 "canonical_ts_match_roll_false_vs_roll_bar_false",
             ]
             for tn in tests_keyed:
-                conn.execute(text(SQL_DELETE_STATS_FOR_KEYS), {"table_name": table_name, "test_name": tn})
-            logger.info("Cleared keyed test rows for impacted scope: %s", ", ".join(tests_keyed))
+                conn.execute(
+                    text(SQL_DELETE_STATS_FOR_KEYS),
+                    {"table_name": table_name, "test_name": tn},
+                )
+            logger.info(
+                "Cleared keyed test rows for impacted scope: %s", ", ".join(tests_keyed)
+            )
 
             tests_tf = [
                 "tf_membership_in_dim_timeframe",
@@ -780,17 +817,35 @@ def run(engine: Engine, tables: Iterable[str], full_refresh: bool = False, log_l
                 "dim_timeframe_nominal_reasonable",
             ]
             for tn in tests_tf:
-                conn.execute(text(SQL_DELETE_STATS_FOR_TFS), {"table_name": table_name, "test_name": tn})
-            logger.info("Cleared TF-scoped test rows for impacted TFs: %s", ", ".join(tests_tf))
+                conn.execute(
+                    text(SQL_DELETE_STATS_FOR_TFS),
+                    {"table_name": table_name, "test_name": tn},
+                )
+            logger.info(
+                "Cleared TF-scoped test rows for impacted TFs: %s", ", ".join(tests_tf)
+            )
 
             # Run tests
             logger.info("Running tests for %s ...", table_name)
             conn.execute(text(SQL_TEST_TF_MEMBERSHIP), {"table_name": table_name})
-            conn.execute(text(SQL_TEST_DIM_BOUNDS_MIN_LE_MAX), {"table_name": table_name})
-            conn.execute(text(SQL_TEST_DIM_NOMINAL_REASONABLE), {"table_name": table_name})
-            conn.execute(text(SQL_TEST_CANONICAL_ROWCOUNT.format(table=table_name)), {"table_name": table_name})
-            conn.execute(text(SQL_TEST_CANONICAL_MAX_GAP.format(table=table_name)), {"table_name": table_name})
-            conn.execute(text(SQL_TEST_CANONICAL_TS_MATCH.format(table=table_name)), {"table_name": table_name})
+            conn.execute(
+                text(SQL_TEST_DIM_BOUNDS_MIN_LE_MAX), {"table_name": table_name}
+            )
+            conn.execute(
+                text(SQL_TEST_DIM_NOMINAL_REASONABLE), {"table_name": table_name}
+            )
+            conn.execute(
+                text(SQL_TEST_CANONICAL_ROWCOUNT.format(table=table_name)),
+                {"table_name": table_name},
+            )
+            conn.execute(
+                text(SQL_TEST_CANONICAL_MAX_GAP.format(table=table_name)),
+                {"table_name": table_name},
+            )
+            conn.execute(
+                text(SQL_TEST_CANONICAL_TS_MATCH.format(table=table_name)),
+                {"table_name": table_name},
+            )
 
             exp = infer_expected_scheme(table_name)
             if exp is not None:
@@ -800,19 +855,27 @@ def run(engine: Engine, tables: Iterable[str], full_refresh: bool = False, log_l
                 )
 
             # Advance watermark ONLY after tests succeed
-            conn.execute(text(SQL_UPSERT_STATE), {"table_name": table_name, "last_ingested_at": max_ing})
+            conn.execute(
+                text(SQL_UPSERT_STATE),
+                {"table_name": table_name, "last_ingested_at": max_ing},
+            )
             logger.info("Updated watermark for %s to %s", table_name, max_ing)
 
     logger.info("Done.")
 
 
 def main(db_url: Optional[str] = None, tables: Optional[Iterable[str]] = None) -> None:
-    parser = argparse.ArgumentParser(description="Calendar-aware EMA CAL_ANCHOR stats (incremental via stats_state).")
+    parser = argparse.ArgumentParser(
+        description="Calendar-aware EMA CAL_ANCHOR stats (incremental via stats_state)."
+    )
     parser.add_argument("--db-url", help="Override TARGET_DB_URL from ta_lab2.config")
     parser.add_argument(
         "--tables",
         nargs="+",
-        default=["public.cmc_ema_multi_tf_cal_anchor_us", "public.cmc_ema_multi_tf_cal_anchor_iso"],
+        default=[
+            "public.cmc_ema_multi_tf_cal_anchor_us",
+            "public.cmc_ema_multi_tf_cal_anchor_iso",
+        ],
         help="Schema-qualified EMA tables to audit.",
     )
     parser.add_argument(
@@ -828,7 +891,12 @@ def main(db_url: Optional[str] = None, tables: Optional[Iterable[str]] = None) -
     args = parser.parse_args()
 
     engine = get_engine(args.db_url or db_url)
-    run(engine, args.tables if tables is None else list(tables), full_refresh=args.full_refresh, log_level=args.log_level)
+    run(
+        engine,
+        args.tables if tables is None else list(tables),
+        full_refresh=args.full_refresh,
+        log_level=args.log_level,
+    )
 
 
 if __name__ == "__main__":

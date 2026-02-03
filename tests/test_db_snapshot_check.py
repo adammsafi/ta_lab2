@@ -38,7 +38,17 @@ def _run_snapshot_check() -> dict:
         raise FileNotFoundError(f"Missing fixture at {FIXTURE}")
 
     # Try console script first (most realistic)
-    cmd = ["ta-lab2", "db", "snapshot-check", "--in-path", str(FIXTURE), "--min-rows", "1", "--top-n", "20"]
+    cmd = [
+        "ta-lab2",
+        "db",
+        "snapshot-check",
+        "--in-path",
+        str(FIXTURE),
+        "--min-rows",
+        "1",
+        "--top-n",
+        "20",
+    ]
     try:
         p = subprocess.run(cmd, capture_output=True, text=True, check=False)
         if p.returncode == 0:
@@ -69,7 +79,14 @@ def test_snapshot_check_output_shape_and_warning_gating():
     out = _run_snapshot_check()
 
     # Output keys stable
-    for k in ["meta", "ok", "source", "warnings", "top_tables_by_total_bytes", "top_tables_by_rows"]:
+    for k in [
+        "meta",
+        "ok",
+        "source",
+        "warnings",
+        "top_tables_by_total_bytes",
+        "top_tables_by_rows",
+    ]:
         assert k in out, f"Missing key: {k}"
 
     assert out["ok"] is True

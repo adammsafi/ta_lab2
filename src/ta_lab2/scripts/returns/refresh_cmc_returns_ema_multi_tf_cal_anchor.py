@@ -38,7 +38,7 @@ runfile(
 import argparse
 import os
 from dataclasses import dataclass
-from typing import Iterable, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 from sqlalchemy import bindparam, create_engine, text
 from sqlalchemy.engine import Engine
@@ -60,9 +60,9 @@ Key = Tuple[int, str, int, str, bool]  # (id, tf, period, series, roll)
 @dataclass(frozen=True)
 class RunnerConfig:
     db_url: str
-    scheme: str          # us | iso | both
-    series_mode: str     # ema | ema_bar | both
-    roll_mode: str       # canonical | roll | both
+    scheme: str  # us | iso | both
+    series_mode: str  # ema | ema_bar | both
+    roll_mode: str  # canonical | roll | both
     start: str
     full_refresh: bool
 
@@ -176,7 +176,9 @@ def _load_keys_for_one_table(
             with engine.begin() as cxn:
                 rows = cxn.execute(sql, {"ids": ids, "rolls": rolls}).fetchall()
 
-        keys.extend([(int(r[0]), str(r[1]), int(r[2]), series, bool(r[3])) for r in rows])
+        keys.extend(
+            [(int(r[0]), str(r[1]), int(r[2]), series, bool(r[3])) for r in rows]
+        )
 
     # stable ordering
     keys.sort(key=lambda x: (x[0], x[1], x[2], x[3], x[4]))
@@ -214,15 +216,25 @@ def _ensure_state_rows(engine: Engine, state_table: str, keys: List[Key]) -> Non
     with engine.begin() as cxn:
         cxn.execute(
             sql,
-            {"ids": ids, "tfs": tfs, "periods": periods, "series": series, "rolls": rolls},
+            {
+                "ids": ids,
+                "tfs": tfs,
+                "periods": periods,
+                "series": series,
+                "rolls": rolls,
+            },
         )
 
 
-def _full_refresh(engine: Engine, ret_table: str, state_table: str, keys: List[Key]) -> None:
+def _full_refresh(
+    engine: Engine, ret_table: str, state_table: str, keys: List[Key]
+) -> None:
     if not keys:
         return
 
-    _print(f"--full-refresh: deleting existing rows for {len(keys)} keys and resetting state.")
+    _print(
+        f"--full-refresh: deleting existing rows for {len(keys)} keys and resetting state."
+    )
 
     del_ret = text(
         f"""
@@ -238,8 +250,14 @@ def _full_refresh(engine: Engine, ret_table: str, state_table: str, keys: List[K
     )
 
     with engine.begin() as cxn:
-        for (i, tf, period, series, roll) in keys:
-            params = {"id": i, "tf": tf, "period": period, "series": series, "roll": roll}
+        for i, tf, period, series, roll in keys:
+            params = {
+                "id": i,
+                "tf": tf,
+                "period": period,
+                "series": series,
+                "roll": roll,
+            }
             cxn.execute(del_ret, params)
             cxn.execute(del_state, params)
 
@@ -363,22 +381,38 @@ def _run_one_key(
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Incremental returns builder for calendar-anchored EMA (US/ISO).")
-    p.add_argument("--db-url", default=os.getenv("TARGET_DB_URL", ""), help="Postgres DB URL (or set TARGET_DB_URL).")
+    p = argparse.ArgumentParser(
+        description="Incremental returns builder for calendar-anchored EMA (US/ISO)."
+    )
+    p.add_argument(
+        "--db-url",
+        default=os.getenv("TARGET_DB_URL", ""),
+        help="Postgres DB URL (or set TARGET_DB_URL).",
+    )
 
     p.add_argument("--scheme", default="both", help="us | iso | both")
     p.add_argument("--series", default="both", help="ema | ema_bar | both")
     p.add_argument("--roll-mode", default="both", help="both | canonical | roll")
 
     p.add_argument("--ids", default="all", help="Comma-separated ids, or 'all'.")
-    p.add_argument("--start", default="2010-01-01", help="Start timestamptz for backfills/full refresh.")
-    p.add_argument("--full-refresh", action="store_true", help="Recompute history for selected keys from --start.")
+    p.add_argument(
+        "--start",
+        default="2010-01-01",
+        help="Start timestamptz for backfills/full refresh.",
+    )
+    p.add_argument(
+        "--full-refresh",
+        action="store_true",
+        help="Recompute history for selected keys from --start.",
+    )
 
     args = p.parse_args()
 
     db_url = (args.db_url or "").strip()
     if not db_url:
-        raise SystemExit("ERROR: Missing DB URL. Provide --db-url or set TARGET_DB_URL.")
+        raise SystemExit(
+            "ERROR: Missing DB URL. Provide --db-url or set TARGET_DB_URL."
+        )
 
     cfg = RunnerConfig(
         db_url=db_url,
@@ -389,7 +423,11 @@ def main() -> None:
         full_refresh=bool(args.full_refresh),
     )
 
-    _print("Using DB URL from TARGET_DB_URL env." if os.getenv("TARGET_DB_URL") else "Using DB URL from --db-url.")
+    _print(
+        "Using DB URL from TARGET_DB_URL env."
+        if os.getenv("TARGET_DB_URL")
+        else "Using DB URL from --db-url."
+    )
     _print(
         f"Runner config: scheme={cfg.scheme}, series={cfg.series_mode}, roll_mode={cfg.roll_mode}, "
         f"ids={args.ids}, start={cfg.start}, full_refresh={cfg.full_refresh}"
@@ -407,7 +445,9 @@ def main() -> None:
         _print(f"ret={ret_table}")
         _print(f"state={state_table}")
 
-        keys = _load_keys_for_one_table(engine, ema_table, ids, series_list, cfg.roll_mode)
+        keys = _load_keys_for_one_table(
+            engine, ema_table, ids, series_list, cfg.roll_mode
+        )
         _print(f"resolved keys={len(keys)}")
         if not keys:
             _print("No keys found. Skipping scheme.")
@@ -420,7 +460,9 @@ def main() -> None:
 
         for i, key in enumerate(keys, start=1):
             one_id, one_tf, one_period, one_series, one_roll = key
-            _print(f"Processing key=({one_id},{one_tf},{one_period},{one_series},roll={one_roll}) ({i}/{len(keys)})")
+            _print(
+                f"Processing key=({one_id},{one_tf},{one_period},{one_series},roll={one_roll}) ({i}/{len(keys)})"
+            )
             _run_one_key(engine, ema_table, ret_table, state_table, cfg.start, key)
 
     _print("Done.")

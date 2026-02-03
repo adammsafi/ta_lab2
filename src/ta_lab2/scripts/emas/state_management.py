@@ -20,11 +20,9 @@ All scripts read from pre-computed bar tables that contain bar_seq,
 so all scripts populate all fields consistently.
 """
 
-import warnings
 
 from typing import Optional
 import pandas as pd
-from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
 
@@ -59,6 +57,7 @@ CREATE TABLE IF NOT EXISTS {schema}.{table} (
 # =============================================================================
 # State Table Functions
 # =============================================================================
+
 
 def ensure_ema_state_table(engine: Engine, schema: str, table: str) -> None:
     """

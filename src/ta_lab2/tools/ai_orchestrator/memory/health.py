@@ -43,6 +43,7 @@ class HealthReport:
         ...     scan_timestamp='2026-01-28T15:00:00'
         ... )
     """
+
     total_memories: int
     healthy: int
     stale: int
@@ -84,7 +85,9 @@ class MemoryHealthMonitor:
         """
         self.client = client if client is not None else get_mem0_client()
         self.staleness_days = staleness_days
-        logger.info(f"MemoryHealthMonitor initialized with staleness_days={staleness_days}")
+        logger.info(
+            f"MemoryHealthMonitor initialized with staleness_days={staleness_days}"
+        )
 
     def scan_stale_memories(self) -> list[dict]:
         """Scan all memories and find stale ones (not verified within threshold).
@@ -102,7 +105,9 @@ class MemoryHealthMonitor:
             ...     print(f"{mem['id']}: {mem['age_days']} days old")
         """
         stale_memories = []
-        threshold_date = datetime.now(timezone.utc) - timedelta(days=self.staleness_days)
+        threshold_date = datetime.now(timezone.utc) - timedelta(
+            days=self.staleness_days
+        )
 
         try:
             # Get all memories
@@ -124,7 +129,9 @@ class MemoryHealthMonitor:
                             is_stale = True
                             age_days = (datetime.now(timezone.utc) - verified_date).days
                     except (ValueError, TypeError) as e:
-                        logger.warning(f"Invalid last_verified timestamp for {memory.get('id')}: {e}")
+                        logger.warning(
+                            f"Invalid last_verified timestamp for {memory.get('id')}: {e}"
+                        )
                         is_stale = True
                         age_days = None
                 else:
@@ -134,14 +141,20 @@ class MemoryHealthMonitor:
 
                 if is_stale:
                     content = memory.get("memory", "")
-                    stale_memories.append({
-                        "id": memory.get("id"),
-                        "content": content[:100] if content else "",
-                        "last_verified": last_verified if last_verified else "never",
-                        "age_days": age_days
-                    })
+                    stale_memories.append(
+                        {
+                            "id": memory.get("id"),
+                            "content": content[:100] if content else "",
+                            "last_verified": last_verified
+                            if last_verified
+                            else "never",
+                            "age_days": age_days,
+                        }
+                    )
 
-            logger.info(f"Found {len(stale_memories)} stale memories (threshold: {self.staleness_days} days)")
+            logger.info(
+                f"Found {len(stale_memories)} stale memories (threshold: {self.staleness_days} days)"
+            )
             return stale_memories
 
         except Exception as e:
@@ -171,15 +184,12 @@ class MemoryHealthMonitor:
             missing_metadata = 0
 
             # Age distribution buckets
-            age_buckets = {
-                "0-30d": 0,
-                "30-60d": 0,
-                "60-90d": 0,
-                "90+d": 0
-            }
+            age_buckets = {"0-30d": 0, "30-60d": 0, "60-90d": 0, "90+d": 0}
 
             stale_memories = []
-            threshold_date = datetime.now(timezone.utc) - timedelta(days=self.staleness_days)
+            threshold_date = datetime.now(timezone.utc) - timedelta(
+                days=self.staleness_days
+            )
 
             for memory in all_memories:
                 metadata = memory.get("metadata", {})
@@ -215,12 +225,14 @@ class MemoryHealthMonitor:
                         else:
                             stale += 1
                             content = memory.get("memory", "")
-                            stale_memories.append({
-                                "id": memory.get("id"),
-                                "content": content[:100] if content else "",
-                                "last_verified": last_verified,
-                                "age_days": age_days
-                            })
+                            stale_memories.append(
+                                {
+                                    "id": memory.get("id"),
+                                    "content": content[:100] if content else "",
+                                    "last_verified": last_verified,
+                                    "age_days": age_days,
+                                }
+                            )
                     except (ValueError, TypeError) as e:
                         logger.warning(f"Invalid timestamp for {memory.get('id')}: {e}")
                         stale += 1
@@ -230,12 +242,14 @@ class MemoryHealthMonitor:
                     stale += 1
                     age_buckets["90+d"] += 1
                     content = memory.get("memory", "")
-                    stale_memories.append({
-                        "id": memory.get("id"),
-                        "content": content[:100] if content else "",
-                        "last_verified": "never",
-                        "age_days": None
-                    })
+                    stale_memories.append(
+                        {
+                            "id": memory.get("id"),
+                            "content": content[:100] if content else "",
+                            "last_verified": "never",
+                            "age_days": None,
+                        }
+                    )
 
             report = HealthReport(
                 total_memories=total,
@@ -245,10 +259,12 @@ class MemoryHealthMonitor:
                 missing_metadata=missing_metadata,
                 age_distribution=age_buckets,
                 stale_memories=stale_memories,
-                scan_timestamp=datetime.now(timezone.utc).isoformat()
+                scan_timestamp=datetime.now(timezone.utc).isoformat(),
             )
 
-            logger.info(f"Health report generated: {healthy}/{total} healthy, {stale} stale, {deprecated} deprecated")
+            logger.info(
+                f"Health report generated: {healthy}/{total} healthy, {stale} stale, {deprecated} deprecated"
+            )
             return report
 
         except Exception as e:
@@ -298,19 +314,25 @@ class MemoryHealthMonitor:
                 try:
                     # Get current memory to update metadata
                     all_memories = self.client.get_all(user_id="orchestrator")
-                    current_memory = next((m for m in all_memories if m.get("id") == memory_id), None)
+                    current_memory = next(
+                        (m for m in all_memories if m.get("id") == memory_id), None
+                    )
 
                     if current_memory:
                         current_metadata = current_memory.get("metadata", {})
-                        updated_metadata = mark_deprecated(current_metadata, reason=reason)
+                        updated_metadata = mark_deprecated(
+                            current_metadata, reason=reason
+                        )
 
                         # Update memory with deprecated metadata
                         self.client.update(
                             memory_id=memory_id,
                             data=current_memory.get("memory", ""),
-                            metadata=updated_metadata
+                            metadata=updated_metadata,
                         )
-                        logger.info(f"Flagged memory {memory_id} as deprecated: {reason}")
+                        logger.info(
+                            f"Flagged memory {memory_id} as deprecated: {reason}"
+                        )
                 except Exception as e:
                     logger.error(f"Failed to flag memory {memory_id}: {e}")
                     # Continue flagging other memories
@@ -347,7 +369,9 @@ class MemoryHealthMonitor:
             for memory_id in memory_ids:
                 try:
                     # Find memory
-                    memory = next((m for m in all_memories if m.get("id") == memory_id), None)
+                    memory = next(
+                        (m for m in all_memories if m.get("id") == memory_id), None
+                    )
 
                     if not memory:
                         logger.warning(f"Memory {memory_id} not found")
@@ -356,13 +380,15 @@ class MemoryHealthMonitor:
                     # Update last_verified
                     current_metadata = memory.get("metadata", {})
                     updated_metadata = current_metadata.copy()
-                    updated_metadata["last_verified"] = datetime.now(timezone.utc).isoformat()
+                    updated_metadata["last_verified"] = datetime.now(
+                        timezone.utc
+                    ).isoformat()
 
                     # Update memory
                     self.client.update(
                         memory_id=memory_id,
                         data=memory.get("memory", ""),
-                        metadata=updated_metadata
+                        metadata=updated_metadata,
                     )
 
                     refreshed += 1
@@ -372,7 +398,9 @@ class MemoryHealthMonitor:
                     logger.error(f"Failed to refresh memory {memory_id}: {e}")
                     # Continue refreshing other memories
 
-            logger.info(f"Refreshed verification for {refreshed}/{len(memory_ids)} memories")
+            logger.info(
+                f"Refreshed verification for {refreshed}/{len(memory_ids)} memories"
+            )
             return refreshed
 
         except Exception as e:
@@ -380,7 +408,9 @@ class MemoryHealthMonitor:
             raise
 
 
-def scan_stale_memories(staleness_days: int = 90, client: Optional[Mem0Client] = None) -> list[dict]:
+def scan_stale_memories(
+    staleness_days: int = 90, client: Optional[Mem0Client] = None
+) -> list[dict]:
     """Convenience function to scan for stale memories.
 
     Creates MemoryHealthMonitor and scans for stale memories in one call.
@@ -417,8 +447,8 @@ if __name__ == "__main__":
     monitor = MemoryHealthMonitor(staleness_days=staleness_days)
     report = monitor.generate_health_report()
 
-    print(f"Memory Health Report")
-    print(f"====================")
+    print("Memory Health Report")
+    print("====================")
     print(f"Total: {report.total_memories}")
     print(f"Healthy: {report.healthy}")
     print(f"Stale: {report.stale}")

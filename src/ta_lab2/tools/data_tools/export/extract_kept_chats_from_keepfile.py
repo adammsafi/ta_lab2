@@ -102,9 +102,9 @@ def extract_kept_chats(
 
     # Search roots for fallback lookup by id
     search_roots = [
-        chats_dir,                 # most likely
-        search_root,               # if chats live deeper
-        search_root.parent,        # one level up in case you changed folder structure
+        chats_dir,  # most likely
+        search_root,  # if chats live deeper
+        search_root.parent,  # one level up in case you changed folder structure
     ]
 
     results: List[Dict[str, str]] = []
@@ -234,13 +234,23 @@ def extract_kept_chats(
 
     # Write manifest
     with manifest_path.open("w", encoding="utf-8", newline="") as f:
-        fieldnames = ["row", "id", "src_path", "resolved_path", "dest_path", "status", "error"]
+        fieldnames = [
+            "row",
+            "id",
+            "src_path",
+            "resolved_path",
+            "dest_path",
+            "status",
+            "error",
+        ]
         w = csv.DictWriter(f, fieldnames=fieldnames)
         w.writeheader()
         for r in results:
             w.writerow(r)
 
-    logger.info(f"Copied: {copied}, Recovered: {recovered}, Missing: {missing}, Bad rows: {bad_rows}")
+    logger.info(
+        f"Copied: {copied}, Recovered: {recovered}, Missing: {missing}, Bad rows: {bad_rows}"
+    )
     logger.info(f"Manifest written to: {manifest_path}")
 
     return {

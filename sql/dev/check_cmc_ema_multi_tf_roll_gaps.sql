@@ -1,4 +1,4 @@
-select * 
+select *
 from cmc_ema_multi_tf
 where id = 1 and tf = '1M'
 LIMIT 10

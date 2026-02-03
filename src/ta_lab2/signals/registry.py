@@ -1,6 +1,7 @@
 # src/ta_lab2/signals/registry.py
 # -*- coding: utf-8 -*-
 from __future__ import annotations
+
 """
 Strategy registry for ta_lab2.signals.
 
@@ -45,17 +46,21 @@ except Exception:  # pragma: no cover
 REGISTRY: Dict[str, Callable[..., Tuple[pd.Series, pd.Series, Optional[pd.Series]]]] = {
     "ema_trend": ema_trend_signal,
     **({"rsi_mean_revert": rsi_mean_revert_signal} if rsi_mean_revert_signal else {}),
-    **({"macd_crossover": macd_crossover_signal}   if macd_crossover_signal else {}),
-    **({"breakout_atr": breakout_atr_signal}       if breakout_atr_signal else {}),
+    **({"macd_crossover": macd_crossover_signal} if macd_crossover_signal else {}),
+    **({"breakout_atr": breakout_atr_signal} if breakout_atr_signal else {}),
 }
 
 
-def get_strategy(name: str) -> Callable[..., Tuple[pd.Series, pd.Series, Optional[pd.Series]]]:
+def get_strategy(
+    name: str,
+) -> Callable[..., Tuple[pd.Series, pd.Series, Optional[pd.Series]]]:
     """Safe getter used by research scripts; keeps existing orchestrator behavior intact."""
     fn = REGISTRY.get(name)
     if fn is None:
         available = [k for k, v in REGISTRY.items() if v]
-        raise KeyError(f"Unknown or unavailable strategy '{name}'. Available: {available}")
+        raise KeyError(
+            f"Unknown or unavailable strategy '{name}'. Available: {available}"
+        )
     return fn
 
 
@@ -74,12 +79,14 @@ def _ensure_close(df: pd.DataFrame) -> None:
     if "close" not in df.columns:
         raise KeyError("DataFrame must contain a 'close' column.")
 
+
 def _ensure_ema(df: pd.DataFrame, span: int) -> str:
     _ensure_close(df)
     col = f"ema_{span}"
     if col not in df:
         df[col] = df["close"].ewm(span=span, adjust=False).mean()
     return col
+
 
 def _ensure_rsi(df: pd.DataFrame, n: int = 14) -> str:
     """Minimal Wilder-style RSI (EMA smoothing) on 'close'."""
@@ -93,18 +100,22 @@ def _ensure_rsi(df: pd.DataFrame, n: int = 14) -> str:
         df[col] = 100.0 - (100.0 / (1.0 + rs))
     return col
 
-def _ensure_macd(df: pd.DataFrame, fast: int = 12, slow: int = 26, signal: int = 9) -> tuple[str, str, str]:
+
+def _ensure_macd(
+    df: pd.DataFrame, fast: int = 12, slow: int = 26, signal: int = 9
+) -> tuple[str, str, str]:
     _ensure_close(df)
     macd_col, sig_col, hist_col = "macd", "macd_signal", "macd_hist"
     if macd_col not in df or sig_col not in df or hist_col not in df:
-        ema_f = df["close"].ewm(span=fast,  adjust=False).mean()
-        ema_s = df["close"].ewm(span=slow,  adjust=False).mean()
+        ema_f = df["close"].ewm(span=fast, adjust=False).mean()
+        ema_s = df["close"].ewm(span=slow, adjust=False).mean()
         macd = ema_f - ema_s
         macd_sig = macd.ewm(span=signal, adjust=False).mean()
         df[macd_col] = macd
         df[sig_col] = macd_sig
         df[hist_col] = macd - macd_sig
     return macd_col, sig_col, hist_col
+
 
 def _ensure_atr(df: pd.DataFrame, n: int = 14) -> str:
     """Minimal ATR (Wilder). Requires high/low/close. If missing, silently skip."""
@@ -117,11 +128,9 @@ def _ensure_atr(df: pd.DataFrame, n: int = 14) -> str:
         return col
     high, low, close = df["high"], df["low"], df["close"]
     prev_close = close.shift(1)
-    tr = pd.concat([
-        (high - low),
-        (high - prev_close).abs(),
-        (low - prev_close).abs()
-    ], axis=1).max(axis=1)
+    tr = pd.concat(
+        [(high - low), (high - prev_close).abs(), (low - prev_close).abs()], axis=1
+    ).max(axis=1)
     df[col] = tr.ewm(alpha=1 / n, adjust=False).mean()
     return col
 
@@ -140,7 +149,11 @@ def ensure_for(name: str, df: pd.DataFrame, params: Dict[str, Any]) -> None:
         _ensure_close(df)
 
     elif name == "rsi_mean_revert" and rsi_mean_revert_signal:
-        n = int(params.get("rsi_n", 14)) if "rsi_n" in params else int(str(params.get("rsi_col", "rsi_14")).split("_")[-1])
+        n = (
+            int(params.get("rsi_n", 14))
+            if "rsi_n" in params
+            else int(str(params.get("rsi_col", "rsi_14")).split("_")[-1])
+        )
         _ensure_rsi(df, n)
         # optional trend filter
         tf = params.get("trend_fast")
@@ -196,32 +209,40 @@ def grid_for(name: str) -> List[Dict[str, Any]]:
         for n in (7, 14, 21):
             for lower, upper in ((25, 55), (30, 60), (35, 65)):
                 # with trend filter
-                out.append({
-                    "rsi_n": n,
-                    "rsi_buy": lower, "rsi_sell": upper,
-                    "trend_fast": "ema_17", "trend_slow": "ema_77",
-                    "use_trend": True,
-                    "atr_col": "atr_14",   # optional for sizing/stops
-                    "risk_pct": 0.5,
-                    "atr_mult_stop": 1.5,
-                    "max_leverage": 1.0,
-                })
+                out.append(
+                    {
+                        "rsi_n": n,
+                        "rsi_buy": lower,
+                        "rsi_sell": upper,
+                        "trend_fast": "ema_17",
+                        "trend_slow": "ema_77",
+                        "use_trend": True,
+                        "atr_col": "atr_14",  # optional for sizing/stops
+                        "risk_pct": 0.5,
+                        "atr_mult_stop": 1.5,
+                        "max_leverage": 1.0,
+                    }
+                )
                 # without trend filter
-                out.append({
-                    "rsi_n": n,
-                    "rsi_buy": lower, "rsi_sell": upper,
-                    "trend_fast": None, "trend_slow": None,
-                    "use_trend": False,
-                    "atr_col": "atr_14",
-                    "risk_pct": 0.5,
-                    "atr_mult_stop": 1.5,
-                    "max_leverage": 1.0,
-                })
+                out.append(
+                    {
+                        "rsi_n": n,
+                        "rsi_buy": lower,
+                        "rsi_sell": upper,
+                        "trend_fast": None,
+                        "trend_slow": None,
+                        "use_trend": False,
+                        "atr_col": "atr_14",
+                        "risk_pct": 0.5,
+                        "atr_mult_stop": 1.5,
+                        "max_leverage": 1.0,
+                    }
+                )
         return out
 
     if name == "macd_crossover" and macd_crossover_signal:
         return [
-            {"fast": 8,  "slow": 17, "signal": 9},
+            {"fast": 8, "slow": 17, "signal": 9},
             {"fast": 12, "slow": 26, "signal": 9},
             {"fast": 19, "slow": 39, "signal": 9},
         ]

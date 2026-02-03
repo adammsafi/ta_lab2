@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import csv
 import json
 import logging
 import os
@@ -31,7 +30,14 @@ except ImportError:
 DEFAULT_KEY_MODE = "conflict_key_title"  # conflict_key_title | conflict_key_only | title_only | stable_hash
 
 # If you want stronger dedupe, expand the "key_fields" below, or switch to stable_hash.
-KEY_FIELDS_FOR_HASH = ("conflict_key", "title", "content", "source_path", "conversation_id", "parent_memory_id")
+KEY_FIELDS_FOR_HASH = (
+    "conflict_key",
+    "title",
+    "content",
+    "source_path",
+    "conversation_id",
+    "parent_memory_id",
+)
 
 EVIDENCE_TOKEN_PATTERNS = [
     r"src[\\/].+?\.(py|sql|md|toml|yml|yaml|json)",
@@ -163,6 +169,7 @@ def get_text(o: Dict[str, Any]) -> str:
 
 def stable_hash_key(o: Dict[str, Any]) -> str:
     import hashlib
+
     parts: List[str] = []
     for k in KEY_FIELDS_FOR_HASH:
         parts.append(str(o.get(k, "") or ""))
@@ -222,7 +229,7 @@ def semantic_evidence_check(
     model: str,
     n_results: int = 5,
     threshold: float = 1.1,
-    max_tokens: int = 8000  # Max tokens for text-embedding-3-small is 8192
+    max_tokens: int = 8000,  # Max tokens for text-embedding-3-small is 8192
 ) -> EvidenceResult:
     """
     Performs a semantic search for code chunks related to the memory text.
@@ -230,32 +237,31 @@ def semantic_evidence_check(
     """
     # Truncate memory_text if it's too long for the embedding model
     if len(memory_text) > max_tokens:  # Simple char count as a proxy for tokens
-        logging.warning(f"Memory text too long ({len(memory_text)} chars). Truncating to {max_tokens} chars for embedding.")
+        logging.warning(
+            f"Memory text too long ({len(memory_text)} chars). Truncating to {max_tokens} chars for embedding."
+        )
         memory_text = memory_text[:max_tokens]
 
     query_embedding = get_query_embedding(memory_text, client, model)
     if not query_embedding:
         return EvidenceResult(ok=False, hits=0, patterns=[], sample=[])
 
-    results = collection.query(
-        query_embeddings=[query_embedding],
-        n_results=n_results
-    )
+    results = collection.query(query_embeddings=[query_embedding], n_results=n_results)
 
     hits = 0
     sample = []
     patterns = []  # Use this to store the names of the functions/classes found
 
-    if results and results.get('documents'):
-        for i, doc in enumerate(results['documents'][0]):
-            distance = results['distances'][0][i]
+    if results and results.get("documents"):
+        for i, doc in enumerate(results["documents"][0]):
+            distance = results["distances"][0][i]
             if distance < threshold:
                 hits += 1
-                metadata = results['metadatas'][0][i]
+                metadata = results["metadatas"][0][i]
                 # Create a readable sample format
                 sample_line = f"Source: {metadata.get('file_path')}:{metadata.get('start_line')} | Function/Class: {metadata.get('name')}"
                 sample.append(sample_line)
-                patterns.append(metadata.get('name', ''))
+                patterns.append(metadata.get("name", ""))
 
     return EvidenceResult(ok=(hits > 0), hits=hits, patterns=patterns, sample=sample)
 
@@ -278,7 +284,10 @@ def decide(o: Dict[str, Any], done_marker: bool, ev: EvidenceResult) -> Tuple[st
     if status:
         if status in ACCEPT_STATUSES:
             if looks_cautionary(text) and not looks_like_policy(text):
-                return "review", f"decision_status={status} but text looks cautionary/uncertain"
+                return (
+                    "review",
+                    f"decision_status={status} but text looks cautionary/uncertain",
+                )
             return "accept", f"decision_status={status}"
         if status in REVIEW_STATUSES:
             return "review", f"decision_status={status}"
@@ -313,20 +322,48 @@ def pick_best_candidate(cands: List[Dict[str, Any]]) -> Dict[str, Any]:
 
 
 def main() -> int:
-    logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+    logging.basicConfig(
+        level=logging.INFO,
+        format="[%(asctime)s] %(levelname)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
     log = logging.getLogger()
 
     ap = argparse.ArgumentParser(
         description="Instantiate final memories from children with semantic evidence checking"
     )
     ap.add_argument("--children", required=True, help="Path to memory_children.jsonl")
-    ap.add_argument("--out-dir", required=True, help="Output directory for final/decision/review files")
-    ap.add_argument("--registry", required=True, help="Path to memory_registry_root.jsonl (for parent context)")
-    ap.add_argument("--chroma-dir", required=True, help="Path to the ChromaDB vector store directory.")
-    ap.add_argument("--code-collection-name", required=True, help="Name of the ChromaDB collection for code.")
-    ap.add_argument("--embedding-model", default="text-embedding-3-small", help="OpenAI model for embeddings.")
-    ap.add_argument("--key-mode", default=DEFAULT_KEY_MODE, help="Keying mode for registry")
-    ap.add_argument("--overrides", default=None, help="Path to decision_overrides.jsonl (optional)")
+    ap.add_argument(
+        "--out-dir",
+        required=True,
+        help="Output directory for final/decision/review files",
+    )
+    ap.add_argument(
+        "--registry",
+        required=True,
+        help="Path to memory_registry_root.jsonl (for parent context)",
+    )
+    ap.add_argument(
+        "--chroma-dir",
+        required=True,
+        help="Path to the ChromaDB vector store directory.",
+    )
+    ap.add_argument(
+        "--code-collection-name",
+        required=True,
+        help="Name of the ChromaDB collection for code.",
+    )
+    ap.add_argument(
+        "--embedding-model",
+        default="text-embedding-3-small",
+        help="OpenAI model for embeddings.",
+    )
+    ap.add_argument(
+        "--key-mode", default=DEFAULT_KEY_MODE, help="Keying mode for registry"
+    )
+    ap.add_argument(
+        "--overrides", default=None, help="Path to decision_overrides.jsonl (optional)"
+    )
     args = ap.parse_args()
 
     if not os.environ.get("OPENAI_API_KEY"):
@@ -345,11 +382,12 @@ def main() -> int:
     try:
         chroma_client = chromadb.PersistentClient(path=str(chroma_path))
         code_collection = chroma_client.get_collection(name=args.code_collection_name)
-        log.info(f"Connected to code collection '{args.code_collection_name}' with {code_collection.count()} documents.")
+        log.info(
+            f"Connected to code collection '{args.code_collection_name}' with {code_collection.count()} documents."
+        )
     except Exception as e:
         log.error(f"Failed to connect to ChromaDB collection: {e}")
         return 1
-
 
     # Load parent memory registry for context
     parent_memories: Dict[str, Dict[str, Any]] = {}
@@ -374,7 +412,9 @@ def main() -> int:
         key = compute_registry_key(o, args.key_mode)
 
         text = get_text(o)
-        ev = semantic_evidence_check(text, code_collection, client, args.embedding_model)
+        ev = semantic_evidence_check(
+            text, code_collection, client, args.embedding_model
+        )
 
         decision, reason = decide(o, done_marker=done_marker, ev=ev)
 

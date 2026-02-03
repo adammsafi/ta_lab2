@@ -106,6 +106,7 @@ def load_ids(engine, ids_arg: Optional[str] = None, all_ids: bool = False) -> li
 
     if all_ids:
         from sqlalchemy import text
+
         query = """
         SELECT DISTINCT id
         FROM public.cmc_price_bars_1d
@@ -180,6 +181,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     except Exception as e:
         print(f"Error computing features: {e}", file=sys.stderr)
         import traceback
+
         traceback.print_exc()
         return 1
 

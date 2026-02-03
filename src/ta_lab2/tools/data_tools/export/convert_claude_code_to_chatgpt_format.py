@@ -20,7 +20,7 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,11 @@ def extract_message_content(msg: Dict[str, Any]) -> str:
                 elif item.get("type") == "tool_result":
                     content_val = item.get("content", "")
                     if isinstance(content_val, str):
-                        parts.append(f"[Result: {content_val[:200]}...]" if len(content_val) > 200 else f"[Result: {content_val}]")
+                        parts.append(
+                            f"[Result: {content_val[:200]}...]"
+                            if len(content_val) > 200
+                            else f"[Result: {content_val}]"
+                        )
             elif isinstance(item, str):
                 parts.append(item)
         return "\n".join(parts)
@@ -85,22 +89,26 @@ def convert_claude_code_conversation(jsonl_path: Path) -> Optional[Dict[str, Any
                     elif isinstance(content, dict):
                         content = json.dumps(content)
 
-                    messages.append({
-                        "role": "user",
-                        "content": content,
-                        "timestamp": entry.get("timestamp"),
-                    })
+                    messages.append(
+                        {
+                            "role": "user",
+                            "content": content,
+                            "timestamp": entry.get("timestamp"),
+                        }
+                    )
 
                 # Process assistant messages
                 elif entry.get("type") == "assistant":
                     msg = entry.get("message", {})
                     content = extract_message_content(msg)
 
-                    messages.append({
-                        "role": "assistant",
-                        "content": content,
-                        "timestamp": entry.get("timestamp"),
-                    })
+                    messages.append(
+                        {
+                            "role": "assistant",
+                            "content": content,
+                            "timestamp": entry.get("timestamp"),
+                        }
+                    )
 
             except json.JSONDecodeError as e:
                 logger.warning(f"Skipping invalid JSON line in {jsonl_path.name}: {e}")
@@ -117,7 +125,9 @@ def convert_claude_code_conversation(jsonl_path: Path) -> Optional[Dict[str, Any
         "id": session_id,
         "title": f"Claude Code Session {session_id[:8]}",
         "create_time": first_ts,
-        "update_time": messages[-1].get("timestamp", first_ts) if messages else first_ts,
+        "update_time": messages[-1].get("timestamp", first_ts)
+        if messages
+        else first_ts,
         "mapping": {},
     }
 
@@ -214,7 +224,11 @@ def main() -> int:
     )
     args = ap.parse_args()
 
-    claude_dir = Path(args.claude_dir) if args.claude_dir else (Path.home() / ".claude" / "projects")
+    claude_dir = (
+        Path(args.claude_dir)
+        if args.claude_dir
+        else (Path.home() / ".claude" / "projects")
+    )
     output_file = Path(args.output)
 
     count = convert_claude_conversations(claude_dir, output_file)

@@ -18,7 +18,24 @@ else:
     DF_DAILY = pd.read_parquet("artifacts/btc.parquet")
 
 # 2) Define the timeframes you want
-FREQS = ["2D","3D","4D","5D","10D","25D","45D","W","W-FRI","2W","3W","M","2M","3M","6M","A"]
+FREQS = [
+    "2D",
+    "3D",
+    "4D",
+    "5D",
+    "10D",
+    "25D",
+    "45D",
+    "W",
+    "W-FRI",
+    "2W",
+    "3W",
+    "M",
+    "2M",
+    "3M",
+    "6M",
+    "A",
+]
 
 # 3) Resample and persist the raw OHLCV frames
 FRAMES = resample_many(DF_DAILY, FREQS, outdir="artifacts/frames", overwrite=True)

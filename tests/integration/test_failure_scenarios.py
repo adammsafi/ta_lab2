@@ -15,7 +15,7 @@ from unittest.mock import MagicMock, AsyncMock, patch
 import asyncio
 
 # Import TracingContext for correlation tracking (key_link verification)
-from ta_lab2.observability.tracing import TracingContext, generate_correlation_id
+from ta_lab2.observability.tracing import TracingContext
 
 
 @pytest.mark.integration
@@ -32,10 +32,12 @@ class TestComponentUnavailable:
         task = Task(
             type=TaskType.DATA_ANALYSIS,
             prompt="Task B",
-            context={"handoff_memory_id": "any-id"}
+            context={"handoff_memory_id": "any-id"},
         )
 
-        with patch('ta_lab2.tools.ai_orchestrator.memory.query.get_memory_by_id') as mock_get:
+        with patch(
+            "ta_lab2.tools.ai_orchestrator.memory.query.get_memory_by_id"
+        ) as mock_get:
             mock_get.side_effect = ConnectionError("Qdrant connection refused")
 
             with pytest.raises(ConnectionError):
@@ -54,13 +56,13 @@ class TestComponentUnavailable:
         # Should raise or handle gracefully
         with pytest.raises(Exception):
             with mock_engine.connect():
-                validator.check_gaps('test', [1], '2024-01-01', '2024-01-31')
+                validator.check_gaps("test", [1], "2024-01-01", "2024-01-31")
 
     @pytest.mark.asyncio
     async def test_orchestrator_adapter_unavailable(self, mocker):
         """Test orchestrator handles adapter being unavailable."""
         from ta_lab2.tools.ai_orchestrator.execution import AsyncOrchestrator
-        from ta_lab2.tools.ai_orchestrator.core import Task, TaskType, Platform
+        from ta_lab2.tools.ai_orchestrator.core import Task, TaskType
 
         orchestrator = AsyncOrchestrator(adapters={})  # No adapters
 
@@ -87,13 +89,13 @@ class TestPartialFailures:
         """Test handling when task succeeds but memory write fails."""
         from ta_lab2.tools.ai_orchestrator.memory.update import add_memory
 
-        with patch('ta_lab2.tools.ai_orchestrator.memory.update.get_embedding') as mock_embed:
+        with patch(
+            "ta_lab2.tools.ai_orchestrator.memory.update.get_embedding"
+        ) as mock_embed:
             mock_embed.side_effect = Exception("Memory write failed")
 
             result = add_memory(
-                memory_id="mem-123",
-                content="success",
-                metadata={"type": "task_result"}
+                memory_id="mem-123", content="success", metadata={"type": "task_result"}
             )
 
             # add_memory catches exceptions and returns them in result.errors
@@ -102,30 +104,34 @@ class TestPartialFailures:
 
     def test_refresh_succeeds_validation_fails(self, mocker):
         """Test handling when refresh succeeds but validation fails."""
-        mock_refresh_func = mocker.MagicMock(return_value={'success': True})
-        mock_validate_func = mocker.MagicMock(return_value={'passed': False, 'issues': [{'type': 'gap'}]})
+        mock_refresh_func = mocker.MagicMock(return_value={"success": True})
+        mock_validate_func = mocker.MagicMock(
+            return_value={"passed": False, "issues": [{"type": "gap"}]}
+        )
 
         # Both complete but validation fails
         refresh_result = mock_refresh_func(asset_ids=[1])
         validate_result = mock_validate_func(asset_ids=[1])
 
-        assert refresh_result['success']
-        assert not validate_result['passed']
+        assert refresh_result["success"]
+        assert not validate_result["passed"]
 
     def test_partial_feature_refresh_failure(self, mocker):
         """Test handling when some feature tables fail to refresh."""
-        mock_refresh_all = mocker.MagicMock(return_value={
-            'returns': {'success': True, 'rows': 100},
-            'vol': {'success': False, 'error': 'Vol calc failed'},
-            'ta': {'success': True, 'rows': 100},
-        })
+        mock_refresh_all = mocker.MagicMock(
+            return_value={
+                "returns": {"success": True, "rows": 100},
+                "vol": {"success": False, "error": "Vol calc failed"},
+                "ta": {"success": True, "rows": 100},
+            }
+        )
 
         result = mock_refresh_all(asset_ids=[1])
 
         # Some succeed, some fail
-        assert result['returns']['success']
-        assert not result['vol']['success']
-        assert result['ta']['success']
+        assert result["returns"]["success"]
+        assert not result["vol"]["success"]
+        assert result["ta"]["success"]
 
 
 @pytest.mark.integration
@@ -138,19 +144,33 @@ class TestTimeoutLatency:
         """Test handling when memory search times out."""
         from ta_lab2.tools.ai_orchestrator.memory.query import search_memories
 
-        with patch('ta_lab2.tools.ai_orchestrator.memory.client.get_memory_client') as mock_client:
+        with patch(
+            "ta_lab2.tools.ai_orchestrator.memory.client.get_memory_client"
+        ) as mock_client:
             mock_collection = mocker.MagicMock()
 
             async def slow_query(*args, **kwargs):
                 await asyncio.sleep(10)  # Simulate slow response
-                return {"ids": [[]], "distances": [[]], "documents": [[]], "metadatas": [[]]}
+                return {
+                    "ids": [[]],
+                    "distances": [[]],
+                    "documents": [[]],
+                    "metadatas": [[]],
+                }
 
             # Memory client uses synchronous API, but we can test timeout pattern
-            mock_collection.query.side_effect = lambda *args, **kwargs: {"ids": [[]], "distances": [[]], "documents": [[]], "metadatas": [[]]}
+            mock_collection.query.side_effect = lambda *args, **kwargs: {
+                "ids": [[]],
+                "distances": [[]],
+                "documents": [[]],
+                "metadatas": [[]],
+            }
             mock_client.return_value.collection = mock_collection
 
             # Should complete quickly with mocked data
-            with patch('ta_lab2.tools.ai_orchestrator.memory.update.get_embedding') as mock_embed:
+            with patch(
+                "ta_lab2.tools.ai_orchestrator.memory.update.get_embedding"
+            ) as mock_embed:
                 mock_embed.return_value = [[0.1] * 1536]
                 result = search_memories("test query", max_results=5)
                 assert result is not None
@@ -159,7 +179,12 @@ class TestTimeoutLatency:
     async def test_adapter_execution_timeout(self, mocker):
         """Test handling when adapter execution times out."""
         from ta_lab2.tools.ai_orchestrator.execution import AsyncOrchestrator
-        from ta_lab2.tools.ai_orchestrator.core import Task, TaskType, Platform, TaskConstraints
+        from ta_lab2.tools.ai_orchestrator.core import (
+            Task,
+            TaskType,
+            Platform,
+            TaskConstraints,
+        )
 
         mock_adapter = mocker.MagicMock()
         mock_adapter.submit_task = AsyncMock(return_value="task-123")
@@ -202,10 +227,12 @@ class TestInvalidStateTransitions:
         task = Task(
             type=TaskType.DATA_ANALYSIS,
             prompt="Task B",
-            context={"handoff_memory_id": "nonexistent-context-id"}
+            context={"handoff_memory_id": "nonexistent-context-id"},
         )
 
-        with patch('ta_lab2.tools.ai_orchestrator.memory.query.get_memory_by_id') as mock_get:
+        with patch(
+            "ta_lab2.tools.ai_orchestrator.memory.query.get_memory_by_id"
+        ) as mock_get:
             mock_get.return_value = None
 
             # Task B tries to load context from Task A that doesn't exist
@@ -268,7 +295,7 @@ class TestFailFastMode:
                 raise ValueError(f"{table} failed")
             return MagicMock(success=True)
 
-        tables = ['returns', 'vol', 'ta']
+        tables = ["returns", "vol", "ta"]
 
         # With fail_fast=True, should stop at first failure
         fail_fast = True
@@ -285,14 +312,14 @@ class TestFailFastMode:
 
         # Should have stopped at first error
         assert len(errors) == 1
-        assert 'vol' in errors[0]
+        assert "vol" in errors[0]
 
     def test_continue_on_error_default(self, mocker):
         """Test default behavior continues after errors."""
         errors = []
         results = []
 
-        tables = ['returns', 'vol', 'ta']
+        tables = ["returns", "vol", "ta"]
 
         # Default: continue after failure
         fail_fast = False

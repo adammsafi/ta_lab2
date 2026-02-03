@@ -16,7 +16,9 @@ try:
     from openai import OpenAI
     from openai.types.chat import ChatCompletionMessageParam
 except ImportError:
-    print("OpenAI Python library not found. Please install it with 'pip install openai'.")
+    print(
+        "OpenAI Python library not found. Please install it with 'pip install openai'."
+    )
     sys.exit(1)
 
 try:
@@ -24,6 +26,7 @@ try:
 except ImportError:
     print("ChromaDB library not found. Please install it with 'pip install chromadb'.")
     sys.exit(1)
+
 
 def get_query_embedding(query: str, client: OpenAI, model: str) -> List[float]:
     """Generates an embedding for a single query string."""
@@ -34,7 +37,14 @@ def get_query_embedding(query: str, client: OpenAI, model: str) -> List[float]:
         logging.error(f"Error calling OpenAI embedding API for query: {e}")
         return []
 
-def find_semantic_memories(query: str, collection: chromadb.Collection, client: OpenAI, model: str, top_n: int = 5) -> List[Dict[str, Any]]:
+
+def find_semantic_memories(
+    query: str,
+    collection: chromadb.Collection,
+    client: OpenAI,
+    model: str,
+    top_n: int = 5,
+) -> List[Dict[str, Any]]:
     """
     Finds the most relevant memories using semantic search in ChromaDB.
     """
@@ -42,29 +52,26 @@ def find_semantic_memories(query: str, collection: chromadb.Collection, client: 
     if not query_embedding:
         return []
 
-    results = collection.query(
-        query_embeddings=[query_embedding],
-        n_results=top_n
-    )
-    
+    results = collection.query(query_embeddings=[query_embedding], n_results=top_n)
+
     # The 'documents' field from ChromaDB contains the text we need for the LLM context.
     # We can reconstruct a simplified memory object for the next step.
     retrieved_memories = []
-    if results and results.get('documents'):
-        for i, doc in enumerate(results['documents'][0]):
+    if results and results.get("documents"):
+        for i, doc in enumerate(results["documents"][0]):
             # The 'doc' is the string we created: "Title: ...\nType: ...\nContent: ..."
             # We can pass this directly to the generation model. For simplicity, we'll
             # extract the title from the first line for display.
-            title_line = doc.split('\n')[0]
+            title_line = doc.split("\n")[0]
             # It's better to just pass the whole retrieved document as content.
-            retrieved_memories.append({
-                'title': title_line,
-                'content': doc
-            })
-            
+            retrieved_memories.append({"title": title_line, "content": doc})
+
     return retrieved_memories
 
-def ask_question(query: str, context_memories: List[Dict[str, Any]], client: OpenAI) -> str:
+
+def ask_question(
+    query: str, context_memories: List[Dict[str, Any]], client: OpenAI
+) -> str:
     """
     Asks the OpenAI model a question based on the provided context memories.
     """
@@ -86,23 +93,24 @@ def ask_question(query: str, context_memories: List[Dict[str, Any]], client: Ope
         # The full document from ChromaDB is now the content
         context_str += f"{mem.get('content', '')}\n\n"
 
-    user_prompt = (
-        f"CONTEXT MEMORIES:\n{context_str}\n\n"
-        f"QUESTION: {query}"
-    )
+    user_prompt = f"CONTEXT MEMORIES:\n{context_str}\n\n" f"QUESTION: {query}"
 
     try:
         response = client.chat.completions.create(
-            model="gpt-4o", # Using a more capable model for better synthesis
+            model="gpt-4o",  # Using a more capable model for better synthesis
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
             temperature=0.0,
         )
-        return response.choices[0].message.content or "The model returned an empty response."
+        return (
+            response.choices[0].message.content
+            or "The model returned an empty response."
+        )
     except Exception as e:
         return f"An error occurred while contacting the OpenAI API: {e}"
+
 
 def collect_user_feedback(answer: str) -> tuple[str, dict | None]:
     """
@@ -113,11 +121,11 @@ def collect_user_feedback(answer: str) -> tuple[str, dict | None]:
         try:
             feedback = input("\nWas this helpful? (y/n/correct): ").strip().lower()
 
-            if feedback in ['y', 'yes']:
-                return ('yes', None)
-            elif feedback in ['n', 'no']:
-                return ('no', None)
-            elif feedback == 'correct':
+            if feedback in ["y", "yes"]:
+                return ("yes", None)
+            elif feedback in ["n", "no"]:
+                return ("no", None)
+            elif feedback == "correct":
                 print("\nWhat is the correct information?")
                 title = input("Title (press Enter to keep original): ").strip()
 
@@ -126,18 +134,19 @@ def collect_user_feedback(answer: str) -> tuple[str, dict | None]:
                     content = input("Content: ").strip()
                     if content:
                         break
-                    print("Content cannot be empty. Please provide the correct information.")
+                    print(
+                        "Content cannot be empty. Please provide the correct information."
+                    )
 
-                return ('correct', {'title': title, 'content': content})
+                return ("correct", {"title": title, "content": content})
             else:
                 print("Please enter 'y', 'n', or 'correct'.")
         except (EOFError, KeyboardInterrupt):
-            return ('exit', None)
+            return ("exit", None)
+
 
 def create_correction_memory(
-    original_query: str,
-    original_memories: List[Dict],
-    correction_data: dict
+    original_query: str, original_memories: List[Dict], correction_data: dict
 ) -> dict:
     """Create correction memory with unique ID and metadata."""
     timestamp = datetime.now(timezone.utc)
@@ -152,18 +161,18 @@ def create_correction_memory(
     corrects_memory_id = "unknown"
     if original_memories:
         # Attempt to extract memory_id from the first memory's content
-        first_mem_content = original_memories[0].get('content', '')
-        for line in first_mem_content.split('\n'):
-            if line.startswith('Memory ID:'):
-                corrects_memory_id = line.replace('Memory ID:', '').strip()
+        first_mem_content = original_memories[0].get("content", "")
+        for line in first_mem_content.split("\n"):
+            if line.startswith("Memory ID:"):
+                corrects_memory_id = line.replace("Memory ID:", "").strip()
                 break
 
     # Build correction memory
     correction = {
         "memory_id": memory_id,
-        "title": correction_data.get('title') or "User Correction",
-        "content": correction_data['content'],
-        "source_chunk": correction_data['content'],
+        "title": correction_data.get("title") or "User Correction",
+        "content": correction_data["content"],
+        "source_chunk": correction_data["content"],
         "type": "user_correction",
         "source_path": "ask_project_correction",
         "corrects_memory_id": corrects_memory_id,
@@ -172,25 +181,32 @@ def create_correction_memory(
         "conversation_id": f"ask_project_session_{hash_suffix}",
         "accepted_ts_utc": timestamp.isoformat(),
         "accepted_reason": "user_correction",
-        "evidence": {"ok": True, "hits": 0, "patterns": [], "sample": []}
+        "evidence": {"ok": True, "hits": 0, "patterns": [], "sample": []},
     }
 
     return correction
+
 
 def append_correction_to_jsonl(correction: dict, jsonl_path: Path) -> bool:
     """Atomically append correction to JSONL file."""
     try:
         # Check if file exists
         if not jsonl_path.exists():
-            response = input(f"\nMemory file does not exist at {jsonl_path}. Create it? (y/n): ").strip().lower()
-            if response not in ['y', 'yes']:
+            response = (
+                input(
+                    f"\nMemory file does not exist at {jsonl_path}. Create it? (y/n): "
+                )
+                .strip()
+                .lower()
+            )
+            if response not in ["y", "yes"]:
                 return False
             # Create parent directory if needed
             jsonl_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Append to file
-        with open(jsonl_path, 'a', encoding='utf-8') as f:
-            f.write(json.dumps(correction, ensure_ascii=False) + '\n')
+        with open(jsonl_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(correction, ensure_ascii=False) + "\n")
 
         return True
     except PermissionError:
@@ -202,6 +218,7 @@ def append_correction_to_jsonl(correction: dict, jsonl_path: Path) -> bool:
     except Exception as e:
         logging.error(f"Unexpected error writing to {jsonl_path}: {e}")
         return False
+
 
 def generate_code_search_queries(correction_content: str, client: OpenAI) -> List[str]:
     """Use GPT-4 to generate 2-3 code search queries from correction."""
@@ -226,18 +243,19 @@ def generate_code_search_queries(correction_content: str, client: OpenAI) -> Lis
         )
 
         queries_text = response.choices[0].message.content or ""
-        queries = [q.strip() for q in queries_text.split('\n') if q.strip()]
+        queries = [q.strip() for q in queries_text.split("\n") if q.strip()]
         return queries[:3]  # Ensure max 3 queries
     except Exception as e:
         logging.error(f"Error generating code search queries: {e}")
         return [correction_content]  # Fallback to original content
+
 
 def search_affected_code(
     queries: List[str],
     code_collection: chromadb.Collection,
     client: OpenAI,
     embedding_model: str,
-    threshold: float = 0.7
+    threshold: float = 0.7,
 ) -> List[Dict]:
     """Search code collection for affected code chunks."""
     all_results = []
@@ -250,13 +268,12 @@ def search_affected_code(
                 continue
 
             results = code_collection.query(
-                query_embeddings=[query_embedding],
-                n_results=10
+                query_embeddings=[query_embedding], n_results=10
             )
 
-            if results and results.get('documents') and results.get('distances'):
-                for i, doc in enumerate(results['documents'][0]):
-                    distance = results['distances'][0][i]
+            if results and results.get("documents") and results.get("distances"):
+                for i, doc in enumerate(results["documents"][0]):
+                    distance = results["distances"][0][i]
 
                     # Filter by threshold
                     if distance > threshold:
@@ -264,27 +281,34 @@ def search_affected_code(
 
                     # Extract metadata if available
                     metadata = {}
-                    if results.get('metadatas') and len(results['metadatas'][0]) > i:
-                        metadata = results['metadatas'][0][i] or {}
+                    if results.get("metadatas") and len(results["metadatas"][0]) > i:
+                        metadata = results["metadatas"][0][i] or {}
 
                     # Create unique identifier
-                    doc_id = results.get('ids', [[]])[0][i] if results.get('ids') else f"doc_{i}"
+                    doc_id = (
+                        results.get("ids", [[]])[0][i]
+                        if results.get("ids")
+                        else f"doc_{i}"
+                    )
 
                     if doc_id not in seen_ids:
                         seen_ids.add(doc_id)
-                        all_results.append({
-                            'doc_id': doc_id,
-                            'content': doc,
-                            'distance': distance,
-                            'metadata': metadata
-                        })
+                        all_results.append(
+                            {
+                                "doc_id": doc_id,
+                                "content": doc,
+                                "distance": distance,
+                                "metadata": metadata,
+                            }
+                        )
         except Exception as e:
             logging.error(f"Error searching code with query '{query}': {e}")
             continue
 
     # Sort by distance and limit to top 10
-    all_results.sort(key=lambda x: x['distance'])
+    all_results.sort(key=lambda x: x["distance"])
     return all_results[:10]
+
 
 def format_code_results(results: List[Dict]) -> str:
     """Format code search results with file paths, line numbers, distances."""
@@ -293,11 +317,11 @@ def format_code_results(results: List[Dict]) -> str:
 
     output = "\nCode that may need updates:\n"
     for i, result in enumerate(results, 1):
-        metadata = result.get('metadata', {})
-        file_path = metadata.get('file_path', 'unknown')
-        start_line = metadata.get('start_line', '?')
+        metadata = result.get("metadata", {})
+        file_path = metadata.get("file_path", "unknown")
+        start_line = metadata.get("start_line", "?")
 
-        distance = result['distance']
+        distance = result["distance"]
         relevance = "highly relevant" if distance < 0.5 else "relevant"
 
         output += f"\n{i}. {file_path}:{start_line}\n"
@@ -305,9 +329,9 @@ def format_code_results(results: List[Dict]) -> str:
 
     return output
 
+
 def check_code_collection(
-    chroma_client: chromadb.Client,
-    collection_name: str
+    chroma_client: chromadb.Client, collection_name: str
 ) -> chromadb.Collection | None:
     """Check if code collection exists, return None if missing."""
     try:
@@ -316,29 +340,57 @@ def check_code_collection(
     except Exception:
         return None
 
+
 def main() -> int:
-    logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+    logging.basicConfig(
+        level=logging.INFO,
+        format="[%(asctime)s] %(levelname)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
     log = logging.getLogger()
 
     ap = argparse.ArgumentParser(
         description="Interactively ask questions about your project using a semantic search-powered knowledge base."
     )
-    ap.add_argument("--chroma-dir", required=True, help="Path to the directory containing ChromaDB files.")
-    ap.add_argument("--collection-name", required=True, help="Name of the ChromaDB collection to use.")
-    ap.add_argument("--embedding-model", default="text-embedding-3-small", help="OpenAI model for query embeddings.")
-    ap.add_argument("--memory-file", required=True, help="Path to JSONL file for saving corrections")
-    ap.add_argument("--code-collection-name", default=None, help="ChromaDB collection name for code (optional)")
-    ap.add_argument("--code-search-threshold", type=float, default=0.7, help="Distance threshold for code relevance (0-2, lower=stricter)")
+    ap.add_argument(
+        "--chroma-dir",
+        required=True,
+        help="Path to the directory containing ChromaDB files.",
+    )
+    ap.add_argument(
+        "--collection-name",
+        required=True,
+        help="Name of the ChromaDB collection to use.",
+    )
+    ap.add_argument(
+        "--embedding-model",
+        default="text-embedding-3-small",
+        help="OpenAI model for query embeddings.",
+    )
+    ap.add_argument(
+        "--memory-file", required=True, help="Path to JSONL file for saving corrections"
+    )
+    ap.add_argument(
+        "--code-collection-name",
+        default=None,
+        help="ChromaDB collection name for code (optional)",
+    )
+    ap.add_argument(
+        "--code-search-threshold",
+        type=float,
+        default=0.7,
+        help="Distance threshold for code relevance (0-2, lower=stricter)",
+    )
 
     args = ap.parse_args()
 
     if not os.environ.get("OPENAI_API_KEY"):
         log.error("Error: The OPENAI_API_KEY environment variable is not set.")
         return 1
-    
+
     client = OpenAI()
     chroma_path = Path(args.chroma_dir)
-    
+
     if not chroma_path.exists() or not chroma_path.is_dir():
         log.error(f"ChromaDB directory not found at: {chroma_path}")
         return 1
@@ -348,38 +400,50 @@ def main() -> int:
     try:
         chroma_client = chromadb.PersistentClient(path=str(chroma_path))
         collection = chroma_client.get_collection(name=args.collection_name)
-        log.info(f"✅ Connected to collection '{args.collection_name}' with {collection.count()} memories.")
+        log.info(
+            f"✅ Connected to collection '{args.collection_name}' with {collection.count()} memories."
+        )
     except Exception as e:
         log.error(f"Failed to connect to ChromaDB collection: {e}")
-        log.error("Please ensure you have run the `embed_memories.py` script successfully first.")
+        log.error(
+            "Please ensure you have run the `embed_memories.py` script successfully first."
+        )
         return 1
 
     # --- Check for optional code collection ---
     code_collection = None
     if args.code_collection_name:
-        code_collection = check_code_collection(chroma_client, args.code_collection_name)
+        code_collection = check_code_collection(
+            chroma_client, args.code_collection_name
+        )
         if code_collection:
-            log.info(f"✅ Code collection available for update detection")
+            log.info("✅ Code collection available for update detection")
         else:
-            log.warning(f"Code collection '{args.code_collection_name}' not found. Code search disabled.")
+            log.warning(
+                f"Code collection '{args.code_collection_name}' not found. Code search disabled."
+            )
             log.warning("Run embed_codebase.py to enable code update detection.")
 
     print("\nWelcome to the Project Q&A Tool (Level 4: Semantic Search).")
-    
+
     while True:
         try:
             query = input("\nAsk a question (or type 'exit' to quit): ")
-            if query.lower().strip() == 'exit':
+            if query.lower().strip() == "exit":
                 break
             if not query.strip():
                 continue
 
             # 1. Retrieve relevant memories using semantic search
             print("🧠 Finding semantically relevant memories...")
-            relevant_memories = find_semantic_memories(query, collection, client, model=args.embedding_model)
-            
+            relevant_memories = find_semantic_memories(
+                query, collection, client, model=args.embedding_model
+            )
+
             if not relevant_memories:
-                print("\nAssistant: I could not find any relevant memories in the knowledge base to answer that question.")
+                print(
+                    "\nAssistant: I could not find any relevant memories in the knowledge base to answer that question."
+                )
                 continue
 
             # 2. Generate answer
@@ -393,11 +457,13 @@ def main() -> int:
             # 4. Collect feedback
             feedback_type, correction_data = collect_user_feedback(answer)
 
-            if feedback_type == 'exit':
+            if feedback_type == "exit":
                 break
-            elif feedback_type == 'correct' and correction_data:
+            elif feedback_type == "correct" and correction_data:
                 # Create and save correction
-                correction = create_correction_memory(query, relevant_memories, correction_data)
+                correction = create_correction_memory(
+                    query, relevant_memories, correction_data
+                )
                 memory_file_path = Path(args.memory_file)
 
                 if append_correction_to_jsonl(correction, memory_file_path):
@@ -407,11 +473,14 @@ def main() -> int:
                     if code_collection:
                         print("\n🔍 Searching for code that may need updates...")
                         search_queries = generate_code_search_queries(
-                            correction_data['content'], client
+                            correction_data["content"], client
                         )
                         affected_code = search_affected_code(
-                            search_queries, code_collection, client,
-                            args.embedding_model, args.code_search_threshold
+                            search_queries,
+                            code_collection,
+                            client,
+                            args.embedding_model,
+                            args.code_search_threshold,
                         )
 
                         if affected_code:
@@ -428,6 +497,7 @@ def main() -> int:
             print(f"\nAn unexpected error occurred: {e}")
 
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

@@ -7,7 +7,7 @@ NOTE: mem0ai 1.0.2 uses Qdrant (not ChromaDB) as vector backend. Mem0 provides
 the intelligence layer while Qdrant handles vector storage.
 """
 import logging
-from typing import Optional, Any
+from typing import Optional
 from mem0 import Memory
 
 logger = logging.getLogger(__name__)
@@ -53,7 +53,10 @@ class Mem0Client:
         """
         if self._memory is None:
             if self._config is None:
-                from ta_lab2.tools.ai_orchestrator.memory.mem0_config import create_mem0_config
+                from ta_lab2.tools.ai_orchestrator.memory.mem0_config import (
+                    create_mem0_config,
+                )
+
                 self._config = create_mem0_config()
 
             try:
@@ -70,7 +73,7 @@ class Mem0Client:
         messages: list[dict],
         user_id: str,
         metadata: Optional[dict] = None,
-        infer: bool = True
+        infer: bool = True,
     ) -> dict:
         """Add memory with conflict detection.
 
@@ -98,10 +101,7 @@ class Mem0Client:
         """
         try:
             result = self.memory.add(
-                messages=messages,
-                user_id=user_id,
-                metadata=metadata,
-                infer=infer
+                messages=messages, user_id=user_id, metadata=metadata, infer=infer
             )
             logger.info(f"Added memory for user_id={user_id}, infer={infer}")
             return result
@@ -114,7 +114,7 @@ class Mem0Client:
         query: str,
         user_id: Optional[str] = None,
         filters: Optional[dict] = None,
-        limit: int = 10
+        limit: int = 10,
     ) -> list:
         """Search memories by semantic similarity.
 
@@ -143,17 +143,16 @@ class Mem0Client:
                 search_kwargs["filters"] = filters
 
             results = self.memory.search(**search_kwargs)
-            logger.info(f"Search returned {len(results)} results for query: {query[:50]}")
+            logger.info(
+                f"Search returned {len(results)} results for query: {query[:50]}"
+            )
             return results
         except Exception as e:
             logger.error(f"Search failed for query '{query}': {e}")
             raise
 
     def update(
-        self,
-        memory_id: str,
-        data: str,
-        metadata: Optional[dict] = None
+        self, memory_id: str, data: str, metadata: Optional[dict] = None
     ) -> dict:
         """Update existing memory.
 
@@ -219,7 +218,9 @@ class Mem0Client:
         try:
             response = self.memory.get_all(user_id=user_id)
             # Mem0 get_all() returns {'results': [...]} dict, extract list
-            results = response.get("results", []) if isinstance(response, dict) else response
+            results = (
+                response.get("results", []) if isinstance(response, dict) else response
+            )
             logger.info(f"Retrieved {len(results)} memories")
             return results
         except Exception as e:
@@ -240,7 +241,11 @@ class Mem0Client:
             collection_info = self.memory.vector_store.client.get_collection(
                 collection_name=collection_name
             )
-            count = collection_info.points_count if hasattr(collection_info, 'points_count') else 0
+            count = (
+                collection_info.points_count
+                if hasattr(collection_info, "points_count")
+                else 0
+            )
             return count
         except Exception as e:
             logger.warning(f"Failed to get memory count: {e}")

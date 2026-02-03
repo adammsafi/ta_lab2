@@ -6,8 +6,7 @@ Per CONTEXT.md: Calendar boundaries (month/year rolls) handled correctly.
 """
 
 import pytest
-from datetime import datetime, date
-from unittest.mock import MagicMock
+from datetime import date
 
 
 @pytest.mark.validation

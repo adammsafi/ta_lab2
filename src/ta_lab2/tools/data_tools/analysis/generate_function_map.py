@@ -35,7 +35,6 @@ import ast
 import csv
 import logging
 import os
-import sys
 from pathlib import Path
 from typing import Iterable, List, Optional, Tuple
 
@@ -273,9 +272,7 @@ def generate_function_map(
             text = f.read_text(encoding="utf-8", errors="ignore")
             tree = ast.parse(text, filename=str(f))
             attach_parents(tree)
-            collector = FunctionCollector(
-                str(f.relative_to(root)).replace(os.sep, "/")
-            )
+            collector = FunctionCollector(str(f.relative_to(root)).replace(os.sep, "/"))
             collector.visit(tree)
             rows.extend(collector.rows)
         except SyntaxError as e:
@@ -316,7 +313,8 @@ def generate_function_map(
 def main() -> int:
     """CLI entry point."""
     logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
     ap = argparse.ArgumentParser(

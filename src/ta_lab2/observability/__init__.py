@@ -54,11 +54,25 @@ Usage:
 
 from __future__ import annotations
 
-from ta_lab2.observability.alerts import Alert, AlertSeverity, AlertThresholdChecker, AlertType, check_all_thresholds
+from ta_lab2.observability.alerts import (
+    Alert,
+    AlertSeverity,
+    AlertThresholdChecker,
+    AlertType,
+    check_all_thresholds,
+)
 from ta_lab2.observability.health import HealthChecker, HealthStatus
 from ta_lab2.observability.metrics import Metric, MetricsCollector
-from ta_lab2.observability.storage import WorkflowStateTracker, ensure_observability_tables
-from ta_lab2.observability.tracing import TracingContext, generate_correlation_id, get_tracer, setup_tracing
+from ta_lab2.observability.storage import (
+    WorkflowStateTracker,
+    ensure_observability_tables,
+)
+from ta_lab2.observability.tracing import (
+    TracingContext,
+    generate_correlation_id,
+    get_tracer,
+    setup_tracing,
+)
 
 __all__ = [
     # Tracing

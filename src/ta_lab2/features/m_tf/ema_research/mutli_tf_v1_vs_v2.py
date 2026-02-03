@@ -23,14 +23,14 @@ asset_id = 1
 
 tf_periods = [
     ("10D", 21),
-    ("1M",  21),
-    ("6M",  21),
+    ("1M", 21),
+    ("6M", 21),
 ]
 
 date_windows = [
-    ("Early history",  "2010-01-01", "2015-12-31"),
-    ("Mid 2010s",      "2016-01-01", "2018-06-30"),
-    ("Recent",         "2020-01-01", None),  # None = through last date
+    ("Early history", "2010-01-01", "2015-12-31"),
+    ("Mid 2010s", "2016-01-01", "2018-06-30"),
+    ("Recent", "2020-01-01", None),  # None = through last date
 ]
 
 # --------------------------------------------------------
@@ -42,36 +42,42 @@ engine = create_engine(db_url)
 with engine.begin() as conn:
     # Price history for id=1
     df_price = pd.read_sql(
-        text("""
+        text(
+            """
             SELECT id,
             timestamp as ts,
             close
             FROM cmc_price_histories7
             WHERE id = :id
             ORDER BY ts
-        """),
+        """
+        ),
         conn,
         params={"id": asset_id},
     )
 
     # Original multi_tf
     df_mt1 = pd.read_sql(
-        text("""
+        text(
+            """
             SELECT id, ts, tf, period, ema
             FROM cmc_ema_multi_tf
             WHERE id = :id
-        """),
+        """
+        ),
         conn,
         params={"id": asset_id},
     )
 
     # New multi_tf_v2
     df_mt2 = pd.read_sql(
-        text("""
+        text(
+            """
             SELECT id, ts, tf, period, ema
             FROM cmc_ema_multi_tf_v2
             WHERE id = :id
-        """),
+        """
+        ),
         conn,
         params={"id": asset_id},
     )
@@ -90,6 +96,7 @@ df_mt2.set_index("ts", inplace=True)
 # Helper: get EMA series for a given tf/period
 # --------------------------------------------------------
 
+
 def get_ema_series(df_mt: pd.DataFrame, tf: str, period: int) -> pd.Series:
     """Return EMA series indexed by ts for given tf/period."""
     sub = df_mt[(df_mt["tf"] == tf) & (df_mt["period"] == period)].copy()
@@ -103,15 +110,16 @@ def get_ema_series(df_mt: pd.DataFrame, tf: str, period: int) -> pd.Series:
     sub.sort_index(inplace=True)
     return sub["ema"]
 
+
 # ---------------------------------------
 # Plotting
 # ---------------------------------------
 
-for (title, start_str, end_str) in date_windows:
+for title, start_str, end_str in date_windows:
     if end_str is not None:
         mask_price = (df_price.index >= start_str) & (df_price.index <= end_str)
     else:
-        mask_price = (df_price.index >= start_str)
+        mask_price = df_price.index >= start_str
 
     price_slice = df_price.loc[mask_price]
 
@@ -122,13 +130,14 @@ for (title, start_str, end_str) in date_windows:
     fig, ax = plt.subplots(figsize=(12, 6))
 
     # Price
-    ax.plot(price_slice.index, price_slice["close"],
-            label="Price (close)", linewidth=1.0)
+    ax.plot(
+        price_slice.index, price_slice["close"], label="Price (close)", linewidth=1.0
+    )
 
     start = price_slice.index[0]
     end = price_slice.index[-1]
 
-    for (tf, period) in tf_periods:
+    for tf, period in tf_periods:
         ema1 = get_ema_series(df_mt1, tf, period)  # orig
         ema2 = get_ema_series(df_mt2, tf, period)  # v2
 

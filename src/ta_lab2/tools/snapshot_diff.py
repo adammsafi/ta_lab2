@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 
 def _human_bytes(n: int) -> str:
@@ -51,9 +51,11 @@ class NormTable:
     table: str
     approx_rows: Optional[int]
     columns: Set[str]
-    indexes: Set[str]         # names only (low noise)
-    constraints: Set[str]     # names only (low noise)
-    keys: Set[Tuple[str, Tuple[str, ...]]]  # (type, cols) where type in {"p","u"} if available
+    indexes: Set[str]  # names only (low noise)
+    constraints: Set[str]  # names only (low noise)
+    keys: Set[
+        Tuple[str, Tuple[str, ...]]
+    ]  # (type, cols) where type in {"p","u"} if available
     total_bytes: Optional[int]
     table_bytes: Optional[int]
     index_bytes: Optional[int]
@@ -145,7 +147,11 @@ def load_snapshot(path: str | Path) -> NormSnapshot:
                     if isinstance(kk, dict):
                         typ = str(kk.get("contype") or kk.get("type") or "")
                         cols2 = kk.get("columns") or []
-                        if typ and isinstance(cols2, list) and all(isinstance(x, str) for x in cols2):
+                        if (
+                            typ
+                            and isinstance(cols2, list)
+                            and all(isinstance(x, str) for x in cols2)
+                        ):
                             keys.add((typ, tuple(cols2)))
 
             stats = t.get("table_stats") or {}
@@ -169,7 +175,9 @@ def load_snapshot(path: str | Path) -> NormSnapshot:
     return NormSnapshot(meta=meta, tables=out)
 
 
-def diff_snapshots(a: NormSnapshot, b: NormSnapshot, *, top_n: int = 25) -> Dict[str, Any]:
+def diff_snapshots(
+    a: NormSnapshot, b: NormSnapshot, *, top_n: int = 25
+) -> Dict[str, Any]:
     a_keys = set(a.tables.keys())
     b_keys = set(b.tables.keys())
 
@@ -219,7 +227,16 @@ def diff_snapshots(a: NormSnapshot, b: NormSnapshot, *, top_n: int = 25) -> Dict
             )
 
         # only if we actually have structural info
-        if ta.columns or tb.columns or ta.indexes or tb.indexes or ta.keys or tb.keys or ta.constraints or tb.constraints:
+        if (
+            ta.columns
+            or tb.columns
+            or ta.indexes
+            or tb.indexes
+            or ta.keys
+            or tb.keys
+            or ta.constraints
+            or tb.constraints
+        ):
             cols_added = sorted(tb.columns - ta.columns)
             cols_removed = sorted(ta.columns - tb.columns)
 
@@ -232,7 +249,16 @@ def diff_snapshots(a: NormSnapshot, b: NormSnapshot, *, top_n: int = 25) -> Dict
             keys_added = sorted(list(tb.keys - ta.keys))
             keys_removed = sorted(list(ta.keys - tb.keys))
 
-            if cols_added or cols_removed or idx_added or idx_removed or cons_added or cons_removed or keys_added or keys_removed:
+            if (
+                cols_added
+                or cols_removed
+                or idx_added
+                or idx_removed
+                or cons_added
+                or cons_removed
+                or keys_added
+                or keys_removed
+            ):
                 shape_deltas.append(
                     {
                         "table": k,
@@ -242,8 +268,12 @@ def diff_snapshots(a: NormSnapshot, b: NormSnapshot, *, top_n: int = 25) -> Dict
                         "indexes_removed": idx_removed,
                         "constraints_added": cons_added,
                         "constraints_removed": cons_removed,
-                        "keys_added": [{"type": t, "columns": list(c)} for (t, c) in keys_added],
-                        "keys_removed": [{"type": t, "columns": list(c)} for (t, c) in keys_removed],
+                        "keys_added": [
+                            {"type": t, "columns": list(c)} for (t, c) in keys_added
+                        ],
+                        "keys_removed": [
+                            {"type": t, "columns": list(c)} for (t, c) in keys_removed
+                        ],
                     }
                 )
 
@@ -277,8 +307,12 @@ def render_diff_md(diff: Dict[str, Any], *, title: str = "Snapshot diff") -> str
     lines.append("")
     lines.append(f"- Tables added: **{s.get('tables_added', 0)}**")
     lines.append(f"- Tables removed: **{s.get('tables_removed', 0)}**")
-    lines.append(f"- Tables changed (bytes/rows): **{s.get('tables_with_size_or_row_change', 0)}**")
-    lines.append(f"- Tables changed (shape): **{s.get('tables_with_shape_change', 0)}**")
+    lines.append(
+        f"- Tables changed (bytes/rows): **{s.get('tables_with_size_or_row_change', 0)}**"
+    )
+    lines.append(
+        f"- Tables changed (shape): **{s.get('tables_with_shape_change', 0)}**"
+    )
 
     # FIX: meta_deltas lives under diff["summary"]["meta_deltas"] in diff_snapshots()
     meta_deltas = (diff.get("summary", {}) or {}).get("meta_deltas") or {}

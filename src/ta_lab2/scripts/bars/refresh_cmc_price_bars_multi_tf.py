@@ -42,19 +42,14 @@ NOTES ON CONTRACT FIELDS:
   are emitted here (first/last missing day are left as NaT unless you later choose to compute them).
 """
 
-import argparse
-import os
 import re
 import time
-from datetime import datetime
-from multiprocessing import cpu_count
-from typing import Sequence, Optional
+from typing import Sequence
 
 import numpy as np
 import pandas as pd
 import polars as pl
 from sqlalchemy import create_engine, text
-from sqlalchemy.engine import Engine
 
 from ta_lab2.scripts.bars.common_snapshot_contract import (
     # Contract/invariants + shared snapshot mechanics
@@ -80,7 +75,6 @@ from ta_lab2.scripts.bars.common_snapshot_contract import (
     # Bar builder DB utilities (extracted)
     load_daily_prices_for_id,
     delete_bars_for_id_tf,
-    load_last_snapshot_row,
     load_last_snapshot_info_for_id_tfs,
     # CLI parsing utility (extracted)
     create_bar_builder_argument_parser,
@@ -89,7 +83,6 @@ from ta_lab2.orchestration import (
     MultiprocessingOrchestrator,
     OrchestratorConfig,
     ProgressTracker,
-    create_resilient_worker,
 )
 
 # =============================================================================
@@ -167,6 +160,7 @@ def delete_state_for_id_tf(db_url: str, state_table: str, id_: int, tf: str) -> 
     with engine.begin() as conn:
         conn.execute(q, {"id": int(id_), "tf": tf})
 
+
 def _make_day_time_open(ts: pd.Series) -> pd.Series:
     day_open = ts.shift(1) + _ONE_MS
     if len(ts) > 0:
@@ -219,7 +213,9 @@ def build_snapshots_for_id_polars(
         if "timestamp" in df.columns:
             df["ts"] = df["timestamp"]
         else:
-            raise ValueError("Daily table is missing required 'timestamp' column (needed to derive 'ts').")
+            raise ValueError(
+                "Daily table is missing required 'timestamp' column (needed to derive 'ts')."
+            )
 
     if not pd.api.types.is_datetime64_any_dtype(df["ts"]):
         raise TypeError(f"df['ts'] must be datetime64; got {df['ts'].dtype}")
@@ -242,7 +238,11 @@ def build_snapshots_for_id_polars(
     # Cumulative count within bar_seq (builder-specific)
     pl_df = pl_df.with_columns(
         [
-            pl.col("bar_seq").cum_count().over("bar_seq").cast(pl.Int64).alias("count_days"),
+            pl.col("bar_seq")
+            .cum_count()
+            .over("bar_seq")
+            .cast(pl.Int64)
+            .alias("count_days"),
         ]
     )
 
@@ -261,7 +261,9 @@ def build_snapshots_for_id_polars(
             (pl.col("count_missing_days") > 0).alias("is_missing_days"),
             pl.lit(False).alias("is_partial_start"),
             (pl.col("pos_in_bar") < tf_days).alias("is_partial_end"),
-            (tf_days - pl.col("pos_in_bar")).cast(pl.Int64).alias("count_days_remaining"),
+            (tf_days - pl.col("pos_in_bar"))
+            .cast(pl.Int64)
+            .alias("count_days_remaining"),
         ]
     )
 
@@ -319,7 +321,7 @@ def build_snapshots_for_id(
 ) -> pd.DataFrame:
     """
     PANDAS PATH: Full build for a single id + tf_days, emitting ONE ROW PER DAY per bar_seq.
-    
+
     This is the fallback implementation. Use build_snapshots_for_id_polars() for better performance.
     Kept for compatibility and as reference implementation.
 
@@ -363,12 +365,14 @@ def build_snapshots_for_id(
 
     # Missing days diagnostics (simple)
     gaps = df.groupby("bar_seq", sort=False)["ts"].diff()
-    missing_incr = (gaps / pd.Timedelta(days=1))
+    missing_incr = gaps / pd.Timedelta(days=1)
     missing_incr = missing_incr.fillna(0).astype("int64") - 1
     missing_incr = missing_incr.clip(lower=0).astype("int64")
 
     df["missing_incr"] = missing_incr
-    df["count_missing_days"] = df.groupby("bar_seq", sort=False)["missing_incr"].cumsum().astype("int64")
+    df["count_missing_days"] = (
+        df.groupby("bar_seq", sort=False)["missing_incr"].cumsum().astype("int64")
+    )
     df["is_missing_days"] = df["count_missing_days"] > 0
 
     # Contract-consistent extrema timestamps: fallback to ts when timehigh/timelow missing
@@ -376,14 +380,22 @@ def build_snapshots_for_id(
     timehigh_arr = df["timehigh"].to_numpy(dtype="datetime64[ns]")
     timelow_arr = df["timelow"].to_numpy(dtype="datetime64[ns]")
 
-    t_high = np.where(np.isnat(timehigh_arr), ts_arr, timehigh_arr).astype("datetime64[ns]")
-    t_low = np.where(np.isnat(timelow_arr), ts_arr, timelow_arr).astype("datetime64[ns]")
+    t_high = np.where(np.isnat(timehigh_arr), ts_arr, timehigh_arr).astype(
+        "datetime64[ns]"
+    )
+    t_low = np.where(np.isnat(timelow_arr), ts_arr, timelow_arr).astype(
+        "datetime64[ns]"
+    )
 
     high_vals = df["high"].to_numpy(dtype=float)
     low_vals = df["low"].to_numpy(dtype=float)
 
-    df["time_high"] = _cum_extrema_time_by_bar(gkey=df["bar_seq"], val=high_vals, t=t_high, want="max")
-    df["time_low"] = _cum_extrema_time_by_bar(gkey=df["bar_seq"], val=low_vals, t=t_low, want="min")
+    df["time_high"] = _cum_extrema_time_by_bar(
+        gkey=df["bar_seq"], val=high_vals, t=t_high, want="max"
+    )
+    df["time_low"] = _cum_extrema_time_by_bar(
+        gkey=df["bar_seq"], val=low_vals, t=t_low, want="min"
+    )
 
     df["is_partial_start"] = False
     df["is_partial_end"] = df["pos_in_bar"] < tf_days
@@ -460,14 +472,18 @@ def _append_incremental_rows_for_id_tf(
         return pd.DataFrame()
 
     ts_start = last_time_close + _ONE_MS
-    df_new = load_daily_prices_for_id(db_url=db_url, daily_table=daily_table, id_=int(id_), ts_start=ts_start)
+    df_new = load_daily_prices_for_id(
+        db_url=db_url, daily_table=daily_table, id_=int(id_), ts_start=ts_start
+    )
     if df_new.empty:
         return pd.DataFrame()
 
     cur_bar_seq = last_bar_seq
     cur_pos = last_pos_in_bar
 
-    last_row = load_last_bar_snapshot_row(db_url, bars_table, id_=int(id_), tf=tf_label, bar_seq=cur_bar_seq)
+    last_row = load_last_bar_snapshot_row(
+        db_url, bars_table, id_=int(id_), tf=tf_label, bar_seq=cur_bar_seq
+    )
     if last_row is None:
         return pd.DataFrame()
 
@@ -494,39 +510,51 @@ def _append_incremental_rows_for_id_tf(
             cur_bar_start_day_local = day_ts.tz_convert(DEFAULT_TZ).date()
 
             # reset snapshot baseline (open/high/low should be carried from this first day)
-            prev_snapshot = normalize_output_schema(
-                pd.DataFrame(
-                    [
-                        {
-                            "id": int(id_),
-                            "tf": tf_label,
-                            "tf_days": int(tf_days),
-                            "bar_seq": int(cur_bar_seq),
-                            "time_open": prev_time_open,
-                            "time_close": pd.NaT,
-                            "time_high": pd.NaT,
-                            "time_low": pd.NaT,
-                            "open": float(d["open"]) if pd.notna(d["open"]) else float("nan"),
-                            "high": float(d["high"]) if pd.notna(d["high"]) else float("nan"),
-                            "low": float(d["low"]) if pd.notna(d["low"]) else float("nan"),
-                            "close": float("nan"),
-                            "volume": 0.0,
-                            "market_cap": float(d["market_cap"]) if pd.notna(d["market_cap"]) else float("nan"),
-                            "timestamp": pd.NaT,
-                            "last_ts_half_open": pd.NaT,
-                            "pos_in_bar": 0,
-                            "is_partial_start": False,
-                            "is_partial_end": True,
-                            "count_days_remaining": int(tf_days),
-                            "is_missing_days": False,
-                            "count_days": 0,
-                            "count_missing_days": 0,
-                            "first_missing_day": pd.NaT,
-                            "last_missing_day": pd.NaT,
-                        }
-                    ]
+            prev_snapshot = (
+                normalize_output_schema(
+                    pd.DataFrame(
+                        [
+                            {
+                                "id": int(id_),
+                                "tf": tf_label,
+                                "tf_days": int(tf_days),
+                                "bar_seq": int(cur_bar_seq),
+                                "time_open": prev_time_open,
+                                "time_close": pd.NaT,
+                                "time_high": pd.NaT,
+                                "time_low": pd.NaT,
+                                "open": float(d["open"])
+                                if pd.notna(d["open"])
+                                else float("nan"),
+                                "high": float(d["high"])
+                                if pd.notna(d["high"])
+                                else float("nan"),
+                                "low": float(d["low"])
+                                if pd.notna(d["low"])
+                                else float("nan"),
+                                "close": float("nan"),
+                                "volume": 0.0,
+                                "market_cap": float(d["market_cap"])
+                                if pd.notna(d["market_cap"])
+                                else float("nan"),
+                                "timestamp": pd.NaT,
+                                "last_ts_half_open": pd.NaT,
+                                "pos_in_bar": 0,
+                                "is_partial_start": False,
+                                "is_partial_end": True,
+                                "count_days_remaining": int(tf_days),
+                                "is_missing_days": False,
+                                "count_days": 0,
+                                "count_missing_days": 0,
+                                "first_missing_day": pd.NaT,
+                                "last_missing_day": pd.NaT,
+                            }
+                        ]
+                    )
                 )
-            ).iloc[0].to_dict()
+                .iloc[0]
+                .to_dict()
+            )
 
         cur_pos += 1
 
@@ -535,7 +563,10 @@ def _append_incremental_rows_for_id_tf(
 
         # strict tail continuity for carry-forward gate
         prev_snapshot_day_local = prev_time_close.tz_convert(DEFAULT_TZ).date()
-        missing_days_tail_ok = snapshot_day_local == (prev_snapshot_day_local + pd.Timedelta(days=1)).date()
+        missing_days_tail_ok = (
+            snapshot_day_local
+            == (prev_snapshot_day_local + pd.Timedelta(days=1)).date()
+        )
 
         inp = CarryForwardInputs(
             prev_snapshot_day_local=prev_snapshot_day_local,
@@ -560,8 +591,16 @@ def _append_incremental_rows_for_id_tf(
                 prev_snapshot=prev_snapshot,
                 today_daily_row=d.to_dict(),
                 today_ts_utc=day_ts,
-                today_timehigh_utc=(pd.to_datetime(d["timehigh"], utc=True) if pd.notna(d["timehigh"]) else None),
-                today_timelow_utc=(pd.to_datetime(d["timelow"], utc=True) if pd.notna(d["timelow"]) else None),
+                today_timehigh_utc=(
+                    pd.to_datetime(d["timehigh"], utc=True)
+                    if pd.notna(d["timehigh"])
+                    else None
+                ),
+                today_timelow_utc=(
+                    pd.to_datetime(d["timelow"], utc=True)
+                    if pd.notna(d["timelow"])
+                    else None
+                ),
                 missing_diag=miss_diag,
                 pos_in_bar=int(cur_pos),
                 is_partial_end=bool(is_partial_end),
@@ -590,17 +629,35 @@ def _append_incremental_rows_for_id_tf(
             continue
 
         # Fallback path (explicit incremental math; contract-equivalent)
-        prev_high = float(prev_snapshot.get("high")) if pd.notna(prev_snapshot.get("high")) else float("-inf")
-        prev_low = float(prev_snapshot.get("low")) if pd.notna(prev_snapshot.get("low")) else float("inf")
-        prev_time_high = pd.to_datetime(prev_snapshot.get("time_high"), utc=True, errors="coerce")
-        prev_time_low = pd.to_datetime(prev_snapshot.get("time_low"), utc=True, errors="coerce")
+        prev_high = (
+            float(prev_snapshot.get("high"))
+            if pd.notna(prev_snapshot.get("high"))
+            else float("-inf")
+        )
+        prev_low = (
+            float(prev_snapshot.get("low"))
+            if pd.notna(prev_snapshot.get("low"))
+            else float("inf")
+        )
+        prev_time_high = pd.to_datetime(
+            prev_snapshot.get("time_high"), utc=True, errors="coerce"
+        )
+        prev_time_low = pd.to_datetime(
+            prev_snapshot.get("time_low"), utc=True, errors="coerce"
+        )
 
         day_high = float(d["high"]) if pd.notna(d["high"]) else float("nan")
         day_low = float(d["low"]) if pd.notna(d["low"]) else float("nan")
 
         # fallback-to-ts for tie timestamps (contract)
-        day_th = pd.to_datetime(d["timehigh"], utc=True) if pd.notna(d["timehigh"]) else day_ts
-        day_tl = pd.to_datetime(d["timelow"], utc=True) if pd.notna(d["timelow"]) else day_ts
+        day_th = (
+            pd.to_datetime(d["timehigh"], utc=True)
+            if pd.notna(d["timehigh"])
+            else day_ts
+        )
+        day_tl = (
+            pd.to_datetime(d["timelow"], utc=True) if pd.notna(d["timelow"]) else day_ts
+        )
 
         new_high = prev_high
         new_time_high = prev_time_high
@@ -620,14 +677,24 @@ def _append_incremental_rows_for_id_tf(
             if pd.notna(day_tl) and (pd.isna(new_time_low) or day_tl < new_time_low):
                 new_time_low = day_tl
 
-        prev_vol = float(prev_snapshot.get("volume")) if pd.notna(prev_snapshot.get("volume")) else 0.0
+        prev_vol = (
+            float(prev_snapshot.get("volume"))
+            if pd.notna(prev_snapshot.get("volume"))
+            else 0.0
+        )
         add_vol = float(d["volume"]) if pd.notna(d["volume"]) else 0.0
         new_volume = prev_vol + add_vol
 
-        prev_open = float(prev_snapshot.get("open")) if pd.notna(prev_snapshot.get("open")) else float("nan")
+        prev_open = (
+            float(prev_snapshot.get("open"))
+            if pd.notna(prev_snapshot.get("open"))
+            else float("nan")
+        )
         new_close = float(d["close"]) if pd.notna(d["close"]) else float("nan")
-        new_market_cap = float(d["market_cap"]) if pd.notna(d["market_cap"]) else float(
-            prev_snapshot.get("market_cap", float("nan"))
+        new_market_cap = (
+            float(d["market_cap"])
+            if pd.notna(d["market_cap"])
+            else float(prev_snapshot.get("market_cap", float("nan")))
         )
 
         row = {
@@ -644,7 +711,9 @@ def _append_incremental_rows_for_id_tf(
             "low": float(new_low) if pd.notna(new_low) else float("nan"),
             "close": new_close,
             "volume": float(new_volume),
-            "market_cap": float(new_market_cap) if pd.notna(new_market_cap) else float("nan"),
+            "market_cap": float(new_market_cap)
+            if pd.notna(new_market_cap)
+            else float("nan"),
             "timestamp": day_ts,
             "last_ts_half_open": day_ts + _ONE_MS,
             "pos_in_bar": int(cur_pos),
@@ -685,7 +754,9 @@ def refresh_incremental(
 ) -> None:
     start_time = time.time()
     total_combinations = len(ids) * len(tf_list)
-    print(f"[bars_multi_tf] Incremental: {len(ids)} IDs × {len(tf_list)} TFs = {total_combinations:,} combinations")
+    print(
+        f"[bars_multi_tf] Incremental: {len(ids)} IDs × {len(tf_list)} TFs = {total_combinations:,} combinations"
+    )
 
     ensure_state_table(db_url, state_table, with_tz=False)
 
@@ -716,11 +787,17 @@ def refresh_incremental(
         for tf_days, tf_label in tf_list:
             key = (int(id_), tf_label)
             st = state_map.get(key)
-            last = load_last_snapshot_info(db_url, bars_table, id_=int(id_), tf=tf_label)
+            last = load_last_snapshot_info(
+                db_url, bars_table, id_=int(id_), tf=tf_label
+            )
 
             if st is None and last is None:
-                df_full = load_daily_prices_for_id(db_url=db_url, daily_table=daily_table, id_=int(id_))
-                bars = build_snapshots_for_id_polars(df_full, tf_days=int(tf_days), tf_label=tf_label)
+                df_full = load_daily_prices_for_id(
+                    db_url=db_url, daily_table=daily_table, id_=int(id_)
+                )
+                bars = build_snapshots_for_id_polars(
+                    df_full, tf_days=int(tf_days), tf_label=tf_label
+                )
                 if not bars.empty:
                     upsert_bars(bars, db_url=db_url, bars_table=bars_table)
                     totals["upserted"] += len(bars)
@@ -755,8 +832,12 @@ def refresh_incremental(
             )
 
             if last is None:
-                df_full = load_daily_prices_for_id(db_url=db_url, daily_table=daily_table, id_=int(id_))
-                bars = build_snapshots_for_id_polars(df_full, tf_days=int(tf_days), tf_label=tf_label)
+                df_full = load_daily_prices_for_id(
+                    db_url=db_url, daily_table=daily_table, id_=int(id_)
+                )
+                bars = build_snapshots_for_id_polars(
+                    df_full, tf_days=int(tf_days), tf_label=tf_label
+                )
                 if not bars.empty:
                     upsert_bars(bars, db_url=db_url, bars_table=bars_table)
                     totals["upserted"] += len(bars)
@@ -785,8 +866,12 @@ def refresh_incremental(
                     f"daily_min moved earlier {daily_min_seen} -> {daily_min_ts}. Rebuilding."
                 )
                 delete_bars_for_id_tf(db_url, bars_table, id_=int(id_), tf=tf_label)
-                df_full = load_daily_prices_for_id(db_url=db_url, daily_table=daily_table, id_=int(id_))
-                bars = build_snapshots_for_id_polars(df_full, tf_days=int(tf_days), tf_label=tf_label)
+                df_full = load_daily_prices_for_id(
+                    db_url=db_url, daily_table=daily_table, id_=int(id_)
+                )
+                bars = build_snapshots_for_id_polars(
+                    df_full, tf_days=int(tf_days), tf_label=tf_label
+                )
                 if not bars.empty:
                     upsert_bars(bars, db_url=db_url, bars_table=bars_table)
                     totals["upserted"] += len(bars)
@@ -854,7 +939,9 @@ def refresh_incremental(
                 totals["appends"] += 1
 
                 last_bar_seq2 = int(new_rows["bar_seq"].max())
-                last_time_close2 = pd.to_datetime(new_rows["time_close"].max(), utc=True)
+                last_time_close2 = pd.to_datetime(
+                    new_rows["time_close"].max(), utc=True
+                )
 
                 state_updates.append(
                     {
@@ -868,7 +955,9 @@ def refresh_incremental(
                 )
             except Exception as e:
                 totals["errors"] += 1
-                print(f"[bars_multi_tf] ERROR id={id_} tf={tf_label}: {type(e).__name__}: {e}")
+                print(
+                    f"[bars_multi_tf] ERROR id={id_} tf={tf_label}: {type(e).__name__}: {e}"
+                )
                 state_updates.append(
                     {
                         "id": int(id_),
@@ -911,11 +1000,20 @@ def _process_single_id_with_all_specs(args) -> tuple[list[dict], dict[str, int]]
     ) = args
 
     state_updates: list[dict] = []
-    stats = {"id": int(id_), "upserted": 0, "rebuilds": 0, "appends": 0, "noops": 0, "errors": 0}
+    stats = {
+        "id": int(id_),
+        "upserted": 0,
+        "rebuilds": 0,
+        "appends": 0,
+        "noops": 0,
+        "errors": 0,
+    }
 
     try:
         tfs = [tf_label for _, tf_label in tf_list]
-        last_map = load_last_snapshot_info_for_id_tfs(db_url=db_url, bars_table=bars_table, id_=int(id_), tfs=tfs)
+        last_map = load_last_snapshot_info_for_id_tfs(
+            db_url=db_url, bars_table=bars_table, id_=int(id_), tfs=tfs
+        )
 
         for tf_days, tf_label in tf_list:
             try:
@@ -935,14 +1033,20 @@ def _process_single_id_with_all_specs(args) -> tuple[list[dict], dict[str, int]]
                 )
 
                 if st is None and last is None:
-                    df_full = load_daily_prices_for_id(db_url=db_url, daily_table=daily_table, id_=int(id_))
-                    bars = build_snapshots_for_id_polars(df_full, tf_days=int(tf_days), tf_label=tf_label)
+                    df_full = load_daily_prices_for_id(
+                        db_url=db_url, daily_table=daily_table, id_=int(id_)
+                    )
+                    bars = build_snapshots_for_id_polars(
+                        df_full, tf_days=int(tf_days), tf_label=tf_label
+                    )
                     if not bars.empty:
                         upsert_bars(bars, db_url=db_url, bars_table=bars_table)
                         stats["upserted"] += len(bars)
                         stats["rebuilds"] += 1
                         last_bar_seq = int(bars["bar_seq"].max())
-                        last_time_close = pd.to_datetime(bars["time_close"].max(), utc=True)
+                        last_time_close = pd.to_datetime(
+                            bars["time_close"].max(), utc=True
+                        )
                     else:
                         last_bar_seq = None
                         last_time_close = None
@@ -960,14 +1064,20 @@ def _process_single_id_with_all_specs(args) -> tuple[list[dict], dict[str, int]]
                     continue
 
                 if last is None:
-                    df_full = load_daily_prices_for_id(db_url=db_url, daily_table=daily_table, id_=int(id_))
-                    bars = build_snapshots_for_id_polars(df_full, tf_days=int(tf_days), tf_label=tf_label)
+                    df_full = load_daily_prices_for_id(
+                        db_url=db_url, daily_table=daily_table, id_=int(id_)
+                    )
+                    bars = build_snapshots_for_id_polars(
+                        df_full, tf_days=int(tf_days), tf_label=tf_label
+                    )
                     if not bars.empty:
                         upsert_bars(bars, db_url=db_url, bars_table=bars_table)
                         stats["upserted"] += len(bars)
                         stats["rebuilds"] += 1
                         last_bar_seq = int(bars["bar_seq"].max())
-                        last_time_close = pd.to_datetime(bars["time_close"].max(), utc=True)
+                        last_time_close = pd.to_datetime(
+                            bars["time_close"].max(), utc=True
+                        )
                     else:
                         last_bar_seq = None
                         last_time_close = None
@@ -990,13 +1100,19 @@ def _process_single_id_with_all_specs(args) -> tuple[list[dict], dict[str, int]]
                         f"daily_min moved earlier {daily_min_seen} -> {daily_min_ts}. Rebuilding."
                     )
                     delete_bars_for_id_tf(db_url, bars_table, id_=int(id_), tf=tf_label)
-                    df_full = load_daily_prices_for_id(db_url=db_url, daily_table=daily_table, id_=int(id_))
-                    bars = build_snapshots_for_id_polars(df_full, tf_days=int(tf_days), tf_label=tf_label)
+                    df_full = load_daily_prices_for_id(
+                        db_url=db_url, daily_table=daily_table, id_=int(id_)
+                    )
+                    bars = build_snapshots_for_id_polars(
+                        df_full, tf_days=int(tf_days), tf_label=tf_label
+                    )
                     if not bars.empty:
                         upsert_bars(bars, db_url=db_url, bars_table=bars_table)
                         stats["upserted"] += len(bars)
                         last_bar_seq = int(bars["bar_seq"].max())
-                        last_time_close = pd.to_datetime(bars["time_close"].max(), utc=True)
+                        last_time_close = pd.to_datetime(
+                            bars["time_close"].max(), utc=True
+                        )
                     else:
                         last_bar_seq = None
                         last_time_close = None
@@ -1057,7 +1173,9 @@ def _process_single_id_with_all_specs(args) -> tuple[list[dict], dict[str, int]]
                 stats["appends"] += 1
 
                 last_bar_seq2 = int(new_rows["bar_seq"].max())
-                last_time_close2 = pd.to_datetime(new_rows["time_close"].max(), utc=True)
+                last_time_close2 = pd.to_datetime(
+                    new_rows["time_close"].max(), utc=True
+                )
                 state_updates.append(
                     {
                         "id": int(id_),
@@ -1071,14 +1189,18 @@ def _process_single_id_with_all_specs(args) -> tuple[list[dict], dict[str, int]]
 
             except Exception as e:
                 stats["errors"] += 1
-                print(f"[bars_multi_tf] ERROR id={id_} tf={tf_label}: {type(e).__name__}: {e}")
+                print(
+                    f"[bars_multi_tf] ERROR id={id_} tf={tf_label}: {type(e).__name__}: {e}"
+                )
                 state_updates.append(
                     {
                         "id": int(id_),
                         "tf": tf_label,
                         "daily_min_seen": min(daily_min_seen, daily_min_ts),
                         "daily_max_seen": max(daily_max_seen, daily_max_ts),
-                        "last_bar_seq": st.get("last_bar_seq") if st is not None else None,
+                        "last_bar_seq": st.get("last_bar_seq")
+                        if st is not None
+                        else None,
                         "last_time_close": (
                             pd.to_datetime(st["last_time_close"], utc=True)
                             if st is not None and pd.notna(st.get("last_time_close"))
@@ -1106,7 +1228,9 @@ def refresh_incremental_parallel(
 ) -> None:
     start_time = time.time()
     total_combinations = len(ids) * len(tf_list)
-    print(f"[bars_multi_tf] Incremental (parallel): {len(ids)} IDs × {len(tf_list)} TFs = {total_combinations:,} combinations")
+    print(
+        f"[bars_multi_tf] Incremental (parallel): {len(ids)} IDs × {len(tf_list)} TFs = {total_combinations:,} combinations"
+    )
 
     ensure_state_table(db_url, state_table, with_tz=False)
 
@@ -1142,11 +1266,15 @@ def refresh_incremental_parallel(
             )
         )
 
-    print(f"[bars_multi_tf] Processing {len(tasks)} IDs with {num_processes} workers...")
+    print(
+        f"[bars_multi_tf] Processing {len(tasks)} IDs with {num_processes} workers..."
+    )
 
     # Use orchestrator for parallel execution with progress tracking
     config = OrchestratorConfig(num_processes=num_processes, maxtasksperchild=50)
-    progress = ProgressTracker(total=len(tasks), log_interval=5, prefix="[bars_multi_tf]")
+    progress = ProgressTracker(
+        total=len(tasks), log_interval=5, prefix="[bars_multi_tf]"
+    )
     orchestrator = MultiprocessingOrchestrator(
         worker_fn=_process_single_id_with_all_specs,
         config=config,
@@ -1155,7 +1283,13 @@ def refresh_incremental_parallel(
 
     all_state_updates, totals = orchestrator.execute(
         tasks,
-        stats_template={"upserted": 0, "rebuilds": 0, "appends": 0, "noops": 0, "errors": 0}
+        stats_template={
+            "upserted": 0,
+            "rebuilds": 0,
+            "appends": 0,
+            "noops": 0,
+            "errors": 0,
+        },
     )
 
     upsert_state(db_url, state_table, all_state_updates, with_tz=False)
@@ -1189,11 +1323,15 @@ def refresh_full_rebuild(
     running_total = 0
     combo_count = 0
 
-    print(f"[bars_multi_tf] Full rebuild: {len(ids)} IDs × {len(tf_list)} TFs = {total_combinations:,} combinations")
+    print(
+        f"[bars_multi_tf] Full rebuild: {len(ids)} IDs × {len(tf_list)} TFs = {total_combinations:,} combinations"
+    )
     ensure_state_table(db_url, state_table, with_tz=False)
 
     for id_ in ids:
-        df_id = load_daily_prices_for_id(db_url=db_url, daily_table=daily_table, id_=int(id_))
+        df_id = load_daily_prices_for_id(
+            db_url=db_url, daily_table=daily_table, id_=int(id_)
+        )
         if df_id.empty:
             combo_count += len(tf_list)
             continue
@@ -1201,33 +1339,43 @@ def refresh_full_rebuild(
             combo_count += 1
             delete_bars_for_id_tf(db_url, bars_table, id_=int(id_), tf=tf_label)
             delete_state_for_id_tf(db_url, state_table, id_=int(id_), tf=tf_label)
-            bars = build_snapshots_for_id_polars(df_id, tf_days=int(tf_days), tf_label=tf_label)
+            bars = build_snapshots_for_id_polars(
+                df_id, tf_days=int(tf_days), tf_label=tf_label
+            )
             if not bars.empty:
                 num_rows = len(bars)
                 running_total += num_rows
                 upsert_bars(bars, db_url=db_url, bars_table=bars_table)
                 last_bar_seq = int(bars["bar_seq"].max())
-                last_time_close = pd.to_datetime(bars["time_close"].max(), utc=True).tz_convert(None)
+                last_time_close = pd.to_datetime(
+                    bars["time_close"].max(), utc=True
+                ).tz_convert(None)
                 daily_min_seen = pd.to_datetime(df_id["ts"].min(), utc=True)
                 daily_max_seen = pd.to_datetime(df_id["ts"].max(), utc=True)
                 upsert_state(
                     db_url,
                     state_table,
-                    [{
-                        "id": int(id_),
-                        "tf": tf_label,
-                        "daily_min_seen": daily_min_seen,
-                        "daily_max_seen": daily_max_seen,
-                        "last_bar_seq": last_bar_seq,
-                        "last_time_close": last_time_close,
-                    }],
+                    [
+                        {
+                            "id": int(id_),
+                            "tf": tf_label,
+                            "daily_min_seen": daily_min_seen,
+                            "daily_max_seen": daily_max_seen,
+                            "last_bar_seq": last_bar_seq,
+                            "last_time_close": last_time_close,
+                        }
+                    ],
                     with_tz=False,
                 )
 
                 period_start = bars["time_open"].min().strftime("%Y-%m-%d")
                 period_end = bars["time_close"].max().strftime("%Y-%m-%d")
                 elapsed = time.time() - start_time
-                pct = (combo_count / total_combinations) * 100 if total_combinations > 0 else 0
+                pct = (
+                    (combo_count / total_combinations) * 100
+                    if total_combinations > 0
+                    else 0
+                )
 
                 print(
                     f"[bars_multi_tf] ID={id_}, TF={tf_label}, period={period_start} to {period_end}: "
@@ -1237,7 +1385,9 @@ def refresh_full_rebuild(
     total_time = time.time() - start_time
     minutes = int(total_time // 60)
     seconds = total_time % 60
-    print(f"[bars_multi_tf] Full rebuild complete: {running_total:,} total rows [time: {minutes}m {seconds:.1f}s]")
+    print(
+        f"[bars_multi_tf] Full rebuild complete: {running_total:,} total rows [time: {minutes}m {seconds:.1f}s]"
+    )
 
 
 # =============================================================================
@@ -1266,7 +1416,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     if ids == "all":
         ids = load_all_ids(db_url, args.daily_table)
 
-    tf_list = load_tf_list_from_dim_timeframe(db_url=db_url, include_non_canonical=args.include_non_canonical)
+    tf_list = load_tf_list_from_dim_timeframe(
+        db_url=db_url, include_non_canonical=args.include_non_canonical
+    )
     print(f"[bars_multi_tf] TF list size={len(tf_list)}: {[t for _, t in tf_list]}")
 
     if args.full_rebuild:

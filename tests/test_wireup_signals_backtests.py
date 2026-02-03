@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+
 pytest.importorskip("vectorbt")
 
 # C:\Users\asafi\Downloads\ta_lab2\tests\test_wireup_signals_backtests.py
@@ -28,29 +29,38 @@ from ta_lab2.backtests.splitters import fixed_date_splits
 from ta_lab2.backtests.orchestrator import run_multi_strategy
 from ta_lab2.signals.registry import REGISTRY, get_strategy, ensure_for
 
+
 def _make_synth_df(n_days: int = 400, seed: int = 42) -> pd.DataFrame:
     rng = np.random.default_rng(seed)
     steps = rng.normal(loc=0.001, scale=0.02, size=n_days)
     close = 100 * (1 + steps).cumprod()
     high = close * (1 + rng.uniform(0.0, 0.01, size=n_days))
-    low  = close * (1 - rng.uniform(0.0, 0.01, size=n_days))
+    low = close * (1 - rng.uniform(0.0, 0.01, size=n_days))
     open_ = close / (1 + rng.uniform(-0.005, 0.005, size=n_days))
-    vol   = rng.integers(1000, 5000, size=n_days)
+    vol = rng.integers(1000, 5000, size=n_days)
     idx = pd.date_range("2021-01-01", periods=n_days, freq="D")  # tz-naive
-    return pd.DataFrame({"open": open_, "high": high, "low": low, "close": close, "volume": vol}, index=idx)
+    return pd.DataFrame(
+        {"open": open_, "high": high, "low": low, "close": close, "volume": vol},
+        index=idx,
+    )
+
 
 def _ensure_ema(df: pd.DataFrame, span: int) -> None:
     col = f"ema_{span}"
     if col not in df:
         df[col] = df["close"].ewm(span=span, adjust=False).mean()
 
+
 def run_wireup() -> pd.DataFrame:
     df = _make_synth_df()
 
-    splits = fixed_date_splits([
-        ("2021-02-01", "2021-06-30"),
-        ("2021-07-01", "2021-10-31"),
-    ], prefix="WIRE")
+    splits = fixed_date_splits(
+        [
+            ("2021-02-01", "2021-06-30"),
+            ("2021-07-01", "2021-10-31"),
+        ],
+        prefix="WIRE",
+    )
 
     grid = [
         {"fast_ema": "ema_10", "slow_ema": "ema_30"},
@@ -76,6 +86,7 @@ def run_wireup() -> pd.DataFrame:
     )
     return mr.results
 
+
 def import_research_queries() -> None:
     import ta_lab2.research.queries.run_ema_50_100 as q_run
     import ta_lab2.research.queries.opt_cf_ema as q_coarse
@@ -83,7 +94,9 @@ def import_research_queries() -> None:
     import ta_lab2.research.queries.opt_cf_ema_sensitivity as q_sens
     import ta_lab2.research.queries.wf_validate_ema as q_wf
     import ta_lab2.research.queries.opt_cf_generic as q_gen
+
     _ = (q_run, q_coarse, q_refine, q_sens, q_wf, q_gen)
+
 
 def test_wireup_end_to_end():
     # Registry sanity

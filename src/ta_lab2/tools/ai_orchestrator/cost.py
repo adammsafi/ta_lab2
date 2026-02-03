@@ -19,17 +19,14 @@ PRICING = {
     "gemini_cli": {"input": 0.0, "output": 0.0},  # Free tier
     "gemini-2.0-flash-exp": {"input": 0.0, "output": 0.0},  # Free tier
     "gemini_api": {"input": 0.075, "output": 0.30},  # Paid API
-
     # OpenAI models
     "gpt-4o-mini": {"input": 0.15, "output": 0.60},
     "gpt-4o": {"input": 2.50, "output": 10.00},
     "gpt-4-turbo": {"input": 10.00, "output": 30.00},
-
     # Claude models
     "claude-3-5-sonnet": {"input": 3.00, "output": 15.00},
     "claude-3-opus": {"input": 15.00, "output": 75.00},
     "claude-3-haiku": {"input": 0.25, "output": 1.25},
-
     # Default/unknown
     "unknown": {"input": 0.0, "output": 0.0},
 }
@@ -38,6 +35,7 @@ PRICING = {
 @dataclass
 class CostRecord:
     """Single cost record for persistence."""
+
     task_id: str
     platform: str
     chain_id: Optional[str]
@@ -77,7 +75,8 @@ class CostTracker:
     def _init_db(self):
         """Initialize database schema."""
         conn = sqlite3.connect(self.db_path)
-        conn.execute("""
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS cost_records (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 task_id TEXT NOT NULL,
@@ -90,20 +89,20 @@ class CostTracker:
                 timestamp TEXT NOT NULL,
                 UNIQUE(task_id)
             )
-        """)
+        """
+        )
         # Indexes for common queries
         conn.execute("CREATE INDEX IF NOT EXISTS idx_chain ON cost_records(chain_id)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_platform ON cost_records(platform)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_timestamp ON cost_records(timestamp)")
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_platform ON cost_records(platform)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_timestamp ON cost_records(timestamp)"
+        )
         conn.commit()
         conn.close()
 
-    def record(
-        self,
-        task: Task,
-        result: Result,
-        chain_id: Optional[str] = None
-    ):
+    def record(self, task: Task, result: Result, chain_id: Optional[str] = None):
         """
         Record cost from a completed task.
 
@@ -121,8 +120,8 @@ class CostTracker:
 
         # Calculate cost
         cost = (
-            input_tokens * pricing["input"] / 1_000_000 +
-            output_tokens * pricing["output"] / 1_000_000
+            input_tokens * pricing["input"] / 1_000_000
+            + output_tokens * pricing["output"] / 1_000_000
         )
 
         # Create record
@@ -134,7 +133,7 @@ class CostTracker:
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             cost_usd=cost,
-            timestamp=datetime.now(timezone.utc)
+            timestamp=datetime.now(timezone.utc),
         )
 
         self._persist(record)
@@ -142,20 +141,23 @@ class CostTracker:
     def _persist(self, record: CostRecord):
         """Persist a cost record to database."""
         conn = sqlite3.connect(self.db_path)
-        conn.execute("""
+        conn.execute(
+            """
             INSERT OR REPLACE INTO cost_records
             (task_id, platform, chain_id, model, input_tokens, output_tokens, cost_usd, timestamp)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            record.task_id,
-            record.platform,
-            record.chain_id,
-            record.model,
-            record.input_tokens,
-            record.output_tokens,
-            record.cost_usd,
-            record.timestamp.isoformat()
-        ))
+        """,
+            (
+                record.task_id,
+                record.platform,
+                record.chain_id,
+                record.model,
+                record.input_tokens,
+                record.output_tokens,
+                record.cost_usd,
+                record.timestamp.isoformat(),
+            ),
+        )
         conn.commit()
         conn.close()
 
@@ -163,8 +165,7 @@ class CostTracker:
         """Get cost for a specific task."""
         conn = sqlite3.connect(self.db_path)
         result = conn.execute(
-            "SELECT cost_usd FROM cost_records WHERE task_id = ?",
-            (task_id,)
+            "SELECT cost_usd FROM cost_records WHERE task_id = ?", (task_id,)
         ).fetchone()
         conn.close()
         return result[0] if result else None
@@ -173,8 +174,7 @@ class CostTracker:
         """Get total cost for a workflow chain."""
         conn = sqlite3.connect(self.db_path)
         result = conn.execute(
-            "SELECT SUM(cost_usd) FROM cost_records WHERE chain_id = ?",
-            (chain_id,)
+            "SELECT SUM(cost_usd) FROM cost_records WHERE chain_id = ?", (chain_id,)
         ).fetchone()
         conn.close()
         return result[0] or 0.0
@@ -196,7 +196,7 @@ class CostTracker:
                    FROM cost_records
                    WHERE timestamp >= ?
                    GROUP BY platform""",
-                (since.isoformat(),)
+                (since.isoformat(),),
             ).fetchall()
         else:
             rows = conn.execute(
@@ -218,7 +218,8 @@ class CostTracker:
         date_str = target_date.strftime("%Y-%m-%d")
 
         conn = sqlite3.connect(self.db_path)
-        rows = conn.execute("""
+        rows = conn.execute(
+            """
             SELECT platform,
                    COUNT(*) as tasks,
                    SUM(cost_usd) as total_cost,
@@ -226,7 +227,9 @@ class CostTracker:
             FROM cost_records
             WHERE date(timestamp) = date(?)
             GROUP BY platform
-        """, (date_str,)).fetchall()
+        """,
+            (date_str,),
+        ).fetchall()
         conn.close()
 
         summary = {
@@ -253,13 +256,16 @@ class CostTracker:
     def get_chain_tasks(self, chain_id: str) -> List[CostRecord]:
         """Get all task records for a chain."""
         conn = sqlite3.connect(self.db_path)
-        rows = conn.execute("""
+        rows = conn.execute(
+            """
             SELECT task_id, platform, chain_id, model,
                    input_tokens, output_tokens, cost_usd, timestamp
             FROM cost_records
             WHERE chain_id = ?
             ORDER BY timestamp
-        """, (chain_id,)).fetchall()
+        """,
+            (chain_id,),
+        ).fetchall()
         conn.close()
 
         return [
@@ -271,7 +277,7 @@ class CostTracker:
                 input_tokens=row[4],
                 output_tokens=row[5],
                 cost_usd=row[6],
-                timestamp=datetime.fromisoformat(row[7])
+                timestamp=datetime.fromisoformat(row[7]),
             )
             for row in rows
         ]
@@ -297,8 +303,8 @@ class CostTracker:
 
         pricing = PRICING.get(model, PRICING["unknown"])
         return (
-            estimated_input_tokens * pricing["input"] / 1_000_000 +
-            estimated_output_tokens * pricing["output"] / 1_000_000
+            estimated_input_tokens * pricing["input"] / 1_000_000
+            + estimated_output_tokens * pricing["output"] / 1_000_000
         )
 
     def should_warn_cost(self, prompt: str, threshold_tokens: int = 10000) -> bool:

@@ -11,6 +11,7 @@ except Exception:
 
 # In-code defaults (used if YAML is missing/unavailable)
 from .resolver import DEFAULT_POLICY_TABLE
+
 # Reuse your existing root-config path discovery
 try:
     # Prefer the packaged shim that points to the real root-level config.py
@@ -24,6 +25,7 @@ except Exception:
                 return parent
         return Path(__file__).resolve().parents[2]
 
+
 def _default_policy_yaml_path() -> Path:
     """
     Default expected location: <repo_root>/configs/regime_policies.yaml
@@ -31,7 +33,10 @@ def _default_policy_yaml_path() -> Path:
     """
     return project_root() / "configs" / "regime_policies.yaml"
 
-def load_policy_table(yaml_path: Optional[str | os.PathLike] = None) -> Dict[str, Dict[str, Any]]:
+
+def load_policy_table(
+    yaml_path: Optional[str | os.PathLike] = None,
+) -> Dict[str, Dict[str, Any]]:
     """
     Load a policy overlay from YAML and merge it over DEFAULT_POLICY_TABLE.
     - If yaml_path is None, we try <repo_root>/configs/regime_policies.yaml.
@@ -69,7 +74,14 @@ def load_policy_table(yaml_path: Optional[str | os.PathLike] = None) -> Dict[str
             continue
         # Only accept known fields for robustness
         entry: Dict[str, Any] = {}
-        for k in ("size_mult", "stop_mult", "orders", "setups", "gross_cap", "pyramids"):
+        for k in (
+            "size_mult",
+            "stop_mult",
+            "orders",
+            "setups",
+            "gross_cap",
+            "pyramids",
+        ):
             if k in rule and rule[k] is not None:
                 entry[k] = rule[k]
         if entry:

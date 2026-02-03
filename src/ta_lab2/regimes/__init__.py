@@ -43,7 +43,7 @@ try:
     from .data_budget import assess_data_budget, DataBudgetContext
 except Exception:  # pragma: no cover
     assess_data_budget = None  # type: ignore
-    DataBudgetContext = None   # type: ignore
+    DataBudgetContext = None  # type: ignore
 
 try:
     from .labels import (
@@ -57,14 +57,14 @@ try:
         label_layer_intraday,
     )
 except Exception:  # pragma: no cover
-    label_trend_basic = None           # type: ignore
-    label_vol_bucket = None            # type: ignore
-    label_liquidity_bucket = None      # type: ignore
-    compose_regime_key = None          # type: ignore
-    label_layer_monthly = None         # type: ignore
-    label_layer_weekly = None          # type: ignore
-    label_layer_daily = None           # type: ignore
-    label_layer_intraday = None        # type: ignore
+    label_trend_basic = None  # type: ignore
+    label_vol_bucket = None  # type: ignore
+    label_liquidity_bucket = None  # type: ignore
+    compose_regime_key = None  # type: ignore
+    label_layer_monthly = None  # type: ignore
+    label_layer_weekly = None  # type: ignore
+    label_layer_daily = None  # type: ignore
+    label_layer_intraday = None  # type: ignore
 
 try:
     from .resolver import (
@@ -74,10 +74,10 @@ try:
         TightenOnlyPolicy,
     )
 except Exception:  # pragma: no cover
-    apply_hysteresis = None        # type: ignore
-    resolve_policy = None          # type: ignore
-    DEFAULT_POLICY_TABLE = {}      # type: ignore
-    TightenOnlyPolicy = None       # type: ignore
+    apply_hysteresis = None  # type: ignore
+    resolve_policy = None  # type: ignore
+    DEFAULT_POLICY_TABLE = {}  # type: ignore
+    TightenOnlyPolicy = None  # type: ignore
 
 try:
     from .proxies import (
@@ -87,10 +87,10 @@ try:
         ProxyOutcome,
     )
 except Exception:  # pragma: no cover
-    infer_cycle_proxy = None        # type: ignore
-    infer_weekly_macro_proxy = None # type: ignore
-    ProxyInputs = None              # type: ignore
-    ProxyOutcome = None             # type: ignore
+    infer_cycle_proxy = None  # type: ignore
+    infer_weekly_macro_proxy = None  # type: ignore
+    ProxyInputs = None  # type: ignore
+    ProxyOutcome = None  # type: ignore
 
 try:
     from .policy_loader import load_policy_table
@@ -101,13 +101,6 @@ except Exception:  # pragma: no cover
 # We import specific names *if they exist*; this keeps the public API stable and avoids breakage.
 _flips_exported = []
 try:
-    from .flips import (
-        sign_from_series,
-        detect_flips,
-        label_regimes_from_flips,
-        attach_regimes,
-        regime_stats,
-    )
     _flips_exported = [
         "sign_from_series",
         "detect_flips",
@@ -129,7 +122,6 @@ __all__ = [
     "forward_return_split",
     "lead_lag_max_corr",
     "build_flip_segments",
-
     # ---- Optional regime framework (present if modules are available) ----
     "assess_data_budget",
     "DataBudgetContext",

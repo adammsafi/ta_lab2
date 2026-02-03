@@ -25,9 +25,10 @@ FM_END = "\n---\n"
 # YAML front-matter helpers
 # ---------------------------
 
+
 def has_front_matter(text: str) -> bool:
     t = text.lstrip("\ufeff\r\n\t ")
-    return t.startswith(FM_START) and (FM_END in t[len(FM_START):])
+    return t.startswith(FM_START) and (FM_END in t[len(FM_START) :])
 
 
 def split_front_matter(text: str) -> Tuple[Optional[str], str]:
@@ -37,8 +38,8 @@ def split_front_matter(text: str) -> Tuple[Optional[str], str]:
     end_idx = t.find(FM_END, len(FM_START))
     if end_idx == -1:
         return None, text
-    fm = t[len(FM_START):end_idx]
-    rest = t[end_idx + len(FM_END):]
+    fm = t[len(FM_START) : end_idx]
+    rest = t[end_idx + len(FM_END) :]
     return fm, rest
 
 
@@ -76,7 +77,7 @@ def parse_front_matter_minimal(fm: str) -> Dict[str, Any]:
             if val == "null":
                 out[key] = None
             elif val in ("true", "false"):
-                out[key] = (val == "true")
+                out[key] = val == "true"
             else:
                 if re.fullmatch(r"-?\d+", val):
                     out[key] = int(val)
@@ -120,7 +121,17 @@ CHILD_SCHEMA = {
                 "properties": {
                     "type": {
                         "type": "string",
-                        "enum": ["decision", "procedure", "invariant", "definition", "bug", "fix", "todo", "insight", "meta"],
+                        "enum": [
+                            "decision",
+                            "procedure",
+                            "invariant",
+                            "definition",
+                            "bug",
+                            "fix",
+                            "todo",
+                            "insight",
+                            "meta",
+                        ],
                     },
                     "title": {"type": "string", "maxLength": 120},
                     "content": {"type": "string", "maxLength": 900},
@@ -135,7 +146,13 @@ CHILD_SCHEMA = {
                     },
                     "decision_status": {
                         "type": "string",
-                        "enum": ["", "proposed", "accepted", "implemented", "deprecated"],
+                        "enum": [
+                            "",
+                            "proposed",
+                            "accepted",
+                            "implemented",
+                            "deprecated",
+                        ],
                         "description": "Only for type=decision, else empty string.",
                     },
                     "evidence_hint": {
@@ -144,7 +161,15 @@ CHILD_SCHEMA = {
                         "description": "Optional hint about what could verify this in code/tests/docs, e.g. 'pyproject.toml [project.scripts]'",
                     },
                 },
-                "required": ["type", "title", "content", "confidence", "conflict_key", "decision_status", "evidence_hint"],
+                "required": [
+                    "type",
+                    "title",
+                    "content",
+                    "confidence",
+                    "conflict_key",
+                    "decision_status",
+                    "evidence_hint",
+                ],
             },
         }
     },
@@ -277,6 +302,7 @@ def chunk_by_sections(body: str, max_chars: int) -> List[str]:
 # Conflict grouping + review queue
 # ---------------------------
 
+
 def norm_key(s: str) -> str:
     s = (s or "").strip().lower()
     s = re.sub(r"[^a-z0-9_]+", "_", s)
@@ -288,13 +314,26 @@ def main() -> int:
     ap = argparse.ArgumentParser(
         description="Instantiate child memories (Strategy 2) with auditable provenance + conflict grouping."
     )
-    ap.add_argument("--kept-manifest", required=True, help="Path to kept conversations manifest CSV")
-    ap.add_argument("--out-dir", required=True, help="Output directory for memory_children.jsonl")
+    ap.add_argument(
+        "--kept-manifest", required=True, help="Path to kept conversations manifest CSV"
+    )
+    ap.add_argument(
+        "--out-dir", required=True, help="Output directory for memory_children.jsonl"
+    )
     ap.add_argument("--model", default="gpt-5.2", help="Default gpt-5.2")
-    ap.add_argument("--reasoning-effort", default="high", choices=["none", "medium", "high", "xhigh"])
+    ap.add_argument(
+        "--reasoning-effort",
+        default="high",
+        choices=["none", "medium", "high", "xhigh"],
+    )
     ap.add_argument("--max-chars-per-chunk", type=int, default=12000)
     ap.add_argument("--max-chunks-per-convo", type=int, default=6)
-    ap.add_argument("--max-memories-per-chunk", type=int, default=10, help="Soft cap enforced via prompt/schema maxItems")
+    ap.add_argument(
+        "--max-memories-per-chunk",
+        type=int,
+        default=10,
+        help="Soft cap enforced via prompt/schema maxItems",
+    )
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--run-manifest-out", default="memory_children_run_manifest.json")
     args = ap.parse_args()
@@ -336,7 +375,10 @@ def main() -> int:
                 except Exception:
                     continue
 
-    print(f"[resume] found {len(done_parents)} completed parents (DONE markers)", flush=True)
+    print(
+        f"[resume] found {len(done_parents)} completed parents (DONE markers)",
+        flush=True,
+    )
 
     # conflict_key -> list[child_memory]
     conflicts: Dict[str, List[Dict[str, Any]]] = {}
@@ -358,7 +400,9 @@ def main() -> int:
 
     for kr in kept_rows:
         cid = (kr.get("id") or "").strip()
-        md_path_s = (kr.get("dest_path") or kr.get("resolved_path") or kr.get("src_path") or "").strip()
+        md_path_s = (
+            kr.get("dest_path") or kr.get("resolved_path") or kr.get("src_path") or ""
+        ).strip()
         if not cid or not md_path_s:
             continue
 
@@ -375,19 +419,33 @@ def main() -> int:
 
             parent_memory_id = str(fm.get("memory_id") or "").strip()
             if not parent_memory_id:
-                errors.append({"conversation_id": cid, "path": str(md_path), "error": "missing memory_id in front matter"})
+                errors.append(
+                    {
+                        "conversation_id": cid,
+                        "path": str(md_path),
+                        "error": "missing memory_id in front matter",
+                    }
+                )
                 continue
 
             if parent_memory_id in done_parents:
-                print(f"[resume] skipping already done convo={cid} parent={parent_memory_id}", flush=True)
+                print(
+                    f"[resume] skipping already done convo={cid} parent={parent_memory_id}",
+                    flush=True,
+                )
                 continue
 
             parent_title = str(fm.get("title") or "").strip()
             parent_projects = fm.get("projects") or []
             parent_tags = fm.get("tags") or []
 
-            chunks = chunk_by_sections(body, args.max_chars_per_chunk)[: args.max_chunks_per_convo]
-            print(f"[progress] convo={cid} file={md_path.name} chunks={len(chunks)}", flush=True)
+            chunks = chunk_by_sections(body, args.max_chars_per_chunk)[
+                : args.max_chunks_per_convo
+            ]
+            print(
+                f"[progress] convo={cid} file={md_path.name} chunks={len(chunks)}",
+                flush=True,
+            )
 
             start_marker = {
                 "memory_id": f"{parent_memory_id}::START",
@@ -412,7 +470,10 @@ def main() -> int:
 
             # Extract per chunk
             for chunk_idx, chunk in enumerate(chunks):
-                print(f"[progress] convo={cid} chunk={chunk_idx+1}/{len(chunks)} calling OpenAI...", flush=True)
+                print(
+                    f"[progress] convo={cid} chunk={chunk_idx+1}/{len(chunks)} calling OpenAI...",
+                    flush=True,
+                )
                 data = extract_child_memories(
                     client=client,
                     model=args.model,
@@ -424,7 +485,10 @@ def main() -> int:
                 )
 
                 memories = data.get("memories", []) or []
-                print(f"[progress] convo={cid} chunk={chunk_idx+1}/{len(chunks)} returned memories={len(memories)}", flush=True)
+                print(
+                    f"[progress] convo={cid} chunk={chunk_idx+1}/{len(chunks)} returned memories={len(memories)}",
+                    flush=True,
+                )
                 for mem_i, m in enumerate(memories):
                     child_id = f"{parent_memory_id}::c{chunk_idx:02d}m{mem_i:02d}"
 
@@ -451,7 +515,10 @@ def main() -> int:
                     }
                     emit(child)
                     if (mem_i + 1) % 5 == 0:
-                        print(f"[progress] convo={cid} chunk={chunk_idx+1}/{len(chunks)} emitted={mem_i+1}", flush=True)
+                        print(
+                            f"[progress] convo={cid} chunk={chunk_idx+1}/{len(chunks)} emitted={mem_i+1}",
+                            flush=True,
+                        )
 
             # Mark parent as fully processed (resume-safe)
             done_marker = {
@@ -479,7 +546,9 @@ def main() -> int:
             processed_convos += 1
 
         except Exception as e:
-            errors.append({"conversation_id": cid, "path": str(md_path), "error": repr(e)})
+            errors.append(
+                {"conversation_id": cid, "path": str(md_path), "error": repr(e)}
+            )
 
     if out_f is not None:
         out_f.close()
@@ -493,7 +562,9 @@ def main() -> int:
         if len(decision_items) < 2:
             continue
 
-        statuses = sorted(set((x.get("decision_status") or "").strip() for x in decision_items))
+        statuses = sorted(
+            set((x.get("decision_status") or "").strip() for x in decision_items)
+        )
         contents = sorted(set((x.get("content") or "").strip() for x in decision_items))
 
         is_conflict = (len(statuses) > 1) or (len(contents) > 1)
@@ -516,12 +587,25 @@ def main() -> int:
             }
         )
 
-    conflicts_json.write_text(json.dumps(conflict_report, indent=2, ensure_ascii=False), encoding="utf-8")
+    conflicts_json.write_text(
+        json.dumps(conflict_report, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
 
     with review_csv.open("w", encoding="utf-8", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=["conflict_key", "decision_count", "statuses", "needs_review", "notes"])
+        w = csv.DictWriter(
+            f,
+            fieldnames=[
+                "conflict_key",
+                "decision_count",
+                "statuses",
+                "needs_review",
+                "notes",
+            ],
+        )
         w.writeheader()
-        for r in sorted(review_rows, key=lambda x: (-int(x["decision_count"]), x["conflict_key"])):
+        for r in sorted(
+            review_rows, key=lambda x: (-int(x["decision_count"]), x["conflict_key"])
+        ):
             w.writerow(r)
 
     manifest = {

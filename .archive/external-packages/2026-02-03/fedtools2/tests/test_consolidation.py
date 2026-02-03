@@ -1,5 +1,6 @@
 import pandas as pd
-from fedtools2.utils.consolidation import combine_timeframes, missing_ranges
+from fedtools2.utils.consolidation import missing_ranges
+
 
 def test_missing_ranges_basic():
     idx = pd.date_range("2020-01-01", periods=5, freq="D")

@@ -1,9 +1,10 @@
 # src/ta_lab2/signals/generator.py
 from __future__ import annotations
-from typing import Optional, Tuple
+from typing import Optional
 import numpy as np
 import pandas as pd
 from . import rules
+
 
 def generate_signals(
     df: pd.DataFrame,
@@ -43,39 +44,39 @@ def generate_signals(
         raise KeyError(f"Missing slow EMA column: {slow_ema!r}")
 
     # --- Core entries/exits from EMA cross rules ---
-    long_entry  = rules.ema_crossover_long(d, fast_ema, slow_ema)
-    long_exit   = rules.ema_crossover_short(d, fast_ema, slow_ema)
+    long_entry = rules.ema_crossover_long(d, fast_ema, slow_ema)
+    long_exit = rules.ema_crossover_short(d, fast_ema, slow_ema)
 
     if allow_shorts:
         short_entry = rules.ema_crossover_short(d, fast_ema, slow_ema)
-        short_exit  = rules.ema_crossover_long(d, fast_ema, slow_ema)
+        short_exit = rules.ema_crossover_long(d, fast_ema, slow_ema)
     else:
         short_entry = pd.Series(False, index=d.index)
-        short_exit  = pd.Series(False, index=d.index)
+        short_exit = pd.Series(False, index=d.index)
 
     # --- Optional RSI gates (auto-disable if column missing) ---
     _use_rsi = bool(use_rsi_filter and (rsi_col in d.columns))
     if _use_rsi:
-        long_entry  &= rules.rsi_ok_long(d, rsi_col, rsi_min_long)
+        long_entry &= rules.rsi_ok_long(d, rsi_col, rsi_min_long)
         if allow_shorts:
             short_entry &= rules.rsi_ok_short(d, rsi_col, rsi_max_short)
 
     # --- Optional ATR/volatility gate (auto-disable if column missing) ---
     _use_vol = bool(use_vol_filter and (atr_col in d.columns))
     if _use_vol:
-        long_entry  &= rules.atr_ok(d, atr_col, close_col, min_atr_pct=min_atr_pct)
+        long_entry &= rules.atr_ok(d, atr_col, close_col, min_atr_pct=min_atr_pct)
         if allow_shorts:
             short_entry &= rules.atr_ok(d, atr_col, close_col, min_atr_pct=min_atr_pct)
 
     # --- Cooldown (optional) ---
     if cooldown_bars and cooldown_bars > 0:
-        ce = (long_exit | short_exit)
+        ce = long_exit | short_exit
         # after any exit, block re-entry for N bars
         block = ce.copy().astype(int)
         for i in range(1, cooldown_bars + 1):
             block |= ce.shift(i, fill_value=False).astype(int)
         # mask out entries during cooldown
-        long_entry  &= ~block.astype(bool)
+        long_entry &= ~block.astype(bool)
         if allow_shorts:
             short_entry &= ~block.astype(bool)
 
@@ -84,12 +85,12 @@ def generate_signals(
     # Simpler: start from previous position, flip on entries/exits
     signal = pd.Series(0, index=d.index, dtype=int)
     # Long side
-    signal = np.where(long_entry,  1, signal)
-    signal = np.where(long_exit,   0, signal)
+    signal = np.where(long_entry, 1, signal)
+    signal = np.where(long_exit, 0, signal)
     # Short side (if enabled)
     if allow_shorts:
         signal = np.where(short_entry, -1, signal)
-        signal = np.where(short_exit,   0, signal)
+        signal = np.where(short_exit, 0, signal)
     signal = pd.Series(signal, index=d.index, dtype=int)
     position = signal.replace(0, np.nan).ffill().fillna(0).astype(int)
 
@@ -100,7 +101,7 @@ def generate_signals(
         close = d[close_col].astype(float)
         atr = d[atr_col].astype(float)
         atr_pct = (atr / close).replace([np.inf, -np.inf], np.nan).clip(lower=1e-12)
-        raw = (1.0 / atr_pct)  # inverse vol
+        raw = 1.0 / atr_pct  # inverse vol
         # normalize to a reasonable cap (e.g., 95th percentile to 1.0)
         denom = raw.quantile(0.95)
         size = (raw / denom).clip(upper=1.0).fillna(0.0)
@@ -109,15 +110,15 @@ def generate_signals(
     out = pd.DataFrame(
         {
             "entry_long": long_entry.astype(bool),
-            "exit_long":  long_exit.astype(bool),
+            "exit_long": long_exit.astype(bool),
         },
         index=d.index,
     )
     if allow_shorts:
         out["entry_short"] = short_entry.astype(bool)
-        out["exit_short"]  = short_exit.astype(bool)
+        out["exit_short"] = short_exit.astype(bool)
 
-    out["signal"]   = signal.astype(int)
+    out["signal"] = signal.astype(int)
     out["position"] = position.astype(int)
 
     # Attach size only if computed

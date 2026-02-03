@@ -11,11 +11,10 @@ Uses TracingContext from observability for correlation ID propagation.
 """
 
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
-import asyncio
+from unittest.mock import AsyncMock, patch
 
 # Import TracingContext for correlation tracking
-from ta_lab2.observability.tracing import TracingContext, generate_correlation_id
+from ta_lab2.observability.tracing import TracingContext
 
 
 @pytest.mark.integration
@@ -66,8 +65,13 @@ class TestOrchestratorMemoryContext:
         from ta_lab2.tools.ai_orchestrator.memory.injection import inject_memory_context
 
         # Mock the search_memories function
-        with patch('ta_lab2.tools.ai_orchestrator.memory.injection.search_memories') as mock_search:
-            from ta_lab2.tools.ai_orchestrator.memory.query import SearchResult, SearchResponse
+        with patch(
+            "ta_lab2.tools.ai_orchestrator.memory.injection.search_memories"
+        ) as mock_search:
+            from ta_lab2.tools.ai_orchestrator.memory.query import (
+                SearchResult,
+                SearchResponse,
+            )
 
             mock_search.return_value = SearchResponse(
                 query="Refresh features for BTC",
@@ -77,20 +81,20 @@ class TestOrchestratorMemoryContext:
                         content="BTC EMA patterns show strong trend following",
                         metadata={},
                         similarity=0.95,
-                        distance=0.05
+                        distance=0.05,
                     ),
                     SearchResult(
                         memory_id="mem-2",
                         content="Refresh order: bars -> EMA -> returns -> features",
                         metadata={},
                         similarity=0.92,
-                        distance=0.08
+                        distance=0.08,
                     ),
                 ],
                 total_found=2,
                 filtered_count=2,
                 search_time_ms=10.5,
-                threshold_used=0.7
+                threshold_used=0.7,
             )
 
             enhanced = inject_memory_context("Refresh features for BTC", max_length=500)
@@ -102,9 +106,11 @@ class TestOrchestratorMemoryContext:
     async def test_orchestrator_stores_result_to_memory(self, mocker):
         """Test orchestrator can store task result in memory."""
         # Mock the low-level functions that add_memory depends on
-        with patch('ta_lab2.tools.ai_orchestrator.memory.update.get_embedding') as mock_embed, \
-             patch('ta_lab2.tools.ai_orchestrator.memory.client.get_memory_client') as mock_client:
-
+        with patch(
+            "ta_lab2.tools.ai_orchestrator.memory.update.get_embedding"
+        ) as mock_embed, patch(
+            "ta_lab2.tools.ai_orchestrator.memory.client.get_memory_client"
+        ) as mock_client:
             # Setup mocks
             mock_embed.return_value = [[0.1] * 1536]  # Mock embedding
             mock_collection = mocker.MagicMock()
@@ -116,7 +122,7 @@ class TestOrchestratorMemoryContext:
             result = add_memory(
                 memory_id="mem-123",
                 content="EMA refresh complete: 1000 rows",
-                metadata={"type": "task_result", "rows": 1000}
+                metadata={"type": "task_result", "rows": 1000},
             )
 
             # Verify the collection was called
@@ -133,21 +139,31 @@ class TestOrchestratorMemoryHandoff:
     async def test_handoff_stores_context_with_id(self, mocker):
         """Test handoff creates memory entry with retrievable ID."""
         from ta_lab2.tools.ai_orchestrator.handoff import spawn_child_task
-        from ta_lab2.tools.ai_orchestrator.core import Task, TaskType, Result, Platform, TaskStatus
+        from ta_lab2.tools.ai_orchestrator.core import (
+            Task,
+            TaskType,
+            Result,
+            Platform,
+            TaskStatus,
+        )
 
         # Create a mock parent result
-        parent_task = Task(type=TaskType.DATA_ANALYSIS, prompt="Task A", task_id="task-a-123")
+        parent_task = Task(
+            type=TaskType.DATA_ANALYSIS, prompt="Task A", task_id="task-a-123"
+        )
         parent_result = Result(
             task=parent_task,
             platform=Platform.GEMINI,
             output="data prepared",
             success=True,
-            status=TaskStatus.COMPLETED
+            status=TaskStatus.COMPLETED,
         )
 
-        with patch('ta_lab2.tools.ai_orchestrator.memory.update.get_embedding') as mock_embed, \
-             patch('ta_lab2.tools.ai_orchestrator.memory.client.get_memory_client') as mock_client:
-
+        with patch(
+            "ta_lab2.tools.ai_orchestrator.memory.update.get_embedding"
+        ) as mock_embed, patch(
+            "ta_lab2.tools.ai_orchestrator.memory.client.get_memory_client"
+        ) as mock_client:
             # Setup mocks
             mock_embed.return_value = [[0.1] * 1536]
             mock_collection = mocker.MagicMock()
@@ -157,7 +173,7 @@ class TestOrchestratorMemoryHandoff:
             child_task, handoff = await spawn_child_task(
                 parent_result=parent_result,
                 child_prompt="Task B using data from Task A",
-                child_type=TaskType.DATA_ANALYSIS
+                child_type=TaskType.DATA_ANALYSIS,
             )
 
             # Verify memory was stored
@@ -176,16 +192,18 @@ class TestOrchestratorMemoryHandoff:
         task = Task(
             type=TaskType.DATA_ANALYSIS,
             prompt="Task B",
-            context={"handoff_memory_id": "handoff-456"}
+            context={"handoff_memory_id": "handoff-456"},
         )
 
-        with patch('ta_lab2.tools.ai_orchestrator.memory.query.get_memory_by_id') as mock_get:
+        with patch(
+            "ta_lab2.tools.ai_orchestrator.memory.query.get_memory_by_id"
+        ) as mock_get:
             mock_get.return_value = SearchResult(
                 memory_id="handoff-456",
                 content="Task A completed data preparation",
                 metadata={"task_a_result": "data prepared"},
                 similarity=1.0,
-                distance=0.0
+                distance=0.0,
             )
 
             context = await load_handoff_context(task)
@@ -203,10 +221,12 @@ class TestOrchestratorMemoryHandoff:
         task = Task(
             type=TaskType.DATA_ANALYSIS,
             prompt="Task B",
-            context={"handoff_memory_id": "nonexistent-id"}
+            context={"handoff_memory_id": "nonexistent-id"},
         )
 
-        with patch('ta_lab2.tools.ai_orchestrator.memory.query.get_memory_by_id') as mock_get:
+        with patch(
+            "ta_lab2.tools.ai_orchestrator.memory.query.get_memory_by_id"
+        ) as mock_get:
             mock_get.return_value = None
 
             with pytest.raises(RuntimeError, match="not found"):

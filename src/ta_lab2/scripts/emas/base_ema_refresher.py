@@ -35,13 +35,9 @@ from dataclasses import dataclass
 from typing import Optional, Sequence, Any
 import argparse
 
-from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
-from sqlalchemy.pool import NullPool
 
 from ta_lab2.scripts.bars.common_snapshot_contract import (
-    resolve_db_url,
-    parse_ids,
     load_all_ids,
     load_periods as load_periods_from_lut,
 )
@@ -63,6 +59,7 @@ from ta_lab2.scripts.emas.ema_computation_orchestrator import (
 # Configuration
 # =============================================================================
 
+
 @dataclass(frozen=True)
 class EMARefresherConfig:
     """
@@ -83,6 +80,7 @@ class EMARefresherConfig:
         debug: Enable debug mode
         extra_config: Script-specific configuration (alignment_type, etc.)
     """
+
     db_url: str
     ids: list[int]
     periods: list[int]
@@ -99,12 +97,13 @@ class EMARefresherConfig:
 
     def __post_init__(self):
         if self.extra_config is None:
-            object.__setattr__(self, 'extra_config', {})
+            object.__setattr__(self, "extra_config", {})
 
 
 # =============================================================================
 # Base EMA Refresher
 # =============================================================================
+
 
 class BaseEMARefresher(ABC):
     """
@@ -306,13 +305,17 @@ class BaseEMARefresher(ABC):
         specifics to abstract methods.
         """
         self.logger.info(f"Starting EMA refresh: {self.__class__.__name__}")
-        self.logger.info(f"Configuration: {len(self.config.ids)} IDs, "
-                        f"{len(self.config.periods)} periods")
+        self.logger.info(
+            f"Configuration: {len(self.config.ids)} IDs, "
+            f"{len(self.config.periods)} periods"
+        )
 
         # Ensure state table exists
         self.state_manager.ensure_state_table()
-        self.logger.info(f"State table: {self.state_manager.config.state_schema}."
-                        f"{self.state_manager.config.state_table}")
+        self.logger.info(
+            f"State table: {self.state_manager.config.state_schema}."
+            f"{self.state_manager.config.state_table}"
+        )
 
         # Load timeframes
         tfs = self.get_timeframes()
@@ -320,8 +323,12 @@ class BaseEMARefresher(ABC):
 
         # Log source table info
         source_info = self.get_source_table_info()
-        self.logger.info(f"Source: {source_info['bars_schema']}.{source_info['bars_table']}")
-        self.logger.info(f"Target: {self.config.output_schema}.{self.config.output_table}")
+        self.logger.info(
+            f"Source: {source_info['bars_schema']}.{source_info['bars_table']}"
+        )
+        self.logger.info(
+            f"Target: {self.config.output_schema}.{self.config.output_table}"
+        )
 
         # Execute
         try:
@@ -516,7 +523,9 @@ class BaseEMARefresher(ABC):
 
         if ids_arg.lower() == "all":
             source_info = self.get_source_table_info()
-            source_table_fq = f"{source_info['bars_schema']}.{source_info['bars_table']}"
+            source_table_fq = (
+                f"{source_info['bars_schema']}.{source_info['bars_table']}"
+            )
             ids = load_all_ids(self.config.db_url, source_table_fq)
             self.logger.info(f"Loaded {len(ids)} IDs from {source_table_fq}")
             return ids
@@ -565,14 +574,14 @@ If you see "too many clients already" errors:
         p.add_argument(
             "--db-url",
             default=None,
-            help="SQLAlchemy DB URL (or load from db_config.env / TARGET_DB_URL env)."
+            help="SQLAlchemy DB URL (or load from db_config.env / TARGET_DB_URL env).",
         )
 
         # Input selection
         p.add_argument(
             "--ids",
             default="all",
-            help="Comma list of ids (e.g., 1,52) or 'all' (default)."
+            help="Comma list of ids (e.g., 1,52) or 'all' (default).",
         )
         p.add_argument(
             "--periods",
@@ -589,20 +598,20 @@ If you see "too many clients already" errors:
         p.add_argument(
             "--state-table",
             required=True,
-            help="State table name for incremental tracking"
+            help="State table name for incremental tracking",
         )
 
         # Execution mode
         p.add_argument(
             "--full-refresh",
             action="store_true",
-            help="Ignore state and run full history refresh"
+            help="Ignore state and run full history refresh",
         )
         p.add_argument(
             "--num-processes",
             type=int,
             default=None,
-            help="Number of parallel processes. Default: min(cpu_count(), 4)"
+            help="Number of parallel processes. Default: min(cpu_count(), 4)",
         )
 
         # Logging

@@ -73,7 +73,9 @@ def test_get_watermark_returns_none_for_empty(mock_engine):
     # Mock pd.read_sql to return DataFrame with NaT
     mock_df = pd.DataFrame({"wm": [pd.NaT]})
 
-    with patch("ta_lab2.scripts.emas.sync_cmc_ema_multi_tf_u.pd.read_sql", return_value=mock_df):
+    with patch(
+        "ta_lab2.scripts.emas.sync_cmc_ema_multi_tf_u.pd.read_sql", return_value=mock_df
+    ):
         result = get_watermark(mock_engine, "multi_tf", prefer_ingested_at=False)
 
     assert result is None, "get_watermark should return None for empty/NaT result"
@@ -119,9 +121,7 @@ def test_build_select_expr_success():
     ]
 
     select_sql, where_sql = build_select_expr(
-        cols_complete,
-        "multi_tf_v2",
-        use_ingested_filter=True
+        cols_complete, "multi_tf_v2", use_ingested_filter=True
     )
 
     # Verify SELECT clause contains expected elements
@@ -139,9 +139,7 @@ def test_build_select_expr_success():
 
     # Test with use_ingested_filter=False
     select_sql2, where_sql2 = build_select_expr(
-        cols_complete,
-        "multi_tf_v2",
-        use_ingested_filter=False
+        cols_complete, "multi_tf_v2", use_ingested_filter=False
     )
 
     assert "WHERE" in where_sql2
@@ -162,4 +160,6 @@ def test_table_exists_helper():
 
     # Test with table that definitely doesn't exist
     not_exists_result = table_exists(engine, "public.nonexistent_table_xyz_999")
-    assert not_exists_result is False, "table_exists should return False for nonexistent table"
+    assert (
+        not_exists_result is False
+    ), "table_exists should return False for nonexistent table"

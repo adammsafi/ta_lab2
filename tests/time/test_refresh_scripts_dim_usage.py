@@ -162,7 +162,10 @@ def test_calendar_feature_modules_use_dim(feature_path: str):
     )
 
     # Should query for calendar alignment
-    assert "alignment_type = 'calendar'" in content or "alignment_type='calendar'" in content, (
+    assert (
+        "alignment_type = 'calendar'" in content
+        or "alignment_type='calendar'" in content
+    ), (
         f"{feature_path} does not query for calendar alignment. "
         "Expected SQL: WHERE alignment_type = 'calendar'"
     )
@@ -261,11 +264,13 @@ def test_count_active_vs_deprecated():
     # Count deprecated scripts (recursive to catch old/ subdirs in stats/)
     deprecated_scripts = list(old_dir.rglob("refresh_*.py"))
     # Also check stats/*/old/ directories
-    stats_old_dirs = (PROJECT_ROOT / "src/ta_lab2/scripts/emas/stats").rglob("old/refresh_*.py")
+    stats_old_dirs = (PROJECT_ROOT / "src/ta_lab2/scripts/emas/stats").rglob(
+        "old/refresh_*.py"
+    )
     deprecated_scripts.extend(stats_old_dirs)
     deprecated_count = len(set(deprecated_scripts))  # Remove duplicates
 
-    print(f"\nRefactoring summary:")
+    print("\nRefactoring summary:")
     print(f"  Active scripts: {active_count}")
     print(f"  Deprecated scripts: {deprecated_count}")
     print(f"  Ratio: {deprecated_count / active_count:.1f}x code reduction")

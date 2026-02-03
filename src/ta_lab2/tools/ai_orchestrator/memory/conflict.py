@@ -43,6 +43,7 @@ class ConflictResult:
         conflicting_content: Optional content of conflicting memory
         timestamp: ISO 8601 timestamp when conflict was detected
     """
+
     memory_id: str
     operation: str
     confidence: float
@@ -61,7 +62,7 @@ def detect_conflicts(
     content: str,
     user_id: str = "orchestrator",
     client: Any = None,
-    similarity_threshold: float = 0.85
+    similarity_threshold: float = 0.85,
 ) -> list[dict]:
     """Detect potential conflicts by finding semantically similar memories.
 
@@ -93,30 +94,29 @@ def detect_conflicts(
     """
     if client is None:
         from ta_lab2.tools.ai_orchestrator.memory.mem0_client import get_mem0_client
+
         client = get_mem0_client()
 
     try:
         # Search for semantically similar memories
-        results = client.search(
-            query=content,
-            user_id=user_id,
-            limit=10
-        )
+        results = client.search(query=content, user_id=user_id, limit=10)
 
         # Filter by similarity threshold
         potential_conflicts = []
-        for result in results.get('results', []):
+        for result in results.get("results", []):
             # Mem0 search returns dict with 'id', 'memory', 'metadata', 'score'
             # Score is typically 0-1 where higher = more similar
             similarity = result.get("score", 0.0)
 
             if similarity >= similarity_threshold:
-                potential_conflicts.append({
-                    "memory_id": result.get("id"),
-                    "content": result.get("memory"),
-                    "similarity": similarity,
-                    "metadata": result.get("metadata", {})
-                })
+                potential_conflicts.append(
+                    {
+                        "memory_id": result.get("id"),
+                        "content": result.get("memory"),
+                        "similarity": similarity,
+                        "metadata": result.get("metadata", {}),
+                    }
+                )
 
         logger.info(
             f"Detected {len(potential_conflicts)} potential conflicts "
@@ -133,7 +133,7 @@ def resolve_conflict(
     new_content: str,
     user_id: str = "orchestrator",
     metadata: Optional[dict] = None,
-    client: Any = None
+    client: Any = None,
 ) -> ConflictResult:
     """Resolve conflicts using Mem0's LLM-powered infer=True capability.
 
@@ -164,20 +164,19 @@ def resolve_conflict(
     """
     if client is None:
         from ta_lab2.tools.ai_orchestrator.memory.mem0_client import get_mem0_client
+
         client = get_mem0_client()
 
     try:
         # Use Mem0's add() with infer=True for automatic conflict resolution
         # Format content as message list per Mem0 API
-        messages = [
-            {"role": "user", "content": new_content}
-        ]
+        messages = [{"role": "user", "content": new_content}]
 
         result = client.add(
             messages=messages,
             user_id=user_id,
             metadata=metadata,
-            infer=True  # Enable LLM-powered conflict detection
+            infer=True,  # Enable LLM-powered conflict detection
         )
 
         # Parse Mem0's response
@@ -200,7 +199,9 @@ def resolve_conflict(
         else:
             # Unexpected format - default to ADD
             operation = "ADD"
-            memory_id = result.get("id", "unknown") if isinstance(result, dict) else "unknown"
+            memory_id = (
+                result.get("id", "unknown") if isinstance(result, dict) else "unknown"
+            )
             memory_content = new_content
 
         # Build conflict result
@@ -210,7 +211,7 @@ def resolve_conflict(
             confidence=0.9,  # Mem0 doesn't provide explicit confidence, assume high
             reason=_generate_reason(operation, new_content),
             original_content=new_content,
-            timestamp=datetime.utcnow().isoformat() + "Z"
+            timestamp=datetime.utcnow().isoformat() + "Z",
         )
 
         logger.info(
@@ -221,7 +222,9 @@ def resolve_conflict(
         return conflict_result
 
     except Exception as e:
-        logger.error(f"Failed to resolve conflict for content '{new_content[:50]}...': {e}")
+        logger.error(
+            f"Failed to resolve conflict for content '{new_content[:50]}...': {e}"
+        )
         raise
 
 
@@ -230,7 +233,7 @@ def add_with_conflict_check(
     user_id: str = "orchestrator",
     metadata: Optional[dict] = None,
     client: Any = None,
-    log_conflicts: bool = True
+    log_conflicts: bool = True,
 ) -> dict:
     """Add memory with automatic conflict detection and logging.
 
@@ -255,17 +258,17 @@ def add_with_conflict_check(
     """
     if client is None:
         from ta_lab2.tools.ai_orchestrator.memory.mem0_client import get_mem0_client
+
         client = get_mem0_client()
 
     # Extract content from messages (Mem0 expects message list)
-    content = " ".join([msg.get("content", "") for msg in messages if msg.get("content")])
+    content = " ".join(
+        [msg.get("content", "") for msg in messages if msg.get("content")]
+    )
 
     # Resolve conflict
     conflict_result = resolve_conflict(
-        new_content=content,
-        user_id=user_id,
-        metadata=metadata,
-        client=client
+        new_content=content, user_id=user_id, metadata=metadata, client=client
     )
 
     # Log conflict if enabled
@@ -278,7 +281,7 @@ def add_with_conflict_check(
         "memory_id": conflict_result.memory_id,
         "operation": conflict_result.operation,
         "confidence": conflict_result.confidence,
-        "reason": conflict_result.reason
+        "reason": conflict_result.reason,
     }
 
 
@@ -297,7 +300,7 @@ def _generate_reason(operation: str, content: str) -> str:
         "UPDATE": "Contradiction detected - updated existing memory",
         "DELETE": "Memory marked for deletion by conflict resolver",
         "NOOP": "Duplicate detected - no action taken",
-        "UNKNOWN": "Operation type unclear from Mem0 response"
+        "UNKNOWN": "Operation type unclear from Mem0 response",
     }
 
     reason = reasons.get(operation, f"Unknown operation: {operation}")
@@ -334,5 +337,5 @@ __all__ = [
     "ConflictResult",
     "detect_conflicts",
     "resolve_conflict",
-    "add_with_conflict_check"
+    "add_with_conflict_check",
 ]

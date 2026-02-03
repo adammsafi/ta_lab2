@@ -19,7 +19,6 @@ State tracked in public.cmc_feature_state (feature_type='daily_features').
 import argparse
 import logging
 import sys
-from typing import Optional
 
 from sqlalchemy import create_engine, text
 
@@ -28,8 +27,7 @@ from ta_lab2.scripts.features.daily_features_view import refresh_daily_features
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -43,35 +41,33 @@ def parse_args():
     # ID selection
     id_group = parser.add_mutually_exclusive_group(required=True)
     id_group.add_argument(
-        '--ids',
-        type=str,
-        help='Comma-separated list of asset IDs (e.g., "1,52,1027")'
+        "--ids", type=str, help='Comma-separated list of asset IDs (e.g., "1,52,1027")'
     )
     id_group.add_argument(
-        '--all',
-        action='store_true',
-        help='Refresh all assets (queries dim_sessions for active IDs)'
+        "--all",
+        action="store_true",
+        help="Refresh all assets (queries dim_sessions for active IDs)",
     )
 
     # Date range
     parser.add_argument(
-        '--start',
+        "--start",
         type=str,
-        help='Start date (ISO format, e.g., "2024-01-01"). If not provided, computed from state.'
+        help='Start date (ISO format, e.g., "2024-01-01"). If not provided, computed from state.',
     )
 
     # Refresh mode
     parser.add_argument(
-        '--full-refresh',
-        action='store_true',
-        help='Delete all existing rows for IDs before refresh (default: incremental)'
+        "--full-refresh",
+        action="store_true",
+        help="Delete all existing rows for IDs before refresh (default: incremental)",
     )
 
     # Dry run
     parser.add_argument(
-        '--dry-run',
-        action='store_true',
-        help='Show what would be refreshed without executing'
+        "--dry-run",
+        action="store_true",
+        help="Show what would be refreshed without executing",
     )
 
     return parser.parse_args()
@@ -87,12 +83,14 @@ def get_all_ids(engine) -> list[int]:
     Returns:
         List of active asset IDs
     """
-    sql = text("""
+    sql = text(
+        """
         SELECT DISTINCT id
         FROM public.dim_sessions
         WHERE is_active = TRUE
         ORDER BY id
-    """)
+    """
+    )
 
     with engine.connect() as conn:
         result = conn.execute(sql)
@@ -117,7 +115,7 @@ def main():
         ids = get_all_ids(engine)
         logger.info(f"Discovered {len(ids)} active asset IDs from dim_sessions")
     else:
-        ids = [int(id_.strip()) for id_ in args.ids.split(',')]
+        ids = [int(id_.strip()) for id_ in args.ids.split(",")]
         logger.info(f"Processing {len(ids)} asset IDs: {ids}")
 
     if not ids:
@@ -147,5 +145,5 @@ def main():
         sys.exit(1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

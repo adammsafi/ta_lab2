@@ -7,6 +7,7 @@ from typing import Sequence, Iterable, Literal
 # ---- Core Volatility Estimators (single-bar + rolling) ---
 # =========================================================
 
+
 def add_parkinson_vol(
     df: pd.DataFrame,
     high_col: str = "high",
@@ -39,7 +40,7 @@ def add_garman_klass_vol(
 ) -> pd.DataFrame:
     """Garman–Klass (1980) volatility estimator."""
     o, h, l, c = [df[k].astype(float) for k in (open_col, high_col, low_col, close_col)]
-    rs = 0.5 * (np.log(h/l))**2 - (2*np.log(2)-1) * (np.log(c/o))**2
+    rs = 0.5 * (np.log(h / l)) ** 2 - (2 * np.log(2) - 1) * (np.log(c / o)) ** 2
     for w in windows:
         vol = np.sqrt(rs.rolling(w, min_periods=w).mean())
         if annualize:
@@ -60,7 +61,7 @@ def add_rogers_satchell_vol(
 ) -> pd.DataFrame:
     """Rogers–Satchell (1991) volatility estimator."""
     o, h, l, c = [df[k].astype(float) for k in (open_col, high_col, low_col, close_col)]
-    rs = (np.log(h/c) * np.log(h/o) + np.log(l/c) * np.log(l/o))
+    rs = np.log(h / c) * np.log(h / o) + np.log(l / c) * np.log(l / o)
     for w in windows:
         vol = np.sqrt(rs.rolling(w, min_periods=w).mean())
         if annualize:
@@ -78,12 +79,16 @@ def add_atr(
     close_col: str = "close",
 ) -> pd.DataFrame:
     """Average True Range (Wilder)."""
-    h, l, c = df[high_col].astype(float), df[low_col].astype(float), df[close_col].astype(float)
+    h, l, c = (
+        df[high_col].astype(float),
+        df[low_col].astype(float),
+        df[close_col].astype(float),
+    )
     prev_close = c.shift(1)
     tr = (h - l).abs()
     tr = np.maximum(tr, (h - prev_close).abs())
     tr = np.maximum(tr, (l - prev_close).abs())
-    df[f"atr_{period}"] = tr.ewm(alpha=1/period, adjust=False).mean()
+    df[f"atr_{period}"] = tr.ewm(alpha=1 / period, adjust=False).mean()
     return df
 
 
@@ -122,20 +127,43 @@ def add_rolling_realized_batch(
 ) -> pd.DataFrame:
     """Compute realized vol (Parkinson, RS, GK) across windows."""
     if "parkinson" in which:
-        add_parkinson_vol(df, high_col=high_col, low_col=low_col, windows=windows,
-                          annualize=annualize, periods_per_year=periods_per_year)
+        add_parkinson_vol(
+            df,
+            high_col=high_col,
+            low_col=low_col,
+            windows=windows,
+            annualize=annualize,
+            periods_per_year=periods_per_year,
+        )
     if "rs" in which:
-        add_rogers_satchell_vol(df, open_col=open_col, high_col=high_col, low_col=low_col, close_col=close_col,
-                                windows=windows, annualize=annualize, periods_per_year=periods_per_year)
+        add_rogers_satchell_vol(
+            df,
+            open_col=open_col,
+            high_col=high_col,
+            low_col=low_col,
+            close_col=close_col,
+            windows=windows,
+            annualize=annualize,
+            periods_per_year=periods_per_year,
+        )
     if "gk" in which:
-        add_garman_klass_vol(df, open_col=open_col, high_col=high_col, low_col=low_col, close_col=close_col,
-                             windows=windows, annualize=annualize, periods_per_year=periods_per_year)
+        add_garman_klass_vol(
+            df,
+            open_col=open_col,
+            high_col=high_col,
+            low_col=low_col,
+            close_col=close_col,
+            windows=windows,
+            annualize=annualize,
+            periods_per_year=periods_per_year,
+        )
     return df
 
 
 # =========================================================
 # -------------- Compatibility Shims ----------------------
 # =========================================================
+
 
 def add_rolling_vol_from_returns_batch(
     df: pd.DataFrame,
@@ -228,13 +256,31 @@ def add_volatility_features(
     if do_parkinson:
         add_parkinson_vol(df, high_col=high_col, low_col=low_col, windows=(1,))
     if do_rs:
-        add_rogers_satchell_vol(df, open_col=open_col, high_col=high_col, low_col=low_col,
-                                close_col=close_col, windows=(1,))
+        add_rogers_satchell_vol(
+            df,
+            open_col=open_col,
+            high_col=high_col,
+            low_col=low_col,
+            close_col=close_col,
+            windows=(1,),
+        )
     if do_gk:
-        add_garman_klass_vol(df, open_col=open_col, high_col=high_col, low_col=low_col,
-                             close_col=close_col, windows=(1,))
+        add_garman_klass_vol(
+            df,
+            open_col=open_col,
+            high_col=high_col,
+            low_col=low_col,
+            close_col=close_col,
+            windows=(1,),
+        )
     if do_atr:
-        add_atr(df, period=atr_period, high_col=high_col, low_col=low_col, close_col=close_col)
+        add_atr(
+            df,
+            period=atr_period,
+            high_col=high_col,
+            low_col=low_col,
+            close_col=close_col,
+        )
 
     # ---- Rolling from returns ----
     add_rolling_vol_from_returns_batch(

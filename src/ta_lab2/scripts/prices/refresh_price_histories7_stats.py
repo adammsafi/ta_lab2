@@ -350,6 +350,7 @@ LEFT JOIN (
 # Helpers: engine + runner
 # ---------------------------------------------------------------------------
 
+
 def get_engine(db_url: Optional[str] = None):
     """
     Return a SQLAlchemy engine.
@@ -378,6 +379,7 @@ def run_all_tests(engine) -> None:
 # ---------------------------------------------------------------------------
 # CLI entrypoint
 # ---------------------------------------------------------------------------
+
 
 def main(db_url: Optional[str] = None) -> None:
     """

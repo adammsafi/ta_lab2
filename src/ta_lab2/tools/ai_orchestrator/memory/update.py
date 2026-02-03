@@ -5,7 +5,6 @@ Implements MEMO-07: Incremental update pipeline.
 """
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime
 from typing import List, Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
@@ -45,10 +44,7 @@ class MemoryUpdateResult:
         )
 
 
-def get_embedding(
-    texts: List[str],
-    model: str = EMBEDDING_MODEL
-) -> List[List[float]]:
+def get_embedding(texts: List[str], model: str = EMBEDDING_MODEL) -> List[List[float]]:
     """Generate embeddings using OpenAI API.
 
     Args:
@@ -68,9 +64,11 @@ def get_embedding(
         raise ImportError("openai package required. Install with: pip install openai")
 
     import os
+
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         from ta_lab2.tools.ai_orchestrator.config import load_config
+
         config = load_config()
         api_key = config.openai_api_key
 
@@ -82,10 +80,7 @@ def get_embedding(
     # Clean texts (replace newlines with spaces)
     cleaned_texts = [text.replace("\n", " ").strip() for text in texts]
 
-    response = client.embeddings.create(
-        input=cleaned_texts,
-        model=model
-    )
+    response = client.embeddings.create(input=cleaned_texts, model=model)
 
     embeddings = [item.embedding for item in response.data]
 
@@ -100,10 +95,7 @@ def get_embedding(
 
 
 def add_memory(
-    memory_id: str,
-    content: str,
-    metadata: Optional[Dict[str, Any]] = None,
-    client=None
+    memory_id: str, content: str, metadata: Optional[Dict[str, Any]] = None, client=None
 ) -> MemoryUpdateResult:
     """Add a single memory to the store.
 
@@ -119,19 +111,15 @@ def add_memory(
         MemoryUpdateResult with operation details
     """
     return add_memories(
-        memories=[MemoryInput(
-            memory_id=memory_id,
-            content=content,
-            metadata=metadata or {}
-        )],
-        client=client
+        memories=[
+            MemoryInput(memory_id=memory_id, content=content, metadata=metadata or {})
+        ],
+        client=client,
     )
 
 
 def add_memories(
-    memories: List[MemoryInput],
-    batch_size: int = 50,
-    client=None
+    memories: List[MemoryInput], batch_size: int = 50, client=None
 ) -> MemoryUpdateResult:
     """Add multiple memories with batch embedding generation.
 
@@ -147,10 +135,12 @@ def add_memories(
         MemoryUpdateResult with stats and any errors
     """
     import time
+
     start_time = time.perf_counter()
 
     if client is None:
         from .client import get_memory_client
+
         client = get_memory_client()
 
     result = MemoryUpdateResult()
@@ -158,7 +148,7 @@ def add_memories(
 
     # Process in batches
     for batch_start in range(0, len(memories), batch_size):
-        batch = memories[batch_start:batch_start + batch_size]
+        batch = memories[batch_start : batch_start + batch_size]
         batch_num = batch_start // batch_size + 1
 
         try:
@@ -190,7 +180,7 @@ def add_memories(
                     ids=ids,
                     embeddings=embeddings,
                     documents=documents,
-                    metadatas=metadatas
+                    metadatas=metadatas,
                 )
 
                 # Count adds vs updates
@@ -231,6 +221,7 @@ def delete_memory(memory_id: str, client=None) -> bool:
     """
     if client is None:
         from .client import get_memory_client
+
         client = get_memory_client()
 
     try:

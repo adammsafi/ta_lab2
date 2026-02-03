@@ -1,6 +1,6 @@
 """Tests for cost-optimized routing."""
 import pytest
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock
 
 from ta_lab2.tools.ai_orchestrator.routing import TaskRouter, COST_TIERS
 from ta_lab2.tools.ai_orchestrator.core import Task, TaskType, Platform
@@ -70,7 +70,7 @@ class TestRouteCostOptimized:
         task = Task(
             type=TaskType.CODE_GENERATION,
             prompt="Test prompt",
-            platform_hint=Platform.CLAUDE_CODE
+            platform_hint=Platform.CLAUDE_CODE,
         )
 
         # Mock QuotaTracker - all quotas available
@@ -90,7 +90,7 @@ class TestRouteCostOptimized:
         task = Task(
             type=TaskType.CODE_GENERATION,
             prompt="Test prompt",
-            platform_hint=Platform.CLAUDE_CODE
+            platform_hint=Platform.CLAUDE_CODE,
         )
 
         # Mock QuotaTracker - Claude Code exhausted, others available

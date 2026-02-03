@@ -11,13 +11,12 @@ import logging
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
 # Ensure OPENAI_API_KEY is set
-if not os.environ.get('OPENAI_API_KEY'):
+if not os.environ.get("OPENAI_API_KEY"):
     print("ERROR: OPENAI_API_KEY environment variable not set")
     print("Please set it: export OPENAI_API_KEY=your-key-here")
     sys.exit(1)
@@ -25,8 +24,9 @@ if not os.environ.get('OPENAI_API_KEY'):
 from ta_lab2.tools.ai_orchestrator.memory.migration import (
     migrate_chromadb_to_mem0,
     migrate_metadata,
-    validate_migration
+    validate_migration,
 )
+
 
 def main():
     """Execute full migration pipeline."""
@@ -51,7 +51,7 @@ def main():
         print(f"Will migrate {result1_dry.total} memories from ChromaDB to Mem0")
         response = input("Proceed with ChromaDB -> Mem0 migration? (yes/no): ")
 
-        if response.lower() != 'yes':
+        if response.lower() != "yes":
             print("Migration cancelled by user")
             return
 
@@ -63,10 +63,12 @@ def main():
         print()
 
         if result1.errors > 0:
-            print(f"WARNING: {result1.errors} errors occurred during ChromaDB -> Mem0 migration")
+            print(
+                f"WARNING: {result1.errors} errors occurred during ChromaDB -> Mem0 migration"
+            )
             print(f"Error IDs: {result1.error_ids[:10]}")
             response = input("Continue with metadata migration? (yes/no): ")
-            if response.lower() != 'yes':
+            if response.lower() != "yes":
                 print("Migration stopped by user")
                 return
 
@@ -88,7 +90,7 @@ def main():
     print(f"Will enrich metadata for {result2_dry.updated} memories")
     response = input("Proceed with metadata enrichment? (yes/no): ")
 
-    if response.lower() != 'yes':
+    if response.lower() != "yes":
         print("Migration cancelled by user")
         return
 
@@ -118,7 +120,9 @@ def main():
         print("=" * 80)
         print()
         print(f"Total memories migrated: {result2.total}")
-        print(f"Metadata enrichment success rate: {(result2.updated + result2.skipped) / result2.total * 100:.1f}%")
+        print(
+            f"Metadata enrichment success rate: {(result2.updated + result2.skipped) / result2.total * 100:.1f}%"
+        )
         print()
         print("Phase 3 migration successful!")
     else:
@@ -128,6 +132,7 @@ def main():
         print()
         print("Please review the errors above and re-run migration if needed")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

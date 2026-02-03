@@ -1,6 +1,7 @@
 # src/ta_lab2/features/ema.py
 from __future__ import annotations
 
+import logging
 from typing import Iterable, Optional, Sequence
 
 import numpy as np
@@ -11,6 +12,8 @@ from sqlalchemy.engine import Engine
 from ta_lab2.config import TARGET_DB_URL
 from ta_lab2.io import load_cmc_ohlcv_daily
 
+logger = logging.getLogger(__name__)
+
 __all__ = [
     "compute_ema",
     "add_ema_columns",
@@ -18,6 +21,7 @@ __all__ = [
     "add_ema_d2",
     "prepare_ema_helpers",
     "add_ema_diffs_longform",
+    "filter_ema_periods_by_obs_count",
 ]
 
 # ---------------------------------------------------------------------------
@@ -60,19 +64,75 @@ def compute_ema(
     else:
         period = int(period)
 
-    out = (
-        s.astype(float)
-        .ewm(span=period, adjust=adjust, min_periods=min_periods)
-        .mean()
-    )
-    if name is not None:
-        out = out.rename(name)
-    return out
+    if period <= 0:
+        raise ValueError("period must be a positive integer.")
+
+    min_p = int(min_periods if min_periods is not None else period)
+    if min_p <= 0:
+        raise ValueError("min_periods must be a positive integer.")
+
+    series_np = s.to_numpy(dtype=float, na_value=np.nan)
+    n = len(series_np)
+    out_np = np.full(n, np.nan, dtype=float)
+
+    if n < min_p:
+        return pd.Series(out_np, index=s.index, name=name or s.name)
+
+    alpha = 2.0 / (period + 1.0)
+
+    # Find the first window of `min_p` non-NaN values to seed the calculation
+    first_valid_window_end = -1
+    for i in range(min_p - 1, n):
+        window_slice = series_np[i - (min_p - 1) : i + 1]
+        if not np.isnan(window_slice).any():
+            first_valid_window_end = i
+            break
+
+    # If no such window exists, return all NaNs
+    if first_valid_window_end == -1:
+        return pd.Series(out_np, index=s.index, name=name or s.name)
+
+    # 1. Calculate the SMA seed for the first valid window
+    seed_window = series_np[
+        first_valid_window_end - (min_p - 1) : first_valid_window_end + 1
+    ]
+    seed_val = np.mean(seed_window)
+    out_np[first_valid_window_end] = seed_val
+
+    # 2. Recursively calculate the rest of the EMA
+    prev_ema = seed_val
+    for i in range(first_valid_window_end + 1, n):
+        current_price = series_np[i]
+        if np.isnan(current_price):
+            # If current price is NaN, carry forward the last valid EMA
+            out_np[i] = prev_ema
+        else:
+            prev_ema = alpha * current_price + (1.0 - alpha) * prev_ema
+            out_np[i] = prev_ema
+
+    return pd.Series(out_np, index=s.index, name=name or s.name)
 
 
 # ---------------------------------------------------------------------------
 # Utilities
 # ---------------------------------------------------------------------------
+
+
+def filter_ema_periods_by_obs_count(
+    ema_periods: Iterable[int], n_obs: int
+) -> list[int]:
+    """
+    Return only EMA periods that can be computed given n_obs observations.
+
+    - Deduplicates and sorts ema_periods.
+    - If n_obs <= 0, returns an empty list.
+    - Returns only periods p where n_obs >= p (assumes min_periods=p).
+    """
+    if n_obs <= 0:
+        return []
+    # Dedupe, keep only positive, sort.
+    periods = sorted({p for p in ema_periods if isinstance(p, int) and p > 0})
+    return [p for p in periods if n_obs >= p]
 
 
 def _flip_for_direction(obj: pd.DataFrame | pd.Series, direction: str):
@@ -362,13 +422,9 @@ def prepare_ema_helpers(
             accel_name = f"{col}_ema_{w}_accel"
 
             if overwrite or slope_name not in df.columns:
-                new_cols[slope_name] = _maybe_round(
-                    slope.astype(float), round_places
-                )
+                new_cols[slope_name] = _maybe_round(slope.astype(float), round_places)
             if overwrite or accel_name not in df.columns:
-                new_cols[accel_name] = _maybe_round(
-                    accel.astype(float), round_places
-                )
+                new_cols[accel_name] = _maybe_round(accel.astype(float), round_places)
 
     if new_cols:
         df[list(new_cols.keys())] = pd.DataFrame(new_cols, index=df.index)
@@ -501,7 +557,11 @@ def build_daily_ema_tail_from_seeds(
     frames: list[pd.DataFrame] = []
     for period, state in seeds.items():
         ema_prev = float(state.get("ema"))
-        d1_prev = state.get("d1_roll") if state.get("d1_roll") is not None else state.get("d1")
+        d1_prev = (
+            state.get("d1_roll")
+            if state.get("d1_roll") is not None
+            else state.get("d1")
+        )
         if d1_prev is not None:
             d1_prev = float(d1_prev)
         else:
@@ -686,9 +746,9 @@ def build_daily_ema_frame(
 
             out["id"] = asset_id
             out["period"] = p
-            out["tf"] = "1D"      # daily timeframe label
-            out["tf_days"] = 1    # daily timeframe in days
-            out["roll"] = False   # true daily closes
+            out["tf"] = "1D"  # daily timeframe label
+            out["tf_days"] = 1  # daily timeframe in days
+            out["roll"] = False  # true daily closes
 
             frames.append(
                 out[
@@ -806,8 +866,11 @@ def write_daily_ema_to_db(
     )
 
     if df.empty:
-        print("No daily EMA rows generated.")
+        logger.warning("No daily EMA rows generated")
         return 0
+
+    # CRITICAL: Convert NaN -> None so Postgres stores NULL (COUNT() won't count NaN)
+    df = df.replace({np.nan: None})
 
     tmp_table = f"{out_table}_tmp"
 
@@ -895,7 +958,15 @@ except NameError:
 
 try:
     __all__.extend(
-        ["build_daily_ema_frame", "write_daily_ema_to_db", "build_daily_ema_tail_from_seeds"]
+        [
+            "build_daily_ema_frame",
+            "write_daily_ema_to_db",
+            "build_daily_ema_tail_from_seeds",
+        ]
     )
 except NameError:
-    __all__ = ["build_daily_ema_frame", "write_daily_ema_to_db", "build_daily_ema_tail_from_seeds"]
+    __all__ = [
+        "build_daily_ema_frame",
+        "write_daily_ema_to_db",
+        "build_daily_ema_tail_from_seeds",
+    ]

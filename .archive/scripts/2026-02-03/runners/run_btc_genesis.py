@@ -28,20 +28,33 @@ if SRC_DIR.exists():
     sys.path.insert(0, str(SRC_DIR))
 
 # ---- Package imports ----
-from ta_lab2.pipelines.btc_pipeline import run_btc_pipeline  # returns dict with 'data', 'segments', etc.
 from ta_lab2.regimes.comovement import compute_ema_comovement_hierarchy
 from ta_lab2.features.segments import build_flip_segments
-from ta_lab2.features.ema import add_ema_columns, add_ema_d1, add_ema_d2, prepare_ema_helpers
+from ta_lab2.features.ema import (
+    add_ema_columns,
+    add_ema_d1,
+    add_ema_d2,
+    prepare_ema_helpers,
+)
 from ta_lab2.features.returns import b2t_pct_delta, b2t_log_delta
-from ta_lab2.features.vol import add_parkinson_vol, add_garman_klass_vol, add_rogers_satchell_vol, add_atr, add_logret_stdev_vol
+from ta_lab2.features.vol import (
+    add_parkinson_vol,
+    add_garman_klass_vol,
+    add_rogers_satchell_vol,
+    add_atr,
+    add_logret_stdev_vol,
+)
 from ta_lab2.features.calendar import expand_datetime_features_inplace
 
 
 def _find_default_csv() -> str | None:
     candidates = [
-        "data/btc.csv", "data/BTC.csv", "data/btcusd.csv", "data/btc_usd.csv",
+        "data/btc.csv",
+        "data/BTC.csv",
+        "data/btcusd.csv",
+        "data/btc_usd.csv",
         "data/Bitcoin_01_1_2016-10_26_2025_historical_data_coinmarketcap.csv",
-        "btc.csv"
+        "btc.csv",
     ]
     for p in candidates:
         if Path(p).exists():
@@ -55,22 +68,29 @@ def _find_default_csv() -> str | None:
 # -----------------------------
 # Minimal plotting helpers (in-script) to match genesis visuals
 # -----------------------------
-def _plot_ema_w_slopes_flips(df, base_cols, periods, include_slopes=True, include_flips=True):
+def _plot_ema_w_slopes_flips(
+    df, base_cols, periods, include_slopes=True, include_flips=True
+):
     if isinstance(base_cols, str):
         base_cols = [base_cols]
     x = np.arange(len(df))
     for base_col in base_cols:
         for p in periods:
             ema_col = f"{base_col}_ema_{p}"
-            d1_bps  = f"{ema_col}_d1_bps"
-            d1_pct  = f"{ema_col}_d1_norm"
+            d1_bps = f"{ema_col}_d1_bps"
+            d1_pct = f"{ema_col}_d1_norm"
             flipcol = f"{ema_col}_flip"
 
             if ema_col not in df.columns:
                 continue
 
             fig, ax = plt.subplots(figsize=(14, 7))
-            ax.plot(x, df[ema_col].to_numpy(), linewidth=2, label=f"{base_col.upper()} EMA {p}")
+            ax.plot(
+                x,
+                df[ema_col].to_numpy(),
+                linewidth=2,
+                label=f"{base_col.upper()} EMA {p}",
+            )
             ax.invert_xaxis()
             ax.set_title(f"{base_col.upper()} EMA {p} + slopes + flips")
             ax.set_xlabel("Bars (newest on right)")
@@ -94,13 +114,20 @@ def _plot_ema_w_slopes_flips(df, base_cols, periods, include_slopes=True, includ
             plt.show()
 
 
-def _plot_consolidated_emas(df, base_col, periods, include_slopes=False, include_flips=False):
+def _plot_consolidated_emas(
+    df, base_col, periods, include_slopes=False, include_flips=False
+):
     x = np.arange(len(df))
     fig, ax = plt.subplots(figsize=(14, 7))
     for p in periods:
         ema_col = f"{base_col}_ema_{p}"
         if ema_col in df.columns:
-            ax.plot(x, df[ema_col].to_numpy(), linewidth=1.8, label=f"{base_col.upper()} EMA {p}")
+            ax.plot(
+                x,
+                df[ema_col].to_numpy(),
+                linewidth=1.8,
+                label=f"{base_col.upper()} EMA {p}",
+            )
     ax.invert_xaxis()
     ax.set_title(f"{base_col.upper()} EMAs {', '.join(map(str, periods))}")
     ax.set_xlabel("Bars (newest on right)")
@@ -111,7 +138,9 @@ def _plot_consolidated_emas(df, base_col, periods, include_slopes=False, include
         for p in periods:
             bps_col = f"{base_col}_ema_{p}_d1_bps"
             if bps_col in df.columns:
-                ax2.plot(x, df[bps_col].to_numpy(), alpha=0.5, label=f"Slope bps (p={p})")
+                ax2.plot(
+                    x, df[bps_col].to_numpy(), alpha=0.5, label=f"Slope bps (p={p})"
+                )
         ax2.axhline(0, linestyle="--", linewidth=1, alpha=0.8)
         ax2.legend(loc="upper right")
 
@@ -132,7 +161,13 @@ def _plot_regime_hitrates(major_stats, sub_stats, sub_mixsum):
     # Expect DataFrames with columns including 'regime_label' and 'hit_rate_pct'
     if isinstance(major_stats, pd.DataFrame) and "hit_rate_pct" in major_stats.columns:
         dfp = major_stats.sort_values("hit_rate_pct", ascending=False).head(25)
-        ax = dfp.plot(kind="bar", x="regime_label", y="hit_rate_pct", figsize=(12, 5), legend=False)
+        ax = dfp.plot(
+            kind="bar",
+            x="regime_label",
+            y="hit_rate_pct",
+            figsize=(12, 5),
+            legend=False,
+        )
         ax.set_title("Hitrate (next close > 0) by regime — Major")
         ax.set_ylabel("hitrate %")
         plt.tight_layout()
@@ -149,7 +184,9 @@ def main(argv=None):
     args = parse_args(argv)
     csv_path = args.csv_path or _find_default_csv()
     if not csv_path:
-        raise FileNotFoundError("No input CSV found. Supply --csv or drop a file at data/btc.csv")
+        raise FileNotFoundError(
+            "No input CSV found. Supply --csv or drop a file at data/btc.csv"
+        )
 
     # ============================
     # 1) Build df2 the 'genesis' way (explicit steps)
@@ -190,8 +227,14 @@ def main(argv=None):
     add_logret_stdev_vol(
         df2,
         windows=(30, 60, 90),
-        logret_cols=["open_log_delta","high_log_delta","low_log_delta","close_log_delta","intraday_log_delta"],
-        direction="newest_top"
+        logret_cols=[
+            "open_log_delta",
+            "high_log_delta",
+            "low_log_delta",
+            "close_log_delta",
+            "intraday_log_delta",
+        ],
+        direction="newest_top",
     )
 
     # single-bar realized vol estimators (genesis)
@@ -208,7 +251,14 @@ def main(argv=None):
     add_ema_columns(df2, ema_fields, ema_periods)
     add_ema_d1(df2, ema_fields, ema_periods, round_places=6, direction="newest_top")
     add_ema_d2(df2, ema_fields, ema_periods, round_places=6, direction="newest_top")
-    prepare_ema_helpers(df2, ema_fields, ema_periods, direction="newest_top", overwrite=False, scale="bps")
+    prepare_ema_helpers(
+        df2,
+        ema_fields,
+        ema_periods,
+        direction="newest_top",
+        overwrite=False,
+        scale="bps",
+    )
 
     print("Rows:", len(df2))
     for f in ema_fields:
@@ -231,9 +281,14 @@ def main(argv=None):
     print("segments_df rows:", len(segments_df))
     if isinstance(flip_summary, pd.DataFrame):
         print(flip_summary.head(10))
-    if isinstance(flip_summary_by_year, pd.DataFrame) and not flip_summary_by_year.empty:
+    if (
+        isinstance(flip_summary_by_year, pd.DataFrame)
+        and not flip_summary_by_year.empty
+    ):
         print("\n=== Flip segment summary by year ===")
-        print(flip_summary_by_year.sort_values(["year","field","ema_period"]).head(40))
+        print(
+            flip_summary_by_year.sort_values(["year", "field", "ema_period"]).head(40)
+        )
 
     # ============================
     # 3) Regime hierarchy (genesis)
@@ -265,8 +320,20 @@ def main(argv=None):
     # ============================
     # 4) Plots to match genesis visuals
     # ============================
-    _plot_ema_w_slopes_flips(df2, base_cols="close", periods=ema_periods, include_slopes=True, include_flips=True)
-    _plot_consolidated_emas(df2, base_col="close", periods=ema_periods, include_slopes=False, include_flips=False)
+    _plot_ema_w_slopes_flips(
+        df2,
+        base_cols="close",
+        periods=ema_periods,
+        include_slopes=True,
+        include_flips=True,
+    )
+    _plot_consolidated_emas(
+        df2,
+        base_col="close",
+        periods=ema_periods,
+        include_slopes=False,
+        include_flips=False,
+    )
     _plot_regime_hitrates(major_stats, sub_stats, sub_stats_mixsum)
 
     # Save a small sample like the original script
@@ -282,7 +349,9 @@ def main(argv=None):
     tmax = pd.to_datetime(df2[ts_col].max())
     print(f"\nLoaded rows: {len(df2)}")
     print(f"Date range: {tmin} → {tmax}")
-    print(f"Columns now: {list(df2.columns)[:12]} ... (+{max(0, len(df2.columns)-12)} more)")
+    print(
+        f"Columns now: {list(df2.columns)[:12]} ... (+{max(0, len(df2.columns)-12)} more)"
+    )
 
     return df2, segments_df, major_stats, sub_stats, sub_stats_mixsum
 

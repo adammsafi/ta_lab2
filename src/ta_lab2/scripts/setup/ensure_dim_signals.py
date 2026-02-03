@@ -31,12 +31,14 @@ def ensure_dim_signals() -> None:
     engine = create_engine(db_url)
 
     # Check if table exists and has rows
-    check_sql = text("""
+    check_sql = text(
+        """
         SELECT COUNT(*) as row_count
         FROM information_schema.tables
         WHERE table_schema = 'public'
             AND table_name = 'dim_signals'
-    """)
+    """
+    )
 
     with engine.connect() as conn:
         result = conn.execute(check_sql)
@@ -64,7 +66,7 @@ def ensure_dim_signals() -> None:
         sys.exit(1)
 
     # Read and execute DDL
-    with open(ddl_path, 'r') as f:
+    with open(ddl_path, "r") as f:
         ddl_sql = f.read()
 
     with engine.begin() as conn:

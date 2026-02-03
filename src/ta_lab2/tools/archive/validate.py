@@ -5,7 +5,6 @@ and validating that no data was lost after operations complete.
 """
 import json
 import logging
-from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -56,7 +55,7 @@ def create_snapshot(
     root: Path,
     pattern: str = "**/*.py",
     compute_checksums: bool = True,
-    progress_every: int = 100
+    progress_every: int = 100,
 ) -> ValidationSnapshot:
     """Create filesystem state snapshot for validation.
 
@@ -79,10 +78,7 @@ def create_snapshot(
     root = Path(root).resolve()
     logger.info(f"Creating snapshot of {root} with pattern '{pattern}'")
 
-    files = [
-        f for f in root.glob(pattern)
-        if f.is_file() and not should_exclude(f)
-    ]
+    files = [f for f in root.glob(pattern) if f.is_file() and not should_exclude(f)]
 
     total_size = 0
     checksums: dict[str, str] = {}
@@ -110,17 +106,17 @@ def create_snapshot(
         timestamp=datetime.now(timezone.utc).isoformat(),
         total_files=len(files),
         total_size_bytes=total_size,
-        file_checksums=checksums
+        file_checksums=checksums,
     )
 
-    logger.info(f"Snapshot complete: {snapshot.total_files} files, {snapshot.total_size_bytes:,} bytes")
+    logger.info(
+        f"Snapshot complete: {snapshot.total_files} files, {snapshot.total_size_bytes:,} bytes"
+    )
     return snapshot
 
 
 def validate_no_data_loss(
-    pre: ValidationSnapshot,
-    post: ValidationSnapshot,
-    strict: bool = False
+    pre: ValidationSnapshot, post: ValidationSnapshot, strict: bool = False
 ) -> tuple[bool, list[str]]:
     """Validate that no data was lost between snapshots.
 
@@ -177,7 +173,8 @@ def validate_no_data_loss(
         if missing_checksums:
             # Find which files are missing
             missing_files = [
-                path for path, checksum in pre.file_checksums.items()
+                path
+                for path, checksum in pre.file_checksums.items()
                 if checksum in missing_checksums
             ]
             issues.append(
@@ -211,12 +208,10 @@ def save_snapshot(snapshot: ValidationSnapshot, output_path: Path) -> None:
         "timestamp": snapshot.timestamp,
         "total_files": snapshot.total_files,
         "total_size_bytes": snapshot.total_size_bytes,
-        "file_checksums": snapshot.file_checksums
+        "file_checksums": snapshot.file_checksums,
     }
 
-    output_path.write_text(
-        json.dumps(data, indent=2, sort_keys=True) + "\n"
-    )
+    output_path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n")
     logger.info(f"Saved snapshot to {output_path}")
 
 
@@ -246,7 +241,7 @@ def load_snapshot(input_path: Path) -> Optional[ValidationSnapshot]:
             timestamp=data["timestamp"],
             total_files=data["total_files"],
             total_size_bytes=data["total_size_bytes"],
-            file_checksums=data.get("file_checksums", {})
+            file_checksums=data.get("file_checksums", {}),
         )
     except (json.JSONDecodeError, KeyError) as e:
         logger.error(f"Failed to load snapshot {input_path}: {e}")
@@ -254,9 +249,7 @@ def load_snapshot(input_path: Path) -> Optional[ValidationSnapshot]:
 
 
 def create_multi_directory_snapshot(
-    directories: list[Path],
-    pattern: str = "**/*.py",
-    compute_checksums: bool = True
+    directories: list[Path], pattern: str = "**/*.py", compute_checksums: bool = True
 ) -> dict[str, ValidationSnapshot]:
     """Create snapshots for multiple directories.
 
@@ -280,9 +273,7 @@ def create_multi_directory_snapshot(
         if directory.exists():
             name = directory.name
             snapshots[name] = create_snapshot(
-                directory,
-                pattern=pattern,
-                compute_checksums=compute_checksums
+                directory, pattern=pattern, compute_checksums=compute_checksums
             )
         else:
             logger.warning(f"Directory not found, skipping: {directory}")

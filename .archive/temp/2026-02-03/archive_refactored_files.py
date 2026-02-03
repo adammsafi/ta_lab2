@@ -5,15 +5,14 @@ Phase 16-02: Resolve refactored/original file pairs.
 
 import hashlib
 import json
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 
 
 def compute_sha256(file_path: Path) -> str:
     """Compute SHA256 checksum of file."""
-    with open(file_path, 'rb') as f:
-        return hashlib.file_digest(f, 'sha256').hexdigest()
+    with open(file_path, "rb") as f:
+        return hashlib.file_digest(f, "sha256").hexdigest()
 
 
 def archive_refactored_files():
@@ -34,7 +33,7 @@ def archive_refactored_files():
                 "original_lines": 571,
                 "refactored_lines": 571,
                 "files_identical": True,
-            }
+            },
         },
         {
             "original_path": "src/ta_lab2/features/m_tf/ema_multi_tf_cal_refactored.py",
@@ -46,7 +45,7 @@ def archive_refactored_files():
                 "refactored_lines": 289,
                 "canonical_complete": True,
                 "refactored_stub": True,
-            }
+            },
         },
         {
             "original_path": "src/ta_lab2/features/m_tf/ema_multi_tf_cal_anchor_refactored.py",
@@ -58,7 +57,7 @@ def archive_refactored_files():
                 "refactored_lines": 198,
                 "canonical_complete": True,
                 "refactored_stub": True,
-            }
+            },
         },
     ]
 
@@ -113,7 +112,7 @@ def archive_refactored_files():
         "entries": manifest_entries,
     }
 
-    with open(manifest_path, 'w', encoding='utf-8') as f:
+    with open(manifest_path, "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2, ensure_ascii=False)
 
     print(f"MANIFEST: {manifest_path.relative_to(base_dir)}")

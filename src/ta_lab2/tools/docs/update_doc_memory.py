@@ -8,7 +8,6 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
 
 from ta_lab2.tools.ai_orchestrator.memory.mem0_client import get_mem0_client
 from ta_lab2.tools.ai_orchestrator.memory.snapshot.batch_indexer import BatchIndexResult
@@ -38,6 +37,7 @@ class DocConversionRecord:
         ...     converted_at="2026-02-02T21:15:30Z"
         ... )
     """
+
     original_path: str
     converted_path: str
     archive_path: str
@@ -65,15 +65,15 @@ def extract_sections_from_markdown(md_path: Path) -> list[str]:
             logger.warning(f"Markdown file not found: {md_path}")
             return []
 
-        content = md_path.read_text(encoding='utf-8')
+        content = md_path.read_text(encoding="utf-8")
 
         # Extract H2 headings (## Heading)
         # Pattern: line starts with ##, followed by space, then heading text
-        h2_pattern = re.compile(r'^##\s+(.+)$', re.MULTILINE)
+        h2_pattern = re.compile(r"^##\s+(.+)$", re.MULTILINE)
         matches = h2_pattern.findall(content)
 
         # Clean up headings (strip whitespace, remove trailing punctuation)
-        sections = [match.strip().rstrip(':.') for match in matches]
+        sections = [match.strip().rstrip(":.") for match in matches]
 
         logger.info(f"Extracted {len(sections)} sections from {md_path.name}")
         return sections
@@ -101,9 +101,7 @@ def check_memory_exists(client, original_path: str) -> bool:
     try:
         # Search for memories mentioning this original path
         results = client.search(
-            query=f"Document {original_path} converted",
-            user_id="orchestrator",
-            limit=5
+            query=f"Document {original_path} converted", user_id="orchestrator", limit=5
         )
 
         # Check if any result mentions this specific path
@@ -120,10 +118,7 @@ def check_memory_exists(client, original_path: str) -> bool:
         return False
 
 
-def update_memory_for_doc(
-    record: DocConversionRecord,
-    dry_run: bool = False
-) -> int:
+def update_memory_for_doc(record: DocConversionRecord, dry_run: bool = False) -> int:
     """Create memories for a single converted document.
 
     Creates:
@@ -172,7 +167,7 @@ def update_memory_for_doc(
             "archive_path": record.archive_path,
             "document_type": record.document_type,
             "converted_at": record.converted_at,
-            "tags": ["phase_13", "doc_conversion", record.document_type]
+            "tags": ["phase_13", "doc_conversion", record.document_type],
         }
 
         if dry_run:
@@ -182,7 +177,7 @@ def update_memory_for_doc(
                 messages=[{"role": "user", "content": doc_memory}],
                 user_id="orchestrator",
                 metadata=doc_metadata,
-                infer=False  # Bulk operation, skip LLM conflict detection
+                infer=False,  # Bulk operation, skip LLM conflict detection
             )
             memories_created += 1
             logger.info(f"Created doc memory for {record.original_path}")
@@ -201,17 +196,19 @@ def update_memory_for_doc(
                 "section_name": section,
                 "document_path": record.converted_path,
                 "original_path": record.original_path,
-                "tags": ["phase_13", "doc_section", record.document_type]
+                "tags": ["phase_13", "doc_section", record.document_type],
             }
 
             if dry_run:
-                logger.info(f"[DRY RUN] Would create section memory: {section_memory[:80]}...")
+                logger.info(
+                    f"[DRY RUN] Would create section memory: {section_memory[:80]}..."
+                )
             else:
                 client.add(
                     messages=[{"role": "user", "content": section_memory}],
                     user_id="orchestrator",
                     metadata=section_metadata,
-                    infer=False
+                    infer=False,
                 )
                 memories_created += 1
 
@@ -227,8 +224,7 @@ def update_memory_for_doc(
 
 
 def batch_update_memories(
-    records: list[DocConversionRecord],
-    dry_run: bool = False
+    records: list[DocConversionRecord], dry_run: bool = False
 ) -> BatchIndexResult:
     """Process all conversion records and create memories.
 
@@ -248,14 +244,12 @@ def batch_update_memories(
         >>> print(result)
     """
     result = BatchIndexResult(
-        total=len(records),
-        added=0,
-        skipped=0,
-        errors=0,
-        error_ids=[]
+        total=len(records), added=0, skipped=0, errors=0, error_ids=[]
     )
 
-    logger.info(f"Starting batch memory update for {len(records)} documents (dry_run={dry_run})")
+    logger.info(
+        f"Starting batch memory update for {len(records)} documents (dry_run={dry_run})"
+    )
 
     for i, record in enumerate(records, 1):
         try:
@@ -278,10 +272,7 @@ def batch_update_memories(
     return result
 
 
-def create_phase_snapshot(
-    documents_converted: int,
-    memories_created: int
-) -> dict:
+def create_phase_snapshot(documents_converted: int, memories_created: int) -> dict:
     """Create Phase 13 completion memory snapshot.
 
     Args:
@@ -316,17 +307,19 @@ def create_phase_snapshot(
             "documents_converted": documents_converted,
             "memories_created": memories_created,
             "categories": ["architecture", "features", "planning", "reference"],
-            "tags": ["phase_13_complete", "doc_consolidation_v0.5.0"]
+            "tags": ["phase_13_complete", "doc_consolidation_v0.5.0"],
         }
 
         result = client.add(
             messages=[{"role": "user", "content": snapshot_message}],
             user_id="orchestrator",
             metadata=metadata,
-            infer=False
+            infer=False,
         )
 
-        logger.info(f"Created Phase 13 snapshot: {documents_converted} docs, {memories_created} memories")
+        logger.info(
+            f"Created Phase 13 snapshot: {documents_converted} docs, {memories_created} memories"
+        )
         return result
 
     except Exception as e:
@@ -340,5 +333,5 @@ __all__ = [
     "check_memory_exists",
     "update_memory_for_doc",
     "batch_update_memories",
-    "create_phase_snapshot"
+    "create_phase_snapshot",
 ]

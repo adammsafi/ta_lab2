@@ -5,7 +5,6 @@ and validation snapshots. Follows patterns from memory/migration.py.
 """
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 
 @dataclass
@@ -33,6 +32,7 @@ class FileEntry:
         ...     size_bytes=1024
         ... )
     """
+
     original_path: str
     archive_path: str
     action: str  # deprecated, refactored, migrated
@@ -65,6 +65,7 @@ class ArchiveResult:
           Errors: 1
           Success Rate: 90.0%
     """
+
     total: int
     archived: int
     skipped: int
@@ -73,7 +74,9 @@ class ArchiveResult:
 
     def __str__(self) -> str:
         """Human-readable summary."""
-        success_rate = (self.archived + self.skipped) / self.total * 100 if self.total > 0 else 0
+        success_rate = (
+            (self.archived + self.skipped) / self.total * 100 if self.total > 0 else 0
+        )
         return (
             f"Archive Result:\n"
             f"  Total: {self.total}\n"
@@ -114,6 +117,7 @@ class ValidationSnapshot:
           Size: 500,000 bytes
           Coverage: 100 checksums
     """
+
     root: Path
     pattern: str
     timestamp: str

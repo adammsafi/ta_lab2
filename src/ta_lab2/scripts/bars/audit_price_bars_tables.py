@@ -9,12 +9,11 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import os
 from datetime import UTC, datetime
 from typing import List
 
 import pandas as pd
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
 from ta_lab2.scripts.bars.common_snapshot_contract import (
@@ -212,8 +211,12 @@ def audit_table(engine: Engine, table: str, ids: List[int]) -> pd.DataFrame:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Audit 5 price_bars tables and write a combined CSV.")
-    ap.add_argument("--ids", required=True, help="all OR comma-separated list like 1,52")
+    ap = argparse.ArgumentParser(
+        description="Audit 5 price_bars tables and write a combined CSV."
+    )
+    ap.add_argument(
+        "--ids", required=True, help="all OR comma-separated list like 1,52"
+    )
     ap.add_argument(
         "--daily-table",
         default=DEFAULT_DAILY_TABLE,
@@ -252,7 +255,9 @@ def main() -> None:
             frames.append(df_t)
 
     if not frames:
-        raise RuntimeError("No tables produced results. Check table names/schema and permissions.")
+        raise RuntimeError(
+            "No tables produced results. Check table names/schema and permissions."
+        )
 
     out_df = pd.concat(frames, ignore_index=True)
 

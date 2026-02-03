@@ -6,15 +6,17 @@ import pytest
 
 @pytest.fixture
 def tiny_csv(tmp_path: Path) -> Path:
-    df = pd.DataFrame({
-        "Date": ["2024-01-01","2024-01-02","2024-01-03"],
-        "Open": [100, 101, 102],
-        "High": [101, 102, 103],
-        "Low":  [ 99, 100, 101],
-        "Close":[100.5, 101.5, 102.5],
-        "Volume": [1000, 1200, 1100],
-        "Market Cap": [1e9, 1.01e9, 1.02e9],
-    })
+    df = pd.DataFrame(
+        {
+            "Date": ["2024-01-01", "2024-01-02", "2024-01-03"],
+            "Open": [100, 101, 102],
+            "High": [101, 102, 103],
+            "Low": [99, 100, 101],
+            "Close": [100.5, 101.5, 102.5],
+            "Volume": [1000, 1200, 1100],
+            "Market Cap": [1e9, 1.01e9, 1.02e9],
+        }
+    )
     p = tmp_path / "tiny.csv"
     df.to_csv(p, index=False)
     return p
@@ -38,6 +40,7 @@ def database_url():
 def database_engine(database_url):
     """Create SQLAlchemy engine for testing."""
     from sqlalchemy import create_engine
+
     engine = create_engine(database_url)
     yield engine
     engine.dispose()
@@ -59,6 +62,7 @@ def skip_without_qdrant():
 
     # Try to connect to Qdrant
     import socket
+
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.settimeout(1)
     result = sock.connect_ex((qdrant_host, qdrant_port))
@@ -85,6 +89,5 @@ def pytest_configure(config):
     # Just validate they're accessible
     for marker in markers:
         config.addinivalue_line(
-            "markers",
-            f"{marker}: Marker defined in pyproject.toml"
+            "markers", f"{marker}: Marker defined in pyproject.toml"
         )

@@ -15,13 +15,11 @@ REFACTORED CHANGES:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import List, Optional, Sequence
 import logging
 
-import numpy as np
 import pandas as pd
-from sqlalchemy import Engine, text
+from sqlalchemy import Engine
 
 from ta_lab2.features.m_tf.base_ema_feature import (
     BaseEMAFeature,
@@ -29,7 +27,6 @@ from ta_lab2.features.m_tf.base_ema_feature import (
     TFSpec,
 )
 from ta_lab2.features.m_tf.polars_helpers import read_sql_polars
-from ta_lab2.features.ema import filter_ema_periods_by_obs_count, compute_ema
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +34,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 # Calendar EMA Feature Implementation
 # =============================================================================
+
 
 class CalendarEMAFeature(BaseEMAFeature):
     """
@@ -151,9 +149,13 @@ class CalendarEMAFeature(BaseEMAFeature):
         df["tf"] = df["tf"].astype(str)
         df["tf_days"] = df["tf_days"].astype(int)
 
-        tf_specs = [TFSpec(tf=r.tf, tf_days=int(r.tf_days)) for r in df.itertuples(index=False)]
+        tf_specs = [
+            TFSpec(tf=r.tf, tf_days=int(r.tf_days)) for r in df.itertuples(index=False)
+        ]
 
-        logger.info(f"Loaded {len(tf_specs)} calendar TF specs for scheme={self.scheme}")
+        logger.info(
+            f"Loaded {len(tf_specs)} calendar TF specs for scheme={self.scheme}"
+        )
         self._tf_specs_cache = tf_specs
         return tf_specs
 
@@ -177,7 +179,9 @@ class CalendarEMAFeature(BaseEMAFeature):
 
         # For now, return empty DataFrame as placeholder
         # Full migration would implement complete calendar EMA logic
-        logger.warning(f"Calendar EMA computation for {tf_spec.tf} not fully implemented in refactored version")
+        logger.warning(
+            f"Calendar EMA computation for {tf_spec.tf} not fully implemented in refactored version"
+        )
         return pd.DataFrame()
 
     def get_output_schema(self) -> dict[str, str]:
@@ -222,7 +226,9 @@ class CalendarEMAFeature(BaseEMAFeature):
             df = read_sql_polars(sql, conn)
 
         if df.empty:
-            raise RuntimeError(f"Alpha lookup table {self.alpha_schema}.{self.alpha_table} is empty")
+            raise RuntimeError(
+                f"Alpha lookup table {self.alpha_schema}.{self.alpha_table} is empty"
+            )
 
         df["period"] = df["period"].astype(int)
         df["tf"] = df["tf"].astype(str)
@@ -235,6 +241,7 @@ class CalendarEMAFeature(BaseEMAFeature):
 # =============================================================================
 # Public API (Backward Compatibility - Stub)
 # =============================================================================
+
 
 def write_multi_timeframe_ema_cal_to_db(
     engine: Engine,

@@ -1,10 +1,12 @@
 from datetime import date, datetime, time
 from zoneinfo import ZoneInfo
 
+
 def local_to_utc(d: date, t: time, tz: str) -> datetime:
     z = ZoneInfo(tz)
     local = datetime.combine(d, t).replace(tzinfo=z)
     return local.astimezone(ZoneInfo("UTC"))
+
 
 def test_ny_open_dst_shift():
     tz = "America/New_York"

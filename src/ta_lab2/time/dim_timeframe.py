@@ -118,10 +118,11 @@ class DimTimeframe:
                 is_intraday=bool(row["is_intraday"]),
                 sort_order=int(row["sort_order"]),
                 is_canonical=bool(row["is_canonical"]),
-
                 # New fields
                 calendar_scheme=_to_str_opt(row.get("calendar_scheme")),
-                allow_partial_start=_to_bool(row.get("allow_partial_start"), default=False),
+                allow_partial_start=_to_bool(
+                    row.get("allow_partial_start"), default=False
+                ),
                 allow_partial_end=_to_bool(row.get("allow_partial_end"), default=False),
                 tf_days_min=_to_int_opt(row.get("tf_days_min")),
                 tf_days_max=_to_int_opt(row.get("tf_days_max")),
@@ -295,6 +296,7 @@ def list_tfs(
 
 
 # --- NEW module-level helpers (additive; does not remove/alter old ones) ---
+
 
 def get_tf_days_bounds(tf: str, db_url: str) -> tuple[Optional[int], Optional[int]]:
     """

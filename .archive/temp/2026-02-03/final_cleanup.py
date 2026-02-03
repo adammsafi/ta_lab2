@@ -11,10 +11,9 @@ Usage: python final_cleanup.py
 import sys
 import json
 import subprocess
-import shutil
 from pathlib import Path
 from datetime import datetime
-from typing import List, Dict
+from typing import Dict
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent / "src"))
@@ -96,7 +95,11 @@ def main():
 
     # Archive remaining Python scripts
     print("\n--- Archiving remaining Python scripts ---")
-    for script_name in ["archive_original_files.py", "archive_refactored_files.py", "final_cleanup.py"]:
+    for script_name in [
+        "archive_original_files.py",
+        "archive_refactored_files.py",
+        "final_cleanup.py",
+    ]:
         script_path = root / script_name
         if script_path.exists():
             entry = archive_file_safe(
@@ -170,7 +173,7 @@ def main():
 
     print(f"\nUpdated manifest with {len(entries)} additional files")
     print("\n" + "=" * 80)
-    print(f"FINAL CLEANUP COMPLETE")
+    print("FINAL CLEANUP COMPLETE")
     print("=" * 80)
 
 

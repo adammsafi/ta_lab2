@@ -33,7 +33,7 @@ def expected_dates():
     """
     end = datetime.now().date()
     start = end - timedelta(days=30)
-    return pd.date_range(start, end, freq='D')
+    return pd.date_range(start, end, freq="D")
 
 
 @pytest.fixture
@@ -44,14 +44,14 @@ def mock_dim_sessions():
     Returns session configurations for crypto (24/7) and equity (trading days).
     """
     return {
-        'crypto': {
-            'session': 'CRYPTO',
-            'daily': True,
+        "crypto": {
+            "session": "CRYPTO",
+            "daily": True,
         },
-        'equity': {
-            'session': 'NYSE',
-            'daily': False,
-            'trading_days': [0, 1, 2, 3, 4],  # Monday-Friday
+        "equity": {
+            "session": "NYSE",
+            "daily": False,
+            "trading_days": [0, 1, 2, 3, 4],  # Monday-Friday
         },
     }
 
@@ -114,6 +114,7 @@ def ensure_schema(db_engine):
     if missing_tables:
         # Import and run ensure_dim_tables to create missing tables
         from ta_lab2.scripts.bars.ensure_dim_tables import main as ensure_dim_tables
+
         ensure_dim_tables()
 
     return db_engine
@@ -122,6 +123,7 @@ def ensure_schema(db_engine):
 # ============================================================================
 # Validation report generation
 # ============================================================================
+
 
 @pytest.fixture(scope="session")
 def validation_summary():
@@ -155,18 +157,18 @@ def collect_validation_result(request, validation_summary):
     test_file = request.node.fspath.basename
     category = None
 
-    if 'timeframe_alignment' in test_file or 'calendar_boundaries' in test_file:
+    if "timeframe_alignment" in test_file or "calendar_boundaries" in test_file:
         category = "time_alignment"
-    elif 'gap_detection' in test_file or 'rowcount_validation' in test_file:
+    elif "gap_detection" in test_file or "rowcount_validation" in test_file:
         category = "data_consistency"
-    elif 'backtest_reproducibility' in test_file:
+    elif "backtest_reproducibility" in test_file:
         category = "backtest_reproducibility"
 
     if category is None:
         return  # Not a validation test
 
     # Record result
-    if hasattr(request.node, 'rep_call'):
+    if hasattr(request.node, "rep_call"):
         if request.node.rep_call.passed:
             validation_summary[category]["passed"] += 1
         elif request.node.rep_call.failed:
@@ -199,7 +201,7 @@ def pytest_sessionfinish(session, exitstatus):
 
     Report saved to: reports/validation_summary.md
     """
-    if not hasattr(session.config, 'validation_summary_data'):
+    if not hasattr(session.config, "validation_summary_data"):
         # No validation tests ran
         return
 
@@ -212,7 +214,7 @@ def pytest_sessionfinish(session, exitstatus):
     # Generate markdown report
     report_path = reports_dir / "validation_summary.md"
 
-    with open(report_path, 'w') as f:
+    with open(report_path, "w") as f:
         f.write("# Validation Test Summary\n\n")
         f.write(f"**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
 
@@ -230,7 +232,7 @@ def pytest_sessionfinish(session, exitstatus):
 
         for category, counts in summary_data.items():
             status = "PASS" if counts["failed"] == 0 else "FAIL"
-            display_name = category.replace('_', ' ').title()
+            display_name = category.replace("_", " ").title()
 
             f.write(
                 f"| {display_name} | {counts['passed']} | {counts['failed']} | "
@@ -262,7 +264,9 @@ def pytest_sessionfinish(session, exitstatus):
         # Backtest Reproducibility
         f.write("### Backtest Reproducibility Validation\n\n")
         if summary_data["backtest_reproducibility"]["failed"] == 0:
-            f.write("All reproducibility checks passed. Backtests are deterministic.\n\n")
+            f.write(
+                "All reproducibility checks passed. Backtests are deterministic.\n\n"
+            )
         else:
             f.write(
                 f"**FAILED:** {summary_data['backtest_reproducibility']['failed']} tests failed. "
@@ -273,7 +277,9 @@ def pytest_sessionfinish(session, exitstatus):
         f.write("## Release Readiness\n\n")
         if total_failed == 0:
             f.write("**Status:** READY FOR RELEASE\n\n")
-            f.write("All validation gates passed. System is ready for v0.4.0 release.\n")
+            f.write(
+                "All validation gates passed. System is ready for v0.4.0 release.\n"
+            )
         else:
             f.write("**Status:** NOT READY FOR RELEASE\n\n")
             f.write(

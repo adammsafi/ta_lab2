@@ -1,7 +1,6 @@
 """Semantic search API for ChromaDB memory store."""
 import logging
-from dataclasses import dataclass, field
-from datetime import datetime
+from dataclasses import dataclass
 from typing import List, Optional, Dict, Any
 
 logger = logging.getLogger(__name__)
@@ -15,7 +14,7 @@ class SearchResult:
     content: str
     metadata: Dict[str, Any]
     similarity: float  # 0.0 to 1.0, higher is better
-    distance: float    # Raw ChromaDB distance (lower is better)
+    distance: float  # Raw ChromaDB distance (lower is better)
 
     def __str__(self) -> str:
         return f"Memory({self.memory_id[:8]}..., sim={self.similarity:.2f})"
@@ -46,7 +45,7 @@ def search_memories(
     min_similarity: float = 0.7,
     memory_type: Optional[str] = None,
     metadata_filter: Optional[Dict[str, Any]] = None,
-    client=None
+    client=None,
 ) -> SearchResponse:
     """Search memories using semantic similarity.
 
@@ -73,11 +72,13 @@ def search_memories(
         ...     print(f"{r.similarity:.2f}: {r.content[:50]}...")
     """
     import time
+
     start_time = time.perf_counter()
 
     # Get client
     if client is None:
         from .client import get_memory_client
+
         client = get_memory_client()
 
     collection = client.collection
@@ -102,7 +103,7 @@ def search_memories(
         query_embeddings=[query_embedding],
         n_results=max_results,
         where=where_filter,
-        include=["documents", "metadatas", "distances"]
+        include=["documents", "metadatas", "distances"],
     )
 
     # Convert distance to similarity and filter
@@ -121,13 +122,15 @@ def search_memories(
         if distance > max_distance:
             continue
 
-        results.append(SearchResult(
-            memory_id=raw_results["ids"][0][i],
-            content=raw_results["documents"][0][i],
-            metadata=raw_results["metadatas"][0][i] or {},
-            similarity=round(similarity, 4),
-            distance=round(distance, 4)
-        ))
+        results.append(
+            SearchResult(
+                memory_id=raw_results["ids"][0][i],
+                content=raw_results["documents"][0][i],
+                metadata=raw_results["metadatas"][0][i] or {},
+                similarity=round(similarity, 4),
+                distance=round(distance, 4),
+            )
+        )
 
     elapsed_ms = (time.perf_counter() - start_time) * 1000
 
@@ -137,7 +140,7 @@ def search_memories(
         total_found=total_found,
         filtered_count=len(results),
         search_time_ms=round(elapsed_ms, 2),
-        threshold_used=min_similarity
+        threshold_used=min_similarity,
     )
 
     logger.debug(f"Memory search: {response}")
@@ -156,11 +159,11 @@ def get_memory_by_id(memory_id: str, client=None) -> Optional[SearchResult]:
     """
     if client is None:
         from .client import get_memory_client
+
         client = get_memory_client()
 
     results = client.collection.get(
-        ids=[memory_id],
-        include=["documents", "metadatas", "embeddings"]
+        ids=[memory_id], include=["documents", "metadatas", "embeddings"]
     )
 
     if not results["ids"]:
@@ -171,7 +174,7 @@ def get_memory_by_id(memory_id: str, client=None) -> Optional[SearchResult]:
         content=results["documents"][0],
         metadata=results["metadatas"][0] or {},
         similarity=1.0,  # Exact match
-        distance=0.0
+        distance=0.0,
     )
 
 
@@ -187,12 +190,10 @@ def get_memory_types(client=None, sample_size: int = 100) -> List[str]:
     """
     if client is None:
         from .client import get_memory_client
+
         client = get_memory_client()
 
-    results = client.collection.get(
-        limit=sample_size,
-        include=["metadatas"]
-    )
+    results = client.collection.get(limit=sample_size, include=["metadatas"])
 
     types = set()
     for meta in results.get("metadatas", []):

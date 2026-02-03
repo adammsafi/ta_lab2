@@ -50,9 +50,9 @@ def test_scripts_import_ema_state_manager(script_path: str):
 
     # Check for EMAStateManager or ema_state_manager reference
     has_state_manager = (
-        "EMAStateManager" in content or
-        "ema_state_manager" in content or
-        "from ta_lab2.scripts.emas.ema_state_manager import" in content
+        "EMAStateManager" in content
+        or "ema_state_manager" in content
+        or "from ta_lab2.scripts.emas.ema_state_manager import" in content
     )
 
     assert has_state_manager, (
@@ -87,13 +87,13 @@ def test_scripts_call_state_manager_methods(script_path: str):
     # 2. EMAStateConfig usage (configures state manager)
     # 3. state_table references (indicates state persistence)
     has_state_usage = (
-        "load_state" in content or
-        "save_state" in content or
-        "update_state_from_output" in content or
-        "compute_dirty_window" in content or
-        "EMAStateConfig" in content or
-        "state_table" in content or
-        "state_config" in content
+        "load_state" in content
+        or "save_state" in content
+        or "update_state_from_output" in content
+        or "compute_dirty_window" in content
+        or "EMAStateConfig" in content
+        or "state_table" in content
+        or "state_config" in content
     )
 
     assert has_state_usage, (
@@ -155,10 +155,10 @@ def test_state_manager_has_required_exports():
 
     # Check for save/update state
     has_save_state = (
-        "def save_state" in content or
-        "def update_state" in content or
-        "def upsert_state" in content or
-        "def update_state_from_output" in content
+        "def save_state" in content
+        or "def update_state" in content
+        or "def upsert_state" in content
+        or "def update_state_from_output" in content
     )
     assert has_save_state, (
         "State update method not found. "
@@ -191,9 +191,9 @@ def test_base_refresher_integrates_state():
 
     # Base refresher should import and use state manager
     has_state_integration = (
-        "EMAStateManager" in content or
-        "ema_state_manager" in content or
-        "state_config" in content
+        "EMAStateManager" in content
+        or "ema_state_manager" in content
+        or "state_config" in content
     )
 
     assert has_state_integration, (
@@ -295,23 +295,25 @@ def test_state_usage_summary():
 
         has_import = "EMAStateManager" in content or "ema_state_manager" in content
         has_usage = (
-            "load_state" in content or
-            "save_state" in content or
-            "EMAStateConfig" in content
+            "load_state" in content
+            or "save_state" in content
+            or "EMAStateConfig" in content
         )
 
-        results.append({
-            "script": Path(script_path).name,
-            "has_import": has_import,
-            "has_usage": has_usage,
-        })
+        results.append(
+            {
+                "script": Path(script_path).name,
+                "has_import": has_import,
+                "has_usage": has_usage,
+            }
+        )
 
     scripts_with_state = sum(1 for r in results if r["has_import"] and r["has_usage"])
     total_scripts = len(results)
     coverage = (scripts_with_state / total_scripts * 100) if total_scripts > 0 else 0
 
     print(f"\n{'='*70}")
-    print(f"EMAStateManager Adoption Summary")
+    print("EMAStateManager Adoption Summary")
     print(f"{'='*70}")
     print(f"Production scripts: {total_scripts}")
     print(f"Using EMAStateManager: {scripts_with_state}")

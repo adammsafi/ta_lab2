@@ -1,7 +1,6 @@
 """Tests for MemoryClient and memory validation."""
 import pytest
-from unittest.mock import Mock, patch, MagicMock
-from dataclasses import FrozenInstanceError
+from unittest.mock import patch, MagicMock
 
 from ta_lab2.tools.ai_orchestrator.memory import (
     MemoryClient,
@@ -9,7 +8,7 @@ from ta_lab2.tools.ai_orchestrator.memory import (
     reset_memory_client,
     MemoryValidationResult,
     validate_memory_store,
-    quick_health_check
+    quick_health_check,
 )
 from ta_lab2.tools.ai_orchestrator.config import OrchestratorConfig
 
@@ -21,7 +20,7 @@ def mock_config():
         chromadb_path="/mock/path/to/chromadb",
         chromadb_collection_name="test_memories",
         expected_memory_count=3763,
-        embedding_dimensions=1536
+        embedding_dimensions=1536,
     )
 
 
@@ -53,8 +52,7 @@ class TestMemoryClient:
 
         with patch("chromadb.PersistentClient", return_value=mock_client):
             client = MemoryClient(
-                chroma_path="/test/path",
-                collection_name="test_collection"
+                chroma_path="/test/path", collection_name="test_collection"
             )
 
             assert client._client == mock_client
@@ -144,8 +142,9 @@ class TestMemoryClientFactory:
         """Test that factory loads config from environment if not provided."""
         mock_client, _ = mock_chromadb_client
 
-        with patch("chromadb.PersistentClient", return_value=mock_client), \
-             patch("ta_lab2.tools.ai_orchestrator.config.load_config", return_value=mock_config):
+        with patch("chromadb.PersistentClient", return_value=mock_client), patch(
+            "ta_lab2.tools.ai_orchestrator.config.load_config", return_value=mock_config
+        ):
             client = get_memory_client()
 
             assert client is not None
@@ -176,7 +175,7 @@ class TestMemoryValidationResult:
             metadata_complete=True,
             distance_metric="cosine",
             embedding_dimensions=1536,
-            issues=[]
+            issues=[],
         )
 
         assert result.is_valid is True
@@ -194,7 +193,7 @@ class TestMemoryValidationResult:
             metadata_complete=True,
             distance_metric="cosine",
             embedding_dimensions=1536,
-            issues=[]
+            issues=[],
         )
 
         string_repr = str(result)
@@ -213,7 +212,7 @@ class TestMemoryValidationResult:
             metadata_complete=False,
             distance_metric="l2",
             embedding_dimensions=1536,
-            issues=["Count too low", "Wrong metric"]
+            issues=["Count too low", "Wrong metric"],
         )
 
         string_repr = str(result)
@@ -232,7 +231,7 @@ class TestValidateMemoryStore:
         mock_collection.get.return_value = {
             "embeddings": [[0.1] * 1536 for _ in range(10)],
             "metadatas": [{"key": f"value{i}"} for i in range(10)],
-            "documents": [f"doc{i}" for i in range(10)]
+            "documents": [f"doc{i}" for i in range(10)],
         }
 
         with patch("chromadb.PersistentClient", return_value=mock_client):
@@ -241,7 +240,7 @@ class TestValidateMemoryStore:
                 client=memory_client,
                 expected_count=3763,
                 expected_dimensions=1536,
-                sample_size=10
+                sample_size=10,
             )
 
             assert result.is_valid is True
@@ -258,15 +257,12 @@ class TestValidateMemoryStore:
         mock_collection.get.return_value = {
             "embeddings": [[0.1] * 1536 for _ in range(10)],
             "metadatas": [{"key": f"value{i}"} for i in range(10)],
-            "documents": [f"doc{i}" for i in range(10)]
+            "documents": [f"doc{i}" for i in range(10)],
         }
 
         with patch("chromadb.PersistentClient", return_value=mock_client):
             memory_client = MemoryClient("/test/path", "test_collection")
-            result = validate_memory_store(
-                client=memory_client,
-                expected_count=3763
-            )
+            result = validate_memory_store(client=memory_client, expected_count=3763)
 
             assert result.is_valid is False
             assert any("Count mismatch" in issue for issue in result.issues)
@@ -279,7 +275,7 @@ class TestValidateMemoryStore:
         mock_collection.get.return_value = {
             "embeddings": [[0.1] * 1536 for _ in range(10)],
             "metadatas": [{"key": f"value{i}"} for i in range(10)],
-            "documents": [f"doc{i}" for i in range(10)]
+            "documents": [f"doc{i}" for i in range(10)],
         }
 
         with patch("chromadb.PersistentClient", return_value=mock_client):
@@ -299,14 +295,13 @@ class TestValidateMemoryStore:
         mock_collection.get.return_value = {
             "embeddings": [[0.1] * 768 for _ in range(10)],  # Wrong dimension
             "metadatas": [{"key": f"value{i}"} for i in range(10)],
-            "documents": [f"doc{i}" for i in range(10)]
+            "documents": [f"doc{i}" for i in range(10)],
         }
 
         with patch("chromadb.PersistentClient", return_value=mock_client):
             memory_client = MemoryClient("/test/path", "test_collection")
             result = validate_memory_store(
-                client=memory_client,
-                expected_dimensions=1536
+                client=memory_client, expected_dimensions=1536
             )
 
             assert result.is_valid is False
@@ -320,7 +315,7 @@ class TestValidateMemoryStore:
         mock_collection.get.return_value = {
             "embeddings": [[0.1] * 1536 for _ in range(10)],
             "metadatas": [None] * 10,  # Missing metadata
-            "documents": [f"doc{i}" for i in range(10)]
+            "documents": [f"doc{i}" for i in range(10)],
         }
 
         with patch("chromadb.PersistentClient", return_value=mock_client):
@@ -339,7 +334,7 @@ class TestValidateMemoryStore:
         mock_collection.get.return_value = {
             "embeddings": [None] * 10,  # Null embeddings
             "metadatas": [{"key": f"value{i}"} for i in range(10)],
-            "documents": [f"doc{i}" for i in range(10)]
+            "documents": [f"doc{i}" for i in range(10)],
         }
 
         with patch("chromadb.PersistentClient", return_value=mock_client):
@@ -358,11 +353,12 @@ class TestValidateMemoryStore:
         mock_collection.get.return_value = {
             "embeddings": [[0.1] * 1536 for _ in range(10)],
             "metadatas": [{"key": f"value{i}"} for i in range(10)],
-            "documents": [f"doc{i}" for i in range(10)]
+            "documents": [f"doc{i}" for i in range(10)],
         }
 
-        with patch("chromadb.PersistentClient", return_value=mock_client), \
-             patch("ta_lab2.tools.ai_orchestrator.memory.validation.get_memory_client") as mock_get_client:
+        with patch("chromadb.PersistentClient", return_value=mock_client), patch(
+            "ta_lab2.tools.ai_orchestrator.memory.validation.get_memory_client"
+        ) as mock_get_client:
             mock_memory_client = MemoryClient("/test/path", "test_collection")
             mock_get_client.return_value = mock_memory_client
 
@@ -413,8 +409,9 @@ class TestQuickHealthCheck:
         mock_client, mock_collection = mock_chromadb_client
         mock_collection.count.return_value = 3763
 
-        with patch("chromadb.PersistentClient", return_value=mock_client), \
-             patch("ta_lab2.tools.ai_orchestrator.memory.validation.get_memory_client") as mock_get_client:
+        with patch("chromadb.PersistentClient", return_value=mock_client), patch(
+            "ta_lab2.tools.ai_orchestrator.memory.validation.get_memory_client"
+        ) as mock_get_client:
             mock_memory_client = MemoryClient("/test/path", "test_collection")
             mock_get_client.return_value = mock_memory_client
 

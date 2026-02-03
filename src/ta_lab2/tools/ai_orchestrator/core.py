@@ -10,6 +10,7 @@ from datetime import datetime
 
 class TaskType(Enum):
     """Types of tasks that can be routed to AI platforms."""
+
     CODE_GENERATION = "code_generation"
     REFACTORING = "refactoring"
     RESEARCH = "research"
@@ -24,6 +25,7 @@ class TaskType(Enum):
 
 class Platform(Enum):
     """Available AI platforms."""
+
     CLAUDE_CODE = "claude_code"
     CHATGPT = "chatgpt"
     GEMINI = "gemini"
@@ -31,6 +33,7 @@ class Platform(Enum):
 
 class TaskStatus(Enum):
     """Execution status for async task lifecycle."""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -49,6 +52,7 @@ class TaskConstraints:
         temperature: Model temperature for response randomness
         model: Specific model to use (platform-specific)
     """
+
     max_tokens: Optional[int] = None
     timeout_seconds: float = 300.0
     temperature: Optional[float] = None
@@ -73,6 +77,7 @@ class Task:
         constraints: Execution constraints (tokens, timeout, temperature, model)
         task_id: Unique identifier assigned when submitted (UUID format)
     """
+
     type: TaskType
     prompt: str
     context: dict[str, Any] = field(default_factory=dict)
@@ -106,6 +111,7 @@ class Result:
         files_created: Output files generated during execution
         partial_output: Partial results for streaming or cancellation
     """
+
     task: Task
     platform: Platform
     output: str
@@ -183,9 +189,7 @@ class Orchestrator:
 
         # Update quota tracking
         self.quota_tracker.record_usage(
-            platform=platform.value,
-            tokens=result.tokens_used,
-            cost=result.cost
+            platform=platform.value, tokens=result.tokens_used, cost=result.cost
         )
 
         return result
@@ -200,7 +204,6 @@ class Orchestrator:
         Returns:
             List of results in same order as tasks
         """
-        import asyncio
         from concurrent.futures import ThreadPoolExecutor
 
         with ThreadPoolExecutor(max_workers=len(Platform)) as executor:
@@ -210,10 +213,7 @@ class Orchestrator:
         return results
 
     def execute_gsd_workflow(
-        self,
-        workflow: str,
-        steps: list[str],
-        interactive: bool = False
+        self, workflow: str, steps: list[str], interactive: bool = False
     ) -> Result:
         """
         Execute a GSD workflow through Claude Code.
@@ -237,16 +237,13 @@ class Orchestrator:
                 "workflow": workflow,
                 "steps": steps,
                 "interactive": interactive,
-            }
+            },
         )
 
         return adapter.execute(task)
 
     def execute_batch(
-        self,
-        tasks: list[Task],
-        optimize_cost: bool = True,
-        max_parallel: int = 10
+        self, tasks: list[Task], optimize_cost: bool = True, max_parallel: int = 10
     ) -> list[Result]:
         """
         Execute a batch of tasks with cost optimization.
@@ -265,7 +262,7 @@ class Orchestrator:
         # Execute in chunks to respect max_parallel
         results = []
         for i in range(0, len(sorted_tasks), max_parallel):
-            chunk = sorted_tasks[i:i+max_parallel]
+            chunk = sorted_tasks[i : i + max_parallel]
             chunk_results = self.execute_parallel(chunk)
             results.extend(chunk_results)
 

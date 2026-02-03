@@ -24,7 +24,9 @@ from typing import Optional
 from sqlalchemy import create_engine
 from sqlalchemy.pool import NullPool
 
-from ta_lab2.features.m_tf.ema_multi_tf_v2 import refresh_cmc_ema_multi_tf_v2_incremental
+from ta_lab2.features.m_tf.ema_multi_tf_v2 import (
+    refresh_cmc_ema_multi_tf_v2_incremental,
+)
 from ta_lab2.scripts.bars.common_snapshot_contract import resolve_db_url, get_engine
 from ta_lab2.scripts.emas.base_ema_refresher import (
     BaseEMARefresher,
@@ -42,6 +44,7 @@ DEFAULT_PERIODS = [9, 10, 21, 50, 100, 200]
 # =============================================================================
 # Worker Function (Module-level for pickling)
 # =============================================================================
+
 
 def _process_id_worker(task: WorkerTask) -> int:
     """
@@ -102,6 +105,7 @@ def _process_id_worker(task: WorkerTask) -> int:
 # =============================================================================
 # Refresher Implementation
 # =============================================================================
+
 
 class V2EMARefresher(BaseEMARefresher):
     """
@@ -223,6 +227,7 @@ class V2EMARefresher(BaseEMARefresher):
 
         # Logging arguments
         from ta_lab2.scripts.emas.logging_config import add_logging_args
+
         add_logging_args(p)
 
         return p

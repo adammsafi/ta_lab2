@@ -6,7 +6,6 @@ with rate limiting, error handling, and standardized metadata for snapshots.
 import logging
 import time
 from dataclasses import dataclass
-from typing import Optional
 from ta_lab2.tools.ai_orchestrator.memory.metadata import create_metadata
 
 logger = logging.getLogger(__name__)
@@ -36,6 +35,7 @@ class BatchIndexResult:
           Errors: 2
           Success Rate: 98.0%
     """
+
     total: int
     added: int
     skipped: int
@@ -44,7 +44,9 @@ class BatchIndexResult:
 
     def __str__(self) -> str:
         """Human-readable summary."""
-        success_rate = (self.added + self.skipped) / self.total * 100 if self.total > 0 else 0
+        success_rate = (
+            (self.added + self.skipped) / self.total * 100 if self.total > 0 else 0
+        )
         return (
             f"Batch Index Result:\n"
             f"  Total: {self.total}\n"
@@ -56,10 +58,7 @@ class BatchIndexResult:
 
 
 def batch_add_memories(
-    client,
-    memories: list[dict],
-    batch_size: int = 50,
-    delay_seconds: float = 0.5
+    client, memories: list[dict], batch_size: int = 50, delay_seconds: float = 0.5
 ) -> BatchIndexResult:
     """Add memories in batches with rate limiting and error handling.
 
@@ -90,17 +89,15 @@ def batch_add_memories(
         significantly improving performance for snapshot indexing.
     """
     results = BatchIndexResult(
-        total=len(memories),
-        added=0,
-        skipped=0,
-        errors=0,
-        error_ids=[]
+        total=len(memories), added=0, skipped=0, errors=0, error_ids=[]
     )
 
-    logger.info(f"Starting batch indexing: {results.total} memories, batch_size={batch_size}")
+    logger.info(
+        f"Starting batch indexing: {results.total} memories, batch_size={batch_size}"
+    )
 
     for i in range(0, len(memories), batch_size):
-        batch = memories[i:i+batch_size]
+        batch = memories[i : i + batch_size]
         batch_num = (i // batch_size) + 1
         total_batches = (len(memories) + batch_size - 1) // batch_size
 
@@ -113,7 +110,7 @@ def batch_add_memories(
                     messages=[{"role": "user", "content": memory["content"]}],
                     user_id="orchestrator",
                     metadata=memory["metadata"],
-                    infer=False  # Disable LLM conflict detection for performance
+                    infer=False,  # Disable LLM conflict detection for performance
                 )
                 results.added += 1
 
@@ -143,11 +140,7 @@ def batch_add_memories(
 
 
 def create_snapshot_metadata(
-    source: str,
-    directory: str,
-    file_type: str,
-    file_path: str,
-    **kwargs
+    source: str, directory: str, file_type: str, file_path: str, **kwargs
 ) -> dict:
     """Create standardized metadata for snapshot memories.
 
@@ -180,19 +173,18 @@ def create_snapshot_metadata(
         True
     """
     # Use existing create_metadata as base
-    metadata = create_metadata(
-        source=source,
-        category="codebase_snapshot"
-    )
+    metadata = create_metadata(source=source, category="codebase_snapshot")
 
     # Add snapshot-specific fields
-    metadata.update({
-        "milestone": "v0.5.0",
-        "phase": "pre_reorg",
-        "directory": directory,
-        "file_type": file_type,
-        "file_path": file_path
-    })
+    metadata.update(
+        {
+            "milestone": "v0.5.0",
+            "phase": "pre_reorg",
+            "directory": directory,
+            "file_type": file_type,
+            "file_path": file_path,
+        }
+    )
 
     # Add simple tag for easy filtering
     if "tags" not in metadata:
@@ -270,7 +262,7 @@ def format_file_content_for_memory(file_info: dict) -> str:
         f"Classes: {', '.join(class_names) if class_names else 'None'}",
         f"Commit: {commit_hash}",
         "",
-        f"Summary: Python module with {len(functions)} functions, {len(classes)} classes."
+        f"Summary: Python module with {len(functions)} functions, {len(classes)} classes.",
     ]
 
     return "\n".join(content_lines)
@@ -280,5 +272,5 @@ __all__ = [
     "BatchIndexResult",
     "batch_add_memories",
     "create_snapshot_metadata",
-    "format_file_content_for_memory"
+    "format_file_content_for_memory",
 ]

@@ -162,12 +162,12 @@ def main(argv: Optional[list[str]] = None) -> int:
     log_level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(
         level=log_level,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
     logger = logging.getLogger(__name__)
 
     # Resolve database URL
-    db_url = args.db_url or os.environ.get('TARGET_DB_URL')
+    db_url = args.db_url or os.environ.get("TARGET_DB_URL")
     if not db_url:
         logger.error("Database URL not provided and TARGET_DB_URL not set")
         return 1
@@ -195,7 +195,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     logger.info(f"Processing {len(ids)} cryptocurrency IDs")
 
     # Setup state manager
-    config = SignalStateConfig(signal_type='ema_crossover')
+    config = SignalStateConfig(signal_type="ema_crossover")
     state_manager = SignalStateManager(engine, config)
 
     try:
@@ -209,14 +209,15 @@ def main(argv: Optional[list[str]] = None) -> int:
     try:
         if args.signal_id:
             configs = [
-                c for c in load_active_signals(engine, 'ema_crossover')
-                if c['signal_id'] == args.signal_id
+                c
+                for c in load_active_signals(engine, "ema_crossover")
+                if c["signal_id"] == args.signal_id
             ]
             if not configs:
                 logger.error(f"Signal ID {args.signal_id} not found or not active")
                 return 1
         else:
-            configs = load_active_signals(engine, 'ema_crossover')
+            configs = load_active_signals(engine, "ema_crossover")
 
         if not configs:
             logger.error("No active EMA crossover signals found in dim_signals")
@@ -236,7 +237,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         logger.info(f"Would process IDs: {ids[:10]}{'...' if len(ids) > 10 else ''}")
         logger.info(f"Signal configurations: {[c['signal_name'] for c in configs]}")
         logger.info(f"Full refresh: {args.full_refresh}")
-        logger.info(f"Output table: public.cmc_signals_ema_crossover")
+        logger.info("Output table: public.cmc_signals_ema_crossover")
         return 0
 
     # Generate signals
@@ -261,8 +262,8 @@ def main(argv: Optional[list[str]] = None) -> int:
             # Update state (unless dry_run, but we handled that already)
             if not args.dry_run:
                 rows_updated = state_manager.update_state_after_generation(
-                    signal_table='cmc_signals_ema_crossover',
-                    signal_id=config['signal_id'],
+                    signal_table="cmc_signals_ema_crossover",
+                    signal_id=config["signal_id"],
                 )
                 logger.debug(f"  Updated {rows_updated} state rows")
 
@@ -274,5 +275,5 @@ def main(argv: Optional[list[str]] = None) -> int:
         return 1
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

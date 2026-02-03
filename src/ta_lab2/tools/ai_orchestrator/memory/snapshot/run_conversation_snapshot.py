@@ -16,7 +16,6 @@ import logging
 import argparse
 from pathlib import Path
 from datetime import datetime, timedelta
-from typing import Optional
 from git import Repo
 
 # Import snapshot infrastructure
@@ -24,18 +23,16 @@ from ta_lab2.tools.ai_orchestrator.memory.snapshot.extract_conversations import 
     extract_conversation,
     extract_phase_boundaries,
     link_conversations_to_phases,
-    find_conversation_files
+    find_conversation_files,
 )
 from ta_lab2.tools.ai_orchestrator.memory.snapshot.batch_indexer import (
     batch_add_memories,
-    BatchIndexResult
 )
 from ta_lab2.tools.ai_orchestrator.memory.mem0_client import get_mem0_client
 from ta_lab2.tools.ai_orchestrator.memory.metadata import create_metadata
 
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -46,11 +43,7 @@ PLANNING_DIR = Path("C:/Users/asafi/Downloads/ta_lab2/.planning")
 REPO_PATH = Path("C:/Users/asafi/Downloads/ta_lab2")
 
 
-def get_commits_in_timerange(
-    repo: Repo,
-    start: datetime,
-    end: datetime
-) -> list[dict]:
+def get_commits_in_timerange(repo: Repo, start: datetime, end: datetime) -> list[dict]:
     """Get commits within a time range with file change details.
 
     Uses GitPython to iterate commits between timestamps, extracting
@@ -92,16 +85,20 @@ def get_commits_in_timerange(
 
                 files_changed = [d.a_path for d in diffs if d.a_path]
             except Exception as e:
-                logger.warning(f"Failed to get diff for commit {commit.hexsha[:7]}: {e}")
+                logger.warning(
+                    f"Failed to get diff for commit {commit.hexsha[:7]}: {e}"
+                )
 
-            commits.append({
-                "hash": commit.hexsha[:7],
-                "hash_full": commit.hexsha,
-                "message": commit.message.strip(),
-                "author": commit.author.name,
-                "timestamp": commit.committed_datetime,
-                "files_changed": files_changed
-            })
+            commits.append(
+                {
+                    "hash": commit.hexsha[:7],
+                    "hash_full": commit.hexsha,
+                    "message": commit.message.strip(),
+                    "author": commit.author.name,
+                    "timestamp": commit.committed_datetime,
+                    "files_changed": files_changed,
+                }
+            )
 
     except Exception as e:
         logger.error(f"Failed to iterate commits: {e}")
@@ -111,9 +108,7 @@ def get_commits_in_timerange(
 
 
 def link_conversation_to_commits(
-    conversation_timestamp: datetime,
-    phase_commits: list[dict],
-    window_hours: int = 24
+    conversation_timestamp: datetime, phase_commits: list[dict], window_hours: int = 24
 ) -> list[str]:
     """Link conversation to resulting commits using temporal proximity.
 
@@ -153,8 +148,7 @@ def link_conversation_to_commits(
 
 
 def extract_conversation_summaries(
-    messages: list[dict],
-    max_per_phase: int = 10
+    messages: list[dict], max_per_phase: int = 10
 ) -> list[dict]:
     """Extract most significant conversations from message list.
 
@@ -199,21 +193,25 @@ def extract_conversation_summaries(
 
         # Include user messages (questions, requests)
         if role == "user":
-            significant_messages.append({
-                "role": role,
-                "content": content[:500],  # Truncate to 500 chars
-                "timestamp": msg.get("timestamp"),
-                "message_id": msg.get("message_id")
-            })
+            significant_messages.append(
+                {
+                    "role": role,
+                    "content": content[:500],  # Truncate to 500 chars
+                    "timestamp": msg.get("timestamp"),
+                    "message_id": msg.get("message_id"),
+                }
+            )
 
         # Include assistant messages (responses, decisions)
         elif role == "assistant":
-            significant_messages.append({
-                "role": role,
-                "content": content[:500],  # Truncate to 500 chars
-                "timestamp": msg.get("timestamp"),
-                "message_id": msg.get("message_id")
-            })
+            significant_messages.append(
+                {
+                    "role": role,
+                    "content": content[:500],  # Truncate to 500 chars
+                    "timestamp": msg.get("timestamp"),
+                    "message_id": msg.get("message_id"),
+                }
+            )
 
     # Limit to max_per_phase most recent
     if len(significant_messages) > max_per_phase:
@@ -225,9 +223,7 @@ def extract_conversation_summaries(
 
 
 def format_conversation_for_memory(
-    conversation: dict,
-    phase: int,
-    linked_commits: list[str]
+    conversation: dict, phase: int, linked_commits: list[str]
 ) -> str:
     """Format conversation into memory-suitable content with code links.
 
@@ -255,7 +251,7 @@ def format_conversation_for_memory(
 
     # Parse timestamp for readable date
     try:
-        dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+        dt = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
         date_str = dt.strftime("%Y-%m-%d %H:%M")
     except (ValueError, AttributeError):
         date_str = timestamp
@@ -264,7 +260,7 @@ def format_conversation_for_memory(
     lines = [
         f"Phase {phase} Conversation - {date_str}",
         f"Role: {role}",
-        f"",
+        "",
         f"Content: {content}",
     ]
 
@@ -278,9 +274,7 @@ def format_conversation_for_memory(
 
 
 def run_conversation_snapshot(
-    repo_path: Path,
-    dry_run: bool = False,
-    max_per_phase: int = 10
+    repo_path: Path, dry_run: bool = False, max_per_phase: int = 10
 ) -> dict:
     """Execute conversation snapshot with code change linking.
 
@@ -352,14 +346,16 @@ def run_conversation_snapshot(
 
     # Link conversations to phases
     logger.info("Linking conversations to phases")
-    conversations_by_phase = link_conversations_to_phases(all_messages, phase_boundaries)
+    conversations_by_phase = link_conversations_to_phases(
+        all_messages, phase_boundaries
+    )
 
     # Process each phase
     stats = {
         "phases_processed": 0,
         "conversations_indexed": 0,
         "conversations_with_code_links": 0,
-        "phase_breakdown": {}
+        "phase_breakdown": {},
     }
 
     memories_to_add = []
@@ -371,12 +367,16 @@ def run_conversation_snapshot(
             logger.info(f"Phase {phase_num}: No conversations found")
             continue
 
-        logger.info(f"Phase {phase_num} ({phase_info['name']}): {len(phase_messages)} messages")
+        logger.info(
+            f"Phase {phase_num} ({phase_info['name']}): {len(phase_messages)} messages"
+        )
 
         # Get commits for this phase
         try:
-            phase_start = datetime.fromisoformat(phase_info["start"].replace('Z', '+00:00'))
-            phase_end = datetime.fromisoformat(phase_info["end"].replace('Z', '+00:00'))
+            phase_start = datetime.fromisoformat(
+                phase_info["start"].replace("Z", "+00:00")
+            )
+            phase_end = datetime.fromisoformat(phase_info["end"].replace("Z", "+00:00"))
             phase_commits = get_commits_in_timerange(repo, phase_start, phase_end)
             logger.info(f"  Found {len(phase_commits)} commits in phase timerange")
         except Exception as e:
@@ -384,7 +384,9 @@ def run_conversation_snapshot(
             phase_commits = []
 
         # Extract conversation summaries
-        summaries = extract_conversation_summaries(phase_messages, max_per_phase=max_per_phase)
+        summaries = extract_conversation_summaries(
+            phase_messages, max_per_phase=max_per_phase
+        )
         logger.info(f"  Extracted {len(summaries)} significant conversations")
 
         # Link each conversation to commits
@@ -396,8 +398,12 @@ def run_conversation_snapshot(
                 linked_commits = []
             else:
                 try:
-                    conv_time = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
-                    linked_commits = link_conversation_to_commits(conv_time, phase_commits)
+                    conv_time = datetime.fromisoformat(
+                        timestamp_str.replace("Z", "+00:00")
+                    )
+                    linked_commits = link_conversation_to_commits(
+                        conv_time, phase_commits
+                    )
                 except (ValueError, AttributeError) as e:
                     logger.warning(f"  Invalid timestamp: {timestamp_str}, error: {e}")
                     linked_commits = []
@@ -410,32 +416,26 @@ def run_conversation_snapshot(
 
             # Create metadata
             metadata = create_metadata(
-                source="conversation_history_v0.4.0",
-                category="development_context"
+                source="conversation_history_v0.4.0", category="development_context"
             )
-            metadata.update({
-                "milestone": "v0.4.0",
-                "phase": f"phase_{phase_num}",
-                "phase_name": phase_info["name"],
-                "role": conv.get("role"),
-                "timestamp": timestamp_str,
-                "linked_commits": linked_commits,
-                "has_code_links": len(linked_commits) > 0
-            })
+            metadata.update(
+                {
+                    "milestone": "v0.4.0",
+                    "phase": f"phase_{phase_num}",
+                    "phase_name": phase_info["name"],
+                    "role": conv.get("role"),
+                    "timestamp": timestamp_str,
+                    "linked_commits": linked_commits,
+                    "has_code_links": len(linked_commits) > 0,
+                }
+            )
 
             # Add tags
             if "tags" not in metadata:
                 metadata["tags"] = []
-            metadata["tags"].extend([
-                "conversation",
-                f"phase_{phase_num}",
-                "v0.4.0"
-            ])
+            metadata["tags"].extend(["conversation", f"phase_{phase_num}", "v0.4.0"])
 
-            memories_to_add.append({
-                "content": content,
-                "metadata": metadata
-            })
+            memories_to_add.append({"content": content, "metadata": metadata})
 
         # Update stats
         stats["phases_processed"] += 1
@@ -445,16 +445,20 @@ def run_conversation_snapshot(
             "name": phase_info["name"],
             "conversations": len(summaries),
             "with_code_links": conversations_with_links,
-            "commits_in_phase": len(phase_commits)
+            "commits_in_phase": len(phase_commits),
         }
 
-        logger.info(f"  {conversations_with_links}/{len(summaries)} conversations linked to commits")
+        logger.info(
+            f"  {conversations_with_links}/{len(summaries)} conversations linked to commits"
+        )
 
     # Index memories
     if not dry_run and memories_to_add:
         logger.info(f"Indexing {len(memories_to_add)} conversation memories")
         client = get_mem0_client()
-        result = batch_add_memories(client, memories_to_add, batch_size=50, delay_seconds=0.5)
+        result = batch_add_memories(
+            client, memories_to_add, batch_size=50, delay_seconds=0.5
+        )
         logger.info(str(result))
     else:
         logger.info(f"Dry run: would index {len(memories_to_add)} memories")
@@ -463,9 +467,7 @@ def run_conversation_snapshot(
 
 
 def save_conversation_manifest(
-    stats: dict,
-    phase_boundaries: dict,
-    output_path: Path
+    stats: dict, phase_boundaries: dict, output_path: Path
 ) -> None:
     """Save conversation snapshot manifest with phase boundaries and stats.
 
@@ -494,28 +496,32 @@ def save_conversation_manifest(
                 "name": info["name"],
                 "start": info["start"],
                 "end": info["end"],
-                "summary_file": info["summary_file"]
+                "summary_file": info["summary_file"],
             }
             for phase_num, info in sorted(phase_boundaries.items())
         ],
         "statistics": {
             "phases_processed": stats.get("phases_processed", 0),
             "conversations_indexed": stats.get("conversations_indexed", 0),
-            "conversations_with_code_links": stats.get("conversations_with_code_links", 0),
+            "conversations_with_code_links": stats.get(
+                "conversations_with_code_links", 0
+            ),
             "code_link_percentage": (
-                stats.get("conversations_with_code_links", 0) /
-                stats.get("conversations_indexed", 1) * 100
-                if stats.get("conversations_indexed", 0) > 0 else 0
-            )
+                stats.get("conversations_with_code_links", 0)
+                / stats.get("conversations_indexed", 1)
+                * 100
+                if stats.get("conversations_indexed", 0) > 0
+                else 0
+            ),
         },
-        "phase_breakdown": stats.get("phase_breakdown", {})
+        "phase_breakdown": stats.get("phase_breakdown", {}),
     }
 
     # Ensure output directory exists
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Write manifest
-    with open(output_path, 'w', encoding='utf-8') as f:
+    with open(output_path, "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2, default=str)
 
     logger.info(f"Manifest saved to: {output_path}")
@@ -527,24 +533,20 @@ def main():
         description="Extract v0.4.0 conversation history with code change linking"
     )
     parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Show stats without indexing memories"
+        "--dry-run", action="store_true", help="Show stats without indexing memories"
     )
     parser.add_argument(
         "--max-per-phase",
         type=int,
         default=10,
-        help="Maximum conversations to extract per phase (default: 10)"
+        help="Maximum conversations to extract per phase (default: 10)",
     )
 
     args = parser.parse_args()
 
     # Run snapshot
     stats = run_conversation_snapshot(
-        repo_path=REPO_PATH,
-        dry_run=args.dry_run,
-        max_per_phase=args.max_per_phase
+        repo_path=REPO_PATH, dry_run=args.dry_run, max_per_phase=args.max_per_phase
     )
 
     # Check for errors
@@ -553,29 +555,41 @@ def main():
         return 1
 
     # Print summary
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("CONVERSATION SNAPSHOT SUMMARY")
-    print("="*60)
+    print("=" * 60)
     print(f"Phases processed: {stats.get('phases_processed', 0)}")
     print(f"Conversations indexed: {stats.get('conversations_indexed', 0)}")
-    print(f"Conversations with code links: {stats.get('conversations_with_code_links', 0)}")
+    print(
+        f"Conversations with code links: {stats.get('conversations_with_code_links', 0)}"
+    )
 
     link_pct = (
-        stats.get('conversations_with_code_links', 0) /
-        stats.get('conversations_indexed', 1) * 100
-        if stats.get('conversations_indexed', 0) > 0 else 0
+        stats.get("conversations_with_code_links", 0)
+        / stats.get("conversations_indexed", 1)
+        * 100
+        if stats.get("conversations_indexed", 0) > 0
+        else 0
     )
     print(f"Code link percentage: {link_pct:.1f}%")
 
     print("\nPhase breakdown:")
     for phase_num, breakdown in sorted(stats.get("phase_breakdown", {}).items()):
-        print(f"  Phase {phase_num} ({breakdown['name']}): "
-              f"{breakdown['conversations']} conversations, "
-              f"{breakdown['with_code_links']} with code links")
+        print(
+            f"  Phase {phase_num} ({breakdown['name']}): "
+            f"{breakdown['conversations']} conversations, "
+            f"{breakdown['with_code_links']} with code links"
+        )
 
     # Save manifest (unless dry run)
     if not args.dry_run:
-        manifest_path = PLANNING_DIR / "phases" / "11-memory-preparation" / "snapshots" / "conversations_snapshot.json"
+        manifest_path = (
+            PLANNING_DIR
+            / "phases"
+            / "11-memory-preparation"
+            / "snapshots"
+            / "conversations_snapshot.json"
+        )
 
         # Need phase boundaries for manifest
         try:
@@ -586,7 +600,7 @@ def main():
         except Exception as e:
             logger.error(f"Failed to save manifest: {e}")
 
-    print("="*60)
+    print("=" * 60)
 
     return 0
 

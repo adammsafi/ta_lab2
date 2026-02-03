@@ -93,12 +93,14 @@ class EMASignalGenerator:
             ValueError: If features DataFrame empty
             sqlalchemy.exc.SQLAlchemyError: On database errors
         """
-        signal_id = signal_config['signal_id']
-        signal_name = signal_config['signal_name']
-        params = signal_config['params']
+        signal_id = signal_config["signal_id"]
+        signal_name = signal_config["signal_name"]
+        params = signal_config["params"]
 
         logger.info(f"Generating signals for {signal_name} (signal_id={signal_id})")
-        logger.debug(f"  IDs: {len(ids)}, full_refresh={full_refresh}, dry_run={dry_run}")
+        logger.debug(
+            f"  IDs: {len(ids)}, full_refresh={full_refresh}, dry_run={dry_run}"
+        )
 
         # 1. Load open positions if incremental
         open_positions = pd.DataFrame()
@@ -150,7 +152,7 @@ class EMASignalGenerator:
 
         # 6. Write to database
         if not dry_run:
-            self._write_signals(records, 'cmc_signals_ema_crossover')
+            self._write_signals(records, "cmc_signals_ema_crossover")
             logger.info(f"  Wrote {len(records)} signals to database")
         else:
             logger.info(f"  DRY RUN: Would write {len(records)} signals")
@@ -177,9 +179,16 @@ class EMASignalGenerator:
         """
         # Explicit column list for hash stability
         columns = [
-            "id", "ts", "close",
-            "ema_9", "ema_10", "ema_21", "ema_50", "ema_200",
-            "rsi_14", "atr_14"
+            "id",
+            "ts",
+            "close",
+            "ema_9",
+            "ema_10",
+            "ema_21",
+            "ema_50",
+            "ema_200",
+            "rsi_14",
+            "atr_14",
         ]
 
         where_clauses = ["id = ANY(:ids)"]
@@ -223,19 +232,19 @@ class EMASignalGenerator:
             Tuple of (entries, exits, size) - all boolean/float Series indexed by df.index
         """
         # Map params to ema_trend column names
-        fast_period = params['fast_period']
-        slow_period = params['slow_period']
+        fast_period = params["fast_period"]
+        slow_period = params["slow_period"]
         fast_ema = f"ema_{fast_period}"
         slow_ema = f"ema_{slow_period}"
 
         # Get optional parameters with defaults
-        use_rsi_filter = params.get('use_rsi_filter', False)
-        use_vol_filter = params.get('use_vol_filter', False)
-        allow_shorts = params.get('direction', 'long') != 'long'
-        rsi_min_long = params.get('rsi_min_long', 45)
-        rsi_max_short = params.get('rsi_max_short', 55)
-        min_atr_pct = params.get('min_atr_pct', 0.003)
-        cooldown_bars = params.get('cooldown_bars', 0)
+        use_rsi_filter = params.get("use_rsi_filter", False)
+        use_vol_filter = params.get("use_vol_filter", False)
+        allow_shorts = params.get("direction", "long") != "long"
+        rsi_min_long = params.get("rsi_min_long", 45)
+        rsi_max_short = params.get("rsi_max_short", 55)
+        min_atr_pct = params.get("min_atr_pct", 0.003)
+        cooldown_bars = params.get("cooldown_bars", 0)
 
         # Call ema_trend adapter
         entries, exits, size = make_signals(
@@ -282,56 +291,66 @@ class EMASignalGenerator:
         Returns:
             DataFrame with columns matching cmc_signals_ema_crossover schema
         """
-        fast_period = params['fast_period']
-        slow_period = params['slow_period']
+        fast_period = params["fast_period"]
+        slow_period = params["slow_period"]
         fast_ema = f"ema_{fast_period}"
         slow_ema = f"ema_{slow_period}"
-        direction = params.get('direction', 'long')
+        direction = params.get("direction", "long")
 
         records = []
 
         # Compute hashes for reproducibility
-        feature_cols = ['close', fast_ema, slow_ema, 'rsi_14', 'atr_14']
+        feature_cols = ["close", fast_ema, slow_ema, "rsi_14", "atr_14"]
         feature_hash = compute_feature_hash(df, feature_cols)
         params_hash = compute_params_hash(params)
 
         # Group by ID for per-asset processing
-        for asset_id, group in df.groupby('id'):
+        for asset_id, group in df.groupby("id"):
             # Get open positions for this asset
-            asset_open = open_positions[open_positions['id'] == asset_id] if not open_positions.empty else pd.DataFrame()
+            asset_open = (
+                open_positions[open_positions["id"] == asset_id]
+                if not open_positions.empty
+                else pd.DataFrame()
+            )
 
             # Track open positions as we iterate chronologically
-            open_list = list(asset_open.to_dict('records')) if not asset_open.empty else []
+            open_list = (
+                list(asset_open.to_dict("records")) if not asset_open.empty else []
+            )
 
             for idx, row in group.iterrows():
-                ts = row['ts']
-                close = row['close']
+                ts = row["ts"]
+                close = row["close"]
 
                 # Handle entry signals
                 if entries[idx]:
                     feature_snapshot = {
-                        'close': float(close),
-                        'fast_ema': float(row[fast_ema]),
-                        'slow_ema': float(row[slow_ema]),
-                        'rsi_14': float(row['rsi_14']) if pd.notna(row['rsi_14']) else None,
-                        'atr_14': float(row['atr_14']) if pd.notna(row['atr_14']) else None,
+                        "close": float(close),
+                        "fast_ema": float(row[fast_ema]),
+                        "slow_ema": float(row[slow_ema]),
+                        "rsi_14": float(row["rsi_14"])
+                        if pd.notna(row["rsi_14"])
+                        else None,
+                        "atr_14": float(row["atr_14"])
+                        if pd.notna(row["atr_14"])
+                        else None,
                     }
 
                     record = {
-                        'id': asset_id,
-                        'ts': ts,
-                        'signal_id': signal_id,
-                        'direction': direction,
-                        'position_state': 'open',
-                        'entry_price': close,
-                        'entry_ts': ts,
-                        'exit_price': None,
-                        'exit_ts': None,
-                        'pnl_pct': None,
-                        'feature_snapshot': feature_snapshot,
-                        'signal_version': self.signal_version,
-                        'feature_version_hash': feature_hash,
-                        'params_hash': params_hash,
+                        "id": asset_id,
+                        "ts": ts,
+                        "signal_id": signal_id,
+                        "direction": direction,
+                        "position_state": "open",
+                        "entry_price": close,
+                        "entry_ts": ts,
+                        "exit_price": None,
+                        "exit_ts": None,
+                        "pnl_pct": None,
+                        "feature_snapshot": feature_snapshot,
+                        "signal_version": self.signal_version,
+                        "feature_version_hash": feature_hash,
+                        "params_hash": params_hash,
                     }
                     records.append(record)
                     open_list.append(record)
@@ -341,31 +360,33 @@ class EMASignalGenerator:
                     # Find oldest open position (FIFO)
                     if open_list:
                         open_pos = open_list.pop(0)
-                        entry_price = open_pos['entry_price']
-                        entry_ts = open_pos['entry_ts']
+                        entry_price = open_pos["entry_price"]
+                        entry_ts = open_pos["entry_ts"]
 
                         # Compute PnL
-                        if direction == 'long':
+                        if direction == "long":
                             pnl_pct = ((close - entry_price) / entry_price) * 100
                         else:  # short
                             pnl_pct = ((entry_price - close) / entry_price) * 100
 
                         # Create exit record
                         record = {
-                            'id': asset_id,
-                            'ts': ts,
-                            'signal_id': signal_id,
-                            'direction': direction,
-                            'position_state': 'closed',
-                            'entry_price': entry_price,
-                            'entry_ts': entry_ts,
-                            'exit_price': close,
-                            'exit_ts': ts,
-                            'pnl_pct': pnl_pct,
-                            'feature_snapshot': open_pos['feature_snapshot'],  # Keep entry snapshot
-                            'signal_version': self.signal_version,
-                            'feature_version_hash': feature_hash,
-                            'params_hash': params_hash,
+                            "id": asset_id,
+                            "ts": ts,
+                            "signal_id": signal_id,
+                            "direction": direction,
+                            "position_state": "closed",
+                            "entry_price": entry_price,
+                            "entry_ts": entry_ts,
+                            "exit_price": close,
+                            "exit_ts": ts,
+                            "pnl_pct": pnl_pct,
+                            "feature_snapshot": open_pos[
+                                "feature_snapshot"
+                            ],  # Keep entry snapshot
+                            "signal_version": self.signal_version,
+                            "feature_version_hash": feature_hash,
+                            "params_hash": params_hash,
                         }
                         records.append(record)
 
@@ -390,8 +411,8 @@ class EMASignalGenerator:
         records.to_sql(
             signal_table,
             self.engine,
-            schema='public',
-            if_exists='append',
+            schema="public",
+            if_exists="append",
             index=False,
-            method='multi',
+            method="multi",
         )

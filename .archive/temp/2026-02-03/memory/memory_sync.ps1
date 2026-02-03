@@ -3,7 +3,7 @@ param(
     [Parameter(Mandatory=$true)]
     [ValidateSet("Claude UI", "Claude Code", "ChatGPT", "OpenAI Codex", "Gemini")]
     [string]$Platform,
-    
+
     [string]$SessionNote = ""
 )
 

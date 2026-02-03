@@ -83,10 +83,16 @@ def build_dataset(cfg: dict) -> pd.DataFrame:
     ensure_dir(OUTPUT_DIR)
 
     # Load CSVs
-    fedfunds = read_csv(FED_DATA_DIR / "FEDFUNDS.csv")   # ['observation_date','FEDFUNDS']
-    dfedtaru = read_csv(FED_DATA_DIR / "DFEDTARU.csv")   # ['observation_date','DFEDTARU']
-    dfedtarl = read_csv(FED_DATA_DIR / "DFEDTARL.csv")   # ['observation_date','DFEDTARL']
-    dfedtar  = read_csv(FED_DATA_DIR / "DFEDTAR.csv")    # ['observation_date','DFEDTAR']
+    fedfunds = read_csv(
+        FED_DATA_DIR / "FEDFUNDS.csv"
+    )  # ['observation_date','FEDFUNDS']
+    dfedtaru = read_csv(
+        FED_DATA_DIR / "DFEDTARU.csv"
+    )  # ['observation_date','DFEDTARU']
+    dfedtarl = read_csv(
+        FED_DATA_DIR / "DFEDTARL.csv"
+    )  # ['observation_date','DFEDTARL']
+    dfedtar = read_csv(FED_DATA_DIR / "DFEDTAR.csv")  # ['observation_date','DFEDTAR']
 
     # Merge targets (single-era + range-era)
     merged_targets = combine_timeframes(
@@ -101,10 +107,15 @@ def build_dataset(cfg: dict) -> pd.DataFrame:
     merged_targets.loc[merged_targets.index > cutoff, col] = np.nan
 
     # TARGET_MID = DFEDTAR where available; otherwise midpoint of bounds
-    merged_targets["TARGET_MID"] = merged_targets[col].where(
-        ~merged_targets[col].isna(),
-        (merged_targets["DFEDTARL_DFEDTARL"] + merged_targets["DFEDTARU_DFEDTARU"]) / 2.0,
-    ).astype(float)
+    merged_targets["TARGET_MID"] = (
+        merged_targets[col]
+        .where(
+            ~merged_targets[col].isna(),
+            (merged_targets["DFEDTARL_DFEDTARL"] + merged_targets["DFEDTARU_DFEDTARU"])
+            / 2.0,
+        )
+        .astype(float)
+    )
 
     # TARGET_SPREAD
     merged_targets["TARGET_SPREAD"] = (
@@ -167,7 +178,9 @@ def _maybe_call_sql_sink(df: pd.DataFrame, cfg: dict, save_path: Path) -> None:
 
     writer_path = sql_cfg.get("writer")
     if not writer_path or ":" not in writer_path:
-        raise ValueError("sql.writer must be 'module:function', e.g. 'sql_sink_example:write_dataframe_and_log'")
+        raise ValueError(
+            "sql.writer must be 'module:function', e.g. 'sql_sink_example:write_dataframe_and_log'"
+        )
 
     mod_name, fn_name = writer_path.split(":", 1)
     import importlib
@@ -202,9 +215,17 @@ def main(argv=None):
     parser = argparse.ArgumentParser(
         description="Consolidate Federal Reserve rate datasets into a unified daily CSV."
     )
-    parser.add_argument("--config", type=Path, default=None, help="Path to YAML config.")
-    parser.add_argument("--plot", action="store_true", help="Show quick validation plot.")
-    parser.add_argument("--verbose-missing", action="store_true", help="Print missing-range diagnostics.")
+    parser.add_argument(
+        "--config", type=Path, default=None, help="Path to YAML config."
+    )
+    parser.add_argument(
+        "--plot", action="store_true", help="Show quick validation plot."
+    )
+    parser.add_argument(
+        "--verbose-missing",
+        action="store_true",
+        help="Print missing-range diagnostics.",
+    )
     args = parser.parse_args(argv)
 
     cfg = _load_config(args.config)
@@ -233,6 +254,7 @@ def main(argv=None):
     if cfg.get("plot_quicklook", False):
         try:
             import matplotlib.pyplot as plt
+
             ax = df[["TARGET_MID", "FEDFUNDS"]].plot(figsize=(11, 5), lw=1.1)
             ax.set_title("Fed Policy Target (Mid) vs Effective Fed Funds Rate")
             ax.set_xlabel("")

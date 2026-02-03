@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 r"""
 Full rebuild of public.cmc_price_bars_1d (DROP + rebuild):
 python src/ta_lab2/scripts/bars/refresh_cmc_price_bars_1d.py --rebuild --keep-rejects --fail-on-rejects
@@ -17,6 +18,7 @@ from typing import Any, Optional, Sequence, List, Tuple
 # Prefer psycopg v3, fall back to psycopg2
 try:
     import psycopg  # type: ignore
+
     PSYCOPG3 = True
 except Exception:
     psycopg = None
@@ -24,6 +26,7 @@ except Exception:
 
 try:
     import psycopg2  # type: ignore
+
     PSYCOPG2 = True
 except Exception:
     psycopg2 = None
@@ -42,7 +45,7 @@ def _normalize_db_url(url: str) -> str:
         "postgres+psycopg3://",
     ):
         if url.startswith(prefix):
-            return "postgresql://" + url[len(prefix):]
+            return "postgresql://" + url[len(prefix) :]
     return url
 
 
@@ -68,7 +71,9 @@ def _exec(conn, sql: str, params: Optional[Sequence[Any]] = None) -> None:
     cur.close()
 
 
-def _fetchall(conn, sql: str, params: Optional[Sequence[Any]] = None) -> List[Tuple[Any, ...]]:
+def _fetchall(
+    conn, sql: str, params: Optional[Sequence[Any]] = None
+) -> List[Tuple[Any, ...]]:
     params = params or []
     if PSYCOPG3:
         with conn.cursor() as cur:
@@ -81,7 +86,9 @@ def _fetchall(conn, sql: str, params: Optional[Sequence[Any]] = None) -> List[Tu
     return rows
 
 
-def _fetchone(conn, sql: str, params: Optional[Sequence[Any]] = None) -> Optional[Tuple[Any, ...]]:
+def _fetchone(
+    conn, sql: str, params: Optional[Sequence[Any]] = None
+) -> Optional[Tuple[Any, ...]]:
     params = params or []
     if PSYCOPG3:
         with conn.cursor() as cur:
@@ -214,6 +221,7 @@ TRUNCATE TABLE {rej};
 # -----------------------------------------------------------------------------
 # SQL building blocks
 # -----------------------------------------------------------------------------
+
 
 def _parse_ids_arg(ids_arg: str) -> Optional[List[int]]:
     s = (ids_arg or "").strip().lower()
@@ -658,6 +666,7 @@ SELECT count(*)::int FROM ins;
 # Driver
 # -----------------------------------------------------------------------------
 
+
 def build_1d_incremental(
     *,
     conn,
@@ -705,11 +714,16 @@ def build_1d_incremental(
         # src_rows:   (id, time_min, time_min, time_max, time_max, last_src_ts, last_src_ts, lookback_days)
         params: List[Any] = [
             id_,
-            time_max, time_max,
+            time_max,
+            time_max,
             id_,
-            time_min, time_min,
-            time_max, time_max,
-            last_src_ts, last_src_ts, lookback_days,
+            time_min,
+            time_min,
+            time_max,
+            time_max,
+            last_src_ts,
+            last_src_ts,
+            lookback_days,
         ]
 
         rejected = 0
@@ -752,27 +766,59 @@ def build_1d_incremental(
     if keep_rejects:
         print(f"[bars_1d] rejects={rejects}")
     print(f"[bars_1d] ids_processed={len(id_list)} lookback_days={lookback_days}")
-    print(f"[bars_1d] total_upserted={total_upserted} repaired_timehigh={total_rep_hi} repaired_timelow={total_rep_lo}")
+    print(
+        f"[bars_1d] total_upserted={total_upserted} repaired_timehigh={total_rep_hi} repaired_timelow={total_rep_lo}"
+    )
     if keep_rejects:
         print(f"[bars_1d] total_rejected={total_rej}")
         if fail_on_rejects and total_rej > 0:
-            raise SystemExit(f"[bars_1d] FAIL: {total_rej} rejects inserted into {rejects}")
+            raise SystemExit(
+                f"[bars_1d] FAIL: {total_rej} rejects inserted into {rejects}"
+            )
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Incremental build of canonical 1D bars table with state tracking.")
-    p.add_argument("--db-url", default=os.environ.get("TARGET_DB_URL") or os.environ.get("TA_LAB2_DB_URL") or "")
+    p = argparse.ArgumentParser(
+        description="Incremental build of canonical 1D bars table with state tracking."
+    )
+    p.add_argument(
+        "--db-url",
+        default=os.environ.get("TARGET_DB_URL")
+        or os.environ.get("TA_LAB2_DB_URL")
+        or "",
+    )
     p.add_argument("--src", default="public.cmc_price_histories7")
     p.add_argument("--dst", default="public.cmc_price_bars_1d")
     p.add_argument("--state", default="public.cmc_price_bars_1d_state")
     p.add_argument("--rejects", default="public.cmc_price_bars_1d_rejects")
-    p.add_argument("--ids", default="all", help="all or comma-separated list, e.g. 1,1027,1975")
-    p.add_argument("--time-min", default=None, help='Optional inclusive bound on src."timestamp"')
-    p.add_argument("--time-max", default=None, help='Optional exclusive bound on src."timestamp"')
-    p.add_argument("--lookback-days", type=int, default=3, help="Reprocess this many days back from last_src_ts (handles late revisions)")
-    p.add_argument("--rebuild", action="store_true", help="DROP + recreate dst + state (and rejects if kept) before building")
-    p.add_argument("--keep-rejects", action="store_true", help="Log rejected rows to rejects table")
-    p.add_argument("--fail-on-rejects", action="store_true", help="Exit non-zero if any rejects were logged")
+    p.add_argument(
+        "--ids", default="all", help="all or comma-separated list, e.g. 1,1027,1975"
+    )
+    p.add_argument(
+        "--time-min", default=None, help='Optional inclusive bound on src."timestamp"'
+    )
+    p.add_argument(
+        "--time-max", default=None, help='Optional exclusive bound on src."timestamp"'
+    )
+    p.add_argument(
+        "--lookback-days",
+        type=int,
+        default=3,
+        help="Reprocess this many days back from last_src_ts (handles late revisions)",
+    )
+    p.add_argument(
+        "--rebuild",
+        action="store_true",
+        help="DROP + recreate dst + state (and rejects if kept) before building",
+    )
+    p.add_argument(
+        "--keep-rejects", action="store_true", help="Log rejected rows to rejects table"
+    )
+    p.add_argument(
+        "--fail-on-rejects",
+        action="store_true",
+        help="Exit non-zero if any rejects were logged",
+    )
     args = p.parse_args()
 
     if not args.db_url:

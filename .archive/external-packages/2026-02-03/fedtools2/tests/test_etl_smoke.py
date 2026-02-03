@@ -1,5 +1,6 @@
 from fedtools2.etl import _load_config, build_dataset
 
+
 def test_build_dataset_smoke():
     cfg = _load_config(None)
     df = build_dataset(cfg)
