@@ -8,6 +8,8 @@ import pytest
 ANALYSIS_MODULES = [
     "ta_lab2.tools.data_tools.analysis.generate_function_map",
     "ta_lab2.tools.data_tools.analysis.tree_structure",
+    # Added from 14-12 (enhanced function mapper)
+    "ta_lab2.tools.data_tools.analysis.generate_function_map_with_purpose",
 ]
 
 DATABASE_MODULES = [
@@ -20,6 +22,17 @@ MEMORY_MODULES = [
     "ta_lab2.tools.data_tools.memory.generate_memories_from_code",
     "ta_lab2.tools.data_tools.memory.memory_bank_rest",
     "ta_lab2.tools.data_tools.memory.setup_mem0",
+    # Added from 14-11 (memory pipeline scripts)
+    "ta_lab2.tools.data_tools.memory.generate_memories_from_diffs",
+    "ta_lab2.tools.data_tools.memory.generate_memories_from_conversations",
+    "ta_lab2.tools.data_tools.memory.instantiate_final_memories",
+    "ta_lab2.tools.data_tools.memory.memory_headers_dedup",
+    "ta_lab2.tools.data_tools.memory.memory_headers_step1_deterministic",
+    "ta_lab2.tools.data_tools.memory.memory_headers_step2_openai_enrich",
+    "ta_lab2.tools.data_tools.memory.memory_instantiate_children_step3",
+    "ta_lab2.tools.data_tools.memory.memory_bank_engine_rest",
+    "ta_lab2.tools.data_tools.memory.memory_build_registry",
+    "ta_lab2.tools.data_tools.memory.combine_memories",
 ]
 
 EXPORT_MODULES = [
@@ -39,6 +52,13 @@ GENERATOR_MODULES = [
     "ta_lab2.tools.data_tools.generators.intelligence_report_generator",
     "ta_lab2.tools.data_tools.generators.finetuning_data_generator",
     "ta_lab2.tools.data_tools.generators.review_triage_generator",
+    # Added from 14-12 (commit history generator)
+    "ta_lab2.tools.data_tools.generators.generate_commits_txt",
+]
+
+PROCESSING_MODULES = [
+    # Added from 14-12 (DataFrame consolidation)
+    "ta_lab2.tools.data_tools.processing.DataFrame_Consolidation",
 ]
 
 CONTEXT_MODULES = [
@@ -55,6 +75,7 @@ ALL_MODULES = (
     + MEMORY_MODULES
     + EXPORT_MODULES
     + GENERATOR_MODULES
+    + PROCESSING_MODULES
     + CONTEXT_MODULES
 )
 
