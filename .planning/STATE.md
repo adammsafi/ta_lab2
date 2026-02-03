@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 ## Current Position
 
 Phase: 17 of 19 (Verification & Validation)
-Plan: 3 of 6 in current phase
+Plan: 4 of 6 in current phase
 Status: In progress
-Last activity: 2026-02-03 - Completed 17-03-PLAN.md (CI validation workflow)
+Last activity: 2026-02-03 - Completed 17-04-PLAN.md (pre-commit hooks configuration)
 
-Progress: [##########] 100% v0.4.0 | [██████████] 100% v0.5.0 (Phase 17 in progress: 3/6 plans)
+Progress: [##########] 100% v0.4.0 | [██████████] 100% v0.5.0 (Phase 17 in progress: 4/6 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 96 (56 in v0.4.0, 40 in v0.5.0)
-- Average duration: 13 min
-- Total execution time: 20.15 hours
+- Total plans completed: 97 (56 in v0.4.0, 41 in v0.5.0)
+- Average duration: 12 min
+- Total execution time: 20.28 hours
 
 **By Phase (v0.4.0):**
 
@@ -48,11 +48,11 @@ Progress: [##########] 100% v0.4.0 | [██████████] 100% v0.5.
 | 14-tools-integration | 13 | 128 min | 10 min | Complete |
 | 15-economic-data-strategy | 6 | 36 min | 6 min | Complete |
 | 16-repository-cleanup | 7 | 226 min | 32 min | Complete |
-| 17-verification-validation | 3 | 12 min | 4 min | In progress |
+| 17-verification-validation | 4 | 20 min | 5 min | In progress |
 
 **Recent Trend:**
 - v0.4.0 complete: 10 phases, 56 plans, 12.55 hours total
-- v0.5.0 in progress: Phase 17 started (3/6 plans, 12 min), 40 plans across 7 phases
+- v0.5.0 in progress: Phase 17 started (4/6 plans, 20 min), 41 plans across 7 phases
 
 *Updated after each plan completion*
 
@@ -165,6 +165,10 @@ Recent decisions affecting current work:
 - **Critical jobs block CI** (17-03): import-validation-core and circular-dependencies have no continue-on-error for blocking checks
 - **Warning jobs use continue-on-error** (17-03): organization-rules and import-validation-optional use continue-on-error: true for advisory checks
 - **Separate core vs optional imports** (17-03): Core imports tested without orchestrator (mark "not orchestrator"), optional imports with full dependencies can fail non-blocking
+- **Exclude archived files from quality hooks** (17-04): .archive/ excluded from ruff, ruff-format, debug-statements - contains intentionally preserved code
+- **Use python3 not python3.10** (17-04): System Python version used, not hardcoded 3.10 for virtualenv compatibility
+- **Manifest JSON validation loop pattern** (17-04): bash -c 'for f in "$@"' handles multiple manifest files passed by pre-commit
+- **Document but don't block on lint issues** (17-04): 497 pre-existing Ruff errors documented for gap closure, not fixed in this phase
 
 ### Pending Todos
 
@@ -177,12 +181,17 @@ None yet.
 - regimes<->pipelines: Circular dependency between regimes.run_btc_pipeline and pipelines.btc_pipeline
 - Requires gap closure refactoring before full validation passes
 
+**Pre-existing lint issues (17-04):**
+- 497 Ruff lint errors in active codebase (E402, F841, E701, E712, E722, E741)
+- Documented for gap closure, not blocking current development
+- Main categories: Module imports not at top (E402), unused variables (F841), multiple statements per line (E701)
+
 ## Session Continuity
 
-Last session: 2026-02-03T22:08:23Z
-Stopped at: Completed 17-03-PLAN.md (CI validation workflow with critical/warning job separation)
+Last session: 2026-02-03T22:12:54Z
+Stopped at: Completed 17-04-PLAN.md (pre-commit hooks with Ruff linting, organization rules enforced)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-03 (Phase 17 in progress: 3/6 plans - import validation with 368 tests, import-linter with 3 violations, CI workflow enforcing validation)*
+*Last updated: 2026-02-03 (Phase 17 in progress: 4/6 plans - import validation (368 tests), import-linter (3 violations), CI workflows, pre-commit hooks (497 lint issues documented))*
