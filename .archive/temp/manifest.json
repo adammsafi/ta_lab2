@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "category": "temp",
   "created_at": "2026-02-03T11:26:52.586873",
-  "total_files": 177,
-  "total_size_bytes": 198631069,
+  "total_files": 185,
+  "total_size_bytes": 198718719,
   "files": [
     {
       "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\ema_expected_coverage.csv",
@@ -1952,6 +1952,116 @@
       "commit_hash": "9c75d6a1b46132fe0ae85206b15fcd1534dd523f",
       "phase_number": "16",
       "archive_reason": "Codex write access marker file"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\nul",
+      "archive_path": "not_archived",
+      "action": "skipped_windows_device",
+      "timestamp": "2026-02-03T21:11:07.083509",
+      "sha256_checksum": "n/a",
+      "size_bytes": 0,
+      "commit_hash": null,
+      "phase_number": "16",
+      "archive_reason": "Gap closure: Windows special device name - cannot be read/written on Windows"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\-p",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\temp\\2026-02-03\\corrupted_paths\\special_-p",
+      "action": "moved",
+      "timestamp": "2026-02-03T21:11:07.085016",
+      "sha256_checksum": "directory",
+      "size_bytes": 0,
+      "commit_hash": null,
+      "phase_number": "16",
+      "archive_reason": "Gap closure: Special directory - Special directory - attempt archive, document if fails"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.planningphases11-memory-preparationvalidation",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\temp\\2026-02-03\\corrupted_paths\\corrupted_.planningphases11-memory-preparationvalidation",
+      "action": "moved",
+      "timestamp": "2026-02-03T16:11:48.392161",
+      "sha256_checksum": "directory",
+      "size_bytes": 0,
+      "commit_hash": null,
+      "phase_number": "16",
+      "archive_reason": "Gap closure: Corrupted path from Windows/Claude interaction"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\C\uf03aUsersasafiAppDataLocalTempclaudeC--Users-asafi-Downloads-ta-lab2c83d074d-ffff-4260-96b8-93d1abaa9042scratchpadplan-04-02.txt",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\temp\\2026-02-03\\corrupted_paths\\corrupted_C-UsersasafiAppDataLocalTempclaudeC--Users-asafi-Downloads-ta-lab2c83d074d-ffff-4260-96b8-93d1abaa9042scratchpadplan-04-02.txt",
+      "action": "moved",
+      "timestamp": "2026-02-03T16:11:48.395738",
+      "sha256_checksum": "b630cbcc438765c5b488507f976124b6a96053d4fcb475b7292356dcf5922780",
+      "size_bytes": 27869,
+      "commit_hash": null,
+      "phase_number": "16",
+      "archive_reason": "Gap closure: Corrupted path from Windows/Claude interaction"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\C\uf03aUsersasafiAppDataLocalTempclaudeC--Users-asafi-Downloads-ta-lab2c83d074d-ffff-4260-96b8-93d1abaa9042scratchpadplan-04-03.txt",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\temp\\2026-02-03\\corrupted_paths\\corrupted_C-UsersasafiAppDataLocalTempclaudeC--Users-asafi-Downloads-ta-lab2c83d074d-ffff-4260-96b8-93d1abaa9042scratchpadplan-04-03.txt",
+      "action": "moved",
+      "timestamp": "2026-02-03T16:11:48.397746",
+      "sha256_checksum": "63a274d3506fbb75d83895549f7831307c837becd430dfbdfd69710e6a681655",
+      "size_bytes": 26934,
+      "commit_hash": null,
+      "phase_number": "16",
+      "archive_reason": "Gap closure: Corrupted path from Windows/Claude interaction"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\C\uf03aUsersasafiAppDataLocalTempclaudeC--Users-asafi-Downloads-ta-lab2c83d074d-ffff-4260-96b8-93d1abaa9042scratchpadplan-04-04.txt",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\temp\\2026-02-03\\corrupted_paths\\corrupted_C-UsersasafiAppDataLocalTempclaudeC--Users-asafi-Downloads-ta-lab2c83d074d-ffff-4260-96b8-93d1abaa9042scratchpadplan-04-04.txt",
+      "action": "moved",
+      "timestamp": "2026-02-03T16:11:48.400401",
+      "sha256_checksum": "2faeec9124fd69b14b9fd5568fb64f8d42300074696481c761df5866b3ec6059",
+      "size_bytes": 32847,
+      "commit_hash": null,
+      "phase_number": "16",
+      "archive_reason": "Gap closure: Corrupted path from Windows/Claude interaction"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\C\uf03aUsersasafiDownloadsta_lab2docs",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\temp\\2026-02-03\\corrupted_paths\\corrupted_C-UsersasafiDownloadsta_lab2docs",
+      "action": "moved",
+      "timestamp": "2026-02-03T16:11:48.402495",
+      "sha256_checksum": "directory",
+      "size_bytes": 0,
+      "commit_hash": null,
+      "phase_number": "16",
+      "archive_reason": "Gap closure: Corrupted path from Windows/Claude interaction"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\C\uf03aUsersasafiDownloadsta_lab2testsintegration",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\temp\\2026-02-03\\corrupted_paths\\corrupted_C-UsersasafiDownloadsta_lab2testsintegration",
+      "action": "moved",
+      "timestamp": "2026-02-03T16:11:48.403495",
+      "sha256_checksum": "directory",
+      "size_bytes": 0,
+      "commit_hash": null,
+      "phase_number": "16",
+      "archive_reason": "Gap closure: Corrupted path from Windows/Claude interaction"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\C\uf03aUsersasafiDownloadsta_lab2teststoolsdata_tools",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\temp\\2026-02-03\\corrupted_paths\\corrupted_C-UsersasafiDownloadsta_lab2teststoolsdata_tools",
+      "action": "moved",
+      "timestamp": "2026-02-03T16:11:48.404495",
+      "sha256_checksum": "directory",
+      "size_bytes": 0,
+      "commit_hash": null,
+      "phase_number": "16",
+      "archive_reason": "Gap closure: Corrupted path from Windows/Claude interaction"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\nul",
+      "archive_path": "not_archived",
+      "action": "skipped_windows_device",
+      "timestamp": "2026-02-03T16:11:48.404495",
+      "sha256_checksum": "n/a",
+      "size_bytes": 0,
+      "commit_hash": null,
+      "phase_number": "16",
+      "archive_reason": "Gap closure: Windows special device name - cannot be read/written on Windows"
     }
   ]
 }
