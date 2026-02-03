@@ -1,0 +1,131 @@
+{
+  "$schema": "https://ta-lab2.example.com/schemas/archive-manifest-1.0.0.json",
+  "version": "1.0.0",
+  "created": "2026-02-03T02:46:05.716221+00:00",
+  "category": "data_tools",
+  "source": "C:/Users/asafi/Downloads/Data_Tools",
+  "files": [
+    {
+      "original_path": "write_daily_emas.py",
+      "archive_path": "one_offs/write_daily_emas.py",
+      "checksum_sha256": "25f20cf54ec4187d4864eaaa7249d751b18567a790d24790254151cebf32e1df",
+      "size_bytes": 313,
+      "action": "archived",
+      "reason": "Simple wrapper for existing ta_lab2 functionality",
+      "archived_at": "2026-02-03T02:46:05.716221+00:00"
+    },
+    {
+      "original_path": "write_multi_tf_emas.py",
+      "archive_path": "one_offs/write_multi_tf_emas.py",
+      "checksum_sha256": "c177925f15d9335612eb9733c35ed98b86bfd244b6964ed077de9c3672f34c19",
+      "size_bytes": 346,
+      "action": "archived",
+      "reason": "Simple wrapper for existing ta_lab2 functionality",
+      "archived_at": "2026-02-03T02:46:05.716221+00:00"
+    },
+    {
+      "original_path": "write_ema_multi_tf_cal.py",
+      "archive_path": "one_offs/write_ema_multi_tf_cal.py",
+      "checksum_sha256": "c79726e555e63131fb3369a04cab341d6be07dc60a4b6021ad8400d0c2c30708",
+      "size_bytes": 446,
+      "action": "archived",
+      "reason": "Simple wrapper for existing ta_lab2 functionality",
+      "archived_at": "2026-02-03T02:46:05.716221+00:00"
+    },
+    {
+      "original_path": "upsert_new_emas_canUpdate.py",
+      "archive_path": "one_offs/upsert_new_emas_canUpdate.py",
+      "checksum_sha256": "ae09ff899f574272e0535c7cc14e4ac7073c830a696d04d6a61bac84ded326cc",
+      "size_bytes": 1272,
+      "action": "archived",
+      "reason": "Simple wrapper for existing ta_lab2 functionality",
+      "archived_at": "2026-02-03T02:46:05.716221+00:00"
+    },
+    {
+      "original_path": "github instruction.py",
+      "archive_path": "one_offs/github instruction.py",
+      "checksum_sha256": "13bbb500ce8c07adeaf7497f71bbb714433b7a21a16ed93ce9a75f065a7b7e9c",
+      "size_bytes": 203,
+      "action": "archived",
+      "reason": "One-off instruction file",
+      "archived_at": "2026-02-03T02:46:05.716221+00:00"
+    },
+    {
+      "original_path": "chatgpt/chatgpt_script_look.py",
+      "archive_path": "prototypes/chatgpt_script_look.py",
+      "checksum_sha256": "7cce78a83868fd1e5c6032fd129fd7a3ac341b523131016c022069c70a02a734",
+      "size_bytes": 452,
+      "action": "archived",
+      "reason": "Prototype script - numbered variations indicate experimentation",
+      "archived_at": "2026-02-03T02:46:05.716221+00:00"
+    },
+    {
+      "original_path": "chatgpt/chatgpt_script_keep_look.py",
+      "archive_path": "prototypes/chatgpt_script_keep_look.py",
+      "checksum_sha256": "8cf2da3ba4f9960a2930f2b1eda0f0296e76b9d381a25ba3f3864556eaf3e65a",
+      "size_bytes": 646,
+      "action": "archived",
+      "reason": "Prototype script - numbered variations indicate experimentation",
+      "archived_at": "2026-02-03T02:46:05.716221+00:00"
+    },
+    {
+      "original_path": "chatgpt/chatgpt_script_keep_look1.py",
+      "archive_path": "prototypes/chatgpt_script_keep_look1.py",
+      "checksum_sha256": "512f49977047404da04a19dc547302a4e8b5c7b0cf06713209891d25f4cd9759",
+      "size_bytes": 536,
+      "action": "archived",
+      "reason": "Prototype script - numbered variations indicate experimentation",
+      "archived_at": "2026-02-03T02:46:05.716221+00:00"
+    },
+    {
+      "original_path": "chatgpt/chatgpt_script_keep_look2.py",
+      "archive_path": "prototypes/chatgpt_script_keep_look2.py",
+      "checksum_sha256": "4a3cf069db61c5f8f6f067b845eb056aec127913543304568b52b87b9914c212",
+      "size_bytes": 360,
+      "action": "archived",
+      "reason": "Prototype script - numbered variations indicate experimentation",
+      "archived_at": "2026-02-03T02:46:05.716221+00:00"
+    },
+    {
+      "original_path": "chatgpt/chatgpt_pipeline.py",
+      "archive_path": "prototypes/chatgpt_pipeline.py",
+      "checksum_sha256": "2a75756c628eb0654418cca0706c579685aefdcc9e2cb4d8a51e922e3bd9d253",
+      "size_bytes": 8338,
+      "action": "archived",
+      "reason": "Experimental pipeline orchestration",
+      "archived_at": "2026-02-03T02:46:05.716221+00:00"
+    },
+    {
+      "original_path": "chatgpt/main.py",
+      "archive_path": "prototypes/main.py",
+      "checksum_sha256": "cd53fbd74852bec9b3bc9aca42f9ed2314dfc8d9accff94a07ec34bb702029c1",
+      "size_bytes": 171,
+      "action": "archived",
+      "reason": "Empty stub file, likely unused",
+      "archived_at": "2026-02-03T02:46:05.716221+00:00"
+    },
+    {
+      "original_path": "chatgpt/run_instantiate_final_memories_tests.py",
+      "archive_path": "prototypes/run_instantiate_final_memories_tests.py",
+      "checksum_sha256": "f2d76fe8b7c7be740f91fbd85f0b2136b24198a8f5c7773a0423e231c58745c3",
+      "size_bytes": 11139,
+      "action": "archived",
+      "reason": "Test script, not production tool",
+      "archived_at": "2026-02-03T02:46:05.716221+00:00"
+    },
+    {
+      "original_path": "chatgpt/test_code_search.py",
+      "archive_path": "prototypes/test_code_search.py",
+      "checksum_sha256": "ace005ed2977c7fbb9fee61cb55baba82ef34ee4f6e9ac272e6fd785d4c2692c",
+      "size_bytes": 1862,
+      "action": "archived",
+      "reason": "Test script, not production tool",
+      "archived_at": "2026-02-03T02:46:05.716221+00:00"
+    }
+  ],
+  "summary": {
+    "total_files": 13,
+    "prototypes": 8,
+    "one_offs": 5
+  }
+}
