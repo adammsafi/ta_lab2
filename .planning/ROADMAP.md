@@ -338,7 +338,14 @@ Plans:
   3. Duplicate functions detected and documented (95%+, 85-95%, 70-85% thresholds)
   4. Memory graph validation passes (no orphans, all relationships linked)
   5. Memory queries work: function lookup, cross-reference, edit impact analysis
-**Plans**: TBD
+**Plans**: 6 plans
+Plans:
+- [ ] 19-01-PLAN.md - Create AST-based function extraction and memory indexing
+- [ ] 19-02-PLAN.md - Implement relationship linking (contains, calls, imports, moved_to, similar_to)
+- [ ] 19-03-PLAN.md - Create duplicate detection with three-tier thresholds
+- [ ] 19-04-PLAN.md - Build memory graph validation and query tests
+- [ ] 19-05-PLAN.md - Run validation and generate VALIDATION.md report
+- [ ] 19-06-PLAN.md - Update CHANGELOG, bump version, create v0.5.0 release tag
 
 ## Progress
 
@@ -372,7 +379,7 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> 12 -> ...
 | 16. Repository Cleanup | 0/6 | Planned | - |
 | 17. Verification & Validation | 0/5 | Planned | - |
 | 18. Structure Documentation | 0/4 | Planned | - |
-| 19. Memory Validation & Release | 0/TBD | Not started | - |
+| 19. Memory Validation & Release | 0/6 | Planned | - |
 
 ## Requirement Coverage
 
@@ -395,4 +402,4 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> 12 -> ...
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-03 (Phase 17 planned: 5 plans in 3 waves)*
+*Last updated: 2026-02-03 (Phase 19 planned: 6 plans in 5 waves)*
