@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Generate category-based digests from memory collections."""
 from __future__ import annotations
 
 import argparse

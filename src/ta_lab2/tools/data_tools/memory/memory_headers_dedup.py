@@ -1,16 +1,8 @@
+"""Deduplicate duplicate YAML front-matter blocks in markdown files."""
 from __future__ import annotations
 import argparse
 import csv
 from pathlib import Path
-
-"""
-Deduplicates duplicate YAML front-matter blocks in markdown files.
-
-Usage:
-    python -m ta_lab2.tools.data_tools.memory.memory_headers_dedup \
-        --kept-manifest kept_manifest.csv \
-        [--dry-run]
-"""
 
 FM_START = "---\n"
 FM_END = "\n---\n"

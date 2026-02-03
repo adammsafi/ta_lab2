@@ -1,3 +1,4 @@
+"""Process and instantiate final memory records for storage."""
 from __future__ import annotations
 
 import argparse

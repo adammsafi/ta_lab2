@@ -1,3 +1,4 @@
+"""Enrich memory headers with OpenAI-generated titles and tags (Step 2)."""
 from __future__ import annotations
 
 import argparse

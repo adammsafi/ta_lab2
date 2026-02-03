@@ -1,3 +1,4 @@
+"""Generate semantic memories from git diffs with LLM analysis."""
 from __future__ import annotations
 # generate_memories_from_diffs.py
 

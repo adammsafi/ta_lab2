@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Generate intelligence reports with indexing from memory JSONL."""
 from __future__ import annotations
 
 import argparse

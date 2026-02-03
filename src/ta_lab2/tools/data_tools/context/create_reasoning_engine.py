@@ -1,3 +1,4 @@
+"""Create and deploy Vertex AI reasoning engine with memory bank integration."""
 from __future__ import annotations
 
 # create_reasoning_engine.py (using memory_bank_engine_rest)
@@ -53,10 +54,10 @@ except ImportError:
 
 # Import the self-contained engine
 try:
-    from memory_bank_engine_rest import TA_Lab2_Memory_Engine
+    from ta_lab2.tools.data_tools.memory.memory_bank_engine_rest import TA_Lab2_Memory_Engine
 except ImportError:
-    print("Error: memory_bank_engine_rest.py not found. This file must be in the same directory.")
-    print("This script requires the memory_bank_engine_rest.py engine file to deploy.")
+    print("Error: memory_bank_engine_rest.py not found in ta_lab2.tools.data_tools.memory.")
+    print("This script requires the memory_bank_engine_rest.py engine file to be migrated.")
     import sys
     sys.exit(1)
 

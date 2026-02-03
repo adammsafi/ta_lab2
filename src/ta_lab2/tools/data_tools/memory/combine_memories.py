@@ -1,3 +1,4 @@
+"""Combine multiple JSONL memory files into a single deduplicated collection."""
 
 import argparse
 import json

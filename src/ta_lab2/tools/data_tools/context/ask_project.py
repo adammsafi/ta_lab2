@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""RAG-based project Q&A with semantic search and LLM chat."""
 from __future__ import annotations
 
 import argparse

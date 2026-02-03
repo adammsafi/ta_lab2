@@ -1,3 +1,4 @@
+"""Extract deterministic YAML headers from markdown memory files (Step 1)."""
 from __future__ import annotations
 
 import argparse

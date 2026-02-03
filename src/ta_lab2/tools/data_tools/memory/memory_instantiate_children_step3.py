@@ -1,3 +1,4 @@
+"""Instantiate child memories from parent memory sections (Step 3)."""
 from __future__ import annotations
 
 import argparse

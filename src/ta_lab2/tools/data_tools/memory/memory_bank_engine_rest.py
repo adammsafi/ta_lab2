@@ -1,3 +1,4 @@
+"""Memory Bank REST engine for semantic memory search and retrieval."""
 from __future__ import annotations
 
 # memory_bank_engine_rest.py
