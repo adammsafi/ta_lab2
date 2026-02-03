@@ -1,16 +1,82 @@
-name: Validation Gates
+name: Validation & Verification
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 permissions:
   contents: read
 
 jobs:
-  validation:
+  # Critical jobs that must pass
+  import-validation-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install core dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: Test core imports
+        run: pytest tests/test_imports.py -m "not orchestrator" -v --tb=short
+
+  circular-dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install package and import-linter
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          pip install import-linter
+      - name: Check for circular dependencies
+        run: python -m importlinter
+
+  # Warning jobs (can fail without blocking)
+  import-validation-optional:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install all dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[all]"
+      - name: Test orchestrator imports
+        run: pytest tests/test_imports.py -m "orchestrator" -v --tb=short
+        continue-on-error: true
+
+  organization-rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check no .py files in project root
+        run: |
+          count=$(ls -1 *.py 2>/dev/null | wc -l || echo "0")
+          if [ "$count" -gt 1 ]; then
+            echo "::warning::Multiple Python files found in project root (expected max 1: config.py)"
+            ls *.py
+          fi
+        continue-on-error: true
+      - name: Validate manifest JSON files
+        run: |
+          for f in $(find .archive -name "manifest.json" 2>/dev/null); do
+            python -m json.tool "$f" > /dev/null || echo "::warning::Invalid JSON: $f"
+          done
+        continue-on-error: true
+
+  # Existing database-dependent validation tests
+  validation-tests:
     runs-on: ubuntu-latest
 
     services:
