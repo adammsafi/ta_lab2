@@ -254,7 +254,7 @@ Plans:
 - [ ] 14-13-PLAN.md - Gap closure: Update tests and fix docstrings
 
 ### Phase 15: Economic Data Strategy
-**Goal**: Evaluate fredtools2/fedtools2 and implement integration decision
+**Goal**: Archive fredtools2/fedtools2 packages (research determined no integration needed)
 **Depends on**: Phase 14
 **Requirements**: ECON-01, ECON-02, ECON-03, MEMO-13, MEMO-14
 **Success Criteria** (what must be TRUE):
@@ -263,7 +263,11 @@ Plans:
   3. If integrating: packages accessible via pip install ta_lab2[economic-data]
   4. If archiving: packages in .archive/economic_data/ with documentation
   5. Memory updated with integration decision and file locations
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 15-01-PLAN.md - Archive packages to .archive/economic_data/
+- [ ] 15-02-PLAN.md - Create manifest, README, and integration guide
+- [ ] 15-03-PLAN.md - Update memory with archive relationships and phase snapshot
 
 ### Phase 16: Repository Cleanup
 **Goal**: Clean root directory and consolidate duplicate files
@@ -341,7 +345,7 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> 12 -> ...
 | 12. Archive Foundation | 3/3 | Complete | 2026-02-02 |
 | 13. Documentation Consolidation | 7/7 | Complete | 2026-02-02 |
 | 14. Tools Integration | 13/13 | Complete | 2026-02-03 |
-| 15. Economic Data Strategy | 0/TBD | Not started | - |
+| 15. Economic Data Strategy | 0/3 | Planned | - |
 | 16. Repository Cleanup | 0/TBD | Not started | - |
 | 17. Verification & Validation | 0/TBD | Not started | - |
 | 18. Structure Documentation | 0/TBD | Not started | - |
@@ -368,4 +372,4 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> 12 -> ...
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-03 (Phase 14 gap closure: 3 plans in 2 waves)*
+*Last updated: 2026-02-03 (Phase 15 planning: 3 plans in 3 waves)*
