@@ -57,7 +57,7 @@ For detailed setup instructions, see [Deployment Guide](deployment.md) and Time 
 - Multi-platform AI orchestrator with cost-optimized routing (Gemini free tier → subscriptions → paid APIs)
 - PostgreSQL-backed observability (metrics, tracing, health checks, alerts)
 
-For architectural details and system design, see [ARCHITECTURE](../ARCHITECTURE.md) and [DESIGN](DESIGN.md).
+For architectural details and system design, see [Architecture](architecture/architecture.md), [API Map](architecture/api-map.md), [Project Structure](architecture/structure.md), and [DESIGN](DESIGN.md).
 
 ---
 
@@ -415,7 +415,9 @@ alembic history
 ## Documentation
 
 - **[Design Overview](DESIGN.md)** - High-level system concepts and data flow
-- **[Architecture](../ARCHITECTURE.md)** - Implementation details and schemas
+- **[Architecture](architecture/architecture.md)** - Implementation details and schemas
+- **[API Map](architecture/api-map.md)** - Complete API documentation and symbol reference
+- **[Project Structure](architecture/structure.md)** - Directory structure and organization
 - **[Deployment Guide](deployment.md)** - Setup and configuration
 - **[API Reference](api/memory.md)** - Memory REST API documentation
 - **[CLI Reference](api/orchestrator.md)** - Orchestrator CLI commands
@@ -431,6 +433,9 @@ Documentation converted from ProjectTT (original files preserved in `.archive/do
 
 Core system design, components, and terminology.
 
+- [Architecture Overview](architecture/architecture.md) - Implementation details and schemas (v0.4.0)
+- [API Map](architecture/api-map.md) - Complete API documentation and symbol reference
+- [Project Structure](architecture/structure.md) - Directory structure and file organization
 - [Workspace Overview](architecture/ta-lab2-workspace-v.1.1.md) - Main project architecture and design (v1.1)
 - [Core Components](architecture/corecomponents.md) - Foundational system components
 - [Key Terms](architecture/keyterms.md) - Terminology and definitions
@@ -446,6 +451,12 @@ Core system design, components, and terminology.
 - [Hysteresis](architecture/hysteresis.md) - Hysteresis in technical indicators
 - [Fed Data Summary](architecture/feddata-indepthsummary-20251110.md) - Federal Reserve data integration
 
+### Analysis
+
+Codebase analysis and technical assessments.
+
+- [Gemini Analysis](analysis/lab2-analysis-gemini.md) - Comprehensive codebase analysis using Google Gemini
+
 ### Features
 
 Feature implementations and technical analysis components.
@@ -458,6 +469,8 @@ Feature implementations and technical analysis components.
 - [EMA Multi-Timeframe Calendar Anchor](features/ema-multi-tf-cal-anchor.md) - Anchor-based calendar EMAs
 - [EMA Study](features/emas/ema-study.md) - EMA research and analysis
 - [EMA Alpha Comparison](features/emas/ema-alpha-comparison.md) - Alpha calculation comparison
+- [EMA Feature Migration Plan](features/emas/ema-feature-migration-plan.md) - Migration to BaseEMAFeature pattern
+- [EMA Migration Session Summary](features/emas/ema-migration-session-summary.md) - Session notes from migration work
 - [EMA Thoughts](features/ema-thoughts.md) - Design considerations
 - [EMA Possible Next Steps](features/ema-possible-next-steps.md) - Future enhancements
 - [EMA Loo](features/ema-loo.md) - EMA implementation details
@@ -495,6 +508,12 @@ Reference materials, processes, and supporting documentation.
 - [Update DB](reference/update-db.md) - Database update procedures
 - [Updating Price Data](reference/updating-price-data-rough.md) - Price data refresh process
 - [Refresh Methods Review](reference/review-refreshmethods-20251201.md) - Review of refresh methods
+
+### Guides
+
+Troubleshooting, maintenance, and operational guides.
+
+- [CI Dependency Fixes](guides/ci-dependency-fixes.md) - CI/CD troubleshooting and dependency management
 
 > **Note:** Original Word and Excel files are preserved in `.archive/documentation/` with full git history and SHA256 checksums for integrity verification.
 
