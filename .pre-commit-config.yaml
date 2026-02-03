@@ -45,7 +45,7 @@ repos:
       # Block: No .py files in project root (except config.py)
       - id: no-root-py-files
         name: No .py files in project root
-        entry: bash -c 'count=$(ls -1 *.py 2>/dev/null | grep -v "^config.py$" | wc -l); if [ "$count" -gt 0 ]; then echo "Error: Python files not allowed in project root (except config.py):"; ls *.py | grep -v "^config.py$"; exit 1; fi'
+        entry: bash -c 'count=$(ls -1 *.py 2>/dev/null | grep -v "^config.py$" | wc -l); if [ "$count" -gt 0 ]; then echo "Error Python files not allowed in project root (except config.py)"; ls *.py | grep -v "^config.py$"; exit 1; fi'
         language: system
         pass_filenames: false
         always_run: true
@@ -60,7 +60,7 @@ repos:
 
 # Configuration
 default_language_version:
-  python: python3.10
+  python: python3
 
 # Don't fail fast - show all issues
 fail_fast: false
