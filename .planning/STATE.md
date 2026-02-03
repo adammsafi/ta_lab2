@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 ## Current Position
 
 Phase: 16 of 19 (Repository Cleanup)
-Plan: 4 of 6 in current phase
+Plan: 5 of 6 in current phase
 Status: In progress
-Last activity: 2026-02-03 - Completed 16-04-PLAN.md (duplicate detection)
+Last activity: 2026-02-03 - Completed 16-05-PLAN.md (function similarity analysis)
 
-Progress: [##########] 100% v0.4.0 | [██████████] 100% v0.5.0 (Phase 16 in progress: 4/6 plans)
+Progress: [##########] 100% v0.4.0 | [██████████] 100% v0.5.0 (Phase 16 in progress: 5/6 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 91 (56 in v0.4.0, 35 in v0.5.0)
-- Average duration: 11 min
-- Total execution time: 17.67 hours
+- Total plans completed: 92 (56 in v0.4.0, 36 in v0.5.0)
+- Average duration: 13 min
+- Total execution time: 19.87 hours
 
 **By Phase (v0.4.0):**
 
@@ -47,11 +47,11 @@ Progress: [##########] 100% v0.4.0 | [██████████] 100% v0.5.
 | 13-documentation-consolidation | 7 | 30 min | 4 min | Complete |
 | 14-tools-integration | 13 | 128 min | 10 min | Complete |
 | 15-economic-data-strategy | 6 | 36 min | 6 min | Complete |
-| 16-repository-cleanup | 4 | 82 min | 21 min | In progress |
+| 16-repository-cleanup | 5 | 214 min | 43 min | In progress |
 
 **Recent Trend:**
 - v0.4.0 complete: 10 phases, 56 plans, 12.55 hours total
-- v0.5.0 in progress: Phase 16 in progress (4/6 plans, 82 min), 35 plans across 6 phases
+- v0.5.0 in progress: Phase 16 in progress (5/6 plans, 214 min), 36 plans across 6 phases
 
 *Updated after each plan completion*
 
@@ -150,6 +150,9 @@ Recent decisions affecting current work:
 - **Prefer src/ files as canonical** (16-04): When duplicates exist across directories, src/ta_lab2/ copy designated as canonical
 - **Skip already-archived files** (16-04): Files already in .archive/ documented in manifest rather than moved again
 - **Document previously archived duplicates** (16-04): Duplicates manifest tracks historical archival with action "duplicate_previously_archived"
+- **AST unparse without pre-normalization** (16-05): Use ast.unparse() output directly; it's already normalized and requires lineno for type comments
+- **Length-based similarity pre-filtering** (16-05): Skip comparison if function code lengths differ by >30% for 80% comparison skip rate
+- **Similarity report for manual review only** (16-05): Tool flags candidates (728 near-exact, 297 similar, 438 related); user controls consolidation decisions
 
 ### Pending Todos
 
@@ -161,10 +164,10 @@ None currently.
 
 ## Session Continuity
 
-Last session: 2026-02-03T17:02:08Z
-Stopped at: Completed 16-04-PLAN.md (duplicate detection)
+Last session: 2026-02-03T19:12:24Z
+Stopped at: Completed 16-05-PLAN.md (function similarity analysis)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-03 (Phase 16 in progress: 4/6 plans - duplicate detection complete: SHA256-based tool created, 1 duplicate group found already archived in 16-02, duplicates manifest created)*
+*Last updated: 2026-02-03 (Phase 16 in progress: 5/6 plans - function similarity analysis complete: 2,119 functions analyzed, 1,463 similar pairs found (728 near-exact, 297 similar, 438 related), report generated for manual review)*
