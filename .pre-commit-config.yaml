@@ -1,0 +1,66 @@
+# Pre-commit hooks for ta_lab2
+# Target: <5 seconds total execution time
+#
+# Install: pre-commit install
+# Run manually: pre-commit run --all-files
+# Skip hooks: SKIP=ruff-check git commit -m "message"
+
+repos:
+  # Ruff: Fast linting and formatting (Rust-based, ~10-100x faster than alternatives)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.14
+    hooks:
+      # Run linter with auto-fix (BEFORE formatter)
+      - id: ruff
+        name: ruff lint
+        args: [--fix, --exit-non-zero-on-fix]
+        types_or: [python, pyi]
+
+      # Run formatter
+      - id: ruff-format
+        name: ruff format
+        types_or: [python, pyi]
+
+  # Standard pre-commit hooks (fast checks)
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: '\.md$'  # Allow trailing whitespace in markdown (intentional line breaks)
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: check-added-large-files
+        args: [--maxkb=500]
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: debug-statements
+        name: check for debug statements
+
+  # Custom local hooks for project organization rules
+  - repo: local
+    hooks:
+      # Block: No .py files in project root (except config.py)
+      - id: no-root-py-files
+        name: No .py files in project root
+        entry: bash -c 'count=$(ls -1 *.py 2>/dev/null | grep -v "^config.py$" | wc -l); if [ "$count" -gt 0 ]; then echo "Error: Python files not allowed in project root (except config.py):"; ls *.py | grep -v "^config.py$"; exit 1; fi'
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      # Warn: Validate manifest JSON files (if modified)
+      - id: validate-manifest-json
+        name: Validate manifest JSON
+        entry: python -m json.tool
+        language: system
+        files: 'manifest\.json$'
+        types: [json]
+
+# Configuration
+default_language_version:
+  python: python3.10
+
+# Don't fail fast - show all issues
+fail_fast: false
