@@ -55,8 +55,7 @@ import sys
 import time
 from dataclasses import dataclass
 from datetime import datetime
-from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 from ta_lab2.scripts.emas.logging_config import setup_logging, add_logging_args
 
@@ -68,7 +67,6 @@ SCRIPTS = {
     "cal_anchor": r"C:\Users\asafi\Downloads\ta_lab2\src\ta_lab2\scripts\emas\refresh_cmc_ema_multi_tf_cal_anchor_from_bars.py",
     "v2": r"C:\Users\asafi\Downloads\ta_lab2\src\ta_lab2\scripts\emas\refresh_cmc_ema_multi_tf_v2.py",
 }
-
 
 
 @dataclass
@@ -108,7 +106,10 @@ def _require_env() -> None:
 
 def run_validation(args, logger) -> bool:
     """Run rowcount validation on unified EMA table."""
-    from ta_lab2.scripts.emas.validate_ema_rowcounts import validate_rowcounts, summarize_validation
+    from ta_lab2.scripts.emas.validate_ema_rowcounts import (
+        validate_rowcounts,
+        summarize_validation,
+    )
     from ta_lab2.notifications.telegram import send_validation_alert, is_configured
     from ta_lab2.config import TARGET_DB_URL
     from sqlalchemy import create_engine
@@ -144,7 +145,7 @@ def run_validation(args, logger) -> bool:
             periods=periods,
             start_date=start,
             end_date=end,
-            db_url=db_url
+            db_url=db_url,
         )
     except Exception as e:
         logger.error(f"Validation failed with error: {e}", exc_info=True)
@@ -153,7 +154,9 @@ def run_validation(args, logger) -> bool:
     summary = summarize_validation(df)
 
     if summary["gaps"] > 0 or summary["duplicates"] > 0:
-        logger.warning(f"Validation found issues: {summary['gaps']} gaps, {summary['duplicates']} duplicates")
+        logger.warning(
+            f"Validation found issues: {summary['gaps']} gaps, {summary['duplicates']} duplicates"
+        )
 
         if args.alert_on_validation_error and is_configured():
             send_validation_alert(summary)
@@ -226,7 +229,9 @@ def build_steps(args: argparse.Namespace) -> List[Step]:
         ids,
         "--scheme",
         cal_scheme,
-        *(["--start", start] if start else []),  # script accepts None; we pass start for consistency
+        *(
+            ["--start", start] if start else []
+        ),  # script accepts None; we pass start for consistency
         *(["--end", end] if end else []),
         "--periods",
         periods,
@@ -297,11 +302,15 @@ If you see "too many clients already" errors:
   2. Check active connections: SELECT count(*) FROM pg_stat_activity;
   3. Increase Postgres max_connections if needed
   4. Run scripts individually instead of all at once
-        """
+        """,
     )
 
     p.add_argument("--ids", default="all", help="all | comma list like 1,52")
-    p.add_argument("--start", default="2010-01-01", help="Start date/time for runners that accept it")
+    p.add_argument(
+        "--start",
+        default="2010-01-01",
+        help="Start date/time for runners that accept it",
+    )
     p.add_argument("--end", default="", help="End date/time (optional)")
     p.add_argument(
         "--periods",
@@ -312,15 +321,27 @@ If you see "too many clients already" errors:
     p.add_argument("--cal-scheme", default="both", choices=["us", "iso", "both"])
     p.add_argument("--anchor-scheme", default="both", choices=["us", "iso", "both"])
 
-    p.add_argument("--no-update", action="store_true", help="Passes through to scripts that support it")
-    p.add_argument("--full-refresh", action="store_true", help="For CAL runner: ignore state and run full/args.start")
+    p.add_argument(
+        "--no-update",
+        action="store_true",
+        help="Passes through to scripts that support it",
+    )
+    p.add_argument(
+        "--full-refresh",
+        action="store_true",
+        help="For CAL runner: ignore state and run full/args.start",
+    )
     p.add_argument("--continue-on-error", action="store_true")
 
     # v2-specific knobs
     p.add_argument("--v2-alignment-type", default="tf_day")
     p.add_argument("--v2-include-noncanonical", action="store_true")
     p.add_argument("--price-schema", default="public")
-    p.add_argument("--price-table", default="cmc_price_bars_1d", help="V2 price table (default: cmc_price_bars_1d - validated bars)")
+    p.add_argument(
+        "--price-table",
+        default="cmc_price_bars_1d",
+        help="V2 price table (default: cmc_price_bars_1d - validated bars)",
+    )
     p.add_argument("--out-schema", default="public")
     p.add_argument("--v2-out-table", default="cmc_ema_multi_tf_v2")
 
@@ -374,7 +395,9 @@ def main() -> int:
         return 0
 
     logger.info(f"Running {len(steps)} EMA refresh steps: {[s.name for s in steps]}")
-    logger.info(f"Configuration: ids={args.ids}, periods={args.periods}, start={args.start}, end={args.end}")
+    logger.info(
+        f"Configuration: ids={args.ids}, periods={args.periods}, start={args.start}, end={args.end}"
+    )
 
     failures: List[str] = []
     for i, step in enumerate(steps, 1):
@@ -388,15 +411,19 @@ def main() -> int:
                     f"Step {step.name} FAILED: DATABASE CONNECTION LIMIT REACHED. "
                     f"Try closing other database clients or increase Postgres max_connections. "
                     f"Error: {e}",
-                    exc_info=True
+                    exc_info=True,
                 )
             else:
-                logger.error(f"Step {step.name} FAILED: {type(e).__name__}: {e}", exc_info=True)
+                logger.error(
+                    f"Step {step.name} FAILED: {type(e).__name__}: {e}", exc_info=True
+                )
 
             failures.append(step.name)
 
             if not args.continue_on_error:
-                logger.error("Stopping due to failure (use --continue-on-error to proceed)")
+                logger.error(
+                    "Stopping due to failure (use --continue-on-error to proceed)"
+                )
                 break
             else:
                 logger.warning(f"Continuing despite failure in {step.name}")

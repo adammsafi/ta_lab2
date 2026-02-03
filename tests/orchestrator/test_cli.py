@@ -1,14 +1,10 @@
 """Tests for orchestrator CLI."""
 import json
 import pytest
-import tempfile
-from pathlib import Path
-from unittest.mock import patch, AsyncMock, Mock
+from unittest.mock import patch, Mock
 
 from ta_lab2.tools.ai_orchestrator.cli import (
     build_orchestrator_parser,
-    cmd_submit,
-    cmd_batch,
     cmd_status,
     cmd_costs,
     cmd_quota,
@@ -127,7 +123,9 @@ class TestMainEntrypoint:
 
     def test_main_with_status(self):
         """main() handles status subcommand."""
-        with patch("ta_lab2.tools.ai_orchestrator.cli.cmd_status", return_value=0) as mock_cmd:
+        with patch(
+            "ta_lab2.tools.ai_orchestrator.cli.cmd_status", return_value=0
+        ) as mock_cmd:
             result = main(["status"])
 
         assert result == 0

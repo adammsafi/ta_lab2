@@ -43,6 +43,7 @@ logger = logging.getLogger(__name__)
 # Metric Data Classes
 # =============================================================================
 
+
 @dataclass
 class Metric:
     """
@@ -64,14 +65,17 @@ class Metric:
 
     def __post_init__(self) -> None:
         """Validate metric type."""
-        valid_types = {'counter', 'gauge', 'histogram'}
+        valid_types = {"counter", "gauge", "histogram"}
         if self.metric_type not in valid_types:
-            raise ValueError(f"metric_type must be one of {valid_types}, got {self.metric_type}")
+            raise ValueError(
+                f"metric_type must be one of {valid_types}, got {self.metric_type}"
+            )
 
 
 # =============================================================================
 # Metrics Collector
 # =============================================================================
+
 
 class MetricsCollector:
     """
@@ -102,13 +106,15 @@ class MetricsCollector:
         Logs warning if table doesn't exist but doesn't fail.
         Table should be created via ensure_observability_tables().
         """
-        query = text("""
+        query = text(
+            """
             SELECT EXISTS (
                 SELECT FROM information_schema.tables
                 WHERE table_schema = 'observability'
                 AND table_name = 'metrics'
             )
-        """)
+        """
+        )
 
         try:
             with self.engine.connect() as conn:
@@ -132,26 +138,30 @@ class MetricsCollector:
         Raises:
             Exception: If database insert fails
         """
-        query = text("""
+        query = text(
+            """
             INSERT INTO observability.metrics
                 (metric_name, metric_value, metric_type, recorded_at, labels)
             VALUES
                 (:metric_name, :metric_value, :metric_type, :recorded_at, :labels)
-        """)
+        """
+        )
 
         params = {
-            'metric_name': metric.name,
-            'metric_value': metric.value,
-            'metric_type': metric.metric_type,
-            'recorded_at': metric.timestamp,
-            'labels': metric.labels if metric.labels else None,
+            "metric_name": metric.name,
+            "metric_value": metric.value,
+            "metric_type": metric.metric_type,
+            "recorded_at": metric.timestamp,
+            "labels": metric.labels if metric.labels else None,
         }
 
         try:
             with self.engine.begin() as conn:
                 conn.execute(query, params)
 
-            logger.debug(f"Recorded {metric.metric_type} metric: {metric.name}={metric.value}")
+            logger.debug(
+                f"Recorded {metric.metric_type} metric: {metric.name}={metric.value}"
+            )
         except Exception as e:
             logger.error(f"Failed to record metric {metric.name}: {e}")
             raise
@@ -171,7 +181,7 @@ class MetricsCollector:
         metric = Metric(
             name=name,
             value=value,
-            metric_type='counter',
+            metric_type="counter",
             labels=labels,
         )
         self.record(metric)
@@ -191,7 +201,7 @@ class MetricsCollector:
         metric = Metric(
             name=name,
             value=value,
-            metric_type='gauge',
+            metric_type="gauge",
             labels=labels,
         )
         self.record(metric)
@@ -211,7 +221,7 @@ class MetricsCollector:
         metric = Metric(
             name=name,
             value=value,
-            metric_type='histogram',
+            metric_type="histogram",
             labels=labels,
         )
         self.record(metric)
@@ -239,29 +249,31 @@ class MetricsCollector:
         """
         # Build WHERE clause dynamically
         conditions = ["metric_name = :name"]
-        params: dict[str, Any] = {'name': name, 'limit': limit}
+        params: dict[str, Any] = {"name": name, "limit": limit}
 
         if start_time:
             conditions.append("recorded_at >= :start_time")
-            params['start_time'] = start_time
+            params["start_time"] = start_time
 
         if end_time:
             conditions.append("recorded_at <= :end_time")
-            params['end_time'] = end_time
+            params["end_time"] = end_time
 
         if labels:
             conditions.append("labels @> :labels::jsonb")
-            params['labels'] = labels
+            params["labels"] = labels
 
         where_clause = " AND ".join(conditions)
 
-        query = text(f"""
+        query = text(
+            f"""
             SELECT metric_value, recorded_at, labels
             FROM observability.metrics
             WHERE {where_clause}
             ORDER BY recorded_at DESC
             LIMIT :limit
-        """)
+        """
+        )
 
         results = []
 
@@ -270,11 +282,13 @@ class MetricsCollector:
                 result = conn.execute(query, params)
 
                 for row in result:
-                    results.append({
-                        'value': float(row[0]),
-                        'recorded_at': row[1],
-                        'labels': row[2] or {},
-                    })
+                    results.append(
+                        {
+                            "value": float(row[0]),
+                            "recorded_at": row[1],
+                            "labels": row[2] or {},
+                        }
+                    )
         except Exception as e:
             logger.error(f"Failed to query metrics for {name}: {e}")
 
@@ -312,22 +326,24 @@ class MetricsCollector:
             "recorded_at >= :start_time",
         ]
         params: dict[str, Any] = {
-            'name': name,
-            'start_time': start_time,
-            'percentile': percentile,
+            "name": name,
+            "start_time": start_time,
+            "percentile": percentile,
         }
 
         if labels:
             conditions.append("labels @> :labels::jsonb")
-            params['labels'] = labels
+            params["labels"] = labels
 
         where_clause = " AND ".join(conditions)
 
-        query = text(f"""
+        query = text(
+            f"""
             SELECT PERCENTILE_CONT(:percentile) WITHIN GROUP (ORDER BY metric_value)
             FROM observability.metrics
             WHERE {where_clause}
-        """)
+        """
+        )
 
         try:
             with self.engine.connect() as conn:

@@ -61,16 +61,16 @@ def make_signals(
 
     if allow_shorts:
         entries = (d["entry_long"] | d["entry_short"]).astype(bool)
-        exits   = (d["exit_long"]  | d["exit_short"]).astype(bool)
+        exits = (d["exit_long"] | d["exit_short"]).astype(bool)
     else:
         entries = d["entry_long"].astype(bool)
-        exits   = d["exit_long"].astype(bool)
+        exits = d["exit_long"].astype(bool)
 
     size = d.get("size")  # may be absent; that's fine (runners handle None)
 
     # Ensure alignment to original index
     entries = entries.reindex(df.index, fill_value=False)
-    exits   = exits.reindex(df.index, fill_value=False)
+    exits = exits.reindex(df.index, fill_value=False)
     if size is not None:
         size = size.reindex(df.index).astype(float)
 

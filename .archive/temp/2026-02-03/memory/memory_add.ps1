@@ -3,10 +3,10 @@ param(
     [Parameter(Mandatory=$true)]
     [ValidateSet("architecture", "features", "regimes", "data", "goal", "blocker", "insight")]
     [string]$Type,
-    
+
     [Parameter(Mandatory=$true)]
     [string]$Description,
-    
+
     [string]$Rationale = "",
     [string]$Platform = "PowerShell",
     [string]$Status = "active",

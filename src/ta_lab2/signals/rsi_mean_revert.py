@@ -1,7 +1,6 @@
 from __future__ import annotations
 from typing import Optional, Tuple
 import pandas as pd
-import numpy as np
 from .position_sizing import volatility_size_pct, clamp_size
 
 
@@ -13,10 +12,10 @@ def make_signals(
     confirm_cross: bool = True,
     allow_shorts: bool = False,
     atr_col: str = "atr_14",
-    risk_pct: float = 0.5,          # % of equity risked per trade (for sizing)
-    atr_mult_stop: float = 1.5,     # stop distance in ATRs for sizing calc
+    risk_pct: float = 0.5,  # % of equity risked per trade (for sizing)
+    atr_mult_stop: float = 1.5,  # stop distance in ATRs for sizing calc
     price_col: str = "close",
-    max_leverage: float = 1.0,      # clamp position size
+    max_leverage: float = 1.0,  # clamp position size
 ) -> Tuple[pd.Series, pd.Series, Optional[pd.Series]]:
     """
     RSI mean-revert:
@@ -38,7 +37,9 @@ def make_signals(
     # Entry when recovering upward from oversold
     if confirm_cross:
         entry_long = (~below) & below_prev
-        exit_long = above if not confirm_cross else (above & ~above_prev) | (rsi.shift(1) > rsi)
+        exit_long = (
+            above if not confirm_cross else (above & ~above_prev) | (rsi.shift(1) > rsi)
+        )
     else:
         entry_long = (~below) & below_prev
         exit_long = above
@@ -46,12 +47,14 @@ def make_signals(
     # Optional symmetric shorts
     if allow_shorts:
         entry_short = (~above) & above_prev
-        exit_short = below if not confirm_cross else (below & ~below_prev) | (rsi.shift(1) < rsi)
+        exit_short = (
+            below if not confirm_cross else (below & ~below_prev) | (rsi.shift(1) < rsi)
+        )
         entries = (entry_long | entry_short).astype(bool)
-        exits   = (exit_long  | exit_short).astype(bool)
+        exits = (exit_long | exit_short).astype(bool)
     else:
         entries = entry_long.astype(bool)
-        exits   = exit_long.astype(bool)
+        exits = exit_long.astype(bool)
 
     # Volatility-aware size (optional): risk_pct of equity per trade, ATR * atr_mult_stop stop distance
     size = None
@@ -67,7 +70,7 @@ def make_signals(
 
     # Align and fill
     entries = entries.reindex(df.index, fill_value=False)
-    exits   = exits.reindex(df.index, fill_value=False)
+    exits = exits.reindex(df.index, fill_value=False)
     if size is not None:
         size = size.reindex(df.index).fillna(0.0)
 

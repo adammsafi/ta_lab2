@@ -251,7 +251,11 @@ def generate_commits_txt(
         meta = parts[0].split("\x1f")
         if len(meta) < 3:
             continue
-        commit_hash, author_date, subject = meta[0].strip(), meta[1].strip(), meta[2].strip()
+        commit_hash, author_date, subject = (
+            meta[0].strip(),
+            meta[1].strip(),
+            meta[2].strip(),
+        )
 
         if hash_only:
             lines_out.append(commit_hash)
@@ -276,17 +280,31 @@ def main() -> int:
     """CLI entry point."""
     logging.basicConfig(
         level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
-    ap = argparse.ArgumentParser(description="Generate commits.txt with commit descriptors.")
+    ap = argparse.ArgumentParser(
+        description="Generate commits.txt with commit descriptors."
+    )
     ap.add_argument("--repo", required=True, help="Path to git repo")
     ap.add_argument("--out", required=True, help="Output commits.txt path")
     ap.add_argument("--max", type=int, default=2000, help="Max commits to include")
-    ap.add_argument("--since", default=None, help='Git date, e.g. "2025-01-01" or "2 weeks ago"')
-    ap.add_argument("--until", default=None, help='Git date, e.g. "2026-01-21" or "now"')
-    ap.add_argument("--path", default=None, help="Limit to commits touching this path (e.g. src/ta_lab2)")
-    ap.add_argument("--include-merges", action="store_true", help="Include merge commits (default: false)")
+    ap.add_argument(
+        "--since", default=None, help='Git date, e.g. "2025-01-01" or "2 weeks ago"'
+    )
+    ap.add_argument(
+        "--until", default=None, help='Git date, e.g. "2026-01-21" or "now"'
+    )
+    ap.add_argument(
+        "--path",
+        default=None,
+        help="Limit to commits touching this path (e.g. src/ta_lab2)",
+    )
+    ap.add_argument(
+        "--include-merges",
+        action="store_true",
+        help="Include merge commits (default: false)",
+    )
     ap.add_argument(
         "--hash-only",
         action="store_true",

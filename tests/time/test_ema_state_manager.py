@@ -8,7 +8,6 @@ without requiring database connection.
 import unittest
 from unittest.mock import Mock, MagicMock, patch
 import pandas as pd
-from datetime import datetime, timezone
 
 from ta_lab2.scripts.emas.ema_state_manager import (
     EMAStateConfig,
@@ -118,20 +117,36 @@ class TestLoadState(unittest.TestCase):
         manager = EMAStateManager(mock_engine, config)
 
         # Mock empty result
-        empty_df = pd.DataFrame(columns=[
-            "id", "tf", "period",
-            "daily_min_seen", "daily_max_seen", "last_bar_seq", "last_time_close",
-            "last_canonical_ts",
-            "updated_at"
-        ])
+        empty_df = pd.DataFrame(
+            columns=[
+                "id",
+                "tf",
+                "period",
+                "daily_min_seen",
+                "daily_max_seen",
+                "last_bar_seq",
+                "last_time_close",
+                "last_canonical_ts",
+                "updated_at",
+            ]
+        )
         mock_read_sql.return_value = empty_df
 
         result = manager.load_state()
 
         assert isinstance(result, pd.DataFrame)
         assert len(result) == 0
-        expected_cols = ["id", "tf", "period", "daily_min_seen", "daily_max_seen",
-                        "last_bar_seq", "last_time_close", "last_canonical_ts", "updated_at"]
+        expected_cols = [
+            "id",
+            "tf",
+            "period",
+            "daily_min_seen",
+            "daily_max_seen",
+            "last_bar_seq",
+            "last_time_close",
+            "last_canonical_ts",
+            "updated_at",
+        ]
         assert all(col in result.columns for col in expected_cols)
 
     @patch("ta_lab2.scripts.emas.ema_state_manager.pd.read_sql")
@@ -146,17 +161,19 @@ class TestLoadState(unittest.TestCase):
         manager = EMAStateManager(mock_engine, config)
 
         # Mock successful result
-        result_df = pd.DataFrame({
-            "id": [1],
-            "tf": ["1D"],
-            "period": [9],
-            "daily_min_seen": [None],
-            "daily_max_seen": [None],
-            "last_bar_seq": [None],
-            "last_time_close": [pd.Timestamp("2024-01-01", tz="UTC")],
-            "last_canonical_ts": [None],
-            "updated_at": [pd.Timestamp.now(tz="UTC")],
-        })
+        result_df = pd.DataFrame(
+            {
+                "id": [1],
+                "tf": ["1D"],
+                "period": [9],
+                "daily_min_seen": [None],
+                "daily_max_seen": [None],
+                "last_bar_seq": [None],
+                "last_time_close": [pd.Timestamp("2024-01-01", tz="UTC")],
+                "last_canonical_ts": [None],
+                "updated_at": [pd.Timestamp.now(tz="UTC")],
+            }
+        )
         mock_read_sql.return_value = result_df
 
         result = manager.load_state(ids=[1], tfs=["1D"])
@@ -184,13 +201,24 @@ class TestDirtyWindowComputation(unittest.TestCase):
         manager = EMAStateManager(mock_engine, config)
 
         # Mock empty state
-        empty_df = pd.DataFrame(columns=[
-            "id", "tf", "period", "daily_min_seen", "daily_max_seen",
-            "last_bar_seq", "last_time_close", "last_canonical_ts", "updated_at"
-        ])
+        empty_df = pd.DataFrame(
+            columns=[
+                "id",
+                "tf",
+                "period",
+                "daily_min_seen",
+                "daily_max_seen",
+                "last_bar_seq",
+                "last_time_close",
+                "last_canonical_ts",
+                "updated_at",
+            ]
+        )
         mock_load_state.return_value = empty_df
 
-        result = manager.compute_dirty_window_starts(ids=[1, 2], default_start="2010-01-01")
+        result = manager.compute_dirty_window_starts(
+            ids=[1, 2], default_start="2010-01-01"
+        )
 
         assert len(result) == 2
         assert 1 in result
@@ -207,32 +235,36 @@ class TestDirtyWindowComputation(unittest.TestCase):
 
         # Mock state with data using last_canonical_ts (checked first by implementation)
         # Don't include last_time_close column to ensure last_canonical_ts logic is tested
-        state_df = pd.DataFrame({
-            "id": [1, 1, 2],
-            "tf": ["1D", "1W", "1D"],
-            "period": [9, 9, 10],
-            "daily_min_seen": [None, None, None],
-            "daily_max_seen": [None, None, None],
-            "last_bar_seq": [None, None, None],
-            "last_canonical_ts": [
-                pd.Timestamp("2024-01-15", tz="UTC"),
-                pd.Timestamp("2024-01-20", tz="UTC"),
-                pd.Timestamp("2024-01-10", tz="UTC"),
-            ],
-            "last_time_close": [
-                pd.Timestamp("2024-01-15", tz="UTC"),
-                pd.Timestamp("2024-01-20", tz="UTC"),
-                pd.Timestamp("2024-01-10", tz="UTC"),
-            ],
-            "updated_at": [
-                pd.Timestamp.now(tz="UTC"),
-                pd.Timestamp.now(tz="UTC"),
-                pd.Timestamp.now(tz="UTC"),
-            ],
-        })
+        state_df = pd.DataFrame(
+            {
+                "id": [1, 1, 2],
+                "tf": ["1D", "1W", "1D"],
+                "period": [9, 9, 10],
+                "daily_min_seen": [None, None, None],
+                "daily_max_seen": [None, None, None],
+                "last_bar_seq": [None, None, None],
+                "last_canonical_ts": [
+                    pd.Timestamp("2024-01-15", tz="UTC"),
+                    pd.Timestamp("2024-01-20", tz="UTC"),
+                    pd.Timestamp("2024-01-10", tz="UTC"),
+                ],
+                "last_time_close": [
+                    pd.Timestamp("2024-01-15", tz="UTC"),
+                    pd.Timestamp("2024-01-20", tz="UTC"),
+                    pd.Timestamp("2024-01-10", tz="UTC"),
+                ],
+                "updated_at": [
+                    pd.Timestamp.now(tz="UTC"),
+                    pd.Timestamp.now(tz="UTC"),
+                    pd.Timestamp.now(tz="UTC"),
+                ],
+            }
+        )
         mock_load_state.return_value = state_df
 
-        result = manager.compute_dirty_window_starts(ids=[1, 2], default_start="2010-01-01")
+        result = manager.compute_dirty_window_starts(
+            ids=[1, 2], default_start="2010-01-01"
+        )
 
         assert len(result) == 2
         # ID 1: min of 2024-01-15 and 2024-01-20 = 2024-01-15

@@ -141,17 +141,17 @@ try {
         $data = Get-Content $_.FullName | ConvertFrom-Json
         $stats.decisions += $data.decisions.Count
     }
-    
+
     $activeGoals = Get-Content ".memory/goals/active.json" -ErrorAction SilentlyContinue | ConvertFrom-Json
     $stats.goals = $activeGoals.goals.Count
-    
+
     $sessions = Get-Content ".memory/context/sessions.json" -ErrorAction SilentlyContinue | ConvertFrom-Json
     $stats.sessions = $sessions.sessions.Count
-    
+
     $blockers = Get-Content ".memory/context/blockers.json" -ErrorAction SilentlyContinue | ConvertFrom-Json
     $activeBlockers = $blockers.blockers | Where-Object { $_.status -eq "active" }
     $stats.blockers = $activeBlockers.Count
-    
+
     Write-Host "  Total Decisions: $($stats.decisions)" -ForegroundColor White
     Write-Host "  Active Goals: $($stats.goals)" -ForegroundColor White
     Write-Host "  Total Sessions: $($stats.sessions)" -ForegroundColor White
@@ -171,14 +171,14 @@ if ($issues.Count -eq 0 -and $warnings.Count -eq 0) {
             Write-Host "   • $issue" -ForegroundColor Red
         }
     }
-    
+
     if ($warnings.Count -gt 0) {
         Write-Host "⚠️  Found $($warnings.Count) warning(s):" -ForegroundColor Yellow
         foreach ($warning in $warnings) {
             Write-Host "   • $warning" -ForegroundColor Yellow
         }
     }
-    
+
     if (-not $Fix) {
         Write-Host "`n💡 Run with -Fix flag to auto-repair issues" -ForegroundColor Cyan
     }

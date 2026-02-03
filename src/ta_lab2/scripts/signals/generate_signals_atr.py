@@ -33,7 +33,6 @@ Usage:
 from dataclasses import dataclass
 from typing import Optional
 import pandas as pd
-import numpy as np
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
@@ -92,16 +91,16 @@ class ATRSignalGenerator:
             KeyError: If required params missing from signal_config
             ValueError: If invalid parameter values
         """
-        signal_id = signal_config['signal_id']
-        params = signal_config['params']
+        signal_id = signal_config["signal_id"]
+        params = signal_config["params"]
 
         # Extract parameters with defaults
-        lookback = params.get('lookback', 20)
-        atr_col = params.get('atr_col', 'atr_14')
-        trail_atr_mult = params.get('trail_atr_mult', 2.0)
-        confirm_close = params.get('confirm_close', True)
-        exit_on_channel_crossback = params.get('exit_on_channel_crossback', True)
-        use_trailing_atr_stop = params.get('use_trailing_atr_stop', True)
+        lookback = params.get("lookback", 20)
+        atr_col = params.get("atr_col", "atr_14")
+        trail_atr_mult = params.get("trail_atr_mult", 2.0)
+        confirm_close = params.get("confirm_close", True)
+        exit_on_channel_crossback = params.get("exit_on_channel_crossback", True)
+        use_trailing_atr_stop = params.get("use_trailing_atr_stop", True)
 
         # Determine start timestamp for incremental processing
         if full_refresh:
@@ -133,8 +132,8 @@ class ATRSignalGenerator:
         )
 
         # Add signals to DataFrame
-        df_features['entry_signal'] = entries
-        df_features['exit_signal'] = exits
+        df_features["entry_signal"] = entries
+        df_features["exit_signal"] = exits
 
         # Load open positions for state tracking
         open_positions = self.state_manager.load_open_positions(ids, signal_id)
@@ -154,7 +153,7 @@ class ATRSignalGenerator:
         if not dry_run:
             self._write_signals(records)
             self.state_manager.update_state_after_generation(
-                signal_table='cmc_signals_atr_breakout',
+                signal_table="cmc_signals_atr_breakout",
                 signal_id=signal_id,
             )
 
@@ -226,22 +225,22 @@ class ATRSignalGenerator:
         channel_highs = []
         channel_lows = []
 
-        for id_ in df['id'].unique():
-            mask = df['id'] == id_
-            group_high = df.loc[mask, 'high'].rolling(
-                window=lookback,
-                min_periods=lookback
-            ).max()
-            group_low = df.loc[mask, 'low'].rolling(
-                window=lookback,
-                min_periods=lookback
-            ).min()
+        for id_ in df["id"].unique():
+            mask = df["id"] == id_
+            group_high = (
+                df.loc[mask, "high"]
+                .rolling(window=lookback, min_periods=lookback)
+                .max()
+            )
+            group_low = (
+                df.loc[mask, "low"].rolling(window=lookback, min_periods=lookback).min()
+            )
 
             channel_highs.extend(group_high.tolist())
             channel_lows.extend(group_low.tolist())
 
-        df['channel_high'] = channel_highs
-        df['channel_low'] = channel_lows
+        df["channel_high"] = channel_highs
+        df["channel_low"] = channel_lows
 
         return df
 
@@ -267,8 +266,7 @@ class ATRSignalGenerator:
         """
         # Check channel break
         channel_break = (
-            row['close'] > row['channel_high'] or
-            row['close'] < row['channel_low']
+            row["close"] > row["channel_high"] or row["close"] < row["channel_low"]
         )
 
         # Check ATR expansion (ATR > 1.5x rolling mean over 20 days)
@@ -278,13 +276,13 @@ class ATRSignalGenerator:
         # This would require passing more context or computing in _transform_signals_to_records
 
         if channel_break and atr_expansion:
-            return 'both'
+            return "both"
         elif channel_break:
-            return 'channel_break'
+            return "channel_break"
         elif atr_expansion:
-            return 'atr_expansion'
+            return "atr_expansion"
         else:
-            return 'channel_break'  # Default if signal triggered
+            return "channel_break"  # Default if signal triggered
 
     def _transform_signals_to_records(
         self,
@@ -314,103 +312,133 @@ class ATRSignalGenerator:
         params_hash = compute_params_hash(params)
 
         # Process per asset
-        for id_ in df_features['id'].unique():
-            df_asset = df_features[df_features['id'] == id_].copy()
-            df_asset = df_asset.sort_values('ts')
+        for id_ in df_features["id"].unique():
+            df_asset = df_features[df_features["id"] == id_].copy()
+            df_asset = df_asset.sort_values("ts")
 
             # Get open positions for this asset
-            asset_open = open_positions[
-                (open_positions['id'] == id_) &
-                (open_positions['signal_id'] == signal_id)
-            ] if not open_positions.empty else pd.DataFrame()
+            asset_open = (
+                open_positions[
+                    (open_positions["id"] == id_)
+                    & (open_positions["signal_id"] == signal_id)
+                ]
+                if not open_positions.empty
+                else pd.DataFrame()
+            )
 
             # Track position state
             position_open = not asset_open.empty
-            entry_price = asset_open['entry_price'].iloc[0] if position_open else None
-            entry_ts = asset_open['entry_ts'].iloc[0] if position_open else None
+            entry_price = asset_open["entry_price"].iloc[0] if position_open else None
+            entry_ts = asset_open["entry_ts"].iloc[0] if position_open else None
 
             for idx, row in df_asset.iterrows():
                 # Entry signal
-                if row['entry_signal'] and not position_open:
+                if row["entry_signal"] and not position_open:
                     # Classify breakout type
                     breakout_type = self._classify_breakout_type(row, params)
 
                     # Capture feature snapshot
                     feature_snapshot = {
-                        'close': float(row['close']),
-                        'high': float(row['high']),
-                        'low': float(row['low']),
-                        'atr': float(row['atr_14']),
-                        'channel_high': float(row['channel_high']) if pd.notna(row['channel_high']) else None,
-                        'channel_low': float(row['channel_low']) if pd.notna(row['channel_low']) else None,
+                        "close": float(row["close"]),
+                        "high": float(row["high"]),
+                        "low": float(row["low"]),
+                        "atr": float(row["atr_14"]),
+                        "channel_high": float(row["channel_high"])
+                        if pd.notna(row["channel_high"])
+                        else None,
+                        "channel_low": float(row["channel_low"])
+                        if pd.notna(row["channel_low"])
+                        else None,
                     }
 
                     # Compute feature hash for reproducibility
-                    feature_cols = ['close', 'high', 'low', 'atr_14', 'channel_high', 'channel_low']
+                    feature_cols = [
+                        "close",
+                        "high",
+                        "low",
+                        "atr_14",
+                        "channel_high",
+                        "channel_low",
+                    ]
                     # Create single-row DataFrame for hashing (include 'ts' for sorting)
-                    hash_df = df_asset.loc[[idx], ['ts'] + feature_cols].copy()
+                    hash_df = df_asset.loc[[idx], ["ts"] + feature_cols].copy()
                     feature_hash = compute_feature_hash(hash_df, feature_cols)
 
-                    records.append({
-                        'id': int(id_),
-                        'ts': row['ts'],
-                        'signal_id': signal_id,
-                        'direction': 'long',  # Breakout signals are long-only by default
-                        'position_state': 'open',
-                        'entry_price': float(row['close']),
-                        'entry_ts': row['ts'],
-                        'exit_price': None,
-                        'exit_ts': None,
-                        'pnl_pct': None,
-                        'breakout_type': breakout_type,
-                        'feature_snapshot': feature_snapshot,
-                        'signal_version': self.signal_version,
-                        'feature_version_hash': feature_hash,
-                        'params_hash': params_hash,
-                    })
+                    records.append(
+                        {
+                            "id": int(id_),
+                            "ts": row["ts"],
+                            "signal_id": signal_id,
+                            "direction": "long",  # Breakout signals are long-only by default
+                            "position_state": "open",
+                            "entry_price": float(row["close"]),
+                            "entry_ts": row["ts"],
+                            "exit_price": None,
+                            "exit_ts": None,
+                            "pnl_pct": None,
+                            "breakout_type": breakout_type,
+                            "feature_snapshot": feature_snapshot,
+                            "signal_version": self.signal_version,
+                            "feature_version_hash": feature_hash,
+                            "params_hash": params_hash,
+                        }
+                    )
 
                     position_open = True
-                    entry_price = row['close']
-                    entry_ts = row['ts']
+                    entry_price = row["close"]
+                    entry_ts = row["ts"]
 
                 # Exit signal
-                elif row['exit_signal'] and position_open:
-                    exit_price = row['close']
+                elif row["exit_signal"] and position_open:
+                    exit_price = row["close"]
                     pnl_pct = ((exit_price - entry_price) / entry_price) * 100
 
                     # Classify breakout type at exit (for audit)
                     breakout_type = self._classify_breakout_type(row, params)
 
                     feature_snapshot = {
-                        'close': float(row['close']),
-                        'high': float(row['high']),
-                        'low': float(row['low']),
-                        'atr': float(row['atr_14']),
-                        'channel_high': float(row['channel_high']) if pd.notna(row['channel_high']) else None,
-                        'channel_low': float(row['channel_low']) if pd.notna(row['channel_low']) else None,
+                        "close": float(row["close"]),
+                        "high": float(row["high"]),
+                        "low": float(row["low"]),
+                        "atr": float(row["atr_14"]),
+                        "channel_high": float(row["channel_high"])
+                        if pd.notna(row["channel_high"])
+                        else None,
+                        "channel_low": float(row["channel_low"])
+                        if pd.notna(row["channel_low"])
+                        else None,
                     }
 
-                    feature_cols = ['close', 'high', 'low', 'atr_14', 'channel_high', 'channel_low']
-                    hash_df = df_asset.loc[[idx], ['ts'] + feature_cols].copy()
+                    feature_cols = [
+                        "close",
+                        "high",
+                        "low",
+                        "atr_14",
+                        "channel_high",
+                        "channel_low",
+                    ]
+                    hash_df = df_asset.loc[[idx], ["ts"] + feature_cols].copy()
                     feature_hash = compute_feature_hash(hash_df, feature_cols)
 
-                    records.append({
-                        'id': int(id_),
-                        'ts': row['ts'],
-                        'signal_id': signal_id,
-                        'direction': 'long',
-                        'position_state': 'closed',
-                        'entry_price': float(entry_price),
-                        'entry_ts': entry_ts,
-                        'exit_price': float(exit_price),
-                        'exit_ts': row['ts'],
-                        'pnl_pct': float(pnl_pct),
-                        'breakout_type': breakout_type,
-                        'feature_snapshot': feature_snapshot,
-                        'signal_version': self.signal_version,
-                        'feature_version_hash': feature_hash,
-                        'params_hash': params_hash,
-                    })
+                    records.append(
+                        {
+                            "id": int(id_),
+                            "ts": row["ts"],
+                            "signal_id": signal_id,
+                            "direction": "long",
+                            "position_state": "closed",
+                            "entry_price": float(entry_price),
+                            "entry_ts": entry_ts,
+                            "exit_price": float(exit_price),
+                            "exit_ts": row["ts"],
+                            "pnl_pct": float(pnl_pct),
+                            "breakout_type": breakout_type,
+                            "feature_snapshot": feature_snapshot,
+                            "signal_version": self.signal_version,
+                            "feature_version_hash": feature_hash,
+                            "params_hash": params_hash,
+                        }
+                    )
 
                     position_open = False
                     entry_price = None
@@ -432,17 +460,17 @@ class ATRSignalGenerator:
 
         # Convert feature_snapshot to JSON string for JSONB insertion
         records = records.copy()
-        records['feature_snapshot'] = records['feature_snapshot'].apply(
+        records["feature_snapshot"] = records["feature_snapshot"].apply(
             lambda x: pd.io.json.dumps(x) if x is not None else None
         )
 
         # Write to database
         with self.engine.begin() as conn:
             records.to_sql(
-                name='cmc_signals_atr_breakout',
+                name="cmc_signals_atr_breakout",
                 con=conn,
-                schema='public',
-                if_exists='append',
+                schema="public",
+                if_exists="append",
                 index=False,
-                method='multi',
+                method="multi",
             )

@@ -129,7 +129,9 @@ def _parse_ids(ids_arg: str) -> Optional[List[int]]:
     return [int(x.strip()) for x in ids_arg.split(",") if x.strip()]
 
 
-def _load_keys(engine: Engine, ema_table: str, ids: Optional[List[int]], roll_mode: str) -> List[Tuple[int, str, int, bool]]:
+def _load_keys(
+    engine: Engine, ema_table: str, ids: Optional[List[int]], roll_mode: str
+) -> List[Tuple[int, str, int, bool]]:
     rolls = expand_roll_mode(roll_mode)
 
     if ids is None:
@@ -144,25 +146,24 @@ def _load_keys(engine: Engine, ema_table: str, ids: Optional[List[int]], roll_mo
         with engine.begin() as cxn:
             rows = cxn.execute(sql, {"rolls": rolls}).fetchall()
     else:
-        sql = (
-            text(
-                f"""
+        sql = text(
+            f"""
                 SELECT DISTINCT id::bigint, tf::text, period::int, roll::bool
                 FROM {ema_table}
                 WHERE id IN :ids
                   AND roll = ANY(:rolls)
                 ORDER BY id, tf, period, roll;
                 """
-            )
-            .bindparams(bindparam("ids", expanding=True))
-        )
+        ).bindparams(bindparam("ids", expanding=True))
         with engine.begin() as cxn:
             rows = cxn.execute(sql, {"ids": ids, "rolls": rolls}).fetchall()
 
     return [(int(r[0]), str(r[1]), int(r[2]), bool(r[3])) for r in rows]
 
 
-def _ensure_state_rows(engine: Engine, state_table: str, keys: List[Tuple[int, str, int, bool]]) -> None:
+def _ensure_state_rows(
+    engine: Engine, state_table: str, keys: List[Tuple[int, str, int, bool]]
+) -> None:
     if not keys:
         return
 
@@ -175,15 +176,22 @@ def _ensure_state_rows(engine: Engine, state_table: str, keys: List[Tuple[int, s
     )
 
     with engine.begin() as cxn:
-        for (i, tf, period, roll) in keys:
+        for i, tf, period, roll in keys:
             cxn.execute(ins, {"id": i, "tf": tf, "period": period, "roll": roll})
 
 
-def _full_refresh(engine: Engine, out_table: str, state_table: str, keys: List[Tuple[int, str, int, bool]]) -> None:
+def _full_refresh(
+    engine: Engine,
+    out_table: str,
+    state_table: str,
+    keys: List[Tuple[int, str, int, bool]],
+) -> None:
     if not keys:
         return
 
-    _print(f"--full-refresh: deleting existing rows for {len(keys)} (id,tf,period,roll) keys and resetting state.")
+    _print(
+        f"--full-refresh: deleting existing rows for {len(keys)} (id,tf,period,roll) keys and resetting state."
+    )
 
     del_out = text(
         f"""
@@ -199,7 +207,7 @@ def _full_refresh(engine: Engine, out_table: str, state_table: str, keys: List[T
     )
 
     with engine.begin() as cxn:
-        for (i, tf, period, roll) in keys:
+        for i, tf, period, roll in keys:
             params = {"id": i, "tf": tf, "period": period, "roll": roll}
             cxn.execute(del_out, params)
             cxn.execute(del_state, params)
@@ -207,7 +215,9 @@ def _full_refresh(engine: Engine, out_table: str, state_table: str, keys: List[T
     _ensure_state_rows(engine, state_table, keys)
 
 
-def _run_one_key(engine: Engine, cfg: RunnerConfig, key: Tuple[int, str, int, bool]) -> None:
+def _run_one_key(
+    engine: Engine, cfg: RunnerConfig, key: Tuple[int, str, int, bool]
+) -> None:
     one_id, one_tf, one_period, one_roll = key
 
     sql = text(
@@ -303,27 +313,52 @@ def _run_one_key(engine: Engine, cfg: RunnerConfig, key: Tuple[int, str, int, bo
     )
 
     with engine.begin() as cxn:
-        cxn.execute(sql, {"id": one_id, "tf": one_tf, "period": one_period, "roll": one_roll, "start": cfg.start})
+        cxn.execute(
+            sql,
+            {
+                "id": one_id,
+                "tf": one_tf,
+                "period": one_period,
+                "roll": one_roll,
+                "start": cfg.start,
+            },
+        )
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Incremental EMA returns builder for public.cmc_ema_multi_tf.")
-    p.add_argument("--db-url", default=os.getenv("TARGET_DB_URL", ""), help="Postgres DB URL (or set TARGET_DB_URL).")
+    p = argparse.ArgumentParser(
+        description="Incremental EMA returns builder for public.cmc_ema_multi_tf."
+    )
+    p.add_argument(
+        "--db-url",
+        default=os.getenv("TARGET_DB_URL", ""),
+        help="Postgres DB URL (or set TARGET_DB_URL).",
+    )
 
     p.add_argument("--ids", default="all", help="Comma-separated ids, or 'all'.")
-    p.add_argument("--start", default="2010-01-01", help="Start timestamptz for full history runs.")
+    p.add_argument(
+        "--start", default="2010-01-01", help="Start timestamptz for full history runs."
+    )
     p.add_argument("--roll-mode", default="both", help="both | canonical | roll")
 
     p.add_argument("--ema-table", default=DEFAULT_EMA_TABLE, help="Source EMA table.")
-    p.add_argument("--out-table", default=DEFAULT_OUT_TABLE, help="Output returns table.")
+    p.add_argument(
+        "--out-table", default=DEFAULT_OUT_TABLE, help="Output returns table."
+    )
     p.add_argument("--state-table", default=DEFAULT_STATE_TABLE, help="State table.")
-    p.add_argument("--full-refresh", action="store_true", help="Recompute history for selected keys from --start.")
+    p.add_argument(
+        "--full-refresh",
+        action="store_true",
+        help="Recompute history for selected keys from --start.",
+    )
 
     args = p.parse_args()
 
     db_url = args.db_url.strip()
     if not db_url:
-        raise SystemExit("ERROR: Missing DB URL. Provide --db-url or set TARGET_DB_URL.")
+        raise SystemExit(
+            "ERROR: Missing DB URL. Provide --db-url or set TARGET_DB_URL."
+        )
 
     cfg = RunnerConfig(
         db_url=db_url,
@@ -335,7 +370,11 @@ def main() -> None:
         roll_mode=args.roll_mode.strip().lower(),
     )
 
-    _print("Using DB URL from TARGET_DB_URL env." if os.getenv("TARGET_DB_URL") else "Using DB URL from --db-url.")
+    _print(
+        "Using DB URL from TARGET_DB_URL env."
+        if os.getenv("TARGET_DB_URL")
+        else "Using DB URL from --db-url."
+    )
     _print(
         f"Runner config: ids={args.ids}, roll_mode={cfg.roll_mode}, start={cfg.start}, "
         f"ema={cfg.ema_table}, out={cfg.out_table}, state={cfg.state_table}, full_refresh={cfg.full_refresh}"
@@ -359,7 +398,9 @@ def main() -> None:
 
     for i, key in enumerate(keys, start=1):
         one_id, one_tf, one_period, one_roll = key
-        _print(f"Processing key=({one_id},{one_tf},{one_period},roll={one_roll}) ({i}/{len(keys)})")
+        _print(
+            f"Processing key=({one_id},{one_tf},{one_period},roll={one_roll}) ({i}/{len(keys)})"
+        )
         _run_one_key(engine, cfg, key)
 
     _print("Done.")

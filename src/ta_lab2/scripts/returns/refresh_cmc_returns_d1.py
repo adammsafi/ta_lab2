@@ -91,15 +91,23 @@ def _ensure_state_rows(engine: Engine, state_table: str, ids: Iterable[int]) -> 
         cxn.execute(sql, {"ids": ids})
 
 
-def _full_refresh(engine: Engine, out_table: str, state_table: str, ids: Iterable[int]) -> None:
+def _full_refresh(
+    engine: Engine, out_table: str, state_table: str, ids: Iterable[int]
+) -> None:
     ids = list(ids)
     if not ids:
         return
 
-    _print(f"--full-refresh: deleting existing rows for {len(ids)} ids in {out_table} and resetting state.")
+    _print(
+        f"--full-refresh: deleting existing rows for {len(ids)} ids in {out_table} and resetting state."
+    )
     with engine.begin() as cxn:
-        cxn.execute(text(f"DELETE FROM {out_table} WHERE id = ANY(:ids);"), {"ids": ids})
-        cxn.execute(text(f"DELETE FROM {state_table} WHERE id = ANY(:ids);"), {"ids": ids})
+        cxn.execute(
+            text(f"DELETE FROM {out_table} WHERE id = ANY(:ids);"), {"ids": ids}
+        )
+        cxn.execute(
+            text(f"DELETE FROM {state_table} WHERE id = ANY(:ids);"), {"ids": ids}
+        )
         cxn.execute(
             text(
                 f"""
@@ -191,22 +199,42 @@ def _run_one_id(engine: Engine, cfg: RunnerConfig, one_id: int) -> None:
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Incremental daily returns builder (arith + log) from cmc_price_histories7.")
-    p.add_argument("--db-url", default=os.getenv("TARGET_DB_URL", ""), help="Postgres DB URL (or set TARGET_DB_URL).")
+    p = argparse.ArgumentParser(
+        description="Incremental daily returns builder (arith + log) from cmc_price_histories7."
+    )
+    p.add_argument(
+        "--db-url",
+        default=os.getenv("TARGET_DB_URL", ""),
+        help="Postgres DB URL (or set TARGET_DB_URL).",
+    )
 
     p.add_argument("--ids", default="all", help="Comma-separated ids, or 'all'.")
-    p.add_argument("--start", default="2010-01-01", help="Start date (timestamptz parseable) for full history runs.")
+    p.add_argument(
+        "--start",
+        default="2010-01-01",
+        help="Start date (timestamptz parseable) for full history runs.",
+    )
 
-    p.add_argument("--daily-table", default=DEFAULT_DAILY_TABLE, help="Source daily table.")
-    p.add_argument("--out-table", default=DEFAULT_OUT_TABLE, help="Output returns table.")
+    p.add_argument(
+        "--daily-table", default=DEFAULT_DAILY_TABLE, help="Source daily table."
+    )
+    p.add_argument(
+        "--out-table", default=DEFAULT_OUT_TABLE, help="Output returns table."
+    )
     p.add_argument("--state-table", default=DEFAULT_STATE_TABLE, help="State table.")
 
-    p.add_argument("--full-refresh", action="store_true", help="Recompute history for selected ids from --start.")
+    p.add_argument(
+        "--full-refresh",
+        action="store_true",
+        help="Recompute history for selected ids from --start.",
+    )
     args = p.parse_args()
 
     db_url = args.db_url.strip()
     if not db_url:
-        raise SystemExit("ERROR: Missing DB URL. Provide --db-url or set TARGET_DB_URL.")
+        raise SystemExit(
+            "ERROR: Missing DB URL. Provide --db-url or set TARGET_DB_URL."
+        )
 
     cfg = RunnerConfig(
         db_url=db_url,
@@ -218,7 +246,11 @@ def main() -> None:
         full_refresh=bool(args.full_refresh),
     )
 
-    _print("Using DB URL from TARGET_DB_URL env." if os.getenv("TARGET_DB_URL") else "Using DB URL from --db-url.")
+    _print(
+        "Using DB URL from TARGET_DB_URL env."
+        if os.getenv("TARGET_DB_URL")
+        else "Using DB URL from --db-url."
+    )
     _print(
         f"Runner config: ids={args.ids}, start={cfg.start}, daily={cfg.daily_table}, out={cfg.out_table}, state={cfg.state_table}, full_refresh={cfg.full_refresh}"
     )

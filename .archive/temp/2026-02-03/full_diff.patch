@@ -41,7 +41,7 @@ index 0000000..877728c
 +## 🚀 **ta_lab2 v0.1.0 — First Major Release**
 +
 +### 🧭 Overview
-+This release marks the first full, modular version of **ta_lab2**, a Python toolkit for technical analysis and regime detection.  
++This release marks the first full, modular version of **ta_lab2**, a Python toolkit for technical analysis and regime detection.
 +It introduces a unified configuration system, expanded feature library, and an advanced volatility engine designed for large-scale analytics.
 +
 +---
@@ -58,7 +58,7 @@ index 0000000..877728c
 +
 +---
 +
-+**Tag:** ${{ github.ref_name }}  
++**Tag:** ${{ github.ref_name }}
 +**Release Date:** ${DATE}
 +EOF
 +
@@ -624,7 +624,7 @@ index 0000000..91280df
 +-+    "pandas",
 +-+    "pyyaml",
 +- ]
-+- 
++-
 +-+[project.optional-dependencies]
 +-+dev = [
 +-+    "pytest",
@@ -699,7 +699,7 @@ index 0000000..91280df
 ++from config import load_settings, project_root
 ++from ta_lab2.regimes.run_btc_pipeline import run_btc_pipeline
 ++
-+ 
++
 + def main(argv: list[str] | None = None) -> int:
 +     ap = argparse.ArgumentParser(prog="ta-lab2", description="ta_lab2 CLI")
 +-    ap.add_argument("--config", "-c", default="configs/default.yaml",
@@ -710,13 +710,13 @@ index 0000000..91280df
 ++        help="Path to YAML config relative to project root (default: config/default.yaml)"
 ++    )
 +     args = ap.parse_args(argv)
-+ 
++
 +-    root = project_root()
 +-    cfg_path = (root / args.config).resolve()
 +-    settings = load_settings(cfg_path)
 ++    # Load settings from YAML via the root-level config.py
 ++    settings = load_settings(args.config)
-+ 
++
 +-    csv = (root / settings.data_csv).resolve()
 +-    out_dir = (root / settings.out_dir).resolve()
 ++    # Resolve absolute paths for input and output
@@ -730,13 +730,13 @@ index 0000000..91280df
 ++        ema_windows=settings.ema_windows,
 ++        resample=settings.resample
 ++    )
-+ 
++
 +-    result = run_btc_pipeline(csv_path=csv, out_dir=out_dir,
 +-                              ema_windows=settings.ema_windows,
 +-                              resample=settings.resample)
 +     print("Pipeline complete:", result)
 +     return 0
-+ 
++
 ++
 + if __name__ == "__main__":
 +     raise SystemExit(main())
@@ -994,7 +994,7 @@ index 0000000..91280df
 + import numpy as np
 ++import pandas as pd
 ++from typing import Iterable, Literal, Sequence
-+ 
++
 +-def add_atr(df: pd.DataFrame, period: int = 14,
 +-            high_col="high", low_col="low", close_col="close"):
 ++
@@ -1446,7 +1446,7 @@ index 0000000..bcc3b5d
 ++## 🚀 **ta_lab2 v0.1.0 — First Major Release**
 ++
 ++### 🧭 Overview
-++This release marks the first full, modular version of **ta_lab2**, a Python toolkit for technical analysis and regime detection.  
+++This release marks the first full, modular version of **ta_lab2**, a Python toolkit for technical analysis and regime detection.
 ++It introduces a unified configuration system, expanded feature library, and an advanced volatility engine designed for large-scale analytics.
 ++
 ++---
@@ -1463,7 +1463,7 @@ index 0000000..bcc3b5d
 ++
 ++---
 ++
-++**Tag:** ${{ github.ref_name }}  
+++**Tag:** ${{ github.ref_name }}
 ++**Release Date:** ${DATE}
 ++EOF
 ++
@@ -1721,7 +1721,7 @@ index 0000000..bcc3b5d
 ++-+    "pandas",
 ++-+    "pyyaml",
 ++- ]
-++- 
+++-
 ++-+[project.optional-dependencies]
 ++-+dev = [
 ++-+    "pytest",
@@ -1796,7 +1796,7 @@ index 0000000..bcc3b5d
 +++from config import load_settings, project_root
 +++from ta_lab2.regimes.run_btc_pipeline import run_btc_pipeline
 +++
-++ 
+++
 ++ def main(argv: list[str] | None = None) -> int:
 ++     ap = argparse.ArgumentParser(prog="ta-lab2", description="ta_lab2 CLI")
 ++-    ap.add_argument("--config", "-c", default="configs/default.yaml",
@@ -1807,13 +1807,13 @@ index 0000000..bcc3b5d
 +++        help="Path to YAML config relative to project root (default: config/default.yaml)"
 +++    )
 ++     args = ap.parse_args(argv)
-++ 
+++
 ++-    root = project_root()
 ++-    cfg_path = (root / args.config).resolve()
 ++-    settings = load_settings(cfg_path)
 +++    # Load settings from YAML via the root-level config.py
 +++    settings = load_settings(args.config)
-++ 
+++
 ++-    csv = (root / settings.data_csv).resolve()
 ++-    out_dir = (root / settings.out_dir).resolve()
 +++    # Resolve absolute paths for input and output
@@ -1827,13 +1827,13 @@ index 0000000..bcc3b5d
 +++        ema_windows=settings.ema_windows,
 +++        resample=settings.resample
 +++    )
-++ 
+++
 ++-    result = run_btc_pipeline(csv_path=csv, out_dir=out_dir,
 ++-                              ema_windows=settings.ema_windows,
 ++-                              resample=settings.resample)
 ++     print("Pipeline complete:", result)
 ++     return 0
-++ 
+++
 +++
 ++ if __name__ == "__main__":
 ++     raise SystemExit(main())
@@ -2091,7 +2091,7 @@ index 0000000..bcc3b5d
 ++ import numpy as np
 +++import pandas as pd
 +++from typing import Iterable, Literal, Sequence
-++ 
+++
 ++-def add_atr(df: pd.DataFrame, period: int = 14,
 ++-            high_col="high", low_col="low", close_col="close"):
 +++
@@ -2508,7 +2508,7 @@ index 0000000..bcc3b5d
 +-+    "pandas",
 +-+    "pyyaml",
 +- ]
-+- 
++-
 +-+[project.optional-dependencies]
 +-+dev = [
 +-+    "pytest",
@@ -2626,7 +2626,7 @@ index 0000000..bcc3b5d
 ++from config import load_settings, project_root
 ++from ta_lab2.regimes.run_btc_pipeline import run_btc_pipeline
 ++
-+ 
++
 + def main(argv: list[str] | None = None) -> int:
 +     ap = argparse.ArgumentParser(prog="ta-lab2", description="ta_lab2 CLI")
 +-    ap.add_argument("--config", "-c", default="configs/default.yaml",
@@ -2637,13 +2637,13 @@ index 0000000..bcc3b5d
 ++        help="Path to YAML config relative to project root (default: config/default.yaml)"
 ++    )
 +     args = ap.parse_args(argv)
-+ 
++
 +-    root = project_root()
 +-    cfg_path = (root / args.config).resolve()
 +-    settings = load_settings(cfg_path)
 ++    # Load settings from YAML via the root-level config.py
 ++    settings = load_settings(args.config)
-+ 
++
 +-    csv = (root / settings.data_csv).resolve()
 +-    out_dir = (root / settings.out_dir).resolve()
 ++    # Resolve absolute paths for input and output
@@ -2657,13 +2657,13 @@ index 0000000..bcc3b5d
 ++        ema_windows=settings.ema_windows,
 ++        resample=settings.resample
 ++    )
-+ 
++
 +-    result = run_btc_pipeline(csv_path=csv, out_dir=out_dir,
 +-                              ema_windows=settings.ema_windows,
 +-                              resample=settings.resample)
 +     print("Pipeline complete:", result)
 +     return 0
-+ 
++
 ++
 + if __name__ == "__main__":
 +     raise SystemExit(main())
@@ -2751,11 +2751,11 @@ index 0000000..bcc3b5d
 ++from __future__ import annotations
 + import numpy as np
 + import pandas as pd
-+ 
++
 +@@ -8,6 +9,22 @@ try:
 + except Exception:
 +     _HAS_ASTRONOMY = False
-+ 
++
 ++
 ++def _session_bucket(hour: int) -> str:
 ++    """
@@ -2794,7 +2794,7 @@ index 0000000..bcc3b5d
 +     if prefix is None:
 +         prefix = base_timestamp_col
 +     valid = dt.notna()
-+ 
++
 +-    # Day-of-week numbering
 ++    # US vs ISO weekday numbering
 +     if us_week_start_sunday:
@@ -2809,12 +2809,12 @@ index 0000000..bcc3b5d
 ++        dow_num = dt.dt.isocalendar().day.astype("Int64")
 ++        week_of_year = dt.dt.isocalendar().week.astype("Int64")
 ++        iso_year = dt.dt.isocalendar().year.astype("Int64")
-+ 
++
 ++    # Unix seconds
 +     unix_ns = dt.astype("int64")
 +     unix_ns = pd.Series(unix_ns, index=df.index).where(valid)
 +     unix_s  = (unix_ns // 10**9).astype("Int64")
-+ 
++
 ++    # Days in month and nth day of month
 ++    # (via month boundaries difference)
 ++    month_start = dt.dt.to_period("M").dt.start_time
@@ -2877,11 +2877,11 @@ index 0000000..bcc3b5d
 ++        f"{prefix}_days_in_month": days_in_month,
 ++        f"{prefix}_nth_day_of_month": nth_day_of_month,
 +     }
-+ 
++
 +     # Seasons (exact if astronomy present; else approx)
 +@@ -72,13 +141,15 @@ def expand_datetime_features_inplace(
 +         )
-+ 
++
 +     if _HAS_ASTRONOMY:
 +-        cache = {}
 ++        cache: dict[int, dict[str, object]] = {}
@@ -2901,7 +2901,7 @@ index 0000000..bcc3b5d
 +             if b["fall"]   <= d < b["winter"]: return "Fall"
 +@@ -127,3 +198,23 @@ def expand_datetime_features_inplace(
 +         out[f"{prefix}_moon_illum_frac"] = moon_deg.apply(_illum)
-+ 
++
 +     df[list(out.keys())] = pd.DataFrame(out, index=df.index)
 ++
 ++
@@ -3147,7 +3147,7 @@ index 0000000..bcc3b5d
 ++            vol *= np.sqrt(periods_per_year)
 ++        df[f"vol_gk_{w}"] = vol
 ++    return df
-+ 
++
 +-def add_atr(df: pd.DataFrame, period: int = 14,
 +-            high_col="high", low_col="low", close_col="close"):
 +-    high = df[high_col].astype(float)
@@ -3388,7 +3388,7 @@ index 0000000..bcc3b5d
 ++from __future__ import annotations
 + import pandas as pd
 +-import numpy as np
-+ 
++
 +-from ta_lab2.resample import bin_by_calendar
 + from ta_lab2.features.calendar import expand_datetime_features_inplace
 +-from ta_lab2.features.ema import add_ema_columns, add_ema_d1, add_ema_d2
@@ -3634,7 +3634,7 @@ index 0000000..bcc3b5d
 ++        open_col="open",
 ++        close_col="close",
 ++    )
-+ 
++
 +-    print_ema21_agreement(daily_en, weekly_en)
 ++    # Volatility (single-bar + rolling realized) via shims
 ++    df = add_volatility_features(
@@ -3651,7 +3651,7 @@ index 0000000..bcc3b5d
 ++        annualize=True,
 ++        direction="newest_top",
 ++    )
-+ 
++
 +-    if args.check:
 +-        boundary_check(daily, weekly, monthly, args.check)
 ++    # EMAs + slopes
@@ -3680,7 +3680,7 @@ index 0000000..bcc3b5d
 ++        date_col="timestamp",
 ++        ema_name_fmt="{field}_ema_{period}",
 ++    )
-+ 
++
 +-    daily_reg, stats = compute_regimes(daily_en)
 +-    print(stats.head())
 +-
@@ -3692,7 +3692,7 @@ index 0000000..bcc3b5d
 ++        direction="newest_top",
 ++        return_col="close_pct_delta",
 ++    )
-+ 
++
 +-    if args.outdir:
 +-        os.makedirs(args.outdir, exist_ok=True)
 +-        daily_en.to_parquet(os.path.join(args.outdir, "daily_en.parquet"), index=False)
@@ -4029,7 +4029,7 @@ index 9a6a43d..3c95784 100644
 -+    "pandas",
 -+    "pyyaml",
 - ]
-- 
+-
 -+[project.optional-dependencies]
 -+dev = [
 -+    "pytest",
@@ -4252,7 +4252,7 @@ index 3131e8d..1b8350c 100644
 +from config import load_settings, project_root
 +from ta_lab2.regimes.run_btc_pipeline import run_btc_pipeline
 +
- 
+
  def main(argv: list[str] | None = None) -> int:
      ap = argparse.ArgumentParser(prog="ta-lab2", description="ta_lab2 CLI")
 -    ap.add_argument("--config", "-c", default="configs/default.yaml",
@@ -4263,13 +4263,13 @@ index 3131e8d..1b8350c 100644
 +        help="Path to YAML config relative to project root (default: config/default.yaml)"
 +    )
      args = ap.parse_args(argv)
- 
+
 -    root = project_root()
 -    cfg_path = (root / args.config).resolve()
 -    settings = load_settings(cfg_path)
 +    # Load settings from YAML via the root-level config.py
 +    settings = load_settings(args.config)
- 
+
 -    csv = (root / settings.data_csv).resolve()
 -    out_dir = (root / settings.out_dir).resolve()
 +    # Resolve absolute paths for input and output
@@ -4283,13 +4283,13 @@ index 3131e8d..1b8350c 100644
 +        ema_windows=settings.ema_windows,
 +        resample=settings.resample
 +    )
- 
+
 -    result = run_btc_pipeline(csv_path=csv, out_dir=out_dir,
 -                              ema_windows=settings.ema_windows,
 -                              resample=settings.resample)
      print("Pipeline complete:", result)
      return 0
- 
+
 +
  if __name__ == "__main__":
      raise SystemExit(main())
@@ -4320,7 +4320,7 @@ index b1797bd..8ea1cb1 100644
 +_PROJECT_ROOT = Path(__file__).resolve().parents[2]
 +if str(_PROJECT_ROOT) not in sys.path:
 +    sys.path.insert(0, str(_PROJECT_ROOT))
- 
+
 -@dataclass
 -class Settings:
 -    data_csv: str
@@ -4329,7 +4329,7 @@ index b1797bd..8ea1cb1 100644
 -    resample: dict = field(default_factory=lambda: {"weekly": "W-SUN", "monthly": "MS"})
 +# Import the real root-level config.py
 +_cfg = _imp("config")
- 
+
 -def load_settings(path: str | Path) -> Settings:
 -    p = Path(path)
 -    data = yaml.safe_load(p.read_text(encoding="utf-8"))
@@ -4338,7 +4338,7 @@ index b1797bd..8ea1cb1 100644
 +load_settings = _cfg.load_settings
 +project_root = _cfg.project_root
 +Settings = _cfg.Settings  # type: ignore[attr-defined]
- 
+
 -def project_root(start: str | Path | None = None) -> Path:
 -    # walk up until we find pyproject.toml
 -    cur = Path(start or __file__).resolve()
@@ -4460,10 +4460,10 @@ index 350c794..74f7d6b 100644
 +from __future__ import annotations
 +
 +from typing import Iterable, Sequence
- 
+
  import numpy as np
  import pandas as pd
- 
+
 -try:
 -    import astronomy as astro   # from astronomy-engine
 +# Optional astronomy support (exact seasonal bounds + moon phase)
@@ -4474,7 +4474,7 @@ index 350c794..74f7d6b 100644
 -except Exception:
 +except Exception:  # pragma: no cover - optional
      _HAS_ASTRONOMY = False
- 
+
 +
  def expand_datetime_features_inplace(
      df: pd.DataFrame,
@@ -4532,7 +4532,7 @@ index 350c794..74f7d6b 100644
          prefix = base_timestamp_col
 +
      valid = dt.notna()
- 
+
 -    # Day-of-week numbering
 -    if us_week_start_sunday:
 -        dow_num = ((dt.dt.dayofweek + 1) % 7 + 1).astype("Int64")   # Sun=1..Sat=7
@@ -4540,7 +4540,7 @@ index 350c794..74f7d6b 100644
 -        dow_num = dt.dt.isocalendar().day.astype("Int64")           # Mon=1..Sun=7
 +    # --- Base parts ---
 +    us_dow = ((dt.dt.dayofweek + 1) % 7 + 1).astype("Int64")  # Sun=1..Sat=7
- 
+
 -    unix_ns = dt.astype("int64")
 +    # unix seconds (preserve NaT -> <NA>)
 +    unix_ns = dt.view("int64")
@@ -4563,7 +4563,7 @@ index 350c794..74f7d6b 100644
 +    # ISO calendar parts for week-of-year
 +    iso = dt.dt.isocalendar()
 +    iso_week = iso.week.astype("Int64")
- 
+
      out = {
          f"{prefix}_date": dt.dt.date,
          f"{prefix}_time": dt.dt.time,
@@ -4590,7 +4590,7 @@ index 350c794..74f7d6b 100644
 +        f"{prefix}_quarter":   dt.dt.quarter.astype("Int64"),
          f"{prefix}_year_half": ((dt.dt.quarter - 1) // 2 + 1).astype("Int64"),
 -    }
- 
+
 -    # Seasons (exact if astronomy present; else approx)
 -    def _season_boundaries(year: int):
 -        s = astro.Seasons(year)
@@ -4611,7 +4611,7 @@ index 350c794..74f7d6b 100644
 +        f"{prefix}_is_month_end":   (dt == month_end).astype("Int64").where(valid),
 +        f"{prefix}_is_business_day": is_bus,
 +    }
- 
+
 +    # --- Seasons ---
      if _HAS_ASTRONOMY:
 -        cache = {}
@@ -4672,7 +4672,7 @@ index 350c794..74f7d6b 100644
 +            np.select(conds, ["Spring", "Summer", "Fall"], default="Winter"),
 +            index=df.index,
          ).where(valid)
- 
+
 -    # Moon (noon UTC, via Time.Make)
 +    # --- Moon (snap to noon UTC) ---
      if add_moon and _HAS_ASTRONOMY:
@@ -4724,7 +4724,7 @@ index 350c794..74f7d6b 100644
          out[f"{prefix}_moon_phase_deg"]  = moon_deg
          out[f"{prefix}_moon_phase_name"] = moon_deg.apply(_phase_name)
          out[f"{prefix}_moon_illum_frac"] = moon_deg.apply(_illum)
- 
+
 +    # --- Assign back ---
      df[list(out.keys())] = pd.DataFrame(out, index=df.index)
 +
@@ -4828,7 +4828,7 @@ index 7757bed..b5e43a4 100644
 @@ -1,30 +1,337 @@
 +# src/ta_lab2/features/ema.py
 +from __future__ import annotations
- 
+
 -import pandas as pd
 +from typing import Iterable, Optional, Sequence
  import numpy as np
@@ -4896,7 +4896,7 @@ index 7757bed..b5e43a4 100644
 +# ---------------------------------------------------------------------------
 +# Column builders (in-place, return df) — tolerant to extra kwargs
 +# ---------------------------------------------------------------------------
- 
+
 -def add_ema_columns(df: pd.DataFrame, fields, periods, suffix_fmt="{field}_ema_{period}"):
 -    for field in fields:
 -        x = df[field].astype(float)
@@ -4954,7 +4954,7 @@ index 7757bed..b5e43a4 100644
 +    if new_cols:
 +        df[list(new_cols.keys())] = pd.DataFrame(new_cols, index=df.index)
      return df
- 
+
 -def add_ema_d1(df: pd.DataFrame, fields, periods, round_places=None, suffix_fmt="{field}_ema_{period}"):
 -    for field in fields:
 -        for p in periods:
@@ -5014,7 +5014,7 @@ index 7757bed..b5e43a4 100644
 +    if new_cols:
 +        df[list(new_cols.keys())] = pd.DataFrame(new_cols, index=df.index)
      return df
- 
+
 -def add_ema_d2(df: pd.DataFrame, fields, periods, round_places=None, suffix_fmt="{field}_ema_{period}"):
 -    for field in fields:
 -        for p in periods:
@@ -5531,7 +5531,7 @@ index 53aeb7e..299cf6d 100644
 @@ -1,8 +1,211 @@
 +# src/ta_lab2/features/returns.py
 +from __future__ import annotations
- 
+
 -import pandas as pd
 +from typing import Sequence, Optional, Union
  import numpy as np
@@ -5719,7 +5719,7 @@ index 53aeb7e..299cf6d 100644
 +    """
 +    base = _coerce_cols(columns if columns is not None else cols)
 +    extras = _coerce_cols(extra_cols)
- 
+
 -def add_returns(df: pd.DataFrame, close_col="close"):
 -    df["ret"] = df[close_col].pct_change()
 -    df["logret"] = np.log(df[close_col]).diff()
@@ -5959,7 +5959,7 @@ index 64a9858..945ce28 100644
 +            vol *= np.sqrt(periods_per_year)
 +        df[f"vol_gk_{w}"] = vol
 +    return df
- 
+
 -def add_atr(df: pd.DataFrame, period: int = 14,
 -            high_col="high", low_col="low", close_col="close"):
 -    high = df[high_col].astype(float)
@@ -6194,7 +6194,7 @@ index 26e2182..5c00f95 100644
 -Created on Fri Oct 31 16:05:09 2025
 +# src/ta_lab2/pipelines/btc_pipeline.py
 +from __future__ import annotations
- 
+
 -@author: asafi
 -"""
 -
@@ -6205,7 +6205,7 @@ index 26e2182..5c00f95 100644
 +import inspect
  import numpy as np
 +import pandas as pd
- 
+
 -from ta_lab2.resample import bin_by_calendar
 +# --- Features / indicators ---
  from ta_lab2.features.calendar import expand_datetime_features_inplace
@@ -6228,7 +6228,7 @@ index 26e2182..5c00f95 100644
 +    add_volatility_features,            # single-bar + Parkinson/RS/GK + ATR
 +    add_rolling_vol_from_returns_batch, # realized vol from returns
  )
- 
+
 -# -------- utils --------
 -
 -def _clean_headers(cols):
@@ -6259,7 +6259,7 @@ index 26e2182..5c00f95 100644
 +    compute_ema_comovement_stats,
 +    compute_ema_comovement_hierarchy,
 +)
- 
+
 -    # Build timeopen (prefer timeopen; fallback to epoch timestamp)
 -    if "timeopen" in df.columns:
 -        dt = pd.to_datetime(df["timeopen"], errors="coerce", utc=True)
@@ -6390,7 +6390,7 @@ index 26e2182..5c00f95 100644
 +    if ts != "timestamp":
 +        df = df.rename(columns={ts: "timestamp"})
      return df
- 
+
 -# -------- timeframes --------
 -
 -def build_timeframes(df: pd.DataFrame):
@@ -6815,8 +6815,8 @@ index 2d99560..77b253b 100644
 +import itertools
  import numpy as np
  import pandas as pd
- 
- 
+
+
 +# ---------------------------------------------------------------------
 +# Original utilities (PRESERVED)
 +# ---------------------------------------------------------------------
@@ -6848,7 +6848,7 @@ index 2d99560..77b253b 100644
 @@ -38,7 +51,6 @@ def build_alignment_frame(
      a = _ensure_sorted(low_df[[on] + low_cols].copy(), on)
      b = _ensure_sorted(high_df[[on] + high_cols].copy(), on)
- 
+
 -    # apply suffixes (keep the 'on' column name intact)
      if suffix_low:
          a = a.rename(columns={c: f"{c}{suffix_low}" for c in low_cols})
@@ -6878,8 +6878,8 @@ index 2d99560..77b253b 100644
      if min_periods is None:
 @@ -86,22 +93,15 @@ def rolling_agreement(
      return df
- 
- 
+
+
 -# ---- optional extras (nice to have) -----------------------------------------
 -
 -def forward_return_split(
@@ -6904,8 +6904,8 @@ index 2d99560..77b253b 100644
 +        .reset_index()
 +        .rename(columns={agree_col: "agree"})
 +    )
- 
- 
+
+
  def lead_lag_max_corr(
 @@ -128,3 +128,115 @@ def lead_lag_max_corr(
      s = pd.Series(corrs).dropna()

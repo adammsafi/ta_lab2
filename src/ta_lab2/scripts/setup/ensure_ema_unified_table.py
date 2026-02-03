@@ -23,7 +23,6 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
 from sqlalchemy import create_engine, text
@@ -67,7 +66,9 @@ def table_exists(engine: Engine, schema: str, table_name: str) -> bool:
     return not df.empty
 
 
-def column_exists(engine: Engine, schema: str, table_name: str, column_name: str) -> bool:
+def column_exists(
+    engine: Engine, schema: str, table_name: str, column_name: str
+) -> bool:
     """
     Check if column exists in table.
 
@@ -91,9 +92,7 @@ def column_exists(engine: Engine, schema: str, table_name: str, column_name: str
         """
     )
     df = pd.read_sql(
-        q,
-        engine,
-        params={"schema": schema, "table": table_name, "column": column_name}
+        q, engine, params={"schema": schema, "table": table_name, "column": column_name}
     )
     return not df.empty
 
@@ -123,7 +122,9 @@ def execute_sql_file(engine: Engine, filepath: Path) -> None:
     _log("SQL file executed successfully")
 
 
-def ensure_cmc_ema_multi_tf_u(engine: Engine, sql_dir: Path, dry_run: bool = False) -> dict:
+def ensure_cmc_ema_multi_tf_u(
+    engine: Engine, sql_dir: Path, dry_run: bool = False
+) -> dict:
     """
     Ensure cmc_ema_multi_tf_u table exists with correct schema.
 
@@ -207,24 +208,22 @@ Examples:
 
   # Create table and populate from source tables
   python -m ta_lab2.scripts.setup.ensure_ema_unified_table --sync-after
-        """
+        """,
     )
 
     parser.add_argument(
         "--sql-dir",
         type=Path,
         default=Path("sql/features"),
-        help="Directory containing DDL files (default: sql/features)"
+        help="Directory containing DDL files (default: sql/features)",
     )
     parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Check table status without creating"
+        "--dry-run", action="store_true", help="Check table status without creating"
     )
     parser.add_argument(
         "--sync-after",
         action="store_true",
-        help="Run sync script after ensuring table exists"
+        help="Run sync script after ensuring table exists",
     )
 
     args = parser.parse_args()
@@ -261,9 +260,13 @@ Examples:
             try:
                 # Run sync_cmc_ema_multi_tf_u.py
                 subprocess.run(
-                    [sys.executable, "-m", "ta_lab2.scripts.emas.sync_cmc_ema_multi_tf_u"],
+                    [
+                        sys.executable,
+                        "-m",
+                        "ta_lab2.scripts.emas.sync_cmc_ema_multi_tf_u",
+                    ],
                     check=True,
-                    cwd=Path.cwd()
+                    cwd=Path.cwd(),
                 )
                 _log("[OK] Sync completed successfully")
             except subprocess.CalledProcessError as e:

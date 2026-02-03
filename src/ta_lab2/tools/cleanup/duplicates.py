@@ -10,21 +10,27 @@ Example:
 """
 from pathlib import Path
 from collections import defaultdict
-import hashlib
-import json
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 from typing import Optional
 
 # Import existing archive checksum function
 from ta_lab2.tools.archive import compute_file_checksum
 
 # Directories to exclude from scanning
-EXCLUDE_DIRS = {".git", ".venv", ".venv311", "__pycache__", ".pytest_cache", "node_modules"}
+EXCLUDE_DIRS = {
+    ".git",
+    ".venv",
+    ".venv311",
+    "__pycache__",
+    ".pytest_cache",
+    "node_modules",
+}
 
 
 @dataclass
 class DuplicateGroup:
     """Group of files with identical content."""
+
     sha256: str
     size_bytes: int
     files: list[Path] = field(default_factory=list)
@@ -38,7 +44,7 @@ def find_duplicates(
     root: Path,
     pattern: str = "**/*",
     min_size: int = 1,
-    exclude_dirs: set[str] | None = None
+    exclude_dirs: set[str] | None = None,
 ) -> dict[str, DuplicateGroup]:
     """Find duplicate files by SHA256 hash.
 
@@ -85,9 +91,7 @@ def find_duplicates(
             # Sort by path for consistent ordering
             files.sort(key=lambda x: str(x[0]))
             group = DuplicateGroup(
-                sha256=file_hash,
-                size_bytes=files[0][1],
-                files=[f[0] for f in files]
+                sha256=file_hash, size_bytes=files[0][1], files=[f[0] for f in files]
             )
             # Prefer src/ file as canonical
             src_files = [f for f in group.files if "src" in f.parts]
@@ -109,7 +113,9 @@ def generate_duplicate_report(duplicates: dict[str, DuplicateGroup]) -> dict:
         "summary": {
             "total_duplicate_groups": len(duplicates),
             "total_duplicate_files": sum(len(g.files) for g in duplicates.values()),
-            "total_wasted_bytes": sum(g.size_bytes * (len(g.files) - 1) for g in duplicates.values())
+            "total_wasted_bytes": sum(
+                g.size_bytes * (len(g.files) - 1) for g in duplicates.values()
+            ),
         },
         "src_canonical": [],  # Duplicates where src/ copy is canonical
         "non_src_duplicates": [],  # Duplicates with no src/ copy
@@ -120,7 +126,7 @@ def generate_duplicate_report(duplicates: dict[str, DuplicateGroup]) -> dict:
             "sha256": sha256,
             "size_bytes": group.size_bytes,
             "canonical": str(group.canonical),
-            "duplicates": [str(f) for f in group.files if f != group.canonical]
+            "duplicates": [str(f) for f in group.files if f != group.canonical],
         }
 
         if any("src" in f.parts for f in group.files):

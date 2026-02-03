@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from ta_lab2.config import TARGET_DB_URL
-from ta_lab2.time.dim_sessions import DimSessions, SessionKey
+from ta_lab2.time.dim_sessions import DimSessions
 
 
 def local_to_utc(d: date, t: time, tz: str) -> datetime:
@@ -32,8 +32,9 @@ def test_ny_winter_offset():
 
     winter = local_to_utc(date(2025, 1, 15), open_t, tz)
 
-    assert winter.hour == 14 and winter.minute == 30, \
-        f"Expected 9:30 EST to be 14:30 UTC, got {winter.hour}:{winter.minute} UTC"
+    assert (
+        winter.hour == 14 and winter.minute == 30
+    ), f"Expected 9:30 EST to be 14:30 UTC, got {winter.hour}:{winter.minute} UTC"
 
 
 def test_ny_summer_offset():
@@ -43,8 +44,9 @@ def test_ny_summer_offset():
 
     summer = local_to_utc(date(2025, 7, 15), open_t, tz)
 
-    assert summer.hour == 13 and summer.minute == 30, \
-        f"Expected 9:30 EDT to be 13:30 UTC, got {summer.hour}:{summer.minute} UTC"
+    assert (
+        summer.hour == 13 and summer.minute == 30
+    ), f"Expected 9:30 EDT to be 13:30 UTC, got {summer.hour}:{summer.minute} UTC"
 
 
 def test_spring_forward_transition():
@@ -60,11 +62,17 @@ def test_spring_forward_transition():
     day_after = local_to_utc(date(2025, 3, 10), open_t, tz)
 
     # Before: EST (UTC-5) = 14:30 UTC
-    assert day_before.hour == 14, f"Expected 14:30 UTC before DST, got {day_before.hour}:{day_before.minute}"
+    assert (
+        day_before.hour == 14
+    ), f"Expected 14:30 UTC before DST, got {day_before.hour}:{day_before.minute}"
 
     # After: EDT (UTC-4) = 13:30 UTC
-    assert day_of.hour == 13, f"Expected 13:30 UTC on DST transition, got {day_of.hour}:{day_of.minute}"
-    assert day_after.hour == 13, f"Expected 13:30 UTC after DST, got {day_after.hour}:{day_after.minute}"
+    assert (
+        day_of.hour == 13
+    ), f"Expected 13:30 UTC on DST transition, got {day_of.hour}:{day_of.minute}"
+    assert (
+        day_after.hour == 13
+    ), f"Expected 13:30 UTC after DST, got {day_after.hour}:{day_after.minute}"
 
 
 def test_fall_back_transition():
@@ -80,11 +88,17 @@ def test_fall_back_transition():
     day_after = local_to_utc(date(2025, 11, 3), open_t, tz)
 
     # Before: EDT (UTC-4) = 13:30 UTC
-    assert day_before.hour == 13, f"Expected 13:30 UTC before fall back, got {day_before.hour}:{day_before.minute}"
+    assert (
+        day_before.hour == 13
+    ), f"Expected 13:30 UTC before fall back, got {day_before.hour}:{day_before.minute}"
 
     # After: EST (UTC-5) = 14:30 UTC
-    assert day_of.hour == 14, f"Expected 14:30 UTC on fall back, got {day_of.hour}:{day_of.minute}"
-    assert day_after.hour == 14, f"Expected 14:30 UTC after fall back, got {day_after.hour}:{day_after.minute}"
+    assert (
+        day_of.hour == 14
+    ), f"Expected 14:30 UTC on fall back, got {day_of.hour}:{day_of.minute}"
+    assert (
+        day_after.hour == 14
+    ), f"Expected 14:30 UTC after fall back, got {day_after.hour}:{day_after.minute}"
 
 
 # ============================================================================
@@ -110,7 +124,7 @@ def test_session_windows_span_dst():
         key=key,
         start_date=date(2025, 3, 8),
         end_date=date(2025, 3, 12),
-        db_url=TARGET_DB_URL
+        db_url=TARGET_DB_URL,
     )
 
     # Should have exactly 5 dates (no duplicates, no missing)
@@ -125,8 +139,10 @@ def test_session_windows_span_dst():
         date(2025, 3, 12),
     ]
 
-    actual_dates = [row.session_date if hasattr(row, 'session_date') else row['session_date']
-                    for _, row in windows.iterrows()]
+    actual_dates = [
+        row.session_date if hasattr(row, "session_date") else row["session_date"]
+        for _, row in windows.iterrows()
+    ]
 
     for expected in expected_dates:
         assert expected in actual_dates, f"Missing date {expected} in session windows"
@@ -149,15 +165,19 @@ def test_session_windows_december_january():
         key=key,
         start_date=date(2024, 12, 30),
         end_date=date(2025, 1, 3),
-        db_url=TARGET_DB_URL
+        db_url=TARGET_DB_URL,
     )
 
     # Should have exactly 5 dates
-    assert len(windows) == 5, f"Expected 5 session windows across year boundary, got {len(windows)}"
+    assert (
+        len(windows) == 5
+    ), f"Expected 5 session windows across year boundary, got {len(windows)}"
 
     # Verify year transitions correctly
-    actual_dates = [row.session_date if hasattr(row, 'session_date') else row['session_date']
-                    for _, row in windows.iterrows()]
+    actual_dates = [
+        row.session_date if hasattr(row, "session_date") else row["session_date"]
+        for _, row in windows.iterrows()
+    ]
 
     assert date(2024, 12, 30) in actual_dates, "Missing Dec 30, 2024"
     assert date(2025, 1, 3) in actual_dates, "Missing Jan 3, 2025"
@@ -181,23 +201,37 @@ def test_crypto_session_no_dst():
         key=key,
         start_date=date(2025, 3, 8),
         end_date=date(2025, 3, 12),
-        db_url=TARGET_DB_URL
+        db_url=TARGET_DB_URL,
     )
 
     # Should have data
     assert len(windows) > 0, "Expected session windows for crypto"
 
     # Verify crypto session is marked as 24h and uses UTC timezone
-    assert meta.is_24h is True, f"Expected crypto session to be 24h, got is_24h={meta.is_24h}"
-    assert meta.timezone == "UTC", f"Expected crypto session to use UTC timezone, got {meta.timezone}"
+    assert (
+        meta.is_24h is True
+    ), f"Expected crypto session to be 24h, got is_24h={meta.is_24h}"
+    assert (
+        meta.timezone == "UTC"
+    ), f"Expected crypto session to use UTC timezone, got {meta.timezone}"
 
     # Verify all dates present (no duplicates or missing dates)
-    expected_dates = [date(2025, 3, 8), date(2025, 3, 9), date(2025, 3, 10), date(2025, 3, 11), date(2025, 3, 12)]
-    actual_dates = [row.session_date if hasattr(row, 'session_date') else row['session_date']
-                    for _, row in windows.iterrows()]
+    expected_dates = [
+        date(2025, 3, 8),
+        date(2025, 3, 9),
+        date(2025, 3, 10),
+        date(2025, 3, 11),
+        date(2025, 3, 12),
+    ]
+    actual_dates = [
+        row.session_date if hasattr(row, "session_date") else row["session_date"]
+        for _, row in windows.iterrows()
+    ]
 
     for expected in expected_dates:
-        assert expected in actual_dates, f"Missing date {expected} in crypto session windows"
+        assert (
+            expected in actual_dates
+        ), f"Missing date {expected} in crypto session windows"
 
 
 # ============================================================================
@@ -236,15 +270,16 @@ def test_no_numeric_offsets():
         timezones.add(meta.timezone)
 
     # Check for numeric offset patterns like "+0500", "-0800", etc.
-    numeric_offset_pattern = re.compile(r'^[+-]\d+')
+    numeric_offset_pattern = re.compile(r"^[+-]\d+")
 
     violations = []
     for tz_name in timezones:
         if numeric_offset_pattern.match(tz_name):
             violations.append(tz_name)
 
-    assert len(violations) == 0, \
-        f"Found numeric timezone offsets (should use IANA names): {violations}"
+    assert (
+        len(violations) == 0
+    ), f"Found numeric timezone offsets (should use IANA names): {violations}"
 
 
 # ============================================================================
@@ -269,12 +304,18 @@ def test_leap_year_feb29():
         key=key,
         start_date=date(2024, 2, 29),
         end_date=date(2024, 2, 29),
-        db_url=TARGET_DB_URL
+        db_url=TARGET_DB_URL,
     )
 
     # Should have exactly 1 session window
-    assert len(windows) == 1, f"Expected 1 session window for leap day, got {len(windows)}"
+    assert (
+        len(windows) == 1
+    ), f"Expected 1 session window for leap day, got {len(windows)}"
 
     # Verify date is correct
-    actual_date = windows.iloc[0].session_date if hasattr(windows.iloc[0], 'session_date') else windows.iloc[0]['session_date']
+    actual_date = (
+        windows.iloc[0].session_date
+        if hasattr(windows.iloc[0], "session_date")
+        else windows.iloc[0]["session_date"]
+    )
     assert actual_date == date(2024, 2, 29), f"Expected Feb 29, 2024, got {actual_date}"

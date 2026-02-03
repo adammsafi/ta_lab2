@@ -23,7 +23,6 @@ Usage:
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 from uuid import UUID
@@ -36,6 +35,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 # Schema Management
 # =============================================================================
+
 
 def ensure_observability_tables(engine: Engine) -> None:
     """
@@ -56,21 +56,26 @@ def ensure_observability_tables(engine: Engine) -> None:
         Exception: If SQL execution fails
     """
     # Find SQL file relative to this module
-    sql_file = Path(__file__).parent.parent.parent.parent / "sql" / "ddl" / "create_observability_schema.sql"
+    sql_file = (
+        Path(__file__).parent.parent.parent.parent
+        / "sql"
+        / "ddl"
+        / "create_observability_schema.sql"
+    )
 
     if not sql_file.exists():
         raise FileNotFoundError(f"Observability schema SQL not found: {sql_file}")
 
     logger.info(f"Executing observability schema SQL: {sql_file}")
 
-    with open(sql_file, 'r', encoding='utf-8') as f:
+    with open(sql_file, "r", encoding="utf-8") as f:
         sql = f.read()
 
     with engine.begin() as conn:
         # Execute statement by statement (PostgreSQL doesn't support multiple statements in text())
-        for statement in sql.split(';'):
+        for statement in sql.split(";"):
             statement = statement.strip()
-            if statement and not statement.startswith('--'):
+            if statement and not statement.startswith("--"):
                 conn.execute(text(statement))
 
     logger.info("Observability schema created successfully")
@@ -79,6 +84,7 @@ def ensure_observability_tables(engine: Engine) -> None:
 # =============================================================================
 # Workflow State Tracker
 # =============================================================================
+
 
 class WorkflowStateTracker:
     """
@@ -120,18 +126,20 @@ class WorkflowStateTracker:
         Raises:
             Exception: If insert fails
         """
-        query = text("""
+        query = text(
+            """
             INSERT INTO observability.workflow_state
                 (workflow_id, correlation_id, workflow_type, current_phase, status, metadata)
             VALUES
                 (:workflow_id, :correlation_id, :workflow_type, NULL, 'pending', :metadata)
-        """)
+        """
+        )
 
         params = {
-            'workflow_id': str(workflow_id),
-            'correlation_id': correlation_id,
-            'workflow_type': workflow_type,
-            'metadata': metadata if metadata else None,
+            "workflow_id": str(workflow_id),
+            "correlation_id": correlation_id,
+            "workflow_type": workflow_type,
+            "metadata": metadata if metadata else None,
         }
 
         with self.engine.begin() as conn:
@@ -160,32 +168,36 @@ class WorkflowStateTracker:
         """
         if metadata:
             # Merge with existing metadata
-            query = text("""
+            query = text(
+                """
                 UPDATE observability.workflow_state
                 SET current_phase = :new_phase,
                     status = :status,
                     updated_at = NOW(),
                     metadata = COALESCE(metadata, '{}'::jsonb) || :metadata::jsonb
                 WHERE workflow_id = :workflow_id
-            """)
+            """
+            )
             params = {
-                'workflow_id': str(workflow_id),
-                'new_phase': new_phase,
-                'status': status,
-                'metadata': metadata,
+                "workflow_id": str(workflow_id),
+                "new_phase": new_phase,
+                "status": status,
+                "metadata": metadata,
             }
         else:
-            query = text("""
+            query = text(
+                """
                 UPDATE observability.workflow_state
                 SET current_phase = :new_phase,
                     status = :status,
                     updated_at = NOW()
                 WHERE workflow_id = :workflow_id
-            """)
+            """
+            )
             params = {
-                'workflow_id': str(workflow_id),
-                'new_phase': new_phase,
-                'status': status,
+                "workflow_id": str(workflow_id),
+                "new_phase": new_phase,
+                "status": status,
             }
 
         with self.engine.begin() as conn:
@@ -206,7 +218,8 @@ class WorkflowStateTracker:
         Returns:
             Dict with workflow state or None if not found
         """
-        query = text("""
+        query = text(
+            """
             SELECT
                 workflow_id,
                 correlation_id,
@@ -218,24 +231,25 @@ class WorkflowStateTracker:
                 metadata
             FROM observability.workflow_state
             WHERE workflow_id = :workflow_id
-        """)
+        """
+        )
 
         with self.engine.connect() as conn:
-            result = conn.execute(query, {'workflow_id': str(workflow_id)})
+            result = conn.execute(query, {"workflow_id": str(workflow_id)})
             row = result.fetchone()
 
             if not row:
                 return None
 
             return {
-                'workflow_id': row[0],
-                'correlation_id': row[1],
-                'workflow_type': row[2],
-                'current_phase': row[3],
-                'status': row[4],
-                'created_at': row[5],
-                'updated_at': row[6],
-                'metadata': row[7],
+                "workflow_id": row[0],
+                "correlation_id": row[1],
+                "workflow_type": row[2],
+                "current_phase": row[3],
+                "status": row[4],
+                "created_at": row[5],
+                "updated_at": row[6],
+                "metadata": row[7],
             }
 
     def list_workflows(
@@ -254,7 +268,8 @@ class WorkflowStateTracker:
             List of workflow state dicts, newest first
         """
         if status:
-            query = text("""
+            query = text(
+                """
                 SELECT
                     workflow_id,
                     correlation_id,
@@ -268,10 +283,12 @@ class WorkflowStateTracker:
                 WHERE status = :status
                 ORDER BY created_at DESC
                 LIMIT :limit
-            """)
-            params = {'status': status, 'limit': limit}
+            """
+            )
+            params = {"status": status, "limit": limit}
         else:
-            query = text("""
+            query = text(
+                """
                 SELECT
                     workflow_id,
                     correlation_id,
@@ -284,8 +301,9 @@ class WorkflowStateTracker:
                 FROM observability.workflow_state
                 ORDER BY created_at DESC
                 LIMIT :limit
-            """)
-            params = {'limit': limit}
+            """
+            )
+            params = {"limit": limit}
 
         workflows = []
 
@@ -293,16 +311,18 @@ class WorkflowStateTracker:
             result = conn.execute(query, params)
 
             for row in result:
-                workflows.append({
-                    'workflow_id': row[0],
-                    'correlation_id': row[1],
-                    'workflow_type': row[2],
-                    'current_phase': row[3],
-                    'status': row[4],
-                    'created_at': row[5],
-                    'updated_at': row[6],
-                    'metadata': row[7],
-                })
+                workflows.append(
+                    {
+                        "workflow_id": row[0],
+                        "correlation_id": row[1],
+                        "workflow_type": row[2],
+                        "current_phase": row[3],
+                        "status": row[4],
+                        "created_at": row[5],
+                        "updated_at": row[6],
+                        "metadata": row[7],
+                    }
+                )
 
         return workflows
 
@@ -310,6 +330,7 @@ class WorkflowStateTracker:
 # =============================================================================
 # PostgreSQL Span Exporter (for OpenTelemetry)
 # =============================================================================
+
 
 class PostgreSQLSpanExporter:
     """

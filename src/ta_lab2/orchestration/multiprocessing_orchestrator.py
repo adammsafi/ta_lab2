@@ -163,7 +163,9 @@ class MultiprocessingOrchestrator(Generic[TTask, TStateUpdate, TStats]):
         all_state_updates: list[TStateUpdate] = []
         totals = self._init_stats(stats_template)
 
-        with Pool(processes=num_processes, maxtasksperchild=self.config.maxtasksperchild) as pool:
+        with Pool(
+            processes=num_processes, maxtasksperchild=self.config.maxtasksperchild
+        ) as pool:
             if self.config.use_imap_unordered:
                 # Streaming results (good for long-running tasks)
                 completed = 0

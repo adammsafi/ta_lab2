@@ -54,6 +54,7 @@ except ImportError:
 # Tracer Setup
 # =============================================================================
 
+
 def setup_tracing(service_name: str, engine: Optional[Any] = None) -> Any:
     """
     Initialize OpenTelemetry tracing for this service.
@@ -82,10 +83,13 @@ def setup_tracing(service_name: str, engine: Optional[Any] = None) -> Any:
     if engine:
         try:
             from ta_lab2.observability.storage import PostgreSQLSpanExporter
+
             exporter = PostgreSQLSpanExporter(engine)
             processor = BatchSpanProcessor(exporter)
             provider.add_span_processor(processor)
-            logger.info(f"Tracing configured for {service_name} with PostgreSQL exporter")
+            logger.info(
+                f"Tracing configured for {service_name} with PostgreSQL exporter"
+            )
         except Exception as e:
             logger.warning(f"Failed to setup PostgreSQL span exporter: {e}")
     else:
@@ -117,6 +121,7 @@ def get_tracer(name: str = __name__) -> Any:
 # Tracing Context
 # =============================================================================
 
+
 class TracingContext:
     """
     Context manager for creating OpenTelemetry spans.
@@ -137,7 +142,9 @@ class TracingContext:
             print(f"Trace ID: {ctx.trace_id}")
     """
 
-    def __init__(self, operation_name: str, attributes: Optional[dict[str, Any]] = None):
+    def __init__(
+        self, operation_name: str, attributes: Optional[dict[str, Any]] = None
+    ):
         """
         Initialize tracing context.
 
@@ -204,7 +211,7 @@ class TracingContext:
             return ""
 
         context = self._span.get_span_context()
-        return format(context.trace_id, '032x')
+        return format(context.trace_id, "032x")
 
     @property
     def span_id(self) -> str:
@@ -218,7 +225,7 @@ class TracingContext:
             return ""
 
         context = self._span.get_span_context()
-        return format(context.span_id, '016x')
+        return format(context.span_id, "016x")
 
     def add_event(self, name: str, attributes: Optional[dict[str, Any]] = None) -> None:
         """
@@ -251,6 +258,7 @@ class TracingContext:
 # Correlation ID Generation
 # =============================================================================
 
+
 def generate_correlation_id() -> str:
     """
     Generate correlation ID for cross-system request tracing.
@@ -270,7 +278,7 @@ def generate_correlation_id() -> str:
             current_span = trace.get_current_span()
             if current_span and current_span.is_recording():
                 context = current_span.get_span_context()
-                return format(context.trace_id, '032x')
+                return format(context.trace_id, "032x")
         except Exception:
             pass  # Fall through to UUID generation
 
@@ -281,6 +289,7 @@ def generate_correlation_id() -> str:
 # =============================================================================
 # No-op Tracer (when OpenTelemetry not available)
 # =============================================================================
+
 
 class NoOpTracer:
     """

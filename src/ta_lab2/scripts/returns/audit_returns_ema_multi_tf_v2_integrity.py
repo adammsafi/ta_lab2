@@ -47,7 +47,6 @@ import argparse
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
 from sqlalchemy import create_engine, text
@@ -100,18 +99,34 @@ def _fail_or_warn(strict: bool, msg: str) -> None:
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Audit integrity for cmc_returns_ema_multi_tf_v2.")
-    p.add_argument("--db-url", default=os.getenv("TARGET_DB_URL", ""), help="DB URL (or set TARGET_DB_URL).")
+    p = argparse.ArgumentParser(
+        description="Audit integrity for cmc_returns_ema_multi_tf_v2."
+    )
+    p.add_argument(
+        "--db-url",
+        default=os.getenv("TARGET_DB_URL", ""),
+        help="DB URL (or set TARGET_DB_URL).",
+    )
     p.add_argument("--ema-table", default=DEFAULT_EMA_TABLE)
     p.add_argument("--ret-table", default=DEFAULT_RET_TABLE)
 
     # Output controls
-    p.add_argument("--out", default="", help="Base filename for CSV outputs (no extension). If empty, auto-dated.")
+    p.add_argument(
+        "--out",
+        default="",
+        help="Base filename for CSV outputs (no extension). If empty, auto-dated.",
+    )
     p.add_argument("--out-dir", default=".", help="Directory to write CSV outputs.")
 
     # Behavior / gap threshold controls
-    p.add_argument("--strict", action="store_true", help="Exit non-zero if any FAIL checks occur.")
-    p.add_argument("--dim-timeframe", default=DEFAULT_DIM_TIMEFRAME, help="dim_timeframe table (for gap thresholds).")
+    p.add_argument(
+        "--strict", action="store_true", help="Exit non-zero if any FAIL checks occur."
+    )
+    p.add_argument(
+        "--dim-timeframe",
+        default=DEFAULT_DIM_TIMEFRAME,
+        help="dim_timeframe table (for gap thresholds).",
+    )
     p.add_argument(
         "--gap-mult",
         type=float,
@@ -123,7 +138,9 @@ def main() -> None:
 
     db_url = args.db_url.strip()
     if not db_url:
-        raise SystemExit("ERROR: Missing DB URL. Provide --db-url or set TARGET_DB_URL.")
+        raise SystemExit(
+            "ERROR: Missing DB URL. Provide --db-url or set TARGET_DB_URL."
+        )
 
     engine = _get_engine(db_url)
     ema_table = args.ema_table
@@ -259,7 +276,9 @@ def main() -> None:
         print(anom.head(50).to_string(index=False))
         _fail_or_warn(strict, f"FAIL: gap anomalies found: {len(anom)}")
     else:
-        _print(f"PASS: no gap anomalies (gap_days>=1, and not >{gap_mult}x tf_days_nominal when available).")
+        _print(
+            f"PASS: no gap anomalies (gap_days>=1, and not >{gap_mult}x tf_days_nominal when available)."
+        )
 
     # 4) Null policy
     nulls_sql = f"""
@@ -296,7 +315,9 @@ def main() -> None:
     align = _df(engine, align_sql)
     n_missing = int(align.iloc[0]["n_missing"])
     if n_missing != 0:
-        _print(f"FAIL: {n_missing} returns rows have no matching EMA row in source table.")
+        _print(
+            f"FAIL: {n_missing} returns rows have no matching EMA row in source table."
+        )
         _fail_or_warn(strict, f"FAIL: alignment missing EMA rows: {n_missing}")
     else:
         _print("PASS: all returns timestamps/keys align to EMA source table.")

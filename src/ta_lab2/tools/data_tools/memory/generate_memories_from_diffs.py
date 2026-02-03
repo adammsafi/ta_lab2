@@ -98,7 +98,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 # Optional: Vertex Memory Bank publish (requires google-auth)
 try:
@@ -123,7 +123,10 @@ except Exception:  # pragma: no cover
 try:
     from openai import OpenAI
 except ImportError:
-    print("Error: openai library not found. Install with: pip install openai", file=sys.stderr)
+    print(
+        "Error: openai library not found. Install with: pip install openai",
+        file=sys.stderr,
+    )
     sys.exit(1)
 
 
@@ -132,8 +135,8 @@ DEFAULT_TPM_LIMIT = 30000
 DEFAULT_SAFETY = 0.70
 DEFAULT_MAX_OUTPUT_TOKENS = 600
 DEFAULT_API_DELAY_SEC = 0.0
-DEFAULT_UNIFIED_CONTEXT = 2     # git show --unified=N
-DEFAULT_CONTEXT_KEEP = 1        # keep +/- lines plus this many surrounding diff-context lines
+DEFAULT_UNIFIED_CONTEXT = 2  # git show --unified=N
+DEFAULT_CONTEXT_KEEP = 1  # keep +/- lines plus this many surrounding diff-context lines
 DEFAULT_WORKERS = 1
 
 
@@ -153,8 +156,8 @@ class Hunk:
 class ManifestEntry:
     entry_id: str
     repo_path: str
-    source_type: str   # commit | diff_file
-    source_id: str     # commit hash or diff file path
+    source_type: str  # commit | diff_file
+    source_id: str  # commit hash or diff file path
     commit_subject: str
     file_path: str
     hunk_header: str
@@ -171,7 +174,7 @@ class ManifestEntry:
     context_keep: int = DEFAULT_CONTEXT_KEEP
 
     # status
-    status: str = "pending"        # pending | done | error | skipped
+    status: str = "pending"  # pending | done | error | skipped
     last_error: Optional[str] = None
 
     @staticmethod
@@ -232,6 +235,7 @@ class TokenCounter:
     TokenCounter tries tiktoken for more accurate estimates; falls back to len(text)/4 heuristic.
     We keep this as an estimator (not an exact allocator), but accuracy materially improves chunking.
     """
+
     def __init__(self) -> None:
         self._enc_cache: Dict[str, Any] = {}
 
@@ -329,10 +333,16 @@ def reduce_unified_diff(diff_text: str, context_keep: int = 0) -> List[Hunk]:
                 if hl.startswith("+") or hl.startswith("-"):
                     kept.append(hl)
         else:
-            idxs = [k for k, hl in enumerate(hunk_lines) if hl.startswith("+") or hl.startswith("-")]
+            idxs = [
+                k
+                for k, hl in enumerate(hunk_lines)
+                if hl.startswith("+") or hl.startswith("-")
+            ]
             keep_set = set()
             for k in idxs:
-                for w in range(max(0, k - context_keep), min(len(hunk_lines), k + context_keep + 1)):
+                for w in range(
+                    max(0, k - context_keep), min(len(hunk_lines), k + context_keep + 1)
+                ):
                     keep_set.add(w)
             for k, hl in enumerate(hunk_lines):
                 if k in keep_set:
@@ -353,9 +363,13 @@ def reduce_unified_diff(diff_text: str, context_keep: int = 0) -> List[Hunk]:
     return hunks
 
 
-def load_diff_for_commit(repo_path: str, commit_hash: str, unified_context: int) -> Tuple[str, str]:
+def load_diff_for_commit(
+    repo_path: str, commit_hash: str, unified_context: int
+) -> Tuple[str, str]:
     subject = run_git(repo_path, ["show", "-s", "--format=%s", commit_hash]).strip()
-    diff_text = run_git(repo_path, ["show", f"--unified={int(unified_context)}", commit_hash])
+    diff_text = run_git(
+        repo_path, ["show", f"--unified={int(unified_context)}", commit_hash]
+    )
     return subject, diff_text
 
 
@@ -389,7 +403,9 @@ class DiffCache:
                 return self._cache[key]
 
         if source_type == "commit":
-            subject, diff_text = load_diff_for_commit(repo_path, source_id, unified_context=unified_context)
+            subject, diff_text = load_diff_for_commit(
+                repo_path, source_id, unified_context=unified_context
+            )
         else:
             subject, diff_text = load_diff_from_file(source_id)
 
@@ -406,9 +422,7 @@ DIFFS = DiffCache()
 # =========================
 # Prompting (light dynamic prompt engineering)
 # =========================
-_ALLOWED_TYPES = (
-    "decision|invariant|pitfall|procedure|constraint|design|bugfix|refactor|performance|testing|other"
-)
+_ALLOWED_TYPES = "decision|invariant|pitfall|procedure|constraint|design|bugfix|refactor|performance|testing|other"
 
 
 def _hint_for_file(file_path: str) -> str:
@@ -437,7 +451,9 @@ def build_memory_prompt(
 ) -> str:
     # Encourage specificity more strongly on small prompts; allow broader summaries on huge ones.
     if est_total_tokens <= 1200:
-        specificity = "Be highly specific: include function/class/module names when available."
+        specificity = (
+            "Be highly specific: include function/class/module names when available."
+        )
     else:
         specificity = "Be specific but concise: focus on the most important intent, invariants, and pitfalls."
 
@@ -495,8 +511,17 @@ def normalize_memory_type(x: Any) -> str:
         return "other"
     v = x.strip().lower()
     allowed = {
-        "decision", "invariant", "pitfall", "procedure", "constraint", "design",
-        "bugfix", "refactor", "performance", "testing", "other"
+        "decision",
+        "invariant",
+        "pitfall",
+        "procedure",
+        "constraint",
+        "design",
+        "bugfix",
+        "refactor",
+        "performance",
+        "testing",
+        "other",
     }
     return v if v in allowed else "other"
 
@@ -515,7 +540,9 @@ def coerce_confidence(x: Any) -> float:
 # LLM abstraction
 # =========================
 class LLMClient:
-    def generate_json(self, model: str, prompt: str, max_output_tokens: int) -> Dict[str, Any]:
+    def generate_json(
+        self, model: str, prompt: str, max_output_tokens: int
+    ) -> Dict[str, Any]:
         raise NotImplementedError
 
 
@@ -539,7 +566,7 @@ def _extract_json_object(text: str) -> Dict[str, Any]:
     start = t.find("{")
     end = t.rfind("}")
     if start != -1 and end != -1 and end > start:
-        sub = t[start: end + 1]
+        sub = t[start : end + 1]
         obj2 = json.loads(sub)
         if not isinstance(obj2, dict):
             raise ValueError("Expected a JSON object at top level.")
@@ -548,7 +575,9 @@ def _extract_json_object(text: str) -> Dict[str, Any]:
     raise ValueError("Could not parse JSON from model output.")
 
 
-def _call_openai_json(client: OpenAI, model: str, prompt: str, max_output_tokens: int) -> Dict[str, Any]:
+def _call_openai_json(
+    client: OpenAI, model: str, prompt: str, max_output_tokens: int
+) -> Dict[str, Any]:
     """
     Try Responses API first; fallback to Chat Completions.
     Retries are exponential backoff controlled by env vars.
@@ -586,7 +615,10 @@ def _call_openai_json(client: OpenAI, model: str, prompt: str, max_output_tokens
                 cc = client.chat.completions.create(
                     model=model,
                     messages=[
-                        {"role": "system", "content": "Return valid JSON only. No markdown. No commentary."},
+                        {
+                            "role": "system",
+                            "content": "Return valid JSON only. No markdown. No commentary.",
+                        },
                         {"role": "user", "content": prompt},
                     ],
                     response_format={"type": "json_object"},
@@ -597,7 +629,10 @@ def _call_openai_json(client: OpenAI, model: str, prompt: str, max_output_tokens
                 cc2 = client.chat.completions.create(
                     model=model,
                     messages=[
-                        {"role": "system", "content": "Return valid JSON only. No markdown. No commentary."},
+                        {
+                            "role": "system",
+                            "content": "Return valid JSON only. No markdown. No commentary.",
+                        },
                         {"role": "user", "content": prompt},
                     ],
                     max_tokens=max_output_tokens,
@@ -620,7 +655,9 @@ class OpenAILLMClient(LLMClient):
     def __init__(self) -> None:
         self._client = OpenAI()
 
-    def generate_json(self, model: str, prompt: str, max_output_tokens: int) -> Dict[str, Any]:
+    def generate_json(
+        self, model: str, prompt: str, max_output_tokens: int
+    ) -> Dict[str, Any]:
         return _call_openai_json(self._client, model, prompt, max_output_tokens)
 
 
@@ -642,9 +679,13 @@ class MemoryBankPublisher:
         if not cfg.enabled:
             raise ValueError("Publisher initialized with enabled=False")
         if google is None:
-            raise RuntimeError("google-auth is required for publishing. Install: pip install google-auth")
+            raise RuntimeError(
+                "google-auth is required for publishing. Install: pip install google-auth"
+            )
         self.cfg = cfg
-        creds, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+        creds, _ = google.auth.default(
+            scopes=["https://www.googleapis.com/auth/cloud-platform"]
+        )
         self.sess = google.auth.transport.requests.AuthorizedSession(creds)
 
     @property
@@ -660,7 +701,9 @@ class MemoryBankPublisher:
 
     def create_memory(self, text_content: str) -> Dict[str, Any]:
         url = f"{self.base}/{self.engine_name}/memories"
-        body: Dict[str, Any] = {"memory": {"scope": self.cfg.scope, "textContent": text_content}}
+        body: Dict[str, Any] = {
+            "memory": {"scope": self.cfg.scope, "textContent": text_content}
+        }
         if self.cfg.labels:
             body["memory"]["labels"] = self.cfg.labels
 
@@ -685,11 +728,14 @@ class Mem0Publisher:
     Local mem0 publisher.
     Requires: pip install mem0
     """
+
     def __init__(self, cfg: Mem0PublishConfig):
         if not cfg.enabled:
             raise ValueError("Mem0Publisher initialized with enabled=False")
         if Mem0Memory is None:
-            raise RuntimeError("mem0 is required for publishing. Install: pip install mem0")
+            raise RuntimeError(
+                "mem0 is required for publishing. Install: pip install mem0"
+            )
         if not cfg.user_id:
             raise RuntimeError("mem0 user_id is required.")
         self.cfg = cfg
@@ -768,7 +814,9 @@ _MANIFEST_LOCK = threading.Lock()
 _MEMORIES_LOCK = threading.Lock()
 
 
-def update_manifest_status(manifest_path: Path, entry_id: str, status: str, last_error: Optional[str]) -> None:
+def update_manifest_status(
+    manifest_path: Path, entry_id: str, status: str, last_error: Optional[str]
+) -> None:
     # Simple & safe: rewrite file under lock. Good enough for threaded runs.
     with _MANIFEST_LOCK:
         entries = read_manifest(manifest_path)
@@ -811,7 +859,9 @@ def load_dedup_ids(path: Optional[str]) -> set[str]:
     p = Path(path)
     if not p.exists():
         return set()
-    return {ln.strip() for ln in p.read_text(encoding="utf-8").splitlines() if ln.strip()}
+    return {
+        ln.strip() for ln in p.read_text(encoding="utf-8").splitlines() if ln.strip()
+    }
 
 
 def append_dedup_id(path: Optional[str], memory_id: str) -> None:
@@ -850,7 +900,9 @@ def reconstruct_hunk_from_manifest(e: ManifestEntry) -> Hunk:
         if h.file_path == e.file_path:
             return h
 
-    raise RuntimeError("Could not reconstruct hunk from manifest entry (context parameters may differ).")
+    raise RuntimeError(
+        "Could not reconstruct hunk from manifest entry (context parameters may differ)."
+    )
 
 
 # =========================
@@ -918,7 +970,9 @@ def publish_record(
 
     if publish_mode in ("mem0", "both"):
         if mem0_pub is None:
-            raise RuntimeError("mem0 publisher not configured but publish mode requires it.")
+            raise RuntimeError(
+                "mem0 publisher not configured but publish mode requires it."
+            )
         meta = {
             "memory_id": record.get("memory_id"),
             "memory_type": record.get("memory_type"),
@@ -933,14 +987,18 @@ def publish_record(
 
     if publish_mode in ("memory_bank", "both"):
         if mb_pub is None:
-            raise RuntimeError("memory bank publisher not configured but publish mode requires it.")
+            raise RuntimeError(
+                "memory bank publisher not configured but publish mode requires it."
+            )
         res2 = mb_pub.create_memory(payload)
         results["memory_bank"] = res2
 
     return results
 
 
-def _build_prompt_and_parts(e: ManifestEntry, hunk: Hunk, model: str) -> Tuple[List[Hunk], List[str]]:
+def _build_prompt_and_parts(
+    e: ManifestEntry, hunk: Hunk, model: str
+) -> Tuple[List[Hunk], List[str]]:
     # First pass prompt estimate on full hunk
     tmp_prompt = build_memory_prompt(
         repo_path=e.repo_path,
@@ -958,7 +1016,9 @@ def _build_prompt_and_parts(e: ManifestEntry, hunk: Hunk, model: str) -> Tuple[L
     if est_prompt_tokens > e.max_input_tokens:
         # Conservative chunk budget: leave space for headers/instructions
         chunk_budget = max(600, int(e.max_input_tokens * 0.55))
-        chunks = split_text_by_token_budget(hunk.reduced_diff, max_tokens=chunk_budget, model=model)
+        chunks = split_text_by_token_budget(
+            hunk.reduced_diff, max_tokens=chunk_budget, model=model
+        )
     else:
         chunks = [hunk.reduced_diff]
 
@@ -1024,7 +1084,9 @@ def process_one_manifest_entry(
     parts_hunks, parts_prompts = _build_prompt_and_parts(e, hunk, model=model)
 
     try:
-        for idx, (h_part, prompt) in enumerate(zip(parts_hunks, parts_prompts), start=1):
+        for idx, (h_part, prompt) in enumerate(
+            zip(parts_hunks, parts_prompts), start=1
+        ):
             est_in = TOKENS.estimate(prompt, model)
             if verbose:
                 print(
@@ -1036,9 +1098,13 @@ def process_one_manifest_entry(
             # If prompt is still too large, do a second-level split (rare if budgets are conservative)
             if est_in > e.max_input_tokens:
                 sub_budget = max(500, int(e.max_input_tokens * 0.40))
-                subchunks = split_text_by_token_budget(h_part.reduced_diff, max_tokens=sub_budget, model=model)
+                subchunks = split_text_by_token_budget(
+                    h_part.reduced_diff, max_tokens=sub_budget, model=model
+                )
                 if verbose:
-                    print(f"{progress_prefix}  oversize -> subchunks={len(subchunks)} budget={sub_budget}")
+                    print(
+                        f"{progress_prefix}  oversize -> subchunks={len(subchunks)} budget={sub_budget}"
+                    )
 
                 for sub_i, sub in enumerate(subchunks, start=1):
                     h3 = dataclasses.replace(h_part, reduced_diff=sub)
@@ -1064,8 +1130,14 @@ def process_one_manifest_entry(
                         est_total_tokens=est_total,
                     )
 
-                    mem = llm.generate_json(model=model, prompt=prompt2, max_output_tokens=e.max_output_tokens)
-                    record = format_memory_record(e, h3, idx, len(parts_prompts), mem, model)
+                    mem = llm.generate_json(
+                        model=model,
+                        prompt=prompt2,
+                        max_output_tokens=e.max_output_tokens,
+                    )
+                    record = format_memory_record(
+                        e, h3, idx, len(parts_prompts), mem, model
+                    )
                     record["evidence"]["subchunk_index"] = sub_i
                     record["evidence"]["subchunk_count"] = len(subchunks)
 
@@ -1090,8 +1162,12 @@ def process_one_manifest_entry(
 
                 continue
 
-            mem = llm.generate_json(model=model, prompt=prompt, max_output_tokens=e.max_output_tokens)
-            record = format_memory_record(e, h_part, idx, len(parts_prompts), mem, model)
+            mem = llm.generate_json(
+                model=model, prompt=prompt, max_output_tokens=e.max_output_tokens
+            )
+            record = format_memory_record(
+                e, h_part, idx, len(parts_prompts), mem, model
+            )
 
             # Publish first (optional), then write a single final record
             if publish_mode != "none":
@@ -1122,7 +1198,9 @@ def process_one_manifest_entry(
 # =========================
 # Analyze command
 # =========================
-def _compute_max_input_tokens(tpm_limit: int, safety: float, max_output_tokens: int) -> int:
+def _compute_max_input_tokens(
+    tpm_limit: int, safety: float, max_output_tokens: int
+) -> int:
     max_input_tokens = int((int(tpm_limit) * float(safety)) - int(max_output_tokens))
     if max_input_tokens < 1000:
         max_input_tokens = 1000
@@ -1143,13 +1221,19 @@ def build_manifest_entries_from_commits(
     max_input_tokens = _compute_max_input_tokens(tpm_limit, safety, max_output_tokens)
 
     for ch in commit_hashes:
-        subject, diff_text = load_diff_for_commit(repo_path, ch, unified_context=unified_context)
+        subject, diff_text = load_diff_for_commit(
+            repo_path, ch, unified_context=unified_context
+        )
         hunks = reduce_unified_diff(diff_text, context_keep=context_keep)
         for h in hunks:
             # estimate prompt tokens using the same token counter as runtime chunking
-            prompt_pre = build_memory_prompt(repo_path, "commit", ch, subject, h, 1, 1, est_total_tokens=0)
+            prompt_pre = build_memory_prompt(
+                repo_path, "commit", ch, subject, h, 1, 1, est_total_tokens=0
+            )
             est = TOKENS.estimate(prompt_pre, model)
-            entry_id = sha1_text(f"{repo_path}|commit|{ch}|{h.file_path}|{h.hunk_header}|{h.new_start_line}")[:16]
+            entry_id = sha1_text(
+                f"{repo_path}|commit|{ch}|{h.file_path}|{h.hunk_header}|{h.new_start_line}"
+            )[:16]
             entries.append(
                 ManifestEntry(
                     entry_id=entry_id,
@@ -1190,9 +1274,13 @@ def build_manifest_entries_from_diff_files(
         subject, diff_text = load_diff_from_file(df)
         hunks = reduce_unified_diff(diff_text, context_keep=context_keep)
         for h in hunks:
-            prompt_pre = build_memory_prompt(repo_path, "diff_file", df, subject, h, 1, 1, est_total_tokens=0)
+            prompt_pre = build_memory_prompt(
+                repo_path, "diff_file", df, subject, h, 1, 1, est_total_tokens=0
+            )
             est = TOKENS.estimate(prompt_pre, model)
-            entry_id = sha1_text(f"{repo_path}|diff_file|{df}|{h.file_path}|{h.hunk_header}|{h.new_start_line}")[:16]
+            entry_id = sha1_text(
+                f"{repo_path}|diff_file|{df}|{h.file_path}|{h.hunk_header}|{h.new_start_line}"
+            )[:16]
             entries.append(
                 ManifestEntry(
                     entry_id=entry_id,
@@ -1270,10 +1358,14 @@ def cmd_list(args: argparse.Namespace) -> None:
     skipped = [e for e in entries if e.status == "skipped"]
 
     print(f"Manifest: {manifest}")
-    print(f"Total={len(entries)} pending={len(pending)} done={len(done)} error={len(err)} skipped={len(skipped)}")
+    print(
+        f"Total={len(entries)} pending={len(pending)} done={len(done)} error={len(err)} skipped={len(skipped)}"
+    )
 
     if args.top:
-        pending_sorted = sorted(pending, key=lambda e: e.est_input_tokens, reverse=True)[: int(args.top)]
+        pending_sorted = sorted(
+            pending, key=lambda e: e.est_input_tokens, reverse=True
+        )[: int(args.top)]
         print("\nTop pending by est_input_tokens:")
         for e in pending_sorted:
             print(
@@ -1307,7 +1399,10 @@ def _build_publishers_from_args(
         mem0_cfg = Mem0PublishConfig(
             enabled=True,
             user_id=args.mem0_user_id,
-            base_metadata={"pipeline": "generate_memories_from_diffs", "store": "mem0_local"},
+            base_metadata={
+                "pipeline": "generate_memories_from_diffs",
+                "store": "mem0_local",
+            },
         )
         mem0_pub = Mem0Publisher(mem0_cfg)
 
@@ -1317,11 +1412,17 @@ def _build_publishers_from_args(
         except Exception as ex:
             raise RuntimeError("Invalid JSON for --memory-scope-json") from ex
         try:
-            labels = json.loads(args.memory_labels_json) if args.memory_labels_json else {}
+            labels = (
+                json.loads(args.memory_labels_json) if args.memory_labels_json else {}
+            )
         except Exception as ex:
             raise RuntimeError("Invalid JSON for --memory-labels-json") from ex
 
-        if not args.gcp_project_id or not args.vertex_region or not args.vertex_memory_agent_id:
+        if (
+            not args.gcp_project_id
+            or not args.vertex_region
+            or not args.vertex_memory_agent_id
+        ):
             raise RuntimeError(
                 "--gcp-project-id, --vertex-region, and --vertex-memory-agent-id are required "
                 "when --publish memory_bank/both"
@@ -1343,7 +1444,9 @@ def _build_publishers_from_args(
 # =========================
 # Run-one / Run-batch
 # =========================
-def _pick_pending_entries(entries: List[ManifestEntry], limit: int) -> List[ManifestEntry]:
+def _pick_pending_entries(
+    entries: List[ManifestEntry], limit: int
+) -> List[ManifestEntry]:
     pending = [e for e in entries if e.status == "pending"]
     # Heuristic: larger first to reduce long-tail stragglers
     pending_sorted = sorted(pending, key=lambda e: e.est_input_tokens, reverse=True)
@@ -1370,7 +1473,9 @@ def cmd_run_one(args: argparse.Namespace) -> None:
     publish_mode, publish_format, mem0_pub, mb_pub = _build_publishers_from_args(args)
     llm = OpenAILLMClient()
 
-    print(f"RUN-ONE: entry_id={entry.entry_id} file={entry.file_path} subj={_short(entry.commit_subject, 90)}")
+    print(
+        f"RUN-ONE: entry_id={entry.entry_id} file={entry.file_path} subj={_short(entry.commit_subject, 90)}"
+    )
     process_one_manifest_entry(
         llm=llm,
         manifest_path=manifest_path,
@@ -1448,7 +1553,10 @@ def cmd_run_batch(args: argparse.Namespace) -> None:
                     raise
     else:
         with ThreadPoolExecutor(max_workers=workers) as ex:
-            futures = {ex.submit(_run_one, ix, entry): (ix, entry) for ix, entry in enumerate(todo, start=1)}
+            futures = {
+                ex.submit(_run_one, ix, entry): (ix, entry)
+                for ix, entry in enumerate(todo, start=1)
+            }
             for fut in as_completed(futures):
                 ix, entry = futures[fut]
                 try:
@@ -1461,7 +1569,9 @@ def cmd_run_batch(args: argparse.Namespace) -> None:
                         raise
 
     dur = time.time() - start
-    print(f"RUN-BATCH complete: processed={total} failures={failures} elapsed_sec={dur:.1f}")
+    print(
+        f"RUN-BATCH complete: processed={total} failures={failures} elapsed_sec={dur:.1f}"
+    )
 
 
 # =========================
@@ -1522,7 +1632,9 @@ def cmd_publish_file(args: argparse.Namespace) -> None:
             if args.fail_fast:
                 raise
 
-    print(f"PUBLISH-FILE complete: published={published} skipped={skipped} failed={failed}")
+    print(
+        f"PUBLISH-FILE complete: published={published} skipped={skipped} failed={failed}"
+    )
 
 
 # =========================
@@ -1539,9 +1651,13 @@ def cmd_self_test(_: argparse.Namespace) -> None:
     _assert(_extract_json_object('ok {"b":2} thanks')["b"] == 2, "json salvage failed")
 
     # normalize/coerce
-    _assert(normalize_memory_type("REFactor") == "refactor", "normalize_memory_type failed")
+    _assert(
+        normalize_memory_type("REFactor") == "refactor", "normalize_memory_type failed"
+    )
     _assert(coerce_confidence("0.9") == 0.9, "coerce_confidence numeric failed")
-    _assert(0.0 <= coerce_confidence("nan") <= 1.0, "coerce_confidence nan clamp failed")
+    _assert(
+        0.0 <= coerce_confidence("nan") <= 1.0, "coerce_confidence nan clamp failed"
+    )
 
     # split_text_by_token_budget (ensure never empty chunks)
     chunks = split_text_by_token_budget("a\nb\nc\n", max_tokens=2, model=DEFAULT_MODEL)
@@ -1561,9 +1677,14 @@ def cmd_self_test(_: argparse.Namespace) -> None:
     )
     hs0 = reduce_unified_diff(sample, context_keep=0)
     _assert(len(hs0) == 1, "reduce_unified_diff should produce one hunk")
-    _assert("+new" in hs0[0].reduced_diff and "-old" in hs0[0].reduced_diff, "reduce_unified_diff +/- missing")
+    _assert(
+        "+new" in hs0[0].reduced_diff and "-old" in hs0[0].reduced_diff,
+        "reduce_unified_diff +/- missing",
+    )
     hs1 = reduce_unified_diff(sample, context_keep=1)
-    _assert(" context" in hs1[0].reduced_diff, "reduce_unified_diff context_keep failed")
+    _assert(
+        " context" in hs1[0].reduced_diff, "reduce_unified_diff context_keep failed"
+    )
 
     print("SELF-TEST OK")
 
@@ -1572,11 +1693,15 @@ def cmd_self_test(_: argparse.Namespace) -> None:
 # CLI wiring
 # =========================
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="Generate memories from diffs into a manifest and NDJSON output.")
+    p = argparse.ArgumentParser(
+        description="Generate memories from diffs into a manifest and NDJSON output."
+    )
     sub = p.add_subparsers(dest="cmd", required=True)
 
     # analyze
-    pa = sub.add_parser("analyze", help="Build a manifest from commit hashes and/or diff files.")
+    pa = sub.add_parser(
+        "analyze", help="Build a manifest from commit hashes and/or diff files."
+    )
     pa.add_argument("--repo-path", required=True)
     pa.add_argument("--commit-hashes-file", default=None)
     pa.add_argument("--diff-files-list", default=None)
@@ -1598,8 +1723,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     # shared publish args
     def add_publish_args(px: argparse.ArgumentParser) -> None:
-        px.add_argument("--publish", choices=["none", "mem0", "memory_bank", "both"], default="none")
-        px.add_argument("--publish-format", choices=["text", "raw_json"], default="text")
+        px.add_argument(
+            "--publish", choices=["none", "mem0", "memory_bank", "both"], default="none"
+        )
+        px.add_argument(
+            "--publish-format", choices=["text", "raw_json"], default="text"
+        )
 
         # mem0
         px.add_argument("--mem0-user-id", default=None)
@@ -1612,7 +1741,10 @@ def build_parser() -> argparse.ArgumentParser:
         px.add_argument("--memory-labels-json", default=None)
 
     # run-one
-    po = sub.add_parser("run-one", help="Process a single manifest entry (first pending or by --entry-id).")
+    po = sub.add_parser(
+        "run-one",
+        help="Process a single manifest entry (first pending or by --entry-id).",
+    )
     po.add_argument("--manifest", required=True)
     po.add_argument("--memories-out", required=True)
     po.add_argument("--model", default=DEFAULT_MODEL)
@@ -1623,7 +1755,9 @@ def build_parser() -> argparse.ArgumentParser:
     po.set_defaults(func=cmd_run_one)
 
     # run-batch
-    pb = sub.add_parser("run-batch", help="Process many manifest entries (optionally parallel).")
+    pb = sub.add_parser(
+        "run-batch", help="Process many manifest entries (optionally parallel)."
+    )
     pb.add_argument("--manifest", required=True)
     pb.add_argument("--memories-out", required=True)
     pb.add_argument("--model", default=DEFAULT_MODEL)
@@ -1636,7 +1770,9 @@ def build_parser() -> argparse.ArgumentParser:
     pb.set_defaults(func=cmd_run_batch)
 
     # publish-file
-    pp = sub.add_parser("publish-file", help="Publish an existing memories.ndjson (dedup by memory_id).")
+    pp = sub.add_parser(
+        "publish-file", help="Publish an existing memories.ndjson (dedup by memory_id)."
+    )
     pp.add_argument("--memories-ndjson", required=True)
     pp.add_argument("--dedup-ids-file", default=None)
     pp.add_argument("--api-delay-sec", type=float, default=DEFAULT_API_DELAY_SEC)
@@ -1646,7 +1782,9 @@ def build_parser() -> argparse.ArgumentParser:
     pp.set_defaults(func=cmd_publish_file)
 
     # self-test
-    pt = sub.add_parser("self-test", help="Run local tests for core utilities (no network).")
+    pt = sub.add_parser(
+        "self-test", help="Run local tests for core utilities (no network)."
+    )
     pt.set_defaults(func=cmd_self_test)
 
     return p

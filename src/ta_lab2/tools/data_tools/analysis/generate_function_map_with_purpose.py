@@ -33,7 +33,6 @@ Usage examples:
 from __future__ import annotations
 import ast
 import csv
-import sys
 import os
 import argparse
 import logging
@@ -45,6 +44,7 @@ logger = logging.getLogger(__name__)
 
 # --------------------------- AST helpers ---------------------------
 
+
 def _safe_unparse(node: Optional[ast.AST]) -> str:
     """Safely unparse an AST node to string, returning empty string on failure."""
     if node is None:
@@ -54,9 +54,11 @@ def _safe_unparse(node: Optional[ast.AST]) -> str:
     except Exception:
         return ""
 
+
 def _ann_to_str(node: Optional[ast.expr]) -> str:
     """Convert type annotation to string."""
     return _safe_unparse(node) if node is not None else ""
+
 
 def _get_dec_name(d: ast.expr) -> str:
     """Extract decorator name from AST expression."""
@@ -76,8 +78,10 @@ def _get_dec_name(d: ast.expr) -> str:
         return f"{base}(…)"
     return _safe_unparse(d)
 
+
 def _arglist_sig(args: ast.arguments) -> Tuple[str, str, str, str, str]:
     """Extract function argument signature components."""
+
     def arg_str(a: ast.arg) -> str:
         ann = _ann_to_str(a.annotation)
         return f"{a.arg}: {ann}" if ann else a.arg
@@ -95,12 +99,15 @@ def _arglist_sig(args: ast.arguments) -> Tuple[str, str, str, str, str]:
         if val != "":
             defaults.append(f"{name}={val}")
 
-    kw_defaults = [(_safe_unparse(d) if d is not None else "") for d in args.kw_defaults]
+    kw_defaults = [
+        (_safe_unparse(d) if d is not None else "") for d in args.kw_defaults
+    ]
     for name, val in zip([a.arg for a in args.kwonlyargs], kw_defaults):
         if val != "":
             defaults.append(f"{name}={val}")
 
     return (", ".join(pos), ", ".join(kwonly), vararg, kwarg, ", ".join(defaults))
+
 
 def _method_kind(decorators: List[str]) -> str:
     """Determine method type from decorators."""
@@ -112,9 +119,11 @@ def _method_kind(decorators: List[str]) -> str:
         return "property"
     return "method"
 
+
 def _qualname(stack: List[str], name: str) -> str:
     """Build qualified name from class stack and function name."""
     return ".".join([*stack, name]) if stack else name
+
 
 def _first_sentence(text: str, max_chars: int = 280) -> str:
     """Extract first sentence from text, up to max_chars."""
@@ -126,46 +135,48 @@ def _first_sentence(text: str, max_chars: int = 280) -> str:
             return s[: idx + len(sep)].strip()
     return s[:max_chars].strip()
 
+
 # --------------------------- Heuristic purpose ---------------------------
 
 KEYWORD_PURPOSES = [
     # name-based
-    ("ema",              "Compute or attach exponential moving averages."),
-    ("bollinger",        "Compute Bollinger Bands or related statistics."),
-    ("rsi",              "Compute Relative Strength Index."),
-    ("macd",             "Compute Moving Average Convergence Divergence."),
-    ("atr",              "Compute Average True Range or volatility."),
-    ("vol",              "Compute or aggregate volatility statistics."),
-    ("resample",         "Resample time series to new bar frequencies."),
-    ("season",           "Compute seasonal/periodic summary metrics."),
-    ("trend",            "Detect or label trend regimes."),
-    ("regime",           "Classify market regimes or state labels."),
-    ("segment",          "Build or analyze contiguous market segments."),
-    ("calendar",         "Expand datetime/calendar features (Y/M/W/D, holidays)."),
-    ("plot",             "Plot charts or visualizations."),
-    ("dashboard",        "Provide interactive dashboard or app layout."),
-    ("load",             "Load data from disk or external sources."),
-    ("read_",            "Read data from file-like sources."),
-    ("write_",           "Write data to disk or external sinks."),
-    ("predict",          "Run model inference or predictions."),
-    ("train",            "Train or evaluate models."),
-    ("config",           "Load or validate configuration."),
-    ("feature",          "Attach or compute engineered features."),
+    ("ema", "Compute or attach exponential moving averages."),
+    ("bollinger", "Compute Bollinger Bands or related statistics."),
+    ("rsi", "Compute Relative Strength Index."),
+    ("macd", "Compute Moving Average Convergence Divergence."),
+    ("atr", "Compute Average True Range or volatility."),
+    ("vol", "Compute or aggregate volatility statistics."),
+    ("resample", "Resample time series to new bar frequencies."),
+    ("season", "Compute seasonal/periodic summary metrics."),
+    ("trend", "Detect or label trend regimes."),
+    ("regime", "Classify market regimes or state labels."),
+    ("segment", "Build or analyze contiguous market segments."),
+    ("calendar", "Expand datetime/calendar features (Y/M/W/D, holidays)."),
+    ("plot", "Plot charts or visualizations."),
+    ("dashboard", "Provide interactive dashboard or app layout."),
+    ("load", "Load data from disk or external sources."),
+    ("read_", "Read data from file-like sources."),
+    ("write_", "Write data to disk or external sinks."),
+    ("predict", "Run model inference or predictions."),
+    ("train", "Train or evaluate models."),
+    ("config", "Load or validate configuration."),
+    ("feature", "Attach or compute engineered features."),
 ]
 
 CALL_HINTS = [
-    ("np.",              "Use NumPy operations; numeric transforms or statistics."),
-    ("pd.",              "Use pandas for tabular/time-series operations."),
-    (".ewm(",            "Compute exponentially-weighted statistics."),
-    (".rolling(",        "Compute rolling-window statistics."),
-    ("plt.",             "Create or alter Matplotlib plots."),
-    ("matplotlib",       "Create or alter Matplotlib plots."),
-    ("read_csv(",        "Read CSV data."),
-    ("read_parquet(",    "Read Parquet data."),
-    ("to_csv(",          "Write CSV outputs."),
-    ("to_parquet(",      "Write Parquet outputs."),
-    ("yaml",             "Parse or emit YAML configurations."),
+    ("np.", "Use NumPy operations; numeric transforms or statistics."),
+    ("pd.", "Use pandas for tabular/time-series operations."),
+    (".ewm(", "Compute exponentially-weighted statistics."),
+    (".rolling(", "Compute rolling-window statistics."),
+    ("plt.", "Create or alter Matplotlib plots."),
+    ("matplotlib", "Create or alter Matplotlib plots."),
+    ("read_csv(", "Read CSV data."),
+    ("read_parquet(", "Read Parquet data."),
+    ("to_csv(", "Write CSV outputs."),
+    ("to_parquet(", "Write Parquet outputs."),
+    ("yaml", "Parse or emit YAML configurations."),
 ]
+
 
 def infer_purpose(name: str, called_symbols: Set[str]) -> str:
     """Infer function purpose from name and called symbols using heuristics."""
@@ -191,7 +202,12 @@ def infer_purpose(name: str, called_symbols: Set[str]) -> str:
         parts.append(" ".join(sorted(hints)))
 
     msg = " ".join(parts).strip()
-    return msg if msg else "Define a function/method; purpose not documented (no docstring)."
+    return (
+        msg
+        if msg
+        else "Define a function/method; purpose not documented (no docstring)."
+    )
+
 
 class CallCollector(ast.NodeVisitor):
     """AST visitor to collect all function/method calls."""
@@ -208,16 +224,21 @@ class CallCollector(ast.NodeVisitor):
             pass
         self.generic_visit(node)
 
+
 # --------------------------- Collector ---------------------------
+
 
 def attach_parents(tree: ast.AST):
     """Attach parent_chain attribute to all nodes in AST."""
+
     def _walk(node: ast.AST, parents: List[ast.AST]):
         for child in ast.iter_child_nodes(node):
             child.parent_chain = parents[:]  # type: ignore
             _walk(child, parents + [node])
+
     tree.parent_chain = []  # type: ignore
     _walk(tree, [])
+
 
 class FunctionCollector(ast.NodeVisitor):
     """AST visitor to collect all functions/methods with metadata."""
@@ -247,7 +268,11 @@ class FunctionCollector(ast.NodeVisitor):
         returns = _ann_to_str(node.returns)
         doc = ast.get_docstring(node)
         qname = _qualname(self.stack, node.name)
-        obj_type = _method_kind(decorators) if self.stack else ("async_function" if is_async else "function")
+        obj_type = (
+            _method_kind(decorators)
+            if self.stack
+            else ("async_function" if is_async else "function")
+        )
         start, end = getattr(node, "lineno", None), getattr(node, "end_lineno", None)
 
         # collect called symbols inside body
@@ -257,8 +282,12 @@ class FunctionCollector(ast.NodeVisitor):
 
         # code snippet (first <= 20 lines of the function for review)
         snippet = ""
-        if isinstance(start, int) and isinstance(end, int) and 1 <= start <= end <= len(self.lines):
-            block = self.lines[start - 1:end]
+        if (
+            isinstance(start, int)
+            and isinstance(end, int)
+            and 1 <= start <= end <= len(self.lines)
+        ):
+            block = self.lines[start - 1 : end]
             snippet = "\n".join(block[:20]).strip()
 
         # Purpose: prefer docstring; else heuristic
@@ -267,30 +296,36 @@ class FunctionCollector(ast.NodeVisitor):
         else:
             purpose = infer_purpose(node.name, calls.calls)
 
-        self.rows.append({
-            "ModulePath": self.module_path,
-            "QualifiedName": qname,
-            "Name": node.name,
-            "ObjectType": obj_type,
-            "IsAsync": "yes" if is_async else "no",
-            "Decorators": ", ".join(decorators),
-            "Args_Positional": pos,
-            "Args_KeywordOnly": kwonly,
-            "Arg_Vararg": vararg,
-            "Arg_Kwarg": kwarg,
-            "Defaults": defaults,
-            "Returns": returns,
-            "Purpose": purpose,
-            "Docstring_FirstSentence": _first_sentence(doc) if doc else "",
-            "LineStart": start or "",
-            "LineEnd": end or "",
-            "Called_Symbols": ", ".join(sorted(calls.calls))[:1000],
-            "Code_Snippet": snippet,
-        })
+        self.rows.append(
+            {
+                "ModulePath": self.module_path,
+                "QualifiedName": qname,
+                "Name": node.name,
+                "ObjectType": obj_type,
+                "IsAsync": "yes" if is_async else "no",
+                "Decorators": ", ".join(decorators),
+                "Args_Positional": pos,
+                "Args_KeywordOnly": kwonly,
+                "Arg_Vararg": vararg,
+                "Arg_Kwarg": kwarg,
+                "Defaults": defaults,
+                "Returns": returns,
+                "Purpose": purpose,
+                "Docstring_FirstSentence": _first_sentence(doc) if doc else "",
+                "LineStart": start or "",
+                "LineEnd": end or "",
+                "Called_Symbols": ", ".join(sorted(calls.calls))[:1000],
+                "Code_Snippet": snippet,
+            }
+        )
+
 
 # --------------------------- File iteration ---------------------------
 
-def iter_py_files(root: Path, include_globs: List[str], exclude_globs: List[str]) -> Iterable[Path]:
+
+def iter_py_files(
+    root: Path, include_globs: List[str], exclude_globs: List[str]
+) -> Iterable[Path]:
     """Walk all *.py files under root, applying include/exclude globs.
 
     We normalize both the path and patterns to posix-style ("/") so that
@@ -309,18 +344,22 @@ def iter_py_files(root: Path, include_globs: List[str], exclude_globs: List[str]
             continue
 
         # If includes are specified, require a match
-        if include_posix and not any(fnmatch.fnmatch(rel_posix, pat) for pat in include_posix):
+        if include_posix and not any(
+            fnmatch.fnmatch(rel_posix, pat) for pat in include_posix
+        ):
             continue
 
         yield p
 
+
 # --------------------------- Public API ---------------------------
+
 
 def generate_function_map_with_purpose(
     root: str = ".",
     output: str = "artifacts/function_map.csv",
     include_globs: Optional[List[str]] = None,
-    exclude_globs: Optional[List[str]] = None
+    exclude_globs: Optional[List[str]] = None,
 ) -> int:
     """Generate function map CSV with purpose inference.
 
@@ -362,7 +401,9 @@ def generate_function_map_with_purpose(
             text = f.read_text(encoding="utf-8", errors="ignore")
             tree = ast.parse(text, filename=str(f))
             attach_parents(tree)
-            collector = FunctionCollector(str(f.relative_to(root_path)).replace(os.sep, "/"), text)
+            collector = FunctionCollector(
+                str(f.relative_to(root_path)).replace(os.sep, "/"), text
+            )
             collector.visit(tree)
             out_rows.extend(collector.rows)
         except SyntaxError as e:
@@ -402,18 +443,27 @@ def generate_function_map_with_purpose(
     logger.info(f"Wrote {len(out_rows)} rows to {out}")
     return len(out_rows)
 
+
 # --------------------------- Main ---------------------------
+
 
 def main() -> int:
     """CLI entry point."""
     logging.basicConfig(
         level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
-    ap = argparse.ArgumentParser(description="Generate a CSV map of all functions/methods with inferred Purpose.")
+    ap = argparse.ArgumentParser(
+        description="Generate a CSV map of all functions/methods with inferred Purpose."
+    )
     ap.add_argument("--root", type=str, default=".", help="Repository root directory")
-    ap.add_argument("--output", type=str, default="artifacts/function_map.csv", help="Output CSV path")
+    ap.add_argument(
+        "--output",
+        type=str,
+        default="artifacts/function_map.csv",
+        help="Output CSV path",
+    )
     ap.add_argument(
         "--include",
         type=str,
@@ -448,11 +498,12 @@ def main() -> int:
         root=args.root,
         output=args.output,
         include_globs=args.include,
-        exclude_globs=args.exclude
+        exclude_globs=args.exclude,
     )
 
     print(f"Wrote {count} rows to {args.output}")
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

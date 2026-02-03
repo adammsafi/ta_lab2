@@ -19,16 +19,22 @@ except ImportError:  # pragma: no cover
 
 # ---------- Protocols & dataclasses ----------
 
+
 class SignalFunc(Protocol):
     """Callable that turns a price DataFrame + params into (entries, exits, size)."""
-    def __call__(self, df: pd.DataFrame, **params) -> Tuple[pd.Series, pd.Series, Optional[pd.Series]]: ...
+
+    def __call__(
+        self, df: pd.DataFrame, **params
+    ) -> Tuple[pd.Series, pd.Series, Optional[pd.Series]]:
+        ...
 
 
 @dataclass
 class CostModel:
     """Costs in basis points; funding is daily bps applied to gross position value."""
-    fee_bps: float = 0.0          # per trade commission (bps of notional)
-    slippage_bps: float = 0.0     # per trade slippage (bps of price)
+
+    fee_bps: float = 0.0  # per trade commission (bps of notional)
+    slippage_bps: float = 0.0  # per trade slippage (bps of price)
     funding_bps_day: float = 0.0  # daily bps on absolute position value (for perps)
 
     def to_vbt_kwargs(self) -> Dict[str, Any]:
@@ -66,6 +72,7 @@ class ResultBundle:
 
 # ---------- helpers ----------
 
+
 def _cagr(equity: pd.Series, freq_per_year: int) -> float:
     if equity.empty:
         return 0.0
@@ -95,6 +102,7 @@ def _sharpe(returns: pd.Series, rf: float = 0.0, freq_per_year: int = 252) -> fl
 
 # ---------- core API ----------
 
+
 def run_vbt_on_split(
     df: pd.DataFrame,
     entries: pd.Series,
@@ -107,11 +115,11 @@ def run_vbt_on_split(
 ) -> ResultRow:
     """Run vectorbt on a single time split and compute core metrics."""
     # Slice window
-    d = df.loc[split.start:split.end]
+    d = df.loc[split.start : split.end]
 
     # Align signals to window (keep original indices)
-    e_in = entries.loc[split.start:split.end].astype(bool)
-    e_out = exits.loc[split.start:split.end].astype(bool)
+    e_in = entries.loc[split.start : split.end].astype(bool)
+    e_out = exits.loc[split.start : split.end].astype(bool)
 
     # Next-bar execution WITHOUT creating NaNs (no fillna needed)
     # Using fill_value avoids the FutureWarning from downcasting on fillna/ffill/bfill
@@ -121,16 +129,16 @@ def run_vbt_on_split(
     # Optional sizing aligned to window (force float dtype)
     sz = None
     if size is not None:
-        sz = size.loc[split.start:split.end].astype(float)
+        sz = size.loc[split.start : split.end].astype(float)
 
     # Build portfolio (pass NumPy arrays to avoid pandas dtype warnings)
     pf = vbt.Portfolio.from_signals(
         d[price_col],
-        entries=e_in.to_numpy(),                           # ndarray(bool)
-        exits=e_out.to_numpy(),                            # ndarray(bool)
-        size=None if sz is None else sz.to_numpy(),        # ndarray(float) or None
+        entries=e_in.to_numpy(),  # ndarray(bool)
+        exits=e_out.to_numpy(),  # ndarray(bool)
+        size=None if sz is None else sz.to_numpy(),  # ndarray(float) or None
         **cost.to_vbt_kwargs(),
-        init_cash=1_000.0,                                 # normalized; scale via equity_last externally
+        init_cash=1_000.0,  # normalized; scale via equity_last externally
         freq="D",
     )
 
@@ -184,16 +192,19 @@ def sweep_grid(
             rows.append(row)
 
     table = pd.DataFrame(
-        [{
-            "split": r.split,
-            **{f"p_{k}": v for k, v in r.params.items()},
-            "trades": r.trades,
-            "total_return": r.total_return,
-            "cagr": r.cagr,
-            "mdd": r.mdd,
-            "mar": r.mar,
-            "sharpe": r.sharpe,
-            "equity_last": r.equity_last,
-        } for r in rows]
+        [
+            {
+                "split": r.split,
+                **{f"p_{k}": v for k, v in r.params.items()},
+                "trades": r.trades,
+                "total_return": r.total_return,
+                "cagr": r.cagr,
+                "mdd": r.mdd,
+                "mar": r.mar,
+                "sharpe": r.sharpe,
+                "equity_last": r.equity_last,
+            }
+            for r in rows
+        ]
     ).sort_values(["split"])
     return ResultBundle(rows=rows, table=table)

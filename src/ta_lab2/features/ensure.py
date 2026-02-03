@@ -6,6 +6,7 @@ import pandas as pd
 # We’ll call into your indicators module to avoid re-implementing math
 from ta_lab2.features import indicators as ind
 
+
 def ensure_close(df: pd.DataFrame) -> None:
     if "close" not in df.columns:
         # Try to infer a close-like column
@@ -17,11 +18,13 @@ def ensure_close(df: pd.DataFrame) -> None:
     if "close" not in df.columns:
         raise KeyError("DataFrame must contain a 'close' column.")
 
+
 def ensure_ema(df: pd.DataFrame, span: int) -> None:
     ensure_close(df)
     col = f"ema_{span}"
     if col not in df:
         df[col] = df["close"].ewm(span=span, adjust=False).mean()
+
 
 def ensure_rsi(df: pd.DataFrame, n: int = 14, col: str | None = None) -> str:
     ensure_close(df)
@@ -32,7 +35,10 @@ def ensure_rsi(df: pd.DataFrame, n: int = 14, col: str | None = None) -> str:
         df[target] = s
     return target
 
-def ensure_macd(df: pd.DataFrame, fast: int = 12, slow: int = 26, signal: int = 9) -> tuple[str, str, str]:
+
+def ensure_macd(
+    df: pd.DataFrame, fast: int = 12, slow: int = 26, signal: int = 9
+) -> tuple[str, str, str]:
     ensure_close(df)
     base, sig, hist = "macd", "macd_signal", "macd_hist"
     need = any(c not in df for c in (base, sig, hist))
@@ -42,6 +48,7 @@ def ensure_macd(df: pd.DataFrame, fast: int = 12, slow: int = 26, signal: int = 
         df[base], df[sig], df[hist] = m, s, h
     return base, sig, hist
 
+
 def ensure_adx(df: pd.DataFrame, n: int = 14) -> str:
     # Optional now; stub-friendly if you add ADX later
     col = f"adx_{n}"
@@ -50,6 +57,7 @@ def ensure_adx(df: pd.DataFrame, n: int = 14) -> str:
         # df[col] = ind.adx(df["high"], df["low"], df["close"], n=n)
         pass
     return col
+
 
 def ensure_obv(df: pd.DataFrame) -> str:
     col = "obv"

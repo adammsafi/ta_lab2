@@ -62,10 +62,11 @@ def get_memory_client(config=None) -> MemoryClient:
     if MemoryClient._instance is None:
         if config is None:
             from ta_lab2.tools.ai_orchestrator.config import load_config
+
             config = load_config()
         MemoryClient._instance = MemoryClient(
             chroma_path=config.chromadb_path,
-            collection_name=config.chromadb_collection_name
+            collection_name=config.chromadb_collection_name,
         )
     return MemoryClient._instance
 

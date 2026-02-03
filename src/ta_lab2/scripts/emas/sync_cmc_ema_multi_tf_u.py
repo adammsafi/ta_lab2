@@ -29,8 +29,7 @@ Spyder:
 
 import argparse
 import os
-from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import List, Optional, Sequence, Tuple
 
 import pandas as pd
@@ -106,7 +105,9 @@ def alignment_source_from_table(full_name: str) -> str:
     return table
 
 
-def get_watermark(engine: Engine, alignment_source: str, prefer_ingested_at: bool) -> Optional[datetime]:
+def get_watermark(
+    engine: Engine, alignment_source: str, prefer_ingested_at: bool
+) -> Optional[datetime]:
     """
     Returns max watermark in _u for this alignment_source.
     If prefer_ingested_at=True -> MAX(ingested_at), else MAX(ts).
@@ -138,7 +139,9 @@ def get_watermark(engine: Engine, alignment_source: str, prefer_ingested_at: boo
     return wm
 
 
-def build_select_expr(cols: Sequence[str], alignment_source: str, use_ingested_filter: bool) -> Tuple[str, str]:
+def build_select_expr(
+    cols: Sequence[str], alignment_source: str, use_ingested_filter: bool
+) -> Tuple[str, str]:
     """
     Build (select_sql, where_sql) for INSERT ... SELECT.
     Ensures positional order matches _u insert columns.
@@ -151,15 +154,33 @@ def build_select_expr(cols: Sequence[str], alignment_source: str, use_ingested_f
     e_d2 = "d2::double precision" if "d2" in colset else "NULL::double precision"
     e_tf_days = "tf_days::int" if "tf_days" in colset else "NULL::int"
     e_roll = "COALESCE(roll,false)::boolean" if "roll" in colset else "false::boolean"
-    e_d1_roll = "d1_roll::double precision" if "d1_roll" in colset else "NULL::double precision"
-    e_d2_roll = "d2_roll::double precision" if "d2_roll" in colset else "NULL::double precision"
+    e_d1_roll = (
+        "d1_roll::double precision" if "d1_roll" in colset else "NULL::double precision"
+    )
+    e_d2_roll = (
+        "d2_roll::double precision" if "d2_roll" in colset else "NULL::double precision"
+    )
 
-    e_ema_bar = "ema_bar::double precision" if "ema_bar" in colset else "NULL::double precision"
-    e_d1_bar = "d1_bar::double precision" if "d1_bar" in colset else "NULL::double precision"
-    e_d2_bar = "d2_bar::double precision" if "d2_bar" in colset else "NULL::double precision"
+    e_ema_bar = (
+        "ema_bar::double precision" if "ema_bar" in colset else "NULL::double precision"
+    )
+    e_d1_bar = (
+        "d1_bar::double precision" if "d1_bar" in colset else "NULL::double precision"
+    )
+    e_d2_bar = (
+        "d2_bar::double precision" if "d2_bar" in colset else "NULL::double precision"
+    )
     e_roll_bar = "roll_bar::boolean" if "roll_bar" in colset else "NULL::boolean"
-    e_d1_roll_bar = "d1_roll_bar::double precision" if "d1_roll_bar" in colset else "NULL::double precision"
-    e_d2_roll_bar = "d2_roll_bar::double precision" if "d2_roll_bar" in colset else "NULL::double precision"
+    e_d1_roll_bar = (
+        "d1_roll_bar::double precision"
+        if "d1_roll_bar" in colset
+        else "NULL::double precision"
+    )
+    e_d2_roll_bar = (
+        "d2_roll_bar::double precision"
+        if "d2_roll_bar" in colset
+        else "NULL::double precision"
+    )
 
     # required columns (must exist in source)
     required = {"id", "ts", "tf", "period", "ema"}
@@ -217,17 +238,23 @@ def insert_new_rows(
     if wm is None:
         # No existing rows for this alignment_source in _u.
         # We'll do a full copy from source (still safe with ON CONFLICT DO NOTHING).
-        _log(f"{alignment_source}: no watermark found in _u; full-load from {src_table}")
+        _log(
+            f"{alignment_source}: no watermark found in _u; full-load from {src_table}"
+        )
         where_clause = ""
         params = {"alignment_source": alignment_source}
     else:
         _log(f"{alignment_source}: watermark = {wm.isoformat()}")
-        select_sql, where_clause = build_select_expr(cols, alignment_source, use_ingested_filter=use_ingested_filter)
+        select_sql, where_clause = build_select_expr(
+            cols, alignment_source, use_ingested_filter=use_ingested_filter
+        )
         params = {"alignment_source": alignment_source, "wm": wm}
 
     if wm is None:
         # build select without wm clause
-        select_sql, _ = build_select_expr(cols, alignment_source, use_ingested_filter=False)
+        select_sql, _ = build_select_expr(
+            cols, alignment_source, use_ingested_filter=False
+        )
         where_clause = ""
 
     # Use a CTE so we can count inserted rows
@@ -256,9 +283,13 @@ def insert_new_rows(
         else:
             # match same filter we will use
             if prefer_ingested and "ingested_at" in set(cols):
-                q = text(f"SELECT COUNT(*)::bigint AS n_candidates FROM {src_table} WHERE ingested_at > :wm")
+                q = text(
+                    f"SELECT COUNT(*)::bigint AS n_candidates FROM {src_table} WHERE ingested_at > :wm"
+                )
             else:
-                q = text(f"SELECT COUNT(*)::bigint AS n_candidates FROM {src_table} WHERE ts > :wm")
+                q = text(
+                    f"SELECT COUNT(*)::bigint AS n_candidates FROM {src_table} WHERE ts > :wm"
+                )
             df = pd.read_sql(q, engine, params={"wm": wm})
         n = int(df.loc[0, "n_candidates"])
         _log(f"{alignment_source}: DRY RUN candidates = {n}")
@@ -271,8 +302,14 @@ def insert_new_rows(
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Sync EMA source tables into public.cmc_ema_multi_tf_u (incremental).")
-    ap.add_argument("--dry-run", action="store_true", help="Do not insert; only report candidate counts.")
+    ap = argparse.ArgumentParser(
+        description="Sync EMA source tables into public.cmc_ema_multi_tf_u (incremental)."
+    )
+    ap.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Do not insert; only report candidate counts.",
+    )
     ap.add_argument(
         "--use-ingested-at",
         action="store_true",
@@ -287,7 +324,11 @@ def main() -> None:
 
     engine = get_engine()
 
-    only_set = set([s.strip() for s in args.only.split(",") if s.strip()]) if args.only else None
+    only_set = (
+        set([s.strip() for s in args.only.split(",") if s.strip()])
+        if args.only
+        else None
+    )
 
     total_inserted = 0
     for src in SOURCES:

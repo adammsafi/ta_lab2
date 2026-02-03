@@ -5,7 +5,12 @@ import asyncio
 
 from ta_lab2.tools.ai_orchestrator.adapters import AsyncGeminiAdapter
 from ta_lab2.tools.ai_orchestrator.quota import QuotaTracker
-from ta_lab2.tools.ai_orchestrator.core import Task, TaskType, TaskStatus, TaskConstraints
+from ta_lab2.tools.ai_orchestrator.core import (
+    Task,
+    TaskType,
+    TaskStatus,
+    TaskConstraints,
+)
 
 
 @pytest.fixture
@@ -123,7 +128,9 @@ class TestQuotaIntegration:
     """Test quota tracker integration."""
 
     @pytest.mark.asyncio
-    async def test_quota_checked_before_execution(self, mock_genai_client, sample_task, quota_tracker):
+    async def test_quota_checked_before_execution(
+        self, mock_genai_client, sample_task, quota_tracker
+    ):
         """Test quota is checked before API call."""
         adapter = AsyncGeminiAdapter(api_key="test-key", quota_tracker=quota_tracker)
         adapter._client = mock_genai_client

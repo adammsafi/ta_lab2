@@ -59,23 +59,21 @@ class ContextualChat:
 
         # Generate embedding
         response = self.client.embeddings.create(
-            input=[query],
-            model=self.embedding_model
+            input=[query], model=self.embedding_model
         )
         query_embedding = response.data[0].embedding
 
         # Search ChromaDB
         results = self.collection.query(
-            query_embeddings=[query_embedding],
-            n_results=self.context_k
+            query_embeddings=[query_embedding], n_results=self.context_k
         )
 
-        if not results or not results.get('documents'):
+        if not results or not results.get("documents"):
             return ""
 
         # Format context
         context_parts = ["# Relevant Project Context\n"]
-        for i, doc in enumerate(results['documents'][0], 1):
+        for i, doc in enumerate(results["documents"][0], 1):
             context_parts.append(f"\n## Memory {i}\n{doc}\n")
 
         return "\n".join(context_parts)
@@ -125,11 +123,20 @@ class ContextualChat:
 def main():
     import argparse
 
-    parser = argparse.ArgumentParser(description="Chat with context from ChromaDB memory bank")
+    parser = argparse.ArgumentParser(
+        description="Chat with context from ChromaDB memory bank"
+    )
     parser.add_argument("--chroma-dir", required=True, help="ChromaDB directory")
-    parser.add_argument("--collection", default="project_memories", help="Collection name")
+    parser.add_argument(
+        "--collection", default="project_memories", help="Collection name"
+    )
     parser.add_argument("--model", default="gpt-4o", help="OpenAI model")
-    parser.add_argument("--context-k", type=int, default=8, help="Number of context memories to retrieve")
+    parser.add_argument(
+        "--context-k",
+        type=int,
+        default=8,
+        help="Number of context memories to retrieve",
+    )
     args = parser.parse_args()
 
     if not os.getenv("OPENAI_API_KEY"):
@@ -147,13 +154,13 @@ def main():
         chroma_dir,
         collection_name=args.collection,
         model=args.model,
-        context_k=args.context_k
+        context_k=args.context_k,
     )
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("Contextual Chat - Your memories are automatically retrieved")
     print("Type 'exit' to quit, 'clear' to reset conversation")
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")
 
     while True:
         try:
@@ -162,11 +169,11 @@ def main():
             if not user_input:
                 continue
 
-            if user_input.lower() == 'exit':
+            if user_input.lower() == "exit":
                 print("Goodbye!")
                 break
 
-            if user_input.lower() == 'clear':
+            if user_input.lower() == "clear":
                 chat.messages = []
                 print("Conversation history cleared.\n")
                 continue

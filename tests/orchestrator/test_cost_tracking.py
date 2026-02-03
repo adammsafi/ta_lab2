@@ -1,8 +1,6 @@
 """Tests for cost tracking with SQLite persistence."""
 import pytest
-import tempfile
 from datetime import datetime, timezone
-from pathlib import Path
 
 from ta_lab2.tools.ai_orchestrator.cost import (
     CostTracker,
@@ -84,7 +82,11 @@ class TestCostTracker:
             platform=Platform.CHATGPT,
             output="Output 2",
             success=True,
-            metadata={"model": "gpt-4o-mini", "input_tokens": 200, "output_tokens": 100},
+            metadata={
+                "model": "gpt-4o-mini",
+                "input_tokens": 200,
+                "output_tokens": 100,
+            },
         )
         tracker.record(task2, result2)
 

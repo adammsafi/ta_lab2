@@ -92,7 +92,17 @@ def expand_series(s: str) -> list[str]:
     raise ValueError("series must be one of: ema, ema_bar, both")
 
 
-def _audit_one(engine: Engine, ema_table: str, ret_table: str, dim_tf: str, out_base: Path, strict: bool, gap_mult: float, label: str, series: str) -> None:
+def _audit_one(
+    engine: Engine,
+    ema_table: str,
+    ret_table: str,
+    dim_tf: str,
+    out_base: Path,
+    strict: bool,
+    gap_mult: float,
+    label: str,
+    series: str,
+) -> None:
     _print(f"=== scheme={label} series={series} ===")
 
     # map source columns by series
@@ -130,7 +140,9 @@ def _audit_one(engine: Engine, ema_table: str, ret_table: str, dim_tf: str, out_
     bad_cov = cov[cov["diff"] != 0]
     if not bad_cov.empty:
         _write_csv(bad_cov, Path(str(out_base) + f"_{label}_{series}_coverage_bad.csv"))
-        _fail_or_warn(strict, f"FAIL: {label}/{series} coverage mismatches: {len(bad_cov)}")
+        _fail_or_warn(
+            strict, f"FAIL: {label}/{series} coverage mismatches: {len(bad_cov)}"
+        )
     else:
         _print("PASS: coverage.")
 
@@ -195,7 +207,10 @@ def _audit_one(engine: Engine, ema_table: str, ret_table: str, dim_tf: str, out_
     n_ra_null = int(nulls.iloc[0]["n_ret_arith_null"])
     n_rl_null = int(nulls.iloc[0]["n_ret_log_null"])
     if n_prev_null or n_ra_null or n_rl_null:
-        _fail_or_warn(strict, f"FAIL: {label}/{series} nulls: prev={n_prev_null} arith={n_ra_null} log={n_rl_null}")
+        _fail_or_warn(
+            strict,
+            f"FAIL: {label}/{series} nulls: prev={n_prev_null} arith={n_ra_null} log={n_rl_null}",
+        )
     else:
         _print("PASS: nulls.")
 
@@ -215,7 +230,9 @@ def _audit_one(engine: Engine, ema_table: str, ret_table: str, dim_tf: str, out_
     align = _df(engine, align_sql)
     n_missing = int(align.iloc[0]["n_missing"])
     if n_missing != 0:
-        _fail_or_warn(strict, f"FAIL: {label}/{series} alignment missing EMA rows: {n_missing}")
+        _fail_or_warn(
+            strict, f"FAIL: {label}/{series} alignment missing EMA rows: {n_missing}"
+        )
     else:
         _print("PASS: alignment.")
 
@@ -230,8 +247,14 @@ def _audit_one(engine: Engine, ema_table: str, ret_table: str, dim_tf: str, out_
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Audit unified CAL EMA returns (US/ISO; ema + ema_bar).")
-    p.add_argument("--db-url", default=os.getenv("TARGET_DB_URL", ""), help="DB URL (or set TARGET_DB_URL).")
+    p = argparse.ArgumentParser(
+        description="Audit unified CAL EMA returns (US/ISO; ema + ema_bar)."
+    )
+    p.add_argument(
+        "--db-url",
+        default=os.getenv("TARGET_DB_URL", ""),
+        help="DB URL (or set TARGET_DB_URL).",
+    )
     p.add_argument("--scheme", default="both", help="us | iso | both")
     p.add_argument("--series", default="both", help="ema | ema_bar | both")
 
@@ -243,15 +266,23 @@ def main() -> None:
     p.add_argument("--dim-timeframe", default=DEFAULT_DIM_TF)
     p.add_argument("--gap-mult", type=float, default=1.5)
 
-    p.add_argument("--out", default="", help="Base filename for CSV outputs (no extension). If empty, auto-dated.")
+    p.add_argument(
+        "--out",
+        default="",
+        help="Base filename for CSV outputs (no extension). If empty, auto-dated.",
+    )
     p.add_argument("--out-dir", default=".", help="Directory to write CSV outputs.")
-    p.add_argument("--strict", action="store_true", help="Exit non-zero if any FAIL checks occur.")
+    p.add_argument(
+        "--strict", action="store_true", help="Exit non-zero if any FAIL checks occur."
+    )
 
     args = p.parse_args()
 
     db_url = args.db_url.strip()
     if not db_url:
-        raise SystemExit("ERROR: Missing DB URL. Provide --db-url or set TARGET_DB_URL.")
+        raise SystemExit(
+            "ERROR: Missing DB URL. Provide --db-url or set TARGET_DB_URL."
+        )
 
     engine = _get_engine(db_url)
 
@@ -263,7 +294,9 @@ def main() -> None:
     schemes = expand_scheme(args.scheme)
     series_list = expand_series(args.series)
 
-    _print(f"scheme={args.scheme} series={args.series} strict={strict} gap_mult={args.gap_mult}")
+    _print(
+        f"scheme={args.scheme} series={args.series} strict={strict} gap_mult={args.gap_mult}"
+    )
     _print(f"CSV out dir={out_dir}")
     _print(f"CSV base name={out_name}")
 

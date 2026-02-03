@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 # -*- coding: utf-8 -*-
 """
 Created on Fri Dec 19 21:15:03 2025
@@ -38,14 +39,12 @@ Spyder runfile:
 """
 
 
-
 import argparse
-import os
 from datetime import UTC, datetime
-from typing import Dict, List, Sequence, Tuple
+from typing import List, Sequence
 
 import pandas as pd
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
 from ta_lab2.scripts.bars.common_snapshot_contract import (
@@ -104,7 +103,9 @@ def get_columns(engine: Engine, full_name: str) -> List[str]:
     return df["column_name"].tolist()
 
 
-def get_tf_list(engine: Engine, table: str, ids: Sequence[int], max_tfs: int | None) -> pd.DataFrame:
+def get_tf_list(
+    engine: Engine, table: str, ids: Sequence[int], max_tfs: int | None
+) -> pd.DataFrame:
     """
     Returns distinct (id, tf) pairs to sample.
     Optionally caps TF count per id using alphabetical order (deterministic).
@@ -232,16 +233,26 @@ def main() -> None:
     ap = argparse.ArgumentParser(
         description="Create a visual sample CSV from the 5 price_bars tables (last N rows per id/tf)."
     )
-    ap.add_argument("--ids", required=True, help="all OR comma-separated list like 1,52")
-    ap.add_argument("--daily-table", default=DEFAULT_DAILY_TABLE, help="Used only to resolve --ids all")
-    ap.add_argument("--per-group", type=int, default=25, help="Rows per (table,id,tf) group")
+    ap.add_argument(
+        "--ids", required=True, help="all OR comma-separated list like 1,52"
+    )
+    ap.add_argument(
+        "--daily-table",
+        default=DEFAULT_DAILY_TABLE,
+        help="Used only to resolve --ids all",
+    )
+    ap.add_argument(
+        "--per-group", type=int, default=25, help="Rows per (table,id,tf) group"
+    )
     ap.add_argument(
         "--max-tfs-per-id",
         type=int,
         default=0,
         help="Optional cap on TFs per id (0 means no cap). Useful if your TF list is huge.",
     )
-    ap.add_argument("--out", default="price_bars_samples.csv", help="Output CSV filename")
+    ap.add_argument(
+        "--out", default="price_bars_samples.csv", help="Output CSV filename"
+    )
 
     args = ap.parse_args()
 
@@ -288,7 +299,9 @@ def main() -> None:
             _log(f"No rows for {table} with requested ids.")
             continue
 
-        _log(f"Sampling {table}: {len(tf_pairs)} (id,tf) groups * {args.per_group} rows each (max).")
+        _log(
+            f"Sampling {table}: {len(tf_pairs)} (id,tf) groups * {args.per_group} rows each (max)."
+        )
 
         for _, r in tf_pairs.iterrows():
             id_ = int(r["id"])
@@ -298,7 +311,9 @@ def main() -> None:
                 frames.append(df_g)
 
     if not frames:
-        raise RuntimeError("No samples produced. Check ids/table names and permissions.")
+        raise RuntimeError(
+            "No samples produced. Check ids/table names and permissions."
+        )
 
     out_df = pd.concat(frames, ignore_index=True)
 
@@ -314,7 +329,9 @@ def main() -> None:
             break
 
     if ts_sort:
-        out_df = out_df.sort_values(sort_cols + [ts_sort], ascending=[True, True, True, False]).reset_index(drop=True)
+        out_df = out_df.sort_values(
+            sort_cols + [ts_sort], ascending=[True, True, True, False]
+        ).reset_index(drop=True)
     else:
         out_df = out_df.sort_values(sort_cols).reset_index(drop=True)
 

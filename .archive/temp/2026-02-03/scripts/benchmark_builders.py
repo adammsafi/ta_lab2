@@ -20,6 +20,7 @@ import pandas as pd
 # Optional psutil import for memory tracking
 try:
     import psutil
+
     HAS_PSUTIL = True
 except ImportError:
     HAS_PSUTIL = False
@@ -48,11 +49,7 @@ def get_memory_usage_mb() -> float:
     return 0.0  # Not available
 
 
-def benchmark_function(
-    func: Callable,
-    name: str,
-    iterations: int = 10
-) -> dict:
+def benchmark_function(func: Callable, name: str, iterations: int = 10) -> dict:
     """
     Benchmark a function multiple times.
 
@@ -76,7 +73,9 @@ def benchmark_function(
             print(f"  First run: {elapsed:.4f}s (may include connection setup)")
         elif i % 5 == 0:
             avg_so_far = sum(times) / len(times)
-            print(f"  Iteration {i}/{iterations}: {elapsed:.4f}s (avg: {avg_so_far:.4f}s)")
+            print(
+                f"  Iteration {i}/{iterations}: {elapsed:.4f}s (avg: {avg_so_far:.4f}s)"
+            )
 
     mem_after = get_memory_usage_mb()
     mem_delta = mem_after - mem_before
@@ -86,15 +85,17 @@ def benchmark_function(
     max_time = max(times)
     std_time = pd.Series(times).std()
 
-    print(f"\nResults:")
+    print("\nResults:")
     print(f"  Average: {avg_time:.4f}s")
     print(f"  Min:     {min_time:.4f}s")
     print(f"  Max:     {max_time:.4f}s")
     print(f"  Std Dev: {std_time:.4f}s")
     if HAS_PSUTIL:
-        print(f"  Memory:  {mem_before:.1f} MB → {mem_after:.1f} MB (Δ {mem_delta:+.1f} MB)")
+        print(
+            f"  Memory:  {mem_before:.1f} MB → {mem_after:.1f} MB (Δ {mem_delta:+.1f} MB)"
+        )
     else:
-        print(f"  Memory:  (psutil not installed - memory tracking unavailable)")
+        print("  Memory:  (psutil not installed - memory tracking unavailable)")
 
     return {
         "name": name,
@@ -111,12 +112,10 @@ def benchmark_function(
 
 def benchmark_batch_loading():
     """Benchmark batch loading (1 query for all TFs)."""
+
     def run():
         return load_last_snapshot_info_for_id_tfs(
-            db_url=DB_URL,
-            bars_table=BARS_TABLE,
-            id_=TEST_ID,
-            tfs=TEST_TFS
+            db_url=DB_URL, bars_table=BARS_TABLE, id_=TEST_ID, tfs=TEST_TFS
         )
 
     return benchmark_function(run, "Batch Loading (1 query)", iterations=50)
@@ -124,19 +123,17 @@ def benchmark_batch_loading():
 
 def benchmark_n_plus_one_loading():
     """Benchmark N+1 loading (1 query per TF) - OLD PATTERN."""
+
     def run():
         result = {}
         for tf in TEST_TFS:
             row = load_last_snapshot_row(
-                db_url=DB_URL,
-                bars_table=BARS_TABLE,
-                id_=TEST_ID,
-                tf=tf
+                db_url=DB_URL, bars_table=BARS_TABLE, id_=TEST_ID, tf=tf
             )
             if row:
                 result[tf] = {
                     "last_bar_seq": row.get("bar_seq"),
-                    "last_time_close": row.get("time_close")
+                    "last_time_close": row.get("time_close"),
                 }
         return result
 
@@ -171,29 +168,38 @@ def analyze_batch_vs_n_plus_one(batch_result, n_plus_one_result):
     time_saved = n_plus_one_result["avg_time"] - batch_result["avg_time"]
     queries_saved = len(TEST_TFS) - 1  # N queries vs 1 query
 
-    print(f"\n📊 Performance Comparison:")
+    print("\n📊 Performance Comparison:")
     print(f"  Batch loading:  {batch_result['avg_time']:.4f}s (1 query)")
-    print(f"  N+1 loading:    {n_plus_one_result['avg_time']:.4f}s ({len(TEST_TFS)} queries)")
-    print(f"  ────────────────────────────────")
+    print(
+        f"  N+1 loading:    {n_plus_one_result['avg_time']:.4f}s ({len(TEST_TFS)} queries)"
+    )
+    print("  ────────────────────────────────")
     print(f"  Speedup:        {speedup:.2f}x faster")
     print(f"  Time saved:     {time_saved*1000:.1f}ms per call")
     print(f"  Queries saved:  {queries_saved} per ID")
 
-    print(f"\n📈 Extrapolated Impact (100 IDs):")
+    print("\n📈 Extrapolated Impact (100 IDs):")
     print(f"  Batch: {batch_result['avg_time'] * 100:.2f}s (100 queries)")
-    print(f"  N+1:   {n_plus_one_result['avg_time'] * 100:.2f}s ({len(TEST_TFS) * 100} queries)")
-    print(f"  Time saved: {time_saved * 100:.1f}s = {time_saved * 100 / 60:.1f} minutes")
+    print(
+        f"  N+1:   {n_plus_one_result['avg_time'] * 100:.2f}s ({len(TEST_TFS) * 100} queries)"
+    )
+    print(
+        f"  Time saved: {time_saved * 100:.1f}s = {time_saved * 100 / 60:.1f} minutes"
+    )
 
-    print(f"\n🎯 Database Load Reduction:")
+    print("\n🎯 Database Load Reduction:")
     print(f"  Before: {len(TEST_TFS) * 100:,} queries")
-    print(f"  After:  100 queries")
-    print(f"  Reduction: {((len(TEST_TFS) * 100 - 100) / (len(TEST_TFS) * 100)) * 100:.0f}%")
+    print("  After:  100 queries")
+    print(
+        f"  Reduction: {((len(TEST_TFS) * 100 - 100) / (len(TEST_TFS) * 100)) * 100:.0f}%"
+    )
 
     return {
         "speedup": speedup,
         "time_saved_per_call_ms": time_saved * 1000,
         "queries_saved_per_id": queries_saved,
-        "db_load_reduction_pct": ((len(TEST_TFS) * 100 - 100) / (len(TEST_TFS) * 100)) * 100,
+        "db_load_reduction_pct": ((len(TEST_TFS) * 100 - 100) / (len(TEST_TFS) * 100))
+        * 100,
     }
 
 
@@ -203,7 +209,7 @@ def generate_benchmark_report(results: dict):
     print("BENCHMARK REPORT - BAR BUILDERS REFACTORING")
     print(f"{'='*60}")
 
-    print(f"\n📋 Test Configuration:")
+    print("\n📋 Test Configuration:")
     print(f"  Database: {DB_URL[:50]}...")
     print(f"  Test ID: {TEST_ID} (Bitcoin)")
     print(f"  Timeframes: {len(TEST_TFS)} ({', '.join(TEST_TFS[:3])}...)")
@@ -213,55 +219,65 @@ def generate_benchmark_report(results: dict):
     n_plus_one = results["n_plus_one"]
     analysis = results["analysis"]
 
-    print(f"\n[OK] Key Findings:")
+    print("\n[OK] Key Findings:")
     print(f"  1. Batch loading is {analysis['speedup']:.2f}x faster than N+1 pattern")
     print(f"  2. Saves {analysis['time_saved_per_call_ms']:.1f}ms per ID lookup")
     print(f"  3. Reduces database queries by {analysis['queries_saved_per_id']} per ID")
     print(f"  4. Overall DB load reduction: {analysis['db_load_reduction_pct']:.0f}%")
 
-    print(f"\n📊 Performance Metrics:")
-    print(f"  Batch Loading:")
+    print("\n📊 Performance Metrics:")
+    print("  Batch Loading:")
     print(f"    - Average: {batch['avg_time']*1000:.2f}ms")
     print(f"    - Min:     {batch['min_time']*1000:.2f}ms")
     print(f"    - Max:     {batch['max_time']*1000:.2f}ms")
 
-    print(f"\n  N+1 Loading (old pattern):")
+    print("\n  N+1 Loading (old pattern):")
     print(f"    - Average: {n_plus_one['avg_time']*1000:.2f}ms")
     print(f"    - Min:     {n_plus_one['min_time']*1000:.2f}ms")
     print(f"    - Max:     {n_plus_one['max_time']*1000:.2f}ms")
 
-    print(f"\n💾 Memory Impact:")
+    print("\n💾 Memory Impact:")
     print(f"  Batch: {batch['mem_delta']:+.1f} MB")
     print(f"  N+1:   {n_plus_one['mem_delta']:+.1f} MB")
 
-    print(f"\n🎯 Production Impact Estimate:")
-    print(f"  For cal_anchor builders (100 IDs × 10 TFs):")
-    print(f"    - Query reduction: 1,000 → 100 (90%)")
-    print(f"    - Expected speedup: {analysis['speedup']:.0f}-{analysis['speedup']*1.5:.0f}x")
-    print(f"    - Time saved: ~{analysis['time_saved_per_call_ms'] * 100 / 1000:.0f}s per run")
+    print("\n🎯 Production Impact Estimate:")
+    print("  For cal_anchor builders (100 IDs × 10 TFs):")
+    print("    - Query reduction: 1,000 → 100 (90%)")
+    print(
+        f"    - Expected speedup: {analysis['speedup']:.0f}-{analysis['speedup']*1.5:.0f}x"
+    )
+    print(
+        f"    - Time saved: ~{analysis['time_saved_per_call_ms'] * 100 / 1000:.0f}s per run"
+    )
 
-    print(f"\n[OK] VERDICT:")
-    if analysis['speedup'] > 2.0:
-        print(f"  🎉 EXCELLENT: Refactoring provides significant performance improvement!")
-    elif analysis['speedup'] > 1.5:
-        print(f"  [OK] GOOD: Refactoring provides noticeable performance improvement")
-    elif analysis['speedup'] > 1.1:
-        print(f"  [+] POSITIVE: Refactoring provides modest performance improvement")
+    print("\n[OK] VERDICT:")
+    if analysis["speedup"] > 2.0:
+        print(
+            "  🎉 EXCELLENT: Refactoring provides significant performance improvement!"
+        )
+    elif analysis["speedup"] > 1.5:
+        print("  [OK] GOOD: Refactoring provides noticeable performance improvement")
+    elif analysis["speedup"] > 1.1:
+        print("  [+] POSITIVE: Refactoring provides modest performance improvement")
     else:
-        print(f"  [WARNING]  NEUTRAL: Performance similar (as expected for already-optimized builders)")
+        print(
+            "  [WARNING]  NEUTRAL: Performance similar (as expected for already-optimized builders)"
+        )
 
-    print(f"\n📝 Recommendation:")
-    print(f"  [OK] Deploy refactored builders to production")
-    print(f"  [OK] Monitor cal_anchor builder performance (expect {analysis['speedup']:.0f}x speedup)")
-    print(f"  [OK] No regressions expected for other builders")
+    print("\n📝 Recommendation:")
+    print("  [OK] Deploy refactored builders to production")
+    print(
+        f"  [OK] Monitor cal_anchor builder performance (expect {analysis['speedup']:.0f}x speedup)"
+    )
+    print("  [OK] No regressions expected for other builders")
 
 
 def main():
     """Run all benchmarks."""
-    print("="*60)
+    print("=" * 60)
     print("BAR BUILDERS PERFORMANCE BENCHMARKS")
     print("Phase 5.2: Validation")
-    print("="*60)
+    print("=" * 60)
 
     if not DB_URL:
         print("\nERROR: TARGET_DB_URL environment variable not set")
@@ -272,7 +288,7 @@ def main():
     if HAS_PSUTIL:
         print(f"Process memory: {get_memory_usage_mb():.1f} MB")
     else:
-        print(f"Note: psutil not installed - memory tracking disabled")
+        print("Note: psutil not installed - memory tracking disabled")
 
     # Run benchmarks
     results = {}
@@ -284,8 +300,7 @@ def main():
 
         # Analyze results
         results["analysis"] = analyze_batch_vs_n_plus_one(
-            results["batch"],
-            results["n_plus_one"]
+            results["batch"], results["n_plus_one"]
         )
 
         # Generate report
@@ -300,6 +315,7 @@ def main():
     except Exception as e:
         print(f"\nERROR running benchmarks: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
 

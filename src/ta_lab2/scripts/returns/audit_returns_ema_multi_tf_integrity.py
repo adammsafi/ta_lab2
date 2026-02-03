@@ -88,16 +88,32 @@ def _fail_or_warn(strict: bool, msg: str) -> None:
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Audit integrity for cmc_returns_ema_multi_tf.")
-    p.add_argument("--db-url", default=os.getenv("TARGET_DB_URL", ""), help="DB URL (or set TARGET_DB_URL).")
+    p = argparse.ArgumentParser(
+        description="Audit integrity for cmc_returns_ema_multi_tf."
+    )
+    p.add_argument(
+        "--db-url",
+        default=os.getenv("TARGET_DB_URL", ""),
+        help="DB URL (or set TARGET_DB_URL).",
+    )
     p.add_argument("--ema-table", default=DEFAULT_EMA_TABLE)
     p.add_argument("--ret-table", default=DEFAULT_RET_TABLE)
 
-    p.add_argument("--out", default="", help="Base filename for CSV outputs (no extension). If empty, auto-dated.")
+    p.add_argument(
+        "--out",
+        default="",
+        help="Base filename for CSV outputs (no extension). If empty, auto-dated.",
+    )
     p.add_argument("--out-dir", default=".", help="Directory to write CSV outputs.")
 
-    p.add_argument("--strict", action="store_true", help="Exit non-zero if any FAIL checks occur.")
-    p.add_argument("--dim-timeframe", default=DEFAULT_DIM_TIMEFRAME, help="dim_timeframe table (for gap thresholds).")
+    p.add_argument(
+        "--strict", action="store_true", help="Exit non-zero if any FAIL checks occur."
+    )
+    p.add_argument(
+        "--dim-timeframe",
+        default=DEFAULT_DIM_TIMEFRAME,
+        help="dim_timeframe table (for gap thresholds).",
+    )
     p.add_argument(
         "--gap-mult",
         type=float,
@@ -109,7 +125,9 @@ def main() -> None:
 
     db_url = args.db_url.strip()
     if not db_url:
-        raise SystemExit("ERROR: Missing DB URL. Provide --db-url or set TARGET_DB_URL.")
+        raise SystemExit(
+            "ERROR: Missing DB URL. Provide --db-url or set TARGET_DB_URL."
+        )
 
     engine = _get_engine(db_url)
     ema_table = args.ema_table
@@ -164,12 +182,12 @@ def main() -> None:
 
     bad_cov = cov[cov["diff"] != 0]
     if not bad_cov.empty:
-      _print(f"FAIL: coverage mismatches found: {len(bad_cov)} (showing up to 50)")
-      print(bad_cov.head(50).to_string(index=False))
-      _write_csv(bad_cov, Path(str(out_base) + "_coverage_bad.csv"))
-      _fail_or_warn(strict, f"FAIL: coverage mismatches found: {len(bad_cov)}")
+        _print(f"FAIL: coverage mismatches found: {len(bad_cov)} (showing up to 50)")
+        print(bad_cov.head(50).to_string(index=False))
+        _write_csv(bad_cov, Path(str(out_base) + "_coverage_bad.csv"))
+        _fail_or_warn(strict, f"FAIL: coverage mismatches found: {len(bad_cov)}")
     else:
-      _print("PASS: coverage matches for all (id,tf,period,roll).")
+        _print("PASS: coverage matches for all (id,tf,period,roll).")
 
     # 2) Duplicates
     dup_sql = f"""
@@ -245,7 +263,9 @@ def main() -> None:
         print(anom.head(50).to_string(index=False))
         _fail_or_warn(strict, f"FAIL: gap anomalies found: {len(anom)}")
     else:
-        _print(f"PASS: no gap anomalies (gap_days>=1, and not >{gap_mult}x tf_days_nominal when available).")
+        _print(
+            f"PASS: no gap anomalies (gap_days>=1, and not >{gap_mult}x tf_days_nominal when available)."
+        )
 
     # 4) Null policy
     nulls_sql = f"""
@@ -270,7 +290,9 @@ def main() -> None:
     n_ret_arith_null = int(nulls.iloc[0]["n_ret_arith_null"])
     n_ret_log_null = int(nulls.iloc[0]["n_ret_log_null"])
     if n_ret_arith_null != 0 or n_ret_log_null != 0:
-        _print(f"FAIL: return NULL rows found: ret_arith_null={n_ret_arith_null}, ret_log_null={n_ret_log_null}")
+        _print(
+            f"FAIL: return NULL rows found: ret_arith_null={n_ret_arith_null}, ret_log_null={n_ret_log_null}"
+        )
         _fail_or_warn(strict, "FAIL: returns contain NULLs unexpectedly.")
     else:
         _print("PASS: ret_arith and ret_log are never NULL.")
@@ -290,7 +312,9 @@ def main() -> None:
     align = _df(engine, align_sql)
     n_missing = int(align.iloc[0]["n_missing"])
     if n_missing != 0:
-        _print(f"FAIL: {n_missing} returns rows have no matching EMA row in source table.")
+        _print(
+            f"FAIL: {n_missing} returns rows have no matching EMA row in source table."
+        )
         _fail_or_warn(strict, f"FAIL: alignment missing EMA rows: {n_missing}")
     else:
         _print("PASS: all returns timestamps/keys align to EMA source table.")

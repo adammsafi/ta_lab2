@@ -17,8 +17,7 @@ from ta_lab2.scripts.emas.sync_cmc_ema_multi_tf_u import get_watermark
 # Database connection fixture
 TARGET_DB_URL = os.environ.get("TARGET_DB_URL")
 skip_if_no_db = pytest.mark.skipif(
-    not TARGET_DB_URL,
-    reason="TARGET_DB_URL not configured"
+    not TARGET_DB_URL, reason="TARGET_DB_URL not configured"
 )
 
 
@@ -37,13 +36,15 @@ class TestStateTableExistence:
     def test_ema_state_table_exists(self, db_engine):
         """Query information_schema for common state tables."""
         # Query for state tables
-        query = text("""
+        query = text(
+            """
             SELECT table_name
             FROM information_schema.tables
             WHERE table_schema = 'public'
               AND table_name LIKE 'cmc_ema%state'
             ORDER BY table_name
-        """)
+        """
+        )
 
         with db_engine.connect() as conn:
             df = pd.read_sql(query, conn)
@@ -63,8 +64,9 @@ class TestStateTableExistence:
 
         found_tables = set(df["table_name"].tolist())
         # At least some of these should exist
-        assert any(table in found_tables for table in expected_tables), \
-            f"None of expected state tables found. Found: {found_tables}"
+        assert any(
+            table in found_tables for table in expected_tables
+        ), f"None of expected state tables found. Found: {found_tables}"
 
 
 class TestWatermarking:
@@ -77,8 +79,9 @@ class TestWatermarking:
         result = get_watermark(db_engine, "multi_tf_v2", prefer_ingested_at=False)
 
         # Should return datetime or None
-        assert result is None or isinstance(result, datetime), \
-            f"get_watermark should return datetime or None, got {type(result)}"
+        assert result is None or isinstance(
+            result, datetime
+        ), f"get_watermark should return datetime or None, got {type(result)}"
 
     @skip_if_no_db
     def test_watermark_per_alignment_source(self, db_engine):
@@ -96,8 +99,9 @@ class TestWatermarking:
         has_watermark = any(wm is not None for wm in watermarks.values())
         all_none = all(wm is None for wm in watermarks.values())
 
-        assert has_watermark or all_none, \
-            "Watermarks should either exist or all be None"
+        assert (
+            has_watermark or all_none
+        ), "Watermarks should either exist or all be None"
 
         # If multiple have watermarks, they can differ
         non_none_wms = [wm for wm in watermarks.values() if wm is not None]
@@ -151,8 +155,9 @@ class TestIdempotency:
         )
 
         # Counts should be identical (idempotent detection)
-        assert count1 == count2, \
-            f"Dry run counts differ: {count1} vs {count2} (should be idempotent)"
+        assert (
+            count1 == count2
+        ), f"Dry run counts differ: {count1} vs {count2} (should be idempotent)"
 
 
 class TestStateUpdates:
@@ -162,11 +167,13 @@ class TestStateUpdates:
     def test_state_has_recent_updated_at(self, db_engine):
         """Query state table and verify some rows have updated_at within last 30 days."""
         # Try common state table
-        query = text("""
+        query = text(
+            """
             SELECT COUNT(*) as recent_count
             FROM public.cmc_ema_multi_tf_state
             WHERE updated_at >= CURRENT_DATE - INTERVAL '30 days'
-        """)
+        """
+        )
 
         try:
             with db_engine.connect() as conn:
@@ -178,14 +185,18 @@ class TestStateUpdates:
             # (This assumes periodic refreshes are running)
             if recent_count == 0:
                 # Check if table has any data at all
-                count_query = text("SELECT COUNT(*) as total FROM public.cmc_ema_multi_tf_state")
+                count_query = text(
+                    "SELECT COUNT(*) as total FROM public.cmc_ema_multi_tf_state"
+                )
                 with db_engine.connect() as conn:
                     total_df = pd.read_sql(count_query, conn)
                 total = total_df.loc[0, "total"]
 
                 if total > 0:
                     # Table has data but nothing recent - may indicate issue
-                    pytest.skip("State table has data but no recent updates (may be expected)")
+                    pytest.skip(
+                        "State table has data but no recent updates (may be expected)"
+                    )
                 else:
                     pytest.skip("State table is empty")
             else:
@@ -198,10 +209,12 @@ class TestStateUpdates:
     @skip_if_no_db
     def test_state_covers_multiple_ids(self, db_engine):
         """Query state table and verify multiple distinct IDs present."""
-        query = text("""
+        query = text(
+            """
             SELECT COUNT(DISTINCT id) as id_count
             FROM public.cmc_ema_multi_tf_state
-        """)
+        """
+        )
 
         try:
             with db_engine.connect() as conn:
@@ -213,8 +226,9 @@ class TestStateUpdates:
                 pytest.skip("State table is empty")
 
             # Should track multiple assets
-            assert id_count > 1, \
-                f"State table should track multiple IDs, found {id_count}"
+            assert (
+                id_count > 1
+            ), f"State table should track multiple IDs, found {id_count}"
 
         except Exception as e:
             pytest.skip(f"Could not query state table: {e}")
@@ -222,11 +236,13 @@ class TestStateUpdates:
     @skip_if_no_db
     def test_state_covers_multiple_tfs(self, db_engine):
         """Query state table and verify multiple distinct TFs present."""
-        query = text("""
+        query = text(
+            """
             SELECT COUNT(DISTINCT tf) as tf_count,
                    array_agg(DISTINCT tf ORDER BY tf) as tfs
             FROM public.cmc_ema_multi_tf_state
-        """)
+        """
+        )
 
         try:
             with db_engine.connect() as conn:
@@ -238,15 +254,17 @@ class TestStateUpdates:
                 pytest.skip("State table is empty")
 
             # Should track multiple timeframes
-            assert tf_count > 1, \
-                f"State table should track multiple TFs, found {tf_count}"
+            assert (
+                tf_count > 1
+            ), f"State table should track multiple TFs, found {tf_count}"
 
             # Common timeframes should be present
             tfs = df.loc[0, "tfs"]
             common_tfs = ["1D", "7D", "30D"]
             has_common = any(tf in tfs for tf in common_tfs)
-            assert has_common, \
-                f"State should include common TFs like 1D/7D/30D, found {tfs}"
+            assert (
+                has_common
+            ), f"State should include common TFs like 1D/7D/30D, found {tfs}"
 
         except Exception as e:
             pytest.skip(f"Could not query state table: {e}")
@@ -278,13 +296,15 @@ class TestIncrementalBehavior:
         # Actual testing would require running a full sync which is expensive
 
         # Check that watermark is a valid datetime
-        assert isinstance(initial_wm, datetime), \
-            f"Watermark should be datetime, got {type(initial_wm)}"
+        assert isinstance(
+            initial_wm, datetime
+        ), f"Watermark should be datetime, got {type(initial_wm)}"
 
         # Watermark should be in the past (not future)
         now = datetime.now(timezone.utc)
-        assert initial_wm <= now, \
-            f"Watermark should not be in the future: {initial_wm} vs {now}"
+        assert (
+            initial_wm <= now
+        ), f"Watermark should not be in the future: {initial_wm} vs {now}"
 
         # Document success criteria #6: Incremental refresh infrastructure validated
         # - State tracking per (id, tf, period) enables incremental refresh ✓

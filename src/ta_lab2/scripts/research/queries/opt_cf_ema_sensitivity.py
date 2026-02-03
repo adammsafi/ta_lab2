@@ -15,8 +15,12 @@ from ta_lab2.backtests.splitters import fixed_date_splits
 
 # --- config (defaults + optional env overrides) ---
 DEFAULT_CSV = r"C:\Users\asafi\Downloads\ta_lab2\data\Bitcoin_01_1_2016-10_26_2025_historical_data_coinmarketcap.csv"
-DEFAULT_REFINED = r"C:\Users\asafi\Downloads\ta_lab2\research\outputs\opt_cf_ema_refined.csv"
-DEFAULT_OUT = r"C:\Users\asafi\Downloads\ta_lab2\research\outputs\opt_cf_ema_sensitivity.csv"
+DEFAULT_REFINED = (
+    r"C:\Users\asafi\Downloads\ta_lab2\research\outputs\opt_cf_ema_refined.csv"
+)
+DEFAULT_OUT = (
+    r"C:\Users\asafi\Downloads\ta_lab2\research\outputs\opt_cf_ema_sensitivity.csv"
+)
 
 # Allow overriding paths from the environment, but keep your current defaults
 CSV = os.getenv("TA_LAB2_OPT_CF_EMA_SENS_CSV", DEFAULT_CSV)
@@ -57,11 +61,7 @@ def load_df(p: str) -> pd.DataFrame:
     px = (
         "close"
         if "close" in d.columns
-        else next(
-            c
-            for c in d.columns
-            if "close" in c or c in ("price", "last")
-        )
+        else next(c for c in d.columns if "close" in c or c in ("price", "last"))
     )
     d[ts] = pd.to_datetime(d[ts], errors="coerce")
     d = d.dropna(subset=[ts]).set_index(ts).sort_index()
@@ -95,9 +95,7 @@ def build_grid(f: int, s: int, f_pad=10, s_pad=20, delta=5):
 def main():
     ref = pd.read_csv(REFINED)
     if ref.empty:
-        raise ValueError(
-            f"No rows in {REFINED}. Run the refine step first."
-        )
+        raise ValueError(f"No rows in {REFINED}. Run the refine step first.")
 
     ref = ref.sort_values(
         ["mar", "sharpe", "cagr"],
@@ -115,9 +113,7 @@ def main():
     for span in spans:
         ensure_ema(df, span)
 
-    strategies = {
-        "ema_trend": build_grid(f, s, f_pad=10, s_pad=20, delta=5)
-    }
+    strategies = {"ema_trend": build_grid(f, s, f_pad=10, s_pad=20, delta=5)}
     splits = fixed_date_splits([(START, END)], prefix="SENS")
     cost = CostModel(fee_bps=5, slippage_bps=5)
 

@@ -11,7 +11,7 @@ Example:
 import ast
 from pathlib import Path
 from difflib import SequenceMatcher
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 import logging
 
@@ -24,6 +24,7 @@ EXCLUDE_DIRS = {".git", ".venv", ".venv311", "__pycache__", ".pytest_cache", ".a
 @dataclass
 class FunctionInfo:
     """Information about a parsed function."""
+
     file: Path
     name: str
     lineno: int
@@ -39,6 +40,7 @@ class FunctionInfo:
 @dataclass
 class SimilarityMatch:
     """A pair of similar functions."""
+
     func1: FunctionInfo
     func2: FunctionInfo
     similarity: float
@@ -96,14 +98,16 @@ def extract_functions(file_path: Path) -> list[FunctionInfo]:
                 # Unparse to code string (no normalization needed - unparsed code is already normalized)
                 unparsed = ast.unparse(node)
 
-                functions.append(FunctionInfo(
-                    file=file_path,
-                    name=name,
-                    lineno=lineno,
-                    code=unparsed,
-                    docstring=docstring,
-                    arg_count=arg_count
-                ))
+                functions.append(
+                    FunctionInfo(
+                        file=file_path,
+                        name=name,
+                        lineno=lineno,
+                        code=unparsed,
+                        docstring=docstring,
+                        arg_count=arg_count,
+                    )
+                )
             except Exception as e:
                 logger.debug(f"Error processing {node.name} in {file_path}: {e}")
                 continue
@@ -177,7 +181,9 @@ def find_similar_functions(
 
         # Filter by minimum lines
         for func in functions:
-            if func.code.count("\n") >= min_lines - 1:  # -1 because single line has 0 newlines
+            if (
+                func.code.count("\n") >= min_lines - 1
+            ):  # -1 because single line has 0 newlines
                 all_functions.append(func)
 
     logger.info(f"Extracted {len(all_functions)} functions from {root}")
@@ -190,9 +196,11 @@ def find_similar_functions(
     for i, func1 in enumerate(all_functions):
         # Progress logging every 100 functions
         if i % 100 == 0 and i > 0:
-            logger.info(f"Processed {i}/{len(all_functions)} functions, {comparisons_done} comparisons, {comparisons_skipped} skipped")
+            logger.info(
+                f"Processed {i}/{len(all_functions)} functions, {comparisons_done} comparisons, {comparisons_skipped} skipped"
+            )
 
-        for func2 in all_functions[i + 1:]:
+        for func2 in all_functions[i + 1 :]:
             # Skip same file same name (likely same function)
             if func1.file == func2.file and func1.name == func2.name:
                 comparisons_skipped += 1
@@ -216,17 +224,18 @@ def find_similar_functions(
 
             if similarity >= threshold:
                 tier = classify_similarity(similarity)
-                matches.append(SimilarityMatch(
-                    func1=func1,
-                    func2=func2,
-                    similarity=similarity,
-                    tier=tier
-                ))
+                matches.append(
+                    SimilarityMatch(
+                        func1=func1, func2=func2, similarity=similarity, tier=tier
+                    )
+                )
 
     # Sort by similarity (highest first)
     matches.sort(key=lambda m: m.similarity, reverse=True)
 
-    logger.info(f"Completed: {comparisons_done} comparisons, {comparisons_skipped} skipped, {len(matches)} matches found")
+    logger.info(
+        f"Completed: {comparisons_done} comparisons, {comparisons_skipped} skipped, {len(matches)} matches found"
+    )
 
     return matches
 
@@ -247,8 +256,8 @@ def generate_similarity_report(matches: list[SimilarityMatch]) -> dict:
             "related": len([m for m in matches if m.tier == "related"]),
         },
         "near_exact": [],  # 95%+ similarity
-        "similar": [],     # 85-95% similarity
-        "related": [],     # 70-85% similarity
+        "similar": [],  # 85-95% similarity
+        "related": [],  # 70-85% similarity
     }
 
     for match in matches:

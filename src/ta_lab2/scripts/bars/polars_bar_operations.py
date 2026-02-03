@@ -74,7 +74,11 @@ def apply_ohlcv_cumulative_aggregations(
             pl.col(close_col).alias("close_bar"),
             pl.col(high_col).cum_max().over(group_col).alias("high_bar"),
             pl.col(low_col).cum_min().over(group_col).alias("low_bar"),
-            pl.col(volume_col).fill_null(0.0).cum_sum().over(group_col).alias("vol_bar"),
+            pl.col(volume_col)
+            .fill_null(0.0)
+            .cum_sum()
+            .over(group_col)
+            .alias("vol_bar"),
             pl.col(market_cap_col).forward_fill().over(group_col).alias("mc_bar"),
         ]
     )
@@ -147,7 +151,9 @@ def compute_extrema_timestamps_with_new_extreme_detection(
 
     pl_df = pl_df.with_columns(
         [
-            (prev_high.is_null() | (pl.col(high_bar_col) != prev_high)).alias("_new_high"),
+            (prev_high.is_null() | (pl.col(high_bar_col) != prev_high)).alias(
+                "_new_high"
+            ),
             (prev_low.is_null() | (pl.col(low_bar_col) != prev_low)).alias("_new_low"),
         ]
     )
@@ -261,7 +267,9 @@ def compute_missing_days_gaps(
             pl.when(pl.col("_gap").is_null())
             .then(pl.lit(0))
             .otherwise(
-                ((pl.col("_gap").dt.total_milliseconds() / (1000 * 60 * 60 * 24)) - 1).clip(lower_bound=0)
+                (
+                    (pl.col("_gap").dt.total_milliseconds() / (1000 * 60 * 60 * 24)) - 1
+                ).clip(lower_bound=0)
             )
             .cast(pl.Int64)
             .alias("missing_incr"),
@@ -270,7 +278,10 @@ def compute_missing_days_gaps(
 
     pl_df = pl_df.with_columns(
         [
-            pl.col("missing_incr").cum_sum().over(group_col).alias("count_missing_days"),
+            pl.col("missing_incr")
+            .cum_sum()
+            .over(group_col)
+            .alias("count_missing_days"),
         ]
     )
 
@@ -311,14 +322,20 @@ def normalize_timestamps_for_polars(
 
     # Strict for ts (must be valid)
     if ts_col in df.columns:
-        df[ts_col] = pd.to_datetime(df[ts_col], utc=True, errors="raise").dt.tz_convert(None)
+        df[ts_col] = pd.to_datetime(df[ts_col], utc=True, errors="raise").dt.tz_convert(
+            None
+        )
 
     # Coerce for extrema timestamps (can be null)
     if timehigh_col in df.columns:
-        df[timehigh_col] = pd.to_datetime(df[timehigh_col], utc=True, errors="coerce").dt.tz_convert(None)
+        df[timehigh_col] = pd.to_datetime(
+            df[timehigh_col], utc=True, errors="coerce"
+        ).dt.tz_convert(None)
 
     if timelow_col in df.columns:
-        df[timelow_col] = pd.to_datetime(df[timelow_col], utc=True, errors="coerce").dt.tz_convert(None)
+        df[timelow_col] = pd.to_datetime(
+            df[timelow_col], utc=True, errors="coerce"
+        ).dt.tz_convert(None)
 
     return df
 
@@ -476,7 +493,9 @@ def apply_standard_polars_pipeline(
     pl_df = apply_ohlcv_cumulative_aggregations(pl_df, group_col=group_col)
 
     # Step 3: Extrema timestamps (depends on high_bar/low_bar from step 2)
-    pl_df = compute_extrema_timestamps_with_new_extreme_detection(pl_df, group_col=group_col)
+    pl_df = compute_extrema_timestamps_with_new_extreme_detection(
+        pl_df, group_col=group_col
+    )
 
     # Step 4: Missing days (optional, simple version)
     if include_missing_days:

@@ -6,7 +6,7 @@ Implements MEMO-03: Context injection system retrieves top-K memories.
 import logging
 from typing import List, Optional
 
-from .query import search_memories, SearchResult, SearchResponse
+from .query import search_memories, SearchResult
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +15,7 @@ def format_memories_for_prompt(
     results: List[SearchResult],
     max_length: int = 4000,
     include_metadata: bool = True,
-    include_similarity: bool = True
+    include_similarity: bool = True,
 ) -> str:
     """Format search results for AI prompt injection.
 
@@ -74,7 +74,7 @@ def inject_memory_context(
     min_similarity: float = 0.7,
     memory_type: Optional[str] = None,
     max_length: int = 4000,
-    client=None
+    client=None,
 ) -> str:
     """Retrieve relevant memories and format for AI prompt context.
 
@@ -101,7 +101,7 @@ def inject_memory_context(
         max_results=max_memories,
         min_similarity=min_similarity,
         memory_type=memory_type,
-        client=client
+        client=client,
     )
 
     logger.info(
@@ -109,10 +109,7 @@ def inject_memory_context(
         f"found={response.filtered_count} memories"
     )
 
-    return format_memories_for_prompt(
-        results=response.results,
-        max_length=max_length
-    )
+    return format_memories_for_prompt(results=response.results, max_length=max_length)
 
 
 def build_augmented_prompt(
@@ -121,7 +118,7 @@ def build_augmented_prompt(
     max_memories: int = 5,
     min_similarity: float = 0.7,
     memory_type: Optional[str] = None,
-    client=None
+    client=None,
 ) -> dict:
     """Build a complete RAG-augmented prompt structure.
 
@@ -147,18 +144,19 @@ def build_augmented_prompt(
         max_memories=max_memories,
         min_similarity=min_similarity,
         memory_type=memory_type,
-        client=client
+        client=client,
     )
 
     return {
-        "system": system_prompt or "You are a helpful assistant for the ta_lab2 project.",
+        "system": system_prompt
+        or "You are a helpful assistant for the ta_lab2 project.",
         "context": memory_context,
         "user": user_query,
         "full_prompt": (
-            f"{system_prompt}\n\n"
-            f"{memory_context}\n\n"
-            f"User Query: {user_query}"
-        ) if system_prompt else f"{memory_context}\n\nUser Query: {user_query}"
+            f"{system_prompt}\n\n" f"{memory_context}\n\n" f"User Query: {user_query}"
+        )
+        if system_prompt
+        else f"{memory_context}\n\nUser Query: {user_query}",
     }
 
 

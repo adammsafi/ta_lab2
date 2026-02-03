@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 # DailyFeaturesStore Class
 # =============================================================================
 
+
 class DailyFeaturesStore:
     """
     Manages cmc_daily_features materialized table.
@@ -63,35 +64,35 @@ class DailyFeaturesStore:
 
     # Source table definitions
     SOURCE_TABLES = {
-        'price_bars': {
-            'table': 'cmc_price_bars_1d',
-            'schema': 'public',
-            'required': True,
-            'feature_type': 'price_bars',
+        "price_bars": {
+            "table": "cmc_price_bars_1d",
+            "schema": "public",
+            "required": True,
+            "feature_type": "price_bars",
         },
-        'emas': {
-            'table': 'cmc_ema_multi_tf_u',
-            'schema': 'public',
-            'required': False,
-            'feature_type': 'ema_multi_tf',
+        "emas": {
+            "table": "cmc_ema_multi_tf_u",
+            "schema": "public",
+            "required": False,
+            "feature_type": "ema_multi_tf",
         },
-        'returns': {
-            'table': 'cmc_returns_daily',
-            'schema': 'public',
-            'required': False,
-            'feature_type': 'returns',
+        "returns": {
+            "table": "cmc_returns_daily",
+            "schema": "public",
+            "required": False,
+            "feature_type": "returns",
         },
-        'vol': {
-            'table': 'cmc_vol_daily',
-            'schema': 'public',
-            'required': False,
-            'feature_type': 'vol',
+        "vol": {
+            "table": "cmc_vol_daily",
+            "schema": "public",
+            "required": False,
+            "feature_type": "vol",
         },
-        'ta': {
-            'table': 'cmc_ta_daily',
-            'schema': 'public',
-            'required': False,
-            'feature_type': 'ta',
+        "ta": {
+            "table": "cmc_ta_daily",
+            "schema": "public",
+            "required": False,
+            "feature_type": "ta",
         },
     }
 
@@ -117,30 +118,33 @@ class DailyFeaturesStore:
         result = {}
 
         for source_key, source_info in self.SOURCE_TABLES.items():
-            table_name = source_info['table']
-            schema_name = source_info['schema']
+            table_name = source_info["table"]
+            schema_name = source_info["schema"]
 
             try:
-                sql = text(f"""
+                sql = text(
+                    """
                     SELECT EXISTS (
                         SELECT 1
                         FROM information_schema.tables
                         WHERE table_schema = :schema
                           AND table_name = :table
                     )
-                """)
+                """
+                )
 
                 with self.engine.connect() as conn:
-                    exists = conn.execute(sql, {
-                        'schema': schema_name,
-                        'table': table_name
-                    }).scalar()
+                    exists = conn.execute(
+                        sql, {"schema": schema_name, "table": table_name}
+                    ).scalar()
 
                     if exists:
                         # Check if has data
-                        count_sql = text(f"""
+                        count_sql = text(
+                            f"""
                             SELECT COUNT(*) FROM {schema_name}.{table_name} LIMIT 1
-                        """)
+                        """
+                        )
                         has_data = conn.execute(count_sql).scalar() > 0
                         result[source_key] = has_data
                     else:
@@ -167,13 +171,12 @@ class DailyFeaturesStore:
         watermarks = {}
 
         for source_key, source_info in self.SOURCE_TABLES.items():
-            feature_type = source_info['feature_type']
+            feature_type = source_info["feature_type"]
 
             try:
                 # Load state for this feature type
                 state_df = self.state_manager.load_state(
-                    ids=ids,
-                    feature_type=feature_type
+                    ids=ids, feature_type=feature_type
                 )
 
                 if state_df.empty:
@@ -181,7 +184,7 @@ class DailyFeaturesStore:
                     continue
 
                 # Get MIN of last_ts across all IDs (conservative)
-                ts_series = pd.to_datetime(state_df['last_ts'], errors='coerce')
+                ts_series = pd.to_datetime(state_df["last_ts"], errors="coerce")
                 ts_series = ts_series.dropna()
 
                 if ts_series.empty:
@@ -196,9 +199,7 @@ class DailyFeaturesStore:
         return watermarks
 
     def compute_dirty_window(
-        self,
-        ids: list[int],
-        default_start: str = "2010-01-01"
+        self, ids: list[int], default_start: str = "2010-01-01"
     ) -> tuple[pd.Timestamp, pd.Timestamp]:
         """
         Compute dirty window requiring refresh.
@@ -228,7 +229,7 @@ class DailyFeaturesStore:
             start = min(valid_watermarks)
 
         # End = now
-        end = pd.Timestamp.now(tz='UTC')
+        end = pd.Timestamp.now(tz="UTC")
 
         return start, end
 
@@ -266,8 +267,10 @@ class DailyFeaturesStore:
         logger.info(f"Source tables available: {sources_available}")
 
         # Require price_bars at minimum
-        if not sources_available.get('price_bars', False):
-            logger.error("Required table cmc_price_bars_1d not available - cannot refresh")
+        if not sources_available.get("price_bars", False):
+            logger.error(
+                "Required table cmc_price_bars_1d not available - cannot refresh"
+            )
             return 0
 
         # 2. Compute dirty window
@@ -275,7 +278,7 @@ class DailyFeaturesStore:
             dirty_start, dirty_end = self.compute_dirty_window(ids)
         else:
             dirty_start = pd.to_datetime(start, utc=True)
-            dirty_end = pd.Timestamp.now(tz='UTC')
+            dirty_end = pd.Timestamp.now(tz="UTC")
 
         logger.info(f"Dirty window: {dirty_start} to {dirty_end}")
 
@@ -284,10 +287,7 @@ class DailyFeaturesStore:
 
         # 4. Insert refreshed data
         join_query = self._build_join_query(
-            ids,
-            dirty_start.isoformat(),
-            dirty_end.isoformat(),
-            sources_available
+            ids, dirty_start.isoformat(), dirty_end.isoformat(), sources_available
         )
 
         with self.engine.begin() as conn:
@@ -302,9 +302,7 @@ class DailyFeaturesStore:
         return rows_inserted
 
     def _delete_dirty_rows(
-        self,
-        ids: list[int],
-        start: Optional[pd.Timestamp] = None
+        self, ids: list[int], start: Optional[pd.Timestamp] = None
     ) -> int:
         """
         Delete existing rows in dirty window.
@@ -336,11 +334,7 @@ class DailyFeaturesStore:
         return rows_deleted
 
     def _build_join_query(
-        self,
-        ids: list[int],
-        start: str,
-        end: str,
-        sources_available: dict[str, bool]
+        self, ids: list[int], start: str, end: str, sources_available: dict[str, bool]
     ) -> str:
         """
         Build the JOIN query to materialize features.
@@ -359,7 +353,7 @@ class DailyFeaturesStore:
         Returns:
             SQL INSERT query string
         """
-        ids_list = ','.join(str(id_) for id_ in ids)
+        ids_list = ",".join(str(id_) for id_ in ids)
 
         # Build SELECT columns
         select_cols = [
@@ -375,84 +369,132 @@ class DailyFeaturesStore:
         ]
 
         # EMAs (pivoted from long format)
-        if sources_available.get('emas', False):
-            select_cols.extend([
-                "e9.ema as ema_9",
-                "e10.ema as ema_10",
-                "e21.ema as ema_21",
-                "e50.ema as ema_50",
-                "e200.ema as ema_200",
-                "e9.ema_d1 as ema_9_d1",
-                "e21.ema_d1 as ema_21_d1",
-            ])
+        if sources_available.get("emas", False):
+            select_cols.extend(
+                [
+                    "e9.ema as ema_9",
+                    "e10.ema as ema_10",
+                    "e21.ema as ema_21",
+                    "e50.ema as ema_50",
+                    "e200.ema as ema_200",
+                    "e9.ema_d1 as ema_9_d1",
+                    "e21.ema_d1 as ema_21_d1",
+                ]
+            )
         else:
-            select_cols.extend([
-                "NULL as ema_9", "NULL as ema_10", "NULL as ema_21",
-                "NULL as ema_50", "NULL as ema_200",
-                "NULL as ema_9_d1", "NULL as ema_21_d1",
-            ])
+            select_cols.extend(
+                [
+                    "NULL as ema_9",
+                    "NULL as ema_10",
+                    "NULL as ema_21",
+                    "NULL as ema_50",
+                    "NULL as ema_200",
+                    "NULL as ema_9_d1",
+                    "NULL as ema_21_d1",
+                ]
+            )
 
         # Returns
-        if sources_available.get('returns', False):
-            select_cols.extend([
-                "r.ret_1d_pct", "r.ret_1d_log", "r.ret_7d_pct", "r.ret_30d_pct",
-                "r.ret_1d_pct_zscore", "r.gap_days",
-            ])
+        if sources_available.get("returns", False):
+            select_cols.extend(
+                [
+                    "r.ret_1d_pct",
+                    "r.ret_1d_log",
+                    "r.ret_7d_pct",
+                    "r.ret_30d_pct",
+                    "r.ret_1d_pct_zscore",
+                    "r.gap_days",
+                ]
+            )
         else:
-            select_cols.extend([
-                "NULL as ret_1d_pct", "NULL as ret_1d_log",
-                "NULL as ret_7d_pct", "NULL as ret_30d_pct",
-                "NULL as ret_1d_pct_zscore", "NULL as gap_days",
-            ])
+            select_cols.extend(
+                [
+                    "NULL as ret_1d_pct",
+                    "NULL as ret_1d_log",
+                    "NULL as ret_7d_pct",
+                    "NULL as ret_30d_pct",
+                    "NULL as ret_1d_pct_zscore",
+                    "NULL as gap_days",
+                ]
+            )
 
         # Volatility
-        if sources_available.get('vol', False):
-            select_cols.extend([
-                "v.vol_parkinson_20", "v.vol_gk_20",
-                "v.vol_parkinson_20_zscore", "v.atr_14",
-            ])
+        if sources_available.get("vol", False):
+            select_cols.extend(
+                [
+                    "v.vol_parkinson_20",
+                    "v.vol_gk_20",
+                    "v.vol_parkinson_20_zscore",
+                    "v.atr_14",
+                ]
+            )
         else:
-            select_cols.extend([
-                "NULL as vol_parkinson_20", "NULL as vol_gk_20",
-                "NULL as vol_parkinson_20_zscore", "NULL as atr_14",
-            ])
+            select_cols.extend(
+                [
+                    "NULL as vol_parkinson_20",
+                    "NULL as vol_gk_20",
+                    "NULL as vol_parkinson_20_zscore",
+                    "NULL as atr_14",
+                ]
+            )
 
         # Technical indicators
-        if sources_available.get('ta', False):
-            select_cols.extend([
-                "t.rsi_14", "t.rsi_21",
-                "t.macd_12_26", "t.macd_signal_9", "t.macd_hist_12_26_9",
-                "t.stoch_k_14", "t.stoch_d_3",
-                "t.bb_ma_20", "t.bb_width_20", "t.adx_14",
-            ])
+        if sources_available.get("ta", False):
+            select_cols.extend(
+                [
+                    "t.rsi_14",
+                    "t.rsi_21",
+                    "t.macd_12_26",
+                    "t.macd_signal_9",
+                    "t.macd_hist_12_26_9",
+                    "t.stoch_k_14",
+                    "t.stoch_d_3",
+                    "t.bb_ma_20",
+                    "t.bb_width_20",
+                    "t.adx_14",
+                ]
+            )
         else:
-            select_cols.extend([
-                "NULL as rsi_14", "NULL as rsi_21",
-                "NULL as macd_12_26", "NULL as macd_signal_9", "NULL as macd_hist_12_26_9",
-                "NULL as stoch_k_14", "NULL as stoch_d_3",
-                "NULL as bb_ma_20", "NULL as bb_width_20", "NULL as adx_14",
-            ])
+            select_cols.extend(
+                [
+                    "NULL as rsi_14",
+                    "NULL as rsi_21",
+                    "NULL as macd_12_26",
+                    "NULL as macd_signal_9",
+                    "NULL as macd_hist_12_26_9",
+                    "NULL as stoch_k_14",
+                    "NULL as stoch_d_3",
+                    "NULL as bb_ma_20",
+                    "NULL as bb_width_20",
+                    "NULL as adx_14",
+                ]
+            )
 
         # Data quality flags
         # For now, simple heuristics - can be enhanced
-        select_cols.extend([
-            "CASE WHEN r.gap_days > 1 THEN TRUE ELSE FALSE END as has_price_gap",
-            "CASE WHEN r.is_outlier OR v.vol_parkinson_20_is_outlier OR t.is_outlier THEN TRUE ELSE FALSE END as has_outlier",
-            "now() as updated_at",
-        ])
+        select_cols.extend(
+            [
+                "CASE WHEN r.gap_days > 1 THEN TRUE ELSE FALSE END as has_price_gap",
+                "CASE WHEN r.is_outlier OR v.vol_parkinson_20_is_outlier OR t.is_outlier THEN TRUE ELSE FALSE END as has_outlier",
+                "now() as updated_at",
+            ]
+        )
 
         # Build JOINs
         joins = []
 
         # Base: price_bars + dim_sessions for asset_class
-        joins.append("""
+        joins.append(
+            """
             FROM public.cmc_price_bars_1d p
             LEFT JOIN public.dim_sessions s ON p.id = s.id
-        """)
+        """
+        )
 
         # EMAs (need multiple joins for different periods, filtered to 1D tf)
-        if sources_available.get('emas', False):
-            joins.append("""
+        if sources_available.get("emas", False):
+            joins.append(
+                """
                 LEFT JOIN (SELECT id, ts, ema, ema_d1 FROM public.cmc_ema_multi_tf_u WHERE period = 9 AND tf = '1D') e9
                   ON p.id = e9.id AND p.time_close = e9.ts
                 LEFT JOIN (SELECT id, ts, ema, ema_d1 FROM public.cmc_ema_multi_tf_u WHERE period = 10 AND tf = '1D') e10
@@ -463,25 +505,32 @@ class DailyFeaturesStore:
                   ON p.id = e50.id AND p.time_close = e50.ts
                 LEFT JOIN (SELECT id, ts, ema, ema_d1 FROM public.cmc_ema_multi_tf_u WHERE period = 200 AND tf = '1D') e200
                   ON p.id = e200.id AND p.time_close = e200.ts
-            """)
+            """
+            )
 
         # Returns
-        if sources_available.get('returns', False):
-            joins.append("""
+        if sources_available.get("returns", False):
+            joins.append(
+                """
                 LEFT JOIN public.cmc_returns_daily r ON p.id = r.id AND p.time_close = r.ts
-            """)
+            """
+            )
 
         # Volatility
-        if sources_available.get('vol', False):
-            joins.append("""
+        if sources_available.get("vol", False):
+            joins.append(
+                """
                 LEFT JOIN public.cmc_vol_daily v ON p.id = v.id AND p.time_close = v.ts
-            """)
+            """
+            )
 
         # TA
-        if sources_available.get('ta', False):
-            joins.append("""
+        if sources_available.get("ta", False):
+            joins.append(
+                """
                 LEFT JOIN public.cmc_ta_daily t ON p.id = t.id AND p.time_close = t.ts
-            """)
+            """
+            )
 
         # WHERE clause
         where_clause = f"""
@@ -513,9 +562,9 @@ class DailyFeaturesStore:
         try:
             # Update state using feature_type='daily_features'
             self.state_manager.update_state_from_output(
-                output_table='cmc_daily_features',
-                output_schema='public',
-                feature_name='unified',
+                output_table="cmc_daily_features",
+                output_schema="public",
+                feature_name="unified",
             )
             logger.info("Updated state for daily_features")
         except Exception as e:
@@ -525,6 +574,7 @@ class DailyFeaturesStore:
 # =============================================================================
 # Convenience Function
 # =============================================================================
+
 
 def refresh_daily_features(
     engine: Engine,
@@ -551,9 +601,9 @@ def refresh_daily_features(
 
     # Create state manager for daily_features
     config = FeatureStateConfig(
-        feature_type='daily_features',
-        state_schema='public',
-        state_table='cmc_feature_state',
+        feature_type="daily_features",
+        state_schema="public",
+        state_table="cmc_feature_state",
     )
     state_manager = FeatureStateManager(engine, config)
     state_manager.ensure_state_table()

@@ -30,31 +30,71 @@ ROUTING_MATRIX = {
 COST_PRIORITY = [
     # Tier 1: Free CLI quota (use first)
     {"platform": "gemini", "method": "cli", "quota_key": "gemini_cli", "cost": 0},
-
     # Tier 2: Included in subscriptions (already paid, effectively free)
-    {"platform": "claude_code", "method": "desktop", "quota_key": "claude_code", "cost": 0},
+    {
+        "platform": "claude_code",
+        "method": "desktop",
+        "quota_key": "claude_code",
+        "cost": 0,
+    },
     {"platform": "chatgpt", "method": "web", "quota_key": "chatgpt_plus", "cost": 0},
-
     # Tier 3: Free API tiers
-    {"platform": "gemini", "method": "api_free", "quota_key": "gemini_api_free", "cost": 0},
-
+    {
+        "platform": "gemini",
+        "method": "api_free",
+        "quota_key": "gemini_api_free",
+        "cost": 0,
+    },
     # Tier 4: Paid APIs (last resort)
-    {"platform": "claude", "method": "api", "quota_key": "claude_api", "cost": "variable"},
-    {"platform": "openai", "method": "api", "quota_key": "openai_api", "cost": "variable"},
+    {
+        "platform": "claude",
+        "method": "api",
+        "quota_key": "claude_api",
+        "cost": "variable",
+    },
+    {
+        "platform": "openai",
+        "method": "api",
+        "quota_key": "openai_api",
+        "cost": "variable",
+    },
 ]
 
 # Cost tiers with Platform enum and priority structure for route_cost_optimized
 COST_TIERS = [
     # Tier 1: Gemini CLI free tier (1500 req/day) - ALWAYS try first
-    {"platform": Plat.GEMINI, "quota_key": "gemini_cli", "cost_per_req": 0.0, "priority": 1},
-
+    {
+        "platform": Plat.GEMINI,
+        "quota_key": "gemini_cli",
+        "cost_per_req": 0.0,
+        "priority": 1,
+    },
     # Tier 2: Subscription-included (already paid, effectively free)
-    {"platform": Plat.CLAUDE_CODE, "quota_key": "claude_code", "cost_per_req": 0.0, "priority": 2},
-    {"platform": Plat.CHATGPT, "quota_key": "chatgpt_plus", "cost_per_req": 0.0, "priority": 2},
-
+    {
+        "platform": Plat.CLAUDE_CODE,
+        "quota_key": "claude_code",
+        "cost_per_req": 0.0,
+        "priority": 2,
+    },
+    {
+        "platform": Plat.CHATGPT,
+        "quota_key": "chatgpt_plus",
+        "cost_per_req": 0.0,
+        "priority": 2,
+    },
     # Tier 3: Paid APIs (last resort)
-    {"platform": Plat.GEMINI, "quota_key": "gemini_api", "cost_per_req": 0.0001, "priority": 3},
-    {"platform": Plat.CHATGPT, "quota_key": "openai_api", "cost_per_req": 0.002, "priority": 3},
+    {
+        "platform": Plat.GEMINI,
+        "quota_key": "gemini_api",
+        "cost_per_req": 0.0001,
+        "priority": 3,
+    },
+    {
+        "platform": Plat.CHATGPT,
+        "quota_key": "openai_api",
+        "cost_per_req": 0.002,
+        "priority": 3,
+    },
 ]
 
 
@@ -119,15 +159,15 @@ class TaskRouter:
 
         # Filter by implementation status AND quota availability
         available = [
-            p for p in candidates
+            p
+            for p in candidates
             if p in available_platforms and quota_tracker.can_use(p.value)
         ]
 
         if not available:
             # Try to find any implemented platform with quota
             fallback = [
-                p for p in available_platforms
-                if quota_tracker.can_use(p.value)
+                p for p in available_platforms if quota_tracker.can_use(p.value)
             ]
             if fallback:
                 return fallback[0]
@@ -200,7 +240,9 @@ class TaskRouter:
             "Please wait for quota reset or enable paid APIs."
         )
 
-    def warn_quota_threshold(self, quota_tracker: QuotaTracker, threshold: int = 90) -> list[str]:
+    def warn_quota_threshold(
+        self, quota_tracker: QuotaTracker, threshold: int = 90
+    ) -> list[str]:
         """
         Return warning messages for quotas above threshold percent.
 

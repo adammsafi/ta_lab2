@@ -14,12 +14,11 @@ Prerequisites:
     - Qdrant running on localhost:6333
     - openai_config.env with OPENAI_API_KEY
 """
-import os
 from datetime import datetime
-from pathlib import Path
 
 # Load API key
 from dotenv import load_dotenv
+
 load_dotenv("openai_config.env")
 
 from mem0 import Memory
@@ -30,8 +29,12 @@ config = {
     "embedder": {"provider": "openai"},
     "vector_store": {
         "provider": "qdrant",
-        "config": {"host": "localhost", "port": 6333, "collection_name": "ta_lab2_memories"}
-    }
+        "config": {
+            "host": "localhost",
+            "port": 6333,
+            "collection_name": "ta_lab2_memories",
+        },
+    },
 }
 client = Memory.from_config(config)
 user_id = "ta_lab2_codebase"
@@ -60,7 +63,7 @@ archive_memories = [
             "phase": "15-economic-data-strategy",
             "action": "archived",
             "reason": "Zero usage, ecosystem alternatives superior",
-        }
+        },
     },
     {
         "text": (
@@ -81,7 +84,7 @@ archive_memories = [
             "phase": "15-economic-data-strategy",
             "action": "archived",
             "reason": "Zero usage, ecosystem alternatives superior",
-        }
+        },
     },
 ]
 
@@ -105,7 +108,7 @@ replacement_memories = [
             "new_version": ">=0.5.2",
             "install_command": "pip install ta_lab2[fred]",
             "phase": "15-economic-data-strategy",
-        }
+        },
     },
     {
         "text": (
@@ -122,7 +125,7 @@ replacement_memories = [
             "new_package": "fedfred",
             "new_version": ">=1.0",
             "phase": "15-economic-data-strategy",
-        }
+        },
     },
     {
         "text": (
@@ -137,7 +140,7 @@ replacement_memories = [
             "old_package": "fedtools2",
             "new_package": "ta_lab2.utils.economic + ta_lab2.integrations.economic",
             "phase": "15-economic-data-strategy",
-        }
+        },
     },
 ]
 
@@ -161,7 +164,7 @@ extraction_memories = [
             "source_module": "fedtools2.utils.consolidation",
             "source_package": "fedtools2",
             "phase": "15-economic-data-strategy",
-        }
+        },
     },
     {
         "text": (
@@ -179,7 +182,7 @@ extraction_memories = [
             "source_module": "fedtools2.utils.consolidation",
             "source_package": "fedtools2",
             "phase": "15-economic-data-strategy",
-        }
+        },
     },
     {
         "text": (
@@ -197,7 +200,7 @@ extraction_memories = [
             "source_module": "fedtools2.utils.io",
             "source_package": "fedtools2",
             "phase": "15-economic-data-strategy",
-        }
+        },
     },
 ]
 
@@ -218,7 +221,7 @@ equivalence_memories = [
             "old_function": "fredtools2.fred_api.get_series_observations",
             "new_function": "fredapi.Fred.get_series",
             "phase": "15-economic-data-strategy",
-        }
+        },
     },
     {
         "text": (
@@ -233,7 +236,7 @@ equivalence_memories = [
             "old_function": "fredtools2.jobs.releases.pull_releases",
             "new_function": "ta_lab2.integrations.economic.FredProvider.get_releases",
             "phase": "15-economic-data-strategy",
-        }
+        },
     },
 ]
 
@@ -256,7 +259,7 @@ implementation_memories = [
             "module": "ta_lab2.integrations.economic.fred_provider",
             "protocol": "EconomicDataProvider",
             "phase": "15-economic-data-strategy",
-        }
+        },
     },
     {
         "text": (
@@ -270,28 +273,37 @@ implementation_memories = [
             "type": "implementation_relationship",
             "relationship": "implements",
             "module": "ta_lab2.integrations.economic",
-            "features": ["rate_limiting", "caching", "circuit_breaker", "quality_validation"],
+            "features": [
+                "rate_limiting",
+                "caching",
+                "circuit_breaker",
+                "quality_validation",
+            ],
             "phase": "15-economic-data-strategy",
-        }
+        },
     },
 ]
 
 # Add all memories with infer=False for batch performance
 all_memories = (
-    archive_memories +
-    replacement_memories +
-    extraction_memories +
-    equivalence_memories +
-    implementation_memories
+    archive_memories
+    + replacement_memories
+    + extraction_memories
+    + equivalence_memories
+    + implementation_memories
 )
 
 print(f"Adding {len(all_memories)} memory records...")
 
 for mem in all_memories:
     mem["metadata"]["timestamp"] = datetime.now().isoformat()
-    result = client.add(mem["text"], user_id=user_id, metadata=mem["metadata"], infer=False)
+    result = client.add(
+        mem["text"], user_id=user_id, metadata=mem["metadata"], infer=False
+    )
     memories_added += 1
-    print(f"  Added: {mem['metadata'].get('relationship', 'unknown')} - {mem['metadata'].get('package_name', mem['metadata'].get('function_name', 'unknown'))}")
+    print(
+        f"  Added: {mem['metadata'].get('relationship', 'unknown')} - {mem['metadata'].get('package_name', mem['metadata'].get('function_name', 'unknown'))}"
+    )
 
 print(f"\nTotal memories added: {memories_added}")
 
@@ -320,26 +332,34 @@ phase_snapshot = {
         "decision": "archive + extract + integrate",
         "packages_archived": 2,
         "packages_archived_names": ["fredtools2", "fedtools2"],
-        "modules_created": [
-            "ta_lab2.utils.economic",
-            "ta_lab2.integrations.economic"
-        ],
+        "modules_created": ["ta_lab2.utils.economic", "ta_lab2.integrations.economic"],
         "features_added": [
             "FredProvider (fredapi passthrough)",
             "rate_limiting",
             "caching",
             "circuit_breaker",
             "quality_validation",
-            "migration_tool"
+            "migration_tool",
         ],
-        "requirements_satisfied": ["ECON-01", "ECON-02", "ECON-03", "MEMO-13", "MEMO-14"],
+        "requirements_satisfied": [
+            "ECON-01",
+            "ECON-02",
+            "ECON-03",
+            "MEMO-13",
+            "MEMO-14",
+        ],
         "archive_path": ".archive/external-packages/2026-02-03/",
         "ecosystem_alternatives": ["fredapi", "fedfred"],
-        "timestamp": datetime.now().isoformat()
-    }
+        "timestamp": datetime.now().isoformat(),
+    },
 }
 
-result = client.add(phase_snapshot["text"], user_id=user_id, metadata=phase_snapshot["metadata"], infer=False)
+result = client.add(
+    phase_snapshot["text"],
+    user_id=user_id,
+    metadata=phase_snapshot["metadata"],
+    infer=False,
+)
 print(f"\nPhase snapshot added: {result}")
 
 # ============================================
@@ -353,21 +373,20 @@ verification_queries = [
     # Archive queries
     ("Where is fredtools2 now?", "Should return archive path"),
     ("What happened to fedtools2?", "Should return archive decision"),
-
     # Replacement queries (context requirement: "what replaced fredtools2?")
     ("What replaced fredtools2?", "Should return fredapi"),
     ("What should I use instead of fedtools2?", "Should return ta_lab2.utils.economic"),
-
     # Extraction queries
     ("Where did combine_timeframes come from?", "Should return fedtools2"),
     ("What was extracted from fedtools2?", "Should list functions"),
-
     # Equivalence queries
     ("What is equivalent to get_series_observations?", "Should return Fred.get_series"),
-
     # Phase queries
     ("Phase 15 economic data strategy", "Should return phase snapshot"),
-    ("What modules were created in phase 15?", "Should list utils.economic, integrations.economic"),
+    (
+        "What modules were created in phase 15?",
+        "Should list utils.economic, integrations.economic",
+    ),
 ]
 
 for query, expected in verification_queries:

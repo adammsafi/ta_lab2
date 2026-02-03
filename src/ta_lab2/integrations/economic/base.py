@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Optional, List
 
-from ta_lab2.integrations.economic.types import EconomicSeries, FetchResult, SeriesInfo
+from ta_lab2.integrations.economic.types import FetchResult, SeriesInfo
 
 
 class EconomicDataProvider(ABC):
@@ -31,6 +31,7 @@ class EconomicDataProvider(ABC):
         ...         # Implementation
         ...         pass
     """
+
     name: str = "Unknown"
     base_url: str = ""
 
@@ -40,7 +41,7 @@ class EconomicDataProvider(ABC):
         series_id: str,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
-        **kwargs
+        **kwargs,
     ) -> FetchResult:
         """Fetch time series data for a given series ID.
 
@@ -82,11 +83,7 @@ class EconomicDataProvider(ABC):
         """
         return []
 
-    def get_multiple_series(
-        self,
-        series_ids: List[str],
-        **kwargs
-    ) -> List[FetchResult]:
+    def get_multiple_series(self, series_ids: List[str], **kwargs) -> List[FetchResult]:
         """Fetch multiple series.
 
         Default implementation calls get_series sequentially.

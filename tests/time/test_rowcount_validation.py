@@ -15,8 +15,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
-from datetime import datetime
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pandas as pd
 import pytest
@@ -31,6 +30,7 @@ from ta_lab2.scripts.emas.validate_ema_rowcounts import (
 # ============================================================================
 # Unit Tests - Expected Rowcount Computation
 # ============================================================================
+
 
 def test_compute_expected_1d():
     """Test expected rowcount for 1D timeframe over 30 days."""
@@ -96,17 +96,22 @@ def test_compute_expected_zero_tf_days():
 # Status Logic Tests
 # ============================================================================
 
+
 def test_status_ok():
     """Test that status is OK when actual == expected."""
-    df = pd.DataFrame([{
-        "id": 1,
-        "tf": "1D",
-        "period": 10,
-        "expected": 30,
-        "actual": 30,
-        "diff": 0,
-        "status": "OK",
-    }])
+    df = pd.DataFrame(
+        [
+            {
+                "id": 1,
+                "tf": "1D",
+                "period": 10,
+                "expected": 30,
+                "actual": 30,
+                "diff": 0,
+                "status": "OK",
+            }
+        ]
+    )
 
     summary = summarize_validation(df)
     assert summary["ok"] == 1
@@ -116,15 +121,19 @@ def test_status_ok():
 
 def test_status_gap():
     """Test that status is GAP when actual < expected."""
-    df = pd.DataFrame([{
-        "id": 1,
-        "tf": "1D",
-        "period": 10,
-        "expected": 30,
-        "actual": 25,
-        "diff": -5,
-        "status": "GAP",
-    }])
+    df = pd.DataFrame(
+        [
+            {
+                "id": 1,
+                "tf": "1D",
+                "period": 10,
+                "expected": 30,
+                "actual": 25,
+                "diff": -5,
+                "status": "GAP",
+            }
+        ]
+    )
 
     summary = summarize_validation(df)
     assert summary["ok"] == 0
@@ -136,15 +145,19 @@ def test_status_gap():
 
 def test_status_duplicate():
     """Test that status is DUPLICATE when actual > expected."""
-    df = pd.DataFrame([{
-        "id": 1,
-        "tf": "1D",
-        "period": 10,
-        "expected": 30,
-        "actual": 35,
-        "diff": 5,
-        "status": "DUPLICATE",
-    }])
+    df = pd.DataFrame(
+        [
+            {
+                "id": 1,
+                "tf": "1D",
+                "period": 10,
+                "expected": 30,
+                "actual": 35,
+                "diff": 5,
+                "status": "DUPLICATE",
+            }
+        ]
+    )
 
     summary = summarize_validation(df)
     assert summary["ok"] == 0
@@ -158,13 +171,40 @@ def test_status_duplicate():
 # Summary Tests
 # ============================================================================
 
+
 def test_summarize_validation_counts():
     """Test summarize_validation returns correct counts."""
-    df = pd.DataFrame([
-        {"id": 1, "tf": "1D", "period": 10, "expected": 30, "actual": 30, "diff": 0, "status": "OK"},
-        {"id": 1, "tf": "7D", "period": 10, "expected": 4, "actual": 3, "diff": -1, "status": "GAP"},
-        {"id": 2, "tf": "1D", "period": 20, "expected": 30, "actual": 32, "diff": 2, "status": "DUPLICATE"},
-    ])
+    df = pd.DataFrame(
+        [
+            {
+                "id": 1,
+                "tf": "1D",
+                "period": 10,
+                "expected": 30,
+                "actual": 30,
+                "diff": 0,
+                "status": "OK",
+            },
+            {
+                "id": 1,
+                "tf": "7D",
+                "period": 10,
+                "expected": 4,
+                "actual": 3,
+                "diff": -1,
+                "status": "GAP",
+            },
+            {
+                "id": 2,
+                "tf": "1D",
+                "period": 20,
+                "expected": 30,
+                "actual": 32,
+                "diff": 2,
+                "status": "DUPLICATE",
+            },
+        ]
+    )
 
     summary = summarize_validation(df)
 
@@ -177,7 +217,9 @@ def test_summarize_validation_counts():
 
 def test_summarize_validation_empty():
     """Test summarize_validation with empty DataFrame."""
-    df = pd.DataFrame(columns=["id", "tf", "period", "expected", "actual", "diff", "status"])
+    df = pd.DataFrame(
+        columns=["id", "tf", "period", "expected", "actual", "diff", "status"]
+    )
 
     summary = summarize_validation(df)
 
@@ -192,25 +234,43 @@ def test_summarize_validation_empty():
 # Telegram Integration Tests (Mocked)
 # ============================================================================
 
+
 def test_telegram_alert_not_sent_when_disabled():
     """Verify alert not sent when --alert flag not passed."""
     from ta_lab2.scripts.emas.validate_ema_rowcounts import main
 
-    with patch("ta_lab2.scripts.emas.validate_ema_rowcounts.validate_rowcounts") as mock_validate:
-        with patch("ta_lab2.scripts.emas.validate_ema_rowcounts.send_validation_alert") as mock_alert:
+    with patch(
+        "ta_lab2.scripts.emas.validate_ema_rowcounts.validate_rowcounts"
+    ) as mock_validate:
+        with patch(
+            "ta_lab2.scripts.emas.validate_ema_rowcounts.send_validation_alert"
+        ) as mock_alert:
             # Mock validation to return issues
-            mock_validate.return_value = pd.DataFrame([{
-                "id": 1,
-                "tf": "1D",
-                "period": 10,
-                "expected": 30,
-                "actual": 25,
-                "diff": -5,
-                "status": "GAP",
-            }])
+            mock_validate.return_value = pd.DataFrame(
+                [
+                    {
+                        "id": 1,
+                        "tf": "1D",
+                        "period": 10,
+                        "expected": 30,
+                        "actual": 25,
+                        "diff": -5,
+                        "status": "GAP",
+                    }
+                ]
+            )
 
             # Run without --alert flag
-            with patch("sys.argv", ["validate_ema_rowcounts.py", "--start", "2024-01-01", "--end", "2024-01-30"]):
+            with patch(
+                "sys.argv",
+                [
+                    "validate_ema_rowcounts.py",
+                    "--start",
+                    "2024-01-01",
+                    "--end",
+                    "2024-01-30",
+                ],
+            ):
                 exit_code = main()
 
             # Should return 1 (issues found)
@@ -224,22 +284,43 @@ def test_telegram_alert_sent_on_issues():
     """Verify send_validation_alert called when issues found and --alert set."""
     from ta_lab2.scripts.emas.validate_ema_rowcounts import main
 
-    with patch("ta_lab2.scripts.emas.validate_ema_rowcounts.validate_rowcounts") as mock_validate:
-        with patch("ta_lab2.scripts.emas.validate_ema_rowcounts.send_validation_alert") as mock_alert:
-            with patch("ta_lab2.scripts.emas.validate_ema_rowcounts.telegram_configured", return_value=True):
+    with patch(
+        "ta_lab2.scripts.emas.validate_ema_rowcounts.validate_rowcounts"
+    ) as mock_validate:
+        with patch(
+            "ta_lab2.scripts.emas.validate_ema_rowcounts.send_validation_alert"
+        ) as mock_alert:
+            with patch(
+                "ta_lab2.scripts.emas.validate_ema_rowcounts.telegram_configured",
+                return_value=True,
+            ):
                 # Mock validation to return issues
-                mock_validate.return_value = pd.DataFrame([{
-                    "id": 1,
-                    "tf": "1D",
-                    "period": 10,
-                    "expected": 30,
-                    "actual": 25,
-                    "diff": -5,
-                    "status": "GAP",
-                }])
+                mock_validate.return_value = pd.DataFrame(
+                    [
+                        {
+                            "id": 1,
+                            "tf": "1D",
+                            "period": 10,
+                            "expected": 30,
+                            "actual": 25,
+                            "diff": -5,
+                            "status": "GAP",
+                        }
+                    ]
+                )
 
                 # Run WITH --alert flag
-                with patch("sys.argv", ["validate_ema_rowcounts.py", "--start", "2024-01-01", "--end", "2024-01-30", "--alert"]):
+                with patch(
+                    "sys.argv",
+                    [
+                        "validate_ema_rowcounts.py",
+                        "--start",
+                        "2024-01-01",
+                        "--end",
+                        "2024-01-30",
+                        "--alert",
+                    ],
+                ):
                     exit_code = main()
 
                 # Should return 1 (issues found)
@@ -252,6 +333,7 @@ def test_telegram_alert_sent_on_issues():
 # ============================================================================
 # CLI Tests
 # ============================================================================
+
 
 def test_cli_help():
     """Test CLI --help flag."""
@@ -270,6 +352,7 @@ def test_cli_help():
 # ============================================================================
 # Integration Tests (Database Required)
 # ============================================================================
+
 
 @pytest.mark.skipif(not TARGET_DB_URL, reason="Database not configured")
 def test_validate_rowcounts_returns_dataframe():
@@ -329,13 +412,17 @@ def test_validate_rowcounts_no_crash_on_empty():
 # Success Summary
 # ============================================================================
 
+
 def test_count():
     """Meta-test: verify we have at least 13 tests as specified in plan."""
     import inspect
 
     # Get all functions in this module that start with "test_"
-    tests = [name for name, obj in inspect.getmembers(sys.modules[__name__])
-             if inspect.isfunction(obj) and name.startswith("test_") and name != "test_count"]
+    tests = [
+        name
+        for name, obj in inspect.getmembers(sys.modules[__name__])
+        if inspect.isfunction(obj) and name.startswith("test_") and name != "test_count"
+    ]
 
     # Should have at least 13 tests (plan minimum, may have more for better coverage)
     assert len(tests) >= 13, f"Expected at least 13 tests, found {len(tests)}: {tests}"

@@ -87,7 +87,9 @@ def ensure_empty_dir(out_dir: Path, *, clobber: bool) -> None:
     """Ensure output directory is empty."""
     if out_dir.exists():
         if not clobber:
-            raise SystemExit(f"ERROR: Output dir exists: {out_dir}\nUse --clobber to overwrite.")
+            raise SystemExit(
+                f"ERROR: Output dir exists: {out_dir}\nUse --clobber to overwrite."
+            )
         shutil.rmtree(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -104,7 +106,9 @@ def load_trash_list(path: Path) -> Dict:
         }
     data = json.loads(path.read_text(encoding="utf-8"))
     if data.get("version") != 1:
-        raise SystemExit(f"ERROR: Unsupported trash list version: {data.get('version')}")
+        raise SystemExit(
+            f"ERROR: Unsupported trash list version: {data.get('version')}"
+        )
     if "paths" not in data or not isinstance(data["paths"], list):
         raise SystemExit("ERROR: trash list missing 'paths' list")
     if "notes" not in data or not isinstance(data["notes"], dict):
@@ -152,7 +156,9 @@ def is_trashed(rel: str, *, trash_files: Set[str], trash_folders: List[str]) -> 
     return False
 
 
-def init_from_tree_diff(tree_diff_json: Path, trash_list_path: Path, *, append: bool) -> None:
+def init_from_tree_diff(
+    tree_diff_json: Path, trash_list_path: Path, *, append: bool
+) -> None:
     """Initialize trash list from a tree_diff.json file."""
     td = json.loads(tree_diff_json.read_text(encoding="utf-8"))
 
@@ -183,11 +189,20 @@ def init_from_tree_diff(tree_diff_json: Path, trash_list_path: Path, *, append: 
     logger.info(f"Tree diff: {tree_diff_json}")
     logger.info(f"Trash list: {trash_list_path}")
     logger.info(f"Append: {append}")
-    logger.info(f"Added from diff: folders={len(removed_folders)} files={len(removed_files)}")
+    logger.info(
+        f"Added from diff: folders={len(removed_folders)} files={len(removed_files)}"
+    )
     logger.info(f"Trash list total paths: {len(merged)}")
 
 
-def copy_dir_with_trash_list(in_dir: Path, out_dir: Path, *, trash_files: Set[str], trash_folders: List[str], dry_run: bool) -> Tuple[int, int, int]:
+def copy_dir_with_trash_list(
+    in_dir: Path,
+    out_dir: Path,
+    *,
+    trash_files: Set[str],
+    trash_folders: List[str],
+    dry_run: bool,
+) -> Tuple[int, int, int]:
     """Copy directory excluding trash files."""
     kept = 0
     removed = 0
@@ -215,7 +230,14 @@ def copy_dir_with_trash_list(in_dir: Path, out_dir: Path, *, trash_files: Set[st
     return kept, removed, removed_bytes
 
 
-def copy_zip_with_trash_list(in_zip: Path, out_dir: Path, *, trash_files: Set[str], trash_folders: List[str], dry_run: bool) -> Tuple[int, int, int]:
+def copy_zip_with_trash_list(
+    in_zip: Path,
+    out_dir: Path,
+    *,
+    trash_files: Set[str],
+    trash_folders: List[str],
+    dry_run: bool,
+) -> Tuple[int, int, int]:
     """Extract zip excluding trash files."""
     kept = 0
     removed = 0
@@ -278,12 +300,20 @@ def clean_export(
 
     if is_zip_path(input_path):
         kept, removed, removed_bytes = copy_zip_with_trash_list(
-            input_path, out_dir, trash_files=trash_files, trash_folders=trash_folders, dry_run=dry_run
+            input_path,
+            out_dir,
+            trash_files=trash_files,
+            trash_folders=trash_folders,
+            dry_run=dry_run,
         )
         kind = "zip"
     elif input_path.is_dir():
         kept, removed, removed_bytes = copy_dir_with_trash_list(
-            input_path, out_dir, trash_files=trash_files, trash_folders=trash_folders, dry_run=dry_run
+            input_path,
+            out_dir,
+            trash_files=trash_files,
+            trash_folders=trash_folders,
+            dry_run=dry_run,
         )
         kind = "dir"
     else:
@@ -301,7 +331,9 @@ def clean_export(
             "removed_files": removed,
             "removed_bytes": removed_bytes,
         }
-        (out_dir / "clean_run_manifest.json").write_text(json.dumps(run_manifest, indent=2), encoding="utf-8")
+        (out_dir / "clean_run_manifest.json").write_text(
+            json.dumps(run_manifest, indent=2), encoding="utf-8"
+        )
 
     logger.info(f"Input: {input_path} ({kind})")
     logger.info(f"Output: {out_dir}")
@@ -328,16 +360,38 @@ def main() -> int:
     ap = argparse.ArgumentParser(
         description="Clean a ChatGPT export by removing ONLY explicitly-listed trash paths (persistent list you maintain)."
     )
-    ap.add_argument("input", nargs="?", help="Export .zip or folder (omit when using --init-from-tree-diff)")
-    ap.add_argument("--out", help="Output cleaned folder (required unless using --init-from-tree-diff)")
-    ap.add_argument("--clobber", action="store_true", help="Overwrite --out if it exists")
-    ap.add_argument("--dry-run", action="store_true", help="Do not write files, just report counts")
+    ap.add_argument(
+        "input",
+        nargs="?",
+        help="Export .zip or folder (omit when using --init-from-tree-diff)",
+    )
+    ap.add_argument(
+        "--out",
+        help="Output cleaned folder (required unless using --init-from-tree-diff)",
+    )
+    ap.add_argument(
+        "--clobber", action="store_true", help="Overwrite --out if it exists"
+    )
+    ap.add_argument(
+        "--dry-run", action="store_true", help="Do not write files, just report counts"
+    )
 
-    ap.add_argument("--trash-list", default="trash_list.json", help="Path to trash list json (created if missing)")
+    ap.add_argument(
+        "--trash-list",
+        default="trash_list.json",
+        help="Path to trash list json (created if missing)",
+    )
 
     # Bootstrap trash list from a tree diff produced by chatgpt_export_diff.py
-    ap.add_argument("--init-from-tree-diff", help="Path to tree_diff.json to seed trash list from removed_* arrays")
-    ap.add_argument("--append", action="store_true", help="When initing from tree diff, append to existing list instead of replace")
+    ap.add_argument(
+        "--init-from-tree-diff",
+        help="Path to tree_diff.json to seed trash list from removed_* arrays",
+    )
+    ap.add_argument(
+        "--append",
+        action="store_true",
+        help="When initing from tree diff, append to existing list instead of replace",
+    )
 
     args = ap.parse_args()
 
@@ -353,18 +407,24 @@ def main() -> int:
 
     # Mode: clean input using existing trash list
     if not args.input or not args.out:
-        raise SystemExit("ERROR: cleaning requires INPUT and --out (or use --init-from-tree-diff)")
+        raise SystemExit(
+            "ERROR: cleaning requires INPUT and --out (or use --init-from-tree-diff)"
+        )
 
     in_path = Path(args.input).expanduser()
     out_dir = Path(args.out).expanduser()
 
-    result = clean_export(in_path, out_dir, trash_list_path, clobber=args.clobber, dry_run=args.dry_run)
+    result = clean_export(
+        in_path, out_dir, trash_list_path, clobber=args.clobber, dry_run=args.dry_run
+    )
 
     print("\n=== CLEAN (EXPLICIT LIST ONLY) ===")
     print(f"Input:      {in_path} ({result['input_kind']})")
     print(f"Output:     {out_dir}")
     print(f"Kept:       {result['kept_files']} files")
-    print(f"Removed:    {result['removed_files']} files ({human_bytes(result['removed_bytes'])})")
+    print(
+        f"Removed:    {result['removed_files']} files ({human_bytes(result['removed_bytes'])})"
+    )
     if not args.dry_run:
         print(f"Wrote:      {out_dir / 'clean_run_manifest.json'}")
 

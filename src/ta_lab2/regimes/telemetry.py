@@ -5,6 +5,7 @@ from pathlib import Path
 import csv
 from typing import Optional, Dict, Any
 
+
 @dataclass
 class RegimeSnapshot:
     ts: str
@@ -19,7 +20,10 @@ class RegimeSnapshot:
     pyramids: bool
     gross_cap: float
 
-def append_snapshot(path: Path, snap: RegimeSnapshot, extra: Optional[Dict[str, Any]] = None) -> None:
+
+def append_snapshot(
+    path: Path, snap: RegimeSnapshot, extra: Optional[Dict[str, Any]] = None
+) -> None:
     """
     Append one row (creating the file with header if new). Extras (e.g., pnl) can be included.
     """

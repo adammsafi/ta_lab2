@@ -43,7 +43,6 @@ import shutil
 import subprocess
 import sys
 import zipfile
-from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
@@ -122,15 +121,17 @@ def _extract_kept(keep_csv: Path, out_root: Path, kept_dir: Path) -> Path:
                 continue
 
             if len(row) < 2:
-                results.append({
-                    "row": str(i),
-                    "id": "",
-                    "src_path": "",
-                    "resolved_path": "",
-                    "dest_path": "",
-                    "status": "BAD_ROW",
-                    "error": "Row has fewer than 2 columns (expected: id, path)",
-                })
+                results.append(
+                    {
+                        "row": str(i),
+                        "id": "",
+                        "src_path": "",
+                        "resolved_path": "",
+                        "dest_path": "",
+                        "status": "BAD_ROW",
+                        "error": "Row has fewer than 2 columns (expected: id, path)",
+                    }
+                )
                 continue
 
             cid = (row[0] or "").strip().strip("'\"")
@@ -142,15 +143,17 @@ def _extract_kept(keep_csv: Path, out_root: Path, kept_dir: Path) -> Path:
                 continue
 
             if not cid:
-                results.append({
-                    "row": str(i),
-                    "id": "",
-                    "src_path": src_path_str,
-                    "resolved_path": "",
-                    "dest_path": "",
-                    "status": "BAD_ROW",
-                    "error": "Missing id in column A",
-                })
+                results.append(
+                    {
+                        "row": str(i),
+                        "id": "",
+                        "src_path": src_path_str,
+                        "resolved_path": "",
+                        "dest_path": "",
+                        "status": "BAD_ROW",
+                        "error": "Missing id in column A",
+                    }
+                )
                 continue
 
             src = Path(src_path_str)
@@ -177,32 +180,44 @@ def _extract_kept(keep_csv: Path, out_root: Path, kept_dir: Path) -> Path:
                     status = "FOUND_BY_ID_SEARCH"
 
             if resolved is None:
-                results.append({
-                    "row": str(i),
-                    "id": cid,
-                    "src_path": src_path_str,
-                    "resolved_path": "",
-                    "dest_path": str(dest),
-                    "status": "MISSING",
-                    "error": "File not found via path, basename, or id search",
-                })
+                results.append(
+                    {
+                        "row": str(i),
+                        "id": cid,
+                        "src_path": src_path_str,
+                        "resolved_path": "",
+                        "dest_path": str(dest),
+                        "status": "MISSING",
+                        "error": "File not found via path, basename, or id search",
+                    }
+                )
                 continue
 
             shutil.copy2(resolved, dest)
-            results.append({
-                "row": str(i),
-                "id": cid,
-                "src_path": src_path_str,
-                "resolved_path": str(resolved),
-                "dest_path": str(dest),
-                "status": status,
-                "error": err,
-            })
+            results.append(
+                {
+                    "row": str(i),
+                    "id": cid,
+                    "src_path": src_path_str,
+                    "resolved_path": str(resolved),
+                    "dest_path": str(dest),
+                    "status": status,
+                    "error": err,
+                }
+            )
 
     with manifest_path.open("w", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(
             f,
-            fieldnames=["row", "id", "src_path", "resolved_path", "dest_path", "status", "error"],
+            fieldnames=[
+                "row",
+                "id",
+                "src_path",
+                "resolved_path",
+                "dest_path",
+                "status",
+                "error",
+            ],
         )
         writer.writeheader()
         writer.writerows(results)
@@ -220,14 +235,24 @@ def main() -> int:
     ap = argparse.ArgumentParser(
         description="Orchestrate ChatGPT export cleaning and transcript extraction."
     )
-    ap.add_argument("--export", required=True, help="Path to export zip, folder, or conversations.json")
+    ap.add_argument(
+        "--export",
+        required=True,
+        help="Path to export zip, folder, or conversations.json",
+    )
     ap.add_argument("--out", required=True, help="Output folder for chats/index")
-    ap.add_argument("--min-msgs", type=int, default=4, help="Minimum user/assistant messages")
+    ap.add_argument(
+        "--min-msgs", type=int, default=4, help="Minimum user/assistant messages"
+    )
     ap.add_argument("--trash-list", help="Persistent trash_list.json for cleaning")
     ap.add_argument("--clean-out", help="Output folder for cleaned export")
-    ap.add_argument("--clobber", action="store_true", help="Allow overwrite when cleaning")
+    ap.add_argument(
+        "--clobber", action="store_true", help="Allow overwrite when cleaning"
+    )
     ap.add_argument("--keep-csv", help="CSV with keep rows (id, path)")
-    ap.add_argument("--zip-kept", action="store_true", help="Zip kept folder after extract")
+    ap.add_argument(
+        "--zip-kept", action="store_true", help="Zip kept folder after extract"
+    )
 
     args = ap.parse_args()
 
@@ -243,9 +268,13 @@ def main() -> int:
 
     if args.trash_list:
         if export_path.is_file() and export_path.suffix.lower() == ".json":
-            raise SystemExit("--trash-list requires a zip or folder export, not a .json")
+            raise SystemExit(
+                "--trash-list requires a zip or folder export, not a .json"
+            )
 
-        clean_out = Path(args.clean_out) if args.clean_out else (out_dir / "_clean_export")
+        clean_out = (
+            Path(args.clean_out) if args.clean_out else (out_dir / "_clean_export")
+        )
 
         # Call chatgpt_export_clean.py via Python module
         cmd = [
@@ -278,17 +307,19 @@ def main() -> int:
         raise SystemExit(f"Unsupported export path: {working_root}")
 
     # Call export_chatgpt_conversations.py via Python module
-    _run([
-        sys.executable,
-        "-m",
-        "ta_lab2.tools.data_tools.export.export_chatgpt_conversations",
-        "--in",
-        str(conversations_json),
-        "--out",
-        str(out_dir),
-        "--min-msgs",
-        str(args.min_msgs),
-    ])
+    _run(
+        [
+            sys.executable,
+            "-m",
+            "ta_lab2.tools.data_tools.export.export_chatgpt_conversations",
+            "--in",
+            str(conversations_json),
+            "--out",
+            str(out_dir),
+            "--min-msgs",
+            str(args.min_msgs),
+        ]
+    )
 
     if args.keep_csv:
         keep_csv = Path(args.keep_csv)

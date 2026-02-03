@@ -1,14 +1,19 @@
 from __future__ import annotations
-from typing import Iterable, Dict, Any
+from typing import Iterable
 import numpy as np
 import pandas as pd
 
+
 def _annualization(freq: str) -> float:
     # crude but effective; adjust if you prefer business-day logic
-    if freq.endswith("B"): return np.sqrt(252)
-    if freq.endswith("W"): return np.sqrt(52)
-    if freq.endswith("M"): return np.sqrt(12)
-    if freq in ("A","Y"):  return 1.0
+    if freq.endswith("B"):
+        return np.sqrt(252)
+    if freq.endswith("W"):
+        return np.sqrt(52)
+    if freq.endswith("M"):
+        return np.sqrt(12)
+    if freq in ("A", "Y"):
+        return 1.0
     if freq.endswith("D"):
         try:
             k = float(freq[:-1])  # e.g. "10D" -> 10
@@ -16,6 +21,7 @@ def _annualization(freq: str) -> float:
         except Exception:
             return np.sqrt(365.0)
     return np.sqrt(365.0)
+
 
 def attach_core_features(
     df: pd.DataFrame,
@@ -30,9 +36,9 @@ def attach_core_features(
     """
     d = df.copy()
     d["close"] = pd.to_numeric(d["close"], errors="coerce")
-    d["open"]  = pd.to_numeric(d["open"],  errors="coerce")
-    d["high"]  = pd.to_numeric(d["high"],  errors="coerce")
-    d["low"]   = pd.to_numeric(d["low"],   errors="coerce")
+    d["open"] = pd.to_numeric(d["open"], errors="coerce")
+    d["high"] = pd.to_numeric(d["high"], errors="coerce")
+    d["low"] = pd.to_numeric(d["low"], errors="coerce")
 
     # returns
     d["close_pct_delta"] = d["close"].pct_change()
@@ -42,8 +48,8 @@ def attach_core_features(
     # ATR (14 bars of this timeframe)
     tr = (d["high"] - d["low"]).abs()
     tr = np.maximum(tr, (d["high"] - d["close"].shift()).abs())
-    tr = np.maximum(tr, (d["low"]  - d["close"].shift()).abs())
-    d["atr_14"] = tr.ewm(alpha=1/14, adjust=False).mean()
+    tr = np.maximum(tr, (d["low"] - d["close"].shift()).abs())
+    d["atr_14"] = tr.ewm(alpha=1 / 14, adjust=False).mean()
 
     # EMAs on close
     for p in ema_periods:

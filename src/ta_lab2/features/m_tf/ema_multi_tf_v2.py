@@ -22,7 +22,7 @@ REFACTORED CHANGES:
 from __future__ import annotations
 
 import logging
-from typing import Dict, List, Optional, Sequence
+from typing import List, Optional, Sequence
 
 import numpy as np
 import pandas as pd
@@ -34,8 +34,6 @@ from ta_lab2.features.m_tf.base_ema_feature import (
     TFSpec,
 )
 from ta_lab2.features.m_tf.ema_operations import (
-    calculate_alpha_from_horizon,
-    compute_ema_from_horizon,
     filter_ema_periods_by_obs_count,
 )
 from ta_lab2.features.ema import compute_ema
@@ -47,6 +45,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 # V2 EMA Feature Implementation
 # =============================================================================
+
 
 class MultiTFV2EMAFeature(BaseEMAFeature):
     """
@@ -134,7 +133,9 @@ class MultiTFV2EMAFeature(BaseEMAFeature):
         if not df.empty:
             df["ts"] = pd.to_datetime(df["ts"], utc=True)
 
-        logger.info(f"Loaded {len(df)} daily bars for {len(ids)} IDs from {self.price_schema}.{self.price_table}")
+        logger.info(
+            f"Loaded {len(df)} daily bars for {len(ids)} IDs from {self.price_schema}.{self.price_table}"
+        )
         return df
 
     def get_tf_specs(self) -> list[TFSpec]:
@@ -193,12 +194,18 @@ class MultiTFV2EMAFeature(BaseEMAFeature):
                 missing_days.append(tf)
 
         if missing_days:
-            logger.warning(f"Skipping {len(missing_days)} TFs with missing tf_days: {missing_days[:10]}")
+            logger.warning(
+                f"Skipping {len(missing_days)} TFs with missing tf_days: {missing_days[:10]}"
+            )
 
         if not tf_specs:
-            raise RuntimeError(f"No TFs with valid tf_days found for alignment_type='{self.alignment_type}'")
+            raise RuntimeError(
+                f"No TFs with valid tf_days found for alignment_type='{self.alignment_type}'"
+            )
 
-        logger.info(f"Resolved {len(tf_specs)} TF specs for alignment_type='{self.alignment_type}'")
+        logger.info(
+            f"Resolved {len(tf_specs)} TF specs for alignment_type='{self.alignment_type}'"
+        )
 
         # Cache result
         self._tf_specs_cache = tf_specs
@@ -216,7 +223,19 @@ class MultiTFV2EMAFeature(BaseEMAFeature):
         Returns DataFrame with columns:
         id, ts, tf, period, ema, tf_days, roll, d1_roll, d2_roll, d1, d2
         """
-        out_cols = ["id", "ts", "tf", "period", "ema", "tf_days", "roll", "d1_roll", "d2_roll", "d1", "d2"]
+        out_cols = [
+            "id",
+            "ts",
+            "tf",
+            "period",
+            "ema",
+            "tf_days",
+            "roll",
+            "d1_roll",
+            "d2_roll",
+            "d1",
+            "d2",
+        ]
 
         if df_source.empty:
             return pd.DataFrame(columns=out_cols)
@@ -255,14 +274,16 @@ class MultiTFV2EMAFeature(BaseEMAFeature):
                     min_periods=horizon_days,
                 )
 
-                df_tf = pd.DataFrame({
-                    "id": df_id["id"].values,
-                    "ts": df_id["ts"].values,
-                    "tf": tf_spec.tf,
-                    "period": period_int,
-                    "tf_days": tf_spec.tf_days,
-                    "ema": ema.values,
-                })
+                df_tf = pd.DataFrame(
+                    {
+                        "id": df_id["id"].values,
+                        "ts": df_id["ts"].values,
+                        "tf": tf_spec.tf,
+                        "period": period_int,
+                        "tf_days": tf_spec.tf_days,
+                        "ema": ema.values,
+                    }
+                )
 
                 # Roll flag: FALSE every tf_days-th day
                 df_tf["roll"] = ~roll_false_mask
@@ -286,7 +307,7 @@ class MultiTFV2EMAFeature(BaseEMAFeature):
 
                 # Seeding rule: Skip rows until horizon_days elapsed
                 if horizon_days > 1 and len(df_tf) >= horizon_days:
-                    df_tf = df_tf.iloc[horizon_days - 1:].reset_index(drop=True)
+                    df_tf = df_tf.iloc[horizon_days - 1 :].reset_index(drop=True)
                 else:
                     # Not enough history
                     continue
@@ -320,6 +341,7 @@ class MultiTFV2EMAFeature(BaseEMAFeature):
 # =============================================================================
 # Public API (Backward Compatibility)
 # =============================================================================
+
 
 def refresh_cmc_ema_multi_tf_v2_incremental(
     engine: Engine,

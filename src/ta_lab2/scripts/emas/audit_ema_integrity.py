@@ -47,14 +47,23 @@ Notes:
 """
 
 import argparse
-import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import pandas as pd
-from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
+
+from ta_lab2.scripts.bars.common_snapshot_contract import (
+    get_engine,
+    resolve_db_url,
+    parse_ids,
+    load_all_ids,
+    load_periods,
+    table_exists,
+    get_columns,
+)
+from ta_lab2.features.m_tf.polars_helpers import read_sql_polars
 
 
 # ----------------------------
@@ -84,52 +93,6 @@ def _log(msg: str) -> None:
     print(f"[ema_integrity] {msg}")
 
 
-def get_engine() -> Engine:
-    db_url = os.environ.get("TARGET_DB_URL")
-    if not db_url:
-        raise RuntimeError("TARGET_DB_URL env var is required.")
-    _log("Using DB URL from TARGET_DB_URL env.")
-    return create_engine(db_url, future=True)
-
-
-def parse_ids(engine: Engine, ids_arg: str, daily_table: str) -> List[int]:
-    if ids_arg.strip().lower() == "all":
-        df = pd.read_sql(text(f"SELECT DISTINCT id FROM {daily_table} ORDER BY id"), engine)
-        ids = [int(x) for x in df["id"].tolist()]
-        _log(f"Loaded ALL ids from {daily_table}: {len(ids)}")
-        return ids
-
-    ids: List[int] = []
-    for p in ids_arg.split(","):
-        p = p.strip()
-        if p:
-            ids.append(int(p))
-    if not ids:
-        raise ValueError("No ids parsed.")
-    return ids
-
-
-def load_periods(engine: Engine, periods_arg: str, lut_table: str) -> List[int]:
-    s = (periods_arg or "").strip().lower()
-    if s == "lut":
-        df = pd.read_sql(
-            text(f"SELECT DISTINCT period::int AS period FROM {lut_table} ORDER BY period"),
-            engine,
-        )
-        periods = [int(x) for x in df["period"].tolist()]
-        _log(f"Loaded periods from {lut_table}: {len(periods)}")
-        return periods
-
-    periods: List[int] = []
-    for p in s.split(","):
-        p = p.strip()
-        if p:
-            periods.append(int(p))
-    if not periods:
-        raise ValueError("No periods parsed.")
-    return periods
-
-
 def load_tfs(engine: Engine, family: str, dim_tf_table: str) -> List[str]:
     """
     Return TF list per family using current dim_timeframe semantics:
@@ -142,22 +105,19 @@ def load_tfs(engine: Engine, family: str, dim_tf_table: str) -> List[str]:
       - Months/Years are scheme-agnostic: *_CAL and *_CAL_ANCHOR
     """
     if family == "TF_DAY":
-        q = text(
-            f"""
+        q = f"""
             SELECT tf
             FROM {dim_tf_table}
             WHERE alignment_type = 'tf_day'
               AND is_canonical = TRUE
             ORDER BY display_order, sort_order, tf
             """
-        )
-        df = pd.read_sql(q, engine)
+        df = read_sql_polars(q, engine)
         return [str(x) for x in df["tf"].tolist()]
 
     if family in {"CAL_US", "CAL_ISO"}:
         scheme = "US" if family == "CAL_US" else "ISO"
-        q = text(
-            f"""
+        q = f"""
             SELECT tf
             FROM {dim_tf_table}
             WHERE alignment_type = 'calendar'
@@ -174,14 +134,12 @@ def load_tfs(engine: Engine, family: str, dim_tf_table: str) -> List[str]:
                   )
             ORDER BY display_order, sort_order, tf
             """
-        )
-        df = pd.read_sql(q, engine, params={"scheme": scheme})
+        df = read_sql_polars(q, engine, params={"scheme": scheme})
         return [str(x) for x in df["tf"].tolist()]
 
     if family in {"ANCHOR_US", "ANCHOR_ISO"}:
         scheme = "US" if family == "ANCHOR_US" else "ISO"
-        q = text(
-            f"""
+        q = f"""
             SELECT tf
             FROM {dim_tf_table}
             WHERE alignment_type = 'calendar'
@@ -196,64 +154,30 @@ def load_tfs(engine: Engine, family: str, dim_tf_table: str) -> List[str]:
                   )
             ORDER BY display_order, sort_order, tf
             """
-        )
-        df = pd.read_sql(q, engine, params={"scheme": scheme})
+        df = read_sql_polars(q, engine, params={"scheme": scheme})
         return [str(x) for x in df["tf"].tolist()]
 
     raise ValueError(f"Unknown family: {family}")
-
-
-def table_exists(engine: Engine, full_name: str) -> bool:
-    if "." in full_name:
-        schema, table = full_name.split(".", 1)
-    else:
-        schema, table = "public", full_name
-    q = text(
-        """
-        SELECT 1
-        FROM information_schema.tables
-        WHERE table_schema = :schema AND table_name = :table
-        LIMIT 1
-        """
-    )
-    df = pd.read_sql(q, engine, params={"schema": schema, "table": table})
-    return not df.empty
-
-
-def get_columns(engine: Engine, full_name: str) -> List[str]:
-    if "." in full_name:
-        schema, table = full_name.split(".", 1)
-    else:
-        schema, table = "public", full_name
-    q = text(
-        """
-        SELECT column_name
-        FROM information_schema.columns
-        WHERE table_schema = :schema AND table_name = :table
-        ORDER BY ordinal_position
-        """
-    )
-    df = pd.read_sql(q, engine, params={"schema": schema, "table": table})
-    return df["column_name"].tolist()
 
 
 # ----------------------------
 # Coverage audit
 # ----------------------------
 
+
 def actual_combos(engine: Engine, ema_table: str, ids: List[int]) -> pd.DataFrame:
     in_clause = ",".join(str(int(i)) for i in ids)
-    q = text(
-        f"""
+    q = f"""
         SELECT DISTINCT id::int AS id, tf::text AS tf, period::int AS period
         FROM {ema_table}
         WHERE id IN ({in_clause})
         """
-    )
-    return pd.read_sql(q, engine)
+    return read_sql_polars(q, engine)
 
 
-def run_coverage(engine: Engine, ids: List[int], periods: List[int], dim_tf: str, out_csv: str) -> pd.DataFrame:
+def run_coverage(
+    engine: Engine, ids: List[int], periods: List[int], dim_tf: str, out_csv: str
+) -> pd.DataFrame:
     rows = []
     for ema_table, family in EMA_TABLES.items():
         tfs = load_tfs(engine, family, dim_tf)
@@ -285,6 +209,7 @@ def run_coverage(engine: Engine, ids: List[int], periods: List[int], dim_tf: str
 # ----------------------------
 # Table audit (duplicates, roll shares, null shares)
 # ----------------------------
+
 
 def audit_table(engine: Engine, table: str, ids: Sequence[int]) -> pd.DataFrame:
     if not table_exists(engine, table):
@@ -347,10 +272,11 @@ def audit_table(engine: Engine, table: str, ids: Sequence[int]) -> pd.DataFrame:
         ]
 
     for c in present_cols:
-        select_parts.append(f"SUM(CASE WHEN {c} IS NULL THEN 1 ELSE 0 END)::bigint AS n_{c}_null")
+        select_parts.append(
+            f"SUM(CASE WHEN {c} IS NULL THEN 1 ELSE 0 END)::bigint AS n_{c}_null"
+        )
 
-    q = text(
-        f"""
+    q = f"""
         SELECT
           {", ".join(select_parts)}
         FROM {table}
@@ -358,8 +284,7 @@ def audit_table(engine: Engine, table: str, ids: Sequence[int]) -> pd.DataFrame:
         GROUP BY id, tf, period
         ORDER BY id, tf, period
         """
-    )
-    df = pd.read_sql(q, engine)
+    df = read_sql_polars(q, engine)
     if df.empty:
         return df
 
@@ -369,7 +294,9 @@ def audit_table(engine: Engine, table: str, ids: Sequence[int]) -> pd.DataFrame:
     if has_roll:
         df["roll_share"] = (df["n_roll_true"] / df["n_rows"]).round(8)
         df["canonical_share"] = (df["n_roll_false"] / df["n_rows"]).round(8)
-        df["dup_key_canonical_share"] = (df["n_dup_keys_canonical"] / df["n_rows"]).round(8)
+        df["dup_key_canonical_share"] = (
+            df["n_dup_keys_canonical"] / df["n_rows"]
+        ).round(8)
 
     if has_roll_bar:
         df["roll_bar_share"] = (df["n_roll_bar_true"] / df["n_rows"]).round(8)
@@ -388,9 +315,13 @@ def run_audit(engine: Engine, ids: List[int], out_csv: str) -> pd.DataFrame:
         if not df_t.empty:
             frames.append(df_t)
     if not frames:
-        raise RuntimeError("No audit results. Check table names/schema and permissions.")
+        raise RuntimeError(
+            "No audit results. Check table names/schema and permissions."
+        )
     out_df = pd.concat(frames, ignore_index=True)
-    out_df = out_df.sort_values(["table_name", "id", "tf", "period"]).reset_index(drop=True)
+    out_df = out_df.sort_values(["table_name", "id", "tf", "period"]).reset_index(
+        drop=True
+    )
     out_df.to_csv(out_csv, index=False)
     _log(f"[audit] Wrote {len(out_df)} rows -> {out_csv}")
     return out_df
@@ -399,6 +330,7 @@ def run_audit(engine: Engine, ids: List[int], out_csv: str) -> pd.DataFrame:
 # ----------------------------
 # Spacing audit (missing piece)
 # ----------------------------
+
 
 @dataclass(frozen=True)
 class TfSpec:
@@ -411,24 +343,28 @@ class TfSpec:
 
 def load_dim_timeframe_specs(engine: Engine, dim_tf: str) -> Dict[str, TfSpec]:
     # Try to load required columns; if missing, raise with a useful message.
-    q = text(
-        f"""
+    q = f"""
         SELECT {", ".join(DIM_TF_COLS)}
         FROM {dim_tf}
         """
-    )
-    df = pd.read_sql(q, engine)
+    df = read_sql_polars(q, engine)
     missing_cols = [c for c in DIM_TF_COLS if c not in df.columns]
     if missing_cols:
-        raise RuntimeError(f"dim_timeframe missing columns needed for spacing audit: {missing_cols}")
+        raise RuntimeError(
+            f"dim_timeframe missing columns needed for spacing audit: {missing_cols}"
+        )
 
     out: Dict[str, TfSpec] = {}
     for _, r in df.iterrows():
         tf = str(r["tf"])
         out[tf] = TfSpec(
             tf=tf,
-            alignment_type=str(r["alignment_type"]) if pd.notna(r["alignment_type"]) else "",
-            tf_days_nominal=float(r["tf_days_nominal"]) if pd.notna(r["tf_days_nominal"]) else None,
+            alignment_type=str(r["alignment_type"])
+            if pd.notna(r["alignment_type"])
+            else "",
+            tf_days_nominal=float(r["tf_days_nominal"])
+            if pd.notna(r["tf_days_nominal"])
+            else None,
             tf_days_min=float(r["tf_days_min"]) if pd.notna(r["tf_days_min"]) else None,
             tf_days_max=float(r["tf_days_max"]) if pd.notna(r["tf_days_max"]) else None,
         )
@@ -451,18 +387,18 @@ def fetch_canonical_ts(engine: Engine, table: str, ids: Sequence[int]) -> pd.Dat
         # No roll flag means table might already be canonical-only; keep all rows.
         where = "WHERE id IN ({})".format(in_clause)
 
-    q = text(
-        f"""
+    q = f"""
         SELECT id::int AS id, tf::text AS tf, period::int AS period, ts
         FROM {table}
         {where}
         ORDER BY id, tf, period, ts
         """
-    )
-    return pd.read_sql(q, engine)
+    return read_sql_polars(q, engine)
 
 
-def spacing_eval_for_group(ts_series: pd.Series, spec: Optional[TfSpec]) -> Tuple[int, int, float, float, float]:
+def spacing_eval_for_group(
+    ts_series: pd.Series, spec: Optional[TfSpec]
+) -> Tuple[int, int, float, float, float]:
     """
     Returns:
       n_gaps, n_total_deltas, min_delta_days, max_delta_days, bad_share
@@ -486,7 +422,9 @@ def spacing_eval_for_group(ts_series: pd.Series, spec: Optional[TfSpec]) -> Tupl
     elif spec.tf_days_nominal is not None:
         # If only nominal exists, allow tiny tolerance for tz/rounding.
         tol = 0.5
-        bad = (deltas < (spec.tf_days_nominal - tol)) | (deltas > (spec.tf_days_nominal + tol))
+        bad = (deltas < (spec.tf_days_nominal - tol)) | (
+            deltas > (spec.tf_days_nominal + tol)
+        )
     else:
         return (0, n, mn, mx, 0.0)
 
@@ -495,7 +433,9 @@ def spacing_eval_for_group(ts_series: pd.Series, spec: Optional[TfSpec]) -> Tupl
     return (n_bad, n, mn, mx, bad_share)
 
 
-def run_spacing(engine: Engine, ids: List[int], dim_tf: str, out_csv: str) -> pd.DataFrame:
+def run_spacing(
+    engine: Engine, ids: List[int], dim_tf: str, out_csv: str
+) -> pd.DataFrame:
     specs = load_dim_timeframe_specs(engine, dim_tf)
 
     rows = []
@@ -531,8 +471,13 @@ def run_spacing(engine: Engine, ids: List[int], dim_tf: str, out_csv: str) -> pd
 
     out_df = pd.DataFrame(rows)
     if out_df.empty:
-        raise RuntimeError("No spacing results produced. Check that tables exist and have data.")
-    out_df = out_df.sort_values(["bad_delta_share", "table_name", "id", "tf", "period"], ascending=[False, True, True, True, True]).reset_index(drop=True)
+        raise RuntimeError(
+            "No spacing results produced. Check that tables exist and have data."
+        )
+    out_df = out_df.sort_values(
+        ["bad_delta_share", "table_name", "id", "tf", "period"],
+        ascending=[False, True, True, True, True],
+    ).reset_index(drop=True)
     out_df.to_csv(out_csv, index=False)
     _log(f"[spacing] Wrote {len(out_df)} rows -> {out_csv}")
     return out_df
@@ -542,20 +487,36 @@ def run_spacing(engine: Engine, ids: List[int], dim_tf: str, out_csv: str) -> pd
 # Samples (human eyeball)
 # ----------------------------
 
+
 def pick_sample_cols(colset: set[str]) -> List[str]:
     preferred = [
-        "id", "tf", "period", "ts", "tf_days",
-        "roll", "ema", "d1", "d2", "d1_roll", "d2_roll",
-        "roll_bar", "ema_bar", "d1_bar", "d2_bar", "d1_roll_bar", "d2_roll_bar",
+        "id",
+        "tf",
+        "period",
+        "ts",
+        "tf_days",
+        "roll",
+        "ema",
+        "d1",
+        "d2",
+        "d1_roll",
+        "d2_roll",
+        "roll_bar",
+        "ema_bar",
+        "d1_bar",
+        "d2_bar",
+        "d1_roll_bar",
+        "d2_roll_bar",
         "ingested_at",
     ]
     return [c for c in preferred if c in colset]
 
 
-def get_group_keys(engine: Engine, table: str, ids: Sequence[int], max_groups_per_id: Optional[int]) -> pd.DataFrame:
+def get_group_keys(
+    engine: Engine, table: str, ids: Sequence[int], max_groups_per_id: Optional[int]
+) -> pd.DataFrame:
     in_clause = ",".join(str(int(i)) for i in ids)
-    q = text(
-        f"""
+    q = f"""
         SELECT id, tf, period
         FROM (
           SELECT DISTINCT id, tf, period
@@ -564,8 +525,7 @@ def get_group_keys(engine: Engine, table: str, ids: Sequence[int], max_groups_pe
         ) x
         ORDER BY id, tf, period
         """
-    )
-    df = pd.read_sql(q, engine)
+    df = read_sql_polars(q, engine)
     if df.empty or not max_groups_per_id or max_groups_per_id <= 0:
         return df
 
@@ -575,24 +535,45 @@ def get_group_keys(engine: Engine, table: str, ids: Sequence[int], max_groups_pe
     return pd.concat(out, ignore_index=True)
 
 
-def sample_group(engine: Engine, table: str, cols: List[str], id_: int, tf: str, period: int, per_group: int) -> pd.DataFrame:
-    q = text(
-        f"""
+def sample_group(
+    engine: Engine,
+    table: str,
+    cols: List[str],
+    id_: int,
+    tf: str,
+    period: int,
+    per_group: int,
+) -> pd.DataFrame:
+    q = f"""
         SELECT {", ".join(cols)}
         FROM {table}
         WHERE id = :id AND tf = :tf AND period = :period
         ORDER BY ts DESC
         LIMIT :lim
         """
+    df = read_sql_polars(
+        q,
+        engine,
+        params={
+            "id": int(id_),
+            "tf": str(tf),
+            "period": int(period),
+            "lim": int(per_group),
+        },
     )
-    df = pd.read_sql(q, engine, params={"id": int(id_), "tf": str(tf), "period": int(period), "lim": int(per_group)})
     if df.empty:
         return df
     df.insert(0, "table_name", table)
     return df
 
 
-def run_samples(engine: Engine, ids: List[int], per_group: int, max_groups_per_id: Optional[int], out_csv: str) -> pd.DataFrame:
+def run_samples(
+    engine: Engine,
+    ids: List[int],
+    per_group: int,
+    max_groups_per_id: Optional[int],
+    out_csv: str,
+) -> pd.DataFrame:
     frames: List[pd.DataFrame] = []
     for table in TABLES_FOR_SAMPLES:
         if not table_exists(engine, table):
@@ -612,18 +593,33 @@ def run_samples(engine: Engine, ids: List[int], per_group: int, max_groups_per_i
             _log(f"[samples] No groups found for {table} with requested ids.")
             continue
 
-        _log(f"[samples] Sampling {table}: {len(keys)} groups * {per_group} rows each (max).")
+        _log(
+            f"[samples] Sampling {table}: {len(keys)} groups * {per_group} rows each (max)."
+        )
         for _, r in keys.iterrows():
-            df_g = sample_group(engine, table, cols, int(r["id"]), str(r["tf"]), int(r["period"]), per_group)
+            df_g = sample_group(
+                engine,
+                table,
+                cols,
+                int(r["id"]),
+                str(r["tf"]),
+                int(r["period"]),
+                per_group,
+            )
             if not df_g.empty:
                 frames.append(df_g)
 
     if not frames:
-        raise RuntimeError("No samples produced. Check ids/table names and permissions.")
+        raise RuntimeError(
+            "No samples produced. Check ids/table names and permissions."
+        )
 
     out_df = pd.concat(frames, ignore_index=True)
     out_df["sample_generated_at"] = datetime.now(UTC).isoformat()
-    out_df = out_df.sort_values(["table_name", "id", "tf", "period", "ts"], ascending=[True, True, True, True, False]).reset_index(drop=True)
+    out_df = out_df.sort_values(
+        ["table_name", "id", "tf", "period", "ts"],
+        ascending=[True, True, True, True, False],
+    ).reset_index(drop=True)
     out_df.to_csv(out_csv, index=False)
     _log(f"[samples] Wrote {len(out_df)} rows -> {out_csv}")
     return out_df
@@ -633,13 +629,24 @@ def run_samples(engine: Engine, ids: List[int], per_group: int, max_groups_per_i
 # CLI
 # ----------------------------
 
+
 def main() -> None:
-    ap = argparse.ArgumentParser(description="EMA integrity audit (coverage + duplicates/nulls + spacing + samples).")
-    ap.add_argument("--ids", required=True, help="all OR comma-separated list like 1,52")
-    ap.add_argument("--daily-table", default=DEFAULT_DAILY_TABLE, help="Used only to resolve --ids all")
+    ap = argparse.ArgumentParser(
+        description="EMA integrity audit (coverage + duplicates/nulls + spacing + samples)."
+    )
+    ap.add_argument(
+        "--ids", required=True, help="all OR comma-separated list like 1,52"
+    )
+    ap.add_argument(
+        "--daily-table",
+        default=DEFAULT_DAILY_TABLE,
+        help="Used only to resolve --ids all",
+    )
     ap.add_argument("--dim-tf", default=DEFAULT_DIM_TF)
     ap.add_argument("--lut", default=DEFAULT_LUT)
-    ap.add_argument("--periods", default="lut", help="lut or comma list (used by coverage)")
+    ap.add_argument(
+        "--periods", default="lut", help="lut or comma list (used by coverage)"
+    )
     ap.add_argument(
         "--run",
         default="all",
@@ -651,23 +658,45 @@ def main() -> None:
     ap.add_argument("--out-spacing", default="ema_spacing.csv")
     ap.add_argument("--out-samples", default="ema_samples.csv")
 
-    ap.add_argument("--per-group", type=int, default=50, help="Samples: rows per (table,id,tf,period) group")
-    ap.add_argument("--max-groups-per-id", type=int, default=0, help="Samples: cap groups per id (0 = no cap)")
+    ap.add_argument(
+        "--per-group",
+        type=int,
+        default=50,
+        help="Samples: rows per (table,id,tf,period) group",
+    )
+    ap.add_argument(
+        "--max-groups-per-id",
+        type=int,
+        default=0,
+        help="Samples: cap groups per id (0 = no cap)",
+    )
 
     args = ap.parse_args()
 
-    engine = get_engine()
-    ids = parse_ids(engine, args.ids, args.daily_table)
+    db_url = resolve_db_url(None)
+    engine = get_engine(db_url)
 
-    run_set = {s.strip().lower() for s in (args.run.split(",") if args.run else []) if s.strip()}
+    ids_result = parse_ids(args.ids)
+    if ids_result == "all":
+        ids = load_all_ids(db_url, args.daily_table)
+    else:
+        ids = ids_result
+
+    run_set = {
+        s.strip().lower()
+        for s in (args.run.split(",") if args.run else [])
+        if s.strip()
+    }
     if "all" in run_set or not run_set:
         run_set = {"coverage", "audit", "spacing", "samples"}
 
     results: Dict[str, pd.DataFrame] = {}
 
     if "coverage" in run_set:
-        periods = load_periods(engine, args.periods, args.lut)
-        results["coverage"] = run_coverage(engine, ids, periods, args.dim_tf, args.out_coverage)
+        periods = load_periods(engine, args.periods, lut_table=args.lut)
+        results["coverage"] = run_coverage(
+            engine, ids, periods, args.dim_tf, args.out_coverage
+        )
 
     if "audit" in run_set:
         results["audit"] = run_audit(engine, ids, args.out_audit)
@@ -676,8 +705,14 @@ def main() -> None:
         results["spacing"] = run_spacing(engine, ids, args.dim_tf, args.out_spacing)
 
     if "samples" in run_set:
-        max_groups = args.max_groups_per_id if args.max_groups_per_id and args.max_groups_per_id > 0 else None
-        results["samples"] = run_samples(engine, ids, args.per_group, max_groups, args.out_samples)
+        max_groups = (
+            args.max_groups_per_id
+            if args.max_groups_per_id and args.max_groups_per_id > 0
+            else None
+        )
+        results["samples"] = run_samples(
+            engine, ids, args.per_group, max_groups, args.out_samples
+        )
 
     _log(f"Done. Ran: {sorted(results.keys())}")
 

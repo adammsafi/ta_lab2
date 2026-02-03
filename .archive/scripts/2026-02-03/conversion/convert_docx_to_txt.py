@@ -1,6 +1,6 @@
 """Convert .docx files to .txt files without modifying originals."""
-import os
 from pathlib import Path
+
 
 def convert_docx_to_txt(docx_path, txt_path):
     """Convert a single .docx file to .txt."""
@@ -9,6 +9,7 @@ def convert_docx_to_txt(docx_path, txt_path):
     except ImportError:
         print("python-docx not installed. Installing...")
         import subprocess
+
         subprocess.check_call(["pip", "install", "python-docx"])
         from docx import Document
 
@@ -26,10 +27,11 @@ def convert_docx_to_txt(docx_path, txt_path):
                 full_text.append(cell.text)
 
     # Write to txt file
-    with open(txt_path, 'w', encoding='utf-8') as f:
-        f.write('\n'.join(full_text))
+    with open(txt_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(full_text))
 
     return len(full_text)
+
 
 def main():
     source_dir = Path(r"C:\Users\asafi\Documents\ProjectTT\Plans&Status")
@@ -40,7 +42,7 @@ def main():
     print(f"Found {len(docx_files)} .docx files to convert")
 
     for docx_file in docx_files:
-        txt_file = docx_file.with_suffix('.txt')
+        txt_file = docx_file.with_suffix(".txt")
         print(f"Converting: {docx_file.name} -> {txt_file.name}")
 
         try:
@@ -50,6 +52,7 @@ def main():
             print(f"  ERROR: {e}")
 
     print("\nConversion complete!")
+
 
 if __name__ == "__main__":
     main()

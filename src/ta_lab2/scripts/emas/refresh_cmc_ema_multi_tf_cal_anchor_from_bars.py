@@ -22,7 +22,9 @@ from typing import Optional
 from sqlalchemy import create_engine
 from sqlalchemy.pool import NullPool
 
-from ta_lab2.features.m_tf.ema_multi_tf_cal_anchor import write_multi_timeframe_ema_cal_anchor_to_db
+from ta_lab2.features.m_tf.ema_multi_tf_cal_anchor import (
+    write_multi_timeframe_ema_cal_anchor_to_db,
+)
 from ta_lab2.scripts.bars.common_snapshot_contract import resolve_db_url, get_engine
 from ta_lab2.scripts.emas.base_ema_refresher import (
     BaseEMARefresher,
@@ -40,6 +42,7 @@ DEFAULT_PERIODS = [6, 9, 10, 12, 14, 17, 20, 21, 26, 30, 50, 52, 77, 100, 200, 2
 # =============================================================================
 # Worker Function (Module-level for pickling)
 # =============================================================================
+
 
 def _process_id_worker(task: WorkerTask) -> int:
     """
@@ -99,6 +102,7 @@ def _process_id_worker(task: WorkerTask) -> int:
 # =============================================================================
 # Refresher Implementation
 # =============================================================================
+
 
 class CalAnchorEMARefresher(BaseEMARefresher):
     """
@@ -200,6 +204,7 @@ class CalAnchorEMARefresher(BaseEMARefresher):
 
         # Logging arguments
         from ta_lab2.scripts.emas.logging_config import add_logging_args
+
         add_logging_args(p)
 
         return p

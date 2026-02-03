@@ -4,10 +4,7 @@ from __future__ import annotations
 import argparse
 import csv
 import hashlib
-import os
 import re
-from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -18,9 +15,11 @@ from typing import Any, Dict, List, Optional, Tuple
 FM_START = "---\n"
 FM_END = "\n---\n"
 
+
 def has_front_matter(text: str) -> bool:
     t = text.lstrip("\ufeff\r\n\t ")
-    return t.startswith(FM_START) and (FM_END in t[len(FM_START):])
+    return t.startswith(FM_START) and (FM_END in t[len(FM_START) :])
+
 
 def split_front_matter(text: str) -> Tuple[Optional[str], str]:
     """
@@ -30,22 +29,24 @@ def split_front_matter(text: str) -> Tuple[Optional[str], str]:
     if not has_front_matter(text):
         return None, text
     end_idx = text.find(FM_END, len(FM_START))
-    fm = text[len(FM_START):end_idx]
-    rest = text[end_idx + len(FM_END):]
+    fm = text[len(FM_START) : end_idx]
+    rest = text[end_idx + len(FM_END) :]
     return fm, rest
+
 
 def yaml_escape(s: str) -> str:
     # Minimal escaping; quote if special chars or leading/trailing spaces
     if s is None:
         return '""'
     needs_quotes = (
-        s == "" or
-        s.strip() != s or
-        any(ch in s for ch in [":", "#", "{", "}", "[", "]", "\n", "\r", "\t", "\""])
+        s == ""
+        or s.strip() != s
+        or any(ch in s for ch in [":", "#", "{", "}", "[", "]", "\n", "\r", "\t", '"'])
     )
     if not needs_quotes:
         return s
     return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
 
 def yaml_dump_simple(d: Dict[str, Any]) -> str:
     """
@@ -77,14 +78,17 @@ def yaml_dump_simple(d: Dict[str, Any]) -> str:
                 lines.append(f"{k}: {yaml_escape(str(v))}")
     return "\n".join(lines) + "\n"
 
+
 # -----------------------------
 # CSV loading
 # -----------------------------
+
 
 def read_csv(path: Path) -> List[Dict[str, str]]:
     with path.open("r", encoding="utf-8", newline="") as f:
         reader = csv.DictReader(f)
         return [row for row in reader]
+
 
 def pick(row: Dict[str, str], key: str) -> Optional[str]:
     v = row.get(key)
@@ -93,6 +97,7 @@ def pick(row: Dict[str, str], key: str) -> Optional[str]:
     v = str(v).strip()
     return v if v != "" and v.lower() != "nan" else None
 
+
 def sha256_file(path: Path) -> str:
     h = hashlib.sha256()
     with path.open("rb") as f:
@@ -100,9 +105,11 @@ def sha256_file(path: Path) -> str:
             h.update(chunk)
     return h.hexdigest()
 
+
 # -----------------------------
 # Title derivation
 # -----------------------------
+
 
 def title_from_filename(md_path: Path) -> str:
     # e.g. "11_13_2025_-_Git__Recap_of_recent_discussions__<id>.md"
@@ -117,9 +124,11 @@ def title_from_filename(md_path: Path) -> str:
     stem = re.sub(r"\s+", " ", stem).strip()
     return stem
 
+
 # -----------------------------
 # Main header build
 # -----------------------------
+
 
 def build_header(
     conversation_id: str,
@@ -140,7 +149,6 @@ def build_header(
         "source": "chatgpt",
         "export_date": export_date,
         "memory_version": memory_version,
-
         # semantic fields (to be filled later by OpenAI or manual CSV)
         "summary": "",
         "tags": [],
@@ -149,14 +157,35 @@ def build_header(
         "confidence": "",
     }
 
+
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Prepend deterministic Memory Header v1 YAML to kept ChatGPT markdown files.")
-    ap.add_argument("--index-csv", required=True, help="Path to index.csv (from export_chatgpt_conversations.py)")
+    ap = argparse.ArgumentParser(
+        description="Prepend deterministic Memory Header v1 YAML to kept ChatGPT markdown files."
+    )
+    ap.add_argument(
+        "--index-csv",
+        required=True,
+        help="Path to index.csv (from export_chatgpt_conversations.py)",
+    )
     ap.add_argument("--kept-manifest", required=True, help="Path to kept_manifest.csv")
-    ap.add_argument("--export-date", default="2025-12-28", help="Export date YYYY-MM-DD (default 2025-12-28)")
-    ap.add_argument("--memory-version", default="v1", help="Memory header version label (default v1)")
-    ap.add_argument("--dry-run", action="store_true", help="Print what would change, do not write")
-    ap.add_argument("--only-missing", action="store_true", help="Only add header to files with no front-matter (default true behavior)")
+    ap.add_argument(
+        "--export-date",
+        default="2025-12-28",
+        help="Export date YYYY-MM-DD (default 2025-12-28)",
+    )
+    ap.add_argument(
+        "--memory-version",
+        default="v1",
+        help="Memory header version label (default v1)",
+    )
+    ap.add_argument(
+        "--dry-run", action="store_true", help="Print what would change, do not write"
+    )
+    ap.add_argument(
+        "--only-missing",
+        action="store_true",
+        help="Only add header to files with no front-matter (default true behavior)",
+    )
     args = ap.parse_args()
 
     index_rows = read_csv(Path(args.index_csv))
@@ -176,7 +205,9 @@ def main() -> None:
 
     for kr in kept_rows:
         cid = pick(kr, "id")
-        dest_path_s = pick(kr, "dest_path") or pick(kr, "resolved_path") or pick(kr, "src_path")
+        dest_path_s = (
+            pick(kr, "dest_path") or pick(kr, "resolved_path") or pick(kr, "src_path")
+        )
         status = pick(kr, "status") or ""
 
         if not cid or not dest_path_s:
@@ -225,6 +256,7 @@ def main() -> None:
     print(f"changed: {changed}")
     print(f"skipped_already_has_header: {skipped}")
     print(f"missing_files: {missing}")
+
 
 if __name__ == "__main__":
     main()

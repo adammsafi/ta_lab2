@@ -122,7 +122,6 @@ def cmd_pipeline(args: argparse.Namespace) -> int:
     )
 
 
-
 @dataclass(frozen=True)
 class RegimePolicy:
     size_mult: float = 1.0
@@ -132,11 +131,13 @@ class RegimePolicy:
     gross_cap: float = 1.0
     setups: str = "default"
 
+
 class PipelineSettings(Protocol):
     data_csv: str
     out_dir: str
     ema_windows: Sequence[int]
     resample: str
+
 
 def _detect_repo_root(start: Path) -> Path:
     """Walk upward looking for pyproject.toml or .git. Fall back to start."""
@@ -187,14 +188,18 @@ def _load_regime_policy(repo_root: Path, policy_path: Optional[Path]) -> RegimeP
 
 def _read_df(path: Path) -> Any:
     if pd is None:
-        raise RuntimeError("pandas is not available; cannot read CSV for regime labeling fallback.")
+        raise RuntimeError(
+            "pandas is not available; cannot read CSV for regime labeling fallback."
+        )
     return pd.read_csv(path)
+
 
 ensure_regime_features: Optional[Callable[..., Any]]
 try:
     from ta_lab2.regimes.feature_utils import ensure_regime_features  # type: ignore
 except Exception:
     ensure_regime_features = None  # type: ignore
+
 
 def _ensure_feats_if_possible(df: Any, tag: str) -> Any:
     if df is None or ensure_regime_features is None:
@@ -209,8 +214,9 @@ def _ensure_feats_if_possible(df: Any, tag: str) -> Any:
         return df
 
 
-
-def _maybe_load_policy_table(policy_path: Optional[Path], repo_root: Path) -> Optional[Any]:
+def _maybe_load_policy_table(
+    policy_path: Optional[Path], repo_root: Path
+) -> Optional[Any]:
     """
     Load a policy *table* (not the flat overrides) if present.
     This is intentionally permissive: it returns whatever YAML parses to.
@@ -289,9 +295,13 @@ def _merge_policy_overrides(resolved: Any, pol: RegimePolicy) -> Any:
     return overrides
 
 
-def _present_regime_result_text(symbol: str, budget: Any, L0: Any, L1: Any, L2: Any, L3: Any, resolved: Any) -> None:
+def _present_regime_result_text(
+    symbol: str, budget: Any, L0: Any, L1: Any, L2: Any, L3: Any, resolved: Any
+) -> None:
     print(f"Symbol: {symbol}")
-    print(f"Budget tier: {getattr(budget, 'tier', None) if budget is not None else None}")
+    print(
+        f"Budget tier: {getattr(budget, 'tier', None) if budget is not None else None}"
+    )
     print(f"L0 (Monthly): {L0}")
     print(f"L1 (Weekly):  {L1}")
     print(f"L2 (Daily):   {L2}")
@@ -303,10 +313,14 @@ def _present_regime_result_text(symbol: str, budget: Any, L0: Any, L1: Any, L2: 
         print(resolved)
 
 
-def _present_regime_result_json(symbol: str, budget: Any, L0: Any, L1: Any, L2: Any, L3: Any, resolved: Any) -> None:
+def _present_regime_result_json(
+    symbol: str, budget: Any, L0: Any, L1: Any, L2: Any, L3: Any, resolved: Any
+) -> None:
     payload = {
         "symbol": symbol,
-        "budget": {"tier": getattr(budget, "tier", None)} if budget is not None else None,
+        "budget": {"tier": getattr(budget, "tier", None)}
+        if budget is not None
+        else None,
         "layers": {"L0": L0, "L1": L1, "L2": L2, "L3": L3},
         "resolved_policy": resolved,
     }
@@ -353,13 +367,17 @@ def cmd_regime_inspect(args: argparse.Namespace) -> int:
 
         if isinstance(out, dict):
             budget = out.get("budget", None)
-            layers = out.get("layers", out.get("layer_labels", out.get("regimes", None)))
+            layers = out.get(
+                "layers", out.get("layer_labels", out.get("regimes", None))
+            )
             if isinstance(layers, dict):
                 L0 = _coerce_label(layers.get("L0"))
                 L1 = _coerce_label(layers.get("L1"))
                 L2 = _coerce_label(layers.get("L2"))
                 L3 = _coerce_label(layers.get("L3"))
-            resolved = out.get("resolved_policy", out.get("policy", out.get("resolved", None)))
+            resolved = out.get(
+                "resolved_policy", out.get("policy", out.get("resolved", None))
+            )
 
         resolved = _merge_policy_overrides(resolved, pol)
 
@@ -374,7 +392,9 @@ def cmd_regime_inspect(args: argparse.Namespace) -> int:
     # Path 2: fallback labelers
     # ----------------------------
     if pd is None:
-        print("[ta-lab2 regime-inspect] inspect_regimes not available and pandas is not installed.")
+        print(
+            "[ta-lab2 regime-inspect] inspect_regimes not available and pandas is not installed."
+        )
         return 2
     if any(
         x is None
@@ -386,7 +406,9 @@ def cmd_regime_inspect(args: argparse.Namespace) -> int:
             label_layer_intraday,
         )
     ):
-        print("[ta-lab2 regime-inspect] inspect_regimes not available and regime labelers are not available.")
+        print(
+            "[ta-lab2 regime-inspect] inspect_regimes not available and regime labelers are not available."
+        )
         return 2
 
     df_m = _read_df(args.monthly) if args.monthly and args.monthly.exists() else None
@@ -412,7 +434,9 @@ def cmd_regime_inspect(args: argparse.Namespace) -> int:
     resolved: Any = None
     if resolve_policy_from_table is not None and policy_table is not None:
         try:
-            resolved = resolve_policy_from_table(L0=L0, L1=L1, L2=L2, L3=L3, policy_table=policy_table)  # type: ignore
+            resolved = resolve_policy_from_table(
+                L0=L0, L1=L1, L2=L2, L3=L3, policy_table=policy_table
+            )  # type: ignore
         except Exception:
             resolved = None
 
@@ -444,7 +468,9 @@ def cmd_db(args: argparse.Namespace) -> int:
       - Use --sql for query/explain (matches dbtool)
     """
     if dbtool_main is None:
-        print("[ta-lab2 db] dbtool not available. Did you create src/ta_lab2/tools/dbtool.py?")
+        print(
+            "[ta-lab2 db] dbtool not available. Did you create src/ta_lab2/tools/dbtool.py?"
+        )
         return 2
 
     argv: list[str] = []
@@ -489,7 +515,14 @@ def cmd_db(args: argparse.Namespace) -> int:
         if getattr(args, "missing_threshold", None) is not None:
             argv += ["--missing-threshold", str(args.missing_threshold)]
 
-    elif args.db_cmd in ("describe", "indexes", "constraints", "keys", "profile", "dupes"):
+    elif args.db_cmd in (
+        "describe",
+        "indexes",
+        "constraints",
+        "keys",
+        "profile",
+        "dupes",
+    ):
         argv += [args.schema, args.table]
         if args.db_cmd == "dupes":
             argv += ["--key", args.key]
@@ -551,7 +584,9 @@ def cmd_orchestrator(args: argparse.Namespace) -> int:
     Delegates to orchestrator CLI module.
     """
     if orchestrator_main is None:
-        print("[ta-lab2 orchestrator] Orchestrator not available. Check ai_orchestrator module.")
+        print(
+            "[ta-lab2 orchestrator] Orchestrator not available. Check ai_orchestrator module."
+        )
         return 2
 
     # Build argv for orchestrator CLI
@@ -608,7 +643,9 @@ def build_parser() -> argparse.ArgumentParser:
     sub = ap.add_subparsers(dest="cmd")
 
     # Subcommand: pipeline (preserves original behavior)
-    p_pipeline = sub.add_parser("pipeline", help="Run the BTC pipeline (original default behavior)")
+    p_pipeline = sub.add_parser(
+        "pipeline", help="Run the BTC pipeline (original default behavior)"
+    )
     p_pipeline.add_argument(
         "--config",
         "-c",
@@ -618,12 +655,18 @@ def build_parser() -> argparse.ArgumentParser:
     p_pipeline.set_defaults(func=cmd_pipeline)
 
     # Subcommand: regime-inspect
-    p_reg = sub.add_parser("regime-inspect", help="Inspect multi-timeframe regimes and resolved policy")
-    p_reg.add_argument("--symbol", required=True, help="Symbol label for printing (e.g., BTCUSD)")
+    p_reg = sub.add_parser(
+        "regime-inspect", help="Inspect multi-timeframe regimes and resolved policy"
+    )
+    p_reg.add_argument(
+        "--symbol", required=True, help="Symbol label for printing (e.g., BTCUSD)"
+    )
     p_reg.add_argument("--monthly", type=Path, help="CSV with monthly bars (optional)")
     p_reg.add_argument("--weekly", type=Path, help="CSV with weekly bars (optional)")
     p_reg.add_argument("--daily", type=Path, help="CSV with daily bars (optional)")
-    p_reg.add_argument("--intraday", type=Path, help="CSV with intraday bars (e.g., 4H/1H) (optional)")
+    p_reg.add_argument(
+        "--intraday", type=Path, help="CSV with intraday bars (e.g., 4H/1H) (optional)"
+    )
     p_reg.add_argument(
         "--policy",
         type=Path,
@@ -646,14 +689,24 @@ def build_parser() -> argparse.ArgumentParser:
             "(schemas/tables/describe/indexes/constraints/keys/query/explain/profile/profile-cols/profile-time/dupes/agg/snapshot/snapshot-md/snapshot-check)"
         ),
     )
-    p_db.add_argument("--timeout-ms", type=int, default=15_000, help="statement_timeout in ms (default: 15000)")
+    p_db.add_argument(
+        "--timeout-ms",
+        type=int,
+        default=15_000,
+        help="statement_timeout in ms (default: 15000)",
+    )
     p_db.add_argument(
         "--idle-tx-timeout-ms",
         type=int,
         default=15_000,
         help="idle_in_transaction_session_timeout in ms (default: 15000)",
     )
-    p_db.add_argument("--limit", type=int, default=200, help="default LIMIT / output limit (default: 200)")
+    p_db.add_argument(
+        "--limit",
+        type=int,
+        default=200,
+        help="default LIMIT / output limit (default: 200)",
+    )
 
     db_sub = p_db.add_subparsers(dest="db_cmd", required=True)
 
@@ -669,13 +722,19 @@ def build_parser() -> argparse.ArgumentParser:
             help="Override output limit for this command (defaults to db --limit)",
         )
 
-    p_db_schemas = db_sub.add_parser("schemas", help="List non-system schemas + object counts")
+    p_db_schemas = db_sub.add_parser(
+        "schemas", help="List non-system schemas + object counts"
+    )
     _db_add_limit(p_db_schemas)
     p_db_schemas.set_defaults(func=cmd_db)
 
-    p_db_tables = db_sub.add_parser("tables", help="List tables (optionally for one schema)")
+    p_db_tables = db_sub.add_parser(
+        "tables", help="List tables (optionally for one schema)"
+    )
     _db_add_limit(p_db_tables)
-    p_db_tables.add_argument("--schema", type=str, default=None, help="Schema name (optional)")
+    p_db_tables.add_argument(
+        "--schema", type=str, default=None, help="Schema name (optional)"
+    )
     p_db_tables.set_defaults(func=cmd_db)
 
     p_db_desc = db_sub.add_parser("describe", help="Describe columns for a table")
@@ -684,13 +743,17 @@ def build_parser() -> argparse.ArgumentParser:
     p_db_desc.add_argument("table", type=str)
     p_db_desc.set_defaults(func=cmd_db)
 
-    p_db_indexes = db_sub.add_parser("indexes", help="List indexes for a table (incl. method/unique/primary)")
+    p_db_indexes = db_sub.add_parser(
+        "indexes", help="List indexes for a table (incl. method/unique/primary)"
+    )
     _db_add_limit(p_db_indexes)
     p_db_indexes.add_argument("schema", type=str)
     p_db_indexes.add_argument("table", type=str)
     p_db_indexes.set_defaults(func=cmd_db)
 
-    p_db_constraints = db_sub.add_parser("constraints", help="List constraints for a table")
+    p_db_constraints = db_sub.add_parser(
+        "constraints", help="List constraints for a table"
+    )
     _db_add_limit(p_db_constraints)
     p_db_constraints.add_argument("schema", type=str)
     p_db_constraints.add_argument("table", type=str)
@@ -702,12 +765,16 @@ def build_parser() -> argparse.ArgumentParser:
     p_db_keys.add_argument("table", type=str)
     p_db_keys.set_defaults(func=cmd_db)
 
-    p_db_query = db_sub.add_parser("query", help="Run a safe read-only SQL query (SELECT/WITH/EXPLAIN only)")
+    p_db_query = db_sub.add_parser(
+        "query", help="Run a safe read-only SQL query (SELECT/WITH/EXPLAIN only)"
+    )
     _db_add_limit(p_db_query)
     p_db_query.add_argument("--sql", required=True, help="SQL to execute")
     p_db_query.set_defaults(func=cmd_db)
 
-    p_db_explain = db_sub.add_parser("explain", help="EXPLAIN (ANALYZE FALSE) for a safe query")
+    p_db_explain = db_sub.add_parser(
+        "explain", help="EXPLAIN (ANALYZE FALSE) for a safe query"
+    )
     _db_add_limit(p_db_explain)
     p_db_explain.add_argument("--sql", required=True, help="SQL to explain")
     p_db_explain.set_defaults(func=cmd_db)
@@ -718,22 +785,43 @@ def build_parser() -> argparse.ArgumentParser:
     p_db_profile.add_argument("table", type=str)
     p_db_profile.set_defaults(func=cmd_db)
 
-    p_db_profile_cols = db_sub.add_parser("profile-cols", help="Column profiling from pg_stats")
+    p_db_profile_cols = db_sub.add_parser(
+        "profile-cols", help="Column profiling from pg_stats"
+    )
     _db_add_limit(p_db_profile_cols)
     p_db_profile_cols.add_argument("schema", type=str)
     p_db_profile_cols.add_argument("table", type=str)
-    p_db_profile_cols.add_argument("--cols", default=None, help="Comma-separated column list (optional)")
-    p_db_profile_cols.add_argument("--topn", type=int, default=20, help="Top-N values to show per column (default: 20)")
+    p_db_profile_cols.add_argument(
+        "--cols", default=None, help="Comma-separated column list (optional)"
+    )
+    p_db_profile_cols.add_argument(
+        "--topn",
+        type=int,
+        default=20,
+        help="Top-N values to show per column (default: 20)",
+    )
     p_db_profile_cols.set_defaults(func=cmd_db)
 
-    p_db_profile_time = db_sub.add_parser("profile-time", help="Bucketed time coverage + missing detection")
+    p_db_profile_time = db_sub.add_parser(
+        "profile-time", help="Bucketed time coverage + missing detection"
+    )
     _db_add_limit(p_db_profile_time)
     p_db_profile_time.add_argument("schema", type=str)
     p_db_profile_time.add_argument("table", type=str)
-    p_db_profile_time.add_argument("--ts-col", default="timestamp", help="Timestamp column name (default: timestamp)")
-    p_db_profile_time.add_argument("--bucket", default="1 day", help="Bucket size for coverage (default: 1 day)")
-    p_db_profile_time.add_argument("--start", default=None, help="Optional start timestamp (inclusive)")
-    p_db_profile_time.add_argument("--end", default=None, help="Optional end timestamp (exclusive)")
+    p_db_profile_time.add_argument(
+        "--ts-col",
+        default="timestamp",
+        help="Timestamp column name (default: timestamp)",
+    )
+    p_db_profile_time.add_argument(
+        "--bucket", default="1 day", help="Bucket size for coverage (default: 1 day)"
+    )
+    p_db_profile_time.add_argument(
+        "--start", default=None, help="Optional start timestamp (inclusive)"
+    )
+    p_db_profile_time.add_argument(
+        "--end", default=None, help="Optional end timestamp (exclusive)"
+    )
     p_db_profile_time.add_argument(
         "--missing-threshold",
         type=float,
@@ -742,25 +830,53 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_db_profile_time.set_defaults(func=cmd_db)
 
-    p_db_dupes = db_sub.add_parser("dupes", help="Group-by key integrity probe (duplicate detector)")
+    p_db_dupes = db_sub.add_parser(
+        "dupes", help="Group-by key integrity probe (duplicate detector)"
+    )
     _db_add_limit(p_db_dupes)
     p_db_dupes.add_argument("schema", type=str)
     p_db_dupes.add_argument("table", type=str)
-    p_db_dupes.add_argument("--key", required=True, help="Comma-separated key columns (e.g., id,tf,period,ts)")
-    p_db_dupes.add_argument("--where", default=None, help="Optional WHERE clause (without 'WHERE')")
-    p_db_dupes.add_argument("--having", default=None, help="Optional HAVING clause (without 'HAVING')")
-    p_db_dupes.add_argument("--order-by", default=None, help="Optional ORDER BY clause (without 'ORDER BY')")
+    p_db_dupes.add_argument(
+        "--key",
+        required=True,
+        help="Comma-separated key columns (e.g., id,tf,period,ts)",
+    )
+    p_db_dupes.add_argument(
+        "--where", default=None, help="Optional WHERE clause (without 'WHERE')"
+    )
+    p_db_dupes.add_argument(
+        "--having", default=None, help="Optional HAVING clause (without 'HAVING')"
+    )
+    p_db_dupes.add_argument(
+        "--order-by", default=None, help="Optional ORDER BY clause (without 'ORDER BY')"
+    )
     p_db_dupes.set_defaults(func=cmd_db)
 
     p_db_agg = db_sub.add_parser("agg", help="Safe single-table aggregation builder")
     _db_add_limit(p_db_agg)
     p_db_agg.add_argument("schema", type=str)
     p_db_agg.add_argument("table", type=str)
-    p_db_agg.add_argument("--select", required=True, help="SELECT list (e.g., count(*) as n)")
-    p_db_agg.add_argument("--where", default=None, help="Optional WHERE clause (without 'WHERE')")
-    p_db_agg.add_argument("--group-by", dest="group_by", default=None, help="GROUP BY clause (without 'GROUP BY')")
-    p_db_agg.add_argument("--having", default=None, help="HAVING clause (without 'HAVING')")
-    p_db_agg.add_argument("--order-by", dest="order_by", default=None, help="ORDER BY clause (without 'ORDER BY')")
+    p_db_agg.add_argument(
+        "--select", required=True, help="SELECT list (e.g., count(*) as n)"
+    )
+    p_db_agg.add_argument(
+        "--where", default=None, help="Optional WHERE clause (without 'WHERE')"
+    )
+    p_db_agg.add_argument(
+        "--group-by",
+        dest="group_by",
+        default=None,
+        help="GROUP BY clause (without 'GROUP BY')",
+    )
+    p_db_agg.add_argument(
+        "--having", default=None, help="HAVING clause (without 'HAVING')"
+    )
+    p_db_agg.add_argument(
+        "--order-by",
+        dest="order_by",
+        default=None,
+        help="ORDER BY clause (without 'ORDER BY')",
+    )
     p_db_agg.add_argument(
         "--agg-limit",
         dest="agg_limit",
@@ -770,12 +886,21 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_db_agg.set_defaults(func=cmd_db)
 
-    p_db_snap = db_sub.add_parser("snapshot", help="Write DB schema snapshot JSON (all non-system schemas)")
+    p_db_snap = db_sub.add_parser(
+        "snapshot", help="Write DB schema snapshot JSON (all non-system schemas)"
+    )
     _db_add_limit(p_db_snap)
-    p_db_snap.add_argument("--out", type=str, required=True, help="Output path (e.g., artifacts/db_schema_snapshot.json)")
+    p_db_snap.add_argument(
+        "--out",
+        type=str,
+        required=True,
+        help="Output path (e.g., artifacts/db_schema_snapshot.json)",
+    )
     p_db_snap.set_defaults(func=cmd_db)
 
-    p_db_snap_md = db_sub.add_parser("snapshot-md", help="Write a DB schema snapshot Markdown (optionally from JSON)")
+    p_db_snap_md = db_sub.add_parser(
+        "snapshot-md", help="Write a DB schema snapshot Markdown (optionally from JSON)"
+    )
     _db_add_limit(p_db_snap_md)
     p_db_snap_md.add_argument(
         "--in-path",
@@ -792,7 +917,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_db_snap_md.set_defaults(func=cmd_db)
 
-    p_db_snap_check = db_sub.add_parser("snapshot-check", help="Read a snapshot JSON and emit a compact health summary")
+    p_db_snap_check = db_sub.add_parser(
+        "snapshot-check", help="Read a snapshot JSON and emit a compact health summary"
+    )
     _db_add_limit(p_db_snap_check)
     p_db_snap_check.add_argument(
         "--in-path",
@@ -801,9 +928,24 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         help="Input JSON snapshot path",
     )
-    p_db_snap_check.add_argument("--stale-days", type=int, default=30, help="Warn if analyze older than N days (default: 30)")
-    p_db_snap_check.add_argument("--min-rows", type=int, default=100000, help="Row threshold for warnings (default: 100000)")
-    p_db_snap_check.add_argument("--top-n", type=int, default=20, help="Top N tables for size/row summaries (default: 20)")
+    p_db_snap_check.add_argument(
+        "--stale-days",
+        type=int,
+        default=30,
+        help="Warn if analyze older than N days (default: 30)",
+    )
+    p_db_snap_check.add_argument(
+        "--min-rows",
+        type=int,
+        default=100000,
+        help="Row threshold for warnings (default: 100000)",
+    )
+    p_db_snap_check.add_argument(
+        "--top-n",
+        type=int,
+        default=20,
+        help="Top N tables for size/row summaries (default: 20)",
+    )
     p_db_snap_check.add_argument(
         "--format",
         choices=["json", "text"],
@@ -813,16 +955,22 @@ def build_parser() -> argparse.ArgumentParser:
     p_db_snap_check.set_defaults(func=cmd_db)
 
     # Subcommand: orchestrator
-    p_orch = sub.add_parser("orchestrator", help="AI Orchestrator for multi-platform task execution")
+    p_orch = sub.add_parser(
+        "orchestrator", help="AI Orchestrator for multi-platform task execution"
+    )
     orch_sub = p_orch.add_subparsers(dest="orch_cmd")
 
     # orchestrator submit
     p_orch_submit = orch_sub.add_parser("submit", help="Submit a task for execution")
     p_orch_submit.add_argument("--prompt", "-p", required=True, help="Task prompt")
-    p_orch_submit.add_argument("--type", "-t", default="code_generation", help="Task type")
+    p_orch_submit.add_argument(
+        "--type", "-t", default="code_generation", help="Task type"
+    )
     p_orch_submit.add_argument("--platform", help="Platform hint")
     p_orch_submit.add_argument("--chain-id", help="Workflow chain ID")
-    p_orch_submit.add_argument("--timeout", type=int, default=300, help="Timeout in seconds")
+    p_orch_submit.add_argument(
+        "--timeout", type=int, default=300, help="Timeout in seconds"
+    )
     p_orch_submit.add_argument("--output", "-o", help="Output file")
     p_orch_submit.set_defaults(func=cmd_orchestrator)
 
@@ -830,8 +978,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_orch_batch = orch_sub.add_parser("batch", help="Execute batch from JSON")
     p_orch_batch.add_argument("--input", "-i", required=True, help="Input JSON file")
     p_orch_batch.add_argument("--output", "-o", help="Output JSON file")
-    p_orch_batch.add_argument("--parallel", type=int, default=5, help="Max parallel tasks")
-    p_orch_batch.add_argument("--fallback", action="store_true", help="Enable fallback routing")
+    p_orch_batch.add_argument(
+        "--parallel", type=int, default=5, help="Max parallel tasks"
+    )
+    p_orch_batch.add_argument(
+        "--fallback", action="store_true", help="Enable fallback routing"
+    )
     p_orch_batch.set_defaults(func=cmd_orchestrator)
 
     # orchestrator status

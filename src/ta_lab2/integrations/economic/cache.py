@@ -14,6 +14,7 @@ from typing import Optional, Any, Dict
 @dataclass
 class CacheEntry:
     """Cache entry with value and expiration time."""
+
     value: Any
     expires_at: float
     created_at: float
@@ -97,11 +98,7 @@ class EconomicDataCache:
             return entry.value
 
     def set(
-        self,
-        series_id: str,
-        value: Any,
-        ttl: Optional[float] = None,
-        **params
+        self, series_id: str, value: Any, ttl: Optional[float] = None, **params
     ) -> None:
         """Set value in cache.
 
@@ -115,11 +112,7 @@ class EconomicDataCache:
         ttl = ttl if ttl is not None else self.default_ttl
         now = time.time()
 
-        entry = CacheEntry(
-            value=value,
-            expires_at=now + ttl,
-            created_at=now
-        )
+        entry = CacheEntry(value=value, expires_at=now + ttl, created_at=now)
 
         with self._lock:
             # Evict if at capacity
@@ -173,10 +166,7 @@ class EconomicDataCache:
             Number of entries removed
         """
         with self._lock:
-            expired_keys = [
-                k for k, v in self._cache.items()
-                if v.is_expired
-            ]
+            expired_keys = [k for k, v in self._cache.items() if v.is_expired]
             for key in expired_keys:
                 del self._cache[key]
                 if key in self._access_order:

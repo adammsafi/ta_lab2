@@ -35,7 +35,9 @@ class OrchestratorConfig:
     vertex_ai_location: str = "us-central1"
 
     # ChromaDB Configuration
-    chromadb_path: str = "C:/Users/asafi/Documents/ProjectTT/ChatGPT/20251228/out/chromadb"
+    chromadb_path: str = (
+        "C:/Users/asafi/Documents/ProjectTT/ChatGPT/20251228/out/chromadb"
+    )
     chromadb_collection_name: str = "project_memories"
     expected_memory_count: int = 3763
     embedding_dimensions: int = 1536
@@ -64,7 +66,9 @@ def load_config() -> OrchestratorConfig:
     try:
         quota_alert_thresholds = [int(x.strip()) for x in thresholds_str.split(",")]
     except ValueError:
-        logger.warning(f"Invalid QUOTA_ALERT_THRESHOLDS format: {thresholds_str}, using defaults")
+        logger.warning(
+            f"Invalid QUOTA_ALERT_THRESHOLDS format: {thresholds_str}, using defaults"
+        )
         quota_alert_thresholds = [50, 80, 90]
 
     # Build config
@@ -77,8 +81,13 @@ def load_config() -> OrchestratorConfig:
         mem0_storage_path=os.environ.get("MEM0_STORAGE_PATH", "./.memory/mem0"),
         vertex_ai_project=os.environ.get("VERTEX_AI_PROJECT"),
         vertex_ai_location=os.environ.get("VERTEX_AI_LOCATION", "us-central1"),
-        chromadb_path=os.environ.get("CHROMADB_PATH", "C:/Users/asafi/Documents/ProjectTT/ChatGPT/20251228/out/chromadb"),
-        chromadb_collection_name=os.environ.get("CHROMADB_COLLECTION_NAME", "project_memories"),
+        chromadb_path=os.environ.get(
+            "CHROMADB_PATH",
+            "C:/Users/asafi/Documents/ProjectTT/ChatGPT/20251228/out/chromadb",
+        ),
+        chromadb_collection_name=os.environ.get(
+            "CHROMADB_COLLECTION_NAME", "project_memories"
+        ),
         expected_memory_count=int(os.environ.get("EXPECTED_MEMORY_COUNT", "3763")),
         embedding_dimensions=int(os.environ.get("EMBEDDING_DIMENSIONS", "1536")),
     )
@@ -89,9 +98,13 @@ def load_config() -> OrchestratorConfig:
     if not config.anthropic_api_key:
         logger.debug("ANTHROPIC_API_KEY not set - Claude API mode not configured")
     if not config.google_credentials_path:
-        logger.warning("GOOGLE_APPLICATION_CREDENTIALS not set - Gemini adapter may not work")
+        logger.warning(
+            "GOOGLE_APPLICATION_CREDENTIALS not set - Gemini adapter may not work"
+        )
     if not config.vertex_ai_project:
-        logger.debug("VERTEX_AI_PROJECT not set - Memory Bank cloud storage not configured")
+        logger.debug(
+            "VERTEX_AI_PROJECT not set - Memory Bank cloud storage not configured"
+        )
 
     # Validate ChromaDB path exists
     chromadb_path = Path(config.chromadb_path)
@@ -117,14 +130,14 @@ def validate_config(config: OrchestratorConfig) -> dict[str, bool]:
         - 'vertex_memory': True if Vertex AI project is configured
     """
     status = {
-        'openai': bool(config.openai_api_key),
-        'anthropic': bool(config.anthropic_api_key),
-        'google': bool(config.google_credentials_path),
-        'vertex_memory': bool(config.vertex_ai_project),
+        "openai": bool(config.openai_api_key),
+        "anthropic": bool(config.anthropic_api_key),
+        "google": bool(config.google_credentials_path),
+        "vertex_memory": bool(config.vertex_ai_project),
     }
 
     logger.info(f"SDK configuration status: {status}")
     return status
 
 
-__all__ = ['OrchestratorConfig', 'load_config', 'validate_config']
+__all__ = ["OrchestratorConfig", "load_config", "validate_config"]

@@ -7,6 +7,53 @@ The bar builders create multi-timeframe OHLCV bar snapshots from daily price dat
 1. **Polars Utilities** (`polars_bar_operations.py`) - Reusable vectorized operations
 2. **Multiprocessing Orchestrator** (`ta_lab2.orchestration`) - Generic parallel execution
 
+## Quick Start: Running All Builders
+
+### Master Orchestrator Script
+
+Use `run_all_bar_builders.py` to execute multiple builders with unified configuration:
+
+```bash
+# Run all builders for specific IDs
+python run_all_bar_builders.py --ids 1,52,825
+
+# Run all builders with full rebuild
+python run_all_bar_builders.py --ids all --full-rebuild
+
+# Run only specific builders
+python run_all_bar_builders.py --ids all --builders 1d,multi_tf,cal_iso
+
+# Skip specific builders
+python run_all_bar_builders.py --ids all --skip cal_anchor_iso,cal_anchor_us
+
+# Continue even if a builder fails
+python run_all_bar_builders.py --ids all --continue-on-error
+
+# Dry run (show commands without executing)
+python run_all_bar_builders.py --ids all --dry-run
+```
+
+### Available Builders
+
+| Builder | Description | Supports Full Rebuild |
+|---------|-------------|----------------------|
+| `1d` | 1D canonical bars (SQL-based) | Yes |
+| `multi_tf` | Multi-timeframe rolling bars | Yes |
+| `cal_iso` | Calendar-aligned (ISO week) | Yes |
+| `cal_us` | Calendar-aligned (US week) | Yes |
+| `cal_anchor_iso` | Calendar-anchored with partial snapshots (ISO) | Yes |
+| `cal_anchor_us` | Calendar-anchored with partial snapshots (US) | Yes |
+
+### Common Options
+
+- `--ids` - Comma-separated ID list or "all" (required)
+- `--db-url` - Database URL (default: TARGET_DB_URL env var)
+- `--full-rebuild` - Run full rebuild for all builders
+- `--num-processes` - Number of parallel processes for multi-TF builders
+- `--tz` - Timezone for calendar builders (default: America/New_York)
+- `--continue-on-error` - Continue running other builders if one fails
+- `--verbose` - Show builder output (default: only show on error)
+
 ## Architecture Layers
 
 ```

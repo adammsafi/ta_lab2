@@ -227,9 +227,7 @@ def generate_inventory_report(docs: List[DocumentInfo]) -> dict:
     }
 
 
-def save_inventory_json(
-    inventory: dict, output_path: Path, indent: int = 2
-) -> None:
+def save_inventory_json(inventory: dict, output_path: Path, indent: int = 2) -> None:
     """Save inventory report to JSON file.
 
     Args:
@@ -246,8 +244,8 @@ if __name__ == "__main__":
     docs = discover_projecttt()
     inventory = generate_inventory_report(docs)
 
-    print(f"ProjectTT Document Inventory")
-    print(f"=" * 60)
+    print("ProjectTT Document Inventory")
+    print("=" * 60)
     print(f"Total files: {inventory['total_files']}")
     print(f"  DOCX: {inventory['docx_count']}")
     print(f"  XLSX: {inventory['xlsx_count']}")

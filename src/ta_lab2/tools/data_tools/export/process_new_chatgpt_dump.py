@@ -74,9 +74,7 @@ def load_trash_list(trash_file: Path) -> Set[str]:
 
 
 def filter_new_conversations(
-    new_conversations: List[Dict[str, Any]],
-    old_ids: Set[str],
-    trash_ids: Set[str]
+    new_conversations: List[Dict[str, Any]], old_ids: Set[str], trash_ids: Set[str]
 ) -> List[Dict[str, Any]]:
     """Filter to only new, non-trash conversations."""
     filtered = []
@@ -132,9 +130,9 @@ def process_new_dump(
     existing_memories_file = output_dir / "all_memories_with_claude.jsonl"
     chroma_dir = output_dir / "chromadb"
 
-    logger.info("="*60)
+    logger.info("=" * 60)
     logger.info("NEW CHATGPT DUMP PROCESSOR")
-    logger.info("="*60)
+    logger.info("=" * 60)
 
     # Step 1: Load conversation IDs
     logger.info("\n[STEP 1] Loading conversation IDs...")
@@ -167,8 +165,12 @@ def process_new_dump(
     logger.info("\n[STEP 2] Filtering conversations...")
     filtered = filter_new_conversations(new_conversations, old_ids, trash_ids)
     logger.info(f"  New conversations: {len(filtered)}")
-    logger.info(f"  Skipped (already processed): {len([c for c in new_conversations if c.get('id') in old_ids])}")
-    logger.info(f"  Skipped (trash): {len([c for c in new_conversations if c.get('id') in trash_ids])}")
+    logger.info(
+        f"  Skipped (already processed): {len([c for c in new_conversations if c.get('id') in old_ids])}"
+    )
+    logger.info(
+        f"  Skipped (trash): {len([c for c in new_conversations if c.get('id') in trash_ids])}"
+    )
 
     if not filtered:
         logger.info("\n  No new conversations to process!")
@@ -186,18 +188,24 @@ def process_new_dump(
     # Step 3: Generate memories (if script provided)
     new_mem_count = 0
     if generate_memories_script and generate_memories_script.exists():
-        logger.info(f"\n[STEP 3] Generating memories from {len(filtered)} new conversations...")
+        logger.info(
+            f"\n[STEP 3] Generating memories from {len(filtered)} new conversations..."
+        )
 
         result = subprocess.run(
             [
-                "python", str(generate_memories_script),
-                "--input-file", str(new_filtered_file),
-                "--output-file", str(new_memories_file),
-                "--batch-size", "10",
+                "python",
+                str(generate_memories_script),
+                "--input-file",
+                str(new_filtered_file),
+                "--output-file",
+                str(new_memories_file),
+                "--batch-size",
+                "10",
             ],
             env={**os.environ},
             capture_output=True,
-            text=True
+            text=True,
         )
 
         if result.returncode != 0:
@@ -239,23 +247,32 @@ def process_new_dump(
                         out.write(line)
 
     total_count = existing_count + new_mem_count
-    logger.info(f"  Combined {existing_count} existing + {new_mem_count} new = {total_count} total")
+    logger.info(
+        f"  Combined {existing_count} existing + {new_mem_count} new = {total_count} total"
+    )
 
     # Step 5: Re-embed (if script provided)
     if embed_memories_script and embed_memories_script.exists():
-        logger.info(f"\n[STEP 5] Re-embedding all {total_count} memories into ChromaDB...")
+        logger.info(
+            f"\n[STEP 5] Re-embedding all {total_count} memories into ChromaDB..."
+        )
 
         result = subprocess.run(
             [
-                "python", str(embed_memories_script),
-                "--memory-file", str(combined_memories_file),
-                "--chroma-dir", str(chroma_dir),
-                "--collection-name", "project_memories",
-                "--batch-size", "50",
+                "python",
+                str(embed_memories_script),
+                "--memory-file",
+                str(combined_memories_file),
+                "--chroma-dir",
+                str(chroma_dir),
+                "--collection-name",
+                "project_memories",
+                "--batch-size",
+                "50",
             ],
             env={**os.environ},
             capture_output=True,
-            text=True
+            text=True,
         )
 
         if result.returncode != 0:
@@ -266,9 +283,9 @@ def process_new_dump(
     else:
         logger.warning("  Embedding script not provided, skipping...")
 
-    logger.info("\n" + "="*60)
+    logger.info("\n" + "=" * 60)
     logger.info("SUCCESS! NEW DUMP PROCESSED")
-    logger.info("="*60)
+    logger.info("=" * 60)
     logger.info(f"New conversations processed: {len(filtered)}")
     logger.info(f"New memories extracted: {new_mem_count}")
     logger.info(f"Total memories in database: {total_count}")
@@ -297,7 +314,9 @@ def main() -> int:
     ap.add_argument("--output-dir", required=True, help="Output directory")
     ap.add_argument("--old-dump", help="Path to old conversations.json (for filtering)")
     ap.add_argument("--trash-list", help="Path to trash_list.json (for filtering)")
-    ap.add_argument("--generate-memories-script", help="Path to generate_memories script")
+    ap.add_argument(
+        "--generate-memories-script", help="Path to generate_memories script"
+    )
     ap.add_argument("--embed-memories-script", help="Path to embed_memories script")
     args = ap.parse_args()
 
@@ -305,8 +324,12 @@ def main() -> int:
     output_dir = Path(args.output_dir)
     old_dump = Path(args.old_dump) if args.old_dump else None
     trash_list = Path(args.trash_list) if args.trash_list else None
-    generate_script = Path(args.generate_memories_script) if args.generate_memories_script else None
-    embed_script = Path(args.embed_memories_script) if args.embed_memories_script else None
+    generate_script = (
+        Path(args.generate_memories_script) if args.generate_memories_script else None
+    )
+    embed_script = (
+        Path(args.embed_memories_script) if args.embed_memories_script else None
+    )
 
     result = process_new_dump(
         new_dump,
@@ -318,7 +341,7 @@ def main() -> int:
     )
 
     print(f"\nChromaDB location: {result.get('chroma_dir')}")
-    print(f"\nYou can now query using context tools")
+    print("\nYou can now query using context tools")
     return 0
 
 

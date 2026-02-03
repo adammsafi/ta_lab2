@@ -4,19 +4,19 @@ Tests enhanced metadata schema (created_at, last_verified, deprecated_since)
 and idempotent migration script for enriching existing memories.
 """
 import pytest
-from unittest.mock import Mock, patch, MagicMock
-from datetime import datetime, timezone
+from unittest.mock import Mock
+from datetime import datetime
 
 from ta_lab2.tools.ai_orchestrator.memory.metadata import (
     MemoryMetadata,
     create_metadata,
     validate_metadata,
-    mark_deprecated
+    mark_deprecated,
 )
 from ta_lab2.tools.ai_orchestrator.memory.migration import (
     MigrationResult,
     migrate_metadata,
-    validate_migration
+    validate_migration,
 )
 
 
@@ -53,7 +53,7 @@ class TestMetadataSchema:
         existing = {
             "created_at": "2025-01-01T00:00:00+00:00",
             "deprecated_since": "2026-01-15T00:00:00+00:00",
-            "deprecation_reason": "Outdated"
+            "deprecation_reason": "Outdated",
         }
 
         meta = create_metadata(source="test", existing=existing)
@@ -84,7 +84,7 @@ class TestMetadataSchema:
             "created_at": "not-a-timestamp",
             "last_verified": "2026-01-28T00:00:00+00:00",
             "source": "test",
-            "migration_version": 1
+            "migration_version": 1,
         }
         is_valid, issues = validate_metadata(invalid)
 
@@ -123,7 +123,7 @@ class TestMetadataSchema:
             last_verified="2026-01-28T00:00:00+00:00",
             source="test",
             category=None,  # None should be excluded
-            migration_version=1
+            migration_version=1,
         )
 
         meta_dict = meta.to_dict()
@@ -142,7 +142,7 @@ class TestMigration:
             {
                 "id": "mem_1",
                 "memory": "Test memory",
-                "metadata": {}  # Missing metadata
+                "metadata": {},  # Missing metadata
             }
         ]
 
@@ -162,13 +162,13 @@ class TestMigration:
             {
                 "id": "mem_1",
                 "memory": "Test memory",
-                "metadata": {}  # Missing metadata
+                "metadata": {},  # Missing metadata
             },
             {
                 "id": "mem_2",
                 "memory": "Another memory",
-                "metadata": {"source": "old"}  # Incomplete metadata
-            }
+                "metadata": {"source": "old"},  # Incomplete metadata
+            },
         ]
 
         result = migrate_metadata(client=mock_client, batch_size=10)
@@ -190,7 +190,7 @@ class TestMigration:
             {
                 "id": "mem_1",
                 "memory": "Test memory",
-                "metadata": valid_meta  # Already valid
+                "metadata": valid_meta,  # Already valid
             }
         ]
 
@@ -208,16 +208,8 @@ class TestMigration:
         """Test that errors are logged but don't stop migration."""
         mock_client = Mock()
         mock_client.get_all.return_value = [
-            {
-                "id": "mem_1",
-                "memory": "Test memory",
-                "metadata": {}
-            },
-            {
-                "id": "mem_2",
-                "memory": "Another memory",
-                "metadata": {}
-            }
+            {"id": "mem_1", "memory": "Test memory", "metadata": {}},
+            {"id": "mem_2", "memory": "Another memory", "metadata": {}},
         ]
 
         # First update succeeds, second fails
@@ -237,7 +229,7 @@ class TestMigration:
         mock_client.get_all.return_value = [
             {
                 "memory": "Test memory",
-                "metadata": {}
+                "metadata": {},
                 # No "id" field
             }
         ]
@@ -255,7 +247,7 @@ class TestMigration:
         mock_client.get_all.return_value = [
             {
                 "id": "mem_1",
-                "metadata": {}
+                "metadata": {},
                 # No "memory" field
             }
         ]
@@ -272,11 +264,7 @@ class TestMigration:
         """Test that running migration twice produces same result."""
         mock_client = Mock()
         mock_client.get_all.return_value = [
-            {
-                "id": "mem_1",
-                "memory": "Test memory",
-                "metadata": {}
-            }
+            {"id": "mem_1", "memory": "Test memory", "metadata": {}}
         ]
 
         # First run
@@ -287,11 +275,7 @@ class TestMigration:
         # Update mock to return memory with valid metadata
         valid_meta = create_metadata(source="chromadb_phase2")
         mock_client.get_all.return_value = [
-            {
-                "id": "mem_1",
-                "memory": "Test memory",
-                "metadata": valid_meta
-            }
+            {"id": "mem_1", "memory": "Test memory", "metadata": valid_meta}
         ]
 
         # Second run should skip (already valid)
@@ -302,11 +286,7 @@ class TestMigration:
     def test_migration_result_str(self):
         """Test MigrationResult string representation."""
         result = MigrationResult(
-            total=100,
-            updated=90,
-            skipped=8,
-            errors=2,
-            error_ids=["mem_1", "mem_2"]
+            total=100, updated=90, skipped=8, errors=2, error_ids=["mem_1", "mem_2"]
         )
 
         result_str = str(result)
@@ -327,11 +307,7 @@ class TestValidateMigration:
 
         # Create 10 memories with valid metadata
         mock_client.get_all.return_value = [
-            {
-                "id": f"mem_{i}",
-                "memory": f"Memory {i}",
-                "metadata": valid_meta
-            }
+            {"id": f"mem_{i}", "memory": f"Memory {i}", "metadata": valid_meta}
             for i in range(10)
         ]
 
@@ -347,16 +323,12 @@ class TestValidateMigration:
         valid_meta = create_metadata(source="test")
 
         mock_client.get_all.return_value = [
-            {
-                "id": "mem_1",
-                "memory": "Valid memory",
-                "metadata": valid_meta
-            },
+            {"id": "mem_1", "memory": "Valid memory", "metadata": valid_meta},
             {
                 "id": "mem_2",
                 "memory": "Invalid memory",
-                "metadata": {}  # Invalid
-            }
+                "metadata": {},  # Invalid
+            },
         ]
 
         success, message = validate_migration(client=mock_client, sample_size=10)

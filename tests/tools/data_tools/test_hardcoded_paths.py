@@ -60,7 +60,9 @@ def test_no_hardcoded_paths_in_migrated_modules():
             rel_path = file_path.relative_to(data_tools_dir.parent.parent.parent.parent)
             msg += f"\n{rel_path}:\n"
             for lineno, path in paths:
-                msg += f"  Line {lineno}: {path[:50]}{'...' if len(path) > 50 else ''}\n"
+                msg += (
+                    f"  Line {lineno}: {path[:50]}{'...' if len(path) > 50 else ''}\n"
+                )
         pytest.fail(msg)
 
 

@@ -4,9 +4,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-import os
 import re
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -17,7 +15,7 @@ FM_END = "\n---\n"
 
 def has_front_matter(text: str) -> bool:
     t = text.lstrip("\ufeff\r\n\t ")
-    return t.startswith(FM_START) and (FM_END in t[len(FM_START):])
+    return t.startswith(FM_START) and (FM_END in t[len(FM_START) :])
 
 
 def split_front_matter(text: str) -> Tuple[Optional[str], str]:
@@ -27,8 +25,8 @@ def split_front_matter(text: str) -> Tuple[Optional[str], str]:
     end_idx = t.find(FM_END, len(FM_START))
     if end_idx == -1:
         return None, text
-    fm = t[len(FM_START):end_idx]
-    rest = t[end_idx + len(FM_END):]
+    fm = t[len(FM_START) : end_idx]
+    rest = t[end_idx + len(FM_END) :]
     return fm, rest
 
 
@@ -77,7 +75,7 @@ def parse_front_matter_minimal(fm: str) -> Dict[str, Any]:
             if val == "null":
                 out[key] = None
             elif val in ("true", "false"):
-                out[key] = (val == "true")
+                out[key] = val == "true"
             else:
                 if re.fullmatch(r"-?\d+", val):
                     out[key] = int(val)
@@ -95,6 +93,7 @@ def read_csv(path: Path) -> List[Dict[str, str]]:
 
 def sha256_text(s: str) -> str:
     import hashlib
+
     return hashlib.sha256(s.encode("utf-8", errors="replace")).hexdigest()
 
 
@@ -103,10 +102,18 @@ def ensure_dir(p: Path) -> None:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Build a root memory registry (1 per conversation) from kept markdown YAML headers.")
+    ap = argparse.ArgumentParser(
+        description="Build a root memory registry (1 per conversation) from kept markdown YAML headers."
+    )
     ap.add_argument("--kept-manifest", required=True, help="Path to kept_manifest.csv")
-    ap.add_argument("--out-dir", required=True, help="Output directory for registry artifacts")
-    ap.add_argument("--export-date", default="", help="Optional: export date (YYYY-MM-DD), stored in run manifest")
+    ap.add_argument(
+        "--out-dir", required=True, help="Output directory for registry artifacts"
+    )
+    ap.add_argument(
+        "--export-date",
+        default="",
+        help="Optional: export date (YYYY-MM-DD), stored in run manifest",
+    )
     args = ap.parse_args()
 
     out_dir = Path(args.out_dir)
@@ -124,7 +131,9 @@ def main() -> None:
 
     for kr in kept_rows:
         cid = (kr.get("id") or "").strip()
-        md_path_s = (kr.get("dest_path") or kr.get("resolved_path") or kr.get("src_path") or "").strip()
+        md_path_s = (
+            kr.get("dest_path") or kr.get("resolved_path") or kr.get("src_path") or ""
+        ).strip()
         if not cid or not md_path_s:
             continue
 
@@ -149,7 +158,9 @@ def main() -> None:
                 "title": fm.get("title", ""),
                 "created_utc": fm.get("created_utc", ""),
                 "updated_utc": fm.get("updated_utc", ""),
-                "message_count_user_assistant": fm.get("message_count_user_assistant", 0),
+                "message_count_user_assistant": fm.get(
+                    "message_count_user_assistant", 0
+                ),
                 "source": fm.get("source", "chatgpt"),
                 "export_date": fm.get("export_date", ""),
                 "memory_version": fm.get("memory_version", ""),
@@ -159,12 +170,16 @@ def main() -> None:
                 "people": fm.get("people", []),
                 "confidence": fm.get("confidence", ""),
                 "path": str(md_path),
-                "body_sha256": sha256_text(body[:20000]),  # cheap fingerprint of body start
+                "body_sha256": sha256_text(
+                    body[:20000]
+                ),  # cheap fingerprint of body start
             }
             records.append(rec)
 
         except Exception as e:
-            errors.append({"conversation_id": cid, "path": str(md_path), "error": repr(e)})
+            errors.append(
+                {"conversation_id": cid, "path": str(md_path), "error": repr(e)}
+            )
 
     # Write JSONL
     with registry_jsonl.open("w", encoding="utf-8") as f:
@@ -212,7 +227,12 @@ def main() -> None:
     run_manifest.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
     print("\n=== Summary ===")
-    print(json.dumps({"root_memories": len(records), "skipped": skipped, "errors": len(errors)}, indent=2))
+    print(
+        json.dumps(
+            {"root_memories": len(records), "skipped": skipped, "errors": len(errors)},
+            indent=2,
+        )
+    )
     print("out:", str(out_dir))
 
 

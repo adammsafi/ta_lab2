@@ -42,7 +42,9 @@ def build_flip_segments(
         raise KeyError(f"DataFrame must include '{state_col}' and '{price_col}'.")
 
     states = df[state_col].to_numpy()
-    changes = np.concatenate([[0], np.nonzero(np.diff(states, prepend=states[0]))[0] + 1])
+    changes = np.concatenate(
+        [[0], np.nonzero(np.diff(states, prepend=states[0]))[0] + 1]
+    )
     seg_ids = np.repeat(np.arange(len(changes)), np.diff(np.append(changes, len(df))))
     seg_df = df.copy()
     seg_df["seg_id"] = seg_ids
@@ -61,8 +63,10 @@ def build_flip_segments(
     segs["seg_return"] = segs["end_price"] / segs["start_price"] - 1
 
     if timestamp_col and timestamp_col in df:
-        gb_t = seg_df.groupby("seg_id", sort=False)[timestamp_col].agg(["first", "last"]).rename(
-            columns={"first": "start_time", "last": "end_time"}
+        gb_t = (
+            seg_df.groupby("seg_id", sort=False)[timestamp_col]
+            .agg(["first", "last"])
+            .rename(columns={"first": "start_time", "last": "end_time"})
         )
         segs = segs.join(gb_t, on="seg_id")
 

@@ -20,8 +20,7 @@ from ta_lab2.config import TARGET_DB_URL
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -47,14 +46,16 @@ def table_exists(engine: Engine, schema: str, table_name: str) -> bool:
     Returns:
         True if table exists, False otherwise
     """
-    query = text("""
+    query = text(
+        """
         SELECT EXISTS (
             SELECT 1
             FROM information_schema.tables
             WHERE table_schema = :schema
             AND table_name = :table_name
         )
-    """)
+    """
+    )
 
     with engine.connect() as conn:
         result = conn.execute(query, {"schema": schema, "table_name": table_name})
@@ -98,7 +99,9 @@ def get_row_count(engine: Engine, table_name: str) -> int:
         return result.scalar()
 
 
-def ensure_dim_timeframe(engine: Engine, sql_dir: Path, dry_run: bool = False) -> Dict[str, Any]:
+def ensure_dim_timeframe(
+    engine: Engine, sql_dir: Path, dry_run: bool = False
+) -> Dict[str, Any]:
     """
     Ensure dim_timeframe table exists and is populated.
 
@@ -144,16 +147,20 @@ def ensure_dim_timeframe(engine: Engine, sql_dir: Path, dry_run: bool = False) -
         logger.info("Adding optional columns for future compatibility...")
         with engine.begin() as conn:
             # Check if is_canonical column exists
-            check_col = text("""
+            check_col = text(
+                """
                 SELECT column_name
                 FROM information_schema.columns
                 WHERE table_schema = 'public'
                 AND table_name = 'dim_timeframe'
                 AND column_name = 'is_canonical'
-            """)
+            """
+            )
             result = conn.execute(check_col)
             if not result.fetchone():
-                conn.execute(text("""
+                conn.execute(
+                    text(
+                        """
                     ALTER TABLE dim_timeframe
                     ADD COLUMN IF NOT EXISTS is_canonical boolean NOT NULL DEFAULT true,
                     ADD COLUMN IF NOT EXISTS calendar_scheme text NULL,
@@ -161,8 +168,12 @@ def ensure_dim_timeframe(engine: Engine, sql_dir: Path, dry_run: bool = False) -
                     ADD COLUMN IF NOT EXISTS allow_partial_end boolean NOT NULL DEFAULT false,
                     ADD COLUMN IF NOT EXISTS tf_days_min integer NULL,
                     ADD COLUMN IF NOT EXISTS tf_days_max integer NULL
-                """))
-                logger.info("Added optional columns: is_canonical, calendar_scheme, allow_partial_*, tf_days_min/max")
+                """
+                    )
+                )
+                logger.info(
+                    "Added optional columns: is_canonical, calendar_scheme, allow_partial_*, tf_days_min/max"
+                )
 
         created = True
         rows = get_row_count(engine, "public.dim_timeframe")
@@ -173,7 +184,9 @@ def ensure_dim_timeframe(engine: Engine, sql_dir: Path, dry_run: bool = False) -
     return {"existed": existed, "created": created, "rows": rows}
 
 
-def ensure_dim_sessions(engine: Engine, sql_dir: Path, dry_run: bool = False) -> Dict[str, Any]:
+def ensure_dim_sessions(
+    engine: Engine, sql_dir: Path, dry_run: bool = False
+) -> Dict[str, Any]:
     """
     Ensure dim_sessions table exists and is populated.
 
@@ -199,7 +212,8 @@ def ensure_dim_sessions(engine: Engine, sql_dir: Path, dry_run: bool = False) ->
         logger.info("dim_sessions table missing - creating and populating...")
 
         # Create table with schema matching dim_sessions.py
-        create_table_sql = text("""
+        create_table_sql = text(
+            """
             CREATE TABLE IF NOT EXISTS dim_sessions (
                 asset_class text NOT NULL,
                 region text NOT NULL,
@@ -214,10 +228,12 @@ def ensure_dim_sessions(engine: Engine, sql_dir: Path, dry_run: bool = False) ->
                 is_24h boolean NOT NULL DEFAULT false,
                 PRIMARY KEY (asset_class, region, venue, asset_key_type, asset_key, session_type)
             )
-        """)
+        """
+        )
 
         # Insert default sessions
-        insert_defaults_sql = text("""
+        insert_defaults_sql = text(
+            """
             INSERT INTO dim_sessions
             (asset_class, region, venue, asset_key_type, asset_key, session_type,
              asset_id, timezone, session_open_local, session_close_local, is_24h)
@@ -231,7 +247,8 @@ def ensure_dim_sessions(engine: Engine, sql_dir: Path, dry_run: bool = False) ->
              NULL, 'America/New_York', '09:30:00', '16:00:00', FALSE)
             ON CONFLICT (asset_class, region, venue, asset_key_type, asset_key, session_type)
             DO NOTHING
-        """)
+        """
+        )
 
         with engine.begin() as conn:
             conn.execute(create_table_sql)
@@ -257,12 +274,10 @@ def main() -> None:
         "--sql-dir",
         type=Path,
         default=Path("sql/lookups"),
-        help="Directory containing SQL seed files (default: sql/lookups)"
+        help="Directory containing SQL seed files (default: sql/lookups)",
     )
     parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Check existence without creating tables"
+        "--dry-run", action="store_true", help="Check existence without creating tables"
     )
 
     args = parser.parse_args()
@@ -305,19 +320,19 @@ def main() -> None:
     logger.info("=" * 60)
     logger.info("Summary:")
     logger.info("-" * 60)
-    logger.info(f"dim_timeframe:")
+    logger.info("dim_timeframe:")
     logger.info(f"  - Existed: {dim_timeframe_result['existed']}")
     logger.info(f"  - Created: {dim_timeframe_result['created']}")
     logger.info(f"  - Rows: {dim_timeframe_result['rows']}")
-    logger.info(f"dim_sessions:")
+    logger.info("dim_sessions:")
     logger.info(f"  - Existed: {dim_sessions_result['existed']}")
     logger.info(f"  - Created: {dim_sessions_result['created']}")
     logger.info(f"  - Rows: {dim_sessions_result['rows']}")
     logger.info("=" * 60)
 
-    if dim_timeframe_result['created'] or dim_sessions_result['created']:
+    if dim_timeframe_result["created"] or dim_sessions_result["created"]:
         logger.info("Tables created successfully!")
-    elif dim_timeframe_result['existed'] and dim_sessions_result['existed']:
+    elif dim_timeframe_result["existed"] and dim_sessions_result["existed"]:
         logger.info("All tables already exist - no action needed")
 
     exit(0)

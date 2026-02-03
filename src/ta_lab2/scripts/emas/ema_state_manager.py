@@ -44,6 +44,7 @@ from sqlalchemy.engine import Engine
 # Configuration
 # =============================================================================
 
+
 @dataclass(frozen=True)
 class EMAStateConfig:
     """
@@ -59,6 +60,7 @@ class EMAStateConfig:
         bars_schema: Schema for bars table (default: "public")
         bars_partial_filter: Filter for canonical bars (default: "is_partial_end = FALSE")
     """
+
     state_schema: str = "public"
     state_table: str = "cmc_ema_state"
     ts_column: str = "ts"
@@ -190,12 +192,19 @@ class EMAStateManager:
                 return pd.read_sql(sql, conn, params=params)
             except Exception:
                 # Table doesn't exist yet or is empty
-                return pd.DataFrame(columns=[
-                    "id", "tf", "period",
-                    "daily_min_seen", "daily_max_seen", "last_bar_seq", "last_time_close",
-                    "last_canonical_ts",
-                    "updated_at"
-                ])
+                return pd.DataFrame(
+                    columns=[
+                        "id",
+                        "tf",
+                        "period",
+                        "daily_min_seen",
+                        "daily_max_seen",
+                        "last_bar_seq",
+                        "last_time_close",
+                        "last_canonical_ts",
+                        "updated_at",
+                    ]
+                )
 
     def update_state_from_output(
         self,
@@ -230,7 +239,9 @@ class EMAStateManager:
         """Update state using canonical timestamp logic (for cal/anchor scripts)."""
         ts_col = self.config.ts_column
         roll_filter = self.config.roll_filter
-        where_clause = f"WHERE {roll_filter}" if roll_filter else f"WHERE {ts_col} IS NOT NULL"
+        where_clause = (
+            f"WHERE {roll_filter}" if roll_filter else f"WHERE {ts_col} IS NOT NULL"
+        )
 
         bars_table = self.config.bars_table
         bars_schema = self.config.bars_schema

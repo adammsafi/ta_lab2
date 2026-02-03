@@ -38,11 +38,7 @@ def run_command(cmd: list, description: str) -> bool:
 
     try:
         result = subprocess.run(
-            cmd,
-            check=True,
-            capture_output=True,
-            text=True,
-            env={**os.environ}
+            cmd, check=True, capture_output=True, text=True, env={**os.environ}
         )
         logger.info(result.stdout)
         if result.stderr:
@@ -65,9 +61,13 @@ def main() -> int:
     ap = argparse.ArgumentParser(
         description="Process Claude Code conversations: convert, extract memories, embed"
     )
-    ap.add_argument("--claude-dir", help="Claude projects directory (default: ~/.claude/projects)")
+    ap.add_argument(
+        "--claude-dir", help="Claude projects directory (default: ~/.claude/projects)"
+    )
     ap.add_argument("--output-dir", required=True, help="Output directory")
-    ap.add_argument("--generate-memories-script", help="Path to generate_memories script")
+    ap.add_argument(
+        "--generate-memories-script", help="Path to generate_memories script"
+    )
     ap.add_argument("--embed-memories-script", help="Path to embed_memories script")
     args = ap.parse_args()
 
@@ -75,7 +75,11 @@ def main() -> int:
         logger.error("OPENAI_API_KEY not set")
         return 1
 
-    claude_dir = Path(args.claude_dir) if args.claude_dir else (Path.home() / ".claude" / "projects")
+    claude_dir = (
+        Path(args.claude_dir)
+        if args.claude_dir
+        else (Path.home() / ".claude" / "projects")
+    )
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -86,19 +90,23 @@ def main() -> int:
     all_memories_combined = output_dir / "all_memories_with_claude.jsonl"
     chroma_dir = output_dir / "chromadb"
 
-    logger.info("="*60)
+    logger.info("=" * 60)
     logger.info("CLAUDE CODE MEMORY EXTRACTION PIPELINE")
-    logger.info("="*60)
+    logger.info("=" * 60)
 
     # Step 1: Convert Claude Code conversations
     logger.info("\n[STEP 1] Converting Claude Code conversations...")
     if not run_command(
         [
-            "python", "-m", "ta_lab2.tools.data_tools.export.convert_claude_code_to_chatgpt_format",
-            "--claude-dir", str(claude_dir),
-            "--output", str(claude_json),
+            "python",
+            "-m",
+            "ta_lab2.tools.data_tools.export.convert_claude_code_to_chatgpt_format",
+            "--claude-dir",
+            str(claude_dir),
+            "--output",
+            str(claude_json),
         ],
-        "Convert Claude Code JSONL -> ChatGPT JSON"
+        "Convert Claude Code JSONL -> ChatGPT JSON",
     ):
         logger.error("Conversion failed")
         return 1
@@ -117,12 +125,16 @@ def main() -> int:
         logger.info("\n[STEP 2] Generating memories...")
         if not run_command(
             [
-                "python", args.generate_memories_script,
-                "--input-file", str(claude_json),
-                "--output-file", str(claude_memories),
-                "--batch-size", "10",
+                "python",
+                args.generate_memories_script,
+                "--input-file",
+                str(claude_json),
+                "--output-file",
+                str(claude_memories),
+                "--batch-size",
+                "10",
             ],
-            "Extract memories using GPT-4"
+            "Extract memories using GPT-4",
         ):
             logger.error("Memory generation failed")
             return 1
@@ -157,29 +169,36 @@ def main() -> int:
                         out.write(line)
 
     total_count = existing_count + claude_mem_count
-    logger.info(f"Combined {existing_count} existing + {claude_mem_count} Claude = {total_count} total")
+    logger.info(
+        f"Combined {existing_count} existing + {claude_mem_count} Claude = {total_count} total"
+    )
 
     # Step 4: Re-embed
     if args.embed_memories_script:
         logger.info("\n[STEP 4] Re-embedding into ChromaDB...")
         if not run_command(
             [
-                "python", args.embed_memories_script,
-                "--memory-file", str(all_memories_combined),
-                "--chroma-dir", str(chroma_dir),
-                "--collection-name", "project_memories",
-                "--batch-size", "50",
+                "python",
+                args.embed_memories_script,
+                "--memory-file",
+                str(all_memories_combined),
+                "--chroma-dir",
+                str(chroma_dir),
+                "--collection-name",
+                "project_memories",
+                "--batch-size",
+                "50",
             ],
-            "Embed memories into ChromaDB"
+            "Embed memories into ChromaDB",
         ):
             logger.error("Embedding failed")
             return 1
     else:
         logger.warning("Embedding script not provided, skipping")
 
-    logger.info("\n" + "="*60)
+    logger.info("\n" + "=" * 60)
     logger.info("SUCCESS! PIPELINE COMPLETE!")
-    logger.info("="*60)
+    logger.info("=" * 60)
     logger.info(f"Total memories: {total_count}")
     logger.info(f"ChromaDB location: {chroma_dir}")
 

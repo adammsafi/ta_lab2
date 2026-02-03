@@ -17,12 +17,10 @@ Usage:
 import json
 import logging
 from pathlib import Path
-from typing import Optional
 from datetime import datetime, timezone
 
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -67,17 +65,23 @@ def load_snapshot_manifests(snapshots_dir: Path) -> dict:
                 # So we'll use directory-level counts for validation
                 result[dir_name] = {
                     "files_found": dir_stat["files_found"],
-                    "files_indexed": dir_stat["files_indexed"]
+                    "files_indexed": dir_stat["files_indexed"],
                 }
-            logger.info(f"Loaded external_dirs snapshot: {len(data.get('directory_stats', []))} directories")
+            logger.info(
+                f"Loaded external_dirs snapshot: {len(data.get('directory_stats', []))} directories"
+            )
 
     # Load conversations snapshot (for stats)
     if manifests["conversations"].exists():
         with open(manifests["conversations"], "r") as f:
             data = json.load(f)
-            conversations_count = data.get("statistics", {}).get("conversations_indexed", 0)
+            conversations_count = data.get("statistics", {}).get(
+                "conversations_indexed", 0
+            )
             result["conversations"] = {"count": conversations_count}
-            logger.info(f"Loaded conversations snapshot: {conversations_count} conversations")
+            logger.info(
+                f"Loaded conversations snapshot: {conversations_count} conversations"
+            )
 
     return result
 
@@ -98,20 +102,21 @@ def test_directory_inventory_query(client, directory: str) -> dict:
         # Search with directory filter
         # Note: Remove filters parameter - Qdrant filter syntax is complex
         # Just use semantic search and check results
-        search_results = client.search(
-            query=query,
-            user_id="orchestrator",
-            limit=20
-        )
+        search_results = client.search(query=query, user_id="orchestrator", limit=20)
 
         # Extract results list from response dict
-        results = search_results.get("results", []) if isinstance(search_results, dict) else search_results
+        results = (
+            search_results.get("results", [])
+            if isinstance(search_results, dict)
+            else search_results
+        )
 
         # Filter results to only those from the target directory
         filtered_results = [
-            r for r in results
-            if directory.lower() in r.get("memory", "").lower() or
-               r.get("metadata", {}).get("directory") == directory
+            r
+            for r in results
+            if directory.lower() in r.get("memory", "").lower()
+            or r.get("metadata", {}).get("directory") == directory
         ]
         results = filtered_results
 
@@ -127,7 +132,7 @@ def test_directory_inventory_query(client, directory: str) -> dict:
             "query": query,
             "results_count": len(results),
             "sample_files": sample_files,
-            "success": len(results) > 0
+            "success": len(results) > 0,
         }
     except Exception as e:
         logger.error(f"Directory inventory query failed for {directory}: {e}")
@@ -136,7 +141,7 @@ def test_directory_inventory_query(client, directory: str) -> dict:
             "results_count": 0,
             "sample_files": [],
             "success": False,
-            "error": str(e)
+            "error": str(e),
         }
 
 
@@ -154,20 +159,21 @@ def test_function_lookup_query(client, directory: str) -> dict:
 
     try:
         # Search for functions in directory
-        search_results = client.search(
-            query=query,
-            user_id="orchestrator",
-            limit=10
-        )
+        search_results = client.search(query=query, user_id="orchestrator", limit=10)
 
         # Extract results list from response dict
-        results = search_results.get("results", []) if isinstance(search_results, dict) else search_results
+        results = (
+            search_results.get("results", [])
+            if isinstance(search_results, dict)
+            else search_results
+        )
 
         # Filter results to only those from the target directory
         filtered_results = [
-            r for r in results
-            if r.get("metadata", {}).get("directory") == directory or
-               directory.lower() in r.get("memory", "").lower()
+            r
+            for r in results
+            if r.get("metadata", {}).get("directory") == directory
+            or directory.lower() in r.get("memory", "").lower()
         ]
         results = filtered_results
 
@@ -178,7 +184,7 @@ def test_function_lookup_query(client, directory: str) -> dict:
             "query": query,
             "found": has_functions,
             "results_count": len(results),
-            "success": has_functions
+            "success": has_functions,
         }
     except Exception as e:
         logger.error(f"Function lookup query failed for {directory}: {e}")
@@ -187,7 +193,7 @@ def test_function_lookup_query(client, directory: str) -> dict:
             "found": False,
             "results_count": 0,
             "success": False,
-            "error": str(e)
+            "error": str(e),
         }
 
 
@@ -204,14 +210,14 @@ def test_tag_filtering_query(client, tag: str) -> dict:
     query = f"{tag} snapshot files"
 
     try:
-        search_results = client.search(
-            query=query,
-            user_id="orchestrator",
-            limit=10
-        )
+        search_results = client.search(query=query, user_id="orchestrator", limit=10)
 
         # Extract results list from response dict
-        results = search_results.get("results", []) if isinstance(search_results, dict) else search_results
+        results = (
+            search_results.get("results", [])
+            if isinstance(search_results, dict)
+            else search_results
+        )
 
         # Check if results have the tag
         # Results can be dict or other format - handle both
@@ -229,7 +235,7 @@ def test_tag_filtering_query(client, tag: str) -> dict:
             "results_count": len(results),
             "tagged_results": len(tagged_results),
             "tag_filter_works": len(tagged_results) > 0,
-            "success": len(tagged_results) > 0
+            "success": len(tagged_results) > 0,
         }
     except Exception as e:
         logger.error(f"Tag filtering query failed for {tag}: {e}")
@@ -239,7 +245,7 @@ def test_tag_filtering_query(client, tag: str) -> dict:
             "tagged_results": 0,
             "tag_filter_works": False,
             "success": False,
-            "error": str(e)
+            "error": str(e),
         }
 
 
@@ -257,24 +263,25 @@ def test_cross_reference_query(client) -> dict:
 
     try:
         search_results = client.search(query=query, user_id="orchestrator", limit=5)
-        results = search_results.get("results", []) if isinstance(search_results, dict) else search_results
+        results = (
+            search_results.get("results", [])
+            if isinstance(search_results, dict)
+            else search_results
+        )
 
         return {
             "query": query,
             "results_count": len(results),
-            "success": len(results) > 0
+            "success": len(results) > 0,
         }
     except Exception as e:
         logger.error(f"Cross-reference query failed: {e}")
-        return {
-            "query": query,
-            "results_count": 0,
-            "success": False,
-            "error": str(e)
-        }
+        return {"query": query, "results_count": 0, "success": False, "error": str(e)}
 
 
-def validate_file_coverage(client, expected_files: list[str], sample_size: int = 50) -> dict:
+def validate_file_coverage(
+    client, expected_files: list[str], sample_size: int = 50
+) -> dict:
     """Validate that expected files are queryable via search.
 
     Args:
@@ -298,15 +305,19 @@ def validate_file_coverage(client, expected_files: list[str], sample_size: int =
 
     for file_path in test_files:
         # Extract filename for query
-        filename = Path(file_path).name if "\\" in file_path or "/" in file_path else file_path
+        filename = (
+            Path(file_path).name if "\\" in file_path or "/" in file_path else file_path
+        )
 
         try:
             search_results = client.search(
-                query=f"File {filename}",
-                user_id="orchestrator",
-                limit=3
+                query=f"File {filename}", user_id="orchestrator", limit=3
             )
-            results = search_results.get("results", []) if isinstance(search_results, dict) else search_results
+            results = (
+                search_results.get("results", [])
+                if isinstance(search_results, dict)
+                else search_results
+            )
 
             # Check if any result mentions this file
             file_found = any(filename in r.get("memory", "") for r in results)
@@ -325,7 +336,7 @@ def validate_file_coverage(client, expected_files: list[str], sample_size: int =
         "total": len(test_files),
         "found": found,
         "missing": missing,
-        "coverage_percentage": round(coverage_percentage, 2)
+        "coverage_percentage": round(coverage_percentage, 2),
     }
 
 
@@ -355,7 +366,11 @@ def validate_memory_coverage(snapshots_dir: Path, sample_size: int = 50) -> dict
         collection_info = client.memory.vector_store.client.get_collection(
             collection_name=collection_name
         )
-        total_memories = collection_info.points_count if hasattr(collection_info, 'points_count') else 0
+        total_memories = (
+            collection_info.points_count
+            if hasattr(collection_info, "points_count")
+            else 0
+        )
     except Exception as e:
         logger.warning(f"Failed to get memory count from Qdrant: {e}")
         total_memories = 0
@@ -377,7 +392,7 @@ def validate_memory_coverage(snapshots_dir: Path, sample_size: int = 50) -> dict
 
         directory_results[directory] = {
             "inventory_query": inventory_result,
-            "function_lookup": function_result
+            "function_lookup": function_result,
         }
 
     # Test tag filtering
@@ -393,21 +408,17 @@ def validate_memory_coverage(snapshots_dir: Path, sample_size: int = 50) -> dict
     if "ta_lab2" in manifests and isinstance(manifests["ta_lab2"], list):
         logger.info("Validating file coverage for ta_lab2")
         file_coverage = validate_file_coverage(
-            client,
-            manifests["ta_lab2"],
-            sample_size
+            client, manifests["ta_lab2"], sample_size
         )
 
     # Calculate overall success
     # Count how many directories pass inventory query (main requirement)
     inventory_pass_count = sum(
-        1 for d in directories
-        if directory_results[d]["inventory_query"]["success"]
+        1 for d in directories if directory_results[d]["inventory_query"]["success"]
     )
 
     function_pass_count = sum(
-        1 for d in directories
-        if directory_results[d]["function_lookup"]["success"]
+        1 for d in directories if directory_results[d]["function_lookup"]["success"]
     )
 
     # Calculate coverage: inventory queries are most important (80%), function lookup is nice to have (20%)
@@ -421,9 +432,7 @@ def validate_memory_coverage(snapshots_dir: Path, sample_size: int = 50) -> dict
     # - Total memories > 0
     # - Tag filtering works
     success = (
-        inventory_coverage >= 80.0 and
-        total_memories > 0 and
-        tag_result["success"]
+        inventory_coverage >= 80.0 and total_memories > 0 and tag_result["success"]
     )
 
     # Document gaps
@@ -432,10 +441,12 @@ def validate_memory_coverage(snapshots_dir: Path, sample_size: int = 50) -> dict
         if not directory_results[d]["inventory_query"]["success"]:
             gaps.append(f"Directory '{d}' inventory query returned 0 results")
         if not directory_results[d]["function_lookup"]["success"]:
-            gaps.append(f"Directory '{d}' function lookup query did not find function information")
+            gaps.append(
+                f"Directory '{d}' function lookup query did not find function information"
+            )
 
     return {
-        "timestamp": datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
+        "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "total_memories": total_memories,
         "directories_validated": directories,
         "directory_results": directory_results,
@@ -450,13 +461,14 @@ def validate_memory_coverage(snapshots_dir: Path, sample_size: int = 50) -> dict
             "function_lookup_count": function_pass_count,
             "function_lookup_percentage": round(function_coverage, 2),
             "tag_filtering_working": tag_result["success"],
-            "cross_reference_working": xref_result["success"]
+            "cross_reference_working": xref_result["success"],
         },
         "gaps": gaps,
         "gap_analysis": (
-            "No significant gaps" if success else
-            f"Coverage below threshold: {round(overall_coverage_percentage, 2)}% < 80%"
-        )
+            "No significant gaps"
+            if success
+            else f"Coverage below threshold: {round(overall_coverage_percentage, 2)}% < 80%"
+        ),
     }
 
 
@@ -468,7 +480,9 @@ def run_validation(output_path: Path, sample_size: int = 50):
         sample_size: Max files to test per directory
     """
     # Determine snapshots directory
-    planning_dir = Path(__file__).parent.parent.parent.parent.parent.parent / ".planning"
+    planning_dir = (
+        Path(__file__).parent.parent.parent.parent.parent.parent / ".planning"
+    )
     snapshots_dir = planning_dir / "phases" / "11-memory-preparation" / "snapshots"
 
     logger.info(f"Using snapshots directory: {snapshots_dir}")
@@ -496,22 +510,30 @@ def run_validation(output_path: Path, sample_size: int = 50):
         inventory_success = results["inventory_query"]["success"]
         function_success = results["function_lookup"]["success"]
         print(f"  {directory}:")
-        print(f"    Inventory query: {'PASS' if inventory_success else 'FAIL'} "
-              f"({results['inventory_query']['results_count']} results)")
-        print(f"    Function lookup: {'PASS' if function_success else 'FAIL'} "
-              f"({results['function_lookup']['results_count']} results)")
+        print(
+            f"    Inventory query: {'PASS' if inventory_success else 'FAIL'} "
+            f"({results['inventory_query']['results_count']} results)"
+        )
+        print(
+            f"    Function lookup: {'PASS' if function_success else 'FAIL'} "
+            f"({results['function_lookup']['results_count']} results)"
+        )
 
     print("\nQuery Type Results:")
-    print(f"  Tag filtering: {'PASS' if report['tag_filtering']['success'] else 'FAIL'}")
-    print(f"  Cross-reference: {'PASS' if report['cross_reference']['success'] else 'FAIL'}")
+    print(
+        f"  Tag filtering: {'PASS' if report['tag_filtering']['success'] else 'FAIL'}"
+    )
+    print(
+        f"  Cross-reference: {'PASS' if report['cross_reference']['success'] else 'FAIL'}"
+    )
 
     if report["file_coverage"]:
-        print(f"\nFile Coverage (ta_lab2 sample):")
+        print("\nFile Coverage (ta_lab2 sample):")
         print(f"  Tested: {report['file_coverage']['total']} files")
         print(f"  Found: {report['file_coverage']['found']} files")
         print(f"  Coverage: {report['file_coverage']['coverage_percentage']}%")
 
-    print(f"\nGap Analysis:")
+    print("\nGap Analysis:")
     print(f"  {report['gap_analysis']}")
     if report["gaps"]:
         print(f"\n  Documented gaps ({len(report['gaps'])}):")
@@ -533,14 +555,16 @@ def main():
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path(".planning/phases/11-memory-preparation/validation/coverage_report.json"),
-        help="Output path for validation report"
+        default=Path(
+            ".planning/phases/11-memory-preparation/validation/coverage_report.json"
+        ),
+        help="Output path for validation report",
     )
     parser.add_argument(
         "--sample-size",
         type=int,
         default=50,
-        help="Number of files to test per directory"
+        help="Number of files to test per directory",
     )
 
     args = parser.parse_args()

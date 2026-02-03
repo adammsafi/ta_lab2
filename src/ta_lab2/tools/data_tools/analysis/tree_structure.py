@@ -107,7 +107,9 @@ def _dir_entry(path: str, root: str) -> Dict[str, Any]:
     # Windows relpath can be ".", normalize to "" for root display
     rel = "" if rel == "." else rel.replace(os.sep, "/")
     return {
-        "name": os.path.basename(path) if rel else os.path.basename(root.rstrip(os.sep)),
+        "name": os.path.basename(path)
+        if rel
+        else os.path.basename(root.rstrip(os.sep)),
         "type": "dir" if is_dir else "file",
         "path": rel,
         "size": (0 if is_dir else st.st_size),
@@ -347,9 +349,7 @@ def emit_hybrid_markdown(
     pkg_dir = _find_pkg_dir(pkg_name)
     lines: list[str] = []
     lines.append(f"# {pkg_name} – File & Symbol Map")
-    lines.append(
-        f"_Generated: {datetime.now().isoformat(timespec='seconds')}_\n"
-    )
+    lines.append(f"_Generated: {datetime.now().isoformat(timespec='seconds')}_\n")
 
     for root, dirs, files in os.walk(pkg_dir):
         # prune ignored dirs in-place

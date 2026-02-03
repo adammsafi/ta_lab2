@@ -40,6 +40,7 @@ import logging
 # Worker Task
 # =============================================================================
 
+
 @dataclass(frozen=True)
 class WorkerTask:
     """
@@ -55,6 +56,7 @@ class WorkerTask:
         end: Optional end timestamp for date range filtering
         extra_config: Script-specific configuration (alignment_type, bars_table, etc.)
     """
+
     id_: int
     db_url: str
     periods: list[int]
@@ -64,7 +66,7 @@ class WorkerTask:
 
     def __post_init__(self):
         if self.extra_config is None:
-            object.__setattr__(self, 'extra_config', {})
+            object.__setattr__(self, "extra_config", {})
 
 
 TTask = TypeVar("TTask")
@@ -73,6 +75,7 @@ TTask = TypeVar("TTask")
 # =============================================================================
 # Orchestrator
 # =============================================================================
+
 
 class EMAComputationOrchestrator:
     """
@@ -180,7 +183,9 @@ class EMAComputationOrchestrator:
                     f"(2) Increase Postgres max_connections. "
                     f"Error: {e}"
                 )
-            elif "password authentication failed" in error_msg or "password" in error_msg:
+            elif (
+                "password authentication failed" in error_msg or "password" in error_msg
+            ):
                 self.logger.error(
                     f"DATABASE AUTHENTICATION FAILED. "
                     f"Check that db_url includes correct password. "
@@ -194,7 +199,4 @@ class EMAComputationOrchestrator:
             return 0
 
     def __repr__(self) -> str:
-        return (
-            f"EMAComputationOrchestrator("
-            f"num_processes={self.num_processes})"
-        )
+        return f"EMAComputationOrchestrator(" f"num_processes={self.num_processes})"

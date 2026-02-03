@@ -37,8 +37,8 @@ runfile(
   r"C:\Users\asafi\Downloads\ta_lab2\src\ta_lab2\scripts\returns\refresh_cmc_returns_bars_multi_tf.py",
   wdir=r"C:\Users\asafi\Downloads\ta_lab2",
   args="--ids all --tfs all"
-)  
-  
+)
+
 """
 
 import argparse
@@ -58,8 +58,8 @@ DEFAULT_STATE_TABLE = "public.cmc_returns_bars_multi_tf_state"
 @dataclass(frozen=True)
 class RunnerConfig:
     db_url: str
-    ids: Optional[List[int]]          # None means ALL
-    tfs: Optional[List[str]]          # None means ALL
+    ids: Optional[List[int]]  # None means ALL
+    tfs: Optional[List[str]]  # None means ALL
     bars_table: str
     out_table: str
     state_table: str
@@ -88,7 +88,9 @@ def _load_all_tfs(engine: Engine, bars_table: str) -> List[str]:
     return [str(r[0]) for r in rows]
 
 
-def _load_pairs(engine: Engine, bars_table: str, ids: List[int], tfs: List[str]) -> List[Tuple[int, str]]:
+def _load_pairs(
+    engine: Engine, bars_table: str, ids: List[int], tfs: List[str]
+) -> List[Tuple[int, str]]:
     sql = text(
         f"""
         SELECT DISTINCT id, tf
@@ -102,7 +104,9 @@ def _load_pairs(engine: Engine, bars_table: str, ids: List[int], tfs: List[str])
     return [(int(r[0]), str(r[1])) for r in rows]
 
 
-def _ensure_state_rows(engine: Engine, state_table: str, pairs: Iterable[Tuple[int, str]]) -> None:
+def _ensure_state_rows(
+    engine: Engine, state_table: str, pairs: Iterable[Tuple[int, str]]
+) -> None:
     pairs = [(int(i), str(tf)) for (i, tf) in pairs]
     if not pairs:
         return
@@ -125,11 +129,15 @@ def _ensure_state_rows(engine: Engine, state_table: str, pairs: Iterable[Tuple[i
         cxn.execute(sql, [{"id": i, "tf": tf} for (i, tf) in pairs])
 
 
-def _full_refresh(engine: Engine, out_table: str, state_table: str, pairs: List[Tuple[int, str]]) -> None:
+def _full_refresh(
+    engine: Engine, out_table: str, state_table: str, pairs: List[Tuple[int, str]]
+) -> None:
     if not pairs:
         return
 
-    _print(f"--full-refresh: deleting existing rows for {len(pairs)} (id,tf) keys and resetting state.")
+    _print(
+        f"--full-refresh: deleting existing rows for {len(pairs)} (id,tf) keys and resetting state."
+    )
 
     sql_del_out = text(
         f"""
@@ -234,22 +242,38 @@ def _run_one_pair(engine: Engine, cfg: RunnerConfig, one_id: int, one_tf: str) -
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Incremental bar returns builder (arith + log) from bar snapshots.")
-    p.add_argument("--db-url", default=os.getenv("TARGET_DB_URL", ""), help="Postgres DB URL (or set TARGET_DB_URL).")
+    p = argparse.ArgumentParser(
+        description="Incremental bar returns builder (arith + log) from bar snapshots."
+    )
+    p.add_argument(
+        "--db-url",
+        default=os.getenv("TARGET_DB_URL", ""),
+        help="Postgres DB URL (or set TARGET_DB_URL).",
+    )
 
     p.add_argument("--ids", default="all", help="Comma-separated ids, or 'all'.")
     p.add_argument("--tfs", default="all", help="Comma-separated tfs, or 'all'.")
 
-    p.add_argument("--bars-table", default=DEFAULT_BARS_TABLE, help="Source bars table.")
-    p.add_argument("--out-table", default=DEFAULT_OUT_TABLE, help="Output returns table.")
+    p.add_argument(
+        "--bars-table", default=DEFAULT_BARS_TABLE, help="Source bars table."
+    )
+    p.add_argument(
+        "--out-table", default=DEFAULT_OUT_TABLE, help="Output returns table."
+    )
     p.add_argument("--state-table", default=DEFAULT_STATE_TABLE, help="State table.")
 
-    p.add_argument("--full-refresh", action="store_true", help="Recompute history for selected keys.")
+    p.add_argument(
+        "--full-refresh",
+        action="store_true",
+        help="Recompute history for selected keys.",
+    )
     args = p.parse_args()
 
     db_url = args.db_url.strip()
     if not db_url:
-        raise SystemExit("ERROR: Missing DB URL. Provide --db-url or set TARGET_DB_URL.")
+        raise SystemExit(
+            "ERROR: Missing DB URL. Provide --db-url or set TARGET_DB_URL."
+        )
 
     cfg = RunnerConfig(
         db_url=db_url,
@@ -261,7 +285,11 @@ def main() -> None:
         full_refresh=bool(args.full_refresh),
     )
 
-    _print("Using DB URL from TARGET_DB_URL env." if os.getenv("TARGET_DB_URL") else "Using DB URL from --db-url.")
+    _print(
+        "Using DB URL from TARGET_DB_URL env."
+        if os.getenv("TARGET_DB_URL")
+        else "Using DB URL from --db-url."
+    )
     _print(
         f"Runner config: ids={args.ids}, tfs={args.tfs}, bars={cfg.bars_table}, out={cfg.out_table}, state={cfg.state_table}, full_refresh={cfg.full_refresh}"
     )

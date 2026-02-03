@@ -4,7 +4,6 @@ Runs lint-imports command and fails if any circular imports detected.
 Configuration is in pyproject.toml [tool.importlinter] section.
 """
 import subprocess
-import sys
 import pytest
 
 

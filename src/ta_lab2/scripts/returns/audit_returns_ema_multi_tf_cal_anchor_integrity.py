@@ -120,7 +120,15 @@ def _fail_or_warn(strict: bool, msg: str) -> None:
     _print(msg)
 
 
-def _audit_one(engine: Engine, spec: SchemeSpec, dim_tf: str, gap_mult: float, strict: bool, out_dir: Optional[Path], out_base: str) -> None:
+def _audit_one(
+    engine: Engine,
+    spec: SchemeSpec,
+    dim_tf: str,
+    gap_mult: float,
+    strict: bool,
+    out_dir: Optional[Path],
+    out_base: str,
+) -> None:
     scheme = spec.name
     ema_table = spec.ema_table
     ret_table = spec.ret_table
@@ -182,7 +190,10 @@ def _audit_one(engine: Engine, spec: SchemeSpec, dim_tf: str, gap_mult: float, s
         print(bad_cov.head(50).to_string(index=False))
         if out_dir is not None:
             _write_csv(bad_cov, out_dir / f"{out_base}_{scheme}_coverage_bad.csv")
-        _fail_or_warn(strict, f"FAIL: coverage mismatches found for scheme={scheme}: {len(bad_cov)}")
+        _fail_or_warn(
+            strict,
+            f"FAIL: coverage mismatches found for scheme={scheme}: {len(bad_cov)}",
+        )
 
     # Duplicates
     dup_sql = f"""
@@ -199,7 +210,9 @@ def _audit_one(engine: Engine, spec: SchemeSpec, dim_tf: str, gap_mult: float, s
     else:
         _print(f"FAIL: duplicate return keys found: {len(dups)} (showing up to 50)")
         print(dups.head(50).to_string(index=False))
-        _fail_or_warn(strict, f"FAIL: duplicate return keys for scheme={scheme}: {len(dups)}")
+        _fail_or_warn(
+            strict, f"FAIL: duplicate return keys for scheme={scheme}: {len(dups)}"
+        )
 
     # Gaps summary
     gap_sql = f"""
@@ -246,7 +259,9 @@ def _audit_one(engine: Engine, spec: SchemeSpec, dim_tf: str, gap_mult: float, s
     """
     anom = _df(engine, anom_sql, {"gap_mult": gap_mult})
     if len(anom) == 0:
-        _print(f"PASS: no gap anomalies (>=1 and not >{gap_mult}x tf_days_nominal when available).")
+        _print(
+            f"PASS: no gap anomalies (>=1 and not >{gap_mult}x tf_days_nominal when available)."
+        )
     else:
         _print(f"FAIL: gap anomalies found: {len(anom)} (showing up to 50)")
         print(anom.head(50).to_string(index=False))
@@ -294,7 +309,9 @@ def _audit_one(engine: Engine, spec: SchemeSpec, dim_tf: str, gap_mult: float, s
         _print("PASS: alignment to EMA source table.")
     else:
         _print(f"FAIL: {n_missing} returns rows have no matching EMA source row.")
-        _fail_or_warn(strict, f"FAIL: alignment missing rows for scheme={scheme}: {n_missing}")
+        _fail_or_warn(
+            strict, f"FAIL: alignment missing rows for scheme={scheme}: {n_missing}"
+        )
 
     # Write CSVs
     if out_dir is not None:
@@ -308,20 +325,47 @@ def _audit_one(engine: Engine, spec: SchemeSpec, dim_tf: str, gap_mult: float, s
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Audit integrity for calendar-anchored EMA returns (US/ISO).")
-    p.add_argument("--db-url", default=os.getenv("TARGET_DB_URL", ""), help="DB URL (or set TARGET_DB_URL).")
+    p = argparse.ArgumentParser(
+        description="Audit integrity for calendar-anchored EMA returns (US/ISO)."
+    )
+    p.add_argument(
+        "--db-url",
+        default=os.getenv("TARGET_DB_URL", ""),
+        help="DB URL (or set TARGET_DB_URL).",
+    )
     p.add_argument("--scheme", default="both", help="us | iso | both")
-    p.add_argument("--dim-timeframe", default=DEFAULT_DIM_TF, help="dim_timeframe table (for tf_days_nominal).")
-    p.add_argument("--gap-mult", type=float, default=1.5, help="Flag gaps where gap_days > gap_mult * tf_days_nominal (when available).")
-    p.add_argument("--strict", action="store_true", help="Exit non-zero if any FAIL checks occur.")
-    p.add_argument("--out-dir", default="", help="Directory to write CSV outputs. If empty, no CSVs are written.")
-    p.add_argument("--out", default="", help="Base filename prefix (no extension). Defaults to dated name if omitted.")
+    p.add_argument(
+        "--dim-timeframe",
+        default=DEFAULT_DIM_TF,
+        help="dim_timeframe table (for tf_days_nominal).",
+    )
+    p.add_argument(
+        "--gap-mult",
+        type=float,
+        default=1.5,
+        help="Flag gaps where gap_days > gap_mult * tf_days_nominal (when available).",
+    )
+    p.add_argument(
+        "--strict", action="store_true", help="Exit non-zero if any FAIL checks occur."
+    )
+    p.add_argument(
+        "--out-dir",
+        default="",
+        help="Directory to write CSV outputs. If empty, no CSVs are written.",
+    )
+    p.add_argument(
+        "--out",
+        default="",
+        help="Base filename prefix (no extension). Defaults to dated name if omitted.",
+    )
 
     args = p.parse_args()
 
     db_url = args.db_url.strip()
     if not db_url:
-        raise SystemExit("ERROR: Missing DB URL. Provide --db-url or set TARGET_DB_URL.")
+        raise SystemExit(
+            "ERROR: Missing DB URL. Provide --db-url or set TARGET_DB_URL."
+        )
 
     engine = _get_engine(db_url)
 
@@ -330,8 +374,14 @@ def main() -> None:
     gap_mult = float(args.gap_mult)
     strict = bool(args.strict)
 
-    out_dir = Path(args.out_dir).expanduser().resolve() if args.out_dir.strip() else None
-    out_base = args.out.strip() if args.out.strip() else _resolve_out_base("audit_returns_ema_multi_tf_cal_anchor")
+    out_dir = (
+        Path(args.out_dir).expanduser().resolve() if args.out_dir.strip() else None
+    )
+    out_base = (
+        args.out.strip()
+        if args.out.strip()
+        else _resolve_out_base("audit_returns_ema_multi_tf_cal_anchor")
+    )
 
     _print(f"scheme={scheme}")
     _print(f"dim_timeframe={dim_tf}")

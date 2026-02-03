@@ -10,7 +10,7 @@ from typing import Dict, List, Optional, TYPE_CHECKING
 if TYPE_CHECKING:
     from .core import Task, Result
 
-from .core import Task, Result, Platform, TaskType
+from .core import Task, Result, TaskType
 
 
 @dataclass
@@ -21,10 +21,11 @@ class HandoffContext:
     Per CONTEXT.md: Hybrid (pointer + summary) - Task A includes small summary
     inline for quick reference, full context stored in memory with pointer.
     """
-    memory_id: str              # Pointer to full context in memory
-    summary: str                # Brief inline summary for quick reference
-    parent_task_id: str         # Track genealogy (Task A -> B -> C)
-    chain_id: str               # Workflow-level ID for cost attribution
+
+    memory_id: str  # Pointer to full context in memory
+    summary: str  # Brief inline summary for quick reference
+    parent_task_id: str  # Track genealogy (Task A -> B -> C)
+    chain_id: str  # Workflow-level ID for cost attribution
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     def to_context_dict(self) -> dict:
@@ -45,6 +46,7 @@ class TaskChain:
     Per CONTEXT.md: Explicit chain tracking for debugging, visualization,
     and cost attribution.
     """
+
     chain_id: str
     tasks: List[str] = field(default_factory=list)  # task_ids in order
     total_cost: float = 0.0
@@ -83,7 +85,9 @@ class ChainTracker:
             self._chains[chain_id] = TaskChain(chain_id=chain_id)
         return self._chains[chain_id]
 
-    def record_task(self, chain_id: str, task_id: str, cost: float = 0.0, tokens: int = 0):
+    def record_task(
+        self, chain_id: str, task_id: str, cost: float = 0.0, tokens: int = 0
+    ):
         """Record a task in a chain."""
         chain = self.get_or_create_chain(chain_id)
         chain.add_task(task_id, cost, tokens)
@@ -134,7 +138,9 @@ async def spawn_child_task(
     # Generate IDs
     parent_task_id = parent_result.task.task_id or "unknown"
     memory_id = f"handoff_{parent_task_id}_{uuid.uuid4().hex[:8]}"
-    effective_chain_id = chain_id or parent_result.task.metadata.get("chain_id") or uuid.uuid4().hex
+    effective_chain_id = (
+        chain_id or parent_result.task.metadata.get("chain_id") or uuid.uuid4().hex
+    )
 
     # Store full context in memory
     full_context = f"Parent task output:\n{parent_result.output}"
@@ -147,7 +153,7 @@ async def spawn_child_task(
                 "parent_task_id": parent_task_id,
                 "chain_id": effective_chain_id,
                 "created_at": datetime.now(timezone.utc).isoformat(),
-            }
+            },
         )
     except Exception as e:
         raise RuntimeError(f"Failed to store handoff context in memory: {e}")
@@ -205,7 +211,13 @@ async def load_handoff_context(task: Task) -> str:
         # Per CONTEXT.md: Fail Task B immediately if memory lookup fails
         raise RuntimeError(f"Handoff context not found in memory: {memory_id}")
 
-    return result.content if hasattr(result, 'content') else result.get("content", "") if isinstance(result, dict) else str(result)
+    return (
+        result.content
+        if hasattr(result, "content")
+        else result.get("content", "")
+        if isinstance(result, dict)
+        else str(result)
+    )
 
 
 def has_handoff_context(task: Task) -> bool:

@@ -17,7 +17,6 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-import numpy as np
 import pandas as pd
 
 logger = logging.getLogger(__name__)
@@ -26,6 +25,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 # Alpha Calculation
 # =============================================================================
+
 
 def calculate_alpha_from_period(period: int) -> float:
     """
@@ -77,6 +77,7 @@ def calculate_alpha_from_horizon(horizon_days: int) -> float:
 # =============================================================================
 # Derivative Computation
 # =============================================================================
+
 
 def compute_first_derivative(
     ema_series: pd.Series,
@@ -229,6 +230,7 @@ def compute_rolling_derivatives_canonical(
 # Period Filtering
 # =============================================================================
 
+
 def filter_ema_periods_by_obs_count(
     periods: list[int],
     n_obs: int,
@@ -283,6 +285,7 @@ def filter_ema_periods_by_obs_count(
 # EMA Computation with Horizon
 # =============================================================================
 
+
 def compute_ema_from_horizon(
     prices: pd.Series,
     *,
@@ -327,6 +330,7 @@ def compute_ema_from_horizon(
 # =============================================================================
 # Vectorized Operations
 # =============================================================================
+
 
 def add_ema_columns_vectorized(
     df: pd.DataFrame,

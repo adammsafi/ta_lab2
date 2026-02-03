@@ -55,10 +55,10 @@ def compute_feature_hash(df: pd.DataFrame, columns: list[str]) -> str:
         raise KeyError(f"Columns not found in DataFrame: {missing}")
 
     # Sort by timestamp for deterministic ordering
-    df_sorted = df.sort_values('ts')
+    df_sorted = df.sort_values("ts")
 
     # Generate CSV bytes (exclude index)
-    csv_bytes = df_sorted[columns].to_csv(index=False).encode('utf-8')
+    csv_bytes = df_sorted[columns].to_csv(index=False).encode("utf-8")
 
     # Compute SHA256 hash and return first 16 chars
     hash_full = hashlib.sha256(csv_bytes).hexdigest()
@@ -86,7 +86,7 @@ def compute_params_hash(params: dict) -> str:
     """
     # Convert to JSON with sorted keys
     json_str = json.dumps(params, sort_keys=True)
-    json_bytes = json_str.encode('utf-8')
+    json_bytes = json_str.encode("utf-8")
 
     # Compute SHA256 hash and return first 16 chars
     hash_full = hashlib.sha256(json_bytes).hexdigest()
@@ -123,10 +123,7 @@ def load_active_signals(
         }
     """
     # Build query with optional signal_id filter
-    where_clauses = [
-        "signal_type = :signal_type",
-        "is_active = TRUE"
-    ]
+    where_clauses = ["signal_type = :signal_type", "is_active = TRUE"]
     params = {"signal_type": signal_type}
 
     if signal_id is not None:
@@ -156,7 +153,7 @@ def load_active_signals(
             {
                 "signal_id": row[0],
                 "signal_name": row[1],
-                "params": row[2]  # JSONB auto-parsed to dict by psycopg2
+                "params": row[2],  # JSONB auto-parsed to dict by psycopg2
             }
             for row in rows
         ]

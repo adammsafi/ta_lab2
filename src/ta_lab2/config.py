@@ -25,7 +25,7 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Optional
 
 # ---------------------------------------------------------------------------
 # Locate project root and import root config.py (if it exists)
@@ -60,6 +60,7 @@ else:
 
 # load_settings
 if _root_cfg is not None and hasattr(_root_cfg, "load_settings"):
+
     def load_settings(*args: Any, **kwargs: Any) -> Settings:  # type: ignore[no-redef]
         """
         Thin wrapper around root-level config.load_settings.
@@ -73,6 +74,7 @@ if _root_cfg is not None and hasattr(_root_cfg, "load_settings"):
         """
         return _root_cfg.load_settings(*args, **kwargs)  # type: ignore[no-any-return]
 else:
+
     def load_settings(*args: Any, **kwargs: Any) -> Settings:  # type: ignore[no-redef]
         """
         Fallback: ignore any arguments and return an empty Settings
@@ -95,6 +97,7 @@ else:
 if _root_cfg is not None and hasattr(_root_cfg, "load_local_env"):
     load_local_env = _root_cfg.load_local_env  # type: ignore[assignment]
 else:
+
     def load_local_env(env_filename: str = "db_config.env") -> None:  # type: ignore[no-redef]
         """
         Minimal fallback: load KEY=VALUE lines from an env file at project root.
@@ -135,7 +138,9 @@ _env_db_url = (
     or os.environ.get("MARKETDATA_DB_URL")
 )
 
-_cfg_db_url = getattr(_root_cfg, "TARGET_DB_URL", None) if _root_cfg is not None else None
+_cfg_db_url = (
+    getattr(_root_cfg, "TARGET_DB_URL", None) if _root_cfg is not None else None
+)
 
 # This is what ema_multi_timeframe.py (and your stats scripts) import
 TARGET_DB_URL: Optional[str] = _env_db_url or _cfg_db_url

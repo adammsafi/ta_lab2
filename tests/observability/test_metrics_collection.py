@@ -1,7 +1,6 @@
 """Tests for metrics collection module."""
 
 import pytest
-from unittest.mock import MagicMock, patch
 from datetime import datetime
 
 
@@ -53,7 +52,7 @@ class TestMetricsCollector:
             value=1.0,
             metric_type="counter",
             timestamp=datetime.utcnow(),
-            labels={"env": "test"}
+            labels={"env": "test"},
         )
 
         assert metric.name == "test_metric"
@@ -72,7 +71,7 @@ class TestMetricsCollector:
             value=1.0,
             metric_type="counter",
             timestamp=datetime.utcnow(),
-            labels={}
+            labels={},
         )
 
         collector.record(metric)

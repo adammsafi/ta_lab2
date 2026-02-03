@@ -11,7 +11,7 @@ from ta_lab2.tools.ai_orchestrator.memory import (
     inject_memory_context,
     build_augmented_prompt,
     estimate_context_tokens,
-    reset_memory_client
+    reset_memory_client,
 )
 
 
@@ -25,7 +25,7 @@ class TestSearchResult:
             content="Test content",
             metadata={"type": "test"},
             similarity=0.85,
-            distance=0.15
+            distance=0.15,
         )
         output = str(result)
         assert "abc123de" in output
@@ -39,7 +39,7 @@ class TestSearchResult:
             total_found=10,
             filtered_count=5,
             search_time_ms=12.5,
-            threshold_used=0.7
+            threshold_used=0.7,
         )
         output = str(response)
         assert "5/10" in output
@@ -65,7 +65,7 @@ class TestSearchMemories:
             "ids": [["id1", "id2", "id3"]],
             "documents": [["doc1", "doc2", "doc3"]],
             "metadatas": [[{"type": "a"}, {"type": "b"}, {"type": "c"}]],
-            "distances": [[0.1, 0.25, 0.5]]  # 0.9, 0.75, 0.5 similarity
+            "distances": [[0.1, 0.25, 0.5]],  # 0.9, 0.75, 0.5 similarity
         }
         mock_client.collection = mock_collection
 
@@ -86,7 +86,7 @@ class TestSearchMemories:
             "ids": [["id1"]],
             "documents": [["doc1"]],
             "metadatas": [[{"type": "insight"}]],
-            "distances": [[0.1]]
+            "distances": [[0.1]],
         }
         mock_client.collection = mock_collection
 
@@ -104,7 +104,7 @@ class TestSearchMemories:
             "ids": [["id1"]],
             "documents": [["doc1"]],
             "metadatas": [[{}]],
-            "distances": [[0.2]]  # Should become 0.8 similarity
+            "distances": [[0.2]],  # Should become 0.8 similarity
         }
         mock_client.collection = mock_collection
 
@@ -121,7 +121,7 @@ class TestSearchMemories:
             "ids": [[]],
             "documents": [[]],
             "metadatas": [[]],
-            "distances": [[]]
+            "distances": [[]],
         }
         mock_client.collection = mock_collection
 
@@ -142,13 +142,15 @@ class TestFormatMemories:
 
     def test_format_single_result(self):
         """Test formatting single result."""
-        results = [SearchResult(
-            memory_id="test123",
-            content="This is the memory content.",
-            metadata={"type": "insight", "source_path": "src/test.py"},
-            similarity=0.85,
-            distance=0.15
-        )]
+        results = [
+            SearchResult(
+                memory_id="test123",
+                content="This is the memory content.",
+                metadata={"type": "insight", "source_path": "src/test.py"},
+                similarity=0.85,
+                distance=0.15,
+            )
+        ]
 
         output = format_memories_for_prompt(results)
 
@@ -160,13 +162,16 @@ class TestFormatMemories:
 
     def test_format_respects_max_length(self):
         """Test formatting truncates at max_length."""
-        results = [SearchResult(
-            memory_id=f"id{i}",
-            content="A" * 1000,  # Long content
-            metadata={},
-            similarity=0.9,
-            distance=0.1
-        ) for i in range(10)]
+        results = [
+            SearchResult(
+                memory_id=f"id{i}",
+                content="A" * 1000,  # Long content
+                metadata={},
+                similarity=0.9,
+                distance=0.1,
+            )
+            for i in range(10)
+        ]
 
         output = format_memories_for_prompt(results, max_length=500)
 
@@ -175,13 +180,15 @@ class TestFormatMemories:
 
     def test_format_without_metadata(self):
         """Test formatting without metadata."""
-        results = [SearchResult(
-            memory_id="test123",
-            content="Content only",
-            metadata={},
-            similarity=0.85,
-            distance=0.15
-        )]
+        results = [
+            SearchResult(
+                memory_id="test123",
+                content="Content only",
+                metadata={},
+                similarity=0.85,
+                distance=0.15,
+            )
+        ]
 
         output = format_memories_for_prompt(results, include_metadata=False)
 
@@ -192,22 +199,24 @@ class TestFormatMemories:
 class TestInjectMemoryContext:
     """Tests for inject_memory_context function."""
 
-    @patch('ta_lab2.tools.ai_orchestrator.memory.injection.search_memories')
+    @patch("ta_lab2.tools.ai_orchestrator.memory.injection.search_memories")
     def test_inject_combines_search_and_format(self, mock_search):
         """Test inject_memory_context combines search and formatting."""
         mock_search.return_value = SearchResponse(
             query="test",
-            results=[SearchResult(
-                memory_id="id1",
-                content="Memory content",
-                metadata={"type": "test"},
-                similarity=0.9,
-                distance=0.1
-            )],
+            results=[
+                SearchResult(
+                    memory_id="id1",
+                    content="Memory content",
+                    metadata={"type": "test"},
+                    similarity=0.9,
+                    distance=0.1,
+                )
+            ],
             total_found=1,
             filtered_count=1,
             search_time_ms=5.0,
-            threshold_used=0.7
+            threshold_used=0.7,
         )
 
         context = inject_memory_context("test query")
@@ -216,7 +225,7 @@ class TestInjectMemoryContext:
         assert "Memory content" in context
         mock_search.assert_called_once()
 
-    @patch('ta_lab2.tools.ai_orchestrator.memory.injection.search_memories')
+    @patch("ta_lab2.tools.ai_orchestrator.memory.injection.search_memories")
     def test_inject_passes_parameters(self, mock_search):
         """Test inject_memory_context passes parameters correctly."""
         mock_search.return_value = SearchResponse(
@@ -225,14 +234,11 @@ class TestInjectMemoryContext:
             total_found=0,
             filtered_count=0,
             search_time_ms=1.0,
-            threshold_used=0.8
+            threshold_used=0.8,
         )
 
         inject_memory_context(
-            "test",
-            max_memories=3,
-            min_similarity=0.8,
-            memory_type="insight"
+            "test", max_memories=3, min_similarity=0.8, memory_type="insight"
         )
 
         call_kwargs = mock_search.call_args.kwargs
@@ -244,14 +250,13 @@ class TestInjectMemoryContext:
 class TestBuildAugmentedPrompt:
     """Tests for build_augmented_prompt function."""
 
-    @patch('ta_lab2.tools.ai_orchestrator.memory.injection.inject_memory_context')
+    @patch("ta_lab2.tools.ai_orchestrator.memory.injection.inject_memory_context")
     def test_build_returns_structured_dict(self, mock_inject):
         """Test build_augmented_prompt returns proper structure."""
         mock_inject.return_value = "# Test Context"
 
         result = build_augmented_prompt(
-            user_query="What is EMA?",
-            system_prompt="You are helpful."
+            user_query="What is EMA?", system_prompt="You are helpful."
         )
 
         assert "system" in result
@@ -334,7 +339,7 @@ class TestIntegrationWithRealChromaDB:
                 content=result["documents"][i],
                 metadata=result["metadatas"][i] or {},
                 similarity=0.9,
-                distance=0.1
+                distance=0.1,
             )
             for i in range(len(result["ids"]))
         ]

@@ -10,10 +10,7 @@ Tests Mem0's LLM-powered conflict detection system including:
 Uses mocks for unit tests, integration tests require API keys.
 """
 import pytest
-from unittest.mock import Mock, patch, MagicMock
-from datetime import datetime
-from pathlib import Path
-import json
+from unittest.mock import Mock, patch
 
 from ta_lab2.tools.ai_orchestrator.memory.conflict import (
     ConflictResult,
@@ -21,7 +18,7 @@ from ta_lab2.tools.ai_orchestrator.memory.conflict import (
     resolve_conflict,
     add_with_conflict_check,
     _generate_reason,
-    _log_conflict
+    _log_conflict,
 )
 
 
@@ -38,7 +35,7 @@ def test_conflict_result_creation():
         original_content="EMA uses 20 periods",
         timestamp="2026-01-28T15:00:00Z",
         conflicting_memory="mem_456",
-        conflicting_content="EMA uses 14 periods"
+        conflicting_content="EMA uses 14 periods",
     )
 
     assert result.memory_id == "mem_123"
@@ -59,7 +56,7 @@ def test_conflict_result_defaults():
         confidence=0.88,
         reason="Contradiction detected",
         original_content="New content",
-        timestamp="2026-01-28T15:00:00Z"
+        timestamp="2026-01-28T15:00:00Z",
     )
 
     assert result.conflicting_memory is None
@@ -74,7 +71,7 @@ def test_conflict_result_to_dict():
         confidence=0.99,
         reason="Duplicate",
         original_content="Test",
-        timestamp="2026-01-28T15:00:00Z"
+        timestamp="2026-01-28T15:00:00Z",
     )
 
     result_dict = result.to_dict()
@@ -87,7 +84,7 @@ def test_conflict_result_to_dict():
 # ==================== detect_conflicts Tests ====================
 
 
-@patch('ta_lab2.tools.ai_orchestrator.memory.mem0_client.get_mem0_client')
+@patch("ta_lab2.tools.ai_orchestrator.memory.mem0_client.get_mem0_client")
 def test_detect_conflicts_finds_similar(mock_get_client):
     """Test detect_conflicts finds memories above similarity threshold."""
     # Mock Mem0Client
@@ -100,14 +97,14 @@ def test_detect_conflicts_finds_similar(mock_get_client):
             "id": "mem_similar1",
             "memory": "EMA uses 14 periods",
             "score": 0.92,
-            "metadata": {"category": "technical_analysis"}
+            "metadata": {"category": "technical_analysis"},
         },
         {
             "id": "mem_similar2",
             "memory": "EMA calculation with 14-period window",
             "score": 0.88,
-            "metadata": {"category": "technical_analysis"}
-        }
+            "metadata": {"category": "technical_analysis"},
+        },
     ]
 
     # Search for conflicts
@@ -115,14 +112,12 @@ def test_detect_conflicts_finds_similar(mock_get_client):
         content="EMA uses 20 periods",
         user_id="orchestrator",
         client=mock_client,
-        similarity_threshold=0.85
+        similarity_threshold=0.85,
     )
 
     # Verify search was called
     mock_client.search.assert_called_once_with(
-        query="EMA uses 20 periods",
-        user_id="orchestrator",
-        limit=10
+        query="EMA uses 20 periods", user_id="orchestrator", limit=10
     )
 
     # Verify both high-similarity memories returned
@@ -133,7 +128,7 @@ def test_detect_conflicts_finds_similar(mock_get_client):
     assert conflicts[1]["similarity"] == 0.88
 
 
-@patch('ta_lab2.tools.ai_orchestrator.memory.mem0_client.get_mem0_client')
+@patch("ta_lab2.tools.ai_orchestrator.memory.mem0_client.get_mem0_client")
 def test_detect_conflicts_ignores_different(mock_get_client):
     """Test detect_conflicts filters out dissimilar memories below threshold."""
     mock_client = Mock()
@@ -145,28 +140,28 @@ def test_detect_conflicts_ignores_different(mock_get_client):
             "id": "mem_different1",
             "memory": "Trading strategy for crypto",
             "score": 0.45,
-            "metadata": {}
+            "metadata": {},
         },
         {
             "id": "mem_different2",
             "memory": "Database schema design",
             "score": 0.12,
-            "metadata": {}
-        }
+            "metadata": {},
+        },
     ]
 
     conflicts = detect_conflicts(
         content="EMA uses 20 periods",
         user_id="orchestrator",
         client=mock_client,
-        similarity_threshold=0.85
+        similarity_threshold=0.85,
     )
 
     # No results above threshold
     assert len(conflicts) == 0
 
 
-@patch('ta_lab2.tools.ai_orchestrator.memory.mem0_client.get_mem0_client')
+@patch("ta_lab2.tools.ai_orchestrator.memory.mem0_client.get_mem0_client")
 def test_detect_conflicts_respects_threshold(mock_get_client):
     """Test detect_conflicts uses custom threshold correctly."""
     mock_client = Mock()
@@ -175,7 +170,7 @@ def test_detect_conflicts_respects_threshold(mock_get_client):
     mock_client.search.return_value = [
         {"id": "mem1", "memory": "Test", "score": 0.75, "metadata": {}},
         {"id": "mem2", "memory": "Test", "score": 0.65, "metadata": {}},
-        {"id": "mem3", "memory": "Test", "score": 0.55, "metadata": {}}
+        {"id": "mem3", "memory": "Test", "score": 0.55, "metadata": {}},
     ]
 
     # Use lower threshold
@@ -183,7 +178,7 @@ def test_detect_conflicts_respects_threshold(mock_get_client):
         content="Test content",
         user_id="orchestrator",
         client=mock_client,
-        similarity_threshold=0.60
+        similarity_threshold=0.60,
     )
 
     # Should return 2 memories (0.75 and 0.65, not 0.55)
@@ -192,7 +187,7 @@ def test_detect_conflicts_respects_threshold(mock_get_client):
     assert conflicts[1]["similarity"] == 0.65
 
 
-@patch('ta_lab2.tools.ai_orchestrator.memory.mem0_client.get_mem0_client')
+@patch("ta_lab2.tools.ai_orchestrator.memory.mem0_client.get_mem0_client")
 def test_detect_conflicts_empty_db(mock_get_client):
     """Test detect_conflicts handles empty database gracefully."""
     mock_client = Mock()
@@ -201,9 +196,7 @@ def test_detect_conflicts_empty_db(mock_get_client):
     mock_client.search.return_value = []
 
     conflicts = detect_conflicts(
-        content="New content",
-        user_id="orchestrator",
-        client=mock_client
+        content="New content", user_id="orchestrator", client=mock_client
     )
 
     assert len(conflicts) == 0
@@ -212,7 +205,7 @@ def test_detect_conflicts_empty_db(mock_get_client):
 # ==================== resolve_conflict Tests ====================
 
 
-@patch('ta_lab2.tools.ai_orchestrator.memory.mem0_client.get_mem0_client')
+@patch("ta_lab2.tools.ai_orchestrator.memory.mem0_client.get_mem0_client")
 def test_resolve_conflict_add_operation(mock_get_client):
     """Test resolve_conflict returns ADD for new unique content."""
     mock_client = Mock()
@@ -221,11 +214,7 @@ def test_resolve_conflict_add_operation(mock_get_client):
     # Mock Mem0 add result with ADD operation
     mock_client.add.return_value = {
         "results": [
-            {
-                "memory": "EMA uses 20 periods",
-                "event": "ADD",
-                "id": "mem_new123"
-            }
+            {"memory": "EMA uses 20 periods", "event": "ADD", "id": "mem_new123"}
         ]
     }
 
@@ -233,7 +222,7 @@ def test_resolve_conflict_add_operation(mock_get_client):
         new_content="EMA uses 20 periods",
         user_id="orchestrator",
         metadata={"category": "technical_analysis"},
-        client=mock_client
+        client=mock_client,
     )
 
     # Verify Mem0 add called with infer=True
@@ -250,7 +239,7 @@ def test_resolve_conflict_add_operation(mock_get_client):
     assert result.original_content == "EMA uses 20 periods"
 
 
-@patch('ta_lab2.tools.ai_orchestrator.memory.mem0_client.get_mem0_client')
+@patch("ta_lab2.tools.ai_orchestrator.memory.mem0_client.get_mem0_client")
 def test_resolve_conflict_update_operation(mock_get_client):
     """Test resolve_conflict returns UPDATE for contradictory content."""
     mock_client = Mock()
@@ -262,15 +251,13 @@ def test_resolve_conflict_update_operation(mock_get_client):
             {
                 "memory": "EMA uses 20 periods (updated)",
                 "event": "UPDATE",
-                "id": "mem_existing456"
+                "id": "mem_existing456",
             }
         ]
     }
 
     result = resolve_conflict(
-        new_content="EMA uses 20 periods",
-        user_id="orchestrator",
-        client=mock_client
+        new_content="EMA uses 20 periods", user_id="orchestrator", client=mock_client
     )
 
     assert result.operation == "UPDATE"
@@ -278,7 +265,7 @@ def test_resolve_conflict_update_operation(mock_get_client):
     assert "Contradiction detected" in result.reason
 
 
-@patch('ta_lab2.tools.ai_orchestrator.memory.mem0_client.get_mem0_client')
+@patch("ta_lab2.tools.ai_orchestrator.memory.mem0_client.get_mem0_client")
 def test_resolve_conflict_noop_duplicate(mock_get_client):
     """Test resolve_conflict returns NOOP for exact duplicates."""
     mock_client = Mock()
@@ -287,26 +274,20 @@ def test_resolve_conflict_noop_duplicate(mock_get_client):
     # Mock Mem0 detecting duplicate
     mock_client.add.return_value = {
         "results": [
-            {
-                "memory": "EMA uses 20 periods",
-                "event": "NOOP",
-                "id": "mem_duplicate789"
-            }
+            {"memory": "EMA uses 20 periods", "event": "NOOP", "id": "mem_duplicate789"}
         ]
     }
 
     result = resolve_conflict(
-        new_content="EMA uses 20 periods",
-        user_id="orchestrator",
-        client=mock_client
+        new_content="EMA uses 20 periods", user_id="orchestrator", client=mock_client
     )
 
     assert result.operation == "NOOP"
     assert "Duplicate detected" in result.reason
 
 
-@patch('ta_lab2.tools.ai_orchestrator.memory.mem0_client.get_mem0_client')
-@patch('ta_lab2.tools.ai_orchestrator.memory.conflict._log_conflict')
+@patch("ta_lab2.tools.ai_orchestrator.memory.mem0_client.get_mem0_client")
+@patch("ta_lab2.tools.ai_orchestrator.memory.conflict._log_conflict")
 def test_resolve_conflict_logs_result(mock_log, mock_get_client):
     """Test resolve_conflict logging when called via add_with_conflict_check."""
     mock_client = Mock()
@@ -321,7 +302,7 @@ def test_resolve_conflict_logs_result(mock_log, mock_get_client):
         messages=[{"role": "user", "content": "Test content"}],
         user_id="orchestrator",
         client=mock_client,
-        log_conflicts=True
+        log_conflicts=True,
     )
 
     # Verify logging was called
@@ -334,7 +315,7 @@ def test_resolve_conflict_logs_result(mock_log, mock_get_client):
 # ==================== Context-Dependent Truth Tests ====================
 
 
-@patch('ta_lab2.tools.ai_orchestrator.memory.mem0_client.get_mem0_client')
+@patch("ta_lab2.tools.ai_orchestrator.memory.mem0_client.get_mem0_client")
 def test_different_contexts_not_conflict(mock_get_client):
     """Test same fact with different metadata not flagged as conflict.
 
@@ -354,7 +335,7 @@ def test_different_contexts_not_conflict(mock_get_client):
         new_content="EMA is 14 periods",
         user_id="orchestrator",
         metadata={"asset_class": "stocks"},
-        client=mock_client
+        client=mock_client,
     )
 
     assert result1.operation == "ADD"
@@ -369,7 +350,7 @@ def test_different_contexts_not_conflict(mock_get_client):
         new_content="EMA is 20 periods",
         user_id="orchestrator",
         metadata={"asset_class": "crypto"},
-        client=mock_client
+        client=mock_client,
     )
 
     # Should be ADD (new context) not UPDATE
@@ -380,8 +361,8 @@ def test_different_contexts_not_conflict(mock_get_client):
 # ==================== add_with_conflict_check Tests ====================
 
 
-@patch('ta_lab2.tools.ai_orchestrator.memory.mem0_client.get_mem0_client')
-@patch('ta_lab2.tools.ai_orchestrator.memory.conflict._log_conflict')
+@patch("ta_lab2.tools.ai_orchestrator.memory.mem0_client.get_mem0_client")
+@patch("ta_lab2.tools.ai_orchestrator.memory.conflict._log_conflict")
 def test_add_with_conflict_check_wrapper(mock_log, mock_get_client):
     """Test add_with_conflict_check calls resolve_conflict."""
     mock_client = Mock()
@@ -394,7 +375,7 @@ def test_add_with_conflict_check_wrapper(mock_log, mock_get_client):
     result = add_with_conflict_check(
         messages=[{"role": "user", "content": "Test message"}],
         user_id="orchestrator",
-        client=mock_client
+        client=mock_client,
     )
 
     # Verify Mem0 add was called
@@ -407,8 +388,8 @@ def test_add_with_conflict_check_wrapper(mock_log, mock_get_client):
     assert "reason" in result
 
 
-@patch('ta_lab2.tools.ai_orchestrator.memory.mem0_client.get_mem0_client')
-@patch('ta_lab2.tools.ai_orchestrator.memory.conflict._log_conflict')
+@patch("ta_lab2.tools.ai_orchestrator.memory.mem0_client.get_mem0_client")
+@patch("ta_lab2.tools.ai_orchestrator.memory.conflict._log_conflict")
 def test_add_with_conflict_check_logging(mock_log, mock_get_client):
     """Test add_with_conflict_check writes to conflict log when enabled."""
     mock_client = Mock()
@@ -422,7 +403,7 @@ def test_add_with_conflict_check_logging(mock_log, mock_get_client):
         messages=[{"role": "user", "content": "Logged content"}],
         user_id="orchestrator",
         client=mock_client,
-        log_conflicts=True
+        log_conflicts=True,
     )
 
     # Verify logging was called
@@ -430,8 +411,8 @@ def test_add_with_conflict_check_logging(mock_log, mock_get_client):
     assert result["operation"] == "UPDATE"
 
 
-@patch('ta_lab2.tools.ai_orchestrator.memory.mem0_client.get_mem0_client')
-@patch('ta_lab2.tools.ai_orchestrator.memory.conflict._log_conflict')
+@patch("ta_lab2.tools.ai_orchestrator.memory.mem0_client.get_mem0_client")
+@patch("ta_lab2.tools.ai_orchestrator.memory.conflict._log_conflict")
 def test_add_with_conflict_check_no_logging(mock_log, mock_get_client):
     """Test add_with_conflict_check skips log when disabled."""
     mock_client = Mock()
@@ -445,7 +426,7 @@ def test_add_with_conflict_check_no_logging(mock_log, mock_get_client):
         messages=[{"role": "user", "content": "Test"}],
         user_id="orchestrator",
         client=mock_client,
-        log_conflicts=False  # Disabled
+        log_conflicts=False,  # Disabled
     )
 
     # Verify logging was NOT called
@@ -483,21 +464,25 @@ def test_log_conflict_writes_jsonl(tmp_path):
         confidence=0.85,
         reason="Test logging",
         original_content="Test content",
-        timestamp="2026-01-28T15:00:00Z"
+        timestamp="2026-01-28T15:00:00Z",
     )
 
     # Use tmp_path for isolated test
     log_file = tmp_path / "conflict_log.jsonl"
 
-    with patch('ta_lab2.tools.ai_orchestrator.memory.conflict.Path') as mock_path_class:
+    with patch("ta_lab2.tools.ai_orchestrator.memory.conflict.Path") as mock_path_class:
         mock_path_obj = Mock()
         mock_path_obj.parent.mkdir = Mock()
-        mock_path_obj.__truediv__ = lambda self, other: log_file if other == "conflict_log.jsonl" else tmp_path / other
+        mock_path_obj.__truediv__ = (
+            lambda self, other: log_file
+            if other == "conflict_log.jsonl"
+            else tmp_path / other
+        )
 
         mock_path_class.return_value = mock_path_obj
 
         # Mock open to write to our tmp_path
-        with patch('builtins.open', create=True) as mock_open:
+        with patch("builtins.open", create=True) as mock_open:
             mock_file = Mock()
             mock_open.return_value.__enter__.return_value = mock_file
 
@@ -533,7 +518,7 @@ def test_conflict_detection_real_mem0():
         new_content="The EMA period for testing is 14 days",
         user_id="orchestrator_test",
         metadata={"test": "integration"},
-        client=client
+        client=client,
     )
 
     assert result1.operation in ["ADD", "UPDATE"]
@@ -543,7 +528,7 @@ def test_conflict_detection_real_mem0():
         new_content="The EMA period for testing is 20 days",
         user_id="orchestrator_test",
         metadata={"test": "integration"},
-        client=client
+        client=client,
     )
 
     # Should detect conflict and UPDATE

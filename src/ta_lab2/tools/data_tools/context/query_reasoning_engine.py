@@ -26,7 +26,9 @@ try:
     import vertexai
     from vertexai.preview import reasoning_engines
 except ImportError:
-    print("Error: Vertex AI library not installed. Install with: pip install google-cloud-aiplatform vertexai")
+    print(
+        "Error: Vertex AI library not installed. Install with: pip install google-cloud-aiplatform vertexai"
+    )
     sys.exit(1)
 
 
@@ -61,7 +63,9 @@ def main() -> None:
     resource_name = _env("VERTEX_ENGINE_RESOURCE_NAME")
 
     if not resource_name:
-        ref_path = Path(_env("VERTEX_ENGINE_REF_PATH", "reasoning_engine_ref.json")).resolve()
+        ref_path = Path(
+            _env("VERTEX_ENGINE_REF_PATH", "reasoning_engine_ref.json")
+        ).resolve()
         ref = load_engine_ref(ref_path)
         resource_name = ref.get("resource_name")
 

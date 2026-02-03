@@ -42,29 +42,40 @@ import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 try:
     import vertexai
     from vertexai.preview import reasoning_engines
 except ImportError:
-    print("Error: Vertex AI library not installed. Install with: pip install google-cloud-aiplatform vertexai")
+    print(
+        "Error: Vertex AI library not installed. Install with: pip install google-cloud-aiplatform vertexai"
+    )
     import sys
+
     sys.exit(1)
 
 # Import the self-contained engine
 try:
-    from ta_lab2.tools.data_tools.memory.memory_bank_engine_rest import TA_Lab2_Memory_Engine
+    from ta_lab2.tools.data_tools.memory.memory_bank_engine_rest import (
+        TA_Lab2_Memory_Engine,
+    )
 except ImportError:
-    print("Error: memory_bank_engine_rest.py not found in ta_lab2.tools.data_tools.memory.")
-    print("This script requires the memory_bank_engine_rest.py engine file to be migrated.")
+    print(
+        "Error: memory_bank_engine_rest.py not found in ta_lab2.tools.data_tools.memory."
+    )
+    print(
+        "This script requires the memory_bank_engine_rest.py engine file to be migrated."
+    )
     import sys
+
     sys.exit(1)
 
 
 # =========================
 # Config
 # =========================
+
 
 @dataclass(frozen=True)
 class Config:
@@ -125,11 +136,15 @@ def _validate_scope(scope: object, require_user_id: bool) -> Dict[str, str]:
         if not isinstance(k, str):
             raise ValueError("VERTEX_MEMORY_SCOPE_JSON keys must be strings")
         if not isinstance(v, str):
-            raise ValueError(f'VERTEX_MEMORY_SCOPE_JSON value for key "{k}" must be a string')
+            raise ValueError(
+                f'VERTEX_MEMORY_SCOPE_JSON value for key "{k}" must be a string'
+            )
         out[k] = v
 
     if "app" not in out or not out["app"].strip():
-        raise ValueError('VERTEX_MEMORY_SCOPE_JSON must include a non-empty string key: "app"')
+        raise ValueError(
+            'VERTEX_MEMORY_SCOPE_JSON must include a non-empty string key: "app"'
+        )
 
     if require_user_id and ("user_id" not in out or not out["user_id"].strip()):
         raise ValueError(
@@ -180,7 +195,9 @@ def load_config() -> Config:
     memory_agent_id = _env_required("VERTEX_MEMORY_AGENT_ID")
 
     # New: scope validation controls
-    require_user_id_in_scope = _env_bool("VERTEX_REQUIRE_USER_ID_IN_SCOPE", default=False)
+    require_user_id_in_scope = _env_bool(
+        "VERTEX_REQUIRE_USER_ID_IN_SCOPE", default=False
+    )
 
     scope_raw = os.getenv("VERTEX_MEMORY_SCOPE_JSON", '{"app": "ta_lab2"}')
     try:
@@ -190,9 +207,15 @@ def load_config() -> Config:
 
     scope = _validate_scope(scope_obj, require_user_id=require_user_id_in_scope)
 
-    display_name = os.getenv("VERTEX_ENGINE_DISPLAY_NAME", "ta_lab2 Memory Engine (REST)")
-    description = os.getenv("VERTEX_ENGINE_DESCRIPTION", "Memory engine for ta_lab2 using REST")
-    engine_ref_path = Path(os.getenv("VERTEX_ENGINE_REF_PATH", "reasoning_engine_ref.json")).resolve()
+    display_name = os.getenv(
+        "VERTEX_ENGINE_DISPLAY_NAME", "ta_lab2 Memory Engine (REST)"
+    )
+    description = os.getenv(
+        "VERTEX_ENGINE_DESCRIPTION", "Memory engine for ta_lab2 using REST"
+    )
+    engine_ref_path = Path(
+        os.getenv("VERTEX_ENGINE_REF_PATH", "reasoning_engine_ref.json")
+    ).resolve()
 
     # New: dependency controls
     enable_router_deps = _env_bool("VERTEX_ENABLE_ROUTER_DEPS", default=False)
@@ -221,6 +244,7 @@ def load_config() -> Config:
 # Deploy
 # =========================
 
+
 def save_engine_ref(path: Path, resource_name: str, cfg: Config) -> None:
     payload = {
         "resource_name": resource_name,
@@ -238,7 +262,9 @@ def save_engine_ref(path: Path, resource_name: str, cfg: Config) -> None:
 def main() -> None:
     cfg = load_config()
 
-    vertexai.init(project=cfg.project_id, location=cfg.region, staging_bucket=cfg.staging_bucket)
+    vertexai.init(
+        project=cfg.project_id, location=cfg.region, staging_bucket=cfg.staging_bucket
+    )
 
     # Base requirements
     requirements: List[str] = [
@@ -251,10 +277,12 @@ def main() -> None:
     # New: optional lightweight “mem0-style router” deps (cheap lexical triage)
     # Keep these optional so you don't bloat the deployed image unless you need them.
     if cfg.enable_router_deps:
-        requirements.extend([
-            "rank-bm25",
-            "rapidfuzz",
-        ])
+        requirements.extend(
+            [
+                "rank-bm25",
+                "rapidfuzz",
+            ]
+        )
 
     # New: user-provided extras
     requirements.extend(cfg.extra_requirements)
@@ -288,7 +316,9 @@ def main() -> None:
         extra_packages=cfg.extra_packages,
     )
 
-    print(f"\nReasoning Engine created. Resource name: {reasoning_engine.resource_name}")
+    print(
+        f"\nReasoning Engine created. Resource name: {reasoning_engine.resource_name}"
+    )
     save_engine_ref(cfg.engine_ref_path, reasoning_engine.resource_name, cfg)
     print(f"Saved engine reference to: {cfg.engine_ref_path}")
 

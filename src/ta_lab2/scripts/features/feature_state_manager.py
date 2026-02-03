@@ -46,6 +46,7 @@ from sqlalchemy.engine import Engine
 # Configuration
 # =============================================================================
 
+
 @dataclass(frozen=True)
 class FeatureStateConfig:
     """
@@ -58,6 +59,7 @@ class FeatureStateConfig:
         ts_column: Timestamp column name in output table (default: "ts")
         id_column: ID column name in output table (default: "id")
     """
+
     state_schema: str = "public"
     state_table: str = "cmc_feature_state"
     feature_type: str = "returns"  # 'returns', 'vol', 'ta'
@@ -186,12 +188,18 @@ class FeatureStateManager:
                 return pd.read_sql(sql, conn, params=params)
             except Exception:
                 # Table doesn't exist yet or is empty
-                return pd.DataFrame(columns=[
-                    "id", "feature_type", "feature_name",
-                    "daily_min_seen", "daily_max_seen", "last_ts",
-                    "row_count",
-                    "updated_at"
-                ])
+                return pd.DataFrame(
+                    columns=[
+                        "id",
+                        "feature_type",
+                        "feature_name",
+                        "daily_min_seen",
+                        "daily_max_seen",
+                        "last_ts",
+                        "row_count",
+                        "updated_at",
+                    ]
+                )
 
     def update_state_from_output(
         self,
@@ -221,7 +229,9 @@ class FeatureStateManager:
         # Derive feature_name from table if not provided
         if feature_name is None:
             # Extract from table name (e.g., 'cmc_returns_daily' -> 'returns_daily')
-            feature_name = output_table.replace("cmc_", "").replace(f"_{self.config.feature_type}_", "_")
+            feature_name = output_table.replace("cmc_", "").replace(
+                f"_{self.config.feature_type}_", "_"
+            )
 
         ts_col = self.config.ts_column
         id_col = self.config.id_column
@@ -318,11 +328,13 @@ class FeatureStateManager:
         Raises:
             sqlalchemy.exc.SQLAlchemyError: On database errors
         """
-        sql = text("""
+        sql = text(
+            """
             SELECT null_strategy
             FROM public.dim_features
             WHERE feature_type = :feature_type
-        """)
+        """
+        )
 
         with self.engine.connect() as conn:
             result = conn.execute(sql, {"feature_type": feature_name})
@@ -330,7 +342,7 @@ class FeatureStateManager:
 
             if row is None:
                 # Default to 'skip' if not found
-                return 'skip'
+                return "skip"
 
             return row[0]
 

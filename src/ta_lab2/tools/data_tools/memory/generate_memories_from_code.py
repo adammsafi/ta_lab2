@@ -31,21 +31,19 @@ import ast
 import json
 import logging
 import os
-import sys
 from pathlib import Path
 from typing import Any, Dict, List
 
 try:
     from openai import OpenAI
 except ImportError:
-    raise ImportError(
-        "OpenAI library required. Install with: pip install openai"
-    )
+    raise ImportError("OpenAI library required. Install with: pip install openai")
 
 logger = logging.getLogger(__name__)
 
 
 # --- AST-based Code Chunking (from embed_codebase.py) ---
+
 
 def get_code_chunks(file_path: Path) -> List[Dict[str, Any]]:
     """Parse a Python file and extract functions and classes as chunks.
@@ -65,14 +63,16 @@ def get_code_chunks(file_path: Path) -> List[Dict[str, Any]]:
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
                 chunk_source = ast.get_source_segment(source, node)
                 if chunk_source:
-                    chunks.append({
-                        "file_path": str(file_path),
-                        "start_line": node.lineno,
-                        "end_line": node.end_lineno,
-                        "name": node.name,
-                        "type": type(node).__name__,
-                        "content": chunk_source,
-                    })
+                    chunks.append(
+                        {
+                            "file_path": str(file_path),
+                            "start_line": node.lineno,
+                            "end_line": node.end_lineno,
+                            "name": node.name,
+                            "type": type(node).__name__,
+                            "content": chunk_source,
+                        }
+                    )
     except Exception as e:
         logger.warning(f"Could not parse AST for file {file_path}: {e}")
     return chunks
@@ -80,7 +80,10 @@ def get_code_chunks(file_path: Path) -> List[Dict[str, Any]]:
 
 # --- Memory Generation ---
 
-def generate_memory_for_chunk(chunk: Dict[str, Any], client: OpenAI, model: str) -> Dict[str, Any] | None:
+
+def generate_memory_for_chunk(
+    chunk: Dict[str, Any], client: OpenAI, model: str
+) -> Dict[str, Any] | None:
     """Generate a memory for a single code chunk using OpenAI's Chat Completions API.
 
     Args:
@@ -133,41 +136,52 @@ Please generate a memory for this code chunk in the specified JSON format.
         memory_data = json.loads(json_content)
 
         # Combine with source data
-        memory_data['source_path'] = chunk['file_path']
-        memory_data['source_chunk_name'] = chunk['name']
-        memory_data['source_chunk_start_line'] = chunk['start_line']
-        memory_data['source_chunk_end_line'] = chunk['end_line']
-        memory_data['source_chunk_content'] = chunk['content']
+        memory_data["source_path"] = chunk["file_path"]
+        memory_data["source_chunk_name"] = chunk["name"]
+        memory_data["source_chunk_start_line"] = chunk["start_line"]
+        memory_data["source_chunk_end_line"] = chunk["end_line"]
+        memory_data["source_chunk_content"] = chunk["content"]
 
         return memory_data
 
     except Exception as e:
-        logger.error(f"Failed to generate or parse memory for chunk {chunk['name']} in {chunk['file_path']}: {e}")
+        logger.error(
+            f"Failed to generate or parse memory for chunk {chunk['name']} in {chunk['file_path']}: {e}"
+        )
         return None
 
 
 # --- Main Execution ---
+
 
 def main() -> int:
     """CLI entry point for memory generation from code."""
     logging.basicConfig(
         level=logging.INFO,
         format="[%(asctime)s] %(levelname)s: %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
     log = logging.getLogger()
 
     ap = argparse.ArgumentParser(
         description="Generate memories from the source code of a project."
     )
-    ap.add_argument("--repo-dir", required=True, help="Path to the root of the code repository.")
-    ap.add_argument("--out-file", required=True, help="Path to the output JSONL file for generated memories.")
-    ap.add_argument("--chat-model", default="gpt-4o", help="OpenAI model for memory generation.")
+    ap.add_argument(
+        "--repo-dir", required=True, help="Path to the root of the code repository."
+    )
+    ap.add_argument(
+        "--out-file",
+        required=True,
+        help="Path to the output JSONL file for generated memories.",
+    )
+    ap.add_argument(
+        "--chat-model", default="gpt-4o", help="OpenAI model for memory generation."
+    )
     ap.add_argument(
         "--exclude-dirs",
         type=str,
         default=".venv,env,build,dist,archive,old,backup,tmp,temp",
-        help="Comma-separated list of directory names to exclude."
+        help="Comma-separated list of directory names to exclude.",
     )
     args = ap.parse_args()
 
@@ -184,7 +198,7 @@ def main() -> int:
         return 1
 
     # --- 1. Find and Filter Python Files ---
-    exclude_list = [d.strip() for d in args.exclude_dirs.split(',') if d.strip()]
+    exclude_list = [d.strip() for d in args.exclude_dirs.split(",") if d.strip()]
     log.info(f"Excluding directories containing these names: {exclude_list}")
     log.info(f"Scanning for Python files in {repo_path}...")
 
@@ -193,12 +207,16 @@ def main() -> int:
     for file_path in all_py_files:
         try:
             relative_path_parts = file_path.relative_to(repo_path).parts
-            if not any(excluded_dir in relative_path_parts for excluded_dir in exclude_list):
+            if not any(
+                excluded_dir in relative_path_parts for excluded_dir in exclude_list
+            ):
                 filtered_files.append(file_path)
         except ValueError:
             filtered_files.append(file_path)
 
-    log.info(f"Found {len(all_py_files)} total Python files, processing {len(filtered_files)} after exclusions.")
+    log.info(
+        f"Found {len(all_py_files)} total Python files, processing {len(filtered_files)} after exclusions."
+    )
 
     if not filtered_files:
         log.warning("No Python files found after applying exclusions. Exiting.")
@@ -216,7 +234,9 @@ def main() -> int:
         return 0
 
     # --- 3. Generate Memories ---
-    log.info(f"Generating memories for {len(all_chunks)} code chunks using model '{args.chat_model}'...")
+    log.info(
+        f"Generating memories for {len(all_chunks)} code chunks using model '{args.chat_model}'..."
+    )
 
     # Ensure output directory exists
     out_file_path.parent.mkdir(parents=True, exist_ok=True)
@@ -224,7 +244,9 @@ def main() -> int:
     generated_count = 0
     with out_file_path.open("w", encoding="utf-8") as f:
         for i, chunk in enumerate(all_chunks, 1):
-            log.info(f"Processing chunk {i}/{len(all_chunks)}: '{chunk['name']}' in {chunk['file_path']}")
+            log.info(
+                f"Processing chunk {i}/{len(all_chunks)}: '{chunk['name']}' in {chunk['file_path']}"
+            )
 
             memory = generate_memory_for_chunk(chunk, client, args.chat_model)
 
@@ -232,7 +254,9 @@ def main() -> int:
                 f.write(json.dumps(memory, ensure_ascii=False) + "\n")
                 generated_count += 1
 
-    log.info(f"✅ Generation complete. Wrote {generated_count} memories to {out_file_path}")
+    log.info(
+        f"✅ Generation complete. Wrote {generated_count} memories to {out_file_path}"
+    )
 
     return 0
 

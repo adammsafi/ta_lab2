@@ -7,7 +7,7 @@ Integration tests skip gracefully without database (pytest.mark.skipif).
 
 import os
 from unittest import mock
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock
 import pandas as pd
 import pytest
 from sqlalchemy import create_engine, text
@@ -18,6 +18,7 @@ from ta_lab2.scripts.signals import SignalStateManager, SignalStateConfig
 # =============================================================================
 # Unit Tests (database-free with mocks)
 # =============================================================================
+
 
 def test_config_immutable():
     """Verify SignalStateConfig is frozen (immutable)."""
@@ -52,19 +53,21 @@ def test_load_open_positions_returns_dataframe():
     config = SignalStateConfig(signal_type="ema_crossover")
 
     # Mock pd.read_sql to return test data
-    test_df = pd.DataFrame({
-        "id": [1, 1],
-        "signal_id": [1, 1],
-        "ts": ["2024-01-01", "2024-01-02"],
-        "direction": ["long", "long"],
-        "position_state": ["open", "open"],
-        "entry_ts": ["2024-01-01", "2024-01-02"],
-        "entry_price": [100.0, 101.0],
-        "feature_snapshot": [{"close": 100.0}, {"close": 101.0}],
-        "signal_version": ["v1", "v1"],
-        "feature_version_hash": ["abc123", "abc123"],
-        "params_hash": ["def456", "def456"],
-    })
+    test_df = pd.DataFrame(
+        {
+            "id": [1, 1],
+            "signal_id": [1, 1],
+            "ts": ["2024-01-01", "2024-01-02"],
+            "direction": ["long", "long"],
+            "position_state": ["open", "open"],
+            "entry_ts": ["2024-01-01", "2024-01-02"],
+            "entry_price": [100.0, 101.0],
+            "feature_snapshot": [{"close": 100.0}, {"close": 101.0}],
+            "signal_version": ["v1", "v1"],
+            "feature_version_hash": ["abc123", "abc123"],
+            "params_hash": ["def456", "def456"],
+        }
+    )
 
     with mock.patch("pandas.read_sql", return_value=test_df):
         manager = SignalStateManager(mock_engine, config)
@@ -104,8 +107,7 @@ def test_update_state_after_generation_upserts():
 
     manager = SignalStateManager(mock_engine, config)
     row_count = manager.update_state_after_generation(
-        signal_table="cmc_signals_ema_crossover",
-        signal_id=1
+        signal_table="cmc_signals_ema_crossover", signal_id=1
     )
 
     assert row_count == 5
@@ -128,10 +130,12 @@ def test_get_dirty_window_start_returns_dict():
     config = SignalStateConfig(signal_type="ema_crossover")
 
     # Mock pd.read_sql to return state data
-    test_df = pd.DataFrame({
-        "id": [1, 52],
-        "last_entry_ts": ["2024-01-01", "2024-01-05"],
-    })
+    test_df = pd.DataFrame(
+        {
+            "id": [1, 52],
+            "last_entry_ts": ["2024-01-01", "2024-01-05"],
+        }
+    )
 
     with mock.patch("pandas.read_sql", return_value=test_df):
         manager = SignalStateManager(mock_engine, config)
@@ -160,9 +164,10 @@ def test_get_dirty_window_start_no_state_returns_none():
 # Integration Tests (require database)
 # =============================================================================
 
+
 @pytest.mark.skipif(
     not os.environ.get("TARGET_DB_URL"),
-    reason="No TARGET_DB_URL - skip integration test"
+    reason="No TARGET_DB_URL - skip integration test",
 )
 def test_roundtrip_open_positions():
     """Integration test: Insert signal, load open positions, verify match."""
@@ -178,18 +183,26 @@ def test_roundtrip_open_positions():
     # Insert test signal (open position)
     with engine.begin() as conn:
         # Clean up any existing test data
-        conn.execute(text("""
+        conn.execute(
+            text(
+                """
             DELETE FROM public.cmc_signals_ema_crossover
             WHERE id = 999999 AND signal_id = 1
-        """))
+        """
+            )
+        )
 
         # Insert test signal
-        conn.execute(text("""
+        conn.execute(
+            text(
+                """
             INSERT INTO public.cmc_signals_ema_crossover
             (id, ts, signal_id, direction, position_state, entry_ts, entry_price, feature_snapshot)
             VALUES
             (999999, '2024-01-01', 1, 'long', 'open', '2024-01-01', 100.0, '{"close": 100.0}'::jsonb)
-        """))
+        """
+            )
+        )
 
     # Load open positions
     open_positions = manager.load_open_positions(ids=[999999], signal_id=1)
@@ -202,7 +215,11 @@ def test_roundtrip_open_positions():
 
     # Clean up
     with engine.begin() as conn:
-        conn.execute(text("""
+        conn.execute(
+            text(
+                """
             DELETE FROM public.cmc_signals_ema_crossover
             WHERE id = 999999 AND signal_id = 1
-        """))
+        """
+            )
+        )

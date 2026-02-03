@@ -8,14 +8,15 @@ import pandas as pd
 from .vbt_runner import sweep_grid
 from .costs import CostModel
 from .splitters import Split
+
 # package-relative import so it works inside ta_lab2
 from ..signals.registry import REGISTRY
 
 
 @dataclass
 class MultiResult:
-    results: pd.DataFrame                    # all strategies merged
-    leaders: Dict[str, pd.DataFrame]         # per-strategy leaderboards
+    results: pd.DataFrame  # all strategies merged
+    leaders: Dict[str, pd.DataFrame]  # per-strategy leaderboards
 
 
 def _leaderboard(df: pd.DataFrame) -> pd.DataFrame:
@@ -24,7 +25,9 @@ def _leaderboard(df: pd.DataFrame) -> pd.DataFrame:
     existing = [c for c in cols if c in df.columns]
     if not existing:
         return df
-    return df.sort_values(existing, ascending=[False] * len(existing)).reset_index(drop=True)
+    return df.sort_values(existing, ascending=[False] * len(existing)).reset_index(
+        drop=True
+    )
 
 
 def run_multi_strategy(
@@ -64,7 +67,9 @@ def run_multi_strategy(
 
     for strat_name, grid in strategies.items():
         if strat_name not in REGISTRY:
-            raise KeyError(f"Strategy '{strat_name}' not found in signals.registry.REGISTRY")
+            raise KeyError(
+                f"Strategy '{strat_name}' not found in signals.registry.REGISTRY"
+            )
 
         signal_fn = REGISTRY[strat_name]
         bundle = sweep_grid(

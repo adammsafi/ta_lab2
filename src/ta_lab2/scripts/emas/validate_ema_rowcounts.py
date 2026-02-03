@@ -26,7 +26,10 @@ from sqlalchemy.engine import Engine
 
 from ta_lab2.config import TARGET_DB_URL
 from ta_lab2.time.dim_timeframe import get_tf_days, list_tfs
-from ta_lab2.notifications.telegram import send_validation_alert, is_configured as telegram_configured
+from ta_lab2.notifications.telegram import (
+    send_validation_alert,
+    is_configured as telegram_configured,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +106,8 @@ def get_actual_rowcount(
     Returns:
         Actual row count (canonical rows only, roll=FALSE)
     """
-    query = text(f"""
+    query = text(
+        f"""
         SELECT COUNT(*) as cnt
         FROM {schema}.{table}
         WHERE id = :id_
@@ -111,7 +115,8 @@ def get_actual_rowcount(
           AND period = :period
           AND ts BETWEEN :start_date AND :end_date
           AND roll = FALSE
-    """)
+    """
+    )
 
     with engine.connect() as conn:
         result = conn.execute(
@@ -122,7 +127,7 @@ def get_actual_rowcount(
                 "period": period,
                 "start_date": start_date,
                 "end_date": end_date,
-            }
+            },
         )
         row = result.fetchone()
         return int(row[0]) if row else 0
@@ -174,7 +179,9 @@ def validate_rowcounts(
     results = []
 
     total_checks = len(ids) * len(tfs) * len(periods)
-    logger.info(f"Validating {total_checks} combinations: {len(ids)} IDs x {len(tfs)} TFs x {len(periods)} periods")
+    logger.info(
+        f"Validating {total_checks} combinations: {len(ids)} IDs x {len(tfs)} TFs x {len(periods)} periods"
+    )
 
     for id_ in ids:
         for tf in tfs:
@@ -203,15 +210,17 @@ def validate_rowcounts(
                 else:
                     status = "DUPLICATE"
 
-                results.append({
-                    "id": id_,
-                    "tf": tf,
-                    "period": period,
-                    "expected": expected,
-                    "actual": actual,
-                    "diff": diff,
-                    "status": status,
-                })
+                results.append(
+                    {
+                        "id": id_,
+                        "tf": tf,
+                        "period": period,
+                        "expected": expected,
+                        "actual": actual,
+                        "diff": diff,
+                        "status": status,
+                    }
+                )
 
     df = pd.DataFrame(results)
     return df
@@ -235,15 +244,17 @@ def summarize_validation(df: pd.DataFrame) -> dict:
     # Extract issues (non-OK rows)
     issues = []
     for _, row in df[df["status"] != "OK"].iterrows():
-        issues.append({
-            "id": row["id"],
-            "tf": row["tf"],
-            "period": row["period"],
-            "expected": row["expected"],
-            "actual": row["actual"],
-            "diff": row["diff"],
-            "status": row["status"],
-        })
+        issues.append(
+            {
+                "id": row["id"],
+                "tf": row["tf"],
+                "period": row["period"],
+                "expected": row["expected"],
+                "actual": row["actual"],
+                "diff": row["diff"],
+                "status": row["status"],
+            }
+        )
 
     return {
         "total": total,
@@ -379,7 +390,9 @@ def main() -> int:
 
     # Exit code: 0 if all OK, 1 if any issues
     if summary["gaps"] > 0 or summary["duplicates"] > 0:
-        logger.warning(f"Validation found {summary['gaps']} gaps and {summary['duplicates']} duplicates")
+        logger.warning(
+            f"Validation found {summary['gaps']} gaps and {summary['duplicates']} duplicates"
+        )
         return 1
 
     logger.info("All validation checks passed")

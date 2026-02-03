@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from typing import Iterable, Mapping, Any, Sequence, Optional
+from typing import Mapping, Any, Sequence, Optional
 
 import pathlib
 import pandas as pd

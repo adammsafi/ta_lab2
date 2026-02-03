@@ -1,8 +1,9 @@
 # src/ta_lab2/regimes/labels.py
 from __future__ import annotations
-from typing import Dict, Optional, Sequence
+from typing import Optional
 import numpy as np
 import pandas as pd
+
 
 # ---------- Core labelers (TF-agnostic) ----------
 def label_trend_basic(
@@ -28,8 +29,16 @@ def label_trend_basic(
     up = (px > s) & (f > m)
     dn = (px < s) & (f < m)
     if confirm_bars > 0:
-        up = up.rolling(confirm_bars).apply(lambda x: float(np.all(x == 1.0)), raw=True).astype(bool)
-        dn = dn.rolling(confirm_bars).apply(lambda x: float(np.all(x == 1.0)), raw=True).astype(bool)
+        up = (
+            up.rolling(confirm_bars)
+            .apply(lambda x: float(np.all(x == 1.0)), raw=True)
+            .astype(bool)
+        )
+        dn = (
+            dn.rolling(confirm_bars)
+            .apply(lambda x: float(np.all(x == 1.0)), raw=True)
+            .astype(bool)
+        )
 
     lab = np.where(up, "Up", np.where(dn, "Down", "Sideways"))
     if adx_col is not None and adx_col in df.columns and adx_floor > 0:
@@ -38,10 +47,14 @@ def label_trend_basic(
         lab = np.where(weak & (lab == "Down"), "Sideways", lab)
     return pd.Series(lab, index=df.index, name="trend")
 
+
 def _percentile_series(x: pd.Series) -> pd.Series:
     # Rolling rank percentile of latest value within window
     # Avoids scipy; simple and robust.
-    return x.rolling(len(x)).apply(lambda w: (pd.Series(w).rank().iloc[-1] / max(len(w), 1)) * 100, raw=False)
+    return x.rolling(len(x)).apply(
+        lambda w: (pd.Series(w).rank().iloc[-1] / max(len(w), 1)) * 100, raw=False
+    )
+
 
 def label_vol_bucket(
     df: pd.DataFrame,
@@ -50,8 +63,8 @@ def label_vol_bucket(
     price_col: str = "close",
     window: int = 100,
     mode: str = "full",  # "full" uses percentiles, "lite" uses fixed cutoffs
-    low_cutoff: float = 0.015,   # ~1.5% ATR% fallback
-    high_cutoff: float = 0.04,   # ~4.0% ATR% fallback
+    low_cutoff: float = 0.015,  # ~1.5% ATR% fallback
+    high_cutoff: float = 0.04,  # ~4.0% ATR% fallback
 ) -> pd.Series:
     if atr_col and atr_col in df.columns:
         atrp = df[atr_col] / df[price_col]
@@ -65,8 +78,11 @@ def label_vol_bucket(
         )
         lab = np.where(pct < 33, "Low", np.where(pct < 67, "Normal", "High"))
     else:
-        lab = np.where(atrp < low_cutoff, "Low", np.where(atrp > high_cutoff, "High", "Normal"))
+        lab = np.where(
+            atrp < low_cutoff, "Low", np.where(atrp > high_cutoff, "High", "Normal")
+        )
     return pd.Series(lab, index=df.index, name="vol")
+
 
 def label_liquidity_bucket(
     df: pd.DataFrame,
@@ -91,8 +107,10 @@ def label_liquidity_bucket(
         lab = np.full(len(df), "Normal", dtype=object)
     return pd.Series(lab, index=df.index, name="liq")
 
+
 def compose_regime_key(trend: str, vol: str, liq: str) -> str:
     return f"{trend}-{vol}-{liq}"
+
 
 # ---------- Layer wrappers (L0..L3) ----------
 def label_layer_monthly(
@@ -104,10 +122,24 @@ def label_layer_monthly(
     ema_mid: str = "close_ema_24",
     ema_slow: str = "close_ema_48",
 ) -> pd.Series:
-    trend = label_trend_basic(monthly, price_col=price_col, ema_fast=ema_fast, ema_mid=ema_mid, ema_slow=ema_slow, confirm_bars=2)
-    vol = label_vol_bucket(monthly, price_col=price_col, window=60 if mode == "full" else 30, mode=mode)
+    trend = label_trend_basic(
+        monthly,
+        price_col=price_col,
+        ema_fast=ema_fast,
+        ema_mid=ema_mid,
+        ema_slow=ema_slow,
+        confirm_bars=2,
+    )
+    vol = label_vol_bucket(
+        monthly, price_col=price_col, window=60 if mode == "full" else 30, mode=mode
+    )
     liq = label_liquidity_bucket(monthly)
-    return pd.Series([compose_regime_key(t, v, l) for t, v, l in zip(trend, vol, liq)], index=monthly.index, name="L0")
+    return pd.Series(
+        [compose_regime_key(t, v, l) for t, v, l in zip(trend, vol, liq)],
+        index=monthly.index,
+        name="L0",
+    )
+
 
 def label_layer_weekly(
     weekly: pd.DataFrame,
@@ -118,10 +150,24 @@ def label_layer_weekly(
     ema_mid: str = "close_ema_50",
     ema_slow: str = "close_ema_200",
 ) -> pd.Series:
-    trend = label_trend_basic(weekly, price_col=price_col, ema_fast=ema_fast, ema_mid=ema_mid, ema_slow=ema_slow, confirm_bars=2)
-    vol = label_vol_bucket(weekly, price_col=price_col, window=100 if mode == "full" else 50, mode=mode)
+    trend = label_trend_basic(
+        weekly,
+        price_col=price_col,
+        ema_fast=ema_fast,
+        ema_mid=ema_mid,
+        ema_slow=ema_slow,
+        confirm_bars=2,
+    )
+    vol = label_vol_bucket(
+        weekly, price_col=price_col, window=100 if mode == "full" else 50, mode=mode
+    )
     liq = label_liquidity_bucket(weekly)
-    return pd.Series([compose_regime_key(t, v, l) for t, v, l in zip(trend, vol, liq)], index=weekly.index, name="L1")
+    return pd.Series(
+        [compose_regime_key(t, v, l) for t, v, l in zip(trend, vol, liq)],
+        index=weekly.index,
+        name="L1",
+    )
+
 
 def label_layer_daily(
     daily: pd.DataFrame,
@@ -132,10 +178,24 @@ def label_layer_daily(
     ema_mid: str = "close_ema_50",
     ema_slow: str = "close_ema_100",
 ) -> pd.Series:
-    trend = label_trend_basic(daily, price_col=price_col, ema_fast=ema_fast, ema_mid=ema_mid, ema_slow=ema_slow, confirm_bars=2)
-    vol = label_vol_bucket(daily, price_col=price_col, window=250 if mode == "full" else 100, mode=mode)
+    trend = label_trend_basic(
+        daily,
+        price_col=price_col,
+        ema_fast=ema_fast,
+        ema_mid=ema_mid,
+        ema_slow=ema_slow,
+        confirm_bars=2,
+    )
+    vol = label_vol_bucket(
+        daily, price_col=price_col, window=250 if mode == "full" else 100, mode=mode
+    )
     liq = label_liquidity_bucket(daily)
-    return pd.Series([compose_regime_key(t, v, l) for t, v, l in zip(trend, vol, liq)], index=daily.index, name="L2")
+    return pd.Series(
+        [compose_regime_key(t, v, l) for t, v, l in zip(trend, vol, liq)],
+        index=daily.index,
+        name="L2",
+    )
+
 
 def label_layer_intraday(
     intraday: pd.DataFrame,
@@ -146,7 +206,18 @@ def label_layer_intraday(
     ema_slow: str = "close_ema_89",
 ) -> pd.Series:
     # Intraday often runs "lite" style: short confirm and simple vol proxy
-    trend = label_trend_basic(intraday, price_col=price_col, ema_fast=ema_fast, ema_mid=ema_mid, ema_slow=ema_slow, confirm_bars=1)
+    trend = label_trend_basic(
+        intraday,
+        price_col=price_col,
+        ema_fast=ema_fast,
+        ema_mid=ema_mid,
+        ema_slow=ema_slow,
+        confirm_bars=1,
+    )
     vol = label_vol_bucket(intraday, price_col=price_col, window=300, mode="lite")
     liq = label_liquidity_bucket(intraday)
-    return pd.Series([compose_regime_key(t, v, l) for t, v, l in zip(trend, vol, liq)], index=intraday.index, name="L3")
+    return pd.Series(
+        [compose_regime_key(t, v, l) for t, v, l in zip(trend, vol, liq)],
+        index=intraday.index,
+        name="L3",
+    )

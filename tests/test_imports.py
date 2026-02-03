@@ -27,9 +27,7 @@ def discover_package_modules(package_name: str, package_path: Path) -> list[str]
 
     # Walk the package tree, only return leaf modules (not packages)
     for info in pkgutil.walk_packages(
-        [str(package_path)],
-        prefix=f"{package_name}.",
-        onerror=handle_import_error
+        [str(package_path)], prefix=f"{package_name}.", onerror=handle_import_error
     ):
         modules.append(info.name)
 
@@ -43,12 +41,15 @@ TESTS_PATH = PROJECT_ROOT / "tests"
 
 # Core ta_lab2 modules (excluding tools which are tested separately)
 TA_LAB2_MODULES = [
-    m for m in discover_package_modules("ta_lab2", SRC_PATH / "ta_lab2")
+    m
+    for m in discover_package_modules("ta_lab2", SRC_PATH / "ta_lab2")
     if not m.startswith("ta_lab2.tools.")
 ]
 
 # Tools modules (may have optional dependencies)
-TOOLS_MODULES = discover_package_modules("ta_lab2.tools", SRC_PATH / "ta_lab2" / "tools")
+TOOLS_MODULES = discover_package_modules(
+    "ta_lab2.tools", SRC_PATH / "ta_lab2" / "tools"
+)
 
 # Test modules
 TEST_MODULES = discover_package_modules("tests", TESTS_PATH)
@@ -72,7 +73,9 @@ def test_tools_module_import(module_name):
     """
     # Skip orchestrator modules if dependencies not available
     if "ai_orchestrator" in module_name:
-        pytest.skip(f"Orchestrator module {module_name} - use @pytest.mark.orchestrator tests")
+        pytest.skip(
+            f"Orchestrator module {module_name} - use @pytest.mark.orchestrator tests"
+        )
 
     try:
         importlib.import_module(module_name)
@@ -90,7 +93,9 @@ def test_orchestrator_imports():
     - pytest - all tests (skips orchestrator if deps missing)
     """
     # Skip if dependencies not installed
-    chromadb = pytest.importorskip("chromadb", reason="chromadb required for orchestrator")
+    chromadb = pytest.importorskip(
+        "chromadb", reason="chromadb required for orchestrator"
+    )
     mem0 = pytest.importorskip("mem0ai", reason="mem0ai required for orchestrator")
 
     # Now import orchestrator modules that depend on these

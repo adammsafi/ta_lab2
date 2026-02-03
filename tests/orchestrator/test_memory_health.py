@@ -1,12 +1,12 @@
 """Tests for memory health monitoring."""
 import pytest
 from datetime import datetime, timezone, timedelta
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 from ta_lab2.tools.ai_orchestrator.memory.health import (
     HealthReport,
     MemoryHealthMonitor,
-    scan_stale_memories
+    scan_stale_memories,
 )
 
 
@@ -21,7 +21,7 @@ def test_health_report_creation():
         missing_metadata=2,
         age_distribution={"0-30d": 50, "30-60d": 30, "60-90d": 15, "90+d": 5},
         stale_memories=[],
-        scan_timestamp="2026-01-28T15:00:00"
+        scan_timestamp="2026-01-28T15:00:00",
     )
 
     assert report.total_memories == 100
@@ -34,12 +34,7 @@ def test_health_report_creation():
 
 def test_health_report_age_distribution():
     """Test HealthReport age distribution dict works."""
-    age_dist = {
-        "0-30d": 100,
-        "30-60d": 50,
-        "60-90d": 25,
-        "90+d": 10
-    }
+    age_dist = {"0-30d": 100, "30-60d": 50, "60-90d": 25, "90+d": 10}
 
     report = HealthReport(
         total_memories=185,
@@ -49,7 +44,7 @@ def test_health_report_age_distribution():
         missing_metadata=0,
         age_distribution=age_dist,
         stale_memories=[],
-        scan_timestamp="2026-01-28T15:00:00"
+        scan_timestamp="2026-01-28T15:00:00",
     )
 
     assert report.age_distribution == age_dist
@@ -88,17 +83,17 @@ def test_scan_finds_stale_memories():
             "memory": "This is stale memory content",
             "metadata": {
                 "created_at": old_date.isoformat(),
-                "last_verified": old_date.isoformat()
-            }
+                "last_verified": old_date.isoformat(),
+            },
         },
         {
             "id": "mem_fresh_1",
             "memory": "This is fresh memory content",
             "metadata": {
                 "created_at": recent_date.isoformat(),
-                "last_verified": recent_date.isoformat()
-            }
-        }
+                "last_verified": recent_date.isoformat(),
+            },
+        },
     ]
 
     mock_client = Mock()
@@ -124,17 +119,17 @@ def test_scan_ignores_recent_memories():
             "memory": "Recent memory",
             "metadata": {
                 "created_at": recent_date.isoformat(),
-                "last_verified": recent_date.isoformat()
-            }
+                "last_verified": recent_date.isoformat(),
+            },
         },
         {
             "id": "mem_recent_2",
             "memory": "Another recent memory",
             "metadata": {
                 "created_at": recent_date.isoformat(),
-                "last_verified": recent_date.isoformat()
-            }
-        }
+                "last_verified": recent_date.isoformat(),
+            },
+        },
     ]
 
     mock_client = Mock()
@@ -156,13 +151,9 @@ def test_scan_handles_missing_metadata():
             "metadata": {
                 "created_at": "2026-01-01T00:00:00"
                 # No last_verified
-            }
+            },
         },
-        {
-            "id": "mem_missing_2",
-            "memory": "Memory without metadata",
-            "metadata": {}
-        }
+        {"id": "mem_missing_2", "memory": "Memory without metadata", "metadata": {}},
     ]
 
     mock_client = Mock()
@@ -191,8 +182,8 @@ def test_report_categorizes_by_age():
             "memory": "Fresh",
             "metadata": {
                 "created_at": (now - timedelta(days=10)).isoformat(),
-                "last_verified": (now - timedelta(days=10)).isoformat()
-            }
+                "last_verified": (now - timedelta(days=10)).isoformat(),
+            },
         },
         # 30-60d bucket
         {
@@ -200,8 +191,8 @@ def test_report_categorizes_by_age():
             "memory": "Moderate",
             "metadata": {
                 "created_at": (now - timedelta(days=45)).isoformat(),
-                "last_verified": (now - timedelta(days=45)).isoformat()
-            }
+                "last_verified": (now - timedelta(days=45)).isoformat(),
+            },
         },
         # 60-90d bucket
         {
@@ -209,8 +200,8 @@ def test_report_categorizes_by_age():
             "memory": "Aging",
             "metadata": {
                 "created_at": (now - timedelta(days=75)).isoformat(),
-                "last_verified": (now - timedelta(days=75)).isoformat()
-            }
+                "last_verified": (now - timedelta(days=75)).isoformat(),
+            },
         },
         # 90+d bucket
         {
@@ -218,9 +209,9 @@ def test_report_categorizes_by_age():
             "memory": "Stale",
             "metadata": {
                 "created_at": (now - timedelta(days=120)).isoformat(),
-                "last_verified": (now - timedelta(days=120)).isoformat()
-            }
-        }
+                "last_verified": (now - timedelta(days=120)).isoformat(),
+            },
+        },
     ]
 
     mock_client = Mock()
@@ -246,8 +237,8 @@ def test_report_counts_deprecated():
             "memory": "Active",
             "metadata": {
                 "created_at": now.isoformat(),
-                "last_verified": now.isoformat()
-            }
+                "last_verified": now.isoformat(),
+            },
         },
         {
             "id": "mem_2",
@@ -256,9 +247,9 @@ def test_report_counts_deprecated():
                 "created_at": now.isoformat(),
                 "last_verified": now.isoformat(),
                 "deprecated_since": now.isoformat(),
-                "deprecation_reason": "Test reason"
-            }
-        }
+                "deprecation_reason": "Test reason",
+            },
+        },
     ]
 
     mock_client = Mock()
@@ -282,8 +273,8 @@ def test_report_includes_stale_list():
             "memory": "This is a long stale memory content that should be truncated to 100 characters for the report display purposes",
             "metadata": {
                 "created_at": stale_date.isoformat(),
-                "last_verified": stale_date.isoformat()
-            }
+                "last_verified": stale_date.isoformat(),
+            },
         }
     ]
 
@@ -311,8 +302,8 @@ def test_flag_dry_run_no_update():
             "memory": "Stale memory",
             "metadata": {
                 "created_at": stale_date.isoformat(),
-                "last_verified": stale_date.isoformat()
-            }
+                "last_verified": stale_date.isoformat(),
+            },
         }
     ]
 
@@ -338,8 +329,8 @@ def test_flag_updates_metadata():
             "memory": "Stale memory",
             "metadata": {
                 "created_at": stale_date.isoformat(),
-                "last_verified": stale_date.isoformat()
-            }
+                "last_verified": stale_date.isoformat(),
+            },
         }
     ]
 
@@ -370,8 +361,8 @@ def test_flag_includes_reason():
             "memory": "Stale memory",
             "metadata": {
                 "created_at": stale_date.isoformat(),
-                "last_verified": stale_date.isoformat()
-            }
+                "last_verified": stale_date.isoformat(),
+            },
         }
     ]
 
@@ -401,8 +392,8 @@ def test_refresh_updates_timestamp():
             "memory": "Memory to refresh",
             "metadata": {
                 "created_at": old_date.isoformat(),
-                "last_verified": old_date.isoformat()
-            }
+                "last_verified": old_date.isoformat(),
+            },
         }
     ]
 
@@ -438,17 +429,17 @@ def test_refresh_multiple_memories():
             "memory": "Memory 1",
             "metadata": {
                 "created_at": old_date.isoformat(),
-                "last_verified": old_date.isoformat()
-            }
+                "last_verified": old_date.isoformat(),
+            },
         },
         {
             "id": "mem_2",
             "memory": "Memory 2",
             "metadata": {
                 "created_at": old_date.isoformat(),
-                "last_verified": old_date.isoformat()
-            }
-        }
+                "last_verified": old_date.isoformat(),
+            },
+        },
     ]
 
     mock_client = Mock()
@@ -473,15 +464,17 @@ def test_scan_stale_memories_convenience_function():
             "memory": "Stale",
             "metadata": {
                 "created_at": stale_date.isoformat(),
-                "last_verified": stale_date.isoformat()
-            }
+                "last_verified": stale_date.isoformat(),
+            },
         }
     ]
 
     mock_client = Mock()
     mock_client.get_all.return_value = mock_memories
 
-    with patch("ta_lab2.tools.ai_orchestrator.memory.health.get_mem0_client") as mock_get_client:
+    with patch(
+        "ta_lab2.tools.ai_orchestrator.memory.health.get_mem0_client"
+    ) as mock_get_client:
         mock_get_client.return_value = mock_client
 
         stale = scan_stale_memories(staleness_days=60)

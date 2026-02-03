@@ -112,6 +112,7 @@ def load_ids(engine, ids_arg: Optional[str] = None, all_ids: bool = False) -> li
 
     if all_ids:
         from sqlalchemy import text
+
         query = """
         SELECT DISTINCT id
         FROM public.cmc_price_bars_1d
@@ -166,17 +167,22 @@ def main(argv: Optional[list[str]] = None) -> int:
     # Load active indicators
     try:
         active_indicators = feature.load_indicator_params()
-        indicator_names = [ind['indicator_name'] for ind in active_indicators]
+        indicator_names = [ind["indicator_name"] for ind in active_indicators]
 
         # Filter indicators if specified
         if args.indicators:
             requested = [i.strip() for i in args.indicators.split(",")]
             # Filter to only requested indicators
-            active_indicators = [ind for ind in active_indicators if ind['indicator_name'] in requested]
-            indicator_names = [ind['indicator_name'] for ind in active_indicators]
+            active_indicators = [
+                ind for ind in active_indicators if ind["indicator_name"] in requested
+            ]
+            indicator_names = [ind["indicator_name"] for ind in active_indicators]
 
             if not active_indicators:
-                print(f"Error: No active indicators match requested: {requested}", file=sys.stderr)
+                print(
+                    f"Error: No active indicators match requested: {requested}",
+                    file=sys.stderr,
+                )
                 return 1
 
         print(f"Active indicators: {', '.join(indicator_names)}")
@@ -192,7 +198,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         print(f"Start date: {args.start or 'all available'}")
         print(f"End date: {args.end or 'all available'}")
         print(f"Output table: {config.output_schema}.{config.output_table}")
-        print(f"Indicators to compute:")
+        print("Indicators to compute:")
         for ind in active_indicators:
             print(f"  - {ind['indicator_name']}: {ind['params']}")
         return 0
@@ -210,6 +216,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     except Exception as e:
         print(f"Error computing features: {e}", file=sys.stderr)
         import traceback
+
         traceback.print_exc()
         return 1
 

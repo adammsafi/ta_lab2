@@ -13,11 +13,9 @@ Integration tests (marked with pytest.skipif) require TARGET_DB_URL.
 
 import os
 from unittest.mock import Mock, MagicMock, patch
-import uuid
 
 import pytest
 import pandas as pd
-from sqlalchemy import create_engine
 
 from ta_lab2.scripts.signals.validate_reproducibility import (
     validate_backtest_reproducibility,
@@ -28,12 +26,12 @@ from ta_lab2.scripts.signals.validate_reproducibility import (
     _find_metric_differences,
 )
 from ta_lab2.scripts.backtests import SignalBacktester, BacktestResult
-from ta_lab2.backtests.costs import CostModel
 
 
 # ============================================================================
 # UNIT TESTS (with mocks - no database required)
 # ============================================================================
+
 
 class TestReproducibility:
     """Unit tests for reproducibility validation functions."""
@@ -66,6 +64,7 @@ class TestReproducibility:
 
         # Return identical results for both calls (create copies with different run_id)
         import copy
+
         result1 = copy.copy(result)
         result1.run_id = "test-1"
         result2 = copy.copy(result)
@@ -77,7 +76,8 @@ class TestReproducibility:
         report = validate_backtest_reproducibility(
             mock_backtester,
             "ema_crossover",
-            1, 1,
+            1,
+            1,
             pd.Timestamp("2023-01-01", tz="UTC"),
             pd.Timestamp("2023-12-31", tz="UTC"),
             strict=False,
@@ -112,6 +112,7 @@ class TestReproducibility:
         )
 
         import copy
+
         result1 = copy.copy(result)
         result1.run_id = "test-1"
         result2 = copy.copy(result)
@@ -122,7 +123,8 @@ class TestReproducibility:
         report = validate_backtest_reproducibility(
             mock_backtester,
             "ema_crossover",
-            1, 1,
+            1,
+            1,
             pd.Timestamp("2023-01-01", tz="UTC"),
             pd.Timestamp("2023-12-31", tz="UTC"),
             strict=False,
@@ -157,6 +159,7 @@ class TestReproducibility:
         )
 
         import copy
+
         result1 = copy.copy(result)
         result1.run_id = "test-1"
         result2 = copy.copy(result)
@@ -167,7 +170,8 @@ class TestReproducibility:
         report = validate_backtest_reproducibility(
             mock_backtester,
             "ema_crossover",
-            1, 1,
+            1,
+            1,
             pd.Timestamp("2023-01-01", tz="UTC"),
             pd.Timestamp("2023-12-31", tz="UTC"),
             strict=False,
@@ -202,6 +206,7 @@ class TestReproducibility:
         )
 
         import copy
+
         result1 = copy.copy(result)
         result1.run_id = "test-1"
         result2 = copy.copy(result)
@@ -212,7 +217,8 @@ class TestReproducibility:
         report = validate_backtest_reproducibility(
             mock_backtester,
             "ema_crossover",
-            1, 1,
+            1,
+            1,
             pd.Timestamp("2023-01-01", tz="UTC"),
             pd.Timestamp("2023-12-31", tz="UTC"),
             strict=False,
@@ -246,6 +252,7 @@ class TestReproducibility:
         )
 
         import copy
+
         result2 = copy.copy(result1)
         result2.run_id = "test-2"
         result2.total_return = 0.18  # Different PnL
@@ -255,7 +262,8 @@ class TestReproducibility:
         report = validate_backtest_reproducibility(
             mock_backtester,
             "ema_crossover",
-            1, 1,
+            1,
+            1,
             pd.Timestamp("2023-01-01", tz="UTC"),
             pd.Timestamp("2023-12-31", tz="UTC"),
             strict=False,
@@ -270,14 +278,16 @@ class TestReproducibility:
         mock_engine = MagicMock()
 
         # Mock: stored hash differs from current hash
-        with patch('ta_lab2.scripts.signals.validate_reproducibility._get_latest_feature_hash') as mock_get, \
-             patch('ta_lab2.scripts.signals.validate_reproducibility._compute_current_feature_hash') as mock_compute:
-
+        with patch(
+            "ta_lab2.scripts.signals.validate_reproducibility._get_latest_feature_hash"
+        ) as mock_get, patch(
+            "ta_lab2.scripts.signals.validate_reproducibility._compute_current_feature_hash"
+        ) as mock_compute:
             mock_get.return_value = "abc123"
             mock_compute.return_value = "def456"  # Different hash
 
             is_valid, msg = validate_feature_hash_current(
-                mock_engine, 'ema_crossover', 1, 1, mode='strict'
+                mock_engine, "ema_crossover", 1, 1, mode="strict"
             )
 
             assert is_valid is False
@@ -288,14 +298,16 @@ class TestReproducibility:
         """warn mode logs warning but returns True."""
         mock_engine = MagicMock()
 
-        with patch('ta_lab2.scripts.signals.validate_reproducibility._get_latest_feature_hash') as mock_get, \
-             patch('ta_lab2.scripts.signals.validate_reproducibility._compute_current_feature_hash') as mock_compute:
-
+        with patch(
+            "ta_lab2.scripts.signals.validate_reproducibility._get_latest_feature_hash"
+        ) as mock_get, patch(
+            "ta_lab2.scripts.signals.validate_reproducibility._compute_current_feature_hash"
+        ) as mock_compute:
             mock_get.return_value = "abc123"
             mock_compute.return_value = "def456"  # Different hash
 
             is_valid, msg = validate_feature_hash_current(
-                mock_engine, 'ema_crossover', 1, 1, mode='warn'
+                mock_engine, "ema_crossover", 1, 1, mode="warn"
             )
 
             assert is_valid is True  # Proceeds despite mismatch
@@ -308,7 +320,7 @@ class TestReproducibility:
 
         # Should not call any database functions
         is_valid, msg = validate_feature_hash_current(
-            mock_engine, 'ema_crossover', 1, 1, mode='trust'
+            mock_engine, "ema_crossover", 1, 1, mode="trust"
         )
 
         assert is_valid is True
@@ -318,14 +330,16 @@ class TestReproducibility:
         """validate_feature_hash_current detects data changes."""
         mock_engine = MagicMock()
 
-        with patch('ta_lab2.scripts.signals.validate_reproducibility._get_latest_feature_hash') as mock_get, \
-             patch('ta_lab2.scripts.signals.validate_reproducibility._compute_current_feature_hash') as mock_compute:
-
+        with patch(
+            "ta_lab2.scripts.signals.validate_reproducibility._get_latest_feature_hash"
+        ) as mock_get, patch(
+            "ta_lab2.scripts.signals.validate_reproducibility._compute_current_feature_hash"
+        ) as mock_compute:
             mock_get.return_value = "old_hash"
             mock_compute.return_value = "new_hash"
 
             is_valid, msg = validate_feature_hash_current(
-                mock_engine, 'ema_crossover', 1, 1, mode='warn'
+                mock_engine, "ema_crossover", 1, 1, mode="warn"
             )
 
             assert "old_hash" in msg
@@ -335,35 +349,38 @@ class TestReproducibility:
         """compare_backtest_runs queries cmc_backtest_runs."""
         mock_engine = MagicMock()
 
-        with patch('ta_lab2.scripts.signals.validate_reproducibility._load_run') as mock_load_run, \
-             patch('ta_lab2.scripts.signals.validate_reproducibility._load_trades') as mock_load_trades, \
-             patch('ta_lab2.scripts.signals.validate_reproducibility._load_metrics') as mock_load_metrics:
-
+        with patch(
+            "ta_lab2.scripts.signals.validate_reproducibility._load_run"
+        ) as mock_load_run, patch(
+            "ta_lab2.scripts.signals.validate_reproducibility._load_trades"
+        ) as mock_load_trades, patch(
+            "ta_lab2.scripts.signals.validate_reproducibility._load_metrics"
+        ) as mock_load_metrics:
             # Mock run data
             mock_load_run.side_effect = [
                 {
-                    'run_id': 'run1',
-                    'total_return': 0.15,
-                    'feature_hash': 'abc123',
+                    "run_id": "run1",
+                    "total_return": 0.15,
+                    "feature_hash": "abc123",
                 },
                 {
-                    'run_id': 'run2',
-                    'total_return': 0.15,
-                    'feature_hash': 'abc123',
-                }
+                    "run_id": "run2",
+                    "total_return": 0.15,
+                    "feature_hash": "abc123",
+                },
             ]
 
             mock_load_trades.side_effect = [
-                [{'entry_ts': '2023-01-01'}],
-                [{'entry_ts': '2023-01-01'}]
+                [{"entry_ts": "2023-01-01"}],
+                [{"entry_ts": "2023-01-01"}],
             ]
 
             mock_load_metrics.side_effect = [
-                {'sharpe_ratio': 1.5},
-                {'sharpe_ratio': 1.5}
+                {"sharpe_ratio": 1.5},
+                {"sharpe_ratio": 1.5},
             ]
 
-            report = compare_backtest_runs(mock_engine, 'run1', 'run2')
+            report = compare_backtest_runs(mock_engine, "run1", "run2")
 
             # Verify database queries called
             assert mock_load_run.call_count == 2
@@ -385,14 +402,14 @@ class TestReproducibility:
             differences=[],
         )
 
-        assert hasattr(report, 'is_reproducible')
-        assert hasattr(report, 'run_id_1')
-        assert hasattr(report, 'run_id_2')
-        assert hasattr(report, 'pnl_match')
-        assert hasattr(report, 'metrics_match')
-        assert hasattr(report, 'trade_count_match')
-        assert hasattr(report, 'feature_hash_match')
-        assert hasattr(report, 'differences')
+        assert hasattr(report, "is_reproducible")
+        assert hasattr(report, "run_id_1")
+        assert hasattr(report, "run_id_2")
+        assert hasattr(report, "pnl_match")
+        assert hasattr(report, "metrics_match")
+        assert hasattr(report, "trade_count_match")
+        assert hasattr(report, "feature_hash_match")
+        assert hasattr(report, "differences")
 
         # Test __str__ method
         str_repr = str(report)
@@ -402,40 +419,40 @@ class TestReproducibility:
 
     def test_compare_metrics_returns_true_for_identical_dicts(self):
         """_compare_metrics returns True for identical metric dictionaries."""
-        m1 = {'sharpe': 1.5, 'sortino': 1.8, 'calmar': 2.0}
-        m2 = {'sharpe': 1.5, 'sortino': 1.8, 'calmar': 2.0}
+        m1 = {"sharpe": 1.5, "sortino": 1.8, "calmar": 2.0}
+        m2 = {"sharpe": 1.5, "sortino": 1.8, "calmar": 2.0}
 
         assert _compare_metrics(m1, m2)
 
     def test_compare_metrics_returns_false_for_different_values(self):
         """_compare_metrics returns False when values differ."""
-        m1 = {'sharpe': 1.5, 'sortino': 1.8}
-        m2 = {'sharpe': 1.5, 'sortino': 1.9}  # Different sortino
+        m1 = {"sharpe": 1.5, "sortino": 1.8}
+        m2 = {"sharpe": 1.5, "sortino": 1.9}  # Different sortino
 
         assert not _compare_metrics(m1, m2)
 
     def test_compare_metrics_handles_none_values(self):
         """_compare_metrics handles None values correctly."""
-        m1 = {'sharpe': 1.5, 'profit_factor': None}
-        m2 = {'sharpe': 1.5, 'profit_factor': None}
+        m1 = {"sharpe": 1.5, "profit_factor": None}
+        m2 = {"sharpe": 1.5, "profit_factor": None}
 
         assert _compare_metrics(m1, m2)
 
-        m3 = {'sharpe': 1.5, 'profit_factor': None}
-        m4 = {'sharpe': 1.5, 'profit_factor': 2.0}
+        m3 = {"sharpe": 1.5, "profit_factor": None}
+        m4 = {"sharpe": 1.5, "profit_factor": 2.0}
 
         assert not _compare_metrics(m3, m4)
 
     def test_find_metric_differences_identifies_mismatches(self):
         """_find_metric_differences returns dict of differing metrics."""
-        m1 = {'sharpe': 1.5, 'sortino': 1.8, 'calmar': 2.0}
-        m2 = {'sharpe': 1.5, 'sortino': 1.9, 'calmar': 2.0}
+        m1 = {"sharpe": 1.5, "sortino": 1.8, "calmar": 2.0}
+        m2 = {"sharpe": 1.5, "sortino": 1.9, "calmar": 2.0}
 
         diffs = _find_metric_differences(m1, m2)
 
         assert len(diffs) == 1
-        assert 'sortino' in diffs
-        assert diffs['sortino'] == (1.8, 1.9)
+        assert "sortino" in diffs
+        assert diffs["sortino"] == (1.8, 1.9)
 
     def test_validate_reproducibility_strict_mode_raises_on_mismatch(self):
         """strict=True raises RuntimeError on reproducibility failure."""
@@ -462,6 +479,7 @@ class TestReproducibility:
         )
 
         import copy
+
         result2 = copy.copy(result1)
         result2.run_id = "test-2"
         result2.total_return = 0.20
@@ -472,7 +490,8 @@ class TestReproducibility:
             validate_backtest_reproducibility(
                 mock_backtester,
                 "ema_crossover",
-                1, 1,
+                1,
+                1,
                 pd.Timestamp("2023-01-01", tz="UTC"),
                 pd.Timestamp("2023-12-31", tz="UTC"),
                 strict=True,  # Strict mode
@@ -483,7 +502,8 @@ class TestReproducibility:
 # INTEGRATION TESTS (require database)
 # ============================================================================
 
-@pytest.mark.skipif(not os.environ.get('TARGET_DB_URL'), reason="No database")
+
+@pytest.mark.skipif(not os.environ.get("TARGET_DB_URL"), reason="No database")
 class TestReproducibilityIntegration:
     """Integration tests requiring actual database."""
 

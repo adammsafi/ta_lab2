@@ -17,7 +17,7 @@ Option B contract decisions:
 import argparse
 from dataclasses import dataclass
 from datetime import date, timedelta
-from typing import Any, Callable, Iterable, Literal, Mapping, Optional, Sequence
+from typing import Any, Callable, Iterable, Literal, Mapping, Sequence
 
 import os
 
@@ -29,6 +29,7 @@ from sqlalchemy.engine import Engine
 # =============================================================================
 # 1) Base invariant: exactly 1 row per local day
 # =============================================================================
+
 
 def assert_one_row_per_local_day(
     df: pd.DataFrame,
@@ -62,7 +63,11 @@ def assert_one_row_per_local_day(
             sample = sample.sort_values([id_col, ts_col]).head(10)
         else:
             sample = sample.sort_values(ts_col).head(10)
-        id_note = f" across ids (showing `{id_col}`)" if (id_col and id_col in df.columns) else ""
+        id_note = (
+            f" across ids (showing `{id_col}`)"
+            if (id_col and id_col in df.columns)
+            else ""
+        )
         raise ValueError(
             f"Base daily invariant violated: {int(dups.iloc[0])} rows for local day {dup_day} ({tz}){id_note}. "
             f"Sample:\n{sample}"
@@ -72,6 +77,7 @@ def assert_one_row_per_local_day(
 # =============================================================================
 # 2) Deterministic extrema timestamps: earliest among ties + fallback to ts
 # =============================================================================
+
 
 def compute_time_high_low(
     df_window: pd.DataFrame,
@@ -130,12 +136,15 @@ def compute_time_high_low(
     time_high = th.loc[hi_mask].min() if bool(hi_mask.any()) else pd.NaT
     time_low = tl.loc[lo_mask].min() if bool(lo_mask.any()) else pd.NaT
 
-    return pd.to_datetime(time_high, utc=True, errors="coerce"), pd.to_datetime(time_low, utc=True, errors="coerce")
+    return pd.to_datetime(time_high, utc=True, errors="coerce"), pd.to_datetime(
+        time_low, utc=True, errors="coerce"
+    )
 
 
 # =============================================================================
 # 3) Missing-days diagnostics (simple)
 # =============================================================================
+
 
 def _date_range_inclusive(a: date, b: date) -> list[date]:
     if b < a:
@@ -164,8 +173,12 @@ def compute_missing_days_diagnostics(
         "is_missing_days": len(missing) > 0,
         "count_days": len(expected),
         "count_missing_days": len(missing),
-        "first_missing_day": pd.to_datetime(missing[0]).tz_localize("UTC") if missing else pd.NaT,
-        "last_missing_day": pd.to_datetime(missing[-1]).tz_localize("UTC") if missing else pd.NaT,
+        "first_missing_day": pd.to_datetime(missing[0]).tz_localize("UTC")
+        if missing
+        else pd.NaT,
+        "last_missing_day": pd.to_datetime(missing[-1]).tz_localize("UTC")
+        if missing
+        else pd.NaT,
     }
 
 
@@ -182,7 +195,6 @@ REQUIRED_COL_DEFAULTS: dict[str, Any] = {
     "time_close": pd.NaT,
     "time_high": pd.NaT,
     "time_low": pd.NaT,
-
     # OHLCV + market data
     "open": float("nan"),
     "high": float("nan"),
@@ -190,17 +202,14 @@ REQUIRED_COL_DEFAULTS: dict[str, Any] = {
     "close": float("nan"),
     "volume": float("nan"),
     "market_cap": float("nan"),
-
     # Snapshot bookkeeping
     "timestamp": pd.NaT,
     "last_ts_half_open": pd.NaT,
-
     # Completeness/bookkeeping
     "pos_in_bar": None,
     "is_partial_start": False,
     "is_partial_end": True,
     "count_days_remaining": 0,
-
     # Missing-days diagnostics (simple)
     "is_missing_days": False,
     "count_days": 0,
@@ -226,6 +235,7 @@ def normalize_output_schema(
 # =============================================================================
 # 5) Carry-forward gate + updater (semantics-neutral)
 # =============================================================================
+
 
 @dataclass(frozen=True)
 class CarryForwardInputs:
@@ -279,7 +289,14 @@ def apply_carry_forward(
             out[k] = new_daily_row[k]
 
     # Snapshot bookkeeping overwrite if supplied
-    for k in ("timestamp", "last_ts_half_open", "pos_in_bar", "is_partial_start", "is_partial_end", "count_days_remaining"):
+    for k in (
+        "timestamp",
+        "last_ts_half_open",
+        "pos_in_bar",
+        "is_partial_start",
+        "is_partial_end",
+        "count_days_remaining",
+    ):
         if k in new_daily_row:
             out[k] = new_daily_row[k]
 
@@ -294,19 +311,65 @@ def apply_carry_forward(
 # 6) Semantics-neutral DB / IO helpers (requested API)
 # =============================================================================
 
+
 def resolve_db_url(
     db_url: str | None,
     *,
     env_var: str = "TARGET_DB_URL",
     label: str = "TARGET_DB_URL",
 ) -> str:
-    """Resolve DB URL from explicit value or an environment variable."""
+    """
+    Resolve DB URL from explicit value, db_config.env file, or environment variable.
+
+    Priority order:
+    1. Explicit --db-url argument
+    2. db_config.env file in project root (searched up to 5 levels)
+    3. Environment variable (TARGET_DB_URL or MARKETDATA_DB_URL) as fallback
+    """
     if db_url:
         return db_url
+
+    # Try loading from db_config.env file FIRST (highest priority after explicit arg)
+    try:
+        from pathlib import Path
+
+        # Look for db_config.env in current directory and parent directories
+        current = Path.cwd()
+        for _ in range(5):  # Search up to 5 levels up
+            env_file = current / "db_config.env"
+            if env_file.exists():
+                # Parse the .env file manually (no external dependencies)
+                with open(env_file, "r") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith("#") and "=" in line:
+                            key, value = line.split("=", 1)
+                            key = key.strip()
+                            value = value.strip().strip('"').strip("'")
+                            if key in (env_var, "TARGET_DB_URL", "MARKETDATA_DB_URL"):
+                                # Found URL in file - return it immediately without caching to env
+                                return value
+            current = current.parent
+    except Exception:
+        pass  # Silently continue if file reading fails
+
+    # Fall back to environment variable if file doesn't exist or doesn't have the URL
     val = os.environ.get(env_var)
-    if not val:
-        raise ValueError(f"Missing DB URL. Pass --db-url or set {label} / {env_var}.")
-    return val
+    if val:
+        return val
+
+    # Also check MARKETDATA_DB_URL as final fallback
+    if env_var != "MARKETDATA_DB_URL":
+        val = os.environ.get("MARKETDATA_DB_URL")
+        if val:
+            return val
+
+    raise ValueError(
+        f"Missing DB URL. Either:\n"
+        f"  1. Pass --db-url argument\n"
+        f"  2. Create db_config.env file with {label}=postgresql://...\n"
+        f"  3. Set {label} or MARKETDATA_DB_URL environment variable"
+    )
 
 
 def get_engine(db_url: str) -> Engine:
@@ -317,6 +380,7 @@ def get_engine(db_url: str) -> Engine:
 def resolve_num_processes(num_processes: int | None, *, default: int = 6) -> int:
     """Clamp processes to [1..cpu_count()]."""
     from multiprocessing import cpu_count
+
     ncpu = int(cpu_count())
     n = default if num_processes is None else int(num_processes)
     if n <= 0:
@@ -379,7 +443,9 @@ def load_daily_min_max(
 ) -> pd.DataFrame:
     """Per-id daily MIN/MAX ts (and optionally COUNT)."""
     if not ids:
-        cols = ["id", "daily_min", "daily_max"] + (["row_count"] if include_row_count else [])
+        cols = ["id", "daily_min", "daily_max"] + (
+            ["row_count"] if include_row_count else []
+        )
         return pd.DataFrame(columns=cols)
 
     e = get_engine(db_url)
@@ -413,6 +479,7 @@ def load_daily_min_max(
 # =============================================================================
 # 7) State table helpers (generic with_tz)
 # =============================================================================
+
 
 def _state_pk_cols(with_tz: bool) -> tuple[str, ...]:
     return ("id", "tf", "tz") if with_tz else ("id", "tf")
@@ -488,9 +555,15 @@ def load_state(
     if df.empty:
         return df
 
-    df["daily_min_seen"] = pd.to_datetime(df["daily_min_seen"], utc=True, errors="coerce")
-    df["daily_max_seen"] = pd.to_datetime(df["daily_max_seen"], utc=True, errors="coerce")
-    df["last_time_close"] = pd.to_datetime(df["last_time_close"], utc=True, errors="coerce")
+    df["daily_min_seen"] = pd.to_datetime(
+        df["daily_min_seen"], utc=True, errors="coerce"
+    )
+    df["daily_max_seen"] = pd.to_datetime(
+        df["daily_max_seen"], utc=True, errors="coerce"
+    )
+    df["last_time_close"] = pd.to_datetime(
+        df["last_time_close"], utc=True, errors="coerce"
+    )
     return df
 
 
@@ -541,7 +614,9 @@ def upsert_state(
     values_str = ", ".join([f":{c}" for c in insert_cols])
 
     # Update SET clause: all non-PK columns plus updated_at
-    set_sql = ", ".join([f"{c} = EXCLUDED.{c}" for c in update_cols] + ["updated_at = now()"])
+    set_sql = ", ".join(
+        [f"{c} = EXCLUDED.{c}" for c in update_cols] + ["updated_at = now()"]
+    )
 
     # Conflict target is ALWAYS (id, tf)
     conflict_target = "id, tf"
@@ -562,6 +637,7 @@ def upsert_state(
 # =============================================================================
 # 8) Upsert plumbing: make_upsert_sql, convert_nat_to_none, upsert_bars
 # =============================================================================
+
 
 def make_upsert_sql(
     bars_table: str,
@@ -604,12 +680,15 @@ def convert_nat_to_none(df: pd.DataFrame, cols: Iterable[str]) -> pd.DataFrame:
         s = out[c]
 
         # datetime64 or datetime64tz: must cast to object for None to persist
-        if pd.api.types.is_datetime64_any_dtype(s) or pd.api.types.is_datetime64tz_dtype(s):
+        if pd.api.types.is_datetime64_any_dtype(
+            s
+        ) or pd.api.types.is_datetime64tz_dtype(s):
             out[c] = s.astype("object").where(s.notna(), None)
         else:
             out[c] = s.where(s.notna(), None)
 
     return out
+
 
 def _default_timestamp_cols_for_output(df: pd.DataFrame) -> list[str]:
     """
@@ -649,14 +728,33 @@ def upsert_bars(
 
     # Filter to only valid schema columns FIRST
     valid_cols = [
-        'id', 'tf', 'tf_days', 'bar_seq', 'bar_anchor_offset',
-        'time_open', 'time_close', 'time_high', 'time_low',
-        'open', 'high', 'low', 'close', 'volume', 'market_cap',
-        'is_partial_start', 'is_partial_end', 'is_missing_days',
-        'count_days', 'count_days_remaining', 'count_missing_days',
-        'count_missing_days_start', 'count_missing_days_end',
-        'count_missing_days_interior', 'missing_days_where',
-        'first_missing_day', 'last_missing_day'
+        "id",
+        "tf",
+        "tf_days",
+        "bar_seq",
+        "bar_anchor_offset",
+        "time_open",
+        "time_close",
+        "time_high",
+        "time_low",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "market_cap",
+        "is_partial_start",
+        "is_partial_end",
+        "is_missing_days",
+        "count_days",
+        "count_days_remaining",
+        "count_missing_days",
+        "count_missing_days_start",
+        "count_missing_days_end",
+        "count_missing_days_interior",
+        "missing_days_where",
+        "first_missing_day",
+        "last_missing_day",
     ]
     df = df[[c for c in valid_cols if c in df.columns]]
 
@@ -680,6 +778,7 @@ def upsert_bars(
 # 9) Output invariant patches: enforce_ohlc_sanity + bad time_low fix
 # =============================================================================
 
+
 def enforce_ohlc_sanity(df: pd.DataFrame) -> pd.DataFrame:
     """
     Semantics-neutral invariants for already-built rows.
@@ -699,7 +798,14 @@ def enforce_ohlc_sanity(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
 
     # Normalize datetime cols if present
-    for c in ("time_open", "time_close", "time_low", "time_high", "timestamp", "last_ts_half_open"):
+    for c in (
+        "time_open",
+        "time_close",
+        "time_low",
+        "time_high",
+        "timestamp",
+        "last_ts_half_open",
+    ):
         if c in out.columns:
             out[c] = pd.to_datetime(out[c], utc=True, errors="coerce")
 
@@ -710,14 +816,24 @@ def enforce_ohlc_sanity(df: pd.DataFrame) -> pd.DataFrame:
     oc_min = out[["open", "close"]].min(axis=1, skipna=True)
     oc_max = out[["open", "close"]].max(axis=1, skipna=True)
 
-    pick_open = out["open"].notna() & out["close"].notna() & (out["open"] <= out["close"])
+    pick_open = (
+        out["open"].notna() & out["close"].notna() & (out["open"] <= out["close"])
+    )
 
     # --- BAD time_low FIX ---
-    bad_tl = out["time_low"].notna() & out["time_close"].notna() & (out["time_low"] > out["time_close"])
+    bad_tl = (
+        out["time_low"].notna()
+        & out["time_close"].notna()
+        & (out["time_low"] > out["time_close"])
+    )
     if bad_tl.any():
         out.loc[bad_tl, "low"] = oc_min.loc[bad_tl]
-        out.loc[bad_tl & pick_open, "time_low"] = out.loc[bad_tl & pick_open, "time_open"]
-        out.loc[bad_tl & (~pick_open), "time_low"] = out.loc[bad_tl & (~pick_open), "time_close"]
+        out.loc[bad_tl & pick_open, "time_low"] = out.loc[
+            bad_tl & pick_open, "time_open"
+        ]
+        out.loc[bad_tl & (~pick_open), "time_low"] = out.loc[
+            bad_tl & (~pick_open), "time_close"
+        ]
 
     # Clamp high up if it violates max(open, close)
     high_violate = oc_max.notna() & (out["high"].isna() | (out["high"] < oc_max))
@@ -728,8 +844,12 @@ def enforce_ohlc_sanity(df: pd.DataFrame) -> pd.DataFrame:
     low_violate = oc_min.notna() & (out["low"].isna() | (out["low"] > oc_min))
     if low_violate.any():
         out.loc[low_violate, "low"] = oc_min.loc[low_violate]
-        out.loc[low_violate & pick_open, "time_low"] = out.loc[low_violate & pick_open, "time_open"]
-        out.loc[low_violate & (~pick_open), "time_low"] = out.loc[low_violate & (~pick_open), "time_close"]
+        out.loc[low_violate & pick_open, "time_low"] = out.loc[
+            low_violate & pick_open, "time_open"
+        ]
+        out.loc[low_violate & (~pick_open), "time_low"] = out.loc[
+            low_violate & (~pick_open), "time_close"
+        ]
 
     return out
 
@@ -737,6 +857,7 @@ def enforce_ohlc_sanity(df: pd.DataFrame) -> pd.DataFrame:
 # =============================================================================
 # 10) Shared utilities for EMA/audit scripts
 # =============================================================================
+
 
 def table_exists(engine: Engine, full_name: str) -> bool:
     """
@@ -843,29 +964,29 @@ def create_bar_builder_argument_parser(
         "--ids",
         nargs="+",
         required=True,
-        help="'all' or list of ids (space/comma separated)."
+        help="'all' or list of ids (space/comma separated).",
     )
 
     # Optional DB/table arguments
     ap.add_argument(
         "--db-url",
         default=None,
-        help="Optional DB URL override. Defaults to TARGET_DB_URL env."
+        help="Optional DB URL override. Defaults to TARGET_DB_URL env.",
     )
     ap.add_argument(
         "--daily-table",
         default=default_daily_table,
-        help=f"Daily price table (default: {default_daily_table})"
+        help=f"Daily price table (default: {default_daily_table})",
     )
     ap.add_argument(
         "--bars-table",
         default=default_bars_table,
-        help=f"Output bars table (default: {default_bars_table})"
+        help=f"Output bars table (default: {default_bars_table})",
     )
     ap.add_argument(
         "--state-table",
         default=default_state_table,
-        help=f"State tracking table (default: {default_state_table})"
+        help=f"State tracking table (default: {default_state_table})",
     )
 
     # Optional timezone argument (for calendar builders)
@@ -873,7 +994,7 @@ def create_bar_builder_argument_parser(
         ap.add_argument(
             "--tz",
             default=default_tz,
-            help=f"Timezone for calendar alignment (default: {default_tz})"
+            help=f"Timezone for calendar alignment (default: {default_tz})",
         )
 
     # Optional processing arguments
@@ -881,12 +1002,12 @@ def create_bar_builder_argument_parser(
         "--num-processes",
         type=int,
         default=None,
-        help="Worker processes (default: auto-detect, max 6)"
+        help="Worker processes (default: auto-detect, max 6)",
     )
     ap.add_argument(
         "--full-rebuild",
         action="store_true",
-        help="If set, delete+rebuild snapshots for all requested ids/tfs."
+        help="If set, delete+rebuild snapshots for all requested ids/tfs.",
     )
 
     # Optional fail-on-gaps argument (for anchored builders)
@@ -894,14 +1015,14 @@ def create_bar_builder_argument_parser(
         ap.add_argument(
             "--fail-on-internal-gaps",
             action="store_true",
-            help="Fail if missing-days occur in the interior of a window."
+            help="Fail if missing-days occur in the interior of a window.",
         )
 
     # Legacy compatibility flag
     ap.add_argument(
         "--parallel",
         action="store_true",
-        help="(Legacy/no-op) Kept for pipeline compatibility"
+        help="(Legacy/no-op) Kept for pipeline compatibility",
     )
 
     return ap
@@ -940,6 +1061,7 @@ def load_periods(
 # 11) Bar builder common database utilities (extracted from builders)
 # =============================================================================
 
+
 def load_daily_prices_for_id(
     *,
     db_url: str,
@@ -969,13 +1091,14 @@ def load_daily_prices_for_id(
         DataFrame with daily OHLCV data, ts column in UTC
     """
     if ts_start is None:
-        where = 'WHERE id = :id'
+        where = "WHERE id = :id"
         params = {"id": int(id_)}
     else:
         where = 'WHERE id = :id AND "timestamp" >= :ts_start'
         params = {"id": int(id_), "ts_start": ts_start}
 
-    sql = text(f"""
+    sql = text(
+        f"""
       SELECT
         id,
         "timestamp" AS ts,
@@ -990,7 +1113,8 @@ def load_daily_prices_for_id(
       FROM {daily_table}
       {where}
       ORDER BY "timestamp";
-    """)
+    """
+    )
 
     eng = get_engine(db_url)
     with eng.connect() as conn:
@@ -1057,13 +1181,15 @@ def load_last_snapshot_row(
     Returns:
         Dictionary of last snapshot row, or None if no rows exist
     """
-    sql = text(f"""
+    sql = text(
+        f"""
       SELECT *
       FROM {bars_table}
       WHERE id = :id AND tf = :tf
       ORDER BY time_close DESC
       LIMIT 1;
-    """)
+    """
+    )
     eng = get_engine(db_url)
     with eng.connect() as conn:
         row = conn.execute(sql, {"id": int(id_), "tf": tf}).mappings().first()
@@ -1096,7 +1222,8 @@ def load_last_snapshot_info_for_id_tfs(
     if not tfs:
         return {}
 
-    sql = text(f"""
+    sql = text(
+        f"""
       SELECT DISTINCT ON (tf)
         tf,
         bar_seq AS last_bar_seq,
@@ -1104,7 +1231,8 @@ def load_last_snapshot_info_for_id_tfs(
       FROM {bars_table}
       WHERE id = :id AND tf = ANY(:tfs)
       ORDER BY tf, time_close DESC;
-    """)
+    """
+    )
     eng = get_engine(db_url)
     with eng.connect() as conn:
         rows = conn.execute(sql, {"id": int(id_), "tfs": list(tfs)}).mappings().all()

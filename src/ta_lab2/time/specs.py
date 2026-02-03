@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Iterable, Mapping, Sequence, Optional, Dict, Set, Tuple
+from typing import Iterable, Optional, Dict, Tuple
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
@@ -16,21 +16,24 @@ from sqlalchemy.engine import Engine
 
 class CalendarScheme(str, Enum):
     """Calendar convention for alignment/anchoring logic."""
-    NONE = "NONE"   # for tf-day tables
+
+    NONE = "NONE"  # for tf-day tables
     US = "US"
     ISO = "ISO"
-    CAL = "CAL"     # optional catch-all if you ever use it
+    CAL = "CAL"  # optional catch-all if you ever use it
 
 
 class TimeframeFamily(str, Enum):
     """High-level timeframe semantics family."""
-    TF_DAY = "TF_DAY"            # fixed-day buckets (e.g., 5D, 30D, 360D)
-    CAL = "CAL"                  # calendar-aligned (full periods only)
-    CAL_ANCHOR = "CAL_ANCHOR"    # calendar-anchored (partial at dataset edges allowed)
+
+    TF_DAY = "TF_DAY"  # fixed-day buckets (e.g., 5D, 30D, 360D)
+    CAL = "CAL"  # calendar-aligned (full periods only)
+    CAL_ANCHOR = "CAL_ANCHOR"  # calendar-anchored (partial at dataset edges allowed)
 
 
 class PartialPolicy(str, Enum):
     """Table-level partial-bar policy."""
+
     NONE = "NONE"
     START_END_ALLOWED = "START_END_ALLOWED"
 
@@ -52,6 +55,7 @@ class TimeframeSpec:
 
     Note: other legacy dim_timeframe columns can be added here later if needed.
     """
+
     tf: str
     calendar_scheme: Optional[str] = None
     allow_partial_start: bool = False
@@ -110,6 +114,7 @@ class TableSpec:
     The refresh + QA + EMA layers should take a TableSpec + TimeframeSpec(s)
     and obey them; no calendar logic should be inferred elsewhere.
     """
+
     table_name: str
     family: TimeframeFamily
     calendar_scheme: CalendarScheme = CalendarScheme.NONE
@@ -137,7 +142,9 @@ class TableSpec:
                 f"({len(self.timeframe_allowlist)} allowed)."
             )
         if self.disallow_timeframes and tf in self.disallow_timeframes:
-            raise ValueError(f"{self.table_name}: timeframe '{tf}' is explicitly disallowed.")
+            raise ValueError(
+                f"{self.table_name}: timeframe '{tf}' is explicitly disallowed."
+            )
 
 
 # -----------------------------
@@ -162,12 +169,19 @@ def default_bars_table_registry() -> Dict[str, TableSpec]:
             # Leave allowlist empty to allow any TF_DAY style TFs,
             # but explicitly disallow any CAL-labelled TFs if they exist.
             disallow_timeframes=(
-                "1W_CAL", "2W_CAL", "3W_CAL", "4W_CAL",
-                "1M_CAL", "3M_CAL", "6M_CAL", "12M_CAL",
-                "1W_ANCHOR", "1M_ANCHOR", "12M_ANCHOR",
+                "1W_CAL",
+                "2W_CAL",
+                "3W_CAL",
+                "4W_CAL",
+                "1M_CAL",
+                "3M_CAL",
+                "6M_CAL",
+                "12M_CAL",
+                "1W_ANCHOR",
+                "1M_ANCHOR",
+                "12M_ANCHOR",
             ),
         ),
-
         # 2) Calendar-aligned (US), full periods only
         "cmc_price_bars_multi_tf_cal_us": TableSpec(
             table_name="cmc_price_bars_multi_tf_cal_us",
@@ -175,7 +189,6 @@ def default_bars_table_registry() -> Dict[str, TableSpec]:
             calendar_scheme=CalendarScheme.US,
             partial_policy=PartialPolicy.NONE,
         ),
-
         # 3) Calendar-aligned (ISO), full periods only
         "cmc_price_bars_multi_tf_cal_iso": TableSpec(
             table_name="cmc_price_bars_multi_tf_cal_iso",
@@ -183,7 +196,6 @@ def default_bars_table_registry() -> Dict[str, TableSpec]:
             calendar_scheme=CalendarScheme.ISO,
             partial_policy=PartialPolicy.NONE,
         ),
-
         # 4) Calendar-anchored (US), partial at dataset edges allowed
         "cmc_price_bars_multi_tf_cal_anchor_us": TableSpec(
             table_name="cmc_price_bars_multi_tf_cal_anchor_us",
@@ -191,7 +203,6 @@ def default_bars_table_registry() -> Dict[str, TableSpec]:
             calendar_scheme=CalendarScheme.US,
             partial_policy=PartialPolicy.START_END_ALLOWED,
         ),
-
         # 5) Calendar-anchored (ISO), partial at dataset edges allowed
         "cmc_price_bars_multi_tf_cal_anchor_iso": TableSpec(
             table_name="cmc_price_bars_multi_tf_cal_anchor_iso",
@@ -227,6 +238,7 @@ class TimeSpecStore:
     This is the object you pass around to refresh/QA/EMA code so they stop
     inferring semantics and start obeying specs.
     """
+
     timeframes: Dict[str, TimeframeSpec] = field(default_factory=dict)
     tables: Dict[str, TableSpec] = field(default_factory=default_bars_table_registry)
 
@@ -258,7 +270,9 @@ class TimeSpecStore:
     def list_tables(self) -> Tuple[str, ...]:
         return tuple(sorted(self.tables.keys()))
 
-    def timeframes_for_table(self, table_name: str, *, tfs: Optional[Iterable[str]] = None) -> Tuple[TimeframeSpec, ...]:
+    def timeframes_for_table(
+        self, table_name: str, *, tfs: Optional[Iterable[str]] = None
+    ) -> Tuple[TimeframeSpec, ...]:
         """
         Return TimeframeSpecs for a table, optionally restricted to `tfs`,
         and enforce allowlist/disallow rules.
@@ -267,7 +281,11 @@ class TimeSpecStore:
         if tfs is None:
             # If the table has an explicit allowlist, use it; otherwise return all
             # and let higher-level code decide which TFs it wants to process.
-            chosen = list(table.timeframe_allowlist) if table.timeframe_allowlist else list(self.timeframes.keys())
+            chosen = (
+                list(table.timeframe_allowlist)
+                if table.timeframe_allowlist
+                else list(self.timeframes.keys())
+            )
         else:
             chosen = list(tfs)
 
@@ -284,7 +302,9 @@ def _make_engine(db_url: str | None) -> Engine:
     return create_engine(db_url)
 
 
-def load_time_specs(*, engine: Engine | None = None, db_url: str | None = None) -> TimeSpecStore:
+def load_time_specs(
+    *, engine: Engine | None = None, db_url: str | None = None
+) -> TimeSpecStore:
     """
     Load TimeframeSpec rows from public.dim_timeframe and return a TimeSpecStore.
 
@@ -324,10 +344,7 @@ def require_specs_for_tfs(store: TimeSpecStore, tfs: Iterable[str]) -> None:
     """
     missing = [tf for tf in tfs if tf not in store.timeframes]
     if missing:
-        raise KeyError(
-            "Missing dim_timeframe rows for: "
-            + ", ".join(sorted(missing))
-        )
+        raise KeyError("Missing dim_timeframe rows for: " + ", ".join(sorted(missing)))
 
 
 def assert_table_tf_invariants(

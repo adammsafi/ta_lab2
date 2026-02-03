@@ -1,13 +1,12 @@
 """Update memory with Phase 14 Data_Tools migration relationships."""
 import json
 import logging
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 from dotenv import load_dotenv
 
 # Load OpenAI API key from environment file
-load_dotenv('openai_config.env')
+load_dotenv("openai_config.env")
 
 from ta_lab2.tools.ai_orchestrator.memory.mem0_client import get_mem0_client
 
@@ -17,13 +16,13 @@ logger = logging.getLogger(__name__)
 
 def load_migration_data():
     """Load migration data from discovery.json."""
-    discovery_path = Path('.planning/phases/14-tools-integration/14-01-discovery.json')
+    discovery_path = Path(".planning/phases/14-tools-integration/14-01-discovery.json")
     with open(discovery_path) as f:
         data = json.load(f)
 
-    scripts = data['scripts']['root'] + data['scripts']['chatgpt']
-    migrated = [s for s in scripts if s['decision'] == 'migrate']
-    archived = [s for s in scripts if s['decision'] == 'archive']
+    scripts = data["scripts"]["root"] + data["scripts"]["chatgpt"]
+    migrated = [s for s in scripts if s["decision"] == "migrate"]
+    archived = [s for s in scripts if s["decision"] == "archive"]
 
     return migrated, archived, data
 
@@ -33,17 +32,19 @@ def create_migration_memories(migrated, dry_run=False):
     client = get_mem0_client()
     memories_created = 0
 
-    logger.info(f"Creating migration memories for {len(migrated)} scripts (dry_run={dry_run})")
+    logger.info(
+        f"Creating migration memories for {len(migrated)} scripts (dry_run={dry_run})"
+    )
 
     for script in migrated:
         # Build source path
-        if 'chatgpt/' in script['path']:
+        if "chatgpt/" in script["path"]:
             source = f"C:/Users/asafi/Downloads/Data_Tools/{script['path']}"
         else:
             source = f"C:/Users/asafi/Downloads/Data_Tools/{script['filename']}"
 
-        target = script['target_dir'] + script['filename']
-        category = script['category']
+        target = script["target_dir"] + script["filename"]
+        category = script["category"]
 
         memory_text = f"""Script migration: {script['filename']}
 Moved from: {source}
@@ -75,7 +76,9 @@ Relationship: moved_to"""
             memories_created += 1
 
             if memories_created % 10 == 0:
-                logger.info(f"Progress: {memories_created}/{len(migrated)} migration memories created")
+                logger.info(
+                    f"Progress: {memories_created}/{len(migrated)} migration memories created"
+                )
 
     logger.info(f"Created {memories_created} migration memories")
     return memories_created
@@ -86,16 +89,18 @@ def create_archive_memories(archived, dry_run=False):
     client = get_mem0_client()
     memories_created = 0
 
-    logger.info(f"Creating archive memories for {len(archived)} scripts (dry_run={dry_run})")
+    logger.info(
+        f"Creating archive memories for {len(archived)} scripts (dry_run={dry_run})"
+    )
 
     for script in archived:
         # Build source path
-        if 'chatgpt/' in script['path']:
+        if "chatgpt/" in script["path"]:
             source = f"C:/Users/asafi/Downloads/Data_Tools/{script['path']}"
         else:
             source = f"C:/Users/asafi/Downloads/Data_Tools/{script['filename']}"
 
-        target = script['target_dir'] + script['filename']
+        target = script["target_dir"] + script["filename"]
 
         memory_text = f"""Script archived: {script['filename']}
 Original location: {source}
@@ -108,7 +113,7 @@ Relationship: archived_to"""
             "type": "script_archive",
             "source_path": source,
             "archive_path": target,
-            "reason": script['rationale'][:100],  # Truncate for metadata
+            "reason": script["rationale"][:100],  # Truncate for metadata
             "phase": "14",
             "phase_name": "tools-integration",
             "relationship": "archived_to",
@@ -130,14 +135,21 @@ Relationship: archived_to"""
     return memories_created
 
 
-def create_phase_snapshot(discovery_data, migrated_count, archived_count, dry_run=False):
+def create_phase_snapshot(
+    discovery_data, migrated_count, archived_count, dry_run=False
+):
     """Create Phase 14 completion snapshot."""
     client = get_mem0_client()
 
     # Count scripts by category
     categories = {}
-    for script in [s for s in discovery_data['scripts']['root'] + discovery_data['scripts']['chatgpt'] if s['decision'] == 'migrate']:
-        cat = script['category']
+    for script in [
+        s
+        for s in discovery_data["scripts"]["root"]
+        + discovery_data["scripts"]["chatgpt"]
+        if s["decision"] == "migrate"
+    ]:
+        cat = script["category"]
         categories[cat] = categories.get(cat, 0) + 1
 
     snapshot_text = f"""Phase 14: Tools Integration - Completion Snapshot
@@ -177,11 +189,17 @@ Requirements Satisfied:
         "scripts_migrated": migrated_count,
         "scripts_archived": archived_count,
         "categories": list(categories.keys()),
-        "requirements_satisfied": ["TOOL-01", "TOOL-02", "TOOL-03", "MEMO-13", "MEMO-14"],
+        "requirements_satisfied": [
+            "TOOL-01",
+            "TOOL-02",
+            "TOOL-03",
+            "MEMO-13",
+            "MEMO-14",
+        ],
     }
 
     if dry_run:
-        logger.info(f"[DRY RUN] Would create phase snapshot")
+        logger.info("[DRY RUN] Would create phase snapshot")
         logger.info(f"Snapshot text preview:\n{snapshot_text[:300]}...")
     else:
         client.add(
@@ -201,7 +219,10 @@ def verify_memory_queries():
 
     queries = [
         ("Where is generate_function_map.py now?", "Should show migration record"),
-        ("Data_Tools memory scripts migration", "Should show memory category migrations"),
+        (
+            "Data_Tools memory scripts migration",
+            "Should show memory category migrations",
+        ),
         ("Phase 14 tools integration", "Should show phase snapshot"),
     ]
 
@@ -210,15 +231,11 @@ def verify_memory_queries():
         logger.info(f"\nQuery: {query}")
         logger.info(f"Expected: {description}")
 
-        search_results = client.search(
-            query=query,
-            user_id="ta_lab2_system",
-            limit=3
-        )
+        search_results = client.search(query=query, user_id="ta_lab2_system", limit=3)
 
         # Handle dict vs list response
         if isinstance(search_results, dict):
-            search_results = search_results.get('results', [])
+            search_results = search_results.get("results", [])
 
         logger.info(f"Results ({len(search_results)} found):")
         for i, result in enumerate(search_results[:2], 1):
@@ -246,7 +263,9 @@ if __name__ == "__main__":
 
     # Task 2: Create phase snapshot
     logger.info("\n=== Task 2: Creating phase snapshot ===")
-    snapshot_count = create_phase_snapshot(discovery_data, len(migrated), len(archived), dry_run=dry_run)
+    snapshot_count = create_phase_snapshot(
+        discovery_data, len(migrated), len(archived), dry_run=dry_run
+    )
 
     # Task 3: Verify queries
     if not skip_verify and not dry_run:
@@ -258,4 +277,6 @@ if __name__ == "__main__":
     logger.info(f"Migration memories: {migration_count}")
     logger.info(f"Archive memories: {archive_count}")
     logger.info(f"Phase snapshot: {snapshot_count}")
-    logger.info(f"Total memories created: {migration_count + archive_count + snapshot_count}")
+    logger.info(
+        f"Total memories created: {migration_count + archive_count + snapshot_count}"
+    )

@@ -1,7 +1,6 @@
 """Tests for workflow state tracking."""
 
 import pytest
-from unittest.mock import MagicMock, call
 import uuid
 
 
@@ -57,8 +56,14 @@ class TestWorkflowStateTracker:
         mock_conn = mocker.MagicMock()
         mock_engine.connect.return_value.__enter__.return_value = mock_conn
         mock_conn.execute.return_value.fetchone.return_value = (
-            "wf-123", "corr-456", "orchestrator_task", "executing", "running",
-            datetime.utcnow(), datetime.utcnow(), {}
+            "wf-123",
+            "corr-456",
+            "orchestrator_task",
+            "executing",
+            "running",
+            datetime.utcnow(),
+            datetime.utcnow(),
+            {},
         )
 
         tracker = WorkflowStateTracker(mock_engine)
@@ -81,10 +86,12 @@ class TestWorkflowStateTracker:
 
         # Mock the result iteration with complete rows (8 columns)
         now = datetime.utcnow()
-        mock_result.__iter__ = lambda self: iter([
-            ("wf-1", "corr-1", "task", "executing", "running", now, now, {}),
-            ("wf-2", "corr-2", "task", "executing", "running", now, now, {}),
-        ])
+        mock_result.__iter__ = lambda self: iter(
+            [
+                ("wf-1", "corr-1", "task", "executing", "running", now, now, {}),
+                ("wf-2", "corr-2", "task", "executing", "running", now, now, {}),
+            ]
+        )
 
         tracker = WorkflowStateTracker(mock_engine)
         results = tracker.list_workflows(status="running", limit=10)

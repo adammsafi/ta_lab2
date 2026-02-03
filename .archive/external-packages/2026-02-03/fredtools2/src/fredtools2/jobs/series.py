@@ -1,10 +1,14 @@
 import datetime as dt
 from psycopg2.extras import execute_values
 
+
 def _last_date(conn, sid):
     with conn.cursor() as cur:
-        cur.execute("SELECT max(date) FROM fred_series_values WHERE series_id=%s", (sid,))
+        cur.execute(
+            "SELECT max(date) FROM fred_series_values WHERE series_id=%s", (sid,)
+        )
         return cur.fetchone()[0]
+
 
 def pull_series(conn, api_key, client, series_list):
     total = 0
@@ -18,11 +22,15 @@ def pull_series(conn, api_key, client, series_list):
             rows.append((sid, o["date"], v))
         if rows:
             with conn.cursor() as cur:
-                execute_values(cur, """
+                execute_values(
+                    cur,
+                    """
                     INSERT INTO fred_series_values (series_id, date, value)
                     VALUES %s
                     ON CONFLICT (series_id, date) DO UPDATE SET value = EXCLUDED.value
-                """, rows)
+                """,
+                    rows,
+                )
             conn.commit()
             total += len(rows)
     return total

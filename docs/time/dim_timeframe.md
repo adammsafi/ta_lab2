@@ -47,4 +47,3 @@ tf_day (pure)
 - EMA selects alpha via span_days = tf_days_nominal * period
 - Calendar frames determine roll=True events
 - Multi-TF EMA joins dim_timeframe to classify nodes
-

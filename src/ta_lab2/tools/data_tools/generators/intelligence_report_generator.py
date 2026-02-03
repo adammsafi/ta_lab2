@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, DefaultDict
 from collections import defaultdict
 
+
 def read_jsonl(path: Path) -> Iterable[Dict[str, Any]]:
     """Reads a JSONL file line by line."""
     with path.open("r", encoding="utf-8") as f:
@@ -24,18 +25,19 @@ def read_jsonl(path: Path) -> Iterable[Dict[str, Any]]:
             except Exception as e:
                 raise RuntimeError(f"Invalid JSON on line {i} in {path}: {e}") from e
 
+
 def format_memory_as_markdown(mem: Dict[str, Any], is_full_report: bool = False) -> str:
     """Formats a single memory dictionary into a Markdown string."""
     lines: List[str] = []
-    
+
     title = mem.get("title", "Untitled Memory")
     mem_id = mem.get("memory_id", "N/A")
     mem_type = mem.get("type", "uncategorized").capitalize()
-    
+
     if is_full_report:
         lines.append("---")
         # Add an anchor for direct linking
-        lines.append(f"#### <a name=\"{mem_id}\"></a>{mem_type}: {title}")
+        lines.append(f'#### <a name="{mem_id}"></a>{mem_type}: {title}')
     else:
         lines.append(f"### {title}")
 
@@ -43,13 +45,15 @@ def format_memory_as_markdown(mem: Dict[str, Any], is_full_report: bool = False)
     lines.append(f"- **Memory ID:** `{mem_id}`")
     lines.append(f"- **Confidence:** `{mem.get('confidence', 'N/A')}`")
     lines.append(f"- **Conflict Key:** `{mem.get('conflict_key') or '_none_'}`")
-    lines.append(f"- **Parent Summary:** {mem.get('parent_summary', '').strip() or '_not available_'}")
-    
+    lines.append(
+        f"- **Parent Summary:** {mem.get('parent_summary', '').strip() or '_not available_'}"
+    )
+
     parent_tags = mem.get("parent_tags", [])
-    tags_str = ", ".join(f'`{t}`' for t in parent_tags) if parent_tags else "_none_"
+    tags_str = ", ".join(f"`{t}`" for t in parent_tags) if parent_tags else "_none_"
     lines.append(f"- **Parent Tags:** {tags_str}")
     lines.append("")
-    
+
     content = (mem.get("content", "") or "").strip()
     if content:
         lines.append("**Content:**")
@@ -64,7 +68,7 @@ def format_memory_as_markdown(mem: Dict[str, Any], is_full_report: bool = False)
         lines.append(source_chunk)
         lines.append("```")
         lines.append("")
-    
+
     evidence = mem.get("evidence", {}) or {}
     evidence_sample = evidence.get("sample", [])
     if evidence_sample:
@@ -88,7 +92,7 @@ def sanitize_anchor_link(text: str) -> str:
     # Replace slashes and backslashes with underscores
     text = text.replace("/", "_").replace("\\", "_")
     # Keep only alphanumeric, underscores, and hyphens
-    return re.sub(r'[^a-zA-Z0-9_-]', '', text)
+    return re.sub(r"[^a-zA-Z0-9_-]", "", text)
 
 
 def main() -> int:
@@ -102,12 +106,16 @@ def main() -> int:
 
     start_time = time.time()
     log.info("Starting report generation...")
-    
+
     ap = argparse.ArgumentParser(
         description="Generate a comprehensive Project Intelligence Report from final_memory.jsonl."
     )
-    ap.add_argument("--input", required=True, help="Path to the final_memory.jsonl file.")
-    ap.add_argument("--output", required=True, help="Path for the output Markdown report.")
+    ap.add_argument(
+        "--input", required=True, help="Path to the final_memory.jsonl file."
+    )
+    ap.add_argument(
+        "--output", required=True, help="Path for the output Markdown report."
+    )
     args = ap.parse_args()
 
     in_path = Path(args.input)
@@ -146,11 +154,11 @@ def main() -> int:
         evidence_sample = (mem.get("evidence") or {}).get("sample", [])
         referenced_files = set()
         for evidence_line in evidence_sample:
-            parts = evidence_line.split(':', 2)
+            parts = evidence_line.split(":", 2)
             if len(parts) > 1:
                 file_path = parts[0].replace("\\", "/")
                 referenced_files.add(file_path)
-        
+
         for file_path in referenced_files:
             memories_by_file[file_path].append(mem)
     t2 = time.time()
@@ -160,7 +168,7 @@ def main() -> int:
     t1 = time.time()
     log.info("Generating Markdown content...")
     md_content: List[str] = [
-        f"# Project Intelligence Report",
+        "# Project Intelligence Report",
         f"Generated from: `{in_path.name}` on {datetime.now().isoformat()}",
         f"Total Memories: {len(memories)}",
     ]
@@ -178,18 +186,23 @@ def main() -> int:
     sorted_files = sorted(memories_by_file.keys())
     for file_path in sorted_files:
         anchor = sanitize_anchor_link(f"file-{file_path}")
-        md_content.append(f"### <a name=\"{anchor}\"></a>`{file_path}`")
-        mem_ids = [f"[`{m.get('memory_id')}`](#{m.get('memory_id')})" for m in memories_by_file[file_path]]
+        md_content.append(f'### <a name="{anchor}"></a>`{file_path}`')
+        mem_ids = [
+            f"[`{m.get('memory_id')}`](#{m.get('memory_id')})"
+            for m in memories_by_file[file_path]
+        ]
         md_content.append(f"Referenced by: {', '.join(mem_ids)}\n")
 
     # Full Memory Details by Topic
     md_content.append("\n---\n## 3. Full Memory Details (Grouped by Topic)\n")
     for topic in sorted_topics:
         anchor = sanitize_anchor_link(f"topic-{topic}")
-        md_content.append(f"### <a name=\"{anchor}\"></a>Topic: `{topic}`\n")
-        
-        topic_memories = sorted(memories_by_topic[topic], key=lambda m: m.get('memory_id'))
-        
+        md_content.append(f'### <a name="{anchor}"></a>Topic: `{topic}`\n')
+
+        topic_memories = sorted(
+            memories_by_topic[topic], key=lambda m: m.get("memory_id")
+        )
+
         for mem in topic_memories:
             md_content.append(format_memory_as_markdown(mem, is_full_report=True))
     t2 = time.time()
@@ -209,8 +222,9 @@ def main() -> int:
     total_time = time.time() - start_time
     log.info(f"Successfully generated Project Intelligence Report at: {out_path}")
     log.info(f"Total execution time: {total_time:.2f} seconds.")
-    
+
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

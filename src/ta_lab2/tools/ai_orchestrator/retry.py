@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import logging
-from functools import wraps
 from typing import Callable, TypeVar
 
 from tenacity import (
@@ -16,7 +15,7 @@ from tenacity import (
 logger = logging.getLogger(__name__)
 
 # Type variable for generic decorator
-F = TypeVar('F', bound=Callable)
+F = TypeVar("F", bound=Callable)
 
 
 def retry_on_rate_limit(
@@ -45,6 +44,7 @@ def retry_on_rate_limit(
     # Import here to avoid hard dependency if openai not installed
     try:
         import openai
+
         retry_exceptions = (openai.RateLimitError, openai.APIError)
     except ImportError:
         # Fallback to generic exceptions if openai not installed
@@ -78,11 +78,13 @@ def retry_on_transient(
     import aiohttp
 
     return retry(
-        retry=retry_if_exception_type((
-            aiohttp.ClientError,
-            ConnectionError,
-            TimeoutError,
-        )),
+        retry=retry_if_exception_type(
+            (
+                aiohttp.ClientError,
+                ConnectionError,
+                TimeoutError,
+            )
+        ),
         wait=wait_exponential_jitter(initial=initial_wait, max=max_wait, jitter=1.0),
         stop=stop_after_attempt(max_attempts),
         before_sleep=before_sleep_log(logger, logging.INFO),
@@ -90,4 +92,4 @@ def retry_on_transient(
     )
 
 
-__all__ = ['retry_on_rate_limit', 'retry_on_transient']
+__all__ = ["retry_on_rate_limit", "retry_on_transient"]

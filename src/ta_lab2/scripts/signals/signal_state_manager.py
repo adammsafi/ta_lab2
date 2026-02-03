@@ -36,7 +36,6 @@ Usage:
 """
 
 from dataclasses import dataclass
-from typing import Optional
 import pandas as pd
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
@@ -45,6 +44,7 @@ from sqlalchemy.engine import Engine
 # =============================================================================
 # Configuration
 # =============================================================================
+
 
 @dataclass(frozen=True)
 class SignalStateConfig:
@@ -58,6 +58,7 @@ class SignalStateConfig:
         ts_column: Timestamp column name in signal table (default: "ts")
         id_column: ID column name in signal table (default: "id")
     """
+
     signal_type: str  # Required: 'ema_crossover', 'rsi_mean_revert', 'atr_breakout'
     state_schema: str = "public"
     state_table: str = "cmc_signal_state"
@@ -168,17 +169,25 @@ class SignalStateManager:
         with self.engine.connect() as conn:
             try:
                 return pd.read_sql(
-                    sql,
-                    conn,
-                    params={"ids": ids, "signal_id": signal_id}
+                    sql, conn, params={"ids": ids, "signal_id": signal_id}
                 )
             except Exception:
                 # Table doesn't exist yet or is empty
-                return pd.DataFrame(columns=[
-                    "id", "signal_id", "ts", "direction", "position_state",
-                    "entry_ts", "entry_price", "feature_snapshot",
-                    "signal_version", "feature_version_hash", "params_hash"
-                ])
+                return pd.DataFrame(
+                    columns=[
+                        "id",
+                        "signal_id",
+                        "ts",
+                        "direction",
+                        "position_state",
+                        "entry_ts",
+                        "entry_price",
+                        "feature_snapshot",
+                        "signal_version",
+                        "feature_version_hash",
+                        "params_hash",
+                    ]
+                )
 
     def update_state_after_generation(
         self,
@@ -268,8 +277,8 @@ class SignalStateManager:
                     params={
                         "ids": ids,
                         "signal_type": self.config.signal_type,
-                        "signal_id": signal_id
-                    }
+                        "signal_id": signal_id,
+                    },
                 )
             except Exception:
                 # Table doesn't exist yet
@@ -287,8 +296,7 @@ class SignalStateManager:
                 result[id_] = None
             else:
                 result[id_] = pd.to_datetime(
-                    id_state["last_entry_ts"].iloc[0],
-                    utc=True
+                    id_state["last_entry_ts"].iloc[0], utc=True
                 )
 
         return result

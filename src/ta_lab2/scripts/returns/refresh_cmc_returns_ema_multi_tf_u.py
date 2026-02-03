@@ -35,7 +35,7 @@ runfile(
 import argparse
 import os
 from dataclasses import dataclass
-from typing import Iterable, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
@@ -46,7 +46,9 @@ DEFAULT_OUT_TABLE = "public.cmc_returns_ema_multi_tf_u"
 DEFAULT_STATE_TABLE = "public.cmc_returns_ema_multi_tf_u_state"
 
 
-Key = Tuple[int, str, int, str, str, bool]  # (id, tf, period, alignment_source, series, roll)
+Key = Tuple[
+    int, str, int, str, str, bool
+]  # (id, tf, period, alignment_source, series, roll)
 
 
 def _print(msg: str) -> None:
@@ -101,8 +103,8 @@ def _load_keys(
     Returns distinct key surface from EMA_U, properly mapping roll per series.
     """
     series_set = {s.strip().lower() for s in (series_list or [])}
-    want_ema = ("ema" in series_set)
-    want_bar = ("ema_bar" in series_set)
+    want_ema = "ema" in series_set
+    want_bar = "ema_bar" in series_set
 
     params = {"rolls": list(rolls)}
     where_ids = ""
@@ -154,7 +156,10 @@ def _load_keys(
     with engine.begin() as cxn:
         rows = cxn.execute(sql, params).fetchall()
 
-    return [(int(r[0]), str(r[1]), int(r[2]), str(r[3]), str(r[4]), bool(r[5])) for r in rows]
+    return [
+        (int(r[0]), str(r[1]), int(r[2]), str(r[3]), str(r[4]), bool(r[5]))
+        for r in rows
+    ]
 
 
 def _ensure_state_rows(engine: Engine, state_table: str, keys: List[Key]) -> None:
@@ -317,8 +322,14 @@ class RunnerConfig:
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Build incremental EMA returns from cmc_ema_multi_tf_u.")
-    p.add_argument("--db-url", default=os.getenv("TARGET_DB_URL", ""), help="DB URL (or set TARGET_DB_URL).")
+    p = argparse.ArgumentParser(
+        description="Build incremental EMA returns from cmc_ema_multi_tf_u."
+    )
+    p.add_argument(
+        "--db-url",
+        default=os.getenv("TARGET_DB_URL", ""),
+        help="DB URL (or set TARGET_DB_URL).",
+    )
     p.add_argument("--ema-u-table", default=DEFAULT_EMA_U_TABLE)
     p.add_argument("--out-table", default=DEFAULT_OUT_TABLE)
     p.add_argument("--state-table", default=DEFAULT_STATE_TABLE)
@@ -331,7 +342,9 @@ def main() -> None:
 
     db_url = (args.db_url or "").strip()
     if not db_url:
-        raise SystemExit("ERROR: Missing DB URL. Provide --db-url or set TARGET_DB_URL.")
+        raise SystemExit(
+            "ERROR: Missing DB URL. Provide --db-url or set TARGET_DB_URL."
+        )
 
     cfg = RunnerConfig(
         ema_u_table=args.ema_u_table,
@@ -344,7 +357,11 @@ def main() -> None:
         roll_mode=args.roll_mode,
     )
 
-    _print("Using DB URL from TARGET_DB_URL env." if args.db_url == os.getenv("TARGET_DB_URL", "") else "Using --db-url.")
+    _print(
+        "Using DB URL from TARGET_DB_URL env."
+        if args.db_url == os.getenv("TARGET_DB_URL", "")
+        else "Using --db-url."
+    )
     _print(
         f"Runner config: ids={cfg.ids_arg}, series={cfg.series}, roll_mode={cfg.roll_mode}, "
         f"start={cfg.start}, full_refresh={cfg.full_refresh}"
@@ -369,7 +386,9 @@ def main() -> None:
 
     if cfg.full_refresh:
         # simple full refresh: clear only selected keys (safe) and reset state last_ts
-        _print("Full refresh requested: deleting existing rows for selected keys and resetting state.")
+        _print(
+            "Full refresh requested: deleting existing rows for selected keys and resetting state."
+        )
         with engine.begin() as cxn:
             for k in keys:
                 one_id, one_tf, one_period, one_align, one_series, one_roll = k
@@ -414,8 +433,12 @@ def main() -> None:
     for i, k in enumerate(keys, start=1):
         one_id, one_tf, one_period, one_align, one_series, one_roll = k
         if i <= 3 or (i % 500 == 0) or (i == len(keys)):
-            _print(f"Processing key=({one_id},{one_tf},{one_period},{one_align},{one_series},roll={one_roll}) ({i}/{len(keys)})")
-        _run_one_key(engine, cfg.ema_u_table, cfg.out_table, cfg.state_table, cfg.start, k)
+            _print(
+                f"Processing key=({one_id},{one_tf},{one_period},{one_align},{one_series},roll={one_roll}) ({i}/{len(keys)})"
+            )
+        _run_one_key(
+            engine, cfg.ema_u_table, cfg.out_table, cfg.state_table, cfg.start, k
+        )
 
     _print("Done.")
 

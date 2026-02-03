@@ -11,7 +11,7 @@ Run server:
 import logging
 from typing import Optional, List
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 # Request/Response Models
 class MemorySearchRequest(BaseModel):
     """Request body for memory search."""
+
     query: str = Field(..., description="Search query text")
     max_results: int = Field(5, ge=1, le=20, description="Maximum results")
     min_similarity: float = Field(0.7, ge=0.0, le=1.0, description="Minimum similarity")
@@ -28,6 +29,7 @@ class MemorySearchRequest(BaseModel):
 
 class MemoryResult(BaseModel):
     """Individual memory result."""
+
     memory_id: str
     content: str
     metadata: dict
@@ -36,6 +38,7 @@ class MemoryResult(BaseModel):
 
 class MemorySearchResponse(BaseModel):
     """Response from memory search."""
+
     query: str
     memories: List[MemoryResult]
     count: int
@@ -44,6 +47,7 @@ class MemorySearchResponse(BaseModel):
 
 class MemoryStatsResponse(BaseModel):
     """Response from stats endpoint."""
+
     total_memories: int
     collection_name: str
     distance_metric: str
@@ -52,14 +56,18 @@ class MemoryStatsResponse(BaseModel):
 
 class ContextInjectionRequest(BaseModel):
     """Request for formatted context injection."""
+
     query: str = Field(..., description="Query for context retrieval")
     max_memories: int = Field(5, ge=1, le=10, description="Maximum memories")
     min_similarity: float = Field(0.7, ge=0.0, le=1.0, description="Minimum similarity")
-    max_length: int = Field(4000, ge=100, le=10000, description="Maximum context length")
+    max_length: int = Field(
+        4000, ge=100, le=10000, description="Maximum context length"
+    )
 
 
 class ContextInjectionResponse(BaseModel):
     """Response with formatted context."""
+
     query: str
     context: str
     memory_count: int
@@ -68,6 +76,7 @@ class ContextInjectionResponse(BaseModel):
 
 class HealthReportResponse(BaseModel):
     """Response from health monitoring endpoint."""
+
     total_memories: int
     healthy: int
     stale: int
@@ -79,6 +88,7 @@ class HealthReportResponse(BaseModel):
 
 class StaleMemoryResponse(BaseModel):
     """Individual stale memory for review."""
+
     id: str
     content_preview: str
     last_verified: Optional[str]
@@ -87,11 +97,13 @@ class StaleMemoryResponse(BaseModel):
 
 class RefreshRequest(BaseModel):
     """Request to refresh verification timestamps."""
+
     memory_ids: List[str] = Field(..., min_length=1, max_length=100)
 
 
 class ConflictCheckRequest(BaseModel):
     """Request to check for conflicts."""
+
     content: str = Field(..., min_length=1, max_length=10000)
     user_id: str = Field(default="orchestrator")
     similarity_threshold: float = Field(default=0.85, ge=0.5, le=1.0)
@@ -99,6 +111,7 @@ class ConflictCheckRequest(BaseModel):
 
 class PotentialConflict(BaseModel):
     """Individual potential conflict."""
+
     memory_id: str
     content: str
     similarity: float
@@ -107,12 +120,14 @@ class PotentialConflict(BaseModel):
 
 class ConflictCheckResponse(BaseModel):
     """Response from conflict check endpoint."""
+
     has_conflicts: bool
     conflicts: List[PotentialConflict]
 
 
 class AddWithConflictRequest(BaseModel):
     """Request to add memory with conflict resolution."""
+
     content: str = Field(..., min_length=1, max_length=10000)
     user_id: str = Field(default="orchestrator")
     metadata: Optional[dict] = None
@@ -121,6 +136,7 @@ class AddWithConflictRequest(BaseModel):
 
 class ConflictResolutionResponse(BaseModel):
     """Response from add with conflict resolution."""
+
     memory_id: str
     operation: str
     confidence: float
@@ -136,13 +152,14 @@ def create_memory_api() -> FastAPI:
     app = FastAPI(
         title="ta_lab2 Memory API",
         description="Semantic memory search for cross-platform AI access",
-        version="1.0.0"
+        version="1.0.0",
     )
 
     @app.get("/health")
     async def health_check():
         """Health check endpoint."""
         from .validation import quick_health_check
+
         is_healthy = quick_health_check()
         return {"status": "healthy" if is_healthy else "unhealthy"}
 
@@ -160,7 +177,7 @@ def create_memory_api() -> FastAPI:
                 total_memories=validation.total_count,
                 collection_name=client._collection_name,
                 distance_metric=validation.distance_metric,
-                is_valid=validation.is_valid
+                is_valid=validation.is_valid,
             )
         except Exception as e:
             logger.error(f"Stats failed: {e}")
@@ -179,7 +196,7 @@ def create_memory_api() -> FastAPI:
                 query=request.query,
                 max_results=request.max_results,
                 min_similarity=request.min_similarity,
-                memory_type=request.memory_type
+                memory_type=request.memory_type,
             )
 
             return MemorySearchResponse(
@@ -189,12 +206,12 @@ def create_memory_api() -> FastAPI:
                         memory_id=r.memory_id,
                         content=r.content,
                         metadata=r.metadata,
-                        similarity=r.similarity
+                        similarity=r.similarity,
                     )
                     for r in response.results
                 ],
                 count=response.filtered_count,
-                threshold_used=response.threshold_used
+                threshold_used=response.threshold_used,
             )
         except Exception as e:
             logger.error(f"Search failed: {e}")
@@ -214,7 +231,7 @@ def create_memory_api() -> FastAPI:
             search_response = search_memories(
                 query=request.query,
                 max_results=request.max_memories,
-                min_similarity=request.min_similarity
+                min_similarity=request.min_similarity,
             )
 
             # Get formatted context
@@ -222,14 +239,14 @@ def create_memory_api() -> FastAPI:
                 query=request.query,
                 max_memories=request.max_memories,
                 min_similarity=request.min_similarity,
-                max_length=request.max_length
+                max_length=request.max_length,
             )
 
             return ContextInjectionResponse(
                 query=request.query,
                 context=context,
                 memory_count=search_response.filtered_count,
-                estimated_tokens=estimate_context_tokens(context)
+                estimated_tokens=estimate_context_tokens(context),
             )
         except Exception as e:
             logger.error(f"Context injection failed: {e}")
@@ -240,6 +257,7 @@ def create_memory_api() -> FastAPI:
         """Get list of available memory types."""
         try:
             from .query import get_memory_types
+
             types = get_memory_types()
             return {"types": types, "count": len(types)}
         except Exception as e:
@@ -251,6 +269,7 @@ def create_memory_api() -> FastAPI:
         """Generate memory health report showing stale and deprecated memories."""
         try:
             from .health import MemoryHealthMonitor
+
             monitor = MemoryHealthMonitor(staleness_days=staleness_days)
             report = monitor.generate_health_report()
             return HealthReportResponse(
@@ -260,7 +279,7 @@ def create_memory_api() -> FastAPI:
                 deprecated=report.deprecated,
                 missing_metadata=report.missing_metadata,
                 age_distribution=report.age_distribution,
-                scan_timestamp=report.scan_timestamp
+                scan_timestamp=report.scan_timestamp,
             )
         except Exception as e:
             logger.error(f"Health report failed: {e}")
@@ -271,13 +290,14 @@ def create_memory_api() -> FastAPI:
         """Get list of stale memories for review."""
         try:
             from .health import scan_stale_memories
+
             stale = scan_stale_memories(staleness_days=staleness_days)[:limit]
             return [
                 StaleMemoryResponse(
                     id=m["id"],
                     content_preview=m["content"][:100],
                     last_verified=m.get("last_verified"),
-                    age_days=m["age_days"]
+                    age_days=m["age_days"],
                 )
                 for m in stale
             ]
@@ -290,6 +310,7 @@ def create_memory_api() -> FastAPI:
         """Mark memories as verified (refreshes last_verified timestamp)."""
         try:
             from .health import MemoryHealthMonitor
+
             monitor = MemoryHealthMonitor()
             count = monitor.refresh_verification(request.memory_ids)
             return {"refreshed": count, "memory_ids": request.memory_ids}
@@ -302,10 +323,11 @@ def create_memory_api() -> FastAPI:
         """Check if content conflicts with existing memories."""
         try:
             from .conflict import detect_conflicts
+
             conflicts = detect_conflicts(
                 content=request.content,
                 user_id=request.user_id,
-                similarity_threshold=request.similarity_threshold
+                similarity_threshold=request.similarity_threshold,
             )
             return ConflictCheckResponse(
                 has_conflicts=len(conflicts) > 0,
@@ -314,10 +336,10 @@ def create_memory_api() -> FastAPI:
                         memory_id=c["memory_id"],
                         content=c["content"],
                         similarity=c["similarity"],
-                        metadata=c.get("metadata")
+                        metadata=c.get("metadata"),
                     )
                     for c in conflicts
-                ]
+                ],
             )
         except Exception as e:
             logger.error(f"Conflict check failed: {e}")
@@ -330,21 +352,17 @@ def create_memory_api() -> FastAPI:
             from .conflict import add_with_conflict_check
 
             # Format as message for Mem0
-            messages = [
-                {"role": request.role, "content": request.content}
-            ]
+            messages = [{"role": request.role, "content": request.content}]
 
             result = add_with_conflict_check(
-                messages=messages,
-                user_id=request.user_id,
-                metadata=request.metadata
+                messages=messages, user_id=request.user_id, metadata=request.metadata
             )
 
             return ConflictResolutionResponse(
                 memory_id=result["memory_id"],
                 operation=result["operation"],
                 confidence=result["confidence"],
-                reason=result["reason"]
+                reason=result["reason"],
             )
         except Exception as e:
             logger.error(f"Add with conflict resolution failed: {e}")

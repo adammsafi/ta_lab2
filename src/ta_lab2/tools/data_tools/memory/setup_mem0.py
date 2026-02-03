@@ -42,9 +42,7 @@ from typing import Dict, Any, List
 try:
     from mem0 import Memory
 except ImportError:
-    raise ImportError(
-        "Mem0 library required. Install with: pip install mem0"
-    )
+    raise ImportError("Mem0 library required. Install with: pip install mem0")
 
 logger = logging.getLogger(__name__)
 
@@ -86,14 +84,14 @@ def init_mem0(db_path: str) -> Memory:
             "provider": "openai",
             "config": {
                 "model": "text-embedding-3-small",
-            }
+            },
         },
         "vector_store": {
             "provider": "chroma",
             "config": {
                 "collection_name": "mem0_memories",
                 "path": db_path,
-            }
+            },
         },
     }
 
@@ -145,7 +143,11 @@ def add_memory_to_mem0(
     if memory.get("confidence"):
         metadata["confidence"] = memory["confidence"]
     if memory.get("tags"):
-        metadata["tags"] = ",".join(memory["tags"]) if isinstance(memory["tags"], list) else memory["tags"]
+        metadata["tags"] = (
+            ",".join(memory["tags"])
+            if isinstance(memory["tags"], list)
+            else memory["tags"]
+        )
 
     # Add to mem0
     result = mem0.add(
@@ -162,17 +164,27 @@ def main() -> int:
     logging.basicConfig(
         level=logging.INFO,
         format="[%(asctime)s] %(levelname)s: %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
     log = logging.getLogger()
 
     ap = argparse.ArgumentParser(
         description="Load memories from JSONL into Mem0 with ChromaDB backend."
     )
-    ap.add_argument("--memory-file", required=True, help="Path to JSONL file with memory records.")
-    ap.add_argument("--user-id", help="User ID for memory scoping (default: from MEM0_USER_ID env or 'adam')")
-    ap.add_argument("--db-path", help="Path to ChromaDB storage (default: from MEM0_DB_PATH env or ~/.mem0)")
-    ap.add_argument("--batch-size", type=int, default=50, help="Batch size for progress reporting.")
+    ap.add_argument(
+        "--memory-file", required=True, help="Path to JSONL file with memory records."
+    )
+    ap.add_argument(
+        "--user-id",
+        help="User ID for memory scoping (default: from MEM0_USER_ID env or 'adam')",
+    )
+    ap.add_argument(
+        "--db-path",
+        help="Path to ChromaDB storage (default: from MEM0_DB_PATH env or ~/.mem0)",
+    )
+    ap.add_argument(
+        "--batch-size", type=int, default=50, help="Batch size for progress reporting."
+    )
     args = ap.parse_args()
 
     # Config
@@ -204,29 +216,33 @@ def main() -> int:
     failed = 0
 
     for i in range(0, total, batch_size):
-        batch = memories[i:i + batch_size]
+        batch = memories[i : i + batch_size]
         batch_num = (i // batch_size) + 1
         total_batches = (total + batch_size - 1) // batch_size
 
-        log.info(f"Processing batch {batch_num}/{total_batches} ({len(batch)} memories)...")
+        log.info(
+            f"Processing batch {batch_num}/{total_batches} ({len(batch)} memories)..."
+        )
 
         for mem in batch:
             try:
                 result = add_memory_to_mem0(mem0, mem, user_id)
                 added += 1
             except Exception as e:
-                log.warning(f"Failed to add memory {mem.get('memory_id', 'unknown')}: {e}")
+                log.warning(
+                    f"Failed to add memory {mem.get('memory_id', 'unknown')}: {e}"
+                )
                 failed += 1
 
         log.info(f"Batch complete. Total added: {added}, failed: {failed}")
 
-    log.info(f"✓ Migration complete!")
+    log.info("✓ Migration complete!")
     log.info(f"  Added: {added}")
     log.info(f"  Failed: {failed}")
     log.info(f"  Total: {total}")
 
     # Test retrieval
-    log.info(f"--- Testing Mem0 retrieval ---")
+    log.info("--- Testing Mem0 retrieval ---")
     test_query = "validation framework"
     results = mem0.search(query=test_query, user_id=user_id, limit=3)
     log.info(f"Query: {test_query}")

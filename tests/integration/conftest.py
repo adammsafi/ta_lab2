@@ -6,7 +6,6 @@ dependency management (real infrastructure, mixed, or fully mocked).
 """
 
 import pytest
-from unittest.mock import MagicMock, AsyncMock
 
 
 @pytest.fixture(scope="function")
@@ -35,11 +34,13 @@ def mock_orchestrator(mocker):
     mock = mocker.MagicMock(spec=AsyncOrchestrator)
 
     # Mock async execute_single with AsyncMock
-    mock.execute_single = mocker.AsyncMock(return_value=mocker.MagicMock(
-        output="Test output",
-        success=True,
-        error=None,
-    ))
+    mock.execute_single = mocker.AsyncMock(
+        return_value=mocker.MagicMock(
+            output="Test output",
+            success=True,
+            error=None,
+        )
+    )
 
     return mock
 

@@ -2,7 +2,6 @@
 Core metrics: CAGR, MDD, MAR, Sharpe, Sortino, PSR/DSR placeholders.
 """
 from __future__ import annotations
-from dataclasses import dataclass
 from typing import Dict
 import numpy as np
 import pandas as pd
@@ -47,7 +46,9 @@ def mar(cagr_value: float, mdd_value: float) -> float:
     return float(cagr_value / abs(mdd_value)) if mdd_value != 0 else 0.0
 
 
-def psr_placeholder(returns: pd.Series, rf: float = 0.0, freq_per_year: int = 252) -> float:
+def psr_placeholder(
+    returns: pd.Series, rf: float = 0.0, freq_per_year: int = 252
+) -> float:
     """
     Placeholder Probabilistic Sharpe Ratio (PSR).
     For production: implement the full PSR (Lopez de Prado) or use mlfinlab.
@@ -57,7 +58,9 @@ def psr_placeholder(returns: pd.Series, rf: float = 0.0, freq_per_year: int = 25
     return float(1 / (1 + np.exp(-s)))
 
 
-def summarize(equity: pd.Series, returns: pd.Series, freq_per_year: int = 365) -> Dict[str, float]:
+def summarize(
+    equity: pd.Series, returns: pd.Series, freq_per_year: int = 365
+) -> Dict[str, float]:
     c = cagr(equity, freq_per_year)
     m = max_drawdown(equity)
     return {

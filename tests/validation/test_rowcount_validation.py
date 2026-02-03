@@ -8,8 +8,7 @@ Per CONTEXT.md:
 """
 
 import pytest
-from datetime import date, timedelta
-from unittest.mock import MagicMock
+from datetime import date
 
 
 @pytest.mark.validation
@@ -67,15 +66,15 @@ class TestStrictRowcountValidation:
         # Return data showing mismatch (50% of expected)
         mock_result2 = mocker.MagicMock()
         mock_result2.fetchone.return_value = (
-            date(2024, 1, 1),   # min_date
+            date(2024, 1, 1),  # min_date
             date(2024, 1, 31),  # max_date
-            15,                  # actual (should be ~31)
+            15,  # actual (should be ~31)
         )
 
         mock_conn.execute.side_effect = [mock_result1, mock_result2]
 
         issues = validator.check_rowcounts(
-            table='cmc_returns_daily',
+            table="cmc_returns_daily",
             ids=[1],
         )
 
@@ -138,7 +137,7 @@ class TestEquityRowcounts:
         """Test equity excludes Saturdays and Sundays."""
         # A full week
         week_start = date(2024, 1, 1)  # Monday
-        week_end = date(2024, 1, 7)    # Sunday
+        week_end = date(2024, 1, 7)  # Sunday
 
         # Should be 5 trading days (Mon-Fri)
         trading_days = 5
@@ -157,49 +156,49 @@ class TestRowcountReporting:
         from ta_lab2.scripts.features.validate_features import RowcountIssue
 
         issue = RowcountIssue(
-            table='test',
+            table="test",
             id_=1,
             expected=100,
             actual=95,
             diff_pct=-0.05,
         )
 
-        assert issue.details['expected'] == 100
+        assert issue.details["expected"] == 100
 
     def test_rowcount_issue_has_actual(self):
         """Test RowcountIssue includes actual count."""
         from ta_lab2.scripts.features.validate_features import RowcountIssue
 
         issue = RowcountIssue(
-            table='test',
+            table="test",
             id_=1,
             expected=100,
             actual=95,
             diff_pct=-0.05,
         )
 
-        assert issue.details['actual'] == 95
+        assert issue.details["actual"] == 95
 
     def test_rowcount_issue_has_diff_percent(self):
         """Test RowcountIssue includes difference percentage."""
         from ta_lab2.scripts.features.validate_features import RowcountIssue
 
         issue = RowcountIssue(
-            table='test',
+            table="test",
             id_=1,
             expected=100,
             actual=95,
             diff_pct=-0.05,
         )
 
-        assert issue.details['diff_pct'] == -0.05
+        assert issue.details["diff_pct"] == -0.05
 
     def test_rowcount_issue_message_format(self):
         """Test RowcountIssue message is human-readable."""
         from ta_lab2.scripts.features.validate_features import RowcountIssue
 
         issue = RowcountIssue(
-            table='cmc_returns_daily',
+            table="cmc_returns_daily",
             id_=1,
             expected=100,
             actual=95,
@@ -207,6 +206,6 @@ class TestRowcountReporting:
         )
 
         # Message should include key info
-        assert 'cmc_returns_daily' in issue.message
-        assert '95' in issue.message
-        assert '100' in issue.message
+        assert "cmc_returns_daily" in issue.message
+        assert "95" in issue.message
+        assert "100" in issue.message

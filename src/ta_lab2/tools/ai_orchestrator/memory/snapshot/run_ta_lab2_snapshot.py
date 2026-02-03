@@ -18,11 +18,13 @@ from datetime import datetime
 from pathlib import Path
 from git import Repo
 from ta_lab2.tools.ai_orchestrator.memory.mem0_client import get_mem0_client
-from ta_lab2.tools.ai_orchestrator.memory.snapshot.extract_codebase import extract_directory_tree
+from ta_lab2.tools.ai_orchestrator.memory.snapshot.extract_codebase import (
+    extract_directory_tree,
+)
 from ta_lab2.tools.ai_orchestrator.memory.snapshot.batch_indexer import (
     batch_add_memories,
     create_snapshot_metadata,
-    format_file_content_for_memory
+    format_file_content_for_memory,
 )
 
 logger = logging.getLogger(__name__)
@@ -43,7 +45,7 @@ EXCLUSIONS = [
     ".json",  # data files
     "node_modules",
     ".pytest_cache",
-    ".tox"
+    ".tox",
 ]
 
 
@@ -98,12 +100,10 @@ def run_ta_lab2_snapshot(repo_path: Path, dry_run: bool = False) -> dict:
 
     # Calculate statistics
     total_functions = sum(
-        len(info["code_structure"].get("functions", []))
-        for info in file_infos
+        len(info["code_structure"].get("functions", [])) for info in file_infos
     )
     total_classes = sum(
-        len(info["code_structure"].get("classes", []))
-        for info in file_infos
+        len(info["code_structure"].get("classes", [])) for info in file_infos
     )
 
     logger.info(f"Total functions: {total_functions}, Total classes: {total_classes}")
@@ -115,7 +115,7 @@ def run_ta_lab2_snapshot(repo_path: Path, dry_run: bool = False) -> dict:
         "memories_added": 0,
         "errors": [],
         "files_indexed": [],
-        "commit_hash": commit_hash
+        "commit_hash": commit_hash,
     }
 
     if dry_run:
@@ -151,19 +151,23 @@ def run_ta_lab2_snapshot(repo_path: Path, dry_run: bool = False) -> dict:
                 function_count=len(code_structure.get("functions", [])),
                 class_count=len(code_structure.get("classes", [])),
                 line_count=code_structure.get("line_count", 0),
-                commit_hash=git_metadata.get("commit_hash", commit_hash)
+                commit_hash=git_metadata.get("commit_hash", commit_hash),
             )
 
-            memories.append({
-                "content": content,
-                "metadata": metadata,
-                "id": relative_path  # For error tracking
-            })
+            memories.append(
+                {
+                    "content": content,
+                    "metadata": metadata,
+                    "id": relative_path,  # For error tracking
+                }
+            )
 
             stats["files_indexed"].append(relative_path)
 
         except Exception as e:
-            logger.error(f"Failed to create memory for {file_info.get('relative_path', 'unknown')}: {e}")
+            logger.error(
+                f"Failed to create memory for {file_info.get('relative_path', 'unknown')}: {e}"
+            )
             stats["errors"].append(str(e))
 
     logger.info(f"Created {len(memories)} memories, starting batch indexing")
@@ -171,12 +175,7 @@ def run_ta_lab2_snapshot(repo_path: Path, dry_run: bool = False) -> dict:
     # Batch add to memory with rate limiting
     try:
         client = get_mem0_client()
-        result = batch_add_memories(
-            client,
-            memories,
-            batch_size=50,
-            delay_seconds=0.5
-        )
+        result = batch_add_memories(client, memories, batch_size=50, delay_seconds=0.5)
 
         stats["memories_added"] = result.added
         stats["errors"].extend([f"Memory error: {eid}" for eid in result.error_ids])
@@ -221,13 +220,13 @@ def save_snapshot_manifest(stats: dict, output_path: Path) -> None:
             "total_functions": stats.get("total_functions", 0),
             "total_classes": stats.get("total_classes", 0),
             "memories_added": stats.get("memories_added", 0),
-            "errors": len(stats.get("errors", []))
+            "errors": len(stats.get("errors", [])),
         },
         "files_indexed": stats.get("files_indexed", []),
-        "errors": stats.get("errors", [])
+        "errors": stats.get("errors", []),
     }
 
-    with open(output_path, 'w', encoding='utf-8') as f:
+    with open(output_path, "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2)
 
     logger.info(f"Snapshot manifest saved to: {output_path}")
@@ -248,14 +247,14 @@ def main():
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Discover files without indexing to memory"
+        help="Discover files without indexing to memory",
     )
     args = parser.parse_args()
 
     # Configure logging
     logging.basicConfig(
         level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
     # Get repository path (script location -> src/ta_lab2/tools/ai_orchestrator/memory/snapshot)
@@ -270,13 +269,20 @@ def main():
         stats = run_ta_lab2_snapshot(repo_path, dry_run=args.dry_run)
 
         # Save manifest
-        manifest_path = repo_path / ".planning" / "phases" / "11-memory-preparation" / "snapshots" / "ta_lab2_snapshot.json"
+        manifest_path = (
+            repo_path
+            / ".planning"
+            / "phases"
+            / "11-memory-preparation"
+            / "snapshots"
+            / "ta_lab2_snapshot.json"
+        )
         save_snapshot_manifest(stats, manifest_path)
 
         # Print summary
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("TA_LAB2 SNAPSHOT COMPLETE")
-        print("="*60)
+        print("=" * 60)
         print(f"Total files: {stats['total_files']}")
         print(f"Total functions: {stats['total_functions']}")
         print(f"Total classes: {stats['total_classes']}")
@@ -284,7 +290,7 @@ def main():
         print(f"Errors: {len(stats['errors'])}")
         print(f"Commit hash: {stats['commit_hash']}")
         print(f"\nManifest: {manifest_path}")
-        print("="*60 + "\n")
+        print("=" * 60 + "\n")
 
         if stats["errors"]:
             print("Errors encountered:")

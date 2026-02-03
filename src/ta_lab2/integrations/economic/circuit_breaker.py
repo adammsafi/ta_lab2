@@ -12,14 +12,16 @@ from dataclasses import dataclass
 
 class CircuitState(Enum):
     """Circuit breaker states."""
-    CLOSED = "closed"      # Normal operation
-    OPEN = "open"          # Failing, rejecting requests
+
+    CLOSED = "closed"  # Normal operation
+    OPEN = "open"  # Failing, rejecting requests
     HALF_OPEN = "half_open"  # Testing if service recovered
 
 
 @dataclass
 class CircuitStats:
     """Circuit breaker statistics."""
+
     state: CircuitState
     failure_count: int
     success_count: int
@@ -133,7 +135,7 @@ class CircuitBreaker:
         func: Callable[..., Any],
         *args,
         fallback: Optional[Callable[..., Any]] = None,
-        **kwargs
+        **kwargs,
     ) -> Any:
         """Execute a function through the circuit breaker.
 
@@ -161,7 +163,7 @@ class CircuitBreaker:
             result = func(*args, **kwargs)
             self.record_success()
             return result
-        except Exception as e:
+        except Exception:
             self.record_failure()
             raise
 
@@ -195,4 +197,5 @@ class CircuitBreaker:
 
 class CircuitOpenError(Exception):
     """Raised when circuit breaker is open."""
+
     pass

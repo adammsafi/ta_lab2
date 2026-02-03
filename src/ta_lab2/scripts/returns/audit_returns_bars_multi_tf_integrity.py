@@ -73,14 +73,22 @@ def _write_csv(df: pd.DataFrame, path: Path) -> None:
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Audit integrity for cmc_returns_bars_multi_tf.")
-    p.add_argument("--db-url", default=os.getenv("TARGET_DB_URL", ""), help="DB URL (or set TARGET_DB_URL).")
+    p = argparse.ArgumentParser(
+        description="Audit integrity for cmc_returns_bars_multi_tf."
+    )
+    p.add_argument(
+        "--db-url",
+        default=os.getenv("TARGET_DB_URL", ""),
+        help="DB URL (or set TARGET_DB_URL).",
+    )
     p.add_argument("--bars-table", default=DEFAULT_BARS_TABLE)
     p.add_argument("--ret-table", default=DEFAULT_RET_TABLE)
 
     # Base filename (no extension). If you include a path here, it still works,
     # but recommended usage is: --out <name> and --out-dir <dir>.
-    p.add_argument("--out", default="", help="Base filename for CSV outputs (no extension).")
+    p.add_argument(
+        "--out", default="", help="Base filename for CSV outputs (no extension)."
+    )
 
     # New: output directory for CSVs (default: current directory)
     p.add_argument("--out-dir", default=".", help="Directory to write CSV outputs.")
@@ -89,7 +97,9 @@ def main() -> None:
 
     db_url = args.db_url.strip()
     if not db_url:
-        raise SystemExit("ERROR: Missing DB URL. Provide --db-url or set TARGET_DB_URL.")
+        raise SystemExit(
+            "ERROR: Missing DB URL. Provide --db-url or set TARGET_DB_URL."
+        )
 
     engine = _get_engine(db_url)
     bars_table = args.bars_table
@@ -220,7 +230,9 @@ def main() -> None:
     align = _df(engine, align_sql)
     n_missing = int(align.iloc[0]["n_missing"])
     if n_missing != 0:
-        _print(f"FAIL: {n_missing} returns rows have no matching (id,tf,bar_seq) in bars table.")
+        _print(
+            f"FAIL: {n_missing} returns rows have no matching (id,tf,bar_seq) in bars table."
+        )
     else:
         _print("PASS: all returns keys align to bars table.")
 

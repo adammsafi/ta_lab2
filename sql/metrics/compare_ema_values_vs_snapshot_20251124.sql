@@ -48,5 +48,3 @@ FROM (
 ) AS x
 GROUP BY id, period
 ORDER BY id, period;
-
-

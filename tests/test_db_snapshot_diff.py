@@ -16,31 +16,65 @@ def test_snapshot_diff_added_removed_and_deltas(tmp_path: Path) -> None:
     a = tmp_path / "a.json"
     b = tmp_path / "b.json"
 
-    a.write_text(json.dumps({
-        "meta": {},
-        "schemas": ["public"],
-        "tables": {"public.t1": {"schema":"public","table":"t1","approx_rows": 10}},
-        "table_stats": {"public.t1": {"total_bytes": 100, "table_bytes": 70, "index_bytes": 30}},
-        "top_col_stats": {"public.t1": []}
-    }), encoding="utf-8")
+    a.write_text(
+        json.dumps(
+            {
+                "meta": {},
+                "schemas": ["public"],
+                "tables": {
+                    "public.t1": {"schema": "public", "table": "t1", "approx_rows": 10}
+                },
+                "table_stats": {
+                    "public.t1": {
+                        "total_bytes": 100,
+                        "table_bytes": 70,
+                        "index_bytes": 30,
+                    }
+                },
+                "top_col_stats": {"public.t1": []},
+            }
+        ),
+        encoding="utf-8",
+    )
 
-    b.write_text(json.dumps({
-        "meta": {},
-        "schemas": ["public"],
-        "tables": {
-            "public.t1": {"schema":"public","table":"t1","approx_rows": 30},
-            "public.t2": {"schema":"public","table":"t2","approx_rows": 1}
-        },
-        "table_stats": {
-            "public.t1": {"total_bytes": 300, "table_bytes": 210, "index_bytes": 90},
-            "public.t2": {"total_bytes": 50, "table_bytes": 50, "index_bytes": 0}
-        },
-        "top_col_stats": {"public.t1": [], "public.t2": []}
-    }), encoding="utf-8")
+    b.write_text(
+        json.dumps(
+            {
+                "meta": {},
+                "schemas": ["public"],
+                "tables": {
+                    "public.t1": {"schema": "public", "table": "t1", "approx_rows": 30},
+                    "public.t2": {"schema": "public", "table": "t2", "approx_rows": 1},
+                },
+                "table_stats": {
+                    "public.t1": {
+                        "total_bytes": 300,
+                        "table_bytes": 210,
+                        "index_bytes": 90,
+                    },
+                    "public.t2": {
+                        "total_bytes": 50,
+                        "table_bytes": 50,
+                        "index_bytes": 0,
+                    },
+                },
+                "top_col_stats": {"public.t1": [], "public.t2": []},
+            }
+        ),
+        encoding="utf-8",
+    )
 
     cmd = [
-        sys.executable, "-m", "ta_lab2.tools.dbtool",
-        "snapshot-diff", "--a", str(a), "--b", str(b), "--top-n", "25"
+        sys.executable,
+        "-m",
+        "ta_lab2.tools.dbtool",
+        "snapshot-diff",
+        "--a",
+        str(a),
+        "--b",
+        str(b),
+        "--top-n",
+        "25",
     ]
     out = _run(cmd)
 

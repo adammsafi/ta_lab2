@@ -41,7 +41,7 @@ def extract_conversation(jsonl_path: Path) -> list[dict]:
     line_num = 0
 
     try:
-        with open(jsonl_path, 'r', encoding='utf-8') as f:
+        with open(jsonl_path, "r", encoding="utf-8") as f:
             for line in f:
                 line_num += 1
 
@@ -58,16 +58,22 @@ def extract_conversation(jsonl_path: Path) -> list[dict]:
                         # Handle string content or list content
                         if isinstance(content, list):
                             # Extract text from content blocks
-                            content = " ".join([
-                                block.get("text", "") if isinstance(block, dict) else str(block)
-                                for block in content
-                            ])
-                        messages.append({
-                            "role": "user",
-                            "content": content,
-                            "timestamp": entry.get("timestamp"),
-                            "message_id": entry.get("uuid")
-                        })
+                            content = " ".join(
+                                [
+                                    block.get("text", "")
+                                    if isinstance(block, dict)
+                                    else str(block)
+                                    for block in content
+                                ]
+                            )
+                        messages.append(
+                            {
+                                "role": "user",
+                                "content": content,
+                                "timestamp": entry.get("timestamp"),
+                                "message_id": entry.get("uuid"),
+                            }
+                        )
 
                     # Extract assistant messages (format: type="assistant", message.content)
                     elif entry.get("type") == "assistant":
@@ -90,25 +96,31 @@ def extract_conversation(jsonl_path: Path) -> list[dict]:
 
                         content_str = " ".join(text_parts)
                         if content_str:
-                            messages.append({
-                                "role": "assistant",
-                                "content": content_str,
-                                "timestamp": entry.get("timestamp"),
-                                "message_id": entry.get("uuid")
-                            })
+                            messages.append(
+                                {
+                                    "role": "assistant",
+                                    "content": content_str,
+                                    "timestamp": entry.get("timestamp"),
+                                    "message_id": entry.get("uuid"),
+                                }
+                            )
 
                 except json.JSONDecodeError as e:
-                    logger.warning(f"Skipping malformed JSON at line {line_num} in {jsonl_path}: {e}")
+                    logger.warning(
+                        f"Skipping malformed JSON at line {line_num} in {jsonl_path}: {e}"
+                    )
                     continue
                 except Exception as e:
-                    logger.warning(f"Error parsing line {line_num} in {jsonl_path}: {e}")
+                    logger.warning(
+                        f"Error parsing line {line_num} in {jsonl_path}: {e}"
+                    )
                     continue
 
     except UnicodeDecodeError:
         # Try with fallback encoding
         logger.warning(f"UTF-8 decode failed for {jsonl_path}, trying latin-1")
         try:
-            with open(jsonl_path, 'r', encoding='latin-1') as f:
+            with open(jsonl_path, "r", encoding="latin-1") as f:
                 for line in f:
                     line_num += 1
 
@@ -123,32 +135,43 @@ def extract_conversation(jsonl_path: Path) -> list[dict]:
                             message_obj = entry.get("message", {})
                             content = message_obj.get("content", "")
                             if isinstance(content, list):
-                                content = " ".join([
-                                    block.get("text", "") if isinstance(block, dict) else str(block)
-                                    for block in content
-                                ])
-                            messages.append({
-                                "role": "user",
-                                "content": content,
-                                "timestamp": entry.get("timestamp"),
-                                "message_id": entry.get("uuid")
-                            })
+                                content = " ".join(
+                                    [
+                                        block.get("text", "")
+                                        if isinstance(block, dict)
+                                        else str(block)
+                                        for block in content
+                                    ]
+                                )
+                            messages.append(
+                                {
+                                    "role": "user",
+                                    "content": content,
+                                    "timestamp": entry.get("timestamp"),
+                                    "message_id": entry.get("uuid"),
+                                }
+                            )
                         elif entry.get("type") == "assistant":
                             message_obj = entry.get("message", {})
                             content = message_obj.get("content", [])
                             text_parts = []
                             if isinstance(content, list):
                                 for block in content:
-                                    if isinstance(block, dict) and block.get("type") == "text":
+                                    if (
+                                        isinstance(block, dict)
+                                        and block.get("type") == "text"
+                                    ):
                                         text_parts.append(block.get("text", ""))
                             content_str = " ".join(text_parts)
                             if content_str:
-                                messages.append({
-                                    "role": "assistant",
-                                    "content": content_str,
-                                    "timestamp": entry.get("timestamp"),
-                                    "message_id": entry.get("uuid")
-                                })
+                                messages.append(
+                                    {
+                                        "role": "assistant",
+                                        "content": content_str,
+                                        "timestamp": entry.get("timestamp"),
+                                        "message_id": entry.get("uuid"),
+                                    }
+                                )
                     except json.JSONDecodeError:
                         continue
 
@@ -160,7 +183,9 @@ def extract_conversation(jsonl_path: Path) -> list[dict]:
     return messages
 
 
-def extract_phase_boundaries(planning_dir: Path, repo: Optional[Repo] = None) -> dict[int, dict]:
+def extract_phase_boundaries(
+    planning_dir: Path, repo: Optional[Repo] = None
+) -> dict[int, dict]:
     """Map phases to time ranges using SUMMARY.md files and git commits.
 
     Scans .planning/phases/ directories to find SUMMARY.md files, then uses
@@ -198,14 +223,13 @@ def extract_phase_boundaries(planning_dir: Path, repo: Optional[Repo] = None) ->
     phases = {}
 
     # Get all phase directories (format: NN-name)
-    phase_dirs = sorted([
-        d for d in phases_dir.iterdir()
-        if d.is_dir() and d.name[0].isdigit()
-    ])
+    phase_dirs = sorted(
+        [d for d in phases_dir.iterdir() if d.is_dir() and d.name[0].isdigit()]
+    )
 
     for phase_dir in phase_dirs:
         # Extract phase number and name
-        phase_match = re.match(r'(\d+)-(.+)', phase_dir.name)
+        phase_match = re.match(r"(\d+)-(.+)", phase_dir.name)
         if not phase_match:
             logger.warning(f"Skipping directory with unexpected name: {phase_dir.name}")
             continue
@@ -235,11 +259,15 @@ def extract_phase_boundaries(planning_dir: Path, repo: Optional[Repo] = None) ->
                     summary_file_list.append(str(summary_path))
 
             except Exception as e:
-                logger.warning(f"Failed to extract git metadata for {summary_path}: {e}")
+                logger.warning(
+                    f"Failed to extract git metadata for {summary_path}: {e}"
+                )
                 continue
 
         if not all_commit_times:
-            logger.warning(f"No git commits found for any SUMMARY files in phase {phase_num}")
+            logger.warning(
+                f"No git commits found for any SUMMARY files in phase {phase_num}"
+            )
             continue
 
         # Phase start = earliest commit across all SUMMARY files
@@ -254,7 +282,7 @@ def extract_phase_boundaries(planning_dir: Path, repo: Optional[Repo] = None) ->
             "end": end_date.isoformat(),
             "summary_file": summary_file_list[0] if summary_file_list else "unknown",
             "summary_files": summary_file_list,
-            "commits": len(all_commit_times)
+            "commits": len(all_commit_times),
         }
 
         logger.debug(
@@ -267,8 +295,7 @@ def extract_phase_boundaries(planning_dir: Path, repo: Optional[Repo] = None) ->
 
 
 def link_conversations_to_phases(
-    messages: list[dict],
-    phase_boundaries: dict[int, dict]
+    messages: list[dict], phase_boundaries: dict[int, dict]
 ) -> dict[int, list[dict]]:
     """Group messages by phase using timestamp comparison.
 
@@ -301,7 +328,7 @@ def link_conversations_to_phases(
 
         # Parse timestamp (ISO format expected)
         try:
-            msg_datetime = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+            msg_datetime = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
         except (ValueError, AttributeError) as e:
             logger.warning(f"Invalid timestamp format: {timestamp}, error: {e}")
             conversations_by_phase["untracked"].append(message)
@@ -311,8 +338,12 @@ def link_conversations_to_phases(
         matched = False
         for phase_num, phase_info in phase_boundaries.items():
             try:
-                phase_start = datetime.fromisoformat(phase_info["start"].replace('Z', '+00:00'))
-                phase_end = datetime.fromisoformat(phase_info["end"].replace('Z', '+00:00'))
+                phase_start = datetime.fromisoformat(
+                    phase_info["start"].replace("Z", "+00:00")
+                )
+                phase_end = datetime.fromisoformat(
+                    phase_info["end"].replace("Z", "+00:00")
+                )
 
                 if phase_start <= msg_datetime <= phase_end:
                     conversations_by_phase[phase_num].append(message)
@@ -333,10 +364,7 @@ def link_conversations_to_phases(
     return conversations_by_phase
 
 
-def find_conversation_files(
-    claude_projects_dir: Path,
-    project_name: str
-) -> list[Path]:
+def find_conversation_files(claude_projects_dir: Path, project_name: str) -> list[Path]:
     """Find Claude Code conversation JSONL files for a project.
 
     Searches for project folder matching pattern (e.g., "C--Users-asafi-Downloads-ta-lab2")
@@ -374,7 +402,9 @@ def find_conversation_files(
             jsonl_files.extend(project_dir.glob("*.jsonl"))
 
     if not jsonl_files:
-        logger.warning(f"No .jsonl files found for project '{project_name}' in {claude_projects_dir}")
+        logger.warning(
+            f"No .jsonl files found for project '{project_name}' in {claude_projects_dir}"
+        )
     else:
         logger.info(f"Found {len(jsonl_files)} conversation files for '{project_name}'")
 
@@ -385,5 +415,5 @@ __all__ = [
     "extract_conversation",
     "extract_phase_boundaries",
     "link_conversations_to_phases",
-    "find_conversation_files"
+    "find_conversation_files",
 ]

@@ -98,9 +98,9 @@ def b2t_pct_delta(
     extra_cols: Optional[Sequence[str]] = None,
     round_places: Optional[int] = 6,
     direction: str = "oldest_top",  # or "newest_top"
-    open_col: str = "open",         # kept for compatibility; not required here
-    close_col: str = "close",       # kept for compatibility; not required here
-    **kwargs,                       # swallow legacy args like prefix, add_intraday
+    open_col: str = "open",  # kept for compatibility; not required here
+    close_col: str = "close",  # kept for compatibility; not required here
+    **kwargs,  # swallow legacy args like prefix, add_intraday
 ) -> pd.DataFrame:
     """
     Add bar-to-bar **percent** change columns for each requested column.
@@ -136,9 +136,9 @@ def b2t_log_delta(
     extra_cols: Optional[Sequence[str]] = None,
     round_places: Optional[int] = 6,
     direction: str = "oldest_top",
-    open_col: str = "open",   # kept for compatibility; not required here
-    close_col: str = "close", # kept for compatibility; not required here
-    **kwargs,                 # swallow legacy args like prefix, add_intraday
+    open_col: str = "open",  # kept for compatibility; not required here
+    close_col: str = "close",  # kept for compatibility; not required here
+    **kwargs,  # swallow legacy args like prefix, add_intraday
 ) -> pd.DataFrame:
     """
     Add bar-to-bar **log** change columns for each requested column.
@@ -170,13 +170,13 @@ def add_returns(
     df: pd.DataFrame,
     *,
     cols: Optional[Sequence[str]] = None,
-    columns: Optional[Sequence[str]] = None,   # legacy alias
+    columns: Optional[Sequence[str]] = None,  # legacy alias
     extra_cols: Optional[Sequence[str]] = None,
     round_places: Optional[int] = 6,
     direction: str = "oldest_top",
-    open_col: str = "open",                    # preserved for old call sites
-    close_col: str = "close",                  # preserved for old call sites
-    **kwargs,                                   # swallow legacy extras
+    open_col: str = "open",  # preserved for old call sites
+    close_col: str = "close",  # preserved for old call sites
+    **kwargs,  # swallow legacy extras
 ) -> pd.DataFrame:
     """
     Backward-compatible wrapper that mirrors the original API and adds BOTH:

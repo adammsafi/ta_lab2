@@ -159,25 +159,24 @@ def _load_keys(
         with engine.begin() as cxn:
             rows = cxn.execute(sql, {"rolls": rolls}).fetchall()
     else:
-        sql = (
-            text(
-                f"""
+        sql = text(
+            f"""
                 SELECT DISTINCT id::bigint, tf::text, period::int, roll::bool
                 FROM {ema_table}
                 WHERE id IN :ids
                   AND roll = ANY(:rolls)
                 ORDER BY id, tf, period, roll;
                 """
-            )
-            .bindparams(bindparam("ids", expanding=True))
-        )
+        ).bindparams(bindparam("ids", expanding=True))
         with engine.begin() as cxn:
             rows = cxn.execute(sql, {"ids": ids, "rolls": rolls}).fetchall()
 
     return [(int(r[0]), str(r[1]), int(r[2]), bool(r[3])) for r in rows]
 
 
-def _ensure_state_rows(engine: Engine, state_table: str, keys: List[Tuple[int, str, int, bool]]) -> None:
+def _ensure_state_rows(
+    engine: Engine, state_table: str, keys: List[Tuple[int, str, int, bool]]
+) -> None:
     """
     Create state rows for all keys (idempotent). We still do this row-by-row because it's small
     (one row per key) and avoids any bulk-param typing issues.
@@ -194,11 +193,13 @@ def _ensure_state_rows(engine: Engine, state_table: str, keys: List[Tuple[int, s
     )
 
     with engine.begin() as cxn:
-        for (i, tf, period, roll) in keys:
+        for i, tf, period, roll in keys:
             cxn.execute(ins, {"id": i, "tf": tf, "period": period, "roll": roll})
 
 
-def _read_state_for_keys(engine: Engine, state_table: str, ids: Optional[List[int]]) -> List[Tuple[int, str, int, bool, Optional[str]]]:
+def _read_state_for_keys(
+    engine: Engine, state_table: str, ids: Optional[List[int]]
+) -> List[Tuple[int, str, int, bool, Optional[str]]]:
     """
     Correct pattern to read state. (You may not need this for the per-key CTE approach,
     but keeping it here is useful for debugging and audits.)
@@ -213,16 +214,13 @@ def _read_state_for_keys(engine: Engine, state_table: str, ids: Optional[List[in
         with engine.begin() as cxn:
             rows = cxn.execute(sql).fetchall()
     else:
-        sql = (
-            text(
-                f"""
+        sql = text(
+            f"""
                 SELECT id::bigint, tf::text, period::int, roll::bool, last_ts::timestamptz
                 FROM {state_table}
                 WHERE id IN :ids;
                 """
-            )
-            .bindparams(bindparam("ids", expanding=True))
-        )
+        ).bindparams(bindparam("ids", expanding=True))
         with engine.begin() as cxn:
             rows = cxn.execute(sql, {"ids": ids}).fetchall()
 
@@ -230,11 +228,18 @@ def _read_state_for_keys(engine: Engine, state_table: str, ids: Optional[List[in
     return [(int(r[0]), str(r[1]), int(r[2]), bool(r[3]), r[4]) for r in rows]
 
 
-def _full_refresh(engine: Engine, out_table: str, state_table: str, keys: List[Tuple[int, str, int, bool]]) -> None:
+def _full_refresh(
+    engine: Engine,
+    out_table: str,
+    state_table: str,
+    keys: List[Tuple[int, str, int, bool]],
+) -> None:
     if not keys:
         return
 
-    _print(f"--full-refresh: deleting existing rows for {len(keys)} (id,tf,period,roll) keys and resetting state.")
+    _print(
+        f"--full-refresh: deleting existing rows for {len(keys)} (id,tf,period,roll) keys and resetting state."
+    )
 
     del_out = text(
         f"""
@@ -250,7 +255,7 @@ def _full_refresh(engine: Engine, out_table: str, state_table: str, keys: List[T
     )
 
     with engine.begin() as cxn:
-        for (i, tf, period, roll) in keys:
+        for i, tf, period, roll in keys:
             params = {"id": i, "tf": tf, "period": period, "roll": roll}
             cxn.execute(del_out, params)
             cxn.execute(del_state, params)
@@ -258,7 +263,9 @@ def _full_refresh(engine: Engine, out_table: str, state_table: str, keys: List[T
     _ensure_state_rows(engine, state_table, keys)
 
 
-def _run_one_key(engine: Engine, cfg: RunnerConfig, key: Tuple[int, str, int, bool]) -> None:
+def _run_one_key(
+    engine: Engine, cfg: RunnerConfig, key: Tuple[int, str, int, bool]
+) -> None:
     """
     Correct incremental watermark logic (EMA-specific):
       - pull ts >= last_ts to seed prev_ema
@@ -360,7 +367,13 @@ def _run_one_key(engine: Engine, cfg: RunnerConfig, key: Tuple[int, str, int, bo
     with engine.begin() as cxn:
         cxn.execute(
             sql,
-            {"id": one_id, "tf": one_tf, "period": one_period, "roll": one_roll, "start": cfg.start},
+            {
+                "id": one_id,
+                "tf": one_tf,
+                "period": one_period,
+                "roll": one_roll,
+                "start": cfg.start,
+            },
         )
 
 
@@ -409,28 +422,50 @@ def _upsert_state_bulk_unnest(
     with engine.begin() as cxn:
         cxn.execute(
             upsert_sql,
-            {"ids": ids, "tfs": tfs, "periods": periods, "rolls": rolls, "last_ts": last_ts},
+            {
+                "ids": ids,
+                "tfs": tfs,
+                "periods": periods,
+                "rolls": rolls,
+                "last_ts": last_ts,
+            },
         )
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Incremental EMA returns builder for cmc_ema_multi_tf_v2 (arith + log).")
-    p.add_argument("--db-url", default=os.getenv("TARGET_DB_URL", ""), help="Postgres DB URL (or set TARGET_DB_URL).")
+    p = argparse.ArgumentParser(
+        description="Incremental EMA returns builder for cmc_ema_multi_tf_v2 (arith + log)."
+    )
+    p.add_argument(
+        "--db-url",
+        default=os.getenv("TARGET_DB_URL", ""),
+        help="Postgres DB URL (or set TARGET_DB_URL).",
+    )
 
     p.add_argument("--ids", default="all", help="Comma-separated ids, or 'all'.")
-    p.add_argument("--start", default="2010-01-01", help="Start timestamptz for full history runs.")
+    p.add_argument(
+        "--start", default="2010-01-01", help="Start timestamptz for full history runs."
+    )
     p.add_argument("--roll-mode", default="both", help="both | canonical | roll")
 
     p.add_argument("--ema-table", default=DEFAULT_EMA_TABLE, help="Source EMA table.")
-    p.add_argument("--out-table", default=DEFAULT_OUT_TABLE, help="Output returns table.")
+    p.add_argument(
+        "--out-table", default=DEFAULT_OUT_TABLE, help="Output returns table."
+    )
     p.add_argument("--state-table", default=DEFAULT_STATE_TABLE, help="State table.")
-    p.add_argument("--full-refresh", action="store_true", help="Recompute history for selected keys from --start.")
+    p.add_argument(
+        "--full-refresh",
+        action="store_true",
+        help="Recompute history for selected keys from --start.",
+    )
 
     args = p.parse_args()
 
     db_url = args.db_url.strip()
     if not db_url:
-        raise SystemExit("ERROR: Missing DB URL. Provide --db-url or set TARGET_DB_URL.")
+        raise SystemExit(
+            "ERROR: Missing DB URL. Provide --db-url or set TARGET_DB_URL."
+        )
 
     cfg = RunnerConfig(
         db_url=db_url,
@@ -442,7 +477,11 @@ def main() -> None:
         roll_mode=args.roll_mode.strip().lower(),
     )
 
-    _print("Using DB URL from TARGET_DB_URL env." if os.getenv("TARGET_DB_URL") else "Using DB URL from --db-url.")
+    _print(
+        "Using DB URL from TARGET_DB_URL env."
+        if os.getenv("TARGET_DB_URL")
+        else "Using DB URL from --db-url."
+    )
     _print(
         f"Runner config: ids={args.ids}, roll_mode={cfg.roll_mode}, start={cfg.start}, "
         f"ema={cfg.ema_table}, out={cfg.out_table}, state={cfg.state_table}, full_refresh={cfg.full_refresh}"
@@ -466,7 +505,9 @@ def main() -> None:
 
     for i, key in enumerate(keys, start=1):
         one_id, one_tf, one_period, one_roll = key
-        _print(f"Processing key=({one_id},{one_tf},{one_period},roll={one_roll}) ({i}/{len(keys)})")
+        _print(
+            f"Processing key=({one_id},{one_tf},{one_period},roll={one_roll}) ({i}/{len(keys)})"
+        )
         _run_one_key(engine, cfg, key)
 
     _print("Done.")

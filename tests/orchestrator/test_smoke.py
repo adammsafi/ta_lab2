@@ -1,7 +1,5 @@
 """Smoke tests - end-to-end validation of Phase 1 infrastructure."""
 
-import json
-import os
 import tempfile
 from pathlib import Path
 

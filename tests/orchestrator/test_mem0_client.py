@@ -5,21 +5,22 @@ configuration correctness, singleton pattern, and CRUD operations.
 """
 import pytest
 import os
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch, MagicMock
 from ta_lab2.tools.ai_orchestrator.memory.mem0_config import (
     Mem0Config,
-    create_mem0_config
+    create_mem0_config,
 )
 from ta_lab2.tools.ai_orchestrator.memory.mem0_client import (
     Mem0Client,
     get_mem0_client,
-    reset_mem0_client
+    reset_mem0_client,
 )
 
 
 # ============================================================
 # Configuration Tests
 # ============================================================
+
 
 def test_create_mem0_config_returns_dict():
     """Verify create_mem0_config returns valid configuration dict."""
@@ -49,8 +50,9 @@ def test_config_uses_text_embedding_3_small():
         config = create_mem0_config()
 
         embedder_model = config["embedder"]["config"]["model"]
-        assert embedder_model == "text-embedding-3-small", \
-            "Must use text-embedding-3-small to match Phase 2 embeddings (1536-dim)"
+        assert (
+            embedder_model == "text-embedding-3-small"
+        ), "Must use text-embedding-3-small to match Phase 2 embeddings (1536-dim)"
 
 
 def test_config_uses_gpt4o_mini_for_llm():
@@ -59,8 +61,9 @@ def test_config_uses_gpt4o_mini_for_llm():
         config = create_mem0_config()
 
         llm_model = config["llm"]["config"]["model"]
-        assert llm_model == "gpt-4o-mini", \
-            "Should use gpt-4o-mini for cost-effective conflict detection"
+        assert (
+            llm_model == "gpt-4o-mini"
+        ), "Should use gpt-4o-mini for cost-effective conflict detection"
 
 
 def test_config_raises_without_api_key():
@@ -81,8 +84,7 @@ def test_config_creates_qdrant_directory():
         temp_dir = tempfile.mkdtemp()
         try:
             mem0_config = Mem0Config(
-                chromadb_path=f"{temp_dir}/chromadb",
-                openai_api_key="test-key"
+                chromadb_path=f"{temp_dir}/chromadb", openai_api_key="test-key"
             )
 
             config = create_mem0_config(config=mem0_config)
@@ -97,11 +99,13 @@ def test_config_creates_qdrant_directory():
 def test_config_warns_on_wrong_embedder_model():
     """Verify config warns when embedder model doesn't match Phase 2."""
     with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-        with patch("ta_lab2.tools.ai_orchestrator.memory.mem0_config.logger") as mock_logger:
+        with patch(
+            "ta_lab2.tools.ai_orchestrator.memory.mem0_config.logger"
+        ) as mock_logger:
             mem0_config = Mem0Config(
                 chromadb_path="C:/Users/asafi/Documents/ProjectTT/ChatGPT/20251228/out/chromadb",
                 embedder_model="text-embedding-ada-002",  # Wrong model
-                openai_api_key="test-key"
+                openai_api_key="test-key",
             )
 
             create_mem0_config(config=mem0_config)
@@ -115,6 +119,7 @@ def test_config_warns_on_wrong_embedder_model():
 # ============================================================
 # Singleton Tests
 # ============================================================
+
 
 def test_get_mem0_client_returns_instance():
     """Verify get_mem0_client() returns Mem0Client instance."""
@@ -151,6 +156,7 @@ def test_reset_clears_singleton():
 # Client Method Tests (Mocked)
 # ============================================================
 
+
 def test_add_calls_underlying_memory():
     """Verify add() passes through to Memory.add()."""
     reset_mem0_client()
@@ -164,8 +170,7 @@ def test_add_calls_underlying_memory():
         client._memory = mock_memory
 
         result = client.add(
-            messages=[{"role": "user", "content": "Test memory"}],
-            user_id="test_user"
+            messages=[{"role": "user", "content": "Test memory"}], user_id="test_user"
         )
 
         # Verify Memory.add was called with correct arguments
@@ -184,15 +189,13 @@ def test_search_returns_results():
         mock_memory = MagicMock()
         mock_memory.search.return_value = [
             {"id": "mem_1", "memory": "EMA uses 20 periods", "score": 0.95},
-            {"id": "mem_2", "memory": "EMA calculation formula", "score": 0.87}
+            {"id": "mem_2", "memory": "EMA calculation formula", "score": 0.87},
         ]
 
         client = Mem0Client()
         client._memory = mock_memory
         results = client.search(
-            query="EMA calculation",
-            user_id="orchestrator",
-            limit=5
+            query="EMA calculation", user_id="orchestrator", limit=5
         )
 
         # Verify Memory.search was called
@@ -218,15 +221,13 @@ def test_infer_true_by_default():
         client = Mem0Client()
         client._memory = mock_memory
         # Call add without explicitly setting infer
-        client.add(
-            messages=[{"role": "user", "content": "Test"}],
-            user_id="test_user"
-        )
+        client.add(messages=[{"role": "user", "content": "Test"}], user_id="test_user")
 
         # Verify infer=True was passed
         call_kwargs = mock_memory.add.call_args[1]
-        assert call_kwargs.get("infer") is True, \
-            "infer should default to True for conflict detection"
+        assert (
+            call_kwargs.get("infer") is True
+        ), "infer should default to True for conflict detection"
 
 
 def test_update_calls_memory_update():
@@ -242,7 +243,7 @@ def test_update_calls_memory_update():
         result = client.update(
             memory_id="mem_123",
             data="Updated content",
-            metadata={"last_verified": "2026-01-28"}
+            metadata={"last_verified": "2026-01-28"},
         )
 
         mock_memory.update.assert_called_once()
@@ -276,7 +277,7 @@ def test_get_all_calls_memory_get_all():
         mock_memory = MagicMock()
         mock_memory.get_all.return_value = [
             {"id": "mem_1", "memory": "Memory 1"},
-            {"id": "mem_2", "memory": "Memory 2"}
+            {"id": "mem_2", "memory": "Memory 2"},
         ]
 
         client = Mem0Client()
@@ -305,22 +306,27 @@ def test_memory_count_returns_collection_count():
         mock_memory = MagicMock()
         mock_memory.vector_store = mock_vector_store
 
-        client = Mem0Client(config={"vector_store": {"config": {"collection_name": "project_memories"}}})
+        client = Mem0Client(
+            config={"vector_store": {"config": {"collection_name": "project_memories"}}}
+        )
         client._memory = mock_memory
         count = client.memory_count
 
         assert count == 3763
-        mock_qdrant_client.get_collection.assert_called_once_with(collection_name="project_memories")
+        mock_qdrant_client.get_collection.assert_called_once_with(
+            collection_name="project_memories"
+        )
 
 
 # ============================================================
 # Integration Test (Requires OPENAI_API_KEY and ChromaDB)
 # ============================================================
 
+
 @pytest.mark.integration
 @pytest.mark.skipif(
     not os.environ.get("OPENAI_API_KEY"),
-    reason="Requires OPENAI_API_KEY environment variable"
+    reason="Requires OPENAI_API_KEY environment variable",
 )
 def test_mem0_can_add_and_search_memories():
     """Integration test: Verify Mem0 can add and search memories with Qdrant.
@@ -337,25 +343,31 @@ def test_mem0_can_add_and_search_memories():
         # Add a test memory
         result = client.add(
             messages=[
-                {"role": "user", "content": "Integration test: EMA calculation uses 20-period window"},
-                {"role": "assistant", "content": "Noted: EMA configured with 20-period lookback"}
+                {
+                    "role": "user",
+                    "content": "Integration test: EMA calculation uses 20-period window",
+                },
+                {
+                    "role": "assistant",
+                    "content": "Noted: EMA configured with 20-period lookback",
+                },
             ],
-            user_id="test_integration"
+            user_id="test_integration",
         )
 
         assert "id" in result or "results" in result, "Add should return result with ID"
 
         # Search for the memory
         results = client.search(
-            query="EMA calculation",
-            user_id="test_integration",
-            limit=5
+            query="EMA calculation", user_id="test_integration", limit=5
         )
 
         # Verify we can search (may or may not find the just-added memory depending on indexing)
         assert isinstance(results, list), "Search should return list"
 
-        print(f"Integration test passed: Added memory, search returned {len(results)} results")
+        print(
+            f"Integration test passed: Added memory, search returned {len(results)} results"
+        )
 
     except Exception as e:
         pytest.skip(f"Integration test skipped due to setup issue: {e}")
@@ -364,6 +376,7 @@ def test_mem0_can_add_and_search_memories():
 # ============================================================
 # Error Handling Tests
 # ============================================================
+
 
 def test_add_logs_error_on_failure():
     """Verify add() logs error and re-raises on failure."""
@@ -375,11 +388,12 @@ def test_add_logs_error_on_failure():
 
         client = Mem0Client()
         client._memory = mock_memory
-        with patch("ta_lab2.tools.ai_orchestrator.memory.mem0_client.logger") as mock_logger:
+        with patch(
+            "ta_lab2.tools.ai_orchestrator.memory.mem0_client.logger"
+        ) as mock_logger:
             with pytest.raises(Exception, match="API error"):
                 client.add(
-                    messages=[{"role": "user", "content": "Test"}],
-                    user_id="test_user"
+                    messages=[{"role": "user", "content": "Test"}], user_id="test_user"
                 )
 
             # Verify error was logged
@@ -396,7 +410,9 @@ def test_search_logs_error_on_failure():
 
         client = Mem0Client()
         client._memory = mock_memory
-        with patch("ta_lab2.tools.ai_orchestrator.memory.mem0_client.logger") as mock_logger:
+        with patch(
+            "ta_lab2.tools.ai_orchestrator.memory.mem0_client.logger"
+        ) as mock_logger:
             with pytest.raises(Exception, match="Search failed"):
                 client.search(query="test")
 

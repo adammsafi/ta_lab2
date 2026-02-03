@@ -62,7 +62,9 @@ def equity_plot(
     plt.close()
 
 
-def leaderboard(results: pd.DataFrame, group_cols: Iterable[str] = ("split",)) -> pd.DataFrame:
+def leaderboard(
+    results: pd.DataFrame, group_cols: Iterable[str] = ("split",)
+) -> pd.DataFrame:
     """
     Rank parameter sets inside each group by MAR, then Sharpe, then CAGR.
     Expects columns: ['mar','sharpe','cagr'] plus whatever is in group_cols.
@@ -73,6 +75,8 @@ def leaderboard(results: pd.DataFrame, group_cols: Iterable[str] = ("split",)) -
         return results.assign(_rank=pd.Series(dtype=int))
 
     sort_cols = cols + ["mar", "sharpe", "cagr"]
-    out = results.sort_values(sort_cols, ascending=[True] * len(cols) + [False, False, False]).copy()
+    out = results.sort_values(
+        sort_cols, ascending=[True] * len(cols) + [False, False, False]
+    ).copy()
     out["_rank"] = out.groupby(cols).cumcount() + 1
     return out

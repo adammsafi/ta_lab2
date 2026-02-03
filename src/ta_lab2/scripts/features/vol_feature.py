@@ -35,6 +35,7 @@ from ta_lab2.features.vol import (
 # Configuration
 # =============================================================================
 
+
 @dataclass(frozen=True)
 class VolatilityConfig(FeatureConfig):
     """
@@ -51,6 +52,7 @@ class VolatilityConfig(FeatureConfig):
         periods_per_year: 252 (annualization factor)
         atr_period: 14 (ATR period)
     """
+
     feature_type: str = "vol"
     output_table: str = "cmc_vol_daily"
     null_strategy: str = "forward_fill"  # Per CONTEXT.md - vol forward fills
@@ -73,6 +75,7 @@ class VolatilityConfig(FeatureConfig):
 # =============================================================================
 # Volatility Feature Class
 # =============================================================================
+
 
 class VolatilityFeature(BaseFeature):
     """
@@ -189,44 +192,44 @@ class VolatilityFeature(BaseFeature):
         # Process each ID separately (volatility requires ordering)
         results = []
 
-        for id_val in df['id'].unique():
-            df_id = df[df['id'] == id_val].copy()
+        for id_val in df["id"].unique():
+            df_id = df[df["id"] == id_val].copy()
 
             # Sort by timestamp (required for rolling calculations)
-            df_id = df_id.sort_values('ts')
+            df_id = df_id.sort_values("ts")
 
             # 1. Parkinson volatility (range-based)
-            if 'parkinson' in self.vol_config.estimators:
+            if "parkinson" in self.vol_config.estimators:
                 add_parkinson_vol(
                     df_id,
-                    high_col='high',
-                    low_col='low',
+                    high_col="high",
+                    low_col="low",
                     windows=self.vol_config.vol_windows,
                     annualize=True,
                     periods_per_year=self.vol_config.periods_per_year,
                 )
 
             # 2. Garman-Klass volatility (OHLC-based)
-            if 'gk' in self.vol_config.estimators:
+            if "gk" in self.vol_config.estimators:
                 add_garman_klass_vol(
                     df_id,
-                    open_col='open',
-                    high_col='high',
-                    low_col='low',
-                    close_col='close',
+                    open_col="open",
+                    high_col="high",
+                    low_col="low",
+                    close_col="close",
                     windows=self.vol_config.vol_windows,
                     annualize=True,
                     periods_per_year=self.vol_config.periods_per_year,
                 )
 
             # 3. Rogers-Satchell volatility (drift-independent)
-            if 'rs' in self.vol_config.estimators:
+            if "rs" in self.vol_config.estimators:
                 add_rogers_satchell_vol(
                     df_id,
-                    open_col='open',
-                    high_col='high',
-                    low_col='low',
-                    close_col='close',
+                    open_col="open",
+                    high_col="high",
+                    low_col="low",
+                    close_col="close",
                     windows=self.vol_config.vol_windows,
                     annualize=True,
                     periods_per_year=self.vol_config.periods_per_year,
@@ -236,22 +239,22 @@ class VolatilityFeature(BaseFeature):
             add_atr(
                 df_id,
                 period=self.vol_config.atr_period,
-                open_col='open',
-                high_col='high',
-                low_col='low',
-                close_col='close',
+                open_col="open",
+                high_col="high",
+                low_col="low",
+                close_col="close",
             )
 
             # 5. Rolling historical volatility from log returns
             add_rolling_vol_from_returns_batch(
                 df_id,
-                close_col='close',
+                close_col="close",
                 windows=self.vol_config.vol_windows,
-                types='log',
+                types="log",
                 annualize=True,
                 periods_per_year=self.vol_config.periods_per_year,
                 ddof=0,
-                prefix='vol',
+                prefix="vol",
             )
 
             results.append(df_id)

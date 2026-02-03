@@ -8,7 +8,6 @@ and null strategy retrieval without requiring database connection.
 import unittest
 from unittest.mock import Mock, MagicMock, patch
 import pandas as pd
-from datetime import datetime, timezone
 
 from ta_lab2.scripts.features.feature_state_manager import (
     FeatureStateConfig,
@@ -89,9 +88,7 @@ class TestManagerInitialization(unittest.TestCase):
         """Verify __repr__ returns readable string with table info."""
         mock_engine = Mock()
         config = FeatureStateConfig(
-            state_schema="public",
-            state_table="cmc_feature_state",
-            feature_type="vol"
+            state_schema="public", state_table="cmc_feature_state", feature_type="vol"
         )
         manager = FeatureStateManager(mock_engine, config)
 
@@ -142,20 +139,34 @@ class TestLoadState(unittest.TestCase):
         manager = FeatureStateManager(mock_engine, config)
 
         # Mock empty result
-        empty_df = pd.DataFrame(columns=[
-            "id", "feature_type", "feature_name",
-            "daily_min_seen", "daily_max_seen", "last_ts",
-            "row_count",
-            "updated_at"
-        ])
+        empty_df = pd.DataFrame(
+            columns=[
+                "id",
+                "feature_type",
+                "feature_name",
+                "daily_min_seen",
+                "daily_max_seen",
+                "last_ts",
+                "row_count",
+                "updated_at",
+            ]
+        )
         mock_read_sql.return_value = empty_df
 
         result = manager.load_state()
 
         assert isinstance(result, pd.DataFrame)
         assert len(result) == 0
-        expected_cols = ["id", "feature_type", "feature_name", "daily_min_seen",
-                        "daily_max_seen", "last_ts", "row_count", "updated_at"]
+        expected_cols = [
+            "id",
+            "feature_type",
+            "feature_name",
+            "daily_min_seen",
+            "daily_max_seen",
+            "last_ts",
+            "row_count",
+            "updated_at",
+        ]
         assert all(col in result.columns for col in expected_cols)
 
     @patch("ta_lab2.scripts.features.feature_state_manager.pd.read_sql")
@@ -170,16 +181,18 @@ class TestLoadState(unittest.TestCase):
         manager = FeatureStateManager(mock_engine, config)
 
         # Mock successful result
-        result_df = pd.DataFrame({
-            "id": [1],
-            "feature_type": ["returns"],
-            "feature_name": ["b2t_pct"],
-            "daily_min_seen": [None],
-            "daily_max_seen": [None],
-            "last_ts": [pd.Timestamp("2024-01-01", tz="UTC")],
-            "row_count": [100],
-            "updated_at": [pd.Timestamp.now(tz="UTC")],
-        })
+        result_df = pd.DataFrame(
+            {
+                "id": [1],
+                "feature_type": ["returns"],
+                "feature_name": ["b2t_pct"],
+                "daily_min_seen": [None],
+                "daily_max_seen": [None],
+                "last_ts": [pd.Timestamp("2024-01-01", tz="UTC")],
+                "row_count": [100],
+                "updated_at": [pd.Timestamp.now(tz="UTC")],
+            }
+        )
         mock_read_sql.return_value = result_df
 
         result = manager.load_state(ids=[1])
@@ -206,16 +219,18 @@ class TestLoadState(unittest.TestCase):
         manager = FeatureStateManager(mock_engine, config)
 
         # Mock successful result
-        result_df = pd.DataFrame({
-            "id": [1],
-            "feature_type": ["vol"],
-            "feature_name": ["parkinson_20"],
-            "daily_min_seen": [None],
-            "daily_max_seen": [None],
-            "last_ts": [pd.Timestamp("2024-01-01", tz="UTC")],
-            "row_count": [100],
-            "updated_at": [pd.Timestamp.now(tz="UTC")],
-        })
+        result_df = pd.DataFrame(
+            {
+                "id": [1],
+                "feature_type": ["vol"],
+                "feature_name": ["parkinson_20"],
+                "daily_min_seen": [None],
+                "daily_max_seen": [None],
+                "last_ts": [pd.Timestamp("2024-01-01", tz="UTC")],
+                "row_count": [100],
+                "updated_at": [pd.Timestamp.now(tz="UTC")],
+            }
+        )
         mock_read_sql.return_value = result_df
 
         result = manager.load_state(feature_type="vol")
@@ -242,16 +257,18 @@ class TestLoadState(unittest.TestCase):
         manager = FeatureStateManager(mock_engine, config)
 
         # Mock successful result
-        result_df = pd.DataFrame({
-            "id": [1],
-            "feature_type": ["ta"],
-            "feature_name": ["rsi_14"],
-            "daily_min_seen": [None],
-            "daily_max_seen": [None],
-            "last_ts": [pd.Timestamp("2024-01-01", tz="UTC")],
-            "row_count": [100],
-            "updated_at": [pd.Timestamp.now(tz="UTC")],
-        })
+        result_df = pd.DataFrame(
+            {
+                "id": [1],
+                "feature_type": ["ta"],
+                "feature_name": ["rsi_14"],
+                "daily_min_seen": [None],
+                "daily_max_seen": [None],
+                "last_ts": [pd.Timestamp("2024-01-01", tz="UTC")],
+                "row_count": [100],
+                "updated_at": [pd.Timestamp.now(tz="UTC")],
+            }
+        )
         mock_read_sql.return_value = result_df
 
         result = manager.load_state(feature_names=["rsi_14"])
@@ -264,7 +281,9 @@ class TestLoadState(unittest.TestCase):
         sql_arg = str(call_args[0][0])
 
         assert "WHERE" in sql_arg
-        assert "feature_name = ANY(:feature_names)" in sql_arg or "feature_name" in sql_arg
+        assert (
+            "feature_name = ANY(:feature_names)" in sql_arg or "feature_name" in sql_arg
+        )
 
     @patch("ta_lab2.scripts.features.feature_state_manager.pd.read_sql")
     def test_load_state_returns_empty_on_exception(self, mock_read_sql):
@@ -284,8 +303,16 @@ class TestLoadState(unittest.TestCase):
 
         assert isinstance(result, pd.DataFrame)
         assert len(result) == 0
-        expected_cols = ["id", "feature_type", "feature_name", "daily_min_seen",
-                        "daily_max_seen", "last_ts", "row_count", "updated_at"]
+        expected_cols = [
+            "id",
+            "feature_type",
+            "feature_name",
+            "daily_min_seen",
+            "daily_max_seen",
+            "last_ts",
+            "row_count",
+            "updated_at",
+        ]
         assert all(col in result.columns for col in expected_cols)
 
 
@@ -308,7 +335,7 @@ class TestUpdateStateFromOutput(unittest.TestCase):
         rowcount = manager.update_state_from_output(
             output_table="cmc_returns_daily",
             output_schema="public",
-            feature_name="b2t_pct"
+            feature_name="b2t_pct",
         )
 
         # Verify connection.execute was called
@@ -335,13 +362,23 @@ class TestDirtyWindowComputation(unittest.TestCase):
         manager = FeatureStateManager(mock_engine, config)
 
         # Mock empty state
-        empty_df = pd.DataFrame(columns=[
-            "id", "feature_type", "feature_name", "daily_min_seen", "daily_max_seen",
-            "last_ts", "row_count", "updated_at"
-        ])
+        empty_df = pd.DataFrame(
+            columns=[
+                "id",
+                "feature_type",
+                "feature_name",
+                "daily_min_seen",
+                "daily_max_seen",
+                "last_ts",
+                "row_count",
+                "updated_at",
+            ]
+        )
         mock_load_state.return_value = empty_df
 
-        result = manager.compute_dirty_window_starts(ids=[1, 2], default_start="2010-01-01")
+        result = manager.compute_dirty_window_starts(
+            ids=[1, 2], default_start="2010-01-01"
+        )
 
         assert len(result) == 2
         assert 1 in result
@@ -357,27 +394,31 @@ class TestDirtyWindowComputation(unittest.TestCase):
         manager = FeatureStateManager(mock_engine, config)
 
         # Mock state with data
-        state_df = pd.DataFrame({
-            "id": [1, 1, 2],
-            "feature_type": ["returns", "returns", "returns"],
-            "feature_name": ["b2t_pct", "log_return", "b2t_pct"],
-            "daily_min_seen": [None, None, None],
-            "daily_max_seen": [None, None, None],
-            "last_ts": [
-                pd.Timestamp("2024-01-15", tz="UTC"),
-                pd.Timestamp("2024-01-20", tz="UTC"),
-                pd.Timestamp("2024-01-10", tz="UTC"),
-            ],
-            "row_count": [100, 100, 50],
-            "updated_at": [
-                pd.Timestamp.now(tz="UTC"),
-                pd.Timestamp.now(tz="UTC"),
-                pd.Timestamp.now(tz="UTC"),
-            ],
-        })
+        state_df = pd.DataFrame(
+            {
+                "id": [1, 1, 2],
+                "feature_type": ["returns", "returns", "returns"],
+                "feature_name": ["b2t_pct", "log_return", "b2t_pct"],
+                "daily_min_seen": [None, None, None],
+                "daily_max_seen": [None, None, None],
+                "last_ts": [
+                    pd.Timestamp("2024-01-15", tz="UTC"),
+                    pd.Timestamp("2024-01-20", tz="UTC"),
+                    pd.Timestamp("2024-01-10", tz="UTC"),
+                ],
+                "row_count": [100, 100, 50],
+                "updated_at": [
+                    pd.Timestamp.now(tz="UTC"),
+                    pd.Timestamp.now(tz="UTC"),
+                    pd.Timestamp.now(tz="UTC"),
+                ],
+            }
+        )
         mock_load_state.return_value = state_df
 
-        result = manager.compute_dirty_window_starts(ids=[1, 2], default_start="2010-01-01")
+        result = manager.compute_dirty_window_starts(
+            ids=[1, 2], default_start="2010-01-01"
+        )
 
         assert len(result) == 2
         # ID 1: min of 2024-01-15 and 2024-01-20 = 2024-01-15
@@ -393,22 +434,22 @@ class TestDirtyWindowComputation(unittest.TestCase):
         manager = FeatureStateManager(mock_engine, config)
 
         # Mock state with data
-        state_df = pd.DataFrame({
-            "id": [1],
-            "feature_type": ["vol"],
-            "feature_name": ["parkinson_20"],
-            "daily_min_seen": [None],
-            "daily_max_seen": [None],
-            "last_ts": [pd.Timestamp("2024-01-15", tz="UTC")],
-            "row_count": [100],
-            "updated_at": [pd.Timestamp.now(tz="UTC")],
-        })
+        state_df = pd.DataFrame(
+            {
+                "id": [1],
+                "feature_type": ["vol"],
+                "feature_name": ["parkinson_20"],
+                "daily_min_seen": [None],
+                "daily_max_seen": [None],
+                "last_ts": [pd.Timestamp("2024-01-15", tz="UTC")],
+                "row_count": [100],
+                "updated_at": [pd.Timestamp.now(tz="UTC")],
+            }
+        )
         mock_load_state.return_value = state_df
 
         result = manager.compute_dirty_window_starts(
-            ids=[1],
-            feature_type="vol",
-            default_start="2010-01-01"
+            ids=[1], feature_type="vol", default_start="2010-01-01"
         )
 
         # Verify load_state was called with feature_type filter

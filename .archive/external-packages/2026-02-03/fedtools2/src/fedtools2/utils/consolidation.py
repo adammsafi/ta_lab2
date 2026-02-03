@@ -8,6 +8,7 @@ from __future__ import annotations
 import pandas as pd
 from functools import reduce
 
+
 def _prep(df: pd.DataFrame, name: str) -> pd.DataFrame:
     # (S1) Copy and normalize first column -> 'date' (index)
     df = df.copy()
@@ -25,11 +26,12 @@ def _prep(df: pd.DataFrame, name: str) -> pd.DataFrame:
     # (V3) Avoid column collisions and mark coverage.
     return df
 
+
 def combine_timeframes(
     dfs: list[pd.DataFrame],
     names: list[str],
     persist: bool = True,
-    limit: int | None = None
+    limit: int | None = None,
 ) -> pd.DataFrame:
     # (S4) Validate and normalize
     assert len(dfs) == len(names), "dfs and names must be the same length"
@@ -47,6 +49,7 @@ def combine_timeframes(
         out[value_cols] = out[value_cols].ffill(limit=limit)
     return out
 
+
 def missing_ranges(mask: pd.Series) -> list[tuple[pd.Timestamp, pd.Timestamp]]:
     # (S7) Early exit
     if mask.empty:
@@ -56,6 +59,6 @@ def missing_ranges(mask: pd.Series) -> list[tuple[pd.Timestamp, pd.Timestamp]]:
 
     # (S9) Detect False→True (start) and True→False (end)
     starts = (~b.shift(1, fill_value=False)) & b
-    ends   = b & (~b.shift(-1, fill_value=False))
+    ends = b & (~b.shift(-1, fill_value=False))
     # (V9) Pair into intervals
     return list(zip(b.index[starts], b.index[ends]))

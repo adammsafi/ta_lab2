@@ -10,16 +10,13 @@ These tests wrap existing validate_reproducibility.py infrastructure into
 CI-runnable pytest tests that block release on reproducibility failures.
 """
 
-import os
 import pytest
 import pandas as pd
-from unittest.mock import Mock
 from sqlalchemy import text
 
 from ta_lab2.scripts.signals.validate_reproducibility import (
     validate_backtest_reproducibility,
     validate_feature_hash_current,
-    ReproducibilityReport,
 )
 from ta_lab2.scripts.backtests import SignalBacktester
 from ta_lab2.backtests.costs import CostModel
@@ -37,10 +34,15 @@ def sample_signal(db_session, db_engine):
     Returns first valid signal found in any signal table.
     If no signals exist, returns None (tests will skip).
     """
-    signal_tables = ['cmc_signals_ema_crossover', 'cmc_signals_rsi_mean_revert', 'cmc_signals_atr_breakout']
+    signal_tables = [
+        "cmc_signals_ema_crossover",
+        "cmc_signals_rsi_mean_revert",
+        "cmc_signals_atr_breakout",
+    ]
 
     for table in signal_tables:
-        sql = text(f"""
+        sql = text(
+            f"""
             SELECT
                 :table_type as signal_type,
                 signal_id,
@@ -50,19 +52,22 @@ def sample_signal(db_session, db_engine):
             FROM public.{table}
             WHERE signal_action = 'entry'
             LIMIT 1
-        """)
+        """
+        )
 
         try:
-            result = db_session.execute(sql, {"table_type": table.replace('cmc_signals_', '')})
+            result = db_session.execute(
+                sql, {"table_type": table.replace("cmc_signals_", "")}
+            )
             row = result.fetchone()
 
             if row:
                 return {
-                    'signal_type': row[0],
-                    'signal_id': row[1],
-                    'asset_id': row[2],
-                    'entry_ts': row[3],
-                    'feature_hash': row[4],
+                    "signal_type": row[0],
+                    "signal_id": row[1],
+                    "asset_id": row[2],
+                    "entry_ts": row[3],
+                    "feature_hash": row[4],
                 }
         except Exception:
             # Table might not exist yet
@@ -90,7 +95,9 @@ class TestBacktestReproducibilityValidation:
     validate_reproducibility.py infrastructure. All tests are CI blockers.
     """
 
-    def test_backtest_produces_identical_results_on_rerun(self, backtester, sample_signal, db_session):
+    def test_backtest_produces_identical_results_on_rerun(
+        self, backtester, sample_signal, db_session
+    ):
         """
         CRITICAL: Same backtest twice produces identical results.
 
@@ -103,12 +110,12 @@ class TestBacktestReproducibilityValidation:
             pytest.skip("No signals in database (early project state)")
 
         # Define test parameters
-        signal_type = sample_signal['signal_type']
-        signal_id = sample_signal['signal_id']
-        asset_id = sample_signal['asset_id']
+        signal_type = sample_signal["signal_type"]
+        signal_id = sample_signal["signal_id"]
+        asset_id = sample_signal["asset_id"]
 
         # Use 30-day window ending at signal entry time
-        end_ts = pd.Timestamp(sample_signal['entry_ts'])
+        end_ts = pd.Timestamp(sample_signal["entry_ts"])
         start_ts = end_ts - pd.Timedelta(days=30)
 
         # Run validation (runs backtest twice internally)
@@ -129,9 +136,9 @@ class TestBacktestReproducibilityValidation:
                 f"Backtest not reproducible for {signal_type}/{signal_id}. "
                 f"Differences: {report.differences}"
             )
-            assert len(report.differences) == 0, (
-                f"Found {len(report.differences)} differences: {report.differences}"
-            )
+            assert (
+                len(report.differences) == 0
+            ), f"Found {len(report.differences)} differences: {report.differences}"
 
         except ValueError as e:
             # Backtest might fail if insufficient data
@@ -149,17 +156,13 @@ class TestBacktestReproducibilityValidation:
         if sample_signal is None:
             pytest.skip("No signals in database (early project state)")
 
-        signal_type = sample_signal['signal_type']
-        signal_id = sample_signal['signal_id']
-        asset_id = sample_signal['asset_id']
+        signal_type = sample_signal["signal_type"]
+        signal_id = sample_signal["signal_id"]
+        asset_id = sample_signal["asset_id"]
 
         # Validate feature hash in strict mode
         is_valid, message = validate_feature_hash_current(
-            db_engine,
-            signal_type,
-            signal_id,
-            asset_id,
-            mode='strict'
+            db_engine, signal_type, signal_id, asset_id, mode="strict"
         )
 
         # In strict mode, mismatch is a failure
@@ -179,11 +182,11 @@ class TestBacktestReproducibilityValidation:
         if sample_signal is None:
             pytest.skip("No signals in database")
 
-        signal_type = sample_signal['signal_type']
-        signal_id = sample_signal['signal_id']
-        asset_id = sample_signal['asset_id']
+        signal_type = sample_signal["signal_type"]
+        signal_id = sample_signal["signal_id"]
+        asset_id = sample_signal["asset_id"]
 
-        end_ts = pd.Timestamp(sample_signal['entry_ts'])
+        end_ts = pd.Timestamp(sample_signal["entry_ts"])
         start_ts = end_ts - pd.Timedelta(days=30)
 
         # Run backtest twice
@@ -218,11 +221,11 @@ class TestBacktestReproducibilityValidation:
         if sample_signal is None:
             pytest.skip("No signals in database")
 
-        signal_type = sample_signal['signal_type']
-        signal_id = sample_signal['signal_id']
-        asset_id = sample_signal['asset_id']
+        signal_type = sample_signal["signal_type"]
+        signal_id = sample_signal["signal_id"]
+        asset_id = sample_signal["asset_id"]
 
-        end_ts = pd.Timestamp(sample_signal['entry_ts'])
+        end_ts = pd.Timestamp(sample_signal["entry_ts"])
         start_ts = end_ts - pd.Timedelta(days=30)
 
         # Run backtest twice
@@ -235,9 +238,9 @@ class TestBacktestReproducibilityValidation:
             )
 
             # Compare trade counts (exact match required)
-            assert result1.trade_count == result2.trade_count, (
-                f"Trade count not deterministic: {result1.trade_count} vs {result2.trade_count}"
-            )
+            assert (
+                result1.trade_count == result2.trade_count
+            ), f"Trade count not deterministic: {result1.trade_count} vs {result2.trade_count}"
 
         except ValueError as e:
             if "No feature data" in str(e) or "No signals" in str(e):
@@ -254,11 +257,11 @@ class TestBacktestReproducibilityValidation:
         if sample_signal is None:
             pytest.skip("No signals in database")
 
-        signal_type = sample_signal['signal_type']
-        signal_id = sample_signal['signal_id']
-        asset_id = sample_signal['asset_id']
+        signal_type = sample_signal["signal_type"]
+        signal_id = sample_signal["signal_id"]
+        asset_id = sample_signal["asset_id"]
 
-        end_ts = pd.Timestamp(sample_signal['entry_ts'])
+        end_ts = pd.Timestamp(sample_signal["entry_ts"])
         start_ts = end_ts - pd.Timedelta(days=30)
 
         # Run backtest twice
@@ -271,7 +274,7 @@ class TestBacktestReproducibilityValidation:
             )
 
             # Compare key metrics
-            key_metrics = ['sharpe_ratio', 'win_rate', 'profit_factor']
+            key_metrics = ["sharpe_ratio", "win_rate", "profit_factor"]
 
             for metric_name in key_metrics:
                 val1 = result1.metrics.get(metric_name)
@@ -281,9 +284,9 @@ class TestBacktestReproducibilityValidation:
                 if val1 is None and val2 is None:
                     continue
 
-                assert val1 is not None and val2 is not None, (
-                    f"Metric '{metric_name}' missing in one run: {val1} vs {val2}"
-                )
+                assert (
+                    val1 is not None and val2 is not None
+                ), f"Metric '{metric_name}' missing in one run: {val1} vs {val2}"
 
                 # Compare with tolerance
                 diff = abs(val1 - val2)

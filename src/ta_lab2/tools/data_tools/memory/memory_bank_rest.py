@@ -47,9 +47,7 @@ except ImportError:
 try:
     import requests
 except ImportError:
-    raise ImportError(
-        "Requests library required. Install with: pip install requests"
-    )
+    raise ImportError("Requests library required. Install with: pip install requests")
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +63,7 @@ class MemoryBankConfig:
         api_version: API version (default: "v1beta1")
         scope: Required scope dict for retrieve (e.g., {"app": "ta_lab2", "env": "dev"})
     """
+
     project_id: str
     region: str
     reasoning_engine_id: str  # numeric id or full resource tail
@@ -100,9 +99,13 @@ class MemoryBankREST:
             ValueError: If scope is missing or invalid
         """
         if not cfg.scope or not isinstance(cfg.scope, dict):
-            raise ValueError("cfg.scope is required and must be a dict, e.g. {'app':'ta_lab2','env':'dev'}")
+            raise ValueError(
+                "cfg.scope is required and must be a dict, e.g. {'app':'ta_lab2','env':'dev'}"
+            )
         self.cfg = cfg
-        self._session = google.auth.transport.requests.AuthorizedSession(self._credentials())
+        self._session = google.auth.transport.requests.AuthorizedSession(
+            self._credentials()
+        )
 
     def _credentials(self):
         """Get Google Cloud credentials via ADC."""
@@ -124,7 +127,9 @@ class MemoryBankREST:
         # projects/{project}/locations/{region}/reasoningEngines/{id}
         return f"projects/{self.cfg.project_id}/locations/{self.cfg.region}/reasoningEngines/{self.cfg.reasoning_engine_id}"
 
-    def retrieve(self, *, user_id: str, query: str, limit: int = 5, filter: Optional[str] = None) -> Dict[str, Any]:
+    def retrieve(
+        self, *, user_id: str, query: str, limit: int = 5, filter: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Retrieve memories by semantic search.
 
         Args:
@@ -159,7 +164,14 @@ class MemoryBankREST:
             data["memories"] = data["memories"][: max(0, limit)]
         return data
 
-    def create(self, *, user_id: str, text_content: str, scope: Optional[Dict[str, str]] = None, labels: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+    def create(
+        self,
+        *,
+        user_id: str,
+        text_content: str,
+        scope: Optional[Dict[str, str]] = None,
+        labels: Optional[Dict[str, str]] = None,
+    ) -> Dict[str, Any]:
         """Create a new memory in the bank.
 
         Args:

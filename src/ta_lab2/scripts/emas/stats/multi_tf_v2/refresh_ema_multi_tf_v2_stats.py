@@ -30,12 +30,13 @@ runfile(
 import argparse
 import logging
 import sys
-from typing import Optional
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
-from ta_lab2.config import TARGET_DB_URL
+from ta_lab2.scripts.bars.common_snapshot_contract import (
+    get_engine,
+)
 
 
 EMA_TABLE = "public.cmc_ema_multi_tf_v2"
@@ -46,6 +47,7 @@ STATE_TABLE = "public.ema_multi_tf_v2_stats_state"
 # ----------------------------
 # Logging
 # ----------------------------
+
 
 def _setup_logging(level: str = "INFO") -> logging.Logger:
     logger = logging.getLogger("ema_v2_stats")
@@ -58,10 +60,6 @@ def _setup_logging(level: str = "INFO") -> logging.Logger:
     logger.addHandler(h)
     logger.propagate = False
     return logger
-
-
-def get_engine(db_url: Optional[str] = None) -> Engine:
-    return create_engine(db_url or TARGET_DB_URL)
 
 
 # ----------------------------
@@ -487,6 +485,7 @@ FROM counts;
 # Runner
 # ----------------------------
 
+
 def run(engine: Engine, full_refresh: bool, log_level: str) -> None:
     logger = _setup_logging(log_level)
 
@@ -528,7 +527,9 @@ def run(engine: Engine, full_refresh: bool, log_level: str) -> None:
             return
 
         conn.execute(
-            text("INSERT INTO _impacted_keys(asset_id, tf, period) VALUES (:asset_id, :tf, :period)"),
+            text(
+                "INSERT INTO _impacted_keys(asset_id, tf, period) VALUES (:asset_id, :tf, :period)"
+            ),
             [dict(r._mapping) for r in impacted],
         )
 
@@ -540,14 +541,23 @@ def run(engine: Engine, full_refresh: bool, log_level: str) -> None:
         # Run tests (order: global, TF-level, key-level)
         conn.execute(text(SQL_TEST_KEY_UNIQUENESS_TS), {"table_name": EMA_TABLE})
         conn.execute(text(SQL_TEST_KEY_UNIQUENESS_DATE), {"table_name": EMA_TABLE})
-        conn.execute(text(SQL_TEST_ROLL_DISTRIBUTION_OVERALL), {"table_name": EMA_TABLE})
+        conn.execute(
+            text(SQL_TEST_ROLL_DISTRIBUTION_OVERALL), {"table_name": EMA_TABLE}
+        )
 
         conn.execute(text(SQL_TEST_TF_MEMBERSHIP), {"table_name": EMA_TABLE})
         conn.execute(text(SQL_TEST_TF_DAYS_CONSTANT), {"table_name": EMA_TABLE})
 
-        conn.execute(text(SQL_TEST_ROLL_FALSE_PRESENCE_PER_KEY), {"table_name": EMA_TABLE})
-        conn.execute(text(SQL_TEST_CANONICAL_ROWCOUNT_NONZERO), {"table_name": EMA_TABLE})
-        conn.execute(text(SQL_TEST_CANONICAL_ROWCOUNT_VS_EXPECTED_FROM_RANGE), {"table_name": EMA_TABLE})
+        conn.execute(
+            text(SQL_TEST_ROLL_FALSE_PRESENCE_PER_KEY), {"table_name": EMA_TABLE}
+        )
+        conn.execute(
+            text(SQL_TEST_CANONICAL_ROWCOUNT_NONZERO), {"table_name": EMA_TABLE}
+        )
+        conn.execute(
+            text(SQL_TEST_CANONICAL_ROWCOUNT_VS_EXPECTED_FROM_RANGE),
+            {"table_name": EMA_TABLE},
+        )
         conn.execute(text(SQL_TEST_CANONICAL_MAX_GAP), {"table_name": EMA_TABLE})
 
         # Advance watermark only after successful test writes

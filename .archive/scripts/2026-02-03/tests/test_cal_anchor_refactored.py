@@ -41,10 +41,11 @@ try:
 except Exception as e:
     print(f"\n[FAIL] Error: {e}")
     import traceback
+
     traceback.print_exc()
 
 # Test ISO scheme
-print("\n" + "="*60)
+print("\n" + "=" * 60)
 print("Testing Calendar Anchor EMA Feature (ISO scheme)...")
 
 config_iso = EMAFeatureConfig(
@@ -71,4 +72,5 @@ try:
 except Exception as e:
     print(f"\n[FAIL] Error: {e}")
     import traceback
+
     traceback.print_exc()

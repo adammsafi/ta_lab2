@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Optional
 
 try:
     import requests
@@ -47,7 +46,9 @@ def send_message(text: str, parse_mode: str = "HTML") -> bool:
         True on success, False on failure or if not configured
     """
     if not is_configured():
-        logger.warning("Telegram not configured (missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID)")
+        logger.warning(
+            "Telegram not configured (missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID)"
+        )
         return False
 
     if requests is None:
@@ -70,7 +71,9 @@ def send_message(text: str, parse_mode: str = "HTML") -> bool:
             logger.debug(f"Telegram message sent successfully: {text[:50]}...")
             return True
         else:
-            logger.error(f"Telegram API error: {response.status_code} - {response.text}")
+            logger.error(
+                f"Telegram API error: {response.status_code} - {response.text}"
+            )
             return False
     except Exception as e:
         logger.error(f"Failed to send Telegram message: {e}")
@@ -92,8 +95,8 @@ def send_alert(title: str, message: str, severity: str = "warning") -> bool:
     # Emoji prefix based on severity
     emoji_map = {
         "critical": "\U0001F534",  # Red circle
-        "warning": "\U0001F7E1",   # Yellow circle
-        "info": "\U0001F535",      # Blue circle
+        "warning": "\U0001F7E1",  # Yellow circle
+        "info": "\U0001F535",  # Blue circle
     }
 
     emoji = emoji_map.get(severity.lower(), "\U0001F7E1")
@@ -134,9 +137,9 @@ def send_validation_alert(validation_result: dict) -> bool:
 
     # Build message
     message_parts = [
-        f"<b>EMA Validation Failed</b>",
-        f"",
-        f"Summary:",
+        "<b>EMA Validation Failed</b>",
+        "",
+        "Summary:",
         f"  Total checks: {total}",
         f"  Passed: {ok}",
         f"  Gaps: {gaps}",

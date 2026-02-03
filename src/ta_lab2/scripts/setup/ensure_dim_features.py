@@ -20,8 +20,7 @@ from ta_lab2.config import TARGET_DB_URL
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -47,14 +46,16 @@ def table_exists(engine: Engine, schema: str, table_name: str) -> bool:
     Returns:
         True if table exists, False otherwise
     """
-    query = text("""
+    query = text(
+        """
         SELECT EXISTS (
             SELECT 1
             FROM information_schema.tables
             WHERE table_schema = :schema
             AND table_name = :table_name
         )
-    """)
+    """
+    )
 
     with engine.connect() as conn:
         result = conn.execute(query, {"schema": schema, "table_name": table_name})
@@ -98,7 +99,9 @@ def get_row_count(engine: Engine, table_name: str) -> int:
         return result.scalar()
 
 
-def ensure_dim_features(engine: Engine, sql_dir: Path, dry_run: bool = False) -> Dict[str, Any]:
+def ensure_dim_features(
+    engine: Engine, sql_dir: Path, dry_run: bool = False
+) -> Dict[str, Any]:
     """
     Ensure dim_features table exists and is populated.
 
@@ -138,19 +141,15 @@ def ensure_dim_features(engine: Engine, sql_dir: Path, dry_run: bool = False) ->
 
 def main() -> None:
     """Main CLI entry point."""
-    parser = argparse.ArgumentParser(
-        description="Ensure dim_features table exists"
-    )
+    parser = argparse.ArgumentParser(description="Ensure dim_features table exists")
     parser.add_argument(
         "--sql-dir",
         type=Path,
         default=Path("sql/lookups"),
-        help="Directory containing SQL seed files (default: sql/lookups)"
+        help="Directory containing SQL seed files (default: sql/lookups)",
     )
     parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Check existence without creating table"
+        "--dry-run", action="store_true", help="Check existence without creating table"
     )
 
     args = parser.parse_args()
@@ -191,15 +190,15 @@ def main() -> None:
     logger.info("=" * 60)
     logger.info("Summary:")
     logger.info("-" * 60)
-    logger.info(f"dim_features:")
+    logger.info("dim_features:")
     logger.info(f"  - Existed: {result['existed']}")
     logger.info(f"  - Created: {result['created']}")
     logger.info(f"  - Rows: {result['rows']}")
     logger.info("=" * 60)
 
-    if result['created']:
+    if result["created"]:
         logger.info("Table created successfully!")
-    elif result['existed']:
+    elif result["existed"]:
         logger.info("Table already exists - no action needed")
 
     exit(0)

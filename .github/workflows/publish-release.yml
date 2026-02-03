@@ -8,7 +8,7 @@
 ## 🚀 **ta_lab2 v0.1.0 — First Major Release**
 
 ### 🧭 Overview
-This release marks the first full, modular version of **ta_lab2**, a Python toolkit for technical analysis and regime detection.  
+This release marks the first full, modular version of **ta_lab2**, a Python toolkit for technical analysis and regime detection.
 It introduces a unified configuration system, expanded feature library, and an advanced volatility engine designed for large-scale analytics.
 
 ---
@@ -25,7 +25,7 @@ It introduces a unified configuration system, expanded feature library, and an a
 
 ---
 
-**Tag:** ${{ github.ref_name }}  
+**Tag:** ${{ github.ref_name }}
 **Release Date:** ${DATE}
 EOF
 

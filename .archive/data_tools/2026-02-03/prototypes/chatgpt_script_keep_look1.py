@@ -8,7 +8,9 @@ Created on Sun Dec 28 14:11:21 2025
 import csv
 from pathlib import Path
 
-manifest = Path(r"C:\Users\asafi\Documents\ProjectTT\ChatGPT\20251228\out\kept_manifest.csv")
+manifest = Path(
+    r"C:\Users\asafi\Documents\ProjectTT\ChatGPT\20251228\out\kept_manifest.csv"
+)
 
 missing = []
 with manifest.open("r", encoding="utf-8") as f:

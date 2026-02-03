@@ -16,7 +16,7 @@ REFACTORED CHANGES:
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Sequence
+from typing import List, Optional, Sequence
 import logging
 
 import numpy as np
@@ -28,7 +28,6 @@ from ta_lab2.features.m_tf.base_ema_feature import (
     EMAFeatureConfig,
     TFSpec,
 )
-from ta_lab2.features.m_tf.polars_helpers import read_sql_polars
 from ta_lab2.features.ema import compute_ema, filter_ema_periods_by_obs_count
 from ta_lab2.time.dim_timeframe import list_tfs, get_tf_days
 from ta_lab2.io import _get_marketdata_engine as _get_engine, load_cmc_ohlcv_daily
@@ -39,6 +38,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 # Multi-TF EMA Feature Implementation
 # =============================================================================
+
 
 class MultiTFEMAFeature(BaseEMAFeature):
     """
@@ -115,7 +115,9 @@ class MultiTFEMAFeature(BaseEMAFeature):
         # Extract db_url from engine for list_tfs
         db_url = self.engine.url.render_as_string(hide_password=False)
 
-        all_tf_day = list_tfs(db_url=db_url, alignment_type="tf_day", canonical_only=True)
+        all_tf_day = list_tfs(
+            db_url=db_url, alignment_type="tf_day", canonical_only=True
+        )
         if not all_tf_day:
             raise RuntimeError("dim_timeframe returned no canonical tf_day timeframes")
 
@@ -126,7 +128,9 @@ class MultiTFEMAFeature(BaseEMAFeature):
 
         all_tf_day_d = [tf for tf in all_tf_day if is_day_label(tf)]
         if not all_tf_day_d:
-            raise RuntimeError("No day-label TFs found in dim_timeframe (e.g., '7D', '14D')")
+            raise RuntimeError(
+                "No day-label TFs found in dim_timeframe (e.g., '7D', '14D')"
+            )
 
         # Apply subset filter if provided
         if self.tf_subset is None:
@@ -178,7 +182,9 @@ class MultiTFEMAFeature(BaseEMAFeature):
             return pd.DataFrame()
 
         # Use cached daily data
-        daily = self._daily_data_cache if self._daily_data_cache is not None else df_source
+        daily = (
+            self._daily_data_cache if self._daily_data_cache is not None else df_source
+        )
 
         # Load persisted bars for this TF (all IDs)
         ids = daily["id"].unique().tolist()
@@ -229,7 +235,11 @@ class MultiTFEMAFeature(BaseEMAFeature):
             )
 
             # Bar-close series in bar order
-            df_closes = closes[["ts", "close_bar", "bar_seq"]].sort_values("bar_seq").reset_index(drop=True)
+            df_closes = (
+                closes[["ts", "close_bar", "bar_seq"]]
+                .sort_values("bar_seq")
+                .reset_index(drop=True)
+            )
 
             # Filter periods by observation count
             valid_periods = filter_ema_periods_by_obs_count(periods, len(df_closes))
@@ -254,7 +264,9 @@ class MultiTFEMAFeature(BaseEMAFeature):
                 # Merge with daily grid and compute preview EMAs
                 tmp = grid.merge(bar_df, on="ts", how="left")
                 tmp["ema_prev_bar"] = tmp["ema_bar"].ffill().shift(1)
-                tmp["ema_preview"] = alpha_bar * tmp["close"] + (1.0 - alpha_bar) * tmp["ema_prev_bar"]
+                tmp["ema_preview"] = (
+                    alpha_bar * tmp["close"] + (1.0 - alpha_bar) * tmp["ema_prev_bar"]
+                )
 
                 # Combine: use ema_bar for canonical, ema_preview for others
                 tmp["ema"] = tmp["ema_preview"]
@@ -275,7 +287,9 @@ class MultiTFEMAFeature(BaseEMAFeature):
                 is_close = tmp["ts"].isin(bar_df["ts"])
                 tmp["roll"] = ~is_close
 
-                frames.append(tmp[["id", "tf", "ts", "period", "ema", "tf_days", "roll"]])
+                frames.append(
+                    tmp[["id", "tf", "ts", "period", "ema", "tf_days", "roll"]]
+                )
 
         if not frames:
             return pd.DataFrame()
@@ -396,25 +410,33 @@ class MultiTFEMAFeature(BaseEMAFeature):
     ) -> pd.DataFrame:
         """Generate synthetic TF bars from daily closes (fallback)."""
         if df_id_daily.empty:
-            return pd.DataFrame(columns=["id", "tf", "bar_seq", "time_close", "close_bar"])
+            return pd.DataFrame(
+                columns=["id", "tf", "bar_seq", "time_close", "close_bar"]
+            )
 
         d = df_id_daily.sort_values("ts").reset_index(drop=True)
         n = len(d)
         if tf_days <= 0 or n < tf_days:
-            return pd.DataFrame(columns=["id", "tf", "bar_seq", "time_close", "close_bar"])
+            return pd.DataFrame(
+                columns=["id", "tf", "bar_seq", "time_close", "close_bar"]
+            )
 
         # Canonical indices: (tf_days-1), (2*tf_days-1), ...
         idx = np.arange(tf_days - 1, n, tf_days, dtype=int)
         if idx.size == 0:
-            return pd.DataFrame(columns=["id", "tf", "bar_seq", "time_close", "close_bar"])
+            return pd.DataFrame(
+                columns=["id", "tf", "bar_seq", "time_close", "close_bar"]
+            )
 
-        bars = pd.DataFrame({
-            "id": int(d.loc[0, "id"]),
-            "tf": tf,
-            "bar_seq": np.arange(1, idx.size + 1, dtype=int),
-            "time_close": d.loc[idx, "ts"].to_numpy(),
-            "close_bar": d.loc[idx, "close"].astype(float).to_numpy(),
-        })
+        bars = pd.DataFrame(
+            {
+                "id": int(d.loc[0, "id"]),
+                "tf": tf,
+                "bar_seq": np.arange(1, idx.size + 1, dtype=int),
+                "time_close": d.loc[idx, "ts"].to_numpy(),
+                "close_bar": d.loc[idx, "close"].astype(float).to_numpy(),
+            }
+        )
 
         return bars.reset_index(drop=True)
 
@@ -452,11 +474,30 @@ class MultiTFEMAFeature(BaseEMAFeature):
 # Public API (Backward Compatibility)
 # =============================================================================
 
+
 def write_multi_timeframe_ema_to_db(
     ids: Sequence[int],
     start: str = "2010-01-01",
     end: Optional[str] = None,
-    ema_periods: Sequence[int] = (6, 9, 10, 12, 14, 17, 20, 21, 26, 30, 50, 52, 77, 100, 200, 252, 365),
+    ema_periods: Sequence[int] = (
+        6,
+        9,
+        10,
+        12,
+        14,
+        17,
+        20,
+        21,
+        26,
+        30,
+        50,
+        52,
+        77,
+        100,
+        200,
+        252,
+        365,
+    ),
     tf_subset: Optional[Sequence[str]] = None,
     *,
     db_url: Optional[str] = None,
@@ -537,7 +578,9 @@ def write_multi_timeframe_ema_to_db(
             )
         )
 
-        df_final.to_sql(tmp_table, conn, if_exists="append", index=False, method="multi")
+        df_final.to_sql(
+            tmp_table, conn, if_exists="append", index=False, method="multi"
+        )
 
         conflict_sql = (
             """

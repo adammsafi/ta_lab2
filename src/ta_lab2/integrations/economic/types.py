@@ -6,7 +6,7 @@ ensuring consistent interfaces across different data providers
 """
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any
 
 import pandas as pd
 
@@ -35,6 +35,7 @@ class EconomicSeries:
         ...     source="FRED"
         ... )
     """
+
     series_id: str
     title: str
     data: pd.Series
@@ -77,6 +78,7 @@ class FetchResult:
         fetch_time_ms: Time taken to fetch in milliseconds
         quality_report: Optional quality validation report
     """
+
     success: bool
     series: Optional[EconomicSeries] = None
     error: Optional[str] = None
@@ -100,6 +102,7 @@ class SeriesInfo:
         observation_end: Last available date
         popularity: Popularity ranking (FRED-specific)
     """
+
     series_id: str
     title: str
     units: str = "Unknown"
@@ -118,19 +121,16 @@ FRED_SERIES = {
     "DFEDTARL": "Federal Funds Target Rate Lower Bound",
     "DFEDTARU": "Federal Funds Target Rate Upper Bound",
     "DISCOUNT": "Primary Credit Rate",
-
     # Treasury yields
     "DGS10": "10-Year Treasury Constant Maturity Rate",
     "DGS2": "2-Year Treasury Constant Maturity Rate",
     "T10Y2Y": "10-Year Treasury Minus 2-Year Treasury",
     "DGS30": "30-Year Treasury Constant Maturity Rate",
-
     # Inflation indicators
     "CPIAUCSL": "Consumer Price Index for All Urban Consumers",
     "CPILFESL": "Core CPI (Excluding Food and Energy)",
     "PCEPI": "Personal Consumption Expenditures Price Index",
     "PCEPILFE": "Core PCE Price Index",
-
     # Employment data
     "UNRATE": "Unemployment Rate",
     "PAYEMS": "Total Nonfarm Payrolls",

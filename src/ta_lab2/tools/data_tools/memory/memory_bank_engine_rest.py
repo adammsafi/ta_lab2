@@ -29,6 +29,7 @@ import google.auth.transport.requests
 # Config
 # =========================
 
+
 @dataclass(frozen=True)
 class MBConfig:
     project_id: str
@@ -72,6 +73,7 @@ def _normalize_query(q: str) -> str:
 # Memory Bank REST Client
 # =========================
 
+
 class MemoryBankREST:
     def __init__(self, cfg: MBConfig):
         if not cfg.scope:
@@ -81,7 +83,9 @@ class MemoryBankREST:
 
     def _get_session(self) -> google.auth.transport.requests.AuthorizedSession:
         if self._sess is None:
-            creds, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+            creds, _ = google.auth.default(
+                scopes=["https://www.googleapis.com/auth/cloud-platform"]
+            )
             self._sess = google.auth.transport.requests.AuthorizedSession(creds)
         return self._sess
 
@@ -137,12 +141,14 @@ class MemoryBankREST:
 # Tiny TTL Cache (in-memory)
 # =========================
 
+
 class TTLCache:
     """
     Very small in-memory TTL cache for retrieval results.
     - Not persistent.
     - Good for reducing duplicate retrieval calls.
     """
+
     def __init__(self, *, max_items: int, ttl_seconds: int):
         self.max_items = max(0, int(max_items))
         self.ttl_seconds = max(0, int(ttl_seconds))
@@ -176,6 +182,7 @@ class TTLCache:
 # Engine
 # =========================
 
+
 class TA_Lab2_Memory_Engine:
     """
     Reasoning Engine app: uses Memory Bank via REST.
@@ -189,12 +196,14 @@ class TA_Lab2_Memory_Engine:
         self.reasoning_engine_id = cfg_dict["reasoning_engine_id"]
         self.scope = cfg_dict["scope"]
 
-        self.mb = MemoryBankREST(MBConfig(
-            project_id=self.project_id,
-            region=self.region,
-            reasoning_engine_id=self.reasoning_engine_id,
-            scope=self.scope,
-        ))
+        self.mb = MemoryBankREST(
+            MBConfig(
+                project_id=self.project_id,
+                region=self.region,
+                reasoning_engine_id=self.reasoning_engine_id,
+                scope=self.scope,
+            )
+        )
 
         # Tunables (safe defaults)
         self.min_query_chars = _env_int("MB_MIN_QUERY_CHARS", 12)
@@ -237,14 +246,36 @@ class TA_Lab2_Memory_Engine:
 
         # Skip small-talk / acknowledgements
         smalltalk = {
-            "hi", "hey", "hello", "thanks", "thank you", "ok", "okay", "k",
-            "lol", "lmao", "cool", "nice", "got it", "sounds good", "yup", "yep"
+            "hi",
+            "hey",
+            "hello",
+            "thanks",
+            "thank you",
+            "ok",
+            "okay",
+            "k",
+            "lol",
+            "lmao",
+            "cool",
+            "nice",
+            "got it",
+            "sounds good",
+            "yup",
+            "yep",
         }
         if q_norm in smalltalk:
             return False, "smalltalk"
 
         # Heuristic: if user explicitly references memory, allow retrieval
-        memory_triggers = ("remember", "last time", "previous", "earlier", "we talked", "you said", "remind me")
+        memory_triggers = (
+            "remember",
+            "last time",
+            "previous",
+            "earlier",
+            "we talked",
+            "you said",
+            "remind me",
+        )
         if any(t in q_norm for t in memory_triggers):
             return True, "explicit_memory_trigger"
 

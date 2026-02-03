@@ -14,7 +14,6 @@ from sqlalchemy import text
 from ta_lab2.scripts.bars.common_snapshot_contract import (
     get_engine,
     load_daily_prices_for_id,
-    delete_bars_for_id_tf,
     load_last_snapshot_row,
     load_last_snapshot_info_for_id_tfs,
 )
@@ -28,8 +27,7 @@ TEST_TFS = ["7d", "14d", "21d"]  # Sample timeframes
 DB_URL = os.environ.get("TARGET_DB_URL")
 
 pytestmark = pytest.mark.skipif(
-    not DB_URL,
-    reason="TARGET_DB_URL environment variable not set"
+    not DB_URL, reason="TARGET_DB_URL environment variable not set"
 )
 
 
@@ -43,7 +41,7 @@ class TestExtractedUtilities:
             daily_table="public.cmc_price_histories7",
             id_=1,  # Bitcoin
             ts_start=None,
-            tz="America/New_York"
+            tz="America/New_York",
         )
 
         assert not df.empty, "Daily prices should not be empty for Bitcoin"
@@ -69,17 +67,15 @@ class TestExtractedUtilities:
         )
 
         if not df.empty:
-            assert df["ts"].min() >= ts_start.tz_localize(None), \
-                "All timestamps should be >= ts_start"
+            assert df["ts"].min() >= ts_start.tz_localize(
+                None
+            ), "All timestamps should be >= ts_start"
 
     def test_load_last_snapshot_row(self):
         """Test load_last_snapshot_row returns most recent snapshot."""
         # Assuming bars exist for Bitcoin 7d
         row = load_last_snapshot_row(
-            db_url=DB_URL,
-            bars_table="public.cmc_price_bars_multi_tf",
-            id_=1,
-            tf="7d"
+            db_url=DB_URL, bars_table="public.cmc_price_bars_multi_tf", id_=1, tf="7d"
         )
 
         # May be None if no bars exist yet
@@ -93,10 +89,7 @@ class TestExtractedUtilities:
         """Test batch loading of snapshot info."""
         tfs = ["7d", "14d", "21d"]
         info_map = load_last_snapshot_info_for_id_tfs(
-            db_url=DB_URL,
-            bars_table="public.cmc_price_bars_multi_tf",
-            id_=1,
-            tfs=tfs
+            db_url=DB_URL, bars_table="public.cmc_price_bars_multi_tf", id_=1, tfs=tfs
         )
 
         assert isinstance(info_map, dict), "Should return dict"
@@ -145,18 +138,21 @@ class TestBuilderConsistency:
 
             # Check that module has the functions (either imported or defined)
             # They should be imported from common_snapshot_contract
-            assert hasattr(module, "load_daily_prices_for_id"), \
-                f"{builder_module_name} should have load_daily_prices_for_id"
-            assert hasattr(module, "delete_bars_for_id_tf"), \
-                f"{builder_module_name} should have delete_bars_for_id_tf"
-            assert hasattr(module, "load_last_snapshot_row"), \
-                f"{builder_module_name} should have load_last_snapshot_row"
-            assert hasattr(module, "load_last_snapshot_info_for_id_tfs"), \
-                f"{builder_module_name} should have load_last_snapshot_info_for_id_tfs"
+            assert hasattr(
+                module, "load_daily_prices_for_id"
+            ), f"{builder_module_name} should have load_daily_prices_for_id"
+            assert hasattr(
+                module, "delete_bars_for_id_tf"
+            ), f"{builder_module_name} should have delete_bars_for_id_tf"
+            assert hasattr(
+                module, "load_last_snapshot_row"
+            ), f"{builder_module_name} should have load_last_snapshot_row"
+            assert hasattr(
+                module, "load_last_snapshot_info_for_id_tfs"
+            ), f"{builder_module_name} should have load_last_snapshot_info_for_id_tfs"
 
     def test_no_local_function_duplicates(self):
         """Verify builders don't have local copies of extracted functions."""
-        import inspect
         import importlib
 
         builders = [
@@ -173,16 +169,20 @@ class TestBuilderConsistency:
             module = importlib.import_module(builder_module_name)
 
             # Check that these functions are imported, not locally defined
-            for func_name in ["load_daily_prices_for_id", "delete_bars_for_id_tf",
-                             "load_last_snapshot_row", "load_last_snapshot_info_for_id_tfs"]:
-
+            for func_name in [
+                "load_daily_prices_for_id",
+                "delete_bars_for_id_tf",
+                "load_last_snapshot_row",
+                "load_last_snapshot_info_for_id_tfs",
+            ]:
                 if hasattr(module, func_name):
                     func = getattr(module, func_name)
                     contract_func = getattr(common_snapshot_contract, func_name)
 
                     # They should be the same object (imported, not redefined)
-                    assert func is contract_func, \
-                        f"{builder_module_name}.{func_name} should be imported from common_snapshot_contract, not locally defined"
+                    assert (
+                        func is contract_func
+                    ), f"{builder_module_name}.{func_name} should be imported from common_snapshot_contract, not locally defined"
 
 
 class TestBuilderSmoke:
@@ -232,7 +232,7 @@ class TestPerformanceRegression:
             db_url=DB_URL,
             bars_table="public.cmc_price_bars_multi_tf",
             id_=test_id,
-            tfs=tfs
+            tfs=tfs,
         )
         batch_time = time.perf_counter() - start
 
@@ -244,12 +244,12 @@ class TestPerformanceRegression:
                 db_url=DB_URL,
                 bars_table="public.cmc_price_bars_multi_tf",
                 id_=test_id,
-                tf=tf
+                tf=tf,
             )
             if row:
                 n_plus_1_result[tf] = {
                     "last_bar_seq": row.get("bar_seq"),
-                    "last_time_close": row.get("time_close")
+                    "last_time_close": row.get("time_close"),
                 }
         n_plus_1_time = time.perf_counter() - start
 
@@ -258,8 +258,9 @@ class TestPerformanceRegression:
         print(f"Speedup: {n_plus_1_time / batch_time:.2f}x")
 
         # Batch loading should be faster (at least 1.5x for 5 TFs)
-        assert batch_time < n_plus_1_time, \
-            "Batch loading should be faster than N+1 queries"
+        assert (
+            batch_time < n_plus_1_time
+        ), "Batch loading should be faster than N+1 queries"
 
 
 if __name__ == "__main__":

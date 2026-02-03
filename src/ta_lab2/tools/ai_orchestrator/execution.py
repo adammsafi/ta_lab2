@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from .adapters import AsyncBasePlatformAdapter
     from .core import Task, Result, Platform
 
-from .core import Task, Result, Platform, TaskStatus, TaskType
+from .core import Task, Result, Platform, TaskStatus
 from .routing import TaskRouter
 from .quota import QuotaTracker
 
@@ -24,6 +24,7 @@ RETRY_BASE_DELAY = 1.0  # seconds
 @dataclass
 class AggregatedResult:
     """Combined results from parallel task execution."""
+
     results: List[Result]
     total_cost: float
     total_tokens: int
@@ -59,7 +60,7 @@ def aggregate_results(results: List[Result]) -> AggregatedResult:
         total_duration=sum(r.duration_seconds for r in results),
         success_count=sum(1 for r in results if r.success),
         failure_count=sum(1 for r in results if not r.success),
-        by_platform=by_platform
+        by_platform=by_platform,
     )
 
 
@@ -181,7 +182,9 @@ class AsyncOrchestrator:
             elif i in errors:
                 ordered_results.append(self._error_result(tasks[i], errors[i]))
             else:
-                ordered_results.append(self._error_result(tasks[i], RuntimeError("Unknown error")))
+                ordered_results.append(
+                    self._error_result(tasks[i], RuntimeError("Unknown error"))
+                )
 
         return aggregate_results(ordered_results)
 
@@ -274,7 +277,9 @@ class AsyncOrchestrator:
         # All platforms failed
         return Result(
             task=task,
-            platform=attempted_platforms[-1] if attempted_platforms else Platform.CLAUDE_CODE,
+            platform=attempted_platforms[-1]
+            if attempted_platforms
+            else Platform.CLAUDE_CODE,
             output="",
             success=False,
             status=TaskStatus.FAILED,
@@ -320,7 +325,7 @@ class AsyncOrchestrator:
 
                 # Exponential backoff before retry
                 if attempt < max_retries:
-                    delay = RETRY_BASE_DELAY * (2 ** attempt)
+                    delay = RETRY_BASE_DELAY * (2**attempt)
                     await asyncio.sleep(delay)
 
             except asyncio.CancelledError:
@@ -335,7 +340,7 @@ class AsyncOrchestrator:
                     error=f"Timeout on attempt {attempt + 1}",
                 )
                 if attempt < max_retries:
-                    delay = RETRY_BASE_DELAY * (2 ** attempt)
+                    delay = RETRY_BASE_DELAY * (2**attempt)
                     await asyncio.sleep(delay)
             except Exception as e:
                 last_result = Result(
@@ -347,10 +352,12 @@ class AsyncOrchestrator:
                     error=str(e),
                 )
                 if attempt < max_retries:
-                    delay = RETRY_BASE_DELAY * (2 ** attempt)
+                    delay = RETRY_BASE_DELAY * (2**attempt)
                     await asyncio.sleep(delay)
 
-        return last_result or self._error_result(task, RuntimeError("No result after retries"))
+        return last_result or self._error_result(
+            task, RuntimeError("No result after retries")
+        )
 
     def _is_retryable_error(self, error: Optional[str]) -> bool:
         """
@@ -399,10 +406,7 @@ class AsyncOrchestrator:
         # Default: retry unknown errors
         return True
 
-    def _get_platforms_by_cost(
-        self,
-        exclude: Set[Platform] = None
-    ) -> List[Platform]:
+    def _get_platforms_by_cost(self, exclude: Set[Platform] = None) -> List[Platform]:
         """
         Get platforms ordered by cost priority.
 
@@ -452,7 +456,9 @@ class AsyncOrchestrator:
         except* Exception:
             pass  # Results already collected
 
-        ordered = [results.get(i, self._error_result(tasks[i], RuntimeError("Unknown")))
-                   for i in range(len(tasks))]
+        ordered = [
+            results.get(i, self._error_result(tasks[i], RuntimeError("Unknown")))
+            for i in range(len(tasks))
+        ]
 
         return aggregate_results(ordered)

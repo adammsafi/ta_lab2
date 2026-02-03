@@ -190,5 +190,3 @@ FROM cmc_ema_multi_tf_cal
 GROUP BY id, ts, tf, period
 HAVING COUNT(*) > 1
 ORDER BY n DESC, id, ts, tf, period;
-
-

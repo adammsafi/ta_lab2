@@ -81,7 +81,11 @@ def ensure_tables(engine: Engine, out_table: str, state_table: str) -> None:
                 """
             )
         )
-        cxn.execute(text(f"CREATE INDEX IF NOT EXISTS {idx_name} ON {out_table} (id, tf, time_close);"))
+        cxn.execute(
+            text(
+                f"CREATE INDEX IF NOT EXISTS {idx_name} ON {out_table} (id, tf, time_close);"
+            )
+        )
         cxn.execute(
             text(
                 f"""
@@ -196,7 +200,9 @@ def process_key(
             {"id": key.id, "tf": key.tf, "seed_tc": seed_tc, "last_tc": last_tc},
         )
 
-    max_tc_sql = text(f"SELECT MAX(time_close) FROM {bars_table} WHERE id=:id AND tf=:tf;")
+    max_tc_sql = text(
+        f"SELECT MAX(time_close) FROM {bars_table} WHERE id=:id AND tf=:tf;"
+    )
     with engine.begin() as cxn:
         max_tc = cxn.execute(max_tc_sql, {"id": key.id, "tf": key.tf}).scalar()
 
@@ -207,19 +213,40 @@ def process_key(
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Incremental bar returns builder (time_close keyed).")
-    p.add_argument("--db-url", default=os.getenv("TARGET_DB_URL", ""), help="DB URL (or set TARGET_DB_URL).")
+    p = argparse.ArgumentParser(
+        description="Incremental bar returns builder (time_close keyed)."
+    )
+    p.add_argument(
+        "--db-url",
+        default=os.getenv("TARGET_DB_URL", ""),
+        help="DB URL (or set TARGET_DB_URL).",
+    )
     p.add_argument("--bars-table", default=DEFAULT_BARS_TABLE)
     p.add_argument("--out-table", default=DEFAULT_OUT_TABLE)
     p.add_argument("--state-table", default=DEFAULT_STATE_TABLE)
-    p.add_argument("--start", default="2010-01-01", help="Start time_close for initial build / full refresh.")
-    p.add_argument("--full-refresh", action="store_true", help="Drop and rebuild outputs for this table.")
-    p.add_argument("--limit-keys", type=int, default=0, help="Debug: process only first N (id,tf) groups.")
+    p.add_argument(
+        "--start",
+        default="2010-01-01",
+        help="Start time_close for initial build / full refresh.",
+    )
+    p.add_argument(
+        "--full-refresh",
+        action="store_true",
+        help="Drop and rebuild outputs for this table.",
+    )
+    p.add_argument(
+        "--limit-keys",
+        type=int,
+        default=0,
+        help="Debug: process only first N (id,tf) groups.",
+    )
     args = p.parse_args()
 
     db_url = args.db_url.strip()
     if not db_url:
-        raise SystemExit("ERROR: Missing DB URL. Provide --db-url or set TARGET_DB_URL.")
+        raise SystemExit(
+            "ERROR: Missing DB URL. Provide --db-url or set TARGET_DB_URL."
+        )
 
     engine = _get_engine(db_url)
 
@@ -244,7 +271,9 @@ def main() -> None:
     for i, key in enumerate(keys, start=1):
         if i == 1 or i % 200 == 0:
             _print(f"Processing {key} ({i}/{len(keys)})")
-        n = process_key(engine, args.bars_table, args.out_table, args.state_table, key, args.start)
+        n = process_key(
+            engine, args.bars_table, args.out_table, args.state_table, key, args.start
+        )
         total += n
 
     _print(f"Inserted rows: {total}")

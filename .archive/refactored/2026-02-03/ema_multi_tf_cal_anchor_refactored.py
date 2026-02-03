@@ -35,6 +35,7 @@ logger = logging.getLogger(__name__)
 # Calendar Anchor EMA Feature Implementation
 # =============================================================================
 
+
 class CalendarAnchorEMAFeature(BaseEMAFeature):
     """
     Calendar-anchored EMA feature: EMAs on anchored calendar periods.
@@ -114,9 +115,13 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
         df["tf"] = df["tf"].astype(str)
         df["tf_days"] = df["tf_days"].astype(int)
 
-        tf_specs = [TFSpec(tf=r.tf, tf_days=int(r.tf_days)) for r in df.itertuples(index=False)]
+        tf_specs = [
+            TFSpec(tf=r.tf, tf_days=int(r.tf_days)) for r in df.itertuples(index=False)
+        ]
 
-        logger.info(f"Loaded {len(tf_specs)} calendar anchor TF specs for scheme={self.scheme}")
+        logger.info(
+            f"Loaded {len(tf_specs)} calendar anchor TF specs for scheme={self.scheme}"
+        )
         self._tf_specs_cache = tf_specs
         return tf_specs
 
@@ -127,7 +132,9 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
         periods: list[int],
     ) -> pd.DataFrame:
         """Compute calendar anchor EMAs for single TF (stub)."""
-        logger.warning(f"Calendar anchor EMA computation for {tf_spec.tf} not fully implemented")
+        logger.warning(
+            f"Calendar anchor EMA computation for {tf_spec.tf} not fully implemented"
+        )
         return pd.DataFrame()
 
     def get_output_schema(self) -> dict[str, str]:
@@ -159,6 +166,7 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
 # Public API (Backward Compatibility - Stub)
 # =============================================================================
 
+
 def write_multi_timeframe_ema_cal_anchor_to_db(
     engine: Engine,
     ids: Sequence[int],
@@ -177,7 +185,9 @@ def write_multi_timeframe_ema_cal_anchor_to_db(
 
     NOTE: This is a STUB. Full calendar anchor logic needs implementation.
     """
-    logger.warning("Calendar anchor EMA refactored version is a stub. Use original for production.")
+    logger.warning(
+        "Calendar anchor EMA refactored version is a stub. Use original for production."
+    )
 
     config = EMAFeatureConfig(
         periods=list(ema_periods),

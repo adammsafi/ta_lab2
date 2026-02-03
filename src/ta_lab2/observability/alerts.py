@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
 from typing import Optional, Dict, Any, List
 
@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 class AlertType(Enum):
     """Alert type categories."""
+
     INTEGRATION_FAILURE = "integration_failure"
     PERFORMANCE_DEGRADATION = "performance_degradation"
     DATA_QUALITY = "data_quality"
@@ -33,6 +34,7 @@ class AlertType(Enum):
 
 class AlertSeverity(Enum):
     """Alert severity levels."""
+
     CRITICAL = "critical"
     WARNING = "warning"
     INFO = "info"
@@ -41,6 +43,7 @@ class AlertSeverity(Enum):
 @dataclass
 class Alert:
     """Alert data structure."""
+
     alert_type: AlertType
     severity: AlertSeverity
     title: str
@@ -117,7 +120,7 @@ class AlertThresholdChecker:
                     "current_value": current_value,
                     "baseline": baseline,
                     "ratio": ratio,
-                }
+                },
             )
 
         return None
@@ -150,7 +153,7 @@ class AlertThresholdChecker:
                 "component": component,
                 "error_message": error_message,
                 "error_count": error_count,
-            }
+            },
         )
 
     def check_data_quality(
@@ -184,7 +187,7 @@ class AlertThresholdChecker:
                 "check_type": check_type,
                 "issue_count": issue_count,
                 **details,
-            }
+            },
         )
 
     def check_resource_exhaustion(
@@ -207,7 +210,9 @@ class AlertThresholdChecker:
         if usage_percent < threshold_percent:
             return None
 
-        severity = AlertSeverity.CRITICAL if usage_percent >= 95 else AlertSeverity.WARNING
+        severity = (
+            AlertSeverity.CRITICAL if usage_percent >= 95 else AlertSeverity.WARNING
+        )
 
         return Alert(
             alert_type=AlertType.RESOURCE_EXHAUSTION,
@@ -218,19 +223,24 @@ class AlertThresholdChecker:
                 "resource": resource,
                 "usage_percent": usage_percent,
                 "threshold_percent": threshold_percent,
-            }
+            },
         )
 
     def _calculate_baseline(self, metric_name: str) -> Optional[float]:
         """Calculate p50 baseline from historical data."""
         try:
             with self.engine.connect() as conn:
-                result = conn.execute(text("""
+                result = conn.execute(
+                    text(
+                        """
                     SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY metric_value)
                     FROM observability.metrics
                     WHERE metric_name = :name
                       AND recorded_at >= NOW() - INTERVAL ':days days'
-                """), {"name": metric_name, "days": self.baseline_days})
+                """
+                    ),
+                    {"name": metric_name, "days": self.baseline_days},
+                )
                 return result.scalar()
         except Exception as e:
             logger.warning(f"Failed to calculate baseline for {metric_name}: {e}")
@@ -281,19 +291,24 @@ class AlertThresholdChecker:
         import json
 
         with self.engine.begin() as conn:
-            result = conn.execute(text("""
+            result = conn.execute(
+                text(
+                    """
                 INSERT INTO observability.alerts
                 (alert_type, severity, title, message, triggered_at, metadata)
                 VALUES (:type, :severity, :title, :message, :triggered_at, :metadata::jsonb)
                 RETURNING id
-            """), {
-                "type": alert.alert_type.value,
-                "severity": alert.severity.value,
-                "title": alert.title,
-                "message": alert.message,
-                "triggered_at": alert.triggered_at,
-                "metadata": json.dumps(alert.metadata),
-            })
+            """
+                ),
+                {
+                    "type": alert.alert_type.value,
+                    "severity": alert.severity.value,
+                    "title": alert.title,
+                    "message": alert.message,
+                    "triggered_at": alert.triggered_at,
+                    "metadata": json.dumps(alert.metadata),
+                },
+            )
             alert_id = result.scalar()
             alert.alert_id = alert_id
             return alert_id
@@ -341,15 +356,17 @@ class AlertThresholdChecker:
             with self.engine.connect() as conn:
                 result = conn.execute(text(query), params)
                 for row in result:
-                    alerts.append(Alert(
-                        alert_id=row[0],
-                        alert_type=AlertType(row[1]),
-                        severity=AlertSeverity(row[2]),
-                        title=row[3],
-                        message=row[4],
-                        triggered_at=row[5],
-                        metadata=row[6] or {},
-                    ))
+                    alerts.append(
+                        Alert(
+                            alert_id=row[0],
+                            alert_type=AlertType(row[1]),
+                            severity=AlertSeverity(row[2]),
+                            title=row[3],
+                            message=row[4],
+                            triggered_at=row[5],
+                            metadata=row[6] or {},
+                        )
+                    )
         except Exception as e:
             logger.error(f"Failed to query alerts: {e}")
 

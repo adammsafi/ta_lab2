@@ -32,11 +32,13 @@ def expanding_walk_forward(
         is_start = pd.Timestamp(f"{years[0]}-01-01")
         is_end = pd.Timestamp(f"{years[cut-1]}-12-31")
         oos_end = pd.Timestamp(f"{years[cut+oos_years-1]}-12-31")
-        splits.append(Split(
-            name=f"IS_{years[0]}-{years[cut-1]}__OOS_{years[cut]}-{years[cut+oos_years-1]}",
-            start=is_start,
-            end=oos_end
-        ))
+        splits.append(
+            Split(
+                name=f"IS_{years[0]}-{years[cut-1]}__OOS_{years[cut]}-{years[cut+oos_years-1]}",
+                start=is_start,
+                end=oos_end,
+            )
+        )
     return splits
 
 
@@ -47,5 +49,9 @@ def fixed_date_splits(
     """Build splits from explicit date windows (inclusive)."""
     out: List[Split] = []
     for i, (start, end) in enumerate(windows, 1):
-        out.append(Split(name=f"{prefix}_{i}", start=pd.Timestamp(start), end=pd.Timestamp(end)))
+        out.append(
+            Split(
+                name=f"{prefix}_{i}", start=pd.Timestamp(start), end=pd.Timestamp(end)
+            )
+        )
     return out

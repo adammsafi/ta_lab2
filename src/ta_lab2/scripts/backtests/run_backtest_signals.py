@@ -48,7 +48,6 @@ import logging
 import os
 import sys
 import json
-from datetime import datetime
 
 import pandas as pd
 from sqlalchemy import create_engine
@@ -62,8 +61,8 @@ def setup_logging(verbose: bool = False) -> logging.Logger:
     level = logging.DEBUG if verbose else logging.INFO
     logging.basicConfig(
         level=level,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
     return logging.getLogger(__name__)
 
@@ -71,86 +70,75 @@ def setup_logging(verbose: bool = False) -> logging.Logger:
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
-        description='Run backtests from stored signals in database',
+        description="Run backtests from stored signals in database",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=__doc__
+        epilog=__doc__,
     )
 
     # Required arguments
     parser.add_argument(
-        '--signal-type',
+        "--signal-type",
         required=True,
-        choices=['ema_crossover', 'rsi_mean_revert', 'atr_breakout'],
-        help='Signal type to backtest'
+        choices=["ema_crossover", "rsi_mean_revert", "atr_breakout"],
+        help="Signal type to backtest",
     )
     parser.add_argument(
-        '--signal-id',
-        type=int,
-        required=True,
-        help='Signal ID from dim_signals table'
+        "--signal-id", type=int, required=True, help="Signal ID from dim_signals table"
     )
     parser.add_argument(
-        '--asset-id',
-        type=int,
-        required=True,
-        help='Asset ID to backtest'
+        "--asset-id", type=int, required=True, help="Asset ID to backtest"
     )
     parser.add_argument(
-        '--start',
-        type=str,
-        required=True,
-        help='Start date (YYYY-MM-DD format)'
+        "--start", type=str, required=True, help="Start date (YYYY-MM-DD format)"
     )
     parser.add_argument(
-        '--end',
-        type=str,
-        required=True,
-        help='End date (YYYY-MM-DD format)'
+        "--end", type=str, required=True, help="End date (YYYY-MM-DD format)"
     )
 
     # Cost model options
-    cost_group = parser.add_argument_group('Cost Model Options')
+    cost_group = parser.add_argument_group("Cost Model Options")
     cost_group.add_argument(
-        '--clean-pnl',
-        action='store_true',
-        help='Ignore fees/slippage (clean mode for theoretical PnL)'
+        "--clean-pnl",
+        action="store_true",
+        help="Ignore fees/slippage (clean mode for theoretical PnL)",
     )
     cost_group.add_argument(
-        '--fee-bps',
+        "--fee-bps",
         type=float,
         default=10.0,
-        help='Commission in basis points (default: 10.0 = 0.10%%)'
+        help="Commission in basis points (default: 10.0 = 0.10%%)",
     )
     cost_group.add_argument(
-        '--slippage-bps',
+        "--slippage-bps",
         type=float,
         default=5.0,
-        help='Slippage in basis points (default: 5.0 = 0.05%%)'
+        help="Slippage in basis points (default: 5.0 = 0.05%%)",
     )
     cost_group.add_argument(
-        '--funding-bps',
+        "--funding-bps",
         type=float,
         default=0.0,
-        help='Daily funding cost in basis points (default: 0.0, for perps)'
+        help="Daily funding cost in basis points (default: 0.0, for perps)",
     )
 
     # Output options
-    output_group = parser.add_argument_group('Output Options')
+    output_group = parser.add_argument_group("Output Options")
     output_group.add_argument(
-        '--save-results',
-        action='store_true',
-        help='Store results in database (cmc_backtest_* tables)'
+        "--save-results",
+        action="store_true",
+        help="Store results in database (cmc_backtest_* tables)",
     )
     output_group.add_argument(
-        '--output-json',
+        "--output-json",
         type=str,
-        metavar='PATH',
-        help='Write results to JSON file at specified path'
+        metavar="PATH",
+        help="Write results to JSON file at specified path",
     )
     output_group.add_argument(
-        '--verbose', '-v',
-        action='store_true',
-        help='Enable verbose logging (DEBUG level)'
+        "--verbose",
+        "-v",
+        action="store_true",
+        help="Enable verbose logging (DEBUG level)",
     )
 
     return parser.parse_args()
@@ -171,7 +159,9 @@ def format_results_for_console(result) -> str:
     lines.append(f"  Total Return:  {result.total_return:>10.2%}")
     lines.append(f"  CAGR:          {result.metrics.get('cagr', 0):>10.2%}")
     lines.append(f"  Sharpe Ratio:  {result.sharpe_ratio:>10.2f}")
-    lines.append(f"  Sortino Ratio: {result.metrics.get('sortino_ratio', 0) or 0:>10.2f}")
+    lines.append(
+        f"  Sortino Ratio: {result.metrics.get('sortino_ratio', 0) or 0:>10.2f}"
+    )
     lines.append(f"  Calmar Ratio:  {result.metrics.get('calmar_ratio', 0):>10.2f}")
     lines.append(f"  Max Drawdown:  {result.max_drawdown:>10.2%}")
     lines.append("")
@@ -179,15 +169,21 @@ def format_results_for_console(result) -> str:
     lines.append("-" * 70)
     lines.append(f"  Trade Count:   {result.trade_count:>10}")
     lines.append(f"  Win Rate:      {result.metrics.get('win_rate', 0) or 0:>10.1f}%")
-    lines.append(f"  Profit Factor: {result.metrics.get('profit_factor', 0) or 0:>10.2f}")
+    lines.append(
+        f"  Profit Factor: {result.metrics.get('profit_factor', 0) or 0:>10.2f}"
+    )
     lines.append(f"  Avg Win:       {result.metrics.get('avg_win', 0) or 0:>10.2f}%")
     lines.append(f"  Avg Loss:      {result.metrics.get('avg_loss', 0) or 0:>10.2f}%")
-    lines.append(f"  Avg Hold (d):  {result.metrics.get('avg_holding_period_days', 0) or 0:>10.1f}")
+    lines.append(
+        f"  Avg Hold (d):  {result.metrics.get('avg_holding_period_days', 0) or 0:>10.1f}"
+    )
     lines.append("")
     lines.append("Risk Metrics:")
     lines.append("-" * 70)
     lines.append(f"  VaR 95%:       {result.metrics.get('var_95', 0) or 0:>10.4f}")
-    lines.append(f"  CVaR:          {result.metrics.get('expected_shortfall', 0) or 0:>10.4f}")
+    lines.append(
+        f"  CVaR:          {result.metrics.get('expected_shortfall', 0) or 0:>10.4f}"
+    )
     lines.append("")
     lines.append("Cost Model:")
     lines.append("-" * 70)
@@ -202,26 +198,28 @@ def format_results_for_console(result) -> str:
 def convert_result_to_json_serializable(result) -> dict:
     """Convert BacktestResult to JSON-serializable dictionary."""
     return {
-        'run_id': result.run_id,
-        'signal_type': result.signal_type,
-        'signal_id': result.signal_id,
-        'asset_id': result.asset_id,
-        'start_ts': result.start_ts.isoformat(),
-        'end_ts': result.end_ts.isoformat(),
-        'total_return': float(result.total_return),
-        'sharpe_ratio': float(result.sharpe_ratio),
-        'max_drawdown': float(result.max_drawdown),
-        'trade_count': int(result.trade_count),
-        'cost_model': result.cost_model,
-        'signal_params_hash': result.signal_params_hash,
-        'feature_hash': result.feature_hash,
-        'signal_version': result.signal_version,
-        'vbt_version': result.vbt_version,
-        'metrics': {
+        "run_id": result.run_id,
+        "signal_type": result.signal_type,
+        "signal_id": result.signal_id,
+        "asset_id": result.asset_id,
+        "start_ts": result.start_ts.isoformat(),
+        "end_ts": result.end_ts.isoformat(),
+        "total_return": float(result.total_return),
+        "sharpe_ratio": float(result.sharpe_ratio),
+        "max_drawdown": float(result.max_drawdown),
+        "trade_count": int(result.trade_count),
+        "cost_model": result.cost_model,
+        "signal_params_hash": result.signal_params_hash,
+        "feature_hash": result.feature_hash,
+        "signal_version": result.signal_version,
+        "vbt_version": result.vbt_version,
+        "metrics": {
             k: float(v) if v is not None and not isinstance(v, int) else v
             for k, v in result.metrics.items()
         },
-        'trades': result.trades_df.to_dict(orient='records') if not result.trades_df.empty else [],
+        "trades": result.trades_df.to_dict(orient="records")
+        if not result.trades_df.empty
+        else [],
     }
 
 
@@ -231,7 +229,7 @@ def main():
     logger = setup_logging(args.verbose)
 
     # Check database URL
-    db_url = os.environ.get('TARGET_DB_URL')
+    db_url = os.environ.get("TARGET_DB_URL")
     if not db_url:
         logger.error("TARGET_DB_URL environment variable not set")
         sys.exit(1)
@@ -239,15 +237,17 @@ def main():
     # Create database engine
     try:
         engine = create_engine(db_url)
-        logger.debug(f"Connected to database: {db_url.split('@')[-1]}")  # Hide credentials
+        logger.debug(
+            f"Connected to database: {db_url.split('@')[-1]}"
+        )  # Hide credentials
     except Exception as e:
         logger.error(f"Failed to connect to database: {e}")
         sys.exit(1)
 
     # Parse dates
     try:
-        start_ts = pd.Timestamp(args.start, tz='UTC')
-        end_ts = pd.Timestamp(args.end, tz='UTC')
+        start_ts = pd.Timestamp(args.start, tz="UTC")
+        end_ts = pd.Timestamp(args.end, tz="UTC")
     except Exception as e:
         logger.error(f"Invalid date format: {e}")
         logger.error("Dates must be in YYYY-MM-DD format")
@@ -302,7 +302,7 @@ def main():
     if args.output_json:
         try:
             json_data = convert_result_to_json_serializable(result)
-            with open(args.output_json, 'w') as f:
+            with open(args.output_json, "w") as f:
                 json.dump(json_data, f, indent=2)
             logger.info(f"Results exported to JSON: {args.output_json}")
         except Exception as e:
@@ -315,5 +315,5 @@ def main():
     sys.exit(0)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

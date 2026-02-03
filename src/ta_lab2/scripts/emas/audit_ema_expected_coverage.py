@@ -29,8 +29,10 @@ from datetime import UTC, datetime
 from typing import List
 
 import pandas as pd
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
+
+from ta_lab2.features.m_tf.polars_helpers import read_sql_polars
 
 
 DEFAULT_DAILY_TABLE = "public.cmc_price_histories7"
@@ -61,7 +63,9 @@ def get_engine() -> Engine:
 
 def parse_ids(engine: Engine, ids_arg: str, daily_table: str) -> List[int]:
     if ids_arg.strip().lower() == "all":
-        df = pd.read_sql(text(f"SELECT DISTINCT id FROM {daily_table} ORDER BY id"), engine)
+        df = read_sql_polars(
+            f"SELECT DISTINCT id FROM {daily_table} ORDER BY id", engine
+        )
         ids = [int(x) for x in df["id"].tolist()]
         _log(f"Loaded ALL ids from {daily_table}: {len(ids)}")
         return ids
@@ -79,8 +83,8 @@ def parse_ids(engine: Engine, ids_arg: str, daily_table: str) -> List[int]:
 def load_periods(engine: Engine, periods_arg: str, lut_table: str) -> List[int]:
     s = (periods_arg or "").strip().lower()
     if s == "lut":
-        df = pd.read_sql(
-            text(f"SELECT DISTINCT period::int AS period FROM {lut_table} ORDER BY period"),
+        df = read_sql_polars(
+            f"SELECT DISTINCT period::int AS period FROM {lut_table} ORDER BY period",
             engine,
         )
         periods = [int(x) for x in df["period"].tolist()]
@@ -109,22 +113,19 @@ def load_tfs(engine: Engine, family: str, dim_tf_table: str) -> List[str]:
       - Months/Years are scheme-agnostic: *_CAL and *_CAL_ANCHOR
     """
     if family == "TF_DAY":
-        q = text(
-            f"""
+        q = f"""
             SELECT tf
             FROM {dim_tf_table}
             WHERE alignment_type = 'tf_day'
               AND is_canonical = TRUE
             ORDER BY display_order, sort_order, tf
             """
-        )
-        df = pd.read_sql(q, engine)
+        df = read_sql_polars(q, engine)
         return [str(x) for x in df["tf"].tolist()]
 
     if family in {"CAL_US", "CAL_ISO"}:
         scheme = "US" if family == "CAL_US" else "ISO"
-        q = text(
-            f"""
+        q = f"""
             SELECT tf
             FROM {dim_tf_table}
             WHERE alignment_type = 'calendar'
@@ -143,14 +144,12 @@ def load_tfs(engine: Engine, family: str, dim_tf_table: str) -> List[str]:
                   )
             ORDER BY display_order, sort_order, tf
             """
-        )
-        df = pd.read_sql(q, engine, params={"scheme": scheme})
+        df = read_sql_polars(q, engine, params={"scheme": scheme})
         return [str(x) for x in df["tf"].tolist()]
 
     if family in {"ANCHOR_US", "ANCHOR_ISO"}:
         scheme = "US" if family == "ANCHOR_US" else "ISO"
-        q = text(
-            f"""
+        q = f"""
             SELECT tf
             FROM {dim_tf_table}
             WHERE alignment_type = 'calendar'
@@ -167,8 +166,7 @@ def load_tfs(engine: Engine, family: str, dim_tf_table: str) -> List[str]:
                   )
             ORDER BY display_order, sort_order, tf
             """
-        )
-        df = pd.read_sql(q, engine, params={"scheme": scheme})
+        df = read_sql_polars(q, engine, params={"scheme": scheme})
         return [str(x) for x in df["tf"].tolist()]
 
     raise ValueError(f"Unknown family: {family}")
@@ -177,18 +175,18 @@ def load_tfs(engine: Engine, family: str, dim_tf_table: str) -> List[str]:
 def actual_combos(engine: Engine, ema_table: str, ids: List[int]) -> pd.DataFrame:
     # NOTE: using IN (...) is fine for your small id list (7). Keep it simple.
     in_clause = ",".join(str(int(i)) for i in ids)
-    q = text(
-        f"""
+    q = f"""
         SELECT DISTINCT id::int AS id, tf::text AS tf, period::int AS period
         FROM {ema_table}
         WHERE id IN ({in_clause})
         """
-    )
-    return pd.read_sql(q, engine)
+    return read_sql_polars(q, engine)
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Coverage audit for EMA tables (expected vs actual combos).")
+    ap = argparse.ArgumentParser(
+        description="Coverage audit for EMA tables (expected vs actual combos)."
+    )
     ap.add_argument("--ids", required=True, help="all OR comma-separated list")
     ap.add_argument("--daily-table", default=DEFAULT_DAILY_TABLE)
     ap.add_argument("--dim-tf", default=DEFAULT_DIM_TF)

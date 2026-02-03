@@ -71,21 +71,33 @@ def _fail_or_warn(strict: bool, msg: str) -> None:
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Audit integrity for cmc_returns_ema_multi_tf_u.")
-    p.add_argument("--db-url", default=os.getenv("TARGET_DB_URL", ""), help="DB URL (or set TARGET_DB_URL).")
+    p = argparse.ArgumentParser(
+        description="Audit integrity for cmc_returns_ema_multi_tf_u."
+    )
+    p.add_argument(
+        "--db-url",
+        default=os.getenv("TARGET_DB_URL", ""),
+        help="DB URL (or set TARGET_DB_URL).",
+    )
     p.add_argument("--ema-u-table", default=DEFAULT_EMA_U_TABLE)
     p.add_argument("--ret-table", default=DEFAULT_RET_TABLE)
     p.add_argument("--dim-timeframe", default=DEFAULT_DIM_TF)
     p.add_argument("--gap-mult", type=float, default=1.5)
 
-    p.add_argument("--out", default="", help="Base filename for CSV outputs (no extension).")
+    p.add_argument(
+        "--out", default="", help="Base filename for CSV outputs (no extension)."
+    )
     p.add_argument("--out-dir", default=".", help="Directory to write CSV outputs.")
-    p.add_argument("--strict", action="store_true", help="Exit non-zero if any FAIL checks occur.")
+    p.add_argument(
+        "--strict", action="store_true", help="Exit non-zero if any FAIL checks occur."
+    )
     args = p.parse_args()
 
     db_url = args.db_url.strip()
     if not db_url:
-        raise SystemExit("ERROR: Missing DB URL. Provide --db-url or set TARGET_DB_URL.")
+        raise SystemExit(
+            "ERROR: Missing DB URL. Provide --db-url or set TARGET_DB_URL."
+        )
 
     engine = _get_engine(db_url)
     ema_u = args.ema_u_table

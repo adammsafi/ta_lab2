@@ -25,13 +25,21 @@ runfile(
 """
 
 import argparse
-import os
 from datetime import UTC, datetime
 from typing import List, Sequence
 
 import pandas as pd
-from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
+
+from ta_lab2.scripts.bars.common_snapshot_contract import (
+    get_engine,
+    resolve_db_url,
+    parse_ids,
+    load_all_ids,
+    table_exists,
+    get_columns,
+)
+from ta_lab2.features.m_tf.polars_helpers import read_sql_polars
 
 
 TABLES = [
@@ -50,79 +58,35 @@ def _log(msg: str) -> None:
     print(f"[ema_sample] {msg}")
 
 
-def get_engine() -> Engine:
-    db_url = os.environ.get("TARGET_DB_URL")
-    if not db_url:
-        raise RuntimeError("TARGET_DB_URL env var is required.")
-    _log("Using DB URL from TARGET_DB_URL env.")
-    return create_engine(db_url, future=True)
-
-
-def parse_ids(engine: Engine, ids_arg: str, daily_table: str) -> List[int]:
-    if ids_arg.strip().lower() == "all":
-        df = pd.read_sql(text(f"SELECT DISTINCT id FROM {daily_table} ORDER BY id"), engine)
-        ids = [int(x) for x in df["id"].tolist()]
-        _log(f"Loaded ALL ids from {daily_table}: {len(ids)}")
-        return ids
-
-    ids: List[int] = []
-    for part in ids_arg.split(","):
-        part = part.strip()
-        if part:
-            ids.append(int(part))
-    if not ids:
-        raise ValueError("No ids parsed.")
-    return ids
-
-
-def table_exists(engine: Engine, full_name: str) -> bool:
-    if "." in full_name:
-        schema, table = full_name.split(".", 1)
-    else:
-        schema, table = "public", full_name
-    q = text(
-        """
-        SELECT 1
-        FROM information_schema.tables
-        WHERE table_schema = :schema AND table_name = :table
-        LIMIT 1
-        """
-    )
-    df = pd.read_sql(q, engine, params={"schema": schema, "table": table})
-    return not df.empty
-
-
-def get_columns(engine: Engine, full_name: str) -> List[str]:
-    if "." in full_name:
-        schema, table = full_name.split(".", 1)
-    else:
-        schema, table = "public", full_name
-    q = text(
-        """
-        SELECT column_name
-        FROM information_schema.columns
-        WHERE table_schema = :schema AND table_name = :table
-        ORDER BY ordinal_position
-        """
-    )
-    df = pd.read_sql(q, engine, params={"schema": schema, "table": table})
-    return df["column_name"].tolist()
-
-
 def pick_cols(colset: set[str]) -> List[str]:
     preferred = [
-        "id", "tf", "period", "ts", "tf_days",
-        "roll", "ema", "d1", "d2", "d1_roll", "d2_roll",
-        "roll_bar", "ema_bar", "d1_bar", "d2_bar", "d1_roll_bar", "d2_roll_bar",
+        "id",
+        "tf",
+        "period",
+        "ts",
+        "tf_days",
+        "roll",
+        "ema",
+        "d1",
+        "d2",
+        "d1_roll",
+        "d2_roll",
+        "roll_bar",
+        "ema_bar",
+        "d1_bar",
+        "d2_bar",
+        "d1_roll_bar",
+        "d2_roll_bar",
         "ingested_at",
     ]
     return [c for c in preferred if c in colset]
 
 
-def get_group_keys(engine: Engine, table: str, ids: Sequence[int], max_groups_per_id: int | None) -> pd.DataFrame:
+def get_group_keys(
+    engine: Engine, table: str, ids: Sequence[int], max_groups_per_id: int | None
+) -> pd.DataFrame:
     in_clause = ",".join(str(int(i)) for i in ids)
-    q = text(
-        f"""
+    q = f"""
         SELECT id, tf, period
         FROM (
           SELECT DISTINCT id, tf, period
@@ -131,8 +95,7 @@ def get_group_keys(engine: Engine, table: str, ids: Sequence[int], max_groups_pe
         ) x
         ORDER BY id, tf, period
         """
-    )
-    df = pd.read_sql(q, engine)
+    df = read_sql_polars(q, engine)
     if df.empty or not max_groups_per_id or max_groups_per_id <= 0:
         return df
 
@@ -142,17 +105,32 @@ def get_group_keys(engine: Engine, table: str, ids: Sequence[int], max_groups_pe
     return pd.concat(out, ignore_index=True)
 
 
-def sample_group(engine: Engine, table: str, cols: List[str], id_: int, tf: str, period: int, per_group: int) -> pd.DataFrame:
-    q = text(
-        f"""
+def sample_group(
+    engine: Engine,
+    table: str,
+    cols: List[str],
+    id_: int,
+    tf: str,
+    period: int,
+    per_group: int,
+) -> pd.DataFrame:
+    q = f"""
         SELECT {", ".join(cols)}
         FROM {table}
         WHERE id = :id AND tf = :tf AND period = :period
         ORDER BY ts DESC
         LIMIT :lim
         """
+    df = read_sql_polars(
+        q,
+        engine,
+        params={
+            "id": int(id_),
+            "tf": str(tf),
+            "period": int(period),
+            "lim": int(per_group),
+        },
     )
-    df = pd.read_sql(q, engine, params={"id": int(id_), "tf": str(tf), "period": int(period), "lim": int(per_group)})
     if df.empty:
         return df
     df.insert(0, "table_name", table)
@@ -160,16 +138,37 @@ def sample_group(engine: Engine, table: str, cols: List[str], id_: int, tf: str,
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Create a visual sample CSV from EMA tables (last N rows per id/tf/period).")
-    ap.add_argument("--ids", required=True, help="all OR comma-separated list like 1,52")
-    ap.add_argument("--daily-table", default=DEFAULT_DAILY_TABLE, help="Used only to resolve --ids all")
-    ap.add_argument("--per-group", type=int, default=50, help="Rows per (table,id,tf,period) group")
-    ap.add_argument("--max-groups-per-id", type=int, default=0, help="Cap groups per id (0 = no cap)")
+    ap = argparse.ArgumentParser(
+        description="Create a visual sample CSV from EMA tables (last N rows per id/tf/period)."
+    )
+    ap.add_argument(
+        "--ids", required=True, help="all OR comma-separated list like 1,52"
+    )
+    ap.add_argument(
+        "--daily-table",
+        default=DEFAULT_DAILY_TABLE,
+        help="Used only to resolve --ids all",
+    )
+    ap.add_argument(
+        "--per-group", type=int, default=50, help="Rows per (table,id,tf,period) group"
+    )
+    ap.add_argument(
+        "--max-groups-per-id",
+        type=int,
+        default=0,
+        help="Cap groups per id (0 = no cap)",
+    )
     ap.add_argument("--out", default="ema_samples.csv", help="Output CSV filename")
     args = ap.parse_args()
 
-    eng = get_engine()
-    ids = parse_ids(eng, args.ids, args.daily_table)
+    db_url = resolve_db_url(None)
+    eng = get_engine(db_url)
+
+    ids_result = parse_ids(args.ids)
+    if ids_result == "all":
+        ids = load_all_ids(db_url, args.daily_table)
+    else:
+        ids = ids_result
 
     frames: List[pd.DataFrame] = []
     for table in TABLES:
@@ -189,26 +188,43 @@ def main() -> None:
             eng,
             table,
             ids,
-            max_groups_per_id=(args.max_groups_per_id if args.max_groups_per_id > 0 else None),
+            max_groups_per_id=(
+                args.max_groups_per_id if args.max_groups_per_id > 0 else None
+            ),
         )
         if keys.empty:
             _log(f"No groups found for {table} with requested ids.")
             continue
 
-        _log(f"Sampling {table}: {len(keys)} groups * {args.per_group} rows each (max).")
+        _log(
+            f"Sampling {table}: {len(keys)} groups * {args.per_group} rows each (max)."
+        )
 
         for _, r in keys.iterrows():
-            df_g = sample_group(eng, table, cols, int(r["id"]), str(r["tf"]), int(r["period"]), args.per_group)
+            df_g = sample_group(
+                eng,
+                table,
+                cols,
+                int(r["id"]),
+                str(r["tf"]),
+                int(r["period"]),
+                args.per_group,
+            )
             if not df_g.empty:
                 frames.append(df_g)
 
     if not frames:
-        raise RuntimeError("No samples produced. Check ids/table names and permissions.")
+        raise RuntimeError(
+            "No samples produced. Check ids/table names and permissions."
+        )
 
     out_df = pd.concat(frames, ignore_index=True)
     out_df["sample_generated_at"] = datetime.now(UTC).isoformat()
 
-    out_df = out_df.sort_values(["table_name", "id", "tf", "period", "ts"], ascending=[True, True, True, True, False]).reset_index(drop=True)
+    out_df = out_df.sort_values(
+        ["table_name", "id", "tf", "period", "ts"],
+        ascending=[True, True, True, True, False],
+    ).reset_index(drop=True)
     out_df.to_csv(args.out, index=False)
     _log(f"Wrote {len(out_df)} rows -> {args.out}")
 

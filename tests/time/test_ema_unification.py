@@ -151,7 +151,9 @@ def test_alignment_source_values(engine):
     df = pd.read_sql(q, engine)
 
     if df.empty:
-        pytest.skip("Table cmc_ema_multi_tf_u is empty - cannot validate alignment_source values")
+        pytest.skip(
+            "Table cmc_ema_multi_tf_u is empty - cannot validate alignment_source values"
+        )
 
     actual_sources = set(df["alignment_source"].tolist())
 
@@ -167,7 +169,9 @@ def test_alignment_source_values(engine):
 
     # At least one expected source should be present
     overlap = actual_sources & expected_sources
-    assert overlap, f"No expected alignment_source values found. Got: {sorted(actual_sources)}"
+    assert (
+        overlap
+    ), f"No expected alignment_source values found. Got: {sorted(actual_sources)}"
 
     # Warn about unexpected sources (not a failure, just informational)
     unexpected = actual_sources - expected_sources
@@ -227,7 +231,9 @@ def test_tf_values_match_dim_timeframe(engine):
     df_exists = pd.read_sql(q_exists, engine)
 
     if df_exists.empty:
-        pytest.skip("dim_timeframe table does not exist - cannot validate FK constraint")
+        pytest.skip(
+            "dim_timeframe table does not exist - cannot validate FK constraint"
+        )
 
     # Get distinct tf values from unified table
     q_tf_values = text("SELECT DISTINCT tf FROM cmc_ema_multi_tf_u ORDER BY tf")
@@ -253,6 +259,4 @@ def test_tf_values_match_dim_timeframe(engine):
 
     invalid_tfs = actual_tfs - valid_tfs
 
-    assert not invalid_tfs, (
-        f"TF values in cmc_ema_multi_tf_u not found in dim_timeframe: {sorted(invalid_tfs)}"
-    )
+    assert not invalid_tfs, f"TF values in cmc_ema_multi_tf_u not found in dim_timeframe: {sorted(invalid_tfs)}"

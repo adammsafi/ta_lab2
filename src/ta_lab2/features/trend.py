@@ -50,7 +50,9 @@ def compute_trend_labels(
     # Rolling slope via linear regression on index vs price
     x = np.arange(window)
     denom = (x - x.mean()).var() * window
-    cov = s.rolling(window).apply(lambda v: np.dot(v - v.mean(), x - x.mean()) / denom, raw=False)
+    cov = s.rolling(window).apply(
+        lambda v: np.dot(v - v.mean(), x - x.mean()) / denom, raw=False
+    )
     slope = cov * window  # approximate slope per index unit
     df[f"{price_col}_slope_{window}"] = slope
 
@@ -63,10 +65,7 @@ def compute_trend_labels(
     elif mode == "three_state":
         pct = np.nanpercentile(np.abs(slope.dropna()), [33, 67])
         lo, hi = pct[0], pct[1]
-        label = np.where(
-            slope.abs() < lo, 0,
-            np.where(slope > 0, 1, -1)
-        )
+        label = np.where(slope.abs() < lo, 0, np.where(slope > 0, 1, -1))
     elif mode == "flat_zone":
         label = np.where(np.abs(slope) < flat_thresh, 0, np.sign(slope))
     else:

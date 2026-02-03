@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
@@ -34,7 +34,9 @@ class QAReason(str, Enum):
     TF_DAYS_OUT_OF_BOUNDS = "TF_DAYS_OUT_OF_BOUNDS"
     DISALLOWED_PARTIAL_START = "DISALLOWED_PARTIAL_START"
     DISALLOWED_PARTIAL_END = "DISALLOWED_PARTIAL_END"
-    SCHEME_MISMATCH = "SCHEME_MISMATCH"  # optional placeholder if you add boundary checks
+    SCHEME_MISMATCH = (
+        "SCHEME_MISMATCH"  # optional placeholder if you add boundary checks
+    )
 
 
 # -----------------------------
@@ -207,8 +209,12 @@ def _tf_days_bounds_violations(
                     table=table_name,
                     id=int(r["id"]),
                     tf=tf,
-                    time_open=str(r.get("time_open")) if r.get("time_open") is not None else None,
-                    time_close=str(r.get("time_close")) if r.get("time_close") is not None else None,
+                    time_open=str(r.get("time_open"))
+                    if r.get("time_open") is not None
+                    else None,
+                    time_close=str(r.get("time_close"))
+                    if r.get("time_close") is not None
+                    else None,
                     reason=QAReason.TF_DAYS_OUT_OF_BOUNDS,
                     details={
                         "tf_days": tf_days,
@@ -253,8 +259,12 @@ def _partial_policy_violations(
                     table=table_name,
                     id=int(r["id"]),
                     tf=tf,
-                    time_open=str(r.get("time_open")) if r.get("time_open") is not None else None,
-                    time_close=str(r.get("time_close")) if r.get("time_close") is not None else None,
+                    time_open=str(r.get("time_open"))
+                    if r.get("time_open") is not None
+                    else None,
+                    time_close=str(r.get("time_close"))
+                    if r.get("time_close") is not None
+                    else None,
                     reason=QAReason.DISALLOWED_PARTIAL_START,
                     details={
                         "tf_days": tf_days,
@@ -271,8 +281,12 @@ def _partial_policy_violations(
                     table=table_name,
                     id=int(r["id"]),
                     tf=tf,
-                    time_open=str(r.get("time_open")) if r.get("time_open") is not None else None,
-                    time_close=str(r.get("time_close")) if r.get("time_close") is not None else None,
+                    time_open=str(r.get("time_open"))
+                    if r.get("time_open") is not None
+                    else None,
+                    time_close=str(r.get("time_close"))
+                    if r.get("time_close") is not None
+                    else None,
                     reason=QAReason.DISALLOWED_PARTIAL_END,
                     details={
                         "tf_days": tf_days,
@@ -366,12 +380,20 @@ def run_bars_qa(
                         table=table_name,
                         id=int(r["id"]),
                         tf=str(r["tf"]),
-                        time_open=str(r["time_open"]) if r.get("time_open") is not None else None,
-                        time_close=str(r["time_close"]) if r.get("time_close") is not None else None,
+                        time_open=str(r["time_open"])
+                        if r.get("time_open") is not None
+                        else None,
+                        time_close=str(r["time_close"])
+                        if r.get("time_close") is not None
+                        else None,
                         reason=QAReason(reason),
                         details={
-                            "prev_close": str(r["prev_close"]) if r.get("prev_close") is not None else None,
-                            "prev_open": str(r["prev_open"]) if r.get("prev_open") is not None else None,
+                            "prev_close": str(r["prev_close"])
+                            if r.get("prev_close") is not None
+                            else None,
+                            "prev_open": str(r["prev_open"])
+                            if r.get("prev_open") is not None
+                            else None,
                         },
                     )
                 )
@@ -386,8 +408,12 @@ def run_bars_qa(
                         table=table_name,
                         id=int(r["id"]),
                         tf=str(r["tf"]),
-                        time_open=str(r["time_open"]) if r.get("time_open") is not None else None,
-                        time_close=str(r["time_close"]) if r.get("time_close") is not None else None,
+                        time_open=str(r["time_open"])
+                        if r.get("time_open") is not None
+                        else None,
+                        time_close=str(r["time_close"])
+                        if r.get("time_close") is not None
+                        else None,
                         reason=QAReason.OHLC_INVALID,
                         details={
                             "open": r.get("o"),
@@ -411,8 +437,12 @@ def run_bars_qa(
                         table=table_name,
                         id=int(r["id"]),
                         tf=str(r["tf"]),
-                        time_open=str(r["time_open"]) if r.get("time_open") is not None else None,
-                        time_close=str(r["time_close"]) if r.get("time_close") is not None else None,
+                        time_open=str(r["time_open"])
+                        if r.get("time_open") is not None
+                        else None,
+                        time_close=str(r["time_close"])
+                        if r.get("time_close") is not None
+                        else None,
                         reason=QAReason(reason),
                         details={
                             "bar_seq": r.get("bar_seq"),
@@ -437,7 +467,11 @@ WHERE tf_days IS NULL
             # and letting Python do the bounds check on the returned set if you want.
             # If you prefer: remove WHERE and scan all tf_days. (Heavier.)
             base_rows = conn.execute(text(q), params).mappings().all()
-            violations.extend(_tf_days_bounds_violations(table_name=table_name, store=store, rows=base_rows))
+            violations.extend(
+                _tf_days_bounds_violations(
+                    table_name=table_name, store=store, rows=base_rows
+                )
+            )
 
         # 5) Partial policy enforcement (first/last bars per id/tf)
         if check_partial_policy:
@@ -463,7 +497,11 @@ WHERE rn_asc = 1 OR rn_desc = 1
 """
             )
             rows = conn.execute(text(q), params).mappings().all()
-            violations.extend(_partial_policy_violations(table_name=table_name, store=store, rows_first_last=rows))
+            violations.extend(
+                _partial_policy_violations(
+                    table_name=table_name, store=store, rows_first_last=rows
+                )
+            )
 
     return QARunResult(
         table=table_name,
@@ -484,13 +522,17 @@ def summarize_qa(result: QARunResult, *, max_examples_per_reason: int = 5) -> st
     Produce a readable summary string for logs / CLI.
     """
     lines: List[str] = []
-    lines.append(f"[qa] table={result.table} ids={len(result.checked_ids)} tfs={len(result.checked_tfs)}")
+    lines.append(
+        f"[qa] table={result.table} ids={len(result.checked_ids)} tfs={len(result.checked_tfs)}"
+    )
     if not result.violations:
         lines.append("[qa] ✅ no violations")
         return "\n".join(lines)
 
     lines.append(f"[qa] ❌ violations={len(result.violations)}")
-    for reason, count in sorted(result.counts_by_reason.items(), key=lambda x: (-x[1], x[0])):
+    for reason, count in sorted(
+        result.counts_by_reason.items(), key=lambda x: (-x[1], x[0])
+    ):
         lines.append(f"  - {reason}: {count}")
 
         shown = 0

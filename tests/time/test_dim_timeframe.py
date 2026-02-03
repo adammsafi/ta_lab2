@@ -17,8 +17,7 @@ from ta_lab2.time.dim_timeframe import DimTimeframe, get_tf_days, list_tfs
 
 # Skip all tests if TARGET_DB_URL is not set
 pytestmark = pytest.mark.skipif(
-    not TARGET_DB_URL,
-    reason="TARGET_DB_URL not set - database tests skipped"
+    not TARGET_DB_URL, reason="TARGET_DB_URL not set - database tests skipped"
 )
 
 
@@ -38,14 +37,16 @@ def engine(db_url):
 
 def test_dim_timeframe_table_exists(engine):
     """Verify dim_timeframe table exists in public schema."""
-    query = text("""
+    query = text(
+        """
         SELECT EXISTS (
             SELECT 1
             FROM information_schema.tables
             WHERE table_schema = 'public'
             AND table_name = 'dim_timeframe'
         )
-    """)
+    """
+    )
 
     with engine.connect() as conn:
         result = conn.execute(query)
@@ -76,12 +77,14 @@ def test_dim_timeframe_has_required_columns(engine):
         "tf_days_max",
     }
 
-    query = text("""
+    query = text(
+        """
         SELECT column_name
         FROM information_schema.columns
         WHERE table_schema = 'public'
         AND table_name = 'dim_timeframe'
-    """)
+    """
+    )
 
     with engine.connect() as conn:
         result = conn.execute(query)
@@ -99,7 +102,9 @@ def test_dim_timeframe_has_data(engine):
         result = conn.execute(query)
         row_count = result.scalar()
 
-    assert row_count >= 5, f"dim_timeframe has only {row_count} rows (expected at least 5)"
+    assert (
+        row_count >= 5
+    ), f"dim_timeframe has only {row_count} rows (expected at least 5)"
 
 
 def test_list_tfs_returns_canonical(db_url):
@@ -133,7 +138,9 @@ def test_dimtimeframe_from_db_loads(db_url):
     """Verify DimTimeframe.from_db loads successfully and has data."""
     dim_tf = DimTimeframe.from_db(db_url)
 
-    assert isinstance(dim_tf, DimTimeframe), "from_db did not return DimTimeframe instance"
+    assert isinstance(
+        dim_tf, DimTimeframe
+    ), "from_db did not return DimTimeframe instance"
     assert hasattr(dim_tf, "_meta"), "DimTimeframe missing _meta attribute"
     assert len(dim_tf._meta) > 0, "DimTimeframe._meta is empty"
     assert "1D" in dim_tf._meta, "1D timeframe not found in DimTimeframe._meta"
@@ -144,7 +151,10 @@ def test_dimtimeframe_alignment_type(db_url):
     dim_tf = DimTimeframe.from_db(db_url)
 
     alignment = dim_tf.alignment("1D")
-    assert alignment in ["tf_day", "calendar"], f"Unexpected alignment type: {alignment}"
+    assert alignment in [
+        "tf_day",
+        "calendar",
+    ], f"Unexpected alignment type: {alignment}"
 
 
 def test_dimtimeframe_list_tfs_canonical(db_url):

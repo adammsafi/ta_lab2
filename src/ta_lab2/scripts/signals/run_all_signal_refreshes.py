@@ -32,11 +32,17 @@ from typing import List, Optional
 import pandas as pd
 from sqlalchemy import create_engine, text
 
-from ta_lab2.scripts.signals import SignalStateManager, SignalStateConfig, load_active_signals
+from ta_lab2.scripts.signals import (
+    SignalStateManager,
+    SignalStateConfig,
+    load_active_signals,
+)
 from ta_lab2.scripts.signals.generate_signals_ema import EMASignalGenerator
 from ta_lab2.scripts.signals.generate_signals_rsi import RSISignalGenerator
 from ta_lab2.scripts.signals.generate_signals_atr import ATRSignalGenerator
-from ta_lab2.scripts.signals.validate_reproducibility import validate_backtest_reproducibility
+from ta_lab2.scripts.signals.validate_reproducibility import (
+    validate_backtest_reproducibility,
+)
 from ta_lab2.scripts.backtests import SignalBacktester
 from ta_lab2.backtests.costs import CostModel
 
@@ -50,6 +56,7 @@ class RefreshResult:
 
     Tracks success/failure, signal count, and execution duration for reporting.
     """
+
     signal_type: str
     signals_generated: int
     duration_seconds: float
@@ -98,9 +105,9 @@ def refresh_signal_type(
 
         # Select generator based on type
         generators = {
-            'ema_crossover': EMASignalGenerator,
-            'rsi_mean_revert': RSISignalGenerator,
-            'atr_breakout': ATRSignalGenerator,
+            "ema_crossover": EMASignalGenerator,
+            "rsi_mean_revert": RSISignalGenerator,
+            "atr_breakout": ATRSignalGenerator,
         }
 
         if signal_type not in generators:
@@ -120,13 +127,17 @@ def refresh_signal_type(
             logger.debug(f"    Generated {n} signals")
 
         duration = (datetime.now() - start).total_seconds()
-        logger.info(f"✓ {signal_type} complete: {total_signals} signals in {duration:.1f}s")
+        logger.info(
+            f"✓ {signal_type} complete: {total_signals} signals in {duration:.1f}s"
+        )
 
         return RefreshResult(signal_type, total_signals, duration, True)
 
     except Exception as e:
         duration = (datetime.now() - start).total_seconds()
-        logger.error(f"✗ {signal_type} FAILED after {duration:.1f}s: {e}", exc_info=True)
+        logger.error(
+            f"✗ {signal_type} FAILED after {duration:.1f}s: {e}", exc_info=True
+        )
         return RefreshResult(signal_type, 0, duration, False, str(e))
 
 
@@ -154,7 +165,7 @@ def run_parallel_refresh(
     Returns:
         List of RefreshResult for each signal type
     """
-    signal_types = ['ema_crossover', 'rsi_mean_revert', 'atr_breakout']
+    signal_types = ["ema_crossover", "rsi_mean_revert", "atr_breakout"]
     results = []
 
     logger.info(f"Starting parallel refresh of {len(signal_types)} signal types...")
@@ -216,7 +227,7 @@ def validate_pipeline_reproducibility(
     all_pass = True
     validation_count = 0
 
-    for signal_type in ['ema_crossover', 'rsi_mean_revert', 'atr_breakout']:
+    for signal_type in ["ema_crossover", "rsi_mean_revert", "atr_breakout"]:
         configs = load_active_signals(engine, signal_type)
 
         if not configs:
@@ -225,8 +236,8 @@ def validate_pipeline_reproducibility(
 
         for cfg in configs:
             validation_count += 1
-            signal_name = cfg['signal_name']
-            signal_id = cfg['signal_id']
+            signal_name = cfg["signal_name"]
+            signal_id = cfg["signal_id"]
 
             logger.info(f"  Validating: {signal_type}/{signal_name}")
 
@@ -254,7 +265,9 @@ def validate_pipeline_reproducibility(
                 all_pass = False
 
     if validation_count == 0:
-        logger.warning("No signals to validate (no active configs or no signals generated)")
+        logger.warning(
+            "No signals to validate (no active configs or no signals generated)"
+        )
         return True
 
     return all_pass
@@ -267,11 +280,13 @@ def _get_all_asset_ids(engine) -> list[int]:
     Returns:
         Sorted list of unique asset IDs
     """
-    sql = text("""
+    sql = text(
+        """
         SELECT DISTINCT id
         FROM public.cmc_daily_features
         ORDER BY id
-    """)
+    """
+    )
 
     with engine.connect() as conn:
         result = conn.execute(sql)
@@ -290,7 +305,7 @@ def main():
         Exit code: 0 on success, 1 on failure
     """
     parser = argparse.ArgumentParser(
-        description='Orchestrated signal generation pipeline with reproducibility validation',
+        description="Orchestrated signal generation pipeline with reproducibility validation",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -311,45 +326,43 @@ Examples:
 
   # Specific assets with verbose logging
   python run_all_signal_refreshes.py --ids 1 2 3 --verbose
-        """
+        """,
     )
 
     parser.add_argument(
-        '--ids',
+        "--ids",
         type=int,
-        nargs='+',
-        help='Asset IDs to process (default: all assets from cmc_daily_features)'
+        nargs="+",
+        help="Asset IDs to process (default: all assets from cmc_daily_features)",
     )
     parser.add_argument(
-        '--full-refresh',
-        action='store_true',
-        help='Regenerate all signals (default: incremental refresh)'
+        "--full-refresh",
+        action="store_true",
+        help="Regenerate all signals (default: incremental refresh)",
     )
     parser.add_argument(
-        '--validate-only',
-        action='store_true',
-        help='Skip signal generation, only run reproducibility validation'
+        "--validate-only",
+        action="store_true",
+        help="Skip signal generation, only run reproducibility validation",
     )
     parser.add_argument(
-        '--skip-validation',
-        action='store_true',
-        help='Skip reproducibility validation after signal generation'
+        "--skip-validation",
+        action="store_true",
+        help="Skip reproducibility validation after signal generation",
     )
     parser.add_argument(
-        '--fail-fast',
-        action='store_true',
-        help='Exit immediately on first signal type failure (default: continue with partial results)'
+        "--fail-fast",
+        action="store_true",
+        help="Exit immediately on first signal type failure (default: continue with partial results)",
     )
     parser.add_argument(
-        '--parallel',
-        type=int,
-        default=3,
-        help='Max parallel workers (default: 3)'
+        "--parallel", type=int, default=3, help="Max parallel workers (default: 3)"
     )
     parser.add_argument(
-        '--verbose', '-v',
-        action='store_true',
-        help='Enable verbose (DEBUG-level) logging'
+        "--verbose",
+        "-v",
+        action="store_true",
+        help="Enable verbose (DEBUG-level) logging",
     )
 
     args = parser.parse_args()
@@ -358,8 +371,8 @@ Examples:
     log_level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(
         level=log_level,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
 
     logger.info("=" * 70)
@@ -367,7 +380,7 @@ Examples:
     logger.info("=" * 70)
 
     # Check for database URL
-    db_url = os.environ.get('TARGET_DB_URL')
+    db_url = os.environ.get("TARGET_DB_URL")
     if not db_url:
         logger.error("TARGET_DB_URL environment variable not set")
         return 1
@@ -406,7 +419,9 @@ Examples:
 
         if failed:
             logger.warning("")
-            logger.warning(f"{len(failed)} signal type(s) FAILED, {len(succeeded)} succeeded")
+            logger.warning(
+                f"{len(failed)} signal type(s) FAILED, {len(succeeded)} succeeded"
+            )
             for r in failed:
                 logger.error(f"  FAILED: {r.signal_type} - {r.error}")
 
@@ -429,7 +444,7 @@ Examples:
         sample_asset = ids[0]
 
         # Use recent date range for validation (1 year)
-        sample_end = pd.Timestamp.now(tz='UTC').normalize()
+        sample_end = pd.Timestamp.now(tz="UTC").normalize()
         sample_start = sample_end - pd.Timedelta(days=365)
 
         logger.info(f"Using sample asset {sample_asset} for validation")
@@ -455,5 +470,5 @@ Examples:
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())
