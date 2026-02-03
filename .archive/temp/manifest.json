@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "category": "temp",
   "created_at": "2026-02-03T11:26:52.586873",
-  "total_files": 173,
-  "total_size_bytes": 198617404,
+  "total_files": 177,
+  "total_size_bytes": 198631069,
   "files": [
     {
       "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\ema_expected_coverage.csv",
@@ -1908,6 +1908,50 @@
       "commit_hash": "f183cbb365af92467dc999db082a6a3250953f5a",
       "phase_number": "16",
       "archive_reason": "Loose scripts directory - temporary utilities"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\archive_original_files.py",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\temp\\2026-02-03\\archive_original_files.py",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:35:53.773063",
+      "sha256_checksum": "986ea09d0faed84e4826619e8f35d9c6d948be57bf0fd464741e0514973245bc",
+      "size_bytes": 3110,
+      "commit_hash": "9c75d6a1b46132fe0ae85206b15fcd1534dd523f",
+      "phase_number": "16",
+      "archive_reason": "Temporary archival script from Phase 16-01"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\archive_refactored_files.py",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\temp\\2026-02-03\\archive_refactored_files.py",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:35:53.805927",
+      "sha256_checksum": "a5efc5db1e2f326ca7a3961fd6fa3155558b8eba1624f517d4f2d1ed174d23a8",
+      "size_bytes": 5114,
+      "commit_hash": "9c75d6a1b46132fe0ae85206b15fcd1534dd523f",
+      "phase_number": "16",
+      "archive_reason": "Temporary archival script from Phase 16-01"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\final_cleanup.py",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\temp\\2026-02-03\\final_cleanup.py",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:35:53.840827",
+      "sha256_checksum": "0f11c1dd6712c642d94aee8687b285f59f1f6e3c62361a0142fc07e3d360c9c9",
+      "size_bytes": 5441,
+      "commit_hash": "9c75d6a1b46132fe0ae85206b15fcd1534dd523f",
+      "phase_number": "16",
+      "archive_reason": "Temporary archival script from Phase 16-01"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.codex_write_access",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\temp\\2026-02-03\\.codex_write_access",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:35:53.875841",
+      "sha256_checksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0,
+      "commit_hash": "9c75d6a1b46132fe0ae85206b15fcd1534dd523f",
+      "phase_number": "16",
+      "archive_reason": "Codex write access marker file"
     }
   ]
 }
