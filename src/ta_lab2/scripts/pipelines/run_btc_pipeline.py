@@ -1,4 +1,4 @@
-# src/ta_lab2/regimes/run_btc_pipeline.py
+# src/ta_lab2/scripts/pipelines/run_btc_pipeline.py
 from __future__ import annotations
 from pathlib import Path
 from typing import Any
@@ -30,8 +30,8 @@ def run_btc_pipeline(
       3) Write outputs to out_dir
       4) Return a structured result dict (data + metadata)
 
-    This wrapper keeps the CLI and tests portable while delegating core logic
-    to src/ta_lab2/pipelines/btc_pipeline.py (the canonical implementation).
+    This CLI wrapper provides a file-based interface (CSV input, parquet outputs)
+    while delegating core logic to src/ta_lab2/pipelines/btc_pipeline.py (the canonical implementation).
     """
 
     csv_path = Path(csv_path)
