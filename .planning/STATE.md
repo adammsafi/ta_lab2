@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 ## Current Position
 
 Phase: 17 of 19 (Verification & Validation)
-Plan: 2 of 6 in current phase
+Plan: 3 of 6 in current phase
 Status: In progress
-Last activity: 2026-02-03 - Completed 17-02-PLAN.md (import-linter configuration)
+Last activity: 2026-02-03 - Completed 17-03-PLAN.md (CI validation workflow)
 
-Progress: [##########] 100% v0.4.0 | [██████████] 100% v0.5.0 (Phase 17 in progress: 2/6 plans)
+Progress: [##########] 100% v0.4.0 | [██████████] 100% v0.5.0 (Phase 17 in progress: 3/6 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 95 (56 in v0.4.0, 39 in v0.5.0)
+- Total plans completed: 96 (56 in v0.4.0, 40 in v0.5.0)
 - Average duration: 13 min
-- Total execution time: 20.13 hours
+- Total execution time: 20.15 hours
 
 **By Phase (v0.4.0):**
 
@@ -48,11 +48,11 @@ Progress: [##########] 100% v0.4.0 | [██████████] 100% v0.5.
 | 14-tools-integration | 13 | 128 min | 10 min | Complete |
 | 15-economic-data-strategy | 6 | 36 min | 6 min | Complete |
 | 16-repository-cleanup | 7 | 226 min | 32 min | Complete |
-| 17-verification-validation | 2 | 10 min | 5 min | In progress |
+| 17-verification-validation | 3 | 12 min | 4 min | In progress |
 
 **Recent Trend:**
 - v0.4.0 complete: 10 phases, 56 plans, 12.55 hours total
-- v0.5.0 in progress: Phase 17 started (2/6 plans, 10 min), 39 plans across 7 phases
+- v0.5.0 in progress: Phase 17 started (3/6 plans, 12 min), 40 plans across 7 phases
 
 *Updated after each plan completion*
 
@@ -162,6 +162,9 @@ Recent decisions affecting current work:
 - **Layers contract for import-linter** (17-02): Use layers contract (4-tier hierarchy) not independence for proper layering validation
 - **lint-imports command not python -m** (17-02): importlinter lacks __main__ module, use lint-imports with shell=True for Windows
 - **Document violations not block** (17-02): 3 architectural violations (tools->features, regimes<->pipelines) documented for gap closure
+- **Critical jobs block CI** (17-03): import-validation-core and circular-dependencies have no continue-on-error for blocking checks
+- **Warning jobs use continue-on-error** (17-03): organization-rules and import-validation-optional use continue-on-error: true for advisory checks
+- **Separate core vs optional imports** (17-03): Core imports tested without orchestrator (mark "not orchestrator"), optional imports with full dependencies can fail non-blocking
 
 ### Pending Todos
 
@@ -176,10 +179,10 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-03T22:00:24Z
-Stopped at: Completed 17-02-PLAN.md (import-linter configuration with 3 violations detected)
+Last session: 2026-02-03T22:08:23Z
+Stopped at: Completed 17-03-PLAN.md (CI validation workflow with critical/warning job separation)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-03 (Phase 17 in progress: 2/6 plans - import validation complete with 368 tests, import-linter configured with 3 violations detected for gap closure)*
+*Last updated: 2026-02-03 (Phase 17 in progress: 3/6 plans - import validation with 368 tests, import-linter with 3 violations, CI workflow enforcing validation)*
