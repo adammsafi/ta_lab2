@@ -39,7 +39,7 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 - [x] **Phase 13: Documentation Consolidation** - Convert and integrate ProjectTT docs with memory tracking
 - [x] **Phase 14: Tools Integration** - Migrate Data_Tools scripts with memory updates | 13/13 | Complete | 2026-02-03
 - [x] **Phase 15: Economic Data Strategy** - Archive packages, extract utils, create integration skeleton with memory updates
-- [ ] **Phase 16: Repository Cleanup** - Clean root directory with memory updates
+- [x] **Phase 16: Repository Cleanup** - Clean root directory with memory updates | 7/7 | Complete | 2026-02-03
 - [ ] **Phase 17: Verification & Validation** - Validate imports, dependencies, and structure
 - [ ] **Phase 18: Structure Documentation** - Document final structure and migration decisions
 - [ ] **Phase 19: Memory Validation & Release** - Final memory validation and milestone release
@@ -284,12 +284,15 @@ Plans:
   3. Loose .md files moved to appropriate docs/ subdirectories
   4. Exact duplicates identified via SHA256 and archived
   5. Similar functions (85%+ threshold) flagged for review
-**Plans**: 7 plans (6 complete, 1 gap closure)
+**Plans**: 7/7 complete (including gap closure)
 Plans:
 - [x] 16-01-PLAN.md - Archive temp files, loose scripts, corrupted paths from root
 - [x] 16-02-PLAN.md - Compare and resolve *_refactored.py files, archive *.original files
 - [x] 16-03-PLAN.md - Organize loose .md files into docs/ structure
 - [x] 16-04-PLAN.md - Create duplicate detection tool and identify/archive exact duplicates
+- [x] 16-05-PLAN.md - Create function similarity analysis tool
+- [x] 16-06-PLAN.md - Update memory with file movements and phase snapshot
+- [x] 16-07-PLAN.md - Gap closure: Archive remaining root clutter (temp script, corrupted paths)
 - [x] 16-05-PLAN.md - Create similarity analysis tool and generate three-tier report
 - [x] 16-06-PLAN.md - Update memory with file movements and phase snapshot
 - [ ] 16-07-PLAN.md - Gap closure: Archive remaining root clutter (temp script, corrupted paths)
