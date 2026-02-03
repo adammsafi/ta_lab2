@@ -67,7 +67,24 @@ docs = [
   "mkdocstrings[python]>=1.0",
 ]
 
-# Combined group for development + orchestrator + docs
+# Economic data integration (FRED)
+fred = [
+  "fredapi>=0.5.2",
+]
+
+# Economic data integration (Fed - future)
+# Currently empty, placeholder for fedfred or other Fed-specific packages
+fed = [
+  # "fedfred>=1.0",  # Uncomment when Fed provider implemented
+]
+
+# All economic data providers combined
+economic = [
+  "fredapi>=0.5.2",
+  # "fedfred>=1.0",  # Uncomment when Fed provider implemented
+]
+
+# Combined group for development + orchestrator + docs + economic
 all = [
   "pytest>=8.0",
   "pytest-asyncio>=0.21.0",
@@ -86,6 +103,7 @@ all = [
   "python-dotenv>=1.0.0",
   "mkdocs-material>=9.0",
   "mkdocstrings[python]>=1.0",
+  "fredapi>=0.5.2",
 ]
 
 # ---------- Pytest configuration ----------
