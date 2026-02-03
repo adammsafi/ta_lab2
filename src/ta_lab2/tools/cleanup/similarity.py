@@ -87,20 +87,22 @@ def extract_functions(file_path: Path) -> list[FunctionInfo]:
     for node in ast.walk(tree):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             try:
-                # Normalize AST for comparison (remove location info)
-                normalized = normalize_ast(node)
-                unparsed = ast.unparse(normalized)
-
-                # Extract docstring if present
+                # Save metadata
+                name = node.name
+                lineno = node.lineno
+                arg_count = len(node.args.args)
                 docstring = ast.get_docstring(node)
+
+                # Unparse to code string (no normalization needed - unparsed code is already normalized)
+                unparsed = ast.unparse(node)
 
                 functions.append(FunctionInfo(
                     file=file_path,
-                    name=node.name,
-                    lineno=node.lineno,
+                    name=name,
+                    lineno=lineno,
                     code=unparsed,
                     docstring=docstring,
-                    arg_count=len(node.args.args)
+                    arg_count=arg_count
                 ))
             except Exception as e:
                 logger.debug(f"Error processing {node.name} in {file_path}: {e}")
@@ -113,6 +115,9 @@ def normalize_ast(node: ast.AST) -> ast.AST:
     """Normalize AST by removing location information.
 
     This allows comparing functions regardless of where they appear in files.
+
+    Note: This function is kept for potential future use but is not currently used
+    since ast.unparse() already produces normalized output.
     """
     for child in ast.walk(node):
         for attr in ("lineno", "col_offset", "end_lineno", "end_col_offset"):
