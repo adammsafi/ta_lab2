@@ -1,0 +1,219 @@
+{
+  "$schema": "https://ta_lab2.local/schemas/archive-manifest/v1.0.0",
+  "version": "1.0.0",
+  "category": "scripts",
+  "created_at": "2026-02-03T11:30:33.741453",
+  "total_files": 19,
+  "total_size_bytes": 90035,
+  "files": [
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\openai_config_2.env",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\scripts\\2026-02-03\\configuration\\openai_config_2.env",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:30:31.210897",
+      "sha256_checksum": "fd6a1c1d2b52aabd9094e01fa7c76b5101f7a6fa57b4e197e1e3cb3f5ae41e51",
+      "size_bytes": 180,
+      "commit_hash": "f559eb9affbe01bbb14384f3f86c937e63d61cf0",
+      "phase_number": "16",
+      "archive_reason": "Redundant config - openai_config.env is primary"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\run_btc.py",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\scripts\\2026-02-03\\runners\\run_btc.py",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:30:31.336334",
+      "sha256_checksum": "fdb9d5586b1c06b9d8287c35190f04527b3fedb73ab7a18e0cc1bf729938e89d",
+      "size_bytes": 1812,
+      "commit_hash": "f559eb9affbe01bbb14384f3f86c937e63d61cf0",
+      "phase_number": "16",
+      "archive_reason": "Runner script: -*- coding: utf-8 -*- \"\"\" \"\"\""
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\run_btc_genesis.py",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\scripts\\2026-02-03\\runners\\run_btc_genesis.py",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:30:31.466445",
+      "sha256_checksum": "9a0fb34b2877bc6b3c62a683828a8bcdd625cf517a3005cf77c43e2d092d3b59",
+      "size_bytes": 11301,
+      "commit_hash": "f559eb9affbe01bbb14384f3f86c937e63d61cf0",
+      "phase_number": "16",
+      "archive_reason": "Runner script: -*- coding: utf-8 -*- \"\"\" \"\"\""
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\run_spyder_menu.py",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\scripts\\2026-02-03\\runners\\run_spyder_menu.py",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:30:31.618105",
+      "sha256_checksum": "475e679399e9859329b38f471932b15165ecd362c70d35f2a6f919e9e4b1d25c",
+      "size_bytes": 12031,
+      "commit_hash": "f559eb9affbe01bbb14384f3f86c937e63d61cf0",
+      "phase_number": "16",
+      "archive_reason": "Runner script: -*- coding: utf-8 -*- \"\"\" \"\"\""
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\run_migration.py",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\scripts\\2026-02-03\\runners\\run_migration.py",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:30:31.796775",
+      "sha256_checksum": "adb83f93f9ae8e998e1a4c1a31e37a1dad085ee95a81f0551eb61207761b9c45",
+      "size_bytes": 4215,
+      "commit_hash": "f559eb9affbe01bbb14384f3f86c937e63d61cf0",
+      "phase_number": "16",
+      "archive_reason": "Runner script: \"\"\"Execute full migration: ChromaDB -> Mem0 -> Metadata enrichment. \"\"\" Configure logging"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\run_migration_fixed.py",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\scripts\\2026-02-03\\runners\\run_migration_fixed.py",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:30:31.967068",
+      "sha256_checksum": "65855b07e05da3f7d5c03d258960658e3a98314454f192dd48b740ee4f28e13a",
+      "size_bytes": 2704,
+      "commit_hash": "f559eb9affbe01bbb14384f3f86c937e63d61cf0",
+      "phase_number": "16",
+      "archive_reason": "Runner script: \"\"\"Execute ChromaDB to Mem0 migration with proper persistence. \"\"\" Configure logging"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\fix_qdrant_persistence.py",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\scripts\\2026-02-03\\utilities\\fix_qdrant_persistence.py",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:30:32.116878",
+      "sha256_checksum": "18c0ba5eafddc0294c9f4b6f2540d5a01d845653cb0f5ab7f1f0af7272df6c58",
+      "size_bytes": 5171,
+      "commit_hash": "f559eb9affbe01bbb14384f3f86c937e63d61cf0",
+      "phase_number": "16",
+      "archive_reason": "Fix utility: \"\"\"Fix Qdrant persistence issue and re-run migration. \"\"\" Configure logging"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\count_chromadb_memories.py",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\scripts\\2026-02-03\\utilities\\count_chromadb_memories.py",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:30:32.215718",
+      "sha256_checksum": "ccceea8c687590ec635f0aa0ea8dfa2335f3d50bea3e74150a3ec7d87cf3bf7d",
+      "size_bytes": 717,
+      "commit_hash": "f559eb9affbe01bbb14384f3f86c937e63d61cf0",
+      "phase_number": "16",
+      "archive_reason": "Utility script: !/usr/bin/env python3 \"\"\"Quick script to count memories in ChromaDB.\"\"\""
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\generate_structure_docs.py",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\scripts\\2026-02-03\\utilities\\generate_structure_docs.py",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:30:32.359841",
+      "sha256_checksum": "9c6def5f1d9290ad2e7a2246853f2606538812380d3463c473c12c78815f0952",
+      "size_bytes": 7557,
+      "commit_hash": "f559eb9affbe01bbb14384f3f86c937e63d61cf0",
+      "phase_number": "16",
+      "archive_reason": "Utility script: -*- coding: utf-8 -*- \"\"\" \"\"\""
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\update_phase14_memory.py",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\scripts\\2026-02-03\\utilities\\update_phase14_memory.py",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:30:32.449398",
+      "sha256_checksum": "eb9fc4a7404b805cdd5801eebd3f62053f8faa2179359ac7534bf117a27befa4",
+      "size_bytes": 9547,
+      "commit_hash": "f559eb9affbe01bbb14384f3f86c937e63d61cf0",
+      "phase_number": "16",
+      "archive_reason": "Update utility: \"\"\"Update memory with Phase 14 Data_Tools migration relationships.\"\"\" Load OpenAI API key from environment file \"\"\"Load migration data from discovery.json.\"\"\""
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\convert_docx_to_txt.py",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\scripts\\2026-02-03\\conversion\\convert_docx_to_txt.py",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:30:32.531461",
+      "sha256_checksum": "df5275a4a6f00ce1e6e5be869c6834a69d403fa8451efab556d671f80b444509",
+      "size_bytes": 1644,
+      "commit_hash": "f559eb9affbe01bbb14384f3f86c937e63d61cf0",
+      "phase_number": "16",
+      "archive_reason": "Conversion utility: \"\"\"Convert .docx files to .txt files without modifying originals.\"\"\" \"\"\"Convert a single .docx file to .txt.\"\"\" Extract all text from paragraphs"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\convert_excel_files.py",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\scripts\\2026-02-03\\conversion\\convert_excel_files.py",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:30:32.652853",
+      "sha256_checksum": "40c54723f688e25fd002fcb1f9ef22b58ef5e7c8952d787e676fbee7ed348ead",
+      "size_bytes": 7392,
+      "commit_hash": "f559eb9affbe01bbb14384f3f86c937e63d61cf0",
+      "phase_number": "16",
+      "archive_reason": "Conversion utility: \"\"\"Convert ProjectTT Excel files to Markdown tables for plan 13-04. \"\"\" Set up logging"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\convert_projecttt_batch.py",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\scripts\\2026-02-03\\conversion\\convert_projecttt_batch.py",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:30:32.767635",
+      "sha256_checksum": "14b6d18c66d09ca53a3ba8a0e9ac9eb52170684ede8af754fa7f7c4cc47a02e3",
+      "size_bytes": 8077,
+      "commit_hash": "f559eb9affbe01bbb14384f3f86c937e63d61cf0",
+      "phase_number": "16",
+      "archive_reason": "Conversion utility: \"\"\"Batch convert ProjectTT DOCX files to Markdown. \"\"\" Add src to path for imports"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\test_cal_anchor_refactored.py",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\scripts\\2026-02-03\\tests\\test_cal_anchor_refactored.py",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:30:32.891975",
+      "sha256_checksum": "c7dccebb4912857b04cf4d8e983f467769e036006cfbcd3444d63c2a4b2c54e5",
+      "size_bytes": 2322,
+      "commit_hash": "f559eb9affbe01bbb14384f3f86c937e63d61cf0",
+      "phase_number": "16",
+      "archive_reason": "Test script: \"\"\"Quick test for ema_multi_tf_cal_anchor.py refactored version\"\"\" Test instantiation"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\test_cal_refactored.py",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\scripts\\2026-02-03\\tests\\test_cal_refactored.py",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:30:33.027395",
+      "sha256_checksum": "128ef2804236f2fca3a863fe22a3b2e5f813fefd57a0cd21548f0f7a8b59f194",
+      "size_bytes": 2266,
+      "commit_hash": "f559eb9affbe01bbb14384f3f86c937e63d61cf0",
+      "phase_number": "16",
+      "archive_reason": "Test script: \"\"\"Quick test for ema_multi_tf_cal.py refactored version\"\"\" Test instantiation"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\test_multi_tf_refactored.py",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\scripts\\2026-02-03\\tests\\test_multi_tf_refactored.py",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:30:33.238755",
+      "sha256_checksum": "3dab6be72545f0b27f03016b427bedb2244505645e1ab6d0e8c7664d2c9b5696",
+      "size_bytes": 1183,
+      "commit_hash": "f559eb9affbe01bbb14384f3f86c937e63d61cf0",
+      "phase_number": "16",
+      "archive_reason": "Test script: \"\"\"Quick test for ema_multi_timeframe_refactored.py\"\"\" Test instantiation"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\spyder_run_file_2025_11_02.py",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\scripts\\2026-02-03\\runners\\spyder_run_file_2025_11_02.py",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:30:33.395227",
+      "sha256_checksum": "e6267d4b024c435d34437aa6f4a69b8b6d121eac22944d88fb09f52578cb4104",
+      "size_bytes": 1192,
+      "commit_hash": "f559eb9affbe01bbb14384f3f86c937e63d61cf0",
+      "phase_number": "16",
+      "archive_reason": "Runner script: -*- coding: utf-8 -*- \"\"\" \"\"\""
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\shorter_spyder_run_file_2025_11_02.py",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\scripts\\2026-02-03\\runners\\shorter_spyder_run_file_2025_11_02.py",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:30:33.567617",
+      "sha256_checksum": "7c04c4fc2c1ff1a9601adee8fd2ab483f05ab3517282dbfe92c7d3b0f347d5f6",
+      "size_bytes": 1546,
+      "commit_hash": "f559eb9affbe01bbb14384f3f86c937e63d61cf0",
+      "phase_number": "16",
+      "archive_reason": "Runner script: -*- coding: utf-8 -*- \"\"\" \"\"\""
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\config.py",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\scripts\\2026-02-03\\configuration\\config.py",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:30:33.741453",
+      "sha256_checksum": "391cde46dab75eaa1066acdc79a6a953058f7a7b8a9cbf99b20cd208112ca8e6",
+      "size_bytes": 9178,
+      "commit_hash": "f559eb9affbe01bbb14384f3f86c937e63d61cf0",
+      "phase_number": "16",
+      "archive_reason": "Configuration file: config.py \"\"\" \"\"\""
+    }
+  ]
+}

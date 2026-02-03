@@ -1,9 +1,61 @@
 {
-  "$schema": "https://ta_lab2.local/schemas/archive-manifest/v1.0.0",
-  "version": "1.0.0",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "schema_version": "1.0.0",
   "category": "refactored",
-  "created_at": "2026-02-02T18:23:40Z",
-  "total_files": 0,
-  "total_size_bytes": 0,
-  "files": []
+  "description": "Manifest tracking refactored file archiving decisions",
+  "entries": [
+    {
+      "original_path": "src/ta_lab2/features/m_tf/ema_multi_timeframe_refactored.py",
+      "archive_path": ".archive/refactored/2026-02-03/ema_multi_timeframe_refactored.py",
+      "action": "archived",
+      "timestamp": "2026-02-03T16:25:34.304381+00:00",
+      "sha256_checksum": "3ef83552da570ee544a0bf0200357c1e9074d15c83ba3aff97745305bc7dfdae",
+      "size_bytes": 20223,
+      "comparison_result": {
+        "decision": "archive_refactored",
+        "reason": "Canonical file is already the refactored version; _refactored.py is redundant duplicate",
+        "original_lines": 571,
+        "refactored_lines": 571,
+        "files_identical": true
+      },
+      "phase_number": "16",
+      "archive_reason": "Duplicate of canonical ema_multi_timeframe.py (already refactored)"
+    },
+    {
+      "original_path": "src/ta_lab2/features/m_tf/ema_multi_tf_cal_refactored.py",
+      "archive_path": ".archive/refactored/2026-02-03/ema_multi_tf_cal_refactored.py",
+      "action": "archived",
+      "timestamp": "2026-02-03T16:25:34.360526+00:00",
+      "sha256_checksum": "8cf553bd21c1fdedc6cce2206076af66ac7bc7f352a5585c85c3bfea1b917cbc",
+      "size_bytes": 10041,
+      "comparison_result": {
+        "decision": "archive_refactored",
+        "reason": "Canonical has full dual EMA implementation (607 LOC); refactored is incomplete stub (289 LOC)",
+        "original_lines": 607,
+        "refactored_lines": 289,
+        "canonical_complete": true,
+        "refactored_stub": true
+      },
+      "phase_number": "16",
+      "archive_reason": "Incomplete stub; canonical ema_multi_tf_cal.py is complete refactored version"
+    },
+    {
+      "original_path": "src/ta_lab2/features/m_tf/ema_multi_tf_cal_anchor_refactored.py",
+      "archive_path": ".archive/refactored/2026-02-03/ema_multi_tf_cal_anchor_refactored.py",
+      "action": "archived",
+      "timestamp": "2026-02-03T16:25:34.436358+00:00",
+      "sha256_checksum": "1b77b7e187f38d49d4a241e5640c2501d1dd9ce1afef85cb0909af701fdaec4f",
+      "size_bytes": 6783,
+      "comparison_result": {
+        "decision": "archive_refactored",
+        "reason": "Canonical has full dual EMA + anchor logic (570 LOC); refactored is incomplete stub (198 LOC)",
+        "original_lines": 570,
+        "refactored_lines": 198,
+        "canonical_complete": true,
+        "refactored_stub": true
+      },
+      "phase_number": "16",
+      "archive_reason": "Incomplete stub; canonical ema_multi_tf_cal_anchor.py is complete refactored version"
+    }
+  ]
 }
