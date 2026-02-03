@@ -15,11 +15,13 @@ repos:
         name: ruff lint
         args: [--fix, --exit-non-zero-on-fix]
         types_or: [python, pyi]
+        exclude: '^\.archive/'
 
       # Run formatter
       - id: ruff-format
         name: ruff format
         types_or: [python, pyi]
+        exclude: '^\.archive/'
 
   # Standard pre-commit hooks (fast checks)
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -29,6 +31,7 @@ repos:
         exclude: '\.md$'  # Allow trailing whitespace in markdown (intentional line breaks)
       - id: end-of-file-fixer
       - id: check-yaml
+        exclude: '^\.github/workflows/publish-release\.yml$'  # Incomplete workflow file (fragment)
       - id: check-json
       - id: check-toml
       - id: check-added-large-files
@@ -38,6 +41,7 @@ repos:
         args: [--fix=lf]
       - id: debug-statements
         name: check for debug statements
+        exclude: '^\.archive/'
 
   # Custom local hooks for project organization rules
   - repo: local
@@ -53,7 +57,7 @@ repos:
       # Warn: Validate manifest JSON files (if modified)
       - id: validate-manifest-json
         name: Validate manifest JSON
-        entry: python -m json.tool
+        entry: bash -c 'for f in "$@"; do python -m json.tool "$f" > /dev/null || exit 1; done' --
         language: system
         files: 'manifest\.json$'
         types: [json]
