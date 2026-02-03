@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 
 ## Current Position
 
-Phase: 15 of 19 (Economic Data Strategy)
-Plan: 6 of 6 in current phase
-Status: Phase complete
-Last activity: 2026-02-03 - Completed 15-06-PLAN.md (memory update)
+Phase: 16 of 19 (Repository Cleanup)
+Plan: 1 of 6 in current phase
+Status: In progress
+Last activity: 2026-02-03 - Completed 16-01-PLAN.md (root directory cleanup)
 
-Progress: [##########] 100% v0.4.0 | [█████████ ] 100% v0.5.0 (Phase 15 complete: 6/6 plans)
+Progress: [##########] 100% v0.4.0 | [██████████] 100% v0.5.0 (Phase 16 in progress: 1/6 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 87 (56 in v0.4.0, 31 in v0.5.0)
+- Total plans completed: 88 (56 in v0.4.0, 32 in v0.5.0)
 - Average duration: 11 min
-- Total execution time: 16.30 hours
+- Total execution time: 16.88 hours
 
 **By Phase (v0.4.0):**
 
@@ -47,10 +47,11 @@ Progress: [##########] 100% v0.4.0 | [█████████ ] 100% v0.5.0 
 | 13-documentation-consolidation | 7 | 30 min | 4 min | Complete |
 | 14-tools-integration | 13 | 128 min | 10 min | Complete |
 | 15-economic-data-strategy | 6 | 36 min | 6 min | Complete |
+| 16-repository-cleanup | 1 | 35 min | 35 min | In progress |
 
 **Recent Trend:**
 - v0.4.0 complete: 10 phases, 56 plans, 12.55 hours total
-- v0.5.0 in progress: Phase 15 complete (6/6 plans, 36 min), 31 plans across 5 phases
+- v0.5.0 in progress: Phase 16 in progress (1/6 plans, 35 min), 32 plans across 6 phases
 
 *Updated after each plan completion*
 
@@ -136,6 +137,9 @@ Recent decisions affecting current work:
 - **Configuration follows .env pattern** (15-05): economic_data.env.example matches db_config.env, openai_config.env pattern for consistency
 - **AST-based migration tool** (15-05): Use ast module not regex for accurate import detection in migration scanning tool
 - **11 migration mappings** (15-05): Cover fredtools2 and fedtools2 packages with suggested replacements to new ta_lab2.integrations.economic
+- **Force-add for gitignored archives** (16-01): Use git add -f to override .gitignore for .archive/ directories, ensuring archived files are committed for audit trail
+- **Skip Windows special device names** (16-01): Files named "nul" and "-p" are Windows special device names, cannot be accessed on Windows
+- **Category-based script organization** (16-01): Organize archived scripts by purpose (runners, utilities, conversion, tests, configuration) for easier navigation
 
 ### Pending Todos
 
@@ -147,10 +151,10 @@ None currently.
 
 ## Session Continuity
 
-Last session: 2026-02-03T14:58:47Z
-Stopped at: Completed 15-06-PLAN.md (memory update)
+Last session: 2026-02-03T16:56:44Z
+Stopped at: Completed 16-01-PLAN.md (root directory cleanup)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-03 (Phase 15 complete: 6/6 plans - archive, extraction, integration, packaging, configuration, migration support, and memory tracking complete)*
+*Last updated: 2026-02-03 (Phase 16 in progress: 1/6 plans - root directory cleanup complete: 196 files (189.5 MB) archived with manifest tracking)*
