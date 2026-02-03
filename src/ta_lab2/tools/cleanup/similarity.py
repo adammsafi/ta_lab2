@@ -182,19 +182,36 @@ def find_similar_functions(
 
     logger.info(f"Extracted {len(all_functions)} functions from {root}")
 
-    # Compare all pairs (O(n^2) but acceptable for typical codebase size)
+    # Compare all pairs (O(n^2) but with aggressive filtering for performance)
     matches: list[SimilarityMatch] = []
+    comparisons_done = 0
+    comparisons_skipped = 0
 
     for i, func1 in enumerate(all_functions):
+        # Progress logging every 100 functions
+        if i % 100 == 0 and i > 0:
+            logger.info(f"Processed {i}/{len(all_functions)} functions, {comparisons_done} comparisons, {comparisons_skipped} skipped")
+
         for func2 in all_functions[i + 1:]:
             # Skip same file same name (likely same function)
             if func1.file == func2.file and func1.name == func2.name:
+                comparisons_skipped += 1
                 continue
 
             # Quick filter: skip if arg counts differ significantly
             if abs(func1.arg_count - func2.arg_count) > 3:
+                comparisons_skipped += 1
                 continue
 
+            # Quick filter: skip if code lengths differ by more than 30%
+            len1, len2 = len(func1.code), len(func2.code)
+            if max(len1, len2) > 0:
+                length_ratio = min(len1, len2) / max(len1, len2)
+                if length_ratio < 0.7:  # More than 30% length difference
+                    comparisons_skipped += 1
+                    continue
+
+            comparisons_done += 1
             similarity = compare_functions(func1, func2)
 
             if similarity >= threshold:
@@ -208,6 +225,8 @@ def find_similar_functions(
 
     # Sort by similarity (highest first)
     matches.sort(key=lambda m: m.similarity, reverse=True)
+
+    logger.info(f"Completed: {comparisons_done} comparisons, {comparisons_skipped} skipped, {len(matches)} matches found")
 
     return matches
 
