@@ -20,10 +20,13 @@ def test_no_circular_dependencies():
     except ImportError:
         pytest.skip("import-linter not installed (pip install import-linter)")
 
+    # Use lint-imports command instead of python -m importlinter
+    # (importlinter doesn't have __main__ module)
     result = subprocess.run(
-        [sys.executable, "-m", "importlinter"],
+        ["lint-imports"],
         capture_output=True,
         text=True,
+        shell=True,  # Required on Windows to find lint-imports in PATH
         cwd=".",  # Run from project root
     )
 

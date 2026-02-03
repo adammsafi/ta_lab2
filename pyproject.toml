@@ -152,19 +152,17 @@ exclude_lines = [
 [tool.importlinter]
 root_package = "ta_lab2"
 
-# Contract 1: No circular dependencies between sibling packages
+# Contract 1: No circular dependencies - define proper layering
+# Higher layers can import from lower layers, but not vice versa
+# scripts > pipelines/backtests > signals/regimes/analysis > features/tools (base)
 [[tool.importlinter.contracts]]
-name = "No circular dependencies between ta_lab2 subpackages"
-type = "independence"
-modules = [
-    "ta_lab2.features",
-    "ta_lab2.tools",
+name = "No circular dependencies between ta_lab2 layers"
+type = "layers"
+layers = [
     "ta_lab2.scripts",
-    "ta_lab2.regimes",
-    "ta_lab2.signals",
-    "ta_lab2.backtests",
-    "ta_lab2.analysis",
-    "ta_lab2.pipelines",
+    "ta_lab2.pipelines | ta_lab2.backtests",
+    "ta_lab2.signals | ta_lab2.regimes | ta_lab2.analysis",
+    "ta_lab2.features | ta_lab2.tools",
 ]
 
 # Contract 2: Tools don't import from scripts (layering)
@@ -180,3 +178,17 @@ name = "Features layer doesn't import from scripts layer"
 type = "forbidden"
 source_modules = ["ta_lab2.features"]
 forbidden_modules = ["ta_lab2.scripts"]
+
+# Contract 4: Tools shouldn't import features (foundation layer violation)
+[[tool.importlinter.contracts]]
+name = "Tools layer doesn't import from features layer"
+type = "forbidden"
+source_modules = ["ta_lab2.tools"]
+forbidden_modules = ["ta_lab2.features"]
+
+# Contract 5: Regimes and pipelines circular dependency check
+[[tool.importlinter.contracts]]
+name = "No circular dependency between regimes and pipelines"
+type = "forbidden"
+source_modules = ["ta_lab2.regimes"]
+forbidden_modules = ["ta_lab2.pipelines"]
