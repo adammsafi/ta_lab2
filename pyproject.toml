@@ -37,6 +37,7 @@ dev = [
   "hypothesis",
   "ruff>=0.1.5",
   "mypy>=1.8",
+  "import-linter>=2.7",
 ]
 
 # Plotting (used by viz/all_plots.py and CLI optional plots)
@@ -145,3 +146,36 @@ exclude_lines = [
     "if __name__ == .__main__.:",
     "if TYPE_CHECKING:",
 ]
+
+# ---------- Import-linter configuration ----------
+[tool.importlinter]
+root_package = "ta_lab2"
+
+# Contract 1: No circular dependencies between sibling packages
+[[tool.importlinter.contracts]]
+name = "No circular dependencies between ta_lab2 subpackages"
+type = "acyclic_siblings"
+packages = [
+    "ta_lab2.features",
+    "ta_lab2.tools",
+    "ta_lab2.scripts",
+    "ta_lab2.regimes",
+    "ta_lab2.signals",
+    "ta_lab2.backtests",
+    "ta_lab2.analysis",
+    "ta_lab2.pipelines",
+]
+
+# Contract 2: Tools don't import from scripts (layering)
+[[tool.importlinter.contracts]]
+name = "Tools layer doesn't import from scripts layer"
+type = "forbidden"
+source_modules = ["ta_lab2.tools"]
+forbidden_modules = ["ta_lab2.scripts"]
+
+# Contract 3: Features don't import from scripts (layering)
+[[tool.importlinter.contracts]]
+name = "Features layer doesn't import from scripts layer"
+type = "forbidden"
+source_modules = ["ta_lab2.features"]
+forbidden_modules = ["ta_lab2.scripts"]
