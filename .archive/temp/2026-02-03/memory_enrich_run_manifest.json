@@ -1,0 +1,9 @@
+{
+  "run_utc": "2026-01-15T12:24:27.073532+00:00",
+  "model": "gpt-5.2",
+  "reasoning_effort": "high",
+  "max_chars": 12000,
+  "processed": 60,
+  "skipped": 0,
+  "errors": []
+}

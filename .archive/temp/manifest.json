@@ -1,0 +1,219 @@
+{
+  "$schema": "https://ta_lab2.local/schemas/archive-manifest/v1.0.0",
+  "version": "1.0.0",
+  "category": "temp",
+  "created_at": "2026-02-03T11:26:52.586873",
+  "total_files": 19,
+  "total_size_bytes": 168772738,
+  "files": [
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\ema_expected_coverage.csv",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\temp\\2026-02-03\\ema_expected_coverage.csv",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:26:47.723079",
+      "sha256_checksum": "d7037643a5d2c89d2dfd2cbeb6e907a385e62e6c24ac1d174c361bbd7ef56be0",
+      "size_bytes": 772,
+      "commit_hash": "3ef8ea251129cd9e0afb7d07d42df7f62e92e68c",
+      "phase_number": "16",
+      "archive_reason": "Audit artifact - no longer needed in root"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\ema_samples.csv",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\temp\\2026-02-03\\ema_samples.csv",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:26:48.556665",
+      "sha256_checksum": "184be8e7219dbb13a287c369a576d36a9ea7c786ee4a41ce1bf5b02b27289347",
+      "size_bytes": 112085306,
+      "commit_hash": "3ef8ea251129cd9e0afb7d07d42df7f62e92e68c",
+      "phase_number": "16",
+      "archive_reason": "Audit artifact - no longer needed in root"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\price_bars_audit.csv",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\temp\\2026-02-03\\price_bars_audit.csv",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:26:48.687440",
+      "sha256_checksum": "f6efd85e95a4188d71226b51e9bc4b8dd850977a8a18410e4b74ebc58fd8a519",
+      "size_bytes": 368993,
+      "commit_hash": "3ef8ea251129cd9e0afb7d07d42df7f62e92e68c",
+      "phase_number": "16",
+      "archive_reason": "Audit artifact - no longer needed in root"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\price_bars_samples.csv",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\temp\\2026-02-03\\price_bars_samples.csv",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:26:48.929182",
+      "sha256_checksum": "a0d5a3f12f09ea4a9f090da2680df1e0ef3f7eb797dae37977e1c5fbb96c6243",
+      "size_bytes": 13961408,
+      "commit_hash": "3ef8ea251129cd9e0afb7d07d42df7f62e92e68c",
+      "phase_number": "16",
+      "archive_reason": "Audit artifact - no longer needed in root"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\structure.csv",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\temp\\2026-02-03\\structure.csv",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:26:49.076413",
+      "sha256_checksum": "ac688079f633d8879401187e483f7b4b65da4e0ddeed0fc2ef122131084980d4",
+      "size_bytes": 79685,
+      "commit_hash": "3ef8ea251129cd9e0afb7d07d42df7f62e92e68c",
+      "phase_number": "16",
+      "archive_reason": "Structure artifact - no longer needed in root"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\diff.txt",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\temp\\2026-02-03\\diff.txt",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:26:49.305069",
+      "sha256_checksum": "934321c7680902fed25cade64b72050e2f66bca8d5dfb4e03445a2b821ef3979",
+      "size_bytes": 30047,
+      "commit_hash": "3ef8ea251129cd9e0afb7d07d42df7f62e92e68c",
+      "phase_number": "16",
+      "archive_reason": "Diff artifact - no longer needed"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\full_diff.patch",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\temp\\2026-02-03\\full_diff.patch",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:26:49.548851",
+      "sha256_checksum": "164a95d8ddb00a621e20ad1ac298333517f7f1b0e953e9c790eb4ffd99b7d2b0",
+      "size_bytes": 429810,
+      "commit_hash": "3ef8ea251129cd9e0afb7d07d42df7f62e92e68c",
+      "phase_number": "16",
+      "archive_reason": "Patch artifact - no longer needed"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\full_git_log.txt",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\temp\\2026-02-03\\full_git_log.txt",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:26:49.786879",
+      "sha256_checksum": "2c6d7b199de6f032c2eb0809659b5c1200750818a84c4053aa909dece1e1bbee",
+      "size_bytes": 6388,
+      "commit_hash": "3ef8ea251129cd9e0afb7d07d42df7f62e92e68c",
+      "phase_number": "16",
+      "archive_reason": "Git log snapshot - no longer needed"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\structure.txt",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\temp\\2026-02-03\\structure.txt",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:26:50.057090",
+      "sha256_checksum": "e35cd9ce1796e6b41cb3c8f8a0a949855b30c020fe699d37241c747ac822400d",
+      "size_bytes": 38772,
+      "commit_hash": "3ef8ea251129cd9e0afb7d07d42df7f62e92e68c",
+      "phase_number": "16",
+      "archive_reason": "Structure artifact - superseded by structure.md"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\structure.json",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\temp\\2026-02-03\\structure.json",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:26:50.379325",
+      "sha256_checksum": "3d9fdb5c62905a67f56c3aa0635b43c5c940b658d256cecc6b2a1fcce6109b0e",
+      "size_bytes": 233953,
+      "commit_hash": "3ef8ea251129cd9e0afb7d07d42df7f62e92e68c",
+      "phase_number": "16",
+      "archive_reason": "Structure artifact - no longer needed"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\src_structure.json",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\temp\\2026-02-03\\src_structure.json",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:26:50.641537",
+      "sha256_checksum": "8fd4317be8053dbc36fafdc600090bd6106d292b30e3d4b5013f0ceb1ae931b4",
+      "size_bytes": 63427,
+      "commit_hash": "3ef8ea251129cd9e0afb7d07d42df7f62e92e68c",
+      "phase_number": "16",
+      "archive_reason": "Structure artifact - no longer needed"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\top_exchanges.txt",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\temp\\2026-02-03\\top_exchanges.txt",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:26:50.782700",
+      "sha256_checksum": "f2bb9f49018b3c95d9025c40b4ff2cc9ff5015ba280e296774f6d2054f27c2a9",
+      "size_bytes": 1973,
+      "commit_hash": "3ef8ea251129cd9e0afb7d07d42df7f62e92e68c",
+      "phase_number": "16",
+      "archive_reason": "Reference file - archive for cleanup"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\api_server.log",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\temp\\2026-02-03\\api_server.log",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:26:50.938514",
+      "sha256_checksum": "44b2ac5ce7ac17126a71095779faca21c3d4c8ba6f6f6315ce612bd9419e6f9e",
+      "size_bytes": 19,
+      "commit_hash": "3ef8ea251129cd9e0afb7d07d42df7f62e92e68c",
+      "phase_number": "16",
+      "archive_reason": "Log file - no longer needed"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\pandoc-3.8.3-windows-x86_64.msi",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\temp\\2026-02-03\\pandoc-3.8.3-windows-x86_64.msi",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:26:51.350341",
+      "sha256_checksum": "06cb0b14ac918890453a7c3021e300413cfd83b4bd7ef0fceb5207c2241a2db9",
+      "size_bytes": 41472000,
+      "commit_hash": "3ef8ea251129cd9e0afb7d07d42df7f62e92e68c",
+      "phase_number": "16",
+      "archive_reason": "Binary installer - no longer needed in repo"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\-k",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\temp\\2026-02-03\\-k",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:26:51.493179",
+      "sha256_checksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0,
+      "commit_hash": "3ef8ea251129cd9e0afb7d07d42df7f62e92e68c",
+      "phase_number": "16",
+      "archive_reason": "Corrupted path artifact from Windows/Claude interaction"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\memory_enrich_run_manifest.json",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\temp\\2026-02-03\\memory_enrich_run_manifest.json",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:26:51.898807",
+      "sha256_checksum": "6ffaca1556d4febab727b2982c40cc2f2db549322dd5e2451452a1aff0f0f574",
+      "size_bytes": 184,
+      "commit_hash": "3ef8ea251129cd9e0afb7d07d42df7f62e92e68c",
+      "phase_number": "16",
+      "archive_reason": "Corrupted path artifact from Windows/Claude interaction"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\srcta_lab2toolsdocs__init__.py",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\temp\\2026-02-03\\srcta_lab2toolsdocs__init__.py",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:26:52.029213",
+      "sha256_checksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0,
+      "commit_hash": "3ef8ea251129cd9e0afb7d07d42df7f62e92e68c",
+      "phase_number": "16",
+      "archive_reason": "Corrupted path artifact from Windows/Claude interaction"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\testsorchestrator__init__.py",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\temp\\2026-02-03\\testsorchestrator__init__.py",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:26:52.156618",
+      "sha256_checksum": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "size_bytes": 1,
+      "commit_hash": "3ef8ea251129cd9e0afb7d07d42df7f62e92e68c",
+      "phase_number": "16",
+      "archive_reason": "Corrupted path artifact from Windows/Claude interaction"
+    },
+    {
+      "original_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\testsorchestratortest_validation.py",
+      "archive_path": "C:\\Users\\asafi\\Downloads\\ta_lab2\\.archive\\temp\\2026-02-03\\testsorchestratortest_validation.py",
+      "action": "moved",
+      "timestamp": "2026-02-03T11:26:52.290264",
+      "sha256_checksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0,
+      "commit_hash": "3ef8ea251129cd9e0afb7d07d42df7f62e92e68c",
+      "phase_number": "16",
+      "archive_reason": "Corrupted path artifact from Windows/Claude interaction"
+    }
+  ]
+}

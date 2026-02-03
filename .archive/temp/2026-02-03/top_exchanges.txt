@@ -1,0 +1,32 @@
+| Exchange              | CMC Rank | CG Rank | Source |
+|-----------------------|----------|---------|--------|
+| Binance               | 1        | 1       | Both   |
+| Coinbase Exchange     | 2        | 3       | Both   |
+| Bybit                 | 5        | 2       | Both   |
+| Upbit                 | 3        | N/A     | CMC    |
+| OKX                   | 4        | 4       | Both   |
+| Kraken                | 14       | 5       | Both   |
+| Bitget                | 6        | 9       | Both   |
+| Gate                  | 7        | 6       | Both   |
+| KuCoin                | 8        | 7       | Both   |
+| MEXC                  | 9        | 8       | Both   |
+| HTX                   | 10       | 12      | Both   |
+| Crypto.com Exchange   | 11       | 10      | Both   |
+| Bullish               | N/A      | 11      | CG     |
+| Bitfinex              | 12       | 14      | Both   |
+| BingX                 | 13       | 13      | Both   |
+| Bitstamp by Robinhood | 18       | 15      | Both   |
+| Phemex                | N/A      | 16      | CG     |
+| Binance TR            | 15       | N/A     | CMC    |
+| HashKey Exchange      | N/A      | 17      | CG     |
+| Gemini                | N/A      | 18      | CG     |
+| BitMart               | 16       | N/A     | CMC    |
+| CEX.IO                | N/A      | 19      | CG     |
+| LBank                 | 17       | N/A     | CMC    |
+| Backpack Exchange     | N/A      | 20      | CG     |
+| Bithumb               | 19       | N/A     | CMC    |
+| XT.COM                | 20       | N/A     | CMC    |
+| Hyperliquid           | N/A      | N/A     | DB     |
+
+---
+**Note:** The `cmc_exchange_map` table in the database contains entries for all the exchanges listed above. However, the `cmc_exchange_info` table, which holds detailed data (descriptions, fees, etc.), only contains information for a small subset of these (Binance, Coinbase Exchange, Kraken, Bitfinex, Bitstamp by Robinhood, and Hyperliquid).
