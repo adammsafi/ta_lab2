@@ -1,0 +1,38 @@
+# Dependencies Snapshot for Archived Economic Data Packages
+# Generated: 2026-02-03
+# Purpose: Enable reproducible restoration if needed
+
+## fredtools2 Dependencies (from pyproject.toml)
+requests>=2.32
+psycopg2-binary>=2.9
+python-dotenv>=1.0
+
+## fedtools2 Dependencies (from pyproject.toml)
+pandas>=2.2
+numpy>=1.26
+pyyaml>=6.0
+matplotlib>=3.8
+sqlalchemy>=2.0
+python-dotenv>=1.0
+
+## Combined Unique Dependencies
+matplotlib>=3.8
+numpy>=1.26
+pandas>=2.2
+psycopg2-binary>=2.9
+python-dotenv>=1.0
+pyyaml>=6.0
+requests>=2.32
+sqlalchemy>=2.0
+
+## Ecosystem Alternative Dependencies
+# For fredapi (recommended replacement):
+fredapi>=0.5.2
+
+# For fedfred (async alternative):
+fedfred>=1.0
+
+## Notes
+- fredtools2 requires PostgreSQL server running
+- fedtools2 requires FRED CSV files in FEDTOOLS2_FED_DATA_DIR
+- Both packages expect FRED_API_KEY environment variable
