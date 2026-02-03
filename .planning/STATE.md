@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 ## Current Position
 
 Phase: 14 of 19 (Tools Integration)
-Plan: 8 of 8 in current phase
+Plan: 9 of 9 in current phase
 Status: Phase complete
-Last activity: 2026-02-03 - Completed 14-08-PLAN.md (Data_Tools Archive)
+Last activity: 2026-02-03 - Completed 14-09-PLAN.md (Data_Tools Validation)
 
-Progress: [##########] 100% v0.4.0 | [█████████ ] ~95% v0.5.0 (8/8 plans complete in Phase 14)
+Progress: [##########] 100% v0.4.0 | [█████████ ] ~96% v0.5.0 (9/9 plans complete in Phase 14)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 77 (56 in v0.4.0, 21 in v0.5.0)
+- Total plans completed: 78 (56 in v0.4.0, 22 in v0.5.0)
 - Average duration: 11 min
-- Total execution time: 15.20 hours
+- Total execution time: 15.27 hours
 
 **By Phase (v0.4.0):**
 
@@ -45,11 +45,11 @@ Progress: [##########] 100% v0.4.0 | [█████████ ] ~95% v0.5.0 
 | 11-memory-preparation | 5 | 46 min | 9 min | Complete |
 | 12-archive-foundation | 3 | 11 min | 4 min | Complete |
 | 13-documentation-consolidation | 7 | 30 min | 4 min | Complete |
-| 14-tools-integration | 8 | 86 min | 11 min | Complete |
+| 14-tools-integration | 9 | 90 min | 10 min | Complete |
 
 **Recent Trend:**
 - v0.4.0 complete: 10 phases, 56 plans, 12.55 hours total
-- v0.5.0 in progress: Phase 14 complete (8/8 plans, 86 min total), 21 plans across 4 phases
+- v0.5.0 in progress: Phase 14 complete (9/9 plans, 90 min total), 22 plans across 4 phases
 
 *Updated after each plan completion*
 
@@ -106,6 +106,9 @@ Recent decisions affecting current work:
 - **Wrapper documentation pattern** (14-04): Wrapper functions include docstrings pointing to canonical ta_lab2 implementations for direct access
 - **Archived 13 non-migrated scripts** (14-08): 8 prototypes (experimental/test files) and 5 one-offs (simple wrappers) archived with manifest tracking
 - **Used Phase 12 manifest patterns for Data_Tools** (14-08): $schema versioning, SHA256 checksums, action/reason tracking applied to external tool archiving
+- **Skip gracefully for optional dependencies** (14-09): Import tests use pytest.skip() when dependencies not installed, distinguishing missing deps from broken imports
+- **AST-based code validation** (14-09): AST parsing more accurate than regex for detecting hardcoded paths and sys.path manipulation
+- **Gap closure documentation pattern** (14-09): Document test failures rather than block on fixes, enables prioritized fixing after full migration validation
 
 ### Pending Todos
 
@@ -117,10 +120,10 @@ None currently.
 
 ## Session Continuity
 
-Last session: 2026-02-03T02:48:31Z
-Stopped at: Completed 14-08-PLAN.md (Data_Tools Archive)
+Last session: 2026-02-03T08:02:39Z
+Stopped at: Completed 14-09-PLAN.md (Data_Tools Validation)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-03 (Completed Phase 14 Plan 08: Data_Tools Archive - archived 13 non-migrated Data_Tools scripts with manifest tracking, Phase 14 Tools Integration complete)*
+*Last updated: 2026-02-03 (Completed Phase 14 Plan 09: Data_Tools Validation - parametrized smoke tests and AST-based validation for 26 migrated modules, 45/54 tests passing with gap closure documented)*
