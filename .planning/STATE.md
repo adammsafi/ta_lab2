@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 ## Current Position
 
 Phase: 15 of 19 (Economic Data Strategy)
-Plan: 3 of 6 in current phase
+Plan: 4 of 6 in current phase
 Status: In progress
-Last activity: 2026-02-03 - Completed 15-03-PLAN.md (integrations.economic skeleton)
+Last activity: 2026-02-03 - Completed 15-04-PLAN.md (reliability features)
 
-Progress: [##########] 100% v0.4.0 | [█████████ ] ~99% v0.5.0 (3/6 plans complete in Phase 15)
+Progress: [##########] 100% v0.4.0 | [█████████ ] ~99% v0.5.0 (4/6 plans complete in Phase 15)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 84 (56 in v0.4.0, 28 in v0.5.0)
+- Total plans completed: 85 (56 in v0.4.0, 29 in v0.5.0)
 - Average duration: 11 min
-- Total execution time: 15.97 hours
+- Total execution time: 16.20 hours
 
 **By Phase (v0.4.0):**
 
@@ -46,11 +46,11 @@ Progress: [##########] 100% v0.4.0 | [█████████ ] ~99% v0.5.0 
 | 12-archive-foundation | 3 | 11 min | 4 min | Complete |
 | 13-documentation-consolidation | 7 | 30 min | 4 min | Complete |
 | 14-tools-integration | 13 | 128 min | 10 min | Complete |
-| 15-economic-data-strategy | 3 | 16 min | 5 min | In progress |
+| 15-economic-data-strategy | 4 | 30 min | 8 min | In progress |
 
 **Recent Trend:**
 - v0.4.0 complete: 10 phases, 56 plans, 12.55 hours total
-- v0.5.0 in progress: Phase 15 (3/6 plans, 16 min), 28 plans across 5 phases
+- v0.5.0 in progress: Phase 15 (4/6 plans, 30 min), 29 plans across 5 phases
 
 *Updated after each plan completion*
 
@@ -127,6 +127,10 @@ Recent decisions affecting current work:
 - **Provider pattern for economic data** (15-03): Abstract EconomicDataProvider protocol with working fredapi passthrough, enables future providers
 - **Soft import pattern for fredapi** (15-03): FREDAPI_AVAILABLE flag enables graceful degradation when fredapi missing, follows cache.py pattern
 - **Working fredapi implementation not stub** (15-03): FredProvider actually fetches data via fredapi, demonstrates provider pattern functionality
+- **Singleton rate limiter and cache** (15-04): Global singleton pattern ensures rate limiting and caching work across all FredProvider instances
+- **Per-provider circuit breaker** (15-04): Each FredProvider gets its own circuit breaker to isolate failures per API key or configuration
+- **Quality validation enabled by default** (15-04): Opt-out validation (validate=True default) catches data issues early while allowing performance skip when needed
+- **Log warnings but don't fail on quality issues** (15-04): Data with quality warnings still usable, log issues but return with quality_report for user decision
 - **Four FRED data categories** (15-03): Fed policy rates, Treasury yields, Inflation indicators, Employment data (17 series in FRED_SERIES)
 
 ### Pending Todos
@@ -139,10 +143,10 @@ None currently.
 
 ## Session Continuity
 
-Last session: 2026-02-03T13:19:33Z
-Stopped at: Completed 15-03-PLAN.md (integrations.economic skeleton with working fredapi)
+Last session: 2026-02-03T13:29:00Z
+Stopped at: Completed 15-04-PLAN.md (reliability features for FRED integration)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-03 (Phase 15 in progress: 3/6 plans - integrations.economic skeleton created)*
+*Last updated: 2026-02-03 (Phase 15 in progress: 4/6 plans - reliability layer complete with rate limiting, caching, circuit breaker, quality validation)*
