@@ -38,7 +38,7 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 - [x] **Phase 12: Archive Foundation** - Establish .archive/ structure and preservation patterns
 - [x] **Phase 13: Documentation Consolidation** - Convert and integrate ProjectTT docs with memory tracking
 - [x] **Phase 14: Tools Integration** - Migrate Data_Tools scripts with memory updates | 13/13 | Complete | 2026-02-03
-- [ ] **Phase 15: Economic Data Strategy** - Evaluate and integrate fredtools2/fedtools2 with memory updates
+- [ ] **Phase 15: Economic Data Strategy** - Archive packages, extract utils, create integration skeleton with memory updates
 - [ ] **Phase 16: Repository Cleanup** - Clean root directory with memory updates
 - [ ] **Phase 17: Verification & Validation** - Validate imports, dependencies, and structure
 - [ ] **Phase 18: Structure Documentation** - Document final structure and migration decisions
@@ -254,20 +254,25 @@ Plans:
 - [ ] 14-13-PLAN.md - Gap closure: Update tests and fix docstrings
 
 ### Phase 15: Economic Data Strategy
-**Goal**: Archive fredtools2/fedtools2 packages (research determined no integration needed)
+**Goal**: Archive packages, extract valuable utilities, create production-ready integration skeleton
 **Depends on**: Phase 14
 **Requirements**: ECON-01, ECON-02, ECON-03, MEMO-13, MEMO-14
 **Success Criteria** (what must be TRUE):
-  1. Function inventory complete for both packages
-  2. Decision documented: merge into ta_lab2, keep as optional deps, or archive
-  3. If integrating: packages accessible via pip install ta_lab2[economic-data]
-  4. If archiving: packages in .archive/economic_data/ with documentation
-  5. Memory updated with integration decision and file locations
-**Plans**: 3 plans
+  1. fredtools2 and fedtools2 archived with comprehensive documentation (ALTERNATIVES.md with 4 dimensions)
+  2. Valuable utilities extracted to ta_lab2.utils.economic (combine_timeframes, missing_ranges, etc.)
+  3. Production-ready ta_lab2.integrations.economic with working FredProvider (fredapi passthrough)
+  4. Rate limiting (120/min), TTL caching, circuit breaker, data quality validation implemented
+  5. pyproject.toml updated with [fred], [fed], [economic] optional dependency extras
+  6. Migration support: README guide, migration tool that scans for old imports
+  7. Memory updated with archive/extraction/replacement relationships (supports "what replaced fredtools2?" queries)
+**Plans**: 6 plans
 Plans:
-- [ ] 15-01-PLAN.md - Archive packages to .archive/economic_data/
-- [ ] 15-02-PLAN.md - Create manifest, README, and integration guide
-- [ ] 15-03-PLAN.md - Update memory with archive relationships and phase snapshot
+- [ ] 15-01-PLAN.md - Archive packages with comprehensive documentation (ALTERNATIVES.md, manifest, dependency snapshot)
+- [ ] 15-02-PLAN.md - Extract valuable utilities to ta_lab2.utils.economic
+- [ ] 15-03-PLAN.md - Create integrations.economic skeleton with FredProvider
+- [ ] 15-04-PLAN.md - Add rate limiting, caching, circuit breaker, data quality
+- [ ] 15-05-PLAN.md - Update pyproject.toml, config files, migration support
+- [ ] 15-06-PLAN.md - Update memory with full relationship graph
 
 ### Phase 16: Repository Cleanup
 **Goal**: Clean root directory and consolidate duplicate files
@@ -345,7 +350,7 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> 12 -> ...
 | 12. Archive Foundation | 3/3 | Complete | 2026-02-02 |
 | 13. Documentation Consolidation | 7/7 | Complete | 2026-02-02 |
 | 14. Tools Integration | 13/13 | Complete | 2026-02-03 |
-| 15. Economic Data Strategy | 0/3 | Planned | - |
+| 15. Economic Data Strategy | 0/6 | Planned | - |
 | 16. Repository Cleanup | 0/TBD | Not started | - |
 | 17. Verification & Validation | 0/TBD | Not started | - |
 | 18. Structure Documentation | 0/TBD | Not started | - |
@@ -372,4 +377,4 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> 12 -> ...
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-03 (Phase 15 planning: 3 plans in 3 waves)*
+*Last updated: 2026-02-03 (Phase 15 replanning: 6 plans in 3 waves with comprehensive context)*
