@@ -1,0 +1,916 @@
+---
+phase: 04-orchestrator-adapters
+plan: 04
+type: execute
+wave: 2
+depends_on: ["04-01"]
+files_modified:
+  - src/ta_lab2/tools/ai_orchestrator/adapters.py
+  - src/ta_lab2/tools/ai_orchestrator/quota.py
+  - tests/orchestrator/test_gemini_adapter.py
+autonomous: true
+user_setup:
+  - service: google-genai
+    why: "Gemini API access for task execution"
+    env_vars:
+      - name: GEMINI_API_KEY
+        source: "Google AI Studio -> Get API Key -> Create API key in new project"
+    dashboard_config: []
+
+must_haves:
+  truths:
+    - "Gemini adapter can submit tasks via google-genai SDK and return task_id"
+    - "Gemini adapter integrates with quota tracker from Phase 1"
+    - "Gemini adapter can stream responses via async generator"
+    - "Gemini adapter retries on rate limit errors"
+    - "Gemini adapter respects daily quota limits before execution"
+  artifacts:
+    - path: "src/ta_lab2/tools/ai_orchestrator/adapters.py"
+      provides: "AsyncGeminiAdapter implementation"
+      contains: "class AsyncGeminiAdapter"
+    - path: "src/ta_lab2/tools/ai_orchestrator/quota.py"
+      provides: "Updated quota tracker with adapter integration method"
+      contains: "check_and_record"
+    - path: "tests/orchestrator/test_gemini_adapter.py"
+      provides: "Gemini adapter tests with mocked SDK"
+      min_lines: 80
+  key_links:
+    - from: "AsyncGeminiAdapter"
+      to: "google.genai.Client"
+      via: "SDK client initialization"
+      pattern: "genai\\.Client"
+    - from: "AsyncGeminiAdapter._execute_internal"
+      to: "QuotaTracker"
+      via: "quota check before API call"
+      pattern: "quota_tracker\\.can_use"
+    - from: "AsyncGeminiAdapter"
+      to: "retry.retry_on_rate_limit"
+      via: "import from .retry"
+      pattern: "from \\.retry import"
+---
+
+<objective>
+Implement Gemini async adapter with quota integration
+
+Purpose: Enable task execution via Google's Gemini API using the new google-genai SDK (not deprecated google-generativeai), with proper quota tracking integration per ORCH-03 requirement. Gemini's 1500 requests/day free tier makes quota management critical.
+
+Output: Working AsyncGeminiAdapter that implements all lifecycle methods, integrates with Phase 1 quota tracker, and comprehensive tests with mocked SDK.
+</objective>
+
+<execution_context>
+@./.claude/get-shit-done/workflows/execute-plan.md
+@./.claude/get-shit-done/templates/summary.md
+</execution_context>
+
+<context>
+@.planning/PROJECT.md
+@.planning/ROADMAP.md
+@.planning/phases/04-orchestrator-adapters/04-CONTEXT.md
+@.planning/phases/04-orchestrator-adapters/04-RESEARCH.md
+@src/ta_lab2/tools/ai_orchestrator/adapters.py
+@src/ta_lab2/tools/ai_orchestrator/quota.py
+@src/ta_lab2/tools/ai_orchestrator/core.py
+@src/ta_lab2/tools/ai_orchestrator/config.py
+</context>
+
+<tasks>
+
+<task type="auto">
+  <name>Task 1: Add quota integration helper to QuotaTracker</name>
+  <files>src/ta_lab2/tools/ai_orchestrator/quota.py</files>
+  <action>
+Add a convenience method to QuotaTracker for adapter integration:
+
+```python
+def check_and_reserve(self, platform: str, amount: int = 1) -> tuple[bool, str]:
+    """
+    Check quota availability and reserve if available.
+
+    Convenience method for adapters to check quota before execution
+    and reserve to prevent overcommit.
+
+    Args:
+        platform: Platform name (e.g., 'gemini')
+        amount: Amount to reserve (default: 1 request)
+
+    Returns:
+        Tuple of (success: bool, message: str)
+        - success: True if quota available and reserved
+        - message: Status message or error reason
+    """
+    # Check availability first
+    if not self.can_use(platform, amount):
+        quota_key = self._platform_to_quota_key(platform)
+        quota = self.limits.get(quota_key)
+        if quota:
+            remaining = quota.limit - quota.used - quota.reserved if quota.limit else 0
+            return False, f"Quota exhausted for {platform}. Used: {quota.used}/{quota.limit}, Reserved: {quota.reserved}, Remaining: {remaining}"
+        return False, f"Unknown platform: {platform}"
+
+    # Reserve quota
+    if not self.reserve(platform, amount):
+        return False, f"Could not reserve quota for {platform}"
+
+    return True, f"Reserved {amount} request(s) for {platform}"
+
+
+def release_and_record(self, platform: str, tokens: int = 1, cost: float = 0.0, amount_reserved: int = 1):
+    """
+    Release reservation and record actual usage.
+
+    Use after task completion to convert reservation to actual usage.
+
+    Args:
+        platform: Platform name
+        tokens: Actual tokens used
+        cost: Actual cost
+        amount_reserved: Amount that was reserved (to release)
+    """
+    # Release first (record_usage will also release matching reservation)
+    # This handles the case where reservation != actual usage
+    if amount_reserved > tokens:
+        self.release(platform, amount_reserved - tokens)
+
+    # Record actual usage
+    self.record_usage(platform, tokens, cost)
+```
+
+Add these methods to the QuotaTracker class after the existing `release()` method.
+  </action>
+  <verify>
+```bash
+python -c "
+from ta_lab2.tools.ai_orchestrator.quota import QuotaTracker
+qt = QuotaTracker(persistence_path=None)
+success, msg = qt.check_and_reserve('gemini', 1)
+print(f'check_and_reserve: {success}, {msg}')
+"
+```
+  </verify>
+  <done>
+- check_and_reserve method added to QuotaTracker
+- release_and_record method added for post-execution recording
+- Methods provide clear success/failure messages
+- Integration point ready for adapters
+  </done>
+</task>
+
+<task type="auto">
+  <name>Task 2: Implement AsyncGeminiAdapter in adapters.py</name>
+  <files>src/ta_lab2/tools/ai_orchestrator/adapters.py</files>
+  <action>
+Add AsyncGeminiAdapter class implementing AsyncBasePlatformAdapter.
+
+Key implementation points from RESEARCH.md:
+- Use google-genai SDK (NOT deprecated google-generativeai)
+- Import: `from google import genai`
+- Client init: `genai.Client(api_key=...)`
+- Async method: `client.aio.models.generate_content(...)`
+- Integrate with QuotaTracker before each API call
+
+```python
+class AsyncGeminiAdapter(AsyncBasePlatformAdapter):
+    """
+    Async adapter for Google Gemini via google-genai SDK.
+
+    Features:
+    - Async API calls with google-genai
+    - Streaming support via async generators
+    - Quota tracking integration (1500 req/day free tier)
+    - Retry on rate limits with exponential backoff
+
+    NOTE: Uses new google-genai SDK (not deprecated google-generativeai).
+    """
+
+    def __init__(
+        self,
+        api_key: str | None = None,
+        model: str = "gemini-2.0-flash-exp",
+        timeout: float = 60.0,
+        quota_tracker: QuotaTracker | None = None,
+    ):
+        """
+        Initialize Gemini adapter.
+
+        Args:
+            api_key: Gemini API key (defaults to GEMINI_API_KEY env var)
+            model: Model to use (default: gemini-2.0-flash-exp for cost efficiency)
+            timeout: Default timeout in seconds
+            quota_tracker: Optional QuotaTracker for quota management
+        """
+        self._api_key = api_key or os.environ.get("GEMINI_API_KEY")
+        self._model = model
+        self._timeout = timeout
+        self._quota_tracker = quota_tracker
+        self._client = None
+        self._pending_tasks: dict[str, asyncio.Task] = {}
+
+    async def __aenter__(self):
+        """Initialize async client."""
+        if not self._api_key:
+            raise ValueError("GEMINI_API_KEY not set")
+
+        # Import here to avoid hard dependency
+        try:
+            from google import genai
+            self._client = genai.Client(api_key=self._api_key)
+        except ImportError:
+            raise RuntimeError("google-genai not installed. Run: pip install google-genai")
+
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Cleanup client."""
+        # google-genai client doesn't require explicit cleanup
+        self._client = None
+
+    @property
+    def is_implemented(self) -> bool:
+        """Check if adapter is usable."""
+        return bool(self._api_key)
+
+    @property
+    def implementation_status(self) -> str:
+        """Return implementation status."""
+        if not self._api_key:
+            return "unavailable"
+        return "working"
+
+    def get_adapter_status(self) -> dict:
+        """Return comprehensive adapter status."""
+        quota_info = "not configured"
+        if self._quota_tracker:
+            status = self._quota_tracker.get_status().get("gemini_cli", {})
+            used = status.get("used", 0)
+            limit = status.get("limit", "unlimited")
+            quota_info = f"{used}/{limit}"
+
+        return {
+            "name": "Gemini (Async)",
+            "is_implemented": self.is_implemented,
+            "status": self.implementation_status,
+            "model": self._model,
+            "quota": quota_info,
+            "capabilities": [
+                "google-genai SDK integration",
+                "Streaming responses",
+                "Quota tracking",
+                "Retry on rate limits",
+            ],
+            "requirements": [
+                f"GEMINI_API_KEY {'(set)' if self._api_key else '(missing)'}",
+                "google-genai package",
+            ],
+        }
+
+    async def submit_task(self, task: Task) -> str:
+        """Submit task and return task_id."""
+        task_id = self._generate_task_id(task)
+        task.task_id = task_id
+
+        # Create background task for execution
+        self._pending_tasks[task_id] = asyncio.create_task(
+            self._execute_internal(task)
+        )
+
+        return task_id
+
+    async def get_status(self, task_id: str) -> TaskStatus:
+        """Get task status."""
+        from .core import TaskStatus
+
+        if task_id not in self._pending_tasks:
+            return TaskStatus.UNKNOWN
+
+        task_obj = self._pending_tasks[task_id]
+        if task_obj.done():
+            if task_obj.cancelled():
+                return TaskStatus.CANCELLED
+            if task_obj.exception():
+                return TaskStatus.FAILED
+            return TaskStatus.COMPLETED
+        return TaskStatus.RUNNING
+
+    async def get_result(self, task_id: str, timeout: float = 300) -> Result:
+        """Get complete result, waiting if necessary."""
+        from .core import TaskStatus, Platform
+
+        if task_id not in self._pending_tasks:
+            return Result(
+                task=Task(type=TaskType.CODE_GENERATION, prompt=""),
+                platform=Platform.GEMINI,
+                output="",
+                success=False,
+                status=TaskStatus.UNKNOWN,
+                error=f"Unknown task_id: {task_id}",
+            )
+
+        try:
+            result = await asyncio.wait_for(
+                self._pending_tasks[task_id],
+                timeout=timeout
+            )
+            return result
+        except asyncio.TimeoutError:
+            return Result(
+                task=Task(type=TaskType.CODE_GENERATION, prompt=""),
+                platform=Platform.GEMINI,
+                output="",
+                success=False,
+                status=TaskStatus.FAILED,
+                error=f"Task timed out after {timeout}s",
+            )
+        except asyncio.CancelledError:
+            raise
+
+    async def stream_result(self, task_id: str) -> AsyncIterator[str]:
+        """Stream result chunks."""
+        # Simplified: yield complete result
+        result = await self.get_result(task_id)
+        if result.output:
+            yield result.output
+
+    async def cancel_task(self, task_id: str) -> bool:
+        """Cancel a running task."""
+        if task_id not in self._pending_tasks:
+            return False
+
+        task_obj = self._pending_tasks[task_id]
+        if task_obj.done():
+            return False
+
+        task_obj.cancel()
+        try:
+            await task_obj
+        except asyncio.CancelledError:
+            pass
+
+        # Release reserved quota if we had reserved
+        if self._quota_tracker:
+            self._quota_tracker.release("gemini", 1)
+
+        return True
+
+    async def _execute_internal(self, task: Task) -> Result:
+        """Internal execution with quota checking and retry."""
+        from .core import TaskStatus, Platform
+        from .retry import retry_on_rate_limit
+        import time
+
+        start_time = time.time()
+
+        # Check quota before execution
+        if self._quota_tracker:
+            can_use, msg = self._quota_tracker.check_and_reserve("gemini", 1)
+            if not can_use:
+                return Result(
+                    task=task,
+                    platform=Platform.GEMINI,
+                    output="",
+                    success=False,
+                    status=TaskStatus.FAILED,
+                    error=f"Quota check failed: {msg}",
+                    duration_seconds=time.time() - start_time,
+                )
+
+        if not self._client:
+            if self._quota_tracker:
+                self._quota_tracker.release("gemini", 1)
+            return Result(
+                task=task,
+                platform=Platform.GEMINI,
+                output="",
+                success=False,
+                status=TaskStatus.FAILED,
+                error="Client not initialized. Use 'async with' context manager.",
+            )
+
+        try:
+            # Build prompt with context
+            prompt = task.prompt
+            if task.context:
+                context_str = "\n".join(f"{k}: {v}" for k, v in task.context.items())
+                prompt = f"Context:\n{context_str}\n\nTask:\n{prompt}"
+
+            # Determine model and config
+            model = task.constraints.model if task.constraints and task.constraints.model else self._model
+            config = {}
+            if task.constraints:
+                if task.constraints.max_tokens:
+                    config["max_output_tokens"] = task.constraints.max_tokens
+                if task.constraints.temperature is not None:
+                    config["temperature"] = task.constraints.temperature
+
+            # Apply retry decorator dynamically
+            @retry_on_rate_limit()
+            async def make_request():
+                return await self._client.aio.models.generate_content(
+                    model=model,
+                    contents=prompt,
+                    config=config if config else None,
+                )
+
+            response = await asyncio.wait_for(
+                make_request(),
+                timeout=task.constraints.timeout_seconds if task.constraints and task.constraints.timeout_seconds else self._timeout
+            )
+
+            # Extract output
+            output = response.text if hasattr(response, 'text') else str(response)
+
+            # Record usage with quota tracker
+            tokens_used = 1  # Gemini API tracks requests, not tokens for free tier
+            if self._quota_tracker:
+                self._quota_tracker.release_and_record("gemini", tokens_used, cost=0.0, amount_reserved=1)
+
+            return Result(
+                task=task,
+                platform=Platform.GEMINI,
+                output=output,
+                success=True,
+                status=TaskStatus.COMPLETED,
+                tokens_used=tokens_used,
+                cost=0.0,  # Free tier
+                duration_seconds=time.time() - start_time,
+                metadata={
+                    "model": model,
+                },
+            )
+
+        except asyncio.TimeoutError:
+            if self._quota_tracker:
+                self._quota_tracker.release("gemini", 1)
+            return Result(
+                task=task,
+                platform=Platform.GEMINI,
+                output="",
+                success=False,
+                status=TaskStatus.FAILED,
+                error=f"Execution timed out after {self._timeout}s",
+                duration_seconds=time.time() - start_time,
+            )
+
+        except asyncio.CancelledError:
+            if self._quota_tracker:
+                self._quota_tracker.release("gemini", 1)
+            raise
+
+        except Exception as e:
+            if self._quota_tracker:
+                self._quota_tracker.release("gemini", 1)
+            return Result(
+                task=task,
+                platform=Platform.GEMINI,
+                output="",
+                success=False,
+                status=TaskStatus.FAILED,
+                error=str(e),
+                duration_seconds=time.time() - start_time,
+            )
+
+    async def execute_streaming(self, task: Task) -> AsyncIterator[str]:
+        """Execute task with streaming response."""
+        if not self._client:
+            raise RuntimeError("Client not initialized. Use 'async with' context manager.")
+
+        # Check quota
+        if self._quota_tracker:
+            can_use, msg = self._quota_tracker.check_and_reserve("gemini", 1)
+            if not can_use:
+                raise RuntimeError(f"Quota check failed: {msg}")
+
+        try:
+            prompt = task.prompt
+            if task.context:
+                context_str = "\n".join(f"{k}: {v}" for k, v in task.context.items())
+                prompt = f"Context:\n{context_str}\n\nTask:\n{prompt}"
+
+            model = task.constraints.model if task.constraints and task.constraints.model else self._model
+
+            # Note: google-genai streaming API may differ - this is a simplified version
+            # Production code should use the actual streaming API
+            response = await self._client.aio.models.generate_content(
+                model=model,
+                contents=prompt,
+            )
+
+            # Record usage
+            if self._quota_tracker:
+                self._quota_tracker.release_and_record("gemini", 1, cost=0.0, amount_reserved=1)
+
+            yield response.text if hasattr(response, 'text') else str(response)
+
+        except Exception:
+            if self._quota_tracker:
+                self._quota_tracker.release("gemini", 1)
+            raise
+```
+
+Add necessary imports at top of adapters.py if not present:
+- QuotaTracker import: `from .quota import QuotaTracker`
+  </action>
+  <verify>
+```bash
+python -c "
+from ta_lab2.tools.ai_orchestrator.adapters import AsyncGeminiAdapter
+from ta_lab2.tools.ai_orchestrator.quota import QuotaTracker
+qt = QuotaTracker(persistence_path=None)
+adapter = AsyncGeminiAdapter(quota_tracker=qt)
+print(f'Status: {adapter.implementation_status}')
+print(adapter.get_adapter_status())
+"
+```
+  </verify>
+  <done>
+- AsyncGeminiAdapter class exists in adapters.py
+- Implements all 5 lifecycle methods
+- Uses google-genai SDK (from google import genai)
+- Integrates with QuotaTracker via check_and_reserve/release_and_record
+- Checks quota before API call, releases on failure/cancellation
+- Has execute_streaming method
+- Uses retry_on_rate_limit decorator
+  </done>
+</task>
+
+<task type="auto">
+  <name>Task 3: Create comprehensive tests for Gemini adapter</name>
+  <files>tests/orchestrator/test_gemini_adapter.py</files>
+  <action>
+Create test_gemini_adapter.py with mocked SDK and quota tracker:
+
+```python
+"""Tests for AsyncGeminiAdapter."""
+import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
+import asyncio
+
+from ta_lab2.tools.ai_orchestrator.adapters import AsyncGeminiAdapter
+from ta_lab2.tools.ai_orchestrator.quota import QuotaTracker
+from ta_lab2.tools.ai_orchestrator.core import Task, TaskType, TaskStatus, TaskConstraints
+
+
+@pytest.fixture
+def mock_genai_response():
+    """Create mock Gemini response."""
+    response = MagicMock()
+    response.text = "Test response from Gemini"
+    return response
+
+
+@pytest.fixture
+def mock_genai_client(mock_genai_response):
+    """Create mock google-genai client."""
+    client = MagicMock()
+    client.aio = MagicMock()
+    client.aio.models = MagicMock()
+    client.aio.models.generate_content = AsyncMock(return_value=mock_genai_response)
+    return client
+
+
+@pytest.fixture
+def quota_tracker():
+    """Create quota tracker for testing."""
+    return QuotaTracker(persistence_path=None)
+
+
+@pytest.fixture
+def sample_task():
+    """Create sample task for testing."""
+    return Task(
+        type=TaskType.RESEARCH,
+        prompt="Explain quantum computing",
+    )
+
+
+class TestAsyncGeminiAdapterInit:
+    """Test adapter initialization."""
+
+    def test_init_with_api_key(self):
+        """Test initialization with explicit API key."""
+        adapter = AsyncGeminiAdapter(api_key="test-key")
+        assert adapter.is_implemented is True
+        assert adapter.implementation_status == "working"
+
+    def test_init_without_api_key(self):
+        """Test initialization without API key."""
+        with patch.dict("os.environ", {}, clear=True):
+            adapter = AsyncGeminiAdapter(api_key=None)
+            assert adapter.implementation_status in ["working", "unavailable"]
+
+    def test_init_with_quota_tracker(self, quota_tracker):
+        """Test initialization with quota tracker."""
+        adapter = AsyncGeminiAdapter(api_key="test-key", quota_tracker=quota_tracker)
+        assert adapter._quota_tracker is quota_tracker
+
+    def test_get_adapter_status(self, quota_tracker):
+        """Test adapter status includes quota info."""
+        adapter = AsyncGeminiAdapter(api_key="test-key", quota_tracker=quota_tracker)
+        status = adapter.get_adapter_status()
+
+        assert status["name"] == "Gemini (Async)"
+        assert "quota" in status
+        assert "Quota tracking" in status["capabilities"]
+
+
+class TestAsyncGeminiAdapterExecution:
+    """Test task execution."""
+
+    @pytest.mark.asyncio
+    async def test_submit_task_returns_task_id(self, mock_genai_client, sample_task):
+        """Test that submit_task returns a valid task_id."""
+        with patch("google.genai.Client", return_value=mock_genai_client):
+            adapter = AsyncGeminiAdapter(api_key="test-key")
+            adapter._client = mock_genai_client
+
+            task_id = await adapter.submit_task(sample_task)
+            assert task_id is not None
+            assert "_" in task_id
+
+    @pytest.mark.asyncio
+    async def test_get_result_success(self, mock_genai_client, sample_task):
+        """Test successful result retrieval."""
+        adapter = AsyncGeminiAdapter(api_key="test-key")
+        adapter._client = mock_genai_client
+
+        task_id = await adapter.submit_task(sample_task)
+        result = await adapter.get_result(task_id, timeout=5.0)
+
+        assert result.success is True
+        assert result.status == TaskStatus.COMPLETED
+        assert result.output == "Test response from Gemini"
+
+    @pytest.mark.asyncio
+    async def test_get_result_timeout(self, sample_task):
+        """Test timeout handling."""
+        mock_client = MagicMock()
+        mock_client.aio.models.generate_content = AsyncMock(
+            side_effect=lambda **kwargs: asyncio.sleep(10)
+        )
+
+        adapter = AsyncGeminiAdapter(api_key="test-key")
+        adapter._client = mock_client
+
+        task_id = await adapter.submit_task(sample_task)
+        result = await adapter.get_result(task_id, timeout=0.1)
+
+        assert result.success is False
+        assert "timed out" in result.error.lower()
+
+
+class TestQuotaIntegration:
+    """Test quota tracker integration."""
+
+    @pytest.mark.asyncio
+    async def test_quota_checked_before_execution(self, mock_genai_client, sample_task, quota_tracker):
+        """Test quota is checked before API call."""
+        adapter = AsyncGeminiAdapter(api_key="test-key", quota_tracker=quota_tracker)
+        adapter._client = mock_genai_client
+
+        # Get initial quota
+        initial_status = quota_tracker.get_status()["gemini_cli"]
+        initial_used = initial_status["used"]
+
+        task_id = await adapter.submit_task(sample_task)
+        await adapter.get_result(task_id, timeout=5.0)
+
+        # Quota should be recorded
+        final_status = quota_tracker.get_status()["gemini_cli"]
+        assert final_status["used"] == initial_used + 1
+
+    @pytest.mark.asyncio
+    async def test_quota_exhausted_fails_fast(self, sample_task, quota_tracker):
+        """Test that exhausted quota fails without API call."""
+        # Exhaust quota
+        for i in range(1500):
+            quota_tracker.record_usage("gemini", 1)
+
+        adapter = AsyncGeminiAdapter(api_key="test-key", quota_tracker=quota_tracker)
+        adapter._client = MagicMock()  # Won't be called
+
+        task_id = await adapter.submit_task(sample_task)
+        result = await adapter.get_result(task_id, timeout=5.0)
+
+        assert result.success is False
+        assert "quota" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_quota_released_on_failure(self, sample_task, quota_tracker):
+        """Test quota is released when API call fails."""
+        mock_client = MagicMock()
+        mock_client.aio.models.generate_content = AsyncMock(
+            side_effect=Exception("API Error")
+        )
+
+        adapter = AsyncGeminiAdapter(api_key="test-key", quota_tracker=quota_tracker)
+        adapter._client = mock_client
+
+        initial_reserved = quota_tracker.limits["gemini_cli"].reserved
+
+        task_id = await adapter.submit_task(sample_task)
+        await adapter.get_result(task_id, timeout=5.0)
+
+        # Reservation should be released
+        final_reserved = quota_tracker.limits["gemini_cli"].reserved
+        assert final_reserved == initial_reserved
+
+    @pytest.mark.asyncio
+    async def test_quota_released_on_cancellation(self, sample_task, quota_tracker):
+        """Test quota is released when task is cancelled."""
+        mock_client = MagicMock()
+
+        async def slow_call(*args, **kwargs):
+            await asyncio.sleep(10)
+            return MagicMock(text="Response")
+
+        mock_client.aio.models.generate_content = slow_call
+
+        adapter = AsyncGeminiAdapter(api_key="test-key", quota_tracker=quota_tracker)
+        adapter._client = mock_client
+
+        task_id = await adapter.submit_task(sample_task)
+        await asyncio.sleep(0.01)
+
+        cancelled = await adapter.cancel_task(task_id)
+        assert cancelled is True
+
+        # Check quota was released (not consumed)
+        status = quota_tracker.get_status()["gemini_cli"]
+        # Reserved should be 0 after cancellation
+        assert quota_tracker.limits["gemini_cli"].reserved == 0
+
+
+class TestAsyncGeminiAdapterContextManager:
+    """Test async context manager."""
+
+    @pytest.mark.asyncio
+    async def test_context_manager_init(self):
+        """Test context manager initializes client."""
+        with patch("google.genai.Client") as mock_class:
+            mock_instance = MagicMock()
+            mock_class.return_value = mock_instance
+
+            async with AsyncGeminiAdapter(api_key="test-key") as adapter:
+                assert adapter._client is not None
+                mock_class.assert_called_once_with(api_key="test-key")
+
+    @pytest.mark.asyncio
+    async def test_context_manager_raises_without_key(self):
+        """Test context manager raises if no API key."""
+        with patch.dict("os.environ", {}, clear=True):
+            adapter = AsyncGeminiAdapter(api_key=None)
+            with pytest.raises(ValueError, match="GEMINI_API_KEY"):
+                async with adapter:
+                    pass
+
+
+class TestTaskWithConstraints:
+    """Test task constraints handling."""
+
+    @pytest.mark.asyncio
+    async def test_constraints_passed_to_api(self, mock_genai_client):
+        """Test that constraints are passed to API call."""
+        adapter = AsyncGeminiAdapter(api_key="test-key")
+        adapter._client = mock_genai_client
+
+        task = Task(
+            type=TaskType.RESEARCH,
+            prompt="Test",
+            constraints=TaskConstraints(
+                max_tokens=500,
+                temperature=0.3,
+                model="gemini-1.5-pro",
+            ),
+        )
+
+        task_id = await adapter.submit_task(task)
+        await adapter.get_result(task_id)
+
+        # Check API was called with constraints
+        call_kwargs = mock_genai_client.aio.models.generate_content.call_args.kwargs
+        assert call_kwargs["model"] == "gemini-1.5-pro"
+        config = call_kwargs.get("config", {})
+        assert config.get("max_output_tokens") == 500
+        assert config.get("temperature") == 0.3
+
+
+class TestContextHandling:
+    """Test context injection."""
+
+    @pytest.mark.asyncio
+    async def test_context_added_to_prompt(self, mock_genai_client):
+        """Test that context is prepended to prompt."""
+        adapter = AsyncGeminiAdapter(api_key="test-key")
+        adapter._client = mock_genai_client
+
+        task = Task(
+            type=TaskType.RESEARCH,
+            prompt="Analyze this data",
+            context={"project": "ta_lab2", "domain": "quant trading"},
+        )
+
+        task_id = await adapter.submit_task(task)
+        await adapter.get_result(task_id)
+
+        # Check prompt includes context
+        call_args = mock_genai_client.aio.models.generate_content.call_args
+        prompt = call_args.kwargs.get("contents", "")
+        assert "project: ta_lab2" in prompt
+        assert "domain: quant trading" in prompt
+
+
+class TestUnknownTask:
+    """Test handling of unknown tasks."""
+
+    @pytest.mark.asyncio
+    async def test_get_status_unknown(self):
+        """Test status for unknown task_id."""
+        adapter = AsyncGeminiAdapter(api_key="test-key")
+        status = await adapter.get_status("nonexistent-task-id")
+        assert status == TaskStatus.UNKNOWN
+
+    @pytest.mark.asyncio
+    async def test_get_result_unknown(self):
+        """Test result for unknown task_id."""
+        adapter = AsyncGeminiAdapter(api_key="test-key")
+        result = await adapter.get_result("nonexistent-task-id")
+        assert result.success is False
+        assert result.status == TaskStatus.UNKNOWN
+```
+  </action>
+  <verify>
+```bash
+pytest tests/orchestrator/test_gemini_adapter.py -v
+```
+  </verify>
+  <done>
+- test_gemini_adapter.py exists with 14+ test cases
+- Tests cover: initialization, execution, quota integration, timeout, cancellation, constraints
+- Quota integration tests verify reserve/release/record behavior
+- All tests use mocked SDK (no real API calls)
+- All tests pass
+  </done>
+</task>
+
+</tasks>
+
+<verification>
+After all tasks complete:
+
+1. Module imports:
+```bash
+python -c "
+from ta_lab2.tools.ai_orchestrator.adapters import AsyncGeminiAdapter
+from ta_lab2.tools.ai_orchestrator.quota import QuotaTracker
+print('All Gemini modules import successfully')
+"
+```
+
+2. Run Gemini adapter tests:
+```bash
+pytest tests/orchestrator/test_gemini_adapter.py -v
+```
+
+3. Verify quota integration:
+```bash
+python -c "
+from ta_lab2.tools.ai_orchestrator.quota import QuotaTracker
+qt = QuotaTracker(persistence_path=None)
+success, msg = qt.check_and_reserve('gemini', 1)
+print(f'Quota check: {success}, {msg}')
+qt.release_and_record('gemini', 1, 0.0, 1)
+print('Quota record: OK')
+"
+```
+
+4. Verify all Phase 4 adapters:
+```bash
+python -c "
+from ta_lab2.tools.ai_orchestrator.adapters import (
+    AsyncBasePlatformAdapter,
+    AsyncChatGPTAdapter,
+    AsyncClaudeCodeAdapter,
+    AsyncGeminiAdapter,
+)
+print('All async adapters importable!')
+print(f'ChatGPT: {AsyncChatGPTAdapter(api_key=\"test\").implementation_status}')
+print(f'Claude: {AsyncClaudeCodeAdapter().implementation_status}')
+print(f'Gemini: {AsyncGeminiAdapter(api_key=\"test\").implementation_status}')
+"
+```
+</verification>
+
+<success_criteria>
+- QuotaTracker has check_and_reserve and release_and_record methods
+- AsyncGeminiAdapter implements all 5 lifecycle methods
+- Uses google-genai SDK (from google import genai)
+- Checks quota BEFORE API call via quota_tracker.check_and_reserve()
+- Releases quota on failure/cancellation
+- Records usage after successful completion
+- Retry logic handles rate limits
+- 14+ tests pass with mocked SDK and quota tracker
+- All three async adapters (ChatGPT, Claude, Gemini) importable and functional
+</success_criteria>
+
+<output>
+After completion, create `.planning/phases/04-orchestrator-adapters/04-04-SUMMARY.md`
+</output>

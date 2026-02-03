@@ -1,0 +1,748 @@
+---
+phase: 04-orchestrator-adapters
+plan: 03
+type: execute
+wave: 2
+depends_on: ["04-01"]
+files_modified:
+  - src/ta_lab2/tools/ai_orchestrator/adapters.py
+  - tests/orchestrator/test_claude_adapter.py
+autonomous: true
+user_setup: []
+
+must_haves:
+  truths:
+    - "Claude Code adapter executes tasks via async subprocess"
+    - "Claude Code adapter can parse JSON output from CLI"
+    - "Claude Code adapter can pass context files to CLI"
+    - "Claude Code adapter respects timeout constraints"
+    - "Claude Code adapter can be cancelled mid-execution"
+  artifacts:
+    - path: "src/ta_lab2/tools/ai_orchestrator/adapters.py"
+      provides: "AsyncClaudeCodeAdapter implementation"
+      contains: "class AsyncClaudeCodeAdapter"
+    - path: "tests/orchestrator/test_claude_adapter.py"
+      provides: "Claude Code adapter tests with mocked subprocess"
+      min_lines: 60
+  key_links:
+    - from: "AsyncClaudeCodeAdapter"
+      to: "asyncio.create_subprocess_exec"
+      via: "subprocess creation"
+      pattern: "create_subprocess_exec"
+    - from: "AsyncClaudeCodeAdapter._execute_internal"
+      to: "process.communicate"
+      via: "stdin/stdout communication"
+      pattern: "communicate"
+---
+
+<objective>
+Implement Claude Code async adapter with subprocess execution
+
+Purpose: Enable task execution via Claude Code CLI using async subprocess for non-blocking execution, proper file handling, and JSON output parsing per ORCH-01 requirement.
+
+Output: Working AsyncClaudeCodeAdapter that implements all lifecycle methods with async subprocess execution, and comprehensive tests with mocked subprocess.
+</objective>
+
+<execution_context>
+@./.claude/get-shit-done/workflows/execute-plan.md
+@./.claude/get-shit-done/templates/summary.md
+</execution_context>
+
+<context>
+@.planning/PROJECT.md
+@.planning/ROADMAP.md
+@.planning/phases/04-orchestrator-adapters/04-CONTEXT.md
+@.planning/phases/04-orchestrator-adapters/04-RESEARCH.md
+@src/ta_lab2/tools/ai_orchestrator/adapters.py
+@src/ta_lab2/tools/ai_orchestrator/core.py
+</context>
+
+<tasks>
+
+<task type="auto">
+  <name>Task 1: Implement AsyncClaudeCodeAdapter in adapters.py</name>
+  <files>src/ta_lab2/tools/ai_orchestrator/adapters.py</files>
+  <action>
+Add AsyncClaudeCodeAdapter class implementing AsyncBasePlatformAdapter.
+
+Key implementation points from RESEARCH.md:
+- Use asyncio.create_subprocess_exec (NOT subprocess.run which blocks event loop)
+- Use asyncio.wait_for for timeout handling
+- Always re-raise CancelledError after cleanup
+- CLI has --output-format json flag for scripting
+
+```python
+class AsyncClaudeCodeAdapter(AsyncBasePlatformAdapter):
+    """
+    Async adapter for Claude Code CLI.
+
+    Executes tasks via:
+    - Async subprocess with JSON output parsing
+    - Context file passing via --file flags
+    - Proper timeout and cancellation handling
+
+    NOTE: This requires Claude Code CLI to be installed and accessible.
+    The CLI binary is typically named 'claude' or 'claude-code'.
+    """
+
+    def __init__(
+        self,
+        cli_path: str | None = None,
+        timeout: float = 300.0,
+        output_format: str = "json",
+    ):
+        """
+        Initialize Claude Code adapter.
+
+        Args:
+            cli_path: Path to Claude Code CLI binary (auto-detected if None)
+            timeout: Default timeout for CLI execution in seconds (default: 5 min)
+            output_format: Output format (json, text, or stream-json)
+        """
+        self._cli_path = cli_path or self._find_cli()
+        self._timeout = timeout
+        self._output_format = output_format
+        self._pending_tasks: dict[str, asyncio.Task] = {}
+        self._processes: dict[str, asyncio.subprocess.Process] = {}
+
+    def _find_cli(self) -> str | None:
+        """Find Claude Code CLI binary."""
+        import shutil
+
+        # Try common names
+        for name in ["claude", "claude-code"]:
+            path = shutil.which(name)
+            if path:
+                return path
+        return None
+
+    @property
+    def is_implemented(self) -> bool:
+        """Check if CLI is available."""
+        return self._cli_path is not None
+
+    @property
+    def implementation_status(self) -> str:
+        """Return implementation status."""
+        if not self._cli_path:
+            return "unavailable"
+        return "working"
+
+    def get_adapter_status(self) -> dict:
+        """Return comprehensive adapter status."""
+        return {
+            "name": "Claude Code (Async)",
+            "is_implemented": self.is_implemented,
+            "status": self.implementation_status,
+            "cli_path": self._cli_path,
+            "capabilities": [
+                "Async subprocess execution",
+                "JSON output parsing",
+                "Context file passing",
+                "GSD workflow support (via current session)",
+            ],
+            "requirements": [
+                f"Claude Code CLI {'(found: ' + self._cli_path + ')' if self._cli_path else '(not found)'}"
+            ],
+        }
+
+    async def __aenter__(self):
+        """Enter context - verify CLI exists."""
+        if not self._cli_path:
+            raise RuntimeError("Claude Code CLI not found. Install from https://code.claude.com")
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Exit context - cleanup any running processes."""
+        # Cancel all pending tasks
+        for task_id in list(self._pending_tasks.keys()):
+            await self.cancel_task(task_id)
+
+    async def submit_task(self, task: Task) -> str:
+        """Submit task and return task_id."""
+        task_id = self._generate_task_id(task)
+        task.task_id = task_id
+
+        # Create background task for execution
+        self._pending_tasks[task_id] = asyncio.create_task(
+            self._execute_internal(task, task_id)
+        )
+
+        return task_id
+
+    async def get_status(self, task_id: str) -> TaskStatus:
+        """Get task status."""
+        from .core import TaskStatus
+
+        if task_id not in self._pending_tasks:
+            return TaskStatus.UNKNOWN
+
+        task_obj = self._pending_tasks[task_id]
+        if task_obj.done():
+            if task_obj.cancelled():
+                return TaskStatus.CANCELLED
+            if task_obj.exception():
+                return TaskStatus.FAILED
+            return TaskStatus.COMPLETED
+        return TaskStatus.RUNNING
+
+    async def get_result(self, task_id: str, timeout: float = 300) -> Result:
+        """Get complete result, waiting if necessary."""
+        from .core import TaskStatus, Platform
+
+        if task_id not in self._pending_tasks:
+            return Result(
+                task=Task(type=TaskType.CODE_GENERATION, prompt=""),
+                platform=Platform.CLAUDE_CODE,
+                output="",
+                success=False,
+                status=TaskStatus.UNKNOWN,
+                error=f"Unknown task_id: {task_id}",
+            )
+
+        try:
+            result = await asyncio.wait_for(
+                self._pending_tasks[task_id],
+                timeout=timeout
+            )
+            return result
+        except asyncio.TimeoutError:
+            # Try to kill the process if still running
+            if task_id in self._processes:
+                self._processes[task_id].kill()
+            return Result(
+                task=Task(type=TaskType.CODE_GENERATION, prompt=""),
+                platform=Platform.CLAUDE_CODE,
+                output="",
+                success=False,
+                status=TaskStatus.FAILED,
+                error=f"Task timed out after {timeout}s",
+            )
+        except asyncio.CancelledError:
+            raise  # Always re-raise
+
+    async def stream_result(self, task_id: str) -> AsyncIterator[str]:
+        """Stream result - not fully supported for subprocess."""
+        # Claude CLI can output stream-json format, but parsing is complex
+        # For now, yield complete result
+        result = await self.get_result(task_id)
+        if result.output:
+            yield result.output
+
+    async def cancel_task(self, task_id: str) -> bool:
+        """Cancel a running task."""
+        if task_id not in self._pending_tasks:
+            return False
+
+        task_obj = self._pending_tasks[task_id]
+        if task_obj.done():
+            return False
+
+        # Kill subprocess if running
+        if task_id in self._processes:
+            process = self._processes[task_id]
+            try:
+                process.kill()
+                await process.wait()
+            except ProcessLookupError:
+                pass  # Process already dead
+
+        # Cancel the asyncio task
+        task_obj.cancel()
+        try:
+            await task_obj
+        except asyncio.CancelledError:
+            pass
+
+        return True
+
+    async def _execute_internal(self, task: Task, task_id: str) -> Result:
+        """Execute task via subprocess."""
+        from .core import TaskStatus, Platform
+        import json
+        import time
+
+        start_time = time.time()
+
+        try:
+            # Build command
+            cmd = [self._cli_path, "--output-format", self._output_format]
+
+            # Add context files if provided
+            if task.files:
+                for file_path in task.files:
+                    cmd.extend(["--file", str(file_path)])
+
+            # Create subprocess
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+
+            # Store process reference for cancellation
+            self._processes[task_id] = process
+
+            # Determine timeout
+            timeout = task.constraints.timeout_seconds if task.constraints and task.constraints.timeout_seconds else self._timeout
+
+            try:
+                # Send prompt via stdin and wait for response
+                stdout, stderr = await asyncio.wait_for(
+                    process.communicate(input=task.prompt.encode("utf-8")),
+                    timeout=timeout
+                )
+            finally:
+                # Clean up process reference
+                if task_id in self._processes:
+                    del self._processes[task_id]
+
+            # Check return code
+            if process.returncode != 0:
+                return Result(
+                    task=task,
+                    platform=Platform.CLAUDE_CODE,
+                    output="",
+                    success=False,
+                    status=TaskStatus.FAILED,
+                    error=f"CLI exited with code {process.returncode}: {stderr.decode('utf-8', errors='replace')}",
+                    duration_seconds=time.time() - start_time,
+                )
+
+            # Parse output
+            output_text = stdout.decode("utf-8", errors="replace")
+            files_created = []
+            metadata = {}
+
+            if self._output_format == "json":
+                try:
+                    output_data = json.loads(output_text)
+                    # Extract relevant fields from JSON
+                    output_text = output_data.get("response", output_data.get("content", output_text))
+                    files_created = output_data.get("files_created", [])
+                    metadata = {
+                        "raw_json": output_data,
+                        "model": output_data.get("model"),
+                    }
+                except json.JSONDecodeError:
+                    # If JSON parsing fails, use raw output
+                    metadata["parse_error"] = "Could not parse JSON output"
+
+            return Result(
+                task=task,
+                platform=Platform.CLAUDE_CODE,
+                output=output_text,
+                success=True,
+                status=TaskStatus.COMPLETED,
+                duration_seconds=time.time() - start_time,
+                files_created=files_created,
+                metadata=metadata,
+            )
+
+        except asyncio.TimeoutError:
+            # Kill process on timeout
+            if task_id in self._processes:
+                self._processes[task_id].kill()
+                del self._processes[task_id]
+            return Result(
+                task=task,
+                platform=Platform.CLAUDE_CODE,
+                output="",
+                success=False,
+                status=TaskStatus.FAILED,
+                error=f"Execution timed out after {self._timeout}s",
+                duration_seconds=time.time() - start_time,
+            )
+
+        except asyncio.CancelledError:
+            # Clean up and re-raise
+            if task_id in self._processes:
+                self._processes[task_id].kill()
+                del self._processes[task_id]
+            raise
+
+        except Exception as e:
+            return Result(
+                task=task,
+                platform=Platform.CLAUDE_CODE,
+                output="",
+                success=False,
+                status=TaskStatus.FAILED,
+                error=str(e),
+                duration_seconds=time.time() - start_time,
+            )
+```
+
+Also ensure the necessary imports are at the top of adapters.py:
+- `from typing import AsyncIterator`
+- `import asyncio`
+- `import json`
+  </action>
+  <verify>
+```bash
+python -c "
+from ta_lab2.tools.ai_orchestrator.adapters import AsyncClaudeCodeAdapter
+adapter = AsyncClaudeCodeAdapter()
+print(f'Status: {adapter.implementation_status}')
+print(f'CLI path: {adapter._cli_path}')
+print(adapter.get_adapter_status())
+"
+```
+  </verify>
+  <done>
+- AsyncClaudeCodeAdapter class exists in adapters.py
+- Implements all 5 lifecycle methods
+- Uses asyncio.create_subprocess_exec (not blocking subprocess.run)
+- Handles timeout via asyncio.wait_for
+- Properly re-raises CancelledError after cleanup
+- Kills subprocess on cancellation/timeout
+- Parses JSON output from CLI
+- Passes context files via --file flags
+  </done>
+</task>
+
+<task type="auto">
+  <name>Task 2: Create comprehensive tests for Claude Code adapter</name>
+  <files>tests/orchestrator/test_claude_adapter.py</files>
+  <action>
+Create test_claude_adapter.py with mocked subprocess:
+
+```python
+"""Tests for AsyncClaudeCodeAdapter."""
+import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
+import asyncio
+import json
+
+from ta_lab2.tools.ai_orchestrator.adapters import AsyncClaudeCodeAdapter
+from ta_lab2.tools.ai_orchestrator.core import Task, TaskType, TaskStatus, TaskConstraints
+
+
+@pytest.fixture
+def mock_process():
+    """Create mock asyncio process."""
+    process = AsyncMock()
+    process.returncode = 0
+    process.communicate = AsyncMock(return_value=(
+        json.dumps({"response": "Test output from Claude"}).encode(),
+        b""
+    ))
+    process.kill = MagicMock()
+    process.wait = AsyncMock()
+    return process
+
+
+@pytest.fixture
+def sample_task():
+    """Create sample task for testing."""
+    return Task(
+        type=TaskType.CODE_GENERATION,
+        prompt="Write a hello world function",
+    )
+
+
+class TestAsyncClaudeCodeAdapterInit:
+    """Test adapter initialization."""
+
+    def test_init_with_cli_path(self):
+        """Test initialization with explicit CLI path."""
+        adapter = AsyncClaudeCodeAdapter(cli_path="/usr/bin/claude")
+        assert adapter._cli_path == "/usr/bin/claude"
+        assert adapter.is_implemented is True
+
+    def test_init_auto_detect_cli(self):
+        """Test CLI auto-detection."""
+        with patch("shutil.which", return_value="/usr/bin/claude"):
+            adapter = AsyncClaudeCodeAdapter()
+            assert adapter._cli_path == "/usr/bin/claude"
+            assert adapter.is_implemented is True
+
+    def test_init_cli_not_found(self):
+        """Test when CLI is not found."""
+        with patch("shutil.which", return_value=None):
+            adapter = AsyncClaudeCodeAdapter()
+            assert adapter._cli_path is None
+            assert adapter.is_implemented is False
+            assert adapter.implementation_status == "unavailable"
+
+    def test_get_adapter_status(self):
+        """Test adapter status reporting."""
+        adapter = AsyncClaudeCodeAdapter(cli_path="/usr/bin/claude")
+        status = adapter.get_adapter_status()
+
+        assert status["name"] == "Claude Code (Async)"
+        assert "cli_path" in status
+        assert "Async subprocess execution" in status["capabilities"]
+
+
+class TestAsyncClaudeCodeAdapterExecution:
+    """Test task execution."""
+
+    @pytest.mark.asyncio
+    async def test_submit_task_returns_task_id(self, mock_process, sample_task):
+        """Test that submit_task returns a valid task_id."""
+        with patch("asyncio.create_subprocess_exec", return_value=mock_process):
+            adapter = AsyncClaudeCodeAdapter(cli_path="/usr/bin/claude")
+            task_id = await adapter.submit_task(sample_task)
+
+            assert task_id is not None
+            assert "_" in task_id
+
+    @pytest.mark.asyncio
+    async def test_get_result_success(self, mock_process, sample_task):
+        """Test successful result retrieval."""
+        with patch("asyncio.create_subprocess_exec", return_value=mock_process):
+            adapter = AsyncClaudeCodeAdapter(cli_path="/usr/bin/claude")
+            task_id = await adapter.submit_task(sample_task)
+            result = await adapter.get_result(task_id, timeout=5.0)
+
+            assert result.success is True
+            assert result.status == TaskStatus.COMPLETED
+            assert "Test output from Claude" in result.output
+
+    @pytest.mark.asyncio
+    async def test_get_result_cli_failure(self, sample_task):
+        """Test handling of CLI failure."""
+        mock_proc = AsyncMock()
+        mock_proc.returncode = 1
+        mock_proc.communicate = AsyncMock(return_value=(b"", b"Error: something went wrong"))
+        mock_proc.kill = MagicMock()
+
+        with patch("asyncio.create_subprocess_exec", return_value=mock_proc):
+            adapter = AsyncClaudeCodeAdapter(cli_path="/usr/bin/claude")
+            task_id = await adapter.submit_task(sample_task)
+            result = await adapter.get_result(task_id, timeout=5.0)
+
+            assert result.success is False
+            assert "exited with code 1" in result.error
+
+    @pytest.mark.asyncio
+    async def test_get_result_timeout(self, sample_task):
+        """Test timeout handling."""
+        mock_proc = AsyncMock()
+        # Simulate hanging process
+        async def slow_communicate(input=None):
+            await asyncio.sleep(10)
+            return b"", b""
+
+        mock_proc.communicate = slow_communicate
+        mock_proc.kill = MagicMock()
+        mock_proc.wait = AsyncMock()
+
+        with patch("asyncio.create_subprocess_exec", return_value=mock_proc):
+            adapter = AsyncClaudeCodeAdapter(cli_path="/usr/bin/claude", timeout=0.1)
+            task_id = await adapter.submit_task(sample_task)
+            result = await adapter.get_result(task_id, timeout=0.1)
+
+            assert result.success is False
+            assert "timed out" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_cancel_task(self, sample_task):
+        """Test task cancellation."""
+        mock_proc = AsyncMock()
+        async def slow_communicate(input=None):
+            await asyncio.sleep(10)
+            return b"", b""
+
+        mock_proc.communicate = slow_communicate
+        mock_proc.kill = MagicMock()
+        mock_proc.wait = AsyncMock()
+
+        with patch("asyncio.create_subprocess_exec", return_value=mock_proc):
+            adapter = AsyncClaudeCodeAdapter(cli_path="/usr/bin/claude")
+            task_id = await adapter.submit_task(sample_task)
+            await asyncio.sleep(0.01)  # Let task start
+
+            cancelled = await adapter.cancel_task(task_id)
+            assert cancelled is True
+
+            # Verify process was killed
+            mock_proc.kill.assert_called()
+
+
+class TestAsyncClaudeCodeAdapterContextManager:
+    """Test async context manager."""
+
+    @pytest.mark.asyncio
+    async def test_context_manager_success(self):
+        """Test successful context manager usage."""
+        adapter = AsyncClaudeCodeAdapter(cli_path="/usr/bin/claude")
+        async with adapter as a:
+            assert a is adapter
+
+    @pytest.mark.asyncio
+    async def test_context_manager_raises_without_cli(self):
+        """Test context manager raises if CLI not found."""
+        with patch("shutil.which", return_value=None):
+            adapter = AsyncClaudeCodeAdapter()
+            with pytest.raises(RuntimeError, match="CLI not found"):
+                async with adapter:
+                    pass
+
+    @pytest.mark.asyncio
+    async def test_context_manager_cleanup(self, mock_process, sample_task):
+        """Test that context manager cancels pending tasks."""
+        with patch("asyncio.create_subprocess_exec", return_value=mock_process):
+            adapter = AsyncClaudeCodeAdapter(cli_path="/usr/bin/claude")
+
+            async with adapter:
+                # Submit a task
+                task_id = await adapter.submit_task(sample_task)
+                # Don't wait for it
+
+            # After exiting context, task should be cancelled
+            status = await adapter.get_status(task_id)
+            # Status could be COMPLETED (fast) or CANCELLED
+            assert status in [TaskStatus.COMPLETED, TaskStatus.CANCELLED, TaskStatus.UNKNOWN]
+
+
+class TestFileHandling:
+    """Test context file handling."""
+
+    @pytest.mark.asyncio
+    async def test_files_passed_to_cli(self, mock_process):
+        """Test that files are passed as --file flags."""
+        with patch("asyncio.create_subprocess_exec", return_value=mock_process) as mock_exec:
+            adapter = AsyncClaudeCodeAdapter(cli_path="/usr/bin/claude")
+
+            task = Task(
+                type=TaskType.CODE_GENERATION,
+                prompt="Analyze this file",
+                files=["src/main.py", "src/utils.py"],
+            )
+
+            task_id = await adapter.submit_task(task)
+            await adapter.get_result(task_id, timeout=5.0)
+
+            # Check command includes file flags
+            call_args = mock_exec.call_args[0]
+            assert "--file" in call_args
+            assert "src/main.py" in call_args
+            assert "src/utils.py" in call_args
+
+
+class TestJSONParsing:
+    """Test JSON output parsing."""
+
+    @pytest.mark.asyncio
+    async def test_json_output_parsed(self, sample_task):
+        """Test that JSON output is properly parsed."""
+        json_response = {
+            "response": "Parsed response content",
+            "model": "claude-3-sonnet",
+            "files_created": ["output.py"],
+        }
+
+        mock_proc = AsyncMock()
+        mock_proc.returncode = 0
+        mock_proc.communicate = AsyncMock(return_value=(
+            json.dumps(json_response).encode(),
+            b""
+        ))
+
+        with patch("asyncio.create_subprocess_exec", return_value=mock_proc):
+            adapter = AsyncClaudeCodeAdapter(cli_path="/usr/bin/claude")
+            task_id = await adapter.submit_task(sample_task)
+            result = await adapter.get_result(task_id, timeout=5.0)
+
+            assert result.success is True
+            assert result.output == "Parsed response content"
+            assert result.files_created == ["output.py"]
+            assert result.metadata.get("model") == "claude-3-sonnet"
+
+    @pytest.mark.asyncio
+    async def test_invalid_json_handled(self, sample_task):
+        """Test that invalid JSON is handled gracefully."""
+        mock_proc = AsyncMock()
+        mock_proc.returncode = 0
+        mock_proc.communicate = AsyncMock(return_value=(
+            b"Not valid JSON output",
+            b""
+        ))
+
+        with patch("asyncio.create_subprocess_exec", return_value=mock_proc):
+            adapter = AsyncClaudeCodeAdapter(cli_path="/usr/bin/claude")
+            task_id = await adapter.submit_task(sample_task)
+            result = await adapter.get_result(task_id, timeout=5.0)
+
+            # Should still succeed with raw output
+            assert result.success is True
+            assert "Not valid JSON" in result.output
+            assert "parse_error" in result.metadata
+
+
+class TestUnknownTask:
+    """Test handling of unknown tasks."""
+
+    @pytest.mark.asyncio
+    async def test_get_status_unknown(self):
+        """Test status for unknown task_id."""
+        adapter = AsyncClaudeCodeAdapter(cli_path="/usr/bin/claude")
+        status = await adapter.get_status("nonexistent-task-id")
+        assert status == TaskStatus.UNKNOWN
+
+    @pytest.mark.asyncio
+    async def test_cancel_unknown_task(self):
+        """Test cancelling unknown task returns False."""
+        adapter = AsyncClaudeCodeAdapter(cli_path="/usr/bin/claude")
+        result = await adapter.cancel_task("nonexistent-task-id")
+        assert result is False
+```
+  </action>
+  <verify>
+```bash
+pytest tests/orchestrator/test_claude_adapter.py -v
+```
+  </verify>
+  <done>
+- test_claude_adapter.py exists with 14+ test cases
+- Tests cover: initialization, execution, timeout, cancellation, file handling, JSON parsing
+- All tests use mocked subprocess (no real CLI execution)
+- All tests pass
+  </done>
+</task>
+
+</tasks>
+
+<verification>
+After all tasks complete:
+
+1. Module imports:
+```bash
+python -c "
+from ta_lab2.tools.ai_orchestrator.adapters import AsyncClaudeCodeAdapter
+print('AsyncClaudeCodeAdapter imports successfully')
+"
+```
+
+2. Run Claude adapter tests:
+```bash
+pytest tests/orchestrator/test_claude_adapter.py -v
+```
+
+3. Verify adapter status:
+```bash
+python -c "
+from ta_lab2.tools.ai_orchestrator.adapters import AsyncClaudeCodeAdapter
+adapter = AsyncClaudeCodeAdapter()
+print(adapter.get_adapter_status())
+"
+```
+</verification>
+
+<success_criteria>
+- AsyncClaudeCodeAdapter implements all 5 lifecycle methods
+- Uses asyncio.create_subprocess_exec (not blocking subprocess.run)
+- Handles timeout with asyncio.wait_for
+- Kills subprocess on timeout/cancellation
+- CancelledError always re-raised after cleanup
+- JSON output parsing with graceful fallback
+- Context files passed via --file flags
+- 14+ tests pass with mocked subprocess
+</success_criteria>
+
+<output>
+After completion, create `.planning/phases/04-orchestrator-adapters/04-03-SUMMARY.md`
+</output>
