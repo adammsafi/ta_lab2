@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 ## Current Position
 
 Phase: 17 of 19 (Verification & Validation)
-Plan: 4 of 6 in current phase
+Plan: 5 of 6 in current phase
 Status: In progress
-Last activity: 2026-02-03 - Completed 17-04-PLAN.md (pre-commit hooks configuration)
+Last activity: 2026-02-03 - Completed 17-05-PLAN.md (data loss validation tests)
 
-Progress: [##########] 100% v0.4.0 | [██████████] 100% v0.5.0 (Phase 17 in progress: 4/6 plans)
+Progress: [##########] 100% v0.4.0 | [██████████] 100% v0.5.0 (Phase 17 in progress: 5/6 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 97 (56 in v0.4.0, 41 in v0.5.0)
+- Total plans completed: 98 (56 in v0.4.0, 42 in v0.5.0)
 - Average duration: 12 min
-- Total execution time: 20.28 hours
+- Total execution time: 20.41 hours
 
 **By Phase (v0.4.0):**
 
@@ -48,11 +48,11 @@ Progress: [##########] 100% v0.4.0 | [██████████] 100% v0.5.
 | 14-tools-integration | 13 | 128 min | 10 min | Complete |
 | 15-economic-data-strategy | 6 | 36 min | 6 min | Complete |
 | 16-repository-cleanup | 7 | 226 min | 32 min | Complete |
-| 17-verification-validation | 4 | 20 min | 5 min | In progress |
+| 17-verification-validation | 5 | 28 min | 6 min | In progress |
 
 **Recent Trend:**
 - v0.4.0 complete: 10 phases, 56 plans, 12.55 hours total
-- v0.5.0 in progress: Phase 17 started (4/6 plans, 20 min), 41 plans across 7 phases
+- v0.5.0 in progress: Phase 17 started (5/6 plans, 28 min), 42 plans across 7 phases
 
 *Updated after each plan completion*
 
@@ -122,6 +122,9 @@ Recent decisions affecting current work:
 - **Module docstrings before imports** (14-13): Python __doc__ detection requires docstrings as first module statement (after shebang/future imports)
 - **Fixed relative imports to absolute** (14-13): create_reasoning_engine.py uses full ta_lab2.tools.data_tools.memory path for proper module resolution
 - **100% test coverage enforced** (14-13): All 39 migrated modules validated with parametrized pytest tests (imports + docstrings + path checks)
+- **Distinguish data loss from modifications** (17-05): Files modified since baseline expected, only fail if path gone AND checksum not found
+- **Known reorganization exemptions** (17-05): Track documented replacements (Phase 16 refactored variants) to prevent false positives
+- **Checksum-primary validation hierarchy** (17-05): PRIMARY checksums track files through moves, SECONDARY count catches replaced-content, MEMORY validates tracking
 - **Archive fredtools2/fedtools2 not integrate** (15-01): Zero usage in ta_lab2, ecosystem alternatives (fredapi, fedfred) provide superior functionality
 - **4-dimensional ALTERNATIVES.md pattern** (15-01): Feature mapping, API comparison, migration effort, ecosystem maturity for archived packages
 - **Package-level provenance in manifest** (15-01): origin, author, purpose, entry_point for CLI tools extends Phase 12 manifest pattern
@@ -188,10 +191,10 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-03T22:12:54Z
-Stopped at: Completed 17-04-PLAN.md (pre-commit hooks with Ruff linting, organization rules enforced)
+Last session: 2026-02-03T22:32:00Z
+Stopped at: Completed 17-05-PLAN.md (data loss validation: zero data loss, 409 baseline files verified, 331 modified, 4 known reorganizations)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-03 (Phase 17 in progress: 4/6 plans - import validation (368 tests), import-linter (3 violations), CI workflows, pre-commit hooks (497 lint issues documented))*
+*Last updated: 2026-02-03 (Phase 17 in progress: 5/6 plans - import validation (368 tests), import-linter (3 violations), CI workflows, pre-commit hooks (497 lint issues), data loss validation (zero loss))*
