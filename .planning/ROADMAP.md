@@ -284,7 +284,14 @@ Plans:
   3. Loose .md files moved to appropriate docs/ subdirectories
   4. Exact duplicates identified via SHA256 and archived
   5. Similar functions (85%+ threshold) flagged for review
-**Plans**: TBD
+**Plans**: 6 plans
+Plans:
+- [ ] 16-01-PLAN.md - Archive temp files, loose scripts, corrupted paths from root
+- [ ] 16-02-PLAN.md - Compare and resolve *_refactored.py files, archive *.original files
+- [ ] 16-03-PLAN.md - Organize loose .md files into docs/ structure
+- [ ] 16-04-PLAN.md - Create duplicate detection tool and identify/archive exact duplicates
+- [ ] 16-05-PLAN.md - Create similarity analysis tool and generate three-tier report
+- [ ] 16-06-PLAN.md - Update memory with file movements and phase snapshot
 
 ### Phase 17: Verification & Validation
 **Goal**: Validate all imports work and no data was lost
@@ -351,7 +358,7 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> 12 -> ...
 | 13. Documentation Consolidation | 7/7 | Complete | 2026-02-02 |
 | 14. Tools Integration | 13/13 | Complete | 2026-02-03 |
 | 15. Economic Data Strategy | 0/6 | Planned | - |
-| 16. Repository Cleanup | 0/TBD | Not started | - |
+| 16. Repository Cleanup | 0/6 | Planned | - |
 | 17. Verification & Validation | 0/TBD | Not started | - |
 | 18. Structure Documentation | 0/TBD | Not started | - |
 | 19. Memory Validation & Release | 0/TBD | Not started | - |
@@ -377,4 +384,4 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> 12 -> ...
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-03 (Phase 15 replanning: 6 plans in 3 waves with comprehensive context)*
+*Last updated: 2026-02-03 (Phase 16 planned: 6 plans in 3 waves)*
