@@ -1,0 +1,115 @@
+# ta_lab2 snapshot diff
+
+## Summary
+
+- Tables added: **104**
+- Tables removed: **0**
+- Tables changed (bytes/rows): **0**
+- Tables changed (shape): **0**
+
+## Tables added
+
+- `public._stg_cmc_price_histories7`
+- `public.cmc_bar_returns`
+- `public.cmc_bar_returns_state`
+- `public.cmc_da_ids`
+- `public.cmc_da_info`
+- `public.cmc_ema_daily`
+- `public.cmc_ema_daily_20251124_snapshot`
+- `public.cmc_ema_multi_tf`
+- `public.cmc_ema_multi_tf_20251124_snapshot`
+- `public.cmc_ema_multi_tf_cal`
+- `public.cmc_ema_multi_tf_cal_20251124_snapshot`
+- `public.cmc_ema_multi_tf_cal_20251207_snapshot`
+- `public.cmc_ema_multi_tf_cal_anchor`
+- `public.cmc_ema_multi_tf_cal_anchor_20251207_snapshot`
+- `public.cmc_ema_multi_tf_cal_anchor_iso`
+- `public.cmc_ema_multi_tf_cal_anchor_iso_state`
+- `public.cmc_ema_multi_tf_cal_anchor_us`
+- `public.cmc_ema_multi_tf_cal_anchor_us_state`
+- `public.cmc_ema_multi_tf_cal_iso`
+- `public.cmc_ema_multi_tf_cal_iso_state`
+- `public.cmc_ema_multi_tf_cal_snapshot_20251212`
+- `public.cmc_ema_multi_tf_cal_snapshot_20251215`
+- `public.cmc_ema_multi_tf_cal_us`
+- `public.cmc_ema_multi_tf_cal_us_state`
+- `public.cmc_ema_multi_tf_snapshot_20251214`
+- `public.cmc_ema_multi_tf_snapshot_20251215`
+- `public.cmc_ema_multi_tf_u`
+- `public.cmc_ema_multi_tf_v2`
+- `public.cmc_ema_multi_tf_v2_snapshot_20251214`
+- `public.cmc_ema_multi_tf_v2_snapshot_20251215`
+- `public.cmc_ema_refresh_state`
+- `public.cmc_ema_returns`
+- `public.cmc_ema_returns_state`
+- `public.cmc_exchange_info`
+- `public.cmc_exchange_map`
+- `public.cmc_price_bars_multi_tf`
+- `public.cmc_price_bars_multi_tf_cal_anchor_iso`
+- `public.cmc_price_bars_multi_tf_cal_anchor_iso_snapshot_20251213`
+- `public.cmc_price_bars_multi_tf_cal_anchor_iso_snapshot_20251215`
+- `public.cmc_price_bars_multi_tf_cal_anchor_iso_state`
+- `public.cmc_price_bars_multi_tf_cal_anchor_us`
+- `public.cmc_price_bars_multi_tf_cal_anchor_us_snapshot_20251213`
+- `public.cmc_price_bars_multi_tf_cal_anchor_us_snapshot_20251215`
+- `public.cmc_price_bars_multi_tf_cal_anchor_us_state`
+- `public.cmc_price_bars_multi_tf_cal_iso`
+- `public.cmc_price_bars_multi_tf_cal_iso_snapshot_20251213`
+- `public.cmc_price_bars_multi_tf_cal_iso_snapshot_20251215`
+- `public.cmc_price_bars_multi_tf_cal_iso_state`
+- `public.cmc_price_bars_multi_tf_cal_us`
+- `public.cmc_price_bars_multi_tf_cal_us_snapshot_20251213`
+- `public.cmc_price_bars_multi_tf_cal_us_snapshot_20251215`
+- `public.cmc_price_bars_multi_tf_cal_us_state`
+- `public.cmc_price_bars_multi_tf_snapshot_20251213`
+- `public.cmc_price_bars_multi_tf_snapshot_20251215`
+- `public.cmc_price_bars_multi_tf_state`
+- `public.cmc_price_histories7`
+- `public.cmc_price_ranges`
+- `public.cmc_returns_bars_multi_tf`
+- `public.cmc_returns_bars_multi_tf_cal_anchor_iso`
+- `public.cmc_returns_bars_multi_tf_cal_anchor_iso_state`
+- `public.cmc_returns_bars_multi_tf_cal_anchor_us`
+- `public.cmc_returns_bars_multi_tf_cal_anchor_us_state`
+- `public.cmc_returns_bars_multi_tf_cal_iso`
+- `public.cmc_returns_bars_multi_tf_cal_iso_state`
+- `public.cmc_returns_bars_multi_tf_cal_us`
+- `public.cmc_returns_bars_multi_tf_cal_us_state`
+- `public.cmc_returns_bars_multi_tf_state`
+- `public.cmc_returns_d1`
+- `public.cmc_returns_d1_state`
+- `public.cmc_returns_ema_multi_tf`
+- `public.cmc_returns_ema_multi_tf_cal_anchor_iso`
+- `public.cmc_returns_ema_multi_tf_cal_anchor_iso_state`
+- `public.cmc_returns_ema_multi_tf_cal_anchor_us`
+- `public.cmc_returns_ema_multi_tf_cal_anchor_us_state`
+- `public.cmc_returns_ema_multi_tf_cal_iso`
+- `public.cmc_returns_ema_multi_tf_cal_iso_state`
+- `public.cmc_returns_ema_multi_tf_cal_us`
+- `public.cmc_returns_ema_multi_tf_cal_us_state`
+- `public.cmc_returns_ema_multi_tf_state`
+- `public.cmc_returns_ema_multi_tf_u`
+- `public.cmc_returns_ema_multi_tf_u_state`
+- `public.cmc_returns_ema_multi_tf_v2`
+- `public.cmc_returns_ema_multi_tf_v2_state`
+- `public.cusip_ticker`
+- `public.dim_period`
+- `public.dim_sessions`
+- `public.dim_timeframe`
+- `public.dim_timeframe_backup_20251218`
+- `public.dim_timeframe_period`
+- `public.ema_alpha_lookup`
+- `public.ema_alpha_lut_old`
+- `public.ema_daily_stats`
+- `public.ema_daily_stats_20251124_snapshot`
+- `public.ema_multi_tf_cal_anchor_stats`
+- `public.ema_multi_tf_cal_anchor_stats_state`
+- `public.ema_multi_tf_cal_stats`
+- `public.ema_multi_tf_cal_stats_20251124_snapshot`
+- `public.ema_multi_tf_cal_stats_state`
+- `public.ema_multi_tf_stats`
+- `public.ema_multi_tf_stats_20251124_snapshot`
+- `public.ema_multi_tf_stats_state`
+- `public.ema_multi_tf_v2_stats`
+- `public.ema_multi_tf_v2_stats_state`
+- `public.price_histories7_stats`
