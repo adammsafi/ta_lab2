@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 ## Current Position
 
 Phase: 17 of 19 (Verification & Validation)
-Plan: 1 of 6 in current phase
+Plan: 2 of 6 in current phase
 Status: In progress
-Last activity: 2026-02-03 - Completed 17-01-PLAN.md (import validation)
+Last activity: 2026-02-03 - Completed 17-02-PLAN.md (import-linter configuration)
 
-Progress: [##########] 100% v0.4.0 | [██████████] 100% v0.5.0 (Phase 17 in progress: 1/6 plans)
+Progress: [##########] 100% v0.4.0 | [██████████] 100% v0.5.0 (Phase 17 in progress: 2/6 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 94 (56 in v0.4.0, 38 in v0.5.0)
+- Total plans completed: 95 (56 in v0.4.0, 39 in v0.5.0)
 - Average duration: 13 min
-- Total execution time: 20.08 hours
+- Total execution time: 20.13 hours
 
 **By Phase (v0.4.0):**
 
@@ -48,11 +48,11 @@ Progress: [##########] 100% v0.4.0 | [██████████] 100% v0.5.
 | 14-tools-integration | 13 | 128 min | 10 min | Complete |
 | 15-economic-data-strategy | 6 | 36 min | 6 min | Complete |
 | 16-repository-cleanup | 7 | 226 min | 32 min | Complete |
-| 17-verification-validation | 1 | 5 min | 5 min | In progress |
+| 17-verification-validation | 2 | 10 min | 5 min | In progress |
 
 **Recent Trend:**
 - v0.4.0 complete: 10 phases, 56 plans, 12.55 hours total
-- v0.5.0 in progress: Phase 17 started (1/6 plans, 5 min), 38 plans across 7 phases
+- v0.5.0 in progress: Phase 17 started (2/6 plans, 10 min), 39 plans across 7 phases
 
 *Updated after each plan completion*
 
@@ -159,6 +159,9 @@ Recent decisions affecting current work:
 - **pkgutil.walk_packages for dynamic discovery** (17-01): Use pkgutil for automatic module discovery instead of manual lists that go stale
 - **Separate orchestrator marker** (17-01): Optional dependency tests marked with @pytest.mark.orchestrator for selective execution
 - **Skip orchestrator in tools tests** (17-01): Simpler than using pytest.importorskip in every parametrized test case
+- **Layers contract for import-linter** (17-02): Use layers contract (4-tier hierarchy) not independence for proper layering validation
+- **lint-imports command not python -m** (17-02): importlinter lacks __main__ module, use lint-imports with shell=True for Windows
+- **Document violations not block** (17-02): 3 architectural violations (tools->features, regimes<->pipelines) documented for gap closure
 
 ### Pending Todos
 
@@ -166,14 +169,17 @@ None yet.
 
 ### Blockers/Concerns
 
-None currently.
+**Architectural violations detected (17-02):**
+- tools->features: ema_runners in tools imports from features (foundation layer violation)
+- regimes<->pipelines: Circular dependency between regimes.run_btc_pipeline and pipelines.btc_pipeline
+- Requires gap closure refactoring before full validation passes
 
 ## Session Continuity
 
-Last session: 2026-02-03T21:33:39Z
-Stopped at: Completed 17-01-PLAN.md (import validation with dynamic pkgutil discovery)
+Last session: 2026-02-03T22:00:24Z
+Stopped at: Completed 17-02-PLAN.md (import-linter configuration with 3 violations detected)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-03 (Phase 17 started: 1/6 plans - 368 parametrized import tests created, 332 core modules validated, 1 import-breaking bug fixed)*
+*Last updated: 2026-02-03 (Phase 17 in progress: 2/6 plans - import validation complete with 368 tests, import-linter configured with 3 violations detected for gap closure)*
