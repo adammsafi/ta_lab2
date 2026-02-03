@@ -1,0 +1,54 @@
+# =====================================================================
+# fedtools2 Default Configuration  (safe to commit publicly)
+# ---------------------------------------------------------------------
+# Do NOT put credentials here. Supply DB creds via:
+#   * db_config.env (gitignored) at repo root, or
+#   * .env, or
+#   * environment variables (PGUSER, PGPASS, PGHOST, PGPORT, PGDB)
+# The SQL sink builds the connection string at runtime.
+# =====================================================================
+
+# -----------------------------
+# ETL OUTPUT
+# -----------------------------
+output_dir: "C:/Users/asafi/Downloads/ETL"
+write_latest_copy: true
+latest_filename: "FED_Merged_latest.csv"
+
+# -----------------------------
+# SQL SINK
+# -----------------------------
+sql:
+  enabled: true
+  # Module:function to call after ETL merges the data
+  writer: "fedtools2.sql_sink_example:write_dataframe_and_log"
+  # Leave blank; credentials come from env/.env/db_config.env
+  conn_str: ""
+  base_table: "fed_targets_daily"
+  log_table: "fed_targets_runs"
+
+# -----------------------------
+# LOGGING
+# -----------------------------
+logging:
+  level: "INFO"
+  format: "%(asctime)s [%(levelname)s] %(message)s"
+  log_to_file: false
+  log_file_path: "C:/Users/asafi/Downloads/ETL/fedtools2.log"
+
+# -----------------------------
+# SOURCE CSV PATHS
+# -----------------------------
+sources:
+  fed_csv_paths:
+    DFEDTARL: "C:/Users/asafi/Downloads/FinancialData/FedData/DFEDTARL.csv"
+    DFEDTAR:  "C:/Users/asafi/Downloads/FinancialData/FedData/DFEDTAR.csv"
+    DFEDTARU: "C:/Users/asafi/Downloads/FinancialData/FedData/DFEDTARU.csv"
+    FEDFUNDS: "C:/Users/asafi/Downloads/FinancialData/FedData/FEDFUNDS.csv"
+
+# -----------------------------
+# FAILURE BEHAVIOR
+# -----------------------------
+on_failure:
+  write_csv_backup: true
+  backup_suffix: "_backup"

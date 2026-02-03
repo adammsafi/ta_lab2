@@ -1,0 +1,110 @@
+├── .git
+│   ├── COMMIT_EDITMSG
+│   ├── HEAD
+│   ├── config
+│   ├── description
+│   ├── hooks
+│   │   ├── applypatch-msg.sample
+│   │   ├── commit-msg.sample
+│   │   ├── fsmonitor-watchman.sample
+│   │   ├── post-update.sample
+│   │   ├── pre-applypatch.sample
+│   │   ├── pre-commit.sample
+│   │   ├── pre-merge-commit.sample
+│   │   ├── pre-push.sample
+│   │   ├── pre-rebase.sample
+│   │   ├── pre-receive.sample
+│   │   ├── prepare-commit-msg.sample
+│   │   ├── push-to-checkout.sample
+│   │   ├── sendemail-validate.sample
+│   │   └── update.sample
+│   ├── index
+│   ├── info
+│   │   └── exclude
+│   ├── logs
+│   │   ├── HEAD
+│   │   └── refs
+│   │       ├── heads
+│   │       │   └── main
+│   │       └── remotes
+│   │           └── origin
+│   │               └── main
+│   ├── objects
+│   │   ├── 05
+│   │   │   └── c02cb70109eecdda0f20060e2fc1f1820cc5c2
+│   │   ├── 08
+│   │   │   └── 0548ec73adcc233c4771e1b023739a019b205e
+│   │   ├── 10
+│   │   │   └── 74f66a3e7f3519d6d802b39f2cd5b0bb33c62f
+│   │   ├── 23
+│   │   │   └── 57a6bb93945eff955fdab55d815ca29b128092
+│   │   ├── 2f
+│   │   │   └── 7d34e2e2ebcfd9693e2992c1e7ecf4b2d30a77
+│   │   ├── 4b
+│   │   │   ├── 283982e3fabdf968ac9c9320d5352959153f2f
+│   │   │   └── 7c635a38f5bd43dc4ac580a976b4bbd6f3b5d0
+│   │   ├── 56
+│   │   │   └── bcdc6428b54b83c96d9cfe896b91f8f3216239
+│   │   ├── 5c
+│   │   │   └── ce20d59fbdbc9e0a74fa2906e84a2451bff495
+│   │   ├── 7e
+│   │   │   └── 3015cdfd7e98047b34885d89c20346f1891c55
+│   │   ├── 8e
+│   │   │   └── b5929418ae4a078045be04ba6300039f9de4da
+│   │   ├── 90
+│   │   │   └── 86263a87b86dfcf716a2ee0a485434bf16f5cb
+│   │   ├── ab
+│   │   │   └── 401b6206e22e81832318acf1c36fa9c0d0f7c9
+│   │   ├── b2
+│   │   │   └── 2ee0fe532facee03ab4a5658cef74f2042f29a
+│   │   ├── ba
+│   │   │   └── 937a91467e77bf809b730a934caf6ce4b1132e
+│   │   ├── c3
+│   │   │   ├── df75935858ea64216919950349b9cbe0afc1ba
+│   │   │   └── e129ad11f268bc05c66dd50d76ce93f8ce90e1
+│   │   ├── c7
+│   │   │   └── 330716d3c460313c68798e7fc15812a81875d6
+│   │   ├── f8
+│   │   │   └── db38893b040e51301e1d5b0313bf9e70896fb9
+│   │   ├── info
+│   │   └── pack
+│   └── refs
+│       ├── heads
+│       │   └── main
+│       ├── remotes
+│       │   └── origin
+│       │       └── main
+│       └── tags
+├── .gitignore
+├── .pre-commit-config.yaml
+├── README.md
+├── fedtools2.egg-info
+│   ├── PKG-INFO
+│   ├── SOURCES.txt
+│   ├── dependency_links.txt
+│   ├── entry_points.txt
+│   ├── requires.txt
+│   └── top_level.txt
+├── pyproject.toml
+├── src
+│   ├── __init__.py
+│   ├── __pycache__
+│   │   ├── __init__.cpython-312.pyc
+│   │   └── etl.cpython-312.pyc
+│   ├── config
+│   │   ├── __init__.py
+│   │   └── default.yaml
+│   ├── etl.py
+│   └── utils
+│       ├── __pycache__
+│       │   ├── consolidation.cpython-312.pyc
+│       │   └── io.cpython-312.pyc
+│       ├── consolidation.py
+│       └── io.py
+├── structure.csv
+├── structure.json
+├── structure.md
+├── structure.txt
+└── tests
+    ├── test_consolidation.py
+    └── test_etl_smoke.py

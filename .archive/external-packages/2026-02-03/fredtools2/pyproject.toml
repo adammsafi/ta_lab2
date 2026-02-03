@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling>=1.18"]
+build-backend = "hatchling.build"
+
+[project]
+name = "fredtools"
+version = "0.1.0"
+description = "FRED pulls + PostgreSQL upserts with a small CLI"
+authors = [{ name = "Adam Safi" }]
+license = { text = "MIT" }
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "requests>=2.32",
+  "psycopg2-binary>=2.9",
+  "python-dotenv>=1.0",
+]
+
+[project.scripts]
+fred = "fredtools.cli:main"

@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fedtools2"
+version = "0.1.0"
+description = "ETL + utilities for Federal Reserve rate datasets"
+authors = [
+    { name = "Adam Safi" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "pandas>=2.2",
+    "numpy>=1.26",
+    "pyyaml>=6.0",
+    "matplotlib>=3.8",
+    "sqlalchemy>=2.0",
+    "python-dotenv>=1.0",
+]
+readme = "README.md"
+license = { text = "MIT" }
+classifiers = [
+    "Programming Language :: Python :: 3.11",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.scripts]
+fedtools2 = "fedtools2.etl:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["fedtools2*"]
+
+[tool.setuptools.package-data]
+"fedtools2" = ["config/*.yaml"]

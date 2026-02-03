@@ -1,0 +1,926 @@
+{
+  "name": "fedtools2",
+  "type": "dir",
+  "path": "",
+  "size": 0,
+  "mtime": "2025-11-03T21:48:55+00:00",
+  "children": [
+    {
+      "name": ".git",
+      "type": "dir",
+      "path": ".git",
+      "size": 0,
+      "mtime": "2025-11-03T21:37:03+00:00",
+      "children": [
+        {
+          "name": "COMMIT_EDITMSG",
+          "type": "file",
+          "path": ".git/COMMIT_EDITMSG",
+          "size": 50,
+          "mtime": "2025-11-03T18:26:20+00:00",
+          "children": null
+        },
+        {
+          "name": "HEAD",
+          "type": "file",
+          "path": ".git/HEAD",
+          "size": 21,
+          "mtime": "2025-11-03T18:26:29+00:00",
+          "children": null
+        },
+        {
+          "name": "config",
+          "type": "file",
+          "path": ".git/config",
+          "size": 301,
+          "mtime": "2025-11-03T18:27:07+00:00",
+          "children": null
+        },
+        {
+          "name": "description",
+          "type": "file",
+          "path": ".git/description",
+          "size": 73,
+          "mtime": "2025-11-03T18:25:10+00:00",
+          "children": null
+        },
+        {
+          "name": "hooks",
+          "type": "dir",
+          "path": ".git/hooks",
+          "size": 0,
+          "mtime": "2025-11-03T18:25:10+00:00",
+          "children": [
+            {
+              "name": "applypatch-msg.sample",
+              "type": "file",
+              "path": ".git/hooks/applypatch-msg.sample",
+              "size": 478,
+              "mtime": "2025-11-03T18:25:10+00:00",
+              "children": null
+            },
+            {
+              "name": "commit-msg.sample",
+              "type": "file",
+              "path": ".git/hooks/commit-msg.sample",
+              "size": 896,
+              "mtime": "2025-11-03T18:25:10+00:00",
+              "children": null
+            },
+            {
+              "name": "fsmonitor-watchman.sample",
+              "type": "file",
+              "path": ".git/hooks/fsmonitor-watchman.sample",
+              "size": 4726,
+              "mtime": "2025-11-03T18:25:10+00:00",
+              "children": null
+            },
+            {
+              "name": "post-update.sample",
+              "type": "file",
+              "path": ".git/hooks/post-update.sample",
+              "size": 189,
+              "mtime": "2025-11-03T18:25:10+00:00",
+              "children": null
+            },
+            {
+              "name": "pre-applypatch.sample",
+              "type": "file",
+              "path": ".git/hooks/pre-applypatch.sample",
+              "size": 424,
+              "mtime": "2025-11-03T18:25:10+00:00",
+              "children": null
+            },
+            {
+              "name": "pre-commit.sample",
+              "type": "file",
+              "path": ".git/hooks/pre-commit.sample",
+              "size": 1649,
+              "mtime": "2025-11-03T18:25:10+00:00",
+              "children": null
+            },
+            {
+              "name": "pre-merge-commit.sample",
+              "type": "file",
+              "path": ".git/hooks/pre-merge-commit.sample",
+              "size": 416,
+              "mtime": "2025-11-03T18:25:10+00:00",
+              "children": null
+            },
+            {
+              "name": "pre-push.sample",
+              "type": "file",
+              "path": ".git/hooks/pre-push.sample",
+              "size": 1374,
+              "mtime": "2025-11-03T18:25:10+00:00",
+              "children": null
+            },
+            {
+              "name": "pre-rebase.sample",
+              "type": "file",
+              "path": ".git/hooks/pre-rebase.sample",
+              "size": 4898,
+              "mtime": "2025-11-03T18:25:10+00:00",
+              "children": null
+            },
+            {
+              "name": "pre-receive.sample",
+              "type": "file",
+              "path": ".git/hooks/pre-receive.sample",
+              "size": 544,
+              "mtime": "2025-11-03T18:25:10+00:00",
+              "children": null
+            },
+            {
+              "name": "prepare-commit-msg.sample",
+              "type": "file",
+              "path": ".git/hooks/prepare-commit-msg.sample",
+              "size": 1492,
+              "mtime": "2025-11-03T18:25:10+00:00",
+              "children": null
+            },
+            {
+              "name": "push-to-checkout.sample",
+              "type": "file",
+              "path": ".git/hooks/push-to-checkout.sample",
+              "size": 2783,
+              "mtime": "2025-11-03T18:25:10+00:00",
+              "children": null
+            },
+            {
+              "name": "sendemail-validate.sample",
+              "type": "file",
+              "path": ".git/hooks/sendemail-validate.sample",
+              "size": 2308,
+              "mtime": "2025-11-03T18:25:10+00:00",
+              "children": null
+            },
+            {
+              "name": "update.sample",
+              "type": "file",
+              "path": ".git/hooks/update.sample",
+              "size": 3650,
+              "mtime": "2025-11-03T18:25:10+00:00",
+              "children": null
+            }
+          ]
+        },
+        {
+          "name": "index",
+          "type": "file",
+          "path": ".git/index",
+          "size": 1319,
+          "mtime": "2025-11-03T18:26:20+00:00",
+          "children": null
+        },
+        {
+          "name": "info",
+          "type": "dir",
+          "path": ".git/info",
+          "size": 0,
+          "mtime": "2025-11-03T18:25:10+00:00",
+          "children": [
+            {
+              "name": "exclude",
+              "type": "file",
+              "path": ".git/info/exclude",
+              "size": 240,
+              "mtime": "2025-11-03T18:25:10+00:00",
+              "children": null
+            }
+          ]
+        },
+        {
+          "name": "logs",
+          "type": "dir",
+          "path": ".git/logs",
+          "size": 0,
+          "mtime": "2025-11-03T18:26:20+00:00",
+          "children": [
+            {
+              "name": "HEAD",
+              "type": "file",
+              "path": ".git/logs/HEAD",
+              "size": 567,
+              "mtime": "2025-11-03T18:26:29+00:00",
+              "children": null
+            },
+            {
+              "name": "refs",
+              "type": "dir",
+              "path": ".git/logs/refs",
+              "size": 0,
+              "mtime": "2025-11-03T18:27:07+00:00",
+              "children": [
+                {
+                  "name": "heads",
+                  "type": "dir",
+                  "path": ".git/logs/refs/heads",
+                  "size": 0,
+                  "mtime": "2025-11-03T18:26:29+00:00",
+                  "children": [
+                    {
+                      "name": "main",
+                      "type": "file",
+                      "path": ".git/logs/refs/heads/main",
+                      "size": 383,
+                      "mtime": "2025-11-03T18:26:29+00:00",
+                      "children": null
+                    }
+                  ]
+                },
+                {
+                  "name": "remotes",
+                  "type": "dir",
+                  "path": ".git/logs/refs/remotes",
+                  "size": 0,
+                  "mtime": "2025-11-03T18:27:07+00:00",
+                  "children": [
+                    {
+                      "name": "origin",
+                      "type": "dir",
+                      "path": ".git/logs/refs/remotes/origin",
+                      "size": 0,
+                      "mtime": "2025-11-03T18:27:07+00:00",
+                      "children": [
+                        {
+                          "name": "main",
+                          "type": "file",
+                          "path": ".git/logs/refs/remotes/origin/main",
+                          "size": 146,
+                          "mtime": "2025-11-03T18:27:07+00:00",
+                          "children": null
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "objects",
+          "type": "dir",
+          "path": ".git/objects",
+          "size": 0,
+          "mtime": "2025-11-03T18:26:20+00:00",
+          "children": [
+            {
+              "name": "05",
+              "type": "dir",
+              "path": ".git/objects/05",
+              "size": 0,
+              "mtime": "2025-11-03T18:25:26+00:00",
+              "children": [
+                {
+                  "name": "c02cb70109eecdda0f20060e2fc1f1820cc5c2",
+                  "type": "file",
+                  "path": ".git/objects/05/c02cb70109eecdda0f20060e2fc1f1820cc5c2",
+                  "size": 349,
+                  "mtime": "2025-11-03T18:25:26+00:00",
+                  "children": null
+                }
+              ]
+            },
+            {
+              "name": "08",
+              "type": "dir",
+              "path": ".git/objects/08",
+              "size": 0,
+              "mtime": "2025-11-03T18:25:26+00:00",
+              "children": [
+                {
+                  "name": "0548ec73adcc233c4771e1b023739a019b205e",
+                  "type": "file",
+                  "path": ".git/objects/08/0548ec73adcc233c4771e1b023739a019b205e",
+                  "size": 233,
+                  "mtime": "2025-11-03T18:25:26+00:00",
+                  "children": null
+                }
+              ]
+            },
+            {
+              "name": "10",
+              "type": "dir",
+              "path": ".git/objects/10",
+              "size": 0,
+              "mtime": "2025-11-03T18:25:26+00:00",
+              "children": [
+                {
+                  "name": "74f66a3e7f3519d6d802b39f2cd5b0bb33c62f",
+                  "type": "file",
+                  "path": ".git/objects/10/74f66a3e7f3519d6d802b39f2cd5b0bb33c62f",
+                  "size": 42,
+                  "mtime": "2025-11-03T18:25:26+00:00",
+                  "children": null
+                }
+              ]
+            },
+            {
+              "name": "23",
+              "type": "dir",
+              "path": ".git/objects/23",
+              "size": 0,
+              "mtime": "2025-11-03T18:25:26+00:00",
+              "children": [
+                {
+                  "name": "57a6bb93945eff955fdab55d815ca29b128092",
+                  "type": "file",
+                  "path": ".git/objects/23/57a6bb93945eff955fdab55d815ca29b128092",
+                  "size": 413,
+                  "mtime": "2025-11-03T18:25:26+00:00",
+                  "children": null
+                }
+              ]
+            },
+            {
+              "name": "2f",
+              "type": "dir",
+              "path": ".git/objects/2f",
+              "size": 0,
+              "mtime": "2025-11-03T18:25:26+00:00",
+              "children": [
+                {
+                  "name": "7d34e2e2ebcfd9693e2992c1e7ecf4b2d30a77",
+                  "type": "file",
+                  "path": ".git/objects/2f/7d34e2e2ebcfd9693e2992c1e7ecf4b2d30a77",
+                  "size": 239,
+                  "mtime": "2025-11-03T18:25:26+00:00",
+                  "children": null
+                }
+              ]
+            },
+            {
+              "name": "4b",
+              "type": "dir",
+              "path": ".git/objects/4b",
+              "size": 0,
+              "mtime": "2025-11-03T18:26:20+00:00",
+              "children": [
+                {
+                  "name": "283982e3fabdf968ac9c9320d5352959153f2f",
+                  "type": "file",
+                  "path": ".git/objects/4b/283982e3fabdf968ac9c9320d5352959153f2f",
+                  "size": 156,
+                  "mtime": "2025-11-03T18:26:20+00:00",
+                  "children": null
+                },
+                {
+                  "name": "7c635a38f5bd43dc4ac580a976b4bbd6f3b5d0",
+                  "type": "file",
+                  "path": ".git/objects/4b/7c635a38f5bd43dc4ac580a976b4bbd6f3b5d0",
+                  "size": 183,
+                  "mtime": "2025-11-03T18:25:26+00:00",
+                  "children": null
+                }
+              ]
+            },
+            {
+              "name": "56",
+              "type": "dir",
+              "path": ".git/objects/56",
+              "size": 0,
+              "mtime": "2025-11-03T18:26:20+00:00",
+              "children": [
+                {
+                  "name": "bcdc6428b54b83c96d9cfe896b91f8f3216239",
+                  "type": "file",
+                  "path": ".git/objects/56/bcdc6428b54b83c96d9cfe896b91f8f3216239",
+                  "size": 271,
+                  "mtime": "2025-11-03T18:26:20+00:00",
+                  "children": null
+                }
+              ]
+            },
+            {
+              "name": "5c",
+              "type": "dir",
+              "path": ".git/objects/5c",
+              "size": 0,
+              "mtime": "2025-11-03T18:26:20+00:00",
+              "children": [
+                {
+                  "name": "ce20d59fbdbc9e0a74fa2906e84a2451bff495",
+                  "type": "file",
+                  "path": ".git/objects/5c/ce20d59fbdbc9e0a74fa2906e84a2451bff495",
+                  "size": 88,
+                  "mtime": "2025-11-03T18:26:20+00:00",
+                  "children": null
+                }
+              ]
+            },
+            {
+              "name": "7e",
+              "type": "dir",
+              "path": ".git/objects/7e",
+              "size": 0,
+              "mtime": "2025-11-03T18:25:26+00:00",
+              "children": [
+                {
+                  "name": "3015cdfd7e98047b34885d89c20346f1891c55",
+                  "type": "file",
+                  "path": ".git/objects/7e/3015cdfd7e98047b34885d89c20346f1891c55",
+                  "size": 2188,
+                  "mtime": "2025-11-03T18:25:26+00:00",
+                  "children": null
+                }
+              ]
+            },
+            {
+              "name": "8e",
+              "type": "dir",
+              "path": ".git/objects/8e",
+              "size": 0,
+              "mtime": "2025-11-03T18:25:26+00:00",
+              "children": [
+                {
+                  "name": "b5929418ae4a078045be04ba6300039f9de4da",
+                  "type": "file",
+                  "path": ".git/objects/8e/b5929418ae4a078045be04ba6300039f9de4da",
+                  "size": 329,
+                  "mtime": "2025-11-03T18:25:26+00:00",
+                  "children": null
+                }
+              ]
+            },
+            {
+              "name": "90",
+              "type": "dir",
+              "path": ".git/objects/90",
+              "size": 0,
+              "mtime": "2025-11-03T18:25:26+00:00",
+              "children": [
+                {
+                  "name": "86263a87b86dfcf716a2ee0a485434bf16f5cb",
+                  "type": "file",
+                  "path": ".git/objects/90/86263a87b86dfcf716a2ee0a485434bf16f5cb",
+                  "size": 1072,
+                  "mtime": "2025-11-03T18:25:26+00:00",
+                  "children": null
+                }
+              ]
+            },
+            {
+              "name": "ab",
+              "type": "dir",
+              "path": ".git/objects/ab",
+              "size": 0,
+              "mtime": "2025-11-03T18:26:20+00:00",
+              "children": [
+                {
+                  "name": "401b6206e22e81832318acf1c36fa9c0d0f7c9",
+                  "type": "file",
+                  "path": ".git/objects/ab/401b6206e22e81832318acf1c36fa9c0d0f7c9",
+                  "size": 146,
+                  "mtime": "2025-11-03T18:26:20+00:00",
+                  "children": null
+                }
+              ]
+            },
+            {
+              "name": "b2",
+              "type": "dir",
+              "path": ".git/objects/b2",
+              "size": 0,
+              "mtime": "2025-11-03T18:26:20+00:00",
+              "children": [
+                {
+                  "name": "2ee0fe532facee03ab4a5658cef74f2042f29a",
+                  "type": "file",
+                  "path": ".git/objects/b2/2ee0fe532facee03ab4a5658cef74f2042f29a",
+                  "size": 92,
+                  "mtime": "2025-11-03T18:26:20+00:00",
+                  "children": null
+                }
+              ]
+            },
+            {
+              "name": "ba",
+              "type": "dir",
+              "path": ".git/objects/ba",
+              "size": 0,
+              "mtime": "2025-11-03T18:26:20+00:00",
+              "children": [
+                {
+                  "name": "937a91467e77bf809b730a934caf6ce4b1132e",
+                  "type": "file",
+                  "path": ".git/objects/ba/937a91467e77bf809b730a934caf6ce4b1132e",
+                  "size": 100,
+                  "mtime": "2025-11-03T18:26:20+00:00",
+                  "children": null
+                }
+              ]
+            },
+            {
+              "name": "c3",
+              "type": "dir",
+              "path": ".git/objects/c3",
+              "size": 0,
+              "mtime": "2025-11-03T18:25:26+00:00",
+              "children": [
+                {
+                  "name": "df75935858ea64216919950349b9cbe0afc1ba",
+                  "type": "file",
+                  "path": ".git/objects/c3/df75935858ea64216919950349b9cbe0afc1ba",
+                  "size": 337,
+                  "mtime": "2025-11-03T18:25:26+00:00",
+                  "children": null
+                },
+                {
+                  "name": "e129ad11f268bc05c66dd50d76ce93f8ce90e1",
+                  "type": "file",
+                  "path": ".git/objects/c3/e129ad11f268bc05c66dd50d76ce93f8ce90e1",
+                  "size": 201,
+                  "mtime": "2025-11-03T18:25:26+00:00",
+                  "children": null
+                }
+              ]
+            },
+            {
+              "name": "c7",
+              "type": "dir",
+              "path": ".git/objects/c7",
+              "size": 0,
+              "mtime": "2025-11-03T18:25:26+00:00",
+              "children": [
+                {
+                  "name": "330716d3c460313c68798e7fc15812a81875d6",
+                  "type": "file",
+                  "path": ".git/objects/c7/330716d3c460313c68798e7fc15812a81875d6",
+                  "size": 116,
+                  "mtime": "2025-11-03T18:25:26+00:00",
+                  "children": null
+                }
+              ]
+            },
+            {
+              "name": "f8",
+              "type": "dir",
+              "path": ".git/objects/f8",
+              "size": 0,
+              "mtime": "2025-11-03T18:25:26+00:00",
+              "children": [
+                {
+                  "name": "db38893b040e51301e1d5b0313bf9e70896fb9",
+                  "type": "file",
+                  "path": ".git/objects/f8/db38893b040e51301e1d5b0313bf9e70896fb9",
+                  "size": 36,
+                  "mtime": "2025-11-03T18:25:26+00:00",
+                  "children": null
+                }
+              ]
+            },
+            {
+              "name": "info",
+              "type": "dir",
+              "path": ".git/objects/info",
+              "size": 0,
+              "mtime": "2025-11-03T18:25:10+00:00",
+              "children": []
+            },
+            {
+              "name": "pack",
+              "type": "dir",
+              "path": ".git/objects/pack",
+              "size": 0,
+              "mtime": "2025-11-03T18:25:10+00:00",
+              "children": []
+            }
+          ]
+        },
+        {
+          "name": "refs",
+          "type": "dir",
+          "path": ".git/refs",
+          "size": 0,
+          "mtime": "2025-11-03T18:27:07+00:00",
+          "children": [
+            {
+              "name": "heads",
+              "type": "dir",
+              "path": ".git/refs/heads",
+              "size": 0,
+              "mtime": "2025-11-03T18:26:29+00:00",
+              "children": [
+                {
+                  "name": "main",
+                  "type": "file",
+                  "path": ".git/refs/heads/main",
+                  "size": 41,
+                  "mtime": "2025-11-03T18:26:29+00:00",
+                  "children": null
+                }
+              ]
+            },
+            {
+              "name": "remotes",
+              "type": "dir",
+              "path": ".git/refs/remotes",
+              "size": 0,
+              "mtime": "2025-11-03T18:27:07+00:00",
+              "children": [
+                {
+                  "name": "origin",
+                  "type": "dir",
+                  "path": ".git/refs/remotes/origin",
+                  "size": 0,
+                  "mtime": "2025-11-03T18:27:07+00:00",
+                  "children": [
+                    {
+                      "name": "main",
+                      "type": "file",
+                      "path": ".git/refs/remotes/origin/main",
+                      "size": 41,
+                      "mtime": "2025-11-03T18:27:07+00:00",
+                      "children": null
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "tags",
+              "type": "dir",
+              "path": ".git/refs/tags",
+              "size": 0,
+              "mtime": "2025-11-03T18:25:10+00:00",
+              "children": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": ".gitignore",
+      "type": "file",
+      "path": ".gitignore",
+      "size": 523,
+      "mtime": "2025-11-03T18:24:32+00:00",
+      "children": null
+    },
+    {
+      "name": ".pre-commit-config.yaml",
+      "type": "file",
+      "path": ".pre-commit-config.yaml",
+      "size": 157,
+      "mtime": "2025-11-03T18:14:53+00:00",
+      "children": null
+    },
+    {
+      "name": "README.md",
+      "type": "file",
+      "path": "README.md",
+      "size": 498,
+      "mtime": "2025-11-03T18:14:53+00:00",
+      "children": null
+    },
+    {
+      "name": "fedtools2.egg-info",
+      "type": "dir",
+      "path": "fedtools2.egg-info",
+      "size": 0,
+      "mtime": "2025-11-03T18:16:27+00:00",
+      "children": [
+        {
+          "name": "PKG-INFO",
+          "type": "file",
+          "path": "fedtools2.egg-info/PKG-INFO",
+          "size": 841,
+          "mtime": "2025-11-03T18:16:27+00:00",
+          "children": null
+        },
+        {
+          "name": "SOURCES.txt",
+          "type": "file",
+          "path": "fedtools2.egg-info/SOURCES.txt",
+          "size": 429,
+          "mtime": "2025-11-03T18:16:27+00:00",
+          "children": null
+        },
+        {
+          "name": "dependency_links.txt",
+          "type": "file",
+          "path": "fedtools2.egg-info/dependency_links.txt",
+          "size": 1,
+          "mtime": "2025-11-03T18:16:27+00:00",
+          "children": null
+        },
+        {
+          "name": "entry_points.txt",
+          "type": "file",
+          "path": "fedtools2.egg-info/entry_points.txt",
+          "size": 49,
+          "mtime": "2025-11-03T18:16:27+00:00",
+          "children": null
+        },
+        {
+          "name": "requires.txt",
+          "type": "file",
+          "path": "fedtools2.egg-info/requires.txt",
+          "size": 52,
+          "mtime": "2025-11-03T18:16:27+00:00",
+          "children": null
+        },
+        {
+          "name": "top_level.txt",
+          "type": "file",
+          "path": "fedtools2.egg-info/top_level.txt",
+          "size": 10,
+          "mtime": "2025-11-03T18:16:27+00:00",
+          "children": null
+        }
+      ]
+    },
+    {
+      "name": "pyproject.toml",
+      "type": "file",
+      "path": "pyproject.toml",
+      "size": 668,
+      "mtime": "2025-11-03T18:14:53+00:00",
+      "children": null
+    },
+    {
+      "name": "src",
+      "type": "dir",
+      "path": "src",
+      "size": 0,
+      "mtime": "2025-11-03T18:16:39+00:00",
+      "children": [
+        {
+          "name": "__init__.py",
+          "type": "file",
+          "path": "src/__init__.py",
+          "size": 20,
+          "mtime": "2025-11-03T18:14:53+00:00",
+          "children": null
+        },
+        {
+          "name": "__pycache__",
+          "type": "dir",
+          "path": "src/__pycache__",
+          "size": 0,
+          "mtime": "2025-11-03T18:16:39+00:00",
+          "children": [
+            {
+              "name": "__init__.cpython-312.pyc",
+              "type": "file",
+              "path": "src/__pycache__/__init__.cpython-312.pyc",
+              "size": 153,
+              "mtime": "2025-11-03T18:16:39+00:00",
+              "children": null
+            },
+            {
+              "name": "etl.cpython-312.pyc",
+              "type": "file",
+              "path": "src/__pycache__/etl.cpython-312.pyc",
+              "size": 7178,
+              "mtime": "2025-11-03T18:16:39+00:00",
+              "children": null
+            }
+          ]
+        },
+        {
+          "name": "config",
+          "type": "dir",
+          "path": "src/config",
+          "size": 0,
+          "mtime": "2025-11-03T18:14:53+00:00",
+          "children": [
+            {
+              "name": "__init__.py",
+              "type": "file",
+              "path": "src/config/__init__.py",
+              "size": 26,
+              "mtime": "2025-11-03T18:14:53+00:00",
+              "children": null
+            },
+            {
+              "name": "default.yaml",
+              "type": "file",
+              "path": "src/config/default.yaml",
+              "size": 747,
+              "mtime": "2025-11-03T21:42:04+00:00",
+              "children": null
+            }
+          ]
+        },
+        {
+          "name": "etl.py",
+          "type": "file",
+          "path": "src/etl.py",
+          "size": 8394,
+          "mtime": "2025-11-03T21:46:47+00:00",
+          "children": null
+        },
+        {
+          "name": "utils",
+          "type": "dir",
+          "path": "src/utils",
+          "size": 0,
+          "mtime": "2025-11-03T18:16:41+00:00",
+          "children": [
+            {
+              "name": "__pycache__",
+              "type": "dir",
+              "path": "src/utils/__pycache__",
+              "size": 0,
+              "mtime": "2025-11-03T18:16:41+00:00",
+              "children": [
+                {
+                  "name": "consolidation.cpython-312.pyc",
+                  "type": "file",
+                  "path": "src/utils/__pycache__/consolidation.cpython-312.pyc",
+                  "size": 3060,
+                  "mtime": "2025-11-03T18:16:41+00:00",
+                  "children": null
+                },
+                {
+                  "name": "io.cpython-312.pyc",
+                  "type": "file",
+                  "path": "src/utils/__pycache__/io.cpython-312.pyc",
+                  "size": 729,
+                  "mtime": "2025-11-03T18:16:41+00:00",
+                  "children": null
+                }
+              ]
+            },
+            {
+              "name": "consolidation.py",
+              "type": "file",
+              "path": "src/utils/consolidation.py",
+              "size": 2071,
+              "mtime": "2025-11-03T18:14:53+00:00",
+              "children": null
+            },
+            {
+              "name": "io.py",
+              "type": "file",
+              "path": "src/utils/io.py",
+              "size": 277,
+              "mtime": "2025-11-03T18:14:53+00:00",
+              "children": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "structure.csv",
+      "type": "file",
+      "path": "structure.csv",
+      "size": 8566,
+      "mtime": "2025-11-03T21:48:55+00:00",
+      "children": null
+    },
+    {
+      "name": "structure.json",
+      "type": "file",
+      "path": "structure.json",
+      "size": 29325,
+      "mtime": "2025-11-03T21:48:55+00:00",
+      "children": null
+    },
+    {
+      "name": "structure.md",
+      "type": "file",
+      "path": "structure.md",
+      "size": 4149,
+      "mtime": "2025-11-03T21:49:12+00:00",
+      "children": null
+    },
+    {
+      "name": "structure.txt",
+      "type": "file",
+      "path": "structure.txt",
+      "size": 4135,
+      "mtime": "2025-11-03T21:49:12+00:00",
+      "children": null
+    },
+    {
+      "name": "tests",
+      "type": "dir",
+      "path": "tests",
+      "size": 0,
+      "mtime": "2025-11-03T18:14:53+00:00",
+      "children": [
+        {
+          "name": "test_consolidation.py",
+          "type": "file",
+          "path": "tests/test_consolidation.py",
+          "size": 343,
+          "mtime": "2025-11-03T18:14:53+00:00",
+          "children": null
+        },
+        {
+          "name": "test_etl_smoke.py",
+          "type": "file",
+          "path": "tests/test_etl_smoke.py",
+          "size": 261,
+          "mtime": "2025-11-03T18:14:53+00:00",
+          "children": null
+        }
+      ]
+    }
+  ]
+}
