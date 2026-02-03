@@ -117,6 +117,7 @@ markers = [
     "observability: Observability infrastructure tests",
     "validation: Gap and alignment validation tests",
     "validation_gate: CI validation gate tests (require real database)",
+    "orchestrator: Tests requiring chromadb/mem0ai optional dependencies",
     "slow: Tests that take >10 seconds",
 ]
 
@@ -154,8 +155,8 @@ root_package = "ta_lab2"
 # Contract 1: No circular dependencies between sibling packages
 [[tool.importlinter.contracts]]
 name = "No circular dependencies between ta_lab2 subpackages"
-type = "acyclic_siblings"
-packages = [
+type = "independence"
+modules = [
     "ta_lab2.features",
     "ta_lab2.tools",
     "ta_lab2.scripts",
