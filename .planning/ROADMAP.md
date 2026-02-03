@@ -293,9 +293,6 @@ Plans:
 - [x] 16-05-PLAN.md - Create function similarity analysis tool
 - [x] 16-06-PLAN.md - Update memory with file movements and phase snapshot
 - [x] 16-07-PLAN.md - Gap closure: Archive remaining root clutter (temp script, corrupted paths)
-- [x] 16-05-PLAN.md - Create similarity analysis tool and generate three-tier report
-- [x] 16-06-PLAN.md - Update memory with file movements and phase snapshot
-- [ ] 16-07-PLAN.md - Gap closure: Archive remaining root clutter (temp script, corrupted paths)
 
 ### Phase 17: Verification & Validation
 **Goal**: Validate all imports work and no data was lost
@@ -307,13 +304,16 @@ Plans:
   3. CI tests validate organization rules (no .py in root, manifest integrity)
   4. Pre-commit hooks installed preventing future disorganization
   5. File count validation: pre + archived = post (zero data loss)
-**Plans**: 5 plans
+**Plans**: 8 plans (5 complete, 3 gap closure)
 Plans:
-- [ ] 17-01-PLAN.md - Create dynamic import validation test suite
-- [ ] 17-02-PLAN.md - Configure import-linter for circular dependency detection
-- [ ] 17-03-PLAN.md - Enhance CI workflow with import and circular dep checks
-- [ ] 17-04-PLAN.md - Set up pre-commit hooks with Ruff and org rules
-- [ ] 17-05-PLAN.md - Create data loss validation tests with checksum verification
+- [x] 17-01-PLAN.md - Create dynamic import validation test suite
+- [x] 17-02-PLAN.md - Configure import-linter for circular dependency detection
+- [x] 17-03-PLAN.md - Enhance CI workflow with import and circular dep checks
+- [x] 17-04-PLAN.md - Set up pre-commit hooks with Ruff and org rules
+- [x] 17-05-PLAN.md - Create data loss validation tests with checksum verification
+- [ ] 17-06-PLAN.md - Gap closure: Fix tools->features layer violation (move ema_runners to scripts)
+- [ ] 17-07-PLAN.md - Gap closure: Fix regimes->pipelines violation (move run_btc_pipeline to scripts)
+- [ ] 17-08-PLAN.md - Gap closure: Verify all import-linter contracts pass
 
 ### Phase 18: Structure Documentation
 **Goal**: Document final structure and migration decisions for future reference
@@ -380,8 +380,8 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> 12 -> ...
 | 13. Documentation Consolidation | 7/7 | Complete | 2026-02-02 |
 | 14. Tools Integration | 13/13 | Complete | 2026-02-03 |
 | 15. Economic Data Strategy | 6/6 | Complete | 2026-02-03 |
-| 16. Repository Cleanup | 6/7 | Gap Closure | - |
-| 17. Verification & Validation | 0/5 | Planned | - |
+| 16. Repository Cleanup | 7/7 | Complete | 2026-02-03 |
+| 17. Verification & Validation | 5/8 | Gap Closure | - |
 | 18. Structure Documentation | 0/4 | Planned | - |
 | 19. Memory Validation & Release | 0/6 | Planned | - |
 
@@ -406,4 +406,4 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> 12 -> ...
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-03 (Phase 16 gap closure plan added: 16-07)*
+*Last updated: 2026-02-03 (Phase 17 gap closure plans added: 17-06, 17-07, 17-08 to fix architectural violations)*
