@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 ## Current Position
 
 Phase: 16 of 19 (Repository Cleanup)
-Plan: 2 of 6 in current phase
+Plan: 3 of 6 in current phase
 Status: In progress
-Last activity: 2026-02-03 - Completed 16-02-PLAN.md (refactored/original file resolution)
+Last activity: 2026-02-03 - Completed 16-03-PLAN.md (documentation organization)
 
-Progress: [##########] 100% v0.4.0 | [██████████] 100% v0.5.0 (Phase 16 in progress: 2/6 plans)
+Progress: [##########] 100% v0.4.0 | [██████████] 100% v0.5.0 (Phase 16 in progress: 3/6 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 89 (56 in v0.4.0, 33 in v0.5.0)
+- Total plans completed: 90 (56 in v0.4.0, 34 in v0.5.0)
 - Average duration: 11 min
-- Total execution time: 17.18 hours
+- Total execution time: 17.58 hours
 
 **By Phase (v0.4.0):**
 
@@ -47,11 +47,11 @@ Progress: [##########] 100% v0.4.0 | [██████████] 100% v0.5.
 | 13-documentation-consolidation | 7 | 30 min | 4 min | Complete |
 | 14-tools-integration | 13 | 128 min | 10 min | Complete |
 | 15-economic-data-strategy | 6 | 36 min | 6 min | Complete |
-| 16-repository-cleanup | 2 | 53 min | 27 min | In progress |
+| 16-repository-cleanup | 3 | 77 min | 26 min | In progress |
 
 **Recent Trend:**
 - v0.4.0 complete: 10 phases, 56 plans, 12.55 hours total
-- v0.5.0 in progress: Phase 16 in progress (2/6 plans, 53 min), 33 plans across 6 phases
+- v0.5.0 in progress: Phase 16 in progress (3/6 plans, 77 min), 34 plans across 6 phases
 
 *Updated after each plan completion*
 
@@ -143,6 +143,10 @@ Recent decisions affecting current work:
 - **Canonical files already refactored** (16-02): ema_multi_timeframe.py, ema_multi_tf_cal.py, ema_multi_tf_cal_anchor.py are complete refactored BaseEMAFeature implementations, not originals
 - **Archive duplicate refactored files** (16-02): Refactored variants that are duplicates or incomplete stubs archived, keeping canonical versions
 - **Git history as canonical source** (16-02): .original backup files redundant when git log --follow provides complete history
+- **Lowercase hyphenated doc naming** (16-03): Convert UPPERCASE_NAMES.md to lowercase-with-hyphens.md for consistency (API_MAP.md → api-map.md)
+- **Preserve numbered duplicate docs** (16-03): Files with "1" suffix (dim_timeframe1.md, etc.) have different content than base versions, represent different perspectives
+- **Category-based docs organization** (16-03): Create docs/analysis/, docs/guides/ subdirectories based on content type for discoverability
+- **Archive Phase 13 conversion artifacts** (16-03): conversion_*.json and conversion_notes.md archived to .archive/documentation/ as execution artifacts
 
 ### Pending Todos
 
@@ -154,10 +158,10 @@ None currently.
 
 ## Session Continuity
 
-Last session: 2026-02-03T16:38:55Z
-Stopped at: Completed 16-02-PLAN.md (refactored/original file resolution)
+Last session: 2026-02-03T16:48:35Z
+Stopped at: Completed 16-03-PLAN.md (documentation organization)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-03 (Phase 16 in progress: 2/6 plans - refactored/original resolution complete: 11 redundant files archived with comparison manifests)*
+*Last updated: 2026-02-03 (Phase 16 in progress: 3/6 plans - documentation organization complete: root .md files moved to docs/ subdirectories, index updated, conversion artifacts archived)*
