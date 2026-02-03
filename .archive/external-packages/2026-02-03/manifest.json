@@ -1,7 +1,7 @@
 {
   "$schema": "https://ta-lab2.example.com/schemas/archive-manifest-1.0.0.json",
   "version": "1.0.0",
-  "created": "2026-02-03T13:07:49.275879+00:00",
+  "created": "2026-02-03T13:10:09.621558+00:00",
   "phase": "15-economic-data-strategy",
   "category": "external-packages",
   "decision": "archive",
@@ -42,7 +42,7 @@
       "size_bytes": 459,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.248142+00:00"
+      "archived_at": "2026-02-03T13:10:09.578729+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fredtools2/sql\\001_check_out.sql",
@@ -51,7 +51,7 @@
       "size_bytes": 1114,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.248720+00:00"
+      "archived_at": "2026-02-03T13:10:09.579745+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fredtools2/sql\\002_check_out.sql",
@@ -60,7 +60,7 @@
       "size_bytes": 48,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.249266+00:00"
+      "archived_at": "2026-02-03T13:10:09.580744+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fredtools2/sql\\003_check_out.sql",
@@ -69,7 +69,7 @@
       "size_bytes": 705,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.249835+00:00"
+      "archived_at": "2026-02-03T13:10:09.581673+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fredtools2/sql\\004_check_out.sql",
@@ -78,7 +78,7 @@
       "size_bytes": 366,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.250389+00:00"
+      "archived_at": "2026-02-03T13:10:09.582527+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fredtools2/src\\fredtools2\\cli.py",
@@ -87,7 +87,7 @@
       "size_bytes": 1281,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.250957+00:00"
+      "archived_at": "2026-02-03T13:10:09.583039+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fredtools2/src\\fredtools2\\config.py",
@@ -96,7 +96,7 @@
       "size_bytes": 619,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.251533+00:00"
+      "archived_at": "2026-02-03T13:10:09.584053+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fredtools2/src\\fredtools2\\db.py",
@@ -105,7 +105,7 @@
       "size_bytes": 782,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.252107+00:00"
+      "archived_at": "2026-02-03T13:10:09.585051+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fredtools2/src\\fredtools2\\fred_api.py",
@@ -114,7 +114,7 @@
       "size_bytes": 785,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.252666+00:00"
+      "archived_at": "2026-02-03T13:10:09.586053+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fredtools2/src\\fredtools2\\jobs\\releases.py",
@@ -123,7 +123,7 @@
       "size_bytes": 1504,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.253230+00:00"
+      "archived_at": "2026-02-03T13:10:09.587055+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fredtools2/src\\fredtools2\\jobs\\series.py",
@@ -132,7 +132,7 @@
       "size_bytes": 1109,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.253779+00:00"
+      "archived_at": "2026-02-03T13:10:09.588572+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fredtools2/src\\fredtools2\\sql\\.env.example.txt",
@@ -141,7 +141,7 @@
       "size_bytes": 164,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.254342+00:00"
+      "archived_at": "2026-02-03T13:10:09.590586+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fredtools2/src\\fredtools2\\sql\\schema.sql",
@@ -150,7 +150,7 @@
       "size_bytes": 751,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.254870+00:00"
+      "archived_at": "2026-02-03T13:10:09.591586+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fedtools2/db_config.example.env",
@@ -159,7 +159,7 @@
       "size_bytes": 73,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.258616+00:00"
+      "archived_at": "2026-02-03T13:10:09.596613+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fedtools2/pyproject.toml",
@@ -168,7 +168,7 @@
       "size_bytes": 888,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.259186+00:00"
+      "archived_at": "2026-02-03T13:10:09.597215+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fedtools2/README.md",
@@ -177,7 +177,7 @@
       "size_bytes": 498,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.259784+00:00"
+      "archived_at": "2026-02-03T13:10:09.597744+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fedtools2/setup.py",
@@ -186,7 +186,7 @@
       "size_bytes": 562,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.260440+00:00"
+      "archived_at": "2026-02-03T13:10:09.599267+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fedtools2/src\\fedtools2\\__init__.py",
@@ -195,34 +195,7 @@
       "size_bytes": 20,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.260440+00:00"
-    },
-    {
-      "original_path": "C:/Users/asafi/Downloads/fedtools2/src\\fedtools2\\__pycache__\\__init__.cpython-312.pyc",
-      "archive_path": "fedtools2/src/fedtools2/__pycache__/__init__.cpython-312.pyc",
-      "checksum_sha256": "61f029fec894a959cafce3ae53e1d878f0d58054add462d65fe664c4c15adcd7",
-      "size_bytes": 153,
-      "action": "archived",
-      "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.261114+00:00"
-    },
-    {
-      "original_path": "C:/Users/asafi/Downloads/fedtools2/src\\fedtools2\\__pycache__\\etl.cpython-312.pyc",
-      "archive_path": "fedtools2/src/fedtools2/__pycache__/etl.cpython-312.pyc",
-      "checksum_sha256": "88bfd8832d805d515d35929a36411440642409d812b3cc7e557e0f114138fc38",
-      "size_bytes": 11041,
-      "action": "archived",
-      "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.261909+00:00"
-    },
-    {
-      "original_path": "C:/Users/asafi/Downloads/fedtools2/src\\fedtools2\\__pycache__\\sql_sink_example.cpython-312.pyc",
-      "archive_path": "fedtools2/src/fedtools2/__pycache__/sql_sink_example.cpython-312.pyc",
-      "checksum_sha256": "e31d44fd6344a31ea9a97b9ea6581ceadbe21aca7d7db186947a8fe1f825fa58",
-      "size_bytes": 9876,
-      "action": "archived",
-      "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.262540+00:00"
+      "archived_at": "2026-02-03T13:10:09.600281+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fedtools2/src\\fedtools2\\config\\__init__.py",
@@ -231,7 +204,7 @@
       "size_bytes": 26,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.262540+00:00"
+      "archived_at": "2026-02-03T13:10:09.601281+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fedtools2/src\\fedtools2\\config\\default.yaml",
@@ -240,7 +213,7 @@
       "size_bytes": 1856,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.263110+00:00"
+      "archived_at": "2026-02-03T13:10:09.601281+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fedtools2/src\\fedtools2\\etl.py",
@@ -249,7 +222,7 @@
       "size_bytes": 8394,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.263668+00:00"
+      "archived_at": "2026-02-03T13:10:09.602793+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fedtools2/src\\fedtools2\\fedtools2.egg-info\\dependency_links.txt",
@@ -258,7 +231,7 @@
       "size_bytes": 1,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.264233+00:00"
+      "archived_at": "2026-02-03T13:10:09.603813+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fedtools2/src\\fedtools2\\fedtools2.egg-info\\entry_points.txt",
@@ -267,7 +240,7 @@
       "size_bytes": 49,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.264758+00:00"
+      "archived_at": "2026-02-03T13:10:09.604808+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fedtools2/src\\fedtools2\\fedtools2.egg-info\\PKG-INFO",
@@ -276,7 +249,7 @@
       "size_bytes": 1039,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.265296+00:00"
+      "archived_at": "2026-02-03T13:10:09.605811+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fedtools2/src\\fedtools2\\fedtools2.egg-info\\requires.txt",
@@ -285,7 +258,7 @@
       "size_bytes": 68,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.265862+00:00"
+      "archived_at": "2026-02-03T13:10:09.606806+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fedtools2/src\\fedtools2\\fedtools2.egg-info\\SOURCES.txt",
@@ -294,7 +267,7 @@
       "size_bytes": 309,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.266421+00:00"
+      "archived_at": "2026-02-03T13:10:09.607806+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fedtools2/src\\fedtools2\\fedtools2.egg-info\\top_level.txt",
@@ -303,7 +276,7 @@
       "size_bytes": 1,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.266976+00:00"
+      "archived_at": "2026-02-03T13:10:09.607806+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fedtools2/src\\fedtools2\\sql_sink_example.py",
@@ -312,25 +285,7 @@
       "size_bytes": 7983,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.266976+00:00"
-    },
-    {
-      "original_path": "C:/Users/asafi/Downloads/fedtools2/src\\fedtools2\\utils\\__pycache__\\consolidation.cpython-312.pyc",
-      "archive_path": "fedtools2/src/fedtools2/utils/__pycache__/consolidation.cpython-312.pyc",
-      "checksum_sha256": "4e882715ffe2657009bda52c5b47f419ddf4ce5e210e089fdb27810d7232356e",
-      "size_bytes": 3060,
-      "action": "archived",
-      "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.267549+00:00"
-    },
-    {
-      "original_path": "C:/Users/asafi/Downloads/fedtools2/src\\fedtools2\\utils\\__pycache__\\io.cpython-312.pyc",
-      "archive_path": "fedtools2/src/fedtools2/utils/__pycache__/io.cpython-312.pyc",
-      "checksum_sha256": "d10b5c951a8ca8f5b53fd55b8eec5db67ad64118f4a610b6a33a9a3dd0875d79",
-      "size_bytes": 2507,
-      "action": "archived",
-      "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.268099+00:00"
+      "archived_at": "2026-02-03T13:10:09.609318+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fedtools2/src\\fedtools2\\utils\\consolidation.py",
@@ -339,7 +294,7 @@
       "size_bytes": 2071,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.268636+00:00"
+      "archived_at": "2026-02-03T13:10:09.610331+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fedtools2/src\\fedtools2\\utils\\io.py",
@@ -348,7 +303,7 @@
       "size_bytes": 1475,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.269204+00:00"
+      "archived_at": "2026-02-03T13:10:09.611331+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fedtools2/src\\fedtools2.egg-info\\dependency_links.txt",
@@ -357,7 +312,7 @@
       "size_bytes": 1,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.269764+00:00"
+      "archived_at": "2026-02-03T13:10:09.612329+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fedtools2/src\\fedtools2.egg-info\\entry_points.txt",
@@ -366,7 +321,7 @@
       "size_bytes": 49,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.269764+00:00"
+      "archived_at": "2026-02-03T13:10:09.612963+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fedtools2/src\\fedtools2.egg-info\\PKG-INFO",
@@ -375,7 +330,7 @@
       "size_bytes": 1074,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.270357+00:00"
+      "archived_at": "2026-02-03T13:10:09.613493+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fedtools2/src\\fedtools2.egg-info\\requires.txt",
@@ -384,7 +339,7 @@
       "size_bytes": 87,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.270907+00:00"
+      "archived_at": "2026-02-03T13:10:09.615017+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fedtools2/src\\fedtools2.egg-info\\SOURCES.txt",
@@ -393,7 +348,7 @@
       "size_bytes": 520,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.271460+00:00"
+      "archived_at": "2026-02-03T13:10:09.615017+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fedtools2/src\\fedtools2.egg-info\\top_level.txt",
@@ -402,7 +357,7 @@
       "size_bytes": 10,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.272143+00:00"
+      "archived_at": "2026-02-03T13:10:09.616029+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fedtools2/structure.csv",
@@ -411,7 +366,7 @@
       "size_bytes": 8631,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.272701+00:00"
+      "archived_at": "2026-02-03T13:10:09.617029+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fedtools2/structure.json",
@@ -420,7 +375,7 @@
       "size_bytes": 29712,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.273260+00:00"
+      "archived_at": "2026-02-03T13:10:09.618031+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fedtools2/structure.md",
@@ -429,7 +384,7 @@
       "size_bytes": 4149,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.273806+00:00"
+      "archived_at": "2026-02-03T13:10:09.619031+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fedtools2/structure.txt",
@@ -438,25 +393,7 @@
       "size_bytes": 4135,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.273806+00:00"
-    },
-    {
-      "original_path": "C:/Users/asafi/Downloads/fedtools2/tests\\__pycache__\\test_consolidation.cpython-312-pytest-8.4.2.pyc",
-      "archive_path": "fedtools2/tests/__pycache__/test_consolidation.cpython-312-pytest-8.4.2.pyc",
-      "checksum_sha256": "0230379a2c1f2165af12bc17db84cbf84e454dda889c0eaf5ffdaef6b5efbcc6",
-      "size_bytes": 1514,
-      "action": "archived",
-      "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.274358+00:00"
-    },
-    {
-      "original_path": "C:/Users/asafi/Downloads/fedtools2/tests\\__pycache__\\test_etl_smoke.cpython-312-pytest-8.4.2.pyc",
-      "archive_path": "fedtools2/tests/__pycache__/test_etl_smoke.cpython-312-pytest-8.4.2.pyc",
-      "checksum_sha256": "e000cfed34d7e95280ec03685c3cf33b1b74d1c2b9c3275034017eaf3ac5947c",
-      "size_bytes": 2481,
-      "action": "archived",
-      "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.274358+00:00"
+      "archived_at": "2026-02-03T13:10:09.620032+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fedtools2/tests\\test_consolidation.py",
@@ -465,7 +402,7 @@
       "size_bytes": 343,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.274358+00:00"
+      "archived_at": "2026-02-03T13:10:09.621558+00:00"
     },
     {
       "original_path": "C:/Users/asafi/Downloads/fedtools2/tests\\test_etl_smoke.py",
@@ -474,7 +411,7 @@
       "size_bytes": 261,
       "action": "archived",
       "reason": "Zero usage in ta_lab2, ecosystem alternatives superior",
-      "archived_at": "2026-02-03T13:07:49.275879+00:00"
+      "archived_at": "2026-02-03T13:10:09.621558+00:00"
     }
   ],
   "ecosystem_alternatives": [
@@ -497,7 +434,7 @@
   ],
   "summary": {
     "total_packages": 2,
-    "total_files": 49,
+    "total_files": 42,
     "total_lines": 826
   }
 }
