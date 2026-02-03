@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 
 ## Current Position
 
-Phase: 16 of 19 (Repository Cleanup)
-Plan: 7 of 7 in current phase
-Status: Phase complete (including gap closure)
-Last activity: 2026-02-03 - Completed 16-07-PLAN.md (gap closure - archived remaining root clutter)
+Phase: 17 of 19 (Verification & Validation)
+Plan: 1 of 6 in current phase
+Status: In progress
+Last activity: 2026-02-03 - Completed 17-01-PLAN.md (import validation)
 
-Progress: [##########] 100% v0.4.0 | [██████████] 100% v0.5.0 (Phase 16 complete: 7/7 plans including gap closure)
+Progress: [##########] 100% v0.4.0 | [██████████] 100% v0.5.0 (Phase 17 in progress: 1/6 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 93 (56 in v0.4.0, 37 in v0.5.0)
+- Total plans completed: 94 (56 in v0.4.0, 38 in v0.5.0)
 - Average duration: 13 min
-- Total execution time: 20.00 hours
+- Total execution time: 20.08 hours
 
 **By Phase (v0.4.0):**
 
@@ -48,10 +48,11 @@ Progress: [##########] 100% v0.4.0 | [██████████] 100% v0.5.
 | 14-tools-integration | 13 | 128 min | 10 min | Complete |
 | 15-economic-data-strategy | 6 | 36 min | 6 min | Complete |
 | 16-repository-cleanup | 7 | 226 min | 32 min | Complete |
+| 17-verification-validation | 1 | 5 min | 5 min | In progress |
 
 **Recent Trend:**
 - v0.4.0 complete: 10 phases, 56 plans, 12.55 hours total
-- v0.5.0 in progress: Phase 16 complete (7/7 plans, 226 min), 38 plans across 6 phases
+- v0.5.0 in progress: Phase 17 started (1/6 plans, 5 min), 38 plans across 7 phases
 
 *Updated after each plan completion*
 
@@ -155,6 +156,9 @@ Recent decisions affecting current work:
 - **Similarity report for manual review only** (16-05): Tool flags candidates (728 near-exact, 297 similar, 438 related); user controls consolidation decisions
 - **os.listdir() for Unicode-encoded corrupted paths** (16-07): Use os.listdir() instead of Path() for Windows/Claude interaction artifacts with Unicode encoding issues
 - **Document Windows special device names** (16-07): Document unremovable Windows device names (nul, CON, PRN, etc.) in manifest with action "skipped_windows_device"
+- **pkgutil.walk_packages for dynamic discovery** (17-01): Use pkgutil for automatic module discovery instead of manual lists that go stale
+- **Separate orchestrator marker** (17-01): Optional dependency tests marked with @pytest.mark.orchestrator for selective execution
+- **Skip orchestrator in tools tests** (17-01): Simpler than using pytest.importorskip in every parametrized test case
 
 ### Pending Todos
 
@@ -166,10 +170,10 @@ None currently.
 
 ## Session Continuity
 
-Last session: 2026-02-03T21:13:00Z
-Stopped at: Completed 16-07-PLAN.md (gap closure - archived remaining root clutter)
+Last session: 2026-02-03T21:33:39Z
+Stopped at: Completed 17-01-PLAN.md (import validation with dynamic pkgutil discovery)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-03 (Phase 16 complete: 7/7 plans including gap closure - 208 memories created (197 archives, 10 doc moves, 1 snapshot), all file movements tracked with moved_to relationships, MEMO-13 and MEMO-14 requirements satisfied, CLEAN-01 verified)*
+*Last updated: 2026-02-03 (Phase 17 started: 1/6 plans - 368 parametrized import tests created, 332 core modules validated, 1 import-breaking bug fixed)*
