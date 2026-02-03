@@ -12,7 +12,7 @@ Tables written:
 
 Usage:
     # From Python
-    from ta_lab2.tools.data_tools.database_utils.ema_runners import (
+    from ta_lab2.scripts.emas.ema_runners import (
         write_daily_emas,
         write_multi_tf_emas,
         write_ema_multi_tf_cal,
@@ -23,10 +23,10 @@ Usage:
     rows = write_daily_emas(ids=[1, 1027, 5426], start="2010-01-01")
 
     # CLI
-    python -m ta_lab2.tools.data_tools.database_utils.ema_runners daily --ids 1 1027 --start 2010-01-01
-    python -m ta_lab2.tools.data_tools.database_utils.ema_runners multi-tf --ids 1 1027
-    python -m ta_lab2.tools.data_tools.database_utils.ema_runners multi-tf-cal --ids 1 1027
-    python -m ta_lab2.tools.data_tools.database_utils.ema_runners upsert
+    python -m ta_lab2.scripts.emas.ema_runners daily --ids 1 1027 --start 2010-01-01
+    python -m ta_lab2.scripts.emas.ema_runners multi-tf --ids 1 1027
+    python -m ta_lab2.scripts.emas.ema_runners multi-tf-cal --ids 1 1027
+    python -m ta_lab2.scripts.emas.ema_runners upsert
 
 Note:
     These are convenience wrappers. For production use, prefer:
@@ -244,16 +244,16 @@ def main():
         epilog="""
 Examples:
   # Write daily EMAs for specific IDs
-  python -m ta_lab2.tools.data_tools.database_utils.ema_runners daily --ids 1 1027 5426 --start 2010-01-01
+  python -m ta_lab2.scripts.emas.ema_runners daily --ids 1 1027 5426 --start 2010-01-01
 
   # Write multi-timeframe EMAs
-  python -m ta_lab2.tools.data_tools.database_utils.ema_runners multi-tf --ids 1 1027 --start 2010-01-01
+  python -m ta_lab2.scripts.emas.ema_runners multi-tf --ids 1 1027 --start 2010-01-01
 
   # Write calendar-aligned multi-TF EMAs
-  python -m ta_lab2.tools.data_tools.database_utils.ema_runners multi-tf-cal --ids 1 1027 --start 2010-01-01
+  python -m ta_lab2.scripts.emas.ema_runners multi-tf-cal --ids 1 1027 --start 2010-01-01
 
   # Incremental upsert for all IDs
-  python -m ta_lab2.tools.data_tools.database_utils.ema_runners upsert
+  python -m ta_lab2.scripts.emas.ema_runners upsert
         """,
     )
 

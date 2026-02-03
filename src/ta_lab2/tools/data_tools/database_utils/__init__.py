@@ -1,45 +1,25 @@
 """
 Database utilities migrated from Data_Tools.
 
-EMA-related utilities for:
-- Writing daily EMAs to cmc_ema_daily
-- Writing multi-timeframe EMAs to cmc_ema_multi_tf
-- Writing calendar-adjusted EMAs to cmc_ema_multi_tf_cal
-- Upserting new EMA records with incremental refresh
+MOVED: EMA runner utilities have been relocated to ta_lab2.scripts.emas.ema_runners
+to fix layering violations (tools should not import from features).
+
+The following functions are now available at ta_lab2.scripts.emas.ema_runners:
+- write_daily_emas
+- write_multi_tf_emas
+- write_ema_multi_tf_cal
+- upsert_new_emas
 
 Usage:
-    These utilities complement ta_lab2.scripts.emas/ refresh scripts
-    by providing convenient runner functions with CLI support.
-
-    # Python API
-    from ta_lab2.tools.data_tools.database_utils import (
-        write_daily_emas,
-        write_multi_tf_emas,
-        write_ema_multi_tf_cal,
-        upsert_new_emas,
-    )
-
-    rows = write_daily_emas(ids=[1, 1027], start="2010-01-01")
+    # Import from new location
+    from ta_lab2.scripts.emas.ema_runners import write_daily_emas
 
     # CLI
-    python -m ta_lab2.tools.data_tools.database_utils.ema_runners daily --ids 1 1027
+    python -m ta_lab2.scripts.emas.ema_runners daily --ids 1 1027
 
 Note:
-    All functions wrap existing ta_lab2 infrastructure. For direct access
-    to underlying functionality, use ta_lab2.features.ema and
-    ta_lab2.features.m_tf modules.
+    This package is now empty. Future database utilities that don't violate
+    layering constraints (tools importing from features) can be added here.
 """
 
-from ta_lab2.tools.data_tools.database_utils.ema_runners import (
-    write_daily_emas,
-    write_multi_tf_emas,
-    write_ema_multi_tf_cal,
-    upsert_new_emas,
-)
-
-__all__ = [
-    "write_daily_emas",
-    "write_multi_tf_emas",
-    "write_ema_multi_tf_cal",
-    "upsert_new_emas",
-]
+__all__ = []
