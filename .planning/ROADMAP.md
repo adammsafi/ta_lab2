@@ -284,14 +284,15 @@ Plans:
   3. Loose .md files moved to appropriate docs/ subdirectories
   4. Exact duplicates identified via SHA256 and archived
   5. Similar functions (85%+ threshold) flagged for review
-**Plans**: 6 plans
+**Plans**: 7 plans (6 complete, 1 gap closure)
 Plans:
-- [ ] 16-01-PLAN.md - Archive temp files, loose scripts, corrupted paths from root
-- [ ] 16-02-PLAN.md - Compare and resolve *_refactored.py files, archive *.original files
-- [ ] 16-03-PLAN.md - Organize loose .md files into docs/ structure
-- [ ] 16-04-PLAN.md - Create duplicate detection tool and identify/archive exact duplicates
-- [ ] 16-05-PLAN.md - Create similarity analysis tool and generate three-tier report
-- [ ] 16-06-PLAN.md - Update memory with file movements and phase snapshot
+- [x] 16-01-PLAN.md - Archive temp files, loose scripts, corrupted paths from root
+- [x] 16-02-PLAN.md - Compare and resolve *_refactored.py files, archive *.original files
+- [x] 16-03-PLAN.md - Organize loose .md files into docs/ structure
+- [x] 16-04-PLAN.md - Create duplicate detection tool and identify/archive exact duplicates
+- [x] 16-05-PLAN.md - Create similarity analysis tool and generate three-tier report
+- [x] 16-06-PLAN.md - Update memory with file movements and phase snapshot
+- [ ] 16-07-PLAN.md - Gap closure: Archive remaining root clutter (temp script, corrupted paths)
 
 ### Phase 17: Verification & Validation
 **Goal**: Validate all imports work and no data was lost
@@ -376,7 +377,7 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> 12 -> ...
 | 13. Documentation Consolidation | 7/7 | Complete | 2026-02-02 |
 | 14. Tools Integration | 13/13 | Complete | 2026-02-03 |
 | 15. Economic Data Strategy | 6/6 | Complete | 2026-02-03 |
-| 16. Repository Cleanup | 0/6 | Planned | - |
+| 16. Repository Cleanup | 6/7 | Gap Closure | - |
 | 17. Verification & Validation | 0/5 | Planned | - |
 | 18. Structure Documentation | 0/4 | Planned | - |
 | 19. Memory Validation & Release | 0/6 | Planned | - |
@@ -402,4 +403,4 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> 12 -> ...
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-03 (Phase 19 planned: 6 plans in 5 waves)*
+*Last updated: 2026-02-03 (Phase 16 gap closure plan added: 16-07)*
