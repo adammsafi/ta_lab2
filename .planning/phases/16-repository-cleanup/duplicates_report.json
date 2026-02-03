@@ -1,0 +1,20 @@
+{
+  "$schema": "https://ta_lab2.local/schemas/duplicate-report/v1.0.0",
+  "version": "1.0.0",
+  "summary": {
+    "total_duplicate_groups": 1,
+    "total_duplicate_files": 2,
+    "total_wasted_bytes": 20223
+  },
+  "src_canonical": [
+    {
+      "sha256": "3ef83552da570ee544a0bf0200357c1e9074d15c83ba3aff97745305bc7dfdae",
+      "size_bytes": 20223,
+      "canonical": "src\\ta_lab2\\features\\m_tf\\ema_multi_timeframe.py",
+      "duplicates": [
+        ".archive\\refactored\\2026-02-03\\ema_multi_timeframe_refactored.py"
+      ]
+    }
+  ],
+  "non_src_duplicates": []
+}
