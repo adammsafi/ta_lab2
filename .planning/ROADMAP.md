@@ -315,7 +315,12 @@ Plans:
   3. YAML/JSON manifest tracks rationale for each major decision
   4. Before/after directory tree diagrams included
   5. Migration guide enables finding moved files
-**Plans**: TBD
+**Plans**: 4 plans
+Plans:
+- [ ] 18-01-PLAN.md - Create decisions manifest with JSON Schema (decisions.json, decisions-schema.json, DECISIONS.md)
+- [ ] 18-02-PLAN.md - Generate before/after directory diagrams (ASCII trees + Mermaid)
+- [ ] 18-03-PLAN.md - Create REORGANIZATION.md with full file listings and migration guide
+- [ ] 18-04-PLAN.md - Update README with v0.5.0 ecosystem structure
 
 ### Phase 19: Memory Validation & Release
 **Goal**: Validate memory completeness and release v0.5.0
@@ -360,7 +365,7 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> 12 -> ...
 | 15. Economic Data Strategy | 0/6 | Planned | - |
 | 16. Repository Cleanup | 0/6 | Planned | - |
 | 17. Verification & Validation | 0/TBD | Not started | - |
-| 18. Structure Documentation | 0/TBD | Not started | - |
+| 18. Structure Documentation | 0/4 | Planned | - |
 | 19. Memory Validation & Release | 0/TBD | Not started | - |
 
 ## Requirement Coverage
@@ -384,4 +389,4 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> 12 -> ...
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-03 (Phase 16 planned: 6 plans in 3 waves)*
+*Last updated: 2026-02-03 (Phase 18 planned: 4 plans in 3 waves)*
