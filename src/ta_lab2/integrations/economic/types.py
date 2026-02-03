@@ -72,14 +72,18 @@ class FetchResult:
         success: Whether the fetch succeeded
         series: The fetched series (None if failed)
         error: Error message (None if succeeded)
+        source: Data source ("cache", "fred_api", etc.)
         cached: Whether data was served from cache
         fetch_time_ms: Time taken to fetch in milliseconds
+        quality_report: Optional quality validation report
     """
     success: bool
     series: Optional[EconomicSeries] = None
     error: Optional[str] = None
+    source: str = "unknown"
     cached: bool = False
     fetch_time_ms: float = 0.0
+    quality_report: Optional[Any] = None  # QualityReport from quality.py
 
 
 @dataclass
