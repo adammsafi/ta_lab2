@@ -156,14 +156,14 @@ def run_full_validation(
             report.indexing_result = indexing_result
 
             logger.info(
-                f"Indexed {indexing_result.indexed_count} functions "
-                f"({indexing_result.skipped_count} skipped, "
-                f"{indexing_result.error_count} errors)"
+                f"Indexed {indexing_result.total_functions} functions "
+                f"from {indexing_result.total_files} files "
+                f"({len(indexing_result.errors)} errors)"
             )
 
-            if indexing_result.error_count > 0:
+            if len(indexing_result.errors) > 0:
                 report.warnings.append(
-                    f"{indexing_result.error_count} errors during indexing"
+                    f"{len(indexing_result.errors)} errors during indexing"
                 )
         else:
             logger.info("Skipping indexing (already done or not requested)")
@@ -175,8 +175,13 @@ def run_full_validation(
             linking_result = link_codebase_relationships(src_path)
             report.linking_result = linking_result
 
+            total_rels = (
+                linking_result.contains_count
+                + linking_result.calls_count
+                + linking_result.imports_count
+            )
             logger.info(
-                f"Created {linking_result.relationship_count} relationships "
+                f"Created {total_rels} relationships "
                 f"({linking_result.contains_count} contains, "
                 f"{linking_result.calls_count} calls, "
                 f"{linking_result.imports_count} imports)"
@@ -289,14 +294,19 @@ def generate_validation_md(report: ValidationReport) -> str:
     indexing_status = "Skipped"
     indexing_detail = "Already indexed"
     if report.indexing_result:
-        indexing_status = "OK" if report.indexing_result.error_count == 0 else "WARN"
-        indexing_detail = f"{report.indexing_result.indexed_count} functions indexed"
+        indexing_status = "OK" if len(report.indexing_result.errors) == 0 else "WARN"
+        indexing_detail = f"{report.indexing_result.total_functions} functions indexed"
 
     linking_status = "Skipped"
     linking_detail = "Already linked"
     if report.linking_result:
         linking_status = "OK"
-        linking_detail = f"{report.linking_result.relationship_count} relationships"
+        total_rels = (
+            report.linking_result.contains_count
+            + report.linking_result.calls_count
+            + report.linking_result.imports_count
+        )
+        linking_detail = f"{total_rels} relationships"
 
     graph_status = "PASS" if report.graph_validation.is_valid else "FAIL"
     graph_detail = (
