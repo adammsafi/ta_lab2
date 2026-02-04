@@ -6,64 +6,23 @@
 
 ## Summary
 
-- **Total Requirements:** 32
-- **Complete:** 13
-- **Pending:** 19
-- **Coverage:** 32/32 mapped to phases (100%)
+- **v0.4.0 Requirements:** 42/42 complete (100%)
+- **v0.5.0 Requirements:** 32/32 complete (100%)
+- **Total Requirements:** 74/74 complete (100%)
 
-## Memory Integration Requirements (MEMO-10 to MEMO-18) - CRITICAL BLOCKER
+**Ready for v0.5.0 release.**
 
-**Must complete BEFORE any file reorganization begins**
+## Memory Integration Requirements (MEMO-10 to MEMO-18)
 
-- [ ] **MEMO-10**: Update existing memory with v0.4.0 completion context
-  - Extract conversations from recent Claude Code sessions
-  - Add memories about Phase 10 completion, v0.4.0 release validation
-  - Ensure memory system knows current project state
-
-- [ ] **MEMO-11**: Pre-reorganization memory capture for ta_lab2
-  - Capture current state of ta_lab2 codebase (file structure, functions, dependencies)
-  - Create baseline memory snapshot before any moves
-  - Tag with `pre_reorg_v0.5.0` metadata
-
-- [ ] **MEMO-12**: Pre-integration memory capture for external directories
-  - Index Data_Tools scripts (functions, dependencies, usage)
-  - Index ProjectTT documentation (content, relationships)
-  - Index fredtools2/fedtools2 packages (APIs, functions, dependencies)
-  - Tag with `pre_integration_v0.5.0` metadata
-
-- [ ] **MEMO-13**: File-level memory updates during reorganization
-  - Update memory when individual files move (old path -> new path)
-  - Create `moved_to` relationship links
-  - Mark old location memories with `deprecated_since` timestamp
-
-- [ ] **MEMO-14**: Phase-level memory snapshots
-  - Create memory snapshot at end of each reorganization phase
-  - Tag with phase number and completion timestamp
-  - Enables phase-level rollback if needed
-
-- [ ] **MEMO-15**: Function-level memory granularity
-  - Extract function definitions via AST analysis
-  - Create memories for each significant function (name, purpose, parameters, usage)
-  - Support queries like "What does function X do?" and "What uses function X?"
-
-- [ ] **MEMO-16**: Memory linking with all relationship types
-  - `contains`: file contains function
-  - `calls`: function A calls function B
-  - `imports`: file imports module
-  - `similar_to`: function A is similar to function B (for duplicate detection)
-  - `moved_to` / `replaced_by`: tracking reorganization history
-
-- [ ] **MEMO-17**: Duplicate function detection with thresholds
-  - 95%+ similarity = exact duplicates (auto-flag for consolidation)
-  - 85-95% similarity = very similar (flag for review/refactoring)
-  - 70-85% similarity = somewhat similar (informational only)
-  - Enable queries to find duplicate/similar functions across files
-
-- [ ] **MEMO-18**: Post-reorganization memory validation
-  - Verify all files have memory entries
-  - Verify all relationships are correctly linked
-  - Validate memory graph completeness (no orphaned memories)
-  - Test query capabilities (function lookup, cross-reference, edit impact)
+- [x] **MEMO-10**: Update existing memory with v0.4.0 completion context - Phase 11 (11-01, 11-02, 11-03)
+- [x] **MEMO-11**: Pre-reorganization memory capture for ta_lab2 - Phase 11 (11-02)
+- [x] **MEMO-12**: Pre-integration memory capture for external directories - Phase 11 (11-03, 11-04)
+- [x] **MEMO-13**: File-level memory updates during reorganization - Phases 13-16 (13-06, 14-10, 15-06, 16-06)
+- [x] **MEMO-14**: Phase-level memory snapshots - Phases 13-16
+- [x] **MEMO-15**: Function-level memory granularity - Phase 19 (19-01, 19-05.1)
+- [x] **MEMO-16**: Memory linking with all relationship types - Phase 19 (19-02, 19-05.1)
+- [x] **MEMO-17**: Duplicate function detection with thresholds - Phase 19 (19-03, 19-05.1)
+- [x] **MEMO-18**: Post-reorganization memory validation - Phase 19 (19-04, 19-05.1)
 
 ## Archive Management Requirements (ARCH-01 to ARCH-04)
 
@@ -89,120 +48,41 @@
 
 ## Documentation Consolidation Requirements (DOC-01 to DOC-03)
 
-- [ ] **DOC-01**: Convert ProjectTT documentation to Markdown
-  - Use pypandoc/pandoc for .docx -> .md conversion
-  - Handle Excel files: extract key tables/content, preserve originals
-  - Maintain formatting where possible (tables, lists, code blocks)
-
-- [ ] **DOC-02**: Integrate documentation into unified docs/ structure
-  - Organize by category: docs/design/, docs/analysis/, docs/research/
-  - Create docs/index.md as documentation home page
-  - Update cross-references between docs
-
-- [ ] **DOC-03**: Preserve originals in archive
-  - Move original Excel/Word files to .archive/documentation/
-  - Link from Markdown docs to archived originals
-  - Manifest tracking for all documentation conversions
+- [x] **DOC-01**: Convert ProjectTT documentation to Markdown - Phase 13 (13-01, 13-03, 13-04)
+- [x] **DOC-02**: Integrate documentation into unified docs/ structure - Phase 13 (13-05)
+- [x] **DOC-03**: Preserve originals in archive - Phase 13 (13-05)
 
 ## Tools Integration Requirements (TOOL-01 to TOOL-03)
 
-- [ ] **TOOL-01**: Migrate Data_Tools scripts to ta_lab2/tools/
-  - Create ta_lab2/tools/data_tools/ subdirectory
-  - Move scripts with `git mv` (preserve history)
-  - Organize by function: etl/, analysis/, utilities/
-
-- [ ] **TOOL-02**: Update import paths
-  - Update imports within migrated scripts (if needed)
-  - Use rope or manual updates for import path changes
-  - Verify no hardcoded paths remain
-
-- [ ] **TOOL-03**: Validate imports work post-migration
-  - Pytest smoke tests for all migrated scripts
-  - Verify scripts can import from ta_lab2 modules
-  - Test script execution (if scripts have main entry points)
+- [x] **TOOL-01**: Migrate Data_Tools scripts to ta_lab2/tools/ - Phase 14 (14-01 through 14-07, 14-11, 14-12)
+- [x] **TOOL-02**: Update import paths - Phase 14 (14-09, 14-13)
+- [x] **TOOL-03**: Validate imports work post-migration - Phase 14 (14-09, 14-13)
 
 ## Economic Data Strategy Requirements (ECON-01 to ECON-03)
 
-- [ ] **ECON-01**: Evaluate fredtools2 and fedtools2 packages
-  - Inventory functions and APIs in each package
-  - Assess code overlap between the two packages
-  - Determine value for ta_lab2 (FRED data integration strategy)
-
-- [ ] **ECON-02**: Integration decision and implementation
-  - Decision matrix: merge into ta_lab2, keep as optional deps, or archive
-  - If integrating: move to ta_lab2/lib/ as optional dependencies
-  - If archiving: move to .archive/economic_data/ with documentation
-
-- [ ] **ECON-03**: Optional dependency setup (if integrating)
-  - Add to pyproject.toml as optional dependency group: `[economic-data]`
-  - Update installation docs: `pip install ta_lab2[economic-data]`
-  - Graceful degradation if not installed
+- [x] **ECON-01**: Evaluate fredtools2 and fedtools2 packages - Phase 15 (15-01)
+- [x] **ECON-02**: Integration decision and implementation - Phase 15 (15-02, 15-03, 15-04)
+- [x] **ECON-03**: Optional dependency setup - Phase 15 (15-05)
 
 ## Repository Cleanup Requirements (CLEAN-01 to CLEAN-04)
 
-- [ ] **CLEAN-01**: Clean root directory clutter
-  - Archive temp files, *_refactored.py, *.original files
-  - Archive audit CSVs and migration docs
-  - Archive old config files (openai_config_2.env, etc.)
-  - Target: minimal root directory (README, pyproject.toml, core configs only)
-
-- [ ] **CLEAN-02**: Organize scattered documentation
-  - Move loose .md files to appropriate docs/ subdirectories
-  - Consolidate duplicate docs (archive older versions)
-  - Update README to link to docs/ structure
-
-- [ ] **CLEAN-03**: Remove/archive duplicate files
-  - Identify exact duplicates via SHA256 checksums
-  - Archive duplicates (keep one active copy)
-  - Document which copy was kept and why
-
-- [ ] **CLEAN-04**: Investigate duplicate/similar functions for refactoring
-  - Use MEMO-17 duplicate detection (85%+ similarity threshold)
-  - Review flagged function pairs for consolidation opportunities
-  - Create shared utility functions if beneficial
-  - Document refactoring decisions (consolidate vs keep separate)
+- [x] **CLEAN-01**: Clean root directory clutter - Phase 16 (16-01, 16-07)
+- [x] **CLEAN-02**: Organize scattered documentation - Phase 16 (16-03)
+- [x] **CLEAN-03**: Remove/archive duplicate files - Phase 16 (16-02, 16-04)
+- [x] **CLEAN-04**: Investigate duplicate/similar functions for refactoring - Phase 16 (16-05)
 
 ## Verification & Validation Requirements (VAL-01 to VAL-04)
 
-- [ ] **VAL-01**: Import validation suite
-  - Pytest tests that import all modules after reorganization
-  - Verify no ImportError or ModuleNotFoundError
-  - Test both absolute and relative imports
-
-- [ ] **VAL-02**: Dependency graph validation
-  - Use tools like pydeps or import-linter
-  - Detect circular dependencies introduced during reorganization
-  - Visualize dependency graph for review
-
-- [ ] **VAL-03**: Automated verification tests in CI
-  - Tests that validate organization rules (no .py in root, no clutter)
-  - Tests that validate archive integrity (manifest matches files)
-  - Tests that validate memory graph completeness (MEMO-18)
-  - Fail CI if organization degrades
-
-- [ ] **VAL-04**: Pre-commit hooks to prevent future disorganization
-  - Hook: no .py files in root directory (except setup.py if needed)
-  - Hook: no duplicate files (check SHA256 on commit)
-  - Hook: enforce file naming conventions
-  - Hook: validate imports on commit (ruff/mypy)
+- [x] **VAL-01**: Import validation suite - Phase 17 (17-01)
+- [x] **VAL-02**: Dependency graph validation - Phase 17 (17-02, 17-06, 17-07, 17-08)
+- [x] **VAL-03**: Automated verification tests in CI - Phase 17 (17-03)
+- [x] **VAL-04**: Pre-commit hooks to prevent future disorganization - Phase 17 (17-04, 17-05)
 
 ## Structure Documentation Requirements (STRUCT-01 to STRUCT-03)
 
-- [ ] **STRUCT-01**: Create docs/REORGANIZATION.md guide
-  - Document reorganization decisions (what moved where and why)
-  - Explain new directory structure with examples
-  - Provide migration guide for developers (how to find moved files)
-  - Include before/after directory tree diagrams
-
-- [ ] **STRUCT-02**: Update README with new ecosystem structure
-  - Update project structure section
-  - Add links to major components (tools/, lib/, docs/)
-  - Explain relationship to external directories (archived references)
-
-- [ ] **STRUCT-03**: Document migration decisions in manifest
-  - Structured manifest format (YAML or JSON)
-  - Track rationale for each major decision
-  - Enable future audits: "Why was file X archived instead of migrated?"
+- [x] **STRUCT-01**: Create docs/REORGANIZATION.md guide - Phase 18 (18-03)
+- [x] **STRUCT-02**: Update README with new ecosystem structure - Phase 18 (18-04)
+- [x] **STRUCT-03**: Document migration decisions in manifest - Phase 18 (18-01)
 
 ## Out of Scope (Explicitly Deferred)
 
@@ -216,21 +96,21 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| MEMO-10 | Phase 11 (Memory Preparation) | Pending |
-| MEMO-11 | Phase 11 (Memory Preparation) | Pending |
-| MEMO-12 | Phase 11 (Memory Preparation) | Pending |
-| ARCH-01 | Phase 12 (Archive Foundation) | Pending |
-| ARCH-02 | Phase 12 (Archive Foundation) | Pending |
-| ARCH-03 | Phase 12 (Archive Foundation) | Pending |
-| ARCH-04 | Phase 12 (Archive Foundation) | Pending |
-| DOC-01 | Phase 13 (Documentation Consolidation) | Pending |
-| DOC-02 | Phase 13 (Documentation Consolidation) | Pending |
-| DOC-03 | Phase 13 (Documentation Consolidation) | Pending |
+| MEMO-10 | Phase 11 (Memory Preparation) | Complete |
+| MEMO-11 | Phase 11 (Memory Preparation) | Complete |
+| MEMO-12 | Phase 11 (Memory Preparation) | Complete |
+| ARCH-01 | Phase 12 (Archive Foundation) | Complete |
+| ARCH-02 | Phase 12 (Archive Foundation) | Complete |
+| ARCH-03 | Phase 12 (Archive Foundation) | Complete |
+| ARCH-04 | Phase 12 (Archive Foundation) | Complete |
+| DOC-01 | Phase 13 (Documentation Consolidation) | Complete |
+| DOC-02 | Phase 13 (Documentation Consolidation) | Complete |
+| DOC-03 | Phase 13 (Documentation Consolidation) | Complete |
 | MEMO-13 | Phases 13-16 (During Reorganization) | Complete |
 | MEMO-14 | Phases 13-16 (During Reorganization) | Complete |
-| TOOL-01 | Phase 14 (Tools Integration) | Pending |
-| TOOL-02 | Phase 14 (Tools Integration) | Pending |
-| TOOL-03 | Phase 14 (Tools Integration) | Pending |
+| TOOL-01 | Phase 14 (Tools Integration) | Complete |
+| TOOL-02 | Phase 14 (Tools Integration) | Complete |
+| TOOL-03 | Phase 14 (Tools Integration) | Complete |
 | ECON-01 | Phase 15 (Economic Data Strategy) | Complete |
 | ECON-02 | Phase 15 (Economic Data Strategy) | Complete |
 | ECON-03 | Phase 15 (Economic Data Strategy) | Complete |
@@ -238,18 +118,18 @@
 | CLEAN-02 | Phase 16 (Repository Cleanup) | Complete |
 | CLEAN-03 | Phase 16 (Repository Cleanup) | Complete |
 | CLEAN-04 | Phase 16 (Repository Cleanup) | Complete |
-| VAL-01 | Phase 17 (Verification & Validation) | Pending |
-| VAL-02 | Phase 17 (Verification & Validation) | Pending |
-| VAL-03 | Phase 17 (Verification & Validation) | Pending |
-| VAL-04 | Phase 17 (Verification & Validation) | Pending |
-| STRUCT-01 | Phase 18 (Structure Documentation) | Pending |
-| STRUCT-02 | Phase 18 (Structure Documentation) | Pending |
-| STRUCT-03 | Phase 18 (Structure Documentation) | Pending |
-| MEMO-15 | Phase 19 (Memory Validation & Release) | Pending |
-| MEMO-16 | Phase 19 (Memory Validation & Release) | Pending |
-| MEMO-17 | Phase 19 (Memory Validation & Release) | Pending |
-| MEMO-18 | Phase 19 (Memory Validation & Release) | Pending |
+| VAL-01 | Phase 17 (Verification & Validation) | Complete |
+| VAL-02 | Phase 17 (Verification & Validation) | Complete |
+| VAL-03 | Phase 17 (Verification & Validation) | Complete |
+| VAL-04 | Phase 17 (Verification & Validation) | Complete |
+| STRUCT-01 | Phase 18 (Structure Documentation) | Complete |
+| STRUCT-02 | Phase 18 (Structure Documentation) | Complete |
+| STRUCT-03 | Phase 18 (Structure Documentation) | Complete |
+| MEMO-15 | Phase 19 (Memory Validation & Release) | Complete |
+| MEMO-16 | Phase 19 (Memory Validation & Release) | Complete |
+| MEMO-17 | Phase 19 (Memory Validation & Release) | Complete |
+| MEMO-18 | Phase 19 (Memory Validation & Release) | Complete |
 
 ---
 *Created: 2026-02-02*
-*Last updated: 2026-02-03 (Phase 16 requirements complete: CLEAN-01, CLEAN-02, CLEAN-03, CLEAN-04)*
+*Last updated: 2026-02-04 (v0.5.0 complete: All 74 requirements complete - ready for release)*
