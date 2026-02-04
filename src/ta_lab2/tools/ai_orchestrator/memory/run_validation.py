@@ -117,6 +117,7 @@ def run_full_validation(
             # Try to get function count
             results = client.search(
                 query="function definition",
+                user_id="orchestrator",
                 filters={"category": "function_definition"},
                 limit=1,
             )
@@ -129,6 +130,7 @@ def run_full_validation(
                 while True:
                     batch = client.search(
                         query="function definition",
+                        user_id="orchestrator",
                         filters={"category": "function_definition"},
                         limit=batch_size,
                     )
