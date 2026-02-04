@@ -19,7 +19,10 @@ import ast
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
+if TYPE_CHECKING:
+    from .mem0_client import Mem0Client
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +55,27 @@ class FunctionInfo:
     is_test: bool = False
     decorators: List[str] = field(default_factory=list)
 
+    @property
+    def signature(self) -> str:
+        """Generate function signature string.
+
+        Returns:
+            Human-readable signature like "func(a: int, b: str = 'default') -> bool"
+        """
+        params = []
+        for p in self.parameters:
+            param_str = p["name"]
+            if p.get("annotation"):
+                param_str += f": {p['annotation']}"
+            if p.get("default"):
+                param_str += f" = {p['default']}"
+            params.append(param_str)
+
+        sig = f"{self.name}({', '.join(params)})"
+        if self.return_annotation:
+            sig += f" -> {self.return_annotation}"
+        return sig
+
 
 @dataclass
 class IndexingResult:
@@ -60,12 +84,14 @@ class IndexingResult:
     Attributes:
         total_files: Number of Python files scanned
         total_functions: Number of functions extracted
+        memories_created: Number of function_definition memories stored
         errors: List of (file_path, error_message) tuples
         functions_by_file: Dict mapping file paths to function counts
     """
 
     total_files: int = 0
     total_functions: int = 0
+    memories_created: int = 0
     errors: List[tuple[str, str]] = field(default_factory=list)
     functions_by_file: Dict[str, int] = field(default_factory=dict)
 
@@ -302,6 +328,8 @@ def extract_functions(file_path: Path) -> List[FunctionInfo]:
 def index_codebase_functions(
     root: Path,
     include_tests: bool = True,
+    store_to_memory: bool = True,
+    client: Optional["Mem0Client"] = None,
 ) -> IndexingResult:
     """Extract all functions from Python files in directory tree.
 
@@ -315,6 +343,8 @@ def index_codebase_functions(
     Args:
         root: Root directory to scan
         include_tests: Whether to include test files (default: True)
+        store_to_memory: Whether to store function_definition memories (default: True)
+        client: Optional Mem0Client instance (created if None and store_to_memory=True)
 
     Returns:
         IndexingResult with counts, errors, and per-file statistics
@@ -323,14 +353,26 @@ def index_codebase_functions(
         >>> from pathlib import Path
         >>> result = index_codebase_functions(Path("src/ta_lab2"))
         >>> print(f"Indexed {result.total_functions} functions from {result.total_files} files")
+        >>> print(f"Memories created: {result.memories_created}")
         >>> print(f"Errors: {len(result.errors)}")
     """
     result = IndexingResult()
 
+    # Get Mem0 client if storing to memory
+    mem0_client = None
+    if store_to_memory:
+        if client is not None:
+            mem0_client = client
+        else:
+            from .mem0_client import get_mem0_client
+
+            mem0_client = get_mem0_client()
+
     # Directories to skip
     skip_dirs = {"__pycache__", ".venv", ".git", ".pytest_cache", ".tox", "venv", "env"}
 
-    # Walk directory tree
+    # Collect all files first for progress reporting
+    py_files = []
     for py_file in root.rglob("*.py"):
         # Skip if in excluded directory
         if any(skip_dir in py_file.parts for skip_dir in skip_dirs):
@@ -340,7 +382,12 @@ def index_codebase_functions(
         if not include_tests and ("test" in py_file.name or "tests" in py_file.parts):
             continue
 
-        # Extract functions
+        py_files.append(py_file)
+
+    logger.info(f"Found {len(py_files)} Python files to index")
+
+    # Process files
+    for py_file in py_files:
         try:
             functions = extract_functions(py_file)
 
@@ -349,8 +396,44 @@ def index_codebase_functions(
             result.functions_by_file[str(py_file)] = len(functions)
 
             # Add each function to memory
-            # NOTE: Actual memory indexing happens in Plan 19-02 after
-            # relationship infrastructure is set up. This is extraction only.
+            if mem0_client and functions:
+                for func_info in functions:
+                    try:
+                        # Create memory content
+                        content = f"Function {func_info.name} in {Path(func_info.file_path).name}"
+                        if func_info.docstring:
+                            # Include first line of docstring
+                            first_line = func_info.docstring.split("\n")[0].strip()
+                            content += f": {first_line}"
+
+                        memory_data = {
+                            "role": "user",
+                            "content": content,
+                        }
+
+                        metadata = {
+                            "category": "function_definition",
+                            "file_path": func_info.file_path,
+                            "function_name": func_info.name,
+                            "signature": func_info.signature,
+                            "docstring": func_info.docstring or "",
+                            "line_number": func_info.lineno,
+                            "is_async": func_info.is_async,
+                            "is_test": func_info.is_test,
+                        }
+
+                        mem0_client.add(
+                            messages=[memory_data],
+                            user_id="orchestrator",
+                            metadata=metadata,
+                            infer=False,  # Disable LLM inference for bulk operations
+                        )
+                        result.memories_created += 1
+
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to store memory for {func_info.name}: {e}"
+                        )
 
         except Exception as e:
             error_msg = f"Failed to process {py_file}: {e}"
@@ -359,7 +442,8 @@ def index_codebase_functions(
 
     logger.info(
         f"Indexing complete: {result.total_functions} functions from "
-        f"{result.total_files} files ({len(result.errors)} errors)"
+        f"{result.total_files} files, {result.memories_created} memories created "
+        f"({len(result.errors)} errors)"
     )
 
     return result
