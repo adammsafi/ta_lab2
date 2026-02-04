@@ -26,6 +26,12 @@ Quick start:
     # Link relationships
     result = link_codebase_relationships(Path('src'))
 
+    # Validate memory
+    result = validate_memory_graph()
+
+    # Test queries
+    result = validate_queries()
+
 Run API server:
     uvicorn ta_lab2.tools.ai_orchestrator.memory.api:app --port 8080
 """
@@ -112,6 +118,15 @@ from .relationships import (
     link_codebase_relationships,
     LinkingResult,
 )
+from .graph_validation import (
+    MemoryGraphValidation,
+    validate_memory_graph,
+)
+from .query_validation import (
+    QueryTest,
+    QueryValidation,
+    validate_queries,
+)
 
 __all__ = [
     # Client
@@ -195,4 +210,11 @@ __all__ = [
     "create_relationship_memory",
     "link_codebase_relationships",
     "LinkingResult",
+    # Graph Validation
+    "MemoryGraphValidation",
+    "validate_memory_graph",
+    # Query Validation
+    "QueryTest",
+    "QueryValidation",
+    "validate_queries",
 ]
