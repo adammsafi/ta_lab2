@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ta_lab2.local/schemas/reorganization-decisions/v1.0.0",
+  "title": "Reorganization Decisions Manifest",
+  "description": "Tracks all major decisions made during v0.5.0 ecosystem reorganization",
+  "type": "object",
+  "required": ["$schema", "version", "created_at", "decisions"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "const": "https://ta_lab2.local/schemas/reorganization-decisions/v1.0.0"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "phase_range": {
+      "type": "object",
+      "properties": {
+        "start": {"type": "integer"},
+        "end": {"type": "integer"}
+      }
+    },
+    "decisions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "source", "destination", "action", "timestamp", "phase"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^DEC-[0-9]+$"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["archive", "migrate", "refactor", "merge", "extract", "convert", "create"]
+          },
+          "source": {
+            "type": "string"
+          },
+          "destination": {
+            "type": "string"
+          },
+          "phase": {
+            "type": "integer",
+            "minimum": 11,
+            "maximum": 17
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "category": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "rationale_id": {
+            "type": "string",
+            "pattern": "^RAT-[0-9]+$"
+          },
+          "related_decisions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^DEC-[0-9]+$"
+            }
+          },
+          "requirements": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z]+-[0-9]+$"
+            }
+          },
+          "file_count": {
+            "type": "integer"
+          },
+          "commit_hash": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "rationales": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "summary", "detail"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^RAT-[0-9]+$"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "alternatives_considered": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  }
+}
