@@ -152,6 +152,7 @@ def get_all_function_memories(client) -> List[Dict]:
         # Mem0 search with metadata filters
         results = client.search(
             query="function definition",  # Semantic query
+            user_id="orchestrator",  # Required by Mem0
             filters={"category": "function_definition"},
             limit=limit,
         )
@@ -196,6 +197,7 @@ def get_all_relationship_memories(client) -> List[Dict]:
     while True:
         results = client.search(
             query="function relationship",  # Semantic query
+            user_id="orchestrator",  # Required by Mem0
             filters={"category": "function_relationship"},
             limit=limit,
         )
