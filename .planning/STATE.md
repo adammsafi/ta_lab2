@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 ## Current Position
 
 Phase: 19 of 19 (Memory Validation & Release)
-Plan: 3 of 6 in current phase
+Plan: 4 of 6 in current phase
 Status: In progress
-Last activity: 2026-02-03 - Completed 19-03-PLAN.md (Three-tier similarity detection)
+Last activity: 2026-02-04 - Completed 19-02-PLAN.md (Relationship detection)
 
-Progress: [##########] 100% v0.4.0 | [███████████░] 99% v0.5.0 (Phase 19: 3/6 plans complete)
+Progress: [##########] 100% v0.4.0 | [███████████░] 99% v0.5.0 (Phase 19: 4/6 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 108 (56 in v0.4.0, 52 in v0.5.0)
+- Total plans completed: 109 (56 in v0.4.0, 53 in v0.5.0)
 - Average duration: 12 min
-- Total execution time: 21.16 hours
+- Total execution time: 21.21 hours
 
 **By Phase (v0.4.0):**
 
@@ -50,11 +50,11 @@ Progress: [##########] 100% v0.4.0 | [███████████░] 99% 
 | 16-repository-cleanup | 7 | 226 min | 32 min | Complete |
 | 17-verification-validation | 8 | 38 min | 5 min | Complete |
 | 18-structure-documentation | 4 | 21 min | 5 min | Complete |
-| 19-memory-validation-release | 3 | 13 min | 4 min | In progress |
+| 19-memory-validation-release | 4 | 18 min | 5 min | In progress |
 
 **Recent Trend:**
 - v0.4.0 complete: 10 phases, 56 plans, 12.55 hours total
-- v0.5.0 in progress: 8 phases complete, 51 plans, 8.56 hours (Phase 19: 3/6 plans, 13 min)
+- v0.5.0 in progress: 8 phases complete, 52 plans, 8.61 hours (Phase 19: 4/6 plans, 18 min)
 
 *Updated after each plan completion*
 
@@ -190,6 +190,10 @@ Recent decisions affecting current work:
 - **Significance threshold for function filtering** (19-01): Include function if docstring OR >= 3 lines OR non-private (not starting with "_")
 - **Full signature extraction including edge cases** (19-01): Extract positional args, keyword-only args, *args, **kwargs with types and defaults
 - **Include test functions in index** (19-01): Keep test functions (test_*) for "what tests cover X?" queries
+- **Five relationship types** (19-02): contains (file->function), calls (function->function), imports (file->module), moved_to (reorganization tracking), similar_to (duplicate detection)
+- **TYPE_CHECKING for forward references** (19-02): Avoid circular imports with TYPE_CHECKING pattern for FunctionInfo and Mem0Client types
+- **CallDetector tracks current function context** (19-02): Visitor maintains current_function state for proper caller attribution in call relationships
+- **Relationship metadata with category tag** (19-02): All relationship memories tagged category='function_relationship' for filtering
 - **Three-tier similarity classification** (19-03): EXACT (95%+), VERY_SIMILAR (85-95%), RELATED (70-85%) for actionability tiers
 - **difflib.SequenceMatcher for text comparison** (19-03): Text-based similarity simpler than AST comparison, handles formatting naturally
 - **Six-tier canonical heuristics** (19-03): Docstring (3), type hints (2), src/ vs tests/ (2), core modules (1), nesting depth (1), alphabetical (0.5)
@@ -213,10 +217,10 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-03T20:23:01Z
-Stopped at: Completed 19-03-PLAN.md (Three-tier similarity detection)
+Last session: 2026-02-04T01:23:38Z
+Stopped at: Completed 19-02-PLAN.md (Relationship detection)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-03 (Phase 19 in progress: 3/6 plans - Three-tier duplicate detection with difflib, canonical suggestions for 95%+ duplicates, validated on 83 memory module functions)*
+*Last updated: 2026-02-04 (Phase 19 in progress: 4/6 plans - AST-based relationship detection with CallDetector visitor, 5 relationship types, validated on memory module: 83 contains, 681 calls relationships)*
