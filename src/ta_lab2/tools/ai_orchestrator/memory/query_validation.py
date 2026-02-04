@@ -147,7 +147,10 @@ def test_function_lookup(client) -> QueryTest:
     try:
         # Search for function by name
         results = client.search(
-            query=test.query, filters={"category": "function_definition"}, limit=10
+            query=test.query,
+            user_id="orchestrator",
+            filters={"category": "function_definition"},
+            limit=10,
         )
 
         test.result_count = len(results) if results else 0
@@ -187,6 +190,7 @@ def test_cross_reference(client) -> QueryTest:
         # Search for call relationships
         results = client.search(
             query="search_memories calls",
+            user_id="orchestrator",
             filters={
                 "category": "function_relationship",
                 "relationship_type": "calls",
@@ -230,6 +234,7 @@ def test_edit_impact(client) -> QueryTest:
         # Step 1: Find functions in the file (contains relationships)
         contains_results = client.search(
             query="mem0_client.py contains",
+            user_id="orchestrator",
             filters={
                 "category": "function_relationship",
                 "relationship_type": "contains",
@@ -240,6 +245,7 @@ def test_edit_impact(client) -> QueryTest:
         # Step 2: Find calls to those functions
         calls_results = client.search(
             query="mem0_client calls",
+            user_id="orchestrator",
             filters={
                 "category": "function_relationship",
                 "relationship_type": "calls",
@@ -290,6 +296,7 @@ def test_similar_functions(client) -> QueryTest:
         # Search for similarity relationships
         results = client.search(
             query="search similar",
+            user_id="orchestrator",
             filters={
                 "category": "function_relationship",
                 "relationship_type": "similar_to",
@@ -331,6 +338,7 @@ def test_file_inventory(client) -> QueryTest:
         # Search for contains relationships for the file
         results = client.search(
             query="mem0_client.py contains function",
+            user_id="orchestrator",
             filters={
                 "category": "function_relationship",
                 "relationship_type": "contains",
