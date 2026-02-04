@@ -1,0 +1,107 @@
+%%{init: {'theme':'base'}}%%
+flowchart TB
+    subgraph SRC["src/ta_lab2 (Core Package)"]
+        direction TB
+
+        subgraph FEATURES["features/"]
+            direction LR
+            EMA["ema.py<br/>BaseEMAFeature"]
+            RSI["rsi.py"]
+            MTF["m_tf/<br/>multi-timeframe<br/>variants"]
+            REGIMES["regimes/<br/>pipeline, state"]
+        end
+
+        subgraph SCRIPTS["scripts/ (CLI & Orchestration)"]
+            direction LR
+            BARS["bars/<br/>builders"]
+            EMAS["emas/<br/>audit, stats,<br/>runners"]
+            SIGS["signals/"]
+            PIPE["pipeline/<br/>go-forward"]
+            PIPES["pipelines/<br/>btc pipeline"]
+        end
+
+        subgraph TOOLS["tools/ (Utilities & Integrations)"]
+            direction LR
+            ORCH["ai_orchestrator/<br/>memory, adapters,<br/>snapshot"]
+            ARCH["archive/<br/>manifest,<br/>validate"]
+            DT["data_tools/<br/>40 migrated scripts<br/>6 categories"]
+            DOCS["docs/<br/>convert_docx,<br/>convert_excel"]
+        end
+
+        subgraph INTEG["integrations/"]
+            direction LR
+            ECON["economic/<br/>FredProvider,<br/>rate_limiter,<br/>circuit_breaker,<br/>cache"]
+        end
+
+        subgraph UTILS["utils/"]
+            direction LR
+            ECON_UTIL["economic/"]
+            TIME["time/"]
+        end
+    end
+
+    subgraph DOCS_DIR["docs/ (Documentation)"]
+        direction TB
+        ARCH_DOC["architecture/<br/>converted from<br/>ProjectTT/Foundational"]
+        FEAT_DOC["features/<br/>bars/, emas/<br/>converted docs"]
+        PLAN_DOC["planning/<br/>status, plans"]
+        REF_DOC["reference/<br/>process docs"]
+        DIAG["diagrams/<br/>before/after trees,<br/>data flow"]
+        MAN["manifests/<br/>decision tracking"]
+        MIG["migration/<br/>guides"]
+    end
+
+    subgraph ARCHIVE_DIR[".archive/ (Preservation)"]
+        direction TB
+        A_DOC["documentation/<br/>62 DOCX/XLSX"]
+        A_DT["data_tools/<br/>11 one-offs/<br/>prototypes"]
+        A_EXT["external-packages/<br/>fredtools2,<br/>fedtools2"]
+        A_REF["refactored/<br/>deprecated/<br/>duplicates/"]
+    end
+
+    subgraph PLANNING[".planning/ (GSD Artifacts)"]
+        direction TB
+        PROJ["PROJECT.md"]
+        ROAD["ROADMAP.md"]
+        STATE["STATE.md"]
+        PHASES["phases/<br/>01-10 (v0.4.0)<br/>11-18 (v0.5.0)"]
+    end
+
+    %% Layering dependencies (import-linter enforced)
+    FEATURES --> SCRIPTS
+    SCRIPTS --> TOOLS
+    TOOLS -.-> INTEG
+    TOOLS -.-> UTILS
+
+    %% Cross-package relationships
+    ECON -.->|"provides data"| FEATURES
+    DT -.->|"memory support"| ORCH
+    ORCH -.->|"tracks migrations"| ARCH
+
+    %% Documentation relationships
+    FEAT_DOC -.->|"documents"| FEATURES
+    ARCH_DOC -.->|"documents"| SRC
+    MIG -.->|"migration guide"| TOOLS
+
+    %% Archive relationships
+    A_DT -.->|"archived from"| DT
+    A_EXT -.->|"patterns extracted to"| ECON
+
+    style SRC fill:#e6f7ff,stroke:#0066cc,stroke-width:3px
+    style DOCS_DIR fill:#f0f7e6,stroke:#66aa00,stroke-width:2px
+    style ARCHIVE_DIR fill:#fff4e6,stroke:#cc8800,stroke-width:2px
+    style PLANNING fill:#f0e6ff,stroke:#9933cc,stroke-width:2px
+
+    style FEATURES fill:#cce6ff
+    style SCRIPTS fill:#b3d9ff
+    style TOOLS fill:#99ccff
+    style INTEG fill:#80bfff
+    style UTILS fill:#66b3ff
+
+    style ARCH_DOC fill:#d9f0d9
+    style FEAT_DOC fill:#d9f0d9
+    style DIAG fill:#d9f0d9
+
+    style A_DOC fill:#ffe6cc
+    style A_DT fill:#ffe6cc
+    style A_EXT fill:#ffe6cc
