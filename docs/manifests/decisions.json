@@ -1,0 +1,472 @@
+{
+  "$schema": "https://ta_lab2.local/schemas/reorganization-decisions/v1.0.0",
+  "version": "1.0.0",
+  "created_at": "2026-02-04T00:18:23Z",
+  "phase_range": {
+    "start": 11,
+    "end": 17
+  },
+  "decisions": [
+    {
+      "id": "DEC-001",
+      "type": "archive",
+      "source": "ProjectTT/*.docx",
+      "destination": ".archive/documentation/2026-02-02/",
+      "phase": 13,
+      "timestamp": "2026-02-02T21:41:22Z",
+      "category": "documentation",
+      "action": "Archive original DOCX files after Markdown conversion",
+      "rationale_id": "RAT-001",
+      "related_decisions": ["DEC-002"],
+      "requirements": ["DOC-01", "DOC-02"],
+      "file_count": 62,
+      "commit_hash": "e0470cb"
+    },
+    {
+      "id": "DEC-002",
+      "type": "convert",
+      "source": "ProjectTT/*.docx",
+      "destination": "docs/*/*.md",
+      "phase": 13,
+      "timestamp": "2026-02-02T21:30:00Z",
+      "category": "documentation",
+      "action": "Convert DOCX to Markdown using pypandoc and markdownify",
+      "rationale_id": "RAT-001",
+      "related_decisions": ["DEC-001"],
+      "requirements": ["DOC-01"],
+      "file_count": 62
+    },
+    {
+      "id": "DEC-003",
+      "type": "create",
+      "source": "N/A",
+      "destination": ".archive/{category}/YYYY-MM-DD/",
+      "phase": 12,
+      "timestamp": "2026-02-02T20:00:00Z",
+      "category": "archive-infrastructure",
+      "action": "Create category-first archive structure",
+      "rationale_id": "RAT-002",
+      "related_decisions": ["DEC-004", "DEC-005"],
+      "requirements": ["ARCH-01"],
+      "file_count": 0
+    },
+    {
+      "id": "DEC-004",
+      "type": "create",
+      "source": "N/A",
+      "destination": ".archive/{category}/manifest.json",
+      "phase": 12,
+      "timestamp": "2026-02-02T20:15:00Z",
+      "category": "archive-infrastructure",
+      "action": "Create manifest per category with $schema versioning",
+      "rationale_id": "RAT-003",
+      "related_decisions": ["DEC-003"],
+      "requirements": ["ARCH-02"],
+      "file_count": 0
+    },
+    {
+      "id": "DEC-005",
+      "type": "create",
+      "source": "N/A",
+      "destination": "manifest checksums",
+      "phase": 12,
+      "timestamp": "2026-02-02T20:30:00Z",
+      "category": "archive-infrastructure",
+      "action": "Use SHA256 checksums for file validation",
+      "rationale_id": "RAT-004",
+      "related_decisions": ["DEC-004"],
+      "requirements": ["ARCH-03"],
+      "file_count": 0
+    },
+    {
+      "id": "DEC-006",
+      "type": "migrate",
+      "source": "Data_Tools/chatgpt/*.py",
+      "destination": "src/ta_lab2/tools/data_tools/export/",
+      "phase": 14,
+      "timestamp": "2026-02-03T01:30:00Z",
+      "category": "data-tools",
+      "action": "Migrate ChatGPT export tools to export category",
+      "rationale_id": "RAT-005",
+      "related_decisions": ["DEC-011"],
+      "requirements": ["TOOL-01", "TOOL-02"],
+      "file_count": 6
+    },
+    {
+      "id": "DEC-007",
+      "type": "migrate",
+      "source": "Data_Tools/*.py (analysis)",
+      "destination": "src/ta_lab2/tools/data_tools/analysis/",
+      "phase": 14,
+      "timestamp": "2026-02-03T01:45:00Z",
+      "category": "data-tools",
+      "action": "Migrate AST and tree analysis tools",
+      "rationale_id": "RAT-005",
+      "related_decisions": ["DEC-006"],
+      "requirements": ["TOOL-01"],
+      "file_count": 8
+    },
+    {
+      "id": "DEC-008",
+      "type": "migrate",
+      "source": "Data_Tools/*.py (memory)",
+      "destination": "src/ta_lab2/tools/data_tools/memory/",
+      "phase": 14,
+      "timestamp": "2026-02-03T02:00:00Z",
+      "category": "data-tools",
+      "action": "Migrate embedding and OpenAI memory tools",
+      "rationale_id": "RAT-005",
+      "related_decisions": ["DEC-006"],
+      "requirements": ["TOOL-01"],
+      "file_count": 10
+    },
+    {
+      "id": "DEC-009",
+      "type": "migrate",
+      "source": "Data_Tools/*.py (processing)",
+      "destination": "src/ta_lab2/tools/data_tools/processing/",
+      "phase": 14,
+      "timestamp": "2026-02-03T02:15:00Z",
+      "category": "data-tools",
+      "action": "Migrate DataFrame and data processing utilities",
+      "rationale_id": "RAT-005",
+      "related_decisions": ["DEC-006"],
+      "requirements": ["TOOL-01"],
+      "file_count": 8
+    },
+    {
+      "id": "DEC-010",
+      "type": "migrate",
+      "source": "Data_Tools/*.py (context/generators)",
+      "destination": "src/ta_lab2/tools/data_tools/{context,generators}/",
+      "phase": 14,
+      "timestamp": "2026-02-03T02:30:00Z",
+      "category": "data-tools",
+      "action": "Migrate RAG reasoning and report generation tools",
+      "rationale_id": "RAT-005",
+      "related_decisions": ["DEC-006"],
+      "requirements": ["TOOL-01"],
+      "file_count": 8
+    },
+    {
+      "id": "DEC-011",
+      "type": "archive",
+      "source": "Data_Tools/*.py (prototypes/one-offs)",
+      "destination": ".archive/data_tools/2026-02-03/",
+      "phase": 14,
+      "timestamp": "2026-02-03T02:46:05Z",
+      "category": "data-tools",
+      "action": "Archive prototype scripts and simple wrappers",
+      "rationale_id": "RAT-006",
+      "related_decisions": ["DEC-006"],
+      "requirements": ["TOOL-03"],
+      "file_count": 13
+    },
+    {
+      "id": "DEC-012",
+      "type": "archive",
+      "source": "fredtools2/**/*",
+      "destination": ".archive/external-packages/2026-02-03/fredtools2/",
+      "phase": 15,
+      "timestamp": "2026-02-03T13:10:09Z",
+      "category": "external-packages",
+      "action": "Archive fredtools2 package (zero usage, ecosystem alternatives)",
+      "rationale_id": "RAT-007",
+      "related_decisions": ["DEC-013"],
+      "requirements": ["ECON-01"],
+      "file_count": 13
+    },
+    {
+      "id": "DEC-013",
+      "type": "archive",
+      "source": "fedtools2/**/*",
+      "destination": ".archive/external-packages/2026-02-03/fedtools2/",
+      "phase": 15,
+      "timestamp": "2026-02-03T13:10:09Z",
+      "category": "external-packages",
+      "action": "Archive fedtools2 package (zero usage, ecosystem alternatives)",
+      "rationale_id": "RAT-007",
+      "related_decisions": ["DEC-012"],
+      "requirements": ["ECON-01"],
+      "file_count": 29
+    },
+    {
+      "id": "DEC-014",
+      "type": "create",
+      "source": "N/A",
+      "destination": "src/ta_lab2/integrations/economic/",
+      "phase": 15,
+      "timestamp": "2026-02-03T12:00:00Z",
+      "category": "economic-data",
+      "action": "Create provider pattern for economic data sources",
+      "rationale_id": "RAT-008",
+      "related_decisions": ["DEC-012", "DEC-013"],
+      "requirements": ["ECON-02"],
+      "file_count": 0
+    },
+    {
+      "id": "DEC-015",
+      "type": "create",
+      "source": "N/A",
+      "destination": ".archive/external-packages/ALTERNATIVES.md",
+      "phase": 15,
+      "timestamp": "2026-02-03T13:00:00Z",
+      "category": "external-packages",
+      "action": "Document ecosystem alternatives for archived packages",
+      "rationale_id": "RAT-009",
+      "related_decisions": ["DEC-012", "DEC-013"],
+      "requirements": ["ECON-03"],
+      "file_count": 0
+    },
+    {
+      "id": "DEC-016",
+      "type": "create",
+      "source": "N/A",
+      "destination": ".planning/phases/{NN-name}/",
+      "phase": 11,
+      "timestamp": "2026-02-02T10:00:00Z",
+      "category": "memory-infrastructure",
+      "action": "Create memory-first reorganization tracking structure",
+      "rationale_id": "RAT-010",
+      "related_decisions": [],
+      "requirements": ["MEM-01"],
+      "file_count": 0
+    },
+    {
+      "id": "DEC-017",
+      "type": "create",
+      "source": "N/A",
+      "destination": "snapshot memories in Mem0",
+      "phase": 11,
+      "timestamp": "2026-02-02T11:00:00Z",
+      "category": "memory-infrastructure",
+      "action": "Snapshot project state with dual tagging strategy",
+      "rationale_id": "RAT-011",
+      "related_decisions": ["DEC-016"],
+      "requirements": ["MEM-02"],
+      "file_count": 0
+    },
+    {
+      "id": "DEC-018",
+      "type": "create",
+      "source": "N/A",
+      "destination": "80% queryability threshold",
+      "phase": 11,
+      "timestamp": "2026-02-02T12:00:00Z",
+      "category": "memory-infrastructure",
+      "action": "Establish weighted coverage calculation for memory baseline",
+      "rationale_id": "RAT-012",
+      "related_decisions": ["DEC-017"],
+      "requirements": ["MEM-03"],
+      "file_count": 0
+    },
+    {
+      "id": "DEC-019",
+      "type": "refactor",
+      "source": "src/ta_lab2/tools/ema_runners.py",
+      "destination": "src/ta_lab2/scripts/emas/ema_runners.py",
+      "phase": 17,
+      "timestamp": "2026-02-03T20:00:00Z",
+      "category": "layering-fix",
+      "action": "Move ema_runners from tools to scripts layer",
+      "rationale_id": "RAT-013",
+      "related_decisions": ["DEC-020"],
+      "requirements": ["LAY-01"],
+      "file_count": 1
+    },
+    {
+      "id": "DEC-020",
+      "type": "refactor",
+      "source": "src/ta_lab2/regimes/run_btc_pipeline.py",
+      "destination": "src/ta_lab2/scripts/pipelines/run_btc_pipeline.py",
+      "phase": 17,
+      "timestamp": "2026-02-03T21:00:00Z",
+      "category": "layering-fix",
+      "action": "Move pipeline CLI from regimes to scripts layer",
+      "rationale_id": "RAT-013",
+      "related_decisions": ["DEC-019"],
+      "requirements": ["LAY-02"],
+      "file_count": 1
+    },
+    {
+      "id": "DEC-021",
+      "type": "create",
+      "source": "N/A",
+      "destination": ".pre-commit-config.yaml",
+      "phase": 17,
+      "timestamp": "2026-02-03T18:00:00Z",
+      "category": "quality-infrastructure",
+      "action": "Create pre-commit hooks with .archive/ exclusion",
+      "rationale_id": "RAT-014",
+      "related_decisions": [],
+      "requirements": ["QA-01"],
+      "file_count": 0
+    },
+    {
+      "id": "DEC-022",
+      "type": "create",
+      "source": "N/A",
+      "destination": ".github/workflows/import-validation.yml",
+      "phase": 17,
+      "timestamp": "2026-02-03T17:00:00Z",
+      "category": "quality-infrastructure",
+      "action": "Create CI workflows for import validation and circular dependency checks",
+      "rationale_id": "RAT-015",
+      "related_decisions": ["DEC-021"],
+      "requirements": ["QA-02"],
+      "file_count": 0
+    }
+  ],
+  "rationales": [
+    {
+      "id": "RAT-001",
+      "summary": "Preserve originals while enabling Markdown-based documentation",
+      "detail": "DOCX files were archived after conversion to Markdown to enable full-text search in IDE and GitHub, version control with meaningful diffs, and integration with docs/index.md navigation. The two-step conversion process (pypandoc for DOCX->HTML, then markdownify for HTML->Markdown) provides the best quality output with proper YAML front matter including metadata.",
+      "alternatives_considered": [
+        "Delete originals (rejected: violates NO DELETION constraint)",
+        "Keep both in docs/ (rejected: clutters working directory)",
+        "Convert in-place (rejected: no audit trail)"
+      ]
+    },
+    {
+      "id": "RAT-002",
+      "summary": "Category-first archive structure for browsing by type",
+      "detail": "Archive structure follows .archive/{category}/YYYY-MM-DD/ pattern rather than date-first. This enables browsing by content type (documentation, data_tools, external-packages) which is how developers think about archived content. Within each category, dates provide chronological organization.",
+      "alternatives_considered": [
+        "Date-first structure (rejected: harder to browse by type)",
+        "Flat structure (rejected: doesn't scale)",
+        "Source-path preservation (rejected: loses categorization)"
+      ]
+    },
+    {
+      "id": "RAT-003",
+      "summary": "Manifest per category with $schema versioning",
+      "detail": "Each archive category maintains a single manifest.json file tracking all files across dates. Following Phase 12 pattern, manifests include $schema field with versioned URL for forward compatibility and validation tooling. This enables simpler querying (one file per category) while maintaining JSON Schema validation.",
+      "alternatives_considered": [
+        "Manifest per date (rejected: too many files to query)",
+        "Single global manifest (rejected: doesn't scale)",
+        "No schema versioning (rejected: loses validation)"
+      ]
+    },
+    {
+      "id": "RAT-004",
+      "summary": "Checksum-based validation not path-based",
+      "detail": "SHA256 checksums track files through moves regardless of path changes. Using Python 3.11+ hashlib.file_digest() provides 2-10x faster computation by bypassing buffers. This enables checksum-primary validation hierarchy: PRIMARY checksums track files through moves, SECONDARY count catches replaced-content, MEMORY validates tracking completeness.",
+      "alternatives_considered": [
+        "Path-based validation (rejected: breaks on file moves)",
+        "MD5 checksums (rejected: cryptographically weak)",
+        "No checksums (rejected: can't verify data integrity)"
+      ]
+    },
+    {
+      "id": "RAT-005",
+      "summary": "Functional package organization for Data_Tools migration",
+      "detail": "Data_Tools scripts organized into 6 functional categories: analysis (AST/tree tools), processing (DataFrame utils), memory (embeddings/OpenAI), export (ChatGPT/Claude), context (RAG/reasoning), generators (reports/finetuning). This categorization reflects actual usage patterns and makes tools discoverable by purpose. Each category has descriptive __init__.py documenting available scripts.",
+      "alternatives_considered": [
+        "Flat tools/ directory (rejected: 40+ scripts too many)",
+        "By data source (rejected: doesn't match usage patterns)",
+        "By technology (rejected: too granular)"
+      ]
+    },
+    {
+      "id": "RAT-006",
+      "summary": "Archive vs migrate criteria for Data_Tools",
+      "detail": "Migrated 40 scripts, archived 11 following clear criteria: Migrate by default when useful; archive only clear duplicates (one-off runners), prototypes (numbered iterations like chatgpt_script_keep_look1.py), and test scripts. Archiving includes complete manifest with action/reason tracking following Phase 12 patterns.",
+      "alternatives_considered": [
+        "Migrate everything (rejected: includes obsolete prototypes)",
+        "Archive everything (rejected: loses useful tooling)",
+        "Delete non-migrated (rejected: violates NO DELETION constraint)"
+      ]
+    },
+    {
+      "id": "RAT-007",
+      "summary": "Archive fredtools2/fedtools2 with ecosystem alternatives",
+      "detail": "Both packages have zero usage in ta_lab2 codebase. Ecosystem alternatives (fredapi, fedfred) provide superior functionality with active maintenance, better documentation, and wider adoption. Archived with complete ALTERNATIVES.md documenting feature mapping, API comparison, migration effort, and ecosystem maturity for each package.",
+      "alternatives_considered": [
+        "Integrate into ta_lab2 (rejected: zero usage, duplication)",
+        "Keep as is (rejected: maintenance burden)",
+        "Delete without archiving (rejected: violates NO DELETION constraint)"
+      ]
+    },
+    {
+      "id": "RAT-008",
+      "summary": "Provider pattern for economic data integration",
+      "detail": "Abstract EconomicDataProvider protocol with working fredapi passthrough implementation. This enables future providers (FRED, Fed, Bloomberg, etc.) while providing immediate functionality. Includes singleton rate limiter and cache, per-provider circuit breaker, and opt-out quality validation. Follows soft import pattern for graceful degradation when fredapi missing.",
+      "alternatives_considered": [
+        "Direct fredapi integration (rejected: tight coupling)",
+        "No abstraction (rejected: hard to extend)",
+        "Stub implementation (rejected: not demonstrably working)"
+      ]
+    },
+    {
+      "id": "RAT-009",
+      "summary": "Four-dimensional ALTERNATIVES.md pattern for archived packages",
+      "detail": "ALTERNATIVES.md documents: (1) Feature mapping showing what each archived function does and its replacement, (2) API comparison with code examples, (3) Migration effort estimation, (4) Ecosystem maturity (PyPI versions, GitHub stars, last update). This enables informed decisions about adopting alternatives when archived functionality is needed.",
+      "alternatives_considered": [
+        "Simple list of alternatives (rejected: insufficient context)",
+        "No alternatives documentation (rejected: leaves users stranded)",
+        "In-code comments only (rejected: not discoverable)"
+      ]
+    },
+    {
+      "id": "RAT-010",
+      "summary": "Memory-first reorganization for auditability",
+      "detail": "Phase 11 Memory Preparation completed BEFORE any file moves. This ensures Mem0 has complete snapshot of pre-reorganization state for semantic queries like 'Where did Y.py go?' and 'What replaced X functionality?'. Enables AI agents to understand context during and after reorganization.",
+      "alternatives_considered": [
+        "Document-only tracking (rejected: not semantically queryable)",
+        "Git history only (rejected: hard for AI to navigate)",
+        "Memory after moves (rejected: can't capture before-state)"
+      ]
+    },
+    {
+      "id": "RAT-011",
+      "summary": "Dual tagging strategy for snapshot memories",
+      "detail": "Snapshot memories use simple tags (phase, project, snapshot, memory, ta_lab2, file_list, directory_structure, conversation_context, commit_link) plus structured metadata for filtering. This enables both tag-based queries and post-search metadata filtering. Used infer=False in batch_add_memories() for performance with 24-hour commit linkage window.",
+      "alternatives_considered": [
+        "Tags only (rejected: insufficient filtering precision)",
+        "Metadata only (rejected: harder to query)",
+        "Complex tag hierarchy (rejected: maintenance burden)"
+      ]
+    },
+    {
+      "id": "RAT-012",
+      "summary": "80% directory queryability threshold with weighted coverage",
+      "detail": "Baseline established that 4/5 directories must be semantically queryable (80% threshold). Weighted coverage calculation: inventory queries 80% weight, function lookup 20% weight. This balances directory structure understanding (critical for reorganization) with function-level detail (useful but not essential).",
+      "alternatives_considered": [
+        "100% queryability (rejected: unachievable with complex codebases)",
+        "Unweighted coverage (rejected: over-values function lookup)",
+        "No threshold (rejected: no quality target)"
+      ]
+    },
+    {
+      "id": "RAT-013",
+      "summary": "Layer-appropriate module placement",
+      "detail": "Import-linter enforces 4-tier layering: scripts->features->regimes->tools. Files violating this were moved to appropriate layers: ema_runners.py from tools to scripts (scripts CAN import features), run_btc_pipeline.py from regimes to scripts (CLI orchestration, not core logic). Deprecation notices rather than re-exports to avoid new violations.",
+      "alternatives_considered": [
+        "Relax layering rules (rejected: defeats purpose of architecture)",
+        "Re-export with violations (rejected: creates new issues)",
+        "Leave in wrong layer (rejected: technical debt)"
+      ]
+    },
+    {
+      "id": "RAT-014",
+      "summary": "Pre-commit hooks with archive exclusion",
+      "detail": "Pre-commit hooks enforce quality (ruff, ruff-format, debug-statements) but exclude .archive/ directory. Archived code is intentionally preserved as-is for historical reference, not subject to current quality standards. Manifest JSON validation ensures archive metadata integrity without touching archived code.",
+      "alternatives_considered": [
+        "Apply hooks to archives (rejected: modifies historical artifacts)",
+        "No hooks (rejected: loses quality enforcement)",
+        "Separate hook config (rejected: maintenance complexity)"
+      ]
+    },
+    {
+      "id": "RAT-015",
+      "summary": "CI workflow separation: critical vs advisory checks",
+      "detail": "Critical jobs (import-validation-core, circular-dependencies) have no continue-on-error and block CI. Warning jobs (organization-rules, import-validation-optional) use continue-on-error: true for advisory checks. This distinguishes must-pass from nice-to-have validations. Core imports tested without orchestrator dependency, optional imports can fail non-blocking.",
+      "alternatives_considered": [
+        "All checks blocking (rejected: optional dependencies would fail)",
+        "All checks advisory (rejected: loses enforcement)",
+        "No separation (rejected: unclear severity)"
+      ]
+    }
+  ]
+}
