@@ -1,0 +1,386 @@
+ta_lab2 Ecosystem - Post-Reorganization (v0.5.0)
+================================================
+
+Generated: 2026-02-03
+Status: After consolidation - all 5 directories merged into ta_lab2
+Note: This represents the CONSOLIDATED structure after v0.5.0 reorganization
+
+All external directories (ProjectTT, Data_Tools, fredtools2, fedtools2) have been:
+- Converted and migrated into ta_lab2
+- Archived with full manifests and checksums
+- Documented with ALTERNATIVES.md for archived packages
+
+═══════════════════════════════════════════════════════════════════════════════
+
+ta_lab2/                                    [Unified codebase]
+├── .archive/                               [NEW - Preserved files with manifests]
+│   ├── data_tools/
+│   │   └── 2026-02-03/
+│   │       ├── 00-README.md
+│   │       ├── manifest.json              [11 archived scripts with checksums]
+│   │       ├── one_offs/                  [5 duplicate runners]
+│   │       └── prototypes/                [6 experimental scripts]
+│   ├── deprecated/
+│   │   └── 2026-02-02/
+│   │       └── ... (deprecated code)
+│   ├── documentation/
+│   │   ├── 2026-02-02/                    [62 original DOCX/XLSX files]
+│   │   │   ├── .gitkeep
+│   │   │   ├── CoreComponents.docx
+│   │   │   ├── KeyTerms.docx
+│   │   │   ├── bar_creation.docx
+│   │   │   ├── bar_implementation.docx
+│   │   │   ├── ChatGPT_Convos_Manually_Desc.xlsx
+│   │   │   └── ... (58 more ProjectTT files)
+│   │   ├── 2026-02-03/                    [Additional archives]
+│   │   └── manifest.json
+│   ├── duplicates/
+│   │   └── 2026-02-02/
+│   │       └── ... (duplicate files across directories)
+│   ├── external-packages/
+│   │   └── 2026-02-03/
+│   │       ├── fredtools2/                [13 files - FRED API package]
+│   │       │   ├── src/fredtools2/
+│   │       │   │   ├── cli.py
+│   │       │   │   ├── config.py
+│   │       │   │   ├── db.py
+│   │       │   │   ├── fred_api.py
+│   │       │   │   ├── jobs/
+│   │       │   │   └── sql/
+│   │       │   ├── sql/
+│   │       │   └── pyproject.toml
+│   │       ├── fedtools2/                 [17 files - FED tools package]
+│   │       │   ├── src/fedtools2/
+│   │       │   │   ├── etl.py
+│   │       │   │   ├── config/
+│   │       │   │   ├── utils/
+│   │       │   │   └── fedtools2.egg-info/
+│   │       │   ├── pyproject.toml
+│   │       │   ├── setup.py
+│   │       │   └── README.md
+│   │       ├── manifest.json              [42 files with checksums]
+│   │       ├── ALTERNATIVES.md            [fredapi/fedfred ecosystem guide]
+│   │       ├── README.md
+│   │       └── dependencies_snapshot.txt
+│   ├── migrated/
+│   │   └── 2026-02-02/
+│   │       └── ... (files moved during migration)
+│   ├── originals/
+│   │   └── 2026-02-03/
+│   │       └── ... (original files before refactoring)
+│   ├── refactored/
+│   │   ├── 2026-02-02/
+│   │   └── 2026-02-03/
+│   │       └── ... (refactored file variants)
+│   ├── scripts/
+│   │   └── 2026-02-03/
+│   │       └── ... (archived utility scripts)
+│   ├── temp/
+│   │   └── 2026-02-03/
+│   │       └── ... (temporary files)
+│   └── test_git_history/
+│       └── ... (git history tests)
+│
+├── docs/                                   [NEW - Consolidated documentation]
+│   ├── architecture/                      [Converted from ProjectTT/Foundational]
+│   │   ├── assets/
+│   │   │   ├── corecomponents/           [Images from CoreComponents.docx]
+│   │   │   ├── keyterms/
+│   │   │   ├── regimesindepth/
+│   │   │   ├── ta-lab2-vision-draft-20251111/
+│   │   │   └── ... (architecture assets)
+│   │   ├── chatgpt-visionquestions.md
+│   │   ├── corecomponents.md
+│   │   ├── keyterms.md
+│   │   ├── project-plan.md
+│   │   ├── regimesindepth.md
+│   │   └── ... (architecture docs)
+│   ├── features/                          [Converted from ProjectTT/Features]
+│   │   ├── bars/
+│   │   │   ├── assets/
+│   │   │   │   ├── bar-creation/
+│   │   │   │   └── bar-implementation/
+│   │   │   ├── bar-creation.md
+│   │   │   ├── bar-implementation.md
+│   │   │   └── ... (bar feature docs)
+│   │   ├── emas/
+│   │   │   ├── assets/
+│   │   │   │   ├── ema-daily/
+│   │   │   │   ├── ema-multi-tf/
+│   │   │   │   ├── ema-multi-tf-cal/
+│   │   │   │   └── ema-multi-tf-cal-anchor/
+│   │   │   ├── ema-daily.md
+│   │   │   ├── ema-multi-tf.md
+│   │   │   ├── ema-multi-tf-cal.md
+│   │   │   ├── ema-multi-tf-cal-anchor.md
+│   │   │   └── ... (EMA feature docs)
+│   │   └── memory/
+│   │       └── memory-model.md
+│   ├── planning/                          [Converted from ProjectTT/Plans&Status]
+│   │   ├── assets/
+│   │   │   ├── new-12wk-plan-doc/
+│   │   │   ├── status-20251113/
+│   │   │   └── ... (planning assets)
+│   │   ├── new-12wk-plan-doc.md
+│   │   ├── status-20251113.md
+│   │   └── ... (planning docs)
+│   ├── reference/                         [Converted from ProjectTT/ProcessDocuments]
+│   │   ├── assets/
+│   │   │   ├── chat-gpt-export-processing-end-to-end-process/
+│   │   │   └── ... (reference assets)
+│   │   ├── chat-gpt-export-processing-end-to-end-process.md
+│   │   └── ... (reference docs)
+│   ├── migration/                         [NEW - Migration guides]
+│   │   └── ... (migration documentation)
+│   ├── diagrams/                          [NEW - Before/after visualizations]
+│   │   ├── before_tree.txt               [THIS FILE - v0.4.0 structure]
+│   │   ├── after_tree.txt                [THIS FILE - v0.5.0 structure]
+│   │   ├── data_flow.mmd                 [Mermaid data flow diagram]
+│   │   └── package_structure.mmd         [Mermaid package structure]
+│   ├── manifests/                         [NEW - Decision tracking]
+│   │   └── ... (decision manifests)
+│   ├── analysis/
+│   │   └── ... (analysis documentation)
+│   ├── api/
+│   │   └── ... (API documentation)
+│   ├── guides/
+│   │   └── ... (user guides)
+│   ├── ops/
+│   │   └── ... (operations documentation)
+│   ├── qa/
+│   │   └── ... (quality assurance docs)
+│   ├── time/
+│   │   └── ... (time-related documentation)
+│   ├── cheatsheets/
+│   │   ├── postgres/
+│   │   ├── powershell/
+│   │   └── sql/
+│   ├── assets/                            [Global assets]
+│   ├── DESIGN.md
+│   ├── deployment.md
+│   ├── index.md                           [NEW - Docs index]
+│   └── ... (additional docs)
+│
+├── src/
+│   └── ta_lab2/
+│       ├── __init__.py
+│       ├── features/
+│       │   ├── __init__.py
+│       │   ├── ema.py
+│       │   ├── rsi.py
+│       │   ├── m_tf/
+│       │   │   ├── __init__.py
+│       │   │   ├── ema_multi_timeframe.py     [Refactored]
+│       │   │   ├── ema_multi_tf_cal.py        [Refactored]
+│       │   │   ├── ema_multi_tf_cal_anchor.py [Refactored]
+│       │   │   ├── ema_research/
+│       │   │   └── old/
+│       │   └── ... (feature modules)
+│       ├── regimes/
+│       │   ├── __init__.py
+│       │   ├── pipeline.py
+│       │   └── state.py
+│       ├── pipelines/
+│       │   ├── __init__.py
+│       │   └── ... (pipeline modules)
+│       ├── integrations/                  [NEW - External integrations]
+│       │   └── economic/                  [NEW - Economic data providers]
+│       │       ├── __init__.py
+│       │       ├── provider.py            [FredProvider - extracted patterns]
+│       │       ├── rate_limiter.py
+│       │       ├── circuit_breaker.py
+│       │       └── cache.py
+│       ├── scripts/
+│       │   ├── __init__.py
+│       │   ├── bars/
+│       │   │   ├── __init__.py
+│       │   │   ├── common_snapshot_contract.py
+│       │   │   ├── README.md
+│       │   │   ├── old/
+│       │   │   └── ... (bar scripts)
+│       │   ├── emas/
+│       │   │   ├── __init__.py
+│       │   │   ├── audit_ema_expected_coverage.py
+│       │   │   ├── audit_ema_integrity.py
+│       │   │   ├── audit_ema_samples.py
+│       │   │   ├── audit_ema_tables.py
+│       │   │   ├── ema_runners.py         [Moved from tools - Phase 17]
+│       │   │   ├── stats/
+│       │   │   │   ├── daily/
+│       │   │   │   ├── multi_tf/
+│       │   │   │   ├── multi_tf_cal/
+│       │   │   │   ├── multi_tf_cal_anchor/
+│       │   │   │   └── multi_tf_v2/
+│       │   │   └── old/
+│       │   ├── features/
+│       │   │   └── ta_feature.py
+│       │   ├── pipeline/
+│       │   │   └── run_go_forward_daily_refresh.py
+│       │   ├── pipelines/                 [NEW]
+│       │   │   └── run_btc_pipeline.py    [Moved from regimes - Phase 17]
+│       │   ├── signals/
+│       │   │   └── ... (signal scripts)
+│       │   ├── backtests/
+│       │   ├── etl/
+│       │   ├── observability/
+│       │   ├── prices/
+│       │   ├── research/
+│       │   ├── returns/
+│       │   ├── sandbox/
+│       │   └── setup/
+│       ├── tools/
+│       │   ├── __init__.py
+│       │   ├── ai_orchestrator/
+│       │   │   ├── __init__.py
+│       │   │   └── memory/
+│       │   │       ├── __init__.py
+│       │   │       ├── core.py
+│       │   │       ├── migration.py
+│       │   │       ├── storage.py
+│       │   │       └── snapshot/
+│       │   ├── archive/                   [NEW - Archive tooling]
+│       │   │   ├── __init__.py
+│       │   │   ├── manifest.py
+│       │   │   ├── types.py
+│       │   │   └── validate.py
+│       │   ├── data_tools/                [NEW - Migrated from Data_Tools]
+│       │   │   ├── __init__.py
+│       │   │   ├── analysis/              [3 scripts - AST/tree tools]
+│       │   │   │   ├── __init__.py
+│       │   │   │   ├── generate_function_map.py
+│       │   │   │   ├── generate_function_map_with_purpose.py
+│       │   │   │   └── tree_structure.py
+│       │   │   ├── context/               [5 scripts - RAG/reasoning]
+│       │   │   │   ├── __init__.py
+│       │   │   │   ├── create_project_context.py
+│       │   │   │   ├── create_reasoning_engine.py
+│       │   │   │   └── ... (context tools)
+│       │   │   ├── database_utils/        [2 scripts - DB utilities]
+│       │   │   │   ├── __init__.py
+│       │   │   │   └── ... (DB utils)
+│       │   │   ├── export/                [7 scripts - ChatGPT/Claude export]
+│       │   │   │   ├── __init__.py
+│       │   │   │   ├── export_claude_conversations_to_txt.py
+│       │   │   │   ├── export_claude_md_wrapper.py
+│       │   │   │   ├── export_conversations_to_markdown.py
+│       │   │   │   └── ... (export tools)
+│       │   │   ├── generators/            [6 scripts - Reports/finetuning]
+│       │   │   │   ├── __init__.py
+│       │   │   │   ├── create_report_from_chat.py
+│       │   │   │   ├── generate_finetuning_data.py
+│       │   │   │   └── ... (generators)
+│       │   │   ├── memory/                [16 scripts - Embeddings/OpenAI]
+│       │   │   │   ├── __init__.py
+│       │   │   │   ├── enrich_memories_with_relationships.py
+│       │   │   │   ├── generate_qa_embeddings.py
+│       │   │   │   └── ... (memory tools)
+│       │   │   └── processing/            [1 script - DataFrame utils]
+│       │   │       ├── __init__.py
+│       │   │       └── DataFrame_Consolidation.py
+│       │   ├── cleanup/
+│       │   │   └── ... (cleanup utilities)
+│       │   └── docs/                      [NEW - Document conversion]
+│       │       ├── __init__.py
+│       │       ├── convert_docx.py
+│       │       └── convert_excel.py
+│       ├── utils/
+│       │   ├── __init__.py
+│       │   ├── economic/                  [NEW - Economic utilities]
+│       │   └── time/
+│       │       └── ... (time utilities)
+│       ├── analysis/
+│       ├── backtests/
+│       ├── connectivity/
+│       ├── io/
+│       ├── live/
+│       ├── notifications/
+│       ├── observability/
+│       └── orchestration/
+│
+├── tests/
+│   ├── __init__.py
+│   ├── test_bar_contract.py
+│   ├── test_bar_contract_gap_tests.py
+│   ├── test_bar_ohlc_correctness.py
+│   ├── test_bar_ohlc_correctness_fast.py
+│   ├── test_connectivity.py
+│   └── ... (comprehensive test suite)
+│
+├── .planning/                              [GSD planning artifacts]
+│   ├── PROJECT.md
+│   ├── ROADMAP.md
+│   ├── STATE.md
+│   └── phases/
+│       ├── 01-foundation-quota-management/
+│       ├── 02-memory-core-chromadb-integration/
+│       ├── 03-memory-advanced-mem0-migration/
+│       ├── 04-orchestrator-adapters/
+│       ├── 05-orchestrator-coordination/
+│       ├── 06-ta-lab2-time-model/
+│       ├── 07-ta_lab2-feature-pipeline/
+│       ├── 08-ta_lab2-signals/
+│       ├── 09-integration-observability/
+│       ├── 10-release-validation/
+│       ├── 11-memory-preparation/          [v0.5.0 starts]
+│       ├── 12-archive-foundation/
+│       ├── 13-documentation-consolidation/
+│       ├── 14-tools-integration/
+│       ├── 15-economic-data-strategy/
+│       ├── 16-repository-cleanup/
+│       ├── 17-verification-validation/
+│       └── 18-structure-documentation/     [Current phase]
+│
+├── .claude/                                [Claude tooling]
+├── .gemini/                                [Gemini tooling]
+├── .memory/                                [Memory state]
+├── .gitignore
+├── README.md
+├── pyproject.toml                          [Updated with new dependencies]
+├── db_config.env
+├── openai_config.env
+├── economic_data.env.example               [NEW - FRED API config]
+└── ... (config files)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+Summary Statistics (v0.5.0 Post-Reorganization):
+- Total directories: 1 (consolidated ta_lab2)
+- Python files in src/: ~308 (preserved from v0.4.0)
+- Migrated from Data_Tools: 40 scripts → tools/data_tools/ (6 categories)
+- Archived from Data_Tools: 11 scripts → .archive/data_tools/
+- Converted from ProjectTT: 62 docs → docs/ (Markdown with assets)
+- Archived from ProjectTT: 62 originals → .archive/documentation/
+- Archived packages: fredtools2 (13 files) + fedtools2 (17 files)
+- New subsystems: integrations/economic/, tools/archive/, tools/data_tools/, tools/docs/
+
+Key improvements:
+1. ✓ Unified ecosystem - single directory with clear package structure
+2. ✓ Searchable documentation - all docs converted to Markdown with YAML front matter
+3. ✓ Zero data loss - all files preserved with SHA256 checksums and manifests
+4. ✓ Category-based archive - .archive/{category}/YYYY-MM-DD/ for browsability
+5. ✓ Functional organization - tools/data_tools/ organized by purpose (analysis, memory, export, etc.)
+6. ✓ Import validation - import-linter enforces layering (features → scripts → tools)
+7. ✓ Git history preservation - git log --follow tracks files through moves
+8. ✓ Memory tracking - Mem0 relationships document all migrations/archives
+
+New directories created during v0.5.0:
+- .archive/ (category-based file preservation)
+- docs/diagrams/ (before/after trees, Mermaid visualizations)
+- docs/manifests/ (decision tracking)
+- docs/migration/ (migration guides)
+- src/ta_lab2/integrations/ (external integrations)
+- src/ta_lab2/integrations/economic/ (FredProvider extracted from fredtools2 patterns)
+- src/ta_lab2/tools/archive/ (archiving tooling)
+- src/ta_lab2/tools/data_tools/ (40 migrated Data_Tools scripts in 6 categories)
+- src/ta_lab2/tools/docs/ (document conversion utilities)
+- src/ta_lab2/utils/economic/ (economic data utilities)
+
+Phase 17 import validation fixes:
+- src/ta_lab2/scripts/emas/ema_runners.py (moved from tools - Phase 17)
+- src/ta_lab2/scripts/pipelines/run_btc_pipeline.py (moved from regimes - Phase 17)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+Generated by Phase 18 (Structure Documentation) - Plan 18-02
+This tree represents the consolidated structure after v0.5.0 reorganization (Phases 11-17).
+All external directories have been integrated or archived with full audit trails.
