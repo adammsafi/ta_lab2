@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 ## Current Position
 
 Phase: 17 of 19 (Verification & Validation)
-Plan: 5 of 6 in current phase
-Status: In progress
-Last activity: 2026-02-03 - Completed 17-05-PLAN.md (data loss validation tests)
+Plan: 8 of 8 in current phase
+Status: Phase complete
+Last activity: 2026-02-03 - Completed 17-08-PLAN.md (gap closure: all import-linter contracts pass)
 
-Progress: [##########] 100% v0.4.0 | [██████████] 100% v0.5.0 (Phase 17 in progress: 5/6 plans)
+Progress: [##########] 100% v0.4.0 | [██████████] 100% v0.5.0 (Phase 17 complete: 8/8 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 98 (56 in v0.4.0, 42 in v0.5.0)
-- Average duration: 12 min
-- Total execution time: 20.41 hours
+- Total plans completed: 101 (56 in v0.4.0, 45 in v0.5.0)
+- Average duration: 11 min
+- Total execution time: 20.58 hours
 
 **By Phase (v0.4.0):**
 
@@ -48,11 +48,11 @@ Progress: [##########] 100% v0.4.0 | [██████████] 100% v0.5.
 | 14-tools-integration | 13 | 128 min | 10 min | Complete |
 | 15-economic-data-strategy | 6 | 36 min | 6 min | Complete |
 | 16-repository-cleanup | 7 | 226 min | 32 min | Complete |
-| 17-verification-validation | 5 | 28 min | 6 min | In progress |
+| 17-verification-validation | 8 | 38 min | 5 min | Complete |
 
 **Recent Trend:**
 - v0.4.0 complete: 10 phases, 56 plans, 12.55 hours total
-- v0.5.0 in progress: Phase 17 started (5/6 plans, 28 min), 42 plans across 7 phases
+- v0.5.0 in progress: Phase 17 complete (8/8 plans, 38 min), 45 plans across 7 phases
 
 *Updated after each plan completion*
 
@@ -172,6 +172,13 @@ Recent decisions affecting current work:
 - **Use python3 not python3.10** (17-04): System Python version used, not hardcoded 3.10 for virtualenv compatibility
 - **Manifest JSON validation loop pattern** (17-04): bash -c 'for f in "$@"' handles multiple manifest files passed by pre-commit
 - **Document but don't block on lint issues** (17-04): 497 pre-existing Ruff errors documented for gap closure, not fixed in this phase
+- **Distinguish data loss from modifications** (17-05): Files modified since baseline expected, only fail if path gone AND checksum not found
+- **Known reorganization exemptions** (17-05): Track documented replacements (Phase 16 refactored variants) to prevent false positives
+- **Checksum-primary validation hierarchy** (17-05): PRIMARY checksums track files through moves, SECONDARY count catches replaced-content, MEMORY validates tracking
+- **Move violating modules to appropriate layer** (17-06): ema_runners.py moved from tools to scripts (scripts can import features, tools cannot)
+- **No re-export that violates layering** (17-06): Deprecation notices instead of re-exports that create new violations
+- **CLI wrappers in scripts layer** (17-07): run_btc_pipeline.py moved from regimes to scripts/pipelines (CLI orchestration, not core logic)
+- **Gap closure verification pattern** (17-08): Run full validation suite after fixes, update VERIFICATION.md from gaps_found to verified
 
 ### Pending Todos
 
@@ -179,10 +186,10 @@ None yet.
 
 ### Blockers/Concerns
 
-**Architectural violations detected (17-02):**
-- tools->features: ema_runners in tools imports from features (foundation layer violation)
-- regimes<->pipelines: Circular dependency between regimes.run_btc_pipeline and pipelines.btc_pipeline
-- Requires gap closure refactoring before full validation passes
+**Architectural violations - RESOLVED (17-06, 17-07, 17-08):**
+- ~~tools->features: ema_runners in tools imports from features~~ FIXED: moved to scripts/emas/
+- ~~regimes<->pipelines: Circular dependency~~ FIXED: moved run_btc_pipeline to scripts/pipelines/
+- All 5 import-linter contracts now pass (0 violations)
 
 **Pre-existing lint issues (17-04):**
 - 497 Ruff lint errors in active codebase (E402, F841, E701, E712, E722, E741)
@@ -191,10 +198,10 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-03T22:32:00Z
-Stopped at: Completed 17-05-PLAN.md (data loss validation: zero data loss, 409 baseline files verified, 331 modified, 4 known reorganizations)
+Last session: 2026-02-04T00:01:00Z
+Stopped at: Completed 17-08-PLAN.md (gap closure complete: all import-linter contracts pass, Phase 17 complete)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-03 (Phase 17 in progress: 5/6 plans - import validation (368 tests), import-linter (3 violations), CI workflows, pre-commit hooks (497 lint issues), data loss validation (zero loss))*
+*Last updated: 2026-02-04 (Phase 17 complete: 8/8 plans - import validation (368 tests), import-linter (0 violations), CI workflows, pre-commit hooks, data loss validation (zero loss), gap closure (3 violations fixed))*
