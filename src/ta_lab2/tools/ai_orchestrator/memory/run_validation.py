@@ -25,6 +25,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
+from dotenv import load_dotenv
+
 from .graph_validation import MemoryGraphValidation, validate_memory_graph
 from .indexing import IndexingResult, extract_functions, index_codebase_functions
 from .mem0_client import get_mem0_client
@@ -98,6 +100,14 @@ def run_full_validation(
     logging.basicConfig(
         level=log_level, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
+
+    # Load OpenAI API key from config file
+    config_env = Path(__file__).parent.parent.parent.parent.parent / "openai_config.env"
+    if config_env.exists():
+        load_dotenv(config_env)
+        logger.info(f"Loaded OpenAI config from {config_env}")
+    else:
+        logger.warning(f"OpenAI config not found at {config_env}")
 
     logger.info("Starting full memory validation suite")
     logger.info("Phase: 19-memory-validation-release, Milestone: v0.5.0")
