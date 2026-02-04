@@ -16,6 +16,9 @@ Quick start:
     # Get formatted context for AI prompt
     context = inject_memory_context("How do I backtest?")
 
+    # Index functions
+    result = index_codebase_functions(Path('src'))
+
 Run API server:
     uvicorn ta_lab2.tools.ai_orchestrator.memory.api:app --port 8080
 """
@@ -76,6 +79,13 @@ from .metadata import (
 )
 from .migration import MigrationResult, migrate_metadata, validate_migration
 from .health import HealthReport, MemoryHealthMonitor, scan_stale_memories
+from .indexing import (
+    FunctionInfo,
+    FunctionExtractor,
+    extract_functions,
+    index_codebase_functions,
+    IndexingResult,
+)
 
 __all__ = [
     # Client
@@ -136,4 +146,10 @@ __all__ = [
     "MemoryStatsResponse",
     "ContextInjectionRequest",
     "ContextInjectionResponse",
+    # Indexing
+    "FunctionInfo",
+    "FunctionExtractor",
+    "extract_functions",
+    "index_codebase_functions",
+    "IndexingResult",
 ]
