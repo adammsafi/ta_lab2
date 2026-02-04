@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-02-04
+
+### Added
+- **Memory Preparation (Phase 11)**: Pre-reorganization memory snapshots with codebase, external directories, and conversation history indexing
+- **Archive Foundation (Phase 12)**: Category-based .archive/ structure with manifest tracking, SHA256 checksums, and git history preservation
+- **Documentation Consolidation (Phase 13)**: ProjectTT DOCX/Excel to Markdown conversion with pypandoc+markdownify, organized docs/ structure with index
+- **Tools Integration (Phase 14)**: Data_Tools migration to ta_lab2.tools.data_tools with 6 functional categories (analysis, processing, memory, export, context, generators)
+- **Economic Data Strategy (Phase 15)**: Production-ready ta_lab2.integrations.economic with FredProvider, rate limiting (120/min), TTL caching, circuit breaker, data quality validation
+- **Repository Cleanup (Phase 16)**: Root directory cleanup, temp file archiving, *_refactored.py resolution, duplicate detection with SHA256
+- **Verification & Validation (Phase 17)**: Dynamic import validation, import-linter for circular dependency detection, pre-commit hooks with Ruff
+- **Structure Documentation (Phase 18)**: decisions.json manifest with JSON Schema, before/after directory diagrams, REORGANIZATION.md migration guide
+- **Memory Validation (Phase 19)**: AST-based function extraction (indexing.py), relationship linking (contains/calls/imports/moved_to/similar_to), three-tier duplicate detection (95%+/85-95%/70-85%), memory graph validation
+
+### Changed
+- pyproject.toml updated with [fred], [fed], [economic] optional dependency extras for economic data integration
+- Memory infrastructure enhanced with function-level granularity and relationship graph
+- Archive manifest schema versioned with $schema URLs for forward compatibility
+- CI workflow enhanced with import validation and circular dependency checks
+
+### Fixed
+- Module docstrings positioned before imports for proper __doc__ detection
+- Relative imports converted to absolute imports in migrated scripts
+- Graceful handling of optional dependencies (fredapi, pandas) with helpful error messages
+
+### Deprecated
+- fredtools2 and fedtools2 packages (archived with ALTERNATIVES.md migration guidance)
+
 ## [0.4.0] - 2026-02-01
 
 ### Added
@@ -54,7 +81,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Regime detection framework
 - Basic EMA calculations
 
-[Unreleased]: https://github.com/your-username/ta_lab2/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/your-username/ta_lab2/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/your-username/ta_lab2/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/your-username/ta_lab2/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/your-username/ta_lab2/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/your-username/ta_lab2/releases/tag/v0.3.0
