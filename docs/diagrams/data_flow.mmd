@@ -1,0 +1,65 @@
+%%{init: {'theme':'base', 'themeVariables': { 'fontSize':'14px'}}}%%
+flowchart LR
+    subgraph External["External Directories (v0.4.0)"]
+        direction TB
+        PT["ProjectTT<br/>62 DOCX/XLSX files<br/>(Foundational, Features,<br/>Plans, Process docs)"]
+        DT["Data_Tools<br/>51 Python scripts<br/>(analysis, memory,<br/>export, context,<br/>generators, processing)"]
+        FT["fredtools2<br/>13 Python files<br/>(FRED API client<br/>with DB integration)"]
+        FE["fedtools2<br/>17 Python files<br/>(FED data ETL<br/>with YAML config)"]
+    end
+
+    subgraph Archive[".archive/ (Category-based preservation)"]
+        direction TB
+        DOC["documentation/<br/>2026-02-02/<br/>62 original<br/>DOCX/XLSX files"]
+        ARCH_DT["data_tools/<br/>2026-02-03/<br/>11 archived scripts<br/>(5 one-offs,<br/>6 prototypes)"]
+        EXT["external-packages/<br/>2026-02-03/<br/>fredtools2 (13)<br/>fedtools2 (17)<br/>+ ALTERNATIVES.md"]
+    end
+
+    subgraph Lab2["ta_lab2 (v0.5.0 Consolidated)"]
+        direction TB
+        DOCS["docs/<br/>Converted Markdown<br/>with YAML front matter<br/>(architecture, features,<br/>planning, reference)"]
+        TOOLS["tools/data_tools/<br/>40 migrated scripts<br/>in 6 categories<br/>(analysis, memory,<br/>export, context,<br/>generators, processing)"]
+        ECON["integrations/economic/<br/>FredProvider<br/>(rate limiting,<br/>circuit breaker,<br/>caching)"]
+    end
+
+    PT -->|"Phase 13<br/>Convert to MD"| DOCS
+    PT -->|"Phase 13<br/>Archive originals"| DOC
+
+    DT -->|"Phase 14<br/>Migrate 40 scripts"| TOOLS
+    DT -->|"Phase 14<br/>Archive 11 scripts"| ARCH_DT
+
+    FT -->|"Phase 15<br/>Archive package"| EXT
+    FT -.->|"Phase 15<br/>Extract patterns"| ECON
+
+    FE -->|"Phase 15<br/>Archive package"| EXT
+    FE -.->|"Phase 15<br/>Extract patterns"| ECON
+
+    style External fill:#ffe6e6,stroke:#cc0000,stroke-width:2px
+    style Archive fill:#fff4e6,stroke:#cc8800,stroke-width:2px
+    style Lab2 fill:#e6f7ff,stroke:#0066cc,stroke-width:2px
+
+    style PT fill:#ffcccc
+    style DT fill:#ffcccc
+    style FT fill:#ffcccc
+    style FE fill:#ffcccc
+
+    style DOC fill:#ffe6cc
+    style ARCH_DT fill:#ffe6cc
+    style EXT fill:#ffe6cc
+
+    style DOCS fill:#cce6ff
+    style TOOLS fill:#cce6ff
+    style ECON fill:#cce6ff
+
+    classDef migrationPath stroke:#00aa00,stroke-width:3px
+    classDef archivePath stroke:#ff8800,stroke-width:3px
+    classDef extractPath stroke:#0088ff,stroke-width:2px,stroke-dasharray: 5 5
+
+    linkStyle 0 stroke:#00aa00,stroke-width:3px
+    linkStyle 1 stroke:#ff8800,stroke-width:3px
+    linkStyle 2 stroke:#00aa00,stroke-width:3px
+    linkStyle 3 stroke:#ff8800,stroke-width:3px
+    linkStyle 4 stroke:#ff8800,stroke-width:3px
+    linkStyle 5 stroke:#0088ff,stroke-width:2px,stroke-dasharray: 5 5
+    linkStyle 6 stroke:#ff8800,stroke-width:3px
+    linkStyle 7 stroke:#0088ff,stroke-width:2px,stroke-dasharray: 5 5
