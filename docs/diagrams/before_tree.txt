@@ -1,0 +1,281 @@
+ta_lab2 Ecosystem - Pre-Reorganization (v0.4.0)
+===============================================
+
+Generated: 2026-02-03
+Source: Phase 12 baseline snapshot + Phase 13-15 summaries
+Note: This represents the directory structure BEFORE v0.5.0 reorganization
+
+This snapshot shows all 5 directories as they existed prior to consolidation:
+- ta_lab2 (primary codebase)
+- ProjectTT (62 documentation files)
+- Data_Tools (51 Python scripts)
+- fredtools2 (13 Python files + SQL)
+- fedtools2 (17 Python files + config)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+ta_lab2/
+├── src/
+│   └── ta_lab2/
+│       ├── __init__.py
+│       ├── features/
+│       │   ├── __init__.py
+│       │   ├── ema.py
+│       │   ├── rsi.py
+│       │   ├── m_tf/
+│       │   │   ├── __init__.py
+│       │   │   ├── ema_multi_timeframe.py
+│       │   │   ├── ema_multi_tf_cal.py
+│       │   │   └── ema_multi_tf_cal_anchor.py
+│       │   └── regimes/
+│       │       ├── __init__.py
+│       │       ├── pipeline.py
+│       │       └── state.py
+│       ├── scripts/
+│       │   ├── __init__.py
+│       │   ├── bars/
+│       │   │   ├── __init__.py
+│       │   │   ├── common_snapshot_contract.py
+│       │   │   ├── README.md
+│       │   │   └── ... (bar builders)
+│       │   ├── emas/
+│       │   │   ├── __init__.py
+│       │   │   ├── audit_ema_expected_coverage.py
+│       │   │   ├── audit_ema_integrity.py
+│       │   │   ├── audit_ema_samples.py
+│       │   │   ├── audit_ema_tables.py
+│       │   │   └── stats/
+│       │   │       ├── daily/
+│       │   │       ├── multi_tf/
+│       │   │       ├── multi_tf_cal/
+│       │   │       ├── multi_tf_cal_anchor/
+│       │   │       └── multi_tf_v2/
+│       │   ├── features/
+│       │   │   └── ta_feature.py
+│       │   ├── pipeline/
+│       │   │   └── run_go_forward_daily_refresh.py
+│       │   └── signals/
+│       │       └── ... (signal scripts)
+│       ├── tools/
+│       │   └── ai_orchestrator/
+│       │       ├── __init__.py
+│       │       ├── adapters/
+│       │       │   ├── __init__.py
+│       │       │   ├── langchain_adapter.py
+│       │       │   └── orchestrator_adapter.py
+│       │       └── memory/
+│       │           ├── __init__.py
+│       │           ├── core.py
+│       │           ├── migration.py
+│       │           └── storage.py
+│       └── utils/
+│           ├── __init__.py
+│           └── time/
+│               └── ... (time utilities)
+├── tests/
+│   ├── __init__.py
+│   ├── test_bar_contract.py
+│   ├── test_bar_contract_gap_tests.py
+│   ├── test_bar_ohlc_correctness.py
+│   ├── test_bar_ohlc_correctness_fast.py
+│   └── test_connectivity.py
+├── .planning/
+│   ├── PROJECT.md
+│   ├── ROADMAP.md
+│   ├── STATE.md
+│   └── phases/
+│       ├── 01-foundation-quota-management/
+│       ├── 02-memory-core-chromadb-integration/
+│       ├── 03-memory-advanced-mem0-migration/
+│       ├── 04-orchestrator-adapters/
+│       ├── 05-orchestrator-coordination/
+│       ├── 06-ta-lab2-time-model/
+│       ├── 07-ta_lab2-feature-pipeline/
+│       ├── 08-ta_lab2-signals/
+│       ├── 09-integration-observability/
+│       ├── 10-release-validation/
+│       └── 11-memory-preparation/
+│           └── ... (first v0.5.0 phase)
+├── README.md
+├── pyproject.toml
+├── db_config.env
+├── openai_config.env
+└── ... (config files)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+ProjectTT/                                  [62 files total - DOCX, XLSX, txt]
+├── Foundational/
+│   ├── CoreComponents.docx
+│   ├── KeyTerms.docx
+│   ├── db_schemas_keys.xlsx
+│   └── ... (foundational docs)
+├── Features/
+│   ├── Bars/
+│   │   ├── DesriptiveDocuments/
+│   │   │   ├── bar_creation.docx
+│   │   │   ├── bar_implementation.docx
+│   │   │   └── ... (bar design docs)
+│   │   └── Studies&Scraps/
+│   │       ├── bar_analysis_20260108.xlsx
+│   │       ├── bar_data_analysis.xlsx
+│   │       ├── bar_tf_analysis.xlsx
+│   │       └── ... (analysis files)
+│   └── EMAs/
+│       ├── DesriptiveDocuments/
+│       │   └── ... (EMA design docs)
+│       └── Studies&Scraps/
+│           ├── compare_3_emas'.xlsx
+│           ├── cmcVSbitstampEMAs.xlsx
+│           ├── cmc_ema_multi_tf_cal_us_1W_21P_Approval_20260127.xlsx
+│           └── ... (EMA analysis)
+├── Plans&Status/
+│   ├── ChatGPT_Convos_Manually_Desc.xlsx
+│   ├── ChatGPT_Convos_Manually_Desc2.xlsx
+│   └── ... (planning and status docs)
+├── ProcessDocuments/
+│   ├── Chat Gpt Export Processing – End-to-end Process.docx
+│   ├── ChatGPT_VisionQuestions.docx
+│   └── ... (process documentation)
+├── ChatGPT/
+│   └── ... (exported ChatGPT conversations)
+├── analysis_look.xlsx
+├── assets_exchanges_info.xlsx
+└── ... (additional reference files)
+
+Note: ProjectTT contained mixed documentation - foundational architecture,
+feature designs (Bars/EMAs), planning materials, and process documentation.
+Total: 62 files (mostly DOCX and XLSX formats requiring conversion)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+Data_Tools/                                 [51 Python scripts total]
+├── chatgpt/                                [Memory and export tools]
+│   ├── __init__.py
+│   ├── ask_project.py
+│   ├── generate_memories_from_diffs.py
+│   ├── extract_conversation_titles.py
+│   ├── create_custom_instructions.py
+│   ├── export_claude_conversations_to_txt.py
+│   ├── export_claude_md_wrapper.py
+│   ├── export_conversations_parallel.py
+│   ├── export_conversations_to_markdown.py
+│   └── ... (14+ chat-related scripts)
+├── analysis/                               [Code analysis tools]
+│   ├── generate_function_map.py
+│   ├── generate_function_map_with_purpose.py
+│   └── tree_structure.py
+├── processing/                             [Data processing]
+│   └── DataFrame_Consolidation.py
+├── memory/                                 [Memory infrastructure]
+│   ├── create_reasoning_engine.py
+│   ├── enrich_memories_with_relationships.py
+│   ├── generate_qa_embeddings.py
+│   └── ... (10+ memory scripts)
+├── context/                                [RAG and context tools]
+│   ├── create_project_context.py
+│   ├── generate_context_from_file_tree.py
+│   └── ... (5 context scripts)
+├── generators/                             [Report and training generators]
+│   ├── create_report_from_chat.py
+│   ├── generate_finetuning_data.py
+│   └── ... (6 generator scripts)
+└── ... (additional scripts at root level)
+
+Categories (per Phase 14 discovery):
+- Migrate: 40 scripts (analysis=3, processing=1, memory=16, export=7, context=5, generators=6, database=2)
+- Archive: 11 scripts (one-offs=5, prototypes=6)
+
+External dependencies identified:
+- openai, chromadb, mem0
+- google.auth, google.auth.transport.requests
+- requests, pandas
+
+═══════════════════════════════════════════════════════════════════════════════
+
+fredtools2/                                 [FRED API package - 13 files]
+├── src/
+│   └── fredtools2/
+│       ├── __init__.py
+│       ├── cli.py
+│       ├── config.py
+│       ├── db.py
+│       ├── fred_api.py
+│       ├── jobs/
+│       │   ├── __init__.py
+│       │   ├── releases.py
+│       │   └── series.py
+│       └── sql/
+│           ├── .env.example.txt
+│           └── schema.sql
+├── sql/
+│   ├── 001_check_out.sql
+│   ├── 002_check_out.sql
+│   ├── 003_check_out.sql
+│   └── 004_check_out.sql
+├── pyproject.toml
+└── README.md (assumed)
+
+Purpose: FRED (Federal Reserve Economic Data) API client with database integration
+Zero usage in ta_lab2 codebase
+Superseded by fredapi + ta_lab2.integrations.economic.FredProvider
+
+═══════════════════════════════════════════════════════════════════════════════
+
+fedtools2/                                  [FED tools package - 17 files]
+├── src/
+│   ├── fedtools2/
+│   │   ├── __init__.py
+│   │   ├── etl.py
+│   │   ├── sql_sink_example.py
+│   │   ├── config/
+│   │   │   ├── __init__.py
+│   │   │   └── default.yaml
+│   │   ├── utils/
+│   │   │   ├── __init__.py
+│   │   │   ├── consolidation.py
+│   │   │   └── io.py
+│   │   └── fedtools2.egg-info/
+│   │       ├── dependency_links.txt
+│   │       ├── entry_points.txt
+│   │       ├── PKG-INFO
+│   │       ├── requires.txt
+│   │       ├── SOURCES.txt
+│   │       └── top_level.txt
+│   └── fedtools2.egg-info/
+│       ├── dependency_links.txt
+│       ├── entry_points.txt
+│       ├── PKG-INFO
+│       ├── requires.txt
+│       ├── SOURCES.txt
+│       └── top_level.txt
+├── pyproject.toml
+├── setup.py
+├── README.md
+└── db_config.example.env
+
+Purpose: Federal Reserve data ETL tools
+Zero usage in ta_lab2 codebase
+Superseded by fedfred + ta_lab2.integrations.economic patterns
+
+═══════════════════════════════════════════════════════════════════════════════
+
+Summary Statistics (v0.4.0 Pre-Reorganization):
+- Total directories: 5 (ta_lab2 + 4 external)
+- Python files in ta_lab2: ~308 (per Phase 12 baseline)
+- Python files in external: ~81 (Data_Tools=51, fredtools2=13, fedtools2=17)
+- Documentation files: 62 (ProjectTT DOCX/XLSX)
+- Total Python modules: ~389
+
+Key characteristics:
+1. Fragmented ecosystem - code and docs spread across 5 separate directories
+2. Mixed formats - DOCX/XLSX documentation not searchable or version-controlled
+3. Duplicate functionality - fredtools2/fedtools2 had zero usage, replaced by ecosystem tools
+4. No centralized archive strategy - deprecated code mixed with active code
+5. Data_Tools scripts lacked package structure (flat hierarchy with chatgpt/ subdirectory)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+Generated by Phase 18 (Structure Documentation) - Plan 18-02
+Baseline source: .planning/phases/12-archive-foundation/baseline/pre_reorg_snapshot.json
+This tree represents the state captured on 2026-02-02 before v0.5.0 reorganization began.
