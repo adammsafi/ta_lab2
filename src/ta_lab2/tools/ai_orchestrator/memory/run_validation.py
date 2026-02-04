@@ -102,7 +102,10 @@ def run_full_validation(
     )
 
     # Load OpenAI API key from config file
-    config_env = Path(__file__).parent.parent.parent.parent.parent / "openai_config.env"
+    # Path: run_validation.py -> memory -> ai_orchestrator -> tools -> ta_lab2 -> src -> project_root
+    config_env = (
+        Path(__file__).parent.parent.parent.parent.parent.parent / "openai_config.env"
+    )
     if config_env.exists():
         load_dotenv(config_env)
         logger.info(f"Loaded OpenAI config from {config_env}")
