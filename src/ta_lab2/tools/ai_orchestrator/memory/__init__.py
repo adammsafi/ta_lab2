@@ -1,8 +1,8 @@
 """Memory integration for AI orchestrator.
 
 Provides ChromaDB client, semantic search, context injection,
-incremental updates, REST API for cross-platform access, and
-duplicate detection.
+incremental updates, REST API for cross-platform access,
+duplicate detection, and relationship linking.
 
 Quick start:
     from ta_lab2.tools.ai_orchestrator.memory import (
@@ -22,6 +22,9 @@ Quick start:
 
     # Detect duplicates
     report = detect_duplicates(functions)
+
+    # Link relationships
+    result = link_codebase_relationships(Path('src'))
 
 Run API server:
     uvicorn ta_lab2.tools.ai_orchestrator.memory.api:app --port 8080
@@ -99,6 +102,16 @@ from .similarity import (
     detect_duplicates,
     suggest_canonical,
 )
+from .relationships import (
+    RelationshipType,
+    Relationship,
+    detect_calls,
+    detect_imports,
+    create_contains_relationships,
+    create_relationship_memory,
+    link_codebase_relationships,
+    LinkingResult,
+)
 
 __all__ = [
     # Client
@@ -173,4 +186,13 @@ __all__ = [
     "compute_similarity",
     "detect_duplicates",
     "suggest_canonical",
+    # Relationships
+    "RelationshipType",
+    "Relationship",
+    "detect_calls",
+    "detect_imports",
+    "create_contains_relationships",
+    "create_relationship_memory",
+    "link_codebase_relationships",
+    "LinkingResult",
 ]
