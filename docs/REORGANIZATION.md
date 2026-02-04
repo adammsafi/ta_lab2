@@ -276,3 +276,204 @@ Data_Tools scripts were categorized into functional groups:
 **Note:** All migrated scripts are now importable from their new locations under `ta_lab2.tools.data_tools.*`.
 
 ---
+
+## fredtools2 Archive
+
+**Decision:** DEC-026 | **Rationale:** RAT-004
+**Phase:** 15 (Economic Data Strategy)
+**Total files:** 13
+
+### Strategy
+
+fredtools2 was a wrapper around fredapi for FRED economic data. Archived rather than integrated because:
+- Zero usage within ta_lab2 codebase
+- Ecosystem alternative (fredapi) provides superior functionality
+- New FredProvider in ta_lab2.integrations.economic supersedes
+
+### File Listing
+
+| Original Path | Archived To |
+|---------------|-------------|
+| fredtools2/pyproject.toml | .archive/external-packages/2026-02-03/fredtools2/ |
+| fredtools2/sql/001_check_out.sql | .archive/external-packages/2026-02-03/fredtools2/sql/ |
+| fredtools2/sql/002_check_out.sql | .archive/external-packages/2026-02-03/fredtools2/sql/ |
+| fredtools2/sql/003_check_out.sql | .archive/external-packages/2026-02-03/fredtools2/sql/ |
+| fredtools2/sql/004_check_out.sql | .archive/external-packages/2026-02-03/fredtools2/sql/ |
+| fredtools2/src/fredtools2/cli.py | .archive/external-packages/2026-02-03/fredtools2/src/fredtools2/ |
+| fredtools2/src/fredtools2/config.py | .archive/external-packages/2026-02-03/fredtools2/src/fredtools2/ |
+| fredtools2/src/fredtools2/db.py | .archive/external-packages/2026-02-03/fredtools2/src/fredtools2/ |
+| fredtools2/src/fredtools2/fred_api.py | .archive/external-packages/2026-02-03/fredtools2/src/fredtools2/ |
+| fredtools2/src/fredtools2/jobs/releases.py | .archive/external-packages/2026-02-03/fredtools2/src/fredtools2/jobs/ |
+| fredtools2/src/fredtools2/jobs/series.py | .archive/external-packages/2026-02-03/fredtools2/src/fredtools2/jobs/ |
+| fredtools2/src/fredtools2/sql/.env.example.txt | .archive/external-packages/2026-02-03/fredtools2/src/fredtools2/sql/ |
+| fredtools2/src/fredtools2/sql/schema.sql | .archive/external-packages/2026-02-03/fredtools2/src/fredtools2/sql/ |
+
+### Alternative
+
+Use `ta_lab2.integrations.economic.FredProvider` instead:
+
+```python
+# Before (fredtools2)
+from fredtools2 import FredClient
+client = FredClient(api_key="...")
+data = client.get_series("DFF")
+
+# After (ta_lab2)
+from ta_lab2.integrations.economic import FredProvider
+provider = FredProvider(api_key="...")
+result = provider.get_series("DFF")
+```
+
+See `.archive/external-packages/2026-02-03/ALTERNATIVES.md` for detailed comparison with fredapi ecosystem package.
+
+---
+
+## fedtools2 Archive
+
+**Decision:** DEC-027 | **Rationale:** RAT-004
+**Phase:** 15 (Economic Data Strategy)
+**Total files:** 29
+
+### Strategy
+
+fedtools2 provided Fed policy data utilities. Archived for same reasons as fredtools2.
+
+### File Listing
+
+| Original Path | Archived To |
+|---------------|-------------|
+| fedtools2/pyproject.toml | .archive/external-packages/2026-02-03/fedtools2/ |
+| fedtools2/README.md | .archive/external-packages/2026-02-03/fedtools2/ |
+| fedtools2/setup.py | .archive/external-packages/2026-02-03/fedtools2/ |
+| fedtools2/db_config.example.env | .archive/external-packages/2026-02-03/fedtools2/ |
+| fedtools2/src/fedtools2/__init__.py | .archive/external-packages/2026-02-03/fedtools2/src/fedtools2/ |
+| fedtools2/src/fedtools2/config/__init__.py | .archive/external-packages/2026-02-03/fedtools2/src/fedtools2/config/ |
+| fedtools2/src/fedtools2/config/default.yaml | .archive/external-packages/2026-02-03/fedtools2/src/fedtools2/config/ |
+| fedtools2/src/fedtools2/etl.py | .archive/external-packages/2026-02-03/fedtools2/src/fedtools2/ |
+| fedtools2/src/fedtools2/sql_sink_example.py | .archive/external-packages/2026-02-03/fedtools2/src/fedtools2/ |
+| fedtools2/src/fedtools2/utils/consolidation.py | .archive/external-packages/2026-02-03/fedtools2/src/fedtools2/utils/ |
+| fedtools2/src/fedtools2/utils/io.py | .archive/external-packages/2026-02-03/fedtools2/src/fedtools2/utils/ |
+| fedtools2/src/fedtools2/fedtools2.egg-info/* (5 files) | .archive/external-packages/2026-02-03/fedtools2/src/fedtools2/fedtools2.egg-info/ |
+| fedtools2/src/fedtools2.egg-info/* (5 files) | .archive/external-packages/2026-02-03/fedtools2/src/fedtools2.egg-info/ |
+| fedtools2/tests/test_consolidation.py | .archive/external-packages/2026-02-03/fedtools2/tests/ |
+| fedtools2/tests/test_etl_smoke.py | .archive/external-packages/2026-02-03/fedtools2/tests/ |
+| fedtools2/structure.csv | .archive/external-packages/2026-02-03/fedtools2/ |
+| fedtools2/structure.json | .archive/external-packages/2026-02-03/fedtools2/ |
+| fedtools2/structure.md | .archive/external-packages/2026-02-03/fedtools2/ |
+| fedtools2/structure.txt | .archive/external-packages/2026-02-03/fedtools2/ |
+
+### Alternative
+
+See `.archive/external-packages/2026-02-03/ALTERNATIVES.md` for detailed comparison with fedfred and fredapi ecosystem packages.
+
+---
+
+## Migration Guide
+
+### Import Mapping Quick Reference
+
+| Old Import | New Import | Status |
+|------------|------------|--------|
+| `from ProjectTT.X import Y` | N/A - docs only | Converted to Markdown |
+| `from Data_Tools.generate_function_map import ...` | `from ta_lab2.tools.data_tools.analysis import generate_function_map` | Migrated |
+| `from Data_Tools.tree_structure import ...` | `from ta_lab2.tools.data_tools.analysis import tree_structure` | Migrated |
+| `from Data_Tools.DataFrame_Consolidation import ...` | `from ta_lab2.tools.data_tools.processing import DataFrame_Consolidation` | Migrated |
+| `from Data_Tools.chatgpt.ask_project import ...` | `from ta_lab2.tools.data_tools.context import ask_project` | Migrated |
+| `from Data_Tools.chatgpt.generate_memories_from_diffs import ...` | `from ta_lab2.tools.data_tools.memory import generate_memories_from_diffs` | Migrated |
+| `from Data_Tools.chatgpt.export_chatgpt_conversations import ...` | `from ta_lab2.tools.data_tools.export import export_chatgpt_conversations` | Migrated |
+| `from Data_Tools.chatgpt.intelligence_report_generator import ...` | `from ta_lab2.tools.data_tools.generators import intelligence_report_generator` | Migrated |
+| `from fredtools2 import ...` | `from ta_lab2.integrations.economic import FredProvider` | Replaced |
+| `from fedtools2 import ...` | `from ta_lab2.integrations.economic import FredProvider` | Replaced |
+
+### Finding Archived Files
+
+If you need a file that was archived:
+
+1. Check category manifests:
+   - `.archive/documentation/manifest.json` - ProjectTT docs
+   - `.archive/data_tools/2026-02-03/manifest.json` - Data_Tools scripts
+   - `.archive/external-packages/2026-02-03/manifest.json` - fredtools2/fedtools2
+
+2. Search by original filename:
+   ```bash
+   grep -r "your_file.py" .archive/*/manifest.json
+   ```
+
+3. Files are preserved with SHA256 checksums for verification
+
+### Archived Files with Alternatives
+
+| Archived File | Why Archived | Alternative |
+|---------------|--------------|-------------|
+| Data_Tools/write_daily_emas.py | Wrapper for ta_lab2 func | Use ta_lab2.features.ema directly |
+| Data_Tools/write_multi_tf_emas.py | Wrapper for ta_lab2 func | Use ta_lab2.scripts.emas |
+| fredtools2/* | Ecosystem alternative superior | Use ta_lab2.integrations.economic.FredProvider |
+| fedtools2/* | Ecosystem alternative superior | Use ta_lab2.integrations.economic.FredProvider |
+
+---
+
+## Verification
+
+### Checksum Validation
+
+All archived files have SHA256 checksums in manifest.json. Validate with:
+
+```python
+from ta_lab2.tools.archive import validate_manifest
+from pathlib import Path
+
+# Validate documentation archive
+validate_manifest(Path(".archive/documentation/manifest.json"))
+
+# Validate data_tools archive
+validate_manifest(Path(".archive/data_tools/2026-02-03/manifest.json"))
+
+# Validate external packages archive
+validate_manifest(Path(".archive/external-packages/2026-02-03/manifest.json"))
+```
+
+### File Count Verification
+
+| Category | Expected | Location |
+|----------|----------|----------|
+| ProjectTT archived | 62 | .archive/documentation/manifest.json |
+| Data_Tools migrated | 40 | src/ta_lab2/tools/data_tools/* |
+| Data_Tools archived | 11 | .archive/data_tools/2026-02-03/manifest.json |
+| fredtools2 archived | 13 | .archive/external-packages/2026-02-03/manifest.json |
+| fedtools2 archived | 29 | .archive/external-packages/2026-02-03/manifest.json |
+| **Total** | **155** | |
+
+### Import Verification
+
+Run migration smoke tests:
+
+```bash
+# Test data_tools imports
+pytest tests/test_data_tools_imports.py -v
+
+# Test all tool imports
+pytest tests/test_tool_imports.py -v -m "not orchestrator"
+```
+
+All migrated modules should be importable from their new locations.
+
+### Memory Tracking
+
+All file moves were tracked in Mem0 memory system:
+
+```python
+from ta_lab2.tools.ai_orchestrator.memory import Client
+
+client = Client()
+
+# Query for migration memories
+memories = client.search("Data_Tools migration", limit=50)
+
+# Query for specific file
+file_mem = client.search("ask_project.py moved_to", limit=5)
+```
+
+---
+
+*Document generated: 2026-02-04*
+*Last verified: 2026-02-04*
