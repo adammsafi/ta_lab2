@@ -1,8 +1,12 @@
-# ta_lab2 v0.4.0
+# ta_lab2 v0.5.0
 
 Multi-timescale Technical Analysis Lab with AI Orchestration
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+
+> **v0.5.0 Ecosystem Reorganization Complete**
+> External projects (ProjectTT, Data_Tools, fredtools2, fedtools2) consolidated into unified ta_lab2 structure.
+> See [docs/REORGANIZATION.md](docs/REORGANIZATION.md) for migration guide.
 
 ---
 
@@ -46,7 +50,7 @@ For detailed setup instructions, see [Deployment Guide](docs/deployment.md) and 
 
 ## Overview
 
-**ta_lab2** is a production-ready technical analysis and quantitative trading infrastructure designed for multi-timescale feature engineering, signal generation, and backtesting. The v0.4.0 release introduces AI orchestration capabilities with persistent memory, cost-optimized routing across multiple LLM providers, and comprehensive observability.
+**ta_lab2** is a production-ready technical analysis and quantitative trading infrastructure designed for multi-timescale feature engineering, signal generation, and backtesting. The v0.5.0 release consolidates the entire ecosystem into a unified structure with improved organization and comprehensive documentation.
 
 **Key Capabilities:**
 - Multi-timeframe EMA calculations (daily, calendar, trading-day aligned) across 199 timeframes
@@ -56,8 +60,72 @@ For detailed setup instructions, see [Deployment Guide](docs/deployment.md) and 
 - AI memory system with 3,763+ memories for context persistence across sessions
 - Multi-platform AI orchestrator with cost-optimized routing (Gemini free tier → subscriptions → paid APIs)
 - PostgreSQL-backed observability (metrics, tracing, health checks, alerts)
+- Economic data integration with FRED API provider (rate limiting, caching, quality validation)
 
-For architectural details and system design, see [ARCHITECTURE.md](ARCHITECTURE.md) and [DESIGN.md](docs/DESIGN.md).
+For architectural details and system design, see [Documentation Index](docs/index.md).
+
+---
+
+## Project Structure
+
+ta_lab2 follows a unified ecosystem structure after v0.5.0 reorganization:
+
+```
+ta_lab2/
+├── src/ta_lab2/           # Core Python package
+│   ├── features/          # Technical indicators (EMA, RSI, etc.)
+│   ├── scripts/           # Data pipelines (bars, emas, signals)
+│   ├── integrations/      # External integrations
+│   │   └── economic/      # FRED data provider
+│   └── tools/             # Utility tooling
+│       ├── ai_orchestrator/  # AI platform coordination
+│       ├── archive/          # Archive management utilities
+│       └── data_tools/       # Migrated analysis tools
+│           ├── analysis/     # Code analysis (AST, trees)
+│           ├── memory/       # AI memory pipelines
+│           ├── export/       # ChatGPT export processing
+│           └── generators/   # Report generators
+├── docs/                  # Documentation
+│   ├── architecture/      # System design docs
+│   ├── features/          # Feature documentation
+│   ├── migration/         # Migration guides
+│   └── index.md           # Documentation home
+├── tests/                 # Test suite
+├── .archive/              # Preserved historical files
+│   ├── documentation/     # Original ProjectTT docs
+│   ├── data_tools/        # Archived one-off scripts
+│   └── external-packages/ # fredtools2, fedtools2
+└── .planning/             # GSD planning artifacts
+```
+
+### Key Components
+
+| Component | Location | Description |
+|-----------|----------|-------------|
+| Core Features | `src/ta_lab2/features/` | EMA, RSI, regime detection |
+| Data Pipelines | `src/ta_lab2/scripts/` | Bar builders, EMA refreshers |
+| Economic Data | `src/ta_lab2/integrations/economic/` | FRED provider with caching |
+| AI Orchestrator | `src/ta_lab2/tools/ai_orchestrator/` | Multi-platform AI coordination |
+| Analysis Tools | `src/ta_lab2/tools/data_tools/` | Code analysis, memory tools |
+| Archive | `.archive/` | Preserved files with manifest tracking |
+
+---
+
+## Documentation
+
+- **[Documentation Index](docs/index.md)** - Entry point for all documentation
+- **[Architecture](docs/architecture/)** - System design and core concepts
+- **[Features](docs/features/)** - Feature-specific documentation (EMAs, bars)
+
+### Reorganization Documentation
+
+The v0.5.0 release consolidated external directories into ta_lab2:
+
+- **[REORGANIZATION.md](docs/REORGANIZATION.md)** - Complete guide to what moved where (155 files documented)
+- **[Decision Manifest](docs/manifests/)** - Structured tracking of all decisions
+- **[Diagrams](docs/diagrams/)** - Before/after structure visualizations
+
+If migrating from v0.4.0 or updating imports, see the [Migration Guide](docs/REORGANIZATION.md#migration-guide).
 
 ---
 
@@ -447,12 +515,16 @@ Follow the process in [SECURITY.md](SECURITY.md) to report it privately.
 
 ## Links
 
-- [DESIGN.md](docs/DESIGN.md) - High-level system design, concepts, and data flow
-- [Architecture Documentation](ARCHITECTURE.md) - Implementation details, schemas, and APIs
-- [Deployment Guide](docs/deployment.md) - Infrastructure setup and operations
-- [EMA State Standardization](docs/EMA_STATE_STANDARDIZATION.md) - EMA calculation and state management
-- [Time Model Overview](docs/time/time_model_overview.md) - Timeframe and session definitions
-- [QA Documentation](docs/qa/) - Testing and validation procedures
+### Core Documentation
+- **[Documentation Index](docs/index.md)** - Main documentation entry point
+- **[Architecture](docs/architecture/)** - System design, core concepts, API references
+- **[Features Documentation](docs/features/)** - EMAs, bars, signals, backtesting
+- **[Migration Guides](docs/migration/)** - Import path updates and reorganization reference
+
+### Technical References
+- **[REORGANIZATION.md](docs/REORGANIZATION.md)** - v0.5.0 ecosystem consolidation guide
+- **[EMA State Standardization](docs/EMA_STATE_STANDARDIZATION.md)** - EMA calculation and state management
+- **[Deployment Guide](docs/deployment.md)** - Infrastructure setup and operations
 
 ---
 
@@ -468,9 +540,16 @@ If you want to use this in a commercial setting, reach out first so terms can be
 
 See [CHANGELOG.md](CHANGELOG.md) for release history and upgrade notes.
 
-**Latest Release:** v0.4.0 (2026-02-01)
+**Latest Release:** v0.5.0 (2026-02-04)
+- Ecosystem reorganization: Consolidated 155 files from 4 external directories
+- Enhanced documentation with 62 converted documents and comprehensive guides
+- Economic data integration with FRED provider (rate limiting, caching, quality validation)
+- Migrated analysis tools to `ta_lab2.tools.data_tools` (6 functional categories)
+- Archive system with manifest tracking and SHA256 checksums
+- Comprehensive reorganization documentation with before/after diagrams
+
+**Previous Release:** v0.4.0 (2026-02-01)
 - AI orchestration with Mem0 + Qdrant memory system
 - Multi-platform LLM coordination (Claude, ChatGPT, Gemini)
 - Trading signal system with reproducibility validation
 - PostgreSQL-backed observability and health monitoring
-- Comprehensive validation tests (70+ tests for time alignment, data consistency, backtest reproducibility)
