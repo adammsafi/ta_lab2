@@ -110,44 +110,50 @@ def run_full_validation(
         logger.info("Initializing Mem0 client")
         client = get_mem0_client()
 
-        # Step 2: Check if indexing needed
-        logger.info("Checking if function indexing needed")
-        function_count = 0
-        try:
-            # Try to get function count
-            results = client.search(
-                query="function definition",
-                user_id="orchestrator",
-                filters={"category": "function_definition"},
-                limit=1,
-            )
-            # If we got results, try to estimate total count
-            # by fetching in batches
-            if results:
-                logger.info("Functions already indexed, counting total")
-                batch_size = 1000
-                total = 0
-                while True:
-                    batch = client.search(
-                        query="function definition",
-                        user_id="orchestrator",
-                        filters={"category": "function_definition"},
-                        limit=batch_size,
-                    )
-                    if not batch:
-                        break
-                    total += len(batch)
-                    if len(batch) < batch_size:
-                        break
-                function_count = total
-                logger.info(f"Found {function_count} indexed functions")
-        except Exception as e:
-            logger.warning(f"Error checking function count: {e}")
+        # Step 2: Skip indexing check if not needed
+        if index_if_needed:
+            logger.info("Checking if function indexing needed")
             function_count = 0
+            try:
+                # Try to get function count
+                results = client.search(
+                    query="function definition",
+                    user_id="orchestrator",
+                    filters={"category": "function_definition"},
+                    limit=1,
+                )
+                # If we got results, try to estimate total count
+                # by fetching in batches
+                if results:
+                    logger.info("Functions already indexed, counting total")
+                    batch_size = 1000
+                    total = 0
+                    while True:
+                        batch = client.search(
+                            query="function definition",
+                            user_id="orchestrator",
+                            filters={"category": "function_definition"},
+                            limit=batch_size,
+                        )
+                        if not batch:
+                            break
+                        total += len(batch)
+                        if len(batch) < batch_size:
+                            break
+                    function_count = total
+                    logger.info(f"Found {function_count} indexed functions")
+            except Exception as e:
+                logger.warning(f"Error checking function count: {e}")
+                function_count = 0
 
-        # Step 3: Index if needed (threshold: at least 100 functions expected)
-        indexing_threshold = 100
-        if index_if_needed and function_count < indexing_threshold:
+            # Step 3: Index if needed (threshold: at least 100 functions expected)
+            indexing_threshold = 100
+            should_index = function_count < indexing_threshold
+        else:
+            logger.info("Skipping indexing check (--no-index flag)")
+            should_index = False
+
+        if should_index:
             logger.info(
                 f"Function count ({function_count}) below threshold ({indexing_threshold}), indexing codebase"
             )
