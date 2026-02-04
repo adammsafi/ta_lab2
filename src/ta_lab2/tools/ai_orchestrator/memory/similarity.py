@@ -20,12 +20,15 @@ Usage:
         suggestion = suggest_canonical(dup)
 """
 import difflib
+import logging
 import time
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import List, Optional
 
 from .indexing import FunctionInfo
+
+logger = logging.getLogger(__name__)
 
 
 class SimilarityTier(Enum):
@@ -424,8 +427,17 @@ def detect_duplicates(
     related = []
     comparison_count = 0
 
-    # Compare all pairs
+    # Compare all pairs with progress tracking
     n = len(functions)
+    total_comparisons = n * (n - 1) // 2
+    logger.info(
+        f"Starting duplicate detection: {n} functions, ~{total_comparisons:,} comparisons"
+    )
+
+    # Progress reporting interval (every 10% or at least every 100k comparisons)
+    progress_interval = max(total_comparisons // 10, 100000)
+    last_progress = 0
+
     for i in range(n):
         for j in range(i + 1, n):
             func_a = functions[i]
@@ -443,9 +455,36 @@ def detect_duplicates(
             if len(func_a.source) < 20 or len(func_b.source) < 20:
                 continue
 
+            # Length-based pre-filtering: skip if lengths differ by >30%
+            len_a, len_b = len(func_a.source), len(func_b.source)
+            if len_a > 0 and len_b > 0:
+                ratio = min(len_a, len_b) / max(len_a, len_b)
+                if ratio < 0.70:
+                    comparison_count += 1
+                    # Progress reporting
+                    if comparison_count - last_progress >= progress_interval:
+                        elapsed = time.time() - start_time
+                        pct = comparison_count / total_comparisons * 100
+                        logger.info(
+                            f"Progress: {pct:.0f}% ({comparison_count:,}/{total_comparisons:,}) "
+                            f"- {elapsed:.1f}s elapsed"
+                        )
+                        last_progress = comparison_count
+                    continue
+
             # Compute similarity
             similarity = compute_similarity(func_a.source, func_b.source)
             comparison_count += 1
+
+            # Progress reporting
+            if comparison_count - last_progress >= progress_interval:
+                elapsed = time.time() - start_time
+                pct = comparison_count / total_comparisons * 100
+                logger.info(
+                    f"Progress: {pct:.0f}% ({comparison_count:,}/{total_comparisons:,}) "
+                    f"- {elapsed:.1f}s elapsed"
+                )
+                last_progress = comparison_count
 
             # Classify and store if above threshold
             tier = classify_tier(similarity)
@@ -476,6 +515,13 @@ def detect_duplicates(
     canonical_suggestions = [suggest_canonical(dup) for dup in exact_duplicates]
 
     duration = time.time() - start_time
+    logger.info(
+        f"Duplicate detection complete: {comparison_count:,} comparisons in {duration:.1f}s"
+    )
+    logger.info(
+        f"Found: {len(exact_duplicates)} exact, {len(very_similar)} very similar, "
+        f"{len(related)} related"
+    )
 
     return DuplicateReport(
         exact_duplicates=exact_duplicates,
