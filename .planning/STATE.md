@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 ## Current Position
 
 Phase: 19 of 19 (Memory Validation & Release)
-Plan: 4 of 6 in current phase
+Plan: 5 of 6 in current phase
 Status: In progress
-Last activity: 2026-02-04 - Completed 19-02-PLAN.md (Relationship detection)
+Last activity: 2026-02-04 - Completed 19-04-PLAN.md (Graph & query validation)
 
-Progress: [##########] 100% v0.4.0 | [███████████░] 99% v0.5.0 (Phase 19: 4/6 plans complete)
+Progress: [##########] 100% v0.4.0 | [███████████░] 99% v0.5.0 (Phase 19: 5/6 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 109 (56 in v0.4.0, 53 in v0.5.0)
+- Total plans completed: 110 (56 in v0.4.0, 54 in v0.5.0)
 - Average duration: 12 min
-- Total execution time: 21.21 hours
+- Total execution time: 21.34 hours
 
 **By Phase (v0.4.0):**
 
@@ -50,11 +50,11 @@ Progress: [##########] 100% v0.4.0 | [███████████░] 99% 
 | 16-repository-cleanup | 7 | 226 min | 32 min | Complete |
 | 17-verification-validation | 8 | 38 min | 5 min | Complete |
 | 18-structure-documentation | 4 | 21 min | 5 min | Complete |
-| 19-memory-validation-release | 4 | 18 min | 5 min | In progress |
+| 19-memory-validation-release | 5 | 26 min | 5 min | In progress |
 
 **Recent Trend:**
 - v0.4.0 complete: 10 phases, 56 plans, 12.55 hours total
-- v0.5.0 in progress: 8 phases complete, 52 plans, 8.61 hours (Phase 19: 4/6 plans, 18 min)
+- v0.5.0 in progress: 8 phases complete, 53 plans, 8.64 hours (Phase 19: 5/6 plans, 26 min)
 
 *Updated after each plan completion*
 
@@ -198,6 +198,10 @@ Recent decisions affecting current work:
 - **difflib.SequenceMatcher for text comparison** (19-03): Text-based similarity simpler than AST comparison, handles formatting naturally
 - **Six-tier canonical heuristics** (19-03): Docstring (3), type hints (2), src/ vs tests/ (2), core modules (1), nesting depth (1), alphabetical (0.5)
 - **Skip very short functions** (19-03): Skip functions <20 chars to avoid false positives on trivial code
+- **Configurable orphan rate thresholds** (19-04): 5% for production, 10% for test-heavy codebases (>30% test files)
+- **Post-search metadata filtering for relationships** (19-04): Semantic search + metadata filters instead of Qdrant filter syntax
+- **80% query pass rate minimum** (19-04): Query validation requires 4/5 tests passing for flexibility with edge cases
+- **Pagination for large memory collections** (19-04): Fetch 1000 memories per batch to prevent overflow on large codebases
 
 ### Pending Todos
 
@@ -217,10 +221,10 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-04T01:23:38Z
-Stopped at: Completed 19-02-PLAN.md (Relationship detection)
+Last session: 2026-02-04T02:23:00Z
+Stopped at: Completed 19-04-PLAN.md (Graph & query validation)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-04 (Phase 19 in progress: 4/6 plans - AST-based relationship detection with CallDetector visitor, 5 relationship types, validated on memory module: 83 contains, 681 calls relationships)*
+*Last updated: 2026-02-04 (Phase 19 in progress: 5/6 plans - Memory graph validation with orphan detection, relationship target verification, and five-query capability testing)*
