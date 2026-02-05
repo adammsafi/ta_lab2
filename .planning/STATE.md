@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 ## Current Position
 
 Phase: 24 of 26 (Pattern Consistency)
-Plan: 2 of ? in current phase
+Plan: 4 of ? in current phase
 Status: In progress
-Last activity: 2026-02-05 — Completed 24-02-PLAN.md
+Last activity: 2026-02-05 — Completed 24-04-PLAN.md
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0
 
@@ -55,7 +55,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 **Recent Trend:**
 - v0.4.0 complete: 10 phases, 56 plans, 12.55 hours total
 - v0.5.0 complete: 9 phases, 56 plans, 9.85 hours total
-- v0.6.0 in progress: 21/? plans complete - 5 of 7 phases in progress
+- v0.6.0 in progress: 23/? plans complete - 5 of 7 phases in progress
 
 **By Phase (v0.6.0):**
 
@@ -65,7 +65,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 | 21-comprehensive-review | 4/4 | 29 min | 7 min | Complete |
 | 22-critical-data-quality-fixes | 6/6 | 82 min | 14 min | Complete |
 | 23-reliable-incremental-refresh | 4/4 | 17 min | 4 min | Complete |
-| 24-pattern-consistency | 2/? | 12 min | 6 min | In progress |
+| 24-pattern-consistency | 4/? | 35 min | 9 min | In progress |
 
 *Updated after each plan completion*
 
@@ -98,6 +98,8 @@ Recent decisions affecting current work:
 - **Preserve psycopg for SQL performance in 1D builder** (Phase 24-02): 1D bar builder uses large CTEs with complex aggregations - raw psycopg execution 2-3x faster than SQLAlchemy for this workload
 - **Modernize CLI for BaseBarBuilder consistency** (Phase 24-02): Space-separated IDs, --full-rebuild flag for consistency across all bar builders using BaseBarBuilder
 - **26.7% LOC reduction acceptable for SQL-based builders** (Phase 24-02): 1D builder achieved 260 lines saved (971→711) despite SQL-heavy implementation limiting code reuse with DataFrame-based base class
+- **46% LOC reduction for calendar builders** (Phase 24-04): All 4 calendar builders refactored (5991→3230 lines), preserving calendar alignment (US Sunday vs ISO Monday) and anchor window logic despite complex semantics
+- **tz column design documented (GAP-M03 closed)** (Phase 24-04): Calendar state tables use tz as metadata only, NOT in PRIMARY KEY - single timezone per run design is intentional, not a bug
 
 ### Pending Todos
 
@@ -110,7 +112,7 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-05
-Stopped at: Completed 24-02-PLAN.md
+Stopped at: Completed 24-04-PLAN.md
 Resume file: None
 
 ---
