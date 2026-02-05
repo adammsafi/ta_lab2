@@ -150,3 +150,41 @@ old/
 # allow the default config fixture CSV used by tests
 !data/
 !data/btcusd.csv.planning/intel/
+
+# Data files - should never be in git
+*.csv
+*.xlsx
+*.xls
+*.parquet
+*.pickle
+*.pkl
+*.npy
+*.npz
+*.h5
+*.hdf5
+*.feather
+*.arrow
+
+# Database snapshots and schemas
+**/db_schema*.json
+**/db_schema*.md
+**/*snapshot*.json
+**/*snapshot*.csv
+
+# Audit files
+**/audit_*.csv
+**/audits/*.csv
+
+# Artifacts and temporary data
+**/artifacts/*.csv
+**/artifacts/*.parquet
+**/artifacts/*.json
+**/artifacts/frames/
+
+# Function maps and analysis files
+**/function_map*.csv
+**/*_samples.csv
+**/*_analysis.csv
+
+# Allow exceptions for small config/example files if needed
+# !example_small.csv
