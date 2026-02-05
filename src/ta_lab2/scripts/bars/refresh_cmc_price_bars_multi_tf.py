@@ -215,6 +215,152 @@ def _make_day_time_open(ts: pd.Series) -> pd.Series:
     return day_open
 
 
+def _cum_extrema_time_by_bar(
+    *,
+    gkey: pd.Series,
+    val: np.ndarray,
+    t: np.ndarray,
+    want: str,
+) -> np.ndarray:
+    """
+    Per-row cumulative extrema time (earliest timestamp among ties) within each bar_seq group.
+
+    want="max" uses cumulative max; want="min" uses cumulative min.
+    For ties, choose earlier timestamp.
+
+    IMPORTANT:
+    - t MUST already implement fallback-to-ts when timehigh/timelow is missing.
+    """
+    out = np.empty(len(val), dtype="datetime64[ns]")
+    out[:] = np.datetime64("NaT")
+
+    keys = gkey.to_numpy()
+    n = len(val)
+
+    i = 0
+    while i < n:
+        k = keys[i]
+        j = i + 1
+        while j < n and keys[j] == k:
+            j += 1
+
+        v = val[i:j]
+        tt = t[i:j]
+
+        best_v = v[0]
+        best_t = tt[0]
+        out[i] = best_t
+
+        if want == "max":
+            for idx in range(1, len(v)):
+                cur_v = v[idx]
+                cur_t = tt[idx]
+                if np.isnan(best_v):
+                    best_v = cur_v
+                    best_t = cur_t
+                elif not np.isnan(cur_v):
+                    if cur_v > best_v:
+                        best_v = cur_v
+                        best_t = cur_t
+                    elif cur_v == best_v:
+                        if np.isnat(best_t) or (not np.isnat(cur_t) and cur_t < best_t):
+                            best_t = cur_t
+                out[i + idx] = best_t
+        else:  # want == "min"
+            for idx in range(1, len(v)):
+                cur_v = v[idx]
+                cur_t = tt[idx]
+                if np.isnan(best_v):
+                    best_v = cur_v
+                    best_t = cur_t
+                elif not np.isnan(cur_v):
+                    if cur_v < best_v:
+                        best_v = cur_v
+                        best_t = cur_t
+                    elif cur_v == best_v:
+                        if np.isnat(best_t) or (not np.isnat(cur_t) and cur_t < best_t):
+                            best_t = cur_t
+                out[i + idx] = best_t
+
+        i = j
+
+    return out
+
+
+def load_last_snapshot_info(
+    db_url: str, bars_table: str, id_: int, tf: str
+) -> dict | None:
+    """
+    Returns the latest snapshot row for (id, tf), plus:
+      - last_bar_seq
+      - last_time_close (latest snapshot's time_close)
+      - last_pos_in_bar = count of snapshots in that bar_seq (since one per day)
+    """
+    eng = get_engine(db_url)
+    with eng.connect() as conn:
+        row = (
+            conn.execute(
+                text(
+                    f"""
+                WITH last AS (
+                  SELECT id, tf, MAX(bar_seq) AS last_bar_seq
+                  FROM {bars_table}
+                  WHERE id = :id AND tf = :tf
+                  GROUP BY id, tf
+                ),
+                last_row AS (
+                  SELECT b.*
+                  FROM {bars_table} b
+                  JOIN last l
+                    ON b.id = l.id AND b.tf = l.tf AND b.bar_seq = l.last_bar_seq
+                  ORDER BY b.time_close DESC
+                  LIMIT 1
+                ),
+                pos AS (
+                  SELECT COUNT(*)::int AS last_pos_in_bar
+                  FROM {bars_table} b
+                  JOIN last l
+                    ON b.id = l.id AND b.tf = l.tf AND b.bar_seq = l.last_bar_seq
+                )
+                SELECT
+                  (SELECT last_bar_seq FROM last) AS last_bar_seq,
+                  (SELECT time_close FROM last_row) AS last_time_close,
+                  (SELECT last_pos_in_bar FROM pos) AS last_pos_in_bar;
+                """
+                ),
+                {"id": int(id_), "tf": tf},
+            )
+            .mappings()
+            .first()
+        )
+    return dict(row) if row else None
+
+
+def load_last_bar_snapshot_row(
+    db_url: str, bars_table: str, id_: int, tf: str, bar_seq: int
+) -> dict | None:
+    """Load the latest snapshot row for a specific bar_seq."""
+    eng = get_engine(db_url)
+    with eng.connect() as conn:
+        row = (
+            conn.execute(
+                text(
+                    f"""
+                SELECT *
+                FROM {bars_table}
+                WHERE id = :id AND tf = :tf AND bar_seq = :bar_seq
+                ORDER BY time_close DESC
+                LIMIT 1;
+                """
+                ),
+                {"id": int(id_), "tf": tf, "bar_seq": int(bar_seq)},
+            )
+            .mappings()
+            .first()
+        )
+    return dict(row) if row else None
+
+
 # =============================================================================
 # Bar building (snapshots) - VECTORIZED FULL BUILD
 # =============================================================================
