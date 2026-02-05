@@ -188,3 +188,9 @@ old/
 
 # Allow exceptions for small config/example files if needed
 # !example_small.csv
+
+# Large artifacts and snapshots
+**/artifacts/
+**/*snapshot*.json
+**/db_schema*.json
+**/db_schema*.md
