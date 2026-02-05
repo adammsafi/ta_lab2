@@ -91,3 +91,109 @@ def pytest_configure(config):
         config.addinivalue_line(
             "markers", f"{marker}: Marker defined in pyproject.toml"
         )
+
+    # Check database availability for validation tests (Phase 22-06)
+    global DB_AVAILABLE
+    DB_AVAILABLE = False
+    db_url = os.environ.get("TARGET_DB_URL") or os.environ.get("DATABASE_URL")
+    if db_url:
+        try:
+            from sqlalchemy import create_engine, text
+
+            engine = create_engine(db_url)
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            DB_AVAILABLE = True
+            engine.dispose()
+        except Exception:
+            DB_AVAILABLE = False
+
+    # Make DB_AVAILABLE accessible to test modules
+    try:
+        import tests.test_bar_validation as tbv
+
+        tbv.DB_AVAILABLE = DB_AVAILABLE
+    except ImportError:
+        pass
+
+    try:
+        import tests.test_ema_validation as tev
+
+        tev.DB_AVAILABLE = DB_AVAILABLE
+    except ImportError:
+        pass
+
+
+# Phase 22-06 fixtures for validation tests
+@pytest.fixture
+def sample_ohlc_data():
+    """Sample OHLC data for bar validation tests."""
+    return [
+        {
+            "id": 1,
+            "timestamp": "2024-01-01",
+            "open": 100,
+            "high": 150,
+            "low": 80,
+            "close": 120,
+            "volume": 1000,
+        },
+        {
+            "id": 1,
+            "timestamp": "2024-01-02",
+            "open": 120,
+            "high": 160,
+            "low": 100,
+            "close": 140,
+            "volume": 1200,
+        },
+        {
+            "id": 1,
+            "timestamp": "2024-01-03",
+            "open": 140,
+            "high": 180,
+            "low": 120,
+            "close": 160,
+            "volume": 1500,
+        },
+    ]
+
+
+@pytest.fixture
+def sample_ema_data():
+    """Sample EMA data for validation tests."""
+    return [
+        {
+            "id": 1,
+            "tf": "1D",
+            "period": 10,
+            "timestamp": "2024-01-01",
+            "ema": 100.5,
+            "close": 100,
+        },
+        {
+            "id": 1,
+            "tf": "1D",
+            "period": 10,
+            "timestamp": "2024-01-02",
+            "ema": 102.3,
+            "close": 105,
+        },
+        {
+            "id": 1,
+            "tf": "1D",
+            "period": 10,
+            "timestamp": "2024-01-03",
+            "ema": 104.8,
+            "close": 110,
+        },
+    ]
+
+
+@pytest.fixture
+def mock_engine():
+    """Mock SQLAlchemy engine for unit tests."""
+    from unittest.mock import Mock
+
+    engine = Mock()
+    return engine
