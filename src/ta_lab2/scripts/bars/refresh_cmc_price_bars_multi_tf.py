@@ -78,6 +78,10 @@ from ta_lab2.scripts.bars.common_snapshot_contract import (
     load_last_snapshot_info_for_id_tfs,
     # CLI parsing utility (extracted)
     create_bar_builder_argument_parser,
+    # Reject table utilities (GAP-C01)
+    create_rejects_table_ddl,
+    log_to_rejects,
+    detect_ohlc_violations,
 )
 from ta_lab2.orchestration import (
     MultiprocessingOrchestrator,
@@ -94,6 +98,49 @@ DEFAULT_BARS_TABLE = "public.cmc_price_bars_multi_tf"
 DEFAULT_STATE_TABLE = "public.cmc_price_bars_multi_tf_state"
 DEFAULT_TZ = "America/New_York"
 _ONE_MS = pd.Timedelta(milliseconds=1)
+
+# Module-level state for reject logging (set by main())
+_KEEP_REJECTS = False
+_REJECTS_TABLE = None
+_DB_URL = None
+
+
+# =============================================================================
+# Reject logging helper
+# =============================================================================
+
+
+def _log_ohlc_violations(out: pd.DataFrame) -> None:
+    """
+    Log OHLC violations from DataFrame to rejects table (if enabled).
+
+    Called before enforce_ohlc_sanity to capture original invalid values.
+    """
+    if not _KEEP_REJECTS or not _REJECTS_TABLE or not _DB_URL:
+        return
+
+    rejects = []
+    for _, row in out.iterrows():
+        violations = detect_ohlc_violations(row.to_dict())
+        for vtype, raction in violations:
+            rejects.append(
+                {
+                    "id": row["id"],
+                    "tf": row["tf"],
+                    "bar_seq": row["bar_seq"],
+                    "timestamp": row["timestamp"],
+                    "violation_type": vtype,
+                    "repair_action": raction,
+                    "original_open": row["open"],
+                    "original_high": row["high"],
+                    "original_low": row["low"],
+                    "original_close": row["close"],
+                }
+            )
+    if rejects:
+        engine = get_engine(_DB_URL)
+        log_to_rejects(engine, _REJECTS_TABLE, rejects)
+
 
 # =============================================================================
 # TF selection (from dim_timeframe)
@@ -309,6 +356,7 @@ def build_snapshots_for_id_polars(
     out = compact_output_types(out)
 
     out = normalize_output_schema(out)
+    _log_ohlc_violations(out)  # Log violations before repair
     out = enforce_ohlc_sanity(out)
     return out
 
@@ -437,6 +485,7 @@ def build_snapshots_for_id(
     )
 
     out = normalize_output_schema(out)
+    _log_ohlc_violations(out)  # Log violations before repair
     out = enforce_ohlc_sanity(out)
     return out
 
@@ -734,6 +783,7 @@ def _append_incremental_rows_for_id_tf(
 
     df_out = pd.DataFrame(new_rows)
     df_out = normalize_output_schema(df_out)
+    _log_ohlc_violations(df_out)  # Log violations before repair
     df_out = enforce_ohlc_sanity(df_out)
     return df_out
 
@@ -1406,8 +1456,18 @@ def main(argv: Sequence[str] | None = None) -> None:
         include_fail_on_gaps=False,
     )
 
-    # Add builder-specific argument
+    # Add builder-specific arguments
     ap.add_argument("--include-non-canonical", action="store_true")
+    ap.add_argument(
+        "--keep-rejects",
+        action="store_true",
+        help="Log OHLC violations to rejects table before repair",
+    )
+    ap.add_argument(
+        "--rejects-table",
+        default="cmc_price_bars_multi_tf_rejects",
+        help="Table name for rejects (default: cmc_price_bars_multi_tf_rejects)",
+    )
 
     args = ap.parse_args(list(argv) if argv is not None else None)
 
@@ -1420,6 +1480,20 @@ def main(argv: Sequence[str] | None = None) -> None:
         db_url=db_url, include_non_canonical=args.include_non_canonical
     )
     print(f"[bars_multi_tf] TF list size={len(tf_list)}: {[t for _, t in tf_list]}")
+
+    # Set module-level state for reject logging
+    global _KEEP_REJECTS, _REJECTS_TABLE, _DB_URL
+    _KEEP_REJECTS = args.keep_rejects
+    _REJECTS_TABLE = args.rejects_table
+    _DB_URL = db_url
+
+    # Create rejects table if --keep-rejects flag is set
+    if args.keep_rejects:
+        ddl = create_rejects_table_ddl(args.rejects_table, schema="public")
+        engine = get_engine(db_url)
+        with engine.begin() as conn:
+            conn.execute(text(ddl))
+        print(f"[bars_multi_tf] Reject logging enabled: table={args.rejects_table}")
 
     if args.full_rebuild:
         refresh_full_rebuild(
