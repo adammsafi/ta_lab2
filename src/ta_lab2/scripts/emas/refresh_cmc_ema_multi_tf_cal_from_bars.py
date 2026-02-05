@@ -188,17 +188,10 @@ class CalEMARefresher(BaseEMARefresher):
     @classmethod
     def create_argument_parser(cls) -> argparse.ArgumentParser:
         """Create argument parser with calendar-specific arguments."""
-        p = argparse.ArgumentParser(
+        # Use base parser to get standardized arguments including validation
+        p = cls.create_base_argument_parser(
             description="Refresh calendar-aligned EMAs (US/ISO schemes) - refactored.",
         )
-
-        # Add base arguments manually
-        p.add_argument("--db-url", default=None)
-        p.add_argument("--ids", default="all")
-        p.add_argument("--periods", default=None)
-        p.add_argument("--schema", default="public")
-        p.add_argument("--full-refresh", action="store_true")
-        p.add_argument("--num-processes", type=int, default=None)
 
         # Calendar-specific arguments
         p.add_argument(
@@ -207,15 +200,15 @@ class CalEMARefresher(BaseEMARefresher):
             choices=["us", "iso", "both"],
             help="Calendar scheme: us, iso, or both. Default: us",
         )
+        p.add_argument(
+            "--schema",
+            default="public",
+            help="Schema for output tables (default: public)",
+        )
         p.add_argument("--out-us", default="cmc_ema_multi_tf_cal_us")
         p.add_argument("--out-iso", default="cmc_ema_multi_tf_cal_iso")
         p.add_argument("--alpha-schema", default="public")
         p.add_argument("--alpha-table", default="ema_alpha_lookup")
-
-        # Logging arguments
-        from ta_lab2.scripts.emas.logging_config import add_logging_args
-
-        add_logging_args(p)
 
         return p
 
@@ -264,6 +257,8 @@ class CalEMARefresher(BaseEMARefresher):
             log_file=args.log_file,
             quiet=args.quiet,
             debug=args.debug,
+            validate_output=args.validate_output,
+            ema_rejects_table=args.ema_rejects_table,
             extra_config={},
         )
 
@@ -298,6 +293,8 @@ class CalEMARefresher(BaseEMARefresher):
             log_file=args.log_file,
             quiet=args.quiet,
             debug=args.debug,
+            validate_output=args.validate_output,
+            ema_rejects_table=args.ema_rejects_table,
             extra_config={
                 "scheme": scheme,
                 "schema": args.schema,

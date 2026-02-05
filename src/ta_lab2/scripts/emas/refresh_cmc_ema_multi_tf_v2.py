@@ -193,19 +193,16 @@ class V2EMARefresher(BaseEMARefresher):
     @classmethod
     def create_argument_parser(cls) -> argparse.ArgumentParser:
         """Create argument parser with V2-specific arguments."""
-        p = argparse.ArgumentParser(
+        # Use base parser to get standardized arguments including validation
+        p = cls.create_base_argument_parser(
             description="Refresh cmc_ema_multi_tf_v2 from 1D bars (refactored).",
         )
 
-        # Add base arguments manually
-        p.add_argument("--db-url", default=None)
-        p.add_argument("--ids", default="all")
-        p.add_argument("--periods", default=None)
-        p.add_argument("--out-schema", default="public")
-        p.add_argument("--out-table", default="cmc_ema_multi_tf_v2")
-        p.add_argument("--state-table", default="cmc_ema_multi_tf_v2_state")
-        p.add_argument("--full-refresh", action="store_true")
-        p.add_argument("--num-processes", type=int, default=None)
+        # Override defaults for this script
+        p.set_defaults(
+            out_table="cmc_ema_multi_tf_v2",
+            state_table="cmc_ema_multi_tf_v2_state",
+        )
 
         # V2-specific arguments
         p.add_argument(
@@ -224,11 +221,6 @@ class V2EMARefresher(BaseEMARefresher):
             default="cmc_price_bars_1d",
             help="1D bars table (validated data). Default: cmc_price_bars_1d",
         )
-
-        # Logging arguments
-        from ta_lab2.scripts.emas.logging_config import add_logging_args
-
-        add_logging_args(p)
 
         return p
 
@@ -257,6 +249,8 @@ class V2EMARefresher(BaseEMARefresher):
             log_file=args.log_file,
             quiet=args.quiet,
             debug=args.debug,
+            validate_output=args.validate_output,
+            ema_rejects_table=args.ema_rejects_table,
             extra_config={
                 "alignment_type": args.alignment_type,
                 "canonical_only": canonical_only,
@@ -296,6 +290,8 @@ class V2EMARefresher(BaseEMARefresher):
             log_file=args.log_file,
             quiet=args.quiet,
             debug=args.debug,
+            validate_output=args.validate_output,
+            ema_rejects_table=args.ema_rejects_table,
             extra_config={
                 "alignment_type": args.alignment_type,
                 "canonical_only": canonical_only,
