@@ -372,12 +372,13 @@ Plans:
   3. One command handles daily refresh with meaningful log output
   4. State management patterns documented and consistent across scripts
   5. Logs show what was processed (X days, Y bars, Z EMAs, N gaps flagged)
-**Plans**: TBD
+**Plans**: 4 plans in 3 waves
 
 Plans:
-- [ ] 23-01: Analyze state management patterns across scripts (STAT-01)
-- [ ] 23-02: Build flexible orchestration with modular separation (ORCH-01 to ORCH-04)
-- [ ] 23-03: Standardize state management and visibility (STAT-02 to STAT-04, VISI-01 to VISI-03)
+- [ ] 23-01-PLAN.md - Enhance EMA orchestrator (subprocess, dry-run, summary reporting)
+- [ ] 23-02-PLAN.md - Unified daily refresh script (run_daily_refresh.py with state coordination)
+- [ ] 23-03-PLAN.md - Makefile and log infrastructure (convenience targets, daily logs, alerting)
+- [ ] 23-04-PLAN.md - Documentation (state management patterns, operational guide)
 
 ---
 
@@ -471,7 +472,7 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19
 | 20. Historical Context | 3/3 | Complete | 2026-02-05 |
 | 21. Comprehensive Review | 4/4 | Complete | 2026-02-05 |
 | 22. Critical Data Quality Fixes | 6/6 | Complete | 2026-02-05 |
-| 23. Reliable Incremental Refresh | 0/3 | Not started | - |
+| 23. Reliable Incremental Refresh | 0/4 | Not started | - |
 | 24. Pattern Consistency | 0/1 | Not started | - |
 | 25. Baseline Capture | 0/1 | Not started | - |
 | 26. Validation | 0/3 | Not started | - |
@@ -497,4 +498,4 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-05 (Phase 22 complete: All 4 CRITICAL gaps fixed + derivation architecture)*
+*Last updated: 2026-02-05 (Phase 23 planned: 4 plans in 3 waves)*
