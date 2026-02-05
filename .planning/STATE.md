@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 ## Current Position
 
 Phase: 25 of 26 (Baseline Capture)
-Plan: 1 of 2 in current phase
-Status: In progress
-Last activity: 2026-02-05 — Completed 25-01-PLAN.md
+Plan: 2 of 2 in current phase
+Status: Phase complete
+Last activity: 2026-02-05 — Completed 25-02-PLAN.md
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [#########-] 71% v0.6.0 (5/7 phases)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 86% v0.6.0 (6/7 phases)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 138 (56 in v0.4.0, 56 in v0.5.0, 26 in v0.6.0)
+- Total plans completed: 139 (56 in v0.4.0, 56 in v0.5.0, 27 in v0.6.0)
 - Average duration: 7 min
-- Total execution time: 26.12 hours
+- Total execution time: 26.20 hours
 
 **By Phase (v0.4.0):**
 
@@ -55,7 +55,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [#########-] 71%
 **Recent Trend:**
 - v0.4.0 complete: 10 phases, 56 plans, 12.55 hours total
 - v0.5.0 complete: 9 phases, 56 plans, 9.85 hours total
-- v0.6.0 in progress: 25/? plans complete - 5 of 7 phases complete
+- v0.6.0 in progress: 27/? plans complete - 6 of 7 phases complete
 
 **By Phase (v0.6.0):**
 
@@ -66,7 +66,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [#########-] 71%
 | 22-critical-data-quality-fixes | 6/6 | 82 min | 14 min | Complete |
 | 23-reliable-incremental-refresh | 4/4 | 17 min | 4 min | Complete |
 | 24-pattern-consistency | 4/4 | 40 min | 10 min | Complete |
-| 25-baseline-capture | 1/2 | 6 min | 6 min | In progress |
+| 25-baseline-capture | 2/2 | 11 min | 6 min | Complete |
 
 *Updated after each plan completion*
 
@@ -105,6 +105,10 @@ Recent decisions affecting current work:
 - **Column-specific tolerances** (Phase 25-01): Price (1e-6/1e-5) vs volume (1e-2/1e-4) - different data types need different precision requirements
 - **NaN == NaN is match** (Phase 25-01): Treat NaN == NaN as match using equal_nan=True to avoid SQL NULL semantics issues (NULL != NULL)
 - **Git-based audit trail for baseline capture** (Phase 25-01): Capture git commit hash + timestamp + config in BaselineMetadata for full reproducibility 3 months later
+- **Snapshot -> Truncate -> Rebuild -> Compare workflow** (Phase 25-02): Atomic validation pattern proves refactoring correctness by comparing identical input → output transformations
+- **Intelligent sampling (beginning/end/random)** (Phase 25-02): 30 days beginning + 30 days end + 5% random interior balances speed and confidence - detects temporal drift while avoiding full table scans
+- **Never fail early in baseline capture** (Phase 25-02): Always run to completion, report ALL issues - partial results hide systemic problems
+- **Subprocess isolation for baseline workflow** (Phase 25-02): Run bar builders and EMA refreshers via subprocess.run matching Phase 23 patterns (run_daily_refresh.py)
 
 ### Pending Todos
 
@@ -117,7 +121,7 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-05
-Stopped at: Completed 25-01-PLAN.md
+Stopped at: Completed 25-02-PLAN.md (Phase 25 complete)
 Resume file: None
 
 ---
@@ -143,4 +147,4 @@ Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-05 (Completed 25-01: Baseline Capture Infrastructure - dim_assets DDL, epsilon-aware comparison with NumPy allclose, metadata tracker for git-based audit trail)*
+*Last updated: 2026-02-05 (Completed 25-02: Orchestration Script - capture_baseline.py implementing Snapshot → Truncate → Rebuild → Compare workflow with intelligent sampling and Phase 23 subprocess patterns)*
