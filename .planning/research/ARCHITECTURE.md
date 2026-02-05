@@ -1,879 +1,554 @@
-# Architecture Research: Ecosystem Reorganization
+# Architecture Research: Review & Standardization of Data Pipeline Scripts
 
-**Domain:** Python monorepo consolidation (quantitative trading platform)
-**Researched:** 2026-02-02
+**Domain:** Data Pipeline Standardization (ETL/ELT)
+**Researched:** 2026-02-05
 **Confidence:** HIGH
 
-## Executive Summary
+## Standard Architecture for Review & Standardization Work
 
-This research addresses how to consolidate 4 external directories (ProjectTT documentation, Data_Tools scripts, fredtools2/fedtools2 economic data packages) into the existing ta_lab2 v0.4.0 architecture without deletion, maintaining git history, and ensuring import validation.
-
-The recommended approach follows 2026 Python monorepo best practices with phased integration: (1) archive management for backup artifacts, (2) documentation consolidation using centralized knowledge base patterns, (3) tools integration as internal utilities, and (4) economic data packages as optional dependencies with clear integration boundaries.
-
-**Critical Finding:** Modern Python monorepos (2026) favor living-at-HEAD with editable installs, atomic changes, and workspace-level dependency management. The ta_lab2 src layout provides strong foundation for this consolidation.
-
-## Current Architecture (Baseline)
-
-### Existing ta_lab2 v0.4.0 Structure
+### System Overview
 
 ```
-ta_lab2/
-├── src/ta_lab2/              # Main package (src layout)
-│   ├── features/             # Technical indicators (EMAs, RSI, ATR)
-│   ├── signals/              # Trading signal generators
-│   ├── regimes/              # Market regime detection
-│   ├── backtests/            # Backtesting engines
-│   ├── pipelines/            # Orchestration workflows
-│   ├── scripts/              # Executable data processing
-│   │   ├── bars/             # Price bar refresh
-│   │   ├── emas/             # EMA calculation
-│   │   ├── pipeline/         # Daily refresh orchestration
-│   │   └── etl/              # ETL tasks
-│   ├── tools/                # Database utilities (existing)
-│   │   ├── ai_orchestrator/  # AI coordination system
-│   │   ├── dbtool.py         # DB maintenance
-│   │   └── snapshot_diff.py  # Snapshot comparison
-│   ├── time/                 # Time dimension (sessions, calendars)
-│   ├── observability/        # Metrics, tracing, health
-│   └── viz/                  # Visualization
-├── .planning/                # GSD workflow (phases, research, codebase docs)
-├── docs/                     # Documentation (existing)
-│   ├── api/                  # API reference
-│   ├── cheatsheets/          # Quick reference guides
-│   ├── ops/                  # Operational docs
-│   ├── qa/                   # QA documentation
-│   ├── time/                 # Time model docs
-│   └── *.md                  # Root-level docs (DESIGN.md, deployment.md)
-├── tests/                    # Test suite
-└── sql/                      # Database DDL and migrations
+┌─────────────────────────────────────────────────────────────────────┐
+│                     REVIEW LAYER (Read-Only)                         │
+├─────────────────────────────────────────────────────────────────────┤
+│  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐   │
+│  │  Inventory │  │  Schemas   │  │ Data Flow  │  │  Helpers/  │   │
+│  │  Scripts   │  │  & Tables  │  │  Patterns  │  │  Contracts │   │
+│  └──────┬─────┘  └──────┬─────┘  └──────┬─────┘  └──────┬─────┘   │
+│         │                │                │                │         │
+│         └────────────────┴────────────────┴────────────────┘         │
+│                              ▼                                       │
+├─────────────────────────────────────────────────────────────────────┤
+│                    ANALYSIS LAYER (Document)                         │
+├─────────────────────────────────────────────────────────────────────┤
+│  ┌──────────────────────────────────────────────────────────────┐  │
+│  │  Findings Documents + Code Annotations                        │  │
+│  │  - Gap analysis                                                │  │
+│  │  - Inconsistency catalog                                       │  │
+│  │  - Integration point map                                       │  │
+│  │  - Dependency graph                                            │  │
+│  └───────────────────────────┬──────────────────────────────────┘  │
+│                               ▼                                      │
+├─────────────────────────────────────────────────────────────────────┤
+│                  STANDARDIZATION LAYER (Fix & Unify)                │
+├─────────────────────────────────────────────────────────────────────┤
+│  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐   │
+│  │ Data Source│  │  Patterns  │  │  Schemas   │  │    Code    │   │
+│  │   Fixes    │  │  Alignment │  │  Alignment │  │  Comments  │   │
+│  └────────────┘  └────────────┘  └────────────┘  └────────────┘   │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-**Strengths:**
-- Src layout (testing against installed package, not working directory)
-- Clear separation: features → signals → backtests → observability
-- Database-driven configuration (dim_timeframe, dim_sessions, dim_signals)
-- State management for incremental refresh (watermarks per entity)
-- Existing tools/ namespace for utilities
+### Component Responsibilities
 
-**Integration Capacity:**
-- tools/ can absorb utility scripts without structural change
-- docs/ has subcategories ready for consolidation
-- src layout protects against import confusion during migration
-- .planning/ provides research/decision documentation home
+| Component | Responsibility | Typical Implementation |
+|-----------|----------------|------------------------|
+| Inventory Scripts | Enumerate all scripts, tables, helpers, contracts, orchestrators | File system scan + manual grouping |
+| Schemas & Tables | Document table schemas, constraints, naming conventions, quality flags | Database introspection + DDL review |
+| Data Flow Patterns | Map source → intermediate → target flow, identify validation points | Code inspection + state table analysis |
+| Helpers/Contracts | Identify shared utilities, document interfaces, find duplication | AST analysis + manual review |
+| Analysis Documents | Structured findings (gaps, inconsistencies, dependencies) | Markdown documents with references |
+| Data Source Fixes | Update scripts to use validated sources (bars not raw data) | Code modifications with tests |
+| Pattern Alignment | Standardize data loading, validation, state management | Extract to shared modules |
+| Schema Alignment | Consistent naming, constraints, quality flags across tables | DDL updates + migration scripts |
+| Code Comments | Annotate complex logic, document assumptions, flag TODOs | Inline docstrings + comments |
 
-## Directories to Integrate
-
-### 1. ProjectTT (Documentation Archive)
-
-**Content Type:** Excel/Word documentation (domain knowledge, legacy specs)
-**Format:** Binary files (.xlsx, .docx)
-**Purpose:** Historical reference, domain expertise capture
-
-**Integration Challenges:**
-- Binary formats not git-friendly for diffs
-- May contain sensitive information (trading strategies, API keys)
-- Excel as computation tool vs documentation artifact
-
-**Recommended Strategy:** Archive with conversion
-- Extract text-based content (convert to Markdown where possible)
-- Preserve originals in .archive/ for reference
-- Index key information in docs/ with pointers to archive
-
-### 2. Data_Tools (Python Utility Scripts)
-
-**Content Type:** Python scripts for data manipulation
-**Likely Contents:** ETL helpers, data validation, ad-hoc analysis scripts
-**Current Status:** Standalone directory outside ta_lab2 package
-
-**Integration Challenges:**
-- Unknown import structure (standalone vs package-aware)
-- Potential hardcoded paths or environment assumptions
-- May have overlapping functionality with ta_lab2.scripts/
-
-**Recommended Strategy:** Merge into ta_lab2.tools/ with triage
-- Audit for overlap with existing scripts/tools
-- Convert standalone scripts to package-aware imports
-- Deprecate duplicates, integrate unique capabilities
-
-### 3. fredtools2 (FRED API Package)
-
-**Content Type:** Proper Python package with src/ structure
-**Purpose:** Federal Reserve Economic Data API integration
-**Standard Pattern:** Wrapper around FRED API (similar to fredapi, pyfredapi)
-
-**Integration Challenges:**
-- Already a proper package (has src/ structure)
-- May have own pyproject.toml with dependencies
-- Unclear if used by ta_lab2 currently
-
-**Recommended Strategy:** Optional dependency with namespace preservation
-- Keep as separate package in monorepo (monorepo doesn't mean one package)
-- Reference as path dependency in ta_lab2's pyproject.toml (optional group)
-- Install editable for local development: `pip install -e ./lib/fredtools2`
-
-### 4. fedtools2 (Fed Funds ETL Package)
-
-**Content Type:** Fed funds rate ETL pipeline
-**Purpose:** Federal funds rate data extraction, transformation, loading
-**Relationship:** Likely companion to fredtools2 (specific use case)
-
-**Integration Challenges:**
-- Similar to fredtools2 (proper package structure)
-- May share code with fredtools2 (consider merging)
-- Specialized use case (Fed funds vs general FRED data)
-
-**Recommended Strategy:** Evaluate merge vs separate
-- Assess code overlap with fredtools2
-- If <30% code sharing, keep separate with path dependency
-- If >30% overlap, merge into fredtools2.fedfunds submodule
-
-## Recommended Integration Architecture
-
-### Phase 1: Archive Management
-
-**Create .archive/ structure for deprecated/backup artifacts**
+## Recommended Project Structure for Review Work
 
 ```
-ta_lab2/
-└── .archive/
-    ├── 00-README.md           # Index of archive contents
-    ├── code/                  # Deprecated code (*.original, *_refactored.py)
-    │   ├── bars/              # Old bar builder implementations
-    │   ├── emas/              # Old EMA calculation variants
-    │   └── features/          # Deprecated feature implementations
-    ├── docs/                  # Historical documentation
-    │   └── ProjectTT/         # ProjectTT documentation archive
-    │       ├── 00-INDEX.md    # Catalog of documents
-    │       ├── original/      # Unmodified Excel/Word files
-    │       └── converted/     # Markdown conversions
-    ├── notebooks/             # Research notebooks (if any)
-    └── configs/               # Old configuration files
+.planning/
+├── research/                  # This directory
+│   ├── ARCHITECTURE.md        # This file
+│   ├── SUMMARY.md             # Executive summary
+│   ├── STACK.md               # Technology decisions
+│   ├── FEATURES.md            # Feature landscape
+│   └── PITFALLS.md            # Domain pitfalls
+│
+└── phases/
+    └── [milestone-name]/
+        ├── review/            # Phase 1: Review outputs
+        │   ├── 01-inventory.md           # What exists
+        │   ├── 02-schema-analysis.md     # Table structure
+        │   ├── 03-data-flow.md           # How data moves
+        │   ├── 04-helpers-contracts.md   # Shared code
+        │   ├── 05-gap-analysis.md        # What's missing
+        │   └── 06-integration-points.md  # Where consistency matters
+        │
+        └── standardization/   # Phase 2: Fix outputs
+            ├── 01-data-sources.md        # Fix EMA → bars
+            ├── 02-patterns.md            # Standardize loading/validation
+            ├── 03-schemas.md             # Align table structure
+            └── 04-annotations.md         # Code documentation
 ```
 
-**Archival Rules:**
-1. Nothing deleted from git history (preserve all commits)
-2. Move to .archive/ with git mv (preserves history)
-3. Create index files (00-README.md, 00-INDEX.md) for discoverability
-4. Add .gitattributes rules for binary files (LFS if >100MB)
+### Structure Rationale
 
-**What to Archive:**
-- `*.original` files (backup artifacts scattered in src/)
-- `*_refactored.py` files after integration validation
-- Root directory clutter (temp scripts, test files)
-- ProjectTT documentation (after extraction to docs/)
+- **`.planning/research/`:** Domain-level research (applies to all milestones)
+- **`.planning/phases/[milestone]/review/`:** Read-only analysis outputs
+- **`.planning/phases/[milestone]/standardization/`:** Implementation plans for fixes
+- **Separation of concerns:** Review (understand) before standardization (change)
+- **Traceability:** Each standardization document references review findings
 
-### Phase 2: Documentation Consolidation
+## Architectural Patterns for Review & Standardization
 
-**Integrate ProjectTT into docs/ with unified taxonomy**
+### Pattern 1: Inventory-First Discovery
 
-```
-ta_lab2/
-└── docs/
-    ├── index.md               # Central hub (enhanced with ProjectTT content)
-    ├── api/                   # API reference (existing)
-    ├── architecture/          # NEW: Architecture documentation
-    │   ├── overview.md        # System architecture
-    │   ├── feature-pipeline.md
-    │   ├── signal-system.md
-    │   └── time-model.md
-    ├── domain/                # NEW: Domain knowledge from ProjectTT
-    │   ├── strategies/        # Trading strategy documentation
-    │   │   ├── ema-crossover.md
-    │   │   ├── rsi-mean-revert.md
-    │   │   └── atr-breakout.md
-    │   ├── indicators/        # Indicator definitions
-    │   │   ├── ema.md
-    │   │   ├── rsi.md
-    │   │   └── atr.md
-    │   └── markets/           # Market structure, sessions, hours
-    │       ├── crypto.md
-    │       └── equity.md
-    ├── ops/                   # Operational docs (existing, enhanced)
-    │   ├── daily-refresh.md
-    │   ├── backtest-workflow.md
-    │   └── troubleshooting.md
-    ├── migration/             # NEW: Migration and reorganization docs
-    │   ├── v0.5-reorganization.md  # This milestone
-    │   └── archived-content.md     # Index to .archive/
-    └── external/              # NEW: External package integration
-        ├── fredtools2.md      # FRED API usage
-        └── fedtools2.md       # Fed funds integration
-```
+**What:** Enumerate all components before analyzing relationships
 
-**Documentation Consolidation Pattern:**
-1. **Audit Phase:** Inventory ProjectTT content (Excel sheets → topics, Word docs → sections)
-2. **Extraction Phase:** Convert binary to Markdown (pandoc for Word, manual for Excel)
-3. **Taxonomy Phase:** Map content to docs/ structure (domain/, architecture/, ops/)
-4. **Integration Phase:** Create unified index (docs/index.md links to all sections)
-5. **Archive Phase:** Move originals to .archive/docs/ProjectTT/original/
-
-**Unified Style Guide:**
-- Markdown for all text content (consistency with existing docs/)
-- Code examples use python syntax highlighting
-- Inline links to source code (e.g., `src/ta_lab2/features/ema.py`)
-- Versioned documentation (tag with v0.5.0 for reorganization)
-
-### Phase 3: Tools Integration
-
-**Merge Data_Tools into ta_lab2.tools/ with namespace organization**
-
-```
-ta_lab2/
-└── src/ta_lab2/tools/
-    ├── __init__.py            # Export public tools API
-    ├── ai_orchestrator/       # Existing: AI coordination
-    ├── dbtool.py              # Existing: Database utilities
-    ├── snapshot_diff.py       # Existing: Snapshot comparison
-    ├── data_tools/            # NEW: Migrated from Data_Tools/
-    │   ├── __init__.py        # Expose data manipulation utilities
-    │   ├── validators/        # Data validation scripts
-    │   │   ├── schema_check.py
-    │   │   └── integrity_check.py
-    │   ├── transforms/        # Data transformation utilities
-    │   │   ├── normalizer.py
-    │   │   └── aggregator.py
-    │   ├── exporters/         # Data export helpers
-    │   │   ├── csv_export.py
-    │   │   └── parquet_export.py
-    │   └── legacy/            # Scripts needing refactor
-    │       └── 00-README.md   # Migration status tracker
-    └── cli/                   # NEW: Unified CLI for tools
-        ├── __init__.py
-        ├── data_tools_cli.py  # Data_Tools commands
-        └── orchestrator_cli.py # AI orchestrator commands (moved)
-```
-
-**Migration Strategy:**
-1. **Audit Phase:** Inventory Data_Tools scripts, identify dependencies
-2. **Categorize Phase:** Group by function (validators, transforms, exporters)
-3. **Refactor Phase:** Update imports to use ta_lab2 namespace
-   - Change: `from data_utils import X` → `from ta_lab2.tools.data_tools import X`
-4. **Test Phase:** Validate imports work after migration
-5. **Deprecate Phase:** Add deprecation warnings to old paths (if discoverable)
-
-**Import Validation Pattern:**
-```python
-# In ta_lab2/tools/data_tools/__init__.py
-from .validators import schema_check, integrity_check
-from .transforms import normalizer, aggregator
-from .exporters import csv_export, parquet_export
-
-__all__ = [
-    "schema_check",
-    "integrity_check",
-    "normalizer",
-    "aggregator",
-    "csv_export",
-    "parquet_export"
-]
-```
-
-**Testing Strategy:**
-```python
-# tests/tools/test_data_tools_imports.py
-def test_data_tools_namespace():
-    """Validate all data_tools utilities are importable."""
-    from ta_lab2.tools.data_tools import (
-        schema_check,
-        integrity_check,
-        normalizer,
-        aggregator,
-    )
-    assert callable(schema_check)
-    assert callable(integrity_check)
-```
-
-### Phase 4: Economic Data Packages
-
-**Monorepo structure with separate packages and path dependencies**
-
-```
-ta_lab2/
-├── src/ta_lab2/              # Main package (unchanged)
-├── lib/                      # NEW: Shared libraries (monorepo pattern)
-│   ├── fredtools2/           # FRED API wrapper
-│   │   ├── pyproject.toml    # Own dependencies (requests, pandas)
-│   │   ├── src/
-│   │   │   └── fredtools2/
-│   │   │       ├── __init__.py
-│   │   │       ├── client.py
-│   │   │       ├── series.py
-│   │   │       └── categories.py
-│   │   ├── tests/
-│   │   └── README.md
-│   └── fedtools2/            # Fed funds ETL (or merge into fredtools2)
-│       ├── pyproject.toml
-│       ├── src/
-│       │   └── fedtools2/
-│       │       ├── __init__.py
-│       │       ├── etl.py
-│       │       └── pipeline.py
-│       ├── tests/
-│       └── README.md
-├── pyproject.toml            # Root workspace manifest (NEW)
-└── uv.lock                   # Unified lock file (NEW, if using uv)
-```
-
-**Root pyproject.toml (Workspace Configuration):**
-```toml
-[tool.uv.workspace]
-members = [
-    "src/ta_lab2",
-    "lib/fredtools2",
-    "lib/fedtools2"
-]
-
-[project]
-name = "ta_lab2-workspace"
-version = "0.5.0"
-
-[project.optional-dependencies]
-economic-data = [
-    "fredtools2",
-    "fedtools2"
-]
-```
-
-**ta_lab2 pyproject.toml (Main Package):**
-```toml
-[project]
-name = "ta_lab2"
-version = "0.5.0"
-
-[project.optional-dependencies]
-economic-data = [
-    "fredtools2 @ file:///${PROJECT_ROOT}/lib/fredtools2",
-    "fedtools2 @ file:///${PROJECT_ROOT}/lib/fedtools2"
-]
-
-# Install with: pip install -e ".[economic-data]"
-```
-
-**Integration Pattern (Optional Dependency):**
-```python
-# In ta_lab2/scripts/etl/fetch_fred_data.py
-try:
-    from fredtools2 import FredClient
-    FRED_AVAILABLE = True
-except ImportError:
-    FRED_AVAILABLE = False
-
-def fetch_unemployment_rate():
-    if not FRED_AVAILABLE:
-        raise RuntimeError(
-            "fredtools2 not installed. "
-            "Install with: pip install -e '.[economic-data]'"
-        )
-    client = FredClient(api_key=os.getenv("FRED_API_KEY"))
-    return client.get_series("UNRATE")
-```
-
-**Decision Matrix: Merge vs Separate**
-
-| Criterion | Merge into fredtools2 | Keep Separate |
-|-----------|----------------------|---------------|
-| Code overlap | >30% shared code | <30% shared code |
-| Dependencies | Identical deps | Different deps |
-| Release cycle | Same cadence | Independent updates |
-| API surface | Cohesive single API | Distinct use cases |
-
-**Recommendation:** Start separate, merge later if overlap discovered
-
-## Integration Points
-
-### A. Archive → Documentation Flow
-
-```
-ProjectTT/strategy_notes.docx
-    ↓ (pandoc conversion)
-docs/domain/strategies/ema-crossover.md
-    ↓ (git mv original)
-.archive/docs/ProjectTT/original/strategy_notes.docx
-    ↓ (index update)
-.archive/docs/ProjectTT/00-INDEX.md (new entry)
-```
-
-### B. Data_Tools → ta_lab2.tools Flow
-
-```
-Data_Tools/validate_bars.py
-    ↓ (refactor imports)
-src/ta_lab2/tools/data_tools/validators/bar_validator.py
-    ↓ (expose in __init__)
-ta_lab2.tools.data_tools.validators.bar_validator
-    ↓ (test import)
-tests/tools/test_bar_validator.py (validates import works)
-```
-
-### C. Economic Packages → Optional Dependency Flow
-
-```
-fredtools2/ (standalone)
-    ↓ (move to lib/)
-lib/fredtools2/ (monorepo package)
-    ↓ (add to workspace)
-pyproject.toml [tool.uv.workspace] members
-    ↓ (install editable)
-pip install -e ./lib/fredtools2
-    ↓ (import in ta_lab2)
-ta_lab2.scripts.etl.fetch_fred_data imports fredtools2
-    ↓ (graceful degradation)
-ImportError → helpful message with install command
-```
-
-### D. Root Cleanup → Archive Flow
-
-```
-Root directory clutter (run_btc.py, test_*.py, convert_*.py)
-    ↓ (categorize: scripts, tests, utilities)
-Categorize into: archive_scripts/, archive_tests/, archive_utils/
-    ↓ (git mv to .archive/)
-.archive/code/scripts/, .archive/code/tests/
-    ↓ (update .archive/00-README.md)
-Index with purpose, migration date, replacement location
-```
-
-## Component Responsibilities
-
-| Component | Responsibility | Integration Touch Points |
-|-----------|----------------|--------------------------|
-| **ta_lab2/** (main) | Core trading infrastructure | Imports from lib/ (optional), uses tools/ |
-| **lib/fredtools2** | FRED API client | Standalone, optional dependency of ta_lab2 |
-| **lib/fedtools2** | Fed funds ETL | Standalone, optional dependency of ta_lab2 |
-| **tools/data_tools** | Data manipulation utilities | Used by scripts/, pipelines/ |
-| **docs/** | Unified documentation | References .archive/, lib/ packages |
-| **.archive/** | Historical artifacts | Read-only reference, git history preserved |
-| **.planning/** | GSD workflow artifacts | Documents decisions, research, roadmap |
-
-## Data Flow
-
-### 1. Development Workflow (Post-Reorganization)
-
-```
-Developer checks out ta_lab2
-    ↓
-pip install -e . (installs ta_lab2 in editable mode)
-    ↓
-Optional: pip install -e ".[economic-data]" (installs lib packages)
-    ↓
-Import validation: python -c "import ta_lab2; import ta_lab2.tools.data_tools"
-    ↓
-Run tests: pytest tests/
-    ↓
-Verify imports work after reorganization
-```
-
-### 2. Documentation Lookup Flow
-
-```
-User seeks strategy documentation
-    ↓
-docs/index.md (central hub)
-    ↓
-docs/domain/strategies/ (consolidated content)
-    ↓
-If needs historical reference: docs/migration/archived-content.md
-    ↓
-.archive/docs/ProjectTT/original/ (original files)
-```
-
-### 3. Economic Data Integration Flow
-
-```
-ta_lab2 pipeline needs unemployment rate
-    ↓
-scripts/etl/fetch_fred_data.py
-    ↓
-Check if fredtools2 available (try import)
-    ↓
-If available: FredClient.get_series("UNRATE")
-    ↓
-If not available: Helpful error with install command
-    ↓
-Store in ta_lab2 database (integration complete)
-```
-
-### 4. Tool Discovery Flow
-
-```
-User needs data validation utility
-    ↓
-ta_lab2 CLI: python -m ta_lab2.tools.cli data-tools --list
-    ↓
-Discover: bar_validator, schema_check, integrity_check
-    ↓
-Run: python -m ta_lab2.tools.data_tools.validators.bar_validator --table cmc_price_bars_1d
-    ↓
-Validation report with metrics
-```
-
-## Architectural Patterns
-
-### Pattern 1: Graceful Optional Dependencies
-
-**What:** Import external packages with try/except, provide helpful errors
-
-**When to use:** Economic data packages (fredtools2, fedtools2) - not all users need them
+**When to use:** Starting a comprehensive review with unknown scope
 
 **Trade-offs:**
-- Pros: Minimal install, pay-for-what-you-use, clear error messages
-- Cons: Runtime detection (not install-time), needs documentation
+- **Pro:** Complete picture prevents missed dependencies
+- **Pro:** Enables batch analysis (vs iterative discovery)
+- **Con:** Can be time-consuming upfront
+- **Con:** May discover irrelevant code (old, unused)
 
 **Example:**
 ```python
-# ta_lab2/integrations/fred.py
-try:
-    from fredtools2 import FredClient
-    HAS_FRED = True
-except ImportError:
-    HAS_FRED = False
-    FredClient = None
-
-def get_fred_series(series_id: str, api_key: str):
-    """Fetch FRED series data.
-
-    Requires fredtools2 package:
-        pip install -e ".[economic-data]"
-    """
-    if not HAS_FRED:
-        raise ImportError(
-            "fredtools2 not available. "
-            "Install with: pip install -e '.[economic-data]'"
-        )
-    client = FredClient(api_key=api_key)
-    return client.get_series(series_id)
+# Inventory structure
+inventory = {
+    "bar_builders": {
+        "1d": "refresh_cmc_price_bars_1d.py",
+        "multi_tf": "refresh_cmc_price_bars_multi_tf.py",
+        # ... 5 total
+    },
+    "ema_calculators": {
+        "v1": "refresh_cmc_ema_multi_tf_from_bars.py",
+        "v2": "refresh_cmc_ema_multi_tf_v2.py",
+        "cal_us": "refresh_cmc_ema_multi_tf_cal_from_bars.py",
+        "cal_iso": "refresh_cmc_ema_multi_tf_cal_from_bars.py",
+        "cal_anchor_us": "refresh_cmc_ema_multi_tf_cal_anchor_from_bars.py",
+        "cal_anchor_iso": "refresh_cmc_ema_multi_tf_cal_anchor_from_bars.py",
+    },
+    "state_tables": ["..._state", "..._state", ...],
+    "helpers": ["common_snapshot_contract.py", "base_ema_refresher.py"],
+    "orchestrators": ["multiprocessing_orchestrator.py"],
+}
 ```
 
-### Pattern 2: Archive with Index
+### Pattern 2: Integration Point Mapping
 
-**What:** Move deprecated content to .archive/ with comprehensive indexes
+**What:** Identify where components interact and consistency is critical
 
-**When to use:** Deprecating code, consolidating documentation, cleaning root directory
+**When to use:** After inventory, before deep analysis
 
 **Trade-offs:**
-- Pros: Preserves git history, maintains discoverability, reduces clutter
-- Cons: Requires index maintenance, adds directory depth
+- **Pro:** Focuses effort on high-value areas (interfaces)
+- **Pro:** Reveals cascading dependencies early
+- **Con:** May overlook internal inconsistencies
+- **Con:** Requires understanding of data flow
 
 **Example:**
 ```markdown
-# .archive/00-README.md
+# Integration Point Map
 
-## Archive Organization
+## Critical Integration Points
+1. **Raw data → Bar tables**
+   - Source: price_histories7
+   - Validation: NOT NULL constraints, OHLC invariants
+   - Consumers: All 6 EMA calculators (MUST use bars, not raw)
 
-This directory preserves deprecated code and historical documentation.
-All content maintains full git history via `git mv`.
+2. **Bar tables → EMA tables**
+   - Source: cmc_price_bars_1d, cmc_price_bars_multi_tf_*
+   - State management: per (id, tf, period) watermarks
+   - Consumers: Features, signals, backtests
 
-### Code Archives
-- **code/bars/**: Deprecated bar builder implementations (pre-v0.4.0)
-  - Last used: 2026-01-15
-  - Replacement: `src/ta_lab2/scripts/bars/refresh_cmc_price_bars_1d.py`
-- **code/emas/**: Old EMA calculation variants
-  - Last used: 2026-01-20
-  - Replacement: `src/ta_lab2/features/m_tf/`
-
-### Documentation Archives
-- **docs/ProjectTT/**: Original Excel/Word documentation
-  - Consolidated into: `docs/domain/` (2026-02-02)
-  - Index: `.archive/docs/ProjectTT/00-INDEX.md`
+3. **State tables → Incremental refresh**
+   - Pattern: Load state → compute dirty window → update state
+   - Consistency: Unified schema (id, tf, period, timestamps, bar_seq)
 ```
 
-### Pattern 3: Namespace Preservation in Monorepo
+### Pattern 3: Gap Analysis with Severity Tiers
 
-**What:** Keep separate packages as separate namespaces, use path dependencies
+**What:** Categorize findings by impact and urgency
 
-**When to use:** Proper packages with distinct purposes (fredtools2, fedtools2)
+**When to use:** During analysis phase, before standardization planning
 
 **Trade-offs:**
-- Pros: Clear boundaries, independent versioning, testable in isolation
-- Cons: More complex dependency management, requires workspace tooling
+- **Pro:** Prioritizes work effectively
+- **Pro:** Allows incremental delivery (critical first)
+- **Con:** Subjective severity assessment
+- **Con:** May defer architectural debt
 
 **Example:**
-```python
-# Separate namespaces (NOT merged into ta_lab2)
-from fredtools2 import FredClient  # lib/fredtools2/
-from fedtools2 import FedFundsPipeline  # lib/fedtools2/
-from ta_lab2.tools.data_tools import schema_check  # merged into ta_lab2
+```markdown
+# Gap Analysis
 
-# Integration in ta_lab2 script
-def enrich_with_economic_data(df):
-    """Enrich price data with economic indicators."""
-    if HAS_FRED:
-        unemployment = get_fred_series("UNRATE", api_key)
-        df = df.merge(unemployment, on="date", how="left")
-    return df
+## CRITICAL (Breaks correctness)
+- [ ] EMA v2 uses price_histories7 directly (bypasses validation)
+- [ ] Inconsistent state table schemas (cal variants missing bar_seq)
+
+## HIGH (Creates maintenance burden)
+- [ ] Duplicate data loading logic across 6 EMA scripts
+- [ ] Inconsistent table naming (some _state, some _refresh_state)
+
+## MEDIUM (Quality/DX issues)
+- [ ] Missing code annotations in complex logic
+- [ ] No shared CLI parsing for EMA scripts
+
+## LOW (Nice-to-have)
+- [ ] Old scripts in /old folders (cleanup)
 ```
 
-### Pattern 4: Phased Migration with Validation Gates
+### Pattern 4: Review-Then-Standardize Phases
 
-**What:** Migrate incrementally with tests validating each phase completion
+**What:** Complete read-only review before making changes
 
-**When to use:** All integration phases (archives, docs, tools, packages)
+**When to use:** Large-scale standardization with many unknowns
 
 **Trade-offs:**
-- Pros: Safe incremental progress, clear rollback points, test coverage
-- Cons: Takes longer than big-bang migration
+- **Pro:** Prevents rework from incomplete understanding
+- **Pro:** Enables holistic standardization (not piecemeal)
+- **Con:** Delays visible progress (feels slow)
+- **Con:** Requires discipline to not fix during review
 
-**Example:**
-```python
-# tests/integration/test_phase2_docs_consolidated.py
-def test_projecttt_docs_consolidated():
-    """Validate ProjectTT documentation consolidated into docs/."""
-    docs_domain = Path("docs/domain")
-    assert docs_domain.exists(), "docs/domain/ should exist"
+**Key principle:** Resist the urge to fix issues discovered during review. Document them instead.
 
-    strategy_docs = list(docs_domain.glob("strategies/*.md"))
-    assert len(strategy_docs) >= 3, "Should have ≥3 strategy docs"
+### Pattern 5: Data Source Standardization First
 
-    archive_index = Path(".archive/docs/ProjectTT/00-INDEX.md")
-    assert archive_index.exists(), "Archive index should exist"
+**What:** Fix upstream dependencies before downstream patterns
 
-def test_data_tools_importable():
-    """Validate Data_Tools migrated and importable."""
-    from ta_lab2.tools.data_tools import (
-        schema_check,
-        integrity_check,
-        normalizer
-    )
-    assert callable(schema_check)
-    assert callable(integrity_check)
-    assert callable(normalizer)
+**When to use:** When correctness depends on data quality
+
+**Trade-offs:**
+- **Pro:** Prevents building on broken foundation
+- **Pro:** Downstream work can assume validated data
+- **Con:** May require coordination with data teams
+- **Con:** Can block other standardization work
+
+**Ordering rationale:**
 ```
+1. Data sources (bars → EMAs)      ← MUST fix first (correctness)
+2. State management (schemas)      ← Enables incremental refresh
+3. Loading patterns (shared utils) ← Reduces duplication
+4. Schema naming (cosmetic)        ← Last (low risk)
+```
+
+## Data Flow for Review & Standardization
+
+### Review Flow (Phase 1)
+
+```
+[Codebase]
+    ↓
+[File system scan] → [Inventory document]
+    ↓
+[DDL inspection] → [Schema analysis]
+    ↓
+[Code inspection] → [Data flow map]
+    ↓
+[AST analysis] → [Helper/contract catalog]
+    ↓
+[Cross-reference] → [Gap analysis]
+    ↓
+[Dependency graph] → [Integration point map]
+    ↓
+[Findings documents] (Read-only, no code changes)
+```
+
+### Standardization Flow (Phase 2)
+
+```
+[Gap analysis] + [Integration point map]
+    ↓
+[Prioritization] → [Severity tiers]
+    ↓
+[Data source fixes] → [Update EMA scripts to use bars]
+    ↓
+[Pattern extraction] → [Shared utilities for loading/validation]
+    ↓
+[Schema alignment] → [DDL updates + migrations]
+    ↓
+[Code annotations] → [Inline comments + docstrings]
+    ↓
+[Verification] → [Tests + manual checks]
+    ↓
+[Documentation] → [Analysis docs + code comments]
+```
+
+### Key Data Flows in This Domain
+
+1. **Inventory → Analysis:** List of components feeds into relationship mapping
+2. **Gap analysis → Prioritization:** Findings with severity drive work order
+3. **Integration points → Verification:** Critical interfaces get extra testing
+4. **Review docs → Standardization plans:** Findings directly inform fixes
 
 ## Scaling Considerations
 
-| Scale | Approach |
-|-------|----------|
-| **Current (v0.5.0)** | Single developer, local workstation, simple pip installs |
-| **Near-term (v0.6-0.8)** | Small team (2-3), introduce uv for workspace management, CI validates imports |
-| **Mid-term (v1.0+)** | Team of 5-10, consider Pants/Bazel for fine-grained caching, automated dependency updates |
+| Scale | Architecture Adjustments |
+|-------|--------------------------|
+| 1-10 scripts | Manual review, single-file analysis documents |
+| 10-50 scripts | Automated inventory (AST parsing), structured templates for analysis |
+| 50-200 scripts | Automated dependency graphing, database-backed findings tracking |
+| 200+ scripts | Full codebase analysis tools (SonarQube, CodeQL), dedicated refactoring team |
 
 ### Scaling Priorities
 
-1. **First bottleneck:** Import confusion from reorganization
-   - **Fix:** Comprehensive import validation tests (phase-gated)
-   - **Prevention:** Namespace consistency, clear __init__.py exports
+1. **First bottleneck:** Manual inventory becomes error-prone at 20+ scripts
+   - **Fix:** Automate with file system scans + AST parsing
+   - **Tool:** Python `ast` module, `grep`/`ripgrep` for patterns
 
-2. **Second bottleneck:** Dependency drift across lib/ packages
-   - **Fix:** Unified lock file (uv.lock or poetry.lock)
-   - **Prevention:** Workspace-aware tooling (uv workspaces, poetry path deps)
+2. **Second bottleneck:** Analysis documents become unwieldy at 50+ findings
+   - **Fix:** Structure findings in database or issue tracker
+   - **Tool:** GitHub Issues, Linear, or custom SQLite database
+
+3. **Third bottleneck:** Coordination between reviewers at 100+ scripts
+   - **Fix:** Split by domain (bars, EMAs, features) with integration reviews
+   - **Tool:** CODEOWNERS file, dedicated integration review phase
 
 ## Anti-Patterns
 
-### Anti-Pattern 1: Delete Instead of Archive
+### Anti-Pattern 1: Fix-As-You-Go Review
 
-**What people do:** Delete deprecated files to "clean up" repository
-
-**Why it's wrong:**
-- Loses git history context (why was this approach tried?)
-- No reference for future investigations
-- Can't compare old vs new implementations
-- Breaks git blame chains
-
-**Do this instead:**
-- git mv to .archive/ (preserves full history)
-- Create index files explaining deprecation rationale
-- Link to replacement locations
-- Keep files readable for future reference
-
-### Anti-Pattern 2: Merge All Packages into One
-
-**What people do:** Import fredtools2/fedtools2 directly into ta_lab2 namespace
+**What people do:** Start fixing issues during the review phase
 
 **Why it's wrong:**
-- Breaks separation of concerns (FRED API != trading logic)
-- Forces all users to install economic data dependencies
-- Makes independent versioning impossible
-- Complicates testing (can't test FRED integration without ta_lab2)
+- Incomplete understanding leads to rework
+- May miss systemic issues requiring holistic fixes
+- Review findings become stale as code changes
+- Difficult to track what was reviewed vs fixed
 
 **Do this instead:**
-- Keep as separate packages in lib/
-- Use optional dependencies ([economic-data] extra)
-- Import with try/except for graceful degradation
-- Document integration points clearly
+- Complete read-only review phase
+- Document all findings with references
+- Plan standardization holistically
+- Execute fixes in prioritized order
 
-### Anti-Pattern 3: Documentation Duplication
+### Anti-Pattern 2: Schema Alignment Before Data Source Fixes
 
-**What people do:** Copy Excel content to Markdown, keep both in docs/
+**What people do:** Focus on cosmetic consistency (naming, constraints) before correctness
 
 **Why it's wrong:**
-- Creates maintenance burden (update in two places)
-- Confuses users (which is source of truth?)
-- Wastes repository space with binary files in docs/
+- Building on broken foundation (e.g., EMAs using raw data)
+- Schema changes may need rework after data source fixes
+- Delays fixes to critical correctness issues
+- Wastes effort on low-value cosmetics
 
 **Do this instead:**
-- Convert Excel to Markdown (single source of truth in docs/)
-- Move Excel originals to .archive/ (reference only)
-- Create index linking docs/ to archive/ (traceability)
-- Use docs/index.md as central hub (no duplication)
+- Data source fixes first (bars → EMAs)
+- State management second (enables incremental)
+- Loading patterns third (reduces duplication)
+- Schema naming last (cosmetic)
 
-### Anti-Pattern 4: Hardcoded Paths in Migrated Scripts
+### Anti-Pattern 3: Over-Documentation of Obvious Code
 
-**What people do:** Move Data_Tools scripts without updating hardcoded paths
+**What people do:** Add verbose comments to simple, self-explanatory logic
 
 **Why it's wrong:**
-- Scripts break when directory structure changes
-- Tight coupling to specific filesystem layout
-- Fails on different machines (Windows vs Linux paths)
+- Creates maintenance burden (comments go stale)
+- Obscures truly complex logic that needs explanation
+- Wastes review time on trivia
+- Gives false sense of completeness
 
 **Do this instead:**
-- Use __file__ and Path for relative imports
-- Reference package resources via importlib.resources
-- Environment variables for configurable paths (FRED_API_KEY, DB_URL)
-- Document required environment setup in README
+- Annotate only complex, non-obvious logic
+- Document assumptions and business rules
+- Flag known limitations and TODOs
+- Use descriptive names to make code self-documenting
 
-Example refactor:
-```python
-# BAD: Hardcoded path
-data_dir = "/Users/asafi/data/fred"
+### Anti-Pattern 4: Siloed Review (Per-Script Analysis)
 
-# GOOD: Relative to package
-from pathlib import Path
-data_dir = Path(__file__).parent.parent / "data" / "fred"
+**What people do:** Review each script in isolation without cross-referencing
 
-# BETTER: Environment variable with default
-import os
-data_dir = Path(os.getenv("FRED_DATA_DIR", "./data/fred"))
+**Why it's wrong:**
+- Misses shared patterns and duplication
+- Cannot identify integration point inconsistencies
+- Prevents extraction of shared utilities
+- Results in piecemeal, inconsistent fixes
+
+**Do this instead:**
+- Start with inventory of all components
+- Map integration points across components
+- Identify patterns (data loading, state management)
+- Plan shared utilities before script-by-script fixes
+
+### Anti-Pattern 5: State Table Fragmentation
+
+**What people do:** Each script creates its own state table schema
+
+**Why it's wrong:**
+- Cannot query state across all scripts (no unified view)
+- Inconsistent watermarking strategies
+- Duplication of state management logic
+- Difficult to add new scripts (no template)
+
+**Do this instead:**
+- Unified state table schema for all incremental scripts
+- Shared state management module
+- Document state fields and population rules
+- Enforce schema via shared utilities (not script-local logic)
+
+## Integration Points for This Domain
+
+### Critical Integration Points
+
+| Integration Point | Consistency Requirement | Validation Strategy |
+|-------------------|-------------------------|---------------------|
+| **Raw data → Bars** | NOT NULL constraints, OHLC invariants | Contract validation in bar builders |
+| **Bars → EMAs** | EMAs MUST use validated bars (not raw) | Code inspection + unit tests |
+| **State schema** | Unified (id, tf, period) PRIMARY KEY | Shared state management module |
+| **Incremental refresh** | Consistent watermark pattern | Shared base class or utility functions |
+| **Table naming** | Consistent suffixes (_state, _bars, _ema) | Linting rules + documentation |
+
+### Internal Boundaries
+
+| Boundary | Communication | Notes |
+|----------|---------------|-------|
+| Bar builders ↔ Common contract | Function calls | `common_snapshot_contract.py` |
+| EMA calculators ↔ Base refresher | Inheritance | `BaseEMARefresher` template method pattern |
+| All scripts ↔ Orchestrator | Task execution | `MultiprocessingOrchestrator` |
+| Scripts ↔ State tables | SQL queries | Shared schema via `EMAStateManager` |
+| Review docs ↔ Standardization plans | References | Gap findings linked to fix tasks |
+
+### External Boundaries (Not in Scope)
+
+- **Database ↔ External sources:** Handled by separate ingestion scripts
+- **Features/Signals ↔ Backtests:** Downstream consumers of standardized data
+- **CI/CD ↔ Scripts:** Testing and deployment infrastructure
+
+## Build Order for Review & Standardization
+
+### Phase 1: Review (Read-Only, No Code Changes)
+
+**Order rationale:** Inventory → Relationships → Analysis
+
+```
+1. Inventory (3 tasks, parallel)
+   - Task 1.1: Enumerate bar builders + schemas
+   - Task 1.2: Enumerate EMA calculators + schemas
+   - Task 1.3: Enumerate helpers, contracts, orchestrators
+
+2. Schema Analysis (1 task, depends on 1.1 + 1.2)
+   - Task 2.1: Document table schemas, constraints, naming
+
+3. Data Flow Mapping (1 task, depends on 1.1 + 1.2)
+   - Task 3.1: Map price_histories7 → bars → EMAs → features
+
+4. Helpers/Contracts Analysis (1 task, depends on 1.3)
+   - Task 4.1: Document shared utilities, find duplication
+
+5. Gap Analysis (1 task, depends on 2 + 3 + 4)
+   - Task 5.1: Catalog inconsistencies, missing patterns, data source issues
+
+6. Integration Point Mapping (1 task, depends on 5)
+   - Task 6.1: Identify critical interfaces, document dependencies
 ```
 
-## Build Order (Phased Approach)
+**Critical path:** 1 → 2 → 3 → 5 → 6 (4 can run in parallel with 2/3)
 
-### Phase 1: Archive Management (Week 1, Days 1-2)
-**Goal:** Move backup artifacts to .archive/, establish indexing pattern
+### Phase 2: Standardization (Code Changes + Verification)
 
-**Steps:**
-1. Create .archive/ structure (code/, docs/, configs/)
-2. Identify candidates: `*.original`, `*_refactored.py`, root clutter
-3. git mv candidates to .archive/ (preserves history)
-4. Create .archive/00-README.md with index
-5. Validate: git log --follow shows history
+**Order rationale:** Correctness → Consistency → Quality
 
-**Validation Gate:**
-- All *.original files in .archive/code/
-- .archive/00-README.md comprehensively documents contents
-- git log --follow works for archived files
+```
+1. Data Source Fixes (1 task, CRITICAL)
+   - Task 1.1: Update EMAs to use validated bar tables (not raw)
+   - Verification: Unit tests + manual data checks
 
-### Phase 2: Documentation Consolidation (Week 1, Days 3-4)
-**Goal:** Integrate ProjectTT docs into docs/, archive originals
+2. State Management (1 task, HIGH)
+   - Task 2.1: Standardize state table schema (id, tf, period)
+   - Task 2.2: Shared state management utilities
+   - Verification: Schema migration scripts + tests
 
-**Steps:**
-1. Audit ProjectTT content (inventory Excel sheets, Word docs)
-2. Create docs/domain/, docs/architecture/, docs/migration/
-3. Convert Excel/Word to Markdown (pandoc, manual extraction)
-4. Organize into taxonomy (strategies/, indicators/, markets/)
-5. git mv ProjectTT originals to .archive/docs/ProjectTT/original/
-6. Create .archive/docs/ProjectTT/00-INDEX.md
-7. Update docs/index.md with new sections
+3. Pattern Standardization (2 tasks, HIGH)
+   - Task 3.1: Extract shared data loading utilities
+   - Task 3.2: Extract shared validation logic
+   - Verification: Integration tests
 
-**Validation Gate:**
-- All ProjectTT content accessible via docs/index.md
-- Archive index maps old content to new locations
-- Markdown files render correctly in docs/
+4. Schema Alignment (1 task, MEDIUM)
+   - Task 4.1: Consistent naming (_state, _bars, _ema suffixes)
+   - Task 4.2: Add missing constraints (NOT NULL, CHECK)
+   - Verification: DDL review + constraint tests
 
-### Phase 3: Tools Integration (Week 2, Days 1-3)
-**Goal:** Merge Data_Tools into ta_lab2.tools/, validate imports
+5. Code Annotations (1 task, LOW)
+   - Task 5.1: Annotate complex logic in bar builders
+   - Task 5.2: Annotate complex logic in EMA calculators
+   - Verification: Documentation review
 
-**Steps:**
-1. Audit Data_Tools scripts (categorize by function)
-2. Create src/ta_lab2/tools/data_tools/ structure
-3. Refactor imports to use ta_lab2 namespace
-4. Update __init__.py to expose public API
-5. Write import validation tests (tests/tools/test_data_tools_imports.py)
-6. Run tests: pytest tests/tools/
-7. Document migration in docs/migration/v0.5-reorganization.md
+6. Documentation (1 task, final)
+   - Task 6.1: Update analysis documents with findings
+   - Task 6.2: Update code READMEs with new patterns
+   - Verification: Manual review
+```
 
-**Validation Gate:**
-- All Data_Tools scripts importable via ta_lab2.tools.data_tools
-- Import tests pass (100% coverage of public API)
-- No hardcoded paths remain
+**Critical path:** 1 → 2 → 3 → 4 → 5 → 6 (all sequential due to dependencies)
 
-### Phase 4: Economic Data Packages (Week 2, Days 4-5)
-**Goal:** Integrate fredtools2/fedtools2 as optional dependencies
+### Dependency Graph
 
-**Steps:**
-1. Assess fredtools2/fedtools2 structure (confirm proper packages)
-2. Decide: merge vs separate (use decision matrix)
-3. Create lib/ directory, move packages
-4. Create root pyproject.toml with workspace config
-5. Add optional-dependencies to ta_lab2 pyproject.toml
-6. Install editable: pip install -e ./lib/fredtools2
-7. Create integration example in ta_lab2/scripts/etl/
-8. Write graceful degradation tests
+```
+Review Phase:
+  Inventory (1.1, 1.2, 1.3) [parallel]
+      ↓
+  Schema Analysis (2.1) + Data Flow (3.1) + Helpers (4.1) [parallel]
+      ↓
+  Gap Analysis (5.1)
+      ↓
+  Integration Points (6.1)
 
-**Validation Gate:**
-- fredtools2/fedtools2 installable via pip install -e ./lib/*
-- ta_lab2 imports work with and without economic-data extra
-- Helpful error message when not installed
+Standardization Phase:
+  Data Source Fixes (1.1) [CRITICAL, blocks everything]
+      ↓
+  State Management (2.1, 2.2)
+      ↓
+  Pattern Standardization (3.1, 3.2) [can overlap with 4]
+      ↓
+  Schema Alignment (4.1, 4.2)
+      ↓
+  Code Annotations (5.1, 5.2)
+      ↓
+  Documentation (6.1, 6.2)
+```
 
-### Phase 5: Root Cleanup (Week 2, Day 5)
-**Goal:** Clean root directory, archive remaining clutter
+### Parallelization Opportunities
 
-**Steps:**
-1. Categorize root clutter (scripts, tests, temp files)
-2. git mv to .archive/ appropriate subdirectories
-3. Update .archive/00-README.md with new entries
-4. Verify root directory clean (only essential files)
-5. Update .gitignore if needed
+**Review phase:**
+- Tasks 1.1, 1.2, 1.3 can run in parallel (independent)
+- Tasks 2.1, 3.1, 4.1 can run in parallel (all depend on inventory)
 
-**Validation Gate:**
-- Root directory contains only: src/, lib/, docs/, tests/, .planning/, config files
-- All clutter archived with git history
-- .archive/00-README.md complete
+**Standardization phase:**
+- Tasks 3.1, 3.2, 4.1, 4.2 can partially overlap (different code areas)
+- Tasks 5.1, 5.2 can run in parallel (independent scripts)
 
-### Phase 6: Structure Documentation (Week 2, Day 5)
-**Goal:** Document new structure, write migration guide
+## Research Confidence Assessment
 
-**Steps:**
-1. Update .planning/codebase/STRUCTURE.md (new architecture)
-2. Create docs/migration/v0.5-reorganization.md (migration guide)
-3. Update README.md with ecosystem structure
-4. Create visual diagrams (optional, if time permits)
-
-**Validation Gate:**
-- STRUCTURE.md reflects post-reorganization state
-- Migration guide explains all changes
-- README.md updated with new structure
-
-### Phase 7: Final Verification (Week 2, Day 5)
-**Goal:** End-to-end validation, smoke tests
-
-**Steps:**
-1. Fresh clone test: git clone → pip install -e . → pytest
-2. Import smoke test: python -c "import ta_lab2; import ta_lab2.tools.data_tools"
-3. Run daily refresh pipeline (validate operational scripts work)
-4. Check docs render (mkdocs serve or similar)
-5. Tag release: git tag v0.5.0
-
-**Validation Gate:**
-- Fresh install works (all imports resolve)
-- All tests pass (no import errors)
-- Daily refresh pipeline runs successfully
-- Documentation builds without errors
+| Area | Confidence | Evidence |
+|------|------------|----------|
+| Review patterns | HIGH | Industry standards from 2026 code audit guides |
+| Standardization ordering | HIGH | Data pipeline best practices, ETL frameworks |
+| Integration points | HIGH | Existing codebase analysis (common_snapshot_contract.py, base_ema_refresher.py) |
+| State management | HIGH | Documented standardization (EMA_STATE_STANDARDIZATION.md) |
+| Build order | HIGH | Dependency analysis from codebase structure |
 
 ## Sources
 
-### Python Monorepo Structure
-- [Python Monorepo: an Example. Part 1: Structure and Tooling - Tweag](https://www.tweag.io/blog/2023-04-04-python-monorepo-1/)
-- [Python monorepos - Graphite](https://graphite.dev/guides/python-monorepos)
-- [Building a Monorepo with Python - Earthly Blog](https://earthly.dev/blog/python-monorepo/)
-- [Our Python Monorepo - Opendoor Labs](https://medium.com/opendoor-labs/our-python-monorepo-d34028f2b6fa)
-- [The State of Python Packaging in 2026 - RepoForge](https://learn.repoforge.io/posts/the-state-of-python-packaging-in-2026/)
+### Code Review & Refactoring
+- [Software Code Refactoring: A Comprehensive Review](https://www.researchgate.net/publication/368921892_Software_Code_Refactoring_A_Comprehensive_Review)
+- [Code Review Practices for Refactoring Changes](https://arxiv.org/abs/2203.14404)
+- [The Complete Guide to Professional Code Refactoring](https://dev.to/devcorner/the-complete-guide-to-professional-code-refactoring-transform-your-code-like-a-pro-2h8a)
 
-### Python Project Structure
-- [src layout vs flat layout - Python Packaging User Guide](https://packaging.python.org/en/latest/discussions/src-layout-vs-flat-layout/)
-- [Python Package Structure & Layout - PyOpenSci](https://www.pyopensci.org/python-package-guide/package-structure-code/python-package-structure.html)
-- [Package structure and distribution - Python Packages](https://py-pkgs.org/04-package-structure.html)
+### Codebase Audit
+- [How to Conduct a Code Audit Successfully for 2026](https://www.cleveroad.com/blog/software-code-auditing/)
+- [COD Model: 5-Phase Guide to Codebase Dependency Mapping](https://augmentcode.com/guides/cod-model-5-phase-guide-to-codebase-dependency-mapping)
+- [Effective Code Audits: Processes, Benefits, And Best Practices](https://devcom.com/tech-blog/software-code-audit-what-is-it-and-why-you-need-it-for-your-project/)
 
-### Documentation Consolidation
-- [How to structure technical documentation - GitBook](https://gitbook.com/docs/guides/docs-best-practices/documentation-structure-tips)
-- [Multi-Product Documentation Strategy - Document360](https://document360.com/blog/multi-product-documentation-strategy/)
-- [Centralized Documentation: Definition & Best Practices - Docsie](https://www.docsie.io/blog/glossary/centralized-documentation/)
+### Data Pipeline Standardization
+- [ETL Frameworks in 2026 for Future-Proof Data Pipelines](https://www.integrate.io/blog/etl-frameworks-in-2025-designing-robust-future-proof-data-pipelines/)
+- [ETL Pipeline best practices for reliable data workflows](https://www.getdbt.com/blog/etl-pipeline-best-practices)
+- [Data Load Patterns 101: Full Refresh and Incremental](https://www.tobikodata.com/blog/data-load-patterns-101)
+- [Incremental loading | dlt Docs](https://dlthub.com/docs/general-usage/incremental-loading)
 
-### Economic Data Integration
-- [fredapi - PyPI](https://pypi.org/project/fredapi/)
-- [GitHub - mortada/fredapi](https://github.com/mortada/fredapi)
-- [pyfredapi - GitHub](https://github.com/gw-moore/pyfredapi)
-- [Federal Reserve Economic Data (FRED) Client - FRB](https://frb.readthedocs.io/)
+### Database Standardization
+- [Database Naming Standards: SQL Conventions for Tables](https://blog.devart.com/sql-database-naming-standards.html)
+- [Best Practices for Database Schema Name Conventions](https://vertabelo.com/blog/database-schema-naming-conventions/)
+- [Seven essential database schema best practices](https://www.fivetran.com/blog/database-schema-best-practices)
+
+### Existing Codebase
+- `src/ta_lab2/scripts/bars/common_snapshot_contract.py` - Shared bar builder utilities
+- `src/ta_lab2/scripts/emas/base_ema_refresher.py` - Template Method pattern for EMA scripts
+- `docs/EMA_STATE_STANDARDIZATION.md` - State table unification documentation
+- `.planning/phases/bar-builders-FINAL-SUMMARY.md` - Prior refactoring case study
 
 ---
-*Architecture research for: ta_lab2 v0.5.0 Ecosystem Reorganization*
-*Researched: 2026-02-02*
+*Architecture research for: EMA & Bar Architecture Standardization*
+*Researched: 2026-02-05*
