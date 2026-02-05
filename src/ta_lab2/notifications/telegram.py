@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 import os
+from enum import Enum
 
 try:
     import requests
@@ -20,6 +21,15 @@ except ImportError:
     requests = None  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
+
+
+class AlertSeverity(Enum):
+    """Alert severity levels for filtering."""
+
+    INFO = "info"
+    WARNING = "warning"
+    ERROR = "error"
+    CRITICAL = "critical"
 
 
 def is_configured() -> bool:
@@ -166,3 +176,48 @@ def send_validation_alert(validation_result: dict) -> bool:
 
     message = "\n".join(message_parts)
     return send_alert("EMA Validation Failed", message, severity=severity)
+
+
+def send_critical_alert(
+    error_type: str,
+    error_message: str,
+    context: dict | None = None,
+) -> bool:
+    """
+    Send alert for critical errors (database connection, OHLC corruption, etc.).
+
+    Args:
+        error_type: Category of error ("database", "corruption", "validation")
+        error_message: Human-readable error message
+        context: Additional context (e.g., {"ids": [1, 52], "component": "bars"})
+
+    Returns:
+        True if alert sent successfully, False otherwise
+
+    Example:
+        >>> send_critical_alert(
+        ...     "database",
+        ...     "Connection to PostgreSQL failed",
+        ...     {"host": "localhost", "db": "ta_lab2"}
+        ... )
+    """
+    if not is_configured():
+        return False
+
+    # Format message
+    msg_lines = [
+        f"<b>CRITICAL: {error_type.upper()}</b>",
+        "",
+        error_message,
+    ]
+
+    if context:
+        msg_lines.append("")
+        msg_lines.append("<b>Context:</b>")
+        for key, value in context.items():
+            msg_lines.append(f"  {key}: {value}")
+
+    message = "\n".join(msg_lines)
+
+    # Send using existing mechanism with critical severity
+    return send_alert(f"CRITICAL: {error_type}", message, severity="critical")
