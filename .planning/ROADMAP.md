@@ -3,18 +3,20 @@
 ## Milestones
 
 - v0.4.0 Memory Infrastructure & Orchestrator (Phases 1-10) - SHIPPED 2026-02-01
-- v0.5.0 Ecosystem Reorganization (Phases 11-19) - IN PROGRESS
+- v0.5.0 Ecosystem Reorganization (Phases 11-19) - SHIPPED 2026-02-04
+- **v0.6.0 EMA & Bar Architecture Standardization (Phases 20-26) - IN PROGRESS**
 
 ## Overview
 
-Build trustworthy quant trading infrastructure 3x faster by creating AI coordination that remembers context across platforms. v0.4.0 established quota management, memory infrastructure (3,763 memories in Qdrant via Mem0), multi-platform orchestration with cost optimization, and ta_lab2 development (time model, features, signals). v0.5.0 consolidates four external project directories (ProjectTT, Data_Tools, fredtools2, fedtools2) into the unified ta_lab2 structure with memory-first auditability and zero deletion.
+Build trustworthy quant trading infrastructure 3x faster by creating AI coordination that remembers context across platforms. v0.4.0 established quota management, memory infrastructure (3,763 memories in Qdrant via Mem0), multi-platform orchestration with cost optimization, and ta_lab2 development (time model, features, signals). v0.5.0 consolidated four external project directories into unified ta_lab2 structure. v0.6.0 locks down the bars and EMAs foundation so adding new assets (crypto + equities) is mechanical and reliable.
 
 ## Phases
 
 **Phase Numbering:**
 - Phases 1-10: v0.4.0 (complete)
-- Phases 11-19: v0.5.0 (current milestone)
-- Decimal phases (11.1, 12.1): Urgent insertions if needed
+- Phases 11-19: v0.5.0 (complete)
+- Phases 20-26: v0.6.0 (current milestone)
+- Decimal phases (20.1, 21.1): Urgent insertions if needed
 
 <details>
 <summary>v0.4.0 Memory Infrastructure & Orchestrator (Phases 1-10) - SHIPPED 2026-02-01</summary>
@@ -32,17 +34,30 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 
 </details>
 
-### v0.5.0 Ecosystem Reorganization (Phases 11-19) - IN PROGRESS
+<details>
+<summary>v0.5.0 Ecosystem Reorganization (Phases 11-19) - SHIPPED 2026-02-04</summary>
 
 - [x] **Phase 11: Memory Preparation** - Initialize memory state before any file moves (BLOCKER)
 - [x] **Phase 12: Archive Foundation** - Establish .archive/ structure and preservation patterns
 - [x] **Phase 13: Documentation Consolidation** - Convert and integrate ProjectTT docs with memory tracking
-- [x] **Phase 14: Tools Integration** - Migrate Data_Tools scripts with memory updates | 13/13 | Complete | 2026-02-03
+- [x] **Phase 14: Tools Integration** - Migrate Data_Tools scripts with memory updates
 - [x] **Phase 15: Economic Data Strategy** - Archive packages, extract utils, create integration skeleton with memory updates
-- [x] **Phase 16: Repository Cleanup** - Clean root directory with memory updates | 7/7 | Complete | 2026-02-03
-- [x] **Phase 17: Verification & Validation** - Validate imports, dependencies, and structure | 8/8 | Complete | 2026-02-03
-- [x] **Phase 18: Structure Documentation** - Document final structure and migration decisions | 4/4 | Complete | 2026-02-04
-- [x] **Phase 19: Memory Validation & Release** - Final memory validation and milestone release | 6/6 | Complete | 2026-02-04
+- [x] **Phase 16: Repository Cleanup** - Clean root directory with memory updates
+- [x] **Phase 17: Verification & Validation** - Validate imports, dependencies, and structure
+- [x] **Phase 18: Structure Documentation** - Document final structure and migration decisions
+- [x] **Phase 19: Memory Validation & Release** - Final memory validation and milestone release
+
+</details>
+
+### v0.6.0 EMA & Bar Architecture Standardization (Phases 20-26) - IN PROGRESS
+
+- [ ] **Phase 20: Historical Context** - Review GSD phases 1-10 and existing documentation
+- [ ] **Phase 21: Comprehensive Review** - Complete read-only analysis of all bar/EMA components
+- [ ] **Phase 22: Critical Data Quality Fixes** - Migrate all EMAs to validated bar tables
+- [ ] **Phase 23: Reliable Incremental Refresh** - Flexible orchestration, state management, visibility
+- [ ] **Phase 24: Pattern Consistency** - Standardize patterns where analysis justifies
+- [ ] **Phase 25: Baseline Capture** - Capture current outputs before validation testing
+- [ ] **Phase 26: Validation** - Verify fixes worked correctly, nothing broke
 
 ## Phase Details
 
@@ -173,6 +188,9 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 
 </details>
 
+<details>
+<summary>v0.5.0 Phase Details (Phases 11-19) - COMPLETE</summary>
+
 ### Phase 11: Memory Preparation
 **Goal**: Capture current state of all codebases in memory before any file moves
 **Depends on**: Phase 10 (v0.4.0 complete)
@@ -183,13 +201,7 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
   3. All external directories (Data_Tools, ProjectTT, fredtools2, fedtools2) indexed in memory
   4. Pre-integration memories tagged with pre_integration_v0.5.0 metadata
   5. Memory queries can answer "What files exist in directory X?" for all 5 directories
-**Plans**: 5 plans
-Plans:
-- [x] 11-01-PLAN.md - Create extraction and indexing infrastructure
-- [x] 11-02-PLAN.md - Index ta_lab2 codebase snapshot
-- [x] 11-03-PLAN.md - Index external directories snapshot
-- [x] 11-04-PLAN.md - Extract v0.4.0 conversation history
-- [x] 11-05-PLAN.md - Validate 100% coverage and document state
+**Plans**: 5/5 complete
 
 ### Phase 12: Archive Foundation
 **Goal**: Establish archive structure and preservation patterns before any file moves
@@ -201,11 +213,7 @@ Plans:
   3. manifest.json template created for tracking archived files
   4. git mv verified to preserve history (git log --follow works for test file)
   5. Pre-reorganization file counts recorded for validation
-**Plans**: 3 plans
-Plans:
-- [x] 12-01-PLAN.md - Create archive structure and verify git history preservation
-- [x] 12-02-PLAN.md - Build archive tooling (types, manifest functions)
-- [x] 12-03-PLAN.md - Create validation tools and capture pre-reorg baseline
+**Plans**: 3/3 complete
 
 ### Phase 13: Documentation Consolidation
 **Goal**: Convert ProjectTT documentation and integrate into docs/ structure
@@ -217,15 +225,7 @@ Plans:
   3. Original Excel/Word files preserved in .archive/documentation/
   4. Memory updated with moved_to relationships for each file
   5. Phase-level memory snapshot created with phase 13 tag
-**Plans**: 7 plans (6 complete, 1 gap closure)
-Plans:
-- [x] 13-01-PLAN.md - Create conversion infrastructure (convert_docx.py, convert_excel.py)
-- [x] 13-02-PLAN.md - Discover and categorize ProjectTT documents
-- [x] 13-03-PLAN.md - Convert DOCX files to Markdown
-- [x] 13-04-PLAN.md - Convert Excel files to Markdown tables
-- [x] 13-05-PLAN.md - Archive originals and update docs/index.md
-- [x] 13-06-PLAN.md - Update memory with document relationships and phase snapshot
-- [ ] 13-07-PLAN.md - Gap closure: Add missing exports to __init__.py
+**Plans**: 7/7 complete
 
 ### Phase 14: Tools Integration
 **Goal**: Migrate Data_Tools scripts into ta_lab2/tools/ with working imports
@@ -238,61 +238,32 @@ Plans:
   4. Memory updated with moved_to relationships for each file
   5. Phase-level memory snapshot created with phase 14 tag
 **Plans**: 13/13 complete
-Plans:
-- [x] 14-01-PLAN.md - Discover and categorize Data_Tools scripts
-- [x] 14-02-PLAN.md - Create data_tools package structure
-- [x] 14-03-PLAN.md - Migrate analysis tools (generate_function_map, tree_structure)
-- [x] 14-04-PLAN.md - Migrate database utilities (consolidated into ema_runners.py)
-- [x] 14-05-PLAN.md - Migrate memory/embedding tools
-- [x] 14-06-PLAN.md - Migrate ChatGPT export/processing tools
-- [x] 14-07-PLAN.md - Migrate generator and context tools
-- [x] 14-08-PLAN.md - Archive excluded scripts (prototypes, one-offs)
-- [x] 14-09-PLAN.md - Create validation tests (smoke tests + path validation)
-- [x] 14-10-PLAN.md - Update memory with migration relationships and phase snapshot
-- [ ] 14-11-PLAN.md - Gap closure: Migrate 10 missing memory pipeline scripts
-- [ ] 14-12-PLAN.md - Gap closure: Migrate 3 remaining scripts (analysis, generators, processing)
-- [ ] 14-13-PLAN.md - Gap closure: Update tests and fix docstrings
 
 ### Phase 15: Economic Data Strategy
 **Goal**: Archive packages, extract valuable utilities, create production-ready integration skeleton
 **Depends on**: Phase 14
 **Requirements**: ECON-01, ECON-02, ECON-03, MEMO-13, MEMO-14
 **Success Criteria** (what must be TRUE):
-  1. fredtools2 and fedtools2 archived with comprehensive documentation (ALTERNATIVES.md with 4 dimensions)
-  2. Valuable utilities extracted to ta_lab2.utils.economic (combine_timeframes, missing_ranges, etc.)
-  3. Production-ready ta_lab2.integrations.economic with working FredProvider (fredapi passthrough)
-  4. Rate limiting (120/min), TTL caching, circuit breaker, data quality validation implemented
-  5. pyproject.toml updated with [fred], [fed], [economic] optional dependency extras
-  6. Migration support: README guide, migration tool that scans for old imports
-  7. Memory updated with archive/extraction/replacement relationships (supports "what replaced fredtools2?" queries)
-**Plans**: 6 plans
-Plans:
-- [ ] 15-01-PLAN.md - Archive packages with comprehensive documentation (ALTERNATIVES.md, manifest, dependency snapshot)
-- [ ] 15-02-PLAN.md - Extract valuable utilities to ta_lab2.utils.economic
-- [ ] 15-03-PLAN.md - Create integrations.economic skeleton with FredProvider
-- [ ] 15-04-PLAN.md - Add rate limiting, caching, circuit breaker, data quality
-- [ ] 15-05-PLAN.md - Update pyproject.toml, config files, migration support
-- [ ] 15-06-PLAN.md - Update memory with full relationship graph
+  1. fredtools2 and fedtools2 archived with comprehensive documentation
+  2. Valuable utilities extracted to ta_lab2.utils.economic
+  3. Production-ready ta_lab2.integrations.economic with working FredProvider
+  4. Rate limiting, caching, circuit breaker, data quality validation implemented
+  5. pyproject.toml updated with optional dependency extras
+  6. Migration support: README guide, migration tool
+  7. Memory updated with archive/extraction/replacement relationships
+**Plans**: 6/6 complete
 
 ### Phase 16: Repository Cleanup
 **Goal**: Clean root directory and consolidate duplicate files
 **Depends on**: Phase 15
 **Requirements**: CLEAN-01, CLEAN-02, CLEAN-03, CLEAN-04, MEMO-13, MEMO-14
 **Success Criteria** (what must be TRUE):
-  1. Root directory contains only essential files (README, pyproject.toml, core configs)
+  1. Root directory contains only essential files
   2. Temp files, *_refactored.py, *.original archived with manifest
   3. Loose .md files moved to appropriate docs/ subdirectories
   4. Exact duplicates identified via SHA256 and archived
-  5. Similar functions (85%+ threshold) flagged for review
-**Plans**: 7/7 complete (including gap closure)
-Plans:
-- [x] 16-01-PLAN.md - Archive temp files, loose scripts, corrupted paths from root
-- [x] 16-02-PLAN.md - Compare and resolve *_refactored.py files, archive *.original files
-- [x] 16-03-PLAN.md - Organize loose .md files into docs/ structure
-- [x] 16-04-PLAN.md - Create duplicate detection tool and identify/archive exact duplicates
-- [x] 16-05-PLAN.md - Create function similarity analysis tool
-- [x] 16-06-PLAN.md - Update memory with file movements and phase snapshot
-- [x] 16-07-PLAN.md - Gap closure: Archive remaining root clutter (temp script, corrupted paths)
+  5. Similar functions flagged for review
+**Plans**: 7/7 complete
 
 ### Phase 17: Verification & Validation
 **Goal**: Validate all imports work and no data was lost
@@ -300,20 +271,11 @@ Plans:
 **Requirements**: VAL-01, VAL-02, VAL-03, VAL-04
 **Success Criteria** (what must be TRUE):
   1. All ta_lab2 modules importable without errors
-  2. No circular dependencies detected (pycycle/import-linter clean)
-  3. CI tests validate organization rules (no .py in root, manifest integrity)
-  4. Pre-commit hooks installed preventing future disorganization
+  2. No circular dependencies detected
+  3. CI tests validate organization rules
+  4. Pre-commit hooks installed
   5. File count validation: pre + archived = post (zero data loss)
-**Plans**: 8 plans (5 complete, 3 gap closure)
-Plans:
-- [x] 17-01-PLAN.md - Create dynamic import validation test suite
-- [x] 17-02-PLAN.md - Configure import-linter for circular dependency detection
-- [x] 17-03-PLAN.md - Enhance CI workflow with import and circular dep checks
-- [x] 17-04-PLAN.md - Set up pre-commit hooks with Ruff and org rules
-- [x] 17-05-PLAN.md - Create data loss validation tests with checksum verification
-- [ ] 17-06-PLAN.md - Gap closure: Fix tools->features layer violation (move ema_runners to scripts)
-- [ ] 17-07-PLAN.md - Gap closure: Fix regimes->pipelines violation (move run_btc_pipeline to scripts)
-- [ ] 17-08-PLAN.md - Gap closure: Verify all import-linter contracts pass
+**Plans**: 8/8 complete
 
 ### Phase 18: Structure Documentation
 **Goal**: Document final structure and migration decisions for future reference
@@ -321,16 +283,11 @@ Plans:
 **Requirements**: STRUCT-01, STRUCT-02, STRUCT-03
 **Success Criteria** (what must be TRUE):
   1. docs/REORGANIZATION.md explains what moved where and why
-  2. README updated with new ecosystem structure and component links
+  2. README updated with new ecosystem structure
   3. YAML/JSON manifest tracks rationale for each major decision
   4. Before/after directory tree diagrams included
   5. Migration guide enables finding moved files
 **Plans**: 4/4 complete
-Plans:
-- [x] 18-01-PLAN.md - Create decisions manifest with JSON Schema (decisions.json, decisions-schema.json, DECISIONS.md)
-- [x] 18-02-PLAN.md - Generate before/after directory diagrams (ASCII trees + Mermaid)
-- [x] 18-03-PLAN.md - Create REORGANIZATION.md with full file listings and migration guide
-- [x] 18-04-PLAN.md - Update README with v0.5.0 ecosystem structure
 
 ### Phase 19: Memory Validation & Release
 **Goal**: Validate memory completeness and release v0.5.0
@@ -338,23 +295,138 @@ Plans:
 **Requirements**: MEMO-15, MEMO-16, MEMO-17, MEMO-18
 **Success Criteria** (what must be TRUE):
   1. Function-level memories exist for significant functions
-  2. Memory relationship types complete (contains, calls, imports, moved_to, similar_to)
-  3. Duplicate functions detected and documented (95%+, 85-95%, 70-85% thresholds)
-  4. Memory graph validation passes (no orphans, all relationships linked)
-  5. Memory queries work: function lookup, cross-reference, edit impact analysis
-**Plans**: 6 plans
+  2. Memory relationship types complete
+  3. Duplicate functions detected and documented
+  4. Memory graph validation passes
+  5. Memory queries work
+**Plans**: 6/6 complete
+
+</details>
+
+### Phase 20: Historical Context
+**Goal**: Understand how we got here before making changes
+**Depends on**: Phase 19 (v0.5.0 complete)
+**Requirements**: HIST-01, HIST-02, HIST-03
+**Success Criteria** (what must be TRUE):
+  1. GSD phases 1-10 reviewed with key decisions documented
+  2. Existing documentation inventory complete (what to leverage, what's missing)
+  3. Current state assessment documented (what works, what's unclear, what's broken)
+**Plans**: TBD
+
 Plans:
-- [x] 19-01-PLAN.md - Create AST-based function extraction and memory indexing
-- [x] 19-02-PLAN.md - Implement relationship linking (contains, calls, imports, moved_to, similar_to)
-- [x] 19-03-PLAN.md - Create duplicate detection with three-tier thresholds
-- [x] 19-04-PLAN.md - Build memory graph validation and query tests
-- [x] 19-05-PLAN.md - Run validation and generate VALIDATION.md report (including gap closure 19-05.1)
-- [x] 19-06-PLAN.md - Update CHANGELOG, bump version, create v0.5.0 release tag
+- [ ] 20-01: Review GSD phases 1-10 and document findings
+
+---
+
+### Phase 21: Comprehensive Review
+**Goal**: Complete ALL analysis before any code changes
+**Depends on**: Phase 20
+**Requirements**: RVWQ-01, RVWQ-02, RVWQ-03, RVWQ-04, RVWD-01, RVWD-02, RVWD-03, RVWD-04
+**Success Criteria** (what must be TRUE):
+  1. All 4 understanding questions answered (EMA variants, incremental refresh, validation points, new asset process)
+  2. Script inventory table complete (every bar/EMA script cataloged with purpose, tables, state, dependencies)
+  3. Data flow diagram exists showing price_histories7 -> bars -> EMAs with validation points marked
+  4. Variant comparison matrix complete (6 EMA variants side-by-side)
+  5. Gap analysis document produced with severity tiers (CRITICAL/HIGH/MEDIUM/LOW)
+**Plans**: TBD
+
+Plans:
+- [ ] 21-01: Answer understanding questions (RVWQ-01 to RVWQ-04)
+- [ ] 21-02: Create script inventory and data flow diagram (RVWD-01, RVWD-02)
+- [ ] 21-03: Create variant comparison matrix and gap analysis (RVWD-03, RVWD-04)
+
+---
+
+### Phase 22: Critical Data Quality Fixes
+**Goal**: All EMAs use validated bar tables instead of raw price_histories7
+**Depends on**: Phase 21
+**Requirements**: DATA-01, DATA-02, DATA-03, DATA-04, DVAL-01, DVAL-02, DVAL-03, DVAL-04
+**Success Criteria** (what must be TRUE):
+  1. All 6 EMA variants read from validated bar tables (zero price_histories7 references)
+  2. grep/CI check confirms no EMA script references price_histories7
+  3. Bar tables verified to have NOT NULL constraints on all OHLCV fields
+  4. Bar tables verified to have OHLC invariant check constraints (high >= low, etc.)
+  5. Quality flags standardized and gap handling implemented (missing days flagged, pipeline continues)
+**Plans**: TBD
+
+Plans:
+- [ ] 22-01: Migrate EMA data sources to validated bar tables (DATA-01 to DATA-04)
+- [ ] 22-02: Verify and complete database validation (DVAL-01 to DVAL-04)
+
+---
+
+### Phase 23: Reliable Incremental Refresh
+**Goal**: One command for daily refresh with clear visibility into what happened
+**Depends on**: Phase 22
+**Requirements**: ORCH-01, ORCH-02, ORCH-03, ORCH-04, STAT-01, STAT-02, STAT-03, STAT-04, VISI-01, VISI-02, VISI-03
+**Success Criteria** (what must be TRUE):
+  1. Orchestration script can run: all tasks, bars only, EMAs only, or specific variant
+  2. Bars and EMAs execute as separate modular pieces with clear interfaces
+  3. One command handles daily refresh with meaningful log output
+  4. State management patterns documented and consistent across scripts
+  5. Logs show what was processed (X days, Y bars, Z EMAs, N gaps flagged)
+**Plans**: TBD
+
+Plans:
+- [ ] 23-01: Analyze state management patterns across scripts (STAT-01)
+- [ ] 23-02: Build flexible orchestration with modular separation (ORCH-01 to ORCH-04)
+- [ ] 23-03: Standardize state management and visibility (STAT-02 to STAT-04, VISI-01 to VISI-03)
+
+---
+
+### Phase 24: Pattern Consistency
+**Goal**: Standardize patterns where analysis from Phase 21 justifies
+**Depends on**: Phase 23
+**Requirements**: PATT-01, PATT-02, PATT-03, PATT-04, PATT-05, PATT-06
+**Success Criteria** (what must be TRUE):
+  1. All 6 EMA variants retained (no consolidation)
+  2. Data loading patterns consistent across variants (if gap analysis identified inconsistency)
+  3. Shared utilities extracted for common code (if duplication was identified)
+  4. Standardization applied only where gap analysis justified (no premature abstraction)
+**Plans**: TBD
+
+Plans:
+- [ ] 24-01: Apply pattern standardization based on gap analysis findings (PATT-01 to PATT-06)
+
+---
+
+### Phase 25: Baseline Capture
+**Goal**: Capture current EMA outputs before validation testing
+**Depends on**: Phase 24
+**Requirements**: TEST-01
+**Success Criteria** (what must be TRUE):
+  1. Baseline outputs captured for all 6 EMA variants
+  2. Baselines stored in format suitable for comparison (epsilon tolerance aware)
+  3. Baseline capture documented and reproducible
+**Plans**: TBD
+
+Plans:
+- [ ] 25-01: Capture baseline EMA outputs from all 6 variants (TEST-01)
+
+---
+
+### Phase 26: Validation
+**Goal**: Verify all fixes worked correctly and nothing broke
+**Depends on**: Phase 25
+**Requirements**: TEST-02, TEST-03, TEST-04, TEST-05
+**Success Criteria** (what must be TRUE):
+  1. Side-by-side comparison confirms outputs match baseline within epsilon tolerance
+  2. New asset test (e.g., LTC) works end-to-end through full pipeline
+  3. Incremental refresh test confirms only new data processed, state advances correctly
+  4. Manual spot-checks confirm key tables and outputs are correct
+**Plans**: TBD
+
+Plans:
+- [ ] 26-01: Run side-by-side comparison against baseline (TEST-02)
+- [ ] 26-02: Execute new asset and incremental refresh tests (TEST-03, TEST-04)
+- [ ] 26-03: Perform manual spot-checks and final validation (TEST-05)
+
+---
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> 12 -> ... -> 19 (v0.5.0)
+Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19 (v0.5.0) -> 20 -> ... -> 26 (v0.6.0)
 
 ### v0.4.0 Progress (Complete)
 
@@ -371,7 +443,7 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> 12 -> ...
 | 9. Integration & Observability | 7/7 | Complete | 2026-01-30 |
 | 10. Release Validation | 8/8 | Complete | 2026-02-01 |
 
-### v0.5.0 Progress (Current)
+### v0.5.0 Progress (Complete)
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -385,25 +457,38 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> 12 -> ...
 | 18. Structure Documentation | 4/4 | Complete | 2026-02-04 |
 | 19. Memory Validation & Release | 6/6 | Complete | 2026-02-04 |
 
+### v0.6.0 Progress (Current)
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 20. Historical Context | 0/1 | Not started | - |
+| 21. Comprehensive Review | 0/3 | Not started | - |
+| 22. Critical Data Quality Fixes | 0/2 | Not started | - |
+| 23. Reliable Incremental Refresh | 0/3 | Not started | - |
+| 24. Pattern Consistency | 0/1 | Not started | - |
+| 25. Baseline Capture | 0/1 | Not started | - |
+| 26. Validation | 0/3 | Not started | - |
+
 ## Requirement Coverage
 
-### v0.5.0 Requirements (32 total)
+### v0.6.0 Requirements (40 total)
 
 | Category | Requirements | Phase(s) | Count |
 |----------|--------------|----------|-------|
-| Memory Integration | MEMO-10, MEMO-11, MEMO-12 | Phase 11 | 3 |
-| Memory Integration | MEMO-13, MEMO-14 | Phases 13-16 | 2 (used in 4 phases) |
-| Memory Integration | MEMO-15, MEMO-16, MEMO-17, MEMO-18 | Phase 19 | 4 |
-| Archive Management | ARCH-01, ARCH-02, ARCH-03, ARCH-04 | Phase 12 | 4 |
-| Documentation | DOC-01, DOC-02, DOC-03 | Phase 13 | 3 |
-| Tools Integration | TOOL-01, TOOL-02, TOOL-03 | Phase 14 | 3 |
-| Economic Data | ECON-01, ECON-02, ECON-03 | Phase 15 | 3 |
-| Repository Cleanup | CLEAN-01, CLEAN-02, CLEAN-03, CLEAN-04 | Phase 16 | 4 |
-| Verification | VAL-01, VAL-02, VAL-03, VAL-04 | Phase 17 | 4 |
-| Structure Docs | STRUCT-01, STRUCT-02, STRUCT-03 | Phase 18 | 3 |
+| Historical Context | HIST-01, HIST-02, HIST-03 | Phase 20 | 3 |
+| Understanding Questions | RVWQ-01, RVWQ-02, RVWQ-03, RVWQ-04 | Phase 21 | 4 |
+| Review Deliverables | RVWD-01, RVWD-02, RVWD-03, RVWD-04 | Phase 21 | 4 |
+| Data Source Migration | DATA-01, DATA-02, DATA-03, DATA-04 | Phase 22 | 4 |
+| Database Validation | DVAL-01, DVAL-02, DVAL-03, DVAL-04 | Phase 22 | 4 |
+| Orchestration | ORCH-01, ORCH-02, ORCH-03, ORCH-04 | Phase 23 | 4 |
+| State Management | STAT-01, STAT-02, STAT-03, STAT-04 | Phase 23 | 4 |
+| Visibility | VISI-01, VISI-02, VISI-03 | Phase 23 | 3 |
+| Pattern Standardization | PATT-01, PATT-02, PATT-03, PATT-04, PATT-05, PATT-06 | Phase 24 | 6 |
+| Baseline | TEST-01 | Phase 25 | 1 |
+| Validation Testing | TEST-02, TEST-03, TEST-04, TEST-05 | Phase 26 | 4 |
 
-**Coverage:** 32/32 requirements mapped (100%)
+**Coverage:** 40/40 requirements mapped (100%)
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-04 (v0.5.0 COMPLETE: Phase 19 complete - Memory Validation & Release with function-level granularity, relationship graph, duplicate detection, ready for v0.5.0 tag)*
+*Last updated: 2026-02-05 (v0.6.0 roadmap created: 7 phases, 40 requirements mapped)*

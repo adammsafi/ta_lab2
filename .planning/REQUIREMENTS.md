@@ -13,10 +13,10 @@ EMAs using unvalidated data (price_histories7 with NULLs) creates data quality r
 ## Success Criteria
 
 When v0.6.0 is complete:
-- ✓ **I can add a new asset mechanically** - clear steps, no surprises
-- ✓ **I trust data quality** - validated bars → validated EMAs, NULLs can't slip through
-- ✓ **Incremental refresh just works** - one command, visibility, efficient, gap handling
-- ✓ **I understand the system** - clear docs (building on what exists), can explain how it works
+- **I can add a new asset mechanically** - clear steps, no surprises
+- **I trust data quality** - validated bars -> validated EMAs, NULLs can't slip through
+- **Incremental refresh just works** - one command, visibility, efficient, gap handling
+- **I understand the system** - clear docs (building on what exists), can explain how it works
 
 ---
 
@@ -44,7 +44,7 @@ When v0.6.0 is complete:
 ### Review Deliverables
 
 - [ ] **RVWD-01**: Script inventory table - every bar/EMA script with purpose, tables updated, state tables used, dependencies
-- [ ] **RVWD-02**: Data flow diagram - visual showing price_histories7 → bars → EMAs with validation points marked
+- [ ] **RVWD-02**: Data flow diagram - visual showing price_histories7 -> bars -> EMAs with validation points marked
 - [ ] **RVWD-03**: Variant comparison matrix - side-by-side comparison of 6 EMA variants (data source, state schema, calendar alignment, differences)
 - [ ] **RVWD-04**: Gap analysis document - structured list with severity tiers (CRITICAL: data sources, HIGH: patterns, MEDIUM: schemas, LOW: cosmetic) and recommendations
 
@@ -151,23 +151,65 @@ When v0.6.0 is complete:
 
 ## Traceability
 
-Requirements mapped to roadmap phases (populated by roadmapper):
+Requirements mapped to roadmap phases:
 
-| Requirement ID | Phase(s) | Status |
-|----------------|----------|--------|
-| (To be populated by roadmapper) | | |
+| Requirement ID | Phase | Status |
+|----------------|-------|--------|
+| HIST-01 | Phase 20 | Pending |
+| HIST-02 | Phase 20 | Pending |
+| HIST-03 | Phase 20 | Pending |
+| RVWQ-01 | Phase 21 | Pending |
+| RVWQ-02 | Phase 21 | Pending |
+| RVWQ-03 | Phase 21 | Pending |
+| RVWQ-04 | Phase 21 | Pending |
+| RVWD-01 | Phase 21 | Pending |
+| RVWD-02 | Phase 21 | Pending |
+| RVWD-03 | Phase 21 | Pending |
+| RVWD-04 | Phase 21 | Pending |
+| DATA-01 | Phase 22 | Pending |
+| DATA-02 | Phase 22 | Pending |
+| DATA-03 | Phase 22 | Pending |
+| DATA-04 | Phase 22 | Pending |
+| DVAL-01 | Phase 22 | Pending |
+| DVAL-02 | Phase 22 | Pending |
+| DVAL-03 | Phase 22 | Pending |
+| DVAL-04 | Phase 22 | Pending |
+| ORCH-01 | Phase 23 | Pending |
+| ORCH-02 | Phase 23 | Pending |
+| ORCH-03 | Phase 23 | Pending |
+| ORCH-04 | Phase 23 | Pending |
+| STAT-01 | Phase 23 | Pending |
+| STAT-02 | Phase 23 | Pending |
+| STAT-03 | Phase 23 | Pending |
+| STAT-04 | Phase 23 | Pending |
+| VISI-01 | Phase 23 | Pending |
+| VISI-02 | Phase 23 | Pending |
+| VISI-03 | Phase 23 | Pending |
+| PATT-01 | Phase 24 | Pending |
+| PATT-02 | Phase 24 | Pending |
+| PATT-03 | Phase 24 | Pending |
+| PATT-04 | Phase 24 | Pending |
+| PATT-05 | Phase 24 | Pending |
+| PATT-06 | Phase 24 | Pending |
+| TEST-01 | Phase 25 | Pending |
+| TEST-02 | Phase 26 | Pending |
+| TEST-03 | Phase 26 | Pending |
+| TEST-04 | Phase 26 | Pending |
+| TEST-05 | Phase 26 | Pending |
 
 ---
 
-**Total Requirements:** 40 across 5 phases
-- Phase 0 (Historical Context): 3 requirements
-- Phase 1 (Comprehensive Review): 8 requirements
-- Phase 2 (Critical Fixes): 8 requirements
-- Phase 3 (Incremental Refresh): 10 requirements
-- Phase 4 (Pattern Consistency): 6 requirements
-- Phase 5 (Validation): 5 requirements
+**Total Requirements:** 40 across 6 requirement phases (mapped to 7 roadmap phases)
+- Phase 0 (Historical Context): 3 requirements -> Roadmap Phase 20
+- Phase 1 (Comprehensive Review): 8 requirements -> Roadmap Phase 21
+- Phase 2 (Critical Fixes): 8 requirements -> Roadmap Phase 22
+- Phase 3 (Incremental Refresh): 11 requirements -> Roadmap Phase 23
+- Phase 4 (Pattern Consistency): 6 requirements -> Roadmap Phase 24
+- Phase 5 (Validation): 5 requirements -> Roadmap Phases 25-26
+
+**Coverage:** 40/40 requirements mapped (100%)
 
 ---
 
 *Created: 2026-02-05*
-*Last updated: 2026-02-05 (v0.6.0 requirements defined from bottom-up goal analysis)*
+*Last updated: 2026-02-05 (traceability section populated by roadmapper)*
