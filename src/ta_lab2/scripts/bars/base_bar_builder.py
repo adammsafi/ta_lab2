@@ -159,6 +159,12 @@ class BaseBarBuilder(ABC):
 
         Returns:
             Fully qualified state table name (e.g., "public.cmc_price_bars_1d_state")
+
+        Note on calendar builder state tables:
+            The tz column in calendar builder state tables is metadata only,
+            NOT part of PRIMARY KEY. Calendar builders process single timezone
+            per run (--tz flag). See sql/ddl/calendar_state_tables.sql for full
+            rationale.
         """
 
     @abstractmethod
