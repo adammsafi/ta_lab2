@@ -213,30 +213,21 @@ class MultiTFEMARefresher(BaseEMARefresher):
     @classmethod
     def create_argument_parser(cls) -> argparse.ArgumentParser:
         """Create argument parser with multi-tf specific arguments."""
-        # Create base parser but we'll override required for out_table and state_table
-        p = argparse.ArgumentParser(
+        # Use base parser to get standardized arguments including validation
+        p = cls.create_base_argument_parser(
             description="Refresh cmc_ema_multi_tf from tf_day bars (refactored).",
         )
 
-        # Add base arguments manually to control defaults
-        p.add_argument("--db-url", default=None)
-        p.add_argument("--ids", default="all")
-        p.add_argument("--periods", default=None)
-        p.add_argument("--out-schema", default="public")
-        p.add_argument("--out-table", default="cmc_ema_multi_tf")
-        p.add_argument("--state-table", default="cmc_ema_multi_tf_state")
-        p.add_argument("--full-refresh", action="store_true")
-        p.add_argument("--num-processes", type=int, default=None)
+        # Override defaults for this script
+        p.set_defaults(
+            out_table="cmc_ema_multi_tf",
+            state_table="cmc_ema_multi_tf_state",
+        )
 
         # Script-specific arguments
         p.add_argument("--bars-table", default="cmc_price_bars_multi_tf")
         p.add_argument("--bars-schema", default="public")
         p.add_argument("--tfs", default=None)
-
-        # Logging arguments
-        from ta_lab2.scripts.emas.logging_config import add_logging_args
-
-        add_logging_args(p)
 
         return p
 
@@ -263,6 +254,8 @@ class MultiTFEMARefresher(BaseEMARefresher):
             log_file=args.log_file,
             quiet=args.quiet,
             debug=args.debug,
+            validate_output=args.validate_output,
+            ema_rejects_table=args.ema_rejects_table,
             extra_config={
                 "bars_table": args.bars_table,
                 "bars_schema": args.bars_schema,
@@ -301,6 +294,8 @@ class MultiTFEMARefresher(BaseEMARefresher):
             log_file=args.log_file,
             quiet=args.quiet,
             debug=args.debug,
+            validate_output=args.validate_output,
+            ema_rejects_table=args.ema_rejects_table,
             extra_config={
                 "bars_table": args.bars_table,
                 "bars_schema": args.bars_schema,

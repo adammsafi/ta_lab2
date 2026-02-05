@@ -518,6 +518,101 @@ class BaseEMARefresher(ABC):
             f"{self.config.output_schema}.{self.config.ema_rejects_table}"
         )
 
+    @staticmethod
+    def validate_and_log_ema_batch(
+        engine: Engine,
+        ema_df: pd.DataFrame,
+        bars_df: pd.DataFrame,
+        config: dict,
+        logger: Optional[logging.Logger] = None,
+    ) -> int:
+        """
+        Validate EMA batch and log violations.
+
+        This is a static method so workers can call it without refresher instance.
+
+        Args:
+            engine: SQLAlchemy engine
+            ema_df: DataFrame with computed EMAs (columns: id, tf, period, timestamp, ema)
+            bars_df: DataFrame with source bars (columns: id, tf, timestamp, close)
+            config: Dictionary with:
+                - validate_output: bool (if False, skip validation)
+                - ema_rejects_table: str
+                - output_schema: str
+                - output_table: str (for statistical bounds)
+                - bars_table: str (for price bounds)
+                - bars_schema: str
+            logger: Optional logger for warnings
+
+        Returns:
+            Number of violations found
+        """
+        if not config.get("validate_output", True):
+            return 0
+
+        if logger is None:
+            logger = logging.getLogger(__name__)
+
+        # Merge close prices into EMA dataframe
+        ema_with_close = ema_df.merge(
+            bars_df[["id", "tf", "timestamp", "close"]],
+            on=["id", "tf", "timestamp"],
+            how="left",
+        )
+
+        # Get unique (id, tf) combinations for bounds queries
+        id_tf_pairs = ema_with_close[["id", "tf"]].drop_duplicates()
+
+        # Batch query price bounds
+        price_bounds = {}
+        for _, row in id_tf_pairs.iterrows():
+            bounds = get_price_bounds(
+                engine=engine,
+                id=row["id"],
+                tf=row["tf"],
+                source_table=f"{config['bars_schema']}.{config['bars_table']}",
+                lookback_days=90,
+            )
+            price_bounds[(row["id"], row["tf"])] = bounds
+
+        # Get unique (id, tf, period) combinations for statistical bounds
+        id_tf_period_triples = ema_with_close[["id", "tf", "period"]].drop_duplicates()
+
+        # Batch query statistical bounds
+        statistical_bounds = {}
+        output_table = (
+            f"{config['output_schema']}.{config.get('output_table', 'ema_output')}"
+        )
+        for _, row in id_tf_period_triples.iterrows():
+            bounds = get_statistical_bounds(
+                engine=engine,
+                id=row["id"],
+                tf=row["tf"],
+                period=row["period"],
+                output_table=output_table,
+                lookback_count=100,
+            )
+            statistical_bounds[(row["id"], row["tf"], row["period"])] = bounds
+
+        # Validate
+        _, violations = validate_ema_output(
+            ema_values=ema_with_close,
+            price_bounds=price_bounds,
+            statistical_bounds=statistical_bounds,
+        )
+
+        # Log violations
+        if violations:
+            num_violations = log_ema_violations(
+                engine=engine,
+                violations=violations,
+                rejects_table=config.get("ema_rejects_table", "ema_rejects"),
+                schema=config.get("output_schema", "public"),
+            )
+            return num_violations
+
+        return 0
+
     # =========================================================================
     # Abstract Methods (MUST override)
     # =========================================================================
