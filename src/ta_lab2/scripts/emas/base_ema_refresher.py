@@ -34,8 +34,13 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Optional, Sequence, Any
 import argparse
+import logging
+import json
 
+import pandas as pd
+import numpy as np
 from sqlalchemy.engine import Engine
+from sqlalchemy import text
 
 from ta_lab2.scripts.bars.common_snapshot_contract import (
     load_all_ids,
@@ -53,6 +58,332 @@ from ta_lab2.scripts.emas.ema_computation_orchestrator import (
     EMAComputationOrchestrator,
     WorkerTask,
 )
+
+
+# =============================================================================
+# EMA Validation - Reject Table Schema
+# =============================================================================
+
+EMA_REJECTS_TABLE_DDL = """
+CREATE TABLE IF NOT EXISTS {schema}.{table} (
+    id INTEGER,
+    tf TEXT,
+    period INTEGER,
+    timestamp TIMESTAMPTZ,
+    ema_value DOUBLE PRECISION,
+    violation_type TEXT,  -- 'nan', 'infinity', 'negative', 'out_of_price_bounds', 'out_of_statistical_bounds'
+    bounds_info TEXT,     -- JSON with bound details: {"price_min": X, "price_max": Y, "stat_mean": Z, "stat_std": W}
+    source_bar_close DOUBLE PRECISION,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (id, tf, period, timestamp, violation_type)
+);
+"""
+
+
+# =============================================================================
+# EMA Validation Functions
+# =============================================================================
+
+
+def get_price_bounds(
+    engine: Engine, id: int, tf: str, source_table: str, lookback_days: int = 90
+) -> tuple[float, float]:
+    """
+    Get price bounds from source bar table for EMA validation.
+
+    Returns (min_bound, max_bound) where:
+    - min_bound = 0.5 * MIN(close) over lookback window
+    - max_bound = 2.0 * MAX(close) over lookback window
+
+    These wide bounds catch extreme outliers (infinity, corruption)
+    while allowing normal price movements.
+
+    Args:
+        engine: SQLAlchemy engine for database operations
+        id: Cryptocurrency ID
+        tf: Timeframe (e.g., "1D", "7D")
+        source_table: Source bars table (e.g., "public.cmc_price_bars_multi_tf")
+        lookback_days: Number of days to look back for bounds (default: 90)
+
+    Returns:
+        Tuple of (min_bound, max_bound). Returns (None, None) if no data found.
+    """
+    query = text(
+        f"""
+        SELECT
+            0.5 * MIN(close) as min_bound,
+            2.0 * MAX(close) as max_bound
+        FROM {source_table}
+        WHERE id = :id
+          AND tf = :tf
+          AND timestamp >= NOW() - INTERVAL '{lookback_days} days'
+    """
+    )
+
+    with engine.connect() as conn:
+        result = conn.execute(query, {"id": id, "tf": tf}).fetchone()
+
+    if result and result[0] is not None and result[1] is not None:
+        return (float(result[0]), float(result[1]))
+
+    return (None, None)
+
+
+def get_statistical_bounds(
+    engine: Engine,
+    id: int,
+    tf: str,
+    period: int,
+    output_table: str,
+    lookback_count: int = 100,
+) -> tuple[float, float, float, float]:
+    """
+    Get statistical bounds from historical EMA distribution.
+
+    Returns (mean, std, lower_bound, upper_bound) where:
+    - mean, std computed from last N EMA values for this (id, tf, period)
+    - lower_bound = mean - 3 * std
+    - upper_bound = mean + 3 * std
+
+    These narrow bounds catch calculation drift, subtle errors.
+    Returns (None, None, None, None) if insufficient history (<10 values).
+
+    Args:
+        engine: SQLAlchemy engine for database operations
+        id: Cryptocurrency ID
+        tf: Timeframe (e.g., "1D", "7D")
+        period: EMA period (e.g., 9, 21, 50)
+        output_table: EMA output table (e.g., "public.cmc_ema_multi_tf")
+        lookback_count: Number of recent EMA values to use (default: 100)
+
+    Returns:
+        Tuple of (mean, std, lower_bound, upper_bound).
+        Returns (None, None, None, None) if insufficient history.
+    """
+    query = text(
+        f"""
+        SELECT
+            AVG(ema) as mean,
+            STDDEV(ema) as std,
+            COUNT(*) as count
+        FROM (
+            SELECT ema
+            FROM {output_table}
+            WHERE id = :id
+              AND tf = :tf
+              AND period = :period
+              AND ema IS NOT NULL
+            ORDER BY timestamp DESC
+            LIMIT :lookback_count
+        ) recent
+    """
+    )
+
+    with engine.connect() as conn:
+        result = conn.execute(
+            query,
+            {"id": id, "tf": tf, "period": period, "lookback_count": lookback_count},
+        ).fetchone()
+
+    if result and result[0] is not None and result[1] is not None and result[2] >= 10:
+        mean = float(result[0])
+        std = float(result[1])
+        lower_bound = mean - 3 * std
+        upper_bound = mean + 3 * std
+        return (mean, std, lower_bound, upper_bound)
+
+    return (None, None, None, None)
+
+
+def validate_ema_output(
+    ema_values: pd.DataFrame,  # columns: id, tf, period, timestamp, ema, close
+    price_bounds: dict,  # {(id, tf): (min, max)}
+    statistical_bounds: dict,  # {(id, tf, period): (mean, std, lower, upper)}
+) -> tuple[pd.DataFrame, list[dict]]:
+    """
+    Validate EMA output values against hybrid bounds.
+
+    Checks (in order):
+    1. NOT NULL / NOT NaN
+    2. NOT infinity
+    3. NOT negative
+    4. Within price bounds (0.5x-2x recent min/max)
+    5. Within statistical bounds (mean +/- 3 std)
+
+    Returns:
+    - ema_values unchanged (all rows, including invalid)
+    - list of violation records for rejects table
+
+    Strategy: Warn and continue - log violations but write all EMAs.
+
+    Args:
+        ema_values: DataFrame with columns: id, tf, period, timestamp, ema, close
+        price_bounds: Dictionary mapping (id, tf) -> (min_bound, max_bound)
+        statistical_bounds: Dictionary mapping (id, tf, period) -> (mean, std, lower, upper)
+
+    Returns:
+        Tuple of (ema_values unchanged, list of violation dictionaries)
+    """
+    violations = []
+
+    for idx, row in ema_values.iterrows():
+        id_ = row["id"]
+        tf = row["tf"]
+        period = row["period"]
+        timestamp = row["timestamp"]
+        ema = row["ema"]
+        close = row.get("close", None)
+
+        # Check 1: NOT NULL / NOT NaN
+        if pd.isna(ema):
+            violations.append(
+                {
+                    "id": id_,
+                    "tf": tf,
+                    "period": period,
+                    "timestamp": timestamp,
+                    "ema_value": None,
+                    "violation_type": "nan",
+                    "bounds_info": json.dumps({}),
+                    "source_bar_close": close,
+                }
+            )
+            continue
+
+        # Check 2: NOT infinity
+        if np.isinf(ema):
+            violations.append(
+                {
+                    "id": id_,
+                    "tf": tf,
+                    "period": period,
+                    "timestamp": timestamp,
+                    "ema_value": float(ema) if not np.isnan(ema) else None,
+                    "violation_type": "infinity",
+                    "bounds_info": json.dumps({}),
+                    "source_bar_close": close,
+                }
+            )
+            continue
+
+        # Check 3: NOT negative
+        if ema < 0:
+            violations.append(
+                {
+                    "id": id_,
+                    "tf": tf,
+                    "period": period,
+                    "timestamp": timestamp,
+                    "ema_value": float(ema),
+                    "violation_type": "negative",
+                    "bounds_info": json.dumps({}),
+                    "source_bar_close": close,
+                }
+            )
+            continue
+
+        # Check 4: Within price bounds (if available)
+        price_key = (id_, tf)
+        if price_key in price_bounds:
+            min_bound, max_bound = price_bounds[price_key]
+            if min_bound is not None and max_bound is not None:
+                if ema < min_bound or ema > max_bound:
+                    violations.append(
+                        {
+                            "id": id_,
+                            "tf": tf,
+                            "period": period,
+                            "timestamp": timestamp,
+                            "ema_value": float(ema),
+                            "violation_type": "out_of_price_bounds",
+                            "bounds_info": json.dumps(
+                                {"price_min": min_bound, "price_max": max_bound}
+                            ),
+                            "source_bar_close": close,
+                        }
+                    )
+                    continue
+
+        # Check 5: Within statistical bounds (if available)
+        stat_key = (id_, tf, period)
+        if stat_key in statistical_bounds:
+            mean, std, lower, upper = statistical_bounds[stat_key]
+            if lower is not None and upper is not None:
+                if ema < lower or ema > upper:
+                    violations.append(
+                        {
+                            "id": id_,
+                            "tf": tf,
+                            "period": period,
+                            "timestamp": timestamp,
+                            "ema_value": float(ema),
+                            "violation_type": "out_of_statistical_bounds",
+                            "bounds_info": json.dumps(
+                                {
+                                    "stat_mean": mean,
+                                    "stat_std": std,
+                                    "stat_lower": lower,
+                                    "stat_upper": upper,
+                                }
+                            ),
+                            "source_bar_close": close,
+                        }
+                    )
+
+    return ema_values, violations
+
+
+def log_ema_violations(
+    engine: Engine, violations: list[dict], rejects_table: str, schema: str = "public"
+) -> int:
+    """
+    Log EMA violations to rejects table and application logs.
+
+    For each violation:
+    - INSERT to rejects table
+    - Log at WARNING level: "EMA violation: id={id}, tf={tf}, period={period}, type={violation_type}"
+
+    Returns: Number of violations logged
+
+    Args:
+        engine: SQLAlchemy engine for database operations
+        violations: List of violation dictionaries from validate_ema_output
+        rejects_table: Name of rejects table
+        schema: Database schema (default: "public")
+
+    Returns:
+        Number of violations logged
+    """
+    if not violations:
+        return 0
+
+    logger = logging.getLogger(__name__)
+
+    # Convert to DataFrame for efficient bulk insert
+    df = pd.DataFrame(violations)
+
+    # Insert to rejects table
+    table_fq = f"{schema}.{rejects_table}"
+    df.to_sql(
+        rejects_table,
+        engine,
+        schema=schema,
+        if_exists="append",
+        index=False,
+        method="multi",
+    )
+
+    # Log each violation at WARNING level
+    for violation in violations:
+        logger.warning(
+            f"EMA violation: id={violation['id']}, tf={violation['tf']}, "
+            f"period={violation['period']}, type={violation['violation_type']}, "
+            f"ema_value={violation['ema_value']}"
+        )
+
+    logger.info(f"Logged {len(violations)} EMA violations to {table_fq}")
+
+    return len(violations)
 
 
 # =============================================================================
@@ -78,6 +409,8 @@ class EMARefresherConfig:
         log_file: Optional log file path
         quiet: Suppress console output
         debug: Enable debug mode
+        validate_output: If True, validate EMA output values (default: True)
+        ema_rejects_table: Table name for EMA violations (default: ema_rejects)
         extra_config: Script-specific configuration (alignment_type, etc.)
     """
 
@@ -93,6 +426,8 @@ class EMARefresherConfig:
     log_file: Optional[str] = None
     quiet: bool = False
     debug: bool = False
+    validate_output: bool = True
+    ema_rejects_table: str = "ema_rejects"
     extra_config: dict[str, Any] = None
 
     def __post_init__(self):
@@ -156,6 +491,31 @@ class BaseEMARefresher(ABC):
             log_file=config.log_file,
             quiet=config.quiet,
             debug=config.debug,
+        )
+
+        # Create rejects table if validation enabled
+        if config.validate_output:
+            self._ensure_rejects_table()
+
+    # =========================================================================
+    # Validation Setup
+    # =========================================================================
+
+    def _ensure_rejects_table(self) -> None:
+        """
+        Create EMA rejects table if it doesn't exist.
+
+        Called during __init__ if validate_output is True.
+        """
+        ddl = EMA_REJECTS_TABLE_DDL.format(
+            schema=self.config.output_schema, table=self.config.ema_rejects_table
+        )
+        with self.engine.begin() as conn:
+            conn.execute(text(ddl))
+
+        self.logger.debug(
+            f"Ensured rejects table exists: "
+            f"{self.config.output_schema}.{self.config.ema_rejects_table}"
         )
 
     # =========================================================================
@@ -612,6 +972,25 @@ If you see "too many clients already" errors:
             type=int,
             default=None,
             help="Number of parallel processes. Default: min(cpu_count(), 4)",
+        )
+
+        # Validation
+        p.add_argument(
+            "--validate-output",
+            action="store_true",
+            default=True,
+            help="Validate EMA output (default: True)",
+        )
+        p.add_argument(
+            "--no-validate-output",
+            action="store_false",
+            dest="validate_output",
+            help="Skip EMA output validation",
+        )
+        p.add_argument(
+            "--ema-rejects-table",
+            default="ema_rejects",
+            help="Table name for EMA violations (default: ema_rejects)",
         )
 
         # Logging
