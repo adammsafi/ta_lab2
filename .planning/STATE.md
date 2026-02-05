@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 
 ## Current Position
 
-Phase: 22 of 26 (Critical Data Quality Fixes)
-Plan: 6 of 6 in current phase
+Phase: 23 of 26 (Reliable Incremental Refresh)
+Plan: 1 of 1 in current phase
 Status: Phase complete
-Last activity: 2026-02-05 — Phase 22 complete (All 4 CRITICAL gaps fixed + derivation architecture)
+Last activity: 2026-02-05 — Phase 23 complete (EMA orchestrator enhanced with subprocess isolation)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [########  ] 80% v0.6.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [#########] 85% v0.6.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 125 (56 in v0.4.0, 56 in v0.5.0, 13 in v0.6.0)
+- Total plans completed: 126 (56 in v0.4.0, 56 in v0.5.0, 14 in v0.6.0)
 - Average duration: 7 min
-- Total execution time: 24.7 hours
+- Total execution time: 24.8 hours
 
 **By Phase (v0.4.0):**
 
@@ -55,7 +55,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [########  ] 80%
 **Recent Trend:**
 - v0.4.0 complete: 10 phases, 56 plans, 12.55 hours total
 - v0.5.0 complete: 9 phases, 56 plans, 9.85 hours total
-- v0.6.0 in progress: 13/14 plans complete (93% done) - 3 of 7 phases complete
+- v0.6.0 in progress: 14/14 plans complete (100% done) - 4 of 7 phases complete
 
 **By Phase (v0.6.0):**
 
@@ -64,6 +64,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [########  ] 80%
 | 20-historical-context | 3/3 | 17 min | 6 min | Complete |
 | 21-comprehensive-review | 4/4 | 29 min | 7 min | Complete |
 | 22-critical-data-quality-fixes | 6/6 | 82 min | 14 min | Complete |
+| 23-reliable-incremental-refresh | 1/1 | 4 min | 4 min | Complete |
 
 *Updated after each plan completion*
 
@@ -88,6 +89,7 @@ Recent decisions affecting current work:
 - **Warn and continue for EMA violations** (Phase 22-02): Write all EMAs even if invalid, log to both ema_rejects table and WARNING logs for maximum visibility
 - **Derive multi-TF from 1D bars** (Phase 22-04/22-05): All 5 multi-TF builders support optional --from-1d derivation with calendar alignment - creates single source of truth for bar data quality
 - **Reject tables dual purpose** (Phase 22-01): Multi-TF reject tables log OHLC repairs pre-derivation AND validate aggregation post-derivation - complete audit trail with violation_type + repair_action columns
+- **Subprocess isolation for orchestrators** (Phase 23-01): EMA orchestrator refactored to use subprocess.run instead of runpy for process isolation, matching bar orchestrator pattern with dry-run and summary reporting
 
 ### Pending Todos
 
@@ -100,7 +102,7 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-05
-Stopped at: Phase 22 complete - All 4 CRITICAL gaps fixed (multi-TF rejects, EMA validation, 1D backfill, derivation architecture) + automated test suite
+Stopped at: Phase 23 complete - EMA orchestrator enhanced with subprocess isolation, dry-run, and summary reporting
 Resume file: None
 
 ---
@@ -126,4 +128,4 @@ Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-05 (Phase 22 complete - All 4 CRITICAL gaps fixed: multi-TF reject tables, EMA hybrid validation, 1D backfill detection, derivation architecture, automated test suite)*
+*Last updated: 2026-02-05 (Phase 23 complete - EMA orchestrator enhanced with subprocess isolation, dry-run, and summary reporting)*
