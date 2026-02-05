@@ -353,12 +353,12 @@ Plans:
 **Plans**: 6 plans in 3 waves
 
 Plans:
-- [ ] 22-01-PLAN.md - Multi-TF reject tables (GAP-C01: shared schema + 5 builders)
-- [ ] 22-02-PLAN.md - EMA output validation (GAP-C02: hybrid bounds in BaseEMARefresher)
-- [ ] 22-03-PLAN.md - 1D backfill detection (GAP-C03 Part 1: daily_min_seen column)
-- [ ] 22-04-PLAN.md - Derive multi-TF foundation (GAP-C03 Part 2: derivation module + main builder)
-- [ ] 22-05-PLAN.md - Derive multi-TF calendar builders (GAP-C03 Part 3: all 4 calendar variants)
-- [ ] 22-06-PLAN.md - Automated validation test suite (GAP-C04: tests + CI integration)
+- [x] 22-01-PLAN.md - Multi-TF reject tables (GAP-C01: shared schema + 5 builders)
+- [x] 22-02-PLAN.md - EMA output validation (GAP-C02: hybrid bounds in BaseEMARefresher)
+- [x] 22-03-PLAN.md - 1D backfill detection (GAP-C03 Part 1: daily_min_seen column)
+- [x] 22-04-PLAN.md - Derive multi-TF foundation (GAP-C03 Part 2: derivation module + main builder)
+- [x] 22-05-PLAN.md - Derive multi-TF calendar builders (GAP-C03 Part 3: all 4 calendar variants)
+- [x] 22-06-PLAN.md - Automated validation test suite (GAP-C04: tests + CI integration)
 
 ---
 
@@ -383,18 +383,22 @@ Plans:
 ---
 
 ### Phase 24: Pattern Consistency
-**Goal**: Standardize patterns where analysis from Phase 21 justifies
+**Goal**: Standardize bar builder patterns by extracting BaseBarBuilder following proven BaseEMARefresher template
 **Depends on**: Phase 23
 **Requirements**: PATT-01, PATT-02, PATT-03, PATT-04, PATT-05, PATT-06
 **Success Criteria** (what must be TRUE):
   1. All 6 EMA variants retained (no consolidation)
-  2. Data loading patterns consistent across variants (if gap analysis identified inconsistency)
-  3. Shared utilities extracted for common code (if duplication was identified)
-  4. Standardization applied only where gap analysis justified (no premature abstraction)
-**Plans**: TBD
+  2. BaseBarBuilder template class created mirroring BaseEMARefresher pattern
+  3. All 6 bar builders refactored to use BaseBarBuilder (70% LOC reduction target)
+  4. Calendar tz column design rationale documented (GAP-M03 closed)
+  5. Standardization applied only where gap analysis justified (no premature abstraction)
+**Plans**: 4 plans in 3 waves
 
 Plans:
-- [ ] 24-01: Apply pattern standardization based on gap analysis findings (PATT-01 to PATT-06)
+- [ ] 24-01-PLAN.md - Design and create BaseBarBuilder template class (GAP-M01 foundation)
+- [ ] 24-02-PLAN.md - Refactor 1D bar builder to use BaseBarBuilder (proof of concept)
+- [ ] 24-03-PLAN.md - Refactor main multi-TF builder to use BaseBarBuilder
+- [ ] 24-04-PLAN.md - Refactor 4 calendar builders + document tz column (GAP-M03)
 
 ---
 
@@ -472,8 +476,8 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19
 | 20. Historical Context | 3/3 | Complete | 2026-02-05 |
 | 21. Comprehensive Review | 4/4 | Complete | 2026-02-05 |
 | 22. Critical Data Quality Fixes | 6/6 | Complete | 2026-02-05 |
-| 23. Reliable Incremental Refresh | 0/4 | Not started | - |
-| 24. Pattern Consistency | 0/1 | Not started | - |
+| 23. Reliable Incremental Refresh | 4/4 | Complete | 2026-02-05 |
+| 24. Pattern Consistency | 0/4 | Not started | - |
 | 25. Baseline Capture | 0/1 | Not started | - |
 | 26. Validation | 0/3 | Not started | - |
 
@@ -498,4 +502,4 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-05 (Phase 23 planned: 4 plans in 3 waves)*
+*Last updated: 2026-02-05 (Phase 24 planned: 4 plans in 3 waves)*
