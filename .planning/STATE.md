@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 ## Current Position
 
 Phase: 22 of 26 (Critical Data Quality Fixes)
-Plan: 4 of 4 in current phase
+Plan: 6 of 6 in current phase
 Status: Phase complete
-Last activity: 2026-02-05 — Completed 22-05-PLAN.md (Calendar builders derivation)
+Last activity: 2026-02-05 — Phase 22 complete (All 4 CRITICAL gaps fixed + derivation architecture)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [#######   ] 70% v0.6.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [########  ] 80% v0.6.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 122 (56 in v0.4.0, 56 in v0.5.0, 10 in v0.6.0)
+- Total plans completed: 125 (56 in v0.4.0, 56 in v0.5.0, 13 in v0.6.0)
 - Average duration: 7 min
-- Total execution time: 24.0 hours
+- Total execution time: 24.7 hours
 
 **By Phase (v0.4.0):**
 
@@ -55,7 +55,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [#######   ] 70%
 **Recent Trend:**
 - v0.4.0 complete: 10 phases, 56 plans, 12.55 hours total
 - v0.5.0 complete: 9 phases, 56 plans, 9.85 hours total
-- v0.6.0 in progress: 10/14 plans complete (71% done) - 3 of 7 phases complete
+- v0.6.0 in progress: 13/14 plans complete (93% done) - 3 of 7 phases complete
 
 **By Phase (v0.6.0):**
 
@@ -63,7 +63,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [#######   ] 70%
 |-------|-------|-------|----------|--------|
 | 20-historical-context | 3/3 | 17 min | 6 min | Complete |
 | 21-comprehensive-review | 4/4 | 29 min | 7 min | Complete |
-| 22-critical-data-quality-fixes | 4/4 | 37 min | 9 min | Complete |
+| 22-critical-data-quality-fixes | 6/6 | 82 min | 14 min | Complete |
 
 *Updated after each plan completion*
 
@@ -86,6 +86,8 @@ Recent decisions affecting current work:
 - **Asset onboarding documented** (Phase 21-04): 6-step checklist (dim_assets → 1D bars → multi-TF bars → EMAs → validate → verify incremental), 15-40 minutes per asset
 - **Hybrid EMA validation** (Phase 22-02): Wide price bounds (0.5x-2x) catch corruption, narrow statistical bounds (3σ) catch drift - batched queries achieve <2% overhead
 - **Warn and continue for EMA violations** (Phase 22-02): Write all EMAs even if invalid, log to both ema_rejects table and WARNING logs for maximum visibility
+- **Derive multi-TF from 1D bars** (Phase 22-04/22-05): All 5 multi-TF builders support optional --from-1d derivation with calendar alignment - creates single source of truth for bar data quality
+- **Reject tables dual purpose** (Phase 22-01): Multi-TF reject tables log OHLC repairs pre-derivation AND validate aggregation post-derivation - complete audit trail with violation_type + repair_action columns
 
 ### Pending Todos
 
@@ -98,7 +100,7 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-05
-Stopped at: Completed 22-05-PLAN.md (Calendar builders derivation) - All 4 calendar variant builders can now derive from validated 1D bars with proper calendar alignment
+Stopped at: Phase 22 complete - All 4 CRITICAL gaps fixed (multi-TF rejects, EMA validation, 1D backfill, derivation architecture) + automated test suite
 Resume file: None
 
 ---
@@ -124,4 +126,4 @@ Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-05 (Phase 21 complete - All 4 understanding questions answered, all 4 deliverables created, 15 gaps identified with severity tiers, 100% verification passed)*
+*Last updated: 2026-02-05 (Phase 22 complete - All 4 CRITICAL gaps fixed: multi-TF reject tables, EMA hybrid validation, 1D backfill detection, derivation architecture, automated test suite)*
