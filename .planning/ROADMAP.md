@@ -311,10 +311,12 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
   1. GSD phases 1-10 reviewed with key decisions documented
   2. Existing documentation inventory complete (what to leverage, what's missing)
   3. Current state assessment documented (what works, what's unclear, what's broken)
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 20-01: Review GSD phases 1-10 and document findings
+- [ ] 20-01-PLAN.md — Historical review: mine Git history and SUMMARYs for bar/EMA evolution narrative
+- [ ] 20-02-PLAN.md — Documentation inventory: catalog all bar/EMA docs with multi-dimensional categorization
+- [ ] 20-03-PLAN.md — Current state assessment: feature-level health matrix for bars and EMAs
 
 ---
 
@@ -461,7 +463,7 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 20. Historical Context | 0/1 | Not started | - |
+| 20. Historical Context | 0/3 | Not started | - |
 | 21. Comprehensive Review | 0/3 | Not started | - |
 | 22. Critical Data Quality Fixes | 0/2 | Not started | - |
 | 23. Reliable Incremental Refresh | 0/3 | Not started | - |
@@ -491,4 +493,4 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-05 (v0.6.0 roadmap created: 7 phases, 40 requirements mapped)*
+*Last updated: 2026-02-05 (Phase 20 planned: 3 plans in 1 wave, all parallel)*
