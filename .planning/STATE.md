@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 
 ## Current Position
 
-Phase: 24 of 26 (Pattern Consistency)
-Plan: 4 of 4 in current phase
-Status: Complete
-Last activity: 2026-02-05 — Completed Phase 24 (all 4 plans, 41.2% LOC reduction)
+Phase: 25 of 26 (Baseline Capture)
+Plan: 1 of 2 in current phase
+Status: In progress
+Last activity: 2026-02-05 — Completed 25-01-PLAN.md
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [#########-] 71% v0.6.0 (5/7 phases)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 137 (56 in v0.4.0, 56 in v0.5.0, 25 in v0.6.0)
+- Total plans completed: 138 (56 in v0.4.0, 56 in v0.5.0, 26 in v0.6.0)
 - Average duration: 7 min
-- Total execution time: 26.02 hours
+- Total execution time: 26.12 hours
 
 **By Phase (v0.4.0):**
 
@@ -66,6 +66,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [#########-] 71%
 | 22-critical-data-quality-fixes | 6/6 | 82 min | 14 min | Complete |
 | 23-reliable-incremental-refresh | 4/4 | 17 min | 4 min | Complete |
 | 24-pattern-consistency | 4/4 | 40 min | 10 min | Complete |
+| 25-baseline-capture | 1/2 | 6 min | 6 min | In progress |
 
 *Updated after each plan completion*
 
@@ -100,6 +101,10 @@ Recent decisions affecting current work:
 - **26.7% LOC reduction acceptable for SQL-based builders** (Phase 24-02): 1D builder achieved 260 lines saved (971→711) despite SQL-heavy implementation limiting code reuse with DataFrame-based base class
 - **46% LOC reduction for calendar builders** (Phase 24-04): All 4 calendar builders refactored (5991→3230 lines), preserving calendar alignment (US Sunday vs ISO Monday) and anchor window logic despite complex semantics
 - **tz column design documented (GAP-M03 closed)** (Phase 24-04): Calendar state tables use tz as metadata only, NOT in PRIMARY KEY - single timezone per run design is intentional, not a bug
+- **NumPy allclose hybrid tolerance for baseline comparison** (Phase 25-01): Combine absolute (atol) + relative (rtol) tolerance to handle both small values near zero and large values correctly - avoids false positives/negatives from single epsilon threshold
+- **Column-specific tolerances** (Phase 25-01): Price (1e-6/1e-5) vs volume (1e-2/1e-4) - different data types need different precision requirements
+- **NaN == NaN is match** (Phase 25-01): Treat NaN == NaN as match using equal_nan=True to avoid SQL NULL semantics issues (NULL != NULL)
+- **Git-based audit trail for baseline capture** (Phase 25-01): Capture git commit hash + timestamp + config in BaselineMetadata for full reproducibility 3 months later
 
 ### Pending Todos
 
@@ -112,7 +117,7 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-05
-Stopped at: Completed 24-04-PLAN.md
+Stopped at: Completed 25-01-PLAN.md
 Resume file: None
 
 ---
@@ -138,4 +143,4 @@ Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-05 (Completed Phase 24: Pattern Consistency - BaseBarBuilder created, all 6 bar builders refactored, 41.2% LOC reduction achieved, GAP-M03 closed)*
+*Last updated: 2026-02-05 (Completed 25-01: Baseline Capture Infrastructure - dim_assets DDL, epsilon-aware comparison with NumPy allclose, metadata tracker for git-based audit trail)*
