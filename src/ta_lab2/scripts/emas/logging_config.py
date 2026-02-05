@@ -7,12 +7,14 @@ Provides:
 - File and console output
 - Process-safe logging for parallel execution
 - Correlation IDs for tracking related operations
+- Daily log files with rotation
 """
 
 from __future__ import annotations
 
 import logging
 import sys
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -27,11 +29,64 @@ DEBUG_FORMAT = (
 )
 
 
+def get_daily_log_path(prefix: str = "refresh") -> Path:
+    """
+    Get path for today's log file.
+
+    Args:
+        prefix: Log file prefix (e.g., "refresh", "bars", "emas")
+
+    Returns:
+        Path to log file: .logs/{prefix}-YYYY-MM-DD.log
+
+    Example:
+        >>> log_path = get_daily_log_path("refresh")
+        >>> print(log_path)
+        .logs/refresh-2026-02-05.log
+    """
+    log_dir = Path.cwd() / ".logs"
+    log_dir.mkdir(exist_ok=True)
+
+    today = date.today().isoformat()
+    return log_dir / f"{prefix}-{today}.log"
+
+
+def rotate_logs(log_dir: Path | str = ".logs", keep_days: int = 30) -> int:
+    """
+    Remove log files older than keep_days.
+
+    Args:
+        log_dir: Directory containing log files
+        keep_days: Number of days to keep logs (default: 30)
+
+    Returns:
+        Number of files deleted
+
+    Example:
+        >>> deleted = rotate_logs(".logs", keep_days=30)
+        >>> print(f"Deleted {deleted} old log files")
+    """
+    log_path = Path(log_dir)
+    if not log_path.exists():
+        return 0
+
+    cutoff = datetime.now() - timedelta(days=keep_days)
+    deleted = 0
+
+    for log_file in log_path.glob("refresh-*.log"):
+        if log_file.stat().st_mtime < cutoff.timestamp():
+            log_file.unlink()
+            deleted += 1
+
+    return deleted
+
+
 def setup_logging(
     *,
     name: str,
     level: str = "INFO",
     log_file: Optional[str] = None,
+    log_to_daily_file: bool = False,
     quiet: bool = False,
     debug: bool = False,
 ) -> logging.Logger:
@@ -41,7 +96,8 @@ def setup_logging(
     Args:
         name: Logger name (e.g., "ema_cal", "ema_anchor")
         level: Log level string (DEBUG, INFO, WARNING, ERROR)
-        log_file: Optional log file path
+        log_file: Optional log file path (explicit path)
+        log_to_daily_file: If True and log_file not set, use daily log file
         quiet: If True, only show warnings and errors on console
         debug: If True, use detailed debug format
 
@@ -61,6 +117,10 @@ def setup_logging(
 
     # Parse level
     numeric_level = getattr(logging, level.upper(), logging.INFO)
+
+    # Handle daily log file
+    if log_to_daily_file and not log_file:
+        log_file = str(get_daily_log_path(name))
 
     # Console handler
     console_handler = logging.StreamHandler(sys.stdout)
@@ -129,6 +189,12 @@ def add_logging_args(parser) -> None:
         "--debug",
         action="store_true",
         help="Enable detailed debug logging format with file/line info",
+    )
+
+    log_group.add_argument(
+        "--log-to-daily-file",
+        action="store_true",
+        help="Log to .logs/refresh-YYYY-MM-DD.log in addition to console",
     )
 
 
