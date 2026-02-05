@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 ## Current Position
 
 Phase: 21 of 26 (Comprehensive Review)
-Plan: 3 of 7 in current phase
+Plan: 4 of 7 in current phase
 Status: In progress
-Last activity: 2026-02-05 — Completed 21-03-PLAN.md (incremental refresh & validation documentation)
+Last activity: 2026-02-05 — Completed 21-04-PLAN.md (new asset guide & gap analysis)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [####      ] 29% v0.6.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [#####     ] 36% v0.6.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 118 (56 in v0.4.0, 56 in v0.5.0, 6 in v0.6.0)
+- Total plans completed: 119 (56 in v0.4.0, 56 in v0.5.0, 7 in v0.6.0)
 - Average duration: 9 min
-- Total execution time: 23.0 hours
+- Total execution time: 23.1 hours
 
 **By Phase (v0.4.0):**
 
@@ -55,14 +55,14 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [####      ] 29%
 **Recent Trend:**
 - v0.4.0 complete: 10 phases, 56 plans, 12.55 hours total
 - v0.5.0 complete: 9 phases, 56 plans, 9.85 hours total
-- v0.6.0 in progress: 6/14 plans complete (43% done)
+- v0.6.0 in progress: 7/14 plans complete (50% done)
 
 **By Phase (v0.6.0):**
 
 | Phase | Plans | Total | Avg/Plan | Status |
 |-------|-------|-------|----------|--------|
 | 20-historical-context | 3/3 | 17 min | 6 min | Complete |
-| 21-comprehensive-review | 3/7 | 16 min | 5 min | In progress |
+| 21-comprehensive-review | 4/7 | 23 min | 6 min | In progress |
 
 *Updated after each plan completion*
 
@@ -81,6 +81,8 @@ Recent decisions affecting current work:
 - **Leverage proven Phase 6-7 patterns** (Phase 20): dim_timeframe, unified EMA table, state management are working - extend to bars, don't rebuild
 - **EMAs already use bar tables** (Phase 20): CRITICAL - All 6 EMA variants already migrated to validated bars. Phase 22 assumption invalid, requires re-scoping.
 - **All 6 EMA variants exist for legitimate reasons** (Phase 21): 80%+ infrastructure shared (BaseEMARefresher, EMAStateManager, compute_ema) with 20% intentional differences (data source, calendar alignment, anchoring) - NOT code duplication
+- **Gap severity framework established** (Phase 21-04): CRITICAL (data corruption), HIGH (error-prone), MEDIUM (workarounds), LOW (nice-to-have) - 15 gaps identified (4 CRITICAL, 5 HIGH, 4 MEDIUM, 2 LOW), prioritized for Phase 22-24
+- **Asset onboarding documented** (Phase 21-04): 6-step checklist (dim_assets → 1D bars → multi-TF bars → EMAs → validate → verify incremental), 15-40 minutes per asset
 
 ### Pending Todos
 
@@ -93,7 +95,7 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-05
-Stopped at: Completed 21-03-PLAN.md (incremental refresh & validation documentation)
+Stopped at: Completed 21-04-PLAN.md (new asset guide & gap analysis)
 Resume file: None
 
 ---
@@ -119,4 +121,4 @@ Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-05 (Phase 20 complete - Historical context established, CRITICAL finding: EMAs already use bar tables)*
+*Last updated: 2026-02-05 (Phase 21-04 complete - Asset onboarding guide + Gap analysis with severity tiers complete, Wave 1 synthesis 100%)*
