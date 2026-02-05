@@ -100,18 +100,246 @@ def load_1d_bars_for_id(
     return df_pl
 
 
+def get_week_start_day(alignment: str) -> int:
+    """
+    Get ISO weekday for week start.
+
+    Args:
+        alignment: 'calendar_us' (Sunday=0) or 'calendar_iso' (Monday=1)
+
+    Returns:
+        ISO weekday number (1=Monday through 7=Sunday)
+    """
+    if alignment == "calendar_us":
+        return 7  # Sunday
+    elif alignment == "calendar_iso":
+        return 1  # Monday
+    else:
+        raise ValueError(f"Unknown calendar alignment: {alignment}")
+
+
+def assign_calendar_periods(
+    df_daily: pl.DataFrame,
+    target_tf: str,
+    alignment: str,
+    anchor_mode: bool = False,
+) -> pl.DataFrame:
+    """
+    Assign calendar periods to daily bars based on alignment.
+
+    Args:
+        df_daily: Daily bars with timestamp column
+        target_tf: Target timeframe (1W_CAL, 2W_CAL, 1M_CAL, etc.)
+        alignment: 'calendar_us' or 'calendar_iso'
+        anchor_mode: If True, include partial periods at boundaries
+
+    Returns:
+        DataFrame with added 'period_start' column for grouping
+
+    Calendar rules:
+    - Weeks: Start on week_start_day, fixed 7-day periods
+    - Months: Start on 1st, variable days
+    - Quarters: Start on Jan/Apr/Jul/Oct 1st
+    - Years: Start on Jan 1st
+
+    Anchor mode:
+    - If anchor_mode=True, first/last periods may be partial
+    - is_partial_start/is_partial_end flags set accordingly
+    """
+    if df_daily.is_empty():
+        return df_daily
+
+    # Parse target_tf to determine period type
+    import re
+
+    # Calendar TF patterns: 1W_CAL, 2W_CAL, 1M_CAL, 3M_CAL, 1Y_CAL, etc.
+    match = re.match(r"(\d+)([WMY])_CAL", target_tf)
+    if not match:
+        raise ValueError(
+            f"Unsupported calendar timeframe format: {target_tf}. Expected format: N[W|M|Y]_CAL"
+        )
+
+    qty = int(match.group(1))
+    unit = match.group(2)
+
+    # Convert timestamp to date for calendar calculations
+    df_with_date = df_daily.with_columns(
+        [pl.col("timestamp").dt.date().alias("day_date")]
+    )
+
+    # Determine period_start based on unit and alignment
+    if unit == "W":
+        # Week-based periods
+        # Calculate ISO week start (Monday) for each date
+        df_with_date = df_with_date.with_columns(
+            [
+                (
+                    pl.col("day_date")
+                    - pl.duration(days=pl.col("day_date").dt.weekday() - 1)
+                ).alias("iso_week_start")
+            ]
+        )
+
+        # Adjust to calendar_us (Sunday) if needed
+        if alignment == "calendar_us":
+            df_with_date = df_with_date.with_columns(
+                [
+                    pl.when(pl.col("day_date").dt.weekday() == 7)  # Sunday
+                    .then(pl.col("day_date"))
+                    .otherwise(pl.col("iso_week_start") - pl.duration(days=1))
+                    .alias("period_start_base")
+                ]
+            )
+        else:
+            df_with_date = df_with_date.with_columns(
+                [pl.col("iso_week_start").alias("period_start_base")]
+            )
+
+        # For multi-week periods (qty > 1), group by qty weeks
+        if qty > 1:
+            # Count weeks since epoch and group by qty
+            epoch_date = pl.date(1970, 1, 1)
+            df_with_date = df_with_date.with_columns(
+                [
+                    (
+                        (pl.col("period_start_base") - epoch_date).dt.total_days()
+                        // 7
+                        // qty
+                        * qty
+                        * 7
+                        + epoch_date
+                    ).alias("period_start")
+                ]
+            )
+        else:
+            df_with_date = df_with_date.with_columns(
+                [pl.col("period_start_base").alias("period_start")]
+            )
+
+    elif unit == "M":
+        # Month-based periods
+        df_with_date = df_with_date.with_columns(
+            [
+                pl.date(
+                    pl.col("day_date").dt.year(),
+                    ((pl.col("day_date").dt.month() - 1) // qty * qty + 1).cast(
+                        pl.UInt32
+                    ),
+                    1,
+                ).alias("period_start")
+            ]
+        )
+
+    elif unit == "Y":
+        # Year-based periods
+        df_with_date = df_with_date.with_columns(
+            [
+                pl.date(
+                    (pl.col("day_date").dt.year() // qty * qty).cast(pl.Int32), 1, 1
+                ).alias("period_start")
+            ]
+        )
+
+    return df_with_date
+
+
+def aggregate_by_calendar_period(
+    df_daily: pl.DataFrame,
+    period_col: str = "period_start",
+) -> pl.DataFrame:
+    """
+    Aggregate daily bars by calendar period.
+
+    Same OHLCV aggregation as tf_day mode, but grouped by period_col
+    instead of fixed day counts.
+    """
+    if df_daily.is_empty():
+        return pl.DataFrame()
+
+    # Group by id and period_start, aggregate OHLCV
+    df_agg = (
+        df_daily.groupby(["id", period_col])
+        .agg(
+            [
+                # Identity
+                pl.col("tf").first(),
+                # Timestamps
+                pl.col("time_open").first(),
+                pl.col("timestamp").last().alias("time_close"),
+                # OHLCV aggregation
+                pl.col("open").first(),
+                pl.col("high").max(),
+                pl.col("low").min(),
+                pl.col("close").last(),
+                pl.col("volume").sum(),
+                pl.col("market_cap").last(),
+                # Time extrema (earliest among ties)
+                pl.col("time_high")
+                .filter(pl.col("high") == pl.col("high").max())
+                .min()
+                .alias("time_high"),
+                pl.col("time_low")
+                .filter(pl.col("low") == pl.col("low").min())
+                .min()
+                .alias("time_low"),
+                # Quality flags (OR logic)
+                pl.col("is_partial_start").max(),
+                pl.col("is_partial_end").max(),
+                pl.col("is_missing_days").max(),
+                # Counts
+                pl.col("count_days").sum(),
+                pl.col("count_missing_days").sum(),
+                # Calculate tf_days from period
+                pl.len().alias("actual_days"),
+            ]
+        )
+        .sort([period_col])
+    )
+
+    # Add bar_seq
+    df_agg = df_agg.with_columns(
+        [pl.int_range(1, pl.len() + 1).over("id").cast(pl.Int64).alias("bar_seq")]
+    )
+
+    # Rename period_start to timestamp for consistency
+    df_agg = df_agg.rename({period_col: "timestamp"})
+
+    return df_agg
+
+
+# Mapping of builder type to alignment configuration
+BUILDER_ALIGNMENT_MAP = {
+    "multi_tf": ("tf_day", False),
+    "cal_us": ("calendar_us", False),
+    "cal_iso": ("calendar_iso", False),
+    "cal_anchor_us": ("calendar_us", True),
+    "cal_anchor_iso": ("calendar_iso", True),
+}
+
+
 def aggregate_daily_to_timeframe(
     df_daily: pl.DataFrame,
     target_tf: str,
     alignment: Literal["tf_day", "calendar_us", "calendar_iso"] = "tf_day",
+    anchor_mode: bool = False,
 ) -> pl.DataFrame:
     """
-    Aggregate daily bars into target timeframe.
+    Aggregate daily bars into target timeframe with specified alignment.
+
+    alignment modes:
+    - tf_day: Fixed day-count windows (1D, 2D, 3D, 5D, 1W=7D, etc.)
+    - calendar_us: Calendar-aligned with Sunday week start
+    - calendar_iso: Calendar-aligned with Monday week start
+
+    anchor_mode (only for calendar alignments):
+    - False: Require complete periods (filter incomplete)
+    - True: Allow partial periods at boundaries (with flags)
 
     Args:
         df_daily: Daily bars from load_1d_bars_for_id()
         target_tf: Target timeframe (2D, 3D, 5D, 1W, 2W, 4W, 1M, 3M, etc.)
         alignment: Calendar alignment mode
+        anchor_mode: Allow partial periods at boundaries
 
     Returns:
         Polars DataFrame with aggregated bars:
@@ -132,6 +360,14 @@ def aggregate_daily_to_timeframe(
     if df_daily.is_empty():
         return pl.DataFrame()
 
+    # Route to calendar or tf_day aggregation
+    if alignment in ["calendar_us", "calendar_iso"]:
+        df_with_periods = assign_calendar_periods(
+            df_daily, target_tf, alignment, anchor_mode
+        )
+        return aggregate_by_calendar_period(df_with_periods)
+
+    # tf_day mode: Fixed day-count windows
     # Parse target_tf to get tf_days count
     # Supports: 2D, 3D, 5D, 7D, etc.
     # For now, just handle simple "ND" format
@@ -244,6 +480,7 @@ def derive_multi_tf_bars(
     id: int,
     timeframes: list[str],
     alignment: Literal["tf_day", "calendar_us", "calendar_iso"] = "tf_day",
+    anchor_mode: bool = False,
     start_date: str | None = None,
 ) -> pl.DataFrame:
     """
@@ -254,6 +491,7 @@ def derive_multi_tf_bars(
         id: Asset ID
         timeframes: List of target timeframes (e.g., ["1D", "2D", "1W", "1M"])
         alignment: Calendar alignment mode
+        anchor_mode: Allow partial periods at boundaries (calendar modes only)
         start_date: Only process bars from this date (for incremental)
 
     Returns:
@@ -277,6 +515,7 @@ def derive_multi_tf_bars(
             df_daily=df_1d,
             target_tf=tf,
             alignment=alignment,
+            anchor_mode=anchor_mode,
         )
 
         if not df_tf.is_empty():
