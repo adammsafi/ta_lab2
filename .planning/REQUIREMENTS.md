@@ -1,135 +1,173 @@
-# ta_lab2 v0.5.0 Requirements
+# Requirements: v0.6.0 EMA & Bar Architecture Standardization
 
-**Version:** 0.5.0 Ecosystem Reorganization
-**Created:** 2026-02-02
+**Milestone:** v0.6.0
+**Goal:** Lock down bars and EMAs foundation so adding new assets (crypto + equities) is mechanical and reliable
 **Status:** Active
 
-## Summary
+---
 
-- **v0.4.0 Requirements:** 42/42 complete (100%)
-- **v0.5.0 Requirements:** 32/32 complete (100%)
-- **Total Requirements:** 74/74 complete (100%)
+## Core Problem
 
-**Ready for v0.5.0 release.**
+EMAs using unvalidated data (price_histories7 with NULLs) creates data quality risk. 6 EMA variants with different patterns are hard to maintain. Incremental refresh behavior unclear. Need to understand and lock down the foundation before scaling to more assets and asset classes.
 
-## Memory Integration Requirements (MEMO-10 to MEMO-18)
+## Success Criteria
 
-- [x] **MEMO-10**: Update existing memory with v0.4.0 completion context - Phase 11 (11-01, 11-02, 11-03)
-- [x] **MEMO-11**: Pre-reorganization memory capture for ta_lab2 - Phase 11 (11-02)
-- [x] **MEMO-12**: Pre-integration memory capture for external directories - Phase 11 (11-03, 11-04)
-- [x] **MEMO-13**: File-level memory updates during reorganization - Phases 13-16 (13-06, 14-10, 15-06, 16-06)
-- [x] **MEMO-14**: Phase-level memory snapshots - Phases 13-16
-- [x] **MEMO-15**: Function-level memory granularity - Phase 19 (19-01, 19-05.1)
-- [x] **MEMO-16**: Memory linking with all relationship types - Phase 19 (19-02, 19-05.1)
-- [x] **MEMO-17**: Duplicate function detection with thresholds - Phase 19 (19-03, 19-05.1)
-- [x] **MEMO-18**: Post-reorganization memory validation - Phase 19 (19-04, 19-05.1)
+When v0.6.0 is complete:
+- ✓ **I can add a new asset mechanically** - clear steps, no surprises
+- ✓ **I trust data quality** - validated bars → validated EMAs, NULLs can't slip through
+- ✓ **Incremental refresh just works** - one command, visibility, efficient, gap handling
+- ✓ **I understand the system** - clear docs (building on what exists), can explain how it works
 
-## Archive Management Requirements (ARCH-01 to ARCH-04)
+---
 
-- [x] **ARCH-01**: Create .archive/ directory structure
-  - Timestamped subdirectories (.archive/YYYY-MM-DD/category/)
-  - Categories: backup_artifacts, root_files, deprecated_scripts, documentation
+## Phase 0: Historical Context
 
-- [x] **ARCH-02**: Git history preservation
-  - Use `git mv` for all file moves (preserves git blame/log)
-  - Verify `git log --follow` works for moved files
-  - Never use OS-level moves or deletions
+### Understand How We Got Here
 
-- [x] **ARCH-03**: File inventory manifest system
-  - Create manifest.json for each archive operation
-  - Track: original_path, new_path (or archive_path), action, timestamp, sha256_checksum
-  - Enable queries: "Where did file X go?" and "What files were archived in phase Y?"
+- [ ] **HIST-01**: Review GSD phases 1-10 to understand prior bar/EMA work and decisions made
+- [ ] **HIST-02**: Identify existing documentation to leverage (don't reinvent the wheel)
+- [ ] **HIST-03**: Understand current state: what works, what's unclear, what's broken
 
-- [x] **ARCH-04**: Zero data loss guarantee
-  - Pre-reorganization file count and size
-  - Post-reorganization file count and size (active + archive)
-  - Validation: counts match, no files disappeared
-  - SHA256 checksums for critical files
+---
 
-## Documentation Consolidation Requirements (DOC-01 to DOC-03)
+## Phase 1: Comprehensive Review (Read-Only)
 
-- [x] **DOC-01**: Convert ProjectTT documentation to Markdown - Phase 13 (13-01, 13-03, 13-04)
-- [x] **DOC-02**: Integrate documentation into unified docs/ structure - Phase 13 (13-05)
-- [x] **DOC-03**: Preserve originals in archive - Phase 13 (13-05)
+**Approach:** Complete ALL review/analysis BEFORE any code changes. Leverage existing docs.
 
-## Tools Integration Requirements (TOOL-01 to TOOL-03)
+### Understanding Questions to Answer
 
-- [x] **TOOL-01**: Migrate Data_Tools scripts to ta_lab2/tools/ - Phase 14 (14-01 through 14-07, 14-11, 14-12)
-- [x] **TOOL-02**: Update import paths - Phase 14 (14-09, 14-13)
-- [x] **TOOL-03**: Validate imports work post-migration - Phase 14 (14-09, 14-13)
+- [ ] **RVWQ-01**: What does each EMA variant do? (v1, v2, cal_us, cal_iso, cal_anchor_us, cal_anchor_iso) - purpose, use cases, why they exist
+- [ ] **RVWQ-02**: How does incremental refresh work? (state table watermarking, picking up where left off, gap handling)
+- [ ] **RVWQ-03**: What validation happens where? (where NULLs rejected, where OHLC invariants checked, quality flags)
+- [ ] **RVWQ-04**: How do I add a new asset? (step-by-step guide: tables to update, scripts to run, verification)
 
-## Economic Data Strategy Requirements (ECON-01 to ECON-03)
+### Review Deliverables
 
-- [x] **ECON-01**: Evaluate fredtools2 and fedtools2 packages - Phase 15 (15-01)
-- [x] **ECON-02**: Integration decision and implementation - Phase 15 (15-02, 15-03, 15-04)
-- [x] **ECON-03**: Optional dependency setup - Phase 15 (15-05)
+- [ ] **RVWD-01**: Script inventory table - every bar/EMA script with purpose, tables updated, state tables used, dependencies
+- [ ] **RVWD-02**: Data flow diagram - visual showing price_histories7 → bars → EMAs with validation points marked
+- [ ] **RVWD-03**: Variant comparison matrix - side-by-side comparison of 6 EMA variants (data source, state schema, calendar alignment, differences)
+- [ ] **RVWD-04**: Gap analysis document - structured list with severity tiers (CRITICAL: data sources, HIGH: patterns, MEDIUM: schemas, LOW: cosmetic) and recommendations
 
-## Repository Cleanup Requirements (CLEAN-01 to CLEAN-04)
+---
 
-- [x] **CLEAN-01**: Clean root directory clutter - Phase 16 (16-01, 16-07)
-- [x] **CLEAN-02**: Organize scattered documentation - Phase 16 (16-03)
-- [x] **CLEAN-03**: Remove/archive duplicate files - Phase 16 (16-02, 16-04)
-- [x] **CLEAN-04**: Investigate duplicate/similar functions for refactoring - Phase 16 (16-05)
+## Phase 2: Critical Data Quality Fixes
 
-## Verification & Validation Requirements (VAL-01 to VAL-04)
+**Priority:** CRITICAL - blocks scaling to new assets
 
-- [x] **VAL-01**: Import validation suite - Phase 17 (17-01)
-- [x] **VAL-02**: Dependency graph validation - Phase 17 (17-02, 17-06, 17-07, 17-08)
-- [x] **VAL-03**: Automated verification tests in CI - Phase 17 (17-03)
-- [x] **VAL-04**: Pre-commit hooks to prevent future disorganization - Phase 17 (17-04, 17-05)
+### Data Source Migration
 
-## Structure Documentation Requirements (STRUCT-01 to STRUCT-03)
+- [ ] **DATA-01**: All 6 EMA variants switched to use validated bar tables instead of price_histories7
+- [ ] **DATA-02**: v1, cal_us, cal_iso, cal_anchor_us, cal_anchor_iso migrated to appropriate bar tables
+- [ ] **DATA-03**: v2 verified to already use bars_1d (or migrated if not)
+- [ ] **DATA-04**: No EMA script references price_histories7 (grep check enforced in CI)
 
-- [x] **STRUCT-01**: Create docs/REORGANIZATION.md guide - Phase 18 (18-03)
-- [x] **STRUCT-02**: Update README with new ecosystem structure - Phase 18 (18-04)
-- [x] **STRUCT-03**: Document migration decisions in manifest - Phase 18 (18-01)
+### Database Validation
 
-## Out of Scope (Explicitly Deferred)
+- [ ] **DVAL-01**: Bar tables have NOT NULL constraints on all OHLCV fields (already exist, verify complete)
+- [ ] **DVAL-02**: Bar tables have check constraints for OHLC invariants (high >= low, high >= close, etc.) - verify or add
+- [ ] **DVAL-03**: Quality flags standardized across bar tables (is_missing_days, repaired_timehigh, repaired_timelow, etc.)
+- [ ] **DVAL-04**: Gap handling implemented - missing days flagged but don't break pipeline (manual fix option)
 
-- **Deletion of any files** - Everything preserved via git history + .archive/
-- **Squash/rebase of commit history** - Accept history as-is, use conventional commits going forward
-- **Automated bulk renames beyond imports** - Only update import paths, keep original file/function names unless manually decided
-- **Conversion of all docs to Markdown** - Only convert high-value ProjectTT content, keep originals for reference
-- **Live trading impact** - Reorganization is development-time only, no impact on trading systems
+---
+
+## Phase 3: Reliable Incremental Refresh
+
+**Priority:** HIGH - enables operational confidence
+
+### Orchestration
+
+- [ ] **ORCH-01**: Flexible orchestration script - can run: all tasks, bars only, EMAs only, specific variant
+- [ ] **ORCH-02**: Modular separation - bars and EMAs as separate pieces with clear interfaces
+- [ ] **ORCH-03**: One command for daily refresh - simple operational model
+- [ ] **ORCH-04**: Orchestration eventually covers all features (bars, EMAs, vol, returns) but allows selective execution
+
+### State Management
+
+- [ ] **STAT-01**: Analyze current state management patterns across all scripts (don't assume - discover)
+- [ ] **STAT-02**: Unified state table schema if analysis shows inconsistency (id, tf, period PK or similar)
+- [ ] **STAT-03**: Consistent watermarking approach across bar builders and EMA calculators
+- [ ] **STAT-04**: State updates atomic with data updates (no partial states)
+
+### Visibility & Efficiency
+
+- [ ] **VISI-01**: Logs show what was processed - X days, Y bars, Z EMAs, N gaps flagged
+- [ ] **VISI-02**: Efficient processing - only new data computed, not full recomputation
+- [ ] **VISI-03**: Gap handling visible - clear indication of missing data with manual fix option
+
+---
+
+## Phase 4: Pattern Consistency (Where Justified)
+
+**Priority:** MEDIUM-LOW - only where review shows benefit
+
+### Standardization (Guided by Review Findings)
+
+- [ ] **PATT-01**: Data loading standardization - consistent query patterns across variants (if analysis shows inconsistency)
+- [ ] **PATT-02**: State management code standardized - same read/write patterns (if analysis shows inconsistency)
+- [ ] **PATT-03**: Validation code shared - OHLC invariants, NULL handling, gap detection (if analysis shows duplication)
+- [ ] **PATT-04**: Shared utilities extracted - common code moved to reusable modules (if analysis shows duplication worth extracting)
+
+### Boundaries
+
+- [ ] **PATT-05**: Keep all 6 EMA variants - they serve distinct purposes (calendar alignment, ISO vs US, anchoring)
+- [ ] **PATT-06**: Don't force standardization - only where analysis justifies (avoid premature abstraction)
+
+---
+
+## Phase 5: Validation
+
+**Priority:** CRITICAL - must verify fixes worked correctly
+
+### Testing Strategies
+
+- [ ] **TEST-01**: Baseline capture - current EMA outputs from all 6 variants before any changes
+- [ ] **TEST-02**: Side-by-side comparison - new outputs vs baseline within epsilon tolerance (floating point)
+- [ ] **TEST-03**: New asset test - add test asset (e.g., LTC), verify full pipeline works end-to-end
+- [ ] **TEST-04**: Incremental refresh test - run refresh script multiple times, verify only new data processed, state advances correctly
+- [ ] **TEST-05**: Manual spot-checks - inspect key tables and outputs to confirm correctness
+
+---
+
+## Out of Scope (Explicit Exclusions)
+
+- **Variant consolidation** - Keep all 6 variants; evaluate consolidation only AFTER standardization proves stable
+- **Performance optimization** - Focus on correctness and reliability, not speed (separate milestone)
+- **New features** - No new timeframes, periods, or calculation methods (standardize existing only)
+- **Historical data repair** - Fix forward pipeline only, don't backfill historical inconsistencies
+- **Major schema restructuring** - Add constraints/flags, but don't rename tables or major changes unless justified by review
+
+---
+
+## Constraints & Principles
+
+- **Review first, then fix** - Complete ALL analysis before code changes
+- **Leverage existing docs** - Don't reinvent, build on artifacts and documentation that already exist
+- **Case-by-case scope decisions** - Small fixes do now, big changes defer or justify
+- **Bars and EMAs separate** - Modular design, not tightly coupled
+- **Move quickly on data sources** - Bar tables have better validation, switch over decisively
+- **Whatever it takes timeline** - Do it right, even if it takes 6-8 weeks
+
+---
 
 ## Traceability
 
-| Requirement | Phase | Status |
-|-------------|-------|--------|
-| MEMO-10 | Phase 11 (Memory Preparation) | Complete |
-| MEMO-11 | Phase 11 (Memory Preparation) | Complete |
-| MEMO-12 | Phase 11 (Memory Preparation) | Complete |
-| ARCH-01 | Phase 12 (Archive Foundation) | Complete |
-| ARCH-02 | Phase 12 (Archive Foundation) | Complete |
-| ARCH-03 | Phase 12 (Archive Foundation) | Complete |
-| ARCH-04 | Phase 12 (Archive Foundation) | Complete |
-| DOC-01 | Phase 13 (Documentation Consolidation) | Complete |
-| DOC-02 | Phase 13 (Documentation Consolidation) | Complete |
-| DOC-03 | Phase 13 (Documentation Consolidation) | Complete |
-| MEMO-13 | Phases 13-16 (During Reorganization) | Complete |
-| MEMO-14 | Phases 13-16 (During Reorganization) | Complete |
-| TOOL-01 | Phase 14 (Tools Integration) | Complete |
-| TOOL-02 | Phase 14 (Tools Integration) | Complete |
-| TOOL-03 | Phase 14 (Tools Integration) | Complete |
-| ECON-01 | Phase 15 (Economic Data Strategy) | Complete |
-| ECON-02 | Phase 15 (Economic Data Strategy) | Complete |
-| ECON-03 | Phase 15 (Economic Data Strategy) | Complete |
-| CLEAN-01 | Phase 16 (Repository Cleanup) | Complete |
-| CLEAN-02 | Phase 16 (Repository Cleanup) | Complete |
-| CLEAN-03 | Phase 16 (Repository Cleanup) | Complete |
-| CLEAN-04 | Phase 16 (Repository Cleanup) | Complete |
-| VAL-01 | Phase 17 (Verification & Validation) | Complete |
-| VAL-02 | Phase 17 (Verification & Validation) | Complete |
-| VAL-03 | Phase 17 (Verification & Validation) | Complete |
-| VAL-04 | Phase 17 (Verification & Validation) | Complete |
-| STRUCT-01 | Phase 18 (Structure Documentation) | Complete |
-| STRUCT-02 | Phase 18 (Structure Documentation) | Complete |
-| STRUCT-03 | Phase 18 (Structure Documentation) | Complete |
-| MEMO-15 | Phase 19 (Memory Validation & Release) | Complete |
-| MEMO-16 | Phase 19 (Memory Validation & Release) | Complete |
-| MEMO-17 | Phase 19 (Memory Validation & Release) | Complete |
-| MEMO-18 | Phase 19 (Memory Validation & Release) | Complete |
+Requirements mapped to roadmap phases (populated by roadmapper):
+
+| Requirement ID | Phase(s) | Status |
+|----------------|----------|--------|
+| (To be populated by roadmapper) | | |
 
 ---
-*Created: 2026-02-02*
-*Last updated: 2026-02-04 (v0.5.0 complete: All 74 requirements complete - ready for release)*
+
+**Total Requirements:** 40 across 5 phases
+- Phase 0 (Historical Context): 3 requirements
+- Phase 1 (Comprehensive Review): 8 requirements
+- Phase 2 (Critical Fixes): 8 requirements
+- Phase 3 (Incremental Refresh): 10 requirements
+- Phase 4 (Pattern Consistency): 6 requirements
+- Phase 5 (Validation): 5 requirements
+
+---
+
+*Created: 2026-02-05*
+*Last updated: 2026-02-05 (v0.6.0 requirements defined from bottom-up goal analysis)*
