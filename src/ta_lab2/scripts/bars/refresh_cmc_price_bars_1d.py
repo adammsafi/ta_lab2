@@ -1,20 +1,54 @@
+"""
+1D Bar Builder - Canonical daily bars from price_histories7.
+
+Builds daily OHLC bars with:
+- One bar per local calendar day per asset
+- Deterministic bar_seq (dense_rank by timestamp)
+- OHLC repair and validation
+- Incremental refresh with lookback window
+- Backfill detection and automatic rebuild
+
+Inherits from BaseBarBuilder to standardize:
+- CLI parsing and argument handling
+- Database connection management
+- State table management (tracking last processed timestamp)
+- Execution flow (incremental vs full rebuild)
+- Logging setup
+
+This builder implements variant-specific:
+- Source query (price_histories7 with lookback)
+- Bar building logic (SQL CTE for OHLC aggregation + repair)
+- Backfill detection (track daily_min_seen)
+
+Usage:
+    # Full rebuild
+    python src/ta_lab2/scripts/bars/refresh_cmc_price_bars_1d.py \\
+        --ids 1 1027 --full-rebuild
+
+    # Incremental (default)
+    python src/ta_lab2/scripts/bars/refresh_cmc_price_bars_1d.py \\
+        --ids all --keep-rejects
+
+    # Single ID incremental
+    python src/ta_lab2/scripts/bars/refresh_cmc_price_bars_1d.py \\
+        --ids 1 --keep-rejects
+"""
+
 from __future__ import annotations
 
 import argparse
-import os
-from dataclasses import dataclass
 from typing import Any, List, Optional, Sequence, Tuple
 
-r"""
-Full rebuild of public.cmc_price_bars_1d (DROP + rebuild):
-python src/ta_lab2/scripts/bars/refresh_cmc_price_bars_1d.py --rebuild --keep-rejects --fail-on-rejects
+from sqlalchemy.engine import Engine
 
-Incremental (default behavior):
-python src/ta_lab2/scripts/bars/refresh_cmc_price_bars_1d.py --keep-rejects
-
-Incremental for a single id:
-python src/ta_lab2/scripts/bars/refresh_cmc_price_bars_1d.py --ids 1 --keep-rejects
-"""
+from ta_lab2.scripts.bars.base_bar_builder import BaseBarBuilder
+from ta_lab2.scripts.bars.bar_builder_config import BarBuilderConfig
+from ta_lab2.scripts.bars.common_snapshot_contract import (
+    get_engine,
+    parse_ids,
+    load_all_ids,
+    resolve_db_url,
+)
 
 # Prefer psycopg v3, fall back to psycopg2
 try:
@@ -34,7 +68,13 @@ except Exception:
     PSYCOPG2 = False
 
 
+# =============================================================================
+# Database utilities (psycopg for raw SQL performance)
+# =============================================================================
+
+
 def _normalize_db_url(url: str) -> str:
+    """Remove SQLAlchemy dialect prefix for psycopg connection."""
     if not url:
         return url
     for prefix in (
@@ -51,6 +91,7 @@ def _normalize_db_url(url: str) -> str:
 
 
 def _connect(db_url: str):
+    """Create psycopg connection (v3 preferred, v2 fallback)."""
     url = _normalize_db_url(db_url)
     if PSYCOPG3:
         return psycopg.connect(url, autocommit=True)
@@ -62,6 +103,7 @@ def _connect(db_url: str):
 
 
 def _exec(conn, sql: str, params: Optional[Sequence[Any]] = None) -> None:
+    """Execute SQL statement."""
     params = params or []
     if PSYCOPG3:
         with conn.cursor() as cur:
@@ -75,6 +117,7 @@ def _exec(conn, sql: str, params: Optional[Sequence[Any]] = None) -> None:
 def _fetchall(
     conn, sql: str, params: Optional[Sequence[Any]] = None
 ) -> List[Tuple[Any, ...]]:
+    """Execute SQL and fetch all rows."""
     params = params or []
     if PSYCOPG3:
         with conn.cursor() as cur:
@@ -90,6 +133,7 @@ def _fetchall(
 def _fetchone(
     conn, sql: str, params: Optional[Sequence[Any]] = None
 ) -> Optional[Tuple[Any, ...]]:
+    """Execute SQL and fetch one row."""
     params = params or []
     if PSYCOPG3:
         with conn.cursor() as cur:
@@ -102,132 +146,13 @@ def _fetchone(
     return row
 
 
-# -----------------------------------------------------------------------------
-# DDL
-# -----------------------------------------------------------------------------
-
-DDL_DROP_DST = """
-DROP TABLE IF EXISTS {dst};
-"""
-
-DDL_DROP_STATE = """
-DROP TABLE IF EXISTS {state};
-"""
-
-DDL_DROP_REJECTS = """
-DROP TABLE IF EXISTS {rej};
-"""
-
-DDL_CREATE_DST = """
-CREATE TABLE IF NOT EXISTS {dst} (
-  id          integer NOT NULL,
-  "timestamp" timestamptz NOT NULL,
-
-  tf          text NOT NULL,
-  bar_seq     bigint NOT NULL,
-
-  time_open   timestamptz NOT NULL,
-  time_close  timestamptz NOT NULL,
-  time_high   timestamptz NOT NULL,
-  time_low    timestamptz NOT NULL,
-
-  open   double precision NOT NULL,
-  high   double precision NOT NULL,
-  low    double precision NOT NULL,
-  close  double precision NOT NULL,
-  volume     double precision NOT NULL,
-  market_cap double precision NOT NULL,
-
-  -- NEW: columns expected by test_bar_ohlc_correctness.py
-  is_partial_start boolean NOT NULL DEFAULT false,
-  is_partial_end   boolean NOT NULL DEFAULT false,
-  is_missing_days  boolean NOT NULL DEFAULT false,
-
-  src_name     text,
-  src_load_ts  timestamptz,
-  src_file     text,
-
-  repaired_timehigh boolean NOT NULL DEFAULT false,
-  repaired_timelow  boolean NOT NULL DEFAULT false,
-
-  PRIMARY KEY (id, "timestamp")
-);
-
--- Optional but very useful: guarantee (id, tf, bar_seq) uniqueness for bar semantics
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_constraint
-    WHERE conname = 'cmc_price_bars_1d_id_tf_bar_seq_uniq'
-  ) THEN
-    ALTER TABLE {dst}
-      ADD CONSTRAINT cmc_price_bars_1d_id_tf_bar_seq_uniq UNIQUE (id, tf, bar_seq);
-  END IF;
-END $$;
-"""
-
-DDL_CREATE_REJECTS = """
-CREATE TABLE IF NOT EXISTS {rej} (
-  id          integer,
-  "timestamp" timestamptz,
-
-  tf      text,
-  bar_seq bigint,
-
-  reason      text NOT NULL,
-
-  time_open   timestamptz,
-  time_close  timestamptz,
-  time_high   timestamptz,
-  time_low    timestamptz,
-
-  open   double precision,
-  high   double precision,
-  low    double precision,
-  close  double precision,
-  volume     double precision,
-  market_cap double precision,
-
-  -- NEW: carry these through for rejects too (handy for debugging)
-  is_partial_start boolean,
-  is_partial_end   boolean,
-  is_missing_days  boolean,
-
-  src_name    text,
-  src_load_ts timestamptz,
-  src_file    text
-);
-"""
-
-DDL_CREATE_STATE = """
-CREATE TABLE IF NOT EXISTS {state} (
-  id integer PRIMARY KEY,
-
-  last_src_ts timestamptz,             -- max src."timestamp" processed for this id (after lookback)
-  daily_min_seen timestamptz,          -- min src."timestamp" ever seen for this id (for backfill detection)
-  last_run_ts timestamptz NOT NULL DEFAULT now(),
-
-  last_upserted integer NOT NULL DEFAULT 0,
-  last_repaired_timehigh integer NOT NULL DEFAULT 0,
-  last_repaired_timelow  integer NOT NULL DEFAULT 0,
-  last_rejected integer NOT NULL DEFAULT 0
-);
-"""
-
-DDL_TRUNCATE_REJECTS = """
-TRUNCATE TABLE {rej};
-"""
-
-
-# -----------------------------------------------------------------------------
-# Schema migration
-# -----------------------------------------------------------------------------
+# =============================================================================
+# State table schema migration
+# =============================================================================
 
 
 def _ensure_state_schema(conn, state: str) -> None:
     """Ensure state table has daily_min_seen column (auto-migration)."""
-    # Check if column exists
     check_sql = """
         SELECT column_name FROM information_schema.columns
         WHERE table_schema = 'public'
@@ -238,51 +163,24 @@ def _ensure_state_schema(conn, state: str) -> None:
     row = _fetchone(conn, check_sql, [table_name])
 
     if not row:
-        # Add column
         alter_sql = f"""
             ALTER TABLE {state}
             ADD COLUMN daily_min_seen TIMESTAMPTZ;
         """
         _exec(conn, alter_sql)
 
-        # Backfill existing rows: set daily_min_seen = last_src_ts for safety
         backfill_sql = f"""
             UPDATE {state}
             SET daily_min_seen = last_src_ts
             WHERE daily_min_seen IS NULL;
         """
         _exec(conn, backfill_sql)
-        print(f"[bars_1d] Added daily_min_seen column to {state}")
+        print(f"[1D Builder] Added daily_min_seen column to {state}")
 
 
-# -----------------------------------------------------------------------------
-# SQL building blocks
-# -----------------------------------------------------------------------------
-
-
-def _parse_ids_arg(ids_arg: str) -> Optional[List[int]]:
-    s = (ids_arg or "").strip().lower()
-    if s in ("", "all"):
-        return None
-    out: List[int] = []
-    for part in s.split(","):
-        p = part.strip()
-        if not p:
-            continue
-        out.append(int(p))
-    return out
-
-
-def _list_all_ids(conn, src: str) -> List[int]:
-    rows = _fetchall(conn, f"SELECT DISTINCT id FROM {src} ORDER BY id;")
-    return [int(r[0]) for r in rows]
-
-
-def _get_last_src_ts(conn, state: str, id_: int) -> Optional[str]:
-    row = _fetchone(conn, f"SELECT last_src_ts FROM {state} WHERE id = %s;", [id_])
-    if not row or row[0] is None:
-        return None
-    return str(row[0])
+# =============================================================================
+# Backfill detection
+# =============================================================================
 
 
 def _get_state(conn, state: str, id_: int) -> Optional[dict]:
@@ -298,65 +196,57 @@ def _get_state(conn, state: str, id_: int) -> Optional[dict]:
     }
 
 
-def _check_for_backfill(conn, src: str, id_: int, state: Optional[dict]) -> bool:
+def _check_for_backfill(conn, src: str, id_: int, state_dict: Optional[dict]) -> bool:
     """
     Check if historical data was backfilled before first processed date.
 
     Returns True if backfill detected (rebuild required).
     """
-    if state is None or state.get("daily_min_seen") is None:
+    if state_dict is None or state_dict.get("daily_min_seen") is None:
         return False  # No state = first run, not a backfill
 
-    # Query earliest timestamp in source
     row = _fetchone(
         conn, f"SELECT MIN(timestamp) as daily_min_ts FROM {src} WHERE id = %s;", [id_]
     )
     if row and row[0] is not None:
         daily_min_ts = str(row[0])
-        daily_min_seen = state["daily_min_seen"]
+        daily_min_seen = state_dict["daily_min_seen"]
         if daily_min_ts < daily_min_seen:
-            print(
-                f"[bars_1d] Backfill detected for id={id_}: "
-                f"source min={daily_min_ts}, state min={daily_min_seen}"
-            )
             return True
     return False
 
 
 def _handle_backfill(conn, dst: str, state: str, id_: int) -> None:
     """Delete bars and state for full rebuild."""
-    # Delete all bars for this ID
     _exec(conn, f"DELETE FROM {dst} WHERE id = %s;", [id_])
-    # Delete state (will be recreated during processing)
     _exec(conn, f"DELETE FROM {state} WHERE id = %s;", [id_])
-    print(f"[bars_1d] Backfill rebuild: deleted bars and state for id={id_}")
 
 
-@dataclass(frozen=True)
-class RunWindow:
-    effective_min_ts: Optional[str]
-    effective_max_ts: Optional[str]
+# =============================================================================
+# SQL query builders
+# =============================================================================
 
 
-def _compute_effective_window(
-    *,
-    last_src_ts: Optional[str],
-    time_min: Optional[str],
-    time_max: Optional[str],
-    lookback_days: int,
-) -> RunWindow:
-    return RunWindow(effective_min_ts=time_min, effective_max_ts=time_max)
+def _get_last_src_ts(conn, state: str, id_: int) -> Optional[str]:
+    """Get last processed timestamp for incremental refresh."""
+    row = _fetchone(conn, f"SELECT last_src_ts FROM {state} WHERE id = %s;", [id_])
+    if not row or row[0] is None:
+        return None
+    return str(row[0])
 
 
-def _insert_valid_and_return_stats_sql(dst: str, src: str) -> str:
+def _build_insert_bars_sql(dst: str, src: str) -> str:
     """
-    One statement:
-      - selects src rows for a single id within window
-      - computes tf + bar_seq deterministically
-      - applies repair expression
-      - re-enforces OHLC invariants
-      - upserts into dst
-      - returns aggregate stats: upserted, repaired_hi, repaired_lo, max_src_ts
+    Build SQL CTE for 1D bar computation with OHLC repair.
+
+    This query:
+    1. Computes bar_seq via dense_rank (canonical sequencing)
+    2. Applies time_high/time_low repair if outside [time_open, time_close]
+    3. Re-enforces OHLC invariants after repair
+    4. Upserts into destination table
+    5. Returns aggregate stats (upserted, repaired counts, max_src_ts)
+
+    Returns SQL string with placeholders for parameterized execution.
     """
     return f"""
 WITH ranked_all AS (
@@ -573,242 +463,108 @@ FROM ins;
 """
 
 
-def _insert_rejects_sql(rej: str, src: str) -> str:
+# =============================================================================
+# OneDayBarBuilder
+# =============================================================================
+
+
+class OneDayBarBuilder(BaseBarBuilder):
     """
-    Logs any rows in the incremental window that fail the final filter.
-    Includes tf + bar_seq and the three partial/missing flags.
-    Returns: count of rejects inserted.
+    1D Bar Builder - builds daily OHLC bars from price_histories7.
+
+    Simplest bar builder - one row per local calendar day per asset.
+    Inherits shared infrastructure from BaseBarBuilder.
+    Implements variant-specific: source query, bar building logic.
+
+    Design:
+    - Uses raw psycopg for SQL performance (large CTEs with complex aggregations)
+    - BaseBarBuilder provides orchestration, logging, CLI, state management
+    - This class provides 1D-specific query construction and execution
+    - Backfill detection ensures historical data additions trigger rebuilds
     """
-    return f"""
-WITH ranked_all AS (
-  SELECT
-    s.id,
-    s."timestamp",
-    dense_rank() OVER (PARTITION BY s.id ORDER BY s."timestamp" ASC)::bigint AS bar_seq
-  FROM {src} s
-  WHERE s.id = %s
-    AND (%s IS NULL OR s."timestamp" < %s)
-),
-src_rows AS (
-  SELECT
-    s.id,
-    s.name,
-    s.source_file,
-    s.load_ts,
 
-    s.timeopen  AS time_open,
-    s.timeclose AS time_close,
-    s.timehigh  AS time_high,
-    s.timelow   AS time_low,
+    # Table constants for this builder variant
+    STATE_TABLE = "public.cmc_price_bars_1d_state"
+    OUTPUT_TABLE = "public.cmc_price_bars_1d"
+    SOURCE_TABLE = "public.cmc_price_histories7"
 
-    s."timestamp",
+    def __init__(self, config: BarBuilderConfig, engine: Engine):
+        """Initialize 1D bar builder with psycopg connection."""
+        super().__init__(config, engine)
+        # Create psycopg connection for raw SQL execution
+        self.psycopg_conn = _connect(config.db_url)
 
-    s.open,
-    s.high,
-    s.low,
-    s.close,
-    s.volume,
-    s.marketcap AS market_cap,
+    # =========================================================================
+    # Abstract method implementations (required by BaseBarBuilder)
+    # =========================================================================
 
-    r.bar_seq
-  FROM {src} s
-  JOIN ranked_all r
-    ON r.id = s.id
-   AND r."timestamp" = s."timestamp"
-  WHERE s.id = %s
-    AND (%s IS NULL OR s."timestamp" >= %s)
-    AND (%s IS NULL OR s."timestamp" <  %s)
-    AND (
-      %s IS NULL
-      OR s."timestamp" > (%s::timestamptz - (%s * INTERVAL '1 day'))
-    )
-),
-base AS (
-  SELECT
-    id,
-    "timestamp",
-    '1D'::text AS tf,
-    bar_seq,
-    name,
-    source_file,
-    load_ts,
-    time_open,
-    time_close,
-    (time_high IS NULL OR time_high < time_open OR time_high > time_close) AS needs_timehigh_repair,
-    (time_low  IS NULL OR time_low  < time_open OR time_low  > time_close) AS needs_timelow_repair,
-    open, high, low, close, volume, market_cap, time_high, time_low
-  FROM src_rows
-),
-repaired AS (
-  SELECT
-    id, "timestamp", tf, bar_seq,
-    name, source_file, load_ts,
-    time_open, time_close,
-    CASE
-      WHEN needs_timehigh_repair THEN CASE WHEN close >= open THEN time_close ELSE time_open END
-      ELSE time_high
-    END AS time_high_fix,
-    CASE
-      WHEN needs_timelow_repair THEN CASE WHEN close <= open THEN time_close ELSE time_open END
-      ELSE time_low
-    END AS time_low_fix,
-    CASE WHEN needs_timehigh_repair THEN GREATEST(open, close) ELSE high END AS high_1,
-    CASE WHEN needs_timelow_repair  THEN LEAST(open, close)    ELSE low  END AS low_1,
-    open, close, volume, market_cap
-  FROM base
-),
-final AS (
-  SELECT
-    *,
-    GREATEST(high_1, open, close, low_1) AS high_fix,
-    LEAST(low_1,  open, close, high_1)  AS low_fix
-  FROM repaired
-),
-rej_rows AS (
-  SELECT
-    id,
-    "timestamp",
-    tf,
-    bar_seq,
-    CASE
-      WHEN id IS NULL OR "timestamp" IS NULL THEN 'null_pk'
-      WHEN tf IS NULL OR bar_seq IS NULL THEN 'null_tf_or_bar_seq'
-      WHEN time_open IS NULL OR time_close IS NULL THEN 'null_time_open_time_close'
-      WHEN open IS NULL OR close IS NULL THEN 'null_open_close'
-      WHEN volume IS NULL THEN 'null_volume'
-      WHEN market_cap IS NULL THEN 'null_market_cap'
-      WHEN time_open > time_close THEN 'time_open_gt_time_close'
-      WHEN time_high_fix IS NULL OR time_low_fix IS NULL THEN 'null_time_high_time_low_after_repair'
-      WHEN NOT (time_open <= time_high_fix AND time_high_fix <= time_close) THEN 'time_high_outside_window_after_repair'
-      WHEN NOT (time_open <= time_low_fix  AND time_low_fix  <= time_close) THEN 'time_low_outside_window_after_repair'
-      WHEN high_fix IS NULL OR low_fix IS NULL THEN 'null_ohlc_after_repair'
-      WHEN high_fix < low_fix THEN 'high_lt_low_after_repair'
-      WHEN high_fix < GREATEST(open, close, low_fix) THEN 'high_lt_greatest(open,close,low)_after_repair'
-      WHEN low_fix  > LEAST(open, close, high_fix) THEN 'low_gt_least(open,close,high)_after_repair'
-      ELSE 'failed_final_filter_unknown'
-    END AS reason,
-    time_open,
-    time_close,
-    time_high_fix AS time_high,
-    time_low_fix  AS time_low,
-    open,
-    high_fix AS high,
-    low_fix  AS low,
-    close,
-    volume,
-    market_cap,
-    false::boolean AS is_partial_start,
-    false::boolean AS is_partial_end,
-    false::boolean AS is_missing_days,
-    name AS src_name,
-    load_ts AS src_load_ts,
-    source_file AS src_file
-  FROM final
-  WHERE NOT (
-    id IS NOT NULL
-    AND "timestamp" IS NOT NULL
-    AND tf IS NOT NULL
-    AND bar_seq IS NOT NULL
-    AND time_open IS NOT NULL
-    AND time_close IS NOT NULL
-    AND open IS NOT NULL
-    AND close IS NOT NULL
-    AND time_high_fix IS NOT NULL
-    AND time_low_fix IS NOT NULL
-    AND high_fix IS NOT NULL
-    AND low_fix IS NOT NULL
-    AND time_open <= time_close
-    AND time_open <= time_high_fix AND time_high_fix <= time_close
-    AND time_open <= time_low_fix  AND time_low_fix  <= time_close
-    AND high_fix >= low_fix
-    AND high_fix >= GREATEST(open, close, low_fix)
-    AND low_fix  <= LEAST(open, close, high_fix)
-  )
-),
-ins AS (
-  INSERT INTO {rej} (
-    id, "timestamp", tf, bar_seq, reason,
-    time_open, time_close, time_high, time_low,
-    open, high, low, close, volume, market_cap,
-    is_partial_start, is_partial_end, is_missing_days,
-    src_name, src_load_ts, src_file
-  )
-  SELECT
-    id, "timestamp", tf, bar_seq, reason,
-    time_open, time_close, time_high, time_low,
-    open, high, low, close, volume, market_cap,
-    is_partial_start, is_partial_end, is_missing_days,
-    src_name, src_load_ts, src_file
-  FROM rej_rows
-  RETURNING 1
-)
-SELECT count(*)::int FROM ins;
-"""
+    def get_state_table_name(self) -> str:
+        """Return state table name for 1D builder."""
+        return self.STATE_TABLE
 
+    def get_output_table_name(self) -> str:
+        """Return output bars table name for 1D builder."""
+        return self.OUTPUT_TABLE
 
-# -----------------------------------------------------------------------------
-# Driver
-# -----------------------------------------------------------------------------
+    def get_source_query(self, id_: int, start_ts: Optional[str] = None) -> str:
+        """
+        Return SQL query to load source data for one ID.
 
+        Note: This builder uses psycopg CTEs directly, so this method
+        is not used. Included for interface compliance.
+        """
+        # Not used - 1D builder executes CTEs directly via psycopg
+        return f"SELECT * FROM {self.SOURCE_TABLE} WHERE id = {id_}"
 
-def build_1d_incremental(
-    *,
-    conn,
-    src: str,
-    dst: str,
-    state: str,
-    rejects: str,
-    ids: Optional[List[int]],
-    time_min: Optional[str],
-    time_max: Optional[str],
-    lookback_days: int,
-    rebuild: bool,
-    keep_rejects: bool,
-    fail_on_rejects: bool,
-    rebuild_if_backfill: bool = True,
-) -> None:
-    # Rebuild means DROP + recreate so schema changes always take effect
-    if rebuild:
-        _exec(conn, DDL_DROP_DST.format(dst=dst))
-        _exec(conn, DDL_DROP_STATE.format(state=state))
-        if keep_rejects:
-            _exec(conn, DDL_DROP_REJECTS.format(rej=rejects))
+    def build_bars_for_id(
+        self,
+        id_: int,
+        start_ts: Optional[str] = None,
+    ) -> int:
+        """
+        Build 1D bars for one ID using SQL CTE pipeline.
 
-    _exec(conn, DDL_CREATE_DST.format(dst=dst))
-    _exec(conn, DDL_CREATE_STATE.format(state=state))
-    if keep_rejects:
-        _exec(conn, DDL_CREATE_REJECTS.format(rej=rejects))
-        if rebuild:
-            _exec(conn, DDL_TRUNCATE_REJECTS.format(rej=rejects))
+        This method:
+        1. Checks for backfill (historical data added before first processed date)
+        2. Handles backfill if detected (delete bars + state, rebuild from scratch)
+        3. Loads last processed timestamp from state (for incremental refresh)
+        4. Executes SQL CTE to compute bars with OHLC repair
+        5. Updates state table with new watermarks
+        6. Returns count of rows upserted
 
-    # Ensure state schema has daily_min_seen column (auto-migration)
-    _ensure_state_schema(conn, state)
+        Args:
+            id_: Cryptocurrency ID
+            start_ts: Optional start timestamp (for incremental refresh, not used - state-based)
 
-    id_list = ids if ids is not None else _list_all_ids(conn, src)
+        Returns:
+            Number of rows inserted/updated
+        """
+        conn = self.psycopg_conn
+        src = self.SOURCE_TABLE
+        dst = self.OUTPUT_TABLE
+        state = self.STATE_TABLE
 
-    ins_sql = _insert_valid_and_return_stats_sql(dst=dst, src=src)
-    rej_sql = _insert_rejects_sql(rej=rejects, src=src) if keep_rejects else None
+        # Ensure state table has daily_min_seen column
+        _ensure_state_schema(conn, state)
 
-    total_upserted = 0
-    total_rep_hi = 0
-    total_rep_lo = 0
-    total_rej = 0
-    total_backfill_rebuilds = 0
+        # Check for backfill and handle if detected
+        state_dict = _get_state(conn, state, id_)
+        if _check_for_backfill(conn, src, id_, state_dict):
+            self.logger.info(f"ID={id_}: Backfill detected, triggering full rebuild")
+            _handle_backfill(conn, dst, state, id_)
+            state_dict = None  # Reset state after deletion
 
-    for id_ in id_list:
-        # Check for backfill detection
-        if rebuild_if_backfill:
-            st = _get_state(conn, state, id_)
-            if _check_for_backfill(conn, src, id_, st):
-                _handle_backfill(conn, dst, state, id_)
-                total_backfill_rebuilds += 1
-                # State is now deleted, will be recreated during processing
-
+        # Load last processed timestamp for incremental refresh
         last_src_ts = _get_last_src_ts(conn, state, id_)
 
-        # Params order MUST match the SQL:
-        # ranked_all: (id, time_max, time_max)
-        # src_rows:   (id, time_min, time_min, time_max, time_max, last_src_ts, last_src_ts, lookback_days)
+        # Build SQL parameters
+        # Params order: (id, time_max, time_max, id, time_min, time_min, time_max, time_max, last_src_ts, last_src_ts, lookback_days)
+        time_min = None  # No global time_min filter for 1D builder
+        time_max = None  # No global time_max filter for 1D builder
+        lookback_days = (
+            3  # Reprocess 3 days back from last_src_ts (handles late revisions)
+        )
+
         params: List[Any] = [
             id_,
             time_max,
@@ -823,18 +579,17 @@ def build_1d_incremental(
             lookback_days,
         ]
 
-        rejected = 0
-        if keep_rejects and rej_sql is not None:
-            row = _fetchone(conn, rej_sql, params)
-            rejected = int(row[0]) if row and row[0] is not None else 0
-
+        # Execute bar building SQL
+        ins_sql = _build_insert_bars_sql(dst=dst, src=src)
         row = _fetchone(conn, ins_sql, params)
+
         upserted = int(row[0]) if row and row[0] is not None else 0
         rep_hi = int(row[1]) if row and row[1] is not None else 0
         rep_lo = int(row[2]) if row and row[2] is not None else 0
         max_src_ts = row[3] if row else None
 
-        if max_src_ts is not None or rejected > 0:
+        # Update state if any rows were processed
+        if max_src_ts is not None:
             # Query MIN timestamp from source to track daily_min_seen
             min_row = _fetchone(
                 conn, f"SELECT MIN(timestamp) FROM {src} WHERE id = %s;", [id_]
@@ -848,7 +603,7 @@ def build_1d_incremental(
                 f"""
                 INSERT INTO {state} (id, last_src_ts, daily_min_seen, last_run_ts,
                                     last_upserted, last_repaired_timehigh, last_repaired_timelow, last_rejected)
-                VALUES (%s, %s, %s, now(), %s, %s, %s, %s)
+                VALUES (%s, %s, %s, now(), %s, %s, %s, 0)
                 ON CONFLICT (id) DO UPDATE SET
                   last_src_ts = COALESCE(EXCLUDED.last_src_ts, {state}.last_src_ts),
                   daily_min_seen = LEAST(COALESCE({state}.daily_min_seen, EXCLUDED.daily_min_seen), COALESCE(EXCLUDED.daily_min_seen, {state}.daily_min_seen)),
@@ -858,113 +613,98 @@ def build_1d_incremental(
                   last_repaired_timelow  = EXCLUDED.last_repaired_timelow,
                   last_rejected = EXCLUDED.last_rejected;
                 """,
-                [id_, max_src_ts, daily_min_ts, upserted, rep_hi, rep_lo, rejected],
+                [id_, max_src_ts, daily_min_ts, upserted, rep_hi, rep_lo],
             )
 
-        total_upserted += upserted
-        total_rep_hi += rep_hi
-        total_rep_lo += rep_lo
-        total_rej += rejected
+        self.logger.debug(
+            f"ID={id_}: upserted={upserted}, repaired_hi={rep_hi}, repaired_lo={rep_lo}"
+        )
+        return upserted
 
-    print(f"[bars_1d] src={src}")
-    print(f"[bars_1d] dst={dst}")
-    print(f"[bars_1d] state={state}")
-    if keep_rejects:
-        print(f"[bars_1d] rejects={rejects}")
-    print(f"[bars_1d] ids_processed={len(id_list)} lookback_days={lookback_days}")
-    print(
-        f"[bars_1d] total_upserted={total_upserted} repaired_timehigh={total_rep_hi} repaired_timelow={total_rep_lo}"
-    )
-    if total_backfill_rebuilds > 0:
-        print(f"[bars_1d] backfill_rebuilds={total_backfill_rebuilds}")
-    if keep_rejects:
-        print(f"[bars_1d] total_rejected={total_rej}")
-        if fail_on_rejects and total_rej > 0:
-            raise SystemExit(
-                f"[bars_1d] FAIL: {total_rej} rejects inserted into {rejects}"
-            )
+    @classmethod
+    def create_argument_parser(cls) -> argparse.ArgumentParser:
+        """
+        Create argument parser for 1D bar builder CLI.
+
+        Extends base parser with 1D-specific arguments.
+        """
+        parser = cls.create_base_argument_parser(
+            description="Incremental build of canonical 1D bars table with state tracking.",
+            default_daily_table="public.cmc_price_histories7",
+            default_bars_table="public.cmc_price_bars_1d",
+            default_state_table="public.cmc_price_bars_1d_state",
+            include_tz=False,  # 1D builder doesn't need timezone parameter
+        )
+
+        # Add 1D-specific arguments
+        parser.add_argument(
+            "--keep-rejects",
+            action="store_true",
+            help="Log rejected rows to rejects table (not yet implemented for 1D)",
+        )
+        parser.add_argument(
+            "--fail-on-rejects",
+            action="store_true",
+            help="Exit non-zero if any rejects were logged (not yet implemented for 1D)",
+        )
+
+        return parser
+
+    @classmethod
+    def from_cli_args(cls, args: argparse.Namespace) -> "OneDayBarBuilder":
+        """
+        Factory method: Create 1D bar builder from CLI arguments.
+
+        Args:
+            args: Parsed CLI arguments
+
+        Returns:
+            OneDayBarBuilder instance configured from arguments
+        """
+        # Resolve database URL
+        db_url = resolve_db_url(args.db_url)
+
+        # Create engine for SQLAlchemy operations (state management)
+        engine = get_engine(db_url)
+
+        # Parse IDs
+        ids_parsed = parse_ids(args.ids)
+        if ids_parsed == "all":
+            ids = load_all_ids(db_url, args.daily_table)
+        else:
+            ids = ids_parsed
+
+        # Build configuration
+        config = BarBuilderConfig(
+            db_url=db_url,
+            ids=ids,
+            daily_table=args.daily_table,
+            bars_table=args.bars_table,
+            state_table=args.state_table,
+            full_rebuild=args.full_rebuild,
+            keep_rejects=getattr(args, "keep_rejects", False),
+            rejects_table=f"{args.bars_table}_rejects",
+            num_processes=getattr(args, "num_processes", 6),
+            log_level="INFO",
+            log_file=None,
+            tz=None,  # 1D builder doesn't use timezone
+        )
+
+        return cls(config=config, engine=engine)
+
+
+# =============================================================================
+# CLI Entry Point
+# =============================================================================
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(
-        description="Incremental build of canonical 1D bars table with state tracking."
-    )
-    p.add_argument(
-        "--db-url",
-        default=os.environ.get("TARGET_DB_URL")
-        or os.environ.get("TA_LAB2_DB_URL")
-        or "",
-    )
-    p.add_argument("--src", default="public.cmc_price_histories7")
-    p.add_argument("--dst", default="public.cmc_price_bars_1d")
-    p.add_argument("--state", default="public.cmc_price_bars_1d_state")
-    p.add_argument("--rejects", default="public.cmc_price_bars_1d_rejects")
-    p.add_argument(
-        "--ids", default="all", help="all or comma-separated list, e.g. 1,1027,1975"
-    )
-    p.add_argument(
-        "--time-min", default=None, help='Optional inclusive bound on src."timestamp"'
-    )
-    p.add_argument(
-        "--time-max", default=None, help='Optional exclusive bound on src."timestamp"'
-    )
-    p.add_argument(
-        "--lookback-days",
-        type=int,
-        default=3,
-        help="Reprocess this many days back from last_src_ts (handles late revisions)",
-    )
-    p.add_argument(
-        "--rebuild",
-        action="store_true",
-        help="DROP + recreate dst + state (and rejects if kept) before building",
-    )
-    p.add_argument(
-        "--keep-rejects", action="store_true", help="Log rejected rows to rejects table"
-    )
-    p.add_argument(
-        "--fail-on-rejects",
-        action="store_true",
-        help="Exit non-zero if any rejects were logged",
-    )
-    p.add_argument(
-        "--rebuild-if-backfill",
-        action="store_true",
-        default=True,
-        help="Trigger full rebuild if backfill detected (default: True)",
-    )
-    p.add_argument(
-        "--no-rebuild-if-backfill",
-        action="store_false",
-        dest="rebuild_if_backfill",
-        help="Skip backfill detection and rebuild",
-    )
-    args = p.parse_args()
+    """Entry point for 1D bar builder."""
+    parser = OneDayBarBuilder.create_argument_parser()
+    args = parser.parse_args()
 
-    if not args.db_url:
-        raise SystemExit("Set TARGET_DB_URL (or TA_LAB2_DB_URL) or pass --db-url.")
-
-    ids = _parse_ids_arg(args.ids)
-
-    conn = _connect(args.db_url)
-    try:
-        build_1d_incremental(
-            conn=conn,
-            src=args.src,
-            dst=args.dst,
-            state=args.state,
-            rejects=args.rejects,
-            ids=ids,
-            time_min=args.time_min,
-            time_max=args.time_max,
-            lookback_days=args.lookback_days,
-            rebuild=args.rebuild,
-            keep_rejects=args.keep_rejects,
-            fail_on_rejects=args.fail_on_rejects,
-            rebuild_if_backfill=args.rebuild_if_backfill,
-        )
-    finally:
-        conn.close()
+    builder = OneDayBarBuilder.from_cli_args(args)
+    builder.run()
 
 
 if __name__ == "__main__":
