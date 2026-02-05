@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+# ruff: noqa: E402, F841, F601
 """
 # ======================================================================================
 # refresh_cmc_price_bars_multi_tf_cal_anchor_us.py (UPDATED)
@@ -52,6 +53,11 @@ from ta_lab2.scripts.bars.common_snapshot_contract import (
     delete_bars_for_id_tf,
     load_last_snapshot_row,
     create_bar_builder_argument_parser,
+)
+from ta_lab2.scripts.bars.derive_multi_tf_from_1d import (
+    derive_multi_tf_bars,
+    validate_derivation_consistency,
+    BUILDER_ALIGNMENT_MAP,
 )
 from ta_lab2.orchestration import (
     MultiprocessingOrchestrator,
@@ -1252,6 +1258,18 @@ def main(argv: Sequence[str] | None = None) -> None:
         include_tz=True,
         include_fail_on_gaps=True,
     )
+    # Add derivation arguments
+    ap.add_argument(
+        "--from-1d",
+        action="store_true",
+        help="Derive multi-TF bars from cmc_price_bars_1d instead of price_histories7",
+    )
+    ap.add_argument(
+        "--validate-derivation",
+        action="store_true",
+        help="Compare derived bars to direct computation (for migration validation)",
+    )
+
     args = ap.parse_args(list(argv) if argv is not None else None)
 
     db_url = resolve_db_url(args.db_url)
@@ -1262,6 +1280,17 @@ def main(argv: Sequence[str] | None = None) -> None:
     print(f"[bars_anchor_us] daily_table={args.daily_table}")
     print(f"[bars_anchor_us] bars_table={args.bars_table}")
     print(f"[bars_anchor_us] state_table={args.state_table}")
+
+    # Log derivation mode
+    if args.from_1d:
+        alignment, anchor_mode = BUILDER_ALIGNMENT_MAP["cal_anchor_us"]
+        print(
+            f"[bars_anchor_us] Deriving anchored calendar {alignment} bars from cmc_price_bars_1d (partial periods allowed)"
+        )
+        if args.validate_derivation:
+            print(
+                "[bars_anchor_us] Validation mode: will compare derived bars to direct computation"
+            )
 
     if args.full_rebuild:
         start_time = time.time()
@@ -1277,7 +1306,111 @@ def main(argv: Sequence[str] | None = None) -> None:
         # Ensure state table exists (with tz column)
         ensure_state_table(db_url, args.state_table, with_tz=True)
 
+        # Get alignment mode for derivation (anchor_mode=True for anchor builders)
+        alignment, anchor_mode = BUILDER_ALIGNMENT_MAP["cal_anchor_us"]
+        eng = get_engine(db_url)
+
         for id_ in ids:
+            # If using derivation mode
+            if args.from_1d:
+                # Derive all bars from 1D source with anchor_mode=True
+                timeframes_list = [spec.tf for spec in specs]
+                bars_all = derive_multi_tf_bars(
+                    engine=eng,
+                    id=int(id_),
+                    timeframes=timeframes_list,
+                    alignment=alignment,
+                    anchor_mode=anchor_mode,
+                )
+
+                if args.validate_derivation:
+                    # Load daily and build direct for comparison
+                    df_full = load_daily_prices_for_id(
+                        db_url=db_url, daily_table=args.daily_table, id_=int(id_)
+                    )
+                    bars_direct_all = []
+                    for spec in specs:
+                        bars_direct = _build_snapshots_full_history_for_id_spec_polars(
+                            df_full, spec=spec, tz=args.tz
+                        )
+                        if not bars_direct.empty:
+                            bars_direct_all.append(bars_direct)
+
+                    if bars_direct_all:
+                        import polars as pl
+
+                        bars_direct_combined = pl.from_pandas(
+                            pd.concat(bars_direct_all, ignore_index=True)
+                        )
+                        is_consistent, discrepancies = validate_derivation_consistency(
+                            bars_all, bars_direct_combined
+                        )
+                        if not is_consistent:
+                            print(
+                                f"[bars_anchor_us] Derivation discrepancies for id={id_}: {discrepancies}"
+                            )
+                        else:
+                            print(
+                                f"[bars_anchor_us] Derivation validated successfully for id={id_}"
+                            )
+
+                # Upsert derived bars by timeframe
+                if not bars_all.is_empty():
+                    bars_pd = bars_all.to_pandas()
+                    for spec in specs:
+                        combo_count += 1
+                        delete_bars_for_id_tf(
+                            db_url, args.bars_table, id_=int(id_), tf=spec.tf
+                        )
+                        bars_tf = bars_pd[bars_pd["tf"] == spec.tf].copy()
+
+                        if not bars_tf.empty:
+                            num_rows = len(bars_tf)
+                            running_total += num_rows
+                            upsert_bars(
+                                bars_tf, db_url=db_url, bars_table=args.bars_table
+                            )
+
+                            # State update
+                            state_row = {
+                                "id": int(id_),
+                                "tf": spec.tf,
+                                "tz": args.tz,
+                                "daily_min_seen": pd.to_datetime(
+                                    bars_tf["time_open"].min(), utc=True
+                                ),
+                                "daily_max_seen": pd.to_datetime(
+                                    bars_tf["time_close"].max(), utc=True
+                                ),
+                                "last_bar_seq": int(bars_tf["bar_seq"].max()),
+                                "last_time_close": pd.to_datetime(
+                                    bars_tf["time_close"].max(), utc=True
+                                ),
+                            }
+                            upsert_state(
+                                db_url, args.state_table, [state_row], with_tz=True
+                            )
+
+                            period_start = (
+                                bars_tf["time_open"].min().strftime("%Y-%m-%d")
+                            )
+                            period_end = (
+                                bars_tf["time_close"].max().strftime("%Y-%m-%d")
+                            )
+                            elapsed = time.time() - start_time
+                            pct = (
+                                (combo_count / total_combinations) * 100
+                                if total_combinations > 0
+                                else 0
+                            )
+
+                            print(
+                                f"[bars_anchor_us] ID={id_}, TF={spec.tf}, period={period_start} to {period_end}: "
+                                f"upserted {num_rows:,} rows (DERIVED ANCHOR, {running_total:,} total, {pct:.1f}%) [elapsed: {elapsed:.1f}s]"
+                            )
+                continue
+
+            # Original direct computation path
             df_full = load_daily_prices_for_id(
                 db_url=db_url, daily_table=args.daily_table, id_=int(id_)
             )
