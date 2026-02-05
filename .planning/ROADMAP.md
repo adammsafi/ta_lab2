@@ -403,17 +403,19 @@ Plans:
 ---
 
 ### Phase 25: Baseline Capture
-**Goal**: Capture current EMA outputs before validation testing
+**Goal**: Capture current bar and EMA outputs before validation testing using Snapshot -> Truncate -> Rebuild -> Compare workflow
 **Depends on**: Phase 24
 **Requirements**: TEST-01
 **Success Criteria** (what must be TRUE):
-  1. Baseline outputs captured for all 6 EMA variants
-  2. Baselines stored in format suitable for comparison (epsilon tolerance aware)
-  3. Baseline capture documented and reproducible
-**Plans**: TBD
+  1. Baseline outputs captured for all 6 bar tables and 4 EMA tables
+  2. Baselines stored in timestamped snapshot tables suitable for comparison
+  3. Comparison uses epsilon tolerance with hybrid bounds (rtol + atol)
+  4. Baseline capture documented and reproducible with full metadata audit trail
+**Plans**: 2 plans in 2 waves
 
 Plans:
-- [ ] 25-01: Capture baseline EMA outputs from all 6 variants (TEST-01)
+- [ ] 25-01-PLAN.md - Infrastructure (dim_assets DDL, comparison utilities, metadata tracker)
+- [ ] 25-02-PLAN.md - Orchestration script (Snapshot -> Truncate -> Rebuild -> Compare workflow)
 
 ---
 
@@ -477,8 +479,8 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19
 | 21. Comprehensive Review | 4/4 | Complete | 2026-02-05 |
 | 22. Critical Data Quality Fixes | 6/6 | Complete | 2026-02-05 |
 | 23. Reliable Incremental Refresh | 4/4 | Complete | 2026-02-05 |
-| 24. Pattern Consistency | 0/4 | Not started | - |
-| 25. Baseline Capture | 0/1 | Not started | - |
+| 24. Pattern Consistency | 4/4 | Complete | 2026-02-05 |
+| 25. Baseline Capture | 0/2 | Not started | - |
 | 26. Validation | 0/3 | Not started | - |
 
 ## Requirement Coverage
@@ -502,4 +504,4 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-05 (Phase 24 planned: 4 plans in 3 waves)*
+*Last updated: 2026-02-05 (Phase 25 planned: 2 plans in 2 waves)*
