@@ -204,6 +204,7 @@ CREATE TABLE IF NOT EXISTS {state} (
   id integer PRIMARY KEY,
 
   last_src_ts timestamptz,             -- max src."timestamp" processed for this id (after lookback)
+  daily_min_seen timestamptz,          -- min src."timestamp" ever seen for this id (for backfill detection)
   last_run_ts timestamptz NOT NULL DEFAULT now(),
 
   last_upserted integer NOT NULL DEFAULT 0,
@@ -216,6 +217,41 @@ CREATE TABLE IF NOT EXISTS {state} (
 DDL_TRUNCATE_REJECTS = """
 TRUNCATE TABLE {rej};
 """
+
+
+# -----------------------------------------------------------------------------
+# Schema migration
+# -----------------------------------------------------------------------------
+
+
+def _ensure_state_schema(conn, state: str) -> None:
+    """Ensure state table has daily_min_seen column (auto-migration)."""
+    # Check if column exists
+    check_sql = """
+        SELECT column_name FROM information_schema.columns
+        WHERE table_schema = 'public'
+        AND table_name = %s
+        AND column_name = 'daily_min_seen'
+    """
+    table_name = state.split(".")[-1] if "." in state else state
+    row = _fetchone(conn, check_sql, [table_name])
+
+    if not row:
+        # Add column
+        alter_sql = f"""
+            ALTER TABLE {state}
+            ADD COLUMN daily_min_seen TIMESTAMPTZ;
+        """
+        _exec(conn, alter_sql)
+
+        # Backfill existing rows: set daily_min_seen = last_src_ts for safety
+        backfill_sql = f"""
+            UPDATE {state}
+            SET daily_min_seen = last_src_ts
+            WHERE daily_min_seen IS NULL;
+        """
+        _exec(conn, backfill_sql)
+        print(f"[bars_1d] Added daily_min_seen column to {state}")
 
 
 # -----------------------------------------------------------------------------
@@ -246,6 +282,57 @@ def _get_last_src_ts(conn, state: str, id_: int) -> Optional[str]:
     if not row or row[0] is None:
         return None
     return str(row[0])
+
+
+def _get_state(conn, state: str, id_: int) -> Optional[dict]:
+    """Load full state for an id (including daily_min_seen)."""
+    row = _fetchone(
+        conn,
+        f"SELECT last_src_ts, daily_min_seen FROM {state} WHERE id = %s;",
+        [id_]
+    )
+    if not row:
+        return None
+    return {
+        "last_src_ts": str(row[0]) if row[0] is not None else None,
+        "daily_min_seen": str(row[1]) if row[1] is not None else None,
+    }
+
+
+def _check_for_backfill(conn, src: str, id_: int, state: Optional[dict]) -> bool:
+    """
+    Check if historical data was backfilled before first processed date.
+
+    Returns True if backfill detected (rebuild required).
+    """
+    if state is None or state.get("daily_min_seen") is None:
+        return False  # No state = first run, not a backfill
+
+    # Query earliest timestamp in source
+    row = _fetchone(
+        conn,
+        f"SELECT MIN(timestamp) as daily_min_ts FROM {src} WHERE id = %s;",
+        [id_]
+    )
+    if row and row[0] is not None:
+        daily_min_ts = str(row[0])
+        daily_min_seen = state["daily_min_seen"]
+        if daily_min_ts < daily_min_seen:
+            print(
+                f"[bars_1d] Backfill detected for id={id_}: "
+                f"source min={daily_min_ts}, state min={daily_min_seen}"
+            )
+            return True
+    return False
+
+
+def _handle_backfill(conn, dst: str, state: str, id_: int) -> None:
+    """Delete bars and state for full rebuild."""
+    # Delete all bars for this ID
+    _exec(conn, f"DELETE FROM {dst} WHERE id = %s;", [id_])
+    # Delete state (will be recreated during processing)
+    _exec(conn, f"DELETE FROM {state} WHERE id = %s;", [id_])
+    print(f"[bars_1d] Backfill rebuild: deleted bars and state for id={id_}")
 
 
 @dataclass(frozen=True)
@@ -681,6 +768,7 @@ def build_1d_incremental(
     rebuild: bool,
     keep_rejects: bool,
     fail_on_rejects: bool,
+    rebuild_if_backfill: bool = True,
 ) -> None:
     # Rebuild means DROP + recreate so schema changes always take effect
     if rebuild:
@@ -696,6 +784,9 @@ def build_1d_incremental(
         if rebuild:
             _exec(conn, DDL_TRUNCATE_REJECTS.format(rej=rejects))
 
+    # Ensure state schema has daily_min_seen column (auto-migration)
+    _ensure_state_schema(conn, state)
+
     id_list = ids if ids is not None else _list_all_ids(conn, src)
 
     ins_sql = _insert_valid_and_return_stats_sql(dst=dst, src=src)
@@ -705,8 +796,17 @@ def build_1d_incremental(
     total_rep_hi = 0
     total_rep_lo = 0
     total_rej = 0
+    total_backfill_rebuilds = 0
 
     for id_ in id_list:
+        # Check for backfill detection
+        if rebuild_if_backfill:
+            st = _get_state(conn, state, id_)
+            if _check_for_backfill(conn, src, id_, st):
+                _handle_backfill(conn, dst, state, id_)
+                total_backfill_rebuilds += 1
+                # State is now deleted, will be recreated during processing
+
         last_src_ts = _get_last_src_ts(conn, state, id_)
 
         # Params order MUST match the SQL:
@@ -738,21 +838,26 @@ def build_1d_incremental(
         max_src_ts = row[3] if row else None
 
         if max_src_ts is not None or rejected > 0:
+            # Query MIN timestamp from source to track daily_min_seen
+            min_row = _fetchone(conn, f"SELECT MIN(timestamp) FROM {src} WHERE id = %s;", [id_])
+            daily_min_ts = str(min_row[0]) if min_row and min_row[0] is not None else None
+
             _exec(
                 conn,
                 f"""
-                INSERT INTO {state} (id, last_src_ts, last_run_ts,
+                INSERT INTO {state} (id, last_src_ts, daily_min_seen, last_run_ts,
                                     last_upserted, last_repaired_timehigh, last_repaired_timelow, last_rejected)
-                VALUES (%s, %s, now(), %s, %s, %s, %s)
+                VALUES (%s, %s, %s, now(), %s, %s, %s, %s)
                 ON CONFLICT (id) DO UPDATE SET
                   last_src_ts = COALESCE(EXCLUDED.last_src_ts, {state}.last_src_ts),
+                  daily_min_seen = LEAST(COALESCE({state}.daily_min_seen, EXCLUDED.daily_min_seen), COALESCE(EXCLUDED.daily_min_seen, {state}.daily_min_seen)),
                   last_run_ts = now(),
                   last_upserted = EXCLUDED.last_upserted,
                   last_repaired_timehigh = EXCLUDED.last_repaired_timehigh,
                   last_repaired_timelow  = EXCLUDED.last_repaired_timelow,
                   last_rejected = EXCLUDED.last_rejected;
                 """,
-                [id_, max_src_ts, upserted, rep_hi, rep_lo, rejected],
+                [id_, max_src_ts, daily_min_ts, upserted, rep_hi, rep_lo, rejected],
             )
 
         total_upserted += upserted
@@ -769,6 +874,8 @@ def build_1d_incremental(
     print(
         f"[bars_1d] total_upserted={total_upserted} repaired_timehigh={total_rep_hi} repaired_timelow={total_rep_lo}"
     )
+    if total_backfill_rebuilds > 0:
+        print(f"[bars_1d] backfill_rebuilds={total_backfill_rebuilds}")
     if keep_rejects:
         print(f"[bars_1d] total_rejected={total_rej}")
         if fail_on_rejects and total_rej > 0:
@@ -819,6 +926,18 @@ def main() -> None:
         action="store_true",
         help="Exit non-zero if any rejects were logged",
     )
+    p.add_argument(
+        "--rebuild-if-backfill",
+        action="store_true",
+        default=True,
+        help="Trigger full rebuild if backfill detected (default: True)",
+    )
+    p.add_argument(
+        "--no-rebuild-if-backfill",
+        action="store_false",
+        dest="rebuild_if_backfill",
+        help="Skip backfill detection and rebuild",
+    )
     args = p.parse_args()
 
     if not args.db_url:
@@ -841,6 +960,7 @@ def main() -> None:
             rebuild=args.rebuild,
             keep_rejects=args.keep_rejects,
             fail_on_rejects=args.fail_on_rejects,
+            rebuild_if_backfill=args.rebuild_if_backfill,
         )
     finally:
         conn.close()

@@ -15,11 +15,11 @@ Option B contract decisions:
 """
 
 import argparse
+import math
+import os
 from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any, Callable, Iterable, Literal, Mapping, Sequence
-
-import os
 
 import pandas as pd
 from sqlalchemy import create_engine, text
@@ -1245,3 +1245,136 @@ def load_last_snapshot_info_for_id_tfs(
             "last_time_close": pd.to_datetime(r["last_time_close"], utc=True),
         }
     return out
+
+
+# =============================================================================
+# 12) Multi-TF reject table utilities (GAP-C01: OHLC repair audit trail)
+# =============================================================================
+
+
+def create_rejects_table_ddl(table_name: str, schema: str = "public") -> str:
+    """
+    Generate DDL for multi-TF bar rejects table.
+
+    Schema includes:
+    - violation_type: What was wrong (high_lt_low, high_lt_oc_max, etc.)
+    - repair_action: What was done to fix it (high_low_swapped, high_adjusted, etc.)
+    - Original OHLCV values before repair for audit trail
+
+    Args:
+        table_name: Name of rejects table to create
+        schema: Database schema (default: public)
+
+    Returns:
+        DDL string to create rejects table
+    """
+    full_name = f"{schema}.{table_name}" if schema else table_name
+    return f"""
+CREATE TABLE IF NOT EXISTS {full_name} (
+    id                  INTEGER NOT NULL,
+    tf                  TEXT NOT NULL,
+    bar_seq             INTEGER NOT NULL,
+    timestamp           TIMESTAMPTZ NOT NULL,
+    violation_type      TEXT NOT NULL,
+    repair_action       TEXT NOT NULL,
+    original_open       DOUBLE PRECISION,
+    original_high       DOUBLE PRECISION,
+    original_low        DOUBLE PRECISION,
+    original_close      DOUBLE PRECISION,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (id, tf, bar_seq, timestamp, violation_type)
+);
+"""
+
+
+def detect_ohlc_violations(row: dict) -> list[tuple[str, str]]:
+    """
+    Detect OHLC violations and return list of (violation_type, repair_action) tuples.
+
+    Implementation logic (matching enforce_ohlc_sanity from lines 782-854):
+
+    Args:
+        row: Dictionary with OHLCV keys (open, high, low, close)
+
+    Returns:
+        List of (violation_type, repair_action) tuples for detected violations
+    """
+    violations = []
+    o, h, low, c = (
+        row.get("open"),
+        row.get("high"),
+        row.get("low"),
+        row.get("close"),
+    )
+
+    # Skip if any value is None/NaN
+    if any(
+        v is None or (isinstance(v, float) and math.isnan(v)) for v in [o, h, low, c]
+    ):
+        return violations
+
+    oc_min = min(o, c)
+    oc_max = max(o, c)
+
+    # Check 1: high < low (enforce_ohlc_sanity handles this via clamping which effectively swaps)
+    if h < low:
+        violations.append(("high_lt_low", "values_will_be_clamped"))
+
+    # Check 2: high < max(open, close) -> high will be clamped up (line 839-841)
+    if h < oc_max:
+        violations.append(("high_lt_oc_max", "high_clamped_to_oc_max"))
+
+    # Check 3: low > min(open, close) -> low will be clamped down (line 844-852)
+    if low > oc_min:
+        violations.append(("low_gt_oc_min", "low_clamped_to_oc_min"))
+
+    return violations
+
+
+def log_to_rejects(
+    engine: Engine,
+    rejects_table: str,
+    records: list[dict],
+    schema: str = "public",
+) -> int:
+    """
+    Insert reject records to rejects table.
+
+    Each record should have:
+    - id, tf, bar_seq, timestamp
+    - violation_type, repair_action
+    - original_open, original_high, original_low, original_close (before repair)
+
+    Args:
+        engine: SQLAlchemy engine
+        rejects_table: Name of rejects table
+        records: List of reject record dictionaries
+        schema: Database schema (default: public)
+
+    Returns:
+        Number of records inserted
+    """
+    if not records:
+        return 0
+
+    full_name = f"{schema}.{rejects_table}" if schema else rejects_table
+
+    # Build INSERT statement
+    sql = text(
+        f"""
+        INSERT INTO {full_name} (
+            id, tf, bar_seq, timestamp, violation_type, repair_action,
+            original_open, original_high, original_low, original_close
+        )
+        VALUES (
+            :id, :tf, :bar_seq, :timestamp, :violation_type, :repair_action,
+            :original_open, :original_high, :original_low, :original_close
+        )
+        ON CONFLICT (id, tf, bar_seq, timestamp, violation_type) DO NOTHING;
+        """
+    )
+
+    with engine.begin() as conn:
+        conn.execute(sql, records)
+
+    return len(records)
