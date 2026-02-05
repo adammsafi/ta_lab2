@@ -715,13 +715,25 @@ def upsert_bars(
     bars_table: str,
     conflict_cols: Sequence[str] = ("id", "tf", "bar_seq", "time_close"),
     timestamp_cols: Sequence[str] | None = None,
+    keep_rejects: bool = False,
+    rejects_table: str | None = None,
 ) -> None:
     """
     Standard bar-table write pipeline (shared):
     - normalize schema
+    - log OHLC violations (if keep_rejects=True)
     - enforce output invariants (OHLC sanity, bad time_low fix)
     - NaT -> None for timestamp cols
     - executemany upsert
+
+    Args:
+        df: DataFrame with bar data
+        db_url: Database URL
+        bars_table: Target bars table name
+        conflict_cols: Columns for ON CONFLICT clause
+        timestamp_cols: Columns to convert NaT to None
+        keep_rejects: If True, log OHLC violations before repair
+        rejects_table: Table name for rejects (required if keep_rejects=True)
     """
     if df.empty:
         return
@@ -759,6 +771,31 @@ def upsert_bars(
     df = df[[c for c in valid_cols if c in df.columns]]
 
     df2 = normalize_output_schema(df)
+
+    # Log OHLC violations before repair (if enabled)
+    if keep_rejects and rejects_table:
+        rejects = []
+        for _, row in df2.iterrows():
+            violations = detect_ohlc_violations(row.to_dict())
+            for vtype, raction in violations:
+                rejects.append(
+                    {
+                        "id": row["id"],
+                        "tf": row["tf"],
+                        "bar_seq": row["bar_seq"],
+                        "timestamp": row["timestamp"],
+                        "violation_type": vtype,
+                        "repair_action": raction,
+                        "original_open": row["open"],
+                        "original_high": row["high"],
+                        "original_low": row["low"],
+                        "original_close": row["close"],
+                    }
+                )
+        if rejects:
+            engine = get_engine(db_url)
+            log_to_rejects(engine, rejects_table, rejects)
+
     df2 = enforce_ohlc_sanity(df2)
 
     if timestamp_cols is None:

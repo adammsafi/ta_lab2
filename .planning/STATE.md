@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 
 ## Current Position
 
-Phase: 21 of 26 (Comprehensive Review)
-Plan: 4 of 4 in current phase
-Status: Complete
-Last activity: 2026-02-05 — Phase 21 complete (Comprehensive Review - All analysis complete)
+Phase: 22 of 26 (Critical Data Quality Fixes)
+Plan: 2 of 4 in current phase
+Status: In progress
+Last activity: 2026-02-05 — Completed 22-02-PLAN.md (EMA output validation)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [#####     ] 50% v0.6.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [######    ] 60% v0.6.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 119 (56 in v0.4.0, 56 in v0.5.0, 7 in v0.6.0)
+- Total plans completed: 120 (56 in v0.4.0, 56 in v0.5.0, 8 in v0.6.0)
 - Average duration: 7 min
-- Total execution time: 23.4 hours
+- Total execution time: 23.6 hours
 
 **By Phase (v0.4.0):**
 
@@ -55,7 +55,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [#####     ] 50%
 **Recent Trend:**
 - v0.4.0 complete: 10 phases, 56 plans, 12.55 hours total
 - v0.5.0 complete: 9 phases, 56 plans, 9.85 hours total
-- v0.6.0 in progress: 7/14 plans complete (50% done) - 2 of 7 phases complete
+- v0.6.0 in progress: 8/14 plans complete (57% done) - 2 of 7 phases complete
 
 **By Phase (v0.6.0):**
 
@@ -63,6 +63,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [#####     ] 50%
 |-------|-------|-------|----------|--------|
 | 20-historical-context | 3/3 | 17 min | 6 min | Complete |
 | 21-comprehensive-review | 4/4 | 29 min | 7 min | Complete |
+| 22-critical-data-quality-fixes | 2/4 | 13 min | 7 min | In progress |
 
 *Updated after each plan completion*
 
@@ -83,6 +84,8 @@ Recent decisions affecting current work:
 - **All 6 EMA variants exist for legitimate reasons** (Phase 21): 80%+ infrastructure shared (BaseEMARefresher, EMAStateManager, compute_ema) with 20% intentional differences (data source, calendar alignment, anchoring) - NOT code duplication
 - **Gap severity framework established** (Phase 21-04): CRITICAL (data corruption), HIGH (error-prone), MEDIUM (workarounds), LOW (nice-to-have) - 15 gaps identified (4 CRITICAL, 5 HIGH, 4 MEDIUM, 2 LOW), prioritized for Phase 22-24
 - **Asset onboarding documented** (Phase 21-04): 6-step checklist (dim_assets → 1D bars → multi-TF bars → EMAs → validate → verify incremental), 15-40 minutes per asset
+- **Hybrid EMA validation** (Phase 22-02): Wide price bounds (0.5x-2x) catch corruption, narrow statistical bounds (3σ) catch drift - batched queries achieve <2% overhead
+- **Warn and continue for EMA violations** (Phase 22-02): Write all EMAs even if invalid, log to both ema_rejects table and WARNING logs for maximum visibility
 
 ### Pending Todos
 
@@ -95,7 +98,7 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-05
-Stopped at: Phase 21 complete (Comprehensive Review) - VERIFICATION.md confirms all 5 success criteria verified
+Stopped at: Completed 22-02-PLAN.md (EMA output validation) - Hybrid validation with ema_rejects audit table integrated into BaseEMARefresher
 Resume file: None
 
 ---

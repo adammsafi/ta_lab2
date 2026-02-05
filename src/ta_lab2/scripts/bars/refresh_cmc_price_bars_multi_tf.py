@@ -356,7 +356,6 @@ def build_snapshots_for_id_polars(
     out = compact_output_types(out)
 
     out = normalize_output_schema(out)
-    _log_ohlc_violations(out)  # Log violations before repair
     out = enforce_ohlc_sanity(out)
     return out
 
@@ -485,7 +484,6 @@ def build_snapshots_for_id(
     )
 
     out = normalize_output_schema(out)
-    _log_ohlc_violations(out)  # Log violations before repair
     out = enforce_ohlc_sanity(out)
     return out
 
@@ -783,7 +781,6 @@ def _append_incremental_rows_for_id_tf(
 
     df_out = pd.DataFrame(new_rows)
     df_out = normalize_output_schema(df_out)
-    _log_ohlc_violations(df_out)  # Log violations before repair
     df_out = enforce_ohlc_sanity(df_out)
     return df_out
 
@@ -849,7 +846,13 @@ def refresh_incremental(
                     df_full, tf_days=int(tf_days), tf_label=tf_label
                 )
                 if not bars.empty:
-                    upsert_bars(bars, db_url=db_url, bars_table=bars_table)
+                    upsert_bars(
+                        bars,
+                        db_url=db_url,
+                        bars_table=bars_table,
+                        keep_rejects=_KEEP_REJECTS,
+                        rejects_table=_REJECTS_TABLE,
+                    )
                     totals["upserted"] += len(bars)
                     totals["rebuilds"] += 1
                     last_bar_seq = int(bars["bar_seq"].max())
@@ -889,7 +892,13 @@ def refresh_incremental(
                     df_full, tf_days=int(tf_days), tf_label=tf_label
                 )
                 if not bars.empty:
-                    upsert_bars(bars, db_url=db_url, bars_table=bars_table)
+                    upsert_bars(
+                        bars,
+                        db_url=db_url,
+                        bars_table=bars_table,
+                        keep_rejects=_KEEP_REJECTS,
+                        rejects_table=_REJECTS_TABLE,
+                    )
                     totals["upserted"] += len(bars)
                     totals["rebuilds"] += 1
                     last_bar_seq = int(bars["bar_seq"].max())
@@ -923,7 +932,13 @@ def refresh_incremental(
                     df_full, tf_days=int(tf_days), tf_label=tf_label
                 )
                 if not bars.empty:
-                    upsert_bars(bars, db_url=db_url, bars_table=bars_table)
+                    upsert_bars(
+                        bars,
+                        db_url=db_url,
+                        bars_table=bars_table,
+                        keep_rejects=_KEEP_REJECTS,
+                        rejects_table=_REJECTS_TABLE,
+                    )
                     totals["upserted"] += len(bars)
                     last_bar_seq = int(bars["bar_seq"].max())
                     last_time_close = pd.to_datetime(bars["time_close"].max(), utc=True)
@@ -984,7 +999,13 @@ def refresh_incremental(
                     )
                     continue
 
-                upsert_bars(new_rows, db_url=db_url, bars_table=bars_table)
+                upsert_bars(
+                new_rows,
+                db_url=db_url,
+                bars_table=bars_table,
+                keep_rejects=_KEEP_REJECTS,
+                rejects_table=_REJECTS_TABLE,
+            )
                 totals["upserted"] += len(new_rows)
                 totals["appends"] += 1
 
@@ -1090,7 +1111,13 @@ def _process_single_id_with_all_specs(args) -> tuple[list[dict], dict[str, int]]
                         df_full, tf_days=int(tf_days), tf_label=tf_label
                     )
                     if not bars.empty:
-                        upsert_bars(bars, db_url=db_url, bars_table=bars_table)
+                        upsert_bars(
+                        bars,
+                        db_url=db_url,
+                        bars_table=bars_table,
+                        keep_rejects=_KEEP_REJECTS,
+                        rejects_table=_REJECTS_TABLE,
+                    )
                         stats["upserted"] += len(bars)
                         stats["rebuilds"] += 1
                         last_bar_seq = int(bars["bar_seq"].max())
@@ -1121,7 +1148,13 @@ def _process_single_id_with_all_specs(args) -> tuple[list[dict], dict[str, int]]
                         df_full, tf_days=int(tf_days), tf_label=tf_label
                     )
                     if not bars.empty:
-                        upsert_bars(bars, db_url=db_url, bars_table=bars_table)
+                        upsert_bars(
+                        bars,
+                        db_url=db_url,
+                        bars_table=bars_table,
+                        keep_rejects=_KEEP_REJECTS,
+                        rejects_table=_REJECTS_TABLE,
+                    )
                         stats["upserted"] += len(bars)
                         stats["rebuilds"] += 1
                         last_bar_seq = int(bars["bar_seq"].max())
@@ -1157,7 +1190,13 @@ def _process_single_id_with_all_specs(args) -> tuple[list[dict], dict[str, int]]
                         df_full, tf_days=int(tf_days), tf_label=tf_label
                     )
                     if not bars.empty:
-                        upsert_bars(bars, db_url=db_url, bars_table=bars_table)
+                        upsert_bars(
+                        bars,
+                        db_url=db_url,
+                        bars_table=bars_table,
+                        keep_rejects=_KEEP_REJECTS,
+                        rejects_table=_REJECTS_TABLE,
+                    )
                         stats["upserted"] += len(bars)
                         last_bar_seq = int(bars["bar_seq"].max())
                         last_time_close = pd.to_datetime(
@@ -1218,7 +1257,13 @@ def _process_single_id_with_all_specs(args) -> tuple[list[dict], dict[str, int]]
                     )
                     continue
 
-                upsert_bars(new_rows, db_url=db_url, bars_table=bars_table)
+                upsert_bars(
+                new_rows,
+                db_url=db_url,
+                bars_table=bars_table,
+                keep_rejects=_KEEP_REJECTS,
+                rejects_table=_REJECTS_TABLE,
+            )
                 stats["upserted"] += len(new_rows)
                 stats["appends"] += 1
 
@@ -1395,7 +1440,13 @@ def refresh_full_rebuild(
             if not bars.empty:
                 num_rows = len(bars)
                 running_total += num_rows
-                upsert_bars(bars, db_url=db_url, bars_table=bars_table)
+                upsert_bars(
+                        bars,
+                        db_url=db_url,
+                        bars_table=bars_table,
+                        keep_rejects=_KEEP_REJECTS,
+                        rejects_table=_REJECTS_TABLE,
+                    )
                 last_bar_seq = int(bars["bar_seq"].max())
                 last_time_close = pd.to_datetime(
                     bars["time_close"].max(), utc=True
