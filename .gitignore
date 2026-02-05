@@ -194,3 +194,8 @@ old/
 **/*snapshot*.json
 **/db_schema*.json
 **/db_schema*.md
+
+# Generated reports and analysis
+**/similarity_report.json
+**/*_report.json
+**/*_analysis.json
