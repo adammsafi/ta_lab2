@@ -102,15 +102,15 @@ When v0.6.0 is complete:
 
 ### Standardization (Guided by Review Findings)
 
-- [ ] **PATT-01**: Data loading standardization - consistent query patterns across variants (if analysis shows inconsistency)
-- [ ] **PATT-02**: State management code standardized - same read/write patterns (if analysis shows inconsistency)
-- [ ] **PATT-03**: Validation code shared - OHLC invariants, NULL handling, gap detection (if analysis shows duplication)
-- [ ] **PATT-04**: Shared utilities extracted - common code moved to reusable modules (if analysis shows duplication worth extracting)
+- [x] **PATT-01**: Data loading standardization - consistent query patterns across variants (if analysis shows inconsistency)
+- [x] **PATT-02**: State management code standardized - same read/write patterns (if analysis shows inconsistency)
+- [x] **PATT-03**: Validation code shared - OHLC invariants, NULL handling, gap detection (if analysis shows duplication)
+- [x] **PATT-04**: Shared utilities extracted - common code moved to reusable modules (if analysis shows duplication worth extracting)
 
 ### Boundaries
 
-- [ ] **PATT-05**: Keep all 6 EMA variants - they serve distinct purposes (calendar alignment, ISO vs US, anchoring)
-- [ ] **PATT-06**: Don't force standardization - only where analysis justifies (avoid premature abstraction)
+- [x] **PATT-05**: Keep all 6 EMA variants - they serve distinct purposes (calendar alignment, ISO vs US, anchoring)
+- [x] **PATT-06**: Don't force standardization - only where analysis justifies (avoid premature abstraction)
 
 ---
 

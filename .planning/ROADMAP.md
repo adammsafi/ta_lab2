@@ -55,7 +55,7 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 - [x] **Phase 21: Comprehensive Review** - Complete read-only analysis of all bar/EMA components
 - [x] **Phase 22: Critical Data Quality Fixes** - Fix 4 CRITICAL gaps + derive multi-TF from 1D bars
 - [x] **Phase 23: Reliable Incremental Refresh** - Flexible orchestration, state management, visibility
-- [ ] **Phase 24: Pattern Consistency** - Standardize patterns where analysis justifies
+- [x] **Phase 24: Pattern Consistency** - Standardize patterns where analysis justifies
 - [ ] **Phase 25: Baseline Capture** - Capture current outputs before validation testing
 - [ ] **Phase 26: Validation** - Verify fixes worked correctly, nothing broke
 
@@ -395,10 +395,10 @@ Plans:
 **Plans**: 4 plans in 3 waves
 
 Plans:
-- [ ] 24-01-PLAN.md - Design and create BaseBarBuilder template class (GAP-M01 foundation)
-- [ ] 24-02-PLAN.md - Refactor 1D bar builder to use BaseBarBuilder (proof of concept)
-- [ ] 24-03-PLAN.md - Refactor main multi-TF builder to use BaseBarBuilder
-- [ ] 24-04-PLAN.md - Refactor 4 calendar builders + document tz column (GAP-M03)
+- [x] 24-01-PLAN.md - Design and create BaseBarBuilder template class (GAP-M01 foundation)
+- [x] 24-02-PLAN.md - Refactor 1D bar builder to use BaseBarBuilder (proof of concept)
+- [x] 24-03-PLAN.md - Refactor main multi-TF builder to use BaseBarBuilder
+- [x] 24-04-PLAN.md - Refactor 4 calendar builders + document tz column (GAP-M03)
 
 ---
 
