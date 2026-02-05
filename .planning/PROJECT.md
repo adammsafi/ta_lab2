@@ -8,20 +8,18 @@ A systematic crypto trading platform with integrated AI orchestration and persis
 
 Build trustworthy quant trading infrastructure 3x faster by creating AI coordination that remembers context, routes work optimally, and eliminates redundant context-setting across sessions and platforms.
 
-## Current Milestone: v0.5.0 Ecosystem Reorganization
+## Current Milestone: v0.6.0 EMA & Bar Architecture Standardization
 
-**Goal:** Consolidate scattered project directories (ta_lab2, ProjectTT, Data_Tools, fredtools2, fedtools2) into unified structure without deleting anything.
+**Goal:** Ensure all EMAs use validated bar table data and achieve consistency across bar builder and EMA calculation scripts for non-differentiating features.
 
 **Target features:**
-- Archive Management: Move backup artifacts to .archive/ structure
-- Documentation Consolidation: Integrate ProjectTT docs into ta_lab2
-- Tools Integration: Migrate Data_Tools scripts to ta_lab2/tools/
-- Economic Data Strategy: Evaluate and integrate fredtools2/fedtools2
-- Root Directory Cleanup: Organize clutter while preserving in git
-- Structure Documentation: Create reorganization guide
-- Verification: Validate imports work, nothing lost
+- Comprehensive Review: Document current state of all bar builders, EMA calculators, table schemas, data flows, helpers, contracts, orchestrators
+- Data Source Fix: Update EMAs to use validated bar tables (with NOT NULL constraints and OHLC invariants) instead of raw price_histories7
+- Script Standardization: Consistent patterns across all 6 EMA variants and bar builders for data loading, validation, state management
+- Schema Standardization: Consistent naming, constraints, and quality flags across bar and EMA tables
+- Documentation: Analysis documents + annotated code comments
 
-**Critical Constraint:** NO DELETION - everything preserved in git history + .archive/
+**Critical Architectural Principle:** Price histories should only be used to create bars. All downstream consumers (EMAs, features) should use validated bar data.
 
 ## Requirements
 
@@ -53,17 +51,32 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 - ✓ Adapter architecture (Claude/ChatGPT/Gemini) — existing
 - ✓ Quota tracking design — existing
 
-### Active (v0.5.0 Milestone)
+### Active (v0.6.0 Milestone)
 
-**Ecosystem Reorganization**
-- [ ] Archive backup artifacts (.original files, *_refactored.py)
-- [ ] Consolidate ProjectTT documentation into ta_lab2
-- [ ] Migrate Data_Tools scripts into ta_lab2/tools/
-- [ ] Integrate or reference fredtools2/fedtools2 economic data projects
-- [ ] Clean up root directory clutter (preserve in .archive/)
-- [ ] Document new structure and migration decisions
-- [ ] Verify all imports work after reorganization
-- [ ] Update README with ecosystem structure
+**EMA & Bar Architecture Standardization**
+- [ ] Review all bar builder scripts (1d, multi_tf) - validation logic, repair strategies, quality flags
+- [ ] Review all 6 EMA calculation scripts (v1, v2, cal_us, cal_iso, cal_anchor_us, cal_anchor_iso)
+- [ ] Review table schemas and constraints (bar tables, EMA tables, state tables)
+- [ ] Review data flow: price_histories7 → bar tables → EMA tables
+- [ ] Review helper scripts, shared contracts, orchestrators
+- [ ] Review existing documentation for gaps
+- [ ] Document findings in structured analysis documents
+- [ ] Annotate code with detailed comments
+- [ ] Fix EMA data sources to use validated bar tables
+- [ ] Standardize patterns across scripts
+- [ ] Standardize schemas across tables
+
+### Complete (v0.5.0 Milestone)
+
+**Ecosystem Reorganization** ✓
+- ✓ Archived backup artifacts (.original files, *_refactored.py)
+- ✓ Consolidated ProjectTT documentation into ta_lab2
+- ✓ Migrated Data_Tools scripts into ta_lab2/tools/
+- ✓ Integrated fredtools2/fedtools2 economic data projects
+- ✓ Cleaned up root directory clutter (preserved in .archive/)
+- ✓ Documented new structure and migration decisions
+- ✓ Verified all imports work after reorganization
+- ✓ Updated README with ecosystem structure
 
 ### Complete (v0.4.0 Milestone)
 

@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-02)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v0.5.0 Complete - Ready for release tag
+**Current focus:** v0.6.0 Started - EMA & Bar Architecture Standardization
 
 ## Current Position
 
-Phase: 19 of 19 (Memory Validation & Release)
-Plan: 6 of 6 in current phase
-Status: Complete
-Last activity: 2026-02-04 - Completed 19-06-PLAN.md (Final v0.5.0 Release)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-02-05 — Milestone v0.6.0 started
 
-Progress: [##########] 100% v0.4.0 | [████████████] 100% v0.5.0 (Phase 19: 6/6 plans complete)
+Progress: [##########] 100% v0.4.0 | [████████████] 100% v0.5.0 | [ ] 0% v0.6.0
 
 ## Performance Metrics
 
