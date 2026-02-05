@@ -314,9 +314,9 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 **Plans**: 3 plans
 
 Plans:
-- [ ] 20-01-PLAN.md — Historical review: mine Git history and SUMMARYs for bar/EMA evolution narrative
-- [ ] 20-02-PLAN.md — Documentation inventory: catalog all bar/EMA docs with multi-dimensional categorization
-- [ ] 20-03-PLAN.md — Current state assessment: feature-level health matrix for bars and EMAs
+- [x] 20-01-PLAN.md - Historical review: mine Git history and SUMMARYs for bar/EMA evolution narrative
+- [x] 20-02-PLAN.md - Documentation inventory: catalog all bar/EMA docs with multi-dimensional categorization
+- [x] 20-03-PLAN.md - Current state assessment: feature-level health matrix for bars and EMAs
 
 ---
 
@@ -330,12 +330,13 @@ Plans:
   3. Data flow diagram exists showing price_histories7 -> bars -> EMAs with validation points marked
   4. Variant comparison matrix complete (6 EMA variants side-by-side)
   5. Gap analysis document produced with severity tiers (CRITICAL/HIGH/MEDIUM/LOW)
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 21-01: Answer understanding questions (RVWQ-01 to RVWQ-04)
-- [ ] 21-02: Create script inventory and data flow diagram (RVWD-01, RVWD-02)
-- [ ] 21-03: Create variant comparison matrix and gap analysis (RVWD-03, RVWD-04)
+- [ ] 21-01-PLAN.md - Script inventory and data flow diagram (RVWD-01, RVWD-02)
+- [ ] 21-02-PLAN.md - EMA variants analysis and comparison matrix (RVWQ-01, RVWD-03)
+- [ ] 21-03-PLAN.md - Incremental refresh and validation points (RVWQ-02, RVWQ-03)
+- [ ] 21-04-PLAN.md - New asset guide and gap analysis (RVWQ-04, RVWD-04)
 
 ---
 
@@ -463,8 +464,8 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 20. Historical Context | 0/3 | Not started | - |
-| 21. Comprehensive Review | 0/3 | Not started | - |
+| 20. Historical Context | 3/3 | Complete | 2026-02-05 |
+| 21. Comprehensive Review | 0/4 | Not started | - |
 | 22. Critical Data Quality Fixes | 0/2 | Not started | - |
 | 23. Reliable Incremental Refresh | 0/3 | Not started | - |
 | 24. Pattern Consistency | 0/1 | Not started | - |
@@ -493,4 +494,4 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-05 (Phase 20 planned: 3 plans in 1 wave, all parallel)*
+*Last updated: 2026-02-05 (Phase 21 planned: 4 plans in 2 waves)*
