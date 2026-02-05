@@ -53,7 +53,7 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 
 - [x] **Phase 20: Historical Context** - Review GSD phases 1-10 and existing documentation
 - [x] **Phase 21: Comprehensive Review** - Complete read-only analysis of all bar/EMA components
-- [ ] **Phase 22: Critical Data Quality Fixes** - Migrate all EMAs to validated bar tables
+- [ ] **Phase 22: Critical Data Quality Fixes** - Fix 4 CRITICAL gaps + derive multi-TF from 1D bars
 - [ ] **Phase 23: Reliable Incremental Refresh** - Flexible orchestration, state management, visibility
 - [ ] **Phase 24: Pattern Consistency** - Standardize patterns where analysis justifies
 - [ ] **Phase 25: Baseline Capture** - Capture current outputs before validation testing
@@ -333,28 +333,32 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 21-01-PLAN.md - Script inventory and data flow diagram (RVWD-01, RVWD-02)
-- [ ] 21-02-PLAN.md - EMA variants analysis and comparison matrix (RVWQ-01, RVWD-03)
-- [ ] 21-03-PLAN.md - Incremental refresh and validation points (RVWQ-02, RVWQ-03)
-- [ ] 21-04-PLAN.md - New asset guide and gap analysis (RVWQ-04, RVWD-04)
+- [x] 21-01-PLAN.md - Script inventory and data flow diagram (RVWD-01, RVWD-02)
+- [x] 21-02-PLAN.md - EMA variants analysis and comparison matrix (RVWQ-01, RVWD-03)
+- [x] 21-03-PLAN.md - Incremental refresh and validation points (RVWQ-02, RVWQ-03)
+- [x] 21-04-PLAN.md - New asset guide and gap analysis (RVWQ-04, RVWD-04)
 
 ---
 
 ### Phase 22: Critical Data Quality Fixes
-**Goal**: All EMAs use validated bar tables instead of raw price_histories7
+**Goal**: Fix 4 CRITICAL data quality gaps + architectural refactor to derive multi-TF from 1D bars
 **Depends on**: Phase 21
-**Requirements**: DATA-01, DATA-02, DATA-03, DATA-04, DVAL-01, DVAL-02, DVAL-03, DVAL-04
+**Requirements**: GAP-C01, GAP-C02, GAP-C03, GAP-C04
 **Success Criteria** (what must be TRUE):
-  1. All 6 EMA variants read from validated bar tables (zero price_histories7 references)
-  2. grep/CI check confirms no EMA script references price_histories7
-  3. Bar tables verified to have NOT NULL constraints on all OHLCV fields
-  4. Bar tables verified to have OHLC invariant check constraints (high >= low, etc.)
-  5. Quality flags standardized and gap handling implemented (missing days flagged, pipeline continues)
-**Plans**: TBD
+  1. Multi-TF builders log OHLC repairs to reject tables (GAP-C01 closed)
+  2. EMA output validation catches NaN/infinity/out-of-range values (GAP-C02 closed)
+  3. 1D builder detects backfills and triggers rebuilds (GAP-C03 simple fix)
+  4. Multi-TF bars can be derived from 1D bars (GAP-C03 architectural refactor)
+  5. Automated validation test suite runs in CI (GAP-C04 closed)
+**Plans**: 6 plans in 3 waves
 
 Plans:
-- [ ] 22-01: Migrate EMA data sources to validated bar tables (DATA-01 to DATA-04)
-- [ ] 22-02: Verify and complete database validation (DVAL-01 to DVAL-04)
+- [ ] 22-01-PLAN.md - Multi-TF reject tables (GAP-C01: shared schema + 5 builders)
+- [ ] 22-02-PLAN.md - EMA output validation (GAP-C02: hybrid bounds in BaseEMARefresher)
+- [ ] 22-03-PLAN.md - 1D backfill detection (GAP-C03 Part 1: daily_min_seen column)
+- [ ] 22-04-PLAN.md - Derive multi-TF foundation (GAP-C03 Part 2: derivation module + main builder)
+- [ ] 22-05-PLAN.md - Derive multi-TF calendar builders (GAP-C03 Part 3: all 4 calendar variants)
+- [ ] 22-06-PLAN.md - Automated validation test suite (GAP-C04: tests + CI integration)
 
 ---
 
@@ -465,8 +469,8 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 20. Historical Context | 3/3 | Complete | 2026-02-05 |
-| 21. Comprehensive Review | 0/4 | Not started | - |
-| 22. Critical Data Quality Fixes | 0/2 | Not started | - |
+| 21. Comprehensive Review | 4/4 | Complete | 2026-02-05 |
+| 22. Critical Data Quality Fixes | 0/6 | Not started | - |
 | 23. Reliable Incremental Refresh | 0/3 | Not started | - |
 | 24. Pattern Consistency | 0/1 | Not started | - |
 | 25. Baseline Capture | 0/1 | Not started | - |
@@ -481,8 +485,7 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19
 | Historical Context | HIST-01, HIST-02, HIST-03 | Phase 20 | 3 |
 | Understanding Questions | RVWQ-01, RVWQ-02, RVWQ-03, RVWQ-04 | Phase 21 | 4 |
 | Review Deliverables | RVWD-01, RVWD-02, RVWD-03, RVWD-04 | Phase 21 | 4 |
-| Data Source Migration | DATA-01, DATA-02, DATA-03, DATA-04 | Phase 22 | 4 |
-| Database Validation | DVAL-01, DVAL-02, DVAL-03, DVAL-04 | Phase 22 | 4 |
+| Critical Gaps | GAP-C01, GAP-C02, GAP-C03, GAP-C04 | Phase 22 | 4 |
 | Orchestration | ORCH-01, ORCH-02, ORCH-03, ORCH-04 | Phase 23 | 4 |
 | State Management | STAT-01, STAT-02, STAT-03, STAT-04 | Phase 23 | 4 |
 | Visibility | VISI-01, VISI-02, VISI-03 | Phase 23 | 3 |
@@ -490,8 +493,8 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19
 | Baseline | TEST-01 | Phase 25 | 1 |
 | Validation Testing | TEST-02, TEST-03, TEST-04, TEST-05 | Phase 26 | 4 |
 
-**Coverage:** 40/40 requirements mapped (100%)
+**Coverage:** 37/40 requirements mapped (remaining 3 DATA/DVAL replaced by GAP-C01-04)
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-05 (Phase 21 planned: 4 plans in 2 waves)*
+*Last updated: 2026-02-05 (Phase 22 planned: 6 plans in 3 waves)*
