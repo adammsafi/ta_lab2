@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+import argparse
+import os
+from dataclasses import dataclass
+from typing import Any, List, Optional, Sequence, Tuple
+
 r"""
 Full rebuild of public.cmc_price_bars_1d (DROP + rebuild):
 python src/ta_lab2/scripts/bars/refresh_cmc_price_bars_1d.py --rebuild --keep-rejects --fail-on-rejects
@@ -10,10 +15,6 @@ python src/ta_lab2/scripts/bars/refresh_cmc_price_bars_1d.py --keep-rejects
 Incremental for a single id:
 python src/ta_lab2/scripts/bars/refresh_cmc_price_bars_1d.py --ids 1 --keep-rejects
 """
-import argparse
-import os
-from dataclasses import dataclass
-from typing import Any, Optional, Sequence, List, Tuple
 
 # Prefer psycopg v3, fall back to psycopg2
 try:
@@ -287,9 +288,7 @@ def _get_last_src_ts(conn, state: str, id_: int) -> Optional[str]:
 def _get_state(conn, state: str, id_: int) -> Optional[dict]:
     """Load full state for an id (including daily_min_seen)."""
     row = _fetchone(
-        conn,
-        f"SELECT last_src_ts, daily_min_seen FROM {state} WHERE id = %s;",
-        [id_]
+        conn, f"SELECT last_src_ts, daily_min_seen FROM {state} WHERE id = %s;", [id_]
     )
     if not row:
         return None
@@ -310,9 +309,7 @@ def _check_for_backfill(conn, src: str, id_: int, state: Optional[dict]) -> bool
 
     # Query earliest timestamp in source
     row = _fetchone(
-        conn,
-        f"SELECT MIN(timestamp) as daily_min_ts FROM {src} WHERE id = %s;",
-        [id_]
+        conn, f"SELECT MIN(timestamp) as daily_min_ts FROM {src} WHERE id = %s;", [id_]
     )
     if row and row[0] is not None:
         daily_min_ts = str(row[0])
@@ -839,8 +836,12 @@ def build_1d_incremental(
 
         if max_src_ts is not None or rejected > 0:
             # Query MIN timestamp from source to track daily_min_seen
-            min_row = _fetchone(conn, f"SELECT MIN(timestamp) FROM {src} WHERE id = %s;", [id_])
-            daily_min_ts = str(min_row[0]) if min_row and min_row[0] is not None else None
+            min_row = _fetchone(
+                conn, f"SELECT MIN(timestamp) FROM {src} WHERE id = %s;", [id_]
+            )
+            daily_min_ts = (
+                str(min_row[0]) if min_row and min_row[0] is not None else None
+            )
 
             _exec(
                 conn,
