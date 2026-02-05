@@ -76,23 +76,23 @@ When v0.6.0 is complete:
 
 ### Orchestration
 
-- [ ] **ORCH-01**: Flexible orchestration script - can run: all tasks, bars only, EMAs only, specific variant
-- [ ] **ORCH-02**: Modular separation - bars and EMAs as separate pieces with clear interfaces
-- [ ] **ORCH-03**: One command for daily refresh - simple operational model
-- [ ] **ORCH-04**: Orchestration eventually covers all features (bars, EMAs, vol, returns) but allows selective execution
+- [x] **ORCH-01**: Flexible orchestration script - can run: all tasks, bars only, EMAs only, specific variant
+- [x] **ORCH-02**: Modular separation - bars and EMAs as separate pieces with clear interfaces
+- [x] **ORCH-03**: One command for daily refresh - simple operational model
+- [x] **ORCH-04**: Orchestration eventually covers all features (bars, EMAs, vol, returns) but allows selective execution
 
 ### State Management
 
-- [ ] **STAT-01**: Analyze current state management patterns across all scripts (don't assume - discover)
-- [ ] **STAT-02**: Unified state table schema if analysis shows inconsistency (id, tf, period PK or similar)
-- [ ] **STAT-03**: Consistent watermarking approach across bar builders and EMA calculators
-- [ ] **STAT-04**: State updates atomic with data updates (no partial states)
+- [x] **STAT-01**: Analyze current state management patterns across all scripts (don't assume - discover)
+- [x] **STAT-02**: Unified state table schema if analysis shows inconsistency (id, tf, period PK or similar)
+- [x] **STAT-03**: Consistent watermarking approach across bar builders and EMA calculators
+- [x] **STAT-04**: State updates atomic with data updates (no partial states)
 
 ### Visibility & Efficiency
 
-- [ ] **VISI-01**: Logs show what was processed - X days, Y bars, Z EMAs, N gaps flagged
-- [ ] **VISI-02**: Efficient processing - only new data computed, not full recomputation
-- [ ] **VISI-03**: Gap handling visible - clear indication of missing data with manual fix option
+- [x] **VISI-01**: Logs show what was processed - X days, Y bars, Z EMAs, N gaps flagged
+- [x] **VISI-02**: Efficient processing - only new data computed, not full recomputation
+- [x] **VISI-03**: Gap handling visible - clear indication of missing data with manual fix option
 
 ---
 
