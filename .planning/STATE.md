@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 ## Current Position
 
 Phase: 20 of 26 (Historical Context)
-Plan: 1 of 3 in current phase
-Status: In progress
-Last activity: 2026-02-05 — Completed 20-01-PLAN.md (Historical Review)
+Plan: 3 of 3 in current phase
+Status: Complete
+Last activity: 2026-02-05 — Phase 20 complete (Historical Context)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [#         ] 7% v0.6.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##        ] 14% v0.6.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 113 (56 in v0.4.0, 56 in v0.5.0, 1 in v0.6.0)
-- Average duration: 11 min
-- Total execution time: 22.5 hours
+- Total plans completed: 115 (56 in v0.4.0, 56 in v0.5.0, 3 in v0.6.0)
+- Average duration: 10 min
+- Total execution time: 22.7 hours
 
 **By Phase (v0.4.0):**
 
@@ -55,13 +55,13 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [#         ] 7% 
 **Recent Trend:**
 - v0.4.0 complete: 10 phases, 56 plans, 12.55 hours total
 - v0.5.0 complete: 9 phases, 56 plans, 9.85 hours total
-- v0.6.0 in progress: 1/14 plans complete (7% done)
+- v0.6.0 in progress: 3/14 plans complete (21% done)
 
 **By Phase (v0.6.0):**
 
 | Phase | Plans | Total | Avg/Plan | Status |
 |-------|-------|-------|----------|--------|
-| 20-historical-context | 1/3 | 7 min | 7 min | In progress |
+| 20-historical-context | 3/3 | 17 min | 6 min | Complete |
 
 *Updated after each plan completion*
 
@@ -78,6 +78,7 @@ Recent decisions affecting current work:
 - **Move quickly on data sources** (v0.6.0): Bar tables have better validation, switch over decisively
 - **Whatever it takes timeline** (v0.6.0): Do it right, even if it takes 6-8 weeks
 - **Leverage proven Phase 6-7 patterns** (Phase 20): dim_timeframe, unified EMA table, state management are working - extend to bars, don't rebuild
+- **EMAs already use bar tables** (Phase 20): CRITICAL - All 6 EMA variants already migrated to validated bars. Phase 22 assumption invalid, requires re-scoping.
 
 ### Pending Todos
 
@@ -90,7 +91,7 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-05
-Stopped at: Completed 20-01-PLAN.md (Historical Review - 11 key decisions documented)
+Stopped at: Phase 20 complete - All 3 historical context plans done
 Resume file: None
 
 ---
@@ -116,4 +117,4 @@ Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-05 (20-01 complete - Historical review with 11 key decisions)*
+*Last updated: 2026-02-05 (Phase 20 complete - Historical context established, CRITICAL finding: EMAs already use bar tables)*
