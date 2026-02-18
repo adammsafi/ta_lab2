@@ -213,20 +213,29 @@ def main() -> None:
     nulls_sql = f"""
     SELECT
       COUNT(*) AS n_rows,
-      SUM((prev_ema IS NULL)::int) AS n_prev_ema_null,
       SUM((ret_arith IS NULL)::int) AS n_ret_arith_null,
-      SUM((ret_log IS NULL)::int) AS n_ret_log_null
+      SUM((ret_log IS NULL)::int) AS n_ret_log_null,
+      SUM((delta1 IS NULL)::int) AS n_delta1_null,
+      SUM((delta2 IS NULL)::int) AS n_delta2_null,
+      SUM((delta_ret_arith IS NULL)::int) AS n_delta_ret_arith_null,
+      SUM((delta_ret_log IS NULL)::int) AS n_delta_ret_log_null
     FROM {ret};
     """
     nulls = _df(engine, nulls_sql)
-    n_prev = int(nulls.iloc[0]["n_prev_ema_null"])
     n_ra = int(nulls.iloc[0]["n_ret_arith_null"])
     n_rl = int(nulls.iloc[0]["n_ret_log_null"])
-    if n_prev == 0 and n_ra == 0 and n_rl == 0:
-        _print("PASS: nulls.")
+    if n_ra == 0 and n_rl == 0:
+        _print("PASS: nulls (ret_arith/ret_log).")
     else:
-        _print(f"FAIL: null counts prev={n_prev} ret_arith={n_ra} ret_log={n_rl}")
+        _print(f"FAIL: null counts ret_arith={n_ra} ret_log={n_rl}")
         _fail_or_warn(strict, "FAIL: null policy violated.")
+
+    _print(
+        f"INFO: delta1_null={int(nulls.iloc[0]['n_delta1_null'])}, "
+        f"delta2_null={int(nulls.iloc[0]['n_delta2_null'])}, "
+        f"delta_ret_arith_null={int(nulls.iloc[0]['n_delta_ret_arith_null'])}, "
+        f"delta_ret_log_null={int(nulls.iloc[0]['n_delta_ret_log_null'])}"
+    )
 
     # 5) Alignment: every return row should exist in EMA_U source
     align_sql = f"""

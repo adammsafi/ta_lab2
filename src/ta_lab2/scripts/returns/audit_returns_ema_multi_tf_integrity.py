@@ -9,14 +9,14 @@ into:
   public.cmc_returns_ema_multi_tf
 
 Checks:
-  1) Coverage: n_ret == n_ema - 1 per (id, tf, period, roll)
-  2) Duplicates: no duplicate (id, tf, period, roll, ts) in returns
+  1) Coverage: n_ret == n_ema - 1 per (id, tf, period, series, roll)
+  2) Duplicates: no duplicate (id, ts, tf, period, series, roll) in returns
   3) Gaps:
        - baseline: gap_days >= 1
        - optional threshold: gap_days <= gap_mult * tf_days_nominal (if dim_timeframe provides tf_days_nominal)
   4) Null policy:
-       - prev_ema should never be NULL
-       - ret_arith / ret_log should never be NULL (given builder filters invalid cases)
+       - ret_arith / ret_log should never be NULL
+       - delta1, delta2, delta_ret_arith, delta_ret_log null shares reported
   5) Alignment: every returns row must match an EMA row on (id, tf, period, roll, ts)
 
 CSV output:
@@ -157,22 +157,23 @@ def main() -> None:
       GROUP BY 1,2,3,4
     ),
     r AS (
-      SELECT id, tf, period, roll, COUNT(*) AS n_ret
+      SELECT id, tf, period, series, roll, COUNT(*) AS n_ret
       FROM {ret_table}
-      GROUP BY 1,2,3,4
+      GROUP BY 1,2,3,4,5
     )
     SELECT
       e.id,
       e.tf,
       e.period,
+      r.series,
       e.roll,
       e.n_ema,
       COALESCE(r.n_ret, 0) AS n_ret,
       (e.n_ema - 1) AS expected_ret,
       (COALESCE(r.n_ret, 0) - (e.n_ema - 1)) AS diff
     FROM e
-    LEFT JOIN r USING (id, tf, period, roll)
-    ORDER BY e.id, e.tf, e.period, e.roll;
+    LEFT JOIN r ON r.id = e.id AND r.tf = e.tf AND r.period = e.period AND r.roll = e.roll
+    ORDER BY e.id, e.tf, e.period, r.series, e.roll;
     """
     cov = _df(engine, coverage_sql)
     _print("Coverage (n_ret vs n_ema-1):")
@@ -187,15 +188,15 @@ def main() -> None:
         _write_csv(bad_cov, Path(str(out_base) + "_coverage_bad.csv"))
         _fail_or_warn(strict, f"FAIL: coverage mismatches found: {len(bad_cov)}")
     else:
-        _print("PASS: coverage matches for all (id,tf,period,roll).")
+        _print("PASS: coverage matches for all (id,tf,period,series,roll).")
 
     # 2) Duplicates
     dup_sql = f"""
-    SELECT id, tf, period, roll, ts, COUNT(*) AS n
+    SELECT id, tf, period, series, roll, ts, COUNT(*) AS n
     FROM {ret_table}
-    GROUP BY 1,2,3,4,5
+    GROUP BY 1,2,3,4,5,6
     HAVING COUNT(*) > 1
-    ORDER BY n DESC, id, tf, period, roll, ts
+    ORDER BY n DESC, id, tf, period, series, roll, ts
     LIMIT 5000;
     """
     dups = _df(engine, dup_sql)
@@ -204,7 +205,7 @@ def main() -> None:
         print(dups.head(50).to_string(index=False))
         _fail_or_warn(strict, f"FAIL: duplicate return keys found: {len(dups)}")
     else:
-        _print("PASS: no duplicate (id,tf,period,roll,ts) in returns.")
+        _print("PASS: no duplicate (id,ts,tf,period,series,roll) in returns.")
 
     # 3) Gaps summary + anomalies
     gap_sql = f"""
@@ -212,6 +213,7 @@ def main() -> None:
       id,
       tf,
       period,
+      series,
       roll,
       COUNT(*) AS n_rows,
       SUM((gap_days IS NULL)::int) AS n_gap_null,
@@ -220,8 +222,8 @@ def main() -> None:
       SUM((gap_days > 1)::int) AS n_gap_gt1,
       MAX(gap_days) AS max_gap_days
     FROM {ret_table}
-    GROUP BY 1,2,3,4
-    ORDER BY id, tf, period, roll;
+    GROUP BY 1,2,3,4,5
+    ORDER BY id, tf, period, series, roll;
     """
     gaps = _df(engine, gap_sql)
     _print("gap_days summary (first 20 rows):")
@@ -231,7 +233,7 @@ def main() -> None:
 
     anom_sql = f"""
     WITH r AS (
-      SELECT id, tf, period, roll, ts, gap_days, prev_ema, ema, ret_arith, ret_log
+      SELECT id, tf, period, series, roll, ts, gap_days, delta1, ret_arith, ret_log
       FROM {ret_table}
     ),
     tfm AS (
@@ -239,7 +241,8 @@ def main() -> None:
       FROM {dim_tf}
     )
     SELECT
-      r.id, r.tf, r.period, r.roll, r.ts, r.gap_days, r.prev_ema, r.ema, r.ret_arith, r.ret_log,
+      r.id, r.tf, r.period, r.series, r.roll, r.ts, r.gap_days,
+      r.delta1, r.ret_arith, r.ret_log,
       tfm.tf_days_nominal,
       CASE
         WHEN tfm.tf_days_nominal IS NULL THEN NULL
@@ -251,7 +254,7 @@ def main() -> None:
       r.gap_days IS NULL
       OR r.gap_days < 1
       OR (tfm.tf_days_nominal IS NOT NULL AND r.gap_days > (tfm.tf_days_nominal * {gap_mult}))
-    ORDER BY r.id, r.tf, r.period, r.roll, r.ts
+    ORDER BY r.id, r.tf, r.period, r.series, r.roll, r.ts
     LIMIT 5000;
     """
     anom = _df(engine, anom_sql)
@@ -271,21 +274,17 @@ def main() -> None:
     nulls_sql = f"""
     SELECT
       COUNT(*) AS n_rows,
-      SUM((prev_ema IS NULL)::int) AS n_prev_ema_null,
       SUM((ret_arith IS NULL)::int) AS n_ret_arith_null,
-      SUM((ret_log IS NULL)::int) AS n_ret_log_null
+      SUM((ret_log IS NULL)::int) AS n_ret_log_null,
+      SUM((delta1 IS NULL)::int) AS n_delta1_null,
+      SUM((delta2 IS NULL)::int) AS n_delta2_null,
+      SUM((delta_ret_arith IS NULL)::int) AS n_delta_ret_arith_null,
+      SUM((delta_ret_log IS NULL)::int) AS n_delta_ret_log_null
     FROM {ret_table};
     """
     nulls = _df(engine, nulls_sql)
     _print("Null counts:")
     print(nulls.to_string(index=False))
-
-    n_prev_ema_null = int(nulls.iloc[0]["n_prev_ema_null"])
-    if n_prev_ema_null != 0:
-        _print(f"FAIL: prev_ema NULL rows found: {n_prev_ema_null}")
-        _fail_or_warn(strict, f"FAIL: prev_ema NULL rows found: {n_prev_ema_null}")
-    else:
-        _print("PASS: prev_ema is never NULL.")
 
     n_ret_arith_null = int(nulls.iloc[0]["n_ret_arith_null"])
     n_ret_log_null = int(nulls.iloc[0]["n_ret_log_null"])
@@ -297,7 +296,15 @@ def main() -> None:
     else:
         _print("PASS: ret_arith and ret_log are never NULL.")
 
-    # 5) Alignment
+    # delta1/delta2/delta_ret are expected NULL for the first row per key (no prev)
+    _print(
+        f"INFO: delta1_null={int(nulls.iloc[0]['n_delta1_null'])}, "
+        f"delta2_null={int(nulls.iloc[0]['n_delta2_null'])}, "
+        f"delta_ret_arith_null={int(nulls.iloc[0]['n_delta_ret_arith_null'])}, "
+        f"delta_ret_log_null={int(nulls.iloc[0]['n_delta_ret_log_null'])}"
+    )
+
+    # 5) Alignment (EMA table has no series column; join on shared key columns)
     align_sql = f"""
     SELECT COUNT(*) AS n_missing
     FROM {ret_table} r

@@ -18,8 +18,8 @@ Key semantics:
   - Alignment:
       every returns row key exists in EMA table for same (id, ts, tf, period, roll)
   - Null policy:
-      prev_ema should never be NULL (given builder inserts only rows with a lagged prev_ema)
-      ret_* can be NULL only if ema/prev_ema invalid (0/negatives), but ema is NOT NULL in your schema so this should be rare.
+      ret_arith / ret_log should never be NULL
+      delta1, delta2, delta_ret_arith, delta_ret_log null shares reported
 
 CSV output:
   If --out is provided, writes:
@@ -244,7 +244,7 @@ def main() -> None:
 
     anom_sql = f"""
     WITH r AS (
-      SELECT id, tf, period, roll, ts, gap_days, prev_ema, ema, ret_arith, ret_log
+      SELECT id, tf, period, roll, ts, gap_days, delta1, ret_arith, ret_log
       FROM {ret_table}
     ),
     tfm AS (
@@ -252,7 +252,8 @@ def main() -> None:
       FROM {dim_tf}
     )
     SELECT
-      r.id, r.tf, r.period, r.roll, r.ts, r.gap_days, r.prev_ema, r.ema, r.ret_arith, r.ret_log,
+      r.id, r.tf, r.period, r.roll, r.ts, r.gap_days,
+      r.delta1, r.ret_arith, r.ret_log,
       tfm.tf_days_nominal,
       CASE
         WHEN tfm.tf_days_nominal IS NULL THEN NULL
@@ -284,21 +285,35 @@ def main() -> None:
     nulls_sql = f"""
     SELECT
       COUNT(*) AS n_rows,
-      SUM((prev_ema IS NULL)::int) AS n_prev_ema_null,
       SUM((ret_arith IS NULL)::int) AS n_ret_arith_null,
-      SUM((ret_log IS NULL)::int) AS n_ret_log_null
+      SUM((ret_log IS NULL)::int) AS n_ret_log_null,
+      SUM((delta1 IS NULL)::int) AS n_delta1_null,
+      SUM((delta2 IS NULL)::int) AS n_delta2_null,
+      SUM((delta_ret_arith IS NULL)::int) AS n_delta_ret_arith_null,
+      SUM((delta_ret_log IS NULL)::int) AS n_delta_ret_log_null
     FROM {ret_table};
     """
     nulls = _df(engine, nulls_sql)
     _print("Null counts:")
     print(nulls.to_string(index=False))
 
-    n_prev_ema_null = int(nulls.iloc[0]["n_prev_ema_null"])
-    if n_prev_ema_null != 0:
-        _print(f"FAIL: prev_ema NULL rows found: {n_prev_ema_null}")
-        _fail_or_warn(strict, f"FAIL: prev_ema NULL rows found: {n_prev_ema_null}")
+    n_ret_arith_null = int(nulls.iloc[0]["n_ret_arith_null"])
+    n_ret_log_null = int(nulls.iloc[0]["n_ret_log_null"])
+    if n_ret_arith_null != 0 or n_ret_log_null != 0:
+        _print(
+            f"FAIL: return NULL rows found: ret_arith_null={n_ret_arith_null}, ret_log_null={n_ret_log_null}"
+        )
+        _fail_or_warn(strict, "FAIL: returns contain NULLs unexpectedly.")
     else:
-        _print("PASS: prev_ema is never NULL.")
+        _print("PASS: ret_arith and ret_log are never NULL.")
+
+    # delta1/delta2/delta_ret are expected NULL for the first row per key (no prev)
+    _print(
+        f"INFO: delta1_null={int(nulls.iloc[0]['n_delta1_null'])}, "
+        f"delta2_null={int(nulls.iloc[0]['n_delta2_null'])}, "
+        f"delta_ret_arith_null={int(nulls.iloc[0]['n_delta_ret_arith_null'])}, "
+        f"delta_ret_log_null={int(nulls.iloc[0]['n_delta_ret_log_null'])}"
+    )
 
     # 5) Alignment: every return key should exist in EMA table for same key
     align_sql = f"""

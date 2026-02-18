@@ -11,7 +11,7 @@ Per (scheme, series, roll, id, tf, period):
   - Coverage: n_ret == n_ema - 1
   - No duplicates on PK
   - Gaps: gap_days >= 1; also flags gap_days > gap_mult * tf_days_nominal when available
-  - Nulls: prev_ema/ret_* should be non-null (builder only inserts valid rows)
+  - Nulls: ret_arith/ret_log should be non-null; delta1/delta2/delta_ret null shares reported
   - Alignment: every returns row matches a source EMA row at same (id,tf,period,ts) and roll mapping
 
 Run (Spyder):
@@ -164,7 +164,7 @@ def _audit_one(
     # 3) Gaps anomalies
     anom_sql = f"""
     WITH r AS (
-      SELECT id, tf, period, series, roll, ts, gap_days, prev_ema, ema, ret_arith, ret_log
+      SELECT id, tf, period, series, roll, ts, gap_days, delta1, ret_arith, ret_log
       FROM {ret_table}
       WHERE series = '{series}'
     ),
@@ -195,23 +195,32 @@ def _audit_one(
     nulls_sql = f"""
     SELECT
       COUNT(*) AS n_rows,
-      SUM((prev_ema IS NULL)::int) AS n_prev_ema_null,
       SUM((ret_arith IS NULL)::int) AS n_ret_arith_null,
-      SUM((ret_log IS NULL)::int) AS n_ret_log_null
+      SUM((ret_log IS NULL)::int) AS n_ret_log_null,
+      SUM((delta1 IS NULL)::int) AS n_delta1_null,
+      SUM((delta2 IS NULL)::int) AS n_delta2_null,
+      SUM((delta_ret_arith IS NULL)::int) AS n_delta_ret_arith_null,
+      SUM((delta_ret_log IS NULL)::int) AS n_delta_ret_log_null
     FROM {ret_table}
     WHERE series = '{series}';
     """
     nulls = _df(engine, nulls_sql)
-    n_prev_null = int(nulls.iloc[0]["n_prev_ema_null"])
     n_ra_null = int(nulls.iloc[0]["n_ret_arith_null"])
     n_rl_null = int(nulls.iloc[0]["n_ret_log_null"])
-    if n_prev_null or n_ra_null or n_rl_null:
+    if n_ra_null or n_rl_null:
         _fail_or_warn(
             strict,
-            f"FAIL: {label}/{series} nulls: prev={n_prev_null} arith={n_ra_null} log={n_rl_null}",
+            f"FAIL: {label}/{series} nulls: arith={n_ra_null} log={n_rl_null}",
         )
     else:
-        _print("PASS: nulls.")
+        _print("PASS: nulls (ret_arith/ret_log).")
+
+    _print(
+        f"INFO: delta1_null={int(nulls.iloc[0]['n_delta1_null'])}, "
+        f"delta2_null={int(nulls.iloc[0]['n_delta2_null'])}, "
+        f"delta_ret_arith_null={int(nulls.iloc[0]['n_delta_ret_arith_null'])}, "
+        f"delta_ret_log_null={int(nulls.iloc[0]['n_delta_ret_log_null'])}"
+    )
 
     # 5) Alignment: returns row should match source EMA row at same ts and roll mapping
     align_sql = f"""

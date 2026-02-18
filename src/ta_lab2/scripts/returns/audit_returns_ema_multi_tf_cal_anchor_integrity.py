@@ -27,7 +27,7 @@ Key semantics:
   - Alignment:
       every returns row key exists in EMA source at same (id, tf, period, ts) for the same roll-series mapping
   - Null policy:
-      prev_ema, ret_arith, ret_log should be non-null (builder only inserts valid rows)
+      ret_arith, ret_log should be non-null; delta1/delta2/delta_ret null shares reported
 
 CSV output:
   Writes (if --out-dir is provided):
@@ -237,7 +237,7 @@ def _audit_one(
     # Gap anomalies (NULL/<1 or > gap_mult * tf_days_nominal when available)
     anom_sql = f"""
     WITH r AS (
-      SELECT id, tf, period, series, roll, ts, gap_days, prev_ema, ema, ret_arith, ret_log
+      SELECT id, tf, period, series, roll, ts, gap_days, delta1, ret_arith, ret_log
       FROM {ret_table}
     ),
     tfm AS (
@@ -271,22 +271,31 @@ def _audit_one(
     nulls_sql = f"""
     SELECT
       COUNT(*) AS n_rows,
-      SUM((prev_ema IS NULL)::int) AS n_prev_ema_null,
       SUM((ret_arith IS NULL)::int) AS n_ret_arith_null,
-      SUM((ret_log IS NULL)::int) AS n_ret_log_null
+      SUM((ret_log IS NULL)::int) AS n_ret_log_null,
+      SUM((delta1 IS NULL)::int) AS n_delta1_null,
+      SUM((delta2 IS NULL)::int) AS n_delta2_null,
+      SUM((delta_ret_arith IS NULL)::int) AS n_delta_ret_arith_null,
+      SUM((delta_ret_log IS NULL)::int) AS n_delta_ret_log_null
     FROM {ret_table};
     """
     nulls = _df(engine, nulls_sql)
-    n_prev_ema_null = int(nulls.iloc[0]["n_prev_ema_null"])
     n_ret_arith_null = int(nulls.iloc[0]["n_ret_arith_null"])
     n_ret_log_null = int(nulls.iloc[0]["n_ret_log_null"])
 
-    if n_prev_ema_null == 0 and n_ret_arith_null == 0 and n_ret_log_null == 0:
-        _print("PASS: prev_ema/ret_arith/ret_log are never NULL.")
+    if n_ret_arith_null == 0 and n_ret_log_null == 0:
+        _print("PASS: ret_arith/ret_log are never NULL.")
     else:
         _print("FAIL: NULLs present in returns:")
         print(nulls.to_string(index=False))
         _fail_or_warn(strict, f"FAIL: NULLs present for scheme={scheme}")
+
+    _print(
+        f"INFO: delta1_null={int(nulls.iloc[0]['n_delta1_null'])}, "
+        f"delta2_null={int(nulls.iloc[0]['n_delta2_null'])}, "
+        f"delta_ret_arith_null={int(nulls.iloc[0]['n_delta_ret_arith_null'])}, "
+        f"delta_ret_log_null={int(nulls.iloc[0]['n_delta_ret_log_null'])}"
+    )
 
     # Alignment: returns rows should exist in EMA source at same ts and correct roll mapping per series
     align_sql = f"""
