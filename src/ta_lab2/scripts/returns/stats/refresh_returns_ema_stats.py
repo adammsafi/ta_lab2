@@ -506,38 +506,31 @@ def _sql_test_max_gap(cfg: ReturnsTableConfig) -> str:
     WITH agg AS (
         SELECT
             r.id AS asset_id, r.tf, r.period,
-            MAX(r.gap_days_roll) AS max_gap
+            MAX(r.gap_days_roll) AS max_gap,
+            MAX(r.tf_days) AS tf_days
         FROM {cfg.returns_table} r
         JOIN _impacted_keys k
           ON k.asset_id = r.id AND k.tf = r.tf AND k.period = r.period
         GROUP BY r.id, r.tf, r.period
-    ),
-    joined AS (
-        SELECT
-            a.*,
-            dt.tf_days_nominal
-        FROM agg a
-        LEFT JOIN public.dim_timeframe dt
-          ON dt.tf = a.tf
     )
     SELECT
         :table_name AS table_name,
         'max_gap_vs_tf_days_nominal' AS test_name,
         asset_id, tf, period,
         CASE
-            WHEN tf_days_nominal IS NULL OR tf_days_nominal <= 0 THEN 'WARN'
-            WHEN max_gap <= 1.5 * tf_days_nominal THEN 'PASS'
-            WHEN max_gap <= 2.0 * tf_days_nominal THEN 'WARN'
+            WHEN tf_days IS NULL OR tf_days <= 0 THEN 'WARN'
+            WHEN max_gap <= 1.5 * tf_days THEN 'PASS'
+            WHEN max_gap <= 2.0 * tf_days THEN 'WARN'
             ELSE 'FAIL'
         END AS status,
         max_gap::numeric AS actual,
-        (1.5 * tf_days_nominal)::numeric AS expected,
+        (1.5 * tf_days)::numeric AS expected,
         jsonb_build_object(
             'max_gap_days', max_gap,
-            'tf_days_nominal', tf_days_nominal,
-            'threshold_1_5x', 1.5 * COALESCE(tf_days_nominal, 0)
+            'tf_days', tf_days,
+            'threshold_1_5x', 1.5 * COALESCE(tf_days, 0)
         ) AS extra
-    FROM joined;
+    FROM agg;
     """
 
 

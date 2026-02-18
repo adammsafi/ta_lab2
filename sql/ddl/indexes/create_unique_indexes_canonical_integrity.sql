@@ -34,10 +34,6 @@ CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_cmc_ema_multi_tf__canon_ts
 ON public.cmc_ema_multi_tf (id, tf, period, ts)
 WHERE roll = FALSE;
 
-CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_cmc_ema_multi_tf_v2__canon_ts
-ON public.cmc_ema_multi_tf_v2 (id, tf, period, ts)
-WHERE roll = FALSE;
-
 CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_cmc_ema_multi_tf_cal_us__canon_ts
 ON public.cmc_ema_multi_tf_cal_us (id, tf, period, ts)
 WHERE roll = FALSE;
@@ -88,9 +84,6 @@ ON public.cmc_returns_bars_multi_tf_cal_anchor_iso (id, tf, time_close);
 -- RETURNS (ema): all non-_u tables share same PK structure
 CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_cmc_returns_ema_multi_tf__key
 ON public.cmc_returns_ema_multi_tf (id, tf, period, ts);
-
-CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_cmc_returns_ema_multi_tf_v2__key
-ON public.cmc_returns_ema_multi_tf_v2 (id, tf, period, roll, ts);
 
 CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_cmc_returns_ema_multi_tf_cal_us__key
 ON public.cmc_returns_ema_multi_tf_cal_us (id, tf, period, ts);

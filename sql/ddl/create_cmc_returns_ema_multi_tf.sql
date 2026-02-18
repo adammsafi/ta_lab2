@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS public.cmc_returns_ema_multi_tf (
     id          bigint       NOT NULL,
     ts          timestamptz  NOT NULL,
     tf          text         NOT NULL,
+    tf_days     integer      NOT NULL,
     period      integer      NOT NULL,
     roll        boolean      NOT NULL,
 

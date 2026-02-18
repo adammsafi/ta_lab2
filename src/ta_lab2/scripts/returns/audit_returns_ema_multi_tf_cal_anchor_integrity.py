@@ -195,29 +195,19 @@ def _audit_one(
 
     # Gap anomalies
     anom_sql = f"""
-    WITH r AS (
-      SELECT id, tf, period, roll, ts, gap_days_roll,
-             delta1_ema_roll, ret_arith_ema_roll, ret_log_ema_roll
-      FROM {ret_table}
-    ),
-    tfm AS (
-      SELECT tf, tf_days_nominal::double precision AS tf_days_nominal
-      FROM {dim_tf}
-    )
     SELECT
-      r.*,
-      tfm.tf_days_nominal,
-      (tfm.tf_days_nominal * :gap_mult)::double precision AS gap_thresh
-    FROM r
-    LEFT JOIN tfm USING (tf)
+      id, tf, tf_days, period, roll, ts, gap_days_roll,
+      delta1_ema_roll, ret_arith_ema_roll, ret_log_ema_roll,
+      (tf_days * {gap_mult}) AS gap_thresh
+    FROM {ret_table}
     WHERE
-      r.gap_days_roll IS NULL
-      OR r.gap_days_roll < 1
-      OR (tfm.tf_days_nominal IS NOT NULL AND r.gap_days_roll > (tfm.tf_days_nominal * :gap_mult))
-    ORDER BY r.id, r.tf, r.period, r.roll, r.ts
+      gap_days_roll IS NULL
+      OR gap_days_roll < 1
+      OR gap_days_roll > (tf_days * {gap_mult})
+    ORDER BY id, tf, period, roll, ts
     LIMIT 5000;
     """
-    anom = _df(engine, anom_sql, {"gap_mult": gap_mult})
+    anom = _df(engine, anom_sql)
     if len(anom) == 0:
         _print(f"PASS: no gap anomalies (>=1 and not >{gap_mult}x tf_days_nominal).")
     else:

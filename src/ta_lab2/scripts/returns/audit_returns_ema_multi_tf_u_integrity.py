@@ -174,22 +174,16 @@ def main() -> None:
 
     # 3) Gaps
     anom_sql = f"""
-    WITH tfm AS (
-      SELECT tf, tf_days_nominal::double precision AS tf_days_nominal
-      FROM {dim_tf}
-    )
     SELECT
-      r.id, r.tf, r.period, r.alignment_source, r.roll, r.ts,
-      r.gap_days_roll,
-      tfm.tf_days_nominal,
-      (tfm.tf_days_nominal * {gap_mult}) AS gap_thresh
-    FROM {ret} r
-    LEFT JOIN tfm USING (tf)
+      id, tf, tf_days, period, alignment_source, roll, ts,
+      gap_days_roll,
+      (tf_days * {gap_mult}) AS gap_thresh
+    FROM {ret}
     WHERE
-      r.gap_days_roll IS NULL
-      OR r.gap_days_roll < 1
-      OR (tfm.tf_days_nominal IS NOT NULL AND r.gap_days_roll > (tfm.tf_days_nominal * {gap_mult}))
-    ORDER BY r.id, r.tf, r.period, r.alignment_source, r.roll, r.ts
+      gap_days_roll IS NULL
+      OR gap_days_roll < 1
+      OR gap_days_roll > (tf_days * {gap_mult})
+    ORDER BY id, tf, period, alignment_source, roll, ts
     LIMIT 5000;
     """
     anom = _df(engine, anom_sql)

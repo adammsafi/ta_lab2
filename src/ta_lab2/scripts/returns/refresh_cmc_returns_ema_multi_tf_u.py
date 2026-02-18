@@ -80,6 +80,7 @@ def _ensure_tables(engine: Engine, out_table: str, state_table: str) -> None:
             id              bigint NOT NULL,
             ts              timestamptz NOT NULL,
             tf              text NOT NULL,
+            tf_days         integer NOT NULL,
             period          integer NOT NULL,
             alignment_source text NOT NULL,
             roll            boolean NOT NULL,
@@ -236,7 +237,7 @@ _VALUE_COLS = [
 ]
 
 _INSERT_COLS = (
-    "id, ts, tf, period, alignment_source, roll,\n"
+    "id, ts, tf, tf_days, period, alignment_source, roll,\n"
     + ",\n".join(_VALUE_COLS)
     + ",\ningested_at"
 )
@@ -283,6 +284,7 @@ def _run_one_key(
                 e.id::bigint AS id,
                 e.ts,
                 e.tf,
+                e.tf_days,
                 e.period,
                 e.alignment_source,
                 e.roll,
@@ -308,7 +310,7 @@ def _run_one_key(
         ),
         calc AS (
             SELECT
-                id, ts, tf, period, alignment_source, roll,
+                id, ts, tf, tf_days, period, alignment_source, roll,
 
                 CASE WHEN NOT roll AND prev_ts_c IS NOT NULL
                      THEN (ts::date - prev_ts_c::date)::int END AS gap_days,

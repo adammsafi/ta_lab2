@@ -110,11 +110,6 @@ ema_canon_dupes_non_u AS (
           WHERE roll = FALSE
 
           UNION ALL
-          SELECT 'public.cmc_ema_multi_tf_v2', id, tf, period, ts
-          FROM public.cmc_ema_multi_tf_v2
-          WHERE roll = FALSE
-
-          UNION ALL
           SELECT 'public.cmc_ema_multi_tf_cal_us', id, tf, period, ts
           FROM public.cmc_ema_multi_tf_cal_us
           WHERE roll = FALSE
@@ -201,7 +196,7 @@ ret_bars_dupes AS (
 ),
 
 /* --------------------------
-   RETURNS (ema, non-_u, non-v2): duplicates
+   RETURNS (ema, non-_u): duplicates
    PK := (id, tf, period, ts) — roll is NOT part of PK.
    -------------------------- */
 ret_ema_dupes AS (
@@ -242,28 +237,6 @@ ret_ema_dupes AS (
 ),
 
 /* --------------------------
-   RETURNS (ema_v2): duplicates
-   PK := (id, tf, period, roll, ts) — v2 still has roll in PK.
-   -------------------------- */
-ret_ema_v2_dupes AS (
-  SELECT
-      x.table_name,
-      'returns_ema_v2_duplicate_key' AS test_name,
-      SUM(x.cnt - 1)::bigint AS n_bad,
-      MIN(x.example_key) AS example_key
-  FROM (
-      SELECT
-          'public.cmc_returns_ema_multi_tf_v2' AS table_name,
-          (id::text || '|' || tf || '|' || period::text || '|' || roll::text || '|' || ts::text) AS example_key,
-          COUNT(*)::bigint AS cnt
-      FROM public.cmc_returns_ema_multi_tf_v2
-      GROUP BY id, tf, period, roll, ts
-      HAVING COUNT(*) > 1
-  ) x
-  GROUP BY x.table_name
-),
-
-/* --------------------------
    RETURNS (ema_u): duplicates
    PK := (id, tf, period, alignment_source, ts) — roll is NOT part of PK.
    -------------------------- */
@@ -298,8 +271,6 @@ FROM (
     SELECT * FROM ret_bars_dupes
     UNION ALL
     SELECT * FROM ret_ema_dupes
-    UNION ALL
-    SELECT * FROM ret_ema_v2_dupes
     UNION ALL
     SELECT * FROM ret_ema_u_dupes
 ) failures

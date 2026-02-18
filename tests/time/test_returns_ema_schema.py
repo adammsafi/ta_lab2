@@ -49,6 +49,7 @@ TABLE_PK_COLS: dict[str, list[str]] = {
 # Value columns shared across all tables
 # (unified timeline: _ema/_ema_bar for canonical, _roll for unified)
 VALUE_COLS = [
+    "tf_days",
     "roll",
     "gap_days",
     "gap_days_roll",

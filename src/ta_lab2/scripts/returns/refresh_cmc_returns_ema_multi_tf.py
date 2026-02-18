@@ -72,6 +72,7 @@ def _ensure_tables(engine: Engine, out_table: str, state_table: str) -> None:
             id        bigint NOT NULL,
             ts        timestamptz NOT NULL,
             tf        text NOT NULL,
+            tf_days   integer NOT NULL,
             period    integer NOT NULL,
             roll      boolean NOT NULL,
 
@@ -263,7 +264,7 @@ _VALUE_COLS = [
 ]
 
 _INSERT_COLS = (
-    "id, ts, tf, period, roll,\n" + ",\n".join(_VALUE_COLS) + ",\ningested_at"
+    "id, ts, tf, tf_days, period, roll,\n" + ",\n".join(_VALUE_COLS) + ",\ningested_at"
 )
 _UPSERT_SET = ",\n".join(f"{c} = EXCLUDED.{c}" for c in _VALUE_COLS + ["ingested_at"])
 
@@ -300,6 +301,7 @@ def _run_one_key(engine: Engine, cfg: RunnerConfig, key: Tuple[int, str, int]) -
                 e.id::bigint AS id,
                 e.ts,
                 e.tf,
+                e.tf_days,
                 e.period,
                 e.roll,
                 e.ema,
@@ -325,7 +327,7 @@ def _run_one_key(engine: Engine, cfg: RunnerConfig, key: Tuple[int, str, int]) -
         ),
         calc AS (
             SELECT
-                id, ts, tf, period, roll,
+                id, ts, tf, tf_days, period, roll,
 
                 -- gap_days (canonical: only roll=False)
                 CASE WHEN NOT roll AND prev_ts_c IS NOT NULL
