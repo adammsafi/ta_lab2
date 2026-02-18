@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(unzip:*)",
+      "WebSearch",
+      "Bash(python -c:*)",
+      "Bash(python:*)",
+      "Bash(pytest:*)",
+      "Bash(ls:*)",
+      "Bash(gh run view:*)",
+      "Bash(gh run:*)",
+      "Bash(dir:*)",
+      "Bash(findstr:*)",
+      "Bash(git mv:*)",
+      "Bash(powershell -Command:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git status:*)",
+      "Bash(test:*)",
+      "Bash(git reset:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(curl:*)",
+      "WebFetch(domain:pageindex.ai)",
+      "Bash(while read file)",
+      "Bash(do git rm --cached \"$file\")",
+      "Bash(done)",
+      "Bash(git filter-repo:*)",
+      "Bash(git remote add:*)",
+      "Bash(git push:*)",
+      "Bash(git tag:*)",
+      "Bash(sort:*)",
+      "Bash(grep:*)"
+    ]
+  }
+}
