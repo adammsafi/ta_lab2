@@ -1,26 +1,26 @@
 --A. Bar tables: canonical uniqueness
 --Canonical bars = is_partial_end = FALSE
---Unique key = (id, tf, time_close)
+--Unique key = (id, tf, timestamp)
 
 -- BARS: canonical close uniqueness
 CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_cmc_price_bars_multi_tf__canon_close
-ON public.cmc_price_bars_multi_tf (id, tf, time_close)
+ON public.cmc_price_bars_multi_tf (id, tf, "timestamp")
 WHERE is_partial_end = FALSE;
 
 CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_cmc_price_bars_multi_tf_cal_us__canon_close
-ON public.cmc_price_bars_multi_tf_cal_us (id, tf, time_close)
+ON public.cmc_price_bars_multi_tf_cal_us (id, tf, "timestamp")
 WHERE is_partial_end = FALSE;
 
 CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_cmc_price_bars_multi_tf_cal_iso__canon_close
-ON public.cmc_price_bars_multi_tf_cal_iso (id, tf, time_close)
+ON public.cmc_price_bars_multi_tf_cal_iso (id, tf, "timestamp")
 WHERE is_partial_end = FALSE;
 
 CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_cmc_price_bars_multi_tf_cal_anchor_us__canon_close
-ON public.cmc_price_bars_multi_tf_cal_anchor_us (id, tf, time_close)
+ON public.cmc_price_bars_multi_tf_cal_anchor_us (id, tf, "timestamp")
 WHERE is_partial_end = FALSE;
 
 CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_cmc_price_bars_multi_tf_cal_anchor_iso__canon_close
-ON public.cmc_price_bars_multi_tf_cal_anchor_iso (id, tf, time_close)
+ON public.cmc_price_bars_multi_tf_cal_anchor_iso (id, tf, "timestamp")
 WHERE is_partial_end = FALSE;
 
 

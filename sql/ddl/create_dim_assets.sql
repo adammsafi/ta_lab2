@@ -3,10 +3,10 @@
 -- Pattern: CREATE TABLE AS SELECT with IF NOT EXISTS guard
 
 CREATE TABLE IF NOT EXISTS public.dim_assets AS
-SELECT DISTINCT id, asset_class, symbol
+SELECT DISTINCT asset_id AS id, asset_class, ticker AS symbol
 FROM public.dim_sessions
 WHERE asset_class = 'CRYPTO'
-ORDER BY id;
+ORDER BY asset_id;
 
 ALTER TABLE public.dim_assets
   ADD CONSTRAINT dim_assets_pkey PRIMARY KEY (id);
