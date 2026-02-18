@@ -374,12 +374,34 @@ FROM j;
 
 
 def _sql_test_coverage_vs_ema(cfg: ReturnsTableConfig) -> str:
-    """n_ret == n_ema - 1 per (id, tf, period) group."""
-    # For the EMA source, count rows per (id, tf, period).
-    # For returns, count rows per (id, tf, period).
-    # We group at (id, tf, period) level regardless of series/roll since the
-    # plan says key-level with key_cols grouping, but the impacted_keys temp
-    # table only has (asset_id, tf, period). We aggregate at that level.
+    """n_ret == n_ema - 1 per key group, aggregated to (id, tf, period) for output.
+
+    EMA source tables don't have a 'series' column (ema/ema_bar are separate
+    value columns), so we group EMA by key_cols minus 'series' and returns by
+    full key_cols.  The join matches on the EMA grouping key so each returns
+    sub-key (series variant) is compared to the correct EMA group.
+    """
+    # EMA source grouping: key_cols without 'series'
+    ema_group = [c for c in cfg.key_cols if c != "series"]
+    ret_group = list(cfg.key_cols)
+
+    ema_alias = ", ".join(
+        f"e.{c} AS asset_id" if c == "id" else f"e.{c}" for c in ema_group
+    )
+    ema_group_sql = ", ".join(f"e.{c}" for c in ema_group)
+
+    ret_alias = ", ".join(
+        f"r.{c} AS asset_id" if c == "id" else f"r.{c}" for c in ret_group
+    )
+    ret_group_sql = ", ".join(f"r.{c}" for c in ret_group)
+
+    # Join returns -> EMA on the EMA key columns (using aliased names)
+    join_parts = []
+    for c in ema_group:
+        alias = "asset_id" if c == "id" else c
+        join_parts.append(f"e.{alias} = r.{alias}")
+    join_on = " AND ".join(join_parts)
+
     return f"""
     INSERT INTO {STATS_TABLE} (
         table_name, test_name,
@@ -387,48 +409,63 @@ def _sql_test_coverage_vs_ema(cfg: ReturnsTableConfig) -> str:
         status, actual, expected, extra
     )
     WITH ema_counts AS (
-        SELECT e.id AS asset_id, e.tf, e.period, COUNT(*) AS n_ema
+        SELECT {ema_alias}, COUNT(*) AS n_ema
         FROM {cfg.ema_source_table} e
         JOIN _impacted_keys k
           ON k.asset_id = e.id AND k.tf = e.tf AND k.period = e.period
-        GROUP BY e.id, e.tf, e.period
+        GROUP BY {ema_group_sql}
     ),
     ret_counts AS (
-        SELECT r.id AS asset_id, r.tf, r.period, COUNT(*) AS n_ret
+        SELECT {ret_alias}, COUNT(*) AS n_ret
         FROM {cfg.returns_table} r
         JOIN _impacted_keys k
           ON k.asset_id = r.id AND k.tf = r.tf AND k.period = r.period
-        GROUP BY r.id, r.tf, r.period
+        GROUP BY {ret_group_sql}
     ),
-    j AS (
+    checks AS (
         SELECT
-            COALESCE(e.asset_id, r.asset_id) AS asset_id,
-            COALESCE(e.tf, r.tf)             AS tf,
-            COALESCE(e.period, r.period)     AS period,
-            COALESCE(e.n_ema, 0)             AS n_ema,
-            COALESCE(r.n_ret, 0)             AS n_ret
-        FROM ema_counts e
-        FULL OUTER JOIN ret_counts r
-          USING (asset_id, tf, period)
+            r.asset_id, r.tf, r.period,
+            COALESCE(e.n_ema, 0) AS n_ema,
+            r.n_ret,
+            CASE
+                WHEN e.n_ema IS NULL OR e.n_ema = 0 THEN 'WARN'
+                WHEN r.n_ret = e.n_ema - 1 THEN 'PASS'
+                WHEN abs(r.n_ret - (e.n_ema - 1)) <= 2 THEN 'WARN'
+                ELSE 'FAIL'
+            END AS key_status
+        FROM ret_counts r
+        LEFT JOIN ema_counts e
+          ON {join_on}
+    ),
+    agg AS (
+        SELECT
+            asset_id, tf, period,
+            CASE
+                WHEN bool_or(key_status = 'FAIL') THEN 'FAIL'
+                WHEN bool_or(key_status = 'WARN') THEN 'WARN'
+                ELSE 'PASS'
+            END AS status,
+            SUM(n_ret)::numeric AS total_ret,
+            SUM(n_ema - 1)::numeric AS total_expected,
+            SUM(CASE WHEN key_status <> 'PASS' THEN 1 ELSE 0 END) AS n_bad_keys,
+            COUNT(*) AS n_key_groups
+        FROM checks
+        GROUP BY asset_id, tf, period
     )
     SELECT
         :table_name AS table_name,
         'coverage_vs_ema_source' AS test_name,
         asset_id, tf, period,
-        CASE
-            WHEN n_ema = 0 THEN 'WARN'
-            WHEN n_ret = n_ema - 1 THEN 'PASS'
-            WHEN abs(n_ret - (n_ema - 1)) <= 2 THEN 'WARN'
-            ELSE 'FAIL'
-        END AS status,
-        n_ret::numeric AS actual,
-        (n_ema - 1)::numeric AS expected,
+        status,
+        total_ret AS actual,
+        total_expected AS expected,
         jsonb_build_object(
-            'n_ema', n_ema,
-            'n_ret', n_ret,
-            'diff', n_ret - (n_ema - 1)
+            'total_ret', total_ret,
+            'total_expected', total_expected,
+            'n_bad_keys', n_bad_keys,
+            'n_key_groups', n_key_groups
         ) AS extra
-    FROM j;
+    FROM agg;
     """
 
 

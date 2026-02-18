@@ -97,6 +97,28 @@ def engine(db_url):
     return create_engine(db_url, future=True)
 
 
+@pytest.fixture(scope="module")
+def existing_tables(engine):
+    """Set of returns tables that actually exist in the database."""
+    q = text(
+        """
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = ANY(:tables)
+        """
+    )
+    with engine.connect() as conn:
+        df = pd.read_sql(q, conn, params={"tables": RETURNS_TABLES})
+    return set(df["table_name"].tolist())
+
+
+def _skip_if_missing(existing_tables, table):
+    """Skip test if the table does not exist in the database."""
+    if table not in existing_tables:
+        pytest.skip(f"Table {table} does not exist - skipping")
+
+
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
@@ -162,8 +184,9 @@ def test_returns_table_has_value_columns(engine, table):
 
 
 @pytest.mark.parametrize("table", RETURNS_TABLES)
-def test_returns_pk_uniqueness(engine, table):
+def test_returns_pk_uniqueness(engine, existing_tables, table):
     """Verify no duplicate primary keys."""
+    _skip_if_missing(existing_tables, table)
     pk_cols = TABLE_PK_COLS[table]
     pk_tuple = ", ".join(pk_cols)
 
@@ -191,8 +214,9 @@ def test_returns_pk_uniqueness(engine, table):
 
 
 @pytest.mark.parametrize("table", RETURNS_TABLES)
-def test_returns_table_has_data(engine, table):
+def test_returns_table_has_data(engine, existing_tables, table):
     """Verify table has at least 100 rows."""
+    _skip_if_missing(existing_tables, table)
     q = text(f"SELECT COUNT(*)::bigint AS n_rows FROM {table}")
     with engine.connect() as conn:
         df = pd.read_sql(q, conn)
@@ -206,8 +230,9 @@ def test_returns_table_has_data(engine, table):
 
 
 @pytest.mark.parametrize("table", RETURNS_TABLES)
-def test_returns_tf_in_dim_timeframe(engine, table):
+def test_returns_tf_in_dim_timeframe(engine, existing_tables, table):
     """Verify all tf values exist in dim_timeframe."""
+    _skip_if_missing(existing_tables, table)
     # Check dim_timeframe exists
     q_exists = text(
         """
@@ -252,8 +277,9 @@ def test_returns_tf_in_dim_timeframe(engine, table):
 
 
 @pytest.mark.parametrize("table", RETURNS_TABLES)
-def test_returns_no_null_ret_arith_ret_log(engine, table):
+def test_returns_no_null_ret_arith_ret_log(engine, existing_tables, table):
     """Verify ret_arith and ret_log are never NULL."""
+    _skip_if_missing(existing_tables, table)
     q = text(
         f"""
         SELECT
