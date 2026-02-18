@@ -156,40 +156,40 @@ ema_canon_dupes_u AS (
 
 /* --------------------------
    RETURNS (bars): duplicates
-   key := (id, tf, time_close)
+   PK := (id, tf, "timestamp")
    -------------------------- */
 ret_bars_dupes AS (
   SELECT
       x.table_name,
-      'returns_bars_duplicate_time_close' AS test_name,
+      'returns_bars_duplicate_timestamp' AS test_name,
       SUM(x.cnt - 1)::bigint AS n_bad,
       MIN(x.example_key) AS example_key
   FROM (
       SELECT
           t.table_name,
-          (t.id::text || '|' || t.tf || '|' || t.time_close::text) AS example_key,
+          (t.id::text || '|' || t.tf || '|' || t."timestamp"::text) AS example_key,
           COUNT(*)::bigint AS cnt
       FROM (
-          SELECT 'public.cmc_returns_bars_multi_tf' AS table_name, id, tf, time_close
+          SELECT 'public.cmc_returns_bars_multi_tf' AS table_name, id, tf, "timestamp"
           FROM public.cmc_returns_bars_multi_tf
 
           UNION ALL
-          SELECT 'public.cmc_returns_bars_multi_tf_cal_us', id, tf, time_close
+          SELECT 'public.cmc_returns_bars_multi_tf_cal_us', id, tf, "timestamp"
           FROM public.cmc_returns_bars_multi_tf_cal_us
 
           UNION ALL
-          SELECT 'public.cmc_returns_bars_multi_tf_cal_iso', id, tf, time_close
+          SELECT 'public.cmc_returns_bars_multi_tf_cal_iso', id, tf, "timestamp"
           FROM public.cmc_returns_bars_multi_tf_cal_iso
 
           UNION ALL
-          SELECT 'public.cmc_returns_bars_multi_tf_cal_anchor_us', id, tf, time_close
+          SELECT 'public.cmc_returns_bars_multi_tf_cal_anchor_us', id, tf, "timestamp"
           FROM public.cmc_returns_bars_multi_tf_cal_anchor_us
 
           UNION ALL
-          SELECT 'public.cmc_returns_bars_multi_tf_cal_anchor_iso', id, tf, time_close
+          SELECT 'public.cmc_returns_bars_multi_tf_cal_anchor_iso', id, tf, "timestamp"
           FROM public.cmc_returns_bars_multi_tf_cal_anchor_iso
       ) t
-      GROUP BY t.table_name, t.id, t.tf, t.time_close
+      GROUP BY t.table_name, t.id, t.tf, t."timestamp"
       HAVING COUNT(*) > 1
   ) x
   GROUP BY x.table_name

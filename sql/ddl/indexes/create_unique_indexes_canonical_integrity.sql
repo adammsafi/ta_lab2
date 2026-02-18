@@ -58,24 +58,23 @@ WHERE roll = FALSE;
 
 --C. Returns tables: uniqueness
 --C1) Returns-from-bars
---Key = (id, tf, time_close) (no roll/series concept)
+--PK = (id, "timestamp", tf) — roll is a regular boolean column.
 
+-- RETURNS (bars): unique timestamp per (id,tf)
+CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_cmc_returns_bars_multi_tf__timestamp
+ON public.cmc_returns_bars_multi_tf (id, tf, "timestamp");
 
--- RETURNS (bars): unique time_close per (id,tf)
-CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_cmc_returns_bars_multi_tf__time_close
-ON public.cmc_returns_bars_multi_tf (id, tf, time_close);
+CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_cmc_returns_bars_multi_tf_cal_us__timestamp
+ON public.cmc_returns_bars_multi_tf_cal_us (id, tf, "timestamp");
 
-CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_cmc_returns_bars_multi_tf_cal_us__time_close
-ON public.cmc_returns_bars_multi_tf_cal_us (id, tf, time_close);
+CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_cmc_returns_bars_multi_tf_cal_iso__timestamp
+ON public.cmc_returns_bars_multi_tf_cal_iso (id, tf, "timestamp");
 
-CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_cmc_returns_bars_multi_tf_cal_iso__time_close
-ON public.cmc_returns_bars_multi_tf_cal_iso (id, tf, time_close);
+CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_cmc_returns_bars_multi_tf_cal_anchor_us__timestamp
+ON public.cmc_returns_bars_multi_tf_cal_anchor_us (id, tf, "timestamp");
 
-CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_cmc_returns_bars_multi_tf_cal_anchor_us__time_close
-ON public.cmc_returns_bars_multi_tf_cal_anchor_us (id, tf, time_close);
-
-CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_cmc_returns_bars_multi_tf_cal_anchor_iso__time_close
-ON public.cmc_returns_bars_multi_tf_cal_anchor_iso (id, tf, time_close);
+CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_cmc_returns_bars_multi_tf_cal_anchor_iso__timestamp
+ON public.cmc_returns_bars_multi_tf_cal_anchor_iso (id, tf, "timestamp");
 
 
 --C2) Returns-from-EMA (non-_u)

@@ -1,28 +1,66 @@
 -- ============================
--- Returns on bar snapshots (time_close keyed)
+-- Returns on bar snapshots (wide-column, dual-LAG)
 -- Source bars: public.cmc_price_bars_multi_tf_cal_anchor_us
+-- PK: (id, "timestamp", tf)
 -- ============================
 
-CREATE TABLE IF NOT EXISTS public.cmc_returns_bars_multi_tf_cal_anchor_us (
-    id           integer NOT NULL,
-    tf           text    NOT NULL,
-    time_close   timestamptz NOT NULL,
-    close        double precision,
-    prev_close   double precision,
-    gap_days     double precision,
-    ret_arith    double precision,
-    ret_log      double precision,
-    ingested_at  timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT cmc_returns_bars_multi_tf_cal_anchor_us_pk PRIMARY KEY (id, tf, time_close)
+DROP TABLE IF EXISTS public.cmc_returns_bars_multi_tf_cal_anchor_us CASCADE;
+
+CREATE TABLE public.cmc_returns_bars_multi_tf_cal_anchor_us (
+    id                      integer       NOT NULL,
+    "timestamp"             timestamptz   NOT NULL,
+    tf                      text          NOT NULL,
+
+    tf_days                 integer,
+    bar_seq                 integer,
+    pos_in_bar              integer,
+    count_days              integer,
+    count_days_remaining    integer,
+
+    roll                    boolean       NOT NULL,
+
+    time_close              timestamptz,
+    time_close_bar          timestamptz,
+    time_open_bar           timestamptz,
+
+    gap_bars                integer,
+
+    delta1_roll             double precision,
+    delta2_roll             double precision,
+    ret_arith_roll          double precision,
+    delta_ret_arith_roll    double precision,
+    ret_log_roll            double precision,
+    delta_ret_log_roll      double precision,
+    range_roll              double precision,
+    range_pct_roll          double precision,
+    true_range_roll         double precision,
+    true_range_pct_roll     double precision,
+
+    delta1                  double precision,
+    delta2                  double precision,
+    ret_arith               double precision,
+    delta_ret_arith         double precision,
+    ret_log                 double precision,
+    delta_ret_log           double precision,
+    range                   double precision,
+    range_pct               double precision,
+    true_range              double precision,
+    true_range_pct          double precision,
+
+    ingested_at             timestamptz   NOT NULL DEFAULT now(),
+
+    CONSTRAINT cmc_returns_bars_multi_tf_cal_anchor_us_pk PRIMARY KEY (id, "timestamp", tf)
 );
 
-CREATE INDEX IF NOT EXISTS ix_cmc_returns_bars_multi_tf_cal_anchor_us_time_close
-ON public.cmc_returns_bars_multi_tf_cal_anchor_us (id, tf, time_close);
+CREATE INDEX IF NOT EXISTS ix_cmc_returns_bars_multi_tf_cal_anchor_us_id_tf_ts
+ON public.cmc_returns_bars_multi_tf_cal_anchor_us (id, tf, "timestamp");
 
-CREATE TABLE IF NOT EXISTS public.cmc_returns_bars_multi_tf_cal_anchor_us_state (
-    id              integer NOT NULL,
-    tf              text    NOT NULL,
-    last_time_close timestamptz,
-    updated_at      timestamptz NOT NULL DEFAULT now(),
+DROP TABLE IF EXISTS public.cmc_returns_bars_multi_tf_cal_anchor_us_state CASCADE;
+
+CREATE TABLE public.cmc_returns_bars_multi_tf_cal_anchor_us_state (
+    id              integer       NOT NULL,
+    tf              text          NOT NULL,
+    last_timestamp  timestamptz,
+    updated_at      timestamptz   NOT NULL DEFAULT now(),
     CONSTRAINT cmc_returns_bars_multi_tf_cal_anchor_us_state_pk PRIMARY KEY (id, tf)
 );
