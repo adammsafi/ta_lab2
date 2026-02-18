@@ -334,8 +334,9 @@ def link_conversations_to_phases(
             conversations_by_phase["untracked"].append(message)
             continue
 
-        # Find matching phase
-        matched = False
+        # Find matching phase — pick narrowest window when phases overlap
+        best_phase = None
+        best_duration = None
         for phase_num, phase_info in phase_boundaries.items():
             try:
                 phase_start = datetime.fromisoformat(
@@ -346,14 +347,17 @@ def link_conversations_to_phases(
                 )
 
                 if phase_start <= msg_datetime <= phase_end:
-                    conversations_by_phase[phase_num].append(message)
-                    matched = True
-                    break
+                    duration = (phase_end - phase_start).total_seconds()
+                    if best_duration is None or duration < best_duration:
+                        best_phase = phase_num
+                        best_duration = duration
             except (ValueError, KeyError) as e:
                 logger.warning(f"Invalid phase boundary for phase {phase_num}: {e}")
                 continue
 
-        if not matched:
+        if best_phase is not None:
+            conversations_by_phase[best_phase].append(message)
+        else:
             conversations_by_phase["untracked"].append(message)
 
     # Log summary
