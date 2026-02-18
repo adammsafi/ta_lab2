@@ -10,7 +10,7 @@ Produces per-(table,id,tf,period) metrics:
 - n_rows, min_ts, max_ts
 - duplicate key detection for (id,tf,ts,period)
 - roll/canonical shares when roll columns exist
-- null shares for ema/ema_bar and derivative columns when present
+- null shares for ema/ema_bar and tf_days when present
 
 Run:
   python audit_ema_tables.py --ids all --out ema_audit.csv
@@ -76,15 +76,7 @@ def audit_table(engine: Engine, table: str, ids: Sequence[int]) -> pd.DataFrame:
     # Common numeric columns (only if present)
     maybe_cols = [
         "ema",
-        "d1",
-        "d2",
-        "d1_roll",
-        "d2_roll",
         "ema_bar",
-        "d1_bar",
-        "d2_bar",
-        "d1_roll_bar",
-        "d2_roll_bar",
         "tf_days",
     ]
     present_cols = [c for c in maybe_cols if c in colset]

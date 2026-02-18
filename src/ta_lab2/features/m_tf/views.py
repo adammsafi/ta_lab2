@@ -8,7 +8,10 @@ the helper views:
 
 - public.all_emas
 - public.cmc_price_with_emas
-- public.cmc_price_with_emas_d1d2
+- public.cmc_price_with_emas_d1d2  (legacy alias)
+
+Lean EMA schema: derivative columns (d1, d2, d1_roll, d2_roll) have been
+removed from EMA tables. Derivatives are now in the returns tables.
 
 If you ever want to change the shape of the views, you only need to
 edit this file.
@@ -25,10 +28,6 @@ CREATE OR REPLACE VIEW public.all_emas AS
         1          AS tf_days,
         d.period,
         d.ema,
-        d.d1_roll AS d1,
-        d.d2_roll AS d2,
-        d.d1      AS d1_close,
-        d.d2      AS d2_close,
         d.roll
     FROM public.cmc_ema_daily d
 
@@ -42,10 +41,6 @@ CREATE OR REPLACE VIEW public.all_emas AS
         m.tf_days,
         m.period,
         m.ema,
-        m.d1_roll AS d1,
-        m.d2_roll AS d2,
-        m.d1      AS d1_close,
-        m.d2      AS d2_close,
         m.roll
     FROM public.cmc_ema_multi_tf m;
 """
@@ -60,10 +55,6 @@ SELECT
     e.tf_days,
     e.period,
     e.ema,
-    e.d1,
-    e.d2,
-    e.d1_close,
-    e.d2_close,
     e.roll
 FROM public.cmc_price_histories7 p
 LEFT JOIN public.all_emas e

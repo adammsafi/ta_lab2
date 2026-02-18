@@ -150,37 +150,12 @@ def build_select_expr(
 
     # optional expressions (cast to target types)
     e_ingested_at = "ingested_at" if "ingested_at" in colset else "now()"
-    e_d1 = "d1::double precision" if "d1" in colset else "NULL::double precision"
-    e_d2 = "d2::double precision" if "d2" in colset else "NULL::double precision"
     e_tf_days = "tf_days::int" if "tf_days" in colset else "NULL::int"
     e_roll = "COALESCE(roll,false)::boolean" if "roll" in colset else "false::boolean"
-    e_d1_roll = (
-        "d1_roll::double precision" if "d1_roll" in colset else "NULL::double precision"
-    )
-    e_d2_roll = (
-        "d2_roll::double precision" if "d2_roll" in colset else "NULL::double precision"
-    )
-
     e_ema_bar = (
         "ema_bar::double precision" if "ema_bar" in colset else "NULL::double precision"
     )
-    e_d1_bar = (
-        "d1_bar::double precision" if "d1_bar" in colset else "NULL::double precision"
-    )
-    e_d2_bar = (
-        "d2_bar::double precision" if "d2_bar" in colset else "NULL::double precision"
-    )
     e_roll_bar = "roll_bar::boolean" if "roll_bar" in colset else "NULL::boolean"
-    e_d1_roll_bar = (
-        "d1_roll_bar::double precision"
-        if "d1_roll_bar" in colset
-        else "NULL::double precision"
-    )
-    e_d2_roll_bar = (
-        "d2_roll_bar::double precision"
-        if "d2_roll_bar" in colset
-        else "NULL::double precision"
-    )
 
     # required columns (must exist in source)
     required = {"id", "ts", "tf", "period", "ema"}
@@ -202,19 +177,11 @@ def build_select_expr(
       period::int,
       ema::double precision,
       {e_ingested_at},
-      {e_d1},
-      {e_d2},
       {e_tf_days},
       {e_roll},
-      {e_d1_roll},
-      {e_d2_roll},
       :alignment_source::text,
       {e_ema_bar},
-      {e_d1_bar},
-      {e_d2_bar},
-      {e_roll_bar},
-      {e_d1_roll_bar},
-      {e_d2_roll_bar}
+      {e_roll_bar}
     """
     return select_sql.strip(), where_sql
 
@@ -262,9 +229,9 @@ def insert_new_rows(
     WITH ins AS (
       INSERT INTO {U_TABLE} (
         id, ts, tf, period,
-        ema, ingested_at, d1, d2, tf_days, roll, d1_roll, d2_roll,
+        ema, ingested_at, tf_days, roll,
         alignment_source,
-        ema_bar, d1_bar, d2_bar, roll_bar, d1_roll_bar, d2_roll_bar
+        ema_bar, roll_bar
       )
       {select_sql}
       FROM {src_table}

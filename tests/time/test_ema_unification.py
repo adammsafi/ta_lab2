@@ -70,16 +70,12 @@ def test_unified_table_has_pk_columns(engine):
 
 
 def test_unified_table_has_value_columns(engine):
-    """Verify value columns: ema, ingested_at, d1, d2, tf_days, roll, d1_roll, d2_roll."""
+    """Verify value columns: ema, ingested_at, tf_days, roll."""
     required_value_cols = [
         "ema",
         "ingested_at",
-        "d1",
-        "d2",
         "tf_days",
         "roll",
-        "d1_roll",
-        "d2_roll",
     ]
 
     q = text(
@@ -104,11 +100,7 @@ def test_unified_table_has_bar_columns(engine):
     """Verify bar-space columns for calendar variants."""
     bar_cols = [
         "ema_bar",
-        "d1_bar",
-        "d2_bar",
         "roll_bar",
-        "d1_roll_bar",
-        "d2_roll_bar",
     ]
 
     q = text(

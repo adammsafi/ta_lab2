@@ -229,15 +229,7 @@ def audit_table(engine: Engine, table: str, ids: Sequence[int]) -> pd.DataFrame:
 
     maybe_cols = [
         "ema",
-        "d1",
-        "d2",
-        "d1_roll",
-        "d2_roll",
         "ema_bar",
-        "d1_bar",
-        "d2_bar",
-        "d1_roll_bar",
-        "d2_roll_bar",
         "tf_days",
     ]
     present_cols = [c for c in maybe_cols if c in colset]
@@ -497,16 +489,8 @@ def pick_sample_cols(colset: set[str]) -> List[str]:
         "tf_days",
         "roll",
         "ema",
-        "d1",
-        "d2",
-        "d1_roll",
-        "d2_roll",
         "roll_bar",
         "ema_bar",
-        "d1_bar",
-        "d2_bar",
-        "d1_roll_bar",
-        "d2_roll_bar",
         "ingested_at",
     ]
     return [c for c in preferred if c in colset]

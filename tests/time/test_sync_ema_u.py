@@ -112,12 +112,8 @@ def test_build_select_expr_success():
         "period",
         "ema",
         "ingested_at",
-        "d1",
-        "d2",
         "tf_days",
         "roll",
-        "d1_roll",
-        "d2_roll",
     ]
 
     select_sql, where_sql = build_select_expr(

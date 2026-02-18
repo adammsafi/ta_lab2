@@ -12,7 +12,6 @@ Sampling strategy per (table, id, tf, period):
 Includes diagnostic columns if they exist:
 - roll, roll_bar
 - ema, ema_bar
-- d1/d2 and roll variants
 - tf_days, ingested_at
 
 Run:
@@ -67,16 +66,8 @@ def pick_cols(colset: set[str]) -> List[str]:
         "tf_days",
         "roll",
         "ema",
-        "d1",
-        "d2",
-        "d1_roll",
-        "d2_roll",
         "roll_bar",
         "ema_bar",
-        "d1_bar",
-        "d2_bar",
-        "d1_roll_bar",
-        "d2_roll_bar",
         "ingested_at",
     ]
     return [c for c in preferred if c in colset]
