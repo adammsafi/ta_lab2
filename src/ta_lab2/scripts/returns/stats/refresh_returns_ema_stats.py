@@ -3,13 +3,13 @@ from __future__ import annotations
 r"""
 refresh_returns_ema_stats.py
 
-Parameterized incremental stats script for all 7 EMA-returns tables.
+Parameterized incremental stats script for all 6 EMA-returns tables.
 
 Targets (shared tables, discriminated by table_name):
   public.returns_ema_stats       — stat rows
   public.returns_ema_stats_state — per-table watermark
 
-All 7 returns families share identical value columns and differ only in PK
+All 6 returns families share identical value columns and differ only in PK
 structure, so one script handles them all (unlike EMA stats which need separate
 scripts per family due to calendar/roll/preview logic).
 
@@ -33,7 +33,7 @@ Stats tests:
   7. alignment_to_ema_source    — every returns row has matching EMA source row
 
 CLI:
-  python refresh_returns_ema_stats.py --families multi_tf,v2,cal_us
+  python refresh_returns_ema_stats.py --families multi_tf,cal_us
   python refresh_returns_ema_stats.py --families all
   python refresh_returns_ema_stats.py --families all --full-refresh
 
@@ -53,6 +53,7 @@ from typing import Dict, Iterable, List, Optional
 
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
+from sqlalchemy.exc import ProgrammingError
 
 from ta_lab2.scripts.bars.common_snapshot_contract import get_engine
 
@@ -81,15 +82,6 @@ ALL_CONFIGS: Dict[str, ReturnsTableConfig] = {
         pk_cols=("id", "ts", "tf", "period", "series", "roll"),
         key_cols=("id", "tf", "period", "series", "roll"),
         has_series=True,
-        has_alignment_source=False,
-    ),
-    "v2": ReturnsTableConfig(
-        returns_table="public.cmc_returns_ema_multi_tf_v2",
-        ema_source_table="public.cmc_ema_multi_tf_v2",
-        label="v2",
-        pk_cols=("id", "ts", "tf", "period", "roll"),
-        key_cols=("id", "tf", "period", "roll"),
-        has_series=False,
         has_alignment_source=False,
     ),
     "cal_us": ReturnsTableConfig(
@@ -697,9 +689,13 @@ def run(
             last_ing = conn.execute(
                 text(SQL_GET_STATE), {"table_name": table_name}
             ).scalar()
-            max_ing = conn.execute(
-                text(SQL_MAX_INGESTED_AT.format(table=table_name))
-            ).scalar()
+            try:
+                max_ing = conn.execute(
+                    text(SQL_MAX_INGESTED_AT.format(table=table_name))
+                ).scalar()
+            except ProgrammingError:
+                logger.warning("Table does not exist, skipping: %s", table_name)
+                continue
 
             if max_ing is None:
                 logger.warning("Table empty, skipping: %s", table_name)

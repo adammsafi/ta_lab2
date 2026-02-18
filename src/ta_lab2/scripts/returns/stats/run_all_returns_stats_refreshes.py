@@ -9,7 +9,7 @@ Usage:
     python run_all_returns_stats_refreshes.py
 
     # Run specific families
-    python run_all_returns_stats_refreshes.py --families multi_tf,v2,cal_us
+    python run_all_returns_stats_refreshes.py --families multi_tf,cal_us
 
     # Dry run
     python run_all_returns_stats_refreshes.py --dry-run
@@ -30,7 +30,6 @@ from pathlib import Path
 
 ALL_FAMILY_LABELS = [
     "multi_tf",
-    "v2",
     "cal_us",
     "cal_iso",
     "cal_anchor_us",
@@ -63,7 +62,7 @@ def run_stats_script(
     Run refresh_returns_ema_stats.py via subprocess.
 
     Args:
-        families: Comma-separated family labels (e.g. "multi_tf,v2") or "all"
+        families: Comma-separated family labels (e.g. "multi_tf,cal_us") or "all"
         db_url: Database URL (optional)
         full_refresh: Whether to pass --full-refresh
         verbose: Show detailed output
@@ -202,7 +201,7 @@ Examples:
   python run_all_returns_stats_refreshes.py
 
   # Run specific families
-  python run_all_returns_stats_refreshes.py --families multi_tf,v2,cal_us
+  python run_all_returns_stats_refreshes.py --families multi_tf,cal_us
 
   # Dry run
   python run_all_returns_stats_refreshes.py --dry-run

@@ -1,7 +1,7 @@
 """
 test_returns_ema_schema.py
 
-Validation tests for the 7 cmc_returns_ema_* tables.
+Validation tests for the 6 cmc_returns_ema_* tables.
 Tests schema, data integrity, and referential constraints.
 
 Run:
@@ -23,7 +23,6 @@ from sqlalchemy import create_engine, text
 
 RETURNS_TABLES = [
     "cmc_returns_ema_multi_tf",
-    "cmc_returns_ema_multi_tf_v2",
     "cmc_returns_ema_multi_tf_cal_us",
     "cmc_returns_ema_multi_tf_cal_iso",
     "cmc_returns_ema_multi_tf_cal_anchor_us",
@@ -34,7 +33,6 @@ RETURNS_TABLES = [
 # PK columns per table
 TABLE_PK_COLS: dict[str, list[str]] = {
     "cmc_returns_ema_multi_tf": ["id", "ts", "tf", "period", "series", "roll"],
-    "cmc_returns_ema_multi_tf_v2": ["id", "ts", "tf", "period", "roll"],
     "cmc_returns_ema_multi_tf_cal_us": ["id", "ts", "tf", "period", "series", "roll"],
     "cmc_returns_ema_multi_tf_cal_iso": ["id", "ts", "tf", "period", "series", "roll"],
     "cmc_returns_ema_multi_tf_cal_anchor_us": [
