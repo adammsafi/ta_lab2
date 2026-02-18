@@ -56,7 +56,7 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 - [x] **Phase 22: Critical Data Quality Fixes** - Fix 4 CRITICAL gaps + derive multi-TF from 1D bars
 - [x] **Phase 23: Reliable Incremental Refresh** - Flexible orchestration, state management, visibility
 - [x] **Phase 24: Pattern Consistency** - Standardize patterns where analysis justifies
-- [ ] **Phase 25: Baseline Capture** - Capture current outputs before validation testing
+- [x] **Phase 25: Baseline Capture** - Capture current outputs before validation testing
 - [ ] **Phase 26: Validation** - Verify fixes worked correctly, nothing broke
 
 ## Phase Details
@@ -414,8 +414,8 @@ Plans:
 **Plans**: 2 plans in 2 waves
 
 Plans:
-- [ ] 25-01-PLAN.md - Infrastructure (dim_assets DDL, comparison utilities, metadata tracker)
-- [ ] 25-02-PLAN.md - Orchestration script (Snapshot -> Truncate -> Rebuild -> Compare workflow)
+- [x] 25-01-PLAN.md - Infrastructure (dim_assets DDL, comparison utilities, metadata tracker)
+- [x] 25-02-PLAN.md - Orchestration script (Snapshot -> Truncate -> Rebuild -> Compare workflow)
 
 ---
 
@@ -480,7 +480,7 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19
 | 22. Critical Data Quality Fixes | 6/6 | Complete | 2026-02-05 |
 | 23. Reliable Incremental Refresh | 4/4 | Complete | 2026-02-05 |
 | 24. Pattern Consistency | 4/4 | Complete | 2026-02-05 |
-| 25. Baseline Capture | 0/2 | Not started | - |
+| 25. Baseline Capture | 2/2 | Complete | 2026-02-05 |
 | 26. Validation | 0/3 | Not started | - |
 
 ## Requirement Coverage
