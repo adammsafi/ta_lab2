@@ -70,7 +70,6 @@ class ReturnsTableConfig:
     label: str  # e.g. "multi_tf"
     pk_cols: tuple[str, ...]  # full PK including ts
     key_cols: tuple[str, ...]  # PK minus ts (grouping key)
-    has_series: bool
     has_alignment_source: bool
 
 
@@ -79,54 +78,48 @@ ALL_CONFIGS: Dict[str, ReturnsTableConfig] = {
         returns_table="public.cmc_returns_ema_multi_tf",
         ema_source_table="public.cmc_ema_multi_tf",
         label="multi_tf",
-        pk_cols=("id", "ts", "tf", "period", "series", "roll"),
-        key_cols=("id", "tf", "period", "series", "roll"),
-        has_series=True,
+        pk_cols=("id", "ts", "tf", "period"),
+        key_cols=("id", "tf", "period"),
         has_alignment_source=False,
     ),
     "cal_us": ReturnsTableConfig(
         returns_table="public.cmc_returns_ema_multi_tf_cal_us",
         ema_source_table="public.cmc_ema_multi_tf_cal_us",
         label="cal_us",
-        pk_cols=("id", "ts", "tf", "period", "series", "roll"),
-        key_cols=("id", "tf", "period", "series", "roll"),
-        has_series=True,
+        pk_cols=("id", "ts", "tf", "period"),
+        key_cols=("id", "tf", "period"),
         has_alignment_source=False,
     ),
     "cal_iso": ReturnsTableConfig(
         returns_table="public.cmc_returns_ema_multi_tf_cal_iso",
         ema_source_table="public.cmc_ema_multi_tf_cal_iso",
         label="cal_iso",
-        pk_cols=("id", "ts", "tf", "period", "series", "roll"),
-        key_cols=("id", "tf", "period", "series", "roll"),
-        has_series=True,
+        pk_cols=("id", "ts", "tf", "period"),
+        key_cols=("id", "tf", "period"),
         has_alignment_source=False,
     ),
     "cal_anchor_us": ReturnsTableConfig(
         returns_table="public.cmc_returns_ema_multi_tf_cal_anchor_us",
         ema_source_table="public.cmc_ema_multi_tf_cal_anchor_us",
         label="cal_anchor_us",
-        pk_cols=("id", "ts", "tf", "period", "series", "roll"),
-        key_cols=("id", "tf", "period", "series", "roll"),
-        has_series=True,
+        pk_cols=("id", "ts", "tf", "period"),
+        key_cols=("id", "tf", "period"),
         has_alignment_source=False,
     ),
     "cal_anchor_iso": ReturnsTableConfig(
         returns_table="public.cmc_returns_ema_multi_tf_cal_anchor_iso",
         ema_source_table="public.cmc_ema_multi_tf_cal_anchor_iso",
         label="cal_anchor_iso",
-        pk_cols=("id", "ts", "tf", "period", "series", "roll"),
-        key_cols=("id", "tf", "period", "series", "roll"),
-        has_series=True,
+        pk_cols=("id", "ts", "tf", "period"),
+        key_cols=("id", "tf", "period"),
         has_alignment_source=False,
     ),
     "u": ReturnsTableConfig(
         returns_table="public.cmc_returns_ema_multi_tf_u",
         ema_source_table="public.cmc_ema_multi_tf_u",
         label="u",
-        pk_cols=("id", "ts", "tf", "period", "alignment_source", "series", "roll"),
-        key_cols=("id", "tf", "period", "alignment_source", "series", "roll"),
-        has_series=True,
+        pk_cols=("id", "ts", "tf", "period", "alignment_source"),
+        key_cols=("id", "tf", "period", "alignment_source"),
         has_alignment_source=True,
     ),
 }
@@ -368,28 +361,24 @@ FROM j;
 def _sql_test_coverage_vs_ema(cfg: ReturnsTableConfig) -> str:
     """n_ret == n_ema - 1 per key group, aggregated to (id, tf, period) for output.
 
-    EMA source tables don't have a 'series' column (ema/ema_bar are separate
-    value columns), so we group EMA by key_cols minus 'series' and returns by
-    full key_cols.  The join matches on the EMA grouping key so each returns
-    sub-key (series variant) is compared to the correct EMA group.
+    Both EMA source and returns tables now share the same key structure
+    (no series column), so the comparison is a direct COUNT(*) match.
     """
-    # EMA source grouping: key_cols without 'series'
-    ema_group = [c for c in cfg.key_cols if c != "series"]
-    ret_group = list(cfg.key_cols)
+    key_group = list(cfg.key_cols)
 
     ema_alias = ", ".join(
-        f"e.{c} AS asset_id" if c == "id" else f"e.{c}" for c in ema_group
+        f"e.{c} AS asset_id" if c == "id" else f"e.{c}" for c in key_group
     )
-    ema_group_sql = ", ".join(f"e.{c}" for c in ema_group)
+    ema_group_sql = ", ".join(f"e.{c}" for c in key_group)
 
     ret_alias = ", ".join(
-        f"r.{c} AS asset_id" if c == "id" else f"r.{c}" for c in ret_group
+        f"r.{c} AS asset_id" if c == "id" else f"r.{c}" for c in key_group
     )
-    ret_group_sql = ", ".join(f"r.{c}" for c in ret_group)
+    ret_group_sql = ", ".join(f"r.{c}" for c in key_group)
 
-    # Join returns -> EMA on the EMA key columns (using aliased names)
+    # Join on all key columns
     join_parts = []
-    for c in ema_group:
+    for c in key_group:
         alias = "asset_id" if c == "id" else c
         join_parts.append(f"e.{alias} = r.{alias}")
     join_on = " AND ".join(join_parts)
@@ -476,8 +465,8 @@ def _sql_test_gap_days_min(cfg: ReturnsTableConfig) -> str:
     WITH agg AS (
         SELECT
             r.id AS asset_id, r.tf, r.period,
-            MIN(r.gap_days) AS min_gap,
-            SUM(CASE WHEN r.gap_days IS NULL THEN 1 ELSE 0 END) AS n_null_gap
+            MIN(r.gap_days_roll) AS min_gap,
+            SUM(CASE WHEN r.gap_days_roll IS NULL THEN 1 ELSE 0 END) AS n_null_gap
         FROM {cfg.returns_table} r
         JOIN _impacted_keys k
           ON k.asset_id = r.id AND k.tf = r.tf AND k.period = r.period
@@ -495,7 +484,7 @@ def _sql_test_gap_days_min(cfg: ReturnsTableConfig) -> str:
         COALESCE(min_gap, -1)::numeric AS actual,
         1::numeric AS expected,
         jsonb_build_object(
-            'min_gap_days', min_gap,
+            'min_gap_days_roll', min_gap,
             'n_null_gap', n_null_gap
         ) AS extra
     FROM agg;
@@ -517,7 +506,7 @@ def _sql_test_max_gap(cfg: ReturnsTableConfig) -> str:
     WITH agg AS (
         SELECT
             r.id AS asset_id, r.tf, r.period,
-            MAX(r.gap_days) AS max_gap
+            MAX(r.gap_days_roll) AS max_gap
         FROM {cfg.returns_table} r
         JOIN _impacted_keys k
           ON k.asset_id = r.id AND k.tf = r.tf AND k.period = r.period
@@ -568,8 +557,16 @@ def _sql_test_null_policy_ret(cfg: ReturnsTableConfig) -> str:
         SELECT
             r.id AS asset_id, r.tf, r.period,
             COUNT(*) AS n_rows,
-            SUM(CASE WHEN r.ret_arith IS NULL THEN 1 ELSE 0 END) AS n_null_arith,
-            SUM(CASE WHEN r.ret_log IS NULL THEN 1 ELSE 0 END)   AS n_null_log
+            -- _roll columns should never be NULL (populated on all rows)
+            SUM(CASE WHEN r.ret_arith_ema_roll IS NULL THEN 1 ELSE 0 END) AS n_null_arith_roll,
+            SUM(CASE WHEN r.ret_arith_ema_bar_roll IS NULL THEN 1 ELSE 0 END) AS n_null_arith_bar_roll,
+            SUM(CASE WHEN r.ret_log_ema_roll IS NULL THEN 1 ELSE 0 END)   AS n_null_log_roll,
+            SUM(CASE WHEN r.ret_log_ema_bar_roll IS NULL THEN 1 ELSE 0 END) AS n_null_log_bar_roll,
+            -- Non-roll columns should not be NULL on roll=FALSE rows
+            SUM(CASE WHEN NOT r.roll AND r.ret_arith_ema IS NULL THEN 1 ELSE 0 END) AS n_null_arith_canon,
+            SUM(CASE WHEN NOT r.roll AND r.ret_arith_ema_bar IS NULL THEN 1 ELSE 0 END) AS n_null_arith_bar_canon,
+            SUM(CASE WHEN NOT r.roll AND r.ret_log_ema IS NULL THEN 1 ELSE 0 END)   AS n_null_log_canon,
+            SUM(CASE WHEN NOT r.roll AND r.ret_log_ema_bar IS NULL THEN 1 ELSE 0 END) AS n_null_log_bar_canon
         FROM {cfg.returns_table} r
         JOIN _impacted_keys k
           ON k.asset_id = r.id AND k.tf = r.tf AND k.period = r.period
@@ -580,15 +577,25 @@ def _sql_test_null_policy_ret(cfg: ReturnsTableConfig) -> str:
         'null_policy_ret' AS test_name,
         asset_id, tf, period,
         CASE
-            WHEN n_null_arith = 0 AND n_null_log = 0 THEN 'PASS'
+            WHEN n_null_arith_roll = 0 AND n_null_arith_bar_roll = 0
+             AND n_null_log_roll = 0 AND n_null_log_bar_roll = 0
+             AND n_null_arith_canon = 0 AND n_null_arith_bar_canon = 0
+             AND n_null_log_canon = 0 AND n_null_log_bar_canon = 0 THEN 'PASS'
             ELSE 'FAIL'
         END AS status,
-        (n_null_arith + n_null_log)::numeric AS actual,
+        (n_null_arith_roll + n_null_arith_bar_roll + n_null_log_roll + n_null_log_bar_roll
+         + n_null_arith_canon + n_null_arith_bar_canon + n_null_log_canon + n_null_log_bar_canon)::numeric AS actual,
         0::numeric AS expected,
         jsonb_build_object(
             'n_rows', n_rows,
-            'n_null_ret_arith', n_null_arith,
-            'n_null_ret_log', n_null_log
+            'n_null_arith_roll', n_null_arith_roll,
+            'n_null_arith_bar_roll', n_null_arith_bar_roll,
+            'n_null_log_roll', n_null_log_roll,
+            'n_null_log_bar_roll', n_null_log_bar_roll,
+            'n_null_arith_canon', n_null_arith_canon,
+            'n_null_arith_bar_canon', n_null_arith_bar_canon,
+            'n_null_log_canon', n_null_log_canon,
+            'n_null_log_bar_canon', n_null_log_bar_canon
         ) AS extra
     FROM agg;
     """

@@ -8,8 +8,15 @@ Integrity audit for unified EMA returns built from:
 into:
   public.cmc_returns_ema_multi_tf_u
 
-Keyed by:
-  (id, tf, period, alignment_source, series, roll)
+Unified timeline: _ema/_ema_bar + _roll value columns.
+PK: (id, ts, tf, period, alignment_source) — roll is a regular boolean column.
+
+Per (id, tf, period, alignment_source):
+  - Coverage: n_ret == n_ema - 1
+  - No duplicates on PK (id, ts, tf, period, alignment_source)
+  - Gaps: gap_days_roll >= 1; also flags gap_days_roll > gap_mult * tf_days_nominal
+  - Nulls: _roll columns never NULL; canonical columns never NULL on roll=FALSE
+  - Alignment: every returns row matches a source EMA row on (id, tf, period, alignment_source, ts)
 
 Run (Spyder):
 runfile(
@@ -72,7 +79,7 @@ def _fail_or_warn(strict: bool, msg: str) -> None:
 
 def main() -> None:
     p = argparse.ArgumentParser(
-        description="Audit integrity for cmc_returns_ema_multi_tf_u."
+        description="Audit integrity for cmc_returns_ema_multi_tf_u (wide columns)."
     )
     p.add_argument(
         "--db-url",
@@ -121,41 +128,24 @@ def main() -> None:
     # 1) Coverage: per key returns rows == ema rows - 1
     coverage_sql = f"""
     WITH e AS (
-      SELECT
-        id, tf, period, alignment_source,
-        'ema'::text AS series,
-        roll,
-        COUNT(*) AS n_ema
+      SELECT id, tf, period, alignment_source, COUNT(*) AS n_ema
       FROM {ema_u}
-      GROUP BY 1,2,3,4,5,6
-
-      UNION ALL
-
-      SELECT
-        id, tf, period, alignment_source,
-        'ema_bar'::text AS series,
-        roll AS roll,
-        COUNT(*) AS n_ema
-      FROM {ema_u}
-      WHERE ema_bar IS NOT NULL
-      GROUP BY 1,2,3,4,5,6
+      GROUP BY 1,2,3,4
     ),
     r AS (
-      SELECT
-        id, tf, period, alignment_source, series, roll,
-        COUNT(*) AS n_ret
+      SELECT id, tf, period, alignment_source, COUNT(*) AS n_ret
       FROM {ret}
-      GROUP BY 1,2,3,4,5,6
+      GROUP BY 1,2,3,4
     )
     SELECT
-      e.id, e.tf, e.period, e.alignment_source, e.series, e.roll,
+      e.id, e.tf, e.period, e.alignment_source,
       e.n_ema,
       COALESCE(r.n_ret, 0) AS n_ret,
       (e.n_ema - 1) AS expected_ret,
       (COALESCE(r.n_ret, 0) - (e.n_ema - 1)) AS diff
     FROM e
-    LEFT JOIN r USING (id, tf, period, alignment_source, series, roll)
-    ORDER BY e.id, e.tf, e.period, e.alignment_source, e.series, e.roll;
+    LEFT JOIN r USING (id, tf, period, alignment_source)
+    ORDER BY e.id, e.tf, e.period, e.alignment_source;
     """
     cov = _df(engine, coverage_sql)
     bad_cov = cov[cov["diff"] != 0]
@@ -168,9 +158,9 @@ def main() -> None:
 
     # 2) Duplicates
     dup_sql = f"""
-    SELECT id, tf, period, alignment_source, series, roll, ts, COUNT(*) AS n
+    SELECT id, tf, period, alignment_source, ts, COUNT(*) AS n
     FROM {ret}
-    GROUP BY 1,2,3,4,5,6,7
+    GROUP BY 1,2,3,4,5
     HAVING COUNT(*) > 1
     ORDER BY n DESC
     LIMIT 5000;
@@ -182,24 +172,24 @@ def main() -> None:
         _print(f"FAIL: duplicate keys found: {len(dups)}")
         _fail_or_warn(strict, f"FAIL: duplicate keys found: {len(dups)}")
 
-    # 3) Gaps (>=1 and not > gap_mult * tf_days_nominal where available)
+    # 3) Gaps
     anom_sql = f"""
     WITH tfm AS (
       SELECT tf, tf_days_nominal::double precision AS tf_days_nominal
       FROM {dim_tf}
     )
     SELECT
-      r.id, r.tf, r.period, r.alignment_source, r.series, r.roll, r.ts,
-      r.gap_days,
+      r.id, r.tf, r.period, r.alignment_source, r.roll, r.ts,
+      r.gap_days_roll,
       tfm.tf_days_nominal,
       (tfm.tf_days_nominal * {gap_mult}) AS gap_thresh
     FROM {ret} r
     LEFT JOIN tfm USING (tf)
     WHERE
-      r.gap_days IS NULL
-      OR r.gap_days < 1
-      OR (tfm.tf_days_nominal IS NOT NULL AND r.gap_days > (tfm.tf_days_nominal * {gap_mult}))
-    ORDER BY r.id, r.tf, r.period, r.alignment_source, r.series, r.roll, r.ts
+      r.gap_days_roll IS NULL
+      OR r.gap_days_roll < 1
+      OR (tfm.tf_days_nominal IS NOT NULL AND r.gap_days_roll > (tfm.tf_days_nominal * {gap_mult}))
+    ORDER BY r.id, r.tf, r.period, r.alignment_source, r.roll, r.ts
     LIMIT 5000;
     """
     anom = _df(engine, anom_sql)
@@ -213,31 +203,47 @@ def main() -> None:
     nulls_sql = f"""
     SELECT
       COUNT(*) AS n_rows,
-      SUM((ret_arith IS NULL)::int) AS n_ret_arith_null,
-      SUM((ret_log IS NULL)::int) AS n_ret_log_null,
-      SUM((delta1 IS NULL)::int) AS n_delta1_null,
-      SUM((delta2 IS NULL)::int) AS n_delta2_null,
-      SUM((delta_ret_arith IS NULL)::int) AS n_delta_ret_arith_null,
-      SUM((delta_ret_log IS NULL)::int) AS n_delta_ret_log_null
+      -- _roll columns should never be NULL (populated on all rows)
+      SUM((ret_arith_ema_roll IS NULL)::int) AS n_null_arith_roll,
+      SUM((ret_arith_ema_bar_roll IS NULL)::int) AS n_null_arith_bar_roll,
+      SUM((ret_log_ema_roll IS NULL)::int) AS n_null_log_roll,
+      SUM((ret_log_ema_bar_roll IS NULL)::int) AS n_null_log_bar_roll,
+      -- Non-roll columns should not be NULL on roll=FALSE rows
+      SUM(CASE WHEN NOT roll AND ret_arith_ema IS NULL THEN 1 ELSE 0 END) AS n_null_arith_canon,
+      SUM(CASE WHEN NOT roll AND ret_arith_ema_bar IS NULL THEN 1 ELSE 0 END) AS n_null_arith_bar_canon,
+      SUM(CASE WHEN NOT roll AND ret_log_ema IS NULL THEN 1 ELSE 0 END) AS n_null_log_canon,
+      SUM(CASE WHEN NOT roll AND ret_log_ema_bar IS NULL THEN 1 ELSE 0 END) AS n_null_log_bar_canon
     FROM {ret};
     """
     nulls = _df(engine, nulls_sql)
-    n_ra = int(nulls.iloc[0]["n_ret_arith_null"])
-    n_rl = int(nulls.iloc[0]["n_ret_log_null"])
-    if n_ra == 0 and n_rl == 0:
-        _print("PASS: nulls (ret_arith/ret_log).")
+    roll_nulls = sum(
+        int(nulls.iloc[0][c])
+        for c in [
+            "n_null_arith_roll",
+            "n_null_arith_bar_roll",
+            "n_null_log_roll",
+            "n_null_log_bar_roll",
+        ]
+    )
+    canon_nulls = sum(
+        int(nulls.iloc[0][c])
+        for c in [
+            "n_null_arith_canon",
+            "n_null_arith_bar_canon",
+            "n_null_log_canon",
+            "n_null_log_bar_canon",
+        ]
+    )
+    total_null = roll_nulls + canon_nulls
+    if total_null == 0:
+        _print(
+            "PASS: _roll columns never NULL; canonical columns never NULL on roll=FALSE."
+        )
     else:
-        _print(f"FAIL: null counts ret_arith={n_ra} ret_log={n_rl}")
+        _print(f"FAIL: null counts: roll_nulls={roll_nulls}, canon_nulls={canon_nulls}")
         _fail_or_warn(strict, "FAIL: null policy violated.")
 
-    _print(
-        f"INFO: delta1_null={int(nulls.iloc[0]['n_delta1_null'])}, "
-        f"delta2_null={int(nulls.iloc[0]['n_delta2_null'])}, "
-        f"delta_ret_arith_null={int(nulls.iloc[0]['n_delta_ret_arith_null'])}, "
-        f"delta_ret_log_null={int(nulls.iloc[0]['n_delta_ret_log_null'])}"
-    )
-
-    # 5) Alignment: every return row should exist in EMA_U source
+    # 5) Alignment
     align_sql = f"""
     SELECT COUNT(*) AS n_missing
     FROM {ret} r
@@ -247,7 +253,6 @@ def main() -> None:
      AND e.period = r.period
      AND e.alignment_source = r.alignment_source
      AND e.ts = r.ts
-     AND e.roll = r.roll
     WHERE e.id IS NULL;
     """
     align = _df(engine, align_sql)
@@ -258,7 +263,7 @@ def main() -> None:
         _print(f"FAIL: missing EMA_U rows for returns: {n_missing}")
         _fail_or_warn(strict, f"FAIL: alignment missing EMA_U rows: {n_missing}")
 
-    # Write CSVs (summary-style)
+    # Write CSVs
     _write_csv(cov, Path(str(out_base) + "_coverage.csv"))
     _write_csv(dups, Path(str(out_base) + "_dups.csv"))
     _write_csv(anom, Path(str(out_base) + "_gap_anomalies.csv"))

@@ -3,22 +3,23 @@ from __future__ import annotations
 r"""
 audit_returns_ema_multi_tf_cal_integrity.py
 
-Integrity audit for unified CAL returns tables (US/ISO), containing both:
-  series='ema'
-  series='ema_bar'
+Integrity audit for unified CAL returns tables (US/ISO).
 
-Per (scheme, series, roll, id, tf, period):
+Unified timeline: _ema/_ema_bar + _roll value columns.
+PK: (id, ts, tf, period) — roll is a regular boolean column.
+
+Per (scheme, id, tf, period):
   - Coverage: n_ret == n_ema - 1
   - No duplicates on PK
-  - Gaps: gap_days >= 1; also flags gap_days > gap_mult * tf_days_nominal when available
-  - Nulls: ret_arith/ret_log should be non-null; delta1/delta2/delta_ret null shares reported
-  - Alignment: every returns row matches a source EMA row at same (id,tf,period,ts) and roll mapping
+  - Gaps: gap_days_roll >= 1; also flags gap_days_roll > gap_mult * tf_days_nominal
+  - Nulls: _roll columns never NULL; canonical columns never NULL on roll=FALSE
+  - Alignment: every returns row matches a source EMA row on (id, tf, period, ts)
 
 Run (Spyder):
 runfile(
   r"C:\Users\asafi\Downloads\ta_lab2\src\ta_lab2\scripts\returns\audit_returns_ema_multi_tf_cal_integrity.py",
   wdir=r"C:\Users\asafi\Downloads\ta_lab2",
-  args="--scheme both --series both --out-dir audits/returns --strict"
+  args="--scheme both --out-dir audits/returns --strict"
 )
 """
 
@@ -83,15 +84,6 @@ def expand_scheme(s: str) -> list[str]:
     raise ValueError("scheme must be one of: us, iso, both")
 
 
-def expand_series(s: str) -> list[str]:
-    s = s.strip().lower()
-    if s == "both":
-        return ["ema", "ema_bar"]
-    if s in ("ema", "ema_bar"):
-        return [s]
-    raise ValueError("series must be one of: ema, ema_bar, both")
-
-
 def _audit_one(
     engine: Engine,
     ema_table: str,
@@ -101,72 +93,60 @@ def _audit_one(
     strict: bool,
     gap_mult: float,
     label: str,
-    series: str,
 ) -> None:
-    _print(f"=== scheme={label} series={series} ===")
+    _print(f"=== scheme={label} ===")
 
-    # map source columns by series
-    src_roll_col = "roll"  # noqa: F841
-
-    # 1) Coverage: group by key; returns has series column already
+    # 1) Coverage
     coverage_sql = f"""
     WITH e AS (
-      SELECT id::bigint AS id, tf, period, {src_roll_col}::boolean AS roll, COUNT(*) AS n_ema
+      SELECT id::bigint AS id, tf, period, COUNT(*) AS n_ema
       FROM {ema_table}
-      GROUP BY 1,2,3,4
+      GROUP BY 1,2,3
     ),
     r AS (
-      SELECT id, tf, period, roll, COUNT(*) AS n_ret
+      SELECT id, tf, period, COUNT(*) AS n_ret
       FROM {ret_table}
-      WHERE series = '{series}'
-      GROUP BY 1,2,3,4
+      GROUP BY 1,2,3
     )
     SELECT
-      e.id,
-      e.tf,
-      e.period,
-      '{series}'::text AS series,
-      e.roll,
+      e.id, e.tf, e.period,
       e.n_ema,
       COALESCE(r.n_ret, 0) AS n_ret,
       (e.n_ema - 1) AS expected_ret,
       (COALESCE(r.n_ret, 0) - (e.n_ema - 1)) AS diff
     FROM e
-    LEFT JOIN r USING (id, tf, period, roll)
-    ORDER BY e.id, e.tf, e.period, e.roll;
+    LEFT JOIN r USING (id, tf, period)
+    ORDER BY e.id, e.tf, e.period;
     """
     cov = _df(engine, coverage_sql)
     bad_cov = cov[cov["diff"] != 0]
     if not bad_cov.empty:
-        _write_csv(bad_cov, Path(str(out_base) + f"_{label}_{series}_coverage_bad.csv"))
-        _fail_or_warn(
-            strict, f"FAIL: {label}/{series} coverage mismatches: {len(bad_cov)}"
-        )
+        _write_csv(bad_cov, Path(str(out_base) + f"_{label}_coverage_bad.csv"))
+        _fail_or_warn(strict, f"FAIL: {label} coverage mismatches: {len(bad_cov)}")
     else:
         _print("PASS: coverage.")
 
     # 2) Duplicates
     dup_sql = f"""
-    SELECT id, tf, period, series, roll, ts, COUNT(*) AS n
+    SELECT id, tf, period, ts, COUNT(*) AS n
     FROM {ret_table}
-    WHERE series = '{series}'
-    GROUP BY 1,2,3,4,5,6
+    GROUP BY 1,2,3,4
     HAVING COUNT(*) > 1
-    ORDER BY n DESC, id, tf, period, roll, ts
+    ORDER BY n DESC, id, tf, period, ts
     LIMIT 5000;
     """
     dups = _df(engine, dup_sql)
     if len(dups) > 0:
-        _fail_or_warn(strict, f"FAIL: {label}/{series} duplicate keys: {len(dups)}")
+        _fail_or_warn(strict, f"FAIL: {label} duplicate keys: {len(dups)}")
     else:
         _print("PASS: no duplicates.")
 
     # 3) Gaps anomalies
     anom_sql = f"""
     WITH r AS (
-      SELECT id, tf, period, series, roll, ts, gap_days, delta1, ret_arith, ret_log
+      SELECT id, tf, period, roll, ts, gap_days_roll,
+             delta1_ema_roll, ret_arith_ema_roll, ret_log_ema_roll
       FROM {ret_table}
-      WHERE series = '{series}'
     ),
     tfm AS (
       SELECT tf, tf_days_nominal::double precision AS tf_days_nominal
@@ -179,15 +159,15 @@ def _audit_one(
     FROM r
     LEFT JOIN tfm USING (tf)
     WHERE
-      r.gap_days IS NULL
-      OR r.gap_days < 1
-      OR (tfm.tf_days_nominal IS NOT NULL AND r.gap_days > (tfm.tf_days_nominal * {gap_mult}))
+      r.gap_days_roll IS NULL
+      OR r.gap_days_roll < 1
+      OR (tfm.tf_days_nominal IS NOT NULL AND r.gap_days_roll > (tfm.tf_days_nominal * {gap_mult}))
     ORDER BY r.id, r.tf, r.period, r.roll, r.ts
     LIMIT 5000;
     """
     anom = _df(engine, anom_sql)
     if len(anom) > 0:
-        _fail_or_warn(strict, f"FAIL: {label}/{series} gap anomalies: {len(anom)}")
+        _fail_or_warn(strict, f"FAIL: {label} gap anomalies: {len(anom)}")
     else:
         _print("PASS: gaps.")
 
@@ -195,34 +175,49 @@ def _audit_one(
     nulls_sql = f"""
     SELECT
       COUNT(*) AS n_rows,
-      SUM((ret_arith IS NULL)::int) AS n_ret_arith_null,
-      SUM((ret_log IS NULL)::int) AS n_ret_log_null,
-      SUM((delta1 IS NULL)::int) AS n_delta1_null,
-      SUM((delta2 IS NULL)::int) AS n_delta2_null,
-      SUM((delta_ret_arith IS NULL)::int) AS n_delta_ret_arith_null,
-      SUM((delta_ret_log IS NULL)::int) AS n_delta_ret_log_null
-    FROM {ret_table}
-    WHERE series = '{series}';
+      -- _roll columns should never be NULL (populated on all rows)
+      SUM((ret_arith_ema_roll IS NULL)::int) AS n_null_arith_roll,
+      SUM((ret_arith_ema_bar_roll IS NULL)::int) AS n_null_arith_bar_roll,
+      SUM((ret_log_ema_roll IS NULL)::int) AS n_null_log_roll,
+      SUM((ret_log_ema_bar_roll IS NULL)::int) AS n_null_log_bar_roll,
+      -- Non-roll columns should not be NULL on roll=FALSE rows
+      SUM(CASE WHEN NOT roll AND ret_arith_ema IS NULL THEN 1 ELSE 0 END) AS n_null_arith_canon,
+      SUM(CASE WHEN NOT roll AND ret_arith_ema_bar IS NULL THEN 1 ELSE 0 END) AS n_null_arith_bar_canon,
+      SUM(CASE WHEN NOT roll AND ret_log_ema IS NULL THEN 1 ELSE 0 END) AS n_null_log_canon,
+      SUM(CASE WHEN NOT roll AND ret_log_ema_bar IS NULL THEN 1 ELSE 0 END) AS n_null_log_bar_canon
+    FROM {ret_table};
     """
     nulls = _df(engine, nulls_sql)
-    n_ra_null = int(nulls.iloc[0]["n_ret_arith_null"])
-    n_rl_null = int(nulls.iloc[0]["n_ret_log_null"])
-    if n_ra_null or n_rl_null:
+    roll_nulls = sum(
+        int(nulls.iloc[0][c])
+        for c in [
+            "n_null_arith_roll",
+            "n_null_arith_bar_roll",
+            "n_null_log_roll",
+            "n_null_log_bar_roll",
+        ]
+    )
+    canon_nulls = sum(
+        int(nulls.iloc[0][c])
+        for c in [
+            "n_null_arith_canon",
+            "n_null_arith_bar_canon",
+            "n_null_log_canon",
+            "n_null_log_bar_canon",
+        ]
+    )
+    total_null = roll_nulls + canon_nulls
+    if total_null:
         _fail_or_warn(
             strict,
-            f"FAIL: {label}/{series} nulls: arith={n_ra_null} log={n_rl_null}",
+            f"FAIL: {label} nulls: roll_nulls={roll_nulls}, canon_nulls={canon_nulls}",
         )
     else:
-        _print("PASS: nulls (ret_arith/ret_log).")
+        _print(
+            "PASS: _roll columns never NULL; canonical columns never NULL on roll=FALSE."
+        )
 
-    _print(
-        f"INFO: delta1_null={int(nulls.iloc[0]['n_delta1_null'])}, "
-        f"delta2_null={int(nulls.iloc[0]['n_delta2_null'])}, "
-        f"delta_ret_arith_null={int(nulls.iloc[0]['n_delta_ret_arith_null'])}, "
-        f"delta_ret_log_null={int(nulls.iloc[0]['n_delta_ret_log_null'])}"
-    )
-
-    # 5) Alignment: returns row should match source EMA row at same ts and roll mapping
+    # 5) Alignment
     align_sql = f"""
     SELECT COUNT(*) AS n_missing
     FROM {ret_table} r
@@ -231,32 +226,28 @@ def _audit_one(
      AND e.tf = r.tf
      AND e.period = r.period
      AND e.ts = r.ts
-     AND e.{src_roll_col}::boolean = r.roll
-    WHERE r.series = '{series}'
-      AND e.id IS NULL;
+    WHERE e.id IS NULL;
     """
     align = _df(engine, align_sql)
     n_missing = int(align.iloc[0]["n_missing"])
     if n_missing != 0:
-        _fail_or_warn(
-            strict, f"FAIL: {label}/{series} alignment missing EMA rows: {n_missing}"
-        )
+        _fail_or_warn(strict, f"FAIL: {label} alignment missing EMA rows: {n_missing}")
     else:
         _print("PASS: alignment.")
 
     # Write CSVs
-    _write_csv(cov, Path(str(out_base) + f"_{label}_{series}_coverage.csv"))
-    _write_csv(dups, Path(str(out_base) + f"_{label}_{series}_dups.csv"))
-    _write_csv(anom, Path(str(out_base) + f"_{label}_{series}_gap_anomalies.csv"))
-    _write_csv(nulls, Path(str(out_base) + f"_{label}_{series}_nulls.csv"))
-    _write_csv(align, Path(str(out_base) + f"_{label}_{series}_align.csv"))
+    _write_csv(cov, Path(str(out_base) + f"_{label}_coverage.csv"))
+    _write_csv(dups, Path(str(out_base) + f"_{label}_dups.csv"))
+    _write_csv(anom, Path(str(out_base) + f"_{label}_gap_anomalies.csv"))
+    _write_csv(nulls, Path(str(out_base) + f"_{label}_nulls.csv"))
+    _write_csv(align, Path(str(out_base) + f"_{label}_align.csv"))
 
     _print("Wrote CSV outputs.")
 
 
 def main() -> None:
     p = argparse.ArgumentParser(
-        description="Audit unified CAL EMA returns (US/ISO; ema + ema_bar)."
+        description="Audit unified CAL EMA returns (US/ISO, wide columns)."
     )
     p.add_argument(
         "--db-url",
@@ -264,7 +255,6 @@ def main() -> None:
         help="DB URL (or set TARGET_DB_URL).",
     )
     p.add_argument("--scheme", default="both", help="us | iso | both")
-    p.add_argument("--series", default="both", help="ema | ema_bar | both")
 
     p.add_argument("--ema-us", default=DEFAULT_EMA_US)
     p.add_argument("--ema-iso", default=DEFAULT_EMA_ISO)
@@ -300,11 +290,8 @@ def main() -> None:
 
     strict = bool(args.strict)
     schemes = expand_scheme(args.scheme)
-    series_list = expand_series(args.series)
 
-    _print(
-        f"scheme={args.scheme} series={args.series} strict={strict} gap_mult={args.gap_mult}"
-    )
+    _print(f"scheme={args.scheme} strict={strict} gap_mult={args.gap_mult}")
     _print(f"CSV out dir={out_dir}")
     _print(f"CSV base name={out_name}")
 
@@ -312,18 +299,16 @@ def main() -> None:
         ema_table = args.ema_us if sch == "us" else args.ema_iso
         ret_table = args.ret_us if sch == "us" else args.ret_iso
 
-        for ser in series_list:
-            _audit_one(
-                engine=engine,
-                ema_table=ema_table,
-                ret_table=ret_table,
-                dim_tf=args.dim_timeframe,
-                out_base=out_base,
-                strict=strict,
-                gap_mult=float(args.gap_mult),
-                label=sch,
-                series=ser,
-            )
+        _audit_one(
+            engine=engine,
+            ema_table=ema_table,
+            ret_table=ret_table,
+            dim_tf=args.dim_timeframe,
+            out_base=out_base,
+            strict=strict,
+            gap_mult=float(args.gap_mult),
+            label=sch,
+        )
 
     _print("Audit complete.")
 

@@ -81,38 +81,31 @@ ON public.cmc_returns_bars_multi_tf_cal_anchor_us (id, tf, time_close);
 CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_cmc_returns_bars_multi_tf_cal_anchor_iso__time_close
 ON public.cmc_returns_bars_multi_tf_cal_anchor_iso (id, tf, time_close);
 
--- If you actually have this table later, add it then:
--- CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_cmc_returns_bars_multi_tf_u__time_close
--- ON public.cmc_returns_bars_multi_tf_u (id, tf, time_close);
-
 
 --C2) Returns-from-EMA (non-_u)
---You just discovered the important bit: series is part of identity (ema vs ema_bar).
---Key = (id, tf, period, roll, ts, series)
+--PK = (id, tf, period, ts) — roll is NOT part of PK.
 
-
--- RETURNS (ema): series matters
+-- RETURNS (ema): all non-_u tables share same PK structure
 CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_cmc_returns_ema_multi_tf__key
-ON public.cmc_returns_ema_multi_tf (id, tf, period, roll, ts, series);
+ON public.cmc_returns_ema_multi_tf (id, tf, period, ts);
 
 CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_cmc_returns_ema_multi_tf_v2__key
-ON public.cmc_returns_ema_multi_tf_v2 (id, tf, period, roll, ts, series);
+ON public.cmc_returns_ema_multi_tf_v2 (id, tf, period, roll, ts);
 
 CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_cmc_returns_ema_multi_tf_cal_us__key
-ON public.cmc_returns_ema_multi_tf_cal_us (id, tf, period, roll, ts, series);
+ON public.cmc_returns_ema_multi_tf_cal_us (id, tf, period, ts);
 
 CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_cmc_returns_ema_multi_tf_cal_iso__key
-ON public.cmc_returns_ema_multi_tf_cal_iso (id, tf, period, roll, ts, series);
+ON public.cmc_returns_ema_multi_tf_cal_iso (id, tf, period, ts);
 
 CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_cmc_returns_ema_multi_tf_cal_anchor_us__key
-ON public.cmc_returns_ema_multi_tf_cal_anchor_us (id, tf, period, roll, ts, series);
+ON public.cmc_returns_ema_multi_tf_cal_anchor_us (id, tf, period, ts);
 
 CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_cmc_returns_ema_multi_tf_cal_anchor_iso__key
-ON public.cmc_returns_ema_multi_tf_cal_anchor_iso (id, tf, period, roll, ts, series);
+ON public.cmc_returns_ema_multi_tf_cal_anchor_iso (id, tf, period, ts);
 
 
 --C3) Returns-from-EMA _u
---Key = (id, tf, period, alignment_source, series, roll, ts)
--- RETURNS (ema_u): alignment_source + series both matter
+--PK = (id, tf, period, alignment_source, ts) — roll is NOT part of PK.
 CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_cmc_returns_ema_multi_tf_u__key
-ON public.cmc_returns_ema_multi_tf_u (id, tf, period, alignment_source, series, roll, ts);
+ON public.cmc_returns_ema_multi_tf_u (id, tf, period, alignment_source, ts);

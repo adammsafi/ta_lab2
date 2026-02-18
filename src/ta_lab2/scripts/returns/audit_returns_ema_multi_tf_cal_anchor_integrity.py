@@ -3,7 +3,10 @@ from __future__ import annotations
 r"""
 audit_returns_ema_multi_tf_cal_anchor_integrity.py
 
-Integrity audit for calendar-anchored EMA returns:
+Integrity audit for calendar-anchored EMA returns.
+
+Unified timeline: _ema/_ema_bar + _roll value columns.
+PK: (id, ts, tf, period) — roll is a regular boolean column.
 
 Source EMA tables:
   public.cmc_ema_multi_tf_cal_anchor_us
@@ -13,30 +16,12 @@ Returns tables:
   public.cmc_returns_ema_multi_tf_cal_anchor_us
   public.cmc_returns_ema_multi_tf_cal_anchor_iso
 
-Key semantics:
-  - Returns computed per (id, tf, period, series, roll), ordered by ts
-  - Coverage expectation per key:
-      n_ret == n_src - 1
-    where n_src is count of source EMA points for that series+roll:
-      series='ema'     uses source columns (ema, roll)
-      series='ema_bar' uses source columns (ema_bar, roll)
-  - No duplicate PK rows in returns
-  - Gap sanity:
-      gap_days >= 1
-      optionally flag gap_days > gap_mult * tf_days_nominal (when dim_timeframe provides it)
-  - Alignment:
-      every returns row key exists in EMA source at same (id, tf, period, ts) for the same roll-series mapping
-  - Null policy:
-      ret_arith, ret_log should be non-null; delta1/delta2/delta_ret null shares reported
-
-CSV output:
-  Writes (if --out-dir is provided):
-    <out_dir>/<base>_{scheme}_coverage.csv
-    <out_dir>/<base>_{scheme}_dups.csv
-    <out_dir>/<base>_{scheme}_gaps_summary.csv
-    <out_dir>/<base>_{scheme}_gap_anomalies.csv
-    <out_dir>/<base>_{scheme}_nulls.csv
-    <out_dir>/<base>_{scheme}_align.csv
+Per (scheme, id, tf, period):
+  - Coverage: n_ret == n_ema - 1
+  - No duplicates on PK (id, ts, tf, period)
+  - Gaps: gap_days_roll >= 1; also flags gap_days_roll > gap_mult * tf_days_nominal
+  - Nulls: _roll columns never NULL; canonical columns never NULL on roll=FALSE
+  - Alignment: every returns row matches a source EMA row on (id, tf, period, ts)
 
 Run (Spyder):
 runfile(
@@ -137,54 +122,32 @@ def _audit_one(
     _print(f"ema={ema_table}")
     _print(f"ret={ret_table}")
 
-    # Coverage: compare returns counts to source series counts (ema vs ema_bar)
+    # Coverage
     coverage_sql = f"""
-    WITH src AS (
-      SELECT
-        id,
-        tf,
-        period,
-        'ema'::text AS series,
-        roll::boolean AS roll,
-        COUNT(*) AS n_src
+    WITH e AS (
+      SELECT id, tf, period, COUNT(*) AS n_ema
       FROM {ema_table}
-      GROUP BY 1,2,3,4,5
-
-      UNION ALL
-
-      SELECT
-        id,
-        tf,
-        period,
-        'ema_bar'::text AS series,
-        roll::boolean AS roll,
-        COUNT(*) AS n_src
-      FROM {ema_table}
-      GROUP BY 1,2,3,4,5
+      GROUP BY 1,2,3
     ),
     r AS (
-      SELECT id, tf, period, series, roll, COUNT(*) AS n_ret
+      SELECT id, tf, period, COUNT(*) AS n_ret
       FROM {ret_table}
-      GROUP BY 1,2,3,4,5
+      GROUP BY 1,2,3
     )
     SELECT
-      s.id,
-      s.tf,
-      s.period,
-      s.series,
-      s.roll,
-      s.n_src,
+      e.id, e.tf, e.period,
+      e.n_ema,
       COALESCE(r.n_ret, 0) AS n_ret,
-      (s.n_src - 1) AS expected_ret,
-      (COALESCE(r.n_ret, 0) - (s.n_src - 1)) AS diff
-    FROM src s
-    LEFT JOIN r USING (id, tf, period, series, roll)
-    ORDER BY s.id, s.tf, s.period, s.series, s.roll;
+      (e.n_ema - 1) AS expected_ret,
+      (COALESCE(r.n_ret, 0) - (e.n_ema - 1)) AS diff
+    FROM e
+    LEFT JOIN r USING (id, tf, period)
+    ORDER BY e.id, e.tf, e.period;
     """
     cov = _df(engine, coverage_sql)
     bad_cov = cov[cov["diff"] != 0]
     if bad_cov.empty:
-        _print("PASS: coverage matches for all (id,tf,period,series,roll).")
+        _print("PASS: coverage matches for all (id,tf,period).")
     else:
         _print(f"FAIL: coverage mismatches found: {len(bad_cov)} (showing up to 50)")
         print(bad_cov.head(50).to_string(index=False))
@@ -197,11 +160,11 @@ def _audit_one(
 
     # Duplicates
     dup_sql = f"""
-    SELECT id, tf, period, series, roll, ts, COUNT(*) AS n
+    SELECT id, tf, period, ts, COUNT(*) AS n
     FROM {ret_table}
-    GROUP BY 1,2,3,4,5,6
+    GROUP BY 1,2,3,4
     HAVING COUNT(*) > 1
-    ORDER BY n DESC, id, tf, period, series, roll, ts
+    ORDER BY n DESC, id, tf, period, ts
     LIMIT 5000;
     """
     dups = _df(engine, dup_sql)
@@ -217,27 +180,24 @@ def _audit_one(
     # Gaps summary
     gap_sql = f"""
     SELECT
-      id,
-      tf,
-      period,
-      series,
-      roll,
+      id, tf, period,
       COUNT(*) AS n_rows,
-      SUM((gap_days IS NULL)::int) AS n_gap_null,
-      SUM((gap_days < 1)::int) AS n_gap_lt1,
-      SUM((gap_days = 1)::int) AS n_gap_eq1,
-      SUM((gap_days > 1)::int) AS n_gap_gt1,
-      MAX(gap_days) AS max_gap_days
+      SUM((gap_days_roll IS NULL)::int) AS n_gap_null,
+      SUM((gap_days_roll < 1)::int) AS n_gap_lt1,
+      SUM((gap_days_roll = 1)::int) AS n_gap_eq1,
+      SUM((gap_days_roll > 1)::int) AS n_gap_gt1,
+      MAX(gap_days_roll) AS max_gap_days
     FROM {ret_table}
-    GROUP BY 1,2,3,4,5
-    ORDER BY id, tf, period, series, roll;
+    GROUP BY 1,2,3
+    ORDER BY id, tf, period;
     """
     gaps = _df(engine, gap_sql)
 
-    # Gap anomalies (NULL/<1 or > gap_mult * tf_days_nominal when available)
+    # Gap anomalies
     anom_sql = f"""
     WITH r AS (
-      SELECT id, tf, period, series, roll, ts, gap_days, delta1, ret_arith, ret_log
+      SELECT id, tf, period, roll, ts, gap_days_roll,
+             delta1_ema_roll, ret_arith_ema_roll, ret_log_ema_roll
       FROM {ret_table}
     ),
     tfm AS (
@@ -251,17 +211,15 @@ def _audit_one(
     FROM r
     LEFT JOIN tfm USING (tf)
     WHERE
-      r.gap_days IS NULL
-      OR r.gap_days < 1
-      OR (tfm.tf_days_nominal IS NOT NULL AND r.gap_days > (tfm.tf_days_nominal * :gap_mult))
-    ORDER BY r.id, r.tf, r.period, r.series, r.roll, r.ts
+      r.gap_days_roll IS NULL
+      OR r.gap_days_roll < 1
+      OR (tfm.tf_days_nominal IS NOT NULL AND r.gap_days_roll > (tfm.tf_days_nominal * :gap_mult))
+    ORDER BY r.id, r.tf, r.period, r.roll, r.ts
     LIMIT 5000;
     """
     anom = _df(engine, anom_sql, {"gap_mult": gap_mult})
     if len(anom) == 0:
-        _print(
-            f"PASS: no gap anomalies (>=1 and not >{gap_mult}x tf_days_nominal when available)."
-        )
+        _print(f"PASS: no gap anomalies (>=1 and not >{gap_mult}x tf_days_nominal).")
     else:
         _print(f"FAIL: gap anomalies found: {len(anom)} (showing up to 50)")
         print(anom.head(50).to_string(index=False))
@@ -271,33 +229,50 @@ def _audit_one(
     nulls_sql = f"""
     SELECT
       COUNT(*) AS n_rows,
-      SUM((ret_arith IS NULL)::int) AS n_ret_arith_null,
-      SUM((ret_log IS NULL)::int) AS n_ret_log_null,
-      SUM((delta1 IS NULL)::int) AS n_delta1_null,
-      SUM((delta2 IS NULL)::int) AS n_delta2_null,
-      SUM((delta_ret_arith IS NULL)::int) AS n_delta_ret_arith_null,
-      SUM((delta_ret_log IS NULL)::int) AS n_delta_ret_log_null
+      -- _roll columns should never be NULL (populated on all rows)
+      SUM((ret_arith_ema_roll IS NULL)::int) AS n_null_arith_roll,
+      SUM((ret_arith_ema_bar_roll IS NULL)::int) AS n_null_arith_bar_roll,
+      SUM((ret_log_ema_roll IS NULL)::int) AS n_null_log_roll,
+      SUM((ret_log_ema_bar_roll IS NULL)::int) AS n_null_log_bar_roll,
+      -- Non-roll columns should not be NULL on roll=FALSE rows
+      SUM(CASE WHEN NOT roll AND ret_arith_ema IS NULL THEN 1 ELSE 0 END) AS n_null_arith_canon,
+      SUM(CASE WHEN NOT roll AND ret_arith_ema_bar IS NULL THEN 1 ELSE 0 END) AS n_null_arith_bar_canon,
+      SUM(CASE WHEN NOT roll AND ret_log_ema IS NULL THEN 1 ELSE 0 END) AS n_null_log_canon,
+      SUM(CASE WHEN NOT roll AND ret_log_ema_bar IS NULL THEN 1 ELSE 0 END) AS n_null_log_bar_canon
     FROM {ret_table};
     """
     nulls = _df(engine, nulls_sql)
-    n_ret_arith_null = int(nulls.iloc[0]["n_ret_arith_null"])
-    n_ret_log_null = int(nulls.iloc[0]["n_ret_log_null"])
+    roll_nulls = sum(
+        int(nulls.iloc[0][c])
+        for c in [
+            "n_null_arith_roll",
+            "n_null_arith_bar_roll",
+            "n_null_log_roll",
+            "n_null_log_bar_roll",
+        ]
+    )
+    canon_nulls = sum(
+        int(nulls.iloc[0][c])
+        for c in [
+            "n_null_arith_canon",
+            "n_null_arith_bar_canon",
+            "n_null_log_canon",
+            "n_null_log_bar_canon",
+        ]
+    )
+    total_null = roll_nulls + canon_nulls
 
-    if n_ret_arith_null == 0 and n_ret_log_null == 0:
-        _print("PASS: ret_arith/ret_log are never NULL.")
+    if total_null == 0:
+        _print(
+            "PASS: _roll columns never NULL; canonical columns never NULL on roll=FALSE."
+        )
     else:
-        _print("FAIL: NULLs present in returns:")
-        print(nulls.to_string(index=False))
+        _print(
+            f"FAIL: NULLs in returns: roll_nulls={roll_nulls}, canon_nulls={canon_nulls}"
+        )
         _fail_or_warn(strict, f"FAIL: NULLs present for scheme={scheme}")
 
-    _print(
-        f"INFO: delta1_null={int(nulls.iloc[0]['n_delta1_null'])}, "
-        f"delta2_null={int(nulls.iloc[0]['n_delta2_null'])}, "
-        f"delta_ret_arith_null={int(nulls.iloc[0]['n_delta_ret_arith_null'])}, "
-        f"delta_ret_log_null={int(nulls.iloc[0]['n_delta_ret_log_null'])}"
-    )
-
-    # Alignment: returns rows should exist in EMA source at same ts and correct roll mapping per series
+    # Alignment
     align_sql = f"""
     SELECT COUNT(*) AS n_missing
     FROM {ret_table} r
@@ -306,7 +281,6 @@ def _audit_one(
      AND e.tf = r.tf
      AND e.period = r.period
      AND e.ts = r.ts
-     AND e.roll = r.roll
     WHERE e.id IS NULL;
     """
     align = _df(engine, align_sql)
@@ -332,7 +306,7 @@ def _audit_one(
 
 def main() -> None:
     p = argparse.ArgumentParser(
-        description="Audit integrity for calendar-anchored EMA returns (US/ISO)."
+        description="Audit integrity for calendar-anchored EMA returns (US/ISO, wide columns)."
     )
     p.add_argument(
         "--db-url",
@@ -349,7 +323,7 @@ def main() -> None:
         "--gap-mult",
         type=float,
         default=1.5,
-        help="Flag gaps where gap_days > gap_mult * tf_days_nominal (when available).",
+        help="Flag gaps where gap_days > gap_mult * tf_days_nominal.",
     )
     p.add_argument(
         "--strict", action="store_true", help="Exit non-zero if any FAIL checks occur."

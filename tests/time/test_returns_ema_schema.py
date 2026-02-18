@@ -30,47 +30,56 @@ RETURNS_TABLES = [
     "cmc_returns_ema_multi_tf_u",
 ]
 
-# PK columns per table
+# PK columns per table (roll is NOT part of PK)
 TABLE_PK_COLS: dict[str, list[str]] = {
-    "cmc_returns_ema_multi_tf": ["id", "ts", "tf", "period", "series", "roll"],
-    "cmc_returns_ema_multi_tf_cal_us": ["id", "ts", "tf", "period", "series", "roll"],
-    "cmc_returns_ema_multi_tf_cal_iso": ["id", "ts", "tf", "period", "series", "roll"],
-    "cmc_returns_ema_multi_tf_cal_anchor_us": [
-        "id",
-        "ts",
-        "tf",
-        "period",
-        "series",
-        "roll",
-    ],
-    "cmc_returns_ema_multi_tf_cal_anchor_iso": [
-        "id",
-        "ts",
-        "tf",
-        "period",
-        "series",
-        "roll",
-    ],
+    "cmc_returns_ema_multi_tf": ["id", "ts", "tf", "period"],
+    "cmc_returns_ema_multi_tf_cal_us": ["id", "ts", "tf", "period"],
+    "cmc_returns_ema_multi_tf_cal_iso": ["id", "ts", "tf", "period"],
+    "cmc_returns_ema_multi_tf_cal_anchor_us": ["id", "ts", "tf", "period"],
+    "cmc_returns_ema_multi_tf_cal_anchor_iso": ["id", "ts", "tf", "period"],
     "cmc_returns_ema_multi_tf_u": [
         "id",
         "ts",
         "tf",
         "period",
         "alignment_source",
-        "series",
-        "roll",
     ],
 }
 
 # Value columns shared across all tables
+# (unified timeline: _ema/_ema_bar for canonical, _roll for unified)
 VALUE_COLS = [
+    "roll",
     "gap_days",
-    "delta1",
-    "delta2",
-    "ret_arith",
-    "ret_log",
-    "delta_ret_arith",
-    "delta_ret_log",
+    "gap_days_roll",
+    # ema roll
+    "delta1_ema_roll",
+    "delta2_ema_roll",
+    "ret_arith_ema_roll",
+    "delta_ret_arith_ema_roll",
+    "ret_log_ema_roll",
+    "delta_ret_log_ema_roll",
+    # ema canonical
+    "delta1_ema",
+    "delta2_ema",
+    "ret_arith_ema",
+    "delta_ret_arith_ema",
+    "ret_log_ema",
+    "delta_ret_log_ema",
+    # ema_bar roll
+    "delta1_ema_bar_roll",
+    "delta2_ema_bar_roll",
+    "ret_arith_ema_bar_roll",
+    "delta_ret_arith_ema_bar_roll",
+    "ret_log_ema_bar_roll",
+    "delta_ret_log_ema_bar_roll",
+    # ema_bar canonical
+    "delta1_ema_bar",
+    "delta2_ema_bar",
+    "ret_arith_ema_bar",
+    "delta_ret_arith_ema_bar",
+    "ret_log_ema_bar",
+    "delta_ret_log_ema_bar",
     "ingested_at",
 ]
 
@@ -163,7 +172,7 @@ def test_returns_table_has_pk_columns(engine, table):
 
 @pytest.mark.parametrize("table", RETURNS_TABLES)
 def test_returns_table_has_value_columns(engine, table):
-    """Verify value columns: gap_days, delta1, delta2, ret_arith, ret_log, delta_ret_arith, delta_ret_log, ingested_at."""
+    """Verify value columns are present."""
     q = text(
         """
         SELECT column_name
@@ -275,14 +284,16 @@ def test_returns_tf_in_dim_timeframe(engine, existing_tables, table):
 
 
 @pytest.mark.parametrize("table", RETURNS_TABLES)
-def test_returns_no_null_ret_arith_ret_log(engine, existing_tables, table):
-    """Verify ret_arith and ret_log are never NULL."""
+def test_returns_no_null_roll_returns(engine, existing_tables, table):
+    """Verify _roll return columns are never NULL (populated on all rows)."""
     _skip_if_missing(existing_tables, table)
     q = text(
         f"""
         SELECT
-            SUM(CASE WHEN ret_arith IS NULL THEN 1 ELSE 0 END)::bigint AS n_null_arith,
-            SUM(CASE WHEN ret_log IS NULL THEN 1 ELSE 0 END)::bigint   AS n_null_log,
+            SUM(CASE WHEN ret_arith_ema_roll IS NULL THEN 1 ELSE 0 END)::bigint AS n_null_arith_roll,
+            SUM(CASE WHEN ret_arith_ema_bar_roll IS NULL THEN 1 ELSE 0 END)::bigint AS n_null_arith_bar_roll,
+            SUM(CASE WHEN ret_log_ema_roll IS NULL THEN 1 ELSE 0 END)::bigint AS n_null_log_roll,
+            SUM(CASE WHEN ret_log_ema_bar_roll IS NULL THEN 1 ELSE 0 END)::bigint AS n_null_log_bar_roll,
             COUNT(*)::bigint AS n_rows
         FROM {table}
         """
@@ -294,12 +305,59 @@ def test_returns_no_null_ret_arith_ret_log(engine, existing_tables, table):
     if n_rows == 0:
         pytest.skip(f"Table {table} is empty - cannot validate null policy")
 
-    n_null_arith = int(df.loc[0, "n_null_arith"])
-    n_null_log = int(df.loc[0, "n_null_log"])
+    n_null_arith_roll = int(df.loc[0, "n_null_arith_roll"])
+    n_null_arith_bar_roll = int(df.loc[0, "n_null_arith_bar_roll"])
+    n_null_log_roll = int(df.loc[0, "n_null_log_roll"])
+    n_null_log_bar_roll = int(df.loc[0, "n_null_log_bar_roll"])
 
-    assert (
-        n_null_arith == 0
-    ), f"Table {table} has {n_null_arith} NULL ret_arith values out of {n_rows} rows"
-    assert (
-        n_null_log == 0
-    ), f"Table {table} has {n_null_log} NULL ret_log values out of {n_rows} rows"
+    total_nulls = (
+        n_null_arith_roll
+        + n_null_arith_bar_roll
+        + n_null_log_roll
+        + n_null_log_bar_roll
+    )
+    assert total_nulls == 0, (
+        f"Table {table} has NULL _roll returns: "
+        f"ret_arith_ema_roll={n_null_arith_roll}, ret_arith_ema_bar_roll={n_null_arith_bar_roll}, "
+        f"ret_log_ema_roll={n_null_log_roll}, ret_log_ema_bar_roll={n_null_log_bar_roll} "
+        f"out of {n_rows} rows"
+    )
+
+
+@pytest.mark.parametrize("table", RETURNS_TABLES)
+def test_returns_no_null_canonical_returns(engine, existing_tables, table):
+    """Verify non-roll return columns are never NULL on roll=FALSE rows."""
+    _skip_if_missing(existing_tables, table)
+    q = text(
+        f"""
+        SELECT
+            SUM(CASE WHEN ret_arith_ema IS NULL THEN 1 ELSE 0 END)::bigint AS n_null_arith_ema,
+            SUM(CASE WHEN ret_arith_ema_bar IS NULL THEN 1 ELSE 0 END)::bigint AS n_null_arith_ema_bar,
+            SUM(CASE WHEN ret_log_ema IS NULL THEN 1 ELSE 0 END)::bigint AS n_null_log_ema,
+            SUM(CASE WHEN ret_log_ema_bar IS NULL THEN 1 ELSE 0 END)::bigint AS n_null_log_ema_bar,
+            COUNT(*)::bigint AS n_rows
+        FROM {table}
+        WHERE roll = FALSE
+        """
+    )
+    with engine.connect() as conn:
+        df = pd.read_sql(q, conn)
+
+    n_rows = int(df.loc[0, "n_rows"])
+    if n_rows == 0:
+        pytest.skip(f"Table {table} has no roll=FALSE rows - cannot validate")
+
+    n_null_arith_ema = int(df.loc[0, "n_null_arith_ema"])
+    n_null_arith_ema_bar = int(df.loc[0, "n_null_arith_ema_bar"])
+    n_null_log_ema = int(df.loc[0, "n_null_log_ema"])
+    n_null_log_ema_bar = int(df.loc[0, "n_null_log_ema_bar"])
+
+    total_nulls = (
+        n_null_arith_ema + n_null_arith_ema_bar + n_null_log_ema + n_null_log_ema_bar
+    )
+    assert total_nulls == 0, (
+        f"Table {table} has NULL canonical returns on roll=FALSE rows: "
+        f"ret_arith_ema={n_null_arith_ema}, ret_arith_ema_bar={n_null_arith_ema_bar}, "
+        f"ret_log_ema={n_null_log_ema}, ret_log_ema_bar={n_null_log_ema_bar} "
+        f"out of {n_rows} roll=FALSE rows"
+    )

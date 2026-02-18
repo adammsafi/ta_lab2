@@ -3,7 +3,7 @@ from __future__ import annotations
 r"""
 refresh_cmc_returns_ema_multi_tf_cal_anchor.py
 
-Incremental returns builder for calendar-anchored EMA tables:
+Incremental returns builder for calendar-anchored EMA tables.
 
 Source EMA tables:
   public.cmc_ema_multi_tf_cal_anchor_us
@@ -17,21 +17,28 @@ State tables:
   public.cmc_returns_ema_multi_tf_cal_anchor_us_state
   public.cmc_returns_ema_multi_tf_cal_anchor_iso_state
 
-Series:
-  - series='ema'     uses (ema, roll)
-  - series='ema_bar' uses (ema_bar, roll)
+State key:
+  (id, tf, period) -> last_ts
 
-Incremental semantics (EMA-specific):
-  - watermark last_ts per (id, tf, period, series, roll)
-  - pull src rows where ts >= COALESCE(last_ts, start) to seed prev_ema
-  - insert only rows where ts > last_ts (or last_ts IS NULL)
-  - state last_ts updated to MAX(inserted ts) per key
+Semantics:
+  - Processes BOTH roll=True and roll=False EMA rows for each (id,tf,period)
+    in a single unified timeline ordered by ts.
+  - Non-roll value columns (_ema, _ema_bar): populated only on roll=False rows,
+    computed via LAG within the roll=False partition (canonical->canonical).
+  - Roll value columns (_ema_roll, _ema_bar_roll): populated on ALL rows,
+    computed via LAG over the unified timeline (daily transitions, including
+    the cross-roll transition at bar close timestamps).
+  - PK: (id, ts, tf, period); roll is a regular boolean column.
+  - Incremental by default:
+      inserts rows where ts > last_ts per key
+      but pulls ts >= seed_ts to seed prev values for the first new row
+  - History recomputed only with --full-refresh
 
 Spyder run example:
 runfile(
   r"C:\Users\asafi\Downloads\ta_lab2\src\ta_lab2\scripts\returns\refresh_cmc_returns_ema_multi_tf_cal_anchor.py",
   wdir=r"C:\Users\asafi\Downloads\ta_lab2",
-  args="--scheme both --series both --ids all --roll-mode both"
+  args="--scheme both --ids all"
 )
 """
 
@@ -54,15 +61,10 @@ DEFAULT_STATE_US = "public.cmc_returns_ema_multi_tf_cal_anchor_us_state"
 DEFAULT_STATE_ISO = "public.cmc_returns_ema_multi_tf_cal_anchor_iso_state"
 
 
-Key = Tuple[int, str, int, str, bool]  # (id, tf, period, series, roll)
-
-
 @dataclass(frozen=True)
 class RunnerConfig:
     db_url: str
     scheme: str  # us | iso | both
-    series_mode: str  # ema | ema_bar | both
-    roll_mode: str  # canonical | roll | both
     start: str
     full_refresh: bool
 
@@ -80,28 +82,6 @@ def _parse_ids(ids_arg: str) -> Optional[List[int]]:
     if s == "all" or s == "":
         return None
     return [int(x.strip()) for x in ids_arg.split(",") if x.strip()]
-
-
-def expand_roll_mode(mode: str) -> List[bool]:
-    m = (mode or "").strip().lower()
-    if m == "canonical":
-        return [False]
-    if m == "roll":
-        return [True]
-    if m == "both":
-        return [False, True]
-    raise ValueError("--roll-mode must be one of: both, canonical, roll")
-
-
-def expand_series_mode(mode: str) -> List[str]:
-    m = (mode or "").strip().lower()
-    if m == "ema":
-        return ["ema"]
-    if m == "ema_bar":
-        return ["ema_bar"]
-    if m == "both":
-        return ["ema", "ema_bar"]
-    raise ValueError("--series must be one of: ema, ema_bar, both")
 
 
 def expand_scheme(scheme: str) -> List[str]:
@@ -125,7 +105,6 @@ def _tables_for_scheme(scheme: str) -> Tuple[str, str, str]:
 
 
 def _ensure_tables(engine: Engine, ret_table: str, state_table: str) -> None:
-    """Create returns and state tables if they don't exist."""
     out_sql = text(
         f"""
         CREATE TABLE IF NOT EXISTS {ret_table} (
@@ -133,23 +112,44 @@ def _ensure_tables(engine: Engine, ret_table: str, state_table: str) -> None:
             ts        timestamptz NOT NULL,
             tf        text NOT NULL,
             period    integer NOT NULL,
-            series    text NOT NULL CHECK (series IN ('ema','ema_bar')),
             roll      boolean NOT NULL,
 
-            gap_days  integer,
+            gap_days       integer,
+            gap_days_roll  integer,
 
-            delta1        double precision,
-            delta2        double precision,
+            delta1_ema            double precision,
+            delta1_ema_bar        double precision,
+            delta1_ema_roll       double precision,
+            delta1_ema_bar_roll   double precision,
 
-            ret_arith     double precision,
-            ret_log       double precision,
+            delta2_ema            double precision,
+            delta2_ema_bar        double precision,
+            delta2_ema_roll       double precision,
+            delta2_ema_bar_roll   double precision,
 
-            delta_ret_arith double precision,
-            delta_ret_log   double precision,
+            ret_arith_ema         double precision,
+            ret_arith_ema_bar     double precision,
+            ret_arith_ema_roll    double precision,
+            ret_arith_ema_bar_roll double precision,
+
+            ret_log_ema           double precision,
+            ret_log_ema_bar       double precision,
+            ret_log_ema_roll      double precision,
+            ret_log_ema_bar_roll  double precision,
+
+            delta_ret_arith_ema       double precision,
+            delta_ret_arith_ema_bar   double precision,
+            delta_ret_arith_ema_roll  double precision,
+            delta_ret_arith_ema_bar_roll double precision,
+
+            delta_ret_log_ema         double precision,
+            delta_ret_log_ema_bar     double precision,
+            delta_ret_log_ema_roll    double precision,
+            delta_ret_log_ema_bar_roll double precision,
 
             ingested_at timestamptz NOT NULL DEFAULT now(),
 
-            PRIMARY KEY (id, ts, tf, period, series, roll)
+            PRIMARY KEY (id, ts, tf, period)
         );
         """
     )
@@ -160,11 +160,9 @@ def _ensure_tables(engine: Engine, ret_table: str, state_table: str) -> None:
             id       bigint NOT NULL,
             tf       text NOT NULL,
             period   integer NOT NULL,
-            series   text NOT NULL,
-            roll     boolean NOT NULL,
             last_ts  timestamptz,
             updated_at timestamptz NOT NULL DEFAULT now(),
-            PRIMARY KEY (id, tf, period, series, roll)
+            PRIMARY KEY (id, tf, period)
         );
         """
     )
@@ -174,104 +172,58 @@ def _ensure_tables(engine: Engine, ret_table: str, state_table: str) -> None:
         cxn.execute(state_sql)
 
 
-def _load_keys_for_one_table(
+def _load_keys(
     engine: Engine,
     ema_table: str,
     ids: Optional[List[int]],
-    series_list: List[str],
-    roll_mode: str,
-) -> List[Key]:
-    """
-    Resolve (id, tf, period, series, roll) keys from EMA source table.
-
-    For both series, roll comes from source column 'roll'.
-    """
-    rolls = expand_roll_mode(roll_mode)
-
-    keys: List[Key] = []
-
-    for series in series_list:
-        roll_col = "roll"
-
-        if ids is None:
-            sql = text(
-                f"""
-                SELECT DISTINCT id::bigint, tf::text, period::int, {roll_col}::boolean AS roll
-                FROM {ema_table}
-                WHERE {roll_col} IN :rolls
-                ORDER BY id, tf, period, roll;
-                """
-            ).bindparams(bindparam("rolls", expanding=True))
-            with engine.begin() as cxn:
-                rows = cxn.execute(sql, {"rolls": rolls}).fetchall()
-        else:
-            sql = text(
-                f"""
-                SELECT DISTINCT id::bigint, tf::text, period::int, {roll_col}::boolean AS roll
-                FROM {ema_table}
-                WHERE id IN :ids
-                  AND {roll_col} IN :rolls
-                ORDER BY id, tf, period, roll;
-                """
-            ).bindparams(
-                bindparam("ids", expanding=True),
-                bindparam("rolls", expanding=True),
-            )
-            with engine.begin() as cxn:
-                rows = cxn.execute(sql, {"ids": ids, "rolls": rolls}).fetchall()
-
-        keys.extend(
-            [(int(r[0]), str(r[1]), int(r[2]), series, bool(r[3])) for r in rows]
+) -> List[Tuple[int, str, int]]:
+    """Returns keys as: (id, tf, period)."""
+    if ids is None:
+        sql = text(
+            f"""
+            SELECT DISTINCT id::bigint, tf::text, period::int
+            FROM {ema_table}
+            ORDER BY 1,2,3;
+            """
         )
+        with engine.begin() as cxn:
+            rows = cxn.execute(sql).fetchall()
+    else:
+        sql = text(
+            f"""
+            SELECT DISTINCT id::bigint, tf::text, period::int
+            FROM {ema_table}
+            WHERE id IN :ids
+            ORDER BY 1,2,3;
+            """
+        ).bindparams(bindparam("ids", expanding=True))
+        with engine.begin() as cxn:
+            rows = cxn.execute(sql, {"ids": ids}).fetchall()
 
-    # stable ordering
-    keys.sort(key=lambda x: (x[0], x[1], x[2], x[3], x[4]))
-    return keys
+    return [(int(r[0]), str(r[1]), int(r[2])) for r in rows]
 
 
-def _ensure_state_rows(engine: Engine, state_table: str, keys: List[Key]) -> None:
-    """
-    Bulletproof / fast: INSERT ... SELECT FROM UNNEST ... ON CONFLICT DO NOTHING
-    """
+def _ensure_state_rows(
+    engine: Engine, state_table: str, keys: List[Tuple[int, str, int]]
+) -> None:
     if not keys:
         return
 
-    ids = [k[0] for k in keys]
-    tfs = [k[1] for k in keys]
-    periods = [k[2] for k in keys]
-    series = [k[3] for k in keys]
-    rolls = [k[4] for k in keys]
-
-    sql = text(
+    ins = text(
         f"""
-        INSERT INTO {state_table} (id, tf, period, series, roll, last_ts)
-        SELECT u.id, u.tf, u.period, u.series, u.roll, NULL::timestamptz
-        FROM UNNEST(
-            CAST(:ids     AS bigint[]),
-            CAST(:tfs     AS text[]),
-            CAST(:periods AS int[]),
-            CAST(:series  AS text[]),
-            CAST(:rolls   AS boolean[])
-        ) AS u(id, tf, period, series, roll)
-        ON CONFLICT (id, tf, period, series, roll) DO NOTHING;
+        INSERT INTO {state_table} (id, tf, period, last_ts)
+        VALUES (:id, :tf, :period, NULL)
+        ON CONFLICT (id, tf, period) DO NOTHING;
         """
     )
 
     with engine.begin() as cxn:
-        cxn.execute(
-            sql,
-            {
-                "ids": ids,
-                "tfs": tfs,
-                "periods": periods,
-                "series": series,
-                "rolls": rolls,
-            },
-        )
+        for i, tf, period in keys:
+            cxn.execute(ins, {"id": i, "tf": tf, "period": period})
 
 
 def _full_refresh(
-    engine: Engine, ret_table: str, state_table: str, keys: List[Key]
+    engine: Engine, ret_table: str, state_table: str, keys: List[Tuple[int, str, int]]
 ) -> None:
     if not keys:
         return
@@ -283,29 +235,66 @@ def _full_refresh(
     del_ret = text(
         f"""
         DELETE FROM {ret_table}
-        WHERE id = :id AND tf = :tf AND period = :period AND series = :series AND roll = :roll;
+        WHERE id = :id AND tf = :tf AND period = :period;
         """
     )
     del_state = text(
         f"""
         DELETE FROM {state_table}
-        WHERE id = :id AND tf = :tf AND period = :period AND series = :series AND roll = :roll;
+        WHERE id = :id AND tf = :tf AND period = :period;
         """
     )
 
     with engine.begin() as cxn:
-        for i, tf, period, series, roll in keys:
-            params = {
-                "id": i,
-                "tf": tf,
-                "period": period,
-                "series": series,
-                "roll": roll,
-            }
+        for i, tf, period in keys:
+            params = {"id": i, "tf": tf, "period": period}
             cxn.execute(del_ret, params)
             cxn.execute(del_state, params)
 
     _ensure_state_rows(engine, state_table, keys)
+
+
+# ---------------------------------------------------------------------------
+# Column lists (used in INSERT and ON CONFLICT DO UPDATE)
+# ---------------------------------------------------------------------------
+
+_VALUE_COLS = [
+    "gap_days",
+    "gap_days_roll",
+    # ema roll
+    "delta1_ema_roll",
+    "delta2_ema_roll",
+    "ret_arith_ema_roll",
+    "delta_ret_arith_ema_roll",
+    "ret_log_ema_roll",
+    "delta_ret_log_ema_roll",
+    # ema canonical
+    "delta1_ema",
+    "delta2_ema",
+    "ret_arith_ema",
+    "delta_ret_arith_ema",
+    "ret_log_ema",
+    "delta_ret_log_ema",
+    # ema_bar roll
+    "delta1_ema_bar_roll",
+    "delta2_ema_bar_roll",
+    "ret_arith_ema_bar_roll",
+    "delta_ret_arith_ema_bar_roll",
+    "ret_log_ema_bar_roll",
+    "delta_ret_log_ema_bar_roll",
+    # ema_bar canonical
+    "delta1_ema_bar",
+    "delta2_ema_bar",
+    "ret_arith_ema_bar",
+    "delta_ret_arith_ema_bar",
+    "ret_log_ema_bar",
+    "delta_ret_log_ema_bar",
+]
+
+_INSERT_COLS = (
+    "id, ts, tf, period, roll,\n" + ",\n".join(_VALUE_COLS) + ",\ningested_at"
+)
+_UPSERT_SET = ",\n".join(f"{c} = EXCLUDED.{c}" for c in _VALUE_COLS + ["ingested_at"])
 
 
 def _run_one_key(
@@ -314,37 +303,27 @@ def _run_one_key(
     ret_table: str,
     state_table: str,
     start: str,
-    key: Key,
+    key: Tuple[int, str, int],
 ) -> None:
-    """
-    Build returns for one (id, tf, period, series, roll).
-    No ':param::type' casts; only bind params.
-    """
-    one_id, one_tf, one_period, one_series, one_roll = key
-
-    # Map series -> which EMA column to use. Roll column is always 'roll'.
-    if one_series == "ema":
-        ema_col = "ema"
-    elif one_series == "ema_bar":
-        ema_col = "ema_bar"
-    else:
-        raise ValueError(one_series)
-    roll_col = "roll"
+    one_id, one_tf, one_period = key
 
     sql = text(
         f"""
         WITH st AS (
             SELECT last_ts
             FROM {state_table}
-            WHERE id = :id AND tf = :tf AND period = :period AND series = :series AND roll = :roll
+            WHERE id = :id AND tf = :tf AND period = :period
         ),
         seed AS (
             SELECT COALESCE(
-                (SELECT e2.ts FROM {ema_table} e2
-                 WHERE e2.id = :id AND e2.tf = :tf AND e2.period = :period
-                   AND e2.{roll_col} = :roll
-                   AND e2.ts < (SELECT last_ts FROM st)
-                 ORDER BY e2.ts DESC LIMIT 1),
+                (SELECT MIN(sub.ts) FROM (
+                    SELECT ts FROM {ema_table}
+                    WHERE id = :id AND tf = :tf AND period = :period
+                      AND roll = FALSE
+                      AND ts < COALESCE((SELECT last_ts FROM st), CAST(:start AS timestamptz))
+                    ORDER BY ts DESC
+                    LIMIT 2
+                ) sub),
                 (SELECT last_ts FROM st),
                 CAST(:start AS timestamptz)
             ) AS seed_ts
@@ -355,42 +334,94 @@ def _run_one_key(
                 e.ts,
                 e.tf,
                 e.period,
-                e.{ema_col} AS ema
+                e.roll,
+                e.ema,
+                e.ema_bar
             FROM {ema_table} e, seed
             WHERE e.id = :id
               AND e.tf = :tf
               AND e.period = :period
-              AND e.{roll_col} = :roll
               AND e.ts >= seed.seed_ts
         ),
         lagged AS (
             SELECT
                 s.*,
-                LAG(s.ts)  OVER (ORDER BY s.ts) AS prev_ts,
-                LAG(s.ema) OVER (ORDER BY s.ts) AS prev_ema
+                LAG(s.ts)      OVER (ORDER BY s.ts) AS prev_ts_u,
+                LAG(s.ema)     OVER (ORDER BY s.ts) AS prev_ema_u,
+                LAG(s.ema_bar) OVER (ORDER BY s.ts) AS prev_ema_bar_u,
+                LAG(s.ts)      OVER (PARTITION BY s.roll ORDER BY s.ts) AS prev_ts_c,
+                LAG(s.ema)     OVER (PARTITION BY s.roll ORDER BY s.ts) AS prev_ema_c,
+                LAG(s.ema_bar) OVER (PARTITION BY s.roll ORDER BY s.ts) AS prev_ema_bar_c
             FROM src s
         ),
         calc AS (
             SELECT
-                id, ts, tf, period,
-                CAST(:series AS text) AS series,
-                CAST(:roll   AS boolean) AS roll,
-                (ts::date - prev_ts::date)::int AS gap_days,
-                ema - prev_ema AS delta1,
-                CASE WHEN prev_ema = 0 THEN NULL
-                     ELSE (ema / prev_ema) - 1 END AS ret_arith,
-                CASE WHEN prev_ema <= 0 OR ema <= 0 THEN NULL
-                     ELSE LN(ema / prev_ema) END AS ret_log
+                id, ts, tf, period, roll,
+
+                CASE WHEN NOT roll AND prev_ts_c IS NOT NULL
+                     THEN (ts::date - prev_ts_c::date)::int END AS gap_days,
+                CASE WHEN prev_ts_u IS NOT NULL
+                     THEN (ts::date - prev_ts_u::date)::int END AS gap_days_roll,
+
+                CASE WHEN NOT roll AND prev_ema_c IS NOT NULL
+                     THEN ema - prev_ema_c END AS delta1_ema,
+                CASE WHEN NOT roll AND prev_ema_bar_c IS NOT NULL
+                     THEN ema_bar - prev_ema_bar_c END AS delta1_ema_bar,
+                CASE WHEN prev_ema_u IS NOT NULL
+                     THEN ema - prev_ema_u END AS delta1_ema_roll,
+                CASE WHEN prev_ema_bar_u IS NOT NULL
+                     THEN ema_bar - prev_ema_bar_u END AS delta1_ema_bar_roll,
+
+                CASE WHEN NOT roll AND prev_ema_c IS NOT NULL AND prev_ema_c != 0
+                     THEN (ema / prev_ema_c) - 1 END AS ret_arith_ema,
+                CASE WHEN NOT roll AND prev_ema_bar_c IS NOT NULL AND prev_ema_bar_c != 0
+                     THEN (ema_bar / prev_ema_bar_c) - 1 END AS ret_arith_ema_bar,
+                CASE WHEN prev_ema_u IS NOT NULL AND prev_ema_u != 0
+                     THEN (ema / prev_ema_u) - 1 END AS ret_arith_ema_roll,
+                CASE WHEN prev_ema_bar_u IS NOT NULL AND prev_ema_bar_u != 0
+                     THEN (ema_bar / prev_ema_bar_u) - 1 END AS ret_arith_ema_bar_roll,
+
+                CASE WHEN NOT roll AND prev_ema_c IS NOT NULL AND prev_ema_c > 0 AND ema > 0
+                     THEN LN(ema / prev_ema_c) END AS ret_log_ema,
+                CASE WHEN NOT roll AND prev_ema_bar_c IS NOT NULL AND prev_ema_bar_c > 0 AND ema_bar > 0
+                     THEN LN(ema_bar / prev_ema_bar_c) END AS ret_log_ema_bar,
+                CASE WHEN prev_ema_u IS NOT NULL AND prev_ema_u > 0 AND ema > 0
+                     THEN LN(ema / prev_ema_u) END AS ret_log_ema_roll,
+                CASE WHEN prev_ema_bar_u IS NOT NULL AND prev_ema_bar_u > 0 AND ema_bar > 0
+                     THEN LN(ema_bar / prev_ema_bar_u) END AS ret_log_ema_bar_roll
+
             FROM lagged
-            WHERE prev_ts IS NOT NULL
-              AND prev_ema IS NOT NULL
-              AND ema IS NOT NULL
+            WHERE prev_ts_u IS NOT NULL
         ),
         calc2 AS (
             SELECT c.*,
-                c.delta1 - LAG(c.delta1) OVER (ORDER BY c.ts) AS delta2,
-                c.ret_arith - LAG(c.ret_arith) OVER (ORDER BY c.ts) AS delta_ret_arith,
-                c.ret_log - LAG(c.ret_log) OVER (ORDER BY c.ts) AS delta_ret_log
+                CASE WHEN NOT c.roll
+                     THEN c.delta1_ema - LAG(c.delta1_ema) OVER (PARTITION BY c.roll ORDER BY c.ts)
+                END AS delta2_ema,
+                CASE WHEN NOT c.roll
+                     THEN c.delta1_ema_bar - LAG(c.delta1_ema_bar) OVER (PARTITION BY c.roll ORDER BY c.ts)
+                END AS delta2_ema_bar,
+                c.delta1_ema_roll - LAG(c.delta1_ema_roll) OVER (ORDER BY c.ts) AS delta2_ema_roll,
+                c.delta1_ema_bar_roll - LAG(c.delta1_ema_bar_roll) OVER (ORDER BY c.ts) AS delta2_ema_bar_roll,
+
+                CASE WHEN NOT c.roll
+                     THEN c.ret_arith_ema - LAG(c.ret_arith_ema) OVER (PARTITION BY c.roll ORDER BY c.ts)
+                END AS delta_ret_arith_ema,
+                CASE WHEN NOT c.roll
+                     THEN c.ret_arith_ema_bar - LAG(c.ret_arith_ema_bar) OVER (PARTITION BY c.roll ORDER BY c.ts)
+                END AS delta_ret_arith_ema_bar,
+                c.ret_arith_ema_roll - LAG(c.ret_arith_ema_roll) OVER (ORDER BY c.ts) AS delta_ret_arith_ema_roll,
+                c.ret_arith_ema_bar_roll - LAG(c.ret_arith_ema_bar_roll) OVER (ORDER BY c.ts) AS delta_ret_arith_ema_bar_roll,
+
+                CASE WHEN NOT c.roll
+                     THEN c.ret_log_ema - LAG(c.ret_log_ema) OVER (PARTITION BY c.roll ORDER BY c.ts)
+                END AS delta_ret_log_ema,
+                CASE WHEN NOT c.roll
+                     THEN c.ret_log_ema_bar - LAG(c.ret_log_ema_bar) OVER (PARTITION BY c.roll ORDER BY c.ts)
+                END AS delta_ret_log_ema_bar,
+                c.ret_log_ema_roll - LAG(c.ret_log_ema_roll) OVER (ORDER BY c.ts) AS delta_ret_log_ema_roll,
+                c.ret_log_ema_bar_roll - LAG(c.ret_log_ema_bar_roll) OVER (ORDER BY c.ts) AS delta_ret_log_ema_bar_roll
+
             FROM calc c
         ),
         to_insert AS (
@@ -401,27 +432,21 @@ def _run_one_key(
         ),
         ins AS (
             INSERT INTO {ret_table} (
-                id, ts, tf, period, series, roll,
-                gap_days, delta1, delta2,
-                ret_arith, ret_log,
-                delta_ret_arith, delta_ret_log,
-                ingested_at
+                {_INSERT_COLS}
             )
             SELECT
-                id, ts, tf, period, series, roll,
-                gap_days, delta1, delta2,
-                ret_arith, ret_log,
-                delta_ret_arith, delta_ret_log,
-                now()
+                {_INSERT_COLS.replace('ingested_at', 'now()')}
             FROM to_insert
-            ON CONFLICT (id, ts, tf, period, series, roll) DO NOTHING
+            ON CONFLICT (id, ts, tf, period) DO UPDATE SET
+                roll = EXCLUDED.roll,
+                {_UPSERT_SET}
             RETURNING ts
         )
         UPDATE {state_table} s
         SET
             last_ts = COALESCE((SELECT MAX(ts) FROM ins), s.last_ts),
             updated_at = now()
-        WHERE s.id = :id AND s.tf = :tf AND s.period = :period AND s.series = :series AND s.roll = :roll;
+        WHERE s.id = :id AND s.tf = :tf AND s.period = :period;
         """
     )
 
@@ -432,8 +457,6 @@ def _run_one_key(
                 "id": one_id,
                 "tf": one_tf,
                 "period": one_period,
-                "series": one_series,
-                "roll": one_roll,
                 "start": start,
             },
         )
@@ -441,7 +464,7 @@ def _run_one_key(
 
 def main() -> None:
     p = argparse.ArgumentParser(
-        description="Incremental returns builder for calendar-anchored EMA (US/ISO)."
+        description="Incremental returns builder for calendar-anchored EMA (unified timeline with _roll columns)."
     )
     p.add_argument(
         "--db-url",
@@ -450,9 +473,6 @@ def main() -> None:
     )
 
     p.add_argument("--scheme", default="both", help="us | iso | both")
-    p.add_argument("--series", default="both", help="ema | ema_bar | both")
-    p.add_argument("--roll-mode", default="both", help="both | canonical | roll")
-
     p.add_argument("--ids", default="all", help="Comma-separated ids, or 'all'.")
     p.add_argument(
         "--start",
@@ -476,8 +496,6 @@ def main() -> None:
     cfg = RunnerConfig(
         db_url=db_url,
         scheme=(args.scheme or "both").strip().lower(),
-        series_mode=(args.series or "both").strip().lower(),
-        roll_mode=(args.roll_mode or "both").strip().lower(),
         start=str(args.start),
         full_refresh=bool(args.full_refresh),
     )
@@ -488,13 +506,12 @@ def main() -> None:
         else "Using DB URL from --db-url."
     )
     _print(
-        f"Runner config: scheme={cfg.scheme}, series={cfg.series_mode}, roll_mode={cfg.roll_mode}, "
+        f"Runner config: scheme={cfg.scheme}, "
         f"ids={args.ids}, start={cfg.start}, full_refresh={cfg.full_refresh}"
     )
 
     engine = _get_engine(cfg.db_url)
     ids = _parse_ids(args.ids)
-    series_list = expand_series_mode(cfg.series_mode)
 
     for scheme in expand_scheme(cfg.scheme):
         ema_table, ret_table, state_table = _tables_for_scheme(scheme)
@@ -506,10 +523,8 @@ def main() -> None:
 
         _ensure_tables(engine, ret_table, state_table)
 
-        keys = _load_keys_for_one_table(
-            engine, ema_table, ids, series_list, cfg.roll_mode
-        )
-        _print(f"resolved keys={len(keys)}")
+        keys = _load_keys(engine, ema_table, ids)
+        _print(f"Resolved keys={len(keys)}")
         if not keys:
             _print("No keys found. Skipping scheme.")
             continue
@@ -520,10 +535,8 @@ def main() -> None:
             _full_refresh(engine, ret_table, state_table, keys)
 
         for i, key in enumerate(keys, start=1):
-            one_id, one_tf, one_period, one_series, one_roll = key
-            _print(
-                f"Processing key=({one_id},{one_tf},{one_period},{one_series},roll={one_roll}) ({i}/{len(keys)})"
-            )
+            one_id, one_tf, one_period = key
+            _print(f"Processing key=({one_id},{one_tf},{one_period}) ({i}/{len(keys)})")
             _run_one_key(engine, ema_table, ret_table, state_table, cfg.start, key)
 
     _print("Done.")

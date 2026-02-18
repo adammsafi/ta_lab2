@@ -201,10 +201,10 @@ ret_bars_dupes AS (
 ),
 
 /* --------------------------
-   RETURNS (ema) — NO series tables
-   key := (id, tf, period, roll, ts)
+   RETURNS (ema, non-_u, non-v2): duplicates
+   PK := (id, tf, period, ts) — roll is NOT part of PK.
    -------------------------- */
-ret_ema_dupes_no_series AS (
+ret_ema_dupes AS (
   SELECT
       x.table_name,
       'returns_ema_duplicate_key' AS test_name,
@@ -213,54 +213,51 @@ ret_ema_dupes_no_series AS (
   FROM (
       SELECT
           t.table_name,
-          (t.id::text || '|' || t.tf || '|' || t.period::text || '|' || t.roll::text || '|' || t.ts::text) AS example_key,
+          (t.id::text || '|' || t.tf || '|' || t.period::text || '|' || t.ts::text) AS example_key,
           COUNT(*)::bigint AS cnt
       FROM (
-          SELECT 'public.cmc_returns_ema_multi_tf' AS table_name, id, tf, period, roll, ts
+          SELECT 'public.cmc_returns_ema_multi_tf' AS table_name, id, tf, period, ts
           FROM public.cmc_returns_ema_multi_tf
 
           UNION ALL
-          SELECT 'public.cmc_returns_ema_multi_tf_v2', id, tf, period, roll, ts
-          FROM public.cmc_returns_ema_multi_tf_v2
+          SELECT 'public.cmc_returns_ema_multi_tf_cal_us', id, tf, period, ts
+          FROM public.cmc_returns_ema_multi_tf_cal_us
+
+          UNION ALL
+          SELECT 'public.cmc_returns_ema_multi_tf_cal_iso', id, tf, period, ts
+          FROM public.cmc_returns_ema_multi_tf_cal_iso
+
+          UNION ALL
+          SELECT 'public.cmc_returns_ema_multi_tf_cal_anchor_us', id, tf, period, ts
+          FROM public.cmc_returns_ema_multi_tf_cal_anchor_us
+
+          UNION ALL
+          SELECT 'public.cmc_returns_ema_multi_tf_cal_anchor_iso', id, tf, period, ts
+          FROM public.cmc_returns_ema_multi_tf_cal_anchor_iso
       ) t
-      GROUP BY t.table_name, t.id, t.tf, t.period, t.roll, t.ts
+      GROUP BY t.table_name, t.id, t.tf, t.period, t.ts
       HAVING COUNT(*) > 1
   ) x
   GROUP BY x.table_name
 ),
 
 /* --------------------------
-   RETURNS (ema) — WITH series tables
-   key := (id, tf, period, roll, ts, series)
+   RETURNS (ema_v2): duplicates
+   PK := (id, tf, period, roll, ts) — v2 still has roll in PK.
    -------------------------- */
-ret_ema_dupes_with_series AS (
+ret_ema_v2_dupes AS (
   SELECT
       x.table_name,
-      'returns_ema_duplicate_key' AS test_name,
+      'returns_ema_v2_duplicate_key' AS test_name,
       SUM(x.cnt - 1)::bigint AS n_bad,
       MIN(x.example_key) AS example_key
   FROM (
       SELECT
-          t.table_name,
-          (t.id::text || '|' || t.tf || '|' || t.period::text || '|' || t.roll::text || '|' || t.ts::text || '|' || t.series) AS example_key,
+          'public.cmc_returns_ema_multi_tf_v2' AS table_name,
+          (id::text || '|' || tf || '|' || period::text || '|' || roll::text || '|' || ts::text) AS example_key,
           COUNT(*)::bigint AS cnt
-      FROM (
-          SELECT 'public.cmc_returns_ema_multi_tf_cal_us' AS table_name, id, tf, period, roll, ts, series
-          FROM public.cmc_returns_ema_multi_tf_cal_us
-
-          UNION ALL
-          SELECT 'public.cmc_returns_ema_multi_tf_cal_iso', id, tf, period, roll, ts, series
-          FROM public.cmc_returns_ema_multi_tf_cal_iso
-
-          UNION ALL
-          SELECT 'public.cmc_returns_ema_multi_tf_cal_anchor_us', id, tf, period, roll, ts, series
-          FROM public.cmc_returns_ema_multi_tf_cal_anchor_us
-
-          UNION ALL
-          SELECT 'public.cmc_returns_ema_multi_tf_cal_anchor_iso', id, tf, period, roll, ts, series
-          FROM public.cmc_returns_ema_multi_tf_cal_anchor_iso
-      ) t
-      GROUP BY t.table_name, t.id, t.tf, t.period, t.roll, t.ts, t.series
+      FROM public.cmc_returns_ema_multi_tf_v2
+      GROUP BY id, tf, period, roll, ts
       HAVING COUNT(*) > 1
   ) x
   GROUP BY x.table_name
@@ -268,7 +265,7 @@ ret_ema_dupes_with_series AS (
 
 /* --------------------------
    RETURNS (ema_u): duplicates
-   key := (id, tf, period, alignment_source, series, roll, ts)
+   PK := (id, tf, period, alignment_source, ts) — roll is NOT part of PK.
    -------------------------- */
 ret_ema_u_dupes AS (
   SELECT
@@ -279,10 +276,10 @@ ret_ema_u_dupes AS (
   FROM (
       SELECT
           'public.cmc_returns_ema_multi_tf_u' AS table_name,
-          (id::text || '|' || tf || '|' || period::text || '|' || alignment_source || '|' || series || '|' || roll::text || '|' || ts::text) AS example_key,
+          (id::text || '|' || tf || '|' || period::text || '|' || alignment_source || '|' || ts::text) AS example_key,
           COUNT(*)::bigint AS cnt
       FROM public.cmc_returns_ema_multi_tf_u
-      GROUP BY id, tf, period, alignment_source, series, roll, ts
+      GROUP BY id, tf, period, alignment_source, ts
       HAVING COUNT(*) > 1
   ) x
   GROUP BY x.table_name
@@ -300,9 +297,9 @@ FROM (
     UNION ALL
     SELECT * FROM ret_bars_dupes
     UNION ALL
-    SELECT * FROM ret_ema_dupes_no_series
+    SELECT * FROM ret_ema_dupes
     UNION ALL
-    SELECT * FROM ret_ema_dupes_with_series
+    SELECT * FROM ret_ema_v2_dupes
     UNION ALL
     SELECT * FROM ret_ema_u_dupes
 ) failures
