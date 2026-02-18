@@ -50,7 +50,7 @@ class EMAFeatureConfig:
     periods: list[int]
     output_schema: str
     output_table: str
-    min_obs_multiplier: float = 3.0
+    min_obs_multiplier: float = 1.0
 
 
 @dataclass(frozen=True)
@@ -255,13 +255,15 @@ class BaseEMAFeature(ABC):
         """
         Write EMA results to database with upsert logic.
 
-        Uses ON CONFLICT for incremental updates.
+        Uses PostgreSQL INSERT ... ON CONFLICT DO UPDATE to safely
+        handle rows that already exist (e.g., during incremental refresh
+        where EMA computation must include full history for correctness).
 
         Args:
             df: DataFrame with EMA results
 
         Returns:
-            Number of rows written
+            Number of rows written/updated
         """
         if df.empty:
             return 0
@@ -269,25 +271,61 @@ class BaseEMAFeature(ABC):
         # Ensure output table exists
         self._ensure_output_table()
 
-        # Convert to SQL-compatible types
         df_write = df.copy()
 
-        # Write to temp table then upsert
-        # (Implementation details depend on specific table schema)
-        # For now, use simple insert (can be optimized later)
-
-        table_fq = f"{self.config.output_schema}.{self.config.output_table}"
         rows = df_write.to_sql(
             self.config.output_table,
             self.engine,
             schema=self.config.output_schema,
             if_exists="append",
             index=False,
-            method="multi",
+            method=self._pg_upsert,
             chunksize=10000,
         )
 
         return int(rows) if rows else len(df_write)
+
+    def _pg_upsert(self, pd_table, conn, keys, data_iter):
+        """
+        Custom insert method for pandas to_sql: INSERT ... ON CONFLICT DO UPDATE.
+
+        Args:
+            pd_table: pandas SQLTable object
+            conn: SQLAlchemy connection (within transaction)
+            keys: list of column names
+            data_iter: iterator of row tuples
+
+        Returns:
+            Number of rows affected
+        """
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+        data = [dict(zip(keys, row)) for row in data_iter]
+        if not data:
+            return 0
+
+        stmt = pg_insert(pd_table.table).values(data)
+
+        pk_cols = self._get_pk_columns()
+        update_dict = {key: stmt.excluded[key] for key in keys if key not in pk_cols}
+
+        if update_dict:
+            upsert_stmt = stmt.on_conflict_do_update(
+                index_elements=pk_cols,
+                set_=update_dict,
+            )
+        else:
+            upsert_stmt = stmt.on_conflict_do_nothing(index_elements=pk_cols)
+
+        result = conn.execute(upsert_stmt)
+        return result.rowcount
+
+    def _get_pk_columns(self) -> list[str]:
+        """Extract primary key column names from output schema definition."""
+        schema = self.get_output_schema()
+        pk_def = schema.get("PRIMARY KEY", "")
+        pk_str = pk_def.strip("()")
+        return [col.strip() for col in pk_str.split(",") if col.strip()]
 
     # =========================================================================
     # Helper Methods

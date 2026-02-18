@@ -19,7 +19,7 @@ Key semantics:
       n_ret == n_src - 1
     where n_src is count of source EMA points for that series+roll:
       series='ema'     uses source columns (ema, roll)
-      series='ema_bar' uses source columns (ema_bar, roll_bar)
+      series='ema_bar' uses source columns (ema_bar, roll)
   - No duplicate PK rows in returns
   - Gap sanity:
       gap_days >= 1
@@ -137,7 +137,7 @@ def _audit_one(
     _print(f"ema={ema_table}")
     _print(f"ret={ret_table}")
 
-    # Coverage: compare returns counts to source series counts (ema vs ema_bar, roll vs roll_bar)
+    # Coverage: compare returns counts to source series counts (ema vs ema_bar)
     coverage_sql = f"""
     WITH src AS (
       SELECT
@@ -157,7 +157,7 @@ def _audit_one(
         tf,
         period,
         'ema_bar'::text AS series,
-        roll_bar::boolean AS roll,
+        roll::boolean AS roll,
         COUNT(*) AS n_src
       FROM {ema_table}
       GROUP BY 1,2,3,4,5
@@ -297,10 +297,7 @@ def _audit_one(
      AND e.tf = r.tf
      AND e.period = r.period
      AND e.ts = r.ts
-     AND (
-          (r.series = 'ema'     AND e.roll     = r.roll)
-       OR (r.series = 'ema_bar' AND e.roll_bar = r.roll)
-     )
+     AND e.roll = r.roll
     WHERE e.id IS NULL;
     """
     align = _df(engine, align_sql)

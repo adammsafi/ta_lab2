@@ -87,8 +87,8 @@ class TestReturnsFeatureSourceData(unittest.TestCase):
         # Check query contains expected elements
         self.assertIn("cmc_price_bars_1d", query_text)
         self.assertIn("id IN (1)", query_text)
-        self.assertIn("time_close >= '2024-01-01'", query_text)
-        self.assertIn("time_close <= '2024-01-03'", query_text)
+        self.assertIn("\"timestamp\" >= '2024-01-01'", query_text)
+        self.assertIn("\"timestamp\" <= '2024-01-03'", query_text)
         self.assertIn("ORDER BY id, ts ASC", query_text)
 
         # Verify result

@@ -150,11 +150,11 @@ def process_key(
     insert_sql = text(
         f"""
         WITH src AS (
-          SELECT id, tf, time_close, close
+          SELECT id, tf, "timestamp" AS time_close, close
           FROM {bars_table}
           WHERE id = :id AND tf = :tf
-            AND time_close >= :seed_tc
-          ORDER BY time_close
+            AND "timestamp" >= :seed_tc
+          ORDER BY "timestamp"
         ),
         calc AS (
           SELECT
@@ -200,7 +200,7 @@ def process_key(
         )
 
     max_tc_sql = text(
-        f"SELECT MAX(time_close) FROM {bars_table} WHERE id=:id AND tf=:tf;"
+        f'SELECT MAX("timestamp") FROM {bars_table} WHERE id=:id AND tf=:tf;'
     )
     with engine.begin() as cxn:
         max_tc = cxn.execute(max_tc_sql, {"id": key.id, "tf": key.tf}).scalar()

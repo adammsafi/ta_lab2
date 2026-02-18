@@ -440,8 +440,11 @@ def restore_utc_timezone(
             "time_close",
             "time_high",
             "time_low",
+            "time_open_bar",
+            "time_close_bar",
             "timestamp",
             "last_ts_half_open",
+            "src_load_ts",
         ]
 
     for col in timestamp_cols:

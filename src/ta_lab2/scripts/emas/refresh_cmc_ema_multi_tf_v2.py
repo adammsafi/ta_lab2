@@ -51,13 +51,15 @@ def _process_id_worker(task: WorkerTask) -> int:
     Worker function for parallel processing of individual IDs.
 
     Creates own engine with NullPool to avoid connection pooling issues.
+    Supports tf_subset for TF-level parallelism.
 
     Args:
-        task: WorkerTask containing id, db_url, periods, start, extra_config
+        task: WorkerTask containing id, db_url, periods, start, extra_config, tf_subset
 
     Returns:
         Number of rows inserted/updated (always 0 - v2 doesn't report row count)
     """
+    tf_info = f" tfs={len(task.tf_subset)}" if task.tf_subset else ""
     worker_id = str(task.id_)
     logger = get_worker_logger(
         name="ema_v2",
@@ -67,7 +69,7 @@ def _process_id_worker(task: WorkerTask) -> int:
     )
 
     try:
-        logger.info(f"Starting EMA computation for id={task.id_}")
+        logger.info(f"Starting EMA computation for id={task.id_}{tf_info}")
 
         # Create engine with NullPool for worker
         engine = create_engine(task.db_url, poolclass=NullPool, future=True)
@@ -80,22 +82,66 @@ def _process_id_worker(task: WorkerTask) -> int:
         out_schema = task.extra_config.get("out_schema", "public")
         out_table = task.extra_config.get("out_table", "cmc_ema_multi_tf_v2")
 
-        # V2 feature module handles incremental refresh internally
-        refresh_cmc_ema_multi_tf_v2_incremental(
-            engine,
-            periods=task.periods,
-            ids=[task.id_],
+        # Build feature with optional TF subset via config override
+        from ta_lab2.features.m_tf.base_ema_feature import EMAFeatureConfig
+        from ta_lab2.features.m_tf.ema_multi_tf_v2 import MultiTFV2EMAFeature
+
+        config = EMAFeatureConfig(
+            periods=list(task.periods),
+            output_schema=out_schema,
+            output_table=out_table,
+            min_obs_multiplier=1.0,
+        )
+
+        feature = MultiTFV2EMAFeature(
+            engine=engine,
+            config=config,
             alignment_type=alignment_type,
             canonical_only=canonical_only,
             price_schema=price_schema,
             price_table=price_table,
-            out_schema=out_schema,
-            out_table=out_table,
         )
 
+        # Load data once
+        df_source = feature.load_source_data([task.id_])
+        if df_source.empty:
+            engine.dispose()
+            return 0
+
+        # Get TF specs, apply tf_subset filter if provided
+        tf_specs = feature.get_tf_specs()
+        if task.tf_subset:
+            tf_subset_set = set(task.tf_subset)
+            tf_specs = [s for s in tf_specs if s.tf in tf_subset_set]
+
+        # Compute for each TF
+        all_results = []
+        for tf_spec in tf_specs:
+            from ta_lab2.features.m_tf.ema_operations import (
+                filter_ema_periods_by_obs_count,
+            )
+
+            n_obs = len(df_source)
+            valid_periods = filter_ema_periods_by_obs_count(
+                config.periods,
+                n_obs,
+                min_obs_multiplier=config.min_obs_multiplier,
+            )
+            if not valid_periods:
+                continue
+            df_ema = feature.compute_emas_for_tf(df_source, tf_spec, valid_periods)
+            if not df_ema.empty:
+                all_results.append(df_ema)
+
+        if all_results:
+            import pandas as pd
+
+            df_final = pd.concat(all_results, ignore_index=True)
+            feature.write_to_db(df_final)
+
         engine.dispose()
-        logger.info(f"Completed EMA computation for id={task.id_}")
-        return 0  # V2 doesn't report row count
+        logger.info(f"Completed EMA computation for id={task.id_}{tf_info}")
+        return 0
 
     except Exception as e:
         logger.error(f"Worker failed for id={task.id_}: {e}", exc_info=True)

@@ -55,6 +55,9 @@ class WorkerTask:
         start: Start timestamp for incremental refresh
         end: Optional end timestamp for date range filtering
         extra_config: Script-specific configuration (alignment_type, bars_table, etc.)
+        tf_subset: Optional list of TFs this worker should process.
+                   When None, worker processes all TFs (original behavior).
+                   Used for TF-level parallelism when len(ids) < num_processes.
     """
 
     id_: int
@@ -63,6 +66,7 @@ class WorkerTask:
     start: str
     end: Optional[str] = None
     extra_config: dict[str, Any] = None
+    tf_subset: Optional[list[str]] = None
 
     def __post_init__(self):
         if self.extra_config is None:
@@ -198,5 +202,56 @@ class EMAComputationOrchestrator:
 
             return 0
 
+    @staticmethod
+    def split_tasks_by_tf(
+        tasks: Sequence[WorkerTask],
+        all_tfs: list[str],
+        num_processes: int,
+    ) -> list[WorkerTask]:
+        """
+        Split tasks by TF when there are fewer IDs than workers.
+
+        When len(tasks) < num_processes, split each task's TFs across
+        multiple workers to better utilize available parallelism.
+
+        Example:
+            1 ID, 120 TFs, 4 workers -> 4 tasks of 30 TFs each
+            10 IDs, 120 TFs, 4 workers -> 10 tasks unchanged (existing behavior)
+
+        Args:
+            tasks: Original tasks (one per ID)
+            all_tfs: Full list of timeframes
+            num_processes: Number of available worker processes
+
+        Returns:
+            Expanded task list with tf_subset populated
+        """
+        if not tasks or not all_tfs or len(tasks) >= num_processes:
+            return list(tasks)
+
+        # Calculate how many TF chunks per ID
+        workers_per_id = max(1, num_processes // len(tasks))
+        n_tfs = len(all_tfs)
+        chunk_size = max(1, (n_tfs + workers_per_id - 1) // workers_per_id)
+
+        expanded = []
+        for task in tasks:
+            # Split TFs into chunks
+            for i in range(0, n_tfs, chunk_size):
+                tf_chunk = all_tfs[i : i + chunk_size]
+                expanded.append(
+                    WorkerTask(
+                        id_=task.id_,
+                        db_url=task.db_url,
+                        periods=task.periods,
+                        start=task.start,
+                        end=task.end,
+                        extra_config=task.extra_config,
+                        tf_subset=tf_chunk,
+                    )
+                )
+
+        return expanded
+
     def __repr__(self) -> str:
-        return f"EMAComputationOrchestrator(" f"num_processes={self.num_processes})"
+        return f"EMAComputationOrchestrator(num_processes={self.num_processes})"

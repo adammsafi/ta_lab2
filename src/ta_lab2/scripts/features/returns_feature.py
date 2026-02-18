@@ -125,9 +125,9 @@ class ReturnsFeature(BaseFeature):
         # Build date filters
         date_filters = []
         if start:
-            date_filters.append(f"time_close >= '{start}'::timestamptz")
+            date_filters.append(f"\"timestamp\" >= '{start}'::timestamptz")
         if end:
-            date_filters.append(f"time_close <= '{end}'::timestamptz")
+            date_filters.append(f"\"timestamp\" <= '{end}'::timestamptz")
 
         where_clause = f"id IN ({ids_str})"
         if date_filters:
@@ -137,7 +137,7 @@ class ReturnsFeature(BaseFeature):
         query = f"""
         SELECT
             id,
-            time_close AS ts,
+            "timestamp" AS ts,
             close
         FROM public.cmc_price_bars_1d
         WHERE {where_clause}

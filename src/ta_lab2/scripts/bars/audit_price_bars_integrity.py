@@ -132,7 +132,7 @@ def get_columns(engine: Engine, full_name: str) -> List[str]:
 
 
 def best_ts_col(colset: set[str]) -> Optional[str]:
-    for cand in ["time_close", "ts", "timestamp"]:
+    for cand in ["timestamp", "time_close", "ts"]:
         if cand in colset:
             return cand
     return None
@@ -370,17 +370,17 @@ def audit_table_summary(engine: Engine, table: str, ids: Sequence[int]) -> pd.Da
         df["partial_start_share"] = (df["n_partial_start_true"] / df["n_rows"]).round(8)
 
     # ---- Added checks (require additional DB aggregations) ----
-    # Duplicate snapshot key: (id,tf,bar_seq,time_close) duplicates
-    if has_bar_seq and "time_close" in colset:
+    # Duplicate snapshot key: (id,tf,bar_seq,timestamp) duplicates
+    if has_bar_seq and "timestamp" in colset:
         q_dup = text(
             f"""
             SELECT id::int AS id, tf::text AS tf,
                    SUM(CASE WHEN c > 1 THEN (c - 1) ELSE 0 END)::bigint AS n_dup_snapshot_keys
             FROM (
-              SELECT id, tf, bar_seq, time_close, COUNT(*)::bigint AS c
+              SELECT id, tf, bar_seq, "timestamp", COUNT(*)::bigint AS c
               FROM {table}
               WHERE id IN ({in_clause})
-              GROUP BY id, tf, bar_seq, time_close
+              GROUP BY id, tf, bar_seq, "timestamp"
             ) x
             GROUP BY id, tf
             """
@@ -758,7 +758,7 @@ def run_samples(
 
     sort_cols = [c for c in ["table_name", "id", "tf"] if c in out_df.columns]
     ts_sort = None
-    for cand in ["time_close", "ts", "timestamp"]:
+    for cand in ["timestamp", "time_close", "ts"]:
         if cand in out_df.columns:
             ts_sort = cand
             break

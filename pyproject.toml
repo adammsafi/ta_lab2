@@ -148,6 +148,13 @@ exclude_lines = [
     "if TYPE_CHECKING:",
 ]
 
+# ---------- Ruff configuration ----------
+[tool.ruff.lint]
+ignore = ["E402"]  # Module-level imports: scripts use sys.path manipulation before imports
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["F841"]  # Allow unused variables in tests (assertion results)
+
 # ---------- Import-linter configuration ----------
 [tool.importlinter]
 root_package = "ta_lab2"

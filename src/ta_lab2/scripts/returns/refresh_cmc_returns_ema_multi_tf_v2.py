@@ -99,12 +99,16 @@ def _ensure_tables(engine: Engine, out_table: str, state_table: str) -> None:
             period    integer NOT NULL,
             roll      boolean NOT NULL,
 
-            ema       double precision NOT NULL,
-            prev_ema  double precision,
             gap_days  integer,
 
-            ret_arith double precision,
-            ret_log   double precision,
+            delta1        double precision,
+            delta2        double precision,
+
+            ret_arith     double precision,
+            ret_log       double precision,
+
+            delta_ret_arith double precision,
+            delta_ret_log   double precision,
 
             ingested_at timestamptz NOT NULL DEFAULT now(),
 
@@ -281,6 +285,17 @@ def _run_one_key(
             FROM {cfg.state_table}
             WHERE id = :id AND tf = :tf AND period = :period AND roll = :roll
         ),
+        seed AS (
+            -- Get one row before last_ts for second-level LAG seeding (delta2, delta_ret)
+            SELECT COALESCE(
+                (SELECT e2.ts FROM {cfg.ema_table} e2
+                 WHERE e2.id = :id AND e2.tf = :tf AND e2.period = :period AND e2.roll = :roll
+                   AND e2.ts < (SELECT last_ts FROM st)
+                 ORDER BY e2.ts DESC LIMIT 1),
+                (SELECT last_ts FROM st),
+                CAST(:start AS timestamptz)
+            ) AS seed_ts
+        ),
         src AS (
             SELECT
                 e.id,
@@ -289,14 +304,12 @@ def _run_one_key(
                 e.period,
                 e.roll,
                 e.ema
-            FROM {cfg.ema_table} e
-            CROSS JOIN st
+            FROM {cfg.ema_table} e, seed
             WHERE e.id = :id
               AND e.tf = :tf
               AND e.period = :period
               AND e.roll = :roll
-              -- Seed window: ts >= last_ts (or >= start if last_ts is NULL)
-              AND e.ts >= COALESCE(st.last_ts, CAST(:start AS timestamptz))
+              AND e.ts >= seed.seed_ts
         ),
         lagged AS (
             SELECT
@@ -306,51 +319,49 @@ def _run_one_key(
                 s.period,
                 s.roll,
                 s.ema,
-                LAG(s.ts)  OVER (PARTITION BY s.id, s.tf, s.period, s.roll ORDER BY s.ts)  AS prev_ts,
-                LAG(s.ema) OVER (PARTITION BY s.id, s.tf, s.period, s.roll ORDER BY s.ts)  AS prev_ema
+                LAG(s.ts)  OVER (ORDER BY s.ts) AS prev_ts,
+                LAG(s.ema) OVER (ORDER BY s.ts) AS prev_ema
             FROM src s
         ),
         calc AS (
-            -- Minimal set: arith return, log return, gap_days (optional but recommended)
             SELECT
-                id,
-                ts,
-                tf,
-                period,
-                roll,
-                ema,
-                prev_ema,
-                CASE
-                    WHEN prev_ts IS NULL THEN NULL
-                    ELSE (ts::date - prev_ts::date)::int
-                END AS gap_days,
-                CASE
-                    WHEN prev_ema IS NULL OR prev_ema = 0 THEN NULL
-                    ELSE (ema / prev_ema) - 1
-                END AS ret_arith,
-                CASE
-                    WHEN prev_ema IS NULL OR prev_ema <= 0 OR ema <= 0 THEN NULL
-                    ELSE LN(ema / prev_ema)
-                END AS ret_log
+                id, ts, tf, period, roll,
+                CASE WHEN prev_ts IS NULL THEN NULL
+                     ELSE (ts::date - prev_ts::date)::int END AS gap_days,
+                ema - prev_ema AS delta1,
+                CASE WHEN prev_ema IS NULL OR prev_ema = 0 THEN NULL
+                     ELSE (ema / prev_ema) - 1 END AS ret_arith,
+                CASE WHEN prev_ema IS NULL OR prev_ema <= 0 OR ema <= 0 THEN NULL
+                     ELSE LN(ema / prev_ema) END AS ret_log
             FROM lagged
+            WHERE prev_ema IS NOT NULL
+        ),
+        calc2 AS (
+            SELECT c.*,
+                c.delta1 - LAG(c.delta1) OVER (ORDER BY c.ts) AS delta2,
+                c.ret_arith - LAG(c.ret_arith) OVER (ORDER BY c.ts) AS delta_ret_arith,
+                c.ret_log - LAG(c.ret_log) OVER (ORDER BY c.ts) AS delta_ret_log
+            FROM calc c
         ),
         to_insert AS (
-            SELECT c.*
-            FROM calc c
+            SELECT c2.*
+            FROM calc2 c2
             CROSS JOIN st
-            WHERE
-                c.prev_ema IS NOT NULL
-                AND ((st.last_ts IS NULL) OR (c.ts > st.last_ts))
+            WHERE (st.last_ts IS NULL) OR (c2.ts > st.last_ts)
         ),
         ins AS (
             INSERT INTO {cfg.out_table} (
                 id, ts, tf, period, roll,
-                ema, prev_ema, gap_days, ret_arith, ret_log,
+                gap_days, delta1, delta2,
+                ret_arith, ret_log,
+                delta_ret_arith, delta_ret_log,
                 ingested_at
             )
             SELECT
                 id, ts, tf, period, roll,
-                ema, prev_ema, gap_days, ret_arith, ret_log,
+                gap_days, delta1, delta2,
+                ret_arith, ret_log,
+                delta_ret_arith, delta_ret_log,
                 now()
             FROM to_insert
             ON CONFLICT (id, ts, tf, period, roll) DO NOTHING

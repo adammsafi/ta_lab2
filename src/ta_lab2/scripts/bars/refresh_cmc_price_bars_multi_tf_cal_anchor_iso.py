@@ -42,6 +42,7 @@ from ta_lab2.scripts.bars.common_snapshot_contract import (
     upsert_bars,
     load_daily_prices_for_id,
     delete_bars_for_id_tf,
+    get_coverage_n_days,
 )
 from ta_lab2.scripts.bars.derive_multi_tf_from_1d import (
     derive_multi_tf_bars,
@@ -138,6 +139,17 @@ def _anchor_window_for_day(d: date, n: int, unit: str) -> tuple[date, date]:
         return _anchor_window_for_day_year(d, n)
     else:
         raise ValueError(f"Unknown unit: {unit}")
+
+
+def _nominal_tf_days(spec: TFSpec) -> int:
+    """Approximate minimum calendar days needed for one window of the given spec."""
+    if spec.unit == "W":
+        return spec.n * 7
+    if spec.unit == "M":
+        return spec.n * 28
+    if spec.unit == "Y":
+        return spec.n * 365
+    return 1
 
 
 # =============================================================================
@@ -288,13 +300,13 @@ class AnchorCalendarISOBarBuilder(BaseBarBuilder):
                     if not spec_bars.empty:
                         last_bar_seq = int(spec_bars["bar_seq"].max())
                         last_time_close = pd.to_datetime(
-                            spec_bars["time_close"].max(), utc=True
+                            spec_bars["timestamp"].max(), utc=True
                         )
                         daily_min_ts = pd.to_datetime(
                             spec_bars["time_open"].min(), utc=True
                         )
                         daily_max_ts = pd.to_datetime(
-                            spec_bars["time_close"].max(), utc=True
+                            spec_bars["timestamp"].max(), utc=True
                         )
 
                         upsert_state(
@@ -304,26 +316,28 @@ class AnchorCalendarISOBarBuilder(BaseBarBuilder):
                                 {
                                     "id": int(id_),
                                     "tf": spec.tf,
+                                    "tz": self.config.tz,
                                     "daily_min_seen": daily_min_ts,
                                     "daily_max_seen": daily_max_ts,
                                     "last_bar_seq": last_bar_seq,
                                     "last_time_close": last_time_close,
                                 }
                             ],
-                            with_tz=False,
+                            with_tz=True,
                         )
 
             return total_rows
 
         # Direct mode (from daily prices)
-        # For anchor builders, we'll simplify by always rebuilding
-        # (The original implementation has very complex incremental logic with anchor windows)
+        # For anchor builders, always load full history since we do full rebuild
+        # per TF (delete + rebuild). Using start_ts would only load recent data
+        # after the first run, but we need all data to build correct cumulative snapshots.
 
         df_daily = load_daily_prices_for_id(
             db_url=self.config.db_url,
             daily_table=self.config.daily_table,
             id_=id_,
-            ts_start=start_ts,
+            ts_start=None,
             tz=self.config.tz or DEFAULT_TZ,
         )
 
@@ -334,8 +348,25 @@ class AnchorCalendarISOBarBuilder(BaseBarBuilder):
         daily_min_ts = pd.to_datetime(df_daily["ts"].min(), utc=True)
         daily_max_ts = pd.to_datetime(df_daily["ts"].max(), utc=True)
 
+        # Look up coverage from asset_data_coverage (populated by 1D builder)
+        n_available = get_coverage_n_days(
+            get_engine(self.config.db_url),
+            id_,
+            source_table=self.config.daily_table,
+            granularity="1D",
+        )
+        if n_available is None:
+            n_available = len(df_daily)
+        applicable_specs = [s for s in self.specs if _nominal_tf_days(s) <= n_available]
+        skipped = len(self.specs) - len(applicable_specs)
+        if skipped:
+            self.logger.info(
+                f"ID={id_}: Skipping {skipped} anchor spec(s) "
+                f"(nominal tf_days > {n_available} available days)"
+            )
+
         # Process each spec
-        for spec in self.specs:
+        for spec in applicable_specs:
             try:
                 # Simplified: Always rebuild for anchor builders
                 self.logger.info(
@@ -363,7 +394,7 @@ class AnchorCalendarISOBarBuilder(BaseBarBuilder):
 
                 # Update state
                 last_bar_seq = int(bars["bar_seq"].max())
-                last_time_close = pd.to_datetime(bars["time_close"].max(), utc=True)
+                last_time_close = pd.to_datetime(bars["timestamp"].max(), utc=True)
 
                 upsert_state(
                     self.config.db_url,
@@ -372,13 +403,14 @@ class AnchorCalendarISOBarBuilder(BaseBarBuilder):
                         {
                             "id": int(id_),
                             "tf": spec.tf,
+                            "tz": self.config.tz,
                             "daily_min_seen": daily_min_ts,
                             "daily_max_seen": daily_max_ts,
                             "last_bar_seq": last_bar_seq,
                             "last_time_close": last_time_close,
                         }
                     ],
-                    with_tz=False,
+                    with_tz=True,
                 )
 
                 total_rows += len(bars)
@@ -414,7 +446,11 @@ class AnchorCalendarISOBarBuilder(BaseBarBuilder):
 
         # Assign bar_seq based on anchor windows
         bar_seqs = []
+        window_widths = []  # calendar window width in days
         bar_seq_map = {}  # (window_start, window_end) -> bar_seq
+        window_width_map = {}  # bar_seq -> calendar window width
+        window_end_map = {}  # bar_seq -> window_end date
+        window_start_map = {}  # bar_seq -> window_start date
         current_bar_seq = 1
 
         for day_local in df["day_local"]:
@@ -425,6 +461,9 @@ class AnchorCalendarISOBarBuilder(BaseBarBuilder):
 
             if window_key not in bar_seq_map:
                 bar_seq_map[window_key] = current_bar_seq
+                window_width_map[current_bar_seq] = (window_end - window_start).days + 1
+                window_end_map[current_bar_seq] = window_end
+                window_start_map[current_bar_seq] = window_start
                 current_bar_seq += 1
 
             bar_seqs.append(bar_seq_map[window_key])
@@ -433,21 +472,52 @@ class AnchorCalendarISOBarBuilder(BaseBarBuilder):
 
         # Build bars by aggregating within bar_seq
         rows = []
+        max_data_ts = df["ts"].max()  # Latest data date for partial start/end detection
+        prev_ts = None  # Track previous row's ts for per-row time_open
         for bar_seq in sorted(df["bar_seq"].unique()):
             bar_df = df[df["bar_seq"] == bar_seq].copy()
+            tf_days = window_width_map[bar_seq]
+            anchor_offset = (window_start_map[bar_seq] - REF_MONDAY_ISO).days
+
+            # Determine if bar window has ended (data exists beyond window_end)
+            bar_end = window_end_map[bar_seq]
+            time_close_ts = pd.Timestamp(bar_end, tz="UTC") + pd.Timedelta(
+                hours=23, minutes=59, seconds=59, milliseconds=999
+            )
+            bar_window_ended = max_data_ts >= time_close_ts
+
+            # Partial start: fewer data rows than window width, but window has ended
+            is_partial_start_bar = (len(bar_df) < tf_days) and bar_window_ended
+
+            # Expected total data rows for this bar
+            expected_total = len(bar_df) if bar_window_ended else tf_days
 
             # For each day in this bar, create a snapshot row
             for idx, day_row in bar_df.iterrows():
                 # Get all data up to and including this day
                 snapshot_df = bar_df[bar_df.index <= idx]
 
+                # Per-row time_open = previous row's ts + 1ms
+                if prev_ts is not None:
+                    row_time_open = prev_ts + pd.Timedelta(milliseconds=1)
+                else:
+                    # First row: ts - 1 day + 1ms
+                    row_time_open = (
+                        day_row["ts"]
+                        - pd.Timedelta(days=1)
+                        + pd.Timedelta(milliseconds=1)
+                    )
+
                 row = {
                     "id": int(id_),
                     "tf": spec.tf,
-                    "tf_days": len(snapshot_df),  # Simplified
+                    "tf_days": tf_days,
                     "bar_seq": int(bar_seq),
-                    "time_open": snapshot_df["ts"].iloc[0],
+                    "bar_anchor_offset": int(anchor_offset),
+                    "time_open": row_time_open,
+                    "time_open_bar": pd.Timestamp(window_start_map[bar_seq], tz="UTC"),
                     "time_close": day_row["ts"],
+                    "time_close_bar": time_close_ts,
                     "time_high": snapshot_df.loc[
                         snapshot_df["high"].idxmax(), "timehigh"
                     ]
@@ -465,19 +535,23 @@ class AnchorCalendarISOBarBuilder(BaseBarBuilder):
                     if pd.notna(day_row["market_cap"])
                     else None,
                     "timestamp": day_row["ts"],
-                    "last_ts_half_open": day_row["ts"],
+                    "last_ts_half_open": day_row["ts"] + pd.Timedelta(milliseconds=1),
                     "pos_in_bar": len(snapshot_df),
-                    "is_partial_start": False,  # Simplified
-                    "is_partial_end": idx < len(bar_df) - 1,
-                    "count_days_remaining": len(bar_df) - len(snapshot_df),
+                    "is_partial_start": is_partial_start_bar,
+                    "is_partial_end": len(snapshot_df) < expected_total,
+                    "count_days_remaining": expected_total - len(snapshot_df),
                     "is_missing_days": False,  # Simplified
                     "count_days": len(snapshot_df),
                     "count_missing_days": 0,  # Simplified
                     "first_missing_day": None,
                     "last_missing_day": None,
+                    "src_name": day_row.get("src_name"),
+                    "src_load_ts": day_row.get("src_load_ts"),
+                    "src_file": "cmc_price_bars_1d",
                 }
 
                 rows.append(row)
+                prev_ts = day_row["ts"]
 
         if not rows:
             return pd.DataFrame()
@@ -490,8 +564,11 @@ class AnchorCalendarISOBarBuilder(BaseBarBuilder):
             "time_close",
             "time_high",
             "time_low",
+            "time_open_bar",
+            "time_close_bar",
             "timestamp",
             "last_ts_half_open",
+            "src_load_ts",
         ]:
             if col in out.columns:
                 out[col] = pd.to_datetime(out[col], utc=True)
@@ -551,11 +628,8 @@ class AnchorCalendarISOBarBuilder(BaseBarBuilder):
 
         engine = create_engine(db_url, future=True)
 
-        # Ensure state table exists
-        ensure_state_table(db_url, args.state_table, with_tz=False)
-
-        # Ensure output table exists
-        cls._ensure_bars_table(db_url, args.bars_table)
+        # Ensure state table exists (calendar builders use tz column)
+        ensure_state_table(db_url, args.state_table, with_tz=True)
 
         # Build configuration
         config = BarBuilderConfig(
@@ -567,7 +641,7 @@ class AnchorCalendarISOBarBuilder(BaseBarBuilder):
             full_rebuild=args.full_rebuild,
             tz=args.tz if hasattr(args, "tz") else DEFAULT_TZ,
             num_processes=1,  # Anchor builders use single process for now
-            log_level=args.log_level,
+            log_level=getattr(args, "log_level", "INFO"),
         )
 
         return cls(
@@ -618,52 +692,6 @@ class AnchorCalendarISOBarBuilder(BaseBarBuilder):
             raise RuntimeError("No anchor specs found in dim_timeframe.")
 
         return specs
-
-    @classmethod
-    def _ensure_bars_table(cls, db_url: str, bars_table: str) -> None:
-        """Create the cal_anchor_iso bars table if it doesn't exist."""
-        ddl = f"""
-        CREATE TABLE IF NOT EXISTS {bars_table} (
-          id                        integer      NOT NULL,
-          tf                        text         NOT NULL,
-          tf_days                   integer      NOT NULL,
-          bar_seq                   integer      NOT NULL,
-
-          time_open                 timestamptz  NOT NULL,
-          time_close                timestamptz  NOT NULL,
-          time_high                 timestamptz  NULL,
-          time_low                  timestamptz  NULL,
-
-          open                      double precision NULL,
-          high                      double precision NULL,
-          low                       double precision NULL,
-          close                     double precision NULL,
-          volume                    double precision NULL,
-          market_cap                double precision NULL,
-
-          timestamp                 timestamptz  NULL,
-          last_ts_half_open         timestamptz  NULL,
-
-          pos_in_bar                integer      NULL,
-          is_partial_start          boolean      NULL,
-          is_partial_end            boolean      NULL,
-          count_days_remaining      integer      NULL,
-
-          is_missing_days           boolean      NULL,
-          count_days                integer      NULL,
-          count_missing_days        integer      NULL,
-
-          first_missing_day         date         NULL,
-          last_missing_day          date         NULL,
-
-          ingested_at               timestamptz  NOT NULL DEFAULT now(),
-
-          CONSTRAINT {bars_table.split('.')[-1]}_uq UNIQUE (id, tf, bar_seq, time_close)
-        );
-        """
-        eng = get_engine(db_url)
-        with eng.begin() as conn:
-            conn.execute(text(ddl))
 
 
 # =============================================================================

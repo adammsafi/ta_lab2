@@ -47,9 +47,10 @@ def _process_id_worker(task: WorkerTask) -> int:
     Worker function for parallel processing of individual IDs.
 
     Creates own engine with NullPool to avoid connection pooling issues.
+    Supports tf_subset for TF-level parallelism (passed via extra_config).
 
     Args:
-        task: WorkerTask containing id, db_url, periods, start, extra_config
+        task: WorkerTask containing id, db_url, periods, start, extra_config, tf_subset
 
     Returns:
         Number of rows inserted/updated
@@ -64,7 +65,10 @@ def _process_id_worker(task: WorkerTask) -> int:
     )
 
     try:
-        logger.info(f"Starting EMA computation for id={task.id_}, scheme={scheme}")
+        tf_info = f" tfs={len(task.tf_subset)}" if task.tf_subset else ""
+        logger.info(
+            f"Starting EMA computation for id={task.id_}, scheme={scheme}{tf_info}"
+        )
 
         # Create engine with NullPool for worker
         engine = create_engine(task.db_url, poolclass=NullPool, future=True)
@@ -75,18 +79,63 @@ def _process_id_worker(task: WorkerTask) -> int:
         alpha_schema = task.extra_config.get("alpha_schema", "public")
         alpha_table = task.extra_config.get("alpha_table", "ema_alpha_lookup")
 
-        n = write_multi_timeframe_ema_cal_to_db(
-            engine,
-            [task.id_],
-            scheme=scheme,
-            start=task.start,
-            end=task.end,
-            ema_periods=task.periods,
-            schema=schema,
-            out_table=out_table,
-            alpha_schema=alpha_schema,
-            alpha_table=alpha_table,
-        )
+        # For TF-level parallelism: use the feature class directly with TF filtering
+        if task.tf_subset:
+            from ta_lab2.features.m_tf.base_ema_feature import EMAFeatureConfig
+            from ta_lab2.features.m_tf.ema_multi_tf_cal import CalendarEMAFeature
+            import pandas as pd
+
+            config = EMAFeatureConfig(
+                periods=list(task.periods),
+                output_schema=schema,
+                output_table=out_table,
+            )
+            feature = CalendarEMAFeature(
+                engine=engine,
+                config=config,
+                scheme=scheme,
+                alpha_schema=alpha_schema,
+                alpha_table=alpha_table,
+            )
+            df_daily = feature.load_source_data(
+                [task.id_], start=task.start, end=task.end
+            )
+            if df_daily.empty:
+                engine.dispose()
+                return 0
+
+            tf_specs = feature.get_tf_specs()
+            tf_subset_set = set(task.tf_subset)
+            tf_specs = [s for s in tf_specs if s.tf in tf_subset_set]
+
+            all_results = []
+            for tf_spec in tf_specs:
+                df_ema = feature.compute_emas_for_tf(df_daily, tf_spec, config.periods)
+                if not df_ema.empty:
+                    all_results.append(df_ema)
+
+            if all_results:
+                import numpy as np
+
+                df_out = pd.concat(all_results, ignore_index=True)
+                df_out = df_out.replace({np.nan: None})
+                feature.write_to_db(df_out)
+                n = len(df_out)
+            else:
+                n = 0
+        else:
+            n = write_multi_timeframe_ema_cal_to_db(
+                engine,
+                [task.id_],
+                scheme=scheme,
+                start=task.start,
+                end=task.end,
+                ema_periods=task.periods,
+                schema=schema,
+                out_table=out_table,
+                alpha_schema=alpha_schema,
+                alpha_table=alpha_table,
+            )
 
         engine.dispose()
         logger.info(f"Completed EMA computation for id={task.id_}: {n} rows")
@@ -265,7 +314,7 @@ class CalEMARefresher(BaseEMARefresher):
         temp_state_config = EMAStateConfig(
             state_schema=args.schema,
             state_table=state_table,
-            ts_column="canonical_ts",
+            ts_column="ts",
             roll_filter="roll = FALSE",
             use_canonical_ts=True,
             bars_table=f"cmc_price_bars_multi_tf_cal_{scheme}",
@@ -307,7 +356,7 @@ class CalEMARefresher(BaseEMARefresher):
         state_config = EMAStateConfig(
             state_schema=args.schema,
             state_table=state_table,
-            ts_column="canonical_ts",
+            ts_column="ts",
             roll_filter="roll = FALSE",
             use_canonical_ts=True,
             bars_table=f"cmc_price_bars_multi_tf_cal_{scheme}",
@@ -332,9 +381,9 @@ class CalEMARefresher(BaseEMARefresher):
             schemes_to_run = [args.scheme]
 
         for scheme in schemes_to_run:
-            print(f"\n{'='*80}")
+            print(f"\n{'=' * 80}")
             print(f"Running calendar EMA refresh for scheme: {scheme.upper()}")
-            print(f"{'='*80}\n")
+            print(f"{'=' * 80}\n")
 
             refresher = cls.from_cli_args_for_scheme(args, scheme)
             refresher.run()

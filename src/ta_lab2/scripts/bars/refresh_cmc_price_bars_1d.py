@@ -48,6 +48,8 @@ from ta_lab2.scripts.bars.common_snapshot_contract import (
     parse_ids,
     load_all_ids,
     resolve_db_url,
+    ensure_coverage_table,
+    upsert_coverage,
 )
 
 # Prefer psycopg v3, fall back to psycopg2
@@ -253,7 +255,7 @@ WITH ranked_all AS (
   SELECT
     s.id,
     s."timestamp",
-    dense_rank() OVER (PARTITION BY s.id ORDER BY s."timestamp" ASC)::bigint AS bar_seq
+    dense_rank() OVER (PARTITION BY s.id ORDER BY s."timestamp" ASC)::integer AS bar_seq
   FROM {src} s
   WHERE s.id = %s
     AND (%s IS NULL OR s."timestamp" < %s)
@@ -383,8 +385,21 @@ final AS (
     false::boolean AS is_partial_end,
     false::boolean AS is_missing_days,
 
+    -- 1D fixed metadata
+    1::integer AS tf_days,
+    1::integer AS pos_in_bar,
+    1::integer AS count_days,
+    0::integer AS count_days_remaining,
+    0::integer AS count_missing_days,
+    0::integer AS count_missing_days_start,
+    0::integer AS count_missing_days_end,
+    0::integer AS count_missing_days_interior,
+
     repaired_timehigh,
     repaired_timelow,
+    -- Detect high/low repairs from the CTE logic
+    (GREATEST(high_1, open, close, low_1) <> high_1)::boolean AS repaired_high,
+    (LEAST(low_1, open, close, high_1)  <> low_1)::boolean  AS repaired_low,
 
     name,
     load_ts,
@@ -396,19 +411,27 @@ ins AS (
     id, "timestamp",
     tf, bar_seq,
     time_open, time_close, time_high, time_low,
+    time_open_bar, time_close_bar,
+    last_ts_half_open,
     open, high, low, close, volume, market_cap,
     is_partial_start, is_partial_end, is_missing_days,
+    tf_days, pos_in_bar, count_days, count_days_remaining,
+    count_missing_days, count_missing_days_start, count_missing_days_end, count_missing_days_interior,
     src_name, src_load_ts, src_file,
-    repaired_timehigh, repaired_timelow
+    repaired_timehigh, repaired_timelow, repaired_high, repaired_low
   )
   SELECT
     id, "timestamp",
     tf, bar_seq,
     time_open, time_close, time_high_fix, time_low_fix,
+    time_open AS time_open_bar, time_close AS time_close_bar,
+    "timestamp" + interval '1 millisecond' AS last_ts_half_open,
     open, high_fix, low_fix, close, volume, market_cap,
     is_partial_start, is_partial_end, is_missing_days,
+    tf_days, pos_in_bar, count_days, count_days_remaining,
+    count_missing_days, count_missing_days_start, count_missing_days_end, count_missing_days_interior,
     name, load_ts, source_file,
-    repaired_timehigh, repaired_timelow
+    repaired_timehigh, repaired_timelow, repaired_high, repaired_low
   FROM final
   WHERE
     id IS NOT NULL
@@ -431,13 +454,14 @@ ins AS (
     AND high_fix >= low_fix
     AND high_fix >= GREATEST(open, close, low_fix)
     AND low_fix  <= LEAST(open, close, high_fix)
-  ON CONFLICT (id, "timestamp") DO UPDATE SET
-    tf = EXCLUDED.tf,
-    bar_seq = EXCLUDED.bar_seq,
+  ON CONFLICT (id, tf, bar_seq, "timestamp") DO UPDATE SET
     time_open = EXCLUDED.time_open,
     time_close = EXCLUDED.time_close,
     time_high = EXCLUDED.time_high,
     time_low = EXCLUDED.time_low,
+    time_open_bar = EXCLUDED.time_open_bar,
+    time_close_bar = EXCLUDED.time_close_bar,
+    last_ts_half_open = EXCLUDED.last_ts_half_open,
     open = EXCLUDED.open,
     high = EXCLUDED.high,
     low  = EXCLUDED.low,
@@ -447,11 +471,21 @@ ins AS (
     is_partial_start = EXCLUDED.is_partial_start,
     is_partial_end   = EXCLUDED.is_partial_end,
     is_missing_days  = EXCLUDED.is_missing_days,
+    tf_days = EXCLUDED.tf_days,
+    pos_in_bar = EXCLUDED.pos_in_bar,
+    count_days = EXCLUDED.count_days,
+    count_days_remaining = EXCLUDED.count_days_remaining,
+    count_missing_days = EXCLUDED.count_missing_days,
+    count_missing_days_start = EXCLUDED.count_missing_days_start,
+    count_missing_days_end = EXCLUDED.count_missing_days_end,
+    count_missing_days_interior = EXCLUDED.count_missing_days_interior,
     src_name = EXCLUDED.src_name,
     src_load_ts = EXCLUDED.src_load_ts,
     src_file = EXCLUDED.src_file,
     repaired_timehigh = EXCLUDED.repaired_timehigh,
-    repaired_timelow  = EXCLUDED.repaired_timelow
+    repaired_timelow  = EXCLUDED.repaired_timelow,
+    repaired_high = EXCLUDED.repaired_high,
+    repaired_low = EXCLUDED.repaired_low
   RETURNING repaired_timehigh, repaired_timelow, "timestamp"
 )
 SELECT
@@ -515,6 +549,59 @@ class OneDayBarBuilder(BaseBarBuilder):
         """
         # Not used - 1D builder executes CTEs directly via psycopg
         return f"SELECT * FROM {self.SOURCE_TABLE} WHERE id = {id_}"
+
+    def ensure_state_table_exists(self) -> None:
+        """
+        Create 1D-specific state table if it doesn't exist.
+
+        Schema is different from multi-TF builders:
+        - Primary key is just 'id' (not 'id, tf')
+        - Has 'last_src_ts' instead of 'last_time_close'
+        - Includes daily_min_seen for backfill detection
+        """
+        state_table = self.get_state_table_name()
+        self.logger.info(f"Ensuring 1D state table exists: {state_table}")
+
+        # Handle fully-qualified table names
+        if "." in state_table:
+            schema, table = state_table.split(".", 1)
+            fq_table = state_table
+        else:
+            schema = "public"
+            table = state_table
+            fq_table = f"{schema}.{table}"
+
+        ddl = f"""
+        CREATE TABLE IF NOT EXISTS {fq_table} (
+            id INTEGER NOT NULL,
+            tf TEXT NOT NULL DEFAULT '1D',
+            last_src_ts TIMESTAMPTZ,
+            daily_min_seen TIMESTAMPTZ,
+            daily_max_seen TIMESTAMPTZ,
+            last_bar_seq INTEGER,
+            last_time_close TIMESTAMPTZ,
+            last_run_ts TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            last_upserted INTEGER NOT NULL DEFAULT 0,
+            last_repaired_timehigh INTEGER NOT NULL DEFAULT 0,
+            last_repaired_timelow INTEGER NOT NULL DEFAULT 0,
+            last_rejected INTEGER NOT NULL DEFAULT 0,
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            PRIMARY KEY (id, tf)
+        );
+        """
+
+        try:
+            from sqlalchemy import text
+
+            with self.engine.begin() as conn:
+                conn.execute(text(ddl))
+            self.logger.info(f"State table ready: {state_table}")
+        except Exception as e:
+            self.logger.error(f"Failed to create 1D state table {state_table}: {e}")
+            raise
+
+        # Also ensure coverage table exists
+        ensure_coverage_table(self.engine)
 
     def build_bars_for_id(
         self,
@@ -590,21 +677,25 @@ class OneDayBarBuilder(BaseBarBuilder):
 
         # Update state if any rows were processed
         if max_src_ts is not None:
-            # Query MIN timestamp from source to track daily_min_seen
-            min_row = _fetchone(
-                conn, f"SELECT MIN(timestamp) FROM {src} WHERE id = %s;", [id_]
+            # Query MIN timestamp and COUNT from source for coverage tracking
+            stats_row = _fetchone(
+                conn,
+                f"SELECT MIN(timestamp), MAX(timestamp), COUNT(*)::bigint FROM {src} WHERE id = %s;",
+                [id_],
             )
             daily_min_ts = (
-                str(min_row[0]) if min_row and min_row[0] is not None else None
+                str(stats_row[0]) if stats_row and stats_row[0] is not None else None
             )
+            daily_max_ts_cov = stats_row[1] if stats_row else None
+            total_rows = int(stats_row[2]) if stats_row and stats_row[2] else 0
 
             _exec(
                 conn,
                 f"""
-                INSERT INTO {state} (id, last_src_ts, daily_min_seen, last_run_ts,
+                INSERT INTO {state} (id, tf, last_src_ts, daily_min_seen, last_run_ts,
                                     last_upserted, last_repaired_timehigh, last_repaired_timelow, last_rejected)
-                VALUES (%s, %s, %s, now(), %s, %s, %s, 0)
-                ON CONFLICT (id) DO UPDATE SET
+                VALUES (%s, '1D', %s, %s, now(), %s, %s, %s, 0)
+                ON CONFLICT (id, tf) DO UPDATE SET
                   last_src_ts = COALESCE(EXCLUDED.last_src_ts, {state}.last_src_ts),
                   daily_min_seen = LEAST(COALESCE({state}.daily_min_seen, EXCLUDED.daily_min_seen), COALESCE(EXCLUDED.daily_min_seen, {state}.daily_min_seen)),
                   last_run_ts = now(),
@@ -615,6 +706,26 @@ class OneDayBarBuilder(BaseBarBuilder):
                 """,
                 [id_, max_src_ts, daily_min_ts, upserted, rep_hi, rep_lo],
             )
+
+            # Upsert asset_data_coverage (n_days = n_rows for 1D source data)
+            if (
+                total_rows > 0
+                and daily_min_ts is not None
+                and daily_max_ts_cov is not None
+            ):
+                try:
+                    upsert_coverage(
+                        self.engine,
+                        id_=id_,
+                        source_table=src,
+                        granularity="1D",
+                        n_rows=total_rows,
+                        n_days=total_rows,  # 1D data: each row = 1 calendar day
+                        first_ts=daily_min_ts,
+                        last_ts=daily_max_ts_cov,
+                    )
+                except Exception as e:
+                    self.logger.warning(f"ID={id_}: coverage upsert failed: {e}")
 
         self.logger.debug(
             f"ID={id_}: upserted={upserted}, repaired_hi={rep_hi}, repaired_lo={rep_lo}"

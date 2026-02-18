@@ -106,8 +106,7 @@ def _audit_one(
     _print(f"=== scheme={label} series={series} ===")
 
     # map source columns by series
-    src_ema_col = "ema" if series == "ema" else "ema_bar"
-    src_roll_col = "roll" if series == "ema" else "roll_bar"
+    src_roll_col = "roll"  # noqa: F841
 
     # 1) Coverage: group by key; returns has series column already
     coverage_sql = f"""

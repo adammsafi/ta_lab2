@@ -20,7 +20,6 @@ All scripts read from pre-computed bar tables that contain bar_seq,
 so all scripts populate all fields consistently.
 """
 
-
 from typing import Optional
 import pandas as pd
 from sqlalchemy.engine import Engine
@@ -129,7 +128,7 @@ def update_ema_state_from_output(
         state_table: State table name
         output_table: Output EMA table name
         use_canonical_ts: If True, update from calendar-based timestamp column.
-                         If False, update multi_tf fields from time_close, bar_seq, etc.
+                         If False, update multi_tf fields from ts_column, bar_seq, etc.
         ts_column: Name of timestamp column to use (default: "canonical_ts").
                    For cal scripts: "canonical_ts", for anchor scripts: "ts", etc.
         roll_filter: Optional WHERE clause for filtering canonical rows in output table.

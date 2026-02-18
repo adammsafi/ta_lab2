@@ -7,10 +7,11 @@ Multi-TF EMA semantics:
 - Preview EMAs: daily grid with EMAs between canonical closes
 - Roll flag: FALSE for canonical, TRUE for preview
 
+LEAN SCHEMA: EMA tables store only EMA values. All derivatives
+(d1, d2, delta1, delta2, ret_arith, ret_log) live in returns tables.
+
 REFACTORED CHANGES:
 - Extends BaseEMAFeature abstract class
-- Uses ema_operations for derivative calculations
-- ~540 LOC → ~350 LOC (35% reduction)
 - Complexity remains due to dual data source + preview logic
 """
 
@@ -28,9 +29,13 @@ from ta_lab2.features.m_tf.base_ema_feature import (
     EMAFeatureConfig,
     TFSpec,
 )
-from ta_lab2.features.ema import compute_ema, filter_ema_periods_by_obs_count
+from ta_lab2.features.ema import filter_ema_periods_by_obs_count
+from ta_lab2.features.m_tf.polars_ema_operations import (
+    compute_bar_ema_numpy,
+    compute_dual_ema_numpy,
+)
 from ta_lab2.time.dim_timeframe import list_tfs, get_tf_days
-from ta_lab2.io import _get_marketdata_engine as _get_engine, load_cmc_ohlcv_daily
+from ta_lab2.io import _get_marketdata_engine as _get_engine
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +54,6 @@ class MultiTFEMAFeature(BaseEMAFeature):
     - Loads TFs from dim_timeframe (tf_day family)
     - Preview EMAs between canonical closes
     - Roll flag: FALSE for canonical, TRUE for preview
-    - Derivatives: d1_roll/d2_roll (all rows), d1/d2 (canonical only)
     """
 
     def __init__(
@@ -94,14 +98,23 @@ class MultiTFEMAFeature(BaseEMAFeature):
 
         Returns: DataFrame with id, ts, close (normalized)
         """
-        # Load enough history for EMA stability (from 2010)
-        daily = load_cmc_ohlcv_daily(
-            ids=ids,
-            start="2010-01-01",
-            end=end,
-            db_url=None,  # Uses default from engine
-            tz="UTC",
+        # Load directly from price_histories to avoid config-file dependency
+        # (load_cmc_ohlcv_daily requires configs/default.yaml for table resolution)
+        where = ["id = ANY(:ids)", "timestamp >= :start"]
+        params: dict = {"ids": list(ids), "start": "2010-01-01"}
+        if end is not None:
+            where.append("timestamp < :end")
+            params["end"] = end
+
+        sql = text(
+            f"SELECT id, timestamp AS ts, open, high, low, close, volume "
+            f"FROM public.cmc_price_bars_1d "
+            f"WHERE {' AND '.join(where)} "
+            f"ORDER BY id, timestamp"
         )
+
+        with self.engine.connect() as conn:
+            daily = pd.read_sql(sql, conn, params=params)
 
         daily = self._normalize_daily(daily)
         self._daily_data_cache = daily
@@ -173,6 +186,8 @@ class MultiTFEMAFeature(BaseEMAFeature):
         """
         Compute multi-TF EMAs for single TF.
 
+        Vectorized: uses compute_bar_ema_numpy for bar EMA, numpy for preview.
+
         Logic:
         1. Load/generate canonical bar closes (persisted or synthetic)
         2. For each ID: compute bar EMAs + preview EMAs on daily grid
@@ -220,8 +235,6 @@ class MultiTFEMAFeature(BaseEMAFeature):
 
             # Prepare daily data
             df_id = df_id.sort_values("ts").reset_index(drop=True)
-            df_id["close"] = df_id["close"].astype(float)
-
             # Canonical closes
             closes = bars_id[["time_close", "close_bar", "bar_seq"]].copy()
             closes = closes.rename(columns={"time_close": "ts"})
@@ -244,52 +257,90 @@ class MultiTFEMAFeature(BaseEMAFeature):
             # Filter periods by observation count
             valid_periods = filter_ema_periods_by_obs_count(periods, len(df_closes))
 
+            # Pre-extract numpy arrays for the grid
+            grid_close_arr = grid["close"].astype(float).to_numpy()
+            n_grid = len(grid)
+
             for p in valid_periods:
-                # Compute EMA on bar closes
-                ema_bar = compute_ema(
-                    df_closes["close_bar"].astype(float),
-                    period=p,
-                    adjust=False,
-                    min_periods=p,
+                # Compute bar-space EMA on canonical closes
+                bar_close_arr = df_closes["close_bar"].astype(float).to_numpy()
+                bar_ema_arr = compute_bar_ema_numpy(
+                    bar_close_arr, period=p, min_periods=p
                 )
 
-                bar_df = df_closes[["ts"]].copy()
-                bar_df["ema_bar"] = ema_bar
-                bar_df = bar_df[bar_df["ema_bar"].notna()]
-                if bar_df.empty:
+                valid_mask = ~np.isnan(bar_ema_arr)
+                if not valid_mask.any():
                     continue
 
+                bar_ts = df_closes["ts"].values
+                valid_idx = np.where(valid_mask)[0]
+                bar_ts_valid = bar_ts[valid_idx]
+                bar_ema_valid = bar_ema_arr[valid_idx]
+
+                # Build canonical mask and EMA values on daily grid
+                bar_ts_set = set(pd.DatetimeIndex(bar_ts_valid).tz_localize("UTC"))
+                canon_ts_to_ema = {}
+                for i, ts_key in enumerate(
+                    pd.DatetimeIndex(bar_ts_valid).tz_localize("UTC")
+                ):
+                    canon_ts_to_ema[ts_key] = bar_ema_valid[i]
+
+                canonical_mask = np.zeros(n_grid, dtype=bool)
+                canonical_ema_values = np.full(n_grid, np.nan, dtype=np.float64)
+                grid_ts_list = grid["ts"].tolist()
+                for i in range(n_grid):
+                    ts_val = grid_ts_list[i]
+                    if ts_val in canon_ts_to_ema:
+                        canonical_mask[i] = True
+                        canonical_ema_values[i] = canon_ts_to_ema[ts_val]
+
+                # Compute dual EMA: ema_bar (bar alpha + reanchoring) + ema (daily alpha)
                 alpha_bar = 2.0 / (p + 1.0)
+                alpha_daily = 2.0 / (tf_spec.tf_days * p + 1.0)
 
-                # Merge with daily grid and compute preview EMAs
-                tmp = grid.merge(bar_df, on="ts", how="left")
-                tmp["ema_prev_bar"] = tmp["ema_bar"].ffill().shift(1)
-                tmp["ema_preview"] = (
-                    alpha_bar * tmp["close"] + (1.0 - alpha_bar) * tmp["ema_prev_bar"]
+                ema_bar_out, ema_out = compute_dual_ema_numpy(
+                    grid_close_arr,
+                    canonical_mask,
+                    canonical_ema_values,
+                    alpha_daily,
+                    alpha_bar,
                 )
 
-                # Combine: use ema_bar for canonical, ema_preview for others
-                tmp["ema"] = tmp["ema_preview"]
-                mask_bar = tmp["ema_bar"].notna()
-                tmp.loc[mask_bar, "ema"] = tmp.loc[mask_bar, "ema_bar"]
-
-                # Drop rows before first EMA
-                tmp = tmp[tmp["ema"].notna()]
-                if tmp.empty:
+                # Drop rows before first valid ema_bar
+                valid_ema = ~np.isnan(ema_bar_out)
+                if not valid_ema.any():
                     continue
 
-                tmp["id"] = asset_id
-                tmp["tf"] = tf_spec.tf
-                tmp["period"] = p
-                tmp["tf_days"] = tf_spec.tf_days
+                first_valid = int(np.argmax(valid_ema))
+                sl = slice(first_valid, None)
 
-                # Roll flag: FALSE for canonical closes, TRUE for preview
-                is_close = tmp["ts"].isin(bar_df["ts"])
-                tmp["roll"] = ~is_close
+                grid_ts_slice = grid["ts"].iloc[first_valid:].tolist()
+                roll_arr = ~np.array([t in bar_ts_set for t in grid_ts_slice])
 
-                frames.append(
-                    tmp[["id", "tf", "ts", "period", "ema", "tf_days", "roll"]]
+                # is_partial_end: True for rows after the last canonical close
+                last_canon_ts = max(bar_ts_set) if bar_ts_set else None
+                is_partial_arr = np.array(
+                    [
+                        t > last_canon_ts if last_canon_ts else True
+                        for t in grid_ts_slice
+                    ]
                 )
+
+                tmp = pd.DataFrame(
+                    {
+                        "id": asset_id,
+                        "tf": tf_spec.tf,
+                        "ts": grid_ts_slice,
+                        "period": p,
+                        "tf_days": tf_spec.tf_days,
+                        "roll": roll_arr,
+                        "ema": ema_out[sl],
+                        "ema_bar": ema_bar_out[sl],
+                        "is_partial_end": is_partial_arr,
+                    }
+                )
+
+                frames.append(tmp)
 
         if not frames:
             return pd.DataFrame()
@@ -298,25 +349,20 @@ class MultiTFEMAFeature(BaseEMAFeature):
         result["ts"] = pd.to_datetime(result["ts"], utc=True)
         result = result.sort_values(["id", "tf", "period", "ts"])
 
-        # Add derivatives
-        result = self._add_multi_tf_derivatives(result)
-
         return result
 
     def get_output_schema(self) -> dict[str, str]:
-        """Define output table schema for multi-TF EMAs."""
+        """Define output table schema for multi-TF EMAs (dual EMA)."""
         return {
             "id": "INTEGER NOT NULL",
             "tf": "TEXT NOT NULL",
             "ts": "TIMESTAMPTZ NOT NULL",
             "period": "INTEGER NOT NULL",
-            "ema": "DOUBLE PRECISION",
             "tf_days": "INTEGER",
             "roll": "BOOLEAN",
-            "d1_roll": "DOUBLE PRECISION",
-            "d2_roll": "DOUBLE PRECISION",
-            "d1": "DOUBLE PRECISION",
-            "d2": "DOUBLE PRECISION",
+            "ema": "DOUBLE PRECISION",
+            "ema_bar": "DOUBLE PRECISION",
+            "is_partial_end": "BOOLEAN",
             "ingested_at": "TIMESTAMPTZ DEFAULT now()",
             "PRIMARY KEY": "(id, tf, ts, period)",
         }
@@ -379,13 +425,13 @@ class MultiTFEMAFeature(BaseEMAFeature):
           id,
           tf,
           bar_seq,
-          time_close,
+          "timestamp" AS time_close,
           close AS close_bar
         FROM {self.bars_schema}.{self.bars_table}
         WHERE tf = :tf
           AND id = ANY(:ids)
           AND is_partial_end = FALSE
-          {"" if end_ts is None else "AND time_close <= :end_ts"}
+          {"" if end_ts is None else 'AND "timestamp" <= :end_ts'}
         ORDER BY id, bar_seq
         """
 
@@ -439,35 +485,6 @@ class MultiTFEMAFeature(BaseEMAFeature):
         )
 
         return bars.reset_index(drop=True)
-
-    def _add_multi_tf_derivatives(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Add derivatives for multi-TF EMAs.
-
-        - d1_roll, d2_roll: ALL rows (daily diffs)
-        - d1, d2: canonical only (roll=FALSE)
-        """
-        result = df.copy()
-
-        # Rolling derivatives (all rows)
-        g_full = result.groupby(["id", "tf", "period"], sort=False)
-        result["d1_roll"] = g_full["ema"].diff()
-        result["d2_roll"] = g_full["d1_roll"].diff()
-
-        # Canonical derivatives (roll=FALSE only)
-        result["d1"] = np.nan
-        result["d2"] = np.nan
-
-        mask_close = ~result["roll"]
-        if mask_close.any():
-            close_df = result.loc[mask_close].copy()
-            g_close = close_df.groupby(["id", "tf", "period"], sort=False)
-            close_df["d1"] = g_close["ema"].diff()
-            close_df["d2"] = g_close["d1"].diff()
-            result.loc[close_df.index, "d1"] = close_df["d1"]
-            result.loc[close_df.index, "d2"] = close_df["d2"]
-
-        return result
 
 
 # =============================================================================
@@ -569,9 +586,7 @@ def write_multi_timeframe_ema_to_db(
                 f"""
                 CREATE TEMP TABLE {tmp_table} AS
                 SELECT
-                    id, tf, ts, period,
-                    ema, tf_days,
-                    roll, d1_roll, d2_roll, d1, d2
+                    id, tf, ts, period, tf_days, roll, ema
                 FROM {schema}.{out_table}
                 LIMIT 0;
                 """
@@ -585,13 +600,11 @@ def write_multi_timeframe_ema_to_db(
         conflict_sql = (
             """
             DO UPDATE SET
-                ema      = EXCLUDED.ema,
-                tf_days  = EXCLUDED.tf_days,
-                roll     = EXCLUDED.roll,
-                d1_roll  = EXCLUDED.d1_roll,
-                d2_roll  = EXCLUDED.d2_roll,
-                d1       = EXCLUDED.d1,
-                d2       = EXCLUDED.d2
+                tf_days         = EXCLUDED.tf_days,
+                roll            = EXCLUDED.roll,
+                ema             = EXCLUDED.ema,
+                ema_bar         = EXCLUDED.ema_bar,
+                is_partial_end  = EXCLUDED.is_partial_end
             """
             if update_existing
             else "DO NOTHING"
@@ -599,11 +612,9 @@ def write_multi_timeframe_ema_to_db(
 
         sql = f"""
         INSERT INTO {schema}.{out_table} AS t
-            (id, tf, ts, period, ema, tf_days, roll, d1_roll, d2_roll, d1, d2)
+            (id, tf, ts, period, tf_days, roll, ema, ema_bar, is_partial_end)
         SELECT
-            id, tf, ts, period,
-            ema, tf_days,
-            roll, d1_roll, d2_roll, d1, d2
+            id, tf, ts, period, tf_days, roll, ema, ema_bar, is_partial_end
         FROM {tmp_table}
         ON CONFLICT (id, tf, ts, period)
         {conflict_sql};

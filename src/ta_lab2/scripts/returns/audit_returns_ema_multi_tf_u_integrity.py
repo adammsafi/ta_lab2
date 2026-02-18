@@ -134,10 +134,10 @@ def main() -> None:
       SELECT
         id, tf, period, alignment_source,
         'ema_bar'::text AS series,
-        roll_bar AS roll,
+        roll AS roll,
         COUNT(*) AS n_ema
       FROM {ema_u}
-      WHERE ema_bar IS NOT NULL AND roll_bar IS NOT NULL
+      WHERE ema_bar IS NOT NULL
       GROUP BY 1,2,3,4,5,6
     ),
     r AS (
@@ -238,10 +238,7 @@ def main() -> None:
      AND e.period = r.period
      AND e.alignment_source = r.alignment_source
      AND e.ts = r.ts
-     AND (
-           (r.series = 'ema' AND e.roll = r.roll)
-        OR (r.series = 'ema_bar' AND e.roll_bar = r.roll)
-     )
+     AND e.roll = r.roll
     WHERE e.id IS NULL;
     """
     align = _df(engine, align_sql)

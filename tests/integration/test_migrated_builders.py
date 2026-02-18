@@ -6,6 +6,7 @@ to common_snapshot_contract.py.
 
 Phase 5.1: Integration Testing
 """
+
 import os
 import pytest
 import pandas as pd
@@ -83,7 +84,7 @@ class TestExtractedUtilities:
             assert isinstance(row, dict), "Should return dict"
             assert "id" in row
             assert "tf" in row
-            assert "bar_seq" in row or "time_close" in row
+            assert "bar_seq" in row or "timestamp" in row
 
     def test_load_last_snapshot_info_batch(self):
         """Test batch loading of snapshot info."""
@@ -249,7 +250,7 @@ class TestPerformanceRegression:
             if row:
                 n_plus_1_result[tf] = {
                     "last_bar_seq": row.get("bar_seq"),
-                    "last_time_close": row.get("time_close"),
+                    "last_time_close": row.get("timestamp"),
                 }
         n_plus_1_time = time.perf_counter() - start
 

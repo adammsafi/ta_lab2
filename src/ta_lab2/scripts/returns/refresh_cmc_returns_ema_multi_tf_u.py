@@ -18,7 +18,7 @@ Key semantics:
       (id, tf, period, alignment_source, series, roll)
     ordered by ts
   - series='ema'     uses ema + roll
-  - series='ema_bar' uses ema_bar + roll_bar (aliased to roll)
+  - series='ema_bar' uses ema_bar + roll
   - Incremental:
       for each key, only insert rows where ts > last_ts
       but pull ts >= last_ts to seed prev_ema (first row)
@@ -35,7 +35,7 @@ runfile(
 import argparse
 import os
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
+from typing import List, Optional, Sequence, Tuple
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
@@ -92,6 +92,58 @@ def _expand_roll_mode(roll_mode: str) -> List[bool]:
     raise SystemExit("ERROR: --roll-mode must be one of: true, false, both")
 
 
+def _ensure_tables(engine: Engine, out_table: str, state_table: str) -> None:
+    """Create returns and state tables if they don't exist."""
+    out_sql = text(
+        f"""
+        CREATE TABLE IF NOT EXISTS {out_table} (
+            id              bigint NOT NULL,
+            ts              timestamptz NOT NULL,
+            tf              text NOT NULL,
+            period          integer NOT NULL,
+            alignment_source text NOT NULL,
+            series          text NOT NULL CHECK (series IN ('ema','ema_bar')),
+            roll            boolean NOT NULL,
+
+            gap_days        integer,
+
+            delta1          double precision,
+            delta2          double precision,
+
+            ret_arith       double precision,
+            ret_log         double precision,
+
+            delta_ret_arith double precision,
+            delta_ret_log   double precision,
+
+            ingested_at timestamptz NOT NULL DEFAULT now(),
+
+            PRIMARY KEY (id, ts, tf, period, alignment_source, series, roll)
+        );
+        """
+    )
+
+    state_sql = text(
+        f"""
+        CREATE TABLE IF NOT EXISTS {state_table} (
+            id              bigint NOT NULL,
+            tf              text NOT NULL,
+            period          integer NOT NULL,
+            alignment_source text NOT NULL,
+            series          text NOT NULL,
+            roll            boolean NOT NULL,
+            last_ts         timestamptz,
+            updated_at      timestamptz NOT NULL DEFAULT now(),
+            PRIMARY KEY (id, tf, period, alignment_source, series, roll)
+        );
+        """
+    )
+
+    with engine.begin() as cxn:
+        cxn.execute(out_sql)
+        cxn.execute(state_sql)
+
+
 def _load_keys(
     engine: Engine,
     ema_u_table: str,
@@ -139,11 +191,11 @@ def _load_keys(
               e.period::int,
               e.alignment_source::text,
               'ema_bar'::text AS series,
-              e.roll_bar::boolean AS roll
+              e.roll::boolean AS roll
             FROM {ema_u_table} e
             WHERE e.ema_bar IS NOT NULL
-              AND e.roll_bar IS NOT NULL
-              AND e.roll_bar = ANY(:rolls)
+              AND e.roll IS NOT NULL
+              AND e.roll = ANY(:rolls)
               {where_ids}
             """
         )
@@ -196,12 +248,11 @@ def _run_one_key(
 ) -> None:
     one_id, one_tf, one_period, one_align, one_series, one_roll = key
 
-    # For ema vs ema_bar, select the correct EMA column and correct roll column.
-    # We already normalized key.roll to the right source roll, so we filter using:
-    # - series='ema'     -> e.roll = :roll
-    # - series='ema_bar' -> e.roll_bar = :roll
+    # For ema vs ema_bar, select the correct EMA column.
+    # Roll column is always 'roll' for both series.
     ema_expr = "e.ema" if one_series == "ema" else "e.ema_bar"
-    roll_filter = "e.roll = :roll" if one_series == "ema" else "e.roll_bar = :roll"
+    roll_col = "roll"
+    roll_filter = f"e.{roll_col} = :roll"
 
     sql = text(
         f"""
@@ -215,6 +266,18 @@ def _run_one_key(
               AND series = :series
               AND roll = :roll
         ),
+        seed AS (
+            SELECT COALESCE(
+                (SELECT e2.ts FROM {ema_u_table} e2
+                 WHERE e2.id = :id AND e2.tf = :tf AND e2.period = :period
+                   AND e2.alignment_source = :alignment_source
+                   AND e2.{roll_col} = :roll
+                   AND e2.ts < (SELECT last_ts FROM st)
+                 ORDER BY e2.ts DESC LIMIT 1),
+                (SELECT last_ts FROM st),
+                CAST(:start AS timestamptz)
+            ) AS seed_ts
+        ),
         src AS (
             SELECT
                 e.id::bigint AS id,
@@ -223,14 +286,13 @@ def _run_one_key(
                 e.period,
                 e.alignment_source,
                 {ema_expr} AS ema
-            FROM {ema_u_table} e
-            CROSS JOIN st
+            FROM {ema_u_table} e, seed
             WHERE e.id = :id
               AND e.tf = :tf
               AND e.period = :period
               AND e.alignment_source = :alignment_source
               AND {roll_filter}
-              AND e.ts >= COALESCE(st.last_ts, CAST(:start AS timestamptz))
+              AND e.ts >= seed.seed_ts
               AND {ema_expr} IS NOT NULL
         ),
         lagged AS (
@@ -242,40 +304,46 @@ def _run_one_key(
         ),
         calc AS (
             SELECT
-                id,
-                ts,
-                tf,
-                period,
-                alignment_source,
+                id, ts, tf, period, alignment_source,
                 :series AS series,
                 :roll AS roll,
-                ema,
-                prev_ema,
                 (ts::date - prev_ts::date)::int AS gap_days,
-                (ema / prev_ema) - 1 AS ret_arith,
-                LN(ema / prev_ema) AS ret_log
+                ema - prev_ema AS delta1,
+                CASE WHEN prev_ema = 0 THEN NULL
+                     ELSE (ema / prev_ema) - 1 END AS ret_arith,
+                CASE WHEN prev_ema <= 0 OR ema <= 0 THEN NULL
+                     ELSE LN(ema / prev_ema) END AS ret_log
             FROM lagged
             WHERE prev_ema IS NOT NULL
-              AND prev_ema <> 0
-              AND ema > 0
-              AND prev_ema > 0
               AND prev_ts IS NOT NULL
+              AND ema IS NOT NULL
+        ),
+        calc2 AS (
+            SELECT c.*,
+                c.delta1 - LAG(c.delta1) OVER (ORDER BY c.ts) AS delta2,
+                c.ret_arith - LAG(c.ret_arith) OVER (ORDER BY c.ts) AS delta_ret_arith,
+                c.ret_log - LAG(c.ret_log) OVER (ORDER BY c.ts) AS delta_ret_log
+            FROM calc c
         ),
         to_insert AS (
-            SELECT c.*
-            FROM calc c
+            SELECT c2.*
+            FROM calc2 c2
             CROSS JOIN st
-            WHERE (st.last_ts IS NULL) OR (c.ts > st.last_ts)
+            WHERE (st.last_ts IS NULL) OR (c2.ts > st.last_ts)
         ),
         ins AS (
             INSERT INTO {out_table} (
                 id, ts, tf, period, alignment_source, series, roll,
-                ema, prev_ema, gap_days, ret_arith, ret_log,
+                gap_days, delta1, delta2,
+                ret_arith, ret_log,
+                delta_ret_arith, delta_ret_log,
                 ingested_at
             )
             SELECT
                 id, ts, tf, period, alignment_source, series, roll,
-                ema, prev_ema, gap_days, ret_arith, ret_log,
+                gap_days, delta1, delta2,
+                ret_arith, ret_log,
+                delta_ret_arith, delta_ret_log,
                 now()
             FROM to_insert
             ON CONFLICT (id, ts, tf, period, alignment_source, series, roll) DO NOTHING
@@ -371,6 +439,8 @@ def main() -> None:
     _print(f"state={cfg.state_table}")
 
     engine = _get_engine(db_url)
+
+    _ensure_tables(engine, cfg.out_table, cfg.state_table)
 
     ids = _parse_ids_arg(cfg.ids_arg)
     series_list = _expand_series(cfg.series)

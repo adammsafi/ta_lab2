@@ -8,15 +8,13 @@ V2 semantics:
     * Alpha is based on a DAYS horizon: horizon_days = tf_days * period.
     * roll = FALSE on every tf_days-th day (per id, per tf), TRUE otherwise.
 
-Derivatives (STANDARDIZED NAMING):
-- d1_roll/d2_roll = daily derivatives for ALL rows (full daily series).
-- d1/d2 = derivatives ONLY across canonical endpoints (roll = FALSE).
+LEAN SCHEMA: EMA tables store only EMA values. All derivatives
+(d1, d2, delta1, delta2, ret_arith, ret_log) live in returns tables.
 
 REFACTORED CHANGES:
 - Extends BaseEMAFeature abstract class
 - Uses ema_operations utilities for alpha/derivative calculations
 - Eliminates duplication with other EMA modules
-- ~350 LOC → ~180 LOC (48% reduction)
 """
 
 from __future__ import annotations
@@ -36,7 +34,7 @@ from ta_lab2.features.m_tf.base_ema_feature import (
 from ta_lab2.features.m_tf.ema_operations import (
     filter_ema_periods_by_obs_count,
 )
-from ta_lab2.features.ema import compute_ema
+from ta_lab2.features.m_tf.polars_ema_operations import compute_bar_ema_numpy
 from ta_lab2.time.dim_timeframe import get_tf_days, list_tfs
 
 logger = logging.getLogger(__name__)
@@ -110,21 +108,21 @@ class MultiTFV2EMAFeature(BaseEMAFeature):
             where_clauses.append(f"id IN ({ids_str})")
 
         if start:
-            where_clauses.append(f"time_close >= '{start}'")
+            where_clauses.append(f"\"timestamp\" >= '{start}'")
 
         if end:
-            where_clauses.append(f"time_close <= '{end}'")
+            where_clauses.append(f"\"timestamp\" <= '{end}'")
 
         where_sql = " AND ".join(where_clauses)
 
         sql = f"""
             SELECT
                 id,
-                time_close AS ts,
+                "timestamp" AS ts,
                 close
             FROM {self.price_schema}.{self.price_table}
             WHERE {where_sql}
-            ORDER BY id, time_close
+            ORDER BY id, "timestamp"
         """
 
         with self.engine.connect() as conn:
@@ -220,27 +218,26 @@ class MultiTFV2EMAFeature(BaseEMAFeature):
         """
         Compute V2 EMAs for a single timeframe.
 
+        Vectorized with numpy: compute_bar_ema_numpy replaces pandas compute_ema,
+        numpy array ops replace pandas .diff() and .loc[] operations.
+
         Returns DataFrame with columns:
-        id, ts, tf, period, ema, tf_days, roll, d1_roll, d2_roll, d1, d2
+        id, ts, tf, period, tf_days, roll, ema
         """
         out_cols = [
             "id",
             "ts",
             "tf",
             "period",
-            "ema",
             "tf_days",
             "roll",
-            "d1_roll",
-            "d2_roll",
-            "d1",
-            "d2",
+            "ema",
+            "is_partial_end",
         ]
 
         if df_source.empty:
             return pd.DataFrame(columns=out_cols)
 
-        # Group by ID and compute EMAs
         out_frames: List[pd.DataFrame] = []
 
         for id_val, df_id in df_source.groupby("id"):
@@ -258,59 +255,57 @@ class MultiTFV2EMAFeature(BaseEMAFeature):
             if not valid_periods:
                 continue
 
-            # Day index for roll calculation
-            day_index = np.arange(len(df_id), dtype=int)
-            roll_false_mask = ((day_index + 1) % tf_spec.tf_days) == 0
+            # Pre-extract numpy arrays (shared across periods)
+            id_arr = df_id["id"].values
+            ts_arr = df_id["ts"].values
+            close_arr = df_id["close"].to_numpy(dtype=np.float64)
+
+            # Roll mask: FALSE every tf_days-th day (shared across periods)
+            day_index = np.arange(n_obs, dtype=np.int64)
+            roll_arr = ((day_index + 1) % tf_spec.tf_days) != 0  # True=roll
 
             for period in valid_periods:
                 period_int = int(period)
                 horizon_days = tf_spec.tf_days * period_int
 
-                # Compute daily EMA with horizon-based alpha
-                ema = compute_ema(
-                    df_id["close"],
-                    period=horizon_days,
-                    adjust=False,
-                    min_periods=horizon_days,
+                # Compute daily EMA with numpy (replaces pandas compute_ema)
+                ema_arr = compute_bar_ema_numpy(
+                    close_arr, period=horizon_days, min_periods=horizon_days
                 )
+
+                # Seeding rule: skip rows before horizon_days
+                if horizon_days > 1 and n_obs >= horizon_days:
+                    start_idx = horizon_days - 1
+                else:
+                    continue
+
+                # Slice all arrays from start_idx
+                ema_sl = ema_arr[start_idx:]
+                ts_sl = ts_arr[start_idx:]
+                id_sl = id_arr[start_idx:]
+                roll_sl = roll_arr[start_idx:]
+
+                # is_partial_end: True for rows after last canonical close
+                roll_sl_bool = roll_sl.astype(bool)
+                canon_positions = np.where(~roll_sl_bool)[0]
+                if len(canon_positions) > 0:
+                    last_canon_idx = canon_positions[-1]
+                    is_partial_sl = np.arange(len(roll_sl)) > last_canon_idx
+                else:
+                    is_partial_sl = np.ones(len(roll_sl), dtype=bool)
 
                 df_tf = pd.DataFrame(
                     {
-                        "id": df_id["id"].values,
-                        "ts": df_id["ts"].values,
+                        "id": id_sl,
+                        "ts": ts_sl,
                         "tf": tf_spec.tf,
                         "period": period_int,
                         "tf_days": tf_spec.tf_days,
-                        "ema": ema.values,
+                        "roll": roll_sl,
+                        "ema": ema_sl,
+                        "is_partial_end": is_partial_sl,
                     }
                 )
-
-                # Roll flag: FALSE every tf_days-th day
-                df_tf["roll"] = ~roll_false_mask
-
-                # STANDARDIZED NAMING:
-                # d1_roll/d2_roll = daily diffs for ALL rows
-                df_tf["d1_roll"] = df_tf["ema"].diff()
-                df_tf["d2_roll"] = df_tf["d1_roll"].diff()
-
-                # d1/d2 = diffs only across canonical endpoints (roll=FALSE)
-                df_tf["d1"] = np.nan
-                df_tf["d2"] = np.nan
-
-                can_mask = ~df_tf["roll"]
-                if can_mask.any():
-                    can_ema = df_tf.loc[can_mask, "ema"]
-                    can_d1 = can_ema.diff()
-                    can_d2 = can_d1.diff()
-                    df_tf.loc[can_mask, "d1"] = can_d1.values
-                    df_tf.loc[can_mask, "d2"] = can_d2.values
-
-                # Seeding rule: Skip rows until horizon_days elapsed
-                if horizon_days > 1 and len(df_tf) >= horizon_days:
-                    df_tf = df_tf.iloc[horizon_days - 1 :].reset_index(drop=True)
-                else:
-                    # Not enough history
-                    continue
 
                 out_frames.append(df_tf[out_cols])
 
@@ -320,20 +315,17 @@ class MultiTFV2EMAFeature(BaseEMAFeature):
         return pd.concat(out_frames, ignore_index=True)
 
     def get_output_schema(self) -> dict[str, str]:
-        """Define output table schema for V2 EMAs."""
+        """Define output table schema for V2 EMAs (lean - EMA only)."""
         return {
             "id": "INTEGER NOT NULL",
             "ts": "TIMESTAMPTZ NOT NULL",
             "tf": "TEXT NOT NULL",
             "period": "INTEGER NOT NULL",
-            "ema": "DOUBLE PRECISION",
-            "ingested_at": "TIMESTAMPTZ DEFAULT now()",
-            "d1": "DOUBLE PRECISION",
-            "d2": "DOUBLE PRECISION",
             "tf_days": "INTEGER",
             "roll": "BOOLEAN",
-            "d1_roll": "DOUBLE PRECISION",
-            "d2_roll": "DOUBLE PRECISION",
+            "ema": "DOUBLE PRECISION",
+            "is_partial_end": "BOOLEAN",
+            "ingested_at": "TIMESTAMPTZ DEFAULT now()",
             "PRIMARY KEY": "(id, ts, tf, period)",
         }
 
@@ -375,7 +367,7 @@ def refresh_cmc_ema_multi_tf_v2_incremental(
         periods=list(periods),
         output_schema=out_schema,
         output_table=out_table,
-        min_obs_multiplier=3.0,
+        min_obs_multiplier=1.0,
     )
 
     feature = MultiTFV2EMAFeature(

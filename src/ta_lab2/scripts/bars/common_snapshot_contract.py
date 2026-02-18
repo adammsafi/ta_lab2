@@ -27,6 +27,161 @@ from sqlalchemy.engine import Engine
 
 
 # =============================================================================
+# 0) Table Creation DDL (CREATE TABLE IF NOT EXISTS)
+# =============================================================================
+
+
+def ensure_bar_table_exists(
+    engine: Engine,
+    table_name: str,
+    *,
+    table_type: Literal["1d", "multi_tf", "cal", "cal_anchor"] = "multi_tf",
+    schema: str = "public",
+) -> None:
+    """
+    Create bar table if it doesn't exist.
+
+    Supports all 6 bar table types:
+    - 1d: cmc_price_bars_1d (SQL-based canonical 1D bars)
+    - multi_tf: cmc_price_bars_multi_tf (rolling multi-timeframe bars)
+    - cal: cmc_price_bars_multi_tf_cal_iso/us (calendar-aligned bars)
+    - cal_anchor: cmc_price_bars_multi_tf_cal_anchor_iso/us (calendar-anchored bars)
+
+    Args:
+        engine: SQLAlchemy engine
+        table_name: Name of table to create
+        table_type: Type of bar table (determines schema)
+        schema: Database schema (default: public)
+
+    Usage:
+        # From a builder:
+        ensure_bar_table_exists(self.engine, "cmc_price_bars_multi_tf", table_type="multi_tf")
+        ensure_bar_table_exists(self.engine, "cmc_price_bars_1d", table_type="1d")
+    """
+    # Handle fully-qualified table names (e.g., "public.cmc_price_bars_1d")
+    if "." in table_name:
+        schema, table_name = table_name.split(".", 1)
+
+    ddl = _generate_bar_table_ddl(table_name, table_type=table_type, schema=schema)
+
+    with engine.begin() as conn:
+        conn.execute(text(ddl))
+
+
+def _generate_bar_table_ddl(
+    table_name: str,
+    *,
+    table_type: Literal["1d", "multi_tf", "cal", "cal_anchor"],
+    schema: str = "public",
+) -> str:
+    """
+    Generate CREATE TABLE IF NOT EXISTS DDL for bar tables.
+
+    Unified template: all 6 bar tables share the same column set and PK.
+    Only variation: anchor tables include bar_anchor_offset.
+
+    PK = (id, tf, bar_seq, timestamp) for all table types.
+    """
+    fq_table = f"{schema}.{table_name}"
+    is_anchor = table_type == "cal_anchor"
+
+    anchor_col = ""
+    if is_anchor:
+        anchor_col = "\n    bar_anchor_offset           INTEGER       NULL,"
+
+    # Anchor tables include bar_anchor_offset in unique indexes
+    if is_anchor:
+        canon_ts_cols = "id, tf, bar_anchor_offset, timestamp"
+    else:
+        canon_ts_cols = "id, tf, timestamp"
+
+    return f"""
+CREATE TABLE IF NOT EXISTS {fq_table} (
+    -- Identity / PK
+    id                          INTEGER       NOT NULL,
+    timestamp                   TIMESTAMPTZ   NOT NULL,
+    tf                          TEXT          NOT NULL,
+
+    -- Bar structure
+    tf_days                     INTEGER       NULL,
+    bar_seq                     INTEGER       NOT NULL,
+    pos_in_bar                  INTEGER       NULL,
+    count_days                  INTEGER       NULL,
+    count_days_remaining        INTEGER       NULL,
+
+    -- Bar-level time boundaries
+    time_open_bar               TIMESTAMPTZ   NULL,
+    time_close_bar              TIMESTAMPTZ   NULL,
+
+    -- OHLCV
+    open                        DOUBLE PRECISION NOT NULL,
+    high                        DOUBLE PRECISION NOT NULL,
+    low                         DOUBLE PRECISION NOT NULL,
+    close                       DOUBLE PRECISION NOT NULL,
+    volume                      DOUBLE PRECISION NULL,
+    market_cap                  DOUBLE PRECISION NULL,
+    time_high                   TIMESTAMPTZ   NOT NULL,
+    time_low                    TIMESTAMPTZ   NOT NULL,
+
+    -- Partial flags
+    is_partial_start            BOOLEAN       NOT NULL DEFAULT FALSE,
+    is_partial_end              BOOLEAN       NOT NULL DEFAULT FALSE,
+
+    -- Per-row time boundaries
+    time_open                   TIMESTAMPTZ   NOT NULL,
+    time_close                  TIMESTAMPTZ   NOT NULL,
+    last_ts_half_open           TIMESTAMPTZ   NULL,{anchor_col}
+
+    -- Missing-days diagnostics
+    is_missing_days             BOOLEAN       NOT NULL DEFAULT FALSE,
+    count_missing_days          INTEGER       NULL,
+    count_missing_days_start    INTEGER       NULL,
+    count_missing_days_end      INTEGER       NULL,
+    count_missing_days_interior INTEGER       NULL,
+    missing_days_where          TEXT          NULL,
+    first_missing_day           TIMESTAMPTZ   NULL,
+    last_missing_day            TIMESTAMPTZ   NULL,
+
+    -- Repair booleans
+    repaired_timehigh           BOOLEAN       NOT NULL DEFAULT FALSE,
+    repaired_timelow            BOOLEAN       NOT NULL DEFAULT FALSE,
+    repaired_high               BOOLEAN       NOT NULL DEFAULT FALSE,
+    repaired_low                BOOLEAN       NOT NULL DEFAULT FALSE,
+    repaired_open               BOOLEAN       NOT NULL DEFAULT FALSE,
+    repaired_close              BOOLEAN       NOT NULL DEFAULT FALSE,
+    repaired_volume             BOOLEAN       NOT NULL DEFAULT FALSE,
+    repaired_market_cap         BOOLEAN       NOT NULL DEFAULT FALSE,
+
+    -- Source provenance
+    src_name                    TEXT          NULL,
+    src_load_ts                 TIMESTAMPTZ   NULL,
+    src_file                    TEXT          NULL,
+    ingested_at                 TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+
+    PRIMARY KEY (id, tf, bar_seq, timestamp)
+);
+
+-- Indexes for query performance
+CREATE INDEX IF NOT EXISTS ix_{table_name}_id_tf_barseq
+    ON {fq_table} (id, tf, bar_seq);
+
+CREATE INDEX IF NOT EXISTS ix_{table_name}_id_tf_timeclose
+    ON {fq_table} (id, tf, time_close);
+
+CREATE INDEX IF NOT EXISTS ix_{table_name}_id_tf_timestamp
+    ON {fq_table} (id, tf, timestamp);
+
+CREATE INDEX IF NOT EXISTS ix_{table_name}_tf_timestamp
+    ON {fq_table} (tf, timestamp);
+
+-- Unique constraint for canonical (non-partial) bars
+CREATE UNIQUE INDEX IF NOT EXISTS uq_{table_name}__canon_timestamp
+    ON {fq_table} ({canon_ts_cols})
+    WHERE is_partial_end = FALSE;
+"""
+
+
+# =============================================================================
 # 1) Base invariant: exactly 1 row per local day
 # =============================================================================
 
@@ -195,6 +350,8 @@ REQUIRED_COL_DEFAULTS: dict[str, Any] = {
     "time_close": pd.NaT,
     "time_high": pd.NaT,
     "time_low": pd.NaT,
+    "time_open_bar": pd.NaT,
+    "time_close_bar": pd.NaT,
     # OHLCV + market data
     "open": float("nan"),
     "high": float("nan"),
@@ -202,6 +359,8 @@ REQUIRED_COL_DEFAULTS: dict[str, Any] = {
     "close": float("nan"),
     "volume": float("nan"),
     "market_cap": float("nan"),
+    # Metadata
+    "tf_days": None,
     # Snapshot bookkeeping
     "timestamp": pd.NaT,
     "last_ts_half_open": pd.NaT,
@@ -210,12 +369,29 @@ REQUIRED_COL_DEFAULTS: dict[str, Any] = {
     "is_partial_start": False,
     "is_partial_end": True,
     "count_days_remaining": 0,
-    # Missing-days diagnostics (simple)
+    # Missing-days diagnostics
     "is_missing_days": False,
     "count_days": 0,
     "count_missing_days": 0,
+    "count_missing_days_start": 0,
+    "count_missing_days_end": 0,
+    "count_missing_days_interior": 0,
+    "missing_days_where": None,
     "first_missing_day": pd.NaT,
     "last_missing_day": pd.NaT,
+    # Source provenance
+    "src_name": None,
+    "src_file": None,
+    "src_load_ts": pd.NaT,
+    # Repair booleans
+    "repaired_timehigh": False,
+    "repaired_timelow": False,
+    "repaired_high": False,
+    "repaired_low": False,
+    "repaired_open": False,
+    "repaired_close": False,
+    "repaired_volume": False,
+    "repaired_market_cap": False,
 }
 
 
@@ -643,7 +819,7 @@ def make_upsert_sql(
     bars_table: str,
     cols: Sequence[str],
     *,
-    conflict_cols: Sequence[str] = ("id", "tf", "bar_seq", "time_close"),
+    conflict_cols: Sequence[str] = ("id", "tf", "bar_seq", "timestamp"),
 ) -> str:
     """Generate INSERT ... ON CONFLICT ... DO UPDATE SQL."""
     insert_cols = ", ".join(cols)
@@ -700,10 +876,13 @@ def _default_timestamp_cols_for_output(df: pd.DataFrame) -> list[str]:
         "time_close",
         "time_high",
         "time_low",
+        "time_open_bar",
+        "time_close_bar",
         "timestamp",
         "last_ts_half_open",
         "first_missing_day",
         "last_missing_day",
+        "src_load_ts",
     ]
     return [c for c in candidates if c in df.columns]
 
@@ -713,7 +892,7 @@ def upsert_bars(
     *,
     db_url: str,
     bars_table: str,
-    conflict_cols: Sequence[str] = ("id", "tf", "bar_seq", "time_close"),
+    conflict_cols: Sequence[str] = ("id", "tf", "bar_seq", "timestamp"),
     timestamp_cols: Sequence[str] | None = None,
     keep_rejects: bool = False,
     rejects_table: str | None = None,
@@ -749,12 +928,18 @@ def upsert_bars(
         "time_close",
         "time_high",
         "time_low",
+        "time_open_bar",
+        "time_close_bar",
         "open",
         "high",
         "low",
         "close",
         "volume",
         "market_cap",
+        "ingested_at",
+        "timestamp",
+        "last_ts_half_open",
+        "pos_in_bar",
         "is_partial_start",
         "is_partial_end",
         "is_missing_days",
@@ -767,6 +952,17 @@ def upsert_bars(
         "missing_days_where",
         "first_missing_day",
         "last_missing_day",
+        "src_name",
+        "src_file",
+        "src_load_ts",
+        "repaired_timehigh",
+        "repaired_timelow",
+        "repaired_high",
+        "repaired_low",
+        "repaired_open",
+        "repaired_close",
+        "repaired_volume",
+        "repaired_market_cap",
     ]
     df = df[[c for c in valid_cols if c in df.columns]]
 
@@ -857,6 +1053,20 @@ def enforce_ohlc_sanity(df: pd.DataFrame) -> pd.DataFrame:
         out["open"].notna() & out["close"].notna() & (out["open"] <= out["close"])
     )
 
+    # Ensure repair boolean columns exist
+    for rc in (
+        "repaired_timehigh",
+        "repaired_timelow",
+        "repaired_high",
+        "repaired_low",
+        "repaired_open",
+        "repaired_close",
+        "repaired_volume",
+        "repaired_market_cap",
+    ):
+        if rc not in out.columns:
+            out[rc] = False
+
     # --- BAD time_low FIX ---
     bad_tl = (
         out["time_low"].notna()
@@ -871,11 +1081,14 @@ def enforce_ohlc_sanity(df: pd.DataFrame) -> pd.DataFrame:
         out.loc[bad_tl & (~pick_open), "time_low"] = out.loc[
             bad_tl & (~pick_open), "time_close"
         ]
+        out.loc[bad_tl, "repaired_low"] = True
+        out.loc[bad_tl, "repaired_timelow"] = True
 
     # Clamp high up if it violates max(open, close)
     high_violate = oc_max.notna() & (out["high"].isna() | (out["high"] < oc_max))
     if high_violate.any():
         out.loc[high_violate, "high"] = oc_max.loc[high_violate]
+        out.loc[high_violate, "repaired_high"] = True
 
     # Clamp low down if it violates min(open, close)
     low_violate = oc_min.notna() & (out["low"].isna() | (out["low"] > oc_min))
@@ -887,6 +1100,7 @@ def enforce_ohlc_sanity(df: pd.DataFrame) -> pd.DataFrame:
         out.loc[low_violate & (~pick_open), "time_low"] = out.loc[
             low_violate & (~pick_open), "time_close"
         ]
+        out.loc[low_violate, "repaired_low"] = True
 
     return out
 
@@ -1128,28 +1342,32 @@ def load_daily_prices_for_id(
         DataFrame with daily OHLCV data, ts column in UTC
     """
     if ts_start is None:
-        where = "WHERE id = :id"
+        where = "WHERE s.id = :id"
         params = {"id": int(id_)}
     else:
-        where = 'WHERE id = :id AND "timestamp" >= :ts_start'
+        where = 'WHERE s.id = :id AND s."timestamp" >= :ts_start'
         params = {"id": int(id_), "ts_start": ts_start}
 
     sql = text(
         f"""
       SELECT
-        id,
-        "timestamp" AS ts,
-        timehigh,
-        timelow,
-        open,
-        high,
-        low,
-        close,
-        volume,
-        marketcap AS market_cap
-      FROM {daily_table}
+        s.id,
+        s."timestamp" AS ts,
+        s.timehigh,
+        s.timelow,
+        s.open,
+        s.high,
+        s.low,
+        s.close,
+        s.volume,
+        s.marketcap AS market_cap,
+        b1d.src_name,
+        b1d.ingested_at AS src_load_ts
+      FROM {daily_table} s
+      LEFT JOIN public.cmc_price_bars_1d b1d
+        ON b1d.id = s.id AND b1d."timestamp" = s."timestamp"
       {where}
-      ORDER BY "timestamp";
+      ORDER BY s."timestamp";
     """
     )
 
@@ -1205,7 +1423,7 @@ def load_last_snapshot_row(
     tf: str,
 ) -> dict | None:
     """
-    Load the most recent snapshot row for (id, tf) by time_close DESC.
+    Load the most recent snapshot row for (id, tf) by timestamp DESC.
 
     Used for incremental updates to find the last known bar state.
 
@@ -1223,7 +1441,7 @@ def load_last_snapshot_row(
       SELECT *
       FROM {bars_table}
       WHERE id = :id AND tf = :tf
-      ORDER BY time_close DESC
+      ORDER BY timestamp DESC
       LIMIT 1;
     """
     )
@@ -1264,10 +1482,10 @@ def load_last_snapshot_info_for_id_tfs(
       SELECT DISTINCT ON (tf)
         tf,
         bar_seq AS last_bar_seq,
-        time_close AS last_time_close
+        timestamp AS last_time_close
       FROM {bars_table}
       WHERE id = :id AND tf = ANY(:tfs)
-      ORDER BY tf, time_close DESC;
+      ORDER BY tf, timestamp DESC;
     """
     )
     eng = get_engine(db_url)
@@ -1366,6 +1584,118 @@ def detect_ohlc_violations(row: dict) -> list[tuple[str, str]]:
         violations.append(("low_gt_oc_min", "low_clamped_to_oc_min"))
 
     return violations
+
+
+# =============================================================================
+# 12.5) Asset data coverage table helpers
+# =============================================================================
+
+
+def ensure_coverage_table(engine: Engine, schema: str = "public") -> None:
+    """Create asset_data_coverage table if it doesn't exist."""
+    ddl = f"""
+    CREATE TABLE IF NOT EXISTS {schema}.asset_data_coverage (
+        id              INTEGER     NOT NULL,
+        source_table    TEXT        NOT NULL,
+        granularity     TEXT        NOT NULL,
+        n_rows          BIGINT      NOT NULL,
+        n_days          INTEGER     NOT NULL,
+        first_ts        TIMESTAMPTZ NOT NULL,
+        last_ts         TIMESTAMPTZ NOT NULL,
+        updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (id, source_table, granularity)
+    );
+    """
+    with engine.begin() as conn:
+        conn.execute(text(ddl))
+
+
+def upsert_coverage(
+    engine: Engine,
+    *,
+    id_: int,
+    source_table: str,
+    granularity: str,
+    n_rows: int,
+    n_days: int,
+    first_ts,
+    last_ts,
+    schema: str = "public",
+) -> None:
+    """
+    Upsert a single row into asset_data_coverage.
+
+    Args:
+        engine: SQLAlchemy engine
+        id_: Asset ID
+        source_table: Source table name (e.g., 'public.cmc_price_histories7')
+        granularity: Data granularity ('1D', '1H', etc.)
+        n_rows: Total number of rows
+        n_days: Whole calendar days of data
+        first_ts: Earliest timestamp
+        last_ts: Latest timestamp
+        schema: Database schema (default: public)
+    """
+    sql = text(
+        f"""
+        INSERT INTO {schema}.asset_data_coverage
+            (id, source_table, granularity, n_rows, n_days, first_ts, last_ts, updated_at)
+        VALUES
+            (:id, :source_table, :granularity, :n_rows, :n_days, :first_ts, :last_ts, NOW())
+        ON CONFLICT (id, source_table, granularity) DO UPDATE SET
+            n_rows     = EXCLUDED.n_rows,
+            n_days     = EXCLUDED.n_days,
+            first_ts   = EXCLUDED.first_ts,
+            last_ts    = EXCLUDED.last_ts,
+            updated_at = NOW();
+    """
+    )
+    with engine.begin() as conn:
+        conn.execute(
+            sql,
+            {
+                "id": int(id_),
+                "source_table": source_table,
+                "granularity": granularity,
+                "n_rows": int(n_rows),
+                "n_days": int(n_days),
+                "first_ts": first_ts,
+                "last_ts": last_ts,
+            },
+        )
+
+
+def get_coverage_n_days(
+    engine: Engine,
+    id_: int,
+    source_table: str = "public.cmc_price_histories7",
+    granularity: str = "1D",
+) -> int | None:
+    """
+    Look up n_days from asset_data_coverage for a given asset.
+
+    Returns:
+        n_days integer, or None if no coverage record exists.
+    """
+    sql = text(
+        """
+        SELECT n_days
+        FROM public.asset_data_coverage
+        WHERE id = :id
+          AND source_table = :source_table
+          AND granularity = :granularity;
+    """
+    )
+    with engine.connect() as conn:
+        row = conn.execute(
+            sql,
+            {
+                "id": int(id_),
+                "source_table": source_table,
+                "granularity": granularity,
+            },
+        ).fetchone()
+    return int(row[0]) if row else None
 
 
 def log_to_rejects(

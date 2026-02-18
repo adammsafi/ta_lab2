@@ -85,6 +85,8 @@ from ta_lab2.scripts.bars.common_snapshot_contract import (
     load_daily_prices_for_id,
     delete_bars_for_id_tf,
     create_rejects_table_ddl,
+    # Coverage table
+    get_coverage_n_days,
 )
 
 
@@ -249,8 +251,28 @@ class MultiTFBarBuilder(BaseBarBuilder):
             for _, row in state_df.iterrows():
                 state_map[row["tf"]] = row
 
+        # Look up coverage from asset_data_coverage (populated by 1D builder)
+        n_available = get_coverage_n_days(
+            get_engine(self.config.db_url),
+            id_,
+            source_table=self.config.daily_table,
+            granularity="1D",
+        )
+        if n_available is None:
+            # No coverage record yet – fall back to COUNT query
+            n_available = self._count_total_daily_rows(id_)
+        applicable_tfs = [
+            (d, label) for d, label in self.timeframes if d <= n_available
+        ]
+        skipped = len(self.timeframes) - len(applicable_tfs)
+        if skipped:
+            self.logger.info(
+                f"ID={id_}: Skipping {skipped} timeframe(s) "
+                f"(tf_days > {n_available} available days)"
+            )
+
         # Process each timeframe
-        for tf_days, tf_label in self.timeframes:
+        for tf_days, tf_label in applicable_tfs:
             try:
                 rows = self._build_bars_for_id_tf(
                     id_=id_,
@@ -317,7 +339,10 @@ class MultiTFBarBuilder(BaseBarBuilder):
             return len(bars)
 
         # Incremental append path
-        if daily_max_ts <= last["last_time_close"]:
+        if (
+            last["last_time_close"] is not None
+            and daily_max_ts <= last["last_time_close"]
+        ):
             # No new data
             return 0
 
@@ -422,7 +447,7 @@ class MultiTFBarBuilder(BaseBarBuilder):
             keep_rejects=args.keep_rejects,
             rejects_table=args.rejects_table if args.keep_rejects else None,
             num_processes=resolve_num_processes(args.num_processes),
-            log_level=args.log_level,
+            log_level=getattr(args, "log_level", "INFO"),
         )
 
         return cls(config=config, engine=engine, timeframes=timeframes)
@@ -538,12 +563,20 @@ class MultiTFBarBuilder(BaseBarBuilder):
             ]
         )
 
-        # time_open, time_close, last_ts_half_open
+        # time_open, time_close, time_open_bar, time_close_bar, last_ts_half_open
+        # time_close = per-row snapshot date (this row's ts) -- REVERTED to old behavior
+        # time_close_bar = bar's scheduled end date (time_open + tf_days days)
+        # time_open_bar = bar-level opening time (= time_open)
         one_ms = pl.duration(milliseconds=1)
         pl_df = pl_df.with_columns(
             [
-                pl.col("day_time_open").first().over("bar_seq").alias("time_open"),
+                pl.col("day_time_open").alias("time_open"),
+                pl.col("day_time_open").first().over("bar_seq").alias("time_open_bar"),
                 pl.col("ts").alias("time_close"),
+                (
+                    pl.col("day_time_open").first().over("bar_seq")
+                    + pl.duration(days=tf_days)
+                ).alias("time_close_bar"),
                 (pl.col("ts") + one_ms).alias("last_ts_half_open"),
             ]
         )
@@ -570,13 +603,15 @@ class MultiTFBarBuilder(BaseBarBuilder):
                 pl.col("time_close"),
                 pl.col("time_high"),
                 pl.col("time_low"),
+                pl.col("time_open_bar"),
+                pl.col("time_close_bar"),
                 pl.col("open_bar").cast(pl.Float64).alias("open"),
                 pl.col("high_bar").cast(pl.Float64).alias("high"),
                 pl.col("low_bar").cast(pl.Float64).alias("low"),
                 pl.col("close_bar").cast(pl.Float64).alias("close"),
                 pl.col("vol_bar").cast(pl.Float64).alias("volume"),
                 pl.col("mc_bar").cast(pl.Float64).alias("market_cap"),
-                pl.col("time_close").alias("timestamp"),
+                pl.col("ts").alias("timestamp"),
                 pl.col("last_ts_half_open"),
                 pl.col("pos_in_bar").cast(pl.Int64),
                 pl.col("is_partial_start").cast(pl.Boolean),
@@ -587,6 +622,9 @@ class MultiTFBarBuilder(BaseBarBuilder):
                 pl.col("count_missing_days").cast(pl.Int64),
                 pl.lit(None).cast(pl.Datetime).alias("first_missing_day"),
                 pl.lit(None).cast(pl.Datetime).alias("last_missing_day"),
+                pl.col("src_name"),
+                pl.col("src_load_ts"),
+                pl.lit("cmc_price_bars_1d").alias("src_file"),
             ]
         )
 
@@ -615,13 +653,19 @@ class MultiTFBarBuilder(BaseBarBuilder):
         Uses carry-forward optimization when strict gate passes.
         """
         last_time_close = last["last_time_close"]
-        last_bar_seq = int(last["last_bar_seq"])
-        last_pos_in_bar = int(last["last_pos_in_bar"])
+        last_bar_seq = (
+            int(last["last_bar_seq"]) if last["last_bar_seq"] is not None else 0
+        )
+        last_pos_in_bar = (
+            int(last["last_pos_in_bar"])
+            if last.get("last_pos_in_bar") is not None
+            else 0
+        )
 
-        if daily_max_ts <= last_time_close:
+        if last_time_close is not None and daily_max_ts <= last_time_close:
             return pd.DataFrame()
 
-        ts_start = last_time_close + _ONE_MS
+        ts_start = last_time_close + _ONE_MS if last_time_close is not None else None
         df_new = load_daily_prices_for_id(
             db_url=self.config.db_url,
             daily_table=self.config.daily_table,
@@ -722,12 +766,18 @@ class MultiTFBarBuilder(BaseBarBuilder):
                 out_row["tf"] = tf_label
                 out_row["tf_days"] = int(tf_days)
                 out_row["bar_seq"] = int(cur_bar_seq)
-                out_row["time_open"] = prev_time_open
+                out_row["time_open"] = prev_time_close + _ONE_MS
+                out_row["time_open_bar"] = prev_time_open
+                out_row["time_close"] = day_ts
+                out_row["time_close_bar"] = prev_time_open + pd.Timedelta(days=tf_days)
                 out_row["timestamp"] = day_ts
                 out_row["last_ts_half_open"] = day_ts + _ONE_MS
                 out_row["count_days_remaining"] = int(count_days_remaining)
                 out_row.setdefault("first_missing_day", pd.NaT)
                 out_row.setdefault("last_missing_day", pd.NaT)
+                out_row["src_name"] = d.get("src_name")
+                out_row["src_load_ts"] = d.get("src_load_ts")
+                out_row["src_file"] = "cmc_price_bars_1d"
 
                 out_row = (
                     normalize_output_schema(pd.DataFrame([out_row])).iloc[0].to_dict()
@@ -918,8 +968,11 @@ class MultiTFBarBuilder(BaseBarBuilder):
             "tf": tf_label,
             "tf_days": int(tf_days),
             "bar_seq": int(cur_bar_seq),
-            "time_open": prev_time_open,
+            "time_open": pd.to_datetime(prev_snapshot["time_close"], utc=True)
+            + _ONE_MS,
+            "time_open_bar": prev_time_open,
             "time_close": day_ts,
+            "time_close_bar": prev_time_open + pd.Timedelta(days=tf_days),
             "time_high": new_time_high,
             "time_low": new_time_low,
             "open": prev_open,
@@ -941,11 +994,24 @@ class MultiTFBarBuilder(BaseBarBuilder):
             "count_missing_days": int(miss_diag.count_missing_days),
             "first_missing_day": pd.NaT,
             "last_missing_day": pd.NaT,
+            "src_name": d.get("src_name"),
+            "src_load_ts": d.get("src_load_ts"),
+            "src_file": "cmc_price_bars_1d",
         }
 
     # =========================================================================
     # Helper methods
     # =========================================================================
+
+    def _count_total_daily_rows(self, id_: int) -> int:
+        """Count total daily rows for an ID in the source table."""
+        engine = get_engine(self.config.db_url)
+        with engine.connect() as conn:
+            result = conn.execute(
+                text(f"SELECT COUNT(*) FROM {self.config.daily_table} WHERE id = :id"),
+                {"id": int(id_)},
+            ).scalar()
+        return int(result or 0)
 
     def _load_last_snapshot_info(self, id_: int, tf: str) -> dict | None:
         """Load last snapshot info for (id, tf)."""
@@ -968,7 +1034,7 @@ class MultiTFBarBuilder(BaseBarBuilder):
                       FROM {bars_table} b
                       JOIN last l
                         ON b.id = l.id AND b.tf = l.tf AND b.bar_seq = l.last_bar_seq
-                      ORDER BY b.time_close DESC
+                      ORDER BY b.timestamp DESC
                       LIMIT 1
                     ),
                     pos AS (
@@ -979,7 +1045,7 @@ class MultiTFBarBuilder(BaseBarBuilder):
                     )
                     SELECT
                       (SELECT last_bar_seq FROM last) AS last_bar_seq,
-                      (SELECT time_close FROM last_row) AS last_time_close,
+                      (SELECT timestamp FROM last_row) AS last_time_close,
                       (SELECT last_pos_in_bar FROM pos) AS last_pos_in_bar;
                     """
                     ),
@@ -988,7 +1054,13 @@ class MultiTFBarBuilder(BaseBarBuilder):
                 .mappings()
                 .first()
             )
-        return dict(row) if row else None
+        if row is None:
+            return None
+        d = dict(row)
+        # If no bars exist yet, all values are None - treat as no data
+        if d.get("last_bar_seq") is None:
+            return None
+        return d
 
     def _load_last_bar_snapshot_row(
         self, id_: int, tf: str, bar_seq: int
@@ -1005,7 +1077,7 @@ class MultiTFBarBuilder(BaseBarBuilder):
                     SELECT *
                     FROM {bars_table}
                     WHERE id = :id AND tf = :tf AND bar_seq = :bar_seq
-                    ORDER BY time_close DESC
+                    ORDER BY timestamp DESC
                     LIMIT 1;
                     """
                     ),
@@ -1050,7 +1122,7 @@ class MultiTFBarBuilder(BaseBarBuilder):
     ) -> None:
         """Update state table for (id, tf)."""
         last_bar_seq = int(bars["bar_seq"].max())
-        last_time_close = pd.to_datetime(bars["time_close"].max(), utc=True)
+        last_time_close = pd.to_datetime(bars["timestamp"].max(), utc=True)
 
         upsert_state(
             self.config.db_url,

@@ -111,9 +111,6 @@ def _ensure_state_rows(
     if not pairs:
         return
 
-    ids = [p[0] for p in pairs]
-    tfs = [p[1] for p in pairs]
-
     # Use a join between two unnests to materialize candidate keys;
     # then filter to the exact pairs via EXISTS against a VALUES list built safely.
     # Easiest + safe approach: insert per pair in executemany.
@@ -174,7 +171,7 @@ def _run_one_pair(engine: Engine, cfg: RunnerConfig, one_id: int, one_tf: str) -
                 b.id,
                 b.tf,
                 b.bar_seq,
-                b.time_close,
+                b."timestamp" AS time_close,
                 b.close
             FROM {cfg.bars_table} b
             CROSS JOIN st

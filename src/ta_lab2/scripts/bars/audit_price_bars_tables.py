@@ -96,7 +96,7 @@ def audit_table(engine: Engine, table: str, ids: List[int]) -> pd.DataFrame:
 
     # Identify timestamp column names commonly used
     ts_col = None
-    for cand in ["time_close", "ts", "timestamp"]:
+    for cand in ["timestamp", "time_close", "ts"]:
         if cand in colset:
             ts_col = cand
             break

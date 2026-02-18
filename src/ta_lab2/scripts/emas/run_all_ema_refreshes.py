@@ -11,12 +11,16 @@ Usage:
     # Run only specific refreshers
     python run_all_ema_refreshes.py --ids all --only multi_tf,cal
 
+    # Use 8 parallel processes
+    python run_all_ema_refreshes.py --ids all -n 8
+
     # Dry run to see what would execute
     python run_all_ema_refreshes.py --ids all --dry-run
 
     # Continue on errors
     python run_all_ema_refreshes.py --ids all --continue-on-error
 """
+
 from __future__ import annotations
 
 import argparse
@@ -60,12 +64,6 @@ ALL_REFRESHERS = [
         script_path="refresh_cmc_ema_multi_tf_cal_anchor_from_bars.py",
         description="Calendar-anchored EMAs",
         supports_scheme=True,
-    ),
-    RefresherConfig(
-        name="v2",
-        script_path="refresh_cmc_ema_multi_tf_v2.py",
-        description="Daily-space EMAs (v2)",
-        supports_scheme=False,
     ),
 ]
 
@@ -129,12 +127,7 @@ def build_command(
     anchor_scheme: str | None,
     no_update: bool,
     full_refresh: bool,
-    v2_alignment_type: str,
-    v2_include_noncanonical: bool,
-    price_schema: str,
-    price_table: str,
-    out_schema: str,
-    v2_out_table: str,
+    num_processes: int | None,
     quiet: bool,
 ) -> list[str]:
     """
@@ -150,12 +143,7 @@ def build_command(
         anchor_scheme: Scheme for calendar-anchored EMAs (us/iso/both)
         no_update: Whether to skip update
         full_refresh: Whether to do full refresh
-        v2_alignment_type: Alignment type for v2
-        v2_include_noncanonical: Include noncanonical for v2
-        price_schema: Price schema for v2
-        price_table: Price table for v2
-        out_schema: Output schema for v2
-        v2_out_table: Output table for v2
+        num_processes: Number of parallel processes (default: 4)
         quiet: Quiet mode
 
     Returns:
@@ -170,51 +158,41 @@ def build_command(
     if refresher.name == "multi_tf":
         # refresh_cmc_ema_multi_tf_from_bars.py
         cmd.extend(["--ids", ids])
-        cmd.extend(["--start", start])
-        if end:
-            cmd.extend(["--end", end])
+        cmd.extend(["--out-table", "cmc_ema_multi_tf"])
+        cmd.extend(["--state-table", "cmc_ema_multi_tf_state"])
         cmd.extend(["--periods", periods])
-        if no_update:
-            cmd.append("--no-update")
+        if num_processes is not None:
+            cmd.extend(["--num-processes", str(num_processes)])
+        if full_refresh:
+            cmd.append("--full-refresh")
 
     elif refresher.name == "cal":
-        # refresh_cmc_ema_multi_tf_cal_from_bars.py
+        # refresh_cmc_ema_multi_tf_cal_from_bars.py (doesn't support --start/--end)
         cmd.extend(["--ids", ids])
+        cmd.extend(["--out-table", "cmc_ema_multi_tf_cal"])
+        cmd.extend(["--state-table", "cmc_ema_multi_tf_cal_state"])
         scheme = cal_scheme or "both"
         cmd.extend(["--scheme", scheme])
-        if start:
-            cmd.extend(["--start", start])
-        if end:
-            cmd.extend(["--end", end])
         cmd.extend(["--periods", periods])
+        if num_processes is not None:
+            cmd.extend(["--num-processes", str(num_processes)])
         if full_refresh:
             cmd.append("--full-refresh")
 
     elif refresher.name == "cal_anchor":
-        # refresh_cmc_ema_multi_tf_cal_anchor_from_bars.py
+        # refresh_cmc_ema_multi_tf_cal_anchor_from_bars.py (doesn't support --start/--end)
         cmd.extend(["--ids", ids])
+        cmd.extend(["--out-table", "cmc_ema_multi_tf_cal_anchor"])
+        cmd.extend(["--state-table", "cmc_ema_multi_tf_cal_anchor_state"])
         scheme = anchor_scheme or "both"
         cmd.extend(["--scheme", scheme])
-        cmd.extend(["--start", start])
-        if end:
-            cmd.extend(["--end", end])
         cmd.extend(["--periods", periods])
+        if num_processes is not None:
+            cmd.extend(["--num-processes", str(num_processes)])
         if no_update:
             cmd.append("--no-update")
         if quiet:
             cmd.append("--quiet")
-
-    elif refresher.name == "v2":
-        # refresh_cmc_ema_multi_tf_v2.py
-        cmd.extend(["--ids", ids])
-        cmd.extend(["--periods", periods])
-        cmd.extend(["--alignment-type", v2_alignment_type])
-        if v2_include_noncanonical:
-            cmd.append("--include-noncanonical")
-        cmd.extend(["--price-schema", price_schema])
-        cmd.extend(["--price-table", price_table])
-        cmd.extend(["--out-schema", out_schema])
-        cmd.extend(["--out-table", v2_out_table])
 
     return cmd
 
@@ -236,10 +214,10 @@ def run_refresher(
     Returns:
         RefresherResult with execution details
     """
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print(f"Running: {refresher.name} - {refresher.description}")
     print(f"Command: {' '.join(cmd)}")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
 
     start = time.perf_counter()
 
@@ -302,9 +280,9 @@ def run_refresher(
 
 def print_summary(results: list[RefresherResult]) -> bool:
     """Print execution summary."""
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("EXECUTION SUMMARY")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
 
     total_duration = sum(r.duration_sec for r in results)
     successful = [r for r in results if r.success]
@@ -326,7 +304,7 @@ def print_summary(results: list[RefresherResult]) -> bool:
             error_info = f" ({r.error_message})" if r.error_message else ""
             print(f"  - {r.name}: {r.duration_sec:.1f}s{error_info}")
 
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
 
     if failed:
         print(f"\n[WARNING] {len(failed)} refresher(s) failed!")
@@ -417,6 +395,9 @@ Examples:
   # Run only multi_tf and cal refreshers
   python run_all_ema_refreshes.py --ids all --only multi_tf,cal
 
+  # Use 8 parallel processes for EMA computation
+  python run_all_ema_refreshes.py --ids all -n 8
+
   # Continue on errors (don't stop if a refresher fails)
   python run_all_ema_refreshes.py --ids all --continue-on-error
 
@@ -424,16 +405,17 @@ Examples:
   python run_all_ema_refreshes.py --ids all --dry-run
 
 Available refreshers:
-  multi_tf    - Multi-TF EMAs (tf_day based)
+  multi_tf    - Multi-TF EMAs (tf_day based, dual ema + ema_bar)
   cal         - Calendar-aligned EMAs (us/iso)
   cal_anchor  - Calendar-anchored EMAs
-  v2          - Daily-space EMAs (v2)
 
-CONNECTION NOTES: The multi_tf script uses parallel workers (default: 4).
+CONNECTION NOTES: All EMA refreshers use parallel workers (default: 4).
+Use -n/--num-processes to increase or decrease parallelism.
 If you see "too many clients already" errors:
-  1. Close other database clients (PgAdmin, DBeaver, etc.)
-  2. Check active connections: SELECT count(*) FROM pg_stat_activity;
-  3. Increase Postgres max_connections if needed
+  1. Reduce num-processes: -n 2
+  2. Close other database clients (PgAdmin, DBeaver, etc.)
+  3. Check active connections: SELECT count(*) FROM pg_stat_activity;
+  4. Increase Postgres max_connections if needed
         """,
     )
 
@@ -468,17 +450,12 @@ If you see "too many clients already" errors:
         help="For CAL runner: ignore state and run full/args.start",
     )
 
-    # v2-specific knobs
-    p.add_argument("--v2-alignment-type", default="tf_day")
-    p.add_argument("--v2-include-noncanonical", action="store_true")
-    p.add_argument("--price-schema", default="public")
     p.add_argument(
-        "--price-table",
-        default="cmc_price_bars_1d",
-        help="V2 price table (default: cmc_price_bars_1d - validated bars)",
+        "-n",
+        "--num-processes",
+        type=int,
+        help="Number of parallel processes for EMA refreshers (default: 4)",
     )
-    p.add_argument("--out-schema", default="public")
-    p.add_argument("--v2-out-table", default="cmc_ema_multi_tf_v2")
 
     p.add_argument(
         "--only",
@@ -546,9 +523,9 @@ def main(argv: list[str] | None = None) -> int:
         print("[ERROR] No refreshers selected!")
         return 1
 
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("EMA REFRESHERS ORCHESTRATOR")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
     print(f"\nRefreshers to run: {', '.join(r.name for r in refreshers)}")
     print(f"IDs: {args.ids}")
     print(f"Start: {args.start}")
@@ -573,12 +550,7 @@ def main(argv: list[str] | None = None) -> int:
             anchor_scheme=args.anchor_scheme,
             no_update=args.no_update,
             full_refresh=args.full_refresh,
-            v2_alignment_type=args.v2_alignment_type,
-            v2_include_noncanonical=args.v2_include_noncanonical,
-            price_schema=args.price_schema,
-            price_table=args.price_table,
-            out_schema=args.out_schema,
-            v2_out_table=args.v2_out_table,
+            num_processes=args.num_processes,
             quiet=args.quiet,
         )
 

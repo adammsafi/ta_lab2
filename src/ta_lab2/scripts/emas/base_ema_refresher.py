@@ -32,6 +32,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from multiprocessing import cpu_count
 from typing import Optional, Sequence, Any
 import argparse
 import logging
@@ -72,12 +73,160 @@ CREATE TABLE IF NOT EXISTS {schema}.{table} (
     timestamp TIMESTAMPTZ,
     ema_value DOUBLE PRECISION,
     violation_type TEXT,  -- 'nan', 'infinity', 'negative', 'out_of_price_bounds', 'out_of_statistical_bounds'
-    bounds_info TEXT,     -- JSON with bound details: {"price_min": X, "price_max": Y, "stat_mean": Z, "stat_std": W}
+    bounds_info TEXT,     -- JSON with bound details: {{"price_min": X, "price_max": Y, "stat_mean": Z, "stat_std": W}}
     source_bar_close DOUBLE PRECISION,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     PRIMARY KEY (id, tf, period, timestamp, violation_type)
 );
 """
+
+
+# =============================================================================
+# EMA Output Table DDL (CREATE TABLE IF NOT EXISTS)
+# =============================================================================
+
+
+def ensure_ema_table_exists(
+    engine: Engine,
+    table_name: str,
+    *,
+    table_type: str = "multi_tf",
+    schema: str = "public",
+) -> None:
+    """
+    Create EMA output table if it doesn't exist.
+
+    Supports all EMA table types:
+    - multi_tf: cmc_ema_multi_tf (rolling EMAs from multi-TF bars)
+    - v2: cmc_ema_multi_tf_v2 (calendar EMAs from bars)
+    - cal: cmc_ema_multi_tf_cal_iso/us (calendar-aligned EMAs)
+    - cal_anchor: cmc_ema_multi_tf_cal_anchor_iso/us (calendar-anchored EMAs)
+
+    Args:
+        engine: SQLAlchemy engine
+        table_name: Name of table to create
+        table_type: Type of EMA table (determines schema)
+        schema: Database schema (default: public)
+
+    Usage:
+        # From a refresher:
+        ensure_ema_table_exists(self.engine, "cmc_ema_multi_tf", table_type="multi_tf")
+        ensure_ema_table_exists(self.engine, "cmc_ema_multi_tf_v2", table_type="v2")
+    """
+    # Handle fully-qualified table names (e.g., "public.cmc_ema_multi_tf")
+    if "." in table_name:
+        schema, table_name = table_name.split(".", 1)
+
+    ddl = _generate_ema_table_ddl(table_name, table_type=table_type, schema=schema)
+
+    with engine.begin() as conn:
+        conn.execute(text(ddl))
+
+
+def _generate_ema_table_ddl(
+    table_name: str,
+    *,
+    table_type: str,
+    schema: str = "public",
+) -> str:
+    """
+    Generate CREATE TABLE IF NOT EXISTS DDL for EMA tables.
+
+    Returns complete DDL including:
+    - Column definitions with types and constraints
+    - Primary key
+    - Indexes
+    - Partial unique indexes for canonical (non-roll) rows
+    """
+    fq_table = f"{schema}.{table_name}"
+
+    if table_type == "multi_tf":
+        # Rolling multi-timeframe EMAs (from multi-TF bars) - dual EMA schema
+        return f"""
+CREATE TABLE IF NOT EXISTS {fq_table} (
+    id INTEGER NOT NULL,
+    tf TEXT NOT NULL,
+    ts TIMESTAMPTZ NOT NULL,
+    period INTEGER NOT NULL,
+    tf_days INTEGER,
+    roll BOOLEAN,
+    ema DOUBLE PRECISION,
+    ema_bar DOUBLE PRECISION,
+    is_partial_end BOOLEAN,
+    ingested_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (id, tf, ts, period)
+);
+
+-- Index for roll=true queries
+CREATE INDEX IF NOT EXISTS ix_{table_name}_roll_true_id_tf_period_ts
+    ON {fq_table} (id, tf, period, ts)
+    WHERE roll = TRUE;
+
+-- Unique constraint for canonical (non-roll) rows
+CREATE UNIQUE INDEX IF NOT EXISTS uq_{table_name}__canon_ts
+    ON {fq_table} (id, tf, period, ts)
+    WHERE roll = FALSE;
+"""
+
+    elif table_type == "v2":
+        # V2 EMAs from daily bars - lean schema
+        return f"""
+CREATE TABLE IF NOT EXISTS {fq_table} (
+    id INTEGER NOT NULL,
+    ts TIMESTAMPTZ NOT NULL,
+    tf TEXT NOT NULL,
+    period INTEGER NOT NULL,
+    tf_days INTEGER,
+    roll BOOLEAN,
+    ema DOUBLE PRECISION,
+    is_partial_end BOOLEAN,
+    ingested_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (id, ts, tf, period)
+);
+
+-- Index for queries
+CREATE INDEX IF NOT EXISTS {table_name}__id_tf_period_ts_idx
+    ON {fq_table} (id, tf, period, ts);
+
+-- Unique constraint for canonical (non-roll) rows
+CREATE UNIQUE INDEX IF NOT EXISTS uq_{table_name}__canon_ts
+    ON {fq_table} (id, tf, period, ts)
+    WHERE roll = FALSE;
+"""
+
+    elif table_type in ("cal", "cal_anchor"):
+        # Calendar-aligned or calendar-anchored EMAs - lean schema
+        # Both have same schema (10 columns)
+        return f"""
+CREATE TABLE IF NOT EXISTS {fq_table} (
+    id INTEGER NOT NULL,
+    tf TEXT NOT NULL,
+    ts TIMESTAMPTZ NOT NULL,
+    period INTEGER NOT NULL,
+    tf_days INTEGER,
+    roll BOOLEAN,
+    ema DOUBLE PRECISION,
+    ema_bar DOUBLE PRECISION,
+    is_partial_end BOOLEAN,
+    ingested_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (id, tf, ts, period)
+);
+
+-- Indexes for query performance
+CREATE INDEX IF NOT EXISTS {table_name}_id_ts_idx
+    ON {fq_table} (id, ts);
+
+CREATE INDEX IF NOT EXISTS {table_name}_tf_ts_idx
+    ON {fq_table} (tf, ts);
+
+-- Unique constraint for canonical (non-roll) rows
+CREATE UNIQUE INDEX IF NOT EXISTS uq_{table_name}__canon_ts
+    ON {fq_table} (id, tf, period, ts)
+    WHERE roll = FALSE;
+"""
+
+    else:
+        raise ValueError(f"Unknown table_type: {table_type}")
 
 
 # =============================================================================
@@ -420,7 +569,7 @@ class EMARefresherConfig:
     output_schema: str
     output_table: str
     state_table: str
-    num_processes: int
+    num_processes: Optional[int]
     full_refresh: bool
     log_level: str
     log_file: Optional[str] = None
@@ -493,9 +642,67 @@ class BaseEMARefresher(ABC):
             debug=config.debug,
         )
 
+        # Create output table if not exists
+        self._ensure_output_table_exists()
+
         # Create rejects table if validation enabled
         if config.validate_output:
             self._ensure_rejects_table()
+
+    # =========================================================================
+    # Table Creation
+    # =========================================================================
+
+    def get_table_type(self) -> str:
+        """
+        Get table type for DDL generation.
+
+        Subclasses should override to specify their table type:
+        - "multi_tf" for refresh_cmc_ema_multi_tf_from_bars
+        - "v2" for refresh_cmc_ema_multi_tf_v2
+        - "cal" for cal_iso and cal_us refreshers
+        - "cal_anchor" for cal_anchor_iso and cal_anchor_us refreshers
+
+        Returns:
+            Table type string (default: auto-detected from table name)
+        """
+        # Auto-detect from table name
+        table_name = self.config.output_table.lower()
+
+        if "_v2" in table_name:
+            return "v2"
+        elif "cal_anchor" in table_name:
+            return "cal_anchor"
+        elif "_cal_" in table_name:
+            return "cal"
+        else:
+            return "multi_tf"
+
+    def _ensure_output_table_exists(self) -> None:
+        """
+        Create EMA output table if it doesn't exist.
+
+        Uses get_table_type() to determine schema, then generates
+        and executes CREATE TABLE IF NOT EXISTS DDL.
+
+        Called during __init__ before any EMA computation.
+        """
+        table_name = self.config.output_table
+        table_type = self.get_table_type()
+
+        self.logger.debug(f"Ensuring table exists: {table_name} (type={table_type})")
+
+        try:
+            ensure_ema_table_exists(
+                self.engine,
+                table_name,
+                table_type=table_type,
+                schema=self.config.output_schema,
+            )
+            self.logger.debug(f"Table ready: {table_name}")
+        except Exception as e:
+            self.logger.error(f"Failed to create table {table_name}: {e}")
+            raise
 
     # =========================================================================
     # Validation Setup
@@ -811,8 +1018,9 @@ class BaseEMARefresher(ABC):
         1. Loads existing state
         2. For each ID, computes dirty window start based on state
         3. Creates WorkerTask objects for parallel execution
-        4. Uses EMAComputationOrchestrator to execute tasks in parallel
-        5. Updates state table after all IDs complete
+        4. When fewer IDs than workers, splits TFs across workers for parallelism
+        5. Uses EMAComputationOrchestrator to execute tasks in parallel
+        6. Updates state table after all IDs complete
 
         Parallelization: Uses num_processes workers (default: min(cpu_count(), 4))
         """
@@ -852,14 +1060,28 @@ class BaseEMARefresher(ABC):
             )
             tasks.append(task)
 
-        self.logger.info(f"Created {len(tasks)} worker tasks")
-
-        # Execute in parallel using orchestrator
+        # TF-level splitting: when fewer IDs than workers, split TFs for parallelism
+        effective_num_processes = self.config.num_processes or min(cpu_count(), 4)
         orchestrator = EMAComputationOrchestrator(
             worker_fn=self.get_worker_function(),
-            num_processes=self.config.num_processes,
+            num_processes=effective_num_processes,
             logger=self.logger,
         )
+
+        if len(tasks) < effective_num_processes:
+            all_tfs = self.get_timeframes()
+            if all_tfs:
+                tasks = EMAComputationOrchestrator.split_tasks_by_tf(
+                    tasks, all_tfs, effective_num_processes
+                )
+                self.logger.info(
+                    f"TF-split: {len(self.config.ids)} IDs -> {len(tasks)} tasks "
+                    f"({len(all_tfs)} TFs split across workers)"
+                )
+            else:
+                self.logger.info(f"Created {len(tasks)} worker tasks (no TF split)")
+        else:
+            self.logger.info(f"Created {len(tasks)} worker tasks")
 
         results = orchestrator.execute(tasks)
         total_rows = sum(results)
@@ -880,8 +1102,9 @@ class BaseEMARefresher(ABC):
 
         This method:
         1. Creates WorkerTask objects for each ID with start="2010-01-01"
-        2. Uses EMAComputationOrchestrator to execute tasks in parallel
-        3. Updates state table after all IDs complete
+        2. When fewer IDs than workers, splits TFs across workers for parallelism
+        3. Uses EMAComputationOrchestrator to execute tasks in parallel
+        4. Updates state table after all IDs complete
 
         Parallelization: Uses num_processes workers (default: min(cpu_count(), 4))
         """
@@ -902,14 +1125,30 @@ class BaseEMARefresher(ABC):
             )
             tasks.append(task)
 
-        self.logger.info(f"Created {len(tasks)} worker tasks (full refresh)")
-
-        # Execute in parallel using orchestrator
+        # TF-level splitting: when fewer IDs than workers, split TFs for parallelism
+        effective_num_processes = self.config.num_processes or min(cpu_count(), 4)
         orchestrator = EMAComputationOrchestrator(
             worker_fn=self.get_worker_function(),
-            num_processes=self.config.num_processes,
+            num_processes=effective_num_processes,
             logger=self.logger,
         )
+
+        if len(tasks) < effective_num_processes:
+            all_tfs = self.get_timeframes()
+            if all_tfs:
+                tasks = EMAComputationOrchestrator.split_tasks_by_tf(
+                    tasks, all_tfs, effective_num_processes
+                )
+                self.logger.info(
+                    f"TF-split full refresh: {len(self.config.ids)} IDs -> "
+                    f"{len(tasks)} tasks ({len(all_tfs)} TFs split across workers)"
+                )
+            else:
+                self.logger.info(
+                    f"Created {len(tasks)} worker tasks (full refresh, no TF split)"
+                )
+        else:
+            self.logger.info(f"Created {len(tasks)} worker tasks (full refresh)")
 
         results = orchestrator.execute(tasks)
         total_rows = sum(results)
@@ -1049,10 +1288,10 @@ If you see "too many clients already" errors:
 
         # Output configuration
         p.add_argument("--out-schema", default="public")
-        p.add_argument("--out-table", required=True, help="Output EMA table name")
+        p.add_argument("--out-table", default=None, help="Output EMA table name")
         p.add_argument(
             "--state-table",
-            required=True,
+            default=None,
             help="State table name for incremental tracking",
         )
 

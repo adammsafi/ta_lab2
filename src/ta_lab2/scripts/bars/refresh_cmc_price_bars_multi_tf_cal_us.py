@@ -56,6 +56,10 @@ from ta_lab2.scripts.bars.common_snapshot_contract import (
     load_daily_prices_for_id,
     delete_bars_for_id_tf,
     load_last_snapshot_info_for_id_tfs,
+    get_coverage_n_days,
+)
+from ta_lab2.scripts.bars.polars_bar_operations import (
+    compute_extrema_timestamps_with_new_extreme_detection,
 )
 from ta_lab2.scripts.bars.derive_multi_tf_from_1d import (
     derive_multi_tf_bars,
@@ -141,6 +145,17 @@ def _bar_end_day(bar_start: date, unit: str, qty: int) -> date:
     """Return last day (inclusive) of calendar bar."""
     next_start = _next_boundary(bar_start, unit, qty)
     return next_start - timedelta(days=1)
+
+
+def _nominal_tf_days(spec: CalSpec) -> int:
+    """Approximate minimum calendar days needed for one complete bar."""
+    if spec.unit == "W":
+        return spec.qty * 7
+    if spec.unit == "M":
+        return spec.qty * 28
+    if spec.unit == "Y":
+        return spec.qty * 365
+    return 1
 
 
 # =============================================================================
@@ -323,13 +338,13 @@ class CalendarUSBarBuilder(BaseBarBuilder):
                     if not spec_bars.empty:
                         last_bar_seq = int(spec_bars["bar_seq"].max())
                         last_time_close = pd.to_datetime(
-                            spec_bars["time_close"].max(), utc=True
+                            spec_bars["timestamp"].max(), utc=True
                         )
                         daily_min_ts = pd.to_datetime(
                             spec_bars["time_open"].min(), utc=True
                         )
                         daily_max_ts = pd.to_datetime(
-                            spec_bars["time_close"].max(), utc=True
+                            spec_bars["timestamp"].max(), utc=True
                         )
 
                         upsert_state(
@@ -339,13 +354,14 @@ class CalendarUSBarBuilder(BaseBarBuilder):
                                 {
                                     "id": int(id_),
                                     "tf": spec.tf,
+                                    "tz": self.config.tz,
                                     "daily_min_seen": daily_min_ts,
                                     "daily_max_seen": daily_max_ts,
                                     "last_bar_seq": last_bar_seq,
                                     "last_time_close": last_time_close,
                                 }
                             ],
-                            with_tz=False,
+                            with_tz=True,
                         )
 
             return total_rows
@@ -372,7 +388,7 @@ class CalendarUSBarBuilder(BaseBarBuilder):
             self.config.db_url,
             self.get_state_table_name(),
             [id_],
-            with_tz=False,
+            with_tz=True,
         )
 
         state_map = {}
@@ -380,8 +396,25 @@ class CalendarUSBarBuilder(BaseBarBuilder):
             for _, row in state_df.iterrows():
                 state_map[row["tf"]] = row
 
+        # Look up coverage from asset_data_coverage (populated by 1D builder)
+        n_available = get_coverage_n_days(
+            get_engine(self.config.db_url),
+            id_,
+            source_table=self.config.daily_table,
+            granularity="1D",
+        )
+        if n_available is None:
+            n_available = self._count_total_daily_rows(id_)
+        applicable_specs = [s for s in self.specs if _nominal_tf_days(s) <= n_available]
+        skipped = len(self.specs) - len(applicable_specs)
+        if skipped:
+            self.logger.info(
+                f"ID={id_}: Skipping {skipped} calendar spec(s) "
+                f"(nominal tf_days > {n_available} available days)"
+            )
+
         # Process each spec
-        for spec in self.specs:
+        for spec in applicable_specs:
             try:
                 rows = self._build_bars_for_id_spec(
                     id_=id_,
@@ -397,6 +430,16 @@ class CalendarUSBarBuilder(BaseBarBuilder):
                 continue
 
         return total_rows
+
+    def _count_total_daily_rows(self, id_: int) -> int:
+        """Count total daily rows for an ID in the source table."""
+        engine = get_engine(self.config.db_url)
+        with engine.connect() as conn:
+            result = conn.execute(
+                text(f"SELECT COUNT(*) FROM {self.config.daily_table} WHERE id = :id"),
+                {"id": int(id_)},
+            ).scalar()
+        return int(result or 0)
 
     def _build_bars_for_id_spec(
         self,
@@ -451,7 +494,7 @@ class CalendarUSBarBuilder(BaseBarBuilder):
 
             # Update state
             last_bar_seq = int(bars["bar_seq"].max())
-            last_time_close = pd.to_datetime(bars["time_close"].max(), utc=True)
+            last_time_close = pd.to_datetime(bars["timestamp"].max(), utc=True)
 
             upsert_state(
                 self.config.db_url,
@@ -464,9 +507,10 @@ class CalendarUSBarBuilder(BaseBarBuilder):
                         "daily_max_seen": daily_max_ts,
                         "last_bar_seq": last_bar_seq,
                         "last_time_close": last_time_close,
+                        "tz": self.config.tz,
                     }
                 ],
-                with_tz=False,
+                with_tz=True,
             )
 
             return len(bars)
@@ -504,7 +548,7 @@ class CalendarUSBarBuilder(BaseBarBuilder):
             )
 
             last_bar_seq = int(bars["bar_seq"].max())
-            last_time_close = pd.to_datetime(bars["time_close"].max(), utc=True)
+            last_time_close = pd.to_datetime(bars["timestamp"].max(), utc=True)
 
             upsert_state(
                 self.config.db_url,
@@ -517,9 +561,10 @@ class CalendarUSBarBuilder(BaseBarBuilder):
                         "daily_max_seen": daily_max_ts,
                         "last_bar_seq": last_bar_seq,
                         "last_time_close": last_time_close,
+                        "tz": self.config.tz,
                     }
                 ],
-                with_tz=False,
+                with_tz=True,
             )
 
             return len(bars)
@@ -546,7 +591,7 @@ class CalendarUSBarBuilder(BaseBarBuilder):
         )
 
         last_bar_seq = int(bars["bar_seq"].max())
-        last_time_close = pd.to_datetime(bars["time_close"].max(), utc=True)
+        last_time_close = pd.to_datetime(bars["timestamp"].max(), utc=True)
 
         upsert_state(
             self.config.db_url,
@@ -559,9 +604,10 @@ class CalendarUSBarBuilder(BaseBarBuilder):
                     "daily_max_seen": daily_max_ts,
                     "last_bar_seq": last_bar_seq,
                     "last_time_close": last_time_close,
+                    "tz": self.config.tz,
                 }
             ],
-            with_tz=False,
+            with_tz=True,
         )
 
         return len(bars)
@@ -600,8 +646,10 @@ class CalendarUSBarBuilder(BaseBarBuilder):
         if df.empty:
             return pd.DataFrame()
 
-        # Assign bar_seq based on calendar boundaries
+        # Assign bar_seq and scheduled bar_end_day based on calendar boundaries
         bar_seqs = []
+        bar_end_days = []
+        bar_start_days = []
         bar_seq = 1
         current_bar_start = anchor_start
 
@@ -617,11 +665,22 @@ class CalendarUSBarBuilder(BaseBarBuilder):
                 bar_end = _bar_end_day(current_bar_start, spec.unit, spec.qty)
 
             bar_seqs.append(bar_seq)
+            bar_end_days.append(bar_end)
+            bar_start_days.append(current_bar_start)
 
         df["bar_seq"] = bar_seqs
+        df["bar_end_day"] = bar_end_days
+        df["bar_start_day"] = bar_start_days
 
         # Convert to Polars for vectorized aggregation
         pl_df = pl.from_pandas(df)
+
+        # Normalize timehigh/timelow to tz-naive μs for Polars compatibility
+        for col in ["timehigh", "timelow", "ts"]:
+            if col in pl_df.columns and pl_df[col].dtype != pl.Datetime("us"):
+                pl_df = pl_df.with_columns(
+                    pl.col(col).cast(pl.Datetime("us")).alias(col)
+                )
 
         # Cumulative aggregations within each bar_seq
         pl_df = pl_df.with_columns(
@@ -650,53 +709,53 @@ class CalendarUSBarBuilder(BaseBarBuilder):
             ]
         )
 
-        # Compute time_high and time_low (earliest timestamp for ties)
-        pl_df = pl_df.with_columns(
-            [
-                pl.when(pl.col("high") == pl.col("high_bar"))
-                .then(pl.col("timehigh"))
-                .otherwise(None)
-                .first()
-                .over("bar_seq")
-                .alias("time_high"),
-                pl.when(pl.col("low") == pl.col("low_bar"))
-                .then(pl.col("timelow"))
-                .otherwise(None)
-                .first()
-                .over("bar_seq")
-                .alias("time_low"),
-            ]
+        # Compute time_high and time_low with correct new-extreme reset
+        pl_df = compute_extrema_timestamps_with_new_extreme_detection(
+            pl_df, group_col="bar_seq"
         )
 
-        # Compute tf_days (actual calendar days in bar)
+        # Compute tf_days from window boundaries (nominal width)
         pl_df = pl_df.with_columns(
             [
                 (
-                    pl.col("day_local").max().over("bar_seq")
-                    - pl.col("day_local").min().over("bar_seq")
+                    (pl.col("bar_end_day") - pl.col("bar_start_day"))
+                    .dt.total_days()
+                    .cast(pl.Int64)
+                    + 1
+                ).alias("tf_days_calc"),
+            ]
+        )
+
+        # Compute is_partial_end: True when bar hasn't reached its end yet
+        # (pos_in_bar < tf_days means more days remain in the bar period)
+        pl_df = pl_df.with_columns(
+            [
+                (pl.col("pos_in_bar") < pl.col("tf_days_calc")).alias("is_partial_end"),
+            ]
+        )
+
+        # Compute time_open, time_close, time_open_bar, time_close_bar
+        # time_close = per-row snapshot date (this row's ts) -- REVERTED to old behavior
+        # time_close_bar = bar's scheduled end date (from bar_end_day)
+        # time_open_bar = bar-level opening time (= time_open)
+        pl_df = pl_df.with_columns(
+            [
+                (pl.col("ts").shift(1) + pl.duration(milliseconds=1))
+                .fill_null(
+                    pl.col("ts") - pl.duration(days=1) + pl.duration(milliseconds=1)
                 )
-                .dt.days()
-                .cast(pl.Int64)
-                .alias("tf_days_calc")
-                + 1,
-            ]
-        )
-
-        # Compute is_partial_end (bar not yet complete)
-        # A bar is complete on its scheduled end day
-        pl_df = pl_df.with_columns(
-            [
-                (pl.col("day_local") < pl.col("day_local").max().over("bar_seq")).alias(
-                    "is_partial_end"
-                ),
-            ]
-        )
-
-        # Compute time_open, time_close
-        pl_df = pl_df.with_columns(
-            [
-                pl.col("ts").first().over("bar_seq").alias("time_open"),
+                .alias("time_open"),
+                pl.col("bar_start_day")
+                .cast(pl.Datetime("us"))
+                .dt.replace_time_zone("UTC")
+                .alias("time_open_bar"),
                 pl.col("ts").alias("time_close"),
+                (
+                    pl.col("bar_end_day")
+                    .cast(pl.Datetime("us"))
+                    .dt.replace_time_zone("UTC")
+                    + pl.duration(hours=23, minutes=59, seconds=59, milliseconds=999)
+                ).alias("time_close_bar"),
             ]
         )
 
@@ -706,7 +765,9 @@ class CalendarUSBarBuilder(BaseBarBuilder):
                 pl.col("pos_in_bar").alias("count_days"),
                 pl.lit(False).alias("is_missing_days"),
                 pl.lit(0).cast(pl.Int64).alias("count_missing_days"),
-                pl.lit(0).cast(pl.Int64).alias("count_days_remaining"),
+                (pl.col("tf_days_calc") - pl.col("pos_in_bar")).alias(
+                    "count_days_remaining"
+                ),
             ]
         )
 
@@ -722,14 +783,16 @@ class CalendarUSBarBuilder(BaseBarBuilder):
                 pl.col("time_close"),
                 pl.col("time_high"),
                 pl.col("time_low"),
+                pl.col("time_open_bar"),
+                pl.col("time_close_bar"),
                 pl.col("open_bar").cast(pl.Float64).alias("open"),
                 pl.col("high_bar").cast(pl.Float64).alias("high"),
                 pl.col("low_bar").cast(pl.Float64).alias("low"),
                 pl.col("close_bar").cast(pl.Float64).alias("close"),
                 pl.col("volume_bar").cast(pl.Float64).alias("volume"),
                 pl.col("market_cap_bar").cast(pl.Float64).alias("market_cap"),
-                pl.col("time_close").alias("timestamp"),
-                pl.col("time_close").alias("last_ts_half_open"),  # Simplified
+                pl.col("ts").alias("timestamp"),
+                (pl.col("ts") + pl.duration(milliseconds=1)).alias("last_ts_half_open"),
                 pl.col("pos_in_bar").cast(pl.Int64),
                 pl.lit(False).alias("is_partial_start"),
                 pl.col("is_partial_end").cast(pl.Boolean),
@@ -739,6 +802,9 @@ class CalendarUSBarBuilder(BaseBarBuilder):
                 pl.col("count_missing_days").cast(pl.Int64),
                 pl.lit(None).cast(pl.Date).alias("first_missing_day"),
                 pl.lit(None).cast(pl.Date).alias("last_missing_day"),
+                pl.col("src_name"),
+                pl.col("src_load_ts"),
+                pl.lit("cmc_price_bars_1d").alias("src_file"),
             ]
         )
 
@@ -751,8 +817,11 @@ class CalendarUSBarBuilder(BaseBarBuilder):
             "time_close",
             "time_high",
             "time_low",
+            "time_open_bar",
+            "time_close_bar",
             "timestamp",
             "last_ts_half_open",
+            "src_load_ts",
         ]:
             if col in out.columns:
                 out[col] = pd.to_datetime(out[col], utc=True)
@@ -817,11 +886,8 @@ class CalendarUSBarBuilder(BaseBarBuilder):
 
         engine = create_engine(db_url, future=True)
 
-        # Ensure state table exists
-        ensure_state_table(db_url, args.state_table, with_tz=False)
-
-        # Ensure output table exists
-        cls._ensure_bars_table(db_url, args.bars_table)
+        # Ensure state table exists (calendar builders use tz column)
+        ensure_state_table(db_url, args.state_table, with_tz=True)
 
         # Build configuration
         config = BarBuilderConfig(
@@ -833,7 +899,7 @@ class CalendarUSBarBuilder(BaseBarBuilder):
             full_rebuild=args.full_rebuild,
             tz=args.tz if hasattr(args, "tz") else DEFAULT_TZ,
             num_processes=1,  # Calendar builders use single process for now
-            log_level=args.log_level,
+            log_level=getattr(args, "log_level", "INFO"),
         )
 
         return cls(
@@ -893,52 +959,6 @@ class CalendarUSBarBuilder(BaseBarBuilder):
             )
 
         return specs
-
-    @classmethod
-    def _ensure_bars_table(cls, db_url: str, bars_table: str) -> None:
-        """Create the cal_us bars table if it doesn't exist."""
-        ddl = f"""
-        CREATE TABLE IF NOT EXISTS {bars_table} (
-          id                        integer      NOT NULL,
-          tf                        text         NOT NULL,
-          tf_days                   integer      NOT NULL,
-          bar_seq                   integer      NOT NULL,
-
-          time_open                 timestamptz  NOT NULL,
-          time_close                timestamptz  NOT NULL,
-          time_high                 timestamptz  NULL,
-          time_low                  timestamptz  NULL,
-
-          open                      double precision NULL,
-          high                      double precision NULL,
-          low                       double precision NULL,
-          close                     double precision NULL,
-          volume                    double precision NULL,
-          market_cap                double precision NULL,
-
-          timestamp                 timestamptz  NULL,
-          last_ts_half_open         timestamptz  NULL,
-
-          pos_in_bar                integer      NULL,
-          is_partial_start          boolean      NULL,
-          is_partial_end            boolean      NULL,
-          count_days_remaining      integer      NULL,
-
-          is_missing_days           boolean      NULL,
-          count_days                integer      NULL,
-          count_missing_days        integer      NULL,
-
-          first_missing_day         date         NULL,
-          last_missing_day          date         NULL,
-
-          ingested_at               timestamptz  NOT NULL DEFAULT now(),
-
-          CONSTRAINT {bars_table.split('.')[-1]}_uq UNIQUE (id, tf, bar_seq, time_close)
-        );
-        """
-        eng = get_engine(db_url)
-        with eng.begin() as conn:
-            conn.execute(text(ddl))
 
 
 # =============================================================================

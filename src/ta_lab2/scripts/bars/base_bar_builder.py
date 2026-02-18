@@ -46,6 +46,7 @@ from ta_lab2.scripts.bars.common_snapshot_contract import (
     parse_ids,
     load_all_ids,
     ensure_state_table,
+    ensure_bar_table_exists,
     load_state,
     create_bar_builder_argument_parser,
 )
@@ -283,10 +284,9 @@ class BaseBarBuilder(ABC):
         state_table = self.get_state_table_name()
         output_table = self.get_output_table_name()
 
-        # Determine if state table uses 'tz' column (calendar builders)
-        with_tz = self.config.tz is not None
-
-        ensure_state_table(self.config.db_url, state_table, with_tz=with_tz)
+        # Create tables (can be overridden by subclasses for custom schemas)
+        self.ensure_state_table_exists()
+        self.ensure_output_table_exists()
         self.logger.info(f"State table: {state_table}")
         self.logger.info(f"Output table: {output_table}")
 
@@ -416,14 +416,75 @@ class BaseBarBuilder(ABC):
         self.logger.info(f"Processing {len(parsed)} IDs from command line")
         return parsed
 
+    def get_table_type(self) -> str:
+        """
+        Get table type for DDL generation.
+
+        Subclasses should override to specify their table type:
+        - "1d" for refresh_cmc_price_bars_1d
+        - "multi_tf" for refresh_cmc_price_bars_multi_tf
+        - "cal" for cal_iso and cal_us builders
+        - "cal_anchor" for cal_anchor_iso and cal_anchor_us builders
+
+        Returns:
+            Table type string (default: "multi_tf")
+        """
+        # Default to multi_tf, subclasses should override
+        table_name = self.get_output_table_name().lower()
+
+        if "_1d" in table_name:
+            return "1d"
+        elif "cal_anchor" in table_name:
+            return "cal_anchor"
+        elif "_cal_" in table_name:
+            return "cal"
+        else:
+            return "multi_tf"
+
+    def ensure_state_table_exists(self) -> None:
+        """
+        Create state table if it doesn't exist.
+
+        Default implementation uses generic multi-TF state schema.
+        Subclasses (like 1D builder) can override for custom schemas.
+        """
+        state_table = self.get_state_table_name()
+        with_tz = self.config.tz is not None
+
+        self.logger.info(f"Ensuring state table exists: {state_table}")
+
+        try:
+            ensure_state_table(self.config.db_url, state_table, with_tz=with_tz)
+            self.logger.info(f"State table ready: {state_table}")
+        except Exception as e:
+            self.logger.error(f"Failed to create state table {state_table}: {e}")
+            raise
+
     def ensure_output_table_exists(self) -> None:
         """
         Create output table if it doesn't exist.
 
-        Subclasses should override this if they need custom DDL.
-        Default implementation does nothing (assumes migrations created table).
+        Uses get_table_type() to determine schema, then generates
+        and executes CREATE TABLE IF NOT EXISTS DDL.
+
+        Subclasses can override get_table_type() to control table schema.
         """
-        pass
+        table_name = self.get_output_table_name()
+        table_type = self.get_table_type()
+
+        self.logger.info(f"Ensuring table exists: {table_name} (type={table_type})")
+
+        try:
+            ensure_bar_table_exists(
+                self.engine,
+                table_name,
+                table_type=table_type,
+                schema="public",
+            )
+            self.logger.info(f"Table ready: {table_name}")
+        except Exception as e:
+            self.logger.error(f"Failed to create table {table_name}: {e}")
+            raise
 
     # =========================================================================
     # CLI Integration

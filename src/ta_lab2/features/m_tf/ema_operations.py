@@ -235,7 +235,7 @@ def filter_ema_periods_by_obs_count(
     periods: list[int],
     n_obs: int,
     *,
-    min_obs_multiplier: float = 3.0,
+    min_obs_multiplier: float = 1.0,
     logger_name: Optional[str] = None,
 ) -> list[int]:
     """
@@ -316,7 +316,6 @@ def compute_ema_from_horizon(
     """
     from ta_lab2.features.ema import compute_ema
 
-    alpha = calculate_alpha_from_horizon(horizon_days)
     period = horizon_days  # For min_periods calculation
 
     return compute_ema(

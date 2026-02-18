@@ -144,9 +144,9 @@ def pick_cols(colset: set[str]) -> List[str]:
         "id",
         "tf",
         "bar_seq",
+        "timestamp",
         "time_close",
         "ts",
-        "timestamp",
         "time_open",
         "time_high",
         "time_low",
@@ -172,7 +172,7 @@ def pick_cols(colset: set[str]) -> List[str]:
     cols = [c for c in preferred_order if c in colset]
 
     # Ensure we always include a timestamp column if present
-    if "time_close" not in cols and "ts" not in cols and "timestamp" not in cols:
+    if "timestamp" not in cols and "time_close" not in cols and "ts" not in cols:
         # none present; okay
         pass
 
@@ -180,7 +180,7 @@ def pick_cols(colset: set[str]) -> List[str]:
 
 
 def best_ts_col(colset: set[str]) -> str | None:
-    for cand in ["time_close", "ts", "timestamp"]:
+    for cand in ["timestamp", "time_close", "ts"]:
         if cand in colset:
             return cand
     return None
@@ -320,10 +320,10 @@ def main() -> None:
     # Add audit timestamp
     out_df["sample_generated_at"] = datetime.now(UTC).isoformat()
 
-    # Sort for readability: table, id, tf, then (time_close/ts/timestamp desc if present)
+    # Sort for readability: table, id, tf, then (timestamp/time_close/ts desc if present)
     sort_cols = [c for c in ["table_name", "id", "tf"] if c in out_df.columns]
     ts_sort = None
-    for cand in ["time_close", "ts", "timestamp"]:
+    for cand in ["timestamp", "time_close", "ts"]:
         if cand in out_df.columns:
             ts_sort = cand
             break

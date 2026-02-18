@@ -358,7 +358,7 @@ class DailyFeaturesStore:
         # Build SELECT columns
         select_cols = [
             "p.id",
-            "p.time_close as ts",
+            'p."timestamp" as ts',
             "s.asset_class",
             # OHLCV from price_bars
             "p.open_price as open",
@@ -496,15 +496,15 @@ class DailyFeaturesStore:
             joins.append(
                 """
                 LEFT JOIN (SELECT id, ts, ema, ema_d1 FROM public.cmc_ema_multi_tf_u WHERE period = 9 AND tf = '1D') e9
-                  ON p.id = e9.id AND p.time_close = e9.ts
+                  ON p.id = e9.id AND p."timestamp" = e9.ts
                 LEFT JOIN (SELECT id, ts, ema, ema_d1 FROM public.cmc_ema_multi_tf_u WHERE period = 10 AND tf = '1D') e10
-                  ON p.id = e10.id AND p.time_close = e10.ts
+                  ON p.id = e10.id AND p."timestamp" = e10.ts
                 LEFT JOIN (SELECT id, ts, ema, ema_d1 FROM public.cmc_ema_multi_tf_u WHERE period = 21 AND tf = '1D') e21
-                  ON p.id = e21.id AND p.time_close = e21.ts
+                  ON p.id = e21.id AND p."timestamp" = e21.ts
                 LEFT JOIN (SELECT id, ts, ema, ema_d1 FROM public.cmc_ema_multi_tf_u WHERE period = 50 AND tf = '1D') e50
-                  ON p.id = e50.id AND p.time_close = e50.ts
+                  ON p.id = e50.id AND p."timestamp" = e50.ts
                 LEFT JOIN (SELECT id, ts, ema, ema_d1 FROM public.cmc_ema_multi_tf_u WHERE period = 200 AND tf = '1D') e200
-                  ON p.id = e200.id AND p.time_close = e200.ts
+                  ON p.id = e200.id AND p."timestamp" = e200.ts
             """
             )
 
@@ -512,7 +512,7 @@ class DailyFeaturesStore:
         if sources_available.get("returns", False):
             joins.append(
                 """
-                LEFT JOIN public.cmc_returns_daily r ON p.id = r.id AND p.time_close = r.ts
+                LEFT JOIN public.cmc_returns_daily r ON p.id = r.id AND p."timestamp" = r.ts
             """
             )
 
@@ -520,7 +520,7 @@ class DailyFeaturesStore:
         if sources_available.get("vol", False):
             joins.append(
                 """
-                LEFT JOIN public.cmc_vol_daily v ON p.id = v.id AND p.time_close = v.ts
+                LEFT JOIN public.cmc_vol_daily v ON p.id = v.id AND p."timestamp" = v.ts
             """
             )
 
@@ -528,25 +528,25 @@ class DailyFeaturesStore:
         if sources_available.get("ta", False):
             joins.append(
                 """
-                LEFT JOIN public.cmc_ta_daily t ON p.id = t.id AND p.time_close = t.ts
+                LEFT JOIN public.cmc_ta_daily t ON p.id = t.id AND p."timestamp" = t.ts
             """
             )
 
         # WHERE clause
         where_clause = f"""
             WHERE p.id IN ({ids_list})
-              AND p.time_close >= '{start}'
-              AND p.time_close <= '{end}'
+              AND p."timestamp" >= '{start}'
+              AND p."timestamp" <= '{end}'
         """
 
         # Build complete query
         query = f"""
             INSERT INTO public.cmc_daily_features (
-                {', '.join([col.split(' as ')[-1] if ' as ' in col else col.split('.')[-1] for col in select_cols])}
+                {", ".join([col.split(" as ")[-1] if " as " in col else col.split(".")[-1] for col in select_cols])}
             )
             SELECT
-                {',\n                '.join(select_cols)}
-            {''.join(joins)}
+                {", ".join(select_cols)}
+            {"".join(joins)}
             {where_clause}
         """
 

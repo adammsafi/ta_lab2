@@ -52,11 +52,11 @@ def load_1d_bars_for_id(
     params = {"id": int(id)}
 
     if start_date is not None:
-        where_clauses.append("time_close >= :start_date")
+        where_clauses.append('"timestamp" >= :start_date')
         params["start_date"] = start_date
 
     if end_date is not None:
-        where_clauses.append("time_close <= :end_date")
+        where_clauses.append('"timestamp" <= :end_date')
         params["end_date"] = end_date
 
     where_sql = " AND ".join(where_clauses)
@@ -65,7 +65,7 @@ def load_1d_bars_for_id(
         f"""
         SELECT
             id,
-            time_close AS timestamp,
+            "timestamp",
             tf,
             bar_seq,
             time_open,
@@ -84,7 +84,7 @@ def load_1d_bars_for_id(
             count_missing_days
         FROM public.cmc_price_bars_1d
         WHERE {where_sql}
-        ORDER BY time_close
+        ORDER BY "timestamp"
     """
     )
 

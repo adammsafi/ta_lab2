@@ -190,7 +190,7 @@ def main() -> None:
     SELECT COUNT(*) AS n_missing
     FROM {ret_table} r
     LEFT JOIN {bars_table} b
-      ON b.id = r.id AND b.tf = r.tf AND b.time_close = r.time_close
+      ON b.id = r.id AND b.tf = r.tf AND b."timestamp" = r.time_close
     WHERE b.id IS NULL;
     """
     align = _df(engine, align_sql)

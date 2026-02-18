@@ -7,11 +7,13 @@ Calendar anchor EMA semantics:
 - Similar to cal but with anchored periods
 - Uses is_partial_end (not roll) column for canonical detection
 - Dual EMAs: ema (daily-space) and ema_bar (bar-space with preview)
+- Alpha from lookup table (ema_alpha_lookup), fallback to geometric formula
+
+LEAN SCHEMA: EMA tables store only EMA values. All derivatives
+(d1, d2, delta1, delta2, ret_arith, ret_log) live in returns tables.
 
 REFACTORED CHANGES:
 - Extends BaseEMAFeature abstract class
-- Uses ema_operations for derivative calculations
-- ~550 LOC → ~430 LOC (22% reduction)
 """
 
 from __future__ import annotations
@@ -29,7 +31,10 @@ from ta_lab2.features.m_tf.base_ema_feature import (
     TFSpec,
 )
 from ta_lab2.features.m_tf.polars_helpers import read_sql_polars
-from ta_lab2.features.ema import compute_ema
+from ta_lab2.features.m_tf.polars_ema_operations import (
+    compute_bar_ema_numpy,
+    compute_dual_ema_numpy,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -46,8 +51,8 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
     Similar to CalendarEMAFeature but:
     - Uses _ANCHOR timeframes
     - Uses is_partial_end column (not roll)
-    - Different alpha calculation (daily-equivalent formula)
-    - roll_bar column for bar-space canonical detection
+    - Alpha from ema_alpha_lookup table (fallback to geometric formula)
+    - is_partial_end column for bar completeness tracking
     """
 
     def __init__(
@@ -73,6 +78,7 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
         else:
             raise ValueError(f"Unsupported scheme: {scheme}")
 
+        self._alpha_lookup: Optional[pd.DataFrame] = None
         self._tf_specs_cache: Optional[List[TFSpec]] = None
         self._daily_data_cache: Optional[pd.DataFrame] = None
 
@@ -91,17 +97,17 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
         params = {"ids": ids}
 
         if start:
-            where.append("timeclose >= :start")
+            where.append('"timestamp" >= :start')
             params["start"] = start
         if end:
-            where.append("timeclose <= :end")
+            where.append('"timestamp" <= :end')
             params["end"] = end
 
         sql = f"""
-          SELECT id, timeclose AS ts, close
-          FROM public.cmc_price_histories7
+          SELECT id, "timestamp" AS ts, close
+          FROM public.cmc_price_bars_1d
           WHERE {" AND ".join(where)}
-          ORDER BY id, ts
+          ORDER BY id, "timestamp"
         """
 
         with self.engine.connect() as conn:
@@ -124,7 +130,7 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
         sql = """
           SELECT
             tf,
-            COALESCE(tf_days_min, tf_days_max, tf_days_nominal) AS tf_days
+            COALESCE(tf_days_nominal, tf_days_max, tf_days_min) AS tf_days
           FROM public.dim_timeframe
           WHERE alignment_type = 'calendar'
             AND roll_policy = 'calendar_anchor'
@@ -177,6 +183,13 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
         if df_source.empty or self._daily_data_cache is None:
             return pd.DataFrame()
 
+        # Load alpha lookup
+        alpha_lut = self._load_alpha_lookup()
+        alpha_map = {
+            (r.tf, int(r.period)): float(r.alpha)
+            for r in alpha_lut.itertuples(index=False)
+        }
+
         # Load canonical closes for this TF
         ids = df_source["id"].unique().tolist()
         bars_tf = self._load_anchor_bars(ids, [tf_spec.tf])
@@ -198,11 +211,20 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
 
             # Process each period
             for period in periods:
+                # Get alpha from lookup or fallback
+                alpha_daily = alpha_map.get((tf_spec.tf, period))
+                if alpha_daily is None:
+                    alpha_daily = self._alpha_daily_equivalent(tf_spec.tf_days, period)
+                    logger.debug(
+                        f"Alpha not in lookup for ({tf_spec.tf}, {period}), "
+                        f"using fallback: {alpha_daily:.8f}"
+                    )
+
                 df_out = self._build_one_id_tf_period(
                     daily=df_id,
                     bars_tf=bars_id,
-                    tf_days_for_alpha=tf_spec.tf_days,
                     period=period,
+                    alpha_daily=alpha_daily,
                 )
 
                 if not df_out.empty:
@@ -220,7 +242,7 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
         return result
 
     def get_output_schema(self) -> dict[str, str]:
-        """Define output table schema for calendar anchor EMAs."""
+        """Define output table schema for calendar anchor EMAs (lean - EMA only)."""
         return {
             "id": "INTEGER NOT NULL",
             "tf": "TEXT NOT NULL",
@@ -229,16 +251,8 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
             "tf_days": "INTEGER",
             "roll": "BOOLEAN",
             "ema": "DOUBLE PRECISION",
-            "d1": "DOUBLE PRECISION",
-            "d2": "DOUBLE PRECISION",
-            "d1_roll": "DOUBLE PRECISION",
-            "d2_roll": "DOUBLE PRECISION",
             "ema_bar": "DOUBLE PRECISION",
-            "d1_bar": "DOUBLE PRECISION",
-            "d2_bar": "DOUBLE PRECISION",
-            "roll_bar": "BOOLEAN",
-            "d1_roll_bar": "DOUBLE PRECISION",
-            "d2_roll_bar": "DOUBLE PRECISION",
+            "is_partial_end": "BOOLEAN",
             "ingested_at": "TIMESTAMPTZ DEFAULT now()",
             "PRIMARY KEY": "(id, tf, ts, period)",
         }
@@ -258,7 +272,7 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
             tf,
             tf_days,
             bar_seq,
-            time_close AS ts,
+            "timestamp" AS ts,
             close,
             is_partial_end
           FROM {self.bars_table}
@@ -277,14 +291,44 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
 
         return df
 
+    def _load_alpha_lookup(self) -> pd.DataFrame:
+        """Load alpha lookup table (cached)."""
+        if self._alpha_lookup is not None:
+            return self._alpha_lookup
+
+        sql = f"""
+          SELECT tf, period, alpha_ema_dailyspace AS alpha
+          FROM {self.alpha_schema}.{self.alpha_table}
+        """
+
+        with self.engine.connect() as conn:
+            df = read_sql_polars(sql, conn)
+
+        if df.empty:
+            raise RuntimeError(
+                f"Alpha lookup table {self.alpha_schema}.{self.alpha_table} is empty"
+            )
+
+        df["period"] = df["period"].astype(int)
+        df["tf"] = df["tf"].astype(str)
+        df["alpha"] = df["alpha"].astype(float)
+
+        self._alpha_lookup = df
+        return df
+
     def _build_one_id_tf_period(
         self,
         daily: pd.DataFrame,
         bars_tf: pd.DataFrame,
-        tf_days_for_alpha: int,
         period: int,
+        alpha_daily: float,
     ) -> pd.DataFrame:
-        """Build full daily-grid output for single (id, tf, period)."""
+        """
+        Build full daily-grid output for single (id, tf, period).
+
+        Vectorized with numpy: compute_bar_ema_numpy + compute_dual_ema_numpy
+        replace pd.Series.iloc[i] loops (~100x faster for large series).
+        """
         df = daily[["ts", "close"]].copy()
         df["ts"] = pd.to_datetime(df["ts"], utc=True)
         df = df.sort_values("ts").reset_index(drop=True)
@@ -294,7 +338,7 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
         b = b.sort_values(["bar_seq", "ts"]).reset_index(drop=True)
 
         # Identify canonical bar closes (is_partial_end = FALSE)
-        is_canon_row = b["is_partial_end"] == False
+        is_canon_row = b["is_partial_end"].eq(False)
         canon_b = b.loc[is_canon_row].copy()
 
         # Dedupe to 1 canonical row per bar_seq (keep last)
@@ -308,105 +352,76 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
         canonical_ts = canon_b["ts"].drop_duplicates().sort_values()
 
         # Roll flags
-        is_canonical_day = df["ts"].isin(canonical_ts.tolist())
-        roll = (~is_canonical_day).astype(bool)
+        canonical_ts_set = set(canonical_ts.tolist())
+        is_canonical_day = df["ts"].isin(canonical_ts_set)
+        roll = (~is_canonical_day).to_numpy().astype(bool)
+        canonical_mask = ~roll
 
-        # roll_bar from is_partial_end
-        roll_src = b[["ts", "is_partial_end"]].drop_duplicates(
-            subset=["ts"], keep="last"
+        # Canonical bar EMA at anchored closes using numpy
+        canon_close_arr = canon_b["close"].astype(float).to_numpy()
+        canon_ema_arr = compute_bar_ema_numpy(
+            canon_close_arr, period=period, min_periods=period
         )
-        m_roll = df.merge(roll_src, on="ts", how="left")
-        roll_bar = m_roll["is_partial_end"].fillna(True).astype(bool)
 
-        # Force canonical_ts days to roll_bar FALSE
-        if len(canonical_ts) > 0:
-            roll_bar = np.where(
-                df["ts"].isin(canonical_ts.tolist()), False, roll_bar
-            ).astype(bool)
+        # Build canonical EMA map: ts -> ema_close
+        canon_ts_arr = canon_b["ts"].values
+        canon_ema_map = {}
+        for i in range(len(canon_ts_arr)):
+            if not np.isnan(canon_ema_arr[i]):
+                canon_ema_map[canon_ts_arr[i]] = canon_ema_arr[i]
 
-        # Canonical bar EMA at anchored closes
-        canon_b["ema_close"] = compute_ema(
-            canon_b["close"].astype(float),
-            period=period,
-            adjust=False,
-            min_periods=period,
+        # Build arrays for compute_dual_ema_numpy
+        n = len(df)
+        close_arr = df["close"].astype(float).to_numpy()
+        ts_arr = df["ts"].values
+
+        # Map canonical EMA values onto daily grid
+        canonical_ema_values = np.full(n, np.nan, dtype=np.float64)
+        for i in range(n):
+            if canonical_mask[i] and ts_arr[i] in canon_ema_map:
+                canonical_ema_values[i] = canon_ema_map[ts_arr[i]]
+
+        # Compute dual EMA using numpy
+        alpha_bar = 2.0 / (period + 1.0)
+        ema_bar_arr, ema_arr = compute_dual_ema_numpy(
+            close_arr,
+            canonical_mask=canonical_mask,
+            canonical_ema_values=canonical_ema_values,
+            alpha_daily=alpha_daily,
+            alpha_bar=alpha_bar,
         )
-        canon_map = canon_b[["ts", "ema_close"]].drop_duplicates(subset=["ts"])
 
-        m = df.merge(canon_map, on="ts", how="left")
-
-        # ema_bar: evolves daily, snaps at anchored closes
-        alpha_d_bar = self._alpha_daily_equivalent(tf_days_for_alpha, period)
-        ema_bar = pd.Series(np.nan, index=m.index, dtype=float)
-
-        is_canon_bar_day = (~pd.Series(roll_bar, index=df.index)).to_numpy()
-        seed_mask = is_canon_bar_day & (~m["ema_close"].isna().to_numpy())
-        seed_pos = np.where(seed_mask)[0]
-
-        closes = m["close"].astype(float).to_numpy()
-        ema_close_arr = m["ema_close"].astype(float).to_numpy()
-
-        if len(seed_pos) > 0:
-            i0 = int(seed_pos[0])
-            ema_bar.iloc[:i0] = np.nan
-            ema_bar.iloc[i0] = float(ema_close_arr[i0])
-
-            for i in range(i0 + 1, len(m)):
-                prev = float(ema_bar.iloc[i - 1])
-                x = float(closes[i])
-                v = alpha_d_bar * x + (1.0 - alpha_d_bar) * prev
-
-                # Snap on anchored close days
-                if is_canon_bar_day[i] and not np.isnan(ema_close_arr[i]):
-                    v = float(ema_close_arr[i])
-
-                ema_bar.iloc[i] = v
-
-        # ema: seeded once, continuous daily
-        alpha_d = self._alpha_daily_equivalent(tf_days_for_alpha, period)
-        ema = pd.Series(np.nan, index=m.index, dtype=float)
-
-        seed_mask_time = (~roll.values) & (~ema_bar.isna().to_numpy())
-        seed_pos_time = np.where(seed_mask_time)[0]
-
-        if len(seed_pos_time) > 0:
-            j0 = int(seed_pos_time[0])
-            ema.iloc[:j0] = np.nan
-            ema.iloc[j0] = float(ema_bar.iloc[j0])
-
-            for i in range(j0 + 1, len(m)):
-                prev = float(ema.iloc[i - 1])
-                x = float(closes[i])
-                ema.iloc[i] = alpha_d * x + (1.0 - alpha_d) * prev
+        # is_partial_end: True for rows after the last canonical close
+        last_canon_ts = canonical_ts.max() if len(canonical_ts) > 0 else None
+        if last_canon_ts is not None:
+            is_partial = (df["ts"] > last_canon_ts).to_numpy()
+        else:
+            is_partial = np.ones(n, dtype=bool)
 
         out = pd.DataFrame(
             {
                 "ts": df["ts"],
                 "roll": roll.astype(bool),
-                "ema": ema.astype(float),
-                "ema_bar": ema_bar.astype(float),
-                "roll_bar": pd.Series(roll_bar, index=df.index).astype(bool),
+                "ema": ema_arr,
+                "ema_bar": ema_bar_arr,
+                "is_partial_end": is_partial,
             }
         )
 
-        # Derivatives
-        out = self._add_cal_anchor_derivatives(out)
+        # Filter pre-seed rows: only output from first valid ema_bar onward
+        has_ema_bar = out["ema_bar"].notna()
+        if not has_ema_bar.any():
+            return pd.DataFrame()
+        first_valid = has_ema_bar.idxmax()
+        out = out.loc[first_valid:].reset_index(drop=True)
 
         return out[
             [
                 "ts",
                 "roll",
                 "ema",
-                "d1",
-                "d2",
-                "d1_roll",
-                "d2_roll",
                 "ema_bar",
-                "d1_bar",
-                "d2_bar",
-                "roll_bar",
-                "d1_roll_bar",
-                "d2_roll_bar",
+                "is_partial_end",
             ]
         ]
 
@@ -420,46 +435,6 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
             raise ValueError(f"tf_days must be positive, got {tf_days}")
         alpha_bar = 2.0 / (period + 1.0)
         return 1.0 - (1.0 - alpha_bar) ** (1.0 / tf_days)
-
-    def _canonical_subset_diff(
-        self, x: pd.Series, is_canonical: pd.Series
-    ) -> pd.Series:
-        """Canonical-only diff computed between canonical rows."""
-        is_canonical = is_canonical.astype(bool)
-        y = pd.Series(np.nan, index=x.index, dtype=float)
-
-        idx = x.index[is_canonical.values]
-        if len(idx) <= 1:
-            return y
-
-        xc = x.loc[idx].astype(float)
-        dc = xc.diff()
-        y.loc[idx] = dc.values
-        return y
-
-    def _add_cal_anchor_derivatives(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Add derivatives for dual EMAs (anchor semantics)."""
-        result = df.copy()
-
-        # Daily diffs on ema (all rows)
-        result["d1_roll"] = result["ema"].diff()
-        result["d2_roll"] = result["d1_roll"].diff()
-
-        # Canonical-only diffs on ema
-        is_canon = ~result["roll"]
-        result["d1"] = self._canonical_subset_diff(result["ema"], is_canon)
-        result["d2"] = self._canonical_subset_diff(result["d1"], is_canon)
-
-        # Daily diffs on ema_bar (all rows)
-        result["d1_roll_bar"] = result["ema_bar"].diff()
-        result["d2_roll_bar"] = result["d1_roll_bar"].diff()
-
-        # Canonical-only diffs on ema_bar
-        is_canon_bar = ~result["roll_bar"]
-        result["d1_bar"] = self._canonical_subset_diff(result["ema_bar"], is_canon_bar)
-        result["d2_bar"] = self._canonical_subset_diff(result["d1_bar"], is_canon_bar)
-
-        return result
 
 
 # =============================================================================
@@ -541,6 +516,24 @@ def write_multi_timeframe_ema_cal_anchor_to_db(
 
     # Get TF specs
     tf_specs = feature.get_tf_specs()
+
+    # Pre-filter: only keep TFs that have bars for the requested IDs
+    with engine.connect() as conn:
+        bar_tfs = (
+            conn.execute(
+                text(
+                    f"SELECT DISTINCT tf FROM {feature.bars_table} WHERE id = ANY(:ids)"
+                ),
+                {"ids": list(ids)},
+            )
+            .scalars()
+            .all()
+        )
+    bar_tf_set = set(bar_tfs)
+    skipped = [s.tf for s in tf_specs if s.tf not in bar_tf_set]
+    tf_specs = [s for s in tf_specs if s.tf in bar_tf_set]
+    if skipped:
+        logger.info(f"Skipping {len(skipped)} TFs with no bars: {skipped}")
     logger.info(f"Processing {len(tf_specs)} calendar anchor TFs")
 
     # Compute EMAs for each TF
@@ -564,20 +557,12 @@ def write_multi_timeframe_ema_cal_anchor_to_db(
     # Write to database
     conflict_action = (
         """DO UPDATE SET
-        tf_days      = EXCLUDED.tf_days,
-        roll         = EXCLUDED.roll,
-        ema          = EXCLUDED.ema,
-        d1           = EXCLUDED.d1,
-        d2           = EXCLUDED.d2,
-        d1_roll      = EXCLUDED.d1_roll,
-        d2_roll      = EXCLUDED.d2_roll,
-        ema_bar      = EXCLUDED.ema_bar,
-        d1_bar       = EXCLUDED.d1_bar,
-        d2_bar       = EXCLUDED.d2_bar,
-        roll_bar     = EXCLUDED.roll_bar,
-        d1_roll_bar  = EXCLUDED.d1_roll_bar,
-        d2_roll_bar  = EXCLUDED.d2_roll_bar,
-        ingested_at  = now()"""
+        tf_days          = EXCLUDED.tf_days,
+        roll             = EXCLUDED.roll,
+        ema              = EXCLUDED.ema,
+        ema_bar          = EXCLUDED.ema_bar,
+        is_partial_end   = EXCLUDED.is_partial_end,
+        ingested_at      = now()"""
         if update_existing
         else "DO NOTHING"
     )
@@ -586,14 +571,12 @@ def write_multi_timeframe_ema_cal_anchor_to_db(
         f"""
       INSERT INTO {schema}.{out_table} (
         id, tf, ts, period, tf_days,
-        roll, ema, d1, d2, d1_roll, d2_roll,
-        ema_bar, d1_bar, d2_bar, roll_bar, d1_roll_bar, d2_roll_bar,
+        roll, ema, ema_bar, is_partial_end,
         ingested_at
       )
       VALUES (
         :id, :tf, :ts, :period, :tf_days,
-        :roll, :ema, :d1, :d2, :d1_roll, :d2_roll,
-        :ema_bar, :d1_bar, :d2_bar, :roll_bar, :d1_roll_bar, :d2_roll_bar,
+        :roll, :ema, :ema_bar, :is_partial_end,
         now()
       )
       ON CONFLICT (id, tf, ts, period) {conflict_action}

@@ -14,9 +14,13 @@ Usage:
     # EMAs only (with bar freshness check)
     python run_daily_refresh.py --emas --ids all
 
+    # Use 8 parallel processes for bar builders
+    python run_daily_refresh.py --all --ids all -n 8
+
     # Dry run
     python run_daily_refresh.py --all --ids 1 --dry-run
 """
+
 from __future__ import annotations
 
 import argparse
@@ -69,10 +73,12 @@ def run_bar_builders(
         cmd.append("--verbose")
     if args.continue_on_error:
         cmd.append("--continue-on-error")
+    if args.num_processes:
+        cmd.extend(["--num-processes", str(args.num_processes)])
 
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("RUNNING BAR BUILDERS")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
     print(f"Command: {' '.join(cmd)}")
 
     if args.dry_run:
@@ -153,9 +159,17 @@ def run_ema_refreshers(
     script_dir = Path(__file__).parent / "emas"
     cmd = [sys.executable, str(script_dir / "run_all_ema_refreshes.py")]
 
-    # Format IDs
+    # Format IDs for EMA subprocess
     if ids_for_emas is None:
         ids_str = "all"
+    elif len(ids_for_emas) == 0:
+        print("[INFO] No IDs with fresh bars - skipping EMA refresh")
+        return ComponentResult(
+            component="emas",
+            success=True,
+            duration_sec=0.0,
+            returncode=0,
+        )
     else:
         ids_str = ",".join(str(i) for i in ids_for_emas)
 
@@ -163,10 +177,12 @@ def run_ema_refreshers(
 
     if args.verbose:
         cmd.append("--verbose")
+    if args.num_processes:
+        cmd.extend(["--num-processes", str(args.num_processes)])
 
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("RUNNING EMA REFRESHERS")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
     print(f"Command: {' '.join(cmd)}")
 
     if args.dry_run:
@@ -240,9 +256,9 @@ def print_combined_summary(results: list[tuple[str, ComponentResult]]) -> bool:
     Returns:
         True if all components succeeded, False otherwise
     """
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("DAILY REFRESH SUMMARY")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
 
     total_duration = sum(r.duration_sec for _, r in results)
     successful = [r for _, r in results if r.success]
@@ -266,7 +282,7 @@ def print_combined_summary(results: list[tuple[str, ComponentResult]]) -> bool:
                 error_info = f" ({r.error_message})" if r.error_message else ""
                 print(f"  - {name}: {r.duration_sec:.1f}s{error_info}")
 
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
 
     if failed:
         print(f"\n[WARNING] {len(failed)} component(s) failed!")
@@ -297,6 +313,9 @@ Examples:
 
   # Continue on errors
   python run_daily_refresh.py --all --ids all --continue-on-error
+
+  # Use 8 parallel processes for bar builders
+  python run_daily_refresh.py --all --ids all -n 8
 
   # Skip bar freshness check for EMAs
   python run_daily_refresh.py --emas --ids all --skip-stale-check
@@ -347,6 +366,12 @@ Examples:
         action="store_true",
         help="Continue running remaining components if one fails",
     )
+    p.add_argument(
+        "-n",
+        "--num-processes",
+        type=int,
+        help="Number of parallel processes for bar builders (default: 6)",
+    )
 
     # EMA-specific options
     p.add_argument(
@@ -385,9 +410,9 @@ Examples:
     run_bars = args.bars or args.all
     run_emas = args.emas or args.all
 
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("DAILY REFRESH ORCHESTRATOR")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
     print(
         f"\nComponents: {('bars' if run_bars else '') + (' + ' if run_bars and run_emas else '') + ('EMAs' if run_emas else '')}"
     )
@@ -413,10 +438,13 @@ Examples:
         # Check bar freshness first (unless --skip-stale-check)
         ids_for_emas = parsed_ids
 
-        if not args.skip_stale_check:
-            print(f"\n{'='*70}")
+        # Skip stale check when bars were just refreshed (--all mode)
+        skip_stale = args.skip_stale_check or run_bars
+
+        if not skip_stale:
+            print(f"\n{'=' * 70}")
             print("CHECKING BAR FRESHNESS")
-            print(f"{'='*70}")
+            print(f"{'=' * 70}")
 
             fresh_ids, stale_ids = get_fresh_ids(
                 db_url, parsed_ids, args.staleness_hours
@@ -426,8 +454,7 @@ Examples:
                 print(f"\n[WARNING] {len(stale_ids)} ID(s) have stale bars:")
                 print(f"  Stale IDs: {stale_ids}")
 
-                if not run_bars:
-                    print("\n[INFO] Consider running with --all to refresh bars first")
+                print("\n[INFO] Consider running with --all to refresh bars first")
 
                 # Filter to fresh IDs only
                 ids_for_emas = fresh_ids
@@ -438,6 +465,8 @@ Examples:
                 print(
                     f"\n[OK] All {len(fresh_ids) if fresh_ids else 'requested'} ID(s) have fresh bars"
                 )
+        elif run_bars:
+            print("\n[INFO] Skipping bar freshness check (bars just refreshed)")
 
         ema_result = run_ema_refreshers(args, db_url, ids_for_emas)
         results.append(("emas", ema_result))

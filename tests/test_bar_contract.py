@@ -216,6 +216,18 @@ REQUIRED_BAR_CORE_COLS = {
     "is_partial_start",
     "is_partial_end",
     "is_missing_days",
+    "ingested_at",
+    "src_name",
+    "src_file",
+    "src_load_ts",
+    "repaired_timehigh",
+    "repaired_timelow",
+    "repaired_high",
+    "repaired_low",
+    "repaired_open",
+    "repaired_close",
+    "repaired_volume",
+    "repaired_market_cap",
 }
 
 REQUIRED_SNAPSHOT_COLS = {
@@ -224,7 +236,12 @@ REQUIRED_SNAPSHOT_COLS = {
     "pos_in_bar",
     "count_days_remaining",
     "count_days",
+    "tf_days",
     "count_missing_days",
+    "count_missing_days_start",
+    "count_missing_days_end",
+    "count_missing_days_interior",
+    "missing_days_where",
     "first_missing_day",
     "last_missing_day",
 }

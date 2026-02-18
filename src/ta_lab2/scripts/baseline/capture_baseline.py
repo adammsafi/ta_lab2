@@ -20,6 +20,7 @@ Usage:
 
 Pattern from Phase 23: subprocess isolation, dry-run, verbose control, summary reporting
 """
+
 from __future__ import annotations
 
 import argparse
@@ -69,7 +70,7 @@ EMA_TABLES = [
 ]
 
 # Bar table column configuration
-BAR_KEY_COLUMNS = ["id", "tf", "bar_seq", "time_close"]
+BAR_KEY_COLUMNS = ["id", "tf", "bar_seq", "timestamp"]
 BAR_FLOAT_COLUMNS = ["open", "high", "low", "close", "volume", "market_cap"]
 
 # EMA table column configuration
@@ -142,9 +143,9 @@ def create_snapshots(
     Returns:
         List of SnapshotInfo objects
     """
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("PHASE 1: CREATING SNAPSHOTS")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
     print(f"Timestamp suffix: {timestamp_suffix}")
     print(f"Tables to snapshot: {len(tables)}")
     print(f"Asset filter: {asset_ids if asset_ids else 'all'}")
@@ -262,9 +263,9 @@ def truncate_tables(
     Returns:
         Dict mapping table name to success boolean
     """
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("PHASE 2: TRUNCATING TABLES")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
     print(f"Tables to truncate: {len(tables)}")
 
     results = {}
@@ -340,9 +341,9 @@ def run_bar_builders(
     if verbose:
         cmd.append("--verbose")
 
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("PHASE 3A: REBUILDING BARS")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
     print(f"Command: {' '.join(cmd)}")
 
     if dry_run:
@@ -429,9 +430,9 @@ def run_ema_refreshers(
     if verbose:
         cmd.append("--verbose")
 
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("PHASE 3B: REBUILDING EMAS")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
     print(f"Command: {' '.join(cmd)}")
 
     if dry_run:
@@ -527,7 +528,7 @@ def sample_table_for_comparison(
     """
     # Determine timestamp column based on table type
     if "bar" in table_name.lower():
-        ts_col = "time_close"
+        ts_col = "timestamp"
     else:  # EMA tables
         ts_col = "ts"
 
@@ -541,7 +542,7 @@ def sample_table_for_comparison(
     beginning_sql = f"""
     SELECT * FROM {table_name}
     {where_clause}
-    {' AND ' if where_clause else 'WHERE '} {ts_col} <= (
+    {" AND " if where_clause else "WHERE "} {ts_col} <= (
         SELECT MIN({ts_col}) + INTERVAL '{beginning_days} days'
         FROM {table_name}
         {where_clause}
@@ -553,7 +554,7 @@ def sample_table_for_comparison(
     end_sql = f"""
     SELECT * FROM {table_name}
     {where_clause}
-    {' AND ' if where_clause else 'WHERE '} {ts_col} >= (
+    {" AND " if where_clause else "WHERE "} {ts_col} >= (
         SELECT MAX({ts_col}) - INTERVAL '{end_days} days'
         FROM {table_name}
         {where_clause}
@@ -565,7 +566,7 @@ def sample_table_for_comparison(
     random_sql = f"""
     SELECT * FROM {table_name}
     {where_clause}
-    {' AND ' if where_clause else 'WHERE '} random() < {random_sample_pct}
+    {" AND " if where_clause else "WHERE "} random() < {random_sample_pct}
     AND {ts_col} > (
         SELECT MIN({ts_col}) + INTERVAL '{beginning_days} days'
         FROM {table_name}
@@ -700,9 +701,9 @@ def compare_all_tables(
     Returns:
         List of ComparisonSummary objects
     """
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("PHASE 4: COMPARING SNAPSHOTS TO REBUILT TABLES")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
     print(f"Tables to compare: {len(snapshots)}")
     print(f"Sample config: {sample_config}")
 
@@ -749,9 +750,9 @@ def generate_report(
     Returns:
         True if all comparisons passed, False otherwise
     """
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("PHASE 5: GENERATING REPORT")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
 
     # Overall pass/fail
     all_passed = all(s.passed for s in summaries)
@@ -979,9 +980,9 @@ Examples:
         # Continue without metadata
         metadata = None
 
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("BASELINE CAPTURE ORCHESTRATOR")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
     print(f"IDs: {args.ids}")
     print(f"Asset count: {len(asset_ids) if asset_ids else 'all'}")
     print(f"Timestamp suffix: {timestamp_suffix}")

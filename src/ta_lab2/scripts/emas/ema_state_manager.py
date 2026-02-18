@@ -269,7 +269,7 @@ class EMAStateManager:
                     id,
                     tf,
                     MIN(time_open) as daily_min_seen,
-                    MAX(time_close) as daily_max_seen,
+                    MAX("timestamp") as daily_max_seen,
                     MAX(CASE WHEN {bars_partial_filter} THEN bar_seq END) as last_bar_seq
                 FROM {bars_schema}.{bars_table}
                 GROUP BY id, tf
@@ -369,6 +369,7 @@ class EMAStateManager:
     def _update_multi_tf_mode(self, output_table: str, output_schema: str) -> int:
         """Update state using multi-tf logic (for multi_tf scripts)."""
         state_table_fq = f"{self.config.state_schema}.{self.config.state_table}"
+        ts_col = self.config.ts_column
 
         sql = f"""
         INSERT INTO {state_table_fq} (id, tf, period, last_time_close, last_bar_seq, updated_at)
@@ -376,11 +377,11 @@ class EMAStateManager:
             id,
             tf,
             period,
-            MAX(time_close) as last_time_close,
+            MAX({ts_col}) as last_time_close,
             MAX(bar_seq) as last_bar_seq,
             now() as updated_at
         FROM {output_schema}.{output_table}
-        WHERE time_close IS NOT NULL
+        WHERE {ts_col} IS NOT NULL
         GROUP BY id, tf, period
         ON CONFLICT (id, tf, period) DO UPDATE SET
             last_time_close = EXCLUDED.last_time_close,

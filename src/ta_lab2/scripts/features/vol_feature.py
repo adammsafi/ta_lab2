@@ -139,11 +139,11 @@ class VolatilityFeature(BaseFeature):
         params = {"ids": ids}
 
         if start:
-            where_clauses.append("time_close >= :start")
+            where_clauses.append('"timestamp" >= :start')
             params["start"] = start
 
         if end:
-            where_clauses.append("time_close <= :end")
+            where_clauses.append('"timestamp" <= :end')
             params["end"] = end
 
         where_sql = " AND ".join(where_clauses)
@@ -151,7 +151,7 @@ class VolatilityFeature(BaseFeature):
         sql = f"""
             SELECT
                 id,
-                time_close as ts,
+                "timestamp" as ts,
                 open,
                 high,
                 low,
