@@ -33,7 +33,7 @@ Full refresh option:
 
 Assumptions:
 - EMA tables have ingested_at column (timestamptz).
-- EMA tables have roll (boolean), roll_bar (boolean), ts (timestamptz).
+- EMA tables have roll (boolean), is_partial_end (boolean), ts (timestamptz).
 
 Spyder runfile():
 runfile(
@@ -593,7 +593,7 @@ b AS (
   FROM {{table}} e
   JOIN _impacted_keys k
     ON k.asset_id = e.id AND k.tf = e.tf AND k.period = e.period
-  WHERE e.roll_bar = false
+  WHERE e.is_partial_end = false
 ),
 j AS (
   SELECT
@@ -624,7 +624,7 @@ joined AS (
 )
 SELECT
   :table_name AS table_name,
-  'canonical_ts_match_roll_false_vs_roll_bar_false' AS test_name,
+  'canonical_ts_match_roll_false_vs_is_partial_end_false' AS test_name,
   asset_id, tf, period,
   alignment_type, base_unit, tf_qty, calendar_scheme, calendar_anchor,
   CASE
@@ -799,7 +799,7 @@ def run(
             tests_keyed = [
                 "canonical_row_count_vs_expected_dim_timeframe",
                 "canonical_max_gap_vs_dim_timeframe_bounds",
-                "canonical_ts_match_roll_false_vs_roll_bar_false",
+                "canonical_ts_match_roll_false_vs_is_partial_end_false",
             ]
             for tn in tests_keyed:
                 conn.execute(
