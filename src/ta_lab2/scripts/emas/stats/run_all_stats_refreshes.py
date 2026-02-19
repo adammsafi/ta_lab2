@@ -3,17 +3,16 @@
 Master orchestrator for all EMA stats refresh scripts.
 
 Runs all stats computation scripts in the correct order:
-1. Daily stats (ema_daily_stats)
-2. Multi-TF stats (ema_multi_tf_stats)
-3. Calendar stats (ema_multi_tf_cal_stats)
-4. Calendar anchor stats (ema_multi_tf_cal_anchor_stats)
+1. Multi-TF stats (ema_multi_tf_stats)
+2. Calendar stats (ema_multi_tf_cal_stats)
+3. Calendar anchor stats (ema_multi_tf_cal_anchor_stats)
 
 Usage:
     # Run all stats refreshers
     python run_all_stats_refreshes.py --ids all
 
     # Run specific stats types
-    python run_all_stats_refreshes.py --ids 1,52 --types daily,multi_tf
+    python run_all_stats_refreshes.py --ids 1,52 --types multi_tf
 
     # Dry run
     python run_all_stats_refreshes.py --ids all --dry-run
@@ -41,12 +40,6 @@ class StatsScript:
 
 # All stats scripts in execution order
 ALL_STATS_SCRIPTS = [
-    StatsScript(
-        name="daily",
-        script_path="daily/refresh_ema_daily_stats.py",
-        description="Daily EMA stats",
-        subdirectory="daily",
-    ),
     StatsScript(
         name="multi_tf",
         script_path="multi_tf/refresh_ema_multi_tf_stats.py",
@@ -238,7 +231,7 @@ Examples:
   python run_all_stats_refreshes.py --ids all
 
   # Run specific stats types
-  python run_all_stats_refreshes.py --ids 1,52 --types daily,multi_tf
+  python run_all_stats_refreshes.py --ids 1,52 --types multi_tf
 
   # Dry run
   python run_all_stats_refreshes.py --ids all --dry-run

@@ -19,6 +19,6 @@ LEFT JOIN information_schema.table_constraints AS tc
     AND tc.constraint_type = 'PRIMARY KEY'
 WHERE
     c.table_schema = 'public'
-    AND c.table_name  = 'cmc_ema_daily'
+    AND c.table_name  = 'cmc_ema_multi_tf'
 ORDER BY
     c.ordinal_position;

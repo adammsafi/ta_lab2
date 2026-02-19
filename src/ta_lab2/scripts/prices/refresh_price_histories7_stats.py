@@ -8,8 +8,7 @@ Tables used
 - cmc_price_histories7   : source OHLCV data
 - price_histories7_stats : generic test results / stats table
 - cmc_price_ranges       : per-asset "reasonable price" config
-- cmc_ema_daily          : daily EMA table (used for dirty-past check)
-- cmc_ema_refresh_state  : per-asset EMA refresh state, including last_load_ts_daily
+- cmc_ema_refresh_state  : per-asset EMA refresh state
 
 Tests implemented
 -----------------
@@ -51,37 +50,6 @@ Tests implemented
      - WARN if no range configured
      - FAIL if max_high < high_min OR max_high > high_max
      - PASS otherwise
-
-4) dirty_history_vs_ema_daily  (table_name = 'cmc_price_histories7')
-
-   Goal: detect when historical prices have been (re)loaded *in the past* relative to
-   what the EMA pipeline has already processed, so we know we must do a full EMA
-   recompute (or at least a targeted backfill) for that asset.
-
-   For each asset_id that has both:
-     - a row in cmc_ema_refresh_state with last_load_ts_daily NOT NULL, and
-     - at least one EMA row in cmc_ema_daily:
-
-     - last_ema_ts = MAX(ts) in cmc_ema_daily for that asset
-     - last_load_ts_daily = cmc_ema_refresh_state.last_load_ts_daily
-
-     We look for any cmc_price_histories7 rows where:
-       - timestamp <= last_ema_ts
-       - AND load_ts > last_load_ts_daily
-
-     If any exist, that means "the past changed" after the last EMA pipeline run.
-
-   Status:
-     - PASS if n_dirty_rows = 0
-     - FAIL if n_dirty_rows > 0
-
-   extra JSON includes:
-     - last_load_ts_daily
-     - last_ema_ts
-     - n_dirty_rows
-     - min_dirty_ts
-     - max_dirty_ts
-     - max_dirty_load_ts
 
 ---------------------------------------------------------------------------
 
@@ -279,74 +247,6 @@ LEFT JOIN cmc_price_ranges r
 
 
 # ---------------------------------------------------------------------------
-# Test 4: dirty_history_vs_ema_daily
-# ---------------------------------------------------------------------------
-
-SQL_TEST_DIRTY_HISTORY_VS_EMA_DAILY = """
-INSERT INTO price_histories7_stats (
-    table_name, test_name, asset_id,
-    status, actual, expected, extra
-)
-SELECT
-    'cmc_price_histories7' AS table_name,
-    'dirty_history_vs_ema_daily' AS test_name,
-    s.asset_id,
-    CASE
-        WHEN COALESCE(d.n_dirty_rows, 0) = 0 THEN 'PASS'
-        ELSE 'FAIL'
-    END AS status,
-    COALESCE(d.n_dirty_rows, 0)::NUMERIC AS actual,
-    0::NUMERIC                           AS expected,
-    jsonb_build_object(
-        'last_load_ts_daily', s.last_load_ts_daily,
-        'last_ema_ts',        s.last_ema_ts,
-        'n_dirty_rows',       COALESCE(d.n_dirty_rows, 0),
-        'min_dirty_ts',       d.min_dirty_ts,
-        'max_dirty_ts',       d.max_dirty_ts,
-        'max_dirty_load_ts',  d.max_dirty_load_ts
-    ) AS extra
-FROM (
-    -- Per-asset EMA state: only assets with both last_load_ts_daily and at least one EMA row
-    SELECT
-        r.id              AS asset_id,
-        r.last_load_ts_daily,
-        MAX(e.ts)         AS last_ema_ts
-    FROM cmc_ema_refresh_state r
-    JOIN cmc_ema_daily e
-      ON e.id = r.id
-    WHERE r.last_load_ts_daily IS NOT NULL
-    GROUP BY r.id, r.last_load_ts_daily
-) s
-LEFT JOIN (
-    -- Dirty rows: price rows in the EMA-covered window loaded AFTER last_load_ts_daily
-    SELECT
-        p.id           AS asset_id,
-        COUNT(*)       AS n_dirty_rows,
-        MIN(p.timestamp) AS min_dirty_ts,
-        MAX(p.timestamp) AS max_dirty_ts,
-        MAX(p.load_ts) AS max_dirty_load_ts
-    FROM cmc_price_histories7 p
-    JOIN (
-        SELECT
-            r.id        AS asset_id,
-            r.last_load_ts_daily,
-            MAX(e.ts)   AS last_ema_ts
-        FROM cmc_ema_refresh_state r
-        JOIN cmc_ema_daily e
-          ON e.id = r.id
-        WHERE r.last_load_ts_daily IS NOT NULL
-        GROUP BY r.id, r.last_load_ts_daily
-    ) s2
-      ON s2.asset_id = p.id
-     AND p."timestamp" <= s2.last_ema_ts
-     AND p.load_ts > s2.last_load_ts_daily
-    GROUP BY p.id
-) d
-  ON d.asset_id = s.asset_id;
-"""
-
-
-# ---------------------------------------------------------------------------
 # Helpers: engine + runner
 # ---------------------------------------------------------------------------
 
@@ -373,7 +273,6 @@ def run_all_tests(engine) -> None:
         conn.execute(text(SQL_TEST_BAR_COUNT))
         conn.execute(text(SQL_TEST_PRICE_LOW))
         conn.execute(text(SQL_TEST_PRICE_HIGH))
-        conn.execute(text(SQL_TEST_DIRTY_HISTORY_VS_EMA_DAILY))
 
 
 # ---------------------------------------------------------------------------

@@ -17,32 +17,12 @@ If you ever want to change the shape of the views, you only need to
 edit this file.
 """
 
-# Combines daily and multi-timeframe EMAs into one tall view
+# Multi-timeframe EMAs (includes 1D) as one tall view
 VIEW_ALL_EMAS_SQL = """
 CREATE OR REPLACE VIEW public.all_emas AS
-    -- Daily EMAs (tf = '1D')
-    SELECT
-        d.id,
-        d.ts,
-        '1D'::text AS tf,
-        1          AS tf_days,
-        d.period,
-        d.ema,
-        d.roll
-    FROM public.cmc_ema_daily d
-
-    UNION ALL
-
-    -- Multi-timeframe EMAs (2D, 3D, 1W, 1M, …)
-    SELECT
-        m.id,
-        m.ts,
-        m.tf,
-        m.tf_days,
-        m.period,
-        m.ema,
-        m.roll
-    FROM public.cmc_ema_multi_tf m;
+SELECT
+    id, ts, tf, tf_days, period, ema, roll
+FROM public.cmc_ema_multi_tf;
 """
 
 

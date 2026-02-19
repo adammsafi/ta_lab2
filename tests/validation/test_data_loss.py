@@ -240,7 +240,6 @@ def test_memory_tracks_file_moves():
         ("ProjectTT_overview.md", ".archive/documentation"),
         ("DATA_TOOLS_README.md", ".archive/documentation"),
         # Phase 13: Script consolidation
-        ("refresh_ema_daily_stats.py", "ta_lab2.scripts.emas.stats"),
         # Phase 15: Feature reorganization (if applicable)
         ("ema_utils.py", "ta_lab2.features"),
         # Phase 16: Test reorganization

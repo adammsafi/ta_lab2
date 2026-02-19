@@ -18,7 +18,6 @@ __all__ = [
     "load_close_panel",
     "load_da_ids",
     "load_exchange_info",
-    "write_ema_daily_to_db",
     # NEW: time-dimension helper
     "load_dim_timeframe",
     # ... keep whatever else you already have here ...
@@ -85,7 +84,6 @@ def _get_marketdata_config() -> Any:
             da_info: cmc_da_info
             exchange_info: cmc_exchange_info
             exchange_map: cmc_exchange_map
-            ema_daily: cmc_ema_daily            # optional, with default fallback
     """
     settings = load_settings()
     # Support both attribute style and mapping style
@@ -151,8 +149,6 @@ def _get_marketdata_tables() -> Mapping[str, str]:
         "da_info": m.get("da_info", "cmc_da_info"),
         "exchange_info": m.get("exchange_info", "cmc_exchange_info"),
         "exchange_map": m.get("exchange_map", "cmc_exchange_map"),
-        # indicator table defaults
-        "ema_daily": m.get("ema_daily", "cmc_ema_daily"),
     }
 
 
@@ -459,98 +455,3 @@ def _compute_ema_long_from_close_panel(
     result = pd.concat(frames, ignore_index=True)
     result.sort_values(["id", "ts", "period"], inplace=True)
     return result
-
-
-def write_ema_daily_to_db(
-    ids: Sequence[int],
-    periods: Sequence[int],
-    *,
-    start: Optional[pd.Timestamp | str] = None,
-    end: Optional[pd.Timestamp | str] = None,
-    db_url: str | None = None,
-    chunksize: int = 10_000,
-) -> int:
-    """
-    Compute daily EMAs for the given asset ids from OHLCV in cmc_price_histories7
-    and upsert them into the EMA indicator table (marketdata.tables.ema_daily).
-
-    Table schema (recommended) for ema_daily / cmc_ema_daily:
-
-        id      INT          -- CoinMarketCap asset id
-        ts      TIMESTAMPTZ  -- timestamp (daily bar close)
-        period  INT          -- EMA window length
-        ema     DOUBLE PRECISION
-        ingested_at TIMESTAMPTZ DEFAULT now()
-
-    This function performs an UPSERT:
-        ON CONFLICT (id, ts, period) DO UPDATE SET ema = EXCLUDED.ema
-
-    So rerunning over the same date range will update existing rows instead of
-    creating duplicates.
-
-    Parameters
-    ----------
-    ids :
-        Sequence of CoinMarketCap ids to process.
-    periods :
-        Sequence of EMA window lengths (ints).
-    start, end :
-        Optional date bounds passed through to load_cmc_ohlcv_daily().
-    db_url :
-        Optional DB URL override for marketdata database.
-    chunksize :
-        Batch size for the batched insert.
-
-    Returns
-    -------
-    int
-        Number of EMA rows written (inserted or updated).
-    """
-    if not ids:
-        raise ValueError("ids must be a non-empty sequence of CMC IDs")
-    if not periods:
-        raise ValueError("periods must be a non-empty sequence of EMA lookbacks")
-
-    # Load close prices panel from DB
-    close_panel = load_close_panel(
-        ids=ids,
-        start=start,
-        end=end,
-        db_url=db_url,
-    )
-    if close_panel.empty:
-        return 0
-
-    # Compute EMAs (long format: id, ts, period, ema)
-    ema_long = _compute_ema_long_from_close_panel(close_panel, periods)
-    if ema_long.empty:
-        return 0
-
-    engine = _get_marketdata_engine(db_url=db_url)
-    schema, tables = _get_marketdata_schema_and_tables()
-    ema_table_name = tables["ema_daily"]
-    full_table = _qualify_table(schema, ema_table_name)
-
-    # Convert to list-of-dicts for executemany
-    records = ema_long.to_dict(orient="records")
-    total = len(records)
-    if total == 0:
-        return 0
-
-    # Prepare UPSERT statement
-    stmt = text(
-        f"""
-        INSERT INTO {full_table} (id, ts, period, ema)
-        VALUES (:id, :ts, :period, :ema)
-        ON CONFLICT (id, ts, period) DO UPDATE
-        SET ema = EXCLUDED.ema
-        """
-    )
-
-    # Execute in batches
-    with engine.begin() as conn:
-        for i in range(0, total, chunksize):
-            batch = records[i : i + chunksize]
-            conn.execute(stmt, batch)
-
-    return total

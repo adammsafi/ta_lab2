@@ -33,9 +33,6 @@ DROP TABLE IF EXISTS public.cmc_price_bars_multi_tf_cal_anchor_us_state CASCADE;
 DROP TABLE IF EXISTS public.cmc_price_bars_multi_tf_cal_anchor_us_snapshot_20260206_025653 CASCADE;
 
 -- Drop EMA Tables (main + state + snapshots)
-DROP TABLE IF EXISTS public.cmc_ema_daily CASCADE;
-DROP TABLE IF EXISTS public.cmc_ema_daily_20251124_snapshot CASCADE;
-
 DROP TABLE IF EXISTS public.cmc_ema_multi_tf CASCADE;
 DROP TABLE IF EXISTS public.cmc_ema_multi_tf_state CASCADE;
 DROP TABLE IF EXISTS public.cmc_ema_multi_tf_20251124_snapshot CASCADE;
@@ -66,9 +63,6 @@ DROP TABLE IF EXISTS public.cmc_ema_multi_tf_u CASCADE;
 DROP TABLE IF EXISTS public.cmc_ema_refresh_state CASCADE;
 
 -- Drop EMA Stats Tables (stats + stats_state + snapshots)
-DROP TABLE IF EXISTS public.ema_daily_stats CASCADE;
-DROP TABLE IF EXISTS public.ema_daily_stats_20251124_snapshot CASCADE;
-
 DROP TABLE IF EXISTS public.ema_multi_tf_stats CASCADE;
 DROP TABLE IF EXISTS public.ema_multi_tf_stats_20251124_snapshot CASCADE;
 DROP TABLE IF EXISTS public.ema_multi_tf_stats_state CASCADE;

@@ -28,7 +28,7 @@ def get_all_asset_ids(db_url: Optional[str] = None) -> List[str]:
 
 def main(db_url: Optional[str] = None) -> None:
     """
-    Refresh cmc_ema_daily and cmc_ema_multi_tf for ALL assets in cmc_price_histories7,
+    Refresh cmc_ema_multi_tf for ALL assets in cmc_price_histories7,
     and refresh the EMA views, by invoking the existing refresh_cmc_emas script.
     """
     ids = get_all_asset_ids(db_url=db_url)

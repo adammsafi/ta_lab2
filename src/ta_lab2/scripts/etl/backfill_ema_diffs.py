@@ -18,7 +18,6 @@ DB_URL = os.environ.get(
 # Tables you want to backfill.
 # time_col here is just a *preferred* name; we’ll fall back if it’s missing.
 TABLES = [
-    {"name": "cmc_ema_daily", "time_col": "timeopen"},
     {"name": "cmc_ema_multi_tf", "time_col": "timeopen"},
 ]
 

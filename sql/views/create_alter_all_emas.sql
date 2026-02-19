@@ -9,24 +9,7 @@ DROP VIEW IF EXISTS public.cmc_price_with_emas;
 DROP VIEW IF EXISTS public.all_emas;
 
 CREATE VIEW public.all_emas AS
-    -- Daily EMAs (tf = '1D')
-    SELECT
-        d.id,
-        d.ts,
-        d.tf,
-        d.tf_days,
-        d.period,
-        d.ema,
-        d.d1_roll AS d1,
-        d.d2_roll AS d2,
-        d.d1      AS d1_close,
-        d.d2      AS d2_close,
-        d.roll
-    FROM public.cmc_ema_daily d
-
-    UNION ALL
-
-    -- Multi-timeframe EMAs (original table)
+    -- Multi-timeframe EMAs (includes 1D)
     SELECT
         m.id,
         m.ts,
