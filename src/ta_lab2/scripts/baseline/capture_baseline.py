@@ -59,10 +59,9 @@ BAR_TABLES = [
     "public.cmc_price_bars_multi_tf_cal_anchor_us",
 ]
 
-# All 6 EMA tables from Phase 21 documentation
+# All 5 EMA tables
 EMA_TABLES = [
     "public.cmc_ema_multi_tf",
-    "public.cmc_ema_multi_tf_v2",
     "public.cmc_ema_multi_tf_cal_us",
     "public.cmc_ema_multi_tf_cal_iso",
     "public.cmc_ema_multi_tf_cal_anchor_us",

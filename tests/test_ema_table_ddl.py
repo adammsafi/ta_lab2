@@ -10,7 +10,6 @@ from ta_lab2.scripts.emas.base_ema_refresher import _generate_ema_table_ddl
 # Test all EMA table types
 tables = [
     ("cmc_ema_multi_tf", "multi_tf"),
-    ("cmc_ema_multi_tf_v2", "v2"),
     ("cmc_ema_multi_tf_cal_iso", "cal"),
     ("cmc_ema_multi_tf_cal_us", "cal"),
     ("cmc_ema_multi_tf_cal_anchor_iso", "cal_anchor"),

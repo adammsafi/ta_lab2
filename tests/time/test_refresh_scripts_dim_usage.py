@@ -21,7 +21,6 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent
 # Active refresh scripts (production code)
 ACTIVE_REFRESH_SCRIPTS = [
     "src/ta_lab2/scripts/emas/refresh_cmc_ema_multi_tf_from_bars.py",
-    "src/ta_lab2/scripts/emas/refresh_cmc_ema_multi_tf_v2.py",
     "src/ta_lab2/scripts/emas/refresh_cmc_ema_multi_tf_cal_from_bars.py",
     "src/ta_lab2/scripts/emas/refresh_cmc_ema_multi_tf_cal_anchor_from_bars.py",
 ]
@@ -29,7 +28,6 @@ ACTIVE_REFRESH_SCRIPTS = [
 # Scripts that use dim_timeframe directly (import list_tfs)
 DIRECT_DIM_TF_SCRIPTS = [
     "src/ta_lab2/scripts/emas/refresh_cmc_ema_multi_tf_from_bars.py",
-    "src/ta_lab2/scripts/emas/refresh_cmc_ema_multi_tf_v2.py",
 ]
 
 # Scripts that use dim_timeframe indirectly (via feature modules)
@@ -48,7 +46,6 @@ CALENDAR_FEATURE_MODULES = [
 STATS_SCRIPTS = [
     "src/ta_lab2/scripts/emas/stats/multi_tf/refresh_ema_multi_tf_stats.py",
     "src/ta_lab2/scripts/emas/stats/multi_tf_cal/refresh_ema_multi_tf_cal_stats.py",
-    "src/ta_lab2/scripts/emas/stats/multi_tf_v2/refresh_ema_multi_tf_v2_stats.py",
     "src/ta_lab2/scripts/emas/stats/multi_tf_cal_anchor/refresh_ema_multi_tf_cal_anchor_stats.py",
 ]
 

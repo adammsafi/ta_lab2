@@ -3,12 +3,12 @@ from __future__ import annotations
 """
 sync_cmc_ema_multi_tf_u.py
 
-Incrementally sync EMA records from 6 source EMA tables into:
+Incrementally sync EMA records from 5 source EMA tables into:
   public.cmc_ema_multi_tf_u
 
 Rules:
 - alignment_source = suffix after 'cmc_ema_' in the source table name.
-  e.g. public.cmc_ema_multi_tf_v2 -> multi_tf_v2
+  e.g. public.cmc_ema_multi_tf -> multi_tf
 
 - Watermark per source:
   - If source has ingested_at: use max(ingested_at) from _u for that alignment_source
@@ -41,7 +41,6 @@ U_TABLE = "public.cmc_ema_multi_tf_u"
 
 SOURCES = [
     "public.cmc_ema_multi_tf",
-    "public.cmc_ema_multi_tf_v2",
     "public.cmc_ema_multi_tf_cal_us",
     "public.cmc_ema_multi_tf_cal_iso",
     "public.cmc_ema_multi_tf_cal_anchor_us",
@@ -285,7 +284,7 @@ def main() -> None:
     ap.add_argument(
         "--only",
         default="",
-        help="Optional comma-separated list of alignment_source values to process (e.g. multi_tf_v2,multi_tf_cal_us)",
+        help="Optional comma-separated list of alignment_source values to process (e.g. multi_tf,multi_tf_cal_us)",
     )
     args = ap.parse_args()
 

@@ -5,7 +5,6 @@ This module extracts common EMA computation patterns from all feature modules:
 - ema_multi_timeframe.py
 - ema_multi_tf_cal.py
 - ema_multi_tf_cal_anchor.py
-- ema_multi_tf_v2.py
 
 Analogous to polars_bar_operations.py for bar builders.
 

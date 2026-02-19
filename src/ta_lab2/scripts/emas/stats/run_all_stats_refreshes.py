@@ -5,9 +5,8 @@ Master orchestrator for all EMA stats refresh scripts.
 Runs all stats computation scripts in the correct order:
 1. Daily stats (ema_daily_stats)
 2. Multi-TF stats (ema_multi_tf_stats)
-3. Multi-TF V2 stats (ema_multi_tf_v2_stats)
-4. Calendar stats (ema_multi_tf_cal_stats)
-5. Calendar anchor stats (ema_multi_tf_cal_anchor_stats)
+3. Calendar stats (ema_multi_tf_cal_stats)
+4. Calendar anchor stats (ema_multi_tf_cal_anchor_stats)
 
 Usage:
     # Run all stats refreshers
@@ -53,12 +52,6 @@ ALL_STATS_SCRIPTS = [
         script_path="multi_tf/refresh_ema_multi_tf_stats.py",
         description="Multi-TF rolling EMA stats",
         subdirectory="multi_tf",
-    ),
-    StatsScript(
-        name="multi_tf_v2",
-        script_path="multi_tf_v2/refresh_ema_multi_tf_v2_stats.py",
-        description="Multi-TF V2 EMA stats",
-        subdirectory="multi_tf_v2",
     ),
     StatsScript(
         name="cal",

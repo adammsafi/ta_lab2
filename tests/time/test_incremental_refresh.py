@@ -55,7 +55,6 @@ class TestStateTableExistence:
         # Common expected state tables
         expected_tables = [
             "cmc_ema_multi_tf_state",
-            "cmc_ema_multi_tf_v2_state",
             "cmc_ema_multi_tf_cal_us_state",
             "cmc_ema_multi_tf_cal_iso_state",
             "cmc_ema_multi_tf_cal_anchor_us_state",
@@ -76,7 +75,7 @@ class TestWatermarking:
     def test_get_watermark_returns_datetime_or_none(self, db_engine):
         """Verify get_watermark returns datetime or None (not crash)."""
         # Test with a known alignment_source
-        result = get_watermark(db_engine, "multi_tf_v2", prefer_ingested_at=False)
+        result = get_watermark(db_engine, "multi_tf", prefer_ingested_at=False)
 
         # Should return datetime or None
         assert result is None or isinstance(
@@ -87,7 +86,7 @@ class TestWatermarking:
     def test_watermark_per_alignment_source(self, db_engine):
         """Verify different alignment_sources can have different watermarks."""
         # Get watermarks for different alignment sources
-        sources = ["multi_tf", "multi_tf_v2", "multi_tf_cal_us"]
+        sources = ["multi_tf", "multi_tf_cal_us", "multi_tf_cal_iso"]
         watermarks = {}
 
         for source in sources:
@@ -130,7 +129,7 @@ class TestIdempotency:
         )
 
         # Pick a source table to test
-        test_source = "public.cmc_ema_multi_tf_v2"
+        test_source = "public.cmc_ema_multi_tf"
 
         if not table_exists(db_engine, test_source):
             pytest.skip(f"Test source table {test_source} not found")
@@ -286,10 +285,10 @@ class TestIncrementalBehavior:
         Marked as slow because it's more of a monitoring test.
         """
         # Get current watermark
-        initial_wm = get_watermark(db_engine, "multi_tf_v2", prefer_ingested_at=False)
+        initial_wm = get_watermark(db_engine, "multi_tf", prefer_ingested_at=False)
 
         if initial_wm is None:
-            pytest.skip("No initial watermark found for multi_tf_v2")
+            pytest.skip("No initial watermark found for multi_tf")
 
         # Document: After running a sync, watermark should be >= initial
         # This test just documents the expectation

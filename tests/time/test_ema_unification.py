@@ -127,7 +127,6 @@ def test_alignment_source_values(engine):
 
     Expected alignment sources (those with source tables):
     - multi_tf
-    - multi_tf_v2
     - multi_tf_cal_us
     - multi_tf_cal_iso
     - multi_tf_cal_anchor_us
@@ -152,7 +151,6 @@ def test_alignment_source_values(engine):
     # Expected sources based on SOURCES list in sync_cmc_ema_multi_tf_u.py
     expected_sources = {
         "multi_tf",
-        "multi_tf_v2",
         "multi_tf_cal_us",
         "multi_tf_cal_iso",
         "multi_tf_cal_anchor_us",

@@ -14,7 +14,7 @@ Fixes (2025-12-21):
     * Months/Years: scheme-agnostic: *_CAL and *_CAL_ANCHOR
 
 Expected TFs:
-- multi_tf + v2: dim_timeframe alignment_type='tf_day'
+- multi_tf: dim_timeframe alignment_type='tf_day'
 - cal_us/cal_iso: dim_timeframe alignment_type='calendar', calendar_anchor=FALSE
 - cal_anchor_us/cal_anchor_iso: dim_timeframe alignment_type='calendar', calendar_anchor=TRUE
 
@@ -41,7 +41,6 @@ DEFAULT_LUT = "public.ema_alpha_lookup"
 
 EMA_TABLES = {
     "public.cmc_ema_multi_tf": "TF_DAY",
-    "public.cmc_ema_multi_tf_v2": "TF_DAY",
     "public.cmc_ema_multi_tf_cal_us": "CAL_US",
     "public.cmc_ema_multi_tf_cal_iso": "CAL_ISO",
     "public.cmc_ema_multi_tf_cal_anchor_us": "ANCHOR_US",

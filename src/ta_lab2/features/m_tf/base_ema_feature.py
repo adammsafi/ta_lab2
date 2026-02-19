@@ -6,7 +6,6 @@ for all EMA computation types:
 - ema_multi_timeframe.py
 - ema_multi_tf_cal.py
 - ema_multi_tf_cal_anchor.py
-- ema_multi_tf_v2.py
 
 Design Pattern: Template Method
 - Base class defines computation flow

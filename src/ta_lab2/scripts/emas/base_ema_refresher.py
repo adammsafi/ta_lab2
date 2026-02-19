@@ -25,7 +25,6 @@ Migration: This replaces duplicated code in:
 - refresh_cmc_ema_multi_tf_from_bars.py
 - refresh_cmc_ema_multi_tf_cal_from_bars.py
 - refresh_cmc_ema_multi_tf_cal_anchor_from_bars.py
-- refresh_cmc_ema_multi_tf_v2.py
 """
 
 from __future__ import annotations
@@ -98,7 +97,6 @@ def ensure_ema_table_exists(
 
     Supports all EMA table types:
     - multi_tf: cmc_ema_multi_tf (rolling EMAs from multi-TF bars)
-    - v2: cmc_ema_multi_tf_v2 (calendar EMAs from bars)
     - cal: cmc_ema_multi_tf_cal_iso/us (calendar-aligned EMAs)
     - cal_anchor: cmc_ema_multi_tf_cal_anchor_iso/us (calendar-anchored EMAs)
 
@@ -111,7 +109,6 @@ def ensure_ema_table_exists(
     Usage:
         # From a refresher:
         ensure_ema_table_exists(self.engine, "cmc_ema_multi_tf", table_type="multi_tf")
-        ensure_ema_table_exists(self.engine, "cmc_ema_multi_tf_v2", table_type="v2")
     """
     # Handle fully-qualified table names (e.g., "public.cmc_ema_multi_tf")
     if "." in table_name:
@@ -161,32 +158,6 @@ CREATE TABLE IF NOT EXISTS {fq_table} (
 CREATE INDEX IF NOT EXISTS ix_{table_name}_roll_true_id_tf_period_ts
     ON {fq_table} (id, tf, period, ts)
     WHERE roll = TRUE;
-
--- Unique constraint for canonical (non-roll) rows
-CREATE UNIQUE INDEX IF NOT EXISTS uq_{table_name}__canon_ts
-    ON {fq_table} (id, tf, period, ts)
-    WHERE roll = FALSE;
-"""
-
-    elif table_type == "v2":
-        # V2 EMAs from daily bars - lean schema
-        return f"""
-CREATE TABLE IF NOT EXISTS {fq_table} (
-    id INTEGER NOT NULL,
-    ts TIMESTAMPTZ NOT NULL,
-    tf TEXT NOT NULL,
-    period INTEGER NOT NULL,
-    tf_days INTEGER,
-    roll BOOLEAN,
-    ema DOUBLE PRECISION,
-    is_partial_end BOOLEAN,
-    ingested_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    PRIMARY KEY (id, ts, tf, period)
-);
-
--- Index for queries
-CREATE INDEX IF NOT EXISTS {table_name}__id_tf_period_ts_idx
-    ON {fq_table} (id, tf, period, ts);
 
 -- Unique constraint for canonical (non-roll) rows
 CREATE UNIQUE INDEX IF NOT EXISTS uq_{table_name}__canon_ts
@@ -659,7 +630,6 @@ class BaseEMARefresher(ABC):
 
         Subclasses should override to specify their table type:
         - "multi_tf" for refresh_cmc_ema_multi_tf_from_bars
-        - "v2" for refresh_cmc_ema_multi_tf_v2
         - "cal" for cal_iso and cal_us refreshers
         - "cal_anchor" for cal_anchor_iso and cal_anchor_us refreshers
 
@@ -669,9 +639,7 @@ class BaseEMARefresher(ABC):
         # Auto-detect from table name
         table_name = self.config.output_table.lower()
 
-        if "_v2" in table_name:
-            return "v2"
-        elif "cal_anchor" in table_name:
+        if "cal_anchor" in table_name:
             return "cal_anchor"
         elif "_cal_" in table_name:
             return "cal"

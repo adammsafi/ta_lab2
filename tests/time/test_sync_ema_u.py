@@ -27,17 +27,16 @@ from ta_lab2.scripts.emas.sync_cmc_ema_multi_tf_u import (
 
 
 def test_sources_list():
-    """Verify SOURCES contains 6 expected table names."""
+    """Verify SOURCES contains 5 expected table names."""
     expected_sources = [
         "public.cmc_ema_multi_tf",
-        "public.cmc_ema_multi_tf_v2",
         "public.cmc_ema_multi_tf_cal_us",
         "public.cmc_ema_multi_tf_cal_iso",
         "public.cmc_ema_multi_tf_cal_anchor_us",
         "public.cmc_ema_multi_tf_cal_anchor_iso",
     ]
 
-    assert len(SOURCES) == 6, f"Expected 6 sources, got {len(SOURCES)}"
+    assert len(SOURCES) == 5, f"Expected 5 sources, got {len(SOURCES)}"
 
     for expected in expected_sources:
         assert expected in SOURCES, f"Expected source {expected} not found in SOURCES"
@@ -47,7 +46,6 @@ def test_alignment_source_extraction():
     """Test alignment_source_from_table extracts correct suffix."""
     test_cases = [
         ("public.cmc_ema_multi_tf", "multi_tf"),
-        ("public.cmc_ema_multi_tf_v2", "multi_tf_v2"),
         ("public.cmc_ema_multi_tf_cal_us", "multi_tf_cal_us"),
         ("public.cmc_ema_multi_tf_cal_iso", "multi_tf_cal_iso"),
         ("public.cmc_ema_multi_tf_cal_anchor_us", "multi_tf_cal_anchor_us"),
@@ -117,7 +115,7 @@ def test_build_select_expr_success():
     ]
 
     select_sql, where_sql = build_select_expr(
-        cols_complete, "multi_tf_v2", use_ingested_filter=True
+        cols_complete, "multi_tf", use_ingested_filter=True
     )
 
     # Verify SELECT clause contains expected elements
@@ -135,7 +133,7 @@ def test_build_select_expr_success():
 
     # Test with use_ingested_filter=False
     select_sql2, where_sql2 = build_select_expr(
-        cols_complete, "multi_tf_v2", use_ingested_filter=False
+        cols_complete, "multi_tf", use_ingested_filter=False
     )
 
     assert "WHERE" in where_sql2

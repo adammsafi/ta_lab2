@@ -43,7 +43,6 @@ from ta_lab2.features.m_tf.polars_helpers import read_sql_polars
 
 TABLES = [
     "public.cmc_ema_multi_tf",
-    "public.cmc_ema_multi_tf_v2",
     "public.cmc_ema_multi_tf_cal_us",
     "public.cmc_ema_multi_tf_cal_iso",
     "public.cmc_ema_multi_tf_cal_anchor_us",

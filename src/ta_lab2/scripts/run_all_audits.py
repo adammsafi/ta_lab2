@@ -132,12 +132,6 @@ ALL_AUDIT_SCRIPTS = [
         category="returns",
     ),
     AuditScript(
-        name="returns_ema_multi_tf_v2",
-        script_path="returns/audit_returns_ema_multi_tf_v2_integrity.py",
-        description="Returns integrity (multi-TF V2 EMAs)",
-        category="returns",
-    ),
-    AuditScript(
         name="returns_ema_multi_tf_u",
         script_path="returns/audit_returns_ema_multi_tf_u_integrity.py",
         description="Returns integrity (multi-TF U EMAs)",

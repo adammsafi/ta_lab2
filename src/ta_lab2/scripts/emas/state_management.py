@@ -8,7 +8,6 @@ Standardizes state table schema, creation, loading, and updating across:
 - refresh_cmc_ema_multi_tf_from_bars.py
 - refresh_cmc_ema_multi_tf_cal_from_bars.py
 - refresh_cmc_ema_multi_tf_cal_anchor_from_bars.py
-- refresh_cmc_ema_multi_tf_v2.py
 
 State table schema (unified across all EMA scripts):
 - PRIMARY KEY: (id, tf, period)

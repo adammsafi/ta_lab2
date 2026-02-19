@@ -21,7 +21,6 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent
 # Production refresh scripts (main scripts that write EMA data)
 PRODUCTION_SCRIPTS = [
     "src/ta_lab2/scripts/emas/refresh_cmc_ema_multi_tf_from_bars.py",
-    "src/ta_lab2/scripts/emas/refresh_cmc_ema_multi_tf_v2.py",
     "src/ta_lab2/scripts/emas/refresh_cmc_ema_multi_tf_cal_from_bars.py",
     "src/ta_lab2/scripts/emas/refresh_cmc_ema_multi_tf_cal_anchor_from_bars.py",
 ]
@@ -213,7 +212,6 @@ def test_state_table_referenced(script_path: str):
     State tables store incremental watermarks per (id, tf, period).
     Scripts should specify which state table to use, e.g.:
     - cmc_ema_multi_tf_state
-    - cmc_ema_multi_tf_v2_state
     - cmc_ema_multi_tf_cal_us_state
     - cmc_ema_multi_tf_cal_anchor_us_state
 

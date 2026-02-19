@@ -76,7 +76,6 @@ DEFAULT_LUT = "public.ema_alpha_lookup"
 
 EMA_TABLES: Dict[str, str] = {
     "public.cmc_ema_multi_tf": "TF_DAY",
-    "public.cmc_ema_multi_tf_v2": "TF_DAY",
     "public.cmc_ema_multi_tf_cal_us": "CAL_US",
     "public.cmc_ema_multi_tf_cal_iso": "CAL_ISO",
     "public.cmc_ema_multi_tf_cal_anchor_us": "ANCHOR_US",
