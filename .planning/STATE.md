@@ -10,16 +10,16 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 ## Current Position
 
 Phase: 28 of 28 (Backtest Pipeline Fix) — In progress
-Plan: 1 of 3 in current phase — 28-01 complete
-Status: In progress — 28-02 (vectorbt timestamp fix) is next
-Last activity: 2026-02-20 — Completed 28-01-PLAN.md (signal generator serialization fix)
+Plan: 2 of 3 in current phase — 28-02 complete
+Status: In progress — 28-03 (end-to-end validation) is next
+Last activity: 2026-02-20 — Completed 28-02-PLAN.md (vectorbt 0.28.1 compatibility fix)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [######----] 60% v0.7.0 (1/3 plans in Phase 28 complete)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [########--] 80% v0.7.0 (2/3 plans in Phase 28 complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 143 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 1 in v0.7.0)
+- Total plans completed: 144 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 2 in v0.7.0)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -131,6 +131,10 @@ Recent decisions affecting current work:
 - **EMA early-stop before regimes** (Phase 27-07): Added failure check before running regimes - regimes depend on fresh EMAs; propagates --dry-run to regime subprocess
 - **regime_inspect default reads from DB** (Phase 27-07): Operational check should be fast; --live flag triggers compute_regimes_for_id for testing changes before write
 - **JSONB serialization pattern** (Phase 28-01): Use `json.dumps(x) if isinstance(x, dict) else x` before to_sql() for JSONB columns — isinstance guard is defensive, handles pre-serialized strings; all 3 signal generators now consistent
+- **_ensure_utc pattern** (Phase 28-02): Helper checks ts.dt.tz: None -> tz_localize("UTC"), aware -> tz_convert("UTC") — safe for both vbt naive output and pandas tz-aware series
+- **Tz boundary pattern for vectorbt** (Phase 28-02): Strip tz at vectorbt ingestion (run_backtest), re-add at trade extraction (_ensure_utc in _extract_trades) — single strip covers all downstream vectorbt calls
+- **str.lower() for vbt direction** (Phase 28-02): vbt 0.28.1 returns 'Long'/'Short' strings, not integers — .astype(str).str.lower() handles both string and integer cases without NaN
+- **Backward-compat fee extraction** (Phase 28-02): Entry Fees + Exit Fees (vbt 0.28.1) -> Fees (older vbt) -> 0.0 — chained fallback maximizes cross-version compatibility
 
 ### Pending Todos
 
@@ -142,8 +146,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-20T22:05:00Z
-Stopped at: Completed 28-01-PLAN.md — signal generator serialization fix (EMA + ATR json.dumps)
+Last session: 2026-02-20T22:03:33Z
+Stopped at: Completed 28-02-PLAN.md — vectorbt 0.28.1 compatibility fix (5 bugs fixed in backtest_from_signals.py)
 Resume file: None
 
 ---
