@@ -10,12 +10,12 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 ## Current Position
 
 Phase: 27 of 28 (Regime Integration)
-Plan: 0 of 0 in current phase (not yet planned)
-Status: Phase not planned
+Plan: 1 of 7 in current phase
+Status: In progress
 Next Phase: Phase 28 (Backtest Pipeline Fix)
-Last activity: 2026-02-20 — v0.7.0 started, Phases 27-28 added
+Last activity: 2026-02-20 — Completed 27-01-PLAN.md (Regime Schema DDL)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [----------] 0% v0.7.0 (0/2 phases)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [#---------] ~7% v0.7.0 (1/14 plans)
 
 ## Performance Metrics
 
@@ -111,6 +111,9 @@ Recent decisions affecting current work:
 - **Intelligent sampling (beginning/end/random)** (Phase 25-02): 30 days beginning + 30 days end + 5% random interior balances speed and confidence - detects temporal drift while avoiding full table scans
 - **Never fail early in baseline capture** (Phase 25-02): Always run to completion, report ALL issues - partial results hide systemic problems
 - **Subprocess isolation for baseline workflow** (Phase 25-02): Run bar builders and EMA refreshers via subprocess.run matching Phase 23 patterns (run_daily_refresh.py)
+- **cmc_regime_comovement PK includes computed_at** (Phase 27-01): Retains historical snapshots across refreshes - each refresh snapshot preserved for temporal analytics
+- **regime_key nullable on signal tables** (Phase 27-01): Existing signals have NULL regime_key, backward-compatible, signal generators populate going forward
+- **regime_enabled defaults TRUE on dim_signals** (Phase 27-01): All existing signals automatically participate in regime-aware execution, opt-out is explicit
 
 ### Pending Todos
 
@@ -122,8 +125,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-20
-Stopped at: v0.7.0 phases added (27: Regime Integration, 28: Backtest Pipeline Fix)
+Last session: 2026-02-20T19:24:14Z
+Stopped at: Completed 27-01-PLAN.md (Regime Schema DDL - 4 new tables + 4 columns)
 Resume file: None
 
 ---
