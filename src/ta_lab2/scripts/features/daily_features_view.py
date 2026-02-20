@@ -304,8 +304,8 @@ class FeaturesStore:
                     "e21.ema as ema_21",
                     "e50.ema as ema_50",
                     "e200.ema as ema_200",
-                    "e9.d1 as ema_9_d1",
-                    "e21.d1 as ema_21_d1",
+                    "re9.d1 as ema_9_d1",
+                    "re21.d1 as ema_21_d1",
                 ]
             )
         else:
@@ -426,16 +426,22 @@ class FeaturesStore:
         if sources_available.get("emas", False):
             joins.append(
                 f"""
-                LEFT JOIN (SELECT id, ts, ema, d1 FROM public.cmc_ema_multi_tf_u WHERE period = 9 AND tf = '{tf}') e9
+                LEFT JOIN (SELECT id, ts, ema FROM public.cmc_ema_multi_tf_u WHERE period = 9 AND tf = '{tf}') e9
                   ON p.id = e9.id AND p.time_close = e9.ts
-                LEFT JOIN (SELECT id, ts, ema, d1 FROM public.cmc_ema_multi_tf_u WHERE period = 10 AND tf = '{tf}') e10
+                LEFT JOIN (SELECT id, ts, ema FROM public.cmc_ema_multi_tf_u WHERE period = 10 AND tf = '{tf}') e10
                   ON p.id = e10.id AND p.time_close = e10.ts
-                LEFT JOIN (SELECT id, ts, ema, d1 FROM public.cmc_ema_multi_tf_u WHERE period = 21 AND tf = '{tf}') e21
+                LEFT JOIN (SELECT id, ts, ema FROM public.cmc_ema_multi_tf_u WHERE period = 21 AND tf = '{tf}') e21
                   ON p.id = e21.id AND p.time_close = e21.ts
-                LEFT JOIN (SELECT id, ts, ema, d1 FROM public.cmc_ema_multi_tf_u WHERE period = 50 AND tf = '{tf}') e50
+                LEFT JOIN (SELECT id, ts, ema FROM public.cmc_ema_multi_tf_u WHERE period = 50 AND tf = '{tf}') e50
                   ON p.id = e50.id AND p.time_close = e50.ts
-                LEFT JOIN (SELECT id, ts, ema, d1 FROM public.cmc_ema_multi_tf_u WHERE period = 200 AND tf = '{tf}') e200
+                LEFT JOIN (SELECT id, ts, ema FROM public.cmc_ema_multi_tf_u WHERE period = 200 AND tf = '{tf}') e200
                   ON p.id = e200.id AND p.time_close = e200.ts
+                LEFT JOIN (SELECT id, ts, delta1_ema as d1 FROM public.cmc_returns_ema_multi_tf_u
+                           WHERE period = 9 AND tf = '{tf}' AND alignment_source = 'multi_tf' AND roll = FALSE) re9
+                  ON p.id = re9.id AND p.time_close = re9.ts
+                LEFT JOIN (SELECT id, ts, delta1_ema as d1 FROM public.cmc_returns_ema_multi_tf_u
+                           WHERE period = 21 AND tf = '{tf}' AND alignment_source = 'multi_tf' AND roll = FALSE) re21
+                  ON p.id = re21.id AND p.time_close = re21.ts
             """
             )
 

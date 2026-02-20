@@ -15,7 +15,7 @@ Rules:
   - Else: use max(ts) from _u for that alignment_source
 
 - Insert uses ON CONFLICT DO NOTHING on PK:
-  (id, ts, tf, period, alignment_source)
+  (id, ts, tf, period)
 
 Run:
   python sync_cmc_ema_multi_tf_u.py
@@ -151,10 +151,12 @@ def build_select_expr(
     e_ingested_at = "ingested_at" if "ingested_at" in colset else "now()"
     e_tf_days = "tf_days::int" if "tf_days" in colset else "NULL::int"
     e_roll = "COALESCE(roll,false)::boolean" if "roll" in colset else "false::boolean"
-    _e_ema_bar = (
+    e_ema_bar = (
         "ema_bar::double precision" if "ema_bar" in colset else "NULL::double precision"
     )
-    _e_roll_bar = "roll_bar::boolean" if "roll_bar" in colset else "NULL::boolean"
+    e_is_partial_end = (
+        "is_partial_end::boolean" if "is_partial_end" in colset else "NULL::boolean"
+    )
 
     # required columns (must exist in source)
     required = {"id", "ts", "tf", "period", "ema"}
@@ -175,6 +177,8 @@ def build_select_expr(
       tf::text,
       period::int,
       ema::double precision,
+      {e_ema_bar},
+      {e_is_partial_end},
       {e_ingested_at},
       {e_tf_days},
       {e_roll},
@@ -222,13 +226,12 @@ def insert_new_rows(
         where_clause = ""
 
     # Use a CTE so we can count inserted rows
-    # Note: _u table has (d1, d2, d1_roll, d2_roll) not (ema_bar, roll_bar).
-    # We only sync base columns — derivatives are computed separately.
     sql = f"""
     WITH ins AS (
       INSERT INTO {U_TABLE} (
         id, ts, tf, period,
-        ema, ingested_at, tf_days, roll,
+        ema, ema_bar, is_partial_end,
+        ingested_at, tf_days, roll,
         alignment_source
       )
       {select_sql}
