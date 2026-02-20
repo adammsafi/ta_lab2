@@ -2,10 +2,10 @@
 """
 Unified daily refresh orchestration script.
 
-Coordinates bars and EMAs with state-based checking and clear visibility.
+Coordinates bars, EMAs, and regimes with state-based checking and clear visibility.
 
 Usage:
-    # Full daily refresh (bars then EMAs)
+    # Full daily refresh (bars then EMAs then regimes)
     python run_daily_refresh.py --all --ids 1,52,825
 
     # Bars only
@@ -13,6 +13,9 @@ Usage:
 
     # EMAs only (with bar freshness check)
     python run_daily_refresh.py --emas --ids all
+
+    # Regimes only
+    python run_daily_refresh.py --regimes --ids all
 
     # Use 8 parallel processes for bar builders
     python run_daily_refresh.py --all --ids all -n 8
@@ -246,6 +249,108 @@ def run_ema_refreshers(
         )
 
 
+def run_regime_refresher(
+    args, db_url: str, parsed_ids: list[int] | None
+) -> ComponentResult:
+    """
+    Run regime refresher via subprocess.
+
+    Args:
+        args: CLI arguments
+        db_url: Database URL
+        parsed_ids: Parsed ID list or None for "all"
+
+    Returns:
+        ComponentResult with execution details
+    """
+    script_dir = Path(__file__).parent / "regimes"
+    cmd = [sys.executable, str(script_dir / "refresh_cmc_regimes.py")]
+
+    # Format IDs for regime subprocess
+    if parsed_ids is None:
+        cmd.append("--all")
+    else:
+        cmd.extend(["--ids", ",".join(str(i) for i in parsed_ids)])
+
+    cmd.extend(["--db-url", db_url])
+
+    if args.verbose:
+        cmd.append("--verbose")
+    if getattr(args, "no_regime_hysteresis", False):
+        cmd.append("--no-hysteresis")
+
+    # CRITICAL: Propagate --dry-run to subprocess
+    if getattr(args, "dry_run", False):
+        cmd.append("--dry-run")
+
+    print(f"\n{'=' * 70}")
+    print("RUNNING REGIME REFRESHER")
+    print(f"{'=' * 70}")
+    print(f"Command: {' '.join(cmd)}")
+
+    if args.dry_run:
+        print("[DRY RUN] Would execute regime refresher")
+        return ComponentResult(
+            component="regimes",
+            success=True,
+            duration_sec=0.0,
+            returncode=0,
+        )
+
+    start = time.perf_counter()
+
+    try:
+        if args.verbose:
+            # Stream output
+            result = subprocess.run(cmd, check=False)
+        else:
+            # Capture output
+            result = subprocess.run(cmd, check=False, capture_output=True, text=True)
+
+            # Show output on error
+            if result.returncode != 0:
+                print(
+                    f"\n[ERROR] Regime refresher failed with code {result.returncode}"
+                )
+                if result.stdout:
+                    print(f"\nSTDOUT:\n{result.stdout}")
+                if result.stderr:
+                    print(f"\nSTDERR:\n{result.stderr}")
+
+        duration = time.perf_counter() - start
+
+        if result.returncode == 0:
+            print(f"\n[OK] Regime refresher completed successfully in {duration:.1f}s")
+            return ComponentResult(
+                component="regimes",
+                success=True,
+                duration_sec=duration,
+                returncode=result.returncode,
+            )
+        else:
+            error_msg = f"Exited with code {result.returncode}"
+            print(f"\n[FAILED] Regime refresher failed: {error_msg}")
+            return ComponentResult(
+                component="regimes",
+                success=False,
+                duration_sec=duration,
+                returncode=result.returncode,
+                error_message=error_msg,
+            )
+
+    except Exception as e:
+        duration = time.perf_counter() - start
+        error_msg = str(e)
+        print(f"\n[ERROR] Regime refresher raised exception: {error_msg}")
+        return ComponentResult(
+            component="regimes",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+
+
 def print_combined_summary(results: list[tuple[str, ComponentResult]]) -> bool:
     """
     Print combined execution summary.
@@ -295,11 +400,11 @@ def print_combined_summary(results: list[tuple[str, ComponentResult]]) -> bool:
 def main(argv: list[str] | None = None) -> int:
     """Main entry point."""
     p = argparse.ArgumentParser(
-        description="Unified daily refresh orchestration for bars and EMAs.",
+        description="Unified daily refresh orchestration for bars, EMAs, and regimes.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Full daily refresh (bars then EMAs)
+  # Full daily refresh (bars then EMAs then regimes)
   python run_daily_refresh.py --all --ids 1,52,825
 
   # Bars only
@@ -307,6 +412,9 @@ Examples:
 
   # EMAs only (automatically checks bar freshness)
   python run_daily_refresh.py --emas --ids all
+
+  # Regimes only
+  python run_daily_refresh.py --regimes --ids all
 
   # Dry run to see what would execute
   python run_daily_refresh.py --all --ids 1 --dry-run
@@ -319,6 +427,9 @@ Examples:
 
   # Skip bar freshness check for EMAs
   python run_daily_refresh.py --emas --ids all --skip-stale-check
+
+  # Run regimes without hysteresis smoothing
+  python run_daily_refresh.py --regimes --ids 1 --no-regime-hysteresis
         """,
     )
 
@@ -334,9 +445,14 @@ Examples:
         help="Run EMA refreshers only",
     )
     p.add_argument(
+        "--regimes",
+        action="store_true",
+        help="Run regime refresher only",
+    )
+    p.add_argument(
         "--all",
         action="store_true",
-        help="Run bars then EMAs (full refresh)",
+        help="Run bars then EMAs then regimes (full refresh)",
     )
 
     # Common arguments
@@ -386,11 +502,18 @@ Examples:
         help="Max hours for bar freshness (default: 48.0)",
     )
 
+    # Regime-specific options
+    p.add_argument(
+        "--no-regime-hysteresis",
+        action="store_true",
+        help="Disable hysteresis smoothing in regime refresher (pass --no-hysteresis to subprocess)",
+    )
+
     args = p.parse_args(argv)
 
     # Validation: require explicit target
-    if not (args.bars or args.emas or args.all):
-        p.error("Must specify --bars, --emas, or --all")
+    if not (args.bars or args.emas or args.regimes or args.all):
+        p.error("Must specify --bars, --emas, --regimes, or --all")
 
     # Resolve database URL
     try:
@@ -409,13 +532,22 @@ Examples:
     # Determine what to run
     run_bars = args.bars or args.all
     run_emas = args.emas or args.all
+    run_regimes = args.regimes or args.all
+
+    # Build component description string
+    components = []
+    if run_bars:
+        components.append("bars")
+    if run_emas:
+        components.append("EMAs")
+    if run_regimes:
+        components.append("regimes")
+    components_str = " + ".join(components)
 
     print(f"\n{'=' * 70}")
     print("DAILY REFRESH ORCHESTRATOR")
     print(f"{'=' * 70}")
-    print(
-        f"\nComponents: {('bars' if run_bars else '') + (' + ' if run_bars and run_emas else '') + ('EMAs' if run_emas else '')}"
-    )
+    print(f"\nComponents: {components_str}")
     print(f"IDs: {args.ids}")
     print(f"Continue on error: {args.continue_on_error}")
     if run_emas and not args.skip_stale_check:
@@ -470,6 +602,16 @@ Examples:
 
         ema_result = run_ema_refreshers(args, db_url, ids_for_emas)
         results.append(("emas", ema_result))
+
+        if not ema_result.success and not args.continue_on_error:
+            print("\n[STOPPED] EMA refreshers failed, stopping execution")
+            print("(Use --continue-on-error to run remaining components)")
+            return 1
+
+    # Run regimes if requested (after bars and EMAs)
+    if run_regimes:
+        regime_result = run_regime_refresher(args, db_url, parsed_ids)
+        results.append(("regimes", regime_result))
 
     # Print combined summary
     if not args.dry_run:
