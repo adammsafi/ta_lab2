@@ -41,6 +41,7 @@ class FeatureConfig:
 
     Attributes:
         feature_type: Type of feature ('returns', 'vol', 'ta')
+        tf: Timeframe code (e.g. '1D', '7D', '30D')
         output_schema: Schema for output table (default: 'public')
         output_table: Output table name (set by subclass)
         null_strategy: Null handling strategy ('skip', 'forward_fill', 'interpolate')
@@ -49,6 +50,7 @@ class FeatureConfig:
     """
 
     feature_type: str  # 'returns', 'vol', 'ta'
+    tf: str = "1D"
     output_schema: str = "public"
     output_table: str = ""  # Set by subclass
     null_strategy: str = "skip"
@@ -83,6 +85,9 @@ class BaseFeature(ABC):
     - Database writing with table creation
     """
 
+    SOURCE_TABLE = "public.cmc_price_bars_multi_tf"
+    TS_COLUMN = "time_close"
+
     def __init__(self, engine: Engine, config: FeatureConfig):
         """
         Initialize feature computation module.
@@ -93,6 +98,19 @@ class BaseFeature(ABC):
         """
         self.engine = engine
         self.config = config
+
+    def get_tf_days(self) -> int:
+        """Return tf_days for current tf. Cached after first call."""
+        if self.config.tf == "1D":
+            return 1
+        if not hasattr(self, "_tf_days_cache"):
+            with self.engine.connect() as conn:
+                row = conn.execute(
+                    text("SELECT tf_days_nominal FROM dim_timeframe WHERE tf = :tf"),
+                    {"tf": self.config.tf},
+                ).fetchone()
+                self._tf_days_cache = row[0] if row else 1
+        return self._tf_days_cache
 
     # =========================================================================
     # Abstract Methods (MUST override)
@@ -301,9 +319,12 @@ class BaseFeature(ABC):
 
     def write_to_db(self, df: pd.DataFrame) -> int:
         """
-        Write feature results to database.
+        Write feature results to database using scoped DELETE + INSERT.
 
-        Creates table if it doesn't exist, then appends data.
+        Deletes existing rows for (ids, tf) batch, then inserts new data.
+        Filters DataFrame columns to match the actual DB table columns
+        to prevent column mismatch errors.
+        Safe for re-runs — no duplicate risk.
 
         Args:
             df: DataFrame with feature results
@@ -317,9 +338,27 @@ class BaseFeature(ABC):
         # Ensure output table exists
         self._ensure_output_table()
 
-        # Write to database
-        # Use simple append for now (can be optimized with upsert later)
-        rows = df.to_sql(
+        fq_table = f"{self.config.output_schema}.{self.config.output_table}"
+
+        # Get actual table columns to filter DataFrame
+        table_cols = self._get_table_columns()
+        if table_cols:
+            # Only keep DataFrame columns that exist in the table
+            keep_cols = [c for c in df.columns if c in table_cols]
+            df = df[keep_cols]
+
+        # Scoped delete: existing rows for these (ids, tf)
+        ids = df["id"].unique().tolist()
+        tf = self.config.tf
+
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(f"DELETE FROM {fq_table} WHERE id = ANY(:ids) AND tf = :tf"),
+                {"ids": ids, "tf": tf},
+            )
+
+        # Insert
+        df.to_sql(
             self.config.output_table,
             self.engine,
             schema=self.config.output_schema,
@@ -329,7 +368,29 @@ class BaseFeature(ABC):
             chunksize=10000,
         )
 
-        return int(rows) if rows else len(df)
+        return len(df)
+
+    def _get_table_columns(self) -> set[str]:
+        """Get column names from the actual DB table. Returns empty set if table doesn't exist."""
+        q = text(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = :schema AND table_name = :table
+        """
+        )
+        try:
+            with self.engine.connect() as conn:
+                result = conn.execute(
+                    q,
+                    {
+                        "schema": self.config.output_schema,
+                        "table": self.config.output_table,
+                    },
+                )
+                return {row[0] for row in result}
+        except Exception:
+            return set()
 
     def _ensure_output_table(self) -> None:
         """

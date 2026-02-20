@@ -54,19 +54,16 @@ class VolatilityConfig(FeatureConfig):
     """
 
     feature_type: str = "vol"
-    output_table: str = "cmc_vol_daily"
+    output_table: str = "cmc_vol"
     null_strategy: str = "forward_fill"  # Per CONTEXT.md - vol forward fills
     add_zscore: bool = True
     zscore_window: int = 252
 
-    # Volatility windows (days)
+    # Volatility windows (bars)
     vol_windows: tuple[int, ...] = (20, 63, 126)
 
     # Estimators to compute
     estimators: tuple[str, ...] = ("parkinson", "gk", "rs")
-
-    # Annualization factor (252 trading days)
-    periods_per_year: int = 252
 
     # ATR period
     atr_period: int = 14
@@ -111,6 +108,8 @@ class VolatilityFeature(BaseFeature):
             config = VolatilityConfig()
         super().__init__(engine, config)
         self.vol_config = config  # Type-safe reference
+        # Compute periods_per_year dynamically based on tf_days
+        self._periods_per_year = max(12, round(252 / self.get_tf_days()))
 
     # =========================================================================
     # Abstract Method Implementations
@@ -123,7 +122,7 @@ class VolatilityFeature(BaseFeature):
         end: Optional[str] = None,
     ) -> pd.DataFrame:
         """
-        Load OHLC data from cmc_price_bars_1d for volatility computation.
+        Load OHLC data from cmc_price_bars_multi_tf for configured tf.
 
         Args:
             ids: List of asset IDs
@@ -134,16 +133,15 @@ class VolatilityFeature(BaseFeature):
             DataFrame with columns: id, ts, open, high, low, close
             Sorted by id ASC, ts ASC
         """
-        # Build WHERE clauses
-        where_clauses = ["id = ANY(:ids)"]
-        params = {"ids": ids}
+        where_clauses = ["id = ANY(:ids)", "tf = :tf"]
+        params = {"ids": ids, "tf": self.config.tf}
 
         if start:
-            where_clauses.append('"timestamp" >= :start')
+            where_clauses.append(f"{self.TS_COLUMN} >= :start")
             params["start"] = start
 
         if end:
-            where_clauses.append('"timestamp" <= :end')
+            where_clauses.append(f"{self.TS_COLUMN} <= :end")
             params["end"] = end
 
         where_sql = " AND ".join(where_clauses)
@@ -151,12 +149,12 @@ class VolatilityFeature(BaseFeature):
         sql = f"""
             SELECT
                 id,
-                "timestamp" as ts,
+                {self.TS_COLUMN} as ts,
                 open,
                 high,
                 low,
                 close
-            FROM public.cmc_price_bars_1d
+            FROM {self.SOURCE_TABLE}
             WHERE {where_sql}
             ORDER BY id ASC, ts ASC
         """
@@ -206,7 +204,7 @@ class VolatilityFeature(BaseFeature):
                     low_col="low",
                     windows=self.vol_config.vol_windows,
                     annualize=True,
-                    periods_per_year=self.vol_config.periods_per_year,
+                    periods_per_year=self._periods_per_year,
                 )
 
             # 2. Garman-Klass volatility (OHLC-based)
@@ -219,7 +217,7 @@ class VolatilityFeature(BaseFeature):
                     close_col="close",
                     windows=self.vol_config.vol_windows,
                     annualize=True,
-                    periods_per_year=self.vol_config.periods_per_year,
+                    periods_per_year=self._periods_per_year,
                 )
 
             # 3. Rogers-Satchell volatility (drift-independent)
@@ -232,7 +230,7 @@ class VolatilityFeature(BaseFeature):
                     close_col="close",
                     windows=self.vol_config.vol_windows,
                     annualize=True,
-                    periods_per_year=self.vol_config.periods_per_year,
+                    periods_per_year=self._periods_per_year,
                 )
 
             # 4. ATR (Average True Range)
@@ -252,7 +250,7 @@ class VolatilityFeature(BaseFeature):
                 windows=self.vol_config.vol_windows,
                 types="log",
                 annualize=True,
-                periods_per_year=self.vol_config.periods_per_year,
+                periods_per_year=self._periods_per_year,
                 ddof=0,
                 prefix="vol",
             )
@@ -261,6 +259,10 @@ class VolatilityFeature(BaseFeature):
 
         # Combine all IDs
         df_features = pd.concat(results, ignore_index=True)
+
+        # Add tf and tf_days columns
+        df_features["tf"] = self.config.tf
+        df_features["tf_days"] = self.get_tf_days()
 
         return df_features
 
@@ -274,6 +276,8 @@ class VolatilityFeature(BaseFeature):
         schema = {
             "id": "INTEGER NOT NULL",
             "ts": "TIMESTAMPTZ NOT NULL",
+            "tf": "TEXT NOT NULL",
+            "tf_days": "INTEGER NOT NULL",
             # OHLC context
             "open": "DOUBLE PRECISION",
             "high": "DOUBLE PRECISION",

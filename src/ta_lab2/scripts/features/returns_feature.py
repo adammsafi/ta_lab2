@@ -1,18 +1,18 @@
 """
-ReturnsFeature - Daily returns feature computation module.
+ReturnsFeature - Multi-TF returns feature computation module.
 
-Computes returns over multiple lookback windows (1D, 3D, 5D, 7D, 14D, 21D, 30D, etc.)
+Computes returns over multiple lookback windows (1, 3, 5, 7, 14, 21, 30, etc.)
 derived from dim_timeframe tf_days values.
 
 Features:
-- Bar-to-bar returns (1D percent and log) using existing returns.py functions
-- Multi-day percent returns via pct_change(periods=n)
-- Z-score normalization for key windows (1D, 7D, 30D)
+- Bar-to-bar returns (1-bar percent and log) using existing returns.py functions
+- Multi-bar percent returns via pct_change(periods=n)
+- Z-score normalization for key windows (1, 7, 30 bars)
 - Gap tracking for data quality
 - Outlier detection and flagging
 
-Source: cmc_price_bars_1d (daily validated bars)
-Output: cmc_returns_daily table
+Source: cmc_price_bars_multi_tf (all timeframes)
+Output: cmc_returns table with (id, ts, tf) PK
 State: cmc_feature_state (feature_type='returns')
 """
 
@@ -40,20 +40,20 @@ class ReturnsConfig(FeatureConfig):
 
     Attributes:
         feature_type: Set to 'returns'
-        output_table: Output table name (cmc_returns_daily)
+        output_table: Output table name (cmc_returns)
         null_strategy: 'skip' - preserves gaps in return calculations
         add_zscore: Whether to add z-score normalization (default True)
-        zscore_window: Rolling window for z-score (default 252 days)
-        lookback_windows: Return windows to compute (from dim_timeframe)
+        zscore_window: Rolling window for z-score (default 252 bars)
+        lookback_windows: Return windows to compute (in bars, not days)
     """
 
     feature_type: str = "returns"
-    output_table: str = "cmc_returns_daily"
+    output_table: str = "cmc_returns"
     null_strategy: str = "skip"  # Per CONTEXT.md - returns skip NULLs
     add_zscore: bool = True
     zscore_window: int = 252
 
-    # Return windows to compute (from dim_timeframe tf_days)
+    # Return windows to compute (in bars, from dim_timeframe tf_days)
     lookback_windows: tuple[int, ...] = (1, 3, 5, 7, 14, 21, 30, 63, 126, 252)
 
 
@@ -105,7 +105,7 @@ class ReturnsFeature(BaseFeature):
         end: Optional[str] = None,
     ) -> pd.DataFrame:
         """
-        Load daily close prices from cmc_price_bars_1d.
+        Load close prices from cmc_price_bars_multi_tf for configured tf.
 
         Args:
             ids: List of asset IDs (e.g., cryptocurrency IDs)
@@ -116,67 +116,47 @@ class ReturnsFeature(BaseFeature):
             DataFrame with columns: id, ts, close
             Sorted by id, ts ASC for chronological processing
         """
-        # Build WHERE clause for IDs
         if not ids:
             return pd.DataFrame()
 
-        ids_str = ",".join(str(i) for i in ids)
+        where_clauses = ["id = ANY(:ids)", "tf = :tf"]
+        params = {"ids": ids, "tf": self.config.tf}
 
-        # Build date filters
-        date_filters = []
         if start:
-            date_filters.append(f"\"timestamp\" >= '{start}'::timestamptz")
+            where_clauses.append(f"{self.TS_COLUMN} >= :start")
+            params["start"] = start
         if end:
-            date_filters.append(f"\"timestamp\" <= '{end}'::timestamptz")
+            where_clauses.append(f"{self.TS_COLUMN} <= :end")
+            params["end"] = end
 
-        where_clause = f"id IN ({ids_str})"
-        if date_filters:
-            where_clause += " AND " + " AND ".join(date_filters)
+        where_sql = " AND ".join(where_clauses)
 
-        # Query for close prices
         query = f"""
         SELECT
             id,
-            "timestamp" AS ts,
+            {self.TS_COLUMN} AS ts,
             close
-        FROM public.cmc_price_bars_1d
-        WHERE {where_clause}
+        FROM {self.SOURCE_TABLE}
+        WHERE {where_sql}
         ORDER BY id, ts ASC
         """
 
         with self.engine.connect() as conn:
-            df = pd.read_sql(text(query), conn)
+            df = pd.read_sql(text(query), conn, params=params)
 
         return df
 
     def get_lookback_windows(self) -> list[int]:
         """
-        Get lookback windows from dim_timeframe.
+        Get lookback windows for multi-bar returns.
 
-        Queries dim_timeframe for distinct tf_days values,
-        then intersects with configured lookback_windows.
+        Returns configured lookback windows directly — these represent
+        N-bar periods for pct_change, not calendar day counts.
 
         Returns:
-            List of valid lookback windows (in days)
+            List of lookback windows (in bars)
         """
-        # Query dim_timeframe for available tf_days
-        query = """
-        SELECT DISTINCT tf_days
-        FROM public.dim_timeframe
-        WHERE tf_days IS NOT NULL
-          AND tf_days > 0
-        ORDER BY tf_days
-        """
-
-        with self.engine.connect() as conn:
-            result = conn.execute(text(query))
-            available_windows = [row[0] for row in result]
-
-        # Intersect with configured windows
-        config_windows = self.config.lookback_windows
-        valid_windows = [w for w in config_windows if w in available_windows]
-
-        return valid_windows
+        return list(self.config.lookback_windows)
 
     def compute_features(self, df_source: pd.DataFrame) -> pd.DataFrame:
         """
@@ -185,7 +165,7 @@ class ReturnsFeature(BaseFeature):
         For each asset (id):
         1. Sort by ts ascending
         2. Compute bar-to-bar returns using b2t_pct_delta and b2t_log_delta
-        3. Compute multi-day percent returns via pct_change(periods=n)
+        3. Compute multi-bar percent returns via pct_change(periods=n)
         4. Add gap_days = (ts - ts.shift(1)).dt.days
 
         Args:
@@ -194,7 +174,7 @@ class ReturnsFeature(BaseFeature):
 
         Returns:
             DataFrame with computed return columns
-            Includes: id, ts, close, ret_1d_pct, ret_1d_log, ret_Nd_pct, gap_days
+            Includes: id, ts, tf, tf_days, close, ret_1_pct, ret_1_log, ret_N_pct, gap_days
         """
         if df_source.empty:
             return pd.DataFrame()
@@ -213,36 +193,36 @@ class ReturnsFeature(BaseFeature):
             df_asset = df_asset.sort_values("ts").copy()
 
             # Compute bar-to-bar returns using existing functions
-            # b2t_pct_delta and b2t_log_delta modify df in-place
             b2t_pct_delta(df_asset, cols=["close"], direction="oldest_top")
             b2t_log_delta(df_asset, cols=["close"], direction="oldest_top")
 
-            # Rename to match schema
-            df_asset["ret_1d_pct"] = df_asset["close_b2t_pct"]
-            df_asset["ret_1d_log"] = df_asset["close_b2t_log"]
+            # Rename to match schema (ret_1_pct = 1-bar return)
+            df_asset["ret_1_pct"] = df_asset["close_b2t_pct"]
+            df_asset["ret_1_log"] = df_asset["close_b2t_log"]
 
             # Drop intermediate columns
             df_asset = df_asset.drop(columns=["close_b2t_pct", "close_b2t_log"])
 
-            # Compute multi-day percent returns
+            # Compute multi-bar percent returns
             for window in lookback_windows:
                 if window == 1:
-                    # Already computed as ret_1d_pct
                     continue
 
-                # pct_change(periods=n) computes (close[t] - close[t-n]) / close[t-n]
-                col_name = f"ret_{window}d_pct"
+                col_name = f"ret_{window}_pct"
                 df_asset[col_name] = df_asset["close"].pct_change(periods=window)
 
             # Compute gap_days (days since previous observation)
             df_asset["gap_days"] = (df_asset["ts"] - df_asset["ts"].shift(1)).dt.days
-            # First row has no previous, set to NULL
             df_asset.loc[df_asset.index[0], "gap_days"] = None
 
             results.append(df_asset)
 
         # Combine all assets
         df_features = pd.concat(results, ignore_index=True)
+
+        # Add tf and tf_days columns
+        df_features["tf"] = self.config.tf
+        df_features["tf_days"] = self.get_tf_days()
 
         return df_features
 
@@ -254,24 +234,26 @@ class ReturnsFeature(BaseFeature):
             Dictionary mapping column names to SQL types
         """
         schema = {
-            "id": "INTEGER",
-            "ts": "TIMESTAMPTZ",
+            "id": "INTEGER NOT NULL",
+            "ts": "TIMESTAMPTZ NOT NULL",
+            "tf": "TEXT NOT NULL",
+            "tf_days": "INTEGER NOT NULL",
             "close": "DOUBLE PRECISION",
-            "ret_1d_pct": "DOUBLE PRECISION",
-            "ret_1d_log": "DOUBLE PRECISION",
+            "ret_1_pct": "DOUBLE PRECISION",
+            "ret_1_log": "DOUBLE PRECISION",
         }
 
-        # Add multi-day return columns
+        # Add multi-bar return columns
         for window in self.config.lookback_windows:
             if window == 1:
-                continue  # Already included as ret_1d_pct
-            schema[f"ret_{window}d_pct"] = "DOUBLE PRECISION"
+                continue
+            schema[f"ret_{window}_pct"] = "DOUBLE PRECISION"
 
-        # Add z-score columns (will be added if config.add_zscore is True)
+        # Add z-score columns
         if self.config.add_zscore:
-            schema["ret_1d_pct_zscore"] = "DOUBLE PRECISION"
-            schema["ret_7d_pct_zscore"] = "DOUBLE PRECISION"
-            schema["ret_30d_pct_zscore"] = "DOUBLE PRECISION"
+            schema["ret_1_pct_zscore"] = "DOUBLE PRECISION"
+            schema["ret_7_pct_zscore"] = "DOUBLE PRECISION"
+            schema["ret_30_pct_zscore"] = "DOUBLE PRECISION"
 
         # Add data quality columns
         schema["gap_days"] = "INTEGER"
@@ -289,13 +271,13 @@ class ReturnsFeature(BaseFeature):
         Returns:
             List of return column names (excluding id, ts, metadata)
         """
-        columns = ["ret_1d_pct", "ret_1d_log"]
+        columns = ["ret_1_pct", "ret_1_log"]
 
-        # Add multi-day return columns
+        # Add multi-bar return columns
         for window in self.config.lookback_windows:
             if window == 1:
-                continue  # Already included
-            columns.append(f"ret_{window}d_pct")
+                continue
+            columns.append(f"ret_{window}_pct")
 
         return columns
 
@@ -322,8 +304,8 @@ class ReturnsFeature(BaseFeature):
         # Import here to avoid circular dependency
         from ta_lab2.features.feature_utils import add_zscore as add_zscore_util
 
-        # Add z-score for key windows only (1D, 7D, 30D)
-        key_windows = ["ret_1d_pct", "ret_7d_pct", "ret_30d_pct"]
+        # Add z-score for key windows only (1-bar, 7-bar, 30-bar)
+        key_windows = ["ret_1_pct", "ret_7_pct", "ret_30_pct"]
 
         for col in key_windows:
             if col in df.columns:
@@ -362,7 +344,7 @@ class ReturnsFeature(BaseFeature):
         df["is_outlier"] = False
 
         # Flag outliers in key windows
-        key_windows = ["ret_1d_pct", "ret_7d_pct", "ret_30d_pct"]
+        key_windows = ["ret_1_pct", "ret_7_pct", "ret_30_pct"]
 
         for col in key_windows:
             if col in df.columns:

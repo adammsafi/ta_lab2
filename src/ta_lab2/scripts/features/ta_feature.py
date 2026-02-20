@@ -57,7 +57,7 @@ class TAConfig(FeatureConfig):
     """
 
     feature_type: str = "ta"
-    output_table: str = "cmc_ta_daily"
+    output_table: str = "cmc_ta"
     null_strategy: str = "interpolate"  # Per CONTEXT.md - indicators interpolate
     add_zscore: bool = True
     load_indicators_from_db: bool = True
@@ -106,7 +106,7 @@ class TAFeature(BaseFeature):
         end: Optional[str] = None,
     ) -> pd.DataFrame:
         """
-        Load OHLCV data from cmc_price_bars_1d.
+        Load OHLCV data from cmc_price_bars_multi_tf for configured tf.
 
         Args:
             ids: List of asset IDs
@@ -117,16 +117,15 @@ class TAFeature(BaseFeature):
             DataFrame with columns: id, ts, open, high, low, close, volume
             Sorted by id, ts ASC
         """
-        # Build WHERE clauses
-        where_clauses = ["id = ANY(:ids)"]
-        params = {"ids": ids}
+        where_clauses = ["id = ANY(:ids)", "tf = :tf"]
+        params = {"ids": ids, "tf": self.config.tf}
 
         if start:
-            where_clauses.append("ts >= :start")
+            where_clauses.append(f"{self.TS_COLUMN} >= :start")
             params["start"] = start
 
         if end:
-            where_clauses.append("ts <= :end")
+            where_clauses.append(f"{self.TS_COLUMN} <= :end")
             params["end"] = end
 
         where_sql = " AND ".join(where_clauses)
@@ -134,13 +133,13 @@ class TAFeature(BaseFeature):
         sql_text = f"""
             SELECT
                 id,
-                ts,
+                {self.TS_COLUMN} AS ts,
                 open,
                 high,
                 low,
                 close,
                 volume
-            FROM public.cmc_price_bars_1d
+            FROM {self.SOURCE_TABLE}
             WHERE {where_sql}
             ORDER BY id, ts ASC
         """
@@ -213,11 +212,26 @@ class TAFeature(BaseFeature):
         # Combine all IDs
         df_result = pd.concat(results, ignore_index=True)
 
+        # Add tf and tf_days columns
+        df_result["tf"] = self.config.tf
+        df_result["tf_days"] = self.get_tf_days()
+
         # Select output columns
-        output_cols = ["id", "ts", "close"] + [
+        output_cols = ["id", "ts", "tf", "tf_days", "close"] + [
             col
             for col in df_result.columns
-            if col not in ["id", "ts", "close", "open", "high", "low", "volume"]
+            if col
+            not in [
+                "id",
+                "ts",
+                "tf",
+                "tf_days",
+                "close",
+                "open",
+                "high",
+                "low",
+                "volume",
+            ]
         ]
 
         return df_result[output_cols]
@@ -233,6 +247,8 @@ class TAFeature(BaseFeature):
         schema = {
             "id": "INTEGER NOT NULL",
             "ts": "TIMESTAMPTZ NOT NULL",
+            "tf": "TEXT NOT NULL",
+            "tf_days": "INTEGER NOT NULL",
             "close": "DOUBLE PRECISION",
         }
 
@@ -287,7 +303,6 @@ class TAFeature(BaseFeature):
 
         for ind in indicator_params:
             ind_type = ind["indicator_type"]
-            ind_name = ind["indicator_name"]
             params = ind["params"]
 
             if ind_type == "rsi":
@@ -432,6 +447,49 @@ class TAFeature(BaseFeature):
                 "params": {"period": 14},
             },
         ]
+
+    # =========================================================================
+    # Override normalization/outlier to match DDL
+    # =========================================================================
+
+    def add_normalizations(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Override: only add rsi_14_zscore (matches DDL).
+
+        The DDL only defines rsi_14_zscore — not zscore for every indicator.
+        """
+        if not self.config.add_zscore:
+            return df
+
+        from ta_lab2.features.feature_utils import add_zscore as add_zscore_util
+
+        if "rsi_14" in df.columns:
+            for _, df_asset in df.groupby("id"):
+                idx = df_asset.index
+                add_zscore_util(
+                    df_asset,
+                    "rsi_14",
+                    window=self.config.zscore_window,
+                    out_col="rsi_14_zscore",
+                )
+                df.loc[idx, "rsi_14_zscore"] = df_asset["rsi_14_zscore"]
+
+        return df
+
+    def add_outlier_flags(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Override: single is_outlier column (matches DDL).
+
+        Flag if any indicator value is extreme (4-sigma on RSI).
+        """
+        from ta_lab2.features.feature_utils import flag_outliers
+
+        df["is_outlier"] = False
+        if "rsi_14" in df.columns:
+            df["is_outlier"] = df["is_outlier"] | flag_outliers(
+                df["rsi_14"], n_sigma=4.0, method="zscore"
+            )
+        return df
 
     def _compute_rsi(self, df: pd.DataFrame, params: dict) -> pd.DataFrame:
         """
