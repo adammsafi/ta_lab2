@@ -7,23 +7,28 @@ Standalone post-processing script that adds rolling z-scores and is_outlier
 flags to bar-returns and EMA-returns tables.
 
 Runs AFTER the base returns refresh scripts have populated raw return columns.
-Z-scores are computed per (key, tf) group with an adaptive rolling window:
-    window_bars = round(365 / tf_days)
-If window_bars < 30, z-scores are left NULL (insufficient history).
+Z-scores are computed per (key, tf) group with multiple adaptive rolling windows:
+    window_bars = round(window_days / tf_days)
+If window_bars < 30, that window's z-scores are left NULL (insufficient history).
 
-Bar returns z-scores (computed on 4 canonical + 4 roll return columns):
-    Canonical (roll=FALSE only): ret_arith_zscore, delta_ret_arith_zscore,
-                                 ret_log_zscore, delta_ret_log_zscore
-    Roll (ALL rows):             ret_arith_roll_zscore, delta_ret_arith_roll_zscore,
-                                 ret_log_roll_zscore, delta_ret_log_roll_zscore
+Windows:
+    30-day  (~1 month):  suffix _30
+    90-day  (~3 months): suffix _90
+    365-day (~1 year):   suffix _365
 
-EMA returns z-scores (computed on 4 canonical + 4 roll return columns):
-    Canonical (roll=FALSE only): ret_arith_ema_zscore, ret_arith_ema_bar_zscore,
-                                 ret_log_ema_zscore, ret_log_ema_bar_zscore
-    Roll (ALL rows):             ret_arith_ema_roll_zscore, ret_arith_ema_bar_roll_zscore,
-                                 ret_log_ema_roll_zscore, ret_log_ema_bar_roll_zscore
+Bar returns z-scores (per window, 4 canonical + 4 roll = 8 columns):
+    Canonical (roll=FALSE only): ret_arith_zscore_{W}, delta_ret_arith_zscore_{W},
+                                 ret_log_zscore_{W}, delta_ret_log_zscore_{W}
+    Roll (ALL rows):             ret_arith_roll_zscore_{W}, delta_ret_arith_roll_zscore_{W},
+                                 ret_log_roll_zscore_{W}, delta_ret_log_roll_zscore_{W}
 
-is_outlier: TRUE if any |z-score| > 4 across all 8 z-score columns for that row.
+EMA returns z-scores (per window, 4 canonical + 4 roll = 8 columns):
+    Canonical (roll=FALSE only): ret_arith_ema_zscore_{W}, ret_arith_ema_bar_zscore_{W},
+                                 ret_log_ema_zscore_{W}, ret_log_ema_bar_zscore_{W}
+    Roll (ALL rows):             ret_arith_ema_roll_zscore_{W}, ret_arith_ema_bar_roll_zscore_{W},
+                                 ret_log_ema_roll_zscore_{W}, ret_log_ema_bar_roll_zscore_{W}
+
+is_outlier: TRUE if any |z-score| > 4 across ALL 24 z-score columns for that row.
 
 Usage:
     python -m ta_lab2.scripts.returns.refresh_returns_zscore --tables bars --workers 4
@@ -62,6 +67,13 @@ from ta_lab2.time.dim_timeframe import get_tf_days
 OUTLIER_THRESHOLD = 4.0
 MIN_WINDOW = 30
 
+# (window_days, column_suffix)
+WINDOW_CONFIGS: List[Tuple[int, str]] = [
+    (30, "_30"),
+    (90, "_90"),
+    (365, "_365"),
+]
+
 _PRINT_PREFIX = "ret_zscore"
 
 
@@ -82,22 +94,22 @@ class TableConfig:
     ts_col: str  # column name for ordering (quoted if needed)
     pk_cols: List[str]  # columns forming the PK (for UPDATE join)
     key_cols: List[str]  # grouping columns to iterate over (e.g. [id, tf])
-    # Canonical z-score pairs: (source_col, zscore_col) — computed on roll=FALSE only
-    canonical_pairs: List[Tuple[str, str]]
-    # Roll z-score pairs: (source_col, zscore_col) — computed on ALL rows
-    roll_pairs: List[Tuple[str, str]]
+    # Base canonical pairs: (source_col, zscore_base_name) — suffix added per window
+    canonical_base_pairs: List[Tuple[str, str]]
+    # Base roll pairs: (source_col, zscore_base_name) — suffix added per window
+    roll_base_pairs: List[Tuple[str, str]]
 
 
 # -- Bar returns tables (5) -------------------------------------------------
 
-_BAR_CANONICAL_PAIRS = [
+_BAR_CANONICAL_BASE = [
     ("ret_arith", "ret_arith_zscore"),
     ("delta_ret_arith", "delta_ret_arith_zscore"),
     ("ret_log", "ret_log_zscore"),
     ("delta_ret_log", "delta_ret_log_zscore"),
 ]
 
-_BAR_ROLL_PAIRS = [
+_BAR_ROLL_BASE = [
     ("ret_arith_roll", "ret_arith_roll_zscore"),
     ("delta_ret_arith_roll", "delta_ret_arith_roll_zscore"),
     ("ret_log_roll", "ret_log_roll_zscore"),
@@ -110,53 +122,53 @@ _BAR_TABLES = [
         ts_col='"timestamp"',
         pk_cols=["id", '"timestamp"', "tf"],
         key_cols=["id", "tf"],
-        canonical_pairs=_BAR_CANONICAL_PAIRS,
-        roll_pairs=_BAR_ROLL_PAIRS,
+        canonical_base_pairs=_BAR_CANONICAL_BASE,
+        roll_base_pairs=_BAR_ROLL_BASE,
     ),
     TableConfig(
         table="public.cmc_returns_bars_multi_tf_cal_us",
         ts_col='"timestamp"',
         pk_cols=["id", '"timestamp"', "tf"],
         key_cols=["id", "tf"],
-        canonical_pairs=_BAR_CANONICAL_PAIRS,
-        roll_pairs=_BAR_ROLL_PAIRS,
+        canonical_base_pairs=_BAR_CANONICAL_BASE,
+        roll_base_pairs=_BAR_ROLL_BASE,
     ),
     TableConfig(
         table="public.cmc_returns_bars_multi_tf_cal_iso",
         ts_col='"timestamp"',
         pk_cols=["id", '"timestamp"', "tf"],
         key_cols=["id", "tf"],
-        canonical_pairs=_BAR_CANONICAL_PAIRS,
-        roll_pairs=_BAR_ROLL_PAIRS,
+        canonical_base_pairs=_BAR_CANONICAL_BASE,
+        roll_base_pairs=_BAR_ROLL_BASE,
     ),
     TableConfig(
         table="public.cmc_returns_bars_multi_tf_cal_anchor_us",
         ts_col='"timestamp"',
         pk_cols=["id", '"timestamp"', "tf"],
         key_cols=["id", "tf"],
-        canonical_pairs=_BAR_CANONICAL_PAIRS,
-        roll_pairs=_BAR_ROLL_PAIRS,
+        canonical_base_pairs=_BAR_CANONICAL_BASE,
+        roll_base_pairs=_BAR_ROLL_BASE,
     ),
     TableConfig(
         table="public.cmc_returns_bars_multi_tf_cal_anchor_iso",
         ts_col='"timestamp"',
         pk_cols=["id", '"timestamp"', "tf"],
         key_cols=["id", "tf"],
-        canonical_pairs=_BAR_CANONICAL_PAIRS,
-        roll_pairs=_BAR_ROLL_PAIRS,
+        canonical_base_pairs=_BAR_CANONICAL_BASE,
+        roll_base_pairs=_BAR_ROLL_BASE,
     ),
 ]
 
 # -- EMA returns tables (6) -------------------------------------------------
 
-_EMA_CANONICAL_PAIRS = [
+_EMA_CANONICAL_BASE = [
     ("ret_arith_ema", "ret_arith_ema_zscore"),
     ("ret_arith_ema_bar", "ret_arith_ema_bar_zscore"),
     ("ret_log_ema", "ret_log_ema_zscore"),
     ("ret_log_ema_bar", "ret_log_ema_bar_zscore"),
 ]
 
-_EMA_ROLL_PAIRS = [
+_EMA_ROLL_BASE = [
     ("ret_arith_ema_roll", "ret_arith_ema_roll_zscore"),
     ("ret_arith_ema_bar_roll", "ret_arith_ema_bar_roll_zscore"),
     ("ret_log_ema_roll", "ret_log_ema_roll_zscore"),
@@ -169,48 +181,48 @@ _EMA_TABLES = [
         ts_col="ts",
         pk_cols=["id", "ts", "tf", "period"],
         key_cols=["id", "tf", "period"],
-        canonical_pairs=_EMA_CANONICAL_PAIRS,
-        roll_pairs=_EMA_ROLL_PAIRS,
+        canonical_base_pairs=_EMA_CANONICAL_BASE,
+        roll_base_pairs=_EMA_ROLL_BASE,
     ),
     TableConfig(
         table="public.cmc_returns_ema_multi_tf_u",
         ts_col="ts",
         pk_cols=["id", "ts", "tf", "period", "alignment_source"],
         key_cols=["id", "tf", "period", "alignment_source"],
-        canonical_pairs=_EMA_CANONICAL_PAIRS,
-        roll_pairs=_EMA_ROLL_PAIRS,
+        canonical_base_pairs=_EMA_CANONICAL_BASE,
+        roll_base_pairs=_EMA_ROLL_BASE,
     ),
     TableConfig(
         table="public.cmc_returns_ema_multi_tf_cal_us",
         ts_col="ts",
         pk_cols=["id", "ts", "tf", "period"],
         key_cols=["id", "tf", "period"],
-        canonical_pairs=_EMA_CANONICAL_PAIRS,
-        roll_pairs=_EMA_ROLL_PAIRS,
+        canonical_base_pairs=_EMA_CANONICAL_BASE,
+        roll_base_pairs=_EMA_ROLL_BASE,
     ),
     TableConfig(
         table="public.cmc_returns_ema_multi_tf_cal_iso",
         ts_col="ts",
         pk_cols=["id", "ts", "tf", "period"],
         key_cols=["id", "tf", "period"],
-        canonical_pairs=_EMA_CANONICAL_PAIRS,
-        roll_pairs=_EMA_ROLL_PAIRS,
+        canonical_base_pairs=_EMA_CANONICAL_BASE,
+        roll_base_pairs=_EMA_ROLL_BASE,
     ),
     TableConfig(
         table="public.cmc_returns_ema_multi_tf_cal_anchor_us",
         ts_col="ts",
         pk_cols=["id", "ts", "tf", "period"],
         key_cols=["id", "tf", "period"],
-        canonical_pairs=_EMA_CANONICAL_PAIRS,
-        roll_pairs=_EMA_ROLL_PAIRS,
+        canonical_base_pairs=_EMA_CANONICAL_BASE,
+        roll_base_pairs=_EMA_ROLL_BASE,
     ),
     TableConfig(
         table="public.cmc_returns_ema_multi_tf_cal_anchor_iso",
         ts_col="ts",
         pk_cols=["id", "ts", "tf", "period"],
         key_cols=["id", "tf", "period"],
-        canonical_pairs=_EMA_CANONICAL_PAIRS,
-        roll_pairs=_EMA_ROLL_PAIRS,
+        canonical_base_pairs=_EMA_CANONICAL_BASE,
+        roll_base_pairs=_EMA_ROLL_BASE,
     ),
 ]
 
@@ -229,19 +241,27 @@ def _get_worker_engine(db_url: str) -> Engine:
     return create_engine(db_url, future=True, poolclass=NullPool)
 
 
-def _adaptive_window(tf_days: int) -> int:
-    """Return the adaptive rolling window in bars (~1 calendar year)."""
-    return round(365 / tf_days)
-
-
 def _all_zscore_cols(cfg: TableConfig) -> List[str]:
-    """All z-score output column names."""
-    return [p[1] for p in cfg.canonical_pairs] + [p[1] for p in cfg.roll_pairs]
+    """All z-score output column names across all windows."""
+    cols: List[str] = []
+    for _, suffix in WINDOW_CONFIGS:
+        for _, base in cfg.canonical_base_pairs:
+            cols.append(f"{base}{suffix}")
+        for _, base in cfg.roll_base_pairs:
+            cols.append(f"{base}{suffix}")
+    return cols
 
 
 def _all_source_cols(cfg: TableConfig) -> List[str]:
     """All source columns (canonical + roll) that z-scores are derived from."""
-    return [p[0] for p in cfg.canonical_pairs] + [p[0] for p in cfg.roll_pairs]
+    return [p[0] for p in cfg.canonical_base_pairs] + [
+        p[0] for p in cfg.roll_base_pairs
+    ]
+
+
+def _max_window_bars(tf_days: int) -> int:
+    """Largest window in bars across all WINDOW_CONFIGS for this TF."""
+    return max(round(w / tf_days) for w, _ in WINDOW_CONFIGS)
 
 
 # ---------------------------------------------------------------------------
@@ -309,11 +329,12 @@ def _discover_keys(
 def _process_key(
     db_url: str,
     cfg: TableConfig,
-    window_bars: int,
+    tf_days: int,
     key: Tuple,
 ) -> Tuple[Tuple, int]:
     """
     Compute z-scores for one key (e.g. one (id, tf) or (id, tf, period)).
+    Processes all applicable windows (30, 90, 365) in one pass.
 
     Returns (key, n_rows_updated).
     """
@@ -325,13 +346,17 @@ def _process_key(
 
     # Load all rows for this key, ordered by timestamp
     source_cols = list(
-        set([p[0] for p in cfg.canonical_pairs] + [p[0] for p in cfg.roll_pairs])
+        set(
+            [p[0] for p in cfg.canonical_base_pairs]
+            + [p[0] for p in cfg.roll_base_pairs]
+        )
     )
     select_cols = cfg.pk_cols + ["roll"] + source_cols
     select_str = ", ".join(select_cols)
 
     sql = text(
-        f"SELECT {select_str} FROM {cfg.table} WHERE {key_where} ORDER BY {cfg.ts_col};"
+        f"SELECT {select_str} FROM {cfg.table} "
+        f"WHERE {key_where} ORDER BY {cfg.ts_col};"
     )
 
     with engine.begin() as cxn:
@@ -340,55 +365,72 @@ def _process_key(
     if df.empty:
         return key, 0
 
-    # Initialize z-score columns as NaN
+    # Initialize all z-score columns as NaN
     zscore_cols = _all_zscore_cols(cfg)
     for col in zscore_cols:
         df[col] = np.nan
 
-    # --- Roll z-scores (computed on ALL rows) ---
-    for src_col, z_col in cfg.roll_pairs:
-        if src_col in df.columns:
-            rolling_mean = (
-                df[src_col].rolling(window=window_bars, min_periods=window_bars).mean()
-            )
-            rolling_std = (
-                df[src_col].rolling(window=window_bars, min_periods=window_bars).std()
-            )
-            df[z_col] = np.where(
-                rolling_std > 0,
-                (df[src_col] - rolling_mean) / rolling_std,
-                np.nan,
-            )
-
-    # --- Canonical z-scores (computed on roll=FALSE rows only) ---
+    # Pre-compute canonical mask
     canon_mask = df["roll"] == False  # noqa: E712
-    if canon_mask.any():
+    has_canonical = canon_mask.any()
+    if has_canonical:
         canon_idx = df.index[canon_mask]
-        canon_df = df.loc[canon_idx].copy()
 
-        for src_col, z_col in cfg.canonical_pairs:
-            if src_col in canon_df.columns:
+    # --- Process each window ---
+    for window_days, suffix in WINDOW_CONFIGS:
+        window_bars = round(window_days / tf_days)
+        if window_bars < MIN_WINDOW:
+            continue
+
+        # Roll z-scores (computed on ALL rows)
+        for src_col, base in cfg.roll_base_pairs:
+            if src_col in df.columns:
+                z_col = f"{base}{suffix}"
                 rolling_mean = (
-                    canon_df[src_col]
+                    df[src_col]
                     .rolling(window=window_bars, min_periods=window_bars)
                     .mean()
                 )
                 rolling_std = (
-                    canon_df[src_col]
+                    df[src_col]
                     .rolling(window=window_bars, min_periods=window_bars)
                     .std()
                 )
-                canon_df[z_col] = np.where(
+                df[z_col] = np.where(
                     rolling_std > 0,
-                    (canon_df[src_col] - rolling_mean) / rolling_std,
+                    (df[src_col] - rolling_mean) / rolling_std,
                     np.nan,
                 )
 
-        # Merge canonical z-scores back
-        for _, z_col in cfg.canonical_pairs:
-            df.loc[canon_idx, z_col] = canon_df[z_col].values
+        # Canonical z-scores (computed on roll=FALSE rows only)
+        if has_canonical:
+            canon_df = df.loc[canon_idx].copy()
 
-    # --- is_outlier: TRUE if any |z-score| > 4 ---
+            for src_col, base in cfg.canonical_base_pairs:
+                if src_col in canon_df.columns:
+                    z_col = f"{base}{suffix}"
+                    rolling_mean = (
+                        canon_df[src_col]
+                        .rolling(window=window_bars, min_periods=window_bars)
+                        .mean()
+                    )
+                    rolling_std = (
+                        canon_df[src_col]
+                        .rolling(window=window_bars, min_periods=window_bars)
+                        .std()
+                    )
+                    canon_df[z_col] = np.where(
+                        rolling_std > 0,
+                        (canon_df[src_col] - rolling_mean) / rolling_std,
+                        np.nan,
+                    )
+
+            # Merge canonical z-scores back
+            for _, base in cfg.canonical_base_pairs:
+                z_col = f"{base}{suffix}"
+                df.loc[canon_idx, z_col] = canon_df[z_col].values
+
+    # --- is_outlier: TRUE if any |z-score| > 4 across ALL windows ---
     z_abs = df[zscore_cols].abs()
     # Use object dtype to allow True/False/None (nullable)
     df["is_outlier"] = (z_abs > OUTLIER_THRESHOLD).any(axis=1).astype(object)
@@ -436,7 +478,8 @@ def _process_key(
         cxn.execute(text(f"DROP TABLE IF EXISTS {tmp_name};"))
         cxn.execute(
             text(
-                f"CREATE TEMP TABLE {tmp_name} ({', '.join(tmp_cols_ddl)}) ON COMMIT DROP;"
+                f"CREATE TEMP TABLE {tmp_name} "
+                f"({', '.join(tmp_cols_ddl)}) ON COMMIT DROP;"
             )
         )
 
@@ -444,11 +487,20 @@ def _process_key(
         insert_cols = pk_col_names + update_cols
         placeholders = ", ".join(f":{c}" for c in insert_cols)
         insert_sql = text(
-            f"INSERT INTO {tmp_name} ({', '.join(insert_cols)}) VALUES ({placeholders});"
+            f"INSERT INTO {tmp_name} ({', '.join(insert_cols)}) "
+            f"VALUES ({placeholders});"
         )
 
         # Convert DataFrame to list of dicts, handling NaN → None
-        records = write_df.where(write_df.notna(), None).to_dict("records")
+        # Note: pandas float columns silently convert None back to NaN,
+        # so we must do NaN→None conversion on the dict records instead.
+        records = [
+            {
+                k: (None if isinstance(v, float) and np.isnan(v) else v)
+                for k, v in d.items()
+            }
+            for d in write_df.to_dict("records")
+        ]
         # Batch insert
         cxn.execute(insert_sql, records)
 
@@ -465,7 +517,8 @@ def _process_key(
         on_clause = " AND ".join(on_parts)
 
         update_sql = text(
-            f"UPDATE {cfg.table} t SET {set_parts} FROM {tmp_name} s WHERE {on_clause};"
+            f"UPDATE {cfg.table} t SET {set_parts} "
+            f"FROM {tmp_name} s WHERE {on_clause};"
         )
         cxn.execute(update_sql)
 
@@ -510,21 +563,29 @@ def _process_table(
 
     for tf_val, tf_keys in sorted(keys_by_tf.items()):
         tf_days = get_tf_days(tf_val, db_url)
-        window_bars = _adaptive_window(tf_days)
 
-        if window_bars < MIN_WINDOW:
+        # Skip TF if even the largest window is too small
+        max_wb = _max_window_bars(tf_days)
+        if max_wb < MIN_WINDOW:
             _print(
-                f"  tf={tf_val}: window_bars={window_bars} < {MIN_WINDOW}, "
-                f"skipping {len(tf_keys)} keys (z-scores left NULL)"
+                f"  tf={tf_val}: max_window_bars={max_wb} < {MIN_WINDOW}, "
+                f"skipping {len(tf_keys)} keys (all z-scores left NULL)"
             )
             continue
 
+        # Report which windows are active for this TF
+        active_windows = []
+        for wd, sfx in WINDOW_CONFIGS:
+            wb = round(wd / tf_days)
+            active_windows.append(
+                f"{sfx[1:]}={'ok' if wb >= MIN_WINDOW else 'skip'}({wb})"
+            )
         _print(
-            f"  tf={tf_val}: tf_days={tf_days}, window_bars={window_bars}, "
-            f"keys={len(tf_keys)}"
+            f"  tf={tf_val}: tf_days={tf_days}, "
+            f"windows=[{', '.join(active_windows)}], keys={len(tf_keys)}"
         )
 
-        worker_fn = partial(_process_key, db_url, cfg, window_bars)
+        worker_fn = partial(_process_key, db_url, cfg, tf_days)
 
         if workers > 1 and len(tf_keys) > 1:
             with Pool(processes=min(workers, len(tf_keys))) as pool:
@@ -619,7 +680,8 @@ def main() -> None:
         f"ids={'all' if ids is None else ids}, "
         f"tf={args.tf or 'all'}, "
         f"full_recalc={args.full_recalc}, "
-        f"workers={args.workers}"
+        f"workers={args.workers}, "
+        f"windows={[w for w, _ in WINDOW_CONFIGS]}"
     )
 
     t_total = time.time()

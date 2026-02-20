@@ -47,19 +47,40 @@ CREATE TABLE public.cmc_returns_bars_multi_tf_cal_anchor_us (
     true_range              double precision,
     true_range_pct          double precision,
 
-    -- Z-scores (canonical, roll=FALSE only)
-    ret_arith_zscore            double precision,
-    delta_ret_arith_zscore      double precision,
-    ret_log_zscore              double precision,
-    delta_ret_log_zscore        double precision,
+    -- Z-scores: 30-day window (canonical, roll=FALSE only)
+    ret_arith_zscore_30             double precision,
+    delta_ret_arith_zscore_30       double precision,
+    ret_log_zscore_30               double precision,
+    delta_ret_log_zscore_30         double precision,
+    -- Z-scores: 30-day window (roll, ALL rows)
+    ret_arith_roll_zscore_30        double precision,
+    delta_ret_arith_roll_zscore_30  double precision,
+    ret_log_roll_zscore_30          double precision,
+    delta_ret_log_roll_zscore_30    double precision,
 
-    -- Z-scores (roll, ALL rows)
-    ret_arith_roll_zscore       double precision,
-    delta_ret_arith_roll_zscore double precision,
-    ret_log_roll_zscore         double precision,
-    delta_ret_log_roll_zscore   double precision,
+    -- Z-scores: 90-day window (canonical, roll=FALSE only)
+    ret_arith_zscore_90             double precision,
+    delta_ret_arith_zscore_90       double precision,
+    ret_log_zscore_90               double precision,
+    delta_ret_log_zscore_90         double precision,
+    -- Z-scores: 90-day window (roll, ALL rows)
+    ret_arith_roll_zscore_90        double precision,
+    delta_ret_arith_roll_zscore_90  double precision,
+    ret_log_roll_zscore_90          double precision,
+    delta_ret_log_roll_zscore_90    double precision,
 
-    -- Outlier flag
+    -- Z-scores: 365-day window (canonical, roll=FALSE only)
+    ret_arith_zscore_365            double precision,
+    delta_ret_arith_zscore_365      double precision,
+    ret_log_zscore_365              double precision,
+    delta_ret_log_zscore_365        double precision,
+    -- Z-scores: 365-day window (roll, ALL rows)
+    ret_arith_roll_zscore_365       double precision,
+    delta_ret_arith_roll_zscore_365 double precision,
+    ret_log_roll_zscore_365         double precision,
+    delta_ret_log_roll_zscore_365   double precision,
+
+    -- Outlier flag (TRUE if any |z-score| > 4 across all windows)
     is_outlier                  boolean,
 
     ingested_at             timestamptz   NOT NULL DEFAULT now(),
