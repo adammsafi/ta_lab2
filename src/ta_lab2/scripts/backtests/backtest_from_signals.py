@@ -171,17 +171,20 @@ class SignalBacktester:
         entries = pd.Series(False, index=time_index)
         exits = pd.Series(False, index=time_index)
 
-        # Mark entry and exit timestamps as True
+        # Mark entry and exit timestamps as True.
+        # time_index is tz-naive UTC (from load_prices), so signal timestamps
+        # must also be tz-naive UTC for index lookup to match.
         for row in rows:
             entry_ts = pd.Timestamp(row[0])
-            if entry_ts.tz is None:
-                entry_ts = entry_ts.tz_localize("UTC")
+            # Normalize to tz-naive UTC: localize if naive, convert+strip if aware
+            if entry_ts.tz is not None:
+                entry_ts = entry_ts.tz_convert("UTC").replace(tzinfo=None)
 
             exit_ts = None
             if row[1]:
                 exit_ts = pd.Timestamp(row[1])
-                if exit_ts.tz is None:
-                    exit_ts = exit_ts.tz_localize("UTC")
+                if exit_ts.tz is not None:
+                    exit_ts = exit_ts.tz_convert("UTC").replace(tzinfo=None)
 
             # Set entry if timestamp exists in index
             if entry_ts in entries.index:
@@ -233,9 +236,17 @@ class SignalBacktester:
                     "start_ts": start_ts,
                     "end_ts": end_ts,
                 },
-                index_col="ts",
-                parse_dates=["ts"],
             )
+
+        # Ensure ts is UTC-aware then strip tz to get tz-naive UTC timestamps.
+        # pd.read_sql with index_col='ts' + parse_dates can infer local timezone
+        # (e.g. UTC-04:00) instead of UTC, leading to duplicated index entries
+        # and non-monotonic order after tz-stripping.
+        # Loading without index_col and post-processing gives reliable UTC-naive index.
+        df["ts"] = (
+            pd.to_datetime(df["ts"], utc=True).dt.tz_convert("UTC").dt.tz_localize(None)
+        )
+        df = df.set_index("ts").sort_index()
 
         logger.info(f"Loaded {len(df)} price bars for asset {asset_id}")
 
@@ -303,12 +314,20 @@ class SignalBacktester:
             exits = exits.copy()
             exits.index = exits.index.tz_localize(None)
 
+        # Use date strings as split boundaries so that df.loc[split.start:split.end]
+        # uses pandas partial-date matching (inclusive range) rather than exact-key
+        # lookup.  Exact Timestamp('2010-08-15 00:00:00') fails when actual index
+        # entries are Timestamp('2010-08-15 23:59:59.999000') after tz-stripping.
+        # date strings like '2010-08-15' are treated as partial-date ranges by pandas.
+        split_start = start_ts.strftime("%Y-%m-%d")
+        split_end = end_ts.strftime("%Y-%m-%d")
+
         # 3. Determine cost model
         cost = CostModel() if clean_mode else self.cost_model
         logger.debug(f"Cost model: {cost.describe()}")
 
         # 4. Run vectorbt backtest
-        split = Split("backtest", start_ts, end_ts)
+        split = Split("backtest", split_start, split_end)
 
         try:
             result_row = run_vbt_on_split(
@@ -332,7 +351,7 @@ class SignalBacktester:
 
         # 5. Extract detailed trades from vectorbt
         # Rebuild portfolio to extract trade records
-        pf = self._build_portfolio(prices, entries, exits, cost, start_ts, end_ts)
+        pf = self._build_portfolio(prices, entries, exits, cost, split_start, split_end)
         trades_df = self._extract_trades(pf)
 
         # 6. Compute comprehensive metrics
@@ -439,13 +458,22 @@ class SignalBacktester:
         # Extract trade records
         trades = pf.trades.records_readable
 
+        # vbt 0.28.1 uses 'Avg Entry Price' / 'Avg Exit Price';
+        # older versions used 'Entry Price' / 'Exit Price'.
+        entry_price_col = (
+            "Avg Entry Price" if "Avg Entry Price" in trades.columns else "Entry Price"
+        )
+        exit_price_col = (
+            "Avg Exit Price" if "Avg Exit Price" in trades.columns else "Exit Price"
+        )
+
         # Map to our schema
         trades_df = pd.DataFrame(
             {
                 "entry_ts": _ensure_utc(trades["Entry Timestamp"]),
-                "entry_price": trades["Entry Price"].astype(float),
+                "entry_price": trades[entry_price_col].astype(float),
                 "exit_ts": _ensure_utc(trades["Exit Timestamp"]),
-                "exit_price": trades["Exit Price"].astype(float),
+                "exit_price": trades[exit_price_col].astype(float),
                 # vbt 0.28.1 returns 'Long'/'Short' strings; str.lower() handles both
                 # string ('Long'->'long') and integer (0/1 preserved as '0'/'1') cases
                 "direction": trades["Direction"].astype(str).str.lower(),
@@ -731,7 +759,18 @@ class SignalBacktester:
             """
             )
 
-            conn.execute(metrics_sql, {"run_id": result.run_id, **result.metrics})
+            # Normalize numpy scalar types to Python native types before SQL binding.
+            # psycopg2 cannot adapt np.float64/np.int64 directly (reports
+            # 'schema "np" does not exist' because it interprets the repr).
+            def _to_python(v):
+                if v is None:
+                    return None
+                if hasattr(v, "item"):  # numpy scalar
+                    return v.item()
+                return v
+
+            native_metrics = {k: _to_python(v) for k, v in result.metrics.items()}
+            conn.execute(metrics_sql, {"run_id": result.run_id, **native_metrics})
 
             logger.debug("Inserted metrics record")
 
