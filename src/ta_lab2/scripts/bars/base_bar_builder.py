@@ -39,6 +39,8 @@ from typing import Optional, Sequence
 import argparse
 import logging
 
+import pandas as pd
+
 from sqlalchemy.engine import Engine
 
 from ta_lab2.scripts.bars.bar_builder_config import BarBuilderConfig
@@ -338,12 +340,22 @@ class BaseBarBuilder(ABC):
             start_times = {id_: None for id_ in self.config.ids}
         else:
             self.logger.info(f"Loaded state with {len(state_df)} records")
-            # Build mapping of id -> last_time_close for incremental start point
+            # Build mapping of id -> MIN(last_time_close) for incremental start point.
+            # State table PK is (id, tf), so multiple rows exist per ID.
+            # We need the earliest last_time_close across all TFs for each ID
+            # so that daily data loaded covers all TFs' incremental needs.
             start_times = {}
-            for _, row in state_df.iterrows():
-                id_ = int(row["id"])
-                last_ts = row.get("last_time_close")
-                start_times[id_] = str(last_ts) if last_ts is not None else None
+            for id_ in self.config.ids:
+                id_state = state_df[state_df["id"] == id_]
+                if id_state.empty:
+                    start_times[id_] = None
+                else:
+                    ts_values = pd.to_datetime(
+                        id_state["last_time_close"], errors="coerce"
+                    ).dropna()
+                    start_times[id_] = (
+                        str(ts_values.min()) if not ts_values.empty else None
+                    )
 
         # Process each ID
         total_rows = 0

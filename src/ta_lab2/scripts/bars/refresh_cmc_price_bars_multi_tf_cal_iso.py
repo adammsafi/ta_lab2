@@ -367,23 +367,8 @@ class CalendarISOBarBuilder(BaseBarBuilder):
             return total_rows
 
         # Direct mode (from daily prices)
-        # Load daily price data
-        df_daily = load_daily_prices_for_id(
-            db_url=self.config.db_url,
-            daily_table=self.config.daily_table,
-            id_=id_,
-            ts_start=start_ts,
-            tz=self.config.tz or DEFAULT_TZ,
-        )
-
-        if df_daily.empty:
-            self.logger.info(f"ID={id_}: No daily data found")
-            return 0
-
-        daily_min_ts = pd.to_datetime(df_daily["ts"].min(), utc=True)
-        daily_max_ts = pd.to_datetime(df_daily["ts"].max(), utc=True)
-
-        # Load existing state for all specs
+        # Load existing state for all specs BEFORE daily data load
+        # so we can detect new TFs and override start_ts if needed.
         state_df = load_state(
             self.config.db_url,
             self.get_state_table_name(),
@@ -412,6 +397,30 @@ class CalendarISOBarBuilder(BaseBarBuilder):
                 f"ID={id_}: Skipping {skipped} calendar spec(s) "
                 f"(nominal tf_days > {n_available} available days)"
             )
+
+        # Detect new timeframes (no state yet) — need full daily history
+        has_new_tfs = any(s.tf not in state_map for s in applicable_specs)
+        if has_new_tfs and start_ts is not None:
+            self.logger.info(
+                f"ID={id_}: New timeframe(s) detected, loading full daily history"
+            )
+            start_ts = None
+
+        # Load daily price data (with possibly overridden start_ts)
+        df_daily = load_daily_prices_for_id(
+            db_url=self.config.db_url,
+            daily_table=self.config.daily_table,
+            id_=id_,
+            ts_start=start_ts,
+            tz=self.config.tz or DEFAULT_TZ,
+        )
+
+        if df_daily.empty:
+            self.logger.info(f"ID={id_}: No daily data found")
+            return 0
+
+        daily_min_ts = pd.to_datetime(df_daily["ts"].min(), utc=True)
+        daily_max_ts = pd.to_datetime(df_daily["ts"].max(), utc=True)
 
         # Process each spec
         for spec in applicable_specs:
