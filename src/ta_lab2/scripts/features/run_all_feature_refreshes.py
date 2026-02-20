@@ -10,14 +10,15 @@ Usage:
     python -m ta_lab2.scripts.features.run_all_feature_refreshes --sequential
 
 Refresh order (respects dependencies):
-1. cmc_returns (depends on cmc_price_bars_multi_tf)
-2. cmc_vol (depends on cmc_price_bars_multi_tf)
-3. cmc_ta (depends on cmc_price_bars_multi_tf)
-4. cmc_features (depends on 1-3 + EMAs)
+1. cmc_vol (depends on cmc_price_bars_multi_tf)
+2. cmc_ta (depends on cmc_price_bars_multi_tf)
+3. cmc_features (depends on 1-2 + EMAs + bar returns)
 
 Parallel execution where possible:
-- returns, vol, ta can run in parallel (same dependency)
+- vol, ta can run in parallel (same dependency)
 - cmc_features runs after all complete
+
+Note: cmc_returns is deprecated; returns now come from cmc_returns_bars_multi_tf.
 """
 
 from __future__ import annotations
@@ -57,40 +58,6 @@ class RefreshResult:
 # =============================================================================
 # Refresh Functions
 # =============================================================================
-
-
-def refresh_returns(
-    engine, ids: list[int], start: Optional[str], end: Optional[str], tf: str = "1D"
-) -> RefreshResult:
-    """Refresh cmc_returns table for given tf."""
-    from ta_lab2.scripts.features.returns_feature import ReturnsFeature, ReturnsConfig
-
-    table = "cmc_returns"
-    t0 = time.time()
-
-    try:
-        config = ReturnsConfig(tf=tf)
-        feature = ReturnsFeature(engine, config)
-        rows_written = feature.compute_for_ids(ids=ids, start=start, end=end)
-        duration = time.time() - t0
-
-        return RefreshResult(
-            table=table,
-            rows_inserted=rows_written,
-            duration_seconds=duration,
-            success=True,
-        )
-
-    except Exception as e:
-        duration = time.time() - t0
-        logger.error(f"Returns refresh failed (tf={tf}): {e}", exc_info=True)
-        return RefreshResult(
-            table=table,
-            rows_inserted=0,
-            duration_seconds=duration,
-            success=False,
-            error=str(e),
-        )
 
 
 def refresh_vol(
@@ -222,15 +189,14 @@ def run_all_refreshes(
     logger.info(f"Starting feature refresh for {len(ids)} IDs, tf={tf}")
     logger.info(f"Mode: {'full' if full_refresh else 'incremental'}")
 
-    # Phase 1: Returns, Vol, TA (can run in parallel)
+    # Phase 1: Vol, TA (can run in parallel)
     phase1_tasks = [
-        ("returns", refresh_returns),
         ("vol", refresh_vol),
         ("ta", refresh_ta),
     ]
 
     if parallel:
-        logger.info("Phase 1: Running returns/vol/ta in parallel")
+        logger.info("Phase 1: Running vol/ta in parallel")
 
         with ThreadPoolExecutor(max_workers=3) as executor:
             future_to_name = {}
@@ -251,7 +217,7 @@ def run_all_refreshes(
                     logger.error(f"  {result.table} (tf={tf}): FAILED - {result.error}")
 
     else:
-        logger.info("Phase 1: Running returns/vol/ta sequentially")
+        logger.info("Phase 1: Running vol/ta sequentially")
 
         for name, refresh_fn in phase1_tasks:
             result = refresh_fn(engine, ids, start, end, tf)
@@ -479,7 +445,7 @@ def main() -> int:
             continue
 
         print(f"\n[tf={tf}]")
-        for table in ["cmc_returns", "cmc_vol", "cmc_ta", "cmc_features"]:
+        for table in ["cmc_vol", "cmc_ta", "cmc_features"]:
             if table in results:
                 result = results[table]
                 status = "OK" if result.success else "FAILED"

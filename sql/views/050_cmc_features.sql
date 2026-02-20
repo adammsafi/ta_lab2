@@ -5,7 +5,7 @@
 -- Source tables:
 --   - cmc_price_bars_multi_tf (OHLCV, all TFs)
 --   - cmc_ema_multi_tf_u (EMAs)
---   - cmc_returns (returns across multiple lookbacks)
+--   - cmc_returns_bars_multi_tf (bar returns, replaces deprecated cmc_returns)
 --   - cmc_vol (volatility estimators)
 --   - cmc_ta (technical indicators)
 --
@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS public.cmc_features (
     ema_9_d1        DOUBLE PRECISION,  -- First derivative
     ema_21_d1       DOUBLE PRECISION,
 
-    -- Returns (from cmc_returns)
+    -- Returns (from cmc_returns_bars_multi_tf)
     ret_1_pct       DOUBLE PRECISION,
     ret_1_log       DOUBLE PRECISION,
     ret_7_pct       DOUBLE PRECISION,

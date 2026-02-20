@@ -1,6 +1,9 @@
 -- sql/features/040_cmc_returns.sql
--- Multi-TF returns feature table with multiple lookback windows
+-- DEPRECATED: This table is replaced by cmc_returns_bars_multi_tf which provides
+-- period-over-period returns with z-scores across all timeframes.
+-- Kept for reference only. Do not use for new features.
 --
+-- Old: Multi-TF returns feature table with multiple lookback windows
 -- Lookback windows in bars (not days): 1, 3, 5, 7, 14, 21, 30, 63, 126, 252
 -- Column naming: ret_N_pct = N-bar return (timeframe-agnostic)
 --

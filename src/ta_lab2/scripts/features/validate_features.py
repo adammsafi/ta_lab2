@@ -278,7 +278,6 @@ class FeatureValidator:
 
         # 1. Gap detection for each feature table
         tables_to_check = [
-            "cmc_returns_daily",
             "cmc_vol_daily",
             "cmc_ta_daily",
             "cmc_daily_features",
@@ -291,7 +290,6 @@ class FeatureValidator:
 
         # 2. Outlier detection
         outlier_checks = [
-            ("cmc_returns_daily", ["ret_1d_pct", "ret_7d_pct", "ret_30d_pct"]),
             ("cmc_vol_daily", ["parkinson_vol", "gk_vol", "rs_vol"]),
             ("cmc_ta_daily", ["rsi_14", "macd_12_26_9", "bb_upper_20_2"]),
         ]
@@ -308,7 +306,6 @@ class FeatureValidator:
 
         # 4. NULL ratio checks
         null_checks = [
-            ("cmc_returns_daily", ["ret_1d_pct", "ret_7d_pct"]),
             ("cmc_vol_daily", ["parkinson_vol", "close"]),
             ("cmc_ta_daily", ["rsi_14", "close"]),
         ]
@@ -561,7 +558,7 @@ class FeatureValidator:
         Verify cross-table relationships.
 
         Checks:
-        - cmc_returns_daily.ret_1d_pct ~= (close - prev_close) / prev_close
+        - cmc_returns_bars_multi_tf.ret_arith ~= (close - prev_close) / prev_close
         - cmc_vol_daily.close == cmc_price_bars_1d.close
         - cmc_ta_daily.close == cmc_price_bars_1d.close
         - cmc_daily_features has matching timestamps
@@ -594,16 +591,17 @@ class FeatureValidator:
                     p.id,
                     p.ts,
                     p.calc_ret,
-                    r.ret_1d_pct,
-                    ABS(p.calc_ret - r.ret_1d_pct) as diff
+                    r.ret_arith,
+                    ABS(p.calc_ret - r.ret_arith) as diff
                 FROM price_changes p
-                JOIN public.cmc_returns_daily r
-                  ON p.id = r.id AND DATE(p.ts) = DATE(r.ts)
+                JOIN public.cmc_returns_bars_multi_tf r
+                  ON p.id = r.id AND DATE(p.ts) = DATE(r."timestamp")
+                  AND r.tf = '1D' AND r.roll = FALSE
                 WHERE p.calc_ret IS NOT NULL
-                  AND r.ret_1d_pct IS NOT NULL
-                  AND ABS(p.calc_ret - r.ret_1d_pct) > 0.0001  -- 0.01% tolerance
+                  AND r.ret_arith IS NOT NULL
+                  AND ABS(p.calc_ret - r.ret_arith) > 0.0001  -- 0.01% tolerance
             )
-            SELECT id, ts, calc_ret, ret_1d_pct, diff
+            SELECT id, ts, calc_ret, ret_arith, diff
             FROM mismatches
             ORDER BY diff DESC
             LIMIT 10
@@ -931,7 +929,7 @@ def validate_features(
         query = text(
             """
             SELECT DISTINCT id
-            FROM public.cmc_returns_daily
+            FROM public.cmc_price_bars_multi_tf
             ORDER BY id
             LIMIT 10
         """

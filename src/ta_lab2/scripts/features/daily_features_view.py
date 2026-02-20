@@ -4,7 +4,7 @@ FeaturesStore - Unified multi-TF feature store management.
 This module manages cmc_features, a materialized table joining all features:
 - cmc_price_bars_multi_tf (OHLCV, all timeframes)
 - cmc_ema_multi_tf_u (EMAs)
-- cmc_returns (returns)
+- cmc_returns_bars_multi_tf (returns, replaces deprecated cmc_returns)
 - cmc_vol (volatility)
 - cmc_ta (technical indicators)
 
@@ -53,7 +53,7 @@ class FeaturesStore:
     Source tables (dependency order):
     1. cmc_price_bars_multi_tf (base - required)
     2. cmc_ema_multi_tf_u (depends on bars - optional)
-    3. cmc_returns (depends on bars - optional)
+    3. cmc_returns_bars_multi_tf (bar returns - optional)
     4. cmc_vol (depends on bars - optional)
     5. cmc_ta (depends on bars - optional)
     """
@@ -72,7 +72,7 @@ class FeaturesStore:
             "feature_type": "ema_multi_tf",
         },
         "returns": {
-            "table": "cmc_returns",
+            "table": "cmc_returns_bars_multi_tf",
             "schema": "public",
             "required": False,
             "feature_type": "returns",
@@ -321,16 +321,16 @@ class FeaturesStore:
                 ]
             )
 
-        # Returns
+        # Returns (from cmc_returns_bars_multi_tf, roll=FALSE canonical rows)
         if sources_available.get("returns", False):
             select_cols.extend(
                 [
-                    "r.ret_1_pct",
-                    "r.ret_1_log",
-                    "r.ret_7_pct",
-                    "r.ret_30_pct",
-                    "r.ret_1_pct_zscore",
-                    "r.gap_days",
+                    "r.ret_arith as ret_1_pct",
+                    "r.ret_log as ret_1_log",
+                    "NULL::double precision as ret_7_pct",
+                    "NULL::double precision as ret_30_pct",
+                    "r.ret_arith_zscore_365 as ret_1_pct_zscore",
+                    "r.gap_bars as gap_days",
                 ]
             )
         else:
@@ -403,11 +403,23 @@ class FeaturesStore:
                 ]
             )
 
-        # Data quality flags
+        # Data quality flags (conditional on source availability)
+        gap_expr = (
+            "r.gap_bars > 1" if sources_available.get("returns", False) else "FALSE"
+        )
+        outlier_parts = []
+        if sources_available.get("returns", False):
+            outlier_parts.append("r.is_outlier")
+        if sources_available.get("vol", False):
+            outlier_parts.append("v.vol_parkinson_20_is_outlier")
+        if sources_available.get("ta", False):
+            outlier_parts.append("t.is_outlier")
+        outlier_expr = " OR ".join(outlier_parts) if outlier_parts else "FALSE"
+
         select_cols.extend(
             [
-                "CASE WHEN r.gap_days > 1 THEN TRUE ELSE FALSE END as has_price_gap",
-                "CASE WHEN r.is_outlier OR v.vol_parkinson_20_is_outlier OR t.is_outlier THEN TRUE ELSE FALSE END as has_outlier",
+                f"CASE WHEN {gap_expr} THEN TRUE ELSE FALSE END as has_price_gap",
+                f"CASE WHEN {outlier_expr} THEN TRUE ELSE FALSE END as has_outlier",
                 "now() as updated_at",
             ]
         )
@@ -445,12 +457,12 @@ class FeaturesStore:
             """
             )
 
-        # Returns
+        # Returns (bar returns, canonical rows only)
         if sources_available.get("returns", False):
             joins.append(
                 f"""
-                LEFT JOIN public.cmc_returns r
-                  ON p.id = r.id AND p.time_close = r.ts AND r.tf = '{tf}'
+                LEFT JOIN public.cmc_returns_bars_multi_tf r
+                  ON p.id = r.id AND p.time_close = r."timestamp" AND r.tf = '{tf}' AND r.roll = FALSE
             """
             )
 
