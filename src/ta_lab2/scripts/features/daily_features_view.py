@@ -327,8 +327,6 @@ class FeaturesStore:
                 [
                     "r.ret_arith as ret_1_pct",
                     "r.ret_log as ret_1_log",
-                    "NULL::double precision as ret_7_pct",
-                    "NULL::double precision as ret_30_pct",
                     "r.ret_arith_zscore_365 as ret_1_pct_zscore",
                     "r.gap_bars as gap_days",
                 ]
@@ -338,8 +336,6 @@ class FeaturesStore:
                 [
                     "NULL::double precision as ret_1_pct",
                     "NULL::double precision as ret_1_log",
-                    "NULL::double precision as ret_7_pct",
-                    "NULL::double precision as ret_30_pct",
                     "NULL::double precision as ret_1_pct_zscore",
                     "NULL::integer as gap_days",
                 ]

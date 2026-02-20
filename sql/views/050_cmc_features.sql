@@ -41,8 +41,6 @@ CREATE TABLE IF NOT EXISTS public.cmc_features (
     -- Returns (from cmc_returns_bars_multi_tf)
     ret_1_pct       DOUBLE PRECISION,
     ret_1_log       DOUBLE PRECISION,
-    ret_7_pct       DOUBLE PRECISION,
-    ret_30_pct      DOUBLE PRECISION,
     ret_1_pct_zscore DOUBLE PRECISION,
     gap_days        INTEGER,
 

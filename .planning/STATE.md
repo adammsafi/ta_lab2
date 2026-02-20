@@ -10,12 +10,12 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 ## Current Position
 
 Phase: 27 of 28 (Regime Integration)
-Plan: 5 of 7 in current phase
+Plan: 6 of 7 in current phase
 Status: In progress
 Next Phase: Phase 28 (Backtest Pipeline Fix)
-Last activity: 2026-02-20 — Completed 27-05-PLAN.md (Regime Refresh Integration: hysteresis + 4-table pipeline)
+Last activity: 2026-02-20 — Completed 27-06-PLAN.md (Signal Regime Integration: all 3 generators regime-aware)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [####------] ~36% v0.7.0 (5/14 plans)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [#####-----] ~43% v0.7.0 (6/14 plans)
 
 ## Performance Metrics
 
@@ -122,6 +122,9 @@ Recent decisions affecting current work:
 - **BTC (id=1) as market proxy, skipped for self** (Phase 27-03): When computing regimes for id=1, skip proxy loading to avoid circular self-reference; proxy only applies for other assets lacking L0/L1 history
 - **regime_key fallback chain L2->L1->L0->Unknown** (Phase 27-03): "Unknown" sentinel avoids None in NOT NULL column; L2 (daily) is primary as it has most bars
 - **Row-by-row policy resolution acceptable** (Phase 27-03): 5614 rows resolves in ~2.4s total (DB I/O dominates); vectorization not needed for daily refresh cadence
+- **regime_enabled defaults True on signal generators** (Phase 27-06): Opt-out pattern means all existing refresh workflows become regime-aware automatically; --no-regime flag for explicit A/B comparison
+- **Graceful fallback on empty cmc_regimes** (Phase 27-06): load_regime_context_batch wraps SQL in try/except; merge_regime_context with empty df adds NULL columns - signals generate as before when regime table is empty
+- **RSI regime_key via post-transform merge** (Phase 27-06): RSI transform_signals_to_records uses mutable dict update-in-place pattern; regime_key attached after via (id, entry_ts) join rather than inline to avoid structural changes to the transform method
 - **Per-asset hysteresis tracker reset** (Phase 27-05): tracker.reset() before each asset prevents prior asset state leaking into next; critical for correctness when processing --all
 - **Returns fallback to NULL stats** (Phase 27-05): _load_returns_for_id wraps in try/except; DEBUG-level log avoids noise; avg_ret_1d/std_ret_1d are NULL until cmc_returns.ret_1d column populated
 - **Reload daily_df for comovement** (Phase 27-05): Reload via load_regime_input_data rather than threading through compute_regimes_for_id return; cleaner separation of concerns
@@ -136,8 +139,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-20T19:41:57Z
-Stopped at: Completed 27-05-PLAN.md (Regime Refresh Integration: hysteresis + 4-table pipeline)
+Last session: 2026-02-20T19:47:49Z
+Stopped at: Completed 27-06-PLAN.md (Signal Regime Integration: all 3 generators + --no-regime flag + RSI fix)
 Resume file: None
 
 ---
