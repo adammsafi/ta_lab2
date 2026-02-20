@@ -9,18 +9,17 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 
 ## Current Position
 
-Phase: 27 of 28 (Regime Integration) — COMPLETE
-Plan: 7 of 7 in current phase — all plans complete, E2E verified
-Status: Phase complete — ready for Phase 28
-Next Phase: Phase 28 (Backtest Pipeline Fix)
-Last activity: 2026-02-20 — Completed 27-07-PLAN.md + E2E checkpoint approved (full regime pipeline verified)
+Phase: 28 of 28 (Backtest Pipeline Fix) — In progress
+Plan: 1 of 3 in current phase — 28-01 complete
+Status: In progress — 28-02 (vectorbt timestamp fix) is next
+Last activity: 2026-02-20 — Completed 28-01-PLAN.md (signal generator serialization fix)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [#####-----] 50% v0.7.0 (1/2 phases, 7/7 plans in Phase 27)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [######----] 60% v0.7.0 (1/3 plans in Phase 28 complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 142 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0)
+- Total plans completed: 143 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 1 in v0.7.0)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -131,6 +130,7 @@ Recent decisions affecting current work:
 - **--regimes standalone flag plus --all inclusion** (Phase 27-07): Consistent with --bars/--emas pattern; --all becomes single command for bars->EMAs->regimes pipeline
 - **EMA early-stop before regimes** (Phase 27-07): Added failure check before running regimes - regimes depend on fresh EMAs; propagates --dry-run to regime subprocess
 - **regime_inspect default reads from DB** (Phase 27-07): Operational check should be fast; --live flag triggers compute_regimes_for_id for testing changes before write
+- **JSONB serialization pattern** (Phase 28-01): Use `json.dumps(x) if isinstance(x, dict) else x` before to_sql() for JSONB columns — isinstance guard is defensive, handles pre-serialized strings; all 3 signal generators now consistent
 
 ### Pending Todos
 
@@ -142,8 +142,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-20T19:54:22Z
-Stopped at: Phase 27 complete — all 7 plans done, E2E checkpoint approved. Ready to start Phase 28.
+Last session: 2026-02-20T22:05:00Z
+Stopped at: Completed 28-01-PLAN.md — signal generator serialization fix (EMA + ATR json.dumps)
 Resume file: None
 
 ---
