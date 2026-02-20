@@ -10,12 +10,12 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 ## Current Position
 
 Phase: 27 of 28 (Regime Integration)
-Plan: 1 of 7 in current phase
+Plan: 2 of 7 in current phase
 Status: In progress
 Next Phase: Phase 28 (Backtest Pipeline Fix)
-Last activity: 2026-02-20 — Completed 27-01-PLAN.md (Regime Schema DDL)
+Last activity: 2026-02-20 — Completed 27-02-PLAN.md (Regime Data Loader)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [#---------] ~7% v0.7.0 (1/14 plans)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [##--------] ~14% v0.7.0 (2/14 plans)
 
 ## Performance Metrics
 
@@ -114,6 +114,8 @@ Recent decisions affecting current work:
 - **cmc_regime_comovement PK includes computed_at** (Phase 27-01): Retains historical snapshots across refreshes - each refresh snapshot preserved for temporal analytics
 - **regime_key nullable on signal tables** (Phase 27-01): Existing signals have NULL regime_key, backward-compatible, signal generators populate going forward
 - **regime_enabled defaults TRUE on dim_signals** (Phase 27-01): All existing signals automatically participate in regime-aware execution, opt-out is explicit
+- **int cast before period sort in pivot_emas_to_wide** (Phase 27-02): Cast period to int before sorting column names -- prevents alphabetic trap where '200' < '50'; ensures close_ema_20 < close_ema_50 < close_ema_200
+- **aggfunc='first' in pivot_table for EMA deduplication** (Phase 27-02): Defensive choice; plain pivot() raises ValueError on duplicates, pivot_table silently takes first value -- safer for production pipeline
 
 ### Pending Todos
 
@@ -125,8 +127,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-20T19:24:14Z
-Stopped at: Completed 27-01-PLAN.md (Regime Schema DDL - 4 new tables + 4 columns)
+Last session: 2026-02-20T19:25:28Z
+Stopped at: Completed 27-02-PLAN.md (Regime Data Loader - pivot, bar/EMA loading utilities)
 Resume file: None
 
 ---
