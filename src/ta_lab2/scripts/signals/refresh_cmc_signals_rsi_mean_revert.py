@@ -124,6 +124,11 @@ Examples:
     parser.add_argument(
         "--verbose", "-v", action="store_true", help="Enable debug logging"
     )
+    parser.add_argument(
+        "--no-regime",
+        action="store_true",
+        help="Disable regime context (A/B comparison mode: signals generated without regime sizing)",
+    )
 
     args = parser.parse_args()
 
@@ -198,6 +203,15 @@ Examples:
         logger.warning("No asset IDs to process")
         sys.exit(0)
 
+    # Regime context mode
+    regime_enabled = not args.no_regime
+    if not regime_enabled:
+        logger.info(
+            "Regime context DISABLED (--no-regime mode): signals use base sizing"
+        )
+    else:
+        logger.info("Regime context ENABLED: signals will use regime-adjusted sizing")
+
     # Generate signals
     generator = RSISignalGenerator(engine, state_manager)
     total_signals = 0
@@ -218,6 +232,7 @@ Examples:
                 full_refresh=args.full_refresh,
                 dry_run=args.dry_run,
                 use_adaptive=args.adaptive,
+                regime_enabled=regime_enabled,
             )
             total_signals += count
             logger.info(f"Generated {count} signals for {signal_name}")

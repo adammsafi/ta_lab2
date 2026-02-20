@@ -32,6 +32,7 @@ Usage:
 
 from dataclasses import dataclass
 from typing import Optional
+import logging
 import pandas as pd
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
@@ -39,6 +40,10 @@ from sqlalchemy.engine import Engine
 from ta_lab2.signals.breakout_atr import make_signals
 from .signal_state_manager import SignalStateManager
 from .signal_utils import compute_feature_hash, compute_params_hash
+from .regime_utils import load_regime_context_batch, merge_regime_context
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -71,6 +76,7 @@ class ATRSignalGenerator:
         signal_config: dict,
         full_refresh: bool = False,
         dry_run: bool = False,
+        regime_enabled: bool = True,
     ) -> int:
         """
         Generate ATR breakout signals for specified assets.
@@ -83,6 +89,8 @@ class ATRSignalGenerator:
                 - params: Dict with lookback, atr_col, trail_atr_mult, confirm_close, etc.
             full_refresh: If True, regenerate all signals (default: incremental)
             dry_run: If True, don't write to database (default: False)
+            regime_enabled: If True, load regime context and attach regime_key
+                to signal records. Set False (--no-regime) for A/B comparison.
 
         Returns:
             Number of signal records generated
@@ -93,6 +101,12 @@ class ATRSignalGenerator:
         """
         signal_id = signal_config["signal_id"]
         params = signal_config["params"]
+
+        logger.info(
+            f"Generating ATR signals for {len(ids)} assets, "
+            f"signal_id={signal_id}, full_refresh={full_refresh}, "
+            f"regime_enabled={regime_enabled}"
+        )
 
         # Extract parameters with defaults
         lookback = params.get("lookback", 20)
@@ -116,6 +130,20 @@ class ATRSignalGenerator:
 
         if df_features.empty:
             return 0
+
+        # Load and merge regime context (if enabled)
+        if regime_enabled:
+            regime_df = load_regime_context_batch(
+                engine=self.engine, ids=ids, start_ts=start_ts
+            )
+            df_features = merge_regime_context(df_features, regime_df)
+            n_with_regime = df_features["regime_key"].notna().sum()
+            logger.info(
+                f"Regime context: {n_with_regime}/{len(df_features)} rows have regime data"
+            )
+        else:
+            logger.info("Regime context disabled (--no-regime mode)")
+            df_features["regime_key"] = None
 
         # Compute Donchian channel levels (needed for breakout classification)
         df_features = self._compute_channel_levels(df_features, lookback)
@@ -148,6 +176,13 @@ class ATRSignalGenerator:
 
         if records.empty:
             return 0
+
+        n_tagged = (
+            records["regime_key"].notna().sum()
+            if "regime_key" in records.columns
+            else 0
+        )
+        logger.info(f"Regime-tagged {n_tagged}/{len(records)} signal records")
 
         # Write to database
         if not dry_run:
@@ -332,6 +367,17 @@ class ATRSignalGenerator:
             entry_ts = asset_open["entry_ts"].iloc[0] if position_open else None
 
             for idx, row in df_asset.iterrows():
+                # Regime key for this bar (None if regime not available)
+                raw_rk = row["regime_key"] if "regime_key" in row.index else None
+                regime_key = (
+                    None
+                    if (
+                        raw_rk is None
+                        or (isinstance(raw_rk, float) and pd.isna(raw_rk))
+                    )
+                    else raw_rk
+                )
+
                 # Entry signal
                 if row["entry_signal"] and not position_open:
                     # Classify breakout type
@@ -381,6 +427,7 @@ class ATRSignalGenerator:
                             "signal_version": self.signal_version,
                             "feature_version_hash": feature_hash,
                             "params_hash": params_hash,
+                            "regime_key": regime_key,
                         }
                     )
 
@@ -437,6 +484,7 @@ class ATRSignalGenerator:
                             "signal_version": self.signal_version,
                             "feature_version_hash": feature_hash,
                             "params_hash": params_hash,
+                            "regime_key": regime_key,
                         }
                     )
 

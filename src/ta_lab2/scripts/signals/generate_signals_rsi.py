@@ -40,6 +40,10 @@ from ta_lab2.scripts.signals.signal_utils import (
     compute_feature_hash,
     compute_params_hash,
 )
+from ta_lab2.scripts.signals.regime_utils import (
+    load_regime_context_batch,
+    merge_regime_context,
+)
 from ta_lab2.signals.rsi_mean_revert import make_signals
 
 
@@ -304,6 +308,7 @@ class RSISignalGenerator:
         full_refresh: bool = False,
         dry_run: bool = False,
         use_adaptive: bool = False,
+        regime_enabled: bool = True,
     ) -> int:
         """
         Generate RSI mean reversion signals for specified asset IDs.
@@ -319,6 +324,8 @@ class RSISignalGenerator:
             dry_run: If True, don't write to database (validation mode)
             use_adaptive: If True, use adaptive rolling percentile thresholds
                          instead of static thresholds from dim_signals
+            regime_enabled: If True, load regime context and attach regime_key
+                to signal records. Set False (--no-regime) for A/B comparison.
 
         Returns:
             Number of signal records generated
@@ -333,7 +340,7 @@ class RSISignalGenerator:
         logger.info(
             f"Generating RSI signals for {len(ids)} assets, "
             f"signal_id={signal_id}, full_refresh={full_refresh}, "
-            f"use_adaptive={use_adaptive}"
+            f"use_adaptive={use_adaptive}, regime_enabled={regime_enabled}"
         )
 
         # Determine start timestamp for incremental refresh
@@ -353,6 +360,20 @@ class RSISignalGenerator:
             return 0
 
         logger.info(f"Loaded {len(df_features)} feature rows")
+
+        # Load and merge regime context (if enabled)
+        if regime_enabled:
+            regime_df = load_regime_context_batch(
+                engine=self.engine, ids=ids, start_ts=start_ts
+            )
+            df_features = merge_regime_context(df_features, regime_df)
+            n_with_regime = df_features["regime_key"].notna().sum()
+            logger.info(
+                f"Regime context: {n_with_regime}/{len(df_features)} rows have regime data"
+            )
+        else:
+            logger.info("Regime context disabled (--no-regime mode)")
+            df_features["regime_key"] = None
 
         # Extract parameters
         rsi_col = params.get("rsi_col", "rsi_14")
@@ -381,12 +402,9 @@ class RSISignalGenerator:
                 )
 
                 # Store adaptive thresholds in DataFrame for signal generation
-                df_features_adaptive.loc[
-                    group.index, "adaptive_lower"
-                ] = adaptive_lower.values
-                df_features_adaptive.loc[
-                    group.index, "adaptive_upper"
-                ] = adaptive_upper.values
+                idx = group.index
+                df_features_adaptive.loc[idx, "adaptive_lower"] = adaptive_lower.values
+                df_features_adaptive.loc[idx, "adaptive_upper"] = adaptive_upper.values
 
             # Note: make_signals doesn't support dynamic thresholds per row
             # For now, we use average adaptive thresholds as static override
@@ -441,6 +459,24 @@ class RSISignalGenerator:
             return 0
 
         logger.info(f"Transformed to {len(df_records)} signal records")
+
+        # Attach regime_key from features (join on id + entry_ts)
+        # Use entry_ts: the regime at signal entry determines the regime_key for the record
+        if "regime_key" in df_features.columns:
+            regime_lookup = df_features[["id", "ts", "regime_key"]].copy()
+            regime_lookup.columns = ["id", "entry_ts", "regime_key"]
+            # Ensure compatible types for merge
+            df_records["entry_ts"] = pd.to_datetime(df_records["entry_ts"], utc=True)
+            regime_lookup["entry_ts"] = pd.to_datetime(
+                regime_lookup["entry_ts"], utc=True
+            )
+            df_records = df_records.merge(
+                regime_lookup, on=["id", "entry_ts"], how="left"
+            )
+            n_tagged = df_records["regime_key"].notna().sum()
+            logger.info(f"Regime-tagged {n_tagged}/{len(df_records)} signal records")
+        else:
+            df_records["regime_key"] = None
 
         # Write to database (unless dry run)
         if not dry_run:

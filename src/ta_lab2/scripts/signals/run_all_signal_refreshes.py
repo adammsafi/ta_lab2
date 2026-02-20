@@ -77,6 +77,7 @@ def refresh_signal_type(
     signal_type: str,
     ids: list[int],
     full_refresh: bool,
+    regime_enabled: bool = True,
 ) -> RefreshResult:
     """
     Refresh a single signal type.
@@ -89,6 +90,7 @@ def refresh_signal_type(
         signal_type: 'ema_crossover', 'rsi_mean_revert', or 'atr_breakout'
         ids: List of asset IDs to process
         full_refresh: If True, regenerate all signals. If False, incremental.
+        regime_enabled: If True, load and attach regime context to signals.
 
     Returns:
         RefreshResult with success status and metrics
@@ -122,7 +124,9 @@ def refresh_signal_type(
         total_signals = 0
         for cfg in configs:
             logger.debug(f"  Processing config: {cfg['signal_name']}")
-            n = generator.generate_for_ids(ids, cfg, full_refresh=full_refresh)
+            n = generator.generate_for_ids(
+                ids, cfg, full_refresh=full_refresh, regime_enabled=regime_enabled
+            )
             total_signals += n
             logger.debug(f"    Generated {n} signals")
 
@@ -146,6 +150,7 @@ def run_parallel_refresh(
     ids: list[int],
     full_refresh: bool,
     max_workers: int = 3,
+    regime_enabled: bool = True,
 ) -> List[RefreshResult]:
     """
     Run all signal types in parallel.
@@ -161,6 +166,7 @@ def run_parallel_refresh(
         ids: List of asset IDs to process
         full_refresh: If True, regenerate all signals
         max_workers: Maximum concurrent threads (default 3 = one per signal type)
+        regime_enabled: If True, load and attach regime context to signals.
 
     Returns:
         List of RefreshResult for each signal type
@@ -171,12 +177,15 @@ def run_parallel_refresh(
     logger.info(f"Starting parallel refresh of {len(signal_types)} signal types...")
     logger.info(f"  Max workers: {max_workers}")
     logger.info(f"  Full refresh: {full_refresh}")
+    logger.info(f"  Regime enabled: {regime_enabled}")
     logger.info(f"  Asset count: {len(ids)}")
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # Submit all tasks
         futures = {
-            executor.submit(refresh_signal_type, engine, st, ids, full_refresh): st
+            executor.submit(
+                refresh_signal_type, engine, st, ids, full_refresh, regime_enabled
+            ): st
             for st in signal_types
         }
 
@@ -360,6 +369,11 @@ Examples:
         "--parallel", type=int, default=3, help="Max parallel workers (default: 3)"
     )
     parser.add_argument(
+        "--no-regime",
+        action="store_true",
+        help="Disable regime context for all signal types (A/B comparison mode)",
+    )
+    parser.add_argument(
         "--verbose",
         "-v",
         action="store_true",
@@ -402,11 +416,17 @@ Examples:
 
     # Phase 1: Signal generation (unless validate-only)
     if not args.validate_only:
+        regime_enabled = not args.no_regime
+        if not regime_enabled:
+            logger.info("Regime context DISABLED (--no-regime): A/B comparison mode")
+
         logger.info("")
         logger.info("PHASE 1: Signal Generation")
         logger.info("-" * 70)
 
-        results = run_parallel_refresh(engine, ids, args.full_refresh, args.parallel)
+        results = run_parallel_refresh(
+            engine, ids, args.full_refresh, args.parallel, regime_enabled
+        )
 
         logger.info("")
         logger.info("Phase 1 Results:")

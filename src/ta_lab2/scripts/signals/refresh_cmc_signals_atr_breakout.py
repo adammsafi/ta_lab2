@@ -117,6 +117,11 @@ def main():
         action="store_true",
         help="Enable verbose logging",
     )
+    parser.add_argument(
+        "--no-regime",
+        action="store_true",
+        help="Disable regime context (A/B comparison mode: signals generated without regime sizing)",
+    )
 
     args = parser.parse_args()
 
@@ -191,6 +196,15 @@ def main():
         logger.error(f"Failed to load asset IDs: {e}")
         sys.exit(1)
 
+    # Regime context mode
+    regime_enabled = not args.no_regime
+    if not regime_enabled:
+        logger.info(
+            "Regime context DISABLED (--no-regime mode): signals use base sizing"
+        )
+    else:
+        logger.info("Regime context ENABLED: signals will use regime-adjusted sizing")
+
     # Generate signals
     generator = ATRSignalGenerator(engine, state_manager)
     total_signals = 0
@@ -208,6 +222,7 @@ def main():
                 signal_config=signal_config,
                 full_refresh=args.full_refresh,
                 dry_run=args.dry_run,
+                regime_enabled=regime_enabled,
             )
 
             total_signals += n
