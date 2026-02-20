@@ -278,9 +278,9 @@ class FeatureValidator:
 
         # 1. Gap detection for each feature table
         tables_to_check = [
-            "cmc_vol_daily",
-            "cmc_ta_daily",
-            "cmc_daily_features",
+            "cmc_vol",
+            "cmc_ta",
+            "cmc_features",
         ]
 
         for table in tables_to_check:
@@ -290,8 +290,8 @@ class FeatureValidator:
 
         # 2. Outlier detection
         outlier_checks = [
-            ("cmc_vol_daily", ["parkinson_vol", "gk_vol", "rs_vol"]),
-            ("cmc_ta_daily", ["rsi_14", "macd_12_26_9", "bb_upper_20_2"]),
+            ("cmc_vol", ["vol_parkinson_20", "vol_gk_20", "vol_rs_20"]),
+            ("cmc_ta", ["rsi_14", "macd_12_26", "bb_up_20_2"]),
         ]
 
         for table, columns in outlier_checks:
@@ -306,8 +306,8 @@ class FeatureValidator:
 
         # 4. NULL ratio checks
         null_checks = [
-            ("cmc_vol_daily", ["parkinson_vol", "close"]),
-            ("cmc_ta_daily", ["rsi_14", "close"]),
+            ("cmc_vol", ["vol_parkinson_20", "close"]),
+            ("cmc_ta", ["rsi_14", "close"]),
         ]
 
         for table, columns in null_checks:
@@ -559,9 +559,9 @@ class FeatureValidator:
 
         Checks:
         - cmc_returns_bars_multi_tf.ret_arith ~= (close - prev_close) / prev_close
-        - cmc_vol_daily.close == cmc_price_bars_1d.close
-        - cmc_ta_daily.close == cmc_price_bars_1d.close
-        - cmc_daily_features has matching timestamps
+        - cmc_vol.close == cmc_price_bars_multi_tf.close
+        - cmc_ta.close == cmc_price_bars_multi_tf.close
+        - cmc_features has matching timestamps
 
         Args:
             ids: List of asset IDs
@@ -637,10 +637,11 @@ class FeatureValidator:
         check_vol_close_query = text(
             f"""
             SELECT v.id, v.ts, v.close as vol_close, b.close as bar_close
-            FROM public.cmc_vol_daily v
-            JOIN public.cmc_price_bars_1d b
-              ON v.id = b.id AND DATE(v.ts) = DATE(b.ts)
+            FROM public.cmc_vol v
+            JOIN public.cmc_price_bars_multi_tf b
+              ON v.id = b.id AND v.ts = b.time_close AND v.tf = b.tf
             WHERE v.id IN ({ids_str})
+              AND v.tf = '1D'
               AND ABS(v.close - b.close) > 0.01
             LIMIT 10
         """
@@ -674,10 +675,11 @@ class FeatureValidator:
         check_ta_close_query = text(
             f"""
             SELECT t.id, t.ts, t.close as ta_close, b.close as bar_close
-            FROM public.cmc_ta_daily t
-            JOIN public.cmc_price_bars_1d b
-              ON t.id = b.id AND DATE(t.ts) = DATE(b.ts)
+            FROM public.cmc_ta t
+            JOIN public.cmc_price_bars_multi_tf b
+              ON t.id = b.id AND t.ts = b.time_close AND t.tf = b.tf
             WHERE t.id IN ({ids_str})
+              AND t.tf = '1D'
               AND ABS(t.close - b.close) > 0.01
             LIMIT 10
         """

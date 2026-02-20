@@ -1,17 +1,19 @@
 """
-FeaturesStore - Unified multi-TF feature store management.
+FeaturesStore - Unified multi-TF bar-level feature store management.
 
-This module manages cmc_features, a materialized table joining all features:
+This module manages cmc_features, a materialized table joining all bar-level features:
 - cmc_price_bars_multi_tf (OHLCV, all timeframes)
-- cmc_ema_multi_tf_u (EMAs)
-- cmc_returns_bars_multi_tf (returns, replaces deprecated cmc_returns)
-- cmc_vol (volatility)
+- cmc_returns_bars_multi_tf (bar returns, canonical + roll)
+- cmc_vol (volatility estimators)
 - cmc_ta (technical indicators)
 
+EMAs are NOT included (different granularity with period dimension).
+Query cmc_ema_multi_tf_u and cmc_returns_ema_multi_tf_u directly.
+
 Design:
+- Dynamic column matching: DDL is the contract, JOIN builder auto-discovers columns
 - Incremental refresh based on source table watermarks
 - Graceful degradation when source tables missing
-- Single-table access for ML pipelines
 - Multi-TF support via tf parameter
 
 Usage:
@@ -30,8 +32,98 @@ import pandas as pd
 from sqlalchemy import Engine, text
 
 from ta_lab2.scripts.features.feature_state_manager import FeatureStateManager
+from ta_lab2.scripts.sync_utils import get_columns, _q
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Source table configuration
+# =============================================================================
+
+# Columns to exclude when pulling from each source table.
+# These are PK, metadata, or duplicates of price_bars columns.
+_RETURNS_EXCLUDE = frozenset(
+    {
+        "id",
+        "timestamp",
+        "tf",
+        "tf_days",
+        "bar_seq",
+        "pos_in_bar",
+        "count_days",
+        "count_days_remaining",
+        "roll",
+        "time_close",
+        "time_close_bar",
+        "time_open_bar",
+        "ingested_at",
+    }
+)
+
+_VOL_EXCLUDE = frozenset(
+    {
+        "id",
+        "ts",
+        "tf",
+        "tf_days",
+        "open",
+        "high",
+        "low",
+        "close",
+        "updated_at",
+    }
+)
+
+_TA_EXCLUDE = frozenset(
+    {
+        "id",
+        "ts",
+        "tf",
+        "tf_days",
+        "close",
+        "atr_14",
+        "updated_at",
+    }
+)
+
+# Columns that need renaming to avoid conflicts across sources.
+_RENAMES = {
+    "returns": {"is_outlier": "ret_is_outlier"},
+    "ta": {"is_outlier": "ta_is_outlier"},
+}
+
+# Source table definitions: alias, join condition template, exclude set.
+_SOURCE_DEFS = {
+    "returns": {
+        "table": "public.cmc_returns_bars_multi_tf",
+        "alias": "r",
+        "join_tmpl": (
+            "LEFT JOIN public.cmc_returns_bars_multi_tf r"
+            ' ON p.id = r.id AND p.time_close = r."timestamp"'
+            " AND r.tf = '{tf}' AND r.roll = FALSE"
+        ),
+        "exclude": _RETURNS_EXCLUDE,
+    },
+    "vol": {
+        "table": "public.cmc_vol",
+        "alias": "v",
+        "join_tmpl": (
+            "LEFT JOIN public.cmc_vol v"
+            " ON p.id = v.id AND p.time_close = v.ts AND v.tf = '{tf}'"
+        ),
+        "exclude": _VOL_EXCLUDE,
+    },
+    "ta": {
+        "table": "public.cmc_ta",
+        "alias": "t",
+        "join_tmpl": (
+            "LEFT JOIN public.cmc_ta t"
+            " ON p.id = t.id AND p.time_close = t.ts AND t.tf = '{tf}'"
+        ),
+        "exclude": _TA_EXCLUDE,
+    },
+}
 
 
 # =============================================================================
@@ -52,10 +144,9 @@ class FeaturesStore:
 
     Source tables (dependency order):
     1. cmc_price_bars_multi_tf (base - required)
-    2. cmc_ema_multi_tf_u (depends on bars - optional)
-    3. cmc_returns_bars_multi_tf (bar returns - optional)
-    4. cmc_vol (depends on bars - optional)
-    5. cmc_ta (depends on bars - optional)
+    2. cmc_returns_bars_multi_tf (bar returns - optional)
+    3. cmc_vol (depends on bars - optional)
+    4. cmc_ta (depends on bars - optional)
     """
 
     SOURCE_TABLES = {
@@ -64,12 +155,6 @@ class FeaturesStore:
             "schema": "public",
             "required": True,
             "feature_type": "price_bars",
-        },
-        "emas": {
-            "table": "cmc_ema_multi_tf_u",
-            "schema": "public",
-            "required": False,
-            "feature_type": "ema_multi_tf",
         },
         "returns": {
             "table": "cmc_returns_bars_multi_tf",
@@ -275,210 +360,112 @@ class FeaturesStore:
         """
         Build the JOIN query to materialize features.
 
-        Uses cmc_price_bars_multi_tf as base with time_close as ts.
-        LEFT JOINs optional sources filtered by tf.
+        Uses dynamic column matching: queries cmc_features columns from
+        information_schema, then maps each to the correct source table.
         """
         ids_list = ",".join(str(id_) for id_ in ids)
 
-        # Build SELECT columns
-        select_cols = [
-            "p.id",
-            "p.time_close as ts",
-            f"'{tf}' as tf",
-            "p.tf_days",
-            "'CRYPTO'::text as asset_class",
-            # OHLCV
-            "p.open",
-            "p.high",
-            "p.low",
-            "p.close",
-            "p.volume",
-        ]
+        # Discover target columns from cmc_features DDL
+        target_cols = get_columns(self.engine, "public.cmc_features")
 
-        # EMAs (pivoted from long format)
-        if sources_available.get("emas", False):
-            select_cols.extend(
-                [
-                    "e9.ema as ema_9",
-                    "e10.ema as ema_10",
-                    "e21.ema as ema_21",
-                    "e50.ema as ema_50",
-                    "e200.ema as ema_200",
-                    "re9.d1 as ema_9_d1",
-                    "re21.d1 as ema_21_d1",
-                ]
-            )
-        else:
-            select_cols.extend(
-                [
-                    "NULL::double precision as ema_9",
-                    "NULL::double precision as ema_10",
-                    "NULL::double precision as ema_21",
-                    "NULL::double precision as ema_50",
-                    "NULL::double precision as ema_200",
-                    "NULL::double precision as ema_9_d1",
-                    "NULL::double precision as ema_21_d1",
-                ]
-            )
+        # Discover source columns for each available source
+        source_col_map: dict[str, set[str]] = {}
+        for src_key, src_def in _SOURCE_DEFS.items():
+            if sources_available.get(src_key, False):
+                src_cols = set(get_columns(self.engine, src_def["table"]))
+                source_col_map[src_key] = src_cols
 
-        # Returns (from cmc_returns_bars_multi_tf, roll=FALSE canonical rows)
+        # Build column-to-source lookup (with renames)
+        # For each target column, find which source provides it
+        col_source: dict[str, tuple[str, str]] = {}  # target_col -> (alias, src_col)
+        for src_key, src_def in _SOURCE_DEFS.items():
+            if src_key not in source_col_map:
+                continue
+            alias = src_def["alias"]
+            exclude = src_def["exclude"]
+            renames = _RENAMES.get(src_key, {})
+
+            for src_col in source_col_map[src_key]:
+                if src_col in exclude:
+                    continue
+                # Determine target column name (after rename)
+                target_name = renames.get(src_col, src_col)
+                if target_name in target_cols and target_name not in col_source:
+                    col_source[target_name] = (alias, src_col)
+
+        # Explicit mappings for PK, OHLCV, derived columns
+        explicit = {
+            "id": "p.id",
+            "ts": "p.time_close",
+            "tf": f"'{tf}'",
+            "tf_days": "p.tf_days",
+            "asset_class": "'CRYPTO'::text",
+            "open": "p.open",
+            "high": "p.high",
+            "low": "p.low",
+            "close": "p.close",
+            "volume": "p.volume",
+            "updated_at": "now()",
+        }
+
+        # Build has_price_gap expression
         if sources_available.get("returns", False):
-            select_cols.extend(
-                [
-                    "r.ret_arith as ret_1_pct",
-                    "r.ret_log as ret_1_log",
-                    "r.ret_arith_zscore_365 as ret_1_pct_zscore",
-                    "r.gap_bars as gap_days",
-                ]
-            )
+            explicit[
+                "has_price_gap"
+            ] = "CASE WHEN r.gap_bars > 1 THEN TRUE ELSE FALSE END"
         else:
-            select_cols.extend(
-                [
-                    "NULL::double precision as ret_1_pct",
-                    "NULL::double precision as ret_1_log",
-                    "NULL::double precision as ret_1_pct_zscore",
-                    "NULL::integer as gap_days",
-                ]
-            )
+            explicit["has_price_gap"] = "FALSE"
 
-        # Volatility
-        if sources_available.get("vol", False):
-            select_cols.extend(
-                [
-                    "v.vol_parkinson_20",
-                    "v.vol_gk_20",
-                    "v.vol_parkinson_20_zscore",
-                    "v.atr_14",
-                ]
-            )
-        else:
-            select_cols.extend(
-                [
-                    "NULL::double precision as vol_parkinson_20",
-                    "NULL::double precision as vol_gk_20",
-                    "NULL::double precision as vol_parkinson_20_zscore",
-                    "NULL::double precision as atr_14",
-                ]
-            )
-
-        # Technical indicators (added rsi_7, bb_up_20_2, bb_lo_20_2 for signals)
-        if sources_available.get("ta", False):
-            select_cols.extend(
-                [
-                    "t.rsi_7",
-                    "t.rsi_14",
-                    "t.rsi_21",
-                    "t.macd_12_26",
-                    "t.macd_signal_9",
-                    "t.macd_hist_12_26_9",
-                    "t.stoch_k_14",
-                    "t.stoch_d_3",
-                    "t.bb_ma_20",
-                    "t.bb_up_20_2",
-                    "t.bb_lo_20_2",
-                    "t.bb_width_20",
-                    "t.adx_14",
-                ]
-            )
-        else:
-            select_cols.extend(
-                [
-                    "NULL::double precision as rsi_7",
-                    "NULL::double precision as rsi_14",
-                    "NULL::double precision as rsi_21",
-                    "NULL::double precision as macd_12_26",
-                    "NULL::double precision as macd_signal_9",
-                    "NULL::double precision as macd_hist_12_26_9",
-                    "NULL::double precision as stoch_k_14",
-                    "NULL::double precision as stoch_d_3",
-                    "NULL::double precision as bb_ma_20",
-                    "NULL::double precision as bb_up_20_2",
-                    "NULL::double precision as bb_lo_20_2",
-                    "NULL::double precision as bb_width_20",
-                    "NULL::double precision as adx_14",
-                ]
-            )
-
-        # Data quality flags (conditional on source availability)
-        gap_expr = (
-            "r.gap_bars > 1" if sources_available.get("returns", False) else "FALSE"
-        )
+        # Build has_outlier expression (merged from all sources)
         outlier_parts = []
-        if sources_available.get("returns", False):
+        if "ret_is_outlier" in col_source:
             outlier_parts.append("r.is_outlier")
-        if sources_available.get("vol", False):
-            outlier_parts.append("v.vol_parkinson_20_is_outlier")
-        if sources_available.get("ta", False):
+        # Check individual vol outlier flags
+        for vc in target_cols:
+            if (
+                vc.startswith("vol_")
+                and vc.endswith("_is_outlier")
+                and vc in col_source
+            ):
+                alias, src_col = col_source[vc]
+                outlier_parts.append(f"{alias}.{_q(src_col)}")
+                break  # Just need one vol outlier for the merged flag
+        if "ta_is_outlier" in col_source:
             outlier_parts.append("t.is_outlier")
-        outlier_expr = " OR ".join(outlier_parts) if outlier_parts else "FALSE"
 
-        select_cols.extend(
-            [
-                f"CASE WHEN {gap_expr} THEN TRUE ELSE FALSE END as has_price_gap",
-                f"CASE WHEN {outlier_expr} THEN TRUE ELSE FALSE END as has_outlier",
-                "now() as updated_at",
-            ]
-        )
+        if outlier_parts:
+            explicit[
+                "has_outlier"
+            ] = f"CASE WHEN {' OR '.join(outlier_parts)} THEN TRUE ELSE FALSE END"
+        else:
+            explicit["has_outlier"] = "FALSE"
+
+        # Build SELECT and INSERT column lists
+        select_parts = []
+        insert_cols = []
+
+        for col in target_cols:
+            if col in explicit:
+                select_parts.append(f"{explicit[col]} as {_q(col)}")
+                insert_cols.append(_q(col))
+            elif col in col_source:
+                alias, src_col = col_source[col]
+                if src_col == col:
+                    select_parts.append(f"{alias}.{_q(src_col)}")
+                else:
+                    select_parts.append(f"{alias}.{_q(src_col)} as {_q(col)}")
+                insert_cols.append(_q(col))
+            else:
+                # Column not provided by any source — NULL
+                select_parts.append(f"NULL as {_q(col)}")
+                insert_cols.append(_q(col))
 
         # Build JOINs
-        joins = []
-
-        # Base: price_bars_multi_tf
-        joins.append(
-            """
-            FROM public.cmc_price_bars_multi_tf p
-        """
-        )
-
-        # EMAs (need multiple joins for different periods, filtered to matching tf)
-        if sources_available.get("emas", False):
-            joins.append(
-                f"""
-                LEFT JOIN (SELECT id, ts, ema FROM public.cmc_ema_multi_tf_u WHERE period = 9 AND tf = '{tf}') e9
-                  ON p.id = e9.id AND p.time_close = e9.ts
-                LEFT JOIN (SELECT id, ts, ema FROM public.cmc_ema_multi_tf_u WHERE period = 10 AND tf = '{tf}') e10
-                  ON p.id = e10.id AND p.time_close = e10.ts
-                LEFT JOIN (SELECT id, ts, ema FROM public.cmc_ema_multi_tf_u WHERE period = 21 AND tf = '{tf}') e21
-                  ON p.id = e21.id AND p.time_close = e21.ts
-                LEFT JOIN (SELECT id, ts, ema FROM public.cmc_ema_multi_tf_u WHERE period = 50 AND tf = '{tf}') e50
-                  ON p.id = e50.id AND p.time_close = e50.ts
-                LEFT JOIN (SELECT id, ts, ema FROM public.cmc_ema_multi_tf_u WHERE period = 200 AND tf = '{tf}') e200
-                  ON p.id = e200.id AND p.time_close = e200.ts
-                LEFT JOIN (SELECT id, ts, delta1_ema as d1 FROM public.cmc_returns_ema_multi_tf_u
-                           WHERE period = 9 AND tf = '{tf}' AND alignment_source = 'multi_tf' AND roll = FALSE) re9
-                  ON p.id = re9.id AND p.time_close = re9.ts
-                LEFT JOIN (SELECT id, ts, delta1_ema as d1 FROM public.cmc_returns_ema_multi_tf_u
-                           WHERE period = 21 AND tf = '{tf}' AND alignment_source = 'multi_tf' AND roll = FALSE) re21
-                  ON p.id = re21.id AND p.time_close = re21.ts
-            """
-            )
-
-        # Returns (bar returns, canonical rows only)
-        if sources_available.get("returns", False):
-            joins.append(
-                f"""
-                LEFT JOIN public.cmc_returns_bars_multi_tf r
-                  ON p.id = r.id AND p.time_close = r."timestamp" AND r.tf = '{tf}' AND r.roll = FALSE
-            """
-            )
-
-        # Volatility
-        if sources_available.get("vol", False):
-            joins.append(
-                f"""
-                LEFT JOIN public.cmc_vol v
-                  ON p.id = v.id AND p.time_close = v.ts AND v.tf = '{tf}'
-            """
-            )
-
-        # TA
-        if sources_available.get("ta", False):
-            joins.append(
-                f"""
-                LEFT JOIN public.cmc_ta t
-                  ON p.id = t.id AND p.time_close = t.ts AND t.tf = '{tf}'
-            """
-            )
+        from_clause = "\n            FROM public.cmc_price_bars_multi_tf p"
+        join_clauses = []
+        for src_key, src_def in _SOURCE_DEFS.items():
+            if sources_available.get(src_key, False):
+                join_clauses.append(src_def["join_tmpl"].format(tf=tf))
 
         # WHERE clause
         where_clause = f"""
@@ -488,22 +475,15 @@ class FeaturesStore:
               AND p.time_close <= '{end}'
         """
 
-        # Extract column names for INSERT
-        insert_cols = []
-        for col in select_cols:
-            if " as " in col:
-                insert_cols.append(col.split(" as ")[-1].strip())
-            else:
-                insert_cols.append(col.split(".")[-1].strip().strip('"'))
-
         # Build complete query
         query = f"""
             INSERT INTO public.cmc_features (
                 {", ".join(insert_cols)}
             )
             SELECT
-                {", ".join(select_cols)}
-            {"".join(joins)}
+                {",\n                ".join(select_parts)}
+            {from_clause}
+                {chr(10) + '                '.join(join_clauses)}
             {where_clause}
         """
 

@@ -651,10 +651,12 @@ def _compute_current_feature_hash(
     asset_id: int,
 ) -> Optional[str]:
     """
-    Compute hash of current feature data from cmc_features.
+    Compute hash of current feature data from cmc_features + cmc_ema_multi_tf_u.
 
     Determines which feature columns to include based on signal type,
-    then computes hash of those columns for the asset.
+    then computes hash of those columns for the asset. EMA columns are
+    loaded from cmc_ema_multi_tf_u via LEFT JOINs (EMAs are no longer
+    in cmc_features — different granularity with period dimension).
 
     Args:
         engine: SQLAlchemy engine
@@ -664,17 +666,30 @@ def _compute_current_feature_hash(
     Returns:
         Feature hash string or None if no feature data found
     """
-    # Determine feature columns based on signal type
-    feature_cols = _get_feature_columns_for_signal_type(signal_type)
+    feature_cols, ema_periods = _get_feature_columns_for_signal_type(signal_type)
 
-    # Load feature data for this asset
-    columns_str = ", ".join(feature_cols)
+    # Build SELECT and JOINs for EMA columns
+    select_parts = ["f.ts"] + [f"f.{c}" for c in feature_cols]
+    join_parts = []
+    for period in ema_periods:
+        alias = f"e{period}"
+        select_parts.append(f"{alias}.ema as ema_{period}")
+        join_parts.append(
+            f"LEFT JOIN public.cmc_ema_multi_tf_u {alias}"
+            f" ON f.id = {alias}.id AND f.ts = {alias}.ts"
+            f" AND {alias}.tf = f.tf AND {alias}.period = {period}"
+        )
+
+    select_str = ", ".join(select_parts)
+    join_str = "\n            ".join(join_parts)
+
     sql = text(
         f"""
-        SELECT ts, {columns_str}
-        FROM public.cmc_features
-        WHERE id = :asset_id AND tf = '1D'
-        ORDER BY ts
+        SELECT {select_str}
+        FROM public.cmc_features f
+            {join_str}
+        WHERE f.id = :asset_id AND f.tf = '1D'
+        ORDER BY f.ts
     """
     )
 
@@ -684,44 +699,38 @@ def _compute_current_feature_hash(
     if df.empty:
         return None
 
-    # Compute hash using existing utility
-    return compute_feature_hash(df, feature_cols)
+    # All columns used for hash (feature cols + ema cols)
+    all_hash_cols = feature_cols + [f"ema_{p}" for p in ema_periods]
+    return compute_feature_hash(df, all_hash_cols)
 
 
-def _get_feature_columns_for_signal_type(signal_type: str) -> list[str]:
+def _get_feature_columns_for_signal_type(
+    signal_type: str,
+) -> tuple[list[str], list[int]]:
     """
     Determine which feature columns to include in hash based on signal type.
 
     Different signal types use different features, so we only hash the
     relevant columns to detect changes in features actually used by the signal.
 
+    Returns two lists:
+    - feature_cols: columns from cmc_features
+    - ema_periods: EMA periods to load from cmc_ema_multi_tf_u
+
     Args:
         signal_type: 'ema_crossover', 'rsi_mean_revert', or 'atr_breakout'
 
     Returns:
-        List of column names to include in hash
+        Tuple of (feature_cols, ema_periods)
     """
-    # Base columns (always included)
+    # Base columns (always included, from cmc_features)
     base = ["close"]
 
     if signal_type == "ema_crossover":
-        # EMA signals use EMA columns (specific periods loaded from dim_signals)
-        # For hash validation, include common EMA periods
-        return base + [
-            "ema_9",
-            "ema_10",
-            "ema_21",
-            "ema_50",
-            "ema_200",
-            "rsi_14",
-            "atr_14",  # Context features
-        ]
+        return base + ["rsi_14", "atr_14"], [9, 10, 21, 50, 200]
     elif signal_type == "rsi_mean_revert":
-        # RSI signals use RSI and context features
-        return base + ["rsi_14", "rsi_7", "rsi_21", "atr_14", "ema_21"]
+        return base + ["rsi_14", "rsi_7", "rsi_21", "atr_14"], [21]
     elif signal_type == "atr_breakout":
-        # ATR breakout uses volatility and channel features
-        return base + ["atr_14", "bb_up_20_2", "bb_lo_20_2", "ema_21", "rsi_14"]
+        return base + ["atr_14", "bb_up_20_2", "bb_lo_20_2", "rsi_14"], [21]
     else:
-        # Unknown signal type - use all base features
-        return base
+        return base, []

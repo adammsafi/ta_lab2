@@ -1,5 +1,5 @@
 """
-EMA Signal Generator - Generate EMA crossover signals from cmc_features.
+EMA Signal Generator - Generate EMA crossover signals.
 
 This module generates EMA crossover trading signals using the existing ema_trend.py
 adapter. Signals are stored in cmc_signals_ema_crossover with full feature snapshots
@@ -7,7 +7,7 @@ and version hashes for reproducibility.
 
 Architecture:
 - Load signal configurations from dim_signals (not hardcoded)
-- Fetch features from cmc_features
+- Fetch features from cmc_features + cmc_ema_multi_tf_u
 - Generate signals using ema_trend.make_signals
 - Transform to stateful position records (open/closed)
 - Store in database with feature hashing
@@ -187,10 +187,10 @@ class EMASignalGenerator:
         start_ts: Optional[pd.Timestamp],
     ) -> pd.DataFrame:
         """
-        Load features from cmc_features.
+        Load features from cmc_features + cmc_ema_multi_tf_u.
 
-        Uses explicit column list for hash stability (ensures same columns
-        in same order every time).
+        EMAs are queried from cmc_ema_multi_tf_u (period dimension) and
+        pivoted via LEFT JOINs. Other features come from cmc_features.
 
         Args:
             ids: List of asset IDs
@@ -199,34 +199,33 @@ class EMASignalGenerator:
         Returns:
             DataFrame with columns: id, ts, close, ema_9, ema_10, ema_21, ema_50, ema_200, rsi_14, atr_14
         """
-        # Explicit column list for hash stability
-        columns = [
-            "id",
-            "ts",
-            "close",
-            "ema_9",
-            "ema_10",
-            "ema_21",
-            "ema_50",
-            "ema_200",
-            "rsi_14",
-            "atr_14",
-        ]
-
-        where_clauses = ["id = ANY(:ids)", "tf = '1D'"]
+        where_clauses = ["f.id = ANY(:ids)", "f.tf = '1D'"]
         params = {"ids": ids}
 
         if start_ts is not None:
-            where_clauses.append("ts >= :start_ts")
+            where_clauses.append("f.ts >= :start_ts")
             params["start_ts"] = start_ts
 
         where_sql = " AND ".join(where_clauses)
 
         sql_text = f"""
-            SELECT {", ".join(columns)}
-            FROM public.cmc_features
+            SELECT f.id, f.ts, f.close,
+                   e9.ema as ema_9, e10.ema as ema_10, e21.ema as ema_21,
+                   e50.ema as ema_50, e200.ema as ema_200,
+                   f.rsi_14, f.atr_14
+            FROM public.cmc_features f
+            LEFT JOIN public.cmc_ema_multi_tf_u e9
+              ON f.id = e9.id AND f.ts = e9.ts AND e9.tf = f.tf AND e9.period = 9
+            LEFT JOIN public.cmc_ema_multi_tf_u e10
+              ON f.id = e10.id AND f.ts = e10.ts AND e10.tf = f.tf AND e10.period = 10
+            LEFT JOIN public.cmc_ema_multi_tf_u e21
+              ON f.id = e21.id AND f.ts = e21.ts AND e21.tf = f.tf AND e21.period = 21
+            LEFT JOIN public.cmc_ema_multi_tf_u e50
+              ON f.id = e50.id AND f.ts = e50.ts AND e50.tf = f.tf AND e50.period = 50
+            LEFT JOIN public.cmc_ema_multi_tf_u e200
+              ON f.id = e200.id AND f.ts = e200.ts AND e200.tf = f.tf AND e200.period = 200
             WHERE {where_sql}
-            ORDER BY id, ts
+            ORDER BY f.id, f.ts
         """
 
         sql = text(sql_text)
