@@ -44,7 +44,7 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 - [x] **Phase 13: Documentation Consolidation** - Convert and integrate ProjectTT docs with memory tracking
 - [x] **Phase 14: Tools Integration** - Migrate Data_Tools scripts with memory updates
 - [x] **Phase 15: Economic Data Strategy** - Archive packages, extract utils, create integration skeleton with memory updates
-- [x] **Phase 16: Repository Cleanup** - Clean root directory with memory updates
+- [x] **Phase 16: Repository Cleanup** - Clean root directory and memory updates
 - [x] **Phase 17: Verification & Validation** - Validate imports, dependencies, and structure
 - [x] **Phase 18: Structure Documentation** - Document final structure and migration decisions
 - [x] **Phase 19: Memory Validation & Release** - Final memory validation and milestone release
@@ -478,10 +478,12 @@ Plans:
   3. Backtest runner reads signals and produces PnL results without vectorbt timestamp errors
   4. End-to-end pipeline works: cmc_features -> signals -> backtest -> PnL summary
   5. At least one signal type produces a complete backtest report
-**Plans**: 0 plans
+**Plans**: 3 plans in 2 waves
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 28 to break down)
+- [ ] 28-01-PLAN.md -- Fix EMA and ATR signal generator feature_snapshot serialization (json.dumps)
+- [ ] 28-02-PLAN.md -- Fix vectorbt boundary bugs in backtest_from_signals.py (tz, direction, fees, cost_model)
+- [ ] 28-03-PLAN.md -- End-to-end pipeline verification (signal generation + backtest + DB storage)
 
 ---
 
@@ -536,7 +538,7 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 27. Regime Integration | 0/7 | Planned | - |
-| 28. Backtest Pipeline Fix | 0/0 | Not planned | - |
+| 28. Backtest Pipeline Fix | 0/3 | Planned | - |
 
 ## Requirement Coverage
 
@@ -559,4 +561,4 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-20 (v0.7.0: Phase 27 planned with 7 plans in 4 waves)*
+*Last updated: 2026-02-20 (v0.7.0: Phase 28 planned with 3 plans in 2 waves)*
