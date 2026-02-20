@@ -15,7 +15,7 @@ Status: Phase complete — ready for Phase 28
 Next Phase: Phase 28 (Backtest Pipeline Fix)
 Last activity: 2026-02-20 — Completed 27-07-PLAN.md + E2E checkpoint approved (full regime pipeline verified)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [#######---] ~57% v0.7.0 (8/14 plans)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [#####-----] 50% v0.7.0 (1/2 phases, 7/7 plans in Phase 27)
 
 ## Performance Metrics
 

@@ -442,7 +442,7 @@ Plans:
 
 ### v0.7.0 Regime Integration & Signal Enhancement (Phases 27-28) - IN PROGRESS
 
-- [ ] **Phase 27: Regime Integration** - Connect regime module to DB-backed feature pipeline
+- [x] **Phase 27: Regime Integration** - Connect regime module to DB-backed feature pipeline
 - [ ] **Phase 28: Backtest Pipeline Fix** - Fix signal generators and backtest runner end-to-end
 
 ---
@@ -459,13 +459,13 @@ Plans:
 **Plans**: 7 plans in 4 waves
 
 Plans:
-- [ ] 27-01-PLAN.md -- DDL for regime tables (cmc_regimes, cmc_regime_flips, cmc_regime_stats) + signal table extensions
-- [ ] 27-02-PLAN.md -- EMA pivot utility and DB data loaders (regime_data_loader.py)
-- [ ] 27-03-PLAN.md -- Core refresh_cmc_regimes.py (labeling + policy resolution + DB write)
-- [ ] 27-04-PLAN.md -- HysteresisTracker + flip detection + stats computation
-- [ ] 27-05-PLAN.md -- Wire hysteresis/flips/stats into refresh script + CLI flags
-- [ ] 27-06-PLAN.md -- Signal generator regime integration (all 3 generators + --no-regime flag)
-- [ ] 27-07-PLAN.md -- Orchestrator integration (run_daily_refresh.py) + regime_inspect.py + end-to-end verification
+- [x] 27-01-PLAN.md -- DDL for regime tables (cmc_regimes, cmc_regime_flips, cmc_regime_stats) + signal table extensions
+- [x] 27-02-PLAN.md -- EMA pivot utility and DB data loaders (regime_data_loader.py)
+- [x] 27-03-PLAN.md -- Core refresh_cmc_regimes.py (labeling + policy resolution + DB write)
+- [x] 27-04-PLAN.md -- HysteresisTracker + flip detection + stats computation
+- [x] 27-05-PLAN.md -- Wire hysteresis/flips/stats into refresh script + CLI flags
+- [x] 27-06-PLAN.md -- Signal generator regime integration (all 3 generators + --no-regime flag)
+- [x] 27-07-PLAN.md -- Orchestrator integration (run_daily_refresh.py) + regime_inspect.py + end-to-end verification
 
 ---
 
@@ -537,7 +537,7 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 27. Regime Integration | 0/7 | Planned | - |
+| 27. Regime Integration | 7/7 | Complete | 2026-02-20 |
 | 28. Backtest Pipeline Fix | 0/3 | Planned | - |
 
 ## Requirement Coverage
