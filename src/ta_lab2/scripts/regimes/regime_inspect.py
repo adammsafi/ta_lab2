@@ -309,7 +309,7 @@ def show_flips(engine, asset_id: int, tf: str, verbose: bool) -> int:
     """
     sql = text(
         """
-        SELECT ts, layer, old_regime, new_regime, bars_held
+        SELECT ts, layer, old_regime, new_regime, duration_bars
         FROM public.cmc_regime_flips
         WHERE id = :id AND tf = :tf
         ORDER BY ts DESC
@@ -334,7 +334,7 @@ def show_flips(engine, asset_id: int, tf: str, verbose: bool) -> int:
 
     df["ts"] = pd.to_datetime(df["ts"]).dt.strftime("%Y-%m-%d")
     df["old_regime"] = df["old_regime"].fillna("(initial)")
-    df["bars_held"] = df["bars_held"].fillna("-").astype(str)
+    df["duration_bars"] = df["duration_bars"].fillna("-").astype(str)
 
     # Reverse so oldest first
     df = df.iloc[::-1].reset_index(drop=True)
@@ -344,14 +344,14 @@ def show_flips(engine, asset_id: int, tf: str, verbose: bool) -> int:
         "layer": 7,
         "old_regime": 28,
         "new_regime": 28,
-        "bars_held": 10,
+        "duration_bars": 10,
     }
     header = (
         f"{'Date':<{col_widths['ts']}}"
         f"{'Layer':<{col_widths['layer']}}"
         f"{'Old Regime':<{col_widths['old_regime']}}"
         f"{'New Regime':<{col_widths['new_regime']}}"
-        f"{'Bars Held':<{col_widths['bars_held']}}"
+        f"{'Bars Held':<{col_widths['duration_bars']}}"
     )
     print(header)
     print("-" * len(header))
@@ -362,7 +362,7 @@ def show_flips(engine, asset_id: int, tf: str, verbose: bool) -> int:
             f"{str(row.get('layer', '-')):<{col_widths['layer']}}"
             f"{str(row['old_regime']):<{col_widths['old_regime']}}"
             f"{str(row.get('new_regime', '-')):<{col_widths['new_regime']}}"
-            f"{str(row['bars_held']):<{col_widths['bars_held']}}"
+            f"{str(row['duration_bars']):<{col_widths['duration_bars']}}"
         )
 
     print(f"\n{len(df)} transitions shown")
