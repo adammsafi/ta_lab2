@@ -80,6 +80,12 @@ except Exception:  # pragma: no cover
     TightenOnlyPolicy = None  # type: ignore
 
 try:
+    from .hysteresis import HysteresisTracker, is_tightening_change
+except Exception:  # pragma: no cover
+    HysteresisTracker = None  # type: ignore
+    is_tightening_change = None  # type: ignore
+
+try:
     from .proxies import (
         infer_cycle_proxy,
         infer_weekly_macro_proxy,
@@ -137,6 +143,8 @@ __all__ = [
     "resolve_policy",
     "DEFAULT_POLICY_TABLE",
     "TightenOnlyPolicy",
+    "HysteresisTracker",
+    "is_tightening_change",
     "infer_cycle_proxy",
     "infer_weekly_macro_proxy",
     "ProxyInputs",
