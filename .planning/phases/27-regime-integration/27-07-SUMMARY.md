@@ -49,10 +49,10 @@ completed: 2026-02-20
 
 ## Performance
 
-- **Duration:** 4 min
+- **Duration:** 4 min (auto tasks) + human E2E verification
 - **Started:** 2026-02-20T19:50:58Z
-- **Completed:** 2026-02-20T19:54:22Z
-- **Tasks:** 2 (checkpoint Task 3 paused for human verification)
+- **Completed:** 2026-02-20T19:54:22Z (auto) + checkpoint approved 2026-02-20
+- **Tasks:** 3/3 (Tasks 1-2 auto, Task 3 checkpoint human-verify — approved)
 - **Files modified:** 2
 
 ## Accomplishments
@@ -61,6 +61,7 @@ completed: 2026-02-20
 - Added run_regime_refresher() function matching run_ema_refreshers() pattern (subprocess.run, ComponentResult, dry-run propagation)
 - Created regime_inspect.py with 4 display modes: latest DB read, --live on-the-fly computation, --history N tabular history, --flips recent transitions
 - Verified --dry-run is propagated to regime subprocess (both --verbose and --dry-run appear in command line shown)
+- E2E pipeline approved: all 7 verification commands passed (regime refresh, DB row counts, regime_inspect, EMA signals with/without regime, RSI signals, orchestrator dry-run)
 
 ## Task Commits
 
@@ -68,6 +69,9 @@ Each task was committed atomically:
 
 1. **Task 1: Add --regimes step to run_daily_refresh.py** - `cea3cd45` (feat)
 2. **Task 2: Create regime_inspect.py DB-backed inspection tool** - `214dae1f` (feat)
+3. **Task 3: E2E verification checkpoint** - human-approved (all 7 verification commands passed)
+
+**Plan metadata:** `dee6f922` (docs: complete plan, pre-approval) + this commit (post-approval)
 
 ## Files Created/Modified
 
@@ -94,16 +98,9 @@ None - no external service configuration required.
 
 ## Next Phase Readiness
 
-- Complete regime integration pipeline (all 7 plans in Phase 27) is ready for end-to-end verification
-- Checkpoint Task 3 requires human verification of the full pipeline:
-  1. Regime refresh for BTC/ETH/USDC
-  2. DB table row counts
-  3. regime_inspect output
-  4. EMA signal generation with regime context
-  5. A/B comparison with --no-regime
-  6. RSI signal generation (tests feature_snapshot fix from Plan 06)
-  7. Daily refresh orchestrator dry-run
-- After verification, Phase 28 (Backtest Pipeline Fix) can begin
+- Phase 27 (Regime Integration) is COMPLETE — all 7 plans executed and E2E verified
+- Verified working: regime refresh for multiple assets, all 4 DB tables populated, regime_inspect shows meaningful labels, signal generators load regime context, RSI serialization fix confirmed
+- Phase 28 (Backtest Pipeline Fix) can begin immediately
 
 ---
 *Phase: 27-regime-integration*
