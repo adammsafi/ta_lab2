@@ -29,7 +29,8 @@
       "Bash(git push:*)",
       "Bash(git tag:*)",
       "Bash(sort:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(TMPFILE=\"C:/Users/asafi/AppData/Local/Temp/conv_memories.json\")"
     ]
   }
 }

@@ -1,0 +1,56 @@
+FILES + HOW TO RUN
+
+1) dbtool.py (src/ta_lab2/tools/dbtool.py)
+- What it is:
+  A read-only Postgres “DB inspection” CLI (lists schemas/tables, describes tables, runs safe SELECT-style queries, and generates DB schema snapshots).
+  It also supports DB-less commands for snapshot analysis/diffing. :contentReference[oaicite:2]{index=2} :contentReference[oaicite:3]{index=3}
+
+- DB connection / config:
+  It uses TARGET_DB_URL or MARKETDATA_DB_URL if set; otherwise it will auto-load repo_root/db_config.env if present. :contentReference[oaicite:4]{index=4}
+
+- How to run (pick one):
+  A) From repo root, as a module:
+     python -m ta_lab2.tools.dbtool --help
+
+  B) As a script (path-based):
+     python src/ta_lab2/tools/dbtool.py --help
+
+- Common examples:
+  # list schemas
+  python -m ta_lab2.tools.dbtool schemas
+
+  # list tables (optionally by schema)
+  python -m ta_lab2.tools.dbtool tables --schema public
+
+  # describe a table
+  python -m ta_lab2.tools.dbtool describe public.cmc_price_histories7
+
+  # run a safe query helper (intended for SELECT-ish usage)
+  python -m ta_lab2.tools.dbtool query --sql "select count(*) from public.cmc_price_histories7"
+
+  # write a live DB snapshot to JSON
+  python -m ta_lab2.tools.dbtool snapshot --out artifacts/db_schema_snapshot.json :contentReference[oaicite:5]{index=5}
+
+  # write snapshot Markdown (either from --in-path JSON, or live if omitted)
+  python -m ta_lab2.tools.dbtool snapshot-md --in-path artifacts/db_schema_snapshot.json --out artifacts/db_schema_snapshot.md :contentReference[oaicite:6]{index=6}
+
+  # quick snapshot health summary (DB-less)
+  python -m ta_lab2.tools.dbtool snapshot-check --in-path artifacts/db_schema_snapshot.json --format text :contentReference[oaicite:7]{index=7}
+
+  # diff two snapshots (DB-less)
+  python -m ta_lab2.tools.dbtool snapshot-diff --a artifacts/snap_old.json --b artifacts/snap_new.json --out-md artifacts/snap_diff.md :contentReference[oaicite:8]{index=8}
+
+
+2) snapshot_diff.py (ta_lab2/tools/snapshot_diff.py)
+- What it is:
+  A pure-offline snapshot diff engine:
+  - loads two snapshot JSONs (supports two different snapshot “shapes”)
+  - computes added/removed tables, size/row deltas, and structural (columns/indexes/constraints/keys) changes
+  - can render a Markdown report. :contentReference[oaicite:9]{index=9} :contentReference[oaicite:10]{index=10}
+
+- How it’s typically run:
+  Usually via dbtool’s DB-less subcommand:
+    python -m ta_lab2.tools.dbtool snapshot-diff --a <old.json> --b <new.json> [--out-json ...] [--out-md ...] :contentReference[oaicite:11]{index=11}
+
+- If you want to call it from Python code:
+  from ta_lab2.tools.snapshot_diff import load_snapshot, diff_snapshots, render_diff_md :contentReference[oaicite:12]{index=12}
