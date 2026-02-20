@@ -141,11 +141,29 @@ def merge_regime_context(
         result["orders"] = None
         return result
 
-    # Ensure ts columns are compatible types for merge
+    # Ensure ts columns are compatible types for merge.
+    # pd.read_sql with text() + dict params can return ts as object dtype
+    # (legacy pandas execution path), while regime_df ts is always
+    # datetime64[ns, UTC]. Coerce both sides to datetime64[ns, UTC] so
+    # the merge key types match regardless of how each DataFrame was loaded.
     merge_cols = ["id", "ts"]
+    feature_df = feature_df.copy()
+    if feature_df["ts"].dtype == object:
+        feature_df["ts"] = pd.to_datetime(feature_df["ts"], utc=True)
+    elif getattr(feature_df["ts"].dt, "tz", None) is None:
+        feature_df["ts"] = feature_df["ts"].dt.tz_localize("UTC")
+    else:
+        feature_df["ts"] = feature_df["ts"].dt.tz_convert("UTC")
+
     regime_subset = regime_df[
         merge_cols + ["regime_key", "size_mult", "stop_mult", "orders"]
     ].copy()
+    if regime_subset["ts"].dtype == object:
+        regime_subset["ts"] = pd.to_datetime(regime_subset["ts"], utc=True)
+    elif getattr(regime_subset["ts"].dt, "tz", None) is None:
+        regime_subset["ts"] = regime_subset["ts"].dt.tz_localize("UTC")
+    else:
+        regime_subset["ts"] = regime_subset["ts"].dt.tz_convert("UTC")
 
     merged = feature_df.merge(regime_subset, on=merge_cols, how="left")
     return merged
