@@ -82,6 +82,13 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         help="Preview without writing to database",
     )
 
+    # Regime context
+    parser.add_argument(
+        "--no-regime",
+        action="store_true",
+        help="Disable regime context (A/B comparison mode: signals generated without regime sizing)",
+    )
+
     # Logging
     parser.add_argument(
         "--verbose",
@@ -241,6 +248,15 @@ def main(argv: Optional[list[str]] = None) -> int:
         logger.info("Output table: public.cmc_signals_ema_crossover")
         return 0
 
+    # Regime context mode
+    regime_enabled = not args.no_regime
+    if not regime_enabled:
+        logger.info(
+            "Regime context DISABLED (--no-regime mode): signals use base sizing"
+        )
+    else:
+        logger.info("Regime context ENABLED: signals will use regime-adjusted sizing")
+
     # Generate signals
     generator = EMASignalGenerator(engine, state_manager)
     total_signals = 0
@@ -255,6 +271,7 @@ def main(argv: Optional[list[str]] = None) -> int:
                 signal_config=config,
                 full_refresh=args.full_refresh,
                 dry_run=False,  # Already handled dry_run above
+                regime_enabled=regime_enabled,
             )
 
             total_signals += n

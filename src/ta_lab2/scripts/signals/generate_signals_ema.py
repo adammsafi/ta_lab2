@@ -43,6 +43,7 @@ from sqlalchemy.engine import Engine
 from ta_lab2.signals.ema_trend import make_signals
 from .signal_state_manager import SignalStateManager
 from .signal_utils import compute_feature_hash, compute_params_hash
+from .regime_utils import load_regime_context_batch, merge_regime_context
 
 
 logger = logging.getLogger(__name__)
@@ -69,6 +70,7 @@ class EMASignalGenerator:
         signal_config: dict,
         full_refresh: bool = False,
         dry_run: bool = False,
+        regime_enabled: bool = True,
     ) -> int:
         """
         Generate EMA crossover signals for specified assets.
@@ -84,6 +86,8 @@ class EMASignalGenerator:
                 params must contain: fast_period, slow_period, direction
             full_refresh: If True, recompute all signals (ignore state)
             dry_run: If True, preview without writing to database
+            regime_enabled: If True, load regime context and attach regime_key
+                to signal records. Set False (--no-regime) for A/B comparison.
 
         Returns:
             Number of signal records generated (both entries and exits)
@@ -99,7 +103,8 @@ class EMASignalGenerator:
 
         logger.info(f"Generating signals for {signal_name} (signal_id={signal_id})")
         logger.debug(
-            f"  IDs: {len(ids)}, full_refresh={full_refresh}, dry_run={dry_run}"
+            f"  IDs: {len(ids)}, full_refresh={full_refresh}, dry_run={dry_run}, "
+            f"regime_enabled={regime_enabled}"
         )
 
         # 1. Load open positions if incremental
@@ -129,12 +134,29 @@ class EMASignalGenerator:
 
         logger.debug(f"  Loaded {len(features_df)} feature rows")
 
-        # 4. Generate signals using ema_trend adapter
+        # 4. Load and merge regime context (if enabled)
+        if regime_enabled:
+            regime_df = load_regime_context_batch(
+                engine=self.engine, ids=ids, start_ts=start_ts
+            )
+            features_df = merge_regime_context(features_df, regime_df)
+            n_with_regime = features_df["regime_key"].notna().sum()
+            logger.info(
+                f"  Regime context: {n_with_regime}/{len(features_df)} rows have regime data"
+            )
+        else:
+            logger.info("  Regime context disabled (--no-regime mode)")
+            features_df["regime_key"] = None
+            features_df["size_mult"] = None
+            features_df["stop_mult"] = None
+            features_df["orders"] = None
+
+        # 5. Generate signals using ema_trend adapter
         entries, exits, size = self._generate_signals(features_df, params)
 
         logger.debug(f"  Generated {entries.sum()} entries, {exits.sum()} exits")
 
-        # 5. Transform to stateful records
+        # 6. Transform to stateful records
         records = self._transform_signals_to_records(
             df=features_df,
             entries=entries,
@@ -150,7 +172,7 @@ class EMASignalGenerator:
 
         logger.info(f"  Transformed to {len(records)} signal records")
 
-        # 6. Write to database
+        # 7. Write to database
         if not dry_run:
             self._write_signals(records, "cmc_signals_ema_crossover")
             logger.info(f"  Wrote {len(records)} signals to database")
@@ -201,7 +223,7 @@ class EMASignalGenerator:
         where_sql = " AND ".join(where_clauses)
 
         sql_text = f"""
-            SELECT {', '.join(columns)}
+            SELECT {", ".join(columns)}
             FROM public.cmc_features
             WHERE {where_sql}
             ORDER BY id, ts
@@ -322,6 +344,19 @@ class EMASignalGenerator:
                 ts = row["ts"]
                 close = row["close"]
 
+                # Regime key for this bar (None if regime not available)
+                raw_rk = row["regime_key"] if "regime_key" in row.index else None
+                regime_key = (
+                    None
+                    if (
+                        raw_rk is None
+                        or (isinstance(raw_rk, float) and pd.isna(raw_rk))
+                    )
+                    else raw_rk
+                )
+                if regime_key is not None:
+                    logger.debug(f"    id={asset_id} ts={ts}: regime_key={regime_key}")
+
                 # Handle entry signals
                 if entries[idx]:
                     feature_snapshot = {
@@ -351,6 +386,7 @@ class EMASignalGenerator:
                         "signal_version": self.signal_version,
                         "feature_version_hash": feature_hash,
                         "params_hash": params_hash,
+                        "regime_key": regime_key,
                     }
                     records.append(record)
                     open_list.append(record)
@@ -387,6 +423,7 @@ class EMASignalGenerator:
                             "signal_version": self.signal_version,
                             "feature_version_hash": feature_hash,
                             "params_hash": params_hash,
+                            "regime_key": regime_key,
                         }
                         records.append(record)
 
