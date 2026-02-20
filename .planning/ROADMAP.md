@@ -4,7 +4,8 @@
 
 - v0.4.0 Memory Infrastructure & Orchestrator (Phases 1-10) - SHIPPED 2026-02-01
 - v0.5.0 Ecosystem Reorganization (Phases 11-19) - SHIPPED 2026-02-04
-- **v0.6.0 EMA & Bar Architecture Standardization (Phases 20-26) - IN PROGRESS**
+- v0.6.0 EMA & Bar Architecture Standardization (Phases 20-26) - SHIPPED 2026-02-17
+- **v0.7.0 Regime Integration & Signal Enhancement (Phases 27-28) - IN PROGRESS**
 
 ## Overview
 
@@ -15,8 +16,9 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 **Phase Numbering:**
 - Phases 1-10: v0.4.0 (complete)
 - Phases 11-19: v0.5.0 (complete)
-- Phases 20-26: v0.6.0 (current milestone)
-- Decimal phases (20.1, 21.1): Urgent insertions if needed
+- Phases 20-26: v0.6.0 (complete)
+- Phases 27+: v0.7.0 (current milestone)
+- Decimal phases (27.1, 28.1): Urgent insertions if needed
 
 <details>
 <summary>v0.4.0 Memory Infrastructure & Orchestrator (Phases 1-10) - SHIPPED 2026-02-01</summary>
@@ -49,7 +51,7 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 
 </details>
 
-### v0.6.0 EMA & Bar Architecture Standardization (Phases 20-26) - IN PROGRESS
+### v0.6.0 EMA & Bar Architecture Standardization (Phases 20-26) - SHIPPED 2026-02-17
 
 - [x] **Phase 20: Historical Context** - Review GSD phases 1-10 and existing documentation
 - [x] **Phase 21: Comprehensive Review** - Complete read-only analysis of all bar/EMA components
@@ -57,7 +59,7 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 - [x] **Phase 23: Reliable Incremental Refresh** - Flexible orchestration, state management, visibility
 - [x] **Phase 24: Pattern Consistency** - Standardize patterns where analysis justifies
 - [x] **Phase 25: Baseline Capture** - Capture current outputs before validation testing
-- [ ] **Phase 26: Validation** - Verify fixes worked correctly, nothing broke
+- [x] **Phase 26: Validation** - Verify fixes worked correctly, nothing broke
 
 ## Phase Details
 
@@ -438,10 +440,49 @@ Plans:
 
 ---
 
+### v0.7.0 Regime Integration & Signal Enhancement (Phases 27-28) - IN PROGRESS
+
+- [ ] **Phase 27: Regime Integration** - Connect regime module to DB-backed feature pipeline
+- [ ] **Phase 28: Backtest Pipeline Fix** - Fix signal generators and backtest runner end-to-end
+
+---
+
+### Phase 27: Regime Integration
+**Goal:** Connect existing regime module (labels, policy resolver, hysteresis, data budget) to DB-backed feature pipeline. Write refresh_cmc_regimes.py that reads from cmc_features and calendar bar tables, runs L0-L2 labeling, resolves policy, writes to cmc_regimes table. Wire regime context into signal generators.
+**Depends on:** Phase 26
+**Success Criteria** (what must be TRUE):
+  1. refresh_cmc_regimes.py reads from cmc_features and calendar bar tables (weekly/monthly)
+  2. L0-L2 regime labeling runs against DB data with correct EMA column mapping
+  3. Policy resolver produces regime labels written to cmc_regimes table
+  4. Data budget gating correctly enables/disables layers based on bar history
+  5. Signal generators accept regime context for position sizing/filtering
+**Plans**: 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 27 to break down)
+
+---
+
+### Phase 28: Backtest Pipeline Fix
+**Goal:** Fix the signal generators (dict serialization bug in feature_snapshot) and backtest runner (vectorbt timestamp errors) so the full signal-to-backtest pipeline works end-to-end. Without this, no strategy validation is possible.
+**Depends on:** Phase 26 (can run in parallel with Phase 27)
+**Success Criteria** (what must be TRUE):
+  1. Signal generators write to DB without errors (feature_snapshot serialized correctly)
+  2. All 3 signal refreshers (RSI, EMA crossover, ATR breakout) complete without crashes
+  3. Backtest runner reads signals and produces PnL results without vectorbt timestamp errors
+  4. End-to-end pipeline works: cmc_features -> signals -> backtest -> PnL summary
+  5. At least one signal type produces a complete backtest report
+**Plans**: 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 28 to break down)
+
+---
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19 (v0.5.0) -> 20 -> ... -> 26 (v0.6.0)
+Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19 (v0.5.0) -> 20 -> ... -> 26 (v0.6.0) -> 27 -> 28 (v0.7.0)
 
 ### v0.4.0 Progress (Complete)
 
@@ -472,7 +513,7 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19
 | 18. Structure Documentation | 4/4 | Complete | 2026-02-04 |
 | 19. Memory Validation & Release | 6/6 | Complete | 2026-02-04 |
 
-### v0.6.0 Progress (Current)
+### v0.6.0 Progress (Complete)
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -483,6 +524,13 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19
 | 24. Pattern Consistency | 4/4 | Complete | 2026-02-05 |
 | 25. Baseline Capture | 2/2 | Complete | 2026-02-05 |
 | 26. Validation & Architectural Standardization | 3/3 | Complete | 2026-02-17 |
+
+### v0.7.0 Progress (Current)
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 27. Regime Integration | 0/0 | Not planned | - |
+| 28. Backtest Pipeline Fix | 0/0 | Not planned | - |
 
 ## Requirement Coverage
 
@@ -505,4 +553,4 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-17 (Phase 26 complete, v0.6.0 milestone closed)*
+*Last updated: 2026-02-20 (v0.7.0 started: Phase 27 Regime Integration + Phase 28 Backtest Pipeline Fix)*

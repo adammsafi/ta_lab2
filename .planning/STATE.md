@@ -5,16 +5,17 @@
 See: .planning/PROJECT.md (updated 2026-02-05)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v0.6.0 complete - milestone closed 2026-02-17
+**Current focus:** v0.7.0 Regime Integration & Signal Enhancement
 
 ## Current Position
 
-Phase: 26 of 26 (Validation & Architectural Standardization)
-Plan: 3 of 3 in current phase
-Status: Milestone complete
-Last activity: 2026-02-17 — Phase 26 complete, v0.6.0 closed
+Phase: 27 of 28 (Regime Integration)
+Plan: 0 of 0 in current phase (not yet planned)
+Status: Phase not planned
+Next Phase: Phase 28 (Backtest Pipeline Fix)
+Last activity: 2026-02-20 — v0.7.0 started, Phases 27-28 added
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [----------] 0% v0.7.0 (0/2 phases)
 
 ## Performance Metrics
 
@@ -121,31 +122,30 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-17
-Stopped at: Phase 26 complete, v0.6.0 milestone closed
+Last session: 2026-02-20
+Stopped at: v0.7.0 phases added (27: Regime Integration, 28: Backtest Pipeline Fix)
 Resume file: None
 
 ---
 
-## Milestone Context (v0.6.0)
+## Milestone Context (v0.7.0)
 
-**Goal:** Lock down bars and EMAs foundation so adding new assets is mechanical and reliable
+**Goal:** Connect regime module to DB pipeline and fix backtest pipeline so strategies can be validated end-to-end
 
 **Key Principles:**
-- Review-Then-Standardize pattern (read-only analysis before code changes)
-- Correctness before cosmetics (data sources first, then patterns)
-- ALL-OR-NOTHING for data source migration (no partial standardization)
-- Baseline capture MANDATORY before validation (silent calculation drift is top risk)
+- Leverage existing regime module (13 files, fully built) - integration, not greenfield
+- Calendar-anchored weekly/monthly bars already exist - regime labelers just need column mapping
+- Fix serialization bugs before adding features - backtest pipeline must work first
+- Signal generators need regime awareness for position sizing/filtering
 
 **Phase Summary:**
-- Phase 20: Historical Context (review GSD phases 1-10)
-- Phase 21: Comprehensive Review (complete read-only analysis)
-- Phase 22: Critical Data Quality Fixes (EMAs to validated bars)
-- Phase 23: Reliable Incremental Refresh (orchestration, state, visibility)
-- Phase 24: Pattern Consistency (standardize where justified)
-- Phase 25: Baseline Capture (capture outputs before testing)
-- Phase 26: Validation & Architectural Standardization (unified schemas, lean tables, test infrastructure)
+- Phase 27: Regime Integration (connect regime labels/policy to DB, wire into signals)
+- Phase 28: Backtest Pipeline Fix (fix dict serialization bug, vectorbt timestamps, end-to-end validation)
+
+### Roadmap Evolution
+- Phase 27 added: Regime Integration - connect existing regime module to DB-backed feature pipeline
+- Phase 28 added: Backtest Pipeline Fix - fix signal generators and backtest runner end-to-end
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-17 (Phase 26 complete, v0.6.0 milestone closed)*
+*Last updated: 2026-02-20 (v0.7.0 started: Phases 27-28 added)*
