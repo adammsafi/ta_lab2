@@ -55,6 +55,21 @@ CREATE TABLE IF NOT EXISTS public.cmc_returns_ema_multi_tf_u (
     ret_log_ema_bar             double precision,
     delta_ret_log_ema_bar       double precision,
 
+    -- Z-scores (canonical, roll=FALSE only)
+    ret_arith_ema_zscore          double precision,
+    ret_arith_ema_bar_zscore      double precision,
+    ret_log_ema_zscore            double precision,
+    ret_log_ema_bar_zscore        double precision,
+
+    -- Z-scores (roll, ALL rows)
+    ret_arith_ema_roll_zscore     double precision,
+    ret_arith_ema_bar_roll_zscore double precision,
+    ret_log_ema_roll_zscore       double precision,
+    ret_log_ema_bar_roll_zscore   double precision,
+
+    -- Outlier flag
+    is_outlier                    boolean,
+
     ingested_at      timestamptz NOT NULL DEFAULT now(),
 
     PRIMARY KEY (id, ts, tf, period, alignment_source)

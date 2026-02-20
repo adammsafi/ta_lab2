@@ -47,6 +47,21 @@ CREATE TABLE public.cmc_returns_bars_multi_tf_cal_anchor_iso (
     true_range              double precision,
     true_range_pct          double precision,
 
+    -- Z-scores (canonical, roll=FALSE only)
+    ret_arith_zscore            double precision,
+    delta_ret_arith_zscore      double precision,
+    ret_log_zscore              double precision,
+    delta_ret_log_zscore        double precision,
+
+    -- Z-scores (roll, ALL rows)
+    ret_arith_roll_zscore       double precision,
+    delta_ret_arith_roll_zscore double precision,
+    ret_log_roll_zscore         double precision,
+    delta_ret_log_roll_zscore   double precision,
+
+    -- Outlier flag
+    is_outlier                  boolean,
+
     ingested_at             timestamptz   NOT NULL DEFAULT now(),
 
     CONSTRAINT cmc_returns_bars_multi_tf_cal_anchor_iso_pk PRIMARY KEY (id, "timestamp", tf)

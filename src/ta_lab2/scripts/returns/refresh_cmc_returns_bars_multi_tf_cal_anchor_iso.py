@@ -92,6 +92,18 @@ _VALUE_COLS = [
     "range_pct",
     "true_range",
     "true_range_pct",
+    # z-scores (canonical, roll=FALSE only)
+    "ret_arith_zscore",
+    "delta_ret_arith_zscore",
+    "ret_log_zscore",
+    "delta_ret_log_zscore",
+    # z-scores (roll, ALL rows)
+    "ret_arith_roll_zscore",
+    "delta_ret_arith_roll_zscore",
+    "ret_log_roll_zscore",
+    "delta_ret_log_roll_zscore",
+    # outlier flag
+    "is_outlier",
 ]
 
 _INSERT_COLS = (
@@ -145,6 +157,15 @@ def _ensure_tables(engine: Engine, out_table: str, state_table: str) -> None:
             range_pct               double precision,
             true_range              double precision,
             true_range_pct          double precision,
+            ret_arith_zscore            double precision,
+            delta_ret_arith_zscore      double precision,
+            ret_log_zscore              double precision,
+            delta_ret_log_zscore        double precision,
+            ret_arith_roll_zscore       double precision,
+            delta_ret_arith_roll_zscore double precision,
+            ret_log_roll_zscore         double precision,
+            delta_ret_log_roll_zscore   double precision,
+            is_outlier                  boolean,
             ingested_at             timestamptz   NOT NULL DEFAULT now(),
             PRIMARY KEY (id, "timestamp", tf)
         );

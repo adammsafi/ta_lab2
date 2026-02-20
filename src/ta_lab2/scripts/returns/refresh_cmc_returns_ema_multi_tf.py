@@ -109,6 +109,16 @@ def _ensure_tables(engine: Engine, out_table: str, state_table: str) -> None:
             delta_ret_log_ema_roll    double precision,
             delta_ret_log_ema_bar_roll double precision,
 
+            ret_arith_ema_zscore          double precision,
+            ret_arith_ema_bar_zscore      double precision,
+            ret_log_ema_zscore            double precision,
+            ret_log_ema_bar_zscore        double precision,
+            ret_arith_ema_roll_zscore     double precision,
+            ret_arith_ema_bar_roll_zscore double precision,
+            ret_log_ema_roll_zscore       double precision,
+            ret_log_ema_bar_roll_zscore   double precision,
+            is_outlier                    boolean,
+
             ingested_at timestamptz NOT NULL DEFAULT now(),
 
             PRIMARY KEY (id, ts, tf, period)
@@ -261,6 +271,18 @@ _VALUE_COLS = [
     "delta_ret_arith_ema_bar",
     "ret_log_ema_bar",
     "delta_ret_log_ema_bar",
+    # z-scores (canonical, roll=FALSE only)
+    "ret_arith_ema_zscore",
+    "ret_arith_ema_bar_zscore",
+    "ret_log_ema_zscore",
+    "ret_log_ema_bar_zscore",
+    # z-scores (roll, ALL rows)
+    "ret_arith_ema_roll_zscore",
+    "ret_arith_ema_bar_roll_zscore",
+    "ret_log_ema_roll_zscore",
+    "ret_log_ema_bar_roll_zscore",
+    # outlier flag
+    "is_outlier",
 ]
 
 _INSERT_COLS = (
