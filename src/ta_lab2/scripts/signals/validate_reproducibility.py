@@ -302,7 +302,7 @@ def validate_feature_hash_current(
     """
     Validate that current feature data matches stored hash from signal generation.
 
-    Compares the hash of current feature data (from cmc_daily_features) with
+    Compares the hash of current feature data (from cmc_features) with
     the hash stored during signal generation. This detects when underlying data
     has changed, invalidating reproducibility.
 
@@ -343,7 +343,7 @@ def validate_feature_hash_current(
         logger.info("No stored hash found (first run or no signals yet)")
         return True, "No stored hash found (first run)"
 
-    # Compute current hash from cmc_daily_features
+    # Compute current hash from cmc_features
     current_hash = _compute_current_feature_hash(engine, signal_type, asset_id)
 
     if current_hash is None:
@@ -651,7 +651,7 @@ def _compute_current_feature_hash(
     asset_id: int,
 ) -> Optional[str]:
     """
-    Compute hash of current feature data from cmc_daily_features.
+    Compute hash of current feature data from cmc_features.
 
     Determines which feature columns to include based on signal type,
     then computes hash of those columns for the asset.
@@ -672,8 +672,8 @@ def _compute_current_feature_hash(
     sql = text(
         f"""
         SELECT ts, {columns_str}
-        FROM public.cmc_daily_features
-        WHERE id = :asset_id
+        FROM public.cmc_features
+        WHERE id = :asset_id AND tf = '1D'
         ORDER BY ts
     """
     )

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Refresh RSI mean reversion signals from cmc_daily_features.
+Refresh RSI mean reversion signals from cmc_features.
 
 This script generates RSI mean reversion trading signals using database-driven
 threshold configuration from dim_signals. Supports both incremental and full
@@ -59,7 +59,7 @@ logger = logging.getLogger(__name__)
 
 def _get_all_asset_ids(engine) -> list[int]:
     """
-    Query all unique asset IDs from cmc_daily_features.
+    Query all unique asset IDs from cmc_features.
 
     Args:
         engine: SQLAlchemy engine
@@ -67,7 +67,9 @@ def _get_all_asset_ids(engine) -> list[int]:
     Returns:
         List of asset IDs sorted ascending
     """
-    sql = text("SELECT DISTINCT id FROM public.cmc_daily_features ORDER BY id")
+    sql = text(
+        "SELECT DISTINCT id FROM public.cmc_features WHERE tf = '1D' ORDER BY id"
+    )
 
     with engine.connect() as conn:
         result = conn.execute(sql)
@@ -77,7 +79,7 @@ def _get_all_asset_ids(engine) -> list[int]:
 def main():
     """Main entry point for RSI signal refresh script."""
     parser = argparse.ArgumentParser(
-        description="Refresh RSI mean reversion signals from cmc_daily_features",
+        description="Refresh RSI mean reversion signals from cmc_features",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -99,7 +101,7 @@ Examples:
         "--ids",
         type=int,
         nargs="+",
-        help="Asset IDs to process (default: all from cmc_daily_features)",
+        help="Asset IDs to process (default: all from cmc_features)",
     )
     parser.add_argument(
         "--signal-id",
@@ -187,7 +189,7 @@ Examples:
     else:
         try:
             ids = _get_all_asset_ids(engine)
-            logger.info(f"Processing {len(ids)} assets from cmc_daily_features")
+            logger.info(f"Processing {len(ids)} assets from cmc_features")
         except Exception as e:
             logger.error(f"Failed to query asset IDs: {e}")
             sys.exit(1)

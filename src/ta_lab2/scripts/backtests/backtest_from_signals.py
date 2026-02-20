@@ -3,7 +3,7 @@ Backtest engine that reads signals from database and executes via vectorbt.
 
 This module provides:
 1. Loading signals from cmc_signals_* tables
-2. Loading price data from cmc_daily_features
+2. Loading price data from cmc_features
 3. Running backtests via existing vbt_runner.py infrastructure
 4. Extracting comprehensive metrics from vectorbt Portfolio
 5. Saving results to cmc_backtest_* tables
@@ -192,7 +192,7 @@ class SignalBacktester:
         end_ts: pd.Timestamp,
     ) -> pd.DataFrame:
         """
-        Load price data from cmc_daily_features table.
+        Load price data from cmc_features table.
 
         Args:
             asset_id: Asset ID to filter
@@ -205,8 +205,9 @@ class SignalBacktester:
         sql = text(
             """
             SELECT ts, close
-            FROM public.cmc_daily_features
+            FROM public.cmc_features
             WHERE id = :asset_id
+              AND tf = '1D'
               AND ts >= :start_ts
               AND ts <= :end_ts
             ORDER BY ts
@@ -473,7 +474,6 @@ class SignalBacktester:
         Returns:
             Dictionary with metric names as keys
         """
-        equity = pf.value()
         returns = pf.returns()
 
         # Basic metrics from result_row

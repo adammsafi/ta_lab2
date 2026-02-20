@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Refresh EMA crossover signals from cmc_daily_features.
+Refresh EMA crossover signals from cmc_features.
 
 Generates EMA crossover trading signals using database-driven configuration
 from dim_signals. Supports incremental and full refresh modes with state
@@ -46,7 +46,7 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         Parsed arguments
     """
     parser = argparse.ArgumentParser(
-        description="Refresh EMA crossover signals from cmc_daily_features",
+        description="Refresh EMA crossover signals from cmc_features",
     )
 
     # ID selection
@@ -58,7 +58,7 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     id_group.add_argument(
         "--all",
         action="store_true",
-        help="Process all IDs from cmc_daily_features",
+        help="Process all IDs from cmc_features",
     )
 
     # Signal selection
@@ -107,7 +107,7 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
 
 def get_all_asset_ids(engine) -> list[int]:
     """
-    Query all distinct asset IDs from cmc_daily_features.
+    Query all distinct asset IDs from cmc_features.
 
     Args:
         engine: SQLAlchemy engine
@@ -117,7 +117,8 @@ def get_all_asset_ids(engine) -> list[int]:
     """
     query = """
         SELECT DISTINCT id
-        FROM public.cmc_daily_features
+        FROM public.cmc_features
+        WHERE tf = '1D'
         ORDER BY id
     """
     with engine.connect() as conn:
@@ -132,7 +133,7 @@ def load_ids(engine, ids_arg: Optional[str] = None, all_ids: bool = False) -> li
     Args:
         engine: SQLAlchemy engine
         ids_arg: Comma-separated ID string
-        all_ids: If True, load all IDs from cmc_daily_features
+        all_ids: If True, load all IDs from cmc_features
 
     Returns:
         List of cryptocurrency IDs

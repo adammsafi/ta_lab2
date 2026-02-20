@@ -1,5 +1,5 @@
 """
-EMA Signal Generator - Generate EMA crossover signals from cmc_daily_features.
+EMA Signal Generator - Generate EMA crossover signals from cmc_features.
 
 This module generates EMA crossover trading signals using the existing ema_trend.py
 adapter. Signals are stored in cmc_signals_ema_crossover with full feature snapshots
@@ -7,7 +7,7 @@ and version hashes for reproducibility.
 
 Architecture:
 - Load signal configurations from dim_signals (not hardcoded)
-- Fetch features from cmc_daily_features
+- Fetch features from cmc_features
 - Generate signals using ema_trend.make_signals
 - Transform to stateful position records (open/closed)
 - Store in database with feature hashing
@@ -51,7 +51,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class EMASignalGenerator:
     """
-    Generate EMA crossover signals from cmc_daily_features.
+    Generate EMA crossover signals from cmc_features.
 
     Attributes:
         engine: SQLAlchemy engine for database operations
@@ -120,7 +120,7 @@ class EMASignalGenerator:
 
         logger.debug(f"  Dirty window start: {start_ts}")
 
-        # 3. Load features from cmc_daily_features
+        # 3. Load features from cmc_features
         features_df = self._load_features(ids, start_ts)
 
         if features_df.empty:
@@ -165,7 +165,7 @@ class EMASignalGenerator:
         start_ts: Optional[pd.Timestamp],
     ) -> pd.DataFrame:
         """
-        Load features from cmc_daily_features.
+        Load features from cmc_features.
 
         Uses explicit column list for hash stability (ensures same columns
         in same order every time).
@@ -191,7 +191,7 @@ class EMASignalGenerator:
             "atr_14",
         ]
 
-        where_clauses = ["id = ANY(:ids)"]
+        where_clauses = ["id = ANY(:ids)", "tf = '1D'"]
         params = {"ids": ids}
 
         if start_ts is not None:
@@ -202,7 +202,7 @@ class EMASignalGenerator:
 
         sql_text = f"""
             SELECT {', '.join(columns)}
-            FROM public.cmc_daily_features
+            FROM public.cmc_features
             WHERE {where_sql}
             ORDER BY id, ts
         """

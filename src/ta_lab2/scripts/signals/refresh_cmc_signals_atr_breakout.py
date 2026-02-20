@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Refresh ATR breakout signals from cmc_daily_features.
+Refresh ATR breakout signals from cmc_features.
 
 This script generates ATR breakout signals using Donchian channels with ATR confirmation.
 Signals are stored in cmc_signals_atr_breakout with full feature snapshot for reproducibility.
@@ -59,7 +59,7 @@ from ta_lab2.scripts.signals.generate_signals_atr import ATRSignalGenerator
 
 def _get_all_asset_ids(engine) -> list[int]:
     """
-    Query all active asset IDs from cmc_daily_features.
+    Query all active asset IDs from cmc_features.
 
     Returns:
         List of unique asset IDs with feature data
@@ -67,7 +67,8 @@ def _get_all_asset_ids(engine) -> list[int]:
     sql = text(
         """
         SELECT DISTINCT id
-        FROM public.cmc_daily_features
+        FROM public.cmc_features
+        WHERE tf = '1D'
         ORDER BY id
     """
     )
@@ -80,7 +81,7 @@ def _get_all_asset_ids(engine) -> list[int]:
 def main():
     """Main entry point for ATR breakout signal refresh."""
     parser = argparse.ArgumentParser(
-        description="Refresh ATR breakout signals from cmc_daily_features",
+        description="Refresh ATR breakout signals from cmc_features",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )

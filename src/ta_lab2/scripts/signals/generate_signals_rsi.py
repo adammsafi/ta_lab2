@@ -1,5 +1,5 @@
 """
-RSI Signal Generator - Generate RSI mean reversion signals from cmc_daily_features.
+RSI Signal Generator - Generate RSI mean reversion signals from cmc_features.
 
 This module provides RSI mean reversion signal generation following the existing
 rsi_mean_revert.py adapter logic. Signals are stored in cmc_signals_rsi_mean_revert
@@ -99,7 +99,7 @@ def compute_adaptive_thresholds(
 @dataclass
 class RSISignalGenerator:
     """
-    Generates RSI mean reversion signals from cmc_daily_features.
+    Generates RSI mean reversion signals from cmc_features.
 
     Leverages existing rsi_mean_revert.py adapter logic with database-driven
     threshold configuration from dim_signals. Stores signals in
@@ -121,7 +121,7 @@ class RSISignalGenerator:
         start_ts: Optional[pd.Timestamp] = None,
     ) -> pd.DataFrame:
         """
-        Load feature data from cmc_daily_features.
+        Load feature data from cmc_features.
 
         Args:
             ids: List of asset IDs to load
@@ -132,7 +132,7 @@ class RSISignalGenerator:
             DataFrame with columns: id, ts, close, rsi_14, rsi_7, rsi_21, atr_14
             Sorted by (id, ts) for chronological processing
         """
-        where_clauses = ["id = ANY(:ids)"]
+        where_clauses = ["id = ANY(:ids)", "tf = '1D'"]
         params = {"ids": ids}
 
         if start_ts is not None:
@@ -146,7 +146,7 @@ class RSISignalGenerator:
                 id, ts, close,
                 rsi_14, rsi_7, rsi_21,
                 atr_14
-            FROM public.cmc_daily_features
+            FROM public.cmc_features
             WHERE {where_sql}
             ORDER BY id, ts
         """
@@ -205,7 +205,6 @@ class RSISignalGenerator:
 
             # Track position state
             position_open = False
-            entry_idx = None
 
             for idx in range(len(group)):
                 # Entry signal - open new position
@@ -249,7 +248,6 @@ class RSISignalGenerator:
                     )
 
                     position_open = True
-                    entry_idx = idx
 
                 # Exit signal - close position
                 elif exit_mask[idx] and position_open:
@@ -272,7 +270,6 @@ class RSISignalGenerator:
                     entry_record["rsi_at_exit"] = float(group.loc[idx, rsi_col])
 
                     position_open = False
-                    entry_idx = None
 
         if not records:
             # Return empty DataFrame with correct schema
@@ -327,7 +324,7 @@ class RSISignalGenerator:
 
         Raises:
             ValueError: If required parameters missing
-            KeyError: If required features not in cmc_daily_features
+            KeyError: If required features not in cmc_features
         """
         signal_id = signal_config["signal_id"]
         params = signal_config["params"]

@@ -1,5 +1,5 @@
 """
-ATR Breakout Signal Generator - Generate ATR breakout signals from cmc_daily_features.
+ATR Breakout Signal Generator - Generate ATR breakout signals from cmc_features.
 
 This module generates ATR breakout signals using Donchian channels with ATR confirmation.
 Signals are stored in cmc_signals_atr_breakout with full feature snapshot for reproducibility.
@@ -44,11 +44,11 @@ from .signal_utils import compute_feature_hash, compute_params_hash
 @dataclass
 class ATRSignalGenerator:
     """
-    Generates ATR breakout signals from cmc_daily_features.
+    Generates ATR breakout signals from cmc_features.
 
     Responsibilities:
     - Load breakout parameters from dim_signals
-    - Load features from cmc_daily_features (OHLC, ATR, Bollinger Bands)
+    - Load features from cmc_features (OHLC, ATR, Bollinger Bands)
     - Generate signals using existing breakout_atr.py adapter
     - Classify breakout type (channel_break, atr_expansion, both)
     - Compute Donchian channel levels for audit trail
@@ -111,7 +111,7 @@ class ATRSignalGenerator:
             starts = [ts for ts in dirty_windows.values() if ts is not None]
             start_ts = min(starts) if starts else None
 
-        # Load features from cmc_daily_features
+        # Load features from cmc_features
         df_features = self._load_features(ids, start_ts)
 
         if df_features.empty:
@@ -165,7 +165,7 @@ class ATRSignalGenerator:
         start_ts: Optional[pd.Timestamp],
     ) -> pd.DataFrame:
         """
-        Load features from cmc_daily_features for signal generation.
+        Load features from cmc_features for signal generation.
 
         Loads OHLC for Donchian channel computation, ATR for stops,
         and Bollinger Bands for optional confirmation.
@@ -178,7 +178,7 @@ class ATRSignalGenerator:
             DataFrame with columns: id, ts, open, high, low, close, atr_14,
             bb_up_20_2, bb_lo_20_2
         """
-        where_clauses = ["id = ANY(:ids)"]
+        where_clauses = ["id = ANY(:ids)", "tf = '1D'"]
         params = {"ids": ids}
 
         if start_ts is not None:
@@ -193,7 +193,7 @@ class ATRSignalGenerator:
                 open, high, low, close,
                 atr_14,
                 bb_up_20_2, bb_lo_20_2
-            FROM public.cmc_daily_features
+            FROM public.cmc_features
             WHERE {where_sql}
             ORDER BY id, ts
         """
