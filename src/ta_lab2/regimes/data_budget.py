@@ -31,6 +31,7 @@ def assess_data_budget(
     weekly: Optional[pd.DataFrame] = None,
     daily: Optional[pd.DataFrame] = None,
     intraday: Optional[pd.DataFrame] = None,
+    min_bars_overrides: Optional[Dict[str, int]] = None,
 ) -> DataBudgetContext:
     bars = {
         "M": _count(monthly),
@@ -39,11 +40,15 @@ def assess_data_budget(
         "I": _count(intraday),
     }
 
+    thresholds = dict(_MIN_BARS)
+    if min_bars_overrides:
+        thresholds.update(min_bars_overrides)
+
     enabled = {
-        "L0": bars["M"] >= _MIN_BARS["L0"],
-        "L1": bars["W"] >= _MIN_BARS["L1"],
-        "L2": bars["D"] >= _MIN_BARS["L2"],
-        "L3": bars["I"] >= _MIN_BARS["L3"],
+        "L0": bars["M"] >= thresholds["L0"],
+        "L1": bars["W"] >= thresholds["L1"],
+        "L2": bars["D"] >= thresholds["L2"],
+        "L3": bars["I"] >= thresholds["L3"],
         "L4": True,
     }
 

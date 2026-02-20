@@ -188,8 +188,8 @@ def compute_regimes_for_id(
         cal_scheme:          Calendar scheme for weekly/monthly bars.
                              'iso' (default) or 'us'.
         min_bars_overrides:  Optional dict to override data budget thresholds,
-                             e.g. {"L0": 30, "L1": 26}. Not yet wired to
-                             assess_data_budget (reserved for future use).
+                             e.g. {"L0": 30, "L1": 26}. Passed through to
+                             assess_data_budget().
         hysteresis_tracker:  Optional HysteresisTracker to smooth label
                              transitions. If provided, per-layer hysteresis is
                              applied before policy resolution. Pass None to
@@ -229,7 +229,12 @@ def compute_regimes_for_id(
     # ------------------------------------------------------------------
     # 2. Assess data budget -> determine enabled layers and feature tier
     # ------------------------------------------------------------------
-    ctx = assess_data_budget(monthly=monthly, weekly=weekly, daily=daily)
+    ctx = assess_data_budget(
+        monthly=monthly,
+        weekly=weekly,
+        daily=daily,
+        min_bars_overrides=min_bars_overrides,
+    )
     mode = ctx.feature_tier  # "full" or "lite"
 
     logger.info(
@@ -773,7 +778,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     logger.info("Processing %d assets: %s", len(asset_ids), asset_ids[:10])
 
     # ------------------------------------------------------------------
-    # min_bars overrides (reserved for future integration with assess_data_budget)
+    # min_bars overrides
     # ------------------------------------------------------------------
     min_bars_overrides: Dict[str, int] = {}
     if args.min_bars_l0 is not None:
