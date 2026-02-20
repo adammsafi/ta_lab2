@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 
 ## Current Position
 
-Phase: 28 of 28 (Backtest Pipeline Fix) — In progress
-Plan: 2 of 3 in current phase — 28-02 complete
-Status: In progress — 28-03 (end-to-end validation) is next
-Last activity: 2026-02-20 — Completed 28-02-PLAN.md (vectorbt 0.28.1 compatibility fix)
+Phase: 28 of 28 (Backtest Pipeline Fix) — COMPLETE
+Plan: 3 of 3 in current phase — 28-03 complete
+Status: Phase complete — v0.7.0 COMPLETE
+Last activity: 2026-02-20 — Completed 28-03-PLAN.md (end-to-end pipeline verification)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [########--] 80% v0.7.0 (2/3 plans in Phase 28 complete)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [##########] 100% v0.7.0 (3/3 plans in Phase 28 complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 144 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 2 in v0.7.0)
+- Total plans completed: 147 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 5 in v0.7.0)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -135,6 +135,11 @@ Recent decisions affecting current work:
 - **Tz boundary pattern for vectorbt** (Phase 28-02): Strip tz at vectorbt ingestion (run_backtest), re-add at trade extraction (_ensure_utc in _extract_trades) — single strip covers all downstream vectorbt calls
 - **str.lower() for vbt direction** (Phase 28-02): vbt 0.28.1 returns 'Long'/'Short' strings, not integers — .astype(str).str.lower() handles both string and integer cases without NaN
 - **Backward-compat fee extraction** (Phase 28-02): Entry Fees + Exit Fees (vbt 0.28.1) -> Fees (older vbt) -> 0.0 — chained fallback maximizes cross-version compatibility
+- **ts coercion at merge point** (Phase 28-03): When pd.read_sql legacy path returns ts as object dtype, coerce both sides of merge via pd.to_datetime(utc=True) in merge_regime_context — single central fix covers all 3 signal generator callers
+- **load_prices without index_col** (Phase 28-03): pd.read_sql with index_col='ts'+parse_dates infers local-offset tz (UTC-04:00) producing 1903 duplicate index entries; post-hoc coerce via pd.to_datetime(utc=True).tz_convert("UTC").tz_localize(None) is reliable
+- **date-string split bounds for vbt** (Phase 28-03): strftime('%Y-%m-%d') triggers pandas partial-date matching (inclusive range) for tz-naive DatetimeIndex with 23:59:59.999 entries — exact Timestamp key lookup fails
+- **numpy scalar normalization at SQL boundary** (Phase 28-03): _to_python() with hasattr(v, 'item') normalizes np.float64/np.int64/np.bool_ to Python native before psycopg2 binding — avoids 'schema "np" does not exist' error
+- **vbt 0.28.1 price columns renamed** (Phase 28-03): 'Entry Price'/'Exit Price' -> 'Avg Entry Price'/'Avg Exit Price' in records_readable; use 'Avg Entry Price' in columns check with fallback
 
 ### Pending Todos
 
@@ -146,8 +151,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-20T22:03:33Z
-Stopped at: Completed 28-02-PLAN.md — vectorbt 0.28.1 compatibility fix (5 bugs fixed in backtest_from_signals.py)
+Last session: 2026-02-20T22:17:08Z
+Stopped at: Completed 28-03-PLAN.md — end-to-end pipeline verification (6 bugs fixed, backtest results in DB)
 Resume file: None
 
 ---
