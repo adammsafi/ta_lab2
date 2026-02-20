@@ -448,7 +448,7 @@ Plans:
 ---
 
 ### Phase 27: Regime Integration
-**Goal:** Connect existing regime module (labels, policy resolver, hysteresis, data budget) to DB-backed feature pipeline. Write refresh_cmc_regimes.py that reads from cmc_features and calendar bar tables, runs L0-L2 labeling, resolves policy, writes to cmc_regimes table. Wire regime context into signal generators.
+**Goal:** Connect existing regime module (labels, policy resolver, hysteresis, data budget) to DB-backed feature pipeline. Write refresh_cmc_regimes.py that reads from cmc_features and calendar bar tables, runs L0-L2+ labeling, resolves policy, writes to cmc_regimes table. Wire regime context into signal generators.
 **Depends on:** Phase 26
 **Success Criteria** (what must be TRUE):
   1. refresh_cmc_regimes.py reads from cmc_features and calendar bar tables (weekly/monthly)
@@ -456,10 +456,16 @@ Plans:
   3. Policy resolver produces regime labels written to cmc_regimes table
   4. Data budget gating correctly enables/disables layers based on bar history
   5. Signal generators accept regime context for position sizing/filtering
-**Plans**: 0 plans
+**Plans**: 7 plans in 4 waves
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 27 to break down)
+- [ ] 27-01-PLAN.md -- DDL for regime tables (cmc_regimes, cmc_regime_flips, cmc_regime_stats) + signal table extensions
+- [ ] 27-02-PLAN.md -- EMA pivot utility and DB data loaders (regime_data_loader.py)
+- [ ] 27-03-PLAN.md -- Core refresh_cmc_regimes.py (labeling + policy resolution + DB write)
+- [ ] 27-04-PLAN.md -- HysteresisTracker + flip detection + stats computation
+- [ ] 27-05-PLAN.md -- Wire hysteresis/flips/stats into refresh script + CLI flags
+- [ ] 27-06-PLAN.md -- Signal generator regime integration (all 3 generators + --no-regime flag)
+- [ ] 27-07-PLAN.md -- Orchestrator integration (run_daily_refresh.py) + regime_inspect.py + end-to-end verification
 
 ---
 
@@ -529,7 +535,7 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 27. Regime Integration | 0/0 | Not planned | - |
+| 27. Regime Integration | 0/7 | Planned | - |
 | 28. Backtest Pipeline Fix | 0/0 | Not planned | - |
 
 ## Requirement Coverage
@@ -553,4 +559,4 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-20 (v0.7.0 started: Phase 27 Regime Integration + Phase 28 Backtest Pipeline Fix)*
+*Last updated: 2026-02-20 (v0.7.0: Phase 27 planned with 7 plans in 4 waves)*
