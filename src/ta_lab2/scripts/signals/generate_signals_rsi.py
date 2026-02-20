@@ -29,6 +29,7 @@ Usage:
 
 from dataclasses import dataclass
 from typing import Optional
+import json
 import logging
 import pandas as pd
 from sqlalchemy import text
@@ -446,8 +447,9 @@ class RSISignalGenerator:
             signal_table = "cmc_signals_rsi_mean_revert"
 
             # Convert JSONB column to JSON strings for database insertion
+            # Fix: serialize dict values to JSON string (pre-existing bug: no-op lambda)
             df_records["feature_snapshot"] = df_records["feature_snapshot"].apply(
-                lambda x: x if pd.isna(x) else x
+                lambda x: json.dumps(x) if isinstance(x, dict) else x
             )
 
             with self.engine.begin() as conn:
