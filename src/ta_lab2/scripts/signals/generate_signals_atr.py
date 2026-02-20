@@ -32,6 +32,7 @@ Usage:
 
 from dataclasses import dataclass
 from typing import Optional
+import json
 import logging
 import pandas as pd
 from sqlalchemy import text
@@ -509,7 +510,7 @@ class ATRSignalGenerator:
         # Convert feature_snapshot to JSON string for JSONB insertion
         records = records.copy()
         records["feature_snapshot"] = records["feature_snapshot"].apply(
-            lambda x: pd.io.json.dumps(x) if x is not None else None
+            lambda x: json.dumps(x) if isinstance(x, dict) else x
         )
 
         # Write to database
