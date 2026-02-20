@@ -649,6 +649,77 @@ FROM counts;
 
 
 # ----------------------------
+# Tests (max_ts lag vs price)
+# ----------------------------
+
+SQL_TEST_MAX_TS_LAG_VS_PRICE = f"""
+INSERT INTO {STATS_TABLE} (
+    table_name, test_name, asset_id, tf, period, status, actual, expected, extra
+)
+WITH price_max AS (
+    SELECT
+        id AS asset_id,
+        MAX("timestamp") AS price_max_ts
+    FROM {PRICE_TABLE}
+    GROUP BY id
+),
+ema_max AS (
+    SELECT
+        k.asset_id,
+        k.tf,
+        k.period,
+        MAX(e.ts) AS max_ema_ts
+    FROM _impacted_keys k
+    JOIN {EMA_TABLE} e
+      ON e.id = k.asset_id AND e.tf = k.tf AND e.period = k.period
+    WHERE e.roll = false
+    GROUP BY k.asset_id, k.tf, k.period
+),
+tf_days AS (
+    SELECT DISTINCT tf, tf_days
+    FROM {EMA_TABLE}
+),
+joined AS (
+    SELECT
+        em.asset_id,
+        em.tf,
+        em.period,
+        p.price_max_ts,
+        em.max_ema_ts,
+        td.tf_days,
+        CASE
+            WHEN p.price_max_ts IS NULL OR em.max_ema_ts IS NULL THEN NULL
+            ELSE (p.price_max_ts::date - em.max_ema_ts::date)
+        END AS lag_days
+    FROM ema_max em
+    LEFT JOIN price_max p ON p.asset_id = em.asset_id
+    LEFT JOIN tf_days td  ON td.tf = em.tf
+)
+SELECT
+    :table_name,
+    'ema_multi_tf_max_ts_lag_vs_price',
+    asset_id,
+    tf,
+    period,
+    CASE
+        WHEN price_max_ts IS NULL OR max_ema_ts IS NULL THEN 'FAIL'
+        WHEN lag_days <= COALESCE(tf_days, 1) + 1 THEN 'PASS'
+        WHEN lag_days <= COALESCE(tf_days, 1) * 3  THEN 'WARN'
+        ELSE 'FAIL'
+    END,
+    lag_days::numeric,
+    0,
+    jsonb_build_object(
+        'price_max_ts', price_max_ts,
+        'max_ema_ts',   max_ema_ts,
+        'lag_days',     lag_days,
+        'tf_days',      tf_days
+    )
+FROM joined;
+"""
+
+
+# ----------------------------
 # Runner
 # ----------------------------
 
@@ -727,6 +798,8 @@ def run(engine: Engine, full_refresh: bool, log_level: str) -> None:
         )
 
         conn.execute(text(SQL_TEST_ROLL_FLAG_CONSISTENCY), {"table_name": EMA_TABLE})
+
+        conn.execute(text(SQL_TEST_MAX_TS_LAG_VS_PRICE), {"table_name": EMA_TABLE})
 
         # Advance watermark only after successful test writes
         conn.execute(

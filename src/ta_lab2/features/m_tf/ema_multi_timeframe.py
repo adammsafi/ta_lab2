@@ -586,7 +586,7 @@ def write_multi_timeframe_ema_to_db(
                 f"""
                 CREATE TEMP TABLE {tmp_table} AS
                 SELECT
-                    id, tf, ts, period, tf_days, roll, ema
+                    id, tf, ts, period, tf_days, roll, ema, ema_bar, is_partial_end
                 FROM {schema}.{out_table}
                 LIMIT 0;
                 """

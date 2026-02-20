@@ -151,10 +151,10 @@ def build_select_expr(
     e_ingested_at = "ingested_at" if "ingested_at" in colset else "now()"
     e_tf_days = "tf_days::int" if "tf_days" in colset else "NULL::int"
     e_roll = "COALESCE(roll,false)::boolean" if "roll" in colset else "false::boolean"
-    e_ema_bar = (
+    _e_ema_bar = (
         "ema_bar::double precision" if "ema_bar" in colset else "NULL::double precision"
     )
-    e_roll_bar = "roll_bar::boolean" if "roll_bar" in colset else "NULL::boolean"
+    _e_roll_bar = "roll_bar::boolean" if "roll_bar" in colset else "NULL::boolean"
 
     # required columns (must exist in source)
     required = {"id", "ts", "tf", "period", "ema"}
@@ -178,9 +178,7 @@ def build_select_expr(
       {e_ingested_at},
       {e_tf_days},
       {e_roll},
-      :alignment_source::text,
-      {e_ema_bar},
-      {e_roll_bar}
+      CAST(:alignment_source AS text)
     """
     return select_sql.strip(), where_sql
 
@@ -224,18 +222,19 @@ def insert_new_rows(
         where_clause = ""
 
     # Use a CTE so we can count inserted rows
+    # Note: _u table has (d1, d2, d1_roll, d2_roll) not (ema_bar, roll_bar).
+    # We only sync base columns — derivatives are computed separately.
     sql = f"""
     WITH ins AS (
       INSERT INTO {U_TABLE} (
         id, ts, tf, period,
         ema, ingested_at, tf_days, roll,
-        alignment_source,
-        ema_bar, roll_bar
+        alignment_source
       )
       {select_sql}
       FROM {src_table}
       {where_clause}
-      ON CONFLICT (id, ts, tf, period, alignment_source) DO NOTHING
+      ON CONFLICT (id, ts, tf, period) DO NOTHING
       RETURNING 1
     )
     SELECT COUNT(*)::bigint AS n_inserted FROM ins;
@@ -261,8 +260,10 @@ def insert_new_rows(
         _log(f"{alignment_source}: DRY RUN candidates = {n}")
         return 0
 
-    df_ins = pd.read_sql(text(sql), engine, params=params)
-    n_inserted = int(df_ins.loc[0, "n_inserted"])
+    with engine.begin() as conn:
+        result = conn.execute(text(sql), params)
+        row = result.fetchone()
+        n_inserted = int(row[0]) if row else 0
     _log(f"{alignment_source}: inserted {n_inserted} rows")
     return n_inserted
 
