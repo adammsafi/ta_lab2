@@ -35,6 +35,7 @@ Usage:
 
 from dataclasses import dataclass
 from typing import Optional
+import json
 import logging
 import pandas as pd
 from sqlalchemy import text
@@ -443,7 +444,12 @@ class EMASignalGenerator:
             records: DataFrame with signal records
             signal_table: Target table name (e.g., 'cmc_signals_ema_crossover')
         """
-        # Convert feature_snapshot dict to JSON (pandas handles this automatically for JSONB)
+        # Serialize feature_snapshot dicts to JSON strings for JSONB column
+        records = records.copy()
+        records["feature_snapshot"] = records["feature_snapshot"].apply(
+            lambda x: json.dumps(x) if isinstance(x, dict) else x
+        )
+
         records.to_sql(
             signal_table,
             self.engine,
