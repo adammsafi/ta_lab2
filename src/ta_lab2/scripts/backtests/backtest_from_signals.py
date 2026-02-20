@@ -14,6 +14,7 @@ All backtests are reproducible via feature hashing and parameter tracking.
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional, Any
+import json
 import uuid
 import logging
 
@@ -35,6 +36,15 @@ except (ImportError, AttributeError):
     VBT_VERSION = "unknown"
 
 logger = logging.getLogger(__name__)
+
+
+def _ensure_utc(ts_series: pd.Series) -> pd.Series:
+    """Ensure timestamp series is UTC-aware, handling both naive and aware inputs."""
+    ts = pd.to_datetime(ts_series)
+    if ts.dt.tz is None:
+        return ts.dt.tz_localize("UTC")
+    else:
+        return ts.dt.tz_convert("UTC")
 
 
 @dataclass
@@ -281,6 +291,18 @@ class SignalBacktester:
         if prices.empty:
             raise ValueError(f"No price data found for asset {asset_id}")
 
+        # Strip timezone for vectorbt compatibility
+        # (timestamps re-localized in _extract_trades via _ensure_utc)
+        if prices.index.tz is not None:
+            prices = prices.copy()
+            prices.index = prices.index.tz_localize(None)
+        if entries.index.tz is not None:
+            entries = entries.copy()
+            entries.index = entries.index.tz_localize(None)
+        if exits.index.tz is not None:
+            exits = exits.copy()
+            exits.index = exits.index.tz_localize(None)
+
         # 3. Determine cost model
         cost = CostModel() if clean_mode else self.cost_model
         logger.debug(f"Cost model: {cost.describe()}")
@@ -420,22 +442,27 @@ class SignalBacktester:
         # Map to our schema
         trades_df = pd.DataFrame(
             {
-                "entry_ts": pd.to_datetime(trades["Entry Timestamp"]).dt.tz_localize(
-                    "UTC"
-                ),
+                "entry_ts": _ensure_utc(trades["Entry Timestamp"]),
                 "entry_price": trades["Entry Price"].astype(float),
-                "exit_ts": pd.to_datetime(trades["Exit Timestamp"]).dt.tz_localize(
-                    "UTC"
-                ),
+                "exit_ts": _ensure_utc(trades["Exit Timestamp"]),
                 "exit_price": trades["Exit Price"].astype(float),
-                "direction": trades["Direction"].map({0: "long", 1: "short"}),
+                # vbt 0.28.1 returns 'Long'/'Short' strings; str.lower() handles both
+                # string ('Long'->'long') and integer (0/1 preserved as '0'/'1') cases
+                "direction": trades["Direction"].astype(str).str.lower(),
                 "size": trades["Size"].astype(float),
                 "pnl_pct": trades["Return"].astype(float)
                 * 100,  # Convert to percentage
                 "pnl_dollars": trades["PnL"].astype(float),
-                "fees_paid": trades.get("Fees", 0.0).astype(float)
-                if "Fees" in trades
-                else 0.0,
+                # vbt 0.28.1 uses 'Entry Fees' + 'Exit Fees'; fall back to 'Fees' for
+                # older versions, then to 0.0 if neither column is present
+                "fees_paid": (
+                    trades["Entry Fees"].astype(float)
+                    + trades["Exit Fees"].astype(float)
+                    if "Entry Fees" in trades.columns and "Exit Fees" in trades.columns
+                    else trades["Fees"].astype(float)
+                    if "Fees" in trades.columns
+                    else 0.0
+                ),
                 "slippage_cost": 0.0,  # Vectorbt doesn't separate slippage from fees
             }
         )
@@ -637,7 +664,7 @@ class SignalBacktester:
                     "asset_id": result.asset_id,
                     "start_ts": result.start_ts,
                     "end_ts": result.end_ts,
-                    "cost_model": result.cost_model,  # Dict auto-converted to JSONB
+                    "cost_model": json.dumps(result.cost_model),
                     "signal_params_hash": result.signal_params_hash,
                     "feature_hash": result.feature_hash,
                     "signal_version": result.signal_version,
