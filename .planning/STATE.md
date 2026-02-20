@@ -10,12 +10,12 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 ## Current Position
 
 Phase: 27 of 28 (Regime Integration)
-Plan: 6 of 7 in current phase
-Status: In progress
+Plan: 7 of 7 in current phase (Tasks 1-2 complete, awaiting checkpoint verification)
+Status: Checkpoint reached — awaiting human verification of end-to-end pipeline
 Next Phase: Phase 28 (Backtest Pipeline Fix)
-Last activity: 2026-02-20 — Completed 27-06-PLAN.md (Signal Regime Integration: all 3 generators regime-aware)
+Last activity: 2026-02-20 — Completed 27-07-PLAN.md Tasks 1-2 (Orchestrator integration + regime_inspect.py)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [#####-----] ~43% v0.7.0 (6/14 plans)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [######----] ~50% v0.7.0 (7/14 plans)
 
 ## Performance Metrics
 
@@ -128,6 +128,9 @@ Recent decisions affecting current work:
 - **Per-asset hysteresis tracker reset** (Phase 27-05): tracker.reset() before each asset prevents prior asset state leaking into next; critical for correctness when processing --all
 - **Returns fallback to NULL stats** (Phase 27-05): _load_returns_for_id wraps in try/except; DEBUG-level log avoids noise; avg_ret_1d/std_ret_1d are NULL until cmc_returns.ret_1d column populated
 - **Reload daily_df for comovement** (Phase 27-05): Reload via load_regime_input_data rather than threading through compute_regimes_for_id return; cleaner separation of concerns
+- **--regimes standalone flag plus --all inclusion** (Phase 27-07): Consistent with --bars/--emas pattern; --all becomes single command for bars->EMAs->regimes pipeline
+- **EMA early-stop before regimes** (Phase 27-07): Added failure check before running regimes - regimes depend on fresh EMAs; propagates --dry-run to regime subprocess
+- **regime_inspect default reads from DB** (Phase 27-07): Operational check should be fast; --live flag triggers compute_regimes_for_id for testing changes before write
 
 ### Pending Todos
 
@@ -139,8 +142,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-20T19:47:49Z
-Stopped at: Completed 27-06-PLAN.md (Signal Regime Integration: all 3 generators + --no-regime flag + RSI fix)
+Last session: 2026-02-20T19:54:22Z
+Stopped at: 27-07-PLAN.md Tasks 1-2 complete — awaiting checkpoint verification (Task 3: human-verify end-to-end pipeline)
 Resume file: None
 
 ---
