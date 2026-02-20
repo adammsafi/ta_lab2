@@ -10,12 +10,12 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 ## Current Position
 
 Phase: 27 of 28 (Regime Integration)
-Plan: 3 of 7 in current phase
+Plan: 4 of 7 in current phase
 Status: In progress
 Next Phase: Phase 28 (Backtest Pipeline Fix)
-Last activity: 2026-02-20 — Completed 27-03-PLAN.md (Regime Refresh Script)
+Last activity: 2026-02-20 — Completed 27-04-PLAN.md (Hysteresis, Flips, Stats, Comovement)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [###-------] ~21% v0.7.0 (3/14 plans)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [###-------] ~29% v0.7.0 (4/14 plans)
 
 ## Performance Metrics
 
@@ -116,6 +116,9 @@ Recent decisions affecting current work:
 - **regime_enabled defaults TRUE on dim_signals** (Phase 27-01): All existing signals automatically participate in regime-aware execution, opt-out is explicit
 - **int cast before period sort in pivot_emas_to_wide** (Phase 27-02): Cast period to int before sorting column names -- prevents alphabetic trap where '200' < '50'; ensures close_ema_20 < close_ema_50 < close_ema_200
 - **aggfunc='first' in pivot_table for EMA deduplication** (Phase 27-02): Defensive choice; plain pivot() raises ValueError on duplicates, pivot_table silently takes first value -- safer for production pipeline
+- **HysteresisTracker tightening via size_mult/stop_mult** (Phase 27-04): Tightening = new size < old OR new stop > old; uses public resolve_policy_from_table not private _match_policy to stay decoupled from resolver internals
+- **Flip detection includes initial assignment (old=None)** (Phase 27-04): First regime seen per (id,tf,layer) is recorded as flip with old_regime=None for full audit trail
+- **Comovement scoped DELETE removes all prior snapshots** (Phase 27-04): write_comovement_to_db deletes all rows for (ids,tf) before insert, so each refresh leaves exactly one snapshot -- prevents unbounded table growth
 - **BTC (id=1) as market proxy, skipped for self** (Phase 27-03): When computing regimes for id=1, skip proxy loading to avoid circular self-reference; proxy only applies for other assets lacking L0/L1 history
 - **regime_key fallback chain L2->L1->L0->Unknown** (Phase 27-03): "Unknown" sentinel avoids None in NOT NULL column; L2 (daily) is primary as it has most bars
 - **Row-by-row policy resolution acceptable** (Phase 27-03): 5614 rows resolves in ~2.4s total (DB I/O dominates); vectorization not needed for daily refresh cadence
@@ -130,8 +133,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-20T19:31:20Z
-Stopped at: Completed 27-03-PLAN.md (Regime Refresh Script - compute_regimes_for_id, write_regimes_to_db, CLI)
+Last session: 2026-02-20T19:33:45Z
+Stopped at: Completed 27-04-PLAN.md (Hysteresis, Flips, Stats, Comovement modules)
 Resume file: None
 
 ---
