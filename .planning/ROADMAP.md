@@ -5,7 +5,7 @@
 - v0.4.0 Memory Infrastructure & Orchestrator (Phases 1-10) - SHIPPED 2026-02-01
 - v0.5.0 Ecosystem Reorganization (Phases 11-19) - SHIPPED 2026-02-04
 - v0.6.0 EMA & Bar Architecture Standardization (Phases 20-26) - SHIPPED 2026-02-17
-- **v0.7.0 Regime Integration & Signal Enhancement (Phases 27-28) - IN PROGRESS**
+- v0.7.0 Regime Integration & Signal Enhancement (Phases 27-28) - SHIPPED 2026-02-20
 
 ## Overview
 
@@ -440,10 +440,10 @@ Plans:
 
 ---
 
-### v0.7.0 Regime Integration & Signal Enhancement (Phases 27-28) - IN PROGRESS
+### v0.7.0 Regime Integration & Signal Enhancement (Phases 27-28) - SHIPPED 2026-02-20
 
 - [x] **Phase 27: Regime Integration** - Connect regime module to DB-backed feature pipeline
-- [ ] **Phase 28: Backtest Pipeline Fix** - Fix signal generators and backtest runner end-to-end
+- [x] **Phase 28: Backtest Pipeline Fix** - Fix signal generators and backtest runner end-to-end
 
 ---
 
@@ -481,9 +481,9 @@ Plans:
 **Plans**: 3 plans in 2 waves
 
 Plans:
-- [ ] 28-01-PLAN.md -- Fix EMA and ATR signal generator feature_snapshot serialization (json.dumps)
-- [ ] 28-02-PLAN.md -- Fix vectorbt boundary bugs in backtest_from_signals.py (tz, direction, fees, cost_model)
-- [ ] 28-03-PLAN.md -- End-to-end pipeline verification (signal generation + backtest + DB storage)
+- [x] 28-01-PLAN.md -- Fix EMA and ATR signal generator feature_snapshot serialization (json.dumps)
+- [x] 28-02-PLAN.md -- Fix vectorbt boundary bugs in backtest_from_signals.py (tz, direction, fees, cost_model)
+- [x] 28-03-PLAN.md -- End-to-end pipeline verification (signal generation + backtest + DB storage)
 
 ---
 
@@ -533,12 +533,12 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19
 | 25. Baseline Capture | 2/2 | Complete | 2026-02-05 |
 | 26. Validation & Architectural Standardization | 3/3 | Complete | 2026-02-17 |
 
-### v0.7.0 Progress (Current)
+### v0.7.0 Progress (Complete)
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 27. Regime Integration | 7/7 | Complete | 2026-02-20 |
-| 28. Backtest Pipeline Fix | 0/3 | Planned | - |
+| 28. Backtest Pipeline Fix | 3/3 | Complete | 2026-02-20 |
 
 ## Requirement Coverage
 
@@ -561,4 +561,4 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-20 (v0.7.0: Phase 28 planned with 3 plans in 2 waves)*
+*Last updated: 2026-02-20 (v0.7.0 SHIPPED: Phase 28 complete — all phases done)*

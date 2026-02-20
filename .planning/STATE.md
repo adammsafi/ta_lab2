@@ -11,15 +11,16 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 
 Phase: 28 of 28 (Backtest Pipeline Fix) — COMPLETE
 Plan: 3 of 3 in current phase — 28-03 complete
-Status: Phase complete — v0.7.0 COMPLETE
-Last activity: 2026-02-20 — Completed 28-03-PLAN.md (end-to-end pipeline verification)
+Status: v0.7.0 MILESTONE COMPLETE — all phases done, verified
+Next Phase: None (milestone complete — ready for /gsd:audit-milestone or /gsd:new-milestone)
+Last activity: 2026-02-20 — Phase 28 complete, verified (9/9 must-haves), v0.7.0 shipped
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [##########] 100% v0.7.0 (3/3 plans in Phase 28 complete)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [##########] 100% v0.7.0 (2/2 phases, 10/10 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 147 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 5 in v0.7.0)
+- Total plans completed: 152 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -56,6 +57,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 - v0.4.0 complete: 10 phases, 56 plans, 12.55 hours total
 - v0.5.0 complete: 9 phases, 56 plans, 9.85 hours total
 - v0.6.0 complete: 7 phases, 30 plans, ~3.80 hours total
+- v0.7.0 complete: 2 phases, 10 plans, ~0.50 hours total
 
 **By Phase (v0.6.0):**
 
@@ -68,6 +70,13 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 | 24-pattern-consistency | 4/4 | 40 min | 10 min | Complete |
 | 25-baseline-capture | 2/2 | 11 min | 6 min | Complete |
 | 26-validation | 3/3 | ~120 min | ~40 min | Complete |
+
+**By Phase (v0.7.0):**
+
+| Phase | Plans | Total | Avg/Plan | Status |
+|-------|-------|-------|----------|--------|
+| 27-regime-integration | 7/7 | ~20 min | ~3 min | Complete |
+| 28-backtest-pipeline-fix | 3/3 | ~17 min | ~6 min | Complete |
 
 *Updated after each plan completion*
 
@@ -177,4 +186,4 @@ Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-20 (v0.7.0 started: Phases 27-28 added)*
+*Last updated: 2026-02-20 (v0.7.0 SHIPPED: Phase 28 complete — milestone done)*
