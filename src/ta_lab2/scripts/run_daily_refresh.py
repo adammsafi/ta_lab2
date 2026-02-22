@@ -21,6 +21,9 @@ Usage:
     # Stats only
     python run_daily_refresh.py --stats
 
+    # Weekly QC digest
+    python run_daily_refresh.py --weekly-digest
+
     # Use 8 parallel processes for bar builders
     python run_daily_refresh.py --all --ids all -n 8
 
@@ -517,6 +520,124 @@ def run_stats_runners(args, db_url: str) -> ComponentResult:
         )
 
 
+def run_weekly_digest(args, db_url: str) -> ComponentResult:
+    """
+    Run the weekly QC digest as a standalone subprocess.
+
+    The digest aggregates PASS/WARN/FAIL counts across all stats tables with
+    week-over-week delta comparison and delivers via Telegram if configured.
+
+    This is a reporting operation only -- it does NOT run pipeline stages
+    (bars, EMAs, regimes, stats) and is NOT included in --all.
+
+    Args:
+        args: CLI arguments (checked for dry_run, verbose, no_telegram)
+        db_url: Database URL
+
+    Returns:
+        ComponentResult with execution details
+    """
+    cmd = [
+        sys.executable,
+        "-m",
+        "ta_lab2.scripts.stats.weekly_digest",
+    ]
+
+    cmd.extend(["--db-url", db_url])
+
+    if args.verbose:
+        cmd.append("--verbose")
+
+    # Propagate --no-telegram if caller passed it
+    if getattr(args, "no_telegram", False):
+        cmd.append("--no-telegram")
+
+    # CRITICAL: Propagate --dry-run to subprocess so no live DB connection is
+    # attempted during verification (matches pattern in run_regime_refresher)
+    if getattr(args, "dry_run", False):
+        cmd.append("--dry-run")
+
+    print(f"\n{'=' * 70}")
+    print("RUNNING WEEKLY QC DIGEST")
+    print(f"{'=' * 70}")
+    print(f"Command: {' '.join(cmd)}")
+
+    if args.dry_run:
+        print("[DRY RUN] Would execute weekly digest")
+        return ComponentResult(
+            component="weekly_digest",
+            success=True,
+            duration_sec=0.0,
+            returncode=0,
+        )
+
+    start = time.perf_counter()
+
+    try:
+        if args.verbose:
+            # Stream output
+            result = subprocess.run(cmd, check=False, timeout=TIMEOUT_STATS)
+        else:
+            # Capture output
+            result = subprocess.run(
+                cmd,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=TIMEOUT_STATS,
+            )
+
+            # Show output (digest is informational -- always print stdout)
+            if result.stdout:
+                print(result.stdout)
+            if result.returncode != 0 and result.stderr:
+                print(f"\nSTDERR:\n{result.stderr}")
+
+        duration = time.perf_counter() - start
+
+        if result.returncode == 0:
+            print(f"\n[OK] Weekly digest completed in {duration:.1f}s")
+            return ComponentResult(
+                component="weekly_digest",
+                success=True,
+                duration_sec=duration,
+                returncode=result.returncode,
+            )
+        else:
+            error_msg = f"Exited with code {result.returncode}"
+            print(f"\n[FAILED] Weekly digest failed: {error_msg}")
+            return ComponentResult(
+                component="weekly_digest",
+                success=False,
+                duration_sec=duration,
+                returncode=result.returncode,
+                error_message=error_msg,
+            )
+
+    except subprocess.TimeoutExpired:
+        duration = time.perf_counter() - start
+        error_msg = f"Timed out after {TIMEOUT_STATS}s"
+        print(f"\n[TIMEOUT] Weekly digest: {error_msg}")
+        return ComponentResult(
+            component="weekly_digest",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+    except Exception as e:
+        duration = time.perf_counter() - start
+        error_msg = str(e)
+        print(f"\n[ERROR] Weekly digest raised exception: {error_msg}")
+        return ComponentResult(
+            component="weekly_digest",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+
+
 def print_combined_summary(results: list[tuple[str, ComponentResult]]) -> bool:
     """
     Print combined execution summary.
@@ -585,6 +706,9 @@ Examples:
   # Stats only (data quality check on all tables)
   python run_daily_refresh.py --stats
 
+  # Run weekly QC digest
+  python run_daily_refresh.py --weekly-digest
+
   # Dry run to see what would execute
   python run_daily_refresh.py --all --ids 1 --dry-run
 
@@ -627,6 +751,14 @@ Examples:
         "--all",
         action="store_true",
         help="Run bars then EMAs then regimes then stats (full refresh)",
+    )
+    p.add_argument(
+        "--weekly-digest",
+        action="store_true",
+        help=(
+            "Run weekly QC digest (aggregates stats across all tables, "
+            "sends via Telegram). Standalone -- does not combine with pipeline flags."
+        ),
     )
 
     # Common arguments
@@ -686,8 +818,14 @@ Examples:
     args = p.parse_args(argv)
 
     # Validation: require explicit target
-    if not (args.bars or args.emas or args.regimes or args.stats or args.all):
-        p.error("Must specify --bars, --emas, --regimes, --stats, or --all")
+    if args.weekly_digest:
+        # Weekly digest is a standalone reporting operation -- does not combine
+        # with pipeline flags. Run it and exit immediately.
+        pass
+    elif not (args.bars or args.emas or args.regimes or args.stats or args.all):
+        p.error(
+            "Must specify --bars, --emas, --regimes, --stats, --all, or --weekly-digest"
+        )
 
     # Resolve database URL
     try:
@@ -695,6 +833,11 @@ Examples:
     except RuntimeError as e:
         print(f"[ERROR] {e}")
         return 1
+
+    # Handle --weekly-digest as a standalone operation (exit after completion)
+    if args.weekly_digest:
+        digest_result = run_weekly_digest(args, db_url)
+        return 0 if digest_result.success else 1
 
     # Parse IDs
     try:
