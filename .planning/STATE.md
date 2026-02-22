@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-22)
 ## Current Position
 
 Phase: 29 of 33 (29-stats-qa-orchestration)
-Plan: 2 of 3 complete
+Plan: 3 of 3 complete — Phase 29 DONE
 Status: In progress
-Last activity: 2026-02-22 — Completed 29-02-PLAN.md (stats runner orchestrator + pipeline gate, 3 files, 4 min)
+Last activity: 2026-02-22 — Completed 29-03-PLAN.md (weekly QC digest + --weekly-digest flag, 2 files, 3 min)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [##########] 100% v0.7.0 (2/2 phases, 10/10 plans) | [██░░░░░░░░] 13% v0.8.0 (2/15 plans)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [##########] 100% v0.7.0 (2/2 phases, 10/10 plans) | [███░░░░░░░] 20% v0.8.0 (3/15 plans)
 
 ## Performance Metrics
 
@@ -81,7 +81,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 
 | Phase | Plans | Total | Avg/Plan | Status |
 |-------|-------|-------|----------|--------|
-| 29-stats-qa-orchestration | 2/3 | 10 min | 5 min | In progress |
+| 29-stats-qa-orchestration | 3/3 | 13 min | 4 min | Complete |
 | 30-code-quality-tooling | 0/TBD | — | — | Pending |
 | 31-documentation-freshness | 0/TBD | — | — | Pending |
 | 32-runbooks | 0/TBD | — | — | Pending |
@@ -172,6 +172,10 @@ Recent decisions affecting current work:
 - **DB query is authoritative for FAIL/WARN** (Phase 29-02): Stats runners exit 0 even when they write FAIL rows; orchestrator queries DB after all runners complete -- do NOT rely solely on subprocess return codes
 - **Pipeline gate is unconditional for stats** (Phase 29-02): Stats FAIL always halts even with --continue-on-error; continuing past bad data is worse than stopping; bars/EMAs respect --continue-on-error but stats does not
 - **Telegram alerting internal to stats orchestrator** (Phase 29-02): run_daily_refresh.py only checks exit code; Telegram logic in run_all_stats_runners.py for cohesion
+- **Aggregate comparison for weekly delta** (Phase 29-03): Delete-before-insert means last-week rows for un-impacted keys may not be present; compare aggregate FAIL/WARN totals (NOT row-level) for reliable week-over-week delta
+- **Weekly digest NOT in --all** (Phase 29-03): Digest is a reporting operation invoked on demand (--weekly-digest); --all runs the data refresh pipeline (bars+EMAs+regimes+stats); separate concerns
+- **Dry-run exits before DB engine creation in weekly_digest** (Phase 29-03): --dry-run prints table list and exits 0 immediately, no SQLAlchemy engine created -- safe for CI/verification without DB
+- **Telegram split strategy for digest** (Phase 29-03): Try combined message (<4000 chars) first, truncate to top-5-FAIL if needed, split into two messages as final fallback -- covers all realistic 7-table digest sizes
 
 ### Pending Todos
 
@@ -183,8 +187,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-22T22:07:26Z
-Stopped at: Completed 29-02-PLAN.md — stats runner orchestrator + pipeline gate (3 files, 2 tasks, commits ea9e8cb9 + 7d884086)
+Last session: 2026-02-22T22:13:21Z
+Stopped at: Completed 29-03-PLAN.md — weekly QC digest + --weekly-digest flag (2 files, 2 tasks, commits a89b9699 + 8b497b56)
 Resume file: None
 
 ---
@@ -212,4 +216,4 @@ Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-22 (29-02 complete — stats runner orchestrator + pipeline gate done, Phase 29 plan 3 is next)*
+*Last updated: 2026-02-22 (29-03 complete — weekly QC digest + --weekly-digest flag done, Phase 29 fully complete, Phase 30 is next)*
