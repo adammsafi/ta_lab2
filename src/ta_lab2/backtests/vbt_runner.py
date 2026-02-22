@@ -26,8 +26,7 @@ class SignalFunc(Protocol):
 
     def __call__(
         self, df: pd.DataFrame, **params
-    ) -> Tuple[pd.Series, pd.Series, Optional[pd.Series]]:
-        ...
+    ) -> Tuple[pd.Series, pd.Series, Optional[pd.Series]]: ...
 
 
 @dataclass

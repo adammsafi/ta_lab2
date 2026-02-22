@@ -8,12 +8,12 @@ import pandas as pd
 @dataclass
 class ProxyInputs:
     child_daily: pd.DataFrame
-    parent_weekly: Optional[
-        pd.DataFrame
-    ] = None  # e.g., NDX/sector/BTC weekly with precomputed EMAs/ATR
-    market_weekly: Optional[
-        pd.DataFrame
-    ] = None  # broad market weekly (SPX/Total Market)
+    parent_weekly: Optional[pd.DataFrame] = (
+        None  # e.g., NDX/sector/BTC weekly with precomputed EMAs/ATR
+    )
+    market_weekly: Optional[pd.DataFrame] = (
+        None  # broad market weekly (SPX/Total Market)
+    )
 
 
 @dataclass

@@ -440,9 +440,9 @@ class FeaturesStore:
 
         # Build has_price_gap expression
         if sources_available.get("returns", False):
-            explicit[
-                "has_price_gap"
-            ] = "CASE WHEN r.gap_bars > 1 THEN TRUE ELSE FALSE END"
+            explicit["has_price_gap"] = (
+                "CASE WHEN r.gap_bars > 1 THEN TRUE ELSE FALSE END"
+            )
         else:
             explicit["has_price_gap"] = "FALSE"
 
@@ -464,9 +464,9 @@ class FeaturesStore:
             outlier_parts.append("t.is_outlier")
 
         if outlier_parts:
-            explicit[
-                "has_outlier"
-            ] = f"CASE WHEN {' OR '.join(outlier_parts)} THEN TRUE ELSE FALSE END"
+            explicit["has_outlier"] = (
+                f"CASE WHEN {' OR '.join(outlier_parts)} THEN TRUE ELSE FALSE END"
+            )
         else:
             explicit["has_outlier"] = "FALSE"
 
