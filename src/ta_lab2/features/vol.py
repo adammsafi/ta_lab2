@@ -39,8 +39,10 @@ def add_garman_klass_vol(
     periods_per_year: int = 252,
 ) -> pd.DataFrame:
     """Garman–Klass (1980) volatility estimator."""
-    o, h, l, c = [df[k].astype(float) for k in (open_col, high_col, low_col, close_col)]
-    rs = 0.5 * (np.log(h / l)) ** 2 - (2 * np.log(2) - 1) * (np.log(c / o)) ** 2
+    o, h, lo, c = [
+        df[k].astype(float) for k in (open_col, high_col, low_col, close_col)
+    ]
+    rs = 0.5 * (np.log(h / lo)) ** 2 - (2 * np.log(2) - 1) * (np.log(c / o)) ** 2
     for w in windows:
         vol = np.sqrt(rs.rolling(w, min_periods=w).mean())
         if annualize:
@@ -60,8 +62,10 @@ def add_rogers_satchell_vol(
     periods_per_year: int = 252,
 ) -> pd.DataFrame:
     """Rogers–Satchell (1991) volatility estimator."""
-    o, h, l, c = [df[k].astype(float) for k in (open_col, high_col, low_col, close_col)]
-    rs = np.log(h / c) * np.log(h / o) + np.log(l / c) * np.log(l / o)
+    o, h, lo, c = [
+        df[k].astype(float) for k in (open_col, high_col, low_col, close_col)
+    ]
+    rs = np.log(h / c) * np.log(h / o) + np.log(lo / c) * np.log(lo / o)
     for w in windows:
         vol = np.sqrt(rs.rolling(w, min_periods=w).mean())
         if annualize:
@@ -79,15 +83,15 @@ def add_atr(
     close_col: str = "close",
 ) -> pd.DataFrame:
     """Average True Range (Wilder)."""
-    h, l, c = (
+    h, lo, c = (
         df[high_col].astype(float),
         df[low_col].astype(float),
         df[close_col].astype(float),
     )
     prev_close = c.shift(1)
-    tr = (h - l).abs()
+    tr = (h - lo).abs()
     tr = np.maximum(tr, (h - prev_close).abs())
-    tr = np.maximum(tr, (l - prev_close).abs())
+    tr = np.maximum(tr, (lo - prev_close).abs())
     df[f"atr_{period}"] = tr.ewm(alpha=1 / period, adjust=False).mean()
     return df
 
@@ -176,12 +180,17 @@ def add_rolling_vol_from_returns_batch(
     periods_per_year: int = 252,
     ddof: int = 0,
     prefix: str = "vol",
+    returns_col: str | None = None,
     # Legacy API
     price_col: str | None = None,
     modes: Iterable[str] | None = None,
     direction: str | None = None,
 ) -> pd.DataFrame:
-    """Rolling historical volatility (new + legacy API)."""
+    """Rolling historical volatility (new + legacy API).
+
+    If ``returns_col`` is provided and that column exists in *df*, use it
+    directly as log returns instead of recomputing from ``close_col``.
+    """
     # --- Backward compat mapping ---
     if price_col is not None:
         close_col = price_col
@@ -195,7 +204,13 @@ def add_rolling_vol_from_returns_batch(
             types = "log"
 
     px = df[close_col].astype(float)
-    r_log = np.log(px / px.shift(1))
+
+    # Use pre-computed log returns when available
+    if returns_col and returns_col in df.columns:
+        r_log = df[returns_col].astype(float)
+    else:
+        r_log = np.log(px / px.shift(1))
+
     r_pct = px.pct_change()
 
     if types in ("log", "both"):

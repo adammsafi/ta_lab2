@@ -117,8 +117,16 @@ class TAFeature(BaseFeature):
             DataFrame with columns: id, ts, open, high, low, close, volume
             Sorted by id, ts ASC
         """
-        where_clauses = ["id = ANY(:ids)", "tf = :tf"]
-        params = {"ids": ids, "tf": self.config.tf}
+        where_clauses = [
+            "id = ANY(:ids)",
+            "tf = :tf",
+            "alignment_source = :as_",
+        ]
+        params = {
+            "ids": ids,
+            "tf": self.config.tf,
+            "as_": self.config.alignment_source,
+        }
 
         if start:
             where_clauses.append(f"{self.TS_COLUMN} >= :start")
@@ -212,8 +220,9 @@ class TAFeature(BaseFeature):
         # Combine all IDs
         df_result = pd.concat(results, ignore_index=True)
 
-        # Add tf and tf_days columns
+        # Add tf, alignment_source, and tf_days columns
         df_result["tf"] = self.config.tf
+        df_result["alignment_source"] = self.get_alignment_source()
         df_result["tf_days"] = self.get_tf_days()
 
         # Select output columns
@@ -248,6 +257,7 @@ class TAFeature(BaseFeature):
             "id": "INTEGER NOT NULL",
             "ts": "TIMESTAMPTZ NOT NULL",
             "tf": "TEXT NOT NULL",
+            "alignment_source": "TEXT NOT NULL",
             "tf_days": "INTEGER NOT NULL",
             "close": "DOUBLE PRECISION",
         }

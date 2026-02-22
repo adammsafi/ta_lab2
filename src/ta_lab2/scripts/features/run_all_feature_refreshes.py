@@ -61,16 +61,21 @@ class RefreshResult:
 
 
 def refresh_vol(
-    engine, ids: list[int], start: Optional[str], end: Optional[str], tf: str = "1D"
+    engine,
+    ids: list[int],
+    start: Optional[str],
+    end: Optional[str],
+    tf: str = "1D",
+    alignment_source: str = "multi_tf",
 ) -> RefreshResult:
-    """Refresh cmc_vol table for given tf."""
+    """Refresh cmc_vol table for given tf + alignment_source."""
     from ta_lab2.scripts.features.vol_feature import VolatilityFeature, VolatilityConfig
 
     table = "cmc_vol"
     t0 = time.time()
 
     try:
-        config = VolatilityConfig(tf=tf)
+        config = VolatilityConfig(tf=tf, alignment_source=alignment_source)
         feature = VolatilityFeature(engine, config)
         rows_written = feature.compute_for_ids(ids=ids, start=start, end=end)
         duration = time.time() - t0
@@ -95,16 +100,21 @@ def refresh_vol(
 
 
 def refresh_ta(
-    engine, ids: list[int], start: Optional[str], end: Optional[str], tf: str = "1D"
+    engine,
+    ids: list[int],
+    start: Optional[str],
+    end: Optional[str],
+    tf: str = "1D",
+    alignment_source: str = "multi_tf",
 ) -> RefreshResult:
-    """Refresh cmc_ta table for given tf."""
+    """Refresh cmc_ta table for given tf + alignment_source."""
     from ta_lab2.scripts.features.ta_feature import TAFeature, TAConfig
 
     table = "cmc_ta"
     t0 = time.time()
 
     try:
-        config = TAConfig(tf=tf)
+        config = TAConfig(tf=tf, alignment_source=alignment_source)
         feature = TAFeature(engine, config)
         rows_written = feature.compute_for_ids(ids=ids, start=start, end=end)
         duration = time.time() - t0
@@ -129,16 +139,27 @@ def refresh_ta(
 
 
 def refresh_features_store(
-    engine, ids: list[int], start: Optional[str], end: Optional[str], tf: str = "1D"
+    engine,
+    ids: list[int],
+    start: Optional[str],
+    end: Optional[str],
+    tf: str = "1D",
+    alignment_source: str = "multi_tf",
 ) -> RefreshResult:
-    """Refresh cmc_features table for given tf."""
+    """Refresh cmc_features table for given tf + alignment_source."""
     from ta_lab2.scripts.features.daily_features_view import refresh_features
 
     table = "cmc_features"
     t0 = time.time()
 
     try:
-        rows_written = refresh_features(engine, ids=ids, tf=tf, full_refresh=False)
+        rows_written = refresh_features(
+            engine,
+            ids=ids,
+            tf=tf,
+            alignment_source=alignment_source,
+            full_refresh=False,
+        )
         duration = time.time() - t0
 
         return RefreshResult(
@@ -165,28 +186,42 @@ def refresh_features_store(
 # =============================================================================
 
 
-def get_available_tfs(engine) -> list[str]:
-    """Query distinct TFs from cmc_price_bars_multi_tf."""
-    query = text("SELECT DISTINCT tf FROM public.cmc_price_bars_multi_tf ORDER BY tf")
+def get_available_tf_alignments(engine) -> list[tuple[str, str]]:
+    """Query distinct (tf, alignment_source) pairs from _u table.
+
+    Uses DISTINCT ON (tf) to pick one alignment_source per tf
+    (month/year calendar TFs appear with both _iso and _us but bars
+    are identical).
+    """
+    query = text(
+        """
+        SELECT DISTINCT ON (tf) tf, alignment_source
+        FROM public.cmc_price_bars_multi_tf_u
+        ORDER BY tf, alignment_source
+        """
+    )
     with engine.connect() as conn:
-        result = conn.execute(query)
-        return [row[0] for row in result]
+        return [(row[0], row[1]) for row in conn.execute(query)]
 
 
 def run_all_refreshes(
     engine,
     ids: list[int],
     tf: str = "1D",
+    alignment_source: str = "multi_tf",
     full_refresh: bool = False,
     validate: bool = True,
     parallel: bool = True,
 ) -> dict[str, RefreshResult]:
-    """Refresh all feature tables for a single tf."""
+    """Refresh all feature tables for a single (tf, alignment_source)."""
     results = {}
     start = None
     end = None
 
-    logger.info(f"Starting feature refresh for {len(ids)} IDs, tf={tf}")
+    logger.info(
+        f"Starting feature refresh for {len(ids)} IDs,"
+        f" tf={tf}, alignment_source={alignment_source}"
+    )
     logger.info(f"Mode: {'full' if full_refresh else 'incremental'}")
 
     # Phase 1: Vol, TA (can run in parallel)
@@ -201,7 +236,9 @@ def run_all_refreshes(
         with ThreadPoolExecutor(max_workers=3) as executor:
             future_to_name = {}
             for name, refresh_fn in phase1_tasks:
-                future = executor.submit(refresh_fn, engine, ids, start, end, tf)
+                future = executor.submit(
+                    refresh_fn, engine, ids, start, end, tf, alignment_source
+                )
                 future_to_name[future] = name
 
             for future in as_completed(future_to_name):
@@ -220,7 +257,7 @@ def run_all_refreshes(
         logger.info("Phase 1: Running vol/ta sequentially")
 
         for name, refresh_fn in phase1_tasks:
-            result = refresh_fn(engine, ids, start, end, tf)
+            result = refresh_fn(engine, ids, start, end, tf, alignment_source)
             results[result.table] = result
 
             if result.success:
@@ -233,7 +270,7 @@ def run_all_refreshes(
     # Phase 2: Features store (depends on phase 1)
     logger.info("Phase 2: Running cmc_features (unified view)")
 
-    result = refresh_features_store(engine, ids, start, end, tf)
+    result = refresh_features_store(engine, ids, start, end, tf, alignment_source)
     results[result.table] = result
 
     if result.success:
@@ -279,7 +316,7 @@ def load_ids(engine, ids_arg: Optional[str], all_ids: bool) -> list[int]:
 
     if all_ids:
         query = text(
-            "SELECT DISTINCT id FROM public.cmc_price_bars_multi_tf ORDER BY id"
+            "SELECT DISTINCT id FROM public.cmc_price_bars_multi_tf_u ORDER BY id"
         )
         with engine.connect() as conn:
             result = conn.execute(query)
@@ -399,20 +436,36 @@ def main() -> int:
         f"Processing {len(ids)} IDs: {ids[:10]}{'...' if len(ids) > 10 else ''}"
     )
 
-    # Determine timeframes
+    # Determine (tf, alignment_source) pairs
     if args.all_tfs:
-        tfs = get_available_tfs(engine)
-        logger.info(f"Processing all {len(tfs)} timeframes: {tfs}")
+        tf_alignments = get_available_tf_alignments(engine)
+        logger.info(
+            f"Processing all {len(tf_alignments)} (tf, alignment_source) pairs:"
+            f" {tf_alignments}"
+        )
     else:
-        tfs = [args.tf]
-        logger.info(f"Processing timeframe: {args.tf}")
+        # Look up alignment_source for the specified tf
+        query = text(
+            """
+            SELECT DISTINCT ON (tf) alignment_source
+            FROM public.cmc_price_bars_multi_tf_u WHERE tf = :tf
+            ORDER BY tf, alignment_source
+            """
+        )
+        with engine.connect() as conn:
+            row = conn.execute(query, {"tf": args.tf}).fetchone()
+            alignment_source = row[0] if row else "multi_tf"
+        tf_alignments = [(args.tf, alignment_source)]
+        logger.info(
+            f"Processing timeframe: {args.tf}" f" (alignment_source={alignment_source})"
+        )
 
-    # Run refreshes for each tf
+    # Run refreshes for each (tf, alignment_source)
     all_results = {}
 
-    for tf in tfs:
+    for tf, alignment_source in tf_alignments:
         logger.info(f"\n{'='*60}")
-        logger.info(f"Processing tf={tf}")
+        logger.info(f"Processing tf={tf}, alignment_source={alignment_source}")
         logger.info(f"{'='*60}")
 
         try:
@@ -420,8 +473,10 @@ def main() -> int:
                 engine,
                 ids=ids,
                 tf=tf,
+                alignment_source=alignment_source,
                 full_refresh=args.full_refresh,
-                validate=args.validate and (tf == tfs[-1]),  # validate on last tf only
+                validate=args.validate
+                and ((tf, alignment_source) == tf_alignments[-1]),
                 parallel=args.parallel,
             )
             all_results[tf] = results
@@ -460,7 +515,10 @@ def main() -> int:
                     failures.append(f"{tf}/{table}")
 
     print("\n" + "=" * 70)
-    print(f"Total: {total_rows} rows in {total_duration:.1f}s across {len(tfs)} TFs")
+    print(
+        f"Total: {total_rows} rows in {total_duration:.1f}s"
+        f" across {len(tf_alignments)} TFs"
+    )
 
     if failures:
         print(f"Failures: {', '.join(failures)}")

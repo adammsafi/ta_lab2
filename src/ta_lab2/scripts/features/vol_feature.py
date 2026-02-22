@@ -122,7 +122,8 @@ class VolatilityFeature(BaseFeature):
         end: Optional[str] = None,
     ) -> pd.DataFrame:
         """
-        Load OHLC data from cmc_price_bars_multi_tf for configured tf.
+        Load OHLC data from cmc_price_bars_multi_tf_u for configured tf,
+        LEFT JOINing cmc_returns_bars_multi_tf_u for pre-computed ret_log.
 
         Args:
             ids: List of asset IDs
@@ -130,33 +131,48 @@ class VolatilityFeature(BaseFeature):
             end: Optional end date (inclusive, ISO format)
 
         Returns:
-            DataFrame with columns: id, ts, open, high, low, close
+            DataFrame with columns: id, ts, open, high, low, close, ret_log
             Sorted by id ASC, ts ASC
         """
-        where_clauses = ["id = ANY(:ids)", "tf = :tf"]
-        params = {"ids": ids, "tf": self.config.tf}
+        where_clauses = [
+            "p.id = ANY(:ids)",
+            "p.tf = :tf",
+            "p.alignment_source = :as_",
+        ]
+        params = {
+            "ids": ids,
+            "tf": self.config.tf,
+            "as_": self.get_alignment_source(),
+        }
 
         if start:
-            where_clauses.append(f"{self.TS_COLUMN} >= :start")
+            where_clauses.append(f"p.{self.TS_COLUMN} >= :start")
             params["start"] = start
 
         if end:
-            where_clauses.append(f"{self.TS_COLUMN} <= :end")
+            where_clauses.append(f"p.{self.TS_COLUMN} <= :end")
             params["end"] = end
 
         where_sql = " AND ".join(where_clauses)
 
         sql = f"""
             SELECT
-                id,
-                {self.TS_COLUMN} as ts,
-                open,
-                high,
-                low,
-                close
-            FROM {self.SOURCE_TABLE}
+                p.id,
+                p.{self.TS_COLUMN} as ts,
+                p.open,
+                p.high,
+                p.low,
+                p.close,
+                r.ret_log
+            FROM {self.SOURCE_TABLE} p
+            LEFT JOIN public.cmc_returns_bars_multi_tf_u r
+                ON p.id = r.id
+                AND p.{self.TS_COLUMN} = r."timestamp"
+                AND r.tf = :tf
+                AND r.alignment_source = :as_
+                AND r.roll = FALSE
             WHERE {where_sql}
-            ORDER BY id ASC, ts ASC
+            ORDER BY p.id ASC, ts ASC
         """
 
         with self.engine.connect() as conn:
@@ -244,6 +260,7 @@ class VolatilityFeature(BaseFeature):
             )
 
             # 5. Rolling historical volatility from log returns
+            #    Use pre-computed ret_log from returns _u table when available
             add_rolling_vol_from_returns_batch(
                 df_id,
                 close_col="close",
@@ -253,6 +270,7 @@ class VolatilityFeature(BaseFeature):
                 periods_per_year=self._periods_per_year,
                 ddof=0,
                 prefix="vol",
+                returns_col="ret_log",
             )
 
             results.append(df_id)
@@ -260,8 +278,9 @@ class VolatilityFeature(BaseFeature):
         # Combine all IDs
         df_features = pd.concat(results, ignore_index=True)
 
-        # Add tf and tf_days columns
+        # Add tf, alignment_source, and tf_days columns
         df_features["tf"] = self.config.tf
+        df_features["alignment_source"] = self.get_alignment_source()
         df_features["tf_days"] = self.get_tf_days()
 
         return df_features
@@ -277,6 +296,7 @@ class VolatilityFeature(BaseFeature):
             "id": "INTEGER NOT NULL",
             "ts": "TIMESTAMPTZ NOT NULL",
             "tf": "TEXT NOT NULL",
+            "alignment_source": "TEXT NOT NULL",
             "tf_days": "INTEGER NOT NULL",
             # OHLC context
             "open": "DOUBLE PRECISION",

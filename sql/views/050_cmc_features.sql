@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS public.cmc_features (
     id              INTEGER NOT NULL,
     ts              TIMESTAMPTZ NOT NULL,
     tf              TEXT NOT NULL,
+    alignment_source TEXT NOT NULL,
     tf_days         INTEGER NOT NULL,
 
     -- Asset metadata
@@ -198,15 +199,15 @@ CREATE TABLE IF NOT EXISTS public.cmc_features (
     has_outlier     BOOLEAN DEFAULT FALSE,
     updated_at      TIMESTAMPTZ DEFAULT now(),
 
-    PRIMARY KEY (id, ts, tf)
+    PRIMARY KEY (id, ts, tf, alignment_source)
 );
 
 -- Indexes for common query patterns
-CREATE INDEX IF NOT EXISTS idx_cmc_features_id_tf_ts
-ON public.cmc_features (id, tf, ts DESC);
+CREATE INDEX IF NOT EXISTS idx_cmc_features_id_tf_as_ts
+ON public.cmc_features (id, tf, alignment_source, ts DESC);
 
-CREATE INDEX IF NOT EXISTS idx_cmc_features_asset_class
-ON public.cmc_features (asset_class, tf, ts DESC);
+CREATE INDEX IF NOT EXISTS idx_cmc_features_asset_class_as
+ON public.cmc_features (asset_class, tf, alignment_source, ts DESC);
 
 COMMENT ON TABLE public.cmc_features IS
 'Unified multi-TF bar-level feature store for ML pipelines. Materialized from prices, returns, vol, TA. EMAs excluded (different granularity — query cmc_ema_multi_tf_u directly).';

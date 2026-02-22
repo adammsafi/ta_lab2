@@ -49,6 +49,7 @@ _RETURNS_EXCLUDE = frozenset(
         "timestamp",
         "tf",
         "tf_days",
+        "alignment_source",
         "bar_seq",
         "pos_in_bar",
         "count_days",
@@ -67,6 +68,7 @@ _VOL_EXCLUDE = frozenset(
         "ts",
         "tf",
         "tf_days",
+        "alignment_source",
         "open",
         "high",
         "low",
@@ -81,6 +83,7 @@ _TA_EXCLUDE = frozenset(
         "ts",
         "tf",
         "tf_days",
+        "alignment_source",
         "close",
         "atr_14",
         "updated_at",
@@ -96,12 +99,14 @@ _RENAMES = {
 # Source table definitions: alias, join condition template, exclude set.
 _SOURCE_DEFS = {
     "returns": {
-        "table": "public.cmc_returns_bars_multi_tf",
+        "table": "public.cmc_returns_bars_multi_tf_u",
         "alias": "r",
         "join_tmpl": (
-            "LEFT JOIN public.cmc_returns_bars_multi_tf r"
+            "LEFT JOIN public.cmc_returns_bars_multi_tf_u r"
             ' ON p.id = r.id AND p.time_close = r."timestamp"'
-            " AND r.tf = '{tf}' AND r.roll = FALSE"
+            " AND r.tf = '{tf}'"
+            " AND r.alignment_source = '{alignment_source}'"
+            " AND r.roll = FALSE"
         ),
         "exclude": _RETURNS_EXCLUDE,
     },
@@ -110,7 +115,9 @@ _SOURCE_DEFS = {
         "alias": "v",
         "join_tmpl": (
             "LEFT JOIN public.cmc_vol v"
-            " ON p.id = v.id AND p.time_close = v.ts AND v.tf = '{tf}'"
+            " ON p.id = v.id AND p.time_close = v.ts"
+            " AND v.tf = '{tf}'"
+            " AND v.alignment_source = '{alignment_source}'"
         ),
         "exclude": _VOL_EXCLUDE,
     },
@@ -119,7 +126,9 @@ _SOURCE_DEFS = {
         "alias": "t",
         "join_tmpl": (
             "LEFT JOIN public.cmc_ta t"
-            " ON p.id = t.id AND p.time_close = t.ts AND t.tf = '{tf}'"
+            " ON p.id = t.id AND p.time_close = t.ts"
+            " AND t.tf = '{tf}'"
+            " AND t.alignment_source = '{alignment_source}'"
         ),
         "exclude": _TA_EXCLUDE,
     },
@@ -151,13 +160,13 @@ class FeaturesStore:
 
     SOURCE_TABLES = {
         "price_bars": {
-            "table": "cmc_price_bars_multi_tf",
+            "table": "cmc_price_bars_multi_tf_u",
             "schema": "public",
             "required": True,
             "feature_type": "price_bars",
         },
         "returns": {
-            "table": "cmc_returns_bars_multi_tf",
+            "table": "cmc_returns_bars_multi_tf_u",
             "schema": "public",
             "required": False,
             "feature_type": "returns",
@@ -269,6 +278,7 @@ class FeaturesStore:
         self,
         ids: list[int],
         tf: str = "1D",
+        alignment_source: str = "multi_tf",
         start: Optional[str] = None,
         full_refresh: bool = False,
     ) -> int:
@@ -278,6 +288,7 @@ class FeaturesStore:
         Args:
             ids: List of asset IDs to refresh
             tf: Timeframe code (e.g. '1D', '7D', '30D')
+            alignment_source: Alignment source (e.g. 'multi_tf', 'cal_iso')
             start: Optional start date (ISO format)
             full_refresh: If True, delete all rows for IDs before refresh
 
@@ -294,7 +305,7 @@ class FeaturesStore:
 
         if not sources_available.get("price_bars", False):
             logger.error(
-                "Required table cmc_price_bars_multi_tf not available - cannot refresh"
+                "Required table cmc_price_bars_multi_tf_u not available - cannot refresh"
             )
             return 0
 
@@ -308,18 +319,28 @@ class FeaturesStore:
         logger.info(f"Dirty window: {dirty_start} to {dirty_end}")
 
         # 3. Delete existing rows in dirty window
-        self._delete_dirty_rows(ids, tf, dirty_start if not full_refresh else None)
+        self._delete_dirty_rows(
+            ids, tf, alignment_source, dirty_start if not full_refresh else None
+        )
 
         # 4. Insert refreshed data
         join_query = self._build_join_query(
-            ids, tf, dirty_start.isoformat(), dirty_end.isoformat(), sources_available
+            ids,
+            tf,
+            alignment_source,
+            dirty_start.isoformat(),
+            dirty_end.isoformat(),
+            sources_available,
         )
 
         with self.engine.begin() as conn:
             result = conn.execute(text(join_query))
             rows_inserted = result.rowcount
 
-        logger.info(f"Inserted {rows_inserted} rows into cmc_features (tf={tf})")
+        logger.info(
+            f"Inserted {rows_inserted} rows into cmc_features"
+            f" (tf={tf}, alignment_source={alignment_source})"
+        )
 
         # 5. Update state
         self._update_state(ids)
@@ -327,11 +348,15 @@ class FeaturesStore:
         return rows_inserted
 
     def _delete_dirty_rows(
-        self, ids: list[int], tf: str, start: Optional[pd.Timestamp] = None
+        self,
+        ids: list[int],
+        tf: str,
+        alignment_source: str,
+        start: Optional[pd.Timestamp] = None,
     ) -> int:
-        """Delete existing rows in dirty window for given tf."""
-        where_clause = "id = ANY(:ids) AND tf = :tf"
-        params = {"ids": ids, "tf": tf}
+        """Delete existing rows in dirty window for given tf + alignment_source."""
+        where_clause = "id = ANY(:ids) AND tf = :tf AND alignment_source = :as_"
+        params: dict = {"ids": ids, "tf": tf, "as_": alignment_source}
 
         if start is not None:
             where_clause += " AND ts >= :start"
@@ -346,13 +371,17 @@ class FeaturesStore:
             result = conn.execute(text(delete_sql), params)
             rows_deleted = result.rowcount
 
-        logger.info(f"Deleted {rows_deleted} rows from dirty window (tf={tf})")
+        logger.info(
+            f"Deleted {rows_deleted} rows from dirty window"
+            f" (tf={tf}, alignment_source={alignment_source})"
+        )
         return rows_deleted
 
     def _build_join_query(
         self,
         ids: list[int],
         tf: str,
+        alignment_source: str,
         start: str,
         end: str,
         sources_available: dict[str, bool],
@@ -398,6 +427,7 @@ class FeaturesStore:
             "id": "p.id",
             "ts": "p.time_close",
             "tf": f"'{tf}'",
+            "alignment_source": f"'{alignment_source}'",
             "tf_days": "p.tf_days",
             "asset_class": "'CRYPTO'::text",
             "open": "p.open",
@@ -461,16 +491,21 @@ class FeaturesStore:
                 insert_cols.append(_q(col))
 
         # Build JOINs
-        from_clause = "\n            FROM public.cmc_price_bars_multi_tf p"
+        from_clause = "\n            FROM public.cmc_price_bars_multi_tf_u p"
         join_clauses = []
         for src_key, src_def in _SOURCE_DEFS.items():
             if sources_available.get(src_key, False):
-                join_clauses.append(src_def["join_tmpl"].format(tf=tf))
+                join_clauses.append(
+                    src_def["join_tmpl"].format(
+                        tf=tf, alignment_source=alignment_source
+                    )
+                )
 
         # WHERE clause
         where_clause = f"""
             WHERE p.id IN ({ids_list})
               AND p.tf = '{tf}'
+              AND p.alignment_source = '{alignment_source}'
               AND p.time_close >= '{start}'
               AND p.time_close <= '{end}'
         """
@@ -515,6 +550,7 @@ def refresh_features(
     engine: Engine,
     ids: list[int],
     tf: str = "1D",
+    alignment_source: str = "multi_tf",
     start: Optional[str] = None,
     full_refresh: bool = False,
 ) -> int:
@@ -525,6 +561,7 @@ def refresh_features(
         engine: SQLAlchemy engine
         ids: List of asset IDs to refresh
         tf: Timeframe code (e.g. '1D', '7D')
+        alignment_source: Alignment source (e.g. 'multi_tf', 'cal_iso')
         start: Optional start date (ISO format)
         full_refresh: If True, delete all rows for IDs before refresh
 
@@ -545,7 +582,13 @@ def refresh_features(
     state_manager.ensure_state_table()
 
     store = FeaturesStore(engine, state_manager)
-    return store.refresh_for_ids(ids, tf=tf, start=start, full_refresh=full_refresh)
+    return store.refresh_for_ids(
+        ids,
+        tf=tf,
+        alignment_source=alignment_source,
+        start=start,
+        full_refresh=full_refresh,
+    )
 
 
 # Backwards-compatible alias

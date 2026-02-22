@@ -51,6 +51,7 @@ class FeatureConfig:
 
     feature_type: str  # 'returns', 'vol', 'ta'
     tf: str = "1D"
+    alignment_source: str = "multi_tf"
     output_schema: str = "public"
     output_table: str = ""  # Set by subclass
     null_strategy: str = "skip"
@@ -85,7 +86,7 @@ class BaseFeature(ABC):
     - Database writing with table creation
     """
 
-    SOURCE_TABLE = "public.cmc_price_bars_multi_tf"
+    SOURCE_TABLE = "public.cmc_price_bars_multi_tf_u"
     TS_COLUMN = "time_close"
 
     def __init__(self, engine: Engine, config: FeatureConfig):
@@ -111,6 +112,10 @@ class BaseFeature(ABC):
                 ).fetchone()
                 self._tf_days_cache = row[0] if row else 1
         return self._tf_days_cache
+
+    def get_alignment_source(self) -> str:
+        """Return alignment_source from config."""
+        return self.config.alignment_source
 
     # =========================================================================
     # Abstract Methods (MUST override)
@@ -347,14 +352,19 @@ class BaseFeature(ABC):
             keep_cols = [c for c in df.columns if c in table_cols]
             df = df[keep_cols]
 
-        # Scoped delete: existing rows for these (ids, tf)
+        # Scoped delete: existing rows for these (ids, tf, alignment_source)
         ids = df["id"].unique().tolist()
         tf = self.config.tf
+        alignment_source = self.get_alignment_source()
 
         with self.engine.begin() as conn:
             conn.execute(
-                text(f"DELETE FROM {fq_table} WHERE id = ANY(:ids) AND tf = :tf"),
-                {"ids": ids, "tf": tf},
+                text(
+                    f"DELETE FROM {fq_table}"
+                    " WHERE id = ANY(:ids) AND tf = :tf"
+                    " AND alignment_source = :as_"
+                ),
+                {"ids": ids, "tf": tf, "as_": alignment_source},
             )
 
         # Insert

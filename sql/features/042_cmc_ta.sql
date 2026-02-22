@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS public.cmc_ta (
     id              INTEGER NOT NULL,
     ts              TIMESTAMPTZ NOT NULL,
     tf              TEXT NOT NULL,
+    alignment_source TEXT NOT NULL,
     tf_days         INTEGER NOT NULL,
 
     -- Price context
@@ -48,11 +49,11 @@ CREATE TABLE IF NOT EXISTS public.cmc_ta (
     -- Metadata
     updated_at      TIMESTAMPTZ DEFAULT now(),
 
-    PRIMARY KEY (id, ts, tf)
+    PRIMARY KEY (id, ts, tf, alignment_source)
 );
 
-CREATE INDEX IF NOT EXISTS idx_cmc_ta_id_tf_ts
-ON public.cmc_ta (id, tf, ts DESC);
+CREATE INDEX IF NOT EXISTS idx_cmc_ta_id_tf_as_ts
+ON public.cmc_ta (id, tf, alignment_source, ts DESC);
 
 COMMENT ON TABLE public.cmc_ta IS
 'Multi-TF technical indicators. Parameter sets defined in dim_indicators.';

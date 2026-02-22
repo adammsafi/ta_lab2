@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS public.cmc_vol (
     id              INTEGER NOT NULL,
     ts              TIMESTAMPTZ NOT NULL,
     tf              TEXT NOT NULL,
+    alignment_source TEXT NOT NULL,
     tf_days         INTEGER NOT NULL,
 
     -- OHLC context (for reference)
@@ -77,12 +78,12 @@ CREATE TABLE IF NOT EXISTS public.cmc_vol (
     -- Metadata
     updated_at          TIMESTAMPTZ DEFAULT now(),
 
-    PRIMARY KEY (id, ts, tf)
+    PRIMARY KEY (id, ts, tf, alignment_source)
 );
 
 -- Index for lookups per TF
-CREATE INDEX IF NOT EXISTS idx_cmc_vol_id_tf_ts
-ON public.cmc_vol (id, tf, ts DESC);
+CREATE INDEX IF NOT EXISTS idx_cmc_vol_id_tf_as_ts
+ON public.cmc_vol (id, tf, alignment_source, ts DESC);
 
 COMMENT ON TABLE public.cmc_vol IS
 'Multi-TF volatility measures from cmc_price_bars_multi_tf OHLC. Annualization: periods_per_year = max(12, round(252/tf_days)).';
