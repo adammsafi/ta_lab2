@@ -814,6 +814,11 @@ def main() -> None:
         default=0,
         help="Samples: cap TFs per id (0 = no cap)",
     )
+    ap.add_argument(
+        "--to-db",
+        action="store_true",
+        help="Write audit results to audit_results DB table (in addition to CSV)",
+    )
 
     args = ap.parse_args()
 
@@ -834,26 +839,49 @@ def main() -> None:
     if "all" in run_set or not run_set:
         run_set = {"coverage", "audit", "spacing", "samples"}
 
-    ran = []
+    results = {}
     if "coverage" in run_set:
-        run_coverage(engine, ids, args.dim_tf, args.out_coverage)
-        ran.append("coverage")
+        results["coverage"] = run_coverage(engine, ids, args.dim_tf, args.out_coverage)
     if "audit" in run_set:
-        run_audit(engine, ids, args.out_audit)
-        ran.append("audit")
+        results["audit"] = run_audit(engine, ids, args.out_audit)
     if "spacing" in run_set:
-        run_spacing(engine, ids, args.dim_tf, args.out_spacing)
-        ran.append("spacing")
+        results["spacing"] = run_spacing(engine, ids, args.dim_tf, args.out_spacing)
     if "samples" in run_set:
         max_tfs = (
             args.max_tfs_per_id
             if args.max_tfs_per_id and args.max_tfs_per_id > 0
             else None
         )
-        run_samples(engine, ids, args.per_group, max_tfs, args.out_samples)
-        ran.append("samples")
+        results["samples"] = run_samples(
+            engine, ids, args.per_group, max_tfs, args.out_samples
+        )
 
-    _log(f"Done. Ran: {ran}")
+    # Write to DB if requested
+    if args.to_db:
+        from ta_lab2.scripts.audit.audit_db import (
+            ensure_audit_table,
+            clear_audit_results,
+            write_coverage_to_db,
+            write_table_audit_to_db,
+            write_spacing_to_db,
+        )
+
+        ensure_audit_table(engine)
+        for table in BAR_TABLES:
+            clear_audit_results(engine, table, "coverage")
+            clear_audit_results(engine, table, "audit")
+            clear_audit_results(engine, table, "spacing")
+
+        n_written = 0
+        if "coverage" in results:
+            n_written += write_coverage_to_db(engine, results["coverage"], "bars")
+        if "audit" in results:
+            n_written += write_table_audit_to_db(engine, results["audit"], "bars")
+        if "spacing" in results:
+            n_written += write_spacing_to_db(engine, results["spacing"], "bars")
+        _log(f"[to-db] Wrote {n_written} rows to audit_results")
+
+    _log(f"Done. Ran: {sorted(results.keys())}")
 
 
 if __name__ == "__main__":

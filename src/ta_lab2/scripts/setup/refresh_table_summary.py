@@ -40,12 +40,18 @@ RULES: list[tuple[str, str, str | None, str | None]] = [
     ("cmc_regimes", "REGIME", None, None),
     # QA / reject tables
     ("ema_rejects", "QA", "EMA", None),
+    # Audit results
+    ("audit_results", "QA", "AUDIT", None),
     # Stats state tables (before generic state)
+    ("cmc_features_stats_state", "STATE", "STATS", "FEATURE"),
+    ("price_bars_multi_tf_stats_state", "STATE", "STATS", "BAR"),
     ("returns_ema_stats_state", "STATE", "STATS", "EMA"),
     ("ema_multi_tf_cal_anchor_stats_state", "STATE", "STATS", "EMA"),
     ("ema_multi_tf_cal_stats_state", "STATE", "STATS", "EMA"),
     ("ema_multi_tf_stats_state", "STATE", "STATS", "EMA"),
     # Stats tables
+    ("cmc_features_stats", "STATS", "FEATURE", None),
+    ("price_bars_multi_tf_stats", "STATS", "BAR", None),
     ("returns_ema_stats", "STATS", "RETURN", "EMA"),
     ("ema_multi_tf_cal_anchor_stats", "STATS", "EMA", None),
     ("ema_multi_tf_cal_stats", "STATS", "EMA", None),

@@ -653,6 +653,11 @@ def main() -> None:
         default=0,
         help="Samples: cap groups per id (0 = no cap)",
     )
+    ap.add_argument(
+        "--to-db",
+        action="store_true",
+        help="Write audit results to audit_results DB table (in addition to CSV)",
+    )
 
     args = ap.parse_args()
 
@@ -696,6 +701,31 @@ def main() -> None:
         results["samples"] = run_samples(
             engine, ids, args.per_group, max_groups, args.out_samples
         )
+
+    # Write to DB if requested
+    if args.to_db:
+        from ta_lab2.scripts.audit.audit_db import (
+            ensure_audit_table,
+            clear_audit_results,
+            write_coverage_to_db,
+            write_table_audit_to_db,
+            write_spacing_to_db,
+        )
+
+        ensure_audit_table(engine)
+        for table in EMA_TABLES:
+            clear_audit_results(engine, table, "coverage")
+            clear_audit_results(engine, table, "audit")
+            clear_audit_results(engine, table, "spacing")
+
+        n_written = 0
+        if "coverage" in results:
+            n_written += write_coverage_to_db(engine, results["coverage"], "ema")
+        if "audit" in results:
+            n_written += write_table_audit_to_db(engine, results["audit"], "ema")
+        if "spacing" in results:
+            n_written += write_spacing_to_db(engine, results["spacing"], "ema")
+        _log(f"[to-db] Wrote {n_written} rows to audit_results")
 
     _log(f"Done. Ran: {sorted(results.keys())}")
 
