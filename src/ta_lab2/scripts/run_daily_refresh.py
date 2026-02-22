@@ -2,10 +2,11 @@
 """
 Unified daily refresh orchestration script.
 
-Coordinates bars, EMAs, and regimes with state-based checking and clear visibility.
+Coordinates bars, EMAs, regimes, and stats with state-based checking and clear
+visibility.
 
 Usage:
-    # Full daily refresh (bars then EMAs then regimes)
+    # Full daily refresh (bars then EMAs then regimes then stats)
     python run_daily_refresh.py --all --ids 1,52,825
 
     # Bars only
@@ -16,6 +17,9 @@ Usage:
 
     # Regimes only
     python run_daily_refresh.py --regimes --ids all
+
+    # Stats only
+    python run_daily_refresh.py --stats
 
     # Use 8 parallel processes for bar builders
     python run_daily_refresh.py --all --ids all -n 8
@@ -43,6 +47,7 @@ from ta_lab2.scripts.refresh_utils import (
 TIMEOUT_BARS = 7200  # 2 hours -- bar builders can be slow for full rebuilds
 TIMEOUT_EMAS = 3600  # 1 hour -- EMA refreshers
 TIMEOUT_REGIMES = 1800  # 30 minutes -- regime refresher
+TIMEOUT_STATS = 3600  # 1 hour -- stats runners scan large tables
 
 
 @dataclass
@@ -399,6 +404,119 @@ def run_regime_refresher(
         )
 
 
+def run_stats_runners(args, db_url: str) -> ComponentResult:
+    """
+    Run stats runner orchestrator via subprocess.
+
+    Stats runners query aggregate PASS/WARN/FAIL status from DB after all 6
+    runners complete. The subprocess exits 1 on FAIL (data quality failure)
+    and 0 on PASS or WARN (pipeline continues for WARN, Telegram alert sent).
+
+    Args:
+        args: CLI arguments
+        db_url: Database URL
+
+    Returns:
+        ComponentResult with execution details
+    """
+    cmd = [
+        sys.executable,
+        "-m",
+        "ta_lab2.scripts.stats.run_all_stats_runners",
+    ]
+
+    cmd.extend(["--db-url", db_url])
+
+    if args.verbose:
+        cmd.append("--verbose")
+
+    # CRITICAL: Propagate --dry-run to subprocess
+    if getattr(args, "dry_run", False):
+        cmd.append("--dry-run")
+
+    print(f"\n{'=' * 70}")
+    print("RUNNING STATS RUNNERS")
+    print(f"{'=' * 70}")
+    print(f"Command: {' '.join(cmd)}")
+
+    if args.dry_run:
+        print("[DRY RUN] Would execute stats runners")
+        return ComponentResult(
+            component="stats",
+            success=True,
+            duration_sec=0.0,
+            returncode=0,
+        )
+
+    start = time.perf_counter()
+
+    try:
+        if args.verbose:
+            # Stream output
+            result = subprocess.run(cmd, check=False, timeout=TIMEOUT_STATS)
+        else:
+            # Capture output
+            result = subprocess.run(
+                cmd,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=TIMEOUT_STATS,
+            )
+
+            # Show output on error
+            if result.returncode != 0:
+                print(f"\n[ERROR] Stats runners failed with code {result.returncode}")
+                if result.stdout:
+                    print(f"\nSTDOUT:\n{result.stdout}")
+                if result.stderr:
+                    print(f"\nSTDERR:\n{result.stderr}")
+
+        duration = time.perf_counter() - start
+
+        if result.returncode == 0:
+            print(f"\n[OK] Stats runners completed successfully in {duration:.1f}s")
+            return ComponentResult(
+                component="stats",
+                success=True,
+                duration_sec=duration,
+                returncode=result.returncode,
+            )
+        else:
+            error_msg = f"Exited with code {result.returncode}"
+            print(f"\n[FAILED] Stats runners failed: {error_msg}")
+            return ComponentResult(
+                component="stats",
+                success=False,
+                duration_sec=duration,
+                returncode=result.returncode,
+                error_message=error_msg,
+            )
+
+    except subprocess.TimeoutExpired:
+        duration = time.perf_counter() - start
+        error_msg = f"Timed out after {TIMEOUT_STATS}s"
+        print(f"\n[TIMEOUT] Stats runners: {error_msg}")
+        return ComponentResult(
+            component="stats",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+    except Exception as e:
+        duration = time.perf_counter() - start
+        error_msg = str(e)
+        print(f"\n[ERROR] Stats runners raised exception: {error_msg}")
+        return ComponentResult(
+            component="stats",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+
+
 def print_combined_summary(results: list[tuple[str, ComponentResult]]) -> bool:
     """
     Print combined execution summary.
@@ -448,11 +566,11 @@ def print_combined_summary(results: list[tuple[str, ComponentResult]]) -> bool:
 def main(argv: list[str] | None = None) -> int:
     """Main entry point."""
     p = argparse.ArgumentParser(
-        description="Unified daily refresh orchestration for bars, EMAs, and regimes.",
+        description="Unified daily refresh orchestration for bars, EMAs, regimes, and stats.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Full daily refresh (bars then EMAs then regimes)
+  # Full daily refresh (bars then EMAs then regimes then stats)
   python run_daily_refresh.py --all --ids 1,52,825
 
   # Bars only
@@ -463,6 +581,9 @@ Examples:
 
   # Regimes only
   python run_daily_refresh.py --regimes --ids all
+
+  # Stats only (data quality check on all tables)
+  python run_daily_refresh.py --stats
 
   # Dry run to see what would execute
   python run_daily_refresh.py --all --ids 1 --dry-run
@@ -498,9 +619,14 @@ Examples:
         help="Run regime refresher only",
     )
     p.add_argument(
+        "--stats",
+        action="store_true",
+        help="Run stats runners only (data quality check)",
+    )
+    p.add_argument(
         "--all",
         action="store_true",
-        help="Run bars then EMAs then regimes (full refresh)",
+        help="Run bars then EMAs then regimes then stats (full refresh)",
     )
 
     # Common arguments
@@ -560,8 +686,8 @@ Examples:
     args = p.parse_args(argv)
 
     # Validation: require explicit target
-    if not (args.bars or args.emas or args.regimes or args.all):
-        p.error("Must specify --bars, --emas, --regimes, or --all")
+    if not (args.bars or args.emas or args.regimes or args.stats or args.all):
+        p.error("Must specify --bars, --emas, --regimes, --stats, or --all")
 
     # Resolve database URL
     try:
@@ -581,6 +707,7 @@ Examples:
     run_bars = args.bars or args.all
     run_emas = args.emas or args.all
     run_regimes = args.regimes or args.all
+    run_stats = args.stats or args.all
 
     # Build component description string
     components = []
@@ -590,6 +717,8 @@ Examples:
         components.append("EMAs")
     if run_regimes:
         components.append("regimes")
+    if run_stats:
+        components.append("stats")
     components_str = " + ".join(components)
 
     print(f"\n{'=' * 70}")
@@ -660,6 +789,20 @@ Examples:
     if run_regimes:
         regime_result = run_regime_refresher(args, db_url, parsed_ids)
         results.append(("regimes", regime_result))
+
+    # Run stats if requested (final stage -- after bars, EMAs, regimes)
+    if run_stats:
+        stats_result = run_stats_runners(args, db_url)
+        results.append(("stats", stats_result))
+
+        # Pipeline gate: stats FAIL means data quality issues
+        if not stats_result.success:
+            print(
+                "\n[PIPELINE GATE] Stats runners reported FAIL -- data quality check failed"
+            )
+            print("Review stats tables for specific failures before using this data")
+            # Don't check continue_on_error -- stats FAIL is always terminal
+            return 1
 
     # Print combined summary
     if not args.dry_run:
