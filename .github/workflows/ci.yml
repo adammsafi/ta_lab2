@@ -42,21 +42,60 @@ jobs:
 
   lint:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
-
-      - name: Install tools
-        run: |
-          python -m pip install --upgrade pip
-          pip install ruff
-
+          python-version: "3.12"
+      - name: Install ruff
+        run: pip install "ruff>=0.9.0"
       - name: Ruff lint
+        run: ruff check src/ --output-format=github
+
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install ruff
+        run: pip install "ruff>=0.9.0"
+      - name: Ruff format check
+        run: ruff format --check src/
+
+  mypy:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
         run: |
-          ruff check src || true  # keep lint non-blocking for now
+          pip install "mypy>=1.14" "pandas-stubs>=2.2"
+          pip install -e ".[dev]"
+      - name: mypy (features + regimes)
+        run: mypy src/ta_lab2/features/ src/ta_lab2/regimes/
+
+  version-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Check version consistency
+        run: |
+          PYPROJECT_VER=$(grep -oP '^version = "\K[^"]+' pyproject.toml)
+          README_VER=$(head -1 README.md | grep -oP 'v\K[0-9]+\.[0-9]+\.[0-9]+')
+          if [ "$PYPROJECT_VER" != "$README_VER" ]; then
+            echo "::error::Version mismatch: pyproject.toml=$PYPROJECT_VER, README=$README_VER"
+            exit 1
+          fi
+          echo "Version consistent: $PYPROJECT_VER"
