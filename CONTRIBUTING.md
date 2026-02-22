@@ -64,7 +64,7 @@ If you touch existing code, try to leave it a little cleaner than you found it.
 Before opening a PR:
 
 - Run the test suite: `pytest`
-- If we add linters/formatters later (e.g., `ruff`, `black`), run those too.
+- Run linting and formatting: `ruff check src/ --fix && ruff format src/`
 
 
 ## Opening a pull request

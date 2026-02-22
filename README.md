@@ -451,14 +451,14 @@ pytest -m validation
 ### Code Quality
 
 ```bash
+# Lint (auto-fix)
+ruff check src/ --fix
+
 # Format code
-black src/ tests/
+ruff format src/
 
-# Lint
-ruff check src/ tests/
-
-# Type checking
-mypy src/
+# Type checking (features + regimes only)
+mypy src/ta_lab2/features/ src/ta_lab2/regimes/
 ```
 
 ### Database Migrations
