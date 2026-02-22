@@ -9,13 +9,13 @@ See: .planning/PROJECT.md (updated 2026-02-22)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 29 of 33
 Plan: —
-Status: Defining requirements for v0.8.0
-Next Phase: Phase 29 (pending roadmap creation)
-Last activity: 2026-02-22 — Milestone v0.8.0 started
+Status: Ready to plan
+Next action: Run `/gsd:plan-phase 29` to create Phase 29 plans
+Last activity: 2026-02-22 — v0.8.0 roadmap created (5 phases, 20 requirements)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [##########] 100% v0.7.0 (2/2 phases, 10/10 plans) | [░░░░░░░░░░] 0% v0.8.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [##########] 100% v0.7.0 (2/2 phases, 10/10 plans) | [░░░░░░░░░░] 0% v0.8.0 (0/5 phases)
 
 ## Performance Metrics
 
@@ -78,6 +78,16 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 | 27-regime-integration | 7/7 | ~20 min | ~3 min | Complete |
 | 28-backtest-pipeline-fix | 3/3 | ~17 min | ~6 min | Complete |
 
+**By Phase (v0.8.0):**
+
+| Phase | Plans | Total | Avg/Plan | Status |
+|-------|-------|-------|----------|--------|
+| 29-stats-qa-orchestration | 0/TBD | — | — | Pending |
+| 30-code-quality-tooling | 0/TBD | — | — | Pending |
+| 31-documentation-freshness | 0/TBD | — | — | Pending |
+| 32-runbooks | 0/TBD | — | — | Pending |
+| 33-alembic-migrations | 0/TBD | — | — | Pending |
+
 *Updated after each plan completion*
 
 ## Accumulated Context
@@ -96,8 +106,8 @@ Recent decisions affecting current work:
 - **EMAs already use bar tables** (Phase 20): CRITICAL - All 6 EMA variants already migrated to validated bars. Phase 22 assumption invalid, requires re-scoping.
 - **All 6 EMA variants exist for legitimate reasons** (Phase 21): 80%+ infrastructure shared (BaseEMARefresher, EMAStateManager, compute_ema) with 20% intentional differences (data source, calendar alignment, anchoring) - NOT code duplication
 - **Gap severity framework established** (Phase 21-04): CRITICAL (data corruption), HIGH (error-prone), MEDIUM (workarounds), LOW (nice-to-have) - 15 gaps identified (4 CRITICAL, 5 HIGH, 4 MEDIUM, 2 LOW), prioritized for Phase 22-24
-- **Asset onboarding documented** (Phase 21-04): 6-step checklist (dim_assets → 1D bars → multi-TF bars → EMAs → validate → verify incremental), 15-40 minutes per asset
-- **Hybrid EMA validation** (Phase 22-02): Wide price bounds (0.5x-2x) catch corruption, narrow statistical bounds (3σ) catch drift - batched queries achieve <2% overhead
+- **Asset onboarding documented** (Phase 21-04): 6-step checklist (dim_assets -> 1D bars -> multi-TF bars -> EMAs -> validate -> verify incremental), 15-40 minutes per asset
+- **Hybrid EMA validation** (Phase 22-02): Wide price bounds (0.5x-2x) catch corruption, narrow statistical bounds (3-sigma) catch drift - batched queries achieve <2% overhead
 - **Warn and continue for EMA violations** (Phase 22-02): Write all EMAs even if invalid, log to both ema_rejects table and WARNING logs for maximum visibility
 - **Derive multi-TF from 1D bars** (Phase 22-04/22-05): All 5 multi-TF builders support optional --from-1d derivation with calendar alignment - creates single source of truth for bar data quality
 - **Reject tables dual purpose** (Phase 22-01): Multi-TF reject tables log OHLC repairs pre-derivation AND validate aggregation post-derivation - complete audit trail with violation_type + repair_action columns
@@ -108,14 +118,14 @@ Recent decisions affecting current work:
 - **Severity-based Telegram alerting** (Phase 23-03): AlertSeverity enum filters alerts (default: ERROR+), send_critical_alert() for database/corruption errors
 - **Preserve psycopg for SQL performance in 1D builder** (Phase 24-02): 1D bar builder uses large CTEs with complex aggregations - raw psycopg execution 2-3x faster than SQLAlchemy for this workload
 - **Modernize CLI for BaseBarBuilder consistency** (Phase 24-02): Space-separated IDs, --full-rebuild flag for consistency across all bar builders using BaseBarBuilder
-- **26.7% LOC reduction acceptable for SQL-based builders** (Phase 24-02): 1D builder achieved 260 lines saved (971→711) despite SQL-heavy implementation limiting code reuse with DataFrame-based base class
-- **46% LOC reduction for calendar builders** (Phase 24-04): All 4 calendar builders refactored (5991→3230 lines), preserving calendar alignment (US Sunday vs ISO Monday) and anchor window logic despite complex semantics
+- **26.7% LOC reduction acceptable for SQL-based builders** (Phase 24-02): 1D builder achieved 260 lines saved (971->711) despite SQL-heavy implementation limiting code reuse with DataFrame-based base class
+- **46% LOC reduction for calendar builders** (Phase 24-04): All 4 calendar builders refactored (5991->3230 lines), preserving calendar alignment (US Sunday vs ISO Monday) and anchor window logic despite complex semantics
 - **tz column design documented (GAP-M03 closed)** (Phase 24-04): Calendar state tables use tz as metadata only, NOT in PRIMARY KEY - single timezone per run design is intentional, not a bug
 - **NumPy allclose hybrid tolerance for baseline comparison** (Phase 25-01): Combine absolute (atol) + relative (rtol) tolerance to handle both small values near zero and large values correctly - avoids false positives/negatives from single epsilon threshold
 - **Column-specific tolerances** (Phase 25-01): Price (1e-6/1e-5) vs volume (1e-2/1e-4) - different data types need different precision requirements
 - **NaN == NaN is match** (Phase 25-01): Treat NaN == NaN as match using equal_nan=True to avoid SQL NULL semantics issues (NULL != NULL)
 - **Git-based audit trail for baseline capture** (Phase 25-01): Capture git commit hash + timestamp + config in BaselineMetadata for full reproducibility 3 months later
-- **Snapshot -> Truncate -> Rebuild -> Compare workflow** (Phase 25-02): Atomic validation pattern proves refactoring correctness by comparing identical input → output transformations
+- **Snapshot -> Truncate -> Rebuild -> Compare workflow** (Phase 25-02): Atomic validation pattern proves refactoring correctness by comparing identical input -> output transformations
 - **Intelligent sampling (beginning/end/random)** (Phase 25-02): 30 days beginning + 30 days end + 5% random interior balances speed and confidence - detects temporal drift while avoiding full table scans
 - **Never fail early in baseline capture** (Phase 25-02): Always run to completion, report ALL issues - partial results hide systemic problems
 - **Subprocess isolation for baseline workflow** (Phase 25-02): Run bar builders and EMA refreshers via subprocess.run matching Phase 23 patterns (run_daily_refresh.py)
@@ -139,16 +149,23 @@ Recent decisions affecting current work:
 - **--regimes standalone flag plus --all inclusion** (Phase 27-07): Consistent with --bars/--emas pattern; --all becomes single command for bars->EMAs->regimes pipeline
 - **EMA early-stop before regimes** (Phase 27-07): Added failure check before running regimes - regimes depend on fresh EMAs; propagates --dry-run to regime subprocess
 - **regime_inspect default reads from DB** (Phase 27-07): Operational check should be fast; --live flag triggers compute_regimes_for_id for testing changes before write
-- **JSONB serialization pattern** (Phase 28-01): Use `json.dumps(x) if isinstance(x, dict) else x` before to_sql() for JSONB columns — isinstance guard is defensive, handles pre-serialized strings; all 3 signal generators now consistent
-- **_ensure_utc pattern** (Phase 28-02): Helper checks ts.dt.tz: None -> tz_localize("UTC"), aware -> tz_convert("UTC") — safe for both vbt naive output and pandas tz-aware series
-- **Tz boundary pattern for vectorbt** (Phase 28-02): Strip tz at vectorbt ingestion (run_backtest), re-add at trade extraction (_ensure_utc in _extract_trades) — single strip covers all downstream vectorbt calls
-- **str.lower() for vbt direction** (Phase 28-02): vbt 0.28.1 returns 'Long'/'Short' strings, not integers — .astype(str).str.lower() handles both string and integer cases without NaN
-- **Backward-compat fee extraction** (Phase 28-02): Entry Fees + Exit Fees (vbt 0.28.1) -> Fees (older vbt) -> 0.0 — chained fallback maximizes cross-version compatibility
-- **ts coercion at merge point** (Phase 28-03): When pd.read_sql legacy path returns ts as object dtype, coerce both sides of merge via pd.to_datetime(utc=True) in merge_regime_context — single central fix covers all 3 signal generator callers
+- **JSONB serialization pattern** (Phase 28-01): Use `json.dumps(x) if isinstance(x, dict) else x` before to_sql() for JSONB columns -- isinstance guard is defensive, handles pre-serialized strings; all 3 signal generators now consistent
+- **_ensure_utc pattern** (Phase 28-02): Helper checks ts.dt.tz: None -> tz_localize("UTC"), aware -> tz_convert("UTC") -- safe for both vbt naive output and pandas tz-aware series
+- **Tz boundary pattern for vectorbt** (Phase 28-02): Strip tz at vectorbt ingestion (run_backtest), re-add at trade extraction (_ensure_utc in _extract_trades) -- single strip covers all downstream vectorbt calls
+- **str.lower() for vbt direction** (Phase 28-02): vbt 0.28.1 returns 'Long'/'Short' strings, not integers -- .astype(str).str.lower() handles both string and integer cases without NaN
+- **Backward-compat fee extraction** (Phase 28-02): Entry Fees + Exit Fees (vbt 0.28.1) -> Fees (older vbt) -> 0.0 -- chained fallback maximizes cross-version compatibility
+- **ts coercion at merge point** (Phase 28-03): When pd.read_sql legacy path returns ts as object dtype, coerce both sides of merge via pd.to_datetime(utc=True) in merge_regime_context -- single central fix covers all 3 signal generator callers
 - **load_prices without index_col** (Phase 28-03): pd.read_sql with index_col='ts'+parse_dates infers local-offset tz (UTC-04:00) producing 1903 duplicate index entries; post-hoc coerce via pd.to_datetime(utc=True).tz_convert("UTC").tz_localize(None) is reliable
-- **date-string split bounds for vbt** (Phase 28-03): strftime('%Y-%m-%d') triggers pandas partial-date matching (inclusive range) for tz-naive DatetimeIndex with 23:59:59.999 entries — exact Timestamp key lookup fails
-- **numpy scalar normalization at SQL boundary** (Phase 28-03): _to_python() with hasattr(v, 'item') normalizes np.float64/np.int64/np.bool_ to Python native before psycopg2 binding — avoids 'schema "np" does not exist' error
+- **date-string split bounds for vbt** (Phase 28-03): strftime('%Y-%m-%d') triggers pandas partial-date matching (inclusive range) for tz-naive DatetimeIndex with 23:59:59.999 entries -- exact Timestamp key lookup fails
+- **numpy scalar normalization at SQL boundary** (Phase 28-03): _to_python() with hasattr(v, 'item') normalizes np.float64/np.int64/np.bool_ to Python native before psycopg2 binding -- avoids 'schema "np" does not exist' error
 - **vbt 0.28.1 price columns renamed** (Phase 28-03): 'Entry Price'/'Exit Price' -> 'Avg Entry Price'/'Avg Exit Price' in records_readable; use 'Avg Entry Price' in columns check with fallback
+- **v0.8.0 sequencing constraint** (Roadmap): Phase 29 (Stats) before Phase 30 (Quality) so new orchestrator code is included in ruff sweep; Phase 33 (Alembic) can run in parallel with Phase 29; Phase 31 (Docs) after Phase 30; Phase 32 (Runbooks) last
+- **Subprocess timeouts before new steps** (v0.8.0 research): Add timeout= to all existing subprocess.run() calls BEFORE wiring new stats runner subprocess steps -- prevents silent hangs on Windows (CPython issue #88693)
+- **Ruff zero-violations before removing || true** (v0.8.0 research): Run ruff check src --statistics, fix all violations, verify zero-exit locally, THEN remove || true in a separate PR -- never remove escape hatch while violations exist
+- **No alembic autogenerate in v0.8.0** (v0.8.0 research): Write baseline migration by hand as a no-op; autogenerate without ORM models recreates all 50 tables as op.create_table() calls -- stamp-then-forward only
+- **mypy scoped to features/ and regimes/ only** (v0.8.0 research): Initial CI check non-blocking (continue-on-error: true); 35% unannotated functions + vectorbt/psycopg2 noise make global strict enforcement impossible in v0.8.0
+- **encoding='utf-8' in alembic env.py** (v0.8.0 research): Per MEMORY.md Windows pitfall -- UTF-8 box-drawing chars in SQL comments cause UnicodeDecodeError with default cp1252 encoding
+- **pyproject.toml is version source of truth** (v0.8.0 research): importlib.metadata.version("ta_lab2") reads pyproject.toml; update all three files (pyproject.toml, mkdocs.yml, README.md) to 0.8.0 in a single commit
 
 ### Pending Todos
 
@@ -161,7 +178,7 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: Initializing v0.8.0 milestone — defining requirements
+Stopped at: v0.8.0 roadmap created — ready to plan Phase 29
 Resume file: None
 
 ---
@@ -179,12 +196,14 @@ Resume file: None
 - Alembic is 10% — nearly greenfield migration framework
 
 **Phase Summary:**
-- Phase 29: Stats/QA Orchestration
-- Phase 30: Code Quality Tooling
-- Phase 31: Documentation Freshness
-- Phase 32: Runbooks for New Pipelines
-- Phase 33: Alembic Migrations
+- Phase 29: Stats/QA Orchestration (STAT-01 to STAT-04) — PENDING
+- Phase 30: Code Quality Tooling (QUAL-01 to QUAL-04) — PENDING
+- Phase 31: Documentation Freshness (DOCS-01 to DOCS-04) — PENDING
+- Phase 32: Runbooks (RUNB-01 to RUNB-04) — PENDING
+- Phase 33: Alembic Migrations (MIGR-01 to MIGR-04) — PENDING
+
+**Parallelization note:** Phase 29 and Phase 33 are fully isolated and can be executed on parallel branches simultaneously.
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-22 (v0.8.0 milestone initialized)*
+*Last updated: 2026-02-22 (v0.8.0 roadmap created — Phase 29 is next, ready to plan)*

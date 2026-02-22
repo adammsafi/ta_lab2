@@ -6,6 +6,7 @@
 - v0.5.0 Ecosystem Reorganization (Phases 11-19) - SHIPPED 2026-02-04
 - v0.6.0 EMA & Bar Architecture Standardization (Phases 20-26) - SHIPPED 2026-02-17
 - v0.7.0 Regime Integration & Signal Enhancement (Phases 27-28) - SHIPPED 2026-02-20
+- v0.8.0 Polish & Hardening (Phases 29-33) - IN PROGRESS
 
 ## Overview
 
@@ -17,7 +18,8 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 - Phases 1-10: v0.4.0 (complete)
 - Phases 11-19: v0.5.0 (complete)
 - Phases 20-26: v0.6.0 (complete)
-- Phases 27+: v0.7.0 (current milestone)
+- Phases 27-28: v0.7.0 (complete)
+- Phases 29-33: v0.8.0 (current milestone)
 - Decimal phases (27.1, 28.1): Urgent insertions if needed
 
 <details>
@@ -487,10 +489,89 @@ Plans:
 
 ---
 
+### v0.8.0 Polish & Hardening (Phases 29-33) - IN PROGRESS
+
+- [ ] **Phase 29: Stats/QA Orchestration** - Wire 5 existing stats runners into daily refresh pipeline + weekly QC digest
+- [ ] **Phase 30: Code Quality Tooling** - Make ruff lint blocking in CI, add mypy config, fix stale tooling references
+- [ ] **Phase 31: Documentation Freshness** - Version sync, pipeline mermaid diagram, fix stale refs, mkdocs build clean
+- [ ] **Phase 32: Runbooks** - Regime runbook, backtest runbook, new-asset SOP, disaster recovery guide
+- [ ] **Phase 33: Alembic Migrations** - Bootstrap framework, stamp existing schema, catalog legacy SQL migrations
+
+---
+
+### Phase 29: Stats/QA Orchestration
+**Goal:** The daily refresh pipeline validates data quality automatically — stats runners execute as the final stage and failures halt the pipeline before anyone uses bad data.
+**Depends on:** Phase 28 (v0.7.0 complete)
+**Requirements:** STAT-01, STAT-02, STAT-03, STAT-04
+**Success Criteria** (what must be TRUE):
+  1. `python -m ta_lab2.scripts.run_daily_refresh --all` executes bars -> EMAs -> regimes -> stats in sequence, with stats as the final stage
+  2. `python -m ta_lab2.scripts.run_daily_refresh --stats` runs only stats refreshers as a standalone command, matching the --bars/--emas/--regimes pattern
+  3. Any stats runner returning FAIL status halts the pipeline and sends a Telegram alert; WARN status continues with an alert logged
+  4. The weekly QC digest script produces a human-readable PASS/WARN/FAIL summary across all stats tables and delivers it via Telegram
+  5. Every existing subprocess.run() call in the codebase has a timeout= parameter — no silent hangs possible
+**Plans:** TBD during plan-phase
+
+---
+
+### Phase 30: Code Quality Tooling
+**Goal:** Ruff lint is a hard CI gate — no violations can merge. mypy runs on the two most annotation-complete modules without producing noise. Tooling versions are current and consistent between local and CI.
+**Depends on:** Phase 29 (new stats orchestrator code included in ruff sweep)
+**Requirements:** QUAL-01, QUAL-02, QUAL-03, QUAL-04
+**Success Criteria** (what must be TRUE):
+  1. `ruff check src` exits 0 with no violations — the `|| true` escape hatch removed from ci.yml
+  2. `ruff format --check src` passes in CI alongside lint check
+  3. The CI mypy job runs `mypy src/ta_lab2/features/ src/ta_lab2/regimes/` with [tool.mypy] config in pyproject.toml and does not block merges (continue-on-error: true)
+  4. Pre-commit config references ruff v0.9+ (not the stale v0.1.14); local and CI ruff versions match
+  5. README no longer references black; mkdocstrings version constraint is correct in pyproject.toml
+**Plans:** TBD during plan-phase
+
+---
+
+### Phase 31: Documentation Freshness
+**Goal:** The docs site accurately describes v0.8.0 of the system — version strings are consistent, the pipeline diagram reflects the current architecture, and mkdocs builds without errors.
+**Depends on:** Phase 30 (version bump after tooling finalized)
+**Requirements:** DOCS-01, DOCS-02, DOCS-03, DOCS-04
+**Success Criteria** (what must be TRUE):
+  1. pyproject.toml, mkdocs.yml, and README.md all show version 0.8.0 — `importlib.metadata.version("ta_lab2")` returns "0.8.0"
+  2. `docs/diagrams/data_flow.mmd` exists and accurately shows the bars -> EMAs -> features -> regimes -> signals -> backtest data flow for v0.7.0+ topology
+  3. No [TODO:] placeholders remain in ops docs; no aspirational alembic/black references remain in README or CONTRIBUTING
+  4. `mkdocs build --strict` exits 0 with no broken nav links or missing pages
+**Plans:** TBD during plan-phase
+
+---
+
+### Phase 32: Runbooks
+**Goal:** Every operational workflow introduced in v0.6.0 and v0.7.0 has a written runbook. An operator can pick up any runbook cold and execute the described procedure without needing to read code.
+**Depends on:** Phase 31 (describes the finalized, documented system)
+**Requirements:** RUNB-01, RUNB-02, RUNB-03, RUNB-04
+**Success Criteria** (what must be TRUE):
+  1. `docs/operations/REGIME_PIPELINE.md` exists covering how to run, debug, and recover the regime refresh — matching the section structure of DAILY_REFRESH.md (overview, commands, failure modes, recovery)
+  2. `docs/operations/BACKTEST_PIPELINE.md` exists covering signals -> backtest -> DB storage end-to-end, including how to re-run a specific signal type and interpret results
+  3. `docs/operations/NEW_ASSET_ONBOARDING.md` exists as a standalone SOP with the 6-step checklist (dim_assets -> 1D bars -> multi-TF bars -> EMAs -> validate -> verify incremental) extracted from Phase 21 analysis
+  4. `docs/operations/DISASTER_RECOVERY.md` exists covering backup strategy, restore from snapshot, and rebuild from scratch — including the "alembic stamp head" step as part of DB recovery
+**Plans:** TBD during plan-phase
+
+---
+
+### Phase 33: Alembic Migrations
+**Goal:** Schema changes go through Alembic from this point forward. The existing database is stamped as baseline with no DDL executed on the live DB. All 16 legacy SQL migration files are cataloged in chronological order.
+**Depends on:** Phase 28 (v0.7.0 complete — can run in parallel with Phase 29)
+**Requirements:** MIGR-01, MIGR-02, MIGR-03, MIGR-04
+**Success Criteria** (what must be TRUE):
+  1. `alembic/`, `alembic.ini`, and `alembic/env.py` exist; env.py uses `resolve_db_url()` from refresh_utils, `NullPool`, and `encoding='utf-8'` for any file reads
+  2. `alembic history` shows exactly one revision (the baseline no-op); `alembic current` shows that revision applied to the production DB after `alembic stamp head` executed
+  3. A written workflow document (or section in CONTRIBUTING.md) specifies that all future schema changes require an `alembic revision` before any raw SQL execution — no raw SQL migrations going forward
+  4. All 16 legacy SQL migration files are listed in a catalog (ordered by git log creation date) with purpose documented; files archived as historical reference, not deleted
+**Plans:** TBD during plan-phase
+
+---
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19 (v0.5.0) -> 20 -> ... -> 26 (v0.6.0) -> 27 -> 28 (v0.7.0)
+Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19 (v0.5.0) -> 20 -> ... -> 26 (v0.6.0) -> 27 -> 28 (v0.7.0) -> 29 -> ... -> 33 (v0.8.0)
+
+Note: Phase 29 and Phase 33 can be worked in parallel (fully isolated). Phase 30 follows Phase 29. Phase 31 follows Phase 30. Phase 32 is last.
 
 ### v0.4.0 Progress (Complete)
 
@@ -540,6 +621,16 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19
 | 27. Regime Integration | 7/7 | Complete | 2026-02-20 |
 | 28. Backtest Pipeline Fix | 3/3 | Complete | 2026-02-20 |
 
+### v0.8.0 Progress (In Progress)
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 29. Stats/QA Orchestration | 0/TBD | Pending | — |
+| 30. Code Quality Tooling | 0/TBD | Pending | — |
+| 31. Documentation Freshness | 0/TBD | Pending | — |
+| 32. Runbooks | 0/TBD | Pending | — |
+| 33. Alembic Migrations | 0/TBD | Pending | — |
+
 ## Requirement Coverage
 
 ### v0.6.0 Requirements (40 total)
@@ -559,6 +650,18 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19
 
 **Coverage:** 37/40 requirements mapped (remaining 3 DATA/DVAL replaced by GAP-C01-04)
 
+### v0.8.0 Requirements (20 total)
+
+| Category | Requirements | Phase(s) | Count |
+|----------|--------------|----------|-------|
+| Stats/QA Orchestration | STAT-01, STAT-02, STAT-03, STAT-04 | Phase 29 | 4 |
+| Code Quality | QUAL-01, QUAL-02, QUAL-03, QUAL-04 | Phase 30 | 4 |
+| Documentation | DOCS-01, DOCS-02, DOCS-03, DOCS-04 | Phase 31 | 4 |
+| Runbooks | RUNB-01, RUNB-02, RUNB-03, RUNB-04 | Phase 32 | 4 |
+| Alembic Migrations | MIGR-01, MIGR-02, MIGR-03, MIGR-04 | Phase 33 | 4 |
+
+**Coverage:** 20/20 requirements mapped
+
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-20 (v0.7.0 SHIPPED: Phase 28 complete — all phases done)*
+*Last updated: 2026-02-22 (v0.8.0 roadmap created — 5 phases, 20 requirements, Phases 29-33)*
