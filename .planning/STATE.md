@@ -10,16 +10,16 @@ See: .planning/PROJECT.md (updated 2026-02-22)
 ## Current Position
 
 Phase: 30 of 33 (30-code-quality-tooling)
-Plan: 1 of TBD — Plan 30-01 complete
+Plan: 2 of TBD — Plan 30-02 complete
 Status: In progress
-Last activity: 2026-02-22 — Completed 30-01-PLAN.md (zero ruff violations + full codebase formatting)
+Last activity: 2026-02-22 — Completed 30-02-PLAN.md (5-job CI with hard lint/format gates, mypy, version-check)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [##########] 100% v0.7.0 (2/2 phases, 10/10 plans) | [███░░░░░░░] 27% v0.8.0 (4/15 plans, 1/5 phases)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [##########] 100% v0.7.0 (2/2 phases, 10/10 plans) | [████░░░░░░] 33% v0.8.0 (5/15 plans, 1/5 phases)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 153 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 1 in v0.8.0)
+- Total plans completed: 154 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 2 in v0.8.0)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -82,7 +82,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 | Phase | Plans | Total | Avg/Plan | Status |
 |-------|-------|-------|----------|--------|
 | 29-stats-qa-orchestration | 3/3 | 13 min | 4 min | Complete |
-| 30-code-quality-tooling | 1/TBD | 9 min | 9 min | In progress |
+| 30-code-quality-tooling | 2/TBD | 12 min | 6 min | In progress |
 | 31-documentation-freshness | 0/TBD | — | — | Pending |
 | 32-runbooks | 0/TBD | — | — | Pending |
 | 33-alembic-migrations | 0/TBD | — | — | Pending |
@@ -179,6 +179,10 @@ Recent decisions affecting current work:
 - **E741 l->lq for liquidity loop vars** (Phase 30-01): In labels.py the `l` var iterates over liq (liquidity) series -- rename to `lq` not `lo`; `lo` reserved for OHLC low price in vol.py/resample.py/breakout_atr.py
 - **Pre-commit ruff version mismatch** (Phase 30-01): .pre-commit-config.yaml pins ruff to v0.1.14 while local is 0.14.3; causes hook to reformat Protocol stub ellipsis differently; use --no-verify for formatting fixup commits; update pin in Plan 30-02
 - **target-version=py312 eliminates invalid-syntax** (Phase 30-01): Adding [tool.ruff] global section with target-version=py312 fixes f-string backslash and except* syntax violations without touching code
+- **pandas-stubs dev-only not all** (Phase 30-02): Adding to all group risks numpy version conflict with vectorbt 0.28.1; dev group is safe since vectorbt is not a dev dependency
+- **mypy continue-on-error: true** (Phase 30-02): 15 documented baseline errors in features/regimes (35% unannotated + missing stubs for vectorbt/psycopg2) -- non-blocking enables visibility without blocking PRs
+- **5-job parallel CI** (Phase 30-02): test/lint/format/mypy/version-check all independent, no depends-on chains; lint/format/version-check fast (<30s), mypy non-blocking, test is the slow matrix job
+- **Hard gate removal protocol** (Phase 30-02): Fix all violations FIRST (Plan 30-01) THEN remove || true (Plan 30-02) -- never remove escape hatch while violations exist
 
 ### Pending Todos
 
@@ -190,8 +194,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-22T23:50:15Z
-Stopped at: Completed 30-01-PLAN.md — zero ruff violations + 359 files fully formatted
+Last session: 2026-02-22T23:57:13Z
+Stopped at: Completed 30-02-PLAN.md — 5-job CI with hard lint/format gates, mypy, version-check
 Resume file: None
 
 ---
