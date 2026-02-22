@@ -2,20 +2,20 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-05)
+See: .planning/PROJECT.md (updated 2026-02-22)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v0.7.0 Regime Integration & Signal Enhancement
+**Current focus:** v0.8.0 Polish & Hardening
 
 ## Current Position
 
-Phase: 28 of 28 (Backtest Pipeline Fix) — COMPLETE
-Plan: 3 of 3 in current phase — 28-03 complete
-Status: v0.7.0 MILESTONE COMPLETE — all phases done, verified
-Next Phase: None (milestone complete — ready for /gsd:audit-milestone or /gsd:new-milestone)
-Last activity: 2026-02-20 — Phase 28 complete, verified (9/9 must-haves), v0.7.0 shipped
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements for v0.8.0
+Next Phase: Phase 29 (pending roadmap creation)
+Last activity: 2026-02-22 — Milestone v0.8.0 started
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [##########] 100% v0.7.0 (2/2 phases, 10/10 plans)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [##########] 100% v0.7.0 (2/2 phases, 10/10 plans) | [░░░░░░░░░░] 0% v0.8.0
 
 ## Performance Metrics
 
@@ -160,30 +160,31 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-20T22:17:08Z
-Stopped at: Completed 28-03-PLAN.md — end-to-end pipeline verification (6 bugs fixed, backtest results in DB)
+Last session: 2026-02-22
+Stopped at: Initializing v0.8.0 milestone — defining requirements
 Resume file: None
 
 ---
 
-## Milestone Context (v0.7.0)
+## Milestone Context (v0.8.0)
 
-**Goal:** Connect regime module to DB pipeline and fix backtest pipeline so strategies can be validated end-to-end
+**Goal:** Close out partially-complete infrastructure gaps — production-harden before v0.9.0 research features
 
 **Key Principles:**
-- Leverage existing regime module (13 files, fully built) - integration, not greenfield
-- Calendar-anchored weekly/monthly bars already exist - regime labelers just need column mapping
-- Fix serialization bugs before adding features - backtest pipeline must work first
-- Signal generators need regime awareness for position sizing/filtering
+- Finish what's started — no new features, just hardening
+- 5 stats runners exist but aren't wired into orchestrator — integration, not greenfield
+- Code quality tooling (ruff, pre-commit) is 55% done — add mypy, make lint blocking
+- Docs are 60% done — version freshness and pipeline diagrams needed
+- Runbooks are 70% done — cover regime/backtest pipelines + recovery
+- Alembic is 10% — nearly greenfield migration framework
 
 **Phase Summary:**
-- Phase 27: Regime Integration (connect regime labels/policy to DB, wire into signals)
-- Phase 28: Backtest Pipeline Fix (fix dict serialization bug, vectorbt timestamps, end-to-end validation)
-
-### Roadmap Evolution
-- Phase 27 added: Regime Integration - connect existing regime module to DB-backed feature pipeline
-- Phase 28 added: Backtest Pipeline Fix - fix signal generators and backtest runner end-to-end
+- Phase 29: Stats/QA Orchestration
+- Phase 30: Code Quality Tooling
+- Phase 31: Documentation Freshness
+- Phase 32: Runbooks for New Pipelines
+- Phase 33: Alembic Migrations
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-20 (v0.7.0 SHIPPED: Phase 28 complete — milestone done)*
+*Last updated: 2026-02-22 (v0.8.0 milestone initialized)*

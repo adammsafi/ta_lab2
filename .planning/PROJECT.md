@@ -8,18 +8,18 @@ A systematic crypto trading platform with integrated AI orchestration and persis
 
 Build trustworthy quant trading infrastructure 3x faster by creating AI coordination that remembers context, routes work optimally, and eliminates redundant context-setting across sessions and platforms.
 
-## Current Milestone: v0.6.0 EMA & Bar Architecture Standardization
+## Current Milestone: v0.8.0 Polish & Hardening
 
-**Goal:** Ensure all EMAs use validated bar table data and achieve consistency across bar builder and EMA calculation scripts for non-differentiating features.
+**Goal:** Close out partially-complete infrastructure gaps so the platform is production-hardened before adding new research capabilities in v0.9.0.
 
 **Target features:**
-- Comprehensive Review: Document current state of all bar builders, EMA calculators, table schemas, data flows, helpers, contracts, orchestrators
-- Data Source Fix: Update EMAs to use validated bar tables (with NOT NULL constraints and OHLC invariants) instead of raw price_histories7
-- Script Standardization: Consistent patterns across all 6 EMA variants and bar builders for data loading, validation, state management
-- Schema Standardization: Consistent naming, constraints, and quality flags across bar and EMA tables
-- Documentation: Analysis documents + annotated code comments
+- Stats/QA Orchestration: Wire 5 existing stats runners into daily refresh pipeline + build weekly QC digest report
+- Code Quality Tooling: Add mypy config, make ruff lint blocking in CI, fix stale tooling references
+- Documentation Freshness: Update version refs (mkdocs/README), add data pipeline mermaid diagram, fix stale placeholders
+- Runbooks: Regime pipeline runbook, backtest pipeline runbook, disaster recovery guide, new-asset onboarding SOP
+- Alembic Migrations: Install framework, convert 16 existing raw SQL migrations, add version tracking
 
-**Critical Architectural Principle:** Price histories should only be used to create bars. All downstream consumers (EMAs, features) should use validated bar data.
+**Critical Principle:** This is a "finish what's started" milestone — no new features, just hardening existing infrastructure.
 
 ## Requirements
 
@@ -51,20 +51,32 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 - ✓ Adapter architecture (Claude/ChatGPT/Gemini) — existing
 - ✓ Quota tracking design — existing
 
-### Active (v0.6.0 Milestone)
+### Complete (v0.7.0 Milestone)
 
-**EMA & Bar Architecture Standardization**
-- [ ] Review all bar builder scripts (1d, multi_tf) - validation logic, repair strategies, quality flags
-- [ ] Review all 6 EMA calculation scripts (v1, v2, cal_us, cal_iso, cal_anchor_us, cal_anchor_iso)
-- [ ] Review table schemas and constraints (bar tables, EMA tables, state tables)
-- [ ] Review data flow: price_histories7 → bar tables → EMA tables
-- [ ] Review helper scripts, shared contracts, orchestrators
-- [ ] Review existing documentation for gaps
-- [ ] Document findings in structured analysis documents
-- [ ] Annotate code with detailed comments
-- [ ] Fix EMA data sources to use validated bar tables
-- [ ] Standardize patterns across scripts
-- [ ] Standardize schemas across tables
+**Regime Integration & Signal Enhancement** ✓
+- ✓ Regime pipeline: refresh_cmc_regimes.py with L0-L2 labeling, policy resolution, hysteresis
+- ✓ 4 regime tables: cmc_regimes, cmc_regime_flips, cmc_regime_stats, cmc_regime_comovement
+- ✓ Signal generators wired with regime_enabled param and --no-regime flag
+- ✓ Orchestrator: run_daily_refresh.py --all runs bars→EMAs→regimes
+- ✓ Backtest pipeline fix: feature_snapshot serialization, vectorbt compat, end-to-end verified
+
+### Complete (v0.6.0 Milestone)
+
+**EMA & Bar Architecture Standardization** ✓
+- ✓ Comprehensive review of all bar builders, EMA calculators, schemas, data flows
+- ✓ All EMAs use validated bar tables (not raw price_histories7)
+- ✓ BaseBarBuilder + BaseEMARefresher pattern consistency across all builders
+- ✓ Unified bar/EMA/returns schemas with consistent PKs
+- ✓ Baseline capture + validation (38 pytest tests, 17 audit scripts, stats runners)
+
+### Active (v0.8.0 Milestone)
+
+**Polish & Hardening**
+- [ ] Wire stats runners into run_daily_refresh.py + weekly QC digest
+- [ ] Add mypy config to pyproject.toml, make ruff lint blocking in CI
+- [ ] Update mkdocs.yml/README versions, add pipeline mermaid diagram, fix stale refs
+- [ ] Regime/backtest runbooks, disaster recovery guide, asset onboarding SOP
+- [ ] Install Alembic, convert 16 raw SQL migrations, add version tracking
 
 ### Complete (v0.5.0 Milestone)
 
@@ -158,4 +170,4 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 | Backtest/live parity as success criterion | System is only trustworthy if backtests use identical logic to live trading - reproducibility is mandatory | — Pending |
 
 ---
-*Last updated: 2026-02-02 after v0.5.0 milestone initialization*
+*Last updated: 2026-02-22 after v0.8.0 milestone initialization*
