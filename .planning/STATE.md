@@ -9,13 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-22)
 
 ## Current Position
 
-Phase: 29 of 33
-Plan: —
-Status: Ready to plan
-Next action: Run `/gsd:plan-phase 29` to create Phase 29 plans
-Last activity: 2026-02-22 — v0.8.0 roadmap created (5 phases, 20 requirements)
+Phase: 29 of 33 (29-stats-qa-orchestration)
+Plan: 1 of 3 complete
+Status: In progress
+Last activity: 2026-02-22 — Completed 29-01-PLAN.md (subprocess timeout hardening, 17 files, 6 min)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [##########] 100% v0.7.0 (2/2 phases, 10/10 plans) | [░░░░░░░░░░] 0% v0.8.0 (0/5 phases)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [##########] 100% v0.7.0 (2/2 phases, 10/10 plans) | [█░░░░░░░░░] 7% v0.8.0 (1/15 plans)
 
 ## Performance Metrics
 
@@ -82,7 +81,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 
 | Phase | Plans | Total | Avg/Plan | Status |
 |-------|-------|-------|----------|--------|
-| 29-stats-qa-orchestration | 0/TBD | — | — | Pending |
+| 29-stats-qa-orchestration | 1/3 | 6 min | 6 min | In progress |
 | 30-code-quality-tooling | 0/TBD | — | — | Pending |
 | 31-documentation-freshness | 0/TBD | — | — | Pending |
 | 32-runbooks | 0/TBD | — | — | Pending |
@@ -166,6 +165,9 @@ Recent decisions affecting current work:
 - **mypy scoped to features/ and regimes/ only** (v0.8.0 research): Initial CI check non-blocking (continue-on-error: true); 35% unannotated functions + vectorbt/psycopg2 noise make global strict enforcement impossible in v0.8.0
 - **encoding='utf-8' in alembic env.py** (v0.8.0 research): Per MEMORY.md Windows pitfall -- UTF-8 box-drawing chars in SQL comments cause UnicodeDecodeError with default cp1252 encoding
 - **pyproject.toml is version source of truth** (v0.8.0 research): importlib.metadata.version("ta_lab2") reads pyproject.toml; update all three files (pyproject.toml, mkdocs.yml, README.md) to 0.8.0 in a single commit
+- **Tiered subprocess timeouts by operation weight** (Phase 29-01): bars=7200s, EMAs=3600s, regimes=1800s, stats=3600s, audit=1800s, sync=600s, git=30s, tools=300s -- module-level TIMEOUT_X constants with 'initial estimate' annotation
+- **TimeoutExpired as separate except clause** (Phase 29-01): Catch subprocess.TimeoutExpired BEFORE generic Exception -- keeps timeout error messages clear and distinct; tools use RuntimeError raise, orchestrators use ComponentResult(error_message=...)
+- **report_dev_timeline.py module-level fallback** (Phase 29-01): git log runs at import/module level -- try/except at module scope with git_log=[] fallback (can't return ComponentResult at module scope)
 
 ### Pending Todos
 
@@ -177,8 +179,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-22
-Stopped at: v0.8.0 roadmap created — ready to plan Phase 29
+Last session: 2026-02-22T22:05:00Z
+Stopped at: Completed 29-01-PLAN.md — subprocess timeout hardening (17 files, 2 tasks, commits 36b6e86b + 83a4481c)
 Resume file: None
 
 ---
@@ -206,4 +208,4 @@ Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-22 (v0.8.0 roadmap created — Phase 29 is next, ready to plan)*
+*Last updated: 2026-02-22 (29-01 complete — subprocess timeout hardening done, Phase 29 plan 2 is next)*
