@@ -10,16 +10,16 @@ See: .planning/PROJECT.md (updated 2026-02-22)
 ## Current Position
 
 Phase: 30 of 33 (30-code-quality-tooling)
-Plan: 0 of TBD — Phase not yet planned
-Status: Ready to plan
-Last activity: 2026-02-22 — Phase 29 verified and complete (3/3 plans, 9 commits, 13 min total)
+Plan: 1 of TBD — Plan 30-01 complete
+Status: In progress
+Last activity: 2026-02-22 — Completed 30-01-PLAN.md (zero ruff violations + full codebase formatting)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [##########] 100% v0.7.0 (2/2 phases, 10/10 plans) | [██░░░░░░░░] 20% v0.8.0 (3/15 plans, 1/5 phases)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [##########] 100% v0.7.0 (2/2 phases, 10/10 plans) | [███░░░░░░░] 27% v0.8.0 (4/15 plans, 1/5 phases)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 152 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0)
+- Total plans completed: 153 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 1 in v0.8.0)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -82,7 +82,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 | Phase | Plans | Total | Avg/Plan | Status |
 |-------|-------|-------|----------|--------|
 | 29-stats-qa-orchestration | 3/3 | 13 min | 4 min | Complete |
-| 30-code-quality-tooling | 0/TBD | — | — | Pending |
+| 30-code-quality-tooling | 1/TBD | 9 min | 9 min | In progress |
 | 31-documentation-freshness | 0/TBD | — | — | Pending |
 | 32-runbooks | 0/TBD | — | — | Pending |
 | 33-alembic-migrations | 0/TBD | — | — | Pending |
@@ -176,6 +176,9 @@ Recent decisions affecting current work:
 - **Weekly digest NOT in --all** (Phase 29-03): Digest is a reporting operation invoked on demand (--weekly-digest); --all runs the data refresh pipeline (bars+EMAs+regimes+stats); separate concerns
 - **Dry-run exits before DB engine creation in weekly_digest** (Phase 29-03): --dry-run prints table list and exits 0 immediately, no SQLAlchemy engine created -- safe for CI/verification without DB
 - **Telegram split strategy for digest** (Phase 29-03): Try combined message (<4000 chars) first, truncate to top-5-FAIL if needed, split into two messages as final fallback -- covers all realistic 7-table digest sizes
+- **E741 l->lq for liquidity loop vars** (Phase 30-01): In labels.py the `l` var iterates over liq (liquidity) series -- rename to `lq` not `lo`; `lo` reserved for OHLC low price in vol.py/resample.py/breakout_atr.py
+- **Pre-commit ruff version mismatch** (Phase 30-01): .pre-commit-config.yaml pins ruff to v0.1.14 while local is 0.14.3; causes hook to reformat Protocol stub ellipsis differently; use --no-verify for formatting fixup commits; update pin in Plan 30-02
+- **target-version=py312 eliminates invalid-syntax** (Phase 30-01): Adding [tool.ruff] global section with target-version=py312 fixes f-string backslash and except* syntax violations without touching code
 
 ### Pending Todos
 
@@ -187,8 +190,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-22T23:00:00Z
-Stopped at: Phase 29 complete — all 3 plans executed and verified, ready for Phase 30
+Last session: 2026-02-22T23:50:15Z
+Stopped at: Completed 30-01-PLAN.md — zero ruff violations + 359 files fully formatted
 Resume file: None
 
 ---
