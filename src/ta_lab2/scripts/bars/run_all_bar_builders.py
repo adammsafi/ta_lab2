@@ -31,6 +31,9 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
+# Timeout tiers (seconds); initial estimate, tune after observing actual runtimes
+TIMEOUT_BARS = 7200  # 2 hours -- bar builders can be slow for full rebuilds
+
 
 @dataclass
 class BuilderConfig:
@@ -234,7 +237,7 @@ def run_builder(
     try:
         if verbose:
             # Stream output to console
-            result = subprocess.run(cmd, check=False)
+            result = subprocess.run(cmd, check=False, timeout=TIMEOUT_BARS)
             returncode = result.returncode
         else:
             # Capture output
@@ -243,6 +246,7 @@ def run_builder(
                 check=False,
                 capture_output=True,
                 text=True,
+                timeout=TIMEOUT_BARS,
             )
             returncode = result.returncode
 
@@ -275,6 +279,17 @@ def run_builder(
                 error_message=error_msg,
             )
 
+    except subprocess.TimeoutExpired:
+        duration = time.perf_counter() - start
+        error_msg = f"Timed out after {TIMEOUT_BARS}s"
+        print(f"\n[TIMEOUT] {builder.name}: {error_msg}")
+        return BuilderResult(
+            name=builder.name,
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
     except Exception as e:
         duration = time.perf_counter() - start
         error_msg = str(e)

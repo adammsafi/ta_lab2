@@ -9,6 +9,9 @@ from __future__ import annotations
 import subprocess
 from typing import List, Optional
 
+# Timeout tiers (seconds); initial estimate, tune after observing actual runtimes
+TIMEOUT_SYNC = 600  # 10 minutes -- sync/setup scripts
+
 from sqlalchemy import create_engine, text
 
 from ta_lab2.config import TARGET_DB_URL
@@ -54,7 +57,10 @@ def main(db_url: Optional[str] = None) -> None:
     #     cli_args.extend(["--db-url", db_url])
 
     print("Running:", " ".join(cli_args))
-    subprocess.run(cli_args, check=True)
+    try:
+        subprocess.run(cli_args, check=True, timeout=TIMEOUT_SYNC)
+    except subprocess.TimeoutExpired:
+        raise RuntimeError(f"EMA refresh timed out after {TIMEOUT_SYNC}s")
 
 
 if __name__ == "__main__":

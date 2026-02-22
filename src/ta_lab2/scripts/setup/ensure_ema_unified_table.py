@@ -24,6 +24,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Timeout tiers (seconds); initial estimate, tune after observing actual runtimes
+TIMEOUT_SYNC = 600  # 10 minutes -- sync/setup scripts
+
 import pandas as pd
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
@@ -267,8 +270,12 @@ Examples:
                     ],
                     check=True,
                     cwd=Path.cwd(),
+                    timeout=TIMEOUT_SYNC,
                 )
                 _log("[OK] Sync completed successfully")
+            except subprocess.TimeoutExpired:
+                _log(f"[TIMEOUT] Sync timed out after {TIMEOUT_SYNC}s")
+                sys.exit(1)
             except subprocess.CalledProcessError as e:
                 _log(f"[ERROR] Sync failed: {e}")
                 sys.exit(1)

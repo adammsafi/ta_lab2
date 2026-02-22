@@ -21,6 +21,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+# Timeout tiers (seconds); initial estimate, tune after observing actual runtimes
+TIMEOUT_GIT = 30  # 30 seconds -- git commands
+
 
 @dataclass
 class BaselineConfig:
@@ -157,6 +160,7 @@ def capture_metadata(config: BaselineConfig) -> BaselineMetadata:
         ["git", "rev-parse", "HEAD"],
         cwd=project_root,
         text=True,
+        timeout=TIMEOUT_GIT,
     ).strip()
 
     # Git branch
@@ -164,6 +168,7 @@ def capture_metadata(config: BaselineConfig) -> BaselineMetadata:
         ["git", "rev-parse", "--abbrev-ref", "HEAD"],
         cwd=project_root,
         text=True,
+        timeout=TIMEOUT_GIT,
     ).strip()
 
     # Git dirty status (return code 0 = clean, non-zero = dirty)
@@ -171,6 +176,7 @@ def capture_metadata(config: BaselineConfig) -> BaselineMetadata:
         ["git", "diff", "--quiet"],
         cwd=project_root,
         capture_output=True,
+        timeout=TIMEOUT_GIT,
     )
     git_dirty = git_dirty_result.returncode != 0
 

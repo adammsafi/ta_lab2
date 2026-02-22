@@ -27,6 +27,9 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
+# Timeout tiers (seconds); initial estimate, tune after observing actual runtimes
+TIMEOUT_STATS = 3600  # 1 hour -- stats runners
+
 
 @dataclass
 class StatsScript:
@@ -129,10 +132,12 @@ def run_stats_script(
     try:
         if verbose:
             # Stream output
-            result = subprocess.run(cmd, check=False)
+            result = subprocess.run(cmd, check=False, timeout=TIMEOUT_STATS)
         else:
             # Capture output
-            result = subprocess.run(cmd, check=False, capture_output=True, text=True)
+            result = subprocess.run(
+                cmd, check=False, capture_output=True, text=True, timeout=TIMEOUT_STATS
+            )
 
             # Show output on error
             if result.returncode != 0:
@@ -163,6 +168,17 @@ def run_stats_script(
                 error_message=error_msg,
             )
 
+    except subprocess.TimeoutExpired:
+        duration = time.perf_counter() - start
+        error_msg = f"Timed out after {TIMEOUT_STATS}s"
+        print(f"\n[TIMEOUT] {script.description}: {error_msg}")
+        return ComponentResult(
+            name=script.name,
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
     except Exception as e:
         duration = time.perf_counter() - start
         error_msg = str(e)

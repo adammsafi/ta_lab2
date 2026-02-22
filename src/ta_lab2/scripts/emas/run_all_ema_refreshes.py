@@ -33,6 +33,9 @@ from pathlib import Path
 
 from ta_lab2.scripts.emas.logging_config import setup_logging, add_logging_args
 
+# Timeout tiers (seconds); initial estimate, tune after observing actual runtimes
+TIMEOUT_EMAS = 3600  # 1 hour -- EMA refreshers
+
 
 @dataclass
 class RefresherConfig:
@@ -224,7 +227,7 @@ def run_refresher(
     try:
         if verbose:
             # Stream output to console
-            result = subprocess.run(cmd, check=False)
+            result = subprocess.run(cmd, check=False, timeout=TIMEOUT_EMAS)
             returncode = result.returncode
         else:
             # Capture output
@@ -233,6 +236,7 @@ def run_refresher(
                 check=False,
                 capture_output=True,
                 text=True,
+                timeout=TIMEOUT_EMAS,
             )
             returncode = result.returncode
 
@@ -265,6 +269,17 @@ def run_refresher(
                 error_message=error_msg,
             )
 
+    except subprocess.TimeoutExpired:
+        duration = time.perf_counter() - start
+        error_msg = f"Timed out after {TIMEOUT_EMAS}s"
+        print(f"\n[TIMEOUT] {refresher.name}: {error_msg}")
+        return RefresherResult(
+            name=refresher.name,
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
     except Exception as e:
         duration = time.perf_counter() - start
         error_msg = str(e)

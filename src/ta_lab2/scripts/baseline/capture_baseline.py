@@ -44,6 +44,10 @@ from ta_lab2.scripts.baseline.metadata_tracker import (
     save_metadata,
 )
 
+# Timeout tiers (seconds); initial estimate, tune after observing actual runtimes
+TIMEOUT_BASELINE_BARS = 7200  # 2 hours -- baseline bar builders (full rebuild)
+TIMEOUT_BASELINE_EMAS = 3600  # 1 hour -- baseline EMA refreshers
+
 
 # =============================================================================
 # Table Configuration
@@ -358,9 +362,15 @@ def run_bar_builders(
 
     try:
         if verbose:
-            result = subprocess.run(cmd, check=False)
+            result = subprocess.run(cmd, check=False, timeout=TIMEOUT_BASELINE_BARS)
         else:
-            result = subprocess.run(cmd, check=False, capture_output=True, text=True)
+            result = subprocess.run(
+                cmd,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=TIMEOUT_BASELINE_BARS,
+            )
 
             if result.returncode != 0:
                 print(f"\n[ERROR] Bar builders failed with code {result.returncode}")
@@ -390,6 +400,17 @@ def run_bar_builders(
                 error_message=error_msg,
             )
 
+    except subprocess.TimeoutExpired:
+        duration = time.perf_counter() - start
+        error_msg = f"Timed out after {TIMEOUT_BASELINE_BARS}s"
+        print(f"\n[TIMEOUT] Bar builders: {error_msg}")
+        return SubprocessResult(
+            component="bars",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
     except Exception as e:
         duration = time.perf_counter() - start
         error_msg = str(e)
@@ -447,9 +468,15 @@ def run_ema_refreshers(
 
     try:
         if verbose:
-            result = subprocess.run(cmd, check=False)
+            result = subprocess.run(cmd, check=False, timeout=TIMEOUT_BASELINE_EMAS)
         else:
-            result = subprocess.run(cmd, check=False, capture_output=True, text=True)
+            result = subprocess.run(
+                cmd,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=TIMEOUT_BASELINE_EMAS,
+            )
 
             if result.returncode != 0:
                 print(f"\n[ERROR] EMA refreshers failed with code {result.returncode}")
@@ -479,6 +506,17 @@ def run_ema_refreshers(
                 error_message=error_msg,
             )
 
+    except subprocess.TimeoutExpired:
+        duration = time.perf_counter() - start
+        error_msg = f"Timed out after {TIMEOUT_BASELINE_EMAS}s"
+        print(f"\n[TIMEOUT] EMA refreshers: {error_msg}")
+        return SubprocessResult(
+            component="emas",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
     except Exception as e:
         duration = time.perf_counter() - start
         error_msg = str(e)

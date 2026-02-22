@@ -39,6 +39,11 @@ from ta_lab2.scripts.refresh_utils import (
     resolve_db_url,
 )
 
+# Timeout tiers (seconds); initial estimate, tune after observing actual runtimes
+TIMEOUT_BARS = 7200  # 2 hours -- bar builders can be slow for full rebuilds
+TIMEOUT_EMAS = 3600  # 1 hour -- EMA refreshers
+TIMEOUT_REGIMES = 1800  # 30 minutes -- regime refresher
+
 
 @dataclass
 class ComponentResult:
@@ -98,10 +103,12 @@ def run_bar_builders(
     try:
         if args.verbose:
             # Stream output
-            result = subprocess.run(cmd, check=False)
+            result = subprocess.run(cmd, check=False, timeout=TIMEOUT_BARS)
         else:
             # Capture output
-            result = subprocess.run(cmd, check=False, capture_output=True, text=True)
+            result = subprocess.run(
+                cmd, check=False, capture_output=True, text=True, timeout=TIMEOUT_BARS
+            )
 
             # Show output on error
             if result.returncode != 0:
@@ -132,6 +139,17 @@ def run_bar_builders(
                 error_message=error_msg,
             )
 
+    except subprocess.TimeoutExpired:
+        duration = time.perf_counter() - start
+        error_msg = f"Timed out after {TIMEOUT_BARS}s"
+        print(f"\n[TIMEOUT] Bar builders: {error_msg}")
+        return ComponentResult(
+            component="bars",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
     except Exception as e:
         duration = time.perf_counter() - start
         error_msg = str(e)
@@ -202,10 +220,12 @@ def run_ema_refreshers(
     try:
         if args.verbose:
             # Stream output
-            result = subprocess.run(cmd, check=False)
+            result = subprocess.run(cmd, check=False, timeout=TIMEOUT_EMAS)
         else:
             # Capture output
-            result = subprocess.run(cmd, check=False, capture_output=True, text=True)
+            result = subprocess.run(
+                cmd, check=False, capture_output=True, text=True, timeout=TIMEOUT_EMAS
+            )
 
             # Show output on error
             if result.returncode != 0:
@@ -236,6 +256,17 @@ def run_ema_refreshers(
                 error_message=error_msg,
             )
 
+    except subprocess.TimeoutExpired:
+        duration = time.perf_counter() - start
+        error_msg = f"Timed out after {TIMEOUT_EMAS}s"
+        print(f"\n[TIMEOUT] EMA refreshers: {error_msg}")
+        return ComponentResult(
+            component="emas",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
     except Exception as e:
         duration = time.perf_counter() - start
         error_msg = str(e)
@@ -302,10 +333,16 @@ def run_regime_refresher(
     try:
         if args.verbose:
             # Stream output
-            result = subprocess.run(cmd, check=False)
+            result = subprocess.run(cmd, check=False, timeout=TIMEOUT_REGIMES)
         else:
             # Capture output
-            result = subprocess.run(cmd, check=False, capture_output=True, text=True)
+            result = subprocess.run(
+                cmd,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=TIMEOUT_REGIMES,
+            )
 
             # Show output on error
             if result.returncode != 0:
@@ -338,6 +375,17 @@ def run_regime_refresher(
                 error_message=error_msg,
             )
 
+    except subprocess.TimeoutExpired:
+        duration = time.perf_counter() - start
+        error_msg = f"Timed out after {TIMEOUT_REGIMES}s"
+        print(f"\n[TIMEOUT] Regime refresher: {error_msg}")
+        return ComponentResult(
+            component="regimes",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
     except Exception as e:
         duration = time.perf_counter() - start
         error_msg = str(e)
