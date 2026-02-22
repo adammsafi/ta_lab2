@@ -1,438 +1,415 @@
-# Project Research Summary
+# Research Summary: v0.8.0 Polish & Hardening
 
-**Project:** EMA & Bar Architecture Standardization (v0.6.0)
-**Domain:** Data Pipeline Standardization & Code Review (Financial/Trading System)
-**Researched:** 2026-02-05
-**Confidence:** HIGH
+**Project:** ta_lab2
+**Domain:** Python quant data platform — hardening existing infrastructure
+**Researched:** 2026-02-22
+**Confidence:** HIGH (all findings from direct codebase inspection + verified official sources)
+
+---
 
 ## Executive Summary
 
-This milestone focuses on comprehensive review and standardization of an existing production quantitative trading system with 6 EMA calculation variants processing 22.4M rows and multiple bar builders. The system is working but has accumulated technical debt through duplicated patterns, inconsistent data sources (some EMAs use validated bars, others use raw price histories), and schema variations across similar components. The recommended approach is a rigorous two-phase strategy: first, conduct read-only analysis to understand current architecture and document all dependencies (Phase 1: Review); second, implement standardization fixes prioritizing correctness over cosmetics (Phase 2: Standardization).
+v0.8.0 is a hardening milestone, not a feature milestone. The codebase already has ~50
+tables, 22M+ rows, 408 Python source files, 5 stats runners, 3 signal generators, and a
+working subprocess-based orchestrator. Every area of this milestone has partial
+infrastructure already in place — the work is completing the last-mile connections, not
+building from scratch. The recommended approach is narrow, sequential, and conservative:
+wire existing components together, clean up tooling debt, document what was already built,
+and establish schema migration tracking before any new schema changes land.
 
-The key risk is breaking working calculations during standardization. In quantitative systems, even floating-point precision differences can invalidate historical backtests and flip trading signals. Mitigation requires capturing baseline outputs before any changes, running side-by-side comparisons to verify calculation drift is within epsilon, and enforcing all-or-nothing rules for data source migrations. The architectural principle from PROJECT.md - "price histories should only be used to create bars; all downstream consumers should use validated bar data" - must be fully implemented during standardization, not partially.
+The highest-leverage action in v0.8.0 is wiring the 5 existing stats runners into
+`run_daily_refresh.py` as a final stage. All the hard work (watermark logic, PASS/WARN/FAIL
+schema, incremental patterns) is already done — only orchestration wiring is missing.
+Alembic bootstrapping (stamp-then-move-forward) is the second priority: it has zero risk
+when done correctly (no DDL runs on the live DB) but prevents schema drift from becoming
+unmanageable. Code quality (ruff blocking + mypy non-blocking) and documentation (version
+sync + new runbooks) round out the milestone.
 
-The critical success factor is resisting the urge to "fix as you go" during review. The 6 EMA variants exist for legitimate reasons (calendar alignment, anchored snapshots, different week conventions), and premature consolidation will break downstream consumers. Documentation analysis shows partial standardization already in progress (state table schema unified, shared base classes exist), providing a strong foundation. The standardization work should complete these patterns systematically rather than start from scratch.
+The primary risk in this milestone is not technical complexity — it is sequencing errors.
+Removing `|| true` from ruff CI before achieving zero violations will break all open PRs.
+Using `alembic --autogenerate` before ORM models exist will try to recreate all 50 tables.
+Running mypy globally on day one will produce thousands of errors. Each area has a specific
+"do this first" precondition that must be satisfied before the enforcement step; respecting
+that sequence is the entire risk management strategy for this milestone.
+
+---
 
 ## Key Findings
 
 ### Recommended Stack
 
-The existing stack (PostgreSQL, Python, psycopg2, SQLAlchemy, pandas, pytest) remains the foundation. Stack additions target analysis and validation capabilities rather than new feature libraries. The focus is on programmatic analysis tools that enable systematic pattern detection across 6 similar EMA variants.
+The stack for v0.8.0 requires minimal additions: `alembic>=1.15` (migration framework),
+`pandas-stubs>=2.2` (mypy type stubs for pandas, dev-only), `ruff>=0.9.0` (version
+upgrade from 0.1.5), and `mypy>=1.14` (version upgrade from 1.8). Documentation deps
+need `mkdocs-material>=9.5`, `mkdocstrings[python]>=0.26`, and `mike>=2.1` (explicitly
+pinned for the first time). No new runtime libraries are needed. The stats/QA digest
+report uses only stdlib + existing Telegram notification module — no Jinja2, no
+APScheduler, no Celery.
 
-**Core technologies:**
-- **ast (stdlib)**: Programmatic AST analysis — Built-in to Python 3.11+, enables custom pattern detection across similar scripts without external dependencies
-- **radon 6.0.1**: Code complexity metrics — Industry standard for identifying refactoring candidates through cyclomatic complexity analysis
-- **hypothesis 6.151.4+**: Property-based testing — Already in requirements.txt; ideal for validating OHLC invariants across different data sources
+**Core additions:**
 
-**Supporting libraries:**
-- **pycode-similar 1.0.3**: AST-based code similarity detection to compare 6 EMA variants and identify structural inconsistencies
-- **pytest-cov 6.0+**: Coverage reporting to verify validation test completeness across bar/EMA scripts
-- **SQLAlchemy Inspector**: Schema reflection (already available in stack) for programmatic table structure comparison
-- **ruff 0.15.0+**: Linting and formatting (already in stack, upgrade recommended) for consistency enforcement
+- `alembic>=1.15` — migration framework; bootstrapped via wrap-then-stamp strategy; use
+  `NullPool` in `env.py` (consistent with existing codebase pattern)
+- `ruff>=0.9.0` — upgrade from v0.1.5; pin to prevent CI/local version drift; add
+  `ruff format --check` alongside `ruff check` in CI; pre-commit hook updated from
+  `v0.1.14` to `v0.9.0`
+- `mypy>=1.14` + `pandas-stubs>=2.2` (dev group only) — `ignore_missing_imports = true`
+  required due to conditional imports (vectorbt, fredapi, astronomy-engine); no SQLAlchemy
+  stubs needed (SA 2.0 is natively PEP-484 compliant)
+- `mkdocs-material>=9.5` — native mermaid support via `pymdownx.superfences`; no separate
+  mermaid plugin needed (third-party plugin conflicts with dark mode)
+- `mike>=2.1` — explicitly pinned; currently referenced in `mkdocs.yml` but absent from
+  `pyproject.toml` deps
 
-**What NOT to use:**
-- External schema migration tools (Liquibase, Alembic) — Not modifying schemas in review phase, only analyzing
-- Black/Flake8/isort — Replaced by ruff (faster, already in stack)
-- External diff tools (pgdiff, pgquarrel) — SQLAlchemy Inspector provides programmatic access already
-
-**Rationale:** Analysis over generation. This milestone reviews existing code rather than building new features. Tools focus on understanding current architecture through automation (AST parsing, similarity detection, complexity metrics) rather than manual inspection.
+**What not to add:** Jinja2, APScheduler, Celery, mkdocs-mermaid2-plugin, sqlalchemy-stubs,
+data-science-types (unmaintained since 2021), Flask-Alembic, Liquibase/Flyway (JVM tools),
+Black (replaced by ruff format), pylint (replaced by ruff).
 
 ### Expected Features
 
-This is a code review and standardization project, not a feature development project. The "features" are review and standardization capabilities needed to ensure consistency.
+This milestone hardens 5 existing areas. "Table stakes" means what a mature platform in
+each area requires, measured against what currently exists.
 
-**Must have (table stakes for comprehensive review):**
-- **Comprehensive Inventory** — Can't standardize what you don't catalog; must enumerate all 6 EMA variants, bar builders, state tables, helpers
-- **Data Flow Mapping** — Must understand price_histories7 → bars → EMAs flow before refactoring dependencies
-- **Schema Audit** — Table structures must be compared systematically to identify inconsistencies
-- **Cross-Script Comparison Matrix** — Side-by-side comparison of 6 EMA variants reveals pattern differences
-- **Gap Analysis** — Systematic identification of inconsistencies, missing patterns, data source mismatches
-- **Current State Documentation** — Must document "as-is" architecture before proposing changes
+**Must have (v0.8.0):**
 
-**Should have (differentiators for thorough standardization):**
-- **Constraint Verification** — Proves which bar tables have proper validation (NOT NULL, OHLC invariants) vs unvalidated sources
-- **State Schema Standardization** — Complete the unified state management pattern across all 6 EMA variants (already started in EMA_STATE_STANDARDIZATION.md)
-- **Validation Pattern Library** — Extract common OHLC validation, gap detection, quality scoring into shared modules rather than copy-paste
-- **Data Source Migration Plan** — Systematic conversion from price_histories7 (raw) to validated bars for all EMAs
-- **Cross-Script Comparison Matrix** — Side-by-side comparison reveals pattern inconsistencies and drives priorities
+- Stats runners wired into `run_daily_refresh.py --all` as the final `--stats` stage;
+  `run_all_stats_refreshers.py` new top-level orchestrator
+- Non-zero exit codes from stats runners on FAIL (currently exit 0; failures invisible
+  to orchestration)
+- `[tool.mypy]` section in `pyproject.toml` with `ignore_missing_imports = true`,
+  `check_untyped_defs = true`, per-module overrides for `scripts/` and `scripts/baseline/`
+- Non-blocking mypy CI job scoped to `features/` and `regimes/` only (two most
+  annotation-complete layers)
+- Alembic initialized, empty baseline stamp migration written by hand, `alembic stamp head`
+  applied to production DB after verification on staging
+- All three version strings (`pyproject.toml`, `mkdocs.yml`, `README.md`) updated to `0.8.0`
+  in a single commit
+- `mkdocs build --strict` passes (missing nav files stubbed or removed)
+- Pipeline flow diagram in `docs/diagrams/data_flow.mmd` updated to v0.7.0+ topology
+- Two new runbooks: `docs/operations/STATS_RUNNERS.md` and `docs/operations/FEATURES_PIPELINE.md`
+- SLA section, incident severity classification, and escalation procedures added to
+  `DAILY_REFRESH.md`
 
-**Defer (Phase 3+ after stability proven):**
-- **Variant Consolidation** — Only consolidate after proving standardization works; variants exist for legitimate reasons
-- **Complete Test Suite** — Write contract tests for interfaces during standardization; defer 100% coverage to later
-- **Automated Fix-All Script** — Manual fixes with careful review; automation only for repetitive safe tasks
+**Should have (differentiators for this milestone):**
 
-**Critical anti-features (explicitly NOT do):**
-- **Immediate Refactoring** — Mixing analysis and implementation causes scope creep; must complete review before standardization
-- **Perfect Pattern Enforcement** — Different EMA variants have legitimately different needs; standardize non-differentiating features only
-- **Schema Migration During Review** — Schema changes are risky and require separate validation phase
+- Ruff blocking in CI (`|| true` removed from `ruff check src`) — requires zero violations
+  achieved first; do in a separate PR from the violation-fix PR
+- `ruff format --check` added to CI alongside lint check
+- `timeout=` parameter added to all existing `subprocess.run()` calls before adding new
+  stats runner subprocess steps
+- Version consistency CI check comparing `pyproject.toml` version vs `README.md` heading
+- `run_all_stats_refreshers.py` with runtime profiling of each runner before wiring
 
-**Key insight from research:** The technical debt is quantifiable: 6 EMA variants with inconsistent patterns = 6× maintenance cost for bug fixes. Data source inconsistency (some using validated bars, some using raw price_histories7) creates data quality risk. Standardization ROI is significant: shared validation library reduces bug fix locations from 6 to 1.
+**Defer to post-v0.8.0:**
+
+- mypy strict blocking (flip `continue-on-error: false`) — requires annotating enough of
+  the library layer to reduce error count near zero
+- Alembic autogenerate — requires creating SQLAlchemy Table objects for all 24+ tables;
+  high effort, low value given the raw-SQL pattern in this codebase
+- Mike-based versioned docs with `gh-pages` branch — operations overhead; defer until
+  there are external consumers
+- Architecture decision records — write as new decisions are made, not retroactively
+- Stats trend SQL view — deferred until runners have multi-week history
+- MonkeyType automated annotation — research tool; separate milestone
 
 ### Architecture Approach
 
-The recommended architecture follows a **Review-Then-Standardize** pattern with strict phase separation. Complete read-only analysis before making any code changes to prevent rework from incomplete understanding.
+v0.8.0 changes only orchestration topology, not data flow. The subprocess isolation
+pattern in `run_daily_refresh.py` is intentional and must be preserved — stats runners
+wire via subprocess, not in-process function calls. The current `--all` chain is
+`bars -> EMAs -> regimes`; the target is `bars -> EMAs -> regimes -> stats`. Stats is
+last because it validates freshness of data written by all prior stages. Import-linter
+contracts (5 contracts defined in `pyproject.toml`) constrain module placement: the new
+`run_all_stats_refreshers.py` belongs in `ta_lab2.scripts` (the allowed top orchestration
+layer) and must invoke child processes, not import across layer boundaries.
 
-**Major components:**
+**Major components and their v0.8.0 changes:**
 
-1. **Review Layer (Read-Only)** — Inventory scripts, schemas/tables, data flow patterns, helpers/contracts → feeds analysis layer with complete picture
-2. **Analysis Layer (Document)** — Findings documents with gap analysis, inconsistency catalog, integration point map, dependency graph → drives prioritization
-3. **Standardization Layer (Fix & Unify)** — Data source fixes (EMAs → validated bars), pattern alignment (shared modules), schema alignment (consistent naming/constraints), code comments (annotate complex logic)
-
-**Key patterns:**
-
-- **Inventory-First Discovery**: Enumerate all components before analyzing relationships to prevent missed dependencies
-- **Integration Point Mapping**: Focus effort on critical interfaces where consistency matters most (raw data → bars, bars → EMAs, state management)
-- **Gap Analysis with Severity Tiers**: Categorize findings (CRITICAL/HIGH/MEDIUM/LOW) to prioritize work effectively
-- **Data Source Standardization First**: Fix upstream dependencies before downstream patterns (correctness before cosmetics)
-
-**Project structure:**
-```
-.planning/
-├── research/                  # Domain research (this directory)
-│   ├── STACK.md
-│   ├── FEATURES.md
-│   ├── ARCHITECTURE.md
-│   ├── PITFALLS.md
-│   └── SUMMARY.md             # This file
-└── phases/
-    └── [milestone-name]/
-        ├── review/            # Phase 1: Read-only analysis
-        │   ├── 01-inventory.md
-        │   ├── 02-schema-analysis.md
-        │   ├── 03-data-flow.md
-        │   ├── 04-helpers-contracts.md
-        │   ├── 05-gap-analysis.md
-        │   └── 06-integration-points.md
-        └── standardization/   # Phase 2: Implementation
-            ├── 01-data-sources.md
-            ├── 02-patterns.md
-            ├── 03-schemas.md
-            └── 04-annotations.md
-```
-
-**Build order rationale:** Inventory → Relationships → Analysis for review phase. Correctness → Consistency → Quality for standardization phase. Data source fixes MUST come first (if EMAs use unvalidated data, standardizing patterns builds on broken foundation).
+1. `run_daily_refresh.py` — modified: add `run_stats_refreshers()`, `--stats` flag,
+   include stats in `--all` chain as final stage
+2. `run_all_stats_refreshers.py` — new: top-level orchestrator aggregating 5 existing
+   stats runner scripts via `subprocess.run()` + `ComponentResult` pattern (same pattern
+   as the existing `emas/stats/run_all_stats_refreshes.py`)
+3. `alembic/` + `alembic.ini` + `alembic/versions/0001_baseline_stamp.py` — new:
+   migration framework bootstrap; `env.py` wired to `resolve_db_url()` from `refresh_utils`
+4. `pyproject.toml` — modified: `[tool.mypy]` section, version bump to `0.8.0`, dep
+   version upgrades (ruff, mypy, mkdocs-material), new deps (alembic, pandas-stubs, mike)
+5. `.github/workflows/ci.yml` — modified: ruff blocking (after violations fixed), add
+   non-blocking mypy job scoped to library layer
+6. `docs/operations/STATS_RUNNERS.md` + `docs/operations/FEATURES_PIPELINE.md` — new
+   runbooks following the established section structure from `DAILY_REFRESH.md`
+7. `docs/diagrams/data_flow.mmd` + `docs/operations/DAILY_REFRESH.md` + `mkdocs.yml`
+   — updated to reflect v0.7.0+ reality (regimes wired since v0.7.0 but runbook never
+   updated; nav has broken references)
 
 ### Critical Pitfalls
 
-1. **Breaking Working Scripts During Standardization (Silent Calculation Drift)** — Changing data sources or calculation order can introduce floating-point differences that break backtests and flip trading signals. Prevention: Capture baseline outputs before refactoring, run side-by-side comparisons, document intentional changes, create --validate-against-legacy flag. Warning signs: "Small differences don't matter" (they do in quant systems), no baseline snapshots exist.
+1. **Alembic autogenerate without ORM models recreates all 50 tables** — with no
+   SQLAlchemy MetaData populated, `--autogenerate` compares an empty model against the
+   live DB and generates `op.create_table()` for every existing table. Running the result
+   fails with `DuplicateTable`. Prevention: write the baseline migration as a no-op by
+   hand; do not invoke `--autogenerate` in v0.8.0.
 
-2. **Incomplete Inventory Leading to Orphaned Dependencies** — Teams miss helper scripts, orchestrators, or utility functions that reference "variant X." After consolidation, production jobs fail. Prevention: Grep for table names across entire codebase, grep for module imports, find SQL queries, check orchestrators for hardcoded paths, document ALL consumers with dependency graph. Warning signs: Review lists "6 main scripts" but repo has 30+ files with "ema" in name.
+2. **Removing `|| true` from ruff CI before reaching zero violations blocks all open PRs**
+   — ruff checks the entire `src/` on every run; pre-existing violations in unrelated files
+   block every PR. Prevention: run `ruff check src --statistics` first, fix or suppress all
+   violations, achieve zero-exit locally, then remove the flag in a separate PR from the
+   fix PR.
 
-3. **Premature Consolidation (Removing Variants Still In Use)** — Assuming "variants are redundant" without understanding why 6 exist. Reality: each serves specific use case (calendar alignment, anchor snapshots, ISO week conventions). Prevention: Phase 1 MUST answer "What consumer depends on each variant's unique behavior?" Create variant justification matrix. Defer consolidation to Phase 4-5 after stability proven.
+3. **`subprocess.run()` calls with no `timeout=` hang the orchestrator overnight** — 15+
+   existing subprocess calls have no timeout. A hanging stats runner blocks the pipeline
+   indefinitely; `capture_output=True` on Windows can exacerbate the hang (CPython
+   issue #88693). Prevention: add `timeout=` to all existing calls before adding new steps;
+   handle `subprocess.TimeoutExpired` explicitly.
 
-4. **Schema Change Coordination Failure (State Table Primary Key Migration)** — EMA_STATE_STANDARDIZATION.md documents breaking PK change from (id, tf) to (id, tf, period). Teams update scripts but forget to migrate data, update all dependencies, coordinate deployment. Prevention: Create migration checklist (DDL + data + scripts + staging test + rollback + atomic deploy), use shared state_management.py module, add schema version check in scripts.
+4. **mypy run globally on day one produces thousands of errors** — 35% of ~2,722 functions
+   are unannotated; vectorbt, psycopg2, conditional imports all generate noise. Prevention:
+   scope initial CI check to `features/` and `regimes/` only; add `ignore_missing_imports`
+   and per-library overrides before running; do not attempt global strict enforcement in
+   v0.8.0.
 
-5. **Validation Logic Inconsistency (Some Scripts Validated, Some Raw)** — PROJECT.md principle: "Price histories should only create bars; downstream consumers use validated bars." During standardization, partial migration (3 of 6 EMAs use bars, 3 still use raw) creates data quality divergence. Prevention: ALL-OR-NOTHING rule for Phase 2, validation contract test, automated CI check for price_histories7 references in EMA scripts.
+5. **Three version strings in three files already out of sync** — `pyproject.toml` shows
+   `0.5.0`, `mkdocs.yml` shows `v0.4.0`, `README.md` shows `v0.5.0`. Future readers and
+   tools that read `importlib.metadata.version("ta_lab2")` get wrong values. Prevention:
+   fix all three in the first commit of the milestone; add a CI version-consistency check
+   to prevent future drift.
 
-**Top prevention strategies:**
-- Capture baselines before ANY changes (mandatory for quant systems)
-- Run comprehensive grep/imports analysis (find ALL consumers)
-- ALL-OR-NOTHING for data source migrations (no partial standardization)
-- Atomic schema migrations (DDL + data + scripts deployed together)
-- Extract edge cases from ALL variants (not just "best" variant)
+---
 
 ## Implications for Roadmap
 
-Based on research, suggested phase structure follows **Review → Standardization** with correctness prioritized over cosmetics:
+The 5 hardening areas have a natural dependency ordering. Some must precede others to
+avoid the pitfalls identified above. The suggested structure is 4 phases that can be
+partially parallelized:
 
-### Phase 1: Comprehensive Discovery & Inventory
-**Rationale:** Must catalog all components before analyzing relationships. Prevents missing dependencies that break production during standardization.
+### Phase 29: Orchestrator Hardening — Stats Wiring + Subprocess Timeouts
 
-**Delivers:**
-- Complete inventory of all 6 EMA variants, bar builders, state tables, helpers, orchestrators
-- Cross-script comparison matrix showing structural differences
-- Schema audit documenting constraints, naming, quality flags
+**Rationale:** Highest-leverage change in the milestone. All 5 stats runners are fully
+built and tested; only the orchestration wire is missing. This phase should come first
+because the stats runbook (Phase 32) cannot be written until the integrated workflow
+exists, and adding `timeout=` to existing subprocess calls is a prerequisite for adding
+any new subprocess steps safely.
 
-**Addresses:**
-- Comprehensive Inventory (table stakes from FEATURES.md)
-- Schema Audit (table stakes)
-- Cross-Script Comparison Matrix (differentiator)
+**Delivers:** `run_all_stats_refreshers.py` top-level orchestrator + `--stats` flag in
+`run_daily_refresh.py` + stats as the final `--all` stage + `timeout=` on all existing
+subprocess calls + runtime profile of each stats runner before wiring.
 
-**Avoids:**
-- Incomplete inventory leading to orphaned dependencies (Pitfall #2)
-- Siloed review that misses integration points (Anti-pattern #4)
+**Addresses:** Stats/QA gate (must-have); subprocess hang risk (critical pitfall #3).
 
-**Research flag:** Standard patterns (skip research-phase). File system scanning and AST analysis well-documented.
+**Avoids:** Concurrent orchestrator runs producing duplicate rows (profile runtime before
+wiring; add lockfile consideration); QC digest reporting stale data under
+`--continue-on-error` (add `ingested_at` staleness check as first operation in digest).
 
----
-
-### Phase 2: Data Flow & Integration Point Mapping
-**Rationale:** Must understand data dependencies (price_histories7 → bars → EMAs) before refactoring. Integration points are where consistency is critical.
-
-**Delivers:**
-- Data flow map showing source tables, validation points, consumers
-- Integration point map identifying critical interfaces
-- Current state documentation with "as-is" architecture
-
-**Addresses:**
-- Data Flow Mapping (table stakes from FEATURES.md)
-- Integration Point Mapping (architecture pattern)
-- Current State Documentation (table stakes)
-
-**Avoids:**
-- Premature consolidation without understanding consumers (Pitfall #3)
-- Data source changes without dependency analysis
-
-**Uses:** SQLAlchemy Inspector (STACK.md) for schema reflection, AST analysis for code dependencies
-
-**Research flag:** Standard patterns (skip research-phase). Data lineage mapping well-documented in data engineering best practices.
+**Research flag:** Standard patterns; no deeper research needed. The `ComponentResult` +
+subprocess pattern is established in the codebase (existing EMA stats orchestrator is the
+direct template).
 
 ---
 
-### Phase 3: Gap Analysis & Prioritization
-**Rationale:** Must identify ALL inconsistencies before planning fixes. Severity tiers (CRITICAL/HIGH/MEDIUM/LOW) drive work order.
+### Phase 30: Alembic Bootstrap — Stamp Existing Schema
 
-**Delivers:**
-- Gap analysis with severity tiers
-- Pattern consistency check identifying where same problem solved differently
-- Recommendations document with prioritized standardization tasks
+**Rationale:** Must be done before any v0.8.0 schema changes land. The stamp is a
+read-only DB operation — no DDL executes on the live database. Establishing migration
+tracking now means every subsequent schema change in this milestone and future milestones
+can go through Alembic rather than ad-hoc SQL files.
 
-**Addresses:**
-- Gap Analysis (table stakes from FEATURES.md)
-- Pattern Consistency Check (table stakes)
-- Recommendation Documentation (table stakes)
+**Delivers:** `alembic/` directory + `alembic.ini` (using `%(here)s` for portable paths)
++ `alembic/env.py` wired to `resolve_db_url()` + `alembic/versions/0001_baseline_stamp.py`
+(empty upgrade/downgrade with comments) + `alembic stamp head` applied to production DB
+after verification on staging.
 
-**Avoids:**
-- Schema alignment before data source fixes (Anti-pattern #2)
-- Fix-as-you-go during review (Anti-pattern #1)
+**Addresses:** Alembic baseline stamp (must-have); schema drift prevention for future
+milestones.
 
-**Implements:** Gap Analysis with Severity Tiers (ARCHITECTURE.md pattern)
+**Avoids:** Autogenerate pitfall (no `--autogenerate` invoked; baseline is hand-written
+no-op); Windows path mixing (use `%(here)s` in `alembic.ini`, `encoding='utf-8'` in any
+file reads per existing MEMORY.md guidance); application order ambiguity (keep existing
+16 SQL files as historical reference, do not import them into Alembic).
 
-**Research flag:** Standard patterns (skip research-phase). Code review best practices well-established.
-
----
-
-### Phase 4: Data Source Standardization (CRITICAL)
-**Rationale:** Correctness before cosmetics. EMAs MUST use validated bars (not raw price_histories7) per PROJECT.md principle. This is foundation for all other standardization.
-
-**Delivers:**
-- ALL 6 EMA variants migrated to validated bar tables
-- Validation contract tests proving no price_histories7 usage
-- Baseline output comparison verifying calculation drift < epsilon
-
-**Addresses:**
-- Data Source Migration Plan (differentiator from FEATURES.md)
-- Constraint Verification (differentiator)
-
-**Avoids:**
-- Validation logic inconsistency (Pitfall #5) — ALL-OR-NOTHING migration
-- Silent calculation drift (Pitfall #1) — baseline comparison mandatory
-- Building on broken foundation (Anti-pattern #2)
-
-**Uses:** hypothesis (STACK.md) for property-based OHLC validation tests
-
-**Research flag:** NEEDS RESEARCH. Data migration patterns for financial data with calculation validation requirements. Investigate epsilon tolerance for floating-point comparisons in trading systems.
+**Research flag:** Standard patterns; well-documented in official Alembic cookbook. No
+deeper research needed for the stamp approach. Autogenerate path (deferred) would need
+separate research on ORM model creation for 24+ tables.
 
 ---
 
-### Phase 5: State Schema Completion
-**Rationale:** Complete the unified state management pattern started in EMA_STATE_STANDARDIZATION.md. Enables consistent incremental refresh across all variants.
+### Phase 31: Code Quality — Ruff Blocking + mypy Baseline
 
-**Delivers:**
-- All 6 variants using unified state schema (id, tf, period) PRIMARY KEY
-- Shared state_management.py module enforcing schema
-- Migration complete with atomic deployment (DDL + data + scripts)
+**Rationale:** Should come after Phase 29 so the new stats orchestrator code is included
+in the ruff clean sweep. Must be done as a two-step sequence: (1) audit and fix violations,
+(2) flip enforcement. Doing these in separate PRs makes rollback easier.
 
-**Addresses:**
-- State Schema Standardization (differentiator from FEATURES.md)
+**Delivers:** Zero ruff violations in `src/`; `ruff check` and `ruff format --check`
+blocking in CI; `[tool.mypy]` config in `pyproject.toml`; non-blocking mypy CI job
+scoped to `features/` and `regimes/`; `ruff>=0.9.0` and `mypy>=1.14` version pins;
+`pandas-stubs>=2.2` in dev group; pre-commit updated from `v0.1.14` to `v0.9.0`.
 
-**Avoids:**
-- Schema change coordination failure (Pitfall #4) — atomic migration checklist
-- State table fragmentation (Anti-pattern #5)
+**Addresses:** ruff blocking (should-have); mypy baseline config (must-have); ruff version
+drift prevention.
 
-**Implements:** Data Source Standardization First pattern (ARCHITECTURE.md)
+**Avoids:** Breaking all open PRs (achieve zero violations first, remove `|| true` in
+separate PR); numpy version conflict from pandas-stubs install (pin stubs to dev group
+only; run backtest smoke test after installation to catch any numpy version resolution
+that breaks vectorbt 0.28.1 numerics).
 
-**Research flag:** Standard patterns (skip research-phase). State table unification already documented in EMA_STATE_STANDARDIZATION.md.
-
----
-
-### Phase 6: Pattern Standardization (Shared Modules)
-**Rationale:** After data sources fixed and state unified, extract common patterns (data loading, validation, error handling) into shared modules. Reduces duplication from 6× to 1×.
-
-**Delivers:**
-- Shared data loading utilities
-- Shared validation logic (OHLC checks, gap detection, quality scoring)
-- Edge case handling merged from ALL variants (not just "best" one)
-
-**Addresses:**
-- Validation Pattern Library (differentiator from FEATURES.md)
-- Pattern Consistency Check results from Phase 3
-
-**Avoids:**
-- Edge case coverage gaps (Pitfall #6) — extract edge cases from ALL variants
-- DRY principle violations (FEATURES.md technical debt)
-
-**Uses:** radon (STACK.md) to identify refactoring candidates through complexity metrics
-
-**Research flag:** Standard patterns (skip research-phase). Shared module extraction well-documented in refactoring literature.
+**Research flag:** Well-documented patterns; specific version pins verified against PyPI.
+No deeper research needed.
 
 ---
 
-### Phase 7: Schema Alignment (Cosmetic)
-**Rationale:** After correctness fixed (data sources, state management, patterns), standardize cosmetic consistency (naming, constraints, quality flags).
+### Phase 32: Documentation — Version Sync + Diagram + Runbooks
 
-**Delivers:**
-- Consistent table naming (_state, _bars, _ema suffixes)
-- Missing constraints added (NOT NULL, CHECK where needed)
-- Quality flag standardization across tables
+**Rationale:** Documentation is strictly last because it describes what was built. The
+pipeline diagram and stats runbook depend on Phase 29 being complete. The Alembic runbook
+(if added) depends on Phase 30. The version bump should be the first commit within this
+phase — do not write new v0.8.0 content under a `v0.4.0` site name.
 
-**Addresses:**
-- Schema Audit findings from Phase 1
-- Quality Flag Standardization (differentiator from FEATURES.md)
+**Delivers:** All three version strings updated to `0.8.0` in one commit; `data_flow.mmd`
+replaced with v0.7.0+ topology diagram; `DAILY_REFRESH.md` updated with regimes and stats
+sections; `STATS_RUNNERS.md` new runbook; `FEATURES_PIPELINE.md` new runbook; `mkdocs.yml`
+nav updated and validated; `mkdocs build --strict` passes; SLA + incident severity +
+escalation procedures added to `DAILY_REFRESH.md`; CI version consistency check added.
 
-**Avoids:**
-- Cosmetic changes before correctness (Anti-pattern #2)
+**Addresses:** Docs version fix (must-have); pipeline diagram (must-have); new runbooks
+(must-have); mkdocs nav broken references (must-have).
 
-**Research flag:** Standard patterns (skip research-phase). Database naming conventions well-documented.
+**Avoids:** Writing new content under a stale version label; breaking `mkdocs build` on
+missing nav files (run `mkdocs build --strict` locally before merging any docs PR); leaving
+mike in a broken intermediate state (either activate the `gh-pages` branch or remove the
+mike provider from `mkdocs.yml` — do not leave it in limbo).
 
----
-
-### Phase 8: Code Annotation & Documentation
-**Rationale:** After code stabilized, annotate complex logic and update architecture documentation. Preserves institutional knowledge.
-
-**Delivers:**
-- Inline annotations for complex/non-obvious logic
-- Architecture Decision Records documenting why 6 variants exist
-- Updated PROJECT.md with standardization outcomes
-
-**Addresses:**
-- Code Annotation (table stakes from FEATURES.md)
-- Architecture Decision Records (differentiator)
-
-**Avoids:**
-- Over-documentation of obvious code (Anti-pattern #3)
-
-**Uses:** pdoc (STACK.md) for API documentation generation post-standardization
-
-**Research flag:** Standard patterns (skip research-phase). Code documentation best practices established.
+**Research flag:** Standard markdown and mkdocs patterns; no deeper research needed.
 
 ---
 
 ### Phase Ordering Rationale
 
-1. **Phases 1-3 (Review)** must complete before any code changes. Prevents rework from incomplete understanding and ensures holistic standardization plan.
-
-2. **Phase 4 (Data Source Fix)** is CRITICAL and blocks all downstream work. If EMAs use unvalidated data, standardizing patterns builds on broken foundation.
-
-3. **Phase 5 (State Schema)** enables incremental refresh across all variants. Must complete before pattern standardization (shared modules need unified state interface).
-
-4. **Phase 6 (Pattern Standardization)** extracts shared modules. Requires data sources fixed (Phase 4) and state unified (Phase 5) so shared modules work consistently.
-
-5. **Phase 7 (Schema Alignment)** is cosmetic and safe to do after correctness proven. Low risk, improves maintainability.
-
-6. **Phase 8 (Documentation)** happens last when code is stable. Documentation that describes unstable code becomes outdated quickly.
-
-**Dependency chain:** 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 (sequential; each phase builds on previous)
-
-**Parallelization opportunities:**
-- Within Phase 1: Inventory tasks can run in parallel (bars, EMAs, helpers)
-- Within Phase 6: Pattern extraction for different modules can overlap
-- Within Phase 8: Documentation tasks can run in parallel
-
-**Critical path:** Phase 4 (Data Source Fix) is the bottleneck. All downstream standardization depends on EMAs using validated bars.
+- Phases 29 and 30 can run in parallel on separate branches because they are fully isolated
+  (Phase 29 touches orchestration Python; Phase 30 touches Alembic infrastructure).
+- Phase 31 should wait for Phase 29 to be merged so the new orchestrator code is included
+  in the ruff sweep.
+- Phase 32 is strictly last — the pipeline diagram and runbooks describe the final
+  wired state.
+- Within Phase 29, subprocess timeouts must be added before the new stats subprocess step
+  is wired in; this is a task-level ordering constraint within the phase.
+- Within Phase 31, violation-fix PR must merge before the `|| true` removal PR; enforce
+  this as a PR dependency.
 
 ### Research Flags
 
-**Needs research:**
-- **Phase 4 (Data Source Standardization):** Financial data migration patterns with calculation validation. Investigate epsilon tolerance for floating-point comparisons in trading systems. Baseline capture strategies for large datasets (22.4M rows).
+Phases with well-documented patterns (no deeper research needed):
+- **Phase 29:** ComponentResult + subprocess pattern is established in the codebase;
+  direct replication of existing EMA stats orchestrator pattern.
+- **Phase 30:** Alembic stamp approach is documented in official Alembic cookbook; no-op
+  baseline migration is the correct path for codebases without ORM models.
+- **Phase 31:** ruff and mypy configurations are well-documented; specific version pins
+  verified against PyPI.
+- **Phase 32:** mkdocs-material mermaid, nav structure, and runbook format are all
+  established patterns in the codebase.
 
-**Standard patterns (skip research-phase):**
-- **Phase 1 (Inventory):** File system scanning, AST analysis for code structure
-- **Phase 2 (Data Flow):** Data lineage mapping, dependency graphs
-- **Phase 3 (Gap Analysis):** Code review methodologies, severity classification
-- **Phase 5 (State Schema):** Already documented in EMA_STATE_STANDARDIZATION.md
-- **Phase 6 (Pattern Standardization):** Refactoring literature, shared module extraction
-- **Phase 7 (Schema Alignment):** Database naming conventions
-- **Phase 8 (Documentation):** Code annotation best practices
+Phases requiring empirical investigation during execution (not external research):
+- **Phase 29 (stats runtime profiling):** Profile each of the 5 runners against the full
+  production asset universe before wiring. If combined serial runtime exceeds 20 minutes,
+  parallel execution via the existing `num_processes` pattern may be needed. This is an
+  empirical question resolved by running `time python -m ta_lab2.scripts.<runner> --all`.
+- **Phase 30 (ad-hoc migration ordering):** Reconstruct confirmed application order of the
+  8 unnumbered `sql/migration/` files from `git log --follow --diff-filter=A --
+  sql/migration/` before assigning Alembic revision numbers. No external research needed —
+  this is codebase archaeology.
+- **Phase 31 (ruff violation count):** Run `ruff check src --statistics` as the first
+  action to set the scope of violation-fix work. Count is unknown at research time.
+- **Phase 31 (mypy error count):** Run `mypy src/ta_lab2/features/ src/ta_lab2/regimes/`
+  with the proposed config to get the baseline error count before committing to remediation
+  scope.
+
+---
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Official docs verified for all recommended tools; existing stack (PostgreSQL, pytest, SQLAlchemy) well-established; additions (radon, pycode-similar) are mature stable libraries with clear use cases |
-| Features | HIGH | Feature landscape derived from codebase inspection + 2026 data engineering best practices; table stakes vs differentiators based on code review literature; anti-features validated against refactoring pitfalls |
-| Architecture | HIGH | Patterns based on industry standards (Review-Then-Standardize, Data Source First); existing codebase shows partial implementation (state_management.py, base_ema_refresher.py) validating approach; build order derived from dependency analysis |
-| Pitfalls | HIGH | Critical pitfalls identified from project-specific evidence (EMA_STATE_STANDARDIZATION.md, run_all_ema_refreshes.py) combined with 2026 ETL pipeline failure modes; recovery strategies based on existing codebase patterns |
+| Stack | HIGH | All package versions verified against PyPI (February 2026); SQLAlchemy 2.0 native typing confirmed against official docs; mermaid native support confirmed against mkdocs-material docs; no experimental packages recommended |
+| Features | HIGH | All gaps identified from direct codebase inspection of actual files; table-stakes analysis validated against Dagster/dbt/Alembic official sources; all must-have items are last-mile connections on existing infrastructure |
+| Architecture | HIGH | All findings from direct codebase inspection of `run_daily_refresh.py`, `pyproject.toml`, `ci.yml`, `mkdocs.yml`, `sql/migration/`; subprocess/ComponentResult pattern confirmed in existing code |
+| Pitfalls | HIGH | Critical pitfalls verified against official sources (Alembic issue tracker, CPython issue tracker, mypy official docs); moderate pitfalls from community engineering blogs consistent with official docs; Windows-specific pitfalls directly observed in MEMORY.md |
 
 **Overall confidence:** HIGH
 
-All four research areas have high confidence due to:
-1. **Existing codebase analysis**: Research grounded in actual project structure (6 EMA variants, state tables, bar builders) rather than theoretical patterns
-2. **Official documentation**: Stack recommendations verified against official tool docs (ast, radon, hypothesis, SQLAlchemy)
-3. **2026 industry research**: Feature patterns, architecture approaches, and pitfalls validated against current data engineering best practices
-4. **Project-specific evidence**: Pitfalls derived from actual project docs (EMA_STATE_STANDARDIZATION.md documents breaking PK change; run_all_ema_refreshes.py shows connection pooling warnings)
-
 ### Gaps to Address
 
-**Epsilon tolerance for calculation validation (Phase 4):**
-- Research identifies need for baseline comparison to detect calculation drift
-- Gap: What epsilon value is acceptable for floating-point differences in EMA calculations?
-- Handling: During Phase 4 planning, research financial data validation standards and test with sample comparisons to determine appropriate tolerance (likely 1e-10 or tighter for trading systems)
+- **Stats runner runtime on full asset universe:** No timing baseline captured for any of
+  the 5 stats runners against the full production dataset (~22M rows of EMA data). Profile
+  before wiring. If any single runner exceeds 10 minutes, or the combined serial total
+  exceeds 20 minutes, consider parallelism using the existing `num_processes` pattern from
+  bar builders.
 
-**Variant consolidation criteria (deferred to Phase 9+):**
-- Research recommends deferring consolidation until after standardization stability proven
-- Gap: What criteria determine when consolidation is safe vs when variants should remain separate?
-- Handling: Document during Phase 1 (inventory) which consumers depend on variant-specific behavior. Create "consolidation readiness checklist" for future phases (after v0.6.0 milestone).
+- **Ad-hoc SQL migration application order:** The 8 unnumbered files in `sql/migration/`
+  have no canonical ordering visible from the filesystem. Reconstruct from
+  `git log --follow --diff-filter=A -- sql/migration/` before creating Alembic revision
+  numbers. Files that applied data transformations no longer meaningful on the current schema
+  should be represented as no-ops with documentation comments.
 
-**Test coverage baseline for validation:**
-- Research recommends contract tests during standardization, defer 100% coverage to later
-- Gap: What coverage threshold is sufficient to validate standardization correctness?
-- Handling: During Phase 4 (data source fix), establish baseline coverage for OHLC validation logic and incremental refresh paths. Target 80% coverage for critical paths (data loading, state management, validation) rather than 100% overall.
+- **Current ruff violation count:** `ruff check src --statistics` has not been run at
+  research time. The baseline count is unknown. Run this as the first action of Phase 31
+  to determine scope. The `|| true` in CI suggests violations exist; severity is unknown.
 
-**Performance impact of shared modules:**
-- Pattern standardization (Phase 6) extracts shared utilities for data loading and validation
-- Gap: Will shared modules introduce performance overhead vs inline implementations?
-- Handling: Use pytest-benchmark (already in requirements.txt per STACK.md) to compare performance before/after standardization. Document acceptable performance tolerance (likely <10% overhead acceptable for maintainability gain).
+- **mypy error count on features/ and regimes/:** The two target modules for initial mypy
+  enforcement have not been checked. Run `mypy src/ta_lab2/features/ src/ta_lab2/regimes/`
+  with the proposed config before committing to a remediation scope. The 106 existing bare
+  `# type: ignore` comments will need gradual conversion to specific error codes.
+
+- **mike / gh-pages branch status:** `mkdocs.yml` has `extra.version.provider: mike`
+  configured but a `gh-pages` branch may not exist. Confirm before Phase 32. Either
+  activate mike properly (create the branch, wire the CI deploy job) or remove the provider
+  config to avoid broken version-switcher UI in the deployed docs.
+
+---
 
 ## Sources
 
 ### Primary (HIGH confidence)
 
-**Stack Research:**
-- [Python ast module documentation](https://docs.python.org/3/library/ast.html) — Built-in AST analysis capabilities
-- [Radon documentation](https://radon.readthedocs.io/en/latest/) — Code metrics computation
-- [pytest 9.0 release notes](https://docs.pytest.org/en/stable/changelog.html) — Latest pytest features 2026
-- [Ruff documentation](https://docs.astral.sh/ruff/) — Linter/formatter capabilities
-- [SQLAlchemy reflection documentation](https://docs.sqlalchemy.org/en/20/core/reflection.html) — Schema introspection
-- [Hypothesis documentation](https://hypothesis.readthedocs.io/) — Property-based testing
-
-**Architecture Research:**
-- [Software Code Refactoring: A Comprehensive Review](https://www.researchgate.net/publication/368921892_Software_Code_Refactoring_A_Comprehensive_Review)
-- [ETL Pipeline best practices for reliable data workflows](https://www.getdbt.com/blog/etl-pipeline-best-practices)
-- [Database Naming Standards: SQL Conventions for Tables](https://blog.devart.com/sql-database-naming-standards.html)
-
-**Pitfalls Research:**
-- [5 Critical ETL Pipeline Design Pitfalls to Avoid](https://airbyte.com/data-engineering-resources/etl-pipeline-pitfalls-to-avoid)
-- [Code Refactoring: When to Refactor and How to Avoid Mistakes](https://www.tembo.io/blog/code-refactoring)
-- [Data validation best practices and techniques for finance teams](https://www.cubesoftware.com/blog/data-validation-best-practices)
-
-**Project-Specific Documentation:**
-- `docs/EMA_STATE_STANDARDIZATION.md` — State table unification (breaking PK change documented)
-- `src/ta_lab2/scripts/emas/base_ema_refresher.py` — Template Method pattern for EMA scripts
-- `src/ta_lab2/scripts/bars/common_snapshot_contract.py` — Shared bar builder utilities
-- `.planning/PROJECT.md` — Architectural principle (price_histories7 → bars → EMAs one-way flow)
+- Codebase direct inspection: `run_daily_refresh.py`, `pyproject.toml`,
+  `.github/workflows/ci.yml`, `mkdocs.yml`, `README.md`, `sql/migration/` — all findings
+  directly observed in code
+- [Alembic PyPI](https://pypi.org/project/alembic/) — version 1.18.4 confirmed
+- [Alembic autogenerate documentation](https://alembic.sqlalchemy.org/en/latest/autogenerate.html)
+  — autogenerate-recreates-all-tables pitfall confirmed
+- [Alembic cookbook](https://alembic.sqlalchemy.org/en/latest/cookbook.html) — stamp
+  approach for existing databases confirmed
+- [Alembic Issue #590: Windows path mixing in script_location](https://github.com/sqlalchemy/alembic/issues/590)
+  — path pitfall confirmed
+- [mypy PyPI](https://pypi.org/project/mypy/) — version 1.19.1 confirmed
+- [mypy: Using mypy with an existing codebase](https://mypy.readthedocs.io/en/stable/existing_code.html)
+  — ramp-up strategy and narrow-scope approach confirmed
+- [ruff PyPI](https://pypi.org/project/ruff/) — version 0.15.2 confirmed
+- [mkdocs-material PyPI](https://pypi.org/project/mkdocs-material/) — version 9.7.2 confirmed
+- [Material for MkDocs: native mermaid diagrams](https://squidfunk.github.io/mkdocs-material/reference/diagrams/)
+  — native mermaid support confirmed; no third-party plugin needed
+- [SQLAlchemy 2.0 mypy support](https://docs.sqlalchemy.org/en/20/orm/extensions/mypy.html)
+  — confirms no separate stubs package needed for SA 2.0
+- [CPython issue #88693: subprocess.run hangs on Windows with capture_output](https://github.com/python/cpython/issues/88693)
+  — subprocess timeout pitfall confirmed
+- [mike PyPI](https://pypi.org/project/mike/) — version 2.1.3 confirmed
+- [pandas-stubs PyPI](https://pypi.org/project/pandas-stubs/) — version 3.0.0.260204 confirmed
 
 ### Secondary (MEDIUM confidence)
 
-**Feature Research:**
-- [Start Data Engineering - Data Flow & Code Best Practices](https://www.startdataengineering.com/post/de_best_practices/)
-- [Incremental Pipelines: Managing State at Scale](https://www.geteppo.com/blog/incremental-pipelines-managing-state-at-scale)
-- [Secoda - How to Introduce Code Review to Data Engineering Teams](https://www.secoda.co/blog/how-to-introduce-code-review-to-your-data-engineering-team)
-
-**Architecture Research:**
-- [COD Model: 5-Phase Guide to Codebase Dependency Mapping](https://augmentcode.com/guides/cod-model-5-phase-guide-to-codebase-dependency-mapping)
-- [Data Load Patterns 101: Full Refresh and Incremental](https://www.tobikodata.com/blog/data-load-patterns-101)
-
-### Tertiary (LOW confidence)
-
-**Stack Research:**
-- [Top Python Code Analysis Tools 2026](https://www.jit.io/resources/appsec-tools/top-python-code-analysis-tools-to-improve-code-quality) — AST tool landscape (needs validation in practice)
-- [Property-based testing tutorial](https://semaphore.io/blog/property-based-testing-python-hypothesis-pytest) — Hypothesis integration patterns (tutorial quality variable)
-
-**Feature Research:**
-- Technical debt quantification methods (multiple approaches exist, chose conservative estimates)
+- [Alembic Discussion #1425: Existing PostgreSQL DB bootstrapping](https://github.com/sqlalchemy/alembic/discussions/1425)
+  — stamp strategy for existing DBs; consistent with official docs
+- [Wolt Engineering: Professional-grade mypy configuration](https://careers.wolt.com/en/blog/tech/professional-grade-mypy-configuration)
+  — per-module override strategy for large codebases
+- [Dagster: How to Enforce Data Quality at Every Stage](https://dagster.io/blog/how-to-enforce-data-quality-at-every-stage)
+  — QA gate pattern; consistent with existing PASS/WARN/FAIL schema
+- [dbt Labs: data pipeline quality checks](https://www.getdbt.com/blog/data-pipeline-quality-checks)
+  — incremental QA gate vs full recompute trade-off
+- [Airbus: Python code quality with Ruff, one step at a time](https://cyber.airbus.com/en/newsroom/stories/2025-10-python-code-quality-with-ruff-one-step-at-a-time-part-1)
+  — ruff incremental adoption on large codebase; two-PR strategy for zero-then-enforce
+- [Quantlane: Type-checking a large Python codebase](https://quantlane.com/blog/type-checking-large-codebase/)
+  — mypy scoping strategy for large codebases; narrow-then-expand approach
+- [Rootly: Incident Response Runbooks](https://rootly.com/incident-response/runbooks)
+  — SLA section and incident severity structure
 
 ---
-*Research completed: 2026-02-05*
+
+*Research completed: 2026-02-22*
 *Ready for roadmap: yes*
-*Synthesis: Complete integration of STACK, FEATURES, ARCHITECTURE, PITFALLS research*

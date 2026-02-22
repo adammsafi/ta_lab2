@@ -1,378 +1,330 @@
-# Feature Research: EMA & Bar Architecture Standardization
+# Feature Landscape: v0.8.0 Polish & Hardening
 
-**Domain:** Data validation pipeline standardization and comprehensive code review
-**Researched:** 2026-02-05
-**Confidence:** HIGH
-
-## Feature Landscape
-
-This research addresses a **subsequent milestone** focused on standardization of existing infrastructure. The features below are review/standardization capabilities needed to ensure consistency across 6 EMA variants and multiple bar builders.
-
-**Context:** The project has:
-- 6 working EMA calculation variants (22.4M rows across tables)
-- Multiple bar builders with validation logic
-- State management for incremental updates
-- Mix of validated bar tables and unvalidated price histories as data sources
-
-**Goal:** Comprehensive review + standardization, NOT building new data features.
+**Domain:** Python quant/data platform hardening
+**Researched:** 2026-02-22
+**Scope:** 5 hardening areas on existing infrastructure
 
 ---
 
-## Table Stakes (Users Expect These)
+## Context: What Already Exists
 
-Features that make this a "comprehensive" review rather than a surface-level pass.
+This milestone hardens existing infrastructure, not builds new features. All 5 areas have partial
+implementations already in place. Understanding what exists shapes what "table stakes" means here —
+the bar is "what must be true of a mature platform in each area", measured against what already exists.
+
+| Area | Already Built | Gap |
+|------|--------------|-----|
+| Stats/QA | 5 stats runners + 17 audit scripts + orchestrator | Runners not wired to refresh pipeline; no gate pattern |
+| mypy | Listed as dev dep, no config, not in CI | Config file, CI job, per-module strategy |
+| Documentation | mkdocs-material site, 2 mermaid diagrams, 2 runbooks | Stale version (v0.4.0 in mkdocs.yml vs v0.7.0 actual), no pipeline flow diagram, runbooks missing incident sections |
+| Runbooks | DAILY_REFRESH.md + STATE_MANAGEMENT.md | No SLA section, no incident escalation, no on-call contact, no rollback procedures |
+| Alembic | 16 raw SQL files in sql/migration/ (no framework) | No Alembic init, no version tracking, no stamp of current state |
+
+---
+
+## Area 1: Stats/QA Integration
+
+### Table Stakes
+
+Features a mature Python data platform always has in this area.
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| **Comprehensive Inventory** | Can't standardize what you don't know exists | LOW | File/function discovery across all 6 EMA variants, bar builders, state tables, helpers |
-| **Current State Documentation** | Must document "as-is" before proposing changes | MEDIUM | What patterns exist today? What works? What's inconsistent? |
-| **Gap Analysis** | Identify what's missing or inconsistent | MEDIUM | Data source mismatches, missing validation, schema inconsistencies |
-| **Data Flow Mapping** | Understand dependencies before refactoring | MEDIUM | price_histories7 → bars → EMAs; state table relationships |
-| **Schema Audit** | Table structures must be compared systematically | LOW | Column naming, constraint presence, quality flags, indexes |
-| **Pattern Consistency Check** | Identify where same problem solved differently | MEDIUM | Data loading, state management, validation, error handling |
-| **Code Annotation** | Inline documentation of complex logic | MEDIUM | Annotate existing code with comments explaining "why" not just "what" |
-| **Recommendation Documentation** | Analysis must produce actionable next steps | LOW | What to fix, in what order, with what priority |
+| Stats runners emit non-zero exit codes on FAIL | Without this, failures are invisible to orchestration | Low | Currently runners log FAIL rows but exit 0 |
+| Post-refresh QA gate (blocking) | Critical issues must stop downstream; stale data worse than no data | Medium | Add gate call after each refresh step in run_daily_refresh.py |
+| Stats stored in DB with PASS/WARN/FAIL severity | Enables querying history, trending, dashboards | Low | Already implemented in price_bars_multi_tf_stats schema |
+| Incremental stats (watermark pattern) | Full re-check on every refresh is too slow at scale | Medium | Already implemented in bars stats runner; pattern established |
+| Global audit orchestrator with exit code | run_all_audits.py must return non-zero if any audit fails | Low | Orchestrator exists; exit code logic needs verification |
+| Stats coverage for all major tables | All 4 table families (bars, EMA, returns, features) need coverage | Medium | Bars + features done; EMA and returns stats runners may be incomplete |
 
-**Why table stakes:** A code review that doesn't inventory, document current state, identify gaps, map dependencies, audit schemas, check pattern consistency, annotate code, and provide recommendations is incomplete. Users (future maintainers) expect this baseline.
+### Differentiators
 
----
-
-## Differentiators (Comprehensive vs Surface-Level)
-
-Features that distinguish thorough standardization from a quick pass.
+Features beyond basics that mature quant platforms add.
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| **Constraint Verification** | Proves data quality claims are enforced | MEDIUM | Verify all bar tables have NOT NULL + OHLC invariants; identify unvalidated sources |
-| **State Schema Standardization** | Unified state management across all EMAs | MEDIUM | Already started (see EMA_STATE_STANDARDIZATION.md); ensure all 6 variants follow same pattern |
-| **Validation Pattern Library** | Reusable validation logic instead of copy-paste | HIGH | Extract common OHLC validation, gap detection, quality scoring into shared modules |
-| **Incremental Refresh Analysis** | Understand watermark patterns and correctness | MEDIUM | High watermark tracking, partial update handling, state consistency |
-| **Data Source Migration Plan** | Systematic conversion from price_histories7 to validated bars | HIGH | Not all EMAs use validated bar data yet; plan phased migration |
-| **Quality Flag Standardization** | Consistent quality tracking across all tables | MEDIUM | Bar quality flags (reject reasons, repair strategies) vs EMA quality (coverage, gaps) |
-| **Cross-Script Comparison Matrix** | Side-by-side comparison of 6 EMA variants | MEDIUM | Comparison table showing data loading, state management, validation differences |
-| **Architecture Decision Records** | Document WHY certain patterns exist | LOW | Why 6 separate EMA tables? Why price_histories7 vs bars? Preserve institutional knowledge |
-| **Dependency Graph** | Visual map of table/script dependencies | MEDIUM | Which scripts depend on which tables? What order must things run? |
-| **Test Coverage Analysis** | Identify untested code paths | MEDIUM | Which validation logic has tests? Which state transitions lack coverage? |
+| WARN-only gate (non-blocking) | Allows pipeline to continue while surfacing minor issues via Telegram | Low | Separate FAIL threshold vs WARN threshold at gate check |
+| Stats trend view (PASS rate over time) | Shows data quality trajectory, detects slow degradation | Medium | SQL view over existing stats tables; no new infrastructure |
+| Freshness SLA check in stats | Automated staleness check embedded in stats (not just runbook) | Low | Already done in bar stats (max_ts_lag_vs_price test) |
+| Per-asset FAIL counts in summary | Pinpoint which assets are consistently problematic | Low | Aggregation query over existing stats tables |
+| Stats runner wired into run_all_feature_refreshes | Feature refresh also has QA gate, not just bar/EMA | Medium | Mirror pattern from run_daily_refresh |
 
-**Why differentiators:** These features move from "we documented what exists" to "we understand the architecture deeply and can safely refactor it." The Cross-Script Comparison Matrix and Validation Pattern Library particularly enable systematic standardization.
+### Anti-Features
 
----
+Things to deliberately NOT build.
 
-## Anti-Features (Commonly Requested, Often Problematic)
+| Anti-Feature | Why Avoid | What to Do Instead |
+|--------------|-----------|-------------------|
+| Full stats recompute on every run | At 2.1M rows, this becomes multi-minute blocking step | Use existing incremental watermark pattern; gate only checks latest batch |
+| Stats as a separate scheduled job | Defeats the purpose of gating — QA must run before downstream proceeds | Wire QA gate inline with refresh, not as cron afterthought |
+| Blocking on WARN | WARN = tolerable anomaly; blocking on WARN kills operational velocity | Block only on FAIL; alert on WARN via Telegram |
+| Custom assertion DSL | Reinventing Great Expectations in this codebase | Use existing PASS/WARN/FAIL SQL pattern already established |
+| Replacing audit scripts with stats runners | Both serve different purposes: audits are ad-hoc exploratory, stats are incremental operational | Keep both; wire stats runners into pipeline, audits remain manual |
 
-Features to explicitly NOT do during standardization.
-
-| Feature | Why Requested | Why Problematic | Alternative |
-|---------|---------------|-----------------|-------------|
-| **Immediate Refactoring** | "Fix it while reviewing" | Mixing analysis and implementation causes scope creep | Document issues, prioritize, refactor in separate phase |
-| **Perfect Pattern Enforcement** | "Make everything identical" | Different EMA variants have legitimately different needs (calendar vs fixed-day) | Standardize non-differentiating features only; preserve intentional differences |
-| **Complete Test Suite** | "100% coverage before standardizing" | Testing slows review; you don't know what to test until patterns identified | Write contract tests for interfaces; defer implementation tests |
-| **Schema Migration During Review** | "Update schemas while auditing" | Schema changes are risky; require separate validation | Document schema changes needed; execute in controlled migration phase |
-| **One Unified EMA Table** | "Merge all 6 EMA tables into one" | Already tried; different canonical boundary definitions require separate tables | Keep 6 tables; standardize patterns WITHIN each family |
-| **Automated Fix-All Script** | "Script to auto-standardize everything" | Code generation without understanding causes subtle bugs | Manual fixes with careful review; automation for repetitive tasks only |
-| **Gold-Plating Documentation** | "Document every line of code" | Over-documentation becomes outdated quickly | Annotate complex/non-obvious logic; let code be self-documenting where clear |
-| **Premature Optimization** | "Refactor for performance while reviewing" | Performance fixes without profiling waste time | Note performance concerns; profile and optimize separately if needed |
-
-**Critical anti-feature:** **Immediate Refactoring** is the biggest trap. This milestone is REVIEW + DOCUMENT + PLAN. Actual standardization comes after. Mixing them causes scope explosion and incomplete analysis.
-
----
-
-## Feature Dependencies
+### Feature Dependencies
 
 ```
-Comprehensive Inventory
-    └──requires──> Current State Documentation
-                       └──requires──> Gap Analysis
-                                         └──requires──> Recommendation Documentation
+Stats runners (already exist)
+  -> Gate check function reads latest stats for batch
+  -> Gate called from run_daily_refresh after each major step
+  -> Gate called from run_all_feature_refreshes after feature refresh
 
-Data Flow Mapping ──enhances──> Gap Analysis
-                 └──requires──> Comprehensive Inventory
-
-Schema Audit ──enhances──> Gap Analysis
-Pattern Consistency Check ──enhances──> Gap Analysis
-
-Constraint Verification ──requires──> Schema Audit
-State Schema Standardization ──requires──> Pattern Consistency Check
-
-Validation Pattern Library ──requires──> Pattern Consistency Check
-                           └──conflicts──> Immediate Refactoring (anti-feature)
-
-Data Source Migration Plan ──requires──> Data Flow Mapping
-                           └──requires──> Constraint Verification
-
-Cross-Script Comparison Matrix ──requires──> Comprehensive Inventory
-                                └──enhances──> Pattern Consistency Check
-
-Architecture Decision Records ──requires──> Data Flow Mapping
-Dependency Graph ──requires──> Data Flow Mapping
-
-Test Coverage Analysis ──requires──> Comprehensive Inventory
+Telegram alerting (already exists)
+  -> Gate sends WARN-level alert on WARN rows
+  -> Gate raises exception / non-zero exit on FAIL rows
 ```
 
-### Dependency Notes
+---
 
-- **Comprehensive Inventory must come first:** Can't analyze what you haven't catalogued
-- **Gap Analysis is the convergence point:** Inventory, data flows, schemas, patterns all feed into gap identification
-- **Validation Pattern Library conflicts with Immediate Refactoring:** Can't extract patterns while simultaneously refactoring; must understand patterns first
-- **Data Source Migration Plan requires constraint verification:** Must prove bar tables are properly constrained before migrating EMAs to use them
-- **Cross-Script Comparison Matrix is a force multiplier:** Makes pattern inconsistencies obvious; drives standardization priorities
+## Area 2: mypy Strict Adoption
+
+### Table Stakes
+
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| mypy config in pyproject.toml | Without config, mypy behavior is inconsistent across devs | Low | [tool.mypy] section; currently absent |
+| mypy in CI (non-blocking initially) | Prevents regression of typed modules; catch new errors | Low | Add mypy job to ci.yml with continue-on-error: true initially |
+| check_untyped_defs = true (global) | Checks bodies of untyped functions; catches runtime bugs even without annotations | Low | Most important flag for partial codebases |
+| Per-module overrides for legacy files | Global strict breaks everything; overrides let you ratchet gradually | Low | [mypy-ta_lab2.scripts.*] sections with ignore_errors = True |
+| ignore_missing_imports for third-party stubs | vectorbt, sqlalchemy, pandas all have stubs; others don't — must configure | Low | Prevents noise from missing type stubs |
+| Pinned mypy version in dev deps | mypy errors change between versions; unpinned = non-reproducible CI | Low | Already listed as mypy>=1.8; pin to exact version |
+
+### Differentiators
+
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| Strict mode on new-code modules (features/, time/) | Higher-value modules get immediate type safety | Medium | Enable disallow_untyped_defs = True per module selectively |
+| type: ignore[code] policy (no bare ignores) | Forces precision; prevents ignoring unknown future errors | Low | Add ruff rule or mypy flag to warn on bare type: ignore |
+| mypy CI job becomes blocking (future milestone) | Once error count < threshold, flip continue-on-error: false | Low | Set threshold; document the ratchet plan |
+| Typed protocols for core abstractions | Signal generators, feature refreshers, stats runners have common shapes | High | Retroactively annotating scripts is low value; protocols for new code only |
+| MonkeyType for auto-annotation of hot paths | Automated stub generation for highest-traffic legacy modules | High | Research tool; deferred to future milestone |
+
+### Anti-Features
+
+| Anti-Feature | Why Avoid | What to Do Instead |
+|--------------|-----------|-------------------|
+| --strict globally on day one | Will produce hundreds of errors on a codebase this size; CI unusable | Start with check_untyped_defs only; ratchet per module |
+| Annotating sql/migration scripts and scripts/baseline | These are one-shot migration files; not worth annotating | Exclude from mypy via per-module ignore_errors = True |
+| Ignoring mypy output entirely (current state) | mypy listed as dep but never run = false confidence | Must at minimum run and report; blocking comes later |
+| Retrofitting type annotations to all 80+ .py files in one PR | Unreviewable PR; will introduce bugs | Annotate incrementally by module, highest-import modules first |
+| Using pyright instead of mypy | Pyright is not in existing toolchain; switching adds complexity | Continue with mypy; it is already in pyproject.toml |
+
+### Feature Dependencies
+
+```
+[tool.mypy] in pyproject.toml (new)
+  -> Per-module overrides in same file
+  -> CI job in ci.yml calls: mypy src/ta_lab2 --config-file pyproject.toml
+  -> Pre-commit hook optional (adds latency; evaluate against <5s target)
+```
+
+### Module Priority for Annotation
+
+Based on codebase structure, annotation priority order:
+
+1. `ta_lab2/features/` — widely imported by scripts; high leverage
+2. `ta_lab2/time/` — dim_timeframe.py is critical shared utility
+3. `ta_lab2/scripts/bars/stats/` — new stats runner code; annotate as written
+4. `ta_lab2/scripts/run_daily_refresh.py` — orchestrator; high visibility
+5. Everything else — covered by check_untyped_defs passively
 
 ---
 
-## MVP Definition
+## Area 3: Documentation Freshness
 
-### Phase 1: Discovery & Documentation (v1 of this milestone)
+### Table Stakes
 
-This phase is about **understanding** the current state.
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| mkdocs.yml version matches actual project version | mkdocs.yml says v0.4.0; pyproject.toml says v0.5.0; actual is v0.7.0 | Low | Single-line fix; represents systematic staleness |
+| CHANGELOG.md exists and is current | Standard Python project expectation; documents what changed per version | Medium | File exists in nav but needs v0.5/0.6/0.7 entries |
+| Pipeline flow diagram (Mermaid) | DAILY_REFRESH.md describes execution order in prose; diagram makes it scannable | Medium | bars -> EMAs -> regimes -> features flow; component boxes with arrows |
+| mkdocstrings auto-generation for public APIs | Plugin installed but underutilized; public classes should have docstring-based API docs | Medium | Requires Google-style docstrings on key classes |
+| Nav in mkdocs.yml reflects current docs/ structure | Current nav references files that may not exist or are stale | Low | Audit nav entries vs actual files |
 
-- [ ] **Comprehensive Inventory** - Complete file/function/table listing
-  - Essential: Need to know scope before analyzing
-- [ ] **Data Flow Mapping** - Diagram showing price_histories7 → bars → EMAs → state
-  - Essential: Can't identify data source issues without flow map
-- [ ] **Schema Audit** - Systematic comparison of all bar/EMA/state table schemas
-  - Essential: Schema inconsistencies are a primary concern
-- [ ] **Cross-Script Comparison Matrix** - Side-by-side comparison of 6 EMA variants
-  - Essential: Reveals pattern inconsistencies
-- [ ] **Current State Documentation** - Narrative document describing "as-is" architecture
-  - Essential: Provides context for gap analysis
+### Differentiators
 
-**Success criteria:** Team can answer "What do we have?" and "How does it work?"
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| Mike-based versioned docs (v0.8.0 alias) | latest always points to current; old versions archived | Medium | mike is already configured as provider in mkdocs.yml extra.version |
+| Architecture decision records (ADRs) | Documents WHY key decisions were made; avoids re-litigating the past | Medium | Lightweight ADR format; one per major design decision |
+| Automated CHANGELOG from release-please | .github/release-please-config.json exists; wire to auto-generate CHANGELOG entries | Medium | release-please already configured; may already be generating CHANGELOG |
+| Per-phase pipeline diagram | Each refresh sub-pipeline (bars, EMAs, regimes, features) as separate diagram | Medium | More granular than single flow diagram |
 
-### Phase 2: Analysis & Planning (add after v1)
+### Anti-Features
 
-This phase is about **identifying problems** and **planning fixes**.
+| Anti-Feature | Why Avoid | What to Do Instead |
+|--------------|-----------|-------------------|
+| Manually maintaining API reference docs | API docs go stale immediately on any code change | Use mkdocstrings auto-generation from docstrings |
+| Documenting every internal private function | Creates noise and maintenance burden | Document public interfaces and entry points only |
+| PDF export or multiple output formats | Adds complexity; mkdocs HTML is sufficient for this project | Keep single HTML target |
+| Separate docs repo | Docs-as-code lives in same repo; keeps docs and code in sync | Keep docs/ in same repo |
+| Requiring docs update before every commit | Too heavy for frequent data pipeline commits | Gate docs update on version bump / milestone completion |
 
-- [ ] **Gap Analysis** - Systematic identification of inconsistencies and missing features
-  - Trigger: After comprehensive inventory complete
-- [ ] **Constraint Verification** - Prove which tables have proper constraints
-  - Trigger: After schema audit reveals constraint status
-- [ ] **Pattern Consistency Check** - Identify where same problem solved differently
-  - Trigger: After cross-script comparison matrix built
-- [ ] **Data Source Migration Plan** - Phased plan to move EMAs from price_histories7 to validated bars
-  - Trigger: After data flow mapped and constraints verified
-- [ ] **Recommendation Documentation** - Prioritized list of standardization tasks
-  - Trigger: After gap analysis complete
+### Feature Dependencies
 
-**Success criteria:** Team can answer "What's wrong?" and "What should we fix?"
+```
+mkdocs.yml version fix (prerequisite for all)
+  -> Pipeline flow diagram (Mermaid in docs/operations/)
+  -> CHANGELOG.md update with v0.5 through v0.7 entries
+  -> Nav audit (verify all referenced files exist)
+  -> mkdocstrings docstrings on public classes
 
-### Phase 3: Standardization Execution (defer to separate milestone)
-
-This phase is about **implementing fixes**.
-
-- [ ] **Code Annotation** - Annotate existing code with inline comments
-- [ ] **State Schema Standardization** - Finish unified state table migration
-- [ ] **Quality Flag Standardization** - Consistent quality tracking across tables
-- [ ] **Validation Pattern Library** - Extract reusable validation modules
-- [ ] Data source migration implementation
-- [ ] Schema migrations
-
-**Why defer:** Can't execute standardization until you know what to standardize. Phases 1-2 produce the roadmap; Phase 3 executes it.
+release-please-config.json (existing)
+  -> May already generate CHANGELOG; audit first before building
+```
 
 ---
 
-## Feature Prioritization Matrix
+## Area 4: Operational Runbooks
 
-| Feature | User Value | Implementation Cost | Priority |
-|---------|------------|---------------------|----------|
-| Comprehensive Inventory | HIGH | LOW | P1 (Phase 1) |
-| Data Flow Mapping | HIGH | MEDIUM | P1 (Phase 1) |
-| Schema Audit | HIGH | LOW | P1 (Phase 1) |
-| Cross-Script Comparison Matrix | HIGH | MEDIUM | P1 (Phase 1) |
-| Current State Documentation | HIGH | MEDIUM | P1 (Phase 1) |
-| Gap Analysis | HIGH | MEDIUM | P1 (Phase 2) |
-| Constraint Verification | HIGH | MEDIUM | P1 (Phase 2) |
-| Pattern Consistency Check | HIGH | MEDIUM | P1 (Phase 2) |
-| Data Source Migration Plan | HIGH | HIGH | P2 (Phase 2) |
-| Recommendation Documentation | HIGH | LOW | P1 (Phase 2) |
-| State Schema Standardization | MEDIUM | MEDIUM | P2 (Phase 3) |
-| Validation Pattern Library | MEDIUM | HIGH | P2 (Phase 3) |
-| Code Annotation | MEDIUM | MEDIUM | P2 (Phase 3) |
-| Quality Flag Standardization | MEDIUM | MEDIUM | P2 (Phase 3) |
-| Architecture Decision Records | MEDIUM | LOW | P2 (Phase 1-2) |
-| Dependency Graph | MEDIUM | MEDIUM | P2 (Phase 1) |
-| Test Coverage Analysis | LOW | MEDIUM | P3 (Phase 2) |
-| Incremental Refresh Analysis | MEDIUM | MEDIUM | P2 (Phase 2) |
+### Table Stakes
 
-**Priority key:**
-- P1: Must have for comprehensive review (Phases 1-2)
-- P2: Should have for thorough standardization (Phases 2-3)
-- P3: Nice to have, future consideration
+Mature data pipeline runbooks always include these sections.
 
-**Critical path:** Inventory → Data Flow + Schema Audit + Comparison Matrix → Gap Analysis → Recommendations
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| SLA definition section | How fresh is acceptable? must be written down; ops makes judgment calls without it | Low | Define: bars < 48h stale; features < 72h; EMAs < 48h |
+| Incident severity classification | Not all failures are equal; ops needs a triage framework | Low | P1: data corruption / P2: staleness > SLA / P3: partial failure |
+| Escalation contacts / on-call section | Who to call for what; runbooks are useless during incident if this is missing | Low | Even if single-person team: define escalation path for self |
+| Rollback procedure per component | How do I undo a bad refresh? must be explicit; STATE_MANAGEMENT.md hints at this | Medium | DELETE from state table + backfill pattern; per-component procedures |
+| Recovery validation steps | After recovery, how do you verify the fix worked? | Low | Run relevant stats runner + audit script; check Telegram for alerts |
+| Maintenance window definition | When is it safe to run schema migrations, full rebuilds? | Low | Define: daily refresh window (UTC time), migration window |
 
----
+### Differentiators
 
-## Domain-Specific Patterns
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| Symptom-first index | Ops searches by what they observe, not by component | Low | Seeing X? Go to section Y index at top of DAILY_REFRESH.md |
+| Copy-paste SQL diagnostics | No one memorizes SQL during an incident; pre-written diagnostic queries | Low | STATE_MANAGEMENT.md has some; extend with common patterns |
+| Alert code to runbook section mapping | Each Telegram alert code maps to a runbook section | Medium | OHLC_CORRUPTION -> see DAILY_REFRESH.md#ohlc-corruption |
+| Known issue registry | Documents recurring issues with known root causes and mitigations | Medium | Prevents re-diagnosis of the same problems |
 
-### Data Pipeline Standardization Best Practices
+### Anti-Features
 
-Based on industry research for 2026:
+| Anti-Feature | Why Avoid | What to Do Instead |
+|--------------|-----------|-------------------|
+| Single monolithic runbook | 400-line DAILY_REFRESH.md is already getting unwieldy | Keep operational guide (what to do daily) separate from incident guide (what to do when broken) |
+| Runbook stored only in docs/ with no DB context | Ops needs to know what tables are affected | Include table names and SQL fragments inline |
+| Runbook updated separately from code changes | Runbooks go stale this way | Document runbook update requirement in PR template |
+| Over-specifying every edge case | Reduces usability; runbooks should be scannable not encyclopedic | Cover P1 and P2 scenarios; leave P3 to judgment |
 
-**1. DRY Principle for Pipeline Code**
-All code organization patterns follow the DRY (don't-repeat-yourself) principle, where standard code must remain in a single place. Most company pipelines follow similar patterns which depend on available tools, and establishing a blueprint enables consistent standards.
+### Feature Dependencies
 
-**Source:** [Start Data Engineering](https://www.startdataengineering.com/post/de_best_practices/), [FasterCapital Pipeline Standardization](https://fastercapital.com/topics/best-practices-for-code-review-in-pipelines.html)
+```
+Existing runbooks (DAILY_REFRESH.md, STATE_MANAGEMENT.md)
+  -> Add SLA section to DAILY_REFRESH.md
+  -> Add incident severity + escalation to DAILY_REFRESH.md
+  -> Add rollback procedures (referencing STATE_MANAGEMENT.md patterns)
+  -> Add recovery validation steps (referencing stats runners and audits)
 
-**2. State Management Patterns**
-Organizations are developing data asset systems to track what exactly had been computed in the pipeline and when. High watermark pattern is the most common approach for timestamp or sequence-based incremental extraction, storing the last processed timestamp and updating only after successful load.
-
-**Source:** [Incremental Pipelines at Scale](https://www.geteppo.com/blog/incremental-pipelines-managing-state-at-scale), [Data Engineering Incremental Loading](https://dataengineeracademy.com/blog/data-engineering-incremental-data-loading-strategies/)
-
-**3. Constraint-First Data Quality**
-Establishing standards for data types and constraints such as primary keys, foreign keys, unique constraints, and default values ensures data integrity and consistency. Advanced constraint frameworks leverage check constraints, triggers, and stored procedures to implement complex business rules at the database layer.
-
-**Source:** [Schema Standardization](https://airbyte.com/data-engineering-resources/how-to-standardize-data), [MongoDB Schema Validation](https://www.queryleaf.com/blog/2025/08/21/mongodb-data-validation-and-schema-enforcement-sql-style-data-integrity-patterns/)
-
-**4. Code Review Standards**
-Clear, concise guidelines for the code review process should be established, including defining what constitutes a reviewable piece of code, the scope of the review, and the criteria for approval. Automated code review tools enforce consistency objectively.
-
-**Source:** [Code Review Best Practices 2025](https://group107.com/blog/code-review-best-practices/), [Secoda Code Review](https://www.secoda.co/blog/how-to-introduce-code-review-to-your-data-engineering-team)
-
-**5. Migration Strategy Framework**
-Modernizing code often involves refactoring rather than complete rewrites, making it more efficient and cost-effective. Phased approaches are often better than attempting complete migrations in one go to avoid significant risks and complications.
-
-**Source:** [Code Migration Strategy](https://www.redhat.com/en/blog/modernization-developing-your-code-migration-strategy), [vFunction Migration Strategies](https://vfunction.com/resources/guide-migration-strategies-basics-lift-and-shift-refactor-or-replace/)
-
-### Application to This Project
-
-**Current state:**
-- ✅ State management exists (6 state tables, unified schema)
-- ✅ Constraints exist on bar tables (NOT NULL, OHLC invariants)
-- ❌ DRY violation: 6 EMA scripts with duplicated loading/validation logic
-- ❌ Mixed data sources: Some EMAs use validated bars, some use price_histories7
-- ⚠️ No centralized validation pattern library
-
-**Standardization priorities based on patterns:**
-1. Extract validation logic into shared modules (DRY principle)
-2. Migrate all EMAs to validated bar tables (constraint-first quality)
-3. Complete state schema unification (state management patterns)
-4. Document architecture decisions (review standards)
-5. Plan phased migration (migration strategy framework)
+Telegram alerting module (existing)
+  -> Alert codes should map to runbook sections
+  -> Severity levels (CRITICAL/ERROR/WARNING) map to incident severity (P1/P2/P3)
+```
 
 ---
 
-## Technical Debt Quantification
+## Area 5: Alembic for Existing Projects
 
-Based on findings from existing analysis documents:
+### Table Stakes
 
-### Current Technical Debt
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| Alembic initialized (alembic init) | Without this, migrations remain ad-hoc; impossible to track schema version | Low | Creates alembic/ dir, env.py, alembic.ini |
+| Baseline stamp of current schema | Tells Alembic the current schema is the starting point; prevents it from regenerating all tables | Medium | alembic stamp head after creating initial migration |
+| Initial migration from existing schema | One migration that represents current state; not the raw SQL files | Medium | Hand-write from existing DDL; do NOT use autogenerate as first step |
+| alembic upgrade head in CI | Validates that migrations apply cleanly; catches drift before production | Medium | Add to validation.yml after postgres service setup |
+| Connection configured from env var | alembic.ini uses environment variable; env.py reads TARGET_DB_URL | Low | Consistent with existing db_config.env pattern |
 
-| Category | Severity | Description | Impact |
-|----------|----------|-------------|--------|
-| **Data Source Inconsistency** | HIGH | Some EMAs use price_histories7 (unvalidated) instead of bar tables (validated) | Risk of OHLC invariant violations propagating to EMAs |
-| **Pattern Duplication** | MEDIUM | 6 EMA scripts implement data loading/state management differently | Maintenance burden; bug fixes require 6 updates |
-| **Schema Naming Inconsistency** | LOW | Column names vary (time_close vs timeclose, bar_seq presence) | Confusion; join complexity |
-| **Quality Flag Gaps** | MEDIUM | Bar tables have quality tracking; EMA tables lack explicit quality columns | Can't identify problematic EMA calculations |
-| **Validation Logic Duplication** | HIGH | OHLC validation repeated across bar builders | Inconsistent validation; DRY violation |
-| **State Table Migration Incomplete** | MEDIUM | State schema unified but not all scripts updated | Inconsistent state management |
+### Differentiators
 
-### Cost Estimation
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| include_name filter in env.py | Prevents Alembic from dropping tables it does not know about (system tables, manually-created stats tables) | Low | Critical safety measure for existing-schema onboarding |
+| Autogenerate with SQLAlchemy metadata | Future schema changes auto-detected by comparing Python models to DB | High | Requires creating SQLAlchemy Table objects for all 24+ tables |
+| Raw SQL support in migration scripts | Alembic supports op.execute(raw_sql) for complex DDL | Low | Existing sql/migration/*.sql files can be wrapped in op.execute() |
+| Migration squash after baseline | Once all developers are on Alembic, squash 16 raw SQL files into one baseline revision | Medium | Deferred: do after Alembic is adopted by whole team |
 
-Using [technical debt quantification methods](https://fullscale.io/blog/technical-debt-quantification-financial-analysis/) and [financial services debt patterns](https://www.wwt.com/wwt-research/addressing-technical-debt-in-financial-services):
+### Anti-Features
 
-**Maintenance overhead:**
-- 6 EMA variants × inconsistent patterns = 6× maintenance cost for bug fixes
-- Data source inconsistency = risk of data quality incidents (HIGH impact in trading systems)
-- Pattern duplication = estimated 40% of development time spent on "find and fix in all 6 places"
+| Anti-Feature | Why Avoid | What to Do Instead |
+|--------------|-----------|-------------------|
+| Autogenerate as first step without stamping | Without stamping current state, autogenerate will generate DROP statements for every existing table | Stamp first, then autogenerate for new changes only |
+| Replacing all 16 raw SQL files with Alembic migrations immediately | Creates a massive PR that is hard to review; risks data loss if wrong | Create baseline stamp, keep existing files in sql/migration/, only NEW changes go through Alembic |
+| Running migrations in run_daily_refresh.py | Schema migrations during data refresh creates dangerous coupling | Keep migrations separate, run manually or in dedicated CI job |
+| Using autogenerate without reviewing output | Autogenerate is not perfect; table renames appear as drop+add | Always review autogenerated migration files before committing |
+| Forcing ORM model creation for all tables | This project uses raw SQL heavily; creating 24 SQLAlchemy Table objects is high effort, low value | Use include_name filter with reflection for autogenerate filtering |
 
-**Standardization ROI:**
-- Shared validation library → 1 place to fix bugs (6× reduction)
-- Unified data sources → eliminate unvalidated data risk
-- Consistent patterns → faster onboarding, reduced cognitive load
+### Feature Dependencies
+
+```
+alembic init (new)
+  -> env.py configured with TARGET_DB_URL
+  -> alembic.ini configured
+  -> include_name filter in env.py (safety for existing tables)
+
+Baseline migration (new)
+  -> Created from existing DDL (hand-written, not autogenerated)
+  -> alembic stamp head applied to existing production DB
+  -> All future migrations through Alembic only
+
+CI integration (builds on validation.yml)
+  -> Postgres service already exists in validation.yml
+  -> Add alembic upgrade head step
+  -> Gate: migrations must apply cleanly before tests run
+```
 
 ---
 
-## Existing Architecture Insights
+## MVP Recommendation
 
-From project documentation:
+For v0.8.0, prioritize in this order:
 
-### What Already Exists
+### Must Have (v0.8.0)
 
-**Strong foundations:**
-- 6 working EMA calculation variants processing 22.4M rows
-- State management with unified schema (see EMA_STATE_STANDARDIZATION.md)
-- Bar builders with OHLC validation and NOT NULL constraints
-- Comprehensive analysis documents already created:
-  - `artifacts/ema_architecture_analysis.md` - Full EMA system mapping
-  - `artifacts/bar_table_vs_histories_analysis.md` - Data source analysis
-  - `docs/EMA_STATE_STANDARDIZATION.md` - State table unification
+1. **Stats/QA gate** — Wire existing stats runners into run_daily_refresh.py; emit non-zero exit on FAIL. All infrastructure already exists; this is the last-mile connection.
 
-**Partial standardization already complete:**
-- State table schema unified across all 6 EMA variants
-- Shared state management functions (`state_management.py`)
-- Common snapshot contract for bar builders
+2. **mypy baseline config** — Add [tool.mypy] to pyproject.toml with check_untyped_defs = true, per-module overrides for legacy files, and a non-blocking CI job. Zero runtime changes; pure tooling.
 
-### What Needs Standardization
+3. **Runbook hardening** — Add SLA section, severity classification, and escalation procedures to DAILY_REFRESH.md. Pure docs work; immediate operational value.
 
-**Non-differentiating features to standardize:**
-- Data loading patterns (how EMAs read bar data)
-- Validation logic (OHLC checks, gap detection)
-- State management usage (function calls, watermark updates)
-- Schema naming (consistent column names across related tables)
-- Quality tracking (consistent quality flags/scores)
+4. **Alembic baseline stamp** — Initialize Alembic, create baseline migration representing current schema, stamp the production database. Establishes the framework without changing any schema.
 
-**Intentional differences to PRESERVE:**
-- Canonical boundary definitions (fixed-day vs calendar vs anchored)
-- Bar-space vs time-space calculations
-- TF-specific aggregation logic
-- Different table structures for different EMA families
+5. **Docs version fix** — Update mkdocs.yml to v0.8.0, add pipeline flow Mermaid diagram, update CHANGELOG.md. Low effort, high visibility signal of project health.
 
-**Key architectural principle:**
-> Price histories should only be used to create bars. All downstream consumers (EMAs, features) should use validated bar data.
+### Defer to Post-MVP
 
-This principle is documented in PROJECT.md but not fully implemented yet.
+- **mypy strict adoption** (per-module ratchet): Time-intensive annotation work. Establish CI baseline first.
+- **Alembic autogenerate** (ORM models): Requires creating SQLAlchemy models for 24+ tables. Separate milestone.
+- **Mike versioned docs**: Operations overhead; valuable when there are external consumers of docs.
+- **ADRs**: Valuable but not urgent; write them as new decisions are made, not retroactively.
+- **Stats trend views**: SQL view work; deferred until stats runners have multi-week history.
 
 ---
 
 ## Sources
 
-### Data Pipeline Standards
-- [Start Data Engineering - Data Flow & Code Best Practices](https://www.startdataengineering.com/post/de_best_practices/)
-- [FasterCapital - Best Practices for Code Review in Pipelines](https://fastercapital.com/topics/best-practices-for-code-review-in-pipelines.html)
-- [Secoda - How to Introduce Code Review to Data Engineering Teams](https://www.secoda.co/blog/how-to-introduce-code-review-to-your-data-engineering-team)
-- [FasterCapital - Pipeline Standardization](https://fastercapital.com/content/Pipeline-standardization--How-to-standardize-your-pipeline-code-and-components-and-follow-the-best-practices-and-conventions.html)
-- [Code Review Best Practices for 2025](https://group107.com/blog/code-review-best-practices/)
-
-### State Management & Incremental Processing
-- [Incremental Pipelines: Managing State at Scale](https://www.geteppo.com/blog/incremental-pipelines-managing-state-at-scale)
-- [Data Engineering Incremental Loading Strategies](https://dataengineeracademy.com/blog/data-engineering-incremental-data-loading-strategies/)
-- [OneUpTime - Incremental Extraction](https://oneuptime.com/blog/post/2026-01-30-data-pipeline-incremental-extraction/view)
-- [Google SRE - Data Processing Pipelines](https://sre.google/sre-book/data-processing-pipelines/)
-- [Coalesce - Incremental Processing Strategies](https://coalesce.io/product-technology/incremental-processing-strategies/)
-
-### Schema Standardization & Validation
-- [Adobe Experience Platform - Schema Composition](https://experienceleague.adobe.com/en/docs/experience-platform/xdm/schema/composition)
-- [Airbyte - Database Standardization](https://airbyte.com/data-engineering-resources/how-to-standardize-data)
-- [MongoDB Schema Validation Guide](https://www.datacamp.com/tutorial/mongodb-schema-validation)
-- [QueryLeaf - MongoDB Data Validation](https://www.queryleaf.com/blog/2025/08/21/mongodb-data-validation-and-schema-enforcement-sql-style-data-integrity-patterns/)
-- [Medium - Implementing Data Contracts: Schema Validation](https://medium.com/@brunouy/implementing-data-contracts-schema-validation-5aefa2b89332)
-
-### Technical Debt & Gap Analysis
-- [CodeAnt - Technical Debt Measurement Tools 2026](https://www.codeant.ai/blogs/tools-measure-technical-debt)
-- [WWT - Addressing Technical Debt in Financial Services](https://www.wwt.com/wwt-research/addressing-technical-debt-in-financial-services)
-- [Full Scale - Technical Debt Quantification](https://fullscale.io/blog/technical-debt-quantification-financial-analysis/)
-- [Test Gap Analysis - Teamscale](https://teamscale.com/features/test-gap-analysis)
-- [Gap Analysis in QA - testRigor](https://testrigor.com/blog/gap-analysis-in-qa/)
-
-### Code Documentation & Annotation
-- [Codacy - Code Documentation Best Practices](https://blog.codacy.com/code-documentation)
-- [PEP 8 - Python Style Guide](https://peps.python.org/pep-0008/)
-- [Swimm - Comments in Code Best Practices](https://swimm.io/learn/code-collaboration/comments-in-code-best-practices-and-mistakes-to-avoid)
-- [Document360 - Code Documentation Best Practices](https://document360.com/blog/code-documentation/)
-
-### Migration & Refactoring Strategy
-- [Red Hat - Developing Your Code Migration Strategy](https://www.redhat.com/en/blog/modernization-developing-your-code-migration-strategy)
-- [vFunction - Migration Strategies Guide](https://vfunction.com/resources/guide-migration-strategies-basics-lift-and-shift-refactor-or-replace/)
-- [Microsoft Learn - Select Cloud Migration Strategies](https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/plan/select-cloud-migration-strategy)
-- [Netguru - Streamline Code Migration](https://www.netguru.com/blog/code-migration)
-
-### Project-Specific Sources
-- Project documentation: `.planning/PROJECT.md`, `.planning/ROADMAP.md`
-- Existing analysis: `docs/EMA_STATE_STANDARDIZATION.md`, `artifacts/ema_architecture_analysis.md`, `artifacts/bar_table_vs_histories_analysis.md`
-- Codebase inspection: Bar builder scripts, EMA refresh scripts, state management modules
+- mypy documentation — existing codebase adoption: [Using mypy with an existing codebase](https://mypy.readthedocs.io/en/stable/existing_code.html)
+- Wolt Engineering — professional mypy configuration: [Professional-grade mypy configuration](https://careers.wolt.com/en/blog/tech/professional-grade-mypy-configuration)
+- Alembic documentation — autogenerate: [Auto Generating Migrations](https://alembic.sqlalchemy.org/en/latest/autogenerate.html)
+- Alembic documentation — cookbook (stamping): [Cookbook](https://alembic.sqlalchemy.org/en/latest/cookbook.html)
+- Dagster — data quality at every stage: [How to Enforce Data Quality at Every Stage](https://dagster.io/blog/how-to-enforce-data-quality-at-every-stage)
+- dbt Labs — data pipeline quality checks: [How to build reliable data pipelines with data quality checks](https://www.getdbt.com/blog/data-pipeline-quality-checks)
+- dbt Labs — data SLAs best practices: [What are data SLAs?](https://www.getdbt.com/blog/data-slas-best-practices)
+- Material for MkDocs — versioning: [Setting up versioning](https://squidfunk.github.io/mkdocs-material/setup/setting-up-versioning/)
+- Rootly — incident runbooks guide: [Incident Response Runbooks](https://rootly.com/incident-response/runbooks)
+- Start Data Engineering — pipeline testing: [How to add tests to your data pipelines](https://www.startdataengineering.com/post/how-to-add-tests-to-your-data-pipeline/)
 
 ---
 
-*Feature research for: EMA & Bar Architecture Standardization (v0.6.0 milestone)*
-*Researched: 2026-02-05*
-*Confidence: HIGH (based on project codebase inspection + 2026 industry best practices)*
+## Confidence Assessment
+
+| Area | Confidence | Basis |
+|------|------------|-------|
+| Stats/QA gate pattern | HIGH | Verified against Dagster docs + dbt pattern; aligns with existing PASS/WARN/FAIL schema already in codebase |
+| mypy adoption strategy | HIGH | Official mypy docs + Wolt production config; well-established pattern |
+| Documentation freshness | HIGH | Standard practice; mkdocs.yml version staleness observed directly in codebase |
+| Runbook standard sections | MEDIUM | Multiple authoritative sources (AWS, Atlassian, runbook guides) agree on structure; SLA specifics are project-dependent |
+| Alembic baseline stamp | MEDIUM | Alembic docs describe the approach; existing table handling (include_name) verified against autogenerate docs |
+| Alembic autogenerate with 24 tables | LOW | Complex; ORM model creation required; autogenerate pitfalls well-documented but project-specific impact unverified |
