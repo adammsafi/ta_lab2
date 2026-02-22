@@ -1,7 +1,9 @@
 # src/ta_lab2/research/queries/opt_cf_ema.py
 # -*- coding: utf-8 -*-
 from __future__ import annotations
-import sys, re, pandas as pd
+import sys
+import re
+import pandas as pd
 
 # --- repo import path ---
 repo_src = r"C:\Users\asafi\Downloads\ta_lab2\src"
@@ -42,7 +44,7 @@ def load_df(p):
     d = d.dropna(subset=[ts]).set_index(ts).sort_index()
     try:
         d.index = d.index.tz_localize(None)
-    except:
+    except Exception:
         pass
     if px != "close":
         d = d.rename(columns={px: "close"})

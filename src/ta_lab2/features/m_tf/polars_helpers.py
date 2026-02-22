@@ -176,7 +176,7 @@ def fast_groupby_agg(
                 agg_exprs.append(pl.col(col).min().alias(col))
             elif agg_func == "max":
                 agg_exprs.append(pl.col(col).max().alias(col))
-            elif agg_func == "list" or agg_func == list:
+            elif agg_func == "list" or agg_func is list:
                 agg_exprs.append(pl.col(col).alias(col))
             else:
                 # Fallback for unsupported

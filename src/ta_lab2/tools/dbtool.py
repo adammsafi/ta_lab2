@@ -10,7 +10,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 from datetime import datetime, timezone, timedelta
-import json
 from ta_lab2.tools.snapshot_diff import load_snapshot, diff_snapshots, render_diff_md
 
 # Prefer psycopg (v3). Fall back to psycopg2 if needed.

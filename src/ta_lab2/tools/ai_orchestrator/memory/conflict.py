@@ -190,19 +190,17 @@ def resolve_conflict(
                 first_result = result_list[0]
                 operation = first_result.get("event", "UNKNOWN")
                 memory_id = first_result.get("id", "unknown")
-                memory_content = first_result.get("memory", new_content)
+                first_result.get("memory", new_content)
             else:
                 # Empty results - treat as NOOP
                 operation = "NOOP"
                 memory_id = "none"
-                memory_content = new_content
         else:
             # Unexpected format - default to ADD
             operation = "ADD"
             memory_id = (
                 result.get("id", "unknown") if isinstance(result, dict) else "unknown"
             )
-            memory_content = new_content
 
         # Build conflict result
         conflict_result = ConflictResult(

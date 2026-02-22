@@ -34,13 +34,13 @@ def _apply_ohlcv_agg(
 ):
     """Return a flat agg mapping suitable for pandas >= 1.5."""
     agg = {}
-    o, h, l, c = ohlc_cols
+    o, h, lo, c = ohlc_cols
     if o in w.columns:
         agg[o] = "first"
     if h in w.columns:
         agg[h] = "max"
-    if l in w.columns:
-        agg[l] = "min"
+    if lo in w.columns:
+        agg[lo] = "min"
     if c in w.columns:
         agg[c] = "last"
     for sc in sum_cols:

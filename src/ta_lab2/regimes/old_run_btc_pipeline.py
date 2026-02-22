@@ -5,7 +5,8 @@ Created on Fri Oct 31 11:35:04 2025
 @author: asafi
 """
 
-import sys, re
+import sys
+import re
 import pandas as pd
 
 # Add the parent dir so Python can import the ta_lab2 package folder

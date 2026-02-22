@@ -1,7 +1,9 @@
 # src/ta_lab2/research/queries/opt_cf_ema_sensitivity.py
 # -*- coding: utf-8 -*-
 from __future__ import annotations
-import sys, re, os
+import sys
+import re
+import os
 import pandas as pd
 
 # --- repo import path ---

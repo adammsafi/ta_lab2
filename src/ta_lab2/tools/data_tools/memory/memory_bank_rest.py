@@ -44,11 +44,6 @@ except ImportError:
         "Google Auth libraries required. Install with: pip install google-auth"
     )
 
-try:
-    import requests
-except ImportError:
-    raise ImportError("Requests library required. Install with: pip install requests")
-
 logger = logging.getLogger(__name__)
 
 

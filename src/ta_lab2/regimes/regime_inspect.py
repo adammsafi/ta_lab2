@@ -63,7 +63,7 @@ def main() -> None:
     )
 
     # Load and show active policy table (optional)
-    table = load_policy_table(str(args.policy)) if args.policy else DEFAULT_POLICY_TABLE
+    load_policy_table(str(args.policy)) if args.policy else DEFAULT_POLICY_TABLE
 
     pol = resolve_policy(L0=L0, L1=L1, L2=L2, L3=L3)
 

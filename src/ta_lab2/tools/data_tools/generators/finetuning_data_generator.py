@@ -137,7 +137,6 @@ def main() -> int:
 
     # --- Process Memories for Fine-Tuning ---
     output_path = Path(args.output)
-    output_data: List[Dict[str, Any]] = []
 
     memories_to_process = (
         memories[: args.max_memories] if args.max_memories > 0 else memories

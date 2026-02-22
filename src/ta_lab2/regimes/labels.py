@@ -135,7 +135,7 @@ def label_layer_monthly(
     )
     liq = label_liquidity_bucket(monthly)
     return pd.Series(
-        [compose_regime_key(t, v, l) for t, v, l in zip(trend, vol, liq)],
+        [compose_regime_key(t, v, lq) for t, v, lq in zip(trend, vol, liq)],
         index=monthly.index,
         name="L0",
     )
@@ -163,7 +163,7 @@ def label_layer_weekly(
     )
     liq = label_liquidity_bucket(weekly)
     return pd.Series(
-        [compose_regime_key(t, v, l) for t, v, l in zip(trend, vol, liq)],
+        [compose_regime_key(t, v, lq) for t, v, lq in zip(trend, vol, liq)],
         index=weekly.index,
         name="L1",
     )
@@ -191,7 +191,7 @@ def label_layer_daily(
     )
     liq = label_liquidity_bucket(daily)
     return pd.Series(
-        [compose_regime_key(t, v, l) for t, v, l in zip(trend, vol, liq)],
+        [compose_regime_key(t, v, lq) for t, v, lq in zip(trend, vol, liq)],
         index=daily.index,
         name="L2",
     )
@@ -217,7 +217,7 @@ def label_layer_intraday(
     vol = label_vol_bucket(intraday, price_col=price_col, window=300, mode="lite")
     liq = label_liquidity_bucket(intraday)
     return pd.Series(
-        [compose_regime_key(t, v, l) for t, v, l in zip(trend, vol, liq)],
+        [compose_regime_key(t, v, lq) for t, v, lq in zip(trend, vol, liq)],
         index=intraday.index,
         name="L3",
     )

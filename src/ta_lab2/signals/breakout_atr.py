@@ -32,16 +32,16 @@ def make_signals(
       Exit: channel crossback OR trailing ATR stop (configurable).
       Short side omitted by default (add later if desired).
     """
-    o, h, l, c = [df[col].astype(float) for col in price_cols]
+    o, h, lo, c = [df[col].astype(float) for col in price_cols]
     high_n = _rolling_high(h, lookback)
-    low_n = _rolling_low(l, lookback)
+    low_n = _rolling_low(lo, lookback)
 
     if confirm_close:
         entry_long = c > high_n.shift(1)  # break above prior channel
         exit_long_cb = c < low_n.shift(1)  # cross back into/below channel
     else:
         entry_long = h > high_n.shift(1)
-        exit_long_cb = l < low_n.shift(1)
+        exit_long_cb = lo < low_n.shift(1)
 
     # Optional ATR trailing stop exit
     if use_trailing_atr_stop and atr_col in df.columns:

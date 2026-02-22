@@ -384,9 +384,9 @@ def run_btc_pipeline(
             elif len(hres) == 2:
                 h_major, h_scores = hres
             elif len(hres) == 1:
-                h_major = hres[0]
+                hres[0]
         elif isinstance(hres, dict):
-            h_major = hres.get("corr", pd.DataFrame())
+            hres.get("corr", pd.DataFrame())
             h_scores = hres.get("scores", pd.DataFrame())
 
     # --- Summary ---

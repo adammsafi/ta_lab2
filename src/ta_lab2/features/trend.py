@@ -64,7 +64,7 @@ def compute_trend_labels(
         label = np.where(slope > 0, 1, -1)
     elif mode == "three_state":
         pct = np.nanpercentile(np.abs(slope.dropna()), [33, 67])
-        lo, hi = pct[0], pct[1]
+        lo, _hi = pct[0], pct[1]
         label = np.where(slope.abs() < lo, 0, np.where(slope > 0, 1, -1))
     elif mode == "flat_zone":
         label = np.where(np.abs(slope) < flat_thresh, 0, np.sign(slope))

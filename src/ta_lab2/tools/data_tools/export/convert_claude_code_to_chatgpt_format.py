@@ -231,7 +231,7 @@ def main() -> int:
     )
     output_file = Path(args.output)
 
-    count = convert_claude_conversations(claude_dir, output_file)
+    convert_claude_conversations(claude_dir, output_file)
 
     print(f"\nNext step: Generate memories from {output_file}")
     return 0

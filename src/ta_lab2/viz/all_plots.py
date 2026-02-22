@@ -137,7 +137,7 @@ def plot_consolidated_emas_like(
 ):
     d = df.tail(n).copy()
     x = np.arange(len(d))
-    t = _pick_time_index(d)
+    _pick_time_index(d)
 
     fig, ax = plt.subplots(figsize=(12, 6))
 
@@ -208,7 +208,7 @@ def plot_realized_vol(
 ):
     d = df.tail(n).copy()
     x = np.arange(len(d))
-    t = _pick_time_index(d)
+    _pick_time_index(d)
 
     fig, ax = plt.subplots(figsize=(12, 4))
     plotted = False

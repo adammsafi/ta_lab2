@@ -1,7 +1,10 @@
 # src/ta_lab2/research/queries/opt_cf_generic.py
 # -*- coding: utf-8 -*-
 from __future__ import annotations
-import sys, re, argparse, os
+import sys
+import re
+import argparse
+import os
 from pathlib import Path
 import pandas as pd
 
@@ -39,7 +42,7 @@ def load_df(path):
     d = d.dropna(subset=[ts]).set_index(ts).sort_index()
     try:
         d.index = d.index.tz_localize(None)
-    except:
+    except Exception:
         pass
     if px != "close":
         d = d.rename(columns={px: "close"})

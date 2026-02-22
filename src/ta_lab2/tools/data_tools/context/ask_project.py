@@ -14,7 +14,6 @@ from typing import Any, Dict, List
 
 try:
     from openai import OpenAI
-    from openai.types.chat import ChatCompletionMessageParam
 except ImportError:
     print(
         "OpenAI Python library not found. Please install it with 'pip install openai'."
