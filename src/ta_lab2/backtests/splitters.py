@@ -1,6 +1,7 @@
 """
 Time-series split helpers (expanding and walk-forward).
 """
+
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable, List, Tuple
@@ -30,11 +31,11 @@ def expanding_walk_forward(
 
     for cut in range(insample_years, len(years) - oos_years + 1):
         is_start = pd.Timestamp(f"{years[0]}-01-01")
-        pd.Timestamp(f"{years[cut-1]}-12-31")
-        oos_end = pd.Timestamp(f"{years[cut+oos_years-1]}-12-31")
+        pd.Timestamp(f"{years[cut - 1]}-12-31")
+        oos_end = pd.Timestamp(f"{years[cut + oos_years - 1]}-12-31")
         splits.append(
             Split(
-                name=f"IS_{years[0]}-{years[cut-1]}__OOS_{years[cut]}-{years[cut+oos_years-1]}",
+                name=f"IS_{years[0]}-{years[cut - 1]}__OOS_{years[cut]}-{years[cut + oos_years - 1]}",
                 start=is_start,
                 end=oos_end,
             )

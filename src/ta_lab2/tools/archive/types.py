@@ -3,6 +3,7 @@
 Provides dataclasses for tracking archive operations, file entries,
 and validation snapshots. Follows patterns from memory/migration.py.
 """
+
 from dataclasses import dataclass, field
 from pathlib import Path
 

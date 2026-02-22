@@ -4,6 +4,7 @@ Provides code structure extraction using Python's built-in AST module,
 combined with GitPython for git metadata (commit hash, author, timestamps).
 Supports full directory tree analysis with configurable exclusions.
 """
+
 import ast
 import logging
 from pathlib import Path

@@ -6,6 +6,7 @@ deprecation support (MEMO-08).
 
 All timestamps are ISO 8601 format for consistent parsing and storage.
 """
+
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
 from typing import Optional

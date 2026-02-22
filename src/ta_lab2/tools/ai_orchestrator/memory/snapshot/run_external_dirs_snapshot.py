@@ -9,6 +9,7 @@ Requirements:
 - Handle missing directories gracefully (log warning, continue with others)
 - For ProjectTT: Also handle .docx and .xlsx files if pypandoc available
 """
+
 import argparse
 import json
 import logging
@@ -117,10 +118,10 @@ def run_external_dir_snapshot(dir_config: dict, dry_run: bool = False) -> dict:
     dir_name = dir_config["name"]
     dir_path = dir_config["path"]
 
-    logger.info(f"\n{'='*60}")
+    logger.info(f"\n{'=' * 60}")
     logger.info(f"Processing directory: {dir_name}")
     logger.info(f"Path: {dir_path}")
-    logger.info(f"{'='*60}\n")
+    logger.info(f"{'=' * 60}\n")
 
     # Extract directory tree with code structure and git metadata
     file_infos = extract_directory_tree(dir_path, exclusions=EXCLUSIONS)
@@ -267,9 +268,9 @@ def run_all_external_snapshots(dry_run: bool = False) -> dict:
     }
 
     # Log summary
-    logger.info(f"\n{'='*60}")
+    logger.info(f"\n{'=' * 60}")
     logger.info("EXTERNAL DIRECTORIES SNAPSHOT SUMMARY")
-    logger.info(f"{'='*60}")
+    logger.info(f"{'=' * 60}")
     logger.info(f"Directories processed: {len(valid_dirs)}")
     logger.info(f"Directories missing: {len(missing_dirs)}")
     if missing_dirs:
@@ -277,7 +278,7 @@ def run_all_external_snapshots(dry_run: bool = False) -> dict:
     logger.info(f"Total files found: {total_files}")
     logger.info(f"Total files indexed: {total_indexed}")
     logger.info(f"Total errors: {total_errors}")
-    logger.info(f"{'='*60}\n")
+    logger.info(f"{'=' * 60}\n")
 
     return combined_stats
 

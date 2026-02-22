@@ -3,6 +3,7 @@
 Provides tools for duplicate detection, similarity analysis, and
 repository organization.
 """
+
 from ta_lab2.tools.cleanup.duplicates import (
     DuplicateGroup,
     EXCLUDE_DIRS,

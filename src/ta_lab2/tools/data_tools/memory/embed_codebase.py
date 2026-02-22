@@ -15,6 +15,7 @@ Dependencies:
     - openai: pip install openai
     - chromadb: pip install chromadb
 """
+
 from __future__ import annotations
 
 import argparse
@@ -229,7 +230,7 @@ def main() -> int:
         batch_start_time = time.time()
         batch = all_chunks[i : i + args.batch_size]
         log.info(
-            f"Processing batch {i//args.batch_size + 1}/{(len(all_chunks) + args.batch_size - 1)//args.batch_size}..."
+            f"Processing batch {i // args.batch_size + 1}/{(len(all_chunks) + args.batch_size - 1) // args.batch_size}..."
         )
 
         docs_to_embed = [chunk["content"] for chunk in batch]

@@ -8,6 +8,7 @@ FastAPI is REQUIRED for Phase 2 - not optional.
 Run server:
     uvicorn ta_lab2.tools.ai_orchestrator.memory.api:app --port 8080
 """
+
 import logging
 from typing import Optional, List
 

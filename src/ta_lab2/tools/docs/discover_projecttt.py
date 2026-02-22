@@ -8,6 +8,7 @@ Example:
     >>> docs = discover_projecttt()
     >>> print(f'Found {len(docs)} documents')
 """
+
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Dict, List

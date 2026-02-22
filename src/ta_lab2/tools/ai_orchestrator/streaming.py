@@ -1,4 +1,5 @@
 """Streaming result handlers for async adapters."""
+
 from __future__ import annotations
 
 import asyncio

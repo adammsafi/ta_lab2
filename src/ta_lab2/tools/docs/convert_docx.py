@@ -4,6 +4,7 @@ Converts Microsoft Word documents to Markdown format, extracting metadata
 from document properties and adding YAML front matter. Images are extracted
 to separate assets directory.
 """
+
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -240,13 +241,13 @@ def convert_docx_to_markdown(
 
         # Create YAML front matter
         yaml_lines = ["---"]
-        yaml_lines.append(f"title: \"{metadata['title']}\"")
-        yaml_lines.append(f"author: \"{metadata['author']}\"")
+        yaml_lines.append(f'title: "{metadata["title"]}"')
+        yaml_lines.append(f'author: "{metadata["author"]}"')
         if metadata["created"]:
             yaml_lines.append(f"created: {metadata['created']}")
         if metadata["modified"]:
             yaml_lines.append(f"modified: {metadata['modified']}")
-        yaml_lines.append(f"original_path: \"{metadata['original_path']}\"")
+        yaml_lines.append(f'original_path: "{metadata["original_path"]}"')
         yaml_lines.append(f"original_size_bytes: {metadata['original_size_bytes']}")
         yaml_lines.append("---")
         yaml_lines.append("")  # Blank line after front matter

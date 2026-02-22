@@ -8,6 +8,7 @@ Example:
     >>> similar = find_similar_functions(Path("src"), threshold=0.85)
     >>> print(f"Found {len(similar)} similar function pairs")
 """
+
 import ast
 from pathlib import Path
 from difflib import SequenceMatcher

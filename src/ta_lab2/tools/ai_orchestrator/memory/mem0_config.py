@@ -8,6 +8,7 @@ provides the intelligence layer (conflict detection, dedup) while Qdrant
 handles vector storage. Future migration to ChromaDB backend possible when
 supported.
 """
+
 import os
 import logging
 from pathlib import Path

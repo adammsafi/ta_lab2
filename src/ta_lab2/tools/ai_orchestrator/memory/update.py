@@ -3,6 +3,7 @@
 Adds new memories without breaking existing embeddings.
 Implements MEMO-07: Incremental update pipeline.
 """
+
 import logging
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional

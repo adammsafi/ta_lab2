@@ -1,4 +1,5 @@
 """ChromaDB client wrapper for ta_lab2 memory system."""
+
 import logging
 from typing import Optional
 import chromadb

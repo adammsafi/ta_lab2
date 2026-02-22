@@ -7,6 +7,7 @@ Extracted from fedtools2.utils.io and cleaned up with:
 
 Original source: .archive/external-packages/2026-02-03/fedtools2/src/fedtools2/utils/io.py
 """
+
 from pathlib import Path
 from typing import Union
 

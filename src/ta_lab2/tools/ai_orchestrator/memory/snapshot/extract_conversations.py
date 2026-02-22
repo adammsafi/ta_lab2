@@ -3,6 +3,7 @@
 Provides JSONL parsing for Claude Code transcripts, phase boundary extraction
 from git commit history, and conversation-to-phase linking for v0.4.0 context.
 """
+
 import json
 import logging
 import re

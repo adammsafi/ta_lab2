@@ -495,7 +495,7 @@ def _run_one_key(
                 {_INSERT_COLS}
             )
             SELECT
-                {_INSERT_COLS.replace('ingested_at', 'now()')}
+                {_INSERT_COLS.replace("ingested_at", "now()")}
             FROM to_insert
             ON CONFLICT (id, ts, tf, period) DO UPDATE SET
                 roll = EXCLUDED.roll,

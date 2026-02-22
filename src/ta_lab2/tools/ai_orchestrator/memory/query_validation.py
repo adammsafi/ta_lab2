@@ -15,6 +15,7 @@ Usage:
     result = validate_queries()
     print(f"Query validation: {result.passed_count}/{result.total_count} passed")
 """
+
 import logging
 from dataclasses import dataclass, field
 from typing import List, Optional

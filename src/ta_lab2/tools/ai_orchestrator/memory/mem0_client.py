@@ -6,6 +6,7 @@ detection, duplicate prevention, and CRUD operations with Qdrant vector store.
 NOTE: mem0ai 1.0.2 uses Qdrant (not ChromaDB) as vector backend. Mem0 provides
 the intelligence layer while Qdrant handles vector storage.
 """
+
 import logging
 from typing import Optional
 from mem0 import Memory

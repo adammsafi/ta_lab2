@@ -355,7 +355,7 @@ def render_diff_md(diff: Dict[str, Any], *, title: str = "Snapshot diff") -> str
         lines.append("|---|---:|---:|---:|---:|")
         for d in deltas:
             lines.append(
-                f"| `{d['table']}` | {d['delta_bytes']} ({d['delta_bytes_human']}) | {d['total_bytes_a']} | {d['total_bytes_b']} | {d.get('delta_rows','')} |"
+                f"| `{d['table']}` | {d['delta_bytes']} ({d['delta_bytes_human']}) | {d['total_bytes_a']} | {d['total_bytes_b']} | {d.get('delta_rows', '')} |"
             )
         lines.append("")
 

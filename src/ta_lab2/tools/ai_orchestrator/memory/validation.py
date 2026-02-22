@@ -1,4 +1,5 @@
 """Validation utilities for ChromaDB memory store integrity."""
+
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime

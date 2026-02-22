@@ -355,8 +355,7 @@ def _process_key(
     select_str = ", ".join(select_cols)
 
     sql = text(
-        f"SELECT {select_str} FROM {cfg.table} "
-        f"WHERE {key_where} ORDER BY {cfg.ts_col};"
+        f"SELECT {select_str} FROM {cfg.table} WHERE {key_where} ORDER BY {cfg.ts_col};"
     )
 
     with engine.begin() as cxn:
@@ -517,8 +516,7 @@ def _process_key(
         on_clause = " AND ".join(on_parts)
 
         update_sql = text(
-            f"UPDATE {cfg.table} t SET {set_parts} "
-            f"FROM {tmp_name} s WHERE {on_clause};"
+            f"UPDATE {cfg.table} t SET {set_parts} FROM {tmp_name} s WHERE {on_clause};"
         )
         cxn.execute(update_sql)
 

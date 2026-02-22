@@ -4,6 +4,7 @@ Vectorbt-based runner for fast research & sweeps.
 
 Requires: vectorbt, numpy, pandas
 """
+
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Protocol, Tuple

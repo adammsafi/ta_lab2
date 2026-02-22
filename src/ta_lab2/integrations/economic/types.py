@@ -4,6 +4,7 @@ Provides standardized data structures for economic time series data,
 ensuring consistent interfaces across different data providers
 (FRED, Fed, etc.).
 """
+
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional, Dict, Any

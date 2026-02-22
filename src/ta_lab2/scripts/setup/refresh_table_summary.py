@@ -4,6 +4,7 @@ Usage:
     python -m ta_lab2.scripts.setup.refresh_table_summary
     python -m ta_lab2.scripts.setup.refresh_table_summary --dry-run
 """
+
 from __future__ import annotations
 
 import argparse

@@ -19,6 +19,7 @@ Usage:
     for dup in report.exact_duplicates:
         suggestion = suggest_canonical(dup)
 """
+
 import difflib
 import logging
 import time

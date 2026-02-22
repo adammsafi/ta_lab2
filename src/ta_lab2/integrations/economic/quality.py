@@ -3,6 +3,7 @@
 Provides comprehensive validation including null checks, type validation,
 statistical outlier detection, and range validation based on historical norms.
 """
+
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -183,7 +184,7 @@ class QualityValidator:
                 QualityIssue(
                     severity=severity,
                     category="null",
-                    message=f"{null_pct*100:.1f}% null values ({data.isna().sum()} of {len(data)})",
+                    message=f"{null_pct * 100:.1f}% null values ({data.isna().sum()} of {len(data)})",
                     affected_dates=null_dates[:10],  # Limit to first 10
                     details={"null_percentage": null_pct},
                 )

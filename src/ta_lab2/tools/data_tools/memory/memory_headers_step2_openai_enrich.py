@@ -1,4 +1,5 @@
 """Enrich memory headers with OpenAI-generated titles and tags (Step 2)."""
+
 from __future__ import annotations
 
 import argparse
@@ -226,7 +227,7 @@ def main() -> None:
             "People should be named entities if clearly present; otherwise empty.\n"
         )
 
-        user_prompt = f"Title: {title}\n" f"Conversation (clipped):\n{sample}\n"
+        user_prompt = f"Title: {title}\nConversation (clipped):\n{sample}\n"
 
         try:
             resp = client.responses.create(

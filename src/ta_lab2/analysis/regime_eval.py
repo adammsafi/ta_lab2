@@ -4,6 +4,7 @@ Regime-conditional performance:
 - split metrics by regime labels (e.g., trend_state in {-1,0,1})
 - regime transition analysis stubs
 """
+
 from __future__ import annotations
 from typing import Optional
 import pandas as pd

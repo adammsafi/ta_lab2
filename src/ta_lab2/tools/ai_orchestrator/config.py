@@ -2,6 +2,7 @@
 
 Loads configuration from environment variables and provides validation.
 """
+
 import os
 import logging
 from dataclasses import dataclass, field

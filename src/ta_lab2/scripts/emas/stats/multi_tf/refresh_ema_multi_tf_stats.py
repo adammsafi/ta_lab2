@@ -413,7 +413,7 @@ INSERT INTO {STATS_TABLE} (
     table_name, test_name, asset_id, tf, period, status, actual, expected, extra
 )
 WITH base AS (
-{_SQL_EXPECTED_FROM_RANGE_TEMPLATE.format(EMA_TABLE=EMA_TABLE, ROLL_FLAG='false')}
+{_SQL_EXPECTED_FROM_RANGE_TEMPLATE.format(EMA_TABLE=EMA_TABLE, ROLL_FLAG="false")}
 )
 SELECT
     :table_name,

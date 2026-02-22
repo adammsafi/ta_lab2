@@ -35,6 +35,7 @@ Quick start:
 Run API server:
     uvicorn ta_lab2.tools.ai_orchestrator.memory.api:app --port 8080
 """
+
 from .client import MemoryClient, get_memory_client, reset_memory_client
 from .validation import (
     MemoryValidationResult,

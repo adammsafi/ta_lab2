@@ -3,6 +3,7 @@
 Provides token bucket rate limiting to prevent exceeding API limits.
 FRED API allows 120 requests per minute by default.
 """
+
 import threading
 import time
 from typing import Optional

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """RAG-based project Q&A with semantic search and LLM chat."""
+
 from __future__ import annotations
 
 import argparse
@@ -88,11 +89,11 @@ def ask_question(
 
     context_str = ""
     for i, mem in enumerate(context_memories):
-        context_str += f"--- Memory {i+1} ---\n"
+        context_str += f"--- Memory {i + 1} ---\n"
         # The full document from ChromaDB is now the content
         context_str += f"{mem.get('content', '')}\n\n"
 
-    user_prompt = f"CONTEXT MEMORIES:\n{context_str}\n\n" f"QUESTION: {query}"
+    user_prompt = f"CONTEXT MEMORIES:\n{context_str}\n\nQUESTION: {query}"
 
     try:
         response = client.chat.completions.create(

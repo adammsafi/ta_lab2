@@ -3,6 +3,7 @@
 Provides functions for creating filesystem snapshots before operations
 and validating that no data was lost after operations complete.
 """
+
 import json
 import logging
 from datetime import datetime, timezone
@@ -152,8 +153,7 @@ def validate_no_data_loss(
     elif strict and post.total_files != pre.total_files:
         diff = post.total_files - pre.total_files
         issues.append(
-            f"File count changed by {diff:+d} "
-            f"({pre.total_files} -> {post.total_files})"
+            f"File count changed by {diff:+d} ({pre.total_files} -> {post.total_files})"
         )
 
     # Check total size

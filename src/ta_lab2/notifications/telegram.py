@@ -104,12 +104,12 @@ def send_alert(title: str, message: str, severity: str = "warning") -> bool:
     """
     # Emoji prefix based on severity
     emoji_map = {
-        "critical": "\U0001F534",  # Red circle
-        "warning": "\U0001F7E1",  # Yellow circle
-        "info": "\U0001F535",  # Blue circle
+        "critical": "\U0001f534",  # Red circle
+        "warning": "\U0001f7e1",  # Yellow circle
+        "info": "\U0001f535",  # Blue circle
     }
 
-    emoji = emoji_map.get(severity.lower(), "\U0001F7E1")
+    emoji = emoji_map.get(severity.lower(), "\U0001f7e1")
     formatted_text = f"{emoji} <b>{title}</b>\n\n{message}"
 
     return send_message(formatted_text)

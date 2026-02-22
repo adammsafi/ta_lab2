@@ -1,4 +1,5 @@
 """Deduplicate duplicate YAML front-matter blocks in markdown files."""
+
 from __future__ import annotations
 import argparse
 import csv

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Generate OpenAI fine-tuning datasets from memory collections."""
+
 from __future__ import annotations
 
 import argparse
@@ -152,7 +153,7 @@ def main() -> int:
     with output_path.open("w", encoding="utf-8") as f:
         for i, mem in enumerate(memories_to_process):
             log.info(
-                f"Processing memory {i+1}/{len(memories_to_process)}: '{mem.get('title', 'Untitled')}'"
+                f"Processing memory {i + 1}/{len(memories_to_process)}: '{mem.get('title', 'Untitled')}'"
             )
 
             question = generate_question_for_memory(
@@ -174,13 +175,13 @@ def main() -> int:
                 generated_count += 1
             else:
                 log.warning(
-                    f"Skipping memory {i+1} due to question generation failure."
+                    f"Skipping memory {i + 1} due to question generation failure."
                 )
 
             if (i + 1) % 10 == 0:  # Log progress every 10 memories
                 elapsed = time.time() - start_time
                 log.info(
-                    f"Progress: {i+1}/{len(memories_to_process)} processed. Generated {generated_count} samples. Elapsed: {elapsed:.1f}s"
+                    f"Progress: {i + 1}/{len(memories_to_process)} processed. Generated {generated_count} samples. Elapsed: {elapsed:.1f}s"
                 )
 
     log.info(

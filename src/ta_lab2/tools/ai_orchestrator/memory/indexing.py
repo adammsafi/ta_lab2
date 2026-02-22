@@ -15,6 +15,7 @@ Usage:
     # Index entire codebase to memory
     result = index_codebase_functions(Path("src/ta_lab2"))
 """
+
 import ast
 import logging
 from dataclasses import dataclass, field

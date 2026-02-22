@@ -23,6 +23,7 @@ Dependencies:
     - openai: pip install openai
     - chromadb: pip install chromadb
 """
+
 from __future__ import annotations
 
 import argparse
@@ -165,7 +166,7 @@ def main() -> int:
         batch_start_time = time.time()
         batch = memories[i : i + args.batch_size]
         log.info(
-            f"Processing batch {i//args.batch_size + 1}/{(len(memories) + args.batch_size - 1)//args.batch_size}..."
+            f"Processing batch {i // args.batch_size + 1}/{(len(memories) + args.batch_size - 1) // args.batch_size}..."
         )
 
         # Prepare data for embedding and storage
@@ -177,7 +178,9 @@ def main() -> int:
             {"source_path": mem.get("source_path", ""), "type": mem.get("type", "")}
             for mem in batch
         ]
-        ids = [mem.get("memory_id", f"unknown-id-{i+j}") for j, mem in enumerate(batch)]
+        ids = [
+            mem.get("memory_id", f"unknown-id-{i + j}") for j, mem in enumerate(batch)
+        ]
 
         # Generate embeddings
         embeddings = get_embedding(docs_to_embed, client, model=args.embedding_model)

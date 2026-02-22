@@ -222,7 +222,7 @@ Examples:
   # Dry run
   python run_all_returns_stats_refreshes.py --dry-run
 
-Available families: {', '.join(ALL_FAMILY_LABELS)}
+Available families: {", ".join(ALL_FAMILY_LABELS)}
         """,
     )
 

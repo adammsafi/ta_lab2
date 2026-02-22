@@ -6,6 +6,7 @@ not installed.
 
 Install fredapi with: pip install ta_lab2[fred]
 """
+
 import logging
 import os
 from datetime import datetime

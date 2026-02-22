@@ -1,4 +1,5 @@
 """Create and deploy Vertex AI reasoning engine with memory bank integration."""
+
 from __future__ import annotations
 
 # create_reasoning_engine.py (using memory_bank_engine_rest)

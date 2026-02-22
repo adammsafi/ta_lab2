@@ -518,7 +518,7 @@ class FeaturesStore:
             SELECT
                 {",\n                ".join(select_parts)}
             {from_clause}
-                {chr(10) + '                '.join(join_clauses)}
+                {chr(10) + "                ".join(join_clauses)}
             {where_clause}
         """
 

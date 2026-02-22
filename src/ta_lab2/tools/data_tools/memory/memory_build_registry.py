@@ -1,4 +1,5 @@
 """Build memory source registry from memory collection manifests."""
+
 from __future__ import annotations
 
 import argparse

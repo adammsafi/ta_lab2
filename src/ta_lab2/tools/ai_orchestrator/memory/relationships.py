@@ -19,6 +19,7 @@ Usage:
     # Link all relationships for indexed functions
     result = link_codebase_relationships(Path("src/ta_lab2"))
 """
+
 import ast
 import logging
 from dataclasses import dataclass, field

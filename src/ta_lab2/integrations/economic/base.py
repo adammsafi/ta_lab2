@@ -3,6 +3,7 @@
 Defines the interface that all economic data providers must implement,
 enabling consistent usage across different data sources (FRED, Fed, etc.).
 """
+
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Optional, List

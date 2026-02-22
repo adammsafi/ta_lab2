@@ -15,6 +15,7 @@ Usage from audit scripts:
     write_audit_results(engine, df_audit, "ema", "audit", thresholds=AUDIT_THRESHOLDS)
     write_audit_results(engine, df_spacing, "ema", "spacing", thresholds=SPACING_THRESHOLDS)
 """
+
 from __future__ import annotations
 
 import json

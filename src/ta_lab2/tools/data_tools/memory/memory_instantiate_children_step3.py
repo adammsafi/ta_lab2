@@ -1,4 +1,5 @@
 """Instantiate child memories from parent memory sections (Step 3)."""
+
 from __future__ import annotations
 
 import argparse
@@ -471,7 +472,7 @@ def main() -> int:
             # Extract per chunk
             for chunk_idx, chunk in enumerate(chunks):
                 print(
-                    f"[progress] convo={cid} chunk={chunk_idx+1}/{len(chunks)} calling OpenAI...",
+                    f"[progress] convo={cid} chunk={chunk_idx + 1}/{len(chunks)} calling OpenAI...",
                     flush=True,
                 )
                 data = extract_child_memories(
@@ -486,7 +487,7 @@ def main() -> int:
 
                 memories = data.get("memories", []) or []
                 print(
-                    f"[progress] convo={cid} chunk={chunk_idx+1}/{len(chunks)} returned memories={len(memories)}",
+                    f"[progress] convo={cid} chunk={chunk_idx + 1}/{len(chunks)} returned memories={len(memories)}",
                     flush=True,
                 )
                 for mem_i, m in enumerate(memories):
@@ -516,7 +517,7 @@ def main() -> int:
                     emit(child)
                     if (mem_i + 1) % 5 == 0:
                         print(
-                            f"[progress] convo={cid} chunk={chunk_idx+1}/{len(chunks)} emitted={mem_i+1}",
+                            f"[progress] convo={cid} chunk={chunk_idx + 1}/{len(chunks)} emitted={mem_i + 1}",
                             flush=True,
                         )
 

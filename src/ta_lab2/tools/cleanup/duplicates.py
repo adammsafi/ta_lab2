@@ -8,6 +8,7 @@ Example:
     >>> duplicates = find_duplicates(Path("."), pattern="**/*.py")
     >>> print(f"Found {len(duplicates)} duplicate groups")
 """
+
 from pathlib import Path
 from collections import defaultdict
 from dataclasses import dataclass, field

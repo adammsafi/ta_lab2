@@ -1,4 +1,5 @@
 """Build chronological project timeline from Qdrant conversation memories."""
+
 import json
 import sys
 import io

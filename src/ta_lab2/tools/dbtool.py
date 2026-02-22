@@ -1265,7 +1265,7 @@ def _render_snapshot_md(snap: Dict[str, Any]) -> str:
         ts = table_stats.get(fq)
 
         if isinstance(ts, dict) and ts.get("error"):
-            lines.append(f"- error: `{_md_escape(str(ts.get('error')) )}`")
+            lines.append(f"- error: `{_md_escape(str(ts.get('error')))}`")
         elif isinstance(ts, dict) and ts:
             total_b = ts.get("total_bytes")
             table_b = ts.get("table_bytes")
@@ -1282,16 +1282,16 @@ def _render_snapshot_md(snap: Dict[str, Any]) -> str:
             )
             lines.append("")
             lines.append(
-                f"- last_analyze: `{_md_escape(_fmt_ts(ts.get('last_analyze')) )}`"
+                f"- last_analyze: `{_md_escape(_fmt_ts(ts.get('last_analyze')))}`"
             )
             lines.append(
-                f"- last_autoanalyze: `{_md_escape(_fmt_ts(ts.get('last_autoanalyze')) )}`"
+                f"- last_autoanalyze: `{_md_escape(_fmt_ts(ts.get('last_autoanalyze')))}`"
             )
             lines.append(
-                f"- last_vacuum: `{_md_escape(_fmt_ts(ts.get('last_vacuum')) )}`"
+                f"- last_vacuum: `{_md_escape(_fmt_ts(ts.get('last_vacuum')))}`"
             )
             lines.append(
-                f"- last_autovacuum: `{_md_escape(_fmt_ts(ts.get('last_autovacuum')) )}`"
+                f"- last_autovacuum: `{_md_escape(_fmt_ts(ts.get('last_autovacuum')))}`"
             )
         else:
             lines.append("_None_")
@@ -1306,7 +1306,7 @@ def _render_snapshot_md(snap: Dict[str, Any]) -> str:
 
         cs = top_col_stats.get(fq)
         if isinstance(cs, dict) and cs.get("error"):
-            lines.append(f"- error: `{_md_escape(str(cs.get('error')) )}`")
+            lines.append(f"- error: `{_md_escape(str(cs.get('error')))}`")
         elif isinstance(cs, list) and cs:
             lines.append("| column_name | null_frac | n_distinct | top_values |")
             lines.append("|---|---:|---:|---|")
@@ -1331,7 +1331,7 @@ def _render_snapshot_md(snap: Dict[str, Any]) -> str:
         lines.append("### Keys")
         lines.append("")
         if isinstance(k, dict) and k.get("error"):
-            lines.append(f"- error: `{_md_escape(str(k.get('error')) )}`")
+            lines.append(f"- error: `{_md_escape(str(k.get('error')))}`")
         elif k:
             lines.append("| key_type | constraint_name | columns |")
             lines.append("|---|---|---|")
@@ -1343,7 +1343,7 @@ def _render_snapshot_md(snap: Dict[str, Any]) -> str:
                     else str(cols)
                 )
                 lines.append(
-                    f"| `{_md_escape(str(r.get('key_type','')) )}` | `{_md_escape(str(r.get('constraint_name','')) )}` | `{_md_escape(cols_s)}` |"
+                    f"| `{_md_escape(str(r.get('key_type', '')))}` | `{_md_escape(str(r.get('constraint_name', '')))}` | `{_md_escape(cols_s)}` |"
                 )
         else:
             lines.append("_None_")
@@ -1354,13 +1354,13 @@ def _render_snapshot_md(snap: Dict[str, Any]) -> str:
         lines.append("### Columns")
         lines.append("")
         if isinstance(c, dict) and c.get("error"):
-            lines.append(f"- error: `{_md_escape(str(c.get('error')) )}`")
+            lines.append(f"- error: `{_md_escape(str(c.get('error')))}`")
         elif c:
             lines.append("| # | column_name | data_type | nullable | default |")
             lines.append("|---:|---|---|---|---|")
             for r in c:
                 lines.append(
-                    f"| {r.get('ordinal_position','')} | `{_md_escape(str(r.get('column_name','')) )}` | `{_md_escape(str(r.get('data_type','')) )}` | `{_md_escape(str(r.get('is_nullable','')) )}` | `{_md_escape(str(r.get('column_default','')) )}` |"
+                    f"| {r.get('ordinal_position', '')} | `{_md_escape(str(r.get('column_name', '')))}` | `{_md_escape(str(r.get('data_type', '')))}` | `{_md_escape(str(r.get('is_nullable', '')))}` | `{_md_escape(str(r.get('column_default', '')))}` |"
                 )
         else:
             lines.append("_None_")
@@ -1371,7 +1371,7 @@ def _render_snapshot_md(snap: Dict[str, Any]) -> str:
         lines.append("### Indexes")
         lines.append("")
         if isinstance(ix, dict) and ix.get("error"):
-            lines.append(f"- error: `{_md_escape(str(ix.get('error')) )}`")
+            lines.append(f"- error: `{_md_escape(str(ix.get('error')))}`")
         elif ix:
             lines.append(
                 "| index_name | method | unique | primary | predicate | definition |"
@@ -1381,12 +1381,12 @@ def _render_snapshot_md(snap: Dict[str, Any]) -> str:
                 # Support both old/new shapes
                 predicate = r.get("predicate", r.get("indpred", ""))
                 lines.append(
-                    f"| `{_md_escape(str(r.get('index_name','')) )}`"
-                    f" | `{_md_escape(str(r.get('index_method','')) )}`"
-                    f" | `{_md_escape(str(r.get('is_unique','')) )}`"
-                    f" | `{_md_escape(str(r.get('is_primary','')) )}`"
+                    f"| `{_md_escape(str(r.get('index_name', '')))}`"
+                    f" | `{_md_escape(str(r.get('index_method', '')))}`"
+                    f" | `{_md_escape(str(r.get('is_unique', '')))}`"
+                    f" | `{_md_escape(str(r.get('is_primary', '')))}`"
                     f" | `{_md_escape(str(predicate) if predicate else 'None')}`"
-                    f" | `{_md_escape(str(r.get('indexdef','')) )}` |"
+                    f" | `{_md_escape(str(r.get('indexdef', '')))}` |"
                 )
         else:
             lines.append("_None_")
@@ -1397,13 +1397,13 @@ def _render_snapshot_md(snap: Dict[str, Any]) -> str:
         lines.append("### Constraints")
         lines.append("")
         if isinstance(con, dict) and con.get("error"):
-            lines.append(f"- error: `{_md_escape(str(con.get('error')) )}`")
+            lines.append(f"- error: `{_md_escape(str(con.get('error')))}`")
         elif con:
             lines.append("| constraint_type | constraint_name |")
             lines.append("|---|---|")
             for r in con:
                 lines.append(
-                    f"| `{_md_escape(str(r.get('constraint_type','')) )}` | `{_md_escape(str(r.get('constraint_name','')) )}` |"
+                    f"| `{_md_escape(str(r.get('constraint_type', '')))}` | `{_md_escape(str(r.get('constraint_name', '')))}` |"
                 )
         else:
             lines.append("_None_")

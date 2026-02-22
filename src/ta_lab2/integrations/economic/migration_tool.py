@@ -7,6 +7,7 @@ Usage:
     python -m ta_lab2.integrations.economic.migration_tool /path/to/code
     python -m ta_lab2.integrations.economic.migration_tool .  # Current directory
 """
+
 import argparse
 import ast
 import sys

@@ -19,6 +19,7 @@ Example:
     ... )
     >>> print(f"Operation: {result.operation}, Confidence: {result.confidence}")
 """
+
 import logging
 import json
 from datetime import datetime

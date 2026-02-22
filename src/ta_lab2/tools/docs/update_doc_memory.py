@@ -3,6 +3,7 @@
 Provides batch memory operations for Phase 13 document consolidation,
 creating memories for converted documents and their sections.
 """
+
 import re
 import logging
 from dataclasses import dataclass

@@ -478,7 +478,7 @@ def _run_one_key(engine: Engine, cfg: RunnerConfig, key: Tuple[int, str, int]) -
                 {_INSERT_COLS}
             )
             SELECT
-                {_INSERT_COLS.replace('ingested_at', 'now()')}
+                {_INSERT_COLS.replace("ingested_at", "now()")}
             FROM to_insert
             ON CONFLICT (id, ts, tf, period) DO UPDATE SET
                 roll = EXCLUDED.roll,

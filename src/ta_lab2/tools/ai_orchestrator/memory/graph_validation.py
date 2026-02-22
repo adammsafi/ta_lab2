@@ -16,6 +16,7 @@ Usage:
     else:
         print(f"Validation failed: {result.failure_reasons}")
 """
+
 import logging
 from dataclasses import dataclass, field
 from typing import Dict, List

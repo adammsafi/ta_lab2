@@ -1,4 +1,5 @@
 """Build rich chronological project timeline from Qdrant + git."""
+
 import json
 import sys
 import io

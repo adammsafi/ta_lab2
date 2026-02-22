@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Generate review queue triage reports from memory data."""
+
 from __future__ import annotations
 
 import argparse

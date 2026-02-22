@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Generate code/project review digests from memory JSONL files."""
+
 from __future__ import annotations
 
 import argparse

@@ -4,6 +4,7 @@ Provides functions for creating versioned JSON manifests that track
 archived files with checksums and metadata. Uses hashlib.file_digest()
 (Python 3.11+) for efficient checksum computation.
 """
+
 import hashlib
 import json
 import logging

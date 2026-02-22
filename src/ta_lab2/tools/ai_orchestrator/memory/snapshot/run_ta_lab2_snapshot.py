@@ -11,6 +11,7 @@ Usage:
     # Execute snapshot (index to memory)
     python run_ta_lab2_snapshot.py
 """
+
 import argparse
 import json
 import logging

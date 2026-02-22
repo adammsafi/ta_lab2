@@ -3,6 +3,7 @@
 Converts Excel workbooks to Markdown format with proper table formatting,
 handling multi-sheet workbooks and unnamed columns gracefully.
 """
+
 import logging
 from pathlib import Path
 from typing import Optional, List

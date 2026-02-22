@@ -3,6 +3,7 @@
 Simple parameter sweep utilities (grid/random).
 Goal: quickly test indicator/signal params and rank by performance metrics.
 """
+
 from __future__ import annotations
 import itertools
 import random

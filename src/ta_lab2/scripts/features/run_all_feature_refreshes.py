@@ -457,16 +457,16 @@ def main() -> int:
             alignment_source = row[0] if row else "multi_tf"
         tf_alignments = [(args.tf, alignment_source)]
         logger.info(
-            f"Processing timeframe: {args.tf}" f" (alignment_source={alignment_source})"
+            f"Processing timeframe: {args.tf} (alignment_source={alignment_source})"
         )
 
     # Run refreshes for each (tf, alignment_source)
     all_results = {}
 
     for tf, alignment_source in tf_alignments:
-        logger.info(f"\n{'='*60}")
+        logger.info(f"\n{'=' * 60}")
         logger.info(f"Processing tf={tf}, alignment_source={alignment_source}")
-        logger.info(f"{'='*60}")
+        logger.info(f"{'=' * 60}")
 
         try:
             results = run_all_refreshes(

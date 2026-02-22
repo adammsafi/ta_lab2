@@ -3,6 +3,7 @@
 Formats retrieved memories for inclusion in Claude/ChatGPT/Gemini prompts.
 Implements MEMO-03: Context injection system retrieves top-K memories.
 """
+
 import logging
 from typing import List, Optional
 
@@ -153,7 +154,7 @@ def build_augmented_prompt(
         "context": memory_context,
         "user": user_query,
         "full_prompt": (
-            f"{system_prompt}\n\n" f"{memory_context}\n\n" f"User Query: {user_query}"
+            f"{system_prompt}\n\n{memory_context}\n\nUser Query: {user_query}"
         )
         if system_prompt
         else f"{memory_context}\n\nUser Query: {user_query}",

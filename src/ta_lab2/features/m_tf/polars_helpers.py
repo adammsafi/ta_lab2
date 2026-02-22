@@ -4,6 +4,7 @@ Polars integration helpers for faster DataFrame operations.
 Provides drop-in replacements for pandas operations using Polars internally.
 All functions maintain pandas API compatibility (return pandas DataFrames).
 """
+
 from __future__ import annotations
 
 from typing import Any, Optional

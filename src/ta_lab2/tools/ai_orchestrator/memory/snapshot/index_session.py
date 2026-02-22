@@ -11,6 +11,7 @@ Usage:
     echo '{"session_id":"abc123","transcript_path":"/path/to/session.jsonl"}' | \
         python -m ta_lab2.tools.ai_orchestrator.memory.snapshot.index_session --from-hook
 """
+
 import json
 import sys
 import logging

@@ -30,6 +30,7 @@ Dependencies:
     - google-auth: pip install google-auth
     - requests: pip install requests
 """
+
 from __future__ import annotations
 
 import logging

@@ -16,6 +16,7 @@ Usage:
     from ta_lab2.tools.ai_orchestrator.memory.run_validation import run_full_validation
     report = run_full_validation()
 """
+
 import argparse
 import logging
 import sys

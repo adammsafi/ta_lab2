@@ -8,6 +8,7 @@ Example:
     >>> entry = FileEntry(...)
     >>> manifest = create_manifest([entry], "2026-02-02", "deprecated")
 """
+
 from ta_lab2.tools.archive.types import (
     FileEntry,
     ArchiveResult,

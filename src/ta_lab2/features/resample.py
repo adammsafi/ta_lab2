@@ -39,7 +39,7 @@ def _ensure_ts_index(
 
     if ts_col not in df.columns and not isinstance(df.index, pd.DatetimeIndex):
         raise ValueError(
-            f"_ensure_ts_index(): expected '{ts_col}' column " "or a DatetimeIndex."
+            f"_ensure_ts_index(): expected '{ts_col}' column or a DatetimeIndex."
         )
 
     if not isinstance(df.index, pd.DatetimeIndex):

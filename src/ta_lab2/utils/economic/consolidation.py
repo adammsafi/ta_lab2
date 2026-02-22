@@ -8,6 +8,7 @@ Extracted from fedtools2.utils.consolidation and cleaned up with:
 
 Original source: .archive/external-packages/2026-02-03/fedtools2/src/fedtools2/utils/consolidation.py
 """
+
 from __future__ import annotations
 
 from functools import reduce

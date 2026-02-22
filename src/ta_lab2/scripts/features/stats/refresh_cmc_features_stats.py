@@ -457,8 +457,7 @@ def run(engine: Engine, full_refresh: bool, log_level: str) -> None:
 
         conn.execute(
             text(
-                "INSERT INTO _impacted_feat_keys(asset_id, tf) "
-                "VALUES (:asset_id, :tf)"
+                "INSERT INTO _impacted_feat_keys(asset_id, tf) VALUES (:asset_id, :tf)"
             ),
             [dict(r._mapping) for r in impacted],
         )

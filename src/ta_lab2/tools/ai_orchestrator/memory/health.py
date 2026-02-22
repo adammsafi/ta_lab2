@@ -6,6 +6,7 @@ deprecation workflows (MEMO-06).
 
 Health monitoring is non-destructive by default (dry_run=True).
 """
+
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta

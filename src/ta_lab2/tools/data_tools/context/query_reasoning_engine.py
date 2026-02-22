@@ -1,4 +1,5 @@
 """Query Vertex AI reasoning engine for context-aware responses."""
+
 from __future__ import annotations
 
 # query_reasoning_engine.py

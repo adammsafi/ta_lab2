@@ -24,6 +24,7 @@ Usage:
 Dependencies:
     - openai: pip install openai
 """
+
 from __future__ import annotations
 
 import argparse
@@ -110,10 +111,10 @@ Example:
 
     user_prompt = f"""
 Here is the code chunk to analyze:
-File: {chunk['file_path']}
-Function/Class Name: {chunk['name']}
+File: {chunk["file_path"]}
+Function/Class Name: {chunk["name"]}
 ```python
-{chunk['content']}
+{chunk["content"]}
 ```
 Please generate a memory for this code chunk in the specified JSON format.
 """

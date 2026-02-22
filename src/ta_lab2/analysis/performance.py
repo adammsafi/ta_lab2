@@ -5,6 +5,7 @@ Core performance utilities:
 - basic metrics (CAGR, Sharpe, Sortino, MaxDD, Calmar, Hit-rate, Turnover)
 - evaluation wrappers for a signal DataFrame
 """
+
 from __future__ import annotations
 import numpy as np
 import pandas as pd

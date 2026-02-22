@@ -3,6 +3,7 @@
 Implements the circuit breaker pattern to prevent cascade failures
 when external APIs are down or overloaded.
 """
+
 import threading
 import time
 from enum import Enum
