@@ -12,10 +12,10 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Stats/QA Orchestration
 
-- [ ] **STAT-01**: Stats runners wired into run_daily_refresh.py via --stats flag, included in --all as final stage after regimes
-- [ ] **STAT-02**: Weekly QC digest aggregates PASS/WARN/FAIL counts across all stats tables and sends summary via Telegram
-- [ ] **STAT-03**: Pipeline gates on FAIL status — halts and alerts on FAIL, continues with alert on WARN
-- [ ] **STAT-04**: All existing subprocess.run() calls (15+) have timeout= parameter to prevent silent hangs
+- [x] **STAT-01**: Stats runners wired into run_daily_refresh.py via --stats flag, included in --all as final stage after regimes
+- [x] **STAT-02**: Weekly QC digest aggregates PASS/WARN/FAIL counts across all stats tables and sends summary via Telegram
+- [x] **STAT-03**: Pipeline gates on FAIL status — halts and alerts on FAIL, continues with alert on WARN
+- [x] **STAT-04**: All existing subprocess.run() calls (15+) have timeout= parameter to prevent silent hangs
 
 ### Code Quality
 
@@ -91,10 +91,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| STAT-01 | Phase 29 | Pending |
-| STAT-02 | Phase 29 | Pending |
-| STAT-03 | Phase 29 | Pending |
-| STAT-04 | Phase 29 | Pending |
+| STAT-01 | Phase 29 | Complete |
+| STAT-02 | Phase 29 | Complete |
+| STAT-03 | Phase 29 | Complete |
+| STAT-04 | Phase 29 | Complete |
 | QUAL-01 | Phase 30 | Pending |
 | QUAL-02 | Phase 30 | Pending |
 | QUAL-03 | Phase 30 | Pending |
@@ -119,4 +119,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-22*
-*Last updated: 2026-02-22 after initial definition*
+*Last updated: 2026-02-22 (STAT-01..04 marked Complete after Phase 29 verification)*

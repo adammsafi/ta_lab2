@@ -491,7 +491,7 @@ Plans:
 
 ### v0.8.0 Polish & Hardening (Phases 29-33) - IN PROGRESS
 
-- [ ] **Phase 29: Stats/QA Orchestration** - Wire 5 existing stats runners into daily refresh pipeline + weekly QC digest
+- [x] **Phase 29: Stats/QA Orchestration** - Wire 5 existing stats runners into daily refresh pipeline + weekly QC digest
 - [ ] **Phase 30: Code Quality Tooling** - Make ruff lint blocking in CI, add mypy config, fix stale tooling references
 - [ ] **Phase 31: Documentation Freshness** - Version sync, pipeline mermaid diagram, fix stale refs, mkdocs build clean
 - [ ] **Phase 32: Runbooks** - Regime runbook, backtest runbook, new-asset SOP, disaster recovery guide
@@ -512,9 +512,9 @@ Plans:
 **Plans:** 3 plans in 3 waves
 
 Plans:
-- [ ] 29-01-PLAN.md -- Add timeout= to all ~30 subprocess.run() calls across codebase (STAT-04)
-- [ ] 29-02-PLAN.md -- Stats runner orchestrator + pipeline gating in run_daily_refresh.py (STAT-01, STAT-03)
-- [ ] 29-03-PLAN.md -- Weekly QC digest script with Telegram delivery (STAT-02)
+- [x] 29-01-PLAN.md -- Add timeout= to all ~30 subprocess.run() calls across codebase (STAT-04)
+- [x] 29-02-PLAN.md -- Stats runner orchestrator + pipeline gating in run_daily_refresh.py (STAT-01, STAT-03)
+- [x] 29-03-PLAN.md -- Weekly QC digest script with Telegram delivery (STAT-02)
 
 ---
 
@@ -630,7 +630,7 @@ Note: Phase 29 and Phase 33 can be worked in parallel (fully isolated). Phase 30
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 29. Stats/QA Orchestration | 0/3 | Planned | — |
+| 29. Stats/QA Orchestration | 3/3 | Complete | 2026-02-22 |
 | 30. Code Quality Tooling | 0/TBD | Pending | — |
 | 31. Documentation Freshness | 0/TBD | Pending | — |
 | 32. Runbooks | 0/TBD | Pending | — |
@@ -669,4 +669,4 @@ Note: Phase 29 and Phase 33 can be worked in parallel (fully isolated). Phase 30
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-22 (Phase 29 planned -- 3 plans in 3 waves)*
+*Last updated: 2026-02-22 (Phase 29 complete -- 3/3 plans executed, verified)*
