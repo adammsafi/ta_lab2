@@ -528,7 +528,11 @@ Plans:
   3. The CI mypy job runs `mypy src/ta_lab2/features/ src/ta_lab2/regimes/` with [tool.mypy] config in pyproject.toml and does not block merges (continue-on-error: true)
   4. Pre-commit config references ruff v0.9+ (not the stale v0.1.14); local and CI ruff versions match
   5. README no longer references black; mkdocstrings version constraint is correct in pyproject.toml
-**Plans:** TBD during plan-phase
+**Plans:** 2 plans in 2 waves
+
+Plans:
+- [ ] 30-01-PLAN.md -- Fix all ruff violations (34 total) + reformat 106 files (QUAL-01 part 1)
+- [ ] 30-02-PLAN.md -- Config updates + CI restructure: mypy, version pins, pre-commit, stale refs, CI jobs (QUAL-01 part 2, QUAL-02, QUAL-03, QUAL-04)
 
 ---
 
@@ -631,7 +635,7 @@ Note: Phase 29 and Phase 33 can be worked in parallel (fully isolated). Phase 30
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 29. Stats/QA Orchestration | 3/3 | Complete | 2026-02-22 |
-| 30. Code Quality Tooling | 0/TBD | Pending | — |
+| 30. Code Quality Tooling | 0/2 | In Progress | — |
 | 31. Documentation Freshness | 0/TBD | Pending | — |
 | 32. Runbooks | 0/TBD | Pending | — |
 | 33. Alembic Migrations | 0/TBD | Pending | — |
@@ -669,4 +673,4 @@ Note: Phase 29 and Phase 33 can be worked in parallel (fully isolated). Phase 30
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-22 (Phase 29 complete -- 3/3 plans executed, verified)*
+*Last updated: 2026-02-22 (Phase 30 planned -- 2 plans in 2 waves)*
