@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-22)
 ## Current Position
 
 Phase: 29 of 33 (29-stats-qa-orchestration)
-Plan: 1 of 3 complete
+Plan: 2 of 3 complete
 Status: In progress
-Last activity: 2026-02-22 — Completed 29-01-PLAN.md (subprocess timeout hardening, 17 files, 6 min)
+Last activity: 2026-02-22 — Completed 29-02-PLAN.md (stats runner orchestrator + pipeline gate, 3 files, 4 min)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [##########] 100% v0.7.0 (2/2 phases, 10/10 plans) | [█░░░░░░░░░] 7% v0.8.0 (1/15 plans)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [##########] 100% v0.7.0 (2/2 phases, 10/10 plans) | [██░░░░░░░░] 13% v0.8.0 (2/15 plans)
 
 ## Performance Metrics
 
@@ -81,7 +81,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 
 | Phase | Plans | Total | Avg/Plan | Status |
 |-------|-------|-------|----------|--------|
-| 29-stats-qa-orchestration | 1/3 | 6 min | 6 min | In progress |
+| 29-stats-qa-orchestration | 2/3 | 10 min | 5 min | In progress |
 | 30-code-quality-tooling | 0/TBD | — | — | Pending |
 | 31-documentation-freshness | 0/TBD | — | — | Pending |
 | 32-runbooks | 0/TBD | — | — | Pending |
@@ -168,6 +168,10 @@ Recent decisions affecting current work:
 - **Tiered subprocess timeouts by operation weight** (Phase 29-01): bars=7200s, EMAs=3600s, regimes=1800s, stats=3600s, audit=1800s, sync=600s, git=30s, tools=300s -- module-level TIMEOUT_X constants with 'initial estimate' annotation
 - **TimeoutExpired as separate except clause** (Phase 29-01): Catch subprocess.TimeoutExpired BEFORE generic Exception -- keeps timeout error messages clear and distinct; tools use RuntimeError raise, orchestrators use ComponentResult(error_message=...)
 - **report_dev_timeline.py module-level fallback** (Phase 29-01): git log runs at import/module level -- try/except at module scope with git_log=[] fallback (can't return ComponentResult at module scope)
+- **Stats exit code as pipeline signal** (Phase 29-02): run_all_stats_runners.py exits 1 for FAIL (DB rows or crashed runners), 0 for PASS/WARN -- run_daily_refresh.py checks exit code for pipeline gate
+- **DB query is authoritative for FAIL/WARN** (Phase 29-02): Stats runners exit 0 even when they write FAIL rows; orchestrator queries DB after all runners complete -- do NOT rely solely on subprocess return codes
+- **Pipeline gate is unconditional for stats** (Phase 29-02): Stats FAIL always halts even with --continue-on-error; continuing past bad data is worse than stopping; bars/EMAs respect --continue-on-error but stats does not
+- **Telegram alerting internal to stats orchestrator** (Phase 29-02): run_daily_refresh.py only checks exit code; Telegram logic in run_all_stats_runners.py for cohesion
 
 ### Pending Todos
 
@@ -179,8 +183,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-22T22:05:00Z
-Stopped at: Completed 29-01-PLAN.md — subprocess timeout hardening (17 files, 2 tasks, commits 36b6e86b + 83a4481c)
+Last session: 2026-02-22T22:07:26Z
+Stopped at: Completed 29-02-PLAN.md — stats runner orchestrator + pipeline gate (3 files, 2 tasks, commits ea9e8cb9 + 7d884086)
 Resume file: None
 
 ---
@@ -208,4 +212,4 @@ Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-22 (29-01 complete — subprocess timeout hardening done, Phase 29 plan 2 is next)*
+*Last updated: 2026-02-22 (29-02 complete — stats runner orchestrator + pipeline gate done, Phase 29 plan 3 is next)*
