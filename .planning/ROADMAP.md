@@ -509,7 +509,12 @@ Plans:
   3. Any stats runner returning FAIL status halts the pipeline and sends a Telegram alert; WARN status continues with an alert logged
   4. The weekly QC digest script produces a human-readable PASS/WARN/FAIL summary across all stats tables and delivers it via Telegram
   5. Every existing subprocess.run() call in the codebase has a timeout= parameter — no silent hangs possible
-**Plans:** TBD during plan-phase
+**Plans:** 3 plans in 3 waves
+
+Plans:
+- [ ] 29-01-PLAN.md -- Add timeout= to all ~30 subprocess.run() calls across codebase (STAT-04)
+- [ ] 29-02-PLAN.md -- Stats runner orchestrator + pipeline gating in run_daily_refresh.py (STAT-01, STAT-03)
+- [ ] 29-03-PLAN.md -- Weekly QC digest script with Telegram delivery (STAT-02)
 
 ---
 
@@ -625,7 +630,7 @@ Note: Phase 29 and Phase 33 can be worked in parallel (fully isolated). Phase 30
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 29. Stats/QA Orchestration | 0/TBD | Pending | — |
+| 29. Stats/QA Orchestration | 0/3 | Planned | — |
 | 30. Code Quality Tooling | 0/TBD | Pending | — |
 | 31. Documentation Freshness | 0/TBD | Pending | — |
 | 32. Runbooks | 0/TBD | Pending | — |
@@ -664,4 +669,4 @@ Note: Phase 29 and Phase 33 can be worked in parallel (fully isolated). Phase 30
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-22 (v0.8.0 roadmap created — 5 phases, 20 requirements, Phases 29-33)*
+*Last updated: 2026-02-22 (Phase 29 planned -- 3 plans in 3 waves)*
