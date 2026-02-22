@@ -66,6 +66,9 @@ from typing import List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
+# Timeout tiers (seconds); initial estimate, tune after observing actual runtimes
+TIMEOUT_GIT = 30  # 30 seconds -- git commands
+
 # Regex to parse git --shortstat output
 SHORTSTAT_RE = re.compile(
     r"(?:(\d+)\s+files?\s+changed)?"
@@ -86,16 +89,20 @@ def run_git(args: List[str], repo: str) -> str:
         Git command stdout
 
     Raises:
-        RuntimeError: If git command fails
+        RuntimeError: If git command fails or times out
     """
-    p = subprocess.run(
-        ["git"] + args,
-        cwd=repo,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="ignore",
-    )
+    try:
+        p = subprocess.run(
+            ["git"] + args,
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="ignore",
+            timeout=TIMEOUT_GIT,
+        )
+    except subprocess.TimeoutExpired:
+        raise RuntimeError(f"git {' '.join(args)} timed out after {TIMEOUT_GIT}s")
     if p.returncode != 0:
         raise RuntimeError(f"git {' '.join(args)} failed:\n{p.stderr.strip()}")
     return p.stdout

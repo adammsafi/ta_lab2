@@ -210,9 +210,22 @@ def read_lines(path: Optional[str]) -> List[str]:
     return out
 
 
+# Timeout tiers (seconds); initial estimate, tune after observing actual runtimes
+TIMEOUT_GIT = 30  # 30 seconds -- git commands
+
+
 def run_git(repo_path: str, args: List[str]) -> str:
     cmd = ["git", "-C", repo_path] + args
-    r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        r = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=TIMEOUT_GIT,
+        )
+    except subprocess.TimeoutExpired:
+        raise RuntimeError(f"git timed out after {TIMEOUT_GIT}s: {cmd}")
     if r.returncode != 0:
         raise RuntimeError(f"git failed: {cmd}\n{r.stderr}")
     return r.stdout

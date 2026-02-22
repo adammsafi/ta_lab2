@@ -33,7 +33,10 @@ import logging
 import os
 import subprocess
 from pathlib import Path
-from typing import Set, List, Dict, Any
+from typing import Set, List, Dict, Any, Optional
+
+# Timeout tiers (seconds); initial estimate, tune after observing actual runtimes
+TIMEOUT_TOOL = 300  # 5 minutes -- data processing tool scripts
 
 logger = logging.getLogger(__name__)
 
@@ -192,21 +195,25 @@ def process_new_dump(
             f"\n[STEP 3] Generating memories from {len(filtered)} new conversations..."
         )
 
-        result = subprocess.run(
-            [
-                "python",
-                str(generate_memories_script),
-                "--input-file",
-                str(new_filtered_file),
-                "--output-file",
-                str(new_memories_file),
-                "--batch-size",
-                "10",
-            ],
-            env={**os.environ},
-            capture_output=True,
-            text=True,
-        )
+        try:
+            result = subprocess.run(
+                [
+                    "python",
+                    str(generate_memories_script),
+                    "--input-file",
+                    str(new_filtered_file),
+                    "--output-file",
+                    str(new_memories_file),
+                    "--batch-size",
+                    "10",
+                ],
+                env={**os.environ},
+                capture_output=True,
+                text=True,
+                timeout=TIMEOUT_TOOL,
+            )
+        except subprocess.TimeoutExpired:
+            raise RuntimeError(f"Memory generation timed out after {TIMEOUT_TOOL}s")
 
         if result.returncode != 0:
             logger.error(f"  Error generating memories: {result.stderr}")
@@ -257,23 +264,27 @@ def process_new_dump(
             f"\n[STEP 5] Re-embedding all {total_count} memories into ChromaDB..."
         )
 
-        result = subprocess.run(
-            [
-                "python",
-                str(embed_memories_script),
-                "--memory-file",
-                str(combined_memories_file),
-                "--chroma-dir",
-                str(chroma_dir),
-                "--collection-name",
-                "project_memories",
-                "--batch-size",
-                "50",
-            ],
-            env={**os.environ},
-            capture_output=True,
-            text=True,
-        )
+        try:
+            result = subprocess.run(
+                [
+                    "python",
+                    str(embed_memories_script),
+                    "--memory-file",
+                    str(combined_memories_file),
+                    "--chroma-dir",
+                    str(chroma_dir),
+                    "--collection-name",
+                    "project_memories",
+                    "--batch-size",
+                    "50",
+                ],
+                env={**os.environ},
+                capture_output=True,
+                text=True,
+                timeout=TIMEOUT_TOOL,
+            )
+        except subprocess.TimeoutExpired:
+            raise RuntimeError(f"Embedding timed out after {TIMEOUT_TOOL}s")
 
         if result.returncode != 0:
             logger.error(f"  Error embedding: {result.stderr}")

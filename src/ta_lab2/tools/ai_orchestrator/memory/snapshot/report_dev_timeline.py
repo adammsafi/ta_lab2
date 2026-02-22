@@ -11,6 +11,9 @@ from pathlib import Path
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
 REPO_PATH = Path(__file__).resolve().parents[6]  # ta_lab2 root
+
+# Timeout tiers (seconds); initial estimate, tune after observing actual runtimes
+TIMEOUT_GIT = 30  # 30 seconds -- git commands
 QDRANT_URL = "http://localhost:6333"
 COLLECTION = "project_memories"
 
@@ -59,16 +62,21 @@ for p in points:
     by_phase[phase].append(pl)
 
 # Get git commit log for context
-git_log = (
-    subprocess.run(
+try:
+    _git_result = subprocess.run(
         ["git", "log", "--format=%h|%ai|%s", "--reverse"],
         capture_output=True,
         text=True,
         cwd=str(REPO_PATH),
+        timeout=TIMEOUT_GIT,
     )
-    .stdout.strip()
-    .split("\n")
-)
+    git_log = _git_result.stdout.strip().split("\n")
+except subprocess.TimeoutExpired:
+    print(
+        f"[WARNING] git log timed out after {TIMEOUT_GIT}s -- no commit context",
+        file=sys.stderr,
+    )
+    git_log = []
 
 commits_by_date = defaultdict(list)
 for line in git_log:

@@ -29,6 +29,9 @@ import os
 import subprocess
 from pathlib import Path
 
+# Timeout tiers (seconds); initial estimate, tune after observing actual runtimes
+TIMEOUT_TOOL = 300  # 5 minutes -- data processing tool scripts
+
 logger = logging.getLogger(__name__)
 
 
@@ -38,12 +41,20 @@ def run_command(cmd: list, description: str) -> bool:
 
     try:
         result = subprocess.run(
-            cmd, check=True, capture_output=True, text=True, env={**os.environ}
+            cmd,
+            check=True,
+            capture_output=True,
+            text=True,
+            env={**os.environ},
+            timeout=TIMEOUT_TOOL,
         )
         logger.info(result.stdout)
         if result.stderr:
             logger.warning(f"Warnings: {result.stderr}")
         return True
+    except subprocess.TimeoutExpired:
+        logger.error(f"Timed out after {TIMEOUT_TOOL}s: {description}")
+        return False
     except subprocess.CalledProcessError as e:
         logger.error(f"Error: {e}")
         logger.error(f"stdout: {e.stdout}")

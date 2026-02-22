@@ -539,11 +539,15 @@ class GeminiAdapter(BasePlatformAdapter):
                 raise FileNotFoundError("gcloud CLI not found.")
 
             # Check if gcloud is available
-            subprocess.run(
-                [gcloud_executable, "--version"],
-                capture_output=True,
-                check=True,
-            )
+            try:
+                subprocess.run(
+                    [gcloud_executable, "--version"],
+                    capture_output=True,
+                    check=True,
+                    timeout=30,  # seconds; initial estimate, tune after observing actual runtimes
+                )
+            except subprocess.TimeoutExpired:
+                raise RuntimeError("gcloud --version timed out")
 
             # Execute with Gemini 2.0 Flash
             cmd = [

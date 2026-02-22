@@ -46,13 +46,19 @@ import zipfile
 from pathlib import Path
 from typing import List, Optional
 
+# Timeout tiers (seconds); initial estimate, tune after observing actual runtimes
+TIMEOUT_TOOL = 300  # 5 minutes -- data processing tool scripts
+
 logger = logging.getLogger(__name__)
 
 
 def _run(cmd: List[str]) -> None:
     """Run subprocess command."""
     logger.info("+ " + " ".join(cmd))
-    subprocess.run(cmd, check=True)
+    try:
+        subprocess.run(cmd, check=True, timeout=TIMEOUT_TOOL)
+    except subprocess.TimeoutExpired:
+        raise RuntimeError(f"Command timed out after {TIMEOUT_TOOL}s: {' '.join(cmd)}")
 
 
 def _shortest_path(paths: List[Path]) -> Optional[Path]:
@@ -255,10 +261,6 @@ def main() -> int:
     )
 
     args = ap.parse_args()
-
-    # Reference the other scripts via Python module imports
-    # (They'll be executed in the same package)
-    here = Path(__file__).resolve().parent
 
     export_path = Path(args.export)
     out_dir = Path(args.out)
