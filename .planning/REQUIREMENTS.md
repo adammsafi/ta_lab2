@@ -1,215 +1,122 @@
-# Requirements: v0.6.0 EMA & Bar Architecture Standardization
+# Requirements: v0.8.0 Polish & Hardening
 
-**Milestone:** v0.6.0
-**Goal:** Lock down bars and EMAs foundation so adding new assets (crypto + equities) is mechanical and reliable
-**Status:** Active
-
----
-
-## Core Problem
-
-EMAs using unvalidated data (price_histories7 with NULLs) creates data quality risk. 6 EMA variants with different patterns are hard to maintain. Incremental refresh behavior unclear. Need to understand and lock down the foundation before scaling to more assets and asset classes.
-
-## Success Criteria
-
-When v0.6.0 is complete:
-- **I can add a new asset mechanically** - clear steps, no surprises
-- **I trust data quality** - validated bars -> validated EMAs, NULLs can't slip through
-- **Incremental refresh just works** - one command, visibility, efficient, gap handling
-- **I understand the system** - clear docs (building on what exists), can explain how it works
+**Defined:** 2026-02-22
+**Core Value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
+**Milestone Goal:** Close out partially-complete infrastructure gaps — production-harden before v0.9.0 research features
 
 ---
 
-## Phase 0: Historical Context
+## v0.8.0 Requirements
 
-### Understand How We Got Here
+Requirements for this milestone. Each maps to roadmap phases.
 
-- [ ] **HIST-01**: Review GSD phases 1-10 to understand prior bar/EMA work and decisions made
-- [ ] **HIST-02**: Identify existing documentation to leverage (don't reinvent the wheel)
-- [ ] **HIST-03**: Understand current state: what works, what's unclear, what's broken
+### Stats/QA Orchestration
 
----
+- [ ] **STAT-01**: Stats runners wired into run_daily_refresh.py via --stats flag, included in --all as final stage after regimes
+- [ ] **STAT-02**: Weekly QC digest aggregates PASS/WARN/FAIL counts across all stats tables and sends summary via Telegram
+- [ ] **STAT-03**: Pipeline gates on FAIL status — halts and alerts on FAIL, continues with alert on WARN
+- [ ] **STAT-04**: All existing subprocess.run() calls (15+) have timeout= parameter to prevent silent hangs
 
-## Phase 1: Comprehensive Review (Read-Only)
+### Code Quality
 
-**Approach:** Complete ALL review/analysis BEFORE any code changes. Leverage existing docs.
+- [ ] **QUAL-01**: Ruff lint blocking in CI — existing violations fixed, || true removed from ci.yml
+- [ ] **QUAL-02**: mypy added to CI as non-blocking job, scoped to features/ and regimes/ with [tool.mypy] config in pyproject.toml
+- [ ] **QUAL-03**: Ruff version upgraded from v0.1.14 to v0.9+ in pre-commit, --output-format=github added for PR annotations
+- [ ] **QUAL-04**: Stale tool references fixed — black removed from README, mkdocstrings version constraint corrected
 
-### Understanding Questions to Answer
+### Documentation
 
-- [ ] **RVWQ-01**: What does each EMA variant do? (v1, v2, cal_us, cal_iso, cal_anchor_us, cal_anchor_iso) - purpose, use cases, why they exist
-- [ ] **RVWQ-02**: How does incremental refresh work? (state table watermarking, picking up where left off, gap handling)
-- [ ] **RVWQ-03**: What validation happens where? (where NULLs rejected, where OHLC invariants checked, quality flags)
-- [ ] **RVWQ-04**: How do I add a new asset? (step-by-step guide: tables to update, scripts to run, verification)
+- [ ] **DOCS-01**: Version strings synchronized across pyproject.toml, mkdocs.yml, and README.md to v0.8.0
+- [ ] **DOCS-02**: Pipeline flow mermaid diagram (.mmd) showing bars→EMAs→features→signals→backtest data flow added to docs/diagrams/
+- [ ] **DOCS-03**: Stale references and TODOs resolved — aspirational alembic/black refs removed, [TODO:] placeholders in ops docs filled
+- [ ] **DOCS-04**: mkdocs build --strict passes with no broken nav links or missing pages
 
-### Review Deliverables
+### Runbooks
 
-- [ ] **RVWD-01**: Script inventory table - every bar/EMA script with purpose, tables updated, state tables used, dependencies
-- [ ] **RVWD-02**: Data flow diagram - visual showing price_histories7 -> bars -> EMAs with validation points marked
-- [ ] **RVWD-03**: Variant comparison matrix - side-by-side comparison of 6 EMA variants (data source, state schema, calendar alignment, differences)
-- [ ] **RVWD-04**: Gap analysis document - structured list with severity tiers (CRITICAL: data sources, HIGH: patterns, MEDIUM: schemas, LOW: cosmetic) and recommendations
+- [ ] **RUNB-01**: Regime pipeline runbook documenting how to run, debug, and recover regime refresh (matches DAILY_REFRESH.md format)
+- [ ] **RUNB-02**: Backtest pipeline runbook documenting signals→backtest→DB storage end-to-end workflow
+- [ ] **RUNB-03**: New-asset onboarding SOP as standalone ops doc (extracted from Phase 21 analysis)
+- [ ] **RUNB-04**: Disaster recovery guide covering backup strategy, restore from snapshot, and rebuild from scratch
 
----
+### Alembic Migrations
 
-## Phase 2: Critical Data Quality Fixes
-
-**Priority:** CRITICAL - blocks scaling to new assets
-
-### Data Source Migration
-
-- [ ] **DATA-01**: All 6 EMA variants switched to use validated bar tables instead of price_histories7
-- [ ] **DATA-02**: v1, cal_us, cal_iso, cal_anchor_us, cal_anchor_iso migrated to appropriate bar tables
-- [ ] **DATA-03**: v2 verified to already use bars_1d (or migrated if not)
-- [ ] **DATA-04**: No EMA script references price_histories7 (grep check enforced in CI)
-
-### Database Validation
-
-- [ ] **DVAL-01**: Bar tables have NOT NULL constraints on all OHLCV fields (already exist, verify complete)
-- [ ] **DVAL-02**: Bar tables have check constraints for OHLC invariants (high >= low, high >= close, etc.) - verify or add
-- [ ] **DVAL-03**: Quality flags standardized across bar tables (is_missing_days, repaired_timehigh, repaired_timelow, etc.)
-- [ ] **DVAL-04**: Gap handling implemented - missing days flagged but don't break pipeline (manual fix option)
+- [ ] **MIGR-01**: Alembic framework bootstrapped — alembic.ini, env.py configured for existing DB without ORM models
+- [ ] **MIGR-02**: Existing DB stamped as baseline — no-op baseline migration written, alembic stamp head executed on production
+- [ ] **MIGR-03**: Future workflow documented — all new schema changes must go through alembic revision, not raw SQL
+- [ ] **MIGR-04**: Existing 16 SQL migrations cataloged — ordered by git log date, purpose documented, archived as historical reference
 
 ---
 
-## Phase 3: Reliable Incremental Refresh
+## v0.9.0 Requirements (Deferred)
 
-**Priority:** HIGH - enables operational confidence
+Tracked but not in current roadmap. Planned for next milestone.
 
-### Orchestration
+### Feature Enrichment
+- **FEAT-01**: KAMA, DEMA, TEMA, HMA, zero-lag EMA implementations
+- **FEAT-02**: Feature experimentation framework with lifecycle (experimental→promoted→deprecated)
+- **FEAT-03**: IC/feature importance evaluation pipeline
 
-- [x] **ORCH-01**: Flexible orchestration script - can run: all tasks, bars only, EMAs only, specific variant
-- [x] **ORCH-02**: Modular separation - bars and EMAs as separate pieces with clear interfaces
-- [x] **ORCH-03**: One command for daily refresh - simple operational model
-- [x] **ORCH-04**: Orchestration eventually covers all features (bars, EMAs, vol, returns) but allows selective execution
+### Stress Testing
+- **STRE-01**: Purged K-fold and Combinatorial Purged CV
+- **STRE-02**: Adaptive walk-forward optimization (re-optimize per IS window)
+- **STRE-03**: Multi-asset and multi-strategy parameter sweeps
+- **STRE-04**: Probabilistic Sharpe Ratio (replace psr_placeholder stub)
 
-### State Management
+### Visualization
+- **VIZ-01**: Streamlit dashboard with summary views
+- **VIZ-02**: Parameter sweep heatmaps and correlation heatmaps
+- **VIZ-03**: Interactive plots (Plotly/Altair)
 
-- [x] **STAT-01**: Analyze current state management patterns across all scripts (don't assume - discover)
-- [x] **STAT-02**: Unified state table schema if analysis shows inconsistency (id, tf, period PK or similar)
-- [x] **STAT-03**: Consistent watermarking approach across bar builders and EMA calculators
-- [x] **STAT-04**: State updates atomic with data updates (no partial states)
-
-### Visibility & Efficiency
-
-- [x] **VISI-01**: Logs show what was processed - X days, Y bars, Z EMAs, N gaps flagged
-- [x] **VISI-02**: Efficient processing - only new data computed, not full recomputation
-- [x] **VISI-03**: Gap handling visible - clear indication of missing data with manual fix option
-
----
-
-## Phase 4: Pattern Consistency (Where Justified)
-
-**Priority:** MEDIUM-LOW - only where review shows benefit
-
-### Standardization (Guided by Review Findings)
-
-- [x] **PATT-01**: Data loading standardization - consistent query patterns across variants (if analysis shows inconsistency)
-- [x] **PATT-02**: State management code standardized - same read/write patterns (if analysis shows inconsistency)
-- [x] **PATT-03**: Validation code shared - OHLC invariants, NULL handling, gap detection (if analysis shows duplication)
-- [x] **PATT-04**: Shared utilities extracted - common code moved to reusable modules (if analysis shows duplication worth extracting)
-
-### Boundaries
-
-- [x] **PATT-05**: Keep all 6 EMA variants - they serve distinct purposes (calendar alignment, ISO vs US, anchoring)
-- [x] **PATT-06**: Don't force standardization - only where analysis justifies (avoid premature abstraction)
+### Notebooks
+- **NOTE-01**: End-to-end demo notebooks (load→compute→plot→backtest)
 
 ---
 
-## Phase 5: Validation
+## Out of Scope
 
-**Priority:** CRITICAL - must verify fixes worked correctly
-
-### Testing Strategies
-
-- [x] **TEST-01**: Baseline capture - current EMA outputs from all 6 variants before any changes
-- [x] **TEST-02**: Side-by-side comparison - **SUPERSEDED**: Schema changed fundamentally (unified bars, lean EMAs, enriched returns) making pre-refactor baselines invalid. Replaced by: 38 passing pytest schema tests + 7 stat tests x 5 families (1,215+ key groups all PASS) validating the new architecture directly.
-- [x] **TEST-03**: New asset test - 7 assets running through full pipeline (537 key groups in multi_tf alone). Asset onboarding documented as 6-step mechanical process (Phase 21).
-- [x] **TEST-04**: Incremental refresh test - returns stats script (`refresh_returns_ema_stats.py`) runs incrementally with per-table watermarks in `returns_ema_stats_state`. Full-refresh and incremental modes both validated 2026-02-17.
-- [x] **TEST-05**: Manual spot-checks - 49 pytest tests (38 pass, 8 skip missing tables, 3 fail for non-existent v2 table), 18 audit scripts, returns stats with 7 test types across 5 families all producing PASS status. Coverage, gap_days, null_policy, pk_uniqueness, alignment all validated.
-
----
-
-## Out of Scope (Explicit Exclusions)
-
-- **Variant consolidation** - Keep all 6 variants; evaluate consolidation only AFTER standardization proves stable
-- **Performance optimization** - Focus on correctness and reliability, not speed (separate milestone)
-- **New features** - No new timeframes, periods, or calculation methods (standardize existing only)
-- **Historical data repair** - Fix forward pipeline only, don't backfill historical inconsistencies
-- **Major schema restructuring** - Add constraints/flags, but don't rename tables or major changes unless justified by review
-
----
-
-## Constraints & Principles
-
-- **Review first, then fix** - Complete ALL analysis before code changes
-- **Leverage existing docs** - Don't reinvent, build on artifacts and documentation that already exist
-- **Case-by-case scope decisions** - Small fixes do now, big changes defer or justify
-- **Bars and EMAs separate** - Modular design, not tightly coupled
-- **Move quickly on data sources** - Bar tables have better validation, switch over decisively
-- **Whatever it takes timeline** - Do it right, even if it takes 6-8 weeks
+| Feature | Reason |
+|---------|--------|
+| ORM model creation for all tables | Alembic autogenerate requires ORM models; too large for this milestone — stamp and move forward |
+| mypy strict mode globally | ~250 functions across 400+ files; scope to features/regimes first, expand in v0.9.0 |
+| Full test suite expansion | 70% coverage threshold is enforced; deeper testing is a v0.9.0 concern |
+| CI/CD pipeline changes beyond lint/mypy | Release automation, deployment pipelines out of scope |
+| New schema migrations | Only framework setup; no actual schema changes in this milestone |
+| mkdocs site deployment (gh-pages) | Build validation only; hosting/deployment deferred |
 
 ---
 
 ## Traceability
 
-Requirements mapped to roadmap phases:
+Which phases cover which requirements. Updated during roadmap creation.
 
-| Requirement ID | Phase | Status |
-|----------------|-------|--------|
-| HIST-01 | Phase 20 | Pending |
-| HIST-02 | Phase 20 | Pending |
-| HIST-03 | Phase 20 | Pending |
-| RVWQ-01 | Phase 21 | Pending |
-| RVWQ-02 | Phase 21 | Pending |
-| RVWQ-03 | Phase 21 | Pending |
-| RVWQ-04 | Phase 21 | Pending |
-| RVWD-01 | Phase 21 | Pending |
-| RVWD-02 | Phase 21 | Pending |
-| RVWD-03 | Phase 21 | Pending |
-| RVWD-04 | Phase 21 | Pending |
-| DATA-01 | Phase 22 | Pending |
-| DATA-02 | Phase 22 | Pending |
-| DATA-03 | Phase 22 | Pending |
-| DATA-04 | Phase 22 | Pending |
-| DVAL-01 | Phase 22 | Pending |
-| DVAL-02 | Phase 22 | Pending |
-| DVAL-03 | Phase 22 | Pending |
-| DVAL-04 | Phase 22 | Pending |
-| ORCH-01 | Phase 23 | Pending |
-| ORCH-02 | Phase 23 | Pending |
-| ORCH-03 | Phase 23 | Pending |
-| ORCH-04 | Phase 23 | Pending |
-| STAT-01 | Phase 23 | Pending |
-| STAT-02 | Phase 23 | Pending |
-| STAT-03 | Phase 23 | Pending |
-| STAT-04 | Phase 23 | Pending |
-| VISI-01 | Phase 23 | Pending |
-| VISI-02 | Phase 23 | Pending |
-| VISI-03 | Phase 23 | Pending |
-| PATT-01 | Phase 24 | Pending |
-| PATT-02 | Phase 24 | Pending |
-| PATT-03 | Phase 24 | Pending |
-| PATT-04 | Phase 24 | Pending |
-| PATT-05 | Phase 24 | Pending |
-| PATT-06 | Phase 24 | Pending |
-| TEST-01 | Phase 25 | Complete |
-| TEST-02 | Phase 26 | Complete (superseded by architectural validation) |
-| TEST-03 | Phase 26 | Complete |
-| TEST-04 | Phase 26 | Complete |
-| TEST-05 | Phase 26 | Complete |
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| STAT-01 | Phase 29 | Pending |
+| STAT-02 | Phase 29 | Pending |
+| STAT-03 | Phase 29 | Pending |
+| STAT-04 | Phase 29 | Pending |
+| QUAL-01 | Phase 30 | Pending |
+| QUAL-02 | Phase 30 | Pending |
+| QUAL-03 | Phase 30 | Pending |
+| QUAL-04 | Phase 30 | Pending |
+| DOCS-01 | Phase 31 | Pending |
+| DOCS-02 | Phase 31 | Pending |
+| DOCS-03 | Phase 31 | Pending |
+| DOCS-04 | Phase 31 | Pending |
+| RUNB-01 | Phase 32 | Pending |
+| RUNB-02 | Phase 32 | Pending |
+| RUNB-03 | Phase 32 | Pending |
+| RUNB-04 | Phase 32 | Pending |
+| MIGR-01 | Phase 33 | Pending |
+| MIGR-02 | Phase 33 | Pending |
+| MIGR-03 | Phase 33 | Pending |
+| MIGR-04 | Phase 33 | Pending |
+
+**Coverage:**
+- v0.8.0 requirements: 20 total
+- Mapped to phases: 20
+- Unmapped: 0 ✓
 
 ---
-
-**Total Requirements:** 40 across 6 requirement phases (mapped to 7 roadmap phases)
-- Phase 0 (Historical Context): 3 requirements -> Roadmap Phase 20
-- Phase 1 (Comprehensive Review): 8 requirements -> Roadmap Phase 21
-- Phase 2 (Critical Fixes): 8 requirements -> Roadmap Phase 22
-- Phase 3 (Incremental Refresh): 11 requirements -> Roadmap Phase 23
-- Phase 4 (Pattern Consistency): 6 requirements -> Roadmap Phase 24
-- Phase 5 (Validation): 5 requirements -> Roadmap Phases 25-26
-
-**Coverage:** 40/40 requirements mapped (100%)
-
----
-
-*Created: 2026-02-05*
-*Last updated: 2026-02-17 (Phase 26 complete, all TEST requirements closed)*
+*Requirements defined: 2026-02-22*
+*Last updated: 2026-02-22 after initial definition*
