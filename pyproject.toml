@@ -35,8 +35,9 @@ dev = [
   "pytest-cov>=4.0.0",
   "pytest-json-report>=1.5.0",
   "hypothesis",
-  "ruff>=0.1.5",
-  "mypy>=1.8",
+  "ruff>=0.9.0",
+  "mypy>=1.14",
+  "pandas-stubs>=2.2",
   "import-linter>=2.7",
 ]
 
@@ -65,7 +66,7 @@ orchestrator = [
 # Documentation generation
 docs = [
   "mkdocs-material>=9.0",
-  "mkdocstrings[python]>=1.0",
+  "mkdocstrings[python]>=0.24",
 ]
 
 # Economic data integration (FRED)
@@ -92,8 +93,8 @@ all = [
   "pytest-mock>=3.12.0",
   "pytest-benchmark",
   "hypothesis",
-  "ruff>=0.1.5",
-  "mypy>=1.8",
+  "ruff>=0.9.0",
+  "mypy>=1.14",
   "anthropic>=0.40.0",
   "openai>=1.50.0",
   "google-generativeai>=0.8.0",
@@ -103,7 +104,7 @@ all = [
   "pydantic>=2.0.0",
   "python-dotenv>=1.0.0",
   "mkdocs-material>=9.0",
-  "mkdocstrings[python]>=1.0",
+  "mkdocstrings[python]>=0.24",
   "fredapi>=0.5.2",
 ]
 
@@ -158,6 +159,11 @@ ignore = ["E402"]  # Module-level imports: scripts use sys.path manipulation bef
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["F841"]  # Allow unused variables in tests (assertion results)
+
+# ---------- Mypy configuration ----------
+[tool.mypy]
+ignore_missing_imports = true
+check_untyped_defs = true
 
 # ---------- Import-linter configuration ----------
 [tool.importlinter]
