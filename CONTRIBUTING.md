@@ -4,7 +4,7 @@ Thanks for helping build the quant stack.
 
 ## Dev setup
 
-- Python 3.11 recommended.
+- Python 3.12 recommended.
 - Create a virtualenv and install in editable mode:
 
   ```bash
@@ -46,7 +46,7 @@ If a commit closes an issue, mention it in the body:
 
 ## Code style & expectations
 
-- Python version: 3.11 (match the repo’s `pyproject.toml` / tooling).
+- Python version: 3.12 (match the repo’s `pyproject.toml` / tooling).
 - Follow PEP 8 style unless there’s an existing local convention.
 - Prefer small, composable functions over giant scripts.
 - Add docstrings for any public function, class, or module that’s part of the ta_lab2 “surface area”.
