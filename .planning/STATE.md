@@ -10,16 +10,16 @@ See: .planning/PROJECT.md (updated 2026-02-22)
 ## Current Position
 
 Phase: 31 of 33 (31-documentation-freshness)
-Plan: 2 of 3 — In progress
+Plan: 2 of 3 — In progress (31-01 and 31-02 complete, 31-03 pending)
 Status: In progress
-Last activity: 2026-02-23 — Completed 31-02-PLAN.md (pipeline diagrams)
+Last activity: 2026-02-23 — Completed 31-01-PLAN.md (version bump + stale refs)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [##########] 100% v0.7.0 (2/2 phases, 10/10 plans) | [█████░░░░░] 47% v0.8.0 (7/15 plans, 2/5 phases)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [##########] 100% v0.7.0 (2/2 phases, 10/10 plans) | [█████░░░░░] 53% v0.8.0 (8/15 plans, 2/5 phases)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 156 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 4 in v0.8.0)
+- Total plans completed: 157 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 5 in v0.8.0)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -83,7 +83,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 |-------|-------|-------|----------|--------|
 | 29-stats-qa-orchestration | 3/3 | 13 min | 4 min | Complete |
 | 30-code-quality-tooling | 2/2 | 12 min | 6 min | Complete |
-| 31-documentation-freshness | 2/3 | ~2 min | ~1 min | In progress |
+| 31-documentation-freshness | 2/3 | ~17 min | ~9 min | In progress |
 | 32-runbooks | 0/TBD | — | — | Pending |
 | 33-alembic-migrations | 0/TBD | — | — | Pending |
 
@@ -184,6 +184,8 @@ Recent decisions affecting current work:
 - **5-job parallel CI** (Phase 30-02): test/lint/format/mypy/version-check all independent, no depends-on chains; lint/format/version-check fast (<30s), mypy non-blocking, test is the slow matrix job
 - **Hard gate removal protocol** (Phase 30-02): Fix all violations FIRST (Plan 30-01) THEN remove || true (Plan 30-02) -- never remove escape hatch while violations exist
 - **Split pipeline diagrams into two .mmd files** (Phase 31-02): data_flow.mmd (main pipeline TD) + table_variants.mmd (variant structure LR) -- cleaner rendering than single combined file; Mermaid renderer support for multi-diagram varies
+- **Alembic section deleted not replaced** (Phase 31-01): Aspirational alembic commands removed with no placeholder -- Phase 33 will add real migration docs when Alembic is implemented; empty sections mislead users
+- **Historical changelog entries preserved** (Phase 31-01): v0.4.0/v0.5.0 release entries in README.md and docs/index.md are historical facts, not stale content -- only version-position fields (headers, footers, site_name) are bumped
 
 ### Pending Todos
 
@@ -195,8 +197,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-23T01:33:33Z
-Stopped at: Completed 31-02-PLAN.md — pipeline diagrams (data_flow.mmd + table_variants.mmd)
+Last session: 2026-02-23T01:36:00Z
+Stopped at: Completed 31-01-PLAN.md — version bump to 0.8.0 + stale reference cleanup
 Resume file: None
 
 ---
