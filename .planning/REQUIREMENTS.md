@@ -99,13 +99,13 @@ Deferred to future release. Tracked but not in current roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AMA-01 | Phase 35 | Pending |
-| AMA-02 | Phase 35 | Pending |
-| AMA-03 | Phase 35 | Pending |
-| AMA-04 | Phase 35 | Pending |
-| AMA-05 | Phase 35 | Pending |
-| AMA-06 | Phase 35 | Pending |
-| AMA-07 | Phase 35 | Pending |
+| AMA-01 | Phase 35 | Complete |
+| AMA-02 | Phase 35 | Complete |
+| AMA-03 | Phase 35 | Complete |
+| AMA-04 | Phase 35 | Complete |
+| AMA-05 | Phase 35 | Complete |
+| AMA-06 | Phase 35 | Complete |
+| AMA-07 | Phase 35 | Complete |
 | IC-01 | Phase 37 | Pending |
 | IC-02 | Phase 37 | Pending |
 | IC-03 | Phase 37 | Pending |

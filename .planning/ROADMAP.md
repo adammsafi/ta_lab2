@@ -526,17 +526,17 @@ Plans:
   3. KAMA Efficiency Ratio is stored as a standalone column in `cmc_ama_multi_tf`, queryable independently from the AMA value itself
   4. Z-scores (_zscore_30, _zscore_90, _zscore_365) appear on AMA returns rows after running the existing `refresh_returns_zscore.py` against the AMA returns table
   5. `run_daily_refresh.py --all` executes the AMA stage (after EMAs) and the `cmc_ama_multi_tf_u` unified table is populated via sync
-**Plans**: 8 plans in 5 waves
+**Plans**: 8/8 complete
 
 Plans:
-- [ ] 35-01-PLAN.md -- DDL for all 12 AMA tables + state tables + dim_ama_params
-- [ ] 35-02-PLAN.md -- AMA computation functions (KAMA, DEMA, TEMA, HMA) + ama_params.py
-- [ ] 35-03-PLAN.md -- BaseAMAFeature class + AMAStateManager
-- [ ] 35-04-PLAN.md -- BaseAMARefresher + refresh_cmc_ama_multi_tf.py (main refresher)
-- [ ] 35-05-PLAN.md -- AMA returns feature class + returns refresher script
-- [ ] 35-06-PLAN.md -- Calendar variant refreshers (cal + cal_anchor)
-- [ ] 35-07-PLAN.md -- Sync scripts (_u tables) + z-score extension
-- [ ] 35-08-PLAN.md -- run_all_ama_refreshes.py orchestrator + daily refresh wiring
+- [x] 35-01-PLAN.md -- DDL for all 12 AMA tables + state tables + dim_ama_params
+- [x] 35-02-PLAN.md -- AMA computation functions (KAMA, DEMA, TEMA, HMA) + ama_params.py
+- [x] 35-03-PLAN.md -- BaseAMAFeature class + AMAStateManager
+- [x] 35-04-PLAN.md -- BaseAMARefresher + refresh_cmc_ama_multi_tf.py (main refresher)
+- [x] 35-05-PLAN.md -- AMA returns feature class + returns refresher script
+- [x] 35-06-PLAN.md -- Calendar variant refreshers (cal + cal_anchor)
+- [x] 35-07-PLAN.md -- Sync scripts (_u tables) + z-score extension
+- [x] 35-08-PLAN.md -- run_all_ama_refreshes.py orchestrator + daily refresh wiring
 
 ---
 
