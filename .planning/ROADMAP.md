@@ -521,12 +521,22 @@ Plans:
 **Depends on:** Phase 34 (v0.8.0 complete)
 **Requirements:** AMA-01, AMA-02, AMA-03, AMA-04, AMA-05, AMA-06, AMA-07
 **Success Criteria** (what must be TRUE):
-  1. `python -m ta_lab2.scripts.ama.refresh_cmc_ama --all --all-tfs` completes without errors and populates `cmc_ama_multi_tf` with KAMA, DEMA, TEMA, and HMA rows
+  1. `python -m ta_lab2.scripts.amas.run_all_ama_refreshes --ids all --all-tfs` completes without errors and populates `cmc_ama_multi_tf` with KAMA, DEMA, TEMA, and HMA rows
   2. `cmc_ama_multi_tf` has PK `(id, ts, tf, indicator, params_hash)` and includes derivative columns (d1, d2, d1_roll, d2_roll); rows with insufficient warmup data are NULL rather than computed from stale state
   3. KAMA Efficiency Ratio is stored as a standalone column in `cmc_ama_multi_tf`, queryable independently from the AMA value itself
   4. Z-scores (_zscore_30, _zscore_90, _zscore_365) appear on AMA returns rows after running the existing `refresh_returns_zscore.py` against the AMA returns table
   5. `run_daily_refresh.py --all` executes the AMA stage (after EMAs) and the `cmc_ama_multi_tf_u` unified table is populated via sync
-**Plans**: 0/TBD
+**Plans**: 8 plans in 5 waves
+
+Plans:
+- [ ] 35-01-PLAN.md -- DDL for all 12 AMA tables + state tables + dim_ama_params
+- [ ] 35-02-PLAN.md -- AMA computation functions (KAMA, DEMA, TEMA, HMA) + ama_params.py
+- [ ] 35-03-PLAN.md -- BaseAMAFeature class + AMAStateManager
+- [ ] 35-04-PLAN.md -- BaseAMARefresher + refresh_cmc_ama_multi_tf.py (main refresher)
+- [ ] 35-05-PLAN.md -- AMA returns feature class + returns refresher script
+- [ ] 35-06-PLAN.md -- Calendar variant refreshers (cal + cal_anchor)
+- [ ] 35-07-PLAN.md -- Sync scripts (_u tables) + z-score extension
+- [ ] 35-08-PLAN.md -- run_all_ama_refreshes.py orchestrator + daily refresh wiring
 
 ---
 
@@ -667,7 +677,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 35. AMA Engine | 0/TBD | Not started | — |
+| 35. AMA Engine | 0/8 | Planned | — |
 | 36. PSR + Purged K-Fold | 0/TBD | Not started | — |
 | 37. IC Evaluation | 0/TBD | Not started | — |
 | 38. Feature Experimentation | 0/TBD | Not started | — |
@@ -709,4 +719,4 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-23 (v0.9.0 roadmap added — 6 phases, 35 requirements, Phases 35-40)*
+*Last updated: 2026-02-23 (Phase 35 planned — 8 plans in 5 waves)*
