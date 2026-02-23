@@ -92,13 +92,26 @@ Run an incremental refresh to bring all derived data up to the current date:
 python -m ta_lab2.scripts.run_daily_refresh --all --verbose
 ```
 
-### Alembic Migration State (if Phase 33 is complete)
+### Alembic Migration State
 
-If Alembic migrations have been set up, mark the migration state as current after restore to prevent Alembic from re-applying migrations:
+After restoring the database, stamp the migration state as current to prevent Alembic from
+re-applying migrations:
 
 ```bash
 alembic stamp head
 ```
+
+Verify the stamp:
+
+```bash
+alembic current
+# Expected: 25f2b3c90f65 (head)
+```
+
+**Note:** `alembic stamp head` creates the `alembic_version` table (single column:
+`version_num VARCHAR(32)`, single row with the current revision ID). If your restore
+includes this table, the stamp is a no-op. If your restore skips it (e.g., table-by-table
+restore that excludes `alembic_version`), the stamp recreates it.
 
 ---
 
