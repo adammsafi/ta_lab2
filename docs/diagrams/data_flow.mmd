@@ -1,65 +1,104 @@
-%%{init: {'theme':'base', 'themeVariables': { 'fontSize':'14px'}}}%%
-flowchart LR
-    subgraph External["External Directories (v0.4.0)"]
-        direction TB
-        PT["ProjectTT<br/>62 DOCX/XLSX files<br/>(Foundational, Features,<br/>Plans, Process docs)"]
-        DT["Data_Tools<br/>51 Python scripts<br/>(analysis, memory,<br/>export, context,<br/>generators, processing)"]
-        FT["fredtools2<br/>13 Python files<br/>(FRED API client<br/>with DB integration)"]
-        FE["fedtools2<br/>17 Python files<br/>(FED data ETL<br/>with YAML config)"]
+%%{init: {'theme':'base', 'themeVariables': {'fontSize':'14px'}}}%%
+flowchart TD
+    %% ─────────────────────────────────────────────
+    %% v0.8.0 Data Pipeline — Main Flow
+    %% ─────────────────────────────────────────────
+
+    subgraph S1["Stage 1 — Source"]
+        PH7["cmc_price_histories7\nRaw OHLCV from CoinMarketCap\n(tick/1m/1h/1D granularity)"]
     end
 
-    subgraph Archive[".archive/ (Category-based preservation)"]
-        direction TB
-        DOC["documentation/<br/>2026-02-02/<br/>62 original<br/>DOCX/XLSX files"]
-        ARCH_DT["data_tools/<br/>2026-02-03/<br/>11 archived scripts<br/>(5 one-offs,<br/>6 prototypes)"]
-        EXT["external-packages/<br/>2026-02-03/<br/>fredtools2 (13)<br/>fedtools2 (17)<br/>+ ALTERNATIVES.md"]
+    subgraph S2["Stage 2 — Bars (6 variants → unified)"]
+        BARS["cmc_price_bars_multi_tf_u\nUnified price bars\n(id, ts, tf) primary key\n~4.1M rows, 109 timeframes"]
     end
 
-    subgraph Lab2["ta_lab2 (v0.5.0 Consolidated)"]
-        direction TB
-        DOCS["docs/<br/>Converted Markdown<br/>with YAML front matter<br/>(architecture, features,<br/>planning, reference)"]
-        TOOLS["tools/data_tools/<br/>40 migrated scripts<br/>in 6 categories<br/>(analysis, memory,<br/>export, context,<br/>generators, processing)"]
-        ECON["integrations/economic/<br/>FredProvider<br/>(rate limiting,<br/>circuit breaker,<br/>caching)"]
+    subgraph S3["Stage 3 — Returns & EMAs (parallel)"]
+        BRET["cmc_returns_bars_multi_tf_u\nBar returns with z-scores\n(ret_arith, ret_log,\n_zscore_30/90/365)"]
+        EMAS["cmc_ema_multi_tf_u\nUnified EMA values\n(id, ts, tf, period) PK\n~14.8M rows"]
+        ERET["cmc_returns_ema_multi_tf_u\nEMA returns with z-scores\n(d1, d2, d1_roll, d2_roll)"]
     end
 
-    PT -->|"Phase 13<br/>Convert to MD"| DOCS
-    PT -->|"Phase 13<br/>Archive originals"| DOC
+    subgraph S4["Stage 4 — Feature Store"]
+        VOL["cmc_vol\nVolatility features\n(Parkinson, GK,\nRogers-Satchell, ATR)"]
+        TA["cmc_ta\nTechnical indicators\n(RSI-14, MACD, Bollinger,\nATR-14, ADX)"]
+        FEAT["cmc_features\n112-column bar-level\nfeature store\n(id, ts, tf) primary key"]
+    end
 
-    DT -->|"Phase 14<br/>Migrate 40 scripts"| TOOLS
-    DT -->|"Phase 14<br/>Archive 11 scripts"| ARCH_DT
+    subgraph S5["Stage 5 — Regime Classification"]
+        REG["cmc_regimes\nL0/L1/L2 regime labels\n+ policy resolution\n(HysteresisTracker)"]
+        RFLIP["cmc_regime_flips\nRegime transition audit\ntable (old → new)"]
+        RSTAT["cmc_regime_stats\nPer-regime return stats\n(avg_ret, std_ret, n_bars)"]
+        RCOM["cmc_regime_comovement\nCross-asset regime\nalignment snapshots"]
+    end
 
-    FT -->|"Phase 15<br/>Archive package"| EXT
-    FT -.->|"Phase 15<br/>Extract patterns"| ECON
+    subgraph S6["Stage 6 — Signal Generation"]
+        SEMA["cmc_signals_ema_crossover\nEMA crossover signals\n(reads cmc_features +\ncmc_ema_multi_tf_u)"]
+        SRSI["cmc_signals_rsi_mean_revert\nRSI mean-reversion\nsignals"]
+        SATR["cmc_signals_atr_breakout\nATR breakout signals\n(size_mult, stop_mult\nfrom regimes)"]
+    end
 
-    FE -->|"Phase 15<br/>Archive package"| EXT
-    FE -.->|"Phase 15<br/>Extract patterns"| ECON
+    subgraph S7["Stage 7 — Backtesting"]
+        BRUN["cmc_backtest_runs\nRun metadata\n(strategy, params,\ndate range, commit hash)"]
+        BTRD["cmc_backtest_trades\nIndividual trade records\n(entry/exit ts, pnl,\nfees, regime_key)"]
+        BMET["cmc_backtest_metrics\nAggregate metrics\n(Sharpe, drawdown,\nwin rate, CAGR)"]
+    end
 
-    style External fill:#ffe6e6,stroke:#cc0000,stroke-width:2px
-    style Archive fill:#fff4e6,stroke:#cc8800,stroke-width:2px
-    style Lab2 fill:#e6f7ff,stroke:#0066cc,stroke-width:2px
+    subgraph S8["Stage 8 — Stats / QA"]
+        BSTAT["cmc_bar_stats\nBar data quality\nchecks (6 runners)"]
+        FSTAT["cmc_features_stats\nFeature distribution\nand outlier stats"]
+        AUD["audit_results\nPipeline audit trail\n(row counts, freshness,\ncoverage checks)"]
+    end
 
-    style PT fill:#ffcccc
-    style DT fill:#ffcccc
-    style FT fill:#ffcccc
-    style FE fill:#ffcccc
+    %% ─────────────────────────────────────────────
+    %% Data flow edges
+    %% ─────────────────────────────────────────────
 
-    style DOC fill:#ffe6cc
-    style ARCH_DT fill:#ffe6cc
-    style EXT fill:#ffe6cc
+    PH7 --> BARS
 
-    style DOCS fill:#cce6ff
-    style TOOLS fill:#cce6ff
-    style ECON fill:#cce6ff
+    BARS --> BRET
+    BARS --> EMAS
+    BARS --> VOL
+    BARS --> TA
 
-    classDef migrationPath stroke:#00aa00,stroke-width:3px
-    classDef archivePath stroke:#ff8800,stroke-width:3px
-    classDef extractPath stroke:#0088ff,stroke-width:2px,stroke-dasharray: 5 5
+    EMAS --> ERET
+    EMAS --> FEAT
 
-    linkStyle 0 stroke:#00aa00,stroke-width:3px
-    linkStyle 1 stroke:#ff8800,stroke-width:3px
-    linkStyle 2 stroke:#00aa00,stroke-width:3px
-    linkStyle 3 stroke:#ff8800,stroke-width:3px
-    linkStyle 4 stroke:#ff8800,stroke-width:3px
-    linkStyle 5 stroke:#0088ff,stroke-width:2px,stroke-dasharray: 5 5
-    linkStyle 6 stroke:#ff8800,stroke-width:3px
-    linkStyle 7 stroke:#0088ff,stroke-width:2px,stroke-dasharray: 5 5
+    BRET --> FEAT
+    VOL --> FEAT
+    TA --> FEAT
+
+    FEAT --> REG
+    FEAT --> SEMA
+    FEAT --> SRSI
+    FEAT --> SATR
+
+    EMAS -.->|"LEFT JOIN for EMA\nperiod data"| SEMA
+
+    REG --> RFLIP
+    REG --> RSTAT
+    REG --> RCOM
+    REG -.->|"regime_key\n(optional)"| SATR
+
+    SEMA --> BRUN
+    SRSI --> BRUN
+    SATR --> BRUN
+    BRUN --> BTRD
+    BRUN --> BMET
+
+    BARS --> BSTAT
+    FEAT --> FSTAT
+    BRUN --> AUD
+    BTRD --> AUD
+
+    %% ─────────────────────────────────────────────
+    %% Stage colour coding
+    %% ─────────────────────────────────────────────
+
+    style S1 fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    style S2 fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    style S3 fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    style S4 fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px
+    style S5 fill:#fce4ec,stroke:#880e4f,stroke-width:2px
+    style S6 fill:#e0f7fa,stroke:#006064,stroke-width:2px
+    style S7 fill:#fff8e1,stroke:#f57f17,stroke-width:2px
+    style S8 fill:#efebe9,stroke:#4e342e,stroke-width:2px

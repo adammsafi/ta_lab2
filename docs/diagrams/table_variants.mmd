@@ -1,0 +1,94 @@
+%%{init: {'theme':'base', 'themeVariables': {'fontSize':'13px'}}}%%
+flowchart LR
+    %% ─────────────────────────────────────────────
+    %% v0.8.0 Table Variant Structure
+    %% Each of the 4 bar/EMA table families has
+    %% 5 alignment variants that sync into a
+    %% unified _u table via INSERT ON CONFLICT DO NOTHING
+    %% ─────────────────────────────────────────────
+
+    subgraph FAM1["Family 1 — Price Bars (~4.1M rows)"]
+        direction LR
+        PB1["cmc_price_bars_multi_tf\nBase multi-TF bars\n(alignment_source:\nmulti_tf)"]
+        PB2["cmc_price_bars_cal_iso\nCalendar ISO bars\n(ISO week: Mon start)"]
+        PB3["cmc_price_bars_cal_us\nCalendar US bars\n(US week: Sun start)"]
+        PB4["cmc_price_bars_cal_anchor_iso\nAnchor ISO bars\n(ISO + anchor window)"]
+        PB5["cmc_price_bars_cal_anchor_us\nAnchor US bars\n(US + anchor window)"]
+        PBU["cmc_price_bars_multi_tf_u\nUnified table\nPK: (id, ts, tf,\nalignment_source)\n~4.1M rows total"]
+
+        PB1 -->|sync| PBU
+        PB2 -->|sync| PBU
+        PB3 -->|sync| PBU
+        PB4 -->|sync| PBU
+        PB5 -->|sync| PBU
+    end
+
+    subgraph FAM2["Family 2 — Bar Returns (~4.1M rows)"]
+        direction LR
+        BR1["cmc_returns_bars_multi_tf\nBase bar returns"]
+        BR2["cmc_returns_bars_cal_iso\nCalendar ISO returns"]
+        BR3["cmc_returns_bars_cal_us\nCalendar US returns"]
+        BR4["cmc_returns_bars_cal_anchor_iso\nAnchor ISO returns"]
+        BR5["cmc_returns_bars_cal_anchor_us\nAnchor US returns"]
+        BRU["cmc_returns_bars_multi_tf_u\nUnified table\nPK: (id, ts, tf,\nalignment_source)\nIncludes z-scores:\n_zscore_30/90/365\nis_outlier flag"]
+
+        BR1 -->|sync| BRU
+        BR2 -->|sync| BRU
+        BR3 -->|sync| BRU
+        BR4 -->|sync| BRU
+        BR5 -->|sync| BRU
+    end
+
+    subgraph FAM3["Family 3 — EMA Values (~14.8M rows)"]
+        direction LR
+        EM1["cmc_ema_multi_tf\nBase EMA values"]
+        EM2["cmc_ema_cal_iso\nCalendar ISO EMAs"]
+        EM3["cmc_ema_cal_us\nCalendar US EMAs"]
+        EM4["cmc_ema_cal_anchor_iso\nAnchor ISO EMAs"]
+        EM5["cmc_ema_cal_anchor_us\nAnchor US EMAs"]
+        EMU["cmc_ema_multi_tf_u\nUnified table\nPK: (id, ts, tf, period)\nColumns: close_ema,\nd1, d2, d1_roll,\nd2_roll, alignment_source\n~14.8M rows"]
+
+        EM1 -->|sync| EMU
+        EM2 -->|sync| EMU
+        EM3 -->|sync| EMU
+        EM4 -->|sync| EMU
+        EM5 -->|sync| EMU
+    end
+
+    subgraph FAM4["Family 4 — EMA Returns (~16M rows)"]
+        direction LR
+        ER1["cmc_returns_ema_multi_tf\nBase EMA returns"]
+        ER2["cmc_returns_ema_cal_iso\nCalendar ISO EMA ret"]
+        ER3["cmc_returns_ema_cal_us\nCalendar US EMA ret"]
+        ER4["cmc_returns_ema_cal_anchor_iso\nAnchor ISO EMA ret"]
+        ER5["cmc_returns_ema_cal_anchor_us\nAnchor US EMA ret"]
+        ERU["cmc_returns_ema_multi_tf_u\nUnified table\nPK: (id, ts, tf, period,\nalignment_source)\nIncludes z-scores:\n_zscore_30/90/365\nis_outlier flag\n~16M rows"]
+
+        ER1 -->|sync| ERU
+        ER2 -->|sync| ERU
+        ER3 -->|sync| ERU
+        ER4 -->|sync| ERU
+        ER5 -->|sync| ERU
+    end
+
+    %% ─────────────────────────────────────────────
+    %% Sync mechanism note
+    %% ─────────────────────────────────────────────
+
+    NOTE["Sync pattern:\nINSERT ... SELECT ...\nON CONFLICT DO NOTHING\n+ ingested_at watermark\n(sync_utils.py)"]
+
+    %% ─────────────────────────────────────────────
+    %% Colour coding by family
+    %% ─────────────────────────────────────────────
+
+    style FAM1 fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    style FAM2 fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    style FAM3 fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px
+    style FAM4 fill:#fce4ec,stroke:#880e4f,stroke-width:2px
+
+    style PBU fill:#c8e6c9,stroke:#2e7d32,stroke-width:3px
+    style BRU fill:#bbdefb,stroke:#1565c0,stroke-width:3px
+    style EMU fill:#e1bee7,stroke:#6a1b9a,stroke-width:3px
+    style ERU fill:#f8bbd0,stroke:#880e4f,stroke-width:3px
+
+    style NOTE fill:#fffde7,stroke:#f9a825,stroke-width:1px
