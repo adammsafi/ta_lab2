@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **table_summary DB table**: `refresh_table_summary.py` provides row counts and metadata across all pipeline tables
 - **CI docs job**: `mkdocs build --strict` gate added to GitHub Actions CI workflow
 - **Documentation freshness pass**: Version strings updated to 0.8.0, stale references resolved, TODO placeholders removed
+- **Runbooks (Phase 32)**: Operational runbooks for regime pipeline, backtest pipeline, new-asset onboarding SOP, and disaster recovery guide in `docs/operations/`
+- **Alembic migrations (Phase 33)**: Alembic framework bootstrapped with `alembic/` directory, baseline no-op revision (`25f2b3c90f65`), legacy SQL migration catalog in `sql/migration/CATALOG.md`, and schema change workflow documented in CONTRIBUTING.md
 
 ### Changed
 - Ruff lint blocking in CI; pre-commit hook updated; zero violations enforced
