@@ -815,6 +815,13 @@ Examples:
         help="Disable hysteresis smoothing in regime refresher (pass --no-hysteresis to subprocess)",
     )
 
+    # Weekly digest options
+    p.add_argument(
+        "--no-telegram",
+        action="store_true",
+        help="Suppress Telegram delivery for weekly digest (passed through to weekly_digest subprocess)",
+    )
+
     args = p.parse_args(argv)
 
     # Validation: require explicit target
