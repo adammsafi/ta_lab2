@@ -460,19 +460,6 @@ ruff format src/
 mypy src/ta_lab2/features/ src/ta_lab2/regimes/
 ```
 
-### Database Migrations
-
-```bash
-# Create new migration
-alembic revision -m "Add new feature table"
-
-# Apply migrations
-alembic upgrade head
-
-# View migration history
-alembic history
-```
-
 ---
 
 ## Contributing

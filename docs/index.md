@@ -387,27 +387,14 @@ pytest -m validation
 ### Code Quality
 
 ```bash
+# Lint (auto-fix)
+ruff check src/ --fix
+
 # Format code
-black src/ tests/
+ruff format src/
 
-# Lint
-ruff check src/ tests/
-
-# Type checking
-mypy src/
-```
-
-### Database Migrations
-
-```bash
-# Create new migration
-alembic revision -m "Add new feature table"
-
-# Apply migrations
-alembic upgrade head
-
-# View migration history
-alembic history
+# Type checking (features + regimes only)
+mypy src/ta_lab2/features/ src/ta_lab2/regimes/
 ```
 
 ---

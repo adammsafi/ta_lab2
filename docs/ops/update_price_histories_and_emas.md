@@ -187,9 +187,6 @@ Now we load the cleaned CSVs into the main database price table.
 
    or another dedicated check that compares row counts before/after the load.
 
-   > **If you haven’t finalized a specific “post-load sanity check” query yet, leave a note here like:**  
-   > `[TODO: fill in canonical post-load row-count check SQL here]`.
-
 If anything looks off (for example, the row counts change in an unexpected way), investigate before continuing.
 
 ---
@@ -307,7 +304,7 @@ Immediately after the daily EMA refresh completes:
 1. Run the daily EMA stats script. For example:
 
    ```text
-   [TODO: insert path/filename, e.g. refresh_cmc_ema_daily_stats.py]
+   python -m ta_lab2.scripts.emas.stats.multi_tf.refresh_ema_multi_tf_stats
    ```
 
 2. In your SQL tool, run a query like:
@@ -364,7 +361,7 @@ Immediately after the multi-timeframe EMA refresh completes:
 1. Run the multi-timeframe EMA stats script:
 
    ```text
-   [TODO: insert path/filename, e.g. refresh_cmc_ema_multi_tf_stats.py]
+   python -m ta_lab2.scripts.emas.stats.multi_tf_cal.refresh_ema_multi_tf_cal_stats
    ```
 
 2. Query the stats table (for example, `ema_multi_tf_stats`) for today’s date and review:
@@ -416,7 +413,7 @@ Immediately after the calendar multi-timeframe EMA refresh completes:
 1. Run the calendar multi-timeframe EMA stats script:
 
    ```text
-   [TODO: insert path/filename, e.g. refresh_cmc_ema_multi_tf_cal_stats.py]
+   python -m ta_lab2.scripts.emas.stats.multi_tf_cal_anchor.refresh_ema_multi_tf_cal_anchor_stats
    ```
 
 2. Query the calendar EMA stats table for today’s date. For example:
