@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-22)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v0.8.0 Polish & Hardening
+**Current focus:** Planning v0.9.0 — milestone v0.8.0 shipped and archived
 
 ## Current Position
 
-Phase: 34 of 34 (34-audit-cleanup)
-Plan: 1 of 1 — Complete
-Status: Complete — v0.8.0 audit cleanup shipped
-Last activity: 2026-02-23 — Completed 34-01-PLAN.md (4/4 tasks, 4 files updated)
+Phase: None — between milestones
+Plan: None
+Status: v0.8.0 shipped and archived — planning v0.9.0
+Last activity: 2026-02-23 — Milestone v0.8.0 archived, git tag v0.8.0 created
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [##########] 100% v0.7.0 (2/2 phases, 10/10 plans) | [##########] 100% v0.8.0 (15/15 plans, 5/5 phases) | [##########] 100% v0.8.0-audit (1/1 plans, Phase 34)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 (6 phases, 16 plans, 20/20 requirements)
 
 ## Performance Metrics
 
@@ -210,33 +210,25 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-23
-Stopped at: Completed 34-01-PLAN.md — v0.8.0 audit cleanup complete (4/4 tasks, 166 total plans)
+Stopped at: Milestone v0.8.0 archived — ready for /gsd:new-milestone to start v0.9.0
 Resume file: None
 
 ---
 
-## Milestone Context (v0.8.0)
+## Milestone Context
 
-**Goal:** Close out partially-complete infrastructure gaps — production-harden before v0.9.0 research features
+**v0.8.0 Polish & Hardening — SHIPPED 2026-02-23**
 
-**Key Principles:**
-- Finish what's started — no new features, just hardening
-- 5 stats runners exist but aren't wired into orchestrator — integration, not greenfield
-- Code quality tooling (ruff, pre-commit) is 55% done — add mypy, make lint blocking
-- Docs are 60% done — version freshness and pipeline diagrams needed
-- Runbooks are 70% done — cover regime/backtest pipelines + recovery
-- Alembic is 10% — nearly greenfield migration framework
+See `.planning/milestones/v0.8.0-ROADMAP.md` for archived details.
 
-**Phase Summary:**
-- Phase 29: Stats/QA Orchestration (STAT-01 to STAT-04) — COMPLETE
-- Phase 30: Code Quality Tooling (QUAL-01 to QUAL-04) — COMPLETE
-- Phase 31: Documentation Freshness (DOCS-01 to DOCS-04) — COMPLETE
-- Phase 32: Runbooks (RUNB-01 to RUNB-04) — COMPLETE
-- Phase 33: Alembic Migrations (MIGR-01 to MIGR-04) — COMPLETE
-- Phase 34: Audit Cleanup (gap closure) — COMPLETE
+**v0.9.0 — Not yet started**
 
-**Parallelization note:** Phase 29 and Phase 33 are fully isolated and can be executed on parallel branches simultaneously.
+Next milestone candidates (from v0.8.0 deferred):
+- Feature Enrichment: KAMA, DEMA, TEMA, HMA, experimentation framework, IC evaluation
+- Stress Testing: Purged K-fold, walk-forward optimization, parameter sweeps, probabilistic Sharpe
+- Visualization: Streamlit dashboard, heatmaps, interactive plots
+- Notebooks: End-to-end demo notebooks
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-23 (Phase 34 verified complete — 4/4 must-haves, all v0.8.0 tech debt closed)*
+*Last updated: 2026-02-23 (v0.8.0 milestone archived, planning v0.9.0)*

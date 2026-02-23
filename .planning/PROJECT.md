@@ -8,18 +8,15 @@ A systematic crypto trading platform with integrated AI orchestration and persis
 
 Build trustworthy quant trading infrastructure 3x faster by creating AI coordination that remembers context, routes work optimally, and eliminates redundant context-setting across sessions and platforms.
 
-## Current Milestone: v0.8.0 Polish & Hardening
+## Current Milestone: Planning v0.9.0
 
-**Goal:** Close out partially-complete infrastructure gaps so the platform is production-hardened before adding new research capabilities in v0.9.0.
+**Previous:** v0.8.0 Polish & Hardening — SHIPPED 2026-02-23 (6 phases, 13 plans, 20/20 requirements)
 
-**Target features:**
-- Stats/QA Orchestration: Wire 5 existing stats runners into daily refresh pipeline + build weekly QC digest report
-- Code Quality Tooling: Add mypy config, make ruff lint blocking in CI, fix stale tooling references
-- Documentation Freshness: Update version refs (mkdocs/README), add data pipeline mermaid diagram, fix stale placeholders
-- Runbooks: Regime pipeline runbook, backtest pipeline runbook, disaster recovery guide, new-asset onboarding SOP
-- Alembic Migrations: Install framework, convert 16 existing raw SQL migrations, add version tracking
-
-**Critical Principle:** This is a "finish what's started" milestone — no new features, just hardening existing infrastructure.
+**Next milestone candidates (from v0.8.0 REQUIREMENTS.md deferred section):**
+- Feature Enrichment: KAMA, DEMA, TEMA, HMA, feature experimentation framework, IC evaluation
+- Stress Testing: Purged K-fold, walk-forward optimization, parameter sweeps, probabilistic Sharpe
+- Visualization: Streamlit dashboard, heatmaps, interactive plots
+- Notebooks: End-to-end demo notebooks
 
 ## Requirements
 
@@ -51,13 +48,22 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 - ✓ Adapter architecture (Claude/ChatGPT/Gemini) — existing
 - ✓ Quota tracking design — existing
 
+### Complete (v0.8.0 Milestone)
+
+**Polish & Hardening** ✓
+- ✓ Stats/QA orchestration: stats runners in daily refresh, FAIL gating, weekly Telegram digest
+- ✓ Code quality: ruff lint blocking in CI, mypy non-blocking, 7 parallel CI jobs
+- ✓ Documentation: version 0.8.0 synced, pipeline diagrams, mkdocs --strict CI gate
+- ✓ Runbooks: regime pipeline, backtest pipeline, asset onboarding SOP, disaster recovery
+- ✓ Alembic: framework bootstrapped, baseline revision 25f2b3c90f65, 17 legacy SQL cataloged
+
 ### Complete (v0.7.0 Milestone)
 
 **Regime Integration & Signal Enhancement** ✓
 - ✓ Regime pipeline: refresh_cmc_regimes.py with L0-L2 labeling, policy resolution, hysteresis
 - ✓ 4 regime tables: cmc_regimes, cmc_regime_flips, cmc_regime_stats, cmc_regime_comovement
 - ✓ Signal generators wired with regime_enabled param and --no-regime flag
-- ✓ Orchestrator: run_daily_refresh.py --all runs bars→EMAs→regimes
+- ✓ Orchestrator: run_daily_refresh.py --all runs bars→EMAs→regimes→stats
 - ✓ Backtest pipeline fix: feature_snapshot serialization, vectorbt compat, end-to-end verified
 
 ### Complete (v0.6.0 Milestone)
@@ -68,15 +74,6 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 - ✓ BaseBarBuilder + BaseEMARefresher pattern consistency across all builders
 - ✓ Unified bar/EMA/returns schemas with consistent PKs
 - ✓ Baseline capture + validation (38 pytest tests, 17 audit scripts, stats runners)
-
-### Active (v0.8.0 Milestone)
-
-**Polish & Hardening**
-- [ ] Wire stats runners into run_daily_refresh.py + weekly QC digest
-- [ ] Add mypy config to pyproject.toml, make ruff lint blocking in CI
-- [ ] Update mkdocs.yml/README versions, add pipeline mermaid diagram, fix stale refs
-- [ ] Regime/backtest runbooks, disaster recovery guide, asset onboarding SOP
-- [ ] Install Alembic, convert 16 raw SQL migrations, add version tracking
 
 ### Complete (v0.5.0 Milestone)
 
@@ -170,4 +167,4 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 | Backtest/live parity as success criterion | System is only trustworthy if backtests use identical logic to live trading - reproducibility is mandatory | — Pending |
 
 ---
-*Last updated: 2026-02-22 after v0.8.0 milestone initialization*
+*Last updated: 2026-02-23 after v0.8.0 milestone completion*
