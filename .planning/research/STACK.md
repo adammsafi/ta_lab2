@@ -1,9 +1,39 @@
-# Technology Stack: v0.8.0 Polish & Hardening
+# Technology Stack: v0.9.0 Research & Experimentation
 
 **Project:** ta_lab2
-**Milestone:** v0.8.0 — Stats/QA orchestration, code quality, docs, runbooks, Alembic migrations
-**Researched:** 2026-02-22
-**Overall confidence:** HIGH (all recommendations verified against PyPI or official docs)
+**Milestone:** v0.9.0 — Adaptive MAs, IC evaluation, PSR, Purged CV, Feature lifecycle, Streamlit, Notebooks
+**Researched:** 2026-02-23
+**Overall confidence:** HIGH (all version claims verified against PyPI or official docs)
+
+---
+
+## Environment Clarification: Two Python Environments
+
+This project runs two Python environments. This distinction matters for every dependency decision.
+
+| Environment | Python | Relevant for |
+|-------------|--------|-------------|
+| System Python / `pip` | 3.12.7 | Active dev: runs signals, backtests, scripts, streamlit |
+| `.venv311/` | 3.11.9 | Legacy freeze only; vectorbt was tested here in v0.7.0 |
+
+**Practical consequence:** All new packages should target the **Python 3.12** environment. The `pyproject.toml` already specifies `target-version = "py312"` in ruff config. The main `pip` command resolves to Python 3.12.7.
+
+**Confirmed existing stack (Python 3.12 environment):**
+
+| Package | Installed Version |
+|---------|------------------|
+| numpy | 2.4.1 |
+| scipy | 1.17.0 (released 2026-01-10) |
+| pandas | 2.3.3 |
+| scikit-learn | 1.8.0 (released 2025-12-10) |
+| polars | 1.36.1 |
+| plotly | 6.4.0 |
+| arch | 7.2.0 |
+| numba | 0.64.0 |
+| vectorbt | 0.28.1 |
+| streamlit | 1.44.0 |
+
+**What this means:** scipy, numpy, scikit-learn, plotly, and numba are already installed. The new features can be implemented with minimal new packages.
 
 ---
 
@@ -11,442 +41,316 @@
 
 The following stack is validated and in production. These are NOT open questions:
 
-| Component | Version in pyproject.toml | Status |
-|-----------|--------------------------|--------|
-| Python | 3.12 (CI matrix: 3.11, 3.12) | Locked |
-| PostgreSQL | 16 (in CI service) | Locked |
-| SQLAlchemy | >=2.0 | Locked |
-| pandas | (unpinned) | Locked |
-| numpy | (unpinned) | Locked |
-| vectorbt | 0.28.1 | Locked |
-| ruff | >=0.1.5 (in dev deps) | Needs upgrade + enforcement |
-| mypy | >=1.8 (in dev deps, no config) | Needs config |
-| mkdocs-material | >=9.0 (in docs deps) | Needs update + mermaid |
-| mike | (not in pyproject.toml) | Needs explicit pin |
-| pre-commit | ruff-pre-commit v0.1.14 | Needs upgrade |
-| pytest | >=8.0 | Active |
-| import-linter | >=2.7 | Active |
+| Component | Status |
+|-----------|--------|
+| Python 3.12, PostgreSQL, SQLAlchemy 2.0 | Locked |
+| pandas, numpy, scipy, scikit-learn | Installed, do not re-pin |
+| vectorbt 0.28.1 | Locked — do not upgrade |
+| ruff, mypy, mkdocs-material, alembic | v0.8.0 handled these |
+| matplotlib (existing viz) | Locked |
+| Telegram notifications | Complete |
+| parameter_sweep.py (grid + random search) | Complete |
+| feature_eval.py (Pearson corr, logistic regression) | Partial — needs IC/Spearman extension |
+| splitters.py (expanding walk-forward) | Partial — needs purged CV |
+| metrics.py (PSR placeholder) | Stub — needs real PSR |
 
 ---
 
-## Area 1: Stats/QA Orchestration
+## Feature Area 1: Adaptive Moving Averages (KAMA, DEMA, TEMA, HMA)
 
-### What is needed
+### Recommendation: IMPLEMENT IN-HOUSE — NO NEW LIBRARY
 
-The project has 5 existing stats runners (bars, 3x EMA variant, returns, features) that write PASS/WARN/FAIL results to stats tables and a `run_daily_refresh.py` orchestrator. The hardening work wires stats runners into the daily refresh and adds a weekly digest report.
+**Rationale:** All four adaptive MA algorithms reduce to 10-30 lines of numpy each. The only library options are TA-Lib (requires a C binary install on Windows) and pandas-ta (beta-only, requires Python >=3.12 AND numba >=0.60, while the .venv311 environment has numba 0.57.1 — the divergence creates maintenance risk across environments).
 
-### Stack verdict: NO new libraries required
+The existing codebase already has:
+- A `BaseEMAFeature` hierarchy with vectorized numpy computation patterns
+- `EMAFeature` subclasses that compute running exponential weights
+- Multi-TF feature write pipeline that handles chunked DB writes
 
-The digest report needs only stdlib + already-present deps. The recommendation is explicit: **do not introduce Jinja2, Celery, or Airflow**.
+KAMA, DEMA, TEMA, and HMA are single-pass or two-pass numpy algorithms that slot directly into this hierarchy.
 
-| Use Case | Tool | Why |
-|----------|------|-----|
-| Stats orchestration | stdlib `subprocess` + existing `run_daily_refresh.py` pattern | Already used for bars/EMAs/regimes; same pattern scales |
-| Report formatting | stdlib `string.Template` or f-strings | Reports go to Telegram (HTML) and log files; no templating engine needed |
-| Telegram digest | `ta_lab2.notifications.telegram` (existing) | `send_message(parse_mode="HTML")` already supports structured HTML |
-| Scheduling (weekly digest) | cron / OS scheduler (external) | The codebase already assumes external scheduling; no scheduler library in-process |
-| Data aggregation for digest | pandas (existing) + SQLAlchemy (existing) | Query stats tables, aggregate with pandas |
+**Algorithm complexities:**
 
-**What NOT to add for this area:**
-- **Jinja2**: Overkill for Telegram messages. The existing `telegram.py` sends HTML strings; f-strings are sufficient. Jinja2 adds a dependency for a task that is ~20 lines of formatting code.
-- **Celery / APScheduler / Airflow**: All introduce broker dependencies (Redis/RabbitMQ) or daemon processes. The codebase pattern is subprocess-based scripts invoked by cron. Introducing an in-process scheduler breaks this pattern and adds operational complexity.
-- **pandas-email-report or similar**: No email channel exists; Telegram is the delivery mechanism.
+| Indicator | Formula | numpy operations needed |
+|-----------|---------|------------------------|
+| KAMA | ER = abs(change) / sum(abs(moves)); SC = (ER*(fast-slow)+slow)^2; KAMA_t = KAMA_{t-1} + SC*(P - KAMA_{t-1}) | cumsum, abs, rolling window via stride tricks |
+| DEMA | DEMA = 2*EMA(N) - EMA(EMA(N)) | Two EMA passes |
+| TEMA | TEMA = 3*EMA1 - 3*EMA2 + EMA3 | Three EMA passes |
+| HMA | HMA = WMA(2*WMA(n/2) - WMA(n), sqrt(n)) | Three WMA passes |
 
----
+All algorithms are expressible with numpy and a simple EMA helper function. The existing `BaseEMAFeature` already computes pandas `ewm()` which can be reused.
 
-## Area 2: Code Quality — mypy strict + ruff blocking CI
+**What NOT to add:**
 
-### mypy
+- **TA-Lib (C wrapper):** Requires installing `ta-lib-0.4.0-msvc.zip` to `C:\ta-lib` on Windows before `pip install TA-Lib`. This is a manual binary dependency that breaks CI reproducibility and creates an installation footgun. Latest version is 0.6.8 (Oct 2025), but the C library install requirement makes it inappropriate here.
 
-**Current state:** `mypy>=1.8` listed in dev deps. No `[tool.mypy]` section in `pyproject.toml`. mypy runs nowhere in CI.
+- **pandas-ta 0.4.71b0:** Beta-only (no stable release on PyPI). Requires Python >=3.12 AND numba >=0.60. The `.venv311` environment has numba 0.57.1 which is incompatible. Even though the main environment has numba 0.64.0, installing a beta library for four indicator functions is unjustifiable when the math is 30 lines.
 
-**Recommended version:** `>=1.14` (latest stable is **1.19.1**, released 2025-12-15; constraint `>=1.14` captures recent releases without over-constraining)
-
-**Recommended configuration in `pyproject.toml`:**
-
-```toml
-[tool.mypy]
-python_version = "3.12"
-strict = true
-
-# Exclude scripts that use subprocess/argparse boilerplate with no type benefit
-exclude = [
-    "src/ta_lab2/scripts/",
-    "tests/",
-]
-
-# Untyped third-party libraries: suppress errors rather than adding stubs
-ignore_missing_imports = true
-
-# Per-module relaxations for known-untyped boundaries
-[[tool.mypy.overrides]]
-module = [
-    "vectorbt.*",
-    "psycopg2.*",
-    "requests.*",
-    "hypothesis.*",
-]
-ignore_missing_imports = true
-ignore_errors = true
-```
-
-**Why exclude scripts/:** The `src/ta_lab2/scripts/` subtree contains ~50 orchestration scripts written with argparse, subprocess, and path manipulation. Enforcing strict mypy on all of them as a first pass would produce thousands of errors with low architectural value. The right scope for mypy strict in v0.8.0 is the library layer: `ta_lab2.features`, `ta_lab2.regimes`, `ta_lab2.signals`, `ta_lab2.tools`, `ta_lab2.notifications`.
-
-**Type stubs — what to add:**
-
-| Package | Rationale | Version |
-|---------|-----------|---------|
-| `pandas-stubs` | pandas is untyped; stubs enable DataFrame column checking in feature code | `>=2.2.0` (matches pandas 2.x, not 3.0) |
-
-**What NOT to add for mypy stubs:**
-
-- **`sqlalchemy-stubs` / `sqlalchemy2-stubs`**: The SQLAlchemy mypy plugin is DEPRECATED and removed in SQLAlchemy 2.1. SQLAlchemy 2.0 is natively PEP-484 compliant when using the new declarative constructs. Do not install stubs packages — they will conflict.
-- **`data-science-types`**: Unmaintained since 2021. pandas-stubs is the current standard.
-- **numpy stubs**: numpy ships its own `py.typed` marker as of numpy 1.20. No separate stubs package needed.
-- **`types-requests`**: Only needed if `requests` is in a typed module. The telegram.py uses `try: import requests except ImportError` — this boundary should be marked `ignore_errors = true` in overrides.
-
-**mypy in CI — recommended approach:**
-
-Add a non-blocking (warning-only) mypy step in `ci.yml` initially, then make it blocking after the first pass of fixes. Do not make it blocking on day one; the existing codebase was written without type annotations and will have numerous failures.
-
-```yaml
-- name: mypy type check (library layer)
-  run: |
-    mypy src/ta_lab2/features/ src/ta_lab2/regimes/ \
-         src/ta_lab2/signals/ src/ta_lab2/tools/ \
-         src/ta_lab2/notifications/
-  continue-on-error: true  # Remove once baseline errors are fixed
-```
-
-### ruff
-
-**Current state:** `ruff>=0.1.5` in dev deps; pre-commit at `v0.1.14`; CI runs `ruff check src || true` (non-blocking).
-
-**Current latest stable:** **0.15.2**, released 2026-02-19.
-
-**Recommended version constraint:** `>=0.9.0` in pyproject.toml (captures 0.9.x through 0.15.x; avoids pinning to a specific patch).
-
-**Pre-commit version:** Update `ruff-pre-commit` from `v0.1.14` to `v0.9.0` minimum (or `v0.15.2` for latest). The `v0.1.x` series is over a year old and missing rules.
-
-**Making ruff blocking in CI — minimal change to `ci.yml`:**
-
-Change `ruff check src || true` to:
-
-```yaml
-- name: Ruff lint (blocking)
-  run: ruff check src --output-format=github
-
-- name: Ruff format check (blocking)
-  run: ruff format --check src
-```
-
-Removing `|| true` makes the job fail on lint errors. The `--output-format=github` flag produces inline PR annotations.
-
-**Ruff configuration additions to `pyproject.toml`:**
-
-The existing `[tool.ruff.lint]` only has `ignore = ["E402"]`. Add explicit rule selections for a quant codebase:
-
-```toml
-[tool.ruff]
-line-length = 100
-
-[tool.ruff.lint]
-select = ["E", "F", "W", "I", "N", "UP", "ANN"]
-ignore = [
-    "E402",    # Module-level import (scripts use sys.path manipulation)
-    "ANN101",  # Missing type annotation for self (deprecated rule)
-    "ANN102",  # Missing type annotation for cls (deprecated rule)
-]
-
-[tool.ruff.lint.per-file-ignores]
-"tests/*" = ["F841", "ANN"]  # Allow unused vars + skip annotations in tests
-"src/ta_lab2/scripts/*" = ["ANN"]  # Scripts exempt from annotation enforcement
-```
-
-**What NOT to add for ruff:**
-- **pylint**: ruff replaces pylint for standard checks. Do not run both.
-- **flake8**: Replaced by ruff. Do not add.
-- **bandit (security linting)**: Not in scope for this milestone; would require separate investigation of what rules apply to a quant research codebase.
+- **finta:** Last meaningful release in 2021; effectively unmaintained.
 
 ---
 
-## Area 3: Documentation — mkdocs.yml + mermaid + version sync
+## Feature Area 2: Information Coefficient (IC) Evaluation
 
-### mkdocs-material
+### Recommendation: EXTEND feature_eval.py USING SCIPY (ALREADY INSTALLED)
 
-**Current version in pyproject.toml:** `>=9.0`
-**Current latest stable:** **9.7.2**, released 2026-02-18.
+**What's needed:**
+- Spearman rank correlation (IC per period)
+- Rolling IC mean and IC information ratio (IR = mean_IC / std_IC)
+- IC decay analysis (IC at lag 1, 2, ..., N bars)
+- Turnover metric (fraction of top-quintile assets changing per period)
 
-Update the constraint to `>=9.5` to get mermaid fixes and the latest admonition styles, while avoiding any future 10.x breaking changes.
+**Stack decision:**
 
-**Mermaid diagrams:** mkdocs-material has **native mermaid support** since version 8.2. No separate `mkdocs-mermaid2-plugin` is needed (that plugin conflicts with dark mode and minification). The native integration requires only a `pymdownx.superfences` extension configuration:
+| Capability | Library | Status |
+|-----------|---------|--------|
+| `scipy.stats.spearmanr()` | scipy 1.17.0 | ALREADY INSTALLED |
+| Groupby / rolling windows | pandas 2.3.3 | ALREADY INSTALLED |
+| Plotting IC time series | matplotlib (existing) | ALREADY INSTALLED |
 
-```yaml
-# In mkdocs.yml
-markdown_extensions:
-  - pymdownx.superfences:
-      custom_fences:
-        - name: mermaid
-          class: mermaid
-          format: !!python/name:pymdownx.superfences.fence_code_format
+`scipy.stats.spearmanr(a, b)` returns (correlation, pvalue). Rolling IC by period is a groupby over the timestamp dimension. IC decay is the correlation at shifted horizons. All of this is 50-100 lines in `feature_eval.py`.
+
+**Alphalens-reloaded assessment:**
+
+`alphalens-reloaded==0.4.6` (released 2025-06-02) provides these IC metrics plus pre-built plotting. It is actively maintained (Production/Stable), Python >=3.10, no problematic dependencies.
+
+**Decision: DO NOT add alphalens-reloaded.**
+
+Rationale: The project has an existing `feature_eval.py` with a clear API pattern and a `viz/all_plots.py` with matplotlib conventions. Alphalens-reloaded's plotting style (seaborn-based, opinionated layouts) conflicts with the existing visualization layer. Adding it introduces `seaborn` (not currently installed, 2.1 MB), `statsmodels` (not currently installed, large), and a new plot aesthetic that differs from existing charts. The four IC functions needed fit in ~80 lines. The math is `scipy.stats.spearmanr` in a loop — not complex enough to justify the dependency surface.
+
+**Exception — IF seaborn is added for another reason:** The alphalens-reloaded assessment becomes favorable. Seaborn 0.13.2 (latest, 2024-01-25) is a reasonable add-on for research notebooks. But add seaborn only if notebooks explicitly need seaborn-style plots; do not add it just to unblock alphalens.
+
+---
+
+## Feature Area 3: Probabilistic Sharpe Ratio (PSR)
+
+### Recommendation: IMPLEMENT IN-HOUSE — scipy (ALREADY INSTALLED)
+
+**What's needed (Lopez de Prado formulation):**
+
+```python
+# All required scipy/numpy functions already available
+from scipy.stats import norm, skew, kurtosis
+
+def psr(returns: np.ndarray, sr_benchmark: float = 0.0) -> float:
+    n = len(returns)
+    sr_hat = returns.mean() / returns.std(ddof=1) * np.sqrt(252)
+    skew_r = skew(returns)
+    kurt_r = kurtosis(returns, fisher=True)  # excess kurtosis
+    # Standard deviation of estimated Sharpe (Bailey & Lopez de Prado 2012)
+    sr_std = np.sqrt(
+        (1 + (0.5 * sr_hat**2) - (skew_r * sr_hat) + ((kurt_r / 4) * sr_hat**2)) / (n - 1)
+    )
+    return float(norm.cdf((sr_hat - sr_benchmark) / sr_std))
 ```
 
-This is the only change needed to enable mermaid diagrams in documentation. Diagrams then use standard mermaid code blocks:
+**Required functions and their status:**
 
-````markdown
-```mermaid
-flowchart LR
-    bars[cmc_price_bars_multi_tf] --> emas[cmc_ema_multi_tf_u]
-    emas --> regimes[cmc_regimes]
-    bars --> features[cmc_features]
+| Function | Module | Installed |
+|----------|--------|-----------|
+| `scipy.stats.norm.cdf` | scipy 1.17.0 | YES |
+| `scipy.stats.skew` | scipy 1.17.0 | YES |
+| `scipy.stats.kurtosis` | scipy 1.17.0 | YES |
+| `numpy.sqrt`, `numpy.sqrt` | numpy 2.4.1 | YES |
+
+The existing `metrics.py` has `psr_placeholder()` as a stub. The real PSR is a drop-in replacement using only already-installed libraries.
+
+**What NOT to add:**
+- **mlfinlab:** As of early 2026, mlfinlab is effectively discontinued on PyPI (no new PyPI releases in 12+ months). The project moved to a paid private tier. Its GitHub-sourced open version (`mlfinpy`) is a community fork with unclear maintenance. Do not add.
+- **quantstats:** Adds heavy optional dependencies (yfinance, requests) and has a different API contract than the existing `metrics.py`. The codebase's metrics API is already defined; adapting to quantstats would be net negative.
+- **pypbo:** Small library for backtest overfitting probability; single-function wrappers. Not needed when PSR math is 15 lines.
+
+---
+
+## Feature Area 4: Purged K-Fold Cross-Validation
+
+### Recommendation: IMPLEMENT IN-HOUSE using sklearn BaseEstimator pattern — OR add skfolio
+
+**Option A: Extend splitters.py (preferred for minimal dependency)**
+
+scikit-learn 1.8.0's `TimeSeriesSplit` has a `gap` parameter (embargo). However, it does NOT implement purging (removing overlapping label windows from the training set). For a full Lopez de Prado purged CV, the codebase needs to implement `PurgedKFold` itself.
+
+The implementation is ~100 lines following sklearn's `BaseCrossValidator` interface:
+
+```python
+from sklearn.model_selection import BaseCrossValidator
+import numpy as np
+
+class PurgedKFold(BaseCrossValidator):
+    """
+    Purged K-fold with embargo, following Lopez de Prado AFML Chapter 7.
+    Assumes samples have prediction times and evaluation times.
+    """
+    def __init__(self, n_splits=5, embargo_pct=0.01):
+        self.n_splits = n_splits
+        self.embargo_pct = embargo_pct
+
+    def split(self, X, y=None, pred_times=None, eval_times=None):
+        # ... purge logic using pred_times/eval_times overlap detection
+        pass
+
+    def get_n_splits(self, X=None, y=None, groups=None):
+        return self.n_splits
 ```
-````
 
-### mike (versioning)
+This fits in the existing `splitters.py` and requires only `sklearn.model_selection.BaseCrossValidator` (already installed).
 
-**Current state:** Referenced in `mkdocs.yml` under `extra.version.provider: mike`, but not in `pyproject.toml` docs deps.
+**Option B: skfolio 0.15.5 (released 2026-02-10)**
 
-**Current latest stable:** **2.1.3**, released 2024-08-13. This is the version to pin.
+skfolio provides `CombinatorialPurgedCV`, which is the full combinatorial variant (multiple testing paths). It is actively maintained, Python >=3.10, sklearn-compatible.
 
-Add to `pyproject.toml` docs optional-dependencies:
+**However:** skfolio's primary scope is portfolio optimization (mean-variance, hierarchical clustering). Its CV class is incidental to its main purpose. Adding it for one class (`CombinatorialPurgedCV`) brings in `cvxpy-base`, `clarabel` (convex solver), and `plotly>=5.22.0` as hard dependencies — substantial overhead.
+
+**Decision: Implement PurgedKFold in-house in splitters.py (Option A).**
+
+Reserve skfolio consideration for a future portfolio optimization milestone if that ever becomes scope.
+
+**timeseriescv assessment:** PyPI package `timeseriescv==0.2` is inactive (no new releases). Do not use.
+
+---
+
+## Feature Area 5: Feature Experimentation Framework (Lifecycle)
+
+### Recommendation: NO NEW LIBRARIES — file-based registry + existing DB
+
+The feature lifecycle (experimental → promoted → deprecated) is a **metadata management problem**, not a library problem. The existing infrastructure covers every need:
+
+| Need | Existing tool |
+|------|--------------|
+| Lifecycle state storage | New DB table (`cmc_feature_registry`) via Alembic migration |
+| Feature configuration | YAML config files + `pyyaml` (already in core deps) |
+| Status querying | SQLAlchemy 2.0 (already in core deps) |
+| Compute reuse | Existing `BaseEMAFeature` / feature pipeline |
+| IC evaluation | `feature_eval.py` extensions (Area 2) |
+
+**What NOT to add:**
+- **MLflow:** Experiment tracking at model-level granularity. Overkill for feature-level lifecycle in a single-developer quant lab. Adds an MLflow server process or file backend, a UI that duplicates what a Streamlit dashboard would provide, and tight coupling to MLflow's artifact storage patterns.
+- **DVC (Data Version Control):** Designed for dataset versioning in git. The project tracks features in PostgreSQL, not files. DVC is architecturally mismatched.
+- **Feast (feature store):** Enterprise-grade feature serving with an online/offline store separation. Far beyond current scale (22M rows, single PostgreSQL). The codebase's existing `cmc_features` table IS the feature store.
+- **Weights & Biases / Neptune:** SaaS experiment trackers. Adds external service dependency to a self-contained research codebase.
+
+---
+
+## Feature Area 6: Streamlit Dashboard
+
+### Recommendation: UPGRADE streamlit from 1.44.0 to >=1.54.0
+
+**Current state:** streamlit 1.44.0 is installed in the system Python 3.12 environment. The `requirements-311.txt` freeze records it at 1.44.0. It is NOT in `pyproject.toml` as an optional dependency.
+
+**Latest stable:** 1.54.0 (released 2026-02-04).
+
+**Breaking changes from 1.44 to 1.54:**
+- `st.experimental_get_query_params` and `st.experimental_set_query_params` removed (use `st.query_params`)
+- `st.experimental_user` removed (use `st.user`)
+- Widget identity now key-only (prevents unwanted state resets)
+
+None of these affect a new dashboard (no legacy experimental API to migrate). The upgrade is safe for a greenfield Streamlit app.
+
+**Add to pyproject.toml:**
 
 ```toml
 [project.optional-dependencies]
-docs = [
-  "mkdocs-material>=9.5",
-  "mkdocstrings[python]>=0.26",
-  "mike>=2.1",
+research = [
+  "streamlit>=1.44",        # Dashboard — upgrade to >=1.54.0 for latest fixes
+  "jupyterlab>=4.5",        # Notebook environment
 ]
 ```
 
-**Version sync (mkdocs.yml site_name vs pyproject.toml version):** The `mkdocs.yml` currently has `site_name: ta_lab2 v0.4.0` hardcoded. This will diverge from `pyproject.toml version = "0.5.0"`. The fix is a one-line script in CI (no new library):
+**Why Streamlit over alternatives:**
+- **Dash (Plotly):** More flexible but requires callbacks and React component knowledge. Streamlit's reactive model is faster to build research explorers.
+- **Panel:** Higher capability ceiling but more complex. Not needed for internal research tooling.
+- **Gradio:** ML demo-focused. Wrong audience (researchers, not demo consumers).
 
-```bash
-# In release CI step, before mkdocs build:
-VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
-sed -i "s/site_name: .*/site_name: ta_lab2 v${VERSION}/" mkdocs.yml
-```
+**Streamlit + Plotly integration:** plotly 6.4.0 is already installed. `st.plotly_chart()` renders plotly figures natively. The existing `viz/all_plots.py` uses matplotlib; Streamlit dashboards should use plotly for interactivity.
 
-`tomllib` is stdlib in Python 3.11+. No new dependency needed.
-
-### mkdocstrings
-
-**Current version in pyproject.toml:** `>=1.0` (unusual; mkdocstrings uses `0.x` versioning)
-
-The correct package is `mkdocstrings[python]`, with the handler pinned:
-
-```toml
-"mkdocstrings[python]>=0.26",
-```
-
-**What NOT to add for docs:**
-- **`mkdocs-mermaid2-plugin`**: The third-party plugin has dark mode conflicts and does not work alongside minify. Use native mkdocs-material mermaid support instead.
-- **`mkdocs-minify-plugin`**: Not needed for developer documentation; adds build complexity.
-- **Sphinx**: mkdocs-material is already established. Do not introduce a second doc system.
-- **`mkdocs-git-revision-date-plugin`**: Adds per-page last-modified dates from git history. Cosmetic enhancement; not needed for v0.8.0.
+**What NOT to add for Streamlit:**
+- **streamlit-aggrid:** AgGrid for advanced table display. Useful but adds a JS bundle dependency. Standard `st.dataframe()` is sufficient for MVP.
+- **streamlit-plotly-events:** For click-event callbacks on charts. Overkill for a research explorer.
+- **Redis / streamlit-caching backends:** The default in-memory cache is sufficient for a single-user research dashboard.
 
 ---
 
-## Area 4: Runbooks
+## Feature Area 7: Jupyter Notebooks
 
-### Stack verdict: No library additions — file-based only
+### Recommendation: ADD jupyterlab>=4.5 to research optional group
 
-Runbooks are operational documentation (Markdown files in `docs/`). They describe how to run the regime and backtest pipelines, what to do when a run fails, and how to interpret PASS/WARN/FAIL from stats tables.
+**Current state:** `jupyterlab_widgets 3.0.16` is installed (a component), but `jupyterlab` itself is not installed.
 
-**Format:** Standard Markdown in `docs/runbooks/`, surfaced via mkdocs nav. mermaid diagrams (enabled in Area 3) cover pipeline flow diagrams.
+**Latest stable:** JupyterLab 4.5.5 (released 2026-02-23, today). Notebook 7.5.3 (released 2026-01-26) is based on JupyterLab 4.5.
+
+**Python requirements:** >=3.9 — fully compatible with Python 3.12.
+
+**Installation:**
+```bash
+pip install jupyterlab>=4.5
+```
+
+JupyterLab 4.5 auto-installs `notebook>=7` as a dependency, providing the classic notebook interface too.
+
+**Supporting packages for polished demo notebooks:**
+
+| Package | Version | Purpose | Decision |
+|---------|---------|---------|---------|
+| jupyterlab | >=4.5.5 | Notebook IDE | ADD |
+| jupytext | >=1.16 | Sync .ipynb ↔ .py (git-friendly) | OPTIONAL (see note) |
+| nbconvert | >=7.0 | Convert notebooks to HTML/PDF for docs | OPTIONAL |
+
+**jupytext note:** For notebooks committed to git, `jupytext` converts `.ipynb` files to `.py` format (percent format or light format), making diffs readable and preventing large JSON blob commits. If notebooks will be version-controlled, add jupytext. If notebooks are scratch space only, skip.
 
 **What NOT to add:**
-- **Confluence / Notion integration**: External tools; not needed for a single-developer quant lab.
-- **Automated runbook generation**: The content must be written manually; no tool generates operational knowledge.
+- **papermill:** Parameterized notebook execution. Useful for CI-run notebooks but adds complexity. Not needed for a research demo milestone.
+- **nbformat:** Already a jupyterlab transitive dependency; do not pin separately.
+- **ipywidgets:** Interactive widgets for notebooks. `jupyterlab_widgets 3.0.16` is already installed as a transitive dependency. `ipywidgets` itself can be added if specific interactive widgets are needed in demos.
 
 ---
 
-## Area 5: Alembic Migrations
+## Dependency Conflict Assessment
 
-### Current state
+### numpy 2.4.1 vs vectorbt 0.28.1
 
-16 raw SQL files in `sql/migration/` with mixed naming:
-- 6 files numbered `016`–`021` (sequential)
-- 10 files with descriptive names, no numbering (applied out-of-band)
+vectorbt's `setup.py` specifies `numpy>=1.16.5` (no upper bound). The installed numpy 2.4.1 is higher than tested. The codebase's `MEMORY.md` documents that vectorbt 0.28.1 works in production on this machine. The vbt_runner.py and orchestrator.py are complete and functional.
 
-No Alembic framework exists. No `alembic.ini`. No `alembic/` directory. Database was built by running SQL files manually.
+**Risk:** numpy 2.x introduced breaking changes in some internal C APIs. vectorbt 0.28.1 was released in 2022 and was not tested against numpy 2.x at release time. However, since the existing backtests already work (MEMORY.md: "All 3 signal generators work"), this is not a blocker for v0.9.0.
 
-### Recommended stack
+**Mitigation:** Do not upgrade numpy. Pin `numpy<3.0` in pyproject.toml to prevent accidental major upgrade.
 
-**Alembic version:** **1.18.4** (latest stable, released 2026-02-10).
+### scipy 1.17.0 requirements
 
-Add to `pyproject.toml` dev optional-dependencies:
+scipy 1.17.0 (2026-01-10) requires `numpy>=1.26.4`. The installed numpy 2.4.1 satisfies this. No conflict.
+
+### scikit-learn 1.8.0
+
+scikit-learn 1.8.0 requires numpy, scipy. Both present at compatible versions. No conflict.
+
+### numba 0.64.0
+
+numba 0.64.0 in the Python 3.12 environment. This is compatible with numpy 2.x (numba >=0.61 added numpy 2.0 support). No conflict.
+
+**The .venv311 environment** has numba 0.57.1 with numpy 1.24.4. This is intentionally isolated and is not affected by the Python 3.12 environment changes.
+
+---
+
+## Complete pyproject.toml Changes for v0.9.0
 
 ```toml
-dev = [
-  ...existing dev deps...
-  "alembic>=1.15",
+[project.optional-dependencies]
+# NEW: Research & experimentation tooling
+research = [
+  "streamlit>=1.44",         # Dashboard (upgrade from 1.44.0 to latest stable >=1.54.0)
+  "jupyterlab>=4.5",         # Notebook environment
+  "jupytext>=1.16",          # Git-friendly notebook format (optional but recommended)
+]
+
+# UPDATED: Existing viz group — add seaborn if IC heatmaps needed in notebooks
+viz = [
+  "matplotlib>=3.6",
+  "seaborn>=0.13",           # ADD if notebooks need heatmap-style IC plots
 ]
 ```
 
-### Integration strategy: wrap-then-stamp
+**Core dependencies: NO CHANGES.**
 
-The correct approach for an existing database with raw SQL history is **not** to regenerate migrations from schema reflection (autogenerate), but to **wrap the existing SQL files in Alembic revision scripts** and then stamp the current production database as at `head`. This preserves the SQL logic exactly while establishing migration history tracking.
-
-**Step-by-step approach:**
-
-1. `alembic init alembic` — creates `alembic/` directory with `env.py` and `alembic.ini`
-2. Configure `env.py` to use `TARGET_DB_URL` environment variable (consistent with existing stack pattern)
-3. Create one Alembic revision per numbered SQL file (016–021), each containing `op.execute(Path("sql/migration/NNN_...sql").read_text(encoding="utf-8"))`
-4. Create one "omnibus" revision for the 10 unnumbered files, applied in the order they were actually run (reconstruct from git history / commit dates)
-5. `alembic stamp head` against production — tells Alembic the DB is already at the latest revision without running any SQL
-6. Future schema changes use `alembic revision --autogenerate` or manual revision files
-
-**Critical Windows note from project MEMORY:** SQL files contain UTF-8 box-drawing characters (═══) in comments. Always use `encoding='utf-8'` when reading them in Python. The `op.execute()` call must read the file with explicit encoding:
-
-```python
-# In alembic revision script
-from pathlib import Path
-from alembic import op
-
-def upgrade():
-    sql = Path(__file__).parent.parent.parent / "sql" / "migration" / "016_dim_timeframe_partial_bounds_and_calendar_families.sql"
-    op.execute(sql.read_text(encoding="utf-8"))
-
-def downgrade():
-    pass  # Irreversible DDL — downgrade is a no-op or manual
-```
-
-**env.py database URL pattern (consistent with existing code):**
-
-```python
-import os
-from sqlalchemy import engine_from_config, pool
-
-config = context.config
-
-def run_migrations_online():
-    db_url = os.environ.get("TARGET_DB_URL") or config.get_main_option("sqlalchemy.url")
-    connectable = create_engine(db_url, poolclass=pool.NullPool)
-    ...
-```
-
-`NullPool` is already the pattern used in multiprocessing workers in this codebase — use it in Alembic `env.py` too.
-
-### What NOT to add for migrations
-
-- **Flask-Alembic**: This project has no Flask. Plain `alembic` is correct.
-- **`alembic-utils`**: Extends Alembic with PostgreSQL-specific objects (functions, views, triggers). Not needed for this milestone's scope of wrapping existing ALTER TABLE / CREATE INDEX SQL.
-- **`alembic-postgresql-enum`**: Only needed when using SQLAlchemy Enum types. Not applicable here.
-- **Autogenerate from MetaData**: The codebase does not maintain SQLAlchemy `Table()` metadata objects for all 24+ tables. Autogenerate requires accurate MetaData. Wrapping raw SQL is safer for this codebase's current shape.
-- **Liquibase / Flyway**: Java-based tools. Python ecosystem, no reason to introduce JVM dependency.
-
----
-
-## Complete Recommended Changes to pyproject.toml
-
-```toml
-# --- dev deps additions ---
-dev = [
-  "pytest>=8.0",
-  "pytest-asyncio>=0.21.0",
-  "pytest-mock>=3.12.0",
-  "pytest-benchmark",
-  "pytest-cov>=4.0.0",
-  "pytest-json-report>=1.5.0",
-  "hypothesis",
-  "ruff>=0.9.0",          # CHANGED: was >=0.1.5
-  "mypy>=1.14",           # CHANGED: was >=1.8; adds per-module overrides
-  "pandas-stubs>=2.2",    # NEW: type stubs for pandas (no SQLAlchemy stubs needed)
-  "import-linter>=2.7",
-  "alembic>=1.15",        # NEW: migration framework
-]
-
-# --- docs deps update ---
-docs = [
-  "mkdocs-material>=9.5",        # CHANGED: was >=9.0
-  "mkdocstrings[python]>=0.26",  # FIXED: was >=1.0 (wrong versioning)
-  "mike>=2.1",                   # NEW: was implied but not pinned
-]
-
-# --- new [tool.mypy] section ---
-[tool.mypy]
-python_version = "3.12"
-strict = true
-ignore_missing_imports = true
-exclude = [
-    "src/ta_lab2/scripts/",
-    "tests/",
-]
-
-[[tool.mypy.overrides]]
-module = ["vectorbt.*", "psycopg2.*", "requests.*", "hypothesis.*"]
-ignore_missing_imports = true
-ignore_errors = true
-
-# --- ruff lint update ---
-[tool.ruff]
-line-length = 100
-
-[tool.ruff.lint]
-select = ["E", "F", "W", "I", "N", "UP", "ANN"]
-ignore = ["E402", "ANN101", "ANN102"]
-
-[tool.ruff.lint.per-file-ignores]
-"tests/*" = ["F841", "ANN"]
-"src/ta_lab2/scripts/*" = ["ANN"]
-```
-
----
-
-## Complete Recommended Changes to .pre-commit-config.yaml
-
-Update `ruff-pre-commit` from `v0.1.14` to current:
-
-```yaml
-- repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.9.0   # CHANGED from v0.1.14
-  hooks:
-    - id: ruff
-      name: ruff lint
-      args: [--fix, --exit-non-zero-on-fix]
-      types_or: [python, pyi]
-      exclude: '^\.archive/'
-    - id: ruff-format
-      name: ruff format
-      types_or: [python, pyi]
-      exclude: '^\.archive/'
-```
-
----
-
-## Complete Recommended Changes to ci.yml lint job
-
-```yaml
-lint:
-  runs-on: ubuntu-latest
-  steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.12"
-
-    - name: Install tools
-      run: |
-        python -m pip install --upgrade pip
-        pip install "ruff>=0.9.0" "mypy>=1.14" "pandas-stubs>=2.2"
-
-    - name: Ruff lint (blocking)
-      run: ruff check src --output-format=github
-
-    - name: Ruff format check (blocking)
-      run: ruff format --check src
-
-    - name: mypy type check (library layer — warning only)
-      run: |
-        mypy src/ta_lab2/features/ src/ta_lab2/regimes/ \
-             src/ta_lab2/signals/ src/ta_lab2/tools/ \
-             src/ta_lab2/notifications/
-      continue-on-error: true
-```
+The `pyproject.toml` core `dependencies` block does not need modification. scipy, numpy, scikit-learn, plotly are already installed in the environment. They should not be pinned in core deps unless they are direct imports in the library layer (they currently are not — they're used by scripts and analysis modules).
 
 ---
 
@@ -454,56 +358,89 @@ lint:
 
 | Do Not Add | Why |
 |------------|-----|
-| Jinja2 | f-strings sufficient for Telegram HTML digest |
-| APScheduler / Celery | External cron is the existing pattern; in-process scheduler adds daemon complexity |
-| mkdocs-mermaid2-plugin | Conflicts with dark mode; native mkdocs-material mermaid is superior |
-| sqlalchemy-stubs / sqlalchemy2-stubs | Deprecated; SQLAlchemy 2.0 is natively PEP-484 compliant |
-| data-science-types | Unmaintained since 2021 |
-| Flask-Alembic | No Flask in project |
-| alembic-utils | PostgreSQL-specific extensions; not needed for ALTER TABLE wrappers |
-| Liquibase / Flyway | JVM tools, incompatible ecosystem |
-| Black | Replaced by ruff format; already in stack |
-| bandit | Security linting; out of scope for this milestone |
+| TA-Lib | Requires C binary install on Windows (`C:\ta-lib`); KAMA/DEMA/TEMA/HMA are 30 lines each in numpy |
+| pandas-ta 0.4.71b0 | Beta only; requires Python >=3.12 AND numba >=0.60; incompatible with .venv311; 4 indicators not worth beta dep |
+| mlfinlab | Effectively discontinued on PyPI; moved to paid private tier |
+| quantstats | Adds yfinance/requests overhead; conflicts with existing metrics.py API contract |
+| skfolio | CombinatorialPurgedCV is one class; brings cvxpy-base + clarabel solver as hard deps |
+| timeseriescv | PyPI version 0.2 is inactive; no new releases |
+| alphalens-reloaded | Requires seaborn + statsmodels; IC math is 80 lines in scipy; plot style conflicts with existing viz |
+| MLflow | Overkill for feature lifecycle in a single-developer lab; adds server process or file backend |
+| DVC | Dataset versioning via git; mismatched with PostgreSQL-backed feature store |
+| Feast | Enterprise feature serving (online/offline stores); far beyond current scale |
+| papermill | Parameterized notebook execution; not needed for research demo milestone |
+| Weights & Biases | SaaS external service dependency; self-contained codebase policy |
+| Panel / Dash | More complex than Streamlit; not needed for internal research explorer |
+| pypbo | PSR math is 15 lines; not worth a library dependency |
 
 ---
 
-## Version Summary Table
+## Complete New Packages Summary
 
-| Package | Current in pyproject.toml | Recommended | Latest Stable | Source |
-|---------|--------------------------|-------------|--------------|--------|
-| ruff | >=0.1.5 | >=0.9.0 | 0.15.2 (2026-02-19) | PyPI verified |
-| mypy | >=1.8 | >=1.14 | 1.19.1 (2025-12-15) | PyPI verified |
-| pandas-stubs | not present | >=2.2 | 3.0.0.260204 (2026-02-04)* | PyPI verified |
-| alembic | not present | >=1.15 | 1.18.4 (2026-02-10) | PyPI verified |
-| mkdocs-material | >=9.0 | >=9.5 | 9.7.2 (2026-02-18) | PyPI verified |
-| mike | not pinned | >=2.1 | 2.1.3 (2024-08-13) | PyPI verified |
-| mkdocstrings[python] | >=1.0 (wrong) | >=0.26 | ~0.27 | PyPI |
-| ruff-pre-commit | v0.1.14 | v0.9.0+ | v0.15.2 | GitHub verified |
+| Package | Recommended Version | Purpose | New or Already Installed |
+|---------|---------------------|---------|--------------------------|
+| streamlit | >=1.44 (upgrade to 1.54.0) | Research dashboard | ALREADY INSTALLED (1.44.0) — upgrade |
+| jupyterlab | >=4.5.5 | Notebook environment | NEW |
+| jupytext | >=1.16 | Git-friendly .ipynb format | NEW (optional) |
+| seaborn | >=0.13.2 | Heatmap plots in notebooks | NEW (optional, only if needed) |
 
-*pandas-stubs 3.0.x targets pandas 3.0 (not yet fully supported). Use `>=2.2` to stay on pandas 2.x stubs which are more complete. Pip will resolve to a compatible version.
+**scipy, numpy, scikit-learn, plotly:** Already installed at compatible versions. No installation needed. PSR, IC, Spearman, and PurgedKFold implementations use these directly.
+
+**KAMA, DEMA, TEMA, HMA:** Implemented in-house with numpy. Zero new dependencies.
+
+---
+
+## Installation Commands
+
+```bash
+# Minimum required for v0.9.0 features
+pip install "jupyterlab>=4.5"
+
+# Upgrade Streamlit (already installed, bump to latest)
+pip install "streamlit>=1.54.0"
+
+# Optional: git-friendly notebooks
+pip install "jupytext>=1.16"
+
+# Optional: seaborn for IC heatmaps in notebooks
+pip install "seaborn>=0.13.2"
+```
+
+**No pyproject.toml core dep changes required.** Add `research` optional group to pyproject.toml for documentation purposes.
 
 ---
 
 ## Sources
 
-### High Confidence (PyPI / Official Docs — verified February 2026)
-- [alembic PyPI](https://pypi.org/project/alembic/) — version 1.18.4 confirmed
-- [mypy PyPI](https://pypi.org/project/mypy/) — version 1.19.1 confirmed
-- [ruff PyPI](https://pypi.org/project/ruff/) — version 0.15.2 confirmed
-- [mkdocs-material PyPI](https://pypi.org/project/mkdocs-material/) — version 9.7.2 confirmed
-- [mike PyPI](https://pypi.org/project/mike/) — version 2.1.3 confirmed
-- [pandas-stubs PyPI](https://pypi.org/project/pandas-stubs/) — version 3.0.0.260204 confirmed
-- [Alembic tutorial — stamp & op.execute](https://alembic.sqlalchemy.org/en/latest/tutorial.html)
-- [Material for MkDocs — native mermaid diagrams](https://squidfunk.github.io/mkdocs-material/reference/diagrams/)
-- [mypy config file reference](https://mypy.readthedocs.io/en/stable/config_file.html)
-- [SQLAlchemy 2.0 mypy support](https://docs.sqlalchemy.org/en/20/orm/extensions/mypy.html) — confirms no stubs needed for SA 2.0
+### HIGH Confidence (PyPI / Official Docs — verified February 2026)
 
-### Medium Confidence (Community / Official Blog)
-- [Alembic best practices — wrap existing SQL](https://medium.com/@pavel.loginov.dev/best-practices-for-alembic-and-sqlalchemy-73e4c8a6c205)
-- [ruff GitHub Actions integration](https://docs.astral.sh/ruff/integrations/) — blocking CI pattern
-- [mkdocs-material versioning with mike](https://squidfunk.github.io/mkdocs-material/setup/setting-up-versioning/)
+- [streamlit PyPI](https://pypi.org/project/streamlit/) — version 1.54.0 confirmed
+- [Streamlit 2026 release notes](https://docs.streamlit.io/develop/quick-reference/release-notes/2026) — breaking changes verified
+- [jupyterlab PyPI](https://pypi.org/project/jupyterlab/) — version 4.5.5 confirmed (2026-02-23)
+- [scikit-learn PyPI](https://pypi.org/project/scikit-learn/) — version 1.8.0 (2025-12-10) confirmed
+- [scipy PyPI / Release Notes](https://docs.scipy.org/doc/scipy/release.html) — version 1.17.0 (2026-01-10), requires numpy>=1.26.4
+- [seaborn PyPI](https://pypi.org/project/seaborn/) — version 0.13.2 (2024-01-25) confirmed; no 0.14 released
+- [statsmodels PyPI](https://pypi.org/project/statsmodels/) — version 0.14.6 (2025-12-05) confirmed
+- [alphalens-reloaded PyPI](https://pypi.org/project/alphalens-reloaded/) — version 0.4.6 (2025-06-02), Production/Stable
+- [skfolio PyPI](https://pypi.org/project/skfolio/) — version 0.15.5 (2026-02-10), sklearn-compatible
+- [TA-Lib PyPI](https://pypi.org/project/TA-Lib/) — version 0.6.8 (2025-10-20); C binary required on Windows
+- [TA-Lib install docs](https://ta-lib.github.io/ta-lib-python/install.html) — Windows C binary requirement confirmed
+- [pandas-ta PyPI](https://pypi.org/project/pandas-ta/) — version 0.4.71b0 (2025-09-14); beta only; requires Python>=3.12 + numba>=0.60
+- [numba 0.57.1 PyPI](https://pypi.org/project/numba/0.57.1/) — Python 3.8-3.11 only
+- [scikit-learn TimeSeriesSplit docs](https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.TimeSeriesSplit.html) — gap parameter confirmed
+- [timeseriescv Snyk health](https://snyk.io/advisor/python/timeseriescv) — inactive status confirmed
+- [rubenbriones/Probabilistic-Sharpe-Ratio](https://github.com/rubenbriones/Probabilistic-Sharpe-Ratio/blob/master/src/sharpe_ratio_stats.py) — PSR formula uses scipy.stats.norm.cdf, skew, kurtosis
+- Local `pip show` commands — confirmed installed versions for scipy 1.17.0, scikit-learn 1.8.0, numpy 2.4.1, plotly 6.4.0, arch 7.2.0, numba 0.64.0, streamlit 1.44.0
+
+### MEDIUM Confidence (WebSearch verified with official source)
+
+- [pandas-ta installation docs](https://www.pandas-ta.dev/getting-started/installation/) — numba >=0.60.0 requirement confirmed
+- [mlfinlab GitHub](https://github.com/hudson-and-thames/mlfinlab) — discontinued PyPI releases, moved to paid tier (multiple sources agree)
+- [skfolio model selection docs](https://skfolio.org/user_guide/model_selection.html) — CombinatorialPurgedCV sklearn compatibility confirmed
+- [KAMA algorithm — Perry Kaufman](https://chartschool.stockcharts.com/table-of-contents/technical-indicators-and-overlays/technical-overlays/kaufmans-adaptive-moving-average) — algorithm formula verified
+- [HMA formula](https://medium.com/@basics.machinelearning/hull-moving-average-hma-using-python-48262e18d0fb) — WMA(2*WMA(n/2)-WMA(n), sqrt(n)) confirmed
 
 ---
 
-*Stack research for: v0.8.0 Polish & Hardening*
-*Researched: 2026-02-22*
+*Stack research for: v0.9.0 Research & Experimentation*
+*Researched: 2026-02-23*

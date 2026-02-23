@@ -1,320 +1,486 @@
-# Feature Landscape: v0.8.0 Polish & Hardening
+# Feature Landscape: v0.9.0 Research & Experimentation
 
-**Domain:** Python quant/data platform hardening
-**Researched:** 2026-02-22
-**Scope:** 5 hardening areas on existing infrastructure
+**Domain:** Quantitative research platform — feature evaluation, advanced indicators, CV, backtesting statistics, visualization
+**Researched:** 2026-02-23
+**Scope:** 7 feature areas added to existing quant platform infrastructure
 
 ---
 
 ## Context: What Already Exists
 
-This milestone hardens existing infrastructure, not builds new features. All 5 areas have partial
-implementations already in place. Understanding what exists shapes what "table stakes" means here —
-the bar is "what must be true of a mature platform in each area", measured against what already exists.
+This milestone adds research and experimentation capabilities to an existing platform.
+The bar for "table stakes" is measured against what mature quant research platforms provide
+for each feature area, adjusted for what this codebase already has.
 
-| Area | Already Built | Gap |
-|------|--------------|-----|
-| Stats/QA | 5 stats runners + 17 audit scripts + orchestrator | Runners not wired to refresh pipeline; no gate pattern |
-| mypy | Listed as dev dep, no config, not in CI | Config file, CI job, per-module strategy |
-| Documentation | mkdocs-material site, 2 mermaid diagrams, 2 runbooks | Stale version (v0.4.0 in mkdocs.yml vs v0.7.0 actual), no pipeline flow diagram, runbooks missing incident sections |
-| Runbooks | DAILY_REFRESH.md + STATE_MANAGEMENT.md | No SLA section, no incident escalation, no on-call contact, no rollback procedures |
-| Alembic | 16 raw SQL files in sql/migration/ (no framework) | No Alembic init, no version tracking, no stamp of current state |
-
----
-
-## Area 1: Stats/QA Integration
-
-### Table Stakes
-
-Features a mature Python data platform always has in this area.
-
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| Stats runners emit non-zero exit codes on FAIL | Without this, failures are invisible to orchestration | Low | Currently runners log FAIL rows but exit 0 |
-| Post-refresh QA gate (blocking) | Critical issues must stop downstream; stale data worse than no data | Medium | Add gate call after each refresh step in run_daily_refresh.py |
-| Stats stored in DB with PASS/WARN/FAIL severity | Enables querying history, trending, dashboards | Low | Already implemented in price_bars_multi_tf_stats schema |
-| Incremental stats (watermark pattern) | Full re-check on every refresh is too slow at scale | Medium | Already implemented in bars stats runner; pattern established |
-| Global audit orchestrator with exit code | run_all_audits.py must return non-zero if any audit fails | Low | Orchestrator exists; exit code logic needs verification |
-| Stats coverage for all major tables | All 4 table families (bars, EMA, returns, features) need coverage | Medium | Bars + features done; EMA and returns stats runners may be incomplete |
-
-### Differentiators
-
-Features beyond basics that mature quant platforms add.
-
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| WARN-only gate (non-blocking) | Allows pipeline to continue while surfacing minor issues via Telegram | Low | Separate FAIL threshold vs WARN threshold at gate check |
-| Stats trend view (PASS rate over time) | Shows data quality trajectory, detects slow degradation | Medium | SQL view over existing stats tables; no new infrastructure |
-| Freshness SLA check in stats | Automated staleness check embedded in stats (not just runbook) | Low | Already done in bar stats (max_ts_lag_vs_price test) |
-| Per-asset FAIL counts in summary | Pinpoint which assets are consistently problematic | Low | Aggregation query over existing stats tables |
-| Stats runner wired into run_all_feature_refreshes | Feature refresh also has QA gate, not just bar/EMA | Medium | Mirror pattern from run_daily_refresh |
-
-### Anti-Features
-
-Things to deliberately NOT build.
-
-| Anti-Feature | Why Avoid | What to Do Instead |
-|--------------|-----------|-------------------|
-| Full stats recompute on every run | At 2.1M rows, this becomes multi-minute blocking step | Use existing incremental watermark pattern; gate only checks latest batch |
-| Stats as a separate scheduled job | Defeats the purpose of gating — QA must run before downstream proceeds | Wire QA gate inline with refresh, not as cron afterthought |
-| Blocking on WARN | WARN = tolerable anomaly; blocking on WARN kills operational velocity | Block only on FAIL; alert on WARN via Telegram |
-| Custom assertion DSL | Reinventing Great Expectations in this codebase | Use existing PASS/WARN/FAIL SQL pattern already established |
-| Replacing audit scripts with stats runners | Both serve different purposes: audits are ad-hoc exploratory, stats are incremental operational | Keep both; wire stats runners into pipeline, audits remain manual |
-
-### Feature Dependencies
-
-```
-Stats runners (already exist)
-  -> Gate check function reads latest stats for batch
-  -> Gate called from run_daily_refresh after each major step
-  -> Gate called from run_all_feature_refreshes after feature refresh
-
-Telegram alerting (already exists)
-  -> Gate sends WARN-level alert on WARN rows
-  -> Gate raises exception / non-zero exit on FAIL rows
-```
+| Area | Already Built | Gap for v0.9.0 |
+|------|--------------|----------------|
+| Adaptive MAs | EMA multi-TF (9/10/21/50/200), 6 alignment variants, _u sync, z-scores | KAMA, DEMA, TEMA, HMA — same full pipeline treatment |
+| IC Evaluation | Pearson correlation, logistic regression weights, feature_target_correlations() | Spearman IC, IC decay, IC by regime, turnover/stability |
+| PSR | Sigmoid stub: `1 / (1 + exp(-sharpe))` — not the real formula | Full Lopez de Prado formula with skewness/kurtosis/n; DSR for multiple testing |
+| Purged CV | expanding_walk_forward() + fixed_date_splits() — no embargo, no purging | Embargo gap, purging overlapping labels, CPCV optional |
+| Feature Experimentation | Design notes in feature_experimentation.md (not built) | Config-driven registry, lifecycle states, A/B comparison |
+| Dashboard | None | Streamlit: research explorer + pipeline monitor (two modes) |
+| Notebooks | None | End-to-end demos polished enough to share |
 
 ---
 
-## Area 2: mypy Strict Adoption
+## Feature Area 1: Adaptive Moving Averages (KAMA, DEMA, TEMA, HMA)
 
 ### Table Stakes
 
+Features users expect when adding adaptive MAs to an existing multi-TF platform.
+Missing any of these means the new MAs are second-class citizens relative to existing EMAs.
+
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| mypy config in pyproject.toml | Without config, mypy behavior is inconsistent across devs | Low | [tool.mypy] section; currently absent |
-| mypy in CI (non-blocking initially) | Prevents regression of typed modules; catch new errors | Low | Add mypy job to ci.yml with continue-on-error: true initially |
-| check_untyped_defs = true (global) | Checks bodies of untyped functions; catches runtime bugs even without annotations | Low | Most important flag for partial codebases |
-| Per-module overrides for legacy files | Global strict breaks everything; overrides let you ratchet gradually | Low | [mypy-ta_lab2.scripts.*] sections with ignore_errors = True |
-| ignore_missing_imports for third-party stubs | vectorbt, sqlalchemy, pandas all have stubs; others don't — must configure | Low | Prevents noise from missing type stubs |
-| Pinned mypy version in dev deps | mypy errors change between versions; unpinned = non-reproducible CI | Low | Already listed as mypy>=1.8; pin to exact version |
+| Correct formula for each MA type | KAMA requires Efficiency Ratio; DEMA = 2*EMA - EMA(EMA); TEMA = 3*EMA - 3*EMA(EMA) + EMA(EMA(EMA)); HMA uses WMA(2*WMA(n/2) - WMA(n)) | Medium | DEMA/TEMA are compositional; KAMA needs price direction parameter |
+| Multi-TF persistence (id, ts, tf, period) PK | Existing EMA tables use this PK; adaptive MAs must match | Medium | Same DDL pattern as cmc_ema_multi_tf; new tables needed |
+| _u sync for each new MA family | Unified tables are how signals read data; if no _u, signal generators can't use them | Medium | Mirror sync_cmc_ema_multi_tf_u.py pattern for each new MA |
+| Min-obs guard per TF | EMA guards: `period * min_obs_multiplier`; KAMA needs same (KAMA converges slowly — needs more warmup) | Low | KAMA is more sensitive to warmup than standard EMA |
+| Derivative columns (d1, d2, d1_roll, d2_roll) | Existing EMA tables expose these; signal generators use crossovers between d1 values | Medium | Same ema_operations.py pattern applies |
+| Z-scores on returns (_zscore_30, _zscore_90, _zscore_365) | Returns tables for EMAs have z-scores; new MA returns need same treatment | Medium | refresh_returns_zscore.py pattern already established |
 
 ### Differentiators
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| Strict mode on new-code modules (features/, time/) | Higher-value modules get immediate type safety | Medium | Enable disallow_untyped_defs = True per module selectively |
-| type: ignore[code] policy (no bare ignores) | Forces precision; prevents ignoring unknown future errors | Low | Add ruff rule or mypy flag to warn on bare type: ignore |
-| mypy CI job becomes blocking (future milestone) | Once error count < threshold, flip continue-on-error: false | Low | Set threshold; document the ratchet plan |
-| Typed protocols for core abstractions | Signal generators, feature refreshers, stats runners have common shapes | High | Retroactively annotating scripts is low value; protocols for new code only |
-| MonkeyType for auto-annotation of hot paths | Automated stub generation for highest-traffic legacy modules | High | Research tool; deferred to future milestone |
+| Efficiency Ratio (ER) as standalone column in KAMA table | ER itself is a useful volatility/trending signal; exposing it separately enables IC analysis | Low | Store ER alongside KAMA value during computation |
+| KAMA-specific parameters (fast/slow smoothing constants) | Allows tuning responsiveness; default is Perry Kaufman's 2/30 but alternatives exist | Low | Expose as config; don't hardcode |
+| Signal generator support (KAMA crossover strategy) | KAMA-based crossover as 4th signal generator | High | Separate effort; do not block MA pipeline on this |
+| Cross-MA comparison viz (EMA vs KAMA on same chart) | Research utility: shows where adaptive MA diverges from EMA | Medium | Useful in Streamlit explorer; not needed in DB |
 
 ### Anti-Features
 
 | Anti-Feature | Why Avoid | What to Do Instead |
 |--------------|-----------|-------------------|
-| --strict globally on day one | Will produce hundreds of errors on a codebase this size; CI unusable | Start with check_untyped_defs only; ratchet per module |
-| Annotating sql/migration scripts and scripts/baseline | These are one-shot migration files; not worth annotating | Exclude from mypy via per-module ignore_errors = True |
-| Ignoring mypy output entirely (current state) | mypy listed as dep but never run = false confidence | Must at minimum run and report; blocking comes later |
-| Retrofitting type annotations to all 80+ .py files in one PR | Unreviewable PR; will introduce bugs | Annotate incrementally by module, highest-import modules first |
-| Using pyright instead of mypy | Pyright is not in existing toolchain; switching adds complexity | Continue with mypy; it is already in pyproject.toml |
+| KAMA computed without warmup period | KAMA value is garbage for the first `period` bars; presenting it misleads IC analysis | Always enforce min_obs guard; write NULLs for warmup bars |
+| All 4 MAs in a single table | Makes DDL and queries ambiguous; which MA type is this row? | Separate tables per MA type (cmc_kama_multi_tf, etc.) — same as existing EMA family pattern |
+| Calendar alignment variants before core works | Adding 5 alignment variants (multi_tf, cal_us, cal_asia, etc.) before validating core MA computation | Build multi_tf first, validate IC, then add calendar variants if research shows value |
+| HMA computed as pure EMA of EMA | HMA requires WMA, not EMA; the lag elimination property is lost if substituted | Implement proper WMA; numpy vectorized implementation exists and is not hard |
 
 ### Feature Dependencies
 
 ```
-[tool.mypy] in pyproject.toml (new)
-  -> Per-module overrides in same file
-  -> CI job in ci.yml calls: mypy src/ta_lab2 --config-file pyproject.toml
-  -> Pre-commit hook optional (adds latency; evaluate against <5s target)
+Existing EMA pipeline
+  -> New MA tables (DDL: same (id, ts, tf, period) PK pattern)
+  -> New MA feature classes (BaseEMAFeature subclasses)
+  -> New MA refresher scripts
+  -> _u sync scripts (one per MA family)
+  -> Returns tables (cmc_kama_returns_multi_tf etc.)
+  -> Z-score refresh coverage in refresh_returns_zscore.py
+
+Signal pipeline (optional, defer)
+  -> KAMA crossover signal generator
+  -> Uses cmc_kama_multi_tf_u via LEFT JOIN (same as EMA signal pattern)
 ```
-
-### Module Priority for Annotation
-
-Based on codebase structure, annotation priority order:
-
-1. `ta_lab2/features/` — widely imported by scripts; high leverage
-2. `ta_lab2/time/` — dim_timeframe.py is critical shared utility
-3. `ta_lab2/scripts/bars/stats/` — new stats runner code; annotate as written
-4. `ta_lab2/scripts/run_daily_refresh.py` — orchestrator; high visibility
-5. Everything else — covered by check_untyped_defs passively
 
 ---
 
-## Area 3: Documentation Freshness
+## Feature Area 2: Information Coefficient (IC) Evaluation
+
+IC is the Spearman rank correlation between a feature's value and the forward return of the asset
+over a given horizon. It is the standard tool for measuring predictive signal quality in quant research.
+IC = 0 means no predictive power. IC > 0.05 sustained over time is meaningful. IC > 0.10 is strong.
 
 ### Table Stakes
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| mkdocs.yml version matches actual project version | mkdocs.yml says v0.4.0; pyproject.toml says v0.5.0; actual is v0.7.0 | Low | Single-line fix; represents systematic staleness |
-| CHANGELOG.md exists and is current | Standard Python project expectation; documents what changed per version | Medium | File exists in nav but needs v0.5/0.6/0.7 entries |
-| Pipeline flow diagram (Mermaid) | DAILY_REFRESH.md describes execution order in prose; diagram makes it scannable | Medium | bars -> EMAs -> regimes -> features flow; component boxes with arrows |
-| mkdocstrings auto-generation for public APIs | Plugin installed but underutilized; public classes should have docstring-based API docs | Medium | Requires Google-style docstrings on key classes |
-| Nav in mkdocs.yml reflects current docs/ structure | Current nav references files that may not exist or are stale | Low | Audit nav entries vs actual files |
+| Spearman (rank) IC, not Pearson | Pearson IC is sensitive to return outliers; Spearman is the industry standard for this metric | Low | `scipy.stats.spearmanr` or `pandas.Series.rank` + correlation; NOT the existing Pearson in feature_eval.py |
+| IC computed per feature, per forward-return horizon | Standard horizons: 1D, 5D, 20D — measures decay rate. IC at 1D high but 20D near zero = short-lived signal | Medium | Vectorized across horizons; future_return() already exists |
+| Rolling IC (time series of IC values) | Single-number IC is misleading; rolling shows stability, regime-dependence, and whether IC is degrading | Medium | Rolling window: typically 63 bars (1 quarter) |
+| Mean IC and IC-IR (mean / std of IC) | IC-IR = Information Ratio for features; IC-IR > 0.5 is the benchmark for a signal worth keeping | Low | Compute from rolling IC series |
+| IC decay table (IC vs horizon) | Shows how quickly the signal's predictive power decays — critical for setting holding period | Medium | Run IC for horizons [1, 2, 3, 5, 10, 20, 60] bars |
 
 ### Differentiators
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| Mike-based versioned docs (v0.8.0 alias) | latest always points to current; old versions archived | Medium | mike is already configured as provider in mkdocs.yml extra.version |
-| Architecture decision records (ADRs) | Documents WHY key decisions were made; avoids re-litigating the past | Medium | Lightweight ADR format; one per major design decision |
-| Automated CHANGELOG from release-please | .github/release-please-config.json exists; wire to auto-generate CHANGELOG entries | Medium | release-please already configured; may already be generating CHANGELOG |
-| Per-phase pipeline diagram | Each refresh sub-pipeline (bars, EMAs, regimes, features) as separate diagram | Medium | More granular than single flow diagram |
+| IC by regime | Splits IC computation by regime label (trend_state, vol_state) — answers "does this signal work in all regimes or only trending markets?" | Medium | Existing regime labels in cmc_regimes available; group IC by regime |
+| Feature turnover / rank autocorrelation | High IC but 100% daily rank turnover = not tradable; rank autocorrelation measures signal stability | Medium | `factor_rank_autocorrelation()` in alphalens pattern; period-over-period rank correlation |
+| Feature redundancy detection | IC of feature A vs feature B: if both high IC but correlated, one is redundant | Low | Existing redundancy_report() covers this; extend to use rank correlation instead of Pearson |
+| IC significance test (t-test on rolling IC) | `t = mean_IC * sqrt(T) / std_IC`; flags whether IC is statistically non-zero | Low | Standard formula; adds t-stat and p-value to IC summary output |
+| Quantile returns analysis | Divide assets into quintiles by feature value; top quintile should outperform bottom — visualize spread | High | Requires cross-asset universe; current platform is single-asset-series-focused, not cross-sectional |
 
 ### Anti-Features
 
 | Anti-Feature | Why Avoid | What to Do Instead |
 |--------------|-----------|-------------------|
-| Manually maintaining API reference docs | API docs go stale immediately on any code change | Use mkdocstrings auto-generation from docstrings |
-| Documenting every internal private function | Creates noise and maintenance burden | Document public interfaces and entry points only |
-| PDF export or multiple output formats | Adds complexity; mkdocs HTML is sufficient for this project | Keep single HTML target |
-| Separate docs repo | Docs-as-code lives in same repo; keeps docs and code in sync | Keep docs/ in same repo |
-| Requiring docs update before every commit | Too heavy for frequent data pipeline commits | Gate docs update on version bump / milestone completion |
+| Using Pearson IC as primary metric | Pearson IC inflates for features correlated with return magnitude not direction; Spearman is the standard | Replace feature_eval.py's `corr()` with spearmanr for IC calculation |
+| Computing IC without lag alignment | Feature at time t correlated with return at time t is look-ahead; must use future_return() shifting | Always use `close.shift(-horizon) / close - 1` (already in feature_eval.py); verify no leakage |
+| Single IC value across entire history | Hides the fact that IC may be driven by a single regime or crash event | Always report rolling IC alongside mean IC |
+| Quantile analysis cross-asset before platform supports it | Platform is time-series-per-asset, not cross-sectional; quantile analysis requires ranking across assets simultaneously | Defer quantile analysis; focus on IC time series per feature per asset |
 
 ### Feature Dependencies
 
 ```
-mkdocs.yml version fix (prerequisite for all)
-  -> Pipeline flow diagram (Mermaid in docs/operations/)
-  -> CHANGELOG.md update with v0.5 through v0.7 entries
-  -> Nav audit (verify all referenced files exist)
-  -> mkdocstrings docstrings on public classes
+cmc_features (112 columns, already exists)
+  -> IC computation against future returns from cmc_returns_bars_multi_tf_u
+  -> Requires forward-looking join (feature at t, return at t+horizon)
+  -> WARNING: join must preserve look-ahead-free alignment
 
-release-please-config.json (existing)
-  -> May already generate CHANGELOG; audit first before building
+cmc_regimes (already exists)
+  -> IC by regime: join features with regime labels on (id, ts)
+  -> Group IC by regime label before computing Spearman correlation
+
+Existing feature_eval.py
+  -> Add spearman_ic(), rolling_ic(), ic_decay_table(), ic_by_regime()
+  -> Keep existing Pearson corr functions for redundancy detection use case
 ```
 
 ---
 
-## Area 4: Operational Runbooks
+## Feature Area 3: Probabilistic Sharpe Ratio (PSR) and Deflated Sharpe Ratio (DSR)
 
-### Table Stakes
+PSR answers: "Given the sample Sharpe I observed, what is the probability the true Sharpe exceeds
+a benchmark?" This accounts for sample length, non-normality, skewness, and kurtosis — all of which
+cause the sample Sharpe to be an optimistic estimate.
 
-Mature data pipeline runbooks always include these sections.
-
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| SLA definition section | How fresh is acceptable? must be written down; ops makes judgment calls without it | Low | Define: bars < 48h stale; features < 72h; EMAs < 48h |
-| Incident severity classification | Not all failures are equal; ops needs a triage framework | Low | P1: data corruption / P2: staleness > SLA / P3: partial failure |
-| Escalation contacts / on-call section | Who to call for what; runbooks are useless during incident if this is missing | Low | Even if single-person team: define escalation path for self |
-| Rollback procedure per component | How do I undo a bad refresh? must be explicit; STATE_MANAGEMENT.md hints at this | Medium | DELETE from state table + backfill pattern; per-component procedures |
-| Recovery validation steps | After recovery, how do you verify the fix worked? | Low | Run relevant stats runner + audit script; check Telegram for alerts |
-| Maintenance window definition | When is it safe to run schema migrations, full rebuilds? | Low | Define: daily refresh window (UTC time), migration window |
-
-### Differentiators
-
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| Symptom-first index | Ops searches by what they observe, not by component | Low | Seeing X? Go to section Y index at top of DAILY_REFRESH.md |
-| Copy-paste SQL diagnostics | No one memorizes SQL during an incident; pre-written diagnostic queries | Low | STATE_MANAGEMENT.md has some; extend with common patterns |
-| Alert code to runbook section mapping | Each Telegram alert code maps to a runbook section | Medium | OHLC_CORRUPTION -> see DAILY_REFRESH.md#ohlc-corruption |
-| Known issue registry | Documents recurring issues with known root causes and mitigations | Medium | Prevents re-diagnosis of the same problems |
-
-### Anti-Features
-
-| Anti-Feature | Why Avoid | What to Do Instead |
-|--------------|-----------|-------------------|
-| Single monolithic runbook | 400-line DAILY_REFRESH.md is already getting unwieldy | Keep operational guide (what to do daily) separate from incident guide (what to do when broken) |
-| Runbook stored only in docs/ with no DB context | Ops needs to know what tables are affected | Include table names and SQL fragments inline |
-| Runbook updated separately from code changes | Runbooks go stale this way | Document runbook update requirement in PR template |
-| Over-specifying every edge case | Reduces usability; runbooks should be scannable not encyclopedic | Cover P1 and P2 scenarios; leave P3 to judgment |
-
-### Feature Dependencies
-
-```
-Existing runbooks (DAILY_REFRESH.md, STATE_MANAGEMENT.md)
-  -> Add SLA section to DAILY_REFRESH.md
-  -> Add incident severity + escalation to DAILY_REFRESH.md
-  -> Add rollback procedures (referencing STATE_MANAGEMENT.md patterns)
-  -> Add recovery validation steps (referencing stats runners and audits)
-
-Telegram alerting module (existing)
-  -> Alert codes should map to runbook sections
-  -> Severity levels (CRITICAL/ERROR/WARNING) map to incident severity (P1/P2/P3)
-```
-
----
-
-## Area 5: Alembic for Existing Projects
+DSR extends PSR to the multiple-testing case: when many strategies are tested, the best observed
+Sharpe is inflated by selection bias. DSR deflates by the expected maximum Sharpe under the null.
 
 ### Table Stakes
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| Alembic initialized (alembic init) | Without this, migrations remain ad-hoc; impossible to track schema version | Low | Creates alembic/ dir, env.py, alembic.ini |
-| Baseline stamp of current schema | Tells Alembic the current schema is the starting point; prevents it from regenerating all tables | Medium | alembic stamp head after creating initial migration |
-| Initial migration from existing schema | One migration that represents current state; not the raw SQL files | Medium | Hand-write from existing DDL; do NOT use autogenerate as first step |
-| alembic upgrade head in CI | Validates that migrations apply cleanly; catches drift before production | Medium | Add to validation.yml after postgres service setup |
-| Connection configured from env var | alembic.ini uses environment variable; env.py reads TARGET_DB_URL | Low | Consistent with existing db_config.env pattern |
+| PSR full formula (Bailey/Lopez de Prado 2012) | The placeholder `1/(1+exp(-SR))` is not PSR; it has no statistical meaning and will produce wrong rankings | Medium | Formula: `PSR = Φ[(SR - SR*) * sqrt(n-1) / sqrt(1 - skew*SR + (kurt-1)/4 * SR^2)]` |
+| Inputs: n, skewness, kurtosis of returns | Current metrics.py only uses mean/std; must add `scipy.stats.skew()` and `scipy.stats.kurtosis()` | Low | Already have `sharpe()` function; extend summarize() |
+| Benchmark SR (SR*) parameter | PSR is always relative to a benchmark; default SR* = 0 is valid but should be configurable | Low | Expose as parameter; typical values: 0, 0.5, 1.0 |
+| PSR replaces psr_placeholder() in summarize() | The stub is called in backtest metrics and stored in cmc_backtest_metrics; replacing stub fixes stored values | Medium | Requires re-running backtests or updating stored records |
+| Annualization frequency parameter | PSR depends on observation frequency (daily vs weekly); must match the return series frequency | Low | Already in sharpe(); thread through PSR |
 
 ### Differentiators
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| include_name filter in env.py | Prevents Alembic from dropping tables it does not know about (system tables, manually-created stats tables) | Low | Critical safety measure for existing-schema onboarding |
-| Autogenerate with SQLAlchemy metadata | Future schema changes auto-detected by comparing Python models to DB | High | Requires creating SQLAlchemy Table objects for all 24+ tables |
-| Raw SQL support in migration scripts | Alembic supports op.execute(raw_sql) for complex DDL | Low | Existing sql/migration/*.sql files can be wrapped in op.execute() |
-| Migration squash after baseline | Once all developers are on Alembic, squash 16 raw SQL files into one baseline revision | Medium | Deferred: do after Alembic is adopted by whole team |
+| DSR (Deflated Sharpe Ratio) for parameter sweeps | When running 100 parameter combinations, best observed Sharpe is inflated; DSR corrects for how many trials were run | High | Requires: number of trials tested, correlation between trials (if independent, correlation=0) |
+| Minimum Track Record Length (MinTRL) | Inverse of PSR: "how many observations do I need to be confident this Sharpe is real at 95%?" | Medium | Direct computation from PSR formula; useful for communicating result validity |
+| PSR stored per backtest run | PSR in cmc_backtest_metrics table, replacing the sigmoid stub value | Medium | Schema already has psr column; fix the value, not the schema |
+| Probability of Backtest Overfitting (PBO) via CPCV | Bailey/Lopez de Prado 2014; uses CPCV to estimate probability that selected strategy underperforms OOS | High | Requires CPCV infrastructure; high research value, high complexity |
 
 ### Anti-Features
 
 | Anti-Feature | Why Avoid | What to Do Instead |
 |--------------|-----------|-------------------|
-| Autogenerate as first step without stamping | Without stamping current state, autogenerate will generate DROP statements for every existing table | Stamp first, then autogenerate for new changes only |
-| Replacing all 16 raw SQL files with Alembic migrations immediately | Creates a massive PR that is hard to review; risks data loss if wrong | Create baseline stamp, keep existing files in sql/migration/, only NEW changes go through Alembic |
-| Running migrations in run_daily_refresh.py | Schema migrations during data refresh creates dangerous coupling | Keep migrations separate, run manually or in dedicated CI job |
-| Using autogenerate without reviewing output | Autogenerate is not perfect; table renames appear as drop+add | Always review autogenerated migration files before committing |
-| Forcing ORM model creation for all tables | This project uses raw SQL heavily; creating 24 SQLAlchemy Table objects is high effort, low value | Use include_name filter with reflection for autogenerate filtering |
+| Keeping the sigmoid stub as PSR | The stub maps SR → probability without accounting for sample size or return distribution; a 2-year daily backtest and a 20-year one get the same "PSR" for same SR | Replace entirely with formula; label transition period clearly |
+| Computing PSR on very short return series (< 30 obs) | PSR degenerates when n is small; the formula's denominator involves sqrt(n-1) | Guard: return NaN or None for series with fewer than 30 observations |
+| Annualizing PSR (PSR is already a probability, not a ratio) | PSR output is in [0,1] probability space; annualizing it is nonsensical | Keep PSR as probability; present alongside annualized Sharpe, not instead of it |
+| DSR before CPCV/purged CV is implemented | DSR needs the distribution of tested strategies; without structured trial tracking, the number-of-trials input is guesswork | Implement PSR first; DSR only after parameter sweep infrastructure is organized |
 
 ### Feature Dependencies
 
 ```
-alembic init (new)
-  -> env.py configured with TARGET_DB_URL
-  -> alembic.ini configured
-  -> include_name filter in env.py (safety for existing tables)
+backtests/metrics.py
+  -> Replace psr_placeholder() with psr() using full formula
+  -> Add dsr() function (depends on number of trials)
+  -> scipy.stats for skewness/kurtosis (already in dependencies)
 
-Baseline migration (new)
-  -> Created from existing DDL (hand-written, not autogenerated)
-  -> alembic stamp head applied to existing production DB
-  -> All future migrations through Alembic only
+cmc_backtest_metrics table
+  -> psr column exists; values become valid after formula fix
+  -> DSR would need new column (dsr, n_trials_tested)
 
-CI integration (builds on validation.yml)
-  -> Postgres service already exists in validation.yml
-  -> Add alembic upgrade head step
-  -> Gate: migrations must apply cleanly before tests run
+Parameter sweep (analysis/parameter_sweep.py)
+  -> DSR naturally fits here: sweep tracks n_trials, can compute DSR on best result
+```
+
+---
+
+## Feature Area 4: Purged K-Fold Cross-Validation
+
+Standard K-fold CV assumes IID observations. Financial time series are not IID: labels depend on
+future price movements, which overlap between adjacent bars. Training on bar t and testing on bar t+1
+causes label leakage when the label is a multi-bar forward return.
+
+Purging removes training samples whose labels overlap with the test set time window.
+Embargo adds a buffer gap after the test set to prevent serial correlation leakage.
+
+### Table Stakes
+
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| Embargo gap parameter | Even after purging, serial correlation in features can cause leakage from the bars immediately before/after the test set | Medium | Embargo = skip N bars after test end; N typically 5% of total observations |
+| Purging of overlapping labels | If forward return label at t spans [t, t+h], any training sample with label period overlapping [t, t+h] must be removed | High | Requires label start/end timestamps, not just bar timestamps |
+| Time-ordered splits (no future leakage) | CV splits must always be train-before-test in time; no shuffling | Low | Existing splitters.py already does this; purging adds the label overlap check |
+| Configurable k (number of folds) | More folds = more CV iterations = better estimate of generalization error; k=5 is standard | Low | Parameter on the CV class |
+| Compatible with sklearn pipeline API | Should return (train_indices, test_indices) like sklearn's KFold; enables use with cross_val_score | Medium | Implement as class with split() method returning index arrays |
+
+### Differentiators
+
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| Combinatorial Purged CV (CPCV) | Instead of 1 test path, CPCV generates C(k,p) paths — provides distribution of OOS performance, not just point estimate | High | Lopez de Prado 2018; skfolio has reference implementation; high value for PBO computation |
+| Label span tracking | Store label start/end with each training sample so purging can be precise | High | Requires refactoring how forward returns are attached to features; significant upfront work |
+| Gap-free fold visualization | Show train/test splits as timeline chart in Streamlit — makes split logic auditable | Medium | Useful for dashboard; not required for correctness |
+| Walk-forward + purged CV hybrid | Outer loop: walk-forward (train grows, test slides); inner loop: purged CV on train set for hyperparameter tuning | High | Mature production approach; complex to implement correctly |
+
+### Anti-Features
+
+| Anti-Feature | Why Avoid | What to Do Instead |
+|--------------|-----------|-------------------|
+| Standard K-fold on time series | Without purging/embargo, CV estimates are optimistically biased — the entire reason for building purged CV | The existing `expanding_walk_forward()` is better than standard KFold even without purging; add purging incrementally |
+| Purging without defining label spans | If you purge by "bar timestamp" instead of "label overlap period", you either over-purge (too few training samples) or under-purge (still leaking) | Define label span precisely: a 20D forward return at bar t has label span [t, t+20] |
+| CPCV before basic purged KFold works | CPCV is a significant complexity jump; building it before validating purging logic creates untestable code | Ship purged KFold first, validate on simple test case, then add CPCV as extension |
+| Purged CV on non-time-series features | Purging is only necessary for forward-looking labels; applying it to contemporaneous features (RSI at time t predicting RSI at time t) adds complexity with no benefit | Gate purging on label type; contemporaneous features use standard splits |
+
+### Feature Dependencies
+
+```
+backtests/splitters.py
+  -> Add PurgedKFold class alongside existing expanding_walk_forward()
+  -> PurgedKFold.split() returns (train_idx, test_idx) arrays
+  -> Requires label_start / label_end per sample (or derive from horizon)
+
+cmc_features (existing)
+  -> Features are at bar granularity (ts column)
+  -> Label span for horizon=20D: [ts, ts + 20*tf_days]
+  -> Purging needs to know tf_days from dim_timeframe
+
+CPCV (optional extension)
+  -> Builds on PurgedKFold split logic
+  -> Generates C(k,p) train/test path combinations
+  -> Required for DSR / PBO computation (connects to PSR feature area)
+```
+
+---
+
+## Feature Area 5: Feature Experimentation Framework
+
+A config-driven system for registering features in lifecycle states (experimental → promoted → deprecated),
+computing them on demand from existing base data, and comparing experimental vs promoted variants.
+
+### Table Stakes
+
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| Lifecycle states per feature (experimental, promoted, deprecated) | Without this, all features are equal; promotes arbitrary inclusion; no path to retirement | Low | Simple enum/string field in config |
+| Config file as contract (not code) | Feature definitions in YAML/TOML are readable, diffable, and don't require code changes to add a feature | Medium | Config schema: name, state, indicator_fn, params, description, added_version |
+| Compute on demand from base data | Experimental features are computed from cmc_price_bars or cmc_features data at query time; not persisted until promoted | Medium | Reuse existing indicator functions from indicators.py; thin wrapper |
+| IC evaluation on experimental feature | The entire point of the framework is to evaluate new features before persisting them; IC is the evaluation metric | Medium | Wires into Feature Area 2 (IC) |
+| A/B comparison between experimental and promoted | "Is this KAMA-based feature better than the existing EMA-based equivalent?" — needs side-by-side IC/return analysis | Medium | Output: table of IC values, correlations between candidates |
+
+### Differentiators
+
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| Version history in config | Track when a feature was promoted or deprecated; enables auditing which features were live during which backtest period | Low | Add added_version, promoted_version, deprecated_version fields to config |
+| Promotion path (experimental → promoted → DB persist) | Promotion triggers creation of persistent DB column in cmc_features; demotes to full pipeline citizen | High | Requires Alembic migration (already have Alembic from v0.8.0); automated migration generation |
+| Feature dependency graph | If feature B depends on feature A (e.g., KAMA-returns depends on KAMA), the framework tracks this and computes in order | High | DAG required; overkill for most cases; defer to post-MVP |
+| Cross-asset feature stability report | Does this feature have consistent IC across BTC, ETH, SOL? Stable features are more robust | Medium | Requires running IC per asset; output: IC heatmap by asset |
+
+### Anti-Features
+
+| Anti-Feature | Why Avoid | What to Do Instead |
+|--------------|-----------|-------------------|
+| Building a GUI for feature registration | Heavy investment in UI when a YAML config file serves the same purpose for a 1-person research team | YAML config + code review is sufficient; Streamlit can read the config and display it |
+| Persisting all experimental features to DB | DB becomes polluted with features that get retired; column management becomes unmanageable | Experimental features computed at query time; DB persistence only on promotion |
+| Feature versioning with separate DB tables per version | 1 table per feature version creates 50+ tables quickly | Version in a single table via a `feature_version` column or separate config tracking |
+| Recomputing promoted features via the framework | Promoted features are already in cmc_features and maintained by existing refresh scripts; double-computing wastes resources | Framework handles experimental only; promoted features flow through existing cmc_features pipeline |
+
+### Feature Dependencies
+
+```
+Config file (new): .planning/features/feature_registry.yaml (or similar)
+  -> Feature definitions: name, state, indicator_fn, params, horizons_for_IC
+
+indicators.py (existing)
+  -> Compute engine calls existing functions: rsi(), atr(), macd(), etc.
+  -> New indicator functions added here as needed (KAMA etc. from Feature Area 1)
+
+IC evaluation (Feature Area 2)
+  -> Compute on-demand IC for experimental features
+  -> Output IC summary with experimental vs promoted comparison
+
+Alembic (v0.8.0, existing)
+  -> Promotion path generates Alembic migration to add column to cmc_features
+```
+
+---
+
+## Feature Area 6: Streamlit Dashboard (Two Modes)
+
+### Mode A: Research Explorer
+
+Used during active research sessions to evaluate signals, features, and regime behavior.
+
+#### Table Stakes
+
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| Asset + timeframe selector | All queries must be parameterized; hardcoded asset/TF is unusable as a research tool | Low | Streamlit selectbox from dim_assets and dim_timeframe |
+| IC score table for all features | Top-N features by IC with sortable columns; the central research artifact | Medium | Reads from cmc_features; runs IC on demand or from cached results |
+| Equity curve chart per strategy | Basic performance visualization; without it, the dashboard has no connection to backtest output | Medium | Reads cmc_backtest_runs + metrics; Plotly line chart |
+| Regime transition timeline | Visualize regime labels on price chart (color bands or overlay); connects regime to price behavior | Medium | Reads cmc_regimes; Plotly chart with colored regions by regime state |
+| Feature comparison (A vs B) | Select two features, see IC side-by-side; the main differentiator for the experimentation framework | Medium | Multi-select + IC table filtered by selection |
+| Date range filter | All charts must support zooming to subperiods; full history charts are often unreadable | Low | Streamlit date_input or slider |
+
+#### Differentiators
+
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| IC decay chart (IC vs forward horizon) | See how quickly a signal loses predictive power; informs holding period decisions | Medium | Line chart: horizon on x-axis, mean IC on y-axis |
+| Rolling IC chart (IC over time) | See if the signal is degrading or was only good during a specific regime | Medium | Plotly line chart of rolling IC series |
+| Feature correlation heatmap | Identify redundant features before adding them to a model | Medium | Seaborn or Plotly heatmap of correlation matrix |
+| Regime-conditional IC table | For each regime state, show top features by IC — answers "which features work in which regime" | High | Join on regime labels; compute IC subsetted by regime |
+| Experimental feature upload/compute | User selects an experimental feature from registry, computes IC live | High | Wires into Feature Area 5; complex Streamlit state management |
+
+#### Anti-Features
+
+| Anti-Feature | Why Avoid | What to Do Instead |
+|--------------|-----------|-------------------|
+| Real-time data streaming | This is a research dashboard, not a live trading terminal; data refreshes on page reload is sufficient | Use `@st.cache_data(ttl=3600)` for DB queries |
+| Every feature in one massive page | Research explorer becomes unusable with 112 features and 5 chart types on one page | Use st.tabs() for: Features / Signals / Regimes / Comparison |
+| Matplotlib for all charts | Matplotlib is static; interactive zoom/hover requires Plotly or Altair for research use | Use Plotly Express throughout; `st.plotly_chart(fig, use_container_width=True)` |
+| Streamlit replacing the DB layer | Doing heavy computation in Streamlit callbacks freezes the UI | Keep heavy IC computation in Python functions; cache results; Streamlit is display only |
+
+---
+
+### Mode B: Pipeline Monitor
+
+Used during operations to check pipeline health, data freshness, and QA status.
+
+#### Table Stakes
+
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| Run status table (last N runs) | Shows timestamp, duration, exit status for each refresh step | Low | Reads from run log (if exists) or a simple runs table |
+| Data freshness per table | For each major table, show: last ingested timestamp, rows, staleness in hours | Low | Reads asset_data_coverage table (already exists); SELECT max(last_ts) per source_table |
+| PASS/FAIL stat summary | Count of PASS/WARN/FAIL across all stats runners in last 24h | Medium | Reads existing stats tables (bars_stats, features_stats, etc.) |
+| Telegram alert history | Last N alerts sent — helps diagnose what the pipeline noticed | Medium | Requires logging Telegram sends to DB or file |
+| Per-table row counts vs expected | Flags tables that lost rows unexpectedly (data deletion, failed refresh) | Low | Compare current row count to 7-day rolling average |
+
+#### Differentiators
+
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| Red/yellow/green status badges | Traffic-light UX for quick triage; FAIL = red, WARN = yellow, PASS = green | Low | Streamlit `st.metric()` with delta_color; or markdown with color |
+| Staleness SLA threshold coloring | Highlight tables breaching the SLA defined in runbooks (bars < 48h, features < 72h) | Low | Compare staleness hours to configurable thresholds |
+| Asset-level data gap detection | Some assets may have gaps while others are healthy; per-asset freshness table | Medium | Group by id in asset_data_coverage; flag outliers |
+| Pipeline execution timeline (Gantt-like) | Shows which refresh steps ran, in what order, with duration — useful for perf debugging | High | Requires structured run log; complex to implement |
+
+#### Anti-Features
+
+| Anti-Feature | Why Avoid | What to Do Instead |
+|--------------|-----------|-------------------|
+| Pipeline monitor as separate application | Two Streamlit apps are harder to maintain; both modes need the same DB connection | Single Streamlit app with mode toggle (selectbox: "Research / Monitor") |
+| Auto-refresh on a timer | Streamlit auto-refresh experimental API is fragile; pipeline data doesn't change that fast | Manual refresh button + `@st.cache_data(ttl=300)` for 5-minute cache |
+| Replacing Telegram alerts with dashboard | Dashboard is passive; Telegram is active (pushes on failure); both serve different purposes | Monitor reads the same stats that trigger Telegram; do not replace either |
+
+---
+
+## Feature Area 7: Jupyter Notebooks
+
+### Table Stakes
+
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| End-to-end demo notebook (one per major topic) | Notebooks are the standard medium for sharing quant research; without them, findings live only in scripts | Medium | One notebook per: (1) feature IC analysis, (2) backtest walk-through, (3) regime analysis |
+| Data loading cells are clean and documented | If cell 1 fails to connect to DB, the notebook is unusable by anyone else | Low | Use environment variable for DB connection; document in first cell |
+| Clear separation of: load / compute / visualize | Notebooks that intermix computation with visualization are hard to debug and iterate on | Low | Naming convention: ## Load Data, ## Compute IC, ## Visualize |
+| Outputs cleared before commit | Notebooks with cached outputs are large binary blobs that pollute git history | Low | Add `nbstripout` pre-commit hook or document "always clear before commit" |
+| Results reproducible from DB (not hardcoded DataFrames) | Notebooks that use hardcoded data snapshots become stale immediately | Medium | All data from DB queries; parameterize asset, TF, date range at top |
+
+### Differentiators
+
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| Narrative markdown cells explaining quant concepts | Makes notebooks shareable with non-quant readers; explains WHY before showing code | Low | Add 2-3 sentences before each compute section explaining the metric |
+| Parameter cell at top (asset, TF, date range) | Single cell to change to run for different asset/timeframe — essential for reusability | Low | `ASSET_ID = 1`, `TF = "1D"`, `START_DATE = "2022-01-01"` as named constants at top |
+| IC heatmap across all features as final cell | Summary artifact showing the full feature ranking — the "deliverable" of the research notebook | Medium | Plotly heatmap; columns = features, rows = horizons, values = IC |
+| Walk-forward PnL notebook showing purged CV result | Demonstrates the CV methodology on a real strategy — builds confidence in backtest validity | High | Requires purged CV from Feature Area 4 |
+
+### Anti-Features
+
+| Anti-Feature | Why Avoid | What to Do Instead |
+|--------------|-----------|-------------------|
+| Notebooks that duplicate production code | If IC computation is also in feature_eval.py, the notebook should call that function — not reimplement | `from ta_lab2.analysis.feature_eval import spearman_ic` in notebook |
+| One 500-line mega-notebook | Unnavigable; sections mix concerns; hard to share selectively | 3-5 focused notebooks, each with a single research question |
+| Notebooks that require local CSV files | Creates file path dependency; breaks when anyone else runs the notebook | Always load from DB; if DB query is slow, cache with `@lru_cache` or write to temp Parquet in /tmp |
+| nbconvert to PDF as deliverable | PDF removes interactivity; if the recipient can't run the notebook, send HTML export | Use `jupyter nbconvert --to html` for read-only sharing |
+
+---
+
+## Cross-Feature Dependencies
+
+```
+Adaptive MAs (Area 1)
+  -> Provides new features for IC evaluation (Area 2)
+  -> KAMA Efficiency Ratio as standalone IC candidate
+
+IC Evaluation (Area 2)
+  -> Required by Feature Experimentation framework (Area 5)
+  -> Feeds Streamlit research explorer (Area 6, Mode A)
+  -> Drives notebook analysis (Area 7)
+
+PSR/DSR (Area 3)
+  -> Replaces stub in backtests/metrics.py (prerequisite: none, standalone)
+  -> DSR requires purged CV trial counts (Area 4 dependency)
+
+Purged CV (Area 4)
+  -> Enables valid hyperparameter tuning in backtests
+  -> Required for CPCV (which enables DSR/PBO)
+  -> Feeds walk-forward PnL notebook (Area 7)
+
+Feature Experimentation (Area 5)
+  -> Depends on IC evaluation (Area 2) for feature scoring
+  -> Feeds Streamlit research explorer (Area 6)
+  -> Alembic (v0.8.0) handles promotion migrations
+
+Streamlit Dashboard (Area 6)
+  -> Depends on IC evaluation results (Area 2)
+  -> Reads cmc_backtest_metrics including fixed PSR (Area 3)
+  -> Displays regime data from cmc_regimes (existing)
+  -> Reads feature registry config (Area 5)
+
+Notebooks (Area 7)
+  -> Imports from ta_lab2 package (all areas above)
+  -> Demonstration artifacts, not production code
 ```
 
 ---
 
 ## MVP Recommendation
 
-For v0.8.0, prioritize in this order:
+For v0.9.0 MVP, prioritize by value delivered vs complexity:
 
-### Must Have (v0.8.0)
+### Must Have (core research capability)
 
-1. **Stats/QA gate** — Wire existing stats runners into run_daily_refresh.py; emit non-zero exit on FAIL. All infrastructure already exists; this is the last-mile connection.
+1. **Spearman IC + IC decay** (Area 2, table stakes) — Replaces Pearson correlation in feature_eval.py; delivers the primary research metric. No new infrastructure needed.
 
-2. **mypy baseline config** — Add [tool.mypy] to pyproject.toml with check_untyped_defs = true, per-module overrides for legacy files, and a non-blocking CI job. Zero runtime changes; pure tooling.
+2. **PSR formula** (Area 3, table stakes) — Replaces one function in metrics.py; fixes stored backtest values. Self-contained.
 
-3. **Runbook hardening** — Add SLA section, severity classification, and escalation procedures to DAILY_REFRESH.md. Pure docs work; immediate operational value.
+3. **Purged KFold basic implementation** (Area 4, table stakes) — New class in splitters.py; embargo + purging without CPCV. Validates backtest methodology.
 
-4. **Alembic baseline stamp** — Initialize Alembic, create baseline migration representing current schema, stamp the production database. Establishes the framework without changing any schema.
+4. **KAMA + HMA implementations** (Area 1, table stakes) — KAMA is the most research-valuable adaptive MA (ER column is itself an IC candidate). HMA is the simplest to implement correctly. DEMA/TEMA can follow.
 
-5. **Docs version fix** — Update mkdocs.yml to v0.8.0, add pipeline flow Mermaid diagram, update CHANGELOG.md. Low effort, high visibility signal of project health.
+5. **Feature registry config** (Area 5, table stakes) — YAML config + compute-on-demand; no DB persistence for experimental features.
+
+6. **Streamlit Pipeline Monitor** (Area 6, Mode B) — Reads existing DB tables; no new infrastructure; immediate operational value.
 
 ### Defer to Post-MVP
 
-- **mypy strict adoption** (per-module ratchet): Time-intensive annotation work. Establish CI baseline first.
-- **Alembic autogenerate** (ORM models): Requires creating SQLAlchemy models for 24+ tables. Separate milestone.
-- **Mike versioned docs**: Operations overhead; valuable when there are external consumers of docs.
-- **ADRs**: Valuable but not urgent; write them as new decisions are made, not retroactively.
-- **Stats trend views**: SQL view work; deferred until stats runners have multi-week history.
+- **Streamlit Research Explorer**: Higher complexity; depends on IC infrastructure being solid first. Build Mode B first.
+- **CPCV and DSR**: High complexity; wait until purged KFold is validated and parameter sweep is organized.
+- **Feature promotion path (Alembic migration)**: Experimental features have value before promotion path; build registry first.
+- **Quantile returns analysis**: Requires cross-sectional universe view; current architecture is per-asset time series.
+- **Feature dependency DAG**: Overkill for first iteration of experimentation framework.
+- **Notebooks**: Build after IC evaluation and PSR are working; notebooks showcase those capabilities.
 
 ---
 
 ## Sources
 
-- mypy documentation — existing codebase adoption: [Using mypy with an existing codebase](https://mypy.readthedocs.io/en/stable/existing_code.html)
-- Wolt Engineering — professional mypy configuration: [Professional-grade mypy configuration](https://careers.wolt.com/en/blog/tech/professional-grade-mypy-configuration)
-- Alembic documentation — autogenerate: [Auto Generating Migrations](https://alembic.sqlalchemy.org/en/latest/autogenerate.html)
-- Alembic documentation — cookbook (stamping): [Cookbook](https://alembic.sqlalchemy.org/en/latest/cookbook.html)
-- Dagster — data quality at every stage: [How to Enforce Data Quality at Every Stage](https://dagster.io/blog/how-to-enforce-data-quality-at-every-stage)
-- dbt Labs — data pipeline quality checks: [How to build reliable data pipelines with data quality checks](https://www.getdbt.com/blog/data-pipeline-quality-checks)
-- dbt Labs — data SLAs best practices: [What are data SLAs?](https://www.getdbt.com/blog/data-slas-best-practices)
-- Material for MkDocs — versioning: [Setting up versioning](https://squidfunk.github.io/mkdocs-material/setup/setting-up-versioning/)
-- Rootly — incident runbooks guide: [Incident Response Runbooks](https://rootly.com/incident-response/runbooks)
-- Start Data Engineering — pipeline testing: [How to add tests to your data pipelines](https://www.startdataengineering.com/post/how-to-add-tests-to-your-data-pipeline/)
+- Information Coefficient standard: [PyQuant News — IC with Alphalens](https://www.pyquantnews.com/free-python-resources/real-factor-alpha-how-to-measure-it-with-information-coefficient-and-alphalens-in-python)
+- Alphalens IC analysis outputs: [Alphalens documentation](https://quantopian.github.io/alphalens/alphalens.html)
+- IC decay and turnover: [Quantopian IC tutorial](https://www.quantrocket.com/codeload/quant-finance-lectures/quant_finance_lectures/Lecture38-Factor-Analysis-with-Alphalens.ipynb.html)
+- PSR formula: [Quantdare — Probabilistic Sharpe Ratio](https://quantdare.com/probabilistic-sharpe-ratio/)
+- PSR paper: [QuantConnect PSR implementation](https://www.quantconnect.com/research/17112/probabilistic-sharpe-ratio/)
+- DSR paper: [Bailey/Lopez de Prado — Deflated Sharpe Ratio (PDF)](https://www.davidhbailey.com/dhbpapers/deflated-sharpe.pdf)
+- Purged KFold: [Wikipedia — Purged cross-validation](https://en.wikipedia.org/wiki/Purged_cross-validation)
+- CPCV: [skfolio CombinatorialPurgedCV](https://skfolio.org/generated/skfolio.model_selection.CombinatorialPurgedCV.html)
+- mlfinlab purged CV: [Hudson and Thames mlfinlab](https://github.com/hudson-and-thames/mlfinlab)
+- KAMA: [StockCharts — Kaufman Adaptive MA](https://chartschool.stockcharts.com/table-of-contents/technical-indicators-and-overlays/technical-overlays/kaufmans-adaptive-moving-average-kama)
+- IC by regime: [Two Sigma — ML approach to regime modeling](https://www.twosigma.com/articles/a-machine-learning-approach-to-regime-modeling/)
+- IC thresholds: [IC article with thresholds](https://thetradinganalyst.com/information-coefficient/)
 
 ---
 
@@ -322,9 +488,11 @@ For v0.8.0, prioritize in this order:
 
 | Area | Confidence | Basis |
 |------|------------|-------|
-| Stats/QA gate pattern | HIGH | Verified against Dagster docs + dbt pattern; aligns with existing PASS/WARN/FAIL schema already in codebase |
-| mypy adoption strategy | HIGH | Official mypy docs + Wolt production config; well-established pattern |
-| Documentation freshness | HIGH | Standard practice; mkdocs.yml version staleness observed directly in codebase |
-| Runbook standard sections | MEDIUM | Multiple authoritative sources (AWS, Atlassian, runbook guides) agree on structure; SLA specifics are project-dependent |
-| Alembic baseline stamp | MEDIUM | Alembic docs describe the approach; existing table handling (include_name) verified against autogenerate docs |
-| Alembic autogenerate with 24 tables | LOW | Complex; ORM model creation required; autogenerate pitfalls well-documented but project-specific impact unverified |
+| IC / Spearman standard practice | HIGH | Multiple authoritative sources (Alphalens docs, Quantopian lectures, AQR papers) agree; well-established |
+| PSR formula | HIGH | Original Bailey/Lopez de Prado paper; QuantConnect implementation; formula is published and unambiguous |
+| DSR formula | MEDIUM | Paper is authoritative; Python implementation details verified via GitHub; multiple testing correction approach is sound |
+| Purged KFold mechanics | HIGH | Wikipedia + mlfinlab + quantinsti sources agree on purging/embargo mechanics |
+| CPCV complexity | MEDIUM | skfolio has reference implementation; complexity estimate based on reading source; project-specific integration is unverified |
+| Adaptive MA formulas | HIGH | KAMA formula from Kaufman's original source; DEMA/TEMA/HMA formulas are textbook-standard |
+| Streamlit feasibility | HIGH | Direct experience in codebase; Streamlit is well-documented |
+| Feature registry design | MEDIUM | Lifecycle concepts from tidyverse + OpenTelemetry; quant-specific registry is custom design — no authoritative reference |

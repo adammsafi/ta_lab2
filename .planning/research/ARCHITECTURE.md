@@ -1,538 +1,678 @@
-# Architecture Patterns: v0.8.0 Polish & Hardening
+# Architecture Patterns
 
-**Domain:** Quant trading data platform — hardening existing infrastructure
-**Researched:** 2026-02-22
-**Confidence:** HIGH (all findings from direct codebase inspection)
-
----
-
-## Existing System Map
-
-The current system has a clear orchestration spine: one top-level script,
-`run_daily_refresh.py`, invokes child processes via `subprocess.run()` in
-sequential stages. Each stage has its own sub-orchestrator.
-
-```
-run_daily_refresh.py --all
-  |
-  +-- subprocess --> bars/run_all_bar_builders.py
-  |                   (6 bar builders in sequence)
-  |
-  +-- subprocess --> emas/run_all_ema_refreshes.py
-  |                   (4 EMA refreshers + sync scripts)
-  |
-  +-- subprocess --> regimes/refresh_cmc_regimes.py
-                      (L0-L2 labeling, 4 regime tables)
-
-NOT wired in (manual-only, all functional):
-  bars/stats/refresh_price_bars_stats.py           --> price_bars_multi_tf_stats
-  emas/stats/run_all_stats_refreshes.py            --> 3 EMA *_stats tables
-  features/stats/refresh_cmc_features_stats.py     --> cmc_features_stats
-  returns/stats/run_all_returns_stats_refreshes.py --> returns EMA stats tables
-  prices/refresh_price_histories7_stats.py         --> price_histories7_stats
-```
-
-**Pattern inside each stage:** `subprocess.run(cmd, check=False, capture_output=True,
-text=True)` wrapped in a `ComponentResult` dataclass. Failures print stdout/stderr
-only on non-zero exit code. The orchestrator decides whether to halt or continue
-based on `--continue-on-error`.
+**Domain:** Quant research & experimentation platform (v0.9.0 milestone)
+**Existing codebase:** ta_lab2 v0.8.0 — multi-TF pipeline with 50+ tables, 22M+ rows
+**Researched:** 2026-02-23
+**Confidence:** HIGH (direct codebase inspection, no guesswork)
 
 ---
 
-## Area 1: Stats / QA Integration
+## Existing Architecture Summary
 
-### Existing Components
+The v0.8.0 system is a layered, database-centric quant pipeline. Understanding it precisely
+is prerequisite to integrating the v0.9.0 features without breaking what already works.
 
-The 5 stats runners are fully built scripts with watermark-based incrementality. Each:
-- Creates its own `*_stats` and `*_stats_state` tables via inline DDL
-  (`CREATE TABLE IF NOT EXISTS`) at startup — no external DDL files needed
-- Checks `ingested_at` (or `updated_at`) watermark against last run; no-ops on
-  no new data
-- Runs SQL tests (PK uniqueness, OHLC consistency, freshness lag, row-count vs span)
-- Writes PASS/WARN/FAIL rows into the stats table and advances the watermark
-
-They are idempotent and safe to run after any refresh.
-
-**Existing stats sub-orchestrators (partial coverage):**
-- `emas/stats/run_all_stats_refreshes.py` — covers 3 EMA family stats scripts
-- `returns/stats/run_all_returns_stats_refreshes.py` — covers 6 returns family stats
-
-**Standalone runners (no parent orchestrator yet):**
-- `bars/stats/refresh_price_bars_stats.py` — uses `--full-refresh` flag (not `--ids`)
-- `features/stats/refresh_cmc_features_stats.py` — uses `--full-refresh` flag
-- `prices/refresh_price_histories7_stats.py` — has its own invocation style
-
-### Integration Point
-
-`run_daily_refresh.py` already has a `run_regime_refresher()` function that is the
-exact pattern to replicate. Adding stats means:
-
-1. Write `src/ta_lab2/scripts/run_all_stats_refreshers.py` — a new top-level
-   orchestrator that calls all 5 runners (bars stats, EMA stats, features stats,
-   returns stats, prices stats) via the same `subprocess.run()` pattern
-2. Add a `run_stats_refreshers()` helper function to `run_daily_refresh.py`
-3. Add a `--stats` CLI flag to `run_daily_refresh.py`
-4. Include `--stats` in the `--all` execution chain as the final stage
-
-**Why stats is last in `--all`:**
-Stats validates freshness (`max_ts_lag_vs_price`) and row-counts against the data
-that all prior stages wrote. If stats runs before bars complete, freshness checks
-would reflect the previous run's data.
-
-**Proposed `--all` call chain:**
+### Pipeline Stages (current)
 
 ```
-bars --> EMAs --> regimes --> stats
+cmc_price_histories7
+        |
+        v
+[Bar Builders] --> cmc_price_bars_multi_tf (+ 4 cal variants + _u)
+        |
+        v
+[EMA Refreshers] --> cmc_ema_multi_tf (+ 4 cal variants + _u)
+        |           PK: (id, ts, tf, period)
+        |
+        v
+[Returns] --> cmc_returns_bars_multi_tf (+ 4 cal variants + _u)
+              cmc_returns_ema_multi_tf (+ 4 cal variants + _u)
+        |
+        v
+[Feature Refresh] --> cmc_vol, cmc_ta --> cmc_features
+                      PK: (id, ts, tf, alignment_source)
+        |
+        v
+[Regime Refresh] --> cmc_regimes, cmc_regime_flips,
+                     cmc_regime_stats, cmc_regime_comovement
+        |
+        v
+[Signal Generators] --> cmc_signals_ema_crossover,
+                        cmc_signals_rsi_mean_revert,
+                        cmc_signals_atr_breakout
+        |
+        v
+[Backtest] --> cmc_backtest_runs, cmc_backtest_trades, cmc_backtest_metrics
 ```
 
-**The `--ids` argument does NOT carry through to stats runners.** Stats runners
-query the DB directly and determine impacted keys from the watermark; they do not
-accept per-asset ID filtering.
+### Key Abstractions (existing, do not break)
 
-### New Components Needed
-
-| Component | Location | What It Does |
-|-----------|----------|-------------|
-| `run_all_stats_refreshers.py` | `src/ta_lab2/scripts/` | Top-level orchestrator; calls all 5 stats runners via subprocess |
-| `run_stats_refreshers()` function | In `run_daily_refresh.py` | Wrapper that invokes `run_all_stats_refreshers.py` subprocess |
-| `--stats` flag | `run_daily_refresh.py` argparser | Enables stats-only and stats-as-part-of-`--all` |
-
-### Modified Components
-
-| Component | Change |
-|-----------|--------|
-| `src/ta_lab2/scripts/run_daily_refresh.py` | Add `run_stats_refreshers()`, `--stats` flag, include in `--all` chain |
+| Abstraction | Location | Pattern | Constraints |
+|-------------|----------|---------|-------------|
+| `BaseEMAFeature` | `features/m_tf/base_ema_feature.py` | Template Method | PK: (id, ts, tf, period); `period` is an integer count in units of tf |
+| `BaseEMARefresher` | `scripts/emas/base_ema_refresher.py` | Template Method | State table per refresher; NullPool workers; TF-split parallelism |
+| `BaseFeature` | `scripts/features/base_feature.py` | Template Method | Scoped DELETE+INSERT per (ids, tf); `_get_table_columns()` for DDL sync |
+| `BaseBarBuilder` | `scripts/bars/base_bar_builder.py` | Template Method | All bar tables share same column contract |
+| `run_daily_refresh.py` | `scripts/run_daily_refresh.py` | Subprocess orchestrator | bars->EMAs->regimes->stats; FAIL-gated stats |
 
 ---
 
-## Area 2: Code Quality (mypy + ruff blocking)
+## Critical Design Question: Adaptive MAs and the EMA Table Structure
 
-### Existing State
+The central architectural question for v0.9.0 is whether KAMA, DEMA, TEMA, and HMA
+(Adaptive Moving Averages, or AMAs) can share the existing `cmc_ema_multi_tf*` tables
+or need their own table family.
 
-- `pyproject.toml` has `[tool.ruff.lint]` with `ignore = ["E402"]`
-- `pyproject.toml` has no `[tool.mypy]` section despite `mypy>=1.8` being in `dev` deps
-- `.pre-commit-config.yaml`: ruff runs with `--fix --exit-non-zero-on-fix` — blocks
-  local commits if lint fails with auto-fixes applied
-- `ci.yml` lint job: `ruff check src || true` — deliberately non-blocking in CI
-- `validation.yml` circular-dependency job (`import-linter`) is blocking; ruff is not
+### Why Sharing Is Incompatible
 
-### Integration Point: Ruff Blocking
+The existing EMA table family has this PK: `(id, ts, tf, period)`
 
-The `ci.yml` lint job needs one-line change:
+The `period` column is an integer that means "EMA period in units of tf."
+This is meaningful and unambiguous for standard EMAs: period=21 on tf=1D means
+a 21-bar exponential moving average.
 
-```yaml
-# Current (non-blocking):
-ruff check src || true
+Adaptive MAs do not have a single `period` parameter:
+- **KAMA** (Kaufman Adaptive MA): `efficiency_ratio_period`, `fast_period`, `slow_period`
+- **DEMA** (Double EMA): `period` (equivalent to EMA, but computed differently — not a drop-in)
+- **TEMA** (Triple EMA): `period` (same parameter name, different computation)
+- **HMA** (Hull MA): `period` (same parameter name, uses WMA internally)
 
-# Target (blocking):
-ruff check src
-ruff format --check src
+Forcing KAMA's three parameters into a single integer `period` column would require:
+- A synthetic key (e.g., a lookup table mapping integer IDs to parameter tuples)
+- That lookup to be joined on every query — adding complexity and breaking the
+  clean query pattern `WHERE period IN (9, 21, 50)`
+
+Additionally, the existing `cmc_ema_multi_tf_u` unified table has:
+```sql
+PRIMARY KEY (id, ts, tf, period)
+```
+KAMA rows would collide with EMA rows if they happened to share the same period integer,
+because the table has no `indicator_type` discriminator column.
+
+### Recommended Design: Separate AMA Table Family
+
+Create a new table family for adaptive MAs:
+
+**New table:** `cmc_ama_multi_tf`
+**PK:** `(id, ts, tf, indicator, params_hash)`
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | INTEGER NOT NULL | Asset ID, FK to dim_assets |
+| `ts` | TIMESTAMPTZ NOT NULL | Bar close timestamp |
+| `tf` | TEXT NOT NULL | Timeframe, FK to dim_timeframe.tf |
+| `indicator` | TEXT NOT NULL | 'KAMA', 'DEMA', 'TEMA', 'HMA' |
+| `params_hash` | TEXT NOT NULL | SHA-256 of JSON params (12 chars, collision-safe at this scale) |
+| `ama` | DOUBLE PRECISION | Adaptive MA value |
+| `d1` | DOUBLE PRECISION | First derivative (per-bar diff) |
+| `d2` | DOUBLE PRECISION | Second derivative |
+| `params_json` | JSONB | Full parameter set: {"er_period":10,"fast":2,"slow":30} |
+| `tf_days` | INTEGER | Denormalized from dim_timeframe |
+| `roll` | BOOLEAN NOT NULL DEFAULT false | Consistent with EMA table convention |
+| `ingested_at` | TIMESTAMPTZ NOT NULL DEFAULT NOW() | For sync watermark |
+
+**Companion dim table:** `dim_ama_params`
+| Column | Type | Notes |
+|--------|------|-------|
+| `params_hash` | TEXT NOT NULL | PK — SHA-256 of canonical JSON |
+| `indicator` | TEXT NOT NULL | 'KAMA', 'DEMA', 'TEMA', 'HMA' |
+| `params_json` | JSONB NOT NULL | Full parameters |
+| `label` | TEXT | Human-readable: "KAMA_10_2_30" |
+| `created_at` | TIMESTAMPTZ NOT NULL DEFAULT NOW() | |
+
+This design:
+- Avoids polluting the EMA table family with a different semantic
+- Allows querying all AMA types in a single table
+- Stores full params without a synthetic integer key
+- The `params_hash` approach is familiar to anyone working with MLflow experiment tracking
+
+**No unified _u table in phase 1.** The existing _u tables unify across alignment variants
+(multi_tf + cal_iso + cal_us + cal_anchor_us + cal_anchor_iso). For v0.9.0, only the
+canonical multi_tf alignment is needed. Add cal variants in a future milestone.
+
+### AMA Hierarchy: Reuse BaseEMAFeature Pattern
+
+The existing `BaseEMAFeature` hierarchy is clean and can be extended. DEMA, TEMA, and HMA
+are single-parameter — they fit the `period` slot cleanly (just computed differently
+from a standard EMA). KAMA is the outlier with three parameters.
+
+**Recommended class hierarchy:**
+
+```
+BaseAMAFeature (new, analogous to BaseEMAFeature)
+    |
+    +-- DEMAFeature    (period -> maps to integer, period=N computes DEMA(N))
+    +-- TEMAFeature    (period -> maps to integer)
+    +-- HMAFeature     (period -> maps to integer)
+    +-- KAMAFeature    (params: er_period, fast_period, slow_period)
 ```
 
-**Risk assessment:** The `|| true` exists because there are active lint violations in
-the codebase. Flipping without auditing first will break CI immediately. Required
-pre-work: run `ruff check src` locally, count violations, apply `ruff --fix` where
-safe, commit clean state, then flip CI.
+`BaseAMAFeature` is NOT a subclass of `BaseEMAFeature` because:
+- Output table is different (`cmc_ama_multi_tf` vs `cmc_ema_multi_tf`)
+- PK columns are different (`params_hash` vs `period`)
+- The `write_to_db` upsert logic differs (conflict on `params_hash` not `period`)
 
-Ruff format checking (`--check` flag) is new — format violations are not currently
-checked in CI (only locally via pre-commit). Add it separately from lint blocking
-to isolate failure modes.
+However, `BaseAMAFeature` can copy the same Template Method pattern: `load_source_data`,
+`get_tf_specs`, `compute_ama_for_tf`, `write_to_db`. The bar loading logic
+(`load_source_data`) can be shared by importing the same helper used in EMA subclasses.
 
-### Integration Point: mypy
+**Refresher class:** `BaseAMARefresher` (analogous to `BaseEMARefresher`)
 
-No `[tool.mypy]` section exists in `pyproject.toml`. Add:
+- Reuses same state management pattern: `EMAStateManager` or a new `AMAStateManager`
+  with same schema (id, indicator, params_hash, last_ts)
+- Reuses same worker function pattern (NullPool, per-ID workers)
+- CLI arguments: `--indicator KAMA,DEMA,TEMA,HMA`, `--params-set default`
 
-```toml
-[tool.mypy]
-python_version = "3.11"
-warn_return_any = true
-warn_unused_configs = true
-ignore_missing_imports = true
-exclude = [
-    "src/ta_lab2/tools/",
-    "src/ta_lab2/scripts/baseline/",
-    ".archive/",
-    ".venv311/",
-]
-```
-
-`ignore_missing_imports = true` is mandatory. The codebase uses conditional imports
-for vectorbt, astronomy-engine, and fredapi which are not installed in CI's core
-environment (`.[dev]`). Without this flag, mypy will error on every file that touches
-those dependencies.
-
-**CI job to add to `ci.yml`:**
-
-```yaml
-- name: Type check (mypy)
-  run: |
-    mypy src/ta_lab2 || true   # non-blocking initially
-```
-
-Initial mypy run on a codebase this size will surface dozens to hundreds of errors.
-Strategy: add config and non-blocking CI first, fix errors domain by domain, then
-remove `|| true` once a domain is clean.
-
-### Modified Components
-
-| Component | Change |
-|-----------|--------|
-| `pyproject.toml` | Add `[tool.mypy]` section |
-| `.github/workflows/ci.yml` | Remove `|| true` from ruff lint; add mypy job (non-blocking) |
+**Integration into orchestrator:**
+`run_all_ema_refreshes.py` should be renamed or supplemented with `run_all_ma_refreshes.py`
+which runs both EMA and AMA refreshers. The daily orchestrator `run_daily_refresh.py`
+adds `--amas` flag (or includes AMAs in `--emas` flag — the simpler choice is to
+fold AMAs into the existing `--emas` stage, since they share the same dependency on bars).
 
 ---
 
-## Area 3: Documentation (mkdocs version + pipeline diagram)
+## IC Evaluation: New Component
 
-### Existing State
+**What it is:** Spearman Information Coefficient (IC) between features and forward returns,
+IC decay across lags, IC turnover.
 
-- `mkdocs.yml` line 1: `site_name: ta_lab2 v0.4.0` — three major versions behind
-  actual v0.7.0
-- `pyproject.toml` line 7: `version = "0.5.0"` — also stale (should track
-  current milestone)
-- `docs/diagrams/data_flow.mmd` depicts the v0.5.0 migration story (Phase 13-15
-  archive/consolidation) — not the current runtime pipeline
-- `docs/operations/DAILY_REFRESH.md` covers bars + EMAs only; no regimes section,
-  no stats section, no features pipeline section
-- `mkdocs.yml` nav references `ARCHITECTURE.md` at docs root — that file does not
-  exist (nav is broken)
+**Where it lives:** `src/ta_lab2/analysis/ic_eval.py` (new file)
 
-### Integration Point: Version Sync
+**Source data:** `cmc_features` (feature store) + `cmc_returns_bars_multi_tf_u` (forward returns)
 
-Both `mkdocs.yml` (`site_name`) and `pyproject.toml` (`version`) must be updated
-together to avoid drift. The natural tie-in is a single commit that bumps both. No
-automated version sourcing exists — both are hardcoded strings.
+**Integration points:**
 
-### Integration Point: Pipeline Diagram
+| Touch point | Change type | Notes |
+|-------------|-------------|-------|
+| `analysis/feature_eval.py` | Extend | Current `feature_target_correlations()` uses Pearson; add Spearman IC version |
+| `analysis/ic_eval.py` | New | IC, IC decay, ICIR, IC turnover |
+| New DB table: `cmc_ic_results` | New | (id, feature_name, tf, lag, ic, ic_ir, computed_at) |
 
-The existing `docs/diagrams/data_flow.mmd` is the right file to replace. It uses
-Mermaid syntax consistent with the `pymdownx.superfences` extension already configured
-in `mkdocs.yml`. The replacement should depict the v0.7.0+ runtime pipeline:
-
-```mermaid
-flowchart TD
-    PH["cmc_price_histories7\n(raw OHLCV source)"]
-    PH --> BARS["run_all_bar_builders.py\n6 bar variants x N assets"]
-    BARS --> EMAS["run_all_ema_refreshes.py\n4 EMA families"]
-    BARS --> RET["Returns & Z-scores\nrefresh_returns_zscore.py"]
-    EMAS --> REG["refresh_cmc_regimes.py\nL0-L2, 4 regime tables"]
-    BARS --> FEAT["run_all_feature_refreshes.py\nvol -> TA -> cmc_features"]
-    REG --> STATS["run_all_stats_refreshers.py\n5 domain stats runners"]
-    FEAT --> STATS
-    RET --> STATS
+**Schema for `cmc_ic_results`:**
+```sql
+CREATE TABLE IF NOT EXISTS public.cmc_ic_results (
+    run_id          TEXT NOT NULL,         -- UUID or timestamp-based run identifier
+    feature_name    TEXT NOT NULL,
+    tf              TEXT NOT NULL,
+    lag             INTEGER NOT NULL,      -- forward return horizon in bars
+    ic              DOUBLE PRECISION,      -- Spearman IC
+    ic_ir           DOUBLE PRECISION,      -- IC / std(IC) = IC information ratio
+    ic_mean         DOUBLE PRECISION,      -- rolling mean of IC
+    n_obs           INTEGER,
+    computed_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (run_id, feature_name, tf, lag)
+);
 ```
 
-### Integration Point: DAILY_REFRESH.md
-
-The existing runbook must be updated in two places:
-
-1. **Entry Points section** — add `--regimes` and `--stats` flags with descriptions
-   (matching the existing flags table format)
-2. **Troubleshooting section** — add common regimes and stats failure patterns
-
-The existing document structure (Quick Start / Entry Points / Execution Order / Logs /
-Troubleshooting / Workflow Patterns / Cron Setup / Performance / See Also) should not
-change. New content slots in under existing headers.
-
-### Modified Components
-
-| Component | Change |
-|-----------|--------|
-| `mkdocs.yml` | Update `site_name` version string to v0.8.0 |
-| `pyproject.toml` | Update `version` field to match |
-| `docs/diagrams/data_flow.mmd` | Replace with current pipeline diagram |
-| `docs/operations/DAILY_REFRESH.md` | Add regimes + stats sections |
+**No changes to daily refresh pipeline.** IC evaluation is on-demand analysis,
+not a scheduled refresh step. It runs from notebooks or CLI scripts in the analysis
+tier, not from `run_daily_refresh.py`.
 
 ---
 
-## Area 4: Runbooks
+## PSR: Replace Placeholder in metrics.py
 
-### Existing Convention
+**Current state:** `backtests/metrics.py` contains `psr_placeholder()` — a sigmoid
+approximation that is acknowledged as a stub. The comment explicitly calls for
+"the full PSR (Lopez de Prado) or use mlfinlab."
 
-`docs/operations/` holds operational runbooks. Current runbooks:
-- `DAILY_REFRESH.md` — the canonical format; covers bars + EMAs refresh
-- `STATE_MANAGEMENT.md` — covers state table schemas and SQL queries
+**Recommended approach:** Implement PSR natively in `metrics.py` (no new library).
 
-The established section structure is:
+Lopez de Prado's PSR formula (from "The Sharpe Ratio Efficient Frontier", 2012):
 ```
-Quick Start → Entry Points → Execution Order → Logs and Monitoring
-→ Troubleshooting → Workflow Patterns → Cron Setup → Performance → See Also
+PSR(SR*) = Phi(((SR_hat - SR*) * sqrt(T-1)) / sqrt(1 - skew*SR_hat + (kurtosis-1)/4 * SR_hat^2))
 ```
+Where `Phi` is the standard normal CDF.
 
-### What Is Missing
+This requires: scipy.stats.norm.cdf — scipy is already in the environment.
 
-No runbooks exist for:
-- Stats runners (5 runners across 5 domains)
-- Feature refresh pipeline (`run_all_feature_refreshes.py`)
-- Regimes pipeline (wired into daily refresh since v0.7.0 but not documented as
-  a standalone runbook)
+**Integration:**
+- Modify `backtests/metrics.py`: Replace `psr_placeholder()` with `psr()` that takes
+  `returns: pd.Series, benchmark_sr: float = 0.0` and returns a float in (0, 1).
+- Add `dsr()` function (Deflated Sharpe Ratio — accounts for multiple testing).
+- No schema changes — PSR is a scalar metric stored in `cmc_backtest_metrics` already.
+- Update `summarize()` to call the real implementation.
 
-### New Runbook Placement and Content
-
-**`docs/operations/STATS_RUNNERS.md`** — New file covering:
-- What stats runners do (QA/validation, not production data)
-- How to interpret PASS/WARN/FAIL results
-- Per-domain runner invocation (bars, EMA, features, returns, prices)
-- What each stats table contains and where to query it
-- Common failure patterns (watermark drift, missing data source)
-- When to use `--full-refresh` to reset watermarks
-
-**`docs/operations/FEATURES_PIPELINE.md`** — New file covering:
-- Dependency on bars + EMAs being current before running
-- The `--tf` and `--all-tfs` flags
-- How vol, TA, and cmc_features are layered
-- Column schema (the 112-column cmc_features table)
-- What "dynamic column matching" means in practice
-- Common errors (column mismatch, missing dependency data)
-
-**Regimes:** Do NOT create a separate regimes runbook. Regimes are already wired into
-`run_daily_refresh.py --regimes`. Add a "Regimes" subsection to `DAILY_REFRESH.md`
-under Entry Points (consistent with how `--bars` and `--emas` are documented).
-
-### mkdocs nav Integration
-
-New runbooks must be added to `mkdocs.yml` nav under an appropriate section.
-Currently the nav has no `Operations` section — one should be added:
-
-```yaml
-nav:
-  - Operations:
-    - Daily Refresh: operations/DAILY_REFRESH.md
-    - State Management: operations/STATE_MANAGEMENT.md
-    - Stats Runners: operations/STATS_RUNNERS.md
-    - Features Pipeline: operations/FEATURES_PIPELINE.md
-```
-
-### New / Modified Components
-
-| Component | Type |
-|-----------|------|
-| `docs/operations/STATS_RUNNERS.md` | New file |
-| `docs/operations/FEATURES_PIPELINE.md` | New file |
-| `docs/operations/DAILY_REFRESH.md` | Modified — add regimes and stats subsections |
-| `mkdocs.yml` | Modified — add Operations nav section |
+**Confidence:** MEDIUM — the formula is well-documented but the exact scaling
+(T-1 vs T, population vs sample moments) needs verification against a reference
+implementation before trusting outputs.
 
 ---
 
-## Area 5: Alembic
+## Purged K-Fold: New Component in backtests/
 
-### Existing State
+**Current state:** `backtests/splitters.py` has expanding walk-forward by calendar years.
+No purging, no embargo. This is inadequate for financial ML (label overlap creates
+look-ahead bias in CV).
 
-- No alembic present — zero alembic files found in the entire repository
-- 16 raw SQL files in `sql/migration/` with mixed naming conventions:
-  - 8 files use `NNN_description.sql` (e.g., `016_dim_timeframe_*.sql`)
-  - 8 files use `alter_*` or `rebuild_*` prefix (no sequential number)
-- Stats runners and some refreshers create tables via inline `CREATE TABLE IF NOT
-  EXISTS` Python strings — not tracked in any external DDL
-- Separate `sql/ddl/` directory holds creation DDL for core tables
+**What purged K-fold adds:**
+- Embargo: N bars dropped after each train fold boundary (prevents label overlap)
+- Purging: removes training samples whose labels overlap with test period
+- Lopez de Prado's CPCV (Combinatorial Purged Cross-Validation) is the gold standard
 
-### Bootstrap Strategy
+**Recommended design:**
 
-Bootstrapping alembic against a live database that already has all tables applied
-requires "stamp without migrate":
+```python
+# backtests/splitters.py additions
 
-1. `pip install alembic` (already in `dev` deps in `pyproject.toml`)
-2. `alembic init alembic` at project root — creates `alembic/` directory and `alembic.ini`
-3. Edit `alembic.ini`: point `script_location` at `alembic/`, leave `sqlalchemy.url`
-   empty (will be set in `env.py`)
-4. Edit `alembic/env.py` to resolve DB URL from the existing config pattern:
+@dataclass
+class PurgedKFoldSplit:
+    """One fold of purged time-series K-fold."""
+    fold: int
+    train_idx: np.ndarray
+    test_idx: np.ndarray
+    embargo_idx: np.ndarray    # excluded indices between train and test
 
-   ```python
-   from ta_lab2.scripts.refresh_utils import resolve_db_url
-   config.set_main_option("sqlalchemy.url", resolve_db_url(None))
-   ```
 
-5. Create an initial "baseline" migration that is intentionally empty:
-
-   ```bash
-   alembic revision -m "0001_baseline_stamp"
-   # Edit the generated file: upgrade() = pass, downgrade() = pass
-   ```
-
-6. Stamp the live database without running any DDL:
-
-   ```bash
-   alembic stamp head
-   ```
-
-From this point forward, all new schema changes go through `alembic revision`.
-
-### Handling the Existing 16 SQL Migration Files
-
-These files document what was applied historically. They should **not** be imported
-into alembic. They are already applied to the live database. Alembic takes over from
-this point forward only. Recommended action: add a comment to `sql/migration/README.md`
-(or the top of each file) noting "applied manually before alembic was introduced; do
-not re-run."
-
-### Handling Inline DDL in Stats Runners
-
-Stats runners use `CREATE TABLE IF NOT EXISTS` to create their own QA tables at
-runtime. This creates a minor conflict with alembic as the canonical schema source.
-
-**Recommended approach (Option A):** Keep inline DDL for stats tables as-is. They are
-self-managing QA tables with no downstream consumers other than their own runner.
-Document in the baseline migration that these tables exist but are managed externally.
-This adds zero risk and zero scope.
-
-**Alternative (Option B):** Extract stats table DDL into alembic migrations and remove
-inline DDL from runners. More consistent but requires touching every stats runner
-script. Appropriate for a later polish cycle, not for the hardening milestone.
-
-### Naming Convention for Future Migrations
-
-Embed the human-readable sequential number in the migration message since alembic
-manages its own hash-based revision IDs:
-
-```bash
-alembic revision -m "0022_add_audit_results_table"
-alembic revision -m "0023_add_table_summary_table"
+def purged_kfold_splits(
+    index: pd.DatetimeIndex,
+    n_splits: int = 5,
+    embargo_pct: float = 0.01,   # fraction of total samples to embargo
+) -> list[PurgedKFoldSplit]:
+    """
+    Purged K-fold splitter for time-series data.
+    Implements the approach from Lopez de Prado (2018), Chapter 7.
+    """
+    ...
 ```
 
-This makes `alembic history` readable without losing alembic's native revision chain.
-The existing `sql/migration/` directory coexists for historical reference.
+**Integration points:**
 
-### New / Modified Components
+| Touch point | Change type | Notes |
+|-------------|-------------|-------|
+| `backtests/splitters.py` | Add functions | Add `purged_kfold_splits()`, `PurgedKFoldSplit` |
+| `backtests/orchestrator.py` | Optional | Plumb purged CV into parameter sweep if desired |
+| `analysis/parameter_sweep.py` | Optional | Support new splitter type |
 
-| Component | Type | Notes |
-|-----------|------|-------|
-| `alembic/` directory | New | Created by `alembic init` |
-| `alembic.ini` | New | Config at project root |
-| `alembic/env.py` | New (generated, edited) | Wired to `resolve_db_url()` |
-| `alembic/versions/0001_baseline_stamp.py` | New | Empty upgrade/downgrade |
-| `pyproject.toml` dev deps | Modified | Add `alembic>=1.13` |
-| `sql/migration/` | No change | Keep as historical reference |
+No schema changes — purged K-fold is a computation utility, results go into
+existing `cmc_backtest_metrics`.
 
 ---
 
-## Full Component Inventory: New vs Modified
+## Feature Experimentation Framework: New Subsystem
 
-### Modified (existing files changed)
+**What it is:** A config-driven registry that tracks feature lifecycle
+(experimental -> promoted -> deprecated) and enables systematic IC evaluation
+across features without ad-hoc scripting.
 
-| Component | What Changes |
-|-----------|-------------|
-| `src/ta_lab2/scripts/run_daily_refresh.py` | Add `run_stats_refreshers()`, `--stats` flag, include in `--all` |
-| `pyproject.toml` | Add `[tool.mypy]`, update `version`, add `alembic>=1.13` to dev |
-| `.github/workflows/ci.yml` | Remove `|| true` from ruff lint; add non-blocking mypy job |
-| `mkdocs.yml` | Update version string; add Operations nav section |
-| `docs/diagrams/data_flow.mmd` | Replace with current v0.7.0+ pipeline diagram |
-| `docs/operations/DAILY_REFRESH.md` | Add regimes subsection, add stats subsection |
+**Design notes from MEMORY.md:**
+> Config-driven feature registry with lifecycle: experimental -> promoted -> deprecated
+> Compute engine reuses existing indicator functions on persisted base data
+> Evaluation layer for IC, feature importance, stability across assets/TFs
 
-### New (files that do not yet exist)
+**Recommended architecture:**
 
-| Component | Purpose |
-|-----------|---------|
-| `src/ta_lab2/scripts/run_all_stats_refreshers.py` | Top-level stats orchestrator |
-| `docs/operations/STATS_RUNNERS.md` | Operations runbook for stats runners |
-| `docs/operations/FEATURES_PIPELINE.md` | Operations runbook for feature refresh |
-| `alembic/` directory + `alembic.ini` | Migration tooling bootstrap |
-| `alembic/versions/0001_baseline_stamp.py` | Empty baseline migration |
+### New Tables
+
+**`dim_feature_registry`** — tracks feature definitions and lifecycle:
+```sql
+CREATE TABLE IF NOT EXISTS public.dim_feature_registry (
+    feature_id      SERIAL PRIMARY KEY,
+    feature_name    TEXT NOT NULL UNIQUE,    -- e.g. 'kama_10_2_30_d1'
+    indicator_type  TEXT NOT NULL,           -- 'AMA', 'TA', 'VOL', 'RETURNS'
+    params_json     JSONB,                   -- {"er_period":10, "fast":2, "slow":30}
+    status          TEXT NOT NULL DEFAULT 'experimental',  -- experimental/promoted/deprecated
+    source_table    TEXT NOT NULL,           -- 'cmc_ama_multi_tf' or 'cmc_features'
+    source_column   TEXT NOT NULL,           -- column name in source table
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    promoted_at     TIMESTAMPTZ,
+    deprecated_at   TIMESTAMPTZ,
+    notes           TEXT
+);
+```
+
+**`cmc_feature_experiments`** — IC evaluation results linked to registry:
+```sql
+CREATE TABLE IF NOT EXISTS public.cmc_feature_experiments (
+    experiment_id   TEXT NOT NULL,           -- e.g. 'exp_kama_2026_02_23'
+    feature_id      INTEGER REFERENCES dim_feature_registry(feature_id),
+    tf              TEXT NOT NULL,
+    lag             INTEGER NOT NULL,
+    ic_mean         DOUBLE PRECISION,
+    ic_ir           DOUBLE PRECISION,
+    ic_decay_half   INTEGER,                 -- lag at which IC drops to 50% of peak
+    n_assets        INTEGER,
+    n_obs           INTEGER,
+    computed_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (experiment_id, feature_id, tf, lag)
+);
+```
+
+### New Python Module: `src/ta_lab2/research/`
+
+This is a new top-level module (not under `scripts/` or `analysis/`) because it
+spans computation, evaluation, and persistence in ways that do not fit cleanly into
+the existing layer structure.
+
+```
+src/ta_lab2/research/
+    __init__.py
+    registry.py          # FeatureRegistry class -- CRUD on dim_feature_registry
+    experiment.py        # ExperimentRunner -- run IC eval for a set of features
+    ic_eval.py           # IC computation (imported from analysis/ or standalone)
+    lifecycle.py         # promote(), deprecate(), compare_generations()
+    reports.py           # summary tables, markdown reports
+```
+
+**`FeatureRegistry`** is a thin wrapper over `dim_feature_registry`:
+- `register(feature_name, indicator_type, params, source_table, source_column)`
+- `promote(feature_name)` / `deprecate(feature_name)`
+- `list_by_status(status)` -> list of feature definitions
+- `get(feature_name)` -> single feature definition
+
+**`ExperimentRunner`**:
+- Accepts a list of feature names from the registry
+- Loads feature values from their `source_table.source_column`
+- Computes IC against forward returns from `cmc_returns_bars_multi_tf_u`
+- Writes results to `cmc_feature_experiments`
+- No side effects on the main pipeline tables
+
+**Integration with existing pipeline:**
+None required for the framework itself. The framework reads from existing tables;
+it does not write back to them. New AMA values (from `cmc_ama_multi_tf`) become
+candidates for registration in `dim_feature_registry` and inclusion in experiments.
+
+---
+
+## Streamlit Dashboard: New Application
+
+**What it is:** Two-panel research explorer and pipeline monitor.
+
+**Where it lives:** `apps/dashboard/` at project root (not inside src/).
+
+**Rationale for `apps/` not `src/ta_lab2/viz/`:** Streamlit apps are not library code.
+They should not be importable as package modules and should not affect the package's
+import graph. Dashboard code in the package root would pollute package imports, add
+Streamlit as a hard dependency, and slow down test collection.
+
+```
+apps/
+    dashboard/
+        __init__.py     (empty)
+        app.py          # Streamlit entry point
+        pages/
+            01_pipeline_monitor.py
+            02_feature_explorer.py
+            03_backtest_results.py
+            04_regime_view.py
+        components/
+            charts.py   # plotly wrappers
+            tables.py   # st.dataframe helpers
+            db.py       # cached DB queries via st.cache_data
+```
+
+**Data flow:** All DB reads, no writes. Queries existing tables directly via SQLAlchemy.
+Streamlit's `st.cache_data` (TTL-based) handles query caching to avoid hammering the DB.
+
+**Integration points:**
+
+| Touch point | Change type | Notes |
+|-------------|-------------|-------|
+| `src/ta_lab2/config.py` | Read-only | Dashboard imports `resolve_db_url()` for connection |
+| `src/ta_lab2/analysis/` | Read-only | Dashboard calls existing `evaluate_signals()`, `sharpe()`, etc. |
+| `pyproject.toml` | Add optional dep group | `[project.optional-dependencies] viz = ["streamlit", "plotly"]` |
+| No pipeline tables modified | None | Dashboard is read-only |
+
+**CI:** Dashboard is excluded from test coverage. Add a basic
+`streamlit run apps/dashboard/app.py --headless` smoke-test in CI only if Streamlit is
+installed (conditional on optional dep group being installed).
+
+---
+
+## Jupyter Notebooks: Integration Pattern
+
+**Where they live:** `notebooks/` at project root (already conventional for quant projects).
+
+**Pattern:** All notebooks import from `ta_lab2` package. They do not copy-paste pipeline
+code. This enforces that notebook code is a thin consumer of library functions.
+
+```
+notebooks/
+    01_ama_exploration.ipynb
+    02_ic_evaluation_walkthrough.ipynb
+    03_purged_kfold_demo.ipynb
+    04_feature_experimentation_demo.ipynb
+    05_regime_overlay_backtest.ipynb
+```
+
+**No architectural changes needed** — notebooks are consumers, not producers.
+The `resolve_db_url()` connection helper already works from any Python context.
+
+---
+
+## Component Boundaries
+
+### New vs Modified
+
+| Component | New or Modified | Description |
+|-----------|-----------------|-------------|
+| `cmc_ama_multi_tf` (table) | New | Adaptive MA values, PK: (id, ts, tf, indicator, params_hash) |
+| `dim_ama_params` (table) | New | Human-readable parameter set registry |
+| `dim_feature_registry` (table) | New | Feature lifecycle tracking |
+| `cmc_feature_experiments` (table) | New | IC evaluation results |
+| `cmc_ic_results` (table) | New | Per-feature IC by lag |
+| `features/m_tf/ama_operations.py` | New | Pure AMA computation functions (KAMA, DEMA, TEMA, HMA) |
+| `features/m_tf/base_ama_feature.py` | New | Template Method for AMA computation |
+| `features/m_tf/ama_multi_timeframe.py` | New | Concrete AMAFeature subclasses |
+| `scripts/emas/refresh_cmc_ama_multi_tf.py` | New | Refresher for AMA table |
+| `scripts/emas/run_all_ma_refreshes.py` | New | Orchestrate both EMA and AMA |
+| `backtests/metrics.py` | Modify | Replace `psr_placeholder()` with real PSR/DSR |
+| `backtests/splitters.py` | Modify | Add `purged_kfold_splits()`, `PurgedKFoldSplit` |
+| `analysis/ic_eval.py` | New | Spearman IC, IC decay, ICIR |
+| `analysis/feature_eval.py` | Modify | Add Spearman variant alongside existing Pearson |
+| `research/` module | New | FeatureRegistry, ExperimentRunner, lifecycle |
+| `apps/dashboard/` | New | Streamlit app (outside src/) |
+| `notebooks/` | New | End-to-end demo notebooks |
+| `run_daily_refresh.py` | Modify | Add `--amas` flag or fold into `--emas` stage |
+| `pyproject.toml` | Modify | Add optional `[viz]` dependency group |
+| `sql/features/` | New files | DDL for new tables |
+| Alembic migrations | New revisions | Schema changes go through Alembic (v0.8.0 MIGR-03) |
+
+### Components That Must NOT Change
+
+| Component | Why |
+|-----------|-----|
+| `cmc_ema_multi_tf*` table family | Existing PK is (id,ts,tf,period); altering breaks all queries |
+| `cmc_ema_multi_tf_u` | Unified view with existing alignment_source tracking; stable contract for signal generators |
+| `BaseEMAFeature` / `BaseEMARefresher` | Signal generators depend on the EMA table schema indirectly |
+| `cmc_features` 112-column schema | Signal generators query this directly; column changes require migration + signal regeneration |
+| `run_daily_refresh.py` stage ordering | bars->EMAs->regimes->stats ordering is a hard dependency |
 
 ---
 
 ## Data Flow Changes
 
-### Current (v0.7.0)
+### Adding AMAs to the Pipeline
 
 ```
-run_daily_refresh.py --all
-  bars -> EMAs -> regimes
-  [stats: manual, each runner invoked separately]
+[Existing bars] --> cmc_price_bars_multi_tf_u
+                        |
+          +-------------+
+          |             |
+          v             v
+  [EMA Refreshers]  [AMA Refreshers]    -- new parallel branch
+   cmc_ema_multi_tf  cmc_ama_multi_tf   -- new table
+          |             |
+          +------+-------+
+                 |
+                 v (signal generators can optionally JOIN cmc_ama_multi_tf)
+         [Signal Generators]
 ```
 
-### Target (v0.8.0)
+AMAs are a parallel branch, not a replacement. The existing EMA branch is unchanged.
+Signal generators can optionally JOIN `cmc_ama_multi_tf` for AMA-based crossover signals
+in a future milestone, using the same LEFT JOIN pattern as EMA queries.
+
+### Adding IC Evaluation
 
 ```
-run_daily_refresh.py --all
-  bars -> EMAs -> regimes -> stats
-
-run_daily_refresh.py --stats     (standalone, safe to run anytime)
+cmc_features + cmc_ama_multi_tf --> [IC Evaluator] --> cmc_ic_results
+cmc_returns_bars_multi_tf_u --------^                  cmc_feature_experiments
+dim_feature_registry ---------------^
 ```
 
-No changes to what data is written or how — only orchestration topology changes.
-The 5 stats runners already exist and are complete; only wiring changes.
+This is a read-from-pipeline, write-to-research-tables pattern. No pipeline tables
+are modified by IC evaluation.
 
 ---
 
-## Suggested Build Order
+## Schema Changes Needed
 
-This order minimizes risk at each step and allows each step to be validated before
-the next begins.
+All schema changes must go through Alembic (established in v0.8.0 MIGR-03).
 
-**Step 1 — Stats orchestrator (new file) + wire into daily refresh**
-
-Build `run_all_stats_refreshers.py` first (collecting the 5 existing runners via the
-same subprocess/ComponentResult pattern as the existing EMA stats orchestrator).
-Then add `run_stats_refreshers()` to `run_daily_refresh.py` and the `--stats` flag.
-
-Test sequence: `--stats --dry-run`, then `--stats` alone, then `--all --dry-run`,
-then `--all` with `--continue-on-error`. This is entirely new code that does not
-modify any existing execution paths.
-
-**Step 2 — Alembic bootstrap**
-
-Bootstrap alembic and stamp the live DB before any new schema changes land in v0.8.0.
-The stamp is a read-only DB operation — no DDL runs, no tables touched. This creates
-the migration tracking infrastructure without any risk to existing data.
-
-**Step 3 — Code quality baseline (assess before blocking)**
-
-Run `ruff check src` locally to see current violation count. Apply `ruff --fix`
-where safe. Commit the cleaned state. Then flip `|| true` in `ci.yml` to make
-ruff blocking. Add `[tool.mypy]` to `pyproject.toml` and the non-blocking mypy
-CI job in the same commit. Assess mypy error count before committing to any
-specific remediation scope.
-
-**Step 4 — Docs: version sync + pipeline diagram**
-
-Update `mkdocs.yml` and `pyproject.toml` version strings in one commit. Replace
-`docs/diagrams/data_flow.mmd` with the current pipeline diagram. Update
-`DAILY_REFRESH.md` to add regimes and stats sections (regimes have been wired
-since v0.7.0 but the runbook was never updated).
-
-**Step 5 — Runbooks**
-
-Write `STATS_RUNNERS.md` and `FEATURES_PIPELINE.md` last — after Step 1 is done
-so the stats runbook accurately describes the integrated workflow. Update `mkdocs.yml`
-nav to include the new runbooks.
+| Migration | Priority | Description |
+|-----------|----------|-------------|
+| `revision_1_ama_tables` | Phase 1 | Create `cmc_ama_multi_tf`, `dim_ama_params` |
+| `revision_2_registry_tables` | Phase 2 | Create `dim_feature_registry`, `cmc_feature_experiments`, `cmc_ic_results` |
+| No changes to existing tables | — | AMA design deliberately avoids altering existing EMA tables |
 
 ---
 
-## Architectural Constraints to Respect
+## Build Order Recommendation
 
-**Subprocess isolation is intentional.** The `subprocess.run()` pattern in
-`run_daily_refresh.py` is deliberate — each child process has its own import scope
-and exception boundary. Stats runners must be wired via subprocess, not imported
-and called in-process. This keeps the orchestrator as a thin coordinator.
+Dependencies define the only valid build order:
 
-**Import-linter contracts must not be violated.** Five contracts are defined in
-`pyproject.toml`. The new `run_all_stats_refreshers.py` lives in `ta_lab2.scripts`
-(the allowed top layer) and only invokes child processes — no cross-layer imports.
-This is safe as written.
+**Phase 1: AMA Computation Engine**
+- `ama_operations.py` (pure functions, no DB)
+- `base_ama_feature.py` (template class)
+- `ama_multi_timeframe.py` (concrete subclasses)
+- Alembic migration: `cmc_ama_multi_tf`, `dim_ama_params`
+- `refresh_cmc_ama_multi_tf.py` (refresher script)
+- Wire into `run_daily_refresh.py`
 
-**Stats tables are self-creating and idempotent.** Each stats runner issues
-`CREATE TABLE IF NOT EXISTS` on startup. Re-running is safe. The orchestrator
-should not add any deduplication logic — individual runners handle it.
+Rationale: AMA values must exist before they can be registered in the feature
+registry or used in IC evaluation. Building the compute engine first also validates
+the table schema before dependent code is written.
 
-**Alembic `env.py` must use the existing DB URL resolution chain.** The project
-uses `resolve_db_url()` from `ta_lab2.scripts.refresh_utils` and `TARGET_DB_URL`
-env var. Alembic's `env.py` should wire into this same function. Do not introduce
-a second resolution path — that would create a two-source-of-truth problem.
+**Phase 2: PSR + Purged K-Fold**
+- Modify `metrics.py` (standalone, no DB dependency)
+- Add to `splitters.py` (standalone)
 
-**mypy `ignore_missing_imports = true` is required.** The codebase has conditional
-imports (vectorbt, astronomy-engine, fredapi). Without this flag, mypy errors on
-every file touching optional deps even when they are guarded by `try/except`.
+These are self-contained modifications with no inter-phase dependencies.
+Can be done in parallel with Phase 1 if needed.
+
+**Phase 3: IC Evaluation**
+- `analysis/ic_eval.py` (depends on cmc_features existing — already present)
+- Alembic migration: `cmc_ic_results`
+
+Works immediately on existing `cmc_features` columns without Phase 1 being complete.
+Phase 1 completion unlocks IC evaluation of AMA columns.
+
+**Phase 4: Feature Experimentation Framework**
+- `research/registry.py`
+- `research/experiment.py`
+- Alembic migration: `dim_feature_registry`, `cmc_feature_experiments`
+
+Requires: IC evaluation working (Phase 3) to power the experiment runner.
+
+**Phase 5: Streamlit Dashboard**
+- `apps/dashboard/` (read-only, depends on all preceding tables existing)
+
+Requires all data layers operational. Dashboard adds no new data; it visualizes existing.
+
+**Phase 6: Notebooks**
+- End-to-end demos referencing all new components.
+- Requires all preceding phases complete.
 
 ---
 
-## Integration Risk Summary
+## Anti-Patterns to Avoid
 
-| Area | Risk Level | Mitigation |
-|------|------------|------------|
-| Stats wiring | Low | Stats runners already exist and work; only orchestration wiring is new |
-| Ruff blocking | Medium | Unknown lint debt exists (the `\|\| true` is not cosmetic); audit locally first |
-| mypy config | Medium | Large codebase; many typing gaps likely; start non-blocking |
-| mkdocs version | Low | String updates only; no logic changes |
-| Runbooks | Low | No code changes; review against actual `--help` output before publishing |
-| Alembic bootstrap | Low | `alembic stamp` is read-only; no DDL runs on live DB |
-| Inline stats DDL vs alembic | Low | Keep as-is; document exception; no scripts need touching |
+### Anti-Pattern 1: Adding `indicator_type` to cmc_ema_multi_tf
+
+**What:** Adding a discriminator column to the existing EMA table family to store AMAs.
+**Why bad:** Requires a nullable column with backward-compat NULL for all existing rows.
+Breaks the clean integer `period` semantics. Forces period=NULL for multi-param AMAs.
+Requires migration of 14.8M+ rows. Breaks all queries that assume `period` is the only
+disambiguation needed.
+**Instead:** Separate `cmc_ama_multi_tf` table with `params_hash` PK column.
+
+### Anti-Pattern 2: Storing KAMA as period=synthetic_int
+
+**What:** Using a lookup table `dim_kama_params` where `param_id` (integer) is stored
+in the EMA table's `period` column.
+**Why bad:** Period integers in the EMA table are meaningful to operators and signal
+generators. Mixing semantic ints (EMA periods) with opaque lookup IDs in the same
+column is a maintenance hazard. The dim_signals table already uses a similar pattern
+and required extra care — do not repeat it here.
+**Instead:** `params_hash` in a new table, no sharing of the period column.
+
+### Anti-Pattern 3: IC Evaluation in the Daily Refresh Pipeline
+
+**What:** Running IC evaluation as a stage in `run_daily_refresh.py`.
+**Why bad:** IC evaluation over 109 TFs and dozens of features across 100+ assets is
+potentially hours of computation. Running it daily would make the refresh pipeline
+unreliable. IC is also inherently a research/analysis operation — it should not block
+daily data production.
+**Instead:** On-demand via CLI or notebooks. Daily refresh is strictly
+bars->EMAs->AMAs->regimes->stats.
+
+### Anti-Pattern 4: Streamlit Dashboard Inside src/ta_lab2/
+
+**What:** Putting the dashboard in `src/ta_lab2/viz/dashboard/`.
+**Why bad:** Dashboard imports are not package imports. Streamlit requires running as a
+script, not as a module. Dashboard code in the package root would pollute package
+imports, add Streamlit as a hard dependency, and slow down test collection.
+**Instead:** `apps/dashboard/` at project root, with Streamlit in optional dep group.
+
+### Anti-Pattern 5: Notebooks That Copy-Paste Pipeline Code
+
+**What:** Notebooks that re-implement feature computation or database queries inline.
+**Why bad:** Diverges from the library. Notebook results become non-reproducible as
+the library evolves. Creates two sources of truth.
+**Instead:** Notebooks import from `ta_lab2`. Library functions are the single
+implementation.
+
+---
+
+## Scalability Considerations
+
+| Concern | Current (22M rows) | With AMA addition | Mitigation |
+|---------|-------------------|-------------------|------------|
+| cmc_ama_multi_tf row count | 0 | ~6-8M rows (4 indicators x 109 TFs x ~15K rows/asset/indicator) | Index on (id, tf, indicator); partial index on canonical rows |
+| IC evaluation query latency | N/A | Potentially slow over full history | Partition by tf; run per-asset batches, aggregate offline |
+| dim_feature_registry size | 0 | Tens to hundreds of rows | Negligible — no performance concern |
+| Dashboard query latency | N/A | Reads from 50+ tables | `st.cache_data` TTL; materialized views for common aggregations |
+
+---
+
+## Open Questions for Phase-Level Research
+
+1. **KAMA parameter sets:** What specific parameter values are canonical for this project?
+   (Standard defaults: er_period=10, fast=2, slow=30.) Need to decide before building
+   `dim_ama_params` seed data.
+
+2. **AMA in daily refresh:** Should AMAs run in the same subprocess as EMAs (extending
+   `run_all_ema_refreshes.py`) or in a separate orchestrator step? Simpler path is to
+   extend the EMA orchestrator. Cleaner path is a new `--amas` step.
+
+3. **Signal generators for AMAs:** Will v0.9.0 add AMA-based signals, or just compute
+   AMA values for research? If signals are in scope, a new `cmc_signals_ama_crossover`
+   table is needed.
+
+4. **PSR benchmark Sharpe:** The PSR formula requires a benchmark Sharpe ratio `SR*`.
+   Industry convention is `SR* = 0` (beat cash) or `SR* = 1.0` (bar for live strategy).
+
+5. **Notebook execution in CI:** Should notebooks run as part of CI? Requires DB
+   connection. Typically excluded from CI in quant projects; test by converting to
+   scripts with `--headless` instead.
+
+---
+
+## Sources
+
+All findings are from direct codebase inspection at commit 26678109 (2026-02-23).
+
+- `src/ta_lab2/features/m_tf/base_ema_feature.py` — Template Method pattern, PK design
+- `src/ta_lab2/scripts/emas/base_ema_refresher.py` — Refresher pattern, state management
+- `src/ta_lab2/scripts/features/base_feature.py` — Feature write pattern
+- `src/ta_lab2/scripts/run_daily_refresh.py` — Orchestrator stage ordering
+- `src/ta_lab2/backtests/metrics.py` — Confirmed `psr_placeholder()` stub
+- `src/ta_lab2/backtests/splitters.py` — Confirmed no purging/embargo
+- `src/ta_lab2/analysis/feature_eval.py` — Confirmed Pearson-only IC
+- `sql/features/030_cmc_ema_multi_tf_u_create.sql` — Confirmed PK: (id, ts, tf, period)
+- `sql/features/042_cmc_ta.sql` — Confirmed feature table schema pattern
+- `.planning/codebase/ARCHITECTURE.md` — Prior architecture mapping (2026-01-21)
+- `.planning/milestones/v0.8.0-REQUIREMENTS.md` — Deferred features list confirmed
+- MEMORY.md — feature_experimentation.md design notes, AMA status
+- PSR formula: Lopez de Prado (2012) "The Sharpe Ratio Efficient Frontier" (MEDIUM confidence on implementation details)
