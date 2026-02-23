@@ -494,7 +494,7 @@ Plans:
 - [x] **Phase 29: Stats/QA Orchestration** - Wire 5 existing stats runners into daily refresh pipeline + weekly QC digest
 - [x] **Phase 30: Code Quality Tooling** - Make ruff lint blocking in CI, add mypy config, fix stale tooling references
 - [x] **Phase 31: Documentation Freshness** - Version sync, pipeline mermaid diagram, fix stale refs, mkdocs build clean
-- [ ] **Phase 32: Runbooks** - Regime runbook, backtest runbook, new-asset SOP, disaster recovery guide
+- [x] **Phase 32: Runbooks** - Regime runbook, backtest runbook, new-asset SOP, disaster recovery guide
 - [ ] **Phase 33: Alembic Migrations** - Bootstrap framework, stamp existing schema, catalog legacy SQL migrations
 
 ---
@@ -566,8 +566,8 @@ Plans:
 **Plans:** 2 plans in 1 wave
 
 Plans:
-- [ ] 32-01-PLAN.md -- Regime pipeline runbook + backtest pipeline runbook (RUNB-01, RUNB-02)
-- [ ] 32-02-PLAN.md -- New-asset onboarding SOP + disaster recovery guide + mkdocs nav (RUNB-03, RUNB-04)
+- [x] 32-01-PLAN.md -- Regime pipeline runbook + backtest pipeline runbook (RUNB-01, RUNB-02)
+- [x] 32-02-PLAN.md -- New-asset onboarding SOP + disaster recovery guide + mkdocs nav (RUNB-03, RUNB-04)
 
 ---
 
@@ -682,4 +682,4 @@ Note: Phase 29 and Phase 33 can be worked in parallel (fully isolated). Phase 30
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-23 (Phase 32 planned -- 2 plans in 1 wave, RUNB-01..04 covered)*
+*Last updated: 2026-02-23 (Phase 32 complete -- 2/2 plans, 9/9 must-haves verified)*

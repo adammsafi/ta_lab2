@@ -33,10 +33,10 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Runbooks
 
-- [ ] **RUNB-01**: Regime pipeline runbook documenting how to run, debug, and recover regime refresh (matches DAILY_REFRESH.md format)
-- [ ] **RUNB-02**: Backtest pipeline runbook documenting signals→backtest→DB storage end-to-end workflow
-- [ ] **RUNB-03**: New-asset onboarding SOP as standalone ops doc (extracted from Phase 21 analysis)
-- [ ] **RUNB-04**: Disaster recovery guide covering backup strategy, restore from snapshot, and rebuild from scratch
+- [x] **RUNB-01**: Regime pipeline runbook documenting how to run, debug, and recover regime refresh (matches DAILY_REFRESH.md format)
+- [x] **RUNB-02**: Backtest pipeline runbook documenting signals→backtest→DB storage end-to-end workflow
+- [x] **RUNB-03**: New-asset onboarding SOP as standalone ops doc (extracted from Phase 21 analysis)
+- [x] **RUNB-04**: Disaster recovery guide covering backup strategy, restore from snapshot, and rebuild from scratch
 
 ### Alembic Migrations
 
@@ -103,10 +103,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DOCS-02 | Phase 31 | Complete |
 | DOCS-03 | Phase 31 | Complete |
 | DOCS-04 | Phase 31 | Complete |
-| RUNB-01 | Phase 32 | Pending |
-| RUNB-02 | Phase 32 | Pending |
-| RUNB-03 | Phase 32 | Pending |
-| RUNB-04 | Phase 32 | Pending |
+| RUNB-01 | Phase 32 | Complete |
+| RUNB-02 | Phase 32 | Complete |
+| RUNB-03 | Phase 32 | Complete |
+| RUNB-04 | Phase 32 | Complete |
 | MIGR-01 | Phase 33 | Pending |
 | MIGR-02 | Phase 33 | Pending |
 | MIGR-03 | Phase 33 | Pending |
@@ -119,4 +119,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-22*
-*Last updated: 2026-02-23 (DOCS-01..04 marked Complete after Phase 31 verification)*
+*Last updated: 2026-02-23 (RUNB-01..04 marked Complete after Phase 32 verification)*
