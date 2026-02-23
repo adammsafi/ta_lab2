@@ -7,10 +7,11 @@
 - v0.6.0 EMA & Bar Architecture Standardization (Phases 20-26) - SHIPPED 2026-02-17
 - v0.7.0 Regime Integration & Signal Enhancement (Phases 27-28) - SHIPPED 2026-02-20
 - v0.8.0 Polish & Hardening (Phases 29-34) - SHIPPED 2026-02-23
+- v0.9.0 Research & Experimentation (Phases 35-40) - current milestone
 
 ## Overview
 
-Build trustworthy quant trading infrastructure 3x faster by creating AI coordination that remembers context across platforms. v0.4.0 established quota management, memory infrastructure (3,763 memories in Qdrant via Mem0), multi-platform orchestration with cost optimization, and ta_lab2 development (time model, features, signals). v0.5.0 consolidated four external project directories into unified ta_lab2 structure. v0.6.0 locks down the bars and EMAs foundation so adding new assets (crypto + equities) is mechanical and reliable.
+Build trustworthy quant trading infrastructure 3x faster by creating AI coordination that remembers context across platforms. v0.4.0 established quota management, memory infrastructure (3,763 memories in Qdrant via Mem0), multi-platform orchestration with cost optimization, and ta_lab2 development (time model, features, signals). v0.5.0 consolidated four external project directories into unified ta_lab2 structure. v0.6.0 locks down the bars and EMAs foundation so adding new assets (crypto + equities) is mechanical and reliable. v0.9.0 completes the research cycle: new adaptive indicators, IC-based feature evaluation, statistically sound CV, a feature experimentation framework, and interactive visualization.
 
 ## Phases
 
@@ -20,6 +21,7 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 - Phases 20-26: v0.6.0 (complete)
 - Phases 27-28: v0.7.0 (complete)
 - Phases 29-34: v0.8.0 (complete)
+- Phases 35-40: v0.9.0 (current)
 - Decimal phases (27.1, 28.1): Urgent insertions if needed
 
 <details>
@@ -460,7 +462,7 @@ Plans:
 <summary>v0.7.0 Phase Details (Phases 27-28) - COMPLETE</summary>
 
 ### Phase 27: Regime Integration
-**Goal:** Connect existing regime module (labels, policy resolver, hysteresis, data budget) to DB-backed feature pipeline. Write refresh_cmc_regimes.py that reads from cmc_features and calendar bar tables, runs L0-L2+ labeling, resolves policy, writes to cmc_regimes table. Wire regime context into signal generators.
+**Goal:** Connect existing regime module (labels, policy resolver, hysteresis, data budget) to DB-backed feature pipeline. Write refresh_cmc_regimes.py that reads from cmc_features and calendar bar tables, runs L0-L2 labeling, resolves policy, writes to cmc_regimes table. Wire regime context into signal generators.
 **Depends on:** Phase 26
 **Success Criteria** (what must be TRUE):
   1. refresh_cmc_regimes.py reads from cmc_features and calendar bar tables (weekly/monthly)
@@ -511,10 +513,96 @@ Plans:
 
 </details>
 
+<details>
+<summary>v0.9.0 Phase Details (Phases 35-40) - CURRENT</summary>
+
+### Phase 35: AMA Engine
+**Goal:** Users can compute and refresh Adaptive Moving Averages (KAMA, DEMA, TEMA, HMA) across all timeframes, with derivatives, z-scores, and unified table sync wired into the daily refresh pipeline.
+**Depends on:** Phase 34 (v0.8.0 complete)
+**Requirements:** AMA-01, AMA-02, AMA-03, AMA-04, AMA-05, AMA-06, AMA-07
+**Success Criteria** (what must be TRUE):
+  1. `python -m ta_lab2.scripts.ama.refresh_cmc_ama --all --all-tfs` completes without errors and populates `cmc_ama_multi_tf` with KAMA, DEMA, TEMA, and HMA rows
+  2. `cmc_ama_multi_tf` has PK `(id, ts, tf, indicator, params_hash)` and includes derivative columns (d1, d2, d1_roll, d2_roll); rows with insufficient warmup data are NULL rather than computed from stale state
+  3. KAMA Efficiency Ratio is stored as a standalone column in `cmc_ama_multi_tf`, queryable independently from the AMA value itself
+  4. Z-scores (_zscore_30, _zscore_90, _zscore_365) appear on AMA returns rows after running the existing `refresh_returns_zscore.py` against the AMA returns table
+  5. `run_daily_refresh.py --all` executes the AMA stage (after EMAs) and the `cmc_ama_multi_tf_u` unified table is populated via sync
+**Plans**: 0/TBD
+
+---
+
+### Phase 36: PSR + Purged K-Fold
+**Goal:** Users can compute statistically sound Sharpe ratio estimates (PSR, DSR, MinTRL) and perform leakage-free cross-validation (PurgedKFold, CPCV) on any backtest result or feature set.
+**Depends on:** Phase 34 (v0.8.0 complete; can run in parallel with Phase 35)
+**Requirements:** PSR-01, PSR-02, PSR-03, PSR-04, PSR-05, CV-01, CV-02, CV-03
+**Success Criteria** (what must be TRUE):
+  1. Alembic migration `psr_rename` completes cleanly: existing `psr` column renamed to `psr_legacy` in `cmc_backtest_metrics` with no data loss; `alembic history` shows the migration
+  2. `compute_psr(returns, sr_star)` returns a value in [0, 1] matching Lopez de Prado formula using scipy skew/kurtosis; returns NaN when n < 30 and logs a warning when n < 100
+  3. `compute_dsr(returns_list, sr_star)` deflates the best-of-N Sharpe correctly — the deflated value is always <= the raw best Sharpe
+  4. `PurgedKFoldSplitter(n_splits, t1_series, embargo_bars)` raises `ValueError` when `t1_series` is not provided; fold train/test indices contain no overlap after purging and embargoing
+  5. `CombPurgedKFoldCV` generates the combinatorial path matrix required for PBO analysis; all generated paths cover the full sample without train-test contamination
+**Plans**: 0/TBD
+
+---
+
+### Phase 37: IC Evaluation
+**Goal:** Users can score any feature column for predictive power across forward-return horizons, broken down by regime, with significance testing and results persisted to the database.
+**Depends on:** Phase 34 (v0.8.0 complete; enhanced by Phase 35 AMAs but not blocked by them)
+**Requirements:** IC-01, IC-02, IC-03, IC-04, IC-05, IC-06, IC-07, IC-08
+**Success Criteria** (what must be TRUE):
+  1. `compute_ic(feature_series, returns_df, train_start, train_end)` raises `TypeError` when `train_start`/`train_end` are omitted; passing future data beyond `train_end` does not affect the returned IC values
+  2. Calling `compute_ic` with horizons `[1, 2, 3, 5, 10, 20, 60]` returns a DataFrame with one IC value per horizon; the IC decay table shows monotonically decreasing absolute IC as horizon increases for a known predictive feature
+  3. Rolling IC time series (63-bar window) and IC-IR summary statistic are computed and match manual calculation on a test fixture
+  4. `compute_ic_by_regime(feature_series, returns_df, regimes_df, train_start, train_end)` returns separate IC values per regime label; assets with no regime data return IC computed on the full sample
+  5. IC significance t-stat and p-value are attached to each IC result row; feature turnover (rank autocorrelation) is computed and stored alongside IC in `cmc_ic_results`
+**Plans**: 0/TBD
+
+---
+
+### Phase 38: Feature Experimentation Framework
+**Goal:** Users can register experimental features in YAML, score them with IC on demand without writing to production tables, and promote statistically significant features through a BH-corrected gate into `dim_feature_registry`.
+**Depends on:** Phase 37 (IC evaluation is the scoring engine)
+**Requirements:** FEAT-01, FEAT-02, FEAT-03, FEAT-04, FEAT-05
+**Success Criteria** (what must be TRUE):
+  1. A YAML feature definition with `lifecycle: experimental` is picked up by `ExperimentRunner` without any DB schema changes; removing the YAML entry stops the feature from being scored
+  2. `ExperimentRunner.run(feature_name, asset_ids, tf, train_start, train_end)` computes the feature from existing base data in memory, scores it with IC across all configured horizons, and writes results to `cmc_feature_experiments` — no rows written to production feature tables
+  3. `promote_feature(feature_name)` passes only when Benjamini-Hochberg corrected p-values are significant at alpha=0.05 for at least one horizon; calling it on a noise feature (IC ~ 0) raises `PromotionRejectedError`
+  4. After promotion, the feature appears in `dim_feature_registry` with `lifecycle: promoted` and a migration stub is generated pointing to the Alembic migrations directory
+  5. `alembic upgrade head` applies the `dim_feature_registry` and `cmc_feature_experiments` DDL migration cleanly on a fresh schema; `alembic downgrade -1` reverses it without errors
+**Plans**: 0/TBD
+
+---
+
+### Phase 39: Streamlit Dashboard
+**Goal:** Users can launch a single Streamlit app that shows live pipeline health (Mode B) and interactive research results — IC scores, equity curves, regime timelines, feature comparisons (Mode A) — without hammering the database.
+**Depends on:** Phases 35-38 (needs meaningful data to display; DASH-04 config is standalone)
+**Requirements:** DASH-01, DASH-02, DASH-03, DASH-04
+**Success Criteria** (what must be TRUE):
+  1. `streamlit run src/ta_lab2/dashboard/app.py` starts without errors on Windows using `fileWatcherType = "poll"` config; the app loads within 10 seconds on a cold start
+  2. Pipeline Monitor (Mode B) displays run status, data freshness per table, and the most recent stats runner PASS/FAIL result sourced from existing DB tables — all without a manual page refresh
+  3. Research Explorer (Mode A) renders an IC score table for a user-selected asset and timeframe, with regime timeline overlay, within the `@st.cache_data(ttl=300)` window
+  4. All DB queries use a NullPool SQLAlchemy engine; running the dashboard for 30 minutes while repeatedly switching modes does not exhaust the database connection pool
+**Plans**: 0/TBD
+
+---
+
+### Phase 40: Notebooks
+**Goal:** Users can hand off 3-5 polished Jupyter notebooks that demonstrate the full v0.9.0 research cycle — from AMA exploration through IC evaluation, purged CV demo, and feature experimentation — each runnable from scratch with a single "Restart and Run All".
+**Depends on:** Phases 35-39 (built last; requires all prior phases to have meaningful outputs)
+**Requirements:** NOTE-01, NOTE-02, NOTE-03
+**Success Criteria** (what must be TRUE):
+  1. Each notebook completes "Restart and Run All" in under 5 minutes on a machine with DB access, producing no errors and no empty output cells
+  2. Parameterized variables (`ASSET_ID`, `TF`, `START_DATE`, `END_DATE`) are defined in the first code cell; changing only those cells and re-running produces valid results for a different asset or timeframe
+  3. Notebooks cover at minimum: AMA value inspection, IC evaluation with decay table, purged K-fold split visualization, and feature experimentation workflow — each with a prose narrative cell before each major computation block
+**Plans**: 0/TBD
+
+</details>
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19 (v0.5.0) -> 20 -> ... -> 26 (v0.6.0) -> 27 -> 28 (v0.7.0) -> 29 -> ... -> 34 (v0.8.0)
+Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19 (v0.5.0) -> 20 -> ... -> 26 (v0.6.0) -> 27 -> 28 (v0.7.0) -> 29 -> ... -> 34 (v0.8.0) -> 35 -> ... -> 40 (v0.9.0)
+
+Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute in parallel. Phase 37 is enhanced by Phase 35 but not blocked. Phase 38 requires Phase 37. Phase 39 requires Phases 35-38. Phase 40 requires all prior v0.9.0 phases.
 
 ### v0.4.0 Progress (Complete)
 
@@ -575,6 +663,17 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19
 | 33. Alembic Migrations | 2/2 | Complete | 2026-02-23 |
 | 34. Audit Cleanup | 1/1 | Complete | 2026-02-23 |
 
+### v0.9.0 Progress (Current)
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 35. AMA Engine | 0/TBD | Not started | — |
+| 36. PSR + Purged K-Fold | 0/TBD | Not started | — |
+| 37. IC Evaluation | 0/TBD | Not started | — |
+| 38. Feature Experimentation | 0/TBD | Not started | — |
+| 39. Streamlit Dashboard | 0/TBD | Not started | — |
+| 40. Notebooks | 0/TBD | Not started | — |
+
 ## Requirement Coverage
 
 ### v0.6.0 Requirements (40 total)
@@ -594,6 +693,20 @@ Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19
 
 **Coverage:** 37/40 requirements mapped (remaining 3 DATA/DVAL replaced by GAP-C01-04)
 
+### v0.9.0 Requirements (35 total)
+
+| Category | Requirements | Phase | Count |
+|----------|--------------|-------|-------|
+| Adaptive Moving Averages | AMA-01, AMA-02, AMA-03, AMA-04, AMA-05, AMA-06, AMA-07 | Phase 35 | 7 |
+| Information Coefficient | IC-01, IC-02, IC-03, IC-04, IC-05, IC-06, IC-07, IC-08 | Phase 37 | 8 |
+| Probabilistic Sharpe Ratio | PSR-01, PSR-02, PSR-03, PSR-04, PSR-05 | Phase 36 | 5 |
+| Cross-Validation | CV-01, CV-02, CV-03 | Phase 36 | 3 |
+| Feature Experimentation | FEAT-01, FEAT-02, FEAT-03, FEAT-04, FEAT-05 | Phase 38 | 5 |
+| Streamlit Dashboard | DASH-01, DASH-02, DASH-03, DASH-04 | Phase 39 | 4 |
+| Jupyter Notebooks | NOTE-01, NOTE-02, NOTE-03 | Phase 40 | 3 |
+
+**Coverage:** 35/35 requirements mapped
+
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-23 (v0.8.0 milestone archived — 6 phases, 13 plans, 20/20 requirements shipped)*
+*Last updated: 2026-02-23 (v0.9.0 roadmap added — 6 phases, 35 requirements, Phases 35-40)*

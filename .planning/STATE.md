@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v0.9.0 Research & Experimentation — defining requirements
+**Current focus:** v0.9.0 Research & Experimentation — roadmap created, ready for Phase 35
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 35 (AMA Engine) — not started
 Plan: —
-Status: Defining requirements for v0.9.0
-Last activity: 2026-02-23 — Milestone v0.9.0 started
+Status: Roadmap created, awaiting first plan
+Last activity: 2026-02-23 — v0.9.0 roadmap created (6 phases, 35 requirements)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [░░░░░░░░░░] 0% v0.9.0
 
@@ -198,6 +198,14 @@ Recent decisions affecting current work:
 - **Baseline revision 25f2b3c90f65 as Alembic epoch** (Phase 33-02): No-op baseline with down_revision=None; alembic stamp head applied to production DB; represents cumulative state after all 17 legacy SQL migrations applied
 - **alembic history in CI not alembic current** (Phase 33-02): history reads filesystem only (no DB), current requires live DB -- history is appropriate for CI structural validation
 - **stamp not upgrade on existing production DB** (Phase 33-02): stamp records current state without DDL; upgrade runs migration code -- use stamp only during initial setup and disaster recovery
+- **v0.9.0 AMA table family** (v0.9.0 research): cmc_ama_multi_tf uses (id, ts, tf, indicator, params_hash) PK -- separate namespace from EMA tables; indicator column distinguishes KAMA/DEMA/TEMA/HMA in a single table
+- **v0.9.0 IC requires train_start/train_end** (v0.9.0 research): All IC functions enforce time-bounded evaluation; no full-history IC for feature selection -- prevents future-information leakage
+- **v0.9.0 PurgedKFold from scratch** (v0.9.0 research): Implement PurgedKFoldSplitter without mlfinlab (discontinued, known bug); t1_series required argument, not optional
+- **v0.9.0 BH correction as promotion gate** (v0.9.0 research): scipy.stats.false_discovery_control() for BH correction; promotion rejected if no horizon passes at alpha=0.05
+- **v0.9.0 PSR migration first** (v0.9.0 research): Alembic migration psr->psr_legacy MUST precede any PSR formula code -- column name collision risk
+- **v0.9.0 Streamlit NullPool** (v0.9.0 research): All dashboard DB queries use NullPool + @st.cache_data(ttl=300); fileWatcherType=poll for Windows compatibility
+- **v0.9.0 zero new core deps** (v0.9.0 research): scipy, sklearn, plotly, streamlit already installed; only new package is jupyterlab >= 4.5
+- **v0.9.0 fix fillna deprecation before IC** (v0.9.0 research): Replace fillna(method='ffill') with ffill() in feature_eval.py before adding IC code -- avoids FutureWarning becoming error
 
 ### Pending Todos
 
@@ -210,7 +218,7 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-23
-Stopped at: Defining v0.9.0 requirements — milestone started, PROJECT.md updated
+Stopped at: v0.9.0 roadmap created — 6 phases (35-40), 35 requirements fully mapped
 Resume file: None
 
 ---
@@ -221,14 +229,26 @@ Resume file: None
 
 See `.planning/milestones/v0.8.0-ROADMAP.md` for archived details.
 
-**v0.9.0 — Not yet started**
+**v0.9.0 Research & Experimentation — In Progress**
 
-Next milestone candidates (from v0.8.0 deferred):
-- Feature Enrichment: KAMA, DEMA, TEMA, HMA, experimentation framework, IC evaluation
-- Stress Testing: Purged K-fold, walk-forward optimization, parameter sweeps, probabilistic Sharpe
-- Visualization: Streamlit dashboard, heatmaps, interactive plots
-- Notebooks: End-to-end demo notebooks
+Roadmap created 2026-02-23. 6 phases, 35 requirements.
+
+Phase overview:
+- Phase 35 (AMA Engine): KAMA, DEMA, TEMA, HMA — new indicator family with params_hash PK
+- Phase 36 (PSR + Purged K-Fold): Statistical rigor — PSR migration, Lopez de Prado PSR/DSR/MinTRL, leakage-free CV
+- Phase 37 (IC Evaluation): Feature scoring — Spearman IC, rolling IC, IC decay, regime breakdown, significance
+- Phase 38 (Feature Experimentation): Registry + ExperimentRunner + BH-corrected promotion gate
+- Phase 39 (Streamlit Dashboard): Pipeline Monitor + Research Explorer, NullPool, Windows-compatible
+- Phase 40 (Notebooks): 3-5 polished, Restart-and-Run-All clean, shareable
+
+Key constraints to remember:
+- PSR-01 (Alembic migration psr->psr_legacy) must run before any PSR formula code
+- IC functions require train_start/train_end — no exceptions
+- PurgedKFold requires t1_series — implement from scratch
+- BH correction is a hard gate, not advisory
+- Phases 35 and 36 have no inter-dependency (can plan/execute in either order)
+- Phase 38 depends on Phase 37 (IC is the scoring engine for ExperimentRunner)
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-23 (v0.9.0 milestone started, defining requirements)*
+*Last updated: 2026-02-23 (v0.9.0 roadmap created — 6 phases 35-40, 35/35 requirements mapped)*

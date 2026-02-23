@@ -99,47 +99,47 @@ Deferred to future release. Tracked but not in current roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AMA-01 | Pending | Pending |
-| AMA-02 | Pending | Pending |
-| AMA-03 | Pending | Pending |
-| AMA-04 | Pending | Pending |
-| AMA-05 | Pending | Pending |
-| AMA-06 | Pending | Pending |
-| AMA-07 | Pending | Pending |
-| IC-01 | Pending | Pending |
-| IC-02 | Pending | Pending |
-| IC-03 | Pending | Pending |
-| IC-04 | Pending | Pending |
-| IC-05 | Pending | Pending |
-| IC-06 | Pending | Pending |
-| IC-07 | Pending | Pending |
-| IC-08 | Pending | Pending |
-| PSR-01 | Pending | Pending |
-| PSR-02 | Pending | Pending |
-| PSR-03 | Pending | Pending |
-| PSR-04 | Pending | Pending |
-| PSR-05 | Pending | Pending |
-| CV-01 | Pending | Pending |
-| CV-02 | Pending | Pending |
-| CV-03 | Pending | Pending |
-| FEAT-01 | Pending | Pending |
-| FEAT-02 | Pending | Pending |
-| FEAT-03 | Pending | Pending |
-| FEAT-04 | Pending | Pending |
-| FEAT-05 | Pending | Pending |
-| DASH-01 | Pending | Pending |
-| DASH-02 | Pending | Pending |
-| DASH-03 | Pending | Pending |
-| DASH-04 | Pending | Pending |
-| NOTE-01 | Pending | Pending |
-| NOTE-02 | Pending | Pending |
-| NOTE-03 | Pending | Pending |
+| AMA-01 | Phase 35 | Pending |
+| AMA-02 | Phase 35 | Pending |
+| AMA-03 | Phase 35 | Pending |
+| AMA-04 | Phase 35 | Pending |
+| AMA-05 | Phase 35 | Pending |
+| AMA-06 | Phase 35 | Pending |
+| AMA-07 | Phase 35 | Pending |
+| IC-01 | Phase 37 | Pending |
+| IC-02 | Phase 37 | Pending |
+| IC-03 | Phase 37 | Pending |
+| IC-04 | Phase 37 | Pending |
+| IC-05 | Phase 37 | Pending |
+| IC-06 | Phase 37 | Pending |
+| IC-07 | Phase 37 | Pending |
+| IC-08 | Phase 37 | Pending |
+| PSR-01 | Phase 36 | Pending |
+| PSR-02 | Phase 36 | Pending |
+| PSR-03 | Phase 36 | Pending |
+| PSR-04 | Phase 36 | Pending |
+| PSR-05 | Phase 36 | Pending |
+| CV-01 | Phase 36 | Pending |
+| CV-02 | Phase 36 | Pending |
+| CV-03 | Phase 36 | Pending |
+| FEAT-01 | Phase 38 | Pending |
+| FEAT-02 | Phase 38 | Pending |
+| FEAT-03 | Phase 38 | Pending |
+| FEAT-04 | Phase 38 | Pending |
+| FEAT-05 | Phase 38 | Pending |
+| DASH-01 | Phase 39 | Pending |
+| DASH-02 | Phase 39 | Pending |
+| DASH-03 | Phase 39 | Pending |
+| DASH-04 | Phase 39 | Pending |
+| NOTE-01 | Phase 40 | Pending |
+| NOTE-02 | Phase 40 | Pending |
+| NOTE-03 | Phase 40 | Pending |
 
 **Coverage:**
 - v0.9.0 requirements: 35 total
-- Mapped to phases: 0 (pending roadmap creation)
-- Unmapped: 35
+- Mapped to phases: 35/35
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-23*
-*Last updated: 2026-02-23 after initial definition*
+*Last updated: 2026-02-23 — traceability table updated after roadmap creation (all 35 requirements mapped)*
