@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-22)
 ## Current Position
 
 Phase: 33 of 33 (33-alembic-migrations)
-Plan: 1 of TBD — In progress
-Status: In progress — 33-01 complete (Alembic framework bootstrapped)
-Last activity: 2026-02-23 — Completed 33-01-PLAN.md (alembic framework bootstrap)
+Plan: 2 of TBD — In progress
+Status: In progress — 33-02 complete (Alembic bootstrap complete: baseline revision stamped, docs written, CI added)
+Last activity: 2026-02-23 — Completed 33-02-PLAN.md (baseline revision + catalog + contributing + DR + CI)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [##########] 100% v0.7.0 (2/2 phases, 10/10 plans) | [███████░░░] 73% v0.8.0 (11/15 plans, 4/5 phases)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [##########] 100% v0.7.0 (2/2 phases, 10/10 plans) | [████████░░] 80% v0.8.0 (12/15 plans, 4/5 phases)
 
 ## Performance Metrics
 
@@ -85,7 +85,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 | 30-code-quality-tooling | 2/2 | 12 min | 6 min | Complete |
 | 31-documentation-freshness | 3/3 | ~25 min | ~8 min | Complete |
 | 32-runbooks | 2/2 | ~9 min | ~5 min | Complete |
-| 33-alembic-migrations | 1/TBD | ~2 min | ~2 min | In progress |
+| 33-alembic-migrations | 2/TBD | ~5 min | ~2.5 min | In progress |
 
 *Updated after each plan completion*
 
@@ -193,6 +193,9 @@ Recent decisions affecting current work:
 - **Standard alembic template over pyproject template** (Phase 33-01): `alembic init alembic` (standard) used; pyproject template appends [tool.alembic] to pyproject.toml but still generates alembic.ini anyway -- redundant; standard template cleaner
 - **target_metadata=None in alembic env.py** (Phase 33-01): Permanently disables autogenerate -- without ORM models it would emit op.create_table() for all 50+ existing tables; all revisions written by hand
 - **Placeholder URL in alembic.ini, real URL via resolve_db_url()** (Phase 33-01): alembic.ini committed with driver://user:pass@localhost/dbname; env.py calls resolve_db_url() which reads db_config.env, TARGET_DB_URL, or MARKETDATA_DB_URL
+- **Baseline revision 25f2b3c90f65 as Alembic epoch** (Phase 33-02): No-op baseline with down_revision=None; alembic stamp head applied to production DB; represents cumulative state after all 17 legacy SQL migrations applied
+- **alembic history in CI not alembic current** (Phase 33-02): history reads filesystem only (no DB), current requires live DB -- history is appropriate for CI structural validation
+- **stamp not upgrade on existing production DB** (Phase 33-02): stamp records current state without DDL; upgrade runs migration code -- use stamp only during initial setup and disaster recovery
 
 ### Pending Todos
 
@@ -204,8 +207,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-23T17:41:57Z
-Stopped at: Completed 33-01-PLAN.md — Alembic framework bootstrapped, alembic history exits 0
+Last session: 2026-02-23T17:50:13Z
+Stopped at: Completed 33-02-PLAN.md — baseline revision stamped, catalog created, CONTRIBUTING.md + DISASTER_RECOVERY.md updated, CI alembic-history job added
 Resume file: None
 
 ---
