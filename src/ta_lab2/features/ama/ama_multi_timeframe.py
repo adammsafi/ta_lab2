@@ -74,7 +74,7 @@ def populate_dim_ama_params(engine: Engine) -> int:
     sql = text(
         """
         INSERT INTO public.dim_ama_params (indicator, params_hash, params_json, label)
-        VALUES (:indicator, :params_hash, :params_json::jsonb, :label)
+        VALUES (:indicator, :params_hash, CAST(:params_json AS jsonb), :label)
         ON CONFLICT (indicator, params_hash) DO NOTHING
         """
     )
