@@ -572,15 +572,19 @@ Plans:
 ---
 
 ### Phase 33: Alembic Migrations
-**Goal:** Schema changes go through Alembic from this point forward. The existing database is stamped as baseline with no DDL executed on the live DB. All 16 legacy SQL migration files are cataloged in chronological order.
+**Goal:** Schema changes go through Alembic from this point forward. The existing database is stamped as baseline with no DDL executed on the live DB. All 17 legacy SQL migration files are cataloged in chronological order.
 **Depends on:** Phase 28 (v0.7.0 complete — can run in parallel with Phase 29)
 **Requirements:** MIGR-01, MIGR-02, MIGR-03, MIGR-04
 **Success Criteria** (what must be TRUE):
   1. `alembic/`, `alembic.ini`, and `alembic/env.py` exist; env.py uses `resolve_db_url()` from refresh_utils, `NullPool`, and `encoding='utf-8'` for any file reads
   2. `alembic history` shows exactly one revision (the baseline no-op); `alembic current` shows that revision applied to the production DB after `alembic stamp head` executed
   3. A written workflow document (or section in CONTRIBUTING.md) specifies that all future schema changes require an `alembic revision` before any raw SQL execution — no raw SQL migrations going forward
-  4. All 16 legacy SQL migration files are listed in a catalog (ordered by git log creation date) with purpose documented; files archived as historical reference, not deleted
-**Plans:** TBD during plan-phase
+  4. All 17 legacy SQL migration files are listed in a catalog (ordered by git log creation date) with purpose documented; files archived as historical reference, not deleted
+**Plans:** 2 plans in 2 waves
+
+Plans:
+- [ ] 33-01-PLAN.md -- Bootstrap Alembic framework: install, init, customize env.py + alembic.ini (MIGR-01)
+- [ ] 33-02-PLAN.md -- Stamp DB + baseline revision + legacy catalog + workflow docs + DR update + CI (MIGR-02, MIGR-03, MIGR-04)
 
 ---
 
@@ -646,8 +650,8 @@ Note: Phase 29 and Phase 33 can be worked in parallel (fully isolated). Phase 30
 | 29. Stats/QA Orchestration | 3/3 | Complete | 2026-02-22 |
 | 30. Code Quality Tooling | 2/2 | Complete | 2026-02-22 |
 | 31. Documentation Freshness | 3/3 | Complete | 2026-02-23 |
-| 32. Runbooks | 0/2 | Pending | — |
-| 33. Alembic Migrations | 0/TBD | Pending | — |
+| 32. Runbooks | 2/2 | Complete | 2026-02-23 |
+| 33. Alembic Migrations | 0/2 | Pending | — |
 
 ## Requirement Coverage
 
@@ -682,4 +686,4 @@ Note: Phase 29 and Phase 33 can be worked in parallel (fully isolated). Phase 30
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-23 (Phase 32 complete -- 2/2 plans, 9/9 must-haves verified)*
+*Last updated: 2026-02-23 (Phase 33 planned -- 2 plans in 2 waves)*
