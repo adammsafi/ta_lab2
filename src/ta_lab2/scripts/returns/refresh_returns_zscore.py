@@ -4,7 +4,7 @@ r"""
 refresh_returns_zscore.py
 
 Standalone post-processing script that adds rolling z-scores and is_outlier
-flags to bar-returns and EMA-returns tables.
+flags to bar-returns, EMA-returns, and AMA-returns tables.
 
 Runs AFTER the base returns refresh scripts have populated raw return columns.
 Z-scores are computed per (key, tf) group with multiple adaptive rolling windows:
@@ -28,11 +28,17 @@ EMA returns z-scores (per window, 4 canonical + 4 roll = 8 columns):
     Roll (ALL rows):             ret_arith_ema_roll_zscore_{W}, ret_arith_ema_bar_roll_zscore_{W},
                                  ret_log_ema_roll_zscore_{W}, ret_log_ema_bar_roll_zscore_{W}
 
-is_outlier: TRUE if any |z-score| > 4 across ALL 24 z-score columns for that row.
+AMA returns z-scores (per window, 2 canonical + 2 roll = 4 columns):
+    Canonical (roll=FALSE only): ret_arith_ama_zscore_{W}, ret_log_ama_zscore_{W}
+    Roll (ALL rows):             ret_arith_ama_roll_zscore_{W}, ret_log_ama_roll_zscore_{W}
+    NOTE: key_cols include indicator and params_hash for per-param-set z-score grouping.
+
+is_outlier: TRUE if any |z-score| > 4 across ALL z-score columns for that row.
 
 Usage:
     python -m ta_lab2.scripts.returns.refresh_returns_zscore --tables bars --workers 4
     python -m ta_lab2.scripts.returns.refresh_returns_zscore --tables emas --workers 4
+    python -m ta_lab2.scripts.returns.refresh_returns_zscore --tables amas --workers 4
     python -m ta_lab2.scripts.returns.refresh_returns_zscore --tables all  --full-recalc
     python -m ta_lab2.scripts.returns.refresh_returns_zscore --tables bars --ids 1 --tf 1D
 
@@ -223,6 +229,74 @@ _EMA_TABLES = [
         key_cols=["id", "tf", "period"],
         canonical_base_pairs=_EMA_CANONICAL_BASE,
         roll_base_pairs=_EMA_ROLL_BASE,
+    ),
+]
+
+# -- AMA returns tables (6) -------------------------------------------------
+# AMA has no _ema_bar column family — only 4 z-score base pairs per window
+# (2 canonical + 2 roll) vs EMA's 8 (4+4).
+# CRITICAL: key_cols MUST include indicator and params_hash so that z-scores
+# are computed per (id, tf, indicator, params_hash) group — prevents z-scores
+# from aggregating across different AMA types and parameter sets.
+
+_AMA_CANONICAL_BASE = [
+    ("ret_arith_ama", "ret_arith_ama_zscore"),
+    ("ret_log_ama", "ret_log_ama_zscore"),
+]
+
+_AMA_ROLL_BASE = [
+    ("ret_arith_ama_roll", "ret_arith_ama_roll_zscore"),
+    ("ret_log_ama_roll", "ret_log_ama_roll_zscore"),
+]
+
+_AMA_TABLES = [
+    TableConfig(
+        table="public.cmc_returns_ama_multi_tf",
+        ts_col="ts",
+        pk_cols=["id", "ts", "tf", "indicator", "params_hash"],
+        key_cols=["id", "tf", "indicator", "params_hash"],
+        canonical_base_pairs=_AMA_CANONICAL_BASE,
+        roll_base_pairs=_AMA_ROLL_BASE,
+    ),
+    TableConfig(
+        table="public.cmc_returns_ama_multi_tf_u",
+        ts_col="ts",
+        pk_cols=["id", "ts", "tf", "indicator", "params_hash", "alignment_source"],
+        key_cols=["id", "tf", "indicator", "params_hash", "alignment_source"],
+        canonical_base_pairs=_AMA_CANONICAL_BASE,
+        roll_base_pairs=_AMA_ROLL_BASE,
+    ),
+    TableConfig(
+        table="public.cmc_returns_ama_multi_tf_cal_us",
+        ts_col="ts",
+        pk_cols=["id", "ts", "tf", "indicator", "params_hash"],
+        key_cols=["id", "tf", "indicator", "params_hash"],
+        canonical_base_pairs=_AMA_CANONICAL_BASE,
+        roll_base_pairs=_AMA_ROLL_BASE,
+    ),
+    TableConfig(
+        table="public.cmc_returns_ama_multi_tf_cal_iso",
+        ts_col="ts",
+        pk_cols=["id", "ts", "tf", "indicator", "params_hash"],
+        key_cols=["id", "tf", "indicator", "params_hash"],
+        canonical_base_pairs=_AMA_CANONICAL_BASE,
+        roll_base_pairs=_AMA_ROLL_BASE,
+    ),
+    TableConfig(
+        table="public.cmc_returns_ama_multi_tf_cal_anchor_us",
+        ts_col="ts",
+        pk_cols=["id", "ts", "tf", "indicator", "params_hash"],
+        key_cols=["id", "tf", "indicator", "params_hash"],
+        canonical_base_pairs=_AMA_CANONICAL_BASE,
+        roll_base_pairs=_AMA_ROLL_BASE,
+    ),
+    TableConfig(
+        table="public.cmc_returns_ama_multi_tf_cal_anchor_iso",
+        ts_col="ts",
+        pk_cols=["id", "ts", "tf", "indicator", "params_hash"],
+        key_cols=["id", "tf", "indicator", "params_hash"],
+        canonical_base_pairs=_AMA_CANONICAL_BASE,
+        roll_base_pairs=_AMA_ROLL_BASE,
     ),
 ]
 
@@ -625,7 +699,7 @@ def main() -> None:
     )
     p.add_argument(
         "--tables",
-        choices=["bars", "emas", "all"],
+        choices=["bars", "emas", "amas", "all"],
         default="all",
         help="Which table family to process (default: all).",
     )
@@ -672,6 +746,8 @@ def main() -> None:
         configs.extend(_BAR_TABLES)
     if args.tables in ("emas", "all"):
         configs.extend(_EMA_TABLES)
+    if args.tables in ("amas", "all"):
+        configs.extend(_AMA_TABLES)
 
     _print(
         f"Processing {len(configs)} tables, "
