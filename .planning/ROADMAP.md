@@ -6,7 +6,7 @@
 - v0.5.0 Ecosystem Reorganization (Phases 11-19) - SHIPPED 2026-02-04
 - v0.6.0 EMA & Bar Architecture Standardization (Phases 20-26) - SHIPPED 2026-02-17
 - v0.7.0 Regime Integration & Signal Enhancement (Phases 27-28) - SHIPPED 2026-02-20
-- v0.8.0 Polish & Hardening (Phases 29-33) - IN PROGRESS
+- v0.8.0 Polish & Hardening (Phases 29-33) - SHIPPED 2026-02-23
 
 ## Overview
 
@@ -489,13 +489,13 @@ Plans:
 
 ---
 
-### v0.8.0 Polish & Hardening (Phases 29-33) - IN PROGRESS
+### v0.8.0 Polish & Hardening (Phases 29-33) - SHIPPED 2026-02-23
 
 - [x] **Phase 29: Stats/QA Orchestration** - Wire 5 existing stats runners into daily refresh pipeline + weekly QC digest
 - [x] **Phase 30: Code Quality Tooling** - Make ruff lint blocking in CI, add mypy config, fix stale tooling references
 - [x] **Phase 31: Documentation Freshness** - Version sync, pipeline mermaid diagram, fix stale refs, mkdocs build clean
 - [x] **Phase 32: Runbooks** - Regime runbook, backtest runbook, new-asset SOP, disaster recovery guide
-- [ ] **Phase 33: Alembic Migrations** - Bootstrap framework, stamp existing schema, catalog legacy SQL migrations
+- [x] **Phase 33: Alembic Migrations** - Bootstrap framework, stamp existing schema, catalog legacy SQL migrations
 
 ---
 
@@ -583,8 +583,8 @@ Plans:
 **Plans:** 2 plans in 2 waves
 
 Plans:
-- [ ] 33-01-PLAN.md -- Bootstrap Alembic framework: install, init, customize env.py + alembic.ini (MIGR-01)
-- [ ] 33-02-PLAN.md -- Stamp DB + baseline revision + legacy catalog + workflow docs + DR update + CI (MIGR-02, MIGR-03, MIGR-04)
+- [x] 33-01-PLAN.md -- Bootstrap Alembic framework: install, init, customize env.py + alembic.ini (MIGR-01)
+- [x] 33-02-PLAN.md -- Stamp DB + baseline revision + legacy catalog + workflow docs + DR update + CI (MIGR-02, MIGR-03, MIGR-04)
 
 ---
 
@@ -651,7 +651,7 @@ Note: Phase 29 and Phase 33 can be worked in parallel (fully isolated). Phase 30
 | 30. Code Quality Tooling | 2/2 | Complete | 2026-02-22 |
 | 31. Documentation Freshness | 3/3 | Complete | 2026-02-23 |
 | 32. Runbooks | 2/2 | Complete | 2026-02-23 |
-| 33. Alembic Migrations | 0/2 | Pending | — |
+| 33. Alembic Migrations | 2/2 | Complete | 2026-02-23 |
 
 ## Requirement Coverage
 
@@ -686,4 +686,4 @@ Note: Phase 29 and Phase 33 can be worked in parallel (fully isolated). Phase 30
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-23 (Phase 33 planned -- 2 plans in 2 waves)*
+*Last updated: 2026-02-23 (Phase 33 complete -- v0.8.0 milestone shipped)*

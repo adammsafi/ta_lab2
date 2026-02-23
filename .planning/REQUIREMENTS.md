@@ -40,10 +40,10 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Alembic Migrations
 
-- [ ] **MIGR-01**: Alembic framework bootstrapped — alembic.ini, env.py configured for existing DB without ORM models
-- [ ] **MIGR-02**: Existing DB stamped as baseline — no-op baseline migration written, alembic stamp head executed on production
-- [ ] **MIGR-03**: Future workflow documented — all new schema changes must go through alembic revision, not raw SQL
-- [ ] **MIGR-04**: Existing 16 SQL migrations cataloged — ordered by git log date, purpose documented, archived as historical reference
+- [x] **MIGR-01**: Alembic framework bootstrapped — alembic.ini, env.py configured for existing DB without ORM models
+- [x] **MIGR-02**: Existing DB stamped as baseline — no-op baseline migration written, alembic stamp head executed on production
+- [x] **MIGR-03**: Future workflow documented — all new schema changes must go through alembic revision, not raw SQL
+- [x] **MIGR-04**: Existing 17 SQL migrations cataloged — ordered by git log date, purpose documented, archived as historical reference
 
 ---
 
@@ -107,10 +107,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RUNB-02 | Phase 32 | Complete |
 | RUNB-03 | Phase 32 | Complete |
 | RUNB-04 | Phase 32 | Complete |
-| MIGR-01 | Phase 33 | Pending |
-| MIGR-02 | Phase 33 | Pending |
-| MIGR-03 | Phase 33 | Pending |
-| MIGR-04 | Phase 33 | Pending |
+| MIGR-01 | Phase 33 | Complete |
+| MIGR-02 | Phase 33 | Complete |
+| MIGR-03 | Phase 33 | Complete |
+| MIGR-04 | Phase 33 | Complete |
 
 **Coverage:**
 - v0.8.0 requirements: 20 total
@@ -119,4 +119,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-22*
-*Last updated: 2026-02-23 (RUNB-01..04 marked Complete after Phase 32 verification)*
+*Last updated: 2026-02-23 (MIGR-01..04 marked Complete after Phase 33 verification — v0.8.0 milestone complete)*
