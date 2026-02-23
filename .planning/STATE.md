@@ -11,15 +11,15 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 Phase: 35 (AMA Engine) — in progress
 Plan: 07 of ~8 (estimate)
-Status: Plan 35-07 complete
-Last activity: 2026-02-23 — Completed 35-07-PLAN.md (AMA _u sync scripts + z-score extension)
+Status: Plan 35-06 complete (executed out-of-order, was blocked by dependency on 35-04)
+Last activity: 2026-02-23 — Completed 35-06-PLAN.md (calendar AMA feature classes + refreshers)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [██████░░░░] ~35% v0.9.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [██████░░░░] ~37% v0.9.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 171 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 5 in Phase 35 so far)
+- Total plans completed: 172 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 6 in Phase 35 so far)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -226,6 +226,9 @@ Recent decisions affecting current work:
 - **sync_sources_to_unified() unmodified for AMA** (Phase 35-07): Dynamic column discovery via information_schema handles indicator+params_hash+alignment_source automatically; AMA_SOURCE_PREFIX='cmc_ama_' strips to multi_tf, multi_tf_cal_us, etc.
 - **Z-score key_cols must include indicator+params_hash** (Phase 35-07): Omitting them aggregates across KAMA/DEMA/TEMA/HMA rows for same (id, tf) — produces garbage; each AMA type+param set gets independent rolling z-score series
 - **_process_key temp table DDL handles AMA cols via else->text** (Phase 35-07): indicator, params_hash, alignment_source all map to text type via existing else-branch — no changes to _process_key needed for AMA support
+- **Custom worker per calendar AMA refresher** (Phase 35-06): _cal_ama_worker / _cal_anchor_ama_worker defined at module level (required for pickling); base _ama_worker hardcodes MultiTFAMAFeature — calendar variants need scheme-aware feature class selection via task.extra_config["scheme"]
+- **SCHEME_MAP for cal AMA routing** (Phase 35-06): Single dict maps scheme key -> feature_class/bars_table/output_table/state_table; mirrors EMA calendar pattern; avoids scattered if/else in worker and _run_for_scheme
+- **No-arg constructor on CalAMARefresher** (Phase 35-06): BaseAMARefresher.create_argument_parser() calls cls() to get get_description() before scheme is known — constructor accepts scheme="us" as default
 
 ### Pending Todos
 
@@ -237,8 +240,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-23T22:23Z
-Stopped at: Completed 35-07-PLAN.md — AMA _u sync scripts + z-score extension (3 files: sync_cmc_ama_multi_tf_u.py, sync_cmc_returns_ama_multi_tf_u.py, refresh_returns_zscore.py)
+Last session: 2026-02-23T22:26Z
+Stopped at: Completed 35-06-PLAN.md — 4 calendar AMA feature classes + 2 refresher scripts (ama_multi_tf_cal.py, ama_multi_tf_cal_anchor.py, refresh_cmc_ama_multi_tf_cal_from_bars.py, refresh_cmc_ama_multi_tf_cal_anchor_from_bars.py)
 Resume file: None
 
 ---
