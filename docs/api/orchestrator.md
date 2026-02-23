@@ -562,5 +562,5 @@ async with AsyncOrchestrator(
 ## See Also
 
 - [Memory API Reference](memory.md) - REST API for memory system
-- [Architecture Documentation](../ARCHITECTURE.md) - System implementation details
+- [Architecture Documentation](../architecture/architecture.md) - System implementation details
 - [Deployment Guide](../deployment.md) - Infrastructure setup

@@ -65,7 +65,7 @@ orchestrator = [
 
 # Documentation generation
 docs = [
-  "mkdocs-material>=9.0",
+  "mkdocs-material>=9.0,<9.7",
   "mkdocstrings[python]>=0.24",
 ]
 
@@ -103,7 +103,7 @@ all = [
   "fastapi>=0.104.0",
   "pydantic>=2.0.0",
   "python-dotenv>=1.0.0",
-  "mkdocs-material>=9.0",
+  "mkdocs-material>=9.0,<9.7",
   "mkdocstrings[python]>=0.24",
   "fredapi>=0.5.2",
 ]

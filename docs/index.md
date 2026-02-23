@@ -408,7 +408,7 @@ mypy src/ta_lab2/features/ src/ta_lab2/regimes/
 - **[Deployment Guide](deployment.md)** - Setup and configuration
 - **[API Reference](api/memory.md)** - Memory REST API documentation
 - **[CLI Reference](api/orchestrator.md)** - Orchestrator CLI commands
-- **[Changelog](../CHANGELOG.md)** - Version history
+- **[Changelog](CHANGELOG.md)** - Version history
 
 ---
 
@@ -549,7 +549,7 @@ If you want to use this in a commercial setting, reach out first so terms can be
 
 ## Changelog
 
-See [CHANGELOG](../CHANGELOG.md) for release history and upgrade notes.
+See [CHANGELOG](CHANGELOG.md) for release history and upgrade notes.
 
 **Latest Release:** v0.8.0 (2026-02-22)
 - Stats/QA orchestration wired into daily refresh with pipeline gate for FAIL rows

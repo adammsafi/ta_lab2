@@ -31,11 +31,11 @@ theme:
 nav:
   - Home: index.md
   - Getting Started:
-    - Quick Start: index.md#quick-start
-    - Installation: deployment.md#installation
+    - Quick Start: index.md
+    - Installation: deployment.md
   - Design:
     - Overview: DESIGN.md
-    - Architecture: ARCHITECTURE.md
+    - Architecture: architecture/architecture.md
   - Components:
     - Time Model: time/time_model_overview.md
     - Features: time/returns_volatility.md
@@ -45,6 +45,9 @@ nav:
     - Memory API: api/memory.md
     - Orchestrator CLI: api/orchestrator.md
   - Changelog: CHANGELOG.md
+
+exclude_docs: |
+  ~$*
 
 plugins:
   - search

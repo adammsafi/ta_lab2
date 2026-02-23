@@ -79,7 +79,7 @@ original_size_bytes: 25836
 
 List of ta\_lib2 Commits
 
-![](./media/image1.emf)
+*(diagram omitted — converted from DOCX, original .emf not available)*
 
 4. Once ta\_lib2 was in an okay spot, I wanted to shift focus to
    complete a POC for:

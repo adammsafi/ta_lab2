@@ -692,7 +692,9 @@ timehigh\_outside\_window\_after\_repair, etc.) that matches the rejects
 table the script writes, so this section and the implementation stay
 aligned.
 
-![](./media/image1.emf)**Appendix**
+*(diagram omitted — converted from DOCX, original .emf not available)*
+
+**Appendix**
 
 **Data dictionary (columns)**
 

@@ -81,7 +81,7 @@ original_size_bytes: 26916
         risk.
    7. Quick reference table:
 
-![](./media/image1.emf)
+*(diagram omitted — converted from DOCX, original .emf not available)*
 
 3. **Minimal API sketch for your codebase:**
 

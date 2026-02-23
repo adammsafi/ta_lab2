@@ -2,7 +2,7 @@
 
 Version: 0.8.0
 
-This document describes the high-level design of ta_lab2, including system goals, architecture overview, data flow, and key design decisions. For implementation details, see [ARCHITECTURE.md](../ARCHITECTURE.md).
+This document describes the high-level design of ta_lab2, including system goals, architecture overview, data flow, and key design decisions. For implementation details, see [ARCHITECTURE.md](architecture/architecture.md).
 
 ---
 
@@ -466,10 +466,10 @@ Graceful degradation: observability works without `opentelemetry-api` via no-op 
 
 ## References
 
-- **Implementation Details**: [ARCHITECTURE.md](../ARCHITECTURE.md) - Package structure, module organization, data flows
+- **Implementation Details**: [ARCHITECTURE.md](architecture/architecture.md) - Package structure, module organization, data flows
 - **Deployment Guide**: [deployment.md](deployment.md) - Infrastructure setup, environment variables, monitoring
-- **Contributing Guide**: [CONTRIBUTING.md](../CONTRIBUTING.md) - Development workflows, branch strategy, PR process
-- **Security Policy**: [SECURITY.md](../SECURITY.md) - Vulnerability reporting, credential handling
+- **Contributing Guide**: CONTRIBUTING.md - Development workflows, branch strategy, PR process
+- **Security Policy**: SECURITY.md - Vulnerability reporting, credential handling
 
 ---
 
