@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: 35 (AMA Engine) — in progress
-Plan: 02 of ~5 (estimate)
-Status: Plan 35-02 complete
-Last activity: 2026-02-23 — Completed 35-02-PLAN.md (AMA computation layer)
+Plan: 03 of ~5 (estimate)
+Status: Plan 35-03 complete
+Last activity: 2026-02-23 — Completed 35-03-PLAN.md (AMA infrastructure layer)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [██░░░░░░░░] ~10% v0.9.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [███░░░░░░░] ~15% v0.9.0
 
 ## Performance Metrics
 
@@ -214,6 +214,9 @@ Recent decisions affecting current work:
 - **KAMA warmup guard via np.full(n, nan) init** (Phase 35-02): All warmup rows are NaN by default from initialization -- only valid positions get computed values; DEMA/TEMA use explicit iloc[:warmup]=nan because ewm() produces values from row 0
 - **HMA uses rolling().apply(raw=True) for WMA** (Phase 35-02): raw=True passes numpy array per window avoiding Series overhead; mathematically correct (linear weights, not exponential); _wma_numpy convolution alternative held in reserve if profiling shows bottleneck on 109 TFs
 - **er column inline on AMA value tables** (Phase 35-01): KAMA Efficiency Ratio stored as er column, NULL for DEMA/TEMA/HMA -- queryable as standalone IC signal without separate join
+- **BaseAMAFeature sibling not subclass of BaseEMAFeature** (Phase 35-03): (indicator, params_hash) PK vs (period) requires independent _get_pk_columns() and _pg_upsert() -- sharing code would require awkward overrides of every DB method
+- **AMAStateManager standalone class** (Phase 35-03): Does NOT reuse EMAStateManager -- EMAStateManager DDL hardcodes period INTEGER PK which is wrong for AMA state
+- **d1_roll == d1 for multi_tf AMA** (Phase 35-03): No intra-period roll variant exists (all rows roll=FALSE); _roll columns kept for schema compatibility with EMA table family
 
 ### Pending Todos
 
@@ -225,8 +228,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-23T22:03Z
-Stopped at: Completed 35-02-PLAN.md — AMA computation layer (3 files: ama_params.py, ama_computations.py, __init__.py)
+Last session: 2026-02-23T22:09Z
+Stopped at: Completed 35-03-PLAN.md — AMA infrastructure layer (3 files: base_ama_feature.py, ama_state_manager.py, scripts/amas/__init__.py)
 Resume file: None
 
 ---
