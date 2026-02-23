@@ -10,16 +10,16 @@ See: .planning/PROJECT.md (updated 2026-02-22)
 ## Current Position
 
 Phase: 33 of 33 (33-alembic-migrations)
-Plan: 0 of TBD — Pending
-Status: Phase 32 verified complete, Phase 33 next
-Last activity: 2026-02-23 — Phase 32 verified complete (2/2 plans, 9/9 must-haves, RUNB-01..04 satisfied)
+Plan: 1 of TBD — In progress
+Status: In progress — 33-01 complete (Alembic framework bootstrapped)
+Last activity: 2026-02-23 — Completed 33-01-PLAN.md (alembic framework bootstrap)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [##########] 100% v0.7.0 (2/2 phases, 10/10 plans) | [██████████] 67% v0.8.0 (10/15 plans, 4/5 phases)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [##########] 100% v0.7.0 (2/2 phases, 10/10 plans) | [███████░░░] 73% v0.8.0 (11/15 plans, 4/5 phases)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 162 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 10 in v0.8.0)
+- Total plans completed: 163 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 11 in v0.8.0)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -85,7 +85,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 | 30-code-quality-tooling | 2/2 | 12 min | 6 min | Complete |
 | 31-documentation-freshness | 3/3 | ~25 min | ~8 min | Complete |
 | 32-runbooks | 2/2 | ~9 min | ~5 min | Complete |
-| 33-alembic-migrations | 0/TBD | — | — | Pending |
+| 33-alembic-migrations | 1/TBD | ~2 min | ~2 min | In progress |
 
 *Updated after each plan completion*
 
@@ -190,6 +190,9 @@ Recent decisions affecting current work:
 - **docs/CHANGELOG.md as content copy** (Phase 31-03): mkdocs on Windows does not follow symlinks; a real file copy is required; updated with v0.8.0 entry
 - **mkdocs-material pinned <9.7** (Phase 31-03): v9.7.x introduced a colorama dependency that crashes on Windows; pin in pyproject.toml docs + all groups
 - **CI docs job independent** (Phase 31-03): docs job runs mkdocs build --strict as blocking gate; version-check now validates pyproject.toml == README.md == mkdocs.yml
+- **Standard alembic template over pyproject template** (Phase 33-01): `alembic init alembic` (standard) used; pyproject template appends [tool.alembic] to pyproject.toml but still generates alembic.ini anyway -- redundant; standard template cleaner
+- **target_metadata=None in alembic env.py** (Phase 33-01): Permanently disables autogenerate -- without ORM models it would emit op.create_table() for all 50+ existing tables; all revisions written by hand
+- **Placeholder URL in alembic.ini, real URL via resolve_db_url()** (Phase 33-01): alembic.ini committed with driver://user:pass@localhost/dbname; env.py calls resolve_db_url() which reads db_config.env, TARGET_DB_URL, or MARKETDATA_DB_URL
 
 ### Pending Todos
 
@@ -201,8 +204,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-23T06:00:00Z
-Stopped at: Phase 32 verified complete — 2/2 plans, 9/9 must-haves passed, RUNB-01..04 satisfied
+Last session: 2026-02-23T17:41:57Z
+Stopped at: Completed 33-01-PLAN.md — Alembic framework bootstrapped, alembic history exits 0
 Resume file: None
 
 ---
