@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-22)
 ## Current Position
 
 Phase: 31 of 33 (31-documentation-freshness)
-Plan: 2 of 3 — In progress (31-01 and 31-02 complete, 31-03 pending)
-Status: In progress
-Last activity: 2026-02-23 — Completed 31-01-PLAN.md (version bump + stale refs)
+Plan: 3 of 3 — Phase complete (31-01, 31-02, 31-03 all complete)
+Status: Phase complete — Phase 32 next
+Last activity: 2026-02-23 — Completed 31-03-PLAN.md (mkdocs CI gate + broken link fixes)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [##########] 100% v0.7.0 (2/2 phases, 10/10 plans) | [█████░░░░░] 53% v0.8.0 (8/15 plans, 2/5 phases)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [##########] 100% v0.7.0 (2/2 phases, 10/10 plans) | [███████░░░] 67% v0.8.0 (10/15 plans, 3/5 phases)
 
 ## Performance Metrics
 
@@ -83,7 +83,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 |-------|-------|-------|----------|--------|
 | 29-stats-qa-orchestration | 3/3 | 13 min | 4 min | Complete |
 | 30-code-quality-tooling | 2/2 | 12 min | 6 min | Complete |
-| 31-documentation-freshness | 2/3 | ~17 min | ~9 min | In progress |
+| 31-documentation-freshness | 3/3 | ~25 min | ~8 min | Complete |
 | 32-runbooks | 0/TBD | — | — | Pending |
 | 33-alembic-migrations | 0/TBD | — | — | Pending |
 
@@ -186,6 +186,10 @@ Recent decisions affecting current work:
 - **Split pipeline diagrams into two .mmd files** (Phase 31-02): data_flow.mmd (main pipeline TD) + table_variants.mmd (variant structure LR) -- cleaner rendering than single combined file; Mermaid renderer support for multi-diagram varies
 - **Alembic section deleted not replaced** (Phase 31-01): Aspirational alembic commands removed with no placeholder -- Phase 33 will add real migration docs when Alembic is implemented; empty sections mislead users
 - **Historical changelog entries preserved** (Phase 31-01): v0.4.0/v0.5.0 release entries in README.md and docs/index.md are historical facts, not stale content -- only version-position fields (headers, footers, site_name) are bumped
+- **Nav anchors removed from mkdocs.yml** (Phase 31-03): mkdocs --strict treats page.md#anchor as a missing file reference; clean page.md paths only
+- **docs/CHANGELOG.md as content copy** (Phase 31-03): mkdocs on Windows does not follow symlinks; a real file copy is required; updated with v0.8.0 entry
+- **mkdocs-material pinned <9.7** (Phase 31-03): v9.7.x introduced a colorama dependency that crashes on Windows; pin in pyproject.toml docs + all groups
+- **CI docs job independent** (Phase 31-03): docs job runs mkdocs build --strict as blocking gate; version-check now validates pyproject.toml == README.md == mkdocs.yml
 
 ### Pending Todos
 
@@ -197,8 +201,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-23T01:36:00Z
-Stopped at: Completed 31-01-PLAN.md — version bump to 0.8.0 + stale reference cleanup
+Last session: 2026-02-23T01:49:00Z
+Stopped at: Completed 31-03-PLAN.md — mkdocs CI gate + broken link fixes (Phase 31 COMPLETE)
 Resume file: None
 
 ---
@@ -218,7 +222,7 @@ Resume file: None
 **Phase Summary:**
 - Phase 29: Stats/QA Orchestration (STAT-01 to STAT-04) — COMPLETE
 - Phase 30: Code Quality Tooling (QUAL-01 to QUAL-04) — COMPLETE
-- Phase 31: Documentation Freshness (DOCS-01 to DOCS-04) — PENDING
+- Phase 31: Documentation Freshness (DOCS-01 to DOCS-04) — COMPLETE
 - Phase 32: Runbooks (RUNB-01 to RUNB-04) — PENDING
 - Phase 33: Alembic Migrations (MIGR-01 to MIGR-04) — PENDING
 
