@@ -40,6 +40,13 @@ nav:
     - Time Model: time/time_model_overview.md
     - Features: time/returns_volatility.md
     - Signals: time/regime_integration.md
+  - Operations:
+    - Daily Refresh: operations/DAILY_REFRESH.md
+    - Regime Pipeline: operations/REGIME_PIPELINE.md
+    - Backtest Pipeline: operations/BACKTEST_PIPELINE.md
+    - New Asset Onboarding: operations/NEW_ASSET_ONBOARDING.md
+    - Disaster Recovery: operations/DISASTER_RECOVERY.md
+    - State Management: operations/STATE_MANAGEMENT.md
   - Deployment: deployment.md
   - API Reference:
     - Memory API: api/memory.md
