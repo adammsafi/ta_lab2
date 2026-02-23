@@ -14,7 +14,7 @@ Plan: 02 of ~5 (estimate)
 Status: Plan 35-02 complete
 Last activity: 2026-02-23 — Completed 35-02-PLAN.md (AMA computation layer)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [█░░░░░░░░░] ~5% v0.9.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [██░░░░░░░░] ~10% v0.9.0
 
 ## Performance Metrics
 
@@ -209,6 +209,10 @@ Recent decisions affecting current work:
 - **AMA uses indicator+params_hash PK** (Phase 35-01): (id, ts, tf, indicator, params_hash) replaces (id, ts, tf, period) -- single table for all AMA types (KAMA/DEMA/TEMA/HMA) distinguished by indicator column
 - **dim_ama_params lookup table** (Phase 35-01): Maps (indicator, params_hash) -> params_json JSONB + label TEXT -- human-readable parameter resolution without decoding hashes
 - **AMA returns have no bar-space variant** (Phase 35-01): _ama columns only (no _ama_bar family) -- AMAs computed on canonical bar closes only, simplifies DDL vs EMA pattern
+- **params_hash covers params dict only, not indicator** (Phase 35-02): DEMA(21)/TEMA(21)/HMA(21) share hash d47fe5cc -- correct design; indicator column provides DB-level differentiation; compute_params_hash receives only the params dict
+- **AMAParamSet.params hash=False** (Phase 35-02): Frozen dataclass with mutable dict field requires hash=False, compare=False on that field -- prevents TypeError at instantiation while keeping the dataclass immutable in practice
+- **KAMA warmup guard via np.full(n, nan) init** (Phase 35-02): All warmup rows are NaN by default from initialization -- only valid positions get computed values; DEMA/TEMA use explicit iloc[:warmup]=nan because ewm() produces values from row 0
+- **HMA uses rolling().apply(raw=True) for WMA** (Phase 35-02): raw=True passes numpy array per window avoiding Series overhead; mathematically correct (linear weights, not exponential); _wma_numpy convolution alternative held in reserve if profiling shows bottleneck on 109 TFs
 - **er column inline on AMA value tables** (Phase 35-01): KAMA Efficiency Ratio stored as er column, NULL for DEMA/TEMA/HMA -- queryable as standalone IC signal without separate join
 
 ### Pending Todos
@@ -222,7 +226,7 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-23T22:03Z
-Stopped at: Completed 35-01-PLAN.md — AMA DDL (9 files, 25 schema objects)
+Stopped at: Completed 35-02-PLAN.md — AMA computation layer (3 files: ama_params.py, ama_computations.py, __init__.py)
 Resume file: None
 
 ---
