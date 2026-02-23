@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-22)
 ## Current Position
 
 Phase: 32 of 33 (32-runbooks)
-Plan: 0 of TBD — Pending
-Status: Phase 31 verified complete, Phase 32 next
-Last activity: 2026-02-23 — Phase 31 verified complete (3/3 plans, DOCS-01..04 satisfied)
+Plan: 2 of 2 — Phase complete
+Status: Phase 32 complete (2/2 plans: RUNB-01..RUNB-04 all written)
+Last activity: 2026-02-23 — Completed 32-02-PLAN.md (NEW_ASSET_ONBOARDING.md + DISASTER_RECOVERY.md + mkdocs Operations nav)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [##########] 100% v0.7.0 (2/2 phases, 10/10 plans) | [█████░░░░░] 53% v0.8.0 (8/15 plans, 3/5 phases)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [##########] 100% v0.7.0 (2/2 phases, 10/10 plans) | [██████░░░░] 60% v0.8.0 (9/15 plans, 4/5 phases)
 
 ## Performance Metrics
 
@@ -84,7 +84,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 | 29-stats-qa-orchestration | 3/3 | 13 min | 4 min | Complete |
 | 30-code-quality-tooling | 2/2 | 12 min | 6 min | Complete |
 | 31-documentation-freshness | 3/3 | ~25 min | ~8 min | Complete |
-| 32-runbooks | 0/TBD | — | — | Pending |
+| 32-runbooks | 2/2 | ~9 min | ~5 min | Complete |
 | 33-alembic-migrations | 0/TBD | — | — | Pending |
 
 *Updated after each plan completion*
@@ -201,8 +201,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-23T03:00:00Z
-Stopped at: Phase 31 verified complete — 3/3 plans, 4/4 must-haves passed
+Last session: 2026-02-23T05:31:18Z
+Stopped at: Completed 32-02-PLAN.md — NEW_ASSET_ONBOARDING.md + DISASTER_RECOVERY.md + mkdocs Operations nav written; Phase 32 complete
 Resume file: None
 
 ---
@@ -223,11 +223,11 @@ Resume file: None
 - Phase 29: Stats/QA Orchestration (STAT-01 to STAT-04) — COMPLETE
 - Phase 30: Code Quality Tooling (QUAL-01 to QUAL-04) — COMPLETE
 - Phase 31: Documentation Freshness (DOCS-01 to DOCS-04) — COMPLETE
-- Phase 32: Runbooks (RUNB-01 to RUNB-04) — PENDING
+- Phase 32: Runbooks (RUNB-01 to RUNB-04) — COMPLETE
 - Phase 33: Alembic Migrations (MIGR-01 to MIGR-04) — PENDING
 
 **Parallelization note:** Phase 29 and Phase 33 are fully isolated and can be executed on parallel branches simultaneously.
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-23 (Phase 31 verified complete — 3/3 plans, DOCS-01..04 satisfied, Phase 32 next)*
+*Last updated: 2026-02-23 (Phase 32 complete — 2/2 plans, RUNB-01..04 satisfied; Phase 33 Alembic Migrations next)*
