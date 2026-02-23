@@ -5,7 +5,7 @@ This guide covers how to run and troubleshoot the daily data refresh workflow.
 ## Quick Start
 
 ```bash
-# Full daily refresh (bars + EMAs)
+# Full daily refresh (bars + EMAs + regimes + stats)
 make daily-refresh
 
 # Or with Python directly
@@ -33,15 +33,19 @@ python src/ta_lab2/scripts/run_daily_refresh.py --all --ids 1,52,825
 ```
 
 **Flags:**
-- `--all` - Run bars then EMAs
+- `--all` - Run bars then EMAs then regimes then stats (full refresh)
 - `--bars` - Run bar builders only
 - `--emas` - Run EMA refreshers only
+- `--regimes` - Run regime refresher only
+- `--stats` - Run stats runners only (data quality check)
+- `--weekly-digest` - Run weekly QC digest (standalone, does not combine with pipeline flags)
 - `--ids X,Y,Z` - Specific asset IDs (or "all")
 - `--dry-run` - Show commands without executing
 - `--verbose` - Show detailed output
 - `--continue-on-error` - Don't stop on failures
 - `--skip-stale-check` - Skip bar freshness check for EMAs
 - `--staleness-hours N` - Max hours for bar freshness (default: 48.0)
+- `--no-regime-hysteresis` - Disable hysteresis smoothing in regime refresher
 
 ### Separate Scripts
 
@@ -98,6 +102,12 @@ make clean-logs        # Remove logs older than 30 days
 3. **cal_anchor** - Calendar-anchored EMAs
 4. **v2** - Daily-space EMAs (v2)
 
+### Regimes (refresh_cmc_regimes.py)
+After EMAs complete. Reads bars + EMAs, runs L0-L2 labeling, resolves policy, writes to cmc_regimes/flips/stats/comovement tables.
+
+### Stats (run_all_stats_runners.py)
+Final stage. Runs 6 stats runners that check data quality across all pipeline tables. FAIL status halts the pipeline and sends a Telegram alert. WARN status continues with alert logged.
+
 ## Logs and Monitoring
 
 ### Log Files
@@ -131,14 +141,16 @@ Example summary output:
 DAILY REFRESH SUMMARY
 ======================================================================
 
-Total components: 2
-Successful: 2
+Total components: 4
+Successful: 4
 Failed: 0
-Total time: 45.3s
+Total time: 87.2s
 
 [OK] Successful components:
   - bars: 28.5s
   - emas: 16.8s
+  - regimes: 24.1s
+  - stats: 17.8s
 
 ======================================================================
 
@@ -160,12 +172,16 @@ Alerts fire on:
 - Database connection errors
 - OHLC corruption above threshold
 - Validation failures (gaps, duplicates)
+- Stats runner FAIL status (data quality failure — halts pipeline)
+- Stats runner WARN status (minor issues — pipeline continues, alert logged)
 
 **Alert severity levels:**
 - `CRITICAL` - Database/corruption errors (always sent)
 - `ERROR` - Validation failures, missing data (default threshold)
 - `WARNING` - Minor issues (not sent by default)
 - `INFO` - Normal operations (not sent)
+
+**Weekly digest:** Run `--weekly-digest` to send a Telegram summary of PASS/WARN/FAIL counts across all stats tables with week-over-week delta comparison. This is a standalone reporting operation — it does not run pipeline stages.
 
 ## Troubleshooting
 
