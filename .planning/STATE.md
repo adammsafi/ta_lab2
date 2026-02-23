@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: 35 (AMA Engine) — context gathered
-Plan: —
-Status: Context gathered, ready for planning
-Last activity: 2026-02-23 — Phase 35 context gathered (4 areas discussed)
+Phase: 35 (AMA Engine) — in progress
+Plan: 02 of ~5 (estimate)
+Status: Plan 35-02 complete
+Last activity: 2026-02-23 — Completed 35-02-PLAN.md (AMA computation layer)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [░░░░░░░░░░] 0% v0.9.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [█░░░░░░░░░] ~5% v0.9.0
 
 ## Performance Metrics
 
@@ -206,6 +206,10 @@ Recent decisions affecting current work:
 - **v0.9.0 Streamlit NullPool** (v0.9.0 research): All dashboard DB queries use NullPool + @st.cache_data(ttl=300); fileWatcherType=poll for Windows compatibility
 - **v0.9.0 zero new core deps** (v0.9.0 research): scipy, sklearn, plotly, streamlit already installed; only new package is jupyterlab >= 4.5
 - **v0.9.0 fix fillna deprecation before IC** (v0.9.0 research): Replace fillna(method='ffill') with ffill() in feature_eval.py before adding IC code -- avoids FutureWarning becoming error
+- **AMA uses indicator+params_hash PK** (Phase 35-01): (id, ts, tf, indicator, params_hash) replaces (id, ts, tf, period) -- single table for all AMA types (KAMA/DEMA/TEMA/HMA) distinguished by indicator column
+- **dim_ama_params lookup table** (Phase 35-01): Maps (indicator, params_hash) -> params_json JSONB + label TEXT -- human-readable parameter resolution without decoding hashes
+- **AMA returns have no bar-space variant** (Phase 35-01): _ama columns only (no _ama_bar family) -- AMAs computed on canonical bar closes only, simplifies DDL vs EMA pattern
+- **er column inline on AMA value tables** (Phase 35-01): KAMA Efficiency Ratio stored as er column, NULL for DEMA/TEMA/HMA -- queryable as standalone IC signal without separate join
 
 ### Pending Todos
 
@@ -217,8 +221,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-23
-Stopped at: Phase 35 context gathered — ready for /gsd:plan-phase 35
+Last session: 2026-02-23T22:03Z
+Stopped at: Completed 35-01-PLAN.md — AMA DDL (9 files, 25 schema objects)
 Resume file: None
 
 ---
