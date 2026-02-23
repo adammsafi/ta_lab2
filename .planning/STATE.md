@@ -10,16 +10,16 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: 35 (AMA Engine) — in progress
-Plan: 03 of ~5 (estimate)
-Status: Plan 35-03 complete
-Last activity: 2026-02-23 — Completed 35-03-PLAN.md (AMA infrastructure layer)
+Plan: 05 of ~6 (estimate)
+Status: Plan 35-05 complete
+Last activity: 2026-02-23 — Completed 35-05-PLAN.md (AMA returns computation layer)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [███░░░░░░░] ~15% v0.9.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [█████░░░░░] ~25% v0.9.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 166 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup)
+- Total plans completed: 169 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 3 in Phase 35 so far)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -217,6 +217,9 @@ Recent decisions affecting current work:
 - **BaseAMAFeature sibling not subclass of BaseEMAFeature** (Phase 35-03): (indicator, params_hash) PK vs (period) requires independent _get_pk_columns() and _pg_upsert() -- sharing code would require awkward overrides of every DB method
 - **AMAStateManager standalone class** (Phase 35-03): Does NOT reuse EMAStateManager -- EMAStateManager DDL hardcodes period INTEGER PK which is wrong for AMA state
 - **d1_roll == d1 for multi_tf AMA** (Phase 35-03): No intra-period roll variant exists (all rows roll=FALSE); _roll columns kept for schema compatibility with EMA table family
+- **AMAReturnsFeature standalone not subclass** (Phase 35-05): Different responsibility than BaseAMAFeature — reads indicator values and computes returns vs. reads bars and computes values; sharing would require awkward multi-level inheritance
+- **State inline DDL creation for returns** (Phase 35-05): _ensure_state_table() creates returns state table at runtime with (id, tf, indicator, params_hash) PK + last_ts watermark — no pre-existing migration needed
+- **c_delta1.values for canonical assignment** (Phase 35-05): When assigning canonical column results back via .loc[canon_idx], use .values to avoid pandas index alignment issues where canonical subset index doesn't match parent index
 
 ### Pending Todos
 
@@ -228,8 +231,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-23T22:09Z
-Stopped at: Completed 35-03-PLAN.md — AMA infrastructure layer (3 files: base_ama_feature.py, ama_state_manager.py, scripts/amas/__init__.py)
+Last session: 2026-02-23T22:17Z
+Stopped at: Completed 35-05-PLAN.md — AMA returns computation layer (2 files: ama_returns.py, refresh_cmc_returns_ama.py)
 Resume file: None
 
 ---
