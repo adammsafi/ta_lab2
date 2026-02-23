@@ -10,16 +10,16 @@ See: .planning/PROJECT.md (updated 2026-02-22)
 ## Current Position
 
 Phase: 31 of 33 (31-documentation-freshness)
-Plan: 0 of TBD — Phase not yet planned
-Status: Ready to plan
-Last activity: 2026-02-22 — Phase 30 verified and complete (2/2 plans, 8 commits, ~12 min total)
+Plan: 2 of 3 — In progress
+Status: In progress
+Last activity: 2026-02-23 — Completed 31-02-PLAN.md (pipeline diagrams)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [##########] 100% v0.7.0 (2/2 phases, 10/10 plans) | [████░░░░░░] 40% v0.8.0 (5/15 plans, 2/5 phases)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 (7/7 phases) | [##########] 100% v0.7.0 (2/2 phases, 10/10 plans) | [█████░░░░░] 47% v0.8.0 (7/15 plans, 2/5 phases)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 154 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 2 in v0.8.0)
+- Total plans completed: 156 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 4 in v0.8.0)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -83,7 +83,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 |-------|-------|-------|----------|--------|
 | 29-stats-qa-orchestration | 3/3 | 13 min | 4 min | Complete |
 | 30-code-quality-tooling | 2/2 | 12 min | 6 min | Complete |
-| 31-documentation-freshness | 0/TBD | — | — | Pending |
+| 31-documentation-freshness | 2/3 | ~2 min | ~1 min | In progress |
 | 32-runbooks | 0/TBD | — | — | Pending |
 | 33-alembic-migrations | 0/TBD | — | — | Pending |
 
@@ -183,6 +183,7 @@ Recent decisions affecting current work:
 - **mypy continue-on-error: true** (Phase 30-02): 15 documented baseline errors in features/regimes (35% unannotated + missing stubs for vectorbt/psycopg2) -- non-blocking enables visibility without blocking PRs
 - **5-job parallel CI** (Phase 30-02): test/lint/format/mypy/version-check all independent, no depends-on chains; lint/format/version-check fast (<30s), mypy non-blocking, test is the slow matrix job
 - **Hard gate removal protocol** (Phase 30-02): Fix all violations FIRST (Plan 30-01) THEN remove || true (Plan 30-02) -- never remove escape hatch while violations exist
+- **Split pipeline diagrams into two .mmd files** (Phase 31-02): data_flow.mmd (main pipeline TD) + table_variants.mmd (variant structure LR) -- cleaner rendering than single combined file; Mermaid renderer support for multi-diagram varies
 
 ### Pending Todos
 
@@ -194,8 +195,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-23T00:30:00Z
-Stopped at: Phase 30 complete — all 2 plans executed and verified, ready for Phase 31
+Last session: 2026-02-23T01:33:33Z
+Stopped at: Completed 31-02-PLAN.md — pipeline diagrams (data_flow.mmd + table_variants.mmd)
 Resume file: None
 
 ---
