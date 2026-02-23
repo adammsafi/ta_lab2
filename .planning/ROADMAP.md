@@ -563,7 +563,11 @@ Plans:
   2. `docs/operations/BACKTEST_PIPELINE.md` exists covering signals -> backtest -> DB storage end-to-end, including how to re-run a specific signal type and interpret results
   3. `docs/operations/NEW_ASSET_ONBOARDING.md` exists as a standalone SOP with the 6-step checklist (dim_assets -> 1D bars -> multi-TF bars -> EMAs -> validate -> verify incremental) extracted from Phase 21 analysis
   4. `docs/operations/DISASTER_RECOVERY.md` exists covering backup strategy, restore from snapshot, and rebuild from scratch — including the "alembic stamp head" step as part of DB recovery
-**Plans:** TBD during plan-phase
+**Plans:** 2 plans in 1 wave
+
+Plans:
+- [ ] 32-01-PLAN.md -- Regime pipeline runbook + backtest pipeline runbook (RUNB-01, RUNB-02)
+- [ ] 32-02-PLAN.md -- New-asset onboarding SOP + disaster recovery guide + mkdocs nav (RUNB-03, RUNB-04)
 
 ---
 
@@ -641,8 +645,8 @@ Note: Phase 29 and Phase 33 can be worked in parallel (fully isolated). Phase 30
 |-------|----------------|--------|-----------|
 | 29. Stats/QA Orchestration | 3/3 | Complete | 2026-02-22 |
 | 30. Code Quality Tooling | 2/2 | Complete | 2026-02-22 |
-| 31. Documentation Freshness | 0/3 | Pending | — |
-| 32. Runbooks | 0/TBD | Pending | — |
+| 31. Documentation Freshness | 3/3 | Complete | 2026-02-23 |
+| 32. Runbooks | 0/2 | Pending | — |
 | 33. Alembic Migrations | 0/TBD | Pending | — |
 
 ## Requirement Coverage
@@ -678,4 +682,4 @@ Note: Phase 29 and Phase 33 can be worked in parallel (fully isolated). Phase 30
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-22 (Phase 31 planned -- 3 plans in 2 waves, DOCS-01..04 covered)*
+*Last updated: 2026-02-23 (Phase 32 planned -- 2 plans in 1 wave, RUNB-01..04 covered)*
