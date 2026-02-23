@@ -550,7 +550,14 @@ Plans:
   3. `compute_dsr(returns_list, sr_star)` deflates the best-of-N Sharpe correctly — the deflated value is always <= the raw best Sharpe
   4. `PurgedKFoldSplitter(n_splits, t1_series, embargo_bars)` raises `ValueError` when `t1_series` is not provided; fold train/test indices contain no overlap after purging and embargoing
   5. `CombPurgedKFoldCV` generates the combinatorial path matrix required for PBO analysis; all generated paths cover the full sample without train-test contamination
-**Plans**: 0/TBD
+**Plans**: 5 plans in 2 waves
+
+Plans:
+- [ ] 36-01-PLAN.md -- Alembic migrations: psr column rename + psr_results table (PSR-01)
+- [ ] 36-02-PLAN.md -- PSR/DSR/MinTRL formulas via TDD (PSR-02, PSR-03, PSR-04, PSR-05)
+- [ ] 36-03-PLAN.md -- PurgedKFoldSplitter + CPCVSplitter via TDD (CV-01, CV-02, CV-03)
+- [ ] 36-04-PLAN.md -- Wire PSR into backtest pipeline + standalone CLI
+- [ ] 36-05-PLAN.md -- Alembic migration check in run_daily_refresh.py
 
 ---
 
@@ -677,12 +684,12 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 35. AMA Engine | 0/8 | Planned | — |
-| 36. PSR + Purged K-Fold | 0/TBD | Not started | — |
-| 37. IC Evaluation | 0/TBD | Not started | — |
-| 38. Feature Experimentation | 0/TBD | Not started | — |
-| 39. Streamlit Dashboard | 0/TBD | Not started | — |
-| 40. Notebooks | 0/TBD | Not started | — |
+| 35. AMA Engine | 8/8 | Complete | 2026-02-23 |
+| 36. PSR + Purged K-Fold | 0/5 | Planned | -- |
+| 37. IC Evaluation | 0/TBD | Not started | -- |
+| 38. Feature Experimentation | 0/TBD | Not started | -- |
+| 39. Streamlit Dashboard | 0/TBD | Not started | -- |
+| 40. Notebooks | 0/TBD | Not started | -- |
 
 ## Requirement Coverage
 
@@ -719,4 +726,4 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-23 (Phase 35 planned — 8 plans in 5 waves)*
+*Last updated: 2026-02-23 (Phase 36 planned -- 5 plans in 2 waves)*
