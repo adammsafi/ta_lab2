@@ -19,7 +19,7 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 - Phases 11-19: v0.5.0 (complete)
 - Phases 20-26: v0.6.0 (complete)
 - Phases 27-28: v0.7.0 (complete)
-- Phases 29-33: v0.8.0 (current milestone)
+- Phases 29-34: v0.8.0 (current milestone)
 - Decimal phases (27.1, 28.1): Urgent insertions if needed
 
 <details>
@@ -489,13 +489,14 @@ Plans:
 
 ---
 
-### v0.8.0 Polish & Hardening (Phases 29-33) - SHIPPED 2026-02-23
+### v0.8.0 Polish & Hardening (Phases 29-34) - SHIPPED 2026-02-23
 
 - [x] **Phase 29: Stats/QA Orchestration** - Wire 5 existing stats runners into daily refresh pipeline + weekly QC digest
 - [x] **Phase 30: Code Quality Tooling** - Make ruff lint blocking in CI, add mypy config, fix stale tooling references
 - [x] **Phase 31: Documentation Freshness** - Version sync, pipeline mermaid diagram, fix stale refs, mkdocs build clean
 - [x] **Phase 32: Runbooks** - Regime runbook, backtest runbook, new-asset SOP, disaster recovery guide
 - [x] **Phase 33: Alembic Migrations** - Bootstrap framework, stamp existing schema, catalog legacy SQL migrations
+- [ ] **Phase 34: Audit Cleanup** - Close 4 tech debt items from milestone audit
 
 ---
 
@@ -588,6 +589,19 @@ Plans:
 
 ---
 
+### Phase 34: Audit Cleanup
+**Goal:** Close 4 tech debt items identified by milestone audit — sync DAILY_REFRESH.md with current orchestrator, update CHANGELOG.md, fix --no-telegram argparse gap, update Python version recommendation.
+**Depends on:** Phase 33 (audit runs after all phases complete)
+**Gap Closure:** Closes tech debt from v0.8.0-MILESTONE-AUDIT.md
+**Success Criteria** (what must be TRUE):
+  1. DAILY_REFRESH.md documents --regimes, --stats, --weekly-digest flags and 4-stage execution order
+  2. CHANGELOG.md 0.8.0 section includes Phase 32 (runbooks) and Phase 33 (alembic) entries
+  3. run_daily_refresh.py argparse declares --no-telegram so it can be forwarded to weekly_digest
+  4. CONTRIBUTING.md recommends Python 3.12 (matching CI and ruff target-version)
+**Plans:** TBD
+
+---
+
 ## Progress
 
 **Execution Order:**
@@ -652,6 +666,7 @@ Note: Phase 29 and Phase 33 can be worked in parallel (fully isolated). Phase 30
 | 31. Documentation Freshness | 3/3 | Complete | 2026-02-23 |
 | 32. Runbooks | 2/2 | Complete | 2026-02-23 |
 | 33. Alembic Migrations | 2/2 | Complete | 2026-02-23 |
+| 34. Audit Cleanup | 0/TBD | Pending | — |
 
 ## Requirement Coverage
 
@@ -686,4 +701,4 @@ Note: Phase 29 and Phase 33 can be worked in parallel (fully isolated). Phase 30
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-23 (Phase 33 complete -- v0.8.0 milestone shipped)*
+*Last updated: 2026-02-23 (Phase 34 audit-cleanup added for gap closure)*
