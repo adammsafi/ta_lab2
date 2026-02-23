@@ -6,7 +6,7 @@
 - v0.5.0 Ecosystem Reorganization (Phases 11-19) - SHIPPED 2026-02-04
 - v0.6.0 EMA & Bar Architecture Standardization (Phases 20-26) - SHIPPED 2026-02-17
 - v0.7.0 Regime Integration & Signal Enhancement (Phases 27-28) - SHIPPED 2026-02-20
-- v0.8.0 Polish & Hardening (Phases 29-33) - SHIPPED 2026-02-23
+- v0.8.0 Polish & Hardening (Phases 29-34) - SHIPPED 2026-02-23
 
 ## Overview
 
@@ -496,7 +496,7 @@ Plans:
 - [x] **Phase 31: Documentation Freshness** - Version sync, pipeline mermaid diagram, fix stale refs, mkdocs build clean
 - [x] **Phase 32: Runbooks** - Regime runbook, backtest runbook, new-asset SOP, disaster recovery guide
 - [x] **Phase 33: Alembic Migrations** - Bootstrap framework, stamp existing schema, catalog legacy SQL migrations
-- [ ] **Phase 34: Audit Cleanup** - Close 4 tech debt items from milestone audit
+- [x] **Phase 34: Audit Cleanup** - Close 4 tech debt items from milestone audit
 
 ---
 
@@ -601,7 +601,7 @@ Plans:
 **Plans:** 1 plan in 1 wave
 
 Plans:
-- [ ] 34-01-PLAN.md -- Close 4 tech debt items: DAILY_REFRESH.md sync, CHANGELOG entries, --no-telegram argparse, Python 3.12 recommendation
+- [x] 34-01-PLAN.md -- Close 4 tech debt items: DAILY_REFRESH.md sync, CHANGELOG entries, --no-telegram argparse, Python 3.12 recommendation
 
 ---
 
@@ -669,7 +669,7 @@ Note: Phase 29 and Phase 33 can be worked in parallel (fully isolated). Phase 30
 | 31. Documentation Freshness | 3/3 | Complete | 2026-02-23 |
 | 32. Runbooks | 2/2 | Complete | 2026-02-23 |
 | 33. Alembic Migrations | 2/2 | Complete | 2026-02-23 |
-| 34. Audit Cleanup | 0/1 | Pending | — |
+| 34. Audit Cleanup | 1/1 | Complete | 2026-02-23 |
 
 ## Requirement Coverage
 
@@ -704,4 +704,4 @@ Note: Phase 29 and Phase 33 can be worked in parallel (fully isolated). Phase 30
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-23 (Phase 34 audit-cleanup planned: 1 plan in 1 wave)*
+*Last updated: 2026-02-23 (Phase 34 audit-cleanup complete: 4/4 tech debt items closed)*
