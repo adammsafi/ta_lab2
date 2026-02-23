@@ -94,8 +94,23 @@ jobs:
         run: |
           PYPROJECT_VER=$(grep -oP '^version = "\K[^"]+' pyproject.toml)
           README_VER=$(head -1 README.md | grep -oP 'v\K[0-9]+\.[0-9]+\.[0-9]+')
-          if [ "$PYPROJECT_VER" != "$README_VER" ]; then
-            echo "::error::Version mismatch: pyproject.toml=$PYPROJECT_VER, README=$README_VER"
+          MKDOCS_VER=$(grep -oP 'site_name:.*v\K[0-9]+\.[0-9]+\.[0-9]+' mkdocs.yml)
+          if [ "$PYPROJECT_VER" != "$README_VER" ] || [ "$PYPROJECT_VER" != "$MKDOCS_VER" ]; then
+            echo "::error::Version mismatch: pyproject.toml=$PYPROJECT_VER, README=$README_VER, mkdocs=$MKDOCS_VER"
             exit 1
           fi
           echo "Version consistent: $PYPROJECT_VER"
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install docs deps
+        run: pip install mkdocs "mkdocs-material>=9.0,<9.7" "mkdocstrings[python]>=0.24"
+      - name: Build docs (strict)
+        run: mkdocs build --strict
