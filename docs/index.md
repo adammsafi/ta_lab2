@@ -1,4 +1,4 @@
-# ta_lab2 v0.4.0
+# ta_lab2 v0.8.0
 
 Multi-timescale Technical Analysis Lab with AI Orchestration
 
@@ -46,7 +46,7 @@ For detailed setup instructions, see [Deployment Guide](deployment.md) and Time 
 
 ## Overview
 
-**ta_lab2** is a production-ready technical analysis and quantitative trading infrastructure designed for multi-timescale feature engineering, signal generation, and backtesting. The v0.4.0 release introduces AI orchestration capabilities with persistent memory, cost-optimized routing across multiple LLM providers, and comprehensive observability.
+**ta_lab2** is a production-ready technical analysis and quantitative trading infrastructure designed for multi-timescale feature engineering, signal generation, and backtesting. The v0.8.0 release delivers production hardening with automated stats/QA orchestration, blocking CI lint, mypy type coverage, and documentation freshness.
 
 **Key Capabilities:**
 - Multi-timeframe EMA calculations (daily, calendar, trading-day aligned) across 199 timeframes
@@ -564,9 +564,8 @@ If you want to use this in a commercial setting, reach out first so terms can be
 
 See [CHANGELOG](../CHANGELOG.md) for release history and upgrade notes.
 
-**Latest Release:** v0.4.0 (2026-02-01)
-- AI orchestration with Mem0 + Qdrant memory system
-- Multi-platform LLM coordination (Claude, ChatGPT, Gemini)
-- Trading signal system with reproducibility validation
-- PostgreSQL-backed observability and health monitoring
-- Comprehensive validation tests (70+ tests for time alignment, data consistency, backtest reproducibility)
+**Latest Release:** v0.8.0 (2026-02-22)
+- Stats/QA orchestration wired into daily refresh with pipeline gate for FAIL rows
+- Ruff lint blocking in CI; pre-commit hook updated; zero violations enforced
+- mypy type checking scoped to features/ and regimes/ (non-blocking in CI)
+- Documentation freshness pass: version strings, stale references, TODO placeholders resolved

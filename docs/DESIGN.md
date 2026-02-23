@@ -1,6 +1,6 @@
 # ta_lab2 System Design
 
-Version: 0.4.0
+Version: 0.8.0
 
 This document describes the high-level design of ta_lab2, including system goals, architecture overview, data flow, and key design decisions. For implementation details, see [ARCHITECTURE.md](../ARCHITECTURE.md).
 
@@ -505,5 +505,5 @@ Graceful degradation: observability works without `opentelemetry-api` via no-op 
 
 ---
 
-*Last updated: 2026-02-01*
-*Version: 0.4.0 release candidate*
+*Last updated: 2026-02-22*
+*Version: 0.8.0*

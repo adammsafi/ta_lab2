@@ -1,12 +1,11 @@
-# ta_lab2 v0.5.0
+# ta_lab2 v0.8.0
 
 Multi-timescale Technical Analysis Lab with AI Orchestration
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
-> **v0.5.0 Ecosystem Reorganization Complete**
-> External projects (ProjectTT, Data_Tools, fredtools2, fedtools2) consolidated into unified ta_lab2 structure.
-> See [docs/REORGANIZATION.md](docs/REORGANIZATION.md) for migration guide.
+> **v0.8.0 Polish and Hardening**
+> Production-hardened infrastructure with automated stats/QA pipeline, blocking CI lint, and fresh documentation.
 
 ---
 
@@ -50,7 +49,7 @@ For detailed setup instructions, see [Deployment Guide](docs/deployment.md) and 
 
 ## Overview
 
-**ta_lab2** is a production-ready technical analysis and quantitative trading infrastructure designed for multi-timescale feature engineering, signal generation, and backtesting. The v0.5.0 release consolidates the entire ecosystem into a unified structure with improved organization and comprehensive documentation.
+**ta_lab2** is a production-ready technical analysis and quantitative trading infrastructure designed for multi-timescale feature engineering, signal generation, and backtesting. The v0.8.0 release delivers production hardening with automated stats/QA orchestration, blocking CI lint, mypy type coverage, and documentation freshness.
 
 **Key Capabilities:**
 - Multi-timeframe EMA calculations (daily, calendar, trading-day aligned) across 199 timeframes
@@ -68,7 +67,7 @@ For architectural details and system design, see [Documentation Index](docs/inde
 
 ## Project Structure
 
-ta_lab2 follows a unified ecosystem structure after v0.5.0 reorganization:
+ta_lab2 follows a unified ecosystem structure:
 
 ```
 ta_lab2/
@@ -540,16 +539,13 @@ If you want to use this in a commercial setting, reach out first so terms can be
 
 See [CHANGELOG.md](CHANGELOG.md) for release history and upgrade notes.
 
-**Latest Release:** v0.5.0 (2026-02-04)
+**Latest Release:** v0.8.0 (2026-02-22)
+- Stats/QA orchestration wired into daily refresh with pipeline gate for FAIL rows
+- Ruff lint blocking in CI; pre-commit hook updated; zero violations enforced
+- mypy type checking scoped to features/ and regimes/ (non-blocking in CI)
+- Documentation freshness pass: version strings, stale references, TODO placeholders resolved
+
+**Previous Release:** v0.5.0 (2026-02-04)
 - Ecosystem reorganization: Consolidated 155 files from 4 external directories
 - Enhanced documentation with 62 converted documents and comprehensive guides
 - Economic data integration with FRED provider (rate limiting, caching, quality validation)
-- Migrated analysis tools to `ta_lab2.tools.data_tools` (6 functional categories)
-- Archive system with manifest tracking and SHA256 checksums
-- Comprehensive reorganization documentation with before/after diagrams
-
-**Previous Release:** v0.4.0 (2026-02-01)
-- AI orchestration with Mem0 + Qdrant memory system
-- Multi-platform LLM coordination (Claude, ChatGPT, Gemini)
-- Trading signal system with reproducibility validation
-- PostgreSQL-backed observability and health monitoring
