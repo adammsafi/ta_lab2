@@ -114,3 +114,17 @@ jobs:
         run: pip install mkdocs "mkdocs-material>=9.0,<9.7" "mkdocstrings[python]>=0.24"
       - name: Build docs (strict)
         run: mkdocs build --strict
+
+  alembic-history:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+      - name: Verify alembic revision chain
+        run: alembic history
