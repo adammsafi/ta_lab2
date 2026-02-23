@@ -545,7 +545,12 @@ Plans:
   2. `docs/diagrams/data_flow.mmd` exists and accurately shows the bars -> EMAs -> features -> regimes -> signals -> backtest data flow for v0.7.0+ topology
   3. No [TODO:] placeholders remain in ops docs; no aspirational alembic/black references remain in README or CONTRIBUTING
   4. `mkdocs build --strict` exits 0 with no broken nav links or missing pages
-**Plans:** TBD during plan-phase
+**Plans:** 3 plans in 2 waves
+
+Plans:
+- [ ] 31-01-PLAN.md -- Version bump to 0.8.0 + stale reference cleanup + TODO resolution (DOCS-01, DOCS-03)
+- [ ] 31-02-PLAN.md -- Pipeline flow diagram with actual DB table names (DOCS-02)
+- [ ] 31-03-PLAN.md -- Fix mkdocs nav, broken links, CHANGELOG.md, CI docs job (DOCS-04)
 
 ---
 
@@ -636,7 +641,7 @@ Note: Phase 29 and Phase 33 can be worked in parallel (fully isolated). Phase 30
 |-------|----------------|--------|-----------|
 | 29. Stats/QA Orchestration | 3/3 | Complete | 2026-02-22 |
 | 30. Code Quality Tooling | 2/2 | Complete | 2026-02-22 |
-| 31. Documentation Freshness | 0/TBD | Pending | — |
+| 31. Documentation Freshness | 0/3 | Pending | — |
 | 32. Runbooks | 0/TBD | Pending | — |
 | 33. Alembic Migrations | 0/TBD | Pending | — |
 
@@ -673,4 +678,4 @@ Note: Phase 29 and Phase 33 can be worked in parallel (fully isolated). Phase 30
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-22 (Phase 30 complete -- 2/2 plans, QUAL-01..04 satisfied)*
+*Last updated: 2026-02-22 (Phase 31 planned -- 3 plans in 2 waves, DOCS-01..04 covered)*
