@@ -493,7 +493,7 @@ Plans:
 
 - [x] **Phase 29: Stats/QA Orchestration** - Wire 5 existing stats runners into daily refresh pipeline + weekly QC digest
 - [x] **Phase 30: Code Quality Tooling** - Make ruff lint blocking in CI, add mypy config, fix stale tooling references
-- [ ] **Phase 31: Documentation Freshness** - Version sync, pipeline mermaid diagram, fix stale refs, mkdocs build clean
+- [x] **Phase 31: Documentation Freshness** - Version sync, pipeline mermaid diagram, fix stale refs, mkdocs build clean
 - [ ] **Phase 32: Runbooks** - Regime runbook, backtest runbook, new-asset SOP, disaster recovery guide
 - [ ] **Phase 33: Alembic Migrations** - Bootstrap framework, stamp existing schema, catalog legacy SQL migrations
 
@@ -548,9 +548,9 @@ Plans:
 **Plans:** 3 plans in 2 waves
 
 Plans:
-- [ ] 31-01-PLAN.md -- Version bump to 0.8.0 + stale reference cleanup + TODO resolution (DOCS-01, DOCS-03)
-- [ ] 31-02-PLAN.md -- Pipeline flow diagram with actual DB table names (DOCS-02)
-- [ ] 31-03-PLAN.md -- Fix mkdocs nav, broken links, CHANGELOG.md, CI docs job (DOCS-04)
+- [x] 31-01-PLAN.md -- Version bump to 0.8.0 + stale reference cleanup + TODO resolution (DOCS-01, DOCS-03)
+- [x] 31-02-PLAN.md -- Pipeline flow diagram with actual DB table names (DOCS-02)
+- [x] 31-03-PLAN.md -- Fix mkdocs nav, broken links, CHANGELOG.md, CI docs job (DOCS-04)
 
 ---
 

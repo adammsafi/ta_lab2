@@ -26,10 +26,10 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Documentation
 
-- [ ] **DOCS-01**: Version strings synchronized across pyproject.toml, mkdocs.yml, and README.md to v0.8.0
-- [ ] **DOCS-02**: Pipeline flow mermaid diagram (.mmd) showing bars→EMAs→features→signals→backtest data flow added to docs/diagrams/
-- [ ] **DOCS-03**: Stale references and TODOs resolved — aspirational alembic/black refs removed, [TODO:] placeholders in ops docs filled
-- [ ] **DOCS-04**: mkdocs build --strict passes with no broken nav links or missing pages
+- [x] **DOCS-01**: Version strings synchronized across pyproject.toml, mkdocs.yml, and README.md to v0.8.0
+- [x] **DOCS-02**: Pipeline flow mermaid diagram (.mmd) showing bars→EMAs→features→signals→backtest data flow added to docs/diagrams/
+- [x] **DOCS-03**: Stale references and TODOs resolved — aspirational alembic/black refs removed, [TODO:] placeholders in ops docs filled
+- [x] **DOCS-04**: mkdocs build --strict passes with no broken nav links or missing pages
 
 ### Runbooks
 
@@ -99,10 +99,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | QUAL-02 | Phase 30 | Complete |
 | QUAL-03 | Phase 30 | Complete |
 | QUAL-04 | Phase 30 | Complete |
-| DOCS-01 | Phase 31 | Pending |
-| DOCS-02 | Phase 31 | Pending |
-| DOCS-03 | Phase 31 | Pending |
-| DOCS-04 | Phase 31 | Pending |
+| DOCS-01 | Phase 31 | Complete |
+| DOCS-02 | Phase 31 | Complete |
+| DOCS-03 | Phase 31 | Complete |
+| DOCS-04 | Phase 31 | Complete |
 | RUNB-01 | Phase 32 | Pending |
 | RUNB-02 | Phase 32 | Pending |
 | RUNB-03 | Phase 32 | Pending |
@@ -119,4 +119,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-22*
-*Last updated: 2026-02-22 (STAT-01..04 marked Complete after Phase 29 verification)*
+*Last updated: 2026-02-23 (DOCS-01..04 marked Complete after Phase 31 verification)*
