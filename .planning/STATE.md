@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: 35 (AMA Engine) — in progress
-Plan: 07 of ~8 (estimate)
-Status: Plan 35-06 complete (executed out-of-order, was blocked by dependency on 35-04)
-Last activity: 2026-02-23 — Completed 35-06-PLAN.md (calendar AMA feature classes + refreshers)
+Phase: 35 (AMA Engine) — COMPLETE
+Plan: 08 of 8
+Status: Phase 35 complete — all 8 plans executed
+Last activity: 2026-02-23 — Completed 35-08-PLAN.md (AMA orchestrator + daily refresh integration)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [██████░░░░] ~37% v0.9.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [████████░░] ~55% v0.9.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 172 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 6 in Phase 35 so far)
+- Total plans completed: 174 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -198,6 +198,9 @@ Recent decisions affecting current work:
 - **Baseline revision 25f2b3c90f65 as Alembic epoch** (Phase 33-02): No-op baseline with down_revision=None; alembic stamp head applied to production DB; represents cumulative state after all 17 legacy SQL migrations applied
 - **alembic history in CI not alembic current** (Phase 33-02): history reads filesystem only (no DB), current requires live DB -- history is appropriate for CI structural validation
 - **stamp not upgrade on existing production DB** (Phase 33-02): stamp records current state without DDL; upgrade runs migration code -- use stamp only during initial setup and disaster recovery
+- **AMA orchestrator uses -m module invocation** (Phase 35-08): All AMA subprocesses invoked via python -m module (not script file paths) -- consistent with refresh_returns_zscore and run_all_stats_runners invocation pattern
+- **PostStep gate: any_value_succeeded** (Phase 35-08): Post-steps run if at least one value refresher succeeds (not all) -- with --continue-on-error, partial value refresher success still produces data; post-steps process whatever was produced
+- **AMAs inherit fresh-bar IDs from EMA filtering** (Phase 35-08): ids_for_amas = ids_for_emas when run_emas is True -- AMAs process same stale-bar-filtered set as EMAs; stale assets skipped in both EMA and AMA stages
 - **v0.9.0 AMA table family** (v0.9.0 research): cmc_ama_multi_tf uses (id, ts, tf, indicator, params_hash) PK -- separate namespace from EMA tables; indicator column distinguishes KAMA/DEMA/TEMA/HMA in a single table
 - **v0.9.0 IC requires train_start/train_end** (v0.9.0 research): All IC functions enforce time-bounded evaluation; no full-history IC for feature selection -- prevents future-information leakage
 - **v0.9.0 PurgedKFold from scratch** (v0.9.0 research): Implement PurgedKFoldSplitter without mlfinlab (discontinued, known bug); t1_series required argument, not optional
@@ -240,8 +243,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-23T22:26Z
-Stopped at: Completed 35-06-PLAN.md — 4 calendar AMA feature classes + 2 refresher scripts (ama_multi_tf_cal.py, ama_multi_tf_cal_anchor.py, refresh_cmc_ama_multi_tf_cal_from_bars.py, refresh_cmc_ama_multi_tf_cal_anchor_from_bars.py)
+Last session: 2026-02-23T22:32Z
+Stopped at: Completed 35-08-PLAN.md — Phase 35 (AMA Engine) fully complete. All 8 plans executed. AMA orchestrator + daily refresh integration delivered.
 Resume file: None
 
 ---
@@ -257,7 +260,7 @@ See `.planning/milestones/v0.8.0-ROADMAP.md` for archived details.
 Roadmap created 2026-02-23. 6 phases, 35 requirements.
 
 Phase overview:
-- Phase 35 (AMA Engine): KAMA, DEMA, TEMA, HMA — new indicator family with params_hash PK
+- Phase 35 (AMA Engine): COMPLETE — KAMA, DEMA, TEMA, HMA indicator family with params_hash PK; 6 AMA table variants + _u; orchestrator + daily refresh integration
 - Phase 36 (PSR + Purged K-Fold): Statistical rigor — PSR migration, Lopez de Prado PSR/DSR/MinTRL, leakage-free CV
 - Phase 37 (IC Evaluation): Feature scoring — Spearman IC, rolling IC, IC decay, regime breakdown, significance
 - Phase 38 (Feature Experimentation): Registry + ExperimentRunner + BH-corrected promotion gate
@@ -274,4 +277,4 @@ Key constraints to remember:
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-23 (v0.9.0 roadmap created — 6 phases 35-40, 35/35 requirements mapped)*
+*Last updated: 2026-02-23 (Phase 35 AMA Engine complete — 8 plans; Phase 36 PSR + Purged K-Fold is next)*
