@@ -2,19 +2,19 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-22)
+See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** Planning v0.9.0 — milestone v0.8.0 shipped and archived
+**Current focus:** v0.9.0 Research & Experimentation — defining requirements
 
 ## Current Position
 
-Phase: None — between milestones
-Plan: None
-Status: v0.8.0 shipped and archived — planning v0.9.0
-Last activity: 2026-02-23 — Milestone v0.8.0 archived, git tag v0.8.0 created
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements for v0.9.0
+Last activity: 2026-02-23 — Milestone v0.9.0 started
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 (6 phases, 16 plans, 20/20 requirements)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [░░░░░░░░░░] 0% v0.9.0
 
 ## Performance Metrics
 
@@ -210,7 +210,7 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-23
-Stopped at: Milestone v0.8.0 archived — ready for /gsd:new-milestone to start v0.9.0
+Stopped at: Defining v0.9.0 requirements — milestone started, PROJECT.md updated
 Resume file: None
 
 ---
@@ -231,4 +231,4 @@ Next milestone candidates (from v0.8.0 deferred):
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-23 (v0.8.0 milestone archived, planning v0.9.0)*
+*Last updated: 2026-02-23 (v0.9.0 milestone started, defining requirements)*

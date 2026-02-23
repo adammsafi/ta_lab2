@@ -8,15 +8,17 @@ A systematic crypto trading platform with integrated AI orchestration and persis
 
 Build trustworthy quant trading infrastructure 3x faster by creating AI coordination that remembers context, routes work optimally, and eliminates redundant context-setting across sessions and platforms.
 
-## Current Milestone: Planning v0.9.0
+## Current Milestone: v0.9.0 Research & Experimentation
 
 **Previous:** v0.8.0 Polish & Hardening — SHIPPED 2026-02-23 (6 phases, 13 plans, 20/20 requirements)
 
-**Next milestone candidates (from v0.8.0 REQUIREMENTS.md deferred section):**
-- Feature Enrichment: KAMA, DEMA, TEMA, HMA, feature experimentation framework, IC evaluation
-- Stress Testing: Purged K-fold, walk-forward optimization, parameter sweeps, probabilistic Sharpe
-- Visualization: Streamlit dashboard, heatmaps, interactive plots
-- Notebooks: End-to-end demo notebooks
+**Goal:** Enable a full research cycle — compute new indicators, evaluate with IC, stress test with CV, and visualize results in an interactive dashboard. End-to-end from feature creation to research insight.
+
+**Target features:**
+- Feature Enrichment: KAMA, DEMA, TEMA, HMA as full pipeline citizens (multi-TF, persisted, _u sync, z-scores) + feature experimentation framework + IC evaluation
+- Stress Testing: Purged K-fold CV, walk-forward optimization improvements, probabilistic Sharpe ratio (full Lopez de Prado, not placeholder)
+- Visualization: Streamlit dashboard with both research explorer (IC scores, equity curves, regime transitions) and pipeline monitor (run status, data freshness, PASS/FAIL)
+- Example Notebooks: End-to-end demos (load → compute → plot → backtest), polished enough to share
 
 ## Requirements
 
@@ -167,4 +169,4 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 | Backtest/live parity as success criterion | System is only trustworthy if backtests use identical logic to live trading - reproducibility is mandatory | — Pending |
 
 ---
-*Last updated: 2026-02-23 after v0.8.0 milestone completion*
+*Last updated: 2026-02-23 after v0.9.0 milestone start*
