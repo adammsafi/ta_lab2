@@ -19,10 +19,10 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Code Quality
 
-- [ ] **QUAL-01**: Ruff lint blocking in CI — existing violations fixed, || true removed from ci.yml
-- [ ] **QUAL-02**: mypy added to CI as non-blocking job, scoped to features/ and regimes/ with [tool.mypy] config in pyproject.toml
-- [ ] **QUAL-03**: Ruff version upgraded from v0.1.14 to v0.9+ in pre-commit, --output-format=github added for PR annotations
-- [ ] **QUAL-04**: Stale tool references fixed — black removed from README, mkdocstrings version constraint corrected
+- [x] **QUAL-01**: Ruff lint blocking in CI — existing violations fixed, || true removed from ci.yml
+- [x] **QUAL-02**: mypy added to CI as non-blocking job, scoped to features/ and regimes/ with [tool.mypy] config in pyproject.toml
+- [x] **QUAL-03**: Ruff version upgraded from v0.1.14 to v0.9+ in pre-commit, --output-format=github added for PR annotations
+- [x] **QUAL-04**: Stale tool references fixed — black removed from README, mkdocstrings version constraint corrected
 
 ### Documentation
 
@@ -95,10 +95,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | STAT-02 | Phase 29 | Complete |
 | STAT-03 | Phase 29 | Complete |
 | STAT-04 | Phase 29 | Complete |
-| QUAL-01 | Phase 30 | Pending |
-| QUAL-02 | Phase 30 | Pending |
-| QUAL-03 | Phase 30 | Pending |
-| QUAL-04 | Phase 30 | Pending |
+| QUAL-01 | Phase 30 | Complete |
+| QUAL-02 | Phase 30 | Complete |
+| QUAL-03 | Phase 30 | Complete |
+| QUAL-04 | Phase 30 | Complete |
 | DOCS-01 | Phase 31 | Pending |
 | DOCS-02 | Phase 31 | Pending |
 | DOCS-03 | Phase 31 | Pending |

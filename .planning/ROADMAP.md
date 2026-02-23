@@ -492,7 +492,7 @@ Plans:
 ### v0.8.0 Polish & Hardening (Phases 29-33) - IN PROGRESS
 
 - [x] **Phase 29: Stats/QA Orchestration** - Wire 5 existing stats runners into daily refresh pipeline + weekly QC digest
-- [ ] **Phase 30: Code Quality Tooling** - Make ruff lint blocking in CI, add mypy config, fix stale tooling references
+- [x] **Phase 30: Code Quality Tooling** - Make ruff lint blocking in CI, add mypy config, fix stale tooling references
 - [ ] **Phase 31: Documentation Freshness** - Version sync, pipeline mermaid diagram, fix stale refs, mkdocs build clean
 - [ ] **Phase 32: Runbooks** - Regime runbook, backtest runbook, new-asset SOP, disaster recovery guide
 - [ ] **Phase 33: Alembic Migrations** - Bootstrap framework, stamp existing schema, catalog legacy SQL migrations
@@ -531,8 +531,8 @@ Plans:
 **Plans:** 2 plans in 2 waves
 
 Plans:
-- [ ] 30-01-PLAN.md -- Fix all ruff violations (34 total) + reformat 106 files (QUAL-01 part 1)
-- [ ] 30-02-PLAN.md -- Config updates + CI restructure: mypy, version pins, pre-commit, stale refs, CI jobs (QUAL-01 part 2, QUAL-02, QUAL-03, QUAL-04)
+- [x] 30-01-PLAN.md -- Fix all ruff violations (34 total) + reformat 106 files (QUAL-01 part 1)
+- [x] 30-02-PLAN.md -- Config updates + CI restructure: mypy, version pins, pre-commit, stale refs, CI jobs (QUAL-01 part 2, QUAL-02, QUAL-03, QUAL-04)
 
 ---
 
@@ -635,7 +635,7 @@ Note: Phase 29 and Phase 33 can be worked in parallel (fully isolated). Phase 30
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 29. Stats/QA Orchestration | 3/3 | Complete | 2026-02-22 |
-| 30. Code Quality Tooling | 0/2 | In Progress | — |
+| 30. Code Quality Tooling | 2/2 | Complete | 2026-02-22 |
 | 31. Documentation Freshness | 0/TBD | Pending | — |
 | 32. Runbooks | 0/TBD | Pending | — |
 | 33. Alembic Migrations | 0/TBD | Pending | — |
@@ -673,4 +673,4 @@ Note: Phase 29 and Phase 33 can be worked in parallel (fully isolated). Phase 30
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-22 (Phase 30 planned -- 2 plans in 2 waves)*
+*Last updated: 2026-02-22 (Phase 30 complete -- 2/2 plans, QUAL-01..04 satisfied)*
