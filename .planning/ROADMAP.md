@@ -598,7 +598,10 @@ Plans:
   2. CHANGELOG.md 0.8.0 section includes Phase 32 (runbooks) and Phase 33 (alembic) entries
   3. run_daily_refresh.py argparse declares --no-telegram so it can be forwarded to weekly_digest
   4. CONTRIBUTING.md recommends Python 3.12 (matching CI and ruff target-version)
-**Plans:** TBD
+**Plans:** 1 plan in 1 wave
+
+Plans:
+- [ ] 34-01-PLAN.md -- Close 4 tech debt items: DAILY_REFRESH.md sync, CHANGELOG entries, --no-telegram argparse, Python 3.12 recommendation
 
 ---
 
@@ -666,7 +669,7 @@ Note: Phase 29 and Phase 33 can be worked in parallel (fully isolated). Phase 30
 | 31. Documentation Freshness | 3/3 | Complete | 2026-02-23 |
 | 32. Runbooks | 2/2 | Complete | 2026-02-23 |
 | 33. Alembic Migrations | 2/2 | Complete | 2026-02-23 |
-| 34. Audit Cleanup | 0/TBD | Pending | — |
+| 34. Audit Cleanup | 0/1 | Pending | — |
 
 ## Requirement Coverage
 
@@ -701,4 +704,4 @@ Note: Phase 29 and Phase 33 can be worked in parallel (fully isolated). Phase 30
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-23 (Phase 34 audit-cleanup added for gap closure)*
+*Last updated: 2026-02-23 (Phase 34 audit-cleanup planned: 1 plan in 1 wave)*
