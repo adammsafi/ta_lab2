@@ -75,7 +75,7 @@ def quick_logit_feature_weights(
 
     cols = [c for c in feature_cols if c in df.columns]
     y = binarize_target(future_return(df[close_col], horizon, log=log_ret)).dropna()
-    X = df.loc[y.index, cols].fillna(method="ffill").fillna(0.0)
+    X = df.loc[y.index, cols].ffill().fillna(0.0)
 
     pipe = Pipeline(
         [
