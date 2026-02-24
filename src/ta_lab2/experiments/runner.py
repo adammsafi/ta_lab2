@@ -49,6 +49,10 @@ _ALLOWED_TABLES = frozenset(
         "cmc_ema_multi_tf_u",
         "cmc_returns_ema_multi_tf",
         "cmc_returns_ema_multi_tf_u",
+        "cmc_ama_multi_tf",
+        "cmc_ama_multi_tf_u",
+        "cmc_returns_ama_multi_tf",
+        "cmc_returns_ama_multi_tf_u",
         "cmc_vol",
         "cmc_ta_daily",
         "cmc_features",
@@ -432,6 +436,17 @@ class ExperimentRunner:
                     "start": train_start,
                     "end": train_end,
                 }
+
+            # Handle optional filters (e.g., indicator, params_hash for AMA tables)
+            filters = inp.get("filters", {})
+            for fkey, fval in filters.items():
+                if not _is_safe_identifier(fkey):
+                    raise ValueError(
+                        f"Filter key '{fkey}' contains unsafe characters. "
+                        "Only alphanumeric and underscore are allowed."
+                    )
+                sql_str += f' AND "{fkey}" = :filter_{fkey}'
+                params[f"filter_{fkey}"] = fval
 
             df = pd.read_sql(text(sql_str), conn, params=params)
 
