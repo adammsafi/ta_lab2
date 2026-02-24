@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: 38 (Feature Experimentation) — In progress
-Plan: 2/5 complete
-Status: Plan 38-02 complete (YAML feature registry subpackage + sample features.yaml)
-Last activity: 2026-02-24 — Completed 38-02-PLAN.md
+Plan: 4/5 complete
+Status: Plan 38-04 complete (FeaturePromoter BH gate + migration stub + promotion/purge CLIs)
+Last activity: 2026-02-24 — Completed 38-04-PLAN.md
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [██████████] ~78% v0.9.0
 
@@ -96,7 +96,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 | 35-ama-engine | 8/8 | ~56 min | ~7 min | Complete |
 | 36-psr-purged-k-fold | 5/5 | ~24 min | ~5 min | Complete |
 | 37-ic-evaluation | 4/4 | ~23 min | ~6 min | Complete |
-| 38-feature-experimentation | 2/5 | ~4 min | ~2 min | In Progress |
+| 38-feature-experimentation | 4/5 | ~15 min | ~4 min | In Progress |
 
 *Updated after each plan completion*
 
@@ -279,6 +279,14 @@ Recent decisions affecting current work:
 - **Sweep naming convention {base}_{key}{val}** (Phase 38-02): Predictable, inspectable variant names from itertools.product expansion; duplicate detection via _features dict keyed by expanded name
 - **eval globals inject np+pd restrict __builtins__** (Phase 38-02): np.log(close) works in inline expressions; os.system() blocked; documents trust assumption for trusted YAML files
 - **External depends_on silently filtered in DAG** (Phase 38-02): Features referencing promoted/external dependencies are not in the registry dict; DAG silently drops them from edges — allows gradual promotion without breaking YAML
+- **Single connection for all assets in ExperimentRunner** (Phase 38-03): PostgreSQL temp tables are session-scoped; opening new connection per asset drops the table; one `with engine.connect() as conn:` block covers all assets in a run
+- **BH correction across all rows not per-asset** (Phase 38-03): scipy.stats.false_discovery_control() applied ONCE across all (asset x horizon x return_type) — more conservative; matches plan intent for 'single run hypothesis testing'
+- **_ALLOWED_TABLES frozenset at query time** (Phase 38-03): Allowlist validated in _load_inputs() not registry.load() — catches YAML edits after initial validation; prevents SQL injection from crafted table names
+- **save_experiment_results DO UPDATE semantics** (Phase 38-03): ON CONFLICT uq_feature_experiments_key DO UPDATE — re-running experiment updates results rather than silently skipping; correct for analysis workflows
+- **BH gate default min_pass_rate=0.0** (Phase 38-04): At least one combo must pass BH at alpha=0.05 (not all); stricter enforcement via --min-pass-rate CLI flag; practical for horizon-specific significance
+- **Live Alembic head for migration stub down_revision** (Phase 38-04): SELECT version_num FROM alembic_version at runtime — never hardcode; avoids chain breaks when new migrations added between promotion runs
+- **Non-destructive feature deprecation** (Phase 38-04): deprecate_feature() sets lifecycle='deprecated', does NOT drop cmc_features column (requires downtime) or delete experiment rows (audit trail); purge_experiment.py defaults to deprecate, not delete
+- **NaN filter before false_discovery_control()** (Phase 38-04): scipy raises ValueError on NaN inputs; filter valid_mask before passing array; return (False, df, reason) when zero valid p-values exist
 
 ### Pending Todos
 
@@ -290,8 +298,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-24
-Stopped at: Completed 38-02-PLAN.md — YAML feature registry subpackage (FeatureRegistry, resolve_experiment_dag, features.yaml)
+Last session: 2026-02-24T12:30:43Z
+Stopped at: Completed 38-03-PLAN.md — ExperimentRunner + run_experiment.py CLI
 Resume file: None
 
 ---
