@@ -11,10 +11,10 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 Phase: 41.1 (Milestone Cleanup) — Complete
 Plan: 3/3 complete
-Status: Phase 41.1 complete. All 3 plans executed: AMA allowlist, experiments dashboard, tech debt cleanup (CLI ref, rolling IC, public fold_boundaries).
-Last activity: 2026-02-24 — Completed 41.1-03-PLAN.md
+Status: Phase 41.1 verified (11/11 must-haves passed). v0.9.0 tech debt closed.
+Last activity: 2026-02-24 — Phase 41.1 verified, all 3 plans executed (AMA allowlist, experiments dashboard, fixes)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [###] 100% v0.9.1 milestone-cleanup
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0
 
 ## Performance Metrics
 
@@ -336,8 +336,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-24T19:38:09Z
-Stopped at: Completed 41.1-03-PLAN.md — CLI ref fix, rolling IC chart in Research Explorer, fold_boundaries public API, notebook import updated
+Last session: 2026-02-24T20:30:00Z
+Stopped at: Phase 41.1 verified (11/11 must-haves). v0.9.0 tech debt closed. Ready for milestone completion.
 Resume file: None
 
 ---
@@ -348,7 +348,7 @@ Resume file: None
 
 See `.planning/milestones/v0.8.0-ROADMAP.md` for archived details.
 
-**v0.9.0 Research & Experimentation — In Progress**
+**v0.9.0 Research & Experimentation — COMPLETE (including tech debt cleanup)**
 
 Roadmap created 2026-02-23. 6 phases, 35 requirements.
 
@@ -360,6 +360,7 @@ Phase overview:
 - Phase 39 (Streamlit Dashboard): COMPLETE — DB layer, cached queries, charts.py, landing page, pipeline monitor (traffic light + stats grid + coverage pivot + alert history), research explorer (IC table, IC decay chart, regime timeline)
 - Phase 40 (Notebooks): COMPLETE — helpers.py (6 functions), 01_explore_indicators.ipynb (29 cells, AMA + regimes), 02_evaluate_features.ipynb (44 cells, IC + purged K-fold + regime A/B), 03_run_experiments.ipynb (33 cells, feature registry + DAG + experiments + dashboard); 13/13 must-haves verified
 - Phase 41 (Asset Descriptive Stats & Correlation): COMPLETE — Alembic migration (5 DB objects), refresh_cmc_asset_stats.py (8 stats x 4 windows), refresh_cmc_cross_asset_corr.py (Pearson+Spearman pairwise), orchestrator + pipeline wiring, dashboard page (stats table + correlation heatmap), regime integration + quality checks; 6/6 must-haves verified
+- Phase 41.1 (Milestone Cleanup): COMPLETE — AMA tables in ExperimentRunner _ALLOWED_TABLES + filter support, 2 AMA YAML features, experiments dashboard page, stale CLI ref fix, rolling IC chart, fold_boundaries public API; 11/11 must-haves verified
 
 Key constraints to remember:
 - PSR-01 (Alembic migration psr->psr_legacy) must run before any PSR formula code

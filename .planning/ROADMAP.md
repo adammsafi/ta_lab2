@@ -525,7 +525,7 @@ Plans:
 - [x] **Phase 39: Streamlit Dashboard** - Pipeline monitor + research explorer with cached DB queries
 - [x] **Phase 40: Notebooks** - 3-5 polished Jupyter notebooks demonstrating the full research cycle
 - [x] **Phase 41: Asset Descriptive Stats & Correlation** - Rolling per-asset summary stats + cross-asset return correlation time series
-- [ ] **Phase 41.1: Milestone Cleanup** - Close tech debt from v0.9.0 audit (AMA allowlist, features.yaml, dashboard enhancements)
+- [x] **Phase 41.1: Milestone Cleanup** - Close tech debt from v0.9.0 audit (AMA allowlist, features.yaml, dashboard enhancements)
 
 </details>
 
@@ -690,9 +690,9 @@ Plans:
 **Plans**: 3 plans in 1 wave
 
 Plans:
-- [ ] 41.1-01-PLAN.md -- AMA tables in ExperimentRunner _ALLOWED_TABLES + filter support + YAML features
-- [ ] 41.1-02-PLAN.md -- Dashboard experiments page (queries + page + nav registration)
-- [ ] 41.1-03-PLAN.md -- Fix stale CLI ref, add rolling IC chart, make fold_boundaries public
+- [x] 41.1-01-PLAN.md -- AMA tables in ExperimentRunner _ALLOWED_TABLES + filter support + YAML features
+- [x] 41.1-02-PLAN.md -- Dashboard experiments page (queries + page + nav registration)
+- [x] 41.1-03-PLAN.md -- Fix stale CLI ref, add rolling IC chart, make fold_boundaries public
 
 </details>
 
@@ -794,7 +794,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | 39. Streamlit Dashboard | 4/4 | Complete | 2026-02-24 |
 | 40. Notebooks | 3/3 | Complete | 2026-02-24 |
 | 41. Asset Descriptive Stats & Correlation | 6/6 | Complete | 2026-02-24 |
-| 41.1. Milestone Cleanup | 0/3 | Planned | -- |
+| 41.1. Milestone Cleanup | 3/3 | Complete | 2026-02-24 |
 
 ### v1.0.0 Progress (Next)
 
