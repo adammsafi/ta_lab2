@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: 41 (Asset Descriptive Stats & Correlation) — Complete
-Plan: 6/6 complete
-Status: Phase 41 verified (6/6 must-haves passed). v0.9.0 milestone complete.
-Last activity: 2026-02-24 — Phase 41 verified, all 6 plans executed
+Phase: 41.1 (Milestone Cleanup) — In Progress
+Plan: 1/3 complete
+Status: Phase 41.1-01 complete. AMA tables wired into ExperimentRunner; 2 AMA experimental features added.
+Last activity: 2026-02-24 — Completed 41.1-01-PLAN.md
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [#░░] 33% v0.9.1 milestone-cleanup
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 206 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41)
+- Total plans completed: 207 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 1 in Phase 41.1)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -97,6 +97,12 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 | 36-psr-purged-k-fold | 5/5 | ~24 min | ~5 min | Complete |
 | 37-ic-evaluation | 4/4 | ~23 min | ~6 min | Complete |
 | 38-feature-experimentation | 5/5 | ~19 min | ~4 min | Complete |
+
+**By Phase (v0.9.1 Milestone Cleanup):**
+
+| Phase | Plans | Total | Avg/Plan | Status |
+|-------|-------|-------|----------|--------|
+| 41.1-milestone-cleanup | 1/3 | ~2 min | ~2 min | In progress |
 
 *Updated after each plan completion*
 
@@ -314,6 +320,8 @@ Recent decisions affecting current work:
 - **load_rolling_stats returns None not empty DataFrame** (Phase 41-06): Allows callers to distinguish "unavailable" from "empty table" — cleaner conditional logic
 - **Regime stats augmentation in main loop not compute_regimes_for_id** (Phase 41-06): Preserves labeling function purity; augmentation left-joined after load_regime_input_data in per-asset loop
 - **check_desc_stats_quality inline not in STATS_TABLES/ALL_STATS_SCRIPTS** (Phase 41-06): No subprocess runner script exists for desc stats tables; inline function avoids creating one
+- **filter_ prefix on ExperimentRunner filter params** (Phase 41.1-01): Prevents collision with existing id/tf/start/end params; filter keys double-quoted in SQL for reserved-word safety
+- **AMA tables NOT in _TABLES_WITHOUT_TF** (Phase 41.1-01): AMA tables have tf column; standard WHERE id/tf/ts clause applies; only cmc_vol/cmc_ta_daily lack tf
 
 ### Pending Todos
 
@@ -325,8 +333,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-24T17:04:21Z
-Stopped at: Completed 41-06-PLAN.md — regime-stats integration (load_rolling_stats_for_asset, --no-desc-stats flags) and desc stats quality checks in stats runner
+Last session: 2026-02-24T19:34:00Z
+Stopped at: Completed 41.1-01-PLAN.md — AMA table allowlist + filter support in ExperimentRunner, kama_er_signal and ama_ret_momentum in features.yaml
 Resume file: None
 
 ---

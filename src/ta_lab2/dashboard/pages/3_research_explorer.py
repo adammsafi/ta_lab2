@@ -13,8 +13,10 @@ from __future__ import annotations
 
 import streamlit as st
 
+from ta_lab2.analysis.ic import compute_rolling_ic
 from ta_lab2.dashboard.charts import (
     build_ic_decay_chart,
+    build_rolling_ic_chart,
     build_regime_price_chart,
     build_regime_timeline,
     chart_download_button,
@@ -23,6 +25,7 @@ from ta_lab2.dashboard.db import get_engine
 from ta_lab2.dashboard.queries.research import (
     load_asset_list,
     load_close_prices,
+    load_feature_close_series,
     load_feature_names,
     load_ic_results,
     load_regimes,
@@ -91,7 +94,7 @@ except Exception as exc:
 if not filtered_features:
     st.info(
         "No IC features found for the selected asset/timeframe combination. "
-        "Run IC evaluation first (e.g. `python -m ta_lab2.scripts.ic.run_ic_evaluation`)."
+        "Run IC evaluation first (e.g. `python -m ta_lab2.scripts.analysis.run_ic_eval`)."
     )
     st.stop()
 
@@ -180,6 +183,48 @@ if not feature_ic.empty:
         st.warning(f"Could not render IC decay chart: {exc}")
 else:
     st.info("Run IC evaluation to view the IC decay chart.")
+
+# ---------------------------------------------------------------------------
+# Rolling IC Chart section
+# ---------------------------------------------------------------------------
+
+st.subheader("Rolling IC")
+if not feature_ic.empty:
+    try:
+        pair = load_feature_close_series(
+            engine, selected_id, selected_tf, selected_feature
+        )
+        if pair is not None:
+            feat_series, close_series_for_ic = pair
+            if len(feat_series) > 63:
+                rolling_ic_series, ic_ir, ic_ir_tstat = compute_rolling_ic(
+                    feat_series, close_series_for_ic.pct_change().dropna(), window=63
+                )
+                fig_rolling = build_rolling_ic_chart(
+                    rolling_ic_series, selected_feature, window=63
+                )
+                st.plotly_chart(fig_rolling, theme=None, key="rolling_ic")
+                chart_download_button(
+                    fig_rolling,
+                    "Download Rolling IC (HTML)",
+                    f"rolling_ic_{selected_symbol}_{selected_tf}_{selected_feature}.html",
+                )
+                col_a, col_b = st.columns(2)
+                with col_a:
+                    st.metric("IC-IR", f"{ic_ir:.4f}")
+                with col_b:
+                    st.metric("IC-IR t-stat", f"{ic_ir_tstat:.2f}")
+            else:
+                st.info("Not enough data points (need >63 bars) for rolling IC.")
+        else:
+            st.info(
+                f"Feature '{selected_feature}' not found in cmc_features for "
+                f"{selected_symbol} ({selected_tf}). Rolling IC requires feature data in cmc_features."
+            )
+    except Exception as exc:
+        st.warning(f"Could not compute rolling IC: {exc}")
+else:
+    st.info("Run IC evaluation to view the rolling IC chart.")
 
 # ---------------------------------------------------------------------------
 # Regime Analysis section
