@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v0.9.0 Research & Experimentation — Phase 37 next (IC Evaluation)
+**Current focus:** v0.9.0 Research & Experimentation — Phase 37 (IC Evaluation) in progress
 
 ## Current Position
 
 Phase: 37 (IC Evaluation) — In progress
-Plan: 1/8 complete
-Status: Plan 37-01 complete — fillna fix + cmc_ic_results table created
-Last activity: 2026-02-24 — Completed 37-01-PLAN.md (IC evaluation prerequisites)
+Plan: 2/8 complete
+Status: Plan 37-02 complete — IC core computation library (44 tests, TDD)
+Last activity: 2026-02-24 — Completed 37-02-PLAN.md (IC core computation library)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [███░░░░░░░] ~70% v0.9.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [████░░░░░░] ~72% v0.9.0
 
 ## Performance Metrics
 
@@ -257,6 +257,10 @@ Recent decisions affecting current work:
 - **_psr_* prefix pattern for detail stats** (Phase 36-04): PSR distributional stats (skewness, kurtosis, n_obs, min_trl) stored in metrics dict with _psr_ prefix; stripped before cmc_backtest_metrics INSERT; passed to psr_results INSERT in same transaction
 - **return_source distinguishes PSR compute paths** (Phase 36-04): 'portfolio' = pf.returns() during backtest (exact, fees-aware); 'trade_reconstruction' = pnl_pct/n_bars approximation from CLI; column makes distinction queryable
 - **DSR CLI deferred to Phase 37+** (Phase 36-04): compute_dsr() library function satisfies formula requirement; CLI extension needs multiple runs' returns simultaneously — not a single-run operation
+- **fwd_ret.reindex() for IC boundary alignment** (Phase 37-02): Use reindex(feat_train.index) not boolean mask when feature and forward return series have different index lengths — aligns by label, avoids IndexError
+- **DatetimeIndex arithmetic returns numpy bool array directly** (Phase 37-02): (feat_train.index + pd.Timedelta(...)) > train_end returns numpy.ndarray, not pandas BooleanArray — no .to_numpy() needed for iloc indexing
+- **IC boundary masking via full-series fwd_ret then reindex+null** (Phase 37-02): Compute forward returns on full series, reindex to train window, null boundary bars where bar_ts + horizon_days > train_end — explicit look-ahead prevention vs. implicit NaN-at-slice-tail
+- **Rolling IC vectorized rank-then-correlate** (Phase 37-02): rolling().rank() then rolling().corr() is 30x faster than per-window spearmanr() loop; IC-IR = mean/std; IC-IR t-stat = mean*sqrt(n)/std (ttest_1samp equivalent)
 
 ### Pending Todos
 
@@ -268,8 +272,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-24T02:05Z
-Stopped at: Phase 37 Plan 01 complete — fillna fix + cmc_ic_results table created
+Last session: 2026-02-24T02:07Z
+Stopped at: Phase 37 Plan 02 complete — IC core computation library (44 tests, TDD)
 Resume file: None
 
 ---
