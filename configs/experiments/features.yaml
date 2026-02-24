@@ -52,3 +52,31 @@ features:
       - table: cmc_price_bars_multi_tf_u
         columns: [close]
     tags: [sharpe, momentum]
+
+  kama_er_signal:
+    lifecycle: experimental
+    description: "KAMA Efficiency Ratio -- trending strength (0=noise, 1=trend)"
+    compute:
+      mode: inline
+      expression: "er"
+    inputs:
+      - table: cmc_ama_multi_tf_u
+        columns: [er]
+        filters:
+          indicator: kama
+          params_hash: d47fe5cc
+    tags: [ama, momentum, kama]
+
+  ama_ret_momentum:
+    lifecycle: experimental
+    description: "KAMA return momentum -- ret_arith of period-21 KAMA"
+    compute:
+      mode: inline
+      expression: "ret_arith"
+    inputs:
+      - table: cmc_returns_ama_multi_tf_u
+        columns: [ret_arith]
+        filters:
+          indicator: kama
+          params_hash: d47fe5cc
+    tags: [ama, momentum, returns]
