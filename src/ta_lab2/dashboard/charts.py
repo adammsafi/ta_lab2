@@ -271,7 +271,9 @@ def build_regime_timeline(regimes_df: pd.DataFrame) -> go.Figure:
 
     # Add one Scatter trace per trend state for legend grouping
     for trend, color in REGIME_BAR_COLORS.items():
-        subset = regimes_work[regimes_work.get("trend_state", pd.Series(dtype=str)) == trend]
+        subset = regimes_work[
+            regimes_work.get("trend_state", pd.Series(dtype=str)) == trend
+        ]
 
         # Handle case where trend_state column may not exist
         if "trend_state" not in regimes_work.columns:
@@ -305,7 +307,9 @@ def build_regime_timeline(regimes_df: pd.DataFrame) -> go.Figure:
         else:
             hover_text = [
                 f"Trend: {t}<br>Date: {d}"
-                for t, d in zip(subset.get("trend_state", [trend] * len(subset)), subset["ts"])
+                for t, d in zip(
+                    subset.get("trend_state", [trend] * len(subset)), subset["ts"]
+                )
             ]
 
         fig.add_trace(
@@ -325,6 +329,203 @@ def build_regime_timeline(regimes_df: pd.DataFrame) -> go.Figure:
         title="Regime Timeline",
         xaxis_title="Date",
         yaxis_title="Trend State",
+    )
+
+    return fig
+
+
+# ---------------------------------------------------------------------------
+# Asset stats and correlation charts
+# ---------------------------------------------------------------------------
+
+
+def build_correlation_heatmap(
+    corr_df: pd.DataFrame,
+    metric: str = "pearson_r",
+) -> go.Figure:
+    """
+    Build a symmetric N x N correlation heatmap from pairwise data.
+
+    Parameters
+    ----------
+    corr_df : pd.DataFrame
+        Output of load_corr_latest() with columns symbol_a, symbol_b, and
+        the metric column (pearson_r or spearman_r).  Each row is one pair.
+    metric : str
+        Column to use for correlation values: ``"pearson_r"`` or ``"spearman_r"``.
+        Default ``"pearson_r"``.
+
+    Returns
+    -------
+    go.Figure
+        Plotly heatmap ready for st.plotly_chart(fig, theme=None).
+    """
+    fig = go.Figure()
+
+    if corr_df is None or corr_df.empty:
+        fig.add_annotation(
+            text="No correlation data available",
+            xref="paper",
+            yref="paper",
+            x=0.5,
+            y=0.5,
+            showarrow=False,
+            font={"size": 16},
+        )
+        fig.update_layout(template="plotly_dark", title="Correlation Heatmap")
+        return fig
+
+    if metric not in corr_df.columns:
+        fig.add_annotation(
+            text=f"Metric '{metric}' not found in correlation data",
+            xref="paper",
+            yref="paper",
+            x=0.5,
+            y=0.5,
+            showarrow=False,
+            font={"size": 16},
+        )
+        fig.update_layout(template="plotly_dark", title="Correlation Heatmap")
+        return fig
+
+    # Collect all unique symbol names for axis ordering
+    symbols_a = set(corr_df["symbol_a"].tolist())
+    symbols_b = set(corr_df["symbol_b"].tolist())
+    all_symbols = sorted(symbols_a | symbols_b)
+    n = len(all_symbols)
+
+    if n == 0:
+        fig.update_layout(template="plotly_dark", title="Correlation Heatmap")
+        return fig
+
+    sym_idx = {s: i for i, s in enumerate(all_symbols)}
+
+    # Build symmetric N x N matrix — diagonal is 1.0
+    import numpy as np
+
+    mat = [[None] * n for _ in range(n)]
+    for i in range(n):
+        mat[i][i] = 1.0
+
+    for _, row in corr_df.iterrows():
+        sa = row["symbol_a"]
+        sb = row["symbol_b"]
+        val = row[metric]
+        if sa in sym_idx and sb in sym_idx:
+            ia, ib = sym_idx[sa], sym_idx[sb]
+            mat[ia][ib] = (
+                float(val) if val is not None and not np.isnan(float(val)) else None
+            )
+            mat[ib][ia] = (
+                float(val) if val is not None and not np.isnan(float(val)) else None
+            )
+
+    # Build text annotation matrix (2 decimal places, empty for None)
+    text_mat = []
+    for row in mat:
+        text_row = []
+        for v in row:
+            if v is None:
+                text_row.append("")
+            else:
+                text_row.append(f"{v:.2f}")
+        text_mat.append(text_row)
+
+    title_label = "Pearson" if "pearson" in metric else "Spearman"
+
+    fig.add_trace(
+        go.Heatmap(
+            z=mat,
+            x=all_symbols,
+            y=all_symbols,
+            colorscale="RdBu",
+            zmid=0,
+            zmin=-1,
+            zmax=1,
+            text=text_mat,
+            texttemplate="%{text}",
+            colorbar={"title": title_label},
+        )
+    )
+
+    fig.update_layout(
+        template="plotly_dark",
+        title=f"Cross-Asset Correlation ({title_label})",
+        xaxis_title="Asset",
+        yaxis_title="Asset",
+        yaxis={"autorange": "reversed"},
+    )
+
+    return fig
+
+
+def build_stat_timeseries_chart(
+    df: pd.DataFrame,
+    stat_col: str,
+    title: str,
+) -> go.Figure:
+    """
+    Build a simple time-series line chart for a rolling stat column.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Output of load_asset_stats_timeseries() — indexed by ts with stat columns.
+    stat_col : str
+        Column name to plot (e.g. ``"sharpe_ann_252"``).
+    title : str
+        Chart title string.
+
+    Returns
+    -------
+    go.Figure
+        Plotly line chart ready for st.plotly_chart(fig, theme=None).
+    """
+    fig = go.Figure()
+
+    if df is None or df.empty:
+        fig.add_annotation(
+            text="No time-series data available",
+            xref="paper",
+            yref="paper",
+            x=0.5,
+            y=0.5,
+            showarrow=False,
+            font={"size": 16},
+        )
+        fig.update_layout(template="plotly_dark", title=title)
+        return fig
+
+    if stat_col not in df.columns:
+        fig.add_annotation(
+            text=f"Column '{stat_col}' not found",
+            xref="paper",
+            yref="paper",
+            x=0.5,
+            y=0.5,
+            showarrow=False,
+            font={"size": 16},
+        )
+        fig.update_layout(template="plotly_dark", title=title)
+        return fig
+
+    series = df[stat_col].dropna()
+
+    fig.add_trace(
+        go.Scatter(
+            x=series.index,
+            y=series.values,
+            mode="lines",
+            name=stat_col,
+            line={"width": 1.5},
+        )
+    )
+
+    fig.update_layout(
+        template="plotly_dark",
+        title=title,
+        xaxis_title="Date",
+        yaxis_title=stat_col,
     )
 
     return fig

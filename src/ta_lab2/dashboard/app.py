@@ -64,6 +64,13 @@ pages = {
             icon=":material/science:",
         )
     ],
+    "Analytics": [
+        st.Page(
+            str(_HERE / "pages" / "4_asset_stats.py"),
+            title="Asset Statistics & Correlation",
+            icon=":material/bar_chart:",
+        )
+    ],
 }
 
 pg = st.navigation(pages)
