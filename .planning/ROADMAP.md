@@ -618,7 +618,7 @@ Plans:
 ---
 
 ### Phase 39: Streamlit Dashboard
-**Goal:** Users can launch a single Streamlit app that shows live pipeline health (Mode B) and interactive research results -- IC scores, equity curves, regime timelines, feature comparisons (Mode A) -- without hammering the database.
+**Goal:** Users can launch a single Streamlit app that shows live pipeline health (Mode B) and interactive research results -- IC scores, regime timelines (Mode A) -- without hammering the database.
 **Depends on:** Phases 35-38 (needs meaningful data to display; DASH-04 config is standalone)
 **Requirements:** DASH-01, DASH-02, DASH-03, DASH-04
 **Success Criteria** (what must be TRUE):
@@ -626,7 +626,13 @@ Plans:
   2. Pipeline Monitor (Mode B) displays run status, data freshness per table, and the most recent stats runner PASS/FAIL result sourced from existing DB tables -- all without a manual page refresh
   3. Research Explorer (Mode A) renders an IC score table for a user-selected asset and timeframe, with regime timeline overlay, within the `@st.cache_data(ttl=300)` window
   4. All DB queries use a NullPool SQLAlchemy engine; running the dashboard for 30 minutes while repeatedly switching modes does not exhaust the database connection pool
-**Plans**: 0/TBD
+**Plans**: 4 plans in 2 waves
+
+Plans:
+- [ ] 39-01-PLAN.md -- Config + DB layer + app shell + query modules (DASH-03, DASH-04)
+- [ ] 39-02-PLAN.md -- Plotly chart builders (IC decay, rolling IC, regime timeline, regime price overlay)
+- [ ] 39-03-PLAN.md -- Landing page + Pipeline Monitor page (DASH-01)
+- [ ] 39-04-PLAN.md -- Research Explorer page (DASH-02)
 
 ---
 
@@ -751,7 +757,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | 36. PSR + Purged K-Fold | 5/5 | Complete | 2026-02-24 |
 | 37. IC Evaluation | 4/4 | Complete | 2026-02-23 |
 | 38. Feature Experimentation | 5/5 | Complete | 2026-02-24 |
-| 39. Streamlit Dashboard | 0/TBD | Not started | -- |
+| 39. Streamlit Dashboard | 0/4 | Not started | -- |
 | 40. Notebooks | 0/TBD | Not started | -- |
 | 41. Asset Descriptive Stats & Correlation | 0/TBD | Not started | -- |
 
@@ -830,4 +836,4 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-24 (Phase 38 complete -- Feature Experimentation; 15/15 must-haves verified)*
+*Last updated: 2026-02-24 (Phase 39 planned -- Streamlit Dashboard; 4 plans in 2 waves)*
