@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: 40 (Notebooks) — In progress
-Plan: 2/3 complete (40-01 done, 40-03 done, 40-02 pending)
-Status: Plan 40-03 complete — 03_run_experiments.ipynb (feature experimentation demo)
-Last activity: 2026-02-24 — Completed 40-03-PLAN.md
+Plan: 3/3 complete (40-01 done, 40-02 done, 40-03 done)
+Status: Plan 40-02 complete — 02_evaluate_features.ipynb (IC evaluation, purged K-fold, regime A/B backtest)
+Last activity: 2026-02-24 — Completed 40-02-PLAN.md
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [███████████] ~96% v0.9.0
 
@@ -309,8 +309,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-24T16:13:59Z
-Stopped at: Completed 40-03-PLAN.md — 03_run_experiments.ipynb (33 cells, FeatureRegistry + ExperimentRunner + BH gate + IC heatmap + Streamlit dashboard launch)
+Last session: 2026-02-24T16:08:29Z
+Stopped at: Completed 40-02-PLAN.md — 02_evaluate_features.ipynb (44 cells, IC evaluation + purged K-fold + regime A/B backtest)
 Resume file: None
 
 ---
@@ -331,7 +331,7 @@ Phase overview:
 - Phase 37 (IC Evaluation): COMPLETE — Spearman IC library (1098 lines), regime breakdown, batch wrapper, Plotly plots, DB helpers, run_ic_eval.py CLI, cmc_ic_results Alembic migration; 5/5 must-haves verified, 61 tests
 - Phase 38 (Feature Experimentation): COMPLETE — YAML feature registry, FeatureRegistry+DAG, ExperimentRunner, FeaturePromoter (BH gate + migration stub), 3 CLIs, 39 unit tests
 - Phase 39 (Streamlit Dashboard): COMPLETE — DB layer, cached queries, charts.py, landing page, pipeline monitor (traffic light + stats grid + coverage pivot + alert history), research explorer (IC table, IC decay chart, regime timeline)
-- Phase 40 (Notebooks): In progress — Plan 01 done (helpers.py + 01_explore_indicators.ipynb); Plans 02 (IC analysis) and 03 (Backtest) remain
+- Phase 40 (Notebooks): In progress — Plans 01 (helpers.py + 01_explore_indicators.ipynb), 02 (02_evaluate_features.ipynb: IC evaluation + purged K-fold + regime A/B), 03 (03_run_experiments.ipynb) all complete
 
 Key constraints to remember:
 - PSR-01 (Alembic migration psr->psr_legacy) must run before any PSR formula code
@@ -343,4 +343,4 @@ Key constraints to remember:
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-24 (Phase 38 complete — Feature Experimentation Framework: YAML registry, DAG, ExperimentRunner, FeaturePromoter, BH gate, 3 CLIs, 39 unit tests)*
+*Last updated: 2026-02-24 (Phase 40 Plan 02 complete — 02_evaluate_features.ipynb: 44 cells, IC evaluation + purged K-fold + regime A/B backtest)*
