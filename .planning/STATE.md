@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v0.9.0 Research & Experimentation — Phase 39 (Streamlit Dashboard) in progress, plan 2/4 complete
+**Current focus:** v0.9.0 Research & Experimentation — Phase 39 (Streamlit Dashboard) COMPLETE, all 4/4 plans done
 
 ## Current Position
 
-Phase: 39 (Streamlit Dashboard) — In progress
-Plan: 2/4 complete
-Status: In progress
-Last activity: 2026-02-24 — Completed 39-02-PLAN.md
+Phase: 39 (Streamlit Dashboard) — Phase complete
+Plan: 4/4 complete (39-01, 39-02, 39-03, 39-04 all done)
+Status: Phase complete
+Last activity: 2026-02-24 — Completed 39-03-PLAN.md (landing page + pipeline monitor)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [██████████] ~87% v0.9.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [██████████] ~93% v0.9.0
 
 ## Performance Metrics
 
@@ -303,8 +303,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-24T13:15:51Z
-Stopped at: Completed 39-01-PLAN.md — dashboard skeleton (db.py, queries/pipeline.py, queries/research.py, app.py with st.navigation)
+Last session: 2026-02-24T13:22:39Z
+Stopped at: Completed 39-04-PLAN.md — Research Explorer page (3_research_explorer.py) with IC scores, IC decay chart, regime timeline, and price chart with regime bands
 Resume file: None
 
 ---
