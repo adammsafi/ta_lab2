@@ -5,21 +5,21 @@
 See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v0.9.0 Research & Experimentation — Phase 41 In Progress (Plan 2/N)
+**Current focus:** v0.9.0 Research & Experimentation — Phase 41 In Progress (Plan 3/N)
 
 ## Current Position
 
 Phase: 41 (Asset Descriptive Stats and Correlation) — In Progress
-Plan: 2/N complete
+Plan: 3/N complete
 Status: In progress
-Last activity: 2026-02-24 — Completed 41-02-PLAN.md (per-asset rolling stats refresh script)
+Last activity: 2026-02-24 — Completed 41-03-PLAN.md (pairwise rolling correlation refresh script)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [████████████] ~97% v0.9.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 202 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 2 in Phase 41)
+- Total plans completed: 203 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 3 in Phase 41)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -304,6 +304,10 @@ Recent decisions affecting current work:
 - **str(engine.url) strips password in SQLAlchemy** (Phase 41-02): str(engine.url) returns masked URL (postgres:***); use explicit db_url string pass-through in worker callchain to avoid authentication failures in subprocess workers
 - **Tz-safe watermark read pattern** (Phase 41-02): pd.Timestamp(row[0]).tz_convert("UTC") if tzinfo else .tz_localize("UTC") — DB may return offset-aware timestamps (e.g. -05:00); constructing pd.Timestamp(row, tz="UTC") raises TypeError when tzinfo already present
 - **kurt_pearson = kurt_fisher + 3.0** (Phase 41-02): pandas .kurt() returns Fisher/excess kurtosis (normal=0); Pearson kurtosis = Fisher + 3.0 (normal=3); both stored for flexibility in downstream analysis (PSR uses Pearson)
+- **cmc_returns_bars_multi_tf uses "timestamp" not "ts"** (Phase 41-03): Source table for correlation uses `"timestamp"` column (PostgreSQL reserved word, must double-quote in raw SQL); contrast with cmc_cross_asset_corr which uses `ts`
+- **SpearmanrResult named tuple access** (Phase 41-03): scipy.stats.spearmanr() returns SpearmanrResult with .statistic and .pvalue attributes (not positional [0]/[1] indexing); same pattern applies to pearsonr()
+- **Wide-load strategy for pairwise correlation** (Phase 41-03): Load all assets' ret_arith for a TF in one query, pivot to wide DataFrame, loop over pairs in Python — avoids N*(N-1)/2 separate DB queries per TF
+- **tz_localize/tz_convert on DatetimeIndex** (Phase 41-03): After pd.DataFrame.pivot(), use `if wide.index.tz is None: .tz_localize("UTC") else: .tz_convert("UTC")` — raw `pd.DatetimeIndex(idx, tz="UTC")` raises TypeError when index already has tzinfo
 
 ### Pending Todos
 
@@ -315,8 +319,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-24T16:56:40Z
-Stopped at: Completed 41-02-PLAN.md — per-asset rolling stats refresh script (refresh_cmc_asset_stats.py)
+Last session: 2026-02-24T16:48:04Z
+Stopped at: Completed 41-03-PLAN.md — pairwise rolling correlation refresh script (refresh_cmc_cross_asset_corr.py)
 Resume file: None
 
 ---
@@ -338,7 +342,7 @@ Phase overview:
 - Phase 38 (Feature Experimentation): COMPLETE — YAML feature registry, FeatureRegistry+DAG, ExperimentRunner, FeaturePromoter (BH gate + migration stub), 3 CLIs, 39 unit tests
 - Phase 39 (Streamlit Dashboard): COMPLETE — DB layer, cached queries, charts.py, landing page, pipeline monitor (traffic light + stats grid + coverage pivot + alert history), research explorer (IC table, IC decay chart, regime timeline)
 - Phase 40 (Notebooks): COMPLETE — helpers.py (6 functions), 01_explore_indicators.ipynb (29 cells, AMA + regimes), 02_evaluate_features.ipynb (44 cells, IC + purged K-fold + regime A/B), 03_run_experiments.ipynb (33 cells, feature registry + DAG + experiments + dashboard); 13/13 must-haves verified
-- Phase 41 (Asset Descriptive Stats and Correlation): IN PROGRESS — Plan 01 complete: Alembic migration 8d5bc7ee1732 creates cmc_asset_stats (32 stat cols), cmc_cross_asset_corr (CHECK id_a < id_b), 2 watermark state tables, cmc_corr_latest materialized view; Plan 02 complete: refresh_cmc_asset_stats.py (8 stats x 4 windows, watermark incremental refresh, multiprocessing, 5613 rows BTC/1D)
+- Phase 41 (Asset Descriptive Stats and Correlation): IN PROGRESS — Plan 01 complete: Alembic migration 8d5bc7ee1732 creates cmc_asset_stats (32 stat cols), cmc_cross_asset_corr (CHECK id_a < id_b), 2 watermark state tables, cmc_corr_latest materialized view; Plan 02 complete: refresh_cmc_asset_stats.py (8 stats x 4 windows, watermark incremental refresh, multiprocessing, 5613 rows BTC/1D); Plan 03 complete: refresh_cmc_cross_asset_corr.py (Pearson+Spearman, 4 windows, N*(N-1)/2 canonical pairs, watermark incremental, cmc_corr_latest refreshed, 22,452 rows for pair 1+52 1D)
 
 Key constraints to remember:
 - PSR-01 (Alembic migration psr->psr_legacy) must run before any PSR formula code
@@ -350,4 +354,4 @@ Key constraints to remember:
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-24 (Phase 41 Plan 02 complete — refresh_cmc_asset_stats.py, rolling stats refresh script)*
+*Last updated: 2026-02-24 (Phase 41 Plan 03 complete — refresh_cmc_cross_asset_corr.py, pairwise rolling correlation refresh script)*
