@@ -525,6 +525,7 @@ Plans:
 - [x] **Phase 39: Streamlit Dashboard** - Pipeline monitor + research explorer with cached DB queries
 - [x] **Phase 40: Notebooks** - 3-5 polished Jupyter notebooks demonstrating the full research cycle
 - [x] **Phase 41: Asset Descriptive Stats & Correlation** - Rolling per-asset summary stats + cross-asset return correlation time series
+- [ ] **Phase 41.1: Milestone Cleanup** - Close tech debt from v0.9.0 audit (AMA allowlist, features.yaml, dashboard enhancements)
 
 </details>
 
@@ -673,6 +674,21 @@ Plans:
 - [x] 41-05-PLAN.md -- Dashboard page: asset stats table + correlation heatmap + time-series explorer
 - [x] 41-06-PLAN.md -- Regime wiring (optional stats augmentation) + quality check registration
 
+---
+
+### Phase 41.1: Milestone Cleanup
+**Goal:** Close tech debt items from v0.9.0 milestone audit — wire AMA tables into experimentation framework, fix stale references, add dashboard experiment visualization and rolling IC chart.
+**Depends on:** Phase 41 (all v0.9.0 phases complete)
+**Gap Closure:** Closes 6 tech debt items from v0.9.0 audit (2 missing integrations, 4 minor fixes)
+**Success Criteria** (what must be TRUE):
+  1. ExperimentRunner `_ALLOWED_TABLES` includes AMA tables; a YAML feature referencing `cmc_ama_multi_tf_u` does not raise ValueError
+  2. At least 2 AMA-based experimental features defined in `configs/experiments/features.yaml`
+  3. Stale CLI reference in Research Explorer help text corrected
+  4. `_fold_boundaries` public API or notebook uses public equivalent
+  5. Dashboard has an Experiments page showing `cmc_feature_experiments` results
+  6. Research Explorer page includes rolling IC chart for selected feature
+**Plans**: 0/TBD
+
 </details>
 
 <details>
@@ -773,6 +789,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | 39. Streamlit Dashboard | 4/4 | Complete | 2026-02-24 |
 | 40. Notebooks | 3/3 | Complete | 2026-02-24 |
 | 41. Asset Descriptive Stats & Correlation | 6/6 | Complete | 2026-02-24 |
+| 41.1. Milestone Cleanup | 0/TBD | Planned | -- |
 
 ### v1.0.0 Progress (Next)
 
