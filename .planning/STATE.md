@@ -10,16 +10,16 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: 37 (IC Evaluation) — In progress
-Plan: 3/8 complete
-Status: Plan 37-03 complete — IC regime breakdown, batch wrapper, Plotly visualizations (61 tests)
-Last activity: 2026-02-24 — Completed 37-03-PLAN.md (regime IC, batch, plot helpers)
+Plan: 4/8 complete
+Status: Plan 37-04 complete — DB helpers (load_feature_series, load_regimes_for_asset, save_ic_results) and run_ic_eval.py CLI
+Last activity: 2026-02-24 — Completed 37-04-PLAN.md (IC DB helpers + CLI end-to-end workflow)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [████░░░░░░] ~73% v0.9.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 185 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 2 in Phase 37)
+- Total plans completed: 186 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 3 in Phase 37)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -266,6 +266,10 @@ Recent decisions affecting current work:
 - **Regime-window train bounds from common_ts intersection** (Phase 37-03): Use min/max of feature-close intersection within regime label as synthetic train_start/train_end — prevents boundary masking from nulling all regime bars
 - **batch_compute_ic excludes 'close' by name convention** (Phase 37-03): Auto-detected feature_cols = all numeric columns except 'close'; consistent with close being a separate argument
 - **Significance coloring threshold 0.05** (Phase 37-03): plot_ic_decay uses sig_threshold=0.05 default; royalblue for significant bars, lightgray for non-significant
+- **Column validation before SQL injection in load_feature_series** (Phase 37-04): get_columns() validates feature_col exists before f-string SQL injection — prevents both runtime errors and column-name SQL injection
+- **split_part SQL for cmc_regimes l2_label parsing** (Phase 37-04): cmc_regimes has NO trend_state/vol_state columns — must derive via split_part(l2_label, '-', 1/2) SQL; never reference them as WHERE filter columns
+- **save_ic_results individual INSERT per row** (Phase 37-04): Loops over rows for accurate rowcount; ON CONFLICT DO NOTHING (append) vs DO UPDATE (overwrite) controlled by overwrite= flag
+- **_to_python() numpy scalar normalization at SQL boundary** (Phase 37-04): hasattr(v, 'item') check normalizes numpy scalars; NaN -> None for SQL NULL; pd.Timestamp -> pydatetime for TIMESTAMPTZ binding
 
 ### Pending Todos
 
@@ -277,8 +281,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-24T02:17Z
-Stopped at: Phase 37 Plan 03 complete — IC regime breakdown, batch wrapper, Plotly visualizations (61 tests)
+Last session: 2026-02-24T02:20Z
+Stopped at: Phase 37 Plan 04 complete — IC DB helpers (load_feature_series, load_regimes_for_asset, save_ic_results) + run_ic_eval.py CLI
 Resume file: None
 
 ---
