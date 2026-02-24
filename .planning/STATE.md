@@ -10,16 +10,16 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: 41.1 (Milestone Cleanup) — In Progress
-Plan: 1/3 complete
-Status: Phase 41.1-01 complete. AMA tables wired into ExperimentRunner; 2 AMA experimental features added.
-Last activity: 2026-02-24 — Completed 41.1-01-PLAN.md
+Plan: 2/3 complete
+Status: Phase 41.1-02 complete. Experiments dashboard page added with BH significance highlighting wired to cmc_feature_experiments.
+Last activity: 2026-02-24 — Completed 41.1-02-PLAN.md
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [#░░] 33% v0.9.1 milestone-cleanup
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [##░] 67% v0.9.1 milestone-cleanup
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 207 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 1 in Phase 41.1)
+- Total plans completed: 208 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 2 in Phase 41.1)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
