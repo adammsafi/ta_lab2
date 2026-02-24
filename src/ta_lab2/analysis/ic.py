@@ -362,6 +362,11 @@ def compute_ic(
     # Compute feature turnover once per feature (shared across all horizon/return_type rows)
     turnover = compute_feature_turnover(feature, min_obs=min_obs)
 
+    # Slice feature to train window once — reused for every horizon/return_type
+    train_mask = (feature.index >= train_start) & (feature.index <= train_end)
+    feat_train = feature[train_mask]
+    has_enough_for_rolling = feat_train.notna().sum() >= rolling_window + 5
+
     rows = []
 
     for return_type in return_types:
@@ -385,18 +390,14 @@ def compute_ic(
             )
 
             # Step 3: Rolling IC + IC-IR
-            # Slice feature and forward returns to train window for rolling IC
-            mask = (feature.index >= train_start) & (feature.index <= train_end)
-            feat_train = feature[mask]
+            if has_enough_for_rolling:
+                fwd_train = fwd_ret_global.reindex(feat_train.index).copy()
 
-            fwd_train = fwd_ret_global.reindex(feat_train.index).copy()
+                # Apply boundary masking for rolling IC as well
+                horizon_delta = pd.Timedelta(days=horizon * tf_days_nominal)
+                boundary_mask = (feat_train.index + horizon_delta) > train_end
+                fwd_train.iloc[boundary_mask] = np.nan
 
-            # Apply boundary masking for rolling IC as well
-            horizon_delta = pd.Timedelta(days=horizon * tf_days_nominal)
-            boundary_mask = (feat_train.index + horizon_delta) > train_end
-            fwd_train.iloc[boundary_mask] = np.nan
-
-            if feat_train.notna().sum() >= rolling_window + 5:
                 _, ic_ir, ic_ir_tstat = compute_rolling_ic(
                     feat_train, fwd_train, window=rolling_window
                 )
