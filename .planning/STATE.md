@@ -5,21 +5,21 @@
 See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v0.9.0 Research & Experimentation — Phase 38 in progress (Feature Experimentation Framework)
+**Current focus:** v0.9.0 Research & Experimentation — Phase 38 COMPLETE, ready for Phase 39 (Streamlit Dashboard)
 
 ## Current Position
 
-Phase: 38 (Feature Experimentation) — In progress
-Plan: 4/5 complete
-Status: Plan 38-04 complete (FeaturePromoter BH gate + migration stub + promotion/purge CLIs)
-Last activity: 2026-02-24 — Completed 38-04-PLAN.md
+Phase: 38 (Feature Experimentation) — Complete
+Plan: 5/5 complete
+Status: Plan 38-05 complete (39 unit tests, E2E CLI verification; Phase 38 fully done)
+Last activity: 2026-02-24 — Completed 38-05-PLAN.md
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [██████████] ~78% v0.9.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [██████████] ~83% v0.9.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 188 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 1 in Phase 38)
+- Total plans completed: 193 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -96,7 +96,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 | 35-ama-engine | 8/8 | ~56 min | ~7 min | Complete |
 | 36-psr-purged-k-fold | 5/5 | ~24 min | ~5 min | Complete |
 | 37-ic-evaluation | 4/4 | ~23 min | ~6 min | Complete |
-| 38-feature-experimentation | 4/5 | ~15 min | ~4 min | In Progress |
+| 38-feature-experimentation | 5/5 | ~19 min | ~4 min | Complete |
 
 *Updated after each plan completion*
 
@@ -287,6 +287,8 @@ Recent decisions affecting current work:
 - **Live Alembic head for migration stub down_revision** (Phase 38-04): SELECT version_num FROM alembic_version at runtime — never hardcode; avoids chain breaks when new migrations added between promotion runs
 - **Non-destructive feature deprecation** (Phase 38-04): deprecate_feature() sets lifecycle='deprecated', does NOT drop cmc_features column (requires downtime) or delete experiment rows (audit trail); purge_experiment.py defaults to deprecate, not delete
 - **NaN filter before false_discovery_control()** (Phase 38-04): scipy raises ValueError on NaN inputs; filter valid_mask before passing array; return (False, df, reason) when zero valid p-values exist
+- **Duplicate detection requires expanded-name collision, not base-name collision** (Phase 38-05): YAML keys must be unique so two features with same base name is impossible; collision arises when sweep expansion produces a variant name that matches an explicitly defined feature (e.g., rsi_sweep[period=5] -> rsi_sweep_period5 collides with explicit rsi_sweep_period5)
+- **dotpath tests patch at import site not target module** (Phase 38-05): Use patch('ta_lab2.experiments.runner.importlib.import_module') not 'importlib.import_module' — ensures mock intercepts ExperimentRunner's importlib calls
 
 ### Pending Todos
 
@@ -298,8 +300,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-24T12:30:43Z
-Stopped at: Completed 38-03-PLAN.md — ExperimentRunner + run_experiment.py CLI
+Last session: 2026-02-24T12:39:35Z
+Stopped at: Completed 38-05-PLAN.md — Phase 38 complete (39 unit tests + E2E CLI verification)
 Resume file: None
 
 ---
@@ -318,7 +320,7 @@ Phase overview:
 - Phase 35 (AMA Engine): COMPLETE — KAMA, DEMA, TEMA, HMA indicator family with params_hash PK; 6 AMA table variants + _u; orchestrator + daily refresh integration
 - Phase 36 (PSR + Purged K-Fold): COMPLETE — Alembic migrations (psr_legacy rename + psr_results table), PSR/DSR/MinTRL formulas (Pearson kurtosis), PurgedKFoldSplitter + CPCVSplitter, PSR pipeline integration + CLI, alembic startup check; 22/22 must-haves verified
 - Phase 37 (IC Evaluation): COMPLETE — Spearman IC library (1098 lines), regime breakdown, batch wrapper, Plotly plots, DB helpers, run_ic_eval.py CLI, cmc_ic_results Alembic migration; 5/5 must-haves verified, 61 tests
-- Phase 38 (Feature Experimentation): Registry + ExperimentRunner + BH-corrected promotion gate
+- Phase 38 (Feature Experimentation): COMPLETE — YAML feature registry, FeatureRegistry+DAG, ExperimentRunner, FeaturePromoter (BH gate + migration stub), 3 CLIs, 39 unit tests
 - Phase 39 (Streamlit Dashboard): Pipeline Monitor + Research Explorer, NullPool, Windows-compatible
 - Phase 40 (Notebooks): 3-5 polished, Restart-and-Run-All clean, shareable
 
@@ -332,4 +334,4 @@ Key constraints to remember:
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-24 (Phase 38 Plan 02 complete — YAML feature registry subpackage: FeatureRegistry, resolve_experiment_dag, configs/experiments/features.yaml)*
+*Last updated: 2026-02-24 (Phase 38 complete — Feature Experimentation Framework: YAML registry, DAG, ExperimentRunner, FeaturePromoter, BH gate, 3 CLIs, 39 unit tests)*
