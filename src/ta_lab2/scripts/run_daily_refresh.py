@@ -2,11 +2,11 @@
 """
 Unified daily refresh orchestration script.
 
-Coordinates bars, EMAs, AMAs, regimes, and stats with state-based checking
-and clear visibility.
+Coordinates bars, EMAs, AMAs, desc_stats, regimes, and stats with
+state-based checking and clear visibility.
 
 Usage:
-    # Full daily refresh (bars then EMAs then AMAs then regimes then stats)
+    # Full daily refresh (bars then EMAs then AMAs then desc_stats then regimes then stats)
     python run_daily_refresh.py --all --ids 1,52,825
 
     # Bars only
@@ -17,6 +17,9 @@ Usage:
 
     # AMAs only
     python run_daily_refresh.py --amas --ids all
+
+    # Desc stats only (asset stats + correlation)
+    python run_daily_refresh.py --desc-stats --ids all
 
     # Regimes only
     python run_daily_refresh.py --regimes --ids all
@@ -54,6 +57,7 @@ from ta_lab2.scripts.refresh_utils import (
 TIMEOUT_BARS = 7200  # 2 hours -- bar builders can be slow for full rebuilds
 TIMEOUT_EMAS = 3600  # 1 hour -- EMA refreshers
 TIMEOUT_AMAS = 3600  # 1 hour -- AMA refreshers
+TIMEOUT_DESC_STATS = 3600  # 1 hour -- asset stats + correlation computation
 TIMEOUT_REGIMES = 1800  # 30 minutes -- regime refresher
 TIMEOUT_STATS = 3600  # 1 hour -- stats runners scan large tables
 
@@ -412,6 +416,136 @@ def run_ama_refreshers(
         print(f"\n[ERROR] AMA refreshers raised exception: {error_msg}")
         return ComponentResult(
             component="amas",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+
+
+def run_desc_stats_refresher(
+    args, db_url: str, parsed_ids: list[int] | None
+) -> ComponentResult:
+    """
+    Run descriptive stats orchestrator via subprocess.
+
+    Desc stats run after AMAs and before regimes, computing per-asset
+    descriptive statistics and pairwise rolling correlations.
+
+    Args:
+        args: CLI arguments
+        db_url: Database URL
+        parsed_ids: Parsed ID list or None for "all"
+
+    Returns:
+        ComponentResult with execution details
+    """
+    cmd = [
+        sys.executable,
+        "-m",
+        "ta_lab2.scripts.desc_stats.run_all_desc_stats_refreshes",
+    ]
+
+    # Format IDs for desc stats subprocess
+    if parsed_ids is None:
+        ids_str = "all"
+    else:
+        ids_str = ",".join(str(i) for i in parsed_ids)
+
+    cmd.extend(["--ids", ids_str])
+    cmd.extend(["--db-url", db_url])
+
+    if args.verbose:
+        cmd.append("--verbose")
+    if args.num_processes:
+        cmd.extend(["--workers", str(args.num_processes)])
+    if args.continue_on_error:
+        cmd.append("--continue-on-error")
+
+    # CRITICAL: Propagate --dry-run to subprocess
+    if getattr(args, "dry_run", False):
+        cmd.append("--dry-run")
+
+    print(f"\n{'=' * 70}")
+    print("RUNNING DESC STATS REFRESHER")
+    print(f"{'=' * 70}")
+    print(f"Command: {' '.join(cmd)}")
+
+    if args.dry_run:
+        print("[DRY RUN] Would execute desc stats refresher")
+        return ComponentResult(
+            component="desc_stats",
+            success=True,
+            duration_sec=0.0,
+            returncode=0,
+        )
+
+    start = time.perf_counter()
+
+    try:
+        if args.verbose:
+            # Stream output
+            result = subprocess.run(cmd, check=False, timeout=TIMEOUT_DESC_STATS)
+        else:
+            # Capture output
+            result = subprocess.run(
+                cmd,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=TIMEOUT_DESC_STATS,
+            )
+
+            # Show output on error
+            if result.returncode != 0:
+                print(
+                    f"\n[ERROR] Desc stats refresher failed with code {result.returncode}"
+                )
+                if result.stdout:
+                    print(f"\nSTDOUT:\n{result.stdout}")
+                if result.stderr:
+                    print(f"\nSTDERR:\n{result.stderr}")
+
+        duration = time.perf_counter() - start
+
+        if result.returncode == 0:
+            print(
+                f"\n[OK] Desc stats refresher completed successfully in {duration:.1f}s"
+            )
+            return ComponentResult(
+                component="desc_stats",
+                success=True,
+                duration_sec=duration,
+                returncode=result.returncode,
+            )
+        else:
+            error_msg = f"Exited with code {result.returncode}"
+            print(f"\n[FAILED] Desc stats refresher failed: {error_msg}")
+            return ComponentResult(
+                component="desc_stats",
+                success=False,
+                duration_sec=duration,
+                returncode=result.returncode,
+                error_message=error_msg,
+            )
+
+    except subprocess.TimeoutExpired:
+        duration = time.perf_counter() - start
+        error_msg = f"Timed out after {TIMEOUT_DESC_STATS}s"
+        print(f"\n[TIMEOUT] Desc stats refresher: {error_msg}")
+        return ComponentResult(
+            component="desc_stats",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+    except Exception as e:
+        duration = time.perf_counter() - start
+        error_msg = str(e)
+        print(f"\n[ERROR] Desc stats refresher raised exception: {error_msg}")
+        return ComponentResult(
+            component="desc_stats",
             success=False,
             duration_sec=duration,
             returncode=-1,
@@ -819,7 +953,8 @@ def main(argv: list[str] | None = None) -> int:
     """Main entry point."""
     p = argparse.ArgumentParser(
         description=(
-            "Unified daily refresh orchestration for bars, EMAs, AMAs, regimes, and stats."
+            "Unified daily refresh orchestration for bars, EMAs, AMAs, "
+            "desc_stats, regimes, and stats."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
@@ -879,6 +1014,11 @@ Examples:
         help="Run AMA refreshers only",
     )
     p.add_argument(
+        "--desc-stats",
+        action="store_true",
+        help="Run descriptive stats refresh only (asset stats + correlation)",
+    )
+    p.add_argument(
         "--regimes",
         action="store_true",
         help="Run regime refresher only",
@@ -891,7 +1031,10 @@ Examples:
     p.add_argument(
         "--all",
         action="store_true",
-        help="Run bars then EMAs then AMAs then regimes then stats (full refresh)",
+        help=(
+            "Run bars then EMAs then AMAs then desc_stats then regimes then stats "
+            "(full refresh)"
+        ),
     )
     p.add_argument(
         "--weekly-digest",
@@ -971,10 +1114,17 @@ Examples:
         # with pipeline flags. Run it and exit immediately.
         pass
     elif not (
-        args.bars or args.emas or args.amas or args.regimes or args.stats or args.all
+        args.bars
+        or args.emas
+        or args.amas
+        or args.desc_stats
+        or args.regimes
+        or args.stats
+        or args.all
     ):
         p.error(
-            "Must specify --bars, --emas, --amas, --regimes, --stats, --all, or --weekly-digest"
+            "Must specify --bars, --emas, --amas, --desc-stats, --regimes, --stats, "
+            "--all, or --weekly-digest"
         )
 
     # Resolve database URL
@@ -1008,6 +1158,7 @@ Examples:
     run_bars = args.bars or args.all
     run_emas = args.emas or args.all
     run_amas = args.amas or args.all
+    run_desc_stats = args.desc_stats or args.all
     run_regimes = args.regimes or args.all
     run_stats = args.stats or args.all
 
@@ -1019,6 +1170,8 @@ Examples:
         components.append("EMAs")
     if run_amas:
         components.append("AMAs")
+    if run_desc_stats:
+        components.append("desc_stats")
     if run_regimes:
         components.append("regimes")
     if run_stats:
@@ -1101,7 +1254,17 @@ Examples:
             print("(Use --continue-on-error to run remaining components)")
             return 1
 
-    # Run regimes if requested (after bars, EMAs, and AMAs)
+    # Run desc stats if requested (after AMAs, before regimes)
+    if run_desc_stats:
+        desc_result = run_desc_stats_refresher(args, db_url, parsed_ids)
+        results.append(("desc_stats", desc_result))
+
+        if not desc_result.success and not args.continue_on_error:
+            print("\n[STOPPED] Desc stats failed, stopping execution")
+            print("(Use --continue-on-error to run remaining components)")
+            return 1
+
+    # Run regimes if requested (after bars, EMAs, AMAs, and desc_stats)
     if run_regimes:
         regime_result = run_regime_refresher(args, db_url, parsed_ids)
         results.append(("regimes", regime_result))
