@@ -10,16 +10,16 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: 36 (PSR + Purged K-Fold) — In Progress
-Plan: 01 of 6
-Status: In progress — Plan 36-01 executed (PSR schema migrations)
-Last activity: 2026-02-23 — Completed 36-01-PLAN.md (Alembic migrations: psr_column_rename + psr_results_table)
+Plan: 03 of 6
+Status: In progress — Plan 36-03 executed (PurgedKFoldSplitter + CPCVSplitter via TDD, 33 tests)
+Last activity: 2026-02-24 — Completed 36-03-PLAN.md (leakage-free CV splitters)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [████████░░] ~57% v0.9.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 175 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 1 in Phase 36)
+- Total plans completed: 176 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 2 in Phase 36)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -94,7 +94,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 | Phase | Plans | Total | Avg/Plan | Status |
 |-------|-------|-------|----------|--------|
 | 35-ama-engine | 8/8 | ~56 min | ~7 min | Complete |
-| 36-psr-purged-k-fold | 1/6 | ~4 min | ~4 min | In Progress |
+| 36-psr-purged-k-fold | 2/6 | ~8 min | ~4 min | In Progress |
 
 *Updated after each plan completion*
 
@@ -243,6 +243,10 @@ Recent decisions affecting current work:
 - **Custom worker per calendar AMA refresher** (Phase 35-06): _cal_ama_worker / _cal_anchor_ama_worker defined at module level (required for pickling); base _ama_worker hardcodes MultiTFAMAFeature — calendar variants need scheme-aware feature class selection via task.extra_config["scheme"]
 - **SCHEME_MAP for cal AMA routing** (Phase 35-06): Single dict maps scheme key -> feature_class/bars_table/output_table/state_table; mirrors EMA calendar pattern; avoids scattered if/else in worker and _run_for_scheme
 - **No-arg constructor on CalAMARefresher** (Phase 35-06): BaseAMARefresher.create_argument_parser() calls cls() to get get_description() before scheme is known — constructor accepts scheme="us" as default
+- **Pearson kurtosis mandatory for PSR** (Phase 36-02): scipy kurtosis(fisher=False) gives gamma_4≈3 for normal data; Fisher/excess (default) gives gamma_4≈0 — wrong variance formula producing SR > sqrt(2) numerical issues
+- **PSR zero-std guard before SR calculation** (Phase 36-02): std==0 returns 0.5/0.0/1.0 based on sr_star sign; must come BEFORE sr_hat = mean/std to avoid division by zero
+- **DSR approximate mode uses fixed seed** (Phase 36-02): rng(42) generates synthetic N(0,1) SR estimates for expected_max_sr — reproducible approximation when full SR list unavailable
+- **Kurtosis test uses relative error + directional comparison** (Phase 36-02): abs tolerance 1e-8 too tight at T=100k due to sample moments — use rel_err for Pearson-vs-approx, directional Pearson>Fisher for the kurtosis trap test
 
 ### Pending Todos
 
@@ -254,8 +258,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-24T00:05Z
-Stopped at: Phase 36 Plan 01 complete — psr_column_rename + psr_results_table Alembic revisions applied
+Last session: 2026-02-24T00:07Z
+Stopped at: Phase 36 Plan 02 complete — PSR/DSR/MinTRL formula module, 31 tests all passing
 Resume file: None
 
 ---
