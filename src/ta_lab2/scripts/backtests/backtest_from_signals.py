@@ -15,14 +15,17 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional, Any
 import json
+import math
 import uuid
 import logging
 
 import pandas as pd
 import numpy as np
+from scipy.stats import skew, kurtosis
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
+from ta_lab2.backtests.psr import compute_psr, min_trl
 from ta_lab2.backtests.vbt_runner import run_vbt_on_split
 from ta_lab2.backtests.costs import CostModel
 from ta_lab2.backtests.splitters import Split
@@ -643,6 +646,29 @@ class SignalBacktester:
             metrics["var_95"] = None
             metrics["expected_shortfall"] = None
 
+        # PSR (Probabilistic Sharpe Ratio) — Lopez de Prado
+        psr_value = compute_psr(returns.values, sr_star=0.0)
+        metrics["psr"] = float(psr_value) if not math.isnan(psr_value) else None
+
+        # PSR detailed stats for psr_results table
+        # Prefix with _psr_ so they can be stripped before the metrics INSERT
+        if len(returns) >= 30:
+            metrics["_psr_skewness"] = float(skew(returns.values))
+            metrics["_psr_kurtosis_pearson"] = float(
+                kurtosis(returns.values, fisher=False)
+            )
+            metrics["_psr_n_obs"] = len(returns)
+            trl = min_trl(
+                returns.values, sr_star=0.0, target_psr=0.95, freq_per_year=365
+            )
+            metrics["_psr_min_trl_bars"] = (
+                trl["n_obs"] if math.isfinite(trl["n_obs"]) else None
+            )
+            metrics["_psr_min_trl_days"] = (
+                trl["calendar_days"] if math.isfinite(trl["calendar_days"]) else None
+            )
+            metrics["_psr_sr_hat"] = trl["sr_hat"]
+
         return metrics
 
     def save_backtest_results(self, result: BacktestResult) -> str:
@@ -741,12 +767,12 @@ class SignalBacktester:
                     (run_id, total_return, cagr, sharpe_ratio, sortino_ratio, calmar_ratio,
                      max_drawdown, max_drawdown_duration_days,
                      trade_count, win_rate, profit_factor, avg_win, avg_loss,
-                     avg_holding_period_days, var_95, expected_shortfall)
+                     avg_holding_period_days, var_95, expected_shortfall, psr)
                 VALUES
                     (:run_id, :total_return, :cagr, :sharpe_ratio, :sortino_ratio, :calmar_ratio,
                      :max_drawdown, :max_drawdown_duration_days,
                      :trade_count, :win_rate, :profit_factor, :avg_win, :avg_loss,
-                     :avg_holding_period_days, :var_95, :expected_shortfall)
+                     :avg_holding_period_days, :var_95, :expected_shortfall, :psr)
                 ON CONFLICT (run_id) DO UPDATE SET
                     total_return = EXCLUDED.total_return,
                     sharpe_ratio = EXCLUDED.sharpe_ratio,
@@ -755,7 +781,8 @@ class SignalBacktester:
                     max_drawdown = EXCLUDED.max_drawdown,
                     trade_count = EXCLUDED.trade_count,
                     win_rate = EXCLUDED.win_rate,
-                    profit_factor = EXCLUDED.profit_factor
+                    profit_factor = EXCLUDED.profit_factor,
+                    psr = EXCLUDED.psr
             """
             )
 
@@ -770,9 +797,57 @@ class SignalBacktester:
                 return v
 
             native_metrics = {k: _to_python(v) for k, v in result.metrics.items()}
-            conn.execute(metrics_sql, {"run_id": result.run_id, **native_metrics})
+
+            # Extract PSR detail stats before building metrics params.
+            # _psr_* keys hold distributional stats for psr_results table;
+            # they must NOT be passed to the cmc_backtest_metrics INSERT.
+            psr_detail = {
+                k: v for k, v in native_metrics.items() if k.startswith("_psr_")
+            }
+            metrics_params = {
+                k: v for k, v in native_metrics.items() if not k.startswith("_psr_")
+            }
+
+            conn.execute(metrics_sql, {"run_id": result.run_id, **metrics_params})
 
             logger.debug("Inserted metrics record")
+
+            # 4. Insert PSR details into psr_results table
+            if metrics_params.get("psr") is not None:
+                psr_detail_sql = text("""
+                    INSERT INTO public.psr_results
+                        (run_id, formula_version, return_source, psr, dsr, min_trl_bars, min_trl_days,
+                         sr_hat, sr_star, n_obs, skewness, kurtosis_pearson)
+                    VALUES
+                        (:run_id, :formula_version, :return_source, :psr, :dsr, :min_trl_bars, :min_trl_days,
+                         :sr_hat, :sr_star, :n_obs, :skewness, :kurtosis_pearson)
+                    ON CONFLICT (run_id, formula_version) DO UPDATE SET
+                        psr = EXCLUDED.psr,
+                        return_source = EXCLUDED.return_source,
+                        min_trl_bars = EXCLUDED.min_trl_bars,
+                        min_trl_days = EXCLUDED.min_trl_days,
+                        computed_at = now()
+                """)
+                conn.execute(
+                    psr_detail_sql,
+                    {
+                        "run_id": result.run_id,
+                        "formula_version": "lopez_de_prado_v1",
+                        "return_source": "portfolio",
+                        "psr": metrics_params.get("psr"),
+                        "dsr": None,  # DSR computed separately for multi-trial
+                        "min_trl_bars": psr_detail.get("_psr_min_trl_bars"),
+                        "min_trl_days": psr_detail.get("_psr_min_trl_days"),
+                        "sr_hat": psr_detail.get("_psr_sr_hat"),
+                        "sr_star": 0.0,
+                        "n_obs": psr_detail.get("_psr_n_obs"),
+                        "skewness": psr_detail.get("_psr_skewness"),
+                        "kurtosis_pearson": psr_detail.get("_psr_kurtosis_pearson"),
+                    },
+                )
+                logger.debug(
+                    "Inserted PSR details to psr_results (return_source=portfolio)"
+                )
 
         logger.info(f"Backtest results saved successfully: {result.run_id}")
         return result.run_id
