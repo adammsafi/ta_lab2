@@ -677,7 +677,7 @@ Plans:
 ---
 
 ### Phase 41.1: Milestone Cleanup
-**Goal:** Close tech debt items from v0.9.0 milestone audit — wire AMA tables into experimentation framework, fix stale references, add dashboard experiment visualization and rolling IC chart.
+**Goal:** Close tech debt items from v0.9.0 milestone audit -- wire AMA tables into experimentation framework, fix stale references, add dashboard experiment visualization and rolling IC chart.
 **Depends on:** Phase 41 (all v0.9.0 phases complete)
 **Gap Closure:** Closes 6 tech debt items from v0.9.0 audit (2 missing integrations, 4 minor fixes)
 **Success Criteria** (what must be TRUE):
@@ -700,7 +700,7 @@ Plans:
 <summary>v1.0.0 V1 Closure -- Paper Trading & Validation (Phases 42-54) - CURRENT</summary>
 
 - [ ] **Phase 42: Strategy Bake-Off** - IC/PSR/CV evaluation of existing signals, select 2 strategies for V1
-- [ ] **Phase 43: Exchange Integration** - Connect to one exchange API, paper order adapter
+- [ ] **Phase 43: Exchange Integration** - Connect to two exchange APIs (Coinbase + Kraken), price feed comparison, paper order adapter
 - [ ] **Phase 44: Order & Fill Store** - DB tables for orders, fills, positions with full audit trail
 - [ ] **Phase 45: Paper-Trade Executor** - Engine reads signals, generates orders, tracks positions, verifies backtest parity
 - [ ] **Phase 46: Risk Controls** - Kill switch, position caps, daily loss stops, circuit breaker, discretionary overrides
@@ -735,6 +735,28 @@ Plans:
 - [ ] 42-03-PLAN.md -- Composite scoring + sensitivity analysis under 4 weighting schemes
 - [ ] 42-04-PLAN.md -- Strategy selection + ensemble contingency + final validation backtest
 - [ ] 42-05-PLAN.md -- Scorecard generation: formal bake-off report with charts and tables
+
+---
+
+### Phase 43: Exchange Integration
+**Goal:** Connect to two exchange APIs (Coinbase Advanced Trade + Kraken) with authenticated access for BTC/ETH spot, price feed comparison against DB bar data, and paper order format translation.
+**Depends on:** Phase 42 (strategies selected; can begin in parallel once bake-off reaches plan 03)
+**Requirements:** EXCH-01, EXCH-02, EXCH-03
+**Success Criteria** (what must be TRUE):
+  1. Coinbase adapter uses Advanced Trade API with JWT ES256 signing; sandbox + production environments switchable via ExchangeConfig
+  2. Kraken adapter uses HMAC-SHA512 signing for private endpoints; all 8 ExchangeInterface methods implemented on both adapters
+  3. refresh_exchange_price_feed.py fetches live prices from both venues, compares against DB bar closes, computes discrepancy with adaptive threshold (3-sigma from cmc_asset_stats), writes to exchange_price_feed table
+  4. CanonicalOrder.to_exchange('coinbase') and .to_exchange('kraken') produce correct exchange-specific order payloads; PaperOrderLogger persists to paper_orders table
+  5. All components unit-tested without live API credentials or database connections
+**Plans**: 6 plans in 3 waves
+
+Plans:
+- [ ] 43-01-PLAN.md -- ExchangeConfig dataclass + Alembic migration (exchange_price_feed, paper_orders tables)
+- [ ] 43-02-PLAN.md -- Coinbase Advanced Trade API rewrite with JWT ES256 auth
+- [ ] 43-03-PLAN.md -- Kraken HMAC-SHA512 auth for private endpoints
+- [ ] 43-04-PLAN.md -- CanonicalOrder dataclass + PaperOrderLogger
+- [ ] 43-05-PLAN.md -- Price feed comparison script + factory update + daily refresh wiring
+- [ ] 43-06-PLAN.md -- Unit tests for all Phase 43 components
 
 </details>
 
@@ -824,7 +846,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 42. Strategy Bake-Off | 0/5 | Planned | -- |
-| 43. Exchange Integration | 0/TBD | Not started | -- |
+| 43. Exchange Integration | 0/6 | Planned | -- |
 | 44. Order & Fill Store | 0/TBD | Not started | -- |
 | 45. Paper-Trade Executor | 0/TBD | Not started | -- |
 | 46. Risk Controls | 0/TBD | Not started | -- |
@@ -894,4 +916,4 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-24 (Phase 42 planned -- Strategy Bake-Off; 5 plans in 5 waves)*
+*Last updated: 2026-02-24 (Phase 43 planned -- Exchange Integration; 6 plans in 3 waves)*
