@@ -21,7 +21,7 @@ st.set_page_config(
 # ---------------------------------------------------------------------------
 with st.sidebar:
     st.title("ta_lab2")
-    st.caption("Pipeline Monitor + Research Explorer")
+    st.caption("Pipeline Monitor + Research + Experiments")
     st.divider()
     st.slider(
         "Cache TTL (s)",
@@ -69,6 +69,13 @@ pages = {
             str(_HERE / "pages" / "4_asset_stats.py"),
             title="Asset Statistics & Correlation",
             icon=":material/bar_chart:",
+        )
+    ],
+    "Experiments": [
+        st.Page(
+            str(_HERE / "pages" / "5_experiments.py"),
+            title="Feature Experiments",
+            icon=":material/experiment:",
         )
     ],
 }
