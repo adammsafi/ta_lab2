@@ -5,21 +5,21 @@
 See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v0.9.0 Research & Experimentation — Phase 41 In Progress (Plan 5/N, Plan 04 complete)
+**Current focus:** v0.9.0 Research & Experimentation — Phase 41 In Progress (Plan 6/N, Plan 06 complete)
 
 ## Current Position
 
 Phase: 41 (Asset Descriptive Stats and Correlation) — In Progress
-Plan: 5/N complete (Plan 04 completed this session)
+Plan: 6/N complete (Plan 06 completed this session)
 Status: In progress
-Last activity: 2026-02-24 — Completed 41-04-PLAN.md (desc stats orchestrator + daily refresh integration)
+Last activity: 2026-02-24 — Completed 41-06-PLAN.md (regime-stats integration + desc stats quality checks)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [████████████] ~97% v0.9.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 205 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 5 in Phase 41)
+- Total plans completed: 206 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -311,6 +311,9 @@ Recent decisions affecting current work:
 - **Desc stats pipeline position: AMAs -> desc_stats -> regimes** (Phase 41-04): desc_stats runs after AMAs (depends on fresh bars/EMAs), before regimes (independent of desc_stats); pipeline order: bars -> EMAs -> AMAs -> desc_stats -> regimes -> stats
 - **Used -m module invocation for desc_stats orchestrator** (Phase 41-04): run_all_desc_stats_refreshes uses python -m module (not script path), matching stats runners and AMA orchestrator patterns
 - **--workers not --num-processes for desc stats subprocess** (Phase 41-04): run_all_desc_stats_refreshes uses --workers param name; daily refresh maps num_processes -> workers when forwarding
+- **load_rolling_stats returns None not empty DataFrame** (Phase 41-06): Allows callers to distinguish "unavailable" from "empty table" — cleaner conditional logic
+- **Regime stats augmentation in main loop not compute_regimes_for_id** (Phase 41-06): Preserves labeling function purity; augmentation left-joined after load_regime_input_data in per-asset loop
+- **check_desc_stats_quality inline not in STATS_TABLES/ALL_STATS_SCRIPTS** (Phase 41-06): No subprocess runner script exists for desc stats tables; inline function avoids creating one
 
 ### Pending Todos
 
@@ -322,8 +325,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-24T16:57:20Z
-Stopped at: Completed 41-04-PLAN.md — desc stats orchestrator + daily refresh pipeline integration (run_all_desc_stats_refreshes.py, run_daily_refresh.py)
+Last session: 2026-02-24T17:04:21Z
+Stopped at: Completed 41-06-PLAN.md — regime-stats integration (load_rolling_stats_for_asset, --no-desc-stats flags) and desc stats quality checks in stats runner
 Resume file: None
 
 ---
