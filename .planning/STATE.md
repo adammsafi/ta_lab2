@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: 38 (Feature Experimentation) — In progress
-Plan: 1/5 complete
-Status: Plan 38-01 complete (Alembic migration for dim_feature_registry + cmc_feature_experiments)
-Last activity: 2026-02-24 — Completed 38-01-PLAN.md
+Plan: 2/5 complete
+Status: Plan 38-02 complete (YAML feature registry subpackage + sample features.yaml)
+Last activity: 2026-02-24 — Completed 38-02-PLAN.md
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [██████████] ~78% v0.9.0
 
@@ -96,7 +96,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 | 35-ama-engine | 8/8 | ~56 min | ~7 min | Complete |
 | 36-psr-purged-k-fold | 5/5 | ~24 min | ~5 min | Complete |
 | 37-ic-evaluation | 4/4 | ~23 min | ~6 min | Complete |
-| 38-feature-experimentation | 1/5 | ~1 min | ~1 min | In Progress |
+| 38-feature-experimentation | 2/5 | ~4 min | ~2 min | In Progress |
 
 *Updated after each plan completion*
 
@@ -275,6 +275,10 @@ Recent decisions affecting current work:
 - **cmc_feature_experiments 9-col unique key** (Phase 38-01): (feature_name, asset_id, tf, horizon, return_type, regime_col, regime_label, train_start, train_end) enables upsert semantics; parallel to cmc_ic_results structure but with feature_name (registry FK) replacing feature (raw column name)
 - **BH-corrected p-value stored at row level** (Phase 38-01): ic_p_value_bh in cmc_feature_experiments stored per experiment row — enables post-hoc significance analysis and promotion gate without rerunning BH correction
 - **Compute cost columns in experiments table** (Phase 38-01): wall_clock_seconds, peak_memory_mb, n_rows_computed — ExperimentRunner can use these to route cheap vs expensive features and monitor resource usage
+- **YAML feature registry lifecycle validation at load time** (Phase 38-02): FeatureRegistry raises ValueError on invalid lifecycle at load() not at compute time — fail fast before any ExperimentRunner computation
+- **Sweep naming convention {base}_{key}{val}** (Phase 38-02): Predictable, inspectable variant names from itertools.product expansion; duplicate detection via _features dict keyed by expanded name
+- **eval globals inject np+pd restrict __builtins__** (Phase 38-02): np.log(close) works in inline expressions; os.system() blocked; documents trust assumption for trusted YAML files
+- **External depends_on silently filtered in DAG** (Phase 38-02): Features referencing promoted/external dependencies are not in the registry dict; DAG silently drops them from edges — allows gradual promotion without breaking YAML
 
 ### Pending Todos
 
@@ -287,7 +291,7 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-24
-Stopped at: Completed 38-01-PLAN.md — Alembic migration for dim_feature_registry + cmc_feature_experiments (revision 6f82e9117c58)
+Stopped at: Completed 38-02-PLAN.md — YAML feature registry subpackage (FeatureRegistry, resolve_experiment_dag, features.yaml)
 Resume file: None
 
 ---
@@ -320,4 +324,4 @@ Key constraints to remember:
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-24 (Phase 38 Plan 01 complete — Alembic migration 6f82e9117c58 for dim_feature_registry + cmc_feature_experiments)*
+*Last updated: 2026-02-24 (Phase 38 Plan 02 complete — YAML feature registry subpackage: FeatureRegistry, resolve_experiment_dag, configs/experiments/features.yaml)*
