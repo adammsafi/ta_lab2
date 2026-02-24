@@ -771,8 +771,8 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | 37. IC Evaluation | 4/4 | Complete | 2026-02-23 |
 | 38. Feature Experimentation | 5/5 | Complete | 2026-02-24 |
 | 39. Streamlit Dashboard | 4/4 | Complete | 2026-02-24 |
-| 40. Notebooks | 0/3 | Planned | -- |
-| 41. Asset Descriptive Stats & Correlation | 0/6 | Planned | -- |
+| 40. Notebooks | 3/3 | Complete | 2026-02-24 |
+| 41. Asset Descriptive Stats & Correlation | 6/6 | Complete | 2026-02-24 |
 
 ### v1.0.0 Progress (Next)
 

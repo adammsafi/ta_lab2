@@ -12,13 +12,13 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Adaptive Moving Averages
 
-- [ ] **AMA-01**: KAMA (Kaufman Adaptive MA) computed correctly with Efficiency Ratio, stored in `cmc_ama_multi_tf` with `(id, ts, tf, indicator, params_hash)` PK, multi-TF across all timeframes
-- [ ] **AMA-02**: DEMA (Double EMA) and TEMA (Triple EMA) computed as compositional EMAs, same table and PK pattern as KAMA
-- [ ] **AMA-03**: HMA (Hull MA) computed using proper WMA (not EWM), same table and PK pattern
-- [ ] **AMA-04**: All AMAs have derivative columns (d1, d2, d1_roll, d2_roll), min-obs warmup guard, and _u unified table sync
-- [ ] **AMA-05**: Z-scores computed on AMA returns (_zscore_30, _zscore_90, _zscore_365) via existing refresh_returns_zscore.py pattern
-- [ ] **AMA-06**: KAMA Efficiency Ratio stored as standalone column — usable as an IC candidate independently
-- [ ] **AMA-07**: AMAs wired into `run_daily_refresh.py` as a stage (parallel to or after EMAs)
+- [x] **AMA-01**: KAMA (Kaufman Adaptive MA) computed correctly with Efficiency Ratio, stored in `cmc_ama_multi_tf` with `(id, ts, tf, indicator, params_hash)` PK, multi-TF across all timeframes
+- [x] **AMA-02**: DEMA (Double EMA) and TEMA (Triple EMA) computed as compositional EMAs, same table and PK pattern as KAMA
+- [x] **AMA-03**: HMA (Hull MA) computed using proper WMA (not EWM), same table and PK pattern
+- [x] **AMA-04**: All AMAs have derivative columns (d1, d2, d1_roll, d2_roll), min-obs warmup guard, and _u unified table sync
+- [x] **AMA-05**: Z-scores computed on AMA returns (_zscore_30, _zscore_90, _zscore_365) via existing refresh_returns_zscore.py pattern
+- [x] **AMA-06**: KAMA Efficiency Ratio stored as standalone column — usable as an IC candidate independently
+- [x] **AMA-07**: AMAs wired into `run_daily_refresh.py` as a stage (parallel to or after EMAs)
 
 ### Information Coefficient Evaluation
 
