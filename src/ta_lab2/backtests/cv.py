@@ -154,7 +154,7 @@ class PurgedKFoldSplitter(BaseCrossValidator):
             max(1, int(self.embargo_frac * n)) if self.embargo_frac > 0 else 0
         )
 
-        fold_bounds = _fold_boundaries(n, self.n_splits)
+        fold_bounds = fold_boundaries(n, self.n_splits)
 
         for fold_start, fold_end in fold_bounds:
             test_idx = np.arange(fold_start, fold_end)
@@ -277,7 +277,7 @@ class CPCVSplitter(BaseCrossValidator):
     ) -> Iterator[np.ndarray]:
         """Yield boolean test masks — required by BaseCrossValidator."""
         n = len(self.t1)
-        fold_bounds = _fold_boundaries(n, self.n_splits)
+        fold_bounds = fold_boundaries(n, self.n_splits)
         for combo in self._combos:
             mask = np.zeros(n, dtype=bool)
             for fold_idx in combo:
@@ -316,7 +316,7 @@ class CPCVSplitter(BaseCrossValidator):
         embargo_size = (
             max(1, int(self.embargo_frac * n)) if self.embargo_frac > 0 else 0
         )
-        fold_bounds = _fold_boundaries(n, self.n_splits)
+        fold_bounds = fold_boundaries(n, self.n_splits)
 
         for combo in self._combos:
             # Build test index as union of selected fold groups
@@ -371,7 +371,7 @@ def _fold_sizes(n: int, n_splits: int) -> list[int]:
     return [base + (1 if i < remainder else 0) for i in range(n_splits)]
 
 
-def _fold_boundaries(n: int, n_splits: int) -> list[tuple[int, int]]:
+def fold_boundaries(n: int, n_splits: int) -> list[tuple[int, int]]:
     """
     Return list of (start, end) index pairs for each fold (end is exclusive).
     """
