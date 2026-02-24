@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v0.9.0 Research & Experimentation — Phase 38 COMPLETE, ready for Phase 39 (Streamlit Dashboard)
+**Current focus:** v0.9.0 Research & Experimentation — Phase 39 (Streamlit Dashboard) in progress, plan 2/4 complete
 
 ## Current Position
 
-Phase: 38 (Feature Experimentation) — Complete
-Plan: 5/5 complete
-Status: Phase 38 verified (15/15 must-haves passed, 39 tests passing)
-Last activity: 2026-02-24 — Completed 38-05-PLAN.md
+Phase: 39 (Streamlit Dashboard) — In progress
+Plan: 2/4 complete
+Status: In progress
+Last activity: 2026-02-24 — Completed 39-02-PLAN.md
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [██████████] ~83% v0.9.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [██████████] ~87% v0.9.0
 
 ## Performance Metrics
 
@@ -289,6 +289,9 @@ Recent decisions affecting current work:
 - **NaN filter before false_discovery_control()** (Phase 38-04): scipy raises ValueError on NaN inputs; filter valid_mask before passing array; return (False, df, reason) when zero valid p-values exist
 - **Duplicate detection requires expanded-name collision, not base-name collision** (Phase 38-05): YAML keys must be unique so two features with same base name is impossible; collision arises when sweep expansion produces a variant name that matches an explicitly defined feature (e.g., rsi_sweep[period=5] -> rsi_sweep_period5 collides with explicit rsi_sweep_period5)
 - **dotpath tests patch at import site not target module** (Phase 38-05): Use patch('ta_lab2.experiments.runner.importlib.import_module') not 'importlib.import_module' — ensures mock intercepts ExperimentRunner's importlib calls
+- **plot_rolling_ic horizon not window parameter** (Phase 39-02): plan assumed window= kwarg but plot_rolling_ic uses horizon= (optional int shown in subtitle); build_rolling_ic_chart maps window->horizon; window is consumed by compute_rolling_ic() which produces the series
+- **chart_download_button lazy streamlit import** (Phase 39-02): import streamlit inside function body — charts.py is imported by notebooks/tests outside Streamlit context; lazy import prevents ImportError at module load time
+- **vrect opacity=1 with rgba alpha for bands** (Phase 39-02): Plotly vrect opacity multiplies the rgba channel; set opacity=1 and use low rgba alpha (0.12-0.15) for correct transparency behavior
 
 ### Pending Todos
 
@@ -300,8 +303,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-24T12:39:35Z
-Stopped at: Completed 38-05-PLAN.md — Phase 38 complete (39 unit tests + E2E CLI verification)
+Last session: 2026-02-24T13:56:56Z
+Stopped at: Completed 39-02-PLAN.md — charts.py with 5 Plotly figure builders (IC wrappers + regime charts)
 Resume file: None
 
 ---
@@ -321,7 +324,7 @@ Phase overview:
 - Phase 36 (PSR + Purged K-Fold): COMPLETE — Alembic migrations (psr_legacy rename + psr_results table), PSR/DSR/MinTRL formulas (Pearson kurtosis), PurgedKFoldSplitter + CPCVSplitter, PSR pipeline integration + CLI, alembic startup check; 22/22 must-haves verified
 - Phase 37 (IC Evaluation): COMPLETE — Spearman IC library (1098 lines), regime breakdown, batch wrapper, Plotly plots, DB helpers, run_ic_eval.py CLI, cmc_ic_results Alembic migration; 5/5 must-haves verified, 61 tests
 - Phase 38 (Feature Experimentation): COMPLETE — YAML feature registry, FeatureRegistry+DAG, ExperimentRunner, FeaturePromoter (BH gate + migration stub), 3 CLIs, 39 unit tests
-- Phase 39 (Streamlit Dashboard): Pipeline Monitor + Research Explorer, NullPool, Windows-compatible
+- Phase 39 (Streamlit Dashboard): 2/4 plans complete — DB layer, cached queries, charts.py; pages + app entry pending
 - Phase 40 (Notebooks): 3-5 polished, Restart-and-Run-All clean, shareable
 
 Key constraints to remember:
