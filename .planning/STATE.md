@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: 41.1 (Milestone Cleanup) — In Progress
-Plan: 2/3 complete
-Status: Phase 41.1-02 complete. Experiments dashboard page added with BH significance highlighting wired to cmc_feature_experiments.
-Last activity: 2026-02-24 — Completed 41.1-02-PLAN.md
+Phase: 41.1 (Milestone Cleanup) — Complete
+Plan: 3/3 complete
+Status: Phase 41.1 complete. All 3 plans executed: AMA allowlist, experiments dashboard, tech debt cleanup (CLI ref, rolling IC, public fold_boundaries).
+Last activity: 2026-02-24 — Completed 41.1-03-PLAN.md
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [##░] 67% v0.9.1 milestone-cleanup
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [###] 100% v0.9.1 milestone-cleanup
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 208 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 2 in Phase 41.1)
+- Total plans completed: 209 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -102,7 +102,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 
 | Phase | Plans | Total | Avg/Plan | Status |
 |-------|-------|-------|----------|--------|
-| 41.1-milestone-cleanup | 1/3 | ~2 min | ~2 min | In progress |
+| 41.1-milestone-cleanup | 3/3 | ~8 min | ~3 min | Complete |
 
 *Updated after each plan completion*
 
@@ -322,6 +322,9 @@ Recent decisions affecting current work:
 - **check_desc_stats_quality inline not in STATS_TABLES/ALL_STATS_SCRIPTS** (Phase 41-06): No subprocess runner script exists for desc stats tables; inline function avoids creating one
 - **filter_ prefix on ExperimentRunner filter params** (Phase 41.1-01): Prevents collision with existing id/tf/start/end params; filter keys double-quoted in SQL for reserved-word safety
 - **AMA tables NOT in _TABLES_WITHOUT_TF** (Phase 41.1-01): AMA tables have tf column; standard WHERE id/tf/ts clause applies; only cmc_vol/cmc_ta_daily lack tf
+- **fold_boundaries public API** (Phase 41.1-03): Renamed from _fold_boundaries — external callers (notebooks, CLIs) should reference public name; _fold_sizes kept private
+- **Column name sanitization before SQL interpolation** (Phase 41.1-03): all(c.isalnum() or c == '_' for c in col) guards before SQL f-string in load_feature_close_series — prevents injection from user-facing selectbox input
+- **close_series_for_ic alias in rolling IC section** (Phase 41.1-03): Avoids shadowing close_series used in Regime Analysis section on same page; Streamlit pages execute top-to-bottom, shadowing breaks later sections
 
 ### Pending Todos
 
@@ -333,8 +336,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-24T19:34:00Z
-Stopped at: Completed 41.1-01-PLAN.md — AMA table allowlist + filter support in ExperimentRunner, kama_er_signal and ama_ret_momentum in features.yaml
+Last session: 2026-02-24T19:38:09Z
+Stopped at: Completed 41.1-03-PLAN.md — CLI ref fix, rolling IC chart in Research Explorer, fold_boundaries public API, notebook import updated
 Resume file: None
 
 ---
