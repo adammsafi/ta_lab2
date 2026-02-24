@@ -5,21 +5,21 @@
 See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v0.9.0 Research & Experimentation — Phase 38 next (Feature Experimentation Framework)
+**Current focus:** v0.9.0 Research & Experimentation — Phase 38 in progress (Feature Experimentation Framework)
 
 ## Current Position
 
-Phase: 37 (IC Evaluation) — Complete
-Plan: 4/4 complete
-Status: Phase 37 verified (5/5 must-haves passed, 61 tests passing)
-Last activity: 2026-02-23 — Phase 37 complete (IC Evaluation)
+Phase: 38 (Feature Experimentation) — In progress
+Plan: 1/5 complete
+Status: Plan 38-01 complete (Alembic migration for dim_feature_registry + cmc_feature_experiments)
+Last activity: 2026-02-24 — Completed 38-01-PLAN.md
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [██████████] ~75% v0.9.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [██████████] ~78% v0.9.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 187 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37)
+- Total plans completed: 188 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 1 in Phase 38)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -96,6 +96,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 | 35-ama-engine | 8/8 | ~56 min | ~7 min | Complete |
 | 36-psr-purged-k-fold | 5/5 | ~24 min | ~5 min | Complete |
 | 37-ic-evaluation | 4/4 | ~23 min | ~6 min | Complete |
+| 38-feature-experimentation | 1/5 | ~1 min | ~1 min | In Progress |
 
 *Updated after each plan completion*
 
@@ -270,6 +271,10 @@ Recent decisions affecting current work:
 - **split_part SQL for cmc_regimes l2_label parsing** (Phase 37-04): cmc_regimes has NO trend_state/vol_state columns — must derive via split_part(l2_label, '-', 1/2) SQL; never reference them as WHERE filter columns
 - **save_ic_results individual INSERT per row** (Phase 37-04): Loops over rows for accurate rowcount; ON CONFLICT DO NOTHING (append) vs DO UPDATE (overwrite) controlled by overwrite= flag
 - **_to_python() numpy scalar normalization at SQL boundary** (Phase 37-04): hasattr(v, 'item') check normalizes numpy scalars; NaN -> None for SQL NULL; pd.Timestamp -> pydatetime for TIMESTAMPTZ binding
+- **Feature registry lifecycle CHECK constraint** (Phase 38-01): dim_feature_registry enforces lifecycle IN ('experimental','promoted','deprecated') at DB level via CHECK constraint — state machine is DB-enforced, not just application-level
+- **cmc_feature_experiments 9-col unique key** (Phase 38-01): (feature_name, asset_id, tf, horizon, return_type, regime_col, regime_label, train_start, train_end) enables upsert semantics; parallel to cmc_ic_results structure but with feature_name (registry FK) replacing feature (raw column name)
+- **BH-corrected p-value stored at row level** (Phase 38-01): ic_p_value_bh in cmc_feature_experiments stored per experiment row — enables post-hoc significance analysis and promotion gate without rerunning BH correction
+- **Compute cost columns in experiments table** (Phase 38-01): wall_clock_seconds, peak_memory_mb, n_rows_computed — ExperimentRunner can use these to route cheap vs expensive features and monitor resource usage
 
 ### Pending Todos
 
@@ -281,8 +286,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-23
-Stopped at: Phase 37 complete — IC Evaluation verified (5/5 must-haves)
+Last session: 2026-02-24
+Stopped at: Completed 38-01-PLAN.md — Alembic migration for dim_feature_registry + cmc_feature_experiments (revision 6f82e9117c58)
 Resume file: None
 
 ---
@@ -315,4 +320,4 @@ Key constraints to remember:
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-23 (Phase 37 complete — IC Evaluation; 5/5 must-haves verified)*
+*Last updated: 2026-02-24 (Phase 38 Plan 01 complete — Alembic migration 6f82e9117c58 for dim_feature_registry + cmc_feature_experiments)*
