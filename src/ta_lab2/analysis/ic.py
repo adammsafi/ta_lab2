@@ -3,7 +3,8 @@
 IC (Information Coefficient) computation library.
 
 Provides Spearman IC per feature per forward-return horizon, rolling IC with
-IC-IR, IC decay table, significance testing, and feature turnover.
+IC-IR, IC decay table, significance testing, feature turnover, regime-conditional
+IC breakdown, batch wrapper, Plotly visualization helpers, and DB persistence.
 
 All public functions operate on pandas Series indexed by tz-aware UTC timestamps.
 train_start and train_end are REQUIRED in compute_ic() — no default values to
@@ -14,6 +15,15 @@ Public API:
     compute_ic               -- per-horizon IC table (14 rows by default)
     compute_rolling_ic       -- vectorized rolling IC + IC-IR summary statistics
     compute_feature_turnover -- rank autocorrelation proxy for signal stability
+    compute_ic_by_regime     -- IC split by regime label (e.g. trend_state, vol_state)
+    batch_compute_ic         -- IC for multiple feature columns, concatenated result
+    plot_ic_decay            -- Plotly bar chart of IC decay across horizons
+    plot_rolling_ic          -- Plotly line chart of rolling IC time series
+
+DB helpers (for CLI and notebooks):
+    load_feature_series      -- load feature + close from cmc_features
+    load_regimes_for_asset   -- load and parse l2_label from cmc_regimes
+    save_ic_results          -- persist IC rows to cmc_ic_results
 
 Internal helpers (exported for testing):
     _compute_single_ic       -- IC + t-stat + p-value for one feature/horizon pair
@@ -24,11 +34,14 @@ Internal helpers (exported for testing):
 from __future__ import annotations
 
 import logging
+import math
 from typing import Optional
 
 import numpy as np
 import pandas as pd
+import plotly.graph_objects as go
 from scipy.stats import norm, spearmanr
+from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
 
@@ -419,3 +432,667 @@ def compute_ic(
             )
 
     return pd.DataFrame(rows)
+
+
+# ---------------------------------------------------------------------------
+# Regime-conditional IC breakdown
+# ---------------------------------------------------------------------------
+
+
+def compute_ic_by_regime(
+    feature: pd.Series,
+    close: pd.Series,
+    regimes_df: Optional[pd.DataFrame],
+    train_start: pd.Timestamp,
+    train_end: pd.Timestamp,
+    *,
+    horizons: Optional[list[int]] = None,
+    return_types: Optional[list[str]] = None,
+    rolling_window: int = 63,
+    tf_days_nominal: int = 1,
+    regime_col: str = "trend_state",
+    min_obs_per_regime: int = 30,
+    min_obs: int = 20,
+) -> pd.DataFrame:
+    """
+    Compute Spearman IC broken down by regime label.
+
+    This function accepts a pre-built ``regimes_df`` — the caller is responsible
+    for loading and parsing regime data from the database. The l2_label
+    parsing (e.g. split('-') to extract trend_state / vol_state) happens in
+    the CLI/DB helper layer (Plan 04), NOT here.
+
+    Parameters
+    ----------
+    feature : pd.Series
+        Feature values indexed by UTC timestamps.
+    close : pd.Series
+        Close prices indexed by UTC timestamps.
+    regimes_df : pd.DataFrame or None
+        DataFrame indexed by ts (UTC) with a column named ``regime_col``
+        containing regime labels (e.g. 'Up', 'Down', 'High', 'Low').
+        If None or empty, falls back to full-sample IC with regime_label='all'.
+    train_start : pd.Timestamp
+        Start of the train window (REQUIRED).
+    train_end : pd.Timestamp
+        End of the train window (REQUIRED).
+    horizons : list[int], optional
+        Forward horizons. Default [1, 2, 3, 5, 10, 20, 60].
+    return_types : list[str], optional
+        Return type(s). Default ['arith', 'log'].
+    rolling_window : int
+        Window size for rolling IC. Default 63.
+    tf_days_nominal : int
+        Nominal calendar days per bar. Default 1.
+    regime_col : str
+        Column name in regimes_df containing the regime labels. Default 'trend_state'.
+    min_obs_per_regime : int
+        Minimum number of observations (bars) required for a regime subset to
+        be evaluated. Regimes with fewer bars are skipped. Default 30.
+    min_obs : int
+        Minimum observations for IC computation within each regime. Default 20.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per (horizon, return_type, regime_label). Includes all columns
+        from compute_ic() plus ``regime_col`` and ``regime_label`` columns.
+        If regimes_df is empty/None, returns full-sample IC with regime_label='all'.
+    """
+    # Fall back to full-sample IC when no regime data is available
+    if regimes_df is None or len(regimes_df) == 0:
+        logger.debug(
+            "compute_ic_by_regime: regimes_df is empty/None — falling back to full-sample IC"
+        )
+        base_df = compute_ic(
+            feature,
+            close,
+            train_start,
+            train_end,
+            horizons=horizons,
+            return_types=return_types,
+            rolling_window=rolling_window,
+            tf_days_nominal=tf_days_nominal,
+            min_obs=min_obs,
+        )
+        base_df["regime_col"] = regime_col
+        base_df["regime_label"] = "all"
+        return base_df
+
+    # Filter regimes to train window
+    regime_in_window = regimes_df[
+        (regimes_df.index >= train_start) & (regimes_df.index <= train_end)
+    ]
+
+    if len(regime_in_window) == 0:
+        logger.debug(
+            "compute_ic_by_regime: no regime rows in train window — falling back to full-sample IC"
+        )
+        base_df = compute_ic(
+            feature,
+            close,
+            train_start,
+            train_end,
+            horizons=horizons,
+            return_types=return_types,
+            rolling_window=rolling_window,
+            tf_days_nominal=tf_days_nominal,
+            min_obs=min_obs,
+        )
+        base_df["regime_col"] = regime_col
+        base_df["regime_label"] = "all"
+        return base_df
+
+    # Split IC by each regime label
+    all_regime_results: list[pd.DataFrame] = []
+    unique_labels = regime_in_window[regime_col].dropna().unique()
+
+    for label in unique_labels:
+        # Timestamps where this regime label is active (within train window)
+        regime_ts = regime_in_window[regime_in_window[regime_col] == label].index
+
+        # Filter feature and close to regime-active timestamps only
+        feat_regime = feature.reindex(regime_ts).dropna()
+        close_regime = close.reindex(regime_ts).dropna()
+
+        # Only keep timestamps present in both (intersection)
+        common_ts = feat_regime.index.intersection(close_regime.index)
+        feat_regime = feat_regime.reindex(common_ts)
+        close_regime = close_regime.reindex(common_ts)
+
+        # Skip sparse regimes
+        n_regime = len(feat_regime.dropna())
+        if n_regime < min_obs_per_regime:
+            logger.debug(
+                "compute_ic_by_regime: skipping regime '%s' — only %d obs (min=%d)",
+                label,
+                n_regime,
+                min_obs_per_regime,
+            )
+            continue
+
+        # For a regime subset, we need to define a synthetic train window
+        # spanning the regime-active timestamps. Use first/last ts in regime.
+        regime_train_start = common_ts.min()
+        regime_train_end = common_ts.max()
+
+        regime_ic_df = compute_ic(
+            feat_regime,
+            close_regime,
+            regime_train_start,
+            regime_train_end,
+            horizons=horizons,
+            return_types=return_types,
+            rolling_window=rolling_window,
+            tf_days_nominal=tf_days_nominal,
+            min_obs=min_obs,
+        )
+
+        regime_ic_df["regime_col"] = regime_col
+        regime_ic_df["regime_label"] = str(label)
+        all_regime_results.append(regime_ic_df)
+
+    if not all_regime_results:
+        # All regimes were sparse — fall back to full-sample IC
+        logger.warning(
+            "compute_ic_by_regime: all regime subsets were sparse — falling back to full-sample IC"
+        )
+        base_df = compute_ic(
+            feature,
+            close,
+            train_start,
+            train_end,
+            horizons=horizons,
+            return_types=return_types,
+            rolling_window=rolling_window,
+            tf_days_nominal=tf_days_nominal,
+            min_obs=min_obs,
+        )
+        base_df["regime_col"] = regime_col
+        base_df["regime_label"] = "all"
+        return base_df
+
+    return pd.concat(all_regime_results, ignore_index=True)
+
+
+# ---------------------------------------------------------------------------
+# Batch wrapper
+# ---------------------------------------------------------------------------
+
+
+def batch_compute_ic(
+    features_df: pd.DataFrame,
+    close: pd.Series,
+    train_start: pd.Timestamp,
+    train_end: pd.Timestamp,
+    *,
+    feature_cols: Optional[list[str]] = None,
+    horizons: Optional[list[int]] = None,
+    return_types: Optional[list[str]] = None,
+    rolling_window: int = 63,
+    tf_days_nominal: int = 1,
+    min_obs: int = 20,
+) -> pd.DataFrame:
+    """
+    Compute IC for multiple feature columns in one call.
+
+    Loops over each feature column, calls ``compute_ic()``, and concatenates
+    all results into a single DataFrame with an additional ``feature`` column.
+
+    Parameters
+    ----------
+    features_df : pd.DataFrame
+        DataFrame indexed by ts (UTC) with multiple feature columns.
+    close : pd.Series
+        Close prices indexed by UTC timestamps.
+    train_start : pd.Timestamp
+        Start of the train window (REQUIRED).
+    train_end : pd.Timestamp
+        End of the train window (REQUIRED).
+    feature_cols : list[str], optional
+        Subset of columns to evaluate. Default: all numeric columns except 'close'.
+    horizons : list[int], optional
+        Forward horizons. Default [1, 2, 3, 5, 10, 20, 60].
+    return_types : list[str], optional
+        Return type(s). Default ['arith', 'log'].
+    rolling_window : int
+        Window size for rolling IC. Default 63.
+    tf_days_nominal : int
+        Nominal calendar days per bar. Default 1.
+    min_obs : int
+        Minimum observations for IC computation. Default 20.
+
+    Returns
+    -------
+    pd.DataFrame
+        Concatenated IC results for all feature columns. Includes all columns
+        from compute_ic() plus a ``feature`` column with the column name.
+    """
+    if feature_cols is None:
+        # Use all numeric columns except 'close'
+        numeric_cols = features_df.select_dtypes(include=[np.number]).columns.tolist()
+        feature_cols = [c for c in numeric_cols if c != "close"]
+
+    all_results: list[pd.DataFrame] = []
+
+    for col in feature_cols:
+        col_ic_df = compute_ic(
+            features_df[col],
+            close,
+            train_start,
+            train_end,
+            horizons=horizons,
+            return_types=return_types,
+            rolling_window=rolling_window,
+            tf_days_nominal=tf_days_nominal,
+            min_obs=min_obs,
+        )
+        col_ic_df["feature"] = col
+        all_results.append(col_ic_df)
+
+    if not all_results:
+        return pd.DataFrame()
+
+    return pd.concat(all_results, ignore_index=True)
+
+
+# ---------------------------------------------------------------------------
+# Plotly visualization helpers
+# ---------------------------------------------------------------------------
+
+
+def plot_ic_decay(
+    ic_df: pd.DataFrame,
+    feature: str,
+    *,
+    return_type: str = "arith",
+    sig_threshold: float = 0.05,
+) -> go.Figure:
+    """
+    Create a Plotly bar chart of IC decay across forward horizons.
+
+    Parameters
+    ----------
+    ic_df : pd.DataFrame
+        DataFrame with columns: horizon, ic, ic_p_value (and optionally return_type).
+        Output of compute_ic() filtered to one return_type, or a DataFrame already
+        containing only the desired return_type rows.
+    feature : str
+        Feature name for the chart title.
+    return_type : str
+        Return type label for the chart title. Default 'arith'.
+    sig_threshold : float
+        p-value significance threshold. Bars with ic_p_value < sig_threshold are
+        colored "royalblue"; others are colored "lightgray". Default 0.05.
+
+    Returns
+    -------
+    plotly.graph_objects.Figure
+        Bar chart of IC vs horizon with significance coloring and p-value annotations.
+    """
+    # Filter to the requested return_type if the column is present
+    if "return_type" in ic_df.columns:
+        plot_df = ic_df[ic_df["return_type"] == return_type].copy()
+    else:
+        plot_df = ic_df.copy()
+
+    # Sort by horizon for clean x-axis
+    plot_df = plot_df.sort_values("horizon").reset_index(drop=True)
+
+    horizons = plot_df["horizon"].tolist()
+    ic_values = plot_df["ic"].tolist()
+    p_values = plot_df["ic_p_value"].tolist()
+
+    # Color bars by significance
+    colors = ["royalblue" if p < sig_threshold else "lightgray" for p in p_values]
+
+    # Text annotation: p-value above each bar
+    text_labels = [f"p={p:.3f}" for p in p_values]
+
+    fig = go.Figure(
+        data=[
+            go.Bar(
+                x=horizons,
+                y=ic_values,
+                marker_color=colors,
+                text=text_labels,
+                textposition="outside",
+            )
+        ]
+    )
+
+    fig.update_layout(
+        title=f"IC Decay -- Feature: {feature} ({return_type} returns)",
+        xaxis_title="Horizon (bars)",
+        yaxis_title="Spearman IC",
+    )
+
+    return fig
+
+
+def plot_rolling_ic(
+    rolling_ic_series: pd.Series,
+    feature: str,
+    *,
+    horizon: Optional[int] = None,
+    return_type: str = "arith",
+) -> go.Figure:
+    """
+    Create a Plotly line chart of rolling IC over time.
+
+    Parameters
+    ----------
+    rolling_ic_series : pd.Series
+        Rolling IC values indexed by timestamp. Output of compute_rolling_ic()
+        (first element of the tuple).
+    feature : str
+        Feature name for the chart title.
+    horizon : int, optional
+        Horizon used to compute the rolling IC. Included in subtitle if provided.
+    return_type : str
+        Return type label for the subtitle. Default 'arith'.
+
+    Returns
+    -------
+    plotly.graph_objects.Figure
+        Line chart of rolling IC with a zero reference line.
+    """
+    # Build subtitle
+    subtitle_parts = []
+    if horizon is not None:
+        subtitle_parts.append(f"horizon={horizon}")
+    subtitle_parts.append(f"return_type={return_type}")
+    subtitle = ", ".join(subtitle_parts)
+
+    title = f"Rolling IC -- Feature: {feature}"
+    if subtitle:
+        title = f"{title} ({subtitle})"
+
+    fig = go.Figure()
+
+    # Rolling IC line
+    fig.add_trace(
+        go.Scatter(
+            x=rolling_ic_series.index,
+            y=rolling_ic_series.values,
+            mode="lines",
+            name="Rolling IC",
+        )
+    )
+
+    # Zero reference line
+    fig.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.5)
+
+    fig.update_layout(
+        title=title,
+        xaxis_title="Date",
+        yaxis_title="Rolling Spearman IC",
+    )
+
+    return fig
+
+
+# ---------------------------------------------------------------------------
+# DB helper functions (for CLI and notebooks)
+# ---------------------------------------------------------------------------
+
+# Non-feature columns to exclude from --all-features discovery
+_NON_FEATURE_COLS = frozenset(
+    ["id", "ts", "tf", "close", "open", "high", "low", "volume", "ingested_at"]
+)
+
+
+def _to_python(v):
+    """
+    Normalize a value for SQL binding.
+
+    - numpy scalars -> Python float/int via .item()
+    - pd.Timestamp -> Python datetime
+    - NaN float -> None (SQL NULL)
+    - Everything else: unchanged
+    """
+    if hasattr(v, "item"):
+        # numpy scalar (float32, float64, int32, int64, etc.)
+        v = v.item()
+    if isinstance(v, pd.Timestamp):
+        return v.to_pydatetime()
+    if isinstance(v, float) and math.isnan(v):
+        return None
+    return v
+
+
+def load_feature_series(
+    conn,
+    asset_id: int,
+    tf: str,
+    feature_col: str,
+    train_start: pd.Timestamp,
+    train_end: pd.Timestamp,
+) -> tuple[pd.Series, pd.Series]:
+    """
+    Load a single feature column + close from cmc_features.
+
+    Parameters
+    ----------
+    conn : SQLAlchemy connection
+        Active database connection.
+    asset_id : int
+        Asset ID to load.
+    tf : str
+        Timeframe (e.g. '1D').
+    feature_col : str
+        Column name to load from cmc_features. Must be a valid column.
+    train_start : pd.Timestamp
+        Start of the range to load (inclusive, UTC).
+    train_end : pd.Timestamp
+        End of the range to load (inclusive, UTC).
+
+    Returns
+    -------
+    tuple[pd.Series, pd.Series]
+        (feature_series, close_series) both indexed by UTC timestamps.
+
+    Raises
+    ------
+    ValueError
+        If feature_col is not a valid column in cmc_features.
+    """
+    # Lazy import to avoid circular imports
+    from ta_lab2.scripts.sync_utils import get_columns
+
+    # Validate column name by querying information_schema
+    # We need an engine for get_columns — use conn.engine if available
+    engine = conn.engine
+    available_cols = get_columns(engine, "public.cmc_features")
+
+    if feature_col not in available_cols:
+        raise ValueError(
+            f"Feature column '{feature_col}' not found in cmc_features. "
+            f"Available columns: {sorted(available_cols)}"
+        )
+
+    # Build SQL with dynamically injected column name (validated above)
+    sql = text(
+        f"SELECT ts, {feature_col}, close FROM public.cmc_features "
+        f"WHERE id = :id AND tf = :tf AND ts >= :start AND ts <= :end ORDER BY ts"
+    )
+
+    df = pd.read_sql(
+        sql,
+        conn,
+        params={"id": asset_id, "tf": tf, "start": train_start, "end": train_end},
+    )
+
+    # CRITICAL: fix mixed-tz-offset object dtype from pd.read_sql on Windows
+    df["ts"] = pd.to_datetime(df["ts"], utc=True)
+    df = df.set_index("ts")
+
+    feature_series = df[feature_col]
+    close_series = df["close"]
+
+    return feature_series, close_series
+
+
+def load_regimes_for_asset(
+    conn,
+    asset_id: int,
+    tf: str,
+    train_start: pd.Timestamp,
+    train_end: pd.Timestamp,
+) -> pd.DataFrame:
+    """
+    Load regime labels from cmc_regimes, parsing trend_state and vol_state from l2_label.
+
+    CRITICAL: cmc_regimes has NO trend_state or vol_state columns.
+    Both are derived from l2_label via split_part() in SQL.
+
+    Parameters
+    ----------
+    conn : SQLAlchemy connection
+        Active database connection.
+    asset_id : int
+        Asset ID to load.
+    tf : str
+        Timeframe (e.g. '1D').
+    train_start : pd.Timestamp
+        Start of the range to load (inclusive, UTC).
+    train_end : pd.Timestamp
+        End of the range to load (inclusive, UTC).
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame indexed by ts (UTC) with columns: regime_key, trend_state, vol_state.
+        Empty DataFrame with those columns if no regime data exists for the asset.
+    """
+    sql = text(
+        """
+        SELECT
+            ts,
+            l2_label AS regime_key,
+            split_part(l2_label, '-', 1) AS trend_state,
+            split_part(l2_label, '-', 2) AS vol_state
+        FROM public.cmc_regimes
+        WHERE id = :id
+          AND tf = :tf
+          AND ts >= :start
+          AND ts <= :end
+          AND l2_label IS NOT NULL
+        ORDER BY ts
+        """
+    )
+
+    df = pd.read_sql(
+        sql,
+        conn,
+        params={"id": asset_id, "tf": tf, "start": train_start, "end": train_end},
+    )
+
+    if df.empty:
+        logger.warning(
+            "load_regimes_for_asset: no regime data found for asset_id=%d tf=%s",
+            asset_id,
+            tf,
+        )
+        return pd.DataFrame(columns=["regime_key", "trend_state", "vol_state"])
+
+    # CRITICAL: fix mixed-tz-offset object dtype from pd.read_sql on Windows
+    df["ts"] = pd.to_datetime(df["ts"], utc=True)
+    df = df.set_index("ts")
+
+    return df[["regime_key", "trend_state", "vol_state"]]
+
+
+def save_ic_results(conn, rows: list[dict], *, overwrite: bool = False) -> int:
+    """
+    Persist IC result rows to cmc_ic_results.
+
+    Parameters
+    ----------
+    conn : SQLAlchemy connection
+        Active database connection (within a transaction).
+    rows : list[dict]
+        List of dicts with keys matching cmc_ic_results columns:
+        asset_id, tf, feature, horizon, horizon_days, return_type,
+        regime_col, regime_label, train_start, train_end,
+        ic, ic_t_stat, ic_p_value, ic_ir, ic_ir_t_stat, turnover, n_obs.
+    overwrite : bool
+        If False (default): ON CONFLICT DO NOTHING (append-only, keeps history).
+        If True: ON CONFLICT DO UPDATE with updated IC values (upsert).
+
+    Returns
+    -------
+    int
+        Number of rows written (rowcount sum across all inserts).
+    """
+    if not rows:
+        return 0
+
+    if overwrite:
+        sql = text(
+            """
+            INSERT INTO public.cmc_ic_results
+                (asset_id, tf, feature, horizon, horizon_days, return_type,
+                 regime_col, regime_label, train_start, train_end,
+                 ic, ic_t_stat, ic_p_value, ic_ir, ic_ir_t_stat, turnover, n_obs)
+            VALUES
+                (:asset_id, :tf, :feature, :horizon, :horizon_days, :return_type,
+                 :regime_col, :regime_label, :train_start, :train_end,
+                 :ic, :ic_t_stat, :ic_p_value, :ic_ir, :ic_ir_t_stat, :turnover, :n_obs)
+            ON CONFLICT (asset_id, tf, feature, horizon, return_type,
+                         regime_col, regime_label, train_start, train_end)
+            DO UPDATE SET
+                ic            = EXCLUDED.ic,
+                ic_t_stat     = EXCLUDED.ic_t_stat,
+                ic_p_value    = EXCLUDED.ic_p_value,
+                ic_ir         = EXCLUDED.ic_ir,
+                ic_ir_t_stat  = EXCLUDED.ic_ir_t_stat,
+                turnover      = EXCLUDED.turnover,
+                n_obs         = EXCLUDED.n_obs,
+                horizon_days  = EXCLUDED.horizon_days,
+                computed_at   = now()
+            """
+        )
+    else:
+        sql = text(
+            """
+            INSERT INTO public.cmc_ic_results
+                (asset_id, tf, feature, horizon, horizon_days, return_type,
+                 regime_col, regime_label, train_start, train_end,
+                 ic, ic_t_stat, ic_p_value, ic_ir, ic_ir_t_stat, turnover, n_obs)
+            VALUES
+                (:asset_id, :tf, :feature, :horizon, :horizon_days, :return_type,
+                 :regime_col, :regime_label, :train_start, :train_end,
+                 :ic, :ic_t_stat, :ic_p_value, :ic_ir, :ic_ir_t_stat, :turnover, :n_obs)
+            ON CONFLICT (asset_id, tf, feature, horizon, return_type,
+                         regime_col, regime_label, train_start, train_end)
+            DO NOTHING
+            """
+        )
+
+    n_written = 0
+    for row in rows:
+        # Normalize numpy scalars and NaN values for SQL binding
+        params = {
+            "asset_id": _to_python(row.get("asset_id")),
+            "tf": _to_python(row.get("tf")),
+            "feature": _to_python(row.get("feature")),
+            "horizon": _to_python(row.get("horizon")),
+            "horizon_days": _to_python(row.get("horizon_days")),
+            "return_type": _to_python(row.get("return_type")),
+            "regime_col": _to_python(row.get("regime_col", "all")),
+            "regime_label": _to_python(row.get("regime_label", "all")),
+            "train_start": _to_python(row.get("train_start")),
+            "train_end": _to_python(row.get("train_end")),
+            "ic": _to_python(row.get("ic")),
+            "ic_t_stat": _to_python(row.get("ic_t_stat")),
+            "ic_p_value": _to_python(row.get("ic_p_value")),
+            "ic_ir": _to_python(row.get("ic_ir")),
+            "ic_ir_t_stat": _to_python(row.get("ic_ir_t_stat")),
+            "turnover": _to_python(row.get("turnover")),
+            "n_obs": _to_python(row.get("n_obs")),
+        }
+        result = conn.execute(sql, params)
+        n_written += result.rowcount
+
+    return n_written
