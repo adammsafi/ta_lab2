@@ -23,7 +23,7 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 - Phases 27-28: v0.7.0 (complete)
 - Phases 29-34: v0.8.0 (complete)
 - Phases 35-41: v0.9.0 (current)
-- Phases 42-54: v1.0.0 (next — V1 Closure)
+- Phases 42-54: v1.0.0 (next -- V1 Closure)
 - Decimal phases (27.1, 28.1): Urgent insertions if needed
 
 <details>
@@ -520,7 +520,7 @@ Plans:
 
 - [x] **Phase 35: AMA Engine** - Adaptive Moving Averages (KAMA, DEMA, TEMA, HMA) with full calendar parity
 - [x] **Phase 36: PSR + Purged K-Fold** - Probabilistic Sharpe Ratio, DSR, MinTRL + leakage-free CV splitters
-- [ ] **Phase 37: IC Evaluation** - Information Coefficient scoring engine with regime breakdown and significance testing
+- [x] **Phase 37: IC Evaluation** - Information Coefficient scoring engine with regime breakdown and significance testing
 - [ ] **Phase 38: Feature Experimentation** - YAML registry, ExperimentRunner, BH-corrected promotion gate
 - [ ] **Phase 39: Streamlit Dashboard** - Pipeline monitor + research explorer with cached DB queries
 - [ ] **Phase 40: Notebooks** - 3-5 polished Jupyter notebooks demonstrating the full research cycle
@@ -562,7 +562,7 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. Alembic migration `psr_rename` completes cleanly: existing `psr` column renamed to `psr_legacy` in `cmc_backtest_metrics` with no data loss; `alembic history` shows the migration
   2. `compute_psr(returns, sr_star)` returns a value in [0, 1] matching Lopez de Prado formula using scipy skew/kurtosis; returns NaN when n < 30 and logs a warning when n < 100
-  3. `compute_dsr(returns_list, sr_star)` deflates the best-of-N Sharpe correctly — the deflated value is always <= the raw best Sharpe
+  3. `compute_dsr(returns_list, sr_star)` deflates the best-of-N Sharpe correctly -- the deflated value is always <= the raw best Sharpe
   4. `PurgedKFoldSplitter(n_splits, t1_series, embargo_bars)` raises `ValueError` when `t1_series` is not provided; fold train/test indices contain no overlap after purging and embargoing
   5. `CombPurgedKFoldCV` generates the combinatorial path matrix required for PBO analysis; all generated paths cover the full sample without train-test contamination
 **Plans**: 5/5 complete
@@ -602,21 +602,28 @@ Plans:
 **Requirements:** FEAT-01, FEAT-02, FEAT-03, FEAT-04, FEAT-05
 **Success Criteria** (what must be TRUE):
   1. A YAML feature definition with `lifecycle: experimental` is picked up by `ExperimentRunner` without any DB schema changes; removing the YAML entry stops the feature from being scored
-  2. `ExperimentRunner.run(feature_name, asset_ids, tf, train_start, train_end)` computes the feature from existing base data in memory, scores it with IC across all configured horizons, and writes results to `cmc_feature_experiments` — no rows written to production feature tables
+  2. `ExperimentRunner.run(feature_name, asset_ids, tf, train_start, train_end)` computes the feature from existing base data in memory, scores it with IC across all configured horizons, and writes results to `cmc_feature_experiments` -- no rows written to production feature tables
   3. `promote_feature(feature_name)` passes only when Benjamini-Hochberg corrected p-values are significant at alpha=0.05 for at least one horizon; calling it on a noise feature (IC ~ 0) raises `PromotionRejectedError`
   4. After promotion, the feature appears in `dim_feature_registry` with `lifecycle: promoted` and a migration stub is generated pointing to the Alembic migrations directory
   5. `alembic upgrade head` applies the `dim_feature_registry` and `cmc_feature_experiments` DDL migration cleanly on a fresh schema; `alembic downgrade -1` reverses it without errors
-**Plans**: 0/TBD
+**Plans**: 5 plans in 3 waves
+
+Plans:
+- [ ] 38-01-PLAN.md -- Alembic migration for dim_feature_registry and cmc_feature_experiments tables (FEAT-05)
+- [ ] 38-02-PLAN.md -- YAML feature registry + DAG dependency resolver (FEAT-01)
+- [ ] 38-03-PLAN.md -- ExperimentRunner + run_experiment.py CLI (FEAT-02, FEAT-03)
+- [ ] 38-04-PLAN.md -- FeaturePromoter + BH gate + promote/purge CLIs (FEAT-04)
+- [ ] 38-05-PLAN.md -- Unit tests + end-to-end verification
 
 ---
 
 ### Phase 39: Streamlit Dashboard
-**Goal:** Users can launch a single Streamlit app that shows live pipeline health (Mode B) and interactive research results — IC scores, equity curves, regime timelines, feature comparisons (Mode A) — without hammering the database.
+**Goal:** Users can launch a single Streamlit app that shows live pipeline health (Mode B) and interactive research results -- IC scores, equity curves, regime timelines, feature comparisons (Mode A) -- without hammering the database.
 **Depends on:** Phases 35-38 (needs meaningful data to display; DASH-04 config is standalone)
 **Requirements:** DASH-01, DASH-02, DASH-03, DASH-04
 **Success Criteria** (what must be TRUE):
   1. `streamlit run src/ta_lab2/dashboard/app.py` starts without errors on Windows using `fileWatcherType = "poll"` config; the app loads within 10 seconds on a cold start
-  2. Pipeline Monitor (Mode B) displays run status, data freshness per table, and the most recent stats runner PASS/FAIL result sourced from existing DB tables — all without a manual page refresh
+  2. Pipeline Monitor (Mode B) displays run status, data freshness per table, and the most recent stats runner PASS/FAIL result sourced from existing DB tables -- all without a manual page refresh
   3. Research Explorer (Mode A) renders an IC score table for a user-selected asset and timeframe, with regime timeline overlay, within the `@st.cache_data(ttl=300)` window
   4. All DB queries use a NullPool SQLAlchemy engine; running the dashboard for 30 minutes while repeatedly switching modes does not exhaust the database connection pool
 **Plans**: 0/TBD
@@ -624,23 +631,23 @@ Plans:
 ---
 
 ### Phase 40: Notebooks
-**Goal:** Users can hand off 3-5 polished Jupyter notebooks that demonstrate the full v0.9.0 research cycle — from AMA exploration through IC evaluation, purged CV demo, and feature experimentation — each runnable from scratch with a single "Restart and Run All".
+**Goal:** Users can hand off 3-5 polished Jupyter notebooks that demonstrate the full v0.9.0 research cycle -- from AMA exploration through IC evaluation, purged CV demo, and feature experimentation -- each runnable from scratch with a single "Restart and Run All".
 **Depends on:** Phases 35-39 (built last; requires all prior phases to have meaningful outputs)
 **Requirements:** NOTE-01, NOTE-02, NOTE-03
 **Success Criteria** (what must be TRUE):
   1. Each notebook completes "Restart and Run All" in under 5 minutes on a machine with DB access, producing no errors and no empty output cells
   2. Parameterized variables (`ASSET_ID`, `TF`, `START_DATE`, `END_DATE`) are defined in the first code cell; changing only those cells and re-running produces valid results for a different asset or timeframe
-  3. Notebooks cover at minimum: AMA value inspection, IC evaluation with decay table, purged K-fold split visualization, and feature experimentation workflow — each with a prose narrative cell before each major computation block
+  3. Notebooks cover at minimum: AMA value inspection, IC evaluation with decay table, purged K-fold split visualization, and feature experimentation workflow -- each with a prose narrative cell before each major computation block
 **Plans**: 0/TBD
 
 ---
 
 ### Phase 41: Asset Descriptive Statistics & Cross-Asset Correlation
-**Goal:** Users can query rolling per-asset descriptive statistics (mean return, std dev, Sharpe, skewness, kurtosis, max drawdown) and cross-asset return correlation as persisted time-series tables — tracked over time at every bar, not just latest snapshots — refreshed daily and usable as future regime detection inputs.
+**Goal:** Users can query rolling per-asset descriptive statistics (mean return, std dev, Sharpe, skewness, kurtosis, max drawdown) and cross-asset return correlation as persisted time-series tables -- tracked over time at every bar, not just latest snapshots -- refreshed daily and usable as future regime detection inputs.
 **Depends on:** Phase 34 (v0.8.0 complete; reads from existing `cmc_returns_bars_multi_tf` and `cmc_vol` tables)
 **Requirements:** DESC-01, DESC-02, DESC-03, DESC-04, DESC-05, CORR-01, CORR-02, CORR-03
 **Success Criteria** (what must be TRUE):
-  1. `cmc_asset_stats` contains rolling mean return and std dev for each asset/TF across trailing windows (30, 60, 90, 252 bars), with one row per (id, ts, tf) — a full time series, not just the latest value
+  1. `cmc_asset_stats` contains rolling mean return and std dev for each asset/TF across trailing windows (30, 60, 90, 252 bars), with one row per (id, ts, tf) -- a full time series, not just the latest value
   2. Rolling Sharpe ratio, skewness (scipy), and kurtosis (scipy) are computed per asset/TF/window and stored alongside mean and std dev in `cmc_asset_stats`
   3. Rolling max drawdown per window is tracked in `cmc_asset_stats`; the value at any row reflects the worst peak-to-trough decline within the trailing window ending at that bar
   4. `cmc_cross_asset_corr` contains pairwise rolling return correlation (Pearson) between all asset pairs per TF, across trailing windows (60, 90, 252 bars), tracked as a time series with one row per (id_a, id_b, ts, tf, window)
@@ -650,7 +657,7 @@ Plans:
 </details>
 
 <details>
-<summary>v1.0.0 V1 Closure — Paper Trading & Validation (Phases 42-54) - NEXT</summary>
+<summary>v1.0.0 V1 Closure -- Paper Trading & Validation (Phases 42-54) - NEXT</summary>
 
 - [ ] **Phase 42: Strategy Bake-Off** - IC/PSR/CV evaluation of existing signals, select 2 strategies for V1
 - [ ] **Phase 43: Exchange Integration** - Connect to one exchange API, paper order adapter
@@ -743,7 +750,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | 35. AMA Engine | 8/8 | Complete | 2026-02-23 |
 | 36. PSR + Purged K-Fold | 5/5 | Complete | 2026-02-24 |
 | 37. IC Evaluation | 4/4 | Complete | 2026-02-23 |
-| 38. Feature Experimentation | 0/TBD | Not started | -- |
+| 38. Feature Experimentation | 0/5 | Not started | -- |
 | 39. Streamlit Dashboard | 0/TBD | Not started | -- |
 | 40. Notebooks | 0/TBD | Not started | -- |
 | 41. Asset Descriptive Stats & Correlation | 0/TBD | Not started | -- |
@@ -823,4 +830,4 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-23 (Phase 37 complete -- IC Evaluation; 5/5 must-haves verified)*
+*Last updated: 2026-02-23 (Phase 38 planned -- Feature Experimentation; 5 plans in 3 waves)*
