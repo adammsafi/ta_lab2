@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: 36 (PSR + Purged K-Fold) — Complete
-Plan: 5/5 complete
-Status: Phase 36 verified (22/22 must-haves passed, 64/64 tests passing)
-Last activity: 2026-02-24 — Phase 36 complete (PSR + Purged K-Fold)
+Phase: 37 (IC Evaluation) — In progress
+Plan: 1/8 complete
+Status: Plan 37-01 complete — fillna fix + cmc_ic_results table created
+Last activity: 2026-02-24 — Completed 37-01-PLAN.md (IC evaluation prerequisites)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [██████████] ~67% v0.9.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [███░░░░░░░] ~70% v0.9.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 183 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36)
+- Total plans completed: 184 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 1 in Phase 37)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -95,6 +95,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 |-------|-------|-------|----------|--------|
 | 35-ama-engine | 8/8 | ~56 min | ~7 min | Complete |
 | 36-psr-purged-k-fold | 5/5 | ~24 min | ~5 min | Complete |
+| 37-ic-evaluation | 1/8 | ~5 min | ~5 min | In progress |
 
 *Updated after each plan completion*
 
@@ -267,8 +268,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-24T00:16Z
-Stopped at: Phase 36 Plan 04 complete — PSR wired into backtest pipeline + compute_psr.py CLI
+Last session: 2026-02-24T02:05Z
+Stopped at: Phase 37 Plan 01 complete — fillna fix + cmc_ic_results table created
 Resume file: None
 
 ---
@@ -301,4 +302,4 @@ Key constraints to remember:
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-24 (Phase 36 complete — PSR + Purged K-Fold; 22/22 must-haves verified)*
+*Last updated: 2026-02-24 (Phase 37 Plan 01 complete — fillna fix + cmc_ic_results Alembic migration)*
