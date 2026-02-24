@@ -247,6 +247,10 @@ Recent decisions affecting current work:
 - **PSR zero-std guard before SR calculation** (Phase 36-02): std==0 returns 0.5/0.0/1.0 based on sr_star sign; must come BEFORE sr_hat = mean/std to avoid division by zero
 - **DSR approximate mode uses fixed seed** (Phase 36-02): rng(42) generates synthetic N(0,1) SR estimates for expected_max_sr — reproducible approximation when full SR list unavailable
 - **Kurtosis test uses relative error + directional comparison** (Phase 36-02): abs tolerance 1e-8 too tight at T=100k due to sample moments — use rel_err for Pearson-vs-approx, directional Pearson>Fisher for the kurtosis trap test
+- **tz-aware pandas comparison fix** (Phase 36-03): Use (series <= ts).to_numpy() not series.values <= ts for tz-aware timestamps — .values strips tz on Windows (MEMORY.md pitfall), causing TypeError in purge comparison
+- **PurgedKFoldSplitter t1_series required** (Phase 36-03): ValueError when None — implement from scratch, no mlfinlab (discontinued, known bug #295)
+- **CPCVSplitter combos pre-computed at init** (Phase 36-03): itertools.combinations stored as self._combos — O(1) get_n_splits() and consistent iteration order for PBO path matrix
+- **Purge in CPCV uses min test_start_ts** (Phase 36-03): Earliest start across all combo groups is the purge boundary — prevents any label from any training obs bleeding into any test group
 
 ### Pending Todos
 
@@ -259,7 +263,7 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-24T00:07Z
-Stopped at: Phase 36 Plan 02 complete — PSR/DSR/MinTRL formula module, 31 tests all passing
+Stopped at: Phase 36 Plan 03 complete — PurgedKFoldSplitter + CPCVSplitter, 33 tests all passing
 Resume file: None
 
 ---
