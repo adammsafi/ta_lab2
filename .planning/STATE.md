@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v0.9.0 Research & Experimentation — Phase 39 COMPLETE, ready for Phase 40 (Notebooks)
+**Current focus:** v0.9.0 Research & Experimentation — Phase 40 (Notebooks) in progress
 
 ## Current Position
 
-Phase: 39 (Streamlit Dashboard) — Complete
-Plan: 4/4 complete
-Status: Phase 39 verified (13/13 must-haves passed)
-Last activity: 2026-02-24 — Phase 39 verified, all 4 plans executed
+Phase: 40 (Notebooks) — In progress
+Plan: 1/3 complete
+Status: Plan 40-01 complete — helpers.py + 01_explore_indicators.ipynb
+Last activity: 2026-02-24 — Completed 40-01-PLAN.md
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [██████████] ~93% v0.9.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [███████████] ~96% v0.9.0
 
 ## Performance Metrics
 
@@ -295,6 +295,9 @@ Recent decisions affecting current work:
 - **Traffic light uses worst-case staleness per family** (Phase 39-03): max(staleness_hours) per family group surfaces any stale table even when others are fresh; avoids false green if one variant is stale
 - **Landing page IC preview: first asset alphabetically** (Phase 39-03): dim_assets ordered by symbol; BTC (id=1) fallback when list empty; preview uses tf='1D' always
 - **TABLE_FAMILIES constant for family grouping** (Phase 39-03): dict[display_name->prefix] used in both Data Freshness expanders and Asset Coverage pivot; unknown source_tables fall back to raw name
+- **NullPool per notebook session** (Phase 40-01): helpers.get_engine() uses NullPool — avoids connection leak across long-running notebook cells; matches Streamlit dashboard pattern
+- **AMAs on-the-fly in notebooks** (Phase 40-01): compute_ama() called directly rather than querying cmc_ama_multi_tf — exploratory notebooks demonstrate the library API; no pre-computed table needed
+- **vrect block grouping** (Phase 40-01): build_regime_vrects() collapses consecutive same-label bars into blocks before fig.add_vrect() — prevents Plotly performance issue with 1000+ individual shapes
 
 ### Pending Todos
 
@@ -306,8 +309,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-24T13:21:46Z
-Stopped at: Completed 39-03-PLAN.md — Landing page (1_landing.py) with pipeline health + IC scores; Pipeline Monitor page (2_pipeline_monitor.py) with traffic light freshness, stats grid, coverage pivot, alert history
+Last session: 2026-02-24T16:25:00Z
+Stopped at: Completed 40-01-PLAN.md — helpers.py (6 functions, NullPool engine) + 01_explore_indicators.ipynb (29 cells, KAMA/DEMA/TEMA/HMA on-the-fly, regime vrect coloring)
 Resume file: None
 
 ---
@@ -328,7 +331,7 @@ Phase overview:
 - Phase 37 (IC Evaluation): COMPLETE — Spearman IC library (1098 lines), regime breakdown, batch wrapper, Plotly plots, DB helpers, run_ic_eval.py CLI, cmc_ic_results Alembic migration; 5/5 must-haves verified, 61 tests
 - Phase 38 (Feature Experimentation): COMPLETE — YAML feature registry, FeatureRegistry+DAG, ExperimentRunner, FeaturePromoter (BH gate + migration stub), 3 CLIs, 39 unit tests
 - Phase 39 (Streamlit Dashboard): COMPLETE — DB layer, cached queries, charts.py, landing page, pipeline monitor (traffic light + stats grid + coverage pivot + alert history), research explorer (IC table, IC decay chart, regime timeline)
-- Phase 40 (Notebooks): 3-5 polished, Restart-and-Run-All clean, shareable
+- Phase 40 (Notebooks): In progress — Plan 01 done (helpers.py + 01_explore_indicators.ipynb); Plans 02 (IC analysis) and 03 (Backtest) remain
 
 Key constraints to remember:
 - PSR-01 (Alembic migration psr->psr_legacy) must run before any PSR formula code
