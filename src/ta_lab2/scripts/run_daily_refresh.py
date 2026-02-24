@@ -582,6 +582,8 @@ def run_regime_refresher(
         cmd.append("--verbose")
     if getattr(args, "no_regime_hysteresis", False):
         cmd.append("--no-hysteresis")
+    if getattr(args, "no_desc_stats_in_regimes", False):
+        cmd.append("--no-desc-stats")
 
     # CRITICAL: Propagate --dry-run to subprocess
     if getattr(args, "dry_run", False):
@@ -1097,6 +1099,14 @@ Examples:
         "--no-regime-hysteresis",
         action="store_true",
         help="Disable hysteresis smoothing in regime refresher (pass --no-hysteresis to subprocess)",
+    )
+    p.add_argument(
+        "--no-desc-stats-in-regimes",
+        action="store_true",
+        help=(
+            "Disable rolling stats augmentation in regime refresher "
+            "(passes --no-desc-stats to the regime subprocess)."
+        ),
     )
 
     # Weekly digest options

@@ -58,6 +58,7 @@ from ta_lab2.scripts.regimes.regime_data_loader import (
     load_and_pivot_emas,
     load_bars_for_tf,
     load_regime_input_data,
+    load_rolling_stats_for_asset,
 )
 from ta_lab2.scripts.regimes.regime_flips import detect_regime_flips, write_flips_to_db
 from ta_lab2.scripts.regimes.regime_stats import compute_regime_stats, write_stats_to_db
@@ -718,6 +719,14 @@ def main(argv: Optional[list[str]] = None) -> int:
         metavar="N",
         help="Minimum consecutive bars before a loosening regime change is accepted (hysteresis).",
     )
+    parser.add_argument(
+        "--no-desc-stats",
+        action="store_true",
+        help=(
+            "Disable rolling stats augmentation from cmc_asset_stats. "
+            "Stats columns will not be merged into the daily DataFrame."
+        ),
+    )
 
     args = parser.parse_args(argv)
 
@@ -832,6 +841,35 @@ def main(argv: Optional[list[str]] = None) -> int:
             data = load_regime_input_data(engine, asset_id, cal_scheme=args.cal_scheme)
             daily_df = data["daily"]
             n_como = 0
+
+            # ---- 4b. Optional rolling stats augmentation ----
+            # Load rolling stats from cmc_asset_stats and merge into daily_df.
+            # Stats columns are infrastructure for future labeling -- currently
+            # merged but not consumed by any labeling function.
+            if not getattr(args, "no_desc_stats", False):
+                rolling_stats = load_rolling_stats_for_asset(engine, asset_id, tf="1D")
+                if rolling_stats is not None and not daily_df.empty:
+                    stats_cols = rolling_stats.columns.tolist()
+                    daily_df = (
+                        daily_df.set_index("ts")
+                        .join(rolling_stats, how="left")
+                        .reset_index()
+                    )
+                    logger.info(
+                        "  [id=%d] Rolling stats augmentation: %d columns merged",
+                        asset_id,
+                        len(stats_cols),
+                    )
+                else:
+                    logger.info(
+                        "  [id=%d] Rolling stats: not available",
+                        asset_id,
+                    )
+            else:
+                logger.debug(
+                    "  [id=%d] Rolling stats: skipped (--no-desc-stats)",
+                    asset_id,
+                )
 
             # ---- 5. Log per-asset summary ----
             unique_keys = regime_df["regime_key"].nunique()
