@@ -33,17 +33,17 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Probabilistic Sharpe Ratio
 
-- [ ] **PSR-01**: Alembic migration renaming existing `psr` column to `psr_legacy` for all pre-migration rows in `cmc_backtest_metrics`
-- [ ] **PSR-02**: Full Lopez de Prado PSR formula replacing `psr_placeholder()` — uses sample size n, skewness, kurtosis via scipy
-- [ ] **PSR-03**: Minimum sample guard (return NaN when n < 30, warn when n < 100) and configurable benchmark SR* parameter
-- [ ] **PSR-04**: DSR (Deflated Sharpe Ratio) for multiple-testing correction — deflates best-of-N Sharpe from parameter sweeps
-- [ ] **PSR-05**: MinTRL (Minimum Track Record Length) — inverse of PSR, reports how many bars needed to trust a given Sharpe estimate
+- [x] **PSR-01**: Alembic migration renaming existing `psr` column to `psr_legacy` for all pre-migration rows in `cmc_backtest_metrics`
+- [x] **PSR-02**: Full Lopez de Prado PSR formula replacing `psr_placeholder()` — uses sample size n, skewness, kurtosis via scipy
+- [x] **PSR-03**: Minimum sample guard (return NaN when n < 30, warn when n < 100) and configurable benchmark SR* parameter
+- [x] **PSR-04**: DSR (Deflated Sharpe Ratio) for multiple-testing correction — deflates best-of-N Sharpe from parameter sweeps
+- [x] **PSR-05**: MinTRL (Minimum Track Record Length) — inverse of PSR, reports how many bars needed to trust a given Sharpe estimate
 
 ### Cross-Validation
 
-- [ ] **CV-01**: `PurgedKFoldSplitter` class with `t1_series` (label end timestamps) as required input, compatible with sklearn `BaseCrossValidator`
-- [ ] **CV-02**: Embargo gap parameterized by label duration in bars, with post-construction fold validation assertions
-- [ ] **CV-03**: CPCV (Combinatorial Purged Cross-Validation) — enables PBO (Probability of Backtest Overfitting) analysis
+- [x] **CV-01**: `PurgedKFoldSplitter` class with `t1_series` (label end timestamps) as required input, compatible with sklearn `BaseCrossValidator`
+- [x] **CV-02**: Embargo gap parameterized by label duration in bars, with post-construction fold validation assertions
+- [x] **CV-03**: CPCV (Combinatorial Purged Cross-Validation) — enables PBO (Probability of Backtest Overfitting) analysis
 
 ### Feature Experimentation Framework
 
@@ -114,14 +114,14 @@ Deferred to future release. Tracked but not in current roadmap.
 | IC-06 | Phase 37 | Pending |
 | IC-07 | Phase 37 | Pending |
 | IC-08 | Phase 37 | Pending |
-| PSR-01 | Phase 36 | Pending |
-| PSR-02 | Phase 36 | Pending |
-| PSR-03 | Phase 36 | Pending |
-| PSR-04 | Phase 36 | Pending |
-| PSR-05 | Phase 36 | Pending |
-| CV-01 | Phase 36 | Pending |
-| CV-02 | Phase 36 | Pending |
-| CV-03 | Phase 36 | Pending |
+| PSR-01 | Phase 36 | Complete |
+| PSR-02 | Phase 36 | Complete |
+| PSR-03 | Phase 36 | Complete |
+| PSR-04 | Phase 36 | Complete |
+| PSR-05 | Phase 36 | Complete |
+| CV-01 | Phase 36 | Complete |
+| CV-02 | Phase 36 | Complete |
+| CV-03 | Phase 36 | Complete |
 | FEAT-01 | Phase 38 | Pending |
 | FEAT-02 | Phase 38 | Pending |
 | FEAT-03 | Phase 38 | Pending |
@@ -142,4 +142,4 @@ Deferred to future release. Tracked but not in current roadmap.
 
 ---
 *Requirements defined: 2026-02-23*
-*Last updated: 2026-02-23 — traceability table updated after roadmap creation (all 35 requirements mapped)*
+*Last updated: 2026-02-24 — PSR-01..05, CV-01..03 marked Complete (Phase 36 verified)*

@@ -550,14 +550,14 @@ Plans:
   3. `compute_dsr(returns_list, sr_star)` deflates the best-of-N Sharpe correctly — the deflated value is always <= the raw best Sharpe
   4. `PurgedKFoldSplitter(n_splits, t1_series, embargo_bars)` raises `ValueError` when `t1_series` is not provided; fold train/test indices contain no overlap after purging and embargoing
   5. `CombPurgedKFoldCV` generates the combinatorial path matrix required for PBO analysis; all generated paths cover the full sample without train-test contamination
-**Plans**: 5 plans in 2 waves
+**Plans**: 5/5 complete
 
 Plans:
-- [ ] 36-01-PLAN.md -- Alembic migrations: psr column rename + psr_results table (PSR-01)
-- [ ] 36-02-PLAN.md -- PSR/DSR/MinTRL formulas via TDD (PSR-02, PSR-03, PSR-04, PSR-05)
-- [ ] 36-03-PLAN.md -- PurgedKFoldSplitter + CPCVSplitter via TDD (CV-01, CV-02, CV-03)
-- [ ] 36-04-PLAN.md -- Wire PSR into backtest pipeline + standalone CLI
-- [ ] 36-05-PLAN.md -- Alembic migration check in run_daily_refresh.py
+- [x] 36-01-PLAN.md -- Alembic migrations: psr column rename + psr_results table (PSR-01)
+- [x] 36-02-PLAN.md -- PSR/DSR/MinTRL formulas via TDD (PSR-02, PSR-03, PSR-04, PSR-05)
+- [x] 36-03-PLAN.md -- PurgedKFoldSplitter + CPCVSplitter via TDD (CV-01, CV-02, CV-03)
+- [x] 36-04-PLAN.md -- Wire PSR into backtest pipeline + standalone CLI
+- [x] 36-05-PLAN.md -- Alembic migration check in run_daily_refresh.py
 
 ---
 

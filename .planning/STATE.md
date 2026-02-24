@@ -5,21 +5,21 @@
 See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v0.9.0 Research & Experimentation — Phase 36 in progress (PSR + Purged K-Fold)
+**Current focus:** v0.9.0 Research & Experimentation — Phase 37 next (IC Evaluation)
 
 ## Current Position
 
-Phase: 36 (PSR + Purged K-Fold) — In Progress
-Plan: 04 and 05 of 6 (both complete)
-Status: In progress — Plans 36-04 and 36-05 executed; 36-06 remains
-Last activity: 2026-02-24 — Completed 36-04-PLAN.md (PSR integration in backtest pipeline)
+Phase: 36 (PSR + Purged K-Fold) — Complete
+Plan: 5/5 complete
+Status: Phase 36 verified (22/22 must-haves passed, 64/64 tests passing)
+Last activity: 2026-02-24 — Phase 36 complete (PSR + Purged K-Fold)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [████████░░] ~57% v0.9.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [██████████] ~67% v0.9.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 180 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 6 in Phase 36)
+- Total plans completed: 183 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -94,7 +94,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 | Phase | Plans | Total | Avg/Plan | Status |
 |-------|-------|-------|----------|--------|
 | 35-ama-engine | 8/8 | ~56 min | ~7 min | Complete |
-| 36-psr-purged-k-fold | 6/6 | ~48 min | ~8 min | In Progress |
+| 36-psr-purged-k-fold | 5/5 | ~24 min | ~5 min | Complete |
 
 *Updated after each plan completion*
 
@@ -285,7 +285,7 @@ Roadmap created 2026-02-23. 6 phases, 35 requirements.
 
 Phase overview:
 - Phase 35 (AMA Engine): COMPLETE — KAMA, DEMA, TEMA, HMA indicator family with params_hash PK; 6 AMA table variants + _u; orchestrator + daily refresh integration
-- Phase 36 (PSR + Purged K-Fold): IN PROGRESS (5/6) — migrations, PSR/DSR/MinTRL formulas, CV splitters, PSR backtest integration, alembic startup check done; plan 06 remaining
+- Phase 36 (PSR + Purged K-Fold): COMPLETE — Alembic migrations (psr_legacy rename + psr_results table), PSR/DSR/MinTRL formulas (Pearson kurtosis), PurgedKFoldSplitter + CPCVSplitter, PSR pipeline integration + CLI, alembic startup check; 22/22 must-haves verified
 - Phase 37 (IC Evaluation): Feature scoring — Spearman IC, rolling IC, IC decay, regime breakdown, significance
 - Phase 38 (Feature Experimentation): Registry + ExperimentRunner + BH-corrected promotion gate
 - Phase 39 (Streamlit Dashboard): Pipeline Monitor + Research Explorer, NullPool, Windows-compatible
@@ -301,4 +301,4 @@ Key constraints to remember:
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-23 (Phase 36 Plan 01 complete — PSR schema migrations; continuing with PSR formula code)*
+*Last updated: 2026-02-24 (Phase 36 complete — PSR + Purged K-Fold; 22/22 must-haves verified)*
