@@ -292,6 +292,9 @@ Recent decisions affecting current work:
 - **plot_rolling_ic horizon not window parameter** (Phase 39-02): plan assumed window= kwarg but plot_rolling_ic uses horizon= (optional int shown in subtitle); build_rolling_ic_chart maps window->horizon; window is consumed by compute_rolling_ic() which produces the series
 - **chart_download_button lazy streamlit import** (Phase 39-02): import streamlit inside function body — charts.py is imported by notebooks/tests outside Streamlit context; lazy import prevents ImportError at module load time
 - **vrect opacity=1 with rgba alpha for bands** (Phase 39-02): Plotly vrect opacity multiplies the rgba channel; set opacity=1 and use low rgba alpha (0.12-0.15) for correct transparency behavior
+- **Traffic light uses worst-case staleness per family** (Phase 39-03): max(staleness_hours) per family group surfaces any stale table even when others are fresh; avoids false green if one variant is stale
+- **Landing page IC preview: first asset alphabetically** (Phase 39-03): dim_assets ordered by symbol; BTC (id=1) fallback when list empty; preview uses tf='1D' always
+- **TABLE_FAMILIES constant for family grouping** (Phase 39-03): dict[display_name->prefix] used in both Data Freshness expanders and Asset Coverage pivot; unknown source_tables fall back to raw name
 
 ### Pending Todos
 
@@ -303,8 +306,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-24T13:22:39Z
-Stopped at: Completed 39-04-PLAN.md — Research Explorer page (3_research_explorer.py) with IC scores, IC decay chart, regime timeline, and price chart with regime bands
+Last session: 2026-02-24T13:21:46Z
+Stopped at: Completed 39-03-PLAN.md — Landing page (1_landing.py) with pipeline health + IC scores; Pipeline Monitor page (2_pipeline_monitor.py) with traffic light freshness, stats grid, coverage pivot, alert history
 Resume file: None
 
 ---
@@ -324,7 +327,7 @@ Phase overview:
 - Phase 36 (PSR + Purged K-Fold): COMPLETE — Alembic migrations (psr_legacy rename + psr_results table), PSR/DSR/MinTRL formulas (Pearson kurtosis), PurgedKFoldSplitter + CPCVSplitter, PSR pipeline integration + CLI, alembic startup check; 22/22 must-haves verified
 - Phase 37 (IC Evaluation): COMPLETE — Spearman IC library (1098 lines), regime breakdown, batch wrapper, Plotly plots, DB helpers, run_ic_eval.py CLI, cmc_ic_results Alembic migration; 5/5 must-haves verified, 61 tests
 - Phase 38 (Feature Experimentation): COMPLETE — YAML feature registry, FeatureRegistry+DAG, ExperimentRunner, FeaturePromoter (BH gate + migration stub), 3 CLIs, 39 unit tests
-- Phase 39 (Streamlit Dashboard): 2/4 plans complete — DB layer, cached queries, charts.py; pages + app entry pending
+- Phase 39 (Streamlit Dashboard): COMPLETE — DB layer, cached queries, charts.py, landing page, pipeline monitor (traffic light + stats grid + coverage pivot + alert history), research explorer (IC table, IC decay chart, regime timeline)
 - Phase 40 (Notebooks): 3-5 polished, Restart-and-Run-All clean, shareable
 
 Key constraints to remember:
