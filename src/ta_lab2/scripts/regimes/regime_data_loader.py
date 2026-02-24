@@ -27,6 +27,7 @@ Exports:
     load_emas_for_tf: Load raw long-format EMAs for a single asset and timeframe
     load_and_pivot_emas: Load EMAs and pivot to wide format in one step
     load_regime_input_data: Load all 3 TF datasets for a single asset
+    load_rolling_stats_for_asset: Load rolling descriptive stats for regime augmentation
 """
 
 from __future__ import annotations
@@ -518,3 +519,74 @@ def load_regime_input_data(
         "weekly": weekly.sort_values("ts").reset_index(drop=True),
         "daily": daily.sort_values("ts").reset_index(drop=True),
     }
+
+
+# ---------------------------------------------------------------------------
+# Rolling Stats Loader (Regime Augmentation)
+# ---------------------------------------------------------------------------
+
+
+def load_rolling_stats_for_asset(
+    engine: Engine,
+    asset_id: int,
+    tf: str = "1D",
+) -> pd.DataFrame | None:
+    """
+    Load rolling descriptive statistics from cmc_asset_stats for a single asset.
+
+    Returns selected rolling stat columns (std_ret_30, std_ret_90, sharpe_ann_90,
+    sharpe_ann_252, max_dd_from_ath) indexed by ts (UTC). Intended for optional
+    regime augmentation: callers merge this DataFrame into their daily bar DataFrame
+    via left join on ts index. Stats columns are infrastructure for future labeling
+    use -- they are not consumed by any labeler function in the current codebase.
+
+    Args:
+        engine:   SQLAlchemy engine connected to PostgreSQL.
+        asset_id: Integer asset ID (matches id in dim_assets).
+        tf:       Timeframe string for cmc_asset_stats (default '1D').
+
+    Returns:
+        DataFrame indexed by ts (tz-aware UTC) with columns:
+        std_ret_30, std_ret_90, sharpe_ann_90, sharpe_ann_252, max_dd_from_ath.
+        Returns None if the table is empty for this asset/tf, or on any error
+        (graceful fallback -- caller should continue without stats).
+
+    Notes:
+        - Returns None (not empty DataFrame) to allow callers to distinguish
+          "stats available but no rows" from "stats not available at all".
+        - DEBUG log on empty result or error; no WARNING raised.
+    """
+    sql = text(
+        """
+        SELECT ts, std_ret_30, std_ret_90, sharpe_ann_90, sharpe_ann_252, max_dd_from_ath
+        FROM public.cmc_asset_stats
+        WHERE id = :id AND tf = :tf
+        ORDER BY ts
+        """
+    )
+
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(sql, conn, params={"id": asset_id, "tf": tf})
+    except Exception as exc:
+        logger.debug(
+            "load_rolling_stats_for_asset: query failed for id=%s tf=%s: %s",
+            asset_id,
+            tf,
+            exc,
+        )
+        return None
+
+    if df.empty:
+        logger.debug(
+            "load_rolling_stats_for_asset: no rows for id=%s tf=%s",
+            asset_id,
+            tf,
+        )
+        return None
+
+    # Parse ts as tz-aware UTC and set as index
+    df["ts"] = pd.to_datetime(df["ts"], utc=True)
+    df = df.set_index("ts").sort_index()
+
+    return df
