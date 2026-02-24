@@ -94,7 +94,7 @@ with col_right:
         if ic_df.empty:
             st.info(
                 "No IC results available. Run:\n"
-                "```\npython -m ta_lab2.scripts.ic.run_ic_eval\n```"
+                "```\npython -m ta_lab2.scripts.analysis.run_ic_eval\n```"
             )
         else:
             # Sort by absolute IC descending, take top 10
