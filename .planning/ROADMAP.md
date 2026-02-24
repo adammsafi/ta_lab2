@@ -663,7 +663,15 @@ Plans:
   3. Rolling max drawdown per window is tracked in `cmc_asset_stats`; the value at any row reflects the worst peak-to-trough decline within the trailing window ending at that bar
   4. `cmc_cross_asset_corr` contains pairwise rolling return correlation (Pearson) between all asset pairs per TF, across trailing windows (60, 90, 252 bars), tracked as a time series with one row per (id_a, id_b, ts, tf, window)
   5. Both tables are created via Alembic migration and wired into `run_daily_refresh.py --all` as a stage (after features); `--desc-stats` flag available for standalone execution
-**Plans**: 0/TBD
+**Plans**: 6 plans in 4 waves
+
+Plans:
+- [ ] 41-01-PLAN.md -- Alembic migration for cmc_asset_stats, cmc_cross_asset_corr, state tables, cmc_corr_latest materialized view
+- [ ] 41-02-PLAN.md -- refresh_cmc_asset_stats.py: per-asset rolling stats with watermark incremental refresh
+- [ ] 41-03-PLAN.md -- refresh_cmc_cross_asset_corr.py: pairwise rolling correlation with materialized view refresh
+- [ ] 41-04-PLAN.md -- run_all_desc_stats_refreshes.py orchestrator + run_daily_refresh.py pipeline wiring
+- [ ] 41-05-PLAN.md -- Dashboard page: asset stats table + correlation heatmap + time-series explorer
+- [ ] 41-06-PLAN.md -- Regime wiring (optional stats augmentation) + quality check registration
 
 </details>
 
@@ -764,7 +772,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | 38. Feature Experimentation | 5/5 | Complete | 2026-02-24 |
 | 39. Streamlit Dashboard | 4/4 | Complete | 2026-02-24 |
 | 40. Notebooks | 0/3 | Planned | -- |
-| 41. Asset Descriptive Stats & Correlation | 0/TBD | Not started | -- |
+| 41. Asset Descriptive Stats & Correlation | 0/6 | Planned | -- |
 
 ### v1.0.0 Progress (Next)
 
@@ -841,4 +849,4 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-24 (Phase 40 planned -- Notebooks; 3 plans in 2 waves)*
+*Last updated: 2026-02-24 (Phase 41 planned -- Asset Descriptive Stats & Correlation; 6 plans in 4 waves)*
