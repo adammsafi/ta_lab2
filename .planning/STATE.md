@@ -5,21 +5,21 @@
 See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v0.9.0 Research & Experimentation — Phase 37 (IC Evaluation) in progress
+**Current focus:** v0.9.0 Research & Experimentation — Phase 38 next (Feature Experimentation Framework)
 
 ## Current Position
 
-Phase: 37 (IC Evaluation) — In progress
-Plan: 4/8 complete
-Status: Plan 37-04 complete — DB helpers (load_feature_series, load_regimes_for_asset, save_ic_results) and run_ic_eval.py CLI
-Last activity: 2026-02-24 — Completed 37-04-PLAN.md (IC DB helpers + CLI end-to-end workflow)
+Phase: 37 (IC Evaluation) — Complete
+Plan: 4/4 complete
+Status: Phase 37 verified (5/5 must-haves passed, 61 tests passing)
+Last activity: 2026-02-23 — Phase 37 complete (IC Evaluation)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [████░░░░░░] ~73% v0.9.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [██████████] ~75% v0.9.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 186 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 3 in Phase 37)
+- Total plans completed: 187 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -95,7 +95,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 |-------|-------|-------|----------|--------|
 | 35-ama-engine | 8/8 | ~56 min | ~7 min | Complete |
 | 36-psr-purged-k-fold | 5/5 | ~24 min | ~5 min | Complete |
-| 37-ic-evaluation | 3/8 | ~16 min | ~5 min | In progress |
+| 37-ic-evaluation | 4/4 | ~23 min | ~6 min | Complete |
 
 *Updated after each plan completion*
 
@@ -281,8 +281,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-24T02:20Z
-Stopped at: Phase 37 Plan 04 complete — IC DB helpers (load_feature_series, load_regimes_for_asset, save_ic_results) + run_ic_eval.py CLI
+Last session: 2026-02-23
+Stopped at: Phase 37 complete — IC Evaluation verified (5/5 must-haves)
 Resume file: None
 
 ---
@@ -300,7 +300,7 @@ Roadmap created 2026-02-23. 6 phases, 35 requirements.
 Phase overview:
 - Phase 35 (AMA Engine): COMPLETE — KAMA, DEMA, TEMA, HMA indicator family with params_hash PK; 6 AMA table variants + _u; orchestrator + daily refresh integration
 - Phase 36 (PSR + Purged K-Fold): COMPLETE — Alembic migrations (psr_legacy rename + psr_results table), PSR/DSR/MinTRL formulas (Pearson kurtosis), PurgedKFoldSplitter + CPCVSplitter, PSR pipeline integration + CLI, alembic startup check; 22/22 must-haves verified
-- Phase 37 (IC Evaluation): Feature scoring — Spearman IC, rolling IC, IC decay, regime breakdown, significance
+- Phase 37 (IC Evaluation): COMPLETE — Spearman IC library (1098 lines), regime breakdown, batch wrapper, Plotly plots, DB helpers, run_ic_eval.py CLI, cmc_ic_results Alembic migration; 5/5 must-haves verified, 61 tests
 - Phase 38 (Feature Experimentation): Registry + ExperimentRunner + BH-corrected promotion gate
 - Phase 39 (Streamlit Dashboard): Pipeline Monitor + Research Explorer, NullPool, Windows-compatible
 - Phase 40 (Notebooks): 3-5 polished, Restart-and-Run-All clean, shareable
@@ -315,4 +315,4 @@ Key constraints to remember:
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-24 (Phase 37 Plan 01 complete — fillna fix + cmc_ic_results Alembic migration)*
+*Last updated: 2026-02-23 (Phase 37 complete — IC Evaluation; 5/5 must-haves verified)*

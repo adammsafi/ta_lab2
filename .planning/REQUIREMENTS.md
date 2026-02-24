@@ -2,7 +2,7 @@
 
 **Defined:** 2026-02-23
 **Core Value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Milestone Goal:** Enable a full research cycle — compute new indicators, evaluate with IC, stress test with CV, and visualize results in an interactive dashboard
+**Milestone Goal:** Enable a full research cycle — compute new indicators, evaluate with IC, stress test with CV, visualize results in an interactive dashboard, and build a rolling descriptive statistics + cross-asset correlation layer
 
 ---
 
@@ -22,14 +22,14 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Information Coefficient Evaluation
 
-- [ ] **IC-01**: Spearman (rank) IC computed per feature, per forward-return horizon [1, 2, 3, 5, 10, 20, 60 bars]
-- [ ] **IC-02**: Rolling IC time series (63-bar window) with IC-IR (mean IC / std IC) summary statistic
-- [ ] **IC-03**: IC decay table showing predictive power decay across horizons — critical for setting holding period
-- [ ] **IC-04**: `train_start` and `train_end` as required parameters on all IC functions — prevents future-information leakage into feature selection
-- [ ] **IC-05**: IC by regime — splits IC computation by regime label (trend_state, vol_state) from cmc_regimes
-- [ ] **IC-06**: IC significance testing — t-stat and p-value on rolling IC to flag statistically non-zero signals
-- [ ] **IC-07**: Feature turnover — rank autocorrelation measuring signal stability across time
-- [ ] **IC-08**: `cmc_ic_results` DB table for persisting IC evaluation results (on-demand, not daily refresh)
+- [x] **IC-01**: Spearman (rank) IC computed per feature, per forward-return horizon [1, 2, 3, 5, 10, 20, 60 bars]
+- [x] **IC-02**: Rolling IC time series (63-bar window) with IC-IR (mean IC / std IC) summary statistic
+- [x] **IC-03**: IC decay table showing predictive power decay across horizons — critical for setting holding period
+- [x] **IC-04**: `train_start` and `train_end` as required parameters on all IC functions — prevents future-information leakage into feature selection
+- [x] **IC-05**: IC by regime — splits IC computation by regime label (trend_state, vol_state) from cmc_regimes
+- [x] **IC-06**: IC significance testing — t-stat and p-value on rolling IC to flag statistically non-zero signals
+- [x] **IC-07**: Feature turnover — rank autocorrelation measuring signal stability across time
+- [x] **IC-08**: `cmc_ic_results` DB table for persisting IC evaluation results (on-demand, not daily refresh)
 
 ### Probabilistic Sharpe Ratio
 
@@ -65,6 +65,20 @@ Requirements for this milestone. Each maps to roadmap phases.
 - [ ] **NOTE-01**: 3-5 focused notebooks covering IC evaluation, AMA exploration, purged K-fold demo, feature experimentation, regime overlay backtest
 - [ ] **NOTE-02**: Each notebook passes "Restart and Run All" cleanly, parameterized with ASSET_ID / TF / START_DATE at top
 - [ ] **NOTE-03**: Polished enough to share — clear narrative, good visuals, no raw cell output dumps
+
+### Asset Descriptive Statistics
+
+- [ ] **DESC-01**: Rolling mean return and std dev per asset/TF across trailing windows (30, 60, 90, 252 bars), stored as full time series in `cmc_asset_stats` with PK `(id, ts, tf)`
+- [ ] **DESC-02**: Rolling Sharpe ratio, skewness (scipy), and kurtosis (scipy) per asset/TF/window stored alongside mean and std dev
+- [ ] **DESC-03**: Rolling max drawdown per window — worst peak-to-trough decline within the trailing window ending at each bar
+- [ ] **DESC-04**: All stats tracked as time series (one row per bar per asset/TF), not just latest snapshot — enables regime-conditioned analysis and historical comparison
+- [ ] **DESC-05**: `cmc_asset_stats` table created via Alembic migration, wired into `run_daily_refresh.py --all` with `--desc-stats` standalone flag
+
+### Cross-Asset Correlation
+
+- [ ] **CORR-01**: Pairwise rolling Pearson return correlation between all asset pairs per TF, across trailing windows (60, 90, 252 bars)
+- [ ] **CORR-02**: Correlation tracked over time as rolling time series with PK `(id_a, id_b, ts, tf, window)` — enables detecting correlation regime shifts (e.g., risk-off spikes)
+- [ ] **CORR-03**: `cmc_cross_asset_corr` table created via Alembic migration, wired into `run_daily_refresh.py --all` with `--desc-stats` flag
 
 ## v1.0+ Requirements
 
@@ -106,14 +120,14 @@ Deferred to future release. Tracked but not in current roadmap.
 | AMA-05 | Phase 35 | Complete |
 | AMA-06 | Phase 35 | Complete |
 | AMA-07 | Phase 35 | Complete |
-| IC-01 | Phase 37 | Pending |
-| IC-02 | Phase 37 | Pending |
-| IC-03 | Phase 37 | Pending |
-| IC-04 | Phase 37 | Pending |
-| IC-05 | Phase 37 | Pending |
-| IC-06 | Phase 37 | Pending |
-| IC-07 | Phase 37 | Pending |
-| IC-08 | Phase 37 | Pending |
+| IC-01 | Phase 37 | Complete |
+| IC-02 | Phase 37 | Complete |
+| IC-03 | Phase 37 | Complete |
+| IC-04 | Phase 37 | Complete |
+| IC-05 | Phase 37 | Complete |
+| IC-06 | Phase 37 | Complete |
+| IC-07 | Phase 37 | Complete |
+| IC-08 | Phase 37 | Complete |
 | PSR-01 | Phase 36 | Complete |
 | PSR-02 | Phase 36 | Complete |
 | PSR-03 | Phase 36 | Complete |
@@ -134,12 +148,20 @@ Deferred to future release. Tracked but not in current roadmap.
 | NOTE-01 | Phase 40 | Pending |
 | NOTE-02 | Phase 40 | Pending |
 | NOTE-03 | Phase 40 | Pending |
+| DESC-01 | Phase 41 | Pending |
+| DESC-02 | Phase 41 | Pending |
+| DESC-03 | Phase 41 | Pending |
+| DESC-04 | Phase 41 | Pending |
+| DESC-05 | Phase 41 | Pending |
+| CORR-01 | Phase 41 | Pending |
+| CORR-02 | Phase 41 | Pending |
+| CORR-03 | Phase 41 | Pending |
 
 **Coverage:**
-- v0.9.0 requirements: 35 total
-- Mapped to phases: 35/35
+- v0.9.0 requirements: 43 total
+- Mapped to phases: 43/43
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-23*
-*Last updated: 2026-02-24 — PSR-01..05, CV-01..03 marked Complete (Phase 36 verified)*
+*Last updated: 2026-02-23 — IC-01..08 marked Complete (Phase 37 verified)*

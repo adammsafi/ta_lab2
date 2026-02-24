@@ -7,11 +7,12 @@
 - v0.6.0 EMA & Bar Architecture Standardization (Phases 20-26) - SHIPPED 2026-02-17
 - v0.7.0 Regime Integration & Signal Enhancement (Phases 27-28) - SHIPPED 2026-02-20
 - v0.8.0 Polish & Hardening (Phases 29-34) - SHIPPED 2026-02-23
-- v0.9.0 Research & Experimentation (Phases 35-40) - current milestone
+- v0.9.0 Research & Experimentation (Phases 35-41) - current milestone
+- v1.0.0 V1 Closure — Paper Trading & Validation (Phases 42-54) - next milestone
 
 ## Overview
 
-Build trustworthy quant trading infrastructure 3x faster by creating AI coordination that remembers context across platforms. v0.4.0 established quota management, memory infrastructure (3,763 memories in Qdrant via Mem0), multi-platform orchestration with cost optimization, and ta_lab2 development (time model, features, signals). v0.5.0 consolidated four external project directories into unified ta_lab2 structure. v0.6.0 locks down the bars and EMAs foundation so adding new assets (crypto + equities) is mechanical and reliable. v0.9.0 completes the research cycle: new adaptive indicators, IC-based feature evaluation, statistically sound CV, a feature experimentation framework, and interactive visualization.
+Build trustworthy quant trading infrastructure 3x faster by creating AI coordination that remembers context across platforms. v0.4.0 established quota management, memory infrastructure (3,763 memories in Qdrant via Mem0), multi-platform orchestration with cost optimization, and ta_lab2 development (time model, features, signals). v0.5.0 consolidated four external project directories into unified ta_lab2 structure. v0.6.0 locks down the bars and EMAs foundation so adding new assets (crypto + equities) is mechanical and reliable. v0.9.0 completes the research cycle: new adaptive indicators, IC-based feature evaluation, statistically sound CV, a feature experimentation framework, interactive visualization, and rolling asset descriptive statistics with cross-asset correlation. v1.0.0 closes the V1 loop from the foundational Project Plan: strategy bake-off, paper-trade executor, risk controls, drift guard, all 6 research tracks answered, 2+ weeks live paper validation, and V1 Results Memo.
 
 ## Phases
 
@@ -21,7 +22,8 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 - Phases 20-26: v0.6.0 (complete)
 - Phases 27-28: v0.7.0 (complete)
 - Phases 29-34: v0.8.0 (complete)
-- Phases 35-40: v0.9.0 (current)
+- Phases 35-41: v0.9.0 (current)
+- Phases 42-54: v1.0.0 (next — V1 Closure)
 - Decimal phases (27.1, 28.1): Urgent insertions if needed
 
 <details>
@@ -514,7 +516,20 @@ Plans:
 </details>
 
 <details>
-<summary>v0.9.0 Phase Details (Phases 35-40) - CURRENT</summary>
+<summary>v0.9.0 Research & Experimentation (Phases 35-41) - CURRENT</summary>
+
+- [x] **Phase 35: AMA Engine** - Adaptive Moving Averages (KAMA, DEMA, TEMA, HMA) with full calendar parity
+- [x] **Phase 36: PSR + Purged K-Fold** - Probabilistic Sharpe Ratio, DSR, MinTRL + leakage-free CV splitters
+- [ ] **Phase 37: IC Evaluation** - Information Coefficient scoring engine with regime breakdown and significance testing
+- [ ] **Phase 38: Feature Experimentation** - YAML registry, ExperimentRunner, BH-corrected promotion gate
+- [ ] **Phase 39: Streamlit Dashboard** - Pipeline monitor + research explorer with cached DB queries
+- [ ] **Phase 40: Notebooks** - 3-5 polished Jupyter notebooks demonstrating the full research cycle
+- [ ] **Phase 41: Asset Descriptive Stats & Correlation** - Rolling per-asset summary stats + cross-asset return correlation time series
+
+</details>
+
+<details>
+<summary>v0.9.0 Phase Details (Phases 35-41)</summary>
 
 ### Phase 35: AMA Engine
 **Goal:** Users can compute and refresh Adaptive Moving Averages (KAMA, DEMA, TEMA, HMA) across all timeframes, with derivatives, z-scores, and unified table sync wired into the daily refresh pipeline.
@@ -574,10 +589,10 @@ Plans:
 **Plans**: 4 plans in 2 waves
 
 Plans:
-- [ ] 37-01-PLAN.md -- Fix fillna deprecation + Alembic migration for cmc_ic_results table
-- [ ] 37-02-PLAN.md -- IC core library via TDD: compute_ic, rolling IC, IC-IR, significance, turnover
-- [ ] 37-03-PLAN.md -- Regime IC breakdown + batch wrapper + Plotly visualization helpers
-- [ ] 37-04-PLAN.md -- CLI script (run_ic_eval.py) + DB helpers (save/load)
+- [x] 37-01-PLAN.md -- Fix fillna deprecation + Alembic migration for cmc_ic_results table
+- [x] 37-02-PLAN.md -- IC core library via TDD: compute_ic, rolling IC, IC-IR, significance, turnover
+- [x] 37-03-PLAN.md -- Regime IC breakdown + batch wrapper + Plotly visualization helpers
+- [x] 37-04-PLAN.md -- CLI script (run_ic_eval.py) + DB helpers (save/load)
 
 ---
 
@@ -618,14 +633,49 @@ Plans:
   3. Notebooks cover at minimum: AMA value inspection, IC evaluation with decay table, purged K-fold split visualization, and feature experimentation workflow — each with a prose narrative cell before each major computation block
 **Plans**: 0/TBD
 
+---
+
+### Phase 41: Asset Descriptive Statistics & Cross-Asset Correlation
+**Goal:** Users can query rolling per-asset descriptive statistics (mean return, std dev, Sharpe, skewness, kurtosis, max drawdown) and cross-asset return correlation as persisted time-series tables — tracked over time at every bar, not just latest snapshots — refreshed daily and usable as future regime detection inputs.
+**Depends on:** Phase 34 (v0.8.0 complete; reads from existing `cmc_returns_bars_multi_tf` and `cmc_vol` tables)
+**Requirements:** DESC-01, DESC-02, DESC-03, DESC-04, DESC-05, CORR-01, CORR-02, CORR-03
+**Success Criteria** (what must be TRUE):
+  1. `cmc_asset_stats` contains rolling mean return and std dev for each asset/TF across trailing windows (30, 60, 90, 252 bars), with one row per (id, ts, tf) — a full time series, not just the latest value
+  2. Rolling Sharpe ratio, skewness (scipy), and kurtosis (scipy) are computed per asset/TF/window and stored alongside mean and std dev in `cmc_asset_stats`
+  3. Rolling max drawdown per window is tracked in `cmc_asset_stats`; the value at any row reflects the worst peak-to-trough decline within the trailing window ending at that bar
+  4. `cmc_cross_asset_corr` contains pairwise rolling return correlation (Pearson) between all asset pairs per TF, across trailing windows (60, 90, 252 bars), tracked as a time series with one row per (id_a, id_b, ts, tf, window)
+  5. Both tables are created via Alembic migration and wired into `run_daily_refresh.py --all` as a stage (after features); `--desc-stats` flag available for standalone execution
+**Plans**: 0/TBD
+
 </details>
+
+<details>
+<summary>v1.0.0 V1 Closure — Paper Trading & Validation (Phases 42-54) - NEXT</summary>
+
+- [ ] **Phase 42: Strategy Bake-Off** - IC/PSR/CV evaluation of existing signals, select 2 strategies for V1
+- [ ] **Phase 43: Exchange Integration** - Connect to one exchange API, paper order adapter
+- [ ] **Phase 44: Order & Fill Store** - DB tables for orders, fills, positions with full audit trail
+- [ ] **Phase 45: Paper-Trade Executor** - Engine reads signals, generates orders, tracks positions, verifies backtest parity
+- [ ] **Phase 46: Risk Controls** - Kill switch, position caps, daily loss stops, circuit breaker, discretionary overrides
+- [ ] **Phase 47: Drift Guard** - Parallel backtest vs paper comparison, auto-pause on divergence
+- [ ] **Phase 48: Loss Limits Policy** - VaR simulation, intraday stop analysis, pool-level cap definition
+- [ ] **Phase 49: Tail-Risk Policy** - Hard stops vs vol-sizing, flatten triggers, policy document
+- [ ] **Phase 50: Data Economics** - Cost audit, build-vs-buy analysis, trigger definition
+- [ ] **Phase 51: Perps Readiness** - Funding rate ingestion, margin model, liquidation buffer, venue downtime playbook
+- [ ] **Phase 52: Operational Dashboard** - Live PnL, exposure, drawdown, drift, risk status views
+- [ ] **Phase 53: V1 Validation** - 2+ weeks paper trading, success criteria measurement
+- [ ] **Phase 54: V1 Results Memo** - Formal report: methodology, results, failure modes, research answers, next steps
+
+</details>
+
+See `.planning/milestones/v1.0.0-REQUIREMENTS.md` and `.planning/milestones/v1.0.0-ROADMAP.md` for full details.
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19 (v0.5.0) -> 20 -> ... -> 26 (v0.6.0) -> 27 -> 28 (v0.7.0) -> 29 -> ... -> 34 (v0.8.0) -> 35 -> ... -> 40 (v0.9.0)
+Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19 (v0.5.0) -> 20 -> ... -> 26 (v0.6.0) -> 27 -> 28 (v0.7.0) -> 29 -> ... -> 34 (v0.8.0) -> 35 -> ... -> 41 (v0.9.0) -> 42 -> ... -> 54 (v1.0.0)
 
-Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute in parallel. Phase 37 is enhanced by Phase 35 but not blocked. Phase 38 requires Phase 37. Phase 39 requires Phases 35-38. Phase 40 requires all prior v0.9.0 phases.
+Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute in parallel. Phase 37 is enhanced by Phase 35 but not blocked. Phase 38 requires Phase 37. Phase 39 requires Phases 35-38. Phase 40 requires all prior v0.9.0 phases. Phase 41 has no hard dependency on Phases 35-40 (reads from existing returns tables) but is sequenced last.
 
 ### v0.4.0 Progress (Complete)
 
@@ -692,10 +742,29 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 |-------|----------------|--------|-----------|
 | 35. AMA Engine | 8/8 | Complete | 2026-02-23 |
 | 36. PSR + Purged K-Fold | 5/5 | Complete | 2026-02-24 |
-| 37. IC Evaluation | 0/4 | Planned | -- |
+| 37. IC Evaluation | 4/4 | Complete | 2026-02-23 |
 | 38. Feature Experimentation | 0/TBD | Not started | -- |
 | 39. Streamlit Dashboard | 0/TBD | Not started | -- |
 | 40. Notebooks | 0/TBD | Not started | -- |
+| 41. Asset Descriptive Stats & Correlation | 0/TBD | Not started | -- |
+
+### v1.0.0 Progress (Next)
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 42. Strategy Bake-Off | 0/TBD | Not started | -- |
+| 43. Exchange Integration | 0/TBD | Not started | -- |
+| 44. Order & Fill Store | 0/TBD | Not started | -- |
+| 45. Paper-Trade Executor | 0/TBD | Not started | -- |
+| 46. Risk Controls | 0/TBD | Not started | -- |
+| 47. Drift Guard | 0/TBD | Not started | -- |
+| 48. Loss Limits Policy | 0/TBD | Not started | -- |
+| 49. Tail-Risk Policy | 0/TBD | Not started | -- |
+| 50. Data Economics | 0/TBD | Not started | -- |
+| 51. Perps Readiness | 0/TBD | Not started | -- |
+| 52. Operational Dashboard | 0/TBD | Not started | -- |
+| 53. V1 Validation | 0/TBD | Not started | -- |
+| 54. V1 Results Memo | 0/TBD | Not started | -- |
 
 ## Requirement Coverage
 
@@ -716,7 +785,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 
 **Coverage:** 37/40 requirements mapped (remaining 3 DATA/DVAL replaced by GAP-C01-04)
 
-### v0.9.0 Requirements (35 total)
+### v0.9.0 Requirements (43 total)
 
 | Category | Requirements | Phase | Count |
 |----------|--------------|-------|-------|
@@ -727,9 +796,31 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | Feature Experimentation | FEAT-01, FEAT-02, FEAT-03, FEAT-04, FEAT-05 | Phase 38 | 5 |
 | Streamlit Dashboard | DASH-01, DASH-02, DASH-03, DASH-04 | Phase 39 | 4 |
 | Jupyter Notebooks | NOTE-01, NOTE-02, NOTE-03 | Phase 40 | 3 |
+| Asset Descriptive Statistics | DESC-01, DESC-02, DESC-03, DESC-04, DESC-05 | Phase 41 | 5 |
+| Cross-Asset Correlation | CORR-01, CORR-02, CORR-03 | Phase 41 | 3 |
 
-**Coverage:** 35/35 requirements mapped
+**Coverage:** 43/43 requirements mapped
+
+### v1.0.0 Requirements (55 total)
+
+| Category | Requirements | Phase | Count |
+|----------|--------------|-------|-------|
+| Strategy Selection | STRAT-01, STRAT-02, STRAT-03, STRAT-04 | Phase 42 | 4 |
+| Exchange Integration | EXCH-01, EXCH-02, EXCH-03 | Phase 43 | 3 |
+| Order & Fill Store | ORD-01, ORD-02, ORD-03, ORD-04 | Phase 44 | 4 |
+| Paper-Trade Executor | EXEC-01, EXEC-02, EXEC-03, EXEC-04, EXEC-05 | Phase 45 | 5 |
+| Risk Controls | RISK-01, RISK-02, RISK-03, RISK-04, RISK-05 | Phase 46 | 5 |
+| Drift Guard | DRIFT-01, DRIFT-02, DRIFT-03, DRIFT-04 | Phase 47 | 4 |
+| Loss Limits Policy | LOSS-01, LOSS-02, LOSS-03, LOSS-04 | Phase 48 | 4 |
+| Tail-Risk Policy | TAIL-01, TAIL-02, TAIL-03 | Phase 49 | 3 |
+| Data Economics | DATA-01, DATA-02, DATA-03 | Phase 50 | 3 |
+| Perps Readiness | PERP-01, PERP-02, PERP-03, PERP-04, PERP-05 | Phase 51 | 5 |
+| Operational Dashboard | DASH-L01, DASH-L02, DASH-L03, DASH-L04, DASH-L05 | Phase 52 | 5 |
+| V1 Validation | VAL-01, VAL-02, VAL-03, VAL-04, VAL-05 | Phase 53 | 5 |
+| V1 Results Memo | MEMO-01, MEMO-02, MEMO-03, MEMO-04, MEMO-05 | Phase 54 | 5 |
+
+**Coverage:** 55/55 requirements mapped
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-24 (Phase 37 planned -- 4 plans in 2 waves)*
+*Last updated: 2026-02-23 (Phase 37 complete -- IC Evaluation; 5/5 must-haves verified)*
