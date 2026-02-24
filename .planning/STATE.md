@@ -5,21 +5,21 @@
 See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v0.9.0 Research & Experimentation — Phase 40 COMPLETE, ready for Phase 41
+**Current focus:** v0.9.0 Research & Experimentation — Phase 41 In Progress (Plan 1/N)
 
 ## Current Position
 
-Phase: 40 (Notebooks) — Complete
-Plan: 3/3 complete
-Status: Phase 40 verified (13/13 must-haves passed)
-Last activity: 2026-02-24 — Phase 40 verified, all 3 plans executed
+Phase: 41 (Asset Descriptive Stats and Correlation) — In Progress
+Plan: 1/N complete
+Status: In progress
+Last activity: 2026-02-24 — Completed 41-01-PLAN.md (Alembic migration: 5 DB objects created)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [███████████] ~96% v0.9.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [████████████] ~97% v0.9.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 200 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40)
+- Total plans completed: 201 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 1 in Phase 41)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -298,6 +298,9 @@ Recent decisions affecting current work:
 - **NullPool per notebook session** (Phase 40-01): helpers.get_engine() uses NullPool — avoids connection leak across long-running notebook cells; matches Streamlit dashboard pattern
 - **AMAs on-the-fly in notebooks** (Phase 40-01): compute_ama() called directly rather than querying cmc_ama_multi_tf — exploratory notebooks demonstrate the library API; no pre-computed table needed
 - **vrect block grouping** (Phase 40-01): build_regime_vrects() collapses consecutive same-label bars into blocks before fig.add_vrect() — prevents Plotly performance issue with 1000+ individual shapes
+- **window reserved word in raw SQL** (Phase 41-01): PostgreSQL reserved word `window` must be double-quoted in raw op.execute() SQL strings; SQLAlchemy op.create_table/op.create_index handle quoting automatically; always test upgrade immediately after writing migrations with raw SQL
+- **Materialized view via op.execute()** (Phase 41-01): Alembic has no native materialized view op; use op.execute() with raw SQL for CREATE MATERIALIZED VIEW and CREATE UNIQUE INDEX; unique index required for REFRESH MATERIALIZED VIEW CONCURRENTLY
+- **Programmatic DDL column generation** (Phase 41-01): For repetitive column patterns (32 stat cols = 8 stats x 4 windows), generate via helper function with tuple constants to avoid copy-paste errors in migration files
 
 ### Pending Todos
 
@@ -309,8 +312,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-24T16:08:29Z
-Stopped at: Completed 40-02-PLAN.md — 02_evaluate_features.ipynb (44 cells, IC evaluation + purged K-fold + regime A/B backtest)
+Last session: 2026-02-24T11:35:54Z
+Stopped at: Completed 41-01-PLAN.md — Alembic migration 8d5bc7ee1732 (5 Phase 41 DB objects)
 Resume file: None
 
 ---
@@ -332,6 +335,7 @@ Phase overview:
 - Phase 38 (Feature Experimentation): COMPLETE — YAML feature registry, FeatureRegistry+DAG, ExperimentRunner, FeaturePromoter (BH gate + migration stub), 3 CLIs, 39 unit tests
 - Phase 39 (Streamlit Dashboard): COMPLETE — DB layer, cached queries, charts.py, landing page, pipeline monitor (traffic light + stats grid + coverage pivot + alert history), research explorer (IC table, IC decay chart, regime timeline)
 - Phase 40 (Notebooks): COMPLETE — helpers.py (6 functions), 01_explore_indicators.ipynb (29 cells, AMA + regimes), 02_evaluate_features.ipynb (44 cells, IC + purged K-fold + regime A/B), 03_run_experiments.ipynb (33 cells, feature registry + DAG + experiments + dashboard); 13/13 must-haves verified
+- Phase 41 (Asset Descriptive Stats and Correlation): IN PROGRESS — Plan 01 complete: Alembic migration 8d5bc7ee1732 creates cmc_asset_stats (32 stat cols), cmc_cross_asset_corr (CHECK id_a < id_b), 2 watermark state tables, cmc_corr_latest materialized view
 
 Key constraints to remember:
 - PSR-01 (Alembic migration psr->psr_legacy) must run before any PSR formula code
@@ -343,4 +347,4 @@ Key constraints to remember:
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-24 (Phase 40 complete — 3 notebooks, 13/13 must-haves verified)*
+*Last updated: 2026-02-24 (Phase 41 Plan 01 complete — Alembic migration 8d5bc7ee1732, 5 DB objects)*
