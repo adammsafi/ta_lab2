@@ -10,16 +10,16 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: 36 (PSR + Purged K-Fold) — In Progress
-Plan: 03 of 6
-Status: In progress — Plan 36-03 executed (PurgedKFoldSplitter + CPCVSplitter via TDD, 33 tests)
-Last activity: 2026-02-24 — Completed 36-03-PLAN.md (leakage-free CV splitters)
+Plan: 04 and 05 of 6 (both complete)
+Status: In progress — Plans 36-04 and 36-05 executed; 36-06 remains
+Last activity: 2026-02-24 — Completed 36-04-PLAN.md (PSR integration in backtest pipeline)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [████████░░] ~57% v0.9.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 176 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 2 in Phase 36)
+- Total plans completed: 180 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 6 in Phase 36)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -94,7 +94,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 | Phase | Plans | Total | Avg/Plan | Status |
 |-------|-------|-------|----------|--------|
 | 35-ama-engine | 8/8 | ~56 min | ~7 min | Complete |
-| 36-psr-purged-k-fold | 2/6 | ~8 min | ~4 min | In Progress |
+| 36-psr-purged-k-fold | 6/6 | ~48 min | ~8 min | In Progress |
 
 *Updated after each plan completion*
 
@@ -251,6 +251,11 @@ Recent decisions affecting current work:
 - **PurgedKFoldSplitter t1_series required** (Phase 36-03): ValueError when None — implement from scratch, no mlfinlab (discontinued, known bug #295)
 - **CPCVSplitter combos pre-computed at init** (Phase 36-03): itertools.combinations stored as self._combos — O(1) get_n_splits() and consistent iteration order for PBO path matrix
 - **Purge in CPCV uses min test_start_ts** (Phase 36-03): Earliest start across all combo groups is the purge boundary — prevents any label from any training obs bleeding into any test group
+- **Warn-only migration check (never auto-upgrade)** (Phase 36-05): run_daily_refresh.py checks alembic current vs head at startup; warns with `alembic upgrade head` instructions; try/except wrapper prevents check failure from crashing pipeline
+- **NullPool for migration check** (Phase 36-05): Matches project pattern for one-shot DB connections; check skipped in --dry-run mode
+- **_psr_* prefix pattern for detail stats** (Phase 36-04): PSR distributional stats (skewness, kurtosis, n_obs, min_trl) stored in metrics dict with _psr_ prefix; stripped before cmc_backtest_metrics INSERT; passed to psr_results INSERT in same transaction
+- **return_source distinguishes PSR compute paths** (Phase 36-04): 'portfolio' = pf.returns() during backtest (exact, fees-aware); 'trade_reconstruction' = pnl_pct/n_bars approximation from CLI; column makes distinction queryable
+- **DSR CLI deferred to Phase 37+** (Phase 36-04): compute_dsr() library function satisfies formula requirement; CLI extension needs multiple runs' returns simultaneously — not a single-run operation
 
 ### Pending Todos
 
@@ -262,8 +267,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-24T00:07Z
-Stopped at: Phase 36 Plan 03 complete — PurgedKFoldSplitter + CPCVSplitter, 33 tests all passing
+Last session: 2026-02-24T00:16Z
+Stopped at: Phase 36 Plan 04 complete — PSR wired into backtest pipeline + compute_psr.py CLI
 Resume file: None
 
 ---
