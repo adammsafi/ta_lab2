@@ -303,8 +303,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-24T13:56:56Z
-Stopped at: Completed 39-02-PLAN.md — charts.py with 5 Plotly figure builders (IC wrappers + regime charts)
+Last session: 2026-02-24T13:15:51Z
+Stopped at: Completed 39-01-PLAN.md — dashboard skeleton (db.py, queries/pipeline.py, queries/research.py, app.py with st.navigation)
 Resume file: None
 
 ---
