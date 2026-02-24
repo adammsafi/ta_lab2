@@ -337,6 +337,250 @@ def send_stats_alerts(
         logger.warning(f"Failed to send stats Telegram alert: {e}")
 
 
+def check_desc_stats_quality(engine) -> list[dict]:
+    """
+    Run inline quality checks on the descriptive stats tables.
+
+    Checks cmc_asset_stats and cmc_cross_asset_corr for basic data integrity:
+    row count, NULL fractions on key columns, implausible values, and
+    constraint violations. Returns a list of check result dicts with keys:
+    table, check, status (PASS/WARN/FAIL), detail.
+
+    Does NOT write results to any DB table -- results are returned to the
+    caller and incorporated into the overall PASS/WARN/FAIL status. Not
+    added to STATS_TABLES or ALL_STATS_SCRIPTS lists because these checks
+    run inline (no subprocess runner script exists for desc stats tables).
+
+    Args:
+        engine: SQLAlchemy engine connected to the database.
+
+    Returns:
+        List of dicts: [{table, check, status, detail}, ...]
+        Returns empty list if both tables are missing or inaccessible.
+    """
+    results: list[dict] = []
+
+    with engine.connect() as conn:
+        # ------------------------------------------------------------------
+        # cmc_asset_stats checks
+        # ------------------------------------------------------------------
+        try:
+            # Check 1: row count > 0
+            row = conn.execute(
+                text("SELECT COUNT(*) FROM public.cmc_asset_stats")
+            ).fetchone()
+            total_rows = int(row[0]) if row else 0
+            if total_rows == 0:
+                results.append(
+                    {
+                        "table": "cmc_asset_stats",
+                        "check": "row_count",
+                        "status": "WARN",
+                        "detail": "Table is empty (0 rows)",
+                    }
+                )
+            else:
+                results.append(
+                    {
+                        "table": "cmc_asset_stats",
+                        "check": "row_count",
+                        "status": "PASS",
+                        "detail": f"{total_rows} rows",
+                    }
+                )
+
+                # Check 2: NULL fraction for std_ret_90 < 50%
+                row = conn.execute(
+                    text(
+                        "SELECT COUNT(*) FILTER (WHERE std_ret_90 IS NULL) * 100.0 / COUNT(*) "
+                        "FROM public.cmc_asset_stats"
+                    )
+                ).fetchone()
+                null_pct = float(row[0]) if row and row[0] is not None else 0.0
+                if null_pct >= 50.0:
+                    results.append(
+                        {
+                            "table": "cmc_asset_stats",
+                            "check": "std_ret_90_null_fraction",
+                            "status": "WARN",
+                            "detail": f"std_ret_90 is NULL in {null_pct:.1f}% of rows (threshold: <50%)",
+                        }
+                    )
+                else:
+                    results.append(
+                        {
+                            "table": "cmc_asset_stats",
+                            "check": "std_ret_90_null_fraction",
+                            "status": "PASS",
+                            "detail": f"std_ret_90 NULL fraction: {null_pct:.1f}%",
+                        }
+                    )
+
+                # Check 3: no implausible mean_ret_252 (should be in [-10, 10] range in decimal)
+                row = conn.execute(
+                    text(
+                        "SELECT COUNT(*) FROM public.cmc_asset_stats "
+                        "WHERE mean_ret_252 IS NOT NULL "
+                        "AND (mean_ret_252 < -10 OR mean_ret_252 > 10)"
+                    )
+                ).fetchone()
+                implausible = int(row[0]) if row else 0
+                if implausible > 0:
+                    results.append(
+                        {
+                            "table": "cmc_asset_stats",
+                            "check": "mean_ret_252_range",
+                            "status": "WARN",
+                            "detail": f"{implausible} rows with implausible mean_ret_252 (outside [-10, 10])",
+                        }
+                    )
+                else:
+                    results.append(
+                        {
+                            "table": "cmc_asset_stats",
+                            "check": "mean_ret_252_range",
+                            "status": "PASS",
+                            "detail": "All mean_ret_252 values in plausible range",
+                        }
+                    )
+
+        except Exception as e:
+            logger.debug("check_desc_stats_quality: cmc_asset_stats unavailable: %s", e)
+            results.append(
+                {
+                    "table": "cmc_asset_stats",
+                    "check": "accessibility",
+                    "status": "WARN",
+                    "detail": f"Table not accessible: {e}",
+                }
+            )
+
+        # ------------------------------------------------------------------
+        # cmc_cross_asset_corr checks
+        # ------------------------------------------------------------------
+        try:
+            # Check 1: row count > 0
+            row = conn.execute(
+                text("SELECT COUNT(*) FROM public.cmc_cross_asset_corr")
+            ).fetchone()
+            total_rows = int(row[0]) if row else 0
+            if total_rows == 0:
+                results.append(
+                    {
+                        "table": "cmc_cross_asset_corr",
+                        "check": "row_count",
+                        "status": "WARN",
+                        "detail": "Table is empty (0 rows)",
+                    }
+                )
+            else:
+                results.append(
+                    {
+                        "table": "cmc_cross_asset_corr",
+                        "check": "row_count",
+                        "status": "PASS",
+                        "detail": f"{total_rows} rows",
+                    }
+                )
+
+                # Check 2: zero rows where id_a >= id_b (all pairs should have id_a < id_b)
+                row = conn.execute(
+                    text(
+                        "SELECT COUNT(*) FROM public.cmc_cross_asset_corr "
+                        "WHERE id_a >= id_b"
+                    )
+                ).fetchone()
+                bad_pairs = int(row[0]) if row else 0
+                if bad_pairs > 0:
+                    results.append(
+                        {
+                            "table": "cmc_cross_asset_corr",
+                            "check": "id_pair_ordering",
+                            "status": "FAIL",
+                            "detail": f"{bad_pairs} rows with id_a >= id_b (violates id_a < id_b constraint)",
+                        }
+                    )
+                else:
+                    results.append(
+                        {
+                            "table": "cmc_cross_asset_corr",
+                            "check": "id_pair_ordering",
+                            "status": "PASS",
+                            "detail": "All pairs have id_a < id_b",
+                        }
+                    )
+
+                # Check 3: pearson_r between -1 and 1
+                row = conn.execute(
+                    text(
+                        "SELECT COUNT(*) FROM public.cmc_cross_asset_corr "
+                        "WHERE pearson_r IS NOT NULL "
+                        "AND (pearson_r < -1.0 OR pearson_r > 1.0)"
+                    )
+                ).fetchone()
+                out_of_range = int(row[0]) if row else 0
+                if out_of_range > 0:
+                    results.append(
+                        {
+                            "table": "cmc_cross_asset_corr",
+                            "check": "pearson_r_range",
+                            "status": "FAIL",
+                            "detail": f"{out_of_range} rows with pearson_r outside [-1, 1]",
+                        }
+                    )
+                else:
+                    results.append(
+                        {
+                            "table": "cmc_cross_asset_corr",
+                            "check": "pearson_r_range",
+                            "status": "PASS",
+                            "detail": "All pearson_r values in [-1, 1]",
+                        }
+                    )
+
+                # Check 4: no NULL n_obs
+                row = conn.execute(
+                    text(
+                        "SELECT COUNT(*) FROM public.cmc_cross_asset_corr "
+                        "WHERE n_obs IS NULL"
+                    )
+                ).fetchone()
+                null_n_obs = int(row[0]) if row else 0
+                if null_n_obs > 0:
+                    results.append(
+                        {
+                            "table": "cmc_cross_asset_corr",
+                            "check": "n_obs_not_null",
+                            "status": "WARN",
+                            "detail": f"{null_n_obs} rows with NULL n_obs",
+                        }
+                    )
+                else:
+                    results.append(
+                        {
+                            "table": "cmc_cross_asset_corr",
+                            "check": "n_obs_not_null",
+                            "status": "PASS",
+                            "detail": "No NULL n_obs values",
+                        }
+                    )
+
+        except Exception as e:
+            logger.debug(
+                "check_desc_stats_quality: cmc_cross_asset_corr unavailable: %s", e
+            )
+            results.append(
+                {
+                    "table": "cmc_cross_asset_corr",
+                    "check": "accessibility",
+                    "status": "WARN",
+                    "detail": f"Table not accessible: {e}",
+                }
+            )
+
+    return results
+
+
 def run_all_stats(
     db_url: str,
     verbose: bool = False,
@@ -349,6 +593,10 @@ def run_all_stats(
     ALL runners execute to completion before aggregate determination.
     A crash (non-zero returncode) is treated as FAIL for that runner.
     DB rows are the authoritative source of PASS/WARN/FAIL status.
+
+    After runners complete, also runs check_desc_stats_quality() inline
+    to check cmc_asset_stats and cmc_cross_asset_corr tables and
+    incorporates results into the overall PASS/WARN/FAIL status.
 
     Args:
         db_url: Database connection URL
@@ -378,21 +626,34 @@ def run_all_stats(
 
     # Query DB for aggregate PASS/WARN/FAIL status (skip in dry-run)
     db_status: dict[str, dict[str, int]] = {}
+    desc_quality_results: list[dict] = []
     if not dry_run:
         try:
             engine = create_engine(db_url)
             db_status = query_stats_status(engine)
+            # Run inline desc stats quality checks
+            desc_quality_results = check_desc_stats_quality(engine)
         except Exception as e:
             logger.warning(f"Could not query stats status from DB: {e}")
 
-    # Determine tables with WARN rows
+    # Determine tables with WARN rows (from stats runner tables)
     warn_runners = [t for t, counts in db_status.items() if counts.get("WARN", 0) > 0]
+
+    # Check desc stats quality results
+    desc_fail = any(r["status"] == "FAIL" for r in desc_quality_results)
+    desc_warn = any(r["status"] == "WARN" for r in desc_quality_results)
+
+    if desc_quality_results and not dry_run:
+        print("\n[DESC STATS] Descriptive stats quality checks:")
+        for r in desc_quality_results:
+            status_str = r["status"]
+            print(f"  [{status_str}] {r['table']}.{r['check']}: {r['detail']}")
 
     # Determine overall status
     db_fail_tables = [t for t, counts in db_status.items() if counts.get("FAIL", 0) > 0]
-    if db_fail_tables or failed_runners:
+    if db_fail_tables or failed_runners or desc_fail:
         overall_status = "FAIL"
-    elif warn_runners:
+    elif warn_runners or desc_warn:
         overall_status = "WARN"
     else:
         overall_status = "PASS"
