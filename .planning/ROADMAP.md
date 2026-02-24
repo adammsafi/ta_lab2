@@ -715,6 +715,29 @@ Plans:
 
 </details>
 
+<details>
+<summary>v1.0.0 Phase Details (Phases 42-54) - IN PROGRESS</summary>
+
+### Phase 42: Strategy Bake-Off
+**Goal:** Use v0.9.0 research tooling to evaluate existing signals and select the 2 best strategies for V1 paper trading, with documented rationale and expected performance.
+**Depends on:** v0.9.0 complete (IC evaluation, PSR, purged K-fold, feature experimentation all available)
+**Requirements:** STRAT-01, STRAT-02, STRAT-03, STRAT-04
+**Success Criteria** (what must be TRUE):
+  1. IC scores computed for all features across BTC/ETH 1D; features ranked by IC-IR
+  2. Walk-forward backtest results for >= 3 signal types with purged K-fold; no data leakage
+  3. 2 strategies selected with documented rationale; parameters chosen via walk-forward, not in-sample optimization
+  4. Final backtest meets Sharpe >= 1.0, Max DD <= 15% with realistic fees/slippage
+**Plans**: 5 plans in 5 waves
+
+Plans:
+- [ ] 42-01-PLAN.md -- IC feature sweep: batch IC across all assets x all TFs x all features
+- [ ] 42-02-PLAN.md -- Walk-forward backtest orchestration with PurgedKFold + CPCV + cost matrix
+- [ ] 42-03-PLAN.md -- Composite scoring + sensitivity analysis under 4 weighting schemes
+- [ ] 42-04-PLAN.md -- Strategy selection + ensemble contingency + final validation backtest
+- [ ] 42-05-PLAN.md -- Scorecard generation: formal bake-off report with charts and tables
+
+</details>
+
 See `.planning/milestones/v1.0.0-REQUIREMENTS.md` and `.planning/milestones/v1.0.0-ROADMAP.md` for full details.
 
 ## Progress
@@ -800,7 +823,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 42. Strategy Bake-Off | 0/TBD | Not started | -- |
+| 42. Strategy Bake-Off | 0/5 | Planned | -- |
 | 43. Exchange Integration | 0/TBD | Not started | -- |
 | 44. Order & Fill Store | 0/TBD | Not started | -- |
 | 45. Paper-Trade Executor | 0/TBD | Not started | -- |
@@ -871,4 +894,4 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-24 (Phase 41 planned -- Asset Descriptive Stats & Correlation; 6 plans in 4 waves)*
+*Last updated: 2026-02-24 (Phase 42 planned -- Strategy Bake-Off; 5 plans in 5 waves)*
