@@ -523,7 +523,7 @@ Plans:
 - [x] **Phase 37: IC Evaluation** - Information Coefficient scoring engine with regime breakdown and significance testing
 - [x] **Phase 38: Feature Experimentation** - YAML registry, ExperimentRunner, BH-corrected promotion gate
 - [x] **Phase 39: Streamlit Dashboard** - Pipeline monitor + research explorer with cached DB queries
-- [ ] **Phase 40: Notebooks** - 3-5 polished Jupyter notebooks demonstrating the full research cycle
+- [x] **Phase 40: Notebooks** - 3-5 polished Jupyter notebooks demonstrating the full research cycle
 - [ ] **Phase 41: Asset Descriptive Stats & Correlation** - Rolling per-asset summary stats + cross-asset return correlation time series
 
 </details>
@@ -644,12 +644,12 @@ Plans:
   1. Each notebook completes "Restart and Run All" in under 5 minutes on a machine with DB access, producing no errors and no empty output cells
   2. Parameterized variables (`ASSET_ID`, `TF`, `START_DATE`, `END_DATE`) are defined in the first code cell; changing only those cells and re-running produces valid results for a different asset or timeframe
   3. Notebooks cover at minimum: AMA value inspection, IC evaluation with decay table, purged K-fold split visualization, and feature experimentation workflow -- each with a prose narrative cell before each major computation block
-**Plans**: 3 plans in 2 waves
+**Plans**: 3/3 complete
 
 Plans:
-- [ ] 40-01-PLAN.md -- Shared helpers module + Notebook 01: Explore Indicators (AMA + regimes)
-- [ ] 40-02-PLAN.md -- Notebook 02: Evaluate Features (IC + purged K-fold + regime A/B backtest)
-- [ ] 40-03-PLAN.md -- Notebook 03: Run Experiments (feature experimentation + dashboard launch)
+- [x] 40-01-PLAN.md -- Shared helpers module + Notebook 01: Explore Indicators (AMA + regimes)
+- [x] 40-02-PLAN.md -- Notebook 02: Evaluate Features (IC + purged K-fold + regime A/B backtest)
+- [x] 40-03-PLAN.md -- Notebook 03: Run Experiments (feature experimentation + dashboard launch)
 
 ---
 

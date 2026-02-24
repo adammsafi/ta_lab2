@@ -62,9 +62,9 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Jupyter Notebooks
 
-- [ ] **NOTE-01**: 3-5 focused notebooks covering IC evaluation, AMA exploration, purged K-fold demo, feature experimentation, regime overlay backtest
-- [ ] **NOTE-02**: Each notebook passes "Restart and Run All" cleanly, parameterized with ASSET_ID / TF / START_DATE at top
-- [ ] **NOTE-03**: Polished enough to share — clear narrative, good visuals, no raw cell output dumps
+- [x] **NOTE-01**: 3-5 focused notebooks covering IC evaluation, AMA exploration, purged K-fold demo, feature experimentation, regime overlay backtest
+- [x] **NOTE-02**: Each notebook passes "Restart and Run All" cleanly, parameterized with ASSET_ID / TF / START_DATE at top
+- [x] **NOTE-03**: Polished enough to share — clear narrative, good visuals, no raw cell output dumps
 
 ### Asset Descriptive Statistics
 
@@ -145,9 +145,9 @@ Deferred to future release. Tracked but not in current roadmap.
 | DASH-02 | Phase 39 | Complete |
 | DASH-03 | Phase 39 | Complete |
 | DASH-04 | Phase 39 | Complete |
-| NOTE-01 | Phase 40 | Pending |
-| NOTE-02 | Phase 40 | Pending |
-| NOTE-03 | Phase 40 | Pending |
+| NOTE-01 | Phase 40 | Complete |
+| NOTE-02 | Phase 40 | Complete |
+| NOTE-03 | Phase 40 | Complete |
 | DESC-01 | Phase 41 | Pending |
 | DESC-02 | Phase 41 | Pending |
 | DESC-03 | Phase 41 | Pending |
