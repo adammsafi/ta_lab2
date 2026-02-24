@@ -5,21 +5,21 @@
 See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v0.9.0 Research & Experimentation — Phase 41 In Progress (Plan 1/N)
+**Current focus:** v0.9.0 Research & Experimentation — Phase 41 In Progress (Plan 2/N)
 
 ## Current Position
 
 Phase: 41 (Asset Descriptive Stats and Correlation) — In Progress
-Plan: 1/N complete
+Plan: 2/N complete
 Status: In progress
-Last activity: 2026-02-24 — Completed 41-01-PLAN.md (Alembic migration: 5 DB objects created)
+Last activity: 2026-02-24 — Completed 41-02-PLAN.md (per-asset rolling stats refresh script)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [████████████] ~97% v0.9.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 201 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 1 in Phase 41)
+- Total plans completed: 202 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 2 in Phase 41)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -301,6 +301,9 @@ Recent decisions affecting current work:
 - **window reserved word in raw SQL** (Phase 41-01): PostgreSQL reserved word `window` must be double-quoted in raw op.execute() SQL strings; SQLAlchemy op.create_table/op.create_index handle quoting automatically; always test upgrade immediately after writing migrations with raw SQL
 - **Materialized view via op.execute()** (Phase 41-01): Alembic has no native materialized view op; use op.execute() with raw SQL for CREATE MATERIALIZED VIEW and CREATE UNIQUE INDEX; unique index required for REFRESH MATERIALIZED VIEW CONCURRENTLY
 - **Programmatic DDL column generation** (Phase 41-01): For repetitive column patterns (32 stat cols = 8 stats x 4 windows), generate via helper function with tuple constants to avoid copy-paste errors in migration files
+- **str(engine.url) strips password in SQLAlchemy** (Phase 41-02): str(engine.url) returns masked URL (postgres:***); use explicit db_url string pass-through in worker callchain to avoid authentication failures in subprocess workers
+- **Tz-safe watermark read pattern** (Phase 41-02): pd.Timestamp(row[0]).tz_convert("UTC") if tzinfo else .tz_localize("UTC") — DB may return offset-aware timestamps (e.g. -05:00); constructing pd.Timestamp(row, tz="UTC") raises TypeError when tzinfo already present
+- **kurt_pearson = kurt_fisher + 3.0** (Phase 41-02): pandas .kurt() returns Fisher/excess kurtosis (normal=0); Pearson kurtosis = Fisher + 3.0 (normal=3); both stored for flexibility in downstream analysis (PSR uses Pearson)
 
 ### Pending Todos
 
@@ -312,8 +315,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-24T11:35:54Z
-Stopped at: Completed 41-01-PLAN.md — Alembic migration 8d5bc7ee1732 (5 Phase 41 DB objects)
+Last session: 2026-02-24T16:56:40Z
+Stopped at: Completed 41-02-PLAN.md — per-asset rolling stats refresh script (refresh_cmc_asset_stats.py)
 Resume file: None
 
 ---
@@ -335,7 +338,7 @@ Phase overview:
 - Phase 38 (Feature Experimentation): COMPLETE — YAML feature registry, FeatureRegistry+DAG, ExperimentRunner, FeaturePromoter (BH gate + migration stub), 3 CLIs, 39 unit tests
 - Phase 39 (Streamlit Dashboard): COMPLETE — DB layer, cached queries, charts.py, landing page, pipeline monitor (traffic light + stats grid + coverage pivot + alert history), research explorer (IC table, IC decay chart, regime timeline)
 - Phase 40 (Notebooks): COMPLETE — helpers.py (6 functions), 01_explore_indicators.ipynb (29 cells, AMA + regimes), 02_evaluate_features.ipynb (44 cells, IC + purged K-fold + regime A/B), 03_run_experiments.ipynb (33 cells, feature registry + DAG + experiments + dashboard); 13/13 must-haves verified
-- Phase 41 (Asset Descriptive Stats and Correlation): IN PROGRESS — Plan 01 complete: Alembic migration 8d5bc7ee1732 creates cmc_asset_stats (32 stat cols), cmc_cross_asset_corr (CHECK id_a < id_b), 2 watermark state tables, cmc_corr_latest materialized view
+- Phase 41 (Asset Descriptive Stats and Correlation): IN PROGRESS — Plan 01 complete: Alembic migration 8d5bc7ee1732 creates cmc_asset_stats (32 stat cols), cmc_cross_asset_corr (CHECK id_a < id_b), 2 watermark state tables, cmc_corr_latest materialized view; Plan 02 complete: refresh_cmc_asset_stats.py (8 stats x 4 windows, watermark incremental refresh, multiprocessing, 5613 rows BTC/1D)
 
 Key constraints to remember:
 - PSR-01 (Alembic migration psr->psr_legacy) must run before any PSR formula code
@@ -347,4 +350,4 @@ Key constraints to remember:
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-24 (Phase 41 Plan 01 complete — Alembic migration 8d5bc7ee1732, 5 DB objects)*
+*Last updated: 2026-02-24 (Phase 41 Plan 02 complete — refresh_cmc_asset_stats.py, rolling stats refresh script)*
