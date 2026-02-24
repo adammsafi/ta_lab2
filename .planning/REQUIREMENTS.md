@@ -55,10 +55,10 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Streamlit Dashboard
 
-- [ ] **DASH-01**: Pipeline Monitor (Mode B) — run status, data freshness, stats runner PASS/FAIL, alert history from existing tables
-- [ ] **DASH-02**: Research Explorer (Mode A) — IC score table, equity curves, regime timeline, feature comparison
-- [ ] **DASH-03**: All DB queries wrapped in `@st.cache_data(ttl=300)` with NullPool engine — no query hammering
-- [ ] **DASH-04**: Windows-compatible config (`.streamlit/config.toml` with `fileWatcherType = "poll"`)
+- [x] **DASH-01**: Pipeline Monitor (Mode B) — run status, data freshness, stats runner PASS/FAIL, alert history from existing tables
+- [x] **DASH-02**: Research Explorer (Mode A) — IC score table, equity curves, regime timeline, feature comparison
+- [x] **DASH-03**: All DB queries wrapped in `@st.cache_data(ttl=300)` with NullPool engine — no query hammering
+- [x] **DASH-04**: Windows-compatible config (`.streamlit/config.toml` with `fileWatcherType = "poll"`)
 
 ### Jupyter Notebooks
 
@@ -141,10 +141,10 @@ Deferred to future release. Tracked but not in current roadmap.
 | FEAT-03 | Phase 38 | Complete |
 | FEAT-04 | Phase 38 | Complete |
 | FEAT-05 | Phase 38 | Complete |
-| DASH-01 | Phase 39 | Pending |
-| DASH-02 | Phase 39 | Pending |
-| DASH-03 | Phase 39 | Pending |
-| DASH-04 | Phase 39 | Pending |
+| DASH-01 | Phase 39 | Complete |
+| DASH-02 | Phase 39 | Complete |
+| DASH-03 | Phase 39 | Complete |
+| DASH-04 | Phase 39 | Complete |
 | NOTE-01 | Phase 40 | Pending |
 | NOTE-02 | Phase 40 | Pending |
 | NOTE-03 | Phase 40 | Pending |
@@ -164,4 +164,4 @@ Deferred to future release. Tracked but not in current roadmap.
 
 ---
 *Requirements defined: 2026-02-23*
-*Last updated: 2026-02-24 — FEAT-01..05 marked Complete (Phase 38 verified)*
+*Last updated: 2026-02-24 — DASH-01..04 marked Complete (Phase 39 verified)*
