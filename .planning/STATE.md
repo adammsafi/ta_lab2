@@ -10,16 +10,16 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: 37 (IC Evaluation) — In progress
-Plan: 2/8 complete
-Status: Plan 37-02 complete — IC core computation library (44 tests, TDD)
-Last activity: 2026-02-24 — Completed 37-02-PLAN.md (IC core computation library)
+Plan: 3/8 complete
+Status: Plan 37-03 complete — IC regime breakdown, batch wrapper, Plotly visualizations (61 tests)
+Last activity: 2026-02-24 — Completed 37-03-PLAN.md (regime IC, batch, plot helpers)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [████░░░░░░] ~72% v0.9.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [████░░░░░░] ~73% v0.9.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 184 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 1 in Phase 37)
+- Total plans completed: 185 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 2 in Phase 37)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -95,7 +95,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 |-------|-------|-------|----------|--------|
 | 35-ama-engine | 8/8 | ~56 min | ~7 min | Complete |
 | 36-psr-purged-k-fold | 5/5 | ~24 min | ~5 min | Complete |
-| 37-ic-evaluation | 1/8 | ~5 min | ~5 min | In progress |
+| 37-ic-evaluation | 3/8 | ~16 min | ~5 min | In progress |
 
 *Updated after each plan completion*
 
@@ -261,6 +261,11 @@ Recent decisions affecting current work:
 - **DatetimeIndex arithmetic returns numpy bool array directly** (Phase 37-02): (feat_train.index + pd.Timedelta(...)) > train_end returns numpy.ndarray, not pandas BooleanArray — no .to_numpy() needed for iloc indexing
 - **IC boundary masking via full-series fwd_ret then reindex+null** (Phase 37-02): Compute forward returns on full series, reindex to train window, null boundary bars where bar_ts + horizon_days > train_end — explicit look-ahead prevention vs. implicit NaN-at-slice-tail
 - **Rolling IC vectorized rank-then-correlate** (Phase 37-02): rolling().rank() then rolling().corr() is 30x faster than per-window spearmanr() loop; IC-IR = mean/std; IC-IR t-stat = mean*sqrt(n)/std (ttest_1samp equivalent)
+- **compute_ic_by_regime accepts pre-built regimes_df** (Phase 37-03): Library layer does NOT load from DB; l2_label parsing (split('-') -> trend_state/vol_state) happens in CLI/DB helper layer (Plan 04); keeps library pure and testable without DB
+- **Sparse-regime guard at min_obs_per_regime=30** (Phase 37-03): Regimes with fewer bars silently skipped; if ALL regimes sparse, falls back to full-sample IC with regime_label='all' — never returns empty DataFrame
+- **Regime-window train bounds from common_ts intersection** (Phase 37-03): Use min/max of feature-close intersection within regime label as synthetic train_start/train_end — prevents boundary masking from nulling all regime bars
+- **batch_compute_ic excludes 'close' by name convention** (Phase 37-03): Auto-detected feature_cols = all numeric columns except 'close'; consistent with close being a separate argument
+- **Significance coloring threshold 0.05** (Phase 37-03): plot_ic_decay uses sig_threshold=0.05 default; royalblue for significant bars, lightgray for non-significant
 
 ### Pending Todos
 
@@ -272,8 +277,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-24T02:07Z
-Stopped at: Phase 37 Plan 02 complete — IC core computation library (44 tests, TDD)
+Last session: 2026-02-24T02:17Z
+Stopped at: Phase 37 Plan 03 complete — IC regime breakdown, batch wrapper, Plotly visualizations (61 tests)
 Resume file: None
 
 ---
