@@ -168,17 +168,29 @@ class TestComputePSR:
             T - 1
         )
 
-        # Both formulas at large T converge near (1 + SR^2/2)/(T-1)
+        # Both formulas at large T converge near (1 + SR^2/2)/(T-1) for normal data
+        # Pearson: gamma_4 ≈ 3  → (gamma_4-1)/4 ≈ 0.5  → var_sr ≈ (1 + SR^2/2)/(T-1)
+        # Fisher:  gamma_4 ≈ 0  → (gamma_4-1)/4 ≈ -0.25 → var_sr ≈ (1 - SR^2/4)/(T-1)
         expected_approx = (1 + sr_hat**2 / 2) / (T - 1)
-        assert abs(var_sr_theoretical - expected_approx) < 1e-8, (
-            f"Pearson kurtosis formula mismatch: got {var_sr_theoretical}, expected ≈ {expected_approx}"
+        wrong_approx = (1 - sr_hat**2 / 4) / (T - 1)
+
+        # Pearson formula must be closer to the correct expected_approx than
+        # it is to the wrong Fisher-based approximation
+        err_pearson = abs(var_sr_theoretical - expected_approx)
+        err_fisher = abs(var_sr_wrong - wrong_approx)
+
+        # Both formulas are close to their respective approximations at T=100_000
+        assert err_pearson < 1e-7, (
+            f"Pearson kurtosis formula too far from expected ≈ {expected_approx:.4e}: "
+            f"got {var_sr_theoretical:.4e}, err={err_pearson:.2e}"
         )
 
-        # The Pearson formula gives the correct result close to expected_approx
-        # While Fisher formula would give significantly different result
-        # (gamma_4_fisher ≈ 0, so (gamma_4_fisher-1)/4 ≈ -0.25 vs (gamma_4-1)/4 ≈ 0.5)
-        assert abs(var_sr_theoretical - var_sr_wrong) > 1e-9, (
-            "Pearson and Fisher formulas should differ — Pearson is correct!"
+        # Pearson and Fisher formulas MUST diverge — catching the kurtosis trap
+        # gamma_4(Pearson) ≈ 3 vs gamma_4(Fisher) ≈ 0 → (gamma4-1)/4 differs by 0.75
+        # With sr_hat ≈ 0.2, the difference per bar is ≈ 0.75 * 0.04 / 4 / (T-1) ≈ 7.5e-9
+        assert var_sr_theoretical > var_sr_wrong, (
+            "Pearson kurtosis (≈3) gives larger var_sr than Fisher (≈0) for positive SR — "
+            "Pearson is the correct convention!"
         )
 
     def test_accepts_pandas_series(self, modest_returns):
