@@ -5,21 +5,21 @@
 See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v0.9.0 Research & Experimentation — Phase 35 complete, ready for Phase 36
+**Current focus:** v0.9.0 Research & Experimentation — Phase 36 in progress (PSR + Purged K-Fold)
 
 ## Current Position
 
-Phase: 35 (AMA Engine) — COMPLETE
-Plan: 08 of 8
-Status: Phase 35 complete — all 8 plans executed
-Last activity: 2026-02-23 — Completed 35-08-PLAN.md (AMA orchestrator + daily refresh integration)
+Phase: 36 (PSR + Purged K-Fold) — In Progress
+Plan: 01 of 6
+Status: In progress — Plan 36-01 executed (PSR schema migrations)
+Last activity: 2026-02-23 — Completed 36-01-PLAN.md (Alembic migrations: psr_column_rename + psr_results_table)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [████████░░] ~55% v0.9.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [████████░░] ~57% v0.9.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 174 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35)
+- Total plans completed: 175 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 1 in Phase 36)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -88,6 +88,13 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 | 32-runbooks | 2/2 | ~9 min | ~5 min | Complete |
 | 33-alembic-migrations | 2/2 | ~5 min | ~3 min | Complete |
 | 34-audit-cleanup | 1/1 | ~2 min | ~2 min | Complete |
+
+**By Phase (v0.9.0):**
+
+| Phase | Plans | Total | Avg/Plan | Status |
+|-------|-------|-------|----------|--------|
+| 35-ama-engine | 8/8 | ~56 min | ~7 min | Complete |
+| 36-psr-purged-k-fold | 1/6 | ~4 min | ~4 min | In Progress |
 
 *Updated after each plan completion*
 
@@ -198,6 +205,10 @@ Recent decisions affecting current work:
 - **Baseline revision 25f2b3c90f65 as Alembic epoch** (Phase 33-02): No-op baseline with down_revision=None; alembic stamp head applied to production DB; represents cumulative state after all 17 legacy SQL migrations applied
 - **alembic history in CI not alembic current** (Phase 33-02): history reads filesystem only (no DB), current requires live DB -- history is appropriate for CI structural validation
 - **stamp not upgrade on existing production DB** (Phase 33-02): stamp records current state without DDL; upgrade runs migration code -- use stamp only during initial setup and disaster recovery
+- **Unconditional DROP IF EXISTS for PSR downgrade** (Phase 36-01): Pre-migration DB had no psr column; renaming psr_legacy back to psr in downgrade creates a phantom column -- use DROP COLUMN IF EXISTS on both columns to return to exact pre-migration state
+- **Two separate PSR revisions** (Phase 36-01): Column rename (adf582a23467) and table creation (5f8223cfbf06) are independent; separate revisions allow bisecting failures and rolling back table only
+- **psr_results unique on (run_id, formula_version)** (Phase 36-01): Prevents duplicate computations; enables multiple formula variants per run for A/B comparison between implementations
+- **return_source TEXT for PSR inputs** (Phase 36-01): Distinguishes portfolio-level vs trade-reconstruction returns -- affects skewness/kurtosis estimates which feed directly into PSR formula
 - **AMA orchestrator uses -m module invocation** (Phase 35-08): All AMA subprocesses invoked via python -m module (not script file paths) -- consistent with refresh_returns_zscore and run_all_stats_runners invocation pattern
 - **PostStep gate: any_value_succeeded** (Phase 35-08): Post-steps run if at least one value refresher succeeds (not all) -- with --continue-on-error, partial value refresher success still produces data; post-steps process whatever was produced
 - **AMAs inherit fresh-bar IDs from EMA filtering** (Phase 35-08): ids_for_amas = ids_for_emas when run_emas is True -- AMAs process same stale-bar-filtered set as EMAs; stale assets skipped in both EMA and AMA stages
@@ -243,8 +254,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-23T22:32Z
-Stopped at: Phase 35 (AMA Engine) verified and complete — ready for /gsd:discuss-phase 36
+Last session: 2026-02-24T00:05Z
+Stopped at: Phase 36 Plan 01 complete — psr_column_rename + psr_results_table Alembic revisions applied
 Resume file: None
 
 ---
@@ -261,7 +272,7 @@ Roadmap created 2026-02-23. 6 phases, 35 requirements.
 
 Phase overview:
 - Phase 35 (AMA Engine): COMPLETE — KAMA, DEMA, TEMA, HMA indicator family with params_hash PK; 6 AMA table variants + _u; orchestrator + daily refresh integration
-- Phase 36 (PSR + Purged K-Fold): Statistical rigor — PSR migration, Lopez de Prado PSR/DSR/MinTRL, leakage-free CV
+- Phase 36 (PSR + Purged K-Fold): IN PROGRESS (1/6) — PSR schema migrations done (psr_column_rename + psr_results_table); PSR formula code next
 - Phase 37 (IC Evaluation): Feature scoring — Spearman IC, rolling IC, IC decay, regime breakdown, significance
 - Phase 38 (Feature Experimentation): Registry + ExperimentRunner + BH-corrected promotion gate
 - Phase 39 (Streamlit Dashboard): Pipeline Monitor + Research Explorer, NullPool, Windows-compatible
@@ -277,4 +288,4 @@ Key constraints to remember:
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-23 (Phase 35 AMA Engine complete — 8 plans; Phase 36 PSR + Purged K-Fold is next)*
+*Last updated: 2026-02-23 (Phase 36 Plan 01 complete — PSR schema migrations; continuing with PSR formula code)*
