@@ -51,6 +51,17 @@ SOURCES = [
         "run_log_table": "cmc_price_bars_1d_state",
         "config": None,
     },
+    {
+        "source_key": "fear_greed_index",
+        "name": "Crypto Fear & Greed Index",
+        "source_type": "api",
+        "url": "https://api.alternative.me/fng/",
+        "description": "Daily Crypto Fear & Greed Index (0-100) from alternative.me.",
+        "refresh_cadence": "daily",
+        "target_table": "cmc_fear_greed",
+        "run_log_table": "cmc_fear_greed_state",
+        "config": json.dumps({"api_hard_cap_entries": 1024, "value_range": [0, 100]}),
+    },
 ]
 
 UPSERT_SQL = text("""
