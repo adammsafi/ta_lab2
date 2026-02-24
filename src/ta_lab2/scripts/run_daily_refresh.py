@@ -43,6 +43,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
+from ta_lab2.scripts.alembic_utils import check_migration_status
 from ta_lab2.scripts.refresh_utils import (
     get_fresh_ids,
     parse_ids,
@@ -982,6 +983,14 @@ Examples:
     except RuntimeError as e:
         print(f"[ERROR] {e}")
         return 1
+
+    # Check Alembic migration status (advisory, non-blocking)
+    if not args.dry_run:
+        if not check_migration_status(db_url):
+            print(
+                "[MIGRATION] Pending migrations detected. "
+                "Run 'alembic upgrade head' before next refresh."
+            )
 
     # Handle --weekly-digest as a standalone operation (exit after completion)
     if args.weekly_digest:
