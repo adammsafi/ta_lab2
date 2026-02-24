@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: 40 (Notebooks) — In progress
-Plan: 1/3 complete
-Status: Plan 40-01 complete — helpers.py + 01_explore_indicators.ipynb
-Last activity: 2026-02-24 — Completed 40-01-PLAN.md
+Plan: 2/3 complete (40-01 done, 40-03 done, 40-02 pending)
+Status: Plan 40-03 complete — 03_run_experiments.ipynb (feature experimentation demo)
+Last activity: 2026-02-24 — Completed 40-03-PLAN.md
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [███████████] ~96% v0.9.0
 
@@ -309,8 +309,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-24T16:25:00Z
-Stopped at: Completed 40-01-PLAN.md — helpers.py (6 functions, NullPool engine) + 01_explore_indicators.ipynb (29 cells, KAMA/DEMA/TEMA/HMA on-the-fly, regime vrect coloring)
+Last session: 2026-02-24T16:13:59Z
+Stopped at: Completed 40-03-PLAN.md — 03_run_experiments.ipynb (33 cells, FeatureRegistry + ExperimentRunner + BH gate + IC heatmap + Streamlit dashboard launch)
 Resume file: None
 
 ---
