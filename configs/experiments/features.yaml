@@ -1,0 +1,54 @@
+# Feature Experimentation Registry
+# Features with lifecycle: experimental are scored by ExperimentRunner
+# Promoted features are tracked in dim_feature_registry (DB)
+#
+# Compute modes:
+#   inline: pandas expression evaluated with DataFrame columns as locals
+#           Globals include {"np": numpy, "pd": pandas, "__builtins__": {}}
+#   dotpath: Python function reference as module.path:function_name
+#
+# Parameter sweeps:
+#   Add a 'params' key with lists of values. Each combination becomes
+#   a separate named variant: e.g., rsi_sweep with period: [5, 14] produces
+#   rsi_sweep_period5 and rsi_sweep_period14.
+#
+# Lifecycle states:
+#   experimental: Active candidates being scored by ExperimentRunner
+#   promoted: Passed BH gate; added to dim_feature_registry + cmc_features
+#   deprecated: No longer maintained; excluded from ExperimentRunner runs
+
+features:
+  vol_ratio_30_7:
+    lifecycle: experimental
+    description: "30d/7d realized vol ratio -- captures vol regime shift"
+    compute:
+      mode: inline
+      expression: "vol_30d / (vol_7d + 1e-10)"
+    inputs:
+      - table: cmc_vol
+        columns: [vol_30d, vol_7d]
+    tags: [vol, ratio]
+
+  rsi_momentum:
+    lifecycle: experimental
+    description: "RSI-based momentum signal centered at zero"
+    compute:
+      mode: inline
+      expression: "rsi_14 - 50"
+    inputs:
+      - table: cmc_ta_daily
+        columns: [rsi_14]
+    tags: [momentum, rsi]
+
+  ret_vol_ratio:
+    lifecycle: experimental
+    description: "Return-to-volatility ratio across param sweep (Sharpe-like)"
+    compute:
+      mode: inline
+      expression: "close.pct_change({period}) / (close.pct_change({period}).rolling({period}).std() + 1e-10)"
+    params:
+      period: [5, 14, 21]
+    inputs:
+      - table: cmc_price_bars_multi_tf_u
+        columns: [close]
+    tags: [sharpe, momentum]
