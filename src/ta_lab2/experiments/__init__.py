@@ -52,6 +52,7 @@ Example usage::
 
     # Promote a feature after running experiments
     from ta_lab2.experiments import FeaturePromoter, PromotionRejectedError
+
     promoter = FeaturePromoter(engine, registry)
     try:
         stub_path = promoter.promote_feature("vol_ratio_30_7", confirm=False)
