@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v0.9.0 Research & Experimentation — Phase 41 In Progress (Plan 6/N, Plan 06 complete)
+**Current focus:** v0.9.0 Research & Experimentation — COMPLETE. Ready for v1.0.0.
 
 ## Current Position
 
-Phase: 41 (Asset Descriptive Stats and Correlation) — In Progress
-Plan: 6/N complete (Plan 06 completed this session)
-Status: In progress
-Last activity: 2026-02-24 — Completed 41-06-PLAN.md (regime-stats integration + desc stats quality checks)
+Phase: 41 (Asset Descriptive Stats & Correlation) — Complete
+Plan: 6/6 complete
+Status: Phase 41 verified (6/6 must-haves passed). v0.9.0 milestone complete.
+Last activity: 2026-02-24 — Phase 41 verified, all 6 plans executed
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [████████████] ~97% v0.9.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0
 
 ## Performance Metrics
 
@@ -348,7 +348,7 @@ Phase overview:
 - Phase 38 (Feature Experimentation): COMPLETE — YAML feature registry, FeatureRegistry+DAG, ExperimentRunner, FeaturePromoter (BH gate + migration stub), 3 CLIs, 39 unit tests
 - Phase 39 (Streamlit Dashboard): COMPLETE — DB layer, cached queries, charts.py, landing page, pipeline monitor (traffic light + stats grid + coverage pivot + alert history), research explorer (IC table, IC decay chart, regime timeline)
 - Phase 40 (Notebooks): COMPLETE — helpers.py (6 functions), 01_explore_indicators.ipynb (29 cells, AMA + regimes), 02_evaluate_features.ipynb (44 cells, IC + purged K-fold + regime A/B), 03_run_experiments.ipynb (33 cells, feature registry + DAG + experiments + dashboard); 13/13 must-haves verified
-- Phase 41 (Asset Descriptive Stats and Correlation): IN PROGRESS — Plan 01 complete: Alembic migration 8d5bc7ee1732 creates cmc_asset_stats (32 stat cols), cmc_cross_asset_corr (CHECK id_a < id_b), 2 watermark state tables, cmc_corr_latest materialized view; Plan 02 complete: refresh_cmc_asset_stats.py (8 stats x 4 windows, watermark incremental refresh, multiprocessing, 5613 rows BTC/1D); Plan 03 complete: refresh_cmc_cross_asset_corr.py (Pearson+Spearman, 4 windows, N*(N-1)/2 canonical pairs, watermark incremental, cmc_corr_latest refreshed, 22,452 rows for pair 1+52 1D); Plan 04 complete: run_all_desc_stats_refreshes.py orchestrator + --desc-stats flag + desc_stats stage in run_daily_refresh.py --all pipeline (AMAs -> desc_stats -> regimes)
+- Phase 41 (Asset Descriptive Stats & Correlation): COMPLETE — Alembic migration (5 DB objects), refresh_cmc_asset_stats.py (8 stats x 4 windows), refresh_cmc_cross_asset_corr.py (Pearson+Spearman pairwise), orchestrator + pipeline wiring, dashboard page (stats table + correlation heatmap), regime integration + quality checks; 6/6 must-haves verified
 
 Key constraints to remember:
 - PSR-01 (Alembic migration psr->psr_legacy) must run before any PSR formula code
@@ -360,4 +360,4 @@ Key constraints to remember:
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-24 (Phase 41 Plan 04 complete — desc stats orchestrator + daily refresh pipeline integration)*
+*Last updated: 2026-02-24 (Phase 41 complete — v0.9.0 milestone complete, 6/6 must-haves verified)*

@@ -524,7 +524,7 @@ Plans:
 - [x] **Phase 38: Feature Experimentation** - YAML registry, ExperimentRunner, BH-corrected promotion gate
 - [x] **Phase 39: Streamlit Dashboard** - Pipeline monitor + research explorer with cached DB queries
 - [x] **Phase 40: Notebooks** - 3-5 polished Jupyter notebooks demonstrating the full research cycle
-- [ ] **Phase 41: Asset Descriptive Stats & Correlation** - Rolling per-asset summary stats + cross-asset return correlation time series
+- [x] **Phase 41: Asset Descriptive Stats & Correlation** - Rolling per-asset summary stats + cross-asset return correlation time series
 
 </details>
 
@@ -663,15 +663,15 @@ Plans:
   3. Rolling max drawdown per window is tracked in `cmc_asset_stats`; the value at any row reflects the worst peak-to-trough decline within the trailing window ending at that bar
   4. `cmc_cross_asset_corr` contains pairwise rolling return correlation (Pearson) between all asset pairs per TF, across trailing windows (30, 60, 90, 252 bars), tracked as a time series with one row per (id_a, id_b, ts, tf, window)
   5. Both tables are created via Alembic migration and wired into `run_daily_refresh.py --all` as a stage (after features); `--desc-stats` flag available for standalone execution
-**Plans**: 6 plans in 4 waves
+**Plans**: 6/6 complete
 
 Plans:
-- [ ] 41-01-PLAN.md -- Alembic migration for cmc_asset_stats, cmc_cross_asset_corr, state tables, cmc_corr_latest materialized view
-- [ ] 41-02-PLAN.md -- refresh_cmc_asset_stats.py: per-asset rolling stats with watermark incremental refresh
-- [ ] 41-03-PLAN.md -- refresh_cmc_cross_asset_corr.py: pairwise rolling correlation with materialized view refresh
-- [ ] 41-04-PLAN.md -- run_all_desc_stats_refreshes.py orchestrator + run_daily_refresh.py pipeline wiring
-- [ ] 41-05-PLAN.md -- Dashboard page: asset stats table + correlation heatmap + time-series explorer
-- [ ] 41-06-PLAN.md -- Regime wiring (optional stats augmentation) + quality check registration
+- [x] 41-01-PLAN.md -- Alembic migration for cmc_asset_stats, cmc_cross_asset_corr, state tables, cmc_corr_latest materialized view
+- [x] 41-02-PLAN.md -- refresh_cmc_asset_stats.py: per-asset rolling stats with watermark incremental refresh
+- [x] 41-03-PLAN.md -- refresh_cmc_cross_asset_corr.py: pairwise rolling correlation with materialized view refresh
+- [x] 41-04-PLAN.md -- run_all_desc_stats_refreshes.py orchestrator + run_daily_refresh.py pipeline wiring
+- [x] 41-05-PLAN.md -- Dashboard page: asset stats table + correlation heatmap + time-series explorer
+- [x] 41-06-PLAN.md -- Regime wiring (optional stats augmentation) + quality check registration
 
 </details>
 

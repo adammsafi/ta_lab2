@@ -68,17 +68,17 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Asset Descriptive Statistics
 
-- [ ] **DESC-01**: Rolling mean return and std dev per asset/TF across trailing windows (30, 60, 90, 252 bars), stored as full time series in `cmc_asset_stats` with PK `(id, ts, tf)`
-- [ ] **DESC-02**: Rolling Sharpe ratio, skewness (scipy), and kurtosis (scipy) per asset/TF/window stored alongside mean and std dev
-- [ ] **DESC-03**: Rolling max drawdown per window — worst peak-to-trough decline within the trailing window ending at each bar
-- [ ] **DESC-04**: All stats tracked as time series (one row per bar per asset/TF), not just latest snapshot — enables regime-conditioned analysis and historical comparison
-- [ ] **DESC-05**: `cmc_asset_stats` table created via Alembic migration, wired into `run_daily_refresh.py --all` with `--desc-stats` standalone flag
+- [x] **DESC-01**: Rolling mean return and std dev per asset/TF across trailing windows (30, 60, 90, 252 bars), stored as full time series in `cmc_asset_stats` with PK `(id, ts, tf)`
+- [x] **DESC-02**: Rolling Sharpe ratio, skewness (scipy), and kurtosis (scipy) per asset/TF/window stored alongside mean and std dev
+- [x] **DESC-03**: Rolling max drawdown per window — worst peak-to-trough decline within the trailing window ending at each bar
+- [x] **DESC-04**: All stats tracked as time series (one row per bar per asset/TF), not just latest snapshot — enables regime-conditioned analysis and historical comparison
+- [x] **DESC-05**: `cmc_asset_stats` table created via Alembic migration, wired into `run_daily_refresh.py --all` with `--desc-stats` standalone flag
 
 ### Cross-Asset Correlation
 
-- [ ] **CORR-01**: Pairwise rolling Pearson return correlation between all asset pairs per TF, across trailing windows (30, 60, 90, 252 bars)
-- [ ] **CORR-02**: Correlation tracked over time as rolling time series with PK `(id_a, id_b, ts, tf, window)` — enables detecting correlation regime shifts (e.g., risk-off spikes)
-- [ ] **CORR-03**: `cmc_cross_asset_corr` table created via Alembic migration, wired into `run_daily_refresh.py --all` with `--desc-stats` flag
+- [x] **CORR-01**: Pairwise rolling Pearson return correlation between all asset pairs per TF, across trailing windows (30, 60, 90, 252 bars)
+- [x] **CORR-02**: Correlation tracked over time as rolling time series with PK `(id_a, id_b, ts, tf, window)` — enables detecting correlation regime shifts (e.g., risk-off spikes)
+- [x] **CORR-03**: `cmc_cross_asset_corr` table created via Alembic migration, wired into `run_daily_refresh.py --all` with `--desc-stats` flag
 
 ## v1.0+ Requirements
 
@@ -148,14 +148,14 @@ Deferred to future release. Tracked but not in current roadmap.
 | NOTE-01 | Phase 40 | Complete |
 | NOTE-02 | Phase 40 | Complete |
 | NOTE-03 | Phase 40 | Complete |
-| DESC-01 | Phase 41 | Pending |
-| DESC-02 | Phase 41 | Pending |
-| DESC-03 | Phase 41 | Pending |
-| DESC-04 | Phase 41 | Pending |
-| DESC-05 | Phase 41 | Pending |
-| CORR-01 | Phase 41 | Pending |
-| CORR-02 | Phase 41 | Pending |
-| CORR-03 | Phase 41 | Pending |
+| DESC-01 | Phase 41 | Complete |
+| DESC-02 | Phase 41 | Complete |
+| DESC-03 | Phase 41 | Complete |
+| DESC-04 | Phase 41 | Complete |
+| DESC-05 | Phase 41 | Complete |
+| CORR-01 | Phase 41 | Complete |
+| CORR-02 | Phase 41 | Complete |
+| CORR-03 | Phase 41 | Complete |
 
 **Coverage:**
 - v0.9.0 requirements: 43 total
