@@ -285,7 +285,7 @@ Roadmap created 2026-02-23. 6 phases, 35 requirements.
 
 Phase overview:
 - Phase 35 (AMA Engine): COMPLETE — KAMA, DEMA, TEMA, HMA indicator family with params_hash PK; 6 AMA table variants + _u; orchestrator + daily refresh integration
-- Phase 36 (PSR + Purged K-Fold): IN PROGRESS (1/6) — PSR schema migrations done (psr_column_rename + psr_results_table); PSR formula code next
+- Phase 36 (PSR + Purged K-Fold): IN PROGRESS (5/6) — migrations, PSR/DSR/MinTRL formulas, CV splitters, PSR backtest integration, alembic startup check done; plan 06 remaining
 - Phase 37 (IC Evaluation): Feature scoring — Spearman IC, rolling IC, IC decay, regime breakdown, significance
 - Phase 38 (Feature Experimentation): Registry + ExperimentRunner + BH-corrected promotion gate
 - Phase 39 (Streamlit Dashboard): Pipeline Monitor + Research Explorer, NullPool, Windows-compatible
