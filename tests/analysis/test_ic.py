@@ -9,6 +9,10 @@ Test classes:
 4. TestRollingIC              - vectorized rolling IC + IC-IR
 5. TestICSignificance         - t-stat and p-value correctness
 6. TestFeatureTurnover        - stable vs random feature turnover
+7. TestComputeICByRegime      - regime-conditional IC breakdown
+8. TestBatchComputeIC         - batch wrapper over multiple feature columns
+9. TestPlotICDecay            - Plotly IC decay bar chart
+10. TestPlotRollingIC         - Plotly rolling IC line chart
 """
 
 from __future__ import annotations
@@ -23,7 +27,11 @@ from ta_lab2.analysis.ic import (
     compute_feature_turnover,
     compute_forward_returns,
     compute_ic,
+    compute_ic_by_regime,
+    batch_compute_ic,
     compute_rolling_ic,
+    plot_ic_decay,
+    plot_rolling_ic,
 )
 
 
@@ -611,3 +619,388 @@ class TestFeatureTurnover:
         )
         result = compute_feature_turnover(stable_feature)
         assert abs(result - expected) < 1e-10
+
+
+# ---------------------------------------------------------------------------
+# 7. TestComputeICByRegime
+# ---------------------------------------------------------------------------
+
+
+def _make_regime_series(index, labels_cycle):
+    """Helper: build a regime Series alternating labels across the index."""
+    labels = [labels_cycle[i % len(labels_cycle)] for i in range(len(index))]
+    return pd.Series(labels, index=index, name="trend_state")
+
+
+class TestComputeICByRegime:
+    def test_empty_regimes_returns_full_sample(
+        self, predictive_feature, close_series, train_start, train_end
+    ):
+        """Pass empty DataFrame -> result has regime_label='all' and matches compute_ic output."""
+        empty_regimes = pd.DataFrame(
+            columns=["trend_state"],
+            index=pd.DatetimeIndex([], tz="UTC"),
+        )
+        result = compute_ic_by_regime(
+            predictive_feature,
+            close_series,
+            empty_regimes,
+            train_start,
+            train_end,
+            regime_col="trend_state",
+        )
+        assert isinstance(result, pd.DataFrame)
+        assert (result["regime_label"] == "all").all()
+        assert (result["regime_col"] == "trend_state").all()
+        # Shape should match full compute_ic output (14 rows by default)
+        assert len(result) == 14
+
+    def test_none_regimes_returns_full_sample(
+        self, predictive_feature, close_series, train_start, train_end
+    ):
+        """Pass None -> same result as empty DataFrame (regime_label='all')."""
+        result = compute_ic_by_regime(
+            predictive_feature,
+            close_series,
+            None,
+            train_start,
+            train_end,
+            regime_col="trend_state",
+        )
+        assert isinstance(result, pd.DataFrame)
+        assert (result["regime_label"] == "all").all()
+        assert len(result) == 14
+
+    def test_splits_by_regime_label(
+        self, predictive_feature, close_series, train_start, train_end
+    ):
+        """
+        Create synthetic regimes_df with 2 labels ('Up', 'Down'), each with
+        many bars. Verify separate IC rows per label.
+        """
+        # Build regimes_df covering the full train window
+        mask = (predictive_feature.index >= train_start) & (
+            predictive_feature.index <= train_end
+        )
+        train_idx = predictive_feature[mask].index
+
+        # Alternate 'Up' and 'Down' every bar
+        regime_series = _make_regime_series(train_idx, ["Up", "Down"])
+        regimes_df = regime_series.to_frame(name="trend_state")
+
+        result = compute_ic_by_regime(
+            predictive_feature,
+            close_series,
+            regimes_df,
+            train_start,
+            train_end,
+            regime_col="trend_state",
+            min_obs_per_regime=30,
+        )
+
+        assert isinstance(result, pd.DataFrame)
+        labels_found = set(result["regime_label"].unique())
+        # Both labels should be present (enough bars per regime)
+        assert "Up" in labels_found, f"Expected 'Up' label, got: {labels_found}"
+        assert "Down" in labels_found, f"Expected 'Down' label, got: {labels_found}"
+        assert "all" not in labels_found, "Should not have 'all' when regimes provided"
+
+    def test_sparse_regime_skipped(
+        self, predictive_feature, close_series, train_start, train_end
+    ):
+        """
+        Create regime 'Rare' with only 10 bars. That label should not appear in results.
+        The dominant regime 'Common' has many bars and should appear.
+        """
+        mask = (predictive_feature.index >= train_start) & (
+            predictive_feature.index <= train_end
+        )
+        train_idx = predictive_feature[mask].index
+
+        # 10 'Rare' bars, rest 'Common'
+        labels = ["Common"] * len(train_idx)
+        for i in range(min(10, len(train_idx))):
+            labels[i] = "Rare"
+
+        regime_series = pd.Series(labels, index=train_idx, name="trend_state")
+        regimes_df = regime_series.to_frame(name="trend_state")
+
+        result = compute_ic_by_regime(
+            predictive_feature,
+            close_series,
+            regimes_df,
+            train_start,
+            train_end,
+            regime_col="trend_state",
+            min_obs_per_regime=30,
+        )
+
+        labels_found = set(result["regime_label"].unique())
+        assert "Rare" not in labels_found, (
+            f"Sparse 'Rare' regime should be skipped, got labels: {labels_found}"
+        )
+        assert "Common" in labels_found, (
+            f"'Common' regime should be present, got labels: {labels_found}"
+        )
+
+    def test_regime_col_parameter(
+        self, predictive_feature, close_series, train_start, train_end
+    ):
+        """Pass regime_col='vol_state' with 'High'/'Low' labels -> results have correct regime_col and regime_label values."""
+        mask = (predictive_feature.index >= train_start) & (
+            predictive_feature.index <= train_end
+        )
+        train_idx = predictive_feature[mask].index
+
+        regime_series = _make_regime_series(train_idx, ["High", "Low"])
+        regimes_df = regime_series.rename("vol_state").to_frame(name="vol_state")
+
+        result = compute_ic_by_regime(
+            predictive_feature,
+            close_series,
+            regimes_df,
+            train_start,
+            train_end,
+            regime_col="vol_state",
+            min_obs_per_regime=30,
+        )
+
+        assert isinstance(result, pd.DataFrame)
+        assert (result["regime_col"] == "vol_state").all(), (
+            f"Expected regime_col='vol_state', got: {result['regime_col'].unique()}"
+        )
+        labels_found = set(result["regime_label"].unique())
+        assert "High" in labels_found, f"Expected 'High', got: {labels_found}"
+        assert "Low" in labels_found, f"Expected 'Low', got: {labels_found}"
+
+
+# ---------------------------------------------------------------------------
+# 8. TestBatchComputeIC
+# ---------------------------------------------------------------------------
+
+
+class TestBatchComputeIC:
+    @pytest.fixture(scope="class")
+    def features_df(self, close_series):
+        """DataFrame with 3 numeric feature columns."""
+        rng = np.random.default_rng(77)
+        idx = close_series.index
+        return pd.DataFrame(
+            {
+                "feat_a": rng.standard_normal(len(idx)),
+                "feat_b": close_series.pct_change().shift(1).values,
+                "feat_c": rng.standard_normal(len(idx)) * 2,
+            },
+            index=idx,
+        )
+
+    def test_batch_multiple_features(
+        self, features_df, close_series, train_start, train_end
+    ):
+        """Pass DataFrame with 3 numeric columns -> result has 'feature' column with all 3 names."""
+        result = batch_compute_ic(
+            features_df,
+            close_series,
+            train_start,
+            train_end,
+        )
+        assert isinstance(result, pd.DataFrame)
+        assert "feature" in result.columns
+        features_found = set(result["feature"].unique())
+        assert features_found == {"feat_a", "feat_b", "feat_c"}, (
+            f"Expected all 3 features, got: {features_found}"
+        )
+
+    def test_batch_feature_cols_filter(
+        self, features_df, close_series, train_start, train_end
+    ):
+        """Pass feature_cols=['feat_a', 'feat_b'] when df has 3 columns -> only 2 features in result."""
+        result = batch_compute_ic(
+            features_df,
+            close_series,
+            train_start,
+            train_end,
+            feature_cols=["feat_a", "feat_b"],
+        )
+        features_found = set(result["feature"].unique())
+        assert features_found == {"feat_a", "feat_b"}, (
+            f"Expected only feat_a and feat_b, got: {features_found}"
+        )
+        assert "feat_c" not in features_found
+
+    def test_batch_shape(self, features_df, close_series, train_start, train_end):
+        """
+        3 features x 7 horizons x 2 return types = 42 rows.
+        """
+        result = batch_compute_ic(
+            features_df,
+            close_series,
+            train_start,
+            train_end,
+        )
+        # Default: 3 features x 7 horizons x 2 return_types = 42
+        assert len(result) == 42, (
+            f"Expected 42 rows (3 features x 7 horizons x 2 return_types), got {len(result)}"
+        )
+
+    def test_batch_excludes_close_column(self, close_series, train_start, train_end):
+        """When features_df has a 'close' column, it should be excluded from feature_cols."""
+        rng = np.random.default_rng(88)
+        idx = close_series.index
+        df_with_close = pd.DataFrame(
+            {
+                "feat_x": rng.standard_normal(len(idx)),
+                "close": close_series.values,
+            },
+            index=idx,
+        )
+        result = batch_compute_ic(
+            df_with_close,
+            close_series,
+            train_start,
+            train_end,
+        )
+        features_found = set(result["feature"].unique())
+        assert "close" not in features_found, (
+            f"'close' column should be excluded, got: {features_found}"
+        )
+        assert "feat_x" in features_found
+
+
+# ---------------------------------------------------------------------------
+# 9. TestPlotICDecay
+# ---------------------------------------------------------------------------
+
+
+class TestPlotICDecay:
+    @pytest.fixture(scope="class")
+    def ic_df_for_plot(self, predictive_feature, close_series, train_start, train_end):
+        """Compute a standard IC DataFrame filtered to 'arith' return type."""
+        df = compute_ic(
+            predictive_feature,
+            close_series,
+            train_start,
+            train_end,
+            horizons=[1, 2, 3, 5, 10, 20, 60],
+            return_types=["arith"],
+        )
+        return df
+
+    def test_returns_plotly_figure(
+        self, ic_df_for_plot, predictive_feature, close_series, train_start, train_end
+    ):
+        """plot_ic_decay returns a plotly Figure."""
+        import plotly.graph_objects as go
+
+        fig = plot_ic_decay(ic_df_for_plot, feature="predictive_feature")
+        assert isinstance(fig, go.Figure), f"Expected go.Figure, got {type(fig)}"
+
+    def test_bar_count_matches_horizons(
+        self, ic_df_for_plot, predictive_feature, close_series, train_start, train_end
+    ):
+        """Number of bars in figure.data[0] matches len(ic_df)."""
+        fig = plot_ic_decay(ic_df_for_plot, feature="predictive_feature")
+        # figure.data[0] is the Bar trace
+        bar_trace = fig.data[0]
+        n_bars = len(bar_trace.x)
+        assert n_bars == len(ic_df_for_plot), (
+            f"Expected {len(ic_df_for_plot)} bars, got {n_bars}"
+        )
+
+    def test_significance_coloring(self, close_series, train_start, train_end):
+        """With mix of p < 0.05 and p > 0.05 -> verify marker_color list has both 'royalblue' and 'lightgray'."""
+        import plotly.graph_objects as go
+
+        # Build a synthetic ic_df with known p-values spanning both sides of 0.05
+        ic_df_mixed = pd.DataFrame(
+            {
+                "horizon": [1, 2, 3, 5, 10, 20, 60],
+                "return_type": ["arith"] * 7,
+                "ic": [0.3, 0.2, 0.1, 0.05, 0.02, 0.01, 0.005],
+                # Mix: first 3 below 0.05, last 4 above 0.05
+                "ic_p_value": [0.01, 0.02, 0.04, 0.10, 0.20, 0.40, 0.80],
+            }
+        )
+
+        fig = plot_ic_decay(ic_df_mixed, feature="test_feature")
+        assert isinstance(fig, go.Figure)
+
+        bar_trace = fig.data[0]
+        colors = list(bar_trace.marker.color)
+
+        assert "royalblue" in colors, "Expected at least one 'royalblue' bar (p < 0.05)"
+        assert "lightgray" in colors, (
+            "Expected at least one 'lightgray' bar (p >= 0.05)"
+        )
+
+    def test_title_includes_feature_name(self, ic_df_for_plot):
+        """Figure title should include the feature name."""
+        feature_name = "my_test_feature"
+        fig = plot_ic_decay(ic_df_for_plot, feature=feature_name)
+        title_text = fig.layout.title.text
+        assert feature_name in title_text, (
+            f"Expected '{feature_name}' in title, got: '{title_text}'"
+        )
+
+
+# ---------------------------------------------------------------------------
+# 10. TestPlotRollingIC
+# ---------------------------------------------------------------------------
+
+
+class TestPlotRollingIC:
+    @pytest.fixture(scope="class")
+    def rolling_ic_series(
+        self, predictive_feature, close_series, train_start, train_end
+    ):
+        """Compute rolling IC series for use in plot tests."""
+        mask = (predictive_feature.index >= train_start) & (
+            predictive_feature.index <= train_end
+        )
+        feat_train = predictive_feature[mask]
+        fwd_ret = compute_forward_returns(close_series, horizon=1, log=False)[mask]
+        rolling_ic, _, _ = compute_rolling_ic(feat_train, fwd_ret, window=63)
+        return rolling_ic
+
+    def test_returns_plotly_figure(self, rolling_ic_series):
+        """plot_rolling_ic returns a plotly Figure."""
+        import plotly.graph_objects as go
+
+        fig = plot_rolling_ic(rolling_ic_series, feature="predictive_feature")
+        assert isinstance(fig, go.Figure), f"Expected go.Figure, got {type(fig)}"
+
+    def test_title_includes_feature_name(self, rolling_ic_series):
+        """Figure title should contain the feature name."""
+        feature_name = "my_rolling_feature"
+        fig = plot_rolling_ic(rolling_ic_series, feature=feature_name)
+        title_text = fig.layout.title.text
+        assert feature_name in title_text, (
+            f"Expected '{feature_name}' in title, got: '{title_text}'"
+        )
+
+    def test_has_zero_reference_line(self, rolling_ic_series):
+        """Figure should include a horizontal reference line at y=0."""
+        fig = plot_rolling_ic(rolling_ic_series, feature="test_feature")
+        # add_hline creates a shape in layout.shapes
+        has_zero_line = any(
+            shape.y0 == 0 and shape.y1 == 0
+            for shape in fig.layout.shapes
+            if hasattr(shape, "y0")
+        )
+        assert has_zero_line, "Expected a horizontal reference line at y=0"
+
+    def test_horizon_and_return_type_in_title(self, rolling_ic_series):
+        """When horizon and return_type are provided, they appear in the title."""
+        fig = plot_rolling_ic(
+            rolling_ic_series,
+            feature="my_feature",
+            horizon=5,
+            return_type="log",
+        )
+        title_text = fig.layout.title.text
+        assert "horizon=5" in title_text, (
+            f"Expected 'horizon=5' in title: '{title_text}'"
+        )
+        assert "return_type=log" in title_text, (
+            f"Expected 'return_type=log' in title: '{title_text}'"
+        )
