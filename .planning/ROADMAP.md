@@ -687,7 +687,12 @@ Plans:
   4. `_fold_boundaries` public API or notebook uses public equivalent
   5. Dashboard has an Experiments page showing `cmc_feature_experiments` results
   6. Research Explorer page includes rolling IC chart for selected feature
-**Plans**: 0/TBD
+**Plans**: 3 plans in 1 wave
+
+Plans:
+- [ ] 41.1-01-PLAN.md -- AMA tables in ExperimentRunner _ALLOWED_TABLES + filter support + YAML features
+- [ ] 41.1-02-PLAN.md -- Dashboard experiments page (queries + page + nav registration)
+- [ ] 41.1-03-PLAN.md -- Fix stale CLI ref, add rolling IC chart, make fold_boundaries public
 
 </details>
 
@@ -789,7 +794,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | 39. Streamlit Dashboard | 4/4 | Complete | 2026-02-24 |
 | 40. Notebooks | 3/3 | Complete | 2026-02-24 |
 | 41. Asset Descriptive Stats & Correlation | 6/6 | Complete | 2026-02-24 |
-| 41.1. Milestone Cleanup | 0/TBD | Planned | -- |
+| 41.1. Milestone Cleanup | 0/3 | Planned | -- |
 
 ### v1.0.0 Progress (Next)
 
