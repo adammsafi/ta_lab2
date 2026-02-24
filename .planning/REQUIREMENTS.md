@@ -47,11 +47,11 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Feature Experimentation Framework
 
-- [ ] **FEAT-01**: YAML-based feature registry with lifecycle states: experimental / promoted / deprecated
-- [ ] **FEAT-02**: Compute experimental features on demand from existing base data — no DB persistence until promotion
-- [ ] **FEAT-03**: `ExperimentRunner` wiring IC evaluation for systematic feature scoring with results persisted to `cmc_feature_experiments`
-- [ ] **FEAT-04**: Benjamini-Hochberg correction as hard gate in promotion logic — prevents noise features from being promoted
-- [ ] **FEAT-05**: `dim_feature_registry` and `cmc_feature_experiments` tables via Alembic migration
+- [x] **FEAT-01**: YAML-based feature registry with lifecycle states: experimental / promoted / deprecated
+- [x] **FEAT-02**: Compute experimental features on demand from existing base data — no DB persistence until promotion
+- [x] **FEAT-03**: `ExperimentRunner` wiring IC evaluation for systematic feature scoring with results persisted to `cmc_feature_experiments`
+- [x] **FEAT-04**: Benjamini-Hochberg correction as hard gate in promotion logic — prevents noise features from being promoted
+- [x] **FEAT-05**: `dim_feature_registry` and `cmc_feature_experiments` tables via Alembic migration
 
 ### Streamlit Dashboard
 
@@ -136,11 +136,11 @@ Deferred to future release. Tracked but not in current roadmap.
 | CV-01 | Phase 36 | Complete |
 | CV-02 | Phase 36 | Complete |
 | CV-03 | Phase 36 | Complete |
-| FEAT-01 | Phase 38 | Pending |
-| FEAT-02 | Phase 38 | Pending |
-| FEAT-03 | Phase 38 | Pending |
-| FEAT-04 | Phase 38 | Pending |
-| FEAT-05 | Phase 38 | Pending |
+| FEAT-01 | Phase 38 | Complete |
+| FEAT-02 | Phase 38 | Complete |
+| FEAT-03 | Phase 38 | Complete |
+| FEAT-04 | Phase 38 | Complete |
+| FEAT-05 | Phase 38 | Complete |
 | DASH-01 | Phase 39 | Pending |
 | DASH-02 | Phase 39 | Pending |
 | DASH-03 | Phase 39 | Pending |
@@ -164,4 +164,4 @@ Deferred to future release. Tracked but not in current roadmap.
 
 ---
 *Requirements defined: 2026-02-23*
-*Last updated: 2026-02-23 — IC-01..08 marked Complete (Phase 37 verified)*
+*Last updated: 2026-02-24 — FEAT-01..05 marked Complete (Phase 38 verified)*

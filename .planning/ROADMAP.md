@@ -521,7 +521,7 @@ Plans:
 - [x] **Phase 35: AMA Engine** - Adaptive Moving Averages (KAMA, DEMA, TEMA, HMA) with full calendar parity
 - [x] **Phase 36: PSR + Purged K-Fold** - Probabilistic Sharpe Ratio, DSR, MinTRL + leakage-free CV splitters
 - [x] **Phase 37: IC Evaluation** - Information Coefficient scoring engine with regime breakdown and significance testing
-- [ ] **Phase 38: Feature Experimentation** - YAML registry, ExperimentRunner, BH-corrected promotion gate
+- [x] **Phase 38: Feature Experimentation** - YAML registry, ExperimentRunner, BH-corrected promotion gate
 - [ ] **Phase 39: Streamlit Dashboard** - Pipeline monitor + research explorer with cached DB queries
 - [ ] **Phase 40: Notebooks** - 3-5 polished Jupyter notebooks demonstrating the full research cycle
 - [ ] **Phase 41: Asset Descriptive Stats & Correlation** - Rolling per-asset summary stats + cross-asset return correlation time series
@@ -606,14 +606,14 @@ Plans:
   3. `promote_feature(feature_name)` passes only when Benjamini-Hochberg corrected p-values are significant at alpha=0.05 for at least one horizon; calling it on a noise feature (IC ~ 0) raises `PromotionRejectedError`
   4. After promotion, the feature appears in `dim_feature_registry` with `lifecycle: promoted` and a migration stub is generated pointing to the Alembic migrations directory
   5. `alembic upgrade head` applies the `dim_feature_registry` and `cmc_feature_experiments` DDL migration cleanly on a fresh schema; `alembic downgrade -1` reverses it without errors
-**Plans**: 5 plans in 3 waves
+**Plans**: 5/5 complete
 
 Plans:
-- [ ] 38-01-PLAN.md -- Alembic migration for dim_feature_registry and cmc_feature_experiments tables (FEAT-05)
-- [ ] 38-02-PLAN.md -- YAML feature registry + DAG dependency resolver (FEAT-01)
-- [ ] 38-03-PLAN.md -- ExperimentRunner + run_experiment.py CLI (FEAT-02, FEAT-03)
-- [ ] 38-04-PLAN.md -- FeaturePromoter + BH gate + promote/purge CLIs (FEAT-04)
-- [ ] 38-05-PLAN.md -- Unit tests + end-to-end verification
+- [x] 38-01-PLAN.md -- Alembic migration for dim_feature_registry and cmc_feature_experiments tables (FEAT-05)
+- [x] 38-02-PLAN.md -- YAML feature registry + DAG dependency resolver (FEAT-01)
+- [x] 38-03-PLAN.md -- ExperimentRunner + run_experiment.py CLI (FEAT-02, FEAT-03)
+- [x] 38-04-PLAN.md -- FeaturePromoter + BH gate + promote/purge CLIs (FEAT-04)
+- [x] 38-05-PLAN.md -- Unit tests + end-to-end verification
 
 ---
 
@@ -750,7 +750,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | 35. AMA Engine | 8/8 | Complete | 2026-02-23 |
 | 36. PSR + Purged K-Fold | 5/5 | Complete | 2026-02-24 |
 | 37. IC Evaluation | 4/4 | Complete | 2026-02-23 |
-| 38. Feature Experimentation | 0/5 | Not started | -- |
+| 38. Feature Experimentation | 5/5 | Complete | 2026-02-24 |
 | 39. Streamlit Dashboard | 0/TBD | Not started | -- |
 | 40. Notebooks | 0/TBD | Not started | -- |
 | 41. Asset Descriptive Stats & Correlation | 0/TBD | Not started | -- |
@@ -830,4 +830,4 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-23 (Phase 38 planned -- Feature Experimentation; 5 plans in 3 waves)*
+*Last updated: 2026-02-24 (Phase 38 complete -- Feature Experimentation; 15/15 must-haves verified)*
