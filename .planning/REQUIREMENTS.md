@@ -76,7 +76,7 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Cross-Asset Correlation
 
-- [ ] **CORR-01**: Pairwise rolling Pearson return correlation between all asset pairs per TF, across trailing windows (60, 90, 252 bars)
+- [ ] **CORR-01**: Pairwise rolling Pearson return correlation between all asset pairs per TF, across trailing windows (30, 60, 90, 252 bars)
 - [ ] **CORR-02**: Correlation tracked over time as rolling time series with PK `(id_a, id_b, ts, tf, window)` — enables detecting correlation regime shifts (e.g., risk-off spikes)
 - [ ] **CORR-03**: `cmc_cross_asset_corr` table created via Alembic migration, wired into `run_daily_refresh.py --all` with `--desc-stats` flag
 

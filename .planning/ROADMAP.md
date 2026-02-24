@@ -661,7 +661,7 @@ Plans:
   1. `cmc_asset_stats` contains rolling mean return and std dev for each asset/TF across trailing windows (30, 60, 90, 252 bars), with one row per (id, ts, tf) -- a full time series, not just the latest value
   2. Rolling Sharpe ratio, skewness (scipy), and kurtosis (scipy) are computed per asset/TF/window and stored alongside mean and std dev in `cmc_asset_stats`
   3. Rolling max drawdown per window is tracked in `cmc_asset_stats`; the value at any row reflects the worst peak-to-trough decline within the trailing window ending at that bar
-  4. `cmc_cross_asset_corr` contains pairwise rolling return correlation (Pearson) between all asset pairs per TF, across trailing windows (60, 90, 252 bars), tracked as a time series with one row per (id_a, id_b, ts, tf, window)
+  4. `cmc_cross_asset_corr` contains pairwise rolling return correlation (Pearson) between all asset pairs per TF, across trailing windows (30, 60, 90, 252 bars), tracked as a time series with one row per (id_a, id_b, ts, tf, window)
   5. Both tables are created via Alembic migration and wired into `run_daily_refresh.py --all` as a stage (after features); `--desc-stats` flag available for standalone execution
 **Plans**: 6 plans in 4 waves
 
