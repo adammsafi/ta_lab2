@@ -191,6 +191,23 @@ def load_to_db(
             pages_fetched=pages_fetched,
             asset_type_counts=type_counts,
         )
+
+        # Update data_sources registry (best-effort — table may not exist yet)
+        try:
+            with engine.begin() as conn:
+                conn.execute(
+                    text("""
+                        UPDATE data_sources SET
+                            last_refreshed = :scraped_at,
+                            last_row_count = :row_count,
+                            updated_at     = NOW()
+                        WHERE source_key = 'companiesmarketcap'
+                    """),
+                    {"scraped_at": scraped_at, "row_count": loaded},
+                )
+        except Exception:
+            logger.debug("data_sources table not available — skipping registry update.")
+
         logger.info("Run %d completed: %d rows loaded.", run_id, loaded)
         return loaded
 
