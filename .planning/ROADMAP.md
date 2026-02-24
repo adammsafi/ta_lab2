@@ -644,7 +644,12 @@ Plans:
   1. Each notebook completes "Restart and Run All" in under 5 minutes on a machine with DB access, producing no errors and no empty output cells
   2. Parameterized variables (`ASSET_ID`, `TF`, `START_DATE`, `END_DATE`) are defined in the first code cell; changing only those cells and re-running produces valid results for a different asset or timeframe
   3. Notebooks cover at minimum: AMA value inspection, IC evaluation with decay table, purged K-fold split visualization, and feature experimentation workflow -- each with a prose narrative cell before each major computation block
-**Plans**: 0/TBD
+**Plans**: 3 plans in 2 waves
+
+Plans:
+- [ ] 40-01-PLAN.md -- Shared helpers module + Notebook 01: Explore Indicators (AMA + regimes)
+- [ ] 40-02-PLAN.md -- Notebook 02: Evaluate Features (IC + purged K-fold + regime A/B backtest)
+- [ ] 40-03-PLAN.md -- Notebook 03: Run Experiments (feature experimentation + dashboard launch)
 
 ---
 
@@ -758,7 +763,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | 37. IC Evaluation | 4/4 | Complete | 2026-02-23 |
 | 38. Feature Experimentation | 5/5 | Complete | 2026-02-24 |
 | 39. Streamlit Dashboard | 4/4 | Complete | 2026-02-24 |
-| 40. Notebooks | 0/TBD | Not started | -- |
+| 40. Notebooks | 0/3 | Planned | -- |
 | 41. Asset Descriptive Stats & Correlation | 0/TBD | Not started | -- |
 
 ### v1.0.0 Progress (Next)
@@ -836,4 +841,4 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-24 (Phase 39 complete -- Streamlit Dashboard; 4/4 plans, 13/13 must-haves verified)*
+*Last updated: 2026-02-24 (Phase 40 planned -- Notebooks; 3 plans in 2 waves)*
