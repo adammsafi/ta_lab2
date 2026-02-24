@@ -571,7 +571,13 @@ Plans:
   3. Rolling IC time series (63-bar window) and IC-IR summary statistic are computed and match manual calculation on a test fixture
   4. `compute_ic_by_regime(feature_series, returns_df, regimes_df, train_start, train_end)` returns separate IC values per regime label; assets with no regime data return IC computed on the full sample
   5. IC significance t-stat and p-value are attached to each IC result row; feature turnover (rank autocorrelation) is computed and stored alongside IC in `cmc_ic_results`
-**Plans**: 0/TBD
+**Plans**: 4 plans in 2 waves
+
+Plans:
+- [ ] 37-01-PLAN.md -- Fix fillna deprecation + Alembic migration for cmc_ic_results table
+- [ ] 37-02-PLAN.md -- IC core library via TDD: compute_ic, rolling IC, IC-IR, significance, turnover
+- [ ] 37-03-PLAN.md -- Regime IC breakdown + batch wrapper + Plotly visualization helpers
+- [ ] 37-04-PLAN.md -- CLI script (run_ic_eval.py) + DB helpers (save/load)
 
 ---
 
@@ -685,8 +691,8 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 35. AMA Engine | 8/8 | Complete | 2026-02-23 |
-| 36. PSR + Purged K-Fold | 0/5 | Planned | -- |
-| 37. IC Evaluation | 0/TBD | Not started | -- |
+| 36. PSR + Purged K-Fold | 5/5 | Complete | 2026-02-24 |
+| 37. IC Evaluation | 0/4 | Planned | -- |
 | 38. Feature Experimentation | 0/TBD | Not started | -- |
 | 39. Streamlit Dashboard | 0/TBD | Not started | -- |
 | 40. Notebooks | 0/TBD | Not started | -- |
@@ -726,4 +732,4 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-23 (Phase 36 planned -- 5 plans in 2 waves)*
+*Last updated: 2026-02-24 (Phase 37 planned -- 4 plans in 2 waves)*
