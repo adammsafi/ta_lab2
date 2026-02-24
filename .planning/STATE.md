@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v0.9.0 Research & Experimentation — COMPLETE. Ready for v1.0.0.
+**Current focus:** v1.0.0 V1 Closure — Paper Trading & Validation
 
 ## Current Position
 
-Phase: 41.1 (Milestone Cleanup) — Complete
-Plan: 3/3 complete
-Status: Phase 41.1 verified (11/11 must-haves passed). v0.9.0 tech debt closed.
-Last activity: 2026-02-24 — Phase 41.1 verified, all 3 plans executed (AMA allowlist, experiments dashboard, fixes)
+Phase: Ready for v1.0.0 Phase 42 (Strategy Bake-Off)
+Plan: 0/TBD complete
+Status: v0.9.0 SHIPPED 2026-02-24. v1.0.0 not yet started.
+Last activity: 2026-02-24 — v0.9.0 milestone archived, v1.0.0 milestone activated
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0
 
@@ -336,8 +336,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-24T20:30:00Z
-Stopped at: Phase 41.1 verified (11/11 must-haves). v0.9.0 tech debt closed. Ready for milestone completion.
+Last session: 2026-02-24T21:00:00Z
+Stopped at: v0.9.0 milestone archived. Roadmap, milestones, project, state all updated. Ready for v1.0.0 Phase 42.
 Resume file: None
 
 ---
@@ -348,7 +348,7 @@ Resume file: None
 
 See `.planning/milestones/v0.8.0-ROADMAP.md` for archived details.
 
-**v0.9.0 Research & Experimentation — COMPLETE (including tech debt cleanup)**
+**v0.9.0 Research & Experimentation — SHIPPED 2026-02-24**
 
 Roadmap created 2026-02-23. 6 phases, 35 requirements.
 
@@ -372,4 +372,4 @@ Key constraints to remember:
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-24 (Phase 41 complete — v0.9.0 milestone complete, 6/6 must-haves verified)*
+*Last updated: 2026-02-24 (v0.9.0 SHIPPED — milestone archived, v1.0.0 activated)*

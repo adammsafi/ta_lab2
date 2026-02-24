@@ -1,5 +1,31 @@
 # Project Milestones: ta_lab2 AI-Accelerated Quant Platform
 
+## v0.9.0 Research & Experimentation (Shipped: 2026-02-24)
+
+**Delivered:** Full research cycle from adaptive indicators through IC evaluation, feature experimentation with BH-corrected promotion, interactive Streamlit dashboard, polished notebooks, and rolling asset statistics with cross-asset correlation.
+
+**Phases completed:** 35-41.1 (38 plans total)
+
+**Key accomplishments:**
+- Adaptive Moving Averages (KAMA, DEMA, TEMA, HMA) with full multi-TF parity, calendar variants, z-scores, and daily refresh integration
+- IC evaluation engine with Spearman IC, rolling IC, regime breakdown, significance testing, and DB persistence
+- PSR/DSR/MinTRL formulas (full Lopez de Prado) + PurgedKFoldSplitter + CPCVSplitter for leakage-free cross-validation
+- YAML-based feature experimentation framework with ExperimentRunner, BH-corrected promotion gate, and 7 experimental features
+- Streamlit dashboard with 5 pages: landing, pipeline monitor, research explorer (rolling IC chart), asset stats, and experiments
+- 3 polished Jupyter notebooks demonstrating the full research cycle end-to-end
+
+**Stats:**
+- 85 files created/modified (src/configs/notebooks/sql)
+- ~22,500 lines added
+- 8 phases, 38 plans
+- 2 days (2026-02-23 -> 2026-02-24)
+
+**Git range:** `docs(35): capture phase context` -> `docs(v0.9.0): re-audit passed`
+
+**What's next:** v1.0.0 V1 Closure -- strategy bake-off, paper-trade executor, risk controls, drift guard, 2+ weeks live paper validation
+
+---
+
 ## v0.8.0 Polish & Hardening (Shipped: 2026-02-23)
 
 **Delivered:** Production-hardened the quant platform with automated data quality gating, code quality CI gates, comprehensive operational runbooks, and Alembic migration framework.

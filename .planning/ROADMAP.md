@@ -7,8 +7,8 @@
 - v0.6.0 EMA & Bar Architecture Standardization (Phases 20-26) - SHIPPED 2026-02-17
 - v0.7.0 Regime Integration & Signal Enhancement (Phases 27-28) - SHIPPED 2026-02-20
 - v0.8.0 Polish & Hardening (Phases 29-34) - SHIPPED 2026-02-23
-- v0.9.0 Research & Experimentation (Phases 35-41) - current milestone
-- v1.0.0 V1 Closure — Paper Trading & Validation (Phases 42-54) - next milestone
+- v0.9.0 Research & Experimentation (Phases 35-41) - SHIPPED 2026-02-24
+- v1.0.0 V1 Closure — Paper Trading & Validation (Phases 42-54) - current milestone
 
 ## Overview
 
@@ -22,8 +22,8 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 - Phases 20-26: v0.6.0 (complete)
 - Phases 27-28: v0.7.0 (complete)
 - Phases 29-34: v0.8.0 (complete)
-- Phases 35-41: v0.9.0 (current)
-- Phases 42-54: v1.0.0 (next -- V1 Closure)
+- Phases 35-41: v0.9.0 (SHIPPED 2026-02-24)
+- Phases 42-54: v1.0.0 (current -- V1 Closure)
 - Decimal phases (27.1, 28.1): Urgent insertions if needed
 
 <details>
@@ -516,7 +516,7 @@ Plans:
 </details>
 
 <details>
-<summary>v0.9.0 Research & Experimentation (Phases 35-41) - CURRENT</summary>
+<summary>v0.9.0 Research & Experimentation (Phases 35-41) - SHIPPED 2026-02-24</summary>
 
 - [x] **Phase 35: AMA Engine** - Adaptive Moving Averages (KAMA, DEMA, TEMA, HMA) with full calendar parity
 - [x] **Phase 36: PSR + Purged K-Fold** - Probabilistic Sharpe Ratio, DSR, MinTRL + leakage-free CV splitters
@@ -530,7 +530,7 @@ Plans:
 </details>
 
 <details>
-<summary>v0.9.0 Phase Details (Phases 35-41)</summary>
+<summary>v0.9.0 Phase Details (Phases 35-41) - COMPLETE</summary>
 
 ### Phase 35: AMA Engine
 **Goal:** Users can compute and refresh Adaptive Moving Averages (KAMA, DEMA, TEMA, HMA) across all timeframes, with derivatives, z-scores, and unified table sync wired into the daily refresh pipeline.
@@ -697,7 +697,7 @@ Plans:
 </details>
 
 <details>
-<summary>v1.0.0 V1 Closure -- Paper Trading & Validation (Phases 42-54) - NEXT</summary>
+<summary>v1.0.0 V1 Closure -- Paper Trading & Validation (Phases 42-54) - CURRENT</summary>
 
 - [ ] **Phase 42: Strategy Bake-Off** - IC/PSR/CV evaluation of existing signals, select 2 strategies for V1
 - [ ] **Phase 43: Exchange Integration** - Connect to one exchange API, paper order adapter
@@ -783,7 +783,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | 33. Alembic Migrations | 2/2 | Complete | 2026-02-23 |
 | 34. Audit Cleanup | 1/1 | Complete | 2026-02-23 |
 
-### v0.9.0 Progress (Current)
+### v0.9.0 Progress (Complete)
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -796,7 +796,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | 41. Asset Descriptive Stats & Correlation | 6/6 | Complete | 2026-02-24 |
 | 41.1. Milestone Cleanup | 3/3 | Complete | 2026-02-24 |
 
-### v1.0.0 Progress (Next)
+### v1.0.0 Progress (Current)
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|

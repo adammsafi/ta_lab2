@@ -8,17 +8,19 @@ A systematic crypto trading platform with integrated AI orchestration and persis
 
 Build trustworthy quant trading infrastructure 3x faster by creating AI coordination that remembers context, routes work optimally, and eliminates redundant context-setting across sessions and platforms.
 
-## Current Milestone: v0.9.0 Research & Experimentation
+## Current Milestone: v1.0.0 V1 Closure — Paper Trading & Validation
 
-**Previous:** v0.8.0 Polish & Hardening — SHIPPED 2026-02-23 (6 phases, 13 plans, 20/20 requirements)
+**Previous:** v0.9.0 Research & Experimentation — SHIPPED 2026-02-24 (8 phases, 38 plans, 43/43 requirements)
 
-**Goal:** Enable a full research cycle — compute new indicators, evaluate with IC, stress test with CV, and visualize results in an interactive dashboard. End-to-end from feature creation to research insight.
+**Goal:** Close the V1 loop — strategy bake-off, paper-trade executor, risk controls, drift guard, all 6 research tracks answered, 2+ weeks live paper validation, and V1 Results Memo.
 
 **Target features:**
-- Feature Enrichment: KAMA, DEMA, TEMA, HMA as full pipeline citizens (multi-TF, persisted, _u sync, z-scores) + feature experimentation framework + IC evaluation
-- Stress Testing: Purged K-fold CV, walk-forward optimization improvements, probabilistic Sharpe ratio (full Lopez de Prado, not placeholder)
-- Visualization: Streamlit dashboard with both research explorer (IC scores, equity curves, regime transitions) and pipeline monitor (run status, data freshness, PASS/FAIL)
-- Example Notebooks: End-to-end demos (load → compute → plot → backtest), polished enough to share
+- Strategy Selection: IC/PSR/CV evaluation of existing signals, select 2 strategies for V1
+- Exchange Integration: Connect to one exchange API, paper order adapter, order & fill store
+- Paper-Trade Executor: Engine reads signals, generates orders, tracks positions, verifies backtest parity
+- Risk Controls: Kill switch, position caps, daily loss stops, circuit breaker, discretionary overrides
+- Drift Guard: Parallel backtest vs paper comparison, auto-pause on divergence
+- V1 Validation: 2+ weeks paper trading, success criteria measurement, V1 Results Memo
 
 ## Requirements
 
@@ -49,6 +51,19 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 - ✓ Cost optimization tiers (free CLI → subscriptions → paid API) — existing
 - ✓ Adapter architecture (Claude/ChatGPT/Gemini) — existing
 - ✓ Quota tracking design — existing
+
+### Complete (v0.9.0 Milestone)
+
+**Research & Experimentation** ✓
+- ✓ Adaptive Moving Averages: KAMA, DEMA, TEMA, HMA with (indicator, params_hash) PK, full multi-TF, _u sync, z-scores, daily refresh integration
+- ✓ IC evaluation: Spearman IC, rolling IC, IC-IR, regime breakdown, significance testing, cmc_ic_results DB persistence
+- ✓ PSR/DSR/MinTRL: full Lopez de Prado formulas, Pearson kurtosis, Alembic migration (psr->psr_legacy), backtest pipeline integration
+- ✓ Cross-validation: PurgedKFoldSplitter + CPCVSplitter from scratch (mlfinlab discontinued), leakage-free fold validation
+- ✓ Feature experimentation: YAML registry, ExperimentRunner, BH-corrected promotion gate, dim_feature_registry + cmc_feature_experiments tables
+- ✓ Streamlit dashboard: 5 pages (landing, pipeline monitor, research explorer with rolling IC, asset stats, experiments), NullPool + cache
+- ✓ Polished notebooks: helpers.py + 3 notebooks (indicators, features, experiments), parameterized, narrative cells
+- ✓ Asset descriptive stats: rolling 30/60/90/252-bar mean/std/Sharpe/skew/kurt/drawdown in cmc_asset_stats
+- ✓ Cross-asset correlation: pairwise rolling Pearson in cmc_cross_asset_corr + cmc_corr_latest materialized view
 
 ### Complete (v0.8.0 Milestone)
 
@@ -169,4 +184,4 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 | Backtest/live parity as success criterion | System is only trustworthy if backtests use identical logic to live trading - reproducibility is mandatory | — Pending |
 
 ---
-*Last updated: 2026-02-23 after v0.9.0 milestone start*
+*Last updated: 2026-02-24 after v0.9.0 milestone ship, v1.0.0 started*
