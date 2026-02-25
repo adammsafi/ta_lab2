@@ -1,4 +1,12 @@
-"""Drift guard computation library -- DriftMetrics dataclass, rolling tracking error, and PIT data snapshots."""
+"""Drift guard package (Phase 47).
+
+Provides continuous drift monitoring between paper executor and backtest replay:
+- DriftMonitor: daily drift comparison orchestrator
+- DriftMetrics: drift measurement dataclass and computation
+- DriftAttributor: 6-source sequential OAT attribution decomposition
+- ReportGenerator: Markdown + Plotly weekly drift reports
+- Drift pause: tiered graduated response (WARNING/PAUSE/ESCALATE)
+"""
 
 from ta_lab2.drift.attribution import AttributionResult, DriftAttributor
 from ta_lab2.drift.data_snapshot import collect_data_snapshot
