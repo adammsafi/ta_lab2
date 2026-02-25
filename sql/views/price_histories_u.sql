@@ -2,7 +2,7 @@
 -- Normalizes CMC and TVC raw price data into a common schema.
 -- Used by multi-TF bar builders via --daily-table public.price_histories_u
 -- to process both data sources transparently.
--- Includes is_primary_venue flag for downstream filtering.
+-- Includes venue_rank integer for informational metadata (never filtered on).
 
 DROP VIEW IF EXISTS public.price_histories_u;
 
@@ -26,14 +26,13 @@ SELECT
     name,
     source_file               AS src_file,
     load_ts                   AS src_load_ts,
-    TRUE::boolean             AS is_primary_venue
+    50::integer               AS venue_rank
 FROM public.cmc_price_histories7
 
 UNION ALL
 
 -- TVC source (equities, ETFs, multi-exchange crypto)
--- Returns ALL venues with is_primary_venue flag from dim_listings.
--- Downstream consumers filter by is_primary_venue = TRUE as needed.
+-- Returns ALL venues with venue_rank from dim_listings.
 SELECT
     t.id,
     t.venue,
@@ -51,7 +50,7 @@ SELECT
     'TradingView'::text       AS name,
     t.source_file             AS src_file,
     t.ingested_at             AS src_load_ts,
-    COALESCE(dl.is_primary, TRUE)::boolean AS is_primary_venue
+    COALESCE(dl.venue_rank, 50)::integer AS venue_rank
 FROM public.tvc_price_histories t
 LEFT JOIN public.dim_listings dl
     ON dl.id = t.id AND dl.venue = t.venue;

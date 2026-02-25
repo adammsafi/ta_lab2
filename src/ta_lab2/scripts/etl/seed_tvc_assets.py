@@ -287,16 +287,17 @@ def seed_assets(engine, discovered: list[dict], dry_run: bool = False) -> dict:
                 listings_by_symbol[sym], key=lambda entry: entry["venue"]
             )
             for i, listing in enumerate(sym_listings):
-                # Single-venue: always primary. Multi-venue: first alphabetically.
-                is_primary = (len(sym_listings) == 1) or (i == 0)
+                # Rank by position: first alphabetically gets rank 0 (best)
+                venue_rank = round(100 * i / max(len(sym_listings), 1))
                 conn.execute(
                     text("""
                         INSERT INTO dim_listings
-                            (id, venue, ticker_on_venue, asset_class, currency, is_primary)
-                        VALUES (:id, :venue, :ticker_on_venue, :asset_class, :currency, :is_primary)
+                            (id, venue, ticker_on_venue, asset_class, currency, venue_rank)
+                        VALUES (:id, :venue, :ticker_on_venue, :asset_class, :currency, :venue_rank)
                         ON CONFLICT (id, venue, ticker_on_venue) DO UPDATE SET
                             asset_class = EXCLUDED.asset_class,
-                            currency = EXCLUDED.currency
+                            currency = EXCLUDED.currency,
+                            venue_rank = EXCLUDED.venue_rank
                     """),
                     {
                         "id": asset_id,
@@ -304,15 +305,15 @@ def seed_assets(engine, discovered: list[dict], dry_run: bool = False) -> dict:
                         "ticker_on_venue": listing["ticker_on_venue"],
                         "asset_class": asset_class,
                         "currency": listing["currency"],
-                        "is_primary": is_primary,
+                        "venue_rank": venue_rank,
                     },
                 )
                 stats["listings_inserted"] += 1
                 logger.info(
-                    "    Listing: %s on %s (primary=%s)",
+                    "    Listing: %s on %s (venue_rank=%s)",
                     listing["ticker_on_venue"],
                     listing["venue"],
-                    is_primary,
+                    venue_rank,
                 )
 
             # --- Insert identifiers ---

@@ -67,7 +67,6 @@ class CycleStatsFeature(BaseFeature):
             "id = ANY(:ids)",
             "tf = :tf",
             "alignment_source = :as_",
-            "is_primary_venue = TRUE",
         ]
         params = {
             "ids": ids,
@@ -81,10 +80,12 @@ class CycleStatsFeature(BaseFeature):
             SELECT
                 id,
                 {self.TS_COLUMN} AS ts,
+                venue,
+                venue_rank,
                 close
             FROM {self.SOURCE_TABLE}
             WHERE {where_sql}
-            ORDER BY id, ts ASC
+            ORDER BY id, venue, ts ASC
         """
 
         with self.engine.connect() as conn:
@@ -99,8 +100,8 @@ class CycleStatsFeature(BaseFeature):
 
         results = []
 
-        for id_val in df_source["id"].unique():
-            df_id = df_source[df_source["id"] == id_val].copy()
+        for (id_val, venue_val), df_id in df_source.groupby(["id", "venue"]):
+            df_id = df_id.copy()
             df_id = df_id.sort_values("ts").reset_index(drop=True)
 
             if len(df_id) < 1:
@@ -127,6 +128,8 @@ class CycleStatsFeature(BaseFeature):
             "ts": "TIMESTAMPTZ NOT NULL",
             "tf": "TEXT NOT NULL",
             "alignment_source": "TEXT NOT NULL",
+            "venue": "TEXT NOT NULL DEFAULT 'CMC_AGG'",
+            "venue_rank": "INTEGER NOT NULL DEFAULT 50",
             "tf_days": "INTEGER NOT NULL",
             "close": "DOUBLE PRECISION",
             "ath": "DOUBLE PRECISION",

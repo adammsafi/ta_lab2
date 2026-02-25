@@ -352,8 +352,9 @@ class BaseFeature(ABC):
             keep_cols = [c for c in df.columns if c in table_cols]
             df = df[keep_cols]
 
-        # Scoped delete: existing rows for these (ids, tf, alignment_source)
+        # Scoped delete: existing rows for these (ids, tf, alignment_source, venue)
         ids = df["id"].unique().tolist()
+        venues = df["venue"].unique().tolist() if "venue" in df.columns else ["CMC_AGG"]
         tf = self.config.tf
         alignment_source = self.get_alignment_source()
 
@@ -363,8 +364,9 @@ class BaseFeature(ABC):
                     f"DELETE FROM {fq_table}"
                     " WHERE id = ANY(:ids) AND tf = :tf"
                     " AND alignment_source = :as_"
+                    " AND venue = ANY(:venues)"
                 ),
-                {"ids": ids, "tf": tf, "as_": alignment_source},
+                {"ids": ids, "tf": tf, "as_": alignment_source, "venues": venues},
             )
 
         # Insert

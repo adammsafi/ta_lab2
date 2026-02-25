@@ -107,7 +107,7 @@ class CalendarEMAFeature(BaseEMAFeature):
 
         Returns: DataFrame with id, ts, close
         """
-        where = ["id = ANY(:ids)", "is_primary_venue = TRUE"]
+        where = ["id = ANY(:ids)"]
         params = {"ids": ids}
 
         if start:
@@ -121,10 +121,12 @@ class CalendarEMAFeature(BaseEMAFeature):
           SELECT
             id,
             "timestamp" AS ts,
-            close
+            close,
+            venue,
+            venue_rank
           FROM public.cmc_price_bars_1d
           WHERE {" AND ".join(where)}
-          ORDER BY id, "timestamp"
+          ORDER BY id, venue, "timestamp"
         """
 
         with self.engine.connect() as conn:
@@ -132,7 +134,7 @@ class CalendarEMAFeature(BaseEMAFeature):
 
         if not df.empty:
             df["ts"] = pd.to_datetime(df["ts"], utc=True)
-            df = df.sort_values(["id", "ts"]).reset_index(drop=True)
+            df = df.sort_values(["id", "venue", "ts"]).reset_index(drop=True)
 
         logger.info(f"Loaded {len(df)} daily rows for {len(ids)} IDs")
         self._daily_data_cache = df
@@ -227,16 +229,31 @@ class CalendarEMAFeature(BaseEMAFeature):
         if tf_closes.empty:
             return pd.DataFrame()
 
-        # Group closes by (id, tf)
-        closes_g = tf_closes.groupby(["id", "tf"])["ts_close"].agg(list).to_dict()
+        # Group closes by (id, venue, tf)
+        closes_g = (
+            tf_closes.groupby(["id", "venue", "tf"])["ts_close"].agg(list).to_dict()
+        )
+
+        # Build venue_rank lookup from canonical closes
+        _venue_rank_map = {}
+        if "venue_rank" in tf_closes.columns:
+            for _, row in (
+                tf_closes[["id", "venue", "venue_rank"]]
+                .drop_duplicates(subset=["id", "venue"])
+                .iterrows()
+            ):
+                _venue_rank_map[(int(row["id"]), row["venue"])] = int(row["venue_rank"])
 
         out_frames = []
 
-        for (id_, tf), close_list in closes_g.items():
+        for (id_, venue, tf), close_list in closes_g.items():
             close_list = sorted(pd.to_datetime(close_list, utc=True))
             close_set = set(close_list)
 
-            df_id = self._daily_data_cache[self._daily_data_cache["id"] == id_].copy()
+            df_id = self._daily_data_cache[
+                (self._daily_data_cache["id"] == id_)
+                & (self._daily_data_cache["venue"] == venue)
+            ].copy()
             if df_id.empty:
                 continue
             df_id = df_id.sort_values("ts").reset_index(drop=True)
@@ -319,12 +336,16 @@ class CalendarEMAFeature(BaseEMAFeature):
                 else:
                     is_partial = np.ones(n_out, dtype=bool)
 
+                venue_rank = _venue_rank_map.get((int(id_), venue), 50)
+
                 df_out = pd.DataFrame(
                     {
                         "id": int(id_),
                         "tf": tf,
                         "ts": ts_out,
                         "period": int(period),
+                        "venue": venue,
+                        "venue_rank": int(venue_rank),
                         "tf_days": tf_spec.tf_days,
                         "roll": roll_out,
                         "ema": ema_arr,
@@ -340,6 +361,8 @@ class CalendarEMAFeature(BaseEMAFeature):
                             "tf",
                             "ts",
                             "period",
+                            "venue",
+                            "venue_rank",
                             "tf_days",
                             "roll",
                             "ema",
@@ -363,13 +386,15 @@ class CalendarEMAFeature(BaseEMAFeature):
             "tf": "TEXT NOT NULL",
             "ts": "TIMESTAMPTZ NOT NULL",
             "period": "INTEGER NOT NULL",
+            "venue": "TEXT NOT NULL DEFAULT 'CMC_AGG'",
+            "venue_rank": "INTEGER NOT NULL DEFAULT 50",
             "tf_days": "INTEGER",
             "roll": "BOOLEAN",
             "ema": "DOUBLE PRECISION",
             "ema_bar": "DOUBLE PRECISION",
             "is_partial_end": "BOOLEAN",
             "ingested_at": "TIMESTAMPTZ DEFAULT now()",
-            "PRIMARY KEY": "(id, tf, ts, period)",
+            "PRIMARY KEY": "(id, tf, ts, period, venue)",
         }
 
     # =========================================================================
@@ -404,19 +429,20 @@ class CalendarEMAFeature(BaseEMAFeature):
     def _load_canonical_closes(self, ids: list[int], tfs: list[str]) -> pd.DataFrame:
         """Load canonical closes from bars table."""
         if not ids or not tfs:
-            return pd.DataFrame(columns=["id", "tf", "ts_close"])
+            return pd.DataFrame(columns=["id", "tf", "ts_close", "venue"])
 
         sql = f"""
           SELECT
             id,
             tf,
-            "timestamp" AS ts_close
+            "timestamp" AS ts_close,
+            venue,
+            venue_rank
           FROM {self.bars_table}
           WHERE id = ANY(:ids)
             AND tf = ANY(:tfs)
             AND is_partial_end = FALSE
-            AND is_primary_venue = TRUE
-          ORDER BY id, tf, "timestamp"
+          ORDER BY id, venue, tf, "timestamp"
         """
 
         with self.engine.connect() as conn:
@@ -550,6 +576,7 @@ def write_multi_timeframe_ema_cal_to_db(
     # Write to database
     conflict_action = (
         """DO UPDATE SET
+        venue_rank       = EXCLUDED.venue_rank,
         tf_days          = EXCLUDED.tf_days,
         roll             = EXCLUDED.roll,
         ema              = EXCLUDED.ema,
@@ -563,16 +590,16 @@ def write_multi_timeframe_ema_cal_to_db(
     upsert_sql = text(
         f"""
       INSERT INTO {schema}.{out_table} (
-        id, tf, ts, period, tf_days,
-        roll, ema, ema_bar, is_partial_end,
+        id, tf, ts, period, venue, venue_rank,
+        tf_days, roll, ema, ema_bar, is_partial_end,
         ingested_at
       )
       VALUES (
-        :id, :tf, :ts, :period, :tf_days,
-        :roll, :ema, :ema_bar, :is_partial_end,
+        :id, :tf, :ts, :period, :venue, :venue_rank,
+        :tf_days, :roll, :ema, :ema_bar, :is_partial_end,
         now()
       )
-      ON CONFLICT (id, tf, ts, period) {conflict_action}
+      ON CONFLICT (id, tf, ts, period, venue) {conflict_action}
     """
     )
 

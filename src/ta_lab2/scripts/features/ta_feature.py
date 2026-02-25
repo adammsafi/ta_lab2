@@ -121,7 +121,6 @@ class TAFeature(BaseFeature):
             "id = ANY(:ids)",
             "tf = :tf",
             "alignment_source = :as_",
-            "is_primary_venue = TRUE",
         ]
         params = {
             "ids": ids,
@@ -143,6 +142,8 @@ class TAFeature(BaseFeature):
             SELECT
                 id,
                 {self.TS_COLUMN} AS ts,
+                venue,
+                venue_rank,
                 open,
                 high,
                 low,
@@ -150,7 +151,7 @@ class TAFeature(BaseFeature):
                 volume
             FROM {self.SOURCE_TABLE}
             WHERE {where_sql}
-            ORDER BY id, ts ASC
+            ORDER BY id, venue, ts ASC
         """
 
         sql = text(sql_text)
@@ -183,11 +184,11 @@ class TAFeature(BaseFeature):
         # Load active indicator parameters
         indicator_params = self.load_indicator_params()
 
-        # Process each ID separately
+        # Process each (id, venue) separately
         results = []
 
-        for id_val in df_source["id"].unique():
-            df_id = df_source[df_source["id"] == id_val].copy()
+        for (id_val, venue_val), df_id in df_source.groupby(["id", "venue"]):
+            df_id = df_id.copy()
 
             # Compute each active indicator
             for ind in indicator_params:
@@ -227,7 +228,7 @@ class TAFeature(BaseFeature):
         df_result["tf_days"] = self.get_tf_days()
 
         # Select output columns
-        output_cols = ["id", "ts", "tf", "tf_days", "close"] + [
+        output_cols = ["id", "ts", "tf", "tf_days", "venue", "venue_rank", "close"] + [
             col
             for col in df_result.columns
             if col
@@ -236,6 +237,8 @@ class TAFeature(BaseFeature):
                 "ts",
                 "tf",
                 "tf_days",
+                "venue",
+                "venue_rank",
                 "close",
                 "open",
                 "high",
@@ -259,6 +262,8 @@ class TAFeature(BaseFeature):
             "ts": "TIMESTAMPTZ NOT NULL",
             "tf": "TEXT NOT NULL",
             "alignment_source": "TEXT NOT NULL",
+            "venue": "TEXT NOT NULL DEFAULT 'CMC_AGG'",
+            "venue_rank": "INTEGER NOT NULL DEFAULT 50",
             "tf_days": "INTEGER NOT NULL",
             "close": "DOUBLE PRECISION",
         }
@@ -475,7 +480,8 @@ class TAFeature(BaseFeature):
         from ta_lab2.features.feature_utils import add_zscore as add_zscore_util
 
         if "rsi_14" in df.columns:
-            for _, df_asset in df.groupby("id"):
+            group_cols = ["id", "venue"] if "venue" in df.columns else ["id"]
+            for _, df_asset in df.groupby(group_cols):
                 idx = df_asset.index
                 add_zscore_util(
                     df_asset,

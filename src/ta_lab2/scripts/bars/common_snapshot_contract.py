@@ -160,7 +160,7 @@ CREATE TABLE IF NOT EXISTS {fq_table} (
 
     -- Venue tracking
     venue                       TEXT          NOT NULL DEFAULT 'CMC_AGG',
-    is_primary_venue            BOOLEAN       NOT NULL DEFAULT TRUE,
+    venue_rank                  INTEGER       NOT NULL DEFAULT 50,
 
     PRIMARY KEY (id, tf, bar_seq, venue, timestamp)
 );
@@ -196,10 +196,12 @@ def assert_one_row_per_local_day(
     ts_col: str = "ts",
     tz: str = "America/New_York",
     id_col: str | None = None,
+    venue_col: str = "venue",
 ) -> None:
     """
-    Enforce that base daily data has exactly 1 row per local calendar day.
+    Enforce that base daily data has exactly 1 row per (venue, local calendar day).
 
+    If the DataFrame has a venue column, uniqueness is checked per venue.
     This must run *before* any bar/window logic.
     """
     if df.empty:
@@ -212,23 +214,40 @@ def assert_one_row_per_local_day(
         bad = df.loc[ts.isna()].head(5)
         raise ValueError(f"{ts_col} contains NaT/invalid timestamps. Sample:\n{bad}")
 
-    local_day = ts.dt.tz_convert(tz).dt.date
-    vc = local_day.value_counts()
-    dups = vc[vc > 1]
+    df_check = df.copy()
+    df_check["_local_day"] = ts.dt.tz_convert(tz).dt.date
+
+    # Build group columns: include venue if present
+    group_cols = []
+    if id_col and id_col in df_check.columns:
+        group_cols.append(id_col)
+    if venue_col in df_check.columns:
+        group_cols.append(venue_col)
+    group_cols.append("_local_day")
+
+    sizes = df_check.groupby(group_cols).size()
+    dups = sizes[sizes > 1]
     if not dups.empty:
-        dup_day = dups.index[0]
-        sample = df.loc[local_day == dup_day]
+        first_dup = dups.index[0]
+        # first_dup is a tuple of (id?, venue?, local_day)
+        dup_day = first_dup[-1] if isinstance(first_dup, tuple) else first_dup
+        sample = df.loc[df_check["_local_day"] == dup_day]
         if id_col and id_col in df.columns:
-            sample = sample.sort_values([id_col, ts_col]).head(10)
+            sort_cols = [id_col]
+            if venue_col in df.columns:
+                sort_cols.append(venue_col)
+            sort_cols.append(ts_col)
+            sample = sample.sort_values(sort_cols).head(10)
         else:
             sample = sample.sort_values(ts_col).head(10)
+        venue_note = " (per venue)" if venue_col in df.columns else ""
         id_note = (
             f" across ids (showing `{id_col}`)"
             if (id_col and id_col in df.columns)
             else ""
         )
         raise ValueError(
-            f"Base daily invariant violated: {int(dups.iloc[0])} rows for local day {dup_day} ({tz}){id_note}. "
+            f"Base daily invariant violated: {int(dups.iloc[0])} rows for local day {dup_day} ({tz}){venue_note}{id_note}. "
             f"Sample:\n{sample}"
         )
 
@@ -398,7 +417,7 @@ REQUIRED_COL_DEFAULTS: dict[str, Any] = {
     "repaired_market_cap": False,
     # Venue tracking
     "venue": "CMC_AGG",
-    "is_primary_venue": True,
+    "venue_rank": 50,
 }
 
 
@@ -714,16 +733,29 @@ def load_state(
     ids: Sequence[int],
     *,
     with_tz: bool = False,
+    with_venue: bool = False,
 ) -> pd.DataFrame:
-    """Load state for ids. If with_tz=True, returns rows for all tz values present."""
+    """Load state for ids. If with_tz=True, returns rows for all tz values present.
+    If with_venue=True, includes venue column (requires venue in state table)."""
     if not ids:
         return pd.DataFrame()
 
-    cols = (
-        "id, tf, tz, daily_min_seen, daily_max_seen, last_bar_seq, last_time_close, updated_at"
-        if with_tz
-        else "id, tf, daily_min_seen, daily_max_seen, last_bar_seq, last_time_close, updated_at"
+    col_parts = ["id", "tf"]
+    if with_tz:
+        col_parts.append("tz")
+    if with_venue:
+        col_parts.append("venue")
+    col_parts.extend(
+        [
+            "daily_min_seen",
+            "daily_max_seen",
+            "last_bar_seq",
+            "last_time_close",
+            "updated_at",
+        ]
     )
+    cols = ", ".join(col_parts)
+
     sql = text(
         f"""
         SELECT {cols}
@@ -756,11 +788,13 @@ def upsert_state(
     rows: pd.DataFrame | Sequence[dict[str, Any]],
     *,
     with_tz: bool = False,
+    with_venue: bool = False,
 ) -> None:
     """
     Upsert state rows.
 
-    Primary key is ALWAYS (id, tf).
+    Primary key is (id, tf) by default.
+    If with_venue=True, PK becomes (id, tf, venue).
     The with_tz parameter controls whether tz column is included in INSERT/UPDATE.
     """
     if isinstance(rows, pd.DataFrame):
@@ -772,8 +806,9 @@ def upsert_state(
         if not payload:
             return
 
-    # CRITICAL: Conflict target is ALWAYS (id, tf), regardless of with_tz
     pk_cols = ["id", "tf"]
+    if with_venue:
+        pk_cols.append("venue")
 
     # Build column lists based on with_tz
     base_data_cols = [
@@ -783,15 +818,12 @@ def upsert_state(
         "last_time_close",
     ]
 
+    extra_cols = []
     if with_tz:
-        # Include tz in INSERT columns (after tf, before data columns)
-        insert_cols = ["id", "tf", "tz"] + base_data_cols
-        # Include tz in UPDATE SET clause
-        update_cols = ["tz"] + base_data_cols
-    else:
-        # No tz column
-        insert_cols = pk_cols + base_data_cols
-        update_cols = base_data_cols
+        extra_cols.append("tz")
+
+    insert_cols = pk_cols + extra_cols + base_data_cols
+    update_cols = extra_cols + base_data_cols
 
     insert_cols_str = ", ".join(insert_cols)
     values_str = ", ".join([f":{c}" for c in insert_cols])
@@ -801,8 +833,7 @@ def upsert_state(
         [f"{c} = EXCLUDED.{c}" for c in update_cols] + ["updated_at = now()"]
     )
 
-    # Conflict target is ALWAYS (id, tf)
-    conflict_target = "id, tf"
+    conflict_target = ", ".join(pk_cols)
 
     sql = text(
         f"""
@@ -1327,14 +1358,17 @@ def load_daily_prices_for_id(
     id_: int,
     ts_start: pd.Timestamp | None = None,
     tz: str = "America/New_York",
+    venue: str | None = None,
 ) -> pd.DataFrame:
     """
     Load daily OHLCV rows for a single id from the daily table.
 
     - If ts_start is provided, only loads rows with timestamp >= ts_start
+    - If venue is provided, filters to that specific venue
+    - If venue is None, returns all venues (caller must handle)
     - Returns rows ordered ascending by timestamp
     - Normalizes to include a 'ts' column (tz-aware UTC)
-    - Enforces 1-row-per-local-day invariant
+    - Enforces 1-row-per-(venue, local-day) invariant
 
     IDENTICAL across all 5 bar builders - extracted to eliminate duplication.
 
@@ -1344,21 +1378,28 @@ def load_daily_prices_for_id(
         id_: Cryptocurrency ID
         ts_start: Optional start timestamp (only load rows >= this)
         tz: Timezone for local day validation (default: America/New_York)
+        venue: Optional venue filter (None = all venues)
 
     Returns:
         DataFrame with daily OHLCV data, ts column in UTC
     """
-    if ts_start is None:
-        where = "WHERE s.id = :id AND s.is_primary_venue = TRUE"
-        params = {"id": int(id_)}
-    else:
-        where = 'WHERE s.id = :id AND s.is_primary_venue = TRUE AND s."timestamp" >= :ts_start'
-        params = {"id": int(id_), "ts_start": ts_start}
+    where_parts = ["s.id = :id"]
+    params: dict = {"id": int(id_)}
+
+    if venue is not None:
+        where_parts.append("s.venue = :venue")
+        params["venue"] = venue
+    if ts_start is not None:
+        where_parts.append('s."timestamp" >= :ts_start')
+        params["ts_start"] = ts_start
+
+    where = "WHERE " + " AND ".join(where_parts)
 
     sql = text(
         f"""
       SELECT
         s.id,
+        s.venue,
         s."timestamp" AS ts,
         s.timehigh,
         s.timelow,
@@ -1369,13 +1410,14 @@ def load_daily_prices_for_id(
         s.volume,
         s.marketcap AS market_cap,
         b1d.src_name,
-        b1d.ingested_at AS src_load_ts
+        b1d.ingested_at AS src_load_ts,
+        COALESCE(b1d.venue_rank, 50) AS venue_rank
       FROM {daily_table} s
       LEFT JOIN public.cmc_price_bars_1d b1d
         ON b1d.id = s.id AND b1d."timestamp" = s."timestamp"
-           AND b1d.is_primary_venue = TRUE
+           AND b1d.venue = s.venue
       {where}
-      ORDER BY s."timestamp";
+      ORDER BY s.venue, s."timestamp";
     """
     )
 
@@ -1393,7 +1435,7 @@ def load_daily_prices_for_id(
         if col in df.columns:
             df[col] = pd.to_datetime(df[col], utc=True, errors="coerce")
 
-    # Hard invariant (shared contract)
+    # Hard invariant (shared contract): 1 row per (venue, local day)
     assert_one_row_per_local_day(df, ts_col="ts", tz=tz, id_col="id")
 
     return df
@@ -1405,9 +1447,10 @@ def delete_bars_for_id_tf(
     *,
     id_: int,
     tf: str,
+    venue: str | None = None,
 ) -> None:
     """
-    Delete all bar snapshots for a specific (id, tf) combination.
+    Delete all bar snapshots for a specific (id, tf) or (id, tf, venue) combination.
 
     Used in full rebuild mode to clear existing bars before regeneration.
 
@@ -1416,11 +1459,20 @@ def delete_bars_for_id_tf(
         bars_table: Bar snapshots table name
         id_: Cryptocurrency ID
         tf: Timeframe string (e.g., "7d", "1w_iso")
+        venue: Optional venue filter. If None, deletes all venues for (id, tf).
     """
-    sql = text(f"DELETE FROM {bars_table} WHERE id = :id AND tf = :tf;")
+    if venue is not None:
+        sql = text(
+            f"DELETE FROM {bars_table} WHERE id = :id AND tf = :tf AND venue = :venue;"
+        )
+    else:
+        sql = text(f"DELETE FROM {bars_table} WHERE id = :id AND tf = :tf;")
+    params: dict = {"id": int(id_), "tf": tf}
+    if venue is not None:
+        params["venue"] = venue
     eng = get_engine(db_url)
     with eng.begin() as conn:
-        conn.execute(sql, {"id": int(id_), "tf": tf})
+        conn.execute(sql, params)
 
 
 def load_last_snapshot_row(

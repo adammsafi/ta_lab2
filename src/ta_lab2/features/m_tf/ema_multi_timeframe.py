@@ -100,17 +100,18 @@ class MultiTFEMAFeature(BaseEMAFeature):
         """
         # Load directly from price_histories to avoid config-file dependency
         # (load_cmc_ohlcv_daily requires configs/default.yaml for table resolution)
-        where = ["id = ANY(:ids)", "timestamp >= :start", "is_primary_venue = TRUE"]
+        where = ["id = ANY(:ids)", "timestamp >= :start"]
         params: dict = {"ids": list(ids), "start": "2010-01-01"}
         if end is not None:
             where.append("timestamp < :end")
             params["end"] = end
 
         sql = text(
-            f"SELECT id, timestamp AS ts, open, high, low, close, volume "
+            f"SELECT id, timestamp AS ts, open, high, low, close, volume, "
+            f"venue, venue_rank "
             f"FROM public.cmc_price_bars_1d "
             f"WHERE {' AND '.join(where)} "
-            f"ORDER BY id, timestamp"
+            f"ORDER BY id, venue, timestamp"
         )
 
         with self.engine.connect() as conn:
@@ -211,14 +212,23 @@ class MultiTFEMAFeature(BaseEMAFeature):
 
         frames = []
 
-        for asset_id in ids:
-            df_id = daily[daily["id"] == asset_id].copy()
+        # Iterate per (id, venue) to compute EMAs per venue
+        id_venue_pairs = (
+            daily[["id", "venue", "venue_rank"]]
+            .drop_duplicates(subset=["id", "venue"])
+            .values.tolist()
+        )
+
+        for asset_id, venue, venue_rank in id_venue_pairs:
+            df_id = daily[(daily["id"] == asset_id) & (daily["venue"] == venue)].copy()
             if df_id.empty:
                 continue
 
-            # Get bars for this ID (persisted or synthetic)
+            # Get bars for this (ID, venue) (persisted or synthetic)
             if not bars_all.empty:
-                bars_id = bars_all[bars_all["id"] == asset_id].copy()
+                bars_id = bars_all[
+                    (bars_all["id"] == asset_id) & (bars_all["venue"] == venue)
+                ].copy()
             else:
                 bars_id = pd.DataFrame()
 
@@ -333,6 +343,8 @@ class MultiTFEMAFeature(BaseEMAFeature):
                         "ts": grid_ts_slice,
                         "period": p,
                         "tf_days": tf_spec.tf_days,
+                        "venue": venue,
+                        "venue_rank": int(venue_rank),
                         "roll": roll_arr,
                         "ema": ema_out[sl],
                         "ema_bar": ema_bar_out[sl],
@@ -347,7 +359,7 @@ class MultiTFEMAFeature(BaseEMAFeature):
 
         result = pd.concat(frames, ignore_index=True)
         result["ts"] = pd.to_datetime(result["ts"], utc=True)
-        result = result.sort_values(["id", "tf", "period", "ts"])
+        result = result.sort_values(["id", "venue", "tf", "period", "ts"])
 
         return result
 
@@ -358,13 +370,15 @@ class MultiTFEMAFeature(BaseEMAFeature):
             "tf": "TEXT NOT NULL",
             "ts": "TIMESTAMPTZ NOT NULL",
             "period": "INTEGER NOT NULL",
+            "venue": "TEXT NOT NULL DEFAULT 'CMC_AGG'",
+            "venue_rank": "INTEGER NOT NULL DEFAULT 50",
             "tf_days": "INTEGER",
             "roll": "BOOLEAN",
             "ema": "DOUBLE PRECISION",
             "ema_bar": "DOUBLE PRECISION",
             "is_partial_end": "BOOLEAN",
             "ingested_at": "TIMESTAMPTZ DEFAULT now()",
-            "PRIMARY KEY": "(id, tf, ts, period)",
+            "PRIMARY KEY": "(id, tf, ts, period, venue)",
         }
 
     # =========================================================================
@@ -392,7 +406,7 @@ class MultiTFEMAFeature(BaseEMAFeature):
                 raise ValueError("Could not find timestamp column in daily data")
 
         # Check required columns
-        required = {"id", "ts", "close"}
+        required = {"id", "ts", "close", "venue"}
         missing = required - set(df.columns)
         if missing:
             raise ValueError(f"Daily OHLCV missing required columns: {missing}")
@@ -408,7 +422,7 @@ class MultiTFEMAFeature(BaseEMAFeature):
             df["volume"] = 0.0
 
         df["ts"] = pd.to_datetime(df["ts"], utc=True)
-        df = df.sort_values(["id", "ts"]).reset_index(drop=True)
+        df = df.sort_values(["id", "venue", "ts"]).reset_index(drop=True)
         return df
 
     def _load_bar_closes(
@@ -426,14 +440,15 @@ class MultiTFEMAFeature(BaseEMAFeature):
           tf,
           bar_seq,
           "timestamp" AS time_close,
-          close AS close_bar
+          close AS close_bar,
+          venue,
+          venue_rank
         FROM {self.bars_schema}.{self.bars_table}
         WHERE tf = :tf
           AND id = ANY(:ids)
           AND is_partial_end = FALSE
-          AND is_primary_venue = TRUE
           {"" if end_ts is None else 'AND "timestamp" <= :end_ts'}
-        ORDER BY id, bar_seq
+        ORDER BY id, venue, bar_seq
         """
 
         params = {"tf": tf, "ids": ids}
@@ -447,7 +462,7 @@ class MultiTFEMAFeature(BaseEMAFeature):
             return df
 
         df["time_close"] = pd.to_datetime(df["time_close"], utc=True)
-        return df.sort_values(["id", "bar_seq"]).reset_index(drop=True)
+        return df.sort_values(["id", "venue", "bar_seq"]).reset_index(drop=True)
 
     def _synthetic_tf_day_bars_from_daily(
         self,
@@ -587,7 +602,8 @@ def write_multi_timeframe_ema_to_db(
                 f"""
                 CREATE TEMP TABLE {tmp_table} AS
                 SELECT
-                    id, tf, ts, period, tf_days, roll, ema, ema_bar, is_partial_end
+                    id, tf, ts, period, venue, venue_rank,
+                    tf_days, roll, ema, ema_bar, is_partial_end
                 FROM {schema}.{out_table}
                 LIMIT 0;
                 """
@@ -601,6 +617,7 @@ def write_multi_timeframe_ema_to_db(
         conflict_sql = (
             """
             DO UPDATE SET
+                venue_rank      = EXCLUDED.venue_rank,
                 tf_days         = EXCLUDED.tf_days,
                 roll            = EXCLUDED.roll,
                 ema             = EXCLUDED.ema,
@@ -613,11 +630,13 @@ def write_multi_timeframe_ema_to_db(
 
         sql = f"""
         INSERT INTO {schema}.{out_table} AS t
-            (id, tf, ts, period, tf_days, roll, ema, ema_bar, is_partial_end)
+            (id, tf, ts, period, venue, venue_rank,
+             tf_days, roll, ema, ema_bar, is_partial_end)
         SELECT
-            id, tf, ts, period, tf_days, roll, ema, ema_bar, is_partial_end
+            id, tf, ts, period, venue, venue_rank,
+            tf_days, roll, ema, ema_bar, is_partial_end
         FROM {tmp_table}
-        ON CONFLICT (id, tf, ts, period)
+        ON CONFLICT (id, tf, ts, period, venue)
         {conflict_sql};
         """
 

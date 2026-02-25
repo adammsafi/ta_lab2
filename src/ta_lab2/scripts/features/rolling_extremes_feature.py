@@ -88,7 +88,6 @@ class RollingExtremesFeature(BaseFeature):
             "id = ANY(:ids)",
             "tf = :tf",
             "alignment_source = :as_",
-            "is_primary_venue = TRUE",
         ]
         params = {
             "ids": ids,
@@ -102,10 +101,12 @@ class RollingExtremesFeature(BaseFeature):
             SELECT
                 id,
                 {self.TS_COLUMN} AS ts,
+                venue,
+                venue_rank,
                 close
             FROM {self.SOURCE_TABLE}
             WHERE {where_sql}
-            ORDER BY id, ts ASC
+            ORDER BY id, venue, ts ASC
         """
 
         with self.engine.connect() as conn:
@@ -120,15 +121,15 @@ class RollingExtremesFeature(BaseFeature):
 
         all_results = []
 
-        for id_val in df_source["id"].unique():
-            df_id = df_source[df_source["id"] == id_val].copy()
+        for (id_val, venue_val), df_id in df_source.groupby(["id", "venue"]):
+            df_id = df_id.copy()
             df_id = df_id.sort_values("ts").reset_index(drop=True)
 
             if len(df_id) < MIN_WINDOW_BARS:
                 continue
 
             for win in self._windows:
-                df_win = df_id[["id", "ts", "close"]].copy()
+                df_win = df_id[["id", "ts", "venue", "venue_rank", "close"]].copy()
                 add_rolling_extremes(df_win, window=win, close_col="close", ts_col="ts")
                 df_win["lookback_bars"] = win
                 all_results.append(df_win)
@@ -151,6 +152,8 @@ class RollingExtremesFeature(BaseFeature):
             "ts": "TIMESTAMPTZ NOT NULL",
             "tf": "TEXT NOT NULL",
             "alignment_source": "TEXT NOT NULL",
+            "venue": "TEXT NOT NULL DEFAULT 'CMC_AGG'",
+            "venue_rank": "INTEGER NOT NULL DEFAULT 50",
             "lookback_bars": "INTEGER NOT NULL",
             "tf_days": "INTEGER NOT NULL",
             "close": "DOUBLE PRECISION",
@@ -204,6 +207,7 @@ class RollingExtremesFeature(BaseFeature):
             df = df[keep_cols]
 
         ids = df["id"].unique().tolist()
+        venues = df["venue"].unique().tolist() if "venue" in df.columns else ["CMC_AGG"]
         tf = self.config.tf
         alignment_source = self.get_alignment_source()
         windows = df["lookback_bars"].unique().tolist()
@@ -214,9 +218,16 @@ class RollingExtremesFeature(BaseFeature):
                     f"DELETE FROM {fq_table}"
                     " WHERE id = ANY(:ids) AND tf = :tf"
                     " AND alignment_source = :as_"
+                    " AND venue = ANY(:venues)"
                     " AND lookback_bars = ANY(:windows)"
                 ),
-                {"ids": ids, "tf": tf, "as_": alignment_source, "windows": windows},
+                {
+                    "ids": ids,
+                    "tf": tf,
+                    "as_": alignment_source,
+                    "venues": venues,
+                    "windows": windows,
+                },
             )
 
         df.to_sql(

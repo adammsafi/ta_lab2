@@ -9,7 +9,7 @@ Key differences from CMC builder:
 - Source: tvc_price_histories (not cmc_price_histories7)
 - No timehigh/timelow: synthesized as timestamp (bar close)
 - No market_cap: set to NULL
-- Venue filtering: for multi-exchange assets, uses dim_listings.is_primary
+- Multi-venue: builds bars for ALL venues, ranks from dim_listings.venue_rank
 - No OHLC repair needed (no intraday timestamps to fix)
 
 Usage:
@@ -116,7 +116,7 @@ def _build_insert_bars_sql(dst: str, src: str, venue_filter: str | None) -> str:
     - No timehigh/timelow repair (synthesized as ts)
     - No market_cap
     - Builds ALL venues by default (venue_filter=None)
-    - Writes venue + is_primary_venue columns for multi-exchange support
+    - Writes venue + venue_rank columns for multi-exchange support
     """
     venue_clause = ""
     if venue_filter:
@@ -133,7 +133,7 @@ WITH src_filtered AS (
     s.low,
     s.close,
     s.volume,
-    COALESCE(dl.is_primary, TRUE) AS is_primary_venue,
+    COALESCE(dl.venue_rank, 50) AS venue_rank,
     s.source_file,
     s.ingested_at
   FROM {src} s
@@ -147,7 +147,7 @@ ranked AS (
   SELECT
     id,
     venue,
-    is_primary_venue,
+    venue_rank,
     "timestamp",
     dense_rank() OVER (PARTITION BY id, venue ORDER BY "timestamp" ASC)::integer AS bar_seq,
     open, high, low, close, volume,
@@ -161,7 +161,7 @@ final AS (
   SELECT
     id,
     venue,
-    is_primary_venue,
+    venue_rank,
     "timestamp",
     '1D'::text AS tf,
     bar_seq,
@@ -214,7 +214,7 @@ ins AS (
     count_missing_days, count_missing_days_start, count_missing_days_end, count_missing_days_interior,
     src_name, src_load_ts, src_file,
     repaired_timehigh, repaired_timelow, repaired_high, repaired_low,
-    venue, is_primary_venue
+    venue, venue_rank
   )
   SELECT
     id, "timestamp",
@@ -228,7 +228,7 @@ ins AS (
     count_missing_days, count_missing_days_start, count_missing_days_end, count_missing_days_interior,
     src_name, src_load_ts, src_file,
     repaired_timehigh, repaired_timelow, repaired_high, repaired_low,
-    venue, is_primary_venue
+    venue, venue_rank
   FROM final
   WHERE
     id IS NOT NULL
@@ -253,7 +253,7 @@ ins AS (
     src_name = EXCLUDED.src_name,
     src_load_ts = EXCLUDED.src_load_ts,
     src_file = EXCLUDED.src_file,
-    is_primary_venue = EXCLUDED.is_primary_venue
+    venue_rank = EXCLUDED.venue_rank
   RETURNING "timestamp"
 )
 SELECT
@@ -434,7 +434,7 @@ class TvcOneDayBarBuilder(BaseBarBuilder):
             "--venue",
             type=str,
             default=None,
-            help="Filter to specific venue (e.g., GATE). Default: use is_primary from dim_listings.",
+            help="Filter to specific venue (e.g., GATE). Default: build ALL venues.",
         )
         return parser
 
@@ -490,7 +490,7 @@ def _sync_1d_to_multi_tf(db_url: str) -> None:
                 src_name = EXCLUDED.src_name,
                 src_load_ts = EXCLUDED.src_load_ts,
                 src_file = EXCLUDED.src_file,
-                is_primary_venue = EXCLUDED.is_primary_venue
+                venue_rank = EXCLUDED.venue_rank
         """)
         logger.info("Synced TVC 1D bars to cmc_price_bars_multi_tf")
         cur.close()

@@ -9,7 +9,7 @@ Writes:
   public.cmc_returns_ema_multi_tf
 
 State:
-  public.cmc_returns_ema_multi_tf_state  (watermark per key: (id, tf, period) -> last_ts)
+  public.cmc_returns_ema_multi_tf_state  (watermark per key: (id, tf, period, venue) -> last_ts)
 
 Semantics:
   - Processes BOTH roll=True and roll=False EMA rows for each (id,tf,period)
@@ -19,7 +19,7 @@ Semantics:
   - Roll value columns (_ema_roll, _ema_bar_roll): populated on ALL rows,
     computed via LAG over the unified timeline (daily transitions, including
     the cross-roll transition at bar close timestamps).
-  - PK: (id, ts, tf, period); roll is a regular boolean column.
+  - PK: (id, ts, tf, period, venue); roll is a regular boolean column.
   - Incremental by default:
       inserts rows where ts > last_ts per key
       but pulls ts >= seed_ts to seed prev values for the first new row
@@ -74,6 +74,8 @@ def _ensure_tables(engine: Engine, out_table: str, state_table: str) -> None:
             tf        text NOT NULL,
             tf_days   integer NOT NULL,
             period    integer NOT NULL,
+            venue     text NOT NULL DEFAULT 'CMC_AGG',
+            venue_rank integer,
             roll      boolean NOT NULL,
 
             gap_days       integer,
@@ -137,7 +139,7 @@ def _ensure_tables(engine: Engine, out_table: str, state_table: str) -> None:
 
             ingested_at timestamptz NOT NULL DEFAULT now(),
 
-            PRIMARY KEY (id, ts, tf, period)
+            PRIMARY KEY (id, ts, tf, period, venue)
         );
         """
     )
@@ -148,9 +150,10 @@ def _ensure_tables(engine: Engine, out_table: str, state_table: str) -> None:
             id       bigint NOT NULL,
             tf       text NOT NULL,
             period   integer NOT NULL,
+            venue    text NOT NULL DEFAULT 'CMC_AGG',
             last_ts  timestamptz,
             updated_at timestamptz NOT NULL DEFAULT now(),
-            PRIMARY KEY (id, tf, period)
+            PRIMARY KEY (id, tf, period, venue)
         );
         """
     )
@@ -171,14 +174,15 @@ def _load_keys(
     engine: Engine,
     ema_table: str,
     ids: Optional[List[int]],
-) -> List[Tuple[int, str, int]]:
-    """Returns keys as: (id, tf, period)."""
+) -> List[Tuple[int, str, int, str]]:
+    """Returns keys as: (id, tf, period, venue)."""
     if ids is None:
         sql = text(
             f"""
-            SELECT DISTINCT id::bigint, tf::text, period::int
+            SELECT DISTINCT id::bigint, tf::text, period::int,
+                   COALESCE(venue, 'CMC_AGG') AS venue
             FROM {ema_table}
-            ORDER BY 1,2,3;
+            ORDER BY 1,2,3,4;
             """
         )
         with engine.begin() as cxn:
@@ -186,66 +190,67 @@ def _load_keys(
     else:
         sql = text(
             f"""
-                SELECT DISTINCT id::bigint, tf::text, period::int
+                SELECT DISTINCT id::bigint, tf::text, period::int,
+                       COALESCE(venue, 'CMC_AGG') AS venue
                 FROM {ema_table}
                 WHERE id IN :ids
-                ORDER BY 1,2,3;
+                ORDER BY 1,2,3,4;
                 """
         ).bindparams(bindparam("ids", expanding=True))
         with engine.begin() as cxn:
             rows = cxn.execute(sql, {"ids": ids}).fetchall()
 
-    return [(int(r[0]), str(r[1]), int(r[2])) for r in rows]
+    return [(int(r[0]), str(r[1]), int(r[2]), str(r[3])) for r in rows]
 
 
 def _ensure_state_rows(
-    engine: Engine, state_table: str, keys: List[Tuple[int, str, int]]
+    engine: Engine, state_table: str, keys: List[Tuple[int, str, int, str]]
 ) -> None:
     if not keys:
         return
 
     ins = text(
         f"""
-        INSERT INTO {state_table} (id, tf, period, last_ts)
-        VALUES (:id, :tf, :period, NULL)
-        ON CONFLICT (id, tf, period) DO NOTHING;
+        INSERT INTO {state_table} (id, tf, period, venue, last_ts)
+        VALUES (:id, :tf, :period, :venue, NULL)
+        ON CONFLICT (id, tf, period, venue) DO NOTHING;
         """
     )
 
     with engine.begin() as cxn:
-        for i, tf, period in keys:
-            cxn.execute(ins, {"id": i, "tf": tf, "period": period})
+        for i, tf, period, venue in keys:
+            cxn.execute(ins, {"id": i, "tf": tf, "period": period, "venue": venue})
 
 
 def _full_refresh(
     engine: Engine,
     out_table: str,
     state_table: str,
-    keys: List[Tuple[int, str, int]],
+    keys: List[Tuple[int, str, int, str]],
 ) -> None:
     if not keys:
         return
 
     _print(
-        f"--full-refresh: deleting existing rows for {len(keys)} (id,tf,period) keys and resetting state."
+        f"--full-refresh: deleting existing rows for {len(keys)} (id,tf,period,venue) keys and resetting state."
     )
 
     del_out = text(
         f"""
         DELETE FROM {out_table}
-        WHERE id = :id AND tf = :tf AND period = :period;
+        WHERE id = :id AND tf = :tf AND period = :period AND venue = :venue;
         """
     )
     del_state = text(
         f"""
         DELETE FROM {state_table}
-        WHERE id = :id AND tf = :tf AND period = :period;
+        WHERE id = :id AND tf = :tf AND period = :period AND venue = :venue;
         """
     )
 
     with engine.begin() as cxn:
-        for i, tf, period in keys:
-            params = {"id": i, "tf": tf, "period": period}
+        for i, tf, period, venue in keys:
+            params = {"id": i, "tf": tf, "period": period, "venue": venue}
             cxn.execute(del_out, params)
             cxn.execute(del_state, params)
 
@@ -291,20 +296,27 @@ _VALUE_COLS = [
 ]
 
 _INSERT_COLS = (
-    "id, ts, tf, tf_days, period, roll,\n" + ",\n".join(_VALUE_COLS) + ",\ningested_at"
+    "id, ts, tf, tf_days, period, venue, venue_rank, roll,\n"
+    + ",\n".join(_VALUE_COLS)
+    + ",\ningested_at"
 )
-_UPSERT_SET = ",\n".join(f"{c} = EXCLUDED.{c}" for c in _VALUE_COLS + ["ingested_at"])
+_UPSERT_SET = ",\n".join(
+    f"{c} = EXCLUDED.{c}"
+    for c in ["venue_rank", "roll"] + _VALUE_COLS + ["ingested_at"]
+)
 
 
-def _run_one_key(engine: Engine, cfg: RunnerConfig, key: Tuple[int, str, int]) -> None:
-    one_id, one_tf, one_period = key
+def _run_one_key(
+    engine: Engine, cfg: RunnerConfig, key: Tuple[int, str, int, str]
+) -> None:
+    one_id, one_tf, one_period, one_venue = key
 
     sql = text(
         f"""
         WITH st AS (
             SELECT last_ts
             FROM {cfg.state_table}
-            WHERE id = :id AND tf = :tf AND period = :period
+            WHERE id = :id AND tf = :tf AND period = :period AND venue = :venue
         ),
         -- Seed: go back 2 canonical (roll=False) rows before last_ts
         -- to provide enough history for both LAG chains (including delta2).
@@ -313,6 +325,7 @@ def _run_one_key(engine: Engine, cfg: RunnerConfig, key: Tuple[int, str, int]) -
                 (SELECT MIN(sub.ts) FROM (
                     SELECT ts FROM {cfg.ema_table}
                     WHERE id = :id AND tf = :tf AND period = :period
+                      AND COALESCE(venue, 'CMC_AGG') = :venue
                       AND roll = FALSE
                       AND ts < COALESCE((SELECT last_ts FROM st), CAST(:start AS timestamptz))
                     ORDER BY ts DESC
@@ -332,29 +345,32 @@ def _run_one_key(engine: Engine, cfg: RunnerConfig, key: Tuple[int, str, int]) -
                 e.period,
                 e.roll,
                 e.ema,
-                e.ema_bar
+                e.ema_bar,
+                COALESCE(e.venue, 'CMC_AGG') AS venue,
+                COALESCE(e.venue_rank, 50) AS venue_rank
             FROM {cfg.ema_table} e, seed
             WHERE e.id = :id
               AND e.tf = :tf
               AND e.period = :period
+              AND COALESCE(e.venue, 'CMC_AGG') = :venue
               AND e.ts >= seed.seed_ts
         ),
         lagged AS (
             SELECT
                 s.*,
                 -- Unified LAG: previous row regardless of roll (for _roll columns)
-                LAG(s.ts)      OVER (ORDER BY s.ts) AS prev_ts_u,
-                LAG(s.ema)     OVER (ORDER BY s.ts) AS prev_ema_u,
-                LAG(s.ema_bar) OVER (ORDER BY s.ts) AS prev_ema_bar_u,
+                LAG(s.ts)      OVER (PARTITION BY s.venue ORDER BY s.ts) AS prev_ts_u,
+                LAG(s.ema)     OVER (PARTITION BY s.venue ORDER BY s.ts) AS prev_ema_u,
+                LAG(s.ema_bar) OVER (PARTITION BY s.venue ORDER BY s.ts) AS prev_ema_bar_u,
                 -- Canonical LAG: previous row within same roll partition (for non-roll columns)
-                LAG(s.ts)      OVER (PARTITION BY s.roll ORDER BY s.ts) AS prev_ts_c,
-                LAG(s.ema)     OVER (PARTITION BY s.roll ORDER BY s.ts) AS prev_ema_c,
-                LAG(s.ema_bar) OVER (PARTITION BY s.roll ORDER BY s.ts) AS prev_ema_bar_c
+                LAG(s.ts)      OVER (PARTITION BY s.venue, s.roll ORDER BY s.ts) AS prev_ts_c,
+                LAG(s.ema)     OVER (PARTITION BY s.venue, s.roll ORDER BY s.ts) AS prev_ema_c,
+                LAG(s.ema_bar) OVER (PARTITION BY s.venue, s.roll ORDER BY s.ts) AS prev_ema_bar_c
             FROM src s
         ),
         calc AS (
             SELECT
-                id, ts, tf, tf_days, period, roll,
+                id, ts, tf, tf_days, period, venue, venue_rank, roll,
 
                 -- gap_days (canonical: only roll=False)
                 CASE WHEN NOT roll AND prev_ts_c IS NOT NULL
@@ -403,36 +419,36 @@ def _run_one_key(engine: Engine, cfg: RunnerConfig, key: Tuple[int, str, int]) -
             SELECT c.*,
                 -- delta2 canonical
                 CASE WHEN NOT c.roll
-                     THEN c.delta1_ema - LAG(c.delta1_ema) OVER (PARTITION BY c.roll ORDER BY c.ts)
+                     THEN c.delta1_ema - LAG(c.delta1_ema) OVER (PARTITION BY c.venue, c.roll ORDER BY c.ts)
                 END AS delta2_ema,
                 CASE WHEN NOT c.roll
-                     THEN c.delta1_ema_bar - LAG(c.delta1_ema_bar) OVER (PARTITION BY c.roll ORDER BY c.ts)
+                     THEN c.delta1_ema_bar - LAG(c.delta1_ema_bar) OVER (PARTITION BY c.venue, c.roll ORDER BY c.ts)
                 END AS delta2_ema_bar,
                 -- delta2 roll
-                c.delta1_ema_roll - LAG(c.delta1_ema_roll) OVER (ORDER BY c.ts) AS delta2_ema_roll,
-                c.delta1_ema_bar_roll - LAG(c.delta1_ema_bar_roll) OVER (ORDER BY c.ts) AS delta2_ema_bar_roll,
+                c.delta1_ema_roll - LAG(c.delta1_ema_roll) OVER (PARTITION BY c.venue ORDER BY c.ts) AS delta2_ema_roll,
+                c.delta1_ema_bar_roll - LAG(c.delta1_ema_bar_roll) OVER (PARTITION BY c.venue ORDER BY c.ts) AS delta2_ema_bar_roll,
 
                 -- delta_ret_arith canonical
                 CASE WHEN NOT c.roll
-                     THEN c.ret_arith_ema - LAG(c.ret_arith_ema) OVER (PARTITION BY c.roll ORDER BY c.ts)
+                     THEN c.ret_arith_ema - LAG(c.ret_arith_ema) OVER (PARTITION BY c.venue, c.roll ORDER BY c.ts)
                 END AS delta_ret_arith_ema,
                 CASE WHEN NOT c.roll
-                     THEN c.ret_arith_ema_bar - LAG(c.ret_arith_ema_bar) OVER (PARTITION BY c.roll ORDER BY c.ts)
+                     THEN c.ret_arith_ema_bar - LAG(c.ret_arith_ema_bar) OVER (PARTITION BY c.venue, c.roll ORDER BY c.ts)
                 END AS delta_ret_arith_ema_bar,
                 -- delta_ret_arith roll
-                c.ret_arith_ema_roll - LAG(c.ret_arith_ema_roll) OVER (ORDER BY c.ts) AS delta_ret_arith_ema_roll,
-                c.ret_arith_ema_bar_roll - LAG(c.ret_arith_ema_bar_roll) OVER (ORDER BY c.ts) AS delta_ret_arith_ema_bar_roll,
+                c.ret_arith_ema_roll - LAG(c.ret_arith_ema_roll) OVER (PARTITION BY c.venue ORDER BY c.ts) AS delta_ret_arith_ema_roll,
+                c.ret_arith_ema_bar_roll - LAG(c.ret_arith_ema_bar_roll) OVER (PARTITION BY c.venue ORDER BY c.ts) AS delta_ret_arith_ema_bar_roll,
 
                 -- delta_ret_log canonical
                 CASE WHEN NOT c.roll
-                     THEN c.ret_log_ema - LAG(c.ret_log_ema) OVER (PARTITION BY c.roll ORDER BY c.ts)
+                     THEN c.ret_log_ema - LAG(c.ret_log_ema) OVER (PARTITION BY c.venue, c.roll ORDER BY c.ts)
                 END AS delta_ret_log_ema,
                 CASE WHEN NOT c.roll
-                     THEN c.ret_log_ema_bar - LAG(c.ret_log_ema_bar) OVER (PARTITION BY c.roll ORDER BY c.ts)
+                     THEN c.ret_log_ema_bar - LAG(c.ret_log_ema_bar) OVER (PARTITION BY c.venue, c.roll ORDER BY c.ts)
                 END AS delta_ret_log_ema_bar,
                 -- delta_ret_log roll
-                c.ret_log_ema_roll - LAG(c.ret_log_ema_roll) OVER (ORDER BY c.ts) AS delta_ret_log_ema_roll,
-                c.ret_log_ema_bar_roll - LAG(c.ret_log_ema_bar_roll) OVER (ORDER BY c.ts) AS delta_ret_log_ema_bar_roll
+                c.ret_log_ema_roll - LAG(c.ret_log_ema_roll) OVER (PARTITION BY c.venue ORDER BY c.ts) AS delta_ret_log_ema_roll,
+                c.ret_log_ema_bar_roll - LAG(c.ret_log_ema_bar_roll) OVER (PARTITION BY c.venue ORDER BY c.ts) AS delta_ret_log_ema_bar_roll
 
             FROM calc c
         ),
@@ -449,8 +465,7 @@ def _run_one_key(engine: Engine, cfg: RunnerConfig, key: Tuple[int, str, int]) -
             SELECT
                 {_INSERT_COLS.replace("ingested_at", "now()")}
             FROM to_insert
-            ON CONFLICT (id, ts, tf, period) DO UPDATE SET
-                roll = EXCLUDED.roll,
+            ON CONFLICT (id, ts, tf, period, venue) DO UPDATE SET
                 {_UPSERT_SET}
             RETURNING ts
         )
@@ -458,7 +473,7 @@ def _run_one_key(engine: Engine, cfg: RunnerConfig, key: Tuple[int, str, int]) -
         SET
             last_ts = COALESCE((SELECT MAX(ts) FROM ins), s.last_ts),
             updated_at = now()
-        WHERE s.id = :id AND s.tf = :tf AND s.period = :period;
+        WHERE s.id = :id AND s.tf = :tf AND s.period = :period AND s.venue = :venue;
         """
     )
 
@@ -469,6 +484,7 @@ def _run_one_key(engine: Engine, cfg: RunnerConfig, key: Tuple[int, str, int]) -
                 "id": one_id,
                 "tf": one_tf,
                 "period": one_period,
+                "venue": one_venue,
                 "start": cfg.start,
             },
         )
@@ -545,8 +561,10 @@ def main() -> None:
         _full_refresh(engine, cfg.out_table, cfg.state_table, keys)
 
     for i, key in enumerate(keys, start=1):
-        one_id, one_tf, one_period = key
-        _print(f"Processing key=({one_id},{one_tf},{one_period}) ({i}/{len(keys)})")
+        one_id, one_tf, one_period, one_venue = key
+        _print(
+            f"Processing key=({one_id},{one_tf},{one_period},{one_venue}) ({i}/{len(keys)})"
+        )
         _run_one_key(engine, cfg, key)
 
     _print("Done.")

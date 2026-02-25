@@ -14,7 +14,7 @@ Rules:
   - If source has ingested_at: use max(ingested_at) from _u for that alignment_source
   - Else: use max(ts) from _u for that alignment_source
 
-- Insert uses ON CONFLICT DO NOTHING on PK:
+- Insert uses ON CONFLICT DO NOTHING on PK (id, ts, tf, period, venue):
   (id, ts, tf, period)
 
 Run:
@@ -170,6 +170,13 @@ def build_select_expr(
     else:
         where_sql = "WHERE ts > :wm"
 
+    e_venue = (
+        "COALESCE(venue, 'CMC_AGG')::text" if "venue" in colset else "'CMC_AGG'::text"
+    )
+    e_venue_rank = (
+        "COALESCE(venue_rank, 50)::int" if "venue_rank" in colset else "50::int"
+    )
+
     select_sql = f"""
     SELECT
       id::int,
@@ -182,6 +189,8 @@ def build_select_expr(
       {e_ingested_at},
       {e_tf_days},
       {e_roll},
+      {e_venue},
+      {e_venue_rank},
       CAST(:alignment_source AS text)
     """
     return select_sql.strip(), where_sql
@@ -232,12 +241,13 @@ def insert_new_rows(
         id, ts, tf, period,
         ema, ema_bar, is_partial_end,
         ingested_at, tf_days, roll,
+        venue, venue_rank,
         alignment_source
       )
       {select_sql}
       FROM {src_table}
       {where_clause}
-      ON CONFLICT (id, ts, tf, period) DO NOTHING
+      ON CONFLICT (id, ts, tf, period, venue) DO NOTHING
       RETURNING 1
     )
     SELECT COUNT(*)::bigint AS n_inserted FROM ins;

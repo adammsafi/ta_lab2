@@ -27,7 +27,7 @@ from datetime import date, timedelta
 from typing import Optional
 
 import pandas as pd
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
 from ta_lab2.scripts.bars.base_bar_builder import BaseBarBuilder
@@ -38,6 +38,7 @@ from ta_lab2.scripts.bars.common_snapshot_contract import (
     parse_ids,
     load_all_ids,
     ensure_state_table,
+    load_state,
     upsert_state,
     upsert_bars,
     load_daily_prices_for_id,
@@ -252,22 +253,22 @@ class AnchorCalendarISOBarBuilder(BaseBarBuilder):
         start_ts: Optional[str] = None,
     ) -> int:
         """
-        Build anchor calendar bars for one ID across all timeframe specs.
+        Build anchor calendar bars for one ID across all timeframe specs and venues.
 
         This is the variant-specific core logic that:
         1. Optionally derives from 1D bars (if from_1d=True)
-        2. Loads daily prices
-        3. For each anchor spec:
-           - Check for backfill
-           - Full rebuild (anchor bars are complex, simplified to always rebuild)
-           - Upsert bars and update state
+        2. Loads daily prices (all venues)
+        3. For each venue:
+           a. For each anchor spec:
+              - Full rebuild (anchor bars always rebuild)
+              - Upsert bars and update state
 
         Args:
             id_: Cryptocurrency ID
             start_ts: Optional start timestamp (for incremental)
 
         Returns:
-            Total number of rows inserted/updated across all specs
+            Total number of rows inserted/updated across all specs and venues
         """
         total_rows = 0
 
@@ -329,24 +330,21 @@ class AnchorCalendarISOBarBuilder(BaseBarBuilder):
             return total_rows
 
         # Direct mode (from daily prices)
-        # For anchor builders, always load full history since we do full rebuild
-        # per TF (delete + rebuild). Using start_ts would only load recent data
-        # after the first run, but we need all data to build correct cumulative snapshots.
-
-        df_daily = load_daily_prices_for_id(
-            db_url=self.config.db_url,
-            daily_table=self.config.daily_table,
-            id_=id_,
-            ts_start=None,
-            tz=self.config.tz or DEFAULT_TZ,
+        # Load existing state for all (tf, venue) combos BEFORE daily data load
+        # so we can detect new TFs and override start_ts if needed.
+        state_df = load_state(
+            self.config.db_url,
+            self.get_state_table_name(),
+            [id_],
+            with_tz=True,
+            with_venue=True,
         )
 
-        if df_daily.empty:
-            self.logger.info(f"ID={id_}: No daily data found")
-            return 0
-
-        daily_min_ts = pd.to_datetime(df_daily["ts"].min(), utc=True)
-        daily_max_ts = pd.to_datetime(df_daily["ts"].max(), utc=True)
+        # State map keyed by (tf, venue)
+        state_map: dict[tuple[str, str], dict] = {}
+        if not state_df.empty:
+            for _, row in state_df.iterrows():
+                state_map[(row["tf"], row.get("venue", "CMC_AGG"))] = row
 
         # Look up coverage from asset_data_coverage (populated by 1D builder)
         n_available = get_coverage_n_days(
@@ -356,7 +354,7 @@ class AnchorCalendarISOBarBuilder(BaseBarBuilder):
             granularity="1D",
         )
         if n_available is None:
-            n_available = len(df_daily)
+            n_available = self._count_total_daily_rows(id_)
         applicable_specs = [s for s in self.specs if _nominal_tf_days(s) <= n_available]
         skipped = len(self.specs) - len(applicable_specs)
         if skipped:
@@ -365,60 +363,117 @@ class AnchorCalendarISOBarBuilder(BaseBarBuilder):
                 f"(nominal tf_days > {n_available} available days)"
             )
 
-        # Process each spec
-        for spec in applicable_specs:
-            try:
-                # Simplified: Always rebuild for anchor builders
-                self.logger.info(
-                    f"ID={id_}, TF={spec.tf}: Building anchor bars (full rebuild)"
-                )
-                delete_bars_for_id_tf(
-                    self.config.db_url,
-                    self.get_output_table_name(),
-                    id_=id_,
-                    tf=spec.tf,
-                )
+        # For anchor builders, always load full history since we do full rebuild
+        # per TF (delete + rebuild). Using start_ts would only load recent data
+        # after the first run, but we need all data to build correct cumulative snapshots.
+        df_all = load_daily_prices_for_id(
+            db_url=self.config.db_url,
+            daily_table=self.config.daily_table,
+            id_=id_,
+            ts_start=None,
+            tz=self.config.tz or DEFAULT_TZ,
+        )
 
-                bars = self._build_anchor_bars_simplified(
-                    df_daily, spec=spec, id_=id_, tz=self.config.tz or DEFAULT_TZ
-                )
+        if df_all.empty:
+            self.logger.info(f"ID={id_}: No daily data found")
+            return 0
 
-                if bars.empty:
-                    continue
+        # Get unique venues
+        venues = df_all["venue"].unique() if "venue" in df_all.columns else ["CMC_AGG"]
 
-                upsert_bars(
-                    bars,
-                    db_url=self.config.db_url,
-                    bars_table=self.get_output_table_name(),
-                )
+        for venue in venues:
+            if "venue" in df_all.columns:
+                df_daily = df_all[df_all["venue"] == venue].copy()
+            else:
+                df_daily = df_all.copy()
 
-                # Update state
-                last_bar_seq = int(bars["bar_seq"].max())
-                last_time_close = pd.to_datetime(bars["timestamp"].max(), utc=True)
-
-                upsert_state(
-                    self.config.db_url,
-                    self.get_state_table_name(),
-                    [
-                        {
-                            "id": int(id_),
-                            "tf": spec.tf,
-                            "tz": self.config.tz,
-                            "daily_min_seen": daily_min_ts,
-                            "daily_max_seen": daily_max_ts,
-                            "last_bar_seq": last_bar_seq,
-                            "last_time_close": last_time_close,
-                        }
-                    ],
-                    with_tz=True,
-                )
-
-                total_rows += len(bars)
-            except Exception as e:
-                self.logger.error(f"ID={id_}, TF={spec.tf} failed: {e}", exc_info=True)
+            if df_daily.empty:
                 continue
 
+            venue_rank = (
+                int(df_daily["venue_rank"].iloc[0])
+                if "venue_rank" in df_daily.columns
+                else 50
+            )
+            daily_min_ts = pd.to_datetime(df_daily["ts"].min(), utc=True)
+            daily_max_ts = pd.to_datetime(df_daily["ts"].max(), utc=True)
+
+            # Process each spec for this venue
+            for spec in applicable_specs:
+                try:
+                    rows = self._build_bars_for_id_tf(
+                        id_=id_,
+                        spec=spec,
+                        df_daily=df_daily,
+                        daily_min_ts=daily_min_ts,
+                        daily_max_ts=daily_max_ts,
+                        state=state_map.get((spec.tf, venue)),
+                        venue=venue,
+                        venue_rank=venue_rank,
+                    )
+                    total_rows += rows
+                except Exception as e:
+                    self.logger.error(
+                        f"ID={id_}, TF={spec.tf}, venue={venue} failed: {e}",
+                        exc_info=True,
+                    )
+                    continue
+
         return total_rows
+
+    def _count_total_daily_rows(self, id_: int) -> int:
+        """Count total daily rows for an ID in the source table."""
+        engine = get_engine(self.config.db_url)
+        with engine.connect() as conn:
+            result = conn.execute(
+                text(f"SELECT COUNT(*) FROM {self.config.daily_table} WHERE id = :id"),
+                {"id": int(id_)},
+            ).scalar()
+        return int(result or 0)
+
+    def _build_bars_for_id_tf(
+        self,
+        id_: int,
+        spec: TFSpec,
+        df_daily: pd.DataFrame,
+        daily_min_ts: pd.Timestamp,
+        daily_max_ts: pd.Timestamp,
+        state: Optional[dict],
+        venue: str = "CMC_AGG",
+        venue_rank: int = 50,
+    ) -> int:
+        """
+        Build bars for one (id, spec, venue) combination.
+
+        Anchor bars always do a full rebuild (delete + rebuild) because
+        anchor window logic requires the full history for correct cumulative snapshots.
+
+        Returns:
+            Number of rows inserted/updated
+        """
+        self.logger.info(
+            f"ID={id_}, TF={spec.tf}, venue={venue}: Building anchor bars (full rebuild)"
+        )
+        self._delete_bars_and_state(id_, spec.tf, venue=venue)
+
+        bars = self._build_anchor_bars_simplified(
+            df_daily, spec=spec, id_=id_, tz=self.config.tz or DEFAULT_TZ
+        )
+
+        if bars.empty:
+            return 0
+
+        # Set venue columns on output bars
+        bars["venue"] = venue
+        bars["venue_rank"] = venue_rank
+
+        upsert_bars(
+            bars,
+            db_url=self.config.db_url,
+            bars_table=self.get_output_table_name(),
+        )
+        self._update_state(id_, spec.tf, bars, daily_min_ts, daily_max_ts, venue=venue)
+        return len(bars)
 
     def _build_anchor_bars_simplified(
         self,
@@ -575,6 +630,118 @@ class AnchorCalendarISOBarBuilder(BaseBarBuilder):
 
         return out
 
+    # =========================================================================
+    # Helper methods (venue-aware)
+    # =========================================================================
+
+    def _load_last_snapshot_info(
+        self, id_: int, tf: str, venue: str = "CMC_AGG"
+    ) -> dict | None:
+        """Load last snapshot info for (id, tf, venue)."""
+        engine = get_engine(self.config.db_url)
+        bars_table = self.get_output_table_name()
+
+        with engine.connect() as conn:
+            row = (
+                conn.execute(
+                    text(
+                        f"""
+                    WITH last AS (
+                      SELECT id, tf, venue, MAX(bar_seq) AS last_bar_seq
+                      FROM {bars_table}
+                      WHERE id = :id AND tf = :tf AND venue = :venue
+                      GROUP BY id, tf, venue
+                    ),
+                    last_row AS (
+                      SELECT b.*
+                      FROM {bars_table} b
+                      JOIN last l
+                        ON b.id = l.id AND b.tf = l.tf AND b.venue = l.venue
+                           AND b.bar_seq = l.last_bar_seq
+                      ORDER BY b.timestamp DESC
+                      LIMIT 1
+                    ),
+                    pos AS (
+                      SELECT COUNT(*)::int AS last_pos_in_bar
+                      FROM {bars_table} b
+                      JOIN last l
+                        ON b.id = l.id AND b.tf = l.tf AND b.venue = l.venue
+                           AND b.bar_seq = l.last_bar_seq
+                    )
+                    SELECT
+                      (SELECT last_bar_seq FROM last) AS last_bar_seq,
+                      (SELECT timestamp FROM last_row) AS last_time_close,
+                      (SELECT last_pos_in_bar FROM pos) AS last_pos_in_bar;
+                    """
+                    ),
+                    {"id": int(id_), "tf": tf, "venue": venue},
+                )
+                .mappings()
+                .first()
+            )
+        if row is None:
+            return None
+        d = dict(row)
+        # If no bars exist yet, all values are None - treat as no data
+        if d.get("last_bar_seq") is None:
+            return None
+        return d
+
+    def _delete_bars_and_state(
+        self, id_: int, tf: str, venue: str | None = None
+    ) -> None:
+        """Delete bars and state for (id, tf, venue) before rebuild."""
+        delete_bars_for_id_tf(
+            self.config.db_url,
+            self.get_output_table_name(),
+            id_=id_,
+            tf=tf,
+            venue=venue,
+        )
+
+        # Delete state
+        engine = create_engine(self.config.db_url, future=True)
+        params: dict = {"id": int(id_), "tf": tf}
+        where = "WHERE id = :id AND tf = :tf"
+        if venue is not None:
+            where += " AND venue = :venue"
+            params["venue"] = venue
+        q = text(f"DELETE FROM {self.get_state_table_name()} {where};")
+        with engine.begin() as conn:
+            conn.execute(q, params)
+
+    def _update_state(
+        self,
+        id_: int,
+        tf: str,
+        bars: pd.DataFrame,
+        daily_min_ts: pd.Timestamp,
+        daily_max_ts: pd.Timestamp,
+        venue: str = "CMC_AGG",
+    ) -> None:
+        """Update state table for (id, tf, venue)."""
+        last_bar_seq = int(bars["bar_seq"].max())
+        last_time_close = pd.to_datetime(bars["timestamp"].max(), utc=True)
+
+        upsert_state(
+            self.config.db_url,
+            self.get_state_table_name(),
+            [
+                {
+                    "id": int(id_),
+                    "tf": tf,
+                    "venue": venue,
+                    "daily_min_seen": daily_min_ts,
+                    "daily_max_seen": daily_max_ts,
+                    "last_bar_seq": last_bar_seq,
+                    "last_time_close": last_time_close,
+                    "tz": self.config.tz,
+                }
+            ],
+            with_tz=True,
+            with_venue=True,
+        )
+
     @classmethod
     def create_argument_parser(cls) -> argparse.ArgumentParser:
         """
@@ -624,8 +791,6 @@ class AnchorCalendarISOBarBuilder(BaseBarBuilder):
         specs = cls._load_anchor_specs_from_dim(db_url)
 
         # Create engine
-        from sqlalchemy import create_engine
-
         engine = create_engine(db_url, future=True)
 
         # Ensure state table exists (calendar builders use tz column)

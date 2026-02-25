@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS public.dim_listings (
     ticker_on_venue TEXT          NOT NULL,
     asset_class     TEXT          NOT NULL,
     currency        TEXT,
-    is_primary      BOOLEAN       DEFAULT FALSE,
+    venue_rank      INTEGER       NOT NULL DEFAULT 50,
     created_at      TIMESTAMPTZ   DEFAULT NOW(),
     PRIMARY KEY (id, venue, ticker_on_venue),
     CONSTRAINT fk_dim_listings_asset

@@ -138,7 +138,6 @@ class VolatilityFeature(BaseFeature):
             "p.id = ANY(:ids)",
             "p.tf = :tf",
             "p.alignment_source = :as_",
-            "p.is_primary_venue = TRUE",
         ]
         params = {
             "ids": ids,
@@ -160,6 +159,8 @@ class VolatilityFeature(BaseFeature):
             SELECT
                 p.id,
                 p.{self.TS_COLUMN} as ts,
+                p.venue,
+                p.venue_rank,
                 p.open,
                 p.high,
                 p.low,
@@ -169,6 +170,7 @@ class VolatilityFeature(BaseFeature):
             LEFT JOIN public.cmc_returns_bars_multi_tf_u r
                 ON p.id = r.id
                 AND p.{self.TS_COLUMN} = r."timestamp"
+                AND p.venue = r.venue
                 AND r.tf = :tf
                 AND r.alignment_source = :as_
                 AND r.roll = FALSE
@@ -204,11 +206,11 @@ class VolatilityFeature(BaseFeature):
         # Make a copy to avoid modifying source
         df = df_source.copy()
 
-        # Process each ID separately (volatility requires ordering)
+        # Process each (id, venue) separately (volatility requires ordering)
         results = []
 
-        for id_val in df["id"].unique():
-            df_id = df[df["id"] == id_val].copy()
+        for (id_val, venue_val), df_id in df.groupby(["id", "venue"]):
+            df_id = df_id.copy()
 
             # Sort by timestamp (required for rolling calculations)
             df_id = df_id.sort_values("ts")
@@ -298,6 +300,8 @@ class VolatilityFeature(BaseFeature):
             "ts": "TIMESTAMPTZ NOT NULL",
             "tf": "TEXT NOT NULL",
             "alignment_source": "TEXT NOT NULL",
+            "venue": "TEXT NOT NULL DEFAULT 'CMC_AGG'",
+            "venue_rank": "INTEGER NOT NULL DEFAULT 50",
             "tf_days": "INTEGER NOT NULL",
             # OHLC context
             "open": "DOUBLE PRECISION",

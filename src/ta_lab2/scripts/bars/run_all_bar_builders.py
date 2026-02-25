@@ -64,6 +64,13 @@ ALL_BUILDERS = [
         supports_full_rebuild=True,
     ),
     BuilderConfig(
+        name="vwap",
+        script_path="refresh_vwap_bars_1d.py",
+        description="VWAP consolidated bars from per-venue 1D bars",
+        requires_tz=False,
+        supports_full_rebuild=False,
+    ),
+    BuilderConfig(
         name="multi_tf",
         script_path="refresh_cmc_price_bars_multi_tf.py",
         description="Multi-timeframe rolling bars (7d, 14d, ...)",
@@ -193,6 +200,10 @@ def build_command(
         cmd.extend(["--ids", ids])
         if full_rebuild:
             cmd.append("--full-rebuild")
+    elif builder.name == "vwap":
+        # VWAP consolidated bar builder
+        cmd.extend(["--db-url", db_url])
+        cmd.extend(["--ids", ids])
     else:
         # Multi-TF builders use standard CLI
         cmd.extend(["--db-url", db_url])
@@ -380,6 +391,7 @@ Examples:
 Available builders:
   1d              - 1D canonical bars from CMC (SQL-based)
   1d_tvc          - 1D canonical bars from TradingView
+  vwap            - VWAP consolidated bars from per-venue 1D bars
   multi_tf        - Multi-timeframe rolling bars
   cal_iso         - Calendar-aligned bars (ISO week)
   cal_us          - Calendar-aligned bars (US week)

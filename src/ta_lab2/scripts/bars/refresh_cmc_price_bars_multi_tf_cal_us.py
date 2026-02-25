@@ -38,7 +38,7 @@ from typing import Optional
 
 import pandas as pd
 import polars as pl
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
 from ta_lab2.scripts.bars.base_bar_builder import BaseBarBuilder
@@ -55,7 +55,6 @@ from ta_lab2.scripts.bars.common_snapshot_contract import (
     upsert_bars,
     load_daily_prices_for_id,
     delete_bars_for_id_tf,
-    load_last_snapshot_info_for_id_tfs,
     get_coverage_n_days,
 )
 from ta_lab2.scripts.bars.polars_bar_operations import (
@@ -262,22 +261,23 @@ class CalendarUSBarBuilder(BaseBarBuilder):
         start_ts: Optional[str] = None,
     ) -> int:
         """
-        Build calendar bars for one ID across all timeframe specs.
+        Build calendar bars for one ID across all timeframe specs and venues.
 
         This is the variant-specific core logic that:
         1. Optionally derives from 1D bars (if from_1d=True)
-        2. Loads daily prices
-        3. For each calendar spec:
-           - Check for backfill
-           - Full rebuild or incremental append
-           - Upsert bars and update state
+        2. Loads daily prices (all venues)
+        3. For each venue:
+           a. For each calendar spec:
+              - Check for backfill
+              - Full rebuild or incremental append
+              - Upsert bars and update state
 
         Args:
             id_: Cryptocurrency ID
             start_ts: Optional start timestamp (for incremental)
 
         Returns:
-            Total number of rows inserted/updated across all specs
+            Total number of rows inserted/updated across all specs and venues
         """
         total_rows = 0
 
@@ -367,19 +367,21 @@ class CalendarUSBarBuilder(BaseBarBuilder):
             return total_rows
 
         # Direct mode (from daily prices)
-        # Load existing state for all specs BEFORE daily data load
+        # Load existing state for all (tf, venue) combos BEFORE daily data load
         # so we can detect new TFs and override start_ts if needed.
         state_df = load_state(
             self.config.db_url,
             self.get_state_table_name(),
             [id_],
             with_tz=True,
+            with_venue=True,
         )
 
-        state_map = {}
+        # State map keyed by (tf, venue)
+        state_map: dict[tuple[str, str], dict] = {}
         if not state_df.empty:
             for _, row in state_df.iterrows():
-                state_map[row["tf"]] = row
+                state_map[(row["tf"], row.get("venue", "CMC_AGG"))] = row
 
         # Look up coverage from asset_data_coverage (populated by 1D builder)
         n_available = get_coverage_n_days(
@@ -398,16 +400,18 @@ class CalendarUSBarBuilder(BaseBarBuilder):
                 f"(nominal tf_days > {n_available} available days)"
             )
 
-        # Detect new timeframes (no state yet) — need full daily history
-        has_new_tfs = any(s.tf not in state_map for s in applicable_specs)
+        # Detect new timeframes (no state yet for any venue) — need full daily history
+        has_new_tfs = any(
+            not any((s.tf, v) in state_map for v in state_map) for s in applicable_specs
+        )
         if has_new_tfs and start_ts is not None:
             self.logger.info(
                 f"ID={id_}: New timeframe(s) detected, loading full daily history"
             )
             start_ts = None
 
-        # Load daily price data (with possibly overridden start_ts)
-        df_daily = load_daily_prices_for_id(
+        # Load daily price data for ALL venues (with possibly overridden start_ts)
+        df_all = load_daily_prices_for_id(
             db_url=self.config.db_url,
             daily_table=self.config.daily_table,
             id_=id_,
@@ -415,28 +419,50 @@ class CalendarUSBarBuilder(BaseBarBuilder):
             tz=self.config.tz or DEFAULT_TZ,
         )
 
-        if df_daily.empty:
+        if df_all.empty:
             self.logger.info(f"ID={id_}: No daily data found")
             return 0
 
-        daily_min_ts = pd.to_datetime(df_daily["ts"].min(), utc=True)
-        daily_max_ts = pd.to_datetime(df_daily["ts"].max(), utc=True)
+        # Get unique venues
+        venues = df_all["venue"].unique() if "venue" in df_all.columns else ["CMC_AGG"]
 
-        # Process each spec
-        for spec in applicable_specs:
-            try:
-                rows = self._build_bars_for_id_spec(
-                    id_=id_,
-                    spec=spec,
-                    df_daily=df_daily,
-                    daily_min_ts=daily_min_ts,
-                    daily_max_ts=daily_max_ts,
-                    state=state_map.get(spec.tf),
-                )
-                total_rows += rows
-            except Exception as e:
-                self.logger.error(f"ID={id_}, TF={spec.tf} failed: {e}", exc_info=True)
+        for venue in venues:
+            if "venue" in df_all.columns:
+                df_daily = df_all[df_all["venue"] == venue].copy()
+            else:
+                df_daily = df_all.copy()
+
+            if df_daily.empty:
                 continue
+
+            venue_rank = (
+                int(df_daily["venue_rank"].iloc[0])
+                if "venue_rank" in df_daily.columns
+                else 50
+            )
+            daily_min_ts = pd.to_datetime(df_daily["ts"].min(), utc=True)
+            daily_max_ts = pd.to_datetime(df_daily["ts"].max(), utc=True)
+
+            # Process each spec for this venue
+            for spec in applicable_specs:
+                try:
+                    rows = self._build_bars_for_id_tf(
+                        id_=id_,
+                        spec=spec,
+                        df_daily=df_daily,
+                        daily_min_ts=daily_min_ts,
+                        daily_max_ts=daily_max_ts,
+                        state=state_map.get((spec.tf, venue)),
+                        venue=venue,
+                        venue_rank=venue_rank,
+                    )
+                    total_rows += rows
+                except Exception as e:
+                    self.logger.error(
+                        f"ID={id_}, TF={spec.tf}, venue={venue} failed: {e}",
+                        exc_info=True,
+                    )
+                    continue
 
         return total_rows
 
@@ -450,7 +476,7 @@ class CalendarUSBarBuilder(BaseBarBuilder):
             ).scalar()
         return int(result or 0)
 
-    def _build_bars_for_id_spec(
+    def _build_bars_for_id_tf(
         self,
         id_: int,
         spec: CalSpec,
@@ -458,9 +484,11 @@ class CalendarUSBarBuilder(BaseBarBuilder):
         daily_min_ts: pd.Timestamp,
         daily_max_ts: pd.Timestamp,
         state: Optional[dict],
+        venue: str = "CMC_AGG",
+        venue_rank: int = 50,
     ) -> int:
         """
-        Build bars for one (id, spec) combination.
+        Build bars for one (id, spec, venue) combination.
 
         Handles:
         - Backfill detection
@@ -476,7 +504,7 @@ class CalendarUSBarBuilder(BaseBarBuilder):
             daily_min_seen = pd.to_datetime(state.get("daily_min_seen"), utc=True)
             if pd.notna(daily_min_seen) and daily_min_ts < daily_min_seen:
                 self.logger.info(
-                    f"ID={id_}, TF={spec.tf}: Backfill detected "
+                    f"ID={id_}, TF={spec.tf}, venue={venue}: Backfill detected "
                     f"({daily_min_seen} -> {daily_min_ts}), rebuilding"
                 )
                 needs_rebuild = True
@@ -484,12 +512,7 @@ class CalendarUSBarBuilder(BaseBarBuilder):
         # Full rebuild path
         if needs_rebuild or state is None or self.config.full_rebuild:
             if needs_rebuild or self.config.full_rebuild:
-                delete_bars_for_id_tf(
-                    self.config.db_url,
-                    self.get_output_table_name(),
-                    id_=id_,
-                    tf=spec.tf,
-                )
+                self._delete_bars_and_state(id_, spec.tf, venue=venue)
 
             bars = self._build_snapshots_full_history_polars(
                 df_daily, spec=spec, tz=self.config.tz or DEFAULT_TZ
@@ -497,31 +520,16 @@ class CalendarUSBarBuilder(BaseBarBuilder):
             if bars.empty:
                 return 0
 
+            # Set venue columns on output bars
+            bars["venue"] = venue
+            bars["venue_rank"] = venue_rank
+
             upsert_bars(
                 bars, db_url=self.config.db_url, bars_table=self.get_output_table_name()
             )
-
-            # Update state
-            last_bar_seq = int(bars["bar_seq"].max())
-            last_time_close = pd.to_datetime(bars["timestamp"].max(), utc=True)
-
-            upsert_state(
-                self.config.db_url,
-                self.get_state_table_name(),
-                [
-                    {
-                        "id": int(id_),
-                        "tf": spec.tf,
-                        "daily_min_seen": daily_min_ts,
-                        "daily_max_seen": daily_max_ts,
-                        "last_bar_seq": last_bar_seq,
-                        "last_time_close": last_time_close,
-                        "tz": self.config.tz,
-                    }
-                ],
-                with_tz=True,
+            self._update_state(
+                id_, spec.tf, bars, daily_min_ts, daily_max_ts, venue=venue
             )
-
             return len(bars)
 
         # Incremental append path
@@ -531,51 +539,30 @@ class CalendarUSBarBuilder(BaseBarBuilder):
             return 0
 
         # Load last snapshot info
-        last_info = load_last_snapshot_info_for_id_tfs(
-            self.config.db_url,
-            self.get_output_table_name(),
-            int(id_),
-            [spec.tf],
-        )
+        last_info = self._load_last_snapshot_info(int(id_), spec.tf, venue=venue)
 
-        if not last_info or spec.tf not in last_info:
+        if not last_info:
             self.logger.warning(
-                f"ID={id_}, TF={spec.tf}: No last snapshot info, rebuilding"
+                f"ID={id_}, TF={spec.tf}, venue={venue}: No last snapshot info, rebuilding"
             )
             # Rebuild
-            delete_bars_for_id_tf(
-                self.config.db_url, self.get_output_table_name(), id_=id_, tf=spec.tf
-            )
+            self._delete_bars_and_state(id_, spec.tf, venue=venue)
             bars = self._build_snapshots_full_history_polars(
                 df_daily, spec=spec, tz=self.config.tz or DEFAULT_TZ
             )
             if bars.empty:
                 return 0
 
+            # Set venue columns on output bars
+            bars["venue"] = venue
+            bars["venue_rank"] = venue_rank
+
             upsert_bars(
                 bars, db_url=self.config.db_url, bars_table=self.get_output_table_name()
             )
-
-            last_bar_seq = int(bars["bar_seq"].max())
-            last_time_close = pd.to_datetime(bars["timestamp"].max(), utc=True)
-
-            upsert_state(
-                self.config.db_url,
-                self.get_state_table_name(),
-                [
-                    {
-                        "id": int(id_),
-                        "tf": spec.tf,
-                        "daily_min_seen": daily_min_ts,
-                        "daily_max_seen": daily_max_ts,
-                        "last_bar_seq": last_bar_seq,
-                        "last_time_close": last_time_close,
-                        "tz": self.config.tz,
-                    }
-                ],
-                with_tz=True,
+            self._update_state(
+                id_, spec.tf, bars, daily_min_ts, daily_max_ts, venue=venue
             )
-
             return len(bars)
 
         # Incremental append
@@ -584,41 +571,23 @@ class CalendarUSBarBuilder(BaseBarBuilder):
         # (The original implementation has complex incremental logic that can be added back if needed)
 
         self.logger.info(
-            f"ID={id_}, TF={spec.tf}: New data detected, rebuilding for now"
+            f"ID={id_}, TF={spec.tf}, venue={venue}: New data detected, rebuilding for now"
         )
-        delete_bars_for_id_tf(
-            self.config.db_url, self.get_output_table_name(), id_=id_, tf=spec.tf
-        )
+        self._delete_bars_and_state(id_, spec.tf, venue=venue)
         bars = self._build_snapshots_full_history_polars(
             df_daily, spec=spec, tz=self.config.tz or DEFAULT_TZ
         )
         if bars.empty:
             return 0
 
+        # Set venue columns on output bars
+        bars["venue"] = venue
+        bars["venue_rank"] = venue_rank
+
         upsert_bars(
             bars, db_url=self.config.db_url, bars_table=self.get_output_table_name()
         )
-
-        last_bar_seq = int(bars["bar_seq"].max())
-        last_time_close = pd.to_datetime(bars["timestamp"].max(), utc=True)
-
-        upsert_state(
-            self.config.db_url,
-            self.get_state_table_name(),
-            [
-                {
-                    "id": int(id_),
-                    "tf": spec.tf,
-                    "daily_min_seen": daily_min_ts,
-                    "daily_max_seen": daily_max_ts,
-                    "last_bar_seq": last_bar_seq,
-                    "last_time_close": last_time_close,
-                    "tz": self.config.tz,
-                }
-            ],
-            with_tz=True,
-        )
-
+        self._update_state(id_, spec.tf, bars, daily_min_ts, daily_max_ts, venue=venue)
         return len(bars)
 
     def _build_snapshots_full_history_polars(
@@ -837,6 +806,118 @@ class CalendarUSBarBuilder(BaseBarBuilder):
 
         return out
 
+    # =========================================================================
+    # Helper methods (venue-aware)
+    # =========================================================================
+
+    def _load_last_snapshot_info(
+        self, id_: int, tf: str, venue: str = "CMC_AGG"
+    ) -> dict | None:
+        """Load last snapshot info for (id, tf, venue)."""
+        engine = get_engine(self.config.db_url)
+        bars_table = self.get_output_table_name()
+
+        with engine.connect() as conn:
+            row = (
+                conn.execute(
+                    text(
+                        f"""
+                    WITH last AS (
+                      SELECT id, tf, venue, MAX(bar_seq) AS last_bar_seq
+                      FROM {bars_table}
+                      WHERE id = :id AND tf = :tf AND venue = :venue
+                      GROUP BY id, tf, venue
+                    ),
+                    last_row AS (
+                      SELECT b.*
+                      FROM {bars_table} b
+                      JOIN last l
+                        ON b.id = l.id AND b.tf = l.tf AND b.venue = l.venue
+                           AND b.bar_seq = l.last_bar_seq
+                      ORDER BY b.timestamp DESC
+                      LIMIT 1
+                    ),
+                    pos AS (
+                      SELECT COUNT(*)::int AS last_pos_in_bar
+                      FROM {bars_table} b
+                      JOIN last l
+                        ON b.id = l.id AND b.tf = l.tf AND b.venue = l.venue
+                           AND b.bar_seq = l.last_bar_seq
+                    )
+                    SELECT
+                      (SELECT last_bar_seq FROM last) AS last_bar_seq,
+                      (SELECT timestamp FROM last_row) AS last_time_close,
+                      (SELECT last_pos_in_bar FROM pos) AS last_pos_in_bar;
+                    """
+                    ),
+                    {"id": int(id_), "tf": tf, "venue": venue},
+                )
+                .mappings()
+                .first()
+            )
+        if row is None:
+            return None
+        d = dict(row)
+        # If no bars exist yet, all values are None - treat as no data
+        if d.get("last_bar_seq") is None:
+            return None
+        return d
+
+    def _delete_bars_and_state(
+        self, id_: int, tf: str, venue: str | None = None
+    ) -> None:
+        """Delete bars and state for (id, tf, venue) before rebuild."""
+        delete_bars_for_id_tf(
+            self.config.db_url,
+            self.get_output_table_name(),
+            id_=id_,
+            tf=tf,
+            venue=venue,
+        )
+
+        # Delete state
+        engine = create_engine(self.config.db_url, future=True)
+        params: dict = {"id": int(id_), "tf": tf}
+        where = "WHERE id = :id AND tf = :tf"
+        if venue is not None:
+            where += " AND venue = :venue"
+            params["venue"] = venue
+        q = text(f"DELETE FROM {self.get_state_table_name()} {where};")
+        with engine.begin() as conn:
+            conn.execute(q, params)
+
+    def _update_state(
+        self,
+        id_: int,
+        tf: str,
+        bars: pd.DataFrame,
+        daily_min_ts: pd.Timestamp,
+        daily_max_ts: pd.Timestamp,
+        venue: str = "CMC_AGG",
+    ) -> None:
+        """Update state table for (id, tf, venue)."""
+        last_bar_seq = int(bars["bar_seq"].max())
+        last_time_close = pd.to_datetime(bars["timestamp"].max(), utc=True)
+
+        upsert_state(
+            self.config.db_url,
+            self.get_state_table_name(),
+            [
+                {
+                    "id": int(id_),
+                    "tf": tf,
+                    "venue": venue,
+                    "daily_min_seen": daily_min_ts,
+                    "daily_max_seen": daily_max_ts,
+                    "last_bar_seq": last_bar_seq,
+                    "last_time_close": last_time_close,
+                    "tz": self.config.tz,
+                }
+            ],
+            with_tz=True,
+            with_venue=True,
+        )
+
     @classmethod
     def create_argument_parser(cls) -> argparse.ArgumentParser:
         """
@@ -891,8 +972,6 @@ class CalendarUSBarBuilder(BaseBarBuilder):
         specs = cls._load_cal_specs_from_dim(db_url)
 
         # Create engine
-        from sqlalchemy import create_engine
-
         engine = create_engine(db_url, future=True)
 
         # Ensure state table exists (calendar builders use tz column)
