@@ -350,6 +350,10 @@ Recent decisions affecting current work:
 - **Fresh JWT per request in CoinbaseExchange** (Phase 43-02): _build_jwt(method, path) called on each authenticated request (not cached); avoids clock-skew edge cases at negligible CPU cost for trading frequency
 - **market_market_ioc BUY/SELL asymmetry** (Phase 43-02): Coinbase market orders use quote_size for BUY (spend X USD) and base_size for SELL (sell X BTC); this is API contract, not a bug
 - **cancel_order wraps id in list** (Phase 43-02): batch_cancel endpoint requires {"order_ids": [id]} even for single cancellation; wrapping is mandatory per API contract
+- **Kraken HMAC: nonce+urlencode -> SHA256 -> prepend urlpath -> HMAC-SHA512 -> base64** (Phase 43-03): Exact algorithm per Kraken REST API docs; _sign() always receives data dict that already has 'nonce' key set by _private_post(); millisecond nonce = str(int(time.time() * 1000))
+- **_requires_auth guard before every private call** (Phase 43-03): Single-method guard pattern; called as first line of _private_post(); raises AuthenticationError immediately if api_key or api_secret is falsy
+- **cancel_order discards CancelOrder result** (Phase 43-03): Kraken returns {"count": N, "pending": [...]}; interface contract requires {"order_id": id, "status": "cancelled"}; result discarded for consistency
+- **get_account_balances filters zero-balance assets** (Phase 43-03): Kraken returns all owned assets including zeros; float(balance) > 0 filter returns only held positions; consistent with Coinbase balance semantics
 
 ### Pending Todos
 
@@ -363,8 +367,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-25T03:40:24Z
-Stopped at: Completed 43-02-PLAN.md — Coinbase adapter rewritten with Advanced Trade API + JWT ES256 auth; all 8 ExchangeInterface methods implemented.
+Last session: 2026-02-25T03:40:51Z
+Stopped at: Completed 43-03-PLAN.md — Kraken HMAC-SHA512 auth added; _sign/_private_post/_requires_auth infrastructure; 5 authenticated endpoints; 0 NotImplementedError.
 Resume file: None
 
 ---
