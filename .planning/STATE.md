@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: Phase 47 (Drift Guard) — In Progress
-Plan: 4/5 complete (47-01 DONE — DB schema DDL; 47-02 DONE — drift metrics computation library + 11 unit tests; 47-03 DONE — DriftMonitor + drift_pause + 18 unit tests; 47-04 DONE — DriftAttributor OAT + ReportGenerator + 19 unit tests)
-Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 started.
-Last activity: 2026-02-25 — Completed 47-04-PLAN.md (DriftAttributor sequential OAT decomposition, ReportGenerator Markdown+Plotly, 19 unit tests, 48 total drift tests passing)
+Phase: Phase 47 (Drift Guard) — COMPLETE
+Plan: 5/5 complete (47-01 DONE — DB schema DDL; 47-02 DONE — drift metrics library + 11 tests; 47-03 DONE — DriftMonitor + drift_pause + 18 tests; 47-04 DONE — DriftAttributor OAT + ReportGenerator + 19 tests; 47-05 DONE — CLI entry points + pipeline wiring + 10 tests)
+Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans).
+Last activity: 2026-02-25 — Completed 47-05-PLAN.md (run_drift_monitor.py + run_drift_report.py CLIs, run_daily_refresh.py --drift/--paper-start pipeline wiring, 10 new tests; 58/58 drift tests passing)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [███] Phase 47 In Progress (3/5)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 237 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 6 in Phase 43, 3 in Phase 44, 7 in Phase 45, 4 in Phase 46, 2 in Phase 47)
+- Total plans completed: 242 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 6 in Phase 43, 3 in Phase 44, 7 in Phase 45, 4 in Phase 46, 5 in Phase 47)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -424,6 +424,9 @@ Recent decisions affecting current work:
 - **_df_to_markdown avoids tabulate** (Phase 47-04): pandas .to_markdown() requires optional tabulate dep which is not installed; custom row-iteration builder handles float formatting + NaN/None display; no new dep added
 - **Attribution waterfall returns None not empty Figure** (Phase 47-04): callers skip html file creation entirely when None returned; cleaner than writing placeholder chart files
 - **attr_* columns opt-in via --with-attribution** (Phase 47-04): daily monitor does NOT populate attribution; report gracefully handles NULL attr_* columns with --with-attribution placeholder note in markdown
+- **Weekly drift report NOT in --all pipeline** (Phase 47-05): run_drift_report.py is manual/cron only; too compute-heavy (7 replays/config) for daily automation; --all includes drift monitor (daily comparison) but not report generation
+- **--paper-start optional in run_daily_refresh.py** (Phase 47-05): drift stage silently skipped when paper_start is None, enabling --all to run daily without drift; drift requires explicit --drift --paper-start DATE or --all --paper-start DATE
+- **Drift stage position: after executor, before stats** (Phase 47-05): drift needs paper fills (written by executor); stats should observe post-drift state; TIMEOUT_DRIFT=600s for backtest replays
 
 ### Pending Todos
 
@@ -437,8 +440,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-25T19:40:37Z
-Stopped at: Completed 47-04-PLAN.md — DriftAttributor (7-step sequential OAT decomposition), ReportGenerator (Markdown + 3 Plotly HTML charts), 19 new tests; 48/48 drift tests passing. Phase 47 Plan 4/5 done.
+Last session: 2026-02-25T19:50:49Z
+Stopped at: Completed 47-05-PLAN.md — CLI entry points (run_drift_monitor.py + run_drift_report.py), run_daily_refresh.py drift pipeline wiring, 10 new integration tests; 58/58 drift tests passing. Phase 47 COMPLETE (5/5 plans).
 Resume file: None
 
 ---
