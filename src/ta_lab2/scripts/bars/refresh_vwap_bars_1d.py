@@ -25,7 +25,8 @@ import os
 
 from sqlalchemy import text
 
-from ta_lab2.db import get_engine, resolve_db_url
+from ta_lab2.io import get_engine
+from ta_lab2.scripts.refresh_utils import resolve_db_url
 
 logger = logging.getLogger(__name__)
 
