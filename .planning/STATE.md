@@ -10,16 +10,16 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: Phase 43 (Exchange Integration) — COMPLETE
-Plan: 5/5 complete
-Status: v1.0.0 in progress. Phase 42 complete. Phase 43: ALL PLANS COMPLETE.
-Last activity: 2026-02-25 — Completed 43-05-PLAN.md (exchange price feed script: live Coinbase/Kraken prices vs bar closes; adaptive threshold from cmc_asset_stats; --exchange-prices flag in run_daily_refresh.py)
+Plan: 6/6 complete
+Status: v1.0.0 in progress. Phase 42 complete. Phase 43: ALL PLANS COMPLETE (including 43-06 unit tests).
+Last activity: 2026-02-25 — Completed 43-06-PLAN.md (200 pure unit tests: ExchangeConfig, CanonicalOrder, Coinbase JWT auth, Kraken HMAC-SHA512 auth, price feed discrepancy logic; all mocked, no credentials/DB required)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [█████] Phase 43 COMPLETE
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 220 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 5 in Phase 43)
+- Total plans completed: 221 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 6 in Phase 43)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -362,6 +362,8 @@ Recent decisions affecting current work:
 - **factory.get_exchange() injects config via kwargs** (Phase 43-05): config=ExchangeConfig injected alongside **credentials kwargs; backward compat preserved for callers passing only keyword credentials
 - **--exchange-prices excluded from --all** (Phase 43-05): live exchange fetches are rate-limited and on-demand; not appropriate for automated nightly pipeline; invoke explicitly
 - **TIMEOUT_EXCHANGE_PRICES = 120s** (Phase 43-05): 2 exchanges x 2 pairs x ~10s per fetch with margin; shorter than pipeline components
+- **Price feed tests aligned to actual 4-tuple API** (Phase 43-06): _fetch_live_price returns (bid, ask, mid, last_price) tuple not dict; FALLBACK_THRESHOLD_PCT (not DEFAULT_THRESHOLD_PCT); tests aligned to actual 43-05 implementation, not plan spec
+- **pytestmark.skipif for forward-compatible test files** (Phase 43-06): test_price_feed.py uses conditional import + pytestmark to auto-skip cleanly if refresh_exchange_price_feed.py absent; pattern reusable for any test file with optional dependency
 
 ### Pending Todos
 
@@ -375,8 +377,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-25T03:50:17Z
-Stopped at: Completed 43-05-PLAN.md — Phase 43 COMPLETE. Exchange price feed script (Coinbase + Kraken vs bar closes, adaptive threshold, --exchange-prices flag in run_daily_refresh).
+Last session: 2026-02-25T03:55:05Z
+Stopped at: Completed 43-06-PLAN.md — Phase 43 FULLY COMPLETE (all 6 plans). 200 unit tests: ExchangeConfig, CanonicalOrder, Coinbase JWT, Kraken HMAC, price feed logic.
 Resume file: None
 
 ---
