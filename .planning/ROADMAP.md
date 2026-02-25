@@ -818,6 +818,27 @@ Plans:
 - [x] 46-03-PLAN.md -- OverrideManager + override_cli + unit tests
 - [x] 46-04-PLAN.md -- Package integration tests + executor wiring documentation
 
+---
+
+### Phase 47: Drift Guard
+**Goal:** Continuous drift monitoring between paper executor and backtest replay -- daily metrics computation, tiered graduated response (WARNING/PAUSE/ESCALATE), 6-source attribution decomposition, and weekly Markdown + Plotly reports.
+**Depends on:** Phase 45 (paper executor fills), Phase 46 (kill switch for escalation), Phase 44 (order/fill tables), Phase 28 (SignalBacktester for replay)
+**Requirements:** DRIFT-01, DRIFT-02, DRIFT-03, DRIFT-04
+**Success Criteria** (what must be TRUE):
+  1. DriftMonitor runs PIT and current-data replays for all active strategies, computes drift metrics, writes to cmc_drift_metrics
+  2. Tiered graduated response: WARNING at 75% threshold, PAUSE at 100%, ESCALATE to kill switch after N days
+  3. DriftAttributor decomposes drift into 6 sources (fees, slippage, timing, data revision, sizing, regime) via sequential OAT
+  4. ReportGenerator produces weekly Markdown report with 3 Plotly HTML charts (equity overlay, tracking error, attribution waterfall)
+  5. Drift monitor wired into run_daily_refresh.py as pipeline stage after executor; weekly report invoked separately
+**Plans**: 5 plans in 4 waves
+
+Plans:
+- [ ] 47-01-PLAN.md -- Alembic migration + reference DDL (cmc_drift_metrics, v_drift_summary, dim_risk_state/limits extensions)
+- [ ] 47-02-PLAN.md -- DriftMetrics dataclass + computation functions + data snapshot collection + unit tests
+- [ ] 47-03-PLAN.md -- DriftMonitor orchestrator + drift pause (tiered graduated response) + unit tests
+- [ ] 47-04-PLAN.md -- DriftAttributor (6-source sequential OAT) + ReportGenerator (Markdown + Plotly) + unit tests
+- [ ] 47-05-PLAN.md -- CLI scripts + pipeline wiring (run_daily_refresh.py) + package exports + full test suite
+
 </details>
 
 See `.planning/milestones/v1.0.0-REQUIREMENTS.md` and `.planning/milestones/v1.0.0-ROADMAP.md` for full details.
@@ -910,7 +931,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | 44. Order & Fill Store | 0/3 | Planned | -- |
 | 45. Paper-Trade Executor | 0/7 | Planned | -- |
 | 46. Risk Controls | 0/4 | Planned | -- |
-| 47. Drift Guard | 0/TBD | Not started | -- |
+| 47. Drift Guard | 0/5 | Planned | -- |
 | 48. Loss Limits Policy | 0/4 | Planned | -- |
 | 49. Tail-Risk Policy | 0/TBD | Not started | -- |
 | 50. Data Economics | 0/TBD | Not started | -- |
@@ -976,4 +997,4 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-24 (Phase 46 planned -- Risk Controls; 4 plans in 3 waves)*
+*Last updated: 2026-02-25 (Phase 47 planned -- Drift Guard; 5 plans in 4 waves)*
