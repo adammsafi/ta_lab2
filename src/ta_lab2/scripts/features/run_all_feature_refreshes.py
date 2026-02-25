@@ -138,6 +138,90 @@ def refresh_ta(
         )
 
 
+def refresh_cycle_stats(
+    engine,
+    ids: list[int],
+    start: Optional[str],
+    end: Optional[str],
+    tf: str = "1D",
+    alignment_source: str = "multi_tf",
+) -> RefreshResult:
+    """Refresh cmc_cycle_stats table for given tf + alignment_source."""
+    from ta_lab2.scripts.features.cycle_stats_feature import (
+        CycleStatsFeature,
+        CycleStatsConfig,
+    )
+
+    table = "cmc_cycle_stats"
+    t0 = time.time()
+
+    try:
+        config = CycleStatsConfig(tf=tf, alignment_source=alignment_source)
+        feature = CycleStatsFeature(engine, config)
+        rows_written = feature.compute_for_ids(ids=ids, start=start, end=end)
+        duration = time.time() - t0
+
+        return RefreshResult(
+            table=table,
+            rows_inserted=rows_written,
+            duration_seconds=duration,
+            success=True,
+        )
+
+    except Exception as e:
+        duration = time.time() - t0
+        logger.error(f"Cycle stats refresh failed (tf={tf}): {e}", exc_info=True)
+        return RefreshResult(
+            table=table,
+            rows_inserted=0,
+            duration_seconds=duration,
+            success=False,
+            error=str(e),
+        )
+
+
+def refresh_rolling_extremes(
+    engine,
+    ids: list[int],
+    start: Optional[str],
+    end: Optional[str],
+    tf: str = "1D",
+    alignment_source: str = "multi_tf",
+) -> RefreshResult:
+    """Refresh cmc_rolling_extremes table for given tf + alignment_source."""
+    from ta_lab2.scripts.features.rolling_extremes_feature import (
+        RollingExtremesFeature,
+        RollingExtremesConfig,
+    )
+
+    table = "cmc_rolling_extremes"
+    t0 = time.time()
+
+    try:
+        config = RollingExtremesConfig(tf=tf, alignment_source=alignment_source)
+        feature = RollingExtremesFeature(engine, config)
+        rows_written = feature.compute_for_ids(ids=ids, start=start, end=end)
+        duration = time.time() - t0
+
+        return RefreshResult(
+            table=table,
+            rows_inserted=rows_written,
+            duration_seconds=duration,
+            success=True,
+        )
+
+    except Exception as e:
+        duration = time.time() - t0
+        logger.error(f"Rolling extremes refresh failed (tf={tf}): {e}", exc_info=True)
+        return RefreshResult(
+            table=table,
+            rows_inserted=0,
+            duration_seconds=duration,
+            success=False,
+            error=str(e),
+        )
+
+
 def refresh_features_store(
     engine,
     ids: list[int],
@@ -224,10 +308,12 @@ def run_all_refreshes(
     )
     logger.info(f"Mode: {'full' if full_refresh else 'incremental'}")
 
-    # Phase 1: Vol, TA (can run in parallel)
+    # Phase 1: Vol, TA, Cycle Stats, Rolling Extremes (can run in parallel)
     phase1_tasks = [
         ("vol", refresh_vol),
         ("ta", refresh_ta),
+        ("cycle_stats", refresh_cycle_stats),
+        ("rolling_extremes", refresh_rolling_extremes),
     ]
 
     if parallel:
@@ -500,7 +586,13 @@ def main() -> int:
             continue
 
         print(f"\n[tf={tf}]")
-        for table in ["cmc_vol", "cmc_ta", "cmc_features"]:
+        for table in [
+            "cmc_vol",
+            "cmc_ta",
+            "cmc_cycle_stats",
+            "cmc_rolling_extremes",
+            "cmc_features",
+        ]:
             if table in results:
                 result = results[table]
                 status = "OK" if result.success else "FAILED"
