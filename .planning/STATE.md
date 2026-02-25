@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: Ready for v1.0.0 Phase 42 (Strategy Bake-Off)
-Plan: 0/TBD complete
-Status: v0.9.0 SHIPPED 2026-02-24. v1.0.0 not yet started.
-Last activity: 2026-02-24 — v0.9.0 milestone archived, v1.0.0 milestone activated
+Phase: Phase 42 (Strategy Bake-Off) — In Progress
+Plan: 1/TBD complete
+Status: v1.0.0 in progress. Phase 42 Plan 01 complete (IC sweep).
+Last activity: 2026-02-24 — Completed 42-01-PLAN.md (IC sweep + feature ranking)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█░░░░] Phase 42 in progress
 
 ## Performance Metrics
 
@@ -325,6 +325,10 @@ Recent decisions affecting current work:
 - **fold_boundaries public API** (Phase 41.1-03): Renamed from _fold_boundaries — external callers (notebooks, CLIs) should reference public name; _fold_sizes kept private
 - **Column name sanitization before SQL interpolation** (Phase 41.1-03): all(c.isalnum() or c == '_' for c in col) guards before SQL f-string in load_feature_close_series — prevents injection from user-facing selectbox input
 - **close_series_for_ic alias in rolling IC section** (Phase 41.1-03): Avoids shadowing close_series used in Regime Analysis section on same page; Streamlit pages execute top-to-bottom, shadowing breaks later sections
+- **IC sweep two-phase strategy** (Phase 42-01): Full 914-pair sweep takes 3-4+ hours; run key TFs (1D, 7D, 14D, 30D, 90D) covering all assets -- delivers 47,614 IC rows in 7-8 minutes for the highest-signal TFs
+- **Per-pair transaction isolation for IC sweep** (Phase 42-01): Each (asset_id, tf) uses its own engine.begin() context; AMA table absence doesn't abort cmc_features sweep; prevents cascade failures
+- **AMA IC sweep graceful degradation** (Phase 42-01): table_exists() pre-check in _discover_ama_combos(); returns empty list if table absent; sweep re-runnable once AMA pipeline populates the table
+- **Regime breakdown scoped to BTC/ETH 1D** (Phase 42-01): _REGIME_ASSET_IDS frozenset pattern; extending to all assets/TFs multiplies compute 4-7x with diminishing analytical value
 
 ### Pending Todos
 
@@ -336,8 +340,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-24T21:00:00Z
-Stopped at: v0.9.0 milestone archived. Roadmap, milestones, project, state all updated. Ready for v1.0.0 Phase 42.
+Last session: 2026-02-25T02:04:00Z
+Stopped at: Completed 42-01-PLAN.md — IC sweep (run_ic_sweep.py) built and run; 47,614 IC rows in cmc_ic_results; feature_ic_ranking.csv produced; regime breakdown for BTC/ETH 1D complete.
 Resume file: None
 
 ---
