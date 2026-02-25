@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: Phase 49 (Tail-Risk Policy) — In progress
-Plan: 3/4 complete (49-01 DONE, 49-03 DONE — TAIL-01 comparison CLI complete)
-Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 in progress (49-02 and 49-03 Wave 2 running in parallel).
-Last activity: 2026-02-25 — Completed 49-03-PLAN.md (TAIL-01 comparison CLI: 3 sizing variants x 4 strategies x 2 assets x 2 vol metrics; SIZING_COMPARISON.md with composite score winner per strategy/asset; ETH on-the-fly signals; Plotly HTML charts)
+Plan: 3/4 complete (49-01 DONE, 49-02 DONE, 49-03 DONE — TAIL-02 flatten trigger + Gate 1.5 complete)
+Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 in progress (49-04 remaining).
+Last activity: 2026-02-25 — Completed 49-02-PLAN.md (TAIL-02 core: flatten_trigger.py pure evaluation module + RiskEngine Gate 1.5 + evaluate_tail_risk_state with 21d/14d cooldown + 3-consecutive-day vol clear)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [███] Phase 49 3/4
 
@@ -446,6 +446,9 @@ Recent decisions affecting current work:
 - **TAIL-01 Variant A baseline_worst_5 as tail reference** (Phase 49-03): Variant A worst_5_day_mean is the reference denom in composite score tail_component; ensures tail improvement is measured relative to fixed-sizing baseline, not absolute
 - **On-the-fly signal generation covers all 3 strategy types** (Phase 49-03): EMA crossover (from cmc_ema_multi_tf_u pivot), RSI threshold (from cmc_features rsi_14), ATR breakout (from cmc_features atr_14 + rolling_high/low); ETH and other assets without signal rows get realistic signals
 - **3-variant comparison wave pattern** (Phase 49-03): A=baseline (fixed+stops), B=vol-sized only, C=vol-sized+stops; composite score allows all 3 to compete; winner selection includes all variants in ranking
+- **TYPE_CHECKING guard for FlattenTriggerResult** (Phase 49-02): if TYPE_CHECKING: guard avoids circular import while satisfying ruff F821; runtime import is deferred inside evaluate_tail_risk_state method body
+- **Gate 1.5 inserts after kill switch in check_order()** (Phase 49-02): FLATTEN blocks all orders and logs tail_risk_escalated event; REDUCE halves buy qty only (not sell qty); existing test mocks need one extra tail_risk_state result in side_effect sequences
+- **De-escalation dual gate: cooldown AND 3-consecutive-day vol** (Phase 49-02): 21d (flatten) or 14d (reduce) cooldown AND 3 consecutive days of 20d vol below 9.23% reduce threshold; 23 bars loaded to compute 3 overlapping 20d windows
 
 ### Pending Todos
 
@@ -459,8 +462,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-25T21:38:00Z
-Stopped at: Completed 49-03-PLAN.md — TAIL-01 comparison CLI (run_tail_risk_comparison.py): 3 variants (fixed+stops, vol-sized, vol-sized+stops), 4 strategies, BTC+ETH, 2 vol metrics, SIZING_COMPARISON.md with composite score winner + Recovery Bars column, Plotly HTML charts. 1/1 tasks PASS.
+Last session: 2026-02-25T21:33:17Z
+Stopped at: Completed 49-02-PLAN.md — TAIL-02 core: flatten_trigger.py pure evaluation module + RiskEngine Gate 1.5 + evaluate_tail_risk_state with 21d/14d cooldown + 3-consecutive-day vol clear. 2/2 tasks, 82 tests pass.
 Resume file: None
 
 ---
