@@ -1,0 +1,3 @@
+"""
+Paper trade executor package.
+"""
