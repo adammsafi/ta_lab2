@@ -6,6 +6,7 @@ from ta_lab2.executor.fill_simulator import (
     FillSimulatorConfig,
 )
 from ta_lab2.executor.paper_executor import PaperExecutor
+from ta_lab2.executor.parity_checker import ParityChecker
 from ta_lab2.executor.position_sizer import (
     ExecutorConfig,
     PositionSizer,
@@ -18,6 +19,7 @@ __all__ = [
     "FillSimulator",
     "FillSimulatorConfig",
     "PaperExecutor",
+    "ParityChecker",
     "ExecutorConfig",
     "PositionSizer",
     "compute_order_delta",
