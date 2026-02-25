@@ -704,7 +704,7 @@ Plans:
 - [x] **Phase 44: Order & Fill Store** - DB tables for orders, fills, positions with full audit trail
 - [x] **Phase 45: Paper-Trade Executor** - Engine reads signals, generates orders, tracks positions, verifies backtest parity
 - [x] **Phase 46: Risk Controls** - Kill switch, position caps, daily loss stops, circuit breaker, discretionary overrides
-- [ ] **Phase 47: Drift Guard** - Parallel backtest vs paper comparison, auto-pause on divergence
+- [x] **Phase 47: Drift Guard** - Parallel backtest vs paper comparison, auto-pause on divergence
 - [ ] **Phase 48: Loss Limits Policy** - VaR simulation, intraday stop analysis, pool-level cap definition
 - [ ] **Phase 49: Tail-Risk Policy** - Hard stops vs vol-sizing, flatten triggers, policy document
 - [ ] **Phase 50: Data Economics** - Cost audit, build-vs-buy analysis, trigger definition
@@ -833,11 +833,11 @@ Plans:
 **Plans**: 5 plans in 4 waves
 
 Plans:
-- [ ] 47-01-PLAN.md -- Alembic migration + reference DDL (cmc_drift_metrics, v_drift_summary, dim_risk_state/limits extensions)
-- [ ] 47-02-PLAN.md -- DriftMetrics dataclass + computation functions + data snapshot collection + unit tests
-- [ ] 47-03-PLAN.md -- DriftMonitor orchestrator + drift pause (tiered graduated response) + unit tests
-- [ ] 47-04-PLAN.md -- DriftAttributor (6-source sequential OAT) + ReportGenerator (Markdown + Plotly) + unit tests
-- [ ] 47-05-PLAN.md -- CLI scripts + pipeline wiring (run_daily_refresh.py) + package exports + full test suite
+- [x] 47-01-PLAN.md -- Alembic migration + reference DDL (cmc_drift_metrics, v_drift_summary, dim_risk_state/limits extensions)
+- [x] 47-02-PLAN.md -- DriftMetrics dataclass + computation functions + data snapshot collection + unit tests
+- [x] 47-03-PLAN.md -- DriftMonitor orchestrator + drift pause (tiered graduated response) + unit tests
+- [x] 47-04-PLAN.md -- DriftAttributor (6-source sequential OAT) + ReportGenerator (Markdown + Plotly) + unit tests
+- [x] 47-05-PLAN.md -- CLI scripts + pipeline wiring (run_daily_refresh.py) + package exports + full test suite
 ---
 
 ### Phase 51: Perps Readiness
@@ -990,7 +990,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | 44. Order & Fill Store | 0/3 | Planned | -- |
 | 45. Paper-Trade Executor | 0/7 | Planned | -- |
 | 46. Risk Controls | 0/4 | Planned | -- |
-| 47. Drift Guard | 0/5 | Planned | -- |
+| 47. Drift Guard | 5/5 | Complete | 2026-02-25 |
 | 48. Loss Limits Policy | 0/4 | Planned | -- |
 | 49. Tail-Risk Policy | 0/TBD | Not started | -- |
 | 50. Data Economics | 0/2 | Planned | -- |
