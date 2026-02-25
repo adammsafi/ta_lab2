@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: Phase 46 (Risk Controls) — COMPLETE
-Plan: 4/4 complete (46-01 DONE — DB schema; 46-02 DONE — RiskEngine + KillSwitch + CLI; 46-03 DONE — OverrideManager CLI + tests; 46-04 DONE — integration tests + finalized exports + executor docstring)
-Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans).
-Last activity: 2026-02-25 — Completed 46-04-PLAN.md (10 exports in __init__.py, executor integration docstring on RiskEngine, 32 integration tests, 82/82 risk tests passing)
+Phase: Phase 47 (Drift Guard) — In Progress
+Plan: 2/5 complete (47-01 DONE — DB schema DDL; 47-02 DONE — drift metrics computation library + 11 unit tests)
+Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 started.
+Last activity: 2026-02-25 — Completed 47-02-PLAN.md (DriftMetrics dataclass, compute_drift_metrics, rolling tracking error, Sharpe, PIT data snapshot, 11 unit tests all passing)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [██] Phase 47 In Progress (2/5)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 235 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 6 in Phase 43, 3 in Phase 44, 7 in Phase 45, 4 in Phase 46)
+- Total plans completed: 237 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 6 in Phase 43, 3 in Phase 44, 7 in Phase 45, 4 in Phase 46, 2 in Phase 47)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -410,6 +410,10 @@ Recent decisions affecting current work:
 - **RiskEngine executor wiring: check_order -> check_daily_loss -> update_circuit_breaker, no state caching** (Phase 46-04): 4-step pattern documented in RiskEngine class docstring; executor must NOT cache kill switch state -- fresh read on every call ensures CLI-triggered halts take effect immediately
 - **KillSwitchStatus and print_kill_switch_status in package __all__** (Phase 46-04): all publicly useful kill_switch symbols importable from ta_lab2.risk; 10 total symbols in __all__
 - **Method-local imports for import-verification tests** (Phase 46-04): avoids ruff F401/F811 when the same symbol is imported at module level and again inside each test method; idiomatic pattern for TestFullModuleImports-style test classes
+- **DriftMetrics frozen dataclass** (Phase 47-02): frozen=True enforces immutability for daily measurement records; 22 fields aligned to cmc_drift_metrics table columns
+- **Rolling TE strict NaN semantics** (Phase 47-02): pd.Series.rolling(window, min_periods=window).std() -- tracking_error_5d/30d take last non-NaN value, None when window not yet reached; threshold_breach always False when None
+- **compute_sharpe ddof=1** (Phase 47-02): sample std (ddof=1) consistent with pandas rolling().std() convention; returns None when std==0 or len<2
+- **collect_data_snapshot returns ISO strings** (Phase 47-02): .isoformat() on datetime objects avoids tz-aware serialization pitfalls (MEMORY.md Windows pitfall)
 
 ### Pending Todos
 
@@ -423,8 +427,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-25T15:00:00Z
-Stopped at: Completed 46-04-PLAN.md — finalized risk package (10 exports), executor integration docstring on RiskEngine, 32 integration tests, 82/82 risk tests passing. Phase 46 COMPLETE.
+Last session: 2026-02-25T19:14:12Z
+Stopped at: Completed 47-02-PLAN.md — DriftMetrics frozen dataclass (22 fields), compute_drift_metrics, compute_rolling_tracking_error, compute_sharpe, collect_data_snapshot; 11/11 unit tests passing. Phase 47 Plan 2/5 done.
 Resume file: None
 
 ---
