@@ -2,8 +2,8 @@
 """
 Unified daily refresh orchestration script.
 
-Coordinates bars, EMAs, AMAs, desc_stats, regimes, signals, executor, and
-stats with state-based checking and clear visibility.
+Coordinates bars, EMAs, AMAs, desc_stats, regimes, signals, executor,
+drift monitor, and stats with state-based checking and clear visibility.
 
 Usage:
     # Full daily refresh (bars then EMAs then AMAs then desc_stats then regimes then signals then executor then stats)
@@ -30,6 +30,9 @@ Usage:
     # Paper executor only
     python run_daily_refresh.py --execute
 
+    # Drift monitor only (requires --paper-start)
+    python run_daily_refresh.py --drift --paper-start 2025-01-01
+
     # Stats only
     python run_daily_refresh.py --stats
 
@@ -38,6 +41,9 @@ Usage:
 
     # Full pipeline without executor
     python run_daily_refresh.py --all --no-execute
+
+    # Full pipeline with drift monitoring (--paper-start enables drift stage)
+    python run_daily_refresh.py --all --paper-start 2025-01-01
 
     # Use 8 parallel processes for bar builders
     python run_daily_refresh.py --all --ids all -n 8
@@ -74,6 +80,7 @@ TIMEOUT_EXECUTOR = (
 )
 TIMEOUT_STATS = 3600  # 1 hour -- stats runners scan large tables
 TIMEOUT_EXCHANGE_PRICES = 120  # 2 minutes -- live price fetches from exchanges
+TIMEOUT_DRIFT = 600  # 10 minutes -- drift runs replays which involve backtest execution
 
 
 @dataclass
@@ -901,6 +908,115 @@ def run_paper_executor_stage(args, db_url: str) -> ComponentResult:
         )
 
 
+def run_drift_monitor_stage(args, db_url: str) -> ComponentResult:
+    """
+    Run drift monitor via subprocess.
+
+    Runs parallel backtest replay and computes drift metrics for all active
+    paper trading strategies. Activates drift pause when thresholds are breached.
+    Runs after executor stage and before stats stage.
+
+    Args:
+        args: CLI arguments (must have args.paper_start)
+        db_url: Database URL
+
+    Returns:
+        ComponentResult with execution details
+    """
+    cmd = [
+        sys.executable,
+        "-m",
+        "ta_lab2.scripts.drift.run_drift_monitor",
+        "--paper-start",
+        args.paper_start,
+        "--db-url",
+        db_url,
+    ]
+    if getattr(args, "verbose", False):
+        cmd.append("--verbose")
+    if getattr(args, "dry_run", False):
+        cmd.append("--dry-run")
+
+    print(f"\n{'=' * 70}")
+    print("RUNNING DRIFT MONITOR")
+    print(f"{'=' * 70}")
+    print(f"Command: {' '.join(cmd)}")
+
+    if getattr(args, "dry_run", False):
+        print("[DRY RUN] Would execute drift monitor")
+        return ComponentResult(
+            component="drift_monitor",
+            success=True,
+            duration_sec=0.0,
+            returncode=0,
+        )
+
+    start = time.perf_counter()
+
+    try:
+        if getattr(args, "verbose", False):
+            result = subprocess.run(cmd, check=False, timeout=TIMEOUT_DRIFT)
+        else:
+            result = subprocess.run(
+                cmd,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=TIMEOUT_DRIFT,
+            )
+
+            if result.returncode != 0:
+                print(f"\n[ERROR] Drift monitor failed (code {result.returncode})")
+                if result.stdout:
+                    print(f"\nSTDOUT:\n{result.stdout[-2000:]}")
+                if result.stderr:
+                    print(f"\nSTDERR:\n{result.stderr[-2000:]}")
+
+        duration = time.perf_counter() - start
+
+        if result.returncode == 0:
+            print(f"\n[OK] Drift monitor completed in {duration:.1f}s")
+            return ComponentResult(
+                component="drift_monitor",
+                success=True,
+                duration_sec=duration,
+                returncode=result.returncode,
+            )
+        else:
+            error_msg = f"Exited with code {result.returncode}"
+            print(f"\n[FAILED] Drift monitor failed: {error_msg}")
+            return ComponentResult(
+                component="drift_monitor",
+                success=False,
+                duration_sec=duration,
+                returncode=result.returncode,
+                error_message=error_msg,
+            )
+
+    except subprocess.TimeoutExpired:
+        duration = time.perf_counter() - start
+        error_msg = f"Timed out after {TIMEOUT_DRIFT}s"
+        print(f"\n[TIMEOUT] Drift monitor: {error_msg}")
+        return ComponentResult(
+            component="drift_monitor",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+    except Exception as e:
+        duration = time.perf_counter() - start
+        error_msg = str(e)
+        print(f"\n[ERROR] Drift monitor raised exception: {error_msg}")
+        return ComponentResult(
+            component="drift_monitor",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+
+
 def run_stats_runners(args, db_url: str) -> ComponentResult:
     """
     Run stats runner orchestrator via subprocess.
@@ -1392,6 +1508,29 @@ Examples:
         help="Skip executor stage in --all mode (signals still generated)",
     )
     p.add_argument(
+        "--drift",
+        action="store_true",
+        help=(
+            "Run drift monitor only (requires --paper-start). "
+            "Computes drift metrics between paper executor and backtest replay."
+        ),
+    )
+    p.add_argument(
+        "--no-drift",
+        action="store_true",
+        help="Skip drift monitor stage in --all mode",
+    )
+    p.add_argument(
+        "--paper-start",
+        metavar="DATE",
+        default=None,
+        help=(
+            "ISO date for paper trading start (e.g. 2025-01-01). "
+            "Optional: drift stage is silently skipped when absent, "
+            "even if --drift or --all is specified."
+        ),
+    )
+    p.add_argument(
         "--stats",
         action="store_true",
         help="Run stats runners only (data quality check)",
@@ -1518,12 +1657,13 @@ Examples:
         or args.regimes
         or args.signals
         or args.execute
+        or args.drift
         or args.stats
         or args.all
     ):
         p.error(
             "Must specify --bars, --emas, --amas, --desc-stats, --regimes, --signals, "
-            "--execute, --stats, --all, --weekly-digest, or --exchange-prices"
+            "--execute, --drift, --stats, --all, --weekly-digest, or --exchange-prices"
         )
 
     # Resolve database URL
@@ -1566,6 +1706,7 @@ Examples:
     run_regimes = args.regimes or args.all
     run_signals = args.signals or args.all
     run_executor = (args.execute or args.all) and not getattr(args, "no_execute", False)
+    run_drift = (args.drift or args.all) and not getattr(args, "no_drift", False)
     run_stats = args.stats or args.all
 
     # Build component description string
@@ -1584,6 +1725,8 @@ Examples:
         components.append("signals")
     if run_executor:
         components.append("executor")
+    if run_drift and getattr(args, "paper_start", None):
+        components.append("drift_monitor")
     if run_stats:
         components.append("stats")
     components_str = " + ".join(components)
@@ -1703,6 +1846,22 @@ Examples:
             print("\n[STOPPED] Paper executor failed, stopping execution")
             print("(Use --continue-on-error to run remaining components)")
             return 1
+
+    # Run drift monitor if requested (after executor, before stats)
+    # --paper-start is OPTIONAL: if not provided, drift stage is silently skipped
+    # even when --drift or --all is used. This allows --all to work without
+    # requiring --paper-start every time.
+    paper_start = getattr(args, "paper_start", None)
+    if run_drift and paper_start:
+        drift_result = run_drift_monitor_stage(args, db_url)
+        results.append(("drift_monitor", drift_result))
+
+        if not drift_result.success and not args.continue_on_error:
+            print("\n[STOPPED] Drift monitor failed, stopping execution")
+            print("(Use --continue-on-error to run remaining components)")
+            return 1
+    elif run_drift and not paper_start:
+        print("[INFO] Drift monitor skipped: --paper-start not provided")
 
     # Run stats if requested (final stage -- after bars, EMAs, regimes, executor)
     if run_stats:
