@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: Phase 43 (Exchange Integration) — COMPLETE
-Plan: 6/6 complete
-Status: v1.0.0 in progress. Phase 42 complete. Phase 43: ALL PLANS COMPLETE (including 43-06 unit tests).
-Last activity: 2026-02-25 — Completed 43-06-PLAN.md (200 pure unit tests: ExchangeConfig, CanonicalOrder, Coinbase JWT auth, Kraken HMAC-SHA512 auth, price feed discrepancy logic; all mocked, no credentials/DB required)
+Phase: Phase 44 (Order & Fill Store) — In progress
+Plan: 1/3 complete (44-02 done; 44-01 is Alembic migration pending DB)
+Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44: 44-02 COMPLETE.
+Last activity: 2026-02-25 — Completed 44-02-PLAN.md (compute_position_update() pure function via TDD; 16 tests pass)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [█] Phase 44 in progress
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 221 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 6 in Phase 43)
+- Total plans completed: 222 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 6 in Phase 43, 1 in Phase 44)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -364,6 +364,9 @@ Recent decisions affecting current work:
 - **TIMEOUT_EXCHANGE_PRICES = 120s** (Phase 43-05): 2 exchanges x 2 pairs x ~10s per fetch with margin; shorter than pipeline components
 - **Price feed tests aligned to actual 4-tuple API** (Phase 43-06): _fetch_live_price returns (bid, ask, mid, last_price) tuple not dict; FALLBACK_THRESHOLD_PCT (not DEFAULT_THRESHOLD_PCT); tests aligned to actual 43-05 implementation, not plan spec
 - **pytestmark.skipif for forward-compatible test files** (Phase 43-06): test_price_feed.py uses conditional import + pytestmark to auto-skip cleanly if refresh_exchange_price_feed.py absent; pattern reusable for any test file with optional dependency
+- **fill_qty sign (not new_qty sign) determines add vs reduce** (Phase 44-02): fill_adds_to_position = (current_qty > 0) == (fill_qty > 0); partial close keeps same direction for new_qty but fill_qty opposes current_qty -- using new_qty sign misclassifies partial closes as additions
+- **Partial close preserves avg_cost_basis unchanged** (Phase 44-02): Only new position and flip set avg_cost = fill_price; partial close retains current_avg_cost; full close sets cost = 0
+- **Explicit is_flip check after realized PnL computation** (Phase 44-02): is_flip = (current_qty > 0) != (new_qty > 0); needed to distinguish partial close (keep avg_cost) from flip (set avg_cost = fill_price) when new_qty != 0
 
 ### Pending Todos
 
@@ -377,8 +380,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-25T03:55:05Z
-Stopped at: Completed 43-06-PLAN.md — Phase 43 FULLY COMPLETE (all 6 plans). 200 unit tests: ExchangeConfig, CanonicalOrder, Coinbase JWT, Kraken HMAC, price feed logic.
+Last session: 2026-02-25T04:35:37Z
+Stopped at: Completed 44-02-PLAN.md — compute_position_update() TDD plan complete; 16 tests pass; 2 commits (test + feat).
 Resume file: None
 
 ---
