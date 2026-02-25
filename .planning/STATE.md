@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: Phase 49 (Tail-Risk Policy) — COMPLETE
-Plan: 4/4 complete (49-01 DONE, 49-02 DONE, 49-03 DONE, 49-04 DONE — TAIL-03 policy document generator complete)
-Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans).
-Last activity: 2026-02-25 — Completed 49-04-PLAN.md (TAIL-03 capstone: generate_tail_risk_policy.py CLI producing TAIL_RISK_POLICY.md + tail_risk_config.yaml + vol_spike_history.html; Phase 49 complete)
+Phase: Phase 50 (Data Economics) — In progress
+Plan: 1/2 complete (50-01 DONE — cost audit + vendor comparison; 50-02 pending)
+Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 in progress (1/2 done).
+Last activity: 2026-02-25 — Completed 50-01-PLAN.md (data economics cost audit: 46 GB DB measured, 171 tables, 17 assets, $200-800/mo TCO; vendor comparison: CoinGecko $129/mo for 2x scale)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [█] Phase 50 in progress (1/2)
 
 ## Performance Metrics
 
@@ -451,6 +451,12 @@ Recent decisions affecting current work:
 - **De-escalation dual gate: cooldown AND 3-consecutive-day vol** (Phase 49-02): 21d (flatten) or 14d (reduce) cooldown AND 3 consecutive days of 20d vol below 9.23% reduce threshold; 23 bars loaded to compute 3 overlapping 20d windows
 - **SQL-based manual override only in TAIL_RISK_POLICY.md** (Phase 49-04): Manual override section uses direct SQL (UPDATE dim_risk_state + INSERT cmc_risk_events); no CLI flags referenced; matches actual schema from Phase 49-01 Alembic migration
 - **SIZING_COMPARISON.md embedding conditional** (Phase 49-04): Policy generator reads "## Summary Recommendations" section via string markers when file present; falls back to research calibration values with note when absent -- allows generator to run before Plan 03 output exists
+- **DB is 46 GB not 8-12 GB** (Phase 50-01): pg_database_size() measured 46 GB; research estimate was 4x too low due to index overhead (47% of total), baseline snapshot tables (_20260218), and cross-asset correlation table (4.7 GB alone); always measure, never estimate
+- **17 assets tracked not 2** (Phase 50-01): dim_assets has 17 rows including 8 crypto (CMC IDs) + 9 equities (FBTC, GOOGL, GS, IBIT, KO, MARA, MSTR, NVDA, WMT); per-asset storage ~2.7 GB average
+- **Developer time is 99%+ of TCO** (Phase 50-01): $0 API costs vs $200-800/month developer time; adding CoinGecko $129/mo adds 16-65% to cash TCO but is secondary to maintenance hours
+- **CoinGecko Analyst ($129/mo) for 2x scale** (Phase 50-01): Replaces fragile CMC manual bulk download; full history to 2013, 18k+ coins, proper REST API; migration LOE 1-2 days adapter + 1 week backfill
+- **Alpaca free tier for equities at 2x scale** (Phase 50-01): Already integrated for paper trading execution (Phase 45); activating data API requires only new ingestion script; $0 cost
+- **reports/ is gitignored by design** (Phase 50-01): analysis documents in reports/data-economics/ follow Phase 42-05 convention (bakeoff reports also gitignored); on-disk but not in git
 
 ### Pending Todos
 
@@ -464,8 +470,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-25T21:45:30Z
-Stopped at: Completed 49-04-PLAN.md — TAIL-03 capstone: generate_tail_risk_policy.py producing TAIL_RISK_POLICY.md + tail_risk_config.yaml + vol_spike_history.html. Phase 49 COMPLETE (all 4 plans done).
+Last session: 2026-02-25T23:02:00Z
+Stopped at: Completed 50-01-PLAN.md — data economics cost audit (46 GB measured DB, 171 tables, 17 assets, $200-800/mo TCO) + vendor comparison (CoinGecko $129/mo for 2x scale, Alpaca free for equities). Phase 50 in progress (1/2 complete).
 Resume file: None
 
 ---
