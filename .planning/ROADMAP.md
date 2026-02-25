@@ -758,6 +758,24 @@ Plans:
 - [ ] 43-05-PLAN.md -- Price feed comparison script + factory update + daily refresh wiring
 - [ ] 43-06-PLAN.md -- Unit tests for all Phase 43 components
 
+---
+
+### Phase 44: Order & Fill Store
+**Goal:** Persist every order, fill, and position change in the database with full audit trail and atomic updates.
+**Depends on:** Phase 43 (needs exchange order format for schema design)
+**Requirements:** ORD-01, ORD-02, ORD-03, ORD-04
+**Success Criteria** (what must be TRUE):
+  1. `cmc_orders`, `cmc_fills`, `cmc_positions` tables created via Alembic
+  2. Order lifecycle tracked: created -> submitted -> filled/cancelled/rejected
+  3. Partial fills update position correctly with weighted cost basis
+  4. All writes are atomic -- no orphaned fills or inconsistent positions
+**Plans**: 3 plans in 2 waves
+
+Plans:
+- [ ] 44-01-PLAN.md -- Alembic migration for all Phase 44 tables (cmc_orders, cmc_fills, cmc_positions, cmc_order_events, cmc_order_dead_letter) + v_cmc_positions_agg view + reference DDL
+- [ ] 44-02-PLAN.md -- Position math TDD: compute_position_update() pure function with all edge cases (new, add, close, flip)
+- [ ] 44-03-PLAN.md -- OrderManager class (process_fill, promote_paper_order, update_order_status, dead letter) + unit tests
+
 </details>
 
 See `.planning/milestones/v1.0.0-REQUIREMENTS.md` and `.planning/milestones/v1.0.0-ROADMAP.md` for full details.
@@ -847,7 +865,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 |-------|----------------|--------|-----------|
 | 42. Strategy Bake-Off | 0/5 | Planned | -- |
 | 43. Exchange Integration | 0/6 | Planned | -- |
-| 44. Order & Fill Store | 0/TBD | Not started | -- |
+| 44. Order & Fill Store | 0/3 | Planned | -- |
 | 45. Paper-Trade Executor | 0/TBD | Not started | -- |
 | 46. Risk Controls | 0/TBD | Not started | -- |
 | 47. Drift Guard | 0/TBD | Not started | -- |
@@ -916,4 +934,4 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-24 (Phase 43 planned -- Exchange Integration; 6 plans in 3 waves)*
+*Last updated: 2026-02-24 (Phase 44 planned -- Order & Fill Store; 3 plans in 2 waves)*
