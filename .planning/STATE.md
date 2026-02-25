@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: Phase 42 (Strategy Bake-Off) — In Progress
-Plan: 3/TBD complete
-Status: v1.0.0 in progress. Phase 42 Plan 03 complete (composite scoring + sensitivity analysis).
-Last activity: 2026-02-25 — Completed 42-03-PLAN.md (composite_scorer.py + run_bakeoff_scoring CLI; ema_trend(17,77) robust top-1 in 4/4 schemes)
+Plan: 4/TBD complete
+Status: v1.0.0 in progress. Phase 42 Plan 04 complete (strategy selection + STRATEGY_SELECTION.md + final validation).
+Last activity: 2026-02-25 — Completed 42-04-PLAN.md (select_strategies.py; ema_trend(17,77) and ema_trend(21,50) selected; V1 gate MaxDD failure documented; ensemble blend fails; final_validation.csv generated)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [██░░░] Phase 42 in progress
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [███░░] Phase 42 in progress
 
 ## Performance Metrics
 
@@ -337,6 +337,10 @@ Recent decisions affecting current work:
 - **V1 gates flag but don't eliminate** (Phase 42-03): All strategies receive composite scores regardless of gate failures; gate_failures documented in output; allows selecting "best available" when no strategy meets both gates
 - **ema_trend(17,77) robust top-1 in 4/4 schemes** (Phase 42-03): Consistently ranks #1 under balanced, risk_focus, quality_focus, and low_cost schemes; ema_trend(21,50) robust top-2 in 3/4; both fail MaxDD gate (-70-75%)
 - **Robust threshold 3/4 weighting schemes** (Phase 42-03): Strategy is "robust" if top-2 in >= 3 of 4 schemes; 3/4 means "mostly consistent ranking" allowing one outlier scheme; 4/4 too strict, 2/4 too loose
+- **Two EMA strategies selected for V1** (Phase 42-04): ema_trend(17,77) robust top-1 in 4/4 schemes; ema_trend(21,50) robust top-2 in 3/4; both fail MaxDD gate (70-75% worst-fold drawdown is structural crypto bear market risk)
+- **Ensemble blend fails too** (Phase 42-04): Majority-vote blend of both EMA strategies also fails V1 gates — both lose during same macro bear market regimes (2018, 2022); blending reduces Sharpe while barely improving MaxDD
+- **V1 deployment with reduced sizing** (Phase 42-04): Deploy at 10% position fraction (not 50% from backtest) + circuit breaker at 15% portfolio DD due to V1 MaxDD gate failure; Phase 45 must implement circuit breakers
+- **Full-sample vs OOS consistency** (Phase 42-04): Full-sample Sharpe (1.647, 1.705) > OOS mean (1.401, 1.397) but within 1 std — OOS walk-forward is conservative (expected), not overfitting evidence
 
 ### Pending Todos
 
@@ -346,12 +350,12 @@ None yet.
 
 | Priority | Item | Status | Action |
 |----------|------|--------|--------|
-| Medium | V1 gate: no single strategy passes Sharpe>=1.0 + MaxDD<=15% | Active | Ensemble/blending step in 42-04 per CONTEXT.md; blend_signals() ready in composite_scorer.py |
+| Medium | V1 gate MaxDD failure: no strategy (including ensemble) passes MaxDD <= 15% | Documented | Select top-2 anyway per plan; deploy with reduced sizing + circuit breakers; update V1 validation criteria in Phase 53 |
 
 ## Session Continuity
 
-Last session: 2026-02-25T02:45:00Z
-Stopped at: Completed 42-03-PLAN.md — composite_scorer.py + run_bakeoff_scoring CLI; ema_trend(17,77) robust top-1 in 4/4 schemes; no strategies pass both V1 gates; blend_signals() ready for 42-04.
+Last session: 2026-02-25T02:57:45Z
+Stopped at: Completed 42-04-PLAN.md — select_strategies.py; ema_trend(17,77) + ema_trend(21,50) selected; STRATEGY_SELECTION.md + final_validation.csv written; V1 deployment config ready for Phase 45.
 Resume file: None
 
 ---
