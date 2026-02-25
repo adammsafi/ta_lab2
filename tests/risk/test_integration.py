@@ -87,6 +87,11 @@ def _halted_state() -> MagicMock:
     return _make_result(fetchone=("halted",))
 
 
+def _tail_risk_normal() -> MagicMock:
+    """Gate 1.5: tail_risk_state = 'normal' (no tail risk active)."""
+    return _make_result(fetchone=("normal",))
+
+
 def _no_cb_tripped() -> MagicMock:
     return _make_result(fetchone=("{}",))
 
@@ -146,6 +151,7 @@ class TestCheckOrderPriorityOrder:
         engine, conn = _make_engine_with_sequence(
             [
                 _active_state(),  # Gate 1: active -> pass
+                _tail_risk_normal(),  # Gate 1.5: tail risk normal -> pass
                 _limits_result(),  # Gate 2: _load_limits for CB cooldown
                 _make_result(
                     fetchone=(json.dumps({cb_key: tripped_at}),)
@@ -167,14 +173,15 @@ class TestCheckOrderPriorityOrder:
 
         assert result.allowed is False
         assert "Circuit breaker" in result.blocked_reason
-        # Position cap limits were NOT loaded (3 ops: active + limits_CB + cb_tripped)
-        assert conn.execute.call_count == 3
+        # Position cap limits were NOT loaded (4 ops: active + tail_risk + limits_CB + cb_tripped)
+        assert conn.execute.call_count == 4
 
     def test_position_cap_blocks_before_portfolio_cap(self):
         """When position is at cap, order is blocked before portfolio cap check."""
         engine, conn = _make_engine_with_sequence(
             [
                 _active_state(),  # Gate 1: active
+                _tail_risk_normal(),  # Gate 1.5: tail risk normal
                 _limits_result(),  # Gate 2: limits for CB cooldown
                 _no_cb_tripped(),  # Gate 2: CB not tripped
                 _limits_result(),  # Gate 3: limits for position/portfolio cap
@@ -202,6 +209,7 @@ class TestCheckOrderPriorityOrder:
         engine, conn = _make_engine_with_sequence(
             [
                 _active_state(),  # Gate 1: active
+                _tail_risk_normal(),  # Gate 1.5: tail risk normal
                 _limits_result(),  # Gate 2: limits for CB cooldown
                 _no_cb_tripped(),  # Gate 2: CB not tripped
                 _limits_result(),  # Gate 3/4: limits for caps
@@ -255,6 +263,7 @@ class TestCheckOrderPriorityOrder:
         engine, conn = _make_engine_with_sequence(
             [
                 _active_state(),  # Gate 1: active
+                _tail_risk_normal(),  # Gate 1.5: tail risk normal
                 _limits_result(),  # Gate 2: limits for CB
                 _no_cb_tripped(),  # Gate 2: CB not tripped
                 _limits_result(),  # Gate 3: limits loaded (even for sell -- side check is inside)
@@ -312,6 +321,7 @@ class TestRiskEngineWithOverrideManager:
         re_conn = MagicMock()
         re_conn.execute.side_effect = [
             _active_state(),
+            _tail_risk_normal(),  # Gate 1.5: tail risk check
             _limits_result(),
             _no_cb_tripped(),
             _limits_result(),

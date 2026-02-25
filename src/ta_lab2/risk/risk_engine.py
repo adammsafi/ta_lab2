@@ -1,15 +1,16 @@
 """
 RiskEngine: Order-level risk gate for paper trading.
 
-Checks every order through 5 sequential gates before allowing execution:
-  1. Kill switch -- immediate block if trading is halted
-  2. Circuit breaker -- block if per-strategy breaker is tripped
-  3. Per-asset position cap -- scale down quantity if it would exceed max_position_pct
-  4. Portfolio utilization cap -- scale down if total exposure would exceed max_portfolio_pct
-  5. All pass -- allow with (possibly adjusted) quantity
+Checks every order through 6 sequential gates before allowing execution:
+  1.  Kill switch -- immediate block if trading is halted
+  1.5 Tail risk -- block if FLATTEN, halve buy qty if REDUCE
+  2.  Circuit breaker -- block if per-strategy breaker is tripped
+  3.  Per-asset position cap -- scale down quantity if it would exceed max_position_pct
+  4.  Portfolio utilization cap -- scale down if total exposure would exceed max_portfolio_pct
+  5.  All pass -- allow with (possibly adjusted) quantity
 
 Limits are hot-reloaded from dim_risk_limits on each check_order() call.
-State (kill switch, circuit breaker) is read from dim_risk_state.
+State (kill switch, circuit breaker, tail risk) is read from dim_risk_state.
 
 Usage:
     from sqlalchemy import create_engine
@@ -38,10 +39,13 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
+
+if TYPE_CHECKING:
+    from ta_lab2.risk.flatten_trigger import FlattenTriggerResult
 
 logger = logging.getLogger(__name__)
 
@@ -146,6 +150,9 @@ class RiskEngine:
                    return
                qty_to_submit = result.adjusted_quantity
 
+        2b. Gate 1.5 (tail risk) is checked automatically inside check_order().
+            No separate call needed. FLATTEN blocks all orders; REDUCE halves buy qty.
+
         3. Call check_daily_loss() once per trading day (e.g., at session open)
            to auto-trigger the kill switch on drawdown threshold breach::
 
@@ -223,6 +230,29 @@ class RiskEngine:
                 allowed=False,
                 blocked_reason="Kill switch active -- trading halted",
             )
+
+        # Gate 1.5: Tail risk state
+        tail_state, size_mult = self.check_tail_risk_state(asset_id, strategy_id)
+        if tail_state == "flatten":
+            self._log_event(
+                event_type="tail_risk_escalated",
+                trigger_source="tail_risk",
+                reason="Order blocked by tail risk FLATTEN state",
+                asset_id=asset_id,
+                strategy_id=strategy_id,
+                metadata={"tail_risk_state": "flatten", "order_side": order_side},
+            )
+            return RiskCheckResult(
+                allowed=False,
+                blocked_reason="Tail risk: FLATTEN state active -- all new orders blocked",
+            )
+        if tail_state == "reduce" and order_side.lower() == "buy":
+            # Halve buy order quantity in REDUCE state
+            order_qty = (order_qty * Decimal(str(size_mult))).quantize(
+                Decimal("0.00000001")
+            )
+            order_notional = order_qty * fill_price
+            logger.info("Tail risk REDUCE: buy order quantity halved to %s", order_qty)
 
         # Gate 2: Circuit breaker
         cb_key = f"{asset_id}:{strategy_id}"
@@ -323,6 +353,295 @@ class RiskEngine:
             allowed=True,
             adjusted_quantity=order_qty,
         )
+
+    def check_tail_risk_state(
+        self,
+        asset_id: Optional[int] = None,
+        strategy_id: Optional[int] = None,
+    ) -> tuple[str, float]:
+        """
+        Read tail_risk_state from dim_risk_state.
+
+        Returns (state, size_multiplier):
+          ('normal', 1.0)  -- no change to order sizing
+          ('reduce', 0.5)  -- halve buy order quantities
+          ('flatten', 0.0) -- block all new orders
+
+        Args:
+            asset_id:    Unused (reserved for future asset-specific tail risk).
+            strategy_id: Unused (reserved for future strategy-specific tail risk).
+
+        Returns:
+            Tuple of (state_string, size_multiplier_float).
+        """
+        with self._engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT tail_risk_state FROM dim_risk_state WHERE state_id = 1")
+            ).fetchone()
+        if row is None or row[0] == "normal":
+            return ("normal", 1.0)
+        if row[0] == "reduce":
+            return ("reduce", 0.5)
+        if row[0] == "flatten":
+            return ("flatten", 0.0)
+        return ("normal", 1.0)  # safe default for unexpected values
+
+    def evaluate_tail_risk_state(
+        self,
+        asset_id: int = 1,
+        api_healthy: bool = True,
+        correlation_30d: Optional[float] = None,
+    ) -> "FlattenTriggerResult":
+        """
+        Daily tail risk evaluation.
+
+        Reads current 20d rolling vol and latest daily return from the returns table,
+        computes the trigger state via check_flatten_trigger(), applies cooldown logic
+        for de-escalation, and updates dim_risk_state if the state has changed.
+
+        De-escalation requirements (prevents premature clearing):
+          FLATTEN -> REDUCE:  21-day cooldown AND 3 consecutive days of vol below reduce threshold
+          REDUCE  -> NORMAL:  14-day cooldown AND 3 consecutive days of vol below reduce threshold
+        Escalation is immediate (no cooldown).
+
+        Call once per day from run_daily_refresh.py or the executor daily cycle.
+
+        Args:
+            asset_id:        Asset ID to use as the market proxy (default 1 = BTC).
+            api_healthy:     Pass False if the exchange API is unreachable.
+            correlation_30d: Current BTC/ETH 30d rolling correlation, or None to skip check.
+
+        Returns:
+            FlattenTriggerResult describing the current (possibly held) state.
+        """
+        from ta_lab2.risk.flatten_trigger import (
+            EscalationState,
+            FlattenTriggerResult,
+            check_flatten_trigger,
+        )
+
+        # 1. Read current state from DB
+        with self._engine.connect() as conn:
+            row = conn.execute(
+                text(
+                    """
+                SELECT tail_risk_state, tail_risk_triggered_at, tail_risk_cleared_at
+                FROM dim_risk_state WHERE state_id = 1
+                """
+                )
+            ).fetchone()
+
+        current_state = row[0] if row else "normal"
+        triggered_at = row[1] if row else None
+
+        # 2. Load market data: latest daily return and 20 bars for rolling vol
+        with self._engine.connect() as conn:
+            ret_row = conn.execute(
+                text(
+                    """
+                SELECT ret_arith FROM cmc_returns_bars_multi_tf_u
+                WHERE id = :asset_id AND tf = '1D' AND ret_arith IS NOT NULL
+                ORDER BY "timestamp" DESC LIMIT 1
+                """
+                ),
+                {"asset_id": asset_id},
+            ).fetchone()
+
+            vol_rows = conn.execute(
+                text(
+                    """
+                SELECT ret_arith FROM cmc_returns_bars_multi_tf_u
+                WHERE id = :asset_id AND tf = '1D' AND ret_arith IS NOT NULL
+                ORDER BY "timestamp" DESC LIMIT 20
+                """
+                ),
+                {"asset_id": asset_id},
+            ).fetchall()
+
+        if ret_row is None or len(vol_rows) < 20:
+            logger.warning(
+                "Insufficient data for tail risk evaluation (need 20 bars, got %d)",
+                len(vol_rows) if vol_rows else 0,
+            )
+            return FlattenTriggerResult(
+                state=EscalationState(current_state),
+                trigger_type=None,
+                trigger_value=None,
+                threshold_used=0.0,
+                details="Insufficient data for evaluation",
+            )
+
+        import numpy as np
+
+        latest_return = float(ret_row[0])
+        rolling_vol = float(np.std([float(r[0]) for r in vol_rows]))
+
+        # 3. Evaluate trigger conditions
+        trigger_result = check_flatten_trigger(
+            rolling_vol_20d=rolling_vol,
+            latest_daily_return=latest_return,
+            api_healthy=api_healthy,
+            correlation_30d=correlation_30d,
+        )
+
+        new_state = trigger_result.state.value
+
+        # 4. Apply cooldown logic for de-escalation
+        # Escalation (normal->reduce, reduce->flatten, normal->flatten) is always immediate.
+        # De-escalation requires BOTH cooldown elapsed AND 3 consecutive clear vol days.
+        from datetime import datetime, timezone
+
+        now = datetime.now(timezone.utc)
+        state_order = {"normal": 0, "reduce": 1, "flatten": 2}
+
+        if state_order.get(new_state, 0) < state_order.get(current_state, 0):
+            # De-escalation requested -- apply cooldown gates
+            cooldown_days = 21 if current_state == "flatten" else 14
+
+            cooldown_met = False
+            if triggered_at is not None:
+                elapsed = (now - triggered_at).days
+                cooldown_met = elapsed >= cooldown_days
+            else:
+                cooldown_met = True  # no triggered_at means safe to de-escalate
+
+            # Check 3-consecutive-day vol requirement (only if cooldown passed)
+            vol_clear_met = False
+            if cooldown_met:
+                with self._engine.connect() as conn:
+                    # Load 23 bars to compute rolling 20d vol for 3 trailing days
+                    recent_rows = conn.execute(
+                        text(
+                            """
+                        SELECT ret_arith FROM cmc_returns_bars_multi_tf_u
+                        WHERE id = :asset_id AND tf = '1D' AND ret_arith IS NOT NULL
+                        ORDER BY "timestamp" DESC LIMIT 23
+                        """
+                        ),
+                        {"asset_id": asset_id},
+                    ).fetchall()
+
+                if len(recent_rows) >= 22:
+                    all_rets = [float(r[0]) for r in recent_rows]
+                    reduce_threshold = 0.0923  # default reduce_vol_threshold
+                    consecutive_clear = 0
+                    for offset in range(3):
+                        window = all_rets[offset : offset + 20]
+                        if len(window) == 20:
+                            vol_day = float(np.std(window))
+                            if vol_day < reduce_threshold:
+                                consecutive_clear += 1
+                            else:
+                                break
+                    vol_clear_met = consecutive_clear >= 3
+                    logger.info(
+                        "Tail risk de-escalation vol check: %d/3 consecutive days below threshold (%.4f)",
+                        consecutive_clear,
+                        reduce_threshold,
+                    )
+                else:
+                    logger.info(
+                        "Insufficient data for 3-day vol clear check (need 23 bars, got %d)",
+                        len(recent_rows),
+                    )
+
+            if not cooldown_met:
+                elapsed = (now - triggered_at).days if triggered_at else 0
+                logger.info(
+                    "Tail risk de-escalation blocked by cooldown: %d/%d days elapsed",
+                    elapsed,
+                    cooldown_days,
+                )
+                new_state = current_state
+                trigger_result = FlattenTriggerResult(
+                    state=EscalationState(current_state),
+                    trigger_type=trigger_result.trigger_type,
+                    trigger_value=trigger_result.trigger_value,
+                    threshold_used=trigger_result.threshold_used,
+                    details=f"De-escalation blocked by cooldown ({elapsed}/{cooldown_days} days)",
+                )
+            elif not vol_clear_met:
+                logger.info(
+                    "Tail risk de-escalation blocked: vol not below threshold for 3 consecutive days",
+                )
+                new_state = current_state
+                trigger_result = FlattenTriggerResult(
+                    state=EscalationState(current_state),
+                    trigger_type=trigger_result.trigger_type,
+                    trigger_value=trigger_result.trigger_value,
+                    threshold_used=trigger_result.threshold_used,
+                    details="De-escalation blocked: vol not below reduce threshold for 3 consecutive days",
+                )
+
+        # 5. Update DB if state changed
+        if new_state != current_state:
+            is_escalation = state_order.get(new_state, 0) > state_order.get(
+                current_state, 0
+            )
+            with self._engine.begin() as conn:
+                if is_escalation:
+                    conn.execute(
+                        text(
+                            """
+                        UPDATE dim_risk_state
+                        SET tail_risk_state = :new_state,
+                            tail_risk_triggered_at = :now,
+                            tail_risk_trigger_reason = :reason,
+                            updated_at = :now
+                        WHERE state_id = 1
+                        """
+                        ),
+                        {
+                            "new_state": new_state,
+                            "now": now,
+                            "reason": trigger_result.details,
+                        },
+                    )
+                else:
+                    conn.execute(
+                        text(
+                            """
+                        UPDATE dim_risk_state
+                        SET tail_risk_state = :new_state,
+                            tail_risk_cleared_at = :now,
+                            tail_risk_trigger_reason = :reason,
+                            updated_at = :now
+                        WHERE state_id = 1
+                        """
+                        ),
+                        {
+                            "new_state": new_state,
+                            "now": now,
+                            "reason": trigger_result.details,
+                        },
+                    )
+
+            event_type = "tail_risk_escalated" if is_escalation else "tail_risk_cleared"
+            self._log_event(
+                event_type=event_type,
+                trigger_source="tail_risk",
+                reason=(
+                    f"State changed: {current_state} -> {new_state}. {trigger_result.details}"
+                ),
+                asset_id=asset_id,
+                metadata={
+                    "old_state": current_state,
+                    "new_state": new_state,
+                    "trigger_type": trigger_result.trigger_type,
+                    "trigger_value": trigger_result.trigger_value,
+                    "threshold_used": trigger_result.threshold_used,
+                    "rolling_vol_20d": rolling_vol,
+                    "latest_daily_return": latest_return,
+                },
+            )
+            logger.warning(
+                "Tail risk state changed: %s -> %s (%s)",
+                current_state,
+                new_state,
+                trigger_result.details,
+            )
+
+        return trigger_result
 
     def check_daily_loss(self) -> bool:
         """

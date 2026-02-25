@@ -68,6 +68,11 @@ def _halted_state_row():
     return ("halted",)
 
 
+def _tail_risk_normal_row():
+    """Simulate dim_risk_state tail_risk_state = 'normal' (Gate 1.5)."""
+    return ("normal",)
+
+
 def _no_cb_tripped():
     """Simulate cb_breaker_tripped_at = '{}'."""
     return ("{}",)
@@ -199,7 +204,7 @@ class TestCheckOrderKillSwitch:
     def test_active_state_does_not_block_at_gate_1(self):
         """When trading_state='active', kill switch gate passes."""
         # _is_circuit_breaker_tripped calls _load_limits first, then reads cb_breaker_tripped_at.
-        # Order: active -> limits(for CB cooldown) -> cb_tripped -> limits(for cap gates)
+        # Order: active -> tail_risk(normal) -> limits(for CB cooldown) -> cb_tripped -> limits(for cap gates)
         mock_engine = MagicMock()
         conn = MagicMock()
         mock_engine.connect.return_value.__enter__ = MagicMock(return_value=conn)
@@ -208,6 +213,9 @@ class TestCheckOrderKillSwitch:
         # Gate 1: active
         active_result = MagicMock()
         active_result.fetchone.return_value = ("active",)
+        # Gate 1.5: tail_risk_state = 'normal'
+        tail_risk_result = MagicMock()
+        tail_risk_result.fetchone.return_value = ("normal",)
         # Gate 2: _load_limits inside _is_circuit_breaker_tripped (needs cooldown)
         limits_for_cb = MagicMock()
         limits_for_cb.fetchall.return_value = _default_limits_row()
@@ -220,6 +228,7 @@ class TestCheckOrderKillSwitch:
 
         conn.execute.side_effect = [
             active_result,
+            tail_risk_result,
             limits_for_cb,
             cb_result,
             limits_for_caps,
@@ -254,7 +263,7 @@ class TestCheckOrderPositionCap:
         Order: 30 units @ 500 = 15000 notional.
         Expected: scaled to 10000 / 500 = 20 units.
 
-        Call order: active -> limits(CB) -> cb_tripped -> limits(caps) -> log_event
+        Call order: active -> tail_risk(normal) -> limits(CB) -> cb_tripped -> limits(caps) -> log_event
         """
         mock_engine = MagicMock()
         conn = MagicMock()
@@ -263,6 +272,8 @@ class TestCheckOrderPositionCap:
 
         active_result = MagicMock()
         active_result.fetchone.return_value = ("active",)
+        tail_risk_result = MagicMock()
+        tail_risk_result.fetchone.return_value = ("normal",)
         limits_for_cb = MagicMock()
         limits_for_cb.fetchall.return_value = _default_limits_row()
         cb_result = MagicMock()
@@ -275,6 +286,7 @@ class TestCheckOrderPositionCap:
 
         conn.execute.side_effect = [
             active_result,
+            tail_risk_result,
             limits_for_cb,
             cb_result,
             limits_for_caps,
@@ -305,6 +317,8 @@ class TestCheckOrderPositionCap:
 
         active_result = MagicMock()
         active_result.fetchone.return_value = ("active",)
+        tail_risk_result = MagicMock()
+        tail_risk_result.fetchone.return_value = ("normal",)
         limits_for_cb = MagicMock()
         limits_for_cb.fetchall.return_value = _default_limits_row()
         cb_result = MagicMock()
@@ -314,6 +328,7 @@ class TestCheckOrderPositionCap:
 
         conn.execute.side_effect = [
             active_result,
+            tail_risk_result,
             limits_for_cb,
             cb_result,
             limits_for_caps,
@@ -353,6 +368,8 @@ class TestCheckOrderPositionCapExhausted:
 
         active_result = MagicMock()
         active_result.fetchone.return_value = ("active",)
+        tail_risk_result = MagicMock()
+        tail_risk_result.fetchone.return_value = ("normal",)
         limits_for_cb = MagicMock()
         limits_for_cb.fetchall.return_value = _default_limits_row()
         cb_result = MagicMock()
@@ -364,6 +381,7 @@ class TestCheckOrderPositionCapExhausted:
 
         conn.execute.side_effect = [
             active_result,
+            tail_risk_result,
             limits_for_cb,
             cb_result,
             limits_for_caps,
@@ -395,6 +413,8 @@ class TestCheckOrderPositionCapExhausted:
 
         active_result = MagicMock()
         active_result.fetchone.return_value = ("active",)
+        tail_risk_result = MagicMock()
+        tail_risk_result.fetchone.return_value = ("normal",)
         limits_for_cb = MagicMock()
         limits_for_cb.fetchall.return_value = _default_limits_row()
         cb_result = MagicMock()
@@ -404,6 +424,7 @@ class TestCheckOrderPositionCapExhausted:
 
         conn.execute.side_effect = [
             active_result,
+            tail_risk_result,
             limits_for_cb,
             cb_result,
             limits_for_caps,
@@ -442,6 +463,8 @@ class TestCheckOrderAllClear:
 
         active_result = MagicMock()
         active_result.fetchone.return_value = ("active",)
+        tail_risk_result = MagicMock()
+        tail_risk_result.fetchone.return_value = ("normal",)
         limits_for_cb = MagicMock()
         limits_for_cb.fetchall.return_value = _default_limits_row()
         cb_result = MagicMock()
@@ -451,6 +474,7 @@ class TestCheckOrderAllClear:
 
         conn.execute.side_effect = [
             active_result,
+            tail_risk_result,
             limits_for_cb,
             cb_result,
             limits_for_caps,
@@ -490,6 +514,9 @@ class TestCircuitBreakerTripped:
         # Gate 1: active
         active_result = MagicMock()
         active_result.fetchone.return_value = ("active",)
+        # Gate 1.5: tail risk normal
+        tail_risk_result = MagicMock()
+        tail_risk_result.fetchone.return_value = ("normal",)
         # Gate 2: cb tripped 1 hour ago (within 24h cooldown)
         cb_key = "1:1"
         tripped_at = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
@@ -499,7 +526,12 @@ class TestCircuitBreakerTripped:
         limits_result = MagicMock()
         limits_result.fetchall.return_value = _default_limits_row()
 
-        conn.execute.side_effect = [active_result, limits_result, cb_tripped_result]
+        conn.execute.side_effect = [
+            active_result,
+            tail_risk_result,
+            limits_result,
+            cb_tripped_result,
+        ]
 
         engine = RiskEngine(mock_engine)
         result = engine.check_order(
@@ -671,6 +703,9 @@ class TestCircuitBreakerCooldownAutoReset:
         # Gate 1: active
         active_result = MagicMock()
         active_result.fetchone.return_value = ("active",)
+        # Gate 1.5: tail risk normal
+        tail_risk_result = MagicMock()
+        tail_risk_result.fetchone.return_value = ("normal",)
         # Gate 2: _load_limits (for cooldown)
         limits_result = MagicMock()
         limits_result.fetchall.return_value = _default_limits_row()
@@ -690,6 +725,7 @@ class TestCircuitBreakerCooldownAutoReset:
 
         conn.execute.side_effect = [
             active_result,
+            tail_risk_result,
             limits_result,
             cb_tripped_result,
             losses_row_result,

@@ -1,5 +1,10 @@
-"""Risk controls for paper trading -- kill switch, position caps, daily loss, circuit breaker."""
+"""Risk controls for paper trading -- kill switch, position caps, daily loss, circuit breaker, tail risk."""
 
+from ta_lab2.risk.flatten_trigger import (
+    EscalationState,
+    FlattenTriggerResult,
+    check_flatten_trigger,
+)
 from ta_lab2.risk.kill_switch import (
     KillSwitchStatus,
     activate_kill_switch,
@@ -21,4 +26,7 @@ __all__ = [
     "print_kill_switch_status",
     "OverrideManager",
     "OverrideInfo",
+    "EscalationState",
+    "FlattenTriggerResult",
+    "check_flatten_trigger",
 ]
