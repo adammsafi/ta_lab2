@@ -94,6 +94,13 @@ def run_bar_builders(
     cmd.extend(["--ids", args.ids])
     cmd.extend(["--db-url", db_url])
 
+    # Source filtering: skip builders that don't match --source
+    source = getattr(args, "source", "all")
+    if source == "cmc":
+        cmd.extend(["--skip", "1d_tvc"])
+    elif source == "tvc":
+        cmd.extend(["--skip", "1d"])
+
     if args.verbose:
         cmd.append("--verbose")
     if args.continue_on_error:
@@ -1056,6 +1063,15 @@ Examples:
     p.add_argument(
         "--db-url",
         help="Database URL (default: from config/env)",
+    )
+    p.add_argument(
+        "--source",
+        choices=["cmc", "tvc", "all"],
+        default="all",
+        help=(
+            "Data source filter for bar builders: "
+            "'cmc' = CMC 1D only, 'tvc' = TVC 1D only, 'all' = both (default: all)"
+        ),
     )
 
     # Execution options

@@ -121,6 +121,7 @@ class TAFeature(BaseFeature):
             "id = ANY(:ids)",
             "tf = :tf",
             "alignment_source = :as_",
+            "is_primary_venue = TRUE",
         ]
         params = {
             "ids": ids,

@@ -506,6 +506,7 @@ class FeaturesStore:
             WHERE p.id IN ({ids_list})
               AND p.tf = '{tf}'
               AND p.alignment_source = '{alignment_source}'
+              AND p.is_primary_venue = TRUE
               AND p.time_close >= '{start}'
               AND p.time_close <= '{end}'
         """

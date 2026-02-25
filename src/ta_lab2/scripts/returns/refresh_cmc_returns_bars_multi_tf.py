@@ -92,38 +92,11 @@ _VALUE_COLS = [
     "range_pct",
     "true_range",
     "true_range_pct",
-    # z-scores: 30-day window (canonical)
-    "ret_arith_zscore_30",
-    "delta_ret_arith_zscore_30",
-    "ret_log_zscore_30",
-    "delta_ret_log_zscore_30",
-    # z-scores: 30-day window (roll)
-    "ret_arith_roll_zscore_30",
-    "delta_ret_arith_roll_zscore_30",
-    "ret_log_roll_zscore_30",
-    "delta_ret_log_roll_zscore_30",
-    # z-scores: 90-day window (canonical)
-    "ret_arith_zscore_90",
-    "delta_ret_arith_zscore_90",
-    "ret_log_zscore_90",
-    "delta_ret_log_zscore_90",
-    # z-scores: 90-day window (roll)
-    "ret_arith_roll_zscore_90",
-    "delta_ret_arith_roll_zscore_90",
-    "ret_log_roll_zscore_90",
-    "delta_ret_log_roll_zscore_90",
-    # z-scores: 365-day window (canonical)
-    "ret_arith_zscore_365",
-    "delta_ret_arith_zscore_365",
-    "ret_log_zscore_365",
-    "delta_ret_log_zscore_365",
-    # z-scores: 365-day window (roll)
-    "ret_arith_roll_zscore_365",
-    "delta_ret_arith_roll_zscore_365",
-    "ret_log_roll_zscore_365",
-    "delta_ret_log_roll_zscore_365",
-    # outlier flag
-    "is_outlier",
+    # NOTE: z-score columns (ret_arith_zscore_30/90/365, etc.) and is_outlier
+    # are NOT computed here. They are populated by the standalone post-processor:
+    #   refresh_returns_zscore.py
+    # Including them here would cause "column does not exist" errors in the
+    # INSERT ... SELECT CTE (which only computes base returns/deltas/ranges).
 ]
 
 _INSERT_COLS = (
@@ -344,6 +317,7 @@ def _run_one_key(
             FROM {bars_table} b, seed
             WHERE b.id = :id
               AND b.tf = :tf
+              AND b.is_primary_venue = TRUE
               AND b."timestamp" >= seed.seed_ts
         ),
         lagged AS (

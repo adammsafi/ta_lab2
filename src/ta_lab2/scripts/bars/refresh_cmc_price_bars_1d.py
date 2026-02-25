@@ -443,7 +443,6 @@ ins AS (
     AND open IS NOT NULL
     AND close IS NOT NULL
     AND volume IS NOT NULL
-    AND market_cap IS NOT NULL
     AND time_high_fix IS NOT NULL
     AND time_low_fix IS NOT NULL
     AND high_fix IS NOT NULL

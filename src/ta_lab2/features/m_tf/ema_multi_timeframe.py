@@ -100,7 +100,7 @@ class MultiTFEMAFeature(BaseEMAFeature):
         """
         # Load directly from price_histories to avoid config-file dependency
         # (load_cmc_ohlcv_daily requires configs/default.yaml for table resolution)
-        where = ["id = ANY(:ids)", "timestamp >= :start"]
+        where = ["id = ANY(:ids)", "timestamp >= :start", "is_primary_venue = TRUE"]
         params: dict = {"ids": list(ids), "start": "2010-01-01"}
         if end is not None:
             where.append("timestamp < :end")
@@ -431,6 +431,7 @@ class MultiTFEMAFeature(BaseEMAFeature):
         WHERE tf = :tf
           AND id = ANY(:ids)
           AND is_partial_end = FALSE
+          AND is_primary_venue = TRUE
           {"" if end_ts is None else 'AND "timestamp" <= :end_ts'}
         ORDER BY id, bar_seq
         """

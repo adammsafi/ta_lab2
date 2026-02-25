@@ -91,9 +91,9 @@ def _generate_bar_table_ddl(
 
     # Anchor tables include bar_anchor_offset in unique indexes
     if is_anchor:
-        canon_ts_cols = "id, tf, bar_anchor_offset, timestamp"
+        canon_ts_cols = "id, tf, venue, bar_anchor_offset, timestamp"
     else:
-        canon_ts_cols = "id, tf, timestamp"
+        canon_ts_cols = "id, tf, venue, timestamp"
 
     return f"""
 CREATE TABLE IF NOT EXISTS {fq_table} (
@@ -158,21 +158,25 @@ CREATE TABLE IF NOT EXISTS {fq_table} (
     src_file                    TEXT          NULL,
     ingested_at                 TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
 
-    PRIMARY KEY (id, tf, bar_seq, timestamp)
+    -- Venue tracking
+    venue                       TEXT          NOT NULL DEFAULT 'CMC_AGG',
+    is_primary_venue            BOOLEAN       NOT NULL DEFAULT TRUE,
+
+    PRIMARY KEY (id, tf, bar_seq, venue, timestamp)
 );
 
 -- Indexes for query performance
 CREATE INDEX IF NOT EXISTS ix_{table_name}_id_tf_barseq
-    ON {fq_table} (id, tf, bar_seq);
+    ON {fq_table} (id, tf, venue, bar_seq);
 
 CREATE INDEX IF NOT EXISTS ix_{table_name}_id_tf_timeclose
-    ON {fq_table} (id, tf, time_close);
+    ON {fq_table} (id, tf, venue, time_close);
 
 CREATE INDEX IF NOT EXISTS ix_{table_name}_id_tf_timestamp
-    ON {fq_table} (id, tf, timestamp);
+    ON {fq_table} (id, tf, venue, timestamp);
 
 CREATE INDEX IF NOT EXISTS ix_{table_name}_tf_timestamp
-    ON {fq_table} (tf, timestamp);
+    ON {fq_table} (tf, venue, timestamp);
 
 -- Unique constraint for canonical (non-partial) bars
 CREATE UNIQUE INDEX IF NOT EXISTS uq_{table_name}__canon_timestamp
@@ -392,6 +396,9 @@ REQUIRED_COL_DEFAULTS: dict[str, Any] = {
     "repaired_close": False,
     "repaired_volume": False,
     "repaired_market_cap": False,
+    # Venue tracking
+    "venue": "CMC_AGG",
+    "is_primary_venue": True,
 }
 
 
@@ -819,7 +826,7 @@ def make_upsert_sql(
     bars_table: str,
     cols: Sequence[str],
     *,
-    conflict_cols: Sequence[str] = ("id", "tf", "bar_seq", "timestamp"),
+    conflict_cols: Sequence[str] = ("id", "tf", "bar_seq", "venue", "timestamp"),
 ) -> str:
     """Generate INSERT ... ON CONFLICT ... DO UPDATE SQL."""
     insert_cols = ", ".join(cols)
@@ -892,7 +899,7 @@ def upsert_bars(
     *,
     db_url: str,
     bars_table: str,
-    conflict_cols: Sequence[str] = ("id", "tf", "bar_seq", "timestamp"),
+    conflict_cols: Sequence[str] = ("id", "tf", "bar_seq", "venue", "timestamp"),
     timestamp_cols: Sequence[str] | None = None,
     keep_rejects: bool = False,
     rejects_table: str | None = None,
@@ -1342,10 +1349,10 @@ def load_daily_prices_for_id(
         DataFrame with daily OHLCV data, ts column in UTC
     """
     if ts_start is None:
-        where = "WHERE s.id = :id"
+        where = "WHERE s.id = :id AND s.is_primary_venue = TRUE"
         params = {"id": int(id_)}
     else:
-        where = 'WHERE s.id = :id AND s."timestamp" >= :ts_start'
+        where = 'WHERE s.id = :id AND s.is_primary_venue = TRUE AND s."timestamp" >= :ts_start'
         params = {"id": int(id_), "ts_start": ts_start}
 
     sql = text(
@@ -1366,6 +1373,7 @@ def load_daily_prices_for_id(
       FROM {daily_table} s
       LEFT JOIN public.cmc_price_bars_1d b1d
         ON b1d.id = s.id AND b1d."timestamp" = s."timestamp"
+           AND b1d.is_primary_venue = TRUE
       {where}
       ORDER BY s."timestamp";
     """

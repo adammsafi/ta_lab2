@@ -107,7 +107,7 @@ class CalendarEMAFeature(BaseEMAFeature):
 
         Returns: DataFrame with id, ts, close
         """
-        where = ["id = ANY(:ids)"]
+        where = ["id = ANY(:ids)", "is_primary_venue = TRUE"]
         params = {"ids": ids}
 
         if start:
@@ -415,6 +415,7 @@ class CalendarEMAFeature(BaseEMAFeature):
           WHERE id = ANY(:ids)
             AND tf = ANY(:tfs)
             AND is_partial_end = FALSE
+            AND is_primary_venue = TRUE
           ORDER BY id, tf, "timestamp"
         """
 

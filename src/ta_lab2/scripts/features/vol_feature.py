@@ -138,6 +138,7 @@ class VolatilityFeature(BaseFeature):
             "p.id = ANY(:ids)",
             "p.tf = :tf",
             "p.alignment_source = :as_",
+            "p.is_primary_venue = TRUE",
         ]
         params = {
             "ids": ids,

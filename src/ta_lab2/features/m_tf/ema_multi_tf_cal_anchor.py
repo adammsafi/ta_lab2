@@ -93,7 +93,7 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
         end: Optional[str] = None,
     ) -> pd.DataFrame:
         """Load daily closes for all IDs."""
-        where = ["id = ANY(:ids)"]
+        where = ["id = ANY(:ids)", "is_primary_venue = TRUE"]
         params = {"ids": ids}
 
         if start:
@@ -278,6 +278,7 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
           FROM {self.bars_table}
           WHERE id = ANY(:ids)
             AND tf = ANY(:tfs)
+            AND is_primary_venue = TRUE
           ORDER BY id, tf, bar_seq, ts
         """
 

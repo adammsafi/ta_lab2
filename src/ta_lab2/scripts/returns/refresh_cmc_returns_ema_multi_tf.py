@@ -287,38 +287,7 @@ _VALUE_COLS = [
     "delta_ret_arith_ema_bar",
     "ret_log_ema_bar",
     "delta_ret_log_ema_bar",
-    # z-scores: 30-day window (canonical)
-    "ret_arith_ema_zscore_30",
-    "ret_arith_ema_bar_zscore_30",
-    "ret_log_ema_zscore_30",
-    "ret_log_ema_bar_zscore_30",
-    # z-scores: 30-day window (roll)
-    "ret_arith_ema_roll_zscore_30",
-    "ret_arith_ema_bar_roll_zscore_30",
-    "ret_log_ema_roll_zscore_30",
-    "ret_log_ema_bar_roll_zscore_30",
-    # z-scores: 90-day window (canonical)
-    "ret_arith_ema_zscore_90",
-    "ret_arith_ema_bar_zscore_90",
-    "ret_log_ema_zscore_90",
-    "ret_log_ema_bar_zscore_90",
-    # z-scores: 90-day window (roll)
-    "ret_arith_ema_roll_zscore_90",
-    "ret_arith_ema_bar_roll_zscore_90",
-    "ret_log_ema_roll_zscore_90",
-    "ret_log_ema_bar_roll_zscore_90",
-    # z-scores: 365-day window (canonical)
-    "ret_arith_ema_zscore_365",
-    "ret_arith_ema_bar_zscore_365",
-    "ret_log_ema_zscore_365",
-    "ret_log_ema_bar_zscore_365",
-    # z-scores: 365-day window (roll)
-    "ret_arith_ema_roll_zscore_365",
-    "ret_arith_ema_bar_roll_zscore_365",
-    "ret_log_ema_roll_zscore_365",
-    "ret_log_ema_bar_roll_zscore_365",
-    # outlier flag
-    "is_outlier",
+    # NOTE: z-score columns and is_outlier are populated by refresh_returns_zscore.py
 ]
 
 _INSERT_COLS = (
