@@ -699,7 +699,7 @@ Plans:
 <details>
 <summary>v1.0.0 V1 Closure -- Paper Trading & Validation (Phases 42-54) - CURRENT</summary>
 
-- [ ] **Phase 42: Strategy Bake-Off** - IC/PSR/CV evaluation of existing signals, select 2 strategies for V1
+- [x] **Phase 42: Strategy Bake-Off** - IC/PSR/CV evaluation of existing signals, select 2 strategies for V1
 - [ ] **Phase 43: Exchange Integration** - Connect to two exchange APIs (Coinbase + Kraken), price feed comparison, paper order adapter
 - [ ] **Phase 44: Order & Fill Store** - DB tables for orders, fills, positions with full audit trail
 - [ ] **Phase 45: Paper-Trade Executor** - Engine reads signals, generates orders, tracks positions, verifies backtest parity
@@ -730,11 +730,11 @@ Plans:
 **Plans**: 5 plans in 5 waves
 
 Plans:
-- [ ] 42-01-PLAN.md -- IC feature sweep: batch IC across all assets x all TFs x all features
-- [ ] 42-02-PLAN.md -- Walk-forward backtest orchestration with PurgedKFold + CPCV + cost matrix
-- [ ] 42-03-PLAN.md -- Composite scoring + sensitivity analysis under 4 weighting schemes
-- [ ] 42-04-PLAN.md -- Strategy selection + ensemble contingency + final validation backtest
-- [ ] 42-05-PLAN.md -- Scorecard generation: formal bake-off report with charts and tables
+- [x] 42-01-PLAN.md -- IC feature sweep: batch IC across all assets x all TFs x all features
+- [x] 42-02-PLAN.md -- Walk-forward backtest orchestration with PurgedKFold + CPCV + cost matrix
+- [x] 42-03-PLAN.md -- Composite scoring + sensitivity analysis under 4 weighting schemes
+- [x] 42-04-PLAN.md -- Strategy selection + ensemble contingency + final validation backtest
+- [x] 42-05-PLAN.md -- Scorecard generation: formal bake-off report with charts and tables
 
 ---
 
