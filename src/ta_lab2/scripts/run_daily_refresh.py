@@ -2,11 +2,11 @@
 """
 Unified daily refresh orchestration script.
 
-Coordinates bars, EMAs, AMAs, desc_stats, regimes, and stats with
-state-based checking and clear visibility.
+Coordinates bars, EMAs, AMAs, desc_stats, regimes, signals, executor, and
+stats with state-based checking and clear visibility.
 
 Usage:
-    # Full daily refresh (bars then EMAs then AMAs then desc_stats then regimes then stats)
+    # Full daily refresh (bars then EMAs then AMAs then desc_stats then regimes then signals then executor then stats)
     python run_daily_refresh.py --all --ids 1,52,825
 
     # Bars only
@@ -24,11 +24,20 @@ Usage:
     # Regimes only
     python run_daily_refresh.py --regimes --ids all
 
+    # Signal generation only
+    python run_daily_refresh.py --signals
+
+    # Paper executor only
+    python run_daily_refresh.py --execute
+
     # Stats only
     python run_daily_refresh.py --stats
 
     # Weekly QC digest
     python run_daily_refresh.py --weekly-digest
+
+    # Full pipeline without executor
+    python run_daily_refresh.py --all --no-execute
 
     # Use 8 parallel processes for bar builders
     python run_daily_refresh.py --all --ids all -n 8
@@ -59,6 +68,10 @@ TIMEOUT_EMAS = 3600  # 1 hour -- EMA refreshers
 TIMEOUT_AMAS = 3600  # 1 hour -- AMA refreshers
 TIMEOUT_DESC_STATS = 3600  # 1 hour -- asset stats + correlation computation
 TIMEOUT_REGIMES = 1800  # 30 minutes -- regime refresher
+TIMEOUT_SIGNALS = 1800  # 30 minutes -- signal generation for all types
+TIMEOUT_EXECUTOR = (
+    300  # 5 minutes -- daily executor is fast (2 strategies, ~100 assets)
+)
 TIMEOUT_STATS = 3600  # 1 hour -- stats runners scan large tables
 TIMEOUT_EXCHANGE_PRICES = 120  # 2 minutes -- live price fetches from exchanges
 
@@ -682,6 +695,212 @@ def run_regime_refresher(
         )
 
 
+def run_signal_refreshes(args, db_url: str) -> ComponentResult:
+    """
+    Run signal generation via subprocess.
+
+    Generates EMA crossover, RSI, and ATR breakout signals for all assets.
+    Runs after regimes (regime-aware signal generation) and before the executor.
+
+    Args:
+        args: CLI arguments
+        db_url: Database URL
+
+    Returns:
+        ComponentResult with execution details
+    """
+    cmd = [
+        sys.executable,
+        "-m",
+        "ta_lab2.scripts.signals.run_all_signal_refreshes",
+    ]
+
+    print(f"\n{'=' * 70}")
+    print("RUNNING SIGNAL GENERATION")
+    print(f"{'=' * 70}")
+    print(f"Command: {' '.join(cmd)}")
+
+    if getattr(args, "dry_run", False):
+        print("[DRY RUN] Would run signal generation")
+        return ComponentResult(
+            component="signals",
+            success=True,
+            duration_sec=0.0,
+            returncode=0,
+        )
+
+    start = time.perf_counter()
+
+    try:
+        if getattr(args, "verbose", False):
+            result = subprocess.run(cmd, check=False, timeout=TIMEOUT_SIGNALS)
+        else:
+            result = subprocess.run(
+                cmd,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=TIMEOUT_SIGNALS,
+            )
+
+            if result.returncode != 0:
+                print(f"\n[ERROR] Signal generation failed (code {result.returncode})")
+                if result.stdout:
+                    print(f"\nSTDOUT:\n{result.stdout[-2000:]}")
+                if result.stderr:
+                    print(f"\nSTDERR:\n{result.stderr[-2000:]}")
+
+        duration = time.perf_counter() - start
+
+        if result.returncode == 0:
+            print(f"\n[OK] Signal generation completed in {duration:.1f}s")
+            return ComponentResult(
+                component="signals",
+                success=True,
+                duration_sec=duration,
+                returncode=result.returncode,
+            )
+        else:
+            error_msg = f"Exited with code {result.returncode}"
+            print(f"\n[FAILED] Signal generation failed: {error_msg}")
+            return ComponentResult(
+                component="signals",
+                success=False,
+                duration_sec=duration,
+                returncode=result.returncode,
+                error_message=error_msg,
+            )
+
+    except subprocess.TimeoutExpired:
+        duration = time.perf_counter() - start
+        error_msg = f"Timed out after {TIMEOUT_SIGNALS}s"
+        print(f"\n[TIMEOUT] Signal generation: {error_msg}")
+        return ComponentResult(
+            component="signals",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+    except Exception as e:
+        duration = time.perf_counter() - start
+        error_msg = str(e)
+        print(f"\n[ERROR] Signal generation raised exception: {error_msg}")
+        return ComponentResult(
+            component="signals",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+
+
+def run_paper_executor_stage(args, db_url: str) -> ComponentResult:
+    """
+    Run paper executor via subprocess.
+
+    Processes new signals into paper orders and simulates fills for all active
+    strategies in dim_executor_config. Runs after signals and before stats.
+
+    Args:
+        args: CLI arguments
+        db_url: Database URL
+
+    Returns:
+        ComponentResult with execution details
+    """
+    cmd = [
+        sys.executable,
+        "-m",
+        "ta_lab2.scripts.executor.run_paper_executor",
+        "--db-url",
+        db_url,
+    ]
+    if getattr(args, "verbose", False):
+        cmd.append("--verbose")
+    if getattr(args, "dry_run", False):
+        cmd.append("--dry-run")
+
+    print(f"\n{'=' * 70}")
+    print("RUNNING PAPER EXECUTOR")
+    print(f"{'=' * 70}")
+    print(f"Command: {' '.join(cmd)}")
+
+    if getattr(args, "dry_run", False):
+        print("[DRY RUN] Would execute paper executor")
+        return ComponentResult(
+            component="executor",
+            success=True,
+            duration_sec=0.0,
+            returncode=0,
+        )
+
+    start = time.perf_counter()
+
+    try:
+        if getattr(args, "verbose", False):
+            result = subprocess.run(cmd, check=False, timeout=TIMEOUT_EXECUTOR)
+        else:
+            result = subprocess.run(
+                cmd,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=TIMEOUT_EXECUTOR,
+            )
+
+            if result.returncode != 0:
+                print(f"\n[ERROR] Paper executor failed (code {result.returncode})")
+                if result.stdout:
+                    print(f"\nSTDOUT:\n{result.stdout[-2000:]}")
+                if result.stderr:
+                    print(f"\nSTDERR:\n{result.stderr[-2000:]}")
+
+        duration = time.perf_counter() - start
+
+        if result.returncode == 0:
+            print(f"\n[OK] Paper executor completed in {duration:.1f}s")
+            return ComponentResult(
+                component="executor",
+                success=True,
+                duration_sec=duration,
+                returncode=result.returncode,
+            )
+        else:
+            error_msg = f"Exited with code {result.returncode}"
+            print(f"\n[FAILED] Paper executor failed: {error_msg}")
+            return ComponentResult(
+                component="executor",
+                success=False,
+                duration_sec=duration,
+                returncode=result.returncode,
+                error_message=error_msg,
+            )
+
+    except subprocess.TimeoutExpired:
+        duration = time.perf_counter() - start
+        error_msg = f"Timed out after {TIMEOUT_EXECUTOR}s"
+        print(f"\n[TIMEOUT] Paper executor: {error_msg}")
+        return ComponentResult(
+            component="executor",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+    except Exception as e:
+        duration = time.perf_counter() - start
+        error_msg = str(e)
+        print(f"\n[ERROR] Paper executor raised exception: {error_msg}")
+        return ComponentResult(
+            component="executor",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+
+
 def run_stats_runners(args, db_url: str) -> ComponentResult:
     """
     Run stats runner orchestrator via subprocess.
@@ -1079,12 +1298,12 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(
         description=(
             "Unified daily refresh orchestration for bars, EMAs, AMAs, "
-            "desc_stats, regimes, and stats."
+            "desc_stats, regimes, signals, executor, and stats."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Full daily refresh (bars then EMAs then AMAs then regimes then stats)
+  # Full daily refresh (bars -> EMAs -> AMAs -> desc_stats -> regimes -> signals -> executor -> stats)
   python run_daily_refresh.py --all --ids 1,52,825
 
   # Bars only
@@ -1099,8 +1318,17 @@ Examples:
   # Regimes only
   python run_daily_refresh.py --regimes --ids all
 
+  # Signal generation only
+  python run_daily_refresh.py --signals
+
+  # Paper executor only
+  python run_daily_refresh.py --execute
+
   # Stats only (data quality check on all tables)
   python run_daily_refresh.py --stats
+
+  # Full pipeline without executor
+  python run_daily_refresh.py --all --no-execute
 
   # Run weekly QC digest
   python run_daily_refresh.py --weekly-digest
@@ -1149,6 +1377,21 @@ Examples:
         help="Run regime refresher only",
     )
     p.add_argument(
+        "--signals",
+        action="store_true",
+        help="Run signal generation only (EMA crossover, RSI, ATR breakout)",
+    )
+    p.add_argument(
+        "--execute",
+        action="store_true",
+        help="Run paper executor only (process signals into orders/fills)",
+    )
+    p.add_argument(
+        "--no-execute",
+        action="store_true",
+        help="Skip executor stage in --all mode (signals still generated)",
+    )
+    p.add_argument(
         "--stats",
         action="store_true",
         help="Run stats runners only (data quality check)",
@@ -1157,8 +1400,8 @@ Examples:
         "--all",
         action="store_true",
         help=(
-            "Run bars then EMAs then AMAs then desc_stats then regimes then stats "
-            "(full refresh)"
+            "Run bars then EMAs then AMAs then desc_stats then regimes "
+            "then signals then executor then stats (full refresh)"
         ),
     )
     p.add_argument(
@@ -1273,12 +1516,14 @@ Examples:
         or args.amas
         or args.desc_stats
         or args.regimes
+        or args.signals
+        or args.execute
         or args.stats
         or args.all
     ):
         p.error(
-            "Must specify --bars, --emas, --amas, --desc-stats, --regimes, --stats, "
-            "--all, --weekly-digest, or --exchange-prices"
+            "Must specify --bars, --emas, --amas, --desc-stats, --regimes, --signals, "
+            "--execute, --stats, --all, --weekly-digest, or --exchange-prices"
         )
 
     # Resolve database URL
@@ -1319,6 +1564,8 @@ Examples:
     run_amas = args.amas or args.all
     run_desc_stats = args.desc_stats or args.all
     run_regimes = args.regimes or args.all
+    run_signals = args.signals or args.all
+    run_executor = (args.execute or args.all) and not getattr(args, "no_execute", False)
     run_stats = args.stats or args.all
 
     # Build component description string
@@ -1333,6 +1580,10 @@ Examples:
         components.append("desc_stats")
     if run_regimes:
         components.append("regimes")
+    if run_signals:
+        components.append("signals")
+    if run_executor:
+        components.append("executor")
     if run_stats:
         components.append("stats")
     components_str = " + ".join(components)
@@ -1428,7 +1679,32 @@ Examples:
         regime_result = run_regime_refresher(args, db_url, parsed_ids)
         results.append(("regimes", regime_result))
 
-    # Run stats if requested (final stage -- after bars, EMAs, regimes)
+        if not regime_result.success and not args.continue_on_error:
+            print("\n[STOPPED] Regime refresher failed, stopping execution")
+            print("(Use --continue-on-error to run remaining components)")
+            return 1
+
+    # Run signal generation if requested (after regimes, before executor)
+    if run_signals:
+        signal_result = run_signal_refreshes(args, db_url)
+        results.append(("signals", signal_result))
+
+        if not signal_result.success and not args.continue_on_error:
+            print("\n[STOPPED] Signal generation failed, stopping execution")
+            print("(Use --continue-on-error to run remaining components)")
+            return 1
+
+    # Run paper executor if requested (after signals, before stats)
+    if run_executor:
+        executor_result = run_paper_executor_stage(args, db_url)
+        results.append(("executor", executor_result))
+
+        if not executor_result.success and not args.continue_on_error:
+            print("\n[STOPPED] Paper executor failed, stopping execution")
+            print("(Use --continue-on-error to run remaining components)")
+            return 1
+
+    # Run stats if requested (final stage -- after bars, EMAs, regimes, executor)
     if run_stats:
         stats_result = run_stats_runners(args, db_url)
         results.append(("stats", stats_result))
