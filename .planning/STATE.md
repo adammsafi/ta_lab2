@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: Phase 42 (Strategy Bake-Off) — In Progress
-Plan: 1/TBD complete
-Status: v1.0.0 in progress. Phase 42 Plan 01 complete (IC sweep).
-Last activity: 2026-02-24 — Completed 42-01-PLAN.md (IC sweep + feature ranking)
+Plan: 2/TBD complete
+Status: v1.0.0 in progress. Phase 42 Plan 02 complete (walk-forward bake-off + OOS metrics).
+Last activity: 2026-02-24 — Completed 42-02-PLAN.md (walk-forward bake-off, PSR/DSR, 480 rows in strategy_bakeoff_results)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█░░░░] Phase 42 in progress
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [██░░░] Phase 42 in progress
 
 ## Performance Metrics
 
@@ -329,6 +329,10 @@ Recent decisions affecting current work:
 - **Per-pair transaction isolation for IC sweep** (Phase 42-01): Each (asset_id, tf) uses its own engine.begin() context; AMA table absence doesn't abort cmc_features sweep; prevents cascade failures
 - **AMA IC sweep graceful degradation** (Phase 42-01): table_exists() pre-check in _discover_ama_combos(); returns empty list if table absent; sweep re-runnable once AMA pipeline populates the table
 - **Regime breakdown scoped to BTC/ETH 1D** (Phase 42-01): _REGIME_ASSET_IDS frozenset pattern; extending to all assets/TFs multiplies compute 4-7x with diminishing analytical value
+- **CAST(:param AS jsonb) for JSONB in SQLAlchemy text()** (Phase 42-02): :param::jsonb triggers psycopg2 syntax error (colon clash with named param syntax); use CAST(:param AS jsonb) instead
+- **DSR sr_estimates must be per-bar not annualized** (Phase 42-02): compute_psr/dsr uses per-bar sr_hat = mean/std; divide annualized Sharpe by sqrt(365) before passing as sr_estimates benchmark
+- **V1 gate outcome: no single strategy passes Sharpe>=1.0 + MaxDD<=15%** (Phase 42-02): Best is ema_trend BTC 1D Sharpe=1.42 but MaxDD worst=-70.1%; RSI low drawdown but Sharpe<1.0; ensemble/blending step needed per CONTEXT.md
+- **Fixed-parameter walk-forward as baseline** (Phase 42-02): Expanding-window re-optimization deliberately deferred; clean OOS metrics established for V1 selection; re-opt can be added as incremental enhancement
 
 ### Pending Todos
 
@@ -336,12 +340,14 @@ None yet.
 
 ### Blockers/Concerns
 
-None yet.
+| Priority | Item | Status | Action |
+|----------|------|--------|--------|
+| Medium | V1 gate: no single strategy passes Sharpe>=1.0 + MaxDD<=15% | Active | Ensemble/blending step in 42-03 or 42-04 per CONTEXT.md |
 
 ## Session Continuity
 
-Last session: 2026-02-25T02:04:00Z
-Stopped at: Completed 42-01-PLAN.md — IC sweep (run_ic_sweep.py) built and run; 47,614 IC rows in cmc_ic_results; feature_ic_ranking.csv produced; regime breakdown for BTC/ETH 1D complete.
+Last session: 2026-02-25T02:35:00Z
+Stopped at: Completed 42-02-PLAN.md — walk-forward bake-off (bakeoff_orchestrator.py) built and run; 480 OOS rows in strategy_bakeoff_results; PSR/DSR computed; run_bakeoff.py CLI created.
 Resume file: None
 
 ---
