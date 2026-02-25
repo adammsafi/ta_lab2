@@ -51,27 +51,46 @@ logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Kraken cost matrix: 6 spot + 6 perps = 12 scenarios
-# Spot:  maker 0.16% (16 bps), taker 0.26% (26 bps) x slippage 5/10/20 bps
-# Perps: same fees + funding 0.01%/8h = 0.03% per day (3 bps/day)
+# Spot:  maker 0.16% (16 bps) x 3 slippage + taker 0.26% (26 bps) x 3 slippage
+# Perps: same fees + funding 0.01%/8h = 0.03% per day (3 bps/day) x 6 fee/slip combos
 # ---------------------------------------------------------------------------
 _SLIPPAGE_LEVELS = [5.0, 10.0, 20.0]  # bps
-_SPOT_FEE_BPS = 21.0  # blended maker/taker ~(0.16+0.26)/2 = 0.21% = 21 bps
-_PERPS_FEE_BPS = 21.0  # same fee tier on perps
+_SPOT_MAKER_FEE_BPS = 16.0  # Kraken spot maker fee: 0.16% = 16 bps
+_SPOT_TAKER_FEE_BPS = 26.0  # Kraken spot taker fee: 0.26% = 26 bps
+_PERPS_MAKER_FEE_BPS = 2.0  # Kraken perps maker fee: 0.02% = 2 bps
+_PERPS_TAKER_FEE_BPS = 5.0  # Kraken perps taker fee: 0.05% = 5 bps
 _PERPS_FUNDING_BPS_DAY = 3.0  # 0.01%/8h * 3 = 0.03%/day = 3 bps/day
 
-KRAKEN_COST_MATRIX: List[CostModel] = [
-    # Spot scenarios
-    CostModel(fee_bps=_SPOT_FEE_BPS, slippage_bps=slip, funding_bps_day=0.0)
-    for slip in _SLIPPAGE_LEVELS
-] + [
-    # Perps scenarios
-    CostModel(
-        fee_bps=_PERPS_FEE_BPS,
-        slippage_bps=slip,
-        funding_bps_day=_PERPS_FUNDING_BPS_DAY,
-    )
-    for slip in _SLIPPAGE_LEVELS
-]
+KRAKEN_COST_MATRIX: List[CostModel] = (
+    [
+        # Spot maker scenarios (3): maker 16 bps x slippage 5/10/20
+        CostModel(fee_bps=_SPOT_MAKER_FEE_BPS, slippage_bps=slip, funding_bps_day=0.0)
+        for slip in _SLIPPAGE_LEVELS
+    ]
+    + [
+        # Spot taker scenarios (3): taker 26 bps x slippage 5/10/20
+        CostModel(fee_bps=_SPOT_TAKER_FEE_BPS, slippage_bps=slip, funding_bps_day=0.0)
+        for slip in _SLIPPAGE_LEVELS
+    ]
+    + [
+        # Perps maker scenarios (3): maker 2 bps + funding x slippage 5/10/20
+        CostModel(
+            fee_bps=_PERPS_MAKER_FEE_BPS,
+            slippage_bps=slip,
+            funding_bps_day=_PERPS_FUNDING_BPS_DAY,
+        )
+        for slip in _SLIPPAGE_LEVELS
+    ]
+    + [
+        # Perps taker scenarios (3): taker 5 bps + funding x slippage 5/10/20
+        CostModel(
+            fee_bps=_PERPS_TAKER_FEE_BPS,
+            slippage_bps=slip,
+            funding_bps_day=_PERPS_FUNDING_BPS_DAY,
+        )
+        for slip in _SLIPPAGE_LEVELS
+    ]
+)
 
 
 # ---------------------------------------------------------------------------
@@ -786,7 +805,7 @@ class BakeoffOrchestrator:
             WHERE strategy_name = :strategy_name
               AND asset_id = :asset_id
               AND tf = :tf
-              AND params_json::text = :params_json
+              AND params_json = CAST(:params_json AS jsonb)
               AND cost_scenario = :cost_scenario
               AND cv_method = :cv_method
             LIMIT 1
@@ -838,11 +857,13 @@ class BakeoffOrchestrator:
                 psr, dsr, psr_n_obs, pbo_prob, fold_metrics_json
             )
             VALUES (
-                :strategy_name, :asset_id, :tf, :params_json::jsonb, :cost_scenario, :cv_method,
+                :strategy_name, :asset_id, :tf,
+                CAST(:params_json AS jsonb), :cost_scenario, :cv_method,
                 :n_folds, :embargo_bars,
                 :sharpe_mean, :sharpe_std, :max_drawdown_mean, :max_drawdown_worst,
                 :total_return_mean, :cagr_mean, :trade_count_total, :turnover,
-                :psr, :dsr, :psr_n_obs, :pbo_prob, :fold_metrics_json::jsonb
+                :psr, :dsr, :psr_n_obs, :pbo_prob,
+                CAST(:fold_metrics_json AS jsonb)
             )
             ON CONFLICT (strategy_name, asset_id, tf, params_json, cost_scenario, cv_method)
             DO UPDATE SET
@@ -929,19 +950,27 @@ def _compute_and_attach_dsr(all_results: List[StrategyResult]) -> None:
         key = (sr.asset_id, sr.tf, sr.cost_scenario, sr.cv_method)
         groups[key].append(sr)
 
+    # Frequency scaling: annualized Sharpe -> per-bar Sharpe
+    # The PSR/DSR formula uses per-bar units (sr_hat = mean/std on per-bar returns).
+    # Our sharpe_mean is annualized (multiplied by sqrt(365)).
+    # De-annualize to match the per-bar Sharpe computed internally by compute_psr.
+    _FREQ_PER_YEAR = 365
+    _SR_SCALE = math.sqrt(_FREQ_PER_YEAR)
+
     # For each group, compute DSR
     for key, group in groups.items():
         if not group:
             continue
 
-        # Collect all Sharpe estimates for the group
-        sr_estimates = [
-            sr.sharpe_mean
+        # Collect all per-bar Sharpe estimates for the group
+        # (de-annualize by dividing by sqrt(365))
+        sr_estimates_perbar = [
+            sr.sharpe_mean / _SR_SCALE
             for sr in group
             if not (isinstance(sr.sharpe_mean, float) and math.isnan(sr.sharpe_mean))
         ]
 
-        if not sr_estimates:
+        if not sr_estimates_perbar:
             continue
 
         # Best strategy by sharpe_mean
@@ -953,19 +982,8 @@ def _compute_and_attach_dsr(all_results: List[StrategyResult]) -> None:
         if not valid:
             continue
 
-        best = max(valid, key=lambda x: x.sharpe_mean)
-
-        # Reconstruct OOS returns from fold_metrics
-        best_oos = []
-        for fm in best.fold_metrics:
-            best_oos.extend(fm.oos_returns)
-
-        if len(best_oos) < 30:
-            continue
-
-        # Attach DSR to all strategies in group using the same benchmark
-        # (expected max SR across all strategies), but evaluated on each
-        # strategy's own OOS returns
+        # Attach DSR to each strategy using per-bar OOS returns + per-bar SR estimates
+        # DSR: PSR(sr_star = E[max SR across all strategies in per-bar units])
         for sr in group:
             sr_oos = []
             for fm in sr.fold_metrics:
@@ -978,5 +996,5 @@ def _compute_and_attach_dsr(all_results: List[StrategyResult]) -> None:
                 warnings.simplefilter("ignore")
                 sr.dsr = compute_dsr(
                     best_trial_returns=sr_oos,
-                    sr_estimates=sr_estimates,
+                    sr_estimates=sr_estimates_perbar,
                 )
