@@ -798,6 +798,25 @@ Plans:
 - [ ] 45-05-PLAN.md -- CLI entry points + pipeline wiring (signals + executor stages in run_daily_refresh.py)
 - [ ] 45-06-PLAN.md -- ParityChecker: backtest parity verification + dedicated CLI
 - [ ] 45-07-PLAN.md -- Integration verification: package exports, full test suite, pipeline smoke test
+---
+
+### Phase 46: Risk Controls
+**Goal:** Implement kill switch, position caps, daily loss stops, circuit breaker, and discretionary override logging -- the safety net required before running any paper trades.
+**Depends on:** Phase 44 (needs position tracking), Phase 45 (needs executor to enforce controls)
+**Requirements:** RISK-01, RISK-02, RISK-03, RISK-04, RISK-05
+**Success Criteria** (what must be TRUE):
+  1. Kill switch flattens all positions and halts processing in < 5 seconds
+  2. Position caps enforced -- oversized orders scaled down with log
+  3. Daily loss stop triggers kill switch when threshold exceeded
+  4. Discretionary overrides logged with full audit trail
+  5. Circuit breaker pauses on N consecutive losing signals
+**Plans**: 4 plans in 3 waves
+
+Plans:
+- [ ] 46-01-PLAN.md -- Alembic migration for 4 risk tables (dim_risk_limits, dim_risk_state, cmc_risk_events, cmc_risk_overrides) + reference DDL
+- [ ] 46-02-PLAN.md -- RiskEngine library + KillSwitch operations + kill_switch_cli + unit tests
+- [ ] 46-03-PLAN.md -- OverrideManager + override_cli + unit tests
+- [ ] 46-04-PLAN.md -- Package integration tests + executor wiring documentation
 
 </details>
 
@@ -890,7 +909,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | 43. Exchange Integration | 0/6 | Planned | -- |
 | 44. Order & Fill Store | 0/3 | Planned | -- |
 | 45. Paper-Trade Executor | 0/7 | Planned | -- |
-| 46. Risk Controls | 0/TBD | Not started | -- |
+| 46. Risk Controls | 0/4 | Planned | -- |
 | 47. Drift Guard | 0/TBD | Not started | -- |
 | 48. Loss Limits Policy | 0/TBD | Not started | -- |
 | 49. Tail-Risk Policy | 0/TBD | Not started | -- |
@@ -957,4 +976,4 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-24 (Phase 45 planned -- Paper-Trade Executor; 7 plans in 4 waves)*
+*Last updated: 2026-02-24 (Phase 46 planned -- Risk Controls; 4 plans in 3 waves)*
