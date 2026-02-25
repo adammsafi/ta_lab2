@@ -921,6 +921,25 @@ Plans:
 
 ---
 
+### Phase 54: V1 Results Memo
+**Goal:** Produce the formal V1 capstone report documenting methodology, quantitative results (backtest + paper), failure modes, all 6 research track answers, and V2 recommendations. Single Python generator script produces reports/v1_memo/V1_MEMO.md with companion Plotly HTML charts and CSV data tables.
+**Depends on:** Phases 42-49 (backtest and policy data); Phase 53 (paper trading data, graceful degradation if incomplete)
+**Requirements:** MEMO-01, MEMO-02, MEMO-03, MEMO-04, MEMO-05
+**Success Criteria** (what must be TRUE):
+  1. `python -m ta_lab2.scripts.analysis.generate_v1_memo --backtest-only` produces reports/v1_memo/V1_MEMO.md with all 7 sections rendered from backtest and policy artifacts
+  2. Methodology section documents data sources, strategy descriptions, parameter selection (IC/PSR/CV bake-off), and fee/slippage assumptions
+  3. Results section includes Sharpe, MaxDD, MAR, win rate, turnover for both strategies against 4 benchmarks; paper trading sections gracefully degrade when Phase 53 data unavailable
+  4. Each of the 6 research tracks has a dedicated subsection with methodology, findings, and remaining questions
+  5. V2 roadmap proposes concrete phases (56+) with go/no-go triggers and effort estimates grounded in V1 velocity data
+**Plans**: 3 plans in 3 waves
+
+Plans:
+- [ ] 54-01-PLAN.md -- Generator skeleton + CLI + Executive Summary + Build Narrative + Methodology (MEMO-01)
+- [ ] 54-02-PLAN.md -- Results (MEMO-02) + Failure Modes (MEMO-03) with DB queries, charts, benchmarks
+- [ ] 54-03-PLAN.md -- Research Tracks (MEMO-04) + Key Takeaways + V2 Roadmap (MEMO-05) + Appendix + CSV exports
+
+---
+
 ### Phase 55: Feature & Signal Evaluation
 **Goal:** Close the evaluation gap -- run the v0.9.0 IC and experimentation infrastructure on real data, score all existing features and AMA variants, validate signal quality, and populate dashboards with empirical results.
 **Depends on:** v0.9.0 complete (Phases 37-38 IC evaluation + feature experimentation framework already built)
@@ -1039,7 +1058,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | 51. Perps Readiness | 0/5 | Planned | -- |
 | 52. Operational Dashboard | 0/4 | Planned | -- |
 | 53. V1 Validation | 0/4 | Planned | -- |
-| 54. V1 Results Memo | 0/TBD | Not started | -- |
+| 54. V1 Results Memo | 0/3 | Planned | -- |
 | 55. Feature & Signal Evaluation | 0/5 | Planned | -- |
 
 ## Requirement Coverage
@@ -1100,4 +1119,4 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-25 (Phase 49 complete -- Tail-Risk Policy; 4 plans in 3 waves)*
+*Last updated: 2026-02-25 (Phase 54 planned -- V1 Results Memo; 3 plans in 3 waves)*
