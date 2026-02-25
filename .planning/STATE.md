@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: Phase 49 (Tail-Risk Policy) — In progress
-Plan: 3/4 complete (49-01 DONE, 49-02 DONE, 49-03 DONE — TAIL-02 flatten trigger + Gate 1.5 complete)
-Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 in progress (49-04 remaining).
-Last activity: 2026-02-25 — Completed 49-02-PLAN.md (TAIL-02 core: flatten_trigger.py pure evaluation module + RiskEngine Gate 1.5 + evaluate_tail_risk_state with 21d/14d cooldown + 3-consecutive-day vol clear)
+Phase: Phase 49 (Tail-Risk Policy) — COMPLETE
+Plan: 4/4 complete (49-01 DONE, 49-02 DONE, 49-03 DONE, 49-04 DONE — TAIL-03 policy document generator complete)
+Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans).
+Last activity: 2026-02-25 — Completed 49-04-PLAN.md (TAIL-03 capstone: generate_tail_risk_policy.py CLI producing TAIL_RISK_POLICY.md + tail_risk_config.yaml + vol_spike_history.html; Phase 49 complete)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [███] Phase 49 3/4
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE
 
 ## Performance Metrics
 
@@ -449,6 +449,8 @@ Recent decisions affecting current work:
 - **TYPE_CHECKING guard for FlattenTriggerResult** (Phase 49-02): if TYPE_CHECKING: guard avoids circular import while satisfying ruff F821; runtime import is deferred inside evaluate_tail_risk_state method body
 - **Gate 1.5 inserts after kill switch in check_order()** (Phase 49-02): FLATTEN blocks all orders and logs tail_risk_escalated event; REDUCE halves buy qty only (not sell qty); existing test mocks need one extra tail_risk_state result in side_effect sequences
 - **De-escalation dual gate: cooldown AND 3-consecutive-day vol** (Phase 49-02): 21d (flatten) or 14d (reduce) cooldown AND 3 consecutive days of 20d vol below 9.23% reduce threshold; 23 bars loaded to compute 3 overlapping 20d windows
+- **SQL-based manual override only in TAIL_RISK_POLICY.md** (Phase 49-04): Manual override section uses direct SQL (UPDATE dim_risk_state + INSERT cmc_risk_events); no CLI flags referenced; matches actual schema from Phase 49-01 Alembic migration
+- **SIZING_COMPARISON.md embedding conditional** (Phase 49-04): Policy generator reads "## Summary Recommendations" section via string markers when file present; falls back to research calibration values with note when absent -- allows generator to run before Plan 03 output exists
 
 ### Pending Todos
 
@@ -462,8 +464,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-25T21:33:17Z
-Stopped at: Completed 49-02-PLAN.md — TAIL-02 core: flatten_trigger.py pure evaluation module + RiskEngine Gate 1.5 + evaluate_tail_risk_state with 21d/14d cooldown + 3-consecutive-day vol clear. 2/2 tasks, 82 tests pass.
+Last session: 2026-02-25T21:45:30Z
+Stopped at: Completed 49-04-PLAN.md — TAIL-03 capstone: generate_tail_risk_policy.py producing TAIL_RISK_POLICY.md + tail_risk_config.yaml + vol_spike_history.html. Phase 49 COMPLETE (all 4 plans done).
 Resume file: None
 
 ---
