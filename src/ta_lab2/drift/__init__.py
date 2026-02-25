@@ -1,5 +1,6 @@
 """Drift guard computation library -- DriftMetrics dataclass, rolling tracking error, and PIT data snapshots."""
 
+from ta_lab2.drift.attribution import AttributionResult, DriftAttributor
 from ta_lab2.drift.data_snapshot import collect_data_snapshot
 from ta_lab2.drift.drift_metrics import (
     DriftMetrics,
@@ -14,8 +15,11 @@ from ta_lab2.drift.drift_pause import (
     check_drift_threshold,
     disable_drift_pause,
 )
+from ta_lab2.drift.drift_report import ReportGenerator
 
 __all__ = [
+    "AttributionResult",
+    "DriftAttributor",
     "DriftMetrics",
     "compute_drift_metrics",
     "compute_rolling_tracking_error",
@@ -26,4 +30,5 @@ __all__ = [
     "check_drift_threshold",
     "check_drift_escalation",
     "DriftMonitor",
+    "ReportGenerator",
 ]
