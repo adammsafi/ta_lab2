@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: Phase 43 (Exchange Integration) — In progress
-Plan: 1/5 complete
-Status: v1.0.0 in progress. Phase 42 complete. Phase 43 started: Plan 01 (ExchangeConfig + DDL) complete.
-Last activity: 2026-02-25 — Completed 43-01-PLAN.md (ExchangeConfig dataclass; Alembic migration b180d8d07a85 for exchange_price_feed + paper_orders; reference DDL)
+Plan: 3/5 complete
+Status: v1.0.0 in progress. Phase 42 complete. Phase 43: Plans 01-03 complete.
+Last activity: 2026-02-25 — Completed 43-03-PLAN.md (Kraken HMAC-SHA512 auth: _sign, _private_post, 5 authenticated endpoints; no NotImplementedError remains)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [█] Phase 43 1/5
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [███] Phase 43 3/5
 
 ## Performance Metrics
 
@@ -347,6 +347,9 @@ Recent decisions affecting current work:
 - **down_revision = actual head, not plan spec** (Phase 43-01): Plan spec listed 8d5bc7ee1732 as expected down_revision but actual head was e74f5622e710 (strategy_bakeoff_results from Phase 42-02); always run alembic history to verify before setting down_revision
 - **ExchangeConfig NOT frozen** (Phase 43-01): Mutable dataclass allows environment switching at runtime without object recreation; from_env_file classmethod uses manual dotenv parser (no python-dotenv dependency)
 - **paper_orders.status includes Phase 44 states** (Phase 43-01): CHECK constraint includes pending/filled/cancelled/rejected now to avoid ALTER TABLE in Phase 44; current Phase 43 only uses 'paper'
+- **Fresh JWT per request in CoinbaseExchange** (Phase 43-02): _build_jwt(method, path) called on each authenticated request (not cached); avoids clock-skew edge cases at negligible CPU cost for trading frequency
+- **market_market_ioc BUY/SELL asymmetry** (Phase 43-02): Coinbase market orders use quote_size for BUY (spend X USD) and base_size for SELL (sell X BTC); this is API contract, not a bug
+- **cancel_order wraps id in list** (Phase 43-02): batch_cancel endpoint requires {"order_ids": [id]} even for single cancellation; wrapping is mandatory per API contract
 
 ### Pending Todos
 
@@ -360,8 +363,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-25T03:38:00Z
-Stopped at: Completed 43-01-PLAN.md — ExchangeConfig dataclass; Alembic migration b180d8d07a85 (exchange_price_feed + paper_orders); reference DDL.
+Last session: 2026-02-25T03:40:24Z
+Stopped at: Completed 43-02-PLAN.md — Coinbase adapter rewritten with Advanced Trade API + JWT ES256 auth; all 8 ExchangeInterface methods implemented.
 Resume file: None
 
 ---
