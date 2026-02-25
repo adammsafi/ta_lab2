@@ -838,6 +838,27 @@ Plans:
 - [ ] 47-03-PLAN.md -- DriftMonitor orchestrator + drift pause (tiered graduated response) + unit tests
 - [ ] 47-04-PLAN.md -- DriftAttributor (6-source sequential OAT) + ReportGenerator (Markdown + Plotly) + unit tests
 - [ ] 47-05-PLAN.md -- CLI scripts + pipeline wiring (run_daily_refresh.py) + package exports + full test suite
+---
+
+### Phase 51: Perps Readiness
+**Goal:** Build the technical foundation for perpetual futures paper trading: funding rate ingestion from 6 venues, margin model (isolated + cross), liquidation buffer with alerts, backtester extension for funding payments, and venue downtime playbook.
+**Depends on:** Phase 46 (risk controls for Gate 1.6 extension)
+**Requirements:** PERP-01, PERP-02, PERP-03, PERP-04, PERP-05
+**Success Criteria** (what must be TRUE):
+  1. `python -m ta_lab2.scripts.perps.refresh_funding_rates --all` ingests funding rate history from 6 venues (Binance, Hyperliquid, Bybit, dYdX, Aevo, Aster) for BTC/ETH with watermark-based incremental refresh
+  2. FundingAdjuster computes per-bar funding payments and adjusts backtest equity curve; both daily and per-settlement modes supported; sign convention correct (positive rate = longs pay)
+  3. MarginState tracks isolated and cross margin with venue-specific tiered rates from cmc_margin_config; compute_margin_utilization flags warning at 1.5x and critical at 1.1x maintenance margin
+  4. RiskEngine Gate 1.6 blocks buy orders when margin utilization is at or below 1.1x maintenance margin; sell orders always pass (reducing exposure is safe)
+  5. Venue downtime playbook documents procedure for all downtime types with machine-readable YAML health config and hedge-on-alternate-venue procedure
+**Plans**: 5 plans in 4 waves
+
+Plans:
+- [ ] 51-01-PLAN.md -- Alembic migration + reference DDL (cmc_funding_rates, cmc_margin_config, cmc_perp_positions, risk event extensions)
+- [ ] 51-02-PLAN.md -- Funding rate fetchers (6 venues) + refresh_funding_rates.py CLI with watermark pagination and daily rollup
+- [ ] 51-03-PLAN.md -- Venue downtime playbook (Markdown procedure + YAML health config)
+- [ ] 51-04-PLAN.md -- FundingAdjuster (backtester extension) + margin model (MarginState + tiered rates) + unit tests
+- [ ] 51-05-PLAN.md -- Liquidation buffer (RiskEngine Gate 1.6) + package exports + integration tests
+
 
 ---
 
@@ -953,7 +974,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | 48. Loss Limits Policy | 0/4 | Planned | -- |
 | 49. Tail-Risk Policy | 0/TBD | Not started | -- |
 | 50. Data Economics | 0/2 | Planned | -- |
-| 51. Perps Readiness | 0/TBD | Not started | -- |
+| 51. Perps Readiness | 0/5 | Planned | -- |
 | 52. Operational Dashboard | 0/TBD | Not started | -- |
 | 53. V1 Validation | 0/TBD | Not started | -- |
 | 54. V1 Results Memo | 0/TBD | Not started | -- |
