@@ -60,6 +60,7 @@ TIMEOUT_AMAS = 3600  # 1 hour -- AMA refreshers
 TIMEOUT_DESC_STATS = 3600  # 1 hour -- asset stats + correlation computation
 TIMEOUT_REGIMES = 1800  # 30 minutes -- regime refresher
 TIMEOUT_STATS = 3600  # 1 hour -- stats runners scan large tables
+TIMEOUT_EXCHANGE_PRICES = 120  # 2 minutes -- live price fetches from exchanges
 
 
 @dataclass
@@ -794,6 +795,121 @@ def run_stats_runners(args, db_url: str) -> ComponentResult:
         )
 
 
+def run_exchange_prices(args, db_url: str) -> ComponentResult:
+    """
+    Run the exchange price feed refresh via subprocess.
+
+    Fetches live spot prices from Coinbase and Kraken for BTC/USD and ETH/USD,
+    compares against the most recent daily bar close, and writes snapshots to
+    exchange_price_feed. WARNING is logged when discrepancy exceeds the adaptive
+    threshold derived from cmc_asset_stats.
+
+    This component is NOT included in --all. Invoke explicitly with
+    --exchange-prices.
+
+    Args:
+        args: CLI arguments
+        db_url: Database URL
+
+    Returns:
+        ComponentResult with execution details
+    """
+    cmd = [
+        sys.executable,
+        "-m",
+        "ta_lab2.scripts.exchange.refresh_exchange_price_feed",
+    ]
+
+    cmd.extend(["--db-url", db_url])
+
+    if args.verbose:
+        cmd.append("--verbose")
+
+    # Propagate --dry-run so no DB writes occur during verification
+    if getattr(args, "dry_run", False):
+        cmd.append("--dry-run")
+
+    print(f"\n{'=' * 70}")
+    print("RUNNING EXCHANGE PRICE FEED")
+    print(f"{'=' * 70}")
+    print(f"Command: {' '.join(cmd)}")
+
+    if args.dry_run:
+        print("[DRY RUN] Would execute exchange price feed refresh")
+        return ComponentResult(
+            component="exchange_prices",
+            success=True,
+            duration_sec=0.0,
+            returncode=0,
+        )
+
+    start = time.perf_counter()
+
+    try:
+        if args.verbose:
+            # Stream output
+            result = subprocess.run(cmd, check=False, timeout=TIMEOUT_EXCHANGE_PRICES)
+        else:
+            # Capture output
+            result = subprocess.run(
+                cmd,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=TIMEOUT_EXCHANGE_PRICES,
+            )
+
+            # Always show output (price feed is informational)
+            if result.stdout:
+                print(result.stdout)
+            if result.returncode != 0 and result.stderr:
+                print(f"\nSTDERR:\n{result.stderr}")
+
+        duration = time.perf_counter() - start
+
+        if result.returncode == 0:
+            print(f"\n[OK] Exchange price feed completed in {duration:.1f}s")
+            return ComponentResult(
+                component="exchange_prices",
+                success=True,
+                duration_sec=duration,
+                returncode=result.returncode,
+            )
+        else:
+            error_msg = f"Exited with code {result.returncode}"
+            print(f"\n[FAILED] Exchange price feed failed: {error_msg}")
+            return ComponentResult(
+                component="exchange_prices",
+                success=False,
+                duration_sec=duration,
+                returncode=result.returncode,
+                error_message=error_msg,
+            )
+
+    except subprocess.TimeoutExpired:
+        duration = time.perf_counter() - start
+        error_msg = f"Timed out after {TIMEOUT_EXCHANGE_PRICES}s"
+        print(f"\n[TIMEOUT] Exchange price feed: {error_msg}")
+        return ComponentResult(
+            component="exchange_prices",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+    except Exception as e:
+        duration = time.perf_counter() - start
+        error_msg = str(e)
+        print(f"\n[ERROR] Exchange price feed raised exception: {error_msg}")
+        return ComponentResult(
+            component="exchange_prices",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+
+
 def run_weekly_digest(args, db_url: str) -> ComponentResult:
     """
     Run the weekly QC digest as a standalone subprocess.
@@ -1053,6 +1169,15 @@ Examples:
             "sends via Telegram). Standalone -- does not combine with pipeline flags."
         ),
     )
+    p.add_argument(
+        "--exchange-prices",
+        action="store_true",
+        help=(
+            "Fetch live spot prices from exchanges and compare against bar closes. "
+            "Writes snapshots to exchange_price_feed. "
+            "NOT included in --all; invoke explicitly."
+        ),
+    )
 
     # Common arguments
     p.add_argument(
@@ -1139,6 +1264,9 @@ Examples:
         # Weekly digest is a standalone reporting operation -- does not combine
         # with pipeline flags. Run it and exit immediately.
         pass
+    elif args.exchange_prices:
+        # Exchange prices is a standalone fetch -- does not combine with pipeline.
+        pass
     elif not (
         args.bars
         or args.emas
@@ -1150,7 +1278,7 @@ Examples:
     ):
         p.error(
             "Must specify --bars, --emas, --amas, --desc-stats, --regimes, --stats, "
-            "--all, or --weekly-digest"
+            "--all, --weekly-digest, or --exchange-prices"
         )
 
     # Resolve database URL
@@ -1172,6 +1300,11 @@ Examples:
     if args.weekly_digest:
         digest_result = run_weekly_digest(args, db_url)
         return 0 if digest_result.success else 1
+
+    # Handle --exchange-prices as a standalone operation (exit after completion)
+    if args.exchange_prices:
+        exchange_result = run_exchange_prices(args, db_url)
+        return 0 if exchange_result.success else 1
 
     # Parse IDs
     try:
