@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: Phase 48 (Loss Limits Policy) — COMPLETE
-Plan: 4/4 complete (48-01 DONE — Alembic migration + VaR simulator; 48-02 DONE — stop-loss simulator; 48-03 DONE — VaR simulation CLI + VAR_REPORT.md; 48-04 DONE — pool cap seeding + override governance validation)
-Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans).
-Last activity: 2026-02-25 — Completed 48-03-PLAN.md (run_var_simulation.py: VaR suite at 95%/99% with bar returns fallback; run_stop_simulation.py: hard/trailing/time stop sweep from real signals; VAR_REPORT.md + STOP_SIMULATION_REPORT.md + HTML charts; recommended 5.9% daily loss cap)
+Phase: Phase 49 (Tail-Risk Policy) — In progress
+Plan: 1/4 complete (49-01 DONE — Alembic migration tail_risk_state + vol_sizer library)
+Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 in progress.
+Last activity: 2026-02-25 — Completed 49-01-PLAN.md (Alembic migration a9ec3c00a54a: tail_risk_state column on dim_risk_state with CHECK normal/reduce/flatten + 3 audit columns + extended cmc_risk_events constraints; vol_sizer library: ATR + realized-vol position sizing + vectorbt wrapper + worst-N-day returns + comparison metrics)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [█] Phase 49 1/4
 
 ## Performance Metrics
 
@@ -439,6 +439,10 @@ Recent decisions affecting current work:
 - **Aggregate pool cap hardcoded at 15%** (Phase 48-04): Phase 42 V1 circuit breaker is a design constraint, not a computed value; bake-off arithmetic applies to conservative/core/opportunistic only
 - **SAVEPOINT pattern for CHECK constraint test** (Phase 48-04): engine.begin() opens single transaction; SAVEPOINT + ROLLBACK TO SAVEPOINT rolls back only the failing INSERT without aborting outer transaction; required for multi-test validation scripts
 - **Pool caps scaled by multiplier with vision ceiling** (Phase 48-04): Conservative=base*1, Core=base*2, Opportunistic=base*3; each capped at Vision Draft DD target; provides smooth risk tier progression while honoring stated targets
+- **max_position_pct=0.30 vol-sizer cap** (Phase 49-01): 30% NAV cap prevents over-leverage when vol is very low (e.g. vol=0.001% would yield 1000x leverage uncapped); ATR-based and realized-vol functions both cap at max_position_pct
+- **size_array NaN on non-entry bars** (Phase 49-01): np.where(entries, position_units, np.nan) -- vbt interprets NaN as "hold existing position", which is correct for sizing only at entry bars
+- **Flat metrics dict pattern** (Phase 49-01): worst_n_day_returns returns flat dict merged via ** unpacking into compute_comparison_metrics -- no nested dicts; all keys at top level for direct DataFrame row construction
+- **Alembic CHECK extension: DROP IF EXISTS then ADD** (Phase 49-01): Extending enum-like CHECK constraints requires DROP CONSTRAINT IF EXISTS before ADD CONSTRAINT to avoid duplicate constraint errors; applies to both event_type and trigger_source on cmc_risk_events
 
 ### Pending Todos
 
@@ -452,8 +456,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-25T20:42:00Z
-Stopped at: Completed 48-04-PLAN.md — Phase 48 COMPLETE. define_pool_caps.py (4 pool rows seeded to dim_risk_limits; Conservative 7.73%/Core 15.46%/Opportunistic 23.19%/Aggregate 15.00%); validate_override_governance.py (4/4 DB validation tests PASS; POOL_CAPS.md + OVERRIDE_POLICY.md generated). LOSS-03 and LOSS-04 closed.
+Last session: 2026-02-25T16:28:00Z
+Stopped at: Completed 49-01-PLAN.md — Alembic migration a9ec3c00a54a (tail_risk_state column + audit columns on dim_risk_state; extended CHECK constraints on cmc_risk_events); vol_sizer library (ATR + realized-vol position sizing, vectorbt wrapper, worst-N-day returns, comparison metrics). 2/2 tasks PASS.
 Resume file: None
 
 ---
