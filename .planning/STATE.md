@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: Phase 42 (Strategy Bake-Off) — COMPLETE
-Plan: 5/5 complete
-Status: v1.0.0 in progress. Phase 42 all 5 plans complete. Scorecard generated. Next: Phase 45 (Paper-Trade Executor) or Phase 53 (V1 Validation).
-Last activity: 2026-02-25 — Completed 42-05-PLAN.md (generate_bakeoff_scorecard.py; BAKEOFF_SCORECARD.md 20KB with 6 sections + 5 charts; Phase 42 complete)
+Phase: Phase 43 (Exchange Integration) — In progress
+Plan: 1/5 complete
+Status: v1.0.0 in progress. Phase 42 complete. Phase 43 started: Plan 01 (ExchangeConfig + DDL) complete.
+Last activity: 2026-02-25 — Completed 43-01-PLAN.md (ExchangeConfig dataclass; Alembic migration b180d8d07a85 for exchange_price_feed + paper_orders; reference DDL)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [█] Phase 43 1/5
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 214 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42)
+- Total plans completed: 215 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 1 in Phase 43)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -344,6 +344,9 @@ Recent decisions affecting current work:
 - **Ensemble blend fails too** (Phase 42-04): Majority-vote blend of both EMA strategies also fails V1 gates — both lose during same macro bear market regimes (2018, 2022); blending reduces Sharpe while barely improving MaxDD
 - **V1 deployment with reduced sizing** (Phase 42-04): Deploy at 10% position fraction (not 50% from backtest) + circuit breaker at 15% portfolio DD due to V1 MaxDD gate failure; Phase 45 must implement circuit breakers
 - **Full-sample vs OOS consistency** (Phase 42-04): Full-sample Sharpe (1.647, 1.705) > OOS mean (1.401, 1.397) but within 1 std — OOS walk-forward is conservative (expected), not overfitting evidence
+- **down_revision = actual head, not plan spec** (Phase 43-01): Plan spec listed 8d5bc7ee1732 as expected down_revision but actual head was e74f5622e710 (strategy_bakeoff_results from Phase 42-02); always run alembic history to verify before setting down_revision
+- **ExchangeConfig NOT frozen** (Phase 43-01): Mutable dataclass allows environment switching at runtime without object recreation; from_env_file classmethod uses manual dotenv parser (no python-dotenv dependency)
+- **paper_orders.status includes Phase 44 states** (Phase 43-01): CHECK constraint includes pending/filled/cancelled/rejected now to avoid ALTER TABLE in Phase 44; current Phase 43 only uses 'paper'
 
 ### Pending Todos
 
@@ -357,8 +360,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-25T03:08:10Z
-Stopped at: Completed 42-05-PLAN.md — generate_bakeoff_scorecard.py; BAKEOFF_SCORECARD.md (20KB, 6 sections, 5 charts); Phase 42 complete.
+Last session: 2026-02-25T03:38:00Z
+Stopped at: Completed 43-01-PLAN.md — ExchangeConfig dataclass; Alembic migration b180d8d07a85 (exchange_price_feed + paper_orders); reference DDL.
 Resume file: None
 
 ---
