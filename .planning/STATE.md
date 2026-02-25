@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: Phase 47 (Drift Guard) — In Progress
-Plan: 3/5 complete (47-01 DONE — DB schema DDL; 47-02 DONE — drift metrics computation library + 11 unit tests; 47-03 DONE — DriftMonitor + drift_pause + 18 unit tests)
+Plan: 4/5 complete (47-01 DONE — DB schema DDL; 47-02 DONE — drift metrics computation library + 11 unit tests; 47-03 DONE — DriftMonitor + drift_pause + 18 unit tests; 47-04 DONE — DriftAttributor OAT + ReportGenerator + 19 unit tests)
 Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 started.
-Last activity: 2026-02-25 — Completed 47-03-PLAN.md (DriftMonitor orchestrator, drift_pause tiered response, 18 unit tests, 29 total drift tests passing)
+Last activity: 2026-02-25 — Completed 47-04-PLAN.md (DriftAttributor sequential OAT decomposition, ReportGenerator Markdown+Plotly, 19 unit tests, 48 total drift tests passing)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [███] Phase 47 In Progress (3/5)
 
@@ -420,6 +420,10 @@ Recent decisions affecting current work:
 - **Drift pause softer than kill switch** (Phase 47-03): drift_paused=TRUE preserves positions, only blocks new signal processing; trading_state unchanged; tiered: WARNING at 75%, PAUSE at 100% threshold, ESCALATE after drift_auto_escalate_after_days
 - **SIGNAL_TABLE_MAP injection prevention** (Phase 47-03): signal_type validated against SIGNAL_TABLE_MAP before constructing dynamic SQL for asset_id query; raises warning and skips config on unknown type
 - **v_drift_summary refresh concurrent vs non-concurrent** (Phase 47-03): COUNT(*) check selects refresh variant; empty view cannot use CONCURRENTLY (Postgres raises 'not yet populated'); populated view uses CONCURRENTLY via unique index from Plan 47-01
+- **V1 OAT steps 3+5 are always 0** (Phase 47-04): timing_delta (both use next-bar-open execution) and sizing_delta (both use same model) are documented placeholders logged at DEBUG; explicit 0.0 assignment is correct for V1, not missing code
+- **_df_to_markdown avoids tabulate** (Phase 47-04): pandas .to_markdown() requires optional tabulate dep which is not installed; custom row-iteration builder handles float formatting + NaN/None display; no new dep added
+- **Attribution waterfall returns None not empty Figure** (Phase 47-04): callers skip html file creation entirely when None returned; cleaner than writing placeholder chart files
+- **attr_* columns opt-in via --with-attribution** (Phase 47-04): daily monitor does NOT populate attribution; report gracefully handles NULL attr_* columns with --with-attribution placeholder note in markdown
 
 ### Pending Todos
 
@@ -433,8 +437,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-25T19:27:59Z
-Stopped at: Completed 47-03-PLAN.md — DriftMonitor orchestrator (run/config-loading/replay/metrics/upsert/view-refresh), drift_pause tiered response (activate/disable/check_threshold/check_escalation); 29/29 drift tests passing. Phase 47 Plan 3/5 done.
+Last session: 2026-02-25T19:40:37Z
+Stopped at: Completed 47-04-PLAN.md — DriftAttributor (7-step sequential OAT decomposition), ReportGenerator (Markdown + 3 Plotly HTML charts), 19 new tests; 48/48 drift tests passing. Phase 47 Plan 4/5 done.
 Resume file: None
 
 ---
