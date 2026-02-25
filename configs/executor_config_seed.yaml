@@ -1,0 +1,86 @@
+# configs/executor_config_seed.yaml
+# ---------------------------------------------------------------------------
+# V1 paper trade executor strategy configurations.
+# These are the two strategies selected from the Phase 42 bakeoff:
+#   - ema_trend_17_77: robust top-1 in 4/4 weighting schemes
+#   - ema_trend_21_50: robust top-2 in 3/4 weighting schemes
+#
+# Deployment note (Phase 42-04 decision):
+#   Both strategies fail the MaxDD <= 15% gate due to structural crypto bear
+#   market drawdowns (70-75% worst fold). Deploy at 10% position_fraction
+#   (not 50% backtest size) + circuit breaker at 15% portfolio DD (Phase 46).
+#
+# Usage:
+#   These values are loaded by the executor bootstrap script to INSERT rows
+#   into dim_executor_config (on conflict do nothing = idempotent).
+#   See src/ta_lab2/executor/bootstrap_configs.py (Phase 45-03).
+# ---------------------------------------------------------------------------
+
+executor_configs:
+
+  - config_name: ema_trend_17_77_paper_v1
+    signal_type: ema_crossover
+    signal_name: ema_17_77_long         # matches dim_signals.signal_name
+    is_active: true
+    exchange: paper
+    environment: sandbox
+
+    # Position sizing
+    sizing_mode: fixed_fraction
+    position_fraction: 0.10             # 10% of portfolio per position (V1 reduced sizing)
+    max_position_fraction: 0.20         # hard cap at 20%
+
+    # Fill simulation
+    fill_price_mode: next_bar_open      # simulate next-bar-open execution
+    slippage_mode: lognormal            # realistic log-normal slippage
+    slippage_base_bps: 3.0              # 3 bps base slippage
+    slippage_noise_sigma: 0.5           # sigma for log-normal noise term
+    volume_impact_factor: 0.1           # 10% volume impact scaling
+
+    # Execution quality simulation
+    rejection_rate: 0.0                 # no rejections in paper mode
+    partial_fill_rate: 0.0              # no partial fills in paper mode
+    execution_delay_bars: 0             # execute at next-bar-open (0 delay)
+
+    # Scheduling
+    cadence_hours: 26.0                 # ~daily with 2-hour drift tolerance
+
+    # Phase 42 bakeoff context
+    _notes: |
+      Robust top-1 strategy: ranked #1 in 4/4 weighting schemes (balanced,
+      risk_focus, quality_focus, low_cost). Full-sample Sharpe 1.705,
+      OOS mean Sharpe 1.401. MaxDD worst fold -75% (structural crypto bear).
+      Deployed at reduced 10% sizing per Phase 42-04 decision.
+
+  - config_name: ema_trend_21_50_paper_v1
+    signal_type: ema_crossover
+    signal_name: ema_21_50_long         # matches dim_signals.signal_name (signal_id=2)
+    is_active: true
+    exchange: paper
+    environment: sandbox
+
+    # Position sizing
+    sizing_mode: fixed_fraction
+    position_fraction: 0.10             # 10% of portfolio per position (V1 reduced sizing)
+    max_position_fraction: 0.20         # hard cap at 20%
+
+    # Fill simulation
+    fill_price_mode: next_bar_open      # simulate next-bar-open execution
+    slippage_mode: lognormal            # realistic log-normal slippage
+    slippage_base_bps: 3.0              # 3 bps base slippage
+    slippage_noise_sigma: 0.5           # sigma for log-normal noise term
+    volume_impact_factor: 0.1           # 10% volume impact scaling
+
+    # Execution quality simulation
+    rejection_rate: 0.0                 # no rejections in paper mode
+    partial_fill_rate: 0.0              # no partial fills in paper mode
+    execution_delay_bars: 0             # execute at next-bar-open (0 delay)
+
+    # Scheduling
+    cadence_hours: 26.0                 # ~daily with 2-hour drift tolerance
+
+    # Phase 42 bakeoff context
+    _notes: |
+      Robust top-2 strategy: ranked top-2 in 3/4 weighting schemes. Full-sample
+      Sharpe 1.647, OOS mean Sharpe 1.397. MaxDD worst fold -70% (structural
+      crypto bear). Deployed at reduced 10% sizing per Phase 42-04 decision.
