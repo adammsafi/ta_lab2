@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: Phase 43 (Exchange Integration) — In progress
-Plan: 3/5 complete
-Status: v1.0.0 in progress. Phase 42 complete. Phase 43: Plans 01-03 complete.
-Last activity: 2026-02-25 — Completed 43-03-PLAN.md (Kraken HMAC-SHA512 auth: _sign, _private_post, 5 authenticated endpoints; no NotImplementedError remains)
+Plan: 4/5 complete
+Status: v1.0.0 in progress. Phase 42 complete. Phase 43: Plans 01-04 complete.
+Last activity: 2026-02-25 — Completed 43-04-PLAN.md (CanonicalOrder dataclass with to_exchange() for Coinbase/Kraken; PaperOrderLogger for paper_orders table persistence)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [███] Phase 43 3/5
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [████] Phase 43 4/5
 
 ## Performance Metrics
 
@@ -354,6 +354,10 @@ Recent decisions affecting current work:
 - **_requires_auth guard before every private call** (Phase 43-03): Single-method guard pattern; called as first line of _private_post(); raises AuthenticationError immediately if api_key or api_secret is falsy
 - **cancel_order discards CancelOrder result** (Phase 43-03): Kraken returns {"count": N, "pending": [...]}; interface contract requires {"order_id": id, "status": "cancelled"}; result discarded for consistency
 - **get_account_balances filters zero-balance assets** (Phase 43-03): Kraken returns all owned assets including zeros; float(balance) > 0 filter returns only held positions; consistent with Coinbase balance semantics
+- **CanonicalOrder mutable dataclass** (Phase 43-04): Not frozen — allows signal_id assignment post-construction when logging DB signal rows without object recreation
+- **Coinbase side uppercase BUY/SELL, Kraken type lowercase buy/sell** (Phase 43-04): Each _to_exchange() method encodes the case per API spec; CanonicalOrder always stores lowercase canonical side
+- **stop_limit_stop_limit_gtc for Coinbase stop orders** (Phase 43-04): Coinbase REST only supports stop-limit not pure stop-market; limit_price defaults to stop_price when not set
+- **from_signal() accepts side or direction key** (Phase 43-04): Signal pipeline outputs direction=Long/Short; direct dicts use side=buy/sell; both normalized to canonical lowercase buy/sell
 
 ### Pending Todos
 
@@ -367,8 +371,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-25T03:40:51Z
-Stopped at: Completed 43-03-PLAN.md — Kraken HMAC-SHA512 auth added; _sign/_private_post/_requires_auth infrastructure; 5 authenticated endpoints; 0 NotImplementedError.
+Last session: 2026-02-25T03:43:31Z
+Stopped at: Completed 43-04-PLAN.md — CanonicalOrder dataclass (to_exchange for Coinbase/Kraken), PaperOrderLogger (paper_orders table INSERT RETURNING), from_signal() normalization.
 Resume file: None
 
 ---
