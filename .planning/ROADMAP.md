@@ -702,7 +702,7 @@ Plans:
 - [x] **Phase 42: Strategy Bake-Off** - IC/PSR/CV evaluation of existing signals, select 2 strategies for V1
 - [x] **Phase 43: Exchange Integration** - Connect to two exchange APIs (Coinbase + Kraken), price feed comparison, paper order adapter
 - [x] **Phase 44: Order & Fill Store** - DB tables for orders, fills, positions with full audit trail
-- [ ] **Phase 45: Paper-Trade Executor** - Engine reads signals, generates orders, tracks positions, verifies backtest parity
+- [x] **Phase 45: Paper-Trade Executor** - Engine reads signals, generates orders, tracks positions, verifies backtest parity
 - [ ] **Phase 46: Risk Controls** - Kill switch, position caps, daily loss stops, circuit breaker, discretionary overrides
 - [ ] **Phase 47: Drift Guard** - Parallel backtest vs paper comparison, auto-pause on divergence
 - [ ] **Phase 48: Loss Limits Policy** - VaR simulation, intraday stop analysis, pool-level cap definition
@@ -791,13 +791,13 @@ Plans:
 **Plans**: 7 plans in 4 waves
 
 Plans:
-- [ ] 45-01-PLAN.md -- Alembic migration (dim_executor_config, cmc_executor_run_log, cmc_positions PK extension, signal table columns) + YAML seed
-- [ ] 45-02-PLAN.md -- FillSimulator TDD: slippage model (zero, fixed, lognormal) with seeded RNG
-- [ ] 45-03-PLAN.md -- SignalReader (watermark + stale guard) + PositionSizer (3 sizing modes) + unit tests
-- [ ] 45-04-PLAN.md -- PaperExecutor class: orchestrate signal-to-fill pipeline + unit tests
-- [ ] 45-05-PLAN.md -- CLI entry points + pipeline wiring (signals + executor stages in run_daily_refresh.py)
-- [ ] 45-06-PLAN.md -- ParityChecker: backtest parity verification + dedicated CLI
-- [ ] 45-07-PLAN.md -- Integration verification: package exports, full test suite, pipeline smoke test
+- [x] 45-01-PLAN.md -- Alembic migration (dim_executor_config, cmc_executor_run_log, cmc_positions PK extension, signal table columns) + YAML seed
+- [x] 45-02-PLAN.md -- FillSimulator TDD: slippage model (zero, fixed, lognormal) with seeded RNG
+- [x] 45-03-PLAN.md -- SignalReader (watermark + stale guard) + PositionSizer (3 sizing modes) + unit tests
+- [x] 45-04-PLAN.md -- PaperExecutor class: orchestrate signal-to-fill pipeline + unit tests
+- [x] 45-05-PLAN.md -- CLI entry points + pipeline wiring (signals + executor stages in run_daily_refresh.py)
+- [x] 45-06-PLAN.md -- ParityChecker: backtest parity verification + dedicated CLI
+- [x] 45-07-PLAN.md -- Integration verification: package exports, full test suite, pipeline smoke test
 ---
 
 ### Phase 46: Risk Controls
