@@ -911,7 +911,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | 45. Paper-Trade Executor | 0/7 | Planned | -- |
 | 46. Risk Controls | 0/4 | Planned | -- |
 | 47. Drift Guard | 0/TBD | Not started | -- |
-| 48. Loss Limits Policy | 0/TBD | Not started | -- |
+| 48. Loss Limits Policy | 0/4 | Planned | -- |
 | 49. Tail-Risk Policy | 0/TBD | Not started | -- |
 | 50. Data Economics | 0/TBD | Not started | -- |
 | 51. Perps Readiness | 0/TBD | Not started | -- |
