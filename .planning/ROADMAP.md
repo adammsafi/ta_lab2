@@ -839,6 +839,24 @@ Plans:
 - [ ] 47-04-PLAN.md -- DriftAttributor (6-source sequential OAT) + ReportGenerator (Markdown + Plotly) + unit tests
 - [ ] 47-05-PLAN.md -- CLI scripts + pipeline wiring (run_daily_refresh.py) + package exports + full test suite
 
+---
+
+### Phase 50: Data Economics
+**Goal:** Make the build-vs-buy decision for data infrastructure with documented rationale and quantitative triggers for re-evaluation.
+**Depends on:** No hard code dependencies (research/analysis phase producing documents, not code)
+**Requirements:** DATA-01, DATA-02, DATA-03
+**Success Criteria** (what must be TRUE):
+  1. Current data costs audited with real DB measurements (pg_database_size), per-asset granularity, and developer time estimates
+  2. Three architecture alternatives (local PostgreSQL, DIY data lake, managed platform) compared at current, 2x, and 5x scale with monthly TCO ranges
+  3. Multi-factor decision trigger matrix defines quantitative thresholds for when data lake migration becomes justified
+  4. ADR in MADR 4.0 format captures the decision with dissenting view and review schedule
+  5. Crypto + equities vendor comparison covers pricing, history depth, and API access
+**Plans**: 2 plans in 2 waves
+
+Plans:
+- [ ] 50-01-PLAN.md -- DB measurements + cost audit + vendor comparison documents
+- [ ] 50-02-PLAN.md -- TCO model + decision triggers + ADR + executive summary
+
 </details>
 
 See `.planning/milestones/v1.0.0-REQUIREMENTS.md` and `.planning/milestones/v1.0.0-ROADMAP.md` for full details.
@@ -934,7 +952,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | 47. Drift Guard | 0/5 | Planned | -- |
 | 48. Loss Limits Policy | 0/4 | Planned | -- |
 | 49. Tail-Risk Policy | 0/TBD | Not started | -- |
-| 50. Data Economics | 0/TBD | Not started | -- |
+| 50. Data Economics | 0/2 | Planned | -- |
 | 51. Perps Readiness | 0/TBD | Not started | -- |
 | 52. Operational Dashboard | 0/TBD | Not started | -- |
 | 53. V1 Validation | 0/TBD | Not started | -- |
@@ -997,4 +1015,4 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-25 (Phase 47 planned -- Drift Guard; 5 plans in 4 waves)*
+*Last updated: 2026-02-25 (Phase 50 planned -- Data Economics; 2 plans in 2 waves)*
