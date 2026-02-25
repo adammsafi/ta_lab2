@@ -31,7 +31,7 @@ REQUEST_TIMEOUT = 30  # seconds
 # ---------------------------------------------------------------------------
 
 UPSERT_SQL = text("""
-    INSERT INTO cmc_fear_greed (ts, value, value_classification, api_timestamp)
+    INSERT INTO alternative_me_fear_greed (ts, value, value_classification, api_timestamp)
     VALUES (:ts, :value, :value_classification, :api_timestamp)
     ON CONFLICT (ts) DO UPDATE SET
         value                = EXCLUDED.value,
@@ -41,7 +41,7 @@ UPSERT_SQL = text("""
 """)
 
 UPSERT_STATE_SQL = text("""
-    INSERT INTO cmc_fear_greed_state (singleton_key, last_ts, last_run_ts, rows_written)
+    INSERT INTO alternative_me_fear_greed_state (singleton_key, last_ts, last_run_ts, rows_written)
     VALUES (TRUE, :last_ts, NOW(), :rows_written)
     ON CONFLICT (singleton_key) DO UPDATE SET
         last_ts      = EXCLUDED.last_ts,
@@ -118,7 +118,9 @@ def read_state(engine) -> date | None:
     """Read last_ts from state table. Returns None if no state exists."""
     with engine.connect() as conn:
         result = conn.execute(
-            text("SELECT last_ts FROM cmc_fear_greed_state WHERE singleton_key = TRUE")
+            text(
+                "SELECT last_ts FROM alternative_me_fear_greed_state WHERE singleton_key = TRUE"
+            )
         )
         row = result.fetchone()
         return row[0] if row else None
@@ -249,7 +251,7 @@ Examples:
 
     # -- upsert --
     written = upsert_rows(engine, rows)
-    logger.info("Upserted %d rows into cmc_fear_greed.", written)
+    logger.info("Upserted %d rows into alternative_me_fear_greed.", written)
 
     # -- update state --
     max_ts = max(r["ts"] for r in rows)
