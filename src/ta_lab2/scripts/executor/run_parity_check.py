@@ -136,9 +136,7 @@ def _print_verbose_comparison(
             bps = abs(ex_price - bt_price) / bt_price * 10_000
         else:
             bps = float("nan")
-        print(
-            f"{i:>4}  {bt_price:>16.4f}  {ex_price:>16.4f}  {bps:>18.4f}"
-        )
+        print(f"{i:>4}  {bt_price:>16.4f}  {ex_price:>16.4f}  {bps:>18.4f}")
 
 
 def main() -> int:
