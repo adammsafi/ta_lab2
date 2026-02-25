@@ -61,6 +61,7 @@ class FillData:
     fee_currency: Optional[str] = None
     exchange_fill_id: Optional[str] = None
     filled_at: Optional[datetime] = None
+    strategy_id: int = 0  # default 0 for legacy/unattributed fills
 
 
 # ---------------------------------------------------------------------------
@@ -285,10 +286,15 @@ class OrderManager:
                     SELECT quantity, avg_cost_basis, realized_pnl
                     FROM public.cmc_positions
                     WHERE asset_id = :asset_id AND exchange = :exchange
+                      AND strategy_id = :strategy_id
                     FOR UPDATE
                     """
                 ),
-                {"asset_id": order_row.asset_id, "exchange": order_row.exchange},
+                {
+                    "asset_id": order_row.asset_id,
+                    "exchange": order_row.exchange,
+                    "strategy_id": fill_data.strategy_id,
+                },
             ).fetchone()
 
             if pos_row is not None:
@@ -397,13 +403,13 @@ class OrderManager:
                 text(
                     """
                     INSERT INTO public.cmc_positions (
-                        asset_id, exchange, quantity, avg_cost_basis,
+                        asset_id, exchange, strategy_id, quantity, avg_cost_basis,
                         realized_pnl, last_fill_id, last_updated
                     ) VALUES (
-                        :asset_id, :exchange, :quantity, :avg_cost_basis,
+                        :asset_id, :exchange, :strategy_id, :quantity, :avg_cost_basis,
                         :realized_pnl, :last_fill_id, now()
                     )
-                    ON CONFLICT (asset_id, exchange) DO UPDATE SET
+                    ON CONFLICT (asset_id, exchange, strategy_id) DO UPDATE SET
                         quantity = EXCLUDED.quantity,
                         avg_cost_basis = EXCLUDED.avg_cost_basis,
                         realized_pnl = EXCLUDED.realized_pnl,
@@ -414,6 +420,7 @@ class OrderManager:
                 {
                     "asset_id": order_row.asset_id,
                     "exchange": order_row.exchange,
+                    "strategy_id": fill_data.strategy_id,
                     "quantity": str(pos_update["quantity"]),
                     "avg_cost_basis": str(pos_update["avg_cost_basis"]),
                     "realized_pnl": str(pos_update["realized_pnl"]),
