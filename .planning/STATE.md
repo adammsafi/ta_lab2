@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: Phase 45 (Paper Trade Executor) — In progress
-Plan: 2/5 complete (45-01 DONE; 45-02 DONE)
+Plan: 3/5 complete (45-01 DONE; 45-02 DONE; 45-03 DONE)
 Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 in progress.
-Last activity: 2026-02-25 — Completed 45-02-PLAN.md (FillSimulator TDD: zero/fixed/lognormal slippage, Decimal prices, seeded RNG, rejection + partial fill; 35 tests green)
+Last activity: 2026-02-25 — Completed 45-03-PLAN.md (SignalReader watermark queries + StaleSignalError stale guard; PositionSizer 3 sizing modes + Decimal arithmetic; ExecutorConfig dataclass; 28 unit tests all pass without DB)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [██] Phase 45 in progress
 
@@ -374,6 +374,12 @@ Recent decisions affecting current work:
 - **FillSimulator lognormal mean=0 (log-scale unbiased)** (Phase 45-02): rng.lognormal(mean=0, sigma) produces median=1.0 noise multiplier — combined with positive bps offset, buy fills are adverse (higher) and sell fills are adverse (lower) on average; correct distribution for slippage
 - **Decimal via str(round(float, 8))** (Phase 45-02): Converting float->Decimal through string avoids IEEE 754 representation artifacts; 8 decimal places (satoshi precision) sufficient for crypto prices
 - **FillSimulator rejection before slippage** (Phase 45-02): Check rng.random() < rejection_rate first — saves RNG calls when rejection_rate is high; partial fill check uses sequential rng.random() after rejection passes
+- **SQL injection guard via frozenset whitelist** (Phase 45-03): signal_table validated against _VALID_SIGNAL_TABLES = frozenset(SIGNAL_TABLE_MAP.values()) before any f-string interpolation; raises ValueError on invalid input
+- **First-run stale bypass** (Phase 45-03): last_watermark_ts=None causes check_signal_freshness to return silently with no DB query — prevents false StaleSignalError on initial executor startup
+- **Decimal via str() for position sizing** (Phase 45-03): Decimal(str(float_value)) prevents float precision accumulation; config fields stored as float, converted at sizing boundary
+- **Unknown regime defaults to 1.0 multiplier** (Phase 45-03): REGIME_MULTIPLIERS.get(regime_label or "", Decimal("1.0")) — unknown labels treated as fixed_fraction (conservative, no adjustment)
+- **signal_strength minimum 10% floor** (Phase 45-03): max(Decimal(str(confidence)), Decimal("0.10")) prevents negligible but non-zero positions from near-zero confidence signals
+- **get_current_price two-source fallback** (Phase 45-03): exchange_price_feed first (< 24h old); falls back to cmc_price_bars_multi_tf 1D bar close on staleness or table-not-found; raises ValueError when neither has price
 
 ### Pending Todos
 
@@ -387,8 +393,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-25T05:11:00Z
-Stopped at: Completed 45-02-PLAN.md — FillSimulator TDD (zero/fixed/lognormal slippage, seeded numpy RNG, rejection + partial fill, 35 tests green); executor package created.
+Last session: 2026-02-25T05:13:10Z
+Stopped at: Completed 45-03-PLAN.md — SignalReader (watermark queries, stale guard, SQL injection guard); PositionSizer (3 sizing modes, Decimal arithmetic, ExecutorConfig); 28 unit tests all pass without DB.
 Resume file: None
 
 ---
