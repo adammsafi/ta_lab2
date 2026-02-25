@@ -776,6 +776,29 @@ Plans:
 - [ ] 44-02-PLAN.md -- Position math TDD: compute_position_update() pure function with all edge cases (new, add, close, flip)
 - [ ] 44-03-PLAN.md -- OrderManager class (process_fill, promote_paper_order, update_order_status, dead letter) + unit tests
 
+---
+
+### Phase 45: Paper-Trade Executor
+**Goal:** Engine that reads signals, places paper orders, tracks positions and P&L, and can be verified against the backtester for parity.
+**Depends on:** Phase 44 (needs order/fill store)
+**Requirements:** EXEC-01, EXEC-02, EXEC-03, EXEC-04, EXEC-05
+**Success Criteria** (what must be TRUE):
+  1. Executor reads signals and generates orders for selected strategies
+  2. Paper fills simulated with configurable slippage model (zero, fixed, lognormal)
+  3. Position tracker maintains holdings, cost basis, unrealized P&L per strategy
+  4. Execution loop runs daily with full logging (wired into run_daily_refresh.py)
+  5. Historical replay produces results matching backtester within tolerance
+**Plans**: 7 plans in 4 waves
+
+Plans:
+- [ ] 45-01-PLAN.md -- Alembic migration (dim_executor_config, cmc_executor_run_log, cmc_positions PK extension, signal table columns) + YAML seed
+- [ ] 45-02-PLAN.md -- FillSimulator TDD: slippage model (zero, fixed, lognormal) with seeded RNG
+- [ ] 45-03-PLAN.md -- SignalReader (watermark + stale guard) + PositionSizer (3 sizing modes) + unit tests
+- [ ] 45-04-PLAN.md -- PaperExecutor class: orchestrate signal-to-fill pipeline + unit tests
+- [ ] 45-05-PLAN.md -- CLI entry points + pipeline wiring (signals + executor stages in run_daily_refresh.py)
+- [ ] 45-06-PLAN.md -- ParityChecker: backtest parity verification + dedicated CLI
+- [ ] 45-07-PLAN.md -- Integration verification: package exports, full test suite, pipeline smoke test
+
 </details>
 
 See `.planning/milestones/v1.0.0-REQUIREMENTS.md` and `.planning/milestones/v1.0.0-ROADMAP.md` for full details.
@@ -866,7 +889,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | 42. Strategy Bake-Off | 0/5 | Planned | -- |
 | 43. Exchange Integration | 0/6 | Planned | -- |
 | 44. Order & Fill Store | 0/3 | Planned | -- |
-| 45. Paper-Trade Executor | 0/TBD | Not started | -- |
+| 45. Paper-Trade Executor | 0/7 | Planned | -- |
 | 46. Risk Controls | 0/TBD | Not started | -- |
 | 47. Drift Guard | 0/TBD | Not started | -- |
 | 48. Loss Limits Policy | 0/TBD | Not started | -- |
@@ -934,4 +957,4 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-24 (Phase 44 planned -- Order & Fill Store; 3 plans in 2 waves)*
+*Last updated: 2026-02-24 (Phase 45 planned -- Paper-Trade Executor; 7 plans in 4 waves)*
