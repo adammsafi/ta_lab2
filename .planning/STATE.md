@@ -10,16 +10,16 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: Phase 46 (Risk Controls) — In Progress
-Plan: 1/? complete (46-01 DONE — DB schema foundation)
-Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 started.
-Last activity: 2026-02-25 — Completed 46-01-PLAN.md (4 risk tables via Alembic migration b5178d671e38; dim_risk_state seeded state_id=1; dim_risk_limits seeded with portfolio defaults; upgrade/downgrade round-trip verified)
+Plan: 2/? complete (46-01 DONE — DB schema; 46-02 DONE — RiskEngine + KillSwitch + CLI)
+Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 in progress (2 plans done).
+Last activity: 2026-02-25 — Completed 46-02-PLAN.md (RiskEngine with 5-gate check_order, atomic kill switch with Telegram, OverrideManager CRUD, kill_switch_cli, 50 unit tests all passing)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [█] Phase 46 In Progress (1/? plans)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [██] Phase 46 In Progress (2/? plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 232 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 6 in Phase 43, 3 in Phase 44, 7 in Phase 45, 1 in Phase 46)
+- Total plans completed: 233 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 6 in Phase 43, 3 in Phase 44, 7 in Phase 45, 2 in Phase 46)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -401,6 +401,10 @@ Recent decisions affecting current work:
 - **CHECK(state_id=1) for single-row invariant** (Phase 46-01): dim_risk_state enforces single-row at DB level via CHECK(state_id=1) constraint -- no application code needed to prevent duplicate rows; seed row inserted in upgrade() with ON CONFLICT DO NOTHING
 - **Free-text system_signal/override_action on cmc_risk_overrides** (Phase 46-01): No CHECK constraint -- allows future signal types without requiring a migration to extend allowed set; operator-entered free text
 - **NULL-scope for dim_risk_limits defaults** (Phase 46-01): NULL asset_id + NULL strategy_id = portfolio-wide row; non-NULL rows override for specific asset/strategy pairs; same scoped-config pattern as dim_executor_config
+- **_is_circuit_breaker_tripped calls _load_limits first** (Phase 46-02): needs cooldown_hours before checking elapsed time; test mock side_effect sequences must follow order: active -> limits(CB) -> cb_tripped -> limits(caps)
+- **Sell orders skip all cap gates** (Phase 46-02): reducing exposure is always safe; only buy orders can increase risk; position cap and portfolio cap gates only apply to order_side == 'buy'
+- **OverrideManager included in 46-02 package** (Phase 46-02): linter auto-generated companion module for cmc_risk_overrides CRUD; completes the discretionary override workflow; 21 additional tests verify create/apply/revert/get_active/get_pending
+- **RiskLimits hardcoded defaults as fallback** (Phase 46-02): _load_limits() returns RiskLimits() if no DB row found -- ensures risk engine degrades safely during initial setup
 
 ### Pending Todos
 
@@ -414,8 +418,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-25T14:32:30Z
-Stopped at: Completed 46-01-PLAN.md — Risk controls DB schema (4 tables, Alembic migration b5178d671e38, upgrade/downgrade verified, 4 DDL reference files in sql/risk/).
+Last session: 2026-02-25T14:47:14Z
+Stopped at: Completed 46-02-PLAN.md — RiskEngine, KillSwitch, OverrideManager library code + kill_switch_cli + 50 unit tests all passing without live DB.
 Resume file: None
 
 ---
