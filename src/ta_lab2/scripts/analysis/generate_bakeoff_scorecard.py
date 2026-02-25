@@ -26,7 +26,7 @@ import argparse
 import json
 import logging
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
-_PROJECT_ROOT = Path(__file__).resolve().parents[5]  # ta_lab2/
+_PROJECT_ROOT = Path(__file__).resolve().parents[4]  # ta_lab2/
 _REPORTS_DIR = _PROJECT_ROOT / "reports" / "bakeoff"
 _CHARTS_DIR = _REPORTS_DIR / "charts"
 _SCORECARD_PATH = _REPORTS_DIR / "BAKEOFF_SCORECARD.md"
@@ -414,7 +414,9 @@ def generate_cost_sensitivity_chart(
         annotation_text="Sharpe=1.0 gate",
     )
 
-    safe_name = label_fragment.replace("/", "_").replace(" ", "_")[:30]
+    import re
+
+    safe_name = re.sub(r"[^a-zA-Z0-9_]", "_", label_fragment)[:30].strip("_")
     fig.update_layout(
         title=f"Cost Sensitivity: {strategy_name}",
         xaxis_title="Cost Scenario",
@@ -1339,12 +1341,12 @@ def build_scorecard(
         chart_cost2 = generate_cost_sensitivity_chart(
             all_scores_df,
             strategy_name="ema_trend(21,50)",
-            label_fragment='ema_21, "slow_ema": "ema_50"',
+            label_fragment='slow_ema": "ema_50',
             charts_dir=charts_dir,
         )
 
     # --- Build document ---
-    now = datetime.utcnow().strftime("%Y-%m-%d")
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     lines = [
         "# V1 Strategy Bake-Off Scorecard",
         "",
