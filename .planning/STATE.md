@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 Phase: Phase 45 (Paper Trade Executor) — In progress
 Plan: 3/5 complete (45-01 DONE; 45-02 DONE; 45-03 DONE)
 Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 in progress.
-Last activity: 2026-02-25 — Completed 45-03-PLAN.md (SignalReader watermark queries + StaleSignalError stale guard; PositionSizer 3 sizing modes + Decimal arithmetic; ExecutorConfig dataclass; 28 unit tests all pass without DB)
+Last activity: 2026-02-25 — Completed 45-01-PLAN.md (Alembic migration 225bf8646f03: dim_executor_config + cmc_executor_run_log + extended cmc_positions PK + executor_processed_at + ema_17_77_long seed; reference DDL + YAML seed; round-trip verified)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [██] Phase 45 in progress
 
@@ -371,6 +371,11 @@ Recent decisions affecting current work:
 - **FillData.fill_qty always positive, direction from order.side** (Phase 44-03): Matches exchange API semantics (cmc_fills CHECK fill_qty > 0); signed_fill computed in _do_process_fill as fill_qty * -1 for sells
 - **Dead-letter uses own engine.begin() (separate connection)** (Phase 44-03): Original transaction is in rolled-back state; reusing same connection would fail; separate connection guarantees DLQ always commits
 - **All OrderManager methods static (stateless class)** (Phase 44-03): Callers pass engine explicitly; no instance state; makes testing trivial and prevents accidental engine reuse across workers
+- **DROP + CREATE view for column addition** (Phase 45-01): PostgreSQL raises InvalidTableDefinition when CREATE OR REPLACE VIEW adds a column before existing ones; must DROP VIEW + CREATE VIEW; applies in both upgrade and downgrade paths
+- **SERIAL PK on dim_executor_config** (Phase 45-01): Config rows are few (tens); human-readable integer IDs useful in run_log.config_ids and CLI; UUID overkill for config dimension table
+- **config_ids as TEXT JSON array in run_log** (Phase 45-01): sa.ARRAY is PostgreSQL-specific; TEXT JSON string "[1,2]" is portable and avoids array dialect issues in SQLAlchemy
+- **strategy_id DEFAULT 0 on cmc_positions** (Phase 45-01): Existing rows get strategy_id=0 without data migration; 0 = "default/unassigned strategy" convention
+- **INSERT WHERE NOT EXISTS for signal seeding** (Phase 45-01): Idempotent migration -- ema_17_77_long INSERT skipped if already present; ema_21_50_long pre-existing as signal_id=2
 - **FillSimulator lognormal mean=0 (log-scale unbiased)** (Phase 45-02): rng.lognormal(mean=0, sigma) produces median=1.0 noise multiplier — combined with positive bps offset, buy fills are adverse (higher) and sell fills are adverse (lower) on average; correct distribution for slippage
 - **Decimal via str(round(float, 8))** (Phase 45-02): Converting float->Decimal through string avoids IEEE 754 representation artifacts; 8 decimal places (satoshi precision) sufficient for crypto prices
 - **FillSimulator rejection before slippage** (Phase 45-02): Check rng.random() < rejection_rate first — saves RNG calls when rejection_rate is high; partial fill check uses sequential rng.random() after rejection passes
