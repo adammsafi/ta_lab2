@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: Phase 50 (Data Economics) — COMPLETE
-Plan: 2/2 complete (50-01 DONE — cost audit + vendor comparison; 50-02 DONE — TCO model + ADR + executive summary)
-Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans).
-Last activity: 2026-02-25 — Completed 50-02-PLAN.md (TCO model: stay on PostgreSQL through 2x scale; ADR-001 accepted; decision trigger matrix with 7 thresholds; TimescaleDB Cloud as 5x migration target)
+Phase: Phase 51 (Perps Readiness) — In progress
+Plan: 3/5 complete (51-01 DONE — reference DDL; 51-02 DONE — funding rate ingestion; 51-03 DONE — venue downtime playbook)
+Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 in progress (3/5).
+Last activity: 2026-02-25 — Completed 51-03-PLAN.md (venue downtime playbook PERP-05: YAML health config + 435-line Markdown procedure for all 6 venues; graduated health states; hedge-on-alternate-venue procedure; SQL-first incident documentation)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [███░░] Phase 51 in progress (3/5)
 
 ## Performance Metrics
 
@@ -457,6 +457,10 @@ Recent decisions affecting current work:
 - **CoinGecko Analyst ($129/mo) for 2x scale** (Phase 50-01): Replaces fragile CMC manual bulk download; full history to 2013, 18k+ coins, proper REST API; migration LOE 1-2 days adapter + 1 week backfill
 - **Alpaca free tier for equities at 2x scale** (Phase 50-01): Already integrated for paper trading execution (Phase 45); activating data API requires only new ingestion script; $0 cost
 - **reports/ is gitignored by design** (Phase 50-01): analysis documents in reports/data-economics/ follow Phase 42-05 convention (bakeoff reports also gitignored); on-disk but not in git
+- **Graduated health states: HEALTHY > DEGRADED > DOWN** (Phase 51-03): DEGRADED does not halt orders (monitoring increase only); DOWN halts all new orders and triggers hedge procedure; DEGRADED escalates to DOWN after 30 min sustained
+- **V1 hedge procedure is manual** (Phase 51-03): operator identifies open positions via SQL, selects alternate venue from priority list [binance, bybit, hyperliquid], places opposing order manually; automated failover routing deferred
+- **3-consecutive-check recovery gate** (Phase 51-03): venue must pass 3 consecutive health checks before resuming normal operations — prevents premature resumption during intermittent recovery
+- **dYdX higher latency thresholds** (Phase 51-03): max_latency_ms=4000, stale_orderbook_seconds=60 vs 2000ms/30s for CEX venues — reflects on-chain indexer architecture reality
 
 ### Pending Todos
 
@@ -470,8 +474,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-25T23:02:00Z
-Stopped at: Completed 50-01-PLAN.md — data economics cost audit (46 GB measured DB, 171 tables, 17 assets, $200-800/mo TCO) + vendor comparison (CoinGecko $129/mo for 2x scale, Alpaca free for equities). Phase 50 in progress (1/2 complete).
+Last session: 2026-02-25T23:29:17Z
+Stopped at: Completed 51-03-PLAN.md — venue downtime playbook (PERP-05): YAML health config + 435-line Markdown playbook for all 6 perps venues; graduated health states (HEALTHY/DEGRADED/DOWN); 7-step hedge-on-alternate-venue procedure; daily monitoring checklist with SQL queries. Phase 51 in progress (3/5 complete).
 Resume file: None
 
 ---
