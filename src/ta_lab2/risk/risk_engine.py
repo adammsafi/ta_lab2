@@ -119,6 +119,50 @@ class RiskEngine:
 
     The engine is stateless across calls except for the injected SQLAlchemy engine.
     All reads are fresh per-call to capture live state changes.
+
+    Executor integration (Phase 45 wiring):
+    ----------------------------------------
+    The paper trading executor (ta_lab2.scripts.paper_trading.executor) should
+    integrate RiskEngine as follows:
+
+        1. Instantiate once at executor startup::
+
+               from ta_lab2.risk import RiskEngine
+               risk = RiskEngine(db_engine)
+
+        2. Call check_order() before every order submission::
+
+               result = risk.check_order(
+                   order_qty=signal_qty,
+                   order_side=signal_side,
+                   fill_price=mid_price,
+                   asset_id=asset_id,
+                   strategy_id=strategy_id,
+                   current_position_value=pos_value,
+                   portfolio_value=portfolio_value,
+               )
+               if not result.allowed:
+                   logger.warning("Order blocked: %s", result.blocked_reason)
+                   return
+               qty_to_submit = result.adjusted_quantity
+
+        3. Call check_daily_loss() once per trading day (e.g., at session open)
+           to auto-trigger the kill switch on drawdown threshold breach::
+
+               if risk.check_daily_loss():
+                   logger.critical("Daily loss kill switch triggered")
+                   return
+
+        4. Call update_circuit_breaker() after each closed trade::
+
+               risk.update_circuit_breaker(
+                   strategy_id=strategy_id,
+                   realized_pnl=trade_pnl,
+                   asset_id=asset_id,
+               )
+
+    The executor must NOT cache the kill switch state -- check_order() reads fresh
+    state on every call, ensuring CLI-triggered halts take effect immediately.
     """
 
     def __init__(self, engine: Engine) -> None:
