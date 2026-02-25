@@ -701,7 +701,7 @@ Plans:
 
 - [x] **Phase 42: Strategy Bake-Off** - IC/PSR/CV evaluation of existing signals, select 2 strategies for V1
 - [x] **Phase 43: Exchange Integration** - Connect to two exchange APIs (Coinbase + Kraken), price feed comparison, paper order adapter
-- [ ] **Phase 44: Order & Fill Store** - DB tables for orders, fills, positions with full audit trail
+- [x] **Phase 44: Order & Fill Store** - DB tables for orders, fills, positions with full audit trail
 - [ ] **Phase 45: Paper-Trade Executor** - Engine reads signals, generates orders, tracks positions, verifies backtest parity
 - [ ] **Phase 46: Risk Controls** - Kill switch, position caps, daily loss stops, circuit breaker, discretionary overrides
 - [ ] **Phase 47: Drift Guard** - Parallel backtest vs paper comparison, auto-pause on divergence
@@ -772,9 +772,9 @@ Plans:
 **Plans**: 3 plans in 2 waves
 
 Plans:
-- [ ] 44-01-PLAN.md -- Alembic migration for all Phase 44 tables (cmc_orders, cmc_fills, cmc_positions, cmc_order_events, cmc_order_dead_letter) + v_cmc_positions_agg view + reference DDL
-- [ ] 44-02-PLAN.md -- Position math TDD: compute_position_update() pure function with all edge cases (new, add, close, flip)
-- [ ] 44-03-PLAN.md -- OrderManager class (process_fill, promote_paper_order, update_order_status, dead letter) + unit tests
+- [x] 44-01-PLAN.md -- Alembic migration for all Phase 44 tables (cmc_orders, cmc_fills, cmc_positions, cmc_order_events, cmc_order_dead_letter) + v_cmc_positions_agg view + reference DDL
+- [x] 44-02-PLAN.md -- Position math TDD: compute_position_update() pure function with all edge cases (new, add, close, flip)
+- [x] 44-03-PLAN.md -- OrderManager class (process_fill, promote_paper_order, update_order_status, dead letter) + unit tests
 
 ---
 
