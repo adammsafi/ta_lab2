@@ -705,7 +705,7 @@ Plans:
 - [x] **Phase 45: Paper-Trade Executor** - Engine reads signals, generates orders, tracks positions, verifies backtest parity
 - [x] **Phase 46: Risk Controls** - Kill switch, position caps, daily loss stops, circuit breaker, discretionary overrides
 - [x] **Phase 47: Drift Guard** - Parallel backtest vs paper comparison, auto-pause on divergence
-- [ ] **Phase 48: Loss Limits Policy** - VaR simulation, intraday stop analysis, pool-level cap definition
+- [x] **Phase 48: Loss Limits Policy** - VaR simulation, intraday stop analysis, pool-level cap definition
 - [ ] **Phase 49: Tail-Risk Policy** - Hard stops vs vol-sizing, flatten triggers, policy document
 - [ ] **Phase 50: Data Economics** - Cost audit, build-vs-buy analysis, trigger definition
 - [ ] **Phase 51: Perps Readiness** - Funding rate ingestion, margin model, liquidation buffer, venue downtime playbook
@@ -1011,7 +1011,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | 45. Paper-Trade Executor | 0/7 | Planned | -- |
 | 46. Risk Controls | 0/4 | Planned | -- |
 | 47. Drift Guard | 5/5 | Complete | 2026-02-25 |
-| 48. Loss Limits Policy | 0/4 | Planned | -- |
+| 48. Loss Limits Policy | 4/4 | Complete | 2026-02-25 |
 | 49. Tail-Risk Policy | 0/TBD | Not started | -- |
 | 50. Data Economics | 0/2 | Planned | -- |
 | 51. Perps Readiness | 0/5 | Planned | -- |
