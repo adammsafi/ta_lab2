@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: Phase 45 (Paper Trade Executor) — In progress
-Plan: 3/5 complete (45-01 DONE; 45-02 DONE; 45-03 DONE)
+Plan: 4/5 complete (45-01 DONE; 45-02 DONE; 45-03 DONE; 45-04 DONE)
 Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 in progress.
-Last activity: 2026-02-25 — Completed 45-01-PLAN.md (Alembic migration 225bf8646f03: dim_executor_config + cmc_executor_run_log + extended cmc_positions PK + executor_processed_at + ema_17_77_long seed; reference DDL + YAML seed; round-trip verified)
+Last activity: 2026-02-25 — Completed 45-04-PLAN.md (OrderManager strategy_id patch + PaperExecutor signal-to-fill orchestrator + 16 unit tests; 150 tests pass)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [██] Phase 45 in progress
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [████] Phase 45 in progress
 
 ## Performance Metrics
 
@@ -385,6 +385,11 @@ Recent decisions affecting current work:
 - **Unknown regime defaults to 1.0 multiplier** (Phase 45-03): REGIME_MULTIPLIERS.get(regime_label or "", Decimal("1.0")) — unknown labels treated as fixed_fraction (conservative, no adjustment)
 - **signal_strength minimum 10% floor** (Phase 45-03): max(Decimal(str(confidence)), Decimal("0.10")) prevents negligible but non-zero positions from near-zero confidence signals
 - **get_current_price two-source fallback** (Phase 45-03): exchange_price_feed first (< 24h old); falls back to cmc_price_bars_multi_tf 1D bar close on staleness or table-not-found; raises ValueError when neither has price
+- **strategy_id default 0 on FillData** (Phase 45-04): Default 0 preserves backward compat for all Phase 44 callers; PaperExecutor passes config.config_id for per-strategy position isolation matching new PK
+- **PaperOrderLogger created per _process_asset_signal call** (Phase 45-04): PaperOrderLogger builds its own engine; pass str(engine.url) to reuse DB settings; avoids complex engine sharing while keeping test isolation clean
+- **Explicit conn.commit() in _run_strategy connect() context** (Phase 45-04): engine.connect() does not auto-commit unlike engine.begin(); required after watermark update and mark_signals_processed
+- **Extra executor config fields as _-prefixed attrs** (Phase 45-04): slippage_mode/bps/sigma/etc. from dim_executor_config attached as _-prefixed attrs on ExecutorConfig instance post-construction; avoids modifying 45-03 dataclass or subclassing; getattr() with defaults makes pipeline resilient
+- **_MIN_ORDER_THRESHOLD = 0.00001 for delta skip** (Phase 45-04): Prevents negligible rebalance orders (0.00001 BTC at $100K = $1 minimum notional); below threshold returns skipped_no_delta=True without touching order pipeline
 
 ### Pending Todos
 
@@ -398,8 +403,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-25T05:13:10Z
-Stopped at: Completed 45-03-PLAN.md — SignalReader (watermark queries, stale guard, SQL injection guard); PositionSizer (3 sizing modes, Decimal arithmetic, ExecutorConfig); 28 unit tests all pass without DB.
+Last session: 2026-02-25T05:28:23Z
+Stopped at: Completed 45-04-PLAN.md — OrderManager strategy_id patch (ON CONFLICT updated); PaperExecutor orchestrator (signal-to-fill pipeline, dry-run, run log); 16 mock-based unit tests; 150 total tests pass.
 Resume file: None
 
 ---
