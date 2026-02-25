@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 Phase: Phase 48 (Loss Limits Policy) — COMPLETE
 Plan: 4/4 complete (48-01 DONE — Alembic migration + VaR simulator; 48-02 DONE — stop-loss simulator; 48-03 DONE — VaR simulation CLI + VAR_REPORT.md; 48-04 DONE — pool cap seeding + override governance validation)
 Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans).
-Last activity: 2026-02-25 — Completed 48-04-PLAN.md (define_pool_caps.py: seeds 4 pool rows in dim_risk_limits from Phase 42 bake-off MaxDD; validate_override_governance.py: 4/4 DB tests PASS; POOL_CAPS.md + OVERRIDE_POLICY.md generated)
+Last activity: 2026-02-25 — Completed 48-03-PLAN.md (run_var_simulation.py: VaR suite at 95%/99% with bar returns fallback; run_stop_simulation.py: hard/trailing/time stop sweep from real signals; VAR_REPORT.md + STOP_SIMULATION_REPORT.md + HTML charts; recommended 5.9% daily loss cap)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE
 
