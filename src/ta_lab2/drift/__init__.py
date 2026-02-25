@@ -7,6 +7,7 @@ from ta_lab2.drift.drift_metrics import (
     compute_rolling_tracking_error,
     compute_sharpe,
 )
+from ta_lab2.drift.drift_monitor import DriftMonitor
 from ta_lab2.drift.drift_pause import (
     activate_drift_pause,
     check_drift_escalation,
@@ -24,4 +25,5 @@ __all__ = [
     "disable_drift_pause",
     "check_drift_threshold",
     "check_drift_escalation",
+    "DriftMonitor",
 ]
