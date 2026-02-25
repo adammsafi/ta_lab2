@@ -706,7 +706,7 @@ Plans:
 - [x] **Phase 46: Risk Controls** - Kill switch, position caps, daily loss stops, circuit breaker, discretionary overrides
 - [x] **Phase 47: Drift Guard** - Parallel backtest vs paper comparison, auto-pause on divergence
 - [x] **Phase 48: Loss Limits Policy** - VaR simulation, intraday stop analysis, pool-level cap definition
-- [ ] **Phase 49: Tail-Risk Policy** - Hard stops vs vol-sizing, flatten triggers, policy document
+- [x] **Phase 49: Tail-Risk Policy** - Hard stops vs vol-sizing, flatten triggers, policy document
 - [ ] **Phase 50: Data Economics** - Cost audit, build-vs-buy analysis, trigger definition
 - [ ] **Phase 51: Perps Readiness** - Funding rate ingestion, margin model, liquidation buffer, venue downtime playbook
 - [ ] **Phase 52: Operational Dashboard** - Live PnL, exposure, drawdown, drift, risk status views
@@ -1034,7 +1034,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | 46. Risk Controls | 0/4 | Planned | -- |
 | 47. Drift Guard | 5/5 | Complete | 2026-02-25 |
 | 48. Loss Limits Policy | 4/4 | Complete | 2026-02-25 |
-| 49. Tail-Risk Policy | 0/TBD | Not started | -- |
+| 49. Tail-Risk Policy | 4/4 | Complete | 2026-02-25 |
 | 50. Data Economics | 0/2 | Planned | -- |
 | 51. Perps Readiness | 0/5 | Planned | -- |
 | 52. Operational Dashboard | 0/4 | Planned | -- |
@@ -1100,4 +1100,4 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-25 (Phase 55 planned -- Feature & Signal Evaluation; 5 plans in 3 waves)*
+*Last updated: 2026-02-25 (Phase 49 complete -- Tail-Risk Policy; 4 plans in 3 waves)*
