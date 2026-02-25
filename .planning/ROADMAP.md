@@ -697,7 +697,7 @@ Plans:
 </details>
 
 <details>
-<summary>v1.0.0 V1 Closure -- Paper Trading & Validation (Phases 42-54) - CURRENT</summary>
+<summary>v1.0.0 V1 Closure -- Paper Trading & Validation (Phases 42-55) - CURRENT</summary>
 
 - [x] **Phase 42: Strategy Bake-Off** - IC/PSR/CV evaluation of existing signals, select 2 strategies for V1
 - [x] **Phase 43: Exchange Integration** - Connect to two exchange APIs (Coinbase + Kraken), price feed comparison, paper order adapter
@@ -712,11 +712,12 @@ Plans:
 - [ ] **Phase 52: Operational Dashboard** - Live PnL, exposure, drawdown, drift, risk status views
 - [ ] **Phase 53: V1 Validation** - 2+ weeks paper trading, success criteria measurement
 - [ ] **Phase 54: V1 Results Memo** - Formal report: methodology, results, failure modes, research answers, next steps
+- [ ] **Phase 55: Feature & Signal Evaluation** - Run IC evals on all features/AMAs, score with BH gate, adaptive RSI A/B, populate dashboards
 
 </details>
 
 <details>
-<summary>v1.0.0 Phase Details (Phases 42-54) - IN PROGRESS</summary>
+<summary>v1.0.0 Phase Details (Phases 42-55) - IN PROGRESS</summary>
 
 ### Phase 42: Strategy Bake-Off
 **Goal:** Use v0.9.0 research tooling to evaluate existing signals and select the 2 best strategies for V1 paper trading, with documented rationale and expected performance.
@@ -918,6 +919,27 @@ Plans:
 - [ ] 53-03-PLAN.md -- Kill switch exercise protocol script (8-step manual + auto trigger test)
 - [ ] 53-04-PLAN.md -- End-of-period report builder (Markdown + Plotly + Jupyter notebook) + package exports + nbformat dep
 
+---
+
+### Phase 55: Feature & Signal Evaluation
+**Goal:** Close the evaluation gap -- run the v0.9.0 IC and experimentation infrastructure on real data, score all existing features and AMA variants, validate signal quality, and populate dashboards with empirical results.
+**Depends on:** v0.9.0 complete (Phases 37-38 IC evaluation + feature experimentation framework already built)
+**Requirements:** EVAL-01, EVAL-02, EVAL-03, EVAL-04, EVAL-05
+**Success Criteria** (what must be TRUE):
+  1. IC scores computed for all canonical features (rsi_14, EMA crossovers, vol ratios, return z-scores) across all assets x all TFs; features ranked by IC-IR
+  2. AMA variants (KAMA ER, DEMA momentum, TEMA/HMA slopes) defined in features.yaml and scored via ExperimentRunner; BH gate applied
+  3. Adaptive RSI vs static RSI A/B comparison: IC scores + backtest Sharpe documented; default updated if adaptive wins, code removed if it doesn't
+  4. cmc_ic_results and cmc_feature_experiments tables populated with real data; dashboards (Research Explorer, Experiments page) show non-empty results
+  5. Evaluation findings documented: top features by IC-IR, regime-conditional IC breakdown, promoted/deprecated feature decisions
+**Plans**: 5 plans in 3 waves
+
+Plans:
+- [ ] 55-01-PLAN.md -- Methodology verification + full IC sweep across all assets x all 109 TFs
+- [ ] 55-02-PLAN.md -- YAML feature registry expansion from 5 to ~130+ entries (canonical + AMA + EMA crossovers + adaptive RSI)
+- [ ] 55-03-PLAN.md -- ExperimentRunner sweep for all YAML features + BH gate summary
+- [ ] 55-04-PLAN.md -- Adaptive vs static RSI A/B comparison (IC + walk-forward Sharpe)
+- [ ] 55-05-PLAN.md -- Lifecycle decisions + EVALUATION_FINDINGS.md + Jupyter notebook
+
 </details>
 
 See `.planning/milestones/v1.0.0-REQUIREMENTS.md` and `.planning/milestones/v1.0.0-ROADMAP.md` for full details.
@@ -925,9 +947,9 @@ See `.planning/milestones/v1.0.0-REQUIREMENTS.md` and `.planning/milestones/v1.0
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19 (v0.5.0) -> 20 -> ... -> 26 (v0.6.0) -> 27 -> 28 (v0.7.0) -> 29 -> ... -> 34 (v0.8.0) -> 35 -> ... -> 41 (v0.9.0) -> 42 -> ... -> 54 (v1.0.0)
+Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19 (v0.5.0) -> 20 -> ... -> 26 (v0.6.0) -> 27 -> 28 (v0.7.0) -> 29 -> ... -> 34 (v0.8.0) -> 35 -> ... -> 41 (v0.9.0) -> 42 -> ... -> 55 (v1.0.0)
 
-Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute in parallel. Phase 37 is enhanced by Phase 35 but not blocked. Phase 38 requires Phase 37. Phase 39 requires Phases 35-38. Phase 40 requires all prior v0.9.0 phases. Phase 41 has no hard dependency on Phases 35-40 (reads from existing returns tables) but is sequenced last.
+Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute in parallel. Phase 37 is enhanced by Phase 35 but not blocked. Phase 38 requires Phase 37. Phase 39 requires Phases 35-38. Phase 40 requires all prior v0.9.0 phases. Phase 41 has no hard dependency on Phases 35-40 (reads from existing returns tables) but is sequenced last. Phase 55 depends only on v0.9.0 (not on other v1.0.0 phases).
 
 ### v0.4.0 Progress (Complete)
 
@@ -1018,6 +1040,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | 52. Operational Dashboard | 0/4 | Planned | -- |
 | 53. V1 Validation | 0/4 | Planned | -- |
 | 54. V1 Results Memo | 0/TBD | Not started | -- |
+| 55. Feature & Signal Evaluation | 0/5 | Planned | -- |
 
 ## Requirement Coverage
 
@@ -1054,7 +1077,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 
 **Coverage:** 43/43 requirements mapped
 
-### v1.0.0 Requirements (55 total)
+### v1.0.0 Requirements (60 total)
 
 | Category | Requirements | Phase | Count |
 |----------|--------------|-------|-------|
@@ -1071,9 +1094,10 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | Operational Dashboard | DASH-L01, DASH-L02, DASH-L03, DASH-L04, DASH-L05 | Phase 52 | 5 |
 | V1 Validation | VAL-01, VAL-02, VAL-03, VAL-04, VAL-05 | Phase 53 | 5 |
 | V1 Results Memo | MEMO-01, MEMO-02, MEMO-03, MEMO-04, MEMO-05 | Phase 54 | 5 |
+| Feature & Signal Evaluation | EVAL-01, EVAL-02, EVAL-03, EVAL-04, EVAL-05 | Phase 55 | 5 |
 
-**Coverage:** 55/55 requirements mapped
+**Coverage:** 60/60 requirements mapped
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-25 (Phase 53 planned -- V1 Validation; 4 plans in 3 waves)*
+*Last updated: 2026-02-25 (Phase 55 planned -- Feature & Signal Evaluation; 5 plans in 3 waves)*
