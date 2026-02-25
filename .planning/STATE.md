@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: Phase 42 (Strategy Bake-Off) — In Progress
-Plan: 4/TBD complete
-Status: v1.0.0 in progress. Phase 42 Plan 04 complete (strategy selection + STRATEGY_SELECTION.md + final validation).
-Last activity: 2026-02-25 — Completed 42-04-PLAN.md (select_strategies.py; ema_trend(17,77) and ema_trend(21,50) selected; V1 gate MaxDD failure documented; ensemble blend fails; final_validation.csv generated)
+Phase: Phase 42 (Strategy Bake-Off) — COMPLETE
+Plan: 5/5 complete
+Status: v1.0.0 in progress. Phase 42 all 5 plans complete. Scorecard generated. Next: Phase 45 (Paper-Trade Executor) or Phase 53 (V1 Validation).
+Last activity: 2026-02-25 — Completed 42-05-PLAN.md (generate_bakeoff_scorecard.py; BAKEOFF_SCORECARD.md 20KB with 6 sections + 5 charts; Phase 42 complete)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [███░░] Phase 42 in progress
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE
 
 ## Performance Metrics
 
@@ -338,6 +338,9 @@ Recent decisions affecting current work:
 - **ema_trend(17,77) robust top-1 in 4/4 schemes** (Phase 42-03): Consistently ranks #1 under balanced, risk_focus, quality_focus, and low_cost schemes; ema_trend(21,50) robust top-2 in 3/4; both fail MaxDD gate (-70-75%)
 - **Robust threshold 3/4 weighting schemes** (Phase 42-03): Strategy is "robust" if top-2 in >= 3 of 4 schemes; 3/4 means "mostly consistent ranking" allowing one outlier scheme; 4/4 too strict, 2/4 too loose
 - **Two EMA strategies selected for V1** (Phase 42-04): ema_trend(17,77) robust top-1 in 4/4 schemes; ema_trend(21,50) robust top-2 in 3/4; both fail MaxDD gate (70-75% worst-fold drawdown is structural crypto bear market risk)
+- **Scorecard in gitignored reports/** (Phase 42-05): BAKEOFF_SCORECARD.md lives in reports/bakeoff/ (gitignored); generate_bakeoff_scorecard.py committed as reproducibility artifact; all Phase 42 report outputs (CSVs, MDs) follow same pattern
+- **HTML charts as primary format** (Phase 42-05): kaleido not installed; Plotly charts exported as .html; script auto-upgrades to PNG when kaleido installed (no code change needed)
+- **parents[4] for scripts/analysis/ depth** (Phase 42-05): Path(__file__).resolve().parents[4] is correct for project root from scripts/analysis/ (not parents[5] which reaches Downloads/)
 - **Ensemble blend fails too** (Phase 42-04): Majority-vote blend of both EMA strategies also fails V1 gates — both lose during same macro bear market regimes (2018, 2022); blending reduces Sharpe while barely improving MaxDD
 - **V1 deployment with reduced sizing** (Phase 42-04): Deploy at 10% position fraction (not 50% from backtest) + circuit breaker at 15% portfolio DD due to V1 MaxDD gate failure; Phase 45 must implement circuit breakers
 - **Full-sample vs OOS consistency** (Phase 42-04): Full-sample Sharpe (1.647, 1.705) > OOS mean (1.401, 1.397) but within 1 std — OOS walk-forward is conservative (expected), not overfitting evidence
@@ -354,8 +357,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-25T02:57:45Z
-Stopped at: Completed 42-04-PLAN.md — select_strategies.py; ema_trend(17,77) + ema_trend(21,50) selected; STRATEGY_SELECTION.md + final_validation.csv written; V1 deployment config ready for Phase 45.
+Last session: 2026-02-25T03:08:10Z
+Stopped at: Completed 42-05-PLAN.md — generate_bakeoff_scorecard.py; BAKEOFF_SCORECARD.md (20KB, 6 sections, 5 charts); Phase 42 complete.
 Resume file: None
 
 ---
