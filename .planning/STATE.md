@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 Phase: Phase 51 (Perps Readiness) — In progress
 Plan: 3/5 complete (51-01 DONE — reference DDL; 51-02 DONE — funding rate ingestion; 51-03 DONE — venue downtime playbook)
 Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 in progress (3/5).
-Last activity: 2026-02-25 — Completed 51-03-PLAN.md (venue downtime playbook PERP-05: YAML health config + 435-line Markdown procedure for all 6 venues; graduated health states; hedge-on-alternate-venue procedure; SQL-first incident documentation)
+Last activity: 2026-02-25 — Completed 51-02-PLAN.md (funding rate ingestion PERP-01: funding_fetchers.py with 7 per-venue fetch functions + refresh_funding_rates.py with watermark-based incremental ingest, daily rollup, cross-venue fallback; Lighter stubbed pending SDK)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [███░░] Phase 51 in progress (3/5)
 
@@ -463,6 +463,10 @@ Recent decisions affecting current work:
 - **V1 hedge procedure is manual** (Phase 51-03): operator identifies open positions via SQL, selects alternate venue from priority list [binance, bybit, hyperliquid], places opposing order manually; automated failover routing deferred
 - **3-consecutive-check recovery gate** (Phase 51-03): venue must pass 3 consecutive health checks before resuming normal operations — prevents premature resumption during intermittent recovery
 - **dYdX higher latency thresholds** (Phase 51-03): max_latency_ms=4000, stale_orderbook_seconds=60 vs 2000ms/30s for CEX venues — reflects on-chain indexer architecture reality
+- **Lighter stub returns [] + WARNING (Phase 51-02)**: lighter-python SDK integration deferred; REST endpoint unconfirmed; fetch_lighter_funding() logs WARNING and returns [] so lighter path is exercised in --all runs without blocking
+- **Bybit backward pagination with both-or-neither constraint (Phase 51-02)**: _ingest_bybit() slides backward from now providing both startTime+endTime (Bybit requires endTime when startTime provided); never passes startTime alone
+- **Dry-run skips DB entirely (Phase 51-02)**: ingest_venue_full(dry_run=True) uses epoch constants as start, logs what would be fetched, no fetcher calls or DB writes; --dry-run works without DB connection
+- **Daily rollup opt-in via --rollup (Phase 51-02)**: default behavior skips rollup; must explicitly request with --rollup flag; keeps incremental refresh fast
 
 ### Pending Todos
 
@@ -476,8 +480,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-25T23:30:15Z
-Stopped at: Completed 51-01-PLAN.md — Phase 51 schema: cmc_funding_rates + cmc_margin_config (8 seed rows) + cmc_perp_positions tables; extended chk_risk_events_type (liquidation_warning/critical/margin_alert) and chk_risk_events_source (margin_monitor); dim_risk_limits margin threshold columns; Alembic migration 30eac3660488 upgrade+downgrade verified clean. Phase 51 in progress (3/5 complete; 51-01 SUMMARY created this session).
+Last session: 2026-02-25T23:39:10Z
+Stopped at: Completed 51-02-PLAN.md — funding rate ingestion: funding_fetchers.py (FundingRateRow + 7 fetch functions, Lighter stubbed) + refresh_funding_rates.py (watermark-based incremental ingest, daily rollup, cross-venue fallback, --dry-run no-DB mode). Phase 51 in progress (3/5 complete).
 Resume file: None
 
 ---
