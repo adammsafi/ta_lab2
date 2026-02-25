@@ -457,6 +457,8 @@ Recent decisions affecting current work:
 - **CoinGecko Analyst ($129/mo) for 2x scale** (Phase 50-01): Replaces fragile CMC manual bulk download; full history to 2013, 18k+ coins, proper REST API; migration LOE 1-2 days adapter + 1 week backfill
 - **Alpaca free tier for equities at 2x scale** (Phase 50-01): Already integrated for paper trading execution (Phase 45); activating data API requires only new ingestion script; $0 cost
 - **reports/ is gitignored by design** (Phase 50-01): analysis documents in reports/data-economics/ follow Phase 42-05 convention (bakeoff reports also gitignored); on-disk but not in git
+- **cmc_perp_positions separate from cmc_positions** (Phase 51-01): cmc_positions has CHECK (exchange IN (coinbase,kraken,paper,aggregate)); separate table avoids touching spot position logic; cmc_perp_positions has its own venue CHECK with all 7 perp venues
+- **margin_alert_threshold=1.5, liquidation_kill_threshold=1.1 in dim_risk_limits** (Phase 51-01): Stored as per-strategy configurable columns with server defaults matching CONTEXT.md buffer zone spec
 - **Graduated health states: HEALTHY > DEGRADED > DOWN** (Phase 51-03): DEGRADED does not halt orders (monitoring increase only); DOWN halts all new orders and triggers hedge procedure; DEGRADED escalates to DOWN after 30 min sustained
 - **V1 hedge procedure is manual** (Phase 51-03): operator identifies open positions via SQL, selects alternate venue from priority list [binance, bybit, hyperliquid], places opposing order manually; automated failover routing deferred
 - **3-consecutive-check recovery gate** (Phase 51-03): venue must pass 3 consecutive health checks before resuming normal operations — prevents premature resumption during intermittent recovery
@@ -474,8 +476,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-25T23:29:17Z
-Stopped at: Completed 51-03-PLAN.md — venue downtime playbook (PERP-05): YAML health config + 435-line Markdown playbook for all 6 perps venues; graduated health states (HEALTHY/DEGRADED/DOWN); 7-step hedge-on-alternate-venue procedure; daily monitoring checklist with SQL queries. Phase 51 in progress (3/5 complete).
+Last session: 2026-02-25T23:30:15Z
+Stopped at: Completed 51-01-PLAN.md — Phase 51 schema: cmc_funding_rates + cmc_margin_config (8 seed rows) + cmc_perp_positions tables; extended chk_risk_events_type (liquidation_warning/critical/margin_alert) and chk_risk_events_source (margin_monitor); dim_risk_limits margin threshold columns; Alembic migration 30eac3660488 upgrade+downgrade verified clean. Phase 51 in progress (3/5 complete; 51-01 SUMMARY created this session).
 Resume file: None
 
 ---
