@@ -700,7 +700,7 @@ Plans:
 <summary>v1.0.0 V1 Closure -- Paper Trading & Validation (Phases 42-54) - CURRENT</summary>
 
 - [x] **Phase 42: Strategy Bake-Off** - IC/PSR/CV evaluation of existing signals, select 2 strategies for V1
-- [ ] **Phase 43: Exchange Integration** - Connect to two exchange APIs (Coinbase + Kraken), price feed comparison, paper order adapter
+- [x] **Phase 43: Exchange Integration** - Connect to two exchange APIs (Coinbase + Kraken), price feed comparison, paper order adapter
 - [ ] **Phase 44: Order & Fill Store** - DB tables for orders, fills, positions with full audit trail
 - [ ] **Phase 45: Paper-Trade Executor** - Engine reads signals, generates orders, tracks positions, verifies backtest parity
 - [ ] **Phase 46: Risk Controls** - Kill switch, position caps, daily loss stops, circuit breaker, discretionary overrides
@@ -751,12 +751,12 @@ Plans:
 **Plans**: 6 plans in 3 waves
 
 Plans:
-- [ ] 43-01-PLAN.md -- ExchangeConfig dataclass + Alembic migration (exchange_price_feed, paper_orders tables)
-- [ ] 43-02-PLAN.md -- Coinbase Advanced Trade API rewrite with JWT ES256 auth
-- [ ] 43-03-PLAN.md -- Kraken HMAC-SHA512 auth for private endpoints
-- [ ] 43-04-PLAN.md -- CanonicalOrder dataclass + PaperOrderLogger
-- [ ] 43-05-PLAN.md -- Price feed comparison script + factory update + daily refresh wiring
-- [ ] 43-06-PLAN.md -- Unit tests for all Phase 43 components
+- [x] 43-01-PLAN.md -- ExchangeConfig dataclass + Alembic migration (exchange_price_feed, paper_orders tables)
+- [x] 43-02-PLAN.md -- Coinbase Advanced Trade API rewrite with JWT ES256 auth
+- [x] 43-03-PLAN.md -- Kraken HMAC-SHA512 auth for private endpoints
+- [x] 43-04-PLAN.md -- CanonicalOrder dataclass + PaperOrderLogger
+- [x] 43-05-PLAN.md -- Price feed comparison script + factory update + daily refresh wiring
+- [x] 43-06-PLAN.md -- Unit tests for all Phase 43 components
 
 ---
 
