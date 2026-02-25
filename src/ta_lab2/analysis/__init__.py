@@ -26,3 +26,14 @@ try:
     )
 except ImportError:
     pass
+
+try:
+    from ta_lab2.analysis.vol_sizer import (  # noqa: F401
+        compute_comparison_metrics,
+        compute_realized_vol_position,
+        compute_vol_sized_position,
+        run_vol_sized_backtest,
+        worst_n_day_returns,
+    )
+except ImportError:
+    pass
