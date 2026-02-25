@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: Phase 48 (Loss Limits Policy) — In Progress
-Plan: 2/4 complete (48-01 DONE — VaR simulator library; 48-02 DONE — stop-loss simulator library: hard/trailing/time-stop sweep via vectorbt)
+Plan: 2/4 complete (48-01 DONE — Alembic migration 328fdc315e1b (pool_name+override governance cols) + VaR simulator library (historical/parametric/CF/CVaR); 48-02 DONE — stop-loss simulator library: hard/trailing/time-stop sweep via vectorbt)
 Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans).
-Last activity: 2026-02-25 — Completed 48-02-PLAN.md (stop_simulator.py: simulate_hard_stop/trailing/time, compute_recovery_time, sweep_stops; vectorbt 0.28.1 tz-strip + numpy vectorized time-stop)
+Last activity: 2026-02-25 — Completed 48-01-PLAN.md (migration 328fdc315e1b: pool_name+override governance cols with CHECK constraints; var_simulator.py: historical_var, parametric_var_normal, cornish_fisher_var, historical_cvar, compute_var_suite, var_to_daily_cap)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE
 
@@ -431,6 +431,10 @@ Recent decisions affecting current work:
 - **recovery_time np.nan sentinel** (Phase 48-02): compute_recovery_time returns np.nan when equity never fully recovers from final drawdown -- not zero; callers must handle NaN explicitly
 - **Stop simulator pure library pattern** (Phase 48-02): no DB, no CLI, no reports -- only price+signals inputs, Portfolio/DataFrame outputs; CLI deferred to Phase 48-03
 - **sharpe_ratio(freq=365) for crypto** (Phase 48-02): 365-day annualization matches crypto always-on markets; consistent with vbt_runner.py freq_per_year=365
+- **CF fallback threshold 8.0 for excess kurtosis** (Phase 48-01): values above 8 indicate distributions where CF polynomial may have non-monotonic behavior; fallback to historical VaR + WARNING log is the safe choice
+- **var_to_daily_cap uses median not mean across strategies** (Phase 48-01): robust to outlier strategies with extreme VaR values; 15% ceiling aligns with Phase 45 V1 circuit breaker decision
+- **try/except re-export in analysis/__init__.py** (Phase 48-01): Wave 1 parallel plans (48-01, 48-02) both write to __init__.py; graceful ImportError means either order of execution is safe
+- **F401 per-file-ignore for __init__.py in pyproject.toml** (Phase 48-01): `**/__init__.py = ["F401"]` added to ruff config; canonical solution for re-export pattern; consistent with existing `tests/*` ignore
 
 ### Pending Todos
 
@@ -444,8 +448,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-25T05:34:00Z
-Stopped at: Completed 48-02-PLAN.md — stop_simulator.py (simulate_hard_stop, simulate_trailing_stop, simulate_time_stop via custom numpy exit arrays, compute_recovery_time, sweep_stops returning DataFrame of 9 metrics); analysis/__init__.py re-exports both VaR and stop simulator.
+Last session: 2026-02-25T20:31:15Z
+Stopped at: Completed 48-01-PLAN.md — Alembic migration 328fdc315e1b (pool_name+override governance cols with CHECK constraints); var_simulator.py (historical_var, parametric_var_normal, cornish_fisher_var with CF fallback at kurtosis>8, historical_cvar, compute_var_suite, var_to_daily_cap capped at 15%); analysis/__init__.py re-exports.
 Resume file: None
 
 ---
