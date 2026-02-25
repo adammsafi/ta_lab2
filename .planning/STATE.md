@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: Phase 42 (Strategy Bake-Off) — In Progress
-Plan: 2/TBD complete
-Status: v1.0.0 in progress. Phase 42 Plan 02 complete (walk-forward bake-off + OOS metrics).
-Last activity: 2026-02-24 — Completed 42-02-PLAN.md (walk-forward bake-off, PSR/DSR, 480 rows in strategy_bakeoff_results)
+Plan: 3/TBD complete
+Status: v1.0.0 in progress. Phase 42 Plan 03 complete (composite scoring + sensitivity analysis).
+Last activity: 2026-02-25 — Completed 42-03-PLAN.md (composite_scorer.py + run_bakeoff_scoring CLI; ema_trend(17,77) robust top-1 in 4/4 schemes)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [██░░░] Phase 42 in progress
 
@@ -333,6 +333,10 @@ Recent decisions affecting current work:
 - **DSR sr_estimates must be per-bar not annualized** (Phase 42-02): compute_psr/dsr uses per-bar sr_hat = mean/std; divide annualized Sharpe by sqrt(365) before passing as sr_estimates benchmark
 - **V1 gate outcome: no single strategy passes Sharpe>=1.0 + MaxDD<=15%** (Phase 42-02): Best is ema_trend BTC 1D Sharpe=1.42 but MaxDD worst=-70.1%; RSI low drawdown but Sharpe<1.0; ensemble/blending step needed per CONTEXT.md
 - **Fixed-parameter walk-forward as baseline** (Phase 42-02): Expanding-window re-optimization deliberately deferred; clean OOS metrics established for V1 selection; re-opt can be added as incremental enhancement
+- **Min-max normalization for composite score** (Phase 42-03): Min-max over z-score — interpretable [0,1] range, no distributional assumption; handles small N (3-10 strategies); max_drawdown_worst (single worst fold) not mean — worst fold is what kills live accounts
+- **V1 gates flag but don't eliminate** (Phase 42-03): All strategies receive composite scores regardless of gate failures; gate_failures documented in output; allows selecting "best available" when no strategy meets both gates
+- **ema_trend(17,77) robust top-1 in 4/4 schemes** (Phase 42-03): Consistently ranks #1 under balanced, risk_focus, quality_focus, and low_cost schemes; ema_trend(21,50) robust top-2 in 3/4; both fail MaxDD gate (-70-75%)
+- **Robust threshold 3/4 weighting schemes** (Phase 42-03): Strategy is "robust" if top-2 in >= 3 of 4 schemes; 3/4 means "mostly consistent ranking" allowing one outlier scheme; 4/4 too strict, 2/4 too loose
 
 ### Pending Todos
 
@@ -342,12 +346,12 @@ None yet.
 
 | Priority | Item | Status | Action |
 |----------|------|--------|--------|
-| Medium | V1 gate: no single strategy passes Sharpe>=1.0 + MaxDD<=15% | Active | Ensemble/blending step in 42-03 or 42-04 per CONTEXT.md |
+| Medium | V1 gate: no single strategy passes Sharpe>=1.0 + MaxDD<=15% | Active | Ensemble/blending step in 42-04 per CONTEXT.md; blend_signals() ready in composite_scorer.py |
 
 ## Session Continuity
 
-Last session: 2026-02-25T02:35:00Z
-Stopped at: Completed 42-02-PLAN.md — walk-forward bake-off (bakeoff_orchestrator.py) built and run; 480 OOS rows in strategy_bakeoff_results; PSR/DSR computed; run_bakeoff.py CLI created.
+Last session: 2026-02-25T02:45:00Z
+Stopped at: Completed 42-03-PLAN.md — composite_scorer.py + run_bakeoff_scoring CLI; ema_trend(17,77) robust top-1 in 4/4 schemes; no strategies pass both V1 gates; blend_signals() ready for 42-04.
 Resume file: None
 
 ---
