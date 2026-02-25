@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: Phase 48 (Loss Limits Policy) — In Progress
-Plan: 2/4 complete (48-01 DONE — Alembic migration 328fdc315e1b (pool_name+override governance cols) + VaR simulator library (historical/parametric/CF/CVaR); 48-02 DONE — stop-loss simulator library: hard/trailing/time-stop sweep via vectorbt)
-Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans).
-Last activity: 2026-02-25 — Completed 48-01-PLAN.md (migration 328fdc315e1b: pool_name+override governance cols with CHECK constraints; var_simulator.py: historical_var, parametric_var_normal, cornish_fisher_var, historical_cvar, compute_var_suite, var_to_daily_cap)
+Phase: Phase 48 (Loss Limits Policy) — COMPLETE
+Plan: 4/4 complete (48-01 DONE — Alembic migration + VaR simulator; 48-02 DONE — stop-loss simulator; 48-03 DONE — VaR simulation CLI + VAR_REPORT.md; 48-04 DONE — pool cap seeding + override governance validation)
+Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans).
+Last activity: 2026-02-25 — Completed 48-04-PLAN.md (define_pool_caps.py: seeds 4 pool rows in dim_risk_limits from Phase 42 bake-off MaxDD; validate_override_governance.py: 4/4 DB tests PASS; POOL_CAPS.md + OVERRIDE_POLICY.md generated)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 242 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 6 in Phase 43, 3 in Phase 44, 7 in Phase 45, 4 in Phase 46, 5 in Phase 47)
+- Total plans completed: 246 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 6 in Phase 43, 3 in Phase 44, 7 in Phase 45, 4 in Phase 46, 5 in Phase 47, 4 in Phase 48)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -435,6 +435,10 @@ Recent decisions affecting current work:
 - **var_to_daily_cap uses median not mean across strategies** (Phase 48-01): robust to outlier strategies with extreme VaR values; 15% ceiling aligns with Phase 45 V1 circuit breaker decision
 - **try/except re-export in analysis/__init__.py** (Phase 48-01): Wave 1 parallel plans (48-01, 48-02) both write to __init__.py; graceful ImportError means either order of execution is safe
 - **F401 per-file-ignore for __init__.py in pyproject.toml** (Phase 48-01): `**/__init__.py = ["F401"]` added to ruff config; canonical solution for re-export pattern; consistent with existing `tests/*` ignore
+- **SELECT-before-INSERT for pool rows in dim_risk_limits** (Phase 48-04): pool_name has no UNIQUE constraint (NULL rows for portfolio-wide defaults are valid); SELECT-then-UPDATE/INSERT prevents duplicates without schema change
+- **Aggregate pool cap hardcoded at 15%** (Phase 48-04): Phase 42 V1 circuit breaker is a design constraint, not a computed value; bake-off arithmetic applies to conservative/core/opportunistic only
+- **SAVEPOINT pattern for CHECK constraint test** (Phase 48-04): engine.begin() opens single transaction; SAVEPOINT + ROLLBACK TO SAVEPOINT rolls back only the failing INSERT without aborting outer transaction; required for multi-test validation scripts
+- **Pool caps scaled by multiplier with vision ceiling** (Phase 48-04): Conservative=base*1, Core=base*2, Opportunistic=base*3; each capped at Vision Draft DD target; provides smooth risk tier progression while honoring stated targets
 
 ### Pending Todos
 
@@ -448,8 +452,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-25T20:31:15Z
-Stopped at: Completed 48-01-PLAN.md — Alembic migration 328fdc315e1b (pool_name+override governance cols with CHECK constraints); var_simulator.py (historical_var, parametric_var_normal, cornish_fisher_var with CF fallback at kurtosis>8, historical_cvar, compute_var_suite, var_to_daily_cap capped at 15%); analysis/__init__.py re-exports.
+Last session: 2026-02-25T20:42:00Z
+Stopped at: Completed 48-04-PLAN.md — Phase 48 COMPLETE. define_pool_caps.py (4 pool rows seeded to dim_risk_limits; Conservative 7.73%/Core 15.46%/Opportunistic 23.19%/Aggregate 15.00%); validate_override_governance.py (4/4 DB validation tests PASS; POOL_CAPS.md + OVERRIDE_POLICY.md generated). LOSS-03 and LOSS-04 closed.
 Resume file: None
 
 ---
