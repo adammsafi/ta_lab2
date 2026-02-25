@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: Phase 45 (Paper Trade Executor) — COMPLETE
-Plan: 7/7 complete (45-01 DONE; 45-02 DONE; 45-03 DONE; 45-04 DONE; 45-05 DONE; 45-06 DONE; 45-07 DONE)
-Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans).
-Last activity: 2026-02-25 — Completed 45-07-PLAN.md (executor package exports finalized; REGIME_MULTIPLIERS + SIGNAL_TABLE_MAP exported; 24 integration smoke tests; 114 total executor tests pass)
+Phase: Phase 46 (Risk Controls) — In Progress
+Plan: 1/? complete (46-01 DONE — DB schema foundation)
+Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 started.
+Last activity: 2026-02-25 — Completed 46-01-PLAN.md (4 risk tables via Alembic migration b5178d671e38; dim_risk_state seeded state_id=1; dim_risk_limits seeded with portfolio defaults; upgrade/downgrade round-trip verified)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [█] Phase 46 In Progress (1/? plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 231 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 6 in Phase 43, 3 in Phase 44, 7 in Phase 45)
+- Total plans completed: 232 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 6 in Phase 43, 3 in Phase 44, 7 in Phase 45, 1 in Phase 46)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -397,6 +397,10 @@ Recent decisions affecting current work:
 - **parents[4] for scripts/executor/ depth** (Phase 45-05): Path(__file__).resolve().parents[4] is correct for project root from scripts/executor/ (0=executor/, 1=scripts/, 2=ta_lab2/, 3=src/, 4=project_root/) -- not parents[5] which reaches Downloads/
 - **--no-execute skips executor but not signals in --all** (Phase 45-05): Signals are always generated in --all mode; executor consumption is optional; --no-execute only skips run_paper_executor_stage
 - **Regime stop-gate added to existing pipeline** (Phase 45-05): Regimes block was missing continue_on_error guard before signals/executor stages were added; fixed as deviation auto-fix; regimes now participates in stop-on-error flow consistently
+- **JSON-as-TEXT for CB counters** (Phase 46-01): cb_consecutive_losses and cb_breaker_tripped_at store per-key JSON as TEXT columns (not JSONB) -- avoids jsonb operator dependencies; Python dicts serialize directly via json.dumps(); acceptable for low-frequency state updates
+- **CHECK(state_id=1) for single-row invariant** (Phase 46-01): dim_risk_state enforces single-row at DB level via CHECK(state_id=1) constraint -- no application code needed to prevent duplicate rows; seed row inserted in upgrade() with ON CONFLICT DO NOTHING
+- **Free-text system_signal/override_action on cmc_risk_overrides** (Phase 46-01): No CHECK constraint -- allows future signal types without requiring a migration to extend allowed set; operator-entered free text
+- **NULL-scope for dim_risk_limits defaults** (Phase 46-01): NULL asset_id + NULL strategy_id = portfolio-wide row; non-NULL rows override for specific asset/strategy pairs; same scoped-config pattern as dim_executor_config
 
 ### Pending Todos
 
@@ -410,8 +414,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-25T05:39:30Z
-Stopped at: Completed 45-07-PLAN.md — Integration verification (24 smoke tests, 114 total executor tests pass); Phase 45 COMPLETE (7/7 plans verified 5/5 must-haves).
+Last session: 2026-02-25T14:32:30Z
+Stopped at: Completed 46-01-PLAN.md — Risk controls DB schema (4 tables, Alembic migration b5178d671e38, upgrade/downgrade verified, 4 DDL reference files in sql/risk/).
 Resume file: None
 
 ---
