@@ -229,7 +229,7 @@ class ReportGenerator:
         """
         sql = text(
             """
-            SELECT tracking_error_threshold
+            SELECT drift_tracking_error_threshold_5d
             FROM public.dim_risk_limits
             WHERE asset_id IS NULL AND strategy_id IS NULL
             LIMIT 1
@@ -527,7 +527,7 @@ class ReportGenerator:
                     )
 
             # Compute breach count per config
-            breach_col = "threshold_breach_5d"
+            breach_col = "threshold_breach"
             if breach_col in df.columns:
                 breach_counts = (
                     df[df[breach_col]]
@@ -552,8 +552,8 @@ class ReportGenerator:
         threshold = self._load_te_threshold()
         lines.append(f"- **Tracking error threshold**: {threshold:.1%}")
 
-        if "threshold_breach_5d" in df.columns:
-            total_breaches = int(df["threshold_breach_5d"].sum())
+        if "threshold_breach" in df.columns:
+            total_breaches = int(df["threshold_breach"].sum())
             lines.append(f"- **Breaches this week**: {total_breaches}")
         if "drift_paused" in df.columns:
             pause_active = bool(df["drift_paused"].any())

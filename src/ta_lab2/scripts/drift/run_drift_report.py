@@ -161,14 +161,17 @@ Examples:
             attributor = DriftAttributor(engine)
 
             # Load configs with metrics for the period
+            # JOIN dim_executor_config to get signal_id (not in cmc_drift_metrics)
             with engine.connect() as conn:
                 rows = conn.execute(
                     text(
                         """
-                        SELECT DISTINCT dm.config_id, dm.signal_id, dm.signal_type,
-                               dm.asset_id, dm.paper_trade_count, dm.paper_pnl
+                        SELECT DISTINCT dm.config_id, dec.signal_id, dm.signal_type,
+                               dm.asset_id, dm.paper_trade_count,
+                               dm.paper_cumulative_pnl
                         FROM cmc_drift_metrics dm
-                        WHERE dm.as_of_date BETWEEN :start AND :end
+                        JOIN dim_executor_config dec ON dec.config_id = dm.config_id
+                        WHERE dm.metric_date BETWEEN :start AND :end
                           AND dm.paper_trade_count >= 10
                         """
                     ),
@@ -194,14 +197,14 @@ Examples:
                             asset_id=row.asset_id,
                             paper_start=week_start.isoformat(),
                             paper_end=week_end.isoformat(),
-                            paper_pnl=float(row.paper_pnl),
+                            paper_pnl=float(row.paper_cumulative_pnl),
                             paper_trade_count=int(row.paper_trade_count),
                         )
                         logger.debug(
-                            "Attribution done: config_id=%d asset_id=%d te_delta=%.4f",
+                            "Attribution done: config_id=%d asset_id=%d residual=%.4f",
                             row.config_id,
                             row.asset_id,
-                            result.te_delta,
+                            result.unexplained_residual,
                         )
                     except Exception as exc:  # noqa: BLE001
                         logger.warning(
