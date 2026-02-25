@@ -1,12 +1,13 @@
 """
 RiskEngine: Order-level risk gate for paper trading.
 
-Checks every order through 6 sequential gates before allowing execution:
+Checks every order through 7 sequential gates before allowing execution:
   1.  Kill switch -- immediate block if trading is halted
   1.5 Tail risk -- block if FLATTEN, halve buy qty if REDUCE
   2.  Circuit breaker -- block if per-strategy breaker is tripped
   3.  Per-asset position cap -- scale down quantity if it would exceed max_position_pct
   4.  Portfolio utilization cap -- scale down if total exposure would exceed max_portfolio_pct
+  1.6 Margin/liquidation check -- block buys when margin utilization is critically low (perps only)
   5.  All pass -- allow with (possibly adjusted) quantity
 
 Limits are hot-reloaded from dim_risk_limits on each check_order() call.
@@ -97,6 +98,23 @@ class RiskLimits:
     allow_overrides: bool = True
     """Whether discretionary overrides are permitted for this scope."""
 
+    margin_alert_threshold: float = 1.5
+    """Margin utilization ratio at which a liquidation_warning event is logged.
+
+    When margin_utilization <= this value, a warning event is logged but the
+    order is NOT blocked (warning is informational only).
+    Default matches dim_risk_limits seed value from Phase 51 migration.
+    """
+
+    liquidation_kill_threshold: float = 1.1
+    """Margin utilization ratio at which buy orders are blocked.
+
+    When margin_utilization <= this value, new buy orders are blocked and a
+    liquidation_critical event is logged.  Reducing exposure (sells) is always
+    allowed regardless of this threshold.
+    Default matches dim_risk_limits seed value from Phase 51 migration.
+    """
+
 
 @dataclass
 class RiskCheckResult:
@@ -153,6 +171,10 @@ class RiskEngine:
         2b. Gate 1.5 (tail risk) is checked automatically inside check_order().
             No separate call needed. FLATTEN blocks all orders; REDUCE halves buy qty.
 
+        2c. Gate 1.6 (margin/liquidation) is checked automatically inside check_order()
+            for buy orders. Sell orders bypass this gate (reducing exposure is safe).
+            Requires cmc_perp_positions table populated by the paper trading executor.
+
         3. Call check_daily_loss() once per trading day (e.g., at session open)
            to auto-trigger the kill switch on drawdown threshold breach::
 
@@ -196,7 +218,7 @@ class RiskEngine:
         portfolio_value: Decimal,
     ) -> RiskCheckResult:
         """
-        Run order through all 5 risk gates.
+        Run order through all risk gates.
 
         Gates are checked in priority order. The first blocking gate short-circuits
         the remaining checks. Position/portfolio cap gates scale down quantity rather
@@ -347,6 +369,26 @@ class RiskEngine:
                 )
                 if scaled_qty < order_qty:
                     order_qty = scaled_qty
+
+            # Gate 1.6: Margin/liquidation check (perps only, buy orders only)
+            margin_result = self._check_margin_gate(
+                asset_id=asset_id,
+                strategy_id=strategy_id,
+                order_side=order_side,
+                limits=limits,
+            )
+            if margin_result in ("critical", "buffer"):
+                reason = (
+                    f"Liquidation critical: margin utilization at or below "
+                    f"{limits.liquidation_kill_threshold}x maintenance margin"
+                    if margin_result == "critical"
+                    else "Margin buffer insufficient: must maintain >= 2x maintenance margin to open new positions"
+                )
+                return RiskCheckResult(
+                    allowed=False,
+                    blocked_reason=reason,
+                )
+            # Note: "warning" result is logged but does NOT block -- order proceeds
 
         # Gate 5: All pass
         return RiskCheckResult(
@@ -1012,6 +1054,8 @@ class RiskEngine:
           4. Portfolio-wide defaults (both NULL)
 
         Returns the most specific matching row, or hardcoded defaults if no DB row found.
+        Handles NULL values for new columns (margin_alert_threshold,
+        liquidation_kill_threshold) gracefully by falling back to dataclass defaults.
         """
         rows = []
         with self._engine.connect() as conn:
@@ -1027,7 +1071,9 @@ class RiskEngine:
                     cb_cooldown_hours,
                     allow_overrides,
                     asset_id,
-                    strategy_id
+                    strategy_id,
+                    margin_alert_threshold,
+                    liquidation_kill_threshold
                 FROM dim_risk_limits
                 WHERE
                     (asset_id = :asset_id OR asset_id IS NULL)
@@ -1047,6 +1093,16 @@ class RiskEngine:
             return RiskLimits()
 
         row = rows[0]
+        # Columns 9 and 10 are the new margin threshold columns (may be NULL on older rows)
+        _defaults = RiskLimits()
+        margin_alert = (
+            float(row[9]) if row[9] is not None else _defaults.margin_alert_threshold
+        )
+        liq_kill = (
+            float(row[10])
+            if row[10] is not None
+            else _defaults.liquidation_kill_threshold
+        )
         return RiskLimits(
             max_position_pct=float(row[0]),
             max_portfolio_pct=float(row[1]),
@@ -1055,7 +1111,203 @@ class RiskEngine:
             cb_loss_threshold_pct=float(row[4]),
             cb_cooldown_hours=float(row[5]),
             allow_overrides=bool(row[6]),
+            margin_alert_threshold=margin_alert,
+            liquidation_kill_threshold=liq_kill,
         )
+
+    def _check_margin_gate(
+        self,
+        asset_id: int,
+        strategy_id: int,
+        order_side: str,
+        limits: RiskLimits,
+    ) -> Optional[str]:
+        """
+        Gate 1.6: Margin/liquidation check for perpetual futures positions.
+
+        Only applies to buy orders. Sell orders (reduces exposure) always bypass
+        this gate -- closing or reducing a position is always allowed.
+
+        Threshold check order (most severe to least severe to avoid dead code):
+          1. Critical (<=1.1x maintenance margin) -- blocks order
+          2. Warning  (<=1.5x maintenance margin) -- logs event only, does NOT block
+          3. Buffer   (<=2.0x maintenance margin) -- blocks order
+          4. Safe     (>2.0x)                     -- returns None (gate passes)
+
+        Args:
+            asset_id:    Asset ID (unused for perp query; reserved for future filtering).
+            strategy_id: Strategy ID for position lookup.
+            order_side:  "buy" or "sell".
+            limits:      Loaded RiskLimits (contains threshold values).
+
+        Returns:
+            "critical" -- blocks order (margin <= liquidation_kill_threshold)
+            "warning"  -- logs event only, does NOT block (margin <= margin_alert_threshold)
+            "buffer"   -- blocks order (margin <= 2.0x but above warning threshold)
+            None       -- gate passes (no perp position or margin is safe)
+        """
+        # Sells/closes always allowed -- reducing exposure is safe
+        if order_side.lower() == "sell":
+            return None
+
+        # Query cmc_perp_positions for any active position for this strategy
+        try:
+            with self._engine.connect() as conn:
+                pos_row = conn.execute(
+                    text(
+                        """
+                    SELECT
+                        venue,
+                        symbol,
+                        allocated_margin,
+                        leverage,
+                        margin_mode,
+                        side,
+                        mark_price,
+                        quantity,
+                        avg_entry_price
+                    FROM cmc_perp_positions
+                    WHERE strategy_id = :strategy_id
+                      AND side != 'flat'
+                    ORDER BY updated_at DESC
+                    LIMIT 1
+                    """
+                    ),
+                    {"strategy_id": strategy_id},
+                ).fetchone()
+        except Exception as exc:
+            logger.debug(
+                "Gate 1.6: cmc_perp_positions query failed (table may not exist): %s",
+                exc,
+            )
+            return None
+
+        if pos_row is None:
+            # No perp position -- gate passes (spot-only or no active position)
+            return None
+
+        (
+            venue,
+            symbol,
+            allocated_margin,
+            leverage,
+            margin_mode,
+            side,
+            mark_price,
+            quantity,
+            avg_entry_price,
+        ) = pos_row  # noqa: E501
+
+        if allocated_margin is None or mark_price is None or quantity is None:
+            logger.debug(
+                "Gate 1.6: incomplete margin data for venue=%s symbol=%s -- skipping",
+                venue,
+                symbol,
+            )
+            return None
+
+        from decimal import Decimal as _Decimal
+
+        allocated_margin = _Decimal(str(allocated_margin))
+        leverage = _Decimal(str(leverage)) if leverage is not None else _Decimal("1")
+        mark_price = _Decimal(str(mark_price))
+        quantity = _Decimal(str(abs(float(quantity))))
+        position_value = mark_price * quantity
+
+        # Load margin tiers from cmc_margin_config
+        from ta_lab2.risk.margin_monitor import (
+            compute_margin_utilization,
+            load_margin_tiers,
+        )
+
+        tiers = load_margin_tiers(self._engine, venue=venue, symbol=symbol)
+
+        entry_price = (
+            _Decimal(str(avg_entry_price)) if avg_entry_price is not None else None
+        )
+        margin_state = compute_margin_utilization(
+            position_value=position_value,
+            allocated_margin=allocated_margin,
+            leverage=leverage,
+            tiers=tiers,
+            margin_mode=margin_mode or "isolated",
+            venue=venue,
+            symbol=symbol,
+            side=side or "long",
+            entry_price=entry_price,
+        )
+
+        util = margin_state.margin_utilization
+        liq_kill = _Decimal(str(limits.liquidation_kill_threshold))  # default 1.1
+        alert_thresh = _Decimal(str(limits.margin_alert_threshold))  # default 1.5
+        buffer_thresh = _Decimal("2.0")
+
+        # Check from most severe to least severe (avoids dead code)
+
+        # 1. Critical: margin <= 1.1x -- blocks buy order
+        if util <= liq_kill:
+            self._log_event(
+                event_type="liquidation_critical",
+                trigger_source="margin_monitor",
+                reason=(
+                    f"Margin utilization {float(util):.4f} at or below "
+                    f"critical threshold {float(liq_kill):.1f}x for "
+                    f"venue={venue} symbol={symbol}"
+                ),
+                asset_id=asset_id,
+                strategy_id=strategy_id,
+                metadata={
+                    "margin_utilization": float(util),
+                    "liquidation_kill_threshold": float(liq_kill),
+                    "venue": venue,
+                    "symbol": symbol,
+                },
+            )
+            return "critical"
+
+        # 2. Warning: margin <= 1.5x -- logs event but does NOT block
+        if util <= alert_thresh:
+            self._log_event(
+                event_type="liquidation_warning",
+                trigger_source="margin_monitor",
+                reason=(
+                    f"Margin utilization {float(util):.4f} at or below "
+                    f"warning threshold {float(alert_thresh):.1f}x for "
+                    f"venue={venue} symbol={symbol} (order NOT blocked)"
+                ),
+                asset_id=asset_id,
+                strategy_id=strategy_id,
+                metadata={
+                    "margin_utilization": float(util),
+                    "margin_alert_threshold": float(alert_thresh),
+                    "venue": venue,
+                    "symbol": symbol,
+                },
+            )
+            return "warning"
+
+        # 3. Buffer: margin <= 2.0x -- blocks buy order (proactive buffer)
+        if util <= buffer_thresh:
+            self._log_event(
+                event_type="margin_alert",
+                trigger_source="margin_monitor",
+                reason=(
+                    f"Margin utilization {float(util):.4f} below 2x buffer for "
+                    f"venue={venue} symbol={symbol} -- must maintain >= 2x to open new positions"
+                ),
+                asset_id=asset_id,
+                strategy_id=strategy_id,
+                metadata={
+                    "margin_utilization": float(util),
+                    "buffer_threshold": 2.0,
+                    "venue": venue,
+                    "symbol": symbol,
+                },
+            )
+            return "buffer"
+
+        # 4. Safe: > 2.0x
+        return None
 
     def _compute_portfolio_value(self) -> Optional[Decimal]:
         """

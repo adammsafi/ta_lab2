@@ -83,7 +83,8 @@ def _default_limits_row():
     Simulate dim_risk_limits portfolio-wide defaults row.
     Columns: max_position_pct, max_portfolio_pct, daily_loss_pct_threshold,
              cb_consecutive_losses_n, cb_loss_threshold_pct, cb_cooldown_hours,
-             allow_overrides, asset_id, strategy_id
+             allow_overrides, asset_id, strategy_id,
+             margin_alert_threshold, liquidation_kill_threshold
     """
     return [
         (
@@ -96,8 +97,17 @@ def _default_limits_row():
             True,  # allow_overrides
             None,  # asset_id
             None,  # strategy_id
+            Decimal("1.5"),  # margin_alert_threshold
+            Decimal("1.1"),  # liquidation_kill_threshold
         )
     ]
+
+
+def _no_perp_position():
+    """Simulate cmc_perp_positions returning no active position (Gate 1.6 passes)."""
+    result = MagicMock()
+    result.fetchone.return_value = None
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -225,6 +235,8 @@ class TestCheckOrderKillSwitch:
         # Gate 3: limits for position/portfolio cap
         limits_for_caps = MagicMock()
         limits_for_caps.fetchall.return_value = _default_limits_row()
+        # Gate 1.6: cmc_perp_positions -- no perp position, gate passes
+        perp_pos_result = _no_perp_position()
 
         conn.execute.side_effect = [
             active_result,
@@ -232,6 +244,7 @@ class TestCheckOrderKillSwitch:
             limits_for_cb,
             cb_result,
             limits_for_caps,
+            perp_pos_result,
         ]
 
         engine = RiskEngine(mock_engine)
@@ -284,6 +297,9 @@ class TestCheckOrderPositionCap:
         log_result = MagicMock()
         log_result.fetchone.return_value = None
 
+        # Gate 1.6: cmc_perp_positions -- no perp position, gate passes
+        perp_pos_result = _no_perp_position()
+
         conn.execute.side_effect = [
             active_result,
             tail_risk_result,
@@ -291,6 +307,7 @@ class TestCheckOrderPositionCap:
             cb_result,
             limits_for_caps,
             log_result,
+            perp_pos_result,
         ]
 
         engine = RiskEngine(mock_engine)
@@ -326,12 +343,16 @@ class TestCheckOrderPositionCap:
         limits_for_caps = MagicMock()
         limits_for_caps.fetchall.return_value = _default_limits_row()
 
+        # Gate 1.6: cmc_perp_positions -- no perp position, gate passes
+        perp_pos_result = _no_perp_position()
+
         conn.execute.side_effect = [
             active_result,
             tail_risk_result,
             limits_for_cb,
             cb_result,
             limits_for_caps,
+            perp_pos_result,
         ]
 
         engine = RiskEngine(mock_engine)
@@ -472,12 +493,16 @@ class TestCheckOrderAllClear:
         limits_for_caps = MagicMock()
         limits_for_caps.fetchall.return_value = _default_limits_row()
 
+        # Gate 1.6: cmc_perp_positions -- no perp position, gate passes
+        perp_pos_result = _no_perp_position()
+
         conn.execute.side_effect = [
             active_result,
             tail_risk_result,
             limits_for_cb,
             cb_result,
             limits_for_caps,
+            perp_pos_result,
         ]
 
         engine = RiskEngine(mock_engine)
@@ -723,6 +748,9 @@ class TestCircuitBreakerCooldownAutoReset:
         limits_result2 = MagicMock()
         limits_result2.fetchall.return_value = _default_limits_row()
 
+        # Gate 1.6: cmc_perp_positions -- no perp position, gate passes
+        perp_pos_result = _no_perp_position()
+
         conn.execute.side_effect = [
             active_result,
             tail_risk_result,
@@ -731,6 +759,7 @@ class TestCircuitBreakerCooldownAutoReset:
             losses_row_result,
             update_result,
             limits_result2,
+            perp_pos_result,
         ]
 
         engine = RiskEngine(mock_engine)

@@ -34,7 +34,8 @@ def _default_limits_row():
     Simulate dim_risk_limits portfolio-wide defaults row.
     Columns: max_position_pct, max_portfolio_pct, daily_loss_pct_threshold,
              cb_consecutive_losses_n, cb_loss_threshold_pct, cb_cooldown_hours,
-             allow_overrides, asset_id, strategy_id
+             allow_overrides, asset_id, strategy_id,
+             margin_alert_threshold, liquidation_kill_threshold
     """
     return [
         (
@@ -47,8 +48,15 @@ def _default_limits_row():
             True,  # allow_overrides
             None,  # asset_id
             None,  # strategy_id
+            Decimal("1.5"),  # margin_alert_threshold
+            Decimal("1.1"),  # liquidation_kill_threshold
         )
     ]
+
+
+def _no_perp_position() -> MagicMock:
+    """Simulate cmc_perp_positions returning no active position (Gate 1.6 passes)."""
+    return _make_result(fetchone=None)
 
 
 def _make_engine_with_sequence(
@@ -213,6 +221,7 @@ class TestCheckOrderPriorityOrder:
                 _limits_result(),  # Gate 2: limits for CB cooldown
                 _no_cb_tripped(),  # Gate 2: CB not tripped
                 _limits_result(),  # Gate 3/4: limits for caps
+                _no_perp_position(),  # Gate 1.6: no perp position, gate passes
             ]
         )
 
@@ -325,6 +334,7 @@ class TestRiskEngineWithOverrideManager:
             _limits_result(),
             _no_cb_tripped(),
             _limits_result(),
+            _no_perp_position(),  # Gate 1.6: no perp position, gate passes
         ]
         re_engine.connect.return_value.__enter__ = MagicMock(return_value=re_conn)
         re_engine.connect.return_value.__exit__ = MagicMock(return_value=False)
