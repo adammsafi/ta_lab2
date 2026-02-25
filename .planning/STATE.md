@@ -10,16 +10,16 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: Phase 45 (Paper Trade Executor) — COMPLETE
-Plan: 5/5 complete (45-01 DONE; 45-02 DONE; 45-03 DONE; 45-04 DONE; 45-05 DONE)
+Plan: 6/6 complete (45-01 DONE; 45-02 DONE; 45-03 DONE; 45-04 DONE; 45-05 DONE; 45-06 DONE)
 Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE.
-Last activity: 2026-02-25 — Completed 45-05-PLAN.md (CLI entry points + pipeline wiring for signals and executor)
+Last activity: 2026-02-25 — Completed 45-06-PLAN.md (ParityChecker + run_parity_check CLI + 11 unit tests; 90 executor tests pass)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [█████] Phase 45 COMPLETE
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [██████] Phase 45 COMPLETE
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 229 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 6 in Phase 43, 3 in Phase 44, 5 in Phase 45)
+- Total plans completed: 230 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 6 in Phase 43, 3 in Phase 44, 6 in Phase 45)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -391,6 +391,9 @@ Recent decisions affecting current work:
 - **Extra executor config fields as _-prefixed attrs** (Phase 45-04): slippage_mode/bps/sigma/etc. from dim_executor_config attached as _-prefixed attrs on ExecutorConfig instance post-construction; avoids modifying 45-03 dataclass or subclassing; getattr() with defaults makes pipeline resilient
 - **_MIN_ORDER_THRESHOLD = 0.00001 for delta skip** (Phase 45-04): Prevents negligible rebalance orders (0.00001 BTC at $100K = $1 minimum notional); below threshold returns skipped_no_delta=True without touching order pipeline
 - **run_paper_executor_stage() not run_paper_executor()** (Phase 45-05): Function name avoids collision with the module name ta_lab2.scripts.executor.run_paper_executor; consistent pattern with other stage functions
+- **fill_price as pnl proxy in ParityChecker** (Phase 45-06): cmc_fills has no pnl column; use fill_price array as comparison series for correlation vs bt_pnl; detects systematic executor divergence without requiring pnl computation on fill records
+- **Mode-gated parity tolerance** (Phase 45-06): zero mode uses bps divergence < 1.0 (deterministic exact match); lognormal/fixed modes use P&L correlation >= 0.99 (statistical tolerance matching FillSimulator semantics)
+- **Empty backtest trades = immediate fail** (Phase 45-06): parity_pass=False when backtest_trade_count=0; avoids misleading trade_count_match=True from (0==0) when no comparison data exists
 - **parents[4] for scripts/executor/ depth** (Phase 45-05): Path(__file__).resolve().parents[4] is correct for project root from scripts/executor/ (0=executor/, 1=scripts/, 2=ta_lab2/, 3=src/, 4=project_root/) -- not parents[5] which reaches Downloads/
 - **--no-execute skips executor but not signals in --all** (Phase 45-05): Signals are always generated in --all mode; executor consumption is optional; --no-execute only skips run_paper_executor_stage
 - **Regime stop-gate added to existing pipeline** (Phase 45-05): Regimes block was missing continue_on_error guard before signals/executor stages were added; fixed as deviation auto-fix; regimes now participates in stop-on-error flow consistently
@@ -407,8 +410,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-25T05:38:49Z
-Stopped at: Completed 45-05-PLAN.md — CLI scripts (run_paper_executor.py, seed_executor_config.py); run_daily_refresh.py --signals/--execute/--no-execute pipeline wiring; Phase 45 COMPLETE (5/5 plans).
+Last session: 2026-02-25T05:39:30Z
+Stopped at: Completed 45-06-PLAN.md — ParityChecker (bps divergence + correlation), run_parity_check.py CLI (exit 0/1), 11 mock unit tests; 90 executor tests pass; Phase 45 COMPLETE (6/6 plans).
 Resume file: None
 
 ---
