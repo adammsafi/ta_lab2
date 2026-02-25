@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: Phase 47 (Drift Guard) — In Progress
-Plan: 2/5 complete (47-01 DONE — DB schema DDL; 47-02 DONE — drift metrics computation library + 11 unit tests)
+Plan: 3/5 complete (47-01 DONE — DB schema DDL; 47-02 DONE — drift metrics computation library + 11 unit tests; 47-03 DONE — DriftMonitor + drift_pause + 18 unit tests)
 Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 started.
-Last activity: 2026-02-25 — Completed 47-02-PLAN.md (DriftMetrics dataclass, compute_drift_metrics, rolling tracking error, Sharpe, PIT data snapshot, 11 unit tests all passing)
+Last activity: 2026-02-25 — Completed 47-03-PLAN.md (DriftMonitor orchestrator, drift_pause tiered response, 18 unit tests, 29 total drift tests passing)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [██] Phase 47 In Progress (2/5)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [███] Phase 47 In Progress (3/5)
 
 ## Performance Metrics
 
@@ -414,6 +414,12 @@ Recent decisions affecting current work:
 - **Rolling TE strict NaN semantics** (Phase 47-02): pd.Series.rolling(window, min_periods=window).std() -- tracking_error_5d/30d take last non-NaN value, None when window not yet reached; threshold_breach always False when None
 - **compute_sharpe ddof=1** (Phase 47-02): sample std (ddof=1) consistent with pandas rolling().std() convention; returns None when std==0 or len<2
 - **collect_data_snapshot returns ISO strings** (Phase 47-02): .isoformat() on datetime objects avoids tz-aware serialization pitfalls (MEMORY.md Windows pitfall)
+- **activate_kill_switch at module level in drift_pause.py** (Phase 47-03): Deferred import inside function body makes symbol un-patchable via @patch; module-level import required; no circular import exists (kill_switch.py does not import from drift)
+- **V1 PIT replay uses current data** (Phase 47-03): PIT snapshots not yet written to cmc_executor_run_log.data_snapshot; both replays use current data; data_revision_pnl_diff=0; WARNING logged; framework ready for real PIT snapshots when executor is patched
+- **Paper fill P&L as signed cash flow proxy** (Phase 47-03): cmc_fills lacks explicit pnl column; (buy=-1, sell=+1) * price * qty used as daily net cash flow; sufficient for V1 tracking error detection
+- **Drift pause softer than kill switch** (Phase 47-03): drift_paused=TRUE preserves positions, only blocks new signal processing; trading_state unchanged; tiered: WARNING at 75%, PAUSE at 100% threshold, ESCALATE after drift_auto_escalate_after_days
+- **SIGNAL_TABLE_MAP injection prevention** (Phase 47-03): signal_type validated against SIGNAL_TABLE_MAP before constructing dynamic SQL for asset_id query; raises warning and skips config on unknown type
+- **v_drift_summary refresh concurrent vs non-concurrent** (Phase 47-03): COUNT(*) check selects refresh variant; empty view cannot use CONCURRENTLY (Postgres raises 'not yet populated'); populated view uses CONCURRENTLY via unique index from Plan 47-01
 
 ### Pending Todos
 
@@ -427,8 +433,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-25T19:14:12Z
-Stopped at: Completed 47-02-PLAN.md — DriftMetrics frozen dataclass (22 fields), compute_drift_metrics, compute_rolling_tracking_error, compute_sharpe, collect_data_snapshot; 11/11 unit tests passing. Phase 47 Plan 2/5 done.
+Last session: 2026-02-25T19:27:59Z
+Stopped at: Completed 47-03-PLAN.md — DriftMonitor orchestrator (run/config-loading/replay/metrics/upsert/view-refresh), drift_pause tiered response (activate/disable/check_threshold/check_escalation); 29/29 drift tests passing. Phase 47 Plan 3/5 done.
 Resume file: None
 
 ---
