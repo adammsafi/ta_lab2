@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: Phase 44 (Order & Fill Store) — In progress
-Plan: 2/3 complete (44-01 DONE; 44-02 DONE; 44-03 pending)
-Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44: 44-01 COMPLETE, 44-02 COMPLETE.
-Last activity: 2026-02-25 — Completed 44-01-PLAN.md (Alembic migration 9e692eb7b762 creates 5 OMS tables + v_cmc_positions_agg view)
+Phase: Phase 44 (Order & Fill Store) — COMPLETE
+Plan: 3/3 complete (44-01 DONE; 44-02 DONE; 44-03 DONE)
+Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE.
+Last activity: 2026-02-25 — Completed 44-03-PLAN.md (OrderManager class with atomic process_fill, promote_paper_order, update_order_status; dead-letter capture; 55 unit tests)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [██] Phase 44 in progress (2/3)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 223 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 6 in Phase 43, 2 in Phase 44)
+- Total plans completed: 224 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 6 in Phase 43, 3 in Phase 44)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -367,6 +367,10 @@ Recent decisions affecting current work:
 - **fill_qty sign (not new_qty sign) determines add vs reduce** (Phase 44-02): fill_adds_to_position = (current_qty > 0) == (fill_qty > 0); partial close keeps same direction for new_qty but fill_qty opposes current_qty -- using new_qty sign misclassifies partial closes as additions
 - **Partial close preserves avg_cost_basis unchanged** (Phase 44-02): Only new position and flip set avg_cost = fill_price; partial close retains current_avg_cost; full close sets cost = 0
 - **Explicit is_flip check after realized PnL computation** (Phase 44-02): is_flip = (current_qty > 0) != (new_qty > 0); needed to distinguish partial close (keep avg_cost) from flip (set avg_cost = fill_price) when new_qty != 0
+- **FOR SHARE on order read, FOR UPDATE on position** (Phase 44-03): Multiple fills for different orders can read cmc_orders simultaneously; only position needs exclusive lock since two fills for same asset+exchange race on cmc_positions
+- **FillData.fill_qty always positive, direction from order.side** (Phase 44-03): Matches exchange API semantics (cmc_fills CHECK fill_qty > 0); signed_fill computed in _do_process_fill as fill_qty * -1 for sells
+- **Dead-letter uses own engine.begin() (separate connection)** (Phase 44-03): Original transaction is in rolled-back state; reusing same connection would fail; separate connection guarantees DLQ always commits
+- **All OrderManager methods static (stateless class)** (Phase 44-03): Callers pass engine explicitly; no instance state; makes testing trivial and prevents accidental engine reuse across workers
 
 ### Pending Todos
 
@@ -380,8 +384,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-25T04:44:26Z
-Stopped at: Completed 44-01-PLAN.md — Alembic migration 9e692eb7b762 creates cmc_orders/cmc_fills/cmc_positions/cmc_order_events/cmc_order_dead_letter + v_cmc_positions_agg; 6 reference DDL files in sql/trading/; round-trip upgrade/downgrade verified.
+Last session: 2026-02-25T04:54:00Z
+Stopped at: Completed 44-03-PLAN.md — OrderManager class (process_fill, promote_paper_order, update_order_status, dead-letter); 55 unit tests (no live DB); Phase 44 COMPLETE.
 Resume file: None
 
 ---
