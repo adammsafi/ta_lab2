@@ -898,6 +898,26 @@ Plans:
 - [ ] 52-03-PLAN.md -- Drift Monitor page (TE chart, equity overlay) + Executor Status page (run log, config)
 - [ ] 52-04-PLAN.md -- App.py navigation registration + landing page operational health indicators + human verification
 
+---
+
+### Phase 53: V1 Validation
+**Goal:** Build the validation tooling to run, monitor, and report on 2+ weeks of paper trading -- gate assessment framework, daily logs, audit/gap detection, kill switch exercise protocol, and comprehensive end-of-period report.
+**Depends on:** Phase 45 (paper executor), Phase 46 (risk controls), Phase 47 (drift guard), Phase 52 (operational dashboard)
+**Requirements:** VAL-01, VAL-02, VAL-03, VAL-04, VAL-05
+**Success Criteria** (what must be TRUE):
+  1. Paper trading runs for minimum 2 consecutive weeks with both selected strategies active
+  2. Tracking error vs backtest measured: target < 1%
+  3. Slippage measured and documented: target < 50 bps
+  4. Kill switch tested: triggered manually and automatically (via daily loss stop) during validation period
+  5. All operational logs reviewed: no unexplained gaps, no silent failures, full order/fill audit trail
+**Plans**: 4 plans in 3 waves
+
+Plans:
+- [ ] 53-01-PLAN.md -- Gate framework (GateStatus/GateResult/score_gate/build_gate_scorecard) + pre-flight checklist CLI
+- [ ] 53-02-PLAN.md -- Daily validation log generator + audit/gap detection checker + CLIs
+- [ ] 53-03-PLAN.md -- Kill switch exercise protocol script (8-step manual + auto trigger test)
+- [ ] 53-04-PLAN.md -- End-of-period report builder (Markdown + Plotly + Jupyter notebook) + package exports + nbformat dep
+
 </details>
 
 See `.planning/milestones/v1.0.0-REQUIREMENTS.md` and `.planning/milestones/v1.0.0-ROADMAP.md` for full details.
@@ -996,7 +1016,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | 50. Data Economics | 0/2 | Planned | -- |
 | 51. Perps Readiness | 0/5 | Planned | -- |
 | 52. Operational Dashboard | 0/4 | Planned | -- |
-| 53. V1 Validation | 0/TBD | Not started | -- |
+| 53. V1 Validation | 0/4 | Planned | -- |
 | 54. V1 Results Memo | 0/TBD | Not started | -- |
 
 ## Requirement Coverage
@@ -1056,4 +1076,4 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-25 (Phase 52 planned -- Operational Dashboard; 4 plans in 3 waves)*
+*Last updated: 2026-02-25 (Phase 53 planned -- V1 Validation; 4 plans in 3 waves)*
