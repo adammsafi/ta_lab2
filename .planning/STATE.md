@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: Phase 51 (Perps Readiness) — In progress
-Plan: 3/5 complete (51-01 DONE — reference DDL; 51-02 DONE — funding rate ingestion; 51-03 DONE — venue downtime playbook)
-Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 in progress (3/5).
-Last activity: 2026-02-25 — Completed 51-02-PLAN.md (funding rate ingestion PERP-01: funding_fetchers.py with 7 per-venue fetch functions + refresh_funding_rates.py with watermark-based incremental ingest, daily rollup, cross-venue fallback; Lighter stubbed pending SDK)
+Plan: 4/5 complete (51-01 DONE — reference DDL; 51-02 DONE — funding rate ingestion; 51-03 DONE — venue downtime playbook; 51-04 DONE — FundingAdjuster + MarginMonitor)
+Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 in progress (4/5).
+Last activity: 2026-02-25 — Completed 51-04-PLAN.md (FundingAdjuster PERP-02 + MarginMonitor PERP-03: post-simulation funding P&L adjustment with daily/per_settlement modes, correct long/short sign conventions; tiered margin model with 1.5x warning/1.1x critical thresholds, cross-margin utilization, liquidation price estimation; 64 unit tests, no DB required)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [███░░] Phase 51 in progress (3/5)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [████░] Phase 51 in progress (4/5)
 
 ## Performance Metrics
 
@@ -467,6 +467,11 @@ Recent decisions affecting current work:
 - **Bybit backward pagination with both-or-neither constraint (Phase 51-02)**: _ingest_bybit() slides backward from now providing both startTime+endTime (Bybit requires endTime when startTime provided); never passes startTime alone
 - **Dry-run skips DB entirely (Phase 51-02)**: ingest_venue_full(dry_run=True) uses epoch constants as start, logs what would be fetched, no fetcher calls or DB writes; --dry-run works without DB connection
 - **Daily rollup opt-in via --rollup (Phase 51-02)**: default behavior skips rollup; must explicitly request with --rollup flag; keeps incremental refresh fast
+- **Equity as position_timeline approximation in FundingAdjuster (Phase 51-04)**: FundingAdjuster.adjust() uses pf.value() as absolute notional; accurate for 1x leverage; callers with levered positions should supply actual notional
+- **Lazy vbt import in FundingAdjuster.adjust() (Phase 51-04)**: vectorbt imported inside method body — allows funding_adjuster.py to be imported in test/CI environments without vectorbt installed; vbt_runner.py unchanged
+- **Decimal('inf') for unbounded tier cap in MarginMonitor (Phase 51-04)**: load_margin_tiers() converts None/inf strings from cmc_margin_config to Decimal('inf') for correct applies_to() evaluation without special-casing the last tier
+- **Liquidation price not estimated for cross mode (Phase 51-04)**: per-position liq price in cross margin requires portfolio-level wallet balance calculation; returning None for cross mode is correct; Plan 05 can add portfolio-level liq estimation if needed
+- **Conservative IM=10%/MM=5% defaults when no tier rows (Phase 51-04)**: load_margin_tiers returning [] triggers fallback; prefer safety over leniency; WARNING logged so operator knows tier data is missing
 
 ### Pending Todos
 
@@ -480,8 +485,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-25T23:39:10Z
-Stopped at: Completed 51-02-PLAN.md — funding rate ingestion: funding_fetchers.py (FundingRateRow + 7 fetch functions, Lighter stubbed) + refresh_funding_rates.py (watermark-based incremental ingest, daily rollup, cross-venue fallback, --dry-run no-DB mode). Phase 51 in progress (3/5 complete).
+Last session: 2026-02-25T23:47:26Z
+Stopped at: Completed 51-04-PLAN.md — FundingAdjuster + MarginMonitor: funding_adjuster.py (FundingAdjustedResult, compute_funding_payments, load_funding_rates_for_backtest, get_funding_rate_with_fallback, FundingAdjuster class with lazy vbt import + tz-naive alignment) + margin_monitor.py (MarginTier, MarginState, compute_margin_utilization with 3-tier selection and 1.5x/1.1x thresholds, compute_cross_margin_utilization, load_margin_tiers from cmc_margin_config, liquidation price estimation). 64 unit tests, all passing, no DB required. Phase 51 in progress (4/5 complete).
 Resume file: None
 
 ---
