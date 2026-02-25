@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: Phase 49 (Tail-Risk Policy) — In progress
-Plan: 1/4 complete (49-01 DONE — Alembic migration tail_risk_state + vol_sizer library)
-Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 in progress.
-Last activity: 2026-02-25 — Completed 49-01-PLAN.md (Alembic migration a9ec3c00a54a: tail_risk_state column on dim_risk_state with CHECK normal/reduce/flatten + 3 audit columns + extended cmc_risk_events constraints; vol_sizer library: ATR + realized-vol position sizing + vectorbt wrapper + worst-N-day returns + comparison metrics)
+Plan: 3/4 complete (49-01 DONE, 49-03 DONE — TAIL-01 comparison CLI complete)
+Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 in progress (49-02 and 49-03 Wave 2 running in parallel).
+Last activity: 2026-02-25 — Completed 49-03-PLAN.md (TAIL-01 comparison CLI: 3 sizing variants x 4 strategies x 2 assets x 2 vol metrics; SIZING_COMPARISON.md with composite score winner per strategy/asset; ETH on-the-fly signals; Plotly HTML charts)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [█] Phase 49 1/4
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [███] Phase 49 3/4
 
 ## Performance Metrics
 
@@ -443,6 +443,9 @@ Recent decisions affecting current work:
 - **size_array NaN on non-entry bars** (Phase 49-01): np.where(entries, position_units, np.nan) -- vbt interprets NaN as "hold existing position", which is correct for sizing only at entry bars
 - **Flat metrics dict pattern** (Phase 49-01): worst_n_day_returns returns flat dict merged via ** unpacking into compute_comparison_metrics -- no nested dicts; all keys at top level for direct DataFrame row construction
 - **Alembic CHECK extension: DROP IF EXISTS then ADD** (Phase 49-01): Extending enum-like CHECK constraints requires DROP CONSTRAINT IF EXISTS before ADD CONSTRAINT to avoid duplicate constraint errors; applies to both event_type and trigger_source on cmc_risk_events
+- **TAIL-01 Variant A baseline_worst_5 as tail reference** (Phase 49-03): Variant A worst_5_day_mean is the reference denom in composite score tail_component; ensures tail improvement is measured relative to fixed-sizing baseline, not absolute
+- **On-the-fly signal generation covers all 3 strategy types** (Phase 49-03): EMA crossover (from cmc_ema_multi_tf_u pivot), RSI threshold (from cmc_features rsi_14), ATR breakout (from cmc_features atr_14 + rolling_high/low); ETH and other assets without signal rows get realistic signals
+- **3-variant comparison wave pattern** (Phase 49-03): A=baseline (fixed+stops), B=vol-sized only, C=vol-sized+stops; composite score allows all 3 to compete; winner selection includes all variants in ranking
 
 ### Pending Todos
 
@@ -456,8 +459,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-25T16:28:00Z
-Stopped at: Completed 49-01-PLAN.md — Alembic migration a9ec3c00a54a (tail_risk_state column + audit columns on dim_risk_state; extended CHECK constraints on cmc_risk_events); vol_sizer library (ATR + realized-vol position sizing, vectorbt wrapper, worst-N-day returns, comparison metrics). 2/2 tasks PASS.
+Last session: 2026-02-25T21:38:00Z
+Stopped at: Completed 49-03-PLAN.md — TAIL-01 comparison CLI (run_tail_risk_comparison.py): 3 variants (fixed+stops, vol-sized, vol-sized+stops), 4 strategies, BTC+ETH, 2 vol metrics, SIZING_COMPARISON.md with composite score winner + Recovery Bars column, Plotly HTML charts. 1/1 tasks PASS.
 Resume file: None
 
 ---
