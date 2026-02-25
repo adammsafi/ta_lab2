@@ -703,7 +703,7 @@ Plans:
 - [x] **Phase 43: Exchange Integration** - Connect to two exchange APIs (Coinbase + Kraken), price feed comparison, paper order adapter
 - [x] **Phase 44: Order & Fill Store** - DB tables for orders, fills, positions with full audit trail
 - [x] **Phase 45: Paper-Trade Executor** - Engine reads signals, generates orders, tracks positions, verifies backtest parity
-- [ ] **Phase 46: Risk Controls** - Kill switch, position caps, daily loss stops, circuit breaker, discretionary overrides
+- [x] **Phase 46: Risk Controls** - Kill switch, position caps, daily loss stops, circuit breaker, discretionary overrides
 - [ ] **Phase 47: Drift Guard** - Parallel backtest vs paper comparison, auto-pause on divergence
 - [ ] **Phase 48: Loss Limits Policy** - VaR simulation, intraday stop analysis, pool-level cap definition
 - [ ] **Phase 49: Tail-Risk Policy** - Hard stops vs vol-sizing, flatten triggers, policy document
@@ -813,10 +813,10 @@ Plans:
 **Plans**: 4 plans in 3 waves
 
 Plans:
-- [ ] 46-01-PLAN.md -- Alembic migration for 4 risk tables (dim_risk_limits, dim_risk_state, cmc_risk_events, cmc_risk_overrides) + reference DDL
-- [ ] 46-02-PLAN.md -- RiskEngine library + KillSwitch operations + kill_switch_cli + unit tests
-- [ ] 46-03-PLAN.md -- OverrideManager + override_cli + unit tests
-- [ ] 46-04-PLAN.md -- Package integration tests + executor wiring documentation
+- [x] 46-01-PLAN.md -- Alembic migration for 4 risk tables (dim_risk_limits, dim_risk_state, cmc_risk_events, cmc_risk_overrides) + reference DDL
+- [x] 46-02-PLAN.md -- RiskEngine library + KillSwitch operations + kill_switch_cli + unit tests
+- [x] 46-03-PLAN.md -- OverrideManager + override_cli + unit tests
+- [x] 46-04-PLAN.md -- Package integration tests + executor wiring documentation
 
 </details>
 
