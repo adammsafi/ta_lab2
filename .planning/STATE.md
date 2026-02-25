@@ -10,16 +10,16 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: Phase 44 (Order & Fill Store) — In progress
-Plan: 1/3 complete (44-02 done; 44-01 is Alembic migration pending DB)
-Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44: 44-02 COMPLETE.
-Last activity: 2026-02-25 — Completed 44-02-PLAN.md (compute_position_update() pure function via TDD; 16 tests pass)
+Plan: 2/3 complete (44-01 DONE; 44-02 DONE; 44-03 pending)
+Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44: 44-01 COMPLETE, 44-02 COMPLETE.
+Last activity: 2026-02-25 — Completed 44-01-PLAN.md (Alembic migration 9e692eb7b762 creates 5 OMS tables + v_cmc_positions_agg view)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [█] Phase 44 in progress
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [██] Phase 44 in progress (2/3)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 222 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 6 in Phase 43, 1 in Phase 44)
+- Total plans completed: 223 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 6 in Phase 43, 2 in Phase 44)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -380,8 +380,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-25T04:35:37Z
-Stopped at: Completed 44-02-PLAN.md — compute_position_update() TDD plan complete; 16 tests pass; 2 commits (test + feat).
+Last session: 2026-02-25T04:44:26Z
+Stopped at: Completed 44-01-PLAN.md — Alembic migration 9e692eb7b762 creates cmc_orders/cmc_fills/cmc_positions/cmc_order_events/cmc_order_dead_letter + v_cmc_positions_agg; 6 reference DDL files in sql/trading/; round-trip upgrade/downgrade verified.
 Resume file: None
 
 ---
