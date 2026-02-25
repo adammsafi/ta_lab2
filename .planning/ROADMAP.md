@@ -878,6 +878,26 @@ Plans:
 - [ ] 50-01-PLAN.md -- DB measurements + cost audit + vendor comparison documents
 - [ ] 50-02-PLAN.md -- TCO model + decision triggers + ADR + executive summary
 
+---
+
+### Phase 52: Operational Dashboard
+**Goal:** Extend the existing Phase 39 Streamlit dashboard with 4 operational pages showing live PnL, exposure, drawdown, drift status, and risk controls -- the cockpit for daily paper trading monitoring.
+**Depends on:** Phase 45 (paper executor), Phase 46 (risk controls), Phase 47 (drift guard)
+**Requirements:** DASH-L01, DASH-L02, DASH-L03, DASH-L04, DASH-L05
+**Success Criteria** (what must be TRUE):
+  1. Live PnL view: cumulative PnL equity curve, daily P&L, drawdown chart (stacked two-panel), since inception
+  2. Exposure view: current positions per asset with notional value, pct of portfolio, cost basis, regime label, and last 20 fills trade log
+  3. Drawdown view: peak equity, current drawdown pct, max historical drawdown pct, time since peak
+  4. Drift view: paper vs backtest tracking error displayed as rolling time series with alert threshold line, equity overlay chart
+  5. Risk status: kill switch state, daily loss consumed vs cap (progress bar), position utilization vs caps, circuit breaker status, filterable risk event history
+**Plans**: 4 plans in 3 waves
+
+Plans:
+- [ ] 52-01-PLAN.md -- Query modules (trading, risk, drift, executor) + operational chart builders in charts.py
+- [ ] 52-02-PLAN.md -- Trading page (PnL, positions, trade log) + Risk & Controls page (kill switch, limits, events)
+- [ ] 52-03-PLAN.md -- Drift Monitor page (TE chart, equity overlay) + Executor Status page (run log, config)
+- [ ] 52-04-PLAN.md -- App.py navigation registration + landing page operational health indicators + human verification
+
 </details>
 
 See `.planning/milestones/v1.0.0-REQUIREMENTS.md` and `.planning/milestones/v1.0.0-ROADMAP.md` for full details.
@@ -975,7 +995,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | 49. Tail-Risk Policy | 0/TBD | Not started | -- |
 | 50. Data Economics | 0/2 | Planned | -- |
 | 51. Perps Readiness | 0/5 | Planned | -- |
-| 52. Operational Dashboard | 0/TBD | Not started | -- |
+| 52. Operational Dashboard | 0/4 | Planned | -- |
 | 53. V1 Validation | 0/TBD | Not started | -- |
 | 54. V1 Results Memo | 0/TBD | Not started | -- |
 
@@ -1036,4 +1056,4 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-25 (Phase 50 planned -- Data Economics; 2 plans in 2 waves)*
+*Last updated: 2026-02-25 (Phase 52 planned -- Operational Dashboard; 4 plans in 3 waves)*
