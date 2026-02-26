@@ -87,6 +87,11 @@ economic = [
   # "fedfred>=1.0",  # Uncomment when Fed provider implemented
 ]
 
+# Validation reporting (end-of-period V1 report + Jupyter notebook)
+validation = [
+  "nbformat>=5.0",
+]
+
 # Combined group for development + orchestrator + docs + economic
 all = [
   "alembic>=1.18",
@@ -108,6 +113,7 @@ all = [
   "mkdocs-material>=9.0,<9.7",
   "mkdocstrings[python]>=0.24",
   "fredapi>=0.5.2",
+  "nbformat>=5.0",
 ]
 
 # ---------- Pytest configuration ----------
