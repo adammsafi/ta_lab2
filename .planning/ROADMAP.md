@@ -708,7 +708,7 @@ Plans:
 - [x] **Phase 48: Loss Limits Policy** - VaR simulation, intraday stop analysis, pool-level cap definition
 - [x] **Phase 49: Tail-Risk Policy** - Hard stops vs vol-sizing, flatten triggers, policy document
 - [x] **Phase 50: Data Economics** - Cost audit, build-vs-buy analysis, trigger definition
-- [ ] **Phase 51: Perps Readiness** - Funding rate ingestion, margin model, liquidation buffer, venue downtime playbook
+- [x] **Phase 51: Perps Readiness** - Funding rate ingestion, margin model, liquidation buffer, venue downtime playbook
 - [ ] **Phase 52: Operational Dashboard** - Live PnL, exposure, drawdown, drift, risk status views
 - [ ] **Phase 53: V1 Validation** - 2+ weeks paper trading, success criteria measurement
 - [ ] **Phase 54: V1 Results Memo** - Formal report: methodology, results, failure modes, research answers, next steps
@@ -854,11 +854,11 @@ Plans:
 **Plans**: 5 plans in 4 waves
 
 Plans:
-- [ ] 51-01-PLAN.md -- Alembic migration + reference DDL (cmc_funding_rates, cmc_margin_config, cmc_perp_positions, risk event extensions)
-- [ ] 51-02-PLAN.md -- Funding rate fetchers (6 venues) + refresh_funding_rates.py CLI with watermark pagination and daily rollup
-- [ ] 51-03-PLAN.md -- Venue downtime playbook (Markdown procedure + YAML health config)
-- [ ] 51-04-PLAN.md -- FundingAdjuster (backtester extension) + margin model (MarginState + tiered rates) + unit tests
-- [ ] 51-05-PLAN.md -- Liquidation buffer (RiskEngine Gate 1.6) + package exports + integration tests
+- [x] 51-01-PLAN.md -- Alembic migration + reference DDL (cmc_funding_rates, cmc_margin_config, cmc_perp_positions, risk event extensions)
+- [x] 51-02-PLAN.md -- Funding rate fetchers (6 venues) + refresh_funding_rates.py CLI with watermark pagination and daily rollup
+- [x] 51-03-PLAN.md -- Venue downtime playbook (Markdown procedure + YAML health config)
+- [x] 51-04-PLAN.md -- FundingAdjuster (backtester extension) + margin model (MarginState + tiered rates) + unit tests
+- [x] 51-05-PLAN.md -- Liquidation buffer (RiskEngine Gate 1.6) + package exports + integration tests
 
 
 ---
@@ -1055,7 +1055,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | 48. Loss Limits Policy | 4/4 | Complete | 2026-02-25 |
 | 49. Tail-Risk Policy | 4/4 | Complete | 2026-02-25 |
 | 50. Data Economics | 2/2 | Complete | 2026-02-25 |
-| 51. Perps Readiness | 0/5 | Planned | -- |
+| 51. Perps Readiness | 5/5 | Complete | 2026-02-25 |
 | 52. Operational Dashboard | 0/4 | Planned | -- |
 | 53. V1 Validation | 0/4 | Planned | -- |
 | 54. V1 Results Memo | 0/3 | Planned | -- |
@@ -1119,4 +1119,4 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-25 (Phase 50 complete -- Data Economics; 2 plans in 2 waves)*
+*Last updated: 2026-02-25 (Phase 51 complete -- Perps Readiness; 5 plans in 4 waves)*
