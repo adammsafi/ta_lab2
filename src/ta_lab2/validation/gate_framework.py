@@ -357,9 +357,9 @@ def run_full_audit(
 ) -> AuditSummary:
     """Run the full log audit and return an AuditSummary.
 
-    Placeholder for Phase 53 Plan 01.  The complete implementation
-    (gap detection, orphan orders, position/fill consistency) is in
-    audit_checker.py (Plan 02).
+    Delegates to AuditChecker (implemented in Plan 02) which runs 6
+    gap detection checks: missing run days, error runs, orphaned orders,
+    position/fill consistency, stale price data, drift metric gaps.
 
     Args:
         engine: SQLAlchemy Engine.
@@ -367,9 +367,13 @@ def run_full_audit(
         end:    Inclusive end date.
 
     Returns:
-        AuditSummary(n_anomalies=0, n_signed_off=0, all_signed_off=True).
+        AuditSummary with n_anomalies, n_signed_off, all_signed_off.
     """
-    return AuditSummary(n_anomalies=0, n_signed_off=0, all_signed_off=True)
+    from ta_lab2.validation.audit_checker import AuditChecker
+
+    checker = AuditChecker(engine)
+    _, summary = checker.run_audit(start, end)
+    return summary
 
 
 # ---------------------------------------------------------------------------
