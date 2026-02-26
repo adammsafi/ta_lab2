@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: Phase 52 (Operational Dashboard) — In progress
-Plan: 1/2 complete (52-01 DONE — 4 query modules + 3 chart builders; 52-02 PENDING — 4 operational pages + app.py wiring)
-Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 in progress.
-Last activity: 2026-02-25 — Completed 52-01-PLAN.md (Operational dashboard foundation: 4 query modules — trading/risk/drift/executor — with 10 cached functions; 3 Plotly chart builders added to charts.py — build_pnl_drawdown_chart, build_tracking_error_chart, build_equity_overlay_chart; all imports verified)
+Plan: 2/2 complete (52-01 DONE — 4 query modules + 3 chart builders; 52-02 DONE — Trading page + Risk & Controls page)
+Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 in progress (2/2 plans — COMPLETE if no additional pages needed).
+Last activity: 2026-02-26 — Completed 52-02-PLAN.md (Trading page: portfolio KPIs, PnL+drawdown chart, 12-col positions table, 20-fill trade log; Risk & Controls page: kill switch cards, proximity gauges, circuit breaker expander, filterable event history; both with safety banners + 15-min auto-refresh)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [█░] Phase 52 in progress (1/2)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [██] Phase 52 in progress (2/2)
 
 ## Performance Metrics
 
