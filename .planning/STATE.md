@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: Phase 54 (V1 Results Memo) — COMPLETE
-Plan: 3/3 complete (54-03 DONE — Research Tracks + Key Takeaways + V2 Roadmap + Appendix + CSV exports + build timeline chart)
-Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 COMPLETE (all 3 plans). V1_MEMO.md GENERATED.
-Last activity: 2026-02-26 — Completed 54-03-PLAN.md (generate_v1_memo.py 3,827 lines; Research Tracks + Key Takeaways + V2 Roadmap + Appendix fully implemented; 3 CSV exports; build_timeline.html; V1_MEMO.md = 8,783 words, 0 stubs, 3 charts, 3 CSVs)
+Phase: Phase 55 (Feature & Signal Evaluation) — IN PROGRESS
+Plan: 2/5 complete (55-02 DONE — expanded features.yaml: 91 features, KAMA hash bug fixed, AMA variants verified, EMA crossover deferred)
+Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 COMPLETE (all 3 plans). V1_MEMO.md GENERATED. Phase 55 Plan 01 COMPLETE. Phase 55 Plan 02 COMPLETE.
+Last activity: 2026-02-26 — Completed 55-02-PLAN.md (features.yaml expanded 7→91 entries: 53 canonical cmc_features, 31 AMA variants, 1 adaptive RSI; KAMA hash bug fixed; public features property on FeatureRegistry; EMA crossovers documented as deferred to 55-04)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [██░░░] Phase 55 (2/5)
 
 ## Performance Metrics
 
@@ -497,6 +497,10 @@ Recent decisions affecting current work:
 - **Reports directory is gitignored (Phase 54-01)**: reports/v1_memo/ (like all reports/) is in .gitignore; only generate_v1_memo.py is version-controlled; memo is a runtime artifact regenerated on demand
 - **Research track functions use typed optional args (Phase 54-03)**: _section_research_tracks(bakeoff, policy_docs, engine) — all optional, caller passes None or omits; backwards-compatible with any call site
 - **V2 phases 55-61 scoped in V1 memo (Phase 54-03)**: V1_MEMO.md Section 7.3 proposes 7 concrete V2 phases with effort estimates derived from actual V1 velocity; Phase 55 is already in v1.0.0 roadmap per STATE.md
+- **features public property on FeatureRegistry (Phase 55-02)**: Added r.features as read-only dict property (alias of _features); enables r.features.keys() pattern in validation commands; list_all() preserved for backward compat
+- **KAMA hash bug fixed in YAML (Phase 55-02)**: kama_er_signal and ama_ret_momentum used d47fe5cc (DEMA/TEMA/HMA period=21 MD5) not de1106d5 (KAMA(10,2,30)); corrected in features.yaml; KAMA canonical hash is de1106d5
+- **AMA filter requires both indicator AND params_hash (Phase 55-02)**: Period-only AMAs share hash when period matches (e.g., DEMA(9)/TEMA(9)/HMA(9) all = 514ffe35); filter indicator (lowercase) + params_hash = unambiguous
+- **EMA crossovers deferred to 55-04 (Phase 55-02)**: dotpath fn(input_df) has no kwargs or DB connection; two cmc_ema_multi_tf_u inputs produce 'ema' column collision on merge; needs ExperimentRunner enhancement for column renaming
 - **Gantt chart via go.Bar horizontal not figure_factory (Phase 54-03)**: plotly.figure_factory.create_gantt() is deprecated; go.Bar(orientation='h', base=[start], x=[duration]) achieves same result with no extra dependencies
 
 ### Pending Todos
@@ -511,8 +515,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-26T19:28:30Z
-Stopped at: Completed 54-03-PLAN.md — generate_v1_memo.py complete (3,827 lines); Research Tracks (6 deep-dives), Key Takeaways (12 lessons), V2 Roadmap (phases 55-61), Appendix fully implemented; 3 CSV exports; build_timeline.html; V1_MEMO.md = 8,783 words, 3 charts, 3 CSVs; Phase 54 COMPLETE (3/3 plans). V1_MEMO.md GENERATED.
+Last session: 2026-02-26T15:10:00Z
+Stopped at: Completed 55-02-PLAN.md — features.yaml expanded 7→91 entries (53 canonical cmc_features, 31 AMA variants, 1 adaptive RSI); KAMA hash bug fixed; FeatureRegistry.features property added; EMA crossovers documented as deferred to 55-04. Phase 55 at 2/5 plans.
 Resume file: None
 
 ---
