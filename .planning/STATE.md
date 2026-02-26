@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: Phase 51 (Perps Readiness) — COMPLETE
-Plan: 5/5 complete (51-01 DONE — reference DDL; 51-02 DONE — funding rate ingestion; 51-03 DONE — venue downtime playbook; 51-04 DONE — FundingAdjuster + MarginMonitor; 51-05 DONE — RiskEngine Gate 1.6 margin/liquidation check)
-Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans).
-Last activity: 2026-02-25 — Completed 51-05-PLAN.md (RiskEngine Gate 1.6: margin/liquidation buffer check integrated into check_order() buy-only path with three severity levels: critical <=1.1x blocks, warning <=1.5x logs only, buffer <=2.0x blocks; RiskLimits extended with margin_alert_threshold + liquidation_kill_threshold; NULL-safe DB loading; 35 unit + 32 integration tests, 67 total; all 149 risk tests passing)
+Phase: Phase 52 (Operational Dashboard) — In progress
+Plan: 1/2 complete (52-01 DONE — 4 query modules + 3 chart builders; 52-02 PENDING — 4 operational pages + app.py wiring)
+Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 in progress.
+Last activity: 2026-02-25 — Completed 52-01-PLAN.md (Operational dashboard foundation: 4 query modules — trading/risk/drift/executor — with 10 cached functions; 3 Plotly chart builders added to charts.py — build_pnl_drawdown_chart, build_tracking_error_chart, build_equity_overlay_chart; all imports verified)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [█░] Phase 52 in progress (1/2)
 
 ## Performance Metrics
 
@@ -476,6 +476,9 @@ Recent decisions affecting current work:
 - **NULL-safe dim_risk_limits column loading (Phase 51-05)**: _load_limits() reads columns at index 9 (margin_alert_threshold) and 10 (liquidation_kill_threshold); falls back to RiskLimits() dataclass defaults (1.5 / 1.1) when NULL; backward compatible with pre-Phase 51 rows
 - **Gate extension requires updating existing buy-order mock sequences (Phase 51-05)**: adding Gate 1.6 required updating 5 tests in test_risk_engine.py and 2 in test_integration.py with _no_perp_position() mock for buy orders that pass cap gates and reach Gate 1.6
 - **Conservative IM=10%/MM=5% defaults when no tier rows (Phase 51-04)**: load_margin_tiers returning [] triggers fallback; prefer safety over leniency; WARNING logged so operator knows tier data is missing
+- **Operational query TTL tiers (Phase 52-01)**: 60s risk_state (safety-critical), 120s positions/fills/events/run_log (executor cadence), 300s limits/drift/config/pnl (rarely changing); consistent with research recommendations
+- **Correlated subquery for latest regime per asset (Phase 52-01)**: load_open_positions uses WHERE r.ts = (SELECT MAX(ts)...) correlated subquery rather than GROUP BY JOIN to avoid fan-out when multiple regime rows share a day
+- **.tolist() for all Plotly x-axis dates in operational charts (Phase 52-01)**: documented MEMORY.md tz pitfall; series.values strips tz on Windows; .tolist() is safe for both tz-aware and tz-naive datetime Series
 
 ### Pending Todos
 
@@ -489,8 +492,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-25T00:03:30Z
-Stopped at: Completed 51-05-PLAN.md — RiskEngine Gate 1.6 (margin/liquidation buffer check): _check_margin_gate() with three severity levels (critical/warning/buffer), RiskLimits extended with margin_alert_threshold + liquidation_kill_threshold, NULL-safe _load_limits() SQL reading 11 columns, package exports for ta_lab2.risk and ta_lab2.backtests, 67 new tests (35 unit + 32 integration), all 149 risk tests passing. Phase 51 COMPLETE (5/5).
+Last session: 2026-02-25T23:53:33Z
+Stopped at: Completed 52-01-PLAN.md — Operational dashboard foundation: 4 query modules (queries/trading.py, queries/risk.py, queries/drift.py, queries/executor.py) with 10 @st.cache_data functions + _engine pattern; 3 chart builders added to charts.py (build_pnl_drawdown_chart, build_tracking_error_chart, build_equity_overlay_chart); all imports verified.
 Resume file: None
 
 ---
