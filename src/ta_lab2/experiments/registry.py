@@ -112,6 +112,11 @@ class FeatureRegistry:
             if spec.get("lifecycle") == "experimental"
         ]
 
+    @property
+    def features(self) -> dict[str, dict[str, Any]]:
+        """Public read-only view of the expanded feature dict (all lifecycles)."""
+        return dict(self._features)
+
     def list_all(self) -> dict[str, dict[str, Any]]:
         """Return the full feature dict (all lifecycles)."""
         return dict(self._features)
