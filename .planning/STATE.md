@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: Phase 53 (V1 Validation) — IN PROGRESS
-Plan: 2/4 complete (53-01 DONE — gate framework + pre-flight checklist; 53-02 DONE — daily validation log + audit checker)
+Plan: 3/4 complete (53-01 DONE — gate framework + pre-flight checklist; 53-02 DONE — daily validation log + audit checker; 53-03 DONE — kill switch exercise protocol CLI)
 Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans).
-Last activity: 2026-02-26 — Completed 53-02-PLAN.md (DailyValidationLog 7-section DB report; AuditChecker 6-check gap detection; run_daily_validation_log + run_audit_check CLIs; gate_framework.run_full_audit() wired to real AuditChecker)
+Last activity: 2026-02-26 — Completed 53-03-PLAN.md (KillSwitchExercise 8-step protocol; ExerciseStep dataclass; polling loop for auto-trigger; try/finally threshold restoration; Markdown evidence doc with VAL-04 assessment; --skip-auto/--poll-interval/--poll-timeout flags)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [███] Phase 53: 3/4
 
 ## Performance Metrics
 
@@ -486,6 +486,9 @@ Recent decisions affecting current work:
 - **avg_cost_basis not avg_entry_price (Phase 53-02)**: cmc_positions uses avg_cost_basis as the column name; plan spec was precise; any future code reading this table should use avg_cost_basis
 - **Lazy import inside run_full_audit() prevents circular import (Phase 53-02)**: audit_checker.py imports AuditSummary from gate_framework.py; gate_framework.py must lazy-import AuditChecker inside run_full_audit() body to avoid circular dependency
 - **Audit CLI exit codes: 0=pass, 1=anomalies, 2=error (Phase 53-02)**: Distinguishes "no anomalies" from "anomalies detected but script ran successfully" from "script crashed"; callers can gate on 0 for automated pipelines
+- **Polling loop not input() for kill switch auto-trigger (Phase 53-03)**: Step 5 polls DB every 5s for up to 5min; using input() would allow operator to advance past step without trigger firing (no false PASS); explicit FAIL on timeout forces honest result
+- **try/finally for kill switch threshold restoration (Phase 53-03)**: Step 5 (lower threshold) and step 7 (restore) wrapped in try/finally to guarantee restoration even on polling timeout or exception; threshold corruption would be worse than exercise failure
+- **"V1 EXERCISE:" prefix tags all exercise events (Phase 53-03)**: All exercise-triggered events carry this prefix in reason string; allows filtering exercise data from real incidents via WHERE reason LIKE 'V1 EXERCISE:%'; no new DB event types needed
 
 ### Pending Todos
 
@@ -499,8 +502,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-26T18:33:28Z
-Stopped at: Completed 53-02-PLAN.md — DailyValidationLog (7 DB-queried sections, Markdown output); AuditChecker (6 gap detection checks, typed AuditFinding + AuditSummary); run_daily_validation_log + run_audit_check CLIs; gate_framework.run_full_audit() wired to real AuditChecker. Phase 53: 2/4 plans complete.
+Last session: 2026-02-26T18:41:08Z
+Stopped at: Completed 53-03-PLAN.md — KillSwitchExercise 8-step protocol; polling loop for auto-trigger (5s x 60 iter); try/finally threshold restoration guarantee; Markdown VAL-04 evidence doc. Phase 53: 3/4 plans complete.
 Resume file: None
 
 ---
