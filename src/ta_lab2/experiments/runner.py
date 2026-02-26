@@ -68,6 +68,17 @@ _TABLES_WITHOUT_TF = frozenset(
     ]
 )
 
+# Tables that use "timestamp" (not "ts") as the time column.
+# All price bars tables use "timestamp"; EMA/vol/features tables use "ts".
+_TABLES_WITH_TIMESTAMP_COL = frozenset(
+    [
+        "cmc_price_bars_multi_tf",
+        "cmc_price_bars_multi_tf_u",
+        "cmc_returns_bars_multi_tf",
+        "cmc_returns_bars_multi_tf_u",
+    ]
+)
+
 # Default close source when inputs do not include a close price
 _CLOSE_SOURCE_TABLE = "cmc_price_bars_multi_tf_u"
 
@@ -414,11 +425,15 @@ class ExperimentRunner:
 
             col_list = ", ".join(columns)
 
+            # Determine the time column name: price bars tables use "timestamp",
+            # all other allowed tables use "ts".
+            ts_col = "timestamp" if table in _TABLES_WITH_TIMESTAMP_COL else "ts"
+
             # Build query — handle tables without tf column
             if table in _TABLES_WITHOUT_TF:
                 sql_str = (
-                    f"SELECT ts, {col_list} FROM public.{table} "
-                    f"WHERE id = :id AND ts BETWEEN :start AND :end ORDER BY ts"
+                    f"SELECT {ts_col} AS ts, {col_list} FROM public.{table} "
+                    f"WHERE id = :id AND {ts_col} BETWEEN :start AND :end ORDER BY {ts_col}"
                 )
                 params = {
                     "id": asset_id,
@@ -427,8 +442,8 @@ class ExperimentRunner:
                 }
             else:
                 sql_str = (
-                    f"SELECT ts, {col_list} FROM public.{table} "
-                    f"WHERE id = :id AND tf = :tf AND ts BETWEEN :start AND :end ORDER BY ts"
+                    f"SELECT {ts_col} AS ts, {col_list} FROM public.{table} "
+                    f"WHERE id = :id AND tf = :tf AND {ts_col} BETWEEN :start AND :end ORDER BY {ts_col}"
                 )
                 params = {
                     "id": asset_id,
@@ -582,10 +597,11 @@ class ExperimentRunner:
         if "close" in input_df.columns:
             return input_df["close"]
 
-        # Load close from default price table
+        # Load close from default price table.
+        # cmc_price_bars_multi_tf_u uses "timestamp" (not "ts") as the time column.
         sql_str = (
-            f"SELECT ts, close FROM public.{_CLOSE_SOURCE_TABLE} "
-            f"WHERE id = :id AND tf = :tf AND ts BETWEEN :start AND :end ORDER BY ts"
+            f"SELECT timestamp AS ts, close FROM public.{_CLOSE_SOURCE_TABLE} "
+            f"WHERE id = :id AND tf = :tf AND timestamp BETWEEN :start AND :end ORDER BY timestamp"
         )
         df = pd.read_sql(
             text(sql_str),
@@ -654,7 +670,9 @@ class ExperimentRunner:
                     "ts": ts.to_pydatetime() if isinstance(ts, pd.Timestamp) else ts,
                     "tf": tf,
                     "feature_name": feature_name,
-                    "feature_val": float(val) if not _is_nan(val) else None,
+                    "feature_val": float(val)
+                    if val is not None and not _is_nan(val)
+                    else None,
                 }
             )
 
