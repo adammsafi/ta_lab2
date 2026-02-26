@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: Phase 52 (Operational Dashboard) — In progress
-Plan: 3/3 complete (52-01 DONE — 4 query modules + 3 chart builders; 52-02 DONE — Trading page + Risk & Controls page; 52-03 DONE — Drift Monitor + Executor Status pages)
-Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 in progress (3/3 plans complete).
-Last activity: 2026-02-25 — Completed 52-03-PLAN.md (Drift Monitor page with TE time series + threshold lines (DASH-L04) + equity overlay; Executor Status page with run log, KPIs, failed runs detail; both auto-refresh via @st.fragment(run_every=900))
+Phase: Phase 52 (Operational Dashboard) — COMPLETE
+Plan: 4/4 complete (52-01 DONE — 4 query modules + 3 chart builders; 52-02 DONE — Trading page + Risk & Controls page; 52-03 DONE — Drift Monitor + Executor Status pages; 52-04 DONE — Navigation integration + landing page Operational Health section)
+Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans).
+Last activity: 2026-02-26 — Completed 52-04-PLAN.md (Operations nav group in app.py with 4 pages; Operational Health section on landing page with 4 traffic-light indicators: Kill Switch, Drift Pause, Executor Last Run, Circuit Breaker; human verify passed; Streamlit 1.44 st.Page relative path bug fixed)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [███] Phase 52 in progress (3/3)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE
 
 ## Performance Metrics
 
@@ -479,6 +479,9 @@ Recent decisions affecting current work:
 - **Operational query TTL tiers (Phase 52-01)**: 60s risk_state (safety-critical), 120s positions/fills/events/run_log (executor cadence), 300s limits/drift/config/pnl (rarely changing); consistent with research recommendations
 - **Correlated subquery for latest regime per asset (Phase 52-01)**: load_open_positions uses WHERE r.ts = (SELECT MAX(ts)...) correlated subquery rather than GROUP BY JOIN to avoid fan-out when multiple regime rows share a day
 - **.tolist() for all Plotly x-axis dates in operational charts (Phase 52-01)**: documented MEMORY.md tz pitfall; series.values strips tz on Windows; .tolist() is safe for both tz-aware and tz-naive datetime Series
+- **Relative path strings for st.Page (Phase 52-04)**: Use "pages/X.py" not str(Path(__file__).parent / "pages" / "X.py") -- Streamlit 1.44 prepends main_script_parent before resolving; relative Path object causes doubled-path error when launched via relative invocation path; only caught at runtime, not by ast.parse
+- **Four independent try/except per Operational Health indicator (Phase 52-04)**: outer block loads shared engine+risk_state; inner per-indicator blocks isolate failures -- one failing query never suppresses the remaining three indicators
+- **Traffic light semantics: delta_color normal/off/inverse = green/amber/red (Phase 52-04)**: st.metric delta_color normal=green OK, off=amber WARN/STALE, inverse=red HALTED/TRIPPED; drift pause escalates to red at >=3 days; executor STALE turns amber at 26h and red at 48h
 
 ### Pending Todos
 
@@ -492,8 +495,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-25T23:53:33Z
-Stopped at: Completed 52-01-PLAN.md — Operational dashboard foundation: 4 query modules (queries/trading.py, queries/risk.py, queries/drift.py, queries/executor.py) with 10 @st.cache_data functions + _engine pattern; 3 chart builders added to charts.py (build_pnl_drawdown_chart, build_tracking_error_chart, build_equity_overlay_chart); all imports verified.
+Last session: 2026-02-26T10:54:10Z
+Stopped at: Completed 52-04-PLAN.md — Navigation integration: Operations nav group in app.py with 4 pages (Trading, Risk & Controls, Drift Monitor, Executor Status); Operational Health section on landing page with 4 traffic-light metrics; human verify passed; Streamlit 1.44 st.Page relative path fix applied. Phase 52 COMPLETE.
 Resume file: None
 
 ---
