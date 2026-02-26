@@ -307,6 +307,11 @@ class RSISignalGenerator:
         signal_config: dict,
         full_refresh: bool = False,
         dry_run: bool = False,
+        # Adaptive RSI evaluated in Phase 55 A/B comparison; static retained as default.
+        # IC-IR: static wins 14/14 horizon/asset combos (mean |IC-IR| 0.51 vs 0.29).
+        # Walk-forward Sharpe: adaptive wins 4/5 folds but misses IC criterion.
+        # Both conditions required per policy; inconclusive -> status quo retained.
+        # See reports/evaluation/adaptive_rsi_ab_comparison.md
         use_adaptive: bool = False,
         regime_enabled: bool = True,
     ) -> int:
