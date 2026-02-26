@@ -54,12 +54,14 @@ logger = logging.getLogger(__name__)
 _REGIME_ASSET_IDS = frozenset([1, 1027])
 _REGIME_TF = "1D"
 
-# Extra metadata columns in cmc_features to exclude from feature discovery
+# Extra metadata columns in cmc_features to exclude from feature discovery.
+# Includes text/categorical columns that cannot be converted to float for IC computation.
 _EXTRA_NON_FEATURE_COLS = frozenset(
     [
         "alignment_source",
         "tf_days",
         "asset_class",
+        "venue",
         "updated_at",
         "has_price_gap",
         "has_outlier",
