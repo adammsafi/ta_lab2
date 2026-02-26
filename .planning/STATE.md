@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: Phase 55 (Feature & Signal Evaluation) — IN PROGRESS
-Plan: 4/5 complete (55-01 DONE — IC baseline extended 47,614→82,110 rows; 55-02 DONE — features.yaml 7→91 entries; 55-04 DONE — adaptive vs static RSI A/B comparison, static retained as default)
-Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 COMPLETE (all 3 plans). V1_MEMO.md GENERATED. Phase 55 Plans 01, 02, 04 COMPLETE.
-Last activity: 2026-02-26 — Completed 55-04-PLAN.md (adaptive vs static RSI A/B: static wins IC 14/14, adaptive wins Sharpe 4/5 folds; inconclusive by dual-criterion; use_adaptive=False retained; reports/evaluation/ artifacts created)
+Plan: 4/5 complete (55-01 DONE — IC baseline extended 47,614→82,110 rows; 55-02 DONE — features.yaml 7→91 entries; 55-03 DONE — ExperimentRunner sweep 100 features x 5 TFs, 67,788 rows; 55-04 DONE — adaptive vs static RSI A/B comparison, static retained as default)
+Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 COMPLETE (all 3 plans). V1_MEMO.md GENERATED. Phase 55 Plans 01, 02, 03, 04 COMPLETE.
+Last activity: 2026-02-26 — Completed 55-03-PLAN.md (ExperimentRunner sweep: 100 features x 5 TFs x 17 assets; 67,788 IC rows; 79/100 BH gate passes; fixed timestamp column bug in runner.py; expanded features.yaml 91->135)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [████░] Phase 55 (4/5)
 
@@ -507,6 +507,10 @@ Recent decisions affecting current work:
 - **Static RSI retained as default (Phase 55-04)**: Dual-criterion A/B comparison (IC-IR majority + OOS Sharpe) required both to win; static wins IC 14/14 (mean |IC-IR| 0.51 vs 0.29), adaptive wins Sharpe 4/5 folds but fails IC criterion; inconclusive -> status quo
 - **Adaptive RSI normalization reduces IC signal quality (Phase 55-04)**: Dividing by P80-P20 range compresses RSI into [0,1] and reduces Spearman IC vs forward returns; threshold shift from 30/70 to ~44/66 drives Sharpe advantage via trade frequency, not signal quality
 - **Gantt chart via go.Bar horizontal not figure_factory (Phase 54-03)**: plotly.figure_factory.create_gantt() is deprecated; go.Bar(orientation='h', base=[start], x=[duration]) achieves same result with no extra dependencies
+- **Price bars tables use 'timestamp' not 'ts' (Phase 55-03)**: cmc_price_bars_multi_tf, cmc_price_bars_multi_tf_u, cmc_returns_bars_multi_tf, cmc_returns_bars_multi_tf_u all use 'timestamp' as time column; all other tables (EMA, vol, features, regimes) use 'ts'; fixed via _TABLES_WITH_TIMESTAMP_COL frozenset in ExperimentRunner
+- **AMA experiments: 0 rows expected until cmc_ama_multi_tf_u populated (Phase 55-03)**: 31 AMA features + kama_er_signal + ama_ret_momentum return 0 rows; ExperimentRunner handles gracefully; run AMA refresh pipeline to unlock these features
+- **cmc_feature_experiments: 100 distinct features, 5 TFs, 67,788 rows (Phase 55-03)**: BH gate: 79/100 pass; top features by |IC|: canonical_bb_up_20_2 (0.122), canonical_bb_ma_20 (0.122), canonical_atr_14 (0.117)
+- **features.yaml expanded to 135 entries (Phase 55-03)**: Categories E (27 unmapped cmc_features cols) + F (12 derived inline features) + 4 additional added to reach 100 distinct working feature threshold
 
 ### Pending Todos
 
@@ -520,8 +524,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-26T01:00:00Z
-Stopped at: Completed 55-04-PLAN.md — adaptive vs static RSI A/B comparison complete; static RSI retained as default (inconclusive by dual-criterion policy: static wins IC 14/14, adaptive wins Sharpe 4/5 folds); generate_signals_rsi.py updated with decision comment; reports/evaluation/{adaptive_rsi_ic_comparison.csv,adaptive_rsi_bakeoff.csv,adaptive_rsi_ab_comparison.md} created. Phase 55 at 4/5 plans.
+Last session: 2026-02-26T18:05:00Z
+Stopped at: Completed 55-03-PLAN.md — ExperimentRunner sweep complete; 100 features x 5 TFs x 17 assets; 67,788 IC rows in cmc_feature_experiments; 79/100 BH gate passes; 3 bug fixes in runner.py (timestamp col, None guard, load_inputs alias); features.yaml 91->135; CSVs in reports/evaluation/. Phase 55 at 4/5 plans complete.
 Resume file: None
 
 ---
@@ -545,6 +549,7 @@ Phase overview:
 - Phase 40 (Notebooks): COMPLETE — helpers.py (6 functions), 01_explore_indicators.ipynb (29 cells, AMA + regimes), 02_evaluate_features.ipynb (44 cells, IC + purged K-fold + regime A/B), 03_run_experiments.ipynb (33 cells, feature registry + DAG + experiments + dashboard); 13/13 must-haves verified
 - Phase 41 (Asset Descriptive Stats & Correlation): COMPLETE — Alembic migration (5 DB objects), refresh_cmc_asset_stats.py (8 stats x 4 windows), refresh_cmc_cross_asset_corr.py (Pearson+Spearman pairwise), orchestrator + pipeline wiring, dashboard page (stats table + correlation heatmap), regime integration + quality checks; 6/6 must-haves verified
 - Phase 41.1 (Milestone Cleanup): COMPLETE — AMA tables in ExperimentRunner _ALLOWED_TABLES + filter support, 2 AMA YAML features, experiments dashboard page, stale CLI ref fix, rolling IC chart, fold_boundaries public API; 11/11 must-haves verified
+- Phase 55 Plan 03: COMPLETE — ExperimentRunner sweep 100 features x 5 TFs; 67,788 IC rows; 79/100 BH gate passes; fixed timestamp column bug; features.yaml 91->135
 
 Key constraints to remember:
 - PSR-01 (Alembic migration psr->psr_legacy) must run before any PSR formula code
