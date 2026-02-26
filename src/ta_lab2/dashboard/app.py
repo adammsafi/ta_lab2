@@ -21,7 +21,7 @@ st.set_page_config(
 # ---------------------------------------------------------------------------
 with st.sidebar:
     st.title("ta_lab2")
-    st.caption("Pipeline Monitor + Research + Experiments")
+    st.caption("Pipeline Monitor + Operations + Research + Experiments")
     st.divider()
     st.slider(
         "Cache TTL (s)",
@@ -49,6 +49,28 @@ pages = {
             title="Dashboard Home",
             icon=":material/home:",
         )
+    ],
+    "Operations": [
+        st.Page(
+            str(_HERE / "pages" / "6_trading.py"),
+            title="Trading",
+            icon=":material/candlestick_chart:",
+        ),
+        st.Page(
+            str(_HERE / "pages" / "7_risk_controls.py"),
+            title="Risk & Controls",
+            icon=":material/security:",
+        ),
+        st.Page(
+            str(_HERE / "pages" / "8_drift_monitor.py"),
+            title="Drift Monitor",
+            icon=":material/trending_up:",
+        ),
+        st.Page(
+            str(_HERE / "pages" / "9_executor_status.py"),
+            title="Executor Status",
+            icon=":material/play_circle:",
+        ),
     ],
     "Monitor": [
         st.Page(
