@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: Phase 55 (Feature & Signal Evaluation) — IN PROGRESS
-Plan: 2/5 complete (55-02 DONE — expanded features.yaml: 91 features, KAMA hash bug fixed, AMA variants verified, EMA crossover deferred)
+Plan: 2/5 complete (55-01 DONE — IC baseline extended 47,614→82,110 rows, 4 new TFs, regime breakdown, methodology verified; 55-02 DONE — features.yaml expanded 7→91 entries)
 Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 COMPLETE (all 3 plans). V1_MEMO.md GENERATED. Phase 55 Plan 01 COMPLETE. Phase 55 Plan 02 COMPLETE.
-Last activity: 2026-02-26 — Completed 55-02-PLAN.md (features.yaml expanded 7→91 entries: 53 canonical cmc_features, 31 AMA variants, 1 adaptive RSI; KAMA hash bug fixed; public features property on FeatureRegistry; EMA crossovers documented as deferred to 55-04)
+Last activity: 2026-02-26 — Completed 55-01-PLAN.md (IC baseline extended: 47,614→82,110 rows, 9 TFs; regime IC for BTC/ETH 1D; methodology_verification.csv 9/9 MATCH; ic_ranking_full.csv 97 features; bug fix: venue column excluded)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [██░░░] Phase 55 (2/5)
 
@@ -501,6 +501,9 @@ Recent decisions affecting current work:
 - **KAMA hash bug fixed in YAML (Phase 55-02)**: kama_er_signal and ama_ret_momentum used d47fe5cc (DEMA/TEMA/HMA period=21 MD5) not de1106d5 (KAMA(10,2,30)); corrected in features.yaml; KAMA canonical hash is de1106d5
 - **AMA filter requires both indicator AND params_hash (Phase 55-02)**: Period-only AMAs share hash when period matches (e.g., DEMA(9)/TEMA(9)/HMA(9) all = 514ffe35); filter indicator (lowercase) + params_hash = unambiguous
 - **EMA crossovers deferred to 55-04 (Phase 55-02)**: dotpath fn(input_df) has no kwargs or DB connection; two cmc_ema_multi_tf_u inputs produce 'ema' column collision on merge; needs ExperimentRunner enhancement for column renaming
+- **IC sweep staged for 9 TFs not all 109 (Phase 55-01)**: Full 109-TF sweep ~9-10 hours; ran 3D, 5D, 10D, 21D as representative additions; Phase 42 5 TFs preserved; cmc_ic_results now 82,110 rows (9 TFs); full sweep available via --all --no-overwrite
+- **venue column excluded from IC features (Phase 55-01)**: cmc_features.venue='CMC_AGG' is text, not float; added to _EXTRA_NON_FEATURE_COLS in run_ic_sweep.py; 100 feature columns now used (was 101)
+- **reports/evaluation/ for Phase 55 artifacts (Phase 55-01)**: Consistent with reports/bakeoff/ from Phase 42; gitignored; methodology_verification.csv and ic_ranking_full.csv stored here
 - **Gantt chart via go.Bar horizontal not figure_factory (Phase 54-03)**: plotly.figure_factory.create_gantt() is deprecated; go.Bar(orientation='h', base=[start], x=[duration]) achieves same result with no extra dependencies
 
 ### Pending Todos
@@ -515,8 +518,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-26T15:10:00Z
-Stopped at: Completed 55-02-PLAN.md — features.yaml expanded 7→91 entries (53 canonical cmc_features, 31 AMA variants, 1 adaptive RSI); KAMA hash bug fixed; FeatureRegistry.features property added; EMA crossovers documented as deferred to 55-04. Phase 55 at 2/5 plans.
+Last session: 2026-02-26T20:09:57Z
+Stopped at: Completed 55-01-PLAN.md — IC baseline extended 47,614→82,110 rows (9 TFs: +3D,5D,10D,21D); regime IC for BTC/ETH 1D; methodology_verification.csv 9/9 MATCH; ic_ranking_full.csv 97 features ranked; venue column bug fixed. Phase 55 at 2/5 plans (01 and 02 both done).
 Resume file: None
 
 ---
