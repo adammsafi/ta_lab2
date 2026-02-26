@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: Phase 52 (Operational Dashboard) — COMPLETE
-Plan: 4/4 complete (52-01 DONE — 4 query modules + 3 chart builders; 52-02 DONE — Trading page + Risk & Controls page; 52-03 DONE — Drift Monitor + Executor Status pages; 52-04 DONE — Navigation integration + landing page Operational Health section)
+Phase: Phase 53 (V1 Validation) — IN PROGRESS
+Plan: 2/4 complete (53-01 DONE — gate framework + pre-flight checklist; 53-02 DONE — daily validation log + audit checker)
 Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans).
-Last activity: 2026-02-26 — Completed 52-04-PLAN.md (Operations nav group in app.py with 4 pages; Operational Health section on landing page with 4 traffic-light indicators: Kill Switch, Drift Pause, Executor Last Run, Circuit Breaker; human verify passed; Streamlit 1.44 st.Page relative path bug fixed)
+Last activity: 2026-02-26 — Completed 53-02-PLAN.md (DailyValidationLog 7-section DB report; AuditChecker 6-check gap detection; run_daily_validation_log + run_audit_check CLIs; gate_framework.run_full_audit() wired to real AuditChecker)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE
 
@@ -482,6 +482,10 @@ Recent decisions affecting current work:
 - **Relative path strings for st.Page (Phase 52-04)**: Use "pages/X.py" not str(Path(__file__).parent / "pages" / "X.py") -- Streamlit 1.44 prepends main_script_parent before resolving; relative Path object causes doubled-path error when launched via relative invocation path; only caught at runtime, not by ast.parse
 - **Four independent try/except per Operational Health indicator (Phase 52-04)**: outer block loads shared engine+risk_state; inner per-indicator blocks isolate failures -- one failing query never suppresses the remaining three indicators
 - **Traffic light semantics: delta_color normal/off/inverse = green/amber/red (Phase 52-04)**: st.metric delta_color normal=green OK, off=amber WARN/STALE, inverse=red HALTED/TRIPPED; drift pause escalates to red at >=3 days; executor STALE turns amber at 26h and red at 48h
+- **No strategy_id on cmc_orders/cmc_fills (Phase 53-02)**: Orders and fills lack strategy_id; aggregate P&L comes from fills+orders; per-strategy P&L and positions attribution come from cmc_positions (has strategy_id as PK column)
+- **avg_cost_basis not avg_entry_price (Phase 53-02)**: cmc_positions uses avg_cost_basis as the column name; plan spec was precise; any future code reading this table should use avg_cost_basis
+- **Lazy import inside run_full_audit() prevents circular import (Phase 53-02)**: audit_checker.py imports AuditSummary from gate_framework.py; gate_framework.py must lazy-import AuditChecker inside run_full_audit() body to avoid circular dependency
+- **Audit CLI exit codes: 0=pass, 1=anomalies, 2=error (Phase 53-02)**: Distinguishes "no anomalies" from "anomalies detected but script ran successfully" from "script crashed"; callers can gate on 0 for automated pipelines
 
 ### Pending Todos
 
@@ -495,8 +499,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-26T10:54:10Z
-Stopped at: Completed 52-04-PLAN.md — Navigation integration: Operations nav group in app.py with 4 pages (Trading, Risk & Controls, Drift Monitor, Executor Status); Operational Health section on landing page with 4 traffic-light metrics; human verify passed; Streamlit 1.44 st.Page relative path fix applied. Phase 52 COMPLETE.
+Last session: 2026-02-26T18:33:28Z
+Stopped at: Completed 53-02-PLAN.md — DailyValidationLog (7 DB-queried sections, Markdown output); AuditChecker (6 gap detection checks, typed AuditFinding + AuditSummary); run_daily_validation_log + run_audit_check CLIs; gate_framework.run_full_audit() wired to real AuditChecker. Phase 53: 2/4 plans complete.
 Resume file: None
 
 ---
