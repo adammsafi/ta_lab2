@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: Phase 55 (Feature & Signal Evaluation) — IN PROGRESS
-Plan: 2/5 complete (55-01 DONE — IC baseline extended 47,614→82,110 rows, 4 new TFs, regime breakdown, methodology verified; 55-02 DONE — features.yaml expanded 7→91 entries)
-Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 COMPLETE (all 3 plans). V1_MEMO.md GENERATED. Phase 55 Plan 01 COMPLETE. Phase 55 Plan 02 COMPLETE.
-Last activity: 2026-02-26 — Completed 55-01-PLAN.md (IC baseline extended: 47,614→82,110 rows, 9 TFs; regime IC for BTC/ETH 1D; methodology_verification.csv 9/9 MATCH; ic_ranking_full.csv 97 features; bug fix: venue column excluded)
+Plan: 4/5 complete (55-01 DONE — IC baseline extended 47,614→82,110 rows; 55-02 DONE — features.yaml 7→91 entries; 55-04 DONE — adaptive vs static RSI A/B comparison, static retained as default)
+Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 COMPLETE (all 3 plans). V1_MEMO.md GENERATED. Phase 55 Plans 01, 02, 04 COMPLETE.
+Last activity: 2026-02-26 — Completed 55-04-PLAN.md (adaptive vs static RSI A/B: static wins IC 14/14, adaptive wins Sharpe 4/5 folds; inconclusive by dual-criterion; use_adaptive=False retained; reports/evaluation/ artifacts created)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [██░░░] Phase 55 (2/5)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [████░] Phase 55 (4/5)
 
 ## Performance Metrics
 
@@ -504,6 +504,8 @@ Recent decisions affecting current work:
 - **IC sweep staged for 9 TFs not all 109 (Phase 55-01)**: Full 109-TF sweep ~9-10 hours; ran 3D, 5D, 10D, 21D as representative additions; Phase 42 5 TFs preserved; cmc_ic_results now 82,110 rows (9 TFs); full sweep available via --all --no-overwrite
 - **venue column excluded from IC features (Phase 55-01)**: cmc_features.venue='CMC_AGG' is text, not float; added to _EXTRA_NON_FEATURE_COLS in run_ic_sweep.py; 100 feature columns now used (was 101)
 - **reports/evaluation/ for Phase 55 artifacts (Phase 55-01)**: Consistent with reports/bakeoff/ from Phase 42; gitignored; methodology_verification.csv and ic_ranking_full.csv stored here
+- **Static RSI retained as default (Phase 55-04)**: Dual-criterion A/B comparison (IC-IR majority + OOS Sharpe) required both to win; static wins IC 14/14 (mean |IC-IR| 0.51 vs 0.29), adaptive wins Sharpe 4/5 folds but fails IC criterion; inconclusive -> status quo
+- **Adaptive RSI normalization reduces IC signal quality (Phase 55-04)**: Dividing by P80-P20 range compresses RSI into [0,1] and reduces Spearman IC vs forward returns; threshold shift from 30/70 to ~44/66 drives Sharpe advantage via trade frequency, not signal quality
 - **Gantt chart via go.Bar horizontal not figure_factory (Phase 54-03)**: plotly.figure_factory.create_gantt() is deprecated; go.Bar(orientation='h', base=[start], x=[duration]) achieves same result with no extra dependencies
 
 ### Pending Todos
@@ -518,8 +520,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-26T20:09:57Z
-Stopped at: Completed 55-01-PLAN.md — IC baseline extended 47,614→82,110 rows (9 TFs: +3D,5D,10D,21D); regime IC for BTC/ETH 1D; methodology_verification.csv 9/9 MATCH; ic_ranking_full.csv 97 features ranked; venue column bug fixed. Phase 55 at 2/5 plans (01 and 02 both done).
+Last session: 2026-02-26T01:00:00Z
+Stopped at: Completed 55-04-PLAN.md — adaptive vs static RSI A/B comparison complete; static RSI retained as default (inconclusive by dual-criterion policy: static wins IC 14/14, adaptive wins Sharpe 4/5 folds); generate_signals_rsi.py updated with decision comment; reports/evaluation/{adaptive_rsi_ic_comparison.csv,adaptive_rsi_bakeoff.csv,adaptive_rsi_ab_comparison.md} created. Phase 55 at 4/5 plans.
 Resume file: None
 
 ---
