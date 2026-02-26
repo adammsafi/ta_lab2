@@ -18,6 +18,11 @@
 #   deprecated: No longer maintained; excluded from ExperimentRunner runs
 
 features:
+
+  # =========================================================================
+  # ORIGINAL FEATURES (kept from Phase 55-01)
+  # =========================================================================
+
   vol_ratio_30_7:
     lifecycle: experimental
     description: "30d/7d realized vol ratio -- captures vol regime shift"
@@ -55,7 +60,7 @@ features:
 
   kama_er_signal:
     lifecycle: experimental
-    description: "KAMA Efficiency Ratio -- trending strength (0=noise, 1=trend)"
+    description: "KAMA(10,2,30) Efficiency Ratio -- trending strength (0=noise, 1=trend)"
     compute:
       mode: inline
       expression: "er"
@@ -64,12 +69,12 @@ features:
         columns: [er]
         filters:
           indicator: kama
-          params_hash: d47fe5cc
+          params_hash: de1106d5  # KAMA(10,2,30) canonical -- fixed from d47fe5cc (was DEMA/TEMA/HMA period=21)
     tags: [ama, momentum, kama]
 
   ama_ret_momentum:
     lifecycle: experimental
-    description: "KAMA return momentum -- ret_arith of period-21 KAMA"
+    description: "KAMA(10,2,30) return momentum -- ret_arith of canonical KAMA"
     compute:
       mode: inline
       expression: "ret_arith"
@@ -78,5 +83,1146 @@ features:
         columns: [ret_arith]
         filters:
           indicator: kama
-          params_hash: d47fe5cc
+          params_hash: de1106d5  # KAMA(10,2,30) canonical -- fixed from d47fe5cc
     tags: [ama, momentum, returns]
+
+  # =========================================================================
+  # CATEGORY A: Canonical cmc_features columns (~76 features)
+  # All sourced from cmc_features table.
+  # Non-feature columns excluded: id, ts, tf, alignment_source, tf_days,
+  #   asset_class, open, high, low, close, volume, updated_at,
+  #   has_price_gap, has_outlier, gap_bars, ret_is_outlier,
+  #   vol_*_is_outlier, ta_is_outlier
+  # =========================================================================
+
+  # -------------------------------------------------------------------------
+  # Returns: Canonical bar-to-bar
+  # -------------------------------------------------------------------------
+
+  canonical_delta1:
+    lifecycle: experimental
+    description: "Canonical price delta (close - prev_close) from cmc_features"
+    compute:
+      mode: inline
+      expression: "delta1"
+    inputs:
+      - table: cmc_features
+        columns: [delta1]
+    tags: [canonical, returns, price]
+
+  canonical_delta2:
+    lifecycle: experimental
+    description: "Lagged price delta (close_t-1 - close_t-2) from cmc_features"
+    compute:
+      mode: inline
+      expression: "delta2"
+    inputs:
+      - table: cmc_features
+        columns: [delta2]
+    tags: [canonical, returns, price]
+
+  canonical_ret_arith:
+    lifecycle: experimental
+    description: "Arithmetic bar return from cmc_features"
+    compute:
+      mode: inline
+      expression: "ret_arith"
+    inputs:
+      - table: cmc_features
+        columns: [ret_arith]
+    tags: [canonical, returns]
+
+  canonical_delta_ret_arith:
+    lifecycle: experimental
+    description: "Delta of arithmetic return (momentum of returns) from cmc_features"
+    compute:
+      mode: inline
+      expression: "delta_ret_arith"
+    inputs:
+      - table: cmc_features
+        columns: [delta_ret_arith]
+    tags: [canonical, returns, momentum]
+
+  canonical_ret_log:
+    lifecycle: experimental
+    description: "Log bar return from cmc_features"
+    compute:
+      mode: inline
+      expression: "ret_log"
+    inputs:
+      - table: cmc_features
+        columns: [ret_log]
+    tags: [canonical, returns]
+
+  canonical_delta_ret_log:
+    lifecycle: experimental
+    description: "Delta of log return from cmc_features"
+    compute:
+      mode: inline
+      expression: "delta_ret_log"
+    inputs:
+      - table: cmc_features
+        columns: [delta_ret_log]
+    tags: [canonical, returns, momentum]
+
+  canonical_range_pct:
+    lifecycle: experimental
+    description: "Bar range as percentage of close (high-low)/close from cmc_features"
+    compute:
+      mode: inline
+      expression: "range_pct"
+    inputs:
+      - table: cmc_features
+        columns: [range_pct]
+    tags: [canonical, returns, volatility]
+
+  canonical_true_range_pct:
+    lifecycle: experimental
+    description: "True range as percentage of close from cmc_features"
+    compute:
+      mode: inline
+      expression: "true_range_pct"
+    inputs:
+      - table: cmc_features
+        columns: [true_range_pct]
+    tags: [canonical, returns, volatility]
+
+  # -------------------------------------------------------------------------
+  # Returns: Roll columns (daily-frequency LAG)
+  # -------------------------------------------------------------------------
+
+  canonical_ret_arith_roll:
+    lifecycle: experimental
+    description: "Roll-adjusted arithmetic return from cmc_features"
+    compute:
+      mode: inline
+      expression: "ret_arith_roll"
+    inputs:
+      - table: cmc_features
+        columns: [ret_arith_roll]
+    tags: [canonical, returns, roll]
+
+  canonical_ret_log_roll:
+    lifecycle: experimental
+    description: "Roll-adjusted log return from cmc_features"
+    compute:
+      mode: inline
+      expression: "ret_log_roll"
+    inputs:
+      - table: cmc_features
+        columns: [ret_log_roll]
+    tags: [canonical, returns, roll]
+
+  canonical_range_pct_roll:
+    lifecycle: experimental
+    description: "Roll-adjusted bar range percentage from cmc_features"
+    compute:
+      mode: inline
+      expression: "range_pct_roll"
+    inputs:
+      - table: cmc_features
+        columns: [range_pct_roll]
+    tags: [canonical, returns, roll, volatility]
+
+  canonical_true_range_pct_roll:
+    lifecycle: experimental
+    description: "Roll-adjusted true range percentage from cmc_features"
+    compute:
+      mode: inline
+      expression: "true_range_pct_roll"
+    inputs:
+      - table: cmc_features
+        columns: [true_range_pct_roll]
+    tags: [canonical, returns, roll, volatility]
+
+  # -------------------------------------------------------------------------
+  # Returns: Z-scores (30-day window)
+  # -------------------------------------------------------------------------
+
+  canonical_ret_arith_zscore_30:
+    lifecycle: experimental
+    description: "Arithmetic return z-score (30-bar window) from cmc_features"
+    compute:
+      mode: inline
+      expression: "ret_arith_zscore_30"
+    inputs:
+      - table: cmc_features
+        columns: [ret_arith_zscore_30]
+    tags: [canonical, returns, zscore]
+
+  canonical_ret_log_zscore_30:
+    lifecycle: experimental
+    description: "Log return z-score (30-bar window) from cmc_features"
+    compute:
+      mode: inline
+      expression: "ret_log_zscore_30"
+    inputs:
+      - table: cmc_features
+        columns: [ret_log_zscore_30]
+    tags: [canonical, returns, zscore]
+
+  canonical_ret_arith_roll_zscore_30:
+    lifecycle: experimental
+    description: "Roll arithmetic return z-score (30-bar window) from cmc_features"
+    compute:
+      mode: inline
+      expression: "ret_arith_roll_zscore_30"
+    inputs:
+      - table: cmc_features
+        columns: [ret_arith_roll_zscore_30]
+    tags: [canonical, returns, roll, zscore]
+
+  # -------------------------------------------------------------------------
+  # Returns: Z-scores (90-day window)
+  # -------------------------------------------------------------------------
+
+  canonical_ret_arith_zscore_90:
+    lifecycle: experimental
+    description: "Arithmetic return z-score (90-bar window) from cmc_features"
+    compute:
+      mode: inline
+      expression: "ret_arith_zscore_90"
+    inputs:
+      - table: cmc_features
+        columns: [ret_arith_zscore_90]
+    tags: [canonical, returns, zscore]
+
+  canonical_ret_log_zscore_90:
+    lifecycle: experimental
+    description: "Log return z-score (90-bar window) from cmc_features"
+    compute:
+      mode: inline
+      expression: "ret_log_zscore_90"
+    inputs:
+      - table: cmc_features
+        columns: [ret_log_zscore_90]
+    tags: [canonical, returns, zscore]
+
+  canonical_ret_arith_roll_zscore_90:
+    lifecycle: experimental
+    description: "Roll arithmetic return z-score (90-bar window) from cmc_features"
+    compute:
+      mode: inline
+      expression: "ret_arith_roll_zscore_90"
+    inputs:
+      - table: cmc_features
+        columns: [ret_arith_roll_zscore_90]
+    tags: [canonical, returns, roll, zscore]
+
+  # -------------------------------------------------------------------------
+  # Returns: Z-scores (365-day window)
+  # -------------------------------------------------------------------------
+
+  canonical_ret_arith_zscore_365:
+    lifecycle: experimental
+    description: "Arithmetic return z-score (365-bar window) from cmc_features"
+    compute:
+      mode: inline
+      expression: "ret_arith_zscore_365"
+    inputs:
+      - table: cmc_features
+        columns: [ret_arith_zscore_365]
+    tags: [canonical, returns, zscore]
+
+  canonical_ret_log_zscore_365:
+    lifecycle: experimental
+    description: "Log return z-score (365-bar window) from cmc_features"
+    compute:
+      mode: inline
+      expression: "ret_log_zscore_365"
+    inputs:
+      - table: cmc_features
+        columns: [ret_log_zscore_365]
+    tags: [canonical, returns, zscore]
+
+  canonical_ret_arith_roll_zscore_365:
+    lifecycle: experimental
+    description: "Roll arithmetic return z-score (365-bar window) from cmc_features"
+    compute:
+      mode: inline
+      expression: "ret_arith_roll_zscore_365"
+    inputs:
+      - table: cmc_features
+        columns: [ret_arith_roll_zscore_365]
+    tags: [canonical, returns, roll, zscore]
+
+  # -------------------------------------------------------------------------
+  # Volatility: Parkinson range-based
+  # -------------------------------------------------------------------------
+
+  canonical_vol_parkinson_20:
+    lifecycle: experimental
+    description: "Parkinson (1980) range-based volatility, 20-bar from cmc_features"
+    compute:
+      mode: inline
+      expression: "vol_parkinson_20"
+    inputs:
+      - table: cmc_features
+        columns: [vol_parkinson_20]
+    tags: [canonical, vol, parkinson]
+
+  canonical_vol_parkinson_63:
+    lifecycle: experimental
+    description: "Parkinson (1980) range-based volatility, 63-bar from cmc_features"
+    compute:
+      mode: inline
+      expression: "vol_parkinson_63"
+    inputs:
+      - table: cmc_features
+        columns: [vol_parkinson_63]
+    tags: [canonical, vol, parkinson]
+
+  canonical_vol_parkinson_126:
+    lifecycle: experimental
+    description: "Parkinson (1980) range-based volatility, 126-bar from cmc_features"
+    compute:
+      mode: inline
+      expression: "vol_parkinson_126"
+    inputs:
+      - table: cmc_features
+        columns: [vol_parkinson_126]
+    tags: [canonical, vol, parkinson]
+
+  canonical_vol_parkinson_20_zscore:
+    lifecycle: experimental
+    description: "Parkinson 20-bar vol z-score from cmc_features"
+    compute:
+      mode: inline
+      expression: "vol_parkinson_20_zscore"
+    inputs:
+      - table: cmc_features
+        columns: [vol_parkinson_20_zscore]
+    tags: [canonical, vol, parkinson, zscore]
+
+  canonical_vol_parkinson_63_zscore:
+    lifecycle: experimental
+    description: "Parkinson 63-bar vol z-score from cmc_features"
+    compute:
+      mode: inline
+      expression: "vol_parkinson_63_zscore"
+    inputs:
+      - table: cmc_features
+        columns: [vol_parkinson_63_zscore]
+    tags: [canonical, vol, parkinson, zscore]
+
+  # -------------------------------------------------------------------------
+  # Volatility: Garman-Klass OHLC-based
+  # -------------------------------------------------------------------------
+
+  canonical_vol_gk_20:
+    lifecycle: experimental
+    description: "Garman-Klass (1980) OHLC volatility, 20-bar from cmc_features"
+    compute:
+      mode: inline
+      expression: "vol_gk_20"
+    inputs:
+      - table: cmc_features
+        columns: [vol_gk_20]
+    tags: [canonical, vol, garman_klass]
+
+  canonical_vol_gk_63:
+    lifecycle: experimental
+    description: "Garman-Klass (1980) OHLC volatility, 63-bar from cmc_features"
+    compute:
+      mode: inline
+      expression: "vol_gk_63"
+    inputs:
+      - table: cmc_features
+        columns: [vol_gk_63]
+    tags: [canonical, vol, garman_klass]
+
+  canonical_vol_gk_126:
+    lifecycle: experimental
+    description: "Garman-Klass (1980) OHLC volatility, 126-bar from cmc_features"
+    compute:
+      mode: inline
+      expression: "vol_gk_126"
+    inputs:
+      - table: cmc_features
+        columns: [vol_gk_126]
+    tags: [canonical, vol, garman_klass]
+
+  canonical_vol_gk_20_zscore:
+    lifecycle: experimental
+    description: "Garman-Klass 20-bar vol z-score from cmc_features"
+    compute:
+      mode: inline
+      expression: "vol_gk_20_zscore"
+    inputs:
+      - table: cmc_features
+        columns: [vol_gk_20_zscore]
+    tags: [canonical, vol, garman_klass, zscore]
+
+  canonical_vol_gk_63_zscore:
+    lifecycle: experimental
+    description: "Garman-Klass 63-bar vol z-score from cmc_features"
+    compute:
+      mode: inline
+      expression: "vol_gk_63_zscore"
+    inputs:
+      - table: cmc_features
+        columns: [vol_gk_63_zscore]
+    tags: [canonical, vol, garman_klass, zscore]
+
+  # -------------------------------------------------------------------------
+  # Volatility: Rogers-Satchell drift-independent
+  # -------------------------------------------------------------------------
+
+  canonical_vol_rs_20:
+    lifecycle: experimental
+    description: "Rogers-Satchell (1991) drift-independent volatility, 20-bar from cmc_features"
+    compute:
+      mode: inline
+      expression: "vol_rs_20"
+    inputs:
+      - table: cmc_features
+        columns: [vol_rs_20]
+    tags: [canonical, vol, rogers_satchell]
+
+  canonical_vol_rs_63:
+    lifecycle: experimental
+    description: "Rogers-Satchell (1991) volatility, 63-bar from cmc_features"
+    compute:
+      mode: inline
+      expression: "vol_rs_63"
+    inputs:
+      - table: cmc_features
+        columns: [vol_rs_63]
+    tags: [canonical, vol, rogers_satchell]
+
+  canonical_vol_rs_126:
+    lifecycle: experimental
+    description: "Rogers-Satchell (1991) volatility, 126-bar from cmc_features"
+    compute:
+      mode: inline
+      expression: "vol_rs_126"
+    inputs:
+      - table: cmc_features
+        columns: [vol_rs_126]
+    tags: [canonical, vol, rogers_satchell]
+
+  canonical_vol_rs_20_zscore:
+    lifecycle: experimental
+    description: "Rogers-Satchell 20-bar vol z-score from cmc_features"
+    compute:
+      mode: inline
+      expression: "vol_rs_20_zscore"
+    inputs:
+      - table: cmc_features
+        columns: [vol_rs_20_zscore]
+    tags: [canonical, vol, rogers_satchell, zscore]
+
+  # -------------------------------------------------------------------------
+  # Volatility: Rolling historical (log returns)
+  # -------------------------------------------------------------------------
+
+  canonical_vol_log_roll_20:
+    lifecycle: experimental
+    description: "Rolling historical log vol, 20-bar from cmc_features"
+    compute:
+      mode: inline
+      expression: "vol_log_roll_20"
+    inputs:
+      - table: cmc_features
+        columns: [vol_log_roll_20]
+    tags: [canonical, vol, historical]
+
+  canonical_vol_log_roll_63:
+    lifecycle: experimental
+    description: "Rolling historical log vol, 63-bar from cmc_features"
+    compute:
+      mode: inline
+      expression: "vol_log_roll_63"
+    inputs:
+      - table: cmc_features
+        columns: [vol_log_roll_63]
+    tags: [canonical, vol, historical]
+
+  canonical_vol_log_roll_126:
+    lifecycle: experimental
+    description: "Rolling historical log vol, 126-bar from cmc_features"
+    compute:
+      mode: inline
+      expression: "vol_log_roll_126"
+    inputs:
+      - table: cmc_features
+        columns: [vol_log_roll_126]
+    tags: [canonical, vol, historical]
+
+  canonical_atr_14:
+    lifecycle: experimental
+    description: "ATR(14) Average True Range from cmc_features"
+    compute:
+      mode: inline
+      expression: "atr_14"
+    inputs:
+      - table: cmc_features
+        columns: [atr_14]
+    tags: [canonical, vol, atr]
+
+  # -------------------------------------------------------------------------
+  # Technical Indicators: RSI
+  # -------------------------------------------------------------------------
+
+  canonical_rsi_7:
+    lifecycle: experimental
+    description: "RSI(7) from cmc_features"
+    compute:
+      mode: inline
+      expression: "rsi_7"
+    inputs:
+      - table: cmc_features
+        columns: [rsi_7]
+    tags: [canonical, ta, rsi]
+
+  canonical_rsi_14:
+    lifecycle: experimental
+    description: "RSI(14) from cmc_features"
+    compute:
+      mode: inline
+      expression: "rsi_14"
+    inputs:
+      - table: cmc_features
+        columns: [rsi_14]
+    tags: [canonical, ta, rsi]
+
+  canonical_rsi_21:
+    lifecycle: experimental
+    description: "RSI(21) from cmc_features"
+    compute:
+      mode: inline
+      expression: "rsi_21"
+    inputs:
+      - table: cmc_features
+        columns: [rsi_21]
+    tags: [canonical, ta, rsi]
+
+  canonical_rsi_14_zscore:
+    lifecycle: experimental
+    description: "RSI(14) z-score from cmc_features"
+    compute:
+      mode: inline
+      expression: "rsi_14_zscore"
+    inputs:
+      - table: cmc_features
+        columns: [rsi_14_zscore]
+    tags: [canonical, ta, rsi, zscore]
+
+  # -------------------------------------------------------------------------
+  # Technical Indicators: MACD
+  # -------------------------------------------------------------------------
+
+  canonical_macd_12_26:
+    lifecycle: experimental
+    description: "MACD line (12/26) from cmc_features"
+    compute:
+      mode: inline
+      expression: "macd_12_26"
+    inputs:
+      - table: cmc_features
+        columns: [macd_12_26]
+    tags: [canonical, ta, macd]
+
+  canonical_macd_signal_9:
+    lifecycle: experimental
+    description: "MACD signal line (9-period) from cmc_features"
+    compute:
+      mode: inline
+      expression: "macd_signal_9"
+    inputs:
+      - table: cmc_features
+        columns: [macd_signal_9]
+    tags: [canonical, ta, macd]
+
+  canonical_macd_hist_12_26_9:
+    lifecycle: experimental
+    description: "MACD histogram (12/26/9) from cmc_features"
+    compute:
+      mode: inline
+      expression: "macd_hist_12_26_9"
+    inputs:
+      - table: cmc_features
+        columns: [macd_hist_12_26_9]
+    tags: [canonical, ta, macd]
+
+  canonical_macd_8_17:
+    lifecycle: experimental
+    description: "MACD line fast (8/17) from cmc_features"
+    compute:
+      mode: inline
+      expression: "macd_8_17"
+    inputs:
+      - table: cmc_features
+        columns: [macd_8_17]
+    tags: [canonical, ta, macd, fast]
+
+  canonical_macd_hist_8_17_9:
+    lifecycle: experimental
+    description: "MACD histogram fast (8/17/9) from cmc_features"
+    compute:
+      mode: inline
+      expression: "macd_hist_8_17_9"
+    inputs:
+      - table: cmc_features
+        columns: [macd_hist_8_17_9]
+    tags: [canonical, ta, macd, fast]
+
+  # -------------------------------------------------------------------------
+  # Technical Indicators: Stochastic
+  # -------------------------------------------------------------------------
+
+  canonical_stoch_k_14:
+    lifecycle: experimental
+    description: "Stochastic %K(14) from cmc_features"
+    compute:
+      mode: inline
+      expression: "stoch_k_14"
+    inputs:
+      - table: cmc_features
+        columns: [stoch_k_14]
+    tags: [canonical, ta, stochastic]
+
+  canonical_stoch_d_3:
+    lifecycle: experimental
+    description: "Stochastic %D(3) smoothed from cmc_features"
+    compute:
+      mode: inline
+      expression: "stoch_d_3"
+    inputs:
+      - table: cmc_features
+        columns: [stoch_d_3]
+    tags: [canonical, ta, stochastic]
+
+  # -------------------------------------------------------------------------
+  # Technical Indicators: Bollinger Bands
+  # -------------------------------------------------------------------------
+
+  canonical_bb_width_20:
+    lifecycle: experimental
+    description: "Bollinger Band width (20-period, 2-sigma) from cmc_features"
+    compute:
+      mode: inline
+      expression: "bb_width_20"
+    inputs:
+      - table: cmc_features
+        columns: [bb_width_20]
+    tags: [canonical, ta, bollinger]
+
+  canonical_bb_pct_b_20:
+    lifecycle: experimental
+    description: "Bollinger %B (close position within band) derived from cmc_features"
+    compute:
+      mode: inline
+      expression: "(close - bb_lo_20_2) / (bb_up_20_2 - bb_lo_20_2 + 1e-10)"
+    inputs:
+      - table: cmc_features
+        columns: [close, bb_up_20_2, bb_lo_20_2]
+    tags: [canonical, ta, bollinger, derived]
+
+  # -------------------------------------------------------------------------
+  # Technical Indicators: ADX
+  # -------------------------------------------------------------------------
+
+  canonical_adx_14:
+    lifecycle: experimental
+    description: "ADX(14) trend strength from cmc_features"
+    compute:
+      mode: inline
+      expression: "adx_14"
+    inputs:
+      - table: cmc_features
+        columns: [adx_14]
+    tags: [canonical, ta, adx]
+
+  # =========================================================================
+  # CATEGORY B: AMA indicator variants
+  # Sourced from cmc_ama_multi_tf_u (filtered by indicator + params_hash).
+  # Naming: ama_{indicator}_{label_slug}_{column}
+  #
+  # AMA params_hash values (first 8 chars of MD5):
+  #   KAMA(10,2,30) = de1106d5  (er_period=10, fast=2, slow=30)
+  #   KAMA(5,2,15)  = 987fc105  (er_period=5, fast=2, slow=15)
+  #   KAMA(20,2,50) = 8545aeed  (er_period=20, fast=2, slow=50)
+  #   DEMA(9)       = 514ffe35  (period=9)
+  #   DEMA(10)      = 018899b6  (period=10)
+  #   DEMA(21)      = d47fe5cc  (period=21)
+  #   DEMA(50)      = a4b71eb4  (period=50)
+  #   DEMA(200)     = 0fca19a1  (period=200)
+  #   TEMA(9)       = 514ffe35  (period=9) -- same hash as DEMA(9), differs by indicator
+  #   TEMA(10)      = 018899b6  (period=10)
+  #   TEMA(21)      = d47fe5cc  (period=21)
+  #   TEMA(50)      = a4b71eb4  (period=50)
+  #   TEMA(200)     = 0fca19a1  (period=200)
+  #   HMA(9)        = 514ffe35  (period=9)
+  #   HMA(10)       = 018899b6  (period=10)
+  #   HMA(21)       = d47fe5cc  (period=21)
+  #   HMA(50)       = a4b71eb4  (period=50)
+  #   HMA(200)      = 0fca19a1  (period=200)
+  # =========================================================================
+
+  # -------------------------------------------------------------------------
+  # KAMA variants: 3 param sets, 2 columns each (ama, er)
+  # -------------------------------------------------------------------------
+
+  ama_kama_10_2_30_value:
+    lifecycle: experimental
+    description: "KAMA(10,2,30) value -- adaptive MA level"
+    compute:
+      mode: inline
+      expression: "ama"
+    inputs:
+      - table: cmc_ama_multi_tf_u
+        columns: [ama]
+        filters:
+          indicator: kama
+          params_hash: de1106d5
+    tags: [ama, kama, trend]
+
+  ama_kama_10_2_30_er:
+    lifecycle: experimental
+    description: "KAMA(10,2,30) Efficiency Ratio -- trending strength (0=noise, 1=trend)"
+    compute:
+      mode: inline
+      expression: "er"
+    inputs:
+      - table: cmc_ama_multi_tf_u
+        columns: [er]
+        filters:
+          indicator: kama
+          params_hash: de1106d5
+    tags: [ama, kama, momentum]
+
+  ama_kama_5_2_15_value:
+    lifecycle: experimental
+    description: "KAMA(5,2,15) fast value -- adaptive MA level"
+    compute:
+      mode: inline
+      expression: "ama"
+    inputs:
+      - table: cmc_ama_multi_tf_u
+        columns: [ama]
+        filters:
+          indicator: kama
+          params_hash: 987fc105
+    tags: [ama, kama, trend, fast]
+
+  ama_kama_5_2_15_er:
+    lifecycle: experimental
+    description: "KAMA(5,2,15) fast Efficiency Ratio"
+    compute:
+      mode: inline
+      expression: "er"
+    inputs:
+      - table: cmc_ama_multi_tf_u
+        columns: [er]
+        filters:
+          indicator: kama
+          params_hash: 987fc105
+    tags: [ama, kama, momentum, fast]
+
+  ama_kama_20_2_50_value:
+    lifecycle: experimental
+    description: "KAMA(20,2,50) slow value -- adaptive MA level"
+    compute:
+      mode: inline
+      expression: "ama"
+    inputs:
+      - table: cmc_ama_multi_tf_u
+        columns: [ama]
+        filters:
+          indicator: kama
+          params_hash: 8545aeed
+    tags: [ama, kama, trend, slow]
+
+  ama_kama_20_2_50_er:
+    lifecycle: experimental
+    description: "KAMA(20,2,50) slow Efficiency Ratio"
+    compute:
+      mode: inline
+      expression: "er"
+    inputs:
+      - table: cmc_ama_multi_tf_u
+        columns: [er]
+        filters:
+          indicator: kama
+          params_hash: 8545aeed
+    tags: [ama, kama, momentum, slow]
+
+  # -------------------------------------------------------------------------
+  # DEMA variants: 5 param sets, 2 columns each (ama, d1)
+  # -------------------------------------------------------------------------
+
+  ama_dema_9_value:
+    lifecycle: experimental
+    description: "DEMA(9) value -- Double EMA level, period 9"
+    compute:
+      mode: inline
+      expression: "ama"
+    inputs:
+      - table: cmc_ama_multi_tf_u
+        columns: [ama]
+        filters:
+          indicator: dema
+          params_hash: 514ffe35
+    tags: [ama, dema, trend]
+
+  ama_dema_9_d1:
+    lifecycle: experimental
+    description: "DEMA(9) first derivative (momentum)"
+    compute:
+      mode: inline
+      expression: "d1"
+    inputs:
+      - table: cmc_ama_multi_tf_u
+        columns: [d1]
+        filters:
+          indicator: dema
+          params_hash: 514ffe35
+    tags: [ama, dema, momentum]
+
+  ama_dema_21_value:
+    lifecycle: experimental
+    description: "DEMA(21) value -- Double EMA level, period 21"
+    compute:
+      mode: inline
+      expression: "ama"
+    inputs:
+      - table: cmc_ama_multi_tf_u
+        columns: [ama]
+        filters:
+          indicator: dema
+          params_hash: d47fe5cc
+    tags: [ama, dema, trend]
+
+  ama_dema_21_d1:
+    lifecycle: experimental
+    description: "DEMA(21) first derivative (momentum)"
+    compute:
+      mode: inline
+      expression: "d1"
+    inputs:
+      - table: cmc_ama_multi_tf_u
+        columns: [d1]
+        filters:
+          indicator: dema
+          params_hash: d47fe5cc
+    tags: [ama, dema, momentum]
+
+  ama_dema_50_value:
+    lifecycle: experimental
+    description: "DEMA(50) value -- Double EMA level, period 50"
+    compute:
+      mode: inline
+      expression: "ama"
+    inputs:
+      - table: cmc_ama_multi_tf_u
+        columns: [ama]
+        filters:
+          indicator: dema
+          params_hash: a4b71eb4
+    tags: [ama, dema, trend]
+
+  ama_dema_50_d1:
+    lifecycle: experimental
+    description: "DEMA(50) first derivative (momentum)"
+    compute:
+      mode: inline
+      expression: "d1"
+    inputs:
+      - table: cmc_ama_multi_tf_u
+        columns: [d1]
+        filters:
+          indicator: dema
+          params_hash: a4b71eb4
+    tags: [ama, dema, momentum]
+
+  ama_dema_200_value:
+    lifecycle: experimental
+    description: "DEMA(200) value -- Double EMA level, period 200"
+    compute:
+      mode: inline
+      expression: "ama"
+    inputs:
+      - table: cmc_ama_multi_tf_u
+        columns: [ama]
+        filters:
+          indicator: dema
+          params_hash: 0fca19a1
+    tags: [ama, dema, trend, slow]
+
+  ama_dema_200_d1:
+    lifecycle: experimental
+    description: "DEMA(200) first derivative (momentum)"
+    compute:
+      mode: inline
+      expression: "d1"
+    inputs:
+      - table: cmc_ama_multi_tf_u
+        columns: [d1]
+        filters:
+          indicator: dema
+          params_hash: 0fca19a1
+    tags: [ama, dema, momentum, slow]
+
+  # -------------------------------------------------------------------------
+  # TEMA variants: 5 param sets, 2 columns each (ama, d1)
+  # -------------------------------------------------------------------------
+
+  ama_tema_9_value:
+    lifecycle: experimental
+    description: "TEMA(9) value -- Triple EMA level, period 9"
+    compute:
+      mode: inline
+      expression: "ama"
+    inputs:
+      - table: cmc_ama_multi_tf_u
+        columns: [ama]
+        filters:
+          indicator: tema
+          params_hash: 514ffe35
+    tags: [ama, tema, trend]
+
+  ama_tema_9_d1:
+    lifecycle: experimental
+    description: "TEMA(9) first derivative (momentum)"
+    compute:
+      mode: inline
+      expression: "d1"
+    inputs:
+      - table: cmc_ama_multi_tf_u
+        columns: [d1]
+        filters:
+          indicator: tema
+          params_hash: 514ffe35
+    tags: [ama, tema, momentum]
+
+  ama_tema_21_value:
+    lifecycle: experimental
+    description: "TEMA(21) value -- Triple EMA level, period 21"
+    compute:
+      mode: inline
+      expression: "ama"
+    inputs:
+      - table: cmc_ama_multi_tf_u
+        columns: [ama]
+        filters:
+          indicator: tema
+          params_hash: d47fe5cc
+    tags: [ama, tema, trend]
+
+  ama_tema_21_d1:
+    lifecycle: experimental
+    description: "TEMA(21) first derivative (momentum)"
+    compute:
+      mode: inline
+      expression: "d1"
+    inputs:
+      - table: cmc_ama_multi_tf_u
+        columns: [d1]
+        filters:
+          indicator: tema
+          params_hash: d47fe5cc
+    tags: [ama, tema, momentum]
+
+  ama_tema_50_value:
+    lifecycle: experimental
+    description: "TEMA(50) value -- Triple EMA level, period 50"
+    compute:
+      mode: inline
+      expression: "ama"
+    inputs:
+      - table: cmc_ama_multi_tf_u
+        columns: [ama]
+        filters:
+          indicator: tema
+          params_hash: a4b71eb4
+    tags: [ama, tema, trend]
+
+  ama_tema_50_d1:
+    lifecycle: experimental
+    description: "TEMA(50) first derivative (momentum)"
+    compute:
+      mode: inline
+      expression: "d1"
+    inputs:
+      - table: cmc_ama_multi_tf_u
+        columns: [d1]
+        filters:
+          indicator: tema
+          params_hash: a4b71eb4
+    tags: [ama, tema, momentum]
+
+  ama_tema_200_value:
+    lifecycle: experimental
+    description: "TEMA(200) value -- Triple EMA level, period 200"
+    compute:
+      mode: inline
+      expression: "ama"
+    inputs:
+      - table: cmc_ama_multi_tf_u
+        columns: [ama]
+        filters:
+          indicator: tema
+          params_hash: 0fca19a1
+    tags: [ama, tema, trend, slow]
+
+  ama_tema_200_d1:
+    lifecycle: experimental
+    description: "TEMA(200) first derivative (momentum)"
+    compute:
+      mode: inline
+      expression: "d1"
+    inputs:
+      - table: cmc_ama_multi_tf_u
+        columns: [d1]
+        filters:
+          indicator: tema
+          params_hash: 0fca19a1
+    tags: [ama, tema, momentum, slow]
+
+  # -------------------------------------------------------------------------
+  # HMA variants: 5 param sets, 2 columns each (ama, d1)
+  # -------------------------------------------------------------------------
+
+  ama_hma_9_value:
+    lifecycle: experimental
+    description: "HMA(9) value -- Hull MA level, period 9"
+    compute:
+      mode: inline
+      expression: "ama"
+    inputs:
+      - table: cmc_ama_multi_tf_u
+        columns: [ama]
+        filters:
+          indicator: hma
+          params_hash: 514ffe35
+    tags: [ama, hma, trend]
+
+  ama_hma_9_d1:
+    lifecycle: experimental
+    description: "HMA(9) first derivative (momentum)"
+    compute:
+      mode: inline
+      expression: "d1"
+    inputs:
+      - table: cmc_ama_multi_tf_u
+        columns: [d1]
+        filters:
+          indicator: hma
+          params_hash: 514ffe35
+    tags: [ama, hma, momentum]
+
+  ama_hma_21_value:
+    lifecycle: experimental
+    description: "HMA(21) value -- Hull MA level, period 21"
+    compute:
+      mode: inline
+      expression: "ama"
+    inputs:
+      - table: cmc_ama_multi_tf_u
+        columns: [ama]
+        filters:
+          indicator: hma
+          params_hash: d47fe5cc
+    tags: [ama, hma, trend]
+
+  ama_hma_21_d1:
+    lifecycle: experimental
+    description: "HMA(21) first derivative (momentum)"
+    compute:
+      mode: inline
+      expression: "d1"
+    inputs:
+      - table: cmc_ama_multi_tf_u
+        columns: [d1]
+        filters:
+          indicator: hma
+          params_hash: d47fe5cc
+    tags: [ama, hma, momentum]
+
+  ama_hma_50_value:
+    lifecycle: experimental
+    description: "HMA(50) value -- Hull MA level, period 50"
+    compute:
+      mode: inline
+      expression: "ama"
+    inputs:
+      - table: cmc_ama_multi_tf_u
+        columns: [ama]
+        filters:
+          indicator: hma
+          params_hash: a4b71eb4
+    tags: [ama, hma, trend]
+
+  ama_hma_50_d1:
+    lifecycle: experimental
+    description: "HMA(50) first derivative (momentum)"
+    compute:
+      mode: inline
+      expression: "d1"
+    inputs:
+      - table: cmc_ama_multi_tf_u
+        columns: [d1]
+        filters:
+          indicator: hma
+          params_hash: a4b71eb4
+    tags: [ama, hma, momentum]
+
+  ama_hma_200_value:
+    lifecycle: experimental
+    description: "HMA(200) value -- Hull MA level, period 200"
+    compute:
+      mode: inline
+      expression: "ama"
+    inputs:
+      - table: cmc_ama_multi_tf_u
+        columns: [ama]
+        filters:
+          indicator: hma
+          params_hash: 0fca19a1
+    tags: [ama, hma, trend, slow]
+
+  ama_hma_200_d1:
+    lifecycle: experimental
+    description: "HMA(200) first derivative (momentum)"
+    compute:
+      mode: inline
+      expression: "d1"
+    inputs:
+      - table: cmc_ama_multi_tf_u
+        columns: [d1]
+        filters:
+          indicator: hma
+          params_hash: 0fca19a1
+    tags: [ama, hma, momentum, slow]
+
+  # =========================================================================
+  # CATEGORY C: EMA crossover features
+  #
+  # SKIPPED: ExperimentRunner._compute_feature for dotpath mode calls
+  # fn(input_df) with no kwargs support. Two inputs from cmc_ema_multi_tf_u
+  # with different period filters would both produce an 'ema' column, causing
+  # a name collision on inner join. Additionally, a compute function that
+  # loads data from DB requires a connection object not available in dotpath
+  # fn(input_df) signature.
+  #
+  # Resolution: EMA crossovers are better implemented as inline features on
+  # cmc_features once EMA spread columns are added to that table, or as a
+  # separate ExperimentRunner enhancement (support column renaming on multi-
+  # input merge). Deferred to Phase 55-04 (ExperimentRunner enhancement).
+  # =========================================================================
+
+  # =========================================================================
+  # CATEGORY D: Adaptive RSI
+  # =========================================================================
+
+  adaptive_rsi_normalized:
+    lifecycle: experimental
+    description: "RSI(14) normalized by rolling 20th/80th percentile window (100-bar)"
+    compute:
+      mode: inline
+      expression: "(rsi_14 - rsi_14.rolling(100).quantile(0.20)) / (rsi_14.rolling(100).quantile(0.80) - rsi_14.rolling(100).quantile(0.20) + 1e-10)"
+    inputs:
+      - table: cmc_ta_daily
+        columns: [rsi_14]
+    tags: [rsi, adaptive, momentum]
