@@ -20,6 +20,7 @@ import io
 
 import pandas as pd
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 from ta_lab2.analysis.ic import plot_ic_decay, plot_rolling_ic
 
@@ -526,6 +527,248 @@ def build_stat_timeseries_chart(
         title=title,
         xaxis_title="Date",
         yaxis_title=stat_col,
+    )
+
+    return fig
+
+
+# ---------------------------------------------------------------------------
+# Operational charts
+# ---------------------------------------------------------------------------
+
+
+def build_pnl_drawdown_chart(pnl_df: pd.DataFrame) -> go.Figure:
+    """
+    Build a two-panel stacked cumulative PnL + drawdown chart.
+
+    Top panel (65%): cumulative PnL line in green.
+    Bottom panel (35%): drawdown % as a filled red area.
+
+    Parameters
+    ----------
+    pnl_df : pd.DataFrame
+        Output of load_daily_pnl_series() with columns: trade_date,
+        cumulative_pnl, drawdown_pct.
+
+    Returns
+    -------
+    go.Figure
+        Plotly figure ready for st.plotly_chart(fig, theme=None).
+    """
+    fig = make_subplots(
+        rows=2,
+        cols=1,
+        shared_xaxes=True,
+        row_heights=[0.65, 0.35],
+        vertical_spacing=0.05,
+    )
+
+    if pnl_df is None or pnl_df.empty:
+        fig.add_annotation(
+            text="No PnL data available",
+            xref="paper",
+            yref="paper",
+            x=0.5,
+            y=0.5,
+            showarrow=False,
+            font={"size": 16},
+        )
+        fig.update_layout(template="plotly_dark", height=500)
+        return fig
+
+    # Use .tolist() to avoid tz-aware datetime .values pitfall (MEMORY.md)
+    x_dates = pnl_df["trade_date"].tolist()
+
+    fig.add_trace(
+        go.Scatter(
+            x=x_dates,
+            y=pnl_df["cumulative_pnl"],
+            mode="lines",
+            name="Cumulative PnL",
+            line={"color": "rgb(0,200,100)", "width": 1.5},
+        ),
+        row=1,
+        col=1,
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=x_dates,
+            y=pnl_df["drawdown_pct"],
+            mode="lines",
+            name="Drawdown %",
+            fill="tozeroy",
+            line={"color": "rgb(220,50,50)", "width": 1.5},
+        ),
+        row=2,
+        col=1,
+    )
+
+    fig.update_yaxes(title_text="Cumulative PnL ($)", row=1, col=1)
+    fig.update_yaxes(title_text="Drawdown %", row=2, col=1)
+
+    fig.update_layout(
+        template="plotly_dark",
+        height=500,
+        showlegend=True,
+    )
+
+    return fig
+
+
+def build_tracking_error_chart(
+    drift_df: pd.DataFrame,
+    threshold_5d: float | None = None,
+    threshold_30d: float | None = None,
+) -> go.Figure:
+    """
+    Build a tracking error time series chart with optional threshold lines.
+
+    Parameters
+    ----------
+    drift_df : pd.DataFrame
+        Output of load_drift_timeseries() with columns: metric_date,
+        tracking_error_5d, tracking_error_30d.
+    threshold_5d : float | None
+        5-day tracking error threshold to draw as a dashed red horizontal line.
+    threshold_30d : float | None
+        30-day tracking error threshold to draw as a dotted red horizontal line.
+
+    Returns
+    -------
+    go.Figure
+        Plotly figure ready for st.plotly_chart(fig, theme=None).
+    """
+    fig = go.Figure()
+
+    if drift_df is None or drift_df.empty:
+        fig.add_annotation(
+            text="No drift data available",
+            xref="paper",
+            yref="paper",
+            x=0.5,
+            y=0.5,
+            showarrow=False,
+            font={"size": 16},
+        )
+        fig.update_layout(
+            template="plotly_dark",
+            title="Tracking Error Time Series",
+            height=400,
+        )
+        return fig
+
+    x_dates = drift_df["metric_date"].tolist()
+
+    fig.add_trace(
+        go.Scatter(
+            x=x_dates,
+            y=drift_df["tracking_error_5d"],
+            mode="lines",
+            name="TE 5d",
+            line={"color": "rgb(255,165,0)", "width": 1.5},
+        )
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=x_dates,
+            y=drift_df["tracking_error_30d"],
+            mode="lines",
+            name="TE 30d",
+            line={"color": "rgb(100,149,237)", "width": 1.5},
+        )
+    )
+
+    if threshold_5d is not None:
+        fig.add_hline(
+            y=threshold_5d,
+            line_dash="dash",
+            line_color="red",
+            annotation_text="5d threshold",
+        )
+
+    if threshold_30d is not None:
+        fig.add_hline(
+            y=threshold_30d,
+            line_dash="dot",
+            line_color="red",
+            annotation_text="30d threshold",
+        )
+
+    fig.update_layout(
+        template="plotly_dark",
+        title="Tracking Error Time Series",
+        yaxis_title="Tracking Error",
+        height=400,
+    )
+
+    return fig
+
+
+def build_equity_overlay_chart(drift_df: pd.DataFrame) -> go.Figure:
+    """
+    Build a paper vs replay equity overlay chart.
+
+    Two lines on a single panel: paper cumulative PnL vs replay PIT cumulative PnL.
+
+    Parameters
+    ----------
+    drift_df : pd.DataFrame
+        Output of load_drift_timeseries() with columns: metric_date,
+        paper_cumulative_pnl, replay_pit_cumulative_pnl.
+
+    Returns
+    -------
+    go.Figure
+        Plotly figure ready for st.plotly_chart(fig, theme=None).
+    """
+    fig = go.Figure()
+
+    if drift_df is None or drift_df.empty:
+        fig.add_annotation(
+            text="No drift data available",
+            xref="paper",
+            yref="paper",
+            x=0.5,
+            y=0.5,
+            showarrow=False,
+            font={"size": 16},
+        )
+        fig.update_layout(
+            template="plotly_dark",
+            title="Paper vs Replay Equity",
+            height=400,
+        )
+        return fig
+
+    x_dates = drift_df["metric_date"].tolist()
+
+    fig.add_trace(
+        go.Scatter(
+            x=x_dates,
+            y=drift_df["paper_cumulative_pnl"],
+            mode="lines",
+            name="Paper PnL",
+            line={"color": "rgb(0,200,100)", "width": 1.5},
+        )
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=x_dates,
+            y=drift_df["replay_pit_cumulative_pnl"],
+            mode="lines",
+            name="Replay PnL (PIT)",
+            line={"color": "rgb(100,149,237)", "width": 1.5},
+        )
+    )
+
+    fig.update_layout(
+        template="plotly_dark",
+        title="Paper vs Replay Equity",
+        yaxis_title="Cumulative PnL ($)",
+        height=400,
     )
 
     return fig
