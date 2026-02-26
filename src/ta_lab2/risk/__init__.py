@@ -1,4 +1,4 @@
-"""Risk controls for paper trading -- kill switch, position caps, daily loss, circuit breaker, tail risk."""
+"""Risk controls for paper trading -- kill switch, position caps, daily loss, circuit breaker, tail risk, margin monitoring."""
 
 from ta_lab2.risk.flatten_trigger import (
     EscalationState,
@@ -11,6 +11,13 @@ from ta_lab2.risk.kill_switch import (
     get_kill_switch_status,
     print_kill_switch_status,
     re_enable_trading,
+)
+from ta_lab2.risk.margin_monitor import (
+    MarginState,
+    MarginTier,
+    compute_cross_margin_utilization,
+    compute_margin_utilization,
+    load_margin_tiers,
 )
 from ta_lab2.risk.override_manager import OverrideInfo, OverrideManager
 from ta_lab2.risk.risk_engine import RiskCheckResult, RiskEngine, RiskLimits
@@ -29,4 +36,9 @@ __all__ = [
     "EscalationState",
     "FlattenTriggerResult",
     "check_flatten_trigger",
+    "MarginTier",
+    "MarginState",
+    "compute_margin_utilization",
+    "load_margin_tiers",
+    "compute_cross_margin_utilization",
 ]
