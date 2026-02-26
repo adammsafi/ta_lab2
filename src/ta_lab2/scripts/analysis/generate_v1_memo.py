@@ -2303,20 +2303,1193 @@ def _section_failure_modes(
     return "\n".join(lines)
 
 
-def _section_research_tracks(*args, **kwargs) -> str:
-    return "## 5. Research Track Answers\n\n_To be completed in Plan 03._\n"
+def _section_research_tracks(
+    bakeoff: dict[str, pd.DataFrame] | None = None,
+    policy_docs: dict[str, str] | None = None,
+    engine=None,
+) -> str:
+    """
+    Section 5: Research Track Answers.
+    Covers all 6 V1 research tracks with methodology, findings, and remaining questions.
+    """
+    if bakeoff is None:
+        bakeoff = {}
+    if policy_docs is None:
+        policy_docs = {}
+
+    ic_df = bakeoff.get("ic", pd.DataFrame())
+    composite_df = bakeoff.get("composite", pd.DataFrame())
+
+    # ---------------------------------------------------------------------------
+    # Track 1: Core Edge Selection (Phase 42)
+    # ---------------------------------------------------------------------------
+    track1_lines = [
+        "### Track 1: Core Edge Selection (Phase 42)",
+        "",
+        "**Methodology:** IC evaluation across all `cmc_features` columns on BTC 1D daily bars "
+        "(Spearman IC with purged boundaries), followed by walk-forward bake-off with PurgedKFold "
+        "(10 folds, 20-bar embargo). Composite scoring under 4 weighting schemes (Balanced, Risk Focus, "
+        "Quality Focus, Low Cost). PSR and DSR computed for all strategies to correct Sharpe significance.",
+        "",
+        "**Findings:**",
+        "",
+    ]
+
+    # IC table
+    if not ic_df.empty:
+        top_n = min(5, len(ic_df))
+        ic_sorted = ic_df.copy()
+        # Try to sort by IC-IR column (various column name possibilities)
+        ic_ir_col = next(
+            (c for c in ic_df.columns if "ic_ir" in c.lower() or "icir" in c.lower()),
+            None,
+        )
+        if ic_ir_col:
+            ic_sorted = ic_sorted.sort_values(ic_ir_col, ascending=False)
+        ic_sorted = ic_sorted.head(top_n)
+
+        track1_lines.append("**Top 5 Features by |IC-IR| (from Phase 42 IC sweep):**")
+        track1_lines.append("")
+
+        # Build table from available columns
+        feat_col = next(
+            (c for c in ic_df.columns if "feature" in c.lower()), ic_df.columns[0]
+        )
+        rows = []
+        for i, (_, row) in enumerate(ic_sorted.iterrows(), 1):
+            feat = str(row.get(feat_col, row.iloc[0]))
+            ic_ir_val = (
+                f"{float(row[ic_ir_col]):.4f}"
+                if ic_ir_col and ic_ir_col in row
+                else "—"
+            )
+            mean_ic_col = next(
+                (
+                    c
+                    for c in ic_df.columns
+                    if "mean_ic" in c.lower() or "mean" in c.lower()
+                ),
+                None,
+            )
+            mean_ic_val = (
+                f"{float(row[mean_ic_col]):.4f}"
+                if mean_ic_col and mean_ic_col in row
+                else "—"
+            )
+            rows.append([str(i), feat, ic_ir_val, mean_ic_val])
+        track1_lines.append(
+            _format_table(["Rank", "Feature", "|IC-IR|", "Mean IC"], rows)
+        )
+        track1_lines.append("")
+    else:
+        # Fallback: known values from BAKEOFF_SCORECARD.md
+        track1_lines += [
+            "**Top 5 Features by |IC-IR| (from BAKEOFF_SCORECARD.md):**",
+            "",
+            "| Rank | Feature | |IC-IR| | Mean IC |",
+            "|------|---------|---------|---------|",
+            "| 1 | vol_rs_126_is_outlier | 1.4073 | 0.0221 |",
+            "| 2 | vol_parkinson_126_is_outlier | 0.9809 | 0.0352 |",
+            "| 3 | bb_ma_20 | 0.9749 | 0.0362 |",
+            "| 4 | vol_gk_126_is_outlier | 0.8049 | 0.0352 |",
+            "| 5 | vol_log_roll_20_is_outlier | 0.8046 | 0.0168 |",
+            "",
+        ]
+
+    # Strategy ranking
+    if not composite_df.empty and "strategy_label" in composite_df.columns:
+        # Try to extract top strategies from composite scores
+        score_col = next(
+            (
+                c
+                for c in composite_df.columns
+                if "composite" in c.lower() or "score" in c.lower()
+            ),
+            None,
+        )
+        if score_col:
+            top_strats = composite_df.sort_values(score_col, ascending=False).head(3)
+            track1_lines.append(
+                "**Top 3 Strategies by Composite Score (Balanced Scheme):**"
+            )
+            track1_lines.append("")
+            rows = []
+            for i, (_, row) in enumerate(top_strats.iterrows(), 1):
+                rows.append(
+                    [
+                        str(i),
+                        str(row["strategy_label"]),
+                        f"{float(row[score_col]):.4f}",
+                    ]
+                )
+            track1_lines.append(
+                _format_table(["Rank", "Strategy", "Composite Score"], rows)
+            )
+            track1_lines.append("")
+    else:
+        track1_lines += [
+            "**Strategy Rankings (from BAKEOFF_SCORECARD.md):**",
+            "",
+            "| Rank | Strategy | OOS Sharpe | PSR | Robust (top-2 in 3+/4 schemes) |",
+            "|------|----------|-----------|-----|-------------------------------|",
+            "| 1 | ema_trend(fast=ema_17, slow=ema_77) | 1.401 ± 1.111 | 1.0000 | Yes (#1 in all 4) |",
+            "| 2 | ema_trend(fast=ema_21, slow=ema_50) | 1.397 ± 1.168 | 1.0000 | Yes (3/4) |",
+            "| 3 | breakout_atr (best variant) | 0.77 | ~0.85 | No (0/4) |",
+            "",
+        ]
+
+    track1_lines += [
+        "**Key IC findings:**",
+        "- Outlier flags dominate by IC-IR (consistency metric): `vol_rs_126_is_outlier` IC-IR 1.41 "
+        "— high consistency, but low mean IC (0.02). These features are consistent but economically small.",
+        "- Bollinger band signals (`bb_ma_20`, `bb_up_20_2`, `bb_lo_20_2`) show consistently negative "
+        "IC-IR — a mean-reversion edge at the 1D horizon against the trend.",
+        "- EMA crossover features are not in `cmc_features` (they have period granularity); "
+        "their edge was captured by the walk-forward bake-off directly.",
+        "- Bar return series (`ret_arith`, `ret_log`, etc.) exhibit positive IC at 1D–10D horizons, "
+        "consistent with short-term momentum.",
+        "",
+        "**Remaining Questions:**",
+        "- Why do EMA crossovers dominate in OOS Sharpe despite having no significant IC in the "
+        "static IC sweep? Hypothesis: IC measures linear correlation at a fixed horizon; EMA crossovers "
+        "are non-linear regime indicators that IC doesn't capture well.",
+        "- Are there IC-significant features (e.g., the outlier flags at IC-IR 1.4) that could be "
+        "converted to signal generators with higher Sharpe than the current 3 signal types?",
+        "- Would regime-conditioning the IC analysis (bull vs bear vs sideways) reveal different "
+        "feature rankings that the aggregate IC sweep misses?",
+        "",
+    ]
+
+    # ---------------------------------------------------------------------------
+    # Track 2: Loss Limits & Kill-Switch Policy (Phases 46, 48)
+    # ---------------------------------------------------------------------------
+    var_text = policy_docs.get(
+        "loss_limits/VAR_REPORT.md",
+        _safe_read_text(_LOSS_LIMITS_DIR / "VAR_REPORT.md"),
+    )
+    stop_text = policy_docs.get(
+        "loss_limits/STOP_SIMULATION_REPORT.md",
+        _safe_read_text(_LOSS_LIMITS_DIR / "STOP_SIMULATION_REPORT.md"),
+    )
+    pool_text = policy_docs.get(
+        "loss_limits/POOL_CAPS.md",
+        _safe_read_text(_LOSS_LIMITS_DIR / "POOL_CAPS.md"),
+    )
+    override_text = policy_docs.get(
+        "loss_limits/OVERRIDE_POLICY.md",
+        _safe_read_text(_LOSS_LIMITS_DIR / "OVERRIDE_POLICY.md"),
+    )
+
+    track2_lines = [
+        "### Track 2: Loss Limits & Kill-Switch Policy (Phases 46, 48)",
+        "",
+        "**Methodology:** VaR simulation (Historical, Cornish-Fisher, Normal) across 4 strategies "
+        "at 95% and 99% confidence levels. Stop-loss simulation sweeping 15 thresholds "
+        "(hard stop 1-15%, trailing stop 1-15%, time stop 5-30 bars) on BTC 1D data. "
+        "Pool-level cap derivation from empirical MaxDD distribution. Override governance framework "
+        "with time-limited approvals and full audit trail.",
+        "",
+        "**Findings:**",
+        "",
+    ]
+
+    if var_text:
+        track2_lines += [
+            "**VaR thresholds (from VAR_REPORT.md):**",
+            "",
+            "| Metric | Value | Source |",
+            "|--------|-------|--------|",
+            "| Historical VaR (95%) | -5.93% | VAR_REPORT.md — consistent across all strategies |",
+            "| Historical VaR (99%) | -12.84% | VAR_REPORT.md |",
+            "| CVaR (95%) | -10.50% | Expected shortfall beyond VaR threshold |",
+            "| Recommended daily loss cap | 5.9% | Median hist VaR (95%) across strategies |",
+            "| Cornish-Fisher reliability | No | High excess kurtosis (17.17) invalidates CF adjustment |",
+            "",
+        ]
+    else:
+        track2_lines += [
+            "**VaR thresholds:** VAR_REPORT.md not found; expected at reports/loss_limits/VAR_REPORT.md",
+            "",
+        ]
+
+    if stop_text:
+        track2_lines += [
+            "**Stop-loss simulation findings (from STOP_SIMULATION_REPORT.md):**",
+            "",
+            "Hard stops (1-15%) do not materially reduce MaxDD for ema_trend(17,77) on BTC — "
+            "MaxDD remains 74-78% across all hard stop thresholds. This is because the MaxDD "
+            "events are prolonged bear markets (2018, 2022), not single-day crashes. "
+            "Trailing stops at 10% show slightly better Sharpe (808k vs 779k baseline) "
+            "with no meaningful MaxDD improvement. The recommendation from this analysis: "
+            "**stop-loss on individual positions is ineffective for trend-following strategies on "
+            "crypto bear markets. Position sizing and circuit breakers at the portfolio level are "
+            "the correct risk lever.**",
+            "",
+        ]
+    else:
+        track2_lines += [
+            "**Stop-loss simulation:** STOP_SIMULATION_REPORT.md not found.",
+            "",
+        ]
+
+    if pool_text:
+        track2_lines += [
+            "**Pool-level caps (from POOL_CAPS.md):**",
+            "",
+            "| Pool | Daily Loss Cap | Max Position % | DD Target | V1 Status |",
+            "|------|---------------|----------------|-----------|-----------|",
+            "| Conservative | 7.73% | 10% | <= 12% | Defined only |",
+            "| Core | 15.46% | 20% | <= 20% | Defined only |",
+            "| Opportunistic | 23.19% | 40% | <= 40% | Defined only |",
+            "| **Aggregate** | **15.00%** | **15%** | **<= 15%** | **ENFORCED (V1)** |",
+            "",
+            "V1 uses only the Aggregate pool (single portfolio). Pool-specific rows exist for "
+            "future multi-pool deployment.",
+            "",
+        ]
+
+    if override_text:
+        track2_lines += [
+            "**Override governance (from OVERRIDE_POLICY.md):**",
+            "- Default override duration: 24 hours; maximum 7 days",
+            "- 5 reason categories: market_condition, strategy_review, technical_issue, "
+            "manual_risk_reduction, testing",
+            "- All overrides logged to `cmc_risk_overrides` with full audit trail",
+            "- Solo operator in V1: no approval chain required",
+            "",
+        ]
+
+    track2_lines += [
+        "**Remaining Questions:**",
+        "- At what portfolio drawdown level should the kill switch permanently halt trading "
+        "(vs circuit breaker which pauses)? V1 defines 15% circuit breaker; kill switch is not "
+        "yet quantitatively calibrated.",
+        "- Should the daily loss cap (5.9%) be applied at the signal level (per-strategy) or "
+        "only at the aggregate portfolio level? V1 enforces only aggregate.",
+        "- Are position-level hard stops worth implementing for faster-moving assets if V1 "
+        "expands beyond BTC/ETH?",
+        "",
+    ]
+
+    # ---------------------------------------------------------------------------
+    # Track 3: Tail-Risk Policy (Phase 49)
+    # ---------------------------------------------------------------------------
+    tail_policy_text = policy_docs.get(
+        "tail_risk/TAIL_RISK_POLICY.md",
+        _safe_read_text(_TAIL_RISK_DIR / "TAIL_RISK_POLICY.md"),
+    )
+    sizing_text = policy_docs.get(
+        "tail_risk/SIZING_COMPARISON.md",
+        _safe_read_text(_TAIL_RISK_DIR / "SIZING_COMPARISON.md"),
+    )
+
+    track3_lines = [
+        "### Track 3: Tail-Risk Policy (Phase 49)",
+        "",
+        "**Methodology:** Compared 3 position sizing variants (Fixed+Stops, Vol-Sized, "
+        "Vol-Sized+Stops) across 4 bakeoff strategies and 2 vol metrics (ATR-14 and 20d realized vol). "
+        "Calibrated flatten and reduce triggers from BTC historical data (2010-2025, n=5,613 bars). "
+        "Validated trigger coverage against 4 historical crash events.",
+        "",
+        "**Findings:**",
+        "",
+    ]
+
+    if sizing_text:
+        track3_lines += [
+            "**Vol-sizing vs hard stops comparison (from SIZING_COMPARISON.md):**",
+            "",
+            "| Variant | Sharpe | MaxDD | Worst-5-Day | Composite Score |",
+            "|---------|--------|-------|-------------|-----------------|",
+            "| A: Fixed 30% + hard stop 7% | 0.648 | -40.44% | -20.18% | 0.6726 |",
+            "| B: Vol-Sized (ATR, 1% risk budget) | 0.742 | -27.61% | -10.10% | 0.7840 |",
+            "| C: Vol-Sized + hard stop 7% | 0.739 | -27.62% | -10.09% | 0.7778 |",
+            "",
+            "**Winner: Variant B (Vol-Sized, no stops).** Adding stops on top of vol-sizing "
+            "does not improve MaxDD (27.61% vs 27.62%) and marginally reduces Sharpe "
+            "(0.742 vs 0.739). Vol-sizing already provides dynamic deleveraging: at crisis ATR "
+            "(15%), position automatically shrinks from 30% to 6.7%.",
+            "",
+        ]
+
+    if tail_policy_text:
+        track3_lines += [
+            "**Flatten/reduce trigger calibration (from TAIL_RISK_POLICY.md):**",
+            "",
+            "| Trigger | Condition | Level | Historical Trigger Rate |",
+            "|---------|-----------|-------|-------------------------|",
+            "| Exchange halt | API health check fails | FLATTEN | Rare (FTX: 2022-11-08) |",
+            "| Extreme single-day return | |daily return| > 15% | FLATTEN | ~6.6 days/year |",
+            "| Vol spike (3-sigma) | 20d rolling vol > 11.94%/day | FLATTEN | ~8.5 days/year |",
+            "| Correlation breakdown | BTC/ETH 30d corr < -0.20 | FLATTEN | ~5th percentile |",
+            "| Vol spike (2-sigma) | 20d rolling vol > 9.23%/day | REDUCE | ~19 days/year |",
+            "",
+            "**Escalation path:** Normal -> Reduce (auto at 2-sigma vol) -> Flatten "
+            "(auto at 3-sigma vol or exchange halt or |return|>15%). "
+            "Re-entry: 21-day cooldown after flatten, 14-day cooldown after reduce.",
+            "",
+            "**Historical crash coverage:** "
+            "COVID 2020-03-12 (37.2% return -> FLATTEN same day); "
+            "FTX 2022 (exchange halt -> FLATTEN); "
+            "COVID March 15+ (vol spike -> REDUCE on day 3). "
+            "May 2021 12.5% dip is handled by Phase 46 circuit breaker, not tail policy.",
+            "",
+        ]
+
+    track3_lines += [
+        "**Remaining Questions:**",
+        "- The 15% single-day return threshold for FLATTEN was chosen empirically; "
+        "should this scale with the current vol regime (e.g., tighter threshold when "
+        "vol is already elevated)?",
+        "- De-escalation cooldowns (21-day flatten, 14-day reduce) were not backtested; "
+        "they may be overly conservative during fast recoveries (COVID was V-shaped).",
+        "- Vol-sizing with ATR-14 was the winner for BTC 1D; does this generalize to "
+        "ETH and to shorter timeframes (4H, 7D)?",
+        "",
+    ]
+
+    # ---------------------------------------------------------------------------
+    # Track 4: Live/Backtest Drift Guard (Phase 47)
+    # ---------------------------------------------------------------------------
+    track4_lines = [
+        "### Track 4: Live/Backtest Drift Guard (Phase 47)",
+        "",
+        "**Methodology:** Designed and implemented a multi-source drift attribution system "
+        "that monitors live paper trading execution against a reference backtest replay. "
+        "Drift is decomposed across 6 independent sources to enable targeted remediation.",
+        "",
+        "**Architecture (from Phase 47 implementation):**",
+        "",
+        "| Component | Role |",
+        "|-----------|------|",
+        "| DriftMonitor | Computes tracking error (5-day, 30-day) between paper and replay P&L |",
+        "| DriftAttributor | Decomposes drift into 6 sources |",
+        "| DriftGuard (Streamlit page) | Operational dashboard showing live drift metrics |",
+        "| GraduatedResponse | Three response levels: monitor, alert, investigate |",
+        "",
+        "**6 Drift Attribution Sources:**",
+        "",
+        "| Source | What It Measures |",
+        "|--------|-----------------|",
+        "| Signal timing | Lag between signal generation and order placement |",
+        "| Fill price | Slippage vs backtest assumed price (close of previous bar) |",
+        "| Position sizing | Fractional differences from different rounding approaches |",
+        "| Fee delta | Actual fees vs backtest fee assumption (16 bps) |",
+        "| Data gap | Missing price data causing different entry/exit points |",
+        "| Regime drift | Strategy behavior differences under regime labels |",
+        "",
+        "**Findings:**",
+        "",
+        "The drift guard architecture is fully implemented (Phases 47, 52-04). "
+        "Phase 53 conducted kill switch exercises to validate the operational flow. "
+        "The system is in place and ready to collect real live/backtest divergence data "
+        "once live paper trading generates meaningful history (30+ days). "
+        "No significant structural drift was observed in Phase 53 exercises — "
+        "the kill switch exercises were design validation, not performance validation.",
+        "",
+        "**Remaining Questions:**",
+        "- What is the observed tracking error after 30+ days of live paper trading? "
+        "V1 closes without this data (paper trading not run long enough).",
+        "- Which of the 6 sources dominates in practice? Hypothesis is fill price (slippage "
+        "vs end-of-day assumed price) but this is unconfirmed.",
+        "- Should tracking error trigger an automatic strategy review (e.g., if 30-day TE "
+        "exceeds 0.5%, pause and investigate), or remain advisory?",
+        "",
+    ]
+
+    # ---------------------------------------------------------------------------
+    # Track 5: Data Economics (Phase 50)
+    # ---------------------------------------------------------------------------
+    data_econ_path = _PROJECT_ROOT / "reports" / "data-economics" / "cost-audit.md"
+    data_econ_text = _safe_read_text(data_econ_path)
+    phase50_context = _safe_read_text(
+        _PROJECT_ROOT / ".planning" / "phases" / "50-data-economics" / "50-CONTEXT.md"
+    )
+
+    track5_lines = [
+        "### Track 5: Data Economics (Phase 50)",
+        "",
+        "**Methodology:** Total cost of ownership audit for the ta_lab2 data infrastructure, "
+        "covering PostgreSQL storage (measured via pg_database_size), data source costs (CMC API), "
+        "compute, and developer time. Included TCO modeling at scale projections and vendor comparison "
+        "for data lake migration triggers.",
+        "",
+        "**Findings:**",
+        "",
+    ]
+
+    if data_econ_text:
+        track5_lines += [
+            "**Infrastructure summary (from cost-audit.md, measured 2026-02-25):**",
+            "",
+            "| Metric | Measured Value | Notes |",
+            "|--------|----------------|-------|",
+            "| Total DB size | 46 GB | ~4x larger than pre-audit estimate (8-12 GB) |",
+            "| Total tables | 171 | Includes index-heavy unified _u tables |",
+            "| Total live rows | ~70.3M | Across all table families |",
+            "| Monthly API cost | $0 | CMC bulk JSON files, manual ingestion |",
+            "| Largest table family | Returns (20 GB) | Bar + EMA returns, all calendar variants |",
+            "| Surprise: cross-asset corr | 4.7 GB alone | Pairwise Pearson/Spearman all TF/window combos |",
+            "",
+            "**Key finding:** The 46 GB size is primarily index overhead (171 tables × N indexes) "
+            "and baseline snapshot tables. The actual data content is ~20-25 GB. "
+            "The index-to-data ratio is high because each (id, ts, tf) primary key on 40+ table "
+            "variants creates substantial B-tree overhead.",
+            "",
+            "**Migration trigger:** Current infrastructure is PostgreSQL on local hardware — "
+            "zero monthly cost. A data lake migration (e.g., TimescaleDB, Parquet/S3) becomes "
+            "economically justified when: (a) DB grows beyond 200 GB or (b) query latency "
+            "on _u tables exceeds 5 seconds for daily refresh queries.",
+            "",
+        ]
+    elif phase50_context:
+        track5_lines += [
+            "**Phase 50 scope (cost-audit.md not available at time of memo generation):**",
+            "",
+            "Phase 50 built and measured the total cost of ownership for ta_lab2 data infrastructure. "
+            "Key scope: PostgreSQL storage audit, CMC API cost tiers, TCO model at 3x/10x growth "
+            "projections, vendor comparison for data lake migration, and migration trigger thresholds.",
+            "",
+        ]
+
+    track5_lines += [
+        "**Remaining Questions:**",
+        "- What is the actual monthly cloud run rate if the database were migrated to AWS/GCP "
+        "vs remaining on local hardware? The current cost is $0 (local), but operational risk "
+        "is high (single point of failure, no backups).",
+        "- When should data lake migration be triggered? Proposed trigger: 200 GB DB size or "
+        "5-second query latency threshold on daily refresh.",
+        "- Should the CMC API transition from manual bulk downloads to automated API calls? "
+        "The current manual approach is free but requires human intervention for each update.",
+        "",
+    ]
+
+    # ---------------------------------------------------------------------------
+    # Track 6: Perps Readiness (Phase 51)
+    # ---------------------------------------------------------------------------
+    perps_path = _PROJECT_ROOT / "reports" / "perps"
+    phase51_context = _safe_read_text(
+        _PROJECT_ROOT / ".planning" / "phases" / "51-perps-readiness" / "51-CONTEXT.md"
+    )
+    venue_playbook_text = _safe_read_text(perps_path / "VENUE_DOWNTIME_PLAYBOOK.md")
+    venue_health_text = _safe_read_text(perps_path / "venue_health_config.yaml")
+
+    track6_lines = [
+        "### Track 6: Perps Readiness (Phase 51)",
+        "",
+        "**Methodology:** Built the technical foundation for perpetual futures paper trading: "
+        "funding rate data model for 6 venues, margin/liquidation model (isolated + cross margin, "
+        "1-10x leverage), backtester extension for funding payments, and venue downtime playbook "
+        "with hedge-on-alternate-venue procedure.",
+        "",
+        "**Findings:**",
+        "",
+    ]
+
+    if venue_playbook_text:
+        track6_lines += [
+            "**Venue coverage (from VENUE_DOWNTIME_PLAYBOOK.md):**",
+            "",
+            "| Venue | Type | Settlement Interval | Primary Pairs |",
+            "|-------|------|--------------------:|---------------|",
+            "| Binance Futures | CEX | 8h | BTC-USDT, ETH-USDT |",
+            "| Hyperliquid | DEX | 1h | BTC, ETH |",
+            "| Bybit | CEX | 8h | BTCUSDT, ETHUSDT |",
+            "| dYdX v4 | On-chain DEX | 1h | BTC-USD, ETH-USD |",
+            "| Aevo | DEX | 1h | BTC, ETH |",
+            "| Aster DEX | DEX | 8h | BTC, ETH |",
+            "",
+        ]
+
+    if phase51_context:
+        track6_lines += [
+            "**Perps infrastructure built in Phase 51:**",
+            "- Funding rate data model: multi-granularity (8h universal, 4h where available, daily rollup)",
+            "- Margin model: isolated and cross margin, 1-10x leverage, venue-specific margin rates",
+            "- Liquidation alerts: 1.5x maintenance margin alert, 1.1x kill switch",
+            "- Backtester extension: `instrument='spot'|'perp'` flag controlling funding/margin behavior",
+            "- Carry trade modeled as strategy variant (long spot + short perp to collect funding)",
+            "- Venue health: graduated status (healthy > degraded > down) with YAML-configurable thresholds",
+            "- Downtime procedure: hedge on alternate venue during degraded/down events",
+            "",
+        ]
+
+    if venue_health_text:
+        track6_lines += [
+            "**Machine-readable configuration:** `reports/perps/venue_health_config.yaml` "
+            "defines latency limits, stale orderbook windows, spread alert thresholds, "
+            "and escalation timers for all 6 venues.",
+            "",
+        ]
+
+    track6_lines += [
+        "**Readiness assessment:** The perps infrastructure (data model, margin model, "
+        "backtester extension, venue playbook) is fully built. "
+        "The missing piece for V2 perps paper trading is actual funding rate data ingestion — "
+        "this requires live API connections to the 6 venues and a scheduled refresh job.",
+        "",
+        "**Remaining Questions:**",
+        "- What is the historical funding rate impact on Sharpe for BTC perps on Binance "
+        "(2021-2025)? V1 approximated perps costs at 3 bps/day; actual rates varied 1-50+ bps/day "
+        "in bull markets. This is the most important unknown for V2 perps strategy evaluation.",
+        "- Which venue is best for V2 perps paper trading? Binance has the deepest liquidity "
+        "and longest data history; Hyperliquid has lower fees and 1h settlement.",
+        "- Is the carry trade (long spot + short perp for funding income) viable as a "
+        "decorrelated return source? Phase 51 built the model but has no empirical results yet.",
+        "",
+    ]
+
+    # ---------------------------------------------------------------------------
+    # Assemble Section 5
+    # ---------------------------------------------------------------------------
+    lines = [
+        "## 5. Research Track Answers",
+        "",
+        "> V1 included 6 parallel research tracks covering strategy selection, risk policy, "
+        "tail risk, drift monitoring, data economics, and perps readiness. "
+        "Each track below documents the methodology, key findings, and open questions "
+        "that feed directly into the V2 roadmap.",
+        "",
+        "---",
+        "",
+    ]
+    lines += track1_lines
+    lines += ["---", ""]
+    lines += track2_lines
+    lines += ["---", ""]
+    lines += track3_lines
+    lines += ["---", ""]
+    lines += track4_lines
+    lines += ["---", ""]
+    lines += track5_lines
+    lines += ["---", ""]
+    lines += track6_lines
+
+    return "\n".join(lines)
 
 
-def _section_key_takeaways(*args, **kwargs) -> str:
-    return "## 6. Key Takeaways\n\n_To be completed in Plan 03._\n"
+def _section_key_takeaways(milestone_data: dict | None = None) -> str:
+    """
+    Section 6: Key Takeaways.
+    Consolidated 8-12 numbered lessons drawn from the full memo.
+    """
+    if milestone_data is None:
+        milestone_data = {}
+
+    total_plans = milestone_data.get("total_plans", 261)
+    total_hours = milestone_data.get("total_hours", "~28 hours")
+    avg_duration = milestone_data.get("avg_duration", "~7 min")
+
+    lines = [
+        "## 6. Key Takeaways",
+        "",
+        "> Consolidated lessons from the V1 build, organized from most surprising to most actionable.",
+        "",
+        f"**1. AI-accelerated quant development is viable at production quality.** "
+        f"{total_plans} plans executed in {total_hours} at {avg_duration}/plan. "
+        "GSD workflow enabled consistent quality across 7 milestones spanning 14 subsystems. "
+        "Zero gap closures were needed after Phase 19 — the upfront CONTEXT.md + RESEARCH.md "
+        "investment pays off in execution reliability.",
+        "",
+        "**2. Trend-following alone cannot survive crypto macro bear markets.** "
+        "The MaxDD gate failure (-75% worst fold, -77% ensemble) is structural, not a tuning problem. "
+        "All 10 strategy variants fail the 15% MaxDD gate. No EMA parameter combination, position "
+        "sizing, or stop-loss threshold (tested 15 variants) eliminates 70%+ drawdowns during "
+        "2018 and 2022 bear markets. This is a first-principles constraint: long-only BTC trend "
+        "strategies must ride the bear markets.",
+        "",
+        "**3. Position sizing is the primary risk lever — more effective than signal optimization.** "
+        "Vol-sizing (Variant B, ATR-14, 1% risk budget) reduced MaxDD from 40% to 28% and improved "
+        "Sharpe from 0.648 to 0.742 — larger improvement than any parameter optimization achieved. "
+        "The 10% V1 paper trading fraction brings expected portfolio DD to ~4% (3.87% from pool caps). "
+        "Risk management is where alpha lives for undiversified trend strategies.",
+        "",
+        "**4. Statistical rigor adds real value — PSR/PurgedKFold caught overfitting.** "
+        "Without PSR, 3 strategies (RSI variants) look marginal (OOS Sharpe 0.0-0.16). "
+        "Without purged K-fold, in-sample look-ahead would inflate OOS Sharpe estimates. "
+        "The 10-fold purged K-fold with 20-bar embargo gives OOS Sharpe 1.401 with PSR 1.0000 — "
+        "statistical certainty of positive true Sharpe, not a point estimate.",
+        "",
+        "**5. Feature IC decays rapidly; short-term features dominate.** "
+        "Outlier flags (vol_rs_126_is_outlier, IC-IR 1.41) have the highest consistency but "
+        "low mean IC (0.022). The highest-IC features at 1D horizon are all short-term indicators. "
+        "Long-term prediction (5D+ horizon) shows weaker IC across all 97 features evaluated. "
+        "This is consistent with crypto being highly efficient at longer horizons.",
+        "",
+        "**6. EMA crossovers outperform despite not appearing in IC analysis.** "
+        "The IC sweep scores individual features; EMA crossover is a non-linear, regime-changing "
+        "signal that IC doesn't capture. The walk-forward bake-off is the only evaluation method "
+        "that correctly captures its edge. This is a reminder that IC is a screening tool, "
+        "not a complete edge measure.",
+        "",
+        "**7. Risk controls must be automated and non-advisory.** "
+        "Phase 53 kill switch exercises demonstrated that the circuit breaker and flatten triggers "
+        "must execute without human confirmation. In a real bear market, the operator will be "
+        "emotionally compromised. All V1 risk gates (15% circuit breaker, vol-spike flatten, "
+        "exchange-halt flatten) are automated and do not require a human in the loop.",
+        "",
+        "**8. Ensemble diversification provides false comfort for undiversified assets.** "
+        "The ensemble blend of ema_trend(17,77) and ema_trend(21,50) shows MaxDD -77.1% — "
+        "worse than either strategy alone. Both EMA strategies lose in the same macro bear "
+        "markets. True diversification requires uncorrelated signal generators "
+        "(momentum + mean-reversion + carry), not multiple trend variants.",
+        "",
+        "**9. The architecture foundation scales cleanly.** "
+        "24-table normalized family architecture, DDL-as-contract feature store, "
+        "PurgedKFoldSplitter, PSR/DSR framework, multi-source drift guard — "
+        "all were built once and reused without major refactoring. "
+        "V2 will add signals and assets on top of the same infrastructure.",
+        "",
+        "**10. Data economics is a non-issue at V1 scale; plan for V2 growth.** "
+        "46 GB on local PostgreSQL at $0/month is sustainable. "
+        "At 10x growth (460 GB) or multi-venue live trading, a data lake migration "
+        "to TimescaleDB or Parquet/S3 becomes economically justified. "
+        "The trigger threshold (200 GB or 5-second query latency) is defined in Phase 50.",
+        "",
+        "**11. Perpetual futures infrastructure is ready; empirical results are not.** "
+        "Phase 51 built the complete perps stack: funding rate data model, margin/liquidation "
+        "model, backtester extension, and 6-venue downtime playbook. The missing piece is "
+        "real funding rate data and a backtest comparison of spot vs perps Sharpe. "
+        "This is the highest-priority V2 research question.",
+        "",
+        "**12. Drift monitoring provides accountability, not just visibility.** "
+        "The DriftMonitor + DriftAttributor framework decomposes live/backtest divergence "
+        "into 6 attributable sources. This converts 'the system is behaving differently' "
+        "into 'fill price slippage is 8 bps above backtest assumption' — actionable, "
+        "not just observable.",
+        "",
+    ]
+    return "\n".join(lines)
 
 
-def _section_v2_roadmap(*args, **kwargs) -> str:
-    return "## 7. V2 Roadmap\n\n_To be completed in Plan 03._\n"
+def _section_v2_roadmap(milestone_data: dict | None = None) -> str:
+    """
+    Section 7: V2 Roadmap.
+    Evidence-grounded priorities, go/no-go triggers, and proposed phases with effort estimates.
+    """
+    if milestone_data is None:
+        milestone_data = {}
+
+    total_plans = milestone_data.get("total_plans", 261)
+    total_hours = milestone_data.get("total_hours", "~28 hours")
+    avg_duration = milestone_data.get("avg_duration", "~7 min")
+
+    # Parse average minutes from avg_duration string
+    avg_min_match = re.search(r"(\d+)", avg_duration)
+    avg_min = int(avg_min_match.group(1)) if avg_min_match else 7
+
+    def _est(n_plans: int) -> str:
+        """Estimate duration for N plans at V1 average velocity."""
+        total_min = n_plans * avg_min
+        return f"~{total_min} min ({n_plans} plans × {avg_min} min/plan)"
+
+    lines = [
+        "## 7. V2 Roadmap",
+        "",
+        "> All V2 priorities are grounded in V1 evidence. Each priority is linked to a specific "
+        "V1 finding that motivates it. Effort estimates use actual V1 velocity: "
+        f"{total_plans} plans in {total_hours}, averaging {avg_duration}/plan.",
+        "",
+        "---",
+        "",
+        "### 7.1 V2 Priorities (Grounded in V1 Findings)",
+        "",
+        "| Priority | Motivation (V1 Evidence) | Expected V2 Outcome |",
+        "|----------|--------------------------|---------------------|",
+        "| 1. Diversified signal pool | EMA-only ensemble fails (both lose in same bear markets) | Uncorrelated drawdowns across signal types |",
+        "| 2. Per-asset regime-adaptive sizing | Regime labels exist but unused by risk engine | Dynamic allocation exploiting bull/bear/sideways regimes |",
+        "| 3. Perpetual futures integration | Phase 51 stack complete; funding rate empirics missing | Funding carry as decorrelated return source |",
+        "| 4. Multi-timeframe signal blending | 1D IC analysis only; shorter TFs unexplored | Reduced turnover with higher-frequency signal confirmation |",
+        "| 5. Feature evaluation (IC→signal) | Outlier flags have IC-IR 1.4 but no signal generator | Higher-Sharpe signal from IC-proven features |",
+        "| 6. Data lake migration | 46 GB local DB, no redundancy | Operational resilience + multi-venue scale |",
+        "",
+        "---",
+        "",
+        "### 7.2 Go/No-Go Triggers",
+        "",
+        "These are the quantitative thresholds that would trigger major V2 milestones or phase transitions.",
+        "",
+        "| Trigger | Threshold | V1 Status | Next Action |",
+        "|---------|-----------|-----------|-------------|",
+        "| Proceed to real capital | Sharpe >= 1.5 after diversification AND MaxDD <= 20% over 90+ paper days | Not yet (Sharpe 1.4, MaxDD 75%) | Build diversified portfolio in V2 |",
+        "| Remove position fraction reduction | MaxDD <= 15% across 2+ strategies over same period | Not yet (MaxDD structural) | Requires ensemble diversification |",
+        "| Enable perps paper trading | Funding rate backtest Sharpe delta > 0.1 vs spot | Not yet (no empirical funding data) | Phase 60 data ingestion |",
+        "| Data lake migration | DB size > 200 GB OR daily refresh latency > 5s | Not yet (46 GB, ~3 min refresh) | Monitor monthly |",
+        "| Multi-asset expansion | BTC/ETH TE < 0.5% over 60 paper days | Not yet (insufficient paper data) | After 60+ live days |",
+        "| Confidence: tracking error | Live/backtest TE < 0.5% over 30 consecutive days | Not yet (paper trading just started) | Phase 53 data accumulation |",
+        "",
+        "---",
+        "",
+        "### 7.3 Proposed V2 Phases",
+        "",
+        "_Effort estimates derived from V1 average velocity. "
+        f"V1 baseline: {avg_min} min/plan average._",
+        "",
+        "**Phase 55: Feature & Signal Evaluation (already in v1.0.0 roadmap)**",
+        "- Scope: Run IC evaluations with real data, score AMAs, validate signals against live data",
+        f"- Estimated effort: {_est(4)}",
+        "- Blocks: Priority 5 (IC-to-signal conversion)",
+        "",
+        "**Phase 56: RSI Mean-Reversion Signal Refinement**",
+        "- Scope: Investigate why RSI fails on BTC 1D (Sharpe -0.31 to 0.16); test on shorter TFs "
+        "and ETH; add regime conditioning (RSI mean-reversion may only work in sideways regime)",
+        f"- Estimated effort: {_est(4)}",
+        "- Blocks: Priority 1 (diversified signal pool)",
+        "",
+        "**Phase 57: Volatility Breakout Strategy Enhancement**",
+        "- Scope: ATR breakout (current Sharpe 0.75-0.77) is close to V1 Sharpe gate; "
+        "test regime-conditioned variants (only take breakouts in trending regime), "
+        "multi-TF confirmation",
+        f"- Estimated effort: {_est(4)}",
+        "- Blocks: Priority 1, Priority 4 (multi-TF blending)",
+        "",
+        "**Phase 58: Signal Correlation Analysis + Ensemble Allocator**",
+        "- Scope: Measure pairwise correlation of 3+ signal generators across regimes; "
+        "build dynamic ensemble allocator (equal weight vs vol-parity vs Kelly); "
+        "target pairwise rho < 0.3 for inclusion",
+        f"- Estimated effort: {_est(5)}",
+        "- Blocks: Priority 1, go/no-go trigger for 2+ uncorrelated strategies",
+        "",
+        "**Phase 59: Per-Asset Regime-Adaptive Sizing**",
+        "- Scope: Wire regime labels (cmc_regimes) into RiskEngine; "
+        "bull regime = 1.0x sizing, sideways = 0.7x, bear = 0.3x; "
+        "backtest regime-conditioned sizing vs static vol-sizing",
+        f"- Estimated effort: {_est(4)}",
+        "- Blocks: Priority 2",
+        "",
+        "**Phase 60: Perpetual Futures Paper Trading**",
+        "- Scope: Implement funding rate ingestion (6 venues, automated), "
+        "funding-adjusted backtest comparison (spot vs perps Sharpe), "
+        "enable perps paper executor",
+        f"- Estimated effort: {_est(7)}",
+        "- Blocks: Priority 3, go/no-go trigger for perps paper trading",
+        "",
+        "**Phase 61: V2 Validation + Results Memo**",
+        "- Scope: 90-day paper trading validation with diversified portfolio, "
+        "ensemble Sharpe/MaxDD measurement, V2 results memo",
+        f"- Estimated effort: {_est(5)}",
+        "- Marks: V2 closure",
+        "",
+        "---",
+        "",
+        "### 7.4 V2 Success Definition",
+        "",
+        "V2 succeeds when all of the following are true:",
+        "",
+        "1. Ensemble of 3+ uncorrelated signals shows OOS Sharpe >= 1.5 over 5+ years backtest",
+        "2. MaxDD <= 20% in ensemble (currently 75% single-strategy)",
+        "3. Paper trading tracking error < 0.5% over 60 consecutive days",
+        "4. At least one perps strategy shows positive carry after funding costs",
+        "5. All V1 risk controls (vol-sizing, circuit breaker, flatten triggers) remain active",
+        "",
+    ]
+    return "\n".join(lines)
 
 
-def _section_appendix(*args, **kwargs) -> str:
-    return "## Appendix\n\n_To be completed in Plan 03._\n"
+def _section_appendix(
+    bakeoff: dict[str, pd.DataFrame] | None = None,
+    milestone_data: dict | None = None,
+) -> str:
+    """
+    Appendix section: methodology detail, data sources, glossary.
+    """
+    if bakeoff is None:
+        bakeoff = {}
+    if milestone_data is None:
+        milestone_data = {}
+
+    lines = [
+        "## Appendix",
+        "",
+        "### Appendix A: Methodology Detail",
+        "",
+        "**IC Evaluation (Phase 37)**",
+        "",
+        "| Parameter | Value |",
+        "|-----------|-------|",
+        "| Feature set | All `cmc_features` columns (97 available at eval time) |",
+        "| Correlation method | Spearman rank (non-parametric, robust to outliers) |",
+        "| IC horizon | 1-day forward return |",
+        "| Purge window | 20-bar purge (same as CV embargo) |",
+        "| Significance threshold | IC-IR > 0.5 (used as screening heuristic, not gate) |",
+        "| Assets | BTC (id=1), 1D timeframe |",
+        "| Period | 2010-2025 (~5,614 bars) |",
+        "",
+        "**Walk-Forward Bake-Off (Phase 42)**",
+        "",
+        "| Parameter | Value |",
+        "|-----------|-------|",
+        "| CV method | Purged K-fold (PurgedKFoldSplitter) |",
+        "| n_folds | 10 |",
+        "| embargo_bars | 20 (prevents look-ahead leakage between train/test) |",
+        "| Baseline cost | Kraken spot maker 16 bps + 10 bps slippage |",
+        "| Cost scenarios | 12 (3 slippage × 2 fee tiers × 2 venues) |",
+        "| Statistical tests | PSR (sr*=0, n=folds×bars/fold, skew/kurt from fold returns), DSR |",
+        "| Weighting schemes | 4: Balanced, Risk Focus, Quality Focus, Low Cost |",
+        "| Robustness gate | Rank in top-2 in >= 3/4 weighting schemes |",
+        "",
+        "**Composite Scoring (Phase 42)**",
+        "",
+        "| Scheme | Sharpe | MaxDD | PSR | Turnover |",
+        "|--------|--------|-------|-----|---------|",
+        "| Balanced | 30% | 30% | 25% | 15% |",
+        "| Risk Focus | 20% | 45% | 25% | 10% |",
+        "| Quality Focus | 35% | 20% | 35% | 10% |",
+        "| Low Cost | 30% | 25% | 20% | 25% |",
+        "",
+        "All metrics normalized to [0,1] via min-max. MaxDD: absolute value (lower DD = higher score). "
+        "Turnover: inverted (lower turnover = higher score).",
+        "",
+        "---",
+        "",
+        "### Appendix B: Data Sources and Schema",
+        "",
+        "**Primary data source:**",
+        "",
+        "| Property | Value |",
+        "|----------|-------|",
+        "| Provider | CoinMarketCap (CMC) |",
+        "| Subscription tier | Historical (paid) |",
+        "| Ingestion method | Bulk JSON files, manual download |",
+        "| Assets | BTC (id=1), ETH (id=2), 15+ additional |",
+        "| History | 2010-07-13 to 2025-11-24 (BTC) |",
+        "| Granularity | OHLCV daily bars, 109 timeframes |",
+        "| Cost | $0/month (manual bulk export, no API calls) |",
+        "",
+        "**Key DB tables used in V1:**",
+        "",
+        "| Table | Role | Approx Rows | Notes |",
+        "|-------|------|-------------|-------|",
+        "| cmc_price_bars_multi_tf_u | Price bars, all assets, all TFs | 4.1M | Unified _u table |",
+        "| cmc_features | 112-column bar-level feature store | 3.7M | DDL-as-contract design |",
+        "| cmc_ema_multi_tf_u | EMA values by period | 14.8M | (id,ts,tf,period) PK |",
+        "| strategy_bakeoff_results | Walk-forward bake-off aggregated results | ~20 rows | fold_metrics_json JSONB |",
+        "| cmc_backtest_runs | Individual backtest run metadata | ~100 rows | |",
+        "| cmc_backtest_trades | Trade-level backtest results | ~5K rows | |",
+        "| cmc_drift_metrics | Paper vs replay tracking error | Phase 53 data | Optional (--backtest-only) |",
+        "| cmc_fills | Paper trade executions | Phase 53 data | Optional |",
+        "| cmc_risk_events | Risk gate trigger log | Phase 53 data | Optional |",
+        "",
+        "**CSV artifacts:**",
+        "",
+        "| File | Location | Contents |",
+        "|------|----------|----------|",
+        "| feature_ic_ranking.csv | reports/bakeoff/ | All features ranked by IC-IR |",
+        "| composite_scores.csv | reports/bakeoff/ | Strategy scores under 4 weighting schemes |",
+        "| sensitivity_analysis.csv | reports/bakeoff/ | Sharpe degradation across 12 cost scenarios |",
+        "| final_validation.csv | reports/bakeoff/ | Final selected strategies with all metrics |",
+        "| backtest_metrics.csv | reports/v1_memo/data/ | Key metrics for selected strategies (this memo) |",
+        "| research_track_summary.csv | reports/v1_memo/data/ | Track status and key findings (this memo) |",
+        "",
+        "---",
+        "",
+        "### Appendix C: Glossary",
+        "",
+        "| Term | Definition |",
+        "|------|-----------|",
+        "| IC | Information Coefficient — Spearman correlation between a feature and forward return |",
+        "| IC-IR | IC Information Ratio — mean(IC) / std(IC); measures IC consistency across time |",
+        "| PSR | Probabilistic Sharpe Ratio — probability that true Sharpe > 0, corrected for sample length and non-normality (Lopez de Prado) |",
+        "| DSR | Deflated Sharpe Ratio — PSR corrected for selection bias when testing multiple strategies |",
+        "| MinTRL | Minimum Track Record Length — minimum number of observations for PSR to exceed a significance level |",
+        "| PurgedKFold | Cross-validation method that removes (purges) observations from train set that overlap with test set; prevents look-ahead leakage |",
+        "| CPCV | Combinatorial Purged Cross-Validation — extension of PurgedKFold using combinatorial path generation |",
+        "| MAR | MAR ratio (CAGR / MaxDD) — also called Calmar ratio; measures return per unit of drawdown |",
+        "| MaxDD | Maximum drawdown — peak-to-trough loss from an equity high point |",
+        "| VaR | Value at Risk — loss threshold at a given confidence level (e.g., 5.9% at 95%) |",
+        "| CVaR | Conditional VaR (Expected Shortfall) — expected loss conditional on exceeding VaR |",
+        "| CF VaR | Cornish-Fisher VaR — VaR adjustment for skewness and kurtosis; unreliable for BTC (excess kurtosis 17) |",
+        "| AMA | Adaptive Moving Average — family of EMAs with dynamic smoothing (KAMA, DEMA, TEMA, HMA) |",
+        "| ATR | Average True Range — volatility measure based on high-low-close range |",
+        "| KAMA | Kaufman Adaptive Moving Average — adjusts EMA smoothing based on price efficiency ratio |",
+        "| DEMA | Double EMA — reduces lag by applying EMA twice; 2*EMA(n) - EMA(EMA(n)) |",
+        "| TEMA | Triple EMA — further lag reduction; 3*EMA - 3*EMA(EMA) + EMA(EMA(EMA)) |",
+        "| HMA | Hull Moving Average — uses weighted moving averages to minimize lag while maintaining smoothness |",
+        "| OOS | Out-of-sample — data or performance not seen during model training/parameter selection |",
+        "| TE | Tracking Error — standard deviation of difference between live and replay returns |",
+        "| GSD | Get Shit Done — the AI-coordinated development workflow used to build ta_lab2 |",
+        "",
+    ]
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# CSV export functions (Plan 03 additions)
+# ---------------------------------------------------------------------------
+
+
+def _export_backtest_metrics_csv(metrics_df: pd.DataFrame, data_dir: Path) -> Path:
+    """Write backtest metrics to reports/v1_memo/data/backtest_metrics.csv."""
+    data_dir.mkdir(parents=True, exist_ok=True)
+    out_path = data_dir / "backtest_metrics.csv"
+
+    if metrics_df.empty:
+        # Fallback: write known values from STRATEGY_SELECTION.md
+        fallback = pd.DataFrame(
+            [
+                {
+                    "strategy": _LABEL_17_77,
+                    "oos_sharpe_mean": 1.401,
+                    "oos_sharpe_std": 1.111,
+                    "psr": 1.0000,
+                    "max_drawdown_mean_pct": -38.6,
+                    "max_drawdown_worst_pct": -75.0,
+                    "v1_sharpe_gate": "PASS",
+                    "v1_dd_gate": "FAIL",
+                    "source": "BAKEOFF_SCORECARD.md (fallback — DB unavailable)",
+                },
+                {
+                    "strategy": _LABEL_21_50,
+                    "oos_sharpe_mean": 1.397,
+                    "oos_sharpe_std": 1.168,
+                    "psr": 1.0000,
+                    "max_drawdown_mean_pct": -38.7,
+                    "max_drawdown_worst_pct": -70.1,
+                    "v1_sharpe_gate": "PASS",
+                    "v1_dd_gate": "FAIL",
+                    "source": "BAKEOFF_SCORECARD.md (fallback — DB unavailable)",
+                },
+            ]
+        )
+        fallback.to_csv(out_path, index=False, encoding="utf-8")
+        logger.info("Exported backtest_metrics.csv (fallback): %s", out_path)
+        return out_path
+
+    export_cols = [
+        c
+        for c in [
+            "label",
+            "strategy_name",
+            "params_str",
+            "sharpe_mean",
+            "sharpe_std",
+            "psr",
+            "dsr",
+            "max_drawdown_mean",
+            "max_drawdown_worst",
+            "cagr_mean",
+            "total_return_mean",
+            "trade_count_total",
+            "turnover",
+            "mar",
+        ]
+        if c in metrics_df.columns
+    ]
+    metrics_df[export_cols].to_csv(out_path, index=False, encoding="utf-8")
+    logger.info(
+        "Exported backtest_metrics.csv (%d rows): %s", len(metrics_df), out_path
+    )
+    return out_path
+
+
+def _export_paper_metrics_csv(paper_df: pd.DataFrame, data_dir: Path) -> Path:
+    """Write paper trading metrics to reports/v1_memo/data/paper_metrics.csv."""
+    data_dir.mkdir(parents=True, exist_ok=True)
+    out_path = data_dir / "paper_metrics.csv"
+
+    if paper_df.empty:
+        # Write empty CSV with headers to indicate Phase 53 data not available
+        empty = pd.DataFrame(
+            columns=[
+                "config_id",
+                "ts",
+                "paper_cumulative_pnl",
+                "replay_cumulative_pnl",
+                "tracking_error_5d",
+                "tracking_error_30d",
+                "note",
+            ]
+        )
+        empty.to_csv(out_path, index=False, encoding="utf-8")
+        logger.info(
+            "Exported paper_metrics.csv (empty — Phase 53 data not available): %s",
+            out_path,
+        )
+        return out_path
+
+    paper_df.to_csv(out_path, index=False, encoding="utf-8")
+    logger.info("Exported paper_metrics.csv (%d rows): %s", len(paper_df), out_path)
+    return out_path
+
+
+def _export_research_track_summary_csv(data_dir: Path) -> Path:
+    """Write research track summary to reports/v1_memo/data/research_track_summary.csv."""
+    data_dir.mkdir(parents=True, exist_ok=True)
+    out_path = data_dir / "research_track_summary.csv"
+
+    rows = [
+        {
+            "track_number": 1,
+            "track_name": "Core Edge Selection",
+            "phases": "42",
+            "status": "complete",
+            "key_finding": "EMA crossover dominates bake-off (OOS Sharpe 1.4, PSR 1.0000) despite not appearing in IC analysis",
+            "remaining_question": "Why do EMA crossovers outperform despite no IC significance? Can outlier flags (IC-IR 1.4) be converted to signal generators?",
+        },
+        {
+            "track_number": 2,
+            "track_name": "Loss Limits & Kill-Switch Policy",
+            "phases": "46, 48",
+            "status": "complete",
+            "key_finding": "Historical VaR at 95% = -5.93%; stop-loss ineffective for trend-following on crypto; aggregate pool cap 15% enforced",
+            "remaining_question": "At what portfolio drawdown should kill switch permanently halt vs circuit breaker pause? 5.9% daily cap: signal-level or portfolio-level?",
+        },
+        {
+            "track_number": 3,
+            "track_name": "Tail-Risk Policy",
+            "phases": "49",
+            "status": "complete",
+            "key_finding": "Vol-sizing (ATR, 1% risk budget) reduces MaxDD by 32% vs fixed+stops (27.6% vs 40.4%) with higher Sharpe (0.742 vs 0.648)",
+            "remaining_question": "Do flatten thresholds (9.23%/11.94% vol) generalize to ETH and shorter TFs? De-escalation cooldowns not backtested.",
+        },
+        {
+            "track_number": 4,
+            "track_name": "Live/Backtest Drift Guard",
+            "phases": "47",
+            "status": "complete",
+            "key_finding": "6-source drift attribution architecture implemented; Phase 53 kill switch exercises validated operational flow; live data insufficient for empirical TE measurement",
+            "remaining_question": "What is observed tracking error after 30+ days live? Which of the 6 sources dominates?",
+        },
+        {
+            "track_number": 5,
+            "track_name": "Data Economics",
+            "phases": "50",
+            "status": "complete",
+            "key_finding": "Actual DB size 46 GB (4x larger than 8-12 GB pre-estimate); monthly cost $0 (local PostgreSQL); migration trigger: 200 GB or 5s query latency",
+            "remaining_question": "Monthly cloud run rate if migrated to AWS/GCP? CMC manual download vs automated API?",
+        },
+        {
+            "track_number": 6,
+            "track_name": "Perps Readiness",
+            "phases": "51",
+            "status": "complete",
+            "key_finding": "Full perps stack built (funding rate model, margin/liquidation, backtester extension, 6-venue downtime playbook); no live funding rate data yet",
+            "remaining_question": "Historical funding rate impact on Sharpe for BTC perps? Which venue for V2 perps paper trading?",
+        },
+    ]
+
+    df = pd.DataFrame(rows)
+    df.to_csv(out_path, index=False, encoding="utf-8")
+    logger.info("Exported research_track_summary.csv (6 rows): %s", out_path)
+    return out_path
+
+
+# ---------------------------------------------------------------------------
+# Build timeline chart (Plan 03 addition)
+# ---------------------------------------------------------------------------
+
+
+def _chart_build_timeline(milestone_data: dict, charts_dir: Path) -> str:
+    """
+    Gantt-style horizontal bar chart of V1 milestones.
+    X-axis: dates from v0.4.0 ship date to today.
+    Each bar represents a milestone, color-coded by plan count.
+    Returns relative path for markdown embedding.
+    """
+    milestones = milestone_data.get("milestones", [])
+    if not milestones:
+        logger.info("_chart_build_timeline: no milestone data, skipping chart")
+        return ""
+
+    # Parse dates; use defaults where TBD
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    tasks = []
+    for m in milestones:
+        start = m.get("shipped", "2026-01-27")
+        if start == "TBD":
+            start = now_str
+        finish = (
+            now_str  # All milestones end at today (or their next milestone's start)
+        )
+        n_plans = m.get("plans", 0)
+        if isinstance(n_plans, str):
+            # Try to parse numeric prefix; default 10
+            num_match = re.search(r"\d+", n_plans)
+            n_plans = int(num_match.group()) if num_match else 10
+        tasks.append(
+            {
+                "Milestone": f"{m['version']} — {m['name']}",
+                "Start": start,
+                "Finish": finish,
+                "Plans": n_plans,
+                "Phases": m.get("phases", ""),
+            }
+        )
+
+    # Set each milestone's finish to next milestone's start (sequential)
+    for i in range(len(tasks) - 1):
+        tasks[i]["Finish"] = tasks[i + 1]["Start"]
+    # Last milestone ends today
+    tasks[-1]["Finish"] = now_str
+
+    # Determine color scale
+    max_plans = max(t["Plans"] for t in tasks) or 1
+    colors = [
+        f"rgba(70, 130, 180, {0.4 + 0.6 * t['Plans'] / max_plans:.2f})" for t in tasks
+    ]
+
+    fig = go.Figure()
+    for i, task in enumerate(tasks):
+        try:
+            start_dt = datetime.strptime(task["Start"], "%Y-%m-%d")
+            finish_dt = datetime.strptime(task["Finish"], "%Y-%m-%d")
+        except ValueError:
+            continue
+        duration_days = max((finish_dt - start_dt).days, 1)
+        fig.add_trace(
+            go.Bar(
+                x=[duration_days],
+                y=[task["Milestone"]],
+                orientation="h",
+                base=[task["Start"]],
+                marker_color=colors[i],
+                name=task["Milestone"],
+                text=[f"{task['Plans']} plans"],
+                textposition="inside",
+                hovertemplate=(
+                    f"<b>{task['Milestone']}</b><br>"
+                    f"Phases: {task['Phases']}<br>"
+                    f"Plans: {task['Plans']}<br>"
+                    f"Start: {task['Start']}<br>"
+                    f"End: {task['Finish']}"
+                    "<extra></extra>"
+                ),
+                showlegend=False,
+            )
+        )
+
+    # Add x-axis as timeline from start to end
+    all_starts = [t["Start"] for t in tasks if t["Start"] != "TBD"]
+    timeline_start = min(all_starts) if all_starts else "2026-01-27"
+
+    fig.update_layout(
+        title="ta_lab2 V1 Build Timeline (Gantt)",
+        xaxis={
+            "title": "Timeline (days from start)",
+            "type": "linear",
+        },
+        yaxis={"title": "Milestone", "autorange": "reversed"},
+        barmode="stack",
+        height=500,
+        width=1000,
+        margin={"l": 300},
+    )
+
+    # Reframe x-axis to days since timeline_start for readability
+    try:
+        ref_date = datetime.strptime(timeline_start, "%Y-%m-%d")
+        fig.update_xaxes(
+            tickvals=list(range(0, 50, 5)),
+            ticktext=[
+                (ref_date + __import__("datetime").timedelta(days=d)).strftime("%m/%d")
+                for d in range(0, 50, 5)
+            ],
+        )
+    except Exception:
+        pass
+
+    return _save_chart(fig, "build_timeline", charts_dir)
 
 
 # ---------------------------------------------------------------------------
@@ -2481,21 +3654,39 @@ def build_memo(
     lines.append("---")
     lines.append("")
 
-    # Sections 5-7 + Appendix: stubs for Plan 03
-    lines.append(_section_research_tracks())
+    # Load policy documents for research tracks
+    policy_docs = load_policy_documents()
+    logger.info("Loaded %d policy documents for research tracks", len(policy_docs))
+
+    # Section 5: Research Track Answers (fully implemented in Plan 03)
+    lines.append(
+        _section_research_tracks(
+            bakeoff=bakeoff, policy_docs=policy_docs, engine=engine
+        )
+    )
     lines.append("---")
     lines.append("")
 
-    lines.append(_section_key_takeaways())
+    # Section 6: Key Takeaways (fully implemented in Plan 03)
+    lines.append(_section_key_takeaways(milestone_data=milestone_data))
     lines.append("---")
     lines.append("")
 
-    lines.append(_section_v2_roadmap())
+    # Section 7: V2 Roadmap (fully implemented in Plan 03)
+    lines.append(_section_v2_roadmap(milestone_data=milestone_data))
     lines.append("---")
     lines.append("")
 
-    lines.append(_section_appendix())
+    # Appendix (fully implemented in Plan 03)
+    lines.append(_section_appendix(bakeoff=bakeoff, milestone_data=milestone_data))
     lines.append("")
+
+    # Build timeline chart (Plan 03)
+    if generate_charts:
+        timeline_path = _chart_build_timeline(milestone_data, charts_dir)
+        if timeline_path:
+            # Update the Note in Build Narrative section to point to actual generated chart
+            logger.info("Build timeline chart generated: %s", timeline_path)
 
     lines.append("---")
     lines.append("*Generated by: python -m ta_lab2.scripts.analysis.generate_v1_memo*")
@@ -2520,10 +3711,11 @@ def build_memo(
         print(f"  Benchmark rows: {len(benchmark_df)}")
         print(f"  Stress test rows: {len(stress_df)}")
         print(f"  Paper metrics rows: {len(paper_df)}")
+        print(f"  Policy documents loaded: {len(policy_docs)}")
         print(
-            "  Sections: Executive Summary, Build Narrative, Methodology, Results, Failure Modes (full)"
+            "  Sections: Executive Summary, Build Narrative, Methodology, Results, Failure Modes,"
+            " Research Tracks, Key Takeaways, V2 Roadmap, Appendix (ALL IMPLEMENTED)"
         )
-        print("  Stubs: Research Tracks, Key Takeaways, V2 Roadmap, Appendix")
         print(f"  Output would be: {output_path}")
         print(f"  Content length: {len(content):,} bytes")
         return content
@@ -2531,6 +3723,29 @@ def build_memo(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(content, encoding="utf-8")
     logger.info("V1 Memo written to %s (%d bytes)", output_path, len(content))
+
+    # CSV exports (Plan 03)
+    data_dir = output_path.parent / "data"
+    _export_backtest_metrics_csv(backtest_metrics, data_dir)
+    _export_paper_metrics_csv(paper_df, data_dir)
+    _export_research_track_summary_csv(data_dir)
+
+    # Summary
+    charts_count = len(list(charts_dir.glob("*.html"))) + len(
+        list(charts_dir.glob("*.png"))
+    )
+    csv_count = len(list(data_dir.glob("*.csv")))
+    logger.info(
+        "V1 Memo generation complete: %d sections, %d charts, %d CSVs",
+        9,  # Executive Summary + 7 sections + Appendix
+        charts_count,
+        csv_count,
+    )
+    print("\nV1 Memo generation complete:")
+    print(f"  Memo: {output_path}")
+    print(f"  Charts: {charts_dir} ({charts_count} files)")
+    print(f"  CSVs: {data_dir} ({csv_count} files)")
+
     return content
 
 
