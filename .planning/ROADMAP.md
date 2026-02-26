@@ -709,7 +709,7 @@ Plans:
 - [x] **Phase 49: Tail-Risk Policy** - Hard stops vs vol-sizing, flatten triggers, policy document
 - [x] **Phase 50: Data Economics** - Cost audit, build-vs-buy analysis, trigger definition
 - [x] **Phase 51: Perps Readiness** - Funding rate ingestion, margin model, liquidation buffer, venue downtime playbook
-- [ ] **Phase 52: Operational Dashboard** - Live PnL, exposure, drawdown, drift, risk status views
+- [x] **Phase 52: Operational Dashboard** - Live PnL, exposure, drawdown, drift, risk status views
 - [ ] **Phase 53: V1 Validation** - 2+ weeks paper trading, success criteria measurement
 - [ ] **Phase 54: V1 Results Memo** - Formal report: methodology, results, failure modes, research answers, next steps
 - [ ] **Phase 55: Feature & Signal Evaluation** - Run IC evals on all features/AMAs, score with BH gate, adaptive RSI A/B, populate dashboards
@@ -894,10 +894,10 @@ Plans:
 **Plans**: 4 plans in 3 waves
 
 Plans:
-- [ ] 52-01-PLAN.md -- Query modules (trading, risk, drift, executor) + operational chart builders in charts.py
-- [ ] 52-02-PLAN.md -- Trading page (PnL, positions, trade log) + Risk & Controls page (kill switch, limits, events)
-- [ ] 52-03-PLAN.md -- Drift Monitor page (TE chart, equity overlay) + Executor Status page (run log, config)
-- [ ] 52-04-PLAN.md -- App.py navigation registration + landing page operational health indicators + human verification
+- [x] 52-01-PLAN.md -- Query modules (trading, risk, drift, executor) + operational chart builders in charts.py
+- [x] 52-02-PLAN.md -- Trading page (PnL, positions, trade log) + Risk & Controls page (kill switch, limits, events)
+- [x] 52-03-PLAN.md -- Drift Monitor page (TE chart, equity overlay) + Executor Status page (run log, config)
+- [x] 52-04-PLAN.md -- App.py navigation registration + landing page operational health indicators + human verification
 
 ---
 
@@ -1056,7 +1056,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | 49. Tail-Risk Policy | 4/4 | Complete | 2026-02-25 |
 | 50. Data Economics | 2/2 | Complete | 2026-02-25 |
 | 51. Perps Readiness | 5/5 | Complete | 2026-02-25 |
-| 52. Operational Dashboard | 0/4 | Planned | -- |
+| 52. Operational Dashboard | 4/4 | Complete | 2026-02-26 |
 | 53. V1 Validation | 0/4 | Planned | -- |
 | 54. V1 Results Memo | 0/3 | Planned | -- |
 | 55. Feature & Signal Evaluation | 0/5 | Planned | -- |
