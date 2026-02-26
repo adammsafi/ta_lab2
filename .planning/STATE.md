@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: Phase 53 (V1 Validation) — IN PROGRESS
-Plan: 3/4 complete (53-01 DONE — gate framework + pre-flight checklist; 53-02 DONE — daily validation log + audit checker; 53-03 DONE — kill switch exercise protocol CLI)
-Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans).
-Last activity: 2026-02-26 — Completed 53-03-PLAN.md (KillSwitchExercise 8-step protocol; ExerciseStep dataclass; polling loop for auto-trigger; try/finally threshold restoration; Markdown evidence doc with VAL-04 assessment; --skip-auto/--poll-interval/--poll-timeout flags)
+Phase: Phase 53 (V1 Validation) — COMPLETE
+Plan: 4/4 complete (53-01 DONE — gate framework + pre-flight checklist; 53-02 DONE — daily validation log + audit checker; 53-03 DONE — kill switch exercise protocol CLI; 53-04 DONE — ValidationReportBuilder + CLI + Jupyter notebook)
+Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans).
+Last activity: 2026-02-26 — Completed 53-04-PLAN.md (ValidationReportBuilder with 5 Plotly charts; generate_validation_report CLI; Jupyter notebook 11-cell via nbformat; nbformat>=5.0 in pyproject.toml; complete validation package exports with try/except)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [███] Phase 53: 3/4
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 257 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 6 in Phase 43, 3 in Phase 44, 7 in Phase 45, 4 in Phase 46, 5 in Phase 47, 4 in Phase 48, 4 in Phase 49, 2 in Phase 50, 5 in Phase 51)
+- Total plans completed: 261 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 6 in Phase 43, 3 in Phase 44, 7 in Phase 45, 4 in Phase 46, 5 in Phase 47, 4 in Phase 48, 4 in Phase 49, 2 in Phase 50, 5 in Phase 51, 4 in Phase 52, 4 in Phase 53)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -489,6 +489,10 @@ Recent decisions affecting current work:
 - **Polling loop not input() for kill switch auto-trigger (Phase 53-03)**: Step 5 polls DB every 5s for up to 5min; using input() would allow operator to advance past step without trigger firing (no false PASS); explicit FAIL on timeout forces honest result
 - **try/finally for kill switch threshold restoration (Phase 53-03)**: Step 5 (lower threshold) and step 7 (restore) wrapped in try/finally to guarantee restoration even on polling timeout or exception; threshold corruption would be worse than exercise failure
 - **"V1 EXERCISE:" prefix tags all exercise events (Phase 53-03)**: All exercise-triggered events carry this prefix in reason string; allows filtering exercise data from real incidents via WHERE reason LIKE 'V1 EXERCISE:%'; no new DB event types needed
+- **Optional[str] return for chart builders (Phase 53-04)**: Each chart builder returns None when no data exists (no fills, no drift metrics, no kill switch events); Markdown report skips the chart embed when None; no errors during sparse 14-day window
+- **Sign convention documented in equity curve subtitle (Phase 53-04)**: Fills-based P&L = realized cash flow (buy=negative, sell=positive cumsum); Drift replay P&L = mark-to-market paper_cumulative_pnl; divergence is expected and explicitly noted in chart subtitle and Methodology section
+- **try/except ImportError for optional exports in __init__.py (Phase 53-04)**: validation/__init__.py uses try/except ImportError for audit_checker, daily_log, report_builder; only gate_framework is a hard import; allows partial package use during phased rollout
+- **nbformat in 'validation' + 'all' groups (Phase 53-04)**: Separate validation group for targeted install; also added to all group for full install; graceful skip via ImportError warning when not installed
 
 ### Pending Todos
 
@@ -502,8 +506,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-26T18:41:08Z
-Stopped at: Completed 53-03-PLAN.md — KillSwitchExercise 8-step protocol; polling loop for auto-trigger (5s x 60 iter); try/finally threshold restoration guarantee; Markdown VAL-04 evidence doc. Phase 53: 3/4 plans complete.
+Last session: 2026-02-26T18:43:10Z
+Stopped at: Completed 53-04-PLAN.md — ValidationReportBuilder with 5 Plotly charts + generate_validation_report CLI + 11-cell Jupyter notebook + nbformat dep + complete package exports. Phase 53 COMPLETE (4/4 plans).
 Resume file: None
 
 ---
