@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: Phase 54 (V1 Results Memo) — IN PROGRESS
-Plan: 2/3 complete (54-02 DONE — Results section 3.1-3.7 + Failure Modes section 4.1-4.5 + DB queries + 2 charts)
-Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 IN PROGRESS (2/3 plans).
-Last activity: 2026-02-26 — Completed 54-02-PLAN.md (generate_v1_memo.py 2,612 lines; Results + Failure Modes sections fully implemented; 9 DB loading functions; 5 chart functions; benchmark_comparison.html + per_fold_sharpe.html generated under --backtest-only; all DB queries gracefully degrade)
+Phase: Phase 54 (V1 Results Memo) — COMPLETE
+Plan: 3/3 complete (54-03 DONE — Research Tracks + Key Takeaways + V2 Roadmap + Appendix + CSV exports + build timeline chart)
+Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 COMPLETE (all 3 plans). V1_MEMO.md GENERATED.
+Last activity: 2026-02-26 — Completed 54-03-PLAN.md (generate_v1_memo.py 3,827 lines; Research Tracks + Key Takeaways + V2 Roadmap + Appendix fully implemented; 3 CSV exports; build_timeline.html; V1_MEMO.md = 8,783 words, 0 stubs, 3 charts, 3 CSVs)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [██░] Phase 54 IN PROGRESS (2/3)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 261 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 6 in Phase 43, 3 in Phase 44, 7 in Phase 45, 4 in Phase 46, 5 in Phase 47, 4 in Phase 48, 4 in Phase 49, 2 in Phase 50, 5 in Phase 51, 4 in Phase 52, 4 in Phase 53)
+- Total plans completed: 264 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 6 in Phase 43, 3 in Phase 44, 7 in Phase 45, 4 in Phase 46, 5 in Phase 47, 4 in Phase 48, 4 in Phase 49, 2 in Phase 50, 5 in Phase 51, 4 in Phase 52, 4 in Phase 53, 3 in Phase 54)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -495,6 +495,9 @@ Recent decisions affecting current work:
 - **nbformat in 'validation' + 'all' groups (Phase 53-04)**: Separate validation group for targeted install; also added to all group for full install; graceful skip via ImportError warning when not installed
 - **V1 memo plan count from STATE.md regex (Phase 54-01)**: load_milestone_stats() parses "Total plans completed: N" via regex -- future-proof as Phase 54 adds more plans; never hardcode "250+" or "261" inline in memo sections
 - **Reports directory is gitignored (Phase 54-01)**: reports/v1_memo/ (like all reports/) is in .gitignore; only generate_v1_memo.py is version-controlled; memo is a runtime artifact regenerated on demand
+- **Research track functions use typed optional args (Phase 54-03)**: _section_research_tracks(bakeoff, policy_docs, engine) — all optional, caller passes None or omits; backwards-compatible with any call site
+- **V2 phases 55-61 scoped in V1 memo (Phase 54-03)**: V1_MEMO.md Section 7.3 proposes 7 concrete V2 phases with effort estimates derived from actual V1 velocity; Phase 55 is already in v1.0.0 roadmap per STATE.md
+- **Gantt chart via go.Bar horizontal not figure_factory (Phase 54-03)**: plotly.figure_factory.create_gantt() is deprecated; go.Bar(orientation='h', base=[start], x=[duration]) achieves same result with no extra dependencies
 
 ### Pending Todos
 
@@ -508,8 +511,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-26T19:16:29Z
-Stopped at: Completed 54-02-PLAN.md — generate_v1_memo.py Results (3.1-3.7) + Failure Modes (4.1-4.5) sections fully implemented; 9 DB loading functions + 5 chart functions; benchmark_comparison.html + per_fold_sharpe.html generated under --backtest-only; all DB graceful degradation. Phase 54 IN PROGRESS (2/3 plans).
+Last session: 2026-02-26T19:28:30Z
+Stopped at: Completed 54-03-PLAN.md — generate_v1_memo.py complete (3,827 lines); Research Tracks (6 deep-dives), Key Takeaways (12 lessons), V2 Roadmap (phases 55-61), Appendix fully implemented; 3 CSV exports; build_timeline.html; V1_MEMO.md = 8,783 words, 3 charts, 3 CSVs; Phase 54 COMPLETE (3/3 plans). V1_MEMO.md GENERATED.
 Resume file: None
 
 ---
