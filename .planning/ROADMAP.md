@@ -1019,7 +1019,14 @@ Plans:
   3. Black-Litterman integration: CMC market caps -> prior, signals -> views -> posterior -> weights
   4. TopkDropout backtested across universe with turnover tracking; compared to equal-weight and per-asset baselines
   5. Bet sizing function maps signal probability to position size; demonstrated improvement in Sharpe vs fixed sizing
-**Plans**: 0/? (not yet planned)
+**Plans**: 5 plans in 4 waves
+
+Plans:
+- [ ] 58-01-PLAN.md -- Foundation: Alembic migration, portfolio.yaml config, PyPortfolioOpt install, package skeleton
+- [ ] 58-02-PLAN.md -- PortfolioOptimizer: MV/CVaR/HRP wrappers with regime routing and fallback logic
+- [ ] 58-03-PLAN.md -- Black-Litterman allocation + probability-based bet sizing
+- [ ] 58-04-PLAN.md -- TopkDropout selector, turnover cost tracker, rebalance scheduler
+- [ ] 58-05-PLAN.md -- Integration scripts: refresh_portfolio_allocations, portfolio backtest, daily refresh wiring
 
 ---
 
@@ -1230,4 +1237,4 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-27 (Phase 60 planned -- ML Infrastructure & Experimentation; 8 plans in 3 waves)*
+*Last updated: 2026-02-27 (Phase 58 planned -- Portfolio Construction & Position Sizing; 5 plans in 4 waves)*
