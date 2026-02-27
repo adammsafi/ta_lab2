@@ -8,7 +8,7 @@
 - v0.7.0 Regime Integration & Signal Enhancement (Phases 27-28) - SHIPPED 2026-02-20
 - v0.8.0 Polish & Hardening (Phases 29-34) - SHIPPED 2026-02-23
 - v0.9.0 Research & Experimentation (Phases 35-41) - SHIPPED 2026-02-24
-- v1.0.0 V1 Closure — Paper Trading & Validation (Phases 42-54) - current milestone
+- v1.0.0 V1 Closure — Paper Trading & Validation (Phases 42-60) - current milestone
 
 ## Overview
 
@@ -23,7 +23,7 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 - Phases 27-28: v0.7.0 (complete)
 - Phases 29-34: v0.8.0 (complete)
 - Phases 35-41: v0.9.0 (SHIPPED 2026-02-24)
-- Phases 42-54: v1.0.0 (current -- V1 Closure)
+- Phases 42-60: v1.0.0 (current -- V1 Closure)
 - Decimal phases (27.1, 28.1): Urgent insertions if needed
 
 <details>
@@ -697,7 +697,7 @@ Plans:
 </details>
 
 <details>
-<summary>v1.0.0 V1 Closure -- Paper Trading & Validation (Phases 42-56) - CURRENT</summary>
+<summary>v1.0.0 V1 Closure -- Paper Trading & Validation (Phases 42-60) - CURRENT</summary>
 
 - [x] **Phase 42: Strategy Bake-Off** - IC/PSR/CV evaluation of existing signals, select 2 strategies for V1
 - [x] **Phase 43: Exchange Integration** - Connect to two exchange APIs (Coinbase + Kraken), price feed comparison, paper order adapter
@@ -714,11 +714,15 @@ Plans:
 - [x] **Phase 54: V1 Results Memo** - Formal report: methodology, results, failure modes, research answers, next steps
 - [ ] **Phase 55: Feature & Signal Evaluation** - Run IC evals on all features/AMAs, score with BH gate, adaptive RSI A/B, populate dashboards
 - [ ] **Phase 56: Factor Analytics & Reporting Upgrade** - QuantStats tear sheets, IC decay/Rank IC, quintile returns, cross-sectional normalization, MAE/MFE, Monte Carlo CI
+- [ ] **Phase 57: Advanced Labeling & Cross-Validation** - Triple barrier labeling, meta-labeling, purged CPCV, CUSUM event filter, trend scanning
+- [ ] **Phase 58: Portfolio Construction & Position Sizing** - PyPortfolioOpt integration, Black-Litterman, TopkDropout, bet sizing, stop laddering
+- [ ] **Phase 59: Microstructural & Advanced Features** - Fractional differentiation, Kyle/Amihud lambda, SADF bubble detection, entropy, codependence
+- [ ] **Phase 60: ML Infrastructure & Experimentation** - Expression engine, feature importance, regime-routed models, concept drift, experiment tracking, Optuna
 
 </details>
 
 <details>
-<summary>v1.0.0 Phase Details (Phases 42-56) - IN PROGRESS</summary>
+<summary>v1.0.0 Phase Details (Phases 42-60) - IN PROGRESS</summary>
 
 ### Phase 42: Strategy Bake-Off
 **Goal:** Use v0.9.0 research tooling to evaluate existing signals and select the 2 best strategies for V1 paper trading, with documented rationale and expected performance.
@@ -982,6 +986,80 @@ Plans:
 - [ ] 56-06-PLAN.md -- Cross-sectional normalization refresh script
 - [ ] 56-07-PLAN.md -- Backtest pipeline integration (wire QuantStats + MAE/MFE + MC into save_backtest_results)
 
+---
+
+### Phase 57: Advanced Labeling & Cross-Validation
+**Goal:** Replace fixed-horizon return labels with adaptive triple barrier labeling, add meta-labeling for false positive reduction, and implement purged cross-validation (CPCV) to prevent data leakage in backtests. Based on MLFinLab's AFML implementation.
+**Depends on:** Phase 55 (Feature & Signal Evaluation), Phase 56 (Factor Analytics)
+**Requirements:** LABEL-01, LABEL-02, LABEL-03, LABEL-04
+**Success Criteria** (what must be TRUE):
+  1. Triple barrier labeler produces {+1, -1, 0} labels for any (asset, tf) pair with configurable pt/sl multipliers and vertical barrier
+  2. Meta-labeling pipeline: existing signals -> direction, RF classifier -> trade/no-trade with probability-based sizing
+  3. CPCV produces distribution of OOS Sharpe ratios (not single point estimate) for each signal strategy
+  4. CUSUM filter integrated as optional pre-filter for all 3 signal generators; reduces trade count by 20-40% while maintaining or improving Sharpe
+**Plans**: 6 plans
+
+Plans:
+- [ ] 57-01-PLAN.md -- Triple barrier labeling core
+- [ ] 57-02-PLAN.md -- Meta-labeling pipeline
+- [ ] 57-03-PLAN.md -- CPCV implementation
+- [ ] 57-04-PLAN.md -- CUSUM event filter
+- [ ] 57-05-PLAN.md -- Trend scanning labels
+- [ ] 57-06-PLAN.md -- Integration and verification
+
+---
+
+### Phase 58: Portfolio Construction & Position Sizing
+**Goal:** Graduate from per-asset backtesting to portfolio-level optimization. Integrate PyPortfolioOpt for multi-asset allocation, add intelligent position sizing from MLFinLab, and implement cross-asset strategies from Qlib.
+**Depends on:** Phase 56 (Factor Analytics), Phase 42 (Strategy Selection)
+**Requirements:** PORT-01, PORT-02, PORT-03, PORT-04, PORT-05
+**Success Criteria** (what must be TRUE):
+  1. Portfolio optimizer produces allocation weights for the crypto universe given signal scores and covariance matrix
+  2. CVaR and HRP optimizers available as regime-conditional alternatives (bear -> CVaR, stable -> mean-variance)
+  3. Black-Litterman integration: CMC market caps -> prior, signals -> views -> posterior -> weights
+  4. TopkDropout backtested across universe with turnover tracking; compared to equal-weight and per-asset baselines
+  5. Bet sizing function maps signal probability to position size; demonstrated improvement in Sharpe vs fixed sizing
+**Plans**: 0/? (not yet planned)
+
+---
+
+### Phase 59: Microstructural & Advanced Features
+**Goal:** Expand cmc_features with microstructural signals, stationarity-preserving transforms, bubble detection, and non-linear dependency measures drawn from MLFinLab's AFML implementation.
+**Depends on:** Phase 55 (Feature & Signal Evaluation), Phase 56 (Factor Analytics)
+**Requirements:** MICRO-01, MICRO-02, MICRO-03, MICRO-04, MICRO-05
+**Success Criteria** (what must be TRUE):
+  1. Fractionally differentiated prices computed for all assets with auto-tuned d via ADF test; stored as feature columns
+  2. Kyle/Amihud/Hasbrouck lambdas computed from OHLCV bars; added to cmc_features with IC scores showing predictive value
+  3. SADF series computed for all assets; integrated into regime pipeline as bubble/explosive flag
+  4. Entropy features (at least Shannon + Lempel-Ziv) computed and persisted; IC evaluated
+  5. Distance correlation and mutual information matrices computed; compared to Pearson for regime comovement
+**Plans**: 0/? (not yet planned)
+
+---
+
+### Phase 60: ML Infrastructure & Experimentation
+**Goal:** Build the ML experimentation layer -- config-driven factor definitions, feature importance ranking, adaptive models that route by regime, concept drift handling, and experiment tracking. Capstone phase tying together evaluation (55-56), validation (57), and expanded features (59).
+**Depends on:** Phase 57 (Purged CV), Phase 59 (Expanded feature set), Phase 55 (Feature experimentation framework)
+**Requirements:** MLINFRA-01, MLINFRA-02, MLINFRA-03, MLINFRA-04, MLINFRA-05, MLINFRA-06
+**Success Criteria** (what must be TRUE):
+  1. Expression engine parses factor strings from YAML, evaluates against OHLCV data, and produces feature columns without Python code changes
+  2. MDA feature importance report ranks all cmc_features columns by OOS predictive contribution; top/bottom features documented
+  3. Regime-routed strategy backtested: per-regime sub-model vs single model; improvement in Sharpe or drawdown documented
+  4. At least one concept drift model trained and evaluated with purged CV; compared to static model baseline
+  5. Experiment tracker persists full config + metrics for every run; queryable comparison dashboard
+  6. Optuna optimization produces better parameters than grid search on at least 1 strategy with documented efficiency gain
+**Plans**: 8 plans in 3 waves
+
+Plans:
+- [ ] 60-01-PLAN.md -- Expression engine module + YAML expression-mode factors
+- [ ] 60-02-PLAN.md -- Experiment tracking table (DDL) + ExperimentTracker module
+- [ ] 60-03-PLAN.md -- Wire expression engine into FeatureRegistry + ExperimentRunner
+- [ ] 60-04-PLAN.md -- Feature importance module (MDA, SFI, clustered FI)
+- [ ] 60-05-PLAN.md -- Regime router module + feature importance CLI script
+- [ ] 60-06-PLAN.md -- DoubleEnsemble concept drift model
+- [ ] 60-07-PLAN.md -- CLI scripts: regime routing, DoubleEnsemble eval, Optuna sweep
+- [ ] 60-08-PLAN.md -- Dependencies install + Alembic migration + E2E expression verification
+
 </details>
 
 See `.planning/milestones/v1.0.0-REQUIREMENTS.md` and `.planning/milestones/v1.0.0-ROADMAP.md` for full details.
@@ -1084,6 +1162,10 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | 54. V1 Results Memo | 3/3 | Complete | 2026-02-26 |
 | 55. Feature & Signal Evaluation | 0/5 | Planned | -- |
 | 56. Factor Analytics & Reporting Upgrade | 0/7 | Planned | -- |
+| 57. Advanced Labeling & Cross-Validation | 6/6 | Planned | -- |
+| 58. Portfolio Construction & Position Sizing | 0/? | Planned | -- |
+| 59. Microstructural & Advanced Features | 0/? | Planned | -- |
+| 60. ML Infrastructure & Experimentation | 0/8 | Planned | -- |
 
 ## Requirement Coverage
 
@@ -1120,7 +1202,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 
 **Coverage:** 43/43 requirements mapped
 
-### v1.0.0 Requirements (65 total)
+### v1.0.0 Requirements (85 total)
 
 | Category | Requirements | Phase | Count |
 |----------|--------------|-------|-------|
@@ -1139,9 +1221,13 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | V1 Results Memo | MEMO-01, MEMO-02, MEMO-03, MEMO-04, MEMO-05 | Phase 54 | 5 |
 | Feature & Signal Evaluation | EVAL-01, EVAL-02, EVAL-03, EVAL-04, EVAL-05 | Phase 55 | 5 |
 | Factor Analytics & Reporting | ANALYTICS-01, ANALYTICS-02, ANALYTICS-03, ANALYTICS-04, ANALYTICS-05 | Phase 56 | 5 |
+| Advanced Labeling & CV | LABEL-01, LABEL-02, LABEL-03, LABEL-04 | Phase 57 | 4 |
+| Portfolio Construction | PORT-01, PORT-02, PORT-03, PORT-04, PORT-05 | Phase 58 | 5 |
+| Microstructural Features | MICRO-01, MICRO-02, MICRO-03, MICRO-04, MICRO-05 | Phase 59 | 5 |
+| ML Infrastructure | MLINFRA-01, MLINFRA-02, MLINFRA-03, MLINFRA-04, MLINFRA-05, MLINFRA-06 | Phase 60 | 6 |
 
-**Coverage:** 65/65 requirements mapped
+**Coverage:** 85/85 requirements mapped
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-27 (Phase 56 planned -- Factor Analytics & Reporting Upgrade; 7 plans in 3 waves)*
+*Last updated: 2026-02-27 (Phase 60 planned -- ML Infrastructure & Experimentation; 8 plans in 3 waves)*
