@@ -697,7 +697,7 @@ Plans:
 </details>
 
 <details>
-<summary>v1.0.0 V1 Closure -- Paper Trading & Validation (Phases 42-55) - CURRENT</summary>
+<summary>v1.0.0 V1 Closure -- Paper Trading & Validation (Phases 42-56) - CURRENT</summary>
 
 - [x] **Phase 42: Strategy Bake-Off** - IC/PSR/CV evaluation of existing signals, select 2 strategies for V1
 - [x] **Phase 43: Exchange Integration** - Connect to two exchange APIs (Coinbase + Kraken), price feed comparison, paper order adapter
@@ -713,11 +713,12 @@ Plans:
 - [x] **Phase 53: V1 Validation** - 2+ weeks paper trading, success criteria measurement
 - [x] **Phase 54: V1 Results Memo** - Formal report: methodology, results, failure modes, research answers, next steps
 - [ ] **Phase 55: Feature & Signal Evaluation** - Run IC evals on all features/AMAs, score with BH gate, adaptive RSI A/B, populate dashboards
+- [ ] **Phase 56: Factor Analytics & Reporting Upgrade** - QuantStats tear sheets, IC decay/Rank IC, quintile returns, cross-sectional normalization, MAE/MFE, Monte Carlo CI
 
 </details>
 
 <details>
-<summary>v1.0.0 Phase Details (Phases 42-55) - IN PROGRESS</summary>
+<summary>v1.0.0 Phase Details (Phases 42-56) - IN PROGRESS</summary>
 
 ### Phase 42: Strategy Bake-Off
 **Goal:** Use v0.9.0 research tooling to evaluate existing signals and select the 2 best strategies for V1 paper trading, with documented rationale and expected performance.
@@ -958,6 +959,28 @@ Plans:
 - [ ] 55-03-PLAN.md -- ExperimentRunner sweep for all YAML features + BH gate summary
 - [ ] 55-04-PLAN.md -- Adaptive vs static RSI A/B comparison (IC + walk-forward Sharpe)
 - [ ] 55-05-PLAN.md -- Lifecycle decisions + EVALUATION_FINDINGS.md + Jupyter notebook
+---
+
+### Phase 56: Factor Analytics & Reporting Upgrade
+**Goal:** Upgrade strategy and feature evaluation with industry-standard analytics: QuantStats HTML tear sheets (60+ metrics), Rank IC labeling, quintile group returns with monotonicity charts, cross-sectional normalization (CS z-scores and ranks), MAE/MFE per trade, and Monte Carlo Sharpe CI.
+**Depends on:** Phase 55 (needs IC infrastructure and backtest tables populated)
+**Requirements:** ANALYTICS-01, ANALYTICS-02, ANALYTICS-03, ANALYTICS-04, ANALYTICS-05
+**Success Criteria** (what must be TRUE):
+  1. Every backtest run produces an HTML tear sheet with 60+ metrics and benchmark comparison
+  2. IC results include Rank IC, ICIR, and IC decay at 5 horizons for all canonical features
+  3. Cross-sectional z-scores and ranks computed and persisted alongside existing time-series z-scores
+  4. MAE/MFE columns populated in cmc_backtest_trades; Monte Carlo CI reported per backtest run
+  5. Quintile return charts available for any factor -- monotonicity visually confirmed or rejected
+**Plans**: 7 plans in 3 waves
+
+Plans:
+- [ ] 56-01-PLAN.md -- Alembic migrations for all Phase 56 schema changes (rank_ic, mae/mfe, mc_ci, cs_norms, tearsheet_path)
+- [ ] 56-02-PLAN.md -- QuantStats install + HTML tear sheet reporter module
+- [ ] 56-03-PLAN.md -- Quintile group returns engine + Plotly chart + CLI
+- [ ] 56-04-PLAN.md -- Rank IC column update in ic.py + backfill existing data
+- [ ] 56-05-PLAN.md -- MAE/MFE computation module + Monte Carlo resampling module
+- [ ] 56-06-PLAN.md -- Cross-sectional normalization refresh script
+- [ ] 56-07-PLAN.md -- Backtest pipeline integration (wire QuantStats + MAE/MFE + MC into save_backtest_results)
 
 </details>
 
@@ -966,7 +989,7 @@ See `.planning/milestones/v1.0.0-REQUIREMENTS.md` and `.planning/milestones/v1.0
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19 (v0.5.0) -> 20 -> ... -> 26 (v0.6.0) -> 27 -> 28 (v0.7.0) -> 29 -> ... -> 34 (v0.8.0) -> 35 -> ... -> 41 (v0.9.0) -> 42 -> ... -> 55 (v1.0.0)
+Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19 (v0.5.0) -> 20 -> ... -> 26 (v0.6.0) -> 27 -> 28 (v0.7.0) -> 29 -> ... -> 34 (v0.8.0) -> 35 -> ... -> 41 (v0.9.0) -> 42 -> ... -> 56 (v1.0.0)
 
 Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute in parallel. Phase 37 is enhanced by Phase 35 but not blocked. Phase 38 requires Phase 37. Phase 39 requires Phases 35-38. Phase 40 requires all prior v0.9.0 phases. Phase 41 has no hard dependency on Phases 35-40 (reads from existing returns tables) but is sequenced last. Phase 55 depends only on v0.9.0 (not on other v1.0.0 phases).
 
@@ -1060,6 +1083,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | 53. V1 Validation | 4/4 | Complete | 2026-02-26 |
 | 54. V1 Results Memo | 3/3 | Complete | 2026-02-26 |
 | 55. Feature & Signal Evaluation | 0/5 | Planned | -- |
+| 56. Factor Analytics & Reporting Upgrade | 0/7 | Planned | -- |
 
 ## Requirement Coverage
 
@@ -1096,7 +1120,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 
 **Coverage:** 43/43 requirements mapped
 
-### v1.0.0 Requirements (60 total)
+### v1.0.0 Requirements (65 total)
 
 | Category | Requirements | Phase | Count |
 |----------|--------------|-------|-------|
@@ -1114,9 +1138,10 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | V1 Validation | VAL-01, VAL-02, VAL-03, VAL-04, VAL-05 | Phase 53 | 5 |
 | V1 Results Memo | MEMO-01, MEMO-02, MEMO-03, MEMO-04, MEMO-05 | Phase 54 | 5 |
 | Feature & Signal Evaluation | EVAL-01, EVAL-02, EVAL-03, EVAL-04, EVAL-05 | Phase 55 | 5 |
+| Factor Analytics & Reporting | ANALYTICS-01, ANALYTICS-02, ANALYTICS-03, ANALYTICS-04, ANALYTICS-05 | Phase 56 | 5 |
 
-**Coverage:** 60/60 requirements mapped
+**Coverage:** 65/65 requirements mapped
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-26 (Phase 54 complete -- V1 Results Memo; 3 plans in 3 waves)*
+*Last updated: 2026-02-27 (Phase 56 planned -- Factor Analytics & Reporting Upgrade; 7 plans in 3 waves)*
