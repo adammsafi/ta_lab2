@@ -31,11 +31,14 @@ from __future__ import annotations
 import argparse
 import logging
 import time
+from dataclasses import dataclass
+from multiprocessing import Pool
 from pathlib import Path
 from typing import Optional
 
 import pandas as pd
 from sqlalchemy import create_engine, pool, text
+from sqlalchemy.pool import NullPool
 
 from ta_lab2.analysis.ic import (
     _NON_FEATURE_COLS,
@@ -71,6 +74,28 @@ _EXTRA_NON_FEATURE_COLS = frozenset(
 
 # AMA evaluatable columns (er is KAMA-only; others are for all indicators)
 _AMA_FEATURE_COLS = ["ama", "d1", "d2", "d1_roll", "d2_roll", "er"]
+
+
+@dataclass(frozen=True)
+class ICWorkerTask:
+    """
+    Task for a single IC sweep worker process.
+
+    Frozen dataclass with only picklable types (no engine/connection objects).
+    Each worker creates its own NullPool engine from db_url.
+    """
+
+    asset_id: int
+    tf: str
+    n_rows: int
+    db_url: str
+    feature_cols: tuple  # tuple[str, ...] for hashability
+    horizons: tuple  # tuple[int, ...]
+    return_types: tuple  # tuple[str, ...]
+    rolling_window: int
+    tf_days_nominal: int
+    overwrite: bool
+    regime: bool
 
 
 # ---------------------------------------------------------------------------
@@ -354,6 +379,194 @@ def _rows_from_ic_df(
 
 
 # ---------------------------------------------------------------------------
+# Module-level worker function (must be picklable for Windows `spawn`)
+# ---------------------------------------------------------------------------
+
+
+def _ic_worker(task: ICWorkerTask) -> dict:
+    """
+    Worker function for parallel IC sweep.
+
+    Called by multiprocessing.Pool.imap_unordered(). Must be module-level
+    for pickling to work on Windows (spawn start method).
+
+    Creates its own engine with NullPool to prevent connection pooling
+    issues across processes.
+
+    Returns dict with {asset_id, tf, n_written, elapsed, error}.
+    """
+    _logger = logging.getLogger(f"ic_worker.{task.asset_id}.{task.tf}")
+    pair_start = time.time()
+    engine = None
+    try:
+        engine = create_engine(task.db_url, poolclass=NullPool)
+        feature_cols = list(task.feature_cols)
+        horizons = list(task.horizons)
+        return_types = list(task.return_types)
+
+        with engine.begin() as conn:
+            # Load all features + close
+            features_df, close_series = _load_features_and_close(
+                conn, task.asset_id, task.tf, feature_cols
+            )
+
+            if features_df.empty or close_series.empty:
+                _logger.warning(
+                    "No data for asset_id=%d tf=%s — skipping", task.asset_id, task.tf
+                )
+                return {
+                    "asset_id": task.asset_id,
+                    "tf": task.tf,
+                    "n_written": 0,
+                    "elapsed": time.time() - pair_start,
+                    "error": None,
+                }
+
+            train_start = features_df.index.min()
+            train_end = features_df.index.max()
+
+            valid_feature_cols = [
+                c for c in features_df.columns if features_df[c].notna().any()
+            ]
+            if not valid_feature_cols:
+                return {
+                    "asset_id": task.asset_id,
+                    "tf": task.tf,
+                    "n_written": 0,
+                    "elapsed": time.time() - pair_start,
+                    "error": None,
+                }
+
+            # Regime breakdown
+            run_regime = (
+                task.regime
+                and task.asset_id in _REGIME_ASSET_IDS
+                and task.tf == _REGIME_TF
+            )
+            regimes_df = None
+            if run_regime:
+                try:
+                    regimes_df = load_regimes_for_asset(
+                        conn, task.asset_id, task.tf, train_start, train_end
+                    )
+                except Exception as exc:
+                    _logger.warning(
+                        "Failed to load regimes for asset_id=%d tf=%s (%s)",
+                        task.asset_id,
+                        task.tf,
+                        exc,
+                    )
+                    regimes_df = None
+                    run_regime = False
+
+            # Batch IC
+            ic_df = batch_compute_ic(
+                features_df,
+                close_series,
+                train_start,
+                train_end,
+                feature_cols=valid_feature_cols,
+                horizons=horizons,
+                return_types=return_types,
+                rolling_window=task.rolling_window,
+                tf_days_nominal=task.tf_days_nominal,
+            )
+
+            all_ic_rows: list[dict] = []
+            if not ic_df.empty:
+                if "regime_col" not in ic_df.columns:
+                    ic_df["regime_col"] = "all"
+                if "regime_label" not in ic_df.columns:
+                    ic_df["regime_label"] = "all"
+                all_ic_rows.extend(
+                    _rows_from_ic_df(
+                        ic_df,
+                        task.asset_id,
+                        task.tf,
+                        train_start,
+                        train_end,
+                        task.tf_days_nominal,
+                    )
+                )
+
+            # Regime breakdown
+            if run_regime and regimes_df is not None and not regimes_df.empty:
+                for regime_col_name in ["trend_state", "vol_state"]:
+                    for feat_col in valid_feature_cols:
+                        try:
+                            regime_ic_df = compute_ic_by_regime(
+                                features_df[feat_col],
+                                close_series,
+                                regimes_df,
+                                train_start,
+                                train_end,
+                                horizons=horizons,
+                                return_types=return_types,
+                                rolling_window=task.rolling_window,
+                                tf_days_nominal=task.tf_days_nominal,
+                                regime_col=regime_col_name,
+                            )
+                            if not regime_ic_df.empty:
+                                regime_ic_df["feature"] = feat_col
+                                all_ic_rows.extend(
+                                    _rows_from_ic_df(
+                                        regime_ic_df,
+                                        task.asset_id,
+                                        task.tf,
+                                        train_start,
+                                        train_end,
+                                        task.tf_days_nominal,
+                                    )
+                                )
+                        except Exception as exc:
+                            _logger.warning(
+                                "Regime IC failed for asset_id=%d tf=%s feat=%s regime=%s: %s",
+                                task.asset_id,
+                                task.tf,
+                                feat_col,
+                                regime_col_name,
+                                exc,
+                            )
+
+            # Persist
+            n_written = 0
+            if all_ic_rows:
+                n_written = save_ic_results(conn, all_ic_rows, overwrite=task.overwrite)
+
+            elapsed = time.time() - pair_start
+            _logger.info(
+                "asset_id=%d tf=%s: %d IC rows in %.1fs",
+                task.asset_id,
+                task.tf,
+                n_written,
+                elapsed,
+            )
+            return {
+                "asset_id": task.asset_id,
+                "tf": task.tf,
+                "n_written": n_written,
+                "elapsed": elapsed,
+                "error": None,
+            }
+
+    except Exception as exc:
+        elapsed = time.time() - pair_start
+        _logger.error(
+            "Failed asset_id=%d tf=%s: %s", task.asset_id, task.tf, exc, exc_info=True
+        )
+        return {
+            "asset_id": task.asset_id,
+            "tf": task.tf,
+            "n_written": 0,
+            "elapsed": elapsed,
+            "error": str(exc),
+        }
+    finally:
+        if engine is not None:
+            engine.dispose()
+
+
+# ---------------------------------------------------------------------------
 # Main sweep functions
 # ---------------------------------------------------------------------------
 
@@ -370,24 +583,98 @@ def _run_cmc_features_sweep(
     regime: bool,
     asset_ids_filter: Optional[list[int]] = None,
     tf_filter: Optional[str] = None,
+    workers: int = 1,
+    db_url: Optional[str] = None,
 ) -> int:
     """
     Run IC sweep for cmc_features columns across all qualifying (asset, tf) pairs.
 
-    Uses one transaction per asset-TF pair for isolation.
+    When workers > 1, dispatches work via multiprocessing.Pool.imap_unordered.
+    When workers == 1, runs the existing sequential path.
+
     Returns total IC rows written to DB.
     """
+    # Pre-filter pairs to only those matching the scope filters
+    filtered_pairs = [
+        (aid, tf, n)
+        for aid, tf, n in pairs
+        if (asset_ids_filter is None or aid in asset_ids_filter)
+        and (tf_filter is None or tf == tf_filter)
+    ]
+
+    if not filtered_pairs:
+        logger.info("cmc_features sweep: no pairs after filtering")
+        return 0
+
+    # --- Parallel path ---
+    if workers > 1 and len(filtered_pairs) > 1:
+        if db_url is None:
+            raise ValueError("db_url is required for parallel dispatch (workers > 1)")
+
+        # Build tasks — resolve tf_days_nominal in main process
+        tasks: list[ICWorkerTask] = []
+        for asset_id, tf, n_rows in filtered_pairs:
+            try:
+                tf_days_nominal = dim.tf_days(tf)
+            except (KeyError, AttributeError):
+                tf_days_nominal = 1
+
+            tasks.append(
+                ICWorkerTask(
+                    asset_id=asset_id,
+                    tf=tf,
+                    n_rows=n_rows,
+                    db_url=db_url,
+                    feature_cols=tuple(feature_cols),
+                    horizons=tuple(horizons),
+                    return_types=tuple(return_types),
+                    rolling_window=rolling_window,
+                    tf_days_nominal=tf_days_nominal,
+                    overwrite=overwrite,
+                    regime=regime,
+                )
+            )
+
+        n_workers = min(workers, len(tasks))
+        logger.info(
+            "Parallel dispatch: %d tasks across %d workers",
+            len(tasks),
+            n_workers,
+        )
+
+        total_written = 0
+        n_done = 0
+        n_errors = 0
+
+        with Pool(processes=n_workers) as p:
+            for result in p.imap_unordered(_ic_worker, tasks):
+                n_done += 1
+                total_written += result["n_written"]
+                if result["error"]:
+                    n_errors += 1
+
+                if n_done % 10 == 0 or n_done == len(tasks):
+                    logger.info(
+                        "[cmc_features] progress: %d/%d done, %d rows written, %d errors",
+                        n_done,
+                        len(tasks),
+                        total_written,
+                        n_errors,
+                    )
+
+        logger.info(
+            "cmc_features sweep done (parallel): %d rows written, %d errors",
+            total_written,
+            n_errors,
+        )
+        return total_written
+
+    # --- Sequential path (workers == 1) ---
     total_written = 0
-    total_pairs = len(pairs)
+    total_pairs = len(filtered_pairs)
     skipped_sparse = 0
 
-    for idx, (asset_id, tf, n_rows) in enumerate(pairs):
-        # Apply optional filters
-        if asset_ids_filter is not None and asset_id not in asset_ids_filter:
-            continue
-        if tf_filter is not None and tf != tf_filter:
-            continue
-
+    for idx, (asset_id, tf, n_rows) in enumerate(filtered_pairs):
         pair_start = time.time()
         logger.info(
             "[cmc_features %d/%d] asset_id=%d tf=%s n_rows=%d",
@@ -914,6 +1201,19 @@ def main() -> int:
         help="Output directory for feature ranking CSV. Default: reports/bakeoff/.",
     )
 
+    # Parallelism
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        metavar="N",
+        dest="workers",
+        help=(
+            "Number of parallel worker processes for cmc_features sweep. "
+            "Default: 1 (sequential). Recommended: 4-8 for full sweep."
+        ),
+    )
+
     # Verbosity
     parser.add_argument(
         "--verbose",
@@ -1069,6 +1369,8 @@ def main() -> int:
         regime=args.regime,
         asset_ids_filter=args.asset_ids,
         tf_filter=args.tf_filter,
+        workers=args.workers,
+        db_url=db_url,
     )
     total_written += n_written
     logger.info("cmc_features sweep complete: %d IC rows written", n_written)

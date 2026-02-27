@@ -636,8 +636,10 @@ def batch_compute_ic(
     """
     Compute IC for multiple feature columns in one call.
 
-    Loops over each feature column, calls ``compute_ic()``, and concatenates
-    all results into a single DataFrame with an additional ``feature`` column.
+    Pre-computes forward returns and rolling ranks ONCE for all
+    (horizon, return_type) combinations, then reuses them across all features.
+    This avoids redundant compute_forward_returns and rolling().rank() calls
+    (112x reduction for a typical 112-feature sweep).
 
     Parameters
     ----------
@@ -673,20 +675,123 @@ def batch_compute_ic(
         numeric_cols = features_df.select_dtypes(include=[np.number]).columns.tolist()
         feature_cols = [c for c in numeric_cols if c != "close"]
 
+    if horizons is None:
+        horizons = _DEFAULT_HORIZONS
+    if return_types is None:
+        return_types = _DEFAULT_RETURN_TYPES
+
+    # --- Pre-compute forward returns cache ---
+    # Key: (return_type, horizon) -> full-series forward returns
+    fwd_returns_cache: dict[tuple[str, int], pd.Series] = {}
+    for return_type in return_types:
+        log_flag = return_type == "log"
+        for horizon in horizons:
+            fwd_returns_cache[(return_type, horizon)] = compute_forward_returns(
+                close, horizon=horizon, log=log_flag
+            )
+
+    # --- Pre-compute train-window sliced + boundary-masked forward returns ---
+    # Build train mask once (shared index from features_df)
+    train_mask = (features_df.index >= train_start) & (features_df.index <= train_end)
+    train_index = features_df.index[train_mask]
+
+    # Key: (return_type, horizon) -> boundary-masked, train-sliced fwd returns
+    fwd_train_cache: dict[tuple[str, int], pd.Series] = {}
+    # Key: (return_type, horizon) -> pre-computed rolling rank of fwd returns
+    fwd_rank_cache: dict[tuple[str, int], pd.Series] = {}
+
+    for return_type in return_types:
+        for horizon in horizons:
+            fwd_global = fwd_returns_cache[(return_type, horizon)]
+            fwd_train = fwd_global.reindex(train_index).copy()
+
+            # Boundary masking: null forward returns for bars near train_end
+            horizon_delta = pd.Timedelta(days=horizon * tf_days_nominal)
+            boundary_mask = (train_index + horizon_delta) > train_end
+            fwd_train.iloc[boundary_mask] = np.nan
+
+            fwd_train_cache[(return_type, horizon)] = fwd_train
+            fwd_rank_cache[(return_type, horizon)] = fwd_train.rolling(
+                rolling_window
+            ).rank()
+
+    # Determine once whether there's enough data for rolling IC
+    # Use any feature's non-null count as proxy (they share the same index)
+    n_train = train_mask.sum()
+    has_enough_for_rolling = n_train >= rolling_window + 5
+
     all_results: list[pd.DataFrame] = []
 
     for col in feature_cols:
-        col_ic_df = compute_ic(
-            features_df[col],
-            close,
-            train_start,
-            train_end,
-            horizons=horizons,
-            return_types=return_types,
-            rolling_window=rolling_window,
-            tf_days_nominal=tf_days_nominal,
-            min_obs=min_obs,
+        feature = features_df[col]
+
+        # Compute feature turnover once per feature
+        turnover = compute_feature_turnover(feature, min_obs=min_obs)
+
+        # Slice feature to train window
+        feat_train = feature[train_mask]
+        feat_has_rolling = (
+            has_enough_for_rolling and feat_train.notna().sum() >= rolling_window + 5
         )
+
+        rows = []
+
+        for return_type in return_types:
+            for horizon in horizons:
+                fwd_global = fwd_returns_cache[(return_type, horizon)]
+
+                # Point IC via _compute_single_ic (uses full-series fwd_ret)
+                ic_result = _compute_single_ic(
+                    feature,
+                    fwd_global,
+                    train_start,
+                    train_end,
+                    horizon=horizon,
+                    tf_days_nominal=tf_days_nominal,
+                    min_obs=min_obs,
+                )
+
+                # Rolling IC using cached train-sliced fwd returns + ranks
+                if feat_has_rolling:
+                    fwd_train = fwd_train_cache[(return_type, horizon)]
+                    fwd_rank = fwd_rank_cache[(return_type, horizon)]
+
+                    feat_rank = feat_train.rolling(rolling_window).rank()
+                    rolling_ic = feat_rank.rolling(rolling_window).corr(fwd_rank)
+
+                    valid_ic = rolling_ic.dropna()
+                    n_valid = len(valid_ic)
+
+                    if n_valid < 5:
+                        ic_ir, ic_ir_tstat = np.nan, np.nan
+                    else:
+                        ic_mean = float(valid_ic.mean())
+                        ic_std = float(valid_ic.std(ddof=1))
+                        if ic_std == 0.0:
+                            ic_ir, ic_ir_tstat = np.nan, np.nan
+                        else:
+                            ic_ir = ic_mean / ic_std
+                            ic_ir_tstat = ic_mean * np.sqrt(n_valid) / ic_std
+                else:
+                    ic_ir, ic_ir_tstat = np.nan, np.nan
+
+                rows.append(
+                    {
+                        "horizon": horizon,
+                        "return_type": return_type,
+                        "ic": ic_result["ic"],
+                        "ic_t_stat": ic_result["t_stat"],
+                        "ic_p_value": ic_result["p_value"],
+                        "ic_ir": ic_ir,
+                        "ic_ir_t_stat": float(ic_ir_tstat)
+                        if not isinstance(ic_ir_tstat, float)
+                        else ic_ir_tstat,
+                        "turnover": turnover,
+                        "n_obs": ic_result["n_obs"],
+                    }
+                )
+
+        col_ic_df = pd.DataFrame(rows)
         col_ic_df["feature"] = col
         all_results.append(col_ic_df)
 
@@ -1070,10 +1175,9 @@ def save_ic_results(conn, rows: list[dict], *, overwrite: bool = False) -> int:
             """
         )
 
-    n_written = 0
-    for row in rows:
-        # Normalize numpy scalars and NaN values for SQL binding
-        params = {
+    # Batch all rows into a single executemany call (one network round-trip)
+    param_list = [
+        {
             "asset_id": _to_python(row.get("asset_id")),
             "tf": _to_python(row.get("tf")),
             "feature": _to_python(row.get("feature")),
@@ -1092,7 +1196,8 @@ def save_ic_results(conn, rows: list[dict], *, overwrite: bool = False) -> int:
             "turnover": _to_python(row.get("turnover")),
             "n_obs": _to_python(row.get("n_obs")),
         }
-        result = conn.execute(sql, params)
-        n_written += result.rowcount
+        for row in rows
+    ]
+    conn.execute(sql, param_list)
 
-    return n_written
+    return len(param_list)
