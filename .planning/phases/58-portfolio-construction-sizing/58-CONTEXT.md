@@ -1,7 +1,7 @@
 # Phase 58: Portfolio Construction & Position Sizing - Context
 
-**Gathered:** 2026-02-26
-**Status:** Not started
+**Gathered:** 2026-02-27
+**Status:** Ready for planning
 **Depends on:** Phase 56 (Factor Analytics), Phase 42 (Strategy Selection)
 
 <domain>
@@ -13,86 +13,87 @@ Graduate from per-asset backtesting to portfolio-level optimization. Integrate P
 
 </domain>
 
-<scope>
-## Scope
+<decisions>
+## Implementation Decisions
 
-### PyPortfolioOpt Integration (from PyPortfolioOpt)
-Three optimizer families wired to ta_lab2 data:
+### Optimizer selection logic
+- Always run all three optimizers (MV, CVaR, HRP) every period
+- One is designated "active" for execution based on default regime mapping: bear → CVaR, stable → MV, uncertain/ill-conditioned → HRP
+- Override available via config/CLI flag to force a specific optimizer
+- **Claude's Discretion:** Whether HRP auto-fallback triggers on ill-conditioned covariance matrix vs warning-only
+- Optimizer results persisted to DB table (e.g., `cmc_portfolio_allocations`) — full allocation history over time for all 3 optimizers
 
-**EfficientFrontier (mean-variance)**:
-- `min_volatility()`, `max_sharpe()`, `efficient_risk(target_vol)`, `efficient_return(target_ret)`
-- Custom mu vector from `cmc_features` signal scores
-- Weight bounds, sector constraints, L2 regularization, transaction cost penalty
+### Signal-to-allocation pipeline
+- **Claude's Discretion:** How signal scores become expected return (mu) vectors — IC-weighted composite or probability-based
+- **Claude's Discretion:** Whether all active signals or a curated subset feed into Black-Litterman views
+- Market cap data already exists in `cmc_price_bars_multi_tf` (`market_cap` column) — no new data ingestion needed for BL priors
+- Black-Litterman views support BOTH absolute views (directional signals like RSI → expected return for one asset) and relative views (cross-asset signals → "BTC outperforms ETH by X%")
+- Sector constraints via `dim_listings` taxonomy for BL
 
-**EfficientCVaR (tail-risk)**:
-- Minimizes average loss in worst alpha% of days
-- Especially relevant for crypto given heavy left tails
-- Regime-conditional: use in bear regimes (from `cmc_regimes`)
+### Sizing vs optimization layering
+- **Two modes, both supported:**
+  1. **Default (optimizer-first):** Optimizer produces raw weights → bet sizing scales based on signal confidence → risk controls cap final sizes
+  2. **Alternative (sizing-as-constraints):** Bet sizing produces per-asset position bounds → optimizer respects as weight constraints
+- Configurable via YAML; default is mode 1
+- **Risk control integration — also two modes, both supported:**
+  1. **Default (constraints-in-optimizer):** Phase 46 position caps fed into optimizer weight bounds — allocation feasible from the start
+  2. **Alternative (post-optimization clipping):** Optimizer runs unconstrained, risk controls clip/reject over-limit positions
+- Configurable; default is mode 1
+- **Claude's Discretion:** Minimum order sizes — source from Phase 43 ExchangeConfig or separate portfolio config
+- **Stop laddering:** Configurable at per-asset × per-strategy granularity (combined). Global defaults with per-asset and per-strategy overrides.
 
-**HRPOpt (Hierarchical Risk Parity)**:
-- Cluster-based, no matrix inversion required
-- More robust out-of-sample than mean-variance
-- Fallback when covariance matrix is ill-conditioned (small altcoin universes)
+### Cash & yield management
+- Cash is last resort — freed capital from low-confidence sizing redistributes first
+- Groundwork laid for yield-bearing alternatives:
+  - Crypto: stablecoin yield capture (e.g., USDC lending)
+  - Brokerage: money market funds / structured products
+- Not fully built out in this phase — interfaces and config for yield instruments, actual yield capture in future phase
 
-### Risk Models (from PyPortfolioOpt)
-- `exp_cov(span)`: regime-sensitive span (30-90 in high vol, 180 in stable)
-- `semicovariance`: downside-only risk
-- `CovarianceShrinkage.ledoit_wolf()`: reduces estimation error
-- All computed from `cmc_returns_bars_multi_tf_u`
+### Leverage
+- Optimizer can allocate above 100% gross exposure via margin/leverage
+- **Funding-cost-aware:** Phase 51 perps funding rates incorporated into expected return/cost model during optimization
+- **Belt and suspenders:** Optimizer has soft cap on leverage (configurable, default 2x), Phase 46 risk controls enforce hard cap
+- **Claude's Discretion:** Default max exposure parameter value
 
-### Black-Litterman Allocation (from PyPortfolioOpt)
-- Prior: `market_implied_prior_returns(market_caps, risk_aversion, cov_matrix)` using CMC market cap data
-- Views: signal outputs (EMA/RSI) as absolute or relative views via P and Q matrices
-- Posterior: `bl.bl_returns()` → `EfficientFrontier(posterior_mu, posterior_cov)`
-- Sector constraints via `dim_listings` taxonomy (chain/sector grouping)
+### Rebalancing & turnover policy
+- **Three rebalancing modes, all supported, configurable via YAML:**
+  1. Time-based (default: daily, configurable to weekly/monthly)
+  2. Signal-driven (rebalance on new signal arrival)
+  3. Threshold-based (rebalance when actual vs target weights drift beyond X%)
+  - Default: time-based daily with optional threshold overlay
+- **TopkDropout defaults:** Claude's Discretion for K and dropout rate based on crypto universe size
+- **Decomposed cost reporting:** Track and report gross return, turnover cost, and net return separately. Full cost transparency.
+- **Turnover penalty in optimizer:** Available as configurable option (L1 regularization on weight changes), off by default. Post-hoc turnover tracking always on.
 
-### Probability-Based Bet Sizing (from MLFinLab)
-- `bet_size_probability(events, prob, num_classes)` — maps classifier confidence to fractional position size
-- Sigmoid or step function mapping
-- `average_active=True` weights by concurrent positions
-- Plugs into existing signal generators' output
+### Claude's Discretion
+- HRP auto-fallback trigger logic (condition number threshold vs warning)
+- Signal-to-mu mapping approach (IC-weighted vs probability)
+- BL views: all signals vs curated subset
+- Minimum order size sourcing (exchange config vs portfolio config)
+- TopkDropout K and dropout rate defaults
+- Max exposure default value
 
-### TopkDropout Portfolio Strategy (from Qlib)
-- Hold top K assets by signal score
-- Each period: sell bottom-ranked, buy top-ranked
-- Controlled turnover rate: `2 * dropout_rate / K`
-- Natural multi-asset upgrade to per-asset backtesting
-- Backtest with turnover tracking; compare to equal-weight and per-asset baselines
+</decisions>
 
-### Stop Laddering (from VectorBT PRO)
-- Array of incremental exit stops to scale out of positions:
-  ```
-  sl_stop = [0.02, 0.03, 0.05]  # Scale out at 2%, 3%, 5% adverse
-  tp_stop = [0.03, 0.05, 0.10]  # Scale out at 3%, 5%, 10% favorable
-  ```
-- Extends ATR breakout and other signal generators
-- Reduces single-exit cliff risk
+<specifics>
+## Specific Ideas
 
-### Discrete Allocation (from PyPortfolioOpt)
-- `DiscreteAllocation(weights, prices, total_portfolio_value)` converts fractional weights to actionable quantities
-- `greedy_portfolio()` (fast) or `lp_portfolio()` (exact)
-- Post-process for exchange lot-size compliance (minimum order sizes)
+- Cash should not sit idle — even "cash" positions should capture yield (stablecoin yield on crypto, money market on brokerage). Groundwork this phase, full implementation later.
+- Leverage costs must be visible in the optimizer — funding rates from Phase 51 feed into expected return calculation so leveraged positions are priced correctly.
+- "Belt and suspenders" for risk: optimizer soft caps + Phase 46 hard caps — defense in depth, not either/or.
+- Both sizing modes (optimizer-first and sizing-as-constraints) AND both risk integration modes (constraints-in-optimizer and post-optimization clipping) must be switchable. Flexibility to compare approaches empirically.
 
-</scope>
+</specifics>
 
-<requirements>
-## Requirements
+<deferred>
+## Deferred Ideas
 
-- PORT-01: PyPortfolioOpt integration (EfficientFrontier, EfficientCVaR, HRPOpt) with risk model options
-- PORT-02: Black-Litterman allocation with CMC market caps as prior and signal views
-- PORT-03: TopkDropout portfolio strategy backtested with turnover tracking
-- PORT-04: Probability-based bet sizing mapping signal confidence to position size
-- PORT-05: Stop laddering for scaled exits integrated into signal generators
+- Full yield capture implementation (stablecoin lending protocols, money market fund integration) — future phase after groundwork
+- Automated optimizer selection learning (which optimizer performs best in which regime over time) — future ML phase
 
-</requirements>
+</deferred>
 
-<success_criteria>
-## Success Criteria
+---
 
-1. Portfolio optimizer produces allocation weights for the crypto universe given signal scores and covariance matrix
-2. CVaR and HRP optimizers available as regime-conditional alternatives (bear → CVaR, stable → mean-variance)
-3. Black-Litterman integration: CMC market caps → prior, signals → views → posterior → weights
-4. TopkDropout backtested across universe with turnover tracking; compared to equal-weight and per-asset baselines
-5. Bet sizing function maps signal probability to position size; demonstrated improvement in Sharpe vs fixed sizing
-
-</success_criteria>
+*Phase: 58-portfolio-construction-sizing*
+*Context gathered: 2026-02-27*
