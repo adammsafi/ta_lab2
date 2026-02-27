@@ -723,7 +723,7 @@ class ExperimentRunner:
 
         # Apply BH correction
         try:
-            adjusted = false_discovery_control(valid_pvals, method="bh")
+            adjusted = false_discovery_control(valid_pvals.astype(float), method="bh")
             result_df.loc[valid_mask, "ic_p_value_bh"] = adjusted
         except Exception as exc:
             logger.warning(

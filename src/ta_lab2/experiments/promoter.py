@@ -179,7 +179,9 @@ class FeaturePromoter:
             )
 
         # Apply BH correction to the valid subset
-        adjusted = false_discovery_control(valid_pvals_series.values, method="bh")
+        adjusted = false_discovery_control(
+            valid_pvals_series.values.astype(float), method="bh"
+        )
         df.loc[valid_mask, "ic_p_value_bh"] = adjusted
 
         # Count passing combos
