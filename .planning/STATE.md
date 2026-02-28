@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: Phase 57 (Advanced Labeling & CV) — In progress
-Plan: 4/6 in progress (57-01 DONE — triple barrier labeling + DB schema; 57-02 DONE — CUSUM filter + trend scanning; 57-03 DONE — batch refresh ETL script; 57-04 DONE — CUSUM pre-filter in all 3 signal generators)
-Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 COMPLETE (all 3 plans). V1_MEMO.md GENERATED. Phase 55 COMPLETE (all 5 plans). Phase 56 COMPLETE (all 7 plans). Phase 57 in progress (4/6 plans done).
-Last activity: 2026-02-28 — Completed 57-04-PLAN.md (CUSUM pre-filter in all 3 signal generators; --cusum CLI flag; A/B shows 36-44% reduction on ema_9_21 at mult=2.0; default behavior unchanged)
+Phase: Phase 57 (Advanced Labeling & CV) — COMPLETE
+Plan: 6/6 DONE (57-01 triple barrier labeling; 57-02 CUSUM+trend scanning; 57-03 batch ETL; 57-04 CUSUM signal integration; 57-05 meta-labeling; 57-06 CPCV Sharpe distribution)
+Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 COMPLETE (all 3 plans). V1_MEMO.md GENERATED. Phase 55 COMPLETE (all 5 plans). Phase 56 COMPLETE (all 7 plans). Phase 57 COMPLETE (all 6 plans).
+Last activity: 2026-02-28 — Completed 57-06-PLAN.md (CPCV Sharpe distribution runner; CPCV(6,2) -> 15 OOS Sharpe splits; BTC 1D ema_crossover: mean=-0.84, P10=-1.98, 5/15 positive; LABEL-03 satisfied)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [████] Phase 57 in progress
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE
 
 ## Performance Metrics
 
@@ -534,6 +534,9 @@ Recent decisions affecting current work:
 - **CUSUM safe fallback for 0-event assets (Phase 57-04)**: If cusum_filter() returns 0 events for an asset, log WARNING and retain all bars rather than silently dropping — prevents unexpected silent data loss
 - **CUSUM tz-aware event set via .tolist() (Phase 57-04)**: event_set built via pd.to_datetime(cusum_events, utc=True).tolist() to avoid tz-naive mismatch with features DataFrame timestamps (MEMORY.md pitfall)
 - **CUSUM A/B result: mult=2.0 targets ~15% bar density, 36-44% signal reduction on fast signals (Phase 57-04)**: ema_9_21 reduces 36-44% across BTC/ETH/LTC; ema_21_50 reduces 13-25% (expected for slower signals that are already rare)
+- **Pre-join EMA columns before CPCV loop (Phase 57-06)**: _build_features_with_ema() queries cmc_ema_multi_tf_u once, pivots period->ema_N columns, joins into features_df before CPCVSplitter loop; features_df.iloc[test_idx] then includes EMA cols for make_signals()
+- **make_signals() on test fold, not pre-computed signal records (Phase 57-06)**: cmc_signals_* tables store event records (entry/exit with position_state), not continuous position series; calling make_signals(test_features_df) is cleaner and avoids OOS contamination
+- **t1_series tz-aware requires .tolist() not .values on t0/t1 columns (Phase 57-06)**: Another instance of the MEMORY.md tz-aware pitfall; .values strips UTC from tz-aware Series causing empty intersection with features_df.index (tz-aware UTC); .tolist() preserves Timestamp objects
 
 ### Pending Todos
 
@@ -547,8 +550,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-28T07:18:40Z
-Stopped at: Completed 57-04-PLAN.md — CUSUM pre-filter in all 3 signal generators (8b526a3a); --cusum CLI flag; A/B shows 36-44% reduction on ema_9_21 at mult=2.0; default behavior unchanged; 4/6 Phase 57 plans done
+Last session: 2026-02-28T07:29:30Z
+Stopped at: Completed 57-06-PLAN.md — CPCV Sharpe distribution runner (24d25074); CPCV(6,2) -> 15 OOS splits for BTC 1D ema_crossover; mean=-0.84, P10=-1.98, 5/15 positive; Phase 57 COMPLETE (6/6 plans done)
 Resume file: None
 
 ---
