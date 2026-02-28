@@ -534,6 +534,10 @@ Recent decisions affecting current work:
 - **CUSUM safe fallback for 0-event assets (Phase 57-04)**: If cusum_filter() returns 0 events for an asset, log WARNING and retain all bars rather than silently dropping — prevents unexpected silent data loss
 - **CUSUM tz-aware event set via .tolist() (Phase 57-04)**: event_set built via pd.to_datetime(cusum_events, utc=True).tolist() to avoid tz-naive mismatch with features DataFrame timestamps (MEMORY.md pitfall)
 - **CUSUM A/B result: mult=2.0 targets ~15% bar density, 36-44% signal reduction on fast signals (Phase 57-04)**: ema_9_21 reduces 36-44% across BTC/ETH/LTC; ema_21_50 reduces 13-25% (expected for slower signals that are already rare)
+- **pd.merge not .join() for label/signal alignment (Phase 57-05)**: signals_df.join(labels_df) with mismatched index names (t0 vs signal_ts) silently produces 0 rows; rename signal_ts->t0 then pd.merge(on='t0') is the correct approach
+- **balanced_subsample over balanced class_weight (Phase 57-05)**: rebalances at each bootstrap sample rather than globally; better recall/precision tradeoff for financial data where profitable trades are minority; reduces overfitting to majority class
+- **actual_folds cap = min(n_folds, n_aligned//10) (Phase 57-05)**: prevents PurgedKFoldSplitter from creating folds too small for meaningful AUC evaluation; ensures minimum 10 samples per fold
+- **Score ALL signals, not just aligned subset (Phase 57-05)**: final RF scores all signal entries (not just those with matching barrier labels) via load_features_for_timestamps(all_signal_ts); trade_probability available for every open position including recent ones without labels yet
 - **Pre-join EMA columns before CPCV loop (Phase 57-06)**: _build_features_with_ema() queries cmc_ema_multi_tf_u once, pivots period->ema_N columns, joins into features_df before CPCVSplitter loop; features_df.iloc[test_idx] then includes EMA cols for make_signals()
 - **make_signals() on test fold, not pre-computed signal records (Phase 57-06)**: cmc_signals_* tables store event records (entry/exit with position_state), not continuous position series; calling make_signals(test_features_df) is cleaner and avoids OOS contamination
 - **t1_series tz-aware requires .tolist() not .values on t0/t1 columns (Phase 57-06)**: Another instance of the MEMORY.md tz-aware pitfall; .values strips UTC from tz-aware Series causing empty intersection with features_df.index (tz-aware UTC); .tolist() preserves Timestamp objects
@@ -550,8 +554,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-28T07:29:30Z
-Stopped at: Completed 57-06-PLAN.md — CPCV Sharpe distribution runner (24d25074); CPCV(6,2) -> 15 OOS splits for BTC 1D ema_crossover; mean=-0.84, P10=-1.98, 5/15 positive; Phase 57 COMPLETE (6/6 plans done)
+Last session: 2026-02-28T07:28:55Z
+Stopped at: Completed 57-05-PLAN.md — MetaLabeler library (727daba0) + run_meta_labeling.py CLI (b5d14be8); BTC ema_crossover: 151 aligned, mean CV AUC=0.51, filter rate=51%; Phase 57 now 5/6 plans done (57-06 had separate execution)
 Resume file: None
 
 ---
