@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: Phase 58 (Portfolio Construction & Sizing) — In Progress
-Plan: 4/5 DONE (58-04 TopkDropoutSelector, TurnoverTracker, RebalanceScheduler, StopLadder)
-Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 COMPLETE (all 3 plans). V1_MEMO.md GENERATED. Phase 55 COMPLETE (all 5 plans). Phase 56 COMPLETE (all 7 plans). Phase 57 COMPLETE (all 6 plans). Phase 58 started.
-Last activity: 2026-02-28 — Completed 58-04-PLAN.md (topk_selector.py, cost_tracker.py, rebalancer.py, stop_ladder.py; all 4 modules verified; 776 lines total)
+Phase: Phase 58 (Portfolio Construction & Sizing) — COMPLETE
+Plan: 5/5 DONE (58-05 integration scripts: refresh_portfolio_allocations, run_portfolio_backtest, daily refresh wiring)
+Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 COMPLETE (all 3 plans). V1_MEMO.md GENERATED. Phase 55 COMPLETE (all 5 plans). Phase 56 COMPLETE (all 7 plans). Phase 57 COMPLETE (all 6 plans). Phase 58 COMPLETE (all 5 plans).
+Last activity: 2026-02-28 — Completed 58-05-PLAN.md (portfolio/__init__.py 9 exports, refresh_portfolio_allocations.py, run_portfolio_backtest.py, run_daily_refresh.py --portfolio; 5 files, 797 lines added)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [████░] Phase 58 4/5
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [█████] Phase 58 COMPLETE
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 282 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 6 in Phase 43, 3 in Phase 44, 7 in Phase 45, 4 in Phase 46, 5 in Phase 47, 4 in Phase 48, 4 in Phase 49, 2 in Phase 50, 5 in Phase 51, 4 in Phase 52, 4 in Phase 53, 3 in Phase 54, 5 in Phase 55, 7 in Phase 56, 6 in Phase 57)
+- Total plans completed: 287 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 6 in Phase 43, 3 in Phase 44, 7 in Phase 45, 4 in Phase 46, 5 in Phase 47, 4 in Phase 48, 4 in Phase 49, 2 in Phase 50, 5 in Phase 51, 4 in Phase 52, 4 in Phase 53, 3 in Phase 54, 5 in Phase 55, 7 in Phase 56, 6 in Phase 57, 5 in Phase 58)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -551,6 +551,9 @@ Recent decisions affecting current work:
 - **IC-IR weight normalization: clip(lower=0) then / sum() (Phase 58-03)**: Negative IC-IR signals are noise; clip produces non-negative weights; normalize to sum=1.0 before multiplying signal scores; ensures composite score is IC-IR weighted average not sum
 - **Alpha scale: z * annualized_vol * 0.1 (Phase 58-03)**: Cross-sectional z-score converted to return space via 10% of annualized vol as max expected alpha; ties signal strength to asset-level volatility regime
 - **BetSizer min_confidence excludes assets not scales them (Phase 58-03)**: prob < min_confidence returns weight=0 and size=(0,0); explicit exclusion vs. scaling near-zero bets which would still consume optimizer budget for negligible positions
+- **BL fallback to prior-only when no live signals (Phase 58-05)**: refresh_portfolio_allocations passes zero IC-IR so BL degrades to prior-only EfficientFrontier; avoids runtime errors when signal tables are empty
+- **Portfolio stage after signals, before executor in --all pipeline (Phase 58-05)**: optimizer needs latest signal data for BL views; executor can optionally read cmc_portfolio_allocations in future phases
+- **per_asset backtest = momentum top-10 (Phase 58-05)**: simplified stand-in for Phase 42 champion; 1-period return rank; full Phase 42 integration deferred to later phase
 
 ### Pending Todos
 
@@ -564,8 +567,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-28T08:03:00Z
-Stopped at: Completed 58-03-PLAN.md — BLAllocationBuilder (b8d11abb) + BetSizer (629b16a9); Phase 58 now 3/5 plans done
+Last session: 2026-02-28T08:13:08Z
+Stopped at: Completed 58-05-PLAN.md — Phase 58 COMPLETE (5/5 plans); portfolio integration scripts delivered
 Resume file: None
 
 ---
