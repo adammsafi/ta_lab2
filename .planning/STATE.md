@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: Phase 57 (Advanced Labeling & CV) — In progress
-Plan: 2/6 in progress (57-01 DONE — triple barrier labeling; 57-02 DONE — CUSUM filter + trend scanning)
+Plan: 2/6 in progress (57-01 DONE — triple barrier labeling + DB schema; 57-02 DONE — CUSUM filter + trend scanning)
 Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 COMPLETE (all 3 plans). V1_MEMO.md GENERATED. Phase 55 COMPLETE (all 5 plans). Phase 56 COMPLETE (all 7 plans). Phase 57 in progress (2/6 plans done).
-Last activity: 2026-02-28 — Completed 57-02-PLAN.md (CUSUM event filter with log-diff scale alignment; trend scanning OLS t-value labels; both tz-aware UTC; standalone library modules in src/ta_lab2/labeling/)
+Last activity: 2026-02-28 — Completed 57-01-PLAN.md (Alembic migration e5f6a1b2c3d4 for cmc_triple_barrier_labels + cmc_meta_label_results; triple_barrier.py 357 lines: get_daily_vol + apply_triple_barriers + get_t1_series; tz-aware UTC throughout; PurgedKFoldSplitter compatibility verified)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██] Phase 57 in progress
 
@@ -522,6 +522,10 @@ Recent decisions affecting current work:
 - **Double-guard for None in BTC benchmark loader (Phase 56-02)**: _load_btc_benchmark_returns returns None on (a) empty DataFrame from DB query and (b) empty Series after pct_change().dropna() — covers edge case with only 1 row of price data
 - **periods_per_year=365 for crypto tear sheets (Phase 56-02)**: Crypto trades 365 days/year; use 365 not 252 (equity convention); passed to qs.reports.html
 - **BTC_ID=1 hardcoded constant (Phase 56-02)**: CoinMarketCap canonical ID for Bitcoin; module-level constant; query cmc_features WHERE id=1 AND tf='1D' for benchmark returns
+- **down_revision = actual head at execution time (Phase 57-01)**: Plan specified 30eac3660488 but actual head was d4e5f6a1b2c3 (Phase 56 migration 4/4); always run alembic heads before creating migration
+- **Bar-count vertical barriers not calendar time (Phase 57-01)**: close.index.searchsorted(t_events) + num_bars advance; avoids variable density around weekends/holidays; consistent with AFML research pitfall #6
+- **get_t1_series() as canonical t1_series extractor (Phase 57-01)**: pd.Series(result['t1'].values) strips tz on Windows (numpy.datetime64 pitfall); get_t1_series() uses .tolist() to preserve tz-aware UTC; required for PurgedKFoldSplitter/CPCVSplitter compatibility
+- **Triple barrier result index is tz-aware UTC (Phase 57-01)**: apply_triple_barriers() builds index via pd.DatetimeIndex(valid_t0_list).tz_localize("UTC") when tz is None; index and t1 column are both datetime64[ns, UTC]
 
 ### Pending Todos
 
@@ -535,8 +539,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-28T07:09:00Z
-Stopped at: Completed 57-02-PLAN.md — CUSUM event filter (bf3e215b) + trend scanning labels (d03ec7fd); both tz-aware UTC; standalone libraries in src/ta_lab2/labeling/
+Last session: 2026-02-28T07:09:51Z
+Stopped at: Completed 57-01-PLAN.md — DDL + Alembic migration (14d846a8) for cmc_triple_barrier_labels/cmc_meta_label_results; triple barrier labeler (5e892ebf) with get_daily_vol/apply_triple_barriers/get_t1_series; tz-aware UTC; PurgedKFoldSplitter verified
 Resume file: None
 
 ---
