@@ -8,7 +8,7 @@
 - v0.7.0 Regime Integration & Signal Enhancement (Phases 27-28) - SHIPPED 2026-02-20
 - v0.8.0 Polish & Hardening (Phases 29-34) - SHIPPED 2026-02-23
 - v0.9.0 Research & Experimentation (Phases 35-41) - SHIPPED 2026-02-24
-- v1.0.0 V1 Closure — Paper Trading & Validation (Phases 42-62) - current milestone
+- v1.0.0 V1 Closure — Paper Trading & Validation (Phases 42-63) - current milestone
 
 ## Overview
 
@@ -1112,12 +1112,23 @@ Plans:
 
 ---
 
+### Phase 63: Tech Debt Cleanup
+**Goal:** Close 3 low-severity tech debt items from the v1.0.0 milestone audit — bridge bar-level feature promotion path, wire initial_capital from DB config, and add drift monitor --paper-start documentation/warning.
+**Depends on:** Phase 62 (audit found these items)
+**Gap Closure:** Closes tech debt from v1.0.0-MILESTONE-AUDIT.md
+**Success Criteria** (what must be TRUE):
+  1. FeaturePromoter can promote bar-level features from cmc_ic_results (not just cmc_feature_experiments)
+  2. ExecutorConfig.initial_capital loaded from dim_executor_config if available
+  3. run_daily_refresh.py --all warns when drift monitoring is skipped (no --paper-start)
+
+---
+
 See `.planning/milestones/v1.0.0-REQUIREMENTS.md` and `.planning/milestones/v1.0.0-ROADMAP.md` for full details.
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19 (v0.5.0) -> 20 -> ... -> 26 (v0.6.0) -> 27 -> 28 (v0.7.0) -> 29 -> ... -> 34 (v0.8.0) -> 35 -> ... -> 41 (v0.9.0) -> 42 -> ... -> 62 (v1.0.0)
+Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19 (v0.5.0) -> 20 -> ... -> 26 (v0.6.0) -> 27 -> 28 (v0.7.0) -> 29 -> ... -> 34 (v0.8.0) -> 35 -> ... -> 41 (v0.9.0) -> 42 -> ... -> 63 (v1.0.0)
 
 Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute in parallel. Phase 37 is enhanced by Phase 35 but not blocked. Phase 38 requires Phase 37. Phase 39 requires Phases 35-38. Phase 40 requires all prior v0.9.0 phases. Phase 41 has no hard dependency on Phases 35-40 (reads from existing returns tables) but is sequenced last. Phase 55 depends only on v0.9.0 (not on other v1.0.0 phases).
 
