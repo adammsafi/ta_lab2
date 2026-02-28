@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: Phase 56 (Factor Analytics Reporting) — In Progress
-Plan: 3/7 complete (56-02 DONE — quantstats reporter; 56-03 DONE — quintile returns engine + CLI)
-Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 COMPLETE (all 3 plans). V1_MEMO.md GENERATED. Phase 55 COMPLETE (all 5 plans). Phase 56 in progress (56-02 DONE, 56-03 DONE).
-Last activity: 2026-02-28 — Completed 56-03-PLAN.md (quintile engine: compute_quintile_returns cross-sectional pd.qcut ranking, build_quintile_returns_chart Plotly 5-line figure, run_quintile_sweep.py CLI with injection guard)
+Plan: 3/7 complete (56-01 DONE — 4 Alembic migrations, 14 new columns across 5 tables; 56-02 DONE — quantstats reporter; 56-03 DONE — quintile returns engine + CLI)
+Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 COMPLETE (all 3 plans). V1_MEMO.md GENERATED. Phase 55 COMPLETE (all 5 plans). Phase 56 in progress (56-01 DONE, 56-02 DONE, 56-03 DONE).
+Last activity: 2026-02-28 — Completed 56-01-PLAN.md (4 Alembic migrations: rank_ic on cmc_ic_results, mae/mfe on cmc_backtest_trades, MC Sharpe CI columns on cmc_backtest_metrics, tearsheet_path on cmc_backtest_runs, 6 CS-norm columns on cmc_features; 14 columns total across 5 tables; downgrade path verified)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE
 
@@ -533,8 +533,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-28T06:27:58Z
-Stopped at: Completed 56-02-PLAN.md — QuantStats 0.0.81 installed; analytics optional dep group in pyproject.toml; quantstats_reporter.py (185 lines) with generate_tear_sheet(), _load_btc_benchmark_returns(), _strip_tz().
+Last session: 2026-02-28T06:40:00Z
+Stopped at: Completed 56-01-PLAN.md — 4 Alembic migrations (a1b2c3d4e5f6 -> b2c3d4e5f6a1 -> c3d4e5f6a1b2 -> d4e5f6a1b2c3) adding 14 nullable columns across 5 tables; reference DDL at sql/migration/add_factor_analytics_columns.sql.
 Resume file: None
 
 ---
