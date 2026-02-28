@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: Phase 57 (Advanced Labeling & CV) — In progress
-Plan: 2/6 in progress (57-01 DONE — triple barrier labeling + DB schema; 57-02 DONE — CUSUM filter + trend scanning)
-Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 COMPLETE (all 3 plans). V1_MEMO.md GENERATED. Phase 55 COMPLETE (all 5 plans). Phase 56 COMPLETE (all 7 plans). Phase 57 in progress (2/6 plans done).
-Last activity: 2026-02-28 — Completed 57-01-PLAN.md (Alembic migration e5f6a1b2c3d4 for cmc_triple_barrier_labels + cmc_meta_label_results; triple_barrier.py 357 lines: get_daily_vol + apply_triple_barriers + get_t1_series; tz-aware UTC throughout; PurgedKFoldSplitter compatibility verified)
+Plan: 3/6 in progress (57-01 DONE — triple barrier labeling + DB schema; 57-02 DONE — CUSUM filter + trend scanning; 57-03 DONE — batch refresh ETL script)
+Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 COMPLETE (all 3 plans). V1_MEMO.md GENERATED. Phase 55 COMPLETE (all 5 plans). Phase 56 COMPLETE (all 7 plans). Phase 57 in progress (3/6 plans done).
+Last activity: 2026-02-28 — Completed 57-03-PLAN.md (refresh_triple_barrier_labels.py ETL script; 5612 BTC 1D labels persisted; upsert idempotent; CUSUM filter 841/5612 events verified)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██] Phase 57 in progress
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [███] Phase 57 in progress
 
 ## Performance Metrics
 
@@ -526,6 +526,9 @@ Recent decisions affecting current work:
 - **Bar-count vertical barriers not calendar time (Phase 57-01)**: close.index.searchsorted(t_events) + num_bars advance; avoids variable density around weekends/holidays; consistent with AFML research pitfall #6
 - **get_t1_series() as canonical t1_series extractor (Phase 57-01)**: pd.Series(result['t1'].values) strips tz on Windows (numpy.datetime64 pitfall); get_t1_series() uses .tolist() to preserve tz-aware UTC; required for PurgedKFoldSplitter/CPCVSplitter compatibility
 - **Triple barrier result index is tz-aware UTC (Phase 57-01)**: apply_triple_barriers() builds index via pd.DatetimeIndex(valid_t0_list).tz_localize("UTC") when tz is None; index and t1 column are both datetime64[ns, UTC]
+- **cmc_price_bars_multi_tf_u uses 'timestamp' not 'ts' (Phase 57-03)**: All price bars tables (_multi_tf, _multi_tf_u) use 'timestamp' as time column; all other tables (EMA, vol, features, regimes) use 'ts'; confirmed in Phase 55-03 (_TABLES_WITH_TIMESTAMP_COL) but must remember when writing new scripts
+- **Per-row INSERT loop for upsert (Phase 57-03)**: pandas to_sql() doesn't support ON CONFLICT; use conn.execute(text(upsert_sql), row_dict) per row; 5612 rows in ~3s acceptable for batch ETL at current scale
+- **CUSUM event density is asset+multiplier specific (Phase 57-03)**: BTC with multiplier=2.0 -> ~15% density (841/5612); plan mentioned "20-40% reduction" as rule-of-thumb; actual density varies by asset volatility; CUSUM is working correctly
 
 ### Pending Todos
 
@@ -539,8 +542,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-28T07:09:51Z
-Stopped at: Completed 57-01-PLAN.md — DDL + Alembic migration (14d846a8) for cmc_triple_barrier_labels/cmc_meta_label_results; triple barrier labeler (5e892ebf) with get_daily_vol/apply_triple_barriers/get_t1_series; tz-aware UTC; PurgedKFoldSplitter verified
+Last session: 2026-02-28T07:16:28Z
+Stopped at: Completed 57-03-PLAN.md — refresh_triple_barrier_labels.py ETL script (666a1b70); 5612 BTC 1D labels persisted to cmc_triple_barrier_labels; upsert idempotent; CUSUM filter 841 events verified; 3/6 Phase 57 plans done
 Resume file: None
 
 ---
