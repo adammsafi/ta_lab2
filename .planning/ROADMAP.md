@@ -717,7 +717,7 @@ Plans:
 - [x] **Phase 57: Advanced Labeling & Cross-Validation** - Triple barrier labeling, meta-labeling, purged CPCV, CUSUM event filter, trend scanning
 - [x] **Phase 58: Portfolio Construction & Position Sizing** - PyPortfolioOpt integration, Black-Litterman, TopkDropout, bet sizing, stop laddering
 - [x] **Phase 59: Microstructural & Advanced Features** - Fractional differentiation, Kyle/Amihud lambda, SADF bubble detection, entropy, codependence
-- [ ] **Phase 60: ML Infrastructure & Experimentation** - Expression engine, feature importance, regime-routed models, concept drift, experiment tracking, Optuna
+- [x] **Phase 60: ML Infrastructure & Experimentation** - Expression engine, feature importance, regime-routed models, concept drift, experiment tracking, Optuna
 
 </details>
 
@@ -1067,14 +1067,14 @@ Plans:
 **Plans**: 8 plans in 3 waves
 
 Plans:
-- [ ] 60-01-PLAN.md -- Expression engine module + YAML expression-mode factors
-- [ ] 60-02-PLAN.md -- Experiment tracking table (DDL) + ExperimentTracker module
-- [ ] 60-03-PLAN.md -- Wire expression engine into FeatureRegistry + ExperimentRunner
-- [ ] 60-04-PLAN.md -- Feature importance module (MDA, SFI, clustered FI)
-- [ ] 60-05-PLAN.md -- Regime router module + feature importance CLI script
-- [ ] 60-06-PLAN.md -- DoubleEnsemble concept drift model
-- [ ] 60-07-PLAN.md -- CLI scripts: regime routing, DoubleEnsemble eval, Optuna sweep
-- [ ] 60-08-PLAN.md -- Dependencies install + Alembic migration + E2E expression verification
+- [x] 60-01-PLAN.md -- Expression engine module + YAML expression-mode factors
+- [x] 60-02-PLAN.md -- Experiment tracking table (DDL) + ExperimentTracker module
+- [x] 60-03-PLAN.md -- Wire expression engine into FeatureRegistry + ExperimentRunner
+- [x] 60-04-PLAN.md -- Feature importance module (MDA, SFI, clustered FI)
+- [x] 60-05-PLAN.md -- Regime router module + feature importance CLI script
+- [x] 60-06-PLAN.md -- DoubleEnsemble concept drift model
+- [x] 60-07-PLAN.md -- CLI scripts: regime routing, DoubleEnsemble eval, Optuna sweep
+- [x] 60-08-PLAN.md -- Dependencies install + Alembic migration + E2E expression verification
 
 </details>
 
