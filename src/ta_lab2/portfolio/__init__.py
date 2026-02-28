@@ -5,7 +5,6 @@ Modules:
     black_litterman -- BL allocation with market cap prior and signal views
     bet_sizing      -- Probability-based position scaling
     topk_selector   -- TopkDropout asset selection with turnover control
-    rebalancer      -- Time/signal/threshold rebalancing scheduler
     cost_tracker    -- Turnover cost decomposition and tracking
     stop_ladder     -- Multi-tier stop-loss and take-profit exit scaling
 """
@@ -25,7 +24,6 @@ from ta_lab2.portfolio.black_litterman import BLAllocationBuilder  # noqa: E402
 from ta_lab2.portfolio.bet_sizing import BetSizer, probability_bet_size  # noqa: E402
 from ta_lab2.portfolio.topk_selector import TopkDropoutSelector  # noqa: E402
 from ta_lab2.portfolio.cost_tracker import TurnoverTracker  # noqa: E402
-from ta_lab2.portfolio.rebalancer import RebalanceScheduler  # noqa: E402
 from ta_lab2.portfolio.stop_ladder import StopLadder  # noqa: E402
 
 __all__ = [
@@ -36,6 +34,5 @@ __all__ = [
     "probability_bet_size",
     "TopkDropoutSelector",
     "TurnoverTracker",
-    "RebalanceScheduler",
     "StopLadder",
 ]
