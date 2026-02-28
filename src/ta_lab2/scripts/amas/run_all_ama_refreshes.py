@@ -45,7 +45,7 @@ from dataclasses import dataclass
 from ta_lab2.scripts.emas.logging_config import setup_logging, add_logging_args
 
 # Timeout tiers (seconds); matches EMA tier
-TIMEOUT_AMAS = 3600  # 1 hour -- AMA refreshers
+TIMEOUT_AMAS = 10800  # 3 hours -- AMA refreshers (full pipeline takes ~90min)
 
 
 # =============================================================================

@@ -103,6 +103,10 @@ def compute_kama(
     kama = np.full(n, np.nan)
     er = np.full(n, np.nan)
 
+    # Guard: need at least er_period bars to produce a single valid value
+    if n < er_period:
+        return kama, er
+
     fast_sc = 2.0 / (fast_period + 1)
     slow_sc = 2.0 / (slow_period + 1)
 

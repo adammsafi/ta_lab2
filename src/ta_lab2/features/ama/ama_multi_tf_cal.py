@@ -111,17 +111,17 @@ class CalUSAMAFeature(BaseAMAFeature):
         params: dict = {"id": asset_id, "tf": tf}
 
         if start_ts is not None:
-            where_clauses.append("ts >= :start_ts")
+            where_clauses.append('"timestamp" >= :start_ts')
             params["start_ts"] = start_ts
 
         where_sql = " AND ".join(where_clauses)
 
         sql = text(
             f"""
-            SELECT id, ts, tf, tf_days, roll, close, is_partial_end
+            SELECT id, "timestamp" AS ts, tf, tf_days, FALSE AS roll, close, is_partial_end
             FROM {self.bars_schema}.{self.bars_table}
             WHERE {where_sql}
-            ORDER BY ts
+            ORDER BY "timestamp"
             """
         )
 
@@ -301,17 +301,17 @@ class CalISOAMAFeature(BaseAMAFeature):
         params: dict = {"id": asset_id, "tf": tf}
 
         if start_ts is not None:
-            where_clauses.append("ts >= :start_ts")
+            where_clauses.append('"timestamp" >= :start_ts')
             params["start_ts"] = start_ts
 
         where_sql = " AND ".join(where_clauses)
 
         sql = text(
             f"""
-            SELECT id, ts, tf, tf_days, roll, close, is_partial_end
+            SELECT id, "timestamp" AS ts, tf, tf_days, FALSE AS roll, close, is_partial_end
             FROM {self.bars_schema}.{self.bars_table}
             WHERE {where_sql}
-            ORDER BY ts
+            ORDER BY "timestamp"
             """
         )
 

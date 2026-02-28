@@ -393,17 +393,27 @@ class BaseAMAFeature(ABC):
                 if not ids_for_tf:
                     continue
 
-                # Scoped DELETE: remove existing rows for this (ids, tf) slice
+                # Scoped DELETE: remove existing rows for this (ids, tf, ts>=min_ts) slice
+                # Only delete rows from min_ts onwards to preserve older history
+                # during incremental refreshes (where start_ts limits loaded bars)
                 ids_placeholder = ", ".join(str(i) for i in ids_for_tf)
+                min_ts = df_tf["ts"].min()
                 delete_sql = text(
                     f"DELETE FROM {schema}.{table} "
-                    f"WHERE id IN ({ids_placeholder}) AND tf = :tf"
+                    f"WHERE id IN ({ids_placeholder}) AND tf = :tf AND ts >= :min_ts"
                 )
-                conn.execute(delete_sql, {"tf": tf})
+                conn.execute(delete_sql, {"tf": tf, "min_ts": min_ts})
 
             # INSERT the full batch (all tfs) using _pg_upsert safety net
             # We use to_sql with the custom _pg_upsert method
             _ = unique_ids  # referenced above to keep linter happy
+
+        # Deduplicate on PK columns to prevent CardinalityViolation
+        # ("ON CONFLICT DO UPDATE command cannot affect row a second time")
+        pk_cols = self._get_pk_columns()
+        pk_overlap = [c for c in pk_cols if c in df_write.columns]
+        if pk_overlap:
+            df_write = df_write.drop_duplicates(subset=pk_overlap, keep="last")
 
         # Now use to_sql for the actual insert (needs its own connection)
         rows = df_write.to_sql(
