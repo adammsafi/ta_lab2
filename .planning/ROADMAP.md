@@ -716,7 +716,7 @@ Plans:
 - [x] **Phase 56: Factor Analytics & Reporting Upgrade** - QuantStats tear sheets, IC decay/Rank IC, quintile returns, cross-sectional normalization, MAE/MFE, Monte Carlo CI
 - [x] **Phase 57: Advanced Labeling & Cross-Validation** - Triple barrier labeling, meta-labeling, purged CPCV, CUSUM event filter, trend scanning
 - [x] **Phase 58: Portfolio Construction & Position Sizing** - PyPortfolioOpt integration, Black-Litterman, TopkDropout, bet sizing, stop laddering
-- [ ] **Phase 59: Microstructural & Advanced Features** - Fractional differentiation, Kyle/Amihud lambda, SADF bubble detection, entropy, codependence
+- [x] **Phase 59: Microstructural & Advanced Features** - Fractional differentiation, Kyle/Amihud lambda, SADF bubble detection, entropy, codependence
 - [ ] **Phase 60: ML Infrastructure & Experimentation** - Expression engine, feature importance, regime-routed models, concept drift, experiment tracking, Optuna
 
 </details>
@@ -1042,7 +1042,14 @@ Plans:
   3. SADF series computed for all assets; integrated into regime pipeline as bubble/explosive flag
   4. Entropy features (at least Shannon + Lempel-Ziv) computed and persisted; IC evaluated
   5. Distance correlation and mutual information matrices computed; compared to Pearson for regime comovement
-**Plans**: 0/? (not yet planned)
+**Plans**: 5 plans in 3 waves
+
+Plans:
+- [x] 59-01-PLAN.md -- DDL migration: 9 microstructure columns + cmc_codependence table
+- [x] 59-02-PLAN.md -- Core math library: 14 pure numpy/scipy functions with 32 unit tests
+- [x] 59-03-PLAN.md -- MicrostructureFeature BaseFeature subclass + CLI
+- [x] 59-04-PLAN.md -- Codependence pairwise computation script
+- [x] 59-05-PLAN.md -- Orchestrator wiring, SADF regime integration, IC eval, codependence comparison
 
 ---
 
