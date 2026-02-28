@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: Phase 60 (ML Infrastructure & Experimentation) — COMPLETE
-Plan: 8/8 DONE
-Status: v1.0.0 COMPLETE. All 19 phases (42-60) done. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 COMPLETE (all 3 plans). V1_MEMO.md GENERATED. Phase 55 COMPLETE (all 5 plans). Phase 56 COMPLETE (all 7 plans). Phase 57 COMPLETE (all 6 plans). Phase 58 COMPLETE (all 7 plans, including gap closure). Phase 59 COMPLETE (all 5 plans). Phase 60 COMPLETE (all 8 plans).
-Last activity: 2026-02-28 — Completed Phase 60 (all 8 plans: expression engine, ExperimentTracker, expression wiring, feature importance, RegimeRouter, DoubleEnsemble, 3 ML CLI scripts, Alembic migration + E2E verification)
+Phase: Phase 61 (Integration Wiring & Bug Fixes) — In Progress
+Plan: 2/2 DONE
+Status: v1.0.0 COMPLETE. Phase 61 in progress (2/2 plans done). Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 COMPLETE (all 3 plans). V1_MEMO.md GENERATED. Phase 55 COMPLETE (all 5 plans). Phase 56 COMPLETE (all 7 plans). Phase 57 COMPLETE (all 6 plans). Phase 58 COMPLETE (all 7 plans, including gap closure). Phase 59 COMPLETE (all 5 plans). Phase 60 COMPLETE (all 8 plans). Phase 61 Plan 01 DONE. Phase 61 Plan 02 DONE.
+Last activity: 2026-02-28 — Completed Phase 61-01 (RiskEngine wired into PaperExecutor; Telegram alert import/call signature fixed)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [████████] Phase 60 COMPLETE (8 plans)
 
@@ -272,6 +272,9 @@ Recent decisions affecting current work:
 - **Sparse-regime guard at min_obs_per_regime=30** (Phase 37-03): Regimes with fewer bars silently skipped; if ALL regimes sparse, falls back to full-sample IC with regime_label='all' — never returns empty DataFrame
 - **Regime-window train bounds from common_ts intersection** (Phase 37-03): Use min/max of feature-close intersection within regime label as synthetic train_start/train_end — prevents boundary masking from nulling all regime bars
 - **batch_compute_ic excludes 'close' by name convention** (Phase 37-03): Auto-detected feature_cols = all numeric columns except 'close'; consistent with close being a separate argument
+- **RiskEngine integration via _is_halted() direct call** (Phase 61-01): PaperExecutor calls risk_engine._is_halted() directly (private method) at strategy entry -- acceptable; avoids creating a fake order object just to check halt state. check_order() handles all per-order gates including kill switch re-check.
+- **Risk-blocked orders reuse skipped_no_delta counter** (Phase 61-01): check_order() blocks return {skipped_no_delta: True} -- reuses existing counter semantics, avoids schema change to run log
+- **Telegram alert 2-arg signature** (Phase 61-01): send_critical_alert(error_type, message) where error_type is category string ("executor", "database", etc.); import from ta_lab2.notifications.telegram not run_daily_refresh
 - **Significance coloring threshold 0.05** (Phase 37-03): plot_ic_decay uses sig_threshold=0.05 default; royalblue for significant bars, lightgray for non-significant
 - **Column validation before SQL injection in load_feature_series** (Phase 37-04): get_columns() validates feature_col exists before f-string SQL injection — prevents both runtime errors and column-name SQL injection
 - **split_part SQL for cmc_regimes l2_label parsing** (Phase 37-04): cmc_regimes has NO trend_state/vol_state columns — must derive via split_part(l2_label, '-', 1/2) SQL; never reference them as WHERE filter columns
@@ -596,8 +599,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-28T14:53:30Z
-Stopped at: Completed 60-08-PLAN.md — Alembic migration 3caddeff4691 creates cmc_ml_experiments; optuna 4.7.0 + lightgbm 4.6.0 confirmed; 8 expression features validated end-to-end
+Last session: 2026-02-28T20:05:00Z
+Stopped at: Completed 61-02-PLAN.md — feature refresh stage wired into daily pipeline; 4 drift_report.py column-name bugs fixed; TIMEOUT_FEATURES=1800, run_feature_refresh_stage(), --features/--no-features args added
 Resume file: None
 
 ---
@@ -625,6 +628,9 @@ Phase overview:
 - **CS norms separate script pattern** (Phase 56-06): refresh_cmc_cs_norms.py computes CS z-scores and ranks via PARTITION BY window functions; must NOT be written by feature pipeline's _get_table_columns() auto-discovery — separate UPDATE-only script prevents mixing row-level and cross-sectional computation
 - **n_assets >= 5 CS guard** (Phase 56-06): CS z-scores require minimum 5 assets with non-NULL source values at same (ts, tf); fewer than 5 makes cross-sectional distribution meaningless for factor ranking
 - **refresh_cs_norms returns int** (Phase 56-06): Function returns sum of cursor.rowcount across all 3 UPDATE statements; orchestrator uses this directly as rows_inserted in RefreshResult without type conversion
+- **Feature refresh subprocess reads TARGET_DB_URL from env** (Phase 61-02): run_all_feature_refreshes does NOT accept --db-url argument; run_feature_refresh_stage() accepts db_url for interface consistency but does not pass it to subprocess; contrast with bars/EMAs/regimes which all accept --db-url
+- **TE threshold fallback is 0.015 not 0.05** (Phase 61-02): _load_te_threshold() default 0.015 matches drift_pause.py line 243/256; 0.05 was wrong; always verify DDL defaults against actual usage in sibling files
+- **drift_paused column never existed in cmc_drift_metrics DDL** (Phase 61-02): Dead code block removed; DDL review is authoritative; dead column references should fail hard not soft-guard with `if "col" in df.columns`
 
 Key constraints to remember:
 - PSR-01 (Alembic migration psr->psr_legacy) must run before any PSR formula code
