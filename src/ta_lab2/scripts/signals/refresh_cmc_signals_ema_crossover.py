@@ -89,6 +89,22 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         help="Disable regime context (A/B comparison mode: signals generated without regime sizing)",
     )
 
+    # CUSUM pre-filter
+    parser.add_argument(
+        "--cusum",
+        action="store_true",
+        help="Enable symmetric CUSUM pre-filter (AFML Ch.17). "
+        "Reduces signal count by retaining only statistically significant event bars.",
+    )
+    parser.add_argument(
+        "--cusum-multiplier",
+        type=float,
+        default=2.0,
+        metavar="MULT",
+        help="EWM-vol multiplier for CUSUM threshold calibration (default: 2.0). "
+        "Higher = stricter filter = fewer events.",
+    )
+
     # Logging
     parser.add_argument(
         "--verbose",
@@ -257,6 +273,17 @@ def main(argv: Optional[list[str]] = None) -> int:
     else:
         logger.info("Regime context ENABLED: signals will use regime-adjusted sizing")
 
+    # CUSUM filter mode
+    cusum_enabled = args.cusum
+    cusum_multiplier = args.cusum_multiplier
+    if cusum_enabled:
+        logger.info(
+            f"CUSUM pre-filter ENABLED (multiplier={cusum_multiplier}): "
+            "only significant event bars will generate signals"
+        )
+    else:
+        logger.info("CUSUM pre-filter DISABLED (default mode)")
+
     # Generate signals
     generator = EMASignalGenerator(engine, state_manager)
     total_signals = 0
@@ -272,6 +299,8 @@ def main(argv: Optional[list[str]] = None) -> int:
                 full_refresh=args.full_refresh,
                 dry_run=False,  # Already handled dry_run above
                 regime_enabled=regime_enabled,
+                cusum_enabled=cusum_enabled,
+                cusum_threshold_multiplier=cusum_multiplier,
             )
 
             total_signals += n

@@ -42,6 +42,7 @@ from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
 from ta_lab2.signals.ema_trend import make_signals
+from ta_lab2.labeling.cusum_filter import cusum_filter, get_cusum_threshold
 from .signal_state_manager import SignalStateManager
 from .signal_utils import compute_feature_hash, compute_params_hash
 from .regime_utils import load_regime_context_batch, merge_regime_context
@@ -72,6 +73,8 @@ class EMASignalGenerator:
         full_refresh: bool = False,
         dry_run: bool = False,
         regime_enabled: bool = True,
+        cusum_enabled: bool = False,
+        cusum_threshold_multiplier: float = 2.0,
     ) -> int:
         """
         Generate EMA crossover signals for specified assets.
@@ -89,6 +92,12 @@ class EMASignalGenerator:
             dry_run: If True, preview without writing to database
             regime_enabled: If True, load regime context and attach regime_key
                 to signal records. Set False (--no-regime) for A/B comparison.
+            cusum_enabled: If True, apply symmetric CUSUM pre-filter to reduce
+                noise and focus signals on significant price events. Default False
+                preserves backward-compatible behavior.
+            cusum_threshold_multiplier: EWM-vol multiplier for CUSUM threshold
+                calibration. Higher values = fewer events (less filtering).
+                Default 2.0 targets ~20-40% event density on crypto daily data.
 
         Returns:
             Number of signal records generated (both entries and exits)
@@ -134,6 +143,15 @@ class EMASignalGenerator:
             return 0
 
         logger.debug(f"  Loaded {len(features_df)} feature rows")
+
+        # 3b. Apply CUSUM pre-filter (if enabled)
+        if cusum_enabled:
+            features_df = self._apply_cusum_filter(
+                features_df, cusum_threshold_multiplier
+            )
+            if features_df.empty:
+                logger.warning("  CUSUM filter removed all rows - skipping")
+                return 0
 
         # 4. Load and merge regime context (if enabled)
         if regime_enabled:
@@ -181,6 +199,91 @@ class EMASignalGenerator:
             logger.info(f"  DRY RUN: Would write {len(records)} signals")
 
         return len(records)
+
+    def _apply_cusum_filter(
+        self,
+        features_df: pd.DataFrame,
+        multiplier: float,
+    ) -> pd.DataFrame:
+        """
+        Apply per-asset symmetric CUSUM pre-filter to features DataFrame.
+
+        For each asset, computes an EWM-vol-calibrated threshold and retains
+        only the rows at CUSUM event timestamps. Rows between events are
+        discarded, reducing trade count and focusing signal generation on
+        bars where something statistically significant happened.
+
+        Args:
+            features_df: DataFrame with columns id, ts, close (and others).
+            multiplier: EWM-vol scaling factor for threshold calibration.
+                Higher = stricter filter = fewer events.
+
+        Returns:
+            Filtered DataFrame containing only CUSUM event rows.
+            Original row order (id, ts ascending) preserved.
+        """
+        n_before = len(features_df)
+        filtered_parts = []
+
+        for asset_id, group in features_df.groupby("id"):
+            group = group.sort_values("ts").reset_index(drop=True)
+
+            # Ensure ts is DatetimeIndex for cusum_filter
+            close = group.set_index("ts")["close"]
+            if not isinstance(close.index, pd.DatetimeIndex):
+                close.index = pd.to_datetime(close.index, utc=True)
+
+            if len(close) < 2:
+                # Not enough bars to compute CUSUM
+                filtered_parts.append(group)
+                continue
+
+            threshold = get_cusum_threshold(close, multiplier=multiplier)
+            if threshold <= 0:
+                logger.warning(
+                    f"  CUSUM threshold <= 0 for id={asset_id}, skipping filter"
+                )
+                filtered_parts.append(group)
+                continue
+
+            cusum_events = cusum_filter(close, threshold)
+
+            if len(cusum_events) == 0:
+                logger.warning(
+                    f"  CUSUM returned 0 events for id={asset_id} "
+                    f"(threshold={threshold:.6f}), retaining all bars"
+                )
+                filtered_parts.append(group)
+                continue
+
+            # Filter group to CUSUM event timestamps
+            # Normalize both sides to tz-aware UTC for alignment
+            event_set = set(pd.to_datetime(cusum_events, utc=True).tolist())
+            ts_utc = pd.to_datetime(group["ts"], utc=True)
+            mask = ts_utc.isin(event_set)
+            filtered_group = group[mask]
+
+            n_retained = len(filtered_group)
+            n_total = len(group)
+            reduction_pct = (1 - n_retained / n_total) * 100 if n_total > 0 else 0
+            logger.info(
+                f"  CUSUM id={asset_id}: {n_retained}/{n_total} bars retained "
+                f"({reduction_pct:.1f}% reduction, threshold={threshold:.6f})"
+            )
+
+            filtered_parts.append(filtered_group)
+
+        if not filtered_parts:
+            return pd.DataFrame(columns=features_df.columns)
+
+        result = pd.concat(filtered_parts, ignore_index=True)
+        n_after = len(result)
+        total_reduction = (1 - n_after / n_before) * 100 if n_before > 0 else 0
+        logger.info(
+            f"  CUSUM total: {n_after}/{n_before} rows retained "
+            f"({total_reduction:.1f}% reduction, multiplier={multiplier})"
+        )
+        return result
 
     def _load_features(
         self,

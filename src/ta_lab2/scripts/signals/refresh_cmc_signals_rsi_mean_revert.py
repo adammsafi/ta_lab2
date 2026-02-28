@@ -129,6 +129,20 @@ Examples:
         action="store_true",
         help="Disable regime context (A/B comparison mode: signals generated without regime sizing)",
     )
+    parser.add_argument(
+        "--cusum",
+        action="store_true",
+        help="Enable symmetric CUSUM pre-filter (AFML Ch.17). "
+        "Reduces signal count by retaining only statistically significant event bars.",
+    )
+    parser.add_argument(
+        "--cusum-multiplier",
+        type=float,
+        default=2.0,
+        metavar="MULT",
+        help="EWM-vol multiplier for CUSUM threshold calibration (default: 2.0). "
+        "Higher = stricter filter = fewer events.",
+    )
 
     args = parser.parse_args()
 
@@ -212,6 +226,17 @@ Examples:
     else:
         logger.info("Regime context ENABLED: signals will use regime-adjusted sizing")
 
+    # CUSUM filter mode
+    cusum_enabled = args.cusum
+    cusum_multiplier = args.cusum_multiplier
+    if cusum_enabled:
+        logger.info(
+            f"CUSUM pre-filter ENABLED (multiplier={cusum_multiplier}): "
+            "only significant event bars will generate signals"
+        )
+    else:
+        logger.info("CUSUM pre-filter DISABLED (default mode)")
+
     # Generate signals
     generator = RSISignalGenerator(engine, state_manager)
     total_signals = 0
@@ -233,6 +258,8 @@ Examples:
                 dry_run=args.dry_run,
                 use_adaptive=args.adaptive,
                 regime_enabled=regime_enabled,
+                cusum_enabled=cusum_enabled,
+                cusum_threshold_multiplier=cusum_multiplier,
             )
             total_signals += count
             logger.info(f"Generated {count} signals for {signal_name}")
@@ -246,11 +273,13 @@ Examples:
     mode = "DRY RUN" if args.dry_run else "COMMITTED"
     refresh_type = "FULL" if args.full_refresh else "INCREMENTAL"
     threshold_mode = "ADAPTIVE" if args.adaptive else "STATIC"
+    cusum_mode = f"CUSUM(mult={cusum_multiplier})" if cusum_enabled else "NO_CUSUM"
 
     logger.info("=" * 80)
     logger.info(f"SUMMARY ({mode})")
     logger.info(f"  Refresh type: {refresh_type}")
     logger.info(f"  Threshold mode: {threshold_mode}")
+    logger.info(f"  CUSUM mode: {cusum_mode}")
     logger.info(f"  Signals processed: {len(configs)}")
     logger.info(f"  Assets processed: {len(ids)}")
     logger.info(f"  Total signals generated: {total_signals}")

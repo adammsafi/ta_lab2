@@ -122,6 +122,20 @@ def main():
         action="store_true",
         help="Disable regime context (A/B comparison mode: signals generated without regime sizing)",
     )
+    parser.add_argument(
+        "--cusum",
+        action="store_true",
+        help="Enable symmetric CUSUM pre-filter (AFML Ch.17). "
+        "Reduces signal count by retaining only statistically significant event bars.",
+    )
+    parser.add_argument(
+        "--cusum-multiplier",
+        type=float,
+        default=2.0,
+        metavar="MULT",
+        help="EWM-vol multiplier for CUSUM threshold calibration (default: 2.0). "
+        "Higher = stricter filter = fewer events.",
+    )
 
     args = parser.parse_args()
 
@@ -205,6 +219,17 @@ def main():
     else:
         logger.info("Regime context ENABLED: signals will use regime-adjusted sizing")
 
+    # CUSUM filter mode
+    cusum_enabled = args.cusum
+    cusum_multiplier = args.cusum_multiplier
+    if cusum_enabled:
+        logger.info(
+            f"CUSUM pre-filter ENABLED (multiplier={cusum_multiplier}): "
+            "only significant event bars will generate signals"
+        )
+    else:
+        logger.info("CUSUM pre-filter DISABLED (default mode)")
+
     # Generate signals
     generator = ATRSignalGenerator(engine, state_manager)
     total_signals = 0
@@ -223,6 +248,8 @@ def main():
                 full_refresh=args.full_refresh,
                 dry_run=args.dry_run,
                 regime_enabled=regime_enabled,
+                cusum_enabled=cusum_enabled,
+                cusum_threshold_multiplier=cusum_multiplier,
             )
 
             total_signals += n
@@ -235,10 +262,12 @@ def main():
             continue
 
     # Summary
+    cusum_mode = f"CUSUM(mult={cusum_multiplier})" if cusum_enabled else "NO_CUSUM"
     logger.info("=" * 60)
     logger.info(f"Total: {total_signals} ATR breakout signal(s) generated")
     logger.info(f"Mode: {'DRY RUN' if args.dry_run else 'LIVE'}")
     logger.info(f"Refresh: {'FULL' if args.full_refresh else 'INCREMENTAL'}")
+    logger.info(f"CUSUM: {cusum_mode}")
     logger.info("=" * 60)
 
 

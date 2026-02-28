@@ -45,6 +45,7 @@ from ta_lab2.scripts.signals.regime_utils import (
     merge_regime_context,
 )
 from ta_lab2.signals.rsi_mean_revert import make_signals
+from ta_lab2.labeling.cusum_filter import cusum_filter, get_cusum_threshold
 
 
 logger = logging.getLogger(__name__)
@@ -119,6 +120,83 @@ class RSISignalGenerator:
     engine: Engine
     state_manager: SignalStateManager
     signal_version: str = "1.0"
+
+    def _apply_cusum_filter(
+        self,
+        features_df: pd.DataFrame,
+        multiplier: float,
+    ) -> pd.DataFrame:
+        """
+        Apply per-asset symmetric CUSUM pre-filter to features DataFrame.
+
+        For each asset, computes an EWM-vol-calibrated threshold and retains
+        only the rows at CUSUM event timestamps.
+
+        Args:
+            features_df: DataFrame with columns id, ts, close (and others).
+            multiplier: EWM-vol scaling factor for threshold calibration.
+
+        Returns:
+            Filtered DataFrame containing only CUSUM event rows.
+        """
+        n_before = len(features_df)
+        filtered_parts = []
+
+        for asset_id, group in features_df.groupby("id"):
+            group = group.sort_values("ts").reset_index(drop=True)
+
+            close = group.set_index("ts")["close"]
+            if not isinstance(close.index, pd.DatetimeIndex):
+                close.index = pd.to_datetime(close.index, utc=True)
+
+            if len(close) < 2:
+                filtered_parts.append(group)
+                continue
+
+            threshold = get_cusum_threshold(close, multiplier=multiplier)
+            if threshold <= 0:
+                logger.warning(
+                    f"CUSUM threshold <= 0 for id={asset_id}, skipping filter"
+                )
+                filtered_parts.append(group)
+                continue
+
+            cusum_events = cusum_filter(close, threshold)
+
+            if len(cusum_events) == 0:
+                logger.warning(
+                    f"CUSUM returned 0 events for id={asset_id} "
+                    f"(threshold={threshold:.6f}), retaining all bars"
+                )
+                filtered_parts.append(group)
+                continue
+
+            event_set = set(pd.to_datetime(cusum_events, utc=True).tolist())
+            ts_utc = pd.to_datetime(group["ts"], utc=True)
+            mask = ts_utc.isin(event_set)
+            filtered_group = group[mask]
+
+            n_retained = len(filtered_group)
+            n_total = len(group)
+            reduction_pct = (1 - n_retained / n_total) * 100 if n_total > 0 else 0
+            logger.info(
+                f"CUSUM id={asset_id}: {n_retained}/{n_total} bars retained "
+                f"({reduction_pct:.1f}% reduction, threshold={threshold:.6f})"
+            )
+
+            filtered_parts.append(filtered_group)
+
+        if not filtered_parts:
+            return pd.DataFrame(columns=features_df.columns)
+
+        result = pd.concat(filtered_parts, ignore_index=True)
+        n_after = len(result)
+        total_reduction = (1 - n_after / n_before) * 100 if n_before > 0 else 0
+        logger.info(
+            f"CUSUM total: {n_after}/{n_before} rows retained "
+            f"({total_reduction:.1f}% reduction, multiplier={multiplier})"
+        )
+        return result
 
     def load_features(
         self,
@@ -314,6 +392,8 @@ class RSISignalGenerator:
         # See reports/evaluation/adaptive_rsi_ab_comparison.md
         use_adaptive: bool = False,
         regime_enabled: bool = True,
+        cusum_enabled: bool = False,
+        cusum_threshold_multiplier: float = 2.0,
     ) -> int:
         """
         Generate RSI mean reversion signals for specified asset IDs.
@@ -331,6 +411,11 @@ class RSISignalGenerator:
                          instead of static thresholds from dim_signals
             regime_enabled: If True, load regime context and attach regime_key
                 to signal records. Set False (--no-regime) for A/B comparison.
+            cusum_enabled: If True, apply symmetric CUSUM pre-filter before signal
+                generation. Only event timestamps are passed to the signal logic.
+                Default False preserves backward-compatible behavior.
+            cusum_threshold_multiplier: EWM-vol multiplier for CUSUM threshold.
+                Default 2.0. Higher = fewer events.
 
         Returns:
             Number of signal records generated
@@ -365,6 +450,15 @@ class RSISignalGenerator:
             return 0
 
         logger.info(f"Loaded {len(df_features)} feature rows")
+
+        # Apply CUSUM pre-filter (if enabled)
+        if cusum_enabled:
+            df_features = self._apply_cusum_filter(
+                df_features, cusum_threshold_multiplier
+            )
+            if df_features.empty:
+                logger.warning("CUSUM filter removed all rows - skipping")
+                return 0
 
         # Load and merge regime context (if enabled)
         if regime_enabled:
