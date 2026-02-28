@@ -97,6 +97,11 @@ analytics = [
   "quantstats>=0.0.81",
 ]
 
+# Portfolio construction and optimization
+portfolio = [
+  "PyPortfolioOpt>=1.5.6",
+]
+
 # Combined group for development + orchestrator + docs + economic
 all = [
   "alembic>=1.18",

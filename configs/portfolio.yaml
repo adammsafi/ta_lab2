@@ -1,0 +1,99 @@
+# Portfolio Construction & Sizing Configuration
+# Phase 58 - v1.0.0
+# All sections are loaded by ta_lab2.portfolio.load_portfolio_config()
+
+# --- Optimizer settings ---
+optimizer:
+  # Calendar days of history to use for covariance estimation
+  lookback_calendar_days: 180
+  # Minimum number of bars required (guards against thin data)
+  min_lookback_bars: 60
+  # Maximum single-asset weight (hard constraint in optimizer)
+  max_position_pct: 0.15
+  # Maximum sum of absolute weights (leverage cap)
+  max_gross_exposure: 1.5
+  # CVaR tail probability (e.g., 0.95 = 95th percentile loss)
+  cvar_beta: 0.95
+  # Warn/reject covariance matrices above this condition number
+  condition_number_threshold: 1000
+
+# --- Regime-based optimizer routing ---
+# Maps regime labels to optimizer types: 'mv', 'cvar', 'hrp', 'bl'
+regime_routing:
+  bear: cvar
+  stable: mv
+  uncertain: hrp
+  default: hrp
+
+# --- Rebalancing scheduler ---
+rebalancing:
+  # 'time_based' | 'signal_drift' | 'hybrid'
+  mode: time_based
+  # Rebalance frequency (ISO 8601 duration or pandas offset)
+  frequency: 1D
+  # Trigger rebalance if any weight drifts beyond this fraction
+  drift_threshold: 0.05
+  # Apply turnover penalty to optimizer objective
+  turnover_penalty: false
+  # Estimated one-way transaction cost in basis points
+  fee_bps: 10.0
+
+# --- Bet sizing (probability-based position scaling) ---
+bet_sizing:
+  # 'optimizer_first' = start from optimizer weight, scale by confidence
+  # 'signal_first'    = size from signal probability, clip by optimizer limit
+  mode: optimizer_first
+  # w parameter in bet-sizing formula: f = (p*(w+1) - 1) / w
+  w_parameter: 2.0
+  # Minimum signal confidence to include an asset (below = zero weight)
+  min_confidence: 0.2
+
+# --- Top-k asset selection with dropout ---
+topk_selection:
+  # Number of assets to hold in the portfolio
+  topk: 10
+  # Number of assets to drop on each rebalance (turnover control)
+  n_drop: 2
+
+# --- Black-Litterman views ---
+black_litterman:
+  # Tau scales the uncertainty of the prior (smaller = trust prior more)
+  tau: 0.05
+  # Use Idzorek's method for converting confidence to omega
+  use_idzorek: true
+  # Minimum signal confidence to include as a BL view
+  min_view_confidence: 0.2
+  # Maximum signal confidence cap (prevents extreme views)
+  max_view_confidence: 0.8
+  # Which signals to use as views: 'all_active' | 'top_n' | specific list
+  views_source: all_active
+
+# --- Risk integration mode ---
+risk_integration:
+  # 'constraints_in_optimizer' = pass risk limits directly to optimizer
+  # 'post_processing'          = apply risk limits after optimization
+  mode: constraints_in_optimizer
+
+# --- Cash management ---
+cash_management:
+  # If true, redistribute cash freed by closed positions before adding new
+  redistribute_first: true
+  # List of yield instruments to park excess cash (e.g., USDC, USDT)
+  yield_instruments: []
+
+# --- Stop-loss and take-profit laddering ---
+stop_laddering:
+  enabled: true
+  defaults:
+    # Stop-loss levels as fraction of entry price (e.g., 0.02 = 2% below)
+    sl_stops: [0.02, 0.03, 0.05]
+    # Take-profit levels as fraction of entry price (e.g., 0.03 = 3% above)
+    tp_stops: [0.03, 0.05, 0.10]
+    # Fraction of position to exit at each stop-loss tier (must sum to 1.0)
+    sl_sizes: [0.33, 0.33, 0.34]
+    # Fraction of position to exit at each take-profit tier (must sum to 1.0)
+    tp_sizes: [0.33, 0.33, 0.34]
+  # Override defaults per strategy (keyed by strategy name)
+  per_strategy_overrides: {}
+  # Override defaults per asset (keyed by asset symbol or id)
+  per_asset_overrides: {}
