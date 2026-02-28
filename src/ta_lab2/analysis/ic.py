@@ -1120,7 +1120,9 @@ def save_ic_results(conn, rows: list[dict], *, overwrite: bool = False) -> int:
         List of dicts with keys matching cmc_ic_results columns:
         asset_id, tf, feature, horizon, horizon_days, return_type,
         regime_col, regime_label, train_start, train_end,
-        ic, ic_t_stat, ic_p_value, ic_ir, ic_ir_t_stat, turnover, n_obs.
+        ic, ic_t_stat, ic_p_value, ic_ir, ic_ir_t_stat, turnover, n_obs,
+        rank_ic (optional -- defaults to the same value as ic, since ic is
+        always Spearman and Spearman IC == Rank IC by definition).
     overwrite : bool
         If False (default): ON CONFLICT DO NOTHING (append-only, keeps history).
         If True: ON CONFLICT DO UPDATE with updated IC values (upsert).
@@ -1129,6 +1131,12 @@ def save_ic_results(conn, rows: list[dict], *, overwrite: bool = False) -> int:
     -------
     int
         Number of rows written (rowcount sum across all inserts).
+
+    Notes
+    -----
+    rank_ic defaults to the ic value when not explicitly provided in the row dict.
+    Both ic and rank_ic store Spearman rank correlation — they are semantically
+    identical. rank_ic is the ANALYTICS-02 explicit label required for reporting.
     """
     if not rows:
         return 0
@@ -1139,11 +1147,13 @@ def save_ic_results(conn, rows: list[dict], *, overwrite: bool = False) -> int:
             INSERT INTO public.cmc_ic_results
                 (asset_id, tf, feature, horizon, horizon_days, return_type,
                  regime_col, regime_label, train_start, train_end,
-                 ic, ic_t_stat, ic_p_value, ic_ir, ic_ir_t_stat, turnover, n_obs)
+                 ic, ic_t_stat, ic_p_value, ic_ir, ic_ir_t_stat, turnover, n_obs,
+                 rank_ic)
             VALUES
                 (:asset_id, :tf, :feature, :horizon, :horizon_days, :return_type,
                  :regime_col, :regime_label, :train_start, :train_end,
-                 :ic, :ic_t_stat, :ic_p_value, :ic_ir, :ic_ir_t_stat, :turnover, :n_obs)
+                 :ic, :ic_t_stat, :ic_p_value, :ic_ir, :ic_ir_t_stat, :turnover, :n_obs,
+                 :rank_ic)
             ON CONFLICT (asset_id, tf, feature, horizon, return_type,
                          regime_col, regime_label, train_start, train_end)
             DO UPDATE SET
@@ -1155,6 +1165,7 @@ def save_ic_results(conn, rows: list[dict], *, overwrite: bool = False) -> int:
                 turnover      = EXCLUDED.turnover,
                 n_obs         = EXCLUDED.n_obs,
                 horizon_days  = EXCLUDED.horizon_days,
+                rank_ic       = EXCLUDED.rank_ic,
                 computed_at   = now()
             """
         )
@@ -1164,11 +1175,13 @@ def save_ic_results(conn, rows: list[dict], *, overwrite: bool = False) -> int:
             INSERT INTO public.cmc_ic_results
                 (asset_id, tf, feature, horizon, horizon_days, return_type,
                  regime_col, regime_label, train_start, train_end,
-                 ic, ic_t_stat, ic_p_value, ic_ir, ic_ir_t_stat, turnover, n_obs)
+                 ic, ic_t_stat, ic_p_value, ic_ir, ic_ir_t_stat, turnover, n_obs,
+                 rank_ic)
             VALUES
                 (:asset_id, :tf, :feature, :horizon, :horizon_days, :return_type,
                  :regime_col, :regime_label, :train_start, :train_end,
-                 :ic, :ic_t_stat, :ic_p_value, :ic_ir, :ic_ir_t_stat, :turnover, :n_obs)
+                 :ic, :ic_t_stat, :ic_p_value, :ic_ir, :ic_ir_t_stat, :turnover, :n_obs,
+                 :rank_ic)
             ON CONFLICT (asset_id, tf, feature, horizon, return_type,
                          regime_col, regime_label, train_start, train_end)
             DO NOTHING
@@ -1195,6 +1208,8 @@ def save_ic_results(conn, rows: list[dict], *, overwrite: bool = False) -> int:
             "ic_ir_t_stat": _to_python(row.get("ic_ir_t_stat")),
             "turnover": _to_python(row.get("turnover")),
             "n_obs": _to_python(row.get("n_obs")),
+            # rank_ic defaults to ic value (Spearman IC == Rank IC by definition)
+            "rank_ic": _to_python(row.get("rank_ic", row.get("ic"))),
         }
         for row in rows
     ]
