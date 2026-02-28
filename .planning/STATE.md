@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: Phase 55 (Feature & Signal Evaluation) — COMPLETE
-Plan: 5/5 complete (55-01 DONE — IC baseline extended 47,614→82,110 rows; 55-02 DONE — features.yaml 7→91 entries; 55-03 DONE — ExperimentRunner sweep 100 features x 5 TFs, 67,788 rows; 55-04 DONE — adaptive vs static RSI A/B comparison, static retained as default; 55-05 DONE — evaluation findings report, promotion_decisions.csv, 04_evaluation_findings.ipynb)
-Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 COMPLETE (all 3 plans). V1_MEMO.md GENERATED. Phase 55 COMPLETE (all 5 plans).
-Last activity: 2026-02-26 — Completed 55-05-PLAN.md (evaluation findings: 60 features recommended for promotion; 310-line EVALUATION_FINDINGS.md; 39-cell findings notebook; phase 55 capstone complete)
+Phase: Phase 56 (Factor Analytics Reporting) — In Progress
+Plan: 1/7 started (56-02 DONE — quantstats 0.0.81 installed; quantstats_reporter.py with generate_tear_sheet + _load_btc_benchmark_returns)
+Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 COMPLETE (all 3 plans). V1_MEMO.md GENERATED. Phase 55 COMPLETE (all 5 plans). Phase 56 in progress (56-02 DONE).
+Last activity: 2026-02-28 — Completed 56-02-PLAN.md (quantstats 0.0.81 installed; analytics optional dep group in pyproject.toml; quantstats_reporter.py 185 lines with generate_tear_sheet + _load_btc_benchmark_returns + _strip_tz)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE
 
@@ -515,6 +515,11 @@ Recent decisions affecting current work:
 - **dim_feature_registry promotion deferred (Phase 55-05)**: dim_feature_registry has 0 rows; FeaturePromoter.promote_feature() not auto-called; recommendations documented in promotion_decisions.csv for manual review
 - **Outlier flags deprecate_candidate despite top IC-IR (Phase 55-05)**: *_is_outlier features rank #1-#12 by IC-IR but fail BH (too few observations: 4-40 per feature); classified deprecate_candidate
 - **delta_ret_* family all BH-fail (Phase 55-05)**: All 8 delta return features (delta_ret_arith, delta_ret_log, and roll/zscore variants) fail BH; recommend removing from features.yaml
+- **Lazy quantstats import in generate_tear_sheet (Phase 56-02)**: import quantstats as qs inside function body — keeps quantstats optional; ImportError logs warning and returns None; install with pip install 'ta_lab2[analytics]'
+- **benchmark kwarg omission for None case (Phase 56-02)**: Call qs.reports.html(ret, **kwargs) without benchmark keyword when benchmark_returns is None — avoids potential QuantStats internal errors from benchmark=None
+- **Double-guard for None in BTC benchmark loader (Phase 56-02)**: _load_btc_benchmark_returns returns None on (a) empty DataFrame from DB query and (b) empty Series after pct_change().dropna() — covers edge case with only 1 row of price data
+- **periods_per_year=365 for crypto tear sheets (Phase 56-02)**: Crypto trades 365 days/year; use 365 not 252 (equity convention); passed to qs.reports.html
+- **BTC_ID=1 hardcoded constant (Phase 56-02)**: CoinMarketCap canonical ID for Bitcoin; module-level constant; query cmc_features WHERE id=1 AND tf='1D' for benchmark returns
 
 ### Pending Todos
 
@@ -528,8 +533,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-26T23:24:34Z
-Stopped at: Completed 55-05-PLAN.md — Phase 55 COMPLETE. Evaluation findings report (310 lines), promotion_decisions.csv (119 rows, 60 promote), 04_evaluation_findings.ipynb (39 cells). Phase 55 all 5 plans complete.
+Last session: 2026-02-28T06:27:58Z
+Stopped at: Completed 56-02-PLAN.md — QuantStats 0.0.81 installed; analytics optional dep group in pyproject.toml; quantstats_reporter.py (185 lines) with generate_tear_sheet(), _load_btc_benchmark_returns(), _strip_tz().
 Resume file: None
 
 ---
