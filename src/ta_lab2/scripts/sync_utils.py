@@ -97,20 +97,13 @@ def _get_watermark(
     return wm
 
 
-def _sync_one_source(
-    engine: Engine,
-    u_table: str,
-    src_table: str,
-    pk_cols: List[str],
-    alignment_source: str,
-    log_fn,
-    dry_run: bool = False,
-) -> int:
-    """Sync rows from one source table into the unified table. Returns rows inserted."""
+def _build_column_mapping(
+    engine: Engine, u_table: str, src_table: str
+) -> Tuple[str, str, str]:
+    """Build INSERT/SELECT column lists. Returns (insert_csv, select_csv, pk_sql)."""
     u_cols = get_columns(engine, u_table)
     src_cols_set = set(get_columns(engine, src_table))
 
-    # Build SELECT and INSERT column lists
     select_parts: List[str] = []
     insert_cols: List[str] = []
     for col in u_cols:
@@ -121,50 +114,100 @@ def _sync_one_source(
             select_parts.append(_q(col))
             insert_cols.append(_q(col))
         else:
-            # Column in _u but not in source — fill NULL
             select_parts.append("NULL")
             insert_cols.append(_q(col))
 
+    return ", ".join(insert_cols), ", ".join(select_parts)
+
+
+def _sync_one_source(
+    engine: Engine,
+    u_table: str,
+    src_table: str,
+    pk_cols: List[str],
+    alignment_source: str,
+    log_fn,
+    dry_run: bool = False,
+    batch_col: Optional[str] = None,
+) -> int:
+    """Sync rows from one source table into the unified table. Returns rows inserted.
+
+    When batch_col is set (e.g. "id"), rows are batched by distinct values of
+    that column — each batch is a separate committed transaction. This prevents
+    multi-hour single-transaction bulk inserts for large tables.
+    """
+    insert_csv, select_csv = _build_column_mapping(engine, u_table, src_table)
     pk_sql = ", ".join(_q(c) for c in pk_cols)
-    insert_csv = ", ".join(insert_cols)
-    select_csv = ", ".join(select_parts)
 
     # Watermark
     wm = _get_watermark(engine, u_table, alignment_source)
     if wm is None:
         log_fn(f"{alignment_source}: no watermark — full load from {src_table}")
-        where_clause = ""
-        params = {"alignment_source": alignment_source}
+        wm_clause = ""
+        base_params = {"alignment_source": alignment_source}
     else:
         log_fn(f"{alignment_source}: watermark = {wm.isoformat()}")
-        where_clause = 'WHERE "ingested_at" > :wm'
-        params = {"alignment_source": alignment_source, "wm": wm}
+        wm_clause = 'AND "ingested_at" > :wm'
+        base_params = {"alignment_source": alignment_source, "wm": wm}
 
     if dry_run:
-        count_sql = f"SELECT COUNT(*)::bigint AS n FROM {src_table} {where_clause}"
+        where = f"WHERE 1=1 {wm_clause}" if wm_clause else ""
+        count_sql = f"SELECT COUNT(*)::bigint AS n FROM {src_table} {where}"
         with engine.connect() as conn:
-            row = conn.execute(text(count_sql), params).fetchone()
+            row = conn.execute(text(count_sql), base_params).fetchone()
         n = int(row[0]) if row else 0
         log_fn(f"{alignment_source}: DRY RUN — {n:,} candidate rows")
         return 0
 
-    sql = f"""
-    WITH ins AS (
-        INSERT INTO {u_table} ({insert_csv})
-        SELECT {select_csv}
-        FROM {src_table}
-        {where_clause}
-        ON CONFLICT ({pk_sql}) DO NOTHING
-        RETURNING 1
-    )
-    SELECT COUNT(*)::bigint AS n_inserted FROM ins;
-    """
+    # Decide whether to batch
+    if batch_col:
+        batch_where = f"WHERE 1=1 {wm_clause}" if wm_clause else ""
+        ids_sql = (
+            f"SELECT DISTINCT {_q(batch_col)} FROM {src_table} {batch_where} ORDER BY 1"
+        )
+        with engine.connect() as conn:
+            batch_vals = [
+                r[0] for r in conn.execute(text(ids_sql), base_params).fetchall()
+            ]
+        log_fn(
+            f"{alignment_source}: batching by {batch_col}, {len(batch_vals)} batches"
+        )
+    else:
+        batch_vals = [None]  # single batch, no extra WHERE
 
-    with engine.begin() as conn:
-        row = conn.execute(text(sql), params).fetchone()
-        n_inserted = int(row[0]) if row else 0
-    log_fn(f"{alignment_source}: inserted {n_inserted:,} rows")
-    return n_inserted
+    total = 0
+    for bv in batch_vals:
+        if bv is not None:
+            where_clause = f"WHERE {_q(batch_col)} = :batch_val {wm_clause}"
+            params = {**base_params, "batch_val": bv}
+        elif wm_clause:
+            where_clause = f"WHERE 1=1 {wm_clause}"
+            params = base_params
+        else:
+            where_clause = ""
+            params = base_params
+
+        sql = f"""
+        WITH ins AS (
+            INSERT INTO {u_table} ({insert_csv})
+            SELECT {select_csv}
+            FROM {src_table}
+            {where_clause}
+            ON CONFLICT ({pk_sql}) DO NOTHING
+            RETURNING 1
+        )
+        SELECT COUNT(*)::bigint AS n_inserted FROM ins;
+        """
+
+        with engine.begin() as conn:
+            row = conn.execute(text(sql), params).fetchone()
+            n = int(row[0]) if row else 0
+        total += n
+        if bv is not None:
+            log_fn(f"{alignment_source}: {batch_col}={bv} -> {n:,} rows")
+
+    log_fn(f"{alignment_source}: inserted {total:,} rows total")
+    return total
 
 
 def sync_sources_to_unified(
@@ -176,6 +219,7 @@ def sync_sources_to_unified(
     log_prefix: str = "sync",
     dry_run: bool = False,
     only: Optional[Set[str]] = None,
+    batch_col: Optional[str] = None,
 ) -> int:
     """
     Incrementally sync rows from multiple source tables into a single
@@ -218,6 +262,7 @@ def sync_sources_to_unified(
             alignment_source=a,
             log_fn=_log,
             dry_run=dry_run,
+            batch_col=batch_col,
         )
 
     if dry_run:

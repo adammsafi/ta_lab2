@@ -52,14 +52,12 @@ runfile(
 
 import argparse
 import os
+import subprocess
 import time
 from dataclasses import dataclass
-from functools import partial
 from multiprocessing import Pool
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
-import numpy as np
-import pandas as pd
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.pool import NullPool
@@ -165,7 +163,7 @@ _BAR_TABLES = [
     ),
 ]
 
-# -- EMA returns tables (6) -------------------------------------------------
+# -- EMA returns tables (5 source, _u synced separately) -------------------
 
 _EMA_CANONICAL_BASE = [
     ("ret_arith_ema", "ret_arith_ema_zscore"),
@@ -187,14 +185,6 @@ _EMA_TABLES = [
         ts_col="ts",
         pk_cols=["id", "ts", "tf", "period"],
         key_cols=["id", "tf", "period"],
-        canonical_base_pairs=_EMA_CANONICAL_BASE,
-        roll_base_pairs=_EMA_ROLL_BASE,
-    ),
-    TableConfig(
-        table="public.cmc_returns_ema_multi_tf_u",
-        ts_col="ts",
-        pk_cols=["id", "ts", "tf", "period", "alignment_source"],
-        key_cols=["id", "tf", "period", "alignment_source"],
         canonical_base_pairs=_EMA_CANONICAL_BASE,
         roll_base_pairs=_EMA_ROLL_BASE,
     ),
@@ -232,7 +222,7 @@ _EMA_TABLES = [
     ),
 ]
 
-# -- AMA returns tables (6) -------------------------------------------------
+# -- AMA returns tables (5 source, _u synced separately) -------------------
 # AMA has no _ema_bar column family — only 4 z-score base pairs per window
 # (2 canonical + 2 roll) vs EMA's 8 (4+4).
 # CRITICAL: key_cols MUST include indicator and params_hash so that z-scores
@@ -255,14 +245,6 @@ _AMA_TABLES = [
         ts_col="ts",
         pk_cols=["id", "ts", "tf", "indicator", "params_hash"],
         key_cols=["id", "tf", "indicator", "params_hash"],
-        canonical_base_pairs=_AMA_CANONICAL_BASE,
-        roll_base_pairs=_AMA_ROLL_BASE,
-    ),
-    TableConfig(
-        table="public.cmc_returns_ama_multi_tf_u",
-        ts_col="ts",
-        pk_cols=["id", "ts", "tf", "indicator", "params_hash", "alignment_source"],
-        key_cols=["id", "tf", "indicator", "params_hash", "alignment_source"],
         canonical_base_pairs=_AMA_CANONICAL_BASE,
         roll_base_pairs=_AMA_ROLL_BASE,
     ),
@@ -339,267 +321,208 @@ def _max_window_bars(tf_days: int) -> int:
 
 
 # ---------------------------------------------------------------------------
-# Key discovery
+# Core z-score computation (SQL window functions)
 # ---------------------------------------------------------------------------
 
 
-def _discover_keys(
-    engine: Engine,
+def _build_combined_zscore_update_sql(
     cfg: TableConfig,
-    ids: Optional[List[int]],
-    tf_filter: Optional[str],
-    full_recalc: bool,
-) -> List[Tuple]:
+    window_specs: List[Tuple[int, str]],
+    mode: str,
+) -> Optional[str]:
     """
-    Discover (key_col...) tuples that need z-score computation.
+    Build a single SQL UPDATE that computes z-scores for ALL eligible windows
+    at once using multiple named WINDOW definitions.
 
-    Incremental mode (default): find keys that have source data but have NEVER
-    been z-scored (COUNT(is_outlier) = 0 for the key group, since COUNT ignores
-    NULLs). Warm-up rows always have NULL z-scores, so checking individual rows
-    would always re-discover processed keys.
+    window_specs: [(window_bars, suffix), ...] — only windows with wb >= MIN_WINDOW
+    mode='roll':      use roll_base_pairs, no roll filter (all rows)
+    mode='canonical': use canonical_base_pairs, WHERE roll = FALSE
 
-    Full recalc: return all distinct keys.
+    This produces ONE UPDATE per mode instead of one per (window, mode),
+    cutting table scans from 6 to 2 per work unit.
     """
-    key_select = ", ".join(cfg.key_cols)
-    params: Dict[str, Any] = {}
+    pairs = cfg.roll_base_pairs if mode == "roll" else cfg.canonical_base_pairs
+    if not pairs or not window_specs:
+        return None
 
-    where_parts: List[str] = []
-    if ids is not None:
-        where_parts.append("id = ANY(:ids)")
-        params["ids"] = ids
-    if tf_filter is not None:
-        where_parts.append("tf = :tf")
-        params["tf"] = tf_filter
+    roll_filter = " AND roll = FALSE" if mode == "canonical" else ""
 
-    where_clause = (" WHERE " + " AND ".join(where_parts)) if where_parts else ""
+    # Build SET and SELECT parts for all (source_col, window) combinations
+    set_parts = []
+    select_parts = []
+    window_defs = []
+    seen_windows = set()
 
-    if not full_recalc:
-        # Group by key, keep only keys with source data but zero is_outlier set
-        src_cols = _all_source_cols(cfg)
-        any_source_count = " + ".join(f"COUNT({c})" for c in src_cols)
-        sql = text(
-            f"SELECT {key_select} FROM {cfg.table}{where_clause} "
-            f"GROUP BY {key_select} "
-            f"HAVING ({any_source_count}) > 0 AND COUNT(is_outlier) = 0 "
-            f"ORDER BY {key_select};"
-        )
-    else:
-        sql = text(
-            f"SELECT DISTINCT {key_select} FROM {cfg.table}{where_clause} "
-            f"ORDER BY {key_select};"
-        )
-
-    with engine.begin() as cxn:
-        rows = cxn.execute(sql, params).fetchall()
-
-    return [tuple(r) for r in rows]
-
-
-# ---------------------------------------------------------------------------
-# Core z-score computation per key
-# ---------------------------------------------------------------------------
-
-
-def _process_key(
-    db_url: str,
-    cfg: TableConfig,
-    tf_days: int,
-    key: Tuple,
-) -> Tuple[Tuple, int]:
-    """
-    Compute z-scores for one key (e.g. one (id, tf) or (id, tf, period)).
-    Processes all applicable windows (30, 90, 365) in one pass.
-
-    Returns (key, n_rows_updated).
-    """
-    engine = _get_worker_engine(db_url)
-
-    # Build WHERE for this key
-    key_where = " AND ".join(f"{col} = :k{i}" for i, col in enumerate(cfg.key_cols))
-    key_params = {f"k{i}": v for i, v in enumerate(key)}
-
-    # Load all rows for this key, ordered by timestamp
-    source_cols = list(
-        set(
-            [p[0] for p in cfg.canonical_base_pairs]
-            + [p[0] for p in cfg.roll_base_pairs]
-        )
-    )
-    select_cols = cfg.pk_cols + ["roll"] + source_cols
-    select_str = ", ".join(select_cols)
-
-    sql = text(
-        f"SELECT {select_str} FROM {cfg.table} WHERE {key_where} ORDER BY {cfg.ts_col};"
-    )
-
-    with engine.begin() as cxn:
-        df = pd.read_sql(sql, cxn, params=key_params)
-
-    if df.empty:
-        return key, 0
-
-    # Initialize all z-score columns as NaN
-    zscore_cols = _all_zscore_cols(cfg)
-    for col in zscore_cols:
-        df[col] = np.nan
-
-    # Pre-compute canonical mask
-    canon_mask = df["roll"] == False  # noqa: E712
-    has_canonical = canon_mask.any()
-    if has_canonical:
-        canon_idx = df.index[canon_mask]
-
-    # --- Process each window ---
-    for window_days, suffix in WINDOW_CONFIGS:
-        window_bars = round(window_days / tf_days)
-        if window_bars < MIN_WINDOW:
-            continue
-
-        # Roll z-scores (computed on ALL rows)
-        for src_col, base in cfg.roll_base_pairs:
-            if src_col in df.columns:
-                z_col = f"{base}{suffix}"
-                rolling_mean = (
-                    df[src_col]
-                    .rolling(window=window_bars, min_periods=window_bars)
-                    .mean()
-                )
-                rolling_std = (
-                    df[src_col]
-                    .rolling(window=window_bars, min_periods=window_bars)
-                    .std()
-                )
-                df[z_col] = np.where(
-                    rolling_std > 0,
-                    (df[src_col] - rolling_mean) / rolling_std,
-                    np.nan,
-                )
-
-        # Canonical z-scores (computed on roll=FALSE rows only)
-        if has_canonical:
-            canon_df = df.loc[canon_idx].copy()
-
-            for src_col, base in cfg.canonical_base_pairs:
-                if src_col in canon_df.columns:
-                    z_col = f"{base}{suffix}"
-                    rolling_mean = (
-                        canon_df[src_col]
-                        .rolling(window=window_bars, min_periods=window_bars)
-                        .mean()
-                    )
-                    rolling_std = (
-                        canon_df[src_col]
-                        .rolling(window=window_bars, min_periods=window_bars)
-                        .std()
-                    )
-                    canon_df[z_col] = np.where(
-                        rolling_std > 0,
-                        (canon_df[src_col] - rolling_mean) / rolling_std,
-                        np.nan,
-                    )
-
-            # Merge canonical z-scores back
-            for _, base in cfg.canonical_base_pairs:
-                z_col = f"{base}{suffix}"
-                df.loc[canon_idx, z_col] = canon_df[z_col].values
-
-    # --- is_outlier: TRUE if any |z-score| > 4 across ALL windows ---
-    z_abs = df[zscore_cols].abs()
-    # Use object dtype to allow True/False/None (nullable)
-    df["is_outlier"] = (z_abs > OUTLIER_THRESHOLD).any(axis=1).astype(object)
-    # Rows where ALL z-scores are NaN → is_outlier should be NULL
-    all_nan = df[zscore_cols].isna().all(axis=1)
-    df.loc[all_nan, "is_outlier"] = None
-
-    # --- Write back via temp table + UPDATE JOIN ---
-    update_cols = zscore_cols + ["is_outlier"]
-    pk_col_names = [c.strip('"') for c in cfg.pk_cols]
-
-    # Prepare the subset to write
-    write_df = df[pk_col_names + update_cols].copy()
-
-    # Only write rows where at least one z-score is not NaN
-    has_data = write_df[zscore_cols].notna().any(axis=1)
-    write_df = write_df[has_data]
-
-    if write_df.empty:
-        return key, 0
-
-    n_rows = len(write_df)
-
-    with engine.begin() as cxn:
-        # Create temp table
-        tmp_cols_ddl = []
-        for c in pk_col_names:
-            if c == "id":
-                tmp_cols_ddl.append(f"{c} bigint")
-            elif c in ("timestamp", "ts"):
-                tmp_cols_ddl.append(
-                    f'"{c}" timestamptz' if c == "timestamp" else f"{c} timestamptz"
-                )
-            elif c == "period":
-                tmp_cols_ddl.append(f"{c} integer")
-            elif c == "alignment_source":
-                tmp_cols_ddl.append(f"{c} text")
-            else:
-                tmp_cols_ddl.append(f"{c} text")  # tf
-        for c in zscore_cols:
-            tmp_cols_ddl.append(f"{c} double precision")
-        tmp_cols_ddl.append("is_outlier boolean")
-
-        tmp_name = f"tmp_zscore_{cfg.table.split('.')[-1][:40]}"
-        cxn.execute(text(f"DROP TABLE IF EXISTS {tmp_name};"))
-        cxn.execute(
-            text(
-                f"CREATE TEMP TABLE {tmp_name} "
-                f"({', '.join(tmp_cols_ddl)}) ON COMMIT DROP;"
+    for window_bars, suffix in window_specs:
+        win_name = f"w{window_bars}"
+        if win_name not in seen_windows:
+            seen_windows.add(win_name)
+            frame = window_bars - 1
+            partition = ", ".join(cfg.key_cols)
+            window_defs.append(
+                f"{win_name} AS (PARTITION BY {partition} ORDER BY {cfg.ts_col} "
+                f"ROWS BETWEEN {frame} PRECEDING AND CURRENT ROW)"
             )
-        )
 
-        # Insert into temp table
-        insert_cols = pk_col_names + update_cols
-        placeholders = ", ".join(f":{c}" for c in insert_cols)
-        insert_sql = text(
-            f"INSERT INTO {tmp_name} ({', '.join(insert_cols)}) "
-            f"VALUES ({placeholders});"
-        )
+        for src_col, base in pairs:
+            z_col = f"{base}{suffix}"
+            alias = f"_z_{src_col}{suffix}"
+            set_parts.append(f'"{z_col}" = sub."{alias}"')
+            select_parts.append(
+                f'CASE WHEN COUNT("{src_col}") OVER {win_name} >= {window_bars} '
+                f'AND STDDEV_SAMP("{src_col}") OVER {win_name} > 0 '
+                f'THEN ("{src_col}" - AVG("{src_col}") OVER {win_name}) '
+                f'/ STDDEV_SAMP("{src_col}") OVER {win_name} END AS "{alias}"'
+            )
 
-        # Convert DataFrame to list of dicts, handling NaN → None
-        # Note: pandas float columns silently convert None back to NaN,
-        # so we must do NaN→None conversion on the dict records instead.
-        records = [
-            {
-                k: (None if isinstance(v, float) and np.isnan(v) else v)
-                for k, v in d.items()
+    # PK join for UPDATE
+    pk_joins = []
+    for c in cfg.pk_cols:
+        c_clean = c.strip('"')
+        if c_clean == "timestamp":
+            pk_joins.append('t."timestamp" = sub."timestamp"')
+        else:
+            pk_joins.append(f't."{c_clean}" = sub."{c_clean}"')
+
+    return f"""
+    UPDATE {cfg.table} t
+    SET {", ".join(set_parts)}
+    FROM (
+        SELECT {", ".join(f'"{c.strip(chr(34))}"' for c in cfg.pk_cols)},
+            {", ".join(select_parts)}
+        FROM {cfg.table}
+        WHERE id = :id AND tf = :tf{roll_filter}
+        WINDOW {", ".join(window_defs)}
+    ) sub
+    WHERE {" AND ".join(pk_joins)};
+    """
+
+
+def _build_is_outlier_sql(cfg: TableConfig) -> str:
+    """Build SQL to set is_outlier based on all z-score columns."""
+    zscore_cols = _all_zscore_cols(cfg)
+
+    # is_outlier = TRUE if any |z-score| > threshold
+    outlier_conditions = " OR ".join(
+        f'ABS("{c}") > {OUTLIER_THRESHOLD}' for c in zscore_cols
+    )
+    # has_any_zscore = at least one z-score is not NULL
+    any_not_null = " OR ".join(f'"{c}" IS NOT NULL' for c in zscore_cols)
+
+    return f"""
+    UPDATE {cfg.table}
+    SET is_outlier = CASE
+        WHEN ({any_not_null}) THEN ({outlier_conditions})
+        ELSE NULL
+    END
+    WHERE id = :id AND tf = :tf;
+    """
+
+
+def _worker_sql_tf(args: tuple) -> dict:
+    """
+    Process z-scores for one (table, id, tf) using SQL window functions.
+
+    Work unit = (table, id, tf) keeps each UPDATE to ~100K rows max.
+    Runs ~6 UPDATE statements (roll + canonical per window) plus 1 is_outlier.
+    """
+    (
+        cfg_table,
+        cfg_ts_col,
+        cfg_pk_cols,
+        cfg_key_cols,
+        cfg_canon_pairs,
+        cfg_roll_pairs,
+        id_val,
+        tf_val,
+        tf_days_val,
+        db_url,
+    ) = args
+
+    cfg = TableConfig(
+        table=cfg_table,
+        ts_col=cfg_ts_col,
+        pk_cols=cfg_pk_cols,
+        key_cols=cfg_key_cols,
+        canonical_base_pairs=cfg_canon_pairs,
+        roll_base_pairs=cfg_roll_pairs,
+    )
+
+    t0 = time.time()
+    try:
+        engine = _get_worker_engine(db_url)
+        total_updated = 0
+
+        # Compute eligible (window_bars, suffix) for this TF
+        window_specs = []
+        for window_days, suffix in WINDOW_CONFIGS:
+            window_bars = round(window_days / tf_days_val)
+            if window_bars >= MIN_WINDOW:
+                window_specs.append((window_bars, suffix))
+
+        if not window_specs:
+            # No eligible windows for this TF — skip entirely
+            return {
+                "table": cfg.table,
+                "id": id_val,
+                "tf": tf_val,
+                "n_updated": 0,
+                "elapsed": time.time() - t0,
+                "error": None,
             }
-            for d in write_df.to_dict("records")
-        ]
-        # Batch insert
-        cxn.execute(insert_sql, records)
 
-        # UPDATE via JOIN
-        # Build the ON clause from PK columns
-        on_parts = []
-        for c in pk_col_names:
-            if c == "timestamp":
-                on_parts.append('t."timestamp" = s."timestamp"')
-            else:
-                on_parts.append(f"t.{c} = s.{c}")
+        # Single connection, single transaction: 2 UPDATEs + 1 is_outlier
+        with engine.begin() as conn:
+            conn.execute(text("SET LOCAL work_mem = '128MB'"))
 
-        set_parts = ", ".join(f"{c} = s.{c}" for c in update_cols)
-        on_clause = " AND ".join(on_parts)
+            # Roll z-scores (all rows, all windows in one pass)
+            sql = _build_combined_zscore_update_sql(cfg, window_specs, "roll")
+            if sql:
+                result = conn.execute(text(sql), {"id": id_val, "tf": tf_val})
+                total_updated += result.rowcount
 
-        update_sql = text(
-            f"UPDATE {cfg.table} t SET {set_parts} FROM {tmp_name} s WHERE {on_clause};"
-        )
-        cxn.execute(update_sql)
+            # Canonical z-scores (roll=FALSE, all windows in one pass)
+            sql = _build_combined_zscore_update_sql(cfg, window_specs, "canonical")
+            if sql:
+                result = conn.execute(text(sql), {"id": id_val, "tf": tf_val})
+                total_updated += result.rowcount
 
-    return key, n_rows
+            # is_outlier for this (id, tf)
+            sql = _build_is_outlier_sql(cfg)
+            conn.execute(text(sql), {"id": id_val, "tf": tf_val})
+
+        elapsed = time.time() - t0
+        return {
+            "table": cfg.table,
+            "id": id_val,
+            "tf": tf_val,
+            "n_updated": total_updated,
+            "elapsed": elapsed,
+            "error": None,
+        }
+    except Exception as exc:
+        return {
+            "table": cfg_table,
+            "id": id_val,
+            "tf": tf_val,
+            "n_updated": 0,
+            "elapsed": time.time() - t0,
+            "error": f"{type(exc).__name__}: {exc}",
+        }
 
 
 # ---------------------------------------------------------------------------
-# Table-level orchestrator
+# Table-level orchestrator (SQL bulk mode)
 # ---------------------------------------------------------------------------
+
+
+def _get_tf_days_map(engine: Engine, table: str, db_url: str) -> Dict[str, int]:
+    """Get tf -> tf_days mapping for all TFs in a table."""
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text(f"SELECT DISTINCT tf FROM {table} ORDER BY tf")
+        ).fetchall()
+    return {r[0]: get_tf_days(r[0], db_url) for r in rows}
 
 
 def _process_table(
@@ -610,70 +533,151 @@ def _process_table(
     full_recalc: bool,
     workers: int,
 ) -> None:
-    """Process one table: discover keys, group by tf, compute z-scores."""
+    """Process one table using SQL window functions with multiprocessing.
+
+    Work unit = (table, id, tf) so each UPDATE touches ~100K rows max.
+    """
     tbl_short = cfg.table.split(".")[-1]
     _print(f"--- Processing table: {tbl_short} ---")
 
     engine = _get_engine(db_url)
 
-    keys = _discover_keys(engine, cfg, ids, tf_filter, full_recalc)
-    _print(f"  Found {len(keys)} keys to process")
+    # Resolve IDs
+    if ids is not None:
+        id_list = ids
+    else:
+        with engine.connect() as conn:
+            rows = conn.execute(
+                text(f"SELECT DISTINCT id FROM {cfg.table} ORDER BY id")
+            ).fetchall()
+            id_list = [r[0] for r in rows]
 
-    if not keys:
-        _print(f"  No keys need z-score computation for {tbl_short}.")
+    if not id_list:
+        _print(f"  No IDs found in {tbl_short}.")
         return
 
-    # Group keys by tf (index depends on position in key_cols)
-    tf_idx = cfg.key_cols.index("tf")
-    keys_by_tf: Dict[str, List[Tuple]] = {}
-    for k in keys:
-        tf_val = k[tf_idx]
-        keys_by_tf.setdefault(tf_val, []).append(k)
+    # Get tf -> tf_days mapping
+    tf_days_map = _get_tf_days_map(engine, cfg.table, db_url)
+    if tf_filter:
+        tf_days_map = {k: v for k, v in tf_days_map.items() if k == tf_filter}
 
-    total_updated = 0
-    t0 = time.time()
+    _print(
+        f"  {len(id_list)} ids x {len(tf_days_map)} TFs = "
+        f"{len(id_list) * len(tf_days_map)} work units"
+    )
 
-    for tf_val, tf_keys in sorted(keys_by_tf.items()):
-        tf_days = get_tf_days(tf_val, db_url)
-
-        # Skip TF if even the largest window is too small
-        max_wb = _max_window_bars(tf_days)
-        if max_wb < MIN_WINDOW:
-            _print(
-                f"  tf={tf_val}: max_window_bars={max_wb} < {MIN_WINDOW}, "
-                f"skipping {len(tf_keys)} keys (all z-scores left NULL)"
-            )
-            continue
-
-        # Report which windows are active for this TF
-        active_windows = []
-        for wd, sfx in WINDOW_CONFIGS:
-            wb = round(wd / tf_days)
-            active_windows.append(
-                f"{sfx[1:]}={'ok' if wb >= MIN_WINDOW else 'skip'}({wb})"
-            )
-        _print(
-            f"  tf={tf_val}: tf_days={tf_days}, "
-            f"windows=[{', '.join(active_windows)}], keys={len(tf_keys)}"
+    # Build work units: one per (table, id, tf)
+    work_units = [
+        (
+            cfg.table,
+            cfg.ts_col,
+            cfg.pk_cols,
+            cfg.key_cols,
+            cfg.canonical_base_pairs,
+            cfg.roll_base_pairs,
+            id_val,
+            tf_val,
+            tf_days_val,
+            db_url,
         )
+        for id_val in id_list
+        for tf_val, tf_days_val in tf_days_map.items()
+    ]
 
-        worker_fn = partial(_process_key, db_url, cfg, tf_days)
+    t0 = time.time()
+    total_updated = 0
+    errors = []
+    done = 0
 
-        if workers > 1 and len(tf_keys) > 1:
-            with Pool(processes=min(workers, len(tf_keys))) as pool:
-                for key, n_rows in pool.imap_unordered(worker_fn, tf_keys):
-                    total_updated += n_rows
-                    if n_rows > 0:
-                        _print(f"    key={key} -> {n_rows} rows updated")
-        else:
-            for i, k in enumerate(tf_keys, 1):
-                key, n_rows = worker_fn(k)
-                total_updated += n_rows
-                if n_rows > 0:
-                    _print(f"    key={key} -> {n_rows} rows ({i}/{len(tf_keys)})")
+    effective_workers = min(workers, len(work_units))
+
+    def _handle_result(result: dict) -> None:
+        nonlocal total_updated, done
+        total_updated += result["n_updated"]
+        done += 1
+        if result["error"]:
+            errors.append(result)
+            _print(
+                f"  [{tbl_short}] id={result['id']} tf={result['tf']} "
+                f"ERROR: {result['error']}"
+            )
+        elif done % 50 == 0 or done == len(work_units):
+            elapsed_so_far = time.time() - t0
+            _print(
+                f"  [{tbl_short}] {done}/{len(work_units)} done, "
+                f"{total_updated:,} rows updated, {elapsed_so_far:.0f}s elapsed"
+            )
+
+    if effective_workers > 1:
+        with Pool(processes=effective_workers, maxtasksperchild=20) as pool:
+            for result in pool.imap_unordered(_worker_sql_tf, work_units):
+                _handle_result(result)
+    else:
+        for wu in work_units:
+            result = _worker_sql_tf(wu)
+            _handle_result(result)
 
     elapsed = time.time() - t0
-    _print(f"  {tbl_short}: {total_updated} total rows updated in {elapsed:.1f}s")
+    _print(
+        f"  {tbl_short}: {total_updated:,} total rows updated in {elapsed:.1f}s"
+        + (f", {len(errors)} errors" if errors else "")
+    )
+
+
+# ---------------------------------------------------------------------------
+# Re-sync _u tables after z-scoring source tables
+# ---------------------------------------------------------------------------
+
+# Map table family -> sync module path
+_RESYNC_MODULES = {
+    "bars": "ta_lab2.scripts.returns.sync_cmc_returns_bars_multi_tf_u",
+    "emas": "ta_lab2.scripts.returns.sync_cmc_returns_ema_multi_tf_u",
+    "amas": "ta_lab2.scripts.amas.sync_cmc_returns_ama_multi_tf_u",
+}
+
+_RESYNC_U_TABLES = {
+    "bars": "public.cmc_returns_bars_multi_tf_u",
+    "emas": "public.cmc_returns_ema_multi_tf_u",
+    "amas": "public.cmc_returns_ama_multi_tf_u",
+}
+
+
+def _resync_u_tables(db_url: str, table_family: str) -> None:
+    """Truncate and re-sync _u tables so z-scores propagate from source tables."""
+    families = list(_RESYNC_MODULES.keys()) if table_family == "all" else [table_family]
+
+    engine = _get_engine(db_url)
+    for family in families:
+        u_table = _RESYNC_U_TABLES[family]
+        module = _RESYNC_MODULES[family]
+
+        _print(f"--- Re-syncing {u_table} ---")
+
+        # Truncate _u table
+        _print(f"  Truncating {u_table}...")
+        with engine.begin() as conn:
+            conn.execute(text(f"TRUNCATE {u_table}"))
+        _print("  Truncated.")
+
+        # Run sync script as subprocess (inherits TARGET_DB_URL from env)
+        _print(f"  Running sync: python -m {module}")
+        t0 = time.time()
+        result = subprocess.run(
+            ["python", "-m", module],
+            capture_output=True,
+            text=True,
+            timeout=7200,  # 2 hour timeout
+        )
+        elapsed = time.time() - t0
+
+        # Print sync output
+        for line in result.stdout.strip().split("\n"):
+            if line.strip():
+                _print(f"  {line.strip()}")
+        if result.returncode != 0:
+            _print(f"  SYNC ERROR (exit {result.returncode}): {result.stderr[:500]}")
+        else:
+            _print(f"  Sync complete in {elapsed:.0f}s")
 
 
 # ---------------------------------------------------------------------------
@@ -724,6 +728,11 @@ def main() -> None:
         default=1,
         help="Number of parallel workers per table (default: 1).",
     )
+    p.add_argument(
+        "--skip-resync",
+        action="store_true",
+        help="Skip re-syncing _u tables after z-scoring source tables.",
+    )
     args = p.parse_args()
 
     db_url = args.db_url.strip()
@@ -769,6 +778,10 @@ def main() -> None:
             full_recalc=args.full_recalc,
             workers=args.workers,
         )
+
+    # Re-sync _u tables: TRUNCATE + full re-sync from z-scored source tables
+    if not args.skip_resync:
+        _resync_u_tables(db_url, args.tables)
 
     _print(f"All done in {time.time() - t_total:.1f}s")
 
