@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: Phase 60 (ML Infrastructure & Experimentation) — In progress
-Plan: 4/N DONE (60-02: ExperimentTracker + cmc_ml_experiments DDL; 60-04: MDA, SFI, clustered FI)
-Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 COMPLETE (all 3 plans). V1_MEMO.md GENERATED. Phase 55 COMPLETE (all 5 plans). Phase 56 COMPLETE (all 7 plans). Phase 57 COMPLETE (all 6 plans). Phase 58 COMPLETE (all 7 plans, including gap closure: PORT-03, PORT-04, PORT-05 all closed). Phase 59 COMPLETE (all 5 plans). Phase 60 in progress (plans 1+2+4 complete).
-Last activity: 2026-02-28 — Completed 60-02-PLAN.md (cmc_ml_experiments DDL + ExperimentTracker with log_run/get_run/list_runs/compare_runs)
+Plan: 5/N DONE (60-01: expression engine; 60-02: ExperimentTracker + cmc_ml_experiments DDL; 60-03: expression mode wired into registry+runner; 60-04: MDA, SFI, clustered FI)
+Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 COMPLETE (all 3 plans). V1_MEMO.md GENERATED. Phase 55 COMPLETE (all 5 plans). Phase 56 COMPLETE (all 7 plans). Phase 57 COMPLETE (all 6 plans). Phase 58 COMPLETE (all 7 plans, including gap closure: PORT-03, PORT-04, PORT-05 all closed). Phase 59 COMPLETE (all 5 plans). Phase 60 in progress (plans 1+2+3+4 complete).
+Last activity: 2026-02-28 — Completed 60-03-PLAN.md (expression mode wired end-to-end: FeatureRegistry._expand_params + ExperimentRunner._compute_feature dispatch to evaluate_expression)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [███] Phase 60 in progress (3+/N plans)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [████] Phase 60 in progress (4+/N plans)
 
 ## Performance Metrics
 
@@ -574,6 +574,8 @@ Recent decisions affecting current work:
 - **asset_ids as PostgreSQL array literal string (Phase 60-02)**: Pass '{1,2}' string instead of Python list to avoid psycopg2 type binding issues with INTEGER[] arrays
 - **compare_runs() named params eid_0/eid_1/... for IN clause (Phase 60-02)**: Avoids positional binding issues with variable-length IN clauses in SQLAlchemy text()
 - **FeatureRegistry accepts expression mode (Phase 60-01)**: _validate_compute_spec elif mode=='expression' branch added; existing inline/dotpath unchanged; future ExperimentRunner dispatch on mode=='expression' deferred
+- **expression mode _expand_params same substitution as inline (Phase 60-03)**: _expand_params condition extended from mode=='inline' to mode in ('inline','expression'); expression templates use {param} placeholders like inline
+- **Lazy import evaluate_expression in runner (Phase 60-03)**: evaluate_expression imported inside elif branch not at module top level; keeps runner.py dependency-free when expression mode unused; matches existing lazy DimTimeframe import pattern
 
 ### Pending Todos
 
@@ -587,8 +589,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-28T14:35:02Z
-Stopped at: Completed 60-02-PLAN.md — cmc_ml_experiments DDL + ExperimentTracker (log_run/get_run/list_runs/compare_runs/ensure_table)
+Last session: 2026-02-28T14:40:41Z
+Stopped at: Completed 60-03-PLAN.md — expression mode wired into FeatureRegistry._expand_params + ExperimentRunner._compute_feature; MLINFRA-01 end-to-end complete
 Resume file: None
 
 ---
