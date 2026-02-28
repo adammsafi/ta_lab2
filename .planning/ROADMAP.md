@@ -712,8 +712,8 @@ Plans:
 - [x] **Phase 52: Operational Dashboard** - Live PnL, exposure, drawdown, drift, risk status views
 - [x] **Phase 53: V1 Validation** - 2+ weeks paper trading, success criteria measurement
 - [x] **Phase 54: V1 Results Memo** - Formal report: methodology, results, failure modes, research answers, next steps
-- [ ] **Phase 55: Feature & Signal Evaluation** - Run IC evals on all features/AMAs, score with BH gate, adaptive RSI A/B, populate dashboards
-- [ ] **Phase 56: Factor Analytics & Reporting Upgrade** - QuantStats tear sheets, IC decay/Rank IC, quintile returns, cross-sectional normalization, MAE/MFE, Monte Carlo CI
+- [x] **Phase 55: Feature & Signal Evaluation** - Run IC evals on all features/AMAs, score with BH gate, adaptive RSI A/B, populate dashboards
+- [x] **Phase 56: Factor Analytics & Reporting Upgrade** - QuantStats tear sheets, IC decay/Rank IC, quintile returns, cross-sectional normalization, MAE/MFE, Monte Carlo CI
 - [ ] **Phase 57: Advanced Labeling & Cross-Validation** - Triple barrier labeling, meta-labeling, purged CPCV, CUSUM event filter, trend scanning
 - [ ] **Phase 58: Portfolio Construction & Position Sizing** - PyPortfolioOpt integration, Black-Litterman, TopkDropout, bet sizing, stop laddering
 - [ ] **Phase 59: Microstructural & Advanced Features** - Fractional differentiation, Kyle/Amihud lambda, SADF bubble detection, entropy, codependence
@@ -978,13 +978,13 @@ Plans:
 **Plans**: 7 plans in 3 waves
 
 Plans:
-- [ ] 56-01-PLAN.md -- Alembic migrations for all Phase 56 schema changes (rank_ic, mae/mfe, mc_ci, cs_norms, tearsheet_path)
-- [ ] 56-02-PLAN.md -- QuantStats install + HTML tear sheet reporter module
-- [ ] 56-03-PLAN.md -- Quintile group returns engine + Plotly chart + CLI
-- [ ] 56-04-PLAN.md -- Rank IC column update in ic.py + backfill existing data
-- [ ] 56-05-PLAN.md -- MAE/MFE computation module + Monte Carlo resampling module
-- [ ] 56-06-PLAN.md -- Cross-sectional normalization refresh script
-- [ ] 56-07-PLAN.md -- Backtest pipeline integration (wire QuantStats + MAE/MFE + MC into save_backtest_results)
+- [x] 56-01-PLAN.md -- Alembic migrations for all Phase 56 schema changes (rank_ic, mae/mfe, mc_ci, cs_norms, tearsheet_path)
+- [x] 56-02-PLAN.md -- QuantStats install + HTML tear sheet reporter module
+- [x] 56-03-PLAN.md -- Quintile group returns engine + Plotly chart + CLI
+- [x] 56-04-PLAN.md -- Rank IC column update in ic.py + backfill existing data
+- [x] 56-05-PLAN.md -- MAE/MFE computation module + Monte Carlo resampling module
+- [x] 56-06-PLAN.md -- Cross-sectional normalization refresh script
+- [x] 56-07-PLAN.md -- Backtest pipeline integration (wire QuantStats + MAE/MFE + MC into save_backtest_results)
 
 ---
 
