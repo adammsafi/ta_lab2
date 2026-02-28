@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: Phase 60 (ML Infrastructure & Experimentation) — In progress
-Plan: 4/N DONE (60-04: MDA, SFI, clustered feature importance module)
-Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 COMPLETE (all 3 plans). V1_MEMO.md GENERATED. Phase 55 COMPLETE (all 5 plans). Phase 56 COMPLETE (all 7 plans). Phase 57 COMPLETE (all 6 plans). Phase 58 COMPLETE (all 7 plans, including gap closure: PORT-03, PORT-04, PORT-05 all closed). Phase 59 COMPLETE (all 5 plans). Phase 60 in progress (plans 1+4 complete).
-Last activity: 2026-02-28 — Completed 60-04-PLAN.md (MDA, SFI, clustered FI with PurgedKFold + Spearman/Ward clustering)
+Plan: 4/N DONE (60-02: ExperimentTracker + cmc_ml_experiments DDL; 60-04: MDA, SFI, clustered FI)
+Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 COMPLETE (all 3 plans). V1_MEMO.md GENERATED. Phase 55 COMPLETE (all 5 plans). Phase 56 COMPLETE (all 7 plans). Phase 57 COMPLETE (all 6 plans). Phase 58 COMPLETE (all 7 plans, including gap closure: PORT-03, PORT-04, PORT-05 all closed). Phase 59 COMPLETE (all 5 plans). Phase 60 in progress (plans 1+2+4 complete).
+Last activity: 2026-02-28 — Completed 60-02-PLAN.md (cmc_ml_experiments DDL + ExperimentTracker with log_run/get_run/list_runs/compare_runs)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [██] Phase 60 in progress (2+/N plans)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [███] Phase 60 in progress (3+/N plans)
 
 ## Performance Metrics
 
@@ -567,6 +567,12 @@ Recent decisions affecting current work:
 - **Restricted eval sandbox for expression engine (Phase 60-01)**: __builtins__={}, only np/pd/OPERATOR_REGISTRY exposed; no arbitrary builtins; sufficient for trusted YAML expressions without full AST interpreter overhead
 - **OPERATOR_REGISTRY as flat dict (Phase 60-01)**: 16 operators as lambdas/module-level functions in a dict; extensible without class changes; WMA/Slope need module-level functions (not lambdas) due to multi-statement implementation
 - **expression mode validated at load time via ast.parse (Phase 60-01)**: $col -> _placeholder_ substitution + ast.parse(mode='eval') at FeatureRegistry.load(); fail-fast before ExperimentRunner computation
+- **ExperimentTracker engine-injection pattern (Phase 60-02)**: No hardcoded DB config inside ExperimentTracker; caller passes SQLAlchemy engine; ensures testability and multi-DB support
+- **feature_set_hash is SHA-256 of sorted feature names (Phase 60-02)**: Order-independent; enables cache lookup for "same feature set" across runs with different feature ordering
+- **ensure_table() splits DDL on semicolons (Phase 60-02)**: Multi-statement DDL (CREATE TABLE + CREATE INDEX + COMMENT) split on ';' and executed individually; handles PostgreSQL multi-statement DDL files
+- **CAST(:param AS JSONB) not ::jsonb (Phase 60-02)**: SQLAlchemy text() named param colon clashes with ::jsonb PostgreSQL cast suffix; CAST(...) is standard SQL and driver-agnostic
+- **asset_ids as PostgreSQL array literal string (Phase 60-02)**: Pass '{1,2}' string instead of Python list to avoid psycopg2 type binding issues with INTEGER[] arrays
+- **compare_runs() named params eid_0/eid_1/... for IN clause (Phase 60-02)**: Avoids positional binding issues with variable-length IN clauses in SQLAlchemy text()
 - **FeatureRegistry accepts expression mode (Phase 60-01)**: _validate_compute_spec elif mode=='expression' branch added; existing inline/dotpath unchanged; future ExperimentRunner dispatch on mode=='expression' deferred
 
 ### Pending Todos
@@ -581,8 +587,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-28T14:32:05Z
-Stopped at: Completed 60-01-PLAN.md — Phase 60 in progress (ML package, expression engine, expression-mode YAML factors)
+Last session: 2026-02-28T14:35:02Z
+Stopped at: Completed 60-02-PLAN.md — cmc_ml_experiments DDL + ExperimentTracker (log_run/get_run/list_runs/compare_runs/ensure_table)
 Resume file: None
 
 ---
