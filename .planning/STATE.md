@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: Phase 61 (Integration Wiring & Bug Fixes) — COMPLETE
-Plan: 2/2 DONE
-Status: Phase 61 COMPLETE (all 2 plans). Closes 3 integration gaps + 1 phase tech debt from v1.0.0 audit. Phase 62 (Operational Completeness) next. All prior phases (42-60) done.
-Last activity: 2026-02-28 — Completed Phase 61 (RiskEngine wired into PaperExecutor, feature refresh added to daily orchestrator, Telegram alert fixed, drift report bugs fixed)
+Phase: Phase 62 (Operational Completeness) — In progress
+Plan: 1/2 DONE
+Status: Phase 62 Plan 01 COMPLETE. IC sweep verified (114 TFs in cmc_ic_results, 810,320 rows). 107 features promoted in dim_feature_registry. batch_promote_features.py created as reusable CLI. Plan 02 next.
+Last activity: 2026-02-28 — Completed Phase 62 Plan 01 (IC sweep completeness verification, batch promotion script creation)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [████████] Phase 60 COMPLETE (8 plans)
 
@@ -272,6 +272,9 @@ Recent decisions affecting current work:
 - **Sparse-regime guard at min_obs_per_regime=30** (Phase 37-03): Regimes with fewer bars silently skipped; if ALL regimes sparse, falls back to full-sample IC with regime_label='all' — never returns empty DataFrame
 - **Regime-window train bounds from common_ts intersection** (Phase 37-03): Use min/max of feature-close intersection within regime label as synthetic train_start/train_end — prevents boundary masking from nulling all regime bars
 - **batch_compute_ic excludes 'close' by name convention** (Phase 37-03): Auto-detected feature_cols = all numeric columns except 'close'; consistent with close being a separate argument
+- **IC sweep already complete with 114 TFs (Phase 62-01)**: cmc_ic_results had 114 distinct TFs (exceeds 109 target) from prior session; feature_ic_ranking.csv covers 830 (asset_id, tf) pairs; no re-run needed when data is already present
+- **Batch promotion script handles feature name mismatch gracefully (Phase 62-01)**: promotion_decisions.csv lists bar-level features (bb_ma_20, rsi_14, vol_gk_*); FeaturePromoter._load_experiment_results() reads from cmc_feature_experiments (AMA features only); ValueError caught per-feature, logged as ERROR, script continues; correct behavior for a reusable tool
+- **107 AMA features promoted in prior session (Phase 62-01)**: All ama_dema_*/ama_hma_*/ama_kama_*/ama_tema_* promoted via promote_feature.py individually; dim_feature_registry has 107 rows lifecycle='promoted'; Alembic stubs generated but NOT applied (documentation-only per plan)
 - **RiskEngine integration via _is_halted() direct call** (Phase 61-01): PaperExecutor calls risk_engine._is_halted() directly (private method) at strategy entry -- acceptable; avoids creating a fake order object just to check halt state. check_order() handles all per-order gates including kill switch re-check.
 - **Risk-blocked orders reuse skipped_no_delta counter** (Phase 61-01): check_order() blocks return {skipped_no_delta: True} -- reuses existing counter semantics, avoids schema change to run log
 - **Telegram alert 2-arg signature** (Phase 61-01): send_critical_alert(error_type, message) where error_type is category string ("executor", "database", etc.); import from ta_lab2.notifications.telegram not run_daily_refresh
@@ -599,8 +602,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-28T20:05:00Z
-Stopped at: Completed 61-02-PLAN.md — feature refresh stage wired into daily pipeline; 4 drift_report.py column-name bugs fixed; TIMEOUT_FEATURES=1800, run_feature_refresh_stage(), --features/--no-features args added
+Last session: 2026-02-28T20:59:28Z
+Stopped at: Completed 62-01-PLAN.md — IC sweep verified (114 TFs, 810,320 rows), 107 features promoted, batch_promote_features.py created
 Resume file: None
 
 ---
