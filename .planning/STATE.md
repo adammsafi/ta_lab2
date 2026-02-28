@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: Phase 59 (Microstructural & Advanced Features) — COMPLETE
-Plan: 5/5 DONE (59-05: Orchestrator wiring, regime SADF integration, IC evaluation, codependence comparison)
-Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 COMPLETE (all 3 plans). V1_MEMO.md GENERATED. Phase 55 COMPLETE (all 5 plans). Phase 56 COMPLETE (all 7 plans). Phase 57 COMPLETE (all 6 plans). Phase 58 COMPLETE (all 7 plans, including gap closure: PORT-03, PORT-04, PORT-05 all closed). Phase 59 COMPLETE (all 5 plans).
-Last activity: 2026-02-28 — Completed 59-05-PLAN.md (Orchestrator wiring, SADF regime integration, IC eval, codependence comparison)
+Phase: Phase 60 (ML Infrastructure & Experimentation) — In progress
+Plan: 1/N DONE (60-01: ML package, expression engine, expression-mode YAML factors)
+Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 COMPLETE (all 3 plans). V1_MEMO.md GENERATED. Phase 55 COMPLETE (all 5 plans). Phase 56 COMPLETE (all 7 plans). Phase 57 COMPLETE (all 6 plans). Phase 58 COMPLETE (all 7 plans, including gap closure: PORT-03, PORT-04, PORT-05 all closed). Phase 59 COMPLETE (all 5 plans). Phase 60 in progress (plan 1 complete).
+Last activity: 2026-02-28 — Completed 60-01-PLAN.md (ML package, expression engine with 16 operators, expression-mode YAML factors)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [█] Phase 60 in progress (1/N plans)
 
 ## Performance Metrics
 
@@ -564,6 +564,10 @@ Recent decisions affecting current work:
 - **Microstructure in Phase 2b not Phase 1 (Phase 59-05)**: Microstructure does UPDATE on existing cmc_features rows; must run after Phase 2 DELETE+INSERT to avoid data loss
 - **Codependence as --codependence flag (Phase 59-05)**: Pairwise computation ~3 min for all assets; optional weekly batch, not always-on in daily refresh
 - **SADF regime_key suffix "|explosive" (Phase 59-05)**: Purely additive to regime_key; backward-compatible; downstream can parse or ignore
+- **Restricted eval sandbox for expression engine (Phase 60-01)**: __builtins__={}, only np/pd/OPERATOR_REGISTRY exposed; no arbitrary builtins; sufficient for trusted YAML expressions without full AST interpreter overhead
+- **OPERATOR_REGISTRY as flat dict (Phase 60-01)**: 16 operators as lambdas/module-level functions in a dict; extensible without class changes; WMA/Slope need module-level functions (not lambdas) due to multi-statement implementation
+- **expression mode validated at load time via ast.parse (Phase 60-01)**: $col -> _placeholder_ substitution + ast.parse(mode='eval') at FeatureRegistry.load(); fail-fast before ExperimentRunner computation
+- **FeatureRegistry accepts expression mode (Phase 60-01)**: _validate_compute_spec elif mode=='expression' branch added; existing inline/dotpath unchanged; future ExperimentRunner dispatch on mode=='expression' deferred
 
 ### Pending Todos
 
@@ -577,8 +581,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-28T09:37:51Z
-Stopped at: Completed 59-05-PLAN.md — Phase 59 COMPLETE (orchestrator wiring, SADF regime integration, IC eval, codependence comparison)
+Last session: 2026-02-28T14:32:05Z
+Stopped at: Completed 60-01-PLAN.md — Phase 60 in progress (ML package, expression engine, expression-mode YAML factors)
 Resume file: None
 
 ---
