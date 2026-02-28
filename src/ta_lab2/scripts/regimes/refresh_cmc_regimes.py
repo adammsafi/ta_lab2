@@ -160,6 +160,32 @@ def _load_proxy_weekly(
     return merged.sort_values("ts").reset_index(drop=True)
 
 
+def _load_sadf_flags(engine: Engine, asset_id: int) -> pd.Series:
+    """Load sadf_is_explosive flags from cmc_features.
+
+    Returns a Series indexed by tz-aware UTC timestamp, or an empty Series
+    if no SADF data is available for the asset.
+    """
+    query = text("""
+        SELECT ts, sadf_is_explosive
+        FROM cmc_features
+        WHERE id = :id AND tf = '1D' AND sadf_is_explosive IS NOT NULL
+        ORDER BY ts
+    """)
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(query, {"id": asset_id})
+            rows = result.fetchall()
+        if not rows:
+            return pd.Series(dtype=bool)
+        df = pd.DataFrame(rows, columns=["ts", "sadf_is_explosive"])
+        df["ts"] = pd.to_datetime(df["ts"], utc=True)
+        return df.set_index("ts")["sadf_is_explosive"]
+    except Exception as exc:
+        logger.warning("  SADF load failed for id=%s: %s", asset_id, exc)
+        return pd.Series(dtype=bool)
+
+
 # ---------------------------------------------------------------------------
 # Core computation
 # ---------------------------------------------------------------------------
@@ -226,6 +252,17 @@ def compute_regimes_for_id(
             asset_id,
         )
         return pd.DataFrame()
+
+    # Load SADF explosive flags from cmc_features (MICRO-03 integration)
+    sadf_series = _load_sadf_flags(engine, asset_id)
+    if not sadf_series.empty:
+        logger.info(
+            "  SADF flags loaded: %d rows, %d explosive",
+            len(sadf_series),
+            int(sadf_series.sum()),
+        )
+    else:
+        logger.debug("  SADF flags: not available for asset_id=%s", asset_id)
 
     # ------------------------------------------------------------------
     # 2. Assess data budget -> determine enabled layers and feature tier
@@ -432,6 +469,11 @@ def compute_regimes_for_id(
             regime_key = str(l0_val)
         else:
             regime_key = "Unknown"
+
+        # Append SADF explosive flag (MICRO-03 integration)
+        if not sadf_series.empty and row_ts in sadf_series.index:
+            if sadf_series.loc[row_ts]:
+                regime_key = regime_key + "|explosive"
 
         rows.append(
             {
