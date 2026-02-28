@@ -65,6 +65,14 @@ Graduate from per-asset backtesting to portfolio-level optimization. Integrate P
 - **Decomposed cost reporting:** Track and report gross return, turnover cost, and net return separately. Full cost transparency.
 - **Turnover penalty in optimizer:** Available as configurable option (L1 regularization on weight changes), off by default. Post-hoc turnover tracking always on.
 
+### Covariance matrix: multi-TF and adaptive lookback
+- Covariance must be computed **per timeframe**, not hardcoded to 1D. The entire project uses `(id, ts, tf)` as a PK dimension — bars, returns, EMAs, regimes, features. Covariance should follow the same pattern.
+- Source: `cmc_returns_bars_multi_tf_u WHERE tf = :tf` — all 109 TFs already available.
+- **Adaptive lookback window:** Express the default lookback in calendar days (e.g., 180 days), then convert to bars: `lookback_bars = round(lookback_days / tf_days_nominal)` using `dim_timeframe`. This prevents the window being too short on slow TFs (4H: 180 bars = 30 days) or too stale on fast TFs (7D: 180 bars = 3.5 years).
+- **Minimum bar threshold:** Do not compute covariance when `lookback_bars < 60` (insufficient data for stable estimation). Same principle as z-score NULL-when-window-too-small.
+- Config: `portfolio.yaml` should have `lookback_calendar_days: 180` and `min_lookback_bars: 60`, NOT a fixed bar count.
+- TF passed as a parameter alongside asset_ids, consistent with every other feature/script in the project.
+
 ### Claude's Discretion
 - HRP auto-fallback trigger logic (condition number threshold vs warning)
 - Signal-to-mu mapping approach (IC-weighted vs probability)
