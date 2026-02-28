@@ -41,6 +41,7 @@ from ta_lab2.executor.signal_reader import (
 )
 from ta_lab2.paper_trading.canonical_order import CanonicalOrder
 from ta_lab2.paper_trading.paper_order_logger import PaperOrderLogger
+from ta_lab2.risk.risk_engine import RiskEngine
 from ta_lab2.trading.order_manager import FillData, OrderManager
 
 logger = logging.getLogger(__name__)
@@ -73,6 +74,7 @@ class PaperExecutor:
     def __init__(self, engine: Engine) -> None:
         self.engine = engine
         self.signal_reader = SignalReader(engine)
+        self.risk_engine = RiskEngine(engine)
         self.logger = logging.getLogger(__name__)
 
     # ------------------------------------------------------------------
@@ -244,6 +246,39 @@ class PaperExecutor:
         Returns a counts dict: signals_read, orders_generated, fills_processed,
         skipped_no_delta, skipped_rejected.
         """
+        # Risk gate: check if trading is halted
+        if self.risk_engine._is_halted():
+            self.logger.warning(
+                "PaperExecutor: trading halted for config=%s -- skipping",
+                config.config_name,
+            )
+            self._write_run_log(config, status="halted")
+            return {
+                "signals_read": 0,
+                "orders_generated": 0,
+                "fills_processed": 0,
+                "skipped_no_delta": 0,
+                "skipped_rejected": 0,
+            }
+
+        # Risk gate: check daily loss and trigger kill switch if exceeded
+        if self.risk_engine.check_daily_loss():
+            self.logger.warning(
+                "PaperExecutor: daily loss limit triggered for config=%s -- halting",
+                config.config_name,
+            )
+            self._try_telegram_alert(
+                f"DAILY LOSS LIMIT triggered for {config.config_name}"
+            )
+            self._write_run_log(config, status="halted", error="daily_loss_limit")
+            return {
+                "signals_read": 0,
+                "orders_generated": 0,
+                "fills_processed": 0,
+                "skipped_no_delta": 0,
+                "skipped_rejected": 0,
+            }
+
         signal_table = SIGNAL_TABLE_MAP.get(config.signal_type)
         if signal_table is None:
             raise ValueError(
@@ -429,6 +464,32 @@ class PaperExecutor:
                 asset_id,
             )
             return {"skipped_no_delta": True}
+
+        # Risk gate: check order through RiskEngine
+        side_for_risk: str = "buy" if delta > 0 else "sell"
+        current_position_value = current_qty * current_price
+        risk_result = self.risk_engine.check_order(
+            order_qty=abs(delta),
+            order_side=side_for_risk,
+            fill_price=current_price,
+            asset_id=asset_id,
+            strategy_id=config.config_id,
+            current_position_value=current_position_value,
+            portfolio_value=portfolio_value,
+        )
+        if not risk_result.allowed:
+            self.logger.info(
+                "_process_asset_signal: risk gate blocked order for asset_id=%d: %s",
+                asset_id,
+                risk_result.blocked_reason,
+            )
+            return {"skipped_no_delta": True}
+        # Use adjusted quantity from risk engine (may be scaled down)
+        delta = (
+            risk_result.adjusted_quantity
+            if delta > 0
+            else -risk_result.adjusted_quantity
+        )
 
         if dry_run:
             self.logger.info(

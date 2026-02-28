@@ -74,6 +74,7 @@ TIMEOUT_EMAS = 3600  # 1 hour -- EMA refreshers
 TIMEOUT_AMAS = 3600  # 1 hour -- AMA refreshers
 TIMEOUT_DESC_STATS = 3600  # 1 hour -- asset stats + correlation computation
 TIMEOUT_REGIMES = 1800  # 30 minutes -- regime refresher
+TIMEOUT_FEATURES = 1800  # 30 minutes -- feature refresh for all assets at 1D
 TIMEOUT_SIGNALS = 1800  # 30 minutes -- signal generation for all types
 TIMEOUT_PORTFOLIO = 600  # 10 minutes -- portfolio optimizer runs all three methods
 TIMEOUT_EXECUTOR = (
@@ -696,6 +697,110 @@ def run_regime_refresher(
         print(f"\n[ERROR] Regime refresher raised exception: {error_msg}")
         return ComponentResult(
             component="regimes",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+
+
+def run_feature_refresh_stage(args, db_url: str) -> ComponentResult:
+    """
+    Run cmc_features refresh via subprocess.
+
+    Refreshes all feature columns in cmc_features for the 1D timeframe.
+    Runs after regimes and before signals in the full pipeline.
+
+    Args:
+        args: CLI arguments
+        db_url: Database URL (accepted for interface consistency but NOT passed to
+                the subprocess, which reads TARGET_DB_URL from the environment).
+
+    Returns:
+        ComponentResult with execution details
+    """
+    cmd = [
+        sys.executable,
+        "-m",
+        "ta_lab2.scripts.features.run_all_feature_refreshes",
+        "--all",
+        "--tf",
+        "1D",
+    ]
+
+    print(f"\n{'=' * 70}")
+    print("RUNNING FEATURE REFRESH (cmc_features)")
+    print(f"{'=' * 70}")
+    print(f"Command: {' '.join(cmd)}")
+
+    if getattr(args, "dry_run", False):
+        print("[DRY RUN] Would run feature refresh")
+        return ComponentResult(
+            component="features",
+            success=True,
+            duration_sec=0.0,
+            returncode=0,
+        )
+
+    start = time.perf_counter()
+
+    try:
+        if getattr(args, "verbose", False):
+            result = subprocess.run(cmd, check=False, timeout=TIMEOUT_FEATURES)
+        else:
+            result = subprocess.run(
+                cmd,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=TIMEOUT_FEATURES,
+            )
+
+            if result.returncode != 0:
+                print(f"\n[ERROR] Feature refresh failed with code {result.returncode}")
+                if result.stdout:
+                    print(f"\nSTDOUT:\n{result.stdout[-2000:]}")
+                if result.stderr:
+                    print(f"\nSTDERR:\n{result.stderr[-2000:]}")
+
+        duration = time.perf_counter() - start
+
+        if result.returncode == 0:
+            print(f"\n[OK] Feature refresh completed successfully in {duration:.1f}s")
+            return ComponentResult(
+                component="features",
+                success=True,
+                duration_sec=duration,
+                returncode=result.returncode,
+            )
+        else:
+            error_msg = f"Exited with code {result.returncode}"
+            print(f"\n[FAILED] Feature refresh failed: {error_msg}")
+            return ComponentResult(
+                component="features",
+                success=False,
+                duration_sec=duration,
+                returncode=result.returncode,
+                error_message=error_msg,
+            )
+
+    except subprocess.TimeoutExpired:
+        duration = time.perf_counter() - start
+        error_msg = f"Timed out after {TIMEOUT_FEATURES}s"
+        print(f"\n[TIMEOUT] Feature refresh: {error_msg}")
+        return ComponentResult(
+            component="features",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+    except Exception as e:
+        duration = time.perf_counter() - start
+        error_msg = str(e)
+        print(f"\n[ERROR] Feature refresh raised exception: {error_msg}")
+        return ComponentResult(
+            component="features",
             success=False,
             duration_sec=duration,
             returncode=-1,
@@ -1601,6 +1706,16 @@ Examples:
         help="Run regime refresher only",
     )
     p.add_argument(
+        "--features",
+        action="store_true",
+        help="Run feature refresh only (cmc_features for 1D timeframe)",
+    )
+    p.add_argument(
+        "--no-features",
+        action="store_true",
+        help="Skip feature refresh stage in --all mode",
+    )
+    p.add_argument(
         "--signals",
         action="store_true",
         help="Run signal generation only (EMA crossover, RSI, ATR breakout)",
@@ -1658,7 +1773,7 @@ Examples:
         action="store_true",
         help=(
             "Run bars then EMAs then AMAs then desc_stats then regimes "
-            "then signals then executor then stats (full refresh)"
+            "then features then signals then executor then stats (full refresh)"
         ),
     )
     p.add_argument(
@@ -1773,6 +1888,7 @@ Examples:
         or args.amas
         or args.desc_stats
         or args.regimes
+        or args.features
         or args.signals
         or args.portfolio
         or args.execute
@@ -1781,8 +1897,8 @@ Examples:
         or args.all
     ):
         p.error(
-            "Must specify --bars, --emas, --amas, --desc-stats, --regimes, --signals, "
-            "--portfolio, --execute, --drift, --stats, --all, --weekly-digest, "
+            "Must specify --bars, --emas, --amas, --desc-stats, --regimes, --features, "
+            "--signals, --portfolio, --execute, --drift, --stats, --all, --weekly-digest, "
             "or --exchange-prices"
         )
 
@@ -1824,6 +1940,9 @@ Examples:
     run_amas = args.amas or args.all
     run_desc_stats = args.desc_stats or args.all
     run_regimes = args.regimes or args.all
+    run_features = (args.features or args.all) and not getattr(
+        args, "no_features", False
+    )
     run_signals = args.signals or args.all
     run_portfolio = (args.portfolio or args.all) and not getattr(
         args, "no_portfolio", False
@@ -1844,6 +1963,8 @@ Examples:
         components.append("desc_stats")
     if run_regimes:
         components.append("regimes")
+    if run_features:
+        components.append("features")
     if run_signals:
         components.append("signals")
     if run_portfolio:
@@ -1952,7 +2073,17 @@ Examples:
             print("(Use --continue-on-error to run remaining components)")
             return 1
 
-    # Run signal generation if requested (after regimes, before executor)
+    # Run feature refresh if requested (after regimes, before signals)
+    if run_features:
+        feature_result = run_feature_refresh_stage(args, db_url)
+        results.append(("features", feature_result))
+
+        if not feature_result.success and not args.continue_on_error:
+            print("\n[STOPPED] Feature refresh failed, stopping execution")
+            print("(Use --continue-on-error to run remaining components)")
+            return 1
+
+    # Run signal generation if requested (after features, before executor)
     if run_signals:
         signal_result = run_signal_refreshes(args, db_url)
         results.append(("signals", signal_result))
@@ -1963,8 +2094,8 @@ Examples:
             return 1
 
     # Run portfolio allocation refresh if requested (after signals, before executor)
-    # Pipeline order: bars -> EMAs -> AMAs -> desc_stats -> regimes -> signals
-    #                 -> portfolio -> executor -> drift -> stats
+    # Pipeline order: bars -> EMAs -> AMAs -> desc_stats -> regimes -> features
+    #                 -> signals -> portfolio -> executor -> drift -> stats
     if run_portfolio:
         portfolio_result = run_portfolio_refresh_stage(args, db_url)
         results.append(("portfolio", portfolio_result))
