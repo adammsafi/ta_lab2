@@ -238,8 +238,12 @@ def kyle_lambda(close: np.ndarray, volume: np.ndarray, window: int = 20) -> np.n
         mask = ~(np.isnan(y) | np.isnan(x))
         if mask.sum() < 3:
             continue
-        result = scipy.stats.linregress(x[mask], y[mask])
-        out[t] = result.slope
+        try:
+            result = scipy.stats.linregress(x[mask], y[mask])
+            out[t] = result.slope
+        except ValueError:
+            # All-identical x values in window (linregress cannot fit)
+            continue
     return out
 
 
@@ -288,8 +292,12 @@ def hasbrouck_lambda(
         mask = ~(np.isnan(y) | np.isnan(x))
         if mask.sum() < 3:
             continue
-        result = scipy.stats.linregress(x[mask], y[mask])
-        out[t] = result.slope
+        try:
+            result = scipy.stats.linregress(x[mask], y[mask])
+            out[t] = result.slope
+        except ValueError:
+            # All-identical x values in window (linregress cannot fit)
+            continue
     return out
 
 
