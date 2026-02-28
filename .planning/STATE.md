@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: Phase 58 (Portfolio Construction & Sizing) — In Progress
-Plan: 1/5 DONE (58-01 foundation: Alembic migration + portfolio.yaml + PyPortfolioOpt + package skeleton)
+Plan: 2/5 DONE (58-02 PortfolioOptimizer: MV/CVaR/HRP with regime routing, Ledoit-Wolf shrinkage, HRP fallback)
 Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 COMPLETE (all 3 plans). V1_MEMO.md GENERATED. Phase 55 COMPLETE (all 5 plans). Phase 56 COMPLETE (all 7 plans). Phase 57 COMPLETE (all 6 plans). Phase 58 started.
-Last activity: 2026-02-28 — Completed 58-01-PLAN.md (cmc_portfolio_allocations Alembic migration f6a7b8c9d0e1; configs/portfolio.yaml 9 sections; PyPortfolioOpt 1.6.0 + cvxpy solver stack; ta_lab2.portfolio package with load_portfolio_config())
+Last activity: 2026-02-28 — Completed 58-02-PLAN.md (optimizer.py 360 lines; PortfolioOptimizer exports from package __init__; all 3 optimizers verified; smoke test passes)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [█░░░░] Phase 58 1/5
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [██░░░] Phase 58 2/5
 
 ## Performance Metrics
 
@@ -544,6 +544,9 @@ Recent decisions affecting current work:
 - **Portfolio optional dep group separate from all (Phase 58-01)**: PyPortfolioOpt pulls cvxpy, clarabel, osqp, scs, highspy (6 packages, ~100MB); isolated in [portfolio] group; install with pip install -e ".[portfolio]"; not included in all group to avoid breaking existing venv setups
 - **UUID PK with gen_random_uuid() for portfolio allocations (Phase 58-01)**: Matches Phase 57 migration pattern (triple_barrier_labels, meta_label_results); UNIQUE(ts, optimizer, asset_id) constraint enables ON CONFLICT DO UPDATE upsert in future optimizer plans
 - **stop_laddering sizes sum constraint (Phase 58-01)**: sl_sizes and tp_sizes in configs/portfolio.yaml default to [0.33, 0.33, 0.34] — 0.34 last tier ensures exact 1.0 sum; future stop_ladder.py must validate this invariant at load time
+- **Dynamic weight bounds floor max(max_position_pct, 1/n_assets) (Phase 58-02)**: EfficientFrontier requires sum(weights)=1.0 but n_assets*max_position_pct can be < 1.0 (e.g. 5 assets x 0.15 = 0.75 max sum); dynamic floor prevents infeasibility while preserving intent of concentration constraint for larger portfolios
+- **_TF_DAYS_FALLBACK for offline DimTimeframe (Phase 58-02)**: DimTimeframe() requires DB connection; PortfolioOptimizer must work in unit tests and offline analysis; hardcoded map covers all canonical TF strings; DB-first fallback-second resolution in _resolve_tf_days()
+- **Fresh EfficientFrontier per optimizer call (Phase 58-02)**: PyPortfolioOpt EF is stateful; calling max_sharpe() then min_volatility() on same instance causes OptimizationError; each optimizer run uses a fresh instance to prevent state contamination between fallback attempts
 
 ### Pending Todos
 
@@ -557,8 +560,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-28T07:49:35Z
-Stopped at: Completed 58-01-PLAN.md — cmc_portfolio_allocations migration (532dacd7) + portfolio package skeleton (5f662950); Phase 58 now 1/5 plans done
+Last session: 2026-02-28T07:52:54Z
+Stopped at: Completed 58-02-PLAN.md — PortfolioOptimizer (d051ca49): MV/CVaR/HRP + regime routing + HRP ill-cond fallback; Phase 58 now 2/5 plans done
 Resume file: None
 
 ---
