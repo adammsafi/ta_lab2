@@ -18,3 +18,8 @@ def load_portfolio_config(path: str = "configs/portfolio.yaml") -> dict:
 
     with open(Path(path), "r") as f:
         return yaml.safe_load(f)
+
+
+from ta_lab2.portfolio.optimizer import PortfolioOptimizer  # noqa: E402
+
+__all__ = ["load_portfolio_config", "PortfolioOptimizer"]
