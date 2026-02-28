@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: Phase 57 (Advanced Labeling & CV) — In progress
-Plan: 3/6 in progress (57-01 DONE — triple barrier labeling + DB schema; 57-02 DONE — CUSUM filter + trend scanning; 57-03 DONE — batch refresh ETL script)
-Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 COMPLETE (all 3 plans). V1_MEMO.md GENERATED. Phase 55 COMPLETE (all 5 plans). Phase 56 COMPLETE (all 7 plans). Phase 57 in progress (3/6 plans done).
-Last activity: 2026-02-28 — Completed 57-03-PLAN.md (refresh_triple_barrier_labels.py ETL script; 5612 BTC 1D labels persisted; upsert idempotent; CUSUM filter 841/5612 events verified)
+Plan: 4/6 in progress (57-01 DONE — triple barrier labeling + DB schema; 57-02 DONE — CUSUM filter + trend scanning; 57-03 DONE — batch refresh ETL script; 57-04 DONE — CUSUM pre-filter in all 3 signal generators)
+Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 COMPLETE (all 3 plans). V1_MEMO.md GENERATED. Phase 55 COMPLETE (all 5 plans). Phase 56 COMPLETE (all 7 plans). Phase 57 in progress (4/6 plans done).
+Last activity: 2026-02-28 — Completed 57-04-PLAN.md (CUSUM pre-filter in all 3 signal generators; --cusum CLI flag; A/B shows 36-44% reduction on ema_9_21 at mult=2.0; default behavior unchanged)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [███] Phase 57 in progress
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [████] Phase 57 in progress
 
 ## Performance Metrics
 
@@ -529,6 +529,11 @@ Recent decisions affecting current work:
 - **cmc_price_bars_multi_tf_u uses 'timestamp' not 'ts' (Phase 57-03)**: All price bars tables (_multi_tf, _multi_tf_u) use 'timestamp' as time column; all other tables (EMA, vol, features, regimes) use 'ts'; confirmed in Phase 55-03 (_TABLES_WITH_TIMESTAMP_COL) but must remember when writing new scripts
 - **Per-row INSERT loop for upsert (Phase 57-03)**: pandas to_sql() doesn't support ON CONFLICT; use conn.execute(text(upsert_sql), row_dict) per row; 5612 rows in ~3s acceptable for batch ETL at current scale
 - **CUSUM event density is asset+multiplier specific (Phase 57-03)**: BTC with multiplier=2.0 -> ~15% density (841/5612); plan mentioned "20-40% reduction" as rule-of-thumb; actual density varies by asset volatility; CUSUM is working correctly
+- **CUSUM signal pre-filter: default=off (Phase 57-04)**: cusum_enabled=False default on all 3 signal generators preserves 100% backward-compatible behavior; activate via --cusum CLI flag or cusum_enabled=True kwarg
+- **CUSUM filter position: after features load, before regime merge (Phase 57-04)**: _apply_cusum_filter() inserted at step 3b after _load_features() but before load_regime_context_batch() — ensures regime lookup covers CUSUM event timestamps
+- **CUSUM safe fallback for 0-event assets (Phase 57-04)**: If cusum_filter() returns 0 events for an asset, log WARNING and retain all bars rather than silently dropping — prevents unexpected silent data loss
+- **CUSUM tz-aware event set via .tolist() (Phase 57-04)**: event_set built via pd.to_datetime(cusum_events, utc=True).tolist() to avoid tz-naive mismatch with features DataFrame timestamps (MEMORY.md pitfall)
+- **CUSUM A/B result: mult=2.0 targets ~15% bar density, 36-44% signal reduction on fast signals (Phase 57-04)**: ema_9_21 reduces 36-44% across BTC/ETH/LTC; ema_21_50 reduces 13-25% (expected for slower signals that are already rare)
 
 ### Pending Todos
 
@@ -542,8 +547,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-28T07:16:28Z
-Stopped at: Completed 57-03-PLAN.md — refresh_triple_barrier_labels.py ETL script (666a1b70); 5612 BTC 1D labels persisted to cmc_triple_barrier_labels; upsert idempotent; CUSUM filter 841 events verified; 3/6 Phase 57 plans done
+Last session: 2026-02-28T07:18:40Z
+Stopped at: Completed 57-04-PLAN.md — CUSUM pre-filter in all 3 signal generators (8b526a3a); --cusum CLI flag; A/B shows 36-44% reduction on ema_9_21 at mult=2.0; default behavior unchanged; 4/6 Phase 57 plans done
 Resume file: None
 
 ---
