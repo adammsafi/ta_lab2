@@ -2,9 +2,7 @@
 refresh_cmc_returns_ama.py
 
 Computes AMA return columns for all AMA value table variants and writes them
-to the corresponding returns tables.
-
-This script is invoked as part of the all-in-one --amas refresh stage.
+to the corresponding returns tables using SQL window functions (LAG).
 
 Each source table maps to its own returns table:
     cmc_ama_multi_tf            -> cmc_returns_ama_multi_tf
@@ -13,10 +11,17 @@ Each source table maps to its own returns table:
     cmc_ama_multi_tf_cal_anchor_us  -> cmc_returns_ama_multi_tf_cal_anchor_us
     cmc_ama_multi_tf_cal_anchor_iso -> cmc_returns_ama_multi_tf_cal_anchor_iso
 
+Strategy:
+    - Batched by asset id: one SQL INSERT per (source_table, id) pair
+    - Each INSERT uses a 2-pass CTE with window functions for returns
+    - Multiprocessing across (source, id) work units (default 10 workers)
+    - NullPool engines to avoid connection pooling issues in workers
+    - Each work unit: DELETE WHERE id=:id + INSERT ... SELECT with LAG()
+
 Usage:
-    python -m ta_lab2.scripts.amas.refresh_cmc_returns_ama --ids 1 --tf 1D
-    python -m ta_lab2.scripts.amas.refresh_cmc_returns_ama --ids all --all-tfs --source multi_tf
     python -m ta_lab2.scripts.amas.refresh_cmc_returns_ama --ids all --all-tfs --source all
+    python -m ta_lab2.scripts.amas.refresh_cmc_returns_ama --ids 1 --tf 1D
+    python -m ta_lab2.scripts.amas.refresh_cmc_returns_ama --ids all --all-tfs --source multi_tf -n 10
     python -m ta_lab2.scripts.amas.refresh_cmc_returns_ama --ids 1,52 --tf 1D --dry-run
 
 Spyder run example:
@@ -33,6 +38,7 @@ import argparse
 import logging
 import sys
 import time
+from multiprocessing import Pool
 from typing import Optional
 
 from sqlalchemy import create_engine, text
@@ -81,63 +87,95 @@ def _print(msg: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# SQL template: 2-pass CTE with window functions
+# ---------------------------------------------------------------------------
+# Parameters: {src}, {dst}, {where_clause}
+# The where_clause allows scoping to a single id, or id+tf, etc.
+
+_INSERT_SQL = """
+INSERT INTO {dst} (
+    id, ts, tf, tf_days, indicator, params_hash, roll,
+    gap_days_roll, gap_days,
+    delta1_ama_roll, delta2_ama_roll,
+    ret_arith_ama_roll, delta_ret_arith_ama_roll,
+    ret_log_ama_roll, delta_ret_log_ama_roll,
+    delta1_ama, delta2_ama,
+    ret_arith_ama, delta_ret_arith_ama,
+    ret_log_ama, delta_ret_log_ama
+)
+WITH pass1 AS (
+    SELECT
+        id, ts, tf, tf_days, indicator, params_hash, roll, ama,
+        ama - LAG(ama, 1) OVER w AS delta1,
+        ama / NULLIF(LAG(ama, 1) OVER w, 0) - 1.0 AS ret_arith,
+        LN(NULLIF(GREATEST(ama / NULLIF(LAG(ama, 1) OVER w, 0), 0), 0)) AS ret_log,
+        EXTRACT(EPOCH FROM (ts - LAG(ts, 1) OVER w))::double precision / 86400.0 AS gap_days_raw
+    FROM {src}
+    {where_clause}
+    WINDOW w AS (PARTITION BY id, tf, indicator, params_hash ORDER BY ts)
+),
+pass2 AS (
+    SELECT
+        id, ts, tf, tf_days, indicator, params_hash, roll,
+        gap_days_raw::integer AS gap_days_roll,
+        CASE WHEN roll = FALSE THEN gap_days_raw::integer END AS gap_days,
+        delta1 AS delta1_ama_roll,
+        delta1 - LAG(delta1, 1) OVER w AS delta2_ama_roll,
+        ret_arith AS ret_arith_ama_roll,
+        ret_arith - LAG(ret_arith, 1) OVER w AS delta_ret_arith_ama_roll,
+        ret_log AS ret_log_ama_roll,
+        ret_log - LAG(ret_log, 1) OVER w AS delta_ret_log_ama_roll,
+        CASE WHEN roll = FALSE THEN delta1 END AS delta1_ama,
+        CASE WHEN roll = FALSE THEN delta1 - LAG(delta1, 1) OVER w END AS delta2_ama,
+        CASE WHEN roll = FALSE THEN ret_arith END AS ret_arith_ama,
+        CASE WHEN roll = FALSE THEN ret_arith - LAG(ret_arith, 1) OVER w END AS delta_ret_arith_ama,
+        CASE WHEN roll = FALSE THEN ret_log END AS ret_log_ama,
+        CASE WHEN roll = FALSE THEN ret_log - LAG(ret_log, 1) OVER w END AS delta_ret_log_ama
+    FROM pass1
+    WINDOW w AS (PARTITION BY id, tf, indicator, params_hash ORDER BY ts)
+)
+SELECT * FROM pass2
+ON CONFLICT (id, ts, tf, indicator, params_hash) DO NOTHING
+"""
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 
 def _resolve_db_url(cli_db_url: Optional[str]) -> str:
-    """
-    Resolve DB URL from CLI arg, config file, or environment.
-
-    Priority:
-    1. CLI --db-url argument
-    2. db_config.env file (searched up to 5 dirs up)
-    3. TARGET_DB_URL environment variable
-    4. MARKETDATA_DB_URL environment variable
-    """
     from ta_lab2.scripts.refresh_utils import resolve_db_url
 
     return resolve_db_url(cli_db_url)
 
 
 def _get_engine(db_url: str) -> Engine:
-    """Create a NullPool engine suitable for sequential (non-pooled) access."""
     return create_engine(db_url, future=True, poolclass=NullPool)
 
 
 def _table_exists(engine: Engine, full_table: str) -> bool:
-    """Return True if the given fully-qualified table exists in the DB."""
     if "." in full_table:
         schema, table = full_table.split(".", 1)
     else:
         schema, table = "public", full_table
 
     sql = text(
-        """
-        SELECT 1
-        FROM information_schema.tables
-        WHERE table_schema = :schema AND table_name = :table
-        LIMIT 1
-        """
+        "SELECT 1 FROM information_schema.tables "
+        "WHERE table_schema = :schema AND table_name = :table LIMIT 1"
     )
     with engine.connect() as conn:
-        result = conn.execute(sql, {"schema": schema, "table": table})
-        return result.fetchone() is not None
+        return (
+            conn.execute(sql, {"schema": schema, "table": table}).fetchone() is not None
+        )
 
 
 def _resolve_ids(ids_arg: str, engine: Engine, source_table: str) -> list[int]:
-    """
-    Resolve --ids argument to a list of integers.
-
-    'all' -> load all distinct IDs from the source table.
-    '1,52,825' -> parse directly.
-    """
     if ids_arg.strip().lower() == "all":
         sql = text(f"SELECT DISTINCT id FROM {source_table} ORDER BY id")
         with engine.connect() as conn:
             rows = conn.execute(sql).fetchall()
         return [int(r[0]) for r in rows]
-
     return [int(x.strip()) for x in ids_arg.split(",") if x.strip()]
 
 
@@ -147,32 +185,70 @@ def _resolve_tfs(
     engine: Engine,
     source_table: str,
 ) -> list[str]:
-    """
-    Resolve timeframe list from CLI args.
-
-    --tf 1D         -> ["1D"]
-    --all-tfs       -> all distinct TFs in the source table
-    neither         -> raise if both absent
-
-    Args:
-        tf_arg: Value of --tf argument or None.
-        all_tfs: True if --all-tfs was passed.
-        engine: SQLAlchemy engine.
-        source_table: Source AMA table to query TFs from.
-
-    Returns:
-        List of TF label strings.
-    """
     if tf_arg:
         return [tf_arg.strip()]
-
     if all_tfs:
         sql = text(f"SELECT DISTINCT tf FROM {source_table} ORDER BY tf")
         with engine.connect() as conn:
             rows = conn.execute(sql).fetchall()
         return [str(r[0]) for r in rows]
-
     raise ValueError("Provide --tf <TF> or --all-tfs to specify timeframes.")
+
+
+# ---------------------------------------------------------------------------
+# Worker function for multiprocessing
+# ---------------------------------------------------------------------------
+
+
+def _worker(args: tuple) -> dict:
+    """
+    Process one (source_key, asset_id) work unit.
+
+    Scoped DELETE + INSERT using SQL window functions.
+    Each call gets its own NullPool engine (safe for multiprocessing).
+
+    Returns summary dict with source, id, n_rows, elapsed.
+    """
+    source_key, src, dst, asset_id, tf_filter, db_url = args
+    t0 = time.time()
+
+    try:
+        engine = _get_engine(db_url)
+
+        # Build WHERE clause
+        if tf_filter:
+            where_clause = f"WHERE id = {int(asset_id)} AND tf = '{tf_filter}'"
+            delete_where = f"WHERE id = {int(asset_id)} AND tf = '{tf_filter}'"
+        else:
+            where_clause = f"WHERE id = {int(asset_id)}"
+            delete_where = f"WHERE id = {int(asset_id)}"
+
+        insert_sql = _INSERT_SQL.format(src=src, dst=dst, where_clause=where_clause)
+
+        with engine.begin() as conn:
+            conn.execute(text("SET LOCAL work_mem = '128MB'"))
+            conn.execute(text(f"DELETE FROM {dst} {delete_where}"))
+            result = conn.execute(text(insert_sql))
+            n_rows = result.rowcount
+
+        elapsed = time.time() - t0
+        return {
+            "source": source_key,
+            "id": asset_id,
+            "n_rows": n_rows,
+            "elapsed": elapsed,
+            "error": None,
+        }
+
+    except Exception as exc:
+        elapsed = time.time() - t0
+        return {
+            "source": source_key,
+            "id": asset_id,
+            "n_rows": 0,
+            "elapsed": elapsed,
+            "error": str(exc),
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -184,104 +260,108 @@ def _process_source(
     source_key: str,
     source_table: str,
     returns_table: str,
-    state_table: str,
     *,
     ids_arg: str,
     tf_arg: Optional[str],
     all_tfs: bool,
-    verbose: bool,
     dry_run: bool,
     db_url: str,
+    num_processes: int,
 ) -> dict:
-    """
-    Process one AMA source table -> returns table mapping.
-
-    Returns a summary dict: {source, n_ids, n_tfs, n_rows, elapsed, skipped_reason}.
-    """
+    """Process one AMA source table -> returns table mapping."""
     engine = _get_engine(db_url)
 
-    # Check source table exists
     if not _table_exists(engine, source_table):
-        _print(
-            f"  [{source_key}] Source table {source_table} does not exist — skipping"
-        )
+        _print(f"  [{source_key}] Source {source_table} does not exist -- skipping")
         return {"source": source_key, "skipped_reason": "table_missing"}
 
-    # Check source table has data
     with engine.connect() as conn:
         row_count = conn.execute(text(f"SELECT COUNT(*) FROM {source_table}")).scalar()
 
     if row_count == 0:
-        _print(f"  [{source_key}] Source table {source_table} is empty — skipping")
+        _print(f"  [{source_key}] Source {source_table} is empty -- skipping")
         return {"source": source_key, "skipped_reason": "table_empty"}
 
-    # Resolve IDs and TFs
-    try:
-        asset_ids = _resolve_ids(ids_arg, engine, source_table)
-    except Exception as exc:
-        _print(f"  [{source_key}] Could not resolve IDs: {exc} — skipping")
-        return {"source": source_key, "skipped_reason": str(exc)}
-
-    try:
-        tfs = _resolve_tfs(tf_arg, all_tfs, engine, source_table)
-    except Exception as exc:
-        _print(f"  [{source_key}] Could not resolve TFs: {exc} — skipping")
-        return {"source": source_key, "skipped_reason": str(exc)}
-
+    asset_ids = _resolve_ids(ids_arg, engine, source_table)
     if not asset_ids:
-        _print(f"  [{source_key}] No IDs found — skipping")
+        _print(f"  [{source_key}] No IDs found -- skipping")
         return {"source": source_key, "skipped_reason": "no_ids"}
 
-    if not tfs:
-        _print(f"  [{source_key}] No TFs found — skipping")
-        return {"source": source_key, "skipped_reason": "no_tfs"}
+    # For single-TF mode, resolve TFs to verify they exist but pass the filter
+    tf_filter = None
+    if tf_arg:
+        tf_filter = tf_arg.strip()
+    elif not all_tfs:
+        raise ValueError("Provide --tf <TF> or --all-tfs to specify timeframes.")
 
     _print(
         f"  [{source_key}] {source_table} -> {returns_table}: "
-        f"{len(asset_ids)} ids, {len(tfs)} tfs"
+        f"{len(asset_ids)} ids, tf={'all' if not tf_filter else tf_filter}, "
+        f"~{row_count:,} source rows"
     )
 
     if dry_run:
-        _print(
-            f"  [{source_key}] DRY-RUN — would process {len(asset_ids) * len(tfs)} (id, tf) pairs"
-        )
+        _print(f"  [{source_key}] DRY-RUN -- would process {len(asset_ids)} work units")
         return {
             "source": source_key,
             "n_ids": len(asset_ids),
-            "n_tfs": len(tfs),
             "n_rows": 0,
             "elapsed": 0.0,
             "dry_run": True,
         }
 
-    # Actual processing
-    from ta_lab2.features.ama.ama_returns import AMAReturnsFeature
-
-    feature = AMAReturnsFeature(
-        source_table=source_table,
-        returns_table=returns_table,
-        state_table=state_table,
-    )
+    # Build work units: one per (source_key, id)
+    work_units = [
+        (source_key, source_table, returns_table, aid, tf_filter, db_url)
+        for aid in asset_ids
+    ]
 
     t0 = time.time()
+    total_rows = 0
+    errors = []
 
-    if verbose:
-        _print(f"  [{source_key}] Starting refresh...")
-
-    feature.refresh(engine, asset_ids=asset_ids, tfs=tfs)
+    # Use multiprocessing for >1 worker, sequential for 1
+    effective_workers = min(num_processes, len(work_units))
+    if effective_workers > 1:
+        with Pool(processes=effective_workers, maxtasksperchild=1) as pool:
+            for result in pool.imap_unordered(_worker, work_units):
+                total_rows += result["n_rows"]
+                if result["error"]:
+                    errors.append(result)
+                    _print(
+                        f"  [{source_key}] id={result['id']} ERROR: {result['error']}"
+                    )
+                else:
+                    _print(
+                        f"  [{source_key}] id={result['id']}: "
+                        f"{result['n_rows']:,} rows in {result['elapsed']:.1f}s"
+                    )
+    else:
+        for wu in work_units:
+            result = _worker(wu)
+            total_rows += result["n_rows"]
+            if result["error"]:
+                errors.append(result)
+                _print(f"  [{source_key}] id={result['id']} ERROR: {result['error']}")
+            else:
+                _print(
+                    f"  [{source_key}] id={result['id']}: "
+                    f"{result['n_rows']:,} rows in {result['elapsed']:.1f}s"
+                )
 
     elapsed = time.time() - t0
-
     _print(
-        f"  [{source_key}] Done in {elapsed:.1f}s "
-        f"({len(asset_ids)} ids x {len(tfs)} tfs)"
+        f"  [{source_key}] Done: {total_rows:,} rows, "
+        f"{len(asset_ids)} ids, {elapsed:.1f}s"
+        + (f", {len(errors)} errors" if errors else "")
     )
 
     return {
         "source": source_key,
         "n_ids": len(asset_ids),
-        "n_tfs": len(tfs),
+        "n_rows": total_rows,
         "elapsed": elapsed,
+        "errors": errors,
     }
 
 
@@ -294,7 +374,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
             "Compute AMA return columns (delta1, delta2, ret_arith, ret_log + roll "
-            "variants) for all AMA value table variants."
+            "variants) for all AMA value table variants using SQL window functions."
         )
     )
     parser.add_argument(
@@ -323,6 +403,13 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "-n",
+        "--num-processes",
+        type=int,
+        default=10,
+        help="Number of parallel workers (default: 10).",
+    )
+    parser.add_argument(
         "--db-url",
         default=None,
         help="Postgres DB URL. Falls back to db_config.env / TARGET_DB_URL env.",
@@ -340,21 +427,17 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    # Validate TF args
     if args.tf and args.all_tfs:
         parser.error("--tf and --all-tfs are mutually exclusive.")
     if not args.tf and not args.all_tfs:
-        # Default: use all TFs
         args.all_tfs = True
 
-    # Configure logging
     level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(
         level=level,
         format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
     )
 
-    # Resolve DB URL
     try:
         db_url = _resolve_db_url(args.db_url)
     except Exception as exc:
@@ -364,16 +447,19 @@ def main() -> None:
     if args.dry_run:
         _print("DRY-RUN mode: no database writes will occur.")
 
-    # Determine which sources to process
     if args.source == "all":
         sources_to_process = list(TABLE_MAP.keys())
     else:
         sources_to_process = [args.source]
 
     _print(
-        f"Processing {len(sources_to_process)} source(s): {', '.join(sources_to_process)}"
+        f"Processing {len(sources_to_process)} source(s): "
+        f"{', '.join(sources_to_process)}"
     )
-    _print(f"IDs: {args.ids}, TF: {args.tf or 'all'}, dry-run: {args.dry_run}")
+    _print(
+        f"IDs: {args.ids}, TF: {args.tf or 'all'}, "
+        f"workers: {args.num_processes}, dry-run: {args.dry_run}"
+    )
 
     t_total = time.time()
     results = []
@@ -384,25 +470,25 @@ def main() -> None:
             source_key=source_key,
             source_table=source_table,
             returns_table=returns_table,
-            state_table=state_table,
             ids_arg=args.ids,
             tf_arg=args.tf,
             all_tfs=args.all_tfs,
-            verbose=args.verbose,
             dry_run=args.dry_run,
             db_url=db_url,
+            num_processes=args.num_processes,
         )
         results.append(result)
 
-    # Summary
     total_elapsed = time.time() - t_total
     skipped = [r for r in results if "skipped_reason" in r]
     processed = [r for r in results if "skipped_reason" not in r]
+    total_rows = sum(r.get("n_rows", 0) for r in processed)
 
     _print(
         f"--- Summary ---\n"
         f"  Sources processed: {len(processed)}/{len(results)}\n"
         f"  Sources skipped:   {len(skipped)}\n"
+        f"  Total rows:        {total_rows:,}\n"
         f"  Total elapsed:     {total_elapsed:.1f}s"
     )
 

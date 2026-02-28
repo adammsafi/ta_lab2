@@ -88,6 +88,7 @@ def main() -> None:
         log_prefix="ama_sync",
         dry_run=args.dry_run,
         only=only_set,
+        batch_col="id",
     )
 
 
