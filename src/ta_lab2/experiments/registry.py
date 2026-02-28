@@ -203,10 +203,36 @@ class FeatureRegistry:
             dotpath = compute.get("function", "")
             self.validate_dotpath(dotpath)
 
+        elif mode == "expression":
+            # Expression mode uses $col syntax evaluated by the ML expression engine.
+            # Validate the expression template (with $col refs substituted) via ast.parse.
+            expr = compute.get("expression", "")
+            params = spec.get("params", {})
+            import re as _re  # noqa: PLC0415
+
+            _col_pattern = _re.compile(r"\$(\w+)")
+            if params:
+                keys = list(params.keys())
+                values = [(v if isinstance(v, list) else [v]) for v in params.values()]
+                combo = next(itertools.product(*values))
+                variant_params = dict(zip(keys, combo))
+                substituted = expr.format(**variant_params)
+            else:
+                substituted = expr
+            # Replace $col with placeholder for syntax check
+            parsed = _col_pattern.sub("_placeholder_", substituted)
+            try:
+                ast.parse(parsed, mode="eval")
+            except SyntaxError as exc:
+                raise ValueError(
+                    f"Feature '{name}' has invalid expression syntax: {exc}\n"
+                    f"  Expression: {expr!r}"
+                ) from exc
+
         elif mode is not None:
             raise ValueError(
                 f"Feature '{name}' has unknown compute mode: {mode!r}. "
-                "Must be 'inline' or 'dotpath'."
+                "Must be 'inline', 'dotpath', or 'expression'."
             )
 
     def _expand_params(self, name: str, spec: dict) -> list[dict[str, Any]]:
