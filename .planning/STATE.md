@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: Phase 60 (ML Infrastructure & Experimentation) — In progress
-Plan: 7/N DONE (60-01: expression engine; 60-02: ExperimentTracker + cmc_ml_experiments DDL; 60-03: expression mode wired into registry+runner; 60-04: MDA, SFI, clustered FI; 60-05: RegimeRouter + run_feature_importance CLI; 60-06: DoubleEnsemble concept drift model)
-Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 COMPLETE (all 3 plans). V1_MEMO.md GENERATED. Phase 55 COMPLETE (all 5 plans). Phase 56 COMPLETE (all 7 plans). Phase 57 COMPLETE (all 6 plans). Phase 58 COMPLETE (all 7 plans, including gap closure: PORT-03, PORT-04, PORT-05 all closed). Phase 59 COMPLETE (all 5 plans). Phase 60 in progress (plans 1+2+3+4+5+6 complete).
-Last activity: 2026-02-28 — Completed 60-05-PLAN.md (RegimeRouter with per-regime sub-models + global fallback; run_feature_importance CLI for MDA/SFI on cmc_features)
+Plan: 8/N DONE (60-01: expression engine; 60-02: ExperimentTracker + cmc_ml_experiments DDL; 60-03: expression mode wired into registry+runner; 60-04: MDA, SFI, clustered FI; 60-05: RegimeRouter + run_feature_importance CLI; 60-06: DoubleEnsemble concept drift model; 60-08: Alembic migration cmc_ml_experiments + expression engine E2E verified)
+Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 COMPLETE (all 3 plans). V1_MEMO.md GENERATED. Phase 55 COMPLETE (all 5 plans). Phase 56 COMPLETE (all 7 plans). Phase 57 COMPLETE (all 6 plans). Phase 58 COMPLETE (all 7 plans, including gap closure: PORT-03, PORT-04, PORT-05 all closed). Phase 59 COMPLETE (all 5 plans). Phase 60 in progress (plans 1+2+3+4+5+6+8 complete).
+Last activity: 2026-02-28 — Completed 60-08-PLAN.md (Alembic migration 3caddeff4691 creates cmc_ml_experiments; optuna 4.7.0 + lightgbm 4.6.0 confirmed; 8 expression features validated E2E)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [██████] Phase 60 in progress (6+/N plans, 60-05+60-06 complete)
 
@@ -580,6 +580,9 @@ Recent decisions affecting current work:
 - **Recency weight = end/n for DoubleEnsemble (Phase 60-06)**: Later windows get proportionally higher weight; raw weights stored in models list; normalisation to sum=1 deferred to predict_proba()
 - **Always-DataFrame contract enforced in DoubleEnsemble (Phase 60-06)**: isinstance check + TypeError in fit() and predict_proba(); prevents LightGBM feature-name warnings from numpy array inputs
 - **Single-class window skip in DoubleEnsemble (Phase 60-06)**: LightGBM cannot train on one-class window; skip + DEBUG log; global fallback model when n < window_size and dataset has 2+ classes
+- **Verify alembic head at runtime before writing down_revision (Phase 60-08)**: Plan spec listed 30eac3660488 but actual head was f6a7b8c9d0e1 (portfolio_tables); always run `alembic heads` first; plan's suggested head is often stale by the time Wave 3 executes
+- **op.create_table() + op.execute(COMMENT) over raw SQL file read (Phase 60-08)**: All codebase migrations use op.create_table() not file reads; consistent pattern; avoids file-path dependency in migration runtime; GIN index via postgresql_using='gin' kwarg
+- **expression mode E2E: 8 features (5 base + 3 param-sweep) all pass (Phase 60-08)**: vol_ratio_expr expands to 4 variants via fast=[5,10] x slow=[20,30]; all 8 evaluate cleanly against 100-row OHLCV DataFrame with 0 NaN for macd_signal/price_rank
 
 ### Pending Todos
 
@@ -593,8 +596,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-28T14:41:34Z
-Stopped at: Completed 60-06-PLAN.md — DoubleEnsemble concept drift model (sliding-window LightGBM sub-models with sample reweighting + recency-weighted prediction); MLINFRA-04 satisfied
+Last session: 2026-02-28T14:53:30Z
+Stopped at: Completed 60-08-PLAN.md — Alembic migration 3caddeff4691 creates cmc_ml_experiments; optuna 4.7.0 + lightgbm 4.6.0 confirmed; 8 expression features validated end-to-end
 Resume file: None
 
 ---
