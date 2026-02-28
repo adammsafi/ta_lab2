@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: Phase 62 (Operational Completeness) — In progress
-Plan: 1/2 DONE
-Status: Phase 62 Plan 01 COMPLETE. IC sweep verified (114 TFs in cmc_ic_results, 810,320 rows). 107 features promoted in dim_feature_registry. batch_promote_features.py created as reusable CLI. Plan 02 next.
-Last activity: 2026-02-28 — Completed Phase 62 Plan 01 (IC sweep completeness verification, batch promotion script creation)
+Plan: 2/2 DONE (Phase 62 plans 1-2 complete; check roadmap for remaining plans)
+Status: Phase 62 Plan 02 COMPLETE. 6 ML experiments in cmc_ml_experiments (feature importance MDA/RF, global LGBM, regime router, static LGBM, double ensemble, optuna sweep). RebalanceScheduler orphan deleted. reports/ml/feature_importance_1d.csv written.
+Last activity: 2026-02-28 — Completed Phase 62 Plan 02 (ML script execution, dead code removal)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [████████] Phase 60 COMPLETE (8 plans)
 
@@ -275,6 +275,9 @@ Recent decisions affecting current work:
 - **IC sweep already complete with 114 TFs (Phase 62-01)**: cmc_ic_results had 114 distinct TFs (exceeds 109 target) from prior session; feature_ic_ranking.csv covers 830 (asset_id, tf) pairs; no re-run needed when data is already present
 - **Batch promotion script handles feature name mismatch gracefully (Phase 62-01)**: promotion_decisions.csv lists bar-level features (bb_ma_20, rsi_14, vol_gk_*); FeaturePromoter._load_experiment_results() reads from cmc_feature_experiments (AMA features only); ValueError caught per-feature, logged as ERROR, script continues; correct behavior for a reusable tool
 - **107 AMA features promoted in prior session (Phase 62-01)**: All ama_dema_*/ama_hma_*/ama_kama_*/ama_tema_* promoted via promote_feature.py individually; dim_feature_registry has 107 rows lifecycle='promoted'; Alembic stubs generated but NOT applied (documentation-only per plan)
+- **Multi-asset PurgedKFold requires ts sort (Phase 62-02)**: When loading multi-asset data (e.g. asset_ids=1,1027), rows arrive grouped by id then sorted by ts — not globally time-sorted. PurgedKFoldSplitter requires monotonically increasing t1_series index. Fix: sort df_valid and X by ts via `df_valid["ts"].argsort()` before building t1_series.
+- **t1_series index must use .tolist() not .values (Phase 62-02)**: Per MEMORY.md pitfall, `.values` on tz-aware Series returns tz-naive numpy.datetime64. t1_series index used as `test_start_ts` in cv.py comparison against tz-aware t1_complement values — causes TypeError. Fix: use `ts_series.tolist()` for tz-aware Timestamp objects.
+- **cmc_features has non-numeric columns (Phase 62-02)**: asset_class='CRYPTO', venue='CMC_AGG', updated_at datetime, macd_signal_9_fast object-dtype all present in cmc_features but not in _EXCLUDE_COLS. sklearn fails to cast 'CRYPTO' to float32. Fix: add `pd.api.types.is_numeric_dtype(df[c])` filter to feature column selection in all ML scripts. Also add asset_class and venue to _EXCLUDE_COLS.
 - **RiskEngine integration via _is_halted() direct call** (Phase 61-01): PaperExecutor calls risk_engine._is_halted() directly (private method) at strategy entry -- acceptable; avoids creating a fake order object just to check halt state. check_order() handles all per-order gates including kill switch re-check.
 - **Risk-blocked orders reuse skipped_no_delta counter** (Phase 61-01): check_order() blocks return {skipped_no_delta: True} -- reuses existing counter semantics, avoids schema change to run log
 - **Telegram alert 2-arg signature** (Phase 61-01): send_critical_alert(error_type, message) where error_type is category string ("executor", "database", etc.); import from ta_lab2.notifications.telegram not run_daily_refresh
@@ -602,8 +605,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-28T20:59:28Z
-Stopped at: Completed 62-01-PLAN.md — IC sweep verified (114 TFs, 810,320 rows), 107 features promoted, batch_promote_features.py created
+Last session: 2026-02-28T21:07:30Z
+Stopped at: Completed 62-02-PLAN.md — 6 ML experiments logged to cmc_ml_experiments, RebalanceScheduler orphan deleted, portfolio __init__.py cleaned
 Resume file: None
 
 ---
