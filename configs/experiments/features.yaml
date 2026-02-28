@@ -74,13 +74,13 @@ features:
 
   ama_ret_momentum:
     lifecycle: experimental
-    description: "KAMA(10,2,30) return momentum -- ret_arith of canonical KAMA"
+    description: "KAMA(10,2,30) return momentum -- ret_arith_ama of canonical KAMA"
     compute:
       mode: inline
-      expression: "ret_arith"
+      expression: "ret_arith_ama"
     inputs:
       - table: cmc_returns_ama_multi_tf_u
-        columns: [ret_arith]
+        columns: [ret_arith_ama]
         filters:
           indicator: KAMA
           params_hash: de1106d55011ecb8b46ee63d7e1d0cc8  # KAMA(10,2,30) canonical
