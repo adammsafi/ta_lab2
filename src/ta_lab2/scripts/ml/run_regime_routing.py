@@ -57,6 +57,9 @@ _EXCLUDE_COLS = frozenset(
         "volume",
         "market_cap",
         "alignment_source",
+        # categorical/string columns from cmc_features (not numeric features)
+        "asset_class",
+        "venue",
     ]
 )
 
@@ -459,10 +462,14 @@ def main(argv: list[str] | None = None) -> None:
     reg_df = _load_regimes_batch(engine, asset_ids, args.tf, args.start, args.end)
 
     # --- Build feature matrix ---
+    # Exclude non-numeric dtypes (cmc_features has string/datetime cols: asset_class, venue, updated_at)
     feature_cols = [
         c
         for c in df.columns
-        if c not in _EXCLUDE_COLS and df[c].notna().any() and c != "ret_arith"
+        if c not in _EXCLUDE_COLS
+        and df[c].notna().any()
+        and c != "ret_arith"
+        and pd.api.types.is_numeric_dtype(df[c])
     ]
 
     if "ret_arith" not in df.columns:
@@ -477,6 +484,11 @@ def main(argv: list[str] | None = None) -> None:
     X = X[valid_mask].reset_index(drop=True)
     df_valid = df[valid_mask].reset_index(drop=True)
 
+    # --- Sort by ts for PurgedKFold (multi-asset data must be time-sorted globally) ---
+    sort_idx = df_valid["ts"].argsort()
+    df_valid = df_valid.iloc[sort_idx].reset_index(drop=True)
+    X = X.iloc[sort_idx].reset_index(drop=True)
+
     # --- Binary labels ---
     y = (df_valid["ret_arith"] > 0).astype(int).values
     logger.info(
@@ -488,9 +500,11 @@ def main(argv: list[str] | None = None) -> None:
     )
 
     # --- Build t1_series for PurgedKFold ---
+    # CRITICAL (MEMORY.md): .values on tz-aware Series returns tz-naive numpy.datetime64.
+    # Use .tolist() to preserve tz-aware Timestamp objects for correct cv.py comparisons.
     ts_series = df_valid["ts"].reset_index(drop=True)
-    t1_values = (ts_series + pd.Timedelta(days=1)).values
-    t1_series = pd.Series(t1_values, index=ts_series.values)
+    t1_series = ts_series + pd.Timedelta(days=1)
+    t1_series.index = ts_series.tolist()  # index = label start, value = label end
 
     # --- Join regime labels ---
     if not reg_df.empty:

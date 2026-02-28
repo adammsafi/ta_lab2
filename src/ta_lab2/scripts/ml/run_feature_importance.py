@@ -62,6 +62,9 @@ _EXCLUDE_COLS = frozenset(
         "market_cap",
         # alignment metadata
         "alignment_source",
+        # categorical/string columns from cmc_features (not numeric features)
+        "asset_class",
+        "venue",
     ]
 )
 
@@ -302,9 +305,14 @@ def main(argv: list[str] | None = None) -> None:
     logger.info("Loaded %d rows x %d columns", len(df), len(df.columns))
 
     # --- Build feature matrix ---
-    # Exclude PK columns, raw OHLCV, all-NaN columns
+    # Exclude PK columns, raw OHLCV, all-NaN columns, and non-numeric dtypes
+    # (cmc_features may contain string/datetime columns like asset_class, venue, updated_at)
     feature_cols = [
-        c for c in df.columns if c not in _EXCLUDE_COLS and df[c].notna().any()
+        c
+        for c in df.columns
+        if c not in _EXCLUDE_COLS
+        and df[c].notna().any()
+        and pd.api.types.is_numeric_dtype(df[c])
     ]
 
     # ret_arith must be present for labels; if it's in features remove it to avoid target leakage
@@ -328,6 +336,12 @@ def main(argv: list[str] | None = None) -> None:
     X = X[valid_mask]
     df_valid = df[valid_mask].copy()
 
+    # --- Sort by ts for PurgedKFold (multi-asset data must be time-sorted globally) ---
+    # PurgedKFoldSplitter requires monotonically increasing t1_series index.
+    sort_idx = df_valid["ts"].argsort()
+    df_valid = df_valid.iloc[sort_idx].reset_index(drop=True)
+    X = X.iloc[sort_idx].reset_index(drop=True)
+
     # --- Build binary labels from ret_arith ---
     # 1 = positive return (up), 0 = negative/zero (down)
     y = (df_valid["ret_arith"] > 0).astype(int).values
@@ -341,9 +355,11 @@ def main(argv: list[str] | None = None) -> None:
 
     # --- Build t1_series for PurgedKFold ---
     # t1 = label end = ts + 1 bar (1 day for 1D)
+    # CRITICAL (MEMORY.md): .values on tz-aware Series returns tz-naive numpy.datetime64.
+    # Use .tolist() to preserve tz-aware Timestamp objects for correct cv.py comparisons.
     ts_series = df_valid["ts"].reset_index(drop=True)
     t1_series = ts_series + pd.Timedelta(days=1)
-    t1_series.index = ts_series.values  # index = label start, value = label end
+    t1_series.index = ts_series.tolist()  # index = label start, value = label end
     X = X.reset_index(drop=True)
 
     logger.info("Training set: %d samples, %d features", len(X), len(feature_cols))
