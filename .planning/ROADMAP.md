@@ -1078,12 +1078,38 @@ Plans:
 
 </details>
 
+---
+
+### Phase 61: Integration Wiring & Bug Fixes
+**Goal:** Wire the 3 missing cross-phase connections identified by the v1.0.0 milestone audit and fix the Phase 47 drift attribution column-name bugs. After this phase, RiskEngine enforces all risk gates during paper trading, daily refresh includes feature refresh, Telegram alerts fire correctly, and drift attribution reports render without errors.
+**Depends on:** Phase 45 (PaperExecutor), Phase 46 (RiskEngine), Phase 47 (drift guard), Phase 50 (daily refresh orchestrator)
+**Gap Closure:** Closes 3 integration gaps + 1 phase tech debt item from v1.0.0 audit
+**Success Criteria** (what must be TRUE):
+  1. PaperExecutor calls RiskEngine.check_order() before every CanonicalOrder creation, check_daily_loss() at start of each run() iteration, and checks dim_risk_state.trading_state before processing signals
+  2. `run_daily_refresh.py --all` includes a cmc_features refresh stage between regimes and signals
+  3. `send_critical_alert` in paper_executor.py imports from `ta_lab2.notifications.telegram` (not from run_daily_refresh)
+  4. `run_drift_report.py --with-attribution` renders without column-name errors (4 bugs on lines 168-204 fixed) and breach count section populates correctly
+
+---
+
+### Phase 62: Operational Completeness
+**Goal:** Run deferred operational tasks that require live DB execution — complete the IC sweep across all 109 TFs, execute feature promotions to dim_feature_registry, run the 4 ML CLI scripts to generate documented results, and resolve the orphaned RebalanceScheduler.
+**Depends on:** Phase 55 (IC sweep infrastructure), Phase 58 (RebalanceScheduler), Phase 60 (ML CLI scripts)
+**Gap Closure:** Closes remaining tech debt from Phases 55, 58, 60
+**Success Criteria** (what must be TRUE):
+  1. `SELECT COUNT(DISTINCT tf) FROM cmc_ic_results` returns 109 (full IC sweep complete)
+  2. dim_feature_registry populated with promoted features from IC ranking
+  3. All 4 ML CLI scripts (run_feature_importance, run_regime_routing, run_double_ensemble, run_optuna_sweep) executed with --log-experiment; results in cmc_ml_experiments
+  4. RebalanceScheduler either wired into a calling script or removed (no orphaned code)
+
+---
+
 See `.planning/milestones/v1.0.0-REQUIREMENTS.md` and `.planning/milestones/v1.0.0-ROADMAP.md` for full details.
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19 (v0.5.0) -> 20 -> ... -> 26 (v0.6.0) -> 27 -> 28 (v0.7.0) -> 29 -> ... -> 34 (v0.8.0) -> 35 -> ... -> 41 (v0.9.0) -> 42 -> ... -> 56 (v1.0.0)
+Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19 (v0.5.0) -> 20 -> ... -> 26 (v0.6.0) -> 27 -> 28 (v0.7.0) -> 29 -> ... -> 34 (v0.8.0) -> 35 -> ... -> 41 (v0.9.0) -> 42 -> ... -> 62 (v1.0.0)
 
 Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute in parallel. Phase 37 is enhanced by Phase 35 but not blocked. Phase 38 requires Phase 37. Phase 39 requires Phases 35-38. Phase 40 requires all prior v0.9.0 phases. Phase 41 has no hard dependency on Phases 35-40 (reads from existing returns tables) but is sequenced last. Phase 55 depends only on v0.9.0 (not on other v1.0.0 phases).
 
