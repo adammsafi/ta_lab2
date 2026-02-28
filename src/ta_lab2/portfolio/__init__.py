@@ -21,5 +21,21 @@ def load_portfolio_config(path: str = "configs/portfolio.yaml") -> dict:
 
 
 from ta_lab2.portfolio.optimizer import PortfolioOptimizer  # noqa: E402
+from ta_lab2.portfolio.black_litterman import BLAllocationBuilder  # noqa: E402
+from ta_lab2.portfolio.bet_sizing import BetSizer, probability_bet_size  # noqa: E402
+from ta_lab2.portfolio.topk_selector import TopkDropoutSelector  # noqa: E402
+from ta_lab2.portfolio.cost_tracker import TurnoverTracker  # noqa: E402
+from ta_lab2.portfolio.rebalancer import RebalanceScheduler  # noqa: E402
+from ta_lab2.portfolio.stop_ladder import StopLadder  # noqa: E402
 
-__all__ = ["load_portfolio_config", "PortfolioOptimizer"]
+__all__ = [
+    "load_portfolio_config",
+    "PortfolioOptimizer",
+    "BLAllocationBuilder",
+    "BetSizer",
+    "probability_bet_size",
+    "TopkDropoutSelector",
+    "TurnoverTracker",
+    "RebalanceScheduler",
+    "StopLadder",
+]
