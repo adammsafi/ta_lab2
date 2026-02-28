@@ -192,9 +192,30 @@ CREATE TABLE IF NOT EXISTS public.cmc_features (
     rsi_14_zscore                   DOUBLE PRECISION,
     ta_is_outlier                   BOOLEAN DEFAULT FALSE,
 
-    -- ═══════════════════════════════════════════════════════════════
+    -- -----------------------------------------------------------------
+    -- Microstructure Features (from microstructure_feature.py)
+    -- -----------------------------------------------------------------
+
+    -- Fractional differentiation (MICRO-01)
+    close_fracdiff          DOUBLE PRECISION,
+    close_fracdiff_d        DOUBLE PRECISION,
+
+    -- Liquidity impact measures (MICRO-02)
+    kyle_lambda             DOUBLE PRECISION,
+    amihud_lambda           DOUBLE PRECISION,
+    hasbrouck_lambda        DOUBLE PRECISION,
+
+    -- Rolling ADF / SADF proxy (MICRO-03)
+    sadf_stat               DOUBLE PRECISION,
+    sadf_is_explosive       BOOLEAN DEFAULT FALSE,
+
+    -- Entropy features (MICRO-04)
+    entropy_shannon         DOUBLE PRECISION,
+    entropy_lz              DOUBLE PRECISION,
+
+    -- -----------------------------------------------------------------
     -- Derived flags + metadata
-    -- ═══════════════════════════════════════════════════════════════
+    -- -----------------------------------------------------------------
     has_price_gap   BOOLEAN DEFAULT FALSE,
     has_outlier     BOOLEAN DEFAULT FALSE,
     updated_at      TIMESTAMPTZ DEFAULT now(),

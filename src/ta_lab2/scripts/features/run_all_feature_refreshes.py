@@ -239,6 +239,48 @@ def refresh_rolling_extremes(
         )
 
 
+def refresh_microstructure(
+    engine,
+    ids: list[int],
+    start: Optional[str],
+    end: Optional[str],
+    tf: str = "1D",
+    alignment_source: str = "multi_tf",
+) -> RefreshResult:
+    """Refresh microstructure columns in cmc_features for given tf."""
+    from ta_lab2.scripts.features.microstructure_feature import (
+        MicrostructureFeature,
+        MicrostructureConfig,
+    )
+
+    table = "cmc_features (microstructure)"
+    t0 = time.time()
+
+    try:
+        config = MicrostructureConfig(tf=tf, alignment_source=alignment_source)
+        feature = MicrostructureFeature(engine, config)
+        rows_written = feature.compute_for_ids(ids=ids, start=start, end=end)
+        duration = time.time() - t0
+
+        return RefreshResult(
+            table=table,
+            rows_inserted=rows_written,
+            duration_seconds=duration,
+            success=True,
+        )
+
+    except Exception as e:
+        duration = time.time() - t0
+        logger.error(f"Microstructure refresh failed (tf={tf}): {e}", exc_info=True)
+        return RefreshResult(
+            table=table,
+            rows_inserted=0,
+            duration_seconds=duration,
+            success=False,
+            error=str(e),
+        )
+
+
 def refresh_features_store(
     engine,
     ids: list[int],
@@ -354,6 +396,7 @@ def run_all_refreshes(
     full_refresh: bool = False,
     validate: bool = True,
     parallel: bool = True,
+    codependence: bool = False,
 ) -> dict[str, RefreshResult]:
     """Refresh all feature tables for a single (tf, alignment_source)."""
     results = {}
@@ -424,6 +467,22 @@ def run_all_refreshes(
     else:
         logger.error(f"  {result.table} (tf={tf}): FAILED - {result.error}")
 
+    # Phase 2b: Microstructure UPDATE (supplemental columns on cmc_features rows)
+    # MUST run after Phase 2 — microstructure does UPDATE on existing rows,
+    # so the base rows from cmc_features must exist first.
+    logger.info("Phase 2b: Running microstructure feature UPDATE on cmc_features")
+
+    micro_result = refresh_microstructure(engine, ids, start, end, tf, alignment_source)
+    results[micro_result.table] = micro_result
+
+    if micro_result.success:
+        logger.info(
+            f"  {micro_result.table} (tf={tf}): {micro_result.rows_inserted} rows"
+            f" in {micro_result.duration_seconds:.1f}s"
+        )
+    else:
+        logger.error(f"  {micro_result.table} (tf={tf}): FAILED - {micro_result.error}")
+
     # Phase 3: Cross-sectional normalization (depends on cmc_features)
     # MUST run sequentially after cmc_features — window functions read the
     # freshly-written ret_arith / rsi_14 / vol_parkinson_20 values.
@@ -439,6 +498,46 @@ def run_all_refreshes(
         )
     else:
         logger.error(f"  {cs_result.table} (tf={tf}): FAILED - {cs_result.error}")
+
+    # Phase 3b: Codependence (optional, pairwise metrics — ~3 min for all assets)
+    if codependence:
+        logger.info("Phase 3b: Running codependence refresh (pairwise metrics)")
+
+        t0_co = time.time()
+        try:
+            from ta_lab2.scripts.features.codependence_feature import (
+                refresh_codependence,
+            )
+
+            n_pairs = refresh_codependence(engine, ids=ids, tf=tf)
+            duration_co = time.time() - t0_co
+
+            co_result = RefreshResult(
+                table="cmc_codependence",
+                rows_inserted=n_pairs,
+                duration_seconds=duration_co,
+                success=True,
+            )
+        except Exception as e:
+            duration_co = time.time() - t0_co
+            logger.error(f"Codependence refresh failed (tf={tf}): {e}", exc_info=True)
+            co_result = RefreshResult(
+                table="cmc_codependence",
+                rows_inserted=0,
+                duration_seconds=duration_co,
+                success=False,
+                error=str(e),
+            )
+
+        results[co_result.table] = co_result
+
+        if co_result.success:
+            logger.info(
+                f"  {co_result.table} (tf={tf}): {co_result.rows_inserted} pairs"
+                f" in {co_result.duration_seconds:.1f}s"
+            )
+        else:
+            logger.error(f"  {co_result.table} (tf={tf}): FAILED - {co_result.error}")
 
     # Phase 4: Validation (if requested)
     if validate:
@@ -515,6 +614,13 @@ def parse_args() -> argparse.Namespace:
         "--all-tfs",
         action="store_true",
         help="Process all timeframes with data in cmc_price_bars_multi_tf",
+    )
+
+    # Codependence (optional batch step)
+    parser.add_argument(
+        "--codependence",
+        action="store_true",
+        help="Also refresh cmc_codependence (pairwise, ~3 min for all assets)",
     )
 
     # Refresh mode
@@ -638,6 +744,7 @@ def main() -> int:
                 validate=args.validate
                 and ((tf, alignment_source) == tf_alignments[-1]),
                 parallel=args.parallel,
+                codependence=getattr(args, "codependence", False),
             )
             all_results[tf] = results
         except Exception as e:
@@ -665,8 +772,10 @@ def main() -> int:
             "cmc_ta",
             "cmc_cycle_stats",
             "cmc_rolling_extremes",
+            "cmc_features (microstructure)",
             "cmc_features",
             "cmc_features (CS norms)",
+            "cmc_codependence",
         ]:
             if table in results:
                 result = results[table]
