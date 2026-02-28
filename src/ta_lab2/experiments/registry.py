@@ -266,9 +266,9 @@ class FeatureRegistry:
             param_str = "_".join(f"{k}{v}" for k, v in variant_params.items())
             variant_name = f"{name}_{param_str}"
 
-            # Deep-copy the compute section with param substitution for inline
+            # Deep-copy the compute section with param substitution for inline and expression
             compute = spec.get("compute", {})
-            if compute.get("mode") == "inline":
+            if compute.get("mode") in ("inline", "expression"):
                 substituted_expr = compute["expression"].format(**variant_params)
                 new_compute = {**compute, "expression": substituted_expr}
                 variant_spec = {
