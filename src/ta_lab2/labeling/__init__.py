@@ -3,6 +3,7 @@ ta_lab2.labeling -- AFML-inspired labeling primitives.
 
 Modules:
     cusum_filter      -- Symmetric CUSUM event filter (AFML Ch.17)
+    meta_labeler      -- Meta-labeling classifier (AFML Ch.10): RF over primary signals
     trend_scanning    -- OLS t-value trend scanning labels (AFML ML4AM Ch.2)
     triple_barrier    -- Triple barrier labels (+1/-1/0) with vol-scaled barriers (AFML Ch.3)
 """
@@ -12,10 +13,11 @@ from ta_lab2.labeling.cusum_filter import (
     get_cusum_threshold,
     validate_cusum_density,
 )
+from ta_lab2.labeling.meta_labeler import MetaLabeler
 from ta_lab2.labeling.trend_scanning import (
-    trend_scanning_labels,
-    get_trend_weights,
     get_t1_series,
+    get_trend_weights,
+    trend_scanning_labels,
 )
 from ta_lab2.labeling.triple_barrier import (
     add_vertical_barrier,
@@ -30,6 +32,8 @@ __all__ = [
     "cusum_filter",
     "get_cusum_threshold",
     "validate_cusum_density",
+    # Meta-labeling
+    "MetaLabeler",
     # Trend scanning
     "trend_scanning_labels",
     "get_trend_weights",
