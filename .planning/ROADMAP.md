@@ -715,7 +715,7 @@ Plans:
 - [x] **Phase 55: Feature & Signal Evaluation** - Run IC evals on all features/AMAs, score with BH gate, adaptive RSI A/B, populate dashboards
 - [x] **Phase 56: Factor Analytics & Reporting Upgrade** - QuantStats tear sheets, IC decay/Rank IC, quintile returns, cross-sectional normalization, MAE/MFE, Monte Carlo CI
 - [x] **Phase 57: Advanced Labeling & Cross-Validation** - Triple barrier labeling, meta-labeling, purged CPCV, CUSUM event filter, trend scanning
-- [ ] **Phase 58: Portfolio Construction & Position Sizing** - PyPortfolioOpt integration, Black-Litterman, TopkDropout, bet sizing, stop laddering
+- [x] **Phase 58: Portfolio Construction & Position Sizing** - PyPortfolioOpt integration, Black-Litterman, TopkDropout, bet sizing, stop laddering
 - [ ] **Phase 59: Microstructural & Advanced Features** - Fractional differentiation, Kyle/Amihud lambda, SADF bubble detection, entropy, codependence
 - [ ] **Phase 60: ML Infrastructure & Experimentation** - Expression engine, feature importance, regime-routed models, concept drift, experiment tracking, Optuna
 
@@ -1019,14 +1019,16 @@ Plans:
   3. Black-Litterman integration: CMC market caps -> prior, signals -> views -> posterior -> weights
   4. TopkDropout backtested across universe with turnover tracking; compared to equal-weight and per-asset baselines
   5. Bet sizing function maps signal probability to position size; demonstrated improvement in Sharpe vs fixed sizing
-**Plans**: 5 plans in 4 waves
+**Plans**: 7 plans in 4 waves (+ 2 gap closure)
 
 Plans:
-- [ ] 58-01-PLAN.md -- Foundation: Alembic migration, portfolio.yaml config, PyPortfolioOpt install, package skeleton
-- [ ] 58-02-PLAN.md -- PortfolioOptimizer: MV/CVaR/HRP wrappers with regime routing and fallback logic
-- [ ] 58-03-PLAN.md -- Black-Litterman allocation + probability-based bet sizing
-- [ ] 58-04-PLAN.md -- TopkDropout selector, turnover cost tracker, rebalance scheduler
-- [ ] 58-05-PLAN.md -- Integration scripts: refresh_portfolio_allocations, portfolio backtest, daily refresh wiring
+- [x] 58-01-PLAN.md -- Foundation: Alembic migration, portfolio.yaml config, PyPortfolioOpt install, package skeleton
+- [x] 58-02-PLAN.md -- PortfolioOptimizer: MV/CVaR/HRP wrappers with regime routing and fallback logic
+- [x] 58-03-PLAN.md -- Black-Litterman allocation + probability-based bet sizing
+- [x] 58-04-PLAN.md -- TopkDropout selector, turnover cost tracker, rebalance scheduler
+- [x] 58-05-PLAN.md -- Integration scripts: refresh_portfolio_allocations, portfolio backtest, daily refresh wiring
+- [x] 58-06-PLAN.md -- Gap closure: TurnoverTracker wiring + real signal probabilities (PORT-03/04)
+- [x] 58-07-PLAN.md -- Gap closure: StopLadder ATR breakout integration (PORT-05)
 
 ---
 
