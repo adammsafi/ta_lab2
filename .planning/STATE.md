@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: Phase 60 (ML Infrastructure & Experimentation) — In progress
-Plan: 5/N DONE (60-01: expression engine; 60-02: ExperimentTracker + cmc_ml_experiments DDL; 60-03: expression mode wired into registry+runner; 60-04: MDA, SFI, clustered FI)
-Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 COMPLETE (all 3 plans). V1_MEMO.md GENERATED. Phase 55 COMPLETE (all 5 plans). Phase 56 COMPLETE (all 7 plans). Phase 57 COMPLETE (all 6 plans). Phase 58 COMPLETE (all 7 plans, including gap closure: PORT-03, PORT-04, PORT-05 all closed). Phase 59 COMPLETE (all 5 plans). Phase 60 in progress (plans 1+2+3+4 complete).
-Last activity: 2026-02-28 — Completed 60-03-PLAN.md (expression mode wired end-to-end: FeatureRegistry._expand_params + ExperimentRunner._compute_feature dispatch to evaluate_expression)
+Plan: 6/N DONE (60-01: expression engine; 60-02: ExperimentTracker + cmc_ml_experiments DDL; 60-03: expression mode wired into registry+runner; 60-04: MDA, SFI, clustered FI; 60-06: DoubleEnsemble concept drift model)
+Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 COMPLETE (all 3 plans). V1_MEMO.md GENERATED. Phase 55 COMPLETE (all 5 plans). Phase 56 COMPLETE (all 7 plans). Phase 57 COMPLETE (all 6 plans). Phase 58 COMPLETE (all 7 plans, including gap closure: PORT-03, PORT-04, PORT-05 all closed). Phase 59 COMPLETE (all 5 plans). Phase 60 in progress (plans 1+2+3+4+6 complete).
+Last activity: 2026-02-28 — Completed 60-06-PLAN.md (DoubleEnsemble concept drift model: sliding-window LightGBM sub-models with sample reweighting and recency-weighted prediction)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [████] Phase 60 in progress (4+/N plans)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [█████] Phase 60 in progress (5+/N plans, 60-06 complete)
 
 ## Performance Metrics
 
@@ -576,6 +576,10 @@ Recent decisions affecting current work:
 - **FeatureRegistry accepts expression mode (Phase 60-01)**: _validate_compute_spec elif mode=='expression' branch added; existing inline/dotpath unchanged; future ExperimentRunner dispatch on mode=='expression' deferred
 - **expression mode _expand_params same substitution as inline (Phase 60-03)**: _expand_params condition extended from mode=='inline' to mode in ('inline','expression'); expression templates use {param} placeholders like inline
 - **Lazy import evaluate_expression in runner (Phase 60-03)**: evaluate_expression imported inside elif branch not at module top level; keeps runner.py dependency-free when expression mode unused; matches existing lazy DimTimeframe import pattern
+- **Lazy import lightgbm in DoubleEnsemble (Phase 60-06)**: import lightgbm as lgb inside fit()/predict_proba(); module importable without lightgbm installed; ImportError with install instructions raised only at call time
+- **Recency weight = end/n for DoubleEnsemble (Phase 60-06)**: Later windows get proportionally higher weight; raw weights stored in models list; normalisation to sum=1 deferred to predict_proba()
+- **Always-DataFrame contract enforced in DoubleEnsemble (Phase 60-06)**: isinstance check + TypeError in fit() and predict_proba(); prevents LightGBM feature-name warnings from numpy array inputs
+- **Single-class window skip in DoubleEnsemble (Phase 60-06)**: LightGBM cannot train on one-class window; skip + DEBUG log; global fallback model when n < window_size and dataset has 2+ classes
 
 ### Pending Todos
 
@@ -589,8 +593,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-28T14:40:41Z
-Stopped at: Completed 60-03-PLAN.md — expression mode wired into FeatureRegistry._expand_params + ExperimentRunner._compute_feature; MLINFRA-01 end-to-end complete
+Last session: 2026-02-28T14:41:34Z
+Stopped at: Completed 60-06-PLAN.md — DoubleEnsemble concept drift model (sliding-window LightGBM sub-models with sample reweighting + recency-weighted prediction); MLINFRA-04 satisfied
 Resume file: None
 
 ---
