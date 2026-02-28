@@ -714,7 +714,7 @@ Plans:
 - [x] **Phase 54: V1 Results Memo** - Formal report: methodology, results, failure modes, research answers, next steps
 - [x] **Phase 55: Feature & Signal Evaluation** - Run IC evals on all features/AMAs, score with BH gate, adaptive RSI A/B, populate dashboards
 - [x] **Phase 56: Factor Analytics & Reporting Upgrade** - QuantStats tear sheets, IC decay/Rank IC, quintile returns, cross-sectional normalization, MAE/MFE, Monte Carlo CI
-- [ ] **Phase 57: Advanced Labeling & Cross-Validation** - Triple barrier labeling, meta-labeling, purged CPCV, CUSUM event filter, trend scanning
+- [x] **Phase 57: Advanced Labeling & Cross-Validation** - Triple barrier labeling, meta-labeling, purged CPCV, CUSUM event filter, trend scanning
 - [ ] **Phase 58: Portfolio Construction & Position Sizing** - PyPortfolioOpt integration, Black-Litterman, TopkDropout, bet sizing, stop laddering
 - [ ] **Phase 59: Microstructural & Advanced Features** - Fractional differentiation, Kyle/Amihud lambda, SADF bubble detection, entropy, codependence
 - [ ] **Phase 60: ML Infrastructure & Experimentation** - Expression engine, feature importance, regime-routed models, concept drift, experiment tracking, Optuna
@@ -1000,12 +1000,12 @@ Plans:
 **Plans**: 6 plans
 
 Plans:
-- [ ] 57-01-PLAN.md -- Triple barrier labeling core
-- [ ] 57-02-PLAN.md -- Meta-labeling pipeline
-- [ ] 57-03-PLAN.md -- CPCV implementation
-- [ ] 57-04-PLAN.md -- CUSUM event filter
-- [ ] 57-05-PLAN.md -- Trend scanning labels
-- [ ] 57-06-PLAN.md -- Integration and verification
+- [x] 57-01-PLAN.md -- Triple barrier labeling core
+- [x] 57-02-PLAN.md -- CUSUM event filter + trend scanning
+- [x] 57-03-PLAN.md -- Triple barrier batch refresh ETL
+- [x] 57-04-PLAN.md -- CUSUM signal integration
+- [x] 57-05-PLAN.md -- Meta-labeling pipeline
+- [x] 57-06-PLAN.md -- CPCV Sharpe distribution
 
 ---
 
