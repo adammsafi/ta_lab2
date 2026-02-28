@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: Phase 58 (Portfolio Construction & Sizing) — COMPLETE (all 7 plans including gap closure)
-Plan: 7/7 DONE (58-07 gap closure: StopLadder wired into ATR breakout signal generator with --stop-ladder CLI flag)
-Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 COMPLETE (all 3 plans). V1_MEMO.md GENERATED. Phase 55 COMPLETE (all 5 plans). Phase 56 COMPLETE (all 7 plans). Phase 57 COMPLETE (all 6 plans). Phase 58 COMPLETE (all 7 plans, including gap closure: PORT-03, PORT-04, PORT-05 all closed).
-Last activity: 2026-02-28 — Completed 58-07-PLAN.md (StopLadder integration into ATR breakout signal generator, --stop-ladder CLI flag)
+Phase: Phase 59 (Microstructural & Advanced Features) — executing
+Plan: 1/5 DONE (59-01: schema migrations for microstructure columns + codependence table)
+Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 COMPLETE (all 3 plans). V1_MEMO.md GENERATED. Phase 55 COMPLETE (all 5 plans). Phase 56 COMPLETE (all 7 plans). Phase 57 COMPLETE (all 6 plans). Phase 58 COMPLETE (all 7 plans, including gap closure: PORT-03, PORT-04, PORT-05 all closed). Phase 59 IN PROGRESS (1/5 plans).
+Last activity: 2026-02-28 — Completed 59-01-PLAN.md (schema migrations: 9 microstructure columns in cmc_features + cmc_codependence table)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█░░░░] Phase 59 (1/5)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 289 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 6 in Phase 43, 3 in Phase 44, 7 in Phase 45, 4 in Phase 46, 5 in Phase 47, 4 in Phase 48, 4 in Phase 49, 2 in Phase 50, 5 in Phase 51, 4 in Phase 52, 4 in Phase 53, 3 in Phase 54, 5 in Phase 55, 7 in Phase 56, 6 in Phase 57, 7 in Phase 58)
+- Total plans completed: 290 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 6 in Phase 43, 3 in Phase 44, 7 in Phase 45, 4 in Phase 46, 5 in Phase 47, 4 in Phase 48, 4 in Phase 49, 2 in Phase 50, 5 in Phase 51, 4 in Phase 52, 4 in Phase 53, 3 in Phase 54, 5 in Phase 55, 7 in Phase 56, 6 in Phase 57, 7 in Phase 58, 1 in Phase 59)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -554,6 +554,9 @@ Recent decisions affecting current work:
 - **BL fallback to prior-only when no live signals (Phase 58-05)**: refresh_portfolio_allocations passes zero IC-IR so BL degrades to prior-only EfficientFrontier; avoids runtime errors when signal tables are empty
 - **Portfolio stage after signals, before executor in --all pipeline (Phase 58-05)**: optimizer needs latest signal data for BL views; executor can optionally read cmc_portfolio_allocations in future phases
 - **per_asset backtest = momentum top-10 (Phase 58-05)**: simplified stand-in for Phase 42 champion; 1-period return rank; full Phase 42 integration deferred to later phase
+- **Grouped ALTER TABLE by MICRO requirement (Phase 59-01)**: 4 separate ALTER TABLE blocks (MICRO-01 through MICRO-04) rather than single long ALTER TABLE -- maps columns to their source requirements for readability
+- **cmc_codependence PK includes computed_at (Phase 59-01)**: Retains historical snapshots across refreshes -- matches cmc_regime_comovement pattern; each refresh snapshot preserved for temporal analytics
+- **id_a < id_b convention for codependence pairs (Phase 59-01)**: Prevents duplicate (A,B)/(B,A) pairs; documented in COMMENT ON COLUMN; enforced by convention not constraint
 
 ### Pending Todos
 
@@ -567,8 +570,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-28T08:49:29Z
-Stopped at: Completed 58-07-PLAN.md — Phase 58 gap closure COMPLETE (PORT-03 + PORT-04 + PORT-05 all closed)
+Last session: 2026-02-28T09:08:52Z
+Stopped at: Completed 59-01-PLAN.md — Schema migrations for microstructure columns + codependence table
 Resume file: None
 
 ---
