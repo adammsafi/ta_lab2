@@ -10,16 +10,16 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: Phase 59 (Microstructural & Advanced Features) — executing
-Plan: 1/5 DONE (59-01: schema migrations for microstructure columns + codependence table)
-Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 COMPLETE (all 3 plans). V1_MEMO.md GENERATED. Phase 55 COMPLETE (all 5 plans). Phase 56 COMPLETE (all 7 plans). Phase 57 COMPLETE (all 6 plans). Phase 58 COMPLETE (all 7 plans, including gap closure: PORT-03, PORT-04, PORT-05 all closed). Phase 59 IN PROGRESS (1/5 plans).
-Last activity: 2026-02-28 — Completed 59-01-PLAN.md (schema migrations: 9 microstructure columns in cmc_features + cmc_codependence table)
+Plan: 2/5 DONE (59-02: core math library for all 5 microstructural feature classes)
+Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 COMPLETE (all 3 plans). V1_MEMO.md GENERATED. Phase 55 COMPLETE (all 5 plans). Phase 56 COMPLETE (all 7 plans). Phase 57 COMPLETE (all 6 plans). Phase 58 COMPLETE (all 7 plans, including gap closure: PORT-03, PORT-04, PORT-05 all closed). Phase 59 IN PROGRESS (2/5 plans).
+Last activity: 2026-02-28 — Completed 59-02-PLAN.md (core math library: 14 pure numpy/scipy functions for FFD, liquidity, ADF, entropy, codependence + 32 unit tests)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█░░░░] Phase 59 (1/5)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [██░░░] Phase 59 (2/5)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 290 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 6 in Phase 43, 3 in Phase 44, 7 in Phase 45, 4 in Phase 46, 5 in Phase 47, 4 in Phase 48, 4 in Phase 49, 2 in Phase 50, 5 in Phase 51, 4 in Phase 52, 4 in Phase 53, 3 in Phase 54, 5 in Phase 55, 7 in Phase 56, 6 in Phase 57, 7 in Phase 58, 1 in Phase 59)
+- Total plans completed: 291 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 6 in Phase 43, 3 in Phase 44, 7 in Phase 45, 4 in Phase 46, 5 in Phase 47, 4 in Phase 48, 4 in Phase 49, 2 in Phase 50, 5 in Phase 51, 4 in Phase 52, 4 in Phase 53, 3 in Phase 54, 5 in Phase 55, 7 in Phase 56, 6 in Phase 57, 7 in Phase 58, 2 in Phase 59)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -557,6 +557,10 @@ Recent decisions affecting current work:
 - **Grouped ALTER TABLE by MICRO requirement (Phase 59-01)**: 4 separate ALTER TABLE blocks (MICRO-01 through MICRO-04) rather than single long ALTER TABLE -- maps columns to their source requirements for readability
 - **cmc_codependence PK includes computed_at (Phase 59-01)**: Retains historical snapshots across refreshes -- matches cmc_regime_comovement pattern; each refresh snapshot preserved for temporal analytics
 - **id_a < id_b convention for codependence pairs (Phase 59-01)**: Prevents duplicate (A,B)/(B,A) pairs; documented in COMMENT ON COLUMN; enforced by convention not constraint
+- **FFD threshold=1e-2 for ~11 weights at d=0.4 (Phase 59-02)**: Practical rolling window size matching Lopez de Prado recommendation; 1e-5 yields 30+ weights (too slow for production)
+- **ADF via lstsq not statsmodels (Phase 59-02)**: scipy.linalg.lstsq for numerical stability; avoids statsmodels dependency; sufficient for rolling-window unit root testing
+- **LZ complexity normalized by log2(window) (Phase 59-02)**: Makes complexity values comparable across different window sizes; raw LZ count is window-dependent
+- **Pure math pattern: features/microstructure.py (Phase 59-02)**: All algorithms as stateless numpy/scipy functions with no DB/IO; DB wrapper in scripts/; matches vol.py/indicators.py pattern
 
 ### Pending Todos
 
@@ -570,8 +574,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-28T09:08:52Z
-Stopped at: Completed 59-01-PLAN.md — Schema migrations for microstructure columns + codependence table
+Last session: 2026-02-28T09:12:30Z
+Stopped at: Completed 59-02-PLAN.md — Core math library: 14 functions for FFD, liquidity, ADF, entropy, codependence + 32 unit tests
 Resume file: None
 
 ---
