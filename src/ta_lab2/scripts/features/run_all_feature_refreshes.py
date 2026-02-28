@@ -13,10 +13,12 @@ Refresh order (respects dependencies):
 1. cmc_vol (depends on cmc_price_bars_multi_tf)
 2. cmc_ta (depends on cmc_price_bars_multi_tf)
 3. cmc_features (depends on 1-2 + EMAs + bar returns)
+4. cmc_features CS norms (depends on cmc_features having up-to-date ret_arith/rsi_14/vol columns)
 
 Parallel execution where possible:
 - vol, ta can run in parallel (same dependency)
 - cmc_features runs after all complete
+- CS norms run sequentially after cmc_features (window-function UPDATE, not insert)
 
 Note: cmc_returns is deprecated; returns now come from cmc_returns_bars_multi_tf.
 """
@@ -35,6 +37,21 @@ from sqlalchemy import text
 
 from ta_lab2.config import TARGET_DB_URL
 from ta_lab2.scripts.bars.common_snapshot_contract import get_engine
+
+# CS norms import is optional — script may not exist in older deployments.
+try:
+    from ta_lab2.scripts.features.refresh_cmc_cs_norms import (
+        refresh_cs_norms as _refresh_cs_norms,
+    )
+
+    _CS_NORMS_AVAILABLE = True
+except ImportError:
+    _CS_NORMS_AVAILABLE = False
+    logger = logging.getLogger(__name__)
+    logger.warning(
+        "refresh_cmc_cs_norms not found; CS normalization step will be skipped. "
+        "Run Plan 56-06 to create the module."
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -265,6 +282,47 @@ def refresh_features_store(
         )
 
 
+def refresh_cs_norms_step(engine, tf: str = "1D") -> RefreshResult:
+    """Refresh cross-sectional normalization columns in cmc_features.
+
+    Runs after cmc_features refresh (depends on up-to-date ret_arith, rsi_14,
+    vol_parkinson_20 values).  Returns a RefreshResult whose rows_inserted is
+    the sum of cursor.rowcount from all 3 UPDATE statements (int, never None).
+    """
+    table = "cmc_features (CS norms)"
+    t0 = time.time()
+
+    if not _CS_NORMS_AVAILABLE:
+        logger.warning(
+            "CS norms step skipped: refresh_cmc_cs_norms module not available"
+        )
+        return RefreshResult(
+            table=table,
+            rows_inserted=0,
+            duration_seconds=time.time() - t0,
+            success=False,
+            error="refresh_cmc_cs_norms module not available",
+        )
+
+    try:
+        rows = _refresh_cs_norms(engine, tf)  # returns int (sum of rowcounts)
+        return RefreshResult(
+            table=table,
+            rows_inserted=rows,
+            duration_seconds=time.time() - t0,
+            success=True,
+        )
+    except Exception as e:
+        logger.error(f"CS norms refresh failed (tf={tf}): {e}", exc_info=True)
+        return RefreshResult(
+            table=table,
+            rows_inserted=0,
+            duration_seconds=time.time() - t0,
+            success=False,
+            error=str(e),
+        )
+
+
 # =============================================================================
 # Orchestration
 # =============================================================================
@@ -366,9 +424,25 @@ def run_all_refreshes(
     else:
         logger.error(f"  {result.table} (tf={tf}): FAILED - {result.error}")
 
-    # Phase 3: Validation (if requested)
+    # Phase 3: Cross-sectional normalization (depends on cmc_features)
+    # MUST run sequentially after cmc_features — window functions read the
+    # freshly-written ret_arith / rsi_14 / vol_parkinson_20 values.
+    logger.info("Phase 3: Refreshing cross-sectional normalizations (CS norms)")
+
+    cs_result = refresh_cs_norms_step(engine, tf=tf)
+    results[cs_result.table] = cs_result
+
+    if cs_result.success:
+        logger.info(
+            f"  {cs_result.table} (tf={tf}): {cs_result.rows_inserted} rows"
+            f" in {cs_result.duration_seconds:.1f}s"
+        )
+    else:
+        logger.error(f"  {cs_result.table} (tf={tf}): FAILED - {cs_result.error}")
+
+    # Phase 4: Validation (if requested)
     if validate:
-        logger.info("Phase 3: Running validation")
+        logger.info("Phase 4: Running validation")
 
         try:
             from ta_lab2.scripts.features.validate_features import validate_features
@@ -592,6 +666,7 @@ def main() -> int:
             "cmc_cycle_stats",
             "cmc_rolling_extremes",
             "cmc_features",
+            "cmc_features (CS norms)",
         ]:
             if table in results:
                 result = results[table]
