@@ -75,6 +75,7 @@ TIMEOUT_AMAS = 3600  # 1 hour -- AMA refreshers
 TIMEOUT_DESC_STATS = 3600  # 1 hour -- asset stats + correlation computation
 TIMEOUT_REGIMES = 1800  # 30 minutes -- regime refresher
 TIMEOUT_SIGNALS = 1800  # 30 minutes -- signal generation for all types
+TIMEOUT_PORTFOLIO = 600  # 10 minutes -- portfolio optimizer runs all three methods
 TIMEOUT_EXECUTOR = (
     300  # 5 minutes -- daily executor is fast (2 strategies, ~100 assets)
 )
@@ -802,6 +803,113 @@ def run_signal_refreshes(args, db_url: str) -> ComponentResult:
         )
 
 
+def run_portfolio_refresh_stage(args, db_url: str) -> ComponentResult:
+    """
+    Run portfolio allocation refresh via subprocess.
+
+    Runs PortfolioOptimizer (MV/CVaR/HRP) + optional BL + optional bet sizing
+    and persists results to cmc_portfolio_allocations.  Runs after signals and
+    before the paper executor in the full pipeline.
+
+    Args:
+        args: CLI arguments
+        db_url: Database URL
+
+    Returns:
+        ComponentResult with execution details
+    """
+    cmd = [
+        sys.executable,
+        "-m",
+        "ta_lab2.scripts.portfolio.refresh_portfolio_allocations",
+        "--db-url",
+        db_url,
+    ]
+    if getattr(args, "verbose", False):
+        cmd.append("--verbose")
+    if getattr(args, "dry_run", False):
+        cmd.append("--dry-run")
+
+    print(f"\n{'=' * 70}")
+    print("RUNNING PORTFOLIO ALLOCATION REFRESH")
+    print(f"{'=' * 70}")
+    print(f"Command: {' '.join(cmd)}")
+
+    if getattr(args, "dry_run", False):
+        print("[DRY RUN] Would execute portfolio allocation refresh")
+        return ComponentResult(
+            component="portfolio",
+            success=True,
+            duration_sec=0.0,
+            returncode=0,
+        )
+
+    start_t = time.perf_counter()
+
+    try:
+        if getattr(args, "verbose", False):
+            result = subprocess.run(cmd, check=False, timeout=TIMEOUT_PORTFOLIO)
+        else:
+            result = subprocess.run(
+                cmd,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=TIMEOUT_PORTFOLIO,
+            )
+
+            if result.returncode != 0:
+                print(f"\n[ERROR] Portfolio refresh failed (code {result.returncode})")
+                if result.stdout:
+                    print(f"\nSTDOUT:\n{result.stdout[-2000:]}")
+                if result.stderr:
+                    print(f"\nSTDERR:\n{result.stderr[-2000:]}")
+
+        duration = time.perf_counter() - start_t
+
+        if result.returncode == 0:
+            print(f"\n[OK] Portfolio allocation refresh completed in {duration:.1f}s")
+            return ComponentResult(
+                component="portfolio",
+                success=True,
+                duration_sec=duration,
+                returncode=result.returncode,
+            )
+        else:
+            error_msg = f"Exited with code {result.returncode}"
+            print(f"\n[FAILED] Portfolio allocation refresh failed: {error_msg}")
+            return ComponentResult(
+                component="portfolio",
+                success=False,
+                duration_sec=duration,
+                returncode=result.returncode,
+                error_message=error_msg,
+            )
+
+    except subprocess.TimeoutExpired:
+        duration = time.perf_counter() - start_t
+        error_msg = f"Timed out after {TIMEOUT_PORTFOLIO}s"
+        print(f"\n[TIMEOUT] Portfolio allocation refresh: {error_msg}")
+        return ComponentResult(
+            component="portfolio",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+    except Exception as e:
+        duration = time.perf_counter() - start_t
+        error_msg = str(e)
+        print(f"\n[ERROR] Portfolio allocation refresh raised exception: {error_msg}")
+        return ComponentResult(
+            component="portfolio",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+
+
 def run_paper_executor_stage(args, db_url: str) -> ComponentResult:
     """
     Run paper executor via subprocess.
@@ -1498,6 +1606,16 @@ Examples:
         help="Run signal generation only (EMA crossover, RSI, ATR breakout)",
     )
     p.add_argument(
+        "--portfolio",
+        action="store_true",
+        help="Run portfolio allocation refresh only (MV/CVaR/HRP + optional BL + bet sizing)",
+    )
+    p.add_argument(
+        "--no-portfolio",
+        action="store_true",
+        help="Skip portfolio stage in --all mode",
+    )
+    p.add_argument(
         "--execute",
         action="store_true",
         help="Run paper executor only (process signals into orders/fills)",
@@ -1656,6 +1774,7 @@ Examples:
         or args.desc_stats
         or args.regimes
         or args.signals
+        or args.portfolio
         or args.execute
         or args.drift
         or args.stats
@@ -1663,7 +1782,8 @@ Examples:
     ):
         p.error(
             "Must specify --bars, --emas, --amas, --desc-stats, --regimes, --signals, "
-            "--execute, --drift, --stats, --all, --weekly-digest, or --exchange-prices"
+            "--portfolio, --execute, --drift, --stats, --all, --weekly-digest, "
+            "or --exchange-prices"
         )
 
     # Resolve database URL
@@ -1705,6 +1825,9 @@ Examples:
     run_desc_stats = args.desc_stats or args.all
     run_regimes = args.regimes or args.all
     run_signals = args.signals or args.all
+    run_portfolio = (args.portfolio or args.all) and not getattr(
+        args, "no_portfolio", False
+    )
     run_executor = (args.execute or args.all) and not getattr(args, "no_execute", False)
     run_drift = (args.drift or args.all) and not getattr(args, "no_drift", False)
     run_stats = args.stats or args.all
@@ -1723,6 +1846,8 @@ Examples:
         components.append("regimes")
     if run_signals:
         components.append("signals")
+    if run_portfolio:
+        components.append("portfolio")
     if run_executor:
         components.append("executor")
     if run_drift and getattr(args, "paper_start", None):
@@ -1834,6 +1959,18 @@ Examples:
 
         if not signal_result.success and not args.continue_on_error:
             print("\n[STOPPED] Signal generation failed, stopping execution")
+            print("(Use --continue-on-error to run remaining components)")
+            return 1
+
+    # Run portfolio allocation refresh if requested (after signals, before executor)
+    # Pipeline order: bars -> EMAs -> AMAs -> desc_stats -> regimes -> signals
+    #                 -> portfolio -> executor -> drift -> stats
+    if run_portfolio:
+        portfolio_result = run_portfolio_refresh_stage(args, db_url)
+        results.append(("portfolio", portfolio_result))
+
+        if not portfolio_result.success and not args.continue_on_error:
+            print("\n[STOPPED] Portfolio allocation refresh failed, stopping execution")
             print("(Use --continue-on-error to run remaining components)")
             return 1
 
