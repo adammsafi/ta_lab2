@@ -8,7 +8,7 @@
 - v0.7.0 Regime Integration & Signal Enhancement (Phases 27-28) - SHIPPED 2026-02-20
 - v0.8.0 Polish & Hardening (Phases 29-34) - SHIPPED 2026-02-23
 - v0.9.0 Research & Experimentation (Phases 35-41) - SHIPPED 2026-02-24
-- v1.0.0 V1 Closure — Paper Trading & Validation (Phases 42-60) - current milestone
+- v1.0.0 V1 Closure — Paper Trading & Validation (Phases 42-62) - current milestone
 
 ## Overview
 
@@ -1097,7 +1097,7 @@ Plans:
 
 ---
 
-### Phase 62: Operational Completeness
+### Phase 62: Operational Completeness [COMPLETE]
 **Goal:** Run deferred operational tasks that require live DB execution — complete the IC sweep across all 109 TFs, execute feature promotions to dim_feature_registry, run the 4 ML CLI scripts to generate documented results, and resolve the orphaned RebalanceScheduler.
 **Depends on:** Phase 55 (IC sweep infrastructure), Phase 58 (RebalanceScheduler), Phase 60 (ML CLI scripts)
 **Gap Closure:** Closes remaining tech debt from Phases 55, 58, 60
@@ -1106,6 +1106,9 @@ Plans:
   2. dim_feature_registry populated with promoted features from IC ranking
   3. All 4 ML CLI scripts (run_feature_importance, run_regime_routing, run_double_ensemble, run_optuna_sweep) executed with --log-experiment; results in cmc_ml_experiments
   4. RebalanceScheduler either wired into a calling script or removed (no orphaned code)
+**Plans:**
+  - 62-01: IC sweep completion + batch feature promotion (114 TFs, 107 promoted features, batch_promote_features.py)
+  - 62-02: ML CLI experiment execution + RebalanceScheduler removal (6 experiment rows, rebalancer.py deleted)
 
 ---
 
