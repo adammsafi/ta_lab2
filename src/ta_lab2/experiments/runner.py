@@ -565,9 +565,16 @@ class ExperimentRunner:
                 return result
             return pd.Series(result, index=input_df.index)
 
+        elif mode == "expression":
+            from ta_lab2.ml.expression_engine import evaluate_expression  # noqa: PLC0415
+
+            expression = compute.get("expression", "")
+            result = evaluate_expression(expression, input_df)
+            return result
+
         else:
             raise ValueError(
-                f"Unknown compute mode: {mode!r}. Must be 'inline' or 'dotpath'."
+                f"Unknown compute mode: {mode!r}. Must be 'inline', 'dotpath', or 'expression'."
             )
 
     def _get_close_series(
