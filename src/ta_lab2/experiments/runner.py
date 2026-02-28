@@ -433,7 +433,7 @@ class ExperimentRunner:
             if table in _TABLES_WITHOUT_TF:
                 sql_str = (
                     f"SELECT {ts_col} AS ts, {col_list} FROM public.{table} "
-                    f"WHERE id = :id AND {ts_col} BETWEEN :start AND :end ORDER BY {ts_col}"
+                    f"WHERE id = :id AND {ts_col} BETWEEN :start AND :end"
                 )
                 params = {
                     "id": asset_id,
@@ -443,7 +443,7 @@ class ExperimentRunner:
             else:
                 sql_str = (
                     f"SELECT {ts_col} AS ts, {col_list} FROM public.{table} "
-                    f"WHERE id = :id AND tf = :tf AND {ts_col} BETWEEN :start AND :end ORDER BY {ts_col}"
+                    f"WHERE id = :id AND tf = :tf AND {ts_col} BETWEEN :start AND :end"
                 )
                 params = {
                     "id": asset_id,
@@ -462,6 +462,8 @@ class ExperimentRunner:
                     )
                 sql_str += f' AND "{fkey}" = :filter_{fkey}'
                 params[f"filter_{fkey}"] = fval
+
+            sql_str += f" ORDER BY {ts_col}"
 
             df = pd.read_sql(text(sql_str), conn, params=params)
 
