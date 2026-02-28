@@ -92,6 +92,11 @@ validation = [
   "nbformat>=5.0",
 ]
 
+# Analytics: QuantStats tear sheets and performance reporting
+analytics = [
+  "quantstats>=0.0.81",
+]
+
 # Combined group for development + orchestrator + docs + economic
 all = [
   "alembic>=1.18",
