@@ -22,6 +22,7 @@ from ta_lab2.labeling.triple_barrier import (
     apply_triple_barriers,
     get_bins,
     get_daily_vol,
+    get_t1_series as get_triple_barrier_t1_series,
 )
 
 __all__ = [
@@ -38,4 +39,5 @@ __all__ = [
     "add_vertical_barrier",
     "apply_triple_barriers",
     "get_bins",
+    "get_triple_barrier_t1_series",
 ]
