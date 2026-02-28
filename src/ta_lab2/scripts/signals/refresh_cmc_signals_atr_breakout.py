@@ -136,6 +136,20 @@ def main():
         help="EWM-vol multiplier for CUSUM threshold calibration (default: 2.0). "
         "Higher = stricter filter = fewer events.",
     )
+    parser.add_argument(
+        "--stop-ladder",
+        action="store_true",
+        default=False,
+        help="Enable stop-ladder exit signals (PORT-05). "
+        "Checks multi-tier SL/TP levels from configs/portfolio.yaml "
+        "for each open position during signal generation.",
+    )
+    parser.add_argument(
+        "--no-stop-ladder",
+        dest="stop_ladder",
+        action="store_false",
+        help="Disable stop-ladder exit signals (default).",
+    )
 
     args = parser.parse_args()
 
@@ -230,6 +244,13 @@ def main():
     else:
         logger.info("CUSUM pre-filter DISABLED (default mode)")
 
+    # Stop ladder mode
+    stop_ladder_enabled = args.stop_ladder
+    if stop_ladder_enabled:
+        logger.info("Stop ladder ENABLED: multi-tier SL/TP exits from portfolio.yaml")
+    else:
+        logger.info("Stop ladder DISABLED (default mode)")
+
     # Generate signals
     generator = ATRSignalGenerator(engine, state_manager)
     total_signals = 0
@@ -250,6 +271,7 @@ def main():
                 regime_enabled=regime_enabled,
                 cusum_enabled=cusum_enabled,
                 cusum_threshold_multiplier=cusum_multiplier,
+                stop_ladder_enabled=stop_ladder_enabled,
             )
 
             total_signals += n
@@ -263,11 +285,13 @@ def main():
 
     # Summary
     cusum_mode = f"CUSUM(mult={cusum_multiplier})" if cusum_enabled else "NO_CUSUM"
+    sl_mode = "STOP_LADDER" if stop_ladder_enabled else "NO_STOP_LADDER"
     logger.info("=" * 60)
     logger.info(f"Total: {total_signals} ATR breakout signal(s) generated")
     logger.info(f"Mode: {'DRY RUN' if args.dry_run else 'LIVE'}")
     logger.info(f"Refresh: {'FULL' if args.full_refresh else 'INCREMENTAL'}")
     logger.info(f"CUSUM: {cusum_mode}")
+    logger.info(f"Stop ladder: {sl_mode}")
     logger.info("=" * 60)
 
 
