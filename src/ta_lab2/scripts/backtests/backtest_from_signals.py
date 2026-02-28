@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from typing import Optional, Any
 import json
 import math
+import os
 import uuid
 import logging
 
@@ -30,6 +31,12 @@ from ta_lab2.backtests.vbt_runner import run_vbt_on_split
 from ta_lab2.backtests.costs import CostModel
 from ta_lab2.backtests.splitters import Split
 from ta_lab2.scripts.signals.signal_utils import compute_params_hash
+from ta_lab2.analysis.quantstats_reporter import (
+    generate_tear_sheet,
+    _load_btc_benchmark_returns,
+)
+from ta_lab2.analysis.mae_mfe import compute_mae_mfe, _load_close_prices
+from ta_lab2.analysis.monte_carlo import monte_carlo_trades
 
 try:
     import vectorbt as vbt
@@ -81,6 +88,10 @@ class BacktestResult:
     feature_hash: Optional[str]
     signal_version: str
     vbt_version: str
+
+    # Analytics support fields
+    portfolio_returns: Optional[pd.Series] = None
+    tf: str = "1D"
 
 
 @dataclass
@@ -263,6 +274,7 @@ class SignalBacktester:
         start_ts: pd.Timestamp,
         end_ts: pd.Timestamp,
         clean_mode: bool = False,
+        tf: str = "1D",
     ) -> BacktestResult:
         """
         Run backtest for a single asset and signal configuration.
@@ -277,6 +289,7 @@ class SignalBacktester:
             start_ts: Backtest start date
             end_ts: Backtest end date
             clean_mode: If True, ignore fees/slippage (zero cost model)
+            tf: Timeframe string (e.g. '1D', '4H'). Used for price queries.
 
         Returns:
             BacktestResult with metrics, trades, and reproducibility metadata
@@ -360,15 +373,18 @@ class SignalBacktester:
         # 6. Compute comprehensive metrics
         metrics = self._compute_comprehensive_metrics(pf, result_row)
 
-        # 7. Load signal params for hashing
+        # 7. Extract portfolio returns for analytics (QuantStats, Monte Carlo)
+        portfolio_returns = pf.returns()
+
+        # 8. Load signal params for hashing
         signal_params = self._load_signal_params(signal_id)
         signal_params_hash = compute_params_hash(signal_params)
 
-        # 8. Compute feature hash (optional - may be expensive)
+        # 9. Compute feature hash (optional - may be expensive)
         feature_hash = None
         # Skip feature hash computation for now - can be added later if needed
 
-        # 9. Create result
+        # 10. Create result
         return BacktestResult(
             run_id=str(uuid.uuid4()),
             signal_type=signal_type,
@@ -391,6 +407,8 @@ class SignalBacktester:
             feature_hash=feature_hash,
             signal_version="v1.0",  # Hardcoded for now
             vbt_version=VBT_VERSION,
+            portfolio_returns=portfolio_returns,
+            tf=tf,
         )
 
     def _build_portfolio(
@@ -848,6 +866,135 @@ class SignalBacktester:
                 logger.debug(
                     "Inserted PSR details to psr_results (return_source=portfolio)"
                 )
+
+            # 5. QuantStats tear sheet
+            try:
+                if (
+                    result.portfolio_returns is not None
+                    and len(result.portfolio_returns) > 0
+                ):
+                    benchmark = _load_btc_benchmark_returns(
+                        self.engine, result.start_ts, result.end_ts
+                    )
+                    # _load_btc_benchmark_returns returns None when empty — pass through as-is
+                    tearsheet_dir = os.path.join("reports", "tearsheets")
+                    tearsheet_path = os.path.join(
+                        tearsheet_dir, f"{result.run_id}.html"
+                    )
+                    path = generate_tear_sheet(
+                        portfolio_returns=result.portfolio_returns,
+                        benchmark_returns=benchmark,
+                        output_path=tearsheet_path,
+                        title=f"{result.signal_type} / asset {result.asset_id} / {result.run_id[:8]}",
+                    )
+                    if path is not None:
+                        conn.execute(
+                            text(
+                                "UPDATE public.cmc_backtest_runs "
+                                "SET tearsheet_path = :path "
+                                "WHERE run_id = :run_id"
+                            ),
+                            {"path": os.path.abspath(path), "run_id": result.run_id},
+                        )
+                        logger.debug("Tear sheet written: %s", path)
+            except Exception as e:
+                logger.warning("QuantStats tear sheet failed (non-fatal): %s", e)
+
+            # 6. MAE/MFE
+            try:
+                if not result.trades_df.empty:
+                    close_prices = _load_close_prices(
+                        self.engine,
+                        asset_id=result.asset_id,
+                        start_ts=result.start_ts,
+                        end_ts=result.end_ts,
+                        tf=result.tf,  # respects tf from BacktestResult, NOT hardcoded 1D
+                    )
+                    if not close_prices.empty:
+                        trades_with_excursion = compute_mae_mfe(
+                            result.trades_df, close_prices
+                        )
+
+                        # Fetch trade_ids sorted deterministically by (entry_ts, entry_price, created_at)
+                        id_rows = conn.execute(
+                            text(
+                                """
+                                SELECT trade_id, entry_ts, entry_price
+                                FROM public.cmc_backtest_trades
+                                WHERE run_id = :run_id
+                                ORDER BY entry_ts, entry_price, created_at
+                                """
+                            ),
+                            {"run_id": result.run_id},
+                        ).fetchall()
+
+                        # Sort trades_with_excursion by (entry_ts, entry_price) — same key
+                        trades_sorted = trades_with_excursion.sort_values(
+                            ["entry_ts", "entry_price"]
+                        ).reset_index(drop=True)
+
+                        if len(id_rows) == len(trades_sorted):
+                            for idx, id_row in enumerate(id_rows):
+                                trade_id = id_row[0]
+                                mae_val = trades_sorted.at[idx, "mae"]
+                                mfe_val = trades_sorted.at[idx, "mfe"]
+                                # Convert numpy scalars to Python natives
+                                mae_py = float(mae_val) if mae_val is not None else None
+                                mfe_py = float(mfe_val) if mfe_val is not None else None
+                                conn.execute(
+                                    text(
+                                        "UPDATE public.cmc_backtest_trades "
+                                        "SET mae = :mae, mfe = :mfe "
+                                        "WHERE trade_id = :trade_id"
+                                    ),
+                                    {
+                                        "mae": mae_py,
+                                        "mfe": mfe_py,
+                                        "trade_id": trade_id,
+                                    },
+                                )
+                            logger.debug("MAE/MFE updated for %d trades", len(id_rows))
+                        else:
+                            logger.warning(
+                                "MAE/MFE: trade count mismatch — DB has %d rows, "
+                                "computed %d — skipping UPDATE",
+                                len(id_rows),
+                                len(trades_sorted),
+                            )
+            except Exception as e:
+                logger.warning("MAE/MFE computation failed (non-fatal): %s", e)
+
+            # 7. Monte Carlo
+            try:
+                if not result.trades_df.empty:
+                    mc_result = monte_carlo_trades(result.trades_df)
+                    conn.execute(
+                        text(
+                            """
+                            UPDATE public.cmc_backtest_metrics
+                            SET mc_sharpe_lo     = :mc_sharpe_lo,
+                                mc_sharpe_hi     = :mc_sharpe_hi,
+                                mc_sharpe_median = :mc_sharpe_median,
+                                mc_n_samples     = :mc_n_samples
+                            WHERE run_id = :run_id
+                            """
+                        ),
+                        {
+                            "run_id": result.run_id,
+                            "mc_sharpe_lo": mc_result.get("mc_sharpe_lo"),
+                            "mc_sharpe_hi": mc_result.get("mc_sharpe_hi"),
+                            "mc_sharpe_median": mc_result.get("mc_sharpe_median"),
+                            "mc_n_samples": mc_result.get("mc_n_samples"),
+                        },
+                    )
+                    logger.debug(
+                        "Monte Carlo written: lo=%.4f hi=%.4f median=%.4f",
+                        mc_result.get("mc_sharpe_lo") or 0,
+                        mc_result.get("mc_sharpe_hi") or 0,
+                        mc_result.get("mc_sharpe_median") or 0,
+                    )
+            except Exception as e:
+                logger.warning("Monte Carlo failed (non-fatal): %s", e)
 
         logger.info(f"Backtest results saved successfully: {result.run_id}")
         return result.run_id
