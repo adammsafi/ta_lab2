@@ -253,8 +253,12 @@ def _strategy_topk_dropout(
         if total_w > 0:
             held_weights = {a: w / total_w for a, w in held_weights.items()}
 
-        # Bet sizing with uniform 0.6 probability (stand-in for live signal confidence)
-        probs = {a: 0.6 for a in held_weights}
+        # Real trade_probability from cmc_meta_label_results; falls back to 0.6 if unavailable.
+        default_prob = 0.6
+        probs = {
+            a: signal_probs.get(a, default_prob) if signal_probs else default_prob
+            for a in held_weights
+        }
         sides = {a: 1 for a in held_weights}
         sizer = BetSizer(config=config)
         sized = sizer.scale_weights(held_weights, probs, sides)
