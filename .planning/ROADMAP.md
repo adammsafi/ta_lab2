@@ -1120,6 +1120,10 @@ Plans:
   1. FeaturePromoter can promote bar-level features from cmc_ic_results (not just cmc_feature_experiments)
   2. ExecutorConfig.initial_capital loaded from dim_executor_config if available
   3. run_daily_refresh.py --all warns when drift monitoring is skipped (no --paper-start)
+**Plans:** 2 plans
+Plans:
+- [ ] 63-01-PLAN.md — Bridge bar-level feature promotion path (FeaturePromoter reads cmc_ic_results)
+- [ ] 63-02-PLAN.md — Wire initial_capital from DB config + upgrade drift skip warning
 
 ---
 
