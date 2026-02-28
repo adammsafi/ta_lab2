@@ -22,10 +22,13 @@ import logging
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 import numpy as np
 import pandas as pd
+
+if TYPE_CHECKING:
+    from ta_lab2.portfolio.cost_tracker import TurnoverTracker
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +82,43 @@ def _make_engine(db_url: str):
     from sqlalchemy.pool import NullPool
 
     return create_engine(db_url, poolclass=NullPool)
+
+
+def _load_signal_probabilities(engine, tf: str) -> pd.DataFrame:
+    """
+    Load the latest trade_probability per asset from cmc_meta_label_results.
+
+    Returns DataFrame with columns [id, trade_probability].
+    Returns empty DataFrame if table does not exist or has no data.
+    """
+    from sqlalchemy import text
+
+    query = text(
+        """
+        SELECT DISTINCT ON (asset_id)
+            asset_id AS id, trade_probability, t0 AS ts
+        FROM cmc_meta_label_results
+        WHERE trade_probability IS NOT NULL
+        ORDER BY asset_id, t0 DESC
+        """
+    )
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(query, conn)
+        if df.empty:
+            logger.warning("cmc_meta_label_results has no trade_probability data.")
+            return pd.DataFrame()
+        # Ensure numeric type (NUMERIC comes back as Decimal)
+        df["trade_probability"] = df["trade_probability"].astype(float)
+        df["id"] = df["id"].astype(int)
+        return df[["id", "trade_probability"]]
+    except Exception as exc:
+        logger.warning(
+            "Could not load signal probabilities from cmc_meta_label_results: %s. "
+            "Falling back to default probability.",
+            exc,
+        )
+        return pd.DataFrame()
 
 
 def _load_all_prices(tf: str, start: datetime, end: datetime, engine) -> pd.DataFrame:
@@ -183,6 +223,7 @@ def _strategy_topk_dropout(
     prices_window: pd.DataFrame,
     config: dict,
     current_holdings: set,
+    signal_probs: dict[int, float] | None = None,
 ) -> tuple[dict, set]:
     """
     TopkDropout strategy: PortfolioOptimizer + TopkDropoutSelector + BetSizer.
@@ -234,6 +275,7 @@ def _strategy_fixed_sizing(
     prices_window: pd.DataFrame,
     config: dict,
     current_holdings: set,
+    **kwargs,
 ) -> tuple[dict, set]:
     """
     Fixed sizing: TopK selection + uniform 1/K weights (NO probability scaling).
@@ -272,6 +314,7 @@ def _strategy_equal_weight(
     prices_window: pd.DataFrame,
     config: dict,  # noqa: ARG001
     current_holdings: set,  # noqa: ARG001
+    **kwargs,
 ) -> tuple[dict, set]:
     """
     Equal weight: 1/N across ALL assets in the current price universe.
@@ -289,6 +332,7 @@ def _strategy_per_asset(
     prices_window: pd.DataFrame,
     config: dict,  # noqa: ARG001
     current_holdings: set,  # noqa: ARG001
+    **kwargs,
 ) -> tuple[dict, set]:
     """
     Per-asset best strategy (Phase 42 bake-off baseline).
@@ -320,18 +364,24 @@ def _run_backtest(
     strategy: str,
     config: dict,
     rebalance_days: int = 1,
-) -> pd.Series:
+    signal_probs: dict[int, float] | None = None,
+) -> tuple[pd.Series, "TurnoverTracker"]:
     """
     Run a single-strategy backtest over the full price history.
 
     Slices a rolling window, calls the strategy, computes 1-period returns.
+    Tracks turnover cost per rebalance via TurnoverTracker.
 
-    Returns pd.Series of per-period portfolio returns (index = dates).
+    Returns (pd.Series of per-period portfolio returns, TurnoverTracker).
     """
+    from ta_lab2.portfolio import TurnoverTracker
+
+    tracker = TurnoverTracker(config)
+
     all_dates = prices.index
     if len(all_dates) < 60:
         logger.warning("Price history too short for backtest (%d bars)", len(all_dates))
-        return pd.Series(dtype=float)
+        return pd.Series(dtype=float), tracker
 
     strategy_fn = {
         "topk_dropout": _strategy_topk_dropout,
@@ -359,6 +409,9 @@ def _run_backtest(
     for i in range(lookback_bars, len(all_dates) - 1):
         ts = all_dates[i]
 
+        # Save old weights before any potential rebalance
+        old_weights_before = dict(current_weights)
+
         # Rebalance on schedule
         if rebalance_counter % rebalance_days == 0:
             window = prices.iloc[i - lookback_bars : i + 1]
@@ -372,7 +425,10 @@ def _run_backtest(
             if len(window.columns) >= 2:
                 try:
                     new_weights, new_holdings = strategy_fn(
-                        window, config, current_holdings
+                        window,
+                        config,
+                        current_holdings,
+                        signal_probs=signal_probs,
                     )
                     if new_weights:
                         current_weights = new_weights
@@ -394,17 +450,26 @@ def _run_backtest(
                 if p0 > 0 and not np.isnan(p1) and not np.isnan(p0):
                     period_return += w * ((p1 - p0) / p0)
 
+        # Track turnover cost: weight change at start of period + gross return earned
+        tracker.track(
+            ts=ts,
+            old_weights=old_weights_before,
+            new_weights=current_weights,
+            gross_return=period_return,
+            portfolio_value=1.0,
+        )
+
         portfolio_returns.append((ts, period_return))
         rebalance_counter += 1
 
     if not portfolio_returns:
-        return pd.Series(dtype=float)
+        return pd.Series(dtype=float), tracker
 
     return pd.Series(
         [r for _, r in portfolio_returns],
         index=[t for t, _ in portfolio_returns],
         name=strategy,
-    )
+    ), tracker
 
 
 # ---------------------------------------------------------------------------
@@ -458,8 +523,25 @@ def run_backtest(
 
     periods_per_year = _tf_periods_per_year(tf)
 
+    # --- Load signal probabilities for probability-varying bet sizing ---
+    prob_df = _load_signal_probabilities(engine, tf)
+    if not prob_df.empty:
+        signal_probs_map: dict[int, float] = dict(
+            zip(prob_df["id"], prob_df["trade_probability"])
+        )
+        logger.info(
+            "Loaded %d signal probabilities from cmc_meta_label_results.",
+            len(signal_probs_map),
+        )
+    else:
+        signal_probs_map = {}
+        logger.info(
+            "No signal probabilities available; bet sizing will use default 0.6 fallback."
+        )
+
     # --- Run each requested strategy ---
     results: dict[str, pd.Series] = {}
+    trackers: dict[str, "TurnoverTracker"] = {}
     strategy_display = {
         "topk_dropout": "TopkDropout (probability-scaled)",
         "fixed_sizing": "Fixed Sizing (uniform weights)",
@@ -470,10 +552,16 @@ def run_backtest(
     for strat in strategies:
         logger.info("Running strategy: %s ...", strat)
         try:
-            rets = _run_backtest(prices, strat, config)
+            rets, tracker = _run_backtest(
+                prices,
+                strat,
+                config,
+                signal_probs=signal_probs_map or None,
+            )
             # Trim to requested date range
             rets = rets[rets.index >= pd.Timestamp(start, tz="UTC")]
             results[strat] = rets
+            trackers[strat] = tracker
             sharpe = _compute_sharpe(rets, periods_per_year)
             logger.info(
                 "  %s: %d periods, Sharpe=%.3f",
@@ -524,19 +612,26 @@ def run_backtest(
 
     print(f"{'=' * 60}")
 
-    # --- Per-strategy stats ---
+    # --- Per-strategy stats with decomposed cost reporting ---
     print("\n=== Per-Strategy Statistics ===")
     for strat in strategies:
         rets = results.get(strat, pd.Series(dtype=float))
         if rets.empty:
             print(f"  {strat}: no data")
             continue
-        total_return = float((1 + rets).prod() - 1)
+        gross_return = float((1 + rets).prod() - 1)
         ann_vol = float(rets.std(ddof=1) * (periods_per_year**0.5))
         max_dd = float(((1 + rets).cumprod() / (1 + rets).cumprod().cummax() - 1).min())
+
+        # Decomposed turnover cost from TurnoverTracker
+        trk = trackers.get(strat)
+        turnover_cost = sum(r["cost_pct"] for r in trk.history) if trk else 0.0
+        net_return = gross_return - turnover_cost
+
         print(
-            f"  {strat:20s}: total_ret={total_return:+.2%}  ann_vol={ann_vol:.2%}  "
-            f"max_dd={max_dd:.2%}  n_periods={len(rets)}"
+            f"  {strat:20s}: gross_ret={gross_return:+.2%}  turnover_cost={turnover_cost:.2%}  "
+            f"net_ret={net_return:+.2%}  ann_vol={ann_vol:.2%}  max_dd={max_dd:.2%}  "
+            f"n_periods={len(rets)}"
         )
 
     # --- Optional CSV output ---

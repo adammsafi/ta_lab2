@@ -40,6 +40,7 @@ from sqlalchemy.engine import Engine
 
 from ta_lab2.signals.breakout_atr import make_signals
 from ta_lab2.labeling.cusum_filter import cusum_filter, get_cusum_threshold
+from ta_lab2.portfolio import StopLadder
 from .signal_state_manager import SignalStateManager
 from .signal_utils import compute_feature_hash, compute_params_hash
 from .regime_utils import load_regime_context_batch, merge_regime_context
@@ -81,6 +82,7 @@ class ATRSignalGenerator:
         regime_enabled: bool = True,
         cusum_enabled: bool = False,
         cusum_threshold_multiplier: float = 2.0,
+        stop_ladder_enabled: bool = False,
     ) -> int:
         """
         Generate ATR breakout signals for specified assets.
@@ -100,6 +102,10 @@ class ATRSignalGenerator:
                 Default False preserves backward-compatible behavior.
             cusum_threshold_multiplier: EWM-vol multiplier for CUSUM threshold.
                 Default 2.0. Higher = fewer events.
+            stop_ladder_enabled: If True, check multi-tier SL/TP exit levels
+                from configs/portfolio.yaml for each open position. Stop ladder
+                exit records appear alongside channel/ATR exits. Default False
+                preserves backward-compatible behavior.
 
         Returns:
             Number of signal records generated
@@ -181,6 +187,14 @@ class ATRSignalGenerator:
         df_features["entry_signal"] = entries
         df_features["exit_signal"] = exits
 
+        # Instantiate stop ladder (if enabled)
+        if stop_ladder_enabled:
+            stop_ladder: StopLadder | None = StopLadder()  # loads from portfolio.yaml
+            logger.info("Stop ladder ENABLED for ATR breakout signals")
+        else:
+            stop_ladder = None
+            logger.info("Stop ladder DISABLED")
+
         # Load open positions for state tracking
         open_positions = self.state_manager.load_open_positions(ids, signal_id)
 
@@ -190,6 +204,7 @@ class ATRSignalGenerator:
             signal_id=signal_id,
             params=params,
             open_positions=open_positions,
+            stop_ladder=stop_ladder,
         )
 
         if records.empty:
@@ -420,18 +435,23 @@ class ATRSignalGenerator:
         signal_id: int,
         params: dict,
         open_positions: pd.DataFrame,
+        stop_ladder: "StopLadder | None" = None,
     ) -> pd.DataFrame:
         """
         Transform entry/exit signals to stateful position records.
 
         Matches entries to exits, tracks position state (open/closed),
         computes PnL, classifies breakout type, and captures feature snapshot.
+        Optionally checks multi-tier stop ladder exits for open positions.
 
         Args:
             df_features: DataFrame with entry_signal, exit_signal columns
             signal_id: Signal identifier from dim_signals
             params: Signal parameters for breakout classification
             open_positions: DataFrame of currently open positions
+            stop_ladder: Optional StopLadder instance for multi-tier SL/TP exits.
+                When provided and enabled, check_triggers() is called for each
+                bar where a position is open and no channel/ATR exit fired.
 
         Returns:
             DataFrame ready for insertion into cmc_signals_atr_breakout
@@ -440,6 +460,11 @@ class ATRSignalGenerator:
 
         # Compute params hash and feature hash for reproducibility
         params_hash = compute_params_hash(params)
+
+        # Track which stop ladder tiers have been triggered per position.
+        # Key: (asset_id, entry_ts) -> set of tier keys like {"sl_1", "tp_2"}.
+        # Reset when a new position opens.
+        sl_already_triggered: dict[tuple, set[str]] = {}
 
         # Process per asset
         for id_ in df_features["id"].unique():
@@ -460,6 +485,10 @@ class ATRSignalGenerator:
             position_open = not asset_open.empty
             entry_price = asset_open["entry_price"].iloc[0] if position_open else None
             entry_ts = asset_open["entry_ts"].iloc[0] if position_open else None
+
+            # Initialize already_triggered set for pre-existing open position
+            if position_open and entry_ts is not None:
+                sl_already_triggered[(int(id_), entry_ts)] = set()
 
             for idx, row in df_asset.iterrows():
                 # Regime key for this bar (None if regime not available)
@@ -529,8 +558,10 @@ class ATRSignalGenerator:
                     position_open = True
                     entry_price = row["close"]
                     entry_ts = row["ts"]
+                    # Reset stop ladder tracking for this new position
+                    sl_already_triggered[(int(id_), entry_ts)] = set()
 
-                # Exit signal
+                # Exit signal (channel crossback or trailing ATR stop)
                 elif row["exit_signal"] and position_open:
                     exit_price = row["close"]
                     pnl_pct = ((exit_price - entry_price) / entry_price) * 100
@@ -586,6 +617,91 @@ class ATRSignalGenerator:
                     position_open = False
                     entry_price = None
                     entry_ts = None
+
+                # Stop ladder check: position open, no channel/ATR exit on this bar
+                elif (
+                    position_open
+                    and stop_ladder is not None
+                    and stop_ladder.enabled
+                    and entry_price is not None
+                ):
+                    pos_key = (int(id_), entry_ts)
+                    triggered_set = sl_already_triggered.get(pos_key, set())
+
+                    triggers = stop_ladder.check_triggers(
+                        current_price=float(row["close"]),
+                        entry_price=float(entry_price),
+                        side=1,  # ATR breakout is long-only
+                        asset_id=int(id_),
+                        strategy="atr_breakout",
+                        already_triggered=triggered_set,
+                    )
+
+                    for trigger in triggers:
+                        tier_key = f"{trigger['type']}_{trigger['tier']}"
+                        triggered_set.add(tier_key)
+
+                        exit_type = f"stop_ladder_{tier_key}"
+                        current_price = float(row["close"])
+                        pnl_pct = (
+                            (current_price - float(entry_price)) / float(entry_price)
+                        ) * 100
+
+                        feature_snapshot = {
+                            "close": current_price,
+                            "high": float(row["high"]),
+                            "low": float(row["low"]),
+                            "atr": float(row["atr_14"]),
+                            "channel_high": float(row["channel_high"])
+                            if pd.notna(row["channel_high"])
+                            else None,
+                            "channel_low": float(row["channel_low"])
+                            if pd.notna(row["channel_low"])
+                            else None,
+                        }
+
+                        feature_cols = [
+                            "close",
+                            "high",
+                            "low",
+                            "atr_14",
+                            "channel_high",
+                            "channel_low",
+                        ]
+                        hash_df = df_asset.loc[[idx], ["ts"] + feature_cols].copy()
+                        feature_hash = compute_feature_hash(hash_df, feature_cols)
+
+                        records.append(
+                            {
+                                "id": int(id_),
+                                "ts": row["ts"],
+                                "signal_id": signal_id,
+                                "direction": "close",
+                                "position_state": "partial_exit",
+                                "entry_price": float(entry_price),
+                                "entry_ts": entry_ts,
+                                "exit_price": current_price,
+                                "exit_ts": row["ts"],
+                                "pnl_pct": float(pnl_pct),
+                                "breakout_type": exit_type,
+                                "feature_snapshot": feature_snapshot,
+                                "signal_version": self.signal_version,
+                                "feature_version_hash": feature_hash,
+                                "params_hash": params_hash,
+                                "regime_key": regime_key,
+                                "size_frac": trigger["size_frac"],
+                            }
+                        )
+
+                        logger.debug(
+                            "Stop ladder %s tier %d triggered for id=%d at price=%.2f",
+                            trigger["type"],
+                            trigger["tier"],
+                            id_,
+                            current_price,
+                        )
+
+                    sl_already_triggered[pos_key] = triggered_set
 
         return pd.DataFrame(records)
 
