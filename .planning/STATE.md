@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: Phase 58 (Portfolio Construction & Sizing) — In Progress
-Plan: 2/5 DONE (58-02 PortfolioOptimizer: MV/CVaR/HRP with regime routing, Ledoit-Wolf shrinkage, HRP fallback)
+Plan: 3/5 DONE (58-03 BLAllocationBuilder + BetSizer: Black-Litterman posterior weights, IC-IR signal views, probability bet sizing)
 Status: v1.0.0 in progress. Phase 43 COMPLETE. Phase 44 COMPLETE. Phase 45 COMPLETE (all 7 plans). Phase 46 COMPLETE (all 4 plans). Phase 47 COMPLETE (all 5 plans). Phase 48 COMPLETE (all 4 plans). Phase 49 COMPLETE (all 4 plans). Phase 50 COMPLETE (all 2 plans). Phase 51 COMPLETE (all 5 plans). Phase 52 COMPLETE (all 4 plans). Phase 53 COMPLETE (all 4 plans). Phase 54 COMPLETE (all 3 plans). V1_MEMO.md GENERATED. Phase 55 COMPLETE (all 5 plans). Phase 56 COMPLETE (all 7 plans). Phase 57 COMPLETE (all 6 plans). Phase 58 started.
-Last activity: 2026-02-28 — Completed 58-02-PLAN.md (optimizer.py 360 lines; PortfolioOptimizer exports from package __init__; all 3 optimizers verified; smoke test passes)
+Last activity: 2026-02-28 — Completed 58-03-PLAN.md (black_litterman.py + bet_sizing.py; BLAllocationBuilder with Idzorek omega; BetSizer with de Prado formula; all verifications pass)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [██░░░] Phase 58 2/5
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███░░] Phase 58 3/5
 
 ## Performance Metrics
 
@@ -547,6 +547,10 @@ Recent decisions affecting current work:
 - **Dynamic weight bounds floor max(max_position_pct, 1/n_assets) (Phase 58-02)**: EfficientFrontier requires sum(weights)=1.0 but n_assets*max_position_pct can be < 1.0 (e.g. 5 assets x 0.15 = 0.75 max sum); dynamic floor prevents infeasibility while preserving intent of concentration constraint for larger portfolios
 - **_TF_DAYS_FALLBACK for offline DimTimeframe (Phase 58-02)**: DimTimeframe() requires DB connection; PortfolioOptimizer must work in unit tests and offline analysis; hardcoded map covers all canonical TF strings; DB-first fallback-second resolution in _resolve_tf_days()
 - **Fresh EfficientFrontier per optimizer call (Phase 58-02)**: PyPortfolioOpt EF is stateful; calling max_sharpe() then min_volatility() on same instance causes OptimizationError; each optimizer run uses a fresh instance to prevent state contamination between fallback attempts
+- **BL per-asset confidence = weighted mean of per-signal IC-IR confidences (Phase 58-03)**: BlackLittermanModel.omega="idzorek" requires one confidence scalar per view (per asset), not per signal type; weighted mean of per-signal normalized IR values is mathematically coherent for composite views
+- **IC-IR weight normalization: clip(lower=0) then / sum() (Phase 58-03)**: Negative IC-IR signals are noise; clip produces non-negative weights; normalize to sum=1.0 before multiplying signal scores; ensures composite score is IC-IR weighted average not sum
+- **Alpha scale: z * annualized_vol * 0.1 (Phase 58-03)**: Cross-sectional z-score converted to return space via 10% of annualized vol as max expected alpha; ties signal strength to asset-level volatility regime
+- **BetSizer min_confidence excludes assets not scales them (Phase 58-03)**: prob < min_confidence returns weight=0 and size=(0,0); explicit exclusion vs. scaling near-zero bets which would still consume optimizer budget for negligible positions
 
 ### Pending Todos
 
@@ -560,8 +564,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-28T07:52:54Z
-Stopped at: Completed 58-02-PLAN.md — PortfolioOptimizer (d051ca49): MV/CVaR/HRP + regime routing + HRP ill-cond fallback; Phase 58 now 2/5 plans done
+Last session: 2026-02-28T08:03:00Z
+Stopped at: Completed 58-03-PLAN.md — BLAllocationBuilder (b8d11abb) + BetSizer (629b16a9); Phase 58 now 3/5 plans done
 Resume file: None
 
 ---
