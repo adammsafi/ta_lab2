@@ -644,9 +644,9 @@ class PaperExecutor:
         alerting failure must never crash the executor.
         """
         try:
-            from ta_lab2.scripts.run_daily_refresh import send_critical_alert  # noqa: PLC0415
+            from ta_lab2.notifications.telegram import send_critical_alert  # noqa: PLC0415
 
-            send_critical_alert(message)
+            send_critical_alert("executor", message)
         except Exception as exc:  # noqa: BLE001
             self.logger.warning(
                 "_try_telegram_alert: alerting unavailable (%s). Message: %s",

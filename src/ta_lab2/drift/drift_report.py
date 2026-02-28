@@ -80,7 +80,7 @@ _ATTR_COLUMNS = [
     "attr_data_revision_delta",
     "attr_sizing_delta",
     "attr_regime_delta",
-    "attr_unexplained_residual",
+    "attr_unexplained",
 ]
 
 
@@ -148,7 +148,7 @@ class ReportGenerator:
             )
             return self._write_minimal_report(week_start, week_end, output_dir)
 
-        # Determine default TE threshold (fall back to 0.05 if not in DB).
+        # Determine default TE threshold (fall back to 0.015 if not in DB).
         threshold = self._load_te_threshold()
 
         # Generate charts.
@@ -225,7 +225,7 @@ class ReportGenerator:
         """
         Load the portfolio-wide tracking error threshold from dim_risk_limits.
 
-        Returns 0.05 (5%) as a safe default when the table is absent or no row found.
+        Returns 0.015 (1.5%) as a safe default when the table is absent or no row found.
         """
         sql = text(
             """
@@ -241,8 +241,8 @@ class ReportGenerator:
             if row and row[0] is not None:
                 return float(row[0])
         except Exception as exc:
-            logger.debug("_load_te_threshold failed: %s -- using 0.05", exc)
-        return 0.05
+            logger.debug("_load_te_threshold failed: %s -- using 0.015", exc)
+        return 0.015
 
     # ------------------------------------------------------------------
     # Chart generation
@@ -318,7 +318,7 @@ class ReportGenerator:
         df:
             DataFrame with columns: metric_date, tracking_error_5d, tracking_error_30d.
         threshold:
-            Horizontal threshold line value (e.g. 0.05 for 5%).
+            Horizontal threshold line value (e.g. 0.015 for 1.5%).
 
         Returns
         -------
@@ -397,7 +397,7 @@ class ReportGenerator:
         delta_cols = [
             c
             for c in available_attr_cols
-            if c != "attr_baseline_pnl" and c != "attr_unexplained_residual"
+            if c != "attr_baseline_pnl" and c != "attr_unexplained"
         ]
         labels = []
         values = []
@@ -429,8 +429,8 @@ class ReportGenerator:
             all_values.append(value)
             all_measures.append("relative")
 
-        if "attr_unexplained_residual" in df.columns:
-            residual_mean = df["attr_unexplained_residual"].mean(skipna=True)
+        if "attr_unexplained" in df.columns:
+            residual_mean = df["attr_unexplained"].mean(skipna=True)
             if pd.notna(residual_mean):
                 all_labels.append("Unexplained")
                 all_values.append(float(residual_mean))
@@ -555,9 +555,6 @@ class ReportGenerator:
         if "threshold_breach" in df.columns:
             total_breaches = int(df["threshold_breach"].sum())
             lines.append(f"- **Breaches this week**: {total_breaches}")
-        if "drift_paused" in df.columns:
-            pause_active = bool(df["drift_paused"].any())
-            lines.append(f"- **Drift pause active**: {pause_active}")
 
         lines.append("")
 
