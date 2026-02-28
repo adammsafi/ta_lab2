@@ -1080,7 +1080,7 @@ Plans:
 
 ---
 
-### Phase 61: Integration Wiring & Bug Fixes
+### Phase 61: Integration Wiring & Bug Fixes [COMPLETE]
 **Goal:** Wire the 3 missing cross-phase connections identified by the v1.0.0 milestone audit and fix the Phase 47 drift attribution column-name bugs. After this phase, RiskEngine enforces all risk gates during paper trading, daily refresh includes feature refresh, Telegram alerts fire correctly, and drift attribution reports render without errors.
 **Depends on:** Phase 45 (PaperExecutor), Phase 46 (RiskEngine), Phase 47 (drift guard), Phase 50 (daily refresh orchestrator)
 **Gap Closure:** Closes 3 integration gaps + 1 phase tech debt item from v1.0.0 audit
@@ -1089,6 +1089,11 @@ Plans:
   2. `run_daily_refresh.py --all` includes a cmc_features refresh stage between regimes and signals
   3. `send_critical_alert` in paper_executor.py imports from `ta_lab2.notifications.telegram` (not from run_daily_refresh)
   4. `run_drift_report.py --with-attribution` renders without column-name errors (4 bugs on lines 168-204 fixed) and breach count section populates correctly
+**Plans**: 2 plans in 1 wave
+
+Plans:
+- [x] 61-01-PLAN.md -- Wire RiskEngine into PaperExecutor + fix Telegram alert import
+- [x] 61-02-PLAN.md -- Add feature refresh stage to daily orchestrator + fix drift report bugs
 
 ---
 
