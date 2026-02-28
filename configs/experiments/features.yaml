@@ -1740,3 +1740,69 @@ features:
       - table: cmc_features
         columns: [vol_gk_20, vol_gk_126]
     tags: [canonical, vol, garman_klass, log, ratio, derived]
+
+  # =========================================================================
+  # EXPRESSION-MODE FACTORS (Phase 60)
+  # Evaluated by ta_lab2.ml.expression_engine.evaluate_expression().
+  # Expressions use $col syntax mapped to DataFrame columns at runtime.
+  # Operators: EMA, Ref, Delta, Mean, Std, WMA, Max, Min, Rank, Abs, Sign,
+  #            Log, Corr, Slope, Skew, Kurt — defined in OPERATOR_REGISTRY.
+  # =========================================================================
+
+  macd_signal:
+    lifecycle: experimental
+    description: "MACD signal computed from EMA(12)/EMA(26) ratio minus 1 (expression mode)"
+    compute:
+      mode: expression
+      expression: "EMA($close, 12) / EMA($close, 26) - 1"
+    inputs:
+      - table: cmc_price_bars_multi_tf_u
+        columns: [close]
+    tags: [momentum, macd]
+
+  momentum_5d:
+    lifecycle: experimental
+    description: "5-bar price momentum: close / Ref(close, 5) - 1 (expression mode)"
+    compute:
+      mode: expression
+      expression: "$close / Ref($close, 5) - 1"
+    inputs:
+      - table: cmc_price_bars_multi_tf_u
+        columns: [close]
+    tags: [momentum]
+
+  vol_ratio_expr:
+    lifecycle: experimental
+    description: "Volatility ratio: Std(close, fast) / Std(close, slow) with param sweep (expression mode)"
+    compute:
+      mode: expression
+      expression: "Std($close, {fast}) / Std($close, {slow})"
+    params:
+      fast: [5, 10]
+      slow: [20, 30]
+    inputs:
+      - table: cmc_price_bars_multi_tf_u
+        columns: [close]
+    tags: [vol, ratio]
+
+  mean_reversion_z:
+    lifecycle: experimental
+    description: "Z-score of close relative to 20-bar mean and std: mean reversion signal (expression mode)"
+    compute:
+      mode: expression
+      expression: "($close - Mean($close, 20)) / (Std($close, 20) + 1e-10)"
+    inputs:
+      - table: cmc_price_bars_multi_tf_u
+        columns: [close]
+    tags: [mean_reversion, zscore]
+
+  price_rank:
+    lifecycle: experimental
+    description: "Percentile rank of close price in cross-sectional universe (expression mode)"
+    compute:
+      mode: expression
+      expression: "Rank($close)"
+    inputs:
+      - table: cmc_price_bars_multi_tf_u
+        columns: [close]
+    tags: [rank, cross_sectional]
