@@ -1,6 +1,6 @@
 # ta_lab2 Deployment Guide
 
-Version: 0.8.0
+Version: 1.0.0
 
 This guide covers deploying ta_lab2 in development and production environments, including infrastructure setup, environment configuration, database migrations, and monitoring.
 
@@ -958,5 +958,5 @@ docker run --rm \
 
 ---
 
-*Last updated: 2026-02-22*
-*Version: 0.8.0*
+*Last updated: 2026-03-01*
+*Version: 1.0.0*

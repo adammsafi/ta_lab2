@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-03-01
+
+### Added
+- **Strategy Bake-Off (Phase 42)**: IC/PSR/CV evaluation of existing signals; 2 strategies selected with walk-forward backtests (Sharpe >= 1.0, Max DD <= 15%)
+- **Exchange Integration (Phase 43)**: Coinbase + Kraken APIs with paper order adapter and price feed comparison
+- **Order & Fill Store (Phase 44)**: `cmc_orders`, `cmc_fills`, `cmc_positions` tables with FIFO matching and full audit trail
+- **Paper-Trade Executor (Phase 45)**: Signal -> order -> fill -> position pipeline with backtest parity verification; DB-driven config via `dim_executor_config`
+- **Risk Controls (Phase 46)**: RiskEngine with kill switch (`dim_risk_state`), position caps, daily loss stops, circuit breaker
+- **Drift Guard (Phase 47)**: DriftMonitor with tracking error/slippage metrics, auto-pause on divergence, Telegram escalation
+- **Loss Limits Policy (Phase 48)**: VaR simulation, intraday stop analysis, pool-level capital allocation
+- **Tail-Risk Policy (Phase 49)**: Hard stops vs vol-sizing analysis, flatten triggers, policy document
+- **Data Economics (Phase 50)**: Cost audit, build-vs-buy analysis, data trigger definitions
+- **Perps Readiness (Phase 51)**: Funding rate ingestion, margin model, liquidation buffer, venue downtime playbook
+- **Operational Dashboard (Phase 52)**: Streamlit dashboard with live PnL, exposure, drawdown, drift, risk status views
+- **V1 Validation (Phase 53)**: Success criteria framework for paper trading validation
+- **V1 Results Memo (Phase 54)**: Formal report with methodology, results, failure modes, research answers
+- **Feature Evaluation (Phase 55)**: IC sweep across 109 TFs (82K+ rows in `cmc_ic_results`), BH-corrected promotion gate, 107 features promoted to `dim_feature_registry`, adaptive RSI A/B comparison
+- **Factor Analytics (Phase 56)**: QuantStats tear sheets, IC decay/rank IC, quintile returns engine, cross-sectional normalization, MAE/MFE, Monte Carlo CI
+- **Advanced Labeling (Phase 57)**: Triple barrier labeling, meta-labeling (RF + StandardScaler), CUSUM event filter, trend scanning labels
+- **Portfolio Construction (Phase 58)**: PyPortfolioOpt integration, Black-Litterman with market cap prior, TopkDropout selector, BetSizer, StopLadder, TurnoverTracker
+- **Microstructural Features (Phase 59)**: Fractional differentiation (FFD), Kyle/Amihud lambda, SADF bubble detection, Shannon/LZ entropy, pairwise codependence
+- **ML Infrastructure (Phase 60)**: Expression engine for config-driven feature computation, RegimeRouter, DoubleEnsemble concept drift, Optuna TPE sweep, MDA/SFI/clustered feature importance, `cmc_ml_experiments` tracking
+
+### Changed
+- Daily refresh pipeline: bars -> EMAs -> AMAs -> regimes -> features -> signals -> executor -> drift -> stats
+- Feature lifecycle: IC sweep -> `cmc_ic_results` -> FeaturePromoter (dual-source) -> BH gate -> `dim_feature_registry`
+- Telegram notifications wired for kill switch, drift alerts, and daily digest
+- `ExecutorConfig.initial_capital` loaded from DB with NULL fallback
+- Drift monitor skip upgraded to `[WARN]` with actionable `--paper-start` guidance
+
+## [0.9.0] - 2026-02-24
+
+### Added
+- **Adaptive Moving Averages (Phase 35)**: KAMA, DEMA, TEMA, HMA with full multi-TF parity, calendar variants, unified `_u` sync, z-scores, and daily refresh integration (~91M rows)
+- **IC Evaluation Engine (Phase 37)**: Spearman IC, rolling IC, IC-IR, regime breakdown, significance testing; `cmc_ic_results` DB persistence
+- **PSR/DSR/MinTRL (Phase 36)**: Full Lopez de Prado probabilistic Sharpe ratio formulas; PurgedKFoldSplitter + CPCVSplitter for leakage-free CV
+- **Feature Experimentation (Phase 38)**: YAML registry, ExperimentRunner, BH-corrected promotion gate, `dim_feature_registry` + `cmc_feature_experiments` tables
+- **Streamlit Dashboard (Phase 39)**: 5 pages (landing, pipeline monitor, research explorer, asset stats, experiments)
+- **Polished Notebooks (Phase 40)**: `helpers.py` + 3 Jupyter notebooks (indicators, features, experiments)
+- **Asset Stats & Correlation (Phase 41)**: Rolling descriptive stats in `cmc_asset_stats`; pairwise correlation in `cmc_cross_asset_corr`
+
+### Changed
+- `run_daily_refresh --all` includes AMA refresh and descriptive stats stages
+- Cross-validation splitters built from scratch (mlfinlab discontinued)
+- PSR column renamed via Alembic migration for Lopez de Prado formula
+
 ## [0.8.0] - 2026-02-22
 
 ### Added
@@ -131,11 +177,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Regime detection framework
 - Basic EMA calculations
 
-[Unreleased]: https://github.com/your-username/ta_lab2/compare/v0.8.0...HEAD
-[0.8.0]: https://github.com/your-username/ta_lab2/compare/v0.7.0...v0.8.0
-[0.7.0]: https://github.com/your-username/ta_lab2/compare/v0.6.0...v0.7.0
-[0.6.0]: https://github.com/your-username/ta_lab2/compare/v0.5.0...v0.6.0
-[0.5.0]: https://github.com/your-username/ta_lab2/compare/v0.4.0...v0.5.0
-[0.4.0]: https://github.com/your-username/ta_lab2/compare/v0.3.1...v0.4.0
-[0.3.1]: https://github.com/your-username/ta_lab2/compare/v0.3.0...v0.3.1
-[0.3.0]: https://github.com/your-username/ta_lab2/releases/tag/v0.3.0
+[Unreleased]: https://github.com/adammsafi/ta_lab2/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/adammsafi/ta_lab2/compare/v0.9.0...v1.0.0
+[0.9.0]: https://github.com/adammsafi/ta_lab2/compare/v0.8.0...v0.9.0
+[0.8.0]: https://github.com/adammsafi/ta_lab2/compare/v0.7.0...v0.8.0
+[0.7.0]: https://github.com/adammsafi/ta_lab2/compare/v0.6.0...v0.7.0
+[0.6.0]: https://github.com/adammsafi/ta_lab2/compare/v0.5.0...v0.6.0
+[0.5.0]: https://github.com/adammsafi/ta_lab2/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/adammsafi/ta_lab2/compare/v0.3.1...v0.4.0
+[0.3.1]: https://github.com/adammsafi/ta_lab2/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/adammsafi/ta_lab2/releases/tag/v0.3.0

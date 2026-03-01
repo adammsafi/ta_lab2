@@ -1,4 +1,4 @@
-# ta_lab2 v0.8.0
+# ta_lab2 v1.0.0
 
 Multi-timescale Technical Analysis Lab with AI Orchestration
 
@@ -46,7 +46,7 @@ For detailed setup instructions, see [Deployment Guide](deployment.md) and Time 
 
 ## Overview
 
-**ta_lab2** is a production-ready technical analysis and quantitative trading infrastructure designed for multi-timescale feature engineering, signal generation, and backtesting. The v0.8.0 release delivers production hardening with automated stats/QA orchestration, blocking CI lint, mypy type coverage, and documentation freshness.
+**ta_lab2** is a production-ready technical analysis and quantitative trading infrastructure designed for multi-timescale feature engineering, signal generation, backtesting, paper trading, and risk management. The v1.0.0 release closes the V1 loop with a paper-trade executor, risk controls, drift guard, IC-based feature evaluation, portfolio construction, advanced labeling, ML infrastructure, and an operational dashboard.
 
 **Key Capabilities:**
 - Multi-timeframe EMA calculations (daily, calendar, trading-day aligned) across 199 timeframes
@@ -551,8 +551,12 @@ If you want to use this in a commercial setting, reach out first so terms can be
 
 See [CHANGELOG](CHANGELOG.md) for release history and upgrade notes.
 
-**Latest Release:** v0.8.0 (2026-02-22)
-- Stats/QA orchestration wired into daily refresh with pipeline gate for FAIL rows
-- Ruff lint blocking in CI; pre-commit hook updated; zero violations enforced
-- mypy type checking scoped to features/ and regimes/ (non-blocking in CI)
-- Documentation freshness pass: version strings, stale references, TODO placeholders resolved
+**Latest Release:** v1.0.0 (2026-03-01)
+- Paper-trade executor with exchange integration (Coinbase + Kraken) and full order/fill/position pipeline
+- Risk controls: kill switch, daily loss stops, circuit breaker, VaR simulation, tail-risk policy
+- Drift guard with auto-pause on divergence and DriftMonitor metrics
+- IC-based feature evaluation across 109 TFs with BH-corrected promotion gate
+- Portfolio construction (Black-Litterman, TopkDropout, bet sizing, stop laddering)
+- Advanced labeling (triple barrier, meta-labeling, CUSUM filter, trend scanning)
+- ML infrastructure (expression engine, regime routing, DoubleEnsemble, Optuna)
+- Operational Streamlit dashboard with live PnL, exposure, drift, and risk status
