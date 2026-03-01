@@ -190,7 +190,8 @@ class PaperExecutor:
                    max_position_fraction, fill_price_mode, cadence_hours,
                    last_processed_signal_ts, slippage_mode, slippage_base_bps,
                    slippage_noise_sigma, volume_impact_factor,
-                   rejection_rate, partial_fill_rate, execution_delay_bars
+                   rejection_rate, partial_fill_rate, execution_delay_bars,
+                   initial_capital
             FROM public.dim_executor_config
             WHERE is_active = TRUE
             ORDER BY config_id
@@ -213,6 +214,11 @@ class PaperExecutor:
                 fill_price_mode=row.fill_price_mode,
                 cadence_hours=float(row.cadence_hours),
                 last_processed_signal_ts=row.last_processed_signal_ts,
+                initial_capital=(
+                    Decimal(str(row.initial_capital))
+                    if row.initial_capital is not None
+                    else Decimal("100000")
+                ),
             )
             # Attach extra fields used during execution (not in dataclass)
             cfg._environment = row.environment  # type: ignore[attr-defined]

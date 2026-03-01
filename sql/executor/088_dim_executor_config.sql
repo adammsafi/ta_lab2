@@ -24,6 +24,7 @@ CREATE TABLE public.dim_executor_config (
     sizing_mode             TEXT            NOT NULL DEFAULT 'fixed_fraction',
     position_fraction       NUMERIC         NOT NULL DEFAULT 0.10,
     max_position_fraction   NUMERIC         NOT NULL DEFAULT 0.20,
+    initial_capital         NUMERIC         NOT NULL DEFAULT 100000,
 
     -- Fill simulation
     fill_price_mode         TEXT            NOT NULL DEFAULT 'next_bar_open',
@@ -54,6 +55,8 @@ CREATE TABLE public.dim_executor_config (
         CHECK (environment IN ('sandbox', 'production')),
     CONSTRAINT chk_exec_config_sizing_mode
         CHECK (sizing_mode IN ('fixed_fraction', 'regime_adjusted', 'signal_strength')),
+    CONSTRAINT chk_exec_config_initial_capital
+        CHECK (initial_capital > 0),
     CONSTRAINT chk_exec_config_position_fraction
         CHECK (position_fraction > 0 AND position_fraction <= 1),
     CONSTRAINT chk_exec_config_fill_price_mode
