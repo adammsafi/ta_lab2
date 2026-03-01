@@ -1112,7 +1112,7 @@ Plans:
 
 ---
 
-### Phase 63: Tech Debt Cleanup
+### Phase 63: Tech Debt Cleanup [COMPLETE]
 **Goal:** Close 3 low-severity tech debt items from the v1.0.0 milestone audit — bridge bar-level feature promotion path, wire initial_capital from DB config, and add drift monitor --paper-start documentation/warning.
 **Depends on:** Phase 62 (audit found these items)
 **Gap Closure:** Closes tech debt from v1.0.0-MILESTONE-AUDIT.md
@@ -1122,8 +1122,8 @@ Plans:
   3. run_daily_refresh.py --all warns when drift monitoring is skipped (no --paper-start)
 **Plans:** 2 plans
 Plans:
-- [ ] 63-01-PLAN.md — Bridge bar-level feature promotion path (FeaturePromoter reads cmc_ic_results)
-- [ ] 63-02-PLAN.md — Wire initial_capital from DB config + upgrade drift skip warning
+- [x] 63-01-PLAN.md — Bridge bar-level feature promotion path (FeaturePromoter reads cmc_ic_results)
+- [x] 63-02-PLAN.md — Wire initial_capital from DB config + upgrade drift skip warning
 
 ---
 
