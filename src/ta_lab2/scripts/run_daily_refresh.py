@@ -1759,8 +1759,8 @@ Examples:
         default=None,
         help=(
             "ISO date for paper trading start (e.g. 2025-01-01). "
-            "Optional: drift stage is silently skipped when absent, "
-            "even if --drift or --all is specified."
+            "REQUIRED for drift monitoring -- when absent, drift stage "
+            "is skipped with a warning even if --drift or --all is specified."
         ),
     )
     p.add_argument(
@@ -2129,7 +2129,14 @@ Examples:
             print("(Use --continue-on-error to run remaining components)")
             return 1
     elif run_drift and not paper_start:
-        print("[INFO] Drift monitor skipped: --paper-start not provided")
+        print()
+        print("[WARN] Drift monitoring SKIPPED: --paper-start not provided")
+        print(
+            "       To enable drift monitoring, re-run with: --paper-start YYYY-MM-DD"
+        )
+        print(
+            "       (Drift guard compares paper vs backtest to detect execution divergence)"
+        )
 
     # Run stats if requested (final stage -- after bars, EMAs, regimes, executor)
     if run_stats:
