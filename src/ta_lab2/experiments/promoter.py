@@ -213,11 +213,12 @@ class FeaturePromoter:
         alpha: float = 0.05,
         min_pass_rate: float = 0.0,
         confirm: bool = True,
+        source: str = "auto",
     ) -> str:
         """Promote a feature from experimental to promoted lifecycle.
 
         Steps:
-        1. Load experiment results from cmc_feature_experiments.
+        1. Load experiment results from cmc_feature_experiments or cmc_ic_results.
         2. Apply BH gate -- raise PromotionRejectedError if it fails.
         3. Find best IC row among BH-significant results.
         4. Optionally confirm with user.
@@ -229,7 +230,8 @@ class FeaturePromoter:
         Parameters
         ----------
         feature_name:
-            Name of the feature to promote (must match cmc_feature_experiments).
+            Name of the feature to promote (must match cmc_feature_experiments
+            or cmc_ic_results depending on ``source``).
         alpha:
             BH significance threshold (default 0.05).
         min_pass_rate:
@@ -237,6 +239,13 @@ class FeaturePromoter:
         confirm:
             If True, prompt user before writing to DB. Set False (or --yes)
             for non-interactive use.
+        source:
+            Which table to load IC results from. One of:
+            - ``"auto"`` (default): try cmc_feature_experiments first; fall
+              back to cmc_ic_results if empty.
+            - ``"feature_experiments"``: query cmc_feature_experiments only.
+            - ``"ic_results"``: query cmc_ic_results only (for bar-level
+              features whose IC data is written by run_ic_sweep.py).
 
         Returns
         -------
@@ -251,12 +260,18 @@ class FeaturePromoter:
             If the BH gate rejects the feature.
         """
         # Step 1: Load experiment results
-        ic_df = self._load_experiment_results(feature_name)
+        ic_df = self._load_experiment_results(feature_name, source=source)
         if ic_df.empty:
-            raise ValueError(
-                f"No experiment results found for feature '{feature_name}' "
-                "in cmc_feature_experiments."
-            )
+            if source == "auto":
+                raise ValueError(
+                    f"No experiment results found for feature '{feature_name}' "
+                    "in cmc_feature_experiments or cmc_ic_results."
+                )
+            else:
+                raise ValueError(
+                    f"No experiment results found for feature '{feature_name}' "
+                    f"in {source}."
+                )
 
         # Step 2: BH gate
         passed, bh_df, reason = self.check_bh_gate(
@@ -351,8 +366,30 @@ class FeaturePromoter:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _load_experiment_results(self, feature_name: str) -> pd.DataFrame:
-        """Load IC results from cmc_feature_experiments for a feature."""
+    def _load_experiment_results(
+        self, feature_name: str, source: str = "auto"
+    ) -> pd.DataFrame:
+        """Load IC results for a feature from one or both IC tables.
+
+        Parameters
+        ----------
+        feature_name:
+            Feature name to query.
+        source:
+            - ``"feature_experiments"``: query cmc_feature_experiments only.
+            - ``"ic_results"``: query cmc_ic_results only.
+            - ``"auto"`` (default): try cmc_feature_experiments first; fall
+              back to cmc_ic_results if the result is empty.
+
+        Returns
+        -------
+        pd.DataFrame
+            Empty DataFrame when no results are found in the selected source(s).
+        """
+        if source == "ic_results":
+            return self._load_ic_results(feature_name)
+
+        # source == "feature_experiments" or "auto"
         with self._engine.connect() as conn:
             result = conn.execute(
                 text(
@@ -372,6 +409,64 @@ class FeaturePromoter:
                         n_obs
                     FROM public.cmc_feature_experiments
                     WHERE feature_name = :name
+                    ORDER BY horizon, asset_id, tf
+                    """
+                ),
+                {"name": feature_name},
+            )
+            rows = result.fetchall()
+            if rows:
+                return pd.DataFrame(rows, columns=list(result.keys()))
+
+        if source == "feature_experiments":
+            return pd.DataFrame()
+
+        # "auto" fallback: try cmc_ic_results
+        return self._load_ic_results(feature_name)
+
+    def _load_ic_results(self, feature_name: str) -> pd.DataFrame:
+        """Load IC results from cmc_ic_results for a feature.
+
+        Maps cmc_ic_results columns to the same names used by
+        cmc_feature_experiments so callers (check_bh_gate, promote_feature)
+        can treat either source uniformly.
+
+        Column mapping
+        --------------
+        cmc_ic_results.feature  -> feature_name
+        All other IC columns (asset_id, tf, horizon, return_type, regime_col,
+        regime_label, ic, ic_t_stat, ic_p_value, ic_ir, n_obs) are selected
+        directly -- they share identical names in both tables.
+
+        Parameters
+        ----------
+        feature_name:
+            Value of cmc_ic_results.feature to filter on.
+
+        Returns
+        -------
+        pd.DataFrame
+            Empty DataFrame when no results are found.
+        """
+        with self._engine.connect() as conn:
+            result = conn.execute(
+                text(
+                    """
+                    SELECT
+                        feature AS feature_name,
+                        asset_id,
+                        tf,
+                        horizon,
+                        return_type,
+                        regime_col,
+                        regime_label,
+                        ic,
+                        ic_t_stat,
+                        ic_p_value,
+                        ic_ir,
+                        n_obs
+                    FROM public.cmc_ic_results
+                    WHERE feature = :name
                     ORDER BY horizon, asset_id, tf
                     """
                 ),
