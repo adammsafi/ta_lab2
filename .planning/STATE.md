@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: Phase 62 (Operational Completeness) — COMPLETE
-Plan: 2/2 DONE
-Status: Phase 62 COMPLETE (all 2 plans). IC sweep 114 TFs, 107 features promoted, 6 ML experiments logged, RebalanceScheduler deleted. All v1.0.0 phases (42-62) COMPLETE.
-Last activity: 2026-02-28 — Completed Phase 62 (IC sweep, feature promotion, ML experiments, dead code removal)
+Phase: Phase 63 (Tech Debt Cleanup) — In progress
+Plan: 2/N DONE
+Status: Phase 63 active. Plan 01 (batch_promote_features --source flag + dual-source IC loading) COMPLETE. Plan 02 (ExecutorConfig.initial_capital DB column + [WARN] drift skip) COMPLETE.
+Last activity: 2026-03-01 — Completed Phase 63 Plan 02 (initial_capital migration, drift warning upgrade)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [████████] Phase 60 COMPLETE (8 plans) | [██] Phase 61 COMPLETE | [██] Phase 62 COMPLETE
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [████████] Phase 60 COMPLETE (8 plans) | [██] Phase 61 COMPLETE | [██] Phase 62 COMPLETE | [██] Phase 63 in progress (2 plans done)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 308 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 6 in Phase 43, 3 in Phase 44, 7 in Phase 45, 4 in Phase 46, 5 in Phase 47, 4 in Phase 48, 4 in Phase 49, 2 in Phase 50, 5 in Phase 51, 4 in Phase 52, 4 in Phase 53, 3 in Phase 54, 5 in Phase 55, 7 in Phase 56, 6 in Phase 57, 7 in Phase 58, 5 in Phase 59, 8 in Phase 60, 2 in Phase 61, 2 in Phase 62)
+- Total plans completed: 310 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 6 in Phase 43, 3 in Phase 44, 7 in Phase 45, 4 in Phase 46, 5 in Phase 47, 4 in Phase 48, 4 in Phase 49, 2 in Phase 50, 5 in Phase 51, 4 in Phase 52, 4 in Phase 53, 3 in Phase 54, 5 in Phase 55, 7 in Phase 56, 6 in Phase 57, 7 in Phase 58, 5 in Phase 59, 8 in Phase 60, 2 in Phase 61, 2 in Phase 62, 2 in Phase 63 so far)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -605,8 +605,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-28T21:07:30Z
-Stopped at: Completed 62-02-PLAN.md — 6 ML experiments logged to cmc_ml_experiments, RebalanceScheduler orphan deleted, portfolio __init__.py cleaned
+Last session: 2026-03-01T07:39:40Z
+Stopped at: Completed 63-02-PLAN.md — initial_capital Alembic migration, PaperExecutor DB wiring, drift [WARN] upgrade
 Resume file: None
 
 ---
