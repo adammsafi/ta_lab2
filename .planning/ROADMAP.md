@@ -8,7 +8,7 @@
 - v0.7.0 Regime Integration & Signal Enhancement (Phases 27-28) - SHIPPED 2026-02-20
 - v0.8.0 Polish & Hardening (Phases 29-34) - SHIPPED 2026-02-23
 - v0.9.0 Research & Experimentation (Phases 35-41) - SHIPPED 2026-02-24
-- v1.0.0 V1 Closure — Paper Trading & Validation (Phases 42-63) - current milestone
+- v1.0.0 V1 Closure — Paper Trading & Validation (Phases 42-63) - SHIPPED 2026-03-01
 
 ## Overview
 
@@ -23,7 +23,7 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 - Phases 27-28: v0.7.0 (complete)
 - Phases 29-34: v0.8.0 (complete)
 - Phases 35-41: v0.9.0 (SHIPPED 2026-02-24)
-- Phases 42-60: v1.0.0 (current -- V1 Closure)
+- Phases 42-63: v1.0.0 (SHIPPED 2026-03-01)
 - Decimal phases (27.1, 28.1): Urgent insertions if needed
 
 <details>
@@ -697,7 +697,7 @@ Plans:
 </details>
 
 <details>
-<summary>v1.0.0 V1 Closure -- Paper Trading & Validation (Phases 42-60) - CURRENT</summary>
+<summary>v1.0.0 V1 Closure -- Paper Trading & Validation (Phases 42-63) - SHIPPED 2026-03-01</summary>
 
 - [x] **Phase 42: Strategy Bake-Off** - IC/PSR/CV evaluation of existing signals, select 2 strategies for V1
 - [x] **Phase 43: Exchange Integration** - Connect to two exchange APIs (Coinbase + Kraken), price feed comparison, paper order adapter
@@ -718,11 +718,14 @@ Plans:
 - [x] **Phase 58: Portfolio Construction & Position Sizing** - PyPortfolioOpt integration, Black-Litterman, TopkDropout, bet sizing, stop laddering
 - [x] **Phase 59: Microstructural & Advanced Features** - Fractional differentiation, Kyle/Amihud lambda, SADF bubble detection, entropy, codependence
 - [x] **Phase 60: ML Infrastructure & Experimentation** - Expression engine, feature importance, regime-routed models, concept drift, experiment tracking, Optuna
+- [x] **Phase 61: Integration Wiring & Bug Fixes** - Wire 3 missing cross-phase connections + fix drift attribution column-name bugs
+- [x] **Phase 62: Operational Completeness** - Full IC sweep (109 TFs), batch feature promotion, ML CLI experiments, RebalanceScheduler cleanup
+- [x] **Phase 63: Tech Debt Cleanup** - Bridge bar-level IC promotion path, wire initial_capital from DB, upgrade drift skip warning
 
 </details>
 
 <details>
-<summary>v1.0.0 Phase Details (Phases 42-60) - IN PROGRESS</summary>
+<summary>v1.0.0 Phase Details (Phases 42-63) - SHIPPED 2026-03-01</summary>
 
 ### Phase 42: Strategy Bake-Off
 **Goal:** Use v0.9.0 research tooling to evaluate existing signals and select the 2 best strategies for V1 paper trading, with documented rationale and expected performance.
@@ -1208,15 +1211,15 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | 41. Asset Descriptive Stats & Correlation | 6/6 | Complete | 2026-02-24 |
 | 41.1. Milestone Cleanup | 3/3 | Complete | 2026-02-24 |
 
-### v1.0.0 Progress (Current)
+### v1.0.0 Progress (Complete)
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 42. Strategy Bake-Off | 0/5 | Planned | -- |
-| 43. Exchange Integration | 0/6 | Planned | -- |
-| 44. Order & Fill Store | 0/3 | Planned | -- |
-| 45. Paper-Trade Executor | 0/7 | Planned | -- |
-| 46. Risk Controls | 0/4 | Planned | -- |
+| 42. Strategy Bake-Off | 5/5 | Complete | 2026-02-25 |
+| 43. Exchange Integration | 6/6 | Complete | 2026-02-25 |
+| 44. Order & Fill Store | 3/3 | Complete | 2026-02-25 |
+| 45. Paper-Trade Executor | 7/7 | Complete | 2026-02-25 |
+| 46. Risk Controls | 4/4 | Complete | 2026-02-25 |
 | 47. Drift Guard | 5/5 | Complete | 2026-02-25 |
 | 48. Loss Limits Policy | 4/4 | Complete | 2026-02-25 |
 | 49. Tail-Risk Policy | 4/4 | Complete | 2026-02-25 |
@@ -1225,12 +1228,15 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | 52. Operational Dashboard | 4/4 | Complete | 2026-02-26 |
 | 53. V1 Validation | 4/4 | Complete | 2026-02-26 |
 | 54. V1 Results Memo | 3/3 | Complete | 2026-02-26 |
-| 55. Feature & Signal Evaluation | 0/5 | Planned | -- |
-| 56. Factor Analytics & Reporting Upgrade | 0/7 | Planned | -- |
-| 57. Advanced Labeling & Cross-Validation | 6/6 | Planned | -- |
-| 58. Portfolio Construction & Position Sizing | 0/? | Planned | -- |
-| 59. Microstructural & Advanced Features | 0/? | Planned | -- |
-| 60. ML Infrastructure & Experimentation | 0/8 | Planned | -- |
+| 55. Feature & Signal Evaluation | 5/5 | Complete | 2026-02-27 |
+| 56. Factor Analytics & Reporting | 7/7 | Complete | 2026-02-27 |
+| 57. Advanced Labeling & CV | 6/6 | Complete | 2026-02-27 |
+| 58. Portfolio Construction & Sizing | 7/7 | Complete | 2026-02-28 |
+| 59. Microstructural Features | 5/5 | Complete | 2026-02-28 |
+| 60. ML Infrastructure | 8/8 | Complete | 2026-02-28 |
+| 61. Integration Wiring | 2/2 | Complete | 2026-02-28 |
+| 62. Operational Completeness | 2/2 | Complete | 2026-02-28 |
+| 63. Tech Debt Cleanup | 2/2 | Complete | 2026-03-01 |
 
 ## Requirement Coverage
 
@@ -1291,8 +1297,8 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | Microstructural Features | MICRO-01, MICRO-02, MICRO-03, MICRO-04, MICRO-05 | Phase 59 | 5 |
 | ML Infrastructure | MLINFRA-01, MLINFRA-02, MLINFRA-03, MLINFRA-04, MLINFRA-05, MLINFRA-06 | Phase 60 | 6 |
 
-**Coverage:** 85/85 requirements mapped
+**Coverage:** 85/85 requirements satisfied (80 primary + 5 overlap = 85 mapped, 80 unique)
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-27 (Phase 58 planned -- Portfolio Construction & Position Sizing; 5 plans in 4 waves)*
+*Last updated: 2026-03-01 (v1.0.0 milestone shipped — 22 phases, 104 plans, all complete)*

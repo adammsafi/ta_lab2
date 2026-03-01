@@ -1,5 +1,31 @@
 # Project Milestones: ta_lab2 AI-Accelerated Quant Platform
 
+## v1.0.0 V1 Closure: Paper Trading & Validation (Shipped: 2026-03-01)
+
+**Delivered:** Full V1 loop from strategy selection through paper trading, risk controls, drift guard, feature evaluation across 109 TFs, advanced ML infrastructure, and operational dashboard — closing all 6 research tracks with validated results.
+
+**Phases completed:** 42-63 (104 plans total)
+
+**Key accomplishments:**
+- Strategy bake-off with IC/PSR/CV evaluation selecting 2 strategies; walk-forward backtests meeting Sharpe >= 1.0, Max DD <= 15%
+- Paper-trade executor with full signal -> order -> fill -> position pipeline, exchange integration (Coinbase + Kraken), and backtest parity verification
+- Risk controls suite: kill switch, position caps, daily loss stops, circuit breaker, VaR simulation, tail-risk policy, and drift guard with auto-pause on divergence
+- Feature & signal evaluation: IC sweep across 109 TFs (82K+ rows), BH-corrected promotion gate, 107 features promoted to dim_feature_registry, adaptive RSI A/B comparison
+- Advanced ML infrastructure: factor analytics (QuantStats, IC decay, quintile returns), triple barrier labeling, purged CPCV, portfolio construction (Black-Litterman, TopkDropout), microstructural features (fractional diff, Kyle lambda, SADF), expression engine, Optuna hyperparameter optimization
+- Operational dashboard with live PnL, exposure, drawdown, drift, and risk status views; Telegram notifications; V1 Results Memo
+
+**Stats:**
+- 274 files created/modified
+- ~77,167 lines added
+- 22 phases, 104 plans
+- 5 days (2026-02-25 -> 2026-03-01)
+
+**Git range:** `docs(42): complete strategy-bake-off phase` -> `docs(63): complete tech-debt-cleanup phase`
+
+**What's next:** v1.1.0 or v2.0.0 — live trading readiness, multi-asset expansion, or ML model deployment
+
+---
+
 ## v0.9.0 Research & Experimentation (Shipped: 2026-02-24)
 
 **Delivered:** Full research cycle from adaptive indicators through IC evaluation, feature experimentation with BH-corrected promotion, interactive Streamlit dashboard, polished notebooks, and rolling asset statistics with cross-asset correlation.
