@@ -110,18 +110,67 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FRED-01 through FRED-17 | TBD | Pending |
-| MREG-01 through MREG-12 | TBD | Pending |
-| MINT-01 through MINT-07 | TBD | Pending |
-| XAGG-01 through XAGG-04 | TBD | Pending |
-| GATE-01 through GATE-09 | TBD | Pending |
-| OBSV-01 through OBSV-06 | TBD | Pending |
+| FRED-01 | Phase 65 | Pending |
+| FRED-02 | Phase 65 | Pending |
+| FRED-03 | Phase 65 | Pending |
+| FRED-04 | Phase 65 | Pending |
+| FRED-05 | Phase 65 | Pending |
+| FRED-06 | Phase 65 | Pending |
+| FRED-07 | Phase 65 | Pending |
+| FRED-08 | Phase 66 | Pending |
+| FRED-09 | Phase 66 | Pending |
+| FRED-10 | Phase 66 | Pending |
+| FRED-11 | Phase 66 | Pending |
+| FRED-12 | Phase 66 | Pending |
+| FRED-13 | Phase 66 | Pending |
+| FRED-14 | Phase 66 | Pending |
+| FRED-15 | Phase 66 | Pending |
+| FRED-16 | Phase 66 | Pending |
+| FRED-17 | Phase 66 | Pending |
+| MREG-01 | Phase 67 | Pending |
+| MREG-02 | Phase 67 | Pending |
+| MREG-03 | Phase 67 | Pending |
+| MREG-04 | Phase 67 | Pending |
+| MREG-05 | Phase 67 | Pending |
+| MREG-06 | Phase 67 | Pending |
+| MREG-07 | Phase 67 | Pending |
+| MREG-08 | Phase 67 | Pending |
+| MREG-09 | Phase 67 | Pending |
+| MREG-10 | Phase 68 | Pending |
+| MREG-11 | Phase 68 | Pending |
+| MREG-12 | Phase 68 | Pending |
+| MINT-01 | Phase 69 | Pending |
+| MINT-02 | Phase 69 | Pending |
+| MINT-03 | Phase 69 | Pending |
+| MINT-04 | Phase 69 | Pending |
+| MINT-05 | Phase 69 | Pending |
+| MINT-06 | Phase 69 | Pending |
+| MINT-07 | Phase 69 | Pending |
+| XAGG-01 | Phase 70 | Pending |
+| XAGG-02 | Phase 70 | Pending |
+| XAGG-03 | Phase 70 | Pending |
+| XAGG-04 | Phase 70 | Pending |
+| GATE-01 | Phase 71 | Pending |
+| GATE-02 | Phase 71 | Pending |
+| GATE-03 | Phase 71 | Pending |
+| GATE-04 | Phase 71 | Pending |
+| GATE-05 | Phase 71 | Pending |
+| GATE-06 | Phase 71 | Pending |
+| GATE-07 | Phase 71 | Pending |
+| GATE-08 | Phase 71 | Pending |
+| GATE-09 | Phase 71 | Pending |
+| OBSV-01 | Phase 72 | Pending |
+| OBSV-02 | Phase 72 | Pending |
+| OBSV-03 | Phase 72 | Pending |
+| OBSV-04 | Phase 72 | Pending |
+| OBSV-05 | Phase 72 | Pending |
+| OBSV-06 | Phase 72 | Pending |
 
 **Coverage:**
 - v1.0.1 requirements: 55 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 55
+- Mapped to phases: 55/55
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-02*
-*Last updated: 2026-03-02 after research synthesis*
+*Last updated: 2026-03-02 (traceability updated after roadmap creation)*

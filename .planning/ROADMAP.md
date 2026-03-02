@@ -9,6 +9,7 @@
 - v0.8.0 Polish & Hardening (Phases 29-34) - SHIPPED 2026-02-23
 - v0.9.0 Research & Experimentation (Phases 35-41) - SHIPPED 2026-02-24
 - v1.0.0 V1 Closure — Paper Trading & Validation (Phases 42-63) - SHIPPED 2026-03-01
+- v1.0.1 Macro Regime Infrastructure (Phases 64-72) - IN PROGRESS
 
 ## Overview
 
@@ -24,6 +25,7 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 - Phases 29-34: v0.8.0 (complete)
 - Phases 35-41: v0.9.0 (SHIPPED 2026-02-24)
 - Phases 42-63: v1.0.0 (SHIPPED 2026-03-01)
+- Phases 64-72: v1.0.1 (in progress)
 - Decimal phases (27.1, 28.1): Urgent insertions if needed
 
 <details>
@@ -1300,5 +1302,199 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 **Coverage:** 85/85 requirements satisfied (80 primary + 5 overlap = 85 mapped, 80 unique)
 
 ---
+
+
+## Current Milestone: v1.0.1 Macro Regime Infrastructure
+
+**Milestone Goal:** Wire 208K rows of FRED macro data into the regime/risk pipeline -- macro feature computation, macro regime labeler, cross-asset aggregation, and risk gates driven by rates, VIX, carry trade, and financial conditions. Zero new pip dependencies.
+
+### v1.0.1 Phase Summary
+
+- [ ] **Phase 64: MCP Memory Server** - Connect Qdrant to Claude Code via MCP server
+- [ ] **Phase 65: FRED Table & Core Features** - Macro feature table with daily alignment, rate spreads, yield curve, VIX, and dollar strength
+- [ ] **Phase 66: FRED Derived Features & Automation** - Credit stress, financial conditions, carry trade, fed regime, CPI proxy, and daily refresh wiring
+- [ ] **Phase 67: Macro Regime Classifier** - Rule-based 4-dimensional macro regime labeler with hysteresis and YAML config
+- [ ] **Phase 68: HMM & Macro Analytics** - Secondary HMM classifier, lead-lag analysis, and regime transition probabilities
+- [ ] **Phase 69: L4 Resolver Integration** - Wire macro regime into tighten-only resolver chain and executor logging
+- [ ] **Phase 70: Cross-Asset Aggregation** - BTC/ETH correlation features, aggregate funding rate, and crypto-macro correlation regime
+- [ ] **Phase 71: Event Risk Gates** - FOMC/CPI/NFP event calendar, VIX spike gate, carry unwind gate, credit stress gate, composite stress score
+- [ ] **Phase 72: Macro Observability** - Dashboard display, Telegram alerts, FRED freshness monitoring, drift attribution, regime timeline
+
+### Phase 64: MCP Memory Server -- Connect Qdrant to Claude Code
+
+**Goal:** Every new Claude Code session can pull relevant project context via semantic search from the existing Mem0/Qdrant memory store (3,763+ memories).
+**Depends on:** Phase 63 (v1.0.0 complete)
+**Requirements:** None (infrastructure, not macro regime scope)
+**Success Criteria** (what must be TRUE):
+  1. Claude Code can query project memories via MCP tool calls during any session
+  2. Semantic search returns relevant context for representative project queries
+  3. New memories can be stored during sessions and retrieved in subsequent sessions
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 64 to break down)
+
+**Details:**
+- Wrap existing Mem0Client (search, add, get_all) + injection.py (RAG pipeline) as MCP tools
+- Tools: search_memories(query, top_k, category), get_context(query), store_memory(content, category), memory_stats()
+- Register in .claude/settings.json under mcpServers
+- Add CLAUDE.md guidance for when/how to query memories
+- Validate retrieval quality: correct context for representative queries
+- Dependencies: mcp Python SDK, existing mem0ai, qdrant-client
+
+### Phase 65: FRED Table & Core Features
+
+**Goal:** Macro features are available as a daily-aligned table in marketdata, covering rate spreads, yield curve, VIX regime, and dollar strength -- the foundation every downstream macro consumer reads from.
+**Depends on:** Phase 64 (or can start in parallel; no data dependency)
+**Requirements:** FRED-01, FRED-02, FRED-03, FRED-04, FRED-05, FRED-06, FRED-07
+**Success Criteria** (what must be TRUE):
+  1. fred_macro_features table exists with PK (date) and can be queried for any calendar date in the FRED history range
+  2. Mixed-frequency FRED series (monthly, weekly) appear as daily rows with correct forward-fill limits and source_freq provenance
+  3. Net liquidity proxy (WALCL - WTREGEN - RRPONTSYD) computes correctly with weekly forward-fill
+  4. Rate spread features (US-Japan, US-ECB, US-Japan 10Y) and yield curve features (T10Y2Y level, 5d slope change) are populated
+  5. VIX regime labels (calm/elevated/crisis) and dollar strength features (DTWEXBGS level, 5d/20d changes) are populated
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 65 to break down)
+
+### Phase 66: FRED Derived Features & Automation
+
+**Goal:** All remaining macro features -- credit stress, financial conditions, carry trade, fed regime classification, and CPI proxy -- are computed and the entire macro feature pipeline runs automatically in the daily refresh.
+**Depends on:** Phase 65 (core features table must exist)
+**Requirements:** FRED-08, FRED-09, FRED-10, FRED-11, FRED-12, FRED-13, FRED-14, FRED-15, FRED-16, FRED-17
+**Success Criteria** (what must be TRUE):
+  1. Credit stress (HY OAS level, 5d change, 30d z-score), financial conditions (NFCI level, 4-week direction), and M2 YoY change are populated in fred_macro_features
+  2. Carry trade features (DEXJPUS level, 5d pct change, 20d vol, daily z-score) and carry momentum indicator are populated
+  3. Net liquidity 365d rolling z-score and dual-window trend detection are populated
+  4. Fed regime classification (single-target/target-range/zero-bound, hiking/holding/cutting) and TARGET_MID/TARGET_SPREAD are populated
+  5. run_daily_refresh.py runs macro feature computation after FRED sync and before regime computation without manual intervention
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 66 to break down)
+
+### Phase 67: Macro Regime Classifier
+
+**Goal:** A rule-based macro regime labeler produces daily 4-dimensional composite regime keys (monetary policy, liquidity, risk appetite, carry) with hysteresis and YAML-configurable thresholds, stored in cmc_macro_regimes.
+**Depends on:** Phase 66 (all macro features must be available)
+**Requirements:** MREG-01, MREG-02, MREG-03, MREG-04, MREG-05, MREG-06, MREG-07, MREG-08, MREG-09
+**Success Criteria** (what must be TRUE):
+  1. cmc_macro_regimes table contains daily rows with per-dimension labels (monetary_policy, liquidity, risk_appetite, carry) and a composite key like Cutting-Expanding-RiskOn-Stable
+  2. Each dimension uses structural thresholds from YAML config (not hardcoded), and changing a threshold in YAML changes the label without code changes
+  3. Hysteresis prevents rapid regime flapping -- a regime must persist for at least 5 bars before it can transition
+  4. Macro regime refresh runs daily after macro feature computation and before signal generation
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 67 to break down)
+
+### Phase 68: HMM & Macro Analytics
+
+**Goal:** Secondary analytical tools -- HMM regime confirmation, macro-crypto lead-lag quantification, and regime transition probabilities -- provide deeper insight into macro regime quality and predictive power.
+**Depends on:** Phase 67 (macro regime labels and features must exist)
+**Requirements:** MREG-10, MREG-11, MREG-12
+**Success Criteria** (what must be TRUE):
+  1. A 2-3 state GaussianHMM trained on net liquidity + VIX + HY OAS produces state labels that can be compared against rule-based regime labels as a confirmation signal
+  2. Lead-lag analysis using existing lead_lag_max_corr() pattern quantifies the predictive lag of each macro feature on BTC/ETH returns at lags [-20..+20] days
+  3. Regime transition probability matrix is computed from historical macro regime sequences and queryable for any regime-to-regime pair
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 68 to break down)
+
+### Phase 69: L4 Resolver Integration
+
+**Goal:** The macro regime key flows through the existing tighten-only resolver chain as L4, adjusting position sizing for all assets based on macroeconomic state -- without ever loosening constraints.
+**Depends on:** Phase 67 (macro regime labels must exist; Phase 68 is not required)
+**Requirements:** MINT-01, MINT-02, MINT-03, MINT-04, MINT-05, MINT-06, MINT-07
+**Success Criteria** (what must be TRUE):
+  1. resolve_policy_from_table(L4=macro_regime_key) produces valid policy entries for all observed macro regime keys, with size_mult <= 1.0 enforced by assertion
+  2. refresh_cmc_regimes.py loads the latest macro regime and passes it as L4 for every asset, populating cmc_regimes.l4_label
+  3. YAML policy overlay for macro regime entries works via existing policy_loader.py with substring matching for partial patterns
+  4. Executor logs the L4 macro regime alongside L0-L2 per-asset regime for every trade decision
+  5. Adaptive gross_cap from macro regime reduces gross exposure during risk-off conditions
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 69 to break down)
+
+### Phase 70: Cross-Asset Aggregation
+
+**Goal:** Cross-asset signals -- BTC/ETH correlation, aggregate funding rates, and crypto-macro correlation regime -- provide market-wide context that complements per-asset regimes.
+**Depends on:** Phase 65 (FRED core features for macro correlation), Phase 67 (macro regime for correlation context)
+**Requirements:** XAGG-01, XAGG-02, XAGG-03, XAGG-04
+**Success Criteria** (what must be TRUE):
+  1. BTC/ETH 30d rolling correlation is stored as a queryable column in fred_macro_features
+  2. Cross-asset correlation matrix with high-correlation flag (>0.7 = macro-driven market) is computed and stored
+  3. Aggregate funding rate signal with z-score vs 30d/90d history is computed for tracked BTC/ETH perp pairs
+  4. Crypto-macro correlation regime (rolling 60d BTC returns vs VIX, DXY, HY OAS) detects sign flips as anomalies
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 70 to break down)
+
+### Phase 71: Event Risk Gates
+
+**Goal:** Scheduled macro events (FOMC, CPI, NFP) and acute stress indicators (VIX spikes, carry unwinds, credit stress) automatically reduce position sizing through the risk engine, with override capability.
+**Depends on:** Phase 65 (FRED features for VIX/carry/credit data), Phase 69 (resolver integration for policy path)
+**Requirements:** GATE-01, GATE-02, GATE-03, GATE-04, GATE-05, GATE-06, GATE-07, GATE-08, GATE-09
+**Success Criteria** (what must be TRUE):
+  1. dim_macro_events table contains FOMC, CPI, and NFP dates for 2026-2027, and the FOMC gate reduces size_mult within +/-24h of meetings
+  2. VIX spike gate triggers REDUCE at VIX > 30 and FLATTEN at VIX > 40 via flatten_trigger.py
+  3. Carry unwind velocity gate triggers REDUCE at DEXJPUS daily z-score > 2.0 with positive rate spread, and FLATTEN at z-score > 3.0
+  4. Data freshness gate warns at 48h stale FRED data and disables macro regime at 96h, falling back to per-asset only
+  5. Composite macro stress score (0-100) is computed from weighted VIX percentile, HY OAS z-score, carry velocity, and NFCI with tiered response
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 71 to break down)
+
+### Phase 72: Macro Observability
+
+**Goal:** Macro regime state, FRED data health, and macro-driven risk decisions are visible in the dashboard, alerting pipeline, and drift attribution -- providing operational confidence in the macro layer.
+**Depends on:** Phase 67 (regime labels), Phase 69 (resolver integration), Phase 71 (risk gates)
+**Requirements:** OBSV-01, OBSV-02, OBSV-03, OBSV-04, OBSV-05, OBSV-06
+**Success Criteria** (what must be TRUE):
+  1. Streamlit dashboard displays current macro regime with per-dimension labels, color-coded by risk level
+  2. Telegram sends alerts on macro regime transitions, especially to risk-off or carry unwind states
+  3. FRED data freshness appears in pipeline monitor alongside crypto data freshness using traffic-light pattern
+  4. DriftMonitor includes macro regime as a drift attribution source, flagging when macro regime differs between paper and backtest periods
+  5. Macro regime timeline chart overlays regime labels as colored bands on portfolio PnL
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 72 to break down)
+
+### v1.0.1 Progress
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 64. MCP Memory Server | 0/? | Not started | - |
+| 65. FRED Table & Core Features | 0/? | Not started | - |
+| 66. FRED Derived Features & Automation | 0/? | Not started | - |
+| 67. Macro Regime Classifier | 0/? | Not started | - |
+| 68. HMM & Macro Analytics | 0/? | Not started | - |
+| 69. L4 Resolver Integration | 0/? | Not started | - |
+| 70. Cross-Asset Aggregation | 0/? | Not started | - |
+| 71. Event Risk Gates | 0/? | Not started | - |
+| 72. Macro Observability | 0/? | Not started | - |
+
+### v1.0.1 Requirements (55 total)
+
+| Category | Requirements | Phase | Count |
+|----------|--------------|-------|-------|
+| FRED Data Pipeline (core) | FRED-01, FRED-02, FRED-03, FRED-04, FRED-05, FRED-06, FRED-07 | Phase 65 | 7 |
+| FRED Data Pipeline (derived) | FRED-08, FRED-09, FRED-10, FRED-11, FRED-12, FRED-13, FRED-14, FRED-15, FRED-16, FRED-17 | Phase 66 | 10 |
+| Macro Regime (core) | MREG-01, MREG-02, MREG-03, MREG-04, MREG-05, MREG-06, MREG-07, MREG-08, MREG-09 | Phase 67 | 9 |
+| Macro Regime (analytics) | MREG-10, MREG-11, MREG-12 | Phase 68 | 3 |
+| Macro-Asset Integration | MINT-01, MINT-02, MINT-03, MINT-04, MINT-05, MINT-06, MINT-07 | Phase 69 | 7 |
+| Cross-Asset Aggregation | XAGG-01, XAGG-02, XAGG-03, XAGG-04 | Phase 70 | 4 |
+| Event Risk Gates | GATE-01, GATE-02, GATE-03, GATE-04, GATE-05, GATE-06, GATE-07, GATE-08, GATE-09 | Phase 71 | 9 |
+| Observability & Monitoring | OBSV-01, OBSV-02, OBSV-03, OBSV-04, OBSV-05, OBSV-06 | Phase 72 | 6 |
+
+**Coverage:** 55/55 requirements mapped
+
+---
 *Created: 2025-01-22*
-*Last updated: 2026-03-01 (v1.0.0 milestone shipped — 22 phases, 104 plans, all complete)*
+*Last updated: 2026-03-02 (v1.0.1 roadmap created -- Phases 65-72 added for macro regime infrastructure)*
