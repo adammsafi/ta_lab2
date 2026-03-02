@@ -8,9 +8,19 @@ A systematic crypto trading platform with integrated AI orchestration and persis
 
 Build trustworthy quant trading infrastructure 3x faster by creating AI coordination that remembers context, routes work optimally, and eliminates redundant context-setting across sessions and platforms.
 
-## Current State: v1.0.0 SHIPPED (2026-03-01)
+## Current Milestone: v1.0.1 Macro Regime Infrastructure
 
-**Previous:** v0.9.0 Research & Experimentation — SHIPPED 2026-02-24 (8 phases, 38 plans, 43/43 requirements)
+**Goal:** Wire 208K rows of FRED macro data into the regime/risk pipeline — macro feature computation, macro regime labeler, cross-asset aggregation, and risk gates driven by rates, VIX, carry trade, and financial conditions.
+
+**Target features:**
+- Derived FRED series computation (9 series: rate spreads, VIX regime, liquidity proxy, etc.)
+- Macro feature store (rate level, yield curve slope, carry spread, dollar strength, etc.)
+- Macro regime labeler (monetary policy regime, carry trade regime, VIX regime)
+- Macro regime table + wiring into tighten-only resolver chain
+- Cross-asset regime aggregation (market consensus from per-asset L2 labels)
+- Risk gate integration (FOMC gate, VIX gate, carry unwind gate, data freshness gate)
+
+**Previous:** v1.0.0 SHIPPED 2026-03-01 (22 phases, 104 plans, 80/80 requirements)
 
 **v1.0.0 delivered:** Full V1 loop — strategy bake-off, paper-trade executor, risk controls, drift guard, all research tracks answered, feature evaluation across 109 TFs, advanced ML infrastructure, operational dashboard, and V1 Results Memo.
 

@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v1.0.0 SHIPPED — awaiting next milestone
+**Current focus:** v1.0.1 Macro Regime Infrastructure
 
 ## Current Position
 
-Phase: v1.0.0 COMPLETE — all 22 phases (42-63), 104 plans, 80/80 requirements
-Plan: N/A (milestone complete)
-Status: v1.0.0 milestone shipped and archived. 22 phases, 104 plans, 274 files, ~77K lines. Audit passed (80/80 requirements, 8/8 integrations, 4/4 E2E flows). Git tag v1.0.0 pending.
-Last activity: 2026-03-01 — Shipped v1.0.0 milestone
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-02 — Milestone v1.0.1 started
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [████████] Phase 60 COMPLETE (8 plans) | [██] Phase 61 COMPLETE | [██] Phase 62 COMPLETE | [██] Phase 63 COMPLETE
 
