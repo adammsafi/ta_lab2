@@ -1,0 +1,51 @@
+# Docker Compose for ta_lab2 MCP Memory Server + Qdrant
+#
+# Usage:
+#   docker compose -f docker/docker-compose.yml up -d
+#
+# MIGRATION NOTE: If you have an existing Qdrant container with data (3,763+ memories),
+# the named volume "qdrant-storage" below is NEW. Before first run:
+#   1. Check existing volumes: docker volume ls | grep qdrant
+#   2. If data lives in another volume, either:
+#      a. Rename it: docker volume create qdrant-storage && docker run --rm \
+#         -v old_volume:/from -v qdrant-storage:/to alpine sh -c "cp -a /from/. /to/"
+#      b. Or create a Qdrant snapshot and restore after compose up
+#   3. If Qdrant was running with a bind mount, copy data into the named volume
+
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant-storage:/qdrant/storage
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:6333/healthz')\" || curl -sf http://localhost:6333/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  memory-server:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - QDRANT_SERVER_MODE=true
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    env_file:
+      - path: .env
+        required: false
+    depends_on:
+      qdrant:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  qdrant-storage:
