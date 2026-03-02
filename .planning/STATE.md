@@ -10,16 +10,16 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: 64 of 72 -- MCP Memory Server (v1.0.1 Macro Regime Infrastructure)
-Plan: —
-Status: Roadmap complete, ready to plan
-Last activity: 2026-03-02 -- v1.0.1 roadmap created (Phases 65-72 for macro regime infrastructure)
+Plan: 01 of 3 (64-01: MCP Server Tools + Combined ASGI App) COMPLETE
+Status: In progress
+Last activity: 2026-03-02 -- Completed 64-01-PLAN.md (FastMCP tools + combined ASGI app)
 
 ### Roadmap Evolution
 - Phase 64 added: MCP Memory Server -- Connect Qdrant to Claude Code
 - Phases 65-72 added: Macro Regime Infrastructure (FRED pipeline, classifier, L4 integration, risk gates, observability)
 - v1.0.1 roadmap: 9 phases, 55 requirements mapped across 8 requirement categories
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [████████] Phase 60 COMPLETE (8 plans) | [██] Phase 61 COMPLETE | [██] Phase 62 COMPLETE | [██] Phase 63 COMPLETE
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [████████] Phase 60 COMPLETE (8 plans) | [██] Phase 61 COMPLETE | [██] Phase 62 COMPLETE | [██] Phase 63 COMPLETE | [█] Phase 64 (1/3 plans)
 
 ## Performance Metrics
 
@@ -651,6 +651,10 @@ Key constraints to remember:
 - Phases 35 and 36 have no inter-dependency (can plan/execute in either order)
 - Phase 38 depends on Phase 37 (IC is the scoring engine for ExperimentRunner)
 
+- **All MCP tools use Mem0Client exclusively** (Phase 64-01): MCP tools never call ChromaDB search_memories; memory_context adapts Mem0 results to SearchResult dataclass then pipes through format_memories_for_prompt; avoids missing ChromaDB dependency in Docker
+- **MCP lifespan at FastAPI construction time** (Phase 64-01): mcp_app.lifespan passed via create_memory_api(lifespan=) parameter, not post-construction override; safer per research pitfall finding
+- **fastmcp 3.0.2 installed** (Phase 64-01): Standalone package (not mcp SDK bundled FastMCP 1.x); provides latest decorator-based tools, auto schema generation, Streamable HTTP transport
+
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-02-24 (v0.9.0 SHIPPED — milestone archived, v1.0.0 activated)*
+*Last updated: 2026-03-02 (Phase 64-01 MCP Server Tools complete)*
