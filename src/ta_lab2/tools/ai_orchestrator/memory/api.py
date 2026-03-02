@@ -144,8 +144,12 @@ class ConflictResolutionResponse(BaseModel):
     reason: str
 
 
-def create_memory_api() -> FastAPI:
+def create_memory_api(lifespan=None) -> FastAPI:
     """Create FastAPI application for memory API.
+
+    Args:
+        lifespan: Optional ASGI lifespan context manager. When mounting with
+            FastMCP, pass mcp_app.lifespan to share session management.
 
     Returns:
         FastAPI application instance
@@ -154,6 +158,7 @@ def create_memory_api() -> FastAPI:
         title="ta_lab2 Memory API",
         description="Semantic memory search for cross-platform AI access",
         version="1.0.0",
+        lifespan=lifespan,
     )
 
     @app.get("/health")
