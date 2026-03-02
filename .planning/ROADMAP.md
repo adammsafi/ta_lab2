@@ -1329,10 +1329,12 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
   1. Claude Code can query project memories via MCP tool calls during any session
   2. Semantic search returns relevant context for representative project queries
   3. New memories can be stored during sessions and retrieved in subsequent sessions
-**Plans:** 0 plans
+**Plans:** 3 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 64 to break down)
+- [ ] 64-01-PLAN.md -- MCP server tools + combined ASGI app
+- [ ] 64-02-PLAN.md -- Docker infrastructure + Claude Code registration
+- [ ] 64-03-PLAN.md -- End-to-end verification checkpoint
 
 **Details:**
 - Wrap existing Mem0Client (search, add, get_all) + injection.py (RAG pipeline) as MCP tools
@@ -1353,7 +1355,7 @@ Plans:
   3. Net liquidity proxy (WALCL - WTREGEN - RRPONTSYD) computes correctly with weekly forward-fill
   4. Rate spread features (US-Japan, US-ECB, US-Japan 10Y) and yield curve features (T10Y2Y level, 5d slope change) are populated
   5. VIX regime labels (calm/elevated/crisis) and dollar strength features (DTWEXBGS level, 5d/20d changes) are populated
-**Plans:** 0 plans
+**Plans:** 3 plans
 
 Plans:
 - [ ] TBD (run /gsd:plan-phase 65 to break down)
@@ -1369,7 +1371,7 @@ Plans:
   3. Net liquidity 365d rolling z-score and dual-window trend detection are populated
   4. Fed regime classification (single-target/target-range/zero-bound, hiking/holding/cutting) and TARGET_MID/TARGET_SPREAD are populated
   5. run_daily_refresh.py runs macro feature computation after FRED sync and before regime computation without manual intervention
-**Plans:** 0 plans
+**Plans:** 3 plans
 
 Plans:
 - [ ] TBD (run /gsd:plan-phase 66 to break down)
@@ -1384,7 +1386,7 @@ Plans:
   2. Each dimension uses structural thresholds from YAML config (not hardcoded), and changing a threshold in YAML changes the label without code changes
   3. Hysteresis prevents rapid regime flapping -- a regime must persist for at least 5 bars before it can transition
   4. Macro regime refresh runs daily after macro feature computation and before signal generation
-**Plans:** 0 plans
+**Plans:** 3 plans
 
 Plans:
 - [ ] TBD (run /gsd:plan-phase 67 to break down)
@@ -1398,7 +1400,7 @@ Plans:
   1. A 2-3 state GaussianHMM trained on net liquidity + VIX + HY OAS produces state labels that can be compared against rule-based regime labels as a confirmation signal
   2. Lead-lag analysis using existing lead_lag_max_corr() pattern quantifies the predictive lag of each macro feature on BTC/ETH returns at lags [-20..+20] days
   3. Regime transition probability matrix is computed from historical macro regime sequences and queryable for any regime-to-regime pair
-**Plans:** 0 plans
+**Plans:** 3 plans
 
 Plans:
 - [ ] TBD (run /gsd:plan-phase 68 to break down)
@@ -1414,7 +1416,7 @@ Plans:
   3. YAML policy overlay for macro regime entries works via existing policy_loader.py with substring matching for partial patterns
   4. Executor logs the L4 macro regime alongside L0-L2 per-asset regime for every trade decision
   5. Adaptive gross_cap from macro regime reduces gross exposure during risk-off conditions
-**Plans:** 0 plans
+**Plans:** 3 plans
 
 Plans:
 - [ ] TBD (run /gsd:plan-phase 69 to break down)
@@ -1429,7 +1431,7 @@ Plans:
   2. Cross-asset correlation matrix with high-correlation flag (>0.7 = macro-driven market) is computed and stored
   3. Aggregate funding rate signal with z-score vs 30d/90d history is computed for tracked BTC/ETH perp pairs
   4. Crypto-macro correlation regime (rolling 60d BTC returns vs VIX, DXY, HY OAS) detects sign flips as anomalies
-**Plans:** 0 plans
+**Plans:** 3 plans
 
 Plans:
 - [ ] TBD (run /gsd:plan-phase 70 to break down)
@@ -1445,7 +1447,7 @@ Plans:
   3. Carry unwind velocity gate triggers REDUCE at DEXJPUS daily z-score > 2.0 with positive rate spread, and FLATTEN at z-score > 3.0
   4. Data freshness gate warns at 48h stale FRED data and disables macro regime at 96h, falling back to per-asset only
   5. Composite macro stress score (0-100) is computed from weighted VIX percentile, HY OAS z-score, carry velocity, and NFCI with tiered response
-**Plans:** 0 plans
+**Plans:** 3 plans
 
 Plans:
 - [ ] TBD (run /gsd:plan-phase 71 to break down)
@@ -1461,7 +1463,7 @@ Plans:
   3. FRED data freshness appears in pipeline monitor alongside crypto data freshness using traffic-light pattern
   4. DriftMonitor includes macro regime as a drift attribution source, flagging when macro regime differs between paper and backtest periods
   5. Macro regime timeline chart overlays regime labels as colored bands on portfolio PnL
-**Plans:** 0 plans
+**Plans:** 3 plans
 
 Plans:
 - [ ] TBD (run /gsd:plan-phase 72 to break down)
