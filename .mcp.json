@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "ta-lab2-memory": {
+      "type": "http",
+      "url": "http://localhost:8080/mcp/"
+    }
+  }
+}
