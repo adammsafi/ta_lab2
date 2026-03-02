@@ -1358,7 +1358,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 65 to break down)
+- [ ] 65-01-PLAN.md -- Alembic migration + macro computation module (fred_reader, forward_fill, feature_computer)
+- [ ] 65-02-PLAN.md -- CLI refresh script + daily refresh pipeline wiring
+- [ ] 65-03-PLAN.md -- WTREGEN VM addition + end-to-end verification
 
 ### Phase 66: FRED Derived Features & Automation
 
