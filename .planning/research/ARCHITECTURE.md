@@ -1,678 +1,671 @@
-# Architecture Patterns
+# Architecture Patterns: Macro Regime Integration
 
-**Domain:** Quant research & experimentation platform (v0.9.0 milestone)
-**Existing codebase:** ta_lab2 v0.8.0 — multi-TF pipeline with 50+ tables, 22M+ rows
-**Researched:** 2026-02-23
-**Confidence:** HIGH (direct codebase inspection, no guesswork)
-
----
-
-## Existing Architecture Summary
-
-The v0.8.0 system is a layered, database-centric quant pipeline. Understanding it precisely
-is prerequisite to integrating the v0.9.0 features without breaking what already works.
-
-### Pipeline Stages (current)
-
-```
-cmc_price_histories7
-        |
-        v
-[Bar Builders] --> cmc_price_bars_multi_tf (+ 4 cal variants + _u)
-        |
-        v
-[EMA Refreshers] --> cmc_ema_multi_tf (+ 4 cal variants + _u)
-        |           PK: (id, ts, tf, period)
-        |
-        v
-[Returns] --> cmc_returns_bars_multi_tf (+ 4 cal variants + _u)
-              cmc_returns_ema_multi_tf (+ 4 cal variants + _u)
-        |
-        v
-[Feature Refresh] --> cmc_vol, cmc_ta --> cmc_features
-                      PK: (id, ts, tf, alignment_source)
-        |
-        v
-[Regime Refresh] --> cmc_regimes, cmc_regime_flips,
-                     cmc_regime_stats, cmc_regime_comovement
-        |
-        v
-[Signal Generators] --> cmc_signals_ema_crossover,
-                        cmc_signals_rsi_mean_revert,
-                        cmc_signals_atr_breakout
-        |
-        v
-[Backtest] --> cmc_backtest_runs, cmc_backtest_trades, cmc_backtest_metrics
-```
-
-### Key Abstractions (existing, do not break)
-
-| Abstraction | Location | Pattern | Constraints |
-|-------------|----------|---------|-------------|
-| `BaseEMAFeature` | `features/m_tf/base_ema_feature.py` | Template Method | PK: (id, ts, tf, period); `period` is an integer count in units of tf |
-| `BaseEMARefresher` | `scripts/emas/base_ema_refresher.py` | Template Method | State table per refresher; NullPool workers; TF-split parallelism |
-| `BaseFeature` | `scripts/features/base_feature.py` | Template Method | Scoped DELETE+INSERT per (ids, tf); `_get_table_columns()` for DDL sync |
-| `BaseBarBuilder` | `scripts/bars/base_bar_builder.py` | Template Method | All bar tables share same column contract |
-| `run_daily_refresh.py` | `scripts/run_daily_refresh.py` | Subprocess orchestrator | bars->EMAs->regimes->stats; FAIL-gated stats |
+**Domain:** Macro regime infrastructure for existing quant trading platform (ta_lab2)
+**Researched:** 2026-03-01
+**Confidence:** HIGH (based on direct source code analysis of all integration points)
 
 ---
 
-## Critical Design Question: Adaptive MAs and the EMA Table Structure
+## Executive Summary
 
-The central architectural question for v0.9.0 is whether KAMA, DEMA, TEMA, and HMA
-(Adaptive Moving Averages, or AMAs) can share the existing `cmc_ema_multi_tf*` tables
-or need their own table family.
+The existing ta_lab2 regime infrastructure was designed with macro expansion in mind. The `cmc_regimes` table already has `l3_label` and `l4_label` columns (always NULL today). The resolver already accepts `L3` and `L4` keyword arguments and processes them in its tighten-only chain (`L2 -> L1 -> L0 -> L3 -> L4`). The `data_budget.py` already has `L4: 1` (always enabled) in its threshold table. This means macro regime integration is fundamentally a "fill in the empty slot" problem, not a "redesign the architecture" problem.
 
-### Why Sharing Is Incompatible
-
-The existing EMA table family has this PK: `(id, ts, tf, period)`
-
-The `period` column is an integer that means "EMA period in units of tf."
-This is meaningful and unambiguous for standard EMAs: period=21 on tf=1D means
-a 21-bar exponential moving average.
-
-Adaptive MAs do not have a single `period` parameter:
-- **KAMA** (Kaufman Adaptive MA): `efficiency_ratio_period`, `fast_period`, `slow_period`
-- **DEMA** (Double EMA): `period` (equivalent to EMA, but computed differently — not a drop-in)
-- **TEMA** (Triple EMA): `period` (same parameter name, different computation)
-- **HMA** (Hull MA): `period` (same parameter name, uses WMA internally)
-
-Forcing KAMA's three parameters into a single integer `period` column would require:
-- A synthetic key (e.g., a lookup table mapping integer IDs to parameter tuples)
-- That lookup to be joined on every query — adding complexity and breaking the
-  clean query pattern `WHERE period IN (9, 21, 50)`
-
-Additionally, the existing `cmc_ema_multi_tf_u` unified table has:
-```sql
-PRIMARY KEY (id, ts, tf, period)
-```
-KAMA rows would collide with EMA rows if they happened to share the same period integer,
-because the table has no `indicator_type` discriminator column.
-
-### Recommended Design: Separate AMA Table Family
-
-Create a new table family for adaptive MAs:
-
-**New table:** `cmc_ama_multi_tf`
-**PK:** `(id, ts, tf, indicator, params_hash)`
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | INTEGER NOT NULL | Asset ID, FK to dim_assets |
-| `ts` | TIMESTAMPTZ NOT NULL | Bar close timestamp |
-| `tf` | TEXT NOT NULL | Timeframe, FK to dim_timeframe.tf |
-| `indicator` | TEXT NOT NULL | 'KAMA', 'DEMA', 'TEMA', 'HMA' |
-| `params_hash` | TEXT NOT NULL | SHA-256 of JSON params (12 chars, collision-safe at this scale) |
-| `ama` | DOUBLE PRECISION | Adaptive MA value |
-| `d1` | DOUBLE PRECISION | First derivative (per-bar diff) |
-| `d2` | DOUBLE PRECISION | Second derivative |
-| `params_json` | JSONB | Full parameter set: {"er_period":10,"fast":2,"slow":30} |
-| `tf_days` | INTEGER | Denormalized from dim_timeframe |
-| `roll` | BOOLEAN NOT NULL DEFAULT false | Consistent with EMA table convention |
-| `ingested_at` | TIMESTAMPTZ NOT NULL DEFAULT NOW() | For sync watermark |
-
-**Companion dim table:** `dim_ama_params`
-| Column | Type | Notes |
-|--------|------|-------|
-| `params_hash` | TEXT NOT NULL | PK — SHA-256 of canonical JSON |
-| `indicator` | TEXT NOT NULL | 'KAMA', 'DEMA', 'TEMA', 'HMA' |
-| `params_json` | JSONB NOT NULL | Full parameters |
-| `label` | TEXT | Human-readable: "KAMA_10_2_30" |
-| `created_at` | TIMESTAMPTZ NOT NULL DEFAULT NOW() | |
-
-This design:
-- Avoids polluting the EMA table family with a different semantic
-- Allows querying all AMA types in a single table
-- Stores full params without a synthetic integer key
-- The `params_hash` approach is familiar to anyone working with MLflow experiment tracking
-
-**No unified _u table in phase 1.** The existing _u tables unify across alignment variants
-(multi_tf + cal_iso + cal_us + cal_anchor_us + cal_anchor_iso). For v0.9.0, only the
-canonical multi_tf alignment is needed. Add cal variants in a future milestone.
-
-### AMA Hierarchy: Reuse BaseEMAFeature Pattern
-
-The existing `BaseEMAFeature` hierarchy is clean and can be extended. DEMA, TEMA, and HMA
-are single-parameter — they fit the `period` slot cleanly (just computed differently
-from a standard EMA). KAMA is the outlier with three parameters.
-
-**Recommended class hierarchy:**
-
-```
-BaseAMAFeature (new, analogous to BaseEMAFeature)
-    |
-    +-- DEMAFeature    (period -> maps to integer, period=N computes DEMA(N))
-    +-- TEMAFeature    (period -> maps to integer)
-    +-- HMAFeature     (period -> maps to integer)
-    +-- KAMAFeature    (params: er_period, fast_period, slow_period)
-```
-
-`BaseAMAFeature` is NOT a subclass of `BaseEMAFeature` because:
-- Output table is different (`cmc_ama_multi_tf` vs `cmc_ema_multi_tf`)
-- PK columns are different (`params_hash` vs `period`)
-- The `write_to_db` upsert logic differs (conflict on `params_hash` not `period`)
-
-However, `BaseAMAFeature` can copy the same Template Method pattern: `load_source_data`,
-`get_tf_specs`, `compute_ama_for_tf`, `write_to_db`. The bar loading logic
-(`load_source_data`) can be shared by importing the same helper used in EMA subclasses.
-
-**Refresher class:** `BaseAMARefresher` (analogous to `BaseEMARefresher`)
-
-- Reuses same state management pattern: `EMAStateManager` or a new `AMAStateManager`
-  with same schema (id, indicator, params_hash, last_ts)
-- Reuses same worker function pattern (NullPool, per-ID workers)
-- CLI arguments: `--indicator KAMA,DEMA,TEMA,HMA`, `--params-set default`
-
-**Integration into orchestrator:**
-`run_all_ema_refreshes.py` should be renamed or supplemented with `run_all_ma_refreshes.py`
-which runs both EMA and AMA refreshers. The daily orchestrator `run_daily_refresh.py`
-adds `--amas` flag (or includes AMAs in `--emas` flag — the simpler choice is to
-fold AMAs into the existing `--emas` stage, since they share the same dependency on bars).
+The integration requires: (1) a macro feature computation layer that reads FRED data and produces numeric features, (2) a macro labeler that converts features into L4-shaped regime keys, (3) wiring the L4 label into the existing refresh pipeline, and (4) new risk gates that consume macro signals. The existing `integrations/economic/` module (1,766 LOC) should be bypassed -- it is an API client for FRED, but the data already lives locally in `fred.series_values` (208K rows, 39 series). No API calls needed.
 
 ---
 
-## IC Evaluation: New Component
+## Current Architecture (As-Is)
 
-**What it is:** Spearman Information Coefficient (IC) between features and forward returns,
-IC decay across lags, IC turnover.
+### Component Map
 
-**Where it lives:** `src/ta_lab2/analysis/ic_eval.py` (new file)
+```
+                    FRED VM (GCP)
+                        |
+              sync_fred_from_vm.py (SSH+COPY)
+                        |
+                        v
+              fred.series_values (208K rows, 39 series)
+              fred.releases
+              fred.sync_log
+                        |
+                        | (currently: NO consumers)
+                        v
+                    [DEAD END]
 
-**Source data:** `cmc_features` (feature store) + `cmc_returns_bars_multi_tf_u` (forward returns)
 
-**Integration points:**
-
-| Touch point | Change type | Notes |
-|-------------|-------------|-------|
-| `analysis/feature_eval.py` | Extend | Current `feature_target_correlations()` uses Pearson; add Spearman IC version |
-| `analysis/ic_eval.py` | New | IC, IC decay, ICIR, IC turnover |
-| New DB table: `cmc_ic_results` | New | (id, feature_name, tf, lag, ic, ic_ir, computed_at) |
-
-**Schema for `cmc_ic_results`:**
-```sql
-CREATE TABLE IF NOT EXISTS public.cmc_ic_results (
-    run_id          TEXT NOT NULL,         -- UUID or timestamp-based run identifier
-    feature_name    TEXT NOT NULL,
-    tf              TEXT NOT NULL,
-    lag             INTEGER NOT NULL,      -- forward return horizon in bars
-    ic              DOUBLE PRECISION,      -- Spearman IC
-    ic_ir           DOUBLE PRECISION,      -- IC / std(IC) = IC information ratio
-    ic_mean         DOUBLE PRECISION,      -- rolling mean of IC
-    n_obs           INTEGER,
-    computed_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    PRIMARY KEY (run_id, feature_name, tf, lag)
-);
+    cmc_price_bars_multi_tf
+            |
+            v
+    load_regime_input_data()          <- regime_data_loader.py
+            |
+            v
+    label_layer_monthly()  (L0)       <- labels.py
+    label_layer_weekly()   (L1)       <- labels.py
+    label_layer_daily()    (L2)       <- labels.py
+            |
+            v
+    HysteresisTracker.update()        <- hysteresis.py
+            |
+            v
+    resolve_policy_from_table()       <- resolver.py
+    (chain: L2 -> L1 -> L0 -> L3=None -> L4=None)
+            |
+            v
+    write_regimes_to_db()             <- refresh_cmc_regimes.py
+            |
+            v
+    cmc_regimes  (PK: id, ts, tf)
+    cmc_regime_flips
+    cmc_regime_stats
+    cmc_regime_comovement
+            |
+            +-------> position_sizer.py  (reads regime_key, applies size_mult)
+            +-------> regime_router.py   (reads l2_label, routes ML sub-models)
+            +-------> risk_engine.py     (reads tail_risk_state, not regime labels directly)
+            +-------> drift/attribution.py (Step 6: regime delta comparison)
 ```
 
-**No changes to daily refresh pipeline.** IC evaluation is on-demand analysis,
-not a scheduled refresh step. It runs from notebooks or CLI scripts in the analysis
-tier, not from `run_daily_refresh.py`.
+### Key Files and Their Roles
 
----
+| File | Path | Role | Integration Point |
+|------|------|------|-------------------|
+| `resolver.py` | `src/ta_lab2/regimes/resolver.py` | Tighten-only policy combiner | `resolve_policy_from_table(L0=, L1=, L2=, L3=, L4=)` -- L4 slot is ready |
+| `labels.py` | `src/ta_lab2/regimes/labels.py` | Per-asset labelers (L0-L3) | Add L4 labeler or create separate macro labeler |
+| `hysteresis.py` | `src/ta_lab2/regimes/hysteresis.py` | Tighten-immediate, loosen-after-N | Works with any layer key string -- no changes needed |
+| `data_budget.py` | `src/ta_lab2/regimes/data_budget.py` | Layer enablement thresholds | L4 threshold already set to 1 (always enabled) |
+| `proxies.py` | `src/ta_lab2/regimes/proxies.py` | BTC weekly fallback for young assets | No changes needed (macro is asset-agnostic) |
+| `refresh_cmc_regimes.py` | `src/ta_lab2/scripts/regimes/refresh_cmc_regimes.py` | Main refresh orchestrator | Must add L4 label computation + pass to resolver |
+| `policy_loader.py` | `src/ta_lab2/regimes/policy_loader.py` | YAML policy overlay | Add macro-regime policy rules to YAML |
+| `risk_engine.py` | `src/ta_lab2/risk/risk_engine.py` | 7-gate order risk engine | Add new macro-triggered gates |
+| `position_sizer.py` | `src/ta_lab2/executor/position_sizer.py` | Regime-adjusted sizing | Already reads regime_key -- tighten-only propagation sufficient |
+| `regime_router.py` | `src/ta_lab2/ml/regime_router.py` | Per-regime ML model dispatch | Could add macro-regime routing dimension |
+| `sync_fred_from_vm.py` | `src/ta_lab2/scripts/etl/sync_fred_from_vm.py` | FRED data sync from GCP VM | Working, incremental, 39 series -- needs to run before macro features |
+| `run_daily_refresh.py` | `src/ta_lab2/scripts/run_daily_refresh.py` | Pipeline orchestrator | Must add macro_features stage before regimes |
+| `fred_provider.py` | `src/ta_lab2/integrations/economic/fred_provider.py` | FRED API client (UNUSED) | BYPASS -- data already local via sync pipeline |
+| `attribution.py` | `src/ta_lab2/drift/attribution.py` | 6-source drift decomposition | Step 6 (regime) already exists -- macro adds a new attribution dimension |
 
-## PSR: Replace Placeholder in metrics.py
+### Resolver Chain Detail
 
-**Current state:** `backtests/metrics.py` contains `psr_placeholder()` — a sigmoid
-approximation that is acknowledged as a stub. The comment explicitly calls for
-"the full PSR (Lopez de Prado) or use mlfinlab."
-
-**Recommended approach:** Implement PSR natively in `metrics.py` (no new library).
-
-Lopez de Prado's PSR formula (from "The Sharpe Ratio Efficient Frontier", 2012):
-```
-PSR(SR*) = Phi(((SR_hat - SR*) * sqrt(T-1)) / sqrt(1 - skew*SR_hat + (kurtosis-1)/4 * SR_hat^2))
-```
-Where `Phi` is the standard normal CDF.
-
-This requires: scipy.stats.norm.cdf — scipy is already in the environment.
-
-**Integration:**
-- Modify `backtests/metrics.py`: Replace `psr_placeholder()` with `psr()` that takes
-  `returns: pd.Series, benchmark_sr: float = 0.0` and returns a float in (0, 1).
-- Add `dsr()` function (Deflated Sharpe Ratio — accounts for multiple testing).
-- No schema changes — PSR is a scalar metric stored in `cmc_backtest_metrics` already.
-- Update `summarize()` to call the real implementation.
-
-**Confidence:** MEDIUM — the formula is well-documented but the exact scaling
-(T-1 vs T, population vs sample moments) needs verification against a reference
-implementation before trusting outputs.
-
----
-
-## Purged K-Fold: New Component in backtests/
-
-**Current state:** `backtests/splitters.py` has expanding walk-forward by calendar years.
-No purging, no embargo. This is inadequate for financial ML (label overlap creates
-look-ahead bias in CV).
-
-**What purged K-fold adds:**
-- Embargo: N bars dropped after each train fold boundary (prevents label overlap)
-- Purging: removes training samples whose labels overlap with test period
-- Lopez de Prado's CPCV (Combinatorial Purged Cross-Validation) is the gold standard
-
-**Recommended design:**
+The resolver processes layers in this order (line 125 of `resolver.py`):
 
 ```python
-# backtests/splitters.py additions
-
-@dataclass
-class PurgedKFoldSplit:
-    """One fold of purged time-series K-fold."""
-    fold: int
-    train_idx: np.ndarray
-    test_idx: np.ndarray
-    embargo_idx: np.ndarray    # excluded indices between train and test
-
-
-def purged_kfold_splits(
-    index: pd.DatetimeIndex,
-    n_splits: int = 5,
-    embargo_pct: float = 0.01,   # fraction of total samples to embargo
-) -> list[PurgedKFoldSplit]:
-    """
-    Purged K-fold splitter for time-series data.
-    Implements the approach from Lopez de Prado (2018), Chapter 7.
-    """
-    ...
+for key in (L2, L1, L0, L3, L4):
+    if key:
+        policy = _tighten(policy, _match_policy(key, policy_table))
+    if key and "Stressed" in key:
+        policy.orders = "passive"
 ```
 
-**Integration points:**
+**Critical insight:** L4 is processed LAST, meaning it has the final tighten-only pass. A macro "Recession" or "Tightening" label in L4 can override everything below it by tightening size_mult, widening stops, and forcing passive orders. This is exactly the desired behavior -- macro conditions should be the final override.
 
-| Touch point | Change type | Notes |
-|-------------|-------------|-------|
-| `backtests/splitters.py` | Add functions | Add `purged_kfold_splits()`, `PurgedKFoldSplit` |
-| `backtests/orchestrator.py` | Optional | Plumb purged CV into parameter sweep if desired |
-| `analysis/parameter_sweep.py` | Optional | Support new splitter type |
+### cmc_regimes Table Schema
 
-No schema changes — purged K-fold is a computation utility, results go into
-existing `cmc_backtest_metrics`.
-
----
-
-## Feature Experimentation Framework: New Subsystem
-
-**What it is:** A config-driven registry that tracks feature lifecycle
-(experimental -> promoted -> deprecated) and enables systematic IC evaluation
-across features without ad-hoc scripting.
-
-**Design notes from MEMORY.md:**
-> Config-driven feature registry with lifecycle: experimental -> promoted -> deprecated
-> Compute engine reuses existing indicator functions on persisted base data
-> Evaluation layer for IC, feature importance, stability across assets/TFs
-
-**Recommended architecture:**
-
-### New Tables
-
-**`dim_feature_registry`** — tracks feature definitions and lifecycle:
 ```sql
-CREATE TABLE IF NOT EXISTS public.dim_feature_registry (
-    feature_id      SERIAL PRIMARY KEY,
-    feature_name    TEXT NOT NULL UNIQUE,    -- e.g. 'kama_10_2_30_d1'
-    indicator_type  TEXT NOT NULL,           -- 'AMA', 'TA', 'VOL', 'RETURNS'
-    params_json     JSONB,                   -- {"er_period":10, "fast":2, "slow":30}
-    status          TEXT NOT NULL DEFAULT 'experimental',  -- experimental/promoted/deprecated
-    source_table    TEXT NOT NULL,           -- 'cmc_ama_multi_tf' or 'cmc_features'
-    source_column   TEXT NOT NULL,           -- column name in source table
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    promoted_at     TIMESTAMPTZ,
-    deprecated_at   TIMESTAMPTZ,
-    notes           TEXT
+CREATE TABLE public.cmc_regimes (
+    id                  INTEGER         NOT NULL,
+    ts                  TIMESTAMPTZ     NOT NULL,
+    tf                  TEXT            NOT NULL DEFAULT '1D',
+    l0_label            TEXT            NULL,       -- Monthly (cycle)
+    l1_label            TEXT            NULL,       -- Weekly (primary trend)
+    l2_label            TEXT            NULL,       -- Daily (tactical)
+    l3_label            TEXT            NULL,       -- Intraday (UNUSED)
+    l4_label            TEXT            NULL,       -- Execution/Macro (UNUSED)
+    regime_key          TEXT            NOT NULL,
+    size_mult           DOUBLE PRECISION NOT NULL DEFAULT 1.0,
+    stop_mult           DOUBLE PRECISION NOT NULL DEFAULT 1.5,
+    orders              TEXT            NOT NULL DEFAULT 'mixed',
+    gross_cap           DOUBLE PRECISION NOT NULL DEFAULT 1.0,
+    pyramids            BOOLEAN         NOT NULL DEFAULT TRUE,
+    feature_tier        TEXT            NOT NULL DEFAULT 'lite',
+    l0_enabled          BOOLEAN         NOT NULL DEFAULT FALSE,
+    l1_enabled          BOOLEAN         NOT NULL DEFAULT FALSE,
+    l2_enabled          BOOLEAN         NOT NULL DEFAULT FALSE,
+    regime_version_hash TEXT            NULL,
+    updated_at          TIMESTAMPTZ     DEFAULT now(),
+    PRIMARY KEY (id, ts, tf)
 );
 ```
 
-**`cmc_feature_experiments`** — IC evaluation results linked to registry:
+**Important:** The schema has `l3_label` and `l4_label` columns but no `l3_enabled`/`l4_enabled` columns. Adding `l4_enabled` would require a migration. However, since `data_budget.py` already has `L4: 1` (always enabled), and the column can simply be populated, a new boolean column is optional but recommended for consistency.
+
+---
+
+## Recommended Architecture (To-Be)
+
+### Decision 1: Where Do Macro Features Live?
+
+**Recommendation: New `fred_macro_features` table (NOT extension of `cmc_features`).**
+
+Rationale:
+- `cmc_features` is PK'd on `(id, ts, tf)` -- it is per-asset, per-timeframe. Macro features are NOT per-asset. They are market-wide indicators (yield curve slope, MOVE index, CLI diffusion, etc.) that apply identically to all crypto assets.
+- Stuffing macro columns into `cmc_features` would duplicate the same macro row across all 100+ assets, wasting storage and creating confusion about which `id` to read.
+- A separate table with PK `(date)` is clean, simple, and correctly models the domain: macro features are a time series, not per-asset.
+
+**Proposed schema:**
+
 ```sql
-CREATE TABLE IF NOT EXISTS public.cmc_feature_experiments (
-    experiment_id   TEXT NOT NULL,           -- e.g. 'exp_kama_2026_02_23'
-    feature_id      INTEGER REFERENCES dim_feature_registry(feature_id),
-    tf              TEXT NOT NULL,
-    lag             INTEGER NOT NULL,
-    ic_mean         DOUBLE PRECISION,
-    ic_ir           DOUBLE PRECISION,
-    ic_decay_half   INTEGER,                 -- lag at which IC drops to 50% of peak
-    n_assets        INTEGER,
-    n_obs           INTEGER,
-    computed_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    PRIMARY KEY (experiment_id, feature_id, tf, lag)
+CREATE TABLE public.fred_macro_features (
+    date                DATE            NOT NULL PRIMARY KEY,
+
+    -- Yield curve
+    yield_spread_10y2y  DOUBLE PRECISION NULL,   -- T10Y2Y (10yr - 2yr)
+    yield_spread_10y3m  DOUBLE PRECISION NULL,   -- T10Y3M (10yr - 3mo)
+    yield_curve_slope   DOUBLE PRECISION NULL,   -- Derived: normalized spread
+
+    -- Rates
+    fed_funds_rate      DOUBLE PRECISION NULL,   -- FEDFUNDS
+    fed_funds_delta_3m  DOUBLE PRECISION NULL,   -- 3-month change
+
+    -- Credit spreads
+    baa_aaa_spread      DOUBLE PRECISION NULL,   -- BAA10Y - AAA10Y
+    baa_aaa_zscore      DOUBLE PRECISION NULL,   -- Rolling z-score (252d)
+
+    -- Money & liquidity
+    m2_yoy_pct          DOUBLE PRECISION NULL,   -- M2 YoY growth
+    m2_momentum         DOUBLE PRECISION NULL,   -- 3-month rate of change
+
+    -- Volatility
+    move_index          DOUBLE PRECISION NULL,   -- MOVE (bond vol) when available
+    vix_level           DOUBLE PRECISION NULL,   -- VIXCLS when available
+
+    -- Labor market
+    unemployment_rate   DOUBLE PRECISION NULL,   -- UNRATE
+    nfp_mom             DOUBLE PRECISION NULL,   -- PAYEMS month-over-month
+
+    -- Inflation
+    cpi_yoy             DOUBLE PRECISION NULL,   -- CPIAUCSL YoY
+    pce_yoy             DOUBLE PRECISION NULL,   -- PCEPI YoY
+
+    -- Leading indicators
+    cli_oecd            DOUBLE PRECISION NULL,   -- OECD CLI
+    sahm_indicator      DOUBLE PRECISION NULL,   -- SAHMREALTIME
+    pmi_manufacturing   DOUBLE PRECISION NULL,   -- ISM PMI proxy
+
+    -- Composite scores (computed)
+    macro_risk_score    DOUBLE PRECISION NULL,   -- Weighted composite [0..1]
+    liquidity_score     DOUBLE PRECISION NULL,   -- M2 + rates composite
+    growth_score        DOUBLE PRECISION NULL,   -- Employment + PMI composite
+    stress_score        DOUBLE PRECISION NULL,   -- Spreads + vol composite
+
+    -- L4 regime label (derived from composites)
+    l4_macro_label      TEXT            NULL,     -- e.g. "Expansion-EasyMoney-LowStress"
+
+    -- Metadata
+    computed_at         TIMESTAMPTZ     DEFAULT now(),
+    source_freshness    DATE            NULL      -- Latest FRED observation used
 );
+
+-- Index for range queries
+CREATE INDEX idx_fred_macro_features_date
+    ON public.fred_macro_features (date DESC);
 ```
 
-### New Python Module: `src/ta_lab2/research/`
+### Decision 2: Where Does the Macro Labeler Live?
 
-This is a new top-level module (not under `scripts/` or `analysis/`) because it
-spans computation, evaluation, and persistence in ways that do not fit cleanly into
-the existing layer structure.
+**Recommendation: New `regimes/macro_labels.py` (NOT extension of `labels.py`).**
+
+Rationale:
+- The existing labelers in `labels.py` all share the same pattern: they operate on a per-asset DataFrame with price/EMA/ATR columns. Macro labeling is fundamentally different -- it reads from `fred_macro_features`, not from price bars.
+- The output is still a string label compatible with the resolver's `_match_policy()` pattern matching, so it plugs in seamlessly.
+- Keeping it separate makes testing easier (mock FRED data, not price data).
+
+**Proposed module:**
+
+```python
+# src/ta_lab2/regimes/macro_labels.py
+
+def label_macro_regime(macro_df: pd.DataFrame) -> pd.Series:
+    """
+    Classify macro environment into regime labels for L4.
+
+    Returns Series of labels like:
+    - "Expansion-EasyMoney-LowStress"
+    - "Contraction-TightMoney-HighStress"
+    - "Transition-NeutralMoney-RisingStress"
+
+    Format: "{growth}-{liquidity}-{stress}" to match resolver pattern.
+    """
+```
+
+**Label taxonomy for L4 (compatible with resolver's substring matching):**
+
+| Dimension | Values | Source Features |
+|-----------|--------|----------------|
+| Growth | Expansion / Transition / Contraction | CLI, employment, PMI |
+| Liquidity | EasyMoney / NeutralMoney / TightMoney | M2, fed funds rate/delta |
+| Stress | LowStress / RisingStress / HighStress | Credit spreads, MOVE, VIX |
+
+This produces 27 possible L4 labels. The resolver matches via substring, so policy rules can target:
+- `"Contraction-"` -- any contraction (broad match)
+- `"-HighStress"` -- any stress state (broad match)
+- `"Contraction-TightMoney-HighStress"` -- exact (most restrictive)
+
+### Decision 3: How Does L4 Connect to the Resolver?
+
+**Recommendation: Use the existing L4 slot -- no new chain, no overlay, no pre-L0 bypass.**
+
+The resolver already processes `L4` as the final tighten-only pass. This is the correct architecture because:
+
+1. Macro conditions should tighten, never loosen. If per-asset regimes say "Up-Normal-Normal" (full size), but macro says "Contraction-TightMoney-HighStress", the final policy should be tightened. The resolver's `_tighten()` function guarantees this:
+   - `size_mult = min(current, macro_suggested)`
+   - `stop_mult = max(current, macro_suggested)`
+   - `orders` can only degrade toward "passive"
+   - `gross_cap = min(current, macro_suggested)`
+
+2. L4 is processed last, so it is the ultimate override. No per-asset layer can undo a macro tightening.
+
+**Required changes to `refresh_cmc_regimes.py` (lines ~446-454):**
+
+```python
+# CURRENT (line 447-454):
+policy = resolve_policy_from_table(
+    policy_table,
+    L0=l0_val,
+    L1=l1_val,
+    L2=l2_val,
+    L3=None,
+    L4=None,  # <-- Currently hardcoded None
+)
+
+# PROPOSED:
+policy = resolve_policy_from_table(
+    policy_table,
+    L0=l0_val,
+    L1=l1_val,
+    L2=l2_val,
+    L3=None,
+    L4=l4_val,  # <-- From macro labeler, same for all assets
+)
+```
+
+**Required policy table additions (in `configs/regime_policies.yaml`):**
+
+```yaml
+rules:
+  # Macro L4 tightening rules
+  - match: "Contraction-TightMoney-HighStress"
+    size_mult: 0.20
+    stop_mult: 2.50
+    orders: "passive"
+    gross_cap: 0.30
+    pyramids: false
+
+  - match: "Contraction-"
+    size_mult: 0.40
+    stop_mult: 2.00
+    orders: "conservative"
+    gross_cap: 0.50
+
+  - match: "-HighStress"
+    size_mult: 0.50
+    stop_mult: 2.00
+    orders: "passive"
+
+  - match: "-TightMoney-"
+    size_mult: 0.70
+    stop_mult: 1.75
+    orders: "conservative"
+
+  - match: "Expansion-EasyMoney-LowStress"
+    size_mult: 1.00  # no tightening in benign macro
+    stop_mult: 1.25
+    orders: "mixed"
+```
+
+### Decision 4: Cross-Asset Aggregation
+
+**Recommendation: Store in `fred_macro_features` composite scores; no separate aggregation table.**
+
+Cross-asset aggregation (e.g., "what percentage of assets are in a down regime?") is a second-order concern. The primary value of macro regimes is the exogenous signal from FRED data. Cross-asset regime consensus can be computed from `cmc_regimes` on-the-fly:
+
+```sql
+SELECT
+    ts,
+    COUNT(*) FILTER (WHERE l2_label LIKE 'Down%') AS n_down,
+    COUNT(*) FILTER (WHERE l2_label LIKE 'Up%') AS n_up,
+    COUNT(*) AS n_total,
+    COUNT(*) FILTER (WHERE l2_label LIKE 'Down%')::float / NULLIF(COUNT(*), 0) AS pct_down
+FROM cmc_regimes
+WHERE tf = '1D' AND ts = (SELECT MAX(ts) FROM cmc_regimes WHERE tf = '1D')
+GROUP BY ts;
+```
+
+If this query becomes a bottleneck (unlikely with ~100 assets), materialize it as a view. But do not create a separate table now -- YAGNI.
+
+The `fred_macro_features.macro_risk_score` column serves as the primary cross-signal aggregation point. It combines yield curve, credit spreads, and growth indicators into a single 0-to-1 score. This is sufficient for V1.
+
+### Decision 5: New Risk Gates
+
+**Recommendation: Add a "Macro Override" gate to `risk_engine.py` as Gate 1.7, after tail risk but before circuit breaker.**
+
+The existing risk engine has this gate order:
+1. Kill switch
+1.5. Tail risk (FLATTEN/REDUCE)
+1.6. Margin/liquidation check
+2. Circuit breaker
+3. Per-asset position cap
+4. Portfolio utilization cap
+5. All pass
+
+**Proposed new gate:**
 
 ```
-src/ta_lab2/research/
-    __init__.py
-    registry.py          # FeatureRegistry class -- CRUD on dim_feature_registry
-    experiment.py        # ExperimentRunner -- run IC eval for a set of features
-    ic_eval.py           # IC computation (imported from analysis/ or standalone)
-    lifecycle.py         # promote(), deprecate(), compare_generations()
-    reports.py           # summary tables, markdown reports
+1.   Kill switch
+1.5  Tail risk
+1.6  Margin/liquidation
+1.7  MACRO REGIME OVERRIDE (NEW)
+2.   Circuit breaker
+3.   Per-asset position cap (now macro-adjusted)
+4.   Portfolio utilization cap (now macro-adjusted)
+5.   All pass
 ```
 
-**`FeatureRegistry`** is a thin wrapper over `dim_feature_registry`:
-- `register(feature_name, indicator_type, params, source_table, source_column)`
-- `promote(feature_name)` / `deprecate(feature_name)`
-- `list_by_status(status)` -> list of feature definitions
-- `get(feature_name)` -> single feature definition
+Gate 1.7 reads the latest macro risk score from `fred_macro_features` and:
+- **macro_risk_score > 0.8**: Block all new buy orders (similar to tail risk FLATTEN but macro-driven)
+- **macro_risk_score > 0.6**: Halve max_position_pct and max_portfolio_pct
+- **macro_risk_score > 0.4**: Reduce gross_cap by 20%
+- **macro_risk_score <= 0.4**: Pass (no additional tightening)
 
-**`ExperimentRunner`**:
-- Accepts a list of feature names from the registry
-- Loads feature values from their `source_table.source_column`
-- Computes IC against forward returns from `cmc_returns_bars_multi_tf_u`
-- Writes results to `cmc_feature_experiments`
-- No side effects on the main pipeline tables
+This is separate from the L4 tighten-only policy overlay because:
+1. L4 adjusts the per-bar regime policy in `cmc_regimes` (slow signal, changes daily)
+2. Gate 1.7 reads the live macro score at order time (fast signal, could react to intra-day FRED releases)
 
-**Integration with existing pipeline:**
-None required for the framework itself. The framework reads from existing tables;
-it does not write back to them. New AMA values (from `cmc_ama_multi_tf`) become
-candidates for registration in `dim_feature_registry` and inclusion in experiments.
+**Implementation in `risk_engine.py`:**
+
+```python
+def _check_macro_gate(self, order_side: str) -> Optional[str]:
+    """Gate 1.7: Macro regime override."""
+    if order_side.lower() == "sell":
+        return None  # Sells always allowed (reducing exposure)
+
+    try:
+        with self._engine.connect() as conn:
+            row = conn.execute(text("""
+                SELECT macro_risk_score, stress_score
+                FROM fred_macro_features
+                WHERE date <= CURRENT_DATE
+                ORDER BY date DESC LIMIT 1
+            """)).fetchone()
+
+        if row is None:
+            return None  # No macro data -> pass
+
+        macro_score = float(row[0]) if row[0] is not None else 0.0
+
+        if macro_score > 0.8:
+            self._log_event(
+                event_type="macro_regime_blocked",
+                trigger_source="macro_regime",
+                reason=f"Macro risk score {macro_score:.3f} > 0.8 -- new buys blocked",
+            )
+            return "blocked"
+
+        if macro_score > 0.6:
+            # Not blocking, but caller should halve limits
+            return "reduce"
+
+    except Exception as exc:
+        logger.debug("Gate 1.7 macro check failed: %s -- passing", exc)
+        return None
+
+    return None
+```
+
+### Decision 6: Daily Refresh Pipeline Changes
+
+**Recommendation: Insert `macro_features` stage between `desc_stats` and `regimes` in the pipeline.**
+
+Current pipeline order (from `run_daily_refresh.py` line 2097):
+```
+bars -> EMAs -> AMAs -> desc_stats -> regimes -> features -> signals -> portfolio -> executor -> drift -> stats
+```
+
+Proposed pipeline order:
+```
+bars -> EMAs -> AMAs -> desc_stats -> fred_sync -> macro_features -> regimes -> features -> signals -> portfolio -> executor -> drift -> stats
+                                      ^^^^^^^^    ^^^^^^^^^^^^^^^
+                                      NEW STAGE    NEW STAGE
+```
+
+**Stage: `fred_sync`**
+- Runs `sync_fred_from_vm.py --incremental` (already exists)
+- Timeout: 120s (fast SSH COPY, existing TIMEOUT_EXCHANGE_PRICES = 120 is a good model)
+- Failure mode: warn-and-continue (regime pipeline can still run with stale FRED data)
+
+**Stage: `macro_features`**
+- New script: `scripts/macro/refresh_macro_features.py`
+- Reads from `fred.series_values`, computes features, writes to `fred_macro_features`
+- Computes L4 label and stores it for use by the regime refresh stage
+- Timeout: 300s (simple computation, ~39 series, ~208K rows)
+- Failure mode: warn-and-continue (regimes still work with L4=None)
+
+The regime refresh stage (`refresh_cmc_regimes.py`) then reads the latest L4 label from `fred_macro_features` once, and passes it to every asset's `compute_regimes_for_id()` call. Since macro features are asset-agnostic, the L4 label is computed ONCE and reused for all assets (no per-asset macro computation).
+
+### Decision 7: Should `integrations/economic/` Be Revived or Bypassed?
+
+**Recommendation: BYPASS. Use direct SQL reads from `fred.series_values`.**
+
+Rationale:
+1. The data is already local. `fred.series_values` has 208K rows across 39 series, synced incrementally via `sync_fred_from_vm.py`. No API calls to FRED are needed.
+2. `FredProvider` is an API client with rate limiting, circuit breaker, and caching -- infrastructure for live API calls. Macro feature computation reads historical data from a local table. These are different use cases.
+3. The existing sync pipeline (`sync_fred_from_vm.py`) handles data freshness, integrity verification, and even VM purging. It is production-tested and working.
+4. Reviving 1,766 LOC of API client code for a use case that does not need API calls creates unnecessary coupling and test surface.
+
+The `integrations/economic/` module remains deferred (not abandoned). If a future phase needs live API calls (e.g., intra-day economic releases, custom series not on the VM), it can be revived then.
 
 ---
 
-## Streamlit Dashboard: New Application
+## New Components Needed
 
-**What it is:** Two-panel research explorer and pipeline monitor.
+### New Files
 
-**Where it lives:** `apps/dashboard/` at project root (not inside src/).
+| File | Purpose | Est. LOC |
+|------|---------|----------|
+| `src/ta_lab2/regimes/macro_labels.py` | L4 macro regime labeler | ~150 |
+| `src/ta_lab2/regimes/macro_features.py` | FRED-to-features computation (transforms, z-scores, composites) | ~300 |
+| `src/ta_lab2/scripts/macro/refresh_macro_features.py` | CLI script: read FRED, compute features, write table, compute L4 | ~200 |
+| `src/ta_lab2/scripts/macro/__init__.py` | Package init | ~1 |
+| `sql/macro/100_fred_macro_features.sql` | DDL for `fred_macro_features` table | ~80 |
+| `alembic/versions/xxx_macro_regime_tables.py` | Migration: create table + add l4_enabled column | ~60 |
+| `configs/macro_regime_policies.yaml` | L4 policy rules for resolver | ~50 |
+| `tests/test_macro_labels.py` | Unit tests for macro labeler | ~200 |
+| `tests/test_macro_features.py` | Unit tests for feature computation | ~200 |
 
-**Rationale for `apps/` not `src/ta_lab2/viz/`:** Streamlit apps are not library code.
-They should not be importable as package modules and should not affect the package's
-import graph. Dashboard code in the package root would pollute package imports, add
-Streamlit as a hard dependency, and slow down test collection.
+### Modified Files
 
-```
-apps/
-    dashboard/
-        __init__.py     (empty)
-        app.py          # Streamlit entry point
-        pages/
-            01_pipeline_monitor.py
-            02_feature_explorer.py
-            03_backtest_results.py
-            04_regime_view.py
-        components/
-            charts.py   # plotly wrappers
-            tables.py   # st.dataframe helpers
-            db.py       # cached DB queries via st.cache_data
-```
-
-**Data flow:** All DB reads, no writes. Queries existing tables directly via SQLAlchemy.
-Streamlit's `st.cache_data` (TTL-based) handles query caching to avoid hammering the DB.
-
-**Integration points:**
-
-| Touch point | Change type | Notes |
-|-------------|-------------|-------|
-| `src/ta_lab2/config.py` | Read-only | Dashboard imports `resolve_db_url()` for connection |
-| `src/ta_lab2/analysis/` | Read-only | Dashboard calls existing `evaluate_signals()`, `sharpe()`, etc. |
-| `pyproject.toml` | Add optional dep group | `[project.optional-dependencies] viz = ["streamlit", "plotly"]` |
-| No pipeline tables modified | None | Dashboard is read-only |
-
-**CI:** Dashboard is excluded from test coverage. Add a basic
-`streamlit run apps/dashboard/app.py --headless` smoke-test in CI only if Streamlit is
-installed (conditional on optional dep group being installed).
+| File | Change | Risk |
+|------|--------|------|
+| `src/ta_lab2/regimes/resolver.py` | Add macro-specific policy patterns to DEFAULT_POLICY_TABLE | LOW -- additive only, substring matching is backwards-compatible |
+| `src/ta_lab2/scripts/regimes/refresh_cmc_regimes.py` | Load L4 label from fred_macro_features, pass to resolver | MEDIUM -- core regime pipeline, but change is minimal (add 1 query + pass L4) |
+| `src/ta_lab2/risk/risk_engine.py` | Add Gate 1.7 (macro override) | MEDIUM -- new gate in existing chain, must not break existing gates |
+| `src/ta_lab2/scripts/run_daily_refresh.py` | Add `fred_sync` and `macro_features` stages | LOW -- pattern is well-established (copy from existing stages) |
+| `src/ta_lab2/regimes/__init__.py` | Export macro_labels | LOW -- additive only |
+| `configs/regime_policies.yaml` | Add L4 macro rules | LOW -- YAML overlay, existing rules untouched |
 
 ---
 
-## Jupyter Notebooks: Integration Pattern
-
-**Where they live:** `notebooks/` at project root (already conventional for quant projects).
-
-**Pattern:** All notebooks import from `ta_lab2` package. They do not copy-paste pipeline
-code. This enforces that notebook code is a thin consumer of library functions.
+## Data Flow Diagram (To-Be)
 
 ```
-notebooks/
-    01_ama_exploration.ipynb
-    02_ic_evaluation_walkthrough.ipynb
-    03_purged_kfold_demo.ipynb
-    04_feature_experimentation_demo.ipynb
-    05_regime_overlay_backtest.ipynb
+    GCP VM (freddata DB)
+         |
+         | sync_fred_from_vm.py (SSH+COPY, incremental)
+         v
+    fred.series_values (39 series, 208K rows)
+    PK: (series_id, date)
+         |
+         | refresh_macro_features.py (NEW)
+         | 1. Read relevant series (yield curve, credit, M2, employment...)
+         | 2. Compute transforms (spreads, z-scores, momentum, YoY)
+         | 3. Compute composite scores (macro_risk, liquidity, growth, stress)
+         | 4. Compute L4 label from composites
+         | 5. Write to fred_macro_features
+         v
+    fred_macro_features (NEW)
+    PK: (date)
+    Cols: yield_spread_10y2y, baa_aaa_spread, m2_yoy_pct,
+          macro_risk_score, l4_macro_label, ...
+         |
+         |    +--- cmc_price_bars_multi_tf
+         |    |        |
+         |    |        v
+         |    |    label_layer_monthly/weekly/daily() (L0, L1, L2)
+         |    |        |
+         v    v        v
+    refresh_cmc_regimes.py (MODIFIED)
+         |
+         | 1. Load latest L4 from fred_macro_features (1 row, same for all assets)
+         | 2. Per asset: compute L0/L1/L2 (existing)
+         | 3. Apply hysteresis (existing)
+         | 4. resolve_policy_from_table(L0=, L1=, L2=, L3=None, L4=l4_val)
+         | 5. Write to cmc_regimes with l4_label populated
+         v
+    cmc_regimes (l4_label NOW POPULATED)
+         |
+         +-------> position_sizer.py (regime_key now includes L4 tightening)
+         +-------> regime_router.py  (l2_label unchanged, optionally add L4 dimension)
+         +-------> risk_engine.py    (Gate 1.7: reads fred_macro_features.macro_risk_score)
+         +-------> drift/attribution.py (new: macro regime delta attribution step)
 ```
-
-**No architectural changes needed** — notebooks are consumers, not producers.
-The `resolve_db_url()` connection helper already works from any Python context.
 
 ---
 
-## Component Boundaries
+## Pipeline Ordering (Daily Refresh)
 
-### New vs Modified
+```
+Stage 1:  bars              (existing, no change)
+Stage 2:  EMAs              (existing, no change)
+Stage 3:  AMAs              (existing, no change)
+Stage 4:  desc_stats        (existing, no change)
+Stage 5:  fred_sync         (NEW -- run sync_fred_from_vm.py --incremental)
+Stage 6:  macro_features    (NEW -- run refresh_macro_features.py)
+Stage 7:  regimes           (MODIFIED -- now reads L4 from fred_macro_features)
+Stage 8:  features          (existing, no change)
+Stage 9:  signals           (existing, no change)
+Stage 10: portfolio         (existing, no change)
+Stage 11: executor          (MODIFIED -- risk engine now has Gate 1.7)
+Stage 12: drift             (MODIFIED -- macro attribution step added)
+Stage 13: stats             (existing, add macro feature QC checks)
+```
 
-| Component | New or Modified | Description |
-|-----------|-----------------|-------------|
-| `cmc_ama_multi_tf` (table) | New | Adaptive MA values, PK: (id, ts, tf, indicator, params_hash) |
-| `dim_ama_params` (table) | New | Human-readable parameter set registry |
-| `dim_feature_registry` (table) | New | Feature lifecycle tracking |
-| `cmc_feature_experiments` (table) | New | IC evaluation results |
-| `cmc_ic_results` (table) | New | Per-feature IC by lag |
-| `features/m_tf/ama_operations.py` | New | Pure AMA computation functions (KAMA, DEMA, TEMA, HMA) |
-| `features/m_tf/base_ama_feature.py` | New | Template Method for AMA computation |
-| `features/m_tf/ama_multi_timeframe.py` | New | Concrete AMAFeature subclasses |
-| `scripts/emas/refresh_cmc_ama_multi_tf.py` | New | Refresher for AMA table |
-| `scripts/emas/run_all_ma_refreshes.py` | New | Orchestrate both EMA and AMA |
-| `backtests/metrics.py` | Modify | Replace `psr_placeholder()` with real PSR/DSR |
-| `backtests/splitters.py` | Modify | Add `purged_kfold_splits()`, `PurgedKFoldSplit` |
-| `analysis/ic_eval.py` | New | Spearman IC, IC decay, ICIR |
-| `analysis/feature_eval.py` | Modify | Add Spearman variant alongside existing Pearson |
-| `research/` module | New | FeatureRegistry, ExperimentRunner, lifecycle |
-| `apps/dashboard/` | New | Streamlit app (outside src/) |
-| `notebooks/` | New | End-to-end demo notebooks |
-| `run_daily_refresh.py` | Modify | Add `--amas` flag or fold into `--emas` stage |
-| `pyproject.toml` | Modify | Add optional `[viz]` dependency group |
-| `sql/features/` | New files | DDL for new tables |
-| Alembic migrations | New revisions | Schema changes go through Alembic (v0.8.0 MIGR-03) |
-
-### Components That Must NOT Change
-
-| Component | Why |
-|-----------|-----|
-| `cmc_ema_multi_tf*` table family | Existing PK is (id,ts,tf,period); altering breaks all queries |
-| `cmc_ema_multi_tf_u` | Unified view with existing alignment_source tracking; stable contract for signal generators |
-| `BaseEMAFeature` / `BaseEMARefresher` | Signal generators depend on the EMA table schema indirectly |
-| `cmc_features` 112-column schema | Signal generators query this directly; column changes require migration + signal regeneration |
-| `run_daily_refresh.py` stage ordering | bars->EMAs->regimes->stats ordering is a hard dependency |
+**Dependency constraints:**
+- Stage 5 (fred_sync) must run before Stage 6 (macro_features)
+- Stage 6 (macro_features) must run before Stage 7 (regimes)
+- Stage 7 (regimes) must run before Stage 9 (signals) -- existing constraint
+- All other ordering constraints are unchanged
 
 ---
 
-## Data Flow Changes
+## Suggested Build Order
 
-### Adding AMAs to the Pipeline
+### Phase 1: Foundation -- Macro Feature Table + Computation
 
-```
-[Existing bars] --> cmc_price_bars_multi_tf_u
-                        |
-          +-------------+
-          |             |
-          v             v
-  [EMA Refreshers]  [AMA Refreshers]    -- new parallel branch
-   cmc_ema_multi_tf  cmc_ama_multi_tf   -- new table
-          |             |
-          +------+-------+
-                 |
-                 v (signal generators can optionally JOIN cmc_ama_multi_tf)
-         [Signal Generators]
-```
+**Build:**
+1. DDL for `fred_macro_features` table (Alembic migration)
+2. `regimes/macro_features.py` -- transform FRED series into features
+3. `scripts/macro/refresh_macro_features.py` -- CLI entrypoint
+4. Tests for feature computation (unit tests with mock FRED data)
 
-AMAs are a parallel branch, not a replacement. The existing EMA branch is unchanged.
-Signal generators can optionally JOIN `cmc_ama_multi_tf` for AMA-based crossover signals
-in a future milestone, using the same LEFT JOIN pattern as EMA queries.
+**Validates:** Can we compute meaningful macro features from the existing 39 FRED series?
 
-### Adding IC Evaluation
+**No downstream impact** -- nothing reads `fred_macro_features` yet.
 
-```
-cmc_features + cmc_ama_multi_tf --> [IC Evaluator] --> cmc_ic_results
-cmc_returns_bars_multi_tf_u --------^                  cmc_feature_experiments
-dim_feature_registry ---------------^
-```
+### Phase 2: Macro Labeler + L4 Integration
 
-This is a read-from-pipeline, write-to-research-tables pattern. No pipeline tables
-are modified by IC evaluation.
+**Build:**
+1. `regimes/macro_labels.py` -- classify features into L4 labels
+2. Modify `refresh_cmc_regimes.py` -- load L4, pass to resolver
+3. Add L4 policy rules to `configs/regime_policies.yaml`
+4. Add `fred_sync` + `macro_features` stages to `run_daily_refresh.py`
+5. Tests: L4 label propagation through resolver, policy tightening
 
----
+**Validates:** Does L4 tighten-only semantics work correctly? Are policy rules calibrated?
 
-## Schema Changes Needed
+**Downstream impact:** `cmc_regimes.l4_label` now populated, `size_mult`/`stop_mult`/`orders`/`gross_cap` now reflect macro tightening. Position sizer automatically picks this up.
 
-All schema changes must go through Alembic (established in v0.8.0 MIGR-03).
+### Phase 3: Risk Gate + Observability
 
-| Migration | Priority | Description |
-|-----------|----------|-------------|
-| `revision_1_ama_tables` | Phase 1 | Create `cmc_ama_multi_tf`, `dim_ama_params` |
-| `revision_2_registry_tables` | Phase 2 | Create `dim_feature_registry`, `cmc_feature_experiments`, `cmc_ic_results` |
-| No changes to existing tables | — | AMA design deliberately avoids altering existing EMA tables |
+**Build:**
+1. Gate 1.7 in `risk_engine.py` -- macro regime override
+2. `dim_risk_limits` extension for macro thresholds (configurable)
+3. Macro attribution step in `drift/attribution.py`
+4. Dashboard panel for macro regime state
+5. Telegram alerts for macro regime transitions
 
----
+**Validates:** Does macro risk gating work in live paper trading? Does drift attribution correctly separate macro vs micro regime effects?
 
-## Build Order Recommendation
+### Phase 4: Backtesting + Calibration
 
-Dependencies define the only valid build order:
+**Build:**
+1. Historical macro regime backtest (apply L4 labels retroactively)
+2. Calibrate composite weights (macro_risk_score formula)
+3. Compare performance: with vs without macro regime overlay
+4. Cross-validate L4 label transitions against known macro events
 
-**Phase 1: AMA Computation Engine**
-- `ama_operations.py` (pure functions, no DB)
-- `base_ama_feature.py` (template class)
-- `ama_multi_timeframe.py` (concrete subclasses)
-- Alembic migration: `cmc_ama_multi_tf`, `dim_ama_params`
-- `refresh_cmc_ama_multi_tf.py` (refresher script)
-- Wire into `run_daily_refresh.py`
-
-Rationale: AMA values must exist before they can be registered in the feature
-registry or used in IC evaluation. Building the compute engine first also validates
-the table schema before dependent code is written.
-
-**Phase 2: PSR + Purged K-Fold**
-- Modify `metrics.py` (standalone, no DB dependency)
-- Add to `splitters.py` (standalone)
-
-These are self-contained modifications with no inter-phase dependencies.
-Can be done in parallel with Phase 1 if needed.
-
-**Phase 3: IC Evaluation**
-- `analysis/ic_eval.py` (depends on cmc_features existing — already present)
-- Alembic migration: `cmc_ic_results`
-
-Works immediately on existing `cmc_features` columns without Phase 1 being complete.
-Phase 1 completion unlocks IC evaluation of AMA columns.
-
-**Phase 4: Feature Experimentation Framework**
-- `research/registry.py`
-- `research/experiment.py`
-- Alembic migration: `dim_feature_registry`, `cmc_feature_experiments`
-
-Requires: IC evaluation working (Phase 3) to power the experiment runner.
-
-**Phase 5: Streamlit Dashboard**
-- `apps/dashboard/` (read-only, depends on all preceding tables existing)
-
-Requires all data layers operational. Dashboard adds no new data; it visualizes existing.
-
-**Phase 6: Notebooks**
-- End-to-end demos referencing all new components.
-- Requires all preceding phases complete.
+**Validates:** Does macro regime overlay improve risk-adjusted returns historically?
 
 ---
 
 ## Anti-Patterns to Avoid
 
-### Anti-Pattern 1: Adding `indicator_type` to cmc_ema_multi_tf
+### Anti-Pattern 1: Macro Features as Per-Asset Columns
 
-**What:** Adding a discriminator column to the existing EMA table family to store AMAs.
-**Why bad:** Requires a nullable column with backward-compat NULL for all existing rows.
-Breaks the clean integer `period` semantics. Forces period=NULL for multi-param AMAs.
-Requires migration of 14.8M+ rows. Breaks all queries that assume `period` is the only
-disambiguation needed.
-**Instead:** Separate `cmc_ama_multi_tf` table with `params_hash` PK column.
+**What:** Adding `yield_curve_slope`, `credit_spread` columns to `cmc_features` (PK: id, ts, tf).
+**Why bad:** Duplicates identical macro values across 100+ assets. Makes it unclear whether macro features are asset-specific. Breaks the feature pipeline's per-asset write pattern.
+**Instead:** Separate `fred_macro_features` table with PK `(date)`. One row per day, shared by all assets.
 
-### Anti-Pattern 2: Storing KAMA as period=synthetic_int
+### Anti-Pattern 2: Separate Resolver Chain for Macro
 
-**What:** Using a lookup table `dim_kama_params` where `param_id` (integer) is stored
-in the EMA table's `period` column.
-**Why bad:** Period integers in the EMA table are meaningful to operators and signal
-generators. Mixing semantic ints (EMA periods) with opaque lookup IDs in the same
-column is a maintenance hazard. The dim_signals table already uses a similar pattern
-and required extra care — do not repeat it here.
-**Instead:** `params_hash` in a new table, no sharing of the period column.
+**What:** Creating a new `resolve_macro_policy()` function that runs in parallel with the existing resolver.
+**Why bad:** Two policies that must be reconciled. Risk of conflicting signals. Duplicates tighten-only logic.
+**Instead:** Use the existing L4 slot. The resolver already handles 5 layers in a single tighten-only chain.
 
-### Anti-Pattern 3: IC Evaluation in the Daily Refresh Pipeline
+### Anti-Pattern 3: Reviving FredProvider for Local Data
 
-**What:** Running IC evaluation as a stage in `run_daily_refresh.py`.
-**Why bad:** IC evaluation over 109 TFs and dozens of features across 100+ assets is
-potentially hours of computation. Running it daily would make the refresh pipeline
-unreliable. IC is also inherently a research/analysis operation — it should not block
-daily data production.
-**Instead:** On-demand via CLI or notebooks. Daily refresh is strictly
-bars->EMAs->AMAs->regimes->stats.
+**What:** Instantiating `FredProvider` to read data that already lives in `fred.series_values`.
+**Why bad:** API key required, rate limiting overhead, network dependency for local data reads. The API client was designed for fetching from FRED servers, not for reading from a local Postgres table.
+**Instead:** Direct SQL reads from `fred.series_values`. Simple, fast, no external dependencies.
 
-### Anti-Pattern 4: Streamlit Dashboard Inside src/ta_lab2/
+### Anti-Pattern 4: Real-Time Macro Regime Updates
 
-**What:** Putting the dashboard in `src/ta_lab2/viz/dashboard/`.
-**Why bad:** Dashboard imports are not package imports. Streamlit requires running as a
-script, not as a module. Dashboard code in the package root would pollute package
-imports, add Streamlit as a hard dependency, and slow down test collection.
-**Instead:** `apps/dashboard/` at project root, with Streamlit in optional dep group.
+**What:** Trying to update macro regime labels intra-day based on economic releases.
+**Why bad:** FRED data is published with variable delays (employment: 1st Friday, CPI: 2-3 week lag). Intra-day updates would mostly be noise. The daily refresh cadence is appropriate.
+**Instead:** Daily macro feature computation, aligned with the daily refresh pipeline. The risk engine's Gate 1.7 can optionally read the latest score at order time for a "fast path" if needed later.
 
-### Anti-Pattern 5: Notebooks That Copy-Paste Pipeline Code
+### Anti-Pattern 5: Over-Fitting Macro Labels to Crypto Price History
 
-**What:** Notebooks that re-implement feature computation or database queries inline.
-**Why bad:** Diverges from the library. Notebook results become non-reproducible as
-the library evolves. Creates two sources of truth.
-**Instead:** Notebooks import from `ta_lab2`. Library functions are the single
-implementation.
+**What:** Training a classifier to predict crypto regime from FRED data (supervised learning).
+**Why bad:** Crypto-FRED relationship is non-stationary and regime-dependent itself. Overfitting guaranteed with short history. Rule-based labeling with economic priors is more robust.
+**Instead:** Rule-based macro labeler with economically motivated thresholds. Validate via backtest, but do not train on crypto returns.
 
 ---
 
 ## Scalability Considerations
 
-| Concern | Current (22M rows) | With AMA addition | Mitigation |
-|---------|-------------------|-------------------|------------|
-| cmc_ama_multi_tf row count | 0 | ~6-8M rows (4 indicators x 109 TFs x ~15K rows/asset/indicator) | Index on (id, tf, indicator); partial index on canonical rows |
-| IC evaluation query latency | N/A | Potentially slow over full history | Partition by tf; run per-asset batches, aggregate offline |
-| dim_feature_registry size | 0 | Tens to hundreds of rows | Negligible — no performance concern |
-| Dashboard query latency | N/A | Reads from 50+ tables | `st.cache_data` TTL; materialized views for common aggregations |
-
----
-
-## Open Questions for Phase-Level Research
-
-1. **KAMA parameter sets:** What specific parameter values are canonical for this project?
-   (Standard defaults: er_period=10, fast=2, slow=30.) Need to decide before building
-   `dim_ama_params` seed data.
-
-2. **AMA in daily refresh:** Should AMAs run in the same subprocess as EMAs (extending
-   `run_all_ema_refreshes.py`) or in a separate orchestrator step? Simpler path is to
-   extend the EMA orchestrator. Cleaner path is a new `--amas` step.
-
-3. **Signal generators for AMAs:** Will v0.9.0 add AMA-based signals, or just compute
-   AMA values for research? If signals are in scope, a new `cmc_signals_ama_crossover`
-   table is needed.
-
-4. **PSR benchmark Sharpe:** The PSR formula requires a benchmark Sharpe ratio `SR*`.
-   Industry convention is `SR* = 0` (beat cash) or `SR* = 1.0` (bar for live strategy).
-
-5. **Notebook execution in CI:** Should notebooks run as part of CI? Requires DB
-   connection. Typically excluded from CI in quant projects; test by converting to
-   scripts with `--headless` instead.
+| Concern | Current Scale | At Scale | Approach |
+|---------|--------------|----------|----------|
+| FRED data volume | 208K rows, 39 series | ~500K rows, 50+ series | Fine -- single table, daily append |
+| Macro feature computation | ~39 series, trivial | ~50 series, trivial | Pure pandas, <1 second |
+| L4 label per-asset | 1 label, broadcast to all | Same | L4 is global, no per-asset cost |
+| Risk gate DB read | 1 query per order | Same | Single row read, <1ms |
+| Daily refresh pipeline | +2 stages (~5 seconds) | Same | SSH COPY + pandas transforms |
 
 ---
 
 ## Sources
 
-All findings are from direct codebase inspection at commit 26678109 (2026-02-23).
-
-- `src/ta_lab2/features/m_tf/base_ema_feature.py` — Template Method pattern, PK design
-- `src/ta_lab2/scripts/emas/base_ema_refresher.py` — Refresher pattern, state management
-- `src/ta_lab2/scripts/features/base_feature.py` — Feature write pattern
-- `src/ta_lab2/scripts/run_daily_refresh.py` — Orchestrator stage ordering
-- `src/ta_lab2/backtests/metrics.py` — Confirmed `psr_placeholder()` stub
-- `src/ta_lab2/backtests/splitters.py` — Confirmed no purging/embargo
-- `src/ta_lab2/analysis/feature_eval.py` — Confirmed Pearson-only IC
-- `sql/features/030_cmc_ema_multi_tf_u_create.sql` — Confirmed PK: (id, ts, tf, period)
-- `sql/features/042_cmc_ta.sql` — Confirmed feature table schema pattern
-- `.planning/codebase/ARCHITECTURE.md` — Prior architecture mapping (2026-01-21)
-- `.planning/milestones/v0.8.0-REQUIREMENTS.md` — Deferred features list confirmed
-- MEMORY.md — feature_experimentation.md design notes, AMA status
-- PSR formula: Lopez de Prado (2012) "The Sharpe Ratio Efficient Frontier" (MEDIUM confidence on implementation details)
+- Direct code analysis of all files listed in the Component Map section
+- `cmc_regimes` DDL: `C:/Users/asafi/Downloads/ta_lab2/sql/regimes/080_cmc_regimes.sql`
+- Resolver chain: `C:/Users/asafi/Downloads/ta_lab2/src/ta_lab2/regimes/resolver.py`, lines 124-130
+- Data budget L4 threshold: `C:/Users/asafi/Downloads/ta_lab2/src/ta_lab2/regimes/data_budget.py`, line 21
+- FRED sync pipeline: `C:/Users/asafi/Downloads/ta_lab2/src/ta_lab2/scripts/etl/sync_fred_from_vm.py`
+- Risk engine gates: `C:/Users/asafi/Downloads/ta_lab2/src/ta_lab2/risk/risk_engine.py`, lines 1-34 (docstring)
+- Daily refresh ordering: `C:/Users/asafi/Downloads/ta_lab2/src/ta_lab2/scripts/run_daily_refresh.py`, line 2097
+- FRED data status from MEMORY.md: 208K rows, 39 series, PK: series_id, date
+- Refresh script integration: `C:/Users/asafi/Downloads/ta_lab2/src/ta_lab2/scripts/regimes/refresh_cmc_regimes.py`, lines 446-454
+- Position sizer regime usage: `C:/Users/asafi/Downloads/ta_lab2/src/ta_lab2/executor/position_sizer.py`, lines 190-193
+- ML regime router: `C:/Users/asafi/Downloads/ta_lab2/src/ta_lab2/ml/regime_router.py`, lines 45-110
+- Drift attribution: `C:/Users/asafi/Downloads/ta_lab2/src/ta_lab2/drift/attribution.py`, lines 296-309
+- Policy loader: `C:/Users/asafi/Downloads/ta_lab2/src/ta_lab2/regimes/policy_loader.py`
+- Hysteresis tracker: `C:/Users/asafi/Downloads/ta_lab2/src/ta_lab2/regimes/hysteresis.py`
+- FredProvider (bypassed): `C:/Users/asafi/Downloads/ta_lab2/src/ta_lab2/integrations/economic/fred_provider.py`

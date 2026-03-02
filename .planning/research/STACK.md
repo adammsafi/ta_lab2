@@ -1,446 +1,361 @@
-# Technology Stack: v0.9.0 Research & Experimentation
+# Technology Stack: v1.0.1 Macro Regime Infrastructure
 
 **Project:** ta_lab2
-**Milestone:** v0.9.0 — Adaptive MAs, IC evaluation, PSR, Purged CV, Feature lifecycle, Streamlit, Notebooks
-**Researched:** 2026-02-23
-**Overall confidence:** HIGH (all version claims verified against PyPI or official docs)
+**Milestone:** v1.0.1 -- Macro Regime Infrastructure
+**Researched:** 2026-03-01
+**Overall confidence:** HIGH (existing stack verified from installed packages; new additions verified via PyPI/official docs)
 
 ---
 
-## Environment Clarification: Two Python Environments
+## Scope: What This Document Covers
 
-This project runs two Python environments. This distinction matters for every dependency decision.
+This STACK.md covers ONLY the technology decisions for adding macro regime infrastructure to ta_lab2. The existing validated stack (Python 3.12, PostgreSQL, SQLAlchemy 2.0, pandas 2.3, numpy 2.4, scipy 1.17, scikit-learn 1.8, polars, etc.) is NOT re-researched. See the v0.9.0 STACK.md for those decisions.
 
-| Environment | Python | Relevant for |
-|-------------|--------|-------------|
-| System Python / `pip` | 3.12.7 | Active dev: runs signals, backtests, scripts, streamlit |
-| `.venv311/` | 3.11.9 | Legacy freeze only; vectorbt was tested here in v0.7.0 |
-
-**Practical consequence:** All new packages should target the **Python 3.12** environment. The `pyproject.toml` already specifies `target-version = "py312"` in ruff config. The main `pip` command resolves to Python 3.12.7.
-
-**Confirmed existing stack (Python 3.12 environment):**
-
-| Package | Installed Version |
-|---------|------------------|
-| numpy | 2.4.1 |
-| scipy | 1.17.0 (released 2026-01-10) |
-| pandas | 2.3.3 |
-| scikit-learn | 1.8.0 (released 2025-12-10) |
-| polars | 1.36.1 |
-| plotly | 6.4.0 |
-| arch | 7.2.0 |
-| numba | 0.64.0 |
-| vectorbt | 0.28.1 |
-| streamlit | 1.44.0 |
-
-**What this means:** scipy, numpy, scikit-learn, plotly, and numba are already installed. The new features can be implemented with minimal new packages.
+**The question:** What libraries/tools are needed to transform 39 FRED series (already in PostgreSQL) into macro regime labels that feed into the existing L0-L4 tighten-only policy resolver?
 
 ---
 
-## Context: What Already Exists (Do Not Re-Research)
+## Confirmed Existing Stack (Relevant to Macro Regimes)
 
-The following stack is validated and in production. These are NOT open questions:
+| Package | Installed Version | Relevance |
+|---------|------------------|-----------|
+| numpy | 2.4.1 | Array math for derived series, threshold logic |
+| scipy | 1.17.0 | Already used in 14 files; z-scores, statistical tests |
+| pandas | 2.3.3 | Time-series alignment, resampling, rolling windows |
+| scikit-learn | 1.8.0 | Model infrastructure (clone, pipelines) used by RegimeRouter |
+| SQLAlchemy | 2.0+ | DB reads/writes for FRED data and regime tables |
+| PyYAML | installed | Already used by policy_loader.py for regime config |
 
-| Component | Status |
-|-----------|--------|
-| Python 3.12, PostgreSQL, SQLAlchemy 2.0 | Locked |
-| pandas, numpy, scipy, scikit-learn | Installed, do not re-pin |
-| vectorbt 0.28.1 | Locked — do not upgrade |
-| ruff, mypy, mkdocs-material, alembic | v0.8.0 handled these |
-| matplotlib (existing viz) | Locked |
-| Telegram notifications | Complete |
-| parameter_sweep.py (grid + random search) | Complete |
-| feature_eval.py (Pearson corr, logistic regression) | Partial — needs IC/Spearman extension |
-| splitters.py (expanding walk-forward) | Partial — needs purged CV |
-| metrics.py (PSR placeholder) | Stub — needs real PSR |
+**Key insight:** The existing stack already covers 90% of what macro regime labeling needs. The derived series computation (rate spreads, yield curve slope, carry proxies) is straightforward pandas/numpy arithmetic on data already in PostgreSQL. The question is whether we need NEW libraries at all.
 
 ---
 
-## Feature Area 1: Adaptive Moving Averages (KAMA, DEMA, TEMA, HMA)
+## Decision 1: Regime Detection Approach
 
-### Recommendation: IMPLEMENT IN-HOUSE — NO NEW LIBRARY
+### Question: Rule-based vs. HMM vs. Hybrid for Macro Regimes?
 
-**Rationale:** All four adaptive MA algorithms reduce to 10-30 lines of numpy each. The only library options are TA-Lib (requires a C binary install on Windows) and pandas-ta (beta-only, requires Python >=3.12 AND numba >=0.60, while the .venv311 environment has numba 0.57.1 — the divergence creates maintenance risk across environments).
+**Recommendation: Rule-based with threshold hysteresis. Do NOT add HMM.**
 
-The existing codebase already has:
-- A `BaseEMAFeature` hierarchy with vectorized numpy computation patterns
-- `EMAFeature` subclasses that compute running exponential weights
-- Multi-TF feature write pipeline that handles chunked DB writes
+**Confidence: HIGH**
 
-KAMA, DEMA, TEMA, and HMA are single-pass or two-pass numpy algorithms that slot directly into this hierarchy.
+### Rationale
 
-**Algorithm complexities:**
+The existing per-asset regime system (L0-L3) uses a purely rule-based approach: EMA stack position, ATR percentile buckets, and spread thresholds, combined through `label_trend_basic()`, `label_vol_bucket()`, and `label_liquidity_bucket()`. It has proven reliable and interpretable.
 
-| Indicator | Formula | numpy operations needed |
-|-----------|---------|------------------------|
-| KAMA | ER = abs(change) / sum(abs(moves)); SC = (ER*(fast-slow)+slow)^2; KAMA_t = KAMA_{t-1} + SC*(P - KAMA_{t-1}) | cumsum, abs, rolling window via stride tricks |
-| DEMA | DEMA = 2*EMA(N) - EMA(EMA(N)) | Two EMA passes |
-| TEMA | TEMA = 3*EMA1 - 3*EMA2 + EMA3 | Three EMA passes |
-| HMA | HMA = WMA(2*WMA(n/2) - WMA(n), sqrt(n)) | Three WMA passes |
+Macro regime classification is an even stronger case for rule-based thresholds than per-asset regimes:
 
-All algorithms are expressible with numpy and a simple EMA helper function. The existing `BaseEMAFeature` already computes pandas `ewm()` which can be reused.
+1. **Domain knowledge is the signal.** Yield curve inversion (T10Y2Y < 0) is a regime boundary defined by economics, not statistics. The Fed Funds rate has discrete states (hiking, paused, cutting) observable from the data. VIX has well-established threshold bands (sub-15 = complacent, 15-25 = normal, 25-35 = elevated, 35+ = crisis). These are not latent states that need discovery -- they are known.
 
-**What NOT to add:**
+2. **Frequency mismatch kills HMM.** FRED data is daily-to-monthly. An HMM with 3-4 states fitted on 10-20 years of monthly data has ~120-240 observations. The Baum-Welch EM algorithm needs hundreds to thousands of observations per state to converge reliably. The carry trade regime (Japan rate differential, USD/JPY vol) updates weekly at best. HMM would overfit.
 
-- **TA-Lib (C wrapper):** Requires installing `ta-lib-0.4.0-msvc.zip` to `C:\ta-lib` on Windows before `pip install TA-Lib`. This is a manual binary dependency that breaks CI reproducibility and creates an installation footgun. Latest version is 0.6.8 (Oct 2025), but the C library install requirement makes it inappropriate here.
+3. **Interpretability is non-negotiable.** The tighten-only policy resolver (`resolver.py`) maps regime keys like "Up-Normal-Normal" to position sizing rules. An HMM-derived "State 2" has no semantic meaning that maps to policy. You would need a post-hoc mapping from HMM states to policy keys anyway, which is just a threshold classifier with extra steps.
 
-- **pandas-ta 0.4.71b0:** Beta-only (no stable release on PyPI). Requires Python >=3.12 AND numba >=0.60. The `.venv311` environment has numba 0.57.1 which is incompatible. Even though the main environment has numba 0.64.0, installing a beta library for four indicator functions is unjustifiable when the math is 30 lines.
+4. **Consistency with existing architecture.** The L0-L4 system already has hysteresis tracking (`HysteresisTracker`), tighten-only composition (`_tighten()`), and YAML-configurable policy tables. Macro regimes as L4 inputs slot directly into this. An HMM would require a parallel inference pipeline that duplicates logic.
 
-- **finta:** Last meaningful release in 2021; effectively unmaintained.
+5. **HMM adds complexity without value.** hmmlearn 0.3.3 is in "limited maintenance mode" per its PyPI page. Adding a new dependency with uncertain maintenance for marginal benefit is not justified when simple thresholds on well-understood economic indicators work.
 
----
+### What About HMM Later?
 
-## Feature Area 2: Information Coefficient (IC) Evaluation
+If the project evolves to need latent state discovery (e.g., "which combinations of macro variables best predict crypto drawdowns?"), that is a Phase 2+ research question. At that point, the macro feature store built in v1.0.1 provides the input data for HMM experimentation. The rule-based labeler and HMM labeler can coexist as alternative labeling strategies, similar to how `labeling/` has both triple-barrier and trend-scanning approaches.
 
-### Recommendation: EXTEND feature_eval.py USING SCIPY (ALREADY INSTALLED)
+### Alternative Considered: hmmlearn
 
-**What's needed:**
-- Spearman rank correlation (IC per period)
-- Rolling IC mean and IC information ratio (IR = mean_IC / std_IC)
-- IC decay analysis (IC at lag 1, 2, ..., N bars)
-- Turnover metric (fraction of top-quintile assets changing per period)
-
-**Stack decision:**
-
-| Capability | Library | Status |
-|-----------|---------|--------|
-| `scipy.stats.spearmanr()` | scipy 1.17.0 | ALREADY INSTALLED |
-| Groupby / rolling windows | pandas 2.3.3 | ALREADY INSTALLED |
-| Plotting IC time series | matplotlib (existing) | ALREADY INSTALLED |
-
-`scipy.stats.spearmanr(a, b)` returns (correlation, pvalue). Rolling IC by period is a groupby over the timestamp dimension. IC decay is the correlation at shifted horizons. All of this is 50-100 lines in `feature_eval.py`.
-
-**Alphalens-reloaded assessment:**
-
-`alphalens-reloaded==0.4.6` (released 2025-06-02) provides these IC metrics plus pre-built plotting. It is actively maintained (Production/Stable), Python >=3.10, no problematic dependencies.
-
-**Decision: DO NOT add alphalens-reloaded.**
-
-Rationale: The project has an existing `feature_eval.py` with a clear API pattern and a `viz/all_plots.py` with matplotlib conventions. Alphalens-reloaded's plotting style (seaborn-based, opinionated layouts) conflicts with the existing visualization layer. Adding it introduces `seaborn` (not currently installed, 2.1 MB), `statsmodels` (not currently installed, large), and a new plot aesthetic that differs from existing charts. The four IC functions needed fit in ~80 lines. The math is `scipy.stats.spearmanr` in a loop — not complex enough to justify the dependency surface.
-
-**Exception — IF seaborn is added for another reason:** The alphalens-reloaded assessment becomes favorable. Seaborn 0.13.2 (latest, 2024-01-25) is a reasonable add-on for research notebooks. But add seaborn only if notebooks explicitly need seaborn-style plots; do not add it just to unblock alphalens.
+| Criterion | Rule-Based | hmmlearn HMM |
+|-----------|-----------|--------------|
+| New dependency | None | hmmlearn>=0.3.3 (limited maintenance) |
+| Data requirement | Works with any history length | Needs 500+ observations per state for stability |
+| Interpretability | Direct: "yield curve inverted" = policy X | Opaque: "State 2" needs post-hoc interpretation |
+| Integration | Direct plug into L4 resolver slot | Requires wrapper to map states to policy keys |
+| Latency | Instant (threshold comparison) | Viterbi decode pass per update |
+| Maintenance | Zero -- thresholds are economics | Requires retraining, state monitoring, drift detection |
+| Regime transition handling | Uses existing `HysteresisTracker` | Has its own transition matrix (duplicates logic) |
 
 ---
 
-## Feature Area 3: Probabilistic Sharpe Ratio (PSR)
+## Decision 2: New Dependencies
 
-### Recommendation: IMPLEMENT IN-HOUSE — scipy (ALREADY INSTALLED)
+### Required: NONE for Core Macro Regimes
 
-**What's needed (Lopez de Prado formulation):**
+The macro regime infrastructure can be built with **zero new pip dependencies**. Here is why:
+
+| Capability | Implementation | Library |
+|-----------|---------------|---------|
+| Derived series (rate spreads, yield curve slope) | `pandas` arithmetic on `fred.series_values` | Already installed |
+| Rolling z-scores, percentiles | `pandas.rolling()` + `numpy` | Already installed |
+| VIX regime thresholds | Simple comparison operators | Already installed |
+| Carry trade proxy (rate differential, USD/JPY vol) | `pandas` arithmetic + rolling std | Already installed |
+| Macro feature store (DB tables) | `SQLAlchemy` + Alembic migration | Already installed |
+| Regime labeling | Pure Python/numpy threshold logic | Already installed |
+| YAML-configurable thresholds | `PyYAML` via existing `policy_loader.py` | Already installed |
+| Hysteresis filtering | Existing `HysteresisTracker` class | Already built |
+| L4 integration into policy resolver | Existing `resolve_policy(L4=...)` parameter | Already built |
+| Risk gate integration | Existing `RiskEngine` + `dim_risk_state` | Already built |
+
+### Optional: FOMC Calendar Data
+
+**Recommendation: Static YAML file, NOT a library dependency.**
+
+**Confidence: HIGH**
+
+FOMC meets 8 times per year on pre-announced dates. The dates are published years in advance on the Fed website. The total data is ~16 dates over 2 years. A dynamic library to scrape these dates is massive overkill.
+
+| Option | Verdict | Why |
+|--------|---------|-----|
+| FedTools (PyPI) | REJECT | Unmaintained (no release in 12+ months per Snyk health analysis), scrapes HTML which is fragile, adds dependency for 8 dates/year |
+| pandas_market_calendars | REJECT | Designed for exchange trading calendars, not economic event calendars; does not include FOMC dates |
+| Static YAML/JSON in `configs/` | USE THIS | Trivial to maintain (update once per year), zero dependency, version-controlled, deterministic |
+| FRED release calendar API | REJECT | Requires API call for data that changes once per year |
+
+**Implementation:** A `configs/fomc_calendar.yaml` file with meeting dates, statement release times, and a flag for "dot plot" meetings (March, June, September, December SEP meetings). Updated manually when the Fed publishes the next year's calendar (typically in June). The macro regime labeler reads this at startup to compute "days to next FOMC" and "FOMC blackout window" features.
+
+```yaml
+# configs/fomc_calendar.yaml
+fomc_meetings:
+  2025:
+    - date: "2025-01-29"
+      type: statement_only
+    - date: "2025-03-19"
+      type: sep  # Summary of Economic Projections (dot plot)
+    # ... etc
+  2026:
+    - date: "2026-01-28"
+      type: statement_only
+    - date: "2026-03-18"
+      type: sep
+    # ... 6 more
+```
+
+---
+
+## Decision 3: Revive `integrations/economic/` or Bypass?
+
+**Recommendation: Bypass for reads. The existing module stays dormant.**
+
+**Confidence: HIGH**
+
+### Current State
+
+The `integrations/economic/` module (FredProvider, ~1,766 LOC) was built for Phase 15 to **fetch** FRED data via the fredapi API. It has rate limiting, circuit breaker, caching, and quality validation. It is well-engineered but has zero active consumers.
+
+### Why Bypass
+
+The FRED data is **already in PostgreSQL** (`fred.series_values`, 39 series, 208K rows). The sync pipeline (`sync_fred_from_vm.py`) handles incremental updates via SSH COPY from the GCP VM. The macro regime infrastructure needs to **read** this data, not **fetch** it from the FRED API.
+
+The correct integration point is:
 
 ```python
-# All required scipy/numpy functions already available
-from scipy.stats import norm, skew, kurtosis
-
-def psr(returns: np.ndarray, sr_benchmark: float = 0.0) -> float:
-    n = len(returns)
-    sr_hat = returns.mean() / returns.std(ddof=1) * np.sqrt(252)
-    skew_r = skew(returns)
-    kurt_r = kurtosis(returns, fisher=True)  # excess kurtosis
-    # Standard deviation of estimated Sharpe (Bailey & Lopez de Prado 2012)
-    sr_std = np.sqrt(
-        (1 + (0.5 * sr_hat**2) - (skew_r * sr_hat) + ((kurt_r / 4) * sr_hat**2)) / (n - 1)
-    )
-    return float(norm.cdf((sr_hat - sr_benchmark) / sr_std))
+# Read FRED data from PostgreSQL (what macro regimes need)
+SELECT series_id, date, value
+FROM fred.series_values
+WHERE series_id IN ('DGS10', 'DGS2', 'FEDFUNDS', ...)
+ORDER BY date
 ```
 
-**Required functions and their status:**
-
-| Function | Module | Installed |
-|----------|--------|-----------|
-| `scipy.stats.norm.cdf` | scipy 1.17.0 | YES |
-| `scipy.stats.skew` | scipy 1.17.0 | YES |
-| `scipy.stats.kurtosis` | scipy 1.17.0 | YES |
-| `numpy.sqrt`, `numpy.sqrt` | numpy 2.4.1 | YES |
-
-The existing `metrics.py` has `psr_placeholder()` as a stub. The real PSR is a drop-in replacement using only already-installed libraries.
-
-**What NOT to add:**
-- **mlfinlab:** As of early 2026, mlfinlab is effectively discontinued on PyPI (no new PyPI releases in 12+ months). The project moved to a paid private tier. Its GitHub-sourced open version (`mlfinpy`) is a community fork with unclear maintenance. Do not add.
-- **quantstats:** Adds heavy optional dependencies (yfinance, requests) and has a different API contract than the existing `metrics.py`. The codebase's metrics API is already defined; adapting to quantstats would be net negative.
-- **pypbo:** Small library for backtest overfitting probability; single-function wrappers. Not needed when PSR math is 15 lines.
-
----
-
-## Feature Area 4: Purged K-Fold Cross-Validation
-
-### Recommendation: IMPLEMENT IN-HOUSE using sklearn BaseEstimator pattern — OR add skfolio
-
-**Option A: Extend splitters.py (preferred for minimal dependency)**
-
-scikit-learn 1.8.0's `TimeSeriesSplit` has a `gap` parameter (embargo). However, it does NOT implement purging (removing overlapping label windows from the training set). For a full Lopez de Prado purged CV, the codebase needs to implement `PurgedKFold` itself.
-
-The implementation is ~100 lines following sklearn's `BaseCrossValidator` interface:
+NOT:
 
 ```python
-from sklearn.model_selection import BaseCrossValidator
-import numpy as np
-
-class PurgedKFold(BaseCrossValidator):
-    """
-    Purged K-fold with embargo, following Lopez de Prado AFML Chapter 7.
-    Assumes samples have prediction times and evaluation times.
-    """
-    def __init__(self, n_splits=5, embargo_pct=0.01):
-        self.n_splits = n_splits
-        self.embargo_pct = embargo_pct
-
-    def split(self, X, y=None, pred_times=None, eval_times=None):
-        # ... purge logic using pred_times/eval_times overlap detection
-        pass
-
-    def get_n_splits(self, X=None, y=None, groups=None):
-        return self.n_splits
+# Fetch FRED data from API (what integrations/economic/ does)
+provider = FredProvider()
+result = provider.get_series("DGS10")
 ```
 
-This fits in the existing `splitters.py` and requires only `sklearn.model_selection.BaseCrossValidator` (already installed).
+### What Stays
 
-**Option B: skfolio 0.15.5 (released 2026-02-10)**
+- `integrations/economic/` remains as-is (deferred, not abandoned per project convention)
+- If the project later needs to add NEW FRED series beyond the 39 already synced, the FredProvider and sync pipeline are ready
+- The `FRED_SERIES` dictionary in `types.py` is a useful reference but not consumed at runtime
 
-skfolio provides `CombinatorialPurgedCV`, which is the full combinatorial variant (multiple testing paths). It is actively maintained, Python >=3.10, sklearn-compatible.
+### What's New
 
-**However:** skfolio's primary scope is portfolio optimization (mean-variance, hierarchical clustering). Its CV class is incidental to its main purpose. Adding it for one class (`CombinatorialPurgedCV`) brings in `cvxpy-base`, `clarabel` (convex solver), and `plotly>=5.22.0` as hard dependencies — substantial overhead.
-
-**Decision: Implement PurgedKFold in-house in splitters.py (Option A).**
-
-Reserve skfolio consideration for a future portfolio optimization milestone if that ever becomes scope.
-
-**timeseriescv assessment:** PyPI package `timeseriescv==0.2` is inactive (no new releases). Do not use.
+A thin SQL reader module that queries `fred.series_values` and returns time-aligned pandas DataFrames. This is analogous to how `load_prices()` reads `cmc_price_bars_multi_tf` -- a simple query function, not a provider abstraction.
 
 ---
 
-## Feature Area 5: Feature Experimentation Framework (Lifecycle)
+## Decision 4: Database Schema Additions
 
-### Recommendation: NO NEW LIBRARIES — file-based registry + existing DB
+### New Tables (via Alembic migration)
 
-The feature lifecycle (experimental → promoted → deprecated) is a **metadata management problem**, not a library problem. The existing infrastructure covers every need:
+| Table | Purpose | Schema |
+|-------|---------|--------|
+| `cmc_macro_derived_series` | Computed macro indicators (rate spreads, VIX bands, carry proxy) | `(series_id TEXT, date DATE, value FLOAT, computed_at TIMESTAMPTZ)` PK: `(series_id, date)` |
+| `cmc_macro_regimes` | Macro regime labels per domain | `(date DATE, domain TEXT, label TEXT, sublabels JSONB, computed_at TIMESTAMPTZ)` PK: `(date, domain)` |
+| `cmc_macro_features` | Time-series features derived from FRED data | `(date DATE, feature_name TEXT, value FLOAT, computed_at TIMESTAMPTZ)` PK: `(date, feature_name)` |
+| `dim_macro_regime_config` | Threshold configuration for macro regime labeler | `(domain TEXT PK, config JSONB, updated_at TIMESTAMPTZ)` |
 
-| Need | Existing tool |
-|------|--------------|
-| Lifecycle state storage | New DB table (`cmc_feature_registry`) via Alembic migration |
-| Feature configuration | YAML config files + `pyyaml` (already in core deps) |
-| Status querying | SQLAlchemy 2.0 (already in core deps) |
-| Compute reuse | Existing `BaseEMAFeature` / feature pipeline |
-| IC evaluation | `feature_eval.py` extensions (Area 2) |
+### Existing Tables Used (Read-Only)
 
-**What NOT to add:**
-- **MLflow:** Experiment tracking at model-level granularity. Overkill for feature-level lifecycle in a single-developer quant lab. Adds an MLflow server process or file backend, a UI that duplicates what a Streamlit dashboard would provide, and tight coupling to MLflow's artifact storage patterns.
-- **DVC (Data Version Control):** Designed for dataset versioning in git. The project tracks features in PostgreSQL, not files. DVC is architecturally mismatched.
-- **Feast (feature store):** Enterprise-grade feature serving with an online/offline store separation. Far beyond current scale (22M rows, single PostgreSQL). The codebase's existing `cmc_features` table IS the feature store.
-- **Weights & Biases / Neptune:** SaaS experiment trackers. Adds external service dependency to a self-contained research codebase.
+| Table | Usage |
+|-------|-------|
+| `fred.series_values` | Source data for derived series computation |
+| `fred.releases` | FOMC release dates (supplementary) |
+| `cmc_regimes` | Per-asset L0-L3 labels (for cross-regime aggregation) |
+| `dim_risk_state` | Macro risk gate writes (tail_risk_state escalation) |
+| `dim_risk_limits` | Macro-driven limit adjustments |
+
+### Existing Tables Modified
+
+| Table | Change | Why |
+|-------|--------|-----|
+| `cmc_regimes` | Add `l4_label` column (nullable TEXT) | Stores the macro regime label per asset-date, fed into resolver as L4 |
+| `dim_risk_state` | Add `macro_regime_state` column (nullable TEXT) | Tracks current aggregate macro regime for risk engine reads |
 
 ---
 
-## Feature Area 6: Streamlit Dashboard
+## Decision 5: Configuration Architecture
 
-### Recommendation: UPGRADE streamlit from 1.44.0 to >=1.54.0
+### Recommendation: YAML config per macro regime domain
 
-**Current state:** streamlit 1.44.0 is installed in the system Python 3.12 environment. The `requirements-311.txt` freeze records it at 1.44.0. It is NOT in `pyproject.toml` as an optional dependency.
+**Confidence: HIGH**
 
-**Latest stable:** 1.54.0 (released 2026-02-04).
+The project already uses YAML for regime policy configuration (`configs/regime_policies.yaml` via `policy_loader.py`). Extend this pattern for macro regime thresholds.
 
-**Breaking changes from 1.44 to 1.54:**
-- `st.experimental_get_query_params` and `st.experimental_set_query_params` removed (use `st.query_params`)
-- `st.experimental_user` removed (use `st.user`)
-- Widget identity now key-only (prevents unwanted state resets)
+```yaml
+# configs/macro_regimes.yaml
+domains:
+  monetary_policy:
+    series:
+      fed_funds: FEDFUNDS
+      t10y2y: T10Y2Y
+      dgs2: DGS2
+      dgs10: DGS10
+    thresholds:
+      yield_curve_inverted: -0.01  # T10Y2Y below this = inverted
+      rate_hiking: 0.25  # consecutive increase in FEDFUNDS >= this
+      rate_cutting: -0.25  # consecutive decrease
+    labels: [hiking, paused, cutting, inverted]
+    hysteresis_days: 5
 
-None of these affect a new dashboard (no legacy experimental API to migrate). The upgrade is safe for a greenfield Streamlit app.
+  vix_regime:
+    series:
+      vix: VIXCLS
+    thresholds:
+      complacent: 15.0
+      normal_high: 25.0
+      elevated: 35.0
+    labels: [complacent, normal, elevated, crisis]
+    hysteresis_days: 3
 
-**Add to pyproject.toml:**
-
-```toml
-[project.optional-dependencies]
-research = [
-  "streamlit>=1.44",        # Dashboard — upgrade to >=1.54.0 for latest fixes
-  "jupyterlab>=4.5",        # Notebook environment
-]
+  carry_trade:
+    series:
+      fed_funds: FEDFUNDS
+      japan_rate: IRSTCI01JPM156N  # or BOJ policy rate proxy
+      usd_jpy_vol: null  # computed from derived series
+    thresholds:
+      spread_compressed_bps: 200  # below this = stress signal
+      vol_spike_zscore: 2.0  # JPY vol z-score above this = unwind risk
+    labels: [favorable, neutral, stress, unwind]
+    hysteresis_days: 5
 ```
 
-**Why Streamlit over alternatives:**
-- **Dash (Plotly):** More flexible but requires callbacks and React component knowledge. Streamlit's reactive model is faster to build research explorers.
-- **Panel:** Higher capability ceiling but more complex. Not needed for internal research tooling.
-- **Gradio:** ML demo-focused. Wrong audience (researchers, not demo consumers).
+This follows the existing pattern but extends it:
+- `policy_loader.py` loads regime-to-policy mappings (what to DO given a regime)
+- `macro_regimes.yaml` defines regime-detection thresholds (how to DETECT a regime)
 
-**Streamlit + Plotly integration:** plotly 6.4.0 is already installed. `st.plotly_chart()` renders plotly figures natively. The existing `viz/all_plots.py` uses matplotlib; Streamlit dashboards should use plotly for interactivity.
-
-**What NOT to add for Streamlit:**
-- **streamlit-aggrid:** AgGrid for advanced table display. Useful but adds a JS bundle dependency. Standard `st.dataframe()` is sufficient for MVP.
-- **streamlit-plotly-events:** For click-event callbacks on charts. Overkill for a research explorer.
-- **Redis / streamlit-caching backends:** The default in-memory cache is sufficient for a single-user research dashboard.
+Both are YAML, both support hot-reload, both have in-code defaults as fallbacks.
 
 ---
 
-## Feature Area 7: Jupyter Notebooks
+## Decision 6: What NOT to Add
 
-### Recommendation: ADD jupyterlab>=4.5 to research optional group
+These are libraries or approaches I explicitly evaluated and rejected for v1.0.1.
 
-**Current state:** `jupyterlab_widgets 3.0.16` is installed (a component), but `jupyterlab` itself is not installed.
+| Library/Approach | Why NOT |
+|-----------------|---------|
+| **hmmlearn** | Macro data is too low-frequency for HMM; thresholds are known from domain knowledge; adds unmaintained dependency. See Decision 1. |
+| **pomegranate** | Same reasoning as hmmlearn; faster but even more complex API. Not needed when thresholds work. |
+| **statsmodels** | Tempting for time-series decomposition (STL, ARIMA), but macro regime labeling does not need forecasting -- it needs classification of current state. Rolling z-scores via pandas/scipy cover the feature engineering. |
+| **fredapi** | Already installed as optional (`pip install ta_lab2[fred]`), but the macro regime pipeline reads from PostgreSQL, not the FRED API. No change needed. |
+| **FedTools** | Unmaintained scraper for FOMC dates. Static YAML is simpler, more reliable, and zero-dependency. |
+| **pandas_market_calendars** | Exchange trading calendars, not economic event calendars. Does not include FOMC meetings. |
+| **arch** (GARCH) | Already installed (7.2.0) but not needed. VIX is already a volatility measure -- no need to estimate conditional volatility from returns when the market's own estimate (VIX) is available as a FRED series. |
+| **ecocal** | Economic calendar scraper. Same reasoning as FedTools -- static YAML for 8 FOMC dates/year. |
+| **requests** | Already available in the environment but not needed. All data reads are from PostgreSQL. |
 
-**Latest stable:** JupyterLab 4.5.5 (released 2026-02-23, today). Notebook 7.5.3 (released 2026-01-26) is based on JupyterLab 4.5.
+---
 
-**Python requirements:** >=3.9 — fully compatible with Python 3.12.
+## Recommended Stack Delta: v1.0.0 -> v1.0.1
 
-**Installation:**
-```bash
-pip install jupyterlab>=4.5
+### pyproject.toml Changes
+
+**None required for core dependencies.**
+
+The macro regime infrastructure is built entirely on existing dependencies. No new entries in `[project.dependencies]` or `[project.optional-dependencies]`.
+
+### New Files (Code, Not Dependencies)
+
+| File | Purpose |
+|------|---------|
+| `src/ta_lab2/macro/__init__.py` | New package for macro regime infrastructure |
+| `src/ta_lab2/macro/derived_series.py` | Compute rate spreads, yield curve metrics, carry proxies from `fred.series_values` |
+| `src/ta_lab2/macro/feature_store.py` | Build time-series features (rolling z-scores, momentum, regime duration) |
+| `src/ta_lab2/macro/labeler.py` | Rule-based macro regime labeler (monetary policy, VIX, carry) |
+| `src/ta_lab2/macro/aggregator.py` | Cross-domain regime aggregation (composite macro regime key) |
+| `src/ta_lab2/macro/risk_gate.py` | FOMC blackout window, VIX spike, carry unwind risk gates |
+| `src/ta_lab2/macro/fred_reader.py` | Thin SQL reader for `fred.series_values` -> pandas |
+| `configs/macro_regimes.yaml` | Threshold configuration for all macro regime domains |
+| `configs/fomc_calendar.yaml` | Static FOMC meeting dates |
+| Alembic migration | Schema additions (see Decision 4) |
+| `src/ta_lab2/scripts/macro/refresh_macro_regimes.py` | Daily refresh script |
+
+### Import-Linter Implications
+
+The existing layering contract in `pyproject.toml` places `regimes` at the same level as `signals` and `analysis`. The new `macro` package should be at the same level:
+
+```
+ta_lab2.scripts > ta_lab2.pipelines | ta_lab2.backtests > ta_lab2.signals | ta_lab2.regimes | ta_lab2.analysis | ta_lab2.macro > ta_lab2.features | ta_lab2.tools
 ```
 
-JupyterLab 4.5 auto-installs `notebook>=7` as a dependency, providing the classic notebook interface too.
-
-**Supporting packages for polished demo notebooks:**
-
-| Package | Version | Purpose | Decision |
-|---------|---------|---------|---------|
-| jupyterlab | >=4.5.5 | Notebook IDE | ADD |
-| jupytext | >=1.16 | Sync .ipynb ↔ .py (git-friendly) | OPTIONAL (see note) |
-| nbconvert | >=7.0 | Convert notebooks to HTML/PDF for docs | OPTIONAL |
-
-**jupytext note:** For notebooks committed to git, `jupytext` converts `.ipynb` files to `.py` format (percent format or light format), making diffs readable and preventing large JSON blob commits. If notebooks will be version-controlled, add jupytext. If notebooks are scratch space only, skip.
-
-**What NOT to add:**
-- **papermill:** Parameterized notebook execution. Useful for CI-run notebooks but adds complexity. Not needed for a research demo milestone.
-- **nbformat:** Already a jupyterlab transitive dependency; do not pin separately.
-- **ipywidgets:** Interactive widgets for notebooks. `jupyterlab_widgets 3.0.16` is already installed as a transitive dependency. `ipywidgets` itself can be added if specific interactive widgets are needed in demos.
+`macro` can import from `features` and `tools` (lower layers) but NOT from `scripts`, `pipelines`, or `backtests` (higher layers). `regimes` can import from `macro` (same level, no cycle since macro does not import regimes).
 
 ---
 
-## Dependency Conflict Assessment
+## Integration Points Summary
 
-### numpy 2.4.1 vs vectorbt 0.28.1
-
-vectorbt's `setup.py` specifies `numpy>=1.16.5` (no upper bound). The installed numpy 2.4.1 is higher than tested. The codebase's `MEMORY.md` documents that vectorbt 0.28.1 works in production on this machine. The vbt_runner.py and orchestrator.py are complete and functional.
-
-**Risk:** numpy 2.x introduced breaking changes in some internal C APIs. vectorbt 0.28.1 was released in 2022 and was not tested against numpy 2.x at release time. However, since the existing backtests already work (MEMORY.md: "All 3 signal generators work"), this is not a blocker for v0.9.0.
-
-**Mitigation:** Do not upgrade numpy. Pin `numpy<3.0` in pyproject.toml to prevent accidental major upgrade.
-
-### scipy 1.17.0 requirements
-
-scipy 1.17.0 (2026-01-10) requires `numpy>=1.26.4`. The installed numpy 2.4.1 satisfies this. No conflict.
-
-### scikit-learn 1.8.0
-
-scikit-learn 1.8.0 requires numpy, scipy. Both present at compatible versions. No conflict.
-
-### numba 0.64.0
-
-numba 0.64.0 in the Python 3.12 environment. This is compatible with numpy 2.x (numba >=0.61 added numpy 2.0 support). No conflict.
-
-**The .venv311 environment** has numba 0.57.1 with numpy 1.24.4. This is intentionally isolated and is not affected by the Python 3.12 environment changes.
+| Existing Component | How Macro Regimes Connect |
+|-------------------|--------------------------|
+| `resolver.py` L4 parameter | Macro composite regime key passed as `L4=...` to `resolve_policy()` |
+| `HysteresisTracker` | Reused for macro regime transitions (same min_bars_hold logic) |
+| `policy_loader.py` | Extended to load macro-specific policy rules from YAML |
+| `RiskEngine` gates | New macro risk gate reads `dim_risk_state.macro_regime_state` |
+| `DriftMonitor` | New drift source: "macro regime changed" attribution |
+| `RegimeRouter` | Can route by macro regime (L4) in addition to per-asset regime (L2) |
+| Daily refresh pipeline | New step: bars -> EMAs -> regimes -> **macro regimes** -> stats |
 
 ---
 
-## Complete pyproject.toml Changes for v0.9.0
+## Version Pinning Summary
 
-```toml
-[project.optional-dependencies]
-# NEW: Research & experimentation tooling
-research = [
-  "streamlit>=1.44",         # Dashboard (upgrade from 1.44.0 to latest stable >=1.54.0)
-  "jupyterlab>=4.5",         # Notebook environment
-  "jupytext>=1.16",          # Git-friendly notebook format (optional but recommended)
-]
+No new version pins needed. For reference, the existing relevant pins:
 
-# UPDATED: Existing viz group — add seaborn if IC heatmaps needed in notebooks
-viz = [
-  "matplotlib>=3.6",
-  "seaborn>=0.13",           # ADD if notebooks need heatmap-style IC plots
-]
-```
-
-**Core dependencies: NO CHANGES.**
-
-The `pyproject.toml` core `dependencies` block does not need modification. scipy, numpy, scikit-learn, plotly are already installed in the environment. They should not be pinned in core deps unless they are direct imports in the library layer (they currently are not — they're used by scripts and analysis modules).
-
----
-
-## What NOT to Add (Summary)
-
-| Do Not Add | Why |
-|------------|-----|
-| TA-Lib | Requires C binary install on Windows (`C:\ta-lib`); KAMA/DEMA/TEMA/HMA are 30 lines each in numpy |
-| pandas-ta 0.4.71b0 | Beta only; requires Python >=3.12 AND numba >=0.60; incompatible with .venv311; 4 indicators not worth beta dep |
-| mlfinlab | Effectively discontinued on PyPI; moved to paid private tier |
-| quantstats | Adds yfinance/requests overhead; conflicts with existing metrics.py API contract |
-| skfolio | CombinatorialPurgedCV is one class; brings cvxpy-base + clarabel solver as hard deps |
-| timeseriescv | PyPI version 0.2 is inactive; no new releases |
-| alphalens-reloaded | Requires seaborn + statsmodels; IC math is 80 lines in scipy; plot style conflicts with existing viz |
-| MLflow | Overkill for feature lifecycle in a single-developer lab; adds server process or file backend |
-| DVC | Dataset versioning via git; mismatched with PostgreSQL-backed feature store |
-| Feast | Enterprise feature serving (online/offline stores); far beyond current scale |
-| papermill | Parameterized notebook execution; not needed for research demo milestone |
-| Weights & Biases | SaaS external service dependency; self-contained codebase policy |
-| Panel / Dash | More complex than Streamlit; not needed for internal research explorer |
-| pypbo | PSR math is 15 lines; not worth a library dependency |
-
----
-
-## Complete New Packages Summary
-
-| Package | Recommended Version | Purpose | New or Already Installed |
-|---------|---------------------|---------|--------------------------|
-| streamlit | >=1.44 (upgrade to 1.54.0) | Research dashboard | ALREADY INSTALLED (1.44.0) — upgrade |
-| jupyterlab | >=4.5.5 | Notebook environment | NEW |
-| jupytext | >=1.16 | Git-friendly .ipynb format | NEW (optional) |
-| seaborn | >=0.13.2 | Heatmap plots in notebooks | NEW (optional, only if needed) |
-
-**scipy, numpy, scikit-learn, plotly:** Already installed at compatible versions. No installation needed. PSR, IC, Spearman, and PurgedKFold implementations use these directly.
-
-**KAMA, DEMA, TEMA, HMA:** Implemented in-house with numpy. Zero new dependencies.
-
----
-
-## Installation Commands
-
-```bash
-# Minimum required for v0.9.0 features
-pip install "jupyterlab>=4.5"
-
-# Upgrade Streamlit (already installed, bump to latest)
-pip install "streamlit>=1.54.0"
-
-# Optional: git-friendly notebooks
-pip install "jupytext>=1.16"
-
-# Optional: seaborn for IC heatmaps in notebooks
-pip install "seaborn>=0.13.2"
-```
-
-**No pyproject.toml core dep changes required.** Add `research` optional group to pyproject.toml for documentation purposes.
+| Package | Version | Notes |
+|---------|---------|-------|
+| numpy | >=1.24 (installed: 2.4.1) | No macro-specific constraints |
+| scipy | >=1.10 (installed: 1.17.0) | Used for z-score computation in macro features |
+| pandas | >=2.0 (installed: 2.3.3) | DatetimeIndex resampling for daily alignment |
+| PyYAML | >=5.0 (installed) | YAML config loading |
+| SQLAlchemy | >=2.0 (installed) | DB reads/writes |
+| Alembic | >=1.18 (installed) | Schema migrations |
+| scikit-learn | >=1.4 (installed: 1.8.0) | Only if HMM experimentation added later |
 
 ---
 
 ## Sources
 
-### HIGH Confidence (PyPI / Official Docs — verified February 2026)
+### Verified (HIGH confidence)
+- hmmlearn PyPI page: https://pypi.org/project/hmmlearn/ (version 0.3.3, limited maintenance mode)
+- hmmlearn docs: https://hmmlearn.readthedocs.io/en/latest/api.html (GaussianHMM API)
+- FedTools PyPI page: https://pypi.org/project/Fedtools/ (no release in 12+ months)
+- FedTools Snyk health: https://snyk.io/advisor/python/fedtools (project health concerns)
+- pandas_market_calendars docs: https://pandas-market-calendars.readthedocs.io/en/latest/calendars.html (exchange calendars only)
+- Fed FOMC calendar: https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm (official dates)
+- Existing codebase: `regimes/resolver.py` L4 parameter, `regimes/hysteresis.py` HysteresisTracker, `integrations/economic/` FredProvider, `scripts/etl/sync_fred_from_vm.py`, `risk/risk_engine.py`
 
-- [streamlit PyPI](https://pypi.org/project/streamlit/) — version 1.54.0 confirmed
-- [Streamlit 2026 release notes](https://docs.streamlit.io/develop/quick-reference/release-notes/2026) — breaking changes verified
-- [jupyterlab PyPI](https://pypi.org/project/jupyterlab/) — version 4.5.5 confirmed (2026-02-23)
-- [scikit-learn PyPI](https://pypi.org/project/scikit-learn/) — version 1.8.0 (2025-12-10) confirmed
-- [scipy PyPI / Release Notes](https://docs.scipy.org/doc/scipy/release.html) — version 1.17.0 (2026-01-10), requires numpy>=1.26.4
-- [seaborn PyPI](https://pypi.org/project/seaborn/) — version 0.13.2 (2024-01-25) confirmed; no 0.14 released
-- [statsmodels PyPI](https://pypi.org/project/statsmodels/) — version 0.14.6 (2025-12-05) confirmed
-- [alphalens-reloaded PyPI](https://pypi.org/project/alphalens-reloaded/) — version 0.4.6 (2025-06-02), Production/Stable
-- [skfolio PyPI](https://pypi.org/project/skfolio/) — version 0.15.5 (2026-02-10), sklearn-compatible
-- [TA-Lib PyPI](https://pypi.org/project/TA-Lib/) — version 0.6.8 (2025-10-20); C binary required on Windows
-- [TA-Lib install docs](https://ta-lib.github.io/ta-lib-python/install.html) — Windows C binary requirement confirmed
-- [pandas-ta PyPI](https://pypi.org/project/pandas-ta/) — version 0.4.71b0 (2025-09-14); beta only; requires Python>=3.12 + numba>=0.60
-- [numba 0.57.1 PyPI](https://pypi.org/project/numba/0.57.1/) — Python 3.8-3.11 only
-- [scikit-learn TimeSeriesSplit docs](https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.TimeSeriesSplit.html) — gap parameter confirmed
-- [timeseriescv Snyk health](https://snyk.io/advisor/python/timeseriescv) — inactive status confirmed
-- [rubenbriones/Probabilistic-Sharpe-Ratio](https://github.com/rubenbriones/Probabilistic-Sharpe-Ratio/blob/master/src/sharpe_ratio_stats.py) — PSR formula uses scipy.stats.norm.cdf, skew, kurtosis
-- Local `pip show` commands — confirmed installed versions for scipy 1.17.0, scikit-learn 1.8.0, numpy 2.4.1, plotly 6.4.0, arch 7.2.0, numba 0.64.0, streamlit 1.44.0
+### Research (MEDIUM confidence)
+- Macrosynergy regime classification research: https://macrosynergy.com/research/classifying-market-regimes/
+- Tree-based macro regime switching (arXiv): https://arxiv.org/html/2408.12863v1
+- QuantStart HMM regime detection: https://www.quantstart.com/articles/market-regime-detection-using-hidden-markov-models-in-qstrader/
 
-### MEDIUM Confidence (WebSearch verified with official source)
-
-- [pandas-ta installation docs](https://www.pandas-ta.dev/getting-started/installation/) — numba >=0.60.0 requirement confirmed
-- [mlfinlab GitHub](https://github.com/hudson-and-thames/mlfinlab) — discontinued PyPI releases, moved to paid tier (multiple sources agree)
-- [skfolio model selection docs](https://skfolio.org/user_guide/model_selection.html) — CombinatorialPurgedCV sklearn compatibility confirmed
-- [KAMA algorithm — Perry Kaufman](https://chartschool.stockcharts.com/table-of-contents/technical-indicators-and-overlays/technical-overlays/kaufmans-adaptive-moving-average) — algorithm formula verified
-- [HMA formula](https://medium.com/@basics.machinelearning/hull-moving-average-hma-using-python-48262e18d0fb) — WMA(2*WMA(n/2)-WMA(n), sqrt(n)) confirmed
-
----
-
-*Stack research for: v0.9.0 Research & Experimentation*
-*Researched: 2026-02-23*
+### Market Context (MEDIUM confidence)
+- Carry trade unwind mechanics and detection signals: https://www.quantvps.com/blog/yen-carry-trade-unwind-explained
+- USD/JPY carry trade risk assessment: https://www.investing.com/analysis/assessing-usdjpy-carry-trade-risks-in-a-changing-2025-monetary-landscape-200663982
+- BOJ rate normalization timeline: https://seekingalpha.com/article/4853187-boj-may-finally-trigger-yen-carry-trade-unwind
