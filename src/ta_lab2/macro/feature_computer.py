@@ -244,7 +244,8 @@ def compute_macro_features(
         if fred_id in source_dates:
             src = source_dates[fred_id]
             # df_derived.index is DatetimeIndex; src is aligned to same index
-            days = (df_derived.index - src).days
+            delta = df_derived.index.to_series() - src
+            days = delta.dt.days
             df_derived[db_col] = days.where(src.notna(), other=None)
         else:
             df_derived[db_col] = None
