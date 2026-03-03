@@ -759,11 +759,108 @@ def upsert_funding_rate_agg(engine: Engine, df: pd.DataFrame) -> int:
 # ---------------------------------------------------------------------------
 
 
+def send_sign_flip_alerts(sign_flip_df: pd.DataFrame, config: Dict[str, Any]) -> int:
+    """Send Telegram alerts for crypto-macro sign-flip events.
+
+    Reads config.telegram.sign_flip_alerts to determine if alerts are enabled.
+    Groups sign flips by date to avoid spamming: if more than 3 flips on the
+    same date, sends a single summary message instead of individual ones.
+
+    Parameters
+    ----------
+    sign_flip_df:
+        DataFrame with XAGG-04 correlation rows (must contain sign_flip_flag,
+        date, asset_id, macro_var, prev_corr_60d, corr_60d columns).
+    config:
+        Cross-asset config dict (from load_cross_asset_config()).
+
+    Returns
+    -------
+    Number of Telegram alert messages sent (0 if disabled or no flips).
+    """
+    tg_cfg = config.get("telegram", {})
+    if not tg_cfg.get("sign_flip_alerts", False):
+        return 0
+
+    if sign_flip_df.empty:
+        return 0
+
+    # Filter to sign flip rows only
+    flip_df = sign_flip_df[sign_flip_df["sign_flip_flag"] == True].copy()  # noqa: E712
+    if flip_df.empty:
+        return 0
+
+    # Import Telegram module with graceful fallback
+    try:
+        from ta_lab2.notifications.telegram import is_configured, send_alert
+    except ImportError:
+        logger.warning(
+            "ta_lab2.notifications.telegram not importable; skipping sign-flip alerts"
+        )
+        return 0
+
+    if not is_configured():
+        logger.warning("Telegram not configured; skipping sign-flip alerts")
+        return 0
+
+    alerts_sent = 0
+    spam_threshold = 3
+
+    # Group by date
+    for flip_date, date_group in flip_df.groupby("date"):
+        n_flips = len(date_group)
+        try:
+            if n_flips > spam_threshold:
+                # Send a summary instead of individual alerts
+                message = (
+                    f"{n_flips} crypto-macro sign flips detected on {flip_date}\n\n"
+                    "Top flips:\n"
+                )
+                for _, row in date_group.head(spam_threshold).iterrows():
+                    prev = row.get("prev_corr_60d")
+                    curr = row.get("corr_60d")
+                    prev_str = f"{prev:.3f}" if prev is not None else "N/A"
+                    curr_str = f"{curr:.3f}" if curr is not None else "N/A"
+                    message += (
+                        f"  Asset: id={row['asset_id']}  "
+                        f"Macro: {row['macro_var']}  "
+                        f"Corr: {prev_str} -> {curr_str}\n"
+                    )
+                remaining = n_flips - spam_threshold
+                if remaining > 0:
+                    message += f"  ... and {remaining} more"
+                send_alert("CRYPTO-MACRO SIGN FLIP", message, severity="warning")
+                alerts_sent += 1
+            else:
+                # Send individual alerts
+                for _, row in date_group.iterrows():
+                    prev = row.get("prev_corr_60d")
+                    curr = row.get("corr_60d")
+                    prev_str = f"{prev:.3f}" if prev is not None else "N/A"
+                    curr_str = f"{curr:.3f}" if curr is not None else "N/A"
+                    asset_id = row.get("asset_id", "?")
+                    macro_var = row.get("macro_var", "?")
+                    message = (
+                        f"Asset: id={asset_id}\n"
+                        f"Macro Var: {macro_var}\n"
+                        f"Correlation: {prev_str} -> {curr_str}\n"
+                        f"Date: {flip_date}"
+                    )
+                    send_alert("CRYPTO-MACRO SIGN FLIP", message, severity="warning")
+                    alerts_sent += 1
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Sign-flip alert failed for date %s: %s", flip_date, exc)
+
+    logger.info("Sent %d sign-flip Telegram alert(s)", alerts_sent)
+    return alerts_sent
+
+
 def compute_crypto_macro_corr(
     engine: Engine,
     config: Dict[str, Any],
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
+    alert_new_only: bool = True,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Compute crypto-macro correlation regime with sign-flip detection.
 
@@ -782,6 +879,10 @@ def compute_crypto_macro_corr(
         Optional override start date. If None, uses watermark.
     end_date:
         Optional override end date. If None, uses today.
+    alert_new_only:
+        When True (default), Telegram alerts are only sent for dates after the
+        watermark (i.e. newly computed rows). Set to False to suppress all alerts
+        (useful during --full historical recompute to avoid spamming old flips).
 
     Returns
     -------
@@ -996,6 +1097,24 @@ def compute_crypto_macro_corr(
 
     regime_df = pd.DataFrame(regime_rows)
     logger.info("XAGG-04: computed %d macro_regime label rows", len(regime_df))
+
+    # --- Send Telegram sign-flip alerts ---------------------------------
+    # Only alert on new rows (dates after watermark) to avoid spamming
+    # historical sign flips during --full recompute runs.
+    try:
+        alert_df = corr_df
+        if alert_new_only and wm is not None:
+            alert_df = corr_df[
+                corr_df["date"].apply(
+                    lambda d: (d if not hasattr(d, "date") else d) > wm
+                )
+            ]
+        elif not alert_new_only:
+            # Caller opted out of alerts (e.g. --full historical mode)
+            alert_df = pd.DataFrame(columns=corr_df.columns)
+        send_sign_flip_alerts(alert_df, config)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("sign-flip alert error (non-fatal): %s", exc)
 
     return corr_df, regime_df
 
