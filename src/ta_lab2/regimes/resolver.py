@@ -1,5 +1,6 @@
 # src/ta_lab2/regimes/resolver.py
 from __future__ import annotations
+import fnmatch
 from dataclasses import dataclass
 from typing import Dict, Mapping, Optional
 
@@ -50,6 +51,83 @@ DEFAULT_POLICY_TABLE: Dict[str, Dict[str, object]] = {
     },  # liquidity override
 }
 
+# L4 macro regime policy entries using fnmatch glob patterns.
+# Order matters: more specific patterns must precede broader ones (Python 3.7+ dict preserves insertion order).
+L4_MACRO_POLICY_ENTRIES: Dict[str, Dict[str, object]] = {
+    # Most severe: liquidity contraction + risk-off
+    "*-Strongly_Contracting-RiskOff-*": {
+        "size_mult": 0.30,
+        "stop_mult": 2.00,
+        "gross_cap": 0.40,
+        "orders": "passive",
+        "setups": ["stand_down", "hedge"],
+        "pyramids": False,
+    },
+    # Severe: contraction + risk-off
+    "*-Contracting-RiskOff-*": {
+        "size_mult": 0.50,
+        "stop_mult": 1.80,
+        "gross_cap": 0.50,
+        "orders": "conservative",
+        "setups": ["hedge"],
+        "pyramids": False,
+    },
+    # Hiking + risk-off (cautious combo)
+    "Hiking-*-RiskOff-*": {
+        "size_mult": 0.55,
+        "stop_mult": 1.75,
+        "gross_cap": 0.55,
+        "orders": "conservative",
+        "setups": ["hedge"],
+        "pyramids": False,
+    },
+    # Generic risk-off (any monetary/liquidity)
+    "*-RiskOff-*": {
+        "size_mult": 0.60,
+        "stop_mult": 1.70,
+        "gross_cap": 0.60,
+        "orders": "conservative",
+        "setups": ["pullback", "hedge"],
+    },
+    # Carry unwind stress (any combo)
+    "*-Unwind": {
+        "size_mult": 0.65,
+        "stop_mult": 1.65,
+        "gross_cap": 0.65,
+        "orders": "conservative",
+    },
+    # Strong contraction without risk-off
+    "*-Strongly_Contracting-*": {
+        "size_mult": 0.65,
+        "stop_mult": 1.60,
+        "gross_cap": 0.65,
+    },
+    # Mild contraction without risk-off
+    "*-Contracting-*": {
+        "size_mult": 0.80,
+        "stop_mult": 1.50,
+        "gross_cap": 0.80,
+    },
+    # Catch-all for unknown/neutral macro regimes (no tightening)
+    "Unknown*": {
+        "size_mult": 1.0,
+        "stop_mult": 1.5,
+        "gross_cap": 1.0,
+    },
+}
+
+# MINT-02: Tighten-only invariant -- ALL L4 macro entries MUST have size_mult <= 1.0
+for _k, _v in L4_MACRO_POLICY_ENTRIES.items():
+    assert float(_v.get("size_mult", 1.0)) <= 1.0, (
+        f"MINT-02 violation: L4 entry {_k!r} has size_mult={_v.get('size_mult')} > 1.0"
+    )
+    assert float(_v.get("gross_cap", 1.0)) <= 1.0, (
+        f"MINT-02 violation: L4 entry {_k!r} has gross_cap={_v.get('gross_cap')} > 1.0"
+    )
+
+# Merge L4 macro entries into DEFAULT_POLICY_TABLE so resolve_policy() inherits them
+DEFAULT_POLICY_TABLE.update(L4_MACRO_POLICY_ENTRIES)
+
 
 @dataclass
 class TightenOnlyPolicy:
@@ -65,7 +143,12 @@ def _match_policy(
     regime_key: str, table: Mapping[str, Mapping[str, object]]
 ) -> Dict[str, object]:
     for k, v in table.items():
-        # very lightweight pattern: all tokens in k must appear in regime_key
+        # Glob pattern matching (e.g. '*-RiskOff-*') -- check first
+        if "*" in k or "?" in k or "[" in k:
+            if fnmatch.fnmatch(regime_key, k):
+                return dict(v)
+            continue
+        # Existing token-based substring matching (no glob chars)
         tokens = [t for t in k.split("-") if t]  # ignore empty fragments
         if all(t in regime_key for t in tokens):
             return dict(v)
