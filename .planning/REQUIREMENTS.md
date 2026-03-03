@@ -42,13 +42,13 @@
 
 ### Macro-Asset Integration (MINT)
 
-- [ ] **MINT-01**: Macro regime feeds into resolver's L4 slot via `resolve_policy_from_table(L4=macro_regime_key)`
-- [ ] **MINT-02**: Tighten-only semantics preserved — macro `size_mult` ≤ 1.0 for ALL entries, enforced by assertion
-- [ ] **MINT-03**: Macro regime policy entries added to DEFAULT_POLICY_TABLE with substring matching for partial patterns (e.g., `-RiskOff-Unwind` matches any monetary+liquidity combo)
-- [ ] **MINT-04**: YAML policy overlay supported via existing `policy_loader.py` for macro regime entries
-- [ ] **MINT-05**: `refresh_cmc_regimes.py` loads latest macro regime and passes as L4 to resolver for each asset
-- [ ] **MINT-06**: Executor logs L4 macro regime alongside L0-L2 per-asset regime for every trade decision
-- [ ] **MINT-07**: Adaptive gross_cap from macro regime (e.g., risk-off caps gross exposure at 50-60%)
+- [x] **MINT-01**: Macro regime feeds into resolver's L4 slot via `resolve_policy_from_table(L4=macro_regime_key)`
+- [x] **MINT-02**: Tighten-only semantics preserved — macro `size_mult` ≤ 1.0 for ALL entries, enforced by assertion
+- [x] **MINT-03**: Macro regime policy entries added to DEFAULT_POLICY_TABLE with substring matching for partial patterns (e.g., `-RiskOff-Unwind` matches any monetary+liquidity combo)
+- [x] **MINT-04**: YAML policy overlay supported via existing `policy_loader.py` for macro regime entries
+- [x] **MINT-05**: `refresh_cmc_regimes.py` loads latest macro regime and passes as L4 to resolver for each asset
+- [x] **MINT-06**: Executor logs L4 macro regime alongside L0-L2 per-asset regime for every trade decision
+- [x] **MINT-07**: Adaptive gross_cap from macro regime (e.g., risk-off caps gross exposure at 50-60%)
 
 ### Cross-Asset Aggregation (XAGG)
 
@@ -139,13 +139,13 @@
 | MREG-10 | Phase 68 | Complete |
 | MREG-11 | Phase 68 | Complete |
 | MREG-12 | Phase 68 | Complete |
-| MINT-01 | Phase 69 | Pending |
-| MINT-02 | Phase 69 | Pending |
-| MINT-03 | Phase 69 | Pending |
-| MINT-04 | Phase 69 | Pending |
-| MINT-05 | Phase 69 | Pending |
-| MINT-06 | Phase 69 | Pending |
-| MINT-07 | Phase 69 | Pending |
+| MINT-01 | Phase 69 | Complete |
+| MINT-02 | Phase 69 | Complete |
+| MINT-03 | Phase 69 | Complete |
+| MINT-04 | Phase 69 | Complete |
+| MINT-05 | Phase 69 | Complete |
+| MINT-06 | Phase 69 | Complete |
+| MINT-07 | Phase 69 | Complete |
 | XAGG-01 | Phase 70 | Pending |
 | XAGG-02 | Phase 70 | Pending |
 | XAGG-03 | Phase 70 | Pending |

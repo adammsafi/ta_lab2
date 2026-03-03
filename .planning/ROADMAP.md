@@ -1315,7 +1315,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 - [x] **Phase 66: FRED Derived Features & Automation** - Credit stress, financial conditions, carry trade, fed regime, CPI proxy, and daily refresh wiring
 - [x] **Phase 67: Macro Regime Classifier** - Rule-based 4-dimensional macro regime labeler with hysteresis and YAML config -- COMPLETE 2026-03-03
 - [x] **Phase 68: HMM & Macro Analytics** - Secondary HMM classifier, lead-lag analysis, and regime transition probabilities — COMPLETE 2026-03-03
-- [ ] **Phase 69: L4 Resolver Integration** - Wire macro regime into tighten-only resolver chain and executor logging
+- [x] **Phase 69: L4 Resolver Integration** - Wire macro regime into tighten-only resolver chain and executor logging — COMPLETE 2026-03-03
 - [ ] **Phase 70: Cross-Asset Aggregation** - BTC/ETH correlation features, aggregate funding rate, and crypto-macro correlation regime
 - [ ] **Phase 71: Event Risk Gates** - FOMC/CPI/NFP event calendar, VIX spike gate, carry unwind gate, credit stress gate, composite stress score
 - [ ] **Phase 72: Macro Observability** - Dashboard display, Telegram alerts, FRED freshness monitoring, drift attribution, regime timeline
@@ -1428,9 +1428,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 69-01-PLAN.md -- Resolver fnmatch extension + L4 macro policy entries + YAML overlay
-- [ ] 69-02-PLAN.md -- Regime refresh L4 injection + staleness check + Alembic migration
-- [ ] 69-03-PLAN.md -- Executor L4 logging + gross_cap scaling + audit trail
+- [x] 69-01-PLAN.md -- Resolver fnmatch extension + L4 macro policy entries + YAML overlay
+- [x] 69-02-PLAN.md -- Regime refresh L4 injection + staleness check + Alembic migration
+- [x] 69-03-PLAN.md -- Executor L4 logging + gross_cap scaling + audit trail
 
 ### Phase 70: Cross-Asset Aggregation
 
