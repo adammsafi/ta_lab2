@@ -7,13 +7,13 @@
 
 ### FRED Data Pipeline (FRED)
 
-- [ ] **FRED-01**: `fred_macro_features` table exists in marketdata with PK (date), storing daily-aligned macro values for all 39 FRED series plus derived series
-- [ ] **FRED-02**: Mixed-frequency series (monthly, weekly) are forward-filled to daily cadence with `source_freq` provenance column and `limit` guards (45d monthly, 10d weekly)
-- [ ] **FRED-03**: Net liquidity proxy computed daily as `WALCL - WTREGEN - RRPONTSYD` with weekly inputs forward-filled; WTREGEN (TGA) added to VM collection if not present
-- [ ] **FRED-04**: Rate spread features computed: `US_JP_RATE_SPREAD` (DFF - ffill(IRSTCI01JPM156N)), `US_ECB_RATE_SPREAD` (DFF - ECBDFR), `US_JP_10Y_SPREAD` (DGS10 - ffill(IRLTLT01JPM156N))
-- [ ] **FRED-05**: Yield curve features: `T10Y2Y` level stored directly, `YC_SLOPE_CHANGE_5D` computed as 5-day delta
-- [ ] **FRED-06**: VIX regime computed from VIXCLS with thresholds: calm (<15), elevated (15-25), crisis (>25)
-- [ ] **FRED-07**: Dollar strength features: DTWEXBGS level, 5d change, 20d change
+- [x] **FRED-01**: `fred_macro_features` table exists in marketdata with PK (date), storing daily-aligned macro values for all 39 FRED series plus derived series
+- [x] **FRED-02**: Mixed-frequency series (monthly, weekly) are forward-filled to daily cadence with `source_freq` provenance column and `limit` guards (45d monthly, 10d weekly)
+- [x] **FRED-03**: Net liquidity proxy computed daily as `WALCL - WTREGEN - RRPONTSYD` with weekly inputs forward-filled; WTREGEN (TGA) added to VM collection if not present
+- [x] **FRED-04**: Rate spread features computed: `US_JP_RATE_SPREAD` (DFF - ffill(IRSTCI01JPM156N)), `US_ECB_RATE_SPREAD` (DFF - ECBDFR), `US_JP_10Y_SPREAD` (DGS10 - ffill(IRLTLT01JPM156N))
+- [x] **FRED-05**: Yield curve features: `T10Y2Y` level stored directly, `YC_SLOPE_CHANGE_5D` computed as 5-day delta
+- [x] **FRED-06**: VIX regime computed from VIXCLS with thresholds: calm (<15), elevated (15-25), crisis (>25)
+- [x] **FRED-07**: Dollar strength features: DTWEXBGS level, 5d change, 20d change
 - [x] **FRED-08**: Credit stress features: BAMLH0A0HYM2 level, 5d change, 30d rolling z-score
 - [x] **FRED-09**: Financial conditions: NFCI level, 4-week direction (rising/falling)
 - [x] **FRED-10**: M2 money supply: YoY percent change of M2SL, forward-filled to daily
@@ -27,15 +27,15 @@
 
 ### Macro Regime Classification (MREG)
 
-- [ ] **MREG-01**: `cmc_macro_regimes` table with PK (date) storing composite regime key and per-dimension labels (monetary_policy, liquidity, risk_appetite, carry)
-- [ ] **MREG-02**: Monetary policy dimension: `hiking` (DFF 90d change > 0.25%), `cutting` (< -0.25%), `holding` (else) — from DFF trajectory
-- [ ] **MREG-03**: Liquidity dimension: `expanding`/`neutral`/`contracting` from net liquidity 30d change direction, with `strongly_expanding`/`strongly_contracting` at z-score > 1
-- [ ] **MREG-04**: Risk appetite dimension: `risk_off` (VIX > 25 OR HY_OAS z-score > 1.5 OR NFCI > 0.5), `risk_on` (VIX < 15 AND HY_OAS z < -0.5 AND NFCI < -0.5), `neutral` (else)
-- [ ] **MREG-05**: Carry dimension: `unwind` (DEXJPUS daily > 2 sigma AND spread narrowing), `stress` (DEXJPUS 5d vol > 1.5 sigma), `stable` (else)
-- [ ] **MREG-06**: Composite macro regime key in same pattern as per-asset: `Cutting-Expanding-RiskOn-Stable`
-- [ ] **MREG-07**: Hysteresis applied via existing `HysteresisTracker` with `min_bars_hold` appropriate for macro stickiness (≥5 bars)
-- [ ] **MREG-08**: YAML-configurable thresholds for all regime dimension boundaries (not hardcoded)
-- [ ] **MREG-09**: Macro regime refresh runs daily after macro feature computation, before signal generation
+- [x] **MREG-01**: `cmc_macro_regimes` table with PK (date) storing composite regime key and per-dimension labels (monetary_policy, liquidity, risk_appetite, carry)
+- [x] **MREG-02**: Monetary policy dimension: `hiking` (DFF 90d change > 0.25%), `cutting` (< -0.25%), `holding` (else) — from DFF trajectory
+- [x] **MREG-03**: Liquidity dimension: `expanding`/`neutral`/`contracting` from net liquidity 30d change direction, with `strongly_expanding`/`strongly_contracting` at z-score > 1
+- [x] **MREG-04**: Risk appetite dimension: `risk_off` (VIX > 25 OR HY_OAS z-score > 1.5 OR NFCI > 0.5), `risk_on` (VIX < 15 AND HY_OAS z < -0.5 AND NFCI < -0.5), `neutral` (else)
+- [x] **MREG-05**: Carry dimension: `unwind` (DEXJPUS daily > 2 sigma AND spread narrowing), `stress` (DEXJPUS 5d vol > 1.5 sigma), `stable` (else)
+- [x] **MREG-06**: Composite macro regime key in same pattern as per-asset: `Cutting-Expanding-RiskOn-Stable`
+- [x] **MREG-07**: Hysteresis applied via existing `HysteresisTracker` with `min_bars_hold` appropriate for macro stickiness (≥5 bars)
+- [x] **MREG-08**: YAML-configurable thresholds for all regime dimension boundaries (not hardcoded)
+- [x] **MREG-09**: Macro regime refresh runs daily after macro feature computation, before signal generation
 - [x] **MREG-10**: HMM secondary classifier (2-3 state GaussianHMM on all available FRED macro features, covariance_type="diag" default) as optional confirmation signal alongside rule-based labels
 - [x] **MREG-11**: Macro-crypto lead-lag analysis using existing `lead_lag_max_corr()` pattern to quantify macro feature predictive power at lags [-60..+60] days
 - [x] **MREG-12**: Regime transition probability matrix from historical macro regime sequences

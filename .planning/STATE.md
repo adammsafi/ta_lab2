@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: 72 of 72 -- Macro Observability (v1.0.1 Macro Regime Infrastructure) COMPLETE
-Plan: 04 of 4 (72-04: Macro Regime Drift Attribution) COMPLETE [all 4 plans complete]
-Status: Phase 72 COMPLETE -- All plans 01-04 done; OBSV-04 satisfied; DriftAttributor Step 7 + persist_attribution() + dashboard 8-source attribution
-Last activity: 2026-03-03 -- Completed 72-04-PLAN.md (macro_regime_delta attribution + DB write path for attr_* columns)
+Phase: 73 of 73 -- Macro Gate & Alert Wiring (v1.0.1 Macro Regime Infrastructure) COMPLETE
+Plan: 01 of 1 (73-01: Gap Closure) COMPLETE [all 1 plans complete]
+Status: Phase 73 COMPLETE -- All 3 integration gaps closed; MacroGateEvaluator injected, gates/alerts wired into pipeline
+Last activity: 2026-03-03 -- Completed 73-01-PLAN.md (gap closure: MacroGateEvaluator + pipeline wiring + requirements checkboxes)
 
 ### Roadmap Evolution
 - Phase 64 added: MCP Memory Server -- Connect Qdrant to Claude Code
 - Phases 65-72 added: Macro Regime Infrastructure (FRED pipeline, classifier, L4 integration, risk gates, observability)
 - v1.0.1 roadmap: 9 phases, 55 requirements mapped across 8 requirement categories
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [████████] Phase 60 COMPLETE (8 plans) | [██] Phase 61 COMPLETE | [██] Phase 62 COMPLETE | [██] Phase 63 COMPLETE | [███] Phase 64 COMPLETE | [███] Phase 65 COMPLETE | [███] Phase 66 COMPLETE | [███] Phase 67 COMPLETE | [███] Phase 68 COMPLETE | [███] Phase 69 COMPLETE (3/3 plans) | [███] Phase 70 COMPLETE (3/3 plans) | [███] Phase 71 COMPLETE (3/3 plans) | [████] Phase 72 COMPLETE (4/4 plans)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [████████] Phase 60 COMPLETE (8 plans) | [██] Phase 61 COMPLETE | [██] Phase 62 COMPLETE | [██] Phase 63 COMPLETE | [███] Phase 64 COMPLETE | [███] Phase 65 COMPLETE | [███] Phase 66 COMPLETE | [███] Phase 67 COMPLETE | [███] Phase 68 COMPLETE | [███] Phase 69 COMPLETE (3/3 plans) | [███] Phase 70 COMPLETE (3/3 plans) | [███] Phase 71 COMPLETE (3/3 plans) | [████] Phase 72 COMPLETE (4/4 plans) | [█] Phase 73 COMPLETE (1/1 plans)
 
 ## Performance Metrics
 
