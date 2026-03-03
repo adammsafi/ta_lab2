@@ -8,6 +8,8 @@ Public API:
     load_macro_regime_config  -- Load YAML config for macro regime classifier
     HMMClassifier             -- GaussianHMM secondary classifier with BIC selection (Phase 68)
     LeadLagAnalyzer           -- Macro-to-crypto lead-lag cross-correlation analyzer (Phase 68)
+    TransitionProbMatrix      -- Static + rolling regime transition probability matrices (Phase 68)
+    get_transition_prob       -- Query any regime-to-regime transition probability (Phase 68)
 
 Phase 65: FRED Table & Core Features
 Phase 67: Macro Regime Classifier
@@ -23,6 +25,7 @@ from ta_lab2.macro.regime_classifier import (
     MacroRegimeClassifier,
     load_macro_regime_config,
 )
+from ta_lab2.macro.transition_probs import TransitionProbMatrix, get_transition_prob
 
 __all__ = [
     "load_series_wide",
@@ -32,4 +35,6 @@ __all__ = [
     "load_macro_regime_config",
     "HMMClassifier",
     "LeadLagAnalyzer",
+    "TransitionProbMatrix",
+    "get_transition_prob",
 ]
