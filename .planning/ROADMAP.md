@@ -1313,7 +1313,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 - [x] **Phase 64: MCP Memory Server** - Connect Qdrant to Claude Code via MCP server -- COMPLETE 2026-03-02
 - [x] **Phase 65: FRED Table & Core Features** - Macro feature table with daily alignment, rate spreads, yield curve, VIX, and dollar strength
 - [x] **Phase 66: FRED Derived Features & Automation** - Credit stress, financial conditions, carry trade, fed regime, CPI proxy, and daily refresh wiring
-- [ ] **Phase 67: Macro Regime Classifier** - Rule-based 4-dimensional macro regime labeler with hysteresis and YAML config
+- [x] **Phase 67: Macro Regime Classifier** - Rule-based 4-dimensional macro regime labeler with hysteresis and YAML config -- COMPLETE 2026-03-03
 - [ ] **Phase 68: HMM & Macro Analytics** - Secondary HMM classifier, lead-lag analysis, and regime transition probabilities
 - [ ] **Phase 69: L4 Resolver Integration** - Wire macro regime into tighten-only resolver chain and executor logging
 - [ ] **Phase 70: Cross-Asset Aggregation** - BTC/ETH correlation features, aggregate funding rate, and crypto-macro correlation regime
@@ -1394,9 +1394,9 @@ Plans:
 **Plans:** 3 plans in 3 waves
 
 Plans:
-- [ ] 67-01-PLAN.md -- Alembic migration (cmc_macro_regimes + cmc_macro_hysteresis_state)
-- [ ] 67-02-PLAN.md -- MacroRegimeClassifier module + YAML config (4 dimension labelers, hysteresis, bucketing)
-- [ ] 67-03-PLAN.md -- CLI refresh script + daily pipeline wiring (run_daily_refresh.py integration)
+- [x] 67-01-PLAN.md -- Alembic migration (cmc_macro_regimes + cmc_macro_hysteresis_state)
+- [x] 67-02-PLAN.md -- MacroRegimeClassifier module + YAML config (4 dimension labelers, hysteresis, bucketing)
+- [x] 67-03-PLAN.md -- CLI refresh script + daily pipeline wiring (run_daily_refresh.py integration)
 
 ### Phase 68: HMM & Macro Analytics
 
