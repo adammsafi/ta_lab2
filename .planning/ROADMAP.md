@@ -1410,7 +1410,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 68 to break down)
+- [ ] 68-01-PLAN.md -- Alembic migration (3 tables: cmc_hmm_regimes, cmc_macro_lead_lag_results, cmc_macro_transition_probs) + hmmlearn install
+- [ ] 68-02-PLAN.md -- HMMClassifier module + LeadLagAnalyzer module
+- [ ] 68-03-PLAN.md -- TransitionProbMatrix module + CLI script + daily pipeline wiring
 
 ### Phase 69: L4 Resolver Integration
 
