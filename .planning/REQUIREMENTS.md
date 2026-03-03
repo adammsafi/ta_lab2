@@ -71,12 +71,12 @@
 
 ### Observability & Monitoring (OBSV)
 
-- [ ] **OBSV-01**: Macro regime display in Streamlit dashboard: current regime, per-dimension labels, color-coded by risk level
-- [ ] **OBSV-02**: Telegram alert on macro regime transition (especially to risk-off or carry unwind)
-- [ ] **OBSV-03**: FRED data freshness display in pipeline monitor alongside crypto data freshness (traffic-light pattern)
-- [ ] **OBSV-04**: Macro regime as drift attribution source in DriftMonitor: flag when macro regime differs between paper and backtest periods
-- [ ] **OBSV-05**: Macro regime timeline chart: Plotly visualization with regime labels as colored bands overlaid on portfolio PnL
-- [ ] **OBSV-06**: FRED data quality dashboard tab: coverage, freshness, gap detection for all 39 series
+- [x] **OBSV-01**: Macro regime display in Streamlit dashboard: current regime, per-dimension labels, color-coded by risk level
+- [x] **OBSV-02**: Telegram alert on macro regime transition (especially to risk-off or carry unwind)
+- [x] **OBSV-03**: FRED data freshness display in pipeline monitor alongside crypto data freshness (traffic-light pattern)
+- [x] **OBSV-04**: Macro regime as drift attribution source in DriftMonitor: flag when macro regime differs between paper and backtest periods
+- [x] **OBSV-05**: Macro regime timeline chart: Plotly visualization with regime labels as colored bands overlaid on portfolio PnL
+- [x] **OBSV-06**: FRED data quality dashboard tab: coverage, freshness, gap detection for all 39 series
 
 ## Future Requirements (deferred to post-v1.0.1)
 
@@ -159,12 +159,12 @@
 | GATE-07 | Phase 71 | Complete |
 | GATE-08 | Phase 71 | Complete |
 | GATE-09 | Phase 71 | Complete |
-| OBSV-01 | Phase 72 | Pending |
-| OBSV-02 | Phase 72 | Pending |
-| OBSV-03 | Phase 72 | Pending |
-| OBSV-04 | Phase 72 | Pending |
-| OBSV-05 | Phase 72 | Pending |
-| OBSV-06 | Phase 72 | Pending |
+| OBSV-01 | Phase 72 | Complete |
+| OBSV-02 | Phase 72 | Complete |
+| OBSV-03 | Phase 72 | Complete |
+| OBSV-04 | Phase 72 | Complete |
+| OBSV-05 | Phase 72 | Complete |
+| OBSV-06 | Phase 72 | Complete |
 
 **Coverage:**
 - v1.0.1 requirements: 55 total

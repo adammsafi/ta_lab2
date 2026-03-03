@@ -9,7 +9,7 @@
 - v0.8.0 Polish & Hardening (Phases 29-34) - SHIPPED 2026-02-23
 - v0.9.0 Research & Experimentation (Phases 35-41) - SHIPPED 2026-02-24
 - v1.0.0 V1 Closure — Paper Trading & Validation (Phases 42-63) - SHIPPED 2026-03-01
-- v1.0.1 Macro Regime Infrastructure (Phases 64-72) - IN PROGRESS
+- v1.0.1 Macro Regime Infrastructure (Phases 64-72) - COMPLETE 2026-03-03
 
 ## Overview
 
@@ -1318,7 +1318,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 - [x] **Phase 69: L4 Resolver Integration** - Wire macro regime into tighten-only resolver chain and executor logging — COMPLETE 2026-03-03
 - [x] **Phase 70: Cross-Asset Aggregation** - BTC/ETH correlation features, aggregate funding rate, and crypto-macro correlation regime — COMPLETE 2026-03-03
 - [x] **Phase 71: Event Risk Gates** - FOMC/CPI/NFP event calendar, VIX spike gate, carry unwind gate, credit stress gate, composite stress score — COMPLETE 2026-03-03
-- [ ] **Phase 72: Macro Observability** - Dashboard display, Telegram alerts, FRED freshness monitoring, drift attribution, regime timeline
+- [x] **Phase 72: Macro Observability** - Dashboard display, Telegram alerts, FRED freshness monitoring, drift attribution, regime timeline — COMPLETE 2026-03-03
 
 ### Phase 64: MCP Memory Server -- Connect Qdrant to Claude Code
 
@@ -1481,10 +1481,10 @@ Plans:
 **Plans:** 4 plans in 2 waves
 
 Plans:
-- [ ] 72-01-PLAN.md -- Alembic migration (attr_macro_regime_delta + cmc_macro_alert_log) + macro query module + chart builders
-- [ ] 72-02-PLAN.md -- Telegram macro alert manager with throttling + CLI script
-- [ ] 72-03-PLAN.md -- Macro dashboard page (10_macro.py) + app.py registration + Pipeline Monitor FRED freshness
-- [ ] 72-04-PLAN.md -- DriftAttributor macro regime Step 7 + DriftMonitor wiring + dashboard attribution display
+- [x] 72-01-PLAN.md -- Alembic migration (attr_macro_regime_delta + cmc_macro_alert_log) + macro query module + chart builders
+- [x] 72-02-PLAN.md -- Telegram macro alert manager with throttling + CLI script
+- [x] 72-03-PLAN.md -- Macro dashboard page (10_macro.py) + app.py registration + Pipeline Monitor FRED freshness
+- [x] 72-04-PLAN.md -- DriftAttributor macro regime Step 7 + DriftMonitor wiring + dashboard attribution display
 
 ### v1.0.1 Progress
 
@@ -1493,12 +1493,12 @@ Plans:
 | 64. MCP Memory Server | 3/3 | Complete | 2026-03-02 |
 | 65. FRED Table & Core Features | 3/3 | Complete | 2026-03-03 |
 | 66. FRED Derived Features & Automation | 3/3 | Complete | 2026-03-03 |
-| 67. Macro Regime Classifier | 0/? | Not started | - |
-| 68. HMM & Macro Analytics | 0/? | Not started | - |
-| 69. L4 Resolver Integration | 0/3 | Planned | - |
-| 70. Cross-Asset Aggregation | 0/? | Not started | - |
-| 71. Event Risk Gates | 0/? | Not started | - |
-| 72. Macro Observability | 0/4 | Planned | - |
+| 67. Macro Regime Classifier | 3/3 | Complete | 2026-03-03 |
+| 68. HMM & Macro Analytics | 3/3 | Complete | 2026-03-03 |
+| 69. L4 Resolver Integration | 3/3 | Complete | 2026-03-03 |
+| 70. Cross-Asset Aggregation | 3/3 | Complete | 2026-03-03 |
+| 71. Event Risk Gates | 3/3 | Complete | 2026-03-03 |
+| 72. Macro Observability | 4/4 | Complete | 2026-03-03 |
 
 ### v1.0.1 Requirements (55 total)
 
