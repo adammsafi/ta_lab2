@@ -1,0 +1,107 @@
+# Macro Regime Classifier Configuration
+# Phase 67: All thresholds for 4-dimensional macro regime labeling.
+# Changing any threshold here changes the label without code changes (MREG-08).
+
+active_profile: default
+
+hysteresis:
+  min_bars_hold: 5  # >= 5 per MREG-07; applies per-dimension
+
+profiles:
+  default:
+    monetary_policy:
+      hiking_threshold: 0.25
+      cutting_threshold: -0.25
+    liquidity:
+      strongly_expanding_z: 1.0
+      strongly_contracting_z: -1.0
+    risk_appetite:
+      vix_risk_off: 25.0
+      vix_risk_on: 15.0
+      hy_oas_z_risk_off: 1.5
+      hy_oas_z_risk_on: -0.5
+      nfci_risk_off: 0.5
+      nfci_risk_on: -0.5
+    carry:
+      unwind_daily_zscore: 2.0
+      stress_vol_threshold: 1.5   # absolute 20d daily volatility in percentage points
+      spread_narrowing_5d: 0.0
+
+  conservative:
+    monetary_policy:
+      hiking_threshold: 0.15
+      cutting_threshold: -0.15
+    liquidity:
+      strongly_expanding_z: 0.75
+      strongly_contracting_z: -0.75
+    risk_appetite:
+      vix_risk_off: 20.0
+      vix_risk_on: 13.0
+      hy_oas_z_risk_off: 1.0
+      hy_oas_z_risk_on: -0.3
+      nfci_risk_off: 0.3
+      nfci_risk_on: -0.3
+    carry:
+      unwind_daily_zscore: 1.5
+      stress_vol_threshold: 1.2
+      spread_narrowing_5d: 0.0
+
+  aggressive:
+    monetary_policy:
+      hiking_threshold: 0.50
+      cutting_threshold: -0.50
+    liquidity:
+      strongly_expanding_z: 1.5
+      strongly_contracting_z: -1.5
+    risk_appetite:
+      vix_risk_off: 30.0
+      vix_risk_on: 12.0
+      hy_oas_z_risk_off: 2.0
+      hy_oas_z_risk_on: -0.8
+      nfci_risk_off: 0.8
+      nfci_risk_on: -0.8
+    carry:
+      unwind_daily_zscore: 2.5
+      stress_vol_threshold: 2.0
+      spread_narrowing_5d: 0.0
+
+tighten_labels:
+  risk_appetite: ["RiskOff"]
+  carry: ["Unwind", "Stress"]
+  monetary_policy: ["Hiking"]
+  liquidity: ["Strongly_Contracting", "Contracting"]
+
+macro_state_rules:
+  favorable:
+    - "Cutting-Expanding-RiskOn"
+    - "Cutting-Strongly_Expanding-RiskOn"
+    - "Holding-Expanding-RiskOn"
+    - "Holding-Strongly_Expanding-RiskOn"
+  constructive:
+    - "Cutting-Neutral-RiskOn"
+    - "Cutting-Expanding-Neutral"
+    - "Holding-Neutral-RiskOn"
+    - "Holding-Expanding-Neutral"
+    - "Hiking-Expanding-RiskOn"
+    - "Hiking-Strongly_Expanding-RiskOn"
+  neutral:
+    - "Holding-Neutral-Neutral"
+    - "Hiking-Neutral-Neutral"
+    - "Cutting-Neutral-Neutral"
+    - "Cutting-Contracting-RiskOn"
+    - "Holding-Contracting-RiskOn"
+  cautious:
+    - "Hiking-Contracting-Neutral"
+    - "Hiking-Neutral-RiskOff"
+    - "Hiking-Expanding-RiskOff"
+    - "Holding-Contracting-Neutral"
+    - "Cutting-Expanding-RiskOff"
+    - "Cutting-Neutral-RiskOff"
+  adverse:
+    - "Hiking-Contracting-RiskOff"
+    - "Hiking-Strongly_Contracting-RiskOff"
+    - "Holding-Contracting-RiskOff"
+    - "Holding-Strongly_Contracting-RiskOff"
+    - "Cutting-Contracting-RiskOff"
+    - "Cutting-Strongly_Contracting-RiskOff"
+  _default: neutral
