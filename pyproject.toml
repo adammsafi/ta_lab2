@@ -97,6 +97,11 @@ analytics = [
   "quantstats>=0.0.81",
 ]
 
+# HMM regime analytics (Phase 68)
+macro_analytics = [
+  "hmmlearn>=0.3.3",
+]
+
 # Portfolio construction and optimization
 portfolio = [
   "PyPortfolioOpt>=1.5.6",
