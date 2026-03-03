@@ -1377,7 +1377,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 66 to break down)
+- [ ] 66-01-PLAN.md -- Alembic migration (25 columns) + data loading extensions (7 new FRED series)
+- [ ] 66-02-PLAN.md -- Feature computation logic (compute_derived_features_66 for FRED-08 through FRED-16)
+- [ ] 66-03-PLAN.md -- WARMUP_DAYS increase, summary log, and E2E verification
 
 ### Phase 67: Macro Regime Classifier
 
