@@ -59,15 +59,15 @@
 
 ### Event Risk Gates (GATE)
 
-- [ ] **GATE-01**: `dim_macro_events` table seeded with FOMC meeting dates, CPI release dates, and NFP dates for 2026-2027
-- [ ] **GATE-02**: FOMC event gate: size_mult reduction (e.g., 0.5) applied ±24h around FOMC meetings via risk engine
-- [ ] **GATE-03**: VIX spike gate: VIX > 30 triggers REDUCE state, VIX > 40 triggers FLATTEN state in `flatten_trigger.py`
-- [ ] **GATE-04**: Carry unwind velocity gate: DEXJPUS daily z-score > 2.0 with positive rate spread triggers REDUCE; z-score > 3.0 triggers FLATTEN
-- [ ] **GATE-05**: Data freshness gate: WARN if fred_macro_features max(ingested_at) > 48h; disable macro regime if > 96h (fall back to per-asset only)
-- [ ] **GATE-06**: Credit stress gate: BAMLH0A0HYM2 5d z-score > 1.5 applies size_mult 0.7; > 2.5 applies size_mult 0.4
-- [ ] **GATE-07**: CPI release day gate: size_mult reduction ±24h around CPI releases (lighter than FOMC)
-- [ ] **GATE-08**: NFP release day gate: size_mult 0.75 on first Friday of each month
-- [ ] **GATE-09**: Composite macro stress score (0-100): weighted sum of VIX percentile, HY OAS z-score, carry velocity z-score, NFCI level with tiered response (calm/elevated/stressed/crisis)
+- [x] **GATE-01**: `dim_macro_events` table seeded with FOMC meeting dates, CPI release dates, and NFP dates for 2026-2027
+- [x] **GATE-02**: FOMC event gate: size_mult reduction (e.g., 0.5) applied ±24h around FOMC meetings via risk engine
+- [x] **GATE-03**: VIX spike gate: VIX > 30 triggers REDUCE state, VIX > 40 triggers FLATTEN state in `flatten_trigger.py`
+- [x] **GATE-04**: Carry unwind velocity gate: DEXJPUS daily z-score > 2.0 with positive rate spread triggers REDUCE; z-score > 3.0 triggers FLATTEN
+- [x] **GATE-05**: Data freshness gate: WARN if fred_macro_features max(ingested_at) > 48h; disable macro regime if > 96h (fall back to per-asset only)
+- [x] **GATE-06**: Credit stress gate: BAMLH0A0HYM2 5d z-score > 1.5 applies size_mult 0.7; > 2.5 applies size_mult 0.4
+- [x] **GATE-07**: CPI release day gate: size_mult reduction ±24h around CPI releases (lighter than FOMC)
+- [x] **GATE-08**: NFP release day gate: size_mult 0.75 on first Friday of each month
+- [x] **GATE-09**: Composite macro stress score (0-100): weighted sum of VIX percentile, HY OAS z-score, carry velocity z-score, NFCI level with tiered response (calm/elevated/stressed/crisis)
 
 ### Observability & Monitoring (OBSV)
 
@@ -150,15 +150,15 @@
 | XAGG-02 | Phase 70 | Complete |
 | XAGG-03 | Phase 70 | Complete |
 | XAGG-04 | Phase 70 | Complete |
-| GATE-01 | Phase 71 | Pending |
-| GATE-02 | Phase 71 | Pending |
-| GATE-03 | Phase 71 | Pending |
-| GATE-04 | Phase 71 | Pending |
-| GATE-05 | Phase 71 | Pending |
-| GATE-06 | Phase 71 | Pending |
-| GATE-07 | Phase 71 | Pending |
-| GATE-08 | Phase 71 | Pending |
-| GATE-09 | Phase 71 | Pending |
+| GATE-01 | Phase 71 | Complete |
+| GATE-02 | Phase 71 | Complete |
+| GATE-03 | Phase 71 | Complete |
+| GATE-04 | Phase 71 | Complete |
+| GATE-05 | Phase 71 | Complete |
+| GATE-06 | Phase 71 | Complete |
+| GATE-07 | Phase 71 | Complete |
+| GATE-08 | Phase 71 | Complete |
+| GATE-09 | Phase 71 | Complete |
 | OBSV-01 | Phase 72 | Pending |
 | OBSV-02 | Phase 72 | Pending |
 | OBSV-03 | Phase 72 | Pending |

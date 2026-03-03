@@ -1317,7 +1317,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 - [x] **Phase 68: HMM & Macro Analytics** - Secondary HMM classifier, lead-lag analysis, and regime transition probabilities — COMPLETE 2026-03-03
 - [x] **Phase 69: L4 Resolver Integration** - Wire macro regime into tighten-only resolver chain and executor logging — COMPLETE 2026-03-03
 - [x] **Phase 70: Cross-Asset Aggregation** - BTC/ETH correlation features, aggregate funding rate, and crypto-macro correlation regime — COMPLETE 2026-03-03
-- [ ] **Phase 71: Event Risk Gates** - FOMC/CPI/NFP event calendar, VIX spike gate, carry unwind gate, credit stress gate, composite stress score
+- [x] **Phase 71: Event Risk Gates** - FOMC/CPI/NFP event calendar, VIX spike gate, carry unwind gate, credit stress gate, composite stress score — COMPLETE 2026-03-03
 - [ ] **Phase 72: Macro Observability** - Dashboard display, Telegram alerts, FRED freshness monitoring, drift attribution, regime timeline
 
 ### Phase 64: MCP Memory Server -- Connect Qdrant to Claude Code
@@ -1463,9 +1463,9 @@ Plans:
 **Plans:** 3 plans in 3 waves
 
 Plans:
-- [ ] 71-01-PLAN.md -- Alembic migration (4 tables + CHECK constraint extensions) + event calendar seed script
-- [ ] 71-02-PLAN.md -- MacroGateEvaluator (7 individual gates + composite score + state management) + GateOverrideManager
-- [ ] 71-03-PLAN.md -- RiskEngine Gate 1.7 wiring + CLI scripts (evaluate_macro_gates, macro_gate_cli)
+- [x] 71-01-PLAN.md -- Alembic migration (4 tables + CHECK constraint extensions) + event calendar seed script
+- [x] 71-02-PLAN.md -- MacroGateEvaluator (7 individual gates + composite score + state management) + GateOverrideManager
+- [x] 71-03-PLAN.md -- RiskEngine Gate 1.7 wiring + CLI scripts (evaluate_macro_gates, macro_gate_cli)
 
 ### Phase 72: Macro Observability
 
