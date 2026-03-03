@@ -10,16 +10,16 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: 66 of 72 -- FRED Derived Features & Automation (v1.0.1 Macro Regime Infrastructure)
-Plan: 01 of 3 (66-01: Database Columns & Series Pipeline) COMPLETE
-Status: In progress -- 25 new columns added to fred.fred_macro_features, SERIES_TO_LOAD extended to 18 series
-Last activity: 2026-03-03 -- Completed 66-01-PLAN.md (Alembic migration c4d5e6f7a8b9, SERIES_TO_LOAD 11->18, FFILL_LIMITS 11->18)
+Plan: 02 of 3 (66-02: Feature Computation Logic) COMPLETE
+Status: In progress -- compute_derived_features_66() produces 18 derived columns, pipeline outputs 50 columns end-to-end
+Last activity: 2026-03-03 -- Completed 66-02-PLAN.md (compute_derived_features_66, _compute_fed_regime, _rolling_zscore, _RENAME_MAP 11->18, db_columns whitelist extended)
 
 ### Roadmap Evolution
 - Phase 64 added: MCP Memory Server -- Connect Qdrant to Claude Code
 - Phases 65-72 added: Macro Regime Infrastructure (FRED pipeline, classifier, L4 integration, risk gates, observability)
 - v1.0.1 roadmap: 9 phases, 55 requirements mapped across 8 requirement categories
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [████████] Phase 60 COMPLETE (8 plans) | [██] Phase 61 COMPLETE | [██] Phase 62 COMPLETE | [██] Phase 63 COMPLETE | [███] Phase 64 COMPLETE | [███] Phase 65 COMPLETE | [█] Phase 66 (1/3)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [████████] Phase 60 COMPLETE (8 plans) | [██] Phase 61 COMPLETE | [██] Phase 62 COMPLETE | [██] Phase 63 COMPLETE | [███] Phase 64 COMPLETE | [███] Phase 65 COMPLETE | [██] Phase 66 (2/3)
 
 ## Performance Metrics
 
@@ -665,6 +665,11 @@ Key constraints to remember:
 - **All MCP tools use Mem0Client exclusively** (Phase 64-01): MCP tools never call ChromaDB search_memories; memory_context adapts Mem0 results to SearchResult dataclass then pipes through format_memories_for_prompt; avoids missing ChromaDB dependency in Docker
 - **MCP lifespan at FastAPI construction time** (Phase 64-01): mcp_app.lifespan passed via create_memory_api(lifespan=) parameter, not post-construction override; safer per research pitfall finding
 - **fastmcp 3.0.2 installed** (Phase 64-01): Standalone package (not mcp SDK bundled FastMCP 1.x); provides latest decorator-based tools, auto schema generation, Streamable HTTP transport
+- **compute_derived_features_66() after compute_derived_features()** (Phase 66-02): Phase 66 compute function receives DataFrame with Phase 65 derived columns (net_liquidity, us_jp_rate_spread) already present and still-uppercase FRED IDs; rename happens after both compute steps
+- **M2 YoY uses pct_change(365) not pct_change(1)** (Phase 66-02): M2SL is monthly forward-filled to daily; pct_change(1) gives 0 on non-release days; pct_change(365) gives correct YoY
+- **Fed regime data-driven not date-range-based** (Phase 66-02): Structure from DFEDTARU value (zero-bound <= 0.25, single-target spread < 0.001, target-range); trajectory from DFF 90d change (+/-0.25pp threshold = one standard Fed move)
+- **carry_momentum binary with elevated threshold** (Phase 66-02): 0/1 flag where abs(dexjpus_daily_zscore) > threshold; threshold=2.0 when us_jp_rate_spread > 0 (positive carry spread), 1.5 otherwise
+- **_rolling_zscore helper with 80% min_periods** (Phase 66-02): Reusable for any rolling z-score; max(1, int(0.80 * window)) prevents NaN explosion at series start while requiring sufficient data
 - **Named Docker volume for Qdrant** (Phase 64-02): qdrant-storage named volume avoids Windows POSIX path incompatibility with bind mounts; migration note in docker-compose.yml for existing data
 - **Optional env_file in docker-compose** (Phase 64-02): `required: false` on env_file so compose config validates without .env present; users create from .env.example template
 - **Streamable HTTP for MCP registration** (Phase 64-02): .mcp.json uses `type: http` (recommended transport) not deprecated SSE; trailing slash on /mcp/ required for sub-path routing
@@ -672,4 +677,4 @@ Key constraints to remember:
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-03 (Phase 66-01 Database Columns & Series Pipeline complete)*
+*Last updated: 2026-03-03 (Phase 66-02 Feature Computation Logic complete)*
