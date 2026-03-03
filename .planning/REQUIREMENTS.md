@@ -110,13 +110,13 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FRED-01 | Phase 65 | Pending |
-| FRED-02 | Phase 65 | Pending |
-| FRED-03 | Phase 65 | Pending |
-| FRED-04 | Phase 65 | Pending |
-| FRED-05 | Phase 65 | Pending |
-| FRED-06 | Phase 65 | Pending |
-| FRED-07 | Phase 65 | Pending |
+| FRED-01 | Phase 65 | Complete |
+| FRED-02 | Phase 65 | Complete |
+| FRED-03 | Phase 65 | Complete |
+| FRED-04 | Phase 65 | Complete |
+| FRED-05 | Phase 65 | Complete |
+| FRED-06 | Phase 65 | Complete |
+| FRED-07 | Phase 65 | Complete |
 | FRED-08 | Phase 66 | Pending |
 | FRED-09 | Phase 66 | Pending |
 | FRED-10 | Phase 66 | Pending |

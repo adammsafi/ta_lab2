@@ -9,22 +9,22 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: 65 of 72 -- FRED Table & Core Features (v1.0.1 Macro Regime Infrastructure) IN PROGRESS
-Plan: 02 of 3 (65-02: CLI refresh script + daily pipeline integration) COMPLETE
-Status: Phase 65 in progress, ready for Plan 65-03
-Last activity: 2026-03-03 -- Phase 65 Plan 02 complete (2/2 tasks, refresh script + daily pipeline wiring)
+Phase: 65 of 72 -- FRED Table & Core Features (v1.0.1 Macro Regime Infrastructure) COMPLETE
+Plan: 03 of 3 (65-03: WTREGEN VM Addition + E2E Verification) COMPLETE
+Status: Phase 65 complete, all FRED-01 through FRED-07 verified
+Last activity: 2026-03-03 -- Phase 65 complete (3/3 plans, WTREGEN added, 9558 rows in fred.fred_macro_features)
 
 ### Roadmap Evolution
 - Phase 64 added: MCP Memory Server -- Connect Qdrant to Claude Code
 - Phases 65-72 added: Macro Regime Infrastructure (FRED pipeline, classifier, L4 integration, risk gates, observability)
 - v1.0.1 roadmap: 9 phases, 55 requirements mapped across 8 requirement categories
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [████████] Phase 60 COMPLETE (8 plans) | [██] Phase 61 COMPLETE | [██] Phase 62 COMPLETE | [██] Phase 63 COMPLETE | [███] Phase 64 COMPLETE | [██] Phase 65 Plans 01-02 COMPLETE (1/3 plans remaining)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [████████] Phase 60 COMPLETE (8 plans) | [██] Phase 61 COMPLETE | [██] Phase 62 COMPLETE | [██] Phase 63 COMPLETE | [███] Phase 64 COMPLETE | [███] Phase 65 COMPLETE
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 310 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 6 in Phase 43, 3 in Phase 44, 7 in Phase 45, 4 in Phase 46, 5 in Phase 47, 4 in Phase 48, 4 in Phase 49, 2 in Phase 50, 5 in Phase 51, 4 in Phase 52, 4 in Phase 53, 3 in Phase 54, 5 in Phase 55, 7 in Phase 56, 6 in Phase 57, 7 in Phase 58, 5 in Phase 59, 8 in Phase 60, 2 in Phase 61, 2 in Phase 62, 2 in Phase 63)
+- Total plans completed: 313 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 6 in Phase 43, 3 in Phase 44, 7 in Phase 45, 4 in Phase 46, 5 in Phase 47, 4 in Phase 48, 4 in Phase 49, 2 in Phase 50, 5 in Phase 51, 4 in Phase 52, 4 in Phase 53, 3 in Phase 54, 5 in Phase 55, 7 in Phase 56, 6 in Phase 57, 7 in Phase 58, 5 in Phase 59, 8 in Phase 60, 2 in Phase 61, 2 in Phase 62, 2 in Phase 63, 3 in Phase 65)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 

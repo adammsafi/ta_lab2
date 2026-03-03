@@ -1311,7 +1311,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 ### v1.0.1 Phase Summary
 
 - [x] **Phase 64: MCP Memory Server** - Connect Qdrant to Claude Code via MCP server -- COMPLETE 2026-03-02
-- [ ] **Phase 65: FRED Table & Core Features** - Macro feature table with daily alignment, rate spreads, yield curve, VIX, and dollar strength
+- [x] **Phase 65: FRED Table & Core Features** - Macro feature table with daily alignment, rate spreads, yield curve, VIX, and dollar strength
 - [ ] **Phase 66: FRED Derived Features & Automation** - Credit stress, financial conditions, carry trade, fed regime, CPI proxy, and daily refresh wiring
 - [ ] **Phase 67: Macro Regime Classifier** - Rule-based 4-dimensional macro regime labeler with hysteresis and YAML config
 - [ ] **Phase 68: HMM & Macro Analytics** - Secondary HMM classifier, lead-lag analysis, and regime transition probabilities
@@ -1355,11 +1355,12 @@ Plans:
   3. Net liquidity proxy (WALCL - WTREGEN - RRPONTSYD) computes correctly with weekly forward-fill
   4. Rate spread features (US-Japan, US-ECB, US-Japan 10Y) and yield curve features (T10Y2Y level, 5d slope change) are populated
   5. VIX regime labels (calm/elevated/crisis) and dollar strength features (DTWEXBGS level, 5d/20d changes) are populated
-**Plans:** 3 plans
+**Plans:** 3/3 complete
 
 Plans:
-- [ ] 65-01-PLAN.md -- Alembic migration + macro computation module (fred_reader, forward_fill, feature_computer)
-- [ ] 65-02-PLAN.md -- CLI refresh script + daily refresh pipeline wiring
+- [x] 65-01-PLAN.md -- Alembic migration + macro computation module (fred_reader, forward_fill, feature_computer)
+- [x] 65-02-PLAN.md -- CLI refresh script + daily refresh pipeline wiring
+- [x] 65-03-PLAN.md -- WTREGEN VM addition + E2E verification
 - [ ] 65-03-PLAN.md -- WTREGEN VM addition + end-to-end verification
 
 ### Phase 66: FRED Derived Features & Automation
