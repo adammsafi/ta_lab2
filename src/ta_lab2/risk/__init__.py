@@ -1,4 +1,4 @@
-"""Risk controls for paper trading -- kill switch, position caps, daily loss, circuit breaker, tail risk, margin monitoring."""
+"""Risk controls for paper trading -- kill switch, position caps, daily loss, circuit breaker, tail risk, macro gates, margin monitoring."""
 
 from ta_lab2.risk.flatten_trigger import (
     EscalationState,
@@ -12,6 +12,8 @@ from ta_lab2.risk.kill_switch import (
     print_kill_switch_status,
     re_enable_trading,
 )
+from ta_lab2.risk.macro_gate_evaluator import MacroGateEvaluator, MacroGateResult
+from ta_lab2.risk.macro_gate_overrides import GateOverrideManager
 from ta_lab2.risk.margin_monitor import (
     MarginState,
     MarginTier,
@@ -33,6 +35,9 @@ __all__ = [
     "print_kill_switch_status",
     "OverrideManager",
     "OverrideInfo",
+    "MacroGateEvaluator",
+    "MacroGateResult",
+    "GateOverrideManager",
     "EscalationState",
     "FlattenTriggerResult",
     "check_flatten_trigger",

@@ -1,17 +1,19 @@
 """
 RiskEngine: Order-level risk gate for paper trading.
 
-Checks every order through 7 sequential gates before allowing execution:
-  1.  Kill switch -- immediate block if trading is halted
-  1.5 Tail risk -- block if FLATTEN, halve buy qty if REDUCE
-  2.  Circuit breaker -- block if per-strategy breaker is tripped
-  3.  Per-asset position cap -- scale down quantity if it would exceed max_position_pct
-  4.  Portfolio utilization cap -- scale down if total exposure would exceed max_portfolio_pct
-  1.6 Margin/liquidation check -- block buys when margin utilization is critically low (perps only)
-  5.  All pass -- allow with (possibly adjusted) quantity
+Checks every order through sequential gates before allowing execution:
+  1.   Kill switch -- immediate block if trading is halted
+  1.5  Tail risk -- block if FLATTEN, halve buy qty if REDUCE
+  1.7  Macro gates -- block if macro FLATTEN state, scale buy qty if REDUCE
+  2.   Circuit breaker -- block if per-strategy breaker is tripped
+  3.   Per-asset position cap -- scale down quantity if it would exceed max_position_pct
+  4.   Portfolio utilization cap -- scale down if total exposure would exceed max_portfolio_pct
+  1.6  Margin/liquidation check -- block buys when margin utilization is critically low (perps only)
+  5.   All pass -- allow with (possibly adjusted) quantity
 
 Limits are hot-reloaded from dim_risk_limits on each check_order() call.
 State (kill switch, circuit breaker, tail risk) is read from dim_risk_state.
+Macro gate state is read from dim_macro_gate_state via MacroGateEvaluator.
 
 Usage:
     from sqlalchemy import create_engine
@@ -31,6 +33,15 @@ Usage:
     if result.allowed:
         # use result.adjusted_quantity
         ...
+
+To enable macro gates, inject a MacroGateEvaluator::
+
+    from ta_lab2.risk import RiskEngine, MacroGateEvaluator
+    evaluator = MacroGateEvaluator(engine)
+    re = RiskEngine(engine, macro_gate_evaluator=evaluator)
+
+Without a MacroGateEvaluator (the default), Gate 1.7 is a no-op and all
+existing behaviour is preserved (backward compatible).
 """
 
 from __future__ import annotations
@@ -47,6 +58,7 @@ from sqlalchemy.engine import Engine
 
 if TYPE_CHECKING:
     from ta_lab2.risk.flatten_trigger import FlattenTriggerResult
+    from ta_lab2.risk.macro_gate_evaluator import MacroGateEvaluator
 
 logger = logging.getLogger(__name__)
 
@@ -175,6 +187,12 @@ class RiskEngine:
             for buy orders. Sell orders bypass this gate (reducing exposure is safe).
             Requires cmc_perp_positions table populated by the paper trading executor.
 
+        2d. Gate 1.7 (macro gates) is checked automatically when macro_gate_evaluator
+            is injected at construction time. FLATTEN blocks all orders; REDUCE scales
+            buy qty by macro size_mult. Tail risk and macro gate multipliers stack
+            (worst-of -- both reduce independently). When macro_gate_evaluator is None
+            (the default), Gate 1.7 is a no-op.
+
         3. Call check_daily_loss() once per trading day (e.g., at session open)
            to auto-trigger the kill switch on drawdown threshold breach::
 
@@ -194,14 +212,22 @@ class RiskEngine:
     state on every call, ensuring CLI-triggered halts take effect immediately.
     """
 
-    def __init__(self, engine: Engine) -> None:
+    def __init__(
+        self,
+        engine: Engine,
+        macro_gate_evaluator: Optional["MacroGateEvaluator"] = None,
+    ) -> None:
         """
         Initialise RiskEngine.
 
         Args:
             engine: SQLAlchemy Engine connected to the paper trading database.
+            macro_gate_evaluator: Optional MacroGateEvaluator instance for Gate 1.7.
+                When None (default), Gate 1.7 is a no-op -- all existing behaviour
+                is preserved (backward compatible).
         """
         self._engine = engine
+        self._macro_gate_evaluator = macro_gate_evaluator
 
     # ------------------------------------------------------------------
     # Public API
@@ -223,6 +249,16 @@ class RiskEngine:
         Gates are checked in priority order. The first blocking gate short-circuits
         the remaining checks. Position/portfolio cap gates scale down quantity rather
         than outright rejecting (unless the position is already exhausted).
+
+        Gate sequence:
+          1.   Kill switch
+          1.5  Tail risk (FLATTEN blocks; REDUCE scales buy qty by 0.5)
+          1.7  Macro gates (FLATTEN blocks; REDUCE scales buy qty by macro_size_mult)
+          2.   Circuit breaker
+          3.   Per-asset position cap (scales down buy qty)
+          4.   Portfolio utilization cap (scales down buy qty)
+          1.6  Margin/liquidation check (buy-only, perps only)
+          5.   All pass
 
         Args:
             order_qty: Requested order size (in base asset units, e.g. BTC).
@@ -275,6 +311,33 @@ class RiskEngine:
             )
             order_notional = order_qty * fill_price
             logger.info("Tail risk REDUCE: buy order quantity halved to %s", order_qty)
+
+        # Gate 1.7: Macro gates (no-op when macro_gate_evaluator is None)
+        macro_state, macro_size_mult = self._check_macro_gates()
+        if macro_state == "flatten":
+            self._log_event(
+                event_type="macro_stress_gate_triggered",
+                trigger_source="macro_gate",
+                reason="Order blocked by macro gate FLATTEN state",
+                asset_id=asset_id,
+                strategy_id=strategy_id,
+                metadata={"macro_state": "flatten", "order_side": order_side},
+            )
+            return RiskCheckResult(
+                allowed=False,
+                blocked_reason="Macro gate: FLATTEN state active -- all new orders blocked",
+            )
+        if macro_state == "reduce" and order_side.lower() == "buy":
+            # Scale buy order quantity by macro size multiplier
+            order_qty = (order_qty * Decimal(str(macro_size_mult))).quantize(
+                Decimal("0.00000001")
+            )
+            order_notional = order_qty * fill_price
+            logger.info(
+                "Macro gate REDUCE: buy order quantity scaled by %.2f to %s",
+                macro_size_mult,
+                order_qty,
+            )
 
         # Gate 2: Circuit breaker
         cb_key = f"{asset_id}:{strategy_id}"
@@ -950,6 +1013,31 @@ class RiskEngine:
             strategy_id=strategy_id,
         )
         logger.info("Circuit breaker reset for key=%s by operator=%s", cb_key, operator)
+
+    def _check_macro_gates(self) -> tuple[str, float]:
+        """
+        Gate 1.7: Read aggregate macro gate state for per-order checks.
+
+        Delegates to MacroGateEvaluator.check_order_gates() when an evaluator
+        is injected. Returns ('normal', 1.0) when no evaluator is present,
+        preserving backward compatibility.
+
+        Returns:
+            (state, size_multiplier):
+              ('normal', 1.0)  -- no macro restriction
+              ('reduce', mult) -- scale buy order quantity by mult
+              ('flatten', 0.0) -- block all new orders
+        """
+        if self._macro_gate_evaluator is None:
+            return ("normal", 1.0)
+        try:
+            return self._macro_gate_evaluator.check_order_gates()
+        except Exception as exc:
+            logger.warning(
+                "Gate 1.7: macro gate check failed (returning normal to avoid blocking): %s",
+                exc,
+            )
+            return ("normal", 1.0)
 
     # ------------------------------------------------------------------
     # Private helpers
