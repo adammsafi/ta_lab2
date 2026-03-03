@@ -2,11 +2,11 @@
 """
 Unified daily refresh orchestration script.
 
-Coordinates bars, EMAs, AMAs, desc_stats, regimes, signals, executor,
-drift monitor, and stats with state-based checking and clear visibility.
+Coordinates bars, EMAs, AMAs, desc_stats, macro features, regimes, signals,
+executor, drift monitor, and stats with state-based checking and clear visibility.
 
 Usage:
-    # Full daily refresh (bars then EMAs then AMAs then desc_stats then regimes then signals then executor then stats)
+    # Full daily refresh (bars then EMAs then AMAs then desc_stats then macro then regimes then signals then executor then stats)
     python run_daily_refresh.py --all --ids 1,52,825
 
     # Bars only
@@ -20,6 +20,9 @@ Usage:
 
     # Desc stats only (asset stats + correlation)
     python run_daily_refresh.py --desc-stats --ids all
+
+    # FRED macro features only
+    python run_daily_refresh.py --macro
 
     # Regimes only
     python run_daily_refresh.py --regimes --ids all
@@ -83,6 +86,7 @@ TIMEOUT_EXECUTOR = (
 TIMEOUT_STATS = 3600  # 1 hour -- stats runners scan large tables
 TIMEOUT_EXCHANGE_PRICES = 120  # 2 minutes -- live price fetches from exchanges
 TIMEOUT_DRIFT = 600  # 10 minutes -- drift runs replays which involve backtest execution
+TIMEOUT_MACRO = 300  # 5 minutes -- small FRED dataset, fast computation
 
 
 @dataclass
@@ -1622,17 +1626,129 @@ def print_combined_summary(results: list[tuple[str, ComponentResult]]) -> bool:
         return True
 
 
+def run_macro_features(args) -> ComponentResult:
+    """Run FRED macro feature refresh via subprocess.
+
+    Macro features are computed from fred.series_values (populated by
+    sync_fred_from_vm.py) and upserted into fred.fred_macro_features.
+    This stage runs after desc_stats and before regimes so that downstream
+    regime classifiers (Phase 67 L4) can read macro context.
+
+    Args:
+        args: CLI arguments
+
+    Returns:
+        ComponentResult with execution details
+    """
+    cmd = [
+        sys.executable,
+        "-m",
+        "ta_lab2.scripts.macro.refresh_macro_features",
+    ]
+
+    if getattr(args, "dry_run", False):
+        cmd.append("--dry-run")
+    if getattr(args, "verbose", False):
+        cmd.append("--verbose")
+
+    print(f"\n{'=' * 70}")
+    print("RUNNING MACRO FEATURES (FRED)")
+    print(f"{'=' * 70}")
+    print(f"Command: {' '.join(cmd)}")
+
+    if args.dry_run:
+        print("[DRY RUN] Would execute FRED macro feature refresh")
+        return ComponentResult(
+            component="macro_features",
+            success=True,
+            duration_sec=0.0,
+            returncode=0,
+        )
+
+    start = time.perf_counter()
+
+    try:
+        if args.verbose:
+            # Stream output
+            result = subprocess.run(cmd, check=False, timeout=TIMEOUT_MACRO)
+        else:
+            # Capture output
+            result = subprocess.run(
+                cmd,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=TIMEOUT_MACRO,
+            )
+
+            # Show output on error
+            if result.returncode != 0:
+                print(
+                    f"\n[ERROR] Macro feature refresh failed with code {result.returncode}"
+                )
+                if result.stdout:
+                    print(f"\nSTDOUT:\n{result.stdout}")
+                if result.stderr:
+                    print(f"\nSTDERR:\n{result.stderr}")
+
+        duration = time.perf_counter() - start
+
+        if result.returncode == 0:
+            print(
+                f"\n[OK] Macro feature refresh completed successfully in {duration:.1f}s"
+            )
+            return ComponentResult(
+                component="macro_features",
+                success=True,
+                duration_sec=duration,
+                returncode=result.returncode,
+            )
+        else:
+            error_msg = f"Exited with code {result.returncode}"
+            print(f"\n[FAILED] Macro feature refresh failed: {error_msg}")
+            return ComponentResult(
+                component="macro_features",
+                success=False,
+                duration_sec=duration,
+                returncode=result.returncode,
+                error_message=error_msg,
+            )
+
+    except subprocess.TimeoutExpired:
+        duration = time.perf_counter() - start
+        error_msg = f"Timed out after {TIMEOUT_MACRO}s"
+        print(f"\n[TIMEOUT] Macro feature refresh: {error_msg}")
+        return ComponentResult(
+            component="macro_features",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+    except Exception as e:
+        duration = time.perf_counter() - start
+        error_msg = str(e)
+        print(f"\n[ERROR] Macro feature refresh raised exception: {error_msg}")
+        return ComponentResult(
+            component="macro_features",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+
+
 def main(argv: list[str] | None = None) -> int:
     """Main entry point."""
     p = argparse.ArgumentParser(
         description=(
             "Unified daily refresh orchestration for bars, EMAs, AMAs, "
-            "desc_stats, regimes, signals, executor, and stats."
+            "desc_stats, macro features, regimes, signals, executor, and stats."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Full daily refresh (bars -> EMAs -> AMAs -> desc_stats -> regimes -> signals -> executor -> stats)
+  # Full daily refresh (bars -> EMAs -> AMAs -> desc_stats -> macro -> regimes -> signals -> executor -> stats)
   python run_daily_refresh.py --all --ids 1,52,825
 
   # Bars only
@@ -1643,6 +1759,9 @@ Examples:
 
   # AMAs only
   python run_daily_refresh.py --amas --ids all
+
+  # FRED macro features only
+  python run_daily_refresh.py --macro
 
   # Regimes only
   python run_daily_refresh.py --regimes --ids all
@@ -1699,6 +1818,16 @@ Examples:
         "--desc-stats",
         action="store_true",
         help="Run descriptive stats refresh only (asset stats + correlation)",
+    )
+    p.add_argument(
+        "--macro",
+        action="store_true",
+        help="Run FRED macro feature refresh only (incremental upsert into fred.fred_macro_features)",
+    )
+    p.add_argument(
+        "--no-macro",
+        action="store_true",
+        help="Skip FRED macro feature refresh stage in --all mode",
     )
     p.add_argument(
         "--regimes",
@@ -1887,6 +2016,7 @@ Examples:
         or args.emas
         or args.amas
         or args.desc_stats
+        or args.macro
         or args.regimes
         or args.features
         or args.signals
@@ -1897,7 +2027,7 @@ Examples:
         or args.all
     ):
         p.error(
-            "Must specify --bars, --emas, --amas, --desc-stats, --regimes, --features, "
+            "Must specify --bars, --emas, --amas, --desc-stats, --macro, --regimes, --features, "
             "--signals, --portfolio, --execute, --drift, --stats, --all, --weekly-digest, "
             "or --exchange-prices"
         )
@@ -1939,6 +2069,7 @@ Examples:
     run_emas = args.emas or args.all
     run_amas = args.amas or args.all
     run_desc_stats = args.desc_stats or args.all
+    run_macro = (args.macro or args.all) and not getattr(args, "no_macro", False)
     run_regimes = args.regimes or args.all
     run_features = (args.features or args.all) and not getattr(
         args, "no_features", False
@@ -1961,6 +2092,8 @@ Examples:
         components.append("AMAs")
     if run_desc_stats:
         components.append("desc_stats")
+    if run_macro:
+        components.append("macro_features")
     if run_regimes:
         components.append("regimes")
     if run_features:
@@ -2053,7 +2186,7 @@ Examples:
             print("(Use --continue-on-error to run remaining components)")
             return 1
 
-    # Run desc stats if requested (after AMAs, before regimes)
+    # Run desc stats if requested (after AMAs, before macro and regimes)
     if run_desc_stats:
         desc_result = run_desc_stats_refresher(args, db_url, parsed_ids)
         results.append(("desc_stats", desc_result))
@@ -2063,7 +2196,20 @@ Examples:
             print("(Use --continue-on-error to run remaining components)")
             return 1
 
-    # Run regimes if requested (after bars, EMAs, AMAs, and desc_stats)
+    # Run FRED macro features if requested (after desc_stats, before regimes)
+    # Macro features read from fred.series_values (FRED raw data) -- independent of
+    # bars/EMAs/AMAs. Placed here so downstream regime classifiers (Phase 67 L4)
+    # can read macro context during regime computation.
+    if run_macro:
+        macro_result = run_macro_features(args)
+        results.append(("macro_features", macro_result))
+
+        if not macro_result.success and not args.continue_on_error:
+            print("\n[STOPPED] Macro feature refresh failed, stopping execution")
+            print("(Use --continue-on-error to run remaining components)")
+            return 1
+
+    # Run regimes if requested (after bars, EMAs, AMAs, desc_stats, and macro)
     if run_regimes:
         regime_result = run_regime_refresher(args, db_url, parsed_ids)
         results.append(("regimes", regime_result))
