@@ -97,6 +97,8 @@ TIMEOUT_MACRO_ANALYTICS = (
 TIMEOUT_CROSS_ASSET_AGG = (
     600  # 10 minutes -- rolling correlations across all assets + funding z-scores
 )
+TIMEOUT_MACRO_GATES = 120  # 2 minutes -- gate evaluation against FRED features
+TIMEOUT_MACRO_ALERTS = 60  # 1 minute -- transition detection + Telegram send
 
 
 @dataclass
@@ -2092,6 +2094,112 @@ def run_cross_asset_agg(args) -> ComponentResult:
         )
 
 
+def run_evaluate_macro_gates(args) -> ComponentResult:
+    """Evaluate macro gates (VIX, carry, credit, FOMC, freshness) and update gate state."""
+    print("\n--- Evaluate Macro Gates ---")
+    start = time.perf_counter()
+    cmd = [
+        sys.executable,
+        "-m",
+        "ta_lab2.scripts.risk.evaluate_macro_gates",
+    ]
+    try:
+        result = subprocess.run(
+            cmd,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=TIMEOUT_MACRO_GATES,
+        )
+        duration = time.perf_counter() - start
+        if result.returncode == 0:
+            print(f"  Macro gates evaluated ({duration:.1f}s)")
+        else:
+            print(f"  Macro gates: exit code {result.returncode} ({duration:.1f}s)")
+            if result.stderr:
+                print(f"  stderr: {result.stderr[:500]}")
+        return ComponentResult(
+            component="macro_gates",
+            success=result.returncode in (0, 1),  # 0=normal, 1=reduce (both OK)
+            duration_sec=duration,
+            returncode=result.returncode,
+        )
+    except subprocess.TimeoutExpired:
+        duration = time.perf_counter() - start
+        error_msg = f"Timed out after {TIMEOUT_MACRO_GATES}s"
+        print(f"\n[TIMEOUT] Macro gates: {error_msg}")
+        return ComponentResult(
+            component="macro_gates",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+    except Exception as e:
+        duration = time.perf_counter() - start
+        error_msg = str(e)
+        print(f"\n[ERROR] Macro gates raised exception: {error_msg}")
+        return ComponentResult(
+            component="macro_gates",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+
+
+def run_macro_alerts(args) -> ComponentResult:
+    """Check for macro regime transitions and send Telegram alerts."""
+    print("\n--- Macro Regime Alerts ---")
+    start = time.perf_counter()
+    cmd = [
+        sys.executable,
+        "-m",
+        "ta_lab2.scripts.macro.run_macro_alerts",
+    ]
+    try:
+        result = subprocess.run(
+            cmd,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=TIMEOUT_MACRO_ALERTS,
+        )
+        duration = time.perf_counter() - start
+        if result.returncode == 0:
+            print(f"  Macro alerts checked ({duration:.1f}s)")
+        else:
+            print(f"  Macro alerts: exit code {result.returncode} ({duration:.1f}s)")
+        return ComponentResult(
+            component="macro_alerts",
+            success=result.returncode == 0,
+            duration_sec=duration,
+            returncode=result.returncode,
+        )
+    except subprocess.TimeoutExpired:
+        duration = time.perf_counter() - start
+        error_msg = f"Timed out after {TIMEOUT_MACRO_ALERTS}s"
+        print(f"\n[TIMEOUT] Macro alerts: {error_msg}")
+        return ComponentResult(
+            component="macro_alerts",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+    except Exception as e:
+        duration = time.perf_counter() - start
+        error_msg = str(e)
+        print(f"\n[ERROR] Macro alerts raised exception: {error_msg}")
+        return ComponentResult(
+            component="macro_alerts",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+
+
 def main(argv: list[str] | None = None) -> int:
     """Main entry point."""
     p = argparse.ArgumentParser(
@@ -2657,6 +2765,18 @@ Examples:
             print("\n[STOPPED] Cross-asset aggregation failed, stopping execution")
             print("(Use --continue-on-error to run remaining components)")
             return 1
+
+    # Run macro gate evaluation after macro_regimes (Phase 73 gap closure)
+    # Non-blocking: gate failures don't stop the pipeline
+    if run_macro_regimes_flag:
+        gate_result = run_evaluate_macro_gates(args)
+        results.append(("macro_gates", gate_result))
+
+    # Run macro regime transition alerts after macro_regimes (Phase 73 gap closure)
+    # Non-blocking: alert failures don't stop the pipeline
+    if run_macro_regimes_flag:
+        alert_result = run_macro_alerts(args)
+        results.append(("macro_alerts", alert_result))
 
     # Run regimes if requested (after bars, EMAs, AMAs, desc_stats, macro, and macro_regimes)
     if run_regimes:

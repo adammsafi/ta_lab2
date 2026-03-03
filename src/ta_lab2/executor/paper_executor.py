@@ -41,6 +41,7 @@ from ta_lab2.executor.signal_reader import (
 )
 from ta_lab2.paper_trading.canonical_order import CanonicalOrder
 from ta_lab2.paper_trading.paper_order_logger import PaperOrderLogger
+from ta_lab2.risk.macro_gate_evaluator import MacroGateEvaluator
 from ta_lab2.risk.risk_engine import RiskEngine
 from ta_lab2.trading.order_manager import FillData, OrderManager
 
@@ -74,7 +75,10 @@ class PaperExecutor:
     def __init__(self, engine: Engine) -> None:
         self.engine = engine
         self.signal_reader = SignalReader(engine)
-        self.risk_engine = RiskEngine(engine)
+        self._macro_gate_evaluator = MacroGateEvaluator(engine)
+        self.risk_engine = RiskEngine(
+            engine, macro_gate_evaluator=self._macro_gate_evaluator
+        )
         self.logger = logging.getLogger(__name__)
 
     # ------------------------------------------------------------------
