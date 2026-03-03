@@ -35,16 +35,63 @@ from ta_lab2.macro.feature_computer import compute_macro_features
 
 logger = logging.getLogger(__name__)
 
-# Warmup window: covers 45-day monthly forward-fill limit + 20-day rolling window.
-# On incremental runs, we recompute this many days before watermark to ensure
-# feature correctness at the boundary.
-WARMUP_DAYS = 60
+# Warmup window: covers 365-day rolling z-score (FRED-12) + margin for
+# forward-fill propagation. On incremental runs, we recompute this many
+# days before watermark to ensure feature correctness at the boundary.
+WARMUP_DAYS = 400
 
 # Full history start date (used with --full or when no watermark exists)
 FULL_HISTORY_START = "2000-01-01"
 
 # FRED staleness warning threshold (hours)
 FRED_STALENESS_WARN_HOURS = 48.0
+
+# Feature groups for structured summary log (CONTEXT.md requirement)
+_FEATURE_GROUPS = [
+    ("FRED-03 net_liquidity", ["net_liquidity"]),
+    (
+        "FRED-04 rate_spreads",
+        ["us_jp_rate_spread", "us_ecb_rate_spread", "us_jp_10y_spread"],
+    ),
+    ("FRED-05 yc_dynamics", ["yc_slope_change_5d"]),
+    ("FRED-06 vix_regime", ["vix_regime"]),
+    ("FRED-07 dollar_strength", ["dtwexbgs_5d_change", "dtwexbgs_20d_change"]),
+    (
+        "FRED-08 credit_stress",
+        ["hy_oas_level", "hy_oas_5d_change", "hy_oas_30d_zscore"],
+    ),
+    ("FRED-09 fin_conditions", ["nfci_level", "nfci_4wk_direction"]),
+    ("FRED-10 m2", ["m2_yoy_pct"]),
+    (
+        "FRED-11 carry_trade",
+        [
+            "dexjpus_level",
+            "dexjpus_5d_pct_change",
+            "dexjpus_20d_vol",
+            "dexjpus_daily_zscore",
+        ],
+    ),
+    ("FRED-12 net_liq_zscore", ["net_liquidity_365d_zscore", "net_liquidity_trend"]),
+    (
+        "FRED-13/16 fed_regime",
+        [
+            "fed_regime_structure",
+            "fed_regime_trajectory",
+            "target_mid",
+            "target_spread",
+        ],
+    ),
+    ("FRED-14 carry_momentum", ["carry_momentum"]),
+    ("FRED-15 cpi_proxy", ["cpi_surprise_proxy"]),
+]
+
+# Critical columns for staleness check (recent rows should not be all-NaN)
+_STALENESS_CHECK_COLS = [
+    "hy_oas_level",
+    "nfci_level",
+    "dexjpus_level",
+    "fed_regime_structure",
+]
 
 
 # ---------------------------------------------------------------------------
@@ -280,6 +327,40 @@ def upsert_macro_features(engine: Any, df: pd.DataFrame) -> int:
 
 
 # ---------------------------------------------------------------------------
+# Structured summary log
+# ---------------------------------------------------------------------------
+
+
+def _print_feature_summary(df: pd.DataFrame) -> None:
+    """Print structured summary of feature groups computed.
+
+    Shows per-group population status and staleness warnings for critical
+    columns. Called after both dry-run and live upsert for visibility
+    (CONTEXT.md requirement: feature groups computed, columns populated,
+    staleness warnings).
+    """
+    print(f"\n[SUMMARY] Feature groups: {len(_FEATURE_GROUPS)}")
+    for name, cols in _FEATURE_GROUPS:
+        populated = sum(1 for c in cols if c in df.columns and df[c].notna().any())
+        status = (
+            "[OK]" if populated == len(cols) else f"[PARTIAL {populated}/{len(cols)}]"
+        )
+        print(f"  {status} {name}: {populated}/{len(cols)} columns populated")
+
+    # Staleness check: warn if critical columns are all-NaN in last 7 rows
+    recent = df.tail(7)
+    stale_cols = []
+    for col in _STALENESS_CHECK_COLS:
+        if col in recent.columns and recent[col].isna().all():
+            stale_cols.append(col)
+    if stale_cols:
+        print(
+            f"[WARN] Staleness: {', '.join(stale_cols)} "
+            "all-NaN in last 7 rows -- check FRED sync"
+        )
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -410,6 +491,7 @@ Examples:
         pd.set_option("display.max_columns", 10)
         pd.set_option("display.width", 120)
         print(df.head().to_string())
+        _print_feature_summary(df)
         elapsed = time.perf_counter() - t0
         print(
             f"\n[DRY RUN DONE] Elapsed: {elapsed:.1f}s "
@@ -425,6 +507,8 @@ Examples:
         print(f"[ERROR] upsert_macro_features failed: {exc}")
         logger.exception("upsert_macro_features raised an exception")
         return 1
+
+    _print_feature_summary(df)
 
     elapsed = time.perf_counter() - t0
     print(
