@@ -72,6 +72,7 @@ def _df_to_markdown(df: pd.DataFrame) -> str:
 
 
 # Attribution column names present in cmc_drift_metrics (added in Plan 47-01 DDL).
+# attr_macro_regime_delta added in Phase 72 OBSV-04 (migration e6f7a8b9c0d1).
 _ATTR_COLUMNS = [
     "attr_baseline_pnl",
     "attr_fee_delta",
@@ -80,6 +81,7 @@ _ATTR_COLUMNS = [
     "attr_data_revision_delta",
     "attr_sizing_delta",
     "attr_regime_delta",
+    "attr_macro_regime_delta",  # Phase 72 OBSV-04
     "attr_unexplained",
 ]
 

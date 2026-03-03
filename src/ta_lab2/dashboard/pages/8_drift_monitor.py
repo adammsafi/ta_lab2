@@ -259,6 +259,7 @@ def _drift_content(_engine, selected_config_id, history_days, show_history):
                 "attr_data_revision_delta",
                 "attr_sizing_delta",
                 "attr_regime_delta",
+                "attr_macro_regime_delta",
                 "attr_unexplained_delta",
             ]
             present_cols = [c for c in attribution_cols if c in drift_df.columns]
@@ -272,6 +273,7 @@ def _drift_content(_engine, selected_config_id, history_days, show_history):
                     "attr_data_revision_delta": "Data Revision",
                     "attr_sizing_delta": "Sizing",
                     "attr_regime_delta": "Regime",
+                    "attr_macro_regime_delta": "Macro Regime",
                     "attr_unexplained_delta": "Unexplained",
                 }
                 attr_cols = st.columns(min(len(present_cols), 4))

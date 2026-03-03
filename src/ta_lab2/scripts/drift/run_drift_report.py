@@ -206,6 +206,16 @@ Examples:
                             row.asset_id,
                             result.unexplained_residual,
                         )
+                        # Persist attr_* columns to cmc_drift_metrics.
+                        # The base row must already exist from the daily DriftMonitor run.
+                        # Previously run_attribution() result was discarded here,
+                        # leaving attr_* columns NULL. This call fixes that gap.
+                        attributor.persist_attribution(
+                            config_id=row.config_id,
+                            asset_id=row.asset_id,
+                            metric_date=week_end.isoformat(),
+                            result=result,
+                        )
                     except Exception as exc:  # noqa: BLE001
                         logger.warning(
                             "Attribution failed for config_id=%d asset_id=%d: %s",
