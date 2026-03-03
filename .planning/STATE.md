@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: 72 of 72 -- Macro Observability (v1.0.1 Macro Regime Infrastructure) In progress
-Plan: 02 of 4 (72-02: Macro Alert Notifications) COMPLETE
-Status: Phase 72 In Progress -- Plan 02 done; MacroAlertManager + run_macro_alerts CLI created
-Last activity: 2026-03-03 -- Completed 72-02-PLAN.md (MacroAlertManager throttled Telegram alerting + CLI script)
+Plan: 02 of 4 (72-02: Macro Alert Notifications) COMPLETE [72-01 also now complete]
+Status: Phase 72 In Progress -- Plans 01 and 02 done; data foundation (migration+queries+charts) + MacroAlertManager
+Last activity: 2026-03-03 -- Completed 72-01-PLAN.md (Alembic migration e6f7a8b9c0d1 + queries/macro.py + charts.py macro builders)
 
 ### Roadmap Evolution
 - Phase 64 added: MCP Memory Server -- Connect Qdrant to Claude Code
