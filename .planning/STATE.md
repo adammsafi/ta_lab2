@@ -10,16 +10,16 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 ## Current Position
 
 Phase: 68 of 72 -- HMM & Macro Analytics (v1.0.1 Macro Regime Infrastructure) IN PROGRESS
-Plan: 01 of 3 (68-01: Foundation tables + hmmlearn dependency) COMPLETE
-Status: Phase 68 plan 01 complete -- cmc_hmm_regimes, cmc_macro_lead_lag_results, cmc_macro_transition_probs tables + hmmlearn installed
-Last activity: 2026-03-03 -- Completed 68-01-PLAN.md (Alembic migration e0d8f7aec87a + pyproject macro_analytics group)
+Plan: 02 of 3 (68-02: HMMClassifier + LeadLagAnalyzer core modules) COMPLETE
+Status: Phase 68 plan 02 complete -- HMMClassifier (GaussianHMM BIC selection) + LeadLagAnalyzer (38-feature x BTC/ETH, [-60..+60] lags)
+Last activity: 2026-03-03 -- Completed 68-02-PLAN.md (hmm_classifier.py, lead_lag_analyzer.py, updated macro __init__.py)
 
 ### Roadmap Evolution
 - Phase 64 added: MCP Memory Server -- Connect Qdrant to Claude Code
 - Phases 65-72 added: Macro Regime Infrastructure (FRED pipeline, classifier, L4 integration, risk gates, observability)
 - v1.0.1 roadmap: 9 phases, 55 requirements mapped across 8 requirement categories
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [████████] Phase 60 COMPLETE (8 plans) | [██] Phase 61 COMPLETE | [██] Phase 62 COMPLETE | [██] Phase 63 COMPLETE | [███] Phase 64 COMPLETE | [███] Phase 65 COMPLETE | [███] Phase 66 COMPLETE | [███] Phase 67 COMPLETE | [█░░] Phase 68 IN PROGRESS (1/3)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [████████] Phase 60 COMPLETE (8 plans) | [██] Phase 61 COMPLETE | [██] Phase 62 COMPLETE | [██] Phase 63 COMPLETE | [███] Phase 64 COMPLETE | [███] Phase 65 COMPLETE | [███] Phase 66 COMPLETE | [███] Phase 67 COMPLETE | [██░] Phase 68 IN PROGRESS (2/3)
 
 ## Performance Metrics
 
@@ -616,6 +616,10 @@ Recent decisions affecting current work:
 - **Verify alembic head at runtime before writing down_revision (Phase 60-08)**: Plan spec listed 30eac3660488 but actual head was f6a7b8c9d0e1 (portfolio_tables); always run `alembic heads` first; plan's suggested head is often stale by the time Wave 3 executes
 - **op.create_table() + op.execute(COMMENT) over raw SQL file read (Phase 60-08)**: All codebase migrations use op.create_table() not file reads; consistent pattern; avoids file-path dependency in migration runtime; GIN index via postgresql_using='gin' kwarg
 - **expression mode E2E: 8 features (5 base + 3 param-sweep) all pass (Phase 60-08)**: vol_ratio_expr expands to 4 variants via fast=[5,10] x slow=[20,30]; all 8 evaluate cleanly against 100-row OHLCV DataFrame with 0 NaN for macd_signal/price_rank
+- **HMMClassifier default covariance_type='diag' (Phase 68-02)**: With 38 input features, 'full' covariance requires O(38^2)=1444 params/state -- numerically unstable with limited training data. 'diag' is safe default; 'full' is explicit opt-in via constructor param.
+- **HMM state indices have no inherent semantic meaning (Phase 68-02)**: State 0 is NOT automatically 'favorable'. Regime association requires inspecting state_means_json post-fit. Document this in any consumer of cmc_hmm_regimes.
+- **LeadLagAnalyzer lag range [-60..+60] (Phase 68-02)**: Expanded from ROADMAP [-20..+20] during Phase 68 CONTEXT session. User explicitly chose wider range to capture slower macro-to-crypto transmission channels.
+- **Shared helpers in hmm_classifier.py, imported by lead_lag_analyzer.py (Phase 68-02)**: _to_python, _sanitize_dataframe, _get_table_columns defined once; imported via hmm_classifier module. If they diverge, extract to macro/_helpers.py.
 
 ### Pending Todos
 
@@ -629,8 +633,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-03T10:33:16Z
-Stopped at: Completed 67-03-PLAN.md -- Phase 67 complete (CLI + pipeline integration)
+Last session: 2026-03-03T11:10:42Z
+Stopped at: Completed 68-02-PLAN.md -- HMMClassifier + LeadLagAnalyzer core modules
 Resume file: None
 
 ---
