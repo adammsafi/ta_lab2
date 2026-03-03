@@ -1,7 +1,7 @@
 """
 Drift attribution decomposition engine -- DriftAttributor with sequential OAT.
 
-DriftAttributor decomposes drift into 6 independent sources via sequential
+DriftAttributor decomposes drift into 7 independent sources via sequential
 One-At-a-Time (OAT) attribution.  Each step adds one cost source and measures
 its incremental contribution:
 
@@ -12,6 +12,7 @@ its incremental contribution:
   Step 4: +Data revision (PIT vs current comparison, likely 0 in V1)
   Step 5: +Sizing (theoretical vs actual position sizes, V1 placeholder, delta=0)
   Step 6: +Regime (with-regime vs no-regime replay)
+  Step 7: +Macro Regime (dominant macro_state paper period vs backtest training period)
 
   Residual: paper_pnl - total_explained
 
@@ -69,6 +70,17 @@ def _get_signal_backtester_class():
     return _SignalBacktester
 
 
+# State ordering for macro regime distance calculation.
+# Lower score = more favorable conditions.
+_MACRO_STATE_SCORE: dict[str, int] = {
+    "favorable": 0,
+    "constructive": 1,
+    "neutral": 2,
+    "cautious": 3,
+    "adverse": 4,
+}
+
+
 @dataclass(frozen=True)
 class AttributionResult:
     """
@@ -97,12 +109,17 @@ class AttributionResult:
         Incremental contribution of position sizing rounding differences (V1: 0).
     regime_delta:
         Incremental contribution of regime label differences (no-regime vs regime).
+    macro_regime_delta:
+        Drift contribution from differing macro regime conditions between the paper
+        trading period and backtest training period. Computed by comparing the
+        dominant macro_state in each period. Zero when macro data is unavailable
+        or the dominant state is unchanged.
     unexplained_residual:
         paper_pnl - total_explained_pnl.  Positive means paper performed better
         than the model predicts; negative means paper performed worse.
     total_explained_pnl:
         baseline_pnl + fee_delta + slippage_delta + timing_delta +
-        data_revision_delta + sizing_delta + regime_delta.
+        data_revision_delta + sizing_delta + regime_delta + macro_regime_delta.
     paper_pnl:
         Actual paper executor P&L for the attribution period.
     """
@@ -114,6 +131,7 @@ class AttributionResult:
     data_revision_delta: float
     sizing_delta: float
     regime_delta: float
+    macro_regime_delta: float
     unexplained_residual: float
     total_explained_pnl: float
     paper_pnl: float
@@ -129,6 +147,7 @@ def _zeros_with_paper_pnl(paper_pnl: float) -> AttributionResult:
         data_revision_delta=0.0,
         sizing_delta=0.0,
         regime_delta=0.0,
+        macro_regime_delta=0.0,
         unexplained_residual=paper_pnl,
         total_explained_pnl=0.0,
         paper_pnl=paper_pnl,
@@ -139,7 +158,7 @@ class DriftAttributor:
     """
     Sequential OAT attribution engine for drift decomposition.
 
-    Runs N+1=7 backtest replays with progressively added cost sources to isolate
+    Runs N+1=8 backtest replays with progressively added cost sources to isolate
     each attribution component independently.  Backtest failures are handled
     gracefully -- the affected delta is set to 0 and computation continues.
 
@@ -168,7 +187,7 @@ class DriftAttributor:
         paper_trade_count: int,
     ) -> AttributionResult:
         """
-        Decompose drift into 6 attribution sources via sequential OAT.
+        Decompose drift into 7 attribution sources via sequential OAT.
 
         Parameters
         ----------
@@ -308,6 +327,20 @@ class DriftAttributor:
             step2_pnl=step2_pnl,
         )
 
+        # Step 7: +Macro Regime (OBSV-04)
+        macro_regime_delta, macro_details = self._compute_macro_regime_delta(
+            paper_start=paper_start,
+            paper_end=paper_end,
+            step2_pnl=step2_pnl,
+        )
+        logger.debug(
+            "macro_regime_delta=%.4f details=%s for config_id=%d asset_id=%d",
+            macro_regime_delta,
+            macro_details,
+            config_id,
+            asset_id,
+        )
+
         # Residual
         total_explained = (
             baseline_pnl
@@ -317,18 +350,20 @@ class DriftAttributor:
             + data_revision_delta
             + sizing_delta
             + regime_delta
+            + macro_regime_delta
         )
         unexplained_residual = paper_pnl - total_explained
 
         logger.info(
             "Attribution complete for config_id=%d asset_id=%d: "
-            "baseline=%.4f fee=%.4f slip=%.4f regime=%.4f residual=%.4f paper=%.4f",
+            "baseline=%.4f fee=%.4f slip=%.4f regime=%.4f macro=%.4f residual=%.4f paper=%.4f",
             config_id,
             asset_id,
             baseline_pnl,
             fee_delta,
             slippage_delta,
             regime_delta,
+            macro_regime_delta,
             unexplained_residual,
             paper_pnl,
         )
@@ -341,10 +376,84 @@ class DriftAttributor:
             data_revision_delta=data_revision_delta,
             sizing_delta=sizing_delta,
             regime_delta=regime_delta,
+            macro_regime_delta=macro_regime_delta,
             unexplained_residual=unexplained_residual,
             total_explained_pnl=total_explained,
             paper_pnl=paper_pnl,
         )
+
+    def persist_attribution(
+        self,
+        config_id: int,
+        asset_id: int,
+        metric_date: str,
+        result: AttributionResult,
+    ) -> None:
+        """
+        Write attribution results to the attr_* columns of cmc_drift_metrics.
+
+        Uses UPDATE (not INSERT) because the DriftMetrics row must already exist
+        from the daily DriftMonitor run. This is called from
+        run_drift_report.py --with-attribution AFTER run_attribution().
+
+        Parameters
+        ----------
+        config_id:
+            Executor config ID matching the cmc_drift_metrics row.
+        asset_id:
+            Asset ID matching the cmc_drift_metrics row.
+        metric_date:
+            ISO date string (YYYY-MM-DD) for the row to update.
+        result:
+            AttributionResult from run_attribution() containing all delta fields.
+        """
+        sql = text("""
+            UPDATE cmc_drift_metrics
+            SET attr_baseline_pnl = :baseline_pnl,
+                attr_fee_delta = :fee_delta,
+                attr_slippage_delta = :slippage_delta,
+                attr_timing_delta = :timing_delta,
+                attr_data_revision_delta = :data_revision_delta,
+                attr_sizing_delta = :sizing_delta,
+                attr_regime_delta = :regime_delta,
+                attr_macro_regime_delta = :macro_regime_delta,
+                attr_unexplained = :unexplained_residual
+            WHERE config_id = :config_id
+              AND asset_id = :asset_id
+              AND metric_date = :metric_date
+        """)
+        params = {
+            "config_id": config_id,
+            "asset_id": asset_id,
+            "metric_date": metric_date,
+            "baseline_pnl": result.baseline_pnl,
+            "fee_delta": result.fee_delta,
+            "slippage_delta": result.slippage_delta,
+            "timing_delta": result.timing_delta,
+            "data_revision_delta": result.data_revision_delta,
+            "sizing_delta": result.sizing_delta,
+            "regime_delta": result.regime_delta,
+            "macro_regime_delta": result.macro_regime_delta,
+            "unexplained_residual": result.unexplained_residual,
+        }
+        with self._engine.begin() as conn:
+            row_count = conn.execute(sql, params).rowcount
+        if row_count == 0:
+            logger.warning(
+                "persist_attribution: no matching row for config_id=%d asset_id=%d "
+                "metric_date=%s -- run DriftMonitor first to create the base row",
+                config_id,
+                asset_id,
+                metric_date,
+            )
+        else:
+            logger.debug(
+                "persist_attribution: updated %d row(s) for config_id=%d asset_id=%d date=%s",
+                row_count,
+                config_id,
+                asset_id,
+                metric_date,
+            )
 
     # ------------------------------------------------------------------
     # Private helpers
@@ -507,3 +616,101 @@ class DriftAttributor:
             no_regime_pnl,
         )
         return regime_delta
+
+    def _compute_macro_regime_delta(
+        self,
+        paper_start: str,
+        paper_end: str,
+        step2_pnl: float,
+    ) -> tuple[float, dict]:
+        """
+        Compute macro regime attribution delta (Step 7).
+
+        Compares the dominant macro_state during the paper period vs the
+        full backtest training period (defined as 1 year before paper_start).
+        If they differ, the delta represents the estimated drift contribution
+        from macro environment changes.
+
+        Parameters
+        ----------
+        paper_start:
+            ISO date string for the paper trading period start.
+        paper_end:
+            ISO date string for the paper trading period end.
+        step2_pnl:
+            P&L from Step 2 (+Fees +Slippage). Used as basis for heuristic scaling.
+
+        Returns
+        -------
+        Tuple of (delta, details_dict) where details_dict contains:
+          paper_dominant_state, backtest_dominant_state, state_distance.
+        Returns (0.0, {}) when macro data is unavailable.
+        """
+        paper_start_dt = pd.Timestamp(paper_start).date()
+        paper_end_dt = pd.Timestamp(paper_end).date()
+        bt_end_dt = paper_start_dt - pd.Timedelta(days=1)
+        bt_start_dt = paper_start_dt - pd.Timedelta(days=365)
+
+        sql_dominant = text("""
+            SELECT macro_state, COUNT(*) AS n
+            FROM cmc_macro_regimes
+            WHERE date BETWEEN :start AND :end
+              AND profile = 'default'
+            GROUP BY macro_state
+            ORDER BY n DESC
+            LIMIT 1
+        """)
+
+        try:
+            with self._engine.connect() as conn:
+                paper_row = conn.execute(
+                    sql_dominant,
+                    {
+                        "start": paper_start_dt.isoformat(),
+                        "end": paper_end_dt.isoformat(),
+                    },
+                ).fetchone()
+                bt_row = conn.execute(
+                    sql_dominant,
+                    {"start": bt_start_dt.isoformat(), "end": bt_end_dt.isoformat()},
+                ).fetchone()
+        except Exception as exc:
+            logger.debug(
+                "_compute_macro_regime_delta: DB query failed (%s) -- returning 0",
+                exc,
+            )
+            return 0.0, {}
+
+        if paper_row is None or bt_row is None:
+            logger.debug(
+                "_compute_macro_regime_delta: insufficient macro data "
+                "(paper_row=%s bt_row=%s) -- returning 0",
+                paper_row,
+                bt_row,
+            )
+            return 0.0, {}
+
+        paper_state = str(paper_row[0])
+        bt_state = str(bt_row[0])
+
+        if paper_state == bt_state:
+            return 0.0, {
+                "paper_dominant_state": paper_state,
+                "backtest_dominant_state": bt_state,
+                "state_distance": 0,
+            }
+
+        paper_score = _MACRO_STATE_SCORE.get(paper_state, 2)  # default: neutral
+        bt_score = _MACRO_STATE_SCORE.get(bt_state, 2)
+        state_distance = abs(paper_score - bt_score)
+
+        # Heuristic: each state step = ~0.5% of explained PnL (step2_pnl basis).
+        # Negative because more adverse conditions reduce expected performance.
+        macro_regime_delta = -state_distance * 0.005 * abs(step2_pnl)
+
+        details = {
+            "paper_dominant_state": paper_state,
+            "backtest_dominant_state": bt_state,
+            "state_distance": state_distance,
+        }
+        return macro_regime_delta, details
