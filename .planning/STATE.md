@@ -9,22 +9,22 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: 70 of 72 -- Cross-Asset Aggregation (v1.0.1 Macro Regime Infrastructure) In progress
-Plan: 02 of 3 (70-02: Core compute module + CLI script + pipeline wiring) COMPLETE
-Status: Phase 70 Plan 02 COMPLETE -- cross_asset.py with all 4 XAGG compute functions, refresh_cross_asset_agg.py CLI, run_daily_refresh.py wiring, ROADMAP.md criterion fix
-Last activity: 2026-03-03 -- Completed 70-02-PLAN.md (cross_asset.py + CLI + daily refresh integration)
+Phase: 70 of 72 -- Cross-Asset Aggregation (v1.0.1 Macro Regime Infrastructure) COMPLETE
+Plan: 03 of 3 (70-03: Downstream consumers -- covariance override + Telegram alerts) COMPLETE
+Status: Phase 70 COMPLETE -- all 3 plans done; cross-asset signals now wired to portfolio optimizer and Telegram alerting
+Last activity: 2026-03-03 -- Completed 70-03-PLAN.md (PortfolioOptimizer covariance override + sign-flip Telegram alerts)
 
 ### Roadmap Evolution
 - Phase 64 added: MCP Memory Server -- Connect Qdrant to Claude Code
 - Phases 65-72 added: Macro Regime Infrastructure (FRED pipeline, classifier, L4 integration, risk gates, observability)
 - v1.0.1 roadmap: 9 phases, 55 requirements mapped across 8 requirement categories
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [████████] Phase 60 COMPLETE (8 plans) | [██] Phase 61 COMPLETE | [██] Phase 62 COMPLETE | [██] Phase 63 COMPLETE | [███] Phase 64 COMPLETE | [███] Phase 65 COMPLETE | [███] Phase 66 COMPLETE | [███] Phase 67 COMPLETE | [███] Phase 68 COMPLETE | [███] Phase 69 COMPLETE (3/3 plans) | [██] Phase 70 plan 02/03 COMPLETE
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [████████] Phase 60 COMPLETE (8 plans) | [██] Phase 61 COMPLETE | [██] Phase 62 COMPLETE | [██] Phase 63 COMPLETE | [███] Phase 64 COMPLETE | [███] Phase 65 COMPLETE | [███] Phase 66 COMPLETE | [███] Phase 67 COMPLETE | [███] Phase 68 COMPLETE | [███] Phase 69 COMPLETE (3/3 plans) | [███] Phase 70 COMPLETE (3/3 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 326 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 6 in Phase 43, 3 in Phase 44, 7 in Phase 45, 4 in Phase 46, 5 in Phase 47, 4 in Phase 48, 4 in Phase 49, 2 in Phase 50, 5 in Phase 51, 4 in Phase 52, 4 in Phase 53, 3 in Phase 54, 5 in Phase 55, 7 in Phase 56, 6 in Phase 57, 7 in Phase 58, 5 in Phase 59, 8 in Phase 60, 2 in Phase 61, 2 in Phase 62, 2 in Phase 63, 3 in Phase 65, 3 in Phase 66, 3 in Phase 67, 3 in Phase 68, 3 in Phase 69, 2 in Phase 70)
+- Total plans completed: 327 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 6 in Phase 43, 3 in Phase 44, 7 in Phase 45, 4 in Phase 46, 5 in Phase 47, 4 in Phase 48, 4 in Phase 49, 2 in Phase 50, 5 in Phase 51, 4 in Phase 52, 4 in Phase 53, 3 in Phase 54, 5 in Phase 55, 7 in Phase 56, 6 in Phase 57, 7 in Phase 58, 5 in Phase 59, 8 in Phase 60, 2 in Phase 61, 2 in Phase 62, 2 in Phase 63, 3 in Phase 65, 3 in Phase 66, 3 in Phase 67, 3 in Phase 68, 3 in Phase 69, 3 in Phase 70)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -118,6 +118,9 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
+- **Covariance blend_factor=0.3 inflates off-diagonals in high-corr regime** (Phase 70-03): S_adj = (1-0.3)*S + 0.3*S_full_corr where S_full_corr[i,j]=sqrt(var_i*var_j); override is try/except-wrapped so DB failure never breaks optimization; controlled by portfolio.yaml high_corr_override.enabled
+- **alert_new_only=True default in compute_crypto_macro_corr** (Phase 70-03): Only send Telegram alerts for dates after watermark; set to False (or caller passes alert_df=empty) to suppress on --full historical reruns; prevents sign-flip alert spam
+- **sign_flip spam threshold=3** (Phase 70-03): >3 same-date flips sends a single group summary instead of N individual Telegram messages; per-date grouping with head(3) preview + "and N more" suffix
 - **down_revision = f1a2b3c4d5e6 not d5e6f7a8b9c0** (Phase 70-01): Plan doc had stale Phase 67 head; actual head after Phase 69 is f1a2b3c4d5e6; always run alembic heads dynamically before creating migration
 - **crypto_macro_corr_regimes drops cmc_ prefix** (Phase 70-01): Per CONTEXT.md naming rule: tables mixing crypto + non-crypto (FRED macro) data drop the cmc_ prefix; cmc_ prefix reserved for tables whose assets come from cmc_price_histories7/tvc_price_histories
 - **Partial index on sign_flip_flag = TRUE** (Phase 70-01): Only a small fraction of rows will have sign flip; partial index avoids full-table scan for Telegram alert queries in Plan 03
@@ -645,8 +648,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-03T13:26:03Z
-Stopped at: Completed 70-02-PLAN.md -- Phase 70 plan 02/03: Core compute module + CLI script + pipeline wiring
+Last session: 2026-03-03T14:38:16Z
+Stopped at: Completed 70-03-PLAN.md -- Phase 70 COMPLETE (3/3 plans): downstream consumers (covariance override + Telegram alerts)
 Resume file: None
 
 ---
