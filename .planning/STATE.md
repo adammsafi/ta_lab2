@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: 70 of 72 -- Cross-Asset Aggregation (v1.0.1 Macro Regime Infrastructure) COMPLETE
-Plan: 03 of 3 (70-03: Downstream consumers -- covariance override + Telegram alerts) COMPLETE
-Status: Phase 70 COMPLETE -- all 3 plans done; cross-asset signals now wired to portfolio optimizer and Telegram alerting
-Last activity: 2026-03-03 -- Completed 70-03-PLAN.md (PortfolioOptimizer covariance override + sign-flip Telegram alerts)
+Phase: 71 of 72 -- Event Risk Gates (v1.0.1 Macro Regime Infrastructure) IN PROGRESS
+Plan: 01 of 3 (71-01: Database foundation -- 4 tables + seed script) COMPLETE
+Status: Phase 71 in progress -- Plan 01 done; dim_macro_events/dim_macro_gate_state/cmc_macro_stress_history/dim_macro_gate_overrides created + seed script operational
+Last activity: 2026-03-03 -- Completed 71-01-PLAN.md (4 event risk gate tables + cmc_risk_events CHECK extensions + FOMC/CPI/NFP seed script)
 
 ### Roadmap Evolution
 - Phase 64 added: MCP Memory Server -- Connect Qdrant to Claude Code
 - Phases 65-72 added: Macro Regime Infrastructure (FRED pipeline, classifier, L4 integration, risk gates, observability)
 - v1.0.1 roadmap: 9 phases, 55 requirements mapped across 8 requirement categories
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [████████] Phase 60 COMPLETE (8 plans) | [██] Phase 61 COMPLETE | [██] Phase 62 COMPLETE | [██] Phase 63 COMPLETE | [███] Phase 64 COMPLETE | [███] Phase 65 COMPLETE | [███] Phase 66 COMPLETE | [███] Phase 67 COMPLETE | [███] Phase 68 COMPLETE | [███] Phase 69 COMPLETE (3/3 plans) | [███] Phase 70 COMPLETE (3/3 plans)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [████████] Phase 60 COMPLETE (8 plans) | [██] Phase 61 COMPLETE | [██] Phase 62 COMPLETE | [██] Phase 63 COMPLETE | [███] Phase 64 COMPLETE | [███] Phase 65 COMPLETE | [███] Phase 66 COMPLETE | [███] Phase 67 COMPLETE | [███] Phase 68 COMPLETE | [███] Phase 69 COMPLETE (3/3 plans) | [███] Phase 70 COMPLETE (3/3 plans) | [█] Phase 71 Plan 01 COMPLETE (1/3 plans)
 
 ## Performance Metrics
 
@@ -118,6 +118,9 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
+- **Revision ID collision: a2b3c4d5e6f7 used instead of f1a2b3c4d5e6** (Phase 71-01): Plan specified f1a2b3c4d5e6 but that ID was already taken by l4_executor_run_log; always run `ls alembic/versions/ | grep` before using a plan-specified revision ID
+- **CHECK constraint state for cmc_risk_events at Phase 71 start** (Phase 71-01): 15 event types (original 10 + tail_risk + liquidation) + 6 sources; drift types added by ac4cf1223ec7 were lost when a9ec3c00a54a rewrote the constraint without them -- pre-existing issue
+- **seed_macro_events uses stdlib urllib.request not requests** (Phase 71-01): Avoids adding a new dependency; FRED API responses are small JSON; requests not required
 - **Covariance blend_factor=0.3 inflates off-diagonals in high-corr regime** (Phase 70-03): S_adj = (1-0.3)*S + 0.3*S_full_corr where S_full_corr[i,j]=sqrt(var_i*var_j); override is try/except-wrapped so DB failure never breaks optimization; controlled by portfolio.yaml high_corr_override.enabled
 - **alert_new_only=True default in compute_crypto_macro_corr** (Phase 70-03): Only send Telegram alerts for dates after watermark; set to False (or caller passes alert_df=empty) to suppress on --full historical reruns; prevents sign-flip alert spam
 - **sign_flip spam threshold=3** (Phase 70-03): >3 same-date flips sends a single group summary instead of N individual Telegram messages; per-date grouping with head(3) preview + "and N more" suffix
@@ -648,8 +651,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-03T14:38:16Z
-Stopped at: Completed 70-03-PLAN.md -- Phase 70 COMPLETE (3/3 plans): downstream consumers (covariance override + Telegram alerts)
+Last session: 2026-03-03T16:25:00Z
+Stopped at: Completed 71-01-PLAN.md -- Phase 71 Plan 01: database foundation (4 event risk gate tables + seed script)
 Resume file: None
 
 ---
