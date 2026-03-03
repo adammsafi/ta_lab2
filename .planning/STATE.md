@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: 66 of 72 -- FRED Derived Features & Automation (v1.0.1 Macro Regime Infrastructure) COMPLETE
-Plan: 03 of 3 (66-03: Automation & E2E Verification) COMPLETE
-Status: Phase 66 complete -- all FRED-03 through FRED-17 requirements verified, 52-column table with 9558 rows
-Last activity: 2026-03-03 -- Completed 66-03-PLAN.md (WARMUP_DAYS=400, structured summary log, E2E database verification)
+Phase: 67 of 72 -- Macro Regime Classifier (v1.0.1 Macro Regime Infrastructure) IN PROGRESS
+Plan: 01 of 3 (67-01: Macro Regime Tables) COMPLETE
+Status: Plan 67-01 complete -- Alembic migration d5e6f7a8b9c0 creates cmc_macro_regimes + cmc_macro_hysteresis_state
+Last activity: 2026-03-03 -- Completed 67-01-PLAN.md (2 tables, 2 indexes, chains from Phase 66 head)
 
 ### Roadmap Evolution
 - Phase 64 added: MCP Memory Server -- Connect Qdrant to Claude Code
 - Phases 65-72 added: Macro Regime Infrastructure (FRED pipeline, classifier, L4 integration, risk gates, observability)
 - v1.0.1 roadmap: 9 phases, 55 requirements mapped across 8 requirement categories
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [████████] Phase 60 COMPLETE (8 plans) | [██] Phase 61 COMPLETE | [██] Phase 62 COMPLETE | [██] Phase 63 COMPLETE | [███] Phase 64 COMPLETE | [███] Phase 65 COMPLETE | [███] Phase 66 COMPLETE
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [████████] Phase 60 COMPLETE (8 plans) | [██] Phase 61 COMPLETE | [██] Phase 62 COMPLETE | [██] Phase 63 COMPLETE | [███] Phase 64 COMPLETE | [███] Phase 65 COMPLETE | [███] Phase 66 COMPLETE | [█] Phase 67 (1/3)
 
 ## Performance Metrics
 
@@ -118,6 +118,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
+- **Macro regime tables in public schema** (Phase 67-01): cmc_macro_regimes and cmc_macro_hysteresis_state in public schema (not fred) since they are trading-system artifacts consumed by risk engine/executor, not raw FRED data
 - **WARMUP_DAYS=400 for macro watermark** (Phase 66-03): Increased from 60 to 400; covers 365-day rolling z-score (FRED-12) + 35d margin for forward-fill propagation; on incremental runs recompute starts 400 days before watermark to ensure z-score boundary correctness
 - **Structured summary log for macro features** (Phase 66-03): _FEATURE_GROUPS constant maps 13 feature groups (FRED-03 through FRED-15) to column lists; _print_feature_summary() prints [OK]/[PARTIAL] status per group plus staleness warnings for 4 canary columns
 - **run_macro_features(args) no db_url param** (Phase 65-02): Macro refresh derives its own engine via get_engine() unlike other stage functions that pass db_url to subprocess; macro has no per-asset ID filtering requirement
@@ -622,9 +623,9 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-03T04:32:25Z
-Stopped at: Completed 66-03-PLAN.md -- Phase 66 complete (WARMUP_DAYS=400, structured summary log, all 25 Phase 66 columns verified in DB)
-Resume file: None
+Last session: 2026-03-03T10:16:46Z
+Stopped at: Completed 67-01-PLAN.md -- Alembic migration for cmc_macro_regimes + cmc_macro_hysteresis_state
+Resume file: .planning/phases/67-macro-regime-classifier/67-02-PLAN.md
 
 ---
 
