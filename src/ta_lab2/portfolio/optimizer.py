@@ -137,6 +137,11 @@ class PortfolioOptimizer:
         self._regime_routing: Dict[str, str] = {k: str(v) for k, v in rr.items()}
         self._default_optimizer: str = self._regime_routing.get("default", "hrp")
 
+        # High-correlation regime covariance override config
+        hco = config.get("high_corr_override", {})
+        self._high_corr_override_enabled: bool = bool(hco.get("enabled", True))
+        self._high_corr_blend_factor: float = float(hco.get("blend_factor", 0.3))
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -200,6 +205,9 @@ class PortfolioOptimizer:
         )
         S: pd.DataFrame = risk_models.CovarianceShrinkage(prices_window).ledoit_wolf()
 
+        # --- High-correlation regime covariance override ----------------
+        S = self._apply_high_corr_override(S)
+
         # --- Condition number check -------------------------------------
         cond_number = float(np.linalg.cond(S.values))
         ill_conditioned = cond_number > self.condition_number_threshold
@@ -247,6 +255,89 @@ class PortfolioOptimizer:
         active = result.get("active", "hrp")
         w = result.get(active)
         return w if w is not None else {}
+
+    # ------------------------------------------------------------------
+    # High-correlation regime covariance override
+    # ------------------------------------------------------------------
+
+    def _apply_high_corr_override(self, S: pd.DataFrame) -> pd.DataFrame:
+        """Inflate off-diagonal covariance when high_corr_flag is True in DB.
+
+        When the cross-asset high-correlation regime is active (as signaled by
+        cmc_cross_asset_agg.high_corr_flag), blending the covariance matrix
+        toward a fully-correlated matrix reduces the illusory diversification
+        benefit that optimizers might otherwise exploit.
+
+        Blend formula:
+            S_adjusted = (1 - blend_factor) * S + blend_factor * S_full_corr
+
+        where S_full_corr has the same diagonal (variances) as S but
+        off-diagonal entries set to sqrt(var_i * var_j) (correlation = 1.0).
+
+        Parameters
+        ----------
+        S:
+            Covariance matrix computed by the Ledoit-Wolf shrinkage estimator.
+
+        Returns
+        -------
+        Adjusted covariance matrix (same shape and index/columns as input),
+        or S unchanged if the override is disabled or not applicable.
+        """
+        # Check master switch
+        if not self._high_corr_override_enabled:
+            logger.info("high_corr_override disabled in config; skipping.")
+            return S
+
+        # Query latest high_corr_flag from cmc_cross_asset_agg
+        high_corr_flag: Optional[bool] = None
+        avg_pairwise_corr: Optional[float] = None
+        try:
+            import os
+
+            db_url = os.environ.get("TARGET_DB_URL") or os.environ.get("DATABASE_URL")
+            if db_url:
+                from sqlalchemy import create_engine, text
+
+                engine = create_engine(db_url)
+                with engine.connect() as conn:
+                    row = conn.execute(
+                        text(
+                            "SELECT high_corr_flag, avg_pairwise_corr_30d "
+                            "FROM cmc_cross_asset_agg "
+                            "ORDER BY date DESC LIMIT 1"
+                        )
+                    ).fetchone()
+                if row is not None:
+                    high_corr_flag = bool(row[0]) if row[0] is not None else None
+                    avg_pairwise_corr = float(row[1]) if row[1] is not None else None
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "high_corr_override: DB query failed (%s); skipping override.", exc
+            )
+            return S
+
+        if high_corr_flag is not True:
+            # Flag is False, NULL, or DB had no data -- no override
+            return S
+
+        # Build fully-correlated covariance matrix (correlation = 1 for all pairs)
+        variances = np.diag(S.values)  # shape (n,)
+        std_devs = np.sqrt(np.maximum(variances, 0.0))  # shape (n,)
+        # S_full_corr[i, j] = std_i * std_j  (correlation = 1.0)
+        S_full_corr = np.outer(std_devs, std_devs)
+
+        blend = self._high_corr_blend_factor
+        S_adj_values = (1.0 - blend) * S.values + blend * S_full_corr
+
+        logger.warning(
+            "High-correlation regime detected (avg_pairwise_corr=%.3f); "
+            "inflating off-diagonal covariance by blend_factor=%.2f",
+            avg_pairwise_corr if avg_pairwise_corr is not None else float("nan"),
+            blend,
+        )
+
+        return pd.DataFrame(S_adj_values, index=S.index, columns=S.columns)
 
     # ------------------------------------------------------------------
     # Internal optimizer runners (each uses a FRESH instance)

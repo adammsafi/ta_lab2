@@ -97,3 +97,10 @@ stop_laddering:
   per_strategy_overrides: {}
   # Override defaults per asset (keyed by asset symbol or id)
   per_asset_overrides: {}
+
+# --- High-correlation regime covariance override ---
+# When cross-asset high_corr_flag is True, inflate off-diagonal covariance
+# to reduce illusory diversification benefit.
+high_corr_override:
+  enabled: true                  # Master switch
+  blend_factor: 0.3              # Blend toward full-correlation matrix (0=no change, 1=full corr)
