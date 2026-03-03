@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: 64 of 72 -- MCP Memory Server (v1.0.1 Macro Regime Infrastructure) COMPLETE
-Plan: 03 of 3 (64-03: E2E Verification) COMPLETE
-Status: Phase 64 complete, ready for Phase 65
-Last activity: 2026-03-02 -- Phase 64 verified (12/12 must-haves), human checkpoint approved
+Phase: 65 of 72 -- FRED Table & Core Features (v1.0.1 Macro Regime Infrastructure) IN PROGRESS
+Plan: 01 of 3 (65-01: Alembic migration + macro computation module) COMPLETE
+Status: Phase 65 in progress, ready for Plan 65-02
+Last activity: 2026-03-03 -- Phase 65 Plan 01 complete (2/2 tasks, Alembic migration + macro module)
 
 ### Roadmap Evolution
 - Phase 64 added: MCP Memory Server -- Connect Qdrant to Claude Code
 - Phases 65-72 added: Macro Regime Infrastructure (FRED pipeline, classifier, L4 integration, risk gates, observability)
 - v1.0.1 roadmap: 9 phases, 55 requirements mapped across 8 requirement categories
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [████████] Phase 60 COMPLETE (8 plans) | [██] Phase 61 COMPLETE | [██] Phase 62 COMPLETE | [██] Phase 63 COMPLETE | [███] Phase 64 COMPLETE
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [████████] Phase 60 COMPLETE (8 plans) | [██] Phase 61 COMPLETE | [██] Phase 62 COMPLETE | [██] Phase 63 COMPLETE | [███] Phase 64 COMPLETE | [█] Phase 65 Plan 01 COMPLETE (2/3 plans remaining)
 
 ## Performance Metrics
 
@@ -118,6 +118,10 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
+- **FRED macro module engine parameter** (Phase 65-01): load_series_wide/compute_macro_features accept engine as parameter -- caller provides; module does NOT call get_engine() internally; enables test injection and CLI flexibility
+- **FRED Alembic revision ID collision** (Phase 65-01): Plan specified a1b2c3d4e5f6 but that ID was already taken by Phase 56; used b3c4d5e6f7a8 as revision; always run alembic heads before writing down_revision in migration files
+- **Calendar-daily reindex for FRED (Phase 65-01)**: freq='D' includes weekends/holidays -- correct for crypto 24/7 consumers (regime classifier, risk gates, dashboard run on weekend bars)
+- **Missing WTREGEN graceful degradation** (Phase 65-01): net_liquidity set to NaN + WARNING logged when WTREGEN absent from fred.series_values; pipeline continues; WTREGEN VM addition is a manual pre-step
 - **Review first, then fix** (v0.6.0): Complete ALL analysis before code changes
 - **Keep all 6 EMA variants** (v0.6.0): They exist for legitimate reasons (calendar alignment, ISO vs US, anchoring)
 - **Bars and EMAs separate** (v0.6.0): Modular design, not tightly coupled
@@ -610,8 +614,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-01T07:39:40Z
-Stopped at: Completed 63-02-PLAN.md — initial_capital Alembic migration, PaperExecutor DB wiring, drift [WARN] upgrade
+Last session: 2026-03-03T01:34:28Z
+Stopped at: Completed 65-01-PLAN.md -- Alembic migration fred.fred_macro_features (b3c4d5e6f7a8), macro/ package (fred_reader, forward_fill, feature_computer)
 Resume file: None
 
 ---
