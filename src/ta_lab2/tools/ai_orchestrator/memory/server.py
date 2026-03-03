@@ -40,6 +40,23 @@ def create_app() -> FastAPI:
     # Mount MCP endpoint at /mcp/
     api.mount("/mcp", mcp_app)
 
+    # Replace health endpoint with Qdrant-aware check (api.py uses ChromaDB
+    # which is not available in Docker — only Qdrant via Mem0)
+    api.routes[:] = [r for r in api.routes if getattr(r, "path", None) != "/health"]
+
+    @api.get("/health")
+    async def health_check():
+        """Health check using Qdrant backend (Docker-compatible)."""
+        try:
+            from .mem0_client import get_mem0_client
+
+            client = get_mem0_client()
+            count = client.memory_count
+            return {"status": "healthy", "memories": count}
+        except Exception as e:
+            logger.error(f"Health check failed: {e}")
+            return {"status": "unhealthy", "error": str(e)}
+
     logger.info("Combined ASGI app created: MCP at /mcp/, REST at /api/v1/")
 
     return api
