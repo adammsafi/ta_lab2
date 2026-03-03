@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: 67 of 72 -- Macro Regime Classifier (v1.0.1 Macro Regime Infrastructure) COMPLETE
-Plan: 03 of 3 (67-03: Macro Regime CLI & Pipeline Integration) COMPLETE
-Status: Phase 67 complete -- CLI entry point + daily refresh pipeline integration (MREG-09)
-Last activity: 2026-03-03 -- Completed 67-03-PLAN.md (refresh_macro_regimes.py + pipeline wiring)
+Phase: 68 of 72 -- HMM & Macro Analytics (v1.0.1 Macro Regime Infrastructure) IN PROGRESS
+Plan: 01 of 3 (68-01: Foundation tables + hmmlearn dependency) COMPLETE
+Status: Phase 68 plan 01 complete -- cmc_hmm_regimes, cmc_macro_lead_lag_results, cmc_macro_transition_probs tables + hmmlearn installed
+Last activity: 2026-03-03 -- Completed 68-01-PLAN.md (Alembic migration e0d8f7aec87a + pyproject macro_analytics group)
 
 ### Roadmap Evolution
 - Phase 64 added: MCP Memory Server -- Connect Qdrant to Claude Code
 - Phases 65-72 added: Macro Regime Infrastructure (FRED pipeline, classifier, L4 integration, risk gates, observability)
 - v1.0.1 roadmap: 9 phases, 55 requirements mapped across 8 requirement categories
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [████████] Phase 60 COMPLETE (8 plans) | [██] Phase 61 COMPLETE | [██] Phase 62 COMPLETE | [██] Phase 63 COMPLETE | [███] Phase 64 COMPLETE | [███] Phase 65 COMPLETE | [███] Phase 66 COMPLETE | [███] Phase 67 COMPLETE
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [████████] Phase 60 COMPLETE (8 plans) | [██] Phase 61 COMPLETE | [██] Phase 62 COMPLETE | [██] Phase 63 COMPLETE | [███] Phase 64 COMPLETE | [███] Phase 65 COMPLETE | [███] Phase 66 COMPLETE | [███] Phase 67 COMPLETE | [█░░] Phase 68 IN PROGRESS (1/3)
 
 ## Performance Metrics
 
@@ -118,6 +118,10 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
+- **Phase 68 analytics tables in public schema, not fred schema** (Phase 68-01): cmc_hmm_regimes, cmc_macro_lead_lag_results, cmc_macro_transition_probs all live in public schema; fred schema is reserved for raw/derived FRED data; analytics outputs are public schema trading artifacts
+- **TEXT not JSONB for Phase 68 JSON columns** (Phase 68-01): state_means_json and corr_by_lag_json use sa.Text() for DB-agnosticism; upgrade to JSONB in Phase 68-02/03 if query-time JSON parsing is needed
+- **Alembic head at Phase 68 start: d5e6f7a8b9c0** (Phase 68-01): Phase 67 migration was d5e6f7a8b9c0 (macro_regime_tables); Phase 68 migration e0d8f7aec87a chains from it; always run alembic heads dynamically
+- **hmmlearn==0.3.3 declared in macro_analytics optional-dependencies group** (Phase 68-01): New group added after analytics group; not added to all group; install with pip install ta_lab2[macro_analytics]
 - **Pipeline ordering macro_features -> macro_regimes -> regimes** (Phase 67-03): Satisfies MREG-09 requirement; macro regime classification runs after FRED feature refresh and before per-asset regime computation so downstream stages have global macro context
 - **MacroRegimeClassifier dry-run via internal methods** (Phase 67-03): classify() combines computation + upsert returning int; for dry-run mode, call _load_features() + _classify_dataframe() directly to get DataFrame preview without DB writes
 - **Macro regime tables in public schema** (Phase 67-01): cmc_macro_regimes and cmc_macro_hysteresis_state in public schema (not fred) since they are trading-system artifacts consumed by risk engine/executor, not raw FRED data

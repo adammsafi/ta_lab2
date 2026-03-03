@@ -1445,7 +1445,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 70 to break down)
+- [ ] 70-01-PLAN.md -- Alembic migration (3 tables + ALTER) + YAML config
+- [ ] 70-02-PLAN.md -- Core compute module + CLI script + pipeline wiring
+- [ ] 70-03-PLAN.md -- Portfolio optimizer covariance override + Telegram sign-flip alerts
 
 ### Phase 71: Event Risk Gates
 
