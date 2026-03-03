@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: 68 of 72 -- HMM & Macro Analytics (v1.0.1 Macro Regime Infrastructure) COMPLETE
-Plan: 03 of 3 (68-03: TransitionProbMatrix + CLI + pipeline wiring) COMPLETE
-Status: Phase 68 COMPLETE -- TransitionProbMatrix (static + rolling, rule-based + HMM), unified refresh_macro_analytics.py CLI, daily pipeline wired
-Last activity: 2026-03-03 -- Completed 68-03-PLAN.md (transition_probs.py, refresh_macro_analytics.py, run_daily_refresh.py updated)
+Phase: 69 of 72 -- L4 Resolver Integration (v1.0.1 Macro Regime Infrastructure) IN PROGRESS
+Plan: 01 of 3 (69-01: Resolver fnmatch + L4 macro policy entries + YAML overlay) COMPLETE
+Status: Phase 69 Plan 01 COMPLETE -- fnmatch glob support in _match_policy, 8 L4 macro entries in DEFAULT_POLICY_TABLE, MINT-02 invariant asserted, YAML overlay with 7 L4 rules
+Last activity: 2026-03-03 -- Completed 69-01-PLAN.md (resolver.py, policy_loader.py, configs/regime_policies.yaml)
 
 ### Roadmap Evolution
 - Phase 64 added: MCP Memory Server -- Connect Qdrant to Claude Code
 - Phases 65-72 added: Macro Regime Infrastructure (FRED pipeline, classifier, L4 integration, risk gates, observability)
 - v1.0.1 roadmap: 9 phases, 55 requirements mapped across 8 requirement categories
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [████████] Phase 60 COMPLETE (8 plans) | [██] Phase 61 COMPLETE | [██] Phase 62 COMPLETE | [██] Phase 63 COMPLETE | [███] Phase 64 COMPLETE | [███] Phase 65 COMPLETE | [███] Phase 66 COMPLETE | [███] Phase 67 COMPLETE | [███] Phase 68 COMPLETE
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [████████] Phase 60 COMPLETE (8 plans) | [██] Phase 61 COMPLETE | [██] Phase 62 COMPLETE | [██] Phase 63 COMPLETE | [███] Phase 64 COMPLETE | [███] Phase 65 COMPLETE | [███] Phase 66 COMPLETE | [███] Phase 67 COMPLETE | [███] Phase 68 COMPLETE | [█░░] Phase 69 IN PROGRESS (1/3 plans)
 
 ## Performance Metrics
 
@@ -636,8 +636,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-03T11:10:42Z
-Stopped at: Completed 68-02-PLAN.md -- HMMClassifier + LeadLagAnalyzer core modules
+Last session: 2026-03-03T11:45:32Z
+Stopped at: Completed 69-01-PLAN.md -- resolver fnmatch + L4 macro policy entries + YAML overlay
 Resume file: None
 
 ---
