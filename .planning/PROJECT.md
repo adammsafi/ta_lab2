@@ -8,34 +8,16 @@ A systematic crypto trading platform with integrated AI orchestration and persis
 
 Build trustworthy quant trading infrastructure 3x faster by creating AI coordination that remembers context, routes work optimally, and eliminates redundant context-setting across sessions and platforms.
 
-## Current Milestone: v1.0.1 Macro Regime Infrastructure
+## Current State
 
-**Goal:** Wire 208K rows of FRED macro data into the regime/risk pipeline — macro feature computation, macro regime labeler, cross-asset aggregation, and risk gates driven by rates, VIX, carry trade, and financial conditions.
+**Latest shipped:** v1.0.1 Macro Regime Infrastructure (2026-03-03)
+**Next milestone:** TBD -- run `/gsd:new-milestone` to plan next version
 
-**Target features:**
-- Derived FRED series computation (9 series: rate spreads, VIX regime, liquidity proxy, etc.)
-- Macro feature store (rate level, yield curve slope, carry spread, dollar strength, etc.)
-- Macro regime labeler (monetary policy regime, carry trade regime, VIX regime)
-- Macro regime table + wiring into tighten-only resolver chain
-- Cross-asset regime aggregation (market consensus from per-asset L2 labels)
-- Risk gate integration (FOMC gate, VIX gate, carry unwind gate, data freshness gate)
+**v1.0.1 delivered:** FRED macro data pipeline (39 series, 208K rows) wired into regime/risk infrastructure -- 4-dimensional macro regime classifier, tighten-only L4 resolver, event risk gates (FOMC/CPI/NFP/VIX/carry/credit), cross-asset aggregation, and full observability (dashboard, Telegram alerts, drift attribution). 10 phases, 29 plans, 55/55 requirements.
 
-**Previous:** v1.0.0 SHIPPED 2026-03-01 (22 phases, 104 plans, 80/80 requirements)
+**v1.0.0 delivered:** Full V1 loop -- strategy bake-off, paper-trade executor, risk controls, drift guard, all research tracks answered, feature evaluation across 109 TFs, advanced ML infrastructure, operational dashboard, and V1 Results Memo. 22 phases, 104 plans, 80/80 requirements.
 
-**v1.0.0 delivered:** Full V1 loop — strategy bake-off, paper-trade executor, risk controls, drift guard, all research tracks answered, feature evaluation across 109 TFs, advanced ML infrastructure, operational dashboard, and V1 Results Memo.
-
-**Shipped features:**
-- Strategy Selection: IC/PSR/CV evaluation, 2 strategies selected, walk-forward backtests (Sharpe >= 1.0, Max DD <= 15%)
-- Exchange Integration: Coinbase + Kraken APIs, paper order adapter, order & fill store with full audit trail
-- Paper-Trade Executor: Signal -> order -> fill -> position pipeline, backtest parity verification
-- Risk Controls: Kill switch, position caps, daily loss stops, circuit breaker, VaR simulation, tail-risk policy
-- Drift Guard: Parallel backtest vs paper comparison, auto-pause on divergence, DriftMonitor metrics
-- Feature & Signal Evaluation: IC sweep across 109 TFs (82K+ rows), 107 features promoted, adaptive RSI A/B
-- Advanced ML: Factor analytics, triple barrier labeling, purged CPCV, portfolio construction, microstructural features, expression engine, Optuna
-- Operational Dashboard: Live PnL, exposure, drawdown, drift, risk status; Telegram notifications
-- V1 Validation: Success criteria framework, V1 Results Memo
-
-**Stats:** 22 phases, 104 plans, 274 files, ~77K lines, 80/80 requirements satisfied
+**Cumulative stats:** 73 phases, 337 plans, 434+ files, ~113K lines
 
 ## Requirements
 
@@ -66,6 +48,28 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 - ✓ Cost optimization tiers (free CLI → subscriptions → paid API) — existing
 - ✓ Adapter architecture (Claude/ChatGPT/Gemini) — existing
 - ✓ Quota tracking design — existing
+
+### Complete (v1.0.1 Milestone)
+
+**Macro Regime Infrastructure** ✓
+- ✓ FRED macro feature store: 39 series forward-filled to daily, 50+ derived columns (rate spreads, VIX, carry, credit, fed regime, net liquidity) -- v1.0.1
+- ✓ 4-dimensional macro regime classifier (monetary policy, liquidity, risk appetite, carry) with hysteresis and YAML config -- v1.0.1
+- ✓ HMM secondary classifier, lead-lag analysis, regime transition probability matrix -- v1.0.1
+- ✓ L4 tighten-only resolver: macro regime conditions all position sizing, never loosens -- v1.0.1
+- ✓ Event risk gates: FOMC/CPI/NFP calendar, VIX spike, carry unwind, credit stress, composite stress score -- v1.0.1
+- ✓ Cross-asset aggregation: BTC/ETH correlation, funding rate z-score, crypto-macro correlation regime -- v1.0.1
+- ✓ Macro observability: dashboard, Telegram alerts, FRED freshness, drift attribution, regime timeline chart -- v1.0.1
+- ✓ MCP memory server: Qdrant semantic search accessible from Claude Code sessions -- v1.0.1
+
+### Complete (v1.0.0 Milestone)
+
+**Paper Trading & Validation** ✓
+- ✓ Strategy bake-off with IC/PSR/CV evaluation, 2 strategies selected -- v1.0.0
+- ✓ Paper-trade executor: signal -> order -> fill -> position pipeline with backtest parity -- v1.0.0
+- ✓ Risk controls: kill switch, position caps, daily loss stops, circuit breaker, VaR, tail-risk policy -- v1.0.0
+- ✓ Drift guard: parallel backtest vs paper comparison, auto-pause on divergence -- v1.0.0
+- ✓ Advanced ML: factor analytics, triple barrier, purged CPCV, portfolio construction, expression engine, Optuna -- v1.0.0
+- ✓ Operational dashboard: live PnL, exposure, drawdown, drift, risk status; Telegram notifications -- v1.0.0
 
 ### Complete (v0.9.0 Milestone)
 
@@ -199,4 +203,4 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 | Backtest/live parity as success criterion | System is only trustworthy if backtests use identical logic to live trading - reproducibility is mandatory | Validated — PaperExecutor verifies backtest parity |
 
 ---
-*Last updated: 2026-03-01 after v1.0.0 milestone shipped*
+*Last updated: 2026-03-03 after v1.0.1 milestone shipped*

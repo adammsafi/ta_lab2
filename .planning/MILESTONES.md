@@ -1,5 +1,31 @@
 # Project Milestones: ta_lab2 AI-Accelerated Quant Platform
 
+## v1.0.1 Macro Regime Infrastructure (Shipped: 2026-03-03)
+
+**Delivered:** FRED macro data pipeline (39 series, 208K rows) wired into regime/risk infrastructure -- 4-dimensional macro regime classifier, tighten-only L4 resolver integration, event risk gates (FOMC/CPI/NFP/VIX/carry/credit), cross-asset aggregation, and full observability (dashboard, Telegram alerts, drift attribution).
+
+**Phases completed:** 64-73 (29 plans total)
+
+**Key accomplishments:**
+- FRED macro feature store: 39 series forward-filled to daily cadence with 50+ derived columns (rate spreads, VIX regime, carry trade, credit stress, fed regime, net liquidity)
+- 4-dimensional macro regime classifier (monetary policy, liquidity, risk appetite, carry) with hysteresis and YAML-configurable thresholds
+- HMM secondary classifier, macro-crypto lead-lag analysis, and regime transition probability matrix
+- L4 tighten-only resolver integration: macro regime conditions all position sizing without ever loosening constraints
+- Event risk gates: FOMC/CPI/NFP calendar gates, VIX spike gate, carry unwind velocity gate, credit stress gate, composite macro stress score (0-100)
+- Full observability: macro dashboard page, regime timeline chart, FRED freshness monitoring, Telegram regime transition alerts, macro drift attribution
+
+**Stats:**
+- 160 files created/modified
+- ~36,271 lines added
+- 10 phases, 29 plans
+- 2 days (2026-03-02 -> 2026-03-03)
+
+**Git range:** `docs: complete v1.0.1 macro regime infrastructure research` -> `docs(audit): v1.0.1 re-audit passed`
+
+**What's next:** TBD -- live trading deployment, multi-asset expansion, or advanced ML models
+
+---
+
 ## v1.0.0 V1 Closure: Paper Trading & Validation (Shipped: 2026-03-01)
 
 **Delivered:** Full V1 loop from strategy selection through paper trading, risk controls, drift guard, feature evaluation across 109 TFs, advanced ML infrastructure, and operational dashboard — closing all 6 research tracks with validated results.
