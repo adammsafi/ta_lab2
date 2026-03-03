@@ -9,7 +9,7 @@
 - v0.8.0 Polish & Hardening (Phases 29-34) - SHIPPED 2026-02-23
 - v0.9.0 Research & Experimentation (Phases 35-41) - SHIPPED 2026-02-24
 - v1.0.0 V1 Closure — Paper Trading & Validation (Phases 42-63) - SHIPPED 2026-03-01
-- v1.0.1 Macro Regime Infrastructure (Phases 64-72) - COMPLETE 2026-03-03
+- v1.0.1 Macro Regime Infrastructure (Phases 64-73) - IN PROGRESS
 
 ## Overview
 
@@ -1319,6 +1319,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 - [x] **Phase 70: Cross-Asset Aggregation** - BTC/ETH correlation features, aggregate funding rate, and crypto-macro correlation regime — COMPLETE 2026-03-03
 - [x] **Phase 71: Event Risk Gates** - FOMC/CPI/NFP event calendar, VIX spike gate, carry unwind gate, credit stress gate, composite stress score — COMPLETE 2026-03-03
 - [x] **Phase 72: Macro Observability** - Dashboard display, Telegram alerts, FRED freshness monitoring, drift attribution, regime timeline — COMPLETE 2026-03-03
+- [ ] **Phase 73: Macro Gate & Alert Wiring** - Gap closure: inject MacroGateEvaluator into PaperExecutor, wire gates and alerts into daily pipeline
 
 ### Phase 64: MCP Memory Server -- Connect Qdrant to Claude Code
 
@@ -1486,6 +1487,18 @@ Plans:
 - [x] 72-03-PLAN.md -- Macro dashboard page (10_macro.py) + app.py registration + Pipeline Monitor FRED freshness
 - [x] 72-04-PLAN.md -- DriftAttributor macro regime Step 7 + DriftMonitor wiring + dashboard attribution display
 
+### Phase 73: Macro Gate & Alert Wiring
+
+**Goal:** Close 3 integration gaps found by milestone audit: inject MacroGateEvaluator into PaperExecutor so Gate 1.7 activates, add evaluate_macro_gates and run_macro_alerts to run_daily_refresh.py, and fix requirements checkbox formatting.
+**Depends on:** Phase 71 (event risk gates), Phase 72 (macro alerts)
+**Gap Closure:** Closes all 3 gaps from v1.0.1-MILESTONE-AUDIT.md
+**Success Criteria** (what must be TRUE):
+  1. PaperExecutor constructs RiskEngine with MacroGateEvaluator — Gate 1.7 is live
+  2. run_daily_refresh.py --all runs evaluate_macro_gates after regime refresh
+  3. run_daily_refresh.py --all runs run_macro_alerts after regime refresh
+  4. FOMC event gate actually reduces buy order qty during +-24h window (E2E Flow 2 works)
+**Plans:** TBD
+
 ### v1.0.1 Progress
 
 | Phase | Plans Complete | Status | Completed |
@@ -1499,6 +1512,7 @@ Plans:
 | 70. Cross-Asset Aggregation | 3/3 | Complete | 2026-03-03 |
 | 71. Event Risk Gates | 3/3 | Complete | 2026-03-03 |
 | 72. Macro Observability | 4/4 | Complete | 2026-03-03 |
+| 73. Macro Gate & Alert Wiring | 0/? | Gap closure | - |
 
 ### v1.0.1 Requirements (55 total)
 
