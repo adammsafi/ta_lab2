@@ -91,6 +91,9 @@ TIMEOUT_MACRO = 300  # 5 minutes -- small FRED dataset, fast computation
 TIMEOUT_MACRO_REGIMES = (
     300  # 5 minutes -- 4-dimension classification over FRED features
 )
+TIMEOUT_MACRO_ANALYTICS = (
+    900  # 15 minutes -- HMM fitting can be slow (10 restarts x 2-3 state models)
+)
 
 
 @dataclass
@@ -1861,6 +1864,115 @@ def run_macro_regimes(args) -> ComponentResult:
         )
 
 
+def run_macro_analytics(args) -> ComponentResult:
+    """Run macro analytics (HMM, lead-lag, transition probs) via subprocess.
+
+    Runs after macro regimes and before per-asset regime refresh.
+    Produces secondary analytical signals in cmc_hmm_regimes,
+    cmc_macro_lead_lag_results, and cmc_macro_transition_probs.
+
+    Pipeline ordering: macro_features -> macro_regimes -> macro_analytics -> regimes
+
+    Args:
+        args: CLI arguments
+
+    Returns:
+        ComponentResult with execution details
+    """
+    cmd = [
+        sys.executable,
+        "-m",
+        "ta_lab2.scripts.macro.refresh_macro_analytics",
+    ]
+
+    if getattr(args, "dry_run", False):
+        cmd.append("--dry-run")
+    if getattr(args, "verbose", False):
+        cmd.append("--verbose")
+
+    print(f"\n{'=' * 70}")
+    print("RUNNING MACRO ANALYTICS (HMM + Lead-Lag + Transitions)")
+    print(f"{'=' * 70}")
+    print(f"Command: {' '.join(cmd)}")
+
+    if args.dry_run:
+        print("[DRY RUN] Would execute macro analytics")
+        return ComponentResult(
+            component="macro_analytics",
+            success=True,
+            duration_sec=0.0,
+            returncode=0,
+        )
+
+    start = time.perf_counter()
+
+    try:
+        if args.verbose:
+            # Stream output
+            result = subprocess.run(cmd, check=False, timeout=TIMEOUT_MACRO_ANALYTICS)
+        else:
+            # Capture output
+            result = subprocess.run(
+                cmd,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=TIMEOUT_MACRO_ANALYTICS,
+            )
+
+            # Show output on error
+            if result.returncode != 0:
+                print(f"\n[ERROR] Macro analytics failed with code {result.returncode}")
+                if result.stdout:
+                    print(f"\nSTDOUT:\n{result.stdout}")
+                if result.stderr:
+                    print(f"\nSTDERR:\n{result.stderr}")
+
+        duration = time.perf_counter() - start
+
+        if result.returncode == 0:
+            print(f"\n[OK] Macro analytics completed successfully in {duration:.1f}s")
+            return ComponentResult(
+                component="macro_analytics",
+                success=True,
+                duration_sec=duration,
+                returncode=result.returncode,
+            )
+        else:
+            error_msg = f"Exited with code {result.returncode}"
+            print(f"\n[FAILED] Macro analytics failed: {error_msg}")
+            return ComponentResult(
+                component="macro_analytics",
+                success=False,
+                duration_sec=duration,
+                returncode=result.returncode,
+                error_message=error_msg,
+            )
+
+    except subprocess.TimeoutExpired:
+        duration = time.perf_counter() - start
+        error_msg = f"Timed out after {TIMEOUT_MACRO_ANALYTICS}s"
+        print(f"\n[TIMEOUT] Macro analytics: {error_msg}")
+        return ComponentResult(
+            component="macro_analytics",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+    except Exception as e:
+        duration = time.perf_counter() - start
+        error_msg = str(e)
+        print(f"\n[ERROR] Macro analytics raised exception: {error_msg}")
+        return ComponentResult(
+            component="macro_analytics",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+
+
 def main(argv: list[str] | None = None) -> int:
     """Main entry point."""
     p = argparse.ArgumentParser(
@@ -1967,6 +2079,19 @@ Examples:
         type=str,
         default=None,
         help="Override macro regime YAML profile (default/conservative/aggressive)",
+    )
+    p.add_argument(
+        "--macro-analytics",
+        action="store_true",
+        help=(
+            "Run macro analytics only (HMM classifier, lead-lag analysis, "
+            "transition probabilities -- Phase 68)"
+        ),
+    )
+    p.add_argument(
+        "--no-macro-analytics",
+        action="store_true",
+        help="Skip macro analytics stage in --all mode",
     )
     p.add_argument(
         "--regimes",
@@ -2157,6 +2282,7 @@ Examples:
         or args.desc_stats
         or args.macro
         or args.macro_regimes
+        or args.macro_analytics
         or args.regimes
         or args.features
         or args.signals
@@ -2168,8 +2294,8 @@ Examples:
     ):
         p.error(
             "Must specify --bars, --emas, --amas, --desc-stats, --macro, --macro-regimes, "
-            "--regimes, --features, --signals, --portfolio, --execute, --drift, --stats, "
-            "--all, --weekly-digest, or --exchange-prices"
+            "--macro-analytics, --regimes, --features, --signals, --portfolio, --execute, "
+            "--drift, --stats, --all, --weekly-digest, or --exchange-prices"
         )
 
     # Resolve database URL
@@ -2213,6 +2339,9 @@ Examples:
     run_macro_regimes_flag = (args.macro_regimes or args.all) and not getattr(
         args, "no_macro_regimes", False
     )
+    run_macro_analytics_flag = (args.macro_analytics or args.all) and not getattr(
+        args, "no_macro_analytics", False
+    )
     run_regimes = args.regimes or args.all
     run_features = (args.features or args.all) and not getattr(
         args, "no_features", False
@@ -2239,6 +2368,8 @@ Examples:
         components.append("macro_features")
     if run_macro_regimes_flag:
         components.append("macro_regimes")
+    if run_macro_analytics_flag:
+        components.append("macro_analytics")
     if run_regimes:
         components.append("regimes")
     if run_features:
@@ -2362,6 +2493,17 @@ Examples:
 
         if not macro_regimes_result.success and not args.continue_on_error:
             print("\n[STOPPED] Macro regime classification failed, stopping execution")
+            print("(Use --continue-on-error to run remaining components)")
+            return 1
+
+    # Run macro analytics if requested (after macro_regimes, before per-asset regimes)
+    # Pipeline ordering: macro_features -> macro_regimes -> macro_analytics -> regimes (MREG-12)
+    if run_macro_analytics_flag:
+        macro_analytics_result = run_macro_analytics(args)
+        results.append(("macro_analytics", macro_analytics_result))
+
+        if not macro_analytics_result.success and not args.continue_on_error:
+            print("\n[STOPPED] Macro analytics failed, stopping execution")
             print("(Use --continue-on-error to run remaining components)")
             return 1
 
