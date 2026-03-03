@@ -1,0 +1,41 @@
+# Cross-Asset Aggregation Configuration
+# Phase 70: All thresholds for cross-asset signal computation.
+# Changing any threshold here changes behavior without code changes (XAGG).
+
+cross_asset:
+  btc_eth_corr_window: 30       # Rolling window (calendar days) for BTC/ETH correlation
+  avg_pairwise_corr_window: 30  # Rolling window for average pairwise correlation
+  high_corr_threshold: 0.7      # Above this = macro-driven market (XAGG-02)
+  min_assets_for_avg: 3         # Minimum assets with data to compute avg pairwise corr
+
+crypto_macro:
+  corr_window: 60               # Rolling window (calendar days) for crypto-macro correlation
+  sign_flip_threshold: 0.3      # Magnitude threshold: >0.3 to <-0.3 (or vice versa) = sign flip
+  macro_vars:                   # Macro variables for correlation (from fred.fred_macro_features)
+    - vix                       # Maps to vixcls column
+    - dxy                       # Maps to dtwexbgs column
+    - hy_oas                    # Maps to bamlh0a0hym2 column
+    - net_liquidity             # Maps to net_liquidity column
+  # Column mapping: macro_var label -> fred_macro_features column name
+  macro_var_columns:
+    vix: vixcls
+    dxy: dtwexbgs
+    hy_oas: bamlh0a0hym2
+    net_liquidity: net_liquidity
+
+funding_agg:
+  zscore_windows: [30, 90]      # Rolling windows for z-score computation
+  venues:                       # Venues to include in aggregate
+    - binance
+    - hyperliquid
+    - bybit
+    - dydx
+    - aevo
+    - aster
+
+portfolio_override:
+  high_corr_blend_factor: 0.3   # When high_corr_flag=True, blend covariance toward 1.0 by this factor
+  enabled: true                 # Master switch for portfolio covariance override
+
+telegram:
+  sign_flip_alerts: true        # Send Telegram alert on crypto-macro sign flip
