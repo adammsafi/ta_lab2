@@ -1404,8 +1404,8 @@ Plans:
 **Depends on:** Phase 67 (macro regime labels and features must exist)
 **Requirements:** MREG-10, MREG-11, MREG-12
 **Success Criteria** (what must be TRUE):
-  1. A 2-3 state GaussianHMM trained on net liquidity + VIX + HY OAS produces state labels that can be compared against rule-based regime labels as a confirmation signal
-  2. Lead-lag analysis using existing lead_lag_max_corr() pattern quantifies the predictive lag of each macro feature on BTC/ETH returns at lags [-20..+20] days
+  1. A 2-3 state GaussianHMM trained on all available FRED macro features (default covariance_type="diag" for stability) produces state labels that can be compared against rule-based regime labels as a confirmation signal
+  2. Lead-lag analysis using existing lead_lag_max_corr() pattern quantifies the predictive lag of each macro feature on BTC/ETH returns at lags [-60..+60] days
   3. Regime transition probability matrix is computed from historical macro regime sequences and queryable for any regime-to-regime pair
 **Plans:** 3 plans
 

@@ -36,8 +36,8 @@
 - [ ] **MREG-07**: Hysteresis applied via existing `HysteresisTracker` with `min_bars_hold` appropriate for macro stickiness (≥5 bars)
 - [ ] **MREG-08**: YAML-configurable thresholds for all regime dimension boundaries (not hardcoded)
 - [ ] **MREG-09**: Macro regime refresh runs daily after macro feature computation, before signal generation
-- [ ] **MREG-10**: HMM secondary classifier (2-3 state GaussianHMM on net liquidity + VIX + HY OAS) as optional confirmation signal alongside rule-based labels
-- [ ] **MREG-11**: Macro-crypto lead-lag analysis using existing `lead_lag_max_corr()` pattern to quantify macro feature predictive power at lags [-20..+20] days
+- [ ] **MREG-10**: HMM secondary classifier (2-3 state GaussianHMM on all available FRED macro features, covariance_type="diag" default) as optional confirmation signal alongside rule-based labels
+- [ ] **MREG-11**: Macro-crypto lead-lag analysis using existing `lead_lag_max_corr()` pattern to quantify macro feature predictive power at lags [-60..+60] days
 - [ ] **MREG-12**: Regime transition probability matrix from historical macro regime sequences
 
 ### Macro-Asset Integration (MINT)
