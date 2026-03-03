@@ -1428,7 +1428,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 69 to break down)
+- [ ] 69-01-PLAN.md -- Resolver fnmatch extension + L4 macro policy entries + YAML overlay
+- [ ] 69-02-PLAN.md -- Regime refresh L4 injection + staleness check + Alembic migration
+- [ ] 69-03-PLAN.md -- Executor L4 logging + gross_cap scaling + audit trail
 
 ### Phase 70: Cross-Asset Aggregation
 
@@ -1486,7 +1488,7 @@ Plans:
 | 66. FRED Derived Features & Automation | 3/3 | Complete | 2026-03-03 |
 | 67. Macro Regime Classifier | 0/? | Not started | - |
 | 68. HMM & Macro Analytics | 0/? | Not started | - |
-| 69. L4 Resolver Integration | 0/? | Not started | - |
+| 69. L4 Resolver Integration | 0/3 | Planned | - |
 | 70. Cross-Asset Aggregation | 0/? | Not started | - |
 | 71. Event Risk Gates | 0/? | Not started | - |
 | 72. Macro Observability | 0/? | Not started | - |
