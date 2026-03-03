@@ -43,6 +43,7 @@ from ta_lab2.regimes.labels import (
     label_layer_monthly,
     label_layer_weekly,
 )
+from ta_lab2.notifications.telegram import send_critical_alert
 from ta_lab2.regimes.policy_loader import load_policy_table
 from ta_lab2.regimes.proxies import (
     ProxyInputs,
@@ -72,6 +73,12 @@ _REGIME_CODE_VERSION = "v0.7.0"
 
 # BTC asset ID used as broad market proxy for young assets
 _MARKET_PROXY_ID = 1
+
+# Maximum age (in days) for a macro regime row before L4 is disabled
+_L4_STALENESS_DAYS = 7
+
+# Default macro regime profile to query
+_L4_MACRO_PROFILE = "default"
 
 
 # ---------------------------------------------------------------------------
@@ -186,6 +193,107 @@ def _load_sadf_flags(engine: Engine, asset_id: int) -> pd.Series:
         return pd.Series(dtype=bool)
 
 
+def _try_telegram_alert(error_type: str, message: str) -> None:
+    """
+    Attempt to send a Telegram critical alert, suppressing any errors.
+
+    Alerting failure must never crash the regime refresh pipeline.
+    """
+    try:
+        send_critical_alert(error_type, message)
+    except Exception as exc:
+        logger.debug("Telegram alert failed (non-critical): %s", exc)
+
+
+def _load_macro_regime_with_staleness_check(
+    engine: Engine,
+    profile: str = _L4_MACRO_PROFILE,
+) -> Optional[str]:
+    """
+    Load the latest macro regime key from cmc_macro_regimes and validate freshness.
+
+    Returns the regime_key string if available and fresh, or None if L4 should
+    be disabled. None is returned (with Telegram alert) when:
+    - cmc_macro_regimes does not exist (Phase 67 not yet applied)
+    - Table is empty (no macro regime computed yet)
+    - Latest row is older than _L4_STALENESS_DAYS days
+
+    Args:
+        engine:  SQLAlchemy engine connected to PostgreSQL.
+        profile: Macro regime profile to query (default: 'default').
+
+    Returns:
+        regime_key string, or None if L4 should be disabled.
+    """
+    from datetime import date
+
+    query = text(
+        "SELECT regime_key, date FROM public.cmc_macro_regimes "
+        "WHERE profile = :profile ORDER BY date DESC LIMIT 1"
+    )
+
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(query, {"profile": profile})
+            row = result.fetchone()
+    except Exception as exc:
+        # Catches UndefinedTable (Phase 67 not applied) and connection errors
+        logger.warning(
+            "_load_macro_regime_with_staleness_check: query failed (%s) -- L4 disabled",
+            exc,
+        )
+        _try_telegram_alert(
+            "regime_refresh",
+            f"L4 macro regime disabled: cmc_macro_regimes not available ({exc}). "
+            "Phase 67 may not be applied. L4 will be skipped for this run.",
+        )
+        return None
+
+    if row is None:
+        logger.warning(
+            "_load_macro_regime_with_staleness_check: cmc_macro_regimes is empty -- "
+            "L4 disabled (profile=%s)",
+            profile,
+        )
+        _try_telegram_alert(
+            "regime_refresh",
+            f"L4 macro regime disabled: cmc_macro_regimes is empty (profile={profile}). "
+            "Run the macro regime classifier to populate data.",
+        )
+        return None
+
+    regime_key, regime_date = row[0], row[1]
+
+    # Normalise regime_date to a date object for staleness arithmetic
+    if hasattr(regime_date, "date"):
+        regime_date = regime_date.date()
+
+    staleness_days = (date.today() - regime_date).days
+    if staleness_days > _L4_STALENESS_DAYS:
+        logger.warning(
+            "_load_macro_regime_with_staleness_check: macro regime is stale "
+            "(%d days old, limit=%d) -- L4 disabled",
+            staleness_days,
+            _L4_STALENESS_DAYS,
+        )
+        _try_telegram_alert(
+            "regime_refresh",
+            f"L4 macro regime disabled: latest row is {staleness_days} days old "
+            f"(limit={_L4_STALENESS_DAYS}d, profile={profile}, key={regime_key}). "
+            "Re-run macro classifier to refresh.",
+        )
+        return None
+
+    logger.info(
+        "_load_macro_regime_with_staleness_check: L4 regime_key=%r "
+        "(date=%s, staleness=%d days)",
+        regime_key,
+        regime_date,
+        staleness_days,
+    )
+    return str(regime_key)
+
+
 # ---------------------------------------------------------------------------
 # Core computation
 # ---------------------------------------------------------------------------
@@ -198,6 +306,7 @@ def compute_regimes_for_id(
     cal_scheme: str = "iso",
     min_bars_overrides: Optional[Dict[str, int]] = None,
     hysteresis_tracker: Optional[HysteresisTracker] = None,
+    l4_label: Optional[str] = None,
 ) -> pd.DataFrame:
     """
     Compute regime labels and resolved policy for a single asset.
@@ -221,6 +330,9 @@ def compute_regimes_for_id(
                              transitions. If provided, per-layer hysteresis is
                              applied before policy resolution. Pass None to
                              skip hysteresis (raw labels used directly).
+        l4_label:            Optional macro regime composite key (L4 layer).
+                             When provided, passed to resolve_policy_from_table
+                             so L4 overlay rules are applied. None disables L4.
 
     Returns:
         DataFrame with columns matching cmc_regimes schema, one row per
@@ -450,7 +562,7 @@ def compute_regimes_for_id(
             L1=l1_val,
             L2=l2_val,
             L3=None,
-            L4=None,
+            L4=l4_label,
         )
 
         # Apply proxy tightening (proxies can only reduce, never increase)
@@ -484,7 +596,7 @@ def compute_regimes_for_id(
                 "l1_label": l1_val,
                 "l2_label": l2_val,
                 "l3_label": None,
-                "l4_label": None,
+                "l4_label": l4_label,
                 "regime_key": regime_key,
                 "size_mult": policy.size_mult,
                 "stop_mult": policy.stop_mult,
@@ -840,6 +952,17 @@ def main(argv: Optional[list[str]] = None) -> int:
         min_bars_overrides["L2"] = args.min_bars_l2
 
     # ------------------------------------------------------------------
+    # Load macro regime (L4) -- once before the per-asset loop
+    # The macro regime is global (same for all assets). Missing table,
+    # empty data, or staleness disables L4 with a Telegram alert.
+    # ------------------------------------------------------------------
+    l4_label = _load_macro_regime_with_staleness_check(engine)
+    if l4_label is not None:
+        logger.info("L4 macro regime active: %r", l4_label)
+    else:
+        logger.info("L4 macro regime: disabled (missing, empty, or stale)")
+
+    # ------------------------------------------------------------------
     # Per-asset processing
     # ------------------------------------------------------------------
     t0 = time.perf_counter()
@@ -862,6 +985,7 @@ def main(argv: Optional[list[str]] = None) -> int:
                 cal_scheme=args.cal_scheme,
                 min_bars_overrides=min_bars_overrides if min_bars_overrides else None,
                 hysteresis_tracker=hysteresis_tracker,
+                l4_label=l4_label,
             )
 
             if regime_df.empty:
