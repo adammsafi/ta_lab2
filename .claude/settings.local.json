@@ -30,7 +30,18 @@
       "Bash(git tag:*)",
       "Bash(sort:*)",
       "Bash(grep:*)",
-      "Bash(TMPFILE=\"C:/Users/asafi/AppData/Local/Temp/conv_memories.json\")"
+      "Bash(TMPFILE=\"C:/Users/asafi/AppData/Local/Temp/conv_memories.json\")",
+      "Bash(ssh:*)",
+      "Bash(\"C:/Program Files/PostgreSQL/17/bin/psql.exe\":*)",
+      "Bash(PGPASSWORD=3400 \"/c/Program Files/PostgreSQL/18/bin/psql.exe\":*)",
+      "mcp__ta-lab2-memory__memory_store",
+      "mcp__ta-lab2-memory__memory_stats",
+      "Bash(grep ^[+-]:*)",
+      "Bash(python3:*)",
+      "Bash(/c/Users/asafi/AppData/Local/Microsoft/WindowsApps/python3.exe:*)"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "ta-lab2-memory"
+  ]
 }
