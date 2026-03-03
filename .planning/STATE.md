@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: 71 of 72 -- Event Risk Gates (v1.0.1 Macro Regime Infrastructure) COMPLETE
-Plan: 03 of 3 (71-03: RiskEngine Wiring + CLI) COMPLETE
-Status: Phase 71 COMPLETE -- All 3 plans done; Gate 1.7 wired into RiskEngine, evaluate_macro_gates.py + macro_gate_cli.py created
-Last activity: 2026-03-03 -- Completed 71-03-PLAN.md (Gate 1.7 RiskEngine wiring + CLI scripts)
+Phase: 72 of 72 -- Macro Observability (v1.0.1 Macro Regime Infrastructure) In progress
+Plan: 02 of 4 (72-02: Macro Alert Notifications) COMPLETE
+Status: Phase 72 In Progress -- Plan 02 done; MacroAlertManager + run_macro_alerts CLI created
+Last activity: 2026-03-03 -- Completed 72-02-PLAN.md (MacroAlertManager throttled Telegram alerting + CLI script)
 
 ### Roadmap Evolution
 - Phase 64 added: MCP Memory Server -- Connect Qdrant to Claude Code
 - Phases 65-72 added: Macro Regime Infrastructure (FRED pipeline, classifier, L4 integration, risk gates, observability)
 - v1.0.1 roadmap: 9 phases, 55 requirements mapped across 8 requirement categories
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [████████] Phase 60 COMPLETE (8 plans) | [██] Phase 61 COMPLETE | [██] Phase 62 COMPLETE | [██] Phase 63 COMPLETE | [███] Phase 64 COMPLETE | [███] Phase 65 COMPLETE | [███] Phase 66 COMPLETE | [███] Phase 67 COMPLETE | [███] Phase 68 COMPLETE | [███] Phase 69 COMPLETE (3/3 plans) | [███] Phase 70 COMPLETE (3/3 plans) | [███] Phase 71 COMPLETE (3/3 plans)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [████████] Phase 60 COMPLETE (8 plans) | [██] Phase 61 COMPLETE | [██] Phase 62 COMPLETE | [██] Phase 63 COMPLETE | [███] Phase 64 COMPLETE | [███] Phase 65 COMPLETE | [███] Phase 66 COMPLETE | [███] Phase 67 COMPLETE | [███] Phase 68 COMPLETE | [███] Phase 69 COMPLETE (3/3 plans) | [███] Phase 70 COMPLETE (3/3 plans) | [███] Phase 71 COMPLETE (3/3 plans) | [██░░] Phase 72 In Progress (2/4 plans)
 
 ## Performance Metrics
 
@@ -658,8 +658,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-03T16:26:38Z
-Stopped at: Completed 71-02-PLAN.md -- Phase 71 Plan 02: MacroGateEvaluator + GateOverrideManager
+Last session: 2026-03-03T17:02:36Z
+Stopped at: Completed 72-02-PLAN.md -- Phase 72 Plan 02: MacroAlertManager throttled Telegram alerting + run_macro_alerts CLI
 Resume file: None
 
 ---
