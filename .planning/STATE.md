@@ -9,22 +9,22 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: 66 of 72 -- FRED Derived Features & Automation (v1.0.1 Macro Regime Infrastructure)
-Plan: 02 of 3 (66-02: Feature Computation Logic) COMPLETE
-Status: In progress -- compute_derived_features_66() produces 18 derived columns, pipeline outputs 50 columns end-to-end
-Last activity: 2026-03-03 -- Completed 66-02-PLAN.md (compute_derived_features_66, _compute_fed_regime, _rolling_zscore, _RENAME_MAP 11->18, db_columns whitelist extended)
+Phase: 66 of 72 -- FRED Derived Features & Automation (v1.0.1 Macro Regime Infrastructure) COMPLETE
+Plan: 03 of 3 (66-03: Automation & E2E Verification) COMPLETE
+Status: Phase 66 complete -- all FRED-03 through FRED-17 requirements verified, 52-column table with 9558 rows
+Last activity: 2026-03-03 -- Completed 66-03-PLAN.md (WARMUP_DAYS=400, structured summary log, E2E database verification)
 
 ### Roadmap Evolution
 - Phase 64 added: MCP Memory Server -- Connect Qdrant to Claude Code
 - Phases 65-72 added: Macro Regime Infrastructure (FRED pipeline, classifier, L4 integration, risk gates, observability)
 - v1.0.1 roadmap: 9 phases, 55 requirements mapped across 8 requirement categories
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [████████] Phase 60 COMPLETE (8 plans) | [██] Phase 61 COMPLETE | [██] Phase 62 COMPLETE | [██] Phase 63 COMPLETE | [███] Phase 64 COMPLETE | [███] Phase 65 COMPLETE | [██] Phase 66 (2/3)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [████████] Phase 60 COMPLETE (8 plans) | [██] Phase 61 COMPLETE | [██] Phase 62 COMPLETE | [██] Phase 63 COMPLETE | [███] Phase 64 COMPLETE | [███] Phase 65 COMPLETE | [███] Phase 66 COMPLETE
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 313 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 6 in Phase 43, 3 in Phase 44, 7 in Phase 45, 4 in Phase 46, 5 in Phase 47, 4 in Phase 48, 4 in Phase 49, 2 in Phase 50, 5 in Phase 51, 4 in Phase 52, 4 in Phase 53, 3 in Phase 54, 5 in Phase 55, 7 in Phase 56, 6 in Phase 57, 7 in Phase 58, 5 in Phase 59, 8 in Phase 60, 2 in Phase 61, 2 in Phase 62, 2 in Phase 63, 3 in Phase 65)
+- Total plans completed: 316 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 6 in Phase 43, 3 in Phase 44, 7 in Phase 45, 4 in Phase 46, 5 in Phase 47, 4 in Phase 48, 4 in Phase 49, 2 in Phase 50, 5 in Phase 51, 4 in Phase 52, 4 in Phase 53, 3 in Phase 54, 5 in Phase 55, 7 in Phase 56, 6 in Phase 57, 7 in Phase 58, 5 in Phase 59, 8 in Phase 60, 2 in Phase 61, 2 in Phase 62, 2 in Phase 63, 3 in Phase 65, 3 in Phase 66)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -118,7 +118,8 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
-- **WARMUP_DAYS=60 for macro watermark** (Phase 65-02): Covers 45-day monthly ffill limit + 20-day rolling window; on incremental runs recompute starts 60 days before watermark to ensure boundary correctness
+- **WARMUP_DAYS=400 for macro watermark** (Phase 66-03): Increased from 60 to 400; covers 365-day rolling z-score (FRED-12) + 35d margin for forward-fill propagation; on incremental runs recompute starts 400 days before watermark to ensure z-score boundary correctness
+- **Structured summary log for macro features** (Phase 66-03): _FEATURE_GROUPS constant maps 13 feature groups (FRED-03 through FRED-15) to column lists; _print_feature_summary() prints [OK]/[PARTIAL] status per group plus staleness warnings for 4 canary columns
 - **run_macro_features(args) no db_url param** (Phase 65-02): Macro refresh derives its own engine via get_engine() unlike other stage functions that pass db_url to subprocess; macro has no per-asset ID filtering requirement
 - **Macro pipeline position: after desc_stats, before regimes** (Phase 65-02): FRED data is independent of bars/EMAs; must precede Phase 67 macro regime classifier (L4); placement chosen for correct sequencing
 - **TIMEOUT_MACRO=300s** (Phase 65-02): Small FRED dataset (~26 years x 11 series ~9500 rows) computes in seconds; 5 min is conservative upper bound
@@ -621,8 +622,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-03T04:15:07Z
-Stopped at: Completed 66-01-PLAN.md -- Alembic migration c4d5e6f7a8b9 (25 new columns), SERIES_TO_LOAD 18 series, FFILL_LIMITS 18 entries
+Last session: 2026-03-03T04:32:25Z
+Stopped at: Completed 66-03-PLAN.md -- Phase 66 complete (WARMUP_DAYS=400, structured summary log, all 25 Phase 66 columns verified in DB)
 Resume file: None
 
 ---
