@@ -1312,7 +1312,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 
 - [x] **Phase 64: MCP Memory Server** - Connect Qdrant to Claude Code via MCP server -- COMPLETE 2026-03-02
 - [x] **Phase 65: FRED Table & Core Features** - Macro feature table with daily alignment, rate spreads, yield curve, VIX, and dollar strength
-- [ ] **Phase 66: FRED Derived Features & Automation** - Credit stress, financial conditions, carry trade, fed regime, CPI proxy, and daily refresh wiring
+- [x] **Phase 66: FRED Derived Features & Automation** - Credit stress, financial conditions, carry trade, fed regime, CPI proxy, and daily refresh wiring
 - [ ] **Phase 67: Macro Regime Classifier** - Rule-based 4-dimensional macro regime labeler with hysteresis and YAML config
 - [ ] **Phase 68: HMM & Macro Analytics** - Secondary HMM classifier, lead-lag analysis, and regime transition probabilities
 - [ ] **Phase 69: L4 Resolver Integration** - Wire macro regime into tighten-only resolver chain and executor logging
@@ -1374,12 +1374,12 @@ Plans:
   3. Net liquidity 365d rolling z-score and dual-window trend detection are populated
   4. Fed regime classification (single-target/target-range/zero-bound, hiking/holding/cutting) and TARGET_MID/TARGET_SPREAD are populated
   5. run_daily_refresh.py runs macro feature computation after FRED sync and before regime computation without manual intervention
-**Plans:** 3 plans
+**Plans:** 3/3 complete
 
 Plans:
-- [ ] 66-01-PLAN.md -- Alembic migration (25 columns) + data loading extensions (7 new FRED series)
-- [ ] 66-02-PLAN.md -- Feature computation logic (compute_derived_features_66 for FRED-08 through FRED-16)
-- [ ] 66-03-PLAN.md -- WARMUP_DAYS increase, summary log, and E2E verification
+- [x] 66-01-PLAN.md -- Alembic migration (25 columns) + data loading extensions (7 new FRED series)
+- [x] 66-02-PLAN.md -- Feature computation logic (compute_derived_features_66 for FRED-08 through FRED-16)
+- [x] 66-03-PLAN.md -- WARMUP_DAYS increase, summary log, and E2E verification
 
 ### Phase 67: Macro Regime Classifier
 
@@ -1481,9 +1481,9 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 64. MCP Memory Server | 0/? | Not started | - |
-| 65. FRED Table & Core Features | 0/? | Not started | - |
-| 66. FRED Derived Features & Automation | 0/? | Not started | - |
+| 64. MCP Memory Server | 3/3 | Complete | 2026-03-02 |
+| 65. FRED Table & Core Features | 3/3 | Complete | 2026-03-03 |
+| 66. FRED Derived Features & Automation | 3/3 | Complete | 2026-03-03 |
 | 67. Macro Regime Classifier | 0/? | Not started | - |
 | 68. HMM & Macro Analytics | 0/? | Not started | - |
 | 69. L4 Resolver Integration | 0/? | Not started | - |

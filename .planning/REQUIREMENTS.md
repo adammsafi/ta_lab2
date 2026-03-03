@@ -14,16 +14,16 @@
 - [ ] **FRED-05**: Yield curve features: `T10Y2Y` level stored directly, `YC_SLOPE_CHANGE_5D` computed as 5-day delta
 - [ ] **FRED-06**: VIX regime computed from VIXCLS with thresholds: calm (<15), elevated (15-25), crisis (>25)
 - [ ] **FRED-07**: Dollar strength features: DTWEXBGS level, 5d change, 20d change
-- [ ] **FRED-08**: Credit stress features: BAMLH0A0HYM2 level, 5d change, 30d rolling z-score
-- [ ] **FRED-09**: Financial conditions: NFCI level, 4-week direction (rising/falling)
-- [ ] **FRED-10**: M2 money supply: YoY percent change of M2SL, forward-filled to daily
-- [ ] **FRED-11**: Carry trade features: DEXJPUS level, 5d pct change, 20d rolling vol, daily move z-score
-- [ ] **FRED-12**: Net liquidity 365d rolling z-score plus dual-window (30d vs 150d moving average) trend detection
-- [ ] **FRED-13**: Fed regime classification: `single-target`/`target-range`/`zero-bound` from DFEDTARU/DFEDTARL structure plus `hiking`/`holding`/`cutting` from DFF 90d trajectory
-- [ ] **FRED-14**: Carry momentum indicator: `(dexjpus_1d_change / dexjpus_20d_vol)` with elevated threshold at 2.0 when carry spread is positive
-- [ ] **FRED-15**: CPI surprise proxy: `CPIAUCSL_mom - CPIAUCSL_mom.rolling(3).mean()` as deviation from 3-month trend
-- [ ] **FRED-16**: TARGET_MID `(DFEDTARU + DFEDTARL) / 2` and TARGET_SPREAD `DFEDTARU - DFEDTARL` computed daily
-- [ ] **FRED-17**: Macro feature refresh wired into `run_daily_refresh.py` after FRED sync, before regime computation
+- [x] **FRED-08**: Credit stress features: BAMLH0A0HYM2 level, 5d change, 30d rolling z-score
+- [x] **FRED-09**: Financial conditions: NFCI level, 4-week direction (rising/falling)
+- [x] **FRED-10**: M2 money supply: YoY percent change of M2SL, forward-filled to daily
+- [x] **FRED-11**: Carry trade features: DEXJPUS level, 5d pct change, 20d rolling vol, daily move z-score
+- [x] **FRED-12**: Net liquidity 365d rolling z-score plus dual-window (30d vs 150d moving average) trend detection
+- [x] **FRED-13**: Fed regime classification: `single-target`/`target-range`/`zero-bound` from DFEDTARU/DFEDTARL structure plus `hiking`/`holding`/`cutting` from DFF 90d trajectory
+- [x] **FRED-14**: Carry momentum indicator: `(dexjpus_1d_change / dexjpus_20d_vol)` with elevated threshold at 2.0 when carry spread is positive
+- [x] **FRED-15**: CPI surprise proxy: `CPIAUCSL_mom - CPIAUCSL_mom.rolling(3).mean()` as deviation from 3-month trend
+- [x] **FRED-16**: TARGET_MID `(DFEDTARU + DFEDTARL) / 2` and TARGET_SPREAD `DFEDTARU - DFEDTARL` computed daily
+- [x] **FRED-17**: Macro feature refresh wired into `run_daily_refresh.py` after FRED sync, before regime computation
 
 ### Macro Regime Classification (MREG)
 
@@ -117,16 +117,16 @@
 | FRED-05 | Phase 65 | Complete |
 | FRED-06 | Phase 65 | Complete |
 | FRED-07 | Phase 65 | Complete |
-| FRED-08 | Phase 66 | Pending |
-| FRED-09 | Phase 66 | Pending |
-| FRED-10 | Phase 66 | Pending |
-| FRED-11 | Phase 66 | Pending |
-| FRED-12 | Phase 66 | Pending |
-| FRED-13 | Phase 66 | Pending |
-| FRED-14 | Phase 66 | Pending |
-| FRED-15 | Phase 66 | Pending |
-| FRED-16 | Phase 66 | Pending |
-| FRED-17 | Phase 66 | Pending |
+| FRED-08 | Phase 66 | Complete |
+| FRED-09 | Phase 66 | Complete |
+| FRED-10 | Phase 66 | Complete |
+| FRED-11 | Phase 66 | Complete |
+| FRED-12 | Phase 66 | Complete |
+| FRED-13 | Phase 66 | Complete |
+| FRED-14 | Phase 66 | Complete |
+| FRED-15 | Phase 66 | Complete |
+| FRED-16 | Phase 66 | Complete |
+| FRED-17 | Phase 66 | Complete |
 | MREG-01 | Phase 67 | Pending |
 | MREG-02 | Phase 67 | Pending |
 | MREG-03 | Phase 67 | Pending |
