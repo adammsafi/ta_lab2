@@ -53,6 +53,20 @@ FFILL_LIMITS: dict[str, int] = {
     # Japan rates (monthly)
     "IRSTCI01JPM156N": 45,
     "IRLTLT01JPM156N": 45,
+    # ── Phase 66 additions ─────────────────────────────────────────────
+    # FRED-08: Credit stress (daily)
+    "BAMLH0A0HYM2": 5,
+    # FRED-09: Financial conditions (weekly)
+    "NFCI": 10,
+    # FRED-10: M2 money supply (monthly)
+    "M2SL": 45,
+    # FRED-11: Carry trade FX (daily)
+    "DEXJPUS": 5,
+    # FRED-13/16: Fed regime (daily policy rate)
+    "DFEDTARU": 5,
+    "DFEDTARL": 5,
+    # FRED-15: CPI (monthly)
+    "CPIAUCSL": 45,
 }
 
 # ── Source frequency metadata per series ──────────────────────────────────

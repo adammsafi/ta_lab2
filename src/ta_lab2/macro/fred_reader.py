@@ -22,7 +22,7 @@ from sqlalchemy.engine import Engine
 
 logger = logging.getLogger(__name__)
 
-# ── Series needed for FRED-03 through FRED-07 ──────────────────────────────
+# ── Series needed for FRED-03 through FRED-16 ─────────────────────────────
 # Listed in logical groupings per phase requirement.
 SERIES_TO_LOAD: list[str] = [
     # FRED-03: Net liquidity components
@@ -41,6 +41,20 @@ SERIES_TO_LOAD: list[str] = [
     "VIXCLS",  # CBOE Volatility Index (daily)
     # FRED-07: Dollar strength
     "DTWEXBGS",  # Trade-Weighted USD Index: Broad (daily)
+    # ── Phase 66 additions (FRED-08 through FRED-16) ──────────────────
+    # FRED-08: Credit stress
+    "BAMLH0A0HYM2",  # HY OAS spread (daily)
+    # FRED-09: Financial conditions
+    "NFCI",  # Chicago Fed NFCI (weekly)
+    # FRED-10: M2 money supply
+    "M2SL",  # M2 (monthly)
+    # FRED-11: Carry trade FX
+    "DEXJPUS",  # USD/JPY exchange rate (daily)
+    # FRED-13/16: Fed regime (DFEDTARU/DFEDTARL already synced from VM)
+    "DFEDTARU",  # Fed Funds target upper bound (daily)
+    "DFEDTARL",  # Fed Funds target lower bound (daily)
+    # FRED-15: CPI proxy
+    "CPIAUCSL",  # CPI All Items (monthly)
 ]
 
 
@@ -57,7 +71,7 @@ def load_series_wide(
     engine:
         SQLAlchemy engine connected to the marketdata database.
     series_ids:
-        FRED series IDs to load. Defaults to SERIES_TO_LOAD (11 Phase 65 series).
+        FRED series IDs to load. Defaults to SERIES_TO_LOAD (18 series: 11 Phase 65 + 7 Phase 66).
     start_date:
         Optional lower bound on observation date (inclusive), e.g. "2015-01-01".
         If None, loads from the earliest available date.
