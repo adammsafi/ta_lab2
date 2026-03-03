@@ -775,6 +775,307 @@ def build_equity_overlay_chart(drift_df: pd.DataFrame) -> go.Figure:
 
 
 # ---------------------------------------------------------------------------
+# Macro regime color constants
+# ---------------------------------------------------------------------------
+
+# Low-opacity RGBA fills for composite macro state background bands.
+# Keyed by macro_state label from cmc_macro_regimes.macro_state column.
+MACRO_STATE_COLORS: dict[str, str] = {
+    "favorable": "rgba(0,200,100,0.20)",
+    "constructive": "rgba(100,200,100,0.15)",
+    "neutral": "rgba(150,150,150,0.12)",
+    "cautious": "rgba(255,165,0,0.15)",
+    "adverse": "rgba(220,50,50,0.20)",
+}
+
+# Per-dimension label colors for the 4 dimension band panels in the timeline.
+# Keyed by dimension name, then by label value from cmc_macro_regimes columns.
+MACRO_DIMENSION_COLORS: dict[str, dict[str, str]] = {
+    "monetary_policy": {
+        "Cutting": "rgba(0,200,100,0.25)",
+        "Holding": "rgba(150,150,150,0.15)",
+        "Hiking": "rgba(220,50,50,0.25)",
+    },
+    "liquidity": {
+        "Strongly_Expanding": "rgba(0,200,100,0.30)",
+        "Expanding": "rgba(0,200,100,0.15)",
+        "Neutral": "rgba(150,150,150,0.12)",
+        "Contracting": "rgba(220,50,50,0.15)",
+        "Strongly_Contracting": "rgba(220,50,50,0.30)",
+    },
+    "risk_appetite": {
+        "RiskOn": "rgba(0,200,100,0.25)",
+        "Neutral": "rgba(150,150,150,0.15)",
+        "RiskOff": "rgba(220,50,50,0.25)",
+    },
+    "carry": {
+        "Stable": "rgba(0,200,100,0.20)",
+        "Stress": "rgba(255,165,0,0.20)",
+        "Unwind": "rgba(220,50,50,0.25)",
+    },
+}
+
+# Ordered list of dimension columns and their display labels for the 4 bands.
+_MACRO_DIMENSIONS: list[tuple[str, str]] = [
+    ("monetary_policy", "Monetary Policy"),
+    ("liquidity", "Liquidity"),
+    ("risk_appetite", "Risk Appetite"),
+    ("carry", "Carry"),
+]
+
+# Default band color when a label is not found in MACRO_DIMENSION_COLORS.
+_DIMENSION_FALLBACK_COLOR = "rgba(150,150,150,0.12)"
+
+
+# ---------------------------------------------------------------------------
+# Macro regime charts
+# ---------------------------------------------------------------------------
+
+
+def build_macro_regime_timeline(
+    regimes_df: pd.DataFrame,
+    overlay_df: pd.DataFrame | None = None,
+    overlay_label: str = "Portfolio PnL",
+) -> go.Figure:
+    """Build a 5-panel macro regime timeline chart.
+
+    Layout (shared x-axis, shared_xaxes=True):
+      Panel 1 (top, 40%): Overlay line (PnL or asset price) or placeholder.
+      Panel 2 (15%):      monetary_policy dimension band.
+      Panel 3 (15%):      liquidity dimension band.
+      Panel 4 (15%):      risk_appetite dimension band.
+      Panel 5 (15%):      carry dimension band.
+
+    Each dimension panel draws consecutive vrect blocks colored by label value
+    from MACRO_DIMENSION_COLORS.  Vertical dashed transition lines are drawn
+    on all panels at dates where regime_key changes between consecutive rows.
+
+    Parameters
+    ----------
+    regimes_df : pd.DataFrame
+        Output of load_macro_regime_history().  Required columns:
+        date (datetime), monetary_policy, liquidity, risk_appetite, carry,
+        regime_key.  Use .tolist() internally for x-axis to avoid tz pitfall.
+    overlay_df : pd.DataFrame or None
+        Optional overlay for panel 1.  Required columns: date, value.
+        If None, a placeholder annotation is shown.
+    overlay_label : str
+        Legend label for the overlay trace.  Default "Portfolio PnL".
+
+    Returns
+    -------
+    go.Figure
+        5-panel Plotly figure with plotly_dark template, height=800.
+    """
+    fig = make_subplots(
+        rows=5,
+        cols=1,
+        shared_xaxes=True,
+        row_heights=[0.40, 0.15, 0.15, 0.15, 0.15],
+        vertical_spacing=0.02,
+    )
+
+    # Handle empty regimes_df
+    if regimes_df is None or len(regimes_df) == 0:
+        fig.add_annotation(
+            text="No macro regime data available",
+            xref="paper",
+            yref="paper",
+            x=0.5,
+            y=0.5,
+            showarrow=False,
+            font={"size": 16},
+        )
+        fig.update_layout(template="plotly_dark", height=800)
+        return fig
+
+    regimes_work = regimes_df.sort_values("date").reset_index(drop=True)
+
+    # ── Panel 1: Overlay trace ─────────────────────────────────────────────
+    if overlay_df is not None and len(overlay_df) > 0:
+        overlay_work = overlay_df.sort_values("date").reset_index(drop=True)
+        x_overlay = overlay_work["date"].tolist()
+        fig.add_trace(
+            go.Scatter(
+                x=x_overlay,
+                y=overlay_work["value"].tolist(),
+                mode="lines",
+                name=overlay_label,
+                line={"color": "rgb(0,200,100)", "width": 1.5},
+            ),
+            row=1,
+            col=1,
+        )
+    else:
+        fig.add_annotation(
+            text="Select an overlay in the sidebar",
+            xref="x domain",
+            yref="y domain",
+            x=0.5,
+            y=0.5,
+            showarrow=False,
+            font={"size": 13, "color": "rgb(180,180,180)"},
+            row=1,
+            col=1,
+        )
+
+    # ── Compute transition dates (regime_key changes) ──────────────────────
+    transition_dates: list = []
+    for i in range(1, len(regimes_work)):
+        if regimes_work.loc[i, "regime_key"] != regimes_work.loc[i - 1, "regime_key"]:
+            transition_dates.append(regimes_work.loc[i, "date"])
+
+    # ── Panels 2-5: Per-dimension vrect bands ─────────────────────────────
+    for panel_idx, (dim_col, dim_label) in enumerate(_MACRO_DIMENSIONS, start=2):
+        dim_colors = MACRO_DIMENSION_COLORS.get(dim_col, {})
+
+        for i, row in regimes_work.iterrows():
+            start_date = row["date"]
+            label_val = str(row.get(dim_col, ""))
+
+            # End of band: next row's date, or same day + 1 for last row
+            if i + 1 < len(regimes_work):
+                end_date = regimes_work.loc[i + 1, "date"]
+            else:
+                end_date = start_date + pd.Timedelta(days=1)
+
+            color = dim_colors.get(label_val, _DIMENSION_FALLBACK_COLOR)
+
+            fig.add_vrect(
+                x0=start_date,
+                x1=end_date,
+                fillcolor=color,
+                opacity=1,
+                layer="below",
+                line_width=0,
+                row=panel_idx,  # type: ignore[arg-type]
+                col=1,
+            )
+
+        # Set y-axis title for this dimension panel
+        fig.update_yaxes(
+            title_text=dim_label,
+            showticklabels=False,
+            row=panel_idx,
+            col=1,
+        )
+
+    # ── Transition markers: vertical dashed lines on all panels ───────────
+    for tr_date in transition_dates:
+        # Find old -> new transition labels for hover annotation
+        idx = regimes_work[regimes_work["date"] == tr_date].index
+        if len(idx) > 0:
+            i = idx[0]
+            new_key = regimes_work.loc[i, "regime_key"]
+            old_key = regimes_work.loc[i - 1, "regime_key"] if i > 0 else "?"
+        else:
+            old_key, new_key = "?", "?"
+
+        hover_txt = f"{old_key} -> {new_key}"
+
+        # Draw line on each panel (panels 1-5)
+        for panel_row in range(1, 6):
+            fig.add_vline(
+                x=tr_date,
+                line_dash="dash",
+                line_color="rgba(255,255,255,0.35)",
+                line_width=1,
+                annotation_text=hover_txt if panel_row == 1 else "",
+                annotation_font_size=9,
+                annotation_position="top",
+                row=panel_row,  # type: ignore[arg-type]
+                col=1,
+            )
+
+    # ── Layout ────────────────────────────────────────────────────────────
+    fig.update_yaxes(title_text=overlay_label, row=1, col=1)
+    fig.update_xaxes(title_text="Date", row=5, col=1)
+
+    fig.update_layout(
+        template="plotly_dark",
+        height=800,
+        showlegend=True,
+    )
+
+    return fig
+
+
+def build_fred_quality_chart(quality_df: pd.DataFrame) -> go.Figure:
+    """Build a horizontal bar chart showing FRED series coverage percentage.
+
+    Bars are sorted ascending by coverage_pct (worst coverage at top).
+    Color coding: green (>95%), orange (80-95%), red (<80%).
+
+    Parameters
+    ----------
+    quality_df : pd.DataFrame
+        Output of load_fred_series_quality() with columns:
+        series_id, coverage_pct.
+
+    Returns
+    -------
+    go.Figure
+        Plotly horizontal bar chart with plotly_dark template.
+    """
+    fig = go.Figure()
+
+    if quality_df is None or quality_df.empty:
+        fig.add_annotation(
+            text="No FRED quality data available",
+            xref="paper",
+            yref="paper",
+            x=0.5,
+            y=0.5,
+            showarrow=False,
+            font={"size": 16},
+        )
+        fig.update_layout(
+            template="plotly_dark",
+            title="FRED Series Data Coverage",
+            height=400,
+        )
+        return fig
+
+    # Sort ascending by coverage_pct (worst at top of horizontal bar chart)
+    df_sorted = quality_df.sort_values("coverage_pct", ascending=True).reset_index(
+        drop=True
+    )
+
+    def _bar_color(pct: float) -> str:
+        if pct > 95:
+            return "rgb(0,200,100)"
+        if pct >= 80:
+            return "rgb(255,165,0)"
+        return "rgb(220,50,50)"
+
+    colors = [_bar_color(float(p)) for p in df_sorted["coverage_pct"]]
+
+    fig.add_trace(
+        go.Bar(
+            x=df_sorted["coverage_pct"].tolist(),
+            y=df_sorted["series_id"].tolist(),
+            orientation="h",
+            marker={"color": colors},
+            text=[f"{p:.1f}%" for p in df_sorted["coverage_pct"]],
+            textposition="outside",
+            name="Coverage %",
+        )
+    )
+
+    fig.update_xaxes(title_text="Coverage %", range=[0, 110])
+    fig.update_yaxes(title_text="Series ID")
+
+    fig.update_layout(
+        template="plotly_dark",
+        title="FRED Series Data Coverage",
+        height=max(300, 30 * len(df_sorted) + 80),
+        showlegend=False,
+    )
+
+    return fig
+
+
+# ---------------------------------------------------------------------------
 # Download helper
 # ---------------------------------------------------------------------------
 
