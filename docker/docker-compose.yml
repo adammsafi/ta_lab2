@@ -3,14 +3,9 @@
 # Usage:
 #   docker compose -f docker/docker-compose.yml up -d
 #
-# MIGRATION NOTE: If you have an existing Qdrant container with data (3,763+ memories),
-# the named volume "qdrant-storage" below is NEW. Before first run:
-#   1. Check existing volumes: docker volume ls | grep qdrant
-#   2. If data lives in another volume, either:
-#      a. Rename it: docker volume create qdrant-storage && docker run --rm \
-#         -v old_volume:/from -v qdrant-storage:/to alpine sh -c "cp -a /from/. /to/"
-#      b. Or create a Qdrant snapshot and restore after compose up
-#   3. If Qdrant was running with a bind mount, copy data into the named volume
+# DATA: Qdrant data lives at C:/Users/asafi/Documents/ProjectTT/ChatGPT/20251228/out/qdrant_data
+# This bind mount preserves the existing 3,763+ memories from the standalone Qdrant container.
+# Stop the standalone container before starting compose: docker stop qdrant
 
 services:
   qdrant:
@@ -19,14 +14,14 @@ services:
       - "6333:6333"
       - "6334:6334"
     volumes:
-      - qdrant-storage:/qdrant/storage
+      - C:/Users/asafi/Documents/ProjectTT/ChatGPT/20251228/out/qdrant_data:/qdrant/storage
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:6333/healthz')\" || curl -sf http://localhost:6333/healthz || exit 1"]
+      test: ["CMD-SHELL", "bash -c 'cat < /dev/tcp/localhost/6333 <<< \"\"'"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
+      start_period: 15s
 
   memory-server:
     build:
@@ -46,6 +41,3 @@ services:
       qdrant:
         condition: service_healthy
     restart: unless-stopped
-
-volumes:
-  qdrant-storage:

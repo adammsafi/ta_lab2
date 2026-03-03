@@ -48,7 +48,7 @@ def memory_search(
     min_similarity: Annotated[
         float,
         Field(description="Minimum similarity threshold 0.0-1.0", ge=0.0, le=1.0),
-    ] = 0.6,
+    ] = 0.3,
     category: Annotated[Optional[str], "Filter by memory category"] = None,
 ) -> dict:
     """Search project memories by semantic similarity.
@@ -61,7 +61,9 @@ def memory_search(
     client = get_mem0_client()
 
     filters = {"category": category} if category else None
-    results = client.search(query=query, limit=top_k, filters=filters)
+    results = client.search(
+        query=query, user_id="orchestrator", limit=top_k, filters=filters
+    )
 
     # Mem0 search returns either a list or {"results": [...]} dict
     raw_list = results if isinstance(results, list) else results.get("results", [])
@@ -92,7 +94,7 @@ def memory_context(
     min_similarity: Annotated[
         float,
         Field(description="Minimum similarity threshold 0.0-1.0", ge=0.0, le=1.0),
-    ] = 0.6,
+    ] = 0.3,
 ) -> dict:
     """Get formatted RAG context for prompt injection.
 
@@ -109,7 +111,7 @@ def memory_context(
     from ta_lab2.tools.ai_orchestrator.memory.query import SearchResult
 
     client = get_mem0_client()
-    results = client.search(query=query, limit=max_memories)
+    results = client.search(query=query, user_id="orchestrator", limit=max_memories)
 
     # Mem0 search returns either a list or {"results": [...]} dict
     raw_list = results if isinstance(results, list) else results.get("results", [])

@@ -236,10 +236,10 @@ class Mem0Client:
             Number of memories in collection
         """
         try:
-            # Access underlying Qdrant collection
-            # Mem0 stores collection in memory.vector_store.client
+            # Trigger lazy init to ensure config is loaded
+            mem = self.memory
             collection_name = self._config["vector_store"]["config"]["collection_name"]
-            collection_info = self.memory.vector_store.client.get_collection(
+            collection_info = mem.vector_store.client.get_collection(
                 collection_name=collection_name
             )
             count = (
