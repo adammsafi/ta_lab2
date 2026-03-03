@@ -6,14 +6,19 @@ Public API:
     compute_macro_features    -- Full pipeline: load -> ffill -> derive -> rename
     MacroRegimeClassifier     -- Rule-based 4-dimension macro regime labeler (Phase 67)
     load_macro_regime_config  -- Load YAML config for macro regime classifier
+    HMMClassifier             -- GaussianHMM secondary classifier with BIC selection (Phase 68)
+    LeadLagAnalyzer           -- Macro-to-crypto lead-lag cross-correlation analyzer (Phase 68)
 
 Phase 65: FRED Table & Core Features
 Phase 67: Macro Regime Classifier
+Phase 68: HMM & Macro Analytics
 """
 
 from ta_lab2.macro.feature_computer import compute_macro_features
 from ta_lab2.macro.forward_fill import forward_fill_with_limits
 from ta_lab2.macro.fred_reader import load_series_wide
+from ta_lab2.macro.hmm_classifier import HMMClassifier
+from ta_lab2.macro.lead_lag_analyzer import LeadLagAnalyzer
 from ta_lab2.macro.regime_classifier import (
     MacroRegimeClassifier,
     load_macro_regime_config,
@@ -25,4 +30,6 @@ __all__ = [
     "compute_macro_features",
     "MacroRegimeClassifier",
     "load_macro_regime_config",
+    "HMMClassifier",
+    "LeadLagAnalyzer",
 ]
