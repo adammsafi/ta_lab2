@@ -9,22 +9,22 @@ See: .planning/PROJECT.md (updated 2026-02-23)
 
 ## Current Position
 
-Phase: 69 of 72 -- L4 Resolver Integration (v1.0.1 Macro Regime Infrastructure) COMPLETE
-Plan: 03 of 3 (69-03: Executor L4 awareness + gross_cap scaling + audit logging) COMPLETE
-Status: Phase 69 COMPLETE -- PaperExecutor reads full regime context (L0-L4) from cmc_regimes, scales target_qty by L4 gross_cap BEFORE RiskEngine, emits all-layer INFO log per trade decision, records l4_regime/l4_size_mult in cmc_executor_run_log
-Last activity: 2026-03-03 -- Completed 69-03-PLAN.md (paper_executor.py: _load_regime_for_asset, gross_cap scaling, regime logging, _write_run_log L4 columns)
+Phase: 70 of 72 -- Cross-Asset Aggregation (v1.0.1 Macro Regime Infrastructure) In progress
+Plan: 01 of 3 (70-01: DB foundation -- 3 tables + ALTER TABLE + YAML config) COMPLETE
+Status: Phase 70 Plan 01 COMPLETE -- Alembic migration e1f2a3b4c5d6 creates cmc_cross_asset_agg, cmc_funding_rate_agg, crypto_macro_corr_regimes + ALTER TABLE cmc_macro_regimes; YAML config with all XAGG thresholds
+Last activity: 2026-03-03 -- Completed 70-01-PLAN.md (alembic migration + configs/cross_asset_config.yaml)
 
 ### Roadmap Evolution
 - Phase 64 added: MCP Memory Server -- Connect Qdrant to Claude Code
 - Phases 65-72 added: Macro Regime Infrastructure (FRED pipeline, classifier, L4 integration, risk gates, observability)
 - v1.0.1 roadmap: 9 phases, 55 requirements mapped across 8 requirement categories
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [████████] Phase 60 COMPLETE (8 plans) | [██] Phase 61 COMPLETE | [██] Phase 62 COMPLETE | [██] Phase 63 COMPLETE | [███] Phase 64 COMPLETE | [███] Phase 65 COMPLETE | [███] Phase 66 COMPLETE | [███] Phase 67 COMPLETE | [███] Phase 68 COMPLETE | [███] Phase 69 COMPLETE (3/3 plans)
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [############] 100% v0.9.0 | [█████] Phase 42 COMPLETE | [██████] Phase 43 COMPLETE | [███] Phase 44 COMPLETE | [███████] Phase 45 COMPLETE | [████] Phase 46 COMPLETE | [█████] Phase 47 COMPLETE | [████] Phase 48 COMPLETE | [████] Phase 49 COMPLETE | [██] Phase 50 COMPLETE | [█████] Phase 51 COMPLETE | [████] Phase 52 COMPLETE | [████] Phase 53 COMPLETE | [███] Phase 54 COMPLETE | [█████] Phase 55 COMPLETE | [███████] Phase 56 COMPLETE | [██████] Phase 57 COMPLETE | [███████] Phase 58 COMPLETE (7 plans + gap closure) | [█████] Phase 59 COMPLETE | [████████] Phase 60 COMPLETE (8 plans) | [██] Phase 61 COMPLETE | [██] Phase 62 COMPLETE | [██] Phase 63 COMPLETE | [███] Phase 64 COMPLETE | [███] Phase 65 COMPLETE | [███] Phase 66 COMPLETE | [███] Phase 67 COMPLETE | [███] Phase 68 COMPLETE | [███] Phase 69 COMPLETE (3/3 plans) | [█] Phase 70 plan 01/03 COMPLETE
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 324 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 6 in Phase 43, 3 in Phase 44, 7 in Phase 45, 4 in Phase 46, 5 in Phase 47, 4 in Phase 48, 4 in Phase 49, 2 in Phase 50, 5 in Phase 51, 4 in Phase 52, 4 in Phase 53, 3 in Phase 54, 5 in Phase 55, 7 in Phase 56, 6 in Phase 57, 7 in Phase 58, 5 in Phase 59, 8 in Phase 60, 2 in Phase 61, 2 in Phase 62, 2 in Phase 63, 3 in Phase 65, 3 in Phase 66, 3 in Phase 67, 3 in Phase 68, 3 in Phase 69)
+- Total plans completed: 325 (56 in v0.4.0, 56 in v0.5.0, 30 in v0.6.0, 10 in v0.7.0, 13 in v0.8.0, 1 in Phase 34 audit cleanup, 8 in Phase 35, 5 in Phase 36, 4 in Phase 37, 5 in Phase 38, 4 in Phase 39, 3 in Phase 40, 6 in Phase 41, 3 in Phase 41.1, 5 in Phase 42, 6 in Phase 43, 3 in Phase 44, 7 in Phase 45, 4 in Phase 46, 5 in Phase 47, 4 in Phase 48, 4 in Phase 49, 2 in Phase 50, 5 in Phase 51, 4 in Phase 52, 4 in Phase 53, 3 in Phase 54, 5 in Phase 55, 7 in Phase 56, 6 in Phase 57, 7 in Phase 58, 5 in Phase 59, 8 in Phase 60, 2 in Phase 61, 2 in Phase 62, 2 in Phase 63, 3 in Phase 65, 3 in Phase 66, 3 in Phase 67, 3 in Phase 68, 3 in Phase 69, 1 in Phase 70)
 - Average duration: 7 min
 - Total execution time: ~28 hours
 
@@ -118,6 +118,9 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
+- **down_revision = f1a2b3c4d5e6 not d5e6f7a8b9c0** (Phase 70-01): Plan doc had stale Phase 67 head; actual head after Phase 69 is f1a2b3c4d5e6; always run alembic heads dynamically before creating migration
+- **crypto_macro_corr_regimes drops cmc_ prefix** (Phase 70-01): Per CONTEXT.md naming rule: tables mixing crypto + non-crypto (FRED macro) data drop the cmc_ prefix; cmc_ prefix reserved for tables whose assets come from cmc_price_histories7/tvc_price_histories
+- **Partial index on sign_flip_flag = TRUE** (Phase 70-01): Only a small fraction of rows will have sign flip; partial index avoids full-table scan for Telegram alert queries in Plan 03
 - **gross_cap applied BEFORE RiskEngine in executor** (Phase 69-03): Ensures RiskEngine sees already-scaled target_qty; prevents double-capping between L4 gross_cap and RiskEngine position limits; scaling only activates when gross_cap < 1.0
 - **getattr fallback for self._current_l4_label in _write_run_log** (Phase 69-03): Allows _write_run_log to be called from early-exit paths (stale-signal, exception) before run() sets the attribute; avoids AttributeError without extra guards
 - **L4 staleness threshold 7 days** (Phase 69-02): Macro regime updated weekly; >7 days means at least one full cycle missed; _L4_STALENESS_DAYS = 7 in refresh_cmc_regimes.py
@@ -642,8 +645,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-03T11:57:05Z
-Stopped at: Completed 69-03-PLAN.md -- Phase 69 COMPLETE: Executor L4 awareness, gross_cap scaling, full regime audit logging
+Last session: 2026-03-03T13:05:11Z
+Stopped at: Completed 70-01-PLAN.md -- Phase 70 plan 01/03: DB foundation (3 tables + ALTER TABLE + YAML config)
 Resume file: None
 
 ---
