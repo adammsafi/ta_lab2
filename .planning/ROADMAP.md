@@ -1460,10 +1460,12 @@ Plans:
   3. Carry unwind velocity gate triggers REDUCE at DEXJPUS daily z-score > 2.0 with positive rate spread, and FLATTEN at z-score > 3.0
   4. Data freshness gate warns at 48h stale FRED data and disables macro regime at 96h, falling back to per-asset only
   5. Composite macro stress score (0-100) is computed from weighted VIX percentile, HY OAS z-score, carry velocity, and NFCI with tiered response
-**Plans:** 3 plans
+**Plans:** 3 plans in 3 waves
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 71 to break down)
+- [ ] 71-01-PLAN.md -- Alembic migration (4 tables + CHECK constraint extensions) + event calendar seed script
+- [ ] 71-02-PLAN.md -- MacroGateEvaluator (7 individual gates + composite score + state management) + GateOverrideManager
+- [ ] 71-03-PLAN.md -- RiskEngine Gate 1.7 wiring + CLI scripts (evaluate_macro_gates, macro_gate_cli)
 
 ### Phase 72: Macro Observability
 
