@@ -152,6 +152,229 @@ def compute_derived_features(df: pd.DataFrame) -> pd.DataFrame:
     return result
 
 
+# ── Phase 66: FRED-08 through FRED-16 helpers & computation ──────────────
+
+
+def _rolling_zscore(
+    series: pd.Series, window: int, min_fill_pct: float = 0.80
+) -> pd.Series:
+    """Compute rolling z-score with minimum fill requirement.
+
+    Parameters
+    ----------
+    series:
+        Input series (can contain NaN from ffill limits).
+    window:
+        Rolling window size in days.
+    min_fill_pct:
+        Minimum fraction of non-NaN rows required (default: 0.80).
+
+    Returns
+    -------
+    pd.Series
+        Z-score series.  NaN where insufficient data.
+    """
+    min_periods = max(1, int(min_fill_pct * window))
+    roll_mean = series.rolling(window, min_periods=min_periods).mean()
+    roll_std = series.rolling(window, min_periods=min_periods).std()
+    return (series - roll_mean) / roll_std
+
+
+def _compute_fed_regime(df: pd.DataFrame) -> None:
+    """Compute FRED-13 (fed regime) and FRED-16 (TARGET_MID, TARGET_SPREAD) in-place.
+
+    Modifies *df* by adding four columns:
+        target_mid             – (DFEDTARU + DFEDTARL) / 2
+        target_spread          – DFEDTARU - DFEDTARL
+        fed_regime_structure   – "zero-bound" | "single-target" | "target-range" | None
+        fed_regime_trajectory  – "hiking" | "holding" | "cutting" | None
+    """
+    has_upper = "DFEDTARU" in df.columns
+    has_lower = "DFEDTARL" in df.columns
+    has_dff = "DFF" in df.columns
+
+    if has_upper and has_lower:
+        upper = df["DFEDTARU"]
+        lower = df["DFEDTARL"]
+
+        # FRED-16: TARGET_MID and TARGET_SPREAD
+        df["target_mid"] = (upper + lower) / 2.0
+        df["target_spread"] = upper - lower
+
+        # FRED-13 structure: classify based on data values
+        #   zero-bound:    DFEDTARU <= 0.25
+        #   single-target: spread < 0.001 (effectively equal) and not zero-bound
+        #   target-range:  spread >= 0.001 and not zero-bound
+        def _classify_structure(row_upper: float, row_lower: float) -> str | None:
+            if row_upper != row_upper:  # NaN check
+                return None
+            if row_upper <= 0.25:
+                return "zero-bound"
+            if abs(row_upper - row_lower) < 0.001:
+                return "single-target"
+            return "target-range"
+
+        df["fed_regime_structure"] = [
+            _classify_structure(u, lo) for u, lo in zip(upper, lower)
+        ]
+    else:
+        df["target_mid"] = float("nan")
+        df["target_spread"] = float("nan")
+        df["fed_regime_structure"] = None
+
+    # FRED-13 trajectory: hiking / holding / cutting from DFF 90-day change
+    if has_dff:
+        dff = df["DFF"]
+        change_90d = dff.diff(90)
+
+        def _classify_trajectory(delta: float) -> str | None:
+            if delta != delta:  # NaN
+                return None
+            if delta > 0.25:
+                return "hiking"
+            if delta < -0.25:
+                return "cutting"
+            return "holding"
+
+        df["fed_regime_trajectory"] = change_90d.apply(_classify_trajectory)
+    else:
+        df["fed_regime_trajectory"] = None
+
+
+def compute_derived_features_66(df: pd.DataFrame) -> pd.DataFrame:
+    """Compute FRED-08 through FRED-16 derived columns.
+
+    Called AFTER compute_derived_features() which has already added lowercase
+    derived columns (net_liquidity, us_jp_rate_spread, etc.) to the DataFrame.
+    Raw FRED series are still uppercase (BAMLH0A0HYM2, NFCI, etc.) because the
+    rename step happens later in compute_macro_features().
+
+    Parameters
+    ----------
+    df:
+        DataFrame from compute_derived_features().  Contains uppercase FRED IDs
+        plus lowercase derived columns from Phase 65.
+
+    Returns
+    -------
+    pd.DataFrame
+        Same DataFrame with 18 new derived columns added:
+        hy_oas_level, hy_oas_5d_change, hy_oas_30d_zscore,
+        nfci_level, nfci_4wk_direction, m2_yoy_pct,
+        dexjpus_level, dexjpus_5d_pct_change, dexjpus_20d_vol, dexjpus_daily_zscore,
+        net_liquidity_365d_zscore, net_liquidity_trend,
+        fed_regime_structure, fed_regime_trajectory, target_mid, target_spread,
+        carry_momentum, cpi_surprise_proxy
+    """
+    result = df.copy()
+
+    # ── FRED-08: Credit stress (BAMLH0A0HYM2 = HY OAS spread) ─────────
+    if "BAMLH0A0HYM2" in result.columns:
+        hy = result["BAMLH0A0HYM2"]
+        result["hy_oas_level"] = hy
+        result["hy_oas_5d_change"] = hy.diff(5)
+        result["hy_oas_30d_zscore"] = _rolling_zscore(hy, 30)
+    else:
+        result["hy_oas_level"] = float("nan")
+        result["hy_oas_5d_change"] = float("nan")
+        result["hy_oas_30d_zscore"] = float("nan")
+
+    # ── FRED-09: Financial conditions (NFCI -- weekly) ─────────────────
+    if "NFCI" in result.columns:
+        nfci = result["NFCI"]
+        result["nfci_level"] = nfci
+        # 4-week direction: sign of 28-day diff
+        nfci_diff = nfci.diff(28)
+        result["nfci_4wk_direction"] = nfci_diff.apply(
+            lambda x: ("rising" if x > 0 else ("falling" if x < 0 else None))
+            if x == x
+            else None  # NaN check
+        )
+    else:
+        result["nfci_level"] = float("nan")
+        result["nfci_4wk_direction"] = None
+
+    # ── FRED-10: M2 money supply YoY (M2SL -- monthly, ffilled) ───────
+    # CRITICAL: pct_change(365) NOT pct_change(1).  M2SL is monthly
+    # forward-filled to daily; pct_change(1) gives 0 on non-release days.
+    if "M2SL" in result.columns:
+        result["m2_yoy_pct"] = result["M2SL"].pct_change(365) * 100.0
+    else:
+        result["m2_yoy_pct"] = float("nan")
+
+    # ── FRED-11: Carry trade (DEXJPUS -- daily) ───────────────────────
+    if "DEXJPUS" in result.columns:
+        jpy = result["DEXJPUS"]
+        result["dexjpus_level"] = jpy
+        result["dexjpus_5d_pct_change"] = jpy.pct_change(5) * 100.0
+        # 20-day rolling vol of daily returns
+        daily_ret = jpy.pct_change(1) * 100.0
+        result["dexjpus_20d_vol"] = daily_ret.rolling(20, min_periods=16).std()
+        # Daily z-score: z-score of 1-day return using 20d rolling window
+        roll_mean_dm = daily_ret.rolling(20, min_periods=16).mean()
+        roll_std_dm = daily_ret.rolling(20, min_periods=16).std()
+        result["dexjpus_daily_zscore"] = (daily_ret - roll_mean_dm) / roll_std_dm
+    else:
+        result["dexjpus_level"] = float("nan")
+        result["dexjpus_5d_pct_change"] = float("nan")
+        result["dexjpus_20d_vol"] = float("nan")
+        result["dexjpus_daily_zscore"] = float("nan")
+
+    # ── FRED-12: Net liquidity z-score + dual-window trend ────────────
+    # net_liquidity was added by Phase 65 compute_derived_features()
+    if "net_liquidity" in result.columns:
+        nl = result["net_liquidity"]
+        result["net_liquidity_365d_zscore"] = _rolling_zscore(nl, 365)
+        # Dual-window trend: 30d MA vs 150d MA
+        ma30 = nl.rolling(30, min_periods=24).mean()
+        ma150 = nl.rolling(150, min_periods=120).mean()
+        trend_diff = ma30 - ma150
+        result["net_liquidity_trend"] = trend_diff.apply(
+            lambda x: ("expanding" if x > 0 else ("contracting" if x < 0 else None))
+            if x == x
+            else None
+        )
+    else:
+        result["net_liquidity_365d_zscore"] = float("nan")
+        result["net_liquidity_trend"] = None
+
+    # ── FRED-13 + FRED-16: Fed regime + target rate metrics ───────────
+    _compute_fed_regime(result)  # adds target_mid, target_spread,
+    #                              fed_regime_structure, fed_regime_trajectory
+
+    # ── FRED-14: Carry momentum indicator ─────────────────────────────
+    # Uses dexjpus_daily_zscore (FRED-11) and us_jp_rate_spread (Phase 65)
+    if "dexjpus_daily_zscore" in result.columns:
+        base_z = result["dexjpus_daily_zscore"]
+        carry_spread = result.get("us_jp_rate_spread")
+
+        if carry_spread is not None and not (
+            isinstance(carry_spread, float) and carry_spread != carry_spread
+        ):
+            # Elevated threshold (2.0) when carry spread is positive
+            threshold = carry_spread.apply(lambda x: 2.0 if (x == x and x > 0) else 1.5)
+        else:
+            threshold = 1.5
+
+        result["carry_momentum"] = (base_z.abs() > threshold).astype(float)
+        result["carry_momentum"] = result["carry_momentum"].where(
+            base_z.notna(), other=None
+        )
+    else:
+        result["carry_momentum"] = float("nan")
+
+    # ── FRED-15: CPI surprise proxy (CPIAUCSL -- monthly) ────────────
+    if "CPIAUCSL" in result.columns:
+        cpi = result["CPIAUCSL"]
+        cpi_mom = cpi.pct_change(30) * 100.0  # approx MoM from ffilled data
+        baseline = cpi_mom.rolling(90, min_periods=72).mean()  # 3-month trend
+        result["cpi_surprise_proxy"] = cpi_mom - baseline
+    else:
+        result["cpi_surprise_proxy"] = float("nan")
+
+    return result
+
+
 def compute_macro_features(
     engine: Engine,
     start_date: str | None = None,
