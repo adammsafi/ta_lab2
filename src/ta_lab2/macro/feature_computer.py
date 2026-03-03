@@ -1,14 +1,15 @@
 """feature_computer.py
 
-Compute FRED-03 through FRED-07 derived macro features from forward-filled
+Compute FRED-03 through FRED-16 derived macro features from forward-filled
 wide FRED DataFrame.
 
 Pipeline:
-    load_series_wide() -> forward_fill_with_limits() -> compute_derived_features()
+    load_series_wide() -> forward_fill_with_limits()
+    -> compute_derived_features() -> compute_derived_features_66()
     => final DataFrame with DB-ready lowercase column names
 
 The top-level orchestrator is compute_macro_features(engine, start_date, end_date),
-which calls all three steps and returns a DataFrame ready for upsert into
+which calls all steps and returns a DataFrame ready for upsert into
 fred.fred_macro_features.
 
 Usage:
@@ -33,8 +34,9 @@ from ta_lab2.macro.fred_reader import SERIES_TO_LOAD, load_series_wide
 logger = logging.getLogger(__name__)
 
 # ── Lowercase rename map: FRED ID -> DB column name ───────────────────────
-# All 11 raw series columns in fred.fred_macro_features use lowercase names.
+# All 18 raw series columns in fred.fred_macro_features use lowercase names.
 _RENAME_MAP: dict[str, str] = {
+    # Phase 65: 11 original series
     "WALCL": "walcl",
     "WTREGEN": "wtregen",
     "RRPONTSYD": "rrpontsyd",
@@ -46,6 +48,14 @@ _RENAME_MAP: dict[str, str] = {
     "ECBDFR": "ecbdfr",
     "IRSTCI01JPM156N": "irstci01jpm156n",
     "IRLTLT01JPM156N": "irltlt01jpm156n",
+    # Phase 66: 7 new series (FRED-08 through FRED-16)
+    "BAMLH0A0HYM2": "bamlh0a0hym2",
+    "NFCI": "nfci",
+    "M2SL": "m2sl",
+    "DEXJPUS": "dexjpus",
+    "DFEDTARU": "dfedtaru",
+    "DFEDTARL": "dfedtarl",
+    "CPIAUCSL": "cpiaucsl",
 }
 
 # ── VIX regime thresholds (consensus values per research) ──────────────────
@@ -410,14 +420,22 @@ def compute_macro_features(
     pd.DataFrame
         Index: DatetimeIndex (calendar-daily, tz-naive), name="date"
         Columns: lowercase names matching fred.fred_macro_features schema:
-            walcl, wtregen, rrpontsyd, dff, dgs10, t10y2y, vixcls, dtwexbgs,
-            ecbdfr, irstci01jpm156n, irltlt01jpm156n,
-            net_liquidity, us_jp_rate_spread, us_ecb_rate_spread, us_jp_10y_spread,
-            yc_slope_change_5d, vix_regime,
-            dtwexbgs_5d_change, dtwexbgs_20d_change,
-            source_freq_walcl, source_freq_wtregen,
-            source_freq_irstci01jpm156n, source_freq_irltlt01jpm156n,
-            days_since_walcl, days_since_wtregen
+            -- Phase 65 raw: walcl, wtregen, rrpontsyd, dff, dgs10, t10y2y,
+               vixcls, dtwexbgs, ecbdfr, irstci01jpm156n, irltlt01jpm156n
+            -- Phase 66 raw: bamlh0a0hym2, nfci, m2sl, dexjpus, dfedtaru,
+               dfedtarl, cpiaucsl
+            -- Phase 65 derived: net_liquidity, us_jp_rate_spread,
+               us_ecb_rate_spread, us_jp_10y_spread, yc_slope_change_5d,
+               vix_regime, dtwexbgs_5d_change, dtwexbgs_20d_change
+            -- Phase 66 derived: hy_oas_level, hy_oas_5d_change,
+               hy_oas_30d_zscore, nfci_level, nfci_4wk_direction, m2_yoy_pct,
+               dexjpus_level, dexjpus_5d_pct_change, dexjpus_20d_vol,
+               dexjpus_daily_zscore, net_liquidity_365d_zscore,
+               net_liquidity_trend, fed_regime_structure, fed_regime_trajectory,
+               carry_momentum, cpi_surprise_proxy, target_mid, target_spread
+            -- Provenance: source_freq_walcl, source_freq_wtregen,
+               source_freq_irstci01jpm156n, source_freq_irltlt01jpm156n,
+               days_since_walcl, days_since_wtregen
 
     Notes
     -----
@@ -441,8 +459,13 @@ def compute_macro_features(
         df_wide, tracked_series=["WALCL", "WTREGEN"]
     )
 
-    # ── Step 3: Compute derived features ──────────────────────────────────
+    # ── Step 3: Compute derived features (Phase 65: FRED-03 to FRED-07) ──
     df_derived = compute_derived_features(df_filled)
+
+    # ── Step 3b: Compute Phase 66 derived features (FRED-08 to FRED-16) ──
+    # Must run AFTER compute_derived_features() because it needs
+    # net_liquidity and us_jp_rate_spread from Phase 65.
+    df_derived = compute_derived_features_66(df_derived)
 
     # ── Step 4: Rename uppercase FRED IDs to lowercase DB column names ────
     df_derived = df_derived.rename(columns=_RENAME_MAP)
@@ -477,6 +500,7 @@ def compute_macro_features(
     # intermediaries or any unexpected extra columns from the wide DataFrame)
     # Keep only columns that belong in the DB schema
     db_columns = list(_RENAME_MAP.values()) + [
+        # Phase 65 derived features
         "net_liquidity",
         "us_jp_rate_spread",
         "us_ecb_rate_spread",
@@ -485,6 +509,26 @@ def compute_macro_features(
         "vix_regime",
         "dtwexbgs_5d_change",
         "dtwexbgs_20d_change",
+        # Phase 66 derived features (FRED-08 through FRED-16)
+        "hy_oas_level",
+        "hy_oas_5d_change",
+        "hy_oas_30d_zscore",
+        "nfci_level",
+        "nfci_4wk_direction",
+        "m2_yoy_pct",
+        "dexjpus_level",
+        "dexjpus_5d_pct_change",
+        "dexjpus_20d_vol",
+        "dexjpus_daily_zscore",
+        "net_liquidity_365d_zscore",
+        "net_liquidity_trend",
+        "fed_regime_structure",
+        "fed_regime_trajectory",
+        "carry_momentum",
+        "cpi_surprise_proxy",
+        "target_mid",
+        "target_spread",
+        # Provenance columns
         "source_freq_walcl",
         "source_freq_wtregen",
         "source_freq_irstci01jpm156n",
