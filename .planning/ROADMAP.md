@@ -1310,7 +1310,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 
 ### v1.0.1 Phase Summary
 
-- [ ] **Phase 64: MCP Memory Server** - Connect Qdrant to Claude Code via MCP server
+- [x] **Phase 64: MCP Memory Server** - Connect Qdrant to Claude Code via MCP server -- COMPLETE 2026-03-02
 - [ ] **Phase 65: FRED Table & Core Features** - Macro feature table with daily alignment, rate spreads, yield curve, VIX, and dollar strength
 - [ ] **Phase 66: FRED Derived Features & Automation** - Credit stress, financial conditions, carry trade, fed regime, CPI proxy, and daily refresh wiring
 - [ ] **Phase 67: Macro Regime Classifier** - Rule-based 4-dimensional macro regime labeler with hysteresis and YAML config
@@ -1332,9 +1332,9 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 **Plans:** 3 plans
 
 Plans:
-- [ ] 64-01-PLAN.md -- MCP server tools + combined ASGI app
-- [ ] 64-02-PLAN.md -- Docker infrastructure + Claude Code registration
-- [ ] 64-03-PLAN.md -- End-to-end verification checkpoint
+- [x] 64-01-PLAN.md -- MCP server tools + combined ASGI app
+- [x] 64-02-PLAN.md -- Docker infrastructure + Claude Code registration
+- [x] 64-03-PLAN.md -- End-to-end verification checkpoint
 
 **Details:**
 - Wrap existing Mem0Client (search, add, get_all) + injection.py (RAG pipeline) as MCP tools
