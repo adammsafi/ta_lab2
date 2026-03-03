@@ -1474,10 +1474,13 @@ Plans:
   3. FRED data freshness appears in pipeline monitor alongside crypto data freshness using traffic-light pattern
   4. DriftMonitor includes macro regime as a drift attribution source, flagging when macro regime differs between paper and backtest periods
   5. Macro regime timeline chart overlays regime labels as colored bands on portfolio PnL
-**Plans:** 3 plans
+**Plans:** 4 plans in 2 waves
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 72 to break down)
+- [ ] 72-01-PLAN.md -- Alembic migration (attr_macro_regime_delta + cmc_macro_alert_log) + macro query module + chart builders
+- [ ] 72-02-PLAN.md -- Telegram macro alert manager with throttling + CLI script
+- [ ] 72-03-PLAN.md -- Macro dashboard page (10_macro.py) + app.py registration + Pipeline Monitor FRED freshness
+- [ ] 72-04-PLAN.md -- DriftAttributor macro regime Step 7 + DriftMonitor wiring + dashboard attribution display
 
 ### v1.0.1 Progress
 
@@ -1491,7 +1494,7 @@ Plans:
 | 69. L4 Resolver Integration | 0/3 | Planned | - |
 | 70. Cross-Asset Aggregation | 0/? | Not started | - |
 | 71. Event Risk Gates | 0/? | Not started | - |
-| 72. Macro Observability | 0/? | Not started | - |
+| 72. Macro Observability | 0/4 | Planned | - |
 
 ### v1.0.1 Requirements (55 total)
 
