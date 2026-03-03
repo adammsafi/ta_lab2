@@ -1316,7 +1316,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 - [x] **Phase 67: Macro Regime Classifier** - Rule-based 4-dimensional macro regime labeler with hysteresis and YAML config -- COMPLETE 2026-03-03
 - [x] **Phase 68: HMM & Macro Analytics** - Secondary HMM classifier, lead-lag analysis, and regime transition probabilities — COMPLETE 2026-03-03
 - [x] **Phase 69: L4 Resolver Integration** - Wire macro regime into tighten-only resolver chain and executor logging — COMPLETE 2026-03-03
-- [ ] **Phase 70: Cross-Asset Aggregation** - BTC/ETH correlation features, aggregate funding rate, and crypto-macro correlation regime
+- [x] **Phase 70: Cross-Asset Aggregation** - BTC/ETH correlation features, aggregate funding rate, and crypto-macro correlation regime — COMPLETE 2026-03-03
 - [ ] **Phase 71: Event Risk Gates** - FOMC/CPI/NFP event calendar, VIX spike gate, carry unwind gate, credit stress gate, composite stress score
 - [ ] **Phase 72: Macro Observability** - Dashboard display, Telegram alerts, FRED freshness monitoring, drift attribution, regime timeline
 
@@ -1445,9 +1445,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 70-01-PLAN.md -- Alembic migration (3 tables + ALTER) + YAML config
-- [ ] 70-02-PLAN.md -- Core compute module + CLI script + pipeline wiring
-- [ ] 70-03-PLAN.md -- Portfolio optimizer covariance override + Telegram sign-flip alerts
+- [x] 70-01-PLAN.md -- Alembic migration (3 tables + ALTER) + YAML config
+- [x] 70-02-PLAN.md -- Core compute module + CLI script + pipeline wiring
+- [x] 70-03-PLAN.md -- Portfolio optimizer covariance override + Telegram sign-flip alerts
 
 ### Phase 71: Event Risk Gates
 

@@ -52,10 +52,10 @@
 
 ### Cross-Asset Aggregation (XAGG)
 
-- [ ] **XAGG-01**: BTC/ETH 30d rolling correlation exposed as a queryable feature in `fred_macro_features` (already computed for tail risk; make it a stored column)
-- [ ] **XAGG-02**: Cross-asset correlation matrix: 30d rolling average pairwise correlation across top assets with high-correlation flag (>0.7 = macro-driven market)
-- [ ] **XAGG-03**: Aggregate funding rate signal: average funding rate across tracked BTC/ETH perp pairs with z-score vs 30d/90d history
-- [ ] **XAGG-04**: Crypto-macro correlation regime: rolling 60d correlation of BTC returns vs VIX, DXY, HY OAS with anomaly detection when correlations flip sign
+- [x] **XAGG-01**: BTC/ETH 30d rolling correlation exposed as a queryable feature in `fred_macro_features` (already computed for tail risk; make it a stored column)
+- [x] **XAGG-02**: Cross-asset correlation matrix: 30d rolling average pairwise correlation across top assets with high-correlation flag (>0.7 = macro-driven market)
+- [x] **XAGG-03**: Aggregate funding rate signal: average funding rate across tracked BTC/ETH perp pairs with z-score vs 30d/90d history
+- [x] **XAGG-04**: Crypto-macro correlation regime: rolling 60d correlation of BTC returns vs VIX, DXY, HY OAS with anomaly detection when correlations flip sign
 
 ### Event Risk Gates (GATE)
 
@@ -146,10 +146,10 @@
 | MINT-05 | Phase 69 | Complete |
 | MINT-06 | Phase 69 | Complete |
 | MINT-07 | Phase 69 | Complete |
-| XAGG-01 | Phase 70 | Pending |
-| XAGG-02 | Phase 70 | Pending |
-| XAGG-03 | Phase 70 | Pending |
-| XAGG-04 | Phase 70 | Pending |
+| XAGG-01 | Phase 70 | Complete |
+| XAGG-02 | Phase 70 | Complete |
+| XAGG-03 | Phase 70 | Complete |
+| XAGG-04 | Phase 70 | Complete |
 | GATE-01 | Phase 71 | Pending |
 | GATE-02 | Phase 71 | Pending |
 | GATE-03 | Phase 71 | Pending |
