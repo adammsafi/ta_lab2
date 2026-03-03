@@ -125,6 +125,19 @@ class PaperExecutor:
             "errors": [],
         }
 
+        # Load L4 macro regime once for run-level audit (asset_id=1 is representative
+        # since L4 is a global macro regime -- same label applies to all assets).
+        self._current_l4_label: Optional[str] = None
+        self._current_l4_size_mult: Optional[float] = None
+        try:
+            with self.engine.connect() as conn:
+                regime_info = self._load_regime_for_asset(conn, 1)
+                if regime_info["l4_label"] is not None:
+                    self._current_l4_label = regime_info["l4_label"]
+                    self._current_l4_size_mult = regime_info["size_mult"]
+        except Exception as exc:  # noqa: BLE001
+            self.logger.debug("PaperExecutor: L4 regime query failed: %s", exc)
+
         for config in configs:
             try:
                 result = self._run_strategy(
@@ -233,6 +246,53 @@ class PaperExecutor:
 
         self.logger.info("PaperExecutor: loaded %d active configs", len(configs))
         return configs
+
+    # ------------------------------------------------------------------
+    # Regime loading
+    # ------------------------------------------------------------------
+
+    def _load_regime_for_asset(self, conn, asset_id: int) -> dict:
+        """Read the latest regime row from cmc_regimes for the given asset.
+
+        Returns a dict with l0_label, l1_label, l2_label, l4_label,
+        gross_cap, and size_mult. Defaults to gross_cap=1.0 / size_mult=1.0
+        if the table is missing, the row is absent, or any column is NULL.
+        Never raises -- failure always returns defaults.
+        """
+        defaults = {
+            "l0_label": None,
+            "l1_label": None,
+            "l2_label": None,
+            "l4_label": None,
+            "gross_cap": 1.0,
+            "size_mult": 1.0,
+        }
+        try:
+            row = conn.execute(
+                text("""
+                SELECT l0_label, l1_label, l2_label, l4_label, gross_cap, size_mult
+                FROM public.cmc_regimes WHERE id = :asset_id AND tf = '1D'
+                ORDER BY ts DESC LIMIT 1
+            """),
+                {"asset_id": asset_id},
+            ).fetchone()
+        except Exception as exc:
+            self.logger.debug(
+                "_load_regime_for_asset: query failed for asset_id=%d: %s",
+                asset_id,
+                exc,
+            )
+            return defaults
+        if row is None:
+            return defaults
+        return {
+            "l0_label": row.l0_label,
+            "l1_label": row.l1_label,
+            "l2_label": row.l2_label,
+            "l4_label": row.l4_label,
+            "gross_cap": float(row.gross_cap) if row.gross_cap is not None else 1.0,
+            "size_mult": float(row.size_mult) if row.size_mult is not None else 1.0,
+        }
 
     # ------------------------------------------------------------------
     # Per-strategy execution
@@ -433,6 +493,22 @@ class PaperExecutor:
             config=config,
         )
 
+        # --- L4 gross_cap scaling (BEFORE RiskEngine gate) ---
+        regime_info = self._load_regime_for_asset(conn, asset_id)
+        l4_gross_cap = regime_info["gross_cap"]
+        if l4_gross_cap < 1.0:
+            original_target = target_qty
+            target_qty = target_qty * Decimal(str(l4_gross_cap))
+            self.logger.info(
+                "_process_asset_signal: asset_id=%d L4 gross_cap=%.2f scaling "
+                "target_qty %.6f -> %.6f (l4=%s)",
+                asset_id,
+                l4_gross_cap,
+                float(original_target),
+                float(target_qty),
+                regime_info["l4_label"],
+            )
+
         # --- current position ---
         pos_row = conn.execute(
             text(
@@ -495,6 +571,21 @@ class PaperExecutor:
             risk_result.adjusted_quantity
             if delta > 0
             else -risk_result.adjusted_quantity
+        )
+
+        # Full regime layers log line -- emitted for every trade decision.
+        self.logger.info(
+            "_process_asset_signal: asset_id=%d REGIME l0=%s l1=%s l2=%s l4=%s "
+            "size_mult=%.3f gross_cap=%.2f | delta=%.6f side=%s",
+            asset_id,
+            regime_info["l0_label"] or "n/a",
+            regime_info["l1_label"] or "n/a",
+            regime_info["l2_label"] or "n/a",
+            regime_info["l4_label"] or "disabled",
+            regime_info["size_mult"],
+            l4_gross_cap,
+            float(delta),
+            "buy" if delta > 0 else "sell",
         )
 
         if dry_run:
@@ -604,6 +695,12 @@ class PaperExecutor:
         """
         Insert an audit row into cmc_executor_run_log.
 
+        Includes L4 audit columns (l4_regime, l4_size_mult) sourced from
+        self._current_l4_label and self._current_l4_size_mult set during
+        run() initialization. Uses getattr with None fallback so this
+        method is safe even when called before run() sets those attributes
+        (e.g. early-exit stale-signal path).
+
         Does not raise -- log failures should never crash the executor.
         """
         try:
@@ -614,11 +711,13 @@ class PaperExecutor:
                         INSERT INTO public.cmc_executor_run_log (
                             run_id, config_ids, status,
                             signals_read, orders_generated, fills_processed,
-                            skipped_no_delta, error_message, finished_at
+                            skipped_no_delta, error_message, finished_at,
+                            l4_regime, l4_size_mult
                         ) VALUES (
                             :run_id, :config_ids, :status,
                             :signals_read, :orders_generated, :fills_processed,
-                            :skipped_no_delta, :error_message, now()
+                            :skipped_no_delta, :error_message, now(),
+                            :l4_regime, :l4_size_mult
                         )
                         """
                     ),
@@ -631,6 +730,8 @@ class PaperExecutor:
                         "fills_processed": fills,
                         "skipped_no_delta": skipped,
                         "error_message": error,
+                        "l4_regime": getattr(self, "_current_l4_label", None),
+                        "l4_size_mult": getattr(self, "_current_l4_size_mult", None),
                     },
                 )
         except Exception as exc:  # noqa: BLE001
