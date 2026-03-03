@@ -1438,7 +1438,7 @@ Plans:
 **Depends on:** Phase 65 (FRED core features for macro correlation), Phase 67 (macro regime for correlation context)
 **Requirements:** XAGG-01, XAGG-02, XAGG-03, XAGG-04
 **Success Criteria** (what must be TRUE):
-  1. BTC/ETH 30d rolling correlation is stored as a queryable column in fred_macro_features
+  1. BTC/ETH 30d rolling correlation is stored as a queryable column in cmc_cross_asset_agg (cross-asset table, per CONTEXT.md decision)
   2. Cross-asset correlation matrix with high-correlation flag (>0.7 = macro-driven market) is computed and stored
   3. Aggregate funding rate signal with z-score vs 30d/90d history is computed for tracked BTC/ETH perp pairs
   4. Crypto-macro correlation regime (rolling 60d BTC returns vs VIX, DXY, HY OAS) detects sign flips as anomalies

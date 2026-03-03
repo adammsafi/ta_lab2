@@ -94,6 +94,9 @@ TIMEOUT_MACRO_REGIMES = (
 TIMEOUT_MACRO_ANALYTICS = (
     900  # 15 minutes -- HMM fitting can be slow (10 restarts x 2-3 state models)
 )
+TIMEOUT_CROSS_ASSET_AGG = (
+    600  # 10 minutes -- rolling correlations across all assets + funding z-scores
+)
 
 
 @dataclass
@@ -1973,6 +1976,122 @@ def run_macro_analytics(args) -> ComponentResult:
         )
 
 
+def run_cross_asset_agg(args) -> ComponentResult:
+    """Run cross-asset aggregation (XAGG-01 through XAGG-04) via subprocess.
+
+    Runs after macro analytics and before per-asset regime refresh.
+    Produces cross-asset signals in cmc_cross_asset_agg, cmc_funding_rate_agg,
+    and crypto_macro_corr_regimes.
+
+    Pipeline ordering:
+        macro_features -> macro_regimes -> macro_analytics
+        -> cross_asset_agg -> regimes
+
+    Args:
+        args: CLI arguments
+
+    Returns:
+        ComponentResult with execution details
+    """
+    cmd = [
+        sys.executable,
+        "-m",
+        "ta_lab2.scripts.macro.refresh_cross_asset_agg",
+    ]
+
+    if getattr(args, "dry_run", False):
+        cmd.append("--dry-run")
+    if getattr(args, "verbose", False):
+        cmd.append("--verbose")
+
+    print(f"\n{'=' * 70}")
+    print("RUNNING CROSS-ASSET AGGREGATION (XAGG-01 through XAGG-04)")
+    print(f"{'=' * 70}")
+    print(f"Command: {' '.join(cmd)}")
+
+    if getattr(args, "dry_run", False):
+        print("[DRY RUN] Would execute cross-asset aggregation")
+        return ComponentResult(
+            component="cross_asset_agg",
+            success=True,
+            duration_sec=0.0,
+            returncode=0,
+        )
+
+    start = time.perf_counter()
+
+    try:
+        if args.verbose:
+            # Stream output
+            result = subprocess.run(cmd, check=False, timeout=TIMEOUT_CROSS_ASSET_AGG)
+        else:
+            # Capture output
+            result = subprocess.run(
+                cmd,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=TIMEOUT_CROSS_ASSET_AGG,
+            )
+
+            # Show output on error
+            if result.returncode != 0:
+                print(
+                    f"\n[ERROR] Cross-asset aggregation failed with code "
+                    f"{result.returncode}"
+                )
+                if result.stdout:
+                    print(f"\nSTDOUT:\n{result.stdout}")
+                if result.stderr:
+                    print(f"\nSTDERR:\n{result.stderr}")
+
+        duration = time.perf_counter() - start
+
+        if result.returncode == 0:
+            print(
+                f"\n[OK] Cross-asset aggregation completed successfully in {duration:.1f}s"
+            )
+            return ComponentResult(
+                component="cross_asset_agg",
+                success=True,
+                duration_sec=duration,
+                returncode=result.returncode,
+            )
+        else:
+            error_msg = f"Exited with code {result.returncode}"
+            print(f"\n[FAILED] Cross-asset aggregation failed: {error_msg}")
+            return ComponentResult(
+                component="cross_asset_agg",
+                success=False,
+                duration_sec=duration,
+                returncode=result.returncode,
+                error_message=error_msg,
+            )
+
+    except subprocess.TimeoutExpired:
+        duration = time.perf_counter() - start
+        error_msg = f"Timed out after {TIMEOUT_CROSS_ASSET_AGG}s"
+        print(f"\n[TIMEOUT] Cross-asset aggregation: {error_msg}")
+        return ComponentResult(
+            component="cross_asset_agg",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+    except Exception as e:
+        duration = time.perf_counter() - start
+        error_msg = str(e)
+        print(f"\n[ERROR] Cross-asset aggregation raised exception: {error_msg}")
+        return ComponentResult(
+            component="cross_asset_agg",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+
+
 def main(argv: list[str] | None = None) -> int:
     """Main entry point."""
     p = argparse.ArgumentParser(
@@ -2092,6 +2211,20 @@ Examples:
         "--no-macro-analytics",
         action="store_true",
         help="Skip macro analytics stage in --all mode",
+    )
+    p.add_argument(
+        "--cross-asset-agg",
+        action="store_true",
+        help=(
+            "Run cross-asset aggregation only (XAGG-01 through XAGG-04: "
+            "BTC/ETH corr, avg pairwise corr, funding rate z-scores, "
+            "crypto-macro correlation regime -- Phase 70)"
+        ),
+    )
+    p.add_argument(
+        "--no-cross-asset-agg",
+        action="store_true",
+        help="Skip cross-asset aggregation stage in --all mode",
     )
     p.add_argument(
         "--regimes",
@@ -2283,6 +2416,7 @@ Examples:
         or args.macro
         or args.macro_regimes
         or args.macro_analytics
+        or args.cross_asset_agg
         or args.regimes
         or args.features
         or args.signals
@@ -2294,8 +2428,9 @@ Examples:
     ):
         p.error(
             "Must specify --bars, --emas, --amas, --desc-stats, --macro, --macro-regimes, "
-            "--macro-analytics, --regimes, --features, --signals, --portfolio, --execute, "
-            "--drift, --stats, --all, --weekly-digest, or --exchange-prices"
+            "--macro-analytics, --cross-asset-agg, --regimes, --features, --signals, "
+            "--portfolio, --execute, --drift, --stats, --all, --weekly-digest, "
+            "or --exchange-prices"
         )
 
     # Resolve database URL
@@ -2342,6 +2477,9 @@ Examples:
     run_macro_analytics_flag = (args.macro_analytics or args.all) and not getattr(
         args, "no_macro_analytics", False
     )
+    run_cross_asset_agg_flag = (args.cross_asset_agg or args.all) and not getattr(
+        args, "no_cross_asset_agg", False
+    )
     run_regimes = args.regimes or args.all
     run_features = (args.features or args.all) and not getattr(
         args, "no_features", False
@@ -2370,6 +2508,8 @@ Examples:
         components.append("macro_regimes")
     if run_macro_analytics_flag:
         components.append("macro_analytics")
+    if run_cross_asset_agg_flag:
+        components.append("cross_asset_agg")
     if run_regimes:
         components.append("regimes")
     if run_features:
@@ -2504,6 +2644,17 @@ Examples:
 
         if not macro_analytics_result.success and not args.continue_on_error:
             print("\n[STOPPED] Macro analytics failed, stopping execution")
+            print("(Use --continue-on-error to run remaining components)")
+            return 1
+
+    # Run cross-asset aggregation if requested (after macro_analytics, before per-asset regimes)
+    # Pipeline ordering: macro_analytics -> cross_asset_agg -> regimes (XAGG Phase 70)
+    if run_cross_asset_agg_flag:
+        cross_asset_result = run_cross_asset_agg(args)
+        results.append(("cross_asset_agg", cross_asset_result))
+
+        if not cross_asset_result.success and not args.continue_on_error:
+            print("\n[STOPPED] Cross-asset aggregation failed, stopping execution")
             print("(Use --continue-on-error to run remaining components)")
             return 1
 
