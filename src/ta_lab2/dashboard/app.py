@@ -67,6 +67,11 @@ pages = {
             title="Executor Status",
             icon=":material/play_circle:",
         ),
+        st.Page(
+            "pages/10_macro.py",
+            title="Macro",
+            icon=":material/public:",
+        ),
     ],
     "Monitor": [
         st.Page(

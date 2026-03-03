@@ -15,6 +15,7 @@ from __future__ import annotations
 import streamlit as st
 
 from ta_lab2.dashboard.db import get_engine
+from ta_lab2.dashboard.queries.macro import load_fred_freshness
 from ta_lab2.dashboard.queries.pipeline import (
     load_alert_history,
     load_asset_coverage,
@@ -212,3 +213,56 @@ try:
 
 except Exception as exc:  # noqa: BLE001
     st.error(f"Failed to load Alert History: {exc}")
+
+st.divider()
+
+# ===========================================================================
+# Section 5: FRED Data Freshness (OBSV-03)
+# ===========================================================================
+st.subheader("FRED Data Freshness")
+
+try:
+    engine = get_engine()
+    fred_freshness = load_fred_freshness(engine)
+
+    if fred_freshness.empty:
+        st.info("No FRED data found in fred.series_values.")
+    else:
+        # Summary row with traffic lights
+        n_green = (fred_freshness["status"] == "green").sum()
+        n_orange = (fred_freshness["status"] == "orange").sum()
+        n_red = (fred_freshness["status"] == "red").sum()
+
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Total Series", len(fred_freshness))
+        c2.metric(":large_green_circle: Fresh", int(n_green))
+        c3.metric(":large_orange_circle: Stale", int(n_orange))
+        c4.metric(":red_circle: Critical", int(n_red))
+
+        # Expandable detail table
+        with st.expander("FRED Series Detail", expanded=False):
+            display_df = fred_freshness[
+                ["series_id", "latest_date", "staleness_days", "frequency", "status"]
+            ].copy()
+            display_df["indicator"] = display_df["status"].apply(
+                lambda s: ":large_green_circle:"
+                if s == "green"
+                else ":large_orange_circle:"
+                if s == "orange"
+                else ":red_circle:"
+            )
+            st.dataframe(
+                display_df[
+                    [
+                        "indicator",
+                        "series_id",
+                        "latest_date",
+                        "staleness_days",
+                        "frequency",
+                    ]
+                ].reset_index(drop=True),
+                use_container_width=True,
+            )
+
+except Exception as exc:  # noqa: BLE001
+    st.error(f"Failed to load FRED Data Freshness: {exc}")
