@@ -2,8 +2,9 @@
 """
 Unified daily refresh orchestration script.
 
-Coordinates bars, EMAs, AMAs, desc_stats, macro features, regimes, signals,
-executor, drift monitor, and stats with state-based checking and clear visibility.
+Coordinates bars, EMAs, AMAs, desc_stats, macro features, macro regimes,
+per-asset regimes, signals, executor, drift monitor, and stats with
+state-based checking and clear visibility.
 
 Usage:
     # Full daily refresh (bars then EMAs then AMAs then desc_stats then macro then regimes then signals then executor then stats)
@@ -87,6 +88,9 @@ TIMEOUT_STATS = 3600  # 1 hour -- stats runners scan large tables
 TIMEOUT_EXCHANGE_PRICES = 120  # 2 minutes -- live price fetches from exchanges
 TIMEOUT_DRIFT = 600  # 10 minutes -- drift runs replays which involve backtest execution
 TIMEOUT_MACRO = 300  # 5 minutes -- small FRED dataset, fast computation
+TIMEOUT_MACRO_REGIMES = (
+    300  # 5 minutes -- 4-dimension classification over FRED features
+)
 
 
 @dataclass
@@ -1738,6 +1742,125 @@ def run_macro_features(args) -> ComponentResult:
         )
 
 
+def run_macro_regimes(args) -> ComponentResult:
+    """Run macro regime classification via subprocess.
+
+    Classifies daily macro features into 4-dimensional regime labels
+    (monetary_policy, liquidity, risk_appetite, carry) with hysteresis
+    and upserts results into cmc_macro_regimes.
+
+    This stage runs after macro_features and before per-asset regimes
+    so that downstream pipeline stages can read the global macro context.
+
+    Args:
+        args: CLI arguments
+
+    Returns:
+        ComponentResult with execution details
+    """
+    cmd = [
+        sys.executable,
+        "-m",
+        "ta_lab2.scripts.macro.refresh_macro_regimes",
+    ]
+
+    if getattr(args, "dry_run", False):
+        cmd.append("--dry-run")
+    if getattr(args, "verbose", False):
+        cmd.append("--verbose")
+
+    # Propagate profile override if specified
+    macro_regime_profile = getattr(args, "macro_regime_profile", None)
+    if macro_regime_profile:
+        cmd.extend(["--profile", macro_regime_profile])
+
+    print(f"\n{'=' * 70}")
+    print("RUNNING MACRO REGIME CLASSIFICATION")
+    print(f"{'=' * 70}")
+    print(f"Command: {' '.join(cmd)}")
+
+    if args.dry_run:
+        print("[DRY RUN] Would execute macro regime classification")
+        return ComponentResult(
+            component="macro_regimes",
+            success=True,
+            duration_sec=0.0,
+            returncode=0,
+        )
+
+    start = time.perf_counter()
+
+    try:
+        if args.verbose:
+            # Stream output
+            result = subprocess.run(cmd, check=False, timeout=TIMEOUT_MACRO_REGIMES)
+        else:
+            # Capture output
+            result = subprocess.run(
+                cmd,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=TIMEOUT_MACRO_REGIMES,
+            )
+
+            # Show output on error
+            if result.returncode != 0:
+                print(
+                    f"\n[ERROR] Macro regime classification failed with code {result.returncode}"
+                )
+                if result.stdout:
+                    print(f"\nSTDOUT:\n{result.stdout}")
+                if result.stderr:
+                    print(f"\nSTDERR:\n{result.stderr}")
+
+        duration = time.perf_counter() - start
+
+        if result.returncode == 0:
+            print(
+                f"\n[OK] Macro regime classification completed successfully in {duration:.1f}s"
+            )
+            return ComponentResult(
+                component="macro_regimes",
+                success=True,
+                duration_sec=duration,
+                returncode=result.returncode,
+            )
+        else:
+            error_msg = f"Exited with code {result.returncode}"
+            print(f"\n[FAILED] Macro regime classification failed: {error_msg}")
+            return ComponentResult(
+                component="macro_regimes",
+                success=False,
+                duration_sec=duration,
+                returncode=result.returncode,
+                error_message=error_msg,
+            )
+
+    except subprocess.TimeoutExpired:
+        duration = time.perf_counter() - start
+        error_msg = f"Timed out after {TIMEOUT_MACRO_REGIMES}s"
+        print(f"\n[TIMEOUT] Macro regime classification: {error_msg}")
+        return ComponentResult(
+            component="macro_regimes",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+    except Exception as e:
+        duration = time.perf_counter() - start
+        error_msg = str(e)
+        print(f"\n[ERROR] Macro regime classification raised exception: {error_msg}")
+        return ComponentResult(
+            component="macro_regimes",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+
+
 def main(argv: list[str] | None = None) -> int:
     """Main entry point."""
     p = argparse.ArgumentParser(
@@ -1828,6 +1951,22 @@ Examples:
         "--no-macro",
         action="store_true",
         help="Skip FRED macro feature refresh stage in --all mode",
+    )
+    p.add_argument(
+        "--macro-regimes",
+        action="store_true",
+        help="Run macro regime classification only (4-dimension labeling into cmc_macro_regimes)",
+    )
+    p.add_argument(
+        "--no-macro-regimes",
+        action="store_true",
+        help="Skip macro regime classification stage in --all mode",
+    )
+    p.add_argument(
+        "--macro-regime-profile",
+        type=str,
+        default=None,
+        help="Override macro regime YAML profile (default/conservative/aggressive)",
     )
     p.add_argument(
         "--regimes",
@@ -2017,6 +2156,7 @@ Examples:
         or args.amas
         or args.desc_stats
         or args.macro
+        or args.macro_regimes
         or args.regimes
         or args.features
         or args.signals
@@ -2027,9 +2167,9 @@ Examples:
         or args.all
     ):
         p.error(
-            "Must specify --bars, --emas, --amas, --desc-stats, --macro, --regimes, --features, "
-            "--signals, --portfolio, --execute, --drift, --stats, --all, --weekly-digest, "
-            "or --exchange-prices"
+            "Must specify --bars, --emas, --amas, --desc-stats, --macro, --macro-regimes, "
+            "--regimes, --features, --signals, --portfolio, --execute, --drift, --stats, "
+            "--all, --weekly-digest, or --exchange-prices"
         )
 
     # Resolve database URL
@@ -2070,6 +2210,9 @@ Examples:
     run_amas = args.amas or args.all
     run_desc_stats = args.desc_stats or args.all
     run_macro = (args.macro or args.all) and not getattr(args, "no_macro", False)
+    run_macro_regimes_flag = (args.macro_regimes or args.all) and not getattr(
+        args, "no_macro_regimes", False
+    )
     run_regimes = args.regimes or args.all
     run_features = (args.features or args.all) and not getattr(
         args, "no_features", False
@@ -2094,6 +2237,8 @@ Examples:
         components.append("desc_stats")
     if run_macro:
         components.append("macro_features")
+    if run_macro_regimes_flag:
+        components.append("macro_regimes")
     if run_regimes:
         components.append("regimes")
     if run_features:
@@ -2209,7 +2354,18 @@ Examples:
             print("(Use --continue-on-error to run remaining components)")
             return 1
 
-    # Run regimes if requested (after bars, EMAs, AMAs, desc_stats, and macro)
+    # Run macro regime classification if requested (after macro_features, before per-asset regimes)
+    # Pipeline ordering: macro_features -> macro_regimes -> regimes (MREG-09)
+    if run_macro_regimes_flag:
+        macro_regimes_result = run_macro_regimes(args)
+        results.append(("macro_regimes", macro_regimes_result))
+
+        if not macro_regimes_result.success and not args.continue_on_error:
+            print("\n[STOPPED] Macro regime classification failed, stopping execution")
+            print("(Use --continue-on-error to run remaining components)")
+            return 1
+
+    # Run regimes if requested (after bars, EMAs, AMAs, desc_stats, macro, and macro_regimes)
     if run_regimes:
         regime_result = run_regime_refresher(args, db_url, parsed_ids)
         results.append(("regimes", regime_result))
