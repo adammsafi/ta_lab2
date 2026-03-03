@@ -1391,10 +1391,12 @@ Plans:
   2. Each dimension uses structural thresholds from YAML config (not hardcoded), and changing a threshold in YAML changes the label without code changes
   3. Hysteresis prevents rapid regime flapping -- a regime must persist for at least 5 bars before it can transition
   4. Macro regime refresh runs daily after macro feature computation and before signal generation
-**Plans:** 3 plans
+**Plans:** 3 plans in 3 waves
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 67 to break down)
+- [ ] 67-01-PLAN.md -- Alembic migration (cmc_macro_regimes + cmc_macro_hysteresis_state)
+- [ ] 67-02-PLAN.md -- MacroRegimeClassifier module + YAML config (4 dimension labelers, hysteresis, bucketing)
+- [ ] 67-03-PLAN.md -- CLI refresh script + daily pipeline wiring (run_daily_refresh.py integration)
 
 ### Phase 68: HMM & Macro Analytics
 
