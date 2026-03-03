@@ -86,4 +86,19 @@ def load_policy_table(
                 entry[k] = rule[k]
         if entry:
             merged[match] = entry
+
+    # MINT-02: Enforce tighten-only invariant on all glob-pattern entries (L4 entries)
+    for key, val in merged.items():
+        if "*" in key or "?" in key or "[" in key:
+            sm = float(val.get("size_mult", 1.0))
+            gc = float(val.get("gross_cap", 1.0))
+            if sm > 1.0:
+                raise ValueError(
+                    f"MINT-02 violation in YAML policy: entry {key!r} has size_mult={sm} > 1.0"
+                )
+            if gc > 1.0:
+                raise ValueError(
+                    f"MINT-02 violation in YAML policy: entry {key!r} has gross_cap={gc} > 1.0"
+                )
+
     return merged

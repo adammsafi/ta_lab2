@@ -1,6 +1,7 @@
 # configs/regime_policies.yaml
 # Overlay rules that merge over DEFAULT_POLICY_TABLE in code.
-# Matching is substring-based: every token in "match" must appear in the regime key.
+# Matching is substring-based for plain keys (every token in "match" must appear in the regime key).
+# Keys containing *, ?, or [ use fnmatch glob matching (see resolver._match_policy).
 rules:
   - match: "Up-Normal-Normal"
     size_mult: 1.05
@@ -41,3 +42,60 @@ rules:
     stop_mult: 1.30
     orders: passive
     pyramids: false
+
+  # --- L4 Macro Regime Rules (glob patterns) ---
+  # Order matters: more specific patterns must precede broader ones.
+
+  # Most severe: liquidity contraction + risk-off
+  - match: "*-Strongly_Contracting-RiskOff-*"
+    size_mult: 0.30
+    stop_mult: 2.00
+    gross_cap: 0.40
+    orders: passive
+    setups: ["stand_down","hedge"]
+    pyramids: false
+
+  # Severe: contraction + risk-off
+  - match: "*-Contracting-RiskOff-*"
+    size_mult: 0.50
+    stop_mult: 1.80
+    gross_cap: 0.50
+    orders: conservative
+    setups: ["hedge"]
+    pyramids: false
+
+  # Hiking + risk-off (cautious combo)
+  - match: "Hiking-*-RiskOff-*"
+    size_mult: 0.55
+    stop_mult: 1.75
+    gross_cap: 0.55
+    orders: conservative
+    setups: ["hedge"]
+    pyramids: false
+
+  # Generic risk-off (any monetary/liquidity)
+  - match: "*-RiskOff-*"
+    size_mult: 0.60
+    stop_mult: 1.70
+    gross_cap: 0.60
+    orders: conservative
+    setups: ["pullback","hedge"]
+
+  # Carry unwind stress (any combo)
+  - match: "*-Unwind"
+    size_mult: 0.65
+    stop_mult: 1.65
+    gross_cap: 0.65
+    orders: conservative
+
+  # Strong contraction without risk-off
+  - match: "*-Strongly_Contracting-*"
+    size_mult: 0.65
+    stop_mult: 1.60
+    gross_cap: 0.65
+
+  # Mild contraction without risk-off
+  - match: "*-Contracting-*"
+    size_mult: 0.80
+    stop_mult: 1.50
+    gross_cap: 0.80
