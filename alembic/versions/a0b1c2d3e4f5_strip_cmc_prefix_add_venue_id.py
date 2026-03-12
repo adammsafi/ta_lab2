@@ -750,8 +750,7 @@ def upgrade() -> None:
             (5, 'GATE',         'Gate.io exchange'),
             (6, 'COINBASE',     'Coinbase exchange'),
             (7, 'OKX',          'OKX exchange'),
-            (8, 'BATS',         'BATS/Cboe equities'),
-            (9, 'TVC',          'TradingView consolidated')
+            (8, 'BATS',         'BATS/Cboe equities')
     """)
     )
 
@@ -877,7 +876,20 @@ def upgrade() -> None:
     # Tables with asset_id, id_a/id_b, or UUID-only PKs are handled
     # separately or left as-is (no TVC data in those tables).
     # ==================================================================
-    _TVC_IDS_SUBQUERY = "SELECT id FROM public.dim_assets WHERE data_source = 'TVC'"
+    # Map TVC-sourced assets to their actual primary exchange venue.
+    # TVC is a data aggregator (like CMC), not a venue.
+    # CPOOL -> GATE (venue_id=5), equities/ETFs -> BATS (venue_id=8)
+    _VENUE_FIX_MAP = [
+        # (venue_id, subquery for matching asset ids)
+        (
+            5,
+            "SELECT id FROM public.dim_assets WHERE data_source = 'TVC' AND id = 12573",
+        ),  # CPOOL -> GATE
+        (
+            8,
+            "SELECT id FROM public.dim_assets WHERE data_source = 'TVC' AND id != 12573",
+        ),  # equities/ETFs -> BATS
+    ]
 
     # Tables from VENUE_ID_PK_CHANGES that use 'id' (not id_a/id_b)
     _ID_TABLES_FROM_PK = [
@@ -914,31 +926,32 @@ def upgrade() -> None:
         "portfolio_allocations",
     ]
 
-    for tbl in _ID_TABLES_FROM_PK + _ID_TABLES_FROM_COL_ONLY:
-        op.execute(
-            text(
-                f"UPDATE public.{tbl} SET venue_id = 9 "
-                f"WHERE id IN ({_TVC_IDS_SUBQUERY})"
+    for venue_id, ids_subquery in _VENUE_FIX_MAP:
+        for tbl in _ID_TABLES_FROM_PK + _ID_TABLES_FROM_COL_ONLY:
+            op.execute(
+                text(
+                    f"UPDATE public.{tbl} SET venue_id = {venue_id} "
+                    f"WHERE id IN ({ids_subquery})"
+                )
             )
-        )
 
-    for tbl in _ASSET_ID_TABLES:
-        op.execute(
-            text(
-                f"UPDATE public.{tbl} SET venue_id = 9 "
-                f"WHERE asset_id IN ({_TVC_IDS_SUBQUERY})"
+        for tbl in _ASSET_ID_TABLES:
+            op.execute(
+                text(
+                    f"UPDATE public.{tbl} SET venue_id = {venue_id} "
+                    f"WHERE asset_id IN ({ids_subquery})"
+                )
             )
-        )
 
-    # Cross-asset tables: fix if either side is TVC-sourced
-    for tbl in ["cross_asset_corr", "cross_asset_corr_state"]:
-        op.execute(
-            text(
-                f"UPDATE public.{tbl} SET venue_id = 9 "
-                f"WHERE id_a IN ({_TVC_IDS_SUBQUERY}) "
-                f"OR id_b IN ({_TVC_IDS_SUBQUERY})"
+        # Cross-asset tables: fix if either side is from this venue
+        for tbl in ["cross_asset_corr", "cross_asset_corr_state"]:
+            op.execute(
+                text(
+                    f"UPDATE public.{tbl} SET venue_id = {venue_id} "
+                    f"WHERE id_a IN ({ids_subquery}) "
+                    f"OR id_b IN ({ids_subquery})"
+                )
             )
-        )
 
     # ==================================================================
     # Step 8: Recreate views/matviews with new table names
