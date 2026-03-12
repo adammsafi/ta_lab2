@@ -750,7 +750,9 @@ def upgrade() -> None:
             (5, 'GATE',         'Gate.io exchange'),
             (6, 'COINBASE',     'Coinbase exchange'),
             (7, 'OKX',          'OKX exchange'),
-            (8, 'BATS',         'BATS/Cboe equities')
+            (8, 'BATS',         'BATS/Cboe BZX exchange'),
+            (9, 'NASDAQ',       'NASDAQ exchange'),
+            (10, 'NYSE',        'New York Stock Exchange')
     """)
     )
 
@@ -881,14 +883,17 @@ def upgrade() -> None:
     # CPOOL -> GATE (venue_id=5), equities/ETFs -> BATS (venue_id=8)
     _VENUE_FIX_MAP = [
         # (venue_id, subquery for matching asset ids)
+        # CPOOL -> GATE
+        (5, "SELECT id FROM public.dim_assets WHERE id = 12573"),
+        # FBTC -> BATS (Cboe BZX ETF)
+        (8, "SELECT id FROM public.dim_assets WHERE id = 100001"),
+        # NASDAQ-listed: GOOGL, MARA, MSTR, NVDA, IBIT
         (
-            5,
-            "SELECT id FROM public.dim_assets WHERE data_source = 'TVC' AND id = 12573",
-        ),  # CPOOL -> GATE
-        (
-            8,
-            "SELECT id FROM public.dim_assets WHERE data_source = 'TVC' AND id != 12573",
-        ),  # equities/ETFs -> BATS
+            9,
+            "SELECT id FROM public.dim_assets WHERE id IN (100002, 100006, 100007, 100008, 100004)",
+        ),
+        # NYSE-listed: GS, KO, WMT
+        (10, "SELECT id FROM public.dim_assets WHERE id IN (100003, 100005, 100009)"),
     ]
 
     # Tables from VENUE_ID_PK_CHANGES that use 'id' (not id_a/id_b)
