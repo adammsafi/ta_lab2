@@ -871,90 +871,94 @@ def upgrade() -> None:
     )
 
     # ==================================================================
-    # Step 7b: Fix venue_id for non-CMC assets
-    # Assets sourced from TVC (TradingView) should be venue_id=9, not 1.
-    # Uses dim_assets.data_source to identify TVC-sourced assets.
-    # Only updates tables that have an 'id' column referencing dim_assets.
-    # Tables with asset_id, id_a/id_b, or UUID-only PKs are handled
-    # separately or left as-is (no TVC data in those tables).
+    # Step 7b: Set venue_id from existing venue TEXT column
+    # 41 tables already have a venue TEXT column with the actual exchange
+    # name (e.g., 'GATE', 'BYBIT', 'CMC_AGG'). Use that to set venue_id
+    # per row via JOIN to dim_venues, rather than blanket per-asset.
+    # Tables without a venue column keep venue_id=1 (CMC_AGG default).
     # ==================================================================
-    # Map TVC-sourced assets to their actual primary exchange venue.
-    # TVC is a data aggregator (like CMC), not a venue.
-    # CPOOL -> GATE (venue_id=5), equities/ETFs -> BATS (venue_id=8)
-    _VENUE_FIX_MAP = [
-        # (venue_id, subquery for matching asset ids)
-        # CPOOL -> GATE
-        (5, "SELECT id FROM public.dim_assets WHERE id = 12573"),
-        # FBTC -> BATS (Cboe BZX ETF)
-        (8, "SELECT id FROM public.dim_assets WHERE id = 100001"),
-        # NASDAQ-listed: GOOGL, MARA, MSTR, NVDA, IBIT
-        (
-            9,
-            "SELECT id FROM public.dim_assets WHERE id IN (100002, 100006, 100007, 100008, 100004)",
-        ),
-        # NYSE-listed: GS, KO, WMT
-        (10, "SELECT id FROM public.dim_assets WHERE id IN (100003, 100005, 100009)"),
-    ]
 
-    # Tables from VENUE_ID_PK_CHANGES that use 'id' (not id_a/id_b)
-    _ID_TABLES_FROM_PK = [
-        t[0] for t in VENUE_ID_PK_CHANGES if "id" in t[2] and "id_a" not in t[2]
-    ]
-
-    # Tables from VENUE_ID_COLUMN_ONLY that have an 'id' column
-    # (skip trading/execution/UUID-PK tables that use asset_id or no asset ref)
-    _ID_TABLES_FROM_COL_ONLY = [
+    # Tables that have a venue TEXT column (after rename)
+    _TABLES_WITH_VENUE_COL = [
+        # Price bars
         "price_bars_1d",
-        "price_bars_1d_state",
+        "price_bars_multi_tf",
+        "price_bars_multi_tf_cal_iso",
+        "price_bars_multi_tf_cal_us",
+        "price_bars_multi_tf_cal_anchor_iso",
+        "price_bars_multi_tf_cal_anchor_us",
+        "price_bars_multi_tf_u",
+        # Price bar state
+        "price_bars_multi_tf_state",
+        "price_bars_multi_tf_cal_iso_state",
+        "price_bars_multi_tf_cal_us_state",
+        "price_bars_multi_tf_cal_anchor_iso_state",
+        "price_bars_multi_tf_cal_anchor_us_state",
+        # Bar returns
+        "returns_bars_multi_tf",
+        "returns_bars_multi_tf_cal_iso",
+        "returns_bars_multi_tf_cal_us",
+        "returns_bars_multi_tf_cal_anchor_iso",
+        "returns_bars_multi_tf_cal_anchor_us",
+        "returns_bars_multi_tf_u",
+        # Bar returns state
+        "returns_bars_multi_tf_state",
+        "returns_bars_multi_tf_cal_iso_state",
+        "returns_bars_multi_tf_cal_us_state",
+        "returns_bars_multi_tf_cal_anchor_iso_state",
+        "returns_bars_multi_tf_cal_anchor_us_state",
+        # EMA
+        "ema_multi_tf_cal_iso",
+        "ema_multi_tf_cal_us",
+        "ema_multi_tf_u",
+        # EMA returns
+        "returns_ema_multi_tf",
+        "returns_ema_multi_tf_cal_iso",
+        "returns_ema_multi_tf_cal_us",
+        "returns_ema_multi_tf_cal_anchor_iso",
+        "returns_ema_multi_tf_cal_anchor_us",
+        "returns_ema_multi_tf_u",
+        "returns_ema_multi_tf_state",
+        # Features
+        "features",
         "ta",
         "vol",
-        "ta_daily",
-        "vol_daily",
-        "returns_daily",
         "cycle_stats",
         "rolling_extremes",
-        "cs_norms",
-        "features_stats",
-        "regime_flips",
-        "regime_stats",
+        # Perps (already venue-based)
+        "funding_rates",
+        "margin_config",
+        "perp_positions",
     ]
 
-    # Tables that use asset_id instead of id
-    _ASSET_ID_TABLES = [
-        "orders",
-        "fills",
-        "positions",
-        "order_events",
-        "order_dead_letter",
-        "triple_barrier_labels",
-        "meta_label_results",
-        "portfolio_allocations",
+    for tbl in _TABLES_WITH_VENUE_COL:
+        op.execute(
+            text(
+                f"UPDATE public.{tbl} t SET venue_id = dv.venue_id "
+                f"FROM public.dim_venues dv "
+                f"WHERE t.venue = dv.venue AND t.venue_id = 1 AND t.venue != 'CMC_AGG'"
+            )
+        )
+
+    # For equities with venue='BATS', map to actual listing exchange.
+    # BATS is a secondary exchange; the real primary is NYSE or NASDAQ.
+    # FBTC (100001) is actually BATS-listed (Cboe BZX ETF).
+    _EQUITY_VENUE_MAP = [
+        # (venue_id, asset_ids)
+        (
+            9,
+            [100002, 100004, 100006, 100007, 100008],
+        ),  # NASDAQ: GOOGL, IBIT, MARA, MSTR, NVDA
+        (10, [100003, 100005, 100009]),  # NYSE: GS, KO, WMT
+        # FBTC (100001) stays BATS (venue_id=8) -- correct
     ]
-
-    for venue_id, ids_subquery in _VENUE_FIX_MAP:
-        for tbl in _ID_TABLES_FROM_PK + _ID_TABLES_FROM_COL_ONLY:
+    for vid, ids in _EQUITY_VENUE_MAP:
+        id_list = ", ".join(str(i) for i in ids)
+        for tbl in _TABLES_WITH_VENUE_COL:
             op.execute(
                 text(
-                    f"UPDATE public.{tbl} SET venue_id = {venue_id} "
-                    f"WHERE id IN ({ids_subquery})"
-                )
-            )
-
-        for tbl in _ASSET_ID_TABLES:
-            op.execute(
-                text(
-                    f"UPDATE public.{tbl} SET venue_id = {venue_id} "
-                    f"WHERE asset_id IN ({ids_subquery})"
-                )
-            )
-
-        # Cross-asset tables: fix if either side is from this venue
-        for tbl in ["cross_asset_corr", "cross_asset_corr_state"]:
-            op.execute(
-                text(
-                    f"UPDATE public.{tbl} SET venue_id = {venue_id} "
-                    f"WHERE id_a IN ({ids_subquery}) "
-                    f"OR id_b IN ({ids_subquery})"
+                    f"UPDATE public.{tbl} SET venue_id = {vid} "
+                    f"WHERE id IN ({id_list}) AND venue = 'BATS'"
                 )
             )
 
