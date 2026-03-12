@@ -870,6 +870,77 @@ def upgrade() -> None:
     )
 
     # ==================================================================
+    # Step 7b: Fix venue_id for non-CMC assets
+    # Assets sourced from TVC (TradingView) should be venue_id=9, not 1.
+    # Uses dim_assets.data_source to identify TVC-sourced assets.
+    # Only updates tables that have an 'id' column referencing dim_assets.
+    # Tables with asset_id, id_a/id_b, or UUID-only PKs are handled
+    # separately or left as-is (no TVC data in those tables).
+    # ==================================================================
+    _TVC_IDS_SUBQUERY = "SELECT id FROM public.dim_assets WHERE data_source = 'TVC'"
+
+    # Tables from VENUE_ID_PK_CHANGES that use 'id' (not id_a/id_b)
+    _ID_TABLES_FROM_PK = [
+        t[0] for t in VENUE_ID_PK_CHANGES if "id" in t[2] and "id_a" not in t[2]
+    ]
+
+    # Tables from VENUE_ID_COLUMN_ONLY that have an 'id' column
+    # (skip trading/execution/UUID-PK tables that use asset_id or no asset ref)
+    _ID_TABLES_FROM_COL_ONLY = [
+        "price_bars_1d",
+        "price_bars_1d_state",
+        "ta",
+        "vol",
+        "ta_daily",
+        "vol_daily",
+        "returns_daily",
+        "cycle_stats",
+        "rolling_extremes",
+        "cs_norms",
+        "features_stats",
+        "regime_flips",
+        "regime_stats",
+    ]
+
+    # Tables that use asset_id instead of id
+    _ASSET_ID_TABLES = [
+        "orders",
+        "fills",
+        "positions",
+        "order_events",
+        "order_dead_letter",
+        "triple_barrier_labels",
+        "meta_label_results",
+        "portfolio_allocations",
+    ]
+
+    for tbl in _ID_TABLES_FROM_PK + _ID_TABLES_FROM_COL_ONLY:
+        op.execute(
+            text(
+                f"UPDATE public.{tbl} SET venue_id = 9 "
+                f"WHERE id IN ({_TVC_IDS_SUBQUERY})"
+            )
+        )
+
+    for tbl in _ASSET_ID_TABLES:
+        op.execute(
+            text(
+                f"UPDATE public.{tbl} SET venue_id = 9 "
+                f"WHERE asset_id IN ({_TVC_IDS_SUBQUERY})"
+            )
+        )
+
+    # Cross-asset tables: fix if either side is TVC-sourced
+    for tbl in ["cross_asset_corr", "cross_asset_corr_state"]:
+        op.execute(
+            text(
+                f"UPDATE public.{tbl} SET venue_id = 9 "
+                f"WHERE id_a IN ({_TVC_IDS_SUBQUERY}) "
+                f"OR id_b IN ({_TVC_IDS_SUBQUERY})"
+            )
+        )
+
+    # ==================================================================
     # Step 8: Recreate views/matviews with new table names
     # ==================================================================
 
