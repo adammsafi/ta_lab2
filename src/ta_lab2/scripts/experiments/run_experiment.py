@@ -1,9 +1,9 @@
 """
-CLI for running feature experiments and persisting results to cmc_feature_experiments.
+CLI for running feature experiments and persisting results to feature_experiments.
 
 Computes an experimental feature from the YAML registry, scores it with Spearman IC
 against forward returns, applies BH correction across all hypotheses, and optionally
-writes results to cmc_feature_experiments.
+writes results to feature_experiments.
 
 Usage
 -----
@@ -93,7 +93,7 @@ def _to_python(v: Any) -> Any:
 
 def save_experiment_results(conn: Any, result_df: pd.DataFrame) -> int:
     """
-    Persist IC experiment results to cmc_feature_experiments.
+    Persist IC experiment results to feature_experiments.
 
     Uses ON CONFLICT (uq_feature_experiments_key) DO UPDATE for overwrite semantics.
     experiment_id is generated server-side via gen_random_uuid().
@@ -114,7 +114,7 @@ def save_experiment_results(conn: Any, result_df: pd.DataFrame) -> int:
 
     sql = text(
         """
-        INSERT INTO public.cmc_feature_experiments
+        INSERT INTO public.feature_experiments
             (feature_name, asset_id, tf, train_start, train_end,
              horizon, horizon_days, return_type,
              regime_col, regime_label,
@@ -194,7 +194,7 @@ def _load_prior_results(
         """
         SELECT feature_name, asset_id, tf, horizon, return_type,
                ic, ic_p_value, ic_p_value_bh, n_obs, run_at
-        FROM public.cmc_feature_experiments
+        FROM public.feature_experiments
         WHERE feature_name = :feature_name
           AND tf = :tf
           AND train_start = :train_start
@@ -245,7 +245,7 @@ def main() -> int:
             "Run feature experiments from the YAML registry.\n\n"
             "Computes experimental feature values, scores with Spearman IC against "
             "forward returns, applies BH correction across all hypotheses, and "
-            "optionally writes results to cmc_feature_experiments.\n\n"
+            "optionally writes results to feature_experiments.\n\n"
             "Use --dry-run to compute without writing. Use --yes to skip prompt."
         ),
     )
@@ -324,13 +324,13 @@ def main() -> int:
         action="store_true",
         default=False,
         dest="dry_run",
-        help="Print results but do not write to cmc_feature_experiments or scratch table.",
+        help="Print results but do not write to feature_experiments or scratch table.",
     )
     parser.add_argument(
         "--compare",
         action="store_true",
         default=False,
-        help="Compare results against prior runs in cmc_feature_experiments (show delta IC).",
+        help="Compare results against prior runs in feature_experiments (show delta IC).",
     )
 
     # Registry path
@@ -401,10 +401,14 @@ def main() -> int:
             logger.error("Invalid --ids value: %s", exc)
             return 1
     else:
-        logger.info("--ids not provided, loading all assets from dim_assets...")
+        logger.info("--ids not provided, loading tier-1 assets from dim_assets...")
         try:
             with engine.connect() as conn:
-                result = conn.execute(text("SELECT id FROM dim_assets ORDER BY id"))
+                result = conn.execute(
+                    text(
+                        "SELECT id FROM dim_assets WHERE pipeline_tier = 1 ORDER BY id"
+                    )
+                )
                 asset_ids = [row[0] for row in result]
         except Exception as exc:
             logger.error(
@@ -492,7 +496,7 @@ def main() -> int:
         if not should_write:
             try:
                 answer = (
-                    input("\nWrite to cmc_feature_experiments? [y/N]: ").strip().lower()
+                    input("\nWrite to feature_experiments? [y/N]: ").strip().lower()
                 )
                 should_write = answer in ("y", "yes")
             except EOFError:
@@ -505,9 +509,9 @@ def main() -> int:
                 with engine.begin() as conn:
                     n_written = save_experiment_results(conn, result_df)
                 total_rows_written += n_written
-                print(f"  Wrote {n_written} rows to cmc_feature_experiments.")
+                print(f"  Wrote {n_written} rows to feature_experiments.")
                 logger.info(
-                    "Wrote %d rows to cmc_feature_experiments for feature=%s",
+                    "Wrote %d rows to feature_experiments for feature=%s",
                     n_written,
                     feature_name,
                 )

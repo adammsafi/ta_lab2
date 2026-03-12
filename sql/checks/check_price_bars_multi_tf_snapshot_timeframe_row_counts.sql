@@ -10,12 +10,12 @@ snap AS (
       ELSE tf
     END AS tf_norm,
     COUNT(*) AS n
-  FROM public.cmc_price_bars_multi_tf_snapshot_20251213
+  FROM public.price_bars_multi_tf_snapshot_20251213
   GROUP BY 1
 ),
 cur AS (
   SELECT tf AS tf_norm, COUNT(*) AS n
-  FROM public.cmc_price_bars_multi_tf
+  FROM public.price_bars_multi_tf
   GROUP BY 1
 )
 SELECT

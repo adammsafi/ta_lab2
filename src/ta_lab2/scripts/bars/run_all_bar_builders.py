@@ -51,7 +51,7 @@ class BuilderConfig:
 ALL_BUILDERS = [
     BuilderConfig(
         name="1d",
-        script_path="refresh_cmc_price_bars_1d.py",
+        script_path="refresh_price_bars_1d.py",
         description="1D canonical bars from CMC (SQL-based)",
         requires_tz=False,
         supports_full_rebuild=True,  # Uses --rebuild flag
@@ -72,14 +72,14 @@ ALL_BUILDERS = [
     ),
     BuilderConfig(
         name="multi_tf",
-        script_path="refresh_cmc_price_bars_multi_tf.py",
+        script_path="refresh_price_bars_multi_tf.py",
         description="Multi-timeframe rolling bars (7d, 14d, ...)",
         requires_tz=False,
         supports_full_rebuild=True,
     ),
     BuilderConfig(
         name="cal_iso",
-        script_path="refresh_cmc_price_bars_multi_tf_cal_iso.py",
+        script_path="refresh_price_bars_multi_tf_cal_iso.py",
         description="Calendar-aligned bars (ISO week, month, quarter, year)",
         requires_tz=True,
         supports_full_rebuild=True,
@@ -87,7 +87,7 @@ ALL_BUILDERS = [
     ),
     BuilderConfig(
         name="cal_us",
-        script_path="refresh_cmc_price_bars_multi_tf_cal_us.py",
+        script_path="refresh_price_bars_multi_tf_cal_us.py",
         description="Calendar-aligned bars (US week starts Sunday)",
         requires_tz=True,
         supports_full_rebuild=True,
@@ -95,7 +95,7 @@ ALL_BUILDERS = [
     ),
     BuilderConfig(
         name="cal_anchor_iso",
-        script_path="refresh_cmc_price_bars_multi_tf_cal_anchor_iso.py",
+        script_path="refresh_price_bars_multi_tf_cal_anchor_iso.py",
         description="Calendar-anchored bars with partial snapshots (ISO)",
         requires_tz=True,
         supports_full_rebuild=True,
@@ -103,7 +103,7 @@ ALL_BUILDERS = [
     ),
     BuilderConfig(
         name="cal_anchor_us",
-        script_path="refresh_cmc_price_bars_multi_tf_cal_anchor_us.py",
+        script_path="refresh_price_bars_multi_tf_cal_anchor_us.py",
         description="Calendar-anchored bars with partial snapshots (US)",
         requires_tz=True,
         supports_full_rebuild=True,

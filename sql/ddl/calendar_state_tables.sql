@@ -26,7 +26,7 @@
 -- US Calendar Builder (Sunday-start weeks)
 -- ==================================================================================
 
-CREATE TABLE IF NOT EXISTS public.cmc_price_bars_multi_tf_cal_us_state (
+CREATE TABLE IF NOT EXISTS public.price_bars_multi_tf_cal_us_state (
     id INTEGER NOT NULL,
     tf TEXT NOT NULL,
     tz TEXT,  -- NOT in PRIMARY KEY - see rationale above
@@ -38,10 +38,10 @@ CREATE TABLE IF NOT EXISTS public.cmc_price_bars_multi_tf_cal_us_state (
     PRIMARY KEY (id, tf)
 );
 
-COMMENT ON TABLE public.cmc_price_bars_multi_tf_cal_us_state IS
+COMMENT ON TABLE public.price_bars_multi_tf_cal_us_state IS
 'State tracking for US calendar bar builder (Sunday-start weeks). tz column tracks timezone used but is not part of PK.';
 
-COMMENT ON COLUMN public.cmc_price_bars_multi_tf_cal_us_state.tz IS
+COMMENT ON COLUMN public.price_bars_multi_tf_cal_us_state.tz IS
 'Timezone used for calendar alignment (metadata only, not part of PRIMARY KEY). See table comment for design rationale.';
 
 
@@ -49,7 +49,7 @@ COMMENT ON COLUMN public.cmc_price_bars_multi_tf_cal_us_state.tz IS
 -- ISO Calendar Builder (Monday-start weeks)
 -- ==================================================================================
 
-CREATE TABLE IF NOT EXISTS public.cmc_price_bars_multi_tf_cal_iso_state (
+CREATE TABLE IF NOT EXISTS public.price_bars_multi_tf_cal_iso_state (
     id INTEGER NOT NULL,
     tf TEXT NOT NULL,
     tz TEXT,  -- NOT in PRIMARY KEY - see rationale above
@@ -61,10 +61,10 @@ CREATE TABLE IF NOT EXISTS public.cmc_price_bars_multi_tf_cal_iso_state (
     PRIMARY KEY (id, tf)
 );
 
-COMMENT ON TABLE public.cmc_price_bars_multi_tf_cal_iso_state IS
+COMMENT ON TABLE public.price_bars_multi_tf_cal_iso_state IS
 'State tracking for ISO calendar bar builder (Monday-start weeks). tz column tracks timezone used but is not part of PK.';
 
-COMMENT ON COLUMN public.cmc_price_bars_multi_tf_cal_iso_state.tz IS
+COMMENT ON COLUMN public.price_bars_multi_tf_cal_iso_state.tz IS
 'Timezone used for calendar alignment (metadata only, not part of PRIMARY KEY). See table comment for design rationale.';
 
 
@@ -72,7 +72,7 @@ COMMENT ON COLUMN public.cmc_price_bars_multi_tf_cal_iso_state.tz IS
 -- US Anchor Calendar Builder (Sunday-start, year-anchored)
 -- ==================================================================================
 
-CREATE TABLE IF NOT EXISTS public.cmc_price_bars_multi_tf_cal_anchor_us_state (
+CREATE TABLE IF NOT EXISTS public.price_bars_multi_tf_cal_anchor_us_state (
     id INTEGER NOT NULL,
     tf TEXT NOT NULL,
     tz TEXT,  -- NOT in PRIMARY KEY - see rationale above
@@ -84,10 +84,10 @@ CREATE TABLE IF NOT EXISTS public.cmc_price_bars_multi_tf_cal_anchor_us_state (
     PRIMARY KEY (id, tf)
 );
 
-COMMENT ON TABLE public.cmc_price_bars_multi_tf_cal_anchor_us_state IS
+COMMENT ON TABLE public.price_bars_multi_tf_cal_anchor_us_state IS
 'State tracking for US anchor calendar bar builder (year-anchored, Sunday-start weeks). tz column tracks timezone used but is not part of PK.';
 
-COMMENT ON COLUMN public.cmc_price_bars_multi_tf_cal_anchor_us_state.tz IS
+COMMENT ON COLUMN public.price_bars_multi_tf_cal_anchor_us_state.tz IS
 'Timezone used for calendar alignment (metadata only, not part of PRIMARY KEY). See table comment for design rationale.';
 
 
@@ -95,7 +95,7 @@ COMMENT ON COLUMN public.cmc_price_bars_multi_tf_cal_anchor_us_state.tz IS
 -- ISO Anchor Calendar Builder (Monday-start, year-anchored)
 -- ==================================================================================
 
-CREATE TABLE IF NOT EXISTS public.cmc_price_bars_multi_tf_cal_anchor_iso_state (
+CREATE TABLE IF NOT EXISTS public.price_bars_multi_tf_cal_anchor_iso_state (
     id INTEGER NOT NULL,
     tf TEXT NOT NULL,
     tz TEXT,  -- NOT in PRIMARY KEY - see rationale above
@@ -107,10 +107,10 @@ CREATE TABLE IF NOT EXISTS public.cmc_price_bars_multi_tf_cal_anchor_iso_state (
     PRIMARY KEY (id, tf)
 );
 
-COMMENT ON TABLE public.cmc_price_bars_multi_tf_cal_anchor_iso_state IS
+COMMENT ON TABLE public.price_bars_multi_tf_cal_anchor_iso_state IS
 'State tracking for ISO anchor calendar bar builder (year-anchored, Monday-start weeks). tz column tracks timezone used but is not part of PK.';
 
-COMMENT ON COLUMN public.cmc_price_bars_multi_tf_cal_anchor_iso_state.tz IS
+COMMENT ON COLUMN public.price_bars_multi_tf_cal_anchor_iso_state.tz IS
 'Timezone used for calendar alignment (metadata only, not part of PRIMARY KEY). See table comment for design rationale.';
 
 
@@ -127,7 +127,7 @@ COMMENT ON COLUMN public.cmc_price_bars_multi_tf_cal_anchor_iso_state.tz IS
 --
 -- Example migration (DO NOT RUN unless multi-timezone support is implemented):
 --
--- ALTER TABLE public.cmc_price_bars_multi_tf_cal_us_state DROP CONSTRAINT cmc_price_bars_multi_tf_cal_us_state_pkey;
--- ALTER TABLE public.cmc_price_bars_multi_tf_cal_us_state ADD PRIMARY KEY (id, tf, tz);
+-- ALTER TABLE public.price_bars_multi_tf_cal_us_state DROP CONSTRAINT price_bars_multi_tf_cal_us_state_pkey;
+-- ALTER TABLE public.price_bars_multi_tf_cal_us_state ADD PRIMARY KEY (id, tf, tz);
 --
 -- ==================================================================================

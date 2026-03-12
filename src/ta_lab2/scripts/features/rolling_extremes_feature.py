@@ -40,7 +40,7 @@ class RollingExtremesConfig(FeatureConfig):
     """Configuration for rolling extremes computation."""
 
     feature_type: str = "rolling_extremes"
-    output_table: str = "cmc_rolling_extremes"
+    output_table: str = "rolling_extremes"
     null_strategy: str = "skip"
     add_zscore: bool = False
     target_days: tuple[int, ...] = DEFAULT_TARGET_DAYS
@@ -54,10 +54,10 @@ class RollingExtremesFeature(BaseFeature):
     Produces one row per (id, ts, tf, alignment_source, lookback_bars).
 
     Template method flow:
-    1. Load close + ts from cmc_price_bars_multi_tf_u
+    1. Load close + ts from price_bars_multi_tf_u
     2. For each window, compute rolling extremes per asset
     3. Stack all windows into a single DataFrame
-    4. Write to cmc_rolling_extremes
+    4. Write to rolling_extremes
     """
 
     def __init__(self, engine: Engine, config: Optional[RollingExtremesConfig] = None):

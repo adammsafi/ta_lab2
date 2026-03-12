@@ -244,7 +244,7 @@
 │   ├── 006_check_out.sql
 │   ├── 007_check_out.sql
 │   ├── 009_create_ema_refresh_state.sql
-│   ├── 010_alter_cmc_ema_multi_tf_u.sql
+│   ├── 010_alter_ema_multi_tf_u.sql
 │   ├── 011_check_out.sql
 │   ├── 012_check_out.sql
 │   ├── 013_check_out.sql
@@ -255,32 +255,32 @@
 │   ├── checks
 │   │   ├── 001_compare_emas_to_snapshots.sql
 │   │   ├── 020_dim_timeframe_sanity.sql
-│   │   ├── 030_cmc_ema_multi_tf_v2_stats.sql
-│   │   ├── 031_cmc_ema_multi_tf_cal_anchor_stats_table.sql
-│   │   ├── cmc_ema_multi_tf_u_fk_and_tf_audit.sql
+│   │   ├── 030_ema_multi_tf_v2_stats.sql
+│   │   ├── 031_ema_multi_tf_cal_anchor_stats_table.sql
+│   │   ├── ema_multi_tf_u_fk_and_tf_audit.sql
 │   │   ├── dim_timeframe_naming_checks.sql
 │   │   ├── dst_session_instants_proof.sql
 │   │   └── find_duplicate_indexes.sql
-│   ├── cmc_ema_multi_tf_v2.sql
+│   ├── ema_multi_tf_v2.sql
 │   ├── current_insert_into_multi_tf_u.sql
 │   ├── current_insert_into_multi_tf_u_2.sql
 │   ├── ddl
-│   │   ├── create_cmc_returns_ema_multi_tf.sql
-│   │   ├── create_cmc_returns_ema_multi_tf_cal_anchor.sql
-│   │   ├── create_cmc_returns_ema_multi_tf_cal_unified.sql
-│   │   ├── create_cmc_returns_ema_multi_tf_u.sql
+│   │   ├── create_returns_ema_multi_tf.sql
+│   │   ├── create_returns_ema_multi_tf_cal_anchor.sql
+│   │   ├── create_returns_ema_multi_tf_cal_unified.sql
+│   │   ├── create_returns_ema_multi_tf_u.sql
 │   │   ├── create_returns_tables_20251221.sql
-│   │   ├── ddl_cmc_returns_bars_multi_tf.sql
-│   │   ├── ddl_cmc_returns_bars_multi_tf_cal_anchor_iso.sql
-│   │   ├── ddl_cmc_returns_bars_multi_tf_cal_anchor_us.sql
-│   │   ├── ddl_cmc_returns_bars_multi_tf_cal_iso.sql
-│   │   ├── ddl_cmc_returns_bars_multi_tf_cal_us.sql
+│   │   ├── ddl_returns_bars_multi_tf.sql
+│   │   ├── ddl_returns_bars_multi_tf_cal_anchor_iso.sql
+│   │   ├── ddl_returns_bars_multi_tf_cal_anchor_us.sql
+│   │   ├── ddl_returns_bars_multi_tf_cal_iso.sql
+│   │   ├── ddl_returns_bars_multi_tf_cal_us.sql
 │   │   ├── indexes
 │   │   │   └── create_unique_indexes_canonical_integrity.sql
-│   │   └── price_bars__cmc_price_bars_multi_tf.sql
+│   │   └── price_bars__price_bars_multi_tf.sql
 │   ├── dev
 │   │   ├── ddl_extractors.sql
-│   │   ├── rebuild_cmc_ema_multi_tf_u.sql
+│   │   ├── rebuild_ema_multi_tf_u.sql
 │   │   └── todo_6M&12M_multi_tf_cal_lineup.sql
 │   ├── dim
 │   │   ├── dim_session_instants_for_date.sql
@@ -288,11 +288,11 @@
 │   │   ├── public.session_instants_for_date.sql
 │   │   └── qa__dim_timeframe_calendar_filters.sql
 │   ├── features
-│   │   ├── 030_cmc_ema_multi_tf_u_create.sql
-│   │   ├── 031_cmc_price_bars_multi_tf_cal_iso.sql
-│   │   ├── 031_cmc_price_bars_multi_tf_cal_us.sql
-│   │   ├── 033_cmc_price_bars_multi_tf_cal_anchor_us.sql
-│   │   └── 034_cmc_price_bars_multi_tf_cal_anchor_iso.sql
+│   │   ├── 030_ema_multi_tf_u_create.sql
+│   │   ├── 031_price_bars_multi_tf_cal_iso.sql
+│   │   ├── 031_price_bars_multi_tf_cal_us.sql
+│   │   ├── 033_price_bars_multi_tf_cal_anchor_us.sql
+│   │   └── 034_price_bars_multi_tf_cal_anchor_iso.sql
 │   ├── gates
 │   │   └── gate_canonical_integrity.sql
 │   ├── lookups
@@ -332,8 +332,8 @@
 │   │   └── schema_views_template.sql
 │   └── views
 │       ├── create_alter_all_emas.sql
-│       ├── create_alter_cmc_price_with_emas.sql
-│       ├── create_alter_cmc_price_with_emas_d1d2.sql
+│       ├── create_alter_price_with_emas.sql
+│       ├── create_alter_price_with_emas_d1d2.sql
 │       └── see_views.sql
 ├── src
 │   ├── ta_lab2
@@ -507,16 +507,16 @@
 │   │   │   │   ├── audit_price_bars_integrity.py
 │   │   │   │   ├── audit_price_bars_samples.py
 │   │   │   │   ├── audit_price_bars_tables.py
-│   │   │   │   ├── refresh_cmc_price_bars_multi_tf.py
-│   │   │   │   ├── refresh_cmc_price_bars_multi_tf_cal_anchor_iso.py
-│   │   │   │   ├── refresh_cmc_price_bars_multi_tf_cal_anchor_iso_pre-partial-end.py
-│   │   │   │   ├── refresh_cmc_price_bars_multi_tf_cal_anchor_us.py
-│   │   │   │   ├── refresh_cmc_price_bars_multi_tf_cal_anchor_us_pre-partial-end.py
-│   │   │   │   ├── refresh_cmc_price_bars_multi_tf_cal_iso.py
-│   │   │   │   ├── refresh_cmc_price_bars_multi_tf_cal_iso_pre-partial-end.py
-│   │   │   │   ├── refresh_cmc_price_bars_multi_tf_cal_us.py
-│   │   │   │   ├── refresh_cmc_price_bars_multi_tf_cal_us_pre-partial-end.py
-│   │   │   │   └── refresh_cmc_price_bars_multi_tf_pre-partial-end.py
+│   │   │   │   ├── refresh_price_bars_multi_tf.py
+│   │   │   │   ├── refresh_price_bars_multi_tf_cal_anchor_iso.py
+│   │   │   │   ├── refresh_price_bars_multi_tf_cal_anchor_iso_pre-partial-end.py
+│   │   │   │   ├── refresh_price_bars_multi_tf_cal_anchor_us.py
+│   │   │   │   ├── refresh_price_bars_multi_tf_cal_anchor_us_pre-partial-end.py
+│   │   │   │   ├── refresh_price_bars_multi_tf_cal_iso.py
+│   │   │   │   ├── refresh_price_bars_multi_tf_cal_iso_pre-partial-end.py
+│   │   │   │   ├── refresh_price_bars_multi_tf_cal_us.py
+│   │   │   │   ├── refresh_price_bars_multi_tf_cal_us_pre-partial-end.py
+│   │   │   │   └── refresh_price_bars_multi_tf_pre-partial-end.py
 │   │   │   ├── emas
 │   │   │   │   ├── __init__.py
 │   │   │   │   ├── __pycache__
@@ -526,10 +526,10 @@
 │   │   │   │   ├── audit_ema_integrity.py
 │   │   │   │   ├── audit_ema_samples.py
 │   │   │   │   ├── audit_ema_tables.py
-│   │   │   │   ├── refresh_cmc_ema_multi_tf_cal_anchor_from_bars.py
-│   │   │   │   ├── refresh_cmc_ema_multi_tf_cal_from_bars.py
-│   │   │   │   ├── refresh_cmc_ema_multi_tf_from_bars.py
-│   │   │   │   ├── refresh_cmc_ema_multi_tf_v2.py
+│   │   │   │   ├── refresh_ema_multi_tf_cal_anchor_from_bars.py
+│   │   │   │   ├── refresh_ema_multi_tf_cal_from_bars.py
+│   │   │   │   ├── refresh_ema_multi_tf_from_bars.py
+│   │   │   │   ├── refresh_ema_multi_tf_v2.py
 │   │   │   │   ├── run_all_ema_refreshes.py
 │   │   │   │   ├── stats
 │   │   │   │   │   ├── __init__.py
@@ -563,7 +563,7 @@
 │   │   │   │   │       ├── __pycache__
 │   │   │   │   │       │   └── refresh_ema_multi_tf_v2_stats.cpython-312.pyc
 │   │   │   │   │       └── refresh_ema_multi_tf_v2_stats.py
-│   │   │   │   └── sync_cmc_ema_multi_tf_u.py
+│   │   │   │   └── sync_ema_multi_tf_u.py
 │   │   │   ├── etl
 │   │   │   │   ├── backfill_ema_diffs.py
 │   │   │   │   └── update_cmc_history.py
@@ -612,17 +612,17 @@
 │   │   │   │   ├── audit_returns_ema_multi_tf_integrity.py
 │   │   │   │   ├── audit_returns_ema_multi_tf_u_integrity.py
 │   │   │   │   ├── audit_returns_ema_multi_tf_v2_integrity.py
-│   │   │   │   ├── refresh_cmc_returns_bars_multi_tf.py
-│   │   │   │   ├── refresh_cmc_returns_bars_multi_tf_cal_anchor_iso.py
-│   │   │   │   ├── refresh_cmc_returns_bars_multi_tf_cal_anchor_us.py
-│   │   │   │   ├── refresh_cmc_returns_bars_multi_tf_cal_iso.py
-│   │   │   │   ├── refresh_cmc_returns_bars_multi_tf_cal_us.py
+│   │   │   │   ├── refresh_returns_bars_multi_tf.py
+│   │   │   │   ├── refresh_returns_bars_multi_tf_cal_anchor_iso.py
+│   │   │   │   ├── refresh_returns_bars_multi_tf_cal_anchor_us.py
+│   │   │   │   ├── refresh_returns_bars_multi_tf_cal_iso.py
+│   │   │   │   ├── refresh_returns_bars_multi_tf_cal_us.py
 │   │   │   │   ├── refresh_cmc_returns_d1.py
-│   │   │   │   ├── refresh_cmc_returns_ema_multi_tf.py
-│   │   │   │   ├── refresh_cmc_returns_ema_multi_tf_cal.py
-│   │   │   │   ├── refresh_cmc_returns_ema_multi_tf_cal_anchor.py
-│   │   │   │   ├── refresh_cmc_returns_ema_multi_tf_u.py
-│   │   │   │   └── refresh_cmc_returns_ema_multi_tf_v2.py
+│   │   │   │   ├── refresh_returns_ema_multi_tf.py
+│   │   │   │   ├── refresh_returns_ema_multi_tf_cal.py
+│   │   │   │   ├── refresh_returns_ema_multi_tf_cal_anchor.py
+│   │   │   │   ├── refresh_returns_ema_multi_tf_u.py
+│   │   │   │   └── refresh_returns_ema_multi_tf_v2.py
 │   │   │   └── sandbox
 │   │   ├── signals
 │   │   │   ├── __init__.py

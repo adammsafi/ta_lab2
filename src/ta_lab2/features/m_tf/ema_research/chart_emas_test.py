@@ -64,7 +64,7 @@ with engine.begin() as conn:
         text(
             """
             SELECT id, ts, tf, period, ema, roll
-            FROM public.cmc_ema_multi_tf
+            FROM public.ema_multi_tf
             WHERE id=:id AND tf=:tf AND period=:p
             ORDER BY ts
         """
@@ -77,7 +77,7 @@ with engine.begin() as conn:
         text(
             """
             SELECT id, ts, tf, period, ema, roll
-            FROM public.cmc_ema_multi_tf_v2
+            FROM public.ema_multi_tf_v2
             WHERE id=:id AND tf=:tf AND period=:p
             ORDER BY ts
         """
@@ -107,14 +107,14 @@ if df_v1.empty or df_v2.empty:
     with engine.begin() as conn:
         df_tfs_v1 = pd.read_sql(
             text(
-                """SELECT tf, COUNT(*) n FROM public.cmc_ema_multi_tf WHERE id=:id GROUP BY 1 ORDER BY n DESC LIMIT 50"""
+                """SELECT tf, COUNT(*) n FROM public.ema_multi_tf WHERE id=:id GROUP BY 1 ORDER BY n DESC LIMIT 50"""
             ),
             conn,
             params={"id": asset_id},
         )
         df_tfs_v2 = pd.read_sql(
             text(
-                """SELECT tf, COUNT(*) n FROM public.cmc_ema_multi_tf_v2 WHERE id=:id GROUP BY 1 ORDER BY n DESC LIMIT 50"""
+                """SELECT tf, COUNT(*) n FROM public.ema_multi_tf_v2 WHERE id=:id GROUP BY 1 ORDER BY n DESC LIMIT 50"""
             ),
             conn,
             params={"id": asset_id},

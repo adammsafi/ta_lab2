@@ -2,7 +2,7 @@
 Calendar-aligned multi-timeframe EMA - REFACTORED to use BaseEMAFeature.
 
 Calendar EMA semantics:
-- Canonical calendar closes from cmc_price_bars_multi_tf_cal_us/iso
+- Canonical calendar closes from price_bars_multi_tf_cal_us/iso
 - Timeframe universe from dim_timeframe (alignment_type='calendar')
 - Dual EMAs: ema (daily-space) and ema_bar (bar-space with preview)
 - Alpha from lookup table (ema_alpha_lookup)
@@ -81,9 +81,9 @@ class CalendarEMAFeature(BaseEMAFeature):
 
         # Determine bars table from scheme
         if self.scheme == "US":
-            self.bars_table = "public.cmc_price_bars_multi_tf_cal_us"
+            self.bars_table = "public.price_bars_multi_tf_cal_us"
         elif self.scheme == "ISO":
-            self.bars_table = "public.cmc_price_bars_multi_tf_cal_iso"
+            self.bars_table = "public.price_bars_multi_tf_cal_iso"
         else:
             raise ValueError(f"Unsupported scheme: {scheme} (expected US or ISO)")
 
@@ -124,7 +124,7 @@ class CalendarEMAFeature(BaseEMAFeature):
             close,
             venue,
             venue_rank
-          FROM public.cmc_price_bars_1d
+          FROM public.price_bars_1d
           WHERE {" AND ".join(where)}
           ORDER BY id, venue, "timestamp"
         """
@@ -507,7 +507,7 @@ def write_multi_timeframe_ema_cal_to_db(
 
     scheme_u = scheme.strip().upper()
     if out_table is None:
-        out_table = f"cmc_ema_multi_tf_cal_{scheme_u.lower()}"
+        out_table = f"ema_multi_tf_cal_{scheme_u.lower()}"
 
     logger.info(
         f"Computing calendar EMAs: scheme={scheme_u}, periods={len(ema_periods)}, ids={len(ids)}"

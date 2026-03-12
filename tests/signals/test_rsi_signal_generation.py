@@ -513,7 +513,7 @@ class TestRSISignalRoundtrip:
                     text(
                         """
                     SELECT id, signal_id, position_state, rsi_at_entry, rsi_at_exit, pnl_pct
-                    FROM public.cmc_signals_rsi_mean_revert
+                    FROM public.signals_rsi_mean_revert
                     WHERE id = 9999 AND signal_id = 9999
                     ORDER BY ts
                 """
@@ -535,14 +535,14 @@ class TestRSISignalRoundtrip:
                 with engine.begin() as conn:
                     conn.execute(
                         text(
-                            "DELETE FROM public.cmc_signals_rsi_mean_revert WHERE id = 9999"
+                            "DELETE FROM public.signals_rsi_mean_revert WHERE id = 9999"
                         )
                     )
                     conn.execute(
                         text("DELETE FROM public.cmc_daily_features WHERE id = 9999")
                     )
                     conn.execute(
-                        text("DELETE FROM public.cmc_signal_state WHERE id = 9999")
+                        text("DELETE FROM public.signal_state WHERE id = 9999")
                     )
             except Exception:
                 pass  # Tables may not exist
@@ -613,7 +613,7 @@ class TestRSISignalRoundtrip:
                     text(
                         """
                     SELECT rsi_at_entry, rsi_at_exit, position_state
-                    FROM public.cmc_signals_rsi_mean_revert
+                    FROM public.signals_rsi_mean_revert
                     WHERE id = 9998 AND signal_id = 9998
                     ORDER BY ts
                 """
@@ -636,14 +636,14 @@ class TestRSISignalRoundtrip:
                 with engine.begin() as conn:
                     conn.execute(
                         text(
-                            "DELETE FROM public.cmc_signals_rsi_mean_revert WHERE id = 9998"
+                            "DELETE FROM public.signals_rsi_mean_revert WHERE id = 9998"
                         )
                     )
                     conn.execute(
                         text("DELETE FROM public.cmc_daily_features WHERE id = 9998")
                     )
                     conn.execute(
-                        text("DELETE FROM public.cmc_signal_state WHERE id = 9998")
+                        text("DELETE FROM public.signal_state WHERE id = 9998")
                     )
             except Exception:
                 pass  # Tables may not exist
@@ -663,7 +663,7 @@ class TestRSISignalRoundtrip:
             {
                 "id": [9997] * 10,
                 "ts": pd.to_datetime(
-                    [f"2024-01-{i+1:02d}" for i in range(10)], utc=True
+                    [f"2024-01-{i + 1:02d}" for i in range(10)], utc=True
                 ),
                 "close": [100.0 + i for i in range(10)],
                 "rsi_14": [20, 25, 30, 35, 40, 60, 65, 70, 75, 80],
@@ -703,9 +703,7 @@ class TestRSISignalRoundtrip:
             # Clear and generate with 25/75 thresholds
             with engine.begin() as conn:
                 conn.execute(
-                    text(
-                        "DELETE FROM public.cmc_signals_rsi_mean_revert WHERE id = 9997"
-                    )
+                    text("DELETE FROM public.signals_rsi_mean_revert WHERE id = 9997")
                 )
 
             config2 = {
@@ -729,14 +727,14 @@ class TestRSISignalRoundtrip:
                 with engine.begin() as conn:
                     conn.execute(
                         text(
-                            "DELETE FROM public.cmc_signals_rsi_mean_revert WHERE id = 9997"
+                            "DELETE FROM public.signals_rsi_mean_revert WHERE id = 9997"
                         )
                     )
                     conn.execute(
                         text("DELETE FROM public.cmc_daily_features WHERE id = 9997")
                     )
                     conn.execute(
-                        text("DELETE FROM public.cmc_signal_state WHERE id = 9997")
+                        text("DELETE FROM public.signal_state WHERE id = 9997")
                     )
             except Exception:
                 pass  # Tables may not exist

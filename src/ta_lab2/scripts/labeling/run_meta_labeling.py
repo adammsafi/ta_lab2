@@ -5,7 +5,7 @@ Meta-labeling pipeline: train a RandomForest secondary model over primary signal
 Connects primary signal directions to triple barrier label outcomes to build
 binary training targets (y=1 when signal direction was correct), trains a
 RandomForestClassifier with PurgedKFoldSplitter CV, then scores all signal entries
-and persists trade probabilities to cmc_meta_label_results.
+and persists trade probabilities to meta_label_results.
 
 Reference: AFML Ch.10 -- Meta-Labeling (Lopez de Prado, 2018)
 
@@ -27,15 +27,15 @@ Usage:
 
 Pipeline per asset:
     1. Precondition check: triple barrier labels exist + signals exist for this asset
-    2. Load triple barrier labels from cmc_triple_barrier_labels
+    2. Load triple barrier labels from triple_barrier_labels
     3. Load signal directions from signal table (position_state='open' entries)
     4. Align signals to labels by timestamp (inner join on t0/ts)
-    5. Load features from cmc_features for aligned timestamps
+    5. Load features from features for aligned timestamps
     6. Construct meta-labels: y = (primary_side * barrier_bin > 0).astype(int)
     7. Build t1_series from barrier labels for PurgedKFoldSplitter
     8. CV evaluation with PurgedKFoldSplitter: log per-fold AUC
     9. Final model: train on all data, score all signal entries
-    10. Persist to cmc_meta_label_results (unless --dry-run)
+    10. Persist to meta_label_results (unless --dry-run)
 """
 
 from __future__ import annotations
@@ -64,21 +64,21 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 # Maps signal_type -> (table_name, entry_ts_col, direction_col)
-# Signal tables use 'ts' as the event timestamp (same column that's in cmc_features)
+# Signal tables use 'ts' as the event timestamp (same column that's in features)
 # and 'direction' as the long/short indicator.
 SIGNAL_TABLE_MAP = {
     "ema_crossover": (
-        "cmc_signals_ema_crossover",
+        "signals_ema_crossover",
         "ts",
         "direction",
     ),
     "rsi_mean_revert": (
-        "cmc_signals_rsi_mean_revert",
+        "signals_rsi_mean_revert",
         "ts",
         "direction",
     ),
     "atr_breakout": (
-        "cmc_signals_atr_breakout",
+        "signals_atr_breakout",
         "ts",
         "direction",
     ),
@@ -144,10 +144,10 @@ Examples:
   python -m ta_lab2.scripts.labeling.run_meta_labeling --all --signal-type atr_breakout
 
 Preconditions:
-  Triple barrier labels must exist in cmc_triple_barrier_labels.
+  Triple barrier labels must exist in triple_barrier_labels.
   Signals must exist in the appropriate signal table.
   To generate labels: python -m ta_lab2.scripts.labeling.refresh_triple_barrier_labels --ids 1 --tf 1D
-  To generate EMA signals: python -m ta_lab2.scripts.signals.refresh_cmc_signals_ema_crossover --ids 1
+  To generate EMA signals: python -m ta_lab2.scripts.signals.refresh_signals_ema_crossover --ids 1
         """,
     )
 
@@ -243,7 +243,7 @@ def load_asset_ids(
 
     if all_ids:
         q = text(
-            "SELECT DISTINCT asset_id FROM cmc_triple_barrier_labels "
+            "SELECT DISTINCT asset_id FROM triple_barrier_labels "
             "WHERE tf = :tf "
             "  AND pt_multiplier = :pt "
             "  AND sl_multiplier = :sl "
@@ -281,7 +281,7 @@ def check_preconditions(
     """
     # Check triple barrier labels
     q_labels = text(
-        "SELECT COUNT(*) FROM cmc_triple_barrier_labels "
+        "SELECT COUNT(*) FROM triple_barrier_labels "
         "WHERE asset_id = :asset_id "
         "  AND tf = :tf "
         "  AND pt_multiplier = :pt "
@@ -314,9 +314,9 @@ def check_preconditions(
 
     if not n_signals or n_signals == 0:
         script_map = {
-            "ema_crossover": "refresh_cmc_signals_ema_crossover",
-            "rsi_mean_revert": "refresh_cmc_signals_rsi_mean_revert",
-            "atr_breakout": "refresh_cmc_signals_atr_breakout",
+            "ema_crossover": "refresh_signals_ema_crossover",
+            "rsi_mean_revert": "refresh_signals_rsi_mean_revert",
+            "atr_breakout": "refresh_signals_atr_breakout",
         }
         script = script_map[signal_type]
         return False, (
@@ -342,14 +342,14 @@ def load_triple_barrier_labels(
     vertical_bars: int,
 ) -> pd.DataFrame:
     """
-    Load triple barrier labels for one asset from cmc_triple_barrier_labels.
+    Load triple barrier labels for one asset from triple_barrier_labels.
 
     Returns DataFrame with columns: t0, t1, bin, barrier_type, daily_vol.
     Index: RangeIndex (t0 stored as column, not index).
     """
     q = text(
         "SELECT t0, t1, bin, barrier_type, daily_vol "
-        "FROM cmc_triple_barrier_labels "
+        "FROM triple_barrier_labels "
         "WHERE asset_id = :asset_id "
         "  AND tf = :tf "
         "  AND pt_multiplier = :pt "
@@ -433,7 +433,7 @@ def load_features_for_timestamps(
     feature_cols: list[str],
 ) -> pd.DataFrame:
     """
-    Load feature rows from cmc_features for specific timestamps.
+    Load feature rows from features for specific timestamps.
 
     Returns DataFrame with ts as tz-aware UTC index and feature_cols as columns.
     Rows with all-NaN features are kept (MetaLabeler handles NaN internally).
@@ -450,7 +450,7 @@ def load_features_for_timestamps(
 
     q = text(
         f"SELECT f.ts, {col_sql} "
-        f"FROM public.cmc_features f "
+        f"FROM public.features f "
         f"WHERE f.id = :asset_id "
         f"  AND f.tf = :tf "
         f"  AND f.ts = ANY(:ts_list) "
@@ -475,7 +475,7 @@ def load_features_for_timestamps(
 # ---------------------------------------------------------------------------
 
 _UPSERT_SQL = """
-INSERT INTO cmc_meta_label_results
+INSERT INTO meta_label_results
     (result_id, asset_id, tf, signal_type, t0, t1_from_barrier,
      primary_side, meta_label, trade_probability,
      model_version, n_estimators, feature_set, computed_at)
@@ -508,7 +508,7 @@ def write_meta_labels(
     model_version: str,
 ) -> int:
     """
-    Upsert meta-label results into cmc_meta_label_results.
+    Upsert meta-label results into meta_label_results.
 
     Parameters
     ----------
@@ -677,7 +677,7 @@ def process_asset(
     if features_aligned.empty or features_aligned.isnull().all(axis=None):
         logger.warning(
             f"  asset_id={asset_id}: no features loaded for aligned timestamps. "
-            "Ensure cmc_features is populated for this asset/tf."
+            "Ensure features is populated for this asset/tf."
         )
         result["error"] = "No features for aligned timestamps"
         return result
@@ -858,7 +858,7 @@ def process_asset(
         return result
 
     # ------------------------------------------------------------------
-    # 10. Persist to cmc_meta_label_results
+    # 10. Persist to meta_label_results
     # ------------------------------------------------------------------
     # Write results for the aligned subset (has t1_from_barrier info)
     model_version = f"rf_v1_{signal_type}"
@@ -882,7 +882,7 @@ def process_asset(
         )
         result["n_written"] = n_written
         logger.info(
-            f"  asset_id={asset_id}: {n_written} rows written to cmc_meta_label_results"
+            f"  asset_id={asset_id}: {n_written} rows written to meta_label_results"
         )
     except Exception as exc:
         logger.error(f"  asset_id={asset_id}: DB write failed: {exc}", exc_info=True)
@@ -937,7 +937,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     if not asset_ids:
         logger.error(
             "No asset IDs resolved. Provide --ids or --all.\n"
-            "If using --all, ensure cmc_triple_barrier_labels has rows for "
+            "If using --all, ensure triple_barrier_labels has rows for "
             f"tf={args.tf}, pt={args.pt}, sl={args.sl}, vb={args.vertical_bars}."
         )
         return 1

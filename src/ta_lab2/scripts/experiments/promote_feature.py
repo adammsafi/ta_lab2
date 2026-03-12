@@ -2,7 +2,7 @@
 
 Applies the Benjamini-Hochberg correction gate against IC experiment results,
 then writes the promotion record to dim_feature_registry and generates an
-Alembic migration stub for adding the feature column to cmc_features.
+Alembic migration stub for adding the feature column to features.
 
 Usage::
 
@@ -50,7 +50,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--feature",
         required=True,
         metavar="NAME",
-        help="Feature name to promote (must exist in cmc_feature_experiments).",
+        help="Feature name to promote (must exist in feature_experiments).",
     )
     parser.add_argument(
         "--alpha",

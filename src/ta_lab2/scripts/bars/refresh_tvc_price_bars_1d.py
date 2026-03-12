@@ -1,7 +1,7 @@
 """
 1D Bar Builder for TradingView data.
 
-Builds daily OHLC bars from tvc_price_histories into cmc_price_bars_1d.
+Builds daily OHLC bars from tvc_price_histories into price_bars_1d.
 Writes to the SAME output table as the CMC builder so downstream pipeline
 (multi-TF bars, EMAs, features, signals) works without changes.
 
@@ -279,13 +279,13 @@ class TvcOneDayBarBuilder(BaseBarBuilder):
     """
     1D Bar Builder for TradingView data.
 
-    Builds daily OHLC bars from tvc_price_histories into cmc_price_bars_1d.
+    Builds daily OHLC bars from tvc_price_histories into price_bars_1d.
     Uses the same output table as the CMC builder so the downstream pipeline
     works transparently for both CMC and TVC assets.
     """
 
-    STATE_TABLE = "public.cmc_price_bars_1d_state"
-    OUTPUT_TABLE = "public.cmc_price_bars_1d"
+    STATE_TABLE = "public.price_bars_1d_state"
+    OUTPUT_TABLE = "public.price_bars_1d"
     SOURCE_TABLE = "public.tvc_price_histories"
 
     def __init__(
@@ -426,8 +426,8 @@ class TvcOneDayBarBuilder(BaseBarBuilder):
         parser = cls.create_base_argument_parser(
             description="Build 1D bars from TradingView price data.",
             default_daily_table="public.tvc_price_histories",
-            default_bars_table="public.cmc_price_bars_1d",
-            default_state_table="public.cmc_price_bars_1d_state",
+            default_bars_table="public.price_bars_1d",
+            default_state_table="public.price_bars_1d_state",
             include_tz=False,
         )
         parser.add_argument(
@@ -469,7 +469,7 @@ class TvcOneDayBarBuilder(BaseBarBuilder):
 
 
 def _sync_1d_to_multi_tf(db_url: str) -> None:
-    """Copy TVC 1D bars to cmc_price_bars_multi_tf for downstream pipeline."""
+    """Copy TVC 1D bars to price_bars_multi_tf for downstream pipeline."""
     import logging
 
     logger = logging.getLogger(__name__)
@@ -477,8 +477,8 @@ def _sync_1d_to_multi_tf(db_url: str) -> None:
     try:
         cur = conn.cursor()
         cur.execute("""
-            INSERT INTO public.cmc_price_bars_multi_tf
-            SELECT * FROM public.cmc_price_bars_1d
+            INSERT INTO public.price_bars_multi_tf
+            SELECT * FROM public.price_bars_1d
             WHERE src_name = 'TradingView'
             ON CONFLICT (id, tf, bar_seq, venue, "timestamp") DO UPDATE SET
                 open = EXCLUDED.open,
@@ -492,7 +492,7 @@ def _sync_1d_to_multi_tf(db_url: str) -> None:
                 src_file = EXCLUDED.src_file,
                 venue_rank = EXCLUDED.venue_rank
         """)
-        logger.info("Synced TVC 1D bars to cmc_price_bars_multi_tf")
+        logger.info("Synced TVC 1D bars to price_bars_multi_tf")
         cur.close()
     except Exception as e:
         logger.warning("Failed to sync 1D bars to multi_tf: %s", e)

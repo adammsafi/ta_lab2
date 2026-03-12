@@ -9,25 +9,25 @@
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
--- Snapshot: cmc_price_bars_multi_tf
+-- Snapshot: price_bars_multi_tf
 -- -----------------------------------------------------------------------------
-CREATE TABLE public.cmc_price_bars_multi_tf_snapshot_20251213
+CREATE TABLE public.price_bars_multi_tf_snapshot_20251213
 AS
 SELECT *
-FROM public.cmc_price_bars_multi_tf;
+FROM public.price_bars_multi_tf;
 
 -- Add a primary key so joins/diffs are fast and semantics match “real” table.
-ALTER TABLE public.cmc_price_bars_multi_tf_snapshot_20251213
-  ADD CONSTRAINT cmc_price_bars_multi_tf_snapshot_20251213_pkey
+ALTER TABLE public.price_bars_multi_tf_snapshot_20251213
+  ADD CONSTRAINT price_bars_multi_tf_snapshot_20251213_pkey
   PRIMARY KEY (id, tf, bar_seq);
 
 -- -----------------------------------------------------------------------------
--- Snapshot: cmc_price_bars_multi_tf_cal_anchor_iso
+-- Snapshot: price_bars_multi_tf_cal_anchor_iso
 -- -----------------------------------------------------------------------------
-CREATE TABLE public.cmc_price_bars_multi_tf_cal_anchor_iso_snapshot_20251213
+CREATE TABLE public.price_bars_multi_tf_cal_anchor_iso_snapshot_20251213
 AS
 SELECT *
-FROM public.cmc_price_bars_multi_tf_cal_anchor_iso;
+FROM public.price_bars_multi_tf_cal_anchor_iso;
 
 -- -----------------------------------------------------------------------------
 -- OPTIONAL: truncate helpers (dangerous)
@@ -35,6 +35,6 @@ FROM public.cmc_price_bars_multi_tf_cal_anchor_iso;
 -- Use these only when you are intentionally resetting tables to rebuild.
 -- Consider wrapping in a transaction when running interactively.
 
--- TRUNCATE public.cmc_price_bars_multi_tf_cal_anchor_iso;
--- TRUNCATE public.cmc_price_bars_multi_tf_cal_iso;
--- TRUNCATE TABLE public.cmc_price_bars_multi_tf;
+-- TRUNCATE public.price_bars_multi_tf_cal_anchor_iso;
+-- TRUNCATE public.price_bars_multi_tf_cal_iso;
+-- TRUNCATE TABLE public.price_bars_multi_tf;

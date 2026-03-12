@@ -1,11 +1,11 @@
 WITH cur_close AS (
   SELECT *
-  FROM public.cmc_ema_multi_tf
+  FROM public.ema_multi_tf
   WHERE roll = FALSE
 ),
 snap_close AS (
   SELECT *
-  FROM public.cmc_ema_multi_tf_snapshot_20251214
+  FROM public.ema_multi_tf_snapshot_20251214
   WHERE roll = FALSE
 ),
 cur_first AS (

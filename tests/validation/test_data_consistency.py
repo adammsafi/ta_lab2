@@ -25,10 +25,10 @@ class TestDataConsistencyValidation:
         """
         # Check each EMA table for duplicates
         ema_tables = [
-            "cmc_ema_multi_tf_u",
+            "ema_multi_tf_u",
             # Add other EMA tables if they exist
-            # 'cmc_ema_multi_tf',
-            # 'cmc_ema_multi_tf_cal',
+            # 'ema_multi_tf',
+            # 'ema_multi_tf_cal',
         ]
 
         all_duplicates = []
@@ -91,21 +91,21 @@ class TestDataConsistencyValidation:
 
         Tolerance: 5% for delisted assets and data gaps.
         """
-        # Check if cmc_ema_multi_tf_u table exists
+        # Check if ema_multi_tf_u table exists
         check_exists = text(
             """
             SELECT EXISTS (
                 SELECT 1
                 FROM information_schema.tables
                 WHERE table_schema = 'public'
-                AND table_name = 'cmc_ema_multi_tf_u'
+                AND table_name = 'ema_multi_tf_u'
             )
         """
         )
         table_exists = db_session.execute(check_exists).scalar()
 
         if not table_exists:
-            pytest.skip("cmc_ema_multi_tf_u table does not exist")
+            pytest.skip("ema_multi_tf_u table does not exist")
 
         # Sample assets for testing (IDs 1, 2, 3)
         sample_assets = [1, 2, 3]
@@ -114,14 +114,14 @@ class TestDataConsistencyValidation:
         date_range_query = text(
             """
             SELECT MIN(ts)::date AS min_date, MAX(ts)::date AS max_date
-            FROM cmc_ema_multi_tf_u
+            FROM ema_multi_tf_u
             WHERE id = ANY(:asset_ids)
         """
         )
         result = db_session.execute(date_range_query, {"asset_ids": sample_assets})
         row = result.fetchone()
         if not row or not row[0]:
-            pytest.skip("No data in cmc_ema_multi_tf_u for sample assets")
+            pytest.skip("No data in ema_multi_tf_u for sample assets")
 
         min_date, max_date = row[0], row[1]
         total_days = (max_date - min_date).days + 1
@@ -155,7 +155,7 @@ class TestDataConsistencyValidation:
             actual_query = text(
                 """
                 SELECT id, COUNT(*) AS row_count
-                FROM cmc_ema_multi_tf_u
+                FROM ema_multi_tf_u
                 WHERE tf = :tf
                 AND id = ANY(:asset_ids)
                 AND period = 50
@@ -204,9 +204,9 @@ class TestDataConsistencyValidation:
                 )
 
         # Allow some mismatches (strict check would be == [], but crypto 24/7 may have edge cases)
-        assert len(mismatches) == 0 or len(mismatches) < len(
-            test_timeframes
-        ), f"Too many timeframes with rowcount mismatch (>5% tolerance): {mismatches}"
+        assert len(mismatches) == 0 or len(mismatches) < len(test_timeframes), (
+            f"Too many timeframes with rowcount mismatch (>5% tolerance): {mismatches}"
+        )
 
     @pytest.mark.validation_gate
     def test_no_null_ema_values(self, db_session):
@@ -218,7 +218,7 @@ class TestDataConsistencyValidation:
         """
         # Check each EMA table for NULL values
         ema_tables = [
-            "cmc_ema_multi_tf_u",
+            "ema_multi_tf_u",
         ]
 
         all_nulls = []
@@ -278,21 +278,21 @@ class TestDataConsistencyValidation:
 
         Sample check: 1000 random rows for performance.
         """
-        # Check if cmc_ema_multi_tf_u table exists
+        # Check if ema_multi_tf_u table exists
         check_exists = text(
             """
             SELECT EXISTS (
                 SELECT 1
                 FROM information_schema.tables
                 WHERE table_schema = 'public'
-                AND table_name = 'cmc_ema_multi_tf_u'
+                AND table_name = 'ema_multi_tf_u'
             )
         """
         )
         table_exists = db_session.execute(check_exists).scalar()
 
         if not table_exists:
-            pytest.skip("cmc_ema_multi_tf_u table does not exist")
+            pytest.skip("ema_multi_tf_u table does not exist")
 
         # Sample 1000 random rows and compare to price
         # Assuming cmc_price_histories7 has matching (id, ts) data
@@ -305,7 +305,7 @@ class TestDataConsistencyValidation:
                 e.period,
                 e.ema,
                 p.close
-            FROM cmc_ema_multi_tf_u e
+            FROM ema_multi_tf_u e
             LEFT JOIN cmc_price_histories7 p ON e.id = p.id AND e.ts::date = p.ts::date
             WHERE e.tf = '1D'
             AND e.period = 50
@@ -362,7 +362,7 @@ class TestDataConsistencyValidation:
                 SELECT 1
                 FROM information_schema.tables
                 WHERE table_schema = 'public'
-                AND table_name = 'cmc_ema_multi_tf_u'
+                AND table_name = 'ema_multi_tf_u'
             )
         """
         )
@@ -382,7 +382,7 @@ class TestDataConsistencyValidation:
 
         if not ema_exists or not price_exists:
             pytest.skip(
-                "Required tables (cmc_ema_multi_tf_u or cmc_price_histories7) do not exist"
+                "Required tables (ema_multi_tf_u or cmc_price_histories7) do not exist"
             )
 
         # Query for orphan EMA rows (no matching price data)
@@ -390,7 +390,7 @@ class TestDataConsistencyValidation:
         query = text(
             """
             SELECT COUNT(*) AS orphan_count
-            FROM cmc_ema_multi_tf_u e
+            FROM ema_multi_tf_u e
             LEFT JOIN cmc_price_histories7 p ON e.id = p.id AND e.ts::date = p.ts::date
             WHERE e.tf = '1D'
             AND p.id IS NULL
@@ -404,7 +404,7 @@ class TestDataConsistencyValidation:
         total_query = text(
             """
             SELECT COUNT(*)
-            FROM cmc_ema_multi_tf_u
+            FROM ema_multi_tf_u
             WHERE tf = '1D'
         """
         )
@@ -445,14 +445,14 @@ class TestDataConsistencyValidation:
                 SELECT 1
                 FROM information_schema.tables
                 WHERE table_schema = 'public'
-                AND table_name = 'cmc_ema_multi_tf_u'
+                AND table_name = 'ema_multi_tf_u'
             )
         """
         )
         ema_exists = db_session.execute(check_ema).scalar()
 
         if not ema_exists:
-            pytest.skip("cmc_ema_multi_tf_u table does not exist")
+            pytest.skip("ema_multi_tf_u table does not exist")
 
         # Sample crypto asset (ID 1 = BTC commonly)
         crypto_asset_id = 1
@@ -465,7 +465,7 @@ class TestDataConsistencyValidation:
                     id,
                     ts,
                     LAG(ts) OVER (ORDER BY ts) AS prev_ts
-                FROM cmc_ema_multi_tf_u
+                FROM ema_multi_tf_u
                 WHERE tf = '1D'
                 AND id = :asset_id
                 AND period = 50
@@ -506,7 +506,7 @@ class TestDataConsistencyValidation:
             total_rows_query = text(
                 """
                 SELECT COUNT(*)
-                FROM cmc_ema_multi_tf_u
+                FROM ema_multi_tf_u
                 WHERE tf = '1D'
                 AND id = :asset_id
                 AND period = 50
@@ -543,14 +543,14 @@ class TestDataConsistencyValidation:
                 SELECT 1
                 FROM information_schema.tables
                 WHERE table_schema = 'public'
-                AND table_name = 'cmc_returns_daily'
+                AND table_name = 'returns_daily'
             )
         """
         )
         table_exists = db_session.execute(check_exists).scalar()
 
         if not table_exists:
-            pytest.skip("cmc_returns_daily table does not exist")
+            pytest.skip("returns_daily table does not exist")
 
         # Query sample data: returns with current and previous close
         query = text(
@@ -573,7 +573,7 @@ class TestDataConsistencyValidation:
                 p.prev_close,
                 r.return_1d
             FROM price_with_lag p
-            JOIN cmc_returns_daily r ON p.id = r.id AND p.ts::date = r.ts::date
+            JOIN returns_daily r ON p.id = r.id AND p.ts::date = r.ts::date
             WHERE p.prev_close IS NOT NULL
             ORDER BY RANDOM()
             LIMIT 100
@@ -622,14 +622,14 @@ class TestDataConsistencyValidation:
                 SELECT 1
                 FROM information_schema.tables
                 WHERE table_schema = 'public'
-                AND table_name = 'cmc_vol_daily'
+                AND table_name = 'vol_daily'
             )
         """
         )
         table_exists = db_session.execute(check_exists).scalar()
 
         if not table_exists:
-            pytest.skip("cmc_vol_daily table does not exist")
+            pytest.skip("vol_daily table does not exist")
 
         # Query sample volatility data
         query = text(
@@ -639,7 +639,7 @@ class TestDataConsistencyValidation:
                 ts,
                 vol_30d,
                 vol_90d
-            FROM cmc_vol_daily
+            FROM vol_daily
             WHERE id IN (1, 2, 3)
             ORDER BY RANDOM()
             LIMIT 1000

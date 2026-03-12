@@ -3,13 +3,13 @@
 DB-backed EMA comovement statistics computation and writing.
 
 Computes pairwise EMA comovement metrics (correlation, sign agreement rate,
-lead-lag) for a single asset/TF and writes them to ``cmc_regime_comovement``.
+lead-lag) for a single asset/TF and writes them to ``regime_comovement``.
 
 Uses the analytics functions from ta_lab2.regimes.comovement:
 - ``compute_ema_comovement_stats``: correlation matrix + sign agreement rate per EMA pair
 - ``lead_lag_max_corr``: cross-correlation over lag range to find best lead-lag relationship
 
-Table Schema (from sql/regimes/084_cmc_regime_comovement.sql):
+Table Schema (from sql/regimes/084_regime_comovement.sql):
     PK: (id, tf, ema_a, ema_b, computed_at)
     Columns: correlation, sign_agree_rate, best_lead_lag, best_lead_lag_corr, n_obs
 
@@ -197,7 +197,7 @@ def write_comovement_to_db(
     tf: Optional[str] = None,
 ) -> int:
     """
-    Write comovement records to ``cmc_regime_comovement`` using scoped DELETE + INSERT.
+    Write comovement records to ``regime_comovement`` using scoped DELETE + INSERT.
 
     Because ``computed_at`` is part of the PK, each refresh appends a new
     snapshot. The scoped DELETE removes ALL prior snapshots for the given (ids, tf),
@@ -262,14 +262,14 @@ def write_comovement_to_db(
 
     delete_sql = text(
         """
-        DELETE FROM public.cmc_regime_comovement
+        DELETE FROM public.regime_comovement
         WHERE id = ANY(:ids) AND tf = :tf
         """
     )
 
     insert_sql = text(
         """
-        INSERT INTO public.cmc_regime_comovement
+        INSERT INTO public.regime_comovement
             (id, tf, ema_a, ema_b, correlation, sign_agree_rate,
              best_lead_lag, best_lead_lag_corr, n_obs, computed_at)
         VALUES

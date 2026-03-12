@@ -224,11 +224,11 @@ def build_steps(
     # Bars
     steps: List[Step] = []
     bars_scripts = [
-        ("bars_multi_tf", "refresh_cmc_price_bars_multi_tf.py"),
-        ("bars_cal_us", "refresh_cmc_price_bars_multi_tf_cal_us.py"),
-        ("bars_cal_iso", "refresh_cmc_price_bars_multi_tf_cal_iso.py"),
-        ("bars_cal_anchor_us", "refresh_cmc_price_bars_multi_tf_cal_anchor_us.py"),
-        ("bars_cal_anchor_iso", "refresh_cmc_price_bars_multi_tf_cal_anchor_iso.py"),
+        ("bars_multi_tf", "refresh_price_bars_multi_tf.py"),
+        ("bars_cal_us", "refresh_price_bars_multi_tf_cal_us.py"),
+        ("bars_cal_iso", "refresh_price_bars_multi_tf_cal_iso.py"),
+        ("bars_cal_anchor_us", "refresh_price_bars_multi_tf_cal_anchor_us.py"),
+        ("bars_cal_anchor_iso", "refresh_price_bars_multi_tf_cal_anchor_iso.py"),
     ]
 
     for name, fname in bars_scripts:
@@ -263,7 +263,7 @@ def build_steps(
     steps.append(
         Step(
             "ema_u_sync",
-            emas_dir / "sync_cmc_ema_multi_tf_u.py",
+            emas_dir / "sync_ema_multi_tf_u.py",
             ["--use-ingested-at"],
             kind="other",
         )
@@ -405,11 +405,11 @@ def main() -> None:
             and not bars_full_rebuild
         ):
             bars_state_tables = {
-                "bars_multi_tf": "public.cmc_price_bars_multi_tf_state",
-                "bars_cal_us": "public.cmc_price_bars_multi_tf_cal_us_state",
-                "bars_cal_iso": "public.cmc_price_bars_multi_tf_cal_iso_state",
-                "bars_cal_anchor_us": "public.cmc_price_bars_multi_tf_cal_anchor_us_state",
-                "bars_cal_anchor_iso": "public.cmc_price_bars_multi_tf_cal_anchor_iso_state",
+                "bars_multi_tf": "public.price_bars_multi_tf_state",
+                "bars_cal_us": "public.price_bars_multi_tf_cal_us_state",
+                "bars_cal_iso": "public.price_bars_multi_tf_cal_iso_state",
+                "bars_cal_anchor_us": "public.price_bars_multi_tf_cal_anchor_us_state",
+                "bars_cal_anchor_iso": "public.price_bars_multi_tf_cal_anchor_iso_state",
             }
 
             st = bars_state_tables.get(step.name)

@@ -4,9 +4,9 @@ r"""
 audit_returns_ema_multi_tf_u_integrity.py
 
 Integrity audit for unified EMA returns built from:
-  public.cmc_ema_multi_tf_u
+  public.ema_multi_tf_u
 into:
-  public.cmc_returns_ema_multi_tf_u
+  public.returns_ema_multi_tf_u
 
 Unified timeline: _ema/_ema_bar + _roll value columns.
 PK: (id, ts, tf, period, alignment_source) — roll is a regular boolean column.
@@ -37,8 +37,8 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
 
-DEFAULT_EMA_U_TABLE = "public.cmc_ema_multi_tf_u"
-DEFAULT_RET_TABLE = "public.cmc_returns_ema_multi_tf_u"
+DEFAULT_EMA_U_TABLE = "public.ema_multi_tf_u"
+DEFAULT_RET_TABLE = "public.returns_ema_multi_tf_u"
 DEFAULT_DIM_TF = "public.dim_timeframe"
 
 
@@ -79,7 +79,7 @@ def _fail_or_warn(strict: bool, msg: str) -> None:
 
 def main() -> None:
     p = argparse.ArgumentParser(
-        description="Audit integrity for cmc_returns_ema_multi_tf_u (wide columns)."
+        description="Audit integrity for returns_ema_multi_tf_u (wide columns)."
     )
     p.add_argument(
         "--db-url",

@@ -51,7 +51,7 @@ class AMAFeatureConfig:
     Attributes:
         param_sets: List of AMAParamSet instances to compute.
         output_schema: Schema for the output table (e.g. "public").
-        output_table: Output table name (e.g. "cmc_ama_multi_tf").
+        output_table: Output table name (e.g. "ama_multi_tf").
     """
 
     param_sets: list[AMAParamSet]
@@ -166,7 +166,7 @@ class BaseAMAFeature(ABC):
         Used for logging and audit. At minimum include a "source_table" key.
 
         Returns:
-            Dict with metadata keys (e.g. {"source_table": "cmc_price_bars_multi_tf"}).
+            Dict with metadata keys (e.g. {"source_table": "price_bars_multi_tf"}).
         """
 
     # =========================================================================
@@ -262,7 +262,7 @@ class BaseAMAFeature(ABC):
                     "indicator": ps.indicator,
                     "params_hash": ps.params_hash,
                     "tf_days": tf_days,
-                    "roll": False,
+                    "roll": bars["roll"].tolist(),
                     "ama": ama_values.tolist(),
                     "er": er_list,
                 }
@@ -324,10 +324,14 @@ class BaseAMAFeature(ABC):
         result["d1"] = result.groupby(group_cols, sort=False)["ama"].diff(1)
         result["d2"] = result.groupby(group_cols, sort=False)["d1"].diff(1)
 
-        # d1_roll and d2_roll: same as d1/d2 for canonical AMA rows
-        # (no intra-period roll variant exists for AMA tables)
-        result["d1_roll"] = result["d1"]
-        result["d2_roll"] = result["d2"]
+        # d1_roll and d2_roll: computed across ALL rows in unified timeline
+        # (id, tf, indicator, params_hash) — without roll in group key.
+        # Re-sort by unified_cols + ts so canonical and interstitial rows
+        # interleave chronologically before computing diffs.
+        unified_cols = ["id", "tf", "indicator", "params_hash"]
+        result = result.sort_values(unified_cols + ["ts"]).reset_index(drop=True)
+        result["d1_roll"] = result.groupby(unified_cols, sort=False)["ama"].diff(1)
+        result["d2_roll"] = result.groupby(unified_cols, sort=False)["d1_roll"].diff(1)
 
         return result
 

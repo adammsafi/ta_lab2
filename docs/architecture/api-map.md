@@ -323,8 +323,8 @@ _(no top-level classes or functions)_
 - `compute_multi_tf_v2_for_asset(*, df_id, periods, tf_days_by_tf)` — Compute the v2 multi-timeframe DAILY EMA for a single asset id.
 - `load_daily_prices(engine, *, ids, price_schema, price_table)`
 - `load_last_ts_by_key(engine, *, ids, tfs, periods, out_schema, out_table)` — Return {(id, tf, period): last_ts} for existing rows.
-- `refresh_cmc_ema_multi_tf_v2_incremental(*, engine, db_url, periods, ids, alignment_type, canonical_only, price_schema, price_table, out_schema, out_table)` — Incremental refresh of cmc_ema_multi_tf_v2.
-- `refresh_cmc_ema_multi_tf_v2(*, engine, db_url, **kwargs)` — Alias for refresh_cmc_ema_multi_tf_v2_incremental.
+- `refresh_ema_multi_tf_v2_incremental(*, engine, db_url, periods, ids, alignment_type, canonical_only, price_schema, price_table, out_schema, out_table)` — Incremental refresh of ema_multi_tf_v2.
+- `refresh_ema_multi_tf_v2(*, engine, db_url, **kwargs)` — Alias for refresh_ema_multi_tf_v2_incremental.
 
 ### `features/m_tf/ema_multi_timeframe.py`
 **Functions**
@@ -470,8 +470,8 @@ _(no top-level classes or functions)_
 - `compute_multi_tf_v2_for_asset(*, df_id, periods, tf_days_by_tf)` — Compute the v2 multi-timeframe DAILY EMA for a single asset id.
 - `load_daily_prices(engine, *, ids, price_schema, price_table)`
 - `load_last_ts_by_key(engine, *, ids, tfs, periods, out_schema, out_table)` — Return {(id, tf, period): last_ts} for existing rows.
-- `refresh_cmc_ema_multi_tf_v2_incremental(*, engine, db_url, periods, ids, alignment_type, canonical_only, price_schema, price_table, out_schema, out_table)` — Incremental refresh of cmc_ema_multi_tf_v2.
-- `refresh_cmc_ema_multi_tf_v2(*, engine, db_url, **kwargs)` — Alias for refresh_cmc_ema_multi_tf_v2_incremental.
+- `refresh_ema_multi_tf_v2_incremental(*, engine, db_url, periods, ids, alignment_type, canonical_only, price_schema, price_table, out_schema, out_table)` — Incremental refresh of ema_multi_tf_v2.
+- `refresh_ema_multi_tf_v2(*, engine, db_url, **kwargs)` — Alias for refresh_ema_multi_tf_v2_incremental.
 
 ### `features/m_tf/old/ema_multi_tf_v2_pre-bar.py`
 **Classes**
@@ -483,8 +483,8 @@ _(no top-level classes or functions)_
 - `compute_multi_tf_v2_for_asset(df_id, periods, timeframe_tf_days)` — Compute the v2 multi-timeframe DAILY EMA for a single asset (one id).
 - `parse_args()`
 - `load_daily_prices(engine, ids)` — Load daily price history from cmc_price_histories7.
-- `load_last_ts_by_id(engine, ids)` — Look at cmc_ema_multi_tf_v2 and get the latest ts per id.
-- `refresh_cmc_ema_multi_tf_v2_incremental(engine, periods, timeframe_tf_days, ids, db_url)` — Incremental refresh of cmc_ema_multi_tf_v2.
+- `load_last_ts_by_id(engine, ids)` — Look at ema_multi_tf_v2 and get the latest ts per id.
+- `refresh_ema_multi_tf_v2_incremental(engine, periods, timeframe_tf_days, ids, db_url)` — Incremental refresh of ema_multi_tf_v2.
 - `main()`
 
 ### `features/m_tf/old/ema_multi_tf_v2_pre-dim.py`
@@ -496,8 +496,8 @@ _(no top-level classes or functions)_
 - `compute_multi_tf_v2_for_asset(df_id, periods, timeframe_tf_days)` — Compute the v2 multi-timeframe DAILY EMA for a single asset (one id).
 - `parse_args()`
 - `load_daily_prices(engine, ids)` — Load daily price history from cmc_price_histories7.
-- `load_last_ts_by_id(engine, ids)` — Look at cmc_ema_multi_tf_v2 and get the latest ts per id.
-- `refresh_cmc_ema_multi_tf_v2_incremental(engine, periods, timeframe_tf_days, ids)` — Incremental refresh of cmc_ema_multi_tf_v2.
+- `load_last_ts_by_id(engine, ids)` — Look at ema_multi_tf_v2 and get the latest ts per id.
+- `refresh_ema_multi_tf_v2_incremental(engine, periods, timeframe_tf_days, ids)` — Incremental refresh of ema_multi_tf_v2.
 - `main()`
 
 ### `features/m_tf/old/ema_multi_timeframe_pre-bars.py`
@@ -664,7 +664,7 @@ _(no top-level classes or functions)_
 ### `scripts/figure out.py`
 **Functions**
 - `get_all_asset_ids(db_url)` — Load all distinct asset ids from cmc_price_histories7 as strings.
-- `main(db_url)` — Refresh cmc_ema_daily and cmc_ema_multi_tf for ALL assets in cmc_price_histories7,
+- `main(db_url)` — Refresh cmc_ema_daily and ema_multi_tf for ALL assets in cmc_price_histories7,
 
 ### `scripts/open_ai_script.py`
 **Functions**
@@ -723,7 +723,7 @@ _(no top-level classes or functions)_
 - `audit_table(engine, table, ids)` — Produces per-(table,id,tf) metrics. Uses whatever columns exist in the table.
 - `main()`
 
-### `scripts/bars/refresh_cmc_price_bars_multi_tf.py`
+### `scripts/bars/refresh_price_bars_multi_tf.py`
 **Functions**
 - `resolve_db_url(db_url)`
 - `get_engine(db_url)`
@@ -737,7 +737,7 @@ _(no top-level classes or functions)_
 - `ensure_state_table(db_url, state_table)`
 - `load_state(db_url, state_table, ids)`
 - `upsert_state(db_url, state_table, rows)`
-- `load_tf_list_from_dim_timeframe(*, db_url, include_non_canonical)` — Load the TF list for cmc_price_bars_multi_tf from public.dim_timeframe.
+- `load_tf_list_from_dim_timeframe(*, db_url, include_non_canonical)` — Load the TF list for price_bars_multi_tf from public.dim_timeframe.
 - `_make_day_time_open(ts)`
 - `_has_missing_days(ts)`
 - `_count_missing_days(ts)` — Count missing *interior* days based on >1-day gaps between observed timestamps.
@@ -748,7 +748,7 @@ _(no top-level classes or functions)_
 - `refresh_incremental(*, db_url, ids, tf_list, bars_table, state_table)`
 - `main(argv)`
 
-### `scripts/bars/refresh_cmc_price_bars_multi_tf_cal_anchor_iso.py`
+### `scripts/bars/refresh_price_bars_multi_tf_cal_anchor_iso.py`
 **Classes**
 - `AnchorSpec`
 
@@ -789,7 +789,7 @@ _(no top-level classes or functions)_
 - `refresh_incremental(*, db_url, ids, tz, daily_table, bars_table, state_table, fail_on_internal_gaps)`
 - `main(argv)`
 
-### `scripts/bars/refresh_cmc_price_bars_multi_tf_cal_anchor_iso_pre-partial-end.py`
+### `scripts/bars/refresh_price_bars_multi_tf_cal_anchor_iso_pre-partial-end.py`
 **Classes**
 - `AnchorSpec`
 
@@ -826,7 +826,7 @@ _(no top-level classes or functions)_
 - `refresh_incremental(*, db_url, ids, tz, daily_table, bars_table, state_table, fail_on_internal_gaps)`
 - `main(argv)`
 
-### `scripts/bars/refresh_cmc_price_bars_multi_tf_cal_anchor_us.py`
+### `scripts/bars/refresh_price_bars_multi_tf_cal_anchor_us.py`
 **Classes**
 - `AnchorSpec`
 
@@ -866,7 +866,7 @@ _(no top-level classes or functions)_
 - `refresh_incremental(*, db_url, ids, tz, daily_table, bars_table, state_table, fail_on_internal_gaps)`
 - `main(argv)`
 
-### `scripts/bars/refresh_cmc_price_bars_multi_tf_cal_anchor_us_pre-partial-end.py`
+### `scripts/bars/refresh_price_bars_multi_tf_cal_anchor_us_pre-partial-end.py`
 **Classes**
 - `AnchorSpec`
 
@@ -903,7 +903,7 @@ _(no top-level classes or functions)_
 - `refresh_incremental(*, db_url, ids, tz, daily_table, bars_table, state_table, fail_on_internal_gaps)`
 - `main(argv)`
 
-### `scripts/bars/refresh_cmc_price_bars_multi_tf_cal_iso.py`
+### `scripts/bars/refresh_price_bars_multi_tf_cal_iso.py`
 **Classes**
 - `CalIsoSpec`
 
@@ -941,7 +941,7 @@ _(no top-level classes or functions)_
 - `refresh_incremental(*, db_url, ids, tz, daily_table, bars_table, state_table)`
 - `main(argv)`
 
-### `scripts/bars/refresh_cmc_price_bars_multi_tf_cal_iso_pre-partial-end.py`
+### `scripts/bars/refresh_price_bars_multi_tf_cal_iso_pre-partial-end.py`
 **Classes**
 - `CalSpec`
 
@@ -975,7 +975,7 @@ _(no top-level classes or functions)_
 - `refresh_incremental(*, db_url, ids, tz, daily_table, bars_table, state_table)`
 - `main(argv)`
 
-### `scripts/bars/refresh_cmc_price_bars_multi_tf_cal_us.py`
+### `scripts/bars/refresh_price_bars_multi_tf_cal_us.py`
 **Classes**
 - `CalSpec`
 
@@ -1013,7 +1013,7 @@ _(no top-level classes or functions)_
 - `refresh_incremental(*, db_url, ids, tz, daily_table, bars_table, state_table)`
 - `main(argv)`
 
-### `scripts/bars/refresh_cmc_price_bars_multi_tf_cal_us_pre-partial-end.py`
+### `scripts/bars/refresh_price_bars_multi_tf_cal_us_pre-partial-end.py`
 **Classes**
 - `CalSpec`
 
@@ -1048,7 +1048,7 @@ _(no top-level classes or functions)_
 - `refresh_incremental(*, db_url, ids, tz, daily_table, bars_table, state_table)`
 - `main(argv)`
 
-### `scripts/bars/refresh_cmc_price_bars_multi_tf_pre-partial-end.py`
+### `scripts/bars/refresh_price_bars_multi_tf_pre-partial-end.py`
 **Functions**
 - `resolve_db_url(db_url)`
 - `get_engine(db_url)`
@@ -1062,7 +1062,7 @@ _(no top-level classes or functions)_
 - `ensure_state_table(db_url, state_table)`
 - `load_state(db_url, state_table, ids)`
 - `upsert_state(db_url, state_table, rows)`
-- `load_tf_list_from_dim_timeframe(*, db_url, include_non_canonical)` — Load the TF list for cmc_price_bars_multi_tf from public.dim_timeframe.
+- `load_tf_list_from_dim_timeframe(*, db_url, include_non_canonical)` — Load the TF list for price_bars_multi_tf from public.dim_timeframe.
 - `_make_day_time_open(ts)`
 - `_enforce_bar_continuity(out)`
 - `build_bars_for_id(df_id, tf_days, tf_label)` — Full build for a single id + tf_days. Drops partial trailing bars.
@@ -1075,7 +1075,7 @@ _(no top-level classes or functions)_
 
 ## `ta_lab2/scripts/bars/old`
 
-### `scripts/bars/old/refresh_cmc_price_bars_multi_tf_hardcoded_tfs.py`
+### `scripts/bars/old/refresh_price_bars_multi_tf_hardcoded_tfs.py`
 **Functions**
 - `resolve_db_url(db_url)`
 - `get_engine(db_url)`
@@ -1143,7 +1143,7 @@ _(no top-level classes or functions)_
 - `audit_table(engine, table, ids)`
 - `main()`
 
-### `scripts/emas/refresh_cmc_ema_multi_tf_cal_anchor_from_bars.py`
+### `scripts/emas/refresh_ema_multi_tf_cal_anchor_from_bars.py`
 **Functions**
 - `_in_ipython()`
 - `_resolve_db_url()`
@@ -1159,7 +1159,7 @@ _(no top-level classes or functions)_
 - `_parse_args(argv)`
 - `main(argv)`
 
-### `scripts/emas/refresh_cmc_ema_multi_tf_cal_from_bars.py`
+### `scripts/emas/refresh_ema_multi_tf_cal_from_bars.py`
 **Functions**
 - `_resolve_db_url(cli_db_url)`
 - `_parse_ids(arg)`
@@ -1171,7 +1171,7 @@ _(no top-level classes or functions)_
 - `_update_state(engine, schema, table, out_table)` — After EMA write, update state table with latest canonical ts per (id, tf, period).
 - `main()`
 
-### `scripts/emas/refresh_cmc_ema_multi_tf_from_bars.py`
+### `scripts/emas/refresh_ema_multi_tf_from_bars.py`
 **Functions**
 - `build_parser()`
 - `_resolve_db_url(args_db_url)`
@@ -1180,7 +1180,7 @@ _(no top-level classes or functions)_
 - `_load_tf_day_canonical(engine)`
 - `main()`
 
-### `scripts/emas/refresh_cmc_ema_multi_tf_v2.py`
+### `scripts/emas/refresh_ema_multi_tf_v2.py`
 **Functions**
 - `_resolve_db_url(cli_db_url)` — Priority: --db-url, then TARGET_DB_URL env, then MARKETDATA_DB_URL env.
 - `_parse_ids(ids_arg)`
@@ -1200,7 +1200,7 @@ _(no top-level classes or functions)_
 - `parse_args()`
 - `main()`
 
-### `scripts/emas/sync_cmc_ema_multi_tf_u.py`
+### `scripts/emas/sync_ema_multi_tf_u.py`
 **Functions**
 - `_log(msg)`
 - `get_engine()`
@@ -1223,18 +1223,18 @@ _(no top-level classes or functions)_
 **Functions**
 - `main(argv)`
 
-### `scripts/emas/old/refresh_cmc_ema_multi_tf_cal_anchor_from_bars_old.py`
+### `scripts/emas/old/refresh_ema_multi_tf_cal_anchor_from_bars_old.py`
 **Functions**
 - `_in_ipython()`
 - `_load_ids(eng, schema, daily_table, ids_arg)`
 - `_parse_args(argv)`
 - `main(argv)`
 
-### `scripts/emas/old/refresh_cmc_ema_multi_tf_cal_anchor_only.py`
+### `scripts/emas/old/refresh_ema_multi_tf_cal_anchor_only.py`
 **Functions**
 - `main(argv)`
 
-### `scripts/emas/old/refresh_cmc_ema_multi_tf_cal_from_bars_old.py`
+### `scripts/emas/old/refresh_ema_multi_tf_cal_from_bars_old.py`
 **Functions**
 - `_resolve_db_url(cli_db_url)`
 - `_parse_ids(arg)`
@@ -1245,19 +1245,19 @@ _(no top-level classes or functions)_
 - `_update_state(engine, schema, table, out_table)` — After EMA write, update state table with latest canonical ts per (id, tf, period).
 - `main()`
 
-### `scripts/emas/old/refresh_cmc_ema_multi_tf_cal_only.py`
+### `scripts/emas/old/refresh_ema_multi_tf_cal_only.py`
 **Functions**
-- `main(argv)` — Refresh ONLY cmc_ema_multi_tf_cal (calendar-aligned multi-TF EMAs).
+- `main(argv)` — Refresh ONLY ema_multi_tf_cal (calendar-aligned multi-TF EMAs).
 
-### `scripts/emas/old/refresh_cmc_ema_multi_tf_cal_only_v2_old.py`
-**Functions**
-- `main(argv)`
-
-### `scripts/emas/old/refresh_cmc_ema_multi_tf_only.py`
+### `scripts/emas/old/refresh_ema_multi_tf_cal_only_v2_old.py`
 **Functions**
 - `main(argv)`
 
-### `scripts/emas/old/refresh_cmc_ema_multi_tf_v2_from_bars_old.py`
+### `scripts/emas/old/refresh_ema_multi_tf_only.py`
+**Functions**
+- `main(argv)`
+
+### `scripts/emas/old/refresh_ema_multi_tf_v2_from_bars_old.py`
 **Functions**
 - `_resolve_db_url(cli_db_url)` — Priority: --db-url, then TARGET_DB_URL env.
 - `_parse_ids(ids_arg)`
@@ -1265,7 +1265,7 @@ _(no top-level classes or functions)_
 - `build_parser()`
 - `main()`
 
-### `scripts/emas/old/refresh_cmc_ema_multi_tf_v2_only.py`
+### `scripts/emas/old/refresh_ema_multi_tf_v2_only.py`
 **Functions**
 - `main(argv)`
 
@@ -1279,9 +1279,9 @@ _(no top-level classes or functions)_
 - `_get_dirty_window_for_id(conn, asset_id, *, last_load_ts)` — Given an asset id and a last_load_ts watermark, return the earliest
 - `_upsert_refresh_state(conn, asset_id, *, last_load_ts_daily, last_load_ts_multi, last_load_ts_cal)` — Upsert the refresh state for a given id. Only non-None fields are updated
 - `_get_daily_bounds_for_id(conn, asset_id)` — Return (min_daily_ts, max_daily_ts) for this id from cmc_ema_daily.
-- `_get_multi_tf_max_ts_for_id(conn, asset_id)` — Return the maximum ts in cmc_ema_multi_tf for this id (or None if empty).
-- `_get_cal_multi_tf_max_ts_for_id(conn, asset_id)` — Return the maximum ts in cmc_ema_multi_tf_cal for this id (or None if empty).
-- `_get_cal_anchor_multi_tf_max_ts_for_id(conn, asset_id)` — Return the maximum ts in cmc_ema_multi_tf_cal_anchor for this id
+- `_get_multi_tf_max_ts_for_id(conn, asset_id)` — Return the maximum ts in ema_multi_tf for this id (or None if empty).
+- `_get_cal_multi_tf_max_ts_for_id(conn, asset_id)` — Return the maximum ts in ema_multi_tf_cal for this id (or None if empty).
+- `_get_cal_anchor_multi_tf_max_ts_for_id(conn, asset_id)` — Return the maximum ts in ema_multi_tf_cal_anchor for this id
 - `refresh(ids, start, end, *, db_url, update_daily, update_multi_tf, update_cal_multi_tf, update_cal_multi_tf_anchor, update_multi_tf_v2, refresh_all_emas_view, refresh_price_emas_view, refresh_price_emas_d1d2_view)` — Perform the EMA refresh workflow for the given asset ids.
 - `_parse_args(argv)`
 
@@ -1295,8 +1295,8 @@ _(no top-level classes or functions)_
 - `_get_dirty_window_for_id(conn, asset_id, *, last_load_ts)` — Given an asset id and a last_load_ts watermark, return the earliest
 - `_upsert_refresh_state(conn, asset_id, *, last_load_ts_daily, last_load_ts_multi, last_load_ts_cal)` — Upsert the refresh state for a given id. Only non-None fields are updated
 - `_get_daily_bounds_for_id(conn, asset_id)` — Return (min_daily_ts, max_daily_ts) for this id from cmc_ema_daily.
-- `_get_multi_tf_max_ts_for_id(conn, asset_id)` — Return the maximum ts in cmc_ema_multi_tf for this id (or None if empty).
-- `_get_cal_multi_tf_max_ts_for_id(conn, asset_id)` — Return the maximum ts in cmc_ema_multi_tf_cal for this id (or None if empty).
+- `_get_multi_tf_max_ts_for_id(conn, asset_id)` — Return the maximum ts in ema_multi_tf for this id (or None if empty).
+- `_get_cal_multi_tf_max_ts_for_id(conn, asset_id)` — Return the maximum ts in ema_multi_tf_cal for this id (or None if empty).
 - `refresh(ids, start, end, *, db_url, update_daily, update_multi_tf, update_cal_multi_tf, update_multi_tf_v2, refresh_all_emas_view, refresh_price_emas_view, refresh_price_emas_d1d2_view)` — Perform the EMA refresh workflow for the given asset ids.
 - `_parse_args(argv)`
 
@@ -1326,23 +1326,23 @@ _(no top-level classes or functions)_
 - `_get_changed_window(conn, asset_id, prev_load_ts)` — For a given id and previous load_ts watermark, find the earliest timeclose
 - `_upsert_refresh_state(conn, asset_id, *, last_load_ts_daily, last_load_ts_multi, last_load_ts_cal)` — Upsert the refresh state for a given id. Only non-None fields are updated
 - `_get_daily_bounds_for_id(conn, asset_id)` — Return (min_daily_ts, max_daily_ts) for this id from cmc_ema_daily.
-- `_get_max_ema_ts_for_id(conn, table_name, asset_id)` — Return MAX(ts) from a given EMA table (cmc_ema_multi_tf or cmc_ema_multi_tf_cal)
+- `_get_max_ema_ts_for_id(conn, table_name, asset_id)` — Return MAX(ts) from a given EMA table (ema_multi_tf or ema_multi_tf_cal)
 - `_get_max_load_ts_for_id(conn, asset_id)` — Return MAX(load_ts) from cmc_price_histories7 for this id.
 - `refresh(ids, start, end, *, db_url, update_daily, update_multi_tf, update_cal_multi_tf, refresh_all_emas_view, refresh_price_emas_view, refresh_price_emas_d1d2_view)` — Perform the requested updates.
 - `main(argv)`
 
-### `scripts/emas/old/refresh_cmc_price_with_emas_d1d2_view_only.py`
+### `scripts/emas/old/refresh_price_with_emas_d1d2_view_only.py`
 **Functions**
 - `main()`
 
-### `scripts/emas/old/refresh_cmc_price_with_emas_view_only.py`
+### `scripts/emas/old/refresh_price_with_emas_view_only.py`
 **Functions**
 - `main()`
 
 ### `scripts/emas/old/refresh_ema_multi_tf_stats_old.py`
 **Functions**
 - `get_engine(db_url)` — Return a SQLAlchemy engine.
-- `run_all_tests(engine)` — Run all cmc_ema_multi_tf tests in a single transaction.
+- `run_all_tests(engine)` — Run all ema_multi_tf tests in a single transaction.
 - `main(db_url)` — Main entrypoint for both CLI and programmatic use.
 
 ### `scripts/emas/old/run_ema_refresh_examples.py`
@@ -1393,7 +1393,7 @@ _(no top-level classes or functions)_
 ### `scripts/emas/stats/multi_tf/old/refresh_ema_multi_tf_stats_old.py`
 **Functions**
 - `get_engine(db_url)` — Return a SQLAlchemy engine.
-- `run_all_tests(engine)` — Run all cmc_ema_multi_tf tests in a single transaction.
+- `run_all_tests(engine)` — Run all ema_multi_tf tests in a single transaction.
 - `main(db_url)` — Main entrypoint for both CLI and programmatic use.
 
 ### `scripts/emas/stats/multi_tf/old/run_refresh_ema_multi_tf_stats_old.py`
@@ -1417,7 +1417,7 @@ _(no top-level classes or functions)_
 ### `scripts/emas/stats/multi_tf_cal/old/refresh_ema_multi_tf_cal_stats_old.py`
 **Functions**
 - `get_engine(db_url)` — Return a SQLAlchemy engine.
-- `run_all_tests(engine)` — Run all cmc_ema_multi_tf_cal tests in a single transaction.
+- `run_all_tests(engine)` — Run all ema_multi_tf_cal tests in a single transaction.
 - `main(db_url)` — Main entrypoint for both CLI and programmatic use.
 
 ### `scripts/emas/stats/multi_tf_cal/old/run_refresh_ema_multi_tf_cal_stats_old.py`
@@ -1446,7 +1446,7 @@ _(no top-level classes or functions)_
 - `_insert_non_null_ema(conn, ids)` — Check that ema is non-null for each (id, tf, period).
 - `_insert_non_decreasing_ts(conn, ids)` — Check that ts is non-decreasing within each (id, tf, period).
 - `_insert_roll_boolean(conn, ids)` — Sanity check for the roll column: counts true/false/null per group.
-- `refresh(ids, db_url)` — Refresh stats for the given asset ids from cmc_ema_multi_tf_cal_anchor.
+- `refresh(ids, db_url)` — Refresh stats for the given asset ids from ema_multi_tf_cal_anchor.
 - `_normalize_ids_arg(engine, ids_arg)` — Support:
 - `main(argv)`
 
@@ -1472,7 +1472,7 @@ _(no top-level classes or functions)_
 **Functions**
 - `_resolve_db_url(cli_db_url)` — Resolve DB URL from CLI arg or environment, mirroring other scripts.
 - `_get_engine(cli_db_url)`
-- `_load_all_ids(engine)` — Load all distinct asset ids from cmc_ema_multi_tf_v2.
+- `_load_all_ids(engine)` — Load all distinct asset ids from ema_multi_tf_v2.
 - `_normalize_ids_arg(engine, ids_arg)` — Handle:
 - `_delete_existing_for_ids(conn, ids)`
 - `_insert_daily_row_span(conn, ids)` — For each (id, tf, period):
@@ -1699,7 +1699,7 @@ _(no top-level classes or functions)_
 - `_fail_or_warn(strict, msg)`
 - `main()`
 
-### `scripts/returns/refresh_cmc_returns_bars_multi_tf.py`
+### `scripts/returns/refresh_returns_bars_multi_tf.py`
 **Classes**
 - `RunnerConfig`
 
@@ -1714,7 +1714,7 @@ _(no top-level classes or functions)_
 - `_run_one_pair(engine, cfg, one_id, one_tf)`
 - `main()`
 
-### `scripts/returns/refresh_cmc_returns_bars_multi_tf_cal_anchor_iso.py`
+### `scripts/returns/refresh_returns_bars_multi_tf_cal_anchor_iso.py`
 **Classes**
 - `Key`
 
@@ -1729,7 +1729,7 @@ _(no top-level classes or functions)_
 - `process_key(engine, bars_table, out_table, state_table, key, start)`
 - `main()`
 
-### `scripts/returns/refresh_cmc_returns_bars_multi_tf_cal_anchor_us.py`
+### `scripts/returns/refresh_returns_bars_multi_tf_cal_anchor_us.py`
 **Classes**
 - `Key`
 
@@ -1744,7 +1744,7 @@ _(no top-level classes or functions)_
 - `process_key(engine, bars_table, out_table, state_table, key, start)`
 - `main()`
 
-### `scripts/returns/refresh_cmc_returns_bars_multi_tf_cal_iso.py`
+### `scripts/returns/refresh_returns_bars_multi_tf_cal_iso.py`
 **Classes**
 - `Key`
 
@@ -1759,8 +1759,8 @@ _(no top-level classes or functions)_
 - `process_key(engine, bars_table, out_table, state_table, key, start)`
 - `main()`
 
-### `scripts/returns/refresh_cmc_returns_bars_multi_tf_cal_us.py`
-- ⚠️ Parse error: `(unicode error) 'unicodeescape' codec can't decode bytes in position 875-876: truncated \UXXXXXXXX escape (refresh_cmc_returns_bars_multi_tf_cal_us.py, line 3)`
+### `scripts/returns/refresh_returns_bars_multi_tf_cal_us.py`
+- ⚠️ Parse error: `(unicode error) 'unicodeescape' codec can't decode bytes in position 875-876: truncated \UXXXXXXXX escape (refresh_returns_bars_multi_tf_cal_us.py, line 3)`
 
 ### `scripts/returns/refresh_cmc_returns_d1.py`
 **Classes**
@@ -1775,7 +1775,7 @@ _(no top-level classes or functions)_
 - `_run_one_id(engine, cfg, one_id)` — Inserts new return rows for one id and advances the watermark.
 - `main()`
 
-### `scripts/returns/refresh_cmc_returns_ema_multi_tf.py`
+### `scripts/returns/refresh_returns_ema_multi_tf.py`
 **Classes**
 - `RunnerConfig`
 
@@ -1791,7 +1791,7 @@ _(no top-level classes or functions)_
 - `_run_one_key(engine, cfg, key)`
 - `main()`
 
-### `scripts/returns/refresh_cmc_returns_ema_multi_tf_cal.py`
+### `scripts/returns/refresh_returns_ema_multi_tf_cal.py`
 **Classes**
 - `RunnerConfig`
 
@@ -1808,7 +1808,7 @@ _(no top-level classes or functions)_
 - `_run_one_key(engine, ema_table, ret_table, state_table, start, key)`
 - `main()`
 
-### `scripts/returns/refresh_cmc_returns_ema_multi_tf_cal_anchor.py`
+### `scripts/returns/refresh_returns_ema_multi_tf_cal_anchor.py`
 **Classes**
 - `RunnerConfig`
 
@@ -1826,7 +1826,7 @@ _(no top-level classes or functions)_
 - `_run_one_key(engine, ema_table, ret_table, state_table, start, key)` — Build returns for one (id, tf, period, series, roll).
 - `main()`
 
-### `scripts/returns/refresh_cmc_returns_ema_multi_tf_u.py`
+### `scripts/returns/refresh_returns_ema_multi_tf_u.py`
 **Classes**
 - `RunnerConfig`
 
@@ -1841,7 +1841,7 @@ _(no top-level classes or functions)_
 - `_run_one_key(engine, ema_u_table, out_table, state_table, start, key)`
 - `main()`
 
-### `scripts/returns/refresh_cmc_returns_ema_multi_tf_v2.py`
+### `scripts/returns/refresh_returns_ema_multi_tf_v2.py`
 **Classes**
 - `RunnerConfig`
 

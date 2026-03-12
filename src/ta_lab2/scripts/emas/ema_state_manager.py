@@ -17,7 +17,7 @@ Usage:
 
     config = EMAStateConfig(
         state_schema="public",
-        state_table="cmc_ema_multi_tf_state",
+        state_table="ema_multi_tf_state",
         ts_column="ts",
         roll_filter="roll = FALSE",
     )
@@ -28,7 +28,7 @@ Usage:
     state_df = manager.load_state(ids=[1, 52], periods=[9, 10])
 
     manager.update_state_from_output(
-        output_table="cmc_ema_multi_tf",
+        output_table="ema_multi_tf",
         output_schema="public",
     )
 """

@@ -65,15 +65,15 @@ class TestActivateKillSwitch:
         Activating the kill switch must execute exactly 3 SQL statements:
         1. SELECT dim_risk_state (check current state)
         2. UPDATE dim_risk_state (flip to halted)
-        3. UPDATE cmc_orders (cancel pending orders)
-        4. INSERT cmc_risk_events (audit log)
+        3. UPDATE orders (cancel pending orders)
+        4. INSERT risk_events (audit log)
         """
         mock_engine, conn = _make_conn(
             [
                 ("active",),  # SELECT trading_state -- currently active
                 None,  # UPDATE dim_risk_state -> halted
-                None,  # UPDATE cmc_orders (cancel pending)
-                None,  # INSERT cmc_risk_events
+                None,  # UPDATE orders (cancel pending)
+                None,  # INSERT risk_events
             ]
         )
         conn.execute.return_value.rowcount = 2  # 2 orders cancelled
@@ -83,8 +83,8 @@ class TestActivateKillSwitch:
             [
                 ("active",),  # SELECT trading_state
                 None,  # UPDATE dim_risk_state
-                None,  # UPDATE cmc_orders
-                None,  # INSERT cmc_risk_events
+                None,  # UPDATE orders
+                None,  # INSERT risk_events
             ]
         )
 
@@ -181,13 +181,13 @@ class TestReEnableTrading:
         Re-enabling trading must:
         1. SELECT dim_risk_state (verify halted)
         2. UPDATE dim_risk_state (flip to active, clear halt columns)
-        3. INSERT cmc_risk_events (audit log)
+        3. INSERT risk_events (audit log)
         """
         mock_engine, conn = _make_conn(
             [
                 ("halted",),  # SELECT trading_state -- currently halted
                 None,  # UPDATE dim_risk_state -> active
-                None,  # INSERT cmc_risk_events
+                None,  # INSERT risk_events
             ]
         )
 

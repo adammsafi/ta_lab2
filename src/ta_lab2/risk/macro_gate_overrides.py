@@ -1,7 +1,7 @@
 """GateOverrideManager: per-gate macro risk override CRUD with expiry.
 
 Provides create/read/revert/expire operations on dim_macro_gate_overrides.
-Every write also inserts an immutable record to cmc_risk_events, ensuring
+Every write also inserts an immutable record to risk_events, ensuring
 a complete audit trail.
 
 Override types:
@@ -56,7 +56,7 @@ class GateOverrideManager:
     """CRUD operations for per-gate macro risk overrides.
 
     Every write touches both dim_macro_gate_overrides (state) and
-    cmc_risk_events (immutable audit log) in a single transaction.
+    risk_events (immutable audit log) in a single transaction.
     Reads use engine.connect() (read-only).
     Writes use engine.begin() (transactional).
     """
@@ -124,7 +124,7 @@ class GateOverrideManager:
             conn.execute(
                 text(
                     """
-                    INSERT INTO public.cmc_risk_events
+                    INSERT INTO public.risk_events
                         (event_type, trigger_source, reason, operator, metadata)
                     VALUES
                         ('macro_gate_override_created', 'manual',
@@ -254,7 +254,7 @@ class GateOverrideManager:
             conn.execute(
                 text(
                     """
-                    INSERT INTO public.cmc_risk_events
+                    INSERT INTO public.risk_events
                         (event_type, trigger_source, reason, operator, metadata)
                     VALUES
                         ('macro_gate_override_expired', 'manual',
@@ -325,7 +325,7 @@ class GateOverrideManager:
         """Auto-expire overrides that have passed their expires_at timestamp.
 
         Marks them as reverted by 'system' with reason 'auto-expired'.
-        Also logs a macro_gate_override_expired event to cmc_risk_events.
+        Also logs a macro_gate_override_expired event to risk_events.
 
         Returns:
             Count of overrides expired.
@@ -358,7 +358,7 @@ class GateOverrideManager:
                     conn.execute(
                         text(
                             """
-                            INSERT INTO public.cmc_risk_events
+                            INSERT INTO public.risk_events
                                 (event_type, trigger_source, reason, operator, metadata)
                             VALUES
                                 ('macro_gate_override_expired', 'system',

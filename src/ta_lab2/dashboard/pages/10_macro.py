@@ -196,7 +196,7 @@ def _macro_content(_engine, history_days, overlay_choice, show_quality):
                     SELECT
                         date_trunc('day', ts AT TIME ZONE 'UTC') AS date,
                         AVG(close) AS close
-                    FROM public.cmc_price_bars_multi_tf pb
+                    FROM public.price_bars_multi_tf pb
                     JOIN public.dim_assets da ON da.id = pb.id
                     WHERE da.symbol = :symbol
                       AND pb.tf = '1d'

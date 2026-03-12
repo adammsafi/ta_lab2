@@ -39,9 +39,9 @@ def main() -> None:
         default="auto",
         help=(
             "IC data source table. "
-            "'auto' (default): try cmc_feature_experiments first, fall back to cmc_ic_results. "
-            "'feature_experiments': query cmc_feature_experiments only. "
-            "'ic_results': query cmc_ic_results only (for bar-level features from run_ic_sweep.py)."
+            "'auto' (default): try feature_experiments first, fall back to ic_results. "
+            "'feature_experiments': query feature_experiments only. "
+            "'ic_results': query ic_results only (for bar-level features from run_ic_sweep.py)."
         ),
     )
     args = parser.parse_args()

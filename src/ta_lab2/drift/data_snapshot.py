@@ -13,7 +13,7 @@ def collect_data_snapshot(
     """
     Collect the latest data timestamps for each asset across key tables.
 
-    Queries MAX(ts) from cmc_price_bars_multi_tf, cmc_features, and cmc_ema_multi_tf_u
+    Queries MAX(ts) from price_bars_multi_tf, features, and ema_multi_tf_u
     for each asset at the 1D timeframe. Used to record the point-in-time data state
     at paper execution time so drift replay can reconstruct what data was visible.
 
@@ -41,7 +41,7 @@ def collect_data_snapshot(
         row_bar = conn.execute(
             text(
                 "SELECT MAX(ts) AS max_ts "
-                "FROM cmc_price_bars_multi_tf "
+                "FROM price_bars_multi_tf "
                 "WHERE id = :asset_id AND tf = '1D'"
             ),
             {"asset_id": asset_id},
@@ -52,11 +52,11 @@ def collect_data_snapshot(
             else None
         )
 
-        # Latest feature timestamp from cmc_features (1D tf)
+        # Latest feature timestamp from features (1D tf)
         row_feat = conn.execute(
             text(
                 "SELECT MAX(ts) AS max_ts "
-                "FROM cmc_features "
+                "FROM features "
                 "WHERE id = :asset_id AND tf = '1D'"
             ),
             {"asset_id": asset_id},
@@ -67,11 +67,11 @@ def collect_data_snapshot(
             else None
         )
 
-        # Latest EMA timestamp from cmc_ema_multi_tf_u (1D tf)
+        # Latest EMA timestamp from ema_multi_tf_u (1D tf)
         row_ema = conn.execute(
             text(
                 "SELECT MAX(ts) AS max_ts "
-                "FROM cmc_ema_multi_tf_u "
+                "FROM ema_multi_tf_u "
                 "WHERE id = :asset_id AND tf = '1D'"
             ),
             {"asset_id": asset_id},

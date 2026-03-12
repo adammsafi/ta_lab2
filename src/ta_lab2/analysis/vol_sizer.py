@@ -52,7 +52,7 @@ def compute_vol_sized_position(
     close:
         Current price of the asset.
     atr_14:
-        14-bar ATR in DOLLAR terms (from cmc_features atr_14 column).
+        14-bar ATR in DOLLAR terms (from features atr_14 column).
     init_cash:
         Starting cash for the position (used as portfolio NAV reference).
     risk_budget:
@@ -138,7 +138,7 @@ def run_vol_sized_backtest(
         Boolean Series of exit signals (True = exit long).
     vol_series:
         Volatility measure series aligned to price index.
-        If vol_type='atr': dollar ATR (e.g. atr_14 from cmc_features).
+        If vol_type='atr': dollar ATR (e.g. atr_14 from features).
         If vol_type='realized': rolling std of daily returns (fraction, e.g. 0.04).
     vol_type:
         'atr' or 'realized'.

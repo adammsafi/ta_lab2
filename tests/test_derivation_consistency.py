@@ -151,7 +151,7 @@ class TestDerivationConsistency:
         This would run the builder in both modes for a test ID and compare results.
         """
         # TODO: When database is available:
-        # 1. Run: python refresh_cmc_price_bars_multi_tf.py --ids 1 --from-1d --validate-derivation
+        # 1. Run: python refresh_price_bars_multi_tf.py --ids 1 --from-1d --validate-derivation
         # 2. Check logs for "Derivation consistent for id=1"
         # 3. Query both derived and direct bars, compare row-by-row
         pass
@@ -226,7 +226,7 @@ class TestDerivationConsistency:
 #
 # To validate derivation with real data:
 #
-# python src/ta_lab2/scripts/bars/refresh_cmc_price_bars_multi_tf.py \
+# python src/ta_lab2/scripts/bars/refresh_price_bars_multi_tf.py \
 #     --ids 1 --from-1d --validate-derivation
 #
 # Expected output: "Derivation consistent for id=1" (or warning if discrepancies)

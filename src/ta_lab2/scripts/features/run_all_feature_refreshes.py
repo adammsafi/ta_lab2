@@ -10,17 +10,17 @@ Usage:
     python -m ta_lab2.scripts.features.run_all_feature_refreshes --sequential
 
 Refresh order (respects dependencies):
-1. cmc_vol (depends on cmc_price_bars_multi_tf)
-2. cmc_ta (depends on cmc_price_bars_multi_tf)
-3. cmc_features (depends on 1-2 + EMAs + bar returns)
-4. cmc_features CS norms (depends on cmc_features having up-to-date ret_arith/rsi_14/vol columns)
+1. vol (depends on price_bars_multi_tf)
+2. ta (depends on price_bars_multi_tf)
+3. features (depends on 1-2 + EMAs + bar returns)
+4. features CS norms (depends on features having up-to-date ret_arith/rsi_14/vol columns)
 
 Parallel execution where possible:
 - vol, ta can run in parallel (same dependency)
-- cmc_features runs after all complete
-- CS norms run sequentially after cmc_features (window-function UPDATE, not insert)
+- features runs after all complete
+- CS norms run sequentially after features (window-function UPDATE, not insert)
 
-Note: cmc_returns is deprecated; returns now come from cmc_returns_bars_multi_tf.
+Note: cmc_returns is deprecated; returns now come from returns_bars_multi_tf.
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ from ta_lab2.scripts.bars.common_snapshot_contract import get_engine
 
 # CS norms import is optional — script may not exist in older deployments.
 try:
-    from ta_lab2.scripts.features.refresh_cmc_cs_norms import (
+    from ta_lab2.scripts.features.refresh_cs_norms import (
         refresh_cs_norms as _refresh_cs_norms,
     )
 
@@ -49,7 +49,7 @@ except ImportError:
     _CS_NORMS_AVAILABLE = False
     logger = logging.getLogger(__name__)
     logger.warning(
-        "refresh_cmc_cs_norms not found; CS normalization step will be skipped. "
+        "refresh_cs_norms not found; CS normalization step will be skipped. "
         "Run Plan 56-06 to create the module."
     )
 
@@ -85,10 +85,10 @@ def refresh_vol(
     tf: str = "1D",
     alignment_source: str = "multi_tf",
 ) -> RefreshResult:
-    """Refresh cmc_vol table for given tf + alignment_source."""
+    """Refresh vol table for given tf + alignment_source."""
     from ta_lab2.scripts.features.vol_feature import VolatilityFeature, VolatilityConfig
 
-    table = "cmc_vol"
+    table = "vol"
     t0 = time.time()
 
     try:
@@ -124,10 +124,10 @@ def refresh_ta(
     tf: str = "1D",
     alignment_source: str = "multi_tf",
 ) -> RefreshResult:
-    """Refresh cmc_ta table for given tf + alignment_source."""
+    """Refresh ta table for given tf + alignment_source."""
     from ta_lab2.scripts.features.ta_feature import TAFeature, TAConfig
 
-    table = "cmc_ta"
+    table = "ta"
     t0 = time.time()
 
     try:
@@ -163,13 +163,13 @@ def refresh_cycle_stats(
     tf: str = "1D",
     alignment_source: str = "multi_tf",
 ) -> RefreshResult:
-    """Refresh cmc_cycle_stats table for given tf + alignment_source."""
+    """Refresh cycle_stats table for given tf + alignment_source."""
     from ta_lab2.scripts.features.cycle_stats_feature import (
         CycleStatsFeature,
         CycleStatsConfig,
     )
 
-    table = "cmc_cycle_stats"
+    table = "cycle_stats"
     t0 = time.time()
 
     try:
@@ -205,13 +205,13 @@ def refresh_rolling_extremes(
     tf: str = "1D",
     alignment_source: str = "multi_tf",
 ) -> RefreshResult:
-    """Refresh cmc_rolling_extremes table for given tf + alignment_source."""
+    """Refresh rolling_extremes table for given tf + alignment_source."""
     from ta_lab2.scripts.features.rolling_extremes_feature import (
         RollingExtremesFeature,
         RollingExtremesConfig,
     )
 
-    table = "cmc_rolling_extremes"
+    table = "rolling_extremes"
     t0 = time.time()
 
     try:
@@ -247,13 +247,13 @@ def refresh_microstructure(
     tf: str = "1D",
     alignment_source: str = "multi_tf",
 ) -> RefreshResult:
-    """Refresh microstructure columns in cmc_features for given tf."""
+    """Refresh microstructure columns in features for given tf."""
     from ta_lab2.scripts.features.microstructure_feature import (
         MicrostructureFeature,
         MicrostructureConfig,
     )
 
-    table = "cmc_features (microstructure)"
+    table = "features (microstructure)"
     t0 = time.time()
 
     try:
@@ -289,10 +289,10 @@ def refresh_features_store(
     tf: str = "1D",
     alignment_source: str = "multi_tf",
 ) -> RefreshResult:
-    """Refresh cmc_features table for given tf + alignment_source."""
+    """Refresh features table for given tf + alignment_source."""
     from ta_lab2.scripts.features.daily_features_view import refresh_features
 
-    table = "cmc_features"
+    table = "features"
     t0 = time.time()
 
     try:
@@ -325,25 +325,23 @@ def refresh_features_store(
 
 
 def refresh_cs_norms_step(engine, tf: str = "1D") -> RefreshResult:
-    """Refresh cross-sectional normalization columns in cmc_features.
+    """Refresh cross-sectional normalization columns in features.
 
-    Runs after cmc_features refresh (depends on up-to-date ret_arith, rsi_14,
+    Runs after features refresh (depends on up-to-date ret_arith, rsi_14,
     vol_parkinson_20 values).  Returns a RefreshResult whose rows_inserted is
     the sum of cursor.rowcount from all 3 UPDATE statements (int, never None).
     """
-    table = "cmc_features (CS norms)"
+    table = "features (CS norms)"
     t0 = time.time()
 
     if not _CS_NORMS_AVAILABLE:
-        logger.warning(
-            "CS norms step skipped: refresh_cmc_cs_norms module not available"
-        )
+        logger.warning("CS norms step skipped: refresh_cs_norms module not available")
         return RefreshResult(
             table=table,
             rows_inserted=0,
             duration_seconds=time.time() - t0,
             success=False,
-            error="refresh_cmc_cs_norms module not available",
+            error="refresh_cs_norms module not available",
         )
 
     try:
@@ -380,7 +378,7 @@ def get_available_tf_alignments(engine) -> list[tuple[str, str]]:
     query = text(
         """
         SELECT DISTINCT ON (tf) tf, alignment_source
-        FROM public.cmc_price_bars_multi_tf_u
+        FROM public.price_bars_multi_tf_u
         ORDER BY tf, alignment_source
         """
     )
@@ -455,7 +453,7 @@ def run_all_refreshes(
                 logger.error(f"  {result.table} (tf={tf}): FAILED - {result.error}")
 
     # Phase 2: Features store (depends on phase 1)
-    logger.info("Phase 2: Running cmc_features (unified view)")
+    logger.info("Phase 2: Running features (unified view)")
 
     result = refresh_features_store(engine, ids, start, end, tf, alignment_source)
     results[result.table] = result
@@ -467,10 +465,10 @@ def run_all_refreshes(
     else:
         logger.error(f"  {result.table} (tf={tf}): FAILED - {result.error}")
 
-    # Phase 2b: Microstructure UPDATE (supplemental columns on cmc_features rows)
+    # Phase 2b: Microstructure UPDATE (supplemental columns on features rows)
     # MUST run after Phase 2 — microstructure does UPDATE on existing rows,
-    # so the base rows from cmc_features must exist first.
-    logger.info("Phase 2b: Running microstructure feature UPDATE on cmc_features")
+    # so the base rows from features must exist first.
+    logger.info("Phase 2b: Running microstructure feature UPDATE on features")
 
     micro_result = refresh_microstructure(engine, ids, start, end, tf, alignment_source)
     results[micro_result.table] = micro_result
@@ -483,8 +481,8 @@ def run_all_refreshes(
     else:
         logger.error(f"  {micro_result.table} (tf={tf}): FAILED - {micro_result.error}")
 
-    # Phase 3: Cross-sectional normalization (depends on cmc_features)
-    # MUST run sequentially after cmc_features — window functions read the
+    # Phase 3: Cross-sectional normalization (depends on features)
+    # MUST run sequentially after features — window functions read the
     # freshly-written ret_arith / rsi_14 / vol_parkinson_20 values.
     logger.info("Phase 3: Refreshing cross-sectional normalizations (CS norms)")
 
@@ -574,9 +572,7 @@ def load_ids(engine, ids_arg: Optional[str], all_ids: bool) -> list[int]:
         return [int(i.strip()) for i in ids_arg.split(",")]
 
     if all_ids:
-        query = text(
-            "SELECT DISTINCT id FROM public.cmc_price_bars_multi_tf_u ORDER BY id"
-        )
+        query = text("SELECT DISTINCT id FROM public.price_bars_multi_tf_u ORDER BY id")
         with engine.connect() as conn:
             result = conn.execute(query)
             return [row[0] for row in result]
@@ -600,7 +596,7 @@ def parse_args() -> argparse.Namespace:
     id_group.add_argument(
         "--all",
         action="store_true",
-        help="Process all IDs from cmc_price_bars_multi_tf",
+        help="Process all IDs from price_bars_multi_tf",
     )
 
     # Timeframe selection
@@ -613,7 +609,7 @@ def parse_args() -> argparse.Namespace:
     tf_group.add_argument(
         "--all-tfs",
         action="store_true",
-        help="Process all timeframes with data in cmc_price_bars_multi_tf",
+        help="Process all timeframes with data in price_bars_multi_tf",
     )
 
     # Codependence (optional batch step)
@@ -714,7 +710,7 @@ def main() -> int:
         query = text(
             """
             SELECT DISTINCT ON (tf) alignment_source
-            FROM public.cmc_price_bars_multi_tf_u WHERE tf = :tf
+            FROM public.price_bars_multi_tf_u WHERE tf = :tf
             ORDER BY tf, alignment_source
             """
         )
@@ -768,13 +764,13 @@ def main() -> int:
 
         print(f"\n[tf={tf}]")
         for table in [
-            "cmc_vol",
-            "cmc_ta",
-            "cmc_cycle_stats",
-            "cmc_rolling_extremes",
-            "cmc_features (microstructure)",
-            "cmc_features",
-            "cmc_features (CS norms)",
+            "vol",
+            "ta",
+            "cycle_stats",
+            "rolling_extremes",
+            "features (microstructure)",
+            "features",
+            "features (CS norms)",
             "cmc_codependence",
         ]:
             if table in results:

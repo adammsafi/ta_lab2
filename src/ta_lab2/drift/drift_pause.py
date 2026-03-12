@@ -76,7 +76,7 @@ def activate_drift_pause(
 
     Sequence (within a single transaction):
       1. UPDATE dim_risk_state: drift_paused=TRUE, drift_paused_at=now(), drift_paused_reason
-      2. INSERT into cmc_risk_events: audit record with tracking_error and config_id
+      2. INSERT into risk_events: audit record with tracking_error and config_id
 
     After commit, sends a Telegram critical alert (best-effort, failure does not raise).
 
@@ -106,7 +106,7 @@ def activate_drift_pause(
         conn.execute(
             text(
                 """
-                INSERT INTO cmc_risk_events (
+                INSERT INTO risk_events (
                     event_type, trigger_source, reason, metadata
                 ) VALUES (
                     'drift_pause_activated', 'drift_monitor', :reason, :metadata
@@ -157,7 +157,7 @@ def disable_drift_pause(
 
     Sequence (within a single transaction):
       1. UPDATE dim_risk_state: drift_paused=FALSE, clear drift_paused_at/reason
-      2. INSERT into cmc_risk_events: audit record
+      2. INSERT into risk_events: audit record
 
     Args:
         engine: SQLAlchemy Engine.
@@ -189,7 +189,7 @@ def disable_drift_pause(
         conn.execute(
             text(
                 """
-                INSERT INTO cmc_risk_events (
+                INSERT INTO risk_events (
                     event_type, trigger_source, reason, operator
                 ) VALUES (
                     'drift_pause_disabled', 'manual', :reason, :operator
@@ -377,7 +377,7 @@ def check_drift_escalation(engine: Engine) -> bool:
             conn.execute(
                 text(
                     """
-                    INSERT INTO cmc_risk_events (
+                    INSERT INTO risk_events (
                         event_type, trigger_source, reason
                     ) VALUES (
                         'drift_escalated', 'drift_monitor', :reason

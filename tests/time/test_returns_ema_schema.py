@@ -22,22 +22,22 @@ from sqlalchemy import create_engine, text
 # ---------------------------------------------------------------------------
 
 RETURNS_TABLES = [
-    "cmc_returns_ema_multi_tf",
-    "cmc_returns_ema_multi_tf_cal_us",
-    "cmc_returns_ema_multi_tf_cal_iso",
-    "cmc_returns_ema_multi_tf_cal_anchor_us",
-    "cmc_returns_ema_multi_tf_cal_anchor_iso",
-    "cmc_returns_ema_multi_tf_u",
+    "returns_ema_multi_tf",
+    "returns_ema_multi_tf_cal_us",
+    "returns_ema_multi_tf_cal_iso",
+    "returns_ema_multi_tf_cal_anchor_us",
+    "returns_ema_multi_tf_cal_anchor_iso",
+    "returns_ema_multi_tf_u",
 ]
 
 # PK columns per table (roll is NOT part of PK)
 TABLE_PK_COLS: dict[str, list[str]] = {
-    "cmc_returns_ema_multi_tf": ["id", "ts", "tf", "period"],
-    "cmc_returns_ema_multi_tf_cal_us": ["id", "ts", "tf", "period"],
-    "cmc_returns_ema_multi_tf_cal_iso": ["id", "ts", "tf", "period"],
-    "cmc_returns_ema_multi_tf_cal_anchor_us": ["id", "ts", "tf", "period"],
-    "cmc_returns_ema_multi_tf_cal_anchor_iso": ["id", "ts", "tf", "period"],
-    "cmc_returns_ema_multi_tf_u": [
+    "returns_ema_multi_tf": ["id", "ts", "tf", "period"],
+    "returns_ema_multi_tf_cal_us": ["id", "ts", "tf", "period"],
+    "returns_ema_multi_tf_cal_iso": ["id", "ts", "tf", "period"],
+    "returns_ema_multi_tf_cal_anchor_us": ["id", "ts", "tf", "period"],
+    "returns_ema_multi_tf_cal_anchor_iso": ["id", "ts", "tf", "period"],
+    "returns_ema_multi_tf_u": [
         "id",
         "ts",
         "tf",
@@ -279,9 +279,9 @@ def test_returns_tf_in_dim_timeframe(engine, existing_tables, table):
     actual_tfs = set(tf_values)
     invalid_tfs = actual_tfs - valid_tfs
 
-    assert (
-        not invalid_tfs
-    ), f"TF values in {table} not found in dim_timeframe: {sorted(invalid_tfs)}"
+    assert not invalid_tfs, (
+        f"TF values in {table} not found in dim_timeframe: {sorted(invalid_tfs)}"
+    )
 
 
 @pytest.mark.parametrize("table", RETURNS_TABLES)

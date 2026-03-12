@@ -7,8 +7,8 @@ reporting:
 
   1. AMA values  -- multi_tf, cal (us+iso), cal_anchor (us+iso)
   2. AMA returns -- all sources
-  3. _u sync     -- AMA values -> cmc_ama_multi_tf_u
-  4. _u sync     -- AMA returns -> cmc_returns_ama_multi_tf_u
+  3. _u sync     -- AMA values -> ama_multi_tf_u
+  4. _u sync     -- AMA returns -> returns_ama_multi_tf_u
   5. Z-scores    -- AMA returns tables
 
 Usage:
@@ -92,19 +92,19 @@ class RefresherResult:
 ALL_AMA_VALUE_REFRESHERS = [
     RefresherConfig(
         name="multi_tf",
-        module="ta_lab2.scripts.amas.refresh_cmc_ama_multi_tf",
+        module="ta_lab2.scripts.amas.refresh_ama_multi_tf",
         description="Multi-TF AMAs",
         supports_scheme=False,
     ),
     RefresherConfig(
         name="cal",
-        module="ta_lab2.scripts.amas.refresh_cmc_ama_multi_tf_cal_from_bars",
+        module="ta_lab2.scripts.amas.refresh_ama_multi_tf_cal_from_bars",
         description="Calendar AMAs (us+iso)",
         supports_scheme=True,
     ),
     RefresherConfig(
         name="cal_anchor",
-        module="ta_lab2.scripts.amas.refresh_cmc_ama_multi_tf_cal_anchor_from_bars",
+        module="ta_lab2.scripts.amas.refresh_ama_multi_tf_cal_anchor_from_bars",
         description="Calendar anchor AMAs (us+iso)",
         supports_scheme=True,
     ),
@@ -116,17 +116,17 @@ REFRESHER_NAME_MAP = {r.name: r for r in ALL_AMA_VALUE_REFRESHERS}
 POST_STEPS = [
     PostStep(
         name="returns",
-        module="ta_lab2.scripts.amas.refresh_cmc_returns_ama",
+        module="ta_lab2.scripts.amas.refresh_returns_ama",
         description="AMA returns",
     ),
     PostStep(
         name="sync_values",
-        module="ta_lab2.scripts.amas.sync_cmc_ama_multi_tf_u",
+        module="ta_lab2.scripts.amas.sync_ama_multi_tf_u",
         description="Sync AMA values to _u",
     ),
     PostStep(
         name="sync_returns",
-        module="ta_lab2.scripts.amas.sync_cmc_returns_ama_multi_tf_u",
+        module="ta_lab2.scripts.amas.sync_returns_ama_multi_tf_u",
         description="Sync AMA returns to _u",
     ),
     PostStep(
@@ -450,8 +450,8 @@ Pipeline stages (in order):
   cal         -- Calendar-aligned AMAs (us+iso)
   cal_anchor  -- Calendar-anchored AMAs (us+iso)
   returns     -- AMA returns for all sources
-  sync_values -- Sync AMA values -> cmc_ama_multi_tf_u
-  sync_returns-- Sync AMA returns -> cmc_returns_ama_multi_tf_u
+  sync_values -- Sync AMA values -> ama_multi_tf_u
+  sync_returns-- Sync AMA returns -> returns_ama_multi_tf_u
   zscores     -- Z-scores on AMA returns tables
 
 CONNECTION NOTES: AMA refreshers use parallel workers (default: 4).

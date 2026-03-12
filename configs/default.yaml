@@ -135,4 +135,4 @@ marketdata:
     exchange_info: cmc_exchange_info        # info on the 6 exchanges (names, URLs, etc.)
     exchange_map: cmc_exchange_map          # maps exchange ids ↔ names/slugs
     ema_daily: cmc_ema_daily                # daily multi-period ema for 7 assets in ohlcv_daily
-    ema_multi_tf: cmc_ema_multi_tf          # multi-timeframe multi-period ema for 7 assets in ohlcv_daily
+    ema_multi_tf: ema_multi_tf          # multi-timeframe multi-period ema for 7 assets in ohlcv_daily

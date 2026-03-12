@@ -271,13 +271,13 @@ EMA tables store multi-timeframe exponential moving averages:
 psql -d ta_lab2 -f sql/ddl/create_cmc_ema_refresh_state.sql
 
 # Create unified multi-timeframe EMA table
-psql -d ta_lab2 -f sql/ddl/create_cmc_ema_multi_tf_v2.sql
+psql -d ta_lab2 -f sql/ddl/create_ema_multi_tf_v2.sql
 ```
 
 **Optional**: Create additional EMA variant tables if using older schemas:
 ```bash
-psql -d ta_lab2 -f sql/ddl/create_cmc_returns_ema_multi_tf.sql
-psql -d ta_lab2 -f sql/ddl/create_cmc_returns_ema_multi_tf_cal_unified.sql
+psql -d ta_lab2 -f sql/ddl/create_returns_ema_multi_tf.sql
+psql -d ta_lab2 -f sql/ddl/create_returns_ema_multi_tf_cal_unified.sql
 ```
 
 ### 5. Create Price Bar Tables
@@ -286,10 +286,10 @@ Price bar tables store multi-timeframe OHLCV data:
 
 ```bash
 # Create 1D price bars with state tracking
-psql -d ta_lab2 -f sql/ddl/create_cmc_price_bars_1d_state.sql
+psql -d ta_lab2 -f sql/ddl/create_price_bars_1d_state.sql
 
 # Create multi-timeframe price bars
-psql -d ta_lab2 -f sql/ddl/price_bars__cmc_price_bars_multi_tf.sql
+psql -d ta_lab2 -f sql/ddl/price_bars__price_bars_multi_tf.sql
 ```
 
 ### 6. Create Returns Tables
@@ -298,7 +298,7 @@ Returns tables store return calculations across timeframes:
 
 ```bash
 psql -d ta_lab2 -f sql/ddl/create_returns_tables_20251221.sql
-psql -d ta_lab2 -f sql/ddl/ddl_cmc_returns_bars_multi_tf.sql
+psql -d ta_lab2 -f sql/ddl/ddl_returns_bars_multi_tf.sql
 ```
 
 ### 7. Verify Database Setup
@@ -491,10 +491,10 @@ python -m ta_lab2.scripts.emas.refresh_cmc_emas --ids all
 python -m ta_lab2.scripts.emas.refresh_cmc_ema_daily_only --ids all
 
 # Refresh multi-timeframe EMAs
-python -m ta_lab2.scripts.emas.refresh_cmc_ema_multi_tf_only --ids all
+python -m ta_lab2.scripts.emas.refresh_ema_multi_tf_only --ids all
 
 # Sync to unified table
-python -m ta_lab2.scripts.emas.sync_cmc_ema_multi_tf_u --ids all
+python -m ta_lab2.scripts.emas.sync_ema_multi_tf_u --ids all
 ```
 
 ### Price Bar Updates
@@ -503,7 +503,7 @@ Update price bars from source data:
 
 ```bash
 # Refresh daily price bars
-python -m ta_lab2.scripts.bars.refresh_cmc_price_bars_1d --ids all
+python -m ta_lab2.scripts.bars.refresh_price_bars_1d --ids all
 
 # Audit price bar integrity
 python -m ta_lab2.scripts.bars.audit_price_bars_integrity

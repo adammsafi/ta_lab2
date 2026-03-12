@@ -3,12 +3,12 @@ from __future__ import annotations
 """
 SQL view definitions for the EMA pipeline.
 
-These constants are imported by `refresh_cmc_emas.py` to (re)create
+These constants are imported by the EMA refresh scripts to (re)create
 the helper views:
 
 - public.all_emas
-- public.cmc_price_with_emas
-- public.cmc_price_with_emas_d1d2  (legacy alias)
+- public.price_with_emas
+- public.price_with_emas_d1d2  (legacy alias)
 
 Lean EMA schema: derivative columns (d1, d2, d1_roll, d2_roll) have been
 removed from EMA tables. Derivatives are now in the returns tables.
@@ -22,13 +22,13 @@ VIEW_ALL_EMAS_SQL = """
 CREATE OR REPLACE VIEW public.all_emas AS
 SELECT
     id, ts, tf, tf_days, period, ema, roll
-FROM public.cmc_ema_multi_tf;
+FROM public.ema_multi_tf;
 """
 
 
 # Joins daily prices to all EMA rows (tall, not pivoted)
 VIEW_PRICE_WITH_EMAS_SQL = """
-CREATE OR REPLACE VIEW public.cmc_price_with_emas AS
+CREATE OR REPLACE VIEW public.price_with_emas AS
 SELECT
     p.*,
     e.tf,
@@ -43,11 +43,11 @@ LEFT JOIN public.all_emas e
 """
 
 
-# For now this is just an alias of cmc_price_with_emas.
+# For now this is just an alias of price_with_emas.
 # If you later want a more specialised view (e.g. only canonical
 # bars, or only certain periods), you can change the definition here.
 VIEW_PRICE_WITH_EMAS_D1D2_SQL = """
-CREATE OR REPLACE VIEW public.cmc_price_with_emas_d1d2 AS
+CREATE OR REPLACE VIEW public.price_with_emas_d1d2 AS
 SELECT *
-FROM public.cmc_price_with_emas;
+FROM public.price_with_emas;
 """

@@ -55,21 +55,21 @@ TIMEOUT_BASELINE_EMAS = 3600  # 1 hour -- baseline EMA refreshers
 
 # All 6 bar tables from Phase 21 documentation
 BAR_TABLES = [
-    "public.cmc_price_bars_1d",
-    "public.cmc_price_bars_multi_tf",
-    "public.cmc_price_bars_multi_tf_cal_iso",
-    "public.cmc_price_bars_multi_tf_cal_us",
-    "public.cmc_price_bars_multi_tf_cal_anchor_iso",
-    "public.cmc_price_bars_multi_tf_cal_anchor_us",
+    "public.price_bars_1d",
+    "public.price_bars_multi_tf",
+    "public.price_bars_multi_tf_cal_iso",
+    "public.price_bars_multi_tf_cal_us",
+    "public.price_bars_multi_tf_cal_anchor_iso",
+    "public.price_bars_multi_tf_cal_anchor_us",
 ]
 
 # All 5 EMA tables
 EMA_TABLES = [
-    "public.cmc_ema_multi_tf",
-    "public.cmc_ema_multi_tf_cal_us",
-    "public.cmc_ema_multi_tf_cal_iso",
-    "public.cmc_ema_multi_tf_cal_anchor_us",
-    "public.cmc_ema_multi_tf_cal_anchor_iso",
+    "public.ema_multi_tf",
+    "public.ema_multi_tf_cal_us",
+    "public.ema_multi_tf_cal_iso",
+    "public.ema_multi_tf_cal_anchor_us",
+    "public.ema_multi_tf_cal_anchor_iso",
 ]
 
 # Bar table column configuration
@@ -880,13 +880,15 @@ def parse_ids(ids_arg: str, engine) -> list[int] | None:
         List of integer IDs or None for "all"
     """
     if ids_arg.lower() == "all":
-        # Query dim_assets for all IDs
+        # Query dim_assets for pipeline_tier = 1 (full pipeline) assets
         with engine.connect() as conn:
             result = conn.execute(
-                text("SELECT DISTINCT id FROM public.dim_assets ORDER BY id")
+                text(
+                    "SELECT DISTINCT id FROM public.dim_assets WHERE pipeline_tier = 1 ORDER BY id"
+                )
             )
             ids = [row[0] for row in result]
-        print(f"[Info] Resolved 'all' to {len(ids)} IDs from dim_assets")
+        print(f"[Info] Resolved 'all' to {len(ids)} tier-1 IDs from dim_assets")
         return ids
     else:
         # Parse comma-separated list

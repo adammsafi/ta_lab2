@@ -2,9 +2,9 @@
 """
 Batch refresh script for triple barrier labels.
 
-Loads close prices from cmc_price_bars_multi_tf_u, computes vol-scaled triple
+Loads close prices from price_bars_multi_tf_u, computes vol-scaled triple
 barrier labels using AFML Ch.3 methodology, and persists to the
-cmc_triple_barrier_labels table with upsert semantics.
+triple_barrier_labels table with upsert semantics.
 
 Labels:
   bin = +1  profit target (upper barrier) hit first
@@ -48,7 +48,7 @@ logger = logging.getLogger(__name__)
 def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
-        description="Refresh triple barrier labels in cmc_triple_barrier_labels",
+        description="Refresh triple barrier labels in triple_barrier_labels",
     )
 
     # Asset selection (mutually exclusive)
@@ -60,7 +60,7 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     id_group.add_argument(
         "--all",
         action="store_true",
-        help="Process all assets found in cmc_price_bars_multi_tf_u for the given tf",
+        help="Process all assets found in price_bars_multi_tf_u for the given tf",
     )
 
     # Timeframe
@@ -149,10 +149,9 @@ def load_asset_ids(engine, ids_arg: Optional[str], all_ids: bool, tf: str) -> li
         return [int(i.strip()) for i in ids_arg.split(",")]
 
     if all_ids:
-        # cmc_price_bars_multi_tf_u uses 'id' as the asset identifier column
+        # price_bars_multi_tf_u uses 'id' as the asset identifier column
         q = text(
-            "SELECT DISTINCT id FROM cmc_price_bars_multi_tf_u "
-            "WHERE tf = :tf ORDER BY id"
+            "SELECT DISTINCT id FROM price_bars_multi_tf_u WHERE tf = :tf ORDER BY id"
         )
         with engine.connect() as conn:
             rows = conn.execute(q, {"tf": tf}).fetchall()
@@ -168,10 +167,10 @@ def load_asset_ids(engine, ids_arg: Optional[str], all_ids: bool, tf: str) -> li
 
 def load_close(engine, asset_id: int, tf: str) -> pd.Series:
     """Load close price series as a tz-aware UTC DatetimeIndex pd.Series."""
-    # Note: cmc_price_bars_multi_tf_u uses 'timestamp' (not 'ts') as the datetime column.
+    # Note: price_bars_multi_tf_u uses 'timestamp' (not 'ts') as the datetime column.
     q = text(
         "SELECT timestamp, close "
-        "FROM cmc_price_bars_multi_tf_u "
+        "FROM price_bars_multi_tf_u "
         "WHERE id = :id AND tf = :tf "
         "ORDER BY timestamp"
     )
@@ -194,7 +193,7 @@ def load_close(engine, asset_id: int, tf: str) -> pd.Series:
 # ---------------------------------------------------------------------------
 
 _UPSERT_SQL = """
-INSERT INTO cmc_triple_barrier_labels
+INSERT INTO triple_barrier_labels
     (label_id, asset_id, tf, t0, t1,
      pt_multiplier, sl_multiplier, vertical_bars,
      daily_vol, target, ret, bin, barrier_type, computed_at)
@@ -214,7 +213,7 @@ DO UPDATE SET
 """
 
 _DELETE_SQL = """
-DELETE FROM cmc_triple_barrier_labels
+DELETE FROM triple_barrier_labels
 WHERE  asset_id      = :asset_id
   AND  tf            = :tf
   AND  pt_multiplier = :pt
@@ -248,7 +247,7 @@ def write_labels(
     full_refresh: bool,
 ) -> int:
     """
-    Upsert a labels DataFrame into cmc_triple_barrier_labels.
+    Upsert a labels DataFrame into triple_barrier_labels.
 
     Returns number of rows written.
     """

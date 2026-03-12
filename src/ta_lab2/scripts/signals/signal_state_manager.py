@@ -18,7 +18,7 @@ Usage:
 
     config = SignalStateConfig(
         state_schema="public",
-        state_table="cmc_signal_state",
+        state_table="signal_state",
         signal_type="ema_crossover",
     )
 
@@ -30,7 +30,7 @@ Usage:
 
     # Update state after generating signals
     manager.update_state_after_generation(
-        signal_table="cmc_signals_ema_crossover",
+        signal_table="signals_ema_crossover",
         signal_id=1
     )
 """
@@ -54,14 +54,14 @@ class SignalStateConfig:
     Attributes:
         signal_type: Signal category - 'ema_crossover', 'rsi_mean_revert', 'atr_breakout' (required)
         state_schema: Schema containing state table (default: "public")
-        state_table: State table name (default: "cmc_signal_state")
+        state_table: State table name (default: "signal_state")
         ts_column: Timestamp column name in signal table (default: "ts")
         id_column: ID column name in signal table (default: "id")
     """
 
     signal_type: str  # Required: 'ema_crossover', 'rsi_mean_revert', 'atr_breakout'
     state_schema: str = "public"
-    state_table: str = "cmc_signal_state"
+    state_table: str = "signal_state"
     ts_column: str = "ts"
     id_column: str = "id"
 
@@ -201,7 +201,7 @@ class SignalStateManager:
         signal table and upserts into state table.
 
         Args:
-            signal_table: Name of signal table (e.g., 'cmc_signals_ema_crossover')
+            signal_table: Name of signal table (e.g., 'signals_ema_crossover')
             signal_id: Signal ID from dim_signals
 
         Returns:

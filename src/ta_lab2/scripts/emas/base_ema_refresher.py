@@ -22,9 +22,9 @@ Design Pattern: Template Method
 - Reduces code duplication across 4 EMA scripts
 
 Migration: This replaces duplicated code in:
-- refresh_cmc_ema_multi_tf_from_bars.py
-- refresh_cmc_ema_multi_tf_cal_from_bars.py
-- refresh_cmc_ema_multi_tf_cal_anchor_from_bars.py
+- refresh_ema_multi_tf_from_bars.py
+- refresh_ema_multi_tf_cal_from_bars.py
+- refresh_ema_multi_tf_cal_anchor_from_bars.py
 """
 
 from __future__ import annotations
@@ -96,9 +96,9 @@ def ensure_ema_table_exists(
     Create EMA output table if it doesn't exist.
 
     Supports all EMA table types:
-    - multi_tf: cmc_ema_multi_tf (rolling EMAs from multi-TF bars)
-    - cal: cmc_ema_multi_tf_cal_iso/us (calendar-aligned EMAs)
-    - cal_anchor: cmc_ema_multi_tf_cal_anchor_iso/us (calendar-anchored EMAs)
+    - multi_tf: ema_multi_tf (rolling EMAs from multi-TF bars)
+    - cal: ema_multi_tf_cal_iso/us (calendar-aligned EMAs)
+    - cal_anchor: ema_multi_tf_cal_anchor_iso/us (calendar-anchored EMAs)
 
     Args:
         engine: SQLAlchemy engine
@@ -108,9 +108,9 @@ def ensure_ema_table_exists(
 
     Usage:
         # From a refresher:
-        ensure_ema_table_exists(self.engine, "cmc_ema_multi_tf", table_type="multi_tf")
+        ensure_ema_table_exists(self.engine, "ema_multi_tf", table_type="multi_tf")
     """
-    # Handle fully-qualified table names (e.g., "public.cmc_ema_multi_tf")
+    # Handle fully-qualified table names (e.g., "public.ema_multi_tf")
     if "." in table_name:
         schema, table_name = table_name.split(".", 1)
 
@@ -222,7 +222,7 @@ def get_price_bounds(
         engine: SQLAlchemy engine for database operations
         id: Cryptocurrency ID
         tf: Timeframe (e.g., "1D", "7D")
-        source_table: Source bars table (e.g., "public.cmc_price_bars_multi_tf")
+        source_table: Source bars table (e.g., "public.price_bars_multi_tf")
         lookback_days: Number of days to look back for bounds (default: 90)
 
     Returns:
@@ -273,7 +273,7 @@ def get_statistical_bounds(
         id: Cryptocurrency ID
         tf: Timeframe (e.g., "1D", "7D")
         period: EMA period (e.g., 9, 21, 50)
-        output_table: EMA output table (e.g., "public.cmc_ema_multi_tf")
+        output_table: EMA output table (e.g., "public.ema_multi_tf")
         lookback_count: Number of recent EMA values to use (default: 100)
 
     Returns:
@@ -629,7 +629,7 @@ class BaseEMARefresher(ABC):
         Get table type for DDL generation.
 
         Subclasses should override to specify their table type:
-        - "multi_tf" for refresh_cmc_ema_multi_tf_from_bars
+        - "multi_tf" for refresh_ema_multi_tf_from_bars
         - "cal" for cal_iso and cal_us refreshers
         - "cal_anchor" for cal_anchor_iso and cal_anchor_us refreshers
 
@@ -848,7 +848,7 @@ class BaseEMARefresher(ABC):
             - "bars_schema": Source bars schema name
 
         Example:
-            {"bars_table": "cmc_price_bars_multi_tf", "bars_schema": "public"}
+            {"bars_table": "price_bars_multi_tf", "bars_schema": "public"}
         """
 
     @staticmethod

@@ -40,11 +40,11 @@ DEFAULT_DIM_TF = "public.dim_timeframe"
 DEFAULT_LUT = "public.ema_alpha_lookup"
 
 EMA_TABLES = {
-    "public.cmc_ema_multi_tf": "TF_DAY",
-    "public.cmc_ema_multi_tf_cal_us": "CAL_US",
-    "public.cmc_ema_multi_tf_cal_iso": "CAL_ISO",
-    "public.cmc_ema_multi_tf_cal_anchor_us": "ANCHOR_US",
-    "public.cmc_ema_multi_tf_cal_anchor_iso": "ANCHOR_ISO",
+    "public.ema_multi_tf": "TF_DAY",
+    "public.ema_multi_tf_cal_us": "CAL_US",
+    "public.ema_multi_tf_cal_iso": "CAL_ISO",
+    "public.ema_multi_tf_cal_anchor_us": "ANCHOR_US",
+    "public.ema_multi_tf_cal_anchor_iso": "ANCHOR_ISO",
 }
 
 

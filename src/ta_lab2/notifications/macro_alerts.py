@@ -2,8 +2,8 @@
 """
 MacroAlertManager: Telegram alerting for macro regime transitions.
 
-Detects dimension-level and composite regime-key changes in cmc_macro_regimes,
-sends throttled Telegram alerts, and logs all alert activity to cmc_macro_alert_log
+Detects dimension-level and composite regime-key changes in macro_regimes,
+sends throttled Telegram alerts, and logs all alert activity to macro_alert_log
 for audit and dashboard visibility.
 
 Key design decisions:
@@ -11,7 +11,7 @@ Key design decisions:
 - Risk-off (risk_appetite -> RiskOff) and carry unwind (carry -> Unwind) escalate to "critical".
 - Composite alert fires in addition to per-dimension alerts when regime_key changes.
 - Gracefully degrades when Telegram is not configured (logs warning, still writes to DB).
-- cmc_macro_alert_log may not yet exist if Plan 01 Alembic migration hasn't run;
+- macro_alert_log may not yet exist if Plan 01 Alembic migration hasn't run;
   catches OperationalError/ProgrammingError on insert and logs a warning.
 
 Phase 72, Plan 02.
@@ -75,7 +75,7 @@ class MacroAlertManager:
 
     def check_and_alert(self, profile: str = "default") -> list[dict[str, Any]]:
         """
-        Detect transitions in cmc_macro_regimes and send Telegram alerts.
+        Detect transitions in macro_regimes and send Telegram alerts.
 
         Returns:
             List of dicts describing each transition detected (for caller logging).
@@ -164,7 +164,7 @@ class MacroAlertManager:
         sql = text("""
             SELECT date, monetary_policy, liquidity, risk_appetite, carry,
                    regime_key, macro_state
-            FROM cmc_macro_regimes
+            FROM macro_regimes
             WHERE profile = :profile
             ORDER BY date DESC
             LIMIT 2
@@ -173,7 +173,7 @@ class MacroAlertManager:
             with self._engine.connect() as conn:
                 rows = conn.execute(sql, {"profile": profile}).fetchall()
         except Exception as exc:
-            logger.error("Failed to query cmc_macro_regimes: %s", exc)
+            logger.error("Failed to query macro_regimes: %s", exc)
             return None, None
 
         if len(rows) < 2:
@@ -227,7 +227,7 @@ class MacroAlertManager:
         """
         sql = text("""
             SELECT 1
-            FROM cmc_macro_alert_log
+            FROM macro_alert_log
             WHERE alert_type = :alert_type
               AND (dimension = :dimension OR (:dimension IS NULL AND dimension IS NULL))
               AND sent_at > NOW() - (INTERVAL '1 hour' * :hours)
@@ -248,7 +248,7 @@ class MacroAlertManager:
         except (OperationalError, ProgrammingError) as exc:
             # Table may not exist yet if Alembic migration hasn't run
             logger.warning(
-                "cmc_macro_alert_log not accessible (migration pending?): %s", exc
+                "macro_alert_log not accessible (migration pending?): %s", exc
             )
             return False
         except Exception as exc:
@@ -265,9 +265,9 @@ class MacroAlertManager:
         macro_state: str | None,
         throttled: bool,
     ) -> None:
-        """Persist alert record to cmc_macro_alert_log."""
+        """Persist alert record to macro_alert_log."""
         sql = text("""
-            INSERT INTO cmc_macro_alert_log
+            INSERT INTO macro_alert_log
                 (alert_type, dimension, old_label, new_label, regime_key, macro_state, throttled)
             VALUES
                 (:alert_type, :dimension, :old_label, :new_label, :regime_key, :macro_state, :throttled)
@@ -288,10 +288,10 @@ class MacroAlertManager:
                 )
         except (OperationalError, ProgrammingError) as exc:
             logger.warning(
-                "Could not write to cmc_macro_alert_log (migration pending?): %s", exc
+                "Could not write to macro_alert_log (migration pending?): %s", exc
             )
         except Exception as exc:
-            logger.error("Failed to log alert to cmc_macro_alert_log: %s", exc)
+            logger.error("Failed to log alert to macro_alert_log: %s", exc)
 
     def _send_dimension_alert(
         self,

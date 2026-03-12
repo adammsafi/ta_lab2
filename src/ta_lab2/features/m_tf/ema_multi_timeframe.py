@@ -2,7 +2,7 @@
 Multi-timeframe EMA - REFACTORED to use BaseEMAFeature.
 
 Multi-TF EMA semantics:
-- Canonical closes from persisted bars (cmc_price_bars_multi_tf) OR synthetic from daily
+- Canonical closes from persisted bars (price_bars_multi_tf) OR synthetic from daily
 - Timeframe universe from dim_timeframe (tf_day family)
 - Preview EMAs: daily grid with EMAs between canonical closes
 - Roll flag: FALSE for canonical, TRUE for preview
@@ -50,7 +50,7 @@ class MultiTFEMAFeature(BaseEMAFeature):
     Multi-timeframe EMA feature: EMAs with preview values on daily grid.
 
     Key characteristics:
-    - Uses persisted bars from cmc_price_bars_multi_tf OR synthetic from daily
+    - Uses persisted bars from price_bars_multi_tf OR synthetic from daily
     - Loads TFs from dim_timeframe (tf_day family)
     - Preview EMAs between canonical closes
     - Roll flag: FALSE for canonical, TRUE for preview
@@ -62,7 +62,7 @@ class MultiTFEMAFeature(BaseEMAFeature):
         config: EMAFeatureConfig,
         *,
         bars_schema: str = "public",
-        bars_table: str = "cmc_price_bars_multi_tf",
+        bars_table: str = "price_bars_multi_tf",
         tf_subset: Optional[Sequence[str]] = None,
     ):
         """
@@ -109,7 +109,7 @@ class MultiTFEMAFeature(BaseEMAFeature):
         sql = text(
             f"SELECT id, timestamp AS ts, open, high, low, close, volume, "
             f"venue, venue_rank "
-            f"FROM public.cmc_price_bars_1d "
+            f"FROM public.price_bars_1d "
             f"WHERE {' AND '.join(where)} "
             f"ORDER BY id, venue, timestamp"
         )
@@ -535,10 +535,10 @@ def write_multi_timeframe_ema_to_db(
     *,
     db_url: Optional[str] = None,
     schema: str = "public",
-    out_table: str = "cmc_ema_multi_tf",
+    out_table: str = "ema_multi_tf",
     update_existing: bool = True,
     bars_schema: str = "public",
-    bars_table_tf_day: str = "cmc_price_bars_multi_tf",
+    bars_table_tf_day: str = "price_bars_multi_tf",
 ) -> int:
     """
     Compute multi-TF EMAs and write to database (backward compatibility wrapper).

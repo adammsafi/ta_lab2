@@ -104,7 +104,7 @@ def _default_limits_row():
 
 
 def _no_perp_position():
-    """Simulate cmc_perp_positions returning no active position (Gate 1.6 passes)."""
+    """Simulate perp_positions returning no active position (Gate 1.6 passes)."""
     result = MagicMock()
     result.fetchone.return_value = None
     return result
@@ -235,7 +235,7 @@ class TestCheckOrderKillSwitch:
         # Gate 3: limits for position/portfolio cap
         limits_for_caps = MagicMock()
         limits_for_caps.fetchall.return_value = _default_limits_row()
-        # Gate 1.6: cmc_perp_positions -- no perp position, gate passes
+        # Gate 1.6: perp_positions -- no perp position, gate passes
         perp_pos_result = _no_perp_position()
 
         conn.execute.side_effect = [
@@ -297,7 +297,7 @@ class TestCheckOrderPositionCap:
         log_result = MagicMock()
         log_result.fetchone.return_value = None
 
-        # Gate 1.6: cmc_perp_positions -- no perp position, gate passes
+        # Gate 1.6: perp_positions -- no perp position, gate passes
         perp_pos_result = _no_perp_position()
 
         conn.execute.side_effect = [
@@ -343,7 +343,7 @@ class TestCheckOrderPositionCap:
         limits_for_caps = MagicMock()
         limits_for_caps.fetchall.return_value = _default_limits_row()
 
-        # Gate 1.6: cmc_perp_positions -- no perp position, gate passes
+        # Gate 1.6: perp_positions -- no perp position, gate passes
         perp_pos_result = _no_perp_position()
 
         conn.execute.side_effect = [
@@ -493,7 +493,7 @@ class TestCheckOrderAllClear:
         limits_for_caps = MagicMock()
         limits_for_caps.fetchall.return_value = _default_limits_row()
 
-        # Gate 1.6: cmc_perp_positions -- no perp position, gate passes
+        # Gate 1.6: perp_positions -- no perp position, gate passes
         perp_pos_result = _no_perp_position()
 
         conn.execute.side_effect = [
@@ -748,7 +748,7 @@ class TestCircuitBreakerCooldownAutoReset:
         limits_result2 = MagicMock()
         limits_result2.fetchall.return_value = _default_limits_row()
 
-        # Gate 1.6: cmc_perp_positions -- no perp position, gate passes
+        # Gate 1.6: perp_positions -- no perp position, gate passes
         perp_pos_result = _no_perp_position()
 
         conn.execute.side_effect = [

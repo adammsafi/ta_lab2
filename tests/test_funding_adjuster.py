@@ -339,7 +339,7 @@ class TestFundingAdjusterAdjust:
     """Tests for FundingAdjuster.adjust() using mock portfolio and DB."""
 
     def _make_mock_engine_with_rates(self, rate_rows):
-        """Engine that returns specified rate rows from cmc_funding_rates."""
+        """Engine that returns specified rate rows from funding_rates."""
         mock_engine = MagicMock()
         conn = MagicMock()
         mock_engine.connect.return_value.__enter__ = MagicMock(return_value=conn)

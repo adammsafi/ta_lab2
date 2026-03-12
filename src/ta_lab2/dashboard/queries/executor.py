@@ -40,7 +40,7 @@ def load_executor_run_log(_engine, limit: int = 50) -> pd.DataFrame:
             fills_processed,
             skipped_no_delta,
             error_message
-        FROM public.cmc_executor_run_log
+        FROM public.executor_run_log
         ORDER BY started_at DESC
         LIMIT :limit
         """

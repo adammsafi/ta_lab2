@@ -1,8 +1,8 @@
 """
 CLI for regime-routed backtest comparison vs single global model.
 
-Loads ``cmc_features`` for the given asset IDs / timeframe / date range,
-joins ``cmc_regimes`` L2 labels, trains a ``RegimeRouter`` (per-regime
+Loads ``features`` for the given asset IDs / timeframe / date range,
+joins ``regimes`` L2 labels, trains a ``RegimeRouter`` (per-regime
 sub-models) **and** a single global LGBMClassifier / RandomForest, evaluates
 both using purged cross-validation, and prints a comparison table.
 
@@ -57,7 +57,7 @@ _EXCLUDE_COLS = frozenset(
         "volume",
         "market_cap",
         "alignment_source",
-        # categorical/string columns from cmc_features (not numeric features)
+        # categorical/string columns from features (not numeric features)
         "asset_class",
         "venue",
     ]
@@ -74,7 +74,7 @@ def _build_parser() -> argparse.ArgumentParser:
         prog="run_regime_routing",
         description=(
             "Train per-regime sub-models (RegimeRouter) and compare to a single "
-            "global model using purged cross-validation on cmc_features."
+            "global model using purged cross-validation on features."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
@@ -120,7 +120,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--log-experiment",
         action="store_true",
-        help="Log results to cmc_ml_experiments via ExperimentTracker",
+        help="Log results to ml_experiments via ExperimentTracker",
     )
     parser.add_argument(
         "--verbose",
@@ -154,12 +154,12 @@ def _load_features(
     start: str,
     end: str,
 ) -> pd.DataFrame:
-    """Load cmc_features for the given asset_ids, tf, and date range."""
+    """Load features for the given asset_ids, tf, and date range."""
     ids_literal = "{" + ",".join(str(i) for i in asset_ids) + "}"
     sql = text(
         """
         SELECT *
-        FROM public.cmc_features
+        FROM public.features
         WHERE id = ANY(CAST(:ids AS INTEGER[]))
           AND tf = :tf
           AND ts BETWEEN CAST(:start AS TIMESTAMPTZ) AND CAST(:end AS TIMESTAMPTZ)
@@ -186,12 +186,12 @@ def _load_regimes_batch(
     start: str,
     end: str,
 ) -> pd.DataFrame:
-    """Load cmc_regimes L2 labels for all asset_ids in a single query."""
+    """Load regimes L2 labels for all asset_ids in a single query."""
     ids_literal = "{" + ",".join(str(i) for i in asset_ids) + "}"
     sql = text(
         """
         SELECT id, ts, l2_label
-        FROM public.cmc_regimes
+        FROM public.regimes
         WHERE id = ANY(CAST(:ids AS INTEGER[]))
           AND tf = :tf
           AND ts BETWEEN CAST(:start AS TIMESTAMPTZ) AND CAST(:end AS TIMESTAMPTZ)
@@ -444,11 +444,11 @@ def main(argv: list[str] | None = None) -> None:
     engine = _build_engine()
 
     # --- Load features ---
-    logger.info("Loading cmc_features...")
+    logger.info("Loading features...")
     df = _load_features(engine, asset_ids, args.tf, args.start, args.end)
     if df.empty:
         logger.error(
-            "No data in cmc_features for asset_ids=%s tf=%s %s to %s. Exiting.",
+            "No data in features for asset_ids=%s tf=%s %s to %s. Exiting.",
             asset_ids,
             args.tf,
             args.start,
@@ -458,11 +458,11 @@ def main(argv: list[str] | None = None) -> None:
     logger.info("Loaded %d rows x %d columns", len(df), len(df.columns))
 
     # --- Load regimes ---
-    logger.info("Loading cmc_regimes...")
+    logger.info("Loading regimes...")
     reg_df = _load_regimes_batch(engine, asset_ids, args.tf, args.start, args.end)
 
     # --- Build feature matrix ---
-    # Exclude non-numeric dtypes (cmc_features has string/datetime cols: asset_class, venue, updated_at)
+    # Exclude non-numeric dtypes (features has string/datetime cols: asset_class, venue, updated_at)
     feature_cols = [
         c
         for c in df.columns
@@ -473,7 +473,7 @@ def main(argv: list[str] | None = None) -> None:
     ]
 
     if "ret_arith" not in df.columns:
-        logger.error("ret_arith column not found in cmc_features. Cannot build labels.")
+        logger.error("ret_arith column not found in features. Cannot build labels.")
         sys.exit(1)
 
     X = df[feature_cols].copy()
@@ -554,7 +554,7 @@ def main(argv: list[str] | None = None) -> None:
 
     # --- Optional experiment logging ---
     if args.log_experiment:
-        logger.info("Logging experiments to cmc_ml_experiments...")
+        logger.info("Logging experiments to ml_experiments...")
         from ta_lab2.ml.experiment_tracker import ExperimentTracker
 
         tracker = ExperimentTracker(engine)

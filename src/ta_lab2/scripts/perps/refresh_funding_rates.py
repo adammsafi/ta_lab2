@@ -3,7 +3,7 @@ refresh_funding_rates.py
 ========================
 
 CLI script to ingest perpetual funding rate history from 6 active venues
-into the cmc_funding_rates table with watermark-based incremental refresh.
+into the funding_rates table with watermark-based incremental refresh.
 
 Venues supported:
     - binance   (8h settlement, limit 1000/batch)
@@ -135,7 +135,7 @@ VENUE_TF: dict[str, str] = {
 
 def upsert_funding_rates(engine, rows: List[FundingRateRow]) -> int:
     """
-    Upsert funding rate rows into cmc_funding_rates.
+    Upsert funding rate rows into funding_rates.
 
     Uses temp table + INSERT...SELECT...ON CONFLICT DO NOTHING pattern
     (same as sync_utils.py pattern for unified tables).
@@ -181,7 +181,7 @@ def upsert_funding_rates(engine, rows: List[FundingRateRow]) -> int:
             text(
                 """
                 WITH ins AS (
-                    INSERT INTO public.cmc_funding_rates
+                    INSERT INTO public.funding_rates
                         (venue, symbol, ts, tf, funding_rate, mark_price, raw_tf, ingested_at)
                     SELECT
                         venue, symbol, ts::timestamptz, tf,
@@ -221,7 +221,7 @@ def get_watermark(engine, venue: str, symbol: str, tf: str) -> Optional[datetime
         row = conn.execute(
             text(
                 """
-                SELECT MAX(ts) FROM public.cmc_funding_rates
+                SELECT MAX(ts) FROM public.funding_rates
                 WHERE venue = :venue AND symbol = :sym AND tf = :tf
                 """
             ),
@@ -589,7 +589,7 @@ def compute_daily_rollup(engine, venue: str, symbol: str) -> int:
             text(
                 """
                 SELECT ts, funding_rate
-                FROM public.cmc_funding_rates
+                FROM public.funding_rates
                 WHERE venue = :venue AND symbol = :sym AND tf != '1d'
                 ORDER BY ts
                 """
@@ -668,7 +668,7 @@ def get_funding_rate_with_fallback(
         row = conn.execute(
             text(
                 """
-                SELECT funding_rate FROM public.cmc_funding_rates
+                SELECT funding_rate FROM public.funding_rates
                 WHERE venue = :venue AND symbol = :sym AND ts = :ts AND tf = :tf
                 """
             ),
@@ -683,7 +683,7 @@ def get_funding_rate_with_fallback(
         row = conn.execute(
             text(
                 """
-                SELECT AVG(funding_rate) FROM public.cmc_funding_rates
+                SELECT AVG(funding_rate) FROM public.funding_rates
                 WHERE symbol = :sym
                   AND ts BETWEEN :ts_lo AND :ts_hi
                   AND tf = :tf
@@ -819,7 +819,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
             "Ingest perpetual funding rate history from 6 active venues "
-            "(Binance, Hyperliquid, Bybit, dYdX, Aevo, Aster) into cmc_funding_rates."
+            "(Binance, Hyperliquid, Bybit, dYdX, Aevo, Aster) into funding_rates."
         )
     )
 

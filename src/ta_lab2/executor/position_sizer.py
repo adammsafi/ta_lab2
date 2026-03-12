@@ -257,7 +257,7 @@ class PositionSizer:
         """
         Retrieve current portfolio value from aggregated position view.
 
-        Attempts to read from v_cmc_positions_agg. Falls back to initial_capital
+        Attempts to read from v_positions_agg. Falls back to initial_capital
         when no rows exist.
 
         Parameters
@@ -276,7 +276,7 @@ class PositionSizer:
         """
         sql = text(
             "SELECT COALESCE(SUM(realized_pnl), 0) + COALESCE(SUM(unrealized_pnl), 0) AS total_pnl "
-            "FROM public.v_cmc_positions_agg "
+            "FROM public.v_positions_agg "
             "WHERE strategy_id = :strategy_id"
         )
         try:
@@ -313,7 +313,7 @@ class PositionSizer:
         Retrieve the most recent price for an asset.
 
         Tries exchange_price_feed first (real-time). Falls back to the most recent
-        daily bar close from cmc_price_bars_multi_tf when the feed is stale (>24h)
+        daily bar close from price_bars_multi_tf when the feed is stale (>24h)
         or missing.
 
         Parameters
@@ -378,7 +378,7 @@ class PositionSizer:
         # Fall back to daily bar close
         bar_sql = text(
             "SELECT close "
-            "FROM public.cmc_price_bars_multi_tf "
+            "FROM public.price_bars_multi_tf "
             "WHERE id = :asset_id AND tf = '1D' "
             "ORDER BY ts DESC "
             "LIMIT 1"
@@ -387,7 +387,7 @@ class PositionSizer:
         if row and row.close is not None:
             price = Decimal(str(row.close))
             logger.debug(
-                "get_current_price: asset_id=%s price=%s source=cmc_price_bars_multi_tf",
+                "get_current_price: asset_id=%s price=%s source=price_bars_multi_tf",
                 asset_id,
                 price,
             )

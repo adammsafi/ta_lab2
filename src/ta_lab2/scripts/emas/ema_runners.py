@@ -5,8 +5,8 @@ Provides convenience runners for writing different types of EMAs to database tab
 All functions wrap existing ta_lab2 EMA infrastructure.
 
 Tables written:
-- cmc_ema_multi_tf: Multi-timeframe EMAs (1h, 4h, 1d, etc.)
-- cmc_ema_multi_tf_cal: Calendar-aligned multi-timeframe EMAs
+- ema_multi_tf: Multi-timeframe EMAs (1h, 4h, 1d, etc.)
+- ema_multi_tf_cal: Calendar-aligned multi-timeframe EMAs
 - Plus downstream views via refresh operations
 
 Usage:
@@ -70,7 +70,7 @@ def write_multi_tf_emas(
     tf_subset: Sequence[str] | None = None,
 ) -> int:
     """
-    Write multi-timeframe EMAs to cmc_ema_multi_tf table.
+    Write multi-timeframe EMAs to ema_multi_tf table.
 
     Args:
         ids: CMC coin IDs to process
@@ -130,7 +130,7 @@ def write_ema_multi_tf_cal(
     tf_subset: Sequence[str] | None = None,
 ) -> int:
     """
-    Write calendar-aligned multi-timeframe EMAs to cmc_ema_multi_tf_cal table.
+    Write calendar-aligned multi-timeframe EMAs to ema_multi_tf_cal table.
 
     Uses business day calendars to align timeframes with trading schedules.
 
@@ -164,7 +164,7 @@ def write_ema_multi_tf_cal(
         ema_periods=ema_periods,
         tf_subset=tf_subset,
     )
-    logger.info(f"Calendar-aligned EMA rows written to cmc_ema_multi_tf_cal: {total}")
+    logger.info(f"Calendar-aligned EMA rows written to ema_multi_tf_cal: {total}")
     return total
 
 
@@ -173,11 +173,11 @@ def upsert_new_emas() -> None:
     Incremental upsert of new EMAs after fresh price data is loaded.
 
     Updates all EMA tables for all IDs:
-    - cmc_ema_multi_tf
-    - cmc_ema_multi_tf_cal
+    - ema_multi_tf
+    - ema_multi_tf_cal
     - all_emas (view)
-    - cmc_price_with_emas (view)
-    - cmc_price_with_emas_d1d2 (view)
+    - price_with_emas (view)
+    - price_with_emas_d1d2 (view)
 
     This is a wrapper around example_incremental_all_ids_all_targets() which
     handles incremental refresh logic, snapshots, and reporting.

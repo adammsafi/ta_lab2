@@ -30,7 +30,7 @@ from ta_lab2.scripts.refresh_utils import resolve_db_url
 
 logger = logging.getLogger(__name__)
 
-BARS_TABLE = "public.cmc_price_bars_1d"
+BARS_TABLE = "public.price_bars_1d"
 EXCLUDED_VENUES = ("VWAP", "CMC_AGG")
 
 

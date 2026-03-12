@@ -67,7 +67,7 @@ def test_stale_check_skipped_on_first_run():
     # Should not raise and should not call conn.execute
     reader.check_signal_freshness(
         conn=conn,
-        signal_table="cmc_signals_ema_crossover",
+        signal_table="signals_ema_crossover",
         signal_id=1,
         cadence_hours=26.0,
         last_watermark_ts=None,
@@ -95,7 +95,7 @@ def test_stale_check_raises_on_old_signal():
     with pytest.raises(StaleSignalError, match="exceeds cadence limit"):
         reader.check_signal_freshness(
             conn=conn,
-            signal_table="cmc_signals_ema_crossover",
+            signal_table="signals_ema_crossover",
             signal_id=1,
             cadence_hours=26.0,
             last_watermark_ts=_utc_now() - timedelta(hours=25),
@@ -121,7 +121,7 @@ def test_stale_check_passes_on_fresh_signal():
     # Should not raise
     reader.check_signal_freshness(
         conn=conn,
-        signal_table="cmc_signals_ema_crossover",
+        signal_table="signals_ema_crossover",
         signal_id=1,
         cadence_hours=26.0,
         last_watermark_ts=_utc_now() - timedelta(hours=25),
@@ -145,7 +145,7 @@ def test_stale_check_raises_on_no_signals():
     with pytest.raises(StaleSignalError, match="No signals found"):
         reader.check_signal_freshness(
             conn=conn,
-            signal_table="cmc_signals_rsi_mean_revert",
+            signal_table="signals_rsi_mean_revert",
             signal_id=2,
             cadence_hours=26.0,
             last_watermark_ts=_utc_now() - timedelta(hours=1),
@@ -168,7 +168,7 @@ def test_read_unprocessed_with_watermark():
     watermark = _utc_now() - timedelta(hours=2)
     reader.read_unprocessed_signals(
         conn=conn,
-        signal_table="cmc_signals_ema_crossover",
+        signal_table="signals_ema_crossover",
         signal_id=1,
         last_watermark_ts=watermark,
     )
@@ -196,7 +196,7 @@ def test_read_unprocessed_without_watermark():
 
     reader.read_unprocessed_signals(
         conn=conn,
-        signal_table="cmc_signals_atr_breakout",
+        signal_table="signals_atr_breakout",
         signal_id=3,
         last_watermark_ts=None,
     )

@@ -19,7 +19,7 @@ Usage:
 
     config = FeatureStateConfig(
         state_schema="public",
-        state_table="cmc_feature_state",
+        state_table="feature_state",
         feature_type="returns",
         ts_column="ts",
     )
@@ -30,7 +30,7 @@ Usage:
     state_df = manager.load_state(ids=[1, 52], feature_names=["b2t_pct"])
 
     manager.update_state_from_output(
-        output_table="cmc_returns_daily",
+        output_table="returns_daily",
         output_schema="public",
     )
 """
@@ -54,14 +54,14 @@ class FeatureStateConfig:
 
     Attributes:
         state_schema: Schema containing state table (default: "public")
-        state_table: State table name (default: "cmc_feature_state")
+        state_table: State table name (default: "feature_state")
         feature_type: Feature category - 'returns', 'vol', 'ta' (default: "returns")
         ts_column: Timestamp column name in output table (default: "ts")
         id_column: ID column name in output table (default: "id")
     """
 
     state_schema: str = "public"
-    state_table: str = "cmc_feature_state"
+    state_table: str = "feature_state"
     feature_type: str = "returns"  # 'returns', 'vol', 'ta'
     ts_column: str = "ts"
     id_column: str = "id"
@@ -228,7 +228,7 @@ class FeatureStateManager:
         """
         # Derive feature_name from table if not provided
         if feature_name is None:
-            # Extract from table name (e.g., 'cmc_returns_daily' -> 'returns_daily')
+            # Extract from table name (e.g., 'returns_daily' -> 'returns_daily')
             feature_name = output_table.replace("cmc_", "").replace(
                 f"_{self.config.feature_type}_", "_"
             )

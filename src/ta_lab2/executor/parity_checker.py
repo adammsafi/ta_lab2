@@ -157,13 +157,13 @@ class ParityChecker:
     def _load_backtest_trades(
         self, signal_id: int, start_date: str, end_date: str
     ) -> list[dict]:
-        """Load backtest trades from cmc_backtest_trades for a given signal_id."""
+        """Load backtest trades from backtest_trades for a given signal_id."""
         sql = text(
             """
             SELECT bt.entry_ts, bt.exit_ts, bt.entry_price, bt.exit_price,
                    bt.direction, bt.pnl, bt.pnl_pct
-            FROM cmc_backtest_trades bt
-            JOIN cmc_backtest_runs br ON bt.run_id = br.run_id
+            FROM backtest_trades bt
+            JOIN backtest_runs br ON bt.run_id = br.run_id
             WHERE br.signal_id = :signal_id
               AND bt.entry_ts >= :start_date
               AND bt.entry_ts <= :end_date
@@ -185,13 +185,13 @@ class ParityChecker:
     def _load_executor_fills(
         self, signal_id: int, start_date: str, end_date: str
     ) -> list[dict]:
-        """Load executor fills from cmc_fills for a given signal_id."""
+        """Load executor fills from fills for a given signal_id."""
         sql = text(
             """
             SELECT f.filled_at, f.fill_price, f.fill_qty, f.side,
                    o.asset_id, o.signal_id
-            FROM cmc_fills f
-            JOIN cmc_orders o ON f.order_id = o.order_id
+            FROM fills f
+            JOIN orders o ON f.order_id = o.order_id
             WHERE o.signal_id = :signal_id
               AND f.filled_at >= :start_date
               AND f.filled_at <= :end_date

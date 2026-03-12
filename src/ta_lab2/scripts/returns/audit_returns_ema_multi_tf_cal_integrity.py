@@ -33,10 +33,10 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
 
-DEFAULT_EMA_US = "public.cmc_ema_multi_tf_cal_us"
-DEFAULT_EMA_ISO = "public.cmc_ema_multi_tf_cal_iso"
-DEFAULT_RET_US = "public.cmc_returns_ema_multi_tf_cal_us"
-DEFAULT_RET_ISO = "public.cmc_returns_ema_multi_tf_cal_iso"
+DEFAULT_EMA_US = "public.ema_multi_tf_cal_us"
+DEFAULT_EMA_ISO = "public.ema_multi_tf_cal_iso"
+DEFAULT_RET_US = "public.returns_ema_multi_tf_cal_us"
+DEFAULT_RET_ISO = "public.returns_ema_multi_tf_cal_iso"
 DEFAULT_DIM_TF = "public.dim_timeframe"
 
 

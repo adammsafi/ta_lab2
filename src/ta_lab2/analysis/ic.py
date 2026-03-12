@@ -21,9 +21,9 @@ Public API:
     plot_rolling_ic          -- Plotly line chart of rolling IC time series
 
 DB helpers (for CLI and notebooks):
-    load_feature_series      -- load feature + close from cmc_features
-    load_regimes_for_asset   -- load and parse l2_label from cmc_regimes
-    save_ic_results          -- persist IC rows to cmc_ic_results
+    load_feature_series      -- load feature + close from features
+    load_regimes_for_asset   -- load and parse l2_label from regimes
+    save_ic_results          -- persist IC rows to ic_results
 
 Internal helpers (exported for testing):
     _compute_single_ic       -- IC + t-stat + p-value for one feature/horizon pair
@@ -975,7 +975,7 @@ def load_feature_series(
     train_end: pd.Timestamp,
 ) -> tuple[pd.Series, pd.Series]:
     """
-    Load a single feature column + close from cmc_features.
+    Load a single feature column + close from features.
 
     Parameters
     ----------
@@ -986,7 +986,7 @@ def load_feature_series(
     tf : str
         Timeframe (e.g. '1D').
     feature_col : str
-        Column name to load from cmc_features. Must be a valid column.
+        Column name to load from features. Must be a valid column.
     train_start : pd.Timestamp
         Start of the range to load (inclusive, UTC).
     train_end : pd.Timestamp
@@ -1000,7 +1000,7 @@ def load_feature_series(
     Raises
     ------
     ValueError
-        If feature_col is not a valid column in cmc_features.
+        If feature_col is not a valid column in features.
     """
     # Lazy import to avoid circular imports
     from ta_lab2.scripts.sync_utils import get_columns
@@ -1008,17 +1008,17 @@ def load_feature_series(
     # Validate column name by querying information_schema
     # We need an engine for get_columns — use conn.engine if available
     engine = conn.engine
-    available_cols = get_columns(engine, "public.cmc_features")
+    available_cols = get_columns(engine, "public.features")
 
     if feature_col not in available_cols:
         raise ValueError(
-            f"Feature column '{feature_col}' not found in cmc_features. "
+            f"Feature column '{feature_col}' not found in features. "
             f"Available columns: {sorted(available_cols)}"
         )
 
     # Build SQL with dynamically injected column name (validated above)
     sql = text(
-        f"SELECT ts, {feature_col}, close FROM public.cmc_features "
+        f"SELECT ts, {feature_col}, close FROM public.features "
         f"WHERE id = :id AND tf = :tf AND ts >= :start AND ts <= :end ORDER BY ts"
     )
 
@@ -1046,9 +1046,9 @@ def load_regimes_for_asset(
     train_end: pd.Timestamp,
 ) -> pd.DataFrame:
     """
-    Load regime labels from cmc_regimes, parsing trend_state and vol_state from l2_label.
+    Load regime labels from regimes, parsing trend_state and vol_state from l2_label.
 
-    CRITICAL: cmc_regimes has NO trend_state or vol_state columns.
+    CRITICAL: regimes has NO trend_state or vol_state columns.
     Both are derived from l2_label via split_part() in SQL.
 
     Parameters
@@ -1077,7 +1077,7 @@ def load_regimes_for_asset(
             l2_label AS regime_key,
             split_part(l2_label, '-', 1) AS trend_state,
             split_part(l2_label, '-', 2) AS vol_state
-        FROM public.cmc_regimes
+        FROM public.regimes
         WHERE id = :id
           AND tf = :tf
           AND ts >= :start
@@ -1110,14 +1110,14 @@ def load_regimes_for_asset(
 
 def save_ic_results(conn, rows: list[dict], *, overwrite: bool = False) -> int:
     """
-    Persist IC result rows to cmc_ic_results.
+    Persist IC result rows to ic_results.
 
     Parameters
     ----------
     conn : SQLAlchemy connection
         Active database connection (within a transaction).
     rows : list[dict]
-        List of dicts with keys matching cmc_ic_results columns:
+        List of dicts with keys matching ic_results columns:
         asset_id, tf, feature, horizon, horizon_days, return_type,
         regime_col, regime_label, train_start, train_end,
         ic, ic_t_stat, ic_p_value, ic_ir, ic_ir_t_stat, turnover, n_obs,
@@ -1144,7 +1144,7 @@ def save_ic_results(conn, rows: list[dict], *, overwrite: bool = False) -> int:
     if overwrite:
         sql = text(
             """
-            INSERT INTO public.cmc_ic_results
+            INSERT INTO public.ic_results
                 (asset_id, tf, feature, horizon, horizon_days, return_type,
                  regime_col, regime_label, train_start, train_end,
                  ic, ic_t_stat, ic_p_value, ic_ir, ic_ir_t_stat, turnover, n_obs,
@@ -1172,7 +1172,7 @@ def save_ic_results(conn, rows: list[dict], *, overwrite: bool = False) -> int:
     else:
         sql = text(
             """
-            INSERT INTO public.cmc_ic_results
+            INSERT INTO public.ic_results
                 (asset_id, tf, feature, horizon, horizon_days, return_type,
                  regime_col, regime_label, train_start, train_end,
                  ic, ic_t_stat, ic_p_value, ic_ir, ic_ir_t_stat, turnover, n_obs,

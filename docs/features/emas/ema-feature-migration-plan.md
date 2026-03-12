@@ -36,7 +36,7 @@ Abstract base class with:
 **Implementation**:
 - Extends `BaseEMAFeature`
 - Daily-space EMA computation (horizon-based alpha)
-- Loads from cmc_price_bars_1d (is_partial_end=FALSE)
+- Loads from price_bars_1d (is_partial_end=FALSE)
 - Uses dim_timeframe for TF universe
 - Roll flag: FALSE every tf_days-th row
 - Derivatives: d1_roll/d2_roll (all), d1/d2 (canonical only)
@@ -51,7 +51,7 @@ Abstract base class with:
 
 **Implementation**:
 - Extends `BaseEMAFeature`
-- Dual data source: persisted bars (cmc_price_bars_multi_tf) OR synthetic from daily
+- Dual data source: persisted bars (price_bars_multi_tf) OR synthetic from daily
 - Preview EMA computation on daily grid
 - Roll flag: FALSE for canonical, TRUE for preview
 - Derivatives: d1_roll/d2_roll (all), d1/d2 (canonical only)
@@ -76,7 +76,7 @@ Abstract base class with:
 - Full derivative suite: d1/d2, d1_roll/d2_roll, d1_bar/d2_bar, d1_roll_bar/d2_roll_bar
 
 **Key Features**:
-- Canonical closes from `cmc_price_bars_multi_tf_cal_us/iso`
+- Canonical closes from `price_bars_multi_tf_cal_us/iso`
 - `roll` flag: FALSE for canonical, TRUE for preview
 - Alpha lookup integration with fallback calculation
 - Scheme-specific TF selection (US weeks end _CAL_US, ISO weeks end _CAL_ISO)

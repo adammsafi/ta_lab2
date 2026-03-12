@@ -958,7 +958,7 @@ These are the baseline expectations that Phase 53 (V1 Validation) will compare a
 
 ## Appendix: Data Sources
 
-- **IC results:** `cmc_ic_results` table (Phase 37 IC evaluation)
+- **IC results:** `ic_results` table (Phase 37 IC evaluation)
 - **Backtest metrics:** `strategy_bakeoff_results` table (Phase 42-02 walk-forward bake-off)
 - **Composite scores:** `{_COMPOSITE_CSV}`
 - **Sensitivity analysis:** `{_SENSITIVITY_CSV}`

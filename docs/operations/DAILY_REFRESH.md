@@ -102,8 +102,8 @@ make clean-logs        # Remove logs older than 30 days
 3. **cal_anchor** - Calendar-anchored EMAs
 4. **v2** - Daily-space EMAs (v2)
 
-### Regimes (refresh_cmc_regimes.py)
-After EMAs complete. Reads bars + EMAs, runs L0-L2 labeling, resolves policy, writes to cmc_regimes/flips/stats/comovement tables.
+### Regimes (refresh_regimes.py)
+After EMAs complete. Reads bars + EMAs, runs L0-L2 labeling, resolves policy, writes to regimes/flips/stats/comovement tables.
 
 ### Stats (run_all_stats_runners.py)
 Final stage. Runs 6 stats runners that check data quality across all pipeline tables. FAIL status halts the pipeline and sends a Telegram alert. WARN status continues with alert logged.
@@ -224,7 +224,7 @@ python src/ta_lab2/scripts/run_daily_refresh.py --all --full-rebuild --ids all
 ```sql
 -- Bar state
 SELECT id, last_src_ts, last_run_ts, last_upserted
-FROM cmc_price_bars_1d_state
+FROM price_bars_1d_state
 ORDER BY last_run_ts DESC;
 
 -- EMA state
@@ -237,7 +237,7 @@ ORDER BY id;
 
 ```sql
 -- Reset bar state (next run will rebuild)
-DELETE FROM cmc_price_bars_1d_state WHERE id = 825;
+DELETE FROM price_bars_1d_state WHERE id = 825;
 
 -- Reset EMA state
 DELETE FROM cmc_ema_refresh_state WHERE id = 825;
@@ -249,7 +249,7 @@ DELETE FROM cmc_ema_refresh_state WHERE id = 825;
 -- Find IDs with stale bars (> 48 hours)
 SELECT id, last_src_ts,
        EXTRACT(EPOCH FROM (now() - last_src_ts)) / 3600 as staleness_hours
-FROM cmc_price_bars_1d_state
+FROM price_bars_1d_state
 WHERE EXTRACT(EPOCH FROM (now() - last_src_ts)) / 3600 > 48
 ORDER BY staleness_hours DESC;
 ```
@@ -262,13 +262,13 @@ python src/ta_lab2/scripts/validate_bars.py --ids all
 
 # Check for gaps in 1D bars
 SELECT id, COUNT(*) FILTER (WHERE is_missing_days) as gap_count
-FROM cmc_price_bars_1d
+FROM price_bars_1d
 GROUP BY id
 HAVING COUNT(*) FILTER (WHERE is_missing_days) > 0;
 
 # Check EMA rejects
 SELECT id, COUNT(*) as reject_count
-FROM cmc_ema_multi_tf_rejects
+FROM ema_multi_tf_rejects
 GROUP BY id
 ORDER BY reject_count DESC;
 ```
@@ -298,8 +298,8 @@ When adding a new asset to tracking:
 python src/ta_lab2/scripts/run_daily_refresh.py --all --ids 1234
 
 # 3. Verify data
-SELECT COUNT(*) FROM cmc_price_bars_1d WHERE id = 1234;
-SELECT COUNT(*) FROM cmc_ema_multi_tf_u WHERE id = 1234;
+SELECT COUNT(*) FROM price_bars_1d WHERE id = 1234;
+SELECT COUNT(*) FROM ema_multi_tf_u WHERE id = 1234;
 
 # 4. Add to regular rotation (include in "all")
 ```

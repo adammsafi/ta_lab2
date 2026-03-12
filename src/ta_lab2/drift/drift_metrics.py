@@ -16,7 +16,7 @@ class DriftMetrics:
     """
     Represents a full day of drift measurements comparing paper trading to backtest replay.
 
-    Fields align with cmc_drift_metrics table columns.
+    Fields align with drift_metrics table columns.
     """
 
     metric_date: date

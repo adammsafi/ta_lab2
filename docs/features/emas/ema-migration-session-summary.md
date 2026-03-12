@@ -55,7 +55,7 @@ Abstract base class defining the computation template:
 
 **Characteristics**:
 - Daily-space EMA computation (horizon-based alpha)
-- Loads from `cmc_price_bars_1d` (is_partial_end=FALSE)
+- Loads from `price_bars_1d` (is_partial_end=FALSE)
 - Uses `dim_timeframe` for TF universe (tf_day family)
 - Roll flag: FALSE every tf_days-th row
 - Derivatives: d1_roll/d2_roll (all rows), d1/d2 (canonical only)
@@ -66,7 +66,7 @@ Abstract base class defining the computation template:
 ```python
 class MultiTFV2EMAFeature(BaseEMAFeature):
     def load_source_data(self, ids, start, end):
-        # Load from cmc_price_bars_1d WHERE is_partial_end = FALSE
+        # Load from price_bars_1d WHERE is_partial_end = FALSE
 
     def get_tf_specs(self):
         # Load from dim_timeframe, filter to day-based TFs
@@ -84,7 +84,7 @@ class MultiTFV2EMAFeature(BaseEMAFeature):
 **Backup**: `ema_multi_timeframe.original`
 
 **Characteristics**:
-- Dual data source: persisted bars (cmc_price_bars_multi_tf) OR synthetic from daily
+- Dual data source: persisted bars (price_bars_multi_tf) OR synthetic from daily
 - Preview EMA computation on daily grid
 - Roll flag: FALSE for canonical closes, TRUE for preview rows
 - Derivatives: d1_roll/d2_roll (all), d1/d2 (canonical only)
@@ -133,7 +133,7 @@ class MultiTFEMAFeature(BaseEMAFeature):
   - d1_roll_bar, d2_roll_bar (daily ema_bar diffs, all rows)
 
 **Key Features**:
-- Canonical closes from `cmc_price_bars_multi_tf_cal_us/iso` (is_partial_end=FALSE)
+- Canonical closes from `price_bars_multi_tf_cal_us/iso` (is_partial_end=FALSE)
 - Scheme-specific TF selection (US weeks: _CAL_US, ISO weeks: _CAL_ISO, months/years: _CAL)
 - Alpha lookup integration with dynamic fallback
 - Daily grid output with preview EMAs between canonical closes
@@ -159,7 +159,7 @@ class MultiTFEMAFeature(BaseEMAFeature):
 - `is_partial_end` determines canonical rows (not roll inference)
 - `roll_bar` column for bar-space canonical tracking
 - Daily-equivalent alpha formula (not lookup table)
-- Bars table: `cmc_price_bars_multi_tf_cal_anchor_us/iso`
+- Bars table: `price_bars_multi_tf_cal_anchor_us/iso`
 
 ## Benefits of Refactored Architecture
 

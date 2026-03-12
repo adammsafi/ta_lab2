@@ -4,7 +4,7 @@ HMM-based secondary macro regime classifier (MREG-10).
 
 Fits GaussianHMM models with 2 and 3 states on all FRED float features
 from fred.fred_macro_features, selects the winner by BIC, and upserts
-results into cmc_hmm_regimes.
+results into hmm_regimes.
 
 Key design decisions:
 - Default covariance_type="diag": safe for 38 features (avoids O(n^2)
@@ -26,7 +26,7 @@ Usage:
     clf = HMMClassifier(engine)
     df = clf.fit_and_predict()
     rows = clf.upsert_results(df)
-    print(f"Upserted {rows} rows to cmc_hmm_regimes")
+    print(f"Upserted {rows} rows to hmm_regimes")
 """
 
 from __future__ import annotations
@@ -162,7 +162,7 @@ class HMMClassifier:
 
     Fits both 2-state and 3-state GaussianHMM models using an expanding window
     (all available history up to end_date), selects the winner by BIC (lower
-    is better), and writes per-date state labels to cmc_hmm_regimes.
+    is better), and writes per-date state labels to hmm_regimes.
 
     Parameters
     ----------
@@ -342,7 +342,7 @@ class HMMClassifier:
     def _check_needs_refit(self, force_refit: bool) -> bool:
         """Check whether the model needs to be refitted based on cadence.
 
-        Queries MAX(model_run_date) from cmc_hmm_regimes. If the most recent
+        Queries MAX(model_run_date) from hmm_regimes. If the most recent
         run was less than _REFIT_INTERVAL_DAYS ago, skips the refit.
 
         Parameters
@@ -362,12 +362,12 @@ class HMMClassifier:
         try:
             with self.engine.connect() as conn:
                 result = conn.execute(
-                    text("SELECT MAX(model_run_date) FROM cmc_hmm_regimes")
+                    text("SELECT MAX(model_run_date) FROM hmm_regimes")
                 )
                 max_run_date = result.scalar()
         except Exception:  # noqa: BLE001
             logger.info(
-                "_check_needs_refit: could not query cmc_hmm_regimes -- will refit (first run?)"
+                "_check_needs_refit: could not query hmm_regimes -- will refit (first run?)"
             )
             return True
 
@@ -609,7 +609,7 @@ class HMMClassifier:
         return df_out
 
     def upsert_results(self, df: pd.DataFrame) -> int:
-        """Upsert HMM results into cmc_hmm_regimes.
+        """Upsert HMM results into hmm_regimes.
 
         Uses temp table + INSERT ... ON CONFLICT (date, n_states, model_run_date)
         DO UPDATE pattern, matching project upsert conventions.
@@ -655,7 +655,7 @@ class HMMClassifier:
             conn.execute(
                 text(
                     "CREATE TEMP TABLE _hmm_staging "
-                    "(LIKE cmc_hmm_regimes INCLUDING DEFAULTS) "
+                    "(LIKE hmm_regimes INCLUDING DEFAULTS) "
                     "ON COMMIT DROP"
                 )
             )
@@ -672,7 +672,7 @@ class HMMClassifier:
             # Upsert from staging to target
             result = conn.execute(
                 text(
-                    f"INSERT INTO cmc_hmm_regimes ({col_list}) "
+                    f"INSERT INTO hmm_regimes ({col_list}) "
                     f"SELECT {col_list} FROM _hmm_staging "
                     "ON CONFLICT (date, n_states, model_run_date) DO UPDATE SET "
                     f"{set_clause}"
@@ -680,14 +680,14 @@ class HMMClassifier:
             )
             row_count = result.rowcount
 
-        logger.info("upsert_results: %d rows upserted to cmc_hmm_regimes", row_count)
+        logger.info("upsert_results: %d rows upserted to hmm_regimes", row_count)
         return row_count
 
     def compare_with_rule_based(self, n_states: int | None = None) -> dict[str, Any]:
         """Compare HMM state labels with rule-based macro regime labels.
 
         Loads the latest HMM state labels (BIC winner if n_states not specified)
-        and the rule-based labels from cmc_macro_regimes, aligns by date,
+        and the rule-based labels from macro_regimes, aligns by date,
         and computes structural agreement metrics.
 
         Parameters
@@ -718,9 +718,9 @@ class HMMClassifier:
         if n_states is not None:
             hmm_sql = text(
                 "SELECT date, state_label, n_states "
-                "FROM cmc_hmm_regimes "
+                "FROM hmm_regimes "
                 "WHERE n_states = :n_states "
-                "AND model_run_date = (SELECT MAX(model_run_date) FROM cmc_hmm_regimes) "
+                "AND model_run_date = (SELECT MAX(model_run_date) FROM hmm_regimes) "
                 "ORDER BY date ASC"
             )
             hmm_df = pd.read_sql(hmm_sql, self.engine, params={"n_states": n_states})
@@ -728,9 +728,9 @@ class HMMClassifier:
         else:
             hmm_sql = text(
                 "SELECT date, state_label, n_states "
-                "FROM cmc_hmm_regimes "
+                "FROM hmm_regimes "
                 "WHERE is_bic_winner = true "
-                "AND model_run_date = (SELECT MAX(model_run_date) FROM cmc_hmm_regimes) "
+                "AND model_run_date = (SELECT MAX(model_run_date) FROM hmm_regimes) "
                 "ORDER BY date ASC"
             )
             hmm_df = pd.read_sql(hmm_sql, self.engine)
@@ -738,10 +738,8 @@ class HMMClassifier:
                 int(hmm_df["n_states"].iloc[0]) if not hmm_df.empty else -1
             )
 
-        # Load rule-based labels (macro_state column from cmc_macro_regimes)
-        rb_sql = text(
-            "SELECT date, macro_state FROM cmc_macro_regimes ORDER BY date ASC"
-        )
+        # Load rule-based labels (macro_state column from macro_regimes)
+        rb_sql = text("SELECT date, macro_state FROM macro_regimes ORDER BY date ASC")
         rb_df = pd.read_sql(rb_sql, self.engine)
 
         if hmm_df.empty or rb_df.empty:

@@ -1,7 +1,7 @@
 """
 IC decay visualization CLI.
 
-Queries cmc_ic_results for all horizons of a given feature and generates an
+Queries ic_results for all horizons of a given feature and generates an
 HTML bar chart showing IC decay across forward horizons. Uses the existing
 plot_ic_decay() function from ta_lab2.analysis.ic.
 
@@ -39,7 +39,7 @@ _DEFAULT_OUTPUT_DIR = Path("reports/ic_decay")
 
 
 def _build_query(asset_id: int | None) -> str:
-    """Build the aggregation SQL for cmc_ic_results."""
+    """Build the aggregation SQL for ic_results."""
     asset_filter = "AND asset_id = :asset_id" if asset_id is not None else ""
     return f"""
         SELECT
@@ -49,7 +49,7 @@ def _build_query(asset_id: int | None) -> str:
             AVG(rank_ic)     AS rank_ic,
             AVG(ic_ir)       AS ic_ir,
             COUNT(*)         AS n_rows
-        FROM public.cmc_ic_results
+        FROM public.ic_results
         WHERE feature     = :feature
           AND tf          = :tf
           AND return_type = :return_type
@@ -131,7 +131,7 @@ def main(argv: list[str] | None = None) -> int:
     if df.empty:
         logger.error(
             "No IC results found for feature=%s tf=%s return_type=%s%s. "
-            "Run run_ic_sweep first to populate cmc_ic_results.",
+            "Run run_ic_sweep first to populate ic_results.",
             args.feature,
             args.tf,
             args.return_type,

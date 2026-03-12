@@ -29,8 +29,8 @@ Use this document as the **authoritative cutoff reference** for:
 |----------------------|----------------------|-----------------|
 | cmc_price_histories7 | 2025-11-24 19:00:00  | 959,278         |
 | cmc_ema_daily        | 2025-11-24 19:00:00  | 108,978         |
-| cmc_ema_multi_tf     | 2025-11-24 19:00:00  | 1,349,726       |
-| cmc_ema_multi_tf_cal | 2025-11-24 19:00:00  | 1,349,660       |
+| ema_multi_tf     | 2025-11-24 19:00:00  | 1,349,726       |
+| ema_multi_tf_cal | 2025-11-24 19:00:00  | 1,349,660       |
 
 All tables are aligned on the same `max_ts` for the tracked asset ids.
 
@@ -66,7 +66,7 @@ All tables are aligned on the same `max_ts` for the tracked asset ids.
 
 ---
 
-### 2.3 `cmc_ema_multi_tf`
+### 2.3 `ema_multi_tf`
 
 | id    | max_ts               | row_count |
 |-------|----------------------|-----------|
@@ -80,7 +80,7 @@ All tables are aligned on the same `max_ts` for the tracked asset ids.
 
 ---
 
-### 2.4 `cmc_ema_multi_tf_cal`
+### 2.4 `ema_multi_tf_cal`
 
 | id    | max_ts               | row_count |
 |-------|----------------------|-----------|
@@ -97,7 +97,7 @@ All tables are aligned on the same `max_ts` for the tracked asset ids.
 ## 3. Notes
 
 - All tables are current through the same `max_ts`, so this file can be used as a **trusted-through snapshot** for audits and pipeline validation.
-- `cmc_ema_multi_tf` and `cmc_ema_multi_tf_cal` row counts will naturally differ slightly because they are built with different roll / calendar treatments, but their `max_ts` should remain aligned.
+- `ema_multi_tf` and `ema_multi_tf_cal` row counts will naturally differ slightly because they are built with different roll / calendar treatments, but their `max_ts` should remain aligned.
 - If a future snapshot shows:
   - A **lower** `max_ts` than this file for any table/id, something has gone wrong (data loss or bad backfill).  
   - A **large unexpected jump** in row counts relative to price history growth, investigate schema changes, timeframe sets, or bugs in refresh scripts.
@@ -129,8 +129,8 @@ When you run a future refresh and want a new cutoff document:
 
 - Source tables:
   - cmc_ema_daily
-  - cmc_ema_multi_tf
-  - cmc_ema_multi_tf_cal
+  - ema_multi_tf
+  - ema_multi_tf_cal
 
 - Unified schema:
   - id, ts, tf, tf_days, period, ema, d1, d2, d1_close, d2_close, roll

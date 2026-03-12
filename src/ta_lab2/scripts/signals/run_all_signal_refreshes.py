@@ -284,7 +284,7 @@ def validate_pipeline_reproducibility(
 
 def _get_all_asset_ids(engine) -> list[int]:
     """
-    Query all asset IDs from cmc_features.
+    Query all asset IDs from features.
 
     Returns:
         Sorted list of unique asset IDs
@@ -292,7 +292,7 @@ def _get_all_asset_ids(engine) -> list[int]:
     sql = text(
         """
         SELECT DISTINCT id
-        FROM public.cmc_features
+        FROM public.features
         WHERE tf = '1D'
         ORDER BY id
     """
@@ -343,7 +343,7 @@ Examples:
         "--ids",
         type=int,
         nargs="+",
-        help="Asset IDs to process (default: all assets from cmc_features)",
+        help="Asset IDs to process (default: all assets from features)",
     )
     parser.add_argument(
         "--full-refresh",

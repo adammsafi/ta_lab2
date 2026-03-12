@@ -242,7 +242,7 @@ def compare_backtest_runs(
     """
     logger.info(f"Comparing backtest runs: {run_id_1} vs {run_id_2}")
 
-    # Load runs from cmc_backtest_runs
+    # Load runs from backtest_runs
     run1 = _load_run(engine, run_id_1)
     run2 = _load_run(engine, run_id_2)
 
@@ -302,7 +302,7 @@ def validate_feature_hash_current(
     """
     Validate that current feature data matches stored hash from signal generation.
 
-    Compares the hash of current feature data (from cmc_features) with
+    Compares the hash of current feature data (from features) with
     the hash stored during signal generation. This detects when underlying data
     has changed, invalidating reproducibility.
 
@@ -343,7 +343,7 @@ def validate_feature_hash_current(
         logger.info("No stored hash found (first run or no signals yet)")
         return True, "No stored hash found (first run)"
 
-    # Compute current hash from cmc_features
+    # Compute current hash from features
     current_hash = _compute_current_feature_hash(engine, signal_type, asset_id)
 
     if current_hash is None:
@@ -465,7 +465,7 @@ def _find_metric_differences(
 
 def _load_run(engine: Engine, run_id: str) -> dict:
     """
-    Load backtest run metadata from cmc_backtest_runs.
+    Load backtest run metadata from backtest_runs.
 
     Args:
         engine: SQLAlchemy engine
@@ -484,7 +484,7 @@ def _load_run(engine: Engine, run_id: str) -> dict:
             start_ts, end_ts, total_return, sharpe_ratio,
             max_drawdown, trade_count, feature_hash,
             signal_params_hash, signal_version, vbt_version
-        FROM public.cmc_backtest_runs
+        FROM public.backtest_runs
         WHERE run_id = :run_id
     """
     )
@@ -516,7 +516,7 @@ def _load_run(engine: Engine, run_id: str) -> dict:
 
 def _load_trades(engine: Engine, run_id: str) -> list[dict]:
     """
-    Load trade records from cmc_backtest_trades.
+    Load trade records from backtest_trades.
 
     Args:
         engine: SQLAlchemy engine
@@ -530,7 +530,7 @@ def _load_trades(engine: Engine, run_id: str) -> list[dict]:
         SELECT
             entry_ts, entry_price, exit_ts, exit_price,
             direction, size, pnl_pct, pnl_dollars
-        FROM public.cmc_backtest_trades
+        FROM public.backtest_trades
         WHERE run_id = :run_id
         ORDER BY entry_ts
     """
@@ -557,7 +557,7 @@ def _load_trades(engine: Engine, run_id: str) -> list[dict]:
 
 def _load_metrics(engine: Engine, run_id: str) -> dict:
     """
-    Load performance metrics from cmc_backtest_metrics.
+    Load performance metrics from backtest_metrics.
 
     Args:
         engine: SQLAlchemy engine
@@ -576,7 +576,7 @@ def _load_metrics(engine: Engine, run_id: str) -> dict:
             max_drawdown, max_drawdown_duration_days,
             trade_count, win_rate, profit_factor, avg_win, avg_loss,
             avg_holding_period_days, var_95, expected_shortfall
-        FROM public.cmc_backtest_metrics
+        FROM public.backtest_metrics
         WHERE run_id = :run_id
     """
     )
@@ -651,12 +651,12 @@ def _compute_current_feature_hash(
     asset_id: int,
 ) -> Optional[str]:
     """
-    Compute hash of current feature data from cmc_features + cmc_ema_multi_tf_u.
+    Compute hash of current feature data from features + ema_multi_tf_u.
 
     Determines which feature columns to include based on signal type,
     then computes hash of those columns for the asset. EMA columns are
-    loaded from cmc_ema_multi_tf_u via LEFT JOINs (EMAs are no longer
-    in cmc_features — different granularity with period dimension).
+    loaded from ema_multi_tf_u via LEFT JOINs (EMAs are no longer
+    in features — different granularity with period dimension).
 
     Args:
         engine: SQLAlchemy engine
@@ -675,7 +675,7 @@ def _compute_current_feature_hash(
         alias = f"e{period}"
         select_parts.append(f"{alias}.ema as ema_{period}")
         join_parts.append(
-            f"LEFT JOIN public.cmc_ema_multi_tf_u {alias}"
+            f"LEFT JOIN public.ema_multi_tf_u {alias}"
             f" ON f.id = {alias}.id AND f.ts = {alias}.ts"
             f" AND {alias}.tf = f.tf AND {alias}.period = {period}"
         )
@@ -686,7 +686,7 @@ def _compute_current_feature_hash(
     sql = text(
         f"""
         SELECT {select_str}
-        FROM public.cmc_features f
+        FROM public.features f
             {join_str}
         WHERE f.id = :asset_id AND f.tf = '1D'
         ORDER BY f.ts
@@ -714,8 +714,8 @@ def _get_feature_columns_for_signal_type(
     relevant columns to detect changes in features actually used by the signal.
 
     Returns two lists:
-    - feature_cols: columns from cmc_features
-    - ema_periods: EMA periods to load from cmc_ema_multi_tf_u
+    - feature_cols: columns from features
+    - ema_periods: EMA periods to load from ema_multi_tf_u
 
     Args:
         signal_type: 'ema_crossover', 'rsi_mean_revert', or 'atr_breakout'
@@ -723,7 +723,7 @@ def _get_feature_columns_for_signal_type(
     Returns:
         Tuple of (feature_cols, ema_periods)
     """
-    # Base columns (always included, from cmc_features)
+    # Base columns (always included, from features)
     base = ["close"]
 
     if signal_type == "ema_crossover":

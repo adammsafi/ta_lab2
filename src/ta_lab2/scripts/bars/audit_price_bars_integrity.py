@@ -68,11 +68,11 @@ from ta_lab2.scripts.bars.common_snapshot_contract import (
 # ----------------------------
 
 BAR_TABLES: Dict[str, str] = {
-    "public.cmc_price_bars_multi_tf": "TF_DAY",
-    "public.cmc_price_bars_multi_tf_cal_us": "CAL_US",
-    "public.cmc_price_bars_multi_tf_cal_iso": "CAL_ISO",
-    "public.cmc_price_bars_multi_tf_cal_anchor_us": "ANCHOR_US",
-    "public.cmc_price_bars_multi_tf_cal_anchor_iso": "ANCHOR_ISO",
+    "public.price_bars_multi_tf": "TF_DAY",
+    "public.price_bars_multi_tf_cal_us": "CAL_US",
+    "public.price_bars_multi_tf_cal_iso": "CAL_ISO",
+    "public.price_bars_multi_tf_cal_anchor_us": "ANCHOR_US",
+    "public.price_bars_multi_tf_cal_anchor_iso": "ANCHOR_ISO",
 }
 
 DEFAULT_DAILY_TABLE = "public.cmc_price_histories7"

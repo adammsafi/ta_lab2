@@ -16,98 +16,98 @@
 --   time_close_bar = bar-level scheduled end (NEW, = old time_close)
 
 -- =============================================================================
--- 1) cmc_price_bars_1d  (1D: already per-row, backfill only)
+-- 1) price_bars_1d  (1D: already per-row, backfill only)
 -- =============================================================================
-ALTER TABLE public.cmc_price_bars_1d
+ALTER TABLE public.price_bars_1d
     ADD COLUMN IF NOT EXISTS time_open_bar  TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS time_close_bar TIMESTAMPTZ;
 
-UPDATE public.cmc_price_bars_1d
+UPDATE public.price_bars_1d
 SET time_open_bar  = time_open,
     time_close_bar = time_close
 WHERE time_open_bar IS NULL;
 
 -- =============================================================================
--- 2) cmc_price_bars_multi_tf
+-- 2) price_bars_multi_tf
 -- =============================================================================
-ALTER TABLE public.cmc_price_bars_multi_tf
+ALTER TABLE public.price_bars_multi_tf
     ADD COLUMN IF NOT EXISTS time_open_bar  TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS time_close_bar TIMESTAMPTZ;
 
-UPDATE public.cmc_price_bars_multi_tf
+UPDATE public.price_bars_multi_tf
 SET time_open_bar  = time_open,
     time_close_bar = time_close
 WHERE time_open_bar IS NULL;
 
 -- Revert time_close to per-row (= timestamp)
-UPDATE public.cmc_price_bars_multi_tf
+UPDATE public.price_bars_multi_tf
 SET time_close = "timestamp"
 WHERE time_close <> "timestamp";
 
 -- =============================================================================
--- 3) cmc_price_bars_multi_tf_cal_us
+-- 3) price_bars_multi_tf_cal_us
 -- =============================================================================
-ALTER TABLE public.cmc_price_bars_multi_tf_cal_us
+ALTER TABLE public.price_bars_multi_tf_cal_us
     ADD COLUMN IF NOT EXISTS time_open_bar  TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS time_close_bar TIMESTAMPTZ;
 
-UPDATE public.cmc_price_bars_multi_tf_cal_us
+UPDATE public.price_bars_multi_tf_cal_us
 SET time_open_bar  = time_open,
     time_close_bar = time_close
 WHERE time_open_bar IS NULL;
 
 -- Revert time_close to per-row (= timestamp)
-UPDATE public.cmc_price_bars_multi_tf_cal_us
+UPDATE public.price_bars_multi_tf_cal_us
 SET time_close = "timestamp"
 WHERE time_close <> "timestamp";
 
 -- =============================================================================
--- 4) cmc_price_bars_multi_tf_cal_iso
+-- 4) price_bars_multi_tf_cal_iso
 -- =============================================================================
-ALTER TABLE public.cmc_price_bars_multi_tf_cal_iso
+ALTER TABLE public.price_bars_multi_tf_cal_iso
     ADD COLUMN IF NOT EXISTS time_open_bar  TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS time_close_bar TIMESTAMPTZ;
 
-UPDATE public.cmc_price_bars_multi_tf_cal_iso
+UPDATE public.price_bars_multi_tf_cal_iso
 SET time_open_bar  = time_open,
     time_close_bar = time_close
 WHERE time_open_bar IS NULL;
 
 -- Revert time_close to per-row (= timestamp)
-UPDATE public.cmc_price_bars_multi_tf_cal_iso
+UPDATE public.price_bars_multi_tf_cal_iso
 SET time_close = "timestamp"
 WHERE time_close <> "timestamp";
 
 -- =============================================================================
--- 5) cmc_price_bars_multi_tf_cal_anchor_us
+-- 5) price_bars_multi_tf_cal_anchor_us
 -- =============================================================================
-ALTER TABLE public.cmc_price_bars_multi_tf_cal_anchor_us
+ALTER TABLE public.price_bars_multi_tf_cal_anchor_us
     ADD COLUMN IF NOT EXISTS time_open_bar  TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS time_close_bar TIMESTAMPTZ;
 
-UPDATE public.cmc_price_bars_multi_tf_cal_anchor_us
+UPDATE public.price_bars_multi_tf_cal_anchor_us
 SET time_open_bar  = time_open,
     time_close_bar = time_close
 WHERE time_open_bar IS NULL;
 
 -- Revert time_close to per-row (= timestamp)
-UPDATE public.cmc_price_bars_multi_tf_cal_anchor_us
+UPDATE public.price_bars_multi_tf_cal_anchor_us
 SET time_close = "timestamp"
 WHERE time_close <> "timestamp";
 
 -- =============================================================================
--- 6) cmc_price_bars_multi_tf_cal_anchor_iso
+-- 6) price_bars_multi_tf_cal_anchor_iso
 -- =============================================================================
-ALTER TABLE public.cmc_price_bars_multi_tf_cal_anchor_iso
+ALTER TABLE public.price_bars_multi_tf_cal_anchor_iso
     ADD COLUMN IF NOT EXISTS time_open_bar  TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS time_close_bar TIMESTAMPTZ;
 
-UPDATE public.cmc_price_bars_multi_tf_cal_anchor_iso
+UPDATE public.price_bars_multi_tf_cal_anchor_iso
 SET time_open_bar  = time_open,
     time_close_bar = time_close
 WHERE time_open_bar IS NULL;
 
 -- Revert time_close to per-row (= timestamp)
-UPDATE public.cmc_price_bars_multi_tf_cal_anchor_iso
+UPDATE public.price_bars_multi_tf_cal_anchor_iso
 SET time_close = "timestamp"
 WHERE time_close <> "timestamp";

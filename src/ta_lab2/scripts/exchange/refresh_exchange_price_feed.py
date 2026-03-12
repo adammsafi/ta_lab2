@@ -4,10 +4,10 @@ Exchange price feed comparison script.
 
 Fetches live spot prices from Coinbase and Kraken for configured pairs,
 compares each live price against the most recent daily bar close stored in
-cmc_price_bars_multi_tf, computes the discrepancy percentage, and writes
+price_bars_multi_tf, computes the discrepancy percentage, and writes
 every snapshot to exchange_price_feed.
 
-An adaptive threshold (3 * std_ret_30 * 100 from cmc_asset_stats) determines
+An adaptive threshold (3 * std_ret_30 * 100 from asset_stats) determines
 whether a discrepancy is notable; a WARNING is logged when exceeded.
 
 Usage
@@ -52,7 +52,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_EXCHANGES: List[str] = ["coinbase", "kraken"]
 DEFAULT_PAIRS: List[str] = ["BTC/USD", "ETH/USD"]
-FALLBACK_THRESHOLD_PCT = 5.0  # percent; used when cmc_asset_stats has no data
+FALLBACK_THRESHOLD_PCT = 5.0  # percent; used when asset_stats has no data
 
 
 # ---------------------------------------------------------------------------
@@ -92,7 +92,7 @@ def _get_latest_bar_close(
 ) -> Tuple[Optional[float], Optional[datetime]]:
     """
     Return the (close, ts) of the most recent bar for the given asset and
-    timeframe from cmc_price_bars_multi_tf.
+    timeframe from price_bars_multi_tf.
 
     Parameters
     ----------
@@ -111,7 +111,7 @@ def _get_latest_bar_close(
         text(
             """
             SELECT b.close, b.ts
-            FROM public.cmc_price_bars_multi_tf b
+            FROM public.price_bars_multi_tf b
             JOIN public.dim_assets a ON a.id = b.id
             WHERE a.symbol = :symbol
               AND b.tf = :tf
@@ -131,7 +131,7 @@ def _get_adaptive_threshold(conn, asset_symbol: str) -> float:
     """
     Return the adaptive discrepancy threshold (in percent) for an asset.
 
-    Algorithm: 3 * std_ret_30 * 100 from cmc_asset_stats.
+    Algorithm: 3 * std_ret_30 * 100 from asset_stats.
     Falls back to FALLBACK_THRESHOLD_PCT when no row exists or std_ret_30 is NULL.
 
     Parameters
@@ -148,7 +148,7 @@ def _get_adaptive_threshold(conn, asset_symbol: str) -> float:
         text(
             """
             SELECT s.std_ret_30
-            FROM public.cmc_asset_stats s
+            FROM public.asset_stats s
             JOIN public.dim_assets a ON a.id = s.id
             WHERE a.symbol = :symbol
               AND s.std_ret_30 IS NOT NULL
@@ -445,7 +445,7 @@ def main(argv: List[str] | None = None) -> int:
     p = argparse.ArgumentParser(
         description=(
             "Fetch live prices from configured exchanges and compare against "
-            "the most recent bar close in cmc_price_bars_multi_tf. "
+            "the most recent bar close in price_bars_multi_tf. "
             "Writes snapshots to exchange_price_feed."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,

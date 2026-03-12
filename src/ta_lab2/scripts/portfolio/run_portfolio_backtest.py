@@ -86,7 +86,7 @@ def _make_engine(db_url: str):
 
 def _load_signal_probabilities(engine, tf: str) -> pd.DataFrame:
     """
-    Load the latest trade_probability per asset from cmc_meta_label_results.
+    Load the latest trade_probability per asset from meta_label_results.
 
     Returns DataFrame with columns [id, trade_probability].
     Returns empty DataFrame if table does not exist or has no data.
@@ -97,7 +97,7 @@ def _load_signal_probabilities(engine, tf: str) -> pd.DataFrame:
         """
         SELECT DISTINCT ON (asset_id)
             asset_id AS id, trade_probability, t0 AS ts
-        FROM cmc_meta_label_results
+        FROM meta_label_results
         WHERE trade_probability IS NOT NULL
         ORDER BY asset_id, t0 DESC
         """
@@ -106,7 +106,7 @@ def _load_signal_probabilities(engine, tf: str) -> pd.DataFrame:
         with engine.connect() as conn:
             df = pd.read_sql(query, conn)
         if df.empty:
-            logger.warning("cmc_meta_label_results has no trade_probability data.")
+            logger.warning("meta_label_results has no trade_probability data.")
             return pd.DataFrame()
         # Ensure numeric type (NUMERIC comes back as Decimal)
         df["trade_probability"] = df["trade_probability"].astype(float)
@@ -114,7 +114,7 @@ def _load_signal_probabilities(engine, tf: str) -> pd.DataFrame:
         return df[["id", "trade_probability"]]
     except Exception as exc:
         logger.warning(
-            "Could not load signal probabilities from cmc_meta_label_results: %s. "
+            "Could not load signal probabilities from meta_label_results: %s. "
             "Falling back to default probability.",
             exc,
         )
@@ -123,7 +123,7 @@ def _load_signal_probabilities(engine, tf: str) -> pd.DataFrame:
 
 def _load_all_prices(tf: str, start: datetime, end: datetime, engine) -> pd.DataFrame:
     """
-    Load close prices from cmc_price_bars_multi_tf_u for all assets in the date range.
+    Load close prices from price_bars_multi_tf_u for all assets in the date range.
 
     CRITICAL: uses 'timestamp' column (NOT 'ts').
 
@@ -134,7 +134,7 @@ def _load_all_prices(tf: str, start: datetime, end: datetime, engine) -> pd.Data
     query = text(
         """
         SELECT id, timestamp, close
-        FROM cmc_price_bars_multi_tf_u
+        FROM price_bars_multi_tf_u
         WHERE tf = :tf
           AND timestamp >= :start
           AND timestamp <= :end
@@ -253,7 +253,7 @@ def _strategy_topk_dropout(
         if total_w > 0:
             held_weights = {a: w / total_w for a, w in held_weights.items()}
 
-        # Real trade_probability from cmc_meta_label_results; falls back to 0.6 if unavailable.
+        # Real trade_probability from meta_label_results; falls back to 0.6 if unavailable.
         default_prob = 0.6
         probs = {
             a: signal_probs.get(a, default_prob) if signal_probs else default_prob
@@ -534,7 +534,7 @@ def run_backtest(
             zip(prob_df["id"], prob_df["trade_probability"])
         )
         logger.info(
-            "Loaded %d signal probabilities from cmc_meta_label_results.",
+            "Loaded %d signal probabilities from meta_label_results.",
             len(signal_probs_map),
         )
     else:

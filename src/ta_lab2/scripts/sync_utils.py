@@ -68,7 +68,7 @@ def _q(col: str) -> str:
 def alignment_source_from_table(full_name: str, prefix: str) -> str:
     """
     Derive alignment_source label by stripping prefix from table name.
-    e.g.  prefix='cmc_price_bars_', table='cmc_price_bars_multi_tf_cal_us'
+    e.g.  prefix='cmc_price_bars_', table='price_bars_multi_tf_cal_us'
           -> 'multi_tf_cal_us'
     """
     _, table = split_schema_table(full_name)
@@ -228,7 +228,7 @@ def sync_sources_to_unified(
     Parameters
     ----------
     engine : SQLAlchemy Engine
-    u_table : fully-qualified target table (e.g. "public.cmc_price_bars_multi_tf_u")
+    u_table : fully-qualified target table (e.g. "public.price_bars_multi_tf_u")
     sources : list of fully-qualified source tables
     pk_cols : PK column names of the _u table (for ON CONFLICT)
     source_prefix : prefix stripped from source table name to derive alignment_source

@@ -1,11 +1,11 @@
 """refresh_macro_regimes.py
 
-CLI script for macro regime classification and upsert into cmc_macro_regimes.
+CLI script for macro regime classification and upsert into macro_regimes.
 
 Reads daily macro features from fred.fred_macro_features (Phase 65-66),
 classifies each day into 4-dimensional regime labels (monetary_policy,
 liquidity, risk_appetite, carry), applies hysteresis, computes composite
-regime keys and bucketed macro_state, and upserts results to cmc_macro_regimes.
+regime keys and bucketed macro_state, and upserts results to macro_regimes.
 
 Follows the same patterns as refresh_macro_features.py (watermark-based
 incremental, temp table + ON CONFLICT upsert, dry-run support).
@@ -44,7 +44,7 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(
         description=(
             "Classify daily macro features into 4-dimensional regime labels "
-            "and upsert results to cmc_macro_regimes."
+            "and upsert results to macro_regimes."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
@@ -204,7 +204,7 @@ Examples:
         result_df = classifier._classify_dataframe(df_features)
 
         print(
-            f"\n[DRY RUN] Would upsert {len(result_df)} rows to cmc_macro_regimes (profile={profile})"
+            f"\n[DRY RUN] Would upsert {len(result_df)} rows to macro_regimes (profile={profile})"
         )
 
         if "macro_state" in result_df.columns:
@@ -253,7 +253,7 @@ Examples:
     else:
         print(
             f"\n[OK] Macro regime classification complete in {elapsed:.1f}s: "
-            f"{n_upserted} rows upserted to cmc_macro_regimes (profile={profile})"
+            f"{n_upserted} rows upserted to macro_regimes (profile={profile})"
         )
 
     return 0

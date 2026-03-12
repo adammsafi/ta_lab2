@@ -10,7 +10,7 @@ pivot/rename step that is the primary integration risk.
 
 Key Design Decisions:
 - Calendar bar tables use ``time_close`` (not ``ts``) -- always aliased in queries
-- Daily EMAs in cmc_ema_multi_tf_u require ``alignment_source = 'multi_tf'`` filter
+- Daily EMAs in ema_multi_tf_u require ``alignment_source = 'multi_tf'`` filter
   to prevent duplicate rows per (id, ts, tf, period)
 - Period column values are INTEGER in DB but may vary -- cast to int before renaming
   to ensure numeric sort order (20 < 50 < 200), not alphabetic ('200' < '50')
@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 #: Default EMA periods for each timeframe layer.
-#: Confirmed against DEFAULT_PERIODS in refresh_cmc_ema_multi_tf_from_bars.py
+#: Confirmed against DEFAULT_PERIODS in refresh_ema_multi_tf_from_bars.py
 #: and feature_utils.py add_ema_pack() conventions.
 DEFAULT_MONTHLY_PERIODS: list[int] = [12, 24, 48]
 DEFAULT_WEEKLY_PERIODS: list[int] = [20, 50, 200]
@@ -74,7 +74,7 @@ def pivot_emas_to_wide(
 
     Args:
         ema_df: Long-format DataFrame with columns: id, ts, period, ema.
-                May come from cmc_ema_multi_tf_cal_iso/us or cmc_ema_multi_tf_u.
+                May come from ema_multi_tf_cal_iso/us or ema_multi_tf_u.
         periods: List of period values to include (e.g. [20, 50, 200]).
                  Rows with period not in this list are filtered out.
         price_col: Prefix for EMA column names. Default "close" produces
@@ -153,9 +153,9 @@ def load_bars_for_tf(
     Load OHLCV price bars from DB for a single asset and timeframe.
 
     Routes to the correct table based on timeframe:
-    - Daily (``tf='1D'``): queries ``cmc_price_bars_multi_tf``
+    - Daily (``tf='1D'``): queries ``price_bars_multi_tf``
     - Weekly/Monthly (``tf='1W'`` or ``tf='1M'``): queries the calendar bar table
-      (cmc_price_bars_multi_tf_cal_iso or _cal_us depending on cal_scheme)
+      (price_bars_multi_tf_cal_iso or _cal_us depending on cal_scheme)
 
     CRITICAL: Calendar bar tables use ``time_close`` (not ``ts``) as the timestamp
     column. This function always aliases it to ``ts`` so callers receive a
@@ -189,7 +189,7 @@ def load_bars_for_tf(
         sql = text(
             """
             SELECT id, time_close AS ts, open, high, low, close, volume
-            FROM public.cmc_price_bars_multi_tf
+            FROM public.price_bars_multi_tf
             WHERE id = :id AND tf = '1D'
             ORDER BY time_close
         """
@@ -198,7 +198,7 @@ def load_bars_for_tf(
     else:
         # Weekly or monthly: calendar bar table, time_close aliased to ts
         # CRITICAL: PK uses bar_seq, not ts. time_close is the period-end timestamp.
-        table_name = f"cmc_price_bars_multi_tf_cal_{cal_scheme}"
+        table_name = f"price_bars_multi_tf_cal_{cal_scheme}"
         sql = text(
             f"""
             SELECT id, time_close AS ts, open, high, low, close, volume
@@ -252,12 +252,12 @@ def load_emas_for_tf(
     Load raw long-format EMAs from DB for a single asset and timeframe.
 
     Routes to the correct EMA table based on timeframe:
-    - Daily (``tf='1D'``): queries ``cmc_ema_multi_tf_u`` with
+    - Daily (``tf='1D'``): queries ``ema_multi_tf_u`` with
       ``alignment_source = 'multi_tf'`` filter to prevent duplicate rows.
     - Weekly/Monthly (``tf='1W'`` or ``tf='1M'``): queries the calendar EMA table
-      (cmc_ema_multi_tf_cal_iso or _cal_us depending on cal_scheme).
+      (ema_multi_tf_cal_iso or _cal_us depending on cal_scheme).
 
-    CRITICAL: ``cmc_ema_multi_tf_u`` has an ``alignment_source`` column with values
+    CRITICAL: ``ema_multi_tf_u`` has an ``alignment_source`` column with values
     like 'multi_tf', 'multi_tf_cal_us'. For daily regime EMAs, always filter to
     'multi_tf' to avoid duplicate rows per (id, ts, period).
 
@@ -286,14 +286,14 @@ def load_emas_for_tf(
         return empty_result
 
     if tf == "1D":
-        # Daily EMAs from cmc_ema_multi_tf_u
+        # Daily EMAs from ema_multi_tf_u
         # CRITICAL: Filter alignment_source = 'multi_tf' to avoid duplicates.
         # The table has alignment_source in data but NOT in PK -- without this
         # filter, pivot_table may see duplicate (id, ts, period) combinations.
         sql = text(
             """
             SELECT id, ts, period, ema
-            FROM public.cmc_ema_multi_tf_u
+            FROM public.ema_multi_tf_u
             WHERE id = :id
               AND tf = '1D'
               AND period = ANY(:periods)
@@ -306,7 +306,7 @@ def load_emas_for_tf(
         # Weekly/monthly EMAs from calendar EMA table
         # Calendar EMA table PK: (id, tf, ts, period)
         # No alignment_source filter needed -- unique by PK
-        table_name = f"cmc_ema_multi_tf_cal_{cal_scheme}"
+        table_name = f"ema_multi_tf_cal_{cal_scheme}"
         sql = text(
             f"""
             SELECT id, ts, period, ema
@@ -437,7 +437,7 @@ def load_regime_input_data(
     )
 
     # ------------------------------------------------------------------
-    # Monthly (L0) -- cmc_price_bars_multi_tf_cal_{scheme} + cal EMA table
+    # Monthly (L0) -- price_bars_multi_tf_cal_{scheme} + cal EMA table
     # ------------------------------------------------------------------
     monthly_bars = load_bars_for_tf(engine, asset_id, tf="1M", cal_scheme=cal_scheme)
     monthly_emas = load_and_pivot_emas(
@@ -460,7 +460,7 @@ def load_regime_input_data(
         )
 
     # ------------------------------------------------------------------
-    # Weekly (L1) -- cmc_price_bars_multi_tf_cal_{scheme} + cal EMA table
+    # Weekly (L1) -- price_bars_multi_tf_cal_{scheme} + cal EMA table
     # ------------------------------------------------------------------
     weekly_bars = load_bars_for_tf(engine, asset_id, tf="1W", cal_scheme=cal_scheme)
     weekly_emas = load_and_pivot_emas(
@@ -483,7 +483,7 @@ def load_regime_input_data(
         )
 
     # ------------------------------------------------------------------
-    # Daily (L2) -- cmc_price_bars_multi_tf + cmc_ema_multi_tf_u
+    # Daily (L2) -- price_bars_multi_tf + ema_multi_tf_u
     # ------------------------------------------------------------------
     daily_bars = load_bars_for_tf(engine, asset_id, tf="1D", cal_scheme=cal_scheme)
     daily_emas = load_and_pivot_emas(
@@ -532,7 +532,7 @@ def load_rolling_stats_for_asset(
     tf: str = "1D",
 ) -> pd.DataFrame | None:
     """
-    Load rolling descriptive statistics from cmc_asset_stats for a single asset.
+    Load rolling descriptive statistics from asset_stats for a single asset.
 
     Returns selected rolling stat columns (std_ret_30, std_ret_90, sharpe_ann_90,
     sharpe_ann_252, max_dd_from_ath) indexed by ts (UTC). Intended for optional
@@ -543,7 +543,7 @@ def load_rolling_stats_for_asset(
     Args:
         engine:   SQLAlchemy engine connected to PostgreSQL.
         asset_id: Integer asset ID (matches id in dim_assets).
-        tf:       Timeframe string for cmc_asset_stats (default '1D').
+        tf:       Timeframe string for asset_stats (default '1D').
 
     Returns:
         DataFrame indexed by ts (tz-aware UTC) with columns:
@@ -559,7 +559,7 @@ def load_rolling_stats_for_asset(
     sql = text(
         """
         SELECT ts, std_ret_30, std_ret_90, sharpe_ann_90, sharpe_ann_252, max_dd_from_ath
-        FROM public.cmc_asset_stats
+        FROM public.asset_stats
         WHERE id = :id AND tf = :tf
         ORDER BY ts
         """

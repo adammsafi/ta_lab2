@@ -185,7 +185,7 @@ class RiskEngine:
 
         2c. Gate 1.6 (margin/liquidation) is checked automatically inside check_order()
             for buy orders. Sell orders bypass this gate (reducing exposure is safe).
-            Requires cmc_perp_positions table populated by the paper trading executor.
+            Requires perp_positions table populated by the paper trading executor.
 
         2d. Gate 1.7 (macro gates) is checked automatically when macro_gate_evaluator
             is injected at construction time. FLATTEN blocks all orders; REDUCE scales
@@ -544,7 +544,7 @@ class RiskEngine:
             ret_row = conn.execute(
                 text(
                     """
-                SELECT ret_arith FROM cmc_returns_bars_multi_tf_u
+                SELECT ret_arith FROM returns_bars_multi_tf_u
                 WHERE id = :asset_id AND tf = '1D' AND ret_arith IS NOT NULL
                 ORDER BY "timestamp" DESC LIMIT 1
                 """
@@ -555,7 +555,7 @@ class RiskEngine:
             vol_rows = conn.execute(
                 text(
                     """
-                SELECT ret_arith FROM cmc_returns_bars_multi_tf_u
+                SELECT ret_arith FROM returns_bars_multi_tf_u
                 WHERE id = :asset_id AND tf = '1D' AND ret_arith IS NOT NULL
                 ORDER BY "timestamp" DESC LIMIT 20
                 """
@@ -618,7 +618,7 @@ class RiskEngine:
                     recent_rows = conn.execute(
                         text(
                             """
-                        SELECT ret_arith FROM cmc_returns_bars_multi_tf_u
+                        SELECT ret_arith FROM returns_bars_multi_tf_u
                         WHERE id = :asset_id AND tf = '1D' AND ret_arith IS NOT NULL
                         ORDER BY "timestamp" DESC LIMIT 23
                         """
@@ -753,7 +753,7 @@ class RiskEngine:
         Compute daily drawdown from day-open portfolio value and trigger kill switch if exceeded.
 
         Reads day_open_portfolio_value and last_day_open_date from dim_risk_state.
-        If today's date is a new day, updates the day-open value from cmc_positions (if available).
+        If today's date is a new day, updates the day-open value from positions (if available).
         Computes drawdown as (day_open - current) / day_open.
 
         Returns:
@@ -788,7 +788,7 @@ class RiskEngine:
             )
             return False
 
-        # Try to get current portfolio value from cmc_positions
+        # Try to get current portfolio value from positions
         current_value = self._compute_portfolio_value()
         if current_value is None:
             logger.debug(
@@ -1238,7 +1238,7 @@ class RiskEngine:
         if order_side.lower() == "sell":
             return None
 
-        # Query cmc_perp_positions for any active position for this strategy
+        # Query perp_positions for any active position for this strategy
         try:
             with self._engine.connect() as conn:
                 pos_row = conn.execute(
@@ -1254,7 +1254,7 @@ class RiskEngine:
                         mark_price,
                         quantity,
                         avg_entry_price
-                    FROM cmc_perp_positions
+                    FROM perp_positions
                     WHERE strategy_id = :strategy_id
                       AND side != 'flat'
                     ORDER BY updated_at DESC
@@ -1265,7 +1265,7 @@ class RiskEngine:
                 ).fetchone()
         except Exception as exc:
             logger.debug(
-                "Gate 1.6: cmc_perp_positions query failed (table may not exist): %s",
+                "Gate 1.6: perp_positions query failed (table may not exist): %s",
                 exc,
             )
             return None
@@ -1302,7 +1302,7 @@ class RiskEngine:
         quantity = _Decimal(str(abs(float(quantity))))
         position_value = mark_price * quantity
 
-        # Load margin tiers from cmc_margin_config
+        # Load margin tiers from margin_config
         from ta_lab2.risk.margin_monitor import (
             compute_margin_utilization,
             load_margin_tiers,
@@ -1399,7 +1399,7 @@ class RiskEngine:
 
     def _compute_portfolio_value(self) -> Optional[Decimal]:
         """
-        Compute current portfolio value from cmc_positions (if the table exists).
+        Compute current portfolio value from positions (if the table exists).
 
         Returns None if unable to compute (table not found, no rows, etc.).
         """
@@ -1409,7 +1409,7 @@ class RiskEngine:
                     text(
                         """
                     SELECT COALESCE(SUM(current_value), 0)
-                    FROM cmc_positions
+                    FROM positions
                     WHERE status = 'open'
                     """
                     )
@@ -1417,9 +1417,7 @@ class RiskEngine:
             if row and row[0] is not None:
                 return Decimal(str(row[0]))
         except Exception as exc:
-            logger.debug(
-                "Could not compute portfolio value from cmc_positions: %s", exc
-            )
+            logger.debug("Could not compute portfolio value from positions: %s", exc)
         return None
 
     def _log_event(
@@ -1434,7 +1432,7 @@ class RiskEngine:
         metadata: Optional[dict] = None,
     ) -> None:
         """
-        Insert an immutable risk event into cmc_risk_events.
+        Insert an immutable risk event into risk_events.
 
         Failures are logged but never propagated -- the risk check result takes precedence.
         """
@@ -1443,7 +1441,7 @@ class RiskEngine:
                 conn.execute(
                     text(
                         """
-                    INSERT INTO cmc_risk_events (
+                    INSERT INTO risk_events (
                         event_type, trigger_source, reason, operator,
                         asset_id, strategy_id, order_id, metadata
                     ) VALUES (

@@ -8,8 +8,8 @@ WITH j AS (
     c.d2_roll, s.d2_roll AS d2_roll_snap,
     c.tf_days, s.tf_days AS tf_days_snap,
     c.roll,    s.roll    AS roll_snap
-  FROM public.cmc_ema_multi_tf c
-  JOIN public.cmc_ema_multi_tf_snapshot_20251214 s
+  FROM public.ema_multi_tf c
+  JOIN public.ema_multi_tf_snapshot_20251214 s
     USING (id, tf, ts, period)
 ),
 d AS (
@@ -52,8 +52,8 @@ WITH j AS (
     c.id, c.tf, c.ts, c.period,
     c.ema, s.ema AS ema_snap,
     ABS(c.ema - s.ema) AS ema_abs_diff
-  FROM public.cmc_ema_multi_tf c
-  JOIN public.cmc_ema_multi_tf_snapshot_20251214 s
+  FROM public.ema_multi_tf c
+  JOIN public.ema_multi_tf_snapshot_20251214 s
     USING (id, tf, ts, period)
   WHERE c.ema IS NOT NULL AND s.ema IS NOT NULL
 )

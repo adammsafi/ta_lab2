@@ -32,10 +32,10 @@ TABLE_FAMILIES: dict[str, str] = {
     "EMA Values": "cmc_ema",
     "EMA Returns": "cmc_returns_ema",
     "AMA Values": "cmc_ama",
-    "Volatility": "cmc_vol",
-    "TA Indicators": "cmc_ta",
+    "Volatility": "vol",
+    "TA Indicators": "ta",
     "Regimes": "cmc_regime",
-    "Features": "cmc_features",
+    "Features": "features",
 }
 
 

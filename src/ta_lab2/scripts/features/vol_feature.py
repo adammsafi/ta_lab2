@@ -43,7 +43,7 @@ class VolatilityConfig(FeatureConfig):
 
     Attributes:
         feature_type: 'vol' (volatility features)
-        output_table: 'cmc_vol_daily' (output table name)
+        output_table: 'vol_daily' (output table name)
         null_strategy: 'forward_fill' (per CONTEXT.md - vol forward fills)
         add_zscore: True (add z-score normalization)
         zscore_window: 252 (1 trading year for rolling z-score)
@@ -54,7 +54,7 @@ class VolatilityConfig(FeatureConfig):
     """
 
     feature_type: str = "vol"
-    output_table: str = "cmc_vol"
+    output_table: str = "vol"
     null_strategy: str = "forward_fill"  # Per CONTEXT.md - vol forward fills
     add_zscore: bool = True
     zscore_window: int = 252
@@ -88,12 +88,12 @@ class VolatilityFeature(BaseFeature):
     All volatility measures are annualized using sqrt(252) for trading days.
 
     Template method flow:
-    1. Load OHLC data from cmc_price_bars_1d
+    1. Load OHLC data from price_bars_1d
     2. Apply forward_fill null handling (config)
     3. Compute all volatility estimators
     4. Add z-score normalization
     5. Flag outliers
-    6. Write to cmc_vol_daily
+    6. Write to vol_daily
     """
 
     def __init__(self, engine: Engine, config: Optional[VolatilityConfig] = None):
@@ -122,8 +122,8 @@ class VolatilityFeature(BaseFeature):
         end: Optional[str] = None,
     ) -> pd.DataFrame:
         """
-        Load OHLC data from cmc_price_bars_multi_tf_u for configured tf,
-        LEFT JOINing cmc_returns_bars_multi_tf_u for pre-computed ret_log.
+        Load OHLC data from price_bars_multi_tf_u for configured tf,
+        LEFT JOINing returns_bars_multi_tf_u for pre-computed ret_log.
 
         Args:
             ids: List of asset IDs
@@ -167,7 +167,7 @@ class VolatilityFeature(BaseFeature):
                 p.close,
                 r.ret_log
             FROM {self.SOURCE_TABLE} p
-            LEFT JOIN public.cmc_returns_bars_multi_tf_u r
+            LEFT JOIN public.returns_bars_multi_tf_u r
                 ON p.id = r.id
                 AND p.{self.TS_COLUMN} = r."timestamp"
                 AND p.venue = r.venue

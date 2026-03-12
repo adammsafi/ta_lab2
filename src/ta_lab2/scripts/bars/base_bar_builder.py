@@ -24,12 +24,12 @@ Design Pattern: Template Method
 - Reduces code duplication across 6 bar builders
 
 Migration: This replaces duplicated code in:
-- refresh_cmc_price_bars_1d.py
-- refresh_cmc_price_bars_multi_tf.py
-- refresh_cmc_price_bars_multi_tf_cal_us.py
-- refresh_cmc_price_bars_multi_tf_cal_iso.py
-- refresh_cmc_price_bars_multi_tf_cal_anchor_us.py
-- refresh_cmc_price_bars_multi_tf_cal_anchor_iso.py
+- refresh_price_bars_1d.py
+- refresh_price_bars_multi_tf.py
+- refresh_price_bars_multi_tf_cal_us.py
+- refresh_price_bars_multi_tf_cal_iso.py
+- refresh_price_bars_multi_tf_cal_anchor_us.py
+- refresh_price_bars_multi_tf_cal_anchor_iso.py
 """
 
 from __future__ import annotations
@@ -161,7 +161,7 @@ class BaseBarBuilder(ABC):
         Return state table name for this builder variant.
 
         Returns:
-            Fully qualified state table name (e.g., "public.cmc_price_bars_1d_state")
+            Fully qualified state table name (e.g., "public.price_bars_1d_state")
 
         Note on calendar builder state tables:
             The tz column in calendar builder state tables is metadata only,
@@ -176,7 +176,7 @@ class BaseBarBuilder(ABC):
         Return output bars table name for this builder variant.
 
         Returns:
-            Fully qualified output table name (e.g., "public.cmc_price_bars_1d")
+            Fully qualified output table name (e.g., "public.price_bars_1d")
         """
 
     @abstractmethod
@@ -433,8 +433,8 @@ class BaseBarBuilder(ABC):
         Get table type for DDL generation.
 
         Subclasses should override to specify their table type:
-        - "1d" for refresh_cmc_price_bars_1d
-        - "multi_tf" for refresh_cmc_price_bars_multi_tf
+        - "1d" for refresh_price_bars_1d
+        - "multi_tf" for refresh_price_bars_multi_tf
         - "cal" for cal_iso and cal_us builders
         - "cal_anchor" for cal_anchor_iso and cal_anchor_us builders
 

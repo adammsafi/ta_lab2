@@ -5,9 +5,9 @@ DEPRECATED: This module provides backward compatibility wrappers.
 New code should use ema_state_manager.EMAStateManager instead.
 
 Standardizes state table schema, creation, loading, and updating across:
-- refresh_cmc_ema_multi_tf_from_bars.py
-- refresh_cmc_ema_multi_tf_cal_from_bars.py
-- refresh_cmc_ema_multi_tf_cal_anchor_from_bars.py
+- refresh_ema_multi_tf_from_bars.py
+- refresh_ema_multi_tf_cal_from_bars.py
+- refresh_ema_multi_tf_cal_anchor_from_bars.py
 
 State table schema (unified across all EMA scripts):
 - PRIMARY KEY: (id, tf, period)
@@ -66,7 +66,7 @@ def ensure_ema_state_table(engine: Engine, schema: str, table: str) -> None:
     Args:
         engine: SQLAlchemy engine
         schema: Schema name (e.g., 'public')
-        table: State table name (e.g., 'cmc_ema_multi_tf_state')
+        table: State table name (e.g., 'ema_multi_tf_state')
     """
     from ta_lab2.scripts.emas.ema_state_manager import EMAStateManager, EMAStateConfig
 
@@ -133,7 +133,7 @@ def update_ema_state_from_output(
         roll_filter: Optional WHERE clause for filtering canonical rows in output table.
                     For cal scripts: "roll = FALSE", for anchor scripts: "roll_bar = FALSE"
         bars_table: Optional bars table name to read bar_seq and time range from.
-                   For cal: "cmc_price_bars_multi_tf_cal_us", for anchor: "cmc_price_bars_multi_tf_cal_anchor_us"
+                   For cal: "price_bars_multi_tf_cal_us", for anchor: "price_bars_multi_tf_cal_anchor_us"
         bars_schema: Schema for bars table (default: same as schema)
         bars_partial_filter: Filter for canonical bars in bars table (default: "is_partial_end = FALSE")
     """

@@ -107,7 +107,7 @@ ProjectTT contained planning documents, feature documentation, and analysis spre
 | ProjectTT/Features/EMAs/DesriptiveDocuments/ema_daily.docx | docs/features/emas/ema-daily.md | .archive/documentation/2026-02-02/ |
 | ProjectTT/Features/EMAs/EMA_loo.docx | docs/features/emas/ema-loo.md | .archive/documentation/2026-02-02/ |
 | ProjectTT/Features/EMAs/EMA_thoughts.docx | docs/features/emas/ema-thoughts.md | .archive/documentation/2026-02-02/ |
-| ProjectTT/Features/EMAs/Studies&Scraps/cmc_ema_multi_tf_cal_us_1W_21P_Approval_20260127.xlsx | [not converted - spreadsheet] | .archive/documentation/2026-02-02/ |
+| ProjectTT/Features/EMAs/Studies&Scraps/ema_multi_tf_cal_us_1W_21P_Approval_20260127.xlsx | [not converted - spreadsheet] | .archive/documentation/2026-02-02/ |
 | ProjectTT/Features/EMAs/Studies&Scraps/dim_tf&ema_alpha_LUT.xlsx | [not converted - spreadsheet] | .archive/documentation/2026-02-02/ |
 | ProjectTT/Features/EMAs/Studies&Scraps/ema_alpha_lookup_20251219.xlsx | [not converted - spreadsheet] | .archive/documentation/2026-02-02/ |
 | ProjectTT/Features/EMAs/Studies&Scraps/ema_analysis_look.xlsx | [not converted - spreadsheet] | .archive/documentation/2026-02-02/ |

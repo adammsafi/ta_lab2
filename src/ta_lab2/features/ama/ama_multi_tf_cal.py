@@ -2,12 +2,12 @@
 Calendar-aligned multi-timeframe AMA feature classes.
 
 Covers two calendar schemes:
-- CalUSAMAFeature  : loads from cmc_price_bars_multi_tf_cal_us
-- CalISOAMAFeature : loads from cmc_price_bars_multi_tf_cal_iso
+- CalUSAMAFeature  : loads from price_bars_multi_tf_cal_us
+- CalISOAMAFeature : loads from price_bars_multi_tf_cal_iso
 
 Both extend BaseAMAFeature and write to their respective output tables:
-  cmc_ama_multi_tf_cal_us
-  cmc_ama_multi_tf_cal_iso
+  ama_multi_tf_cal_us
+  ama_multi_tf_cal_iso
 
 Design matches MultiTFAMAFeature except:
 - Source bars table is a calendar-aligned table (US or ISO scheme)
@@ -47,9 +47,9 @@ class CalUSAMAFeature(BaseAMAFeature):
     """
     AMA feature for US calendar-aligned bars.
 
-    Loads close prices from cmc_price_bars_multi_tf_cal_us.
+    Loads close prices from price_bars_multi_tf_cal_us.
     TF universe: calendar TFs with US scheme from dim_timeframe.
-    Output table: cmc_ama_multi_tf_cal_us.
+    Output table: ama_multi_tf_cal_us.
     """
 
     def __init__(
@@ -58,7 +58,7 @@ class CalUSAMAFeature(BaseAMAFeature):
         config: Optional[AMAFeatureConfig] = None,
         *,
         bars_schema: str = "public",
-        bars_table: str = "cmc_price_bars_multi_tf_cal_us",
+        bars_table: str = "price_bars_multi_tf_cal_us",
     ) -> None:
         """
         Initialise calendar US AMA feature.
@@ -66,7 +66,7 @@ class CalUSAMAFeature(BaseAMAFeature):
         Args:
             engine: SQLAlchemy engine.
             config: AMA feature configuration. Defaults to AMAFeatureConfig with
-                    ALL_AMA_PARAMS and output_table="cmc_ama_multi_tf_cal_us".
+                    ALL_AMA_PARAMS and output_table="ama_multi_tf_cal_us".
             bars_schema: Schema for bars source table.
             bars_table: Source bars table name.
         """
@@ -74,7 +74,7 @@ class CalUSAMAFeature(BaseAMAFeature):
             config = AMAFeatureConfig(
                 param_sets=list(ALL_AMA_PARAMS),
                 output_schema="public",
-                output_table="cmc_ama_multi_tf_cal_us",
+                output_table="ama_multi_tf_cal_us",
             )
         super().__init__(engine, config)
         self.bars_schema = bars_schema
@@ -118,7 +118,7 @@ class CalUSAMAFeature(BaseAMAFeature):
 
         sql = text(
             f"""
-            SELECT id, "timestamp" AS ts, tf, tf_days, FALSE AS roll, close, is_partial_end
+            SELECT id, "timestamp" AS ts, tf, tf_days, is_partial_end AS roll, close, is_partial_end
             FROM {self.bars_schema}.{self.bars_table}
             WHERE {where_sql}
             ORDER BY "timestamp"
@@ -237,9 +237,9 @@ class CalISOAMAFeature(BaseAMAFeature):
     """
     AMA feature for ISO calendar-aligned bars.
 
-    Loads close prices from cmc_price_bars_multi_tf_cal_iso.
+    Loads close prices from price_bars_multi_tf_cal_iso.
     TF universe: calendar TFs with ISO scheme from dim_timeframe.
-    Output table: cmc_ama_multi_tf_cal_iso.
+    Output table: ama_multi_tf_cal_iso.
     """
 
     def __init__(
@@ -248,7 +248,7 @@ class CalISOAMAFeature(BaseAMAFeature):
         config: Optional[AMAFeatureConfig] = None,
         *,
         bars_schema: str = "public",
-        bars_table: str = "cmc_price_bars_multi_tf_cal_iso",
+        bars_table: str = "price_bars_multi_tf_cal_iso",
     ) -> None:
         """
         Initialise calendar ISO AMA feature.
@@ -256,7 +256,7 @@ class CalISOAMAFeature(BaseAMAFeature):
         Args:
             engine: SQLAlchemy engine.
             config: AMA feature configuration. Defaults to AMAFeatureConfig with
-                    ALL_AMA_PARAMS and output_table="cmc_ama_multi_tf_cal_iso".
+                    ALL_AMA_PARAMS and output_table="ama_multi_tf_cal_iso".
             bars_schema: Schema for bars source table.
             bars_table: Source bars table name.
         """
@@ -264,7 +264,7 @@ class CalISOAMAFeature(BaseAMAFeature):
             config = AMAFeatureConfig(
                 param_sets=list(ALL_AMA_PARAMS),
                 output_schema="public",
-                output_table="cmc_ama_multi_tf_cal_iso",
+                output_table="ama_multi_tf_cal_iso",
             )
         super().__init__(engine, config)
         self.bars_schema = bars_schema
@@ -308,7 +308,7 @@ class CalISOAMAFeature(BaseAMAFeature):
 
         sql = text(
             f"""
-            SELECT id, "timestamp" AS ts, tf, tf_days, FALSE AS roll, close, is_partial_end
+            SELECT id, "timestamp" AS ts, tf, tf_days, is_partial_end AS roll, close, is_partial_end
             FROM {self.bars_schema}.{self.bars_table}
             WHERE {where_sql}
             ORDER BY "timestamp"

@@ -14,16 +14,16 @@
 | cmc_exchange_map | table | external | reference | exchange | API | https://pro-api.coinmarketcap.com/v1/exchange/map?CMC_PRO_API_KEY=UNIFIED-CRYPTOASSET-INDEX&listing_status=active | nan |
 | cmc_price_histories7 | table | nan | price data | da | csv | C:\Users\asafi\Downloads\cmc_price_histories\Backfill | C:\Users\asafi\Downloads\cmc_price_histories\Updates |
 | cmc_ema_daily | table | derived | features | ema | .py | C:\Users\asafi\Downloads\ta_lab2\src\ta_lab2\features\ema.py | nan |
-| cmc_ema_multi_tf | table | derived | features | ema | .py | C:\Users\asafi\Downloads\ta_lab2\src\ta_lab2\features\m_tf\ema_multi_timeframe.py | nan |
-| cmc_ema_multi_tf_cal | table | nan | features | ema | nan | nan | nan |
+| ema_multi_tf | table | derived | features | ema | .py | C:\Users\asafi\Downloads\ta_lab2\src\ta_lab2\features\m_tf\ema_multi_timeframe.py | nan |
+| ema_multi_tf_cal | table | nan | features | ema | nan | nan | nan |
 | cmc_alpha_lut | table | internal | features | ema | .sql | C:\Users\asafi\Downloads\ta_lab2\sql\001_ema_alpha_lookup.sql | nan |
 | all_emas | view | nan | features | ema | .sql | C:\Users\asafi\Downloads\ta_lab2\sql\create_alter_all_emas.sql | nan |
-| cmc_price_with_emas | view | nan | features | ema | .sql | C:\Users\asafi\Downloads\ta_lab2\sql\create_alter_cmc_price_with_emas.sql | nan |
-| cmc_price_with_emas_d1d2 | view | nan | features | ema | .sql | C:\Users\asafi\Downloads\ta_lab2\sql\create_alter_cmc_price_with_emas_d1d2.sql | nan |
+| price_with_emas | view | nan | features | ema | .sql | C:\Users\asafi\Downloads\ta_lab2\sql\create_alter_price_with_emas.sql | nan |
+| price_with_emas_d1d2 | view | nan | features | ema | .sql | C:\Users\asafi\Downloads\ta_lab2\sql\create_alter_price_with_emas_d1d2.sql | nan |
 | price_histories7_stats | table | nan | price data | da_testing | .py | C:\Users\asafi\Downloads\ta_lab2\src\ta_lab2\scripts\run_refresh_price_histories7_stats.py | C:\Users\asafi\Downloads\ta_lab2\src\ta_lab2\scripts\refresh_price_histories7_stats.py |
 | ema_daily_stats | table | nan | features | ema_testing | .py | C:\Users\asafi\Downloads\ta_lab2\src\ta_lab2\scripts\refresh_ema_daily_stats.py | C:\Users\asafi\Downloads\ta_lab2\src\ta_lab2\scripts\refresh_ema_daily_stats.py |
 | ema_multi_tf_stats | table | nan | features | ema_testing | .py | C:\Users\asafi\Downloads\ta_lab2\src\ta_lab2\scripts\run_refresh_ema_multi_tf.py | C:\Users\asafi\Downloads\ta_lab2\src\ta_lab2\scripts\refresh_ema_multi_tf_stats.py |
-| cmc_ema_multi_tf_cal_stats | table | nan | features | ema_testing | nan | nan | nan |
+| ema_multi_tf_cal_stats | table | nan | features | ema_testing | nan | nan | nan |
 | cmc_price_ranges | table | nan | price data | da_testing | .sql | C:\Users\asafi\Downloads\ta_lab2\sql\cmc_price_ranges.sql | nan |
 | _stg_cmc_price_histories7 | table | nan | price data | da_helper | nan | nan | nan |
 
@@ -209,7 +209,7 @@
 | d2_roll | double precision | YES | nan | NO |
 | tf | text | NO | '1D'::text | NO |
 
-## cmc_ema_multi_tf
+## ema_multi_tf
 
 <!-- Complex formatting may not be preserved -->
 
@@ -262,7 +262,7 @@
 | d2_close | double precision | YES | nan |
 | roll | boolean | YES | nan |
 
-## cmc_price_with_emas
+## price_with_emas
 
 <!-- Complex formatting may not be preserved -->
 
@@ -280,7 +280,7 @@
 | period | integer | YES | nan |
 | ema | double precision | YES | nan |
 
-## cmc_price_with_emas_d1d2
+## price_with_emas_d1d2
 
 <!-- Complex formatting may not be preserved -->
 

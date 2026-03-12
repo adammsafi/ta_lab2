@@ -9,12 +9,12 @@ Unified timeline: _ema/_ema_bar + _roll value columns.
 PK: (id, ts, tf, period) — roll is a regular boolean column.
 
 Source EMA tables:
-  public.cmc_ema_multi_tf_cal_anchor_us
-  public.cmc_ema_multi_tf_cal_anchor_iso
+  public.ema_multi_tf_cal_anchor_us
+  public.ema_multi_tf_cal_anchor_iso
 
 Returns tables:
-  public.cmc_returns_ema_multi_tf_cal_anchor_us
-  public.cmc_returns_ema_multi_tf_cal_anchor_iso
+  public.returns_ema_multi_tf_cal_anchor_us
+  public.returns_ema_multi_tf_cal_anchor_iso
 
 Per (scheme, id, tf, period):
   - Coverage: n_ret == n_ema - 1
@@ -45,11 +45,11 @@ from sqlalchemy.engine import Engine
 
 DEFAULT_DIM_TF = "public.dim_timeframe"
 
-DEFAULT_EMA_US = "public.cmc_ema_multi_tf_cal_anchor_us"
-DEFAULT_EMA_ISO = "public.cmc_ema_multi_tf_cal_anchor_iso"
+DEFAULT_EMA_US = "public.ema_multi_tf_cal_anchor_us"
+DEFAULT_EMA_ISO = "public.ema_multi_tf_cal_anchor_iso"
 
-DEFAULT_RET_US = "public.cmc_returns_ema_multi_tf_cal_anchor_us"
-DEFAULT_RET_ISO = "public.cmc_returns_ema_multi_tf_cal_anchor_iso"
+DEFAULT_RET_US = "public.returns_ema_multi_tf_cal_anchor_us"
+DEFAULT_RET_ISO = "public.returns_ema_multi_tf_cal_anchor_iso"
 
 
 def _print(msg: str) -> None:

@@ -34,7 +34,7 @@ DIGEST_TABLES = [
     ("ema_cal", "public.ema_multi_tf_cal_stats"),
     ("ema_cal_anchor", "public.ema_multi_tf_cal_anchor_stats"),
     ("returns_ema", "public.returns_ema_stats"),
-    ("features", "public.cmc_features_stats"),
+    ("features", "public.features_stats"),
     ("audit", "public.audit_results"),
 ]
 

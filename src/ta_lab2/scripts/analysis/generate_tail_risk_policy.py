@@ -67,14 +67,14 @@ def _get_engine(db_url: str | None = None):
 
 def _load_btc_returns(engine, asset_id: int = 1) -> pd.DataFrame:
     """
-    Load BTC daily bar returns from cmc_returns_bars_multi_tf_u.
+    Load BTC daily bar returns from returns_bars_multi_tf_u.
 
     Note: column is "timestamp" (PostgreSQL reserved word, double-quoted).
     """
     sql = text(
         """
         SELECT "timestamp" AS ts, ret_arith
-        FROM cmc_returns_bars_multi_tf_u
+        FROM returns_bars_multi_tf_u
         WHERE id = :asset_id
           AND tf = '1D'
         ORDER BY "timestamp"
@@ -415,7 +415,7 @@ SET tail_risk_state = 'normal',
 WHERE state_id = 1;
 
 -- Log the override event
-INSERT INTO cmc_risk_events (event_type, trigger_source, reason)
+INSERT INTO risk_events (event_type, trigger_source, reason)
 VALUES ('tail_risk_cleared', 'manual', 'Manual override by operator');
 ```
 This updates dim_risk_state.tail_risk_state and logs an override event.
@@ -446,7 +446,7 @@ by design -- during down regimes with elevated vol, aggressive deleveraging is c
 - **flatten_trigger.py:** check_flatten_trigger() evaluates all triggers, returns EscalationState
 - **risk_engine.py:** Gate 1.5 in check_order(), evaluate_tail_risk_state() for daily eval
 - **dim_risk_state:** tail_risk_state column (normal/reduce/flatten) with audit columns
-- **cmc_risk_events:** tail_risk_escalated/tail_risk_cleared event logging
+- **risk_events:** tail_risk_escalated/tail_risk_cleared event logging
 
 ### Configuration
 
@@ -461,7 +461,7 @@ Called by run_daily_refresh.py:
 3. Run check_flatten_trigger()
 4. Apply cooldown logic for de-escalation (cooldown days + 3 consecutive days vol below threshold)
 5. Update dim_risk_state if state changed
-6. Log event to cmc_risk_events
+6. Log event to risk_events
 
 ---
 

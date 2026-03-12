@@ -4,9 +4,9 @@ DriftMonitor -- daily drift comparison between paper executor and backtest repla
 Orchestrates the full drift guard pipeline (DRIFT-01/02/03):
   1. Load all active executor configs from dim_executor_config
   2. For each (config, asset): run PIT and current-data backtest replays
-  3. Load paper fills from cmc_fills / cmc_orders
+  3. Load paper fills from fills / orders
   4. Aggregate daily P&L arrays and compute DriftMetrics via drift_metrics.py
-  5. Write metrics to cmc_drift_metrics (upsert)
+  5. Write metrics to drift_metrics (upsert)
   6. Check drift thresholds -- activate drift pause if breached
   7. Refresh v_drift_summary materialized view
   8. Check drift escalation -- escalate to kill switch if expired
@@ -395,8 +395,8 @@ class DriftMonitor:
         sql = text(
             """
             SELECT f.filled_at, f.fill_price, f.fill_qty, f.side, o.asset_id, o.signal_id
-            FROM cmc_fills f
-            JOIN cmc_orders o ON f.order_id = o.order_id
+            FROM fills f
+            JOIN orders o ON f.order_id = o.order_id
             WHERE o.signal_id = :signal_id
               AND o.asset_id  = :asset_id
               AND f.filled_at >= :start_date
@@ -433,7 +433,7 @@ class DriftMonitor:
         For each calendar day in [start_date, end_date], sums the implied P&L
         for fills that occurred on that day (or 0 if no fills).
 
-        NOTE: Paper fills from cmc_fills do not carry explicit P&L. A buy fill
+        NOTE: Paper fills from fills do not carry explicit P&L. A buy fill
         followed by a sell fill implies P&L via (exit_price - entry_price) * qty.
         For the V1 implementation, this uses fill_price * qty * side_multiplier
         as a signed cash flow proxy, so the P&L array represents net cash flows.
@@ -510,14 +510,14 @@ class DriftMonitor:
 
     def _write_metrics(self, metrics: DriftMetrics) -> None:
         """
-        Upsert a DriftMetrics record to cmc_drift_metrics.
+        Upsert a DriftMetrics record to drift_metrics.
 
         Uses ON CONFLICT (metric_date, config_id, asset_id) DO UPDATE SET
         to safely handle reruns on the same date.
         """
         sql = text(
             """
-            INSERT INTO cmc_drift_metrics (
+            INSERT INTO drift_metrics (
                 metric_date, config_id, asset_id, signal_type,
                 pit_replay_run_id, cur_replay_run_id,
                 paper_trade_count, replay_trade_count,

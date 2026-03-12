@@ -1,8 +1,8 @@
 """
-ATR Breakout Signal Generator - Generate ATR breakout signals from cmc_features.
+ATR Breakout Signal Generator - Generate ATR breakout signals from features.
 
 This module generates ATR breakout signals using Donchian channels with ATR confirmation.
-Signals are stored in cmc_signals_atr_breakout with full feature snapshot for reproducibility.
+Signals are stored in signals_atr_breakout with full feature snapshot for reproducibility.
 
 Signal Logic:
 - Entry: Price breaks above/below Donchian channel (rolling high/low)
@@ -52,11 +52,11 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ATRSignalGenerator:
     """
-    Generates ATR breakout signals from cmc_features.
+    Generates ATR breakout signals from features.
 
     Responsibilities:
     - Load breakout parameters from dim_signals
-    - Load features from cmc_features (OHLC, ATR, Bollinger Bands)
+    - Load features from features (OHLC, ATR, Bollinger Bands)
     - Generate signals using existing breakout_atr.py adapter
     - Classify breakout type (channel_break, atr_expansion, both)
     - Compute Donchian channel levels for audit trail
@@ -140,7 +140,7 @@ class ATRSignalGenerator:
             starts = [ts for ts in dirty_windows.values() if ts is not None]
             start_ts = min(starts) if starts else None
 
-        # Load features from cmc_features
+        # Load features from features
         df_features = self._load_features(ids, start_ts)
 
         if df_features.empty:
@@ -221,7 +221,7 @@ class ATRSignalGenerator:
         if not dry_run:
             self._write_signals(records)
             self.state_manager.update_state_after_generation(
-                signal_table="cmc_signals_atr_breakout",
+                signal_table="signals_atr_breakout",
                 signal_id=signal_id,
             )
 
@@ -310,7 +310,7 @@ class ATRSignalGenerator:
         start_ts: Optional[pd.Timestamp],
     ) -> pd.DataFrame:
         """
-        Load features from cmc_features for signal generation.
+        Load features from features for signal generation.
 
         Loads OHLC for Donchian channel computation, ATR for stops,
         and Bollinger Bands for optional confirmation.
@@ -338,7 +338,7 @@ class ATRSignalGenerator:
                 open, high, low, close,
                 atr_14,
                 bb_up_20_2, bb_lo_20_2
-            FROM public.cmc_features
+            FROM public.features
             WHERE {where_sql}
             ORDER BY id, ts
         """
@@ -454,7 +454,7 @@ class ATRSignalGenerator:
                 bar where a position is open and no channel/ATR exit fired.
 
         Returns:
-            DataFrame ready for insertion into cmc_signals_atr_breakout
+            DataFrame ready for insertion into signals_atr_breakout
         """
         records = []
 
@@ -707,7 +707,7 @@ class ATRSignalGenerator:
 
     def _write_signals(self, records: pd.DataFrame) -> None:
         """
-        Write signal records to cmc_signals_atr_breakout table.
+        Write signal records to signals_atr_breakout table.
 
         Uses INSERT ... ON CONFLICT DO NOTHING for idempotency.
 
@@ -726,7 +726,7 @@ class ATRSignalGenerator:
         # Write to database
         with self.engine.begin() as conn:
             records.to_sql(
-                name="cmc_signals_atr_breakout",
+                name="signals_atr_breakout",
                 con=conn,
                 schema="public",
                 if_exists="append",

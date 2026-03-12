@@ -20,7 +20,7 @@ _STATS_TABLES = [
     "ema_multi_tf_cal_stats",
     "ema_multi_tf_cal_anchor_stats",
     "returns_ema_stats",
-    "cmc_features_stats",
+    "features_stats",
 ]
 
 

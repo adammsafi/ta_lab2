@@ -6,7 +6,7 @@ Goal
 Make dim_timeframe capable of supporting:
   - Variable realized tf_days for calendar windows (e.g., 1M_CAL = 28..31)
   - Partial-period behavior for anchored calendars (min can be 1 day at dataset edges)
-  - ISO-week calendar TF labels used by cmc_price_bars_multi_tf_cal_iso
+  - ISO-week calendar TF labels used by price_bars_multi_tf_cal_iso
   - US + ISO anchored calendar TF labels used by *_cal_anchor_* tables
 
 Design Notes
@@ -160,7 +160,7 @@ WHERE tf IN ('12M_CAL', '1Y_CAL');
 
 /*
 We seed:
-  2A) ISO calendar-week TFs used by cmc_price_bars_multi_tf_cal_iso
+  2A) ISO calendar-week TFs used by price_bars_multi_tf_cal_iso
   2B) Calendar-anchored families (partial allowed) for US + ISO
 */
 
@@ -375,38 +375,38 @@ COMMIT;
 /*
 -- A) TFs present in bars tables but missing from dim_timeframe
 SELECT DISTINCT b.tf
-FROM public.cmc_price_bars_multi_tf b
+FROM public.price_bars_multi_tf b
 LEFT JOIN public.dim_timeframe dt ON dt.tf = b.tf
 WHERE dt.tf IS NULL
 ORDER BY b.tf;
 
 SELECT DISTINCT b.tf
-FROM public.cmc_price_bars_multi_tf_cal_us b
+FROM public.price_bars_multi_tf_cal_us b
 LEFT JOIN public.dim_timeframe dt ON dt.tf = b.tf
 WHERE dt.tf IS NULL
 ORDER BY b.tf;
 
 SELECT DISTINCT b.tf
-FROM public.cmc_price_bars_multi_tf_cal_iso b
+FROM public.price_bars_multi_tf_cal_iso b
 LEFT JOIN public.dim_timeframe dt ON dt.tf = b.tf
 WHERE dt.tf IS NULL
 ORDER BY b.tf;
 
 SELECT DISTINCT b.tf
-FROM public.cmc_price_bars_multi_tf_cal_anchor_us b
+FROM public.price_bars_multi_tf_cal_anchor_us b
 LEFT JOIN public.dim_timeframe dt ON dt.tf = b.tf
 WHERE dt.tf IS NULL
 ORDER BY b.tf;
 
 SELECT DISTINCT b.tf
-FROM public.cmc_price_bars_multi_tf_cal_anchor_iso b
+FROM public.price_bars_multi_tf_cal_anchor_iso b
 LEFT JOIN public.dim_timeframe dt ON dt.tf = b.tf
 WHERE dt.tf IS NULL
 ORDER BY b.tf;
 
 -- B) Realized tf_days outside bounds
 SELECT b.tf, b.tf_days, COUNT(*) AS n
-FROM public.cmc_price_bars_multi_tf b
+FROM public.price_bars_multi_tf b
 JOIN public.dim_timeframe dt ON dt.tf = b.tf
 WHERE b.tf_days < dt.tf_days_min
    OR b.tf_days > dt.tf_days_max

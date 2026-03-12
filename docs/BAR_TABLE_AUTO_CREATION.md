@@ -28,12 +28,12 @@ Changes:
 
 | Table Name | Type | Auto-Detected? |
 |------------|------|----------------|
-| `cmc_price_bars_1d` | `1d` | Yes (contains "_1d") |
-| `cmc_price_bars_multi_tf` | `multi_tf` | Yes (default) |
-| `cmc_price_bars_multi_tf_cal_iso` | `cal` | Yes (contains "_cal_") |
-| `cmc_price_bars_multi_tf_cal_us` | `cal` | Yes (contains "_cal_") |
-| `cmc_price_bars_multi_tf_cal_anchor_iso` | `cal_anchor` | Yes (contains "cal_anchor") |
-| `cmc_price_bars_multi_tf_cal_anchor_us` | `cal_anchor` | Yes (contains "cal_anchor") |
+| `price_bars_1d` | `1d` | Yes (contains "_1d") |
+| `price_bars_multi_tf` | `multi_tf` | Yes (default) |
+| `price_bars_multi_tf_cal_iso` | `cal` | Yes (contains "_cal_") |
+| `price_bars_multi_tf_cal_us` | `cal` | Yes (contains "_cal_") |
+| `price_bars_multi_tf_cal_anchor_iso` | `cal_anchor` | Yes (contains "cal_anchor") |
+| `price_bars_multi_tf_cal_anchor_us` | `cal_anchor` | Yes (contains "cal_anchor") |
 
 ## Usage
 
@@ -43,7 +43,7 @@ No changes needed! Just run the scripts as before:
 
 ```bash
 # Individual script
-python src/ta_lab2/scripts/bars/refresh_cmc_price_bars_multi_tf.py --ids all --full-rebuild
+python src/ta_lab2/scripts/bars/refresh_price_bars_multi_tf.py --ids all --full-rebuild
 
 # Or via orchestrator
 python src/ta_lab2/scripts/bars/run_all_bar_builders.py --ids all
@@ -113,9 +113,9 @@ This generates DDL for all 6 table types without connecting to a database.
 Schemas were extracted from production using dbtool:
 
 ```bash
-python -m ta_lab2.tools.dbtool describe public cmc_price_bars_multi_tf
-python -m ta_lab2.tools.dbtool indexes public cmc_price_bars_multi_tf
-python -m ta_lab2.tools.dbtool constraints public cmc_price_bars_multi_tf
+python -m ta_lab2.tools.dbtool describe public price_bars_multi_tf
+python -m ta_lab2.tools.dbtool indexes public price_bars_multi_tf
+python -m ta_lab2.tools.dbtool constraints public price_bars_multi_tf
 ```
 
 ### Type Detection Logic

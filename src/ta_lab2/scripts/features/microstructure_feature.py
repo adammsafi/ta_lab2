@@ -1,7 +1,7 @@
 """
 Microstructure Feature Module - MICRO-01 through MICRO-04.
 
-Computes per-bar microstructural features and writes them to cmc_features
+Computes per-bar microstructural features and writes them to features
 using UPDATE (supplemental columns on existing rows):
 
   MICRO-01: Fractional Differentiation (close_fracdiff, close_fracdiff_d)
@@ -11,7 +11,7 @@ using UPDATE (supplemental columns on existing rows):
 
 Uses pure math from ta_lab2.features.microstructure -- no duplication.
 
-Write strategy: UPDATE existing cmc_features rows (not DELETE+INSERT).
+Write strategy: UPDATE existing features rows (not DELETE+INSERT).
 Microstructure columns are supplemental to the base feature table.
 
 Usage:
@@ -60,7 +60,7 @@ class MicrostructureConfig(FeatureConfig):
 
     Attributes:
         feature_type: 'microstructure'
-        output_table: 'cmc_features' (writes to existing cmc_features rows)
+        output_table: 'features' (writes to existing features rows)
         null_strategy: 'forward_fill' (forward fill price/volume gaps)
         add_zscore: False (no z-score normalization for microstructure)
         ffd_threshold: Weight cutoff for FFD filter (default 1e-2)
@@ -71,7 +71,7 @@ class MicrostructureConfig(FeatureConfig):
     """
 
     feature_type: str = "microstructure"
-    output_table: str = "cmc_features"
+    output_table: str = "features"
     null_strategy: str = "forward_fill"
     add_zscore: bool = False
 
@@ -121,17 +121,17 @@ class MicrostructureFeature(BaseFeature):
     - rolling_adf: Structural breaks / SADF proxy (MICRO-03)
     - rolling_entropy: Shannon + LZ entropy (MICRO-04)
 
-    Write strategy: UPDATE existing cmc_features rows (supplemental columns).
+    Write strategy: UPDATE existing features rows (supplemental columns).
 
     Template method flow:
-    1. Load OHLCV data from cmc_price_bars_multi_tf_u
+    1. Load OHLCV data from price_bars_multi_tf_u
     2. Apply forward_fill null handling
     3. Compute all microstructure features
     4. No normalization / no outlier flags (overridden to no-op)
-    5. UPDATE cmc_features rows with computed values
+    5. UPDATE features rows with computed values
     """
 
-    SOURCE_TABLE = "public.cmc_price_bars_multi_tf_u"
+    SOURCE_TABLE = "public.price_bars_multi_tf_u"
     TS_COLUMN = "time_close"
 
     def __init__(self, engine: Engine, config: Optional[MicrostructureConfig] = None):
@@ -158,7 +158,7 @@ class MicrostructureFeature(BaseFeature):
         end: Optional[str] = None,
     ) -> pd.DataFrame:
         """
-        Load OHLCV data from cmc_price_bars_multi_tf_u.
+        Load OHLCV data from price_bars_multi_tf_u.
 
         Args:
             ids: List of asset IDs
@@ -344,7 +344,7 @@ class MicrostructureFeature(BaseFeature):
         """
         Get output table schema definition.
 
-        Not used for table creation (cmc_features already exists).
+        Not used for table creation (features already exists).
         Provided for BaseFeature contract compliance.
         """
         return {
@@ -391,10 +391,10 @@ class MicrostructureFeature(BaseFeature):
 
     def write_to_db(self, df: pd.DataFrame) -> int:
         """
-        Write microstructure features to cmc_features via UPDATE.
+        Write microstructure features to features via UPDATE.
 
         Uses batch UPDATE to set only microstructure columns on existing rows.
-        Rows that do not exist in cmc_features are skipped (microstructure
+        Rows that do not exist in features are skipped (microstructure
         features are supplemental -- they require a base row from the
         daily_features_view refresh).
 
@@ -411,7 +411,7 @@ class MicrostructureFeature(BaseFeature):
         # Build UPDATE SQL with parameterized placeholders
         set_clauses = ", ".join(f"{col} = :{col}" for col in MICROSTRUCTURE_COLUMNS)
         update_sql = text(f"""
-            UPDATE public.cmc_features
+            UPDATE public.features
             SET {set_clauses},
                 updated_at = now()
             WHERE id = :id
@@ -470,8 +470,7 @@ class MicrostructureFeature(BaseFeature):
 
         elapsed = time.time() - t0
         logger.info(
-            f"Updated {total_updated}/{len(rows)} rows in cmc_features "
-            f"in {elapsed:.1f}s"
+            f"Updated {total_updated}/{len(rows)} rows in features in {elapsed:.1f}s"
         )
 
         return total_updated
@@ -492,10 +491,10 @@ class MicrostructureFeature(BaseFeature):
 
 
 def _get_all_ids(engine: Engine) -> list[int]:
-    """Get all asset IDs that have rows in cmc_features."""
+    """Get all asset IDs that have rows in features."""
     with engine.connect() as conn:
         result = conn.execute(
-            text("SELECT DISTINCT id FROM public.cmc_features ORDER BY id")
+            text("SELECT DISTINCT id FROM public.features ORDER BY id")
         )
         return [row[0] for row in result]
 
@@ -505,7 +504,7 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Compute microstructure features (MICRO-01 through MICRO-04) "
-            "and write to cmc_features via UPDATE. "
+            "and write to features via UPDATE. "
             "Features: FFD, Kyle/Amihud/Hasbrouck lambdas, rolling ADF, "
             "Shannon/LZ entropy."
         ),
@@ -539,7 +538,7 @@ Feature columns written:
         "--all",
         action="store_true",
         dest="all_ids",
-        help="Process all assets in cmc_features",
+        help="Process all assets in features",
     )
 
     # Timeframe
@@ -609,7 +608,7 @@ def main(argv: Optional[list[str]] = None) -> int:
 
         print(
             f"\nMicrostructure feature refresh complete: "
-            f"{rows_updated} rows updated in cmc_features "
+            f"{rows_updated} rows updated in features "
             f"(tf={args.tf}, ids={len(ids)} assets, {elapsed:.1f}s)"
         )
         return 0

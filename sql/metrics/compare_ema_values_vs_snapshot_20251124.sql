@@ -4,8 +4,8 @@ SELECT
     COUNT(*)                                   AS n_rows_compared,
     SUM( (d.ema IS DISTINCT FROM s.ema)::int ) AS n_mismatched,
     AVG(ABS(d.ema - s.ema))                    AS avg_abs_diff
-FROM cmc_ema_multi_tf d
-JOIN cmc_ema_multi_tf_20251124_snapshot s
+FROM ema_multi_tf d
+JOIN ema_multi_tf_20251124_snapshot s
   ON d.id = s.id
  AND d.ts = s.ts
  AND d.tf = s.tf
@@ -18,8 +18,8 @@ SELECT
     MIN(ABS(d.ema - s.ema))      AS min_abs_diff,
     AVG(ABS(d.ema - s.ema))      AS avg_abs_diff,
     COUNT(*)                     AS n_mismatched
-FROM cmc_ema_multi_tf d
-JOIN cmc_ema_multi_tf_20251124_snapshot s
+FROM ema_multi_tf d
+JOIN ema_multi_tf_20251124_snapshot s
   ON d.id = s.id
  AND d.ts = s.ts
  AND d.tf = s.tf
@@ -40,8 +40,8 @@ FROM (
         d.tf,
         d.period,
         d.ts
-    FROM cmc_ema_multi_tf d
-    JOIN cmc_ema_multi_tf_20251124_snapshot s
+    FROM ema_multi_tf d
+    JOIN ema_multi_tf_20251124_snapshot s
       ON d.id = s.id
      AND d.ts = s.ts
      AND d.tf = s.tf

@@ -4,9 +4,9 @@ DB-backed regime flip detection and writing.
 
 Detects regime transitions (flips) per (id, tf) group across the composite
 regime key and individual L0/L1/L2 layer columns. Writes results to the
-``cmc_regime_flips`` table using scoped DELETE + INSERT.
+``regime_flips`` table using scoped DELETE + INSERT.
 
-Table Schema (from sql/regimes/081_cmc_regime_flips.sql):
+Table Schema (from sql/regimes/081_regime_flips.sql):
     PK: (id, ts, tf, layer)
     Columns: old_regime (TEXT NULL), new_regime (TEXT NOT NULL),
              duration_bars (INTEGER NULL), updated_at (TIMESTAMPTZ)
@@ -19,7 +19,7 @@ Layers detected:
 
 Exports:
     detect_regime_flips: Pure function, DataFrame in -> DataFrame out
-    write_flips_to_db: Write flip records to cmc_regime_flips with scoped DELETE + INSERT
+    write_flips_to_db: Write flip records to regime_flips with scoped DELETE + INSERT
 """
 
 from __future__ import annotations
@@ -163,7 +163,7 @@ def write_flips_to_db(
     tf: Optional[str] = None,
 ) -> int:
     """
-    Write flip records to ``cmc_regime_flips`` using scoped DELETE + INSERT.
+    Write flip records to ``regime_flips`` using scoped DELETE + INSERT.
 
     The scope is determined by ``ids`` and ``tf`` parameters. If not provided,
     they are derived from the DataFrame itself. The scoped DELETE ensures
@@ -220,7 +220,7 @@ def write_flips_to_db(
 
     insert_sql = text(
         """
-        INSERT INTO public.cmc_regime_flips
+        INSERT INTO public.regime_flips
             (id, ts, tf, layer, old_regime, new_regime, duration_bars, updated_at)
         VALUES
             (:id, :ts, :tf, :layer, :old_regime, :new_regime, :duration_bars, now())
@@ -234,7 +234,7 @@ def write_flips_to_db(
 
     delete_sql = text(
         """
-        DELETE FROM public.cmc_regime_flips
+        DELETE FROM public.regime_flips
         WHERE id = ANY(:ids) AND tf = :tf
         """
     )

@@ -31,7 +31,7 @@ class CycleStatsConfig(FeatureConfig):
     """Configuration for cycle stats computation."""
 
     feature_type: str = "cycle_stats"
-    output_table: str = "cmc_cycle_stats"
+    output_table: str = "cycle_stats"
     null_strategy: str = "skip"
     add_zscore: bool = False  # No z-scores on cycle metrics
 
@@ -43,10 +43,10 @@ class CycleStatsFeature(BaseFeature):
     Uses add_ath_cycle() from ta_lab2.features.cycle for core computation.
 
     Template method flow:
-    1. Load close + ts from cmc_price_bars_multi_tf_u
+    1. Load close + ts from price_bars_multi_tf_u
     2. Compute ATH, drawdown, cycle low per asset
     3. No z-scores or outlier flags (cumulative state, not windowed)
-    4. Write to cmc_cycle_stats
+    4. Write to cycle_stats
     """
 
     def __init__(self, engine: Engine, config: Optional[CycleStatsConfig] = None):

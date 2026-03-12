@@ -1,8 +1,8 @@
 """
 AMAReturnsFeature - Computes return columns for AMA value tables.
 
-Reads AMA values from a source table (e.g. cmc_ama_multi_tf) and writes
-return columns to a corresponding returns table (e.g. cmc_returns_ama_multi_tf).
+Reads AMA values from a source table (e.g. ama_multi_tf) and writes
+return columns to a corresponding returns table (e.g. returns_ama_multi_tf).
 
 Column pattern mirrors EMA returns tables but WITHOUT the _ema_bar family:
 
@@ -30,9 +30,9 @@ Usage:
     from ta_lab2.features.ama.ama_returns import AMAReturnsFeature
 
     feature = AMAReturnsFeature(
-        source_table="public.cmc_ama_multi_tf",
-        returns_table="public.cmc_returns_ama_multi_tf",
-        state_table="public.cmc_returns_ama_multi_tf_state",
+        source_table="public.ama_multi_tf",
+        returns_table="public.returns_ama_multi_tf",
+        state_table="public.returns_ama_multi_tf_state",
     )
     feature.refresh(engine, asset_ids=[1, 52], tfs=["1D", "7D"])
 """
@@ -82,7 +82,7 @@ class AMAReturnsFeature:
     Computes AMA returns from a source AMA value table.
 
     This class reads AMA values and writes 12 return columns (+2 gap_days columns)
-    to a returns table whose schema matches create_cmc_returns_ama_multi_tf.sql.
+    to a returns table whose schema matches create_returns_ama_multi_tf.sql.
 
     The computation is grouped by (id, tf, indicator, params_hash) so that
     LAG (diff/pct_change) never crosses parameter-set boundaries.
@@ -101,9 +101,9 @@ class AMAReturnsFeature:
         Initialise AMAReturnsFeature.
 
         Args:
-            source_table: Fully-qualified source table, e.g. "public.cmc_ama_multi_tf".
-            returns_table: Fully-qualified returns table, e.g. "public.cmc_returns_ama_multi_tf".
-            state_table: Fully-qualified state table, e.g. "public.cmc_returns_ama_multi_tf_state".
+            source_table: Fully-qualified source table, e.g. "public.ama_multi_tf".
+            returns_table: Fully-qualified returns table, e.g. "public.returns_ama_multi_tf".
+            state_table: Fully-qualified state table, e.g. "public.returns_ama_multi_tf_state".
         """
         self.source_table = source_table
         self.returns_table = returns_table
@@ -366,7 +366,7 @@ class AMAReturnsFeature:
         """
         Upsert state row for one (id, tf, indicator, params_hash).
 
-        State table DDL from create_cmc_returns_ama_multi_tf.sql:
+        State table DDL from create_returns_ama_multi_tf.sql:
             PK (id, tf, indicator, params_hash)
         """
         # Ensure state table exists

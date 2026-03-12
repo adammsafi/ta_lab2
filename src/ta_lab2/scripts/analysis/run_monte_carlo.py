@@ -1,7 +1,7 @@
 """
 Standalone CLI: run Monte Carlo Sharpe ratio analysis for an existing backtest run.
 
-Loads trade records from cmc_backtest_trades, bootstraps the Sharpe ratio
+Loads trade records from backtest_trades, bootstraps the Sharpe ratio
 distribution by resampling trade PnL, and prints the 95% confidence interval
 (2.5th/97.5th percentiles) plus the median.
 
@@ -13,14 +13,14 @@ Usage
 # Custom parameters:
     python -m ta_lab2.scripts.analysis.run_monte_carlo --run-id <uuid> --n-samples 5000 --seed 99
 
-# Run AND write results back to cmc_backtest_metrics:
+# Run AND write results back to backtest_metrics:
     python -m ta_lab2.scripts.analysis.run_monte_carlo --run-id <uuid> --write
 
 Notes
 -----
 - At least 10 trades are required for meaningful Monte Carlo results.
 - Results are printed to stdout even without --write.
-- mc_sharpe_lo/hi/median/n_samples are written to cmc_backtest_metrics with --write.
+- mc_sharpe_lo/hi/median/n_samples are written to backtest_metrics with --write.
 """
 
 from __future__ import annotations
@@ -46,11 +46,11 @@ logger = logging.getLogger(__name__)
 
 
 def _load_trades(engine, run_id: str) -> pd.DataFrame:
-    """Load trade records from cmc_backtest_trades for this run."""
+    """Load trade records from backtest_trades for this run."""
     sql = text(
         """
         SELECT trade_id, entry_ts, exit_ts, pnl_pct, direction, entry_price
-        FROM public.cmc_backtest_trades
+        FROM public.backtest_trades
         WHERE run_id = :run_id
         ORDER BY entry_ts
         """
@@ -62,8 +62,8 @@ def _load_trades(engine, run_id: str) -> pd.DataFrame:
 
 
 def _verify_run_exists(engine, run_id: str) -> bool:
-    """Return True if run_id exists in cmc_backtest_runs."""
-    sql = text("SELECT 1 FROM public.cmc_backtest_runs WHERE run_id = :run_id LIMIT 1")
+    """Return True if run_id exists in backtest_runs."""
+    sql = text("SELECT 1 FROM public.backtest_runs WHERE run_id = :run_id LIMIT 1")
     with engine.connect() as conn:
         row = conn.execute(sql, {"run_id": run_id}).fetchone()
     return row is not None
@@ -81,13 +81,13 @@ def run_monte_carlo_for_run(
     Parameters
     ----------
     run_id : str
-        UUID of the backtest run in cmc_backtest_runs.
+        UUID of the backtest run in backtest_runs.
     n_samples : int
         Number of bootstrap resamples. Default 1000.
     seed : int
         Random seed for reproducibility. Default 42.
     write : bool
-        If True, UPDATE cmc_backtest_metrics with mc_sharpe_lo/hi/median/n_samples.
+        If True, UPDATE backtest_metrics with mc_sharpe_lo/hi/median/n_samples.
 
     Returns
     -------
@@ -99,7 +99,7 @@ def run_monte_carlo_for_run(
 
     # 1. Verify run exists
     if not _verify_run_exists(engine, run_id):
-        raise ValueError(f"run_id '{run_id}' not found in cmc_backtest_runs")
+        raise ValueError(f"run_id '{run_id}' not found in backtest_runs")
 
     # 2. Load trade records
     trades_df = _load_trades(engine, run_id)
@@ -126,13 +126,13 @@ def run_monte_carlo_for_run(
         result.get("mc_n_samples", 0),
     )
 
-    # 4. Optionally write back to cmc_backtest_metrics
+    # 4. Optionally write back to backtest_metrics
     if write:
         with engine.begin() as conn:
             conn.execute(
                 text(
                     """
-                    UPDATE public.cmc_backtest_metrics
+                    UPDATE public.backtest_metrics
                     SET mc_sharpe_lo     = :mc_sharpe_lo,
                         mc_sharpe_hi     = :mc_sharpe_hi,
                         mc_sharpe_median = :mc_sharpe_median,
@@ -149,7 +149,7 @@ def run_monte_carlo_for_run(
                 },
             )
         logger.info(
-            "Wrote Monte Carlo results to cmc_backtest_metrics for run_id=%s", run_id
+            "Wrote Monte Carlo results to backtest_metrics for run_id=%s", run_id
         )
 
     return result
@@ -166,7 +166,7 @@ def main() -> None:
     parser.add_argument(
         "--run-id",
         required=True,
-        help="UUID of the backtest run (cmc_backtest_runs.run_id)",
+        help="UUID of the backtest run (backtest_runs.run_id)",
     )
     parser.add_argument(
         "--n-samples",
@@ -184,7 +184,7 @@ def main() -> None:
         "--write",
         action="store_true",
         default=False,
-        help="UPDATE cmc_backtest_metrics with mc_sharpe_lo/hi/median/n_samples",
+        help="UPDATE backtest_metrics with mc_sharpe_lo/hi/median/n_samples",
     )
     parser.add_argument(
         "--log-level",
@@ -232,7 +232,7 @@ def main() -> None:
         print(f"  CI width    : {(hi - lo):.4f}")
 
     if args.write:
-        print(f"\n  Wrote results to cmc_backtest_metrics for run_id={args.run_id}")
+        print(f"\n  Wrote results to backtest_metrics for run_id={args.run_id}")
 
 
 if __name__ == "__main__":

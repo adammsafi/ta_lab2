@@ -122,7 +122,7 @@ _BAR_ROLL_BASE = [
 
 _BAR_TABLES = [
     TableConfig(
-        table="public.cmc_returns_bars_multi_tf",
+        table="public.returns_bars_multi_tf",
         ts_col='"timestamp"',
         pk_cols=["id", '"timestamp"', "tf"],
         key_cols=["id", "tf"],
@@ -130,7 +130,7 @@ _BAR_TABLES = [
         roll_base_pairs=_BAR_ROLL_BASE,
     ),
     TableConfig(
-        table="public.cmc_returns_bars_multi_tf_cal_us",
+        table="public.returns_bars_multi_tf_cal_us",
         ts_col='"timestamp"',
         pk_cols=["id", '"timestamp"', "tf"],
         key_cols=["id", "tf"],
@@ -138,7 +138,7 @@ _BAR_TABLES = [
         roll_base_pairs=_BAR_ROLL_BASE,
     ),
     TableConfig(
-        table="public.cmc_returns_bars_multi_tf_cal_iso",
+        table="public.returns_bars_multi_tf_cal_iso",
         ts_col='"timestamp"',
         pk_cols=["id", '"timestamp"', "tf"],
         key_cols=["id", "tf"],
@@ -146,7 +146,7 @@ _BAR_TABLES = [
         roll_base_pairs=_BAR_ROLL_BASE,
     ),
     TableConfig(
-        table="public.cmc_returns_bars_multi_tf_cal_anchor_us",
+        table="public.returns_bars_multi_tf_cal_anchor_us",
         ts_col='"timestamp"',
         pk_cols=["id", '"timestamp"', "tf"],
         key_cols=["id", "tf"],
@@ -154,7 +154,7 @@ _BAR_TABLES = [
         roll_base_pairs=_BAR_ROLL_BASE,
     ),
     TableConfig(
-        table="public.cmc_returns_bars_multi_tf_cal_anchor_iso",
+        table="public.returns_bars_multi_tf_cal_anchor_iso",
         ts_col='"timestamp"',
         pk_cols=["id", '"timestamp"', "tf"],
         key_cols=["id", "tf"],
@@ -181,7 +181,7 @@ _EMA_ROLL_BASE = [
 
 _EMA_TABLES = [
     TableConfig(
-        table="public.cmc_returns_ema_multi_tf",
+        table="public.returns_ema_multi_tf",
         ts_col="ts",
         pk_cols=["id", "ts", "tf", "period"],
         key_cols=["id", "tf", "period"],
@@ -189,7 +189,7 @@ _EMA_TABLES = [
         roll_base_pairs=_EMA_ROLL_BASE,
     ),
     TableConfig(
-        table="public.cmc_returns_ema_multi_tf_cal_us",
+        table="public.returns_ema_multi_tf_cal_us",
         ts_col="ts",
         pk_cols=["id", "ts", "tf", "period"],
         key_cols=["id", "tf", "period"],
@@ -197,7 +197,7 @@ _EMA_TABLES = [
         roll_base_pairs=_EMA_ROLL_BASE,
     ),
     TableConfig(
-        table="public.cmc_returns_ema_multi_tf_cal_iso",
+        table="public.returns_ema_multi_tf_cal_iso",
         ts_col="ts",
         pk_cols=["id", "ts", "tf", "period"],
         key_cols=["id", "tf", "period"],
@@ -205,7 +205,7 @@ _EMA_TABLES = [
         roll_base_pairs=_EMA_ROLL_BASE,
     ),
     TableConfig(
-        table="public.cmc_returns_ema_multi_tf_cal_anchor_us",
+        table="public.returns_ema_multi_tf_cal_anchor_us",
         ts_col="ts",
         pk_cols=["id", "ts", "tf", "period"],
         key_cols=["id", "tf", "period"],
@@ -213,7 +213,7 @@ _EMA_TABLES = [
         roll_base_pairs=_EMA_ROLL_BASE,
     ),
     TableConfig(
-        table="public.cmc_returns_ema_multi_tf_cal_anchor_iso",
+        table="public.returns_ema_multi_tf_cal_anchor_iso",
         ts_col="ts",
         pk_cols=["id", "ts", "tf", "period"],
         key_cols=["id", "tf", "period"],
@@ -241,7 +241,7 @@ _AMA_ROLL_BASE = [
 
 _AMA_TABLES = [
     TableConfig(
-        table="public.cmc_returns_ama_multi_tf",
+        table="public.returns_ama_multi_tf",
         ts_col="ts",
         pk_cols=["id", "ts", "tf", "indicator", "params_hash"],
         key_cols=["id", "tf", "indicator", "params_hash"],
@@ -249,7 +249,7 @@ _AMA_TABLES = [
         roll_base_pairs=_AMA_ROLL_BASE,
     ),
     TableConfig(
-        table="public.cmc_returns_ama_multi_tf_cal_us",
+        table="public.returns_ama_multi_tf_cal_us",
         ts_col="ts",
         pk_cols=["id", "ts", "tf", "indicator", "params_hash"],
         key_cols=["id", "tf", "indicator", "params_hash"],
@@ -257,7 +257,7 @@ _AMA_TABLES = [
         roll_base_pairs=_AMA_ROLL_BASE,
     ),
     TableConfig(
-        table="public.cmc_returns_ama_multi_tf_cal_iso",
+        table="public.returns_ama_multi_tf_cal_iso",
         ts_col="ts",
         pk_cols=["id", "ts", "tf", "indicator", "params_hash"],
         key_cols=["id", "tf", "indicator", "params_hash"],
@@ -265,7 +265,7 @@ _AMA_TABLES = [
         roll_base_pairs=_AMA_ROLL_BASE,
     ),
     TableConfig(
-        table="public.cmc_returns_ama_multi_tf_cal_anchor_us",
+        table="public.returns_ama_multi_tf_cal_anchor_us",
         ts_col="ts",
         pk_cols=["id", "ts", "tf", "indicator", "params_hash"],
         key_cols=["id", "tf", "indicator", "params_hash"],
@@ -273,7 +273,7 @@ _AMA_TABLES = [
         roll_base_pairs=_AMA_ROLL_BASE,
     ),
     TableConfig(
-        table="public.cmc_returns_ama_multi_tf_cal_anchor_iso",
+        table="public.returns_ama_multi_tf_cal_anchor_iso",
         ts_col="ts",
         pk_cols=["id", "ts", "tf", "indicator", "params_hash"],
         key_cols=["id", "tf", "indicator", "params_hash"],
@@ -630,15 +630,15 @@ def _process_table(
 
 # Map table family -> sync module path
 _RESYNC_MODULES = {
-    "bars": "ta_lab2.scripts.returns.sync_cmc_returns_bars_multi_tf_u",
-    "emas": "ta_lab2.scripts.returns.sync_cmc_returns_ema_multi_tf_u",
-    "amas": "ta_lab2.scripts.amas.sync_cmc_returns_ama_multi_tf_u",
+    "bars": "ta_lab2.scripts.returns.sync_returns_bars_multi_tf_u",
+    "emas": "ta_lab2.scripts.returns.sync_returns_ema_multi_tf_u",
+    "amas": "ta_lab2.scripts.amas.sync_returns_ama_multi_tf_u",
 }
 
 _RESYNC_U_TABLES = {
-    "bars": "public.cmc_returns_bars_multi_tf_u",
-    "emas": "public.cmc_returns_ema_multi_tf_u",
-    "amas": "public.cmc_returns_ama_multi_tf_u",
+    "bars": "public.returns_bars_multi_tf_u",
+    "emas": "public.returns_ema_multi_tf_u",
+    "amas": "public.returns_ama_multi_tf_u",
 }
 
 

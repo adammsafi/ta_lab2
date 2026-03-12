@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Strategy Bake-Off (Phase 42)**: IC/PSR/CV evaluation of existing signals; 2 strategies selected with walk-forward backtests (Sharpe >= 1.0, Max DD <= 15%)
 - **Exchange Integration (Phase 43)**: Coinbase + Kraken APIs with paper order adapter and price feed comparison
-- **Order & Fill Store (Phase 44)**: `cmc_orders`, `cmc_fills`, `cmc_positions` tables with FIFO matching and full audit trail
+- **Order & Fill Store (Phase 44)**: `orders`, `fills`, `positions` tables with FIFO matching and full audit trail
 - **Paper-Trade Executor (Phase 45)**: Signal -> order -> fill -> position pipeline with backtest parity verification; DB-driven config via `dim_executor_config`
 - **Risk Controls (Phase 46)**: RiskEngine with kill switch (`dim_risk_state`), position caps, daily loss stops, circuit breaker
 - **Drift Guard (Phase 47)**: DriftMonitor with tracking error/slippage metrics, auto-pause on divergence, Telegram escalation
@@ -23,16 +23,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Operational Dashboard (Phase 52)**: Streamlit dashboard with live PnL, exposure, drawdown, drift, risk status views
 - **V1 Validation (Phase 53)**: Success criteria framework for paper trading validation
 - **V1 Results Memo (Phase 54)**: Formal report with methodology, results, failure modes, research answers
-- **Feature Evaluation (Phase 55)**: IC sweep across 109 TFs (82K+ rows in `cmc_ic_results`), BH-corrected promotion gate, 107 features promoted to `dim_feature_registry`, adaptive RSI A/B comparison
+- **Feature Evaluation (Phase 55)**: IC sweep across 109 TFs (82K+ rows in `ic_results`), BH-corrected promotion gate, 107 features promoted to `dim_feature_registry`, adaptive RSI A/B comparison
 - **Factor Analytics (Phase 56)**: QuantStats tear sheets, IC decay/rank IC, quintile returns engine, cross-sectional normalization, MAE/MFE, Monte Carlo CI
 - **Advanced Labeling (Phase 57)**: Triple barrier labeling, meta-labeling (RF + StandardScaler), CUSUM event filter, trend scanning labels
 - **Portfolio Construction (Phase 58)**: PyPortfolioOpt integration, Black-Litterman with market cap prior, TopkDropout selector, BetSizer, StopLadder, TurnoverTracker
 - **Microstructural Features (Phase 59)**: Fractional differentiation (FFD), Kyle/Amihud lambda, SADF bubble detection, Shannon/LZ entropy, pairwise codependence
-- **ML Infrastructure (Phase 60)**: Expression engine for config-driven feature computation, RegimeRouter, DoubleEnsemble concept drift, Optuna TPE sweep, MDA/SFI/clustered feature importance, `cmc_ml_experiments` tracking
+- **ML Infrastructure (Phase 60)**: Expression engine for config-driven feature computation, RegimeRouter, DoubleEnsemble concept drift, Optuna TPE sweep, MDA/SFI/clustered feature importance, `ml_experiments` tracking
 
 ### Changed
 - Daily refresh pipeline: bars -> EMAs -> AMAs -> regimes -> features -> signals -> executor -> drift -> stats
-- Feature lifecycle: IC sweep -> `cmc_ic_results` -> FeaturePromoter (dual-source) -> BH gate -> `dim_feature_registry`
+- Feature lifecycle: IC sweep -> `ic_results` -> FeaturePromoter (dual-source) -> BH gate -> `dim_feature_registry`
 - Telegram notifications wired for kill switch, drift alerts, and daily digest
 - `ExecutorConfig.initial_capital` loaded from DB with NULL fallback
 - Drift monitor skip upgraded to `[WARN]` with actionable `--paper-start` guidance
@@ -41,12 +41,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Adaptive Moving Averages (Phase 35)**: KAMA, DEMA, TEMA, HMA with full multi-TF parity, calendar variants, unified `_u` sync, z-scores, and daily refresh integration (~91M rows)
-- **IC Evaluation Engine (Phase 37)**: Spearman IC, rolling IC, IC-IR, regime breakdown, significance testing; `cmc_ic_results` DB persistence
+- **IC Evaluation Engine (Phase 37)**: Spearman IC, rolling IC, IC-IR, regime breakdown, significance testing; `ic_results` DB persistence
 - **PSR/DSR/MinTRL (Phase 36)**: Full Lopez de Prado probabilistic Sharpe ratio formulas; PurgedKFoldSplitter + CPCVSplitter for leakage-free CV
-- **Feature Experimentation (Phase 38)**: YAML registry, ExperimentRunner, BH-corrected promotion gate, `dim_feature_registry` + `cmc_feature_experiments` tables
+- **Feature Experimentation (Phase 38)**: YAML registry, ExperimentRunner, BH-corrected promotion gate, `dim_feature_registry` + `feature_experiments` tables
 - **Streamlit Dashboard (Phase 39)**: 5 pages (landing, pipeline monitor, research explorer, asset stats, experiments)
 - **Polished Notebooks (Phase 40)**: `helpers.py` + 3 Jupyter notebooks (indicators, features, experiments)
-- **Asset Stats & Correlation (Phase 41)**: Rolling descriptive stats in `cmc_asset_stats`; pairwise correlation in `cmc_cross_asset_corr`
+- **Asset Stats & Correlation (Phase 41)**: Rolling descriptive stats in `asset_stats`; pairwise correlation in `cross_asset_corr`
 
 ### Changed
 - `run_daily_refresh --all` includes AMA refresh and descriptive stats stages
@@ -75,8 +75,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.7.0] - 2026-02-10
 
 ### Added
-- **Regime pipeline (Phase 27)**: `refresh_cmc_regimes.py` reads bars+EMAs, runs L0-L2 labeling, resolves policy, writes to 4 tables (`cmc_regimes`, `cmc_regime_flips`, `cmc_regime_stats`, `cmc_regime_comovement`)
-- **cmc_features redesign**: Comprehensive bar-level feature store, 112 columns; removed EMA columns, added 46 bar returns, 36 vol, 18 TA columns
+- **Regime pipeline (Phase 27)**: `refresh_regimes.py` reads bars+EMAs, runs L0-L2 labeling, resolves policy, writes to 4 tables (`regimes`, `regime_flips`, `regime_stats`, `regime_comovement`)
+- **features redesign**: Comprehensive bar-level feature store, 112 columns; removed EMA columns, added 46 bar returns, 36 vol, 18 TA columns
 - **Dynamic column matching**: DDL is contract, Python auto-discovers source→target via `get_columns()`
 - **HysteresisTracker**: 3-bar hold for loosening, immediate accept for tightening
 - **`--no-regime` flag**: A/B testing for signal generators
@@ -84,11 +84,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - All 3 signal generators accept `regime_enabled` param
-- Signal generators query `cmc_ema_multi_tf_u` directly via LEFT JOINs (not cmc_features)
-- All 109 TFs refreshed (~2.1M rows total in cmc_features)
+- Signal generators query `ema_multi_tf_u` directly via LEFT JOINs (not features)
+- All 109 TFs refreshed (~2.1M rows total in features)
 
 ### Deprecated
-- `cmc_features` EMA columns (`ema_9/10/21/50/200`) — query `cmc_ema_multi_tf_u` directly
+- `features` EMA columns (`ema_9/10/21/50/200`) — query `ema_multi_tf_u` directly
 
 ## [0.6.0] - 2026-02-07
 
@@ -100,7 +100,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Orchestrator: `run_all_feature_refreshes --all --all-tfs`
-- Feature refresh order: vol, ta (parallel) → cmc_features (depends on both)
+- Feature refresh order: vol, ta (parallel) → features (depends on both)
 - `BaseEMARefresher` hierarchy with 3 refresher scripts
 
 ## [0.5.0] - 2026-02-04

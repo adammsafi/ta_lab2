@@ -7,61 +7,61 @@
 --   You have three “naming groups” that require normalization:
 --
 --   G1: No suffix normalization needed
---       - cmc_price_bars_multi_tf
---       - cmc_ema_multi_tf
---       - cmc_ema_multi_tf_v2
+--       - price_bars_multi_tf
+--       - ema_multi_tf
+--       - ema_multi_tf_v2
 --
 --   G2: Strip _CAL / _ISO suffix from bars-cal tables to compare to ema tf labels
---       - cmc_price_bars_multi_tf_cal_us  (tf like 1W_CAL)
---       - cmc_price_bars_multi_tf_cal_iso (tf like 1W_ISO)
---       - cmc_ema_multi_tf_cal            (tf typically like 1W, 1M, etc.)
+--       - price_bars_multi_tf_cal_us  (tf like 1W_CAL)
+--       - price_bars_multi_tf_cal_iso (tf like 1W_ISO)
+--       - ema_multi_tf_cal            (tf typically like 1W, 1M, etc.)
 --
 --   G3: Strip _US_ANCHOR / _ISO_ANCHOR suffix from anchor bars
---       - cmc_price_bars_multi_tf_cal_anchor_us
---       - cmc_price_bars_multi_tf_cal_anchor_iso
---       - cmc_ema_multi_tf_cal_anchor
+--       - price_bars_multi_tf_cal_anchor_us
+--       - price_bars_multi_tf_cal_anchor_iso
+--       - ema_multi_tf_cal_anchor
 -- =============================================================================
 
 WITH src AS (
     -- ================= GROUP 1 (no normalization) =================
     SELECT 'G1' AS grp, 'bars_multi_tf' AS src, tf::text AS tf_raw, tf::text AS tf_norm
-    FROM public.cmc_price_bars_multi_tf
+    FROM public.price_bars_multi_tf
     GROUP BY tf
     UNION ALL
     SELECT 'G1', 'ema_multi_tf', tf::text, tf::text
-    FROM public.cmc_ema_multi_tf
+    FROM public.ema_multi_tf
     GROUP BY tf
     UNION ALL
     SELECT 'G1', 'ema_multi_tf_v2', tf::text, tf::text
-    FROM public.cmc_ema_multi_tf_v2
+    FROM public.ema_multi_tf_v2
     GROUP BY tf
 
     -- ================= GROUP 2 (strip _CAL / _ISO) =================
     UNION ALL
     SELECT 'G2', 'bars_cal_us', tf::text, regexp_replace(tf::text, '(_CAL|_ISO)$', '')
-    FROM public.cmc_price_bars_multi_tf_cal_us
+    FROM public.price_bars_multi_tf_cal_us
     GROUP BY tf
     UNION ALL
     SELECT 'G2', 'bars_cal_iso', tf::text, regexp_replace(tf::text, '(_CAL|_ISO)$', '')
-    FROM public.cmc_price_bars_multi_tf_cal_iso
+    FROM public.price_bars_multi_tf_cal_iso
     GROUP BY tf
     UNION ALL
     SELECT 'G2', 'ema_multi_tf_cal', tf::text, tf::text
-    FROM public.cmc_ema_multi_tf_cal
+    FROM public.ema_multi_tf_cal
     GROUP BY tf
 
     -- ================= GROUP 3 (strip _US_ANCHOR / _ISO_ANCHOR) =================
     UNION ALL
     SELECT 'G3', 'bars_cal_anchor_us', tf::text, regexp_replace(tf::text, '(_US_ANCHOR|_ISO_ANCHOR)$', '')
-    FROM public.cmc_price_bars_multi_tf_cal_anchor_us
+    FROM public.price_bars_multi_tf_cal_anchor_us
     GROUP BY tf
     UNION ALL
     SELECT 'G3', 'bars_cal_anchor_iso', tf::text, regexp_replace(tf::text, '(_US_ANCHOR|_ISO_ANCHOR)$', '')
-    FROM public.cmc_price_bars_multi_tf_cal_anchor_iso
+    FROM public.price_bars_multi_tf_cal_anchor_iso
     GROUP BY tf
     UNION ALL
     SELECT 'G3', 'ema_multi_tf_cal_anchor', tf::text, tf::text
-    FROM public.cmc_ema_multi_tf_cal_anchor
+    FROM public.ema_multi_tf_cal_anchor
     GROUP BY tf
 ),
 all_tfs AS (
@@ -121,15 +121,15 @@ ORDER BY grp, tf;
 -- -----------------------------------------------------------------------------
 WITH g1_tfs AS (
   SELECT 'bars' AS src, tf::text AS tf
-  FROM public.cmc_price_bars_multi_tf
+  FROM public.price_bars_multi_tf
   GROUP BY tf
   UNION ALL
   SELECT 'ema1' AS src, tf::text AS tf
-  FROM public.cmc_ema_multi_tf
+  FROM public.ema_multi_tf
   GROUP BY tf
   UNION ALL
   SELECT 'ema2' AS src, tf::text AS tf
-  FROM public.cmc_ema_multi_tf_v2
+  FROM public.ema_multi_tf_v2
   GROUP BY tf
 ),
 g1_with_days AS (
@@ -172,15 +172,15 @@ ORDER BY tf_days_fixed NULLS LAST;
 -- -----------------------------------------------------------------------------
 WITH tfs AS (
   SELECT 'bars' AS src, tf::text AS tf
-  FROM public.cmc_price_bars_multi_tf
+  FROM public.price_bars_multi_tf
   GROUP BY tf
   UNION ALL
   SELECT 'ema1' AS src, tf::text AS tf
-  FROM public.cmc_ema_multi_tf
+  FROM public.ema_multi_tf
   GROUP BY tf
   UNION ALL
   SELECT 'ema2' AS src, tf::text AS tf
-  FROM public.cmc_ema_multi_tf_v2
+  FROM public.ema_multi_tf_v2
   GROUP BY tf
 ),
 days AS (
@@ -217,11 +217,11 @@ ORDER BY e.tf_days;
 -- -----------------------------------------------------------------------------
 WITH tfs AS (
   SELECT 'ema1' AS src, tf::text AS tf
-  FROM public.cmc_ema_multi_tf
+  FROM public.ema_multi_tf
   GROUP BY tf
   UNION ALL
   SELECT 'ema2' AS src, tf::text AS tf
-  FROM public.cmc_ema_multi_tf_v2
+  FROM public.ema_multi_tf_v2
   GROUP BY tf
 ),
 days AS (
@@ -258,9 +258,9 @@ FROM tf_list
 ORDER BY tf_days;
 
 WITH used_tfs AS (
-  SELECT DISTINCT tf FROM public.cmc_ema_multi_tf
+  SELECT DISTINCT tf FROM public.ema_multi_tf
   UNION
-  SELECT DISTINCT tf FROM public.cmc_ema_multi_tf_v2
+  SELECT DISTINCT tf FROM public.ema_multi_tf_v2
 ),
 tf_list AS (
   SELECT

@@ -3,9 +3,9 @@
 DB-backed regime statistics computation and writing.
 
 Computes per-asset, per-regime summary statistics (n_bars, pct_of_history,
-avg_ret_1d, std_ret_1d) and writes them to ``cmc_regime_stats``.
+avg_ret_1d, std_ret_1d) and writes them to ``regime_stats``.
 
-Table Schema (from sql/regimes/082_cmc_regime_stats.sql):
+Table Schema (from sql/regimes/082_regime_stats.sql):
     PK: (id, tf, regime_key)
     Columns: n_bars, pct_of_history, avg_ret_1d, std_ret_1d, computed_at
 
@@ -15,7 +15,7 @@ If returns_df is None or missing the required columns, return stats are NaN.
 
 Exports:
     compute_regime_stats: Pure function, DataFrame in -> DataFrame out
-    write_stats_to_db: Write stats to cmc_regime_stats with scoped DELETE + INSERT
+    write_stats_to_db: Write stats to regime_stats with scoped DELETE + INSERT
 """
 
 from __future__ import annotations
@@ -194,7 +194,7 @@ def write_stats_to_db(
     tf: Optional[str] = None,
 ) -> int:
     """
-    Write regime stats to ``cmc_regime_stats`` using scoped DELETE + INSERT.
+    Write regime stats to ``regime_stats`` using scoped DELETE + INSERT.
 
     Args:
         engine: SQLAlchemy engine connected to the PostgreSQL DB.
@@ -252,14 +252,14 @@ def write_stats_to_db(
 
     delete_sql = text(
         """
-        DELETE FROM public.cmc_regime_stats
+        DELETE FROM public.regime_stats
         WHERE id = ANY(:ids) AND tf = :tf
         """
     )
 
     insert_sql = text(
         """
-        INSERT INTO public.cmc_regime_stats
+        INSERT INTO public.regime_stats
             (id, tf, regime_key, n_bars, pct_of_history, avg_ret_1d, std_ret_1d, computed_at)
         VALUES
             (:id, :tf, :regime_key, :n_bars, :pct_of_history, :avg_ret_1d, :std_ret_1d, now())

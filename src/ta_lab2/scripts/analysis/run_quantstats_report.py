@@ -1,7 +1,7 @@
 """
 Standalone CLI: generate a QuantStats HTML tear sheet for an existing backtest run.
 
-Reconstructs the equity curve from trade records stored in cmc_backtest_trades
+Reconstructs the equity curve from trade records stored in backtest_trades
 WITHOUT re-running the backtest. This makes it safe to regenerate tear sheets
 retroactively for any completed run.
 
@@ -13,13 +13,13 @@ Usage
 # Specify custom output path:
     python -m ta_lab2.scripts.analysis.run_quantstats_report --run-id <uuid> --output /tmp/report.html
 
-# Generate AND write tearsheet_path back to cmc_backtest_runs:
+# Generate AND write tearsheet_path back to backtest_runs:
     python -m ta_lab2.scripts.analysis.run_quantstats_report --run-id <uuid> --write
 
 Notes
 -----
-- Equity curve is reconstructed from cmc_backtest_trades (pnl_pct column).
-- BTC benchmark is loaded from cmc_features (id=1, tf=1D). If unavailable, benchmark
+- Equity curve is reconstructed from backtest_trades (pnl_pct column).
+- BTC benchmark is loaded from features (id=1, tf=1D). If unavailable, benchmark
   is omitted and a benchmark-free tear sheet is generated instead.
 - Requires quantstats to be installed: pip install 'ta_lab2[analytics]'
 """
@@ -51,11 +51,11 @@ logger = logging.getLogger(__name__)
 
 
 def _load_run_metadata(engine, run_id: str) -> dict:
-    """Load run metadata from cmc_backtest_runs."""
+    """Load run metadata from backtest_runs."""
     sql = text(
         """
         SELECT run_id, signal_type, asset_id, start_ts, end_ts, trade_count
-        FROM public.cmc_backtest_runs
+        FROM public.backtest_runs
         WHERE run_id = :run_id
         """
     )
@@ -63,7 +63,7 @@ def _load_run_metadata(engine, run_id: str) -> dict:
         row = conn.execute(sql, {"run_id": run_id}).fetchone()
 
     if row is None:
-        raise ValueError(f"run_id '{run_id}' not found in cmc_backtest_runs")
+        raise ValueError(f"run_id '{run_id}' not found in backtest_runs")
 
     return {
         "run_id": str(row[0]),
@@ -76,11 +76,11 @@ def _load_run_metadata(engine, run_id: str) -> dict:
 
 
 def _load_trades(engine, run_id: str) -> pd.DataFrame:
-    """Load trade records from cmc_backtest_trades for this run."""
+    """Load trade records from backtest_trades for this run."""
     sql = text(
         """
         SELECT entry_ts, exit_ts, pnl_pct, direction, entry_price, exit_price
-        FROM public.cmc_backtest_trades
+        FROM public.backtest_trades
         WHERE run_id = :run_id
         ORDER BY entry_ts
         """
@@ -165,11 +165,11 @@ def run_quantstats_report(
     Parameters
     ----------
     run_id : str
-        UUID of the backtest run in cmc_backtest_runs.
+        UUID of the backtest run in backtest_runs.
     output : str or None
         Output path for the HTML file. Defaults to reports/tearsheets/<run_id>.html.
     write : bool
-        If True, UPDATE cmc_backtest_runs.tearsheet_path after generation.
+        If True, UPDATE backtest_runs.tearsheet_path after generation.
 
     Returns
     -------
@@ -238,13 +238,13 @@ def run_quantstats_report(
         with engine.begin() as conn:
             conn.execute(
                 text(
-                    "UPDATE public.cmc_backtest_runs "
+                    "UPDATE public.backtest_runs "
                     "SET tearsheet_path = :path "
                     "WHERE run_id = :run_id"
                 ),
                 {"path": abs_path, "run_id": run_id},
             )
-        print(f"Updated cmc_backtest_runs.tearsheet_path for run_id={run_id}")
+        print(f"Updated backtest_runs.tearsheet_path for run_id={run_id}")
 
     return abs_path
 
@@ -260,7 +260,7 @@ def main() -> None:
     parser.add_argument(
         "--run-id",
         required=True,
-        help="UUID of the backtest run (cmc_backtest_runs.run_id)",
+        help="UUID of the backtest run (backtest_runs.run_id)",
     )
     parser.add_argument(
         "--output",
@@ -271,7 +271,7 @@ def main() -> None:
         "--write",
         action="store_true",
         default=False,
-        help="UPDATE cmc_backtest_runs.tearsheet_path after generation",
+        help="UPDATE backtest_runs.tearsheet_path after generation",
     )
     parser.add_argument(
         "--log-level",

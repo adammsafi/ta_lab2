@@ -101,14 +101,14 @@ Multi-stage feature calculation pipeline for technical analysis across multiple 
 
 **Feature Types:**
 - **EMAs**: Multi-timeframe exponential moving averages (daily, calendar, trading-day aligned)
-  - Tables: `cmc_ema_daily`, `cmc_ema_multi_tf`, `cmc_ema_multi_tf_cal`, `cmc_ema_multi_tf_v2`, `cmc_ema_multi_tf_cal_anchor`
+  - Tables: `cmc_ema_daily`, `ema_multi_tf`, `ema_multi_tf_cal`, `ema_multi_tf_v2`, `ema_multi_tf_cal_anchor`
   - Unified view: `all_emas` (logical union of all EMA tables)
   - Periods: 5, 9, 10, 21, 50, 100, 200
 - **Returns**: Bar-to-bar and multi-day percentage/log returns
-  - Table: `cmc_returns_daily`
+  - Table: `returns_daily`
   - Lookbacks: 1D, 2D, 3D, 5D, 7D, 14D, 21D, 30D, 60D, 90D, 180D, 365D
 - **Volatility**: Parkinson, Garman-Klass, Rogers-Satchell estimators
-  - Table: `cmc_vol_daily`
+  - Table: `vol_daily`
 - **Technical Indicators**: RSI (7, 14, 21), MACD (12/26/9, 8/17/9), Stochastic (14/3), Bollinger Bands (20/2), ATR (14), ADX (14)
   - Table: `cmc_daily_features` (materialized feature store with all indicators)
 
@@ -143,13 +143,13 @@ Database-driven trading signal generation with position lifecycle tracking and f
 
 **Signal Types:**
 - **EMA Crossover**: Fast/slow EMA crossover signals (9/21, 21/50, 50/200)
-  - Table: `cmc_signals_ema_crossover`
+  - Table: `signals_ema_crossover`
   - Direction: LONG (fast > slow), SHORT (fast < slow)
 - **RSI Mean Reversion**: Oversold/overbought RSI signals
-  - Table: `cmc_signals_rsi_mean_revert`
+  - Table: `signals_rsi_mean_revert`
   - Thresholds: Oversold (<30), Overbought (>70)
 - **ATR Breakout**: Donchian channel + ATR expansion breakouts
-  - Table: `cmc_signals_atr_breakout`
+  - Table: `signals_atr_breakout`
   - Types: channel_break, atr_expansion, or both
 
 **Configuration:**

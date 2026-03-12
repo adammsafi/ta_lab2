@@ -259,7 +259,7 @@ class AuditChecker:
         """Check 1: Days in the period with no successful executor run.
 
         Uses generate_series to enumerate every calendar day then LEFT JOINs
-        against cmc_executor_run_log (status IN ('success', 'no_signals')).
+        against executor_run_log (status IN ('success', 'no_signals')).
         """
         sql = text(
             """
@@ -271,7 +271,7 @@ class AuditChecker:
             ) AS g(day)
             LEFT JOIN (
                 SELECT DISTINCT started_at::date AS run_date
-                FROM cmc_executor_run_log
+                FROM executor_run_log
                 WHERE status IN ('success', 'no_signals')
                   AND started_at::date BETWEEN :start_date AND :end_date
             ) r ON g.day::date = r.run_date
@@ -311,7 +311,7 @@ class AuditChecker:
         sql = text(
             """
             SELECT run_id, started_at, status, error_message
-            FROM cmc_executor_run_log
+            FROM executor_run_log
             WHERE status IN ('failed', 'stale_signal')
               AND started_at::date BETWEEN :start_date AND :end_date
             ORDER BY started_at DESC
@@ -349,11 +349,11 @@ class AuditChecker:
         sql = text(
             """
             SELECT order_id, asset_id, status, created_at
-            FROM cmc_orders
+            FROM orders
             WHERE status IN ('created', 'submitted')
               AND created_at < now() - interval '2 days'
               AND NOT EXISTS (
-                SELECT 1 FROM cmc_fills f WHERE f.order_id = cmc_orders.order_id
+                SELECT 1 FROM fills f WHERE f.order_id = orders.order_id
               )
             ORDER BY created_at ASC
             """
@@ -390,12 +390,12 @@ class AuditChecker:
         sql = text(
             """
             SELECT p.asset_id, p.strategy_id, p.quantity, p.avg_cost_basis
-            FROM cmc_positions p
+            FROM positions p
             WHERE p.quantity != 0
               AND NOT EXISTS (
                 SELECT 1
-                FROM cmc_fills f
-                JOIN cmc_orders o ON f.order_id = o.order_id
+                FROM fills f
+                JOIN orders o ON f.order_id = o.order_id
                 WHERE o.asset_id = p.asset_id
               )
             ORDER BY p.asset_id, p.strategy_id
@@ -429,7 +429,7 @@ class AuditChecker:
         sql = text(
             """
             SELECT id, MAX(ts) AS latest_ts
-            FROM cmc_price_bars_multi_tf
+            FROM price_bars_multi_tf
             WHERE tf = '1D'
             GROUP BY id
             HAVING MAX(ts) < now() - interval '28 hours'
@@ -465,14 +465,14 @@ class AuditChecker:
         """Check 6: Executor ran successfully but no drift metrics for that day.
 
         Uses a CTE to find successful executor run days then LEFT JOINs
-        against cmc_drift_metrics.  A missing drift metric on a run day
+        against drift_metrics.  A missing drift metric on a run day
         indicates the drift monitor did not run or failed silently.
         """
         sql = text(
             """
             WITH exec_days AS (
                 SELECT DISTINCT started_at::date AS run_date
-                FROM cmc_executor_run_log
+                FROM executor_run_log
                 WHERE status IN ('success', 'no_signals')
                   AND started_at::date BETWEEN :start_date AND :end_date
             )
@@ -480,7 +480,7 @@ class AuditChecker:
             FROM exec_days e
             LEFT JOIN (
                 SELECT DISTINCT metric_date
-                FROM cmc_drift_metrics
+                FROM drift_metrics
                 WHERE metric_date BETWEEN :start_date AND :end_date
             ) dm ON e.run_date = dm.metric_date
             WHERE dm.metric_date IS NULL

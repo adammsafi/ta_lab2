@@ -82,7 +82,7 @@ def load_1d_bars_for_id(
             is_missing_days,
             count_days,
             count_missing_days
-        FROM public.cmc_price_bars_1d
+        FROM public.price_bars_1d
         WHERE {where_sql}
         ORDER BY "timestamp"
     """

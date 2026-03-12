@@ -84,9 +84,7 @@ class TestE2EWorkflowMocked:
                         0.95,
                         0.05,
                     ),
-                    SearchResult(
-                        "mem-2", "BTC id=1 in cmc_price_bars_1d", {}, 0.90, 0.10
-                    ),
+                    SearchResult("mem-2", "BTC id=1 in price_bars_1d", {}, 0.90, 0.10),
                 ],
                 total_found=2,
                 filtered_count=2,
@@ -104,14 +102,14 @@ class TestE2EWorkflowMocked:
             "ta_lab2.scripts.features.run_all_feature_refreshes.run_all_refreshes"
         ) as mock_refresh:
             mock_refresh.return_value = {
-                "cmc_returns_daily": MagicMock(success=True, rows_inserted=100),
-                "cmc_vol_daily": MagicMock(success=True, rows_inserted=100),
-                "cmc_ta_daily": MagicMock(success=True, rows_inserted=100),
+                "returns_daily": MagicMock(success=True, rows_inserted=100),
+                "vol_daily": MagicMock(success=True, rows_inserted=100),
+                "ta_daily": MagicMock(success=True, rows_inserted=100),
                 "cmc_daily_features": MagicMock(success=True, rows_inserted=100),
             }
 
             refresh_result = mock_refresh(mock_engine, ids=[1], validate=True)
-            assert refresh_result["cmc_returns_daily"].success
+            assert refresh_result["returns_daily"].success
 
         # === STEP 5: Results stored ===
         tracker.transition(
@@ -213,7 +211,7 @@ class TestE2EWorkflowVariants:
             "ta_lab2.scripts.features.validate_features.validate_features"
         ) as mock_validate:
             issues = [
-                GapIssue("cmc_returns_daily", 1, ["2024-01-02"], 10, 9),
+                GapIssue("returns_daily", 1, ["2024-01-02"], 10, 9),
             ]
             mock_validate.return_value = ValidationReport(
                 passed=False,

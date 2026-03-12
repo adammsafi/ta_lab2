@@ -1,6 +1,6 @@
 """CLI: purge experiment results for a feature from the database.
 
-Removes experiment result rows from cmc_feature_experiments and optionally
+Removes experiment result rows from feature_experiments and optionally
 updates or deletes the dim_feature_registry entry. By default (without
 --force), the registry entry is deprecated rather than deleted, preserving
 the audit trail.
@@ -32,7 +32,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="purge_experiment",
         description=(
-            "Purge experiment results for a feature from cmc_feature_experiments. "
+            "Purge experiment results for a feature from feature_experiments. "
             "By default, preserves the dim_feature_registry entry by deprecating it."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -42,7 +42,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--feature",
         required=True,
         metavar="NAME",
-        help="Feature name to purge from cmc_feature_experiments.",
+        help="Feature name to purge from feature_experiments.",
     )
     parser.add_argument(
         "--force",
@@ -91,10 +91,10 @@ def _run(engine, args: argparse.Namespace) -> int:
     feature_name = args.feature
 
     with engine.connect() as conn:
-        # Count rows in cmc_feature_experiments
+        # Count rows in feature_experiments
         row_count_result = conn.execute(
             text(
-                "SELECT COUNT(*) FROM public.cmc_feature_experiments "
+                "SELECT COUNT(*) FROM public.feature_experiments "
                 "WHERE feature_name = :name"
             ),
             {"name": feature_name},
@@ -114,7 +114,7 @@ def _run(engine, args: argparse.Namespace) -> int:
 
     # Print plan
     print(f"Feature: '{feature_name}'")
-    print(f"  cmc_feature_experiments rows to delete: {n_rows}")
+    print(f"  feature_experiments rows to delete: {n_rows}")
 
     if registry_lifecycle is not None:
         if args.force:
@@ -152,9 +152,7 @@ def _run(engine, args: argparse.Namespace) -> int:
     with engine.begin() as conn:
         # Delete experiment rows
         del_result = conn.execute(
-            text(
-                "DELETE FROM public.cmc_feature_experiments WHERE feature_name = :name"
-            ),
+            text("DELETE FROM public.feature_experiments WHERE feature_name = :name"),
             {"name": feature_name},
         )
         deleted_rows = del_result.rowcount
@@ -187,7 +185,7 @@ def _run(engine, args: argparse.Namespace) -> int:
 
     # Summary
     print(
-        f"\nPurge complete: {deleted_rows} row(s) deleted from cmc_feature_experiments. "
+        f"\nPurge complete: {deleted_rows} row(s) deleted from feature_experiments. "
         f"Registry entry {registry_action}."
     )
     return 0

@@ -5,7 +5,7 @@ Override governance validation and OVERRIDE_POLICY.md generator.
 
 Dual purpose:
   1. Validates that override governance rules (expiry, reason categories) are
-     enforceable at the DB level by running live tests against cmc_risk_overrides.
+     enforceable at the DB level by running live tests against risk_overrides.
   2. Generates OVERRIDE_POLICY.md documenting override rules, expiry mechanics,
      reason categories, CLI examples, and DB schema.
 
@@ -102,7 +102,7 @@ def _table_exists(conn, table_name: str) -> bool:
 
 def _test_schema_columns(conn) -> Tuple[bool, str]:
     """
-    Test 1: Verify reason_category, expires_at, extended_at columns exist on cmc_risk_overrides.
+    Test 1: Verify reason_category, expires_at, extended_at columns exist on risk_overrides.
 
     Returns (passed, message).
     """
@@ -113,7 +113,7 @@ def _test_schema_columns(conn) -> Tuple[bool, str]:
             """
             SELECT column_name
             FROM information_schema.columns
-            WHERE table_name = 'cmc_risk_overrides'
+            WHERE table_name = 'risk_overrides'
               AND column_name IN ('reason_category', 'expires_at', 'extended_at')
             ORDER BY column_name
             """
@@ -145,7 +145,7 @@ def _test_check_constraint(conn) -> Tuple[bool, str]:
         conn.execute(
             text(
                 """
-                INSERT INTO public.cmc_risk_overrides
+                INSERT INTO public.risk_overrides
                     (asset_id, strategy_id, operator, reason, system_signal,
                      override_action, reason_category)
                 VALUES (1, 1, 'governance_test', 'Phase 48 validation', 'test',
@@ -191,7 +191,7 @@ def _test_valid_insertion(conn) -> Tuple[bool, str]:
         result = conn.execute(
             text(
                 """
-                INSERT INTO public.cmc_risk_overrides
+                INSERT INTO public.risk_overrides
                     (asset_id, strategy_id, operator, reason, system_signal,
                      override_action, reason_category, expires_at)
                 VALUES (1, 1, 'governance_test', 'Phase 48 validation', 'test',
@@ -210,7 +210,7 @@ def _test_valid_insertion(conn) -> Tuple[bool, str]:
     # Delete the test row immediately
     try:
         conn.execute(
-            text("DELETE FROM public.cmc_risk_overrides WHERE override_id = :oid"),
+            text("DELETE FROM public.risk_overrides WHERE override_id = :oid"),
             {"oid": override_id},
         )
         return (
@@ -239,7 +239,7 @@ def _test_expiry_query(conn) -> Tuple[bool, str]:
             text(
                 """
                 SELECT override_id, expires_at
-                FROM public.cmc_risk_overrides
+                FROM public.risk_overrides
                 WHERE reverted_at IS NULL
                   AND expires_at IS NOT NULL
                   AND expires_at < now()
@@ -267,7 +267,7 @@ def run_validation_tests(
 
     with engine.begin() as conn:
         # Prerequisite: verify required tables exist
-        for table_name in ("dim_risk_limits", "cmc_risk_overrides"):
+        for table_name in ("dim_risk_limits", "risk_overrides"):
             if not _table_exists(conn, table_name):
                 logger.error(
                     "Prerequisite table %s not found. Phase 46 migration must be run first.",
@@ -279,7 +279,7 @@ def run_validation_tests(
                         "passed": False,
                         "message": (
                             f"Table {table_name} missing — Phase 46 migration (dim_risk_limits, "
-                            "cmc_risk_overrides) must be executed before governance validation."
+                            "risk_overrides) must be executed before governance validation."
                         ),
                     }
                 ]
@@ -412,8 +412,8 @@ A `reason` free-text field provides additional context beyond the category.
 
 ### Approval
 - Solo operator: no approval chain required
-- All overrides logged to `cmc_risk_overrides` with full audit trail
-- `cmc_risk_events` records override_created/override_applied/override_reverted events
+- All overrides logged to `risk_overrides` with full audit trail
+- `risk_events` records override_created/override_applied/override_reverted events
 
 ### Creating an Override (CLI)
 
@@ -449,7 +449,7 @@ python -m ta_lab2.scripts.risk.override --action extend \\
 
 ## DB Schema
 
-### cmc_risk_overrides columns (Phase 48 additions)
+### risk_overrides columns (Phase 48 additions)
 
 - `reason_category TEXT` -- CHECK constraint enforces valid categories:
   `('market_condition', 'strategy_review', 'technical_issue', 'manual_risk_reduction', 'testing')`
@@ -460,7 +460,7 @@ python -m ta_lab2.scripts.risk.override --action extend \\
 
 ```sql
 SELECT override_id, asset_id, strategy_id, expires_at
-FROM public.cmc_risk_overrides
+FROM public.risk_overrides
 WHERE reverted_at IS NULL
   AND expires_at IS NOT NULL
   AND expires_at < now()
@@ -469,7 +469,7 @@ WHERE reverted_at IS NULL
 ### CHECK constraint (chk_overrides_reason_cat)
 
 ```sql
-ALTER TABLE public.cmc_risk_overrides
+ALTER TABLE public.risk_overrides
 ADD CONSTRAINT chk_overrides_reason_cat
 CHECK (reason_category IS NULL OR reason_category IN (
     'market_condition', 'strategy_review', 'technical_issue',
@@ -489,7 +489,7 @@ During V1 paper trading:
 - Overrides are applied by PaperExecutor at signal processing time
 - `get_pending_non_sticky_overrides()` in OverrideManager identifies overrides for auto-revert
 - sticky=FALSE overrides are automatically reverted after each signal cycle
-- All override events logged to `cmc_risk_events` for audit
+- All override events logged to `risk_events` for audit
 
 ## Allowed Categories Reference
 

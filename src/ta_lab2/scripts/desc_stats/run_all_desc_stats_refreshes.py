@@ -5,8 +5,8 @@ Orchestrator for all descriptive stats refresh scripts.
 Runs the complete descriptive stats pipeline in logical order with unified CLI
 and error reporting:
 
-  1. Asset stats    -- per-asset descriptive statistics (cmc_asset_stats)
-  2. Correlation    -- pairwise rolling correlations (cmc_cross_asset_corr)
+  1. Asset stats    -- per-asset descriptive statistics (asset_stats)
+  2. Correlation    -- pairwise rolling correlations (cross_asset_corr)
 
 Usage:
     # Run all stages for all assets, all TFs
@@ -75,7 +75,7 @@ def build_asset_stats_command(
     verbose: bool,
 ) -> list[str]:
     """Build subprocess command for asset stats refresher."""
-    cmd = [sys.executable, "-m", "ta_lab2.scripts.desc_stats.refresh_cmc_asset_stats"]
+    cmd = [sys.executable, "-m", "ta_lab2.scripts.desc_stats.refresh_asset_stats"]
 
     cmd.extend(["--ids", ids])
 
@@ -115,7 +115,7 @@ def build_correlation_command(
     cmd = [
         sys.executable,
         "-m",
-        "ta_lab2.scripts.desc_stats.refresh_cmc_cross_asset_corr",
+        "ta_lab2.scripts.desc_stats.refresh_cross_asset_corr",
     ]
 
     cmd.extend(["--ids", ids])

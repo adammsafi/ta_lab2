@@ -54,7 +54,7 @@ STATS_TABLES = [
     "ema_multi_tf_cal_stats",
     "ema_multi_tf_cal_anchor_stats",
     "returns_ema_stats",
-    "cmc_features_stats",
+    "features_stats",
 ]
 
 
@@ -113,7 +113,7 @@ ALL_STATS_SCRIPTS = [
     ),
     StatsScript(
         name="features",
-        module="ta_lab2.scripts.features.stats.refresh_cmc_features_stats",
+        module="ta_lab2.scripts.features.stats.refresh_features_stats",
         description="CMC features stats",
         extra_args=[],
     ),
@@ -341,7 +341,7 @@ def check_desc_stats_quality(engine) -> list[dict]:
     """
     Run inline quality checks on the descriptive stats tables.
 
-    Checks cmc_asset_stats and cmc_cross_asset_corr for basic data integrity:
+    Checks asset_stats and cross_asset_corr for basic data integrity:
     row count, NULL fractions on key columns, implausible values, and
     constraint violations. Returns a list of check result dicts with keys:
     table, check, status (PASS/WARN/FAIL), detail.
@@ -362,18 +362,18 @@ def check_desc_stats_quality(engine) -> list[dict]:
 
     with engine.connect() as conn:
         # ------------------------------------------------------------------
-        # cmc_asset_stats checks
+        # asset_stats checks
         # ------------------------------------------------------------------
         try:
             # Check 1: row count > 0
             row = conn.execute(
-                text("SELECT COUNT(*) FROM public.cmc_asset_stats")
+                text("SELECT COUNT(*) FROM public.asset_stats")
             ).fetchone()
             total_rows = int(row[0]) if row else 0
             if total_rows == 0:
                 results.append(
                     {
-                        "table": "cmc_asset_stats",
+                        "table": "asset_stats",
                         "check": "row_count",
                         "status": "WARN",
                         "detail": "Table is empty (0 rows)",
@@ -382,7 +382,7 @@ def check_desc_stats_quality(engine) -> list[dict]:
             else:
                 results.append(
                     {
-                        "table": "cmc_asset_stats",
+                        "table": "asset_stats",
                         "check": "row_count",
                         "status": "PASS",
                         "detail": f"{total_rows} rows",
@@ -393,14 +393,14 @@ def check_desc_stats_quality(engine) -> list[dict]:
                 row = conn.execute(
                     text(
                         "SELECT COUNT(*) FILTER (WHERE std_ret_90 IS NULL) * 100.0 / COUNT(*) "
-                        "FROM public.cmc_asset_stats"
+                        "FROM public.asset_stats"
                     )
                 ).fetchone()
                 null_pct = float(row[0]) if row and row[0] is not None else 0.0
                 if null_pct >= 50.0:
                     results.append(
                         {
-                            "table": "cmc_asset_stats",
+                            "table": "asset_stats",
                             "check": "std_ret_90_null_fraction",
                             "status": "WARN",
                             "detail": f"std_ret_90 is NULL in {null_pct:.1f}% of rows (threshold: <50%)",
@@ -409,7 +409,7 @@ def check_desc_stats_quality(engine) -> list[dict]:
                 else:
                     results.append(
                         {
-                            "table": "cmc_asset_stats",
+                            "table": "asset_stats",
                             "check": "std_ret_90_null_fraction",
                             "status": "PASS",
                             "detail": f"std_ret_90 NULL fraction: {null_pct:.1f}%",
@@ -419,7 +419,7 @@ def check_desc_stats_quality(engine) -> list[dict]:
                 # Check 3: no implausible mean_ret_252 (should be in [-10, 10] range in decimal)
                 row = conn.execute(
                     text(
-                        "SELECT COUNT(*) FROM public.cmc_asset_stats "
+                        "SELECT COUNT(*) FROM public.asset_stats "
                         "WHERE mean_ret_252 IS NOT NULL "
                         "AND (mean_ret_252 < -10 OR mean_ret_252 > 10)"
                     )
@@ -428,7 +428,7 @@ def check_desc_stats_quality(engine) -> list[dict]:
                 if implausible > 0:
                     results.append(
                         {
-                            "table": "cmc_asset_stats",
+                            "table": "asset_stats",
                             "check": "mean_ret_252_range",
                             "status": "WARN",
                             "detail": f"{implausible} rows with implausible mean_ret_252 (outside [-10, 10])",
@@ -437,7 +437,7 @@ def check_desc_stats_quality(engine) -> list[dict]:
                 else:
                     results.append(
                         {
-                            "table": "cmc_asset_stats",
+                            "table": "asset_stats",
                             "check": "mean_ret_252_range",
                             "status": "PASS",
                             "detail": "All mean_ret_252 values in plausible range",
@@ -445,10 +445,10 @@ def check_desc_stats_quality(engine) -> list[dict]:
                     )
 
         except Exception as e:
-            logger.debug("check_desc_stats_quality: cmc_asset_stats unavailable: %s", e)
+            logger.debug("check_desc_stats_quality: asset_stats unavailable: %s", e)
             results.append(
                 {
-                    "table": "cmc_asset_stats",
+                    "table": "asset_stats",
                     "check": "accessibility",
                     "status": "WARN",
                     "detail": f"Table not accessible: {e}",
@@ -456,18 +456,18 @@ def check_desc_stats_quality(engine) -> list[dict]:
             )
 
         # ------------------------------------------------------------------
-        # cmc_cross_asset_corr checks
+        # cross_asset_corr checks
         # ------------------------------------------------------------------
         try:
             # Check 1: row count > 0
             row = conn.execute(
-                text("SELECT COUNT(*) FROM public.cmc_cross_asset_corr")
+                text("SELECT COUNT(*) FROM public.cross_asset_corr")
             ).fetchone()
             total_rows = int(row[0]) if row else 0
             if total_rows == 0:
                 results.append(
                     {
-                        "table": "cmc_cross_asset_corr",
+                        "table": "cross_asset_corr",
                         "check": "row_count",
                         "status": "WARN",
                         "detail": "Table is empty (0 rows)",
@@ -476,7 +476,7 @@ def check_desc_stats_quality(engine) -> list[dict]:
             else:
                 results.append(
                     {
-                        "table": "cmc_cross_asset_corr",
+                        "table": "cross_asset_corr",
                         "check": "row_count",
                         "status": "PASS",
                         "detail": f"{total_rows} rows",
@@ -486,7 +486,7 @@ def check_desc_stats_quality(engine) -> list[dict]:
                 # Check 2: zero rows where id_a >= id_b (all pairs should have id_a < id_b)
                 row = conn.execute(
                     text(
-                        "SELECT COUNT(*) FROM public.cmc_cross_asset_corr "
+                        "SELECT COUNT(*) FROM public.cross_asset_corr "
                         "WHERE id_a >= id_b"
                     )
                 ).fetchone()
@@ -494,7 +494,7 @@ def check_desc_stats_quality(engine) -> list[dict]:
                 if bad_pairs > 0:
                     results.append(
                         {
-                            "table": "cmc_cross_asset_corr",
+                            "table": "cross_asset_corr",
                             "check": "id_pair_ordering",
                             "status": "FAIL",
                             "detail": f"{bad_pairs} rows with id_a >= id_b (violates id_a < id_b constraint)",
@@ -503,7 +503,7 @@ def check_desc_stats_quality(engine) -> list[dict]:
                 else:
                     results.append(
                         {
-                            "table": "cmc_cross_asset_corr",
+                            "table": "cross_asset_corr",
                             "check": "id_pair_ordering",
                             "status": "PASS",
                             "detail": "All pairs have id_a < id_b",
@@ -513,7 +513,7 @@ def check_desc_stats_quality(engine) -> list[dict]:
                 # Check 3: pearson_r between -1 and 1
                 row = conn.execute(
                     text(
-                        "SELECT COUNT(*) FROM public.cmc_cross_asset_corr "
+                        "SELECT COUNT(*) FROM public.cross_asset_corr "
                         "WHERE pearson_r IS NOT NULL "
                         "AND (pearson_r < -1.0 OR pearson_r > 1.0)"
                     )
@@ -522,7 +522,7 @@ def check_desc_stats_quality(engine) -> list[dict]:
                 if out_of_range > 0:
                     results.append(
                         {
-                            "table": "cmc_cross_asset_corr",
+                            "table": "cross_asset_corr",
                             "check": "pearson_r_range",
                             "status": "FAIL",
                             "detail": f"{out_of_range} rows with pearson_r outside [-1, 1]",
@@ -531,7 +531,7 @@ def check_desc_stats_quality(engine) -> list[dict]:
                 else:
                     results.append(
                         {
-                            "table": "cmc_cross_asset_corr",
+                            "table": "cross_asset_corr",
                             "check": "pearson_r_range",
                             "status": "PASS",
                             "detail": "All pearson_r values in [-1, 1]",
@@ -541,7 +541,7 @@ def check_desc_stats_quality(engine) -> list[dict]:
                 # Check 4: no NULL n_obs
                 row = conn.execute(
                     text(
-                        "SELECT COUNT(*) FROM public.cmc_cross_asset_corr "
+                        "SELECT COUNT(*) FROM public.cross_asset_corr "
                         "WHERE n_obs IS NULL"
                     )
                 ).fetchone()
@@ -549,7 +549,7 @@ def check_desc_stats_quality(engine) -> list[dict]:
                 if null_n_obs > 0:
                     results.append(
                         {
-                            "table": "cmc_cross_asset_corr",
+                            "table": "cross_asset_corr",
                             "check": "n_obs_not_null",
                             "status": "WARN",
                             "detail": f"{null_n_obs} rows with NULL n_obs",
@@ -558,7 +558,7 @@ def check_desc_stats_quality(engine) -> list[dict]:
                 else:
                     results.append(
                         {
-                            "table": "cmc_cross_asset_corr",
+                            "table": "cross_asset_corr",
                             "check": "n_obs_not_null",
                             "status": "PASS",
                             "detail": "No NULL n_obs values",
@@ -567,11 +567,11 @@ def check_desc_stats_quality(engine) -> list[dict]:
 
         except Exception as e:
             logger.debug(
-                "check_desc_stats_quality: cmc_cross_asset_corr unavailable: %s", e
+                "check_desc_stats_quality: cross_asset_corr unavailable: %s", e
             )
             results.append(
                 {
-                    "table": "cmc_cross_asset_corr",
+                    "table": "cross_asset_corr",
                     "check": "accessibility",
                     "status": "WARN",
                     "detail": f"Table not accessible: {e}",
@@ -595,7 +595,7 @@ def run_all_stats(
     DB rows are the authoritative source of PASS/WARN/FAIL status.
 
     After runners complete, also runs check_desc_stats_quality() inline
-    to check cmc_asset_stats and cmc_cross_asset_corr tables and
+    to check asset_stats and cross_asset_corr tables and
     incorporates results into the overall PASS/WARN/FAIL status.
 
     Args:

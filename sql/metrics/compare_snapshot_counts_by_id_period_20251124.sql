@@ -3,7 +3,7 @@ SELECT
     id,
     period,
     COUNT(*) AS n_rows
-FROM cmc_ema_multi_tf
+FROM ema_multi_tf
 GROUP BY id, period
 
 UNION ALL
@@ -13,6 +13,6 @@ SELECT
     id,
     period,
     COUNT(*) AS n_rows
-FROM cmc_ema_multi_tf_20251124_snapshot
+FROM ema_multi_tf_20251124_snapshot
 GROUP BY id, period
 ORDER BY id, period, version;

@@ -120,7 +120,7 @@ ORDER BY
 This view combines:
 
 - **Daily EMAs** from `cmc_ema_daily`
-- **Multi-timeframe EMAs** from `cmc_ema_multi_tf`
+- **Multi-timeframe EMAs** from `ema_multi_tf`
 
 It also standardizes slope fields:
 
@@ -171,7 +171,7 @@ SELECT
     m.d1                AS d1_close,
     m.d2                AS d2_close,
     m.roll
-FROM cmc_ema_multi_tf AS m;
+FROM ema_multi_tf AS m;
 ```
 
 ---
@@ -224,7 +224,7 @@ Notes:
 
 ## 3. Multi-timeframe EMA diagnostics
 
-These queries help inspect and manage the `cmc_ema_multi_tf` table.
+These queries help inspect and manage the `ema_multi_tf` table.
 
 ### 3.1 Inspect multi-timeframe EMAs for one asset
 
@@ -233,7 +233,7 @@ See all TFs and periods for a given `id`, with latest timestamps first and sorte
 
 ```sql
 SELECT *
-FROM cmc_ema_multi_tf
+FROM ema_multi_tf
 WHERE id = 1
 ORDER BY ts DESC, tf_days DESC, period DESC;
 ```
@@ -245,7 +245,7 @@ Zoom in on one multi-TF series and verify `roll` and slopes (`d1`, `d2`, `d1_rol
 
 ```sql
 SELECT *
-FROM cmc_ema_multi_tf
+FROM ema_multi_tf
 WHERE id = 1
   AND tf = '1W'
   AND period = 21
@@ -262,12 +262,12 @@ Confirm both rolling rows and true higher-TF closes exist.
 
 ```sql
 SELECT DISTINCT roll
-FROM cmc_ema_multi_tf;
+FROM ema_multi_tf;
 ```
 
 ```sql
 SELECT roll, COUNT(*) 
-FROM cmc_ema_multi_tf
+FROM ema_multi_tf
 GROUP BY roll;
 ```
 
@@ -282,20 +282,20 @@ Purpose:
 Clear all data before recomputing multi-TF EMAs with a new algorithm.
 
 ```sql
-TRUNCATE TABLE public.cmc_ema_multi_tf;
+TRUNCATE TABLE public.ema_multi_tf;
 ```
 
-> **Warning:** This removes all rows from `cmc_ema_multi_tf`. Only run when you intend to fully regenerate it from your Python pipeline.
+> **Warning:** This removes all rows from `ema_multi_tf`. Only run when you intend to fully regenerate it from your Python pipeline.
 
 ---
 
 ### 3.5 Add `roll`, `d1_roll`, and `d2_roll` columns (one-time schema update)
 
 Purpose:  
-If not already present, extend `cmc_ema_multi_tf` to support rolling vs closing-only slope metrics.
+If not already present, extend `ema_multi_tf` to support rolling vs closing-only slope metrics.
 
 ```sql
-ALTER TABLE public.cmc_ema_multi_tf
+ALTER TABLE public.ema_multi_tf
 ADD COLUMN roll      boolean,
 ADD COLUMN d1_roll   double precision,
 ADD COLUMN d2_roll   double precision;
@@ -305,7 +305,7 @@ Only needed once when updating schema.
 
 ---
 
-## 4. Combined price + EMA view: `cmc_price_with_emas` (simple version)
+## 4. Combined price + EMA view: `price_with_emas` (simple version)
 
 This is an earlier, simplified price+EMA view that only exposes:
 
@@ -314,10 +314,10 @@ This is an earlier, simplified price+EMA view that only exposes:
 
 Useful if you want a lighter view without slopes.
 
-### 4.1 Create or replace `cmc_price_with_emas`
+### 4.1 Create or replace `price_with_emas`
 
 ```sql
-CREATE OR REPLACE VIEW cmc_price_with_emas AS
+CREATE OR REPLACE VIEW price_with_emas AS
 WITH all_emas AS (
     -- Daily EMAs
     SELECT
@@ -339,7 +339,7 @@ WITH all_emas AS (
         m.ts,
         m.period,
         m.ema
-    FROM cmc_ema_multi_tf AS m
+    FROM ema_multi_tf AS m
 )
 SELECT
     p.id,
@@ -358,11 +358,11 @@ LEFT JOIN all_emas AS ae
   AND ae.ts = p.timeclose;
 ```
 
-### 4.2 Query `cmc_price_with_emas` for a single asset
+### 4.2 Query `price_with_emas` for a single asset
 
 ```sql
 SELECT *
-FROM cmc_price_with_emas
+FROM price_with_emas
 WHERE id = 1
 ORDER BY
     bar_ts DESC,
@@ -399,7 +399,7 @@ Verify the schema of your EMA and price tables.
 ```sql
 SELECT column_name, data_type
 FROM information_schema.columns
-WHERE table_name = 'cmc_ema_multi_tf'
+WHERE table_name = 'ema_multi_tf'
 ORDER BY ordinal_position;
 ```
 
@@ -455,7 +455,7 @@ TRUNCATE TABLE public.cmc_ema_daily;
 2. Inspect daily EMAs  
    - `SELECT * FROM cmc_ema_daily WHERE id = 1 ORDER BY ts DESC;`
 3. Inspect multi-TF EMAs  
-   - `SELECT * FROM cmc_ema_multi_tf WHERE id = 1 ORDER BY ts DESC, tf_days DESC, period DESC;`
+   - `SELECT * FROM ema_multi_tf WHERE id = 1 ORDER BY ts DESC, tf_days DESC, period DESC;`
 4. Join prices + EMAs (with slopes)  
    - `SELECT ... FROM cmc_price_histories7 p LEFT JOIN all_emas ae ON ae.id = p.id AND ae.ts = p.timeclose WHERE p.id = 1 ...;`
 

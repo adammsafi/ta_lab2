@@ -1,7 +1,7 @@
 """
 test_ema_unification.py
 
-Validation tests for cmc_ema_multi_tf_u unified EMA table.
+Validation tests for ema_multi_tf_u unified EMA table.
 Tests schema, data integrity, and referential constraints.
 
 Run:
@@ -33,18 +33,18 @@ def engine(db_url):
 
 
 def test_unified_table_exists(engine):
-    """Verify cmc_ema_multi_tf_u table exists in public schema."""
+    """Verify ema_multi_tf_u table exists in public schema."""
     q = text(
         """
         SELECT 1
         FROM information_schema.tables
         WHERE table_schema = 'public'
-          AND table_name = 'cmc_ema_multi_tf_u'
+          AND table_name = 'ema_multi_tf_u'
         """
     )
     df = pd.read_sql(q, engine)
 
-    assert not df.empty, "Table cmc_ema_multi_tf_u does not exist in public schema"
+    assert not df.empty, "Table ema_multi_tf_u does not exist in public schema"
 
 
 def test_unified_table_has_pk_columns(engine):
@@ -56,7 +56,7 @@ def test_unified_table_has_pk_columns(engine):
         SELECT column_name
         FROM information_schema.columns
         WHERE table_schema = 'public'
-          AND table_name = 'cmc_ema_multi_tf_u'
+          AND table_name = 'ema_multi_tf_u'
           AND column_name = ANY(:cols)
         """
     )
@@ -83,7 +83,7 @@ def test_unified_table_has_value_columns(engine):
         SELECT column_name
         FROM information_schema.columns
         WHERE table_schema = 'public'
-          AND table_name = 'cmc_ema_multi_tf_u'
+          AND table_name = 'ema_multi_tf_u'
           AND column_name = ANY(:cols)
         """
     )
@@ -108,7 +108,7 @@ def test_unified_table_has_bar_columns(engine):
         SELECT column_name
         FROM information_schema.columns
         WHERE table_schema = 'public'
-          AND table_name = 'cmc_ema_multi_tf_u'
+          AND table_name = 'ema_multi_tf_u'
           AND column_name = ANY(:cols)
         """
     )
@@ -135,7 +135,7 @@ def test_alignment_source_values(engine):
     q = text(
         """
         SELECT DISTINCT alignment_source
-        FROM cmc_ema_multi_tf_u
+        FROM ema_multi_tf_u
         ORDER BY alignment_source
         """
     )
@@ -143,12 +143,12 @@ def test_alignment_source_values(engine):
 
     if df.empty:
         pytest.skip(
-            "Table cmc_ema_multi_tf_u is empty - cannot validate alignment_source values"
+            "Table ema_multi_tf_u is empty - cannot validate alignment_source values"
         )
 
     actual_sources = set(df["alignment_source"].tolist())
 
-    # Expected sources based on SOURCES list in sync_cmc_ema_multi_tf_u.py
+    # Expected sources based on SOURCES list in sync_ema_multi_tf_u.py
     expected_sources = {
         "multi_tf",
         "multi_tf_cal_us",
@@ -159,9 +159,9 @@ def test_alignment_source_values(engine):
 
     # At least one expected source should be present
     overlap = actual_sources & expected_sources
-    assert (
-        overlap
-    ), f"No expected alignment_source values found. Got: {sorted(actual_sources)}"
+    assert overlap, (
+        f"No expected alignment_source values found. Got: {sorted(actual_sources)}"
+    )
 
     # Warn about unexpected sources (not a failure, just informational)
     unexpected = actual_sources - expected_sources
@@ -171,14 +171,14 @@ def test_alignment_source_values(engine):
 
 def test_unified_table_has_data(engine):
     """Verify table has at least 1000 rows (reasonable minimum for production)."""
-    q = text("SELECT COUNT(*)::bigint AS n_rows FROM cmc_ema_multi_tf_u")
+    q = text("SELECT COUNT(*)::bigint AS n_rows FROM ema_multi_tf_u")
     df = pd.read_sql(q, engine)
 
     n_rows = int(df.loc[0, "n_rows"])
 
     # Allow table to be empty in fresh environments, but warn
     if n_rows == 0:
-        pytest.skip("Table cmc_ema_multi_tf_u is empty - run sync script to populate")
+        pytest.skip("Table ema_multi_tf_u is empty - run sync script to populate")
 
     assert n_rows >= 1000, f"Table has only {n_rows} rows, expected at least 1000"
 
@@ -190,7 +190,7 @@ def test_pk_uniqueness(engine):
         SELECT
             COUNT(*) AS total_rows,
             COUNT(DISTINCT (id, ts, tf, period, alignment_source)) AS distinct_pk
-        FROM cmc_ema_multi_tf_u
+        FROM ema_multi_tf_u
         """
     )
     df = pd.read_sql(q, engine)
@@ -199,7 +199,7 @@ def test_pk_uniqueness(engine):
     distinct = int(df.loc[0, "distinct_pk"])
 
     if total == 0:
-        pytest.skip("Table cmc_ema_multi_tf_u is empty - cannot validate uniqueness")
+        pytest.skip("Table ema_multi_tf_u is empty - cannot validate uniqueness")
 
     assert total == distinct, (
         f"Primary key not unique: {total} total rows but {distinct} distinct PKs. "
@@ -226,11 +226,11 @@ def test_tf_values_match_dim_timeframe(engine):
         )
 
     # Get distinct tf values from unified table
-    q_tf_values = text("SELECT DISTINCT tf FROM cmc_ema_multi_tf_u ORDER BY tf")
+    q_tf_values = text("SELECT DISTINCT tf FROM ema_multi_tf_u ORDER BY tf")
     df_tf = pd.read_sql(q_tf_values, engine)
 
     if df_tf.empty:
-        pytest.skip("cmc_ema_multi_tf_u is empty - cannot validate tf values")
+        pytest.skip("ema_multi_tf_u is empty - cannot validate tf values")
 
     tf_values = df_tf["tf"].tolist()
 
@@ -249,4 +249,6 @@ def test_tf_values_match_dim_timeframe(engine):
 
     invalid_tfs = actual_tfs - valid_tfs
 
-    assert not invalid_tfs, f"TF values in cmc_ema_multi_tf_u not found in dim_timeframe: {sorted(invalid_tfs)}"
+    assert not invalid_tfs, (
+        f"TF values in ema_multi_tf_u not found in dim_timeframe: {sorted(invalid_tfs)}"
+    )

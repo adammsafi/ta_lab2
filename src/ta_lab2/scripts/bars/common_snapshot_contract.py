@@ -42,10 +42,10 @@ def ensure_bar_table_exists(
     Create bar table if it doesn't exist.
 
     Supports all 6 bar table types:
-    - 1d: cmc_price_bars_1d (SQL-based canonical 1D bars)
-    - multi_tf: cmc_price_bars_multi_tf (rolling multi-timeframe bars)
-    - cal: cmc_price_bars_multi_tf_cal_iso/us (calendar-aligned bars)
-    - cal_anchor: cmc_price_bars_multi_tf_cal_anchor_iso/us (calendar-anchored bars)
+    - 1d: price_bars_1d (SQL-based canonical 1D bars)
+    - multi_tf: price_bars_multi_tf (rolling multi-timeframe bars)
+    - cal: price_bars_multi_tf_cal_iso/us (calendar-aligned bars)
+    - cal_anchor: price_bars_multi_tf_cal_anchor_iso/us (calendar-anchored bars)
 
     Args:
         engine: SQLAlchemy engine
@@ -55,10 +55,10 @@ def ensure_bar_table_exists(
 
     Usage:
         # From a builder:
-        ensure_bar_table_exists(self.engine, "cmc_price_bars_multi_tf", table_type="multi_tf")
-        ensure_bar_table_exists(self.engine, "cmc_price_bars_1d", table_type="1d")
+        ensure_bar_table_exists(self.engine, "price_bars_multi_tf", table_type="multi_tf")
+        ensure_bar_table_exists(self.engine, "price_bars_1d", table_type="1d")
     """
-    # Handle fully-qualified table names (e.g., "public.cmc_price_bars_1d")
+    # Handle fully-qualified table names (e.g., "public.price_bars_1d")
     if "." in table_name:
         schema, table_name = table_name.split(".", 1)
 
@@ -1238,8 +1238,8 @@ def create_bar_builder_argument_parser(
         >>> ap = create_bar_builder_argument_parser(
         ...     description="Build multi-TF bars",
         ...     default_daily_table="public.cmc_price_histories7",
-        ...     default_bars_table="public.cmc_price_bars_multi_tf",
-        ...     default_state_table="public.cmc_price_bars_multi_tf_state",
+        ...     default_bars_table="public.price_bars_multi_tf",
+        ...     default_state_table="public.price_bars_multi_tf_state",
         ...     include_tz=False,
         ... )
         >>> args = ap.parse_args()
@@ -1413,7 +1413,7 @@ def load_daily_prices_for_id(
         b1d.ingested_at AS src_load_ts,
         COALESCE(b1d.venue_rank, 50) AS venue_rank
       FROM {daily_table} s
-      LEFT JOIN public.cmc_price_bars_1d b1d
+      LEFT JOIN public.price_bars_1d b1d
         ON b1d.id = s.id AND b1d."timestamp" = s."timestamp"
            AND b1d.venue = s.venue
       {where}

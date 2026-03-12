@@ -66,21 +66,21 @@ DB_URL = _normalize_db_url(DB_URL)
 DEFAULT_TZ = os.environ.get("TA_LAB2_BAR_TEST_TZ", "America/New_York")
 
 BAR_TABLES = [
-    "public.cmc_price_bars_1d",
-    "public.cmc_price_bars_multi_tf",
-    "public.cmc_price_bars_multi_tf_cal_us",
-    "public.cmc_price_bars_multi_tf_cal_iso",
-    "public.cmc_price_bars_multi_tf_cal_anchor_us",
-    "public.cmc_price_bars_multi_tf_cal_anchor_iso",
+    "public.price_bars_1d",
+    "public.price_bars_multi_tf",
+    "public.price_bars_multi_tf_cal_us",
+    "public.price_bars_multi_tf_cal_iso",
+    "public.price_bars_multi_tf_cal_anchor_us",
+    "public.price_bars_multi_tf_cal_anchor_iso",
 ]
 
 STATE_TABLES = [
-    "public.cmc_price_bars_1d_state",
-    "public.cmc_price_bars_multi_tf_state",
-    "public.cmc_price_bars_multi_tf_cal_us_state",
-    "public.cmc_price_bars_multi_tf_cal_iso_state",
-    "public.cmc_price_bars_multi_tf_cal_anchor_us_state",
-    "public.cmc_price_bars_multi_tf_cal_anchor_iso_state",
+    "public.price_bars_1d_state",
+    "public.price_bars_multi_tf_state",
+    "public.price_bars_multi_tf_cal_us_state",
+    "public.price_bars_multi_tf_cal_iso_state",
+    "public.price_bars_multi_tf_cal_anchor_us_state",
+    "public.price_bars_multi_tf_cal_anchor_iso_state",
 ]
 
 
@@ -284,7 +284,7 @@ def test_bar_tables_exist_and_have_required_columns(bar_table: str) -> None:
             f"Fix: migrate the table schema or update bar upsert logic to include these columns."
         )
 
-        if bar_table != "public.cmc_price_bars_1d":
+        if bar_table != "public.price_bars_1d":
             missing2 = sorted(REQUIRED_SNAPSHOT_COLS - cols)
             assert not missing2, (
                 f"{bar_table} is missing snapshot bookkeeping columns: {missing2}\n"
@@ -408,9 +408,9 @@ def test_normalize_output_schema_adds_required_defaults() -> None:
         "count_missing_days",
     ]
     missing = [c for c in must if c not in out.columns]
-    assert (
-        not missing
-    ), f"normalize_output_schema did not add required columns: {missing}"
+    assert not missing, (
+        f"normalize_output_schema did not add required columns: {missing}"
+    )
 
     # verify defaults for newly created cols
     for col, default in REQUIRED_COL_DEFAULTS.items():
@@ -540,9 +540,9 @@ def test_state_upsert_and_load_with_tz_parameter() -> None:
 
         # Load and verify update occurred (should be 1 row, not 2)
         loaded2 = load_state(DB_URL, test_state_table, ids=[1], with_tz=True)
-        assert (
-            len(loaded2) == 1
-        ), "Should still have exactly one row (upsert, not insert)"
+        assert len(loaded2) == 1, (
+            "Should still have exactly one row (upsert, not insert)"
+        )
 
         row2 = loaded2.iloc[0]
         assert row2["tz"] == "UTC", "tz should be updated"
@@ -654,9 +654,9 @@ def test_state_tracking_across_refreshes() -> None:
         # Verify daily_max_seen updated but bar_seq/time_close stable
         state_r3 = load_state(DB_URL, test_state_table, ids=[52], with_tz=True)
         assert len(state_r3) == 1
-        assert (
-            state_r3.iloc[0]["last_bar_seq"] == 2
-        ), "bar_seq unchanged (in-progress bar)"
+        assert state_r3.iloc[0]["last_bar_seq"] == 2, (
+            "bar_seq unchanged (in-progress bar)"
+        )
         assert pd.to_datetime(
             state_r3.iloc[0]["last_time_close"], utc=True
         ) == pd.Timestamp("2025-01-28T23:59:59Z")
@@ -680,7 +680,7 @@ def test_check_for_backfill_detects_historical_data() -> None:
     Test that check_for_backfill returns True when source has data
     earlier than daily_min_seen in state.
     """
-    from ta_lab2.scripts.bars.refresh_cmc_price_bars_1d import _check_for_backfill
+    from ta_lab2.scripts.bars.refresh_price_bars_1d import _check_for_backfill
 
     test_source_table = "public.test_backfill_source"
     conn = _connect()
@@ -736,9 +736,9 @@ def test_check_for_backfill_detects_historical_data() -> None:
         result_backfill = _check_for_backfill(
             conn, test_source_table, 100, state_no_backfill
         )
-        assert (
-            result_backfill is True
-        ), "Should detect backfill when MIN < daily_min_seen"
+        assert result_backfill is True, (
+            "Should detect backfill when MIN < daily_min_seen"
+        )
 
     finally:
         _exec(conn, f"DROP TABLE IF EXISTS {test_source_table}")
@@ -749,7 +749,7 @@ def test_check_for_backfill_no_state() -> None:
     """
     Test that check_for_backfill returns False when state is None (first run).
     """
-    from ta_lab2.scripts.bars.refresh_cmc_price_bars_1d import _check_for_backfill
+    from ta_lab2.scripts.bars.refresh_price_bars_1d import _check_for_backfill
 
     test_source_table = "public.test_backfill_no_state"
     conn = _connect()
@@ -782,9 +782,9 @@ def test_check_for_backfill_no_state() -> None:
         # State with no daily_min_seen
         state_no_min = {"daily_min_seen": None}
         result2 = _check_for_backfill(conn, test_source_table, 200, state_no_min)
-        assert (
-            result2 is False
-        ), "Should not detect backfill when daily_min_seen is None"
+        assert result2 is False, (
+            "Should not detect backfill when daily_min_seen is None"
+        )
 
     finally:
         _exec(conn, f"DROP TABLE IF EXISTS {test_source_table}")
@@ -795,7 +795,7 @@ def test_handle_backfill_deletes_bars_and_state() -> None:
     """
     Test that handle_backfill properly clears bars and state for rebuild.
     """
-    from ta_lab2.scripts.bars.refresh_cmc_price_bars_1d import _handle_backfill
+    from ta_lab2.scripts.bars.refresh_price_bars_1d import _handle_backfill
 
     test_bars_table = "public.test_backfill_bars"
     test_state_table = "public.test_backfill_state"

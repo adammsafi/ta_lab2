@@ -75,10 +75,10 @@ _DEFAULT_FEE_BPS = 16
 
 # Signal table mapping
 SIGNAL_TABLE_MAP = {
-    "ema_trend_17_77": "cmc_signals_ema_crossover",
-    "ema_trend_21_50": "cmc_signals_ema_crossover",
-    "rsi_mean_revert": "cmc_signals_rsi_mean_revert",
-    "breakout_atr": "cmc_signals_atr_breakout",
+    "ema_trend_17_77": "signals_ema_crossover",
+    "ema_trend_21_50": "signals_ema_crossover",
+    "rsi_mean_revert": "signals_rsi_mean_revert",
+    "breakout_atr": "signals_atr_breakout",
 }
 
 # Strategy params for on-the-fly signal generation
@@ -132,7 +132,7 @@ def _fmt_int(v) -> str:
 
 def _load_price_data(engine, asset_id: int, tf: str = "1D") -> pd.Series:
     """
-    Load daily close prices from cmc_price_bars_multi_tf_u.
+    Load daily close prices from price_bars_multi_tf_u.
 
     NOTE: This table uses "timestamp" (a quoted PostgreSQL reserved word), NOT ts.
     Returns pd.Series with DatetimeIndex (UTC), index name = "timestamp".
@@ -140,7 +140,7 @@ def _load_price_data(engine, asset_id: int, tf: str = "1D") -> pd.Series:
     sql = text(
         """
         SELECT "timestamp", close
-        FROM public.cmc_price_bars_multi_tf_u
+        FROM public.price_bars_multi_tf_u
         WHERE id = :asset_id AND tf = :tf
         ORDER BY "timestamp"
         """
@@ -168,15 +168,15 @@ def _load_price_data(engine, asset_id: int, tf: str = "1D") -> pd.Series:
 
 def _load_atr_data(engine, asset_id: int, tf: str = "1D") -> pd.Series:
     """
-    Load ATR-14 values from cmc_features.
+    Load ATR-14 values from features.
 
-    NOTE: cmc_features uses 'ts' (not 'timestamp').
+    NOTE: features uses 'ts' (not 'timestamp').
     Returns pd.Series with DatetimeIndex (UTC).
     """
     sql = text(
         """
         SELECT ts, atr_14
-        FROM public.cmc_features
+        FROM public.features
         WHERE id = :asset_id AND tf = :tf AND atr_14 IS NOT NULL
         ORDER BY ts
         """
@@ -205,16 +205,16 @@ def _load_realized_vol(
     engine, asset_id: int, tf: str = "1D", window: int = 20
 ) -> pd.Series:
     """
-    Load arithmetic returns from cmc_returns_bars_multi_tf_u and compute
+    Load arithmetic returns from returns_bars_multi_tf_u and compute
     rolling(window).std() as realized volatility.
 
-    NOTE: cmc_returns_bars_multi_tf_u uses "timestamp" (quoted reserved word), NOT ts.
+    NOTE: returns_bars_multi_tf_u uses "timestamp" (quoted reserved word), NOT ts.
     Returns pd.Series with DatetimeIndex (UTC).
     """
     sql = text(
         """
         SELECT "timestamp", ret_arith
-        FROM public.cmc_returns_bars_multi_tf_u
+        FROM public.returns_bars_multi_tf_u
         WHERE id = :asset_id AND tf = :tf
         ORDER BY "timestamp"
         """
@@ -248,11 +248,11 @@ def _load_realized_vol(
 def _generate_ema_crossover_signals(
     engine, asset_id: int, fast_ema: int, slow_ema: int, price_index: pd.DatetimeIndex
 ) -> tuple[pd.Series, pd.Series]:
-    """Generate EMA crossover signals on-the-fly from cmc_ema_multi_tf_u."""
+    """Generate EMA crossover signals on-the-fly from ema_multi_tf_u."""
     sql = text(
         """
         SELECT ts, period, ema
-        FROM public.cmc_ema_multi_tf_u
+        FROM public.ema_multi_tf_u
         WHERE id = :asset_id AND tf = '1D' AND period IN :periods
         ORDER BY ts, period
         """
@@ -318,11 +318,11 @@ def _generate_rsi_signals(
     overbought: int,
     price_index: pd.DatetimeIndex,
 ) -> tuple[pd.Series, pd.Series]:
-    """Generate RSI mean-revert signals on-the-fly from cmc_features."""
+    """Generate RSI mean-revert signals on-the-fly from features."""
     sql = text(
         """
         SELECT ts, rsi_14
-        FROM public.cmc_features
+        FROM public.features
         WHERE id = :asset_id AND tf = '1D' AND rsi_14 IS NOT NULL
         ORDER BY ts
         """
@@ -367,11 +367,11 @@ def _generate_atr_breakout_signals(
     price_index: pd.DatetimeIndex,
     price_series: pd.Series,
 ) -> tuple[pd.Series, pd.Series]:
-    """Generate ATR breakout signals on-the-fly from cmc_features."""
+    """Generate ATR breakout signals on-the-fly from features."""
     sql = text(
         """
         SELECT ts, atr_14
-        FROM public.cmc_features
+        FROM public.features
         WHERE id = :asset_id AND tf = '1D' AND atr_14 IS NOT NULL
         ORDER BY ts
         """
@@ -442,8 +442,8 @@ def _load_signals(
     Load or generate (entry, exit) boolean signals aligned to price_index.
 
     Strategy: try loading from the signal table first. If empty (common for ETH),
-    generate on-the-fly using the strategy parameters and cmc_ema_multi_tf_u /
-    cmc_features.
+    generate on-the-fly using the strategy parameters and ema_multi_tf_u /
+    features.
 
     Returns (entries: bool Series, exits: bool Series) aligned to price_index.
     """

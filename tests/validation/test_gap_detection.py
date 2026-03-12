@@ -44,7 +44,7 @@ class TestScheduleBasedGapDetection:
         mock_conn.execute.side_effect = [mock_result1, mock_result2]
 
         issues = validator.check_gaps(
-            table="cmc_returns_daily",
+            table="returns_daily",
             ids=[1],
             start="2024-01-01",
             end="2024-01-03",
@@ -75,7 +75,7 @@ class TestScheduleBasedGapDetection:
         mock_conn.execute.side_effect = [mock_result1, mock_result2]
 
         issues = validator.check_gaps(
-            table="cmc_returns_daily",
+            table="returns_daily",
             ids=[1],
             start="2024-01-01",
             end="2024-01-03",
@@ -159,14 +159,14 @@ class TestGapReporting:
         from ta_lab2.scripts.features.validate_features import GapIssue
 
         issue = GapIssue(
-            table="cmc_returns_daily",
+            table="returns_daily",
             id_=1,
             missing_dates=["2024-01-02"],
             expected=10,
             actual=9,
         )
 
-        assert issue.details["table"] == "cmc_returns_daily"
+        assert issue.details["table"] == "returns_daily"
 
     def test_gap_issue_has_expected_actual(self):
         """Test gap issues include expected vs actual counts."""

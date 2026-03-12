@@ -35,9 +35,9 @@ class StaleSignalError(Exception):
 # ---------------------------------------------------------------------------
 
 SIGNAL_TABLE_MAP: dict[str, str] = {
-    "ema_crossover": "cmc_signals_ema_crossover",
-    "rsi_mean_revert": "cmc_signals_rsi_mean_revert",
-    "atr_breakout": "cmc_signals_atr_breakout",
+    "ema_crossover": "signals_ema_crossover",
+    "rsi_mean_revert": "signals_rsi_mean_revert",
+    "atr_breakout": "signals_atr_breakout",
 }
 
 # Set of valid table names (used for validation / injection prevention)

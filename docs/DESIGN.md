@@ -104,19 +104,19 @@ The foundation of all temporal calculations:
 
 Transforms price data into analysis-ready features:
 
-- **Returns** (`cmc_returns_daily`):
+- **Returns** (`returns_daily`):
   - Bar-to-bar percent and log returns
   - Multi-day returns (1D, 7D, 30D) using `pct_change(periods=n)`
   - Z-score normalization with rolling 252-day window
   - Null handling: skip (preserve gaps for accurate return calculations)
 
-- **Volatility** (`cmc_vol_daily`):
+- **Volatility** (`vol_daily`):
   - Parkinson estimator (high-low range based)
   - Garman-Klass estimator (OHLC based, more efficient)
   - ATR (Average True Range for intraday volatility)
   - Null handling: forward_fill (smooth volatility estimates across gaps)
 
-- **Technical Indicators** (`cmc_ta_daily`):
+- **Technical Indicators** (`ta_daily`):
   - RSI (7, 14, 21 periods), MACD (12/26/9, 8/17/9), Stochastic (14/3)
   - Bollinger Bands (20/2), ATR (14), ADX (14)
   - Database-driven configuration via `dim_indicators` (JSONB params)
@@ -126,7 +126,7 @@ Transforms price data into analysis-ready features:
   - Materialized table (not view) for ML query performance
   - LEFT JOINs for graceful degradation (optional sources return NULL when missing)
   - Incremental refresh via watermark tracking (MIN of all source table watermarks)
-  - Includes EMA pivot (9, 10, 21, 50, 200 periods) from `cmc_ema_multi_tf_u` for 1D timeframe
+  - Includes EMA pivot (9, 10, 21, 50, 200 periods) from `ema_multi_tf_u` for 1D timeframe
 
 **Design decision**: Three null handling strategies configured per feature type in `dim_features`. Outlier detection via z-score (default 4 sigma) and IQR (default 1.5x) methods, flag but keep approach for transparency.
 
@@ -140,9 +140,9 @@ Database-driven signal generation with reproducibility guarantees:
   - Three signal types: ema_crossover, rsi_mean_revert, atr_breakout
 
 - **Signal Tables** (separate by type):
-  - `cmc_signals_ema_crossover`: Fast/slow EMA crossover signals
-  - `cmc_signals_rsi_mean_revert`: RSI oversold/overbought reversals
-  - `cmc_signals_atr_breakout`: Donchian channel + ATR expansion breakouts
+  - `signals_ema_crossover`: Fast/slow EMA crossover signals
+  - `signals_rsi_mean_revert`: RSI oversold/overbought reversals
+  - `signals_atr_breakout`: Donchian channel + ATR expansion breakouts
 
 - **SignalStateManager**:
   - Tracks open positions and dirty windows per `(id, signal_type, signal_id)`
@@ -269,16 +269,16 @@ PostgreSQL-backed observability for SQL queryability:
 1. Price Data (cmc_price_histories7)
         │
         v
-2. EMA Calculation (cmc_ema_multi_tf_u)
+2. EMA Calculation (ema_multi_tf_u)
    - Query dim_timeframe for timeframe definitions
    - Compute EMAs for 1D-365D timeframes
    - Align to trading or calendar schedule per dim_sessions
         │
         v
 3. Feature Computation (parallel execution)
-   ├─> Returns (cmc_returns_daily)
-   ├─> Volatility (cmc_vol_daily)
-   └─> Technical Indicators (cmc_ta_daily)
+   ├─> Returns (returns_daily)
+   ├─> Volatility (vol_daily)
+   └─> Technical Indicators (ta_daily)
         │
         v
 4. Feature Store (cmc_daily_features)

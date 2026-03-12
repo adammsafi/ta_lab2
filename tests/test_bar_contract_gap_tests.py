@@ -88,23 +88,23 @@ MAX_ROWS_SCAN = int(os.environ.get("TA_LAB2_BAR_TEST_MAX_ROWS_SCAN", "50000"))
 DEFAULT_TZ = os.environ.get("TA_LAB2_BAR_TEST_TZ", "America/New_York")
 
 BAR_TABLES = [
-    "public.cmc_price_bars_1d",
-    "public.cmc_price_bars_multi_tf_cal_us",
-    "public.cmc_price_bars_multi_tf_cal_iso",
-    "public.cmc_price_bars_multi_tf_cal_anchor_us",
-    "public.cmc_price_bars_multi_tf_cal_anchor_iso",
-    "public.cmc_price_bars_multi_tf",
+    "public.price_bars_1d",
+    "public.price_bars_multi_tf_cal_us",
+    "public.price_bars_multi_tf_cal_iso",
+    "public.price_bars_multi_tf_cal_anchor_us",
+    "public.price_bars_multi_tf_cal_anchor_iso",
+    "public.price_bars_multi_tf",
 ]
 
 STATE_TABLES = [
     # 1d is special (different schema)
-    "public.cmc_price_bars_1d_state",
+    "public.price_bars_1d_state",
     # contract-based state tables
-    "public.cmc_price_bars_multi_tf_cal_us_state",
-    "public.cmc_price_bars_multi_tf_cal_iso_state",
-    "public.cmc_price_bars_multi_tf_cal_anchor_us_state",
-    "public.cmc_price_bars_multi_tf_cal_anchor_iso_state",
-    "public.cmc_price_bars_multi_tf_state",
+    "public.price_bars_multi_tf_cal_us_state",
+    "public.price_bars_multi_tf_cal_iso_state",
+    "public.price_bars_multi_tf_cal_anchor_us_state",
+    "public.price_bars_multi_tf_cal_anchor_iso_state",
+    "public.price_bars_multi_tf_state",
 ]
 
 
@@ -233,7 +233,7 @@ def test_bar_tables_exist_and_have_core_columns(bar_table: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "bar_table", [t for t in BAR_TABLES if t != "public.cmc_price_bars_1d"]
+    "bar_table", [t for t in BAR_TABLES if t != "public.price_bars_1d"]
 )
 def test_snapshot_tables_have_contract_columns(bar_table: str) -> None:
     """
@@ -304,7 +304,7 @@ def test_ohlc_bounds_hold_in_db(bar_table: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "bar_table", [t for t in BAR_TABLES if t != "public.cmc_price_bars_1d"]
+    "bar_table", [t for t in BAR_TABLES if t != "public.price_bars_1d"]
 )
 def test_missing_days_columns_are_self_consistent(bar_table: str) -> None:
     """
@@ -321,12 +321,12 @@ def test_missing_days_columns_are_self_consistent(bar_table: str) -> None:
         bad_count, bad_order = _fetchall(conn, sql)[0]
         bad_count = int(bad_count or 0)
         bad_order = int(bad_order or 0)
-        assert (
-            bad_count == 0
-        ), f"{bar_table} has rows with is_missing_days=TRUE but count_missing_days < 1"
-        assert (
-            bad_order == 0
-        ), f"{bar_table} has rows with first_missing_day > last_missing_day"
+        assert bad_count == 0, (
+            f"{bar_table} has rows with is_missing_days=TRUE but count_missing_days < 1"
+        )
+        assert bad_order == 0, (
+            f"{bar_table} has rows with first_missing_day > last_missing_day"
+        )
 
 
 # --------------------------------------------------------------------------------------
@@ -364,14 +364,14 @@ def test_state_tables_exist_and_have_expected_columns(state_table: str) -> None:
 
         if state_table.endswith("_1d_state"):
             missing = sorted(REQUIRED_1D_STATE_COLS - cols)
-            assert (
-                not missing
-            ), f"{state_table} missing required 1d state columns: {missing}"
+            assert not missing, (
+                f"{state_table} missing required 1d state columns: {missing}"
+            )
         else:
             missing = sorted(REQUIRED_CONTRACT_STATE_COLS - cols)
-            assert (
-                not missing
-            ), f"{state_table} missing required contract state columns: {missing}"
+            assert not missing, (
+                f"{state_table} missing required contract state columns: {missing}"
+            )
 
 
 @pytest.mark.parametrize(
@@ -394,12 +394,12 @@ def test_state_table_basic_sanity(state_table: str) -> None:
         FROM {state_table};
         """
         bad_range, bad_pair = _fetchall(conn, sql)[0]
-        assert (
-            int(bad_range or 0) == 0
-        ), f"{state_table}: daily_min_seen > daily_max_seen"
-        assert (
-            int(bad_pair or 0) == 0
-        ), f"{state_table}: last_bar_seq and last_time_close nullability mismatch"
+        assert int(bad_range or 0) == 0, (
+            f"{state_table}: daily_min_seen > daily_max_seen"
+        )
+        assert int(bad_pair or 0) == 0, (
+            f"{state_table}: last_bar_seq and last_time_close nullability mismatch"
+        )
 
 
 # --------------------------------------------------------------------------------------

@@ -42,11 +42,11 @@ from ta_lab2.features.m_tf.polars_helpers import read_sql_polars
 
 
 TABLES = [
-    "public.cmc_ema_multi_tf",
-    "public.cmc_ema_multi_tf_cal_us",
-    "public.cmc_ema_multi_tf_cal_iso",
-    "public.cmc_ema_multi_tf_cal_anchor_us",
-    "public.cmc_ema_multi_tf_cal_anchor_iso",
+    "public.ema_multi_tf",
+    "public.ema_multi_tf_cal_us",
+    "public.ema_multi_tf_cal_iso",
+    "public.ema_multi_tf_cal_anchor_us",
+    "public.ema_multi_tf_cal_anchor_iso",
 ]
 
 DEFAULT_DAILY_TABLE = "public.cmc_price_histories7"

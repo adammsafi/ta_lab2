@@ -4,8 +4,8 @@
 BEGIN;
 
 -- Drop dependent views first if they exist, then all_emas itself.
-DROP VIEW IF EXISTS public.cmc_price_with_emas_d1d2;
-DROP VIEW IF EXISTS public.cmc_price_with_emas;
+DROP VIEW IF EXISTS public.price_with_emas_d1d2;
+DROP VIEW IF EXISTS public.price_with_emas;
 DROP VIEW IF EXISTS public.all_emas;
 
 CREATE VIEW public.all_emas AS
@@ -22,7 +22,7 @@ CREATE VIEW public.all_emas AS
         m.d1      AS d1_close,
         m.d2      AS d2_close,
         m.roll
-    FROM public.cmc_ema_multi_tf m
+    FROM public.ema_multi_tf m
 
     UNION ALL
 
@@ -39,6 +39,6 @@ CREATE VIEW public.all_emas AS
         c.d1      AS d1_close,
         c.d2      AS d2_close,
         c.roll
-    FROM public.cmc_ema_multi_tf_cal c;
+    FROM public.ema_multi_tf_cal c;
 
 COMMIT;

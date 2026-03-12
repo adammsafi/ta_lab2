@@ -28,11 +28,11 @@ from ta_lab2.scripts.bars.common_snapshot_contract import (
 # Tables to audit
 # ----------------------------
 TABLES = [
-    "public.cmc_price_bars_multi_tf",
-    "public.cmc_price_bars_multi_tf_cal_us",
-    "public.cmc_price_bars_multi_tf_cal_iso",
-    "public.cmc_price_bars_multi_tf_cal_anchor_us",
-    "public.cmc_price_bars_multi_tf_cal_anchor_iso",
+    "public.price_bars_multi_tf",
+    "public.price_bars_multi_tf_cal_us",
+    "public.price_bars_multi_tf_cal_iso",
+    "public.price_bars_multi_tf_cal_anchor_us",
+    "public.price_bars_multi_tf_cal_anchor_iso",
 ]
 
 DEFAULT_DAILY_TABLE = "public.cmc_price_histories7"

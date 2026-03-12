@@ -5,7 +5,7 @@ Uses trade-reconstructed returns (per-bar approximation) rather than the
 portfolio-level returns available during online computation in backtest_from_signals.py.
 The return_source column in psr_results distinguishes the two paths:
   - 'portfolio'            : pf.returns() during backtest execution (exact, fees-aware)
-  - 'trade_reconstruction' : approximation from cmc_backtest_trades (this script)
+  - 'trade_reconstruction' : approximation from backtest_trades (this script)
 
 Usage:
     # Single run
@@ -130,13 +130,13 @@ def compute_psr_for_run(
     # Load run metadata
     run_row = conn.execute(
         text(
-            "SELECT asset_id, start_ts, end_ts FROM public.cmc_backtest_runs WHERE run_id = :run_id"
+            "SELECT asset_id, start_ts, end_ts FROM public.backtest_runs WHERE run_id = :run_id"
         ),
         {"run_id": run_id},
     ).fetchone()
 
     if run_row is None:
-        logger.warning(f"Run {run_id} not found in cmc_backtest_runs — skipping")
+        logger.warning(f"Run {run_id} not found in backtest_runs — skipping")
         return None
 
     asset_id, start_ts, end_ts = run_row[0], run_row[1], run_row[2]
@@ -145,7 +145,7 @@ def compute_psr_for_run(
     bars_result = conn.execute(
         text(
             """
-            SELECT ts FROM public.cmc_features
+            SELECT ts FROM public.features
             WHERE id = :asset_id
               AND tf = '1D'
               AND ts BETWEEN :start_ts AND :end_ts
@@ -177,7 +177,7 @@ def compute_psr_for_run(
         text(
             """
             SELECT entry_ts, exit_ts, pnl_pct
-            FROM public.cmc_backtest_trades
+            FROM public.backtest_trades
             WHERE run_id = :run_id
             ORDER BY entry_ts
             """
@@ -271,11 +271,11 @@ def compute_psr_for_run(
         },
     )
 
-    # Also update cmc_backtest_metrics.psr column
+    # Also update backtest_metrics.psr column
     conn.execute(
         text(
             """
-            UPDATE public.cmc_backtest_metrics
+            UPDATE public.backtest_metrics
             SET psr = :psr
             WHERE run_id = :run_id
             """
@@ -377,7 +377,7 @@ def main() -> int:
                 logger.info("--recompute: fetching ALL backtest runs")
                 rows = conn.execute(
                     text(
-                        "SELECT run_id FROM public.cmc_backtest_runs ORDER BY run_timestamp"
+                        "SELECT run_id FROM public.backtest_runs ORDER BY run_timestamp"
                     )
                 ).fetchall()
             else:
@@ -386,7 +386,7 @@ def main() -> int:
                     text(
                         """
                         SELECT r.run_id
-                        FROM public.cmc_backtest_runs r
+                        FROM public.backtest_runs r
                         LEFT JOIN public.psr_results p
                             ON r.run_id = p.run_id AND p.formula_version = 'lopez_de_prado_v1'
                         WHERE p.result_id IS NULL

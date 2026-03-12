@@ -8,7 +8,7 @@ Provides:
     - MarginTier:                 Venue-specific tiered margin rate config
     - MarginState:                Current margin state for a single position
     - compute_margin_utilization: Core margin computation with tiered rates
-    - load_margin_tiers:          Load tiers from cmc_margin_config table
+    - load_margin_tiers:          Load tiers from margin_config table
     - compute_cross_margin_utilization: Portfolio-level cross-margin ratio
 
 Threshold semantics (from CONTEXT.md / dim_risk_limits defaults):
@@ -274,7 +274,7 @@ def compute_cross_margin_utilization(
 
 def load_margin_tiers(engine, venue: str, symbol: str) -> List[MarginTier]:
     """
-    Load margin tiers from cmc_margin_config for the given venue and symbol.
+    Load margin tiers from margin_config for the given venue and symbol.
 
     Parameters
     ----------
@@ -300,7 +300,7 @@ def load_margin_tiers(engine, venue: str, symbol: str) -> List[MarginTier]:
             initial_margin_rate,
             maintenance_margin_rate,
             max_leverage
-        FROM cmc_margin_config
+        FROM margin_config
         WHERE venue  = :venue
           AND symbol = :symbol
         ORDER BY notional_floor ASC
@@ -321,7 +321,7 @@ def load_margin_tiers(engine, venue: str, symbol: str) -> List[MarginTier]:
 
     if not rows:
         logger.warning(
-            "No margin tiers found in cmc_margin_config for venue=%s symbol=%s",
+            "No margin tiers found in margin_config for venue=%s symbol=%s",
             venue,
             symbol,
         )

@@ -114,7 +114,7 @@ def _perp_position_row(
     avg_entry_price: float = 48000.0,
 ) -> MagicMock:
     """
-    Simulate a cmc_perp_positions row.
+    Simulate a perp_positions row.
 
     position_value = mark_price * quantity = 50000 * 1.0 = 50000
     Default tier not loaded from DB (empty tiers -> defaults: IM=10%, MM=5%)
@@ -136,7 +136,7 @@ def _perp_position_row(
 
 
 def _empty_margin_tiers():
-    """No margin tiers in cmc_margin_config -- forces conservative defaults."""
+    """No margin tiers in margin_config -- forces conservative defaults."""
     return _make_result(fetchall=[])
 
 
@@ -151,13 +151,13 @@ def _buy_order_full_sequence(
     and reaches Gate 1.6.
 
     Gate 1.6 will execute:
-        1. cmc_perp_positions SELECT
-        2. (if position found) cmc_margin_config SELECT for tiers
-        3. (if gate triggered) cmc_risk_events INSERT (log event)
+        1. perp_positions SELECT
+        2. (if position found) margin_config SELECT for tiers
+        3. (if gate triggered) risk_events INSERT (log event)
 
     Args:
-        perp_position_mock: result for cmc_perp_positions query (None = no position)
-        margin_tiers_mock:  result for cmc_margin_config query (None = skip, only if position found)
+        perp_position_mock: result for perp_positions query (None = no position)
+        margin_tiers_mock:  result for margin_config query (None = skip, only if position found)
         limits_row:         _default_limits_row() or custom
         log_events_count:   number of log event INSERTs expected
     """
@@ -168,7 +168,7 @@ def _buy_order_full_sequence(
         _make_result(fetchall=lim),  # Gate 2: _load_limits (CB cooldown)
         _no_cb_tripped(),  # Gate 2: cb_breaker_tripped_at
         _make_result(fetchall=lim),  # Gate 3/4: _load_limits (caps)
-        perp_position_mock or _no_perp_position(),  # Gate 1.6: cmc_perp_positions
+        perp_position_mock or _no_perp_position(),  # Gate 1.6: perp_positions
     ]
     if margin_tiers_mock is not None:
         seq.append(margin_tiers_mock)
@@ -276,7 +276,7 @@ class TestMarginGateDirectMethod:
                 mark_price=mark_price,
                 quantity=quantity,
             ),
-            _empty_margin_tiers(),  # cmc_margin_config returns no tiers
+            _empty_margin_tiers(),  # margin_config returns no tiers
         ]
         if with_log_event:
             side_effects.append(_log_event_result())
@@ -305,7 +305,7 @@ class TestMarginGateDirectMethod:
         assert conn.execute.call_count == 0
 
     def test_no_perp_position_returns_none(self):
-        """When cmc_perp_positions has no active position, gate returns None (passes)."""
+        """When perp_positions has no active position, gate returns None (passes)."""
         from ta_lab2.risk.risk_engine import RiskEngine, RiskLimits
 
         engine, conn = _make_engine([_no_perp_position()])
@@ -416,7 +416,7 @@ class TestMarginGateDirectMethod:
         assert result == "critical"
 
     def test_no_margin_tiers_uses_fallback_defaults(self):
-        """When cmc_margin_config has no tiers, conservative defaults (IM=10%, MM=5%) apply."""
+        """When margin_config has no tiers, conservative defaults (IM=10%, MM=5%) apply."""
         from ta_lab2.risk.risk_engine import RiskEngine, RiskLimits
 
         # No tiers -> MM=5% -> maintenance_margin = 50000 * 1.0 * 0.05 = 2500

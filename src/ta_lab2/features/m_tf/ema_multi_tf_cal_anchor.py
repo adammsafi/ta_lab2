@@ -2,7 +2,7 @@
 Calendar-anchor multi-timeframe EMA - REFACTORED to use BaseEMAFeature.
 
 Calendar anchor EMA semantics:
-- Canonical closes from cmc_price_bars_multi_tf_cal_anchor_us/iso
+- Canonical closes from price_bars_multi_tf_cal_anchor_us/iso
 - Timeframe universe from dim_timeframe (alignment_type='calendar', ANCHOR families)
 - Similar to cal but with anchored periods
 - Uses is_partial_end (not roll) column for canonical detection
@@ -72,9 +72,9 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
 
         # Determine bars table from scheme
         if self.scheme == "US":
-            self.bars_table = "public.cmc_price_bars_multi_tf_cal_anchor_us"
+            self.bars_table = "public.price_bars_multi_tf_cal_anchor_us"
         elif self.scheme == "ISO":
-            self.bars_table = "public.cmc_price_bars_multi_tf_cal_anchor_iso"
+            self.bars_table = "public.price_bars_multi_tf_cal_anchor_iso"
         else:
             raise ValueError(f"Unsupported scheme: {scheme}")
 
@@ -105,7 +105,7 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
 
         sql = f"""
           SELECT id, "timestamp" AS ts, close, venue, venue_rank
-          FROM public.cmc_price_bars_1d
+          FROM public.price_bars_1d
           WHERE {" AND ".join(where)}
           ORDER BY id, venue, "timestamp"
         """
@@ -516,7 +516,7 @@ def write_multi_timeframe_ema_cal_anchor_to_db(
 
     scheme_u = scheme.strip().upper()
     if out_table is None:
-        out_table = f"cmc_ema_multi_tf_cal_anchor_{scheme_u.lower()}"
+        out_table = f"ema_multi_tf_cal_anchor_{scheme_u.lower()}"
 
     logger.info(
         f"Computing calendar anchor EMAs: scheme={scheme_u}, periods={len(ema_periods)}, ids={len(ids)}"

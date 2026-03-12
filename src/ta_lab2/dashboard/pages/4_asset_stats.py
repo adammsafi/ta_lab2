@@ -78,7 +78,7 @@ except Exception as exc:
 if stats_df is None or stats_df.empty:
     st.info(
         "No asset statistics found. "
-        "Run `python -m ta_lab2.scripts.desc_stats.refresh_cmc_asset_stats --ids all` first."
+        "Run `python -m ta_lab2.scripts.desc_stats.refresh_asset_stats --ids all` first."
     )
 else:
     # Build list of numeric stat columns for the multiselect
@@ -143,7 +143,7 @@ except Exception as exc:
 if corr_df is None or corr_df.empty:
     st.info(
         f"No correlation data found for TF={selected_tf}, window={selected_window} bars. "
-        "Run `python -m ta_lab2.scripts.desc_stats.refresh_cmc_cross_asset_corr --ids all` "
+        "Run `python -m ta_lab2.scripts.desc_stats.refresh_cross_asset_corr --ids all` "
         "and then refresh the materialized view."
     )
 else:

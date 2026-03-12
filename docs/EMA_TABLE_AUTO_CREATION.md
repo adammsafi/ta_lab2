@@ -28,12 +28,12 @@ Changes:
 
 | Table Name | Type | Auto-Detected? | Columns |
 |------------|------|----------------|---------|
-| `cmc_ema_multi_tf` | `multi_tf` | Yes (default) | 12 |
-| `cmc_ema_multi_tf_v2` | `v2` | Yes (contains "_v2") | 12 |
-| `cmc_ema_multi_tf_cal_iso` | `cal` | Yes (contains "_cal_") | 18 |
-| `cmc_ema_multi_tf_cal_us` | `cal` | Yes (contains "_cal_") | 18 |
-| `cmc_ema_multi_tf_cal_anchor_iso` | `cal_anchor` | Yes (contains "cal_anchor") | 18 |
-| `cmc_ema_multi_tf_cal_anchor_us` | `cal_anchor` | Yes (contains "cal_anchor") | 18 |
+| `ema_multi_tf` | `multi_tf` | Yes (default) | 12 |
+| `ema_multi_tf_v2` | `v2` | Yes (contains "_v2") | 12 |
+| `ema_multi_tf_cal_iso` | `cal` | Yes (contains "_cal_") | 18 |
+| `ema_multi_tf_cal_us` | `cal` | Yes (contains "_cal_") | 18 |
+| `ema_multi_tf_cal_anchor_iso` | `cal_anchor` | Yes (contains "cal_anchor") | 18 |
+| `ema_multi_tf_cal_anchor_us` | `cal_anchor` | Yes (contains "cal_anchor") | 18 |
 
 ## Usage
 
@@ -43,7 +43,7 @@ No changes needed! Just run the scripts as before:
 
 ```bash
 # Individual script
-python src/ta_lab2/scripts/emas/refresh_cmc_ema_multi_tf_from_bars.py --ids all --periods all --full-refresh
+python src/ta_lab2/scripts/emas/refresh_ema_multi_tf_from_bars.py --ids all --periods all --full-refresh
 
 # Or via orchestrator
 python src/ta_lab2/scripts/emas/run_all_ema_refreshes.py --ids all --periods all
@@ -118,10 +118,10 @@ This generates DDL for all 6 EMA table types without connecting to a database.
 Schemas were extracted from production using dbtool:
 
 ```bash
-python -m ta_lab2.tools.dbtool describe public cmc_ema_multi_tf
-python -m ta_lab2.tools.dbtool indexes public cmc_ema_multi_tf
-python -m ta_lab2.tools.dbtool describe public cmc_ema_multi_tf_v2
-python -m ta_lab2.tools.dbtool describe public cmc_ema_multi_tf_cal_iso
+python -m ta_lab2.tools.dbtool describe public ema_multi_tf
+python -m ta_lab2.tools.dbtool indexes public ema_multi_tf
+python -m ta_lab2.tools.dbtool describe public ema_multi_tf_v2
+python -m ta_lab2.tools.dbtool describe public ema_multi_tf_cal_iso
 ```
 
 ### Type Detection Logic

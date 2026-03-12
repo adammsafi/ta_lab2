@@ -10,11 +10,11 @@ Execution flow per strategy (dim_executor_config WHERE is_active=TRUE):
 4. For each asset: compute target vs current position
 5. Generate CanonicalOrder for delta (signal_id set BEFORE logging)
 6. Log to paper_orders via PaperOrderLogger
-7. Promote to cmc_orders via OrderManager.promote_paper_order
+7. Promote to orders via OrderManager.promote_paper_order
 8. Simulate fill via FillSimulator
 9. Process fill via OrderManager.process_fill (strategy_id for isolation)
 10. Mark signals as processed, update watermark
-11. Write run log entry to cmc_executor_run_log
+11. Write run log entry to executor_run_log
 """
 
 from __future__ import annotations
@@ -256,7 +256,7 @@ class PaperExecutor:
     # ------------------------------------------------------------------
 
     def _load_regime_for_asset(self, conn, asset_id: int) -> dict:
-        """Read the latest regime row from cmc_regimes for the given asset.
+        """Read the latest regime row from regimes for the given asset.
 
         Returns a dict with l0_label, l1_label, l2_label, l4_label,
         gross_cap, and size_mult. Defaults to gross_cap=1.0 / size_mult=1.0
@@ -275,7 +275,7 @@ class PaperExecutor:
             row = conn.execute(
                 text("""
                 SELECT l0_label, l1_label, l2_label, l4_label, gross_cap, size_mult
-                FROM public.cmc_regimes WHERE id = :asset_id AND tf = '1D'
+                FROM public.regimes WHERE id = :asset_id AND tf = '1D'
                 ORDER BY ts DESC LIMIT 1
             """),
                 {"asset_id": asset_id},
@@ -471,7 +471,7 @@ class PaperExecutor:
         dry_run: bool,
     ) -> dict:
         """
-        Signal -> CanonicalOrder -> paper_orders -> cmc_orders -> fill -> position.
+        Signal -> CanonicalOrder -> paper_orders -> orders -> fill -> position.
 
         Returns a result dict with keys: skipped_no_delta, rejected,
         order_generated, fill_processed.
@@ -518,7 +518,7 @@ class PaperExecutor:
             text(
                 """
                 SELECT quantity
-                FROM public.cmc_positions
+                FROM public.positions
                 WHERE asset_id = :asset_id
                   AND exchange = :exchange
                   AND strategy_id = :strategy_id
@@ -619,7 +619,7 @@ class PaperExecutor:
             asset_id=asset_id,
         )
         # CRITICAL: set signal_id before PaperOrderLogger.log_order so it
-        # propagates through paper_orders -> cmc_orders -> ParityChecker.
+        # propagates through paper_orders -> orders -> ParityChecker.
         order.signal_id = config.signal_id
 
         # --- Phase 1: log to paper_orders ---
@@ -630,7 +630,7 @@ class PaperExecutor:
             environment=getattr(config, "_environment", "sandbox"),
         )
 
-        # --- Phase 2: promote to cmc_orders ---
+        # --- Phase 2: promote to orders ---
         environment = getattr(config, "_environment", "sandbox")
         order_id = OrderManager.promote_paper_order(
             self.engine, paper_uuid, environment
@@ -697,7 +697,7 @@ class PaperExecutor:
         error: Optional[str] = None,
     ) -> None:
         """
-        Insert an audit row into cmc_executor_run_log.
+        Insert an audit row into executor_run_log.
 
         Includes L4 audit columns (l4_regime, l4_size_mult) sourced from
         self._current_l4_label and self._current_l4_size_mult set during
@@ -712,7 +712,7 @@ class PaperExecutor:
                 conn.execute(
                     text(
                         """
-                        INSERT INTO public.cmc_executor_run_log (
+                        INSERT INTO public.executor_run_log (
                             run_id, config_ids, status,
                             signals_read, orders_generated, fills_processed,
                             skipped_no_delta, error_message, finished_at,

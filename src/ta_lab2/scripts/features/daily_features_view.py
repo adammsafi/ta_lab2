@@ -1,14 +1,14 @@
 """
 FeaturesStore - Unified multi-TF bar-level feature store management.
 
-This module manages cmc_features, a materialized table joining all bar-level features:
-- cmc_price_bars_multi_tf (OHLCV, all timeframes)
-- cmc_returns_bars_multi_tf (bar returns, canonical + roll)
-- cmc_vol (volatility estimators)
-- cmc_ta (technical indicators)
+This module manages features, a materialized table joining all bar-level features:
+- price_bars_multi_tf (OHLCV, all timeframes)
+- returns_bars_multi_tf (bar returns, canonical + roll)
+- vol (volatility estimators)
+- ta (technical indicators)
 
 EMAs are NOT included (different granularity with period dimension).
-Query cmc_ema_multi_tf_u and cmc_returns_ema_multi_tf_u directly.
+Query ema_multi_tf_u and returns_ema_multi_tf_u directly.
 
 Design:
 - Dynamic column matching: DDL is the contract, JOIN builder auto-discovers columns
@@ -105,10 +105,10 @@ _RENAMES = {
 # Source table definitions: alias, join condition template, exclude set.
 _SOURCE_DEFS = {
     "returns": {
-        "table": "public.cmc_returns_bars_multi_tf_u",
+        "table": "public.returns_bars_multi_tf_u",
         "alias": "r",
         "join_tmpl": (
-            "LEFT JOIN public.cmc_returns_bars_multi_tf_u r"
+            "LEFT JOIN public.returns_bars_multi_tf_u r"
             ' ON p.id = r.id AND p.time_close = r."timestamp"'
             " AND p.venue = r.venue"
             " AND r.tf = '{tf}'"
@@ -118,10 +118,10 @@ _SOURCE_DEFS = {
         "exclude": _RETURNS_EXCLUDE,
     },
     "vol": {
-        "table": "public.cmc_vol",
+        "table": "public.vol",
         "alias": "v",
         "join_tmpl": (
-            "LEFT JOIN public.cmc_vol v"
+            "LEFT JOIN public.vol v"
             " ON p.id = v.id AND p.time_close = v.ts"
             " AND p.venue = v.venue"
             " AND v.tf = '{tf}'"
@@ -130,10 +130,10 @@ _SOURCE_DEFS = {
         "exclude": _VOL_EXCLUDE,
     },
     "ta": {
-        "table": "public.cmc_ta",
+        "table": "public.ta",
         "alias": "t",
         "join_tmpl": (
-            "LEFT JOIN public.cmc_ta t"
+            "LEFT JOIN public.ta t"
             " ON p.id = t.id AND p.time_close = t.ts"
             " AND p.venue = t.venue"
             " AND t.tf = '{tf}'"
@@ -151,7 +151,7 @@ _SOURCE_DEFS = {
 
 class FeaturesStore:
     """
-    Manages cmc_features materialized table.
+    Manages features materialized table.
 
     Refresh pattern:
     1. Check which source tables exist and have data
@@ -161,33 +161,33 @@ class FeaturesStore:
     5. Update state
 
     Source tables (dependency order):
-    1. cmc_price_bars_multi_tf (base - required)
-    2. cmc_returns_bars_multi_tf (bar returns - optional)
-    3. cmc_vol (depends on bars - optional)
-    4. cmc_ta (depends on bars - optional)
+    1. price_bars_multi_tf (base - required)
+    2. returns_bars_multi_tf (bar returns - optional)
+    3. vol (depends on bars - optional)
+    4. ta (depends on bars - optional)
     """
 
     SOURCE_TABLES = {
         "price_bars": {
-            "table": "cmc_price_bars_multi_tf_u",
+            "table": "price_bars_multi_tf_u",
             "schema": "public",
             "required": True,
             "feature_type": "price_bars",
         },
         "returns": {
-            "table": "cmc_returns_bars_multi_tf_u",
+            "table": "returns_bars_multi_tf_u",
             "schema": "public",
             "required": False,
             "feature_type": "returns",
         },
         "vol": {
-            "table": "cmc_vol",
+            "table": "vol",
             "schema": "public",
             "required": False,
             "feature_type": "vol",
         },
         "ta": {
-            "table": "cmc_ta",
+            "table": "ta",
             "schema": "public",
             "required": False,
             "feature_type": "ta",
@@ -292,7 +292,7 @@ class FeaturesStore:
         full_refresh: bool = False,
     ) -> int:
         """
-        Refresh cmc_features for given IDs and timeframe.
+        Refresh features for given IDs and timeframe.
 
         Args:
             ids: List of asset IDs to refresh
@@ -314,7 +314,7 @@ class FeaturesStore:
 
         if not sources_available.get("price_bars", False):
             logger.error(
-                "Required table cmc_price_bars_multi_tf_u not available - cannot refresh"
+                "Required table price_bars_multi_tf_u not available - cannot refresh"
             )
             return 0
 
@@ -347,7 +347,7 @@ class FeaturesStore:
             rows_inserted = result.rowcount
 
         logger.info(
-            f"Inserted {rows_inserted} rows into cmc_features"
+            f"Inserted {rows_inserted} rows into features"
             f" (tf={tf}, alignment_source={alignment_source})"
         )
 
@@ -372,7 +372,7 @@ class FeaturesStore:
             params["start"] = start
 
         delete_sql = f"""
-            DELETE FROM public.cmc_features
+            DELETE FROM public.features
             WHERE {where_clause}
         """
 
@@ -398,13 +398,13 @@ class FeaturesStore:
         """
         Build the JOIN query to materialize features.
 
-        Uses dynamic column matching: queries cmc_features columns from
+        Uses dynamic column matching: queries features columns from
         information_schema, then maps each to the correct source table.
         """
         ids_list = ",".join(str(id_) for id_ in ids)
 
-        # Discover target columns from cmc_features DDL
-        target_cols = get_columns(self.engine, "public.cmc_features")
+        # Discover target columns from features DDL
+        target_cols = get_columns(self.engine, "public.features")
 
         # Discover source columns for each available source
         source_col_map: dict[str, set[str]] = {}
@@ -502,7 +502,7 @@ class FeaturesStore:
                 insert_cols.append(_q(col))
 
         # Build JOINs
-        from_clause = "\n            FROM public.cmc_price_bars_multi_tf_u p"
+        from_clause = "\n            FROM public.price_bars_multi_tf_u p"
         join_clauses = []
         for src_key, src_def in _SOURCE_DEFS.items():
             if sources_available.get(src_key, False):
@@ -524,7 +524,7 @@ class FeaturesStore:
 
         # Build complete query
         query = f"""
-            INSERT INTO public.cmc_features (
+            INSERT INTO public.features (
                 {", ".join(insert_cols)}
             )
             SELECT
@@ -540,7 +540,7 @@ class FeaturesStore:
         """Update state after successful refresh."""
         try:
             self.state_manager.update_state_from_output(
-                output_table="cmc_features",
+                output_table="features",
                 output_schema="public",
                 feature_name="unified",
             )
@@ -588,7 +588,7 @@ def refresh_features(
     config = FeatureStateConfig(
         feature_type="daily_features",
         state_schema="public",
-        state_table="cmc_feature_state",
+        state_table="feature_state",
     )
     state_manager = FeatureStateManager(engine, config)
     state_manager.ensure_state_table()

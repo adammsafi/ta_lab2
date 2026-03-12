@@ -32,18 +32,18 @@ def get_all_asset_ids(db_url: Optional[str] = None) -> List[str]:
 
 def main(db_url: Optional[str] = None) -> None:
     """
-    Refresh cmc_ema_multi_tf for ALL assets in cmc_price_histories7,
-    and refresh the EMA views, by invoking the existing refresh_cmc_emas script.
+    Refresh ema_multi_tf for ALL assets in cmc_price_histories7,
+    and refresh the EMA views, by invoking the existing refresh_emas script.
     """
     ids = get_all_asset_ids(db_url=db_url)
     if not ids:
         raise RuntimeError("No ids found in cmc_price_histories7.")
 
-    # Build the CLI arguments for refresh_cmc_emas.py
+    # Build the CLI arguments for refresh_emas.py
     cli_args = [
         "python",
         "-m",
-        "ta_lab2.scripts.refresh_cmc_emas",
+        "ta_lab2.scripts.refresh_emas",
         "--ids",
         *ids,
         "--update-daily",

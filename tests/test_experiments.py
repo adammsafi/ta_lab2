@@ -56,7 +56,7 @@ def _minimal_yaml(extra_features: str = "") -> str:
               mode: inline
               expression: "close * 2"
             inputs:
-              - table: cmc_price_bars_multi_tf_u
+              - table: price_bars_multi_tf_u
                 columns: [close]
             tags: [test]
         {extra_features}
@@ -97,7 +97,7 @@ class TestFeatureRegistryLoad:
                 params:
                   period: [5, 14]
                 inputs:
-                  - table: cmc_ta_daily
+                  - table: ta_daily
                     columns: [rsi_14]
             """,
         )
@@ -123,7 +123,7 @@ class TestFeatureRegistryLoad:
                 params:
                   window: [7, 30]
                 inputs:
-                  - table: cmc_price_bars_multi_tf_u
+                  - table: price_bars_multi_tf_u
                     columns: [close]
             """,
         )
@@ -168,7 +168,7 @@ class TestFeatureRegistryLoad:
                 params:
                   period: [5]
                 inputs:
-                  - table: cmc_price_bars_multi_tf_u
+                  - table: price_bars_multi_tf_u
                     columns: [close]
               rsi_sweep_period5:
                 lifecycle: experimental
@@ -176,7 +176,7 @@ class TestFeatureRegistryLoad:
                   mode: inline
                   expression: "close * 2"
                 inputs:
-                  - table: cmc_price_bars_multi_tf_u
+                  - table: price_bars_multi_tf_u
                     columns: [close]
             """,
         )
@@ -198,7 +198,7 @@ class TestFeatureRegistryLoad:
                   mode: inline
                   expression: "close"
                 inputs:
-                  - table: cmc_price_bars_multi_tf_u
+                  - table: price_bars_multi_tf_u
                     columns: [close]
             """,
         )
@@ -218,7 +218,7 @@ class TestFeatureRegistryLoad:
                   mode: inline
                   expression: "close"
                 inputs:
-                  - table: cmc_price_bars_multi_tf_u
+                  - table: price_bars_multi_tf_u
                     columns: [close]
               promoted_feature:
                 lifecycle: promoted
@@ -226,7 +226,7 @@ class TestFeatureRegistryLoad:
                   mode: inline
                   expression: "close * 2"
                 inputs:
-                  - table: cmc_price_bars_multi_tf_u
+                  - table: price_bars_multi_tf_u
                     columns: [close]
               deprecated_feature:
                 lifecycle: deprecated
@@ -234,7 +234,7 @@ class TestFeatureRegistryLoad:
                   mode: inline
                   expression: "close / 2"
                 inputs:
-                  - table: cmc_price_bars_multi_tf_u
+                  - table: price_bars_multi_tf_u
                     columns: [close]
             """,
         )
@@ -266,7 +266,7 @@ class TestFeatureRegistryLoad:
                   mode: inline
                   expression: "close * 3"
                 inputs:
-                  - table: cmc_price_bars_multi_tf_u
+                  - table: price_bars_multi_tf_u
                     columns: [close]
                 tags: [test]
             """,
@@ -450,7 +450,7 @@ class TestComputeFeature:
                   mode: inline
                   expression: "close * 2"
                 inputs:
-                  - table: cmc_price_bars_multi_tf_u
+                  - table: price_bars_multi_tf_u
                     columns: [close]
             """,
         )
@@ -697,7 +697,7 @@ class TestFeatureRegistryEdgeCases:
                   window: [7, 30]
                   period: [14, 60]
                 inputs:
-                  - table: cmc_price_bars_multi_tf_u
+                  - table: price_bars_multi_tf_u
                     columns: [close]
             """,
         )

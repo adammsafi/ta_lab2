@@ -1,7 +1,7 @@
 """
 Regime context loading utilities for signal generators.
 
-Provides batch loading of regime data from cmc_regimes and merging into
+Provides batch loading of regime data from regimes and merging into
 feature DataFrames for regime-aware signal generation.
 
 Usage:
@@ -9,11 +9,11 @@ Usage:
 
     regime_df = load_regime_context_batch(engine, ids, tf='1D')
     # Returns DataFrame with (id, ts, regime_key, size_mult, stop_mult, orders)
-    # Empty DataFrame if cmc_regimes is empty or table doesn't exist.
+    # Empty DataFrame if regimes is empty or table doesn't exist.
 
 Design:
     - Batch load: one SQL query for all IDs in the date range
-    - Graceful fallback: if cmc_regimes is empty, returns empty DataFrame
+    - Graceful fallback: if regimes is empty, returns empty DataFrame
       and callers add NULL regime columns so signals generate as before
     - No exception propagation: regime failure should never block signal generation
 """
@@ -30,7 +30,7 @@ from sqlalchemy.engine import Engine
 
 logger = logging.getLogger(__name__)
 
-# Columns loaded from cmc_regimes (subset relevant for signal generation)
+# Columns loaded from regimes (subset relevant for signal generation)
 _REGIME_COLUMNS = [
     "id",
     "ts",
@@ -48,9 +48,9 @@ def load_regime_context_batch(
     start_ts: Optional[pd.Timestamp] = None,
 ) -> pd.DataFrame:
     """
-    Batch-load regime context from cmc_regimes for all IDs in date range.
+    Batch-load regime context from regimes for all IDs in date range.
 
-    Returns one row per (id, ts) with regime policy columns. If cmc_regimes
+    Returns one row per (id, ts) with regime policy columns. If regimes
     is empty, or the table doesn't exist, returns an empty DataFrame so callers
     can fall back gracefully (NULL regime columns, signals generate as before).
 
@@ -79,7 +79,7 @@ def load_regime_context_batch(
 
     sql_text = f"""
         SELECT {columns_sql}
-        FROM public.cmc_regimes
+        FROM public.regimes
         WHERE {where_sql}
         ORDER BY id, ts
     """

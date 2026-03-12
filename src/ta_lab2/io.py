@@ -29,7 +29,7 @@ def get_engine(db_url: str | None = None):
     Backwards-compatible helper to create a SQLAlchemy engine.
 
     If db_url is None, uses TARGET_DB_URL from ta_lab2.config.
-    This exists so older scripts like refresh_cmc_emas.py that import
+    This exists so older scripts that import
     `get_engine` continue to work.
     """
     return create_engine(db_url or TARGET_DB_URL)

@@ -1,5 +1,5 @@
 -- Purpose: Snapshot max(ts) and total row counts per table for core CMC data tables.
--- Tables:  cmc_price_histories7, cmc_ema_multi_tf, cmc_ema_multi_tf_cal
+-- Tables:  cmc_price_histories7, ema_multi_tf, ema_multi_tf_cal
 -- Usage:   \i sql/metrics/healthchecks/max_ts_rowcount_by_table.sql
 -- Notes:   Used to confirm that all feature tables are in sync with price history
 --          at a coarse, whole-table level.
@@ -15,16 +15,16 @@ UNION ALL
 
 -- 2) Multi-TF EMAs (price-timestamp aligned)
 SELECT
-    'cmc_ema_multi_tf'     AS table_name,
+    'ema_multi_tf'     AS table_name,
     MAX(ts)                AS max_ts,
     COUNT(*)               AS row_count
-FROM cmc_ema_multi_tf
+FROM ema_multi_tf
 
 UNION ALL
 
 -- 3) Multi-TF EMAs (calendar-aligned)
 SELECT
-    'cmc_ema_multi_tf_cal' AS table_name,
+    'ema_multi_tf_cal' AS table_name,
     MAX(ts)                AS max_ts,
     COUNT(*)               AS row_count
-FROM cmc_ema_multi_tf_cal;
+FROM ema_multi_tf_cal;

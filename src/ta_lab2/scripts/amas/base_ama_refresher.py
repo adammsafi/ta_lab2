@@ -84,7 +84,7 @@ class AMAWorkerTask:
     output_schema: str
     output_table: str
     bars_schema: str = "public"
-    bars_table: str = "cmc_price_bars_multi_tf"
+    bars_table: str = "price_bars_multi_tf"
     tf_subset: Optional[list[str]] = None
     full_rebuild: bool = False
     extra_config: dict[str, Any] = field(default_factory=dict)
@@ -264,16 +264,16 @@ class BaseAMARefresher(ABC):
     Usage pattern (subclass):
         class MultiTFAMARefresher(BaseAMARefresher):
             def get_default_output_table(self):
-                return "cmc_ama_multi_tf"
+                return "ama_multi_tf"
             def get_default_state_table(self):
-                return "public.cmc_ama_multi_tf_state"
+                return "public.ama_multi_tf_state"
             def get_description(self):
-                return "Refresh cmc_ama_multi_tf from multi-TF bars."
+                return "Refresh ama_multi_tf from multi-TF bars."
 
     Command line usage:
-        python -m ta_lab2.scripts.amas.refresh_cmc_ama_multi_tf --ids 1 --tf 1D
-        python -m ta_lab2.scripts.amas.refresh_cmc_ama_multi_tf --ids all --all-tfs
-        python -m ta_lab2.scripts.amas.refresh_cmc_ama_multi_tf --ids 1 --all-tfs \\
+        python -m ta_lab2.scripts.amas.refresh_ama_multi_tf --ids 1 --tf 1D
+        python -m ta_lab2.scripts.amas.refresh_ama_multi_tf --ids all --all-tfs
+        python -m ta_lab2.scripts.amas.refresh_ama_multi_tf --ids 1 --all-tfs \\
             --indicators KAMA --full-rebuild
     """
 
@@ -283,11 +283,11 @@ class BaseAMARefresher(ABC):
 
     @abstractmethod
     def get_default_output_table(self) -> str:
-        """Return default output table name (e.g. 'cmc_ama_multi_tf')."""
+        """Return default output table name (e.g. 'ama_multi_tf')."""
 
     @abstractmethod
     def get_default_state_table(self) -> str:
-        """Return default state table name (e.g. 'public.cmc_ama_multi_tf_state')."""
+        """Return default state table name (e.g. 'public.ama_multi_tf_state')."""
 
     @abstractmethod
     def get_description(self) -> str:
@@ -295,7 +295,7 @@ class BaseAMARefresher(ABC):
 
     def get_bars_table(self) -> str:
         """Return source bars table name. Override in calendar subclasses."""
-        return "cmc_price_bars_multi_tf"
+        return "price_bars_multi_tf"
 
     def get_bars_schema(self) -> str:
         """Return source bars schema. Override if needed."""
@@ -321,19 +321,19 @@ class BaseAMARefresher(ABC):
             epilog="""
 Examples:
   # Refresh asset 1 on 1D timeframe
-  python -m ta_lab2.scripts.amas.refresh_cmc_ama_multi_tf --ids 1 --tf 1D
+  python -m ta_lab2.scripts.amas.refresh_ama_multi_tf --ids 1 --tf 1D
 
   # Refresh all assets on all TFs (incremental by default)
-  python -m ta_lab2.scripts.amas.refresh_cmc_ama_multi_tf --ids all --all-tfs
+  python -m ta_lab2.scripts.amas.refresh_ama_multi_tf --ids all --all-tfs
 
   # KAMA only for assets 1 and 52
-  python -m ta_lab2.scripts.amas.refresh_cmc_ama_multi_tf --ids 1,52 --all-tfs --indicators KAMA
+  python -m ta_lab2.scripts.amas.refresh_ama_multi_tf --ids 1,52 --all-tfs --indicators KAMA
 
   # Full rebuild for asset 1
-  python -m ta_lab2.scripts.amas.refresh_cmc_ama_multi_tf --ids 1 --all-tfs --full-rebuild
+  python -m ta_lab2.scripts.amas.refresh_ama_multi_tf --ids 1 --all-tfs --full-rebuild
 
   # Dry run (no DB writes)
-  python -m ta_lab2.scripts.amas.refresh_cmc_ama_multi_tf --ids 1 --tf 1D --dry-run
+  python -m ta_lab2.scripts.amas.refresh_ama_multi_tf --ids 1 --tf 1D --dry-run
 """,
         )
 

@@ -3,7 +3,7 @@ Backtest engine that reads signals from database and executes via vectorbt.
 
 This module provides:
 1. Loading signals from cmc_signals_* tables
-2. Loading price data from cmc_features
+2. Loading price data from features
 3. Running backtests via existing vbt_runner.py infrastructure
 4. Extracting comprehensive metrics from vectorbt Portfolio
 5. Saving results to cmc_backtest_* tables
@@ -219,7 +219,7 @@ class SignalBacktester:
         end_ts: pd.Timestamp,
     ) -> pd.DataFrame:
         """
-        Load price data from cmc_features table.
+        Load price data from features table.
 
         Args:
             asset_id: Asset ID to filter
@@ -232,7 +232,7 @@ class SignalBacktester:
         sql = text(
             """
             SELECT ts, close
-            FROM public.cmc_features
+            FROM public.features
             WHERE id = :asset_id
               AND tf = '1D'
               AND ts >= :start_ts
@@ -453,7 +453,7 @@ class SignalBacktester:
         Extract trade records from vectorbt Portfolio.
 
         Converts vectorbt trade records to DataFrame with columns needed for
-        cmc_backtest_trades table.
+        backtest_trades table.
 
         Returns:
             DataFrame with columns: entry_ts, entry_price, exit_ts, exit_price,
@@ -541,7 +541,7 @@ class SignalBacktester:
         """
         Extract comprehensive metrics from vectorbt Portfolio.
 
-        Computes all metrics needed for cmc_backtest_metrics table.
+        Computes all metrics needed for backtest_metrics table.
 
         Args:
             pf: vectorbt Portfolio object
@@ -705,10 +705,10 @@ class SignalBacktester:
         logger.info(f"Saving backtest results with run_id={result.run_id}")
 
         with self.engine.begin() as conn:
-            # 1. Insert into cmc_backtest_runs
+            # 1. Insert into backtest_runs
             run_sql = text(
                 """
-                INSERT INTO public.cmc_backtest_runs
+                INSERT INTO public.backtest_runs
                     (run_id, signal_type, signal_id, asset_id, start_ts, end_ts,
                      cost_model, signal_params_hash, feature_hash,
                      signal_version, vbt_version, run_timestamp,
@@ -768,7 +768,7 @@ class SignalBacktester:
                             trades_to_insert[col] = ts_series
 
                 trades_to_insert.to_sql(
-                    "cmc_backtest_trades",
+                    "backtest_trades",
                     conn,
                     schema="public",
                     if_exists="append",
@@ -781,7 +781,7 @@ class SignalBacktester:
             # 3. Insert metrics
             metrics_sql = text(
                 """
-                INSERT INTO public.cmc_backtest_metrics
+                INSERT INTO public.backtest_metrics
                     (run_id, total_return, cagr, sharpe_ratio, sortino_ratio, calmar_ratio,
                      max_drawdown, max_drawdown_duration_days,
                      trade_count, win_rate, profit_factor, avg_win, avg_loss,
@@ -818,7 +818,7 @@ class SignalBacktester:
 
             # Extract PSR detail stats before building metrics params.
             # _psr_* keys hold distributional stats for psr_results table;
-            # they must NOT be passed to the cmc_backtest_metrics INSERT.
+            # they must NOT be passed to the backtest_metrics INSERT.
             psr_detail = {
                 k: v for k, v in native_metrics.items() if k.startswith("_psr_")
             }
@@ -890,7 +890,7 @@ class SignalBacktester:
                     if path is not None:
                         conn.execute(
                             text(
-                                "UPDATE public.cmc_backtest_runs "
+                                "UPDATE public.backtest_runs "
                                 "SET tearsheet_path = :path "
                                 "WHERE run_id = :run_id"
                             ),
@@ -920,7 +920,7 @@ class SignalBacktester:
                             text(
                                 """
                                 SELECT trade_id, entry_ts, entry_price
-                                FROM public.cmc_backtest_trades
+                                FROM public.backtest_trades
                                 WHERE run_id = :run_id
                                 ORDER BY entry_ts, entry_price, created_at
                                 """
@@ -943,7 +943,7 @@ class SignalBacktester:
                                 mfe_py = float(mfe_val) if mfe_val is not None else None
                                 conn.execute(
                                     text(
-                                        "UPDATE public.cmc_backtest_trades "
+                                        "UPDATE public.backtest_trades "
                                         "SET mae = :mae, mfe = :mfe "
                                         "WHERE trade_id = :trade_id"
                                     ),
@@ -971,7 +971,7 @@ class SignalBacktester:
                     conn.execute(
                         text(
                             """
-                            UPDATE public.cmc_backtest_metrics
+                            UPDATE public.backtest_metrics
                             SET mc_sharpe_lo     = :mc_sharpe_lo,
                                 mc_sharpe_hi     = :mc_sharpe_hi,
                                 mc_sharpe_median = :mc_sharpe_median,

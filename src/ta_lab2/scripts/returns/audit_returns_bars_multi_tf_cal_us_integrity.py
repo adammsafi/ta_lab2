@@ -4,9 +4,9 @@ r"""
 audit_returns_bars_multi_tf_cal_us_integrity.py
 
 Integrity audit for wide-column bar returns:
-  public.cmc_returns_bars_multi_tf_cal_us
+  public.returns_bars_multi_tf_cal_us
 built from:
-  public.cmc_price_bars_multi_tf_cal_us
+  public.price_bars_multi_tf_cal_us
 
 Checks:
   1) Coverage: n_ret == n_bars - 1 per (id, tf) (counts ALL rows: canonical + snapshot)
@@ -36,8 +36,8 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
 
-DEFAULT_BARS_TABLE = "public.cmc_price_bars_multi_tf_cal_us"
-DEFAULT_RET_TABLE = "public.cmc_returns_bars_multi_tf_cal_us"
+DEFAULT_BARS_TABLE = "public.price_bars_multi_tf_cal_us"
+DEFAULT_RET_TABLE = "public.returns_bars_multi_tf_cal_us"
 
 _PRINT_PREFIX = "audit_ret_bars_cal_us"
 
@@ -79,7 +79,7 @@ def _fail_or_warn(strict: bool, msg: str) -> None:
 
 def main() -> None:
     p = argparse.ArgumentParser(
-        description="Audit integrity for cmc_returns_bars_multi_tf_cal_us (wide-column, dual-LAG)."
+        description="Audit integrity for returns_bars_multi_tf_cal_us (wide-column, dual-LAG)."
     )
     p.add_argument(
         "--db-url",

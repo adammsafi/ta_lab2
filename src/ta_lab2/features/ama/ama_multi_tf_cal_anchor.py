@@ -2,12 +2,12 @@
 Calendar-anchor multi-timeframe AMA feature classes.
 
 Covers two calendar anchor schemes:
-- CalAnchorUSAMAFeature  : loads from cmc_price_bars_multi_tf_cal_anchor_us
-- CalAnchorISOAMAFeature : loads from cmc_price_bars_multi_tf_cal_anchor_iso
+- CalAnchorUSAMAFeature  : loads from price_bars_multi_tf_cal_anchor_us
+- CalAnchorISOAMAFeature : loads from price_bars_multi_tf_cal_anchor_iso
 
 Both extend BaseAMAFeature and write to their respective output tables:
-  cmc_ama_multi_tf_cal_anchor_us
-  cmc_ama_multi_tf_cal_anchor_iso
+  ama_multi_tf_cal_anchor_us
+  ama_multi_tf_cal_anchor_iso
 
 Design matches CalUSAMAFeature/CalISOAMAFeature except:
 - Source bars tables are the anchor-aligned variants
@@ -47,9 +47,9 @@ class CalAnchorUSAMAFeature(BaseAMAFeature):
     """
     AMA feature for US calendar-anchor bars.
 
-    Loads close prices from cmc_price_bars_multi_tf_cal_anchor_us.
+    Loads close prices from price_bars_multi_tf_cal_anchor_us.
     TF universe: calendar anchor TFs with US scheme from dim_timeframe.
-    Output table: cmc_ama_multi_tf_cal_anchor_us.
+    Output table: ama_multi_tf_cal_anchor_us.
     """
 
     def __init__(
@@ -58,7 +58,7 @@ class CalAnchorUSAMAFeature(BaseAMAFeature):
         config: Optional[AMAFeatureConfig] = None,
         *,
         bars_schema: str = "public",
-        bars_table: str = "cmc_price_bars_multi_tf_cal_anchor_us",
+        bars_table: str = "price_bars_multi_tf_cal_anchor_us",
     ) -> None:
         """
         Initialise calendar anchor US AMA feature.
@@ -66,7 +66,7 @@ class CalAnchorUSAMAFeature(BaseAMAFeature):
         Args:
             engine: SQLAlchemy engine.
             config: AMA feature configuration. Defaults to AMAFeatureConfig with
-                    ALL_AMA_PARAMS and output_table="cmc_ama_multi_tf_cal_anchor_us".
+                    ALL_AMA_PARAMS and output_table="ama_multi_tf_cal_anchor_us".
             bars_schema: Schema for bars source table.
             bars_table: Source bars table name.
         """
@@ -74,7 +74,7 @@ class CalAnchorUSAMAFeature(BaseAMAFeature):
             config = AMAFeatureConfig(
                 param_sets=list(ALL_AMA_PARAMS),
                 output_schema="public",
-                output_table="cmc_ama_multi_tf_cal_anchor_us",
+                output_table="ama_multi_tf_cal_anchor_us",
             )
         super().__init__(engine, config)
         self.bars_schema = bars_schema
@@ -118,7 +118,7 @@ class CalAnchorUSAMAFeature(BaseAMAFeature):
 
         sql = text(
             f"""
-            SELECT id, "timestamp" AS ts, tf, tf_days, FALSE AS roll, close, is_partial_end
+            SELECT id, "timestamp" AS ts, tf, tf_days, is_partial_end AS roll, close, is_partial_end
             FROM {self.bars_schema}.{self.bars_table}
             WHERE {where_sql}
             ORDER BY "timestamp"
@@ -244,9 +244,9 @@ class CalAnchorISOAMAFeature(BaseAMAFeature):
     """
     AMA feature for ISO calendar-anchor bars.
 
-    Loads close prices from cmc_price_bars_multi_tf_cal_anchor_iso.
+    Loads close prices from price_bars_multi_tf_cal_anchor_iso.
     TF universe: calendar anchor TFs with ISO scheme from dim_timeframe.
-    Output table: cmc_ama_multi_tf_cal_anchor_iso.
+    Output table: ama_multi_tf_cal_anchor_iso.
     """
 
     def __init__(
@@ -255,7 +255,7 @@ class CalAnchorISOAMAFeature(BaseAMAFeature):
         config: Optional[AMAFeatureConfig] = None,
         *,
         bars_schema: str = "public",
-        bars_table: str = "cmc_price_bars_multi_tf_cal_anchor_iso",
+        bars_table: str = "price_bars_multi_tf_cal_anchor_iso",
     ) -> None:
         """
         Initialise calendar anchor ISO AMA feature.
@@ -263,7 +263,7 @@ class CalAnchorISOAMAFeature(BaseAMAFeature):
         Args:
             engine: SQLAlchemy engine.
             config: AMA feature configuration. Defaults to AMAFeatureConfig with
-                    ALL_AMA_PARAMS and output_table="cmc_ama_multi_tf_cal_anchor_iso".
+                    ALL_AMA_PARAMS and output_table="ama_multi_tf_cal_anchor_iso".
             bars_schema: Schema for bars source table.
             bars_table: Source bars table name.
         """
@@ -271,7 +271,7 @@ class CalAnchorISOAMAFeature(BaseAMAFeature):
             config = AMAFeatureConfig(
                 param_sets=list(ALL_AMA_PARAMS),
                 output_schema="public",
-                output_table="cmc_ama_multi_tf_cal_anchor_iso",
+                output_table="ama_multi_tf_cal_anchor_iso",
             )
         super().__init__(engine, config)
         self.bars_schema = bars_schema
@@ -315,7 +315,7 @@ class CalAnchorISOAMAFeature(BaseAMAFeature):
 
         sql = text(
             f"""
-            SELECT id, "timestamp" AS ts, tf, tf_days, FALSE AS roll, close, is_partial_end
+            SELECT id, "timestamp" AS ts, tf, tf_days, is_partial_end AS roll, close, is_partial_end
             FROM {self.bars_schema}.{self.bars_table}
             WHERE {where_sql}
             ORDER BY "timestamp"

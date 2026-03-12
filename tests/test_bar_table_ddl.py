@@ -9,12 +9,12 @@ from ta_lab2.scripts.bars.common_snapshot_contract import _generate_bar_table_dd
 
 # Test all 6 table types
 tables = [
-    ("cmc_price_bars_1d", "1d"),
-    ("cmc_price_bars_multi_tf", "multi_tf"),
-    ("cmc_price_bars_multi_tf_cal_iso", "cal"),
-    ("cmc_price_bars_multi_tf_cal_us", "cal"),
-    ("cmc_price_bars_multi_tf_cal_anchor_iso", "cal_anchor"),
-    ("cmc_price_bars_multi_tf_cal_anchor_us", "cal_anchor"),
+    ("price_bars_1d", "1d"),
+    ("price_bars_multi_tf", "multi_tf"),
+    ("price_bars_multi_tf_cal_iso", "cal"),
+    ("price_bars_multi_tf_cal_us", "cal"),
+    ("price_bars_multi_tf_cal_anchor_iso", "cal_anchor"),
+    ("price_bars_multi_tf_cal_anchor_us", "cal_anchor"),
 ]
 
 print("=" * 80)

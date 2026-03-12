@@ -2,12 +2,12 @@
 EMA Signal Generator - Generate EMA crossover signals.
 
 This module generates EMA crossover trading signals using the existing ema_trend.py
-adapter. Signals are stored in cmc_signals_ema_crossover with full feature snapshots
+adapter. Signals are stored in signals_ema_crossover with full feature snapshots
 and version hashes for reproducibility.
 
 Architecture:
 - Load signal configurations from dim_signals (not hardcoded)
-- Fetch features from cmc_features + cmc_ema_multi_tf_u
+- Fetch features from features + ema_multi_tf_u
 - Generate signals using ema_trend.make_signals
 - Transform to stateful position records (open/closed)
 - Store in database with feature hashing
@@ -54,7 +54,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class EMASignalGenerator:
     """
-    Generate EMA crossover signals from cmc_features.
+    Generate EMA crossover signals from features.
 
     Attributes:
         engine: SQLAlchemy engine for database operations
@@ -135,7 +135,7 @@ class EMASignalGenerator:
 
         logger.debug(f"  Dirty window start: {start_ts}")
 
-        # 3. Load features from cmc_features
+        # 3. Load features from features
         features_df = self._load_features(ids, start_ts)
 
         if features_df.empty:
@@ -193,7 +193,7 @@ class EMASignalGenerator:
 
         # 7. Write to database
         if not dry_run:
-            self._write_signals(records, "cmc_signals_ema_crossover")
+            self._write_signals(records, "signals_ema_crossover")
             logger.info(f"  Wrote {len(records)} signals to database")
         else:
             logger.info(f"  DRY RUN: Would write {len(records)} signals")
@@ -291,10 +291,10 @@ class EMASignalGenerator:
         start_ts: Optional[pd.Timestamp],
     ) -> pd.DataFrame:
         """
-        Load features from cmc_features + cmc_ema_multi_tf_u.
+        Load features from features + ema_multi_tf_u.
 
-        EMAs are queried from cmc_ema_multi_tf_u (period dimension) and
-        pivoted via LEFT JOINs. Other features come from cmc_features.
+        EMAs are queried from ema_multi_tf_u (period dimension) and
+        pivoted via LEFT JOINs. Other features come from features.
 
         Args:
             ids: List of asset IDs
@@ -317,16 +317,16 @@ class EMASignalGenerator:
                    e9.ema as ema_9, e10.ema as ema_10, e21.ema as ema_21,
                    e50.ema as ema_50, e200.ema as ema_200,
                    f.rsi_14, f.atr_14
-            FROM public.cmc_features f
-            LEFT JOIN public.cmc_ema_multi_tf_u e9
+            FROM public.features f
+            LEFT JOIN public.ema_multi_tf_u e9
               ON f.id = e9.id AND f.ts = e9.ts AND e9.tf = f.tf AND e9.period = 9
-            LEFT JOIN public.cmc_ema_multi_tf_u e10
+            LEFT JOIN public.ema_multi_tf_u e10
               ON f.id = e10.id AND f.ts = e10.ts AND e10.tf = f.tf AND e10.period = 10
-            LEFT JOIN public.cmc_ema_multi_tf_u e21
+            LEFT JOIN public.ema_multi_tf_u e21
               ON f.id = e21.id AND f.ts = e21.ts AND e21.tf = f.tf AND e21.period = 21
-            LEFT JOIN public.cmc_ema_multi_tf_u e50
+            LEFT JOIN public.ema_multi_tf_u e50
               ON f.id = e50.id AND f.ts = e50.ts AND e50.tf = f.tf AND e50.period = 50
-            LEFT JOIN public.cmc_ema_multi_tf_u e200
+            LEFT JOIN public.ema_multi_tf_u e200
               ON f.id = e200.id AND f.ts = e200.ts AND e200.tf = f.tf AND e200.period = 200
             WHERE {where_sql}
             ORDER BY f.id, f.ts
@@ -414,7 +414,7 @@ class EMASignalGenerator:
             open_positions: DataFrame of existing open positions (from state manager)
 
         Returns:
-            DataFrame with columns matching cmc_signals_ema_crossover schema
+            DataFrame with columns matching signals_ema_crossover schema
         """
         fast_period = params["fast_period"]
         slow_period = params["slow_period"]
@@ -545,7 +545,7 @@ class EMASignalGenerator:
 
         Args:
             records: DataFrame with signal records
-            signal_table: Target table name (e.g., 'cmc_signals_ema_crossover')
+            signal_table: Target table name (e.g., 'signals_ema_crossover')
         """
         # Serialize feature_snapshot dicts to JSON strings for JSONB column
         records = records.copy()

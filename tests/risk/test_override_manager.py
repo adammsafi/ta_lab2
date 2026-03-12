@@ -103,7 +103,7 @@ def _make_override_row(
 
 
 class TestCreateOverride:
-    """create_override inserts row into cmc_risk_overrides + audit event."""
+    """create_override inserts row into risk_overrides + audit event."""
 
     def test_returns_override_id(self) -> None:
         """create_override returns the UUID string from RETURNING clause."""
@@ -127,7 +127,7 @@ class TestCreateOverride:
         assert result == _UUID
 
     def test_calls_execute_twice(self) -> None:
-        """Two DB operations: INSERT into cmc_risk_overrides + INSERT into cmc_risk_events."""
+        """Two DB operations: INSERT into risk_overrides + INSERT into risk_events."""
         insert_override_result = MagicMock()
         insert_override_result.scalar.return_value = _UUID
 
@@ -147,8 +147,8 @@ class TestCreateOverride:
 
         assert conn.execute.call_count == 2
 
-    def test_first_insert_targets_cmc_risk_overrides(self) -> None:
-        """First INSERT targets cmc_risk_overrides table."""
+    def test_first_insert_targets_risk_overrides(self) -> None:
+        """First INSERT targets risk_overrides table."""
         insert_override_result = MagicMock()
         insert_override_result.scalar.return_value = _UUID
 
@@ -165,10 +165,10 @@ class TestCreateOverride:
         )
 
         first_call_sql = str(conn.execute.call_args_list[0][0][0])
-        assert "cmc_risk_overrides" in first_call_sql
+        assert "risk_overrides" in first_call_sql
 
-    def test_second_insert_targets_cmc_risk_events_with_correct_type(self) -> None:
-        """Second INSERT targets cmc_risk_events with event_type='override_created'."""
+    def test_second_insert_targets_risk_events_with_correct_type(self) -> None:
+        """Second INSERT targets risk_events with event_type='override_created'."""
         insert_override_result = MagicMock()
         insert_override_result.scalar.return_value = _UUID
 
@@ -185,7 +185,7 @@ class TestCreateOverride:
         )
 
         second_call_sql = str(conn.execute.call_args_list[1][0][0])
-        assert "cmc_risk_events" in second_call_sql
+        assert "risk_events" in second_call_sql
         # Params passed as second positional arg
         second_call_params = conn.execute.call_args_list[1][0][1]
         assert second_call_params.get("reason") == "test"
@@ -265,7 +265,7 @@ class TestApplyOverride:
         assert conn.execute.call_count == 2
 
     def test_update_sql_sets_applied_at(self) -> None:
-        """UPDATE SQL targets cmc_risk_overrides and sets applied_at."""
+        """UPDATE SQL targets risk_overrides and sets applied_at."""
         update_result = MagicMock()
         update_result.rowcount = 1
 
@@ -275,11 +275,11 @@ class TestApplyOverride:
         mgr.apply_override(override_id=_UUID)
 
         update_sql = str(conn.execute.call_args_list[0][0][0])
-        assert "cmc_risk_overrides" in update_sql
+        assert "risk_overrides" in update_sql
         assert "applied_at" in update_sql
 
     def test_event_type_is_override_applied(self) -> None:
-        """Event INSERT targets cmc_risk_events with event_type='override_applied'."""
+        """Event INSERT targets risk_events with event_type='override_applied'."""
         update_result = MagicMock()
         update_result.rowcount = 1
 
@@ -289,7 +289,7 @@ class TestApplyOverride:
         mgr.apply_override(override_id=_UUID)
 
         event_sql = str(conn.execute.call_args_list[1][0][0])
-        assert "cmc_risk_events" in event_sql
+        assert "risk_events" in event_sql
         assert "override_applied" in event_sql
 
 
@@ -364,7 +364,7 @@ class TestRevertOverride:
         mgr.revert_override(override_id=_UUID, reason="resolved", operator="asafi")
 
         event_sql = str(conn.execute.call_args_list[1][0][0])
-        assert "cmc_risk_events" in event_sql
+        assert "risk_events" in event_sql
         assert "override_reverted" in event_sql
 
     def test_no_event_when_already_reverted(self) -> None:

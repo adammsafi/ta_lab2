@@ -44,7 +44,7 @@ def test_ensure_state_table_executes_create():
     # Verify SQL contains CREATE TABLE
     executed_sql = str(conn.execute.call_args[0][0])
     assert "CREATE TABLE" in executed_sql
-    assert "cmc_signal_state" in executed_sql
+    assert "signal_state" in executed_sql
 
 
 def test_load_open_positions_returns_dataframe():
@@ -107,7 +107,7 @@ def test_update_state_after_generation_upserts():
 
     manager = SignalStateManager(mock_engine, config)
     row_count = manager.update_state_after_generation(
-        signal_table="cmc_signals_ema_crossover", signal_id=1
+        signal_table="signals_ema_crossover", signal_id=1
     )
 
     assert row_count == 5
@@ -121,7 +121,7 @@ def test_update_state_after_generation_upserts():
     executed_sql = str(executed_call[0][0])
     assert "INSERT INTO" in executed_sql
     assert "ON CONFLICT" in executed_sql
-    assert "cmc_signal_state" in executed_sql
+    assert "signal_state" in executed_sql
 
 
 def test_get_dirty_window_start_returns_dict():
@@ -186,7 +186,7 @@ def test_roundtrip_open_positions():
         conn.execute(
             text(
                 """
-            DELETE FROM public.cmc_signals_ema_crossover
+            DELETE FROM public.signals_ema_crossover
             WHERE id = 999999 AND signal_id = 1
         """
             )
@@ -196,7 +196,7 @@ def test_roundtrip_open_positions():
         conn.execute(
             text(
                 """
-            INSERT INTO public.cmc_signals_ema_crossover
+            INSERT INTO public.signals_ema_crossover
             (id, ts, signal_id, direction, position_state, entry_ts, entry_price, feature_snapshot)
             VALUES
             (999999, '2024-01-01', 1, 'long', 'open', '2024-01-01', 100.0, '{"close": 100.0}'::jsonb)
@@ -218,7 +218,7 @@ def test_roundtrip_open_positions():
         conn.execute(
             text(
                 """
-            DELETE FROM public.cmc_signals_ema_crossover
+            DELETE FROM public.signals_ema_crossover
             WHERE id = 999999 AND signal_id = 1
         """
             )

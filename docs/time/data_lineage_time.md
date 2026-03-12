@@ -7,7 +7,7 @@ cmc_price_histories7
 cmc_ema_daily
     |
     v
-cmc_ema_multi_tf
+ema_multi_tf
     |
     v
 ema_alpha_lookup + dim_timeframe + dim_period

@@ -1,7 +1,7 @@
 """
 ensure_ema_unified_table.py
 
-Conditional setup script for cmc_ema_multi_tf_u unified EMA table.
+Conditional setup script for ema_multi_tf_u unified EMA table.
 Ensures table exists before running sync or validation tests.
 
 Usage:
@@ -52,7 +52,7 @@ def table_exists(engine: Engine, schema: str, table_name: str) -> bool:
     Args:
         engine: SQLAlchemy engine
         schema: Schema name (e.g., 'public')
-        table_name: Table name (e.g., 'cmc_ema_multi_tf_u')
+        table_name: Table name (e.g., 'ema_multi_tf_u')
 
     Returns:
         True if table exists, False otherwise
@@ -125,11 +125,9 @@ def execute_sql_file(engine: Engine, filepath: Path) -> None:
     _log("SQL file executed successfully")
 
 
-def ensure_cmc_ema_multi_tf_u(
-    engine: Engine, sql_dir: Path, dry_run: bool = False
-) -> dict:
+def ensure_ema_multi_tf_u(engine: Engine, sql_dir: Path, dry_run: bool = False) -> dict:
     """
-    Ensure cmc_ema_multi_tf_u table exists with correct schema.
+    Ensure ema_multi_tf_u table exists with correct schema.
 
     Args:
         engine: SQLAlchemy engine
@@ -143,7 +141,7 @@ def ensure_cmc_ema_multi_tf_u(
             - has_alignment_source: bool (table has alignment_source column)
     """
     schema = "public"
-    table_name = "cmc_ema_multi_tf_u"
+    table_name = "ema_multi_tf_u"
 
     result = {
         "existed": False,
@@ -174,7 +172,7 @@ def ensure_cmc_ema_multi_tf_u(
         return result
 
     # Create table from DDL
-    ddl_file = sql_dir / "030_cmc_ema_multi_tf_u_create.sql"
+    ddl_file = sql_dir / "030_ema_multi_tf_u_create.sql"
 
     try:
         execute_sql_file(engine, ddl_file)
@@ -199,7 +197,7 @@ def ensure_cmc_ema_multi_tf_u(
 def main() -> None:
     """CLI entry point."""
     parser = argparse.ArgumentParser(
-        description="Ensure cmc_ema_multi_tf_u unified EMA table exists",
+        description="Ensure ema_multi_tf_u unified EMA table exists",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -243,7 +241,7 @@ Examples:
 
     # Ensure table exists
     try:
-        result = ensure_cmc_ema_multi_tf_u(engine, args.sql_dir, dry_run=args.dry_run)
+        result = ensure_ema_multi_tf_u(engine, args.sql_dir, dry_run=args.dry_run)
     except Exception as e:
         _log(f"Error: {e}")
         sys.exit(1)
@@ -261,12 +259,12 @@ Examples:
         if result["existed"] or result["created"]:
             _log("Running sync script to populate from source tables...")
             try:
-                # Run sync_cmc_ema_multi_tf_u.py
+                # Run sync_ema_multi_tf_u.py
                 subprocess.run(
                     [
                         sys.executable,
                         "-m",
-                        "ta_lab2.scripts.emas.sync_cmc_ema_multi_tf_u",
+                        "ta_lab2.scripts.emas.sync_ema_multi_tf_u",
                     ],
                     check=True,
                     cwd=Path.cwd(),

@@ -50,14 +50,14 @@ class TAConfig(FeatureConfig):
 
     Attributes:
         feature_type: Type of feature (default: "ta")
-        output_table: Output table name (default: "cmc_ta_daily")
+        output_table: Output table name (default: "ta_daily")
         null_strategy: Null handling strategy (default: "interpolate")
         add_zscore: Whether to add z-score normalization (default: True)
         load_indicators_from_db: Load parameter sets from dim_indicators (default: True)
     """
 
     feature_type: str = "ta"
-    output_table: str = "cmc_ta"
+    output_table: str = "ta"
     null_strategy: str = "interpolate"  # Per CONTEXT.md - indicators interpolate
     add_zscore: bool = True
     load_indicators_from_db: bool = True
@@ -106,7 +106,7 @@ class TAFeature(BaseFeature):
         end: Optional[str] = None,
     ) -> pd.DataFrame:
         """
-        Load OHLCV data from cmc_price_bars_multi_tf for configured tf.
+        Load OHLCV data from price_bars_multi_tf for configured tf.
 
         Args:
             ids: List of asset IDs

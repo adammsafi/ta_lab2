@@ -87,8 +87,8 @@ def activate_kill_switch(
 
     Sequence (within a single connection):
       1. UPDATE dim_risk_state: trading_state='halted', record timestamp/reason/source
-      2. UPDATE cmc_orders: cancel all pending orders (status IN ('created', 'submitted'))
-      3. INSERT into cmc_risk_events: audit record
+      2. UPDATE orders: cancel all pending orders (status IN ('created', 'submitted'))
+      3. INSERT into risk_events: audit record
 
     After commit, sends a Telegram critical alert (best-effort, failure does not raise).
 
@@ -142,7 +142,7 @@ def activate_kill_switch(
         cancel_result = conn.execute(
             text(
                 """
-            UPDATE cmc_orders
+            UPDATE orders
             SET status     = 'cancelled',
                 updated_at = now()
             WHERE status IN ('created', 'submitted')
@@ -155,7 +155,7 @@ def activate_kill_switch(
         conn.execute(
             text(
                 """
-            INSERT INTO cmc_risk_events (
+            INSERT INTO risk_events (
                 event_type, trigger_source, reason, operator
             ) VALUES (
                 'kill_switch_activated', :trigger_source, :reason, :operator
@@ -210,7 +210,7 @@ def re_enable_trading(
     Sequence:
       1. Verify current state is 'halted'
       2. UPDATE dim_risk_state: trading_state='active', clear halt columns
-      3. INSERT into cmc_risk_events: audit record
+      3. INSERT into risk_events: audit record
 
     Args:
         engine: SQLAlchemy Engine.
@@ -257,7 +257,7 @@ def re_enable_trading(
         conn.execute(
             text(
                 """
-            INSERT INTO cmc_risk_events (
+            INSERT INTO risk_events (
                 event_type, trigger_source, reason, operator
             ) VALUES (
                 'kill_switch_disabled', 'manual', :reason, :operator

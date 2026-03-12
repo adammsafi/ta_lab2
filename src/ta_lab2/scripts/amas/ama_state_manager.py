@@ -13,7 +13,7 @@ Do NOT reuse EMAStateManager — the DDL and PK columns are different.
 Usage:
     from ta_lab2.scripts.amas.ama_state_manager import AMAStateManager
 
-    manager = AMAStateManager(engine, state_table="cmc_ama_multi_tf_state")
+    manager = AMAStateManager(engine, state_table="ama_multi_tf_state")
     manager.ensure_state_table()
 
     last_ts = manager.load_state(
@@ -81,8 +81,8 @@ class AMAStateManager:
     Thread-safety: Not thread-safe. Create separate instances per thread/worker.
 
     State table naming convention:
-    - cmc_ama_multi_tf        → cmc_ama_multi_tf_state
-    - cmc_ama_multi_tf_cal_us → cmc_ama_multi_tf_cal_us_state
+    - ama_multi_tf        → ama_multi_tf_state
+    - ama_multi_tf_cal_us → ama_multi_tf_cal_us_state
     Callers specify the state_table name at construction time.
     """
 
@@ -92,7 +92,7 @@ class AMAStateManager:
 
         Args:
             engine: SQLAlchemy engine for database operations.
-            state_table: Fully-unqualified table name (e.g. "cmc_ama_multi_tf_state").
+            state_table: Fully-unqualified table name (e.g. "ama_multi_tf_state").
                          Assumed to be in the "public" schema. Pass "public.table" if
                          a different schema is needed — the DDL uses the literal string.
         """

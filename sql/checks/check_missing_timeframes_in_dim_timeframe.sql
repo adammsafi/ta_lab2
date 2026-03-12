@@ -1,7 +1,7 @@
 SELECT tf
 FROM (
     SELECT DISTINCT m.tf
-    FROM cmc_ema_multi_tf AS m
+    FROM ema_multi_tf AS m
     WHERE NOT EXISTS (
         SELECT 1 FROM dim_timeframe d WHERE d.tf = m.tf
     )
@@ -9,7 +9,7 @@ FROM (
     UNION
 
     SELECT DISTINCT c.tf
-    FROM cmc_ema_multi_tf_cal AS c
+    FROM ema_multi_tf_cal AS c
     WHERE NOT EXISTS (
         SELECT 1 FROM dim_timeframe d WHERE d.tf = c.tf
     )
@@ -17,7 +17,7 @@ FROM (
     UNION
 
     SELECT DISTINCT a.tf
-    FROM cmc_ema_multi_tf_cal_anchor AS a
+    FROM ema_multi_tf_cal_anchor AS a
     WHERE NOT EXISTS (
         SELECT 1 FROM dim_timeframe d WHERE d.tf = a.tf
     )

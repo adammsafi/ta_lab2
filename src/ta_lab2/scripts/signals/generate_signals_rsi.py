@@ -1,8 +1,8 @@
 """
-RSI Signal Generator - Generate RSI mean reversion signals from cmc_features.
+RSI Signal Generator - Generate RSI mean reversion signals from features.
 
 This module provides RSI mean reversion signal generation following the existing
-rsi_mean_revert.py adapter logic. Signals are stored in cmc_signals_rsi_mean_revert
+rsi_mean_revert.py adapter logic. Signals are stored in signals_rsi_mean_revert
 with position lifecycle tracking and RSI value analytics.
 
 Key features:
@@ -105,11 +105,11 @@ def compute_adaptive_thresholds(
 @dataclass
 class RSISignalGenerator:
     """
-    Generates RSI mean reversion signals from cmc_features.
+    Generates RSI mean reversion signals from features.
 
     Leverages existing rsi_mean_revert.py adapter logic with database-driven
     threshold configuration from dim_signals. Stores signals in
-    cmc_signals_rsi_mean_revert with full position lifecycle tracking.
+    signals_rsi_mean_revert with full position lifecycle tracking.
 
     Attributes:
         engine: SQLAlchemy engine for database operations
@@ -204,7 +204,7 @@ class RSISignalGenerator:
         start_ts: Optional[pd.Timestamp] = None,
     ) -> pd.DataFrame:
         """
-        Load feature data from cmc_features.
+        Load feature data from features.
 
         Args:
             ids: List of asset IDs to load
@@ -229,7 +229,7 @@ class RSISignalGenerator:
                 id, ts, close,
                 rsi_14, rsi_7, rsi_21,
                 atr_14
-            FROM public.cmc_features
+            FROM public.features
             WHERE {where_sql}
             ORDER BY id, ts
         """
@@ -273,7 +273,7 @@ class RSISignalGenerator:
             rsi_col: RSI column to track (default: "rsi_14")
 
         Returns:
-            DataFrame with columns matching cmc_signals_rsi_mean_revert schema
+            DataFrame with columns matching signals_rsi_mean_revert schema
             Each row represents either an open or closed position
         """
         records = []
@@ -422,7 +422,7 @@ class RSISignalGenerator:
 
         Raises:
             ValueError: If required parameters missing
-            KeyError: If required features not in cmc_features
+            KeyError: If required features not in features
         """
         signal_id = signal_config["signal_id"]
         params = signal_config["params"]
@@ -579,7 +579,7 @@ class RSISignalGenerator:
 
         # Write to database (unless dry run)
         if not dry_run:
-            signal_table = "cmc_signals_rsi_mean_revert"
+            signal_table = "signals_rsi_mean_revert"
 
             # Convert JSONB column to JSON strings for database insertion
             # Fix: serialize dict values to JSON string (pre-existing bug: no-op lambda)

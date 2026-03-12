@@ -297,7 +297,7 @@ class DriftAttributor:
 
         # Step 4: +Data revision
         # V1: PIT snapshots not yet populated; use 0 as a safe approximation.
-        # When data_snapshot in cmc_executor_run_log is populated this step will
+        # When data_snapshot in executor_run_log is populated this step will
         # run a PIT replay and compare against the current-data replay.
         data_revision_delta = 0.0
         logger.debug(
@@ -390,7 +390,7 @@ class DriftAttributor:
         result: AttributionResult,
     ) -> None:
         """
-        Write attribution results to the attr_* columns of cmc_drift_metrics.
+        Write attribution results to the attr_* columns of drift_metrics.
 
         Uses UPDATE (not INSERT) because the DriftMetrics row must already exist
         from the daily DriftMonitor run. This is called from
@@ -399,16 +399,16 @@ class DriftAttributor:
         Parameters
         ----------
         config_id:
-            Executor config ID matching the cmc_drift_metrics row.
+            Executor config ID matching the drift_metrics row.
         asset_id:
-            Asset ID matching the cmc_drift_metrics row.
+            Asset ID matching the drift_metrics row.
         metric_date:
             ISO date string (YYYY-MM-DD) for the row to update.
         result:
             AttributionResult from run_attribution() containing all delta fields.
         """
         sql = text("""
-            UPDATE cmc_drift_metrics
+            UPDATE drift_metrics
             SET attr_baseline_pnl = :baseline_pnl,
                 attr_fee_delta = :fee_delta,
                 attr_slippage_delta = :slippage_delta,
@@ -653,7 +653,7 @@ class DriftAttributor:
 
         sql_dominant = text("""
             SELECT macro_state, COUNT(*) AS n
-            FROM cmc_macro_regimes
+            FROM macro_regimes
             WHERE date BETWEEN :start AND :end
               AND profile = 'default'
             GROUP BY macro_state

@@ -54,7 +54,7 @@ def check_bar_freshness(
                 id,
                 last_src_ts,
                 EXTRACT(EPOCH FROM (NOW() - last_src_ts)) / 3600 AS staleness_hours
-            FROM public.cmc_price_bars_1d_state
+            FROM public.price_bars_1d_state
             ORDER BY id
         """
         )
@@ -67,7 +67,7 @@ def check_bar_freshness(
                 id,
                 last_src_ts,
                 EXTRACT(EPOCH FROM (NOW() - last_src_ts)) / 3600 AS staleness_hours
-            FROM public.cmc_price_bars_1d_state
+            FROM public.price_bars_1d_state
             WHERE id = ANY(:ids)
             ORDER BY id
         """

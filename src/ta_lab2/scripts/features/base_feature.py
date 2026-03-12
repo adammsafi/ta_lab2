@@ -86,7 +86,7 @@ class BaseFeature(ABC):
     - Database writing with table creation
     """
 
-    SOURCE_TABLE = "public.cmc_price_bars_multi_tf_u"
+    SOURCE_TABLE = "public.price_bars_multi_tf_u"
     TS_COLUMN = "time_close"
 
     def __init__(self, engine: Engine, config: FeatureConfig):

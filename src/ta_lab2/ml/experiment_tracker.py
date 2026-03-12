@@ -1,4 +1,4 @@
-"""ML experiment tracking backed by PostgreSQL cmc_ml_experiments table.
+"""ML experiment tracking backed by PostgreSQL ml_experiments table.
 
 Provides ExperimentTracker, a lightweight experiment manager that logs and
 queries ML model runs.  Every training run (MDA/SFI ranking, regime routing,
@@ -6,7 +6,7 @@ DoubleEnsemble, Optuna sweep) should produce one row via ``log_run()``.
 
 Design notes
 ------------
-- Uses the cmc_ml_experiments table (DDL: sql/ml/095_cmc_ml_experiments.sql).
+- Uses the ml_experiments table (DDL: sql/ml/095_ml_experiments.sql).
 - ``ensure_table()`` runs the DDL idempotently (CREATE TABLE IF NOT EXISTS).
 - All JSONB columns are serialised with ``json.dumps``; numpy scalars are
   normalised via the ``_to_python`` helper (``hasattr(v, 'item')`` pattern).
@@ -93,12 +93,12 @@ def _compute_feature_set_hash(feature_set: list[str]) -> str:
 
 
 def _find_ddl_path() -> Path:
-    """Locate sql/ml/095_cmc_ml_experiments.sql relative to this file."""
+    """Locate sql/ml/095_ml_experiments.sql relative to this file."""
     # Walk up from src/ta_lab2/ml/ to project root then into sql/ml/
     here = Path(__file__).resolve()
     # up: ml/ -> ta_lab2/ -> src/ -> project root
     project_root = here.parent.parent.parent.parent
-    ddl = project_root / "sql" / "ml" / "095_cmc_ml_experiments.sql"
+    ddl = project_root / "sql" / "ml" / "095_ml_experiments.sql"
     if not ddl.exists():
         # Fallback: env override
         env_path = os.environ.get("CMC_ML_DDL_PATH")
@@ -123,7 +123,7 @@ class ExperimentTracker:
     ----------
     engine:
         SQLAlchemy engine pointing at the PostgreSQL database that contains
-        (or will contain) the ``cmc_ml_experiments`` table.
+        (or will contain) the ``ml_experiments`` table.
 
     Methods
     -------
@@ -139,7 +139,7 @@ class ExperimentTracker:
         Return a DataFrame with key metric columns for side-by-side comparison.
     """
 
-    TABLE = "public.cmc_ml_experiments"
+    TABLE = "public.ml_experiments"
 
     def __init__(self, engine: Any) -> None:
         self._engine = engine
@@ -149,7 +149,7 @@ class ExperimentTracker:
     # ------------------------------------------------------------------
 
     def ensure_table(self) -> None:
-        """Execute the DDL from sql/ml/095_cmc_ml_experiments.sql.
+        """Execute the DDL from sql/ml/095_ml_experiments.sql.
 
         Safe to call multiple times — the DDL uses ``CREATE TABLE IF NOT
         EXISTS`` so it is a no-op when the table already exists.

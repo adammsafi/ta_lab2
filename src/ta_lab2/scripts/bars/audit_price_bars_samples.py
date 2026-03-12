@@ -15,11 +15,11 @@ Creates a small "human eyeball" sample CSV to visually confirm that each of the 
 price_bars tables is behaving correctly.
 
 Output: one row per sampled bar-snapshot record, across:
-  1) public.cmc_price_bars_multi_tf
-  2) public.cmc_price_bars_multi_tf_cal_us
-  3) public.cmc_price_bars_multi_tf_cal_iso
-  4) public.cmc_price_bars_multi_tf_cal_anchor_us
-  5) public.cmc_price_bars_multi_tf_cal_anchor_iso
+  1) public.price_bars_multi_tf
+  2) public.price_bars_multi_tf_cal_us
+  3) public.price_bars_multi_tf_cal_iso
+  4) public.price_bars_multi_tf_cal_anchor_us
+  5) public.price_bars_multi_tf_cal_anchor_iso
 
 Sampling strategy (per table, per id, per tf):
   - Take the most recent N rows ordered by (time_close desc, bar_seq desc) when present.
@@ -55,11 +55,11 @@ from ta_lab2.scripts.bars.common_snapshot_contract import (
 )
 
 TABLES = [
-    "public.cmc_price_bars_multi_tf",
-    "public.cmc_price_bars_multi_tf_cal_us",
-    "public.cmc_price_bars_multi_tf_cal_iso",
-    "public.cmc_price_bars_multi_tf_cal_anchor_us",
-    "public.cmc_price_bars_multi_tf_cal_anchor_iso",
+    "public.price_bars_multi_tf",
+    "public.price_bars_multi_tf_cal_us",
+    "public.price_bars_multi_tf_cal_iso",
+    "public.price_bars_multi_tf_cal_anchor_us",
+    "public.price_bars_multi_tf_cal_anchor_iso",
 ]
 
 DEFAULT_DAILY_TABLE = "public.cmc_price_histories7"

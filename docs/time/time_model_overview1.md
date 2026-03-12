@@ -9,7 +9,7 @@
 6. **multi-TF products**: roll vs non-roll views
 
 ## Data Flow
-price → cmc_ema_daily(tf_day) → cmc_ema_multi_tf(tf,period) → features/trend/returns/vol.
+price → cmc_ema_daily(tf_day) → ema_multi_tf(tf,period) → features/trend/returns/vol.
 
 ## DST considerations
 - Weekly anchor uses trading_sessions; DST irrelevant for daily bars.

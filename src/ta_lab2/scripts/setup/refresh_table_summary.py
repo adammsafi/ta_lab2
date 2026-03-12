@@ -26,32 +26,32 @@ RULES: list[tuple[str, str, str | None, str | None]] = [
     # table_summary itself
     ("table_summary", "META", None, None),
     # Backtest output
-    ("cmc_backtest_metrics", "BACKTEST", "METRICS", None),
-    ("cmc_backtest_runs", "BACKTEST", "RUNS", None),
-    ("cmc_backtest_trades", "BACKTEST", "TRADES", None),
+    ("backtest_metrics", "BACKTEST", "METRICS", None),
+    ("backtest_runs", "BACKTEST", "RUNS", None),
+    ("backtest_trades", "BACKTEST", "TRADES", None),
     # Signals
     ("cmc_signals_rsi", "SIGNAL", "RSI", None),
     ("cmc_signals_ema", "SIGNAL", "EMA", None),
     ("cmc_signals_atr", "SIGNAL", "ATR", None),
-    ("cmc_signal_state", "STATE", "SIGNAL", None),
+    ("signal_state", "STATE", "SIGNAL", None),
     # Regime tables
-    ("cmc_regime_comovement", "REGIME", "COMOVEMENT", None),
-    ("cmc_regime_flips", "REGIME", "FLIPS", None),
-    ("cmc_regime_stats", "REGIME", "STATS", None),
-    ("cmc_regimes", "REGIME", None, None),
+    ("regime_comovement", "REGIME", "COMOVEMENT", None),
+    ("regime_flips", "REGIME", "FLIPS", None),
+    ("regime_stats", "REGIME", "STATS", None),
+    ("regimes", "REGIME", None, None),
     # QA / reject tables
     ("ema_rejects", "QA", "EMA", None),
     # Audit results
     ("audit_results", "QA", "AUDIT", None),
     # Stats state tables (before generic state)
-    ("cmc_features_stats_state", "STATE", "STATS", "FEATURE"),
+    ("features_stats_state", "STATE", "STATS", "FEATURE"),
     ("price_bars_multi_tf_stats_state", "STATE", "STATS", "BAR"),
     ("returns_ema_stats_state", "STATE", "STATS", "EMA"),
     ("ema_multi_tf_cal_anchor_stats_state", "STATE", "STATS", "EMA"),
     ("ema_multi_tf_cal_stats_state", "STATE", "STATS", "EMA"),
     ("ema_multi_tf_stats_state", "STATE", "STATS", "EMA"),
     # Stats tables
-    ("cmc_features_stats", "STATS", "FEATURE", None),
+    ("features_stats", "STATS", "FEATURE", None),
     ("price_bars_multi_tf_stats", "STATS", "BAR", None),
     ("returns_ema_stats", "STATS", "RETURN", "EMA"),
     ("ema_multi_tf_cal_anchor_stats", "STATS", "EMA", None),
@@ -62,33 +62,33 @@ RULES: list[tuple[str, str, str | None, str | None]] = [
     ("cmc_price_ranges", "STATS", "PRICE", "RANGE"),
     # State tables — returns from bars
     (
-        "cmc_returns_bars_multi_tf",
+        "returns_bars_multi_tf",
         "STATE",
         "RETURN",
         "BAR",
     ),  # matched by _state suffix below
     # State tables — returns from EMAs
-    ("cmc_returns_ema_multi_tf", "STATE", "RETURN", "EMA"),
+    ("returns_ema_multi_tf", "STATE", "RETURN", "EMA"),
     # State tables — bars
-    ("cmc_price_bars_multi_tf", "STATE", "BAR", None),
-    ("cmc_price_bars_1d_state", "STATE", "BAR", None),
+    ("price_bars_multi_tf", "STATE", "BAR", None),
+    ("price_bars_1d_state", "STATE", "BAR", None),
     # State tables — EMAs
-    ("cmc_ema_multi_tf", "STATE", "EMA", None),
+    ("ema_multi_tf", "STATE", "EMA", None),
     # State tables — features/pipeline
-    ("cmc_feature_state", "STATE", "FEATURE", None),
+    ("feature_state", "STATE", "FEATURE", None),
     ("ta_lab2_pipeline_state", "STATE", "PIPELINE", None),
     # Feature tables
-    ("cmc_features", "FEATURE", None, None),
-    ("cmc_ta", "FEATURE", "TA", None),
-    ("cmc_vol", "FEATURE", "VOL", None),
+    ("features", "FEATURE", None, None),
+    ("ta", "FEATURE", "TA", None),
+    ("vol", "FEATURE", "VOL", None),
     # Return tables (before EMA/BAR to catch returns first)
-    ("cmc_returns_bars_multi_tf", "RETURN", "BAR", None),
-    ("cmc_returns_ema_multi_tf", "RETURN", "EMA", None),
+    ("returns_bars_multi_tf", "RETURN", "BAR", None),
+    ("returns_ema_multi_tf", "RETURN", "EMA", None),
     # EMA tables
-    ("cmc_ema_multi_tf", "EMA", None, None),
+    ("ema_multi_tf", "EMA", None, None),
     # Bar tables
-    ("cmc_price_bars_multi_tf", "BAR", None, None),
-    ("cmc_price_bars_1d", "BAR", None, None),
+    ("price_bars_multi_tf", "BAR", None, None),
+    ("price_bars_1d", "BAR", None, None),
     # Raw price data
     ("cmc_price_histories7", "PRICE", None, "BASE"),
     # Reference / dimension tables

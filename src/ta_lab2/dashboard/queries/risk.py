@@ -91,7 +91,7 @@ def load_risk_events(
     days: int = 30,
     event_type: str | None = None,
 ) -> pd.DataFrame:
-    """Return recent risk events from cmc_risk_events.
+    """Return recent risk events from risk_events.
 
     Columns: event_id, event_ts, event_type, trigger_source, reason, operator,
              asset_id, strategy_id, metadata
@@ -114,7 +114,7 @@ def load_risk_events(
             asset_id,
             strategy_id,
             metadata
-        FROM public.cmc_risk_events
+        FROM public.risk_events
         WHERE event_ts >= NOW() - INTERVAL :interval
     """
     params: dict = {"interval": f"{days} days"}

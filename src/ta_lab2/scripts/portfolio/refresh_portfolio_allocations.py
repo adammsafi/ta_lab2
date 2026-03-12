@@ -3,9 +3,9 @@
 Refresh portfolio allocations.
 
 Loads price history, runs PortfolioOptimizer (+ optional BL and bet-sizing),
-and persists results to cmc_portfolio_allocations.
+and persists results to portfolio_allocations.
 
-CRITICAL: cmc_price_bars_multi_tf_u uses 'timestamp' column (NOT 'ts').
+CRITICAL: price_bars_multi_tf_u uses 'timestamp' column (NOT 'ts').
 CRITICAL: dim_timeframe column is tf_days_nominal. DimTimeframe().tf_days(tf) returns it.
 CRITICAL: Use NullPool for engines in batch scripts.
 ASCII-only file -- no UTF-8 box-drawing characters.
@@ -100,14 +100,14 @@ def _resolve_asset_ids(ids_arg: str, tf: str, engine) -> list[int]:
         with engine.connect() as conn:
             rows = conn.execute(
                 text(
-                    "SELECT DISTINCT id FROM cmc_price_bars_multi_tf_u "
+                    "SELECT DISTINCT id FROM price_bars_multi_tf_u "
                     "WHERE tf = :tf ORDER BY id"
                 ),
                 {"tf": tf},
             ).fetchall()
         ids = [r[0] for r in rows]
         logger.info(
-            "Resolved %d asset IDs from cmc_price_bars_multi_tf_u (tf=%s)", len(ids), tf
+            "Resolved %d asset IDs from price_bars_multi_tf_u (tf=%s)", len(ids), tf
         )
         return ids
 
@@ -128,7 +128,7 @@ def _resolve_asset_ids(ids_arg: str, tf: str, engine) -> list[int]:
 
 def _load_price_matrix(asset_ids: list[int], tf: str, engine) -> pd.DataFrame:
     """
-    Load close prices from cmc_price_bars_multi_tf_u and pivot to wide format.
+    Load close prices from price_bars_multi_tf_u and pivot to wide format.
 
     CRITICAL: uses 'timestamp' column (NOT 'ts').
 
@@ -145,7 +145,7 @@ def _load_price_matrix(asset_ids: list[int], tf: str, engine) -> pd.DataFrame:
     # Use ANY(:ids) so we can pass a list via psycopg2/asyncpg without dynamic SQL
     query = text(
         "SELECT id, timestamp, close "
-        "FROM cmc_price_bars_multi_tf_u "
+        "FROM price_bars_multi_tf_u "
         "WHERE tf = :tf AND id = ANY(:ids) "
         "ORDER BY timestamp"
     )
@@ -191,7 +191,7 @@ def _load_market_caps(asset_ids: list[int], engine) -> pd.Series:
     query = text(
         """
         SELECT DISTINCT ON (id) id, market_cap_usd
-        FROM cmc_price_bars_multi_tf_u
+        FROM price_bars_multi_tf_u
         WHERE tf = '1D'
           AND id = ANY(:ids)
           AND market_cap_usd IS NOT NULL
@@ -230,7 +230,7 @@ def _load_regime(regime_arg: Optional[str], engine) -> Optional[str]:
         query = text(
             """
             SELECT regime_label
-            FROM cmc_regimes
+            FROM regimes
             WHERE id = 1
             ORDER BY ts DESC
             LIMIT 1
@@ -267,7 +267,7 @@ def _persist_allocations(
     dry_run: bool,
 ) -> int:
     """
-    Upsert rows into cmc_portfolio_allocations.
+    Upsert rows into portfolio_allocations.
 
     ON CONFLICT (ts, optimizer, asset_id) DO UPDATE SET weight, final_weight,
     condition_number, regime_label, config_snapshot, created_at.
@@ -283,7 +283,7 @@ def _persist_allocations(
 
     upsert_sql = text(
         """
-        INSERT INTO cmc_portfolio_allocations
+        INSERT INTO portfolio_allocations
             (ts, optimizer, asset_id, weight, final_weight, condition_number,
              regime_label, config_snapshot, is_active, created_at)
         VALUES
@@ -650,7 +650,7 @@ Examples:
     p.add_argument(
         "--regime",
         default=None,
-        help="Override regime label (default: load from cmc_regimes)",
+        help="Override regime label (default: load from regimes)",
     )
     p.add_argument(
         "--lookback",

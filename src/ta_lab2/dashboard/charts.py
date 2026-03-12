@@ -779,7 +779,7 @@ def build_equity_overlay_chart(drift_df: pd.DataFrame) -> go.Figure:
 # ---------------------------------------------------------------------------
 
 # Low-opacity RGBA fills for composite macro state background bands.
-# Keyed by macro_state label from cmc_macro_regimes.macro_state column.
+# Keyed by macro_state label from macro_regimes.macro_state column.
 MACRO_STATE_COLORS: dict[str, str] = {
     "favorable": "rgba(0,200,100,0.20)",
     "constructive": "rgba(100,200,100,0.15)",
@@ -789,7 +789,7 @@ MACRO_STATE_COLORS: dict[str, str] = {
 }
 
 # Per-dimension label colors for the 4 dimension band panels in the timeline.
-# Keyed by dimension name, then by label value from cmc_macro_regimes columns.
+# Keyed by dimension name, then by label value from macro_regimes columns.
 MACRO_DIMENSION_COLORS: dict[str, dict[str, str]] = {
     "monetary_policy": {
         "Cutting": "rgba(0,200,100,0.25)",
