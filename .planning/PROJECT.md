@@ -11,7 +11,18 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 ## Current State
 
 **Latest shipped:** v1.0.1 Macro Regime Infrastructure (2026-03-03)
-**Next milestone:** TBD -- run `/gsd:new-milestone` to plan next version
+**Current milestone:** v1.1.0 Pipeline Consolidation & Storage Optimization
+
+## Current Milestone: v1.1.0 Pipeline Consolidation & Storage Optimization
+
+**Goal:** Eliminate 100GB+ of duplicate data by consolidating siloed tables into _u tables, generalize the 1D bar builder for extensible data source onboarding, and clean up pipeline debt.
+
+**Target features:**
+- Generalized 1D bar builder with source registry (replace 3 source-specific scripts)
+- Direct-to-_u writes for all pipeline scripts (bars, EMAs, AMAs, returns) — drop 30 siloed tables
+- VWAP pipeline integration for all multi-venue assets
+- Prune ~93M NULL first-observation rows from returns tables
+- MCP REST route cleanup (remove dead ChromaDB endpoints)
 
 **v1.0.1 delivered:** FRED macro data pipeline (39 series, 208K rows) wired into regime/risk infrastructure -- 4-dimensional macro regime classifier, tighten-only L4 resolver, event risk gates (FOMC/CPI/NFP/VIX/carry/credit), cross-asset aggregation, and full observability (dashboard, Telegram alerts, drift attribution). 10 phases, 29 plans, 55/55 requirements.
 
@@ -202,5 +213,8 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 | Unified EMA table | Two separate multi-TF EMA systems (tf_day vs calendar) creates permanent inconsistency - must merge before building on top | — Pending |
 | Backtest/live parity as success criterion | System is only trustworthy if backtests use identical logic to live trading - reproducibility is mandatory | Validated — PaperExecutor verifies backtest parity |
 
+| Direct-to-_u writes, drop siloed tables | 30 siloed tables duplicate 100GB+ of data; all consumers already read from _u | — Pending |
+| Generalized 1D bar builder with source registry | 3 source-specific scripts are 80% identical; adding a new source requires copying an entire file | — Pending |
+
 ---
-*Last updated: 2026-03-03 after v1.0.1 milestone shipped*
+*Last updated: 2026-03-19 after v1.1.0 milestone started*
