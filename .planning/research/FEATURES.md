@@ -1,428 +1,480 @@
-# Feature Landscape: v1.0.1 Macro Regime Infrastructure
+# Feature Landscape: Pipeline Consolidation & Storage Optimization
 
-**Domain:** Macro regime features for systematic crypto trading
-**Researched:** 2026-03-01
-**Scope:** FRED-based macro features, regime classification, cross-asset aggregation, event risk gates
-**Builds on:** Existing L0-L3 per-asset regimes, 5-gate RiskEngine, 39-series FRED plan (VM-STRATEGY.md)
+**Domain:** Infrastructure consolidation for quantitative trading data pipeline
+**Researched:** 2026-03-19
+**Confidence:** HIGH (all findings derived from direct codebase analysis)
 
----
+## Scope
 
-## Context: What Already Exists
+This document maps the feature landscape for consolidating ta_lab2's data pipeline:
 
-This milestone adds a macro regime layer to an existing per-asset regime system. The bar
-for "table stakes" is measured against what systematic crypto trading platforms need to
-properly condition on macroeconomic data, adjusted for what ta_lab2 already has.
+1. **1D Bar Builder Consolidation** -- 3 source-specific builders (CMC: 822 LOC, TVC: 511 LOC, HL: 585 LOC) into a generalized builder with source registry
+2. **_u Table Direct-Write Migration** -- Eliminate 30 siloed tables (6 families x 5 variants) by writing directly to unified `_u` tables
+3. **Sync Script Elimination** -- Remove 6 sync-to-_u scripts (771 LOC total) that become unnecessary
 
-| Area | Already Built | Gap for v1.0.1 |
-|------|--------------|----------------|
-| Per-asset regimes | L0 (monthly), L1 (weekly), L2 (daily), L3 (intraday) with trend/vol/liq components | No macro overlay -- regimes are purely price-derived |
-| Policy resolver | Tighten-only semantics across L0-L4, YAML-overridable policy table | L3/L4 slots exist in resolver but are unused; no macro input flows through them |
-| Risk engine | Kill switch, circuit breaker, position/portfolio cap, tail risk (vol spike + correlation breakdown), margin gate | No macro event risk (FOMC, carry unwind, VIX spike); tail risk uses only crypto-native signals |
-| FRED infrastructure | FredProvider (1,766 LOC, deferred), VM collecting 3 series, freddata_local FDW bridge | 36 of 39 series not yet collecting; no sync to marketdata; no derived series computed |
-| Feature store | 112-column cmc_features (bar-level, per-asset); dim_feature_registry | No macro columns; features are entirely crypto price/volume derived |
-| Drift monitor | 6-source attribution, daily comparison, tiered response | No macro drift source; model drift from regime change is undetected |
-| Flatten trigger | Vol spike (2-sigma/3-sigma), extreme return (>15%), API halt, correlation breakdown | No macro triggers (FOMC proximity, carry unwind velocity, credit stress) |
+### Current Scale
 
----
-
-## Feature Area 1: Raw FRED Series Ingestion and Derived Features
-
-These are the base macro features that all downstream regime classification and risk gates
-consume. Without clean, aligned, daily-frequency macro data in the marketdata database,
-nothing else in the milestone can function.
-
-### Table Stakes
-
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| `fred_macro_daily` table in marketdata | All macro features need a single source table; querying across 3 databases is untenable | Medium | Schema: (series_id, date, value, source_freq, ingested_at). PK: (series_id, date). Forward-fill monthly/weekly to daily rows. |
-| Forward-fill alignment for mixed-frequency series | Monthly series (CPIAUCSL, UNRATE) and weekly series (WALCL, NFCI) must be usable alongside daily series without NaN gaps | Low | `ffill()` with `limit=45` for monthly, `limit=10` for weekly. Store `source_freq` column so consumers know the provenance. |
-| Net liquidity proxy: `WALCL - TGA - RRP` | The single most-correlated macro feature to BTC price. Standard formula across TradingView, DurdenBTC, and institutional research. TGA (WTREGEN) must be added to the FRED pull list if not already there. | Low | Derived daily. Note: WALCL is weekly (Wed), RRPONTSYD is daily. Forward-fill WALCL to daily cadence before subtraction. TGA (WTREGEN) is also weekly -- same treatment. |
-| Rate spread features: `US_JP_RATE_SPREAD`, `US_ECB_RATE_SPREAD` | Carry trade incentive is the differential between funding rates. These are already planned in VM-STRATEGY.md. | Low | `DFF - ffill(IRSTCI01JPM156N)` and `DFF - ECBDFR`. Japan rates are monthly; forward-fill before subtraction. |
-| Yield curve features: `T10Y2Y` level + `YC_SLOPE_CHANGE_5D` | Yield curve inversion is a consensus recession signal. 5-day momentum of the slope detects steepening/flattening velocity. | Low | `T10Y2Y` is already a FRED series (direct). Momentum: `T10Y2Y - T10Y2Y.shift(5)`. |
-| VIX level and regime: `VIXCLS` + `VIX_REGIME` | VIX is the standard cross-asset fear gauge. Crypto-VIX correlation tightened significantly in 2024-2025 with BTC/QQQ 30d correlation at 0.70-0.77. | Low | Thresholds: calm (<15), elevated (15-25), crisis (>25). These are consensus thresholds from multiple sources. |
-| Dollar strength: `DTWEXBGS` level + change | Strong dollar = weak BTC is one of the most persistent macro correlations in crypto. | Low | Use 5d and 20d changes alongside level. |
-| Credit stress: `BAMLH0A0HYM2` level + change | HY OAS widening is a reliable risk-off signal. Inverse correlation with S&P 500 (and by extension crypto) is well-documented. | Low | Use level, 5d change, and z-score (30d rolling). Widening > 1 std dev above 30d mean = stress signal. |
-| Financial conditions: `NFCI` level + direction | NFCI is a 105-measure composite from the Chicago Fed. Positive = tight, negative = loose. Loose conditions historically supportive of crypto. | Low | Weekly frequency; forward-fill to daily. Track direction (is NFCI rising or falling over past 4 weeks). |
-| M2 money supply growth: `M2SL` YoY change | Long-horizon BTC correlation. Research suggests 1% rise in liquidity corresponds to approximately 5% rise in crypto, with a 6-week lag. | Low | Monthly; compute YoY pct change, forward-fill to daily. Useful as long-horizon regime context, not a timing signal. |
-| Carry trade features: `DEXJPUS` level + velocity | DEXJPUS is the real-time carry unwind alarm. The Aug 2024 carry unwind triggered 20% BTC/ETH losses. Estimated carry trade size: up to $14T vs $3T crypto market cap. | Medium | Track: level, 5d pct change, 20d rolling vol of changes, z-score of daily move. Rapid JPY strengthening (large negative change in DEXJPUS) = unwind signal. |
-| Sync automation from VM to marketdata | Without automated sync, FRED data goes stale and all downstream features break silently | High | SSH tunnel, materialized view refresh in freddata_local, INSERT...ON CONFLICT into fred_macro_daily. Must run as a cron/scheduled task. |
-
-### Differentiators
-
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| Net liquidity z-score (365d rolling) | Normalizes net liquidity into a regime-interpretable signal. Used by DurdenBTC and institutional macro trackers. 30d vs 150d trend comparison detects regime shifts. | Medium | Z-score = (current - mean_365d) / std_365d. Dual-window (30d vs 150d moving average) for trend regime detection. |
-| CPI surprise proxy | The macro event that moves crypto most is CPI surprise (actual - consensus). Without consensus data, proxy with deviation from 3-month trend. | Medium | `cpi_surprise_proxy = CPIAUCSL_mom - CPIAUCSL_mom.rolling(3).mean()`. Imperfect but captures the concept. Real consensus data (Bloomberg, Refinitiv) requires paid subscription -- defer. |
-| Fed regime classification | `single-target` / `target-range` / `zero-bound` from DFEDTARU/DFEDTARL structure, plus `hiking` / `holding` / `cutting` from DFF trajectory. Already prototyped in fedtools2 ETL. | Medium | Rule-based: TARGET_SPREAD > 0 AND DFF is rising = target-range + hiking. Combine with rate momentum (DFF 30d change sign). |
-| Carry momentum indicator | Beyond rate differential level: rate of change of DEXJPUS relative to its own vol. A 2-sigma daily JPY move when carry spread is wide = high unwind probability. | Medium | `carry_momentum = (dexjpus_1d_change / dexjpus_20d_vol)`. When this exceeds 2.0 and carry spread is positive, carry unwind risk is elevated. |
-| Blended global liquidity proxy | Combine Fed (WALCL-TGA-RRP), ECB (via ECBDFR direction), and BOJ (via DEXJPUS direction) into a single global liquidity score. Institutional research increasingly uses global, not just US, liquidity. | High | Weighted composite: US weight 0.6, EUR weight 0.2, JPY weight 0.2. Requires careful normalization. |
-
-### Anti-Features
-
-| Anti-Feature | Why Avoid | What to Do Instead |
-|--------------|-----------|-------------------|
-| Real-time intraday FRED data | FRED updates once per day (most series). Building infrastructure for sub-daily macro data creates false precision. | Accept daily granularity for FRED data. For intraday macro sensitivity, use crypto-native vol and correlation features (already built in L2/L3 regimes). |
-| Consensus forecast data (Bloomberg/Refinitiv) | Paid subscription required. Consensus data is extremely valuable but adding a paid dependency contradicts the project's free-tier-first economics. | Use trend-deviation proxies for surprise estimation. Defer consensus data to a future milestone if/when paid data becomes justified. |
-| Japan CPI from FRED | FRED's Japan CPI series stopped in June 2021 (confirmed in VM-STRATEGY.md). Building around stale data creates a maintenance trap. | Skip Japan CPI. BOJ rate and DEXJPUS are sufficient carry trade signals. If Japan CPI becomes needed, source directly from BOJ/OECD later. |
-| Recomputing all macro features on every refresh | Some FRED series update weekly or monthly. Recomputing daily wastes cycles and can introduce spurious micro-changes from float rounding. | Track `source_last_updated` per series. Only recompute derived features when an upstream input actually changes. |
-| Backfilling derived series into historical cmc_features rows | cmc_features has 112 columns and millions of rows. Adding macro columns retroactively is a schema migration nightmare. | Keep macro features in a separate `fred_macro_daily` table. Join on date when needed for IC evaluation, ML training, or regime classification. Do NOT add columns to cmc_features. |
-
-### Feature Dependencies
-
-```
-VM FRED collection (39 series)
-  -> SSH tunnel + sync to freddata_local
-  -> Materialized views in freddata_local
-  -> INSERT...ON CONFLICT into fred_macro_daily (marketdata DB)
-  -> Forward-fill mixed-frequency to daily
-  -> Compute derived series (net liquidity, rate spreads, etc.)
-
-fred_macro_daily (new table in marketdata)
-  -> Consumed by macro regime classifier (Feature Area 2)
-  -> Consumed by risk event gates (Feature Area 5)
-  -> Consumed by IC evaluation (existing analysis/ic_eval.py)
-  -> Consumed by drift monitor as new drift source (Feature Area 4)
-```
+| Category | Count | Lines |
+|----------|-------|-------|
+| 1D bar builders (source-specific) | 3 | 1,915 |
+| Multi-TF bar builders (siloed) | 5 | 5,303 |
+| Return builders (siloed) | 4 | 2,428 |
+| Sync-to-_u scripts | 6 | 771 |
+| EMA builders (siloed) | 3 | ~2,000 est. |
+| AMA builders (siloed) | 3 | ~2,000 est. |
+| **Total consolidation surface** | **24** | **~14,400** |
 
 ---
 
-## Feature Area 2: Macro Regime Classification
+## Table Stakes
 
-Classify the current macroeconomic environment into regimes that the policy resolver
-can consume. The key design question: rule-based thresholds vs HMM vs clustering.
+Features the consolidated pipeline MUST have. Missing any of these means the consolidation is unsafe or incomplete.
 
-### Table Stakes
+### TS-1: Source Registry with Declarative Configuration
 
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| Rule-based macro regime labels | Start with deterministic, auditable thresholds. HMM/clustering are model risk on top of model risk. The existing per-asset regime system is rule-based and this consistency matters for debugging. | Medium | Regime dimensions: monetary_policy (hiking/holding/cutting), liquidity (expanding/neutral/contracting), risk_appetite (risk-on/neutral/risk-off), carry (stable/stress/unwind). Each dimension classified by simple threshold rules on FRED features. |
-| Composite macro regime string | Same pattern as per-asset regimes: `Up-Normal-Normal` becomes `Cutting-Expanding-RiskOn-Stable` for macro. Existing `compose_regime_key()` pattern reused. | Low | 4-dimensional string key. Each dimension is a discrete label. Store in `cmc_macro_regimes` table with PK (date). |
-| Monetary policy dimension | Classifies Fed rate trajectory. Most fundamental macro regime dimension for crypto. Rate cuts are structurally bullish for risk assets. | Low | `hiking` if DFF 90d change > 0.25%; `cutting` if DFF 90d change < -0.25%; `holding` otherwise. Thresholds calibrated from historical rate cycles. |
-| Liquidity dimension | Fed net liquidity (WALCL-TGA-RRP) direction. The single most important macro driver for crypto. Expanding net liquidity is the strongest macro tailwind. | Low | `expanding` if net_liquidity 30d change > 0; `contracting` if < 0. Add magnitude: `strongly_expanding` if z-score > 1, `strongly_contracting` if z-score < -1. |
-| Risk appetite dimension | Cross-asset risk-on/risk-off signal combining VIX, credit stress (HY OAS), and financial conditions (NFCI). | Medium | `risk_off` if VIX > 25 OR HY_OAS z-score > 1.5 OR NFCI > 0.5; `risk_on` if VIX < 15 AND HY_OAS z-score < -0.5 AND NFCI < -0.5; `neutral` otherwise. Threshold-based, same pattern as VIX_REGIME. |
-| Carry dimension | Carry trade stability assessment from JPY features. The Aug 2024 unwind demonstrated that this dimension alone can drive 20% drawdowns. | Medium | `unwind` if DEXJPUS daily move > 2 sigma AND US_JP_RATE_SPREAD is narrowing; `stress` if DEXJPUS 5d vol > 1.5 sigma; `stable` otherwise. |
-| Hysteresis on macro regime transitions | Macro data is noisy. Without hysteresis, VIX crossing 25 and back to 24.8 flips regime twice in two days. | Low | Reuse existing `HysteresisTracker` from `regimes/hysteresis.py`. Set `min_bars_hold=5` for macro (longer than per-asset default of 3 because macro regimes should be stickier). |
-| Storage in `cmc_macro_regimes` table | Macro regime state needs to be queryable alongside per-asset regimes for policy resolution and IC evaluation. | Medium | Schema: (date, regime_key, monetary_policy, liquidity, risk_appetite, carry, computed_at). Single row per date. Daily granularity matches FRED update cadence. |
+**Why Expected:** The 3 existing 1D builders differ in exactly 5 dimensions: source table/JOINs, OHLC repair eligibility, backfill detection, venue_id mapping, and post-build hooks. A registry makes these differences explicit and declarative rather than duplicated across 3 files.
 
-### Differentiators
+**Complexity:** Medium
 
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| HMM regime detection as secondary classifier | After rule-based labels are working, fit a 2-3 state HMM on net liquidity + VIX + HY OAS to detect regimes the rules miss. HMMs are the standard academic approach and capture nonlinear state transitions. | High | Use hmmlearn library (GaussianHMM, 2-3 states). Train on 5+ years of data. Compare HMM labels vs rule-based labels -- where they disagree is informative. Do NOT replace rules with HMM; use HMM as a confirmation/divergence signal. |
-| Macro-crypto lead-lag analysis | Quantify whether macro regime changes lead or lag crypto regime changes. Research suggests a 6-week lag between liquidity and BTC. | Medium | Reuse existing `lead_lag_max_corr()` from `regimes/comovement.py`. Test macro features against BTC returns at lags [-20, -10, -5, 0, 5, 10, 20] days. |
-| Regime transition probability matrix | From historical macro regime sequences, compute transition probabilities. "When we are in risk-off, what is the probability of transitioning to risk-on in the next 5/10/20 days?" | Medium | Simple counting from historical labels. Value: informs position sizing -- if P(risk_off -> risk_on) within 5d is >40%, current risk-off may be transient. |
-| IC evaluation of macro features by per-asset regime | "Do macro features have more predictive power during trending markets vs sideways?" Answers whether macro conditioning improves per-asset signals. | Medium | Join fred_macro_daily with cmc_features and cmc_regimes on date. Group IC by L1 regime label. Reuses existing IC infrastructure from v0.9.0. |
+**What It Looks Like:**
 
-### Anti-Features
-
-| Anti-Feature | Why Avoid | What to Do Instead |
-|--------------|-----------|-------------------|
-| HMM as primary regime classifier | HMM states are unlabeled, non-deterministic, and change with retraining. Debugging "why did the system go risk-off?" is nearly impossible with HMM alone. | Rule-based primary, HMM as optional secondary/confirmation signal. |
-| Intraday macro regime updates | FRED data is daily (at best). Updating macro regime intraday creates an illusion of responsiveness when the underlying data hasn't changed. | Daily macro regime update, aligned with FRED data refresh. For intraday macro-like responses, use VIX if available from a live feed (out of scope for FRED integration). |
-| Regime classification from PCA of all 39 FRED series | PCA on 39 macro series is overfit to the training period. The principal components are unstable and uninterpretable. | Use domain-knowledge-driven dimensions (monetary policy, liquidity, risk appetite, carry). Each dimension uses 2-4 specific series, not a statistical cocktail of all 39. |
-| Gaussian Mixture Models as regime classifier | GMM assumes Gaussian regime distributions. Macro regime transitions are abrupt (rate hikes, carry unwinds), not smooth Gaussian clusters. | Rule-based with hysteresis for abrupt transitions. HMM (which models transitions explicitly) is a better probabilistic alternative if one is needed. |
-
-### Feature Dependencies
-
+```python
+@dataclass(frozen=True)
+class SourceConfig:
+    """Declarative config for one data source."""
+    name: str                          # e.g. "CMC", "TVC", "Hyperliquid"
+    source_table: str                  # e.g. "public.cmc_price_histories7"
+    source_schema: str                 # JOINs needed to reach OHLCV
+    venue_id: int                      # dim_venues FK (1=CMC_AGG, 2=HL, 9=TVC)
+    venue_name: str                    # e.g. "HYPERLIQUID"
+    id_resolution: IdResolution        # how to map source IDs to dim_assets.id
+    ohlc_repair: bool                  # CMC has timehigh/timelow repair; TVC/HL do not
+    backfill_detection: bool           # CMC tracks daily_min_seen; TVC/HL do not
+    has_market_cap: bool               # CMC has marketcap; TVC/HL do not
+    post_build_hooks: list[Callable]   # e.g. _sync_1d_to_multi_tf for TVC/HL
+    asset_filter: AssetFilter | None   # e.g. HL_YN.csv filter, None for CMC/TVC
 ```
-fred_macro_daily (Feature Area 1)
-  -> Macro regime classifier reads derived features
-  -> Computes 4-dimensional regime labels
-  -> Writes to cmc_macro_regimes table
 
-regimes/hysteresis.py (existing)
-  -> HysteresisTracker reused for macro regime stickiness
-  -> min_bars_hold=5 for macro (vs 3 for per-asset)
+**Dependencies:** Requires dim_venues, dim_asset_identifiers, dim_listings to exist.
 
-regimes/labels.py pattern (existing)
-  -> Macro labeler functions follow same pattern as label_trend_basic(), label_vol_bucket()
-  -> Each dimension is a function: label_monetary_policy(), label_liquidity(), etc.
+**Evidence from codebase:** Each builder currently hardcodes these 5 dimensions. The differences are well-defined and stable:
+- CMC reads `cmc_price_histories7` directly (no JOIN), has 6-CTE OHLC repair, tracks `daily_min_seen`
+- TVC reads `tvc_price_histories` via `dim_listings` JOIN, no repair, no backfill detection
+- HL reads `hyperliquid.hl_candles` via `dim_asset_identifiers` + `dim_listings` JOIN, no repair, filters via `HL_YN.csv`
+
+### TS-2: Preserved Source-Specific SQL Generation
+
+**Why Expected:** The OHLC repair logic (lines 253-496 of `refresh_price_bars_1d.py`) is CMC-specific and critical for data quality. The TVC/HL builders legitimately skip it. The consolidation must preserve these source-specific SQL paths, not force a one-size-fits-all query.
+
+**Complexity:** Low (these already exist; the task is not losing them)
+
+**What It Looks Like:** The registry's `SourceConfig` determines which SQL template to use. CMC gets the 6-CTE repair pipeline. TVC/HL get simpler SELECTs with GREATEST/LEAST for OHLCV invariants. The generalized builder delegates SQL generation to a `build_insert_sql(source_config) -> str` function that dispatches on config flags.
+
+**Dependencies:** None beyond current code.
+
+**Risk:** Accidentally unifying the SQL when sources genuinely need different CTEs. The temptation to "simplify" by making one query serve all sources would break CMC's timehigh/timelow repair and HL's cross-schema JOIN.
+
+### TS-3: Venue-Aware State Table
+
+**Why Expected:** The three builders currently use incompatible state table schemas. CMC uses PK `(id, tf)`, while HL uses PK `(id, venue_id, tf)`. The consolidated builder needs a single state table that handles multi-venue state.
+
+**Complexity:** Medium
+
+**Current state table schemas (incompatible):**
+
+| Builder | State Table PK | Has venue_id | Has daily_min_seen |
+|---------|---------------|--------------|-------------------|
+| CMC 1D | `(id, tf)` | No | Yes |
+| TVC 1D | `(id, tf)` (shared with CMC!) | No | No |
+| HL 1D | `(id, venue_id, tf)` | Yes | No |
+
+**What It Looks Like:** A single state table with PK `(id, venue_id, tf)` where `venue_id` defaults to 1 (CMC_AGG). Existing CMC/TVC state rows migrate by adding `venue_id=1`. Backfill detection columns (`daily_min_seen`) become optional per source registry config.
+
+**Dependencies:** Must not break CMC/TVC which currently share the same state table.
+
+**Risk:** CMC and TVC currently share `price_bars_1d_state` with PK `(id, tf)`. Adding `venue_id` to the PK requires an ALTER TABLE + data migration. This must happen before the consolidated builder runs.
+
+### TS-4: alignment_source Tag for Direct _u Writes
+
+**Why Expected:** The current _u tables use `alignment_source` (e.g. "multi_tf", "multi_tf_cal_us") to distinguish which pipeline produced each row. Direct-write builders must set this tag at write time, not in a separate sync step.
+
+**Complexity:** Low
+
+**What It Looks Like:** The `alignment_source` value is derived from the builder configuration, added to the output DataFrame/SQL before upsert. The existing `upsert_bars()` function in `common_snapshot_contract.py` already handles column lists dynamically.
+
+**Dependencies:** The `alignment_source` column must exist in target tables (it already does in all _u tables).
+
+**Evidence from codebase:** `sync_utils.py` line 68: `alignment_source_from_table()` derives the tag from table name. In the consolidated pipeline, this becomes a builder config property instead.
+
+### TS-5: Idempotent Upsert with Correct PK for _u Tables
+
+**Why Expected:** _u tables have a different PK than siloed tables -- they include `alignment_source`. The direct-write path must use the correct ON CONFLICT target.
+
+**Complexity:** Low
+
+**Current PKs across families:**
+
+| Family | Siloed PK | _u Table PK (adds alignment_source) |
+|--------|-----------|--------------------------------------|
+| Price Bars | `(id, tf, bar_seq, venue_id, timestamp)` | + `alignment_source` |
+| Bar Returns | `(id, venue_id, timestamp, tf)` | + `alignment_source` |
+| EMA Values | `(id, venue_id, ts, tf, period)` | + `alignment_source` |
+| EMA Returns | similar | + `alignment_source` |
+| AMA Values | similar | + `alignment_source` |
+| AMA Returns | similar | + `alignment_source` |
+
+**What It Looks Like:** Each builder's `upsert_bars()` call specifies `conflict_cols` matching the _u table PK. This is already parameterized in `common_snapshot_contract.py` line 860.
+
+### TS-6: Backward-Compatible CLI Interface
+
+**Why Expected:** `run_all_bar_builders.py` orchestrates 9 builders via subprocess with specific CLI signatures. `run_daily_refresh.py` calls these in a defined order. The consolidated builder must maintain CLI compatibility or update the orchestrators.
+
+**Complexity:** Medium
+
+**Recommendation:** Thin wrapper scripts that instantiate the generalized builder with the right registry config. Each existing script becomes a 10-line wrapper:
+
+```python
+# refresh_price_bars_1d.py (wrapper, preserves CLI contract)
+from ta_lab2.scripts.bars.generalized_1d_builder import Generalized1DBarBuilder
+from ta_lab2.scripts.bars.source_registry import CMC_SOURCE
+
+if __name__ == "__main__":
+    Generalized1DBarBuilder.main(source_config=CMC_SOURCE)
 ```
+
+This approach is safer than a `--source` flag because `run_all_bar_builders.py` calls builders by script path (line 194: `script_dir / builder.script_path`).
+
+**Dependencies:** `run_all_bar_builders.py`, `run_daily_refresh.py` both call builders by script path.
+
+### TS-7: Incremental Refresh Preserved (No Full Rebuild Required)
+
+**Why Expected:** The pipeline runs daily. Incremental refresh is the default mode, rebuilding only new data since the last watermark. This MUST work identically in the consolidated pipeline.
+
+**Complexity:** Low (already implemented in BaseBarBuilder)
+
+**What It Looks Like:** The `_run_incremental()` method in `BaseBarBuilder` already handles this via state table lookback. The consolidated builder inherits this behavior unchanged.
+
+**Dependencies:** State table must be consistent (see TS-3).
+
+### TS-8: Coverage Tracking
+
+**Why Expected:** All three 1D builders upsert to `asset_data_coverage` after building bars. This metadata table tracks n_rows, n_days, first_ts, last_ts per (id, source_table, granularity). Downstream analytics depend on it.
+
+**Complexity:** Low
+
+**Evidence from codebase:** `upsert_coverage()` is called in all three builders identically. The consolidated builder does the same via the shared `common_snapshot_contract.py` helper.
 
 ---
 
-## Feature Area 3: Macro-Asset Regime Integration
+## Differentiators
 
-How macro regimes interact with per-asset regimes in the policy resolver. This is the
-architectural core of the milestone: connecting macro state to trading decisions.
+Features that improve the pipeline beyond its current state. Not expected, but high-value.
 
-### Table Stakes
+### D-1: Single-Pass Multi-Source Build
 
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| Macro regime feeds into L3 or L4 slot in policy resolver | The resolver already accepts L3 and L4 (currently unused). Macro regime should populate one of these slots so existing tighten-only semantics apply automatically. | Medium | Recommendation: Use L4 for macro. L3 is reserved for intraday per-asset regimes (already defined in labels.py as `label_layer_intraday`). L4 is a clean slot for macro overlay. |
-| Tighten-only semantics preserved | Macro regime must only be able to tighten risk, never loosen it. If per-asset says risk-off, macro saying risk-on should NOT increase exposure. This is the fundamental design invariant of the resolver. | Low | Already enforced by `_tighten()` in resolver.py. Macro feeds through the same path. No code change needed for the tighten logic itself. |
-| Macro regime policy entries in DEFAULT_POLICY_TABLE | The resolver does substring matching on regime keys. Macro regime keys need policy entries that map to size_mult, stop_mult, orders, etc. | Medium | Add entries like: `"Cutting-Expanding-RiskOn-Stable": {"size_mult": 1.0}`, `"Hiking-Contracting-RiskOff-": {"size_mult": 0.4, "orders": "passive"}`, `"-RiskOff-Unwind": {"size_mult": 0.2, "orders": "passive"}`. The substring matching makes partial patterns powerful. |
-| Daily macro regime refresh wired into run_daily_refresh.py | Macro regime must be computed after FRED data is synced and before signal generation / executor runs. | Low | New stage in daily refresh: bars -> EMAs -> per-asset regimes -> **macro regime** -> stats -> signals. |
-| Macro regime logged alongside per-asset regime in executor | When the executor makes a trade decision, the log should show both the per-asset regime (L0-L2) and the macro regime (L4). | Low | Extend executor logging to include L4 value. Already logs L0-L2 from policy resolution. |
+**Value Proposition:** Currently, running all 3 sources requires 3 separate invocations (3 process startups, 3 state table reads). A consolidated builder could run all sources in a single invocation with shared DB connections.
 
-### Differentiators
+**Complexity:** Medium
 
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| Macro-asset regime composite analysis | Dashboard view showing: for each (macro_regime, per_asset_regime) pair, what was the average forward return? Answers: "Is macro conditioning additive to per-asset regime?" | Medium | SQL cross-join of cmc_macro_regimes and cmc_regimes, joined with forward returns. Heatmap in Streamlit. |
-| Adaptive gross_cap from macro regime | In risk-off macro environments, cap gross exposure at 50-60% instead of 100%. More nuanced than binary risk-on/off. | Low | Add `gross_cap: 0.5` to risk-off macro policy entries. The resolver already supports gross_cap in TightenOnlyPolicy. |
-| Macro regime in backtest replay | Backtests should be conditionable on macro regime. "What was this strategy's Sharpe during risk-off macro?" Enables regime-conditional backtest analysis. | High | Requires joining cmc_macro_regimes with backtest date range. Needs historical macro regime labels computed over the full backtest period (requires historical FRED data). |
-| Per-asset proxy from macro when per-asset data is thin | For new assets with <52 weekly bars, macro regime is more informative than per-asset L0/L1 (which are undefined). Existing `proxies.py` already has this pattern. | Medium | Extend `infer_cycle_proxy()` and `infer_weekly_macro_proxy()` to incorporate macro regime as an additional tightening factor. |
+**What It Looks Like:**
 
-### Anti-Features
+```bash
+# Current: 3 separate invocations
+python -m ta_lab2.scripts.bars.refresh_price_bars_1d --ids all
+python -m ta_lab2.scripts.bars.refresh_tvc_price_bars_1d --ids all
+python -m ta_lab2.scripts.bars.refresh_hl_price_bars_1d --ids all
 
-| Anti-Feature | Why Avoid | What to Do Instead |
-|--------------|-----------|-------------------|
-| Macro regime overriding per-asset regime (loosening) | If macro says risk-on but per-asset says Down-High-Stressed, loosening is dangerous. This violates the fundamental tighten-only invariant. | Tighten-only, always. Macro can only reduce exposure, never increase it. |
-| Separate macro policy resolver (bypass existing) | Building a parallel resolver for macro creates two policy systems that can contradict. Integration nightmares. | Feed macro through the existing resolver's L4 slot. One resolver, one policy output. |
-| Macro regime as a binary on/off switch | "Macro is bad, don't trade" is too coarse. The existing regime system has nuance (size_mult, stop_mult, orders, setups, gross_cap). Macro should have the same nuance. | Map macro regimes to the same policy dimensions: size_mult, stop_mult, gross_cap, orders. Let tighten-only semantics combine them. |
-| Asset-specific macro sensitivity weights | "BTC is 0.8 correlated with liquidity, SOL is 0.6" -- asset-specific macro betas are unstable and require frequent recalibration. | Use a single macro regime for all assets. Per-asset sensitivity differences are already captured by per-asset regimes (L0-L2). |
-
-### Feature Dependencies
-
+# Consolidated: single invocation
+python -m ta_lab2.scripts.bars.refresh_price_bars_1d --source all --ids all
+# or select specific sources:
+python -m ta_lab2.scripts.bars.refresh_price_bars_1d --source CMC,HL --ids all
 ```
-cmc_macro_regimes (Feature Area 2)
-  -> Macro regime key read by policy resolver as L4
-  -> Must be computed before signal generation each day
 
-regimes/resolver.py (existing)
-  -> resolve_policy() already accepts L4 parameter
-  -> DEFAULT_POLICY_TABLE needs new macro regime entries
-  -> Policy loader (policy_loader.py) supports YAML override
+**When to Build:** Phase 2 (after basic consolidation works). Not required for MVP.
 
-regimes/hysteresis.py (existing)
-  -> HysteresisTracker used for macro regime stickiness
-  -> is_tightening_change() works with macro keys (substring matching)
+### D-2: Automatic Post-Build Hooks
+
+**Value Proposition:** TVC and HL builders currently have a manual `_sync_1d_to_multi_tf()` call after `builder.run()`. This is fragile -- if the sync fails, 1D bars exist but are invisible to the multi-TF pipeline. A hook system makes this automatic and retry-safe.
+
+**Complexity:** Low
+
+**What It Looks Like:** The source registry includes `post_build_hooks: list[Callable]`. After `build_bars_for_id()` succeeds, hooks run in order.
+
+**Evidence from codebase:**
+- `refresh_tvc_price_bars_1d.py` line 506: `_sync_1d_to_multi_tf(builder.config.db_url)` called after `builder.run()`
+- `refresh_hl_price_bars_1d.py` line 580: `_sync_1d_to_multi_tf(builder.config.db_url)` called after `builder.run()`
+
+Both are called outside the builder's transaction scope. If they fail, 1D bars exist but multi-TF pipeline does not see them until next sync.
+
+### D-3: _u Migration Validation Framework
+
+**Value Proposition:** When migrating from siloed-then-sync to direct-_u-write, you need to prove the new path produces identical results. `derive_multi_tf_from_1d.py` already has `validate_derivation_consistency()` (lines 738-807). Extending this pattern to validate _u migration provides safety.
+
+**Complexity:** Medium
+
+**What It Looks Like:**
+
+```python
+def validate_u_migration(
+    engine: Engine,
+    siloed_table: str,
+    u_table: str,
+    alignment_source: str,
+    sample_ids: list[int],
+    tolerance: float = 1e-10,
+) -> tuple[bool, list[str]]:
+    """Compare siloed table rows vs _u table rows for same alignment_source."""
 ```
+
+Run during migration phase for each family. Once validated, flip write target.
+
+**Dependencies:** Both siloed and _u tables must exist simultaneously during migration.
+
+### D-4: Eliminate Duplicated psycopg Utilities
+
+**Value Proposition:** Each of the 3 builders duplicates `_normalize_db_url()`, `_connect()`, `_exec()`, `_fetchone()`, `_fetchall()` -- 5 functions x 3 files = 15 duplicate function definitions, ~180 lines of identical code.
+
+**Complexity:** Low
+
+**What It Looks Like:** Extract to `ta_lab2.scripts.bars.psycopg_utils` module. Each builder imports instead of redefining.
+
+**Evidence from codebase:**
+- `refresh_price_bars_1d.py` lines 78-148: 5 utility functions
+- `refresh_tvc_price_bars_1d.py` lines 56-100: same 5 functions (slightly simplified)
+- `refresh_hl_price_bars_1d.py` lines 66-120: same 5 functions
+
+### D-5: Unified Conflict Resolution Column Set
+
+**Value Proposition:** The three builders have slightly different ON CONFLICT column sets because the PK evolved incrementally:
+- CMC: `ON CONFLICT (id, tf, bar_seq, "timestamp")` -- no venue in PK
+- TVC: `ON CONFLICT (id, tf, bar_seq, venue, "timestamp")` -- venue as TEXT
+- HL: `ON CONFLICT (id, tf, bar_seq, venue_id, "timestamp")` -- venue_id as SMALLINT
+
+This inconsistency is a latent correctness issue. The consolidated builder uses a single, correct conflict target.
+
+**Complexity:** Low (but requires careful PK analysis)
+
+**Risk:** The `price_bars_1d` table DDL (in `common_snapshot_contract.py` line 165) defines PK as `(id, tf, bar_seq, venue, timestamp)` using TEXT venue. But HL writes `venue_id` as SMALLINT. This mismatch must be resolved -- likely by standardizing to `venue_id` across all sources, matching the PK migration already underway on the `refactor/strip-cmc-prefix-add-venue-id` branch.
+
+### D-6: Source-Aware Backfill Detection (Generalized)
+
+**Value Proposition:** Currently only CMC has backfill detection (tracks `daily_min_seen`, rebuilds if MIN(timestamp) decreases). TVC and HL lack this. A generalized builder could offer opt-in backfill detection for any source.
+
+**Complexity:** Medium
+
+**What It Looks Like:** The `backfill_detection: bool` flag in the source registry enables/disables the backfill check per source. When enabled, the same `_check_for_backfill()` logic from CMC applies to any source.
+
+**When to Build:** Phase 2. TVC and HL sources are less likely to have historical backfills, but future sources might.
+
+### D-7: Shadow-Write Migration Pattern
+
+**Value Proposition:** Instead of a hard cutover from siloed to _u, implement shadow writing: builders write to BOTH siloed and _u tables during a transition period. Once validation confirms parity (D-3), stop writing to siloed tables.
+
+**Complexity:** Medium
+
+**What It Looks Like:**
+
+```python
+class MigrationWriteMode(Enum):
+    SILOED_ONLY = "siloed"        # Current behavior
+    SHADOW = "shadow"             # Write to both siloed + _u
+    UNIFIED_ONLY = "unified"      # Target state (post-migration)
+```
+
+The mode is configurable per family, per environment. Shadow mode doubles write load but ensures safe migration with rollback capability.
+
+**When to Build:** Essential for the _u migration phase. Without this, migration is a risky big-bang cutover.
+
+### D-8: Dead Table Cleanup Registry
+
+**Value Proposition:** After migration, 30 siloed tables and 6 sync scripts become dead weight. A cleanup registry tracks which tables are deprecated, when they were last written to, and whether any consumers still read them.
+
+**Complexity:** Low
+
+**What It Looks Like:** A `dim_table_lifecycle` table or YAML config that marks tables as ACTIVE, SHADOW, DEPRECATED, or ARCHIVED. The daily refresh orchestrator warns if deprecated tables are still referenced.
 
 ---
 
-## Feature Area 4: Cross-Asset Aggregation for Macro Context
+## Anti-Features
 
-Using cross-asset crypto signals (BTC dominance, correlation structure, funding rates)
-alongside FRED data to build a richer macro picture.
+Things to deliberately NOT build during this consolidation. Common over-engineering traps.
 
-### Table Stakes
+### AF-1: Generic ORM-Based Bar Builder
 
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| BTC/ETH rolling correlation as macro health indicator | Correlation breakdown (already in flatten_trigger.py at -0.20 threshold) is a crypto-native macro stress signal. Make it a feature, not just a trigger. | Low | Already computed for tail risk. Expose as a column in a features table. 30d rolling Pearson correlation between BTC and ETH daily returns. |
-| Cross-asset correlation matrix (top 5-10 assets) | When all crypto moves together (high average pairwise correlation), the market is in "macro mode" -- driven by macro flows, not asset-specific factors. | Medium | 30d rolling average pairwise correlation across top assets. High avg correlation (>0.7) = macro-driven market; low (<0.4) = idiosyncratic/alpha opportunity. |
-| Aggregate funding rate signal | Perp funding rates across BTC and ETH signal market-wide leverage and sentiment. Extremely positive funding = crowded long; negative = crowded short. | Medium | Already have `cmc_funding_rates` table (v1.0.0). Compute: avg funding rate across tracked pairs, z-score of current vs 30d/90d history. |
-| BTC dominance proxy (if available) | Rising BTC dominance in risk-off environments = flight to quality within crypto. Falling dominance = risk-on rotation to alts. | Low | Requires BTC market cap / total market cap. May not be available from current data sources. If unavailable, skip -- not critical. Mark as LOW confidence. |
+**Why Avoid:** The 1D builders use raw psycopg + SQL CTEs for performance. CMC's bar building is a single 500-line SQL CTE that does bar_seq assignment, OHLC repair, invariant enforcement, and upsert in one round-trip. Replacing this with ORM-based Python logic would be 5-10x slower and lose atomicity.
 
-### Differentiators
+**What to Do Instead:** Keep SQL CTEs per source. The consolidation unifies Python scaffolding (CLI, state, logging), not the SQL core.
 
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| Crypto-macro correlation regime | Track whether BTC-VIX, BTC-DXY, BTC-HY_OAS correlations are in their normal range or breaking down. Correlation regime shifts signal structural market changes. | High | Rolling 60d correlation of BTC daily returns vs each macro feature. When BTC-VIX correlation flips from negative (normal) to positive (anomalous), it signals a structural shift. |
-| Sector-rotation signal within crypto | When macro turns risk-off, capital flows from alts to BTC to stablecoins. Detecting this flow pattern adds alpha to position sizing. | High | Requires market cap data per asset, which may not be in the current database. Defer unless data is readily available. |
-| ETF flow proxy (if accessible) | BTC ETF inflows/outflows are a major post-2024 price driver. Net flows signal institutional macro positioning. | Medium | Requires external data source (not FRED). Alternative.me or similar free API. Mark as LOW confidence for v1.0.1 scope. |
+**Evidence:** `refresh_price_bars_1d.py` lines 253-496 is a single CTE that runs in ~1 second per asset. A Python-side row-by-row equivalent would take 10-30 seconds.
 
-### Anti-Features
+### AF-2: Real-Time / Streaming Bar Builder
 
-| Anti-Feature | Why Avoid | What to Do Instead |
-|--------------|-----------|-------------------|
-| On-chain metrics (active addresses, exchange flows) | Requires Glassnode/CryptoQuant subscription or complex free-tier scraping. High data engineering cost for uncertain alpha. | Defer to future milestone. Focus on FRED (free, reliable) + exchange data (already connected). |
-| Social sentiment analysis (Twitter/Reddit NLP) | Noisy, expensive to compute, requires NLP infrastructure. Alpha from social sentiment is well-documented as fleeting. | Use funding rates as a sentiment proxy -- they directly reflect how traders are positioned, not what they say. |
-| Order book microstructure as macro signal | The existing microstructure module computes Kyle lambda, VPIN. These are per-asset execution features, not macro signals. Conflating them adds confusion. | Keep microstructure features in their own domain. If order book stress across multiple assets is desired, that's a separate feature area. |
+**Why Avoid:** The pipeline is daily-batch. Adding real-time capability requires a fundamentally different architecture (message queues, streaming state, exactly-once delivery). This is out of scope for v1.1.0 consolidation.
 
----
+**What to Do Instead:** Keep batch mode. If real-time is needed later, it would be a separate system.
 
-## Feature Area 5: Macro Event Risk Gates
+### AF-3: Auto-Discovery of New Sources
 
-Risk gates that activate around known macro events (FOMC, VIX spikes, carry unwinds)
-to protect the portfolio from event-driven volatility.
+**Why Avoid:** Tempting to build a system that auto-discovers new source tables and registers them. But each source has unique SQL (JOINs, column mappings, repair logic). Auto-discovery cannot derive these.
 
-### Table Stakes
+**What to Do Instead:** Manual registry. Adding a new source means adding one `SourceConfig` entry with its SQL template. This is a 10-minute task, not a daily operation.
 
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| FOMC event calendar gate | Reduce position limits +/-24h around FOMC meetings. FOMC announcements produce the largest systematic vol spikes in crypto markets. 8 meetings per year, dates are known in advance. | Medium | Store FOMC dates in a `dim_macro_events` table (type, date, description). Risk engine checks: "Is there an FOMC meeting within 24 hours?" If yes, apply size_mult reduction (e.g., 0.5). |
-| VIX spike gate | When VIX crosses a crisis threshold (>30), immediately tighten risk beyond what the daily macro regime would apply. This is an intra-day override for extreme conditions. | Medium | New flatten trigger condition in `flatten_trigger.py`: if VIX > 30 (from most recent FRED pull), set tail_risk_state to REDUCE. VIX > 40, set to FLATTEN. Requires VIX value to be accessible from the risk engine (read from fred_macro_daily). |
-| Carry unwind velocity gate | When DEXJPUS moves >2 sigma in a single day AND the US-Japan rate spread is positive (carry trade is on), activate REDUCE state. The Aug 2024 unwind moved 5% in DEXJPUS and 20% in BTC simultaneously. | High | New trigger in `flatten_trigger.py`: `carry_unwind_trigger`. Inputs: DEXJPUS daily change z-score (from fred_macro_daily), US_JP_RATE_SPREAD level. If z-score > 2.0 AND spread > 0, return REDUCE. If z-score > 3.0 AND spread > 0, return FLATTEN. |
-| Data freshness gate | Alert if FRED sync is stale (>48h without update for daily series). Stale macro data means the macro regime is based on outdated information. | Low | Check `max(ingested_at)` in fred_macro_daily. If > 48h stale, log WARNING and set macro regime confidence to LOW. If > 96h stale, disable macro regime input (fall back to per-asset only). |
-| FOMC calendar seeding | Populate dim_macro_events with known FOMC dates for 2026-2027. This is static data -- 8 meetings per year, dates published by the Fed. | Low | Insert rows manually or from a static JSON file. Include: meeting date, minutes release date (3 weeks later), press conference flag. |
-| Credit stress gate | When HY OAS widens rapidly (>1.5 sigma in 5 days), apply size reduction. Credit stress precedes equity and crypto selloffs. | Medium | Add to macro risk evaluation: if BAMLH0A0HYM2 5d z-score > 1.5, apply size_mult 0.7. If > 2.5, apply size_mult 0.4. |
+### AF-4: Parallel Multi-Source ID Processing
 
-### Differentiators
+**Why Avoid:** Running CMC, TVC, and HL builders concurrently for the same asset ID could cause write conflicts on `price_bars_1d` (same output table, same PK). The current sequential-per-source approach is safe.
 
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| CPI release day gate | CPI releases (monthly) produce the second-largest systematic crypto vol spikes after FOMC. Known dates, high impact. | Low | Add CPI release dates to dim_macro_events. Same gate logic as FOMC: reduce exposure +/-24h around release. |
-| NFP (Non-Farm Payrolls) gate | First Friday of each month. Less impactful than FOMC/CPI but still moves crypto. | Low | Add NFP dates to dim_macro_events. Lighter gate: size_mult 0.75 (vs 0.5 for FOMC). |
-| Composite macro stress score | Single 0-100 score combining VIX level, credit stress, carry velocity, and financial conditions. Higher = more stressed. Threshold-based tier system for risk response. | Medium | Weighted sum: VIX_percentile * 0.3 + HY_OAS_zscore * 0.25 + carry_velocity_zscore * 0.25 + NFCI_level * 0.2. Tiers: 0-30 = calm, 30-60 = elevated, 60-80 = stressed, 80-100 = crisis. |
-| Automatic event gate from macro regime | Instead of hardcoded FOMC dates, detect "macro event periods" automatically from vol spike patterns in macro features. | High | Requires anomaly detection on macro feature time series. Interesting research project but premature for v1.0.1. Hardcoded calendars are simpler and more reliable. |
+**What to Do Instead:** Sources run sequentially (CMC, then TVC, then HL). Within each source, IDs can run in parallel (existing `--num-processes` flag).
 
-### Anti-Features
+### AF-5: Dynamic Schema Evolution for _u Tables
 
-| Anti-Feature | Why Avoid | What to Do Instead |
-|--------------|-----------|-------------------|
-| Real-time VIX feed (websocket) | Requires a separate data provider subscription (CBOE data is not free for streaming). FRED VIX updates once daily. | Use FRED daily VIX. For same-day VIX spikes, the crypto-native vol features (ATR, implied vol from options if available) already capture the information. |
-| Predictive macro event models | "Will the Fed cut rates?" -- predicting macro events is a different problem from responding to macro state. Prediction introduces model risk that compounds with trading model risk. | React to state, not predict. The system should detect "rates are being cut" not "rates will be cut." Use current FRED values, not forecasts. |
-| Blocking all trades during macro events | Complete halt during FOMC is too aggressive. Some strategies (mean reversion, short vol) may benefit from the event. | Reduce exposure (size_mult), don't block entirely. Let per-strategy configuration decide whether to participate in event windows. |
-| Scraping real-time FOMC decisions | FOMC decisions are released at 2:00 PM ET. Scraping the Fed website for real-time decisions is fragile and unnecessary for a paper trading system. | Use next-day FRED data update. For the 2-hour window between announcement and FRED update, the crypto-native tail risk system already handles extreme moves. |
+**Why Avoid:** Tempting to build a system that automatically adds columns to _u tables when source schemas change. But schema changes require careful thought about defaults, NULL handling, and downstream consumers.
 
-### Feature Dependencies
+**What to Do Instead:** Schema changes are explicit Alembic migrations. The `_build_column_mapping()` in `sync_utils.py` already handles missing columns by inserting NULL.
 
-```
-fred_macro_daily (Feature Area 1)
-  -> VIX, HY OAS, DEXJPUS values read by risk gates
-  -> Data freshness checked by staleness gate
+### AF-6: Materialized View Replacement for _u
 
-dim_macro_events (new table)
-  -> FOMC dates, CPI dates, NFP dates
-  -> Seeded statically, updated annually
+**Why Avoid:** A materialized view that UNIONs all 5 siloed tables would "look like" a _u table but have terrible performance (full refresh on every REFRESH). The current approach (INSERT ON CONFLICT DO NOTHING with ingested_at watermark) is incrementally maintainable.
 
-risk/flatten_trigger.py (existing)
-  -> Add new trigger types: vix_spike, carry_unwind, credit_stress
-  -> Priority ordering: existing triggers first, macro triggers after
+**What to Do Instead:** Direct writes to _u tables with alignment_source tag.
 
-risk/risk_engine.py (existing)
-  -> evaluate_tail_risk_state() extended to accept macro inputs
-  -> check_order() unchanged (reads from dim_risk_state as before)
+### AF-7: Over-Abstracting the 6 Table Families
 
-run_daily_refresh.py (existing)
-  -> New stage: macro risk evaluation after macro regime computation
-  -> Updates dim_risk_state.tail_risk_state if macro triggers fire
-```
+**Why Avoid:** Price bars, EMA values, EMA returns, AMA values, AMA returns, and bar returns have similar pipeline structure but different semantics (different PKs, different column sets, different computation logic). Over-abstracting into a single "DataFamily" class that handles all 6 loses domain clarity.
+
+**What to Do Instead:** Handle each family's _u migration independently. Share the `sync_utils.py` pattern and the shadow-write mechanism, but keep family-specific upsert logic.
+
+### AF-8: Premature Siloed Table Deletion
+
+**Why Avoid:** Dropping 30 tables before confirming all downstream consumers (features, signals, regimes, backtests) have migrated to reading from _u tables is catastrophic. Some consumers may still query siloed tables directly.
+
+**What to Do Instead:** The migration has 3 explicit stages: (1) shadow-write, (2) redirect consumers, (3) deprecate siloed tables after a retention period with zero-read confirmation.
 
 ---
 
-## Feature Area 6: Macro Drift and Monitoring
-
-Extending the drift monitor and dashboard to incorporate macro regime state.
-
-### Table Stakes
-
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| Macro regime as drift attribution source | When paper trading PnL diverges from backtest, macro regime change is a plausible explanation. Add macro regime to the drift attribution pipeline. | Medium | New drift source: "macro_regime_changed". If macro regime was different during paper period vs backtest period, flag as potential drift cause. |
-| Macro regime display in Streamlit dashboard | Dashboard should show current macro regime alongside per-asset regimes. Without this, the operator has no visibility into macro overlay decisions. | Low | New card/metric on the dashboard: "Macro Regime: Cutting-Expanding-RiskOn-Stable". Color-coded by risk level. |
-| Macro feature staleness in pipeline monitor | Pipeline monitor (Mode B) should show FRED data freshness alongside crypto data freshness. | Low | Add fred_macro_daily to the staleness check in the pipeline monitor. Same traffic-light pattern as existing tables. |
-| Macro regime change notification via Telegram | When macro regime transitions (especially to risk-off or carry unwind), send a Telegram alert. Macro regime changes are rare (days to weeks between transitions) so alert volume is low. | Low | Reuse existing Telegram notification infrastructure. New message type: "MACRO REGIME CHANGE: risk_appetite changed from neutral to risk_off. VIX at 28.5, HY OAS z-score 1.8." |
-
-### Differentiators
-
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| Macro regime timeline in dashboard | Visual timeline showing macro regime history overlaid on portfolio PnL. Enables visual correlation between regime changes and performance shifts. | Medium | Plotly chart: x-axis = date, top panel = PnL, bottom panel = macro regime labels as colored bands. |
-| FRED data quality dashboard | Show data coverage, freshness, and gap detection for all 39 FRED series in a dedicated dashboard tab. | Medium | Read from fred_macro_daily metadata. Flag series with gaps > 2 business days. |
-
-### Anti-Features
-
-| Anti-Feature | Why Avoid | What to Do Instead |
-|--------------|-----------|-------------------|
-| Real-time macro dashboard with auto-refresh | FRED data updates once per day. Auto-refreshing a macro dashboard every 5 seconds wastes resources and creates a false sense of real-time monitoring. | Manual refresh button with 1-hour cache TTL. Macro data changes once per day; dashboard reflects that cadence. |
-
----
-
-## Cross-Feature Dependencies
+## Feature Dependencies
 
 ```
-Feature Area 1: Raw FRED Ingestion
-  -> Foundation for everything else
-  -> MUST be complete and tested before any other area starts
+TS-1 (Source Registry)
+  |
+  +---> TS-2 (Source-Specific SQL)
+  |
+  +---> TS-3 (Venue-Aware State) ---> TS-7 (Incremental Refresh)
+  |
+  +---> TS-6 (CLI Compatibility)
+  |
+  +---> D-1 (Multi-Source Single Pass)  [optional, Phase 2]
+  |
+  +---> D-2 (Post-Build Hooks)         [optional, Phase 2]
 
-Feature Area 2: Macro Regime Classification
-  -> Depends on Feature Area 1 (reads from fred_macro_daily)
-  -> Required by Feature Area 3 (regime feeds into resolver)
-  -> Required by Feature Area 5 (regime state drives risk gates)
+TS-4 (alignment_source Tag)
+  |
+  +---> TS-5 (Correct _u PK)
+  |
+  +---> D-7 (Shadow-Write Migration)   [Phase 2]
 
-Feature Area 3: Macro-Asset Integration
-  -> Depends on Feature Area 2 (macro regime labels)
-  -> Modifies resolver.py policy table (but not tighten logic)
-  -> Wires into executor via L4 parameter
+D-4 (Dedupe psycopg utils)  [standalone, no dependencies]
 
-Feature Area 4: Cross-Asset Aggregation
-  -> Partially independent (BTC/ETH correlation is already computed)
-  -> Enriches Feature Area 2 (additional inputs to regime classifier)
-  -> Can run in parallel with Feature Areas 2-3
-
-Feature Area 5: Event Risk Gates
-  -> Depends on Feature Area 1 (reads VIX, DEXJPUS from fred_macro_daily)
-  -> Depends on Feature Area 2 (macro regime state as context)
-  -> Modifies risk/flatten_trigger.py (adds new trigger types)
-
-Feature Area 6: Drift and Monitoring
-  -> Depends on Feature Areas 1-3 (needs macro data and regime labels)
-  -> Last in build order (read-only display of other areas' outputs)
+D-3 (Validation Framework)
+  |
+  +---> D-7 (Shadow-Write) ---> D-8 (Dead Table Cleanup)  [Phase 3]
 ```
 
 ---
 
 ## MVP Recommendation
 
-For v1.0.1 MVP, prioritize by dependency order and value delivered:
+### Phase 1: Foundation (1D Bar Builder Consolidation)
 
-### Must Have (enables the macro regime pipeline end-to-end)
+Build these in order:
 
-1. **FRED series expansion + sync pipeline** (Area 1, table stakes) -- Without macro data in marketdata, nothing else works. This is the critical path. Includes fred_macro_daily table DDL, forward-fill alignment, VM collection expansion to 39 series, and sync automation.
+1. **D-4**: Extract duplicated psycopg utilities to shared module (Low effort, immediate savings: ~180 lines)
+2. **TS-1**: Build source registry with declarative config for CMC, TVC, HL
+3. **TS-2**: Preserve source-specific SQL CTEs as registry-referenced templates
+4. **TS-3**: Migrate state table to venue-aware PK `(id, venue_id, tf)`
+5. **TS-8**: Coverage tracking in consolidated builder
+6. **TS-6**: Thin wrapper scripts for backward compatibility
+7. **D-5**: Unified conflict resolution column set
 
-2. **Core derived features** (Area 1, table stakes) -- Net liquidity proxy, rate spreads, VIX regime, YC slope change, dollar strength, credit stress z-score, carry features. These are simple computations on raw series but provide the inputs to everything downstream.
+**Outcome:** 3 builders (1,915 LOC) become 1 generalized builder (~600 LOC) + 3 wrapper scripts (~30 LOC) + registry (~100 LOC). Net reduction: ~1,100 LOC.
 
-3. **Rule-based macro regime classifier** (Area 2, table stakes) -- Four dimensions (monetary policy, liquidity, risk appetite, carry) with threshold rules. Store in cmc_macro_regimes. Apply hysteresis. This is the core intellectual contribution of the milestone.
+### Phase 2: _u Direct Write Migration
 
-4. **L4 integration in policy resolver** (Area 3, table stakes) -- Wire macro regime into the existing resolver's L4 slot. Add policy entries for macro regime keys. Tighten-only semantics preserved automatically.
+1. **TS-4**: Add alignment_source tag to builder output
+2. **TS-5**: Configure correct _u table PKs for upsert
+3. **D-7**: Shadow-write mode (write to both siloed and _u simultaneously)
+4. **D-3**: Validation framework to compare siloed vs _u output
+5. Validate shadow-write parity per family, per sample of IDs
 
-5. **FOMC event gate + VIX spike gate** (Area 5, table stakes) -- The two highest-impact event risk gates. FOMC dates are static (easy to seed). VIX spike reads from fred_macro_daily (already available after Area 1).
+**Outcome:** Builders write to _u directly. Siloed tables still receive writes during shadow period for rollback safety.
 
-6. **Macro regime in dashboard + Telegram** (Area 6, table stakes) -- Operator visibility into macro overlay decisions. Without this, the macro system is a black box.
+### Phase 3: Cutover & Cleanup
 
-### Should Have (adds significant value, not blocking)
+1. Confirm all downstream consumers read from _u tables
+2. Flip write mode to `UNIFIED_ONLY`
+3. Remove 6 sync scripts (771 LOC)
+4. **D-8**: Mark 30 siloed tables as DEPRECATED
+5. Archive siloed tables after a configured retention period (suggest 30 days)
 
-- **Carry unwind velocity gate** (Area 5) -- Higher complexity but critical for the next Aug-2024-style event.
-- **BTC/ETH correlation as feature** (Area 4) -- Already computed; just needs to be exposed as a feature column.
-- **Macro-crypto lead-lag analysis** (Area 4 differentiator) -- Quantifies the value of macro features for crypto timing. Uses existing `lead_lag_max_corr()`.
-- **Data freshness gate** (Area 5) -- Simple to implement, prevents silent degradation.
-- **Credit stress gate** (Area 5) -- HY OAS widening is a reliable risk-off signal.
+**Outcome:** 30 tables eliminated, 6 sync scripts removed, storage halved for pipeline tables.
 
-### Defer to Post-v1.0.1
+### Defer to Post-Consolidation
 
-- **HMM regime detection**: High complexity model risk on top of model risk. Rule-based must work first.
-- **Blended global liquidity proxy**: Requires careful normalization across Fed/ECB/BOJ. Defer until US-only liquidity proxy is validated.
-- **CPI surprise proxy**: Without real consensus data, the proxy is low confidence. Defer until consensus data source is identified.
-- **ETF flow proxy**: Requires external data source not yet integrated.
-- **On-chain metrics**: Requires Glassnode/CryptoQuant subscription.
-- **Macro regime in backtest replay**: Requires full historical FRED data and macro regime labels computed over backtest period. Significant data engineering effort.
+- **D-1** (Multi-source single pass): Nice optimization, not blocking
+- **D-6** (Generalized backfill detection for TVC/HL): Not needed yet
+- **D-2** (Post-build hooks): Current manual `_sync_1d_to_multi_tf` is adequate
+
+---
+
+## Quantified Impact
+
+### LOC Reduction
+
+| Target | Current | After | Savings |
+|--------|---------|-------|---------|
+| 1D bar builders | 1,915 | ~730 | ~1,185 |
+| Duplicated psycopg utils | ~180 (3x60) | ~60 (1x) | ~120 |
+| Sync-to-_u scripts | 771 | 0 | 771 |
+| **Total Phase 1+3** | **~2,866** | **~790** | **~2,076** |
+
+### Table Count Reduction
+
+| Current | After | Reduction |
+|---------|-------|-----------|
+| 30 siloed tables + 6 _u tables = 36 | 6 _u tables | 30 tables dropped |
+
+### Storage Impact
+
+The 30 siloed tables are near-exact duplicates of _u table data (sync scripts use `ON CONFLICT DO NOTHING` to copy rows). With ~230M total rows across all 6 families, the siloed tables duplicate approximately half the pipeline storage. Elimination saves disk and vacuum overhead.
+
+### Operational Simplification
+
+| Metric | Current | After |
+|--------|---------|-------|
+| 1D builder scripts to maintain | 3 (separate codebases) | 1 (+ 3 thin wrappers) |
+| Daily sync operations | 6 (one per _u family) | 0 |
+| State table schemas | 3 (incompatible PKs) | 1 (unified) |
+| ON CONFLICT variants in 1D builders | 3 (different PK cols) | 1 (standard) |
+| Risk of sync failure leaving stale _u data | Ongoing | Eliminated |
 
 ---
 
 ## Sources
 
-### HIGH Confidence (official documentation, codebase inspection)
+All findings derived from direct codebase analysis of the following files:
 
-- Codebase inspection: `regimes/resolver.py` (L3/L4 slots, tighten-only semantics), `regimes/labels.py` (per-asset labeling pattern), `regimes/hysteresis.py` (HysteresisTracker), `risk/risk_engine.py` (7-gate architecture), `risk/flatten_trigger.py` (existing trigger thresholds)
-- VM-STRATEGY.md: 39 FRED series list, derived series formulas, infrastructure gaps
-- FRED official series pages: [VIXCLS](https://fred.stlouisfed.org/series/VIXCLS), [BAMLH0A0HYM2](https://fred.stlouisfed.org/series/BAMLH0A0HYM2), [WALCL](https://fred.stlouisfed.org/series/WALCL), [NFCI](https://fred.stlouisfed.org/series/NFCI)
-- [Chicago Fed NFCI About Page](https://www.chicagofed.org/research/data/nfci/about) -- 105 measures, positive = tight, negative = loose
-
-### MEDIUM Confidence (multiple credible sources agree)
-
-- Net liquidity formula (WALCL - TGA - RRP): [TradingView indicators](https://www.tradingview.com/script/AWrUtm2d-FED-Net-Liquidity-WALCL-TGA-RRP/), [DurdenBTC](https://durdenbtc.com/charts/netliqz/), [Reflexivity Research PDF](https://cdn.prod.website-files.com/64f99c50f4c866dee943165/65367a37c779eab3fa42c35b_Revisiting%20the%20Net%20Liquidity%20Formula.pdf)
-- BTC/equity correlation tightening: [AInvest](https://www.ainvest.com/news/economic-data-fed-policy-signals-reshaping-crypto-market-dynamics-2512/), [MEXC Blog](https://blog.mexc.com/news/how-macro-liquidity-drives-crypto-markets-rate-cuts-etfs-and-capital-flows/)
-- 6-week liquidity-BTC lag: [TraderHC analysis](https://www.traderhc.com/p/liquidity-is-everything-the-one-formula)
-- VIX thresholds (calm <15, elevated 15-25, crisis >25): [DozenDiamonds](https://www.dozendiamonds.com/volatility-regime-shifting/), [CFA Institute](https://blogs.cfainstitute.org/investor/2026/02/20/why-static-portfolios-fail-when-risk-regimes-change/)
-- Carry unwind mechanics: [BIS Bulletin 90](https://www.bis.org/publ/bisbull90.pdf), [CoinDesk analysis](https://www.coindesk.com/markets/2025/12/07/bitcoin-faces-japan-rate-hike-yen-carry-trade-unwind-fears-miss-the-mark-real-risk-lie-elsewhere/)
-- HMM for crypto regime detection: [QuantStart](https://www.quantstart.com/articles/market-regime-detection-using-hidden-markov-models-in-qstrader/), [QuantInsti](https://blog.quantinsti.com/regime-adaptive-trading-python/), [Medium HMM+LSTM](https://medium.com/@akashdevbuilds/how-i-built-a-market-regime-classifier-for-crypto-using-hmms-and-lstms-8151047582f7)
-
-### LOW Confidence (single source, unverified, needs validation)
-
-- 1% liquidity rise = 5% crypto rise claim: Single source (TraderHC). The direction is plausible but the magnitude needs validation against ta_lab2's own data.
-- NFCI threshold of -50/-63 for alt season: Single TradingView indicator description. Needs backtesting against ta_lab2 data before use.
-- BTC dominance as reliable risk-on/off signal: Commonly stated but the mechanism is less clear in a post-ETF market. Needs validation.
-
----
-
-## Confidence Assessment
-
-| Area | Confidence | Basis |
-|------|------------|-------|
-| Raw FRED features (Area 1) | HIGH | Series list verified against FRED.org; formulas are simple arithmetic; sync architecture validated against existing FDW infrastructure |
-| Regime classification (Area 2) | MEDIUM | Rule-based thresholds are reasonable but need calibration against historical data. Exact thresholds (VIX 15/25, rate change 0.25%) are starting points, not final values. |
-| Macro-asset integration (Area 3) | HIGH | Resolver architecture inspection confirms L4 slot is available and tighten-only semantics are enforced by existing code |
-| Cross-asset aggregation (Area 4) | MEDIUM | BTC/ETH correlation is well-understood; broader cross-asset signals depend on data availability that needs verification |
-| Event risk gates (Area 5) | MEDIUM | FOMC/VIX gates are standard practice; carry unwind gate is novel and thresholds need careful calibration from Aug 2024 event data |
-| Drift and monitoring (Area 6) | HIGH | Read-only display of other areas' outputs; Streamlit and Telegram infrastructure is proven |
-
----
-
-*Research completed: 2026-03-01*
-*Ready for roadmap: yes*
+- `src/ta_lab2/scripts/bars/base_bar_builder.py` (557 lines) -- Template Method pattern for bar builders
+- `src/ta_lab2/scripts/bars/refresh_price_bars_1d.py` (822 lines) -- CMC 1D builder with OHLC repair
+- `src/ta_lab2/scripts/bars/refresh_tvc_price_bars_1d.py` (511 lines) -- TVC 1D builder
+- `src/ta_lab2/scripts/bars/refresh_hl_price_bars_1d.py` (585 lines) -- HL 1D builder
+- `src/ta_lab2/scripts/bars/common_snapshot_contract.py` (1,813 lines) -- Shared utilities
+- `src/ta_lab2/scripts/bars/bar_builder_config.py` (53 lines) -- Config dataclass
+- `src/ta_lab2/scripts/bars/derive_multi_tf_from_1d.py` (807 lines) -- 1D-to-multi-TF derivation
+- `src/ta_lab2/scripts/bars/run_all_bar_builders.py` (537 lines) -- Builder orchestrator
+- `src/ta_lab2/scripts/bars/sync_price_bars_multi_tf_u.py` (71 lines) -- Price bars sync
+- `src/ta_lab2/scripts/sync_utils.py` (304 lines) -- Generic sync utilities
+- `src/ta_lab2/scripts/emas/sync_ema_multi_tf_u.py` (359 lines) -- EMA sync (older pattern)
+- `src/ta_lab2/scripts/emas/ema_state_manager.py` -- State management pattern
+- `src/ta_lab2/scripts/bars/refresh_price_bars_multi_tf.py` (1,237 lines) -- Multi-TF builder
+- `src/ta_lab2/scripts/returns/sync_returns_bars_multi_tf_u.py` (68 lines) -- Returns sync
+- `src/ta_lab2/scripts/amas/sync_ama_multi_tf_u.py` (96 lines) -- AMA sync
+- `src/ta_lab2/scripts/amas/sync_returns_ama_multi_tf_u.py` (105 lines) -- AMA returns sync

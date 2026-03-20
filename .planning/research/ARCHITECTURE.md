@@ -1,671 +1,648 @@
-# Architecture Patterns: Macro Regime Integration
+# Architecture Patterns: Pipeline Consolidation & Storage Optimization
 
-**Domain:** Macro regime infrastructure for existing quant trading platform (ta_lab2)
-**Researched:** 2026-03-01
-**Confidence:** HIGH (based on direct source code analysis of all integration points)
-
----
+**Domain:** Infrastructure refactoring for quant trading platform (ta_lab2 v1.1.0)
+**Researched:** 2026-03-19
+**Confidence:** HIGH (based on direct source code analysis of all 1D builders, sync scripts, base classes, and orchestration pipeline)
 
 ## Executive Summary
 
-The existing ta_lab2 regime infrastructure was designed with macro expansion in mind. The `cmc_regimes` table already has `l3_label` and `l4_label` columns (always NULL today). The resolver already accepts `L3` and `L4` keyword arguments and processes them in its tighten-only chain (`L2 -> L1 -> L0 -> L3 -> L4`). The `data_budget.py` already has `L4: 1` (always enabled) in its threshold table. This means macro regime integration is fundamentally a "fill in the empty slot" problem, not a "redesign the architecture" problem.
+The v1.1.0 pipeline consolidation addresses two structural inefficiencies in the current architecture:
 
-The integration requires: (1) a macro feature computation layer that reads FRED data and produces numeric features, (2) a macro labeler that converts features into L4-shaped regime keys, (3) wiring the L4 label into the existing refresh pipeline, and (4) new risk gates that consume macro signals. The existing `integrations/economic/` module (1,766 LOC) should be bypassed -- it is an API client for FRED, but the data already lives locally in `fred.series_values` (208K rows, 39 series). No API calls needed.
+1. **Three separate 1D bar builders** (CMC, TVC, HL) that share 80%+ identical code but diverge in source queries, ID resolution, and venue handling
+2. **Six families of 5 siloed tables + 1 _u table** where sync scripts copy data from siloed tables to unified tables using watermark-based INSERT...ON CONFLICT DO NOTHING
+
+The consolidation strategy has two orthogonal work streams:
+- **Generalized 1D Bar Builder**: Replace three 1D builder scripts with one configurable builder driven by a SourceSpec registry
+- **Direct-to-_u Writes**: Eliminate siloed intermediate tables and sync scripts by having builders write directly to _u tables with alignment_source
+
+Both changes integrate cleanly with the existing BaseBarBuilder template method pattern and common_snapshot_contract utilities.
 
 ---
 
-## Current Architecture (As-Is)
+## Current Architecture (BEFORE)
 
 ### Component Map
 
 ```
-                    FRED VM (GCP)
-                        |
-              sync_fred_from_vm.py (SSH+COPY)
-                        |
-                        v
-              fred.series_values (208K rows, 39 series)
-              fred.releases
-              fred.sync_log
-                        |
-                        | (currently: NO consumers)
-                        v
-                    [DEAD END]
-
-
-    cmc_price_bars_multi_tf
-            |
-            v
-    load_regime_input_data()          <- regime_data_loader.py
-            |
-            v
-    label_layer_monthly()  (L0)       <- labels.py
-    label_layer_weekly()   (L1)       <- labels.py
-    label_layer_daily()    (L2)       <- labels.py
-            |
-            v
-    HysteresisTracker.update()        <- hysteresis.py
-            |
-            v
-    resolve_policy_from_table()       <- resolver.py
-    (chain: L2 -> L1 -> L0 -> L3=None -> L4=None)
-            |
-            v
-    write_regimes_to_db()             <- refresh_cmc_regimes.py
-            |
-            v
-    cmc_regimes  (PK: id, ts, tf)
-    cmc_regime_flips
-    cmc_regime_stats
-    cmc_regime_comovement
-            |
-            +-------> position_sizer.py  (reads regime_key, applies size_mult)
-            +-------> regime_router.py   (reads l2_label, routes ML sub-models)
-            +-------> risk_engine.py     (reads tail_risk_state, not regime labels directly)
-            +-------> drift/attribution.py (Step 6: regime delta comparison)
+Source Tables                    1D Builders                Output
+================               ===========                ======
+cmc_price_histories7  -------> OneDayBarBuilder --------> price_bars_1d
+tvc_price_histories   -------> TvcOneDayBarBuilder ----->     |
+hyperliquid.hl_candles ------> HlOneDayBarBuilder ------>     |
+                                                              v
+                                                     price_bars_multi_tf
+                                                     price_bars_multi_tf_cal_us
+                                                     price_bars_multi_tf_cal_iso
+                                                     price_bars_multi_tf_cal_anchor_us
+                                                     price_bars_multi_tf_cal_anchor_iso
+                                                              |
+                                                    sync_price_bars_multi_tf_u.py
+                                                              |
+                                                              v
+                                                     price_bars_multi_tf_u
+                                                     (alignment_source column)
 ```
 
-### Key Files and Their Roles
+This same pattern repeats for 5 more families (ema, ama, returns_bars, returns_ema, returns_ama) = 6 families total, each with 5 siloed + 1 _u table = 36 tables.
 
-| File | Path | Role | Integration Point |
-|------|------|------|-------------------|
-| `resolver.py` | `src/ta_lab2/regimes/resolver.py` | Tighten-only policy combiner | `resolve_policy_from_table(L0=, L1=, L2=, L3=, L4=)` -- L4 slot is ready |
-| `labels.py` | `src/ta_lab2/regimes/labels.py` | Per-asset labelers (L0-L3) | Add L4 labeler or create separate macro labeler |
-| `hysteresis.py` | `src/ta_lab2/regimes/hysteresis.py` | Tighten-immediate, loosen-after-N | Works with any layer key string -- no changes needed |
-| `data_budget.py` | `src/ta_lab2/regimes/data_budget.py` | Layer enablement thresholds | L4 threshold already set to 1 (always enabled) |
-| `proxies.py` | `src/ta_lab2/regimes/proxies.py` | BTC weekly fallback for young assets | No changes needed (macro is asset-agnostic) |
-| `refresh_cmc_regimes.py` | `src/ta_lab2/scripts/regimes/refresh_cmc_regimes.py` | Main refresh orchestrator | Must add L4 label computation + pass to resolver |
-| `policy_loader.py` | `src/ta_lab2/regimes/policy_loader.py` | YAML policy overlay | Add macro-regime policy rules to YAML |
-| `risk_engine.py` | `src/ta_lab2/risk/risk_engine.py` | 7-gate order risk engine | Add new macro-triggered gates |
-| `position_sizer.py` | `src/ta_lab2/executor/position_sizer.py` | Regime-adjusted sizing | Already reads regime_key -- tighten-only propagation sufficient |
-| `regime_router.py` | `src/ta_lab2/ml/regime_router.py` | Per-regime ML model dispatch | Could add macro-regime routing dimension |
-| `sync_fred_from_vm.py` | `src/ta_lab2/scripts/etl/sync_fred_from_vm.py` | FRED data sync from GCP VM | Working, incremental, 39 series -- needs to run before macro features |
-| `run_daily_refresh.py` | `src/ta_lab2/scripts/run_daily_refresh.py` | Pipeline orchestrator | Must add macro_features stage before regimes |
-| `fred_provider.py` | `src/ta_lab2/integrations/economic/fred_provider.py` | FRED API client (UNUSED) | BYPASS -- data already local via sync pipeline |
-| `attribution.py` | `src/ta_lab2/drift/attribution.py` | 6-source drift decomposition | Step 6 (regime) already exists -- macro adds a new attribution dimension |
+### Current Data Flow (Price Bars)
 
-### Resolver Chain Detail
+```
+Step 1: 1D Bar Building
+  refresh_price_bars_1d.py         (CMC -> price_bars_1d, venue=CMC_AGG)
+  refresh_tvc_price_bars_1d.py     (TVC -> price_bars_1d, venue=TVC_*)
+  refresh_hl_price_bars_1d.py      (HL  -> price_bars_1d, venue=HYPERLIQUID)
+    + _sync_1d_to_multi_tf()       (copies 1D rows to price_bars_multi_tf)
 
-The resolver processes layers in this order (line 125 of `resolver.py`):
+Step 2: Multi-TF Derivation
+  refresh_price_bars_multi_tf.py         -> price_bars_multi_tf
+  refresh_price_bars_multi_tf_cal_us.py  -> price_bars_multi_tf_cal_us
+  refresh_price_bars_multi_tf_cal_iso.py -> price_bars_multi_tf_cal_iso
+  refresh_price_bars_multi_tf_cal_anchor_us.py  -> price_bars_multi_tf_cal_anchor_us
+  refresh_price_bars_multi_tf_cal_anchor_iso.py -> price_bars_multi_tf_cal_anchor_iso
 
-```python
-for key in (L2, L1, L0, L3, L4):
-    if key:
-        policy = _tighten(policy, _match_policy(key, policy_table))
-    if key and "Stressed" in key:
-        policy.orders = "passive"
+Step 3: Sync to _u
+  sync_price_bars_multi_tf_u.py  (INSERT...SELECT...ON CONFLICT DO NOTHING)
+    - Reads from 5 siloed tables
+    - Adds alignment_source column
+    - Watermark-based incremental via ingested_at
+
+Step 4: Downstream (reads from _u only)
+  EMA builders read from price_bars_multi_tf_u
+  Returns builders read from price_bars_multi_tf_u
+  Feature scripts read from price_bars_multi_tf_u
 ```
 
-**Critical insight:** L4 is processed LAST, meaning it has the final tighten-only pass. A macro "Recession" or "Tightening" label in L4 can override everything below it by tightening size_mult, widening stops, and forcing passive orders. This is exactly the desired behavior -- macro conditions should be the final override.
+### Current Code Duplication
 
-### cmc_regimes Table Schema
+**Across 1D Builders (1,905 lines total):**
 
-```sql
-CREATE TABLE public.cmc_regimes (
-    id                  INTEGER         NOT NULL,
-    ts                  TIMESTAMPTZ     NOT NULL,
-    tf                  TEXT            NOT NULL DEFAULT '1D',
-    l0_label            TEXT            NULL,       -- Monthly (cycle)
-    l1_label            TEXT            NULL,       -- Weekly (primary trend)
-    l2_label            TEXT            NULL,       -- Daily (tactical)
-    l3_label            TEXT            NULL,       -- Intraday (UNUSED)
-    l4_label            TEXT            NULL,       -- Execution/Macro (UNUSED)
-    regime_key          TEXT            NOT NULL,
-    size_mult           DOUBLE PRECISION NOT NULL DEFAULT 1.0,
-    stop_mult           DOUBLE PRECISION NOT NULL DEFAULT 1.5,
-    orders              TEXT            NOT NULL DEFAULT 'mixed',
-    gross_cap           DOUBLE PRECISION NOT NULL DEFAULT 1.0,
-    pyramids            BOOLEAN         NOT NULL DEFAULT TRUE,
-    feature_tier        TEXT            NOT NULL DEFAULT 'lite',
-    l0_enabled          BOOLEAN         NOT NULL DEFAULT FALSE,
-    l1_enabled          BOOLEAN         NOT NULL DEFAULT FALSE,
-    l2_enabled          BOOLEAN         NOT NULL DEFAULT FALSE,
-    regime_version_hash TEXT            NULL,
-    updated_at          TIMESTAMPTZ     DEFAULT now(),
-    PRIMARY KEY (id, ts, tf)
-);
-```
+| Component | CMC (822 LOC) | TVC (511 LOC) | HL (585 LOC) | Shared? |
+|-----------|:---:|:---:|:---:|---------|
+| psycopg helpers (_connect, _exec, _fetchone, _fetchall) | Yes | Yes | Yes | Copy-pasted |
+| _normalize_db_url() | Yes | Yes | Yes | Copy-pasted |
+| _get_last_src_ts() | Yes | Yes | Yes | Copy-pasted |
+| ensure_state_table_exists() DDL | Yes | Yes | Yes | Similar DDL |
+| _build_insert_bars_sql() | Yes | Yes | Yes | 80% similar SQL CTEs |
+| build_bars_for_id() | Yes | Yes | Yes | 70% similar logic |
+| _sync_1d_to_multi_tf() | No | Yes | Yes | Copy-pasted |
+| from_cli_args() | Yes | Yes | Yes | Similar pattern |
+| Source query structure | Unique | Unique | Unique | **Different** |
+| ID resolution | parse_ids | _load_tvc_ids | _load_hl_ids | **Different** |
+| Venue handling | Implicit CMC_AGG | Multi-venue | Hardcoded HL | **Different** |
+| OHLC repair | Complex CTE | Simple clamp | Simple clamp | **Different** |
 
-**Important:** The schema has `l3_label` and `l4_label` columns but no `l3_enabled`/`l4_enabled` columns. Adding `l4_enabled` would require a migration. However, since `data_budget.py` already has `L4: 1` (always enabled), and the column can simply be populated, a new boolean column is optional but recommended for consistency.
+**The 3 axes of variation** are: (a) source query, (b) ID resolution, (c) venue/repair logic.
+
+**Across 6 Sync Scripts (total ~600 LOC):**
+
+| Script | Family | Pattern |
+|--------|--------|---------|
+| sync_price_bars_multi_tf_u.py | Bars | sync_utils.sync_sources_to_unified() |
+| sync_ema_multi_tf_u.py | EMA | Custom (predates sync_utils) |
+| sync_ama_multi_tf_u.py | AMA | sync_utils.sync_sources_to_unified() |
+| sync_returns_bars_multi_tf_u.py | Bar returns | sync_utils.sync_sources_to_unified() |
+| sync_returns_ema_multi_tf_u.py | EMA returns | sync_utils.sync_sources_to_unified() |
+| sync_returns_ama_multi_tf_u.py | AMA returns | sync_utils.sync_sources_to_unified() |
+
+Five of six already use the generic sync_utils; the EMA sync is a legacy implementation that should be migrated.
 
 ---
 
-## Recommended Architecture (To-Be)
+## Recommended Architecture (AFTER)
 
-### Decision 1: Where Do Macro Features Live?
+### 1. SourceSpec Registry Pattern
 
-**Recommendation: New `fred_macro_features` table (NOT extension of `cmc_features`).**
-
-Rationale:
-- `cmc_features` is PK'd on `(id, ts, tf)` -- it is per-asset, per-timeframe. Macro features are NOT per-asset. They are market-wide indicators (yield curve slope, MOVE index, CLI diffusion, etc.) that apply identically to all crypto assets.
-- Stuffing macro columns into `cmc_features` would duplicate the same macro row across all 100+ assets, wasting storage and creating confusion about which `id` to read.
-- A separate table with PK `(date)` is clean, simple, and correctly models the domain: macro features are a time series, not per-asset.
-
-**Proposed schema:**
-
-```sql
-CREATE TABLE public.fred_macro_features (
-    date                DATE            NOT NULL PRIMARY KEY,
-
-    -- Yield curve
-    yield_spread_10y2y  DOUBLE PRECISION NULL,   -- T10Y2Y (10yr - 2yr)
-    yield_spread_10y3m  DOUBLE PRECISION NULL,   -- T10Y3M (10yr - 3mo)
-    yield_curve_slope   DOUBLE PRECISION NULL,   -- Derived: normalized spread
-
-    -- Rates
-    fed_funds_rate      DOUBLE PRECISION NULL,   -- FEDFUNDS
-    fed_funds_delta_3m  DOUBLE PRECISION NULL,   -- 3-month change
-
-    -- Credit spreads
-    baa_aaa_spread      DOUBLE PRECISION NULL,   -- BAA10Y - AAA10Y
-    baa_aaa_zscore      DOUBLE PRECISION NULL,   -- Rolling z-score (252d)
-
-    -- Money & liquidity
-    m2_yoy_pct          DOUBLE PRECISION NULL,   -- M2 YoY growth
-    m2_momentum         DOUBLE PRECISION NULL,   -- 3-month rate of change
-
-    -- Volatility
-    move_index          DOUBLE PRECISION NULL,   -- MOVE (bond vol) when available
-    vix_level           DOUBLE PRECISION NULL,   -- VIXCLS when available
-
-    -- Labor market
-    unemployment_rate   DOUBLE PRECISION NULL,   -- UNRATE
-    nfp_mom             DOUBLE PRECISION NULL,   -- PAYEMS month-over-month
-
-    -- Inflation
-    cpi_yoy             DOUBLE PRECISION NULL,   -- CPIAUCSL YoY
-    pce_yoy             DOUBLE PRECISION NULL,   -- PCEPI YoY
-
-    -- Leading indicators
-    cli_oecd            DOUBLE PRECISION NULL,   -- OECD CLI
-    sahm_indicator      DOUBLE PRECISION NULL,   -- SAHMREALTIME
-    pmi_manufacturing   DOUBLE PRECISION NULL,   -- ISM PMI proxy
-
-    -- Composite scores (computed)
-    macro_risk_score    DOUBLE PRECISION NULL,   -- Weighted composite [0..1]
-    liquidity_score     DOUBLE PRECISION NULL,   -- M2 + rates composite
-    growth_score        DOUBLE PRECISION NULL,   -- Employment + PMI composite
-    stress_score        DOUBLE PRECISION NULL,   -- Spreads + vol composite
-
-    -- L4 regime label (derived from composites)
-    l4_macro_label      TEXT            NULL,     -- e.g. "Expansion-EasyMoney-LowStress"
-
-    -- Metadata
-    computed_at         TIMESTAMPTZ     DEFAULT now(),
-    source_freshness    DATE            NULL      -- Latest FRED observation used
-);
-
--- Index for range queries
-CREATE INDEX idx_fred_macro_features_date
-    ON public.fred_macro_features (date DESC);
-```
-
-### Decision 2: Where Does the Macro Labeler Live?
-
-**Recommendation: New `regimes/macro_labels.py` (NOT extension of `labels.py`).**
-
-Rationale:
-- The existing labelers in `labels.py` all share the same pattern: they operate on a per-asset DataFrame with price/EMA/ATR columns. Macro labeling is fundamentally different -- it reads from `fred_macro_features`, not from price bars.
-- The output is still a string label compatible with the resolver's `_match_policy()` pattern matching, so it plugs in seamlessly.
-- Keeping it separate makes testing easier (mock FRED data, not price data).
-
-**Proposed module:**
+A `SourceSpec` dataclass encapsulates the three axes of variation between 1D builders:
 
 ```python
-# src/ta_lab2/regimes/macro_labels.py
+# src/ta_lab2/scripts/bars/source_spec.py
 
-def label_macro_regime(macro_df: pd.DataFrame) -> pd.Series:
+from __future__ import annotations
+from dataclasses import dataclass, field
+from typing import Callable, Optional
+
+@dataclass(frozen=True)
+class SourceSpec:
     """
-    Classify macro environment into regime labels for L4.
+    Declarative specification for a 1D bar data source.
 
-    Returns Series of labels like:
-    - "Expansion-EasyMoney-LowStress"
-    - "Contraction-TightMoney-HighStress"
-    - "Transition-NeutralMoney-RisingStress"
-
-    Format: "{growth}-{liquidity}-{stress}" to match resolver pattern.
+    Encapsulates the three axes of variation:
+    1. Source query (how to read raw data)
+    2. ID resolution (how to determine which IDs to process)
+    3. Venue/repair semantics (how to handle source-specific quirks)
     """
+
+    # Identity
+    name: str                              # e.g., "CMC", "TVC", "HYPERLIQUID"
+    venue_id: int                          # dim_venues FK (1=CMC_AGG, 2=HL, etc.)
+    venue_label: str                       # Written to venue column
+    src_name: str                          # Written to src_name column
+
+    # Source table
+    source_table: str                      # e.g., "public.cmc_price_histories7"
+
+    # SQL template for the INSERT CTE
+    # Must accept: %s for id, %s for start_ts, %s for end_ts
+    # Must produce columns: id, timestamp, open, high, low, close, volume,
+    #   market_cap, venue, venue_id, venue_rank, bar_seq, tf, src_name, ...
+    insert_cte_builder: Callable[[str, str], str]
+
+    # ID resolution
+    id_loader: Callable[[str], list[int]]  # db_url -> list of IDs
+
+    # Venue
+    default_venue_rank: int = 50
+
+    # Repair
+    needs_ohlc_repair: bool = True         # CMC: True (has timehigh/timelow issues)
+    needs_timehigh_timelow: bool = True    # TVC/HL: False (synthesize from ts)
+
+    # Coverage tracking
+    coverage_source_table: str = ""        # For asset_data_coverage upserts
+    coverage_granularity: str = "1D"
+
+    # Backfill detection
+    supports_backfill_detection: bool = True  # CMC: True, others: False initially
 ```
 
-**Label taxonomy for L4 (compatible with resolver's substring matching):**
-
-| Dimension | Values | Source Features |
-|-----------|--------|----------------|
-| Growth | Expansion / Transition / Contraction | CLI, employment, PMI |
-| Liquidity | EasyMoney / NeutralMoney / TightMoney | M2, fed funds rate/delta |
-| Stress | LowStress / RisingStress / HighStress | Credit spreads, MOVE, VIX |
-
-This produces 27 possible L4 labels. The resolver matches via substring, so policy rules can target:
-- `"Contraction-"` -- any contraction (broad match)
-- `"-HighStress"` -- any stress state (broad match)
-- `"Contraction-TightMoney-HighStress"` -- exact (most restrictive)
-
-### Decision 3: How Does L4 Connect to the Resolver?
-
-**Recommendation: Use the existing L4 slot -- no new chain, no overlay, no pre-L0 bypass.**
-
-The resolver already processes `L4` as the final tighten-only pass. This is the correct architecture because:
-
-1. Macro conditions should tighten, never loosen. If per-asset regimes say "Up-Normal-Normal" (full size), but macro says "Contraction-TightMoney-HighStress", the final policy should be tightened. The resolver's `_tighten()` function guarantees this:
-   - `size_mult = min(current, macro_suggested)`
-   - `stop_mult = max(current, macro_suggested)`
-   - `orders` can only degrade toward "passive"
-   - `gross_cap = min(current, macro_suggested)`
-
-2. L4 is processed last, so it is the ultimate override. No per-asset layer can undo a macro tightening.
-
-**Required changes to `refresh_cmc_regimes.py` (lines ~446-454):**
+**Registry of known sources:**
 
 ```python
-# CURRENT (line 447-454):
-policy = resolve_policy_from_table(
-    policy_table,
-    L0=l0_val,
-    L1=l1_val,
-    L2=l2_val,
-    L3=None,
-    L4=None,  # <-- Currently hardcoded None
-)
+# src/ta_lab2/scripts/bars/source_registry.py
 
-# PROPOSED:
-policy = resolve_policy_from_table(
-    policy_table,
-    L0=l0_val,
-    L1=l1_val,
-    L2=l2_val,
-    L3=None,
-    L4=l4_val,  # <-- From macro labeler, same for all assets
-)
+SOURCE_SPECS: dict[str, SourceSpec] = {
+    "CMC": SourceSpec(
+        name="CMC",
+        venue_id=1,
+        venue_label="CMC_AGG",
+        src_name="CoinMarketCap",
+        source_table="public.cmc_price_histories7",
+        insert_cte_builder=build_cmc_insert_cte,
+        id_loader=load_cmc_ids,
+        needs_ohlc_repair=True,
+        needs_timehigh_timelow=True,
+        coverage_source_table="public.cmc_price_histories7",
+        supports_backfill_detection=True,
+    ),
+    "TVC": SourceSpec(
+        name="TVC",
+        venue_id=9,
+        venue_label="TVC",  # Per-venue from dim_listings
+        src_name="TradingView",
+        source_table="public.tvc_price_histories",
+        insert_cte_builder=build_tvc_insert_cte,
+        id_loader=load_tvc_ids,
+        needs_ohlc_repair=False,
+        needs_timehigh_timelow=False,
+        coverage_source_table="public.tvc_price_histories",
+        supports_backfill_detection=False,
+    ),
+    "HYPERLIQUID": SourceSpec(
+        name="HYPERLIQUID",
+        venue_id=2,
+        venue_label="HYPERLIQUID",
+        src_name="Hyperliquid",
+        source_table="hyperliquid.hl_candles",
+        insert_cte_builder=build_hl_insert_cte,
+        id_loader=load_hl_ids,
+        needs_ohlc_repair=False,
+        needs_timehigh_timelow=False,
+        coverage_source_table="hyperliquid.hl_candles",
+        supports_backfill_detection=False,
+    ),
+}
 ```
 
-**Required policy table additions (in `configs/regime_policies.yaml`):**
+**Why a registry and not just CLI args?** Because the CTE SQL for each source is fundamentally different (JOIN structure, column mappings, repair logic). A registry maps source name to its full behavior specification, making the builder truly generic while keeping source-specific SQL isolated.
 
-```yaml
-rules:
-  # Macro L4 tightening rules
-  - match: "Contraction-TightMoney-HighStress"
-    size_mult: 0.20
-    stop_mult: 2.50
-    orders: "passive"
-    gross_cap: 0.30
-    pyramids: false
+### 2. Generalized 1D Bar Builder
 
-  - match: "Contraction-"
-    size_mult: 0.40
-    stop_mult: 2.00
-    orders: "conservative"
-    gross_cap: 0.50
+```python
+# src/ta_lab2/scripts/bars/refresh_price_bars_1d_generic.py
 
-  - match: "-HighStress"
-    size_mult: 0.50
-    stop_mult: 2.00
-    orders: "passive"
+class GenericOneDayBarBuilder(BaseBarBuilder):
+    """
+    Single 1D bar builder that handles all data sources via SourceSpec.
 
-  - match: "-TightMoney-"
-    size_mult: 0.70
-    stop_mult: 1.75
-    orders: "conservative"
+    Replaces: refresh_price_bars_1d.py, refresh_tvc_price_bars_1d.py,
+              refresh_hl_price_bars_1d.py
 
-  - match: "Expansion-EasyMoney-LowStress"
-    size_mult: 1.00  # no tightening in benign macro
-    stop_mult: 1.25
-    orders: "mixed"
+    Usage:
+        python -m ta_lab2.scripts.bars.refresh_price_bars_1d --source CMC --ids all
+        python -m ta_lab2.scripts.bars.refresh_price_bars_1d --source TVC --ids all
+        python -m ta_lab2.scripts.bars.refresh_price_bars_1d --source HYPERLIQUID --ids all
+        python -m ta_lab2.scripts.bars.refresh_price_bars_1d --source all --ids all
+    """
+
+    def __init__(self, config: BarBuilderConfig, engine: Engine, spec: SourceSpec):
+        super().__init__(config, engine)
+        self.spec = spec
+        self.psycopg_conn = _connect(config.db_url)  # Shared helper, not copy-pasted
+
+    def get_state_table_name(self) -> str:
+        return "public.price_bars_1d_state"
+
+    def get_output_table_name(self) -> str:
+        return "public.price_bars_1d"
+
+    def build_bars_for_id(self, id_: int, start_ts=None) -> int:
+        # Common flow:
+        # 1. Check backfill (if spec.supports_backfill_detection)
+        # 2. Get last_src_ts from state
+        # 3. Build and execute CTE via spec.insert_cte_builder
+        # 4. Update state
+        # 5. Update coverage
+        ...
 ```
 
-### Decision 4: Cross-Asset Aggregation
+### 3. Direct-to-_u Write Architecture
 
-**Recommendation: Store in `fred_macro_features` composite scores; no separate aggregation table.**
+**Core idea:** Instead of writing to 5 siloed tables then syncing, write directly to the _u table with alignment_source set at write time.
 
-Cross-asset aggregation (e.g., "what percentage of assets are in a down regime?") is a second-order concern. The primary value of macro regimes is the exogenous signal from FRED data. Cross-asset regime consensus can be computed from `cmc_regimes` on-the-fly:
+```
+BEFORE (3-step):
+  Builder writes to -> price_bars_multi_tf_cal_us
+  Sync copies to    -> price_bars_multi_tf_u (alignment_source='multi_tf_cal_us')
+
+AFTER (1-step):
+  Builder writes directly to -> price_bars_multi_tf_u (alignment_source='multi_tf_cal_us')
+```
+
+**This affects these builder families:**
+
+| Family | # Builders | # Sync Scripts | Write Target Change |
+|--------|-----------|----------------|---------------------|
+| Price bars | 5 multi-TF | 1 | price_bars_multi_tf_* -> price_bars_multi_tf_u |
+| EMA values | 3 | 1 | ema_multi_tf_* -> ema_multi_tf_u |
+| AMA values | 5 | 1 | ama_multi_tf_* -> ama_multi_tf_u |
+| Bar returns | 5 | 1 | returns_bars_multi_tf_* -> returns_bars_multi_tf_u |
+| EMA returns | 3 | 1 | returns_ema_multi_tf_* -> returns_ema_multi_tf_u |
+| AMA returns | 5 | 1 | returns_ama_multi_tf_* -> returns_ama_multi_tf_u |
+| **Total** | **26 builders** | **6 sync scripts** | |
+
+**Modified components:**
+
+Each builder needs one change: its output table name changes and it sets alignment_source on each row.
+
+```python
+# In base class or config:
+class BarBuilderConfig:
+    ...
+    alignment_source: str | None = None   # NEW: if set, write directly to _u table
+
+# In upsert_bars():
+if config.alignment_source:
+    # Add alignment_source column to output DataFrame
+    df["alignment_source"] = config.alignment_source
+    # Use _u table PK for conflict resolution
+    conflict_cols = PK_COLS_U  # includes alignment_source
+```
+
+### 4. Component Boundary Diagram
+
+```
++-------------------------------------------------------------------+
+|                    SourceSpec Registry                              |
+|  CMC: { source_table, insert_cte, id_loader, repair_flags }       |
+|  TVC: { source_table, insert_cte, id_loader, repair_flags }       |
+|  HL:  { source_table, insert_cte, id_loader, repair_flags }       |
++-------------------------------------------------------------------+
+          |
+          v
++-------------------------------------------------------------------+
+|            GenericOneDayBarBuilder (BaseBarBuilder)                 |
+|  - Accepts SourceSpec via constructor                               |
+|  - Delegates SQL generation to spec.insert_cte_builder             |
+|  - Handles state, backfill, coverage uniformly                     |
++-------------------------------------------------------------------+
+          |
+          v
++-------------------------------------------------------------------+
+|                     price_bars_1d                                   |
+|  (all sources write here, venue/venue_id distinguishes)            |
++-------------------------------------------------------------------+
+          |
+          v
++-------------------------------------------------------------------+
+|  Multi-TF Builders (5 variants)                                    |
+|  - Read from price_bars_1d                                         |
+|  - Each writes DIRECTLY to price_bars_multi_tf_u                   |
+|    with alignment_source = 'multi_tf' | 'cal_us' | etc.           |
++-------------------------------------------------------------------+
+          |
+          v
++-------------------------------------------------------------------+
+|  Downstream (EMA, AMA, Returns, Features, Signals, Regimes)       |
+|  - All read from _u tables (no change needed)                      |
++-------------------------------------------------------------------+
+```
+
+### 5. Shared psycopg Utilities
+
+Extract the duplicated psycopg helpers into a shared module:
+
+```python
+# src/ta_lab2/scripts/bars/psycopg_helpers.py
+
+def normalize_db_url(url: str) -> str: ...
+def connect(db_url: str): ...
+def exec_sql(conn, sql: str, params=None) -> None: ...
+def fetchone(conn, sql: str, params=None): ...
+def fetchall(conn, sql: str, params=None): ...
+```
+
+This eliminates ~120 lines of identical copy-pasted code across the three 1D builders.
+
+---
+
+## Detailed Data Flow (AFTER)
+
+### 1D Bar Building (After)
+
+```
+Source Tables                    Generic 1D Builder            Output
+================               ==================            ======
+cmc_price_histories7  --+
+                        |
+tvc_price_histories   --+--> GenericOneDayBarBuilder -----> price_bars_1d
+                        |    (--source CMC|TVC|HL|all)      (all venues coexist)
+hyperliquid.hl_candles -+
+```
+
+### Multi-TF Derivation (After)
+
+```
+price_bars_1d
+    |
+    +---> refresh_price_bars_multi_tf.py --------> price_bars_multi_tf_u
+    |     (alignment_source='multi_tf')            (direct write)
+    |
+    +---> refresh_price_bars_multi_tf_cal_us.py -> price_bars_multi_tf_u
+    |     (alignment_source='multi_tf_cal_us')     (direct write)
+    |
+    +---> refresh_price_bars_multi_tf_cal_iso.py -> price_bars_multi_tf_u
+    |     (alignment_source='multi_tf_cal_iso')     (direct write)
+    |
+    +---> ...anchor_us.py -----------------------> price_bars_multi_tf_u
+    |     (alignment_source='multi_tf_cal_anchor_us')
+    |
+    +---> ...anchor_iso.py ----------------------> price_bars_multi_tf_u
+          (alignment_source='multi_tf_cal_anchor_iso')
+
+No sync step needed. Siloed tables become unused.
+```
+
+### Full Pipeline (After)
+
+```
+run_all_bar_builders.py
+  |
+  +-- GenericOneDayBarBuilder --source CMC --ids all
+  +-- GenericOneDayBarBuilder --source TVC --ids all
+  +-- GenericOneDayBarBuilder --source HL  --ids all
+  +-- VWAP builder (unchanged)
+  +-- refresh_price_bars_multi_tf.py (writes to _u)
+  +-- refresh_price_bars_multi_tf_cal_us.py (writes to _u)
+  +-- refresh_price_bars_multi_tf_cal_iso.py (writes to _u)
+  +-- refresh_price_bars_multi_tf_cal_anchor_us.py (writes to _u)
+  +-- refresh_price_bars_multi_tf_cal_anchor_iso.py (writes to _u)
+  |
+  [NO sync_price_bars_multi_tf_u.py step]
+  |
+  v
+run_all_ema_refreshes.py (reads from price_bars_multi_tf_u -- unchanged)
+  +-- refresh_ema_multi_tf_from_bars.py (writes to ema_multi_tf_u)
+  +-- ...
+  |
+  [NO sync_ema_multi_tf_u.py step]
+```
+
+---
+
+## Integration Points
+
+### What Changes
+
+| Component | Change | Risk |
+|-----------|--------|------|
+| `refresh_price_bars_1d.py` | Replaced by generic builder | LOW -- preserves exact same SQL CTEs |
+| `refresh_tvc_price_bars_1d.py` | Replaced by generic builder | LOW |
+| `refresh_hl_price_bars_1d.py` | Replaced by generic builder | LOW |
+| `refresh_price_bars_multi_tf.py` | Output table changes to _u | MEDIUM -- PK conflict cols change |
+| `refresh_price_bars_multi_tf_cal_*.py` (4 scripts) | Output table changes to _u | MEDIUM -- PK conflict cols change |
+| `sync_price_bars_multi_tf_u.py` | Deprecated/deleted | LOW -- just stops running |
+| `sync_ema_multi_tf_u.py` | Deprecated/deleted | LOW |
+| `sync_ama_multi_tf_u.py` | Deprecated/deleted | LOW |
+| `sync_returns_bars_multi_tf_u.py` | Deprecated/deleted | LOW |
+| `sync_returns_ema_multi_tf_u.py` | Deprecated/deleted | LOW |
+| `sync_returns_ama_multi_tf_u.py` | Deprecated/deleted | LOW |
+| `run_all_bar_builders.py` | Update builder list | LOW |
+| `run_daily_refresh.py` | Remove sync steps (if present) | LOW |
+| `common_snapshot_contract.py` | Add alignment_source support to upsert_bars | LOW |
+| `bar_builder_config.py` | Add alignment_source field | LOW |
+| `base_bar_builder.py` | No changes needed | NONE |
+| Downstream consumers | No changes (read from _u) | NONE |
+
+### What Does NOT Change
+
+- **BaseBarBuilder**: Template method pattern is unchanged. All abstract methods remain the same.
+- **common_snapshot_contract**: Core utilities (enforce_ohlc_sanity, upsert_bars, state helpers) stay the same. alignment_source is additive.
+- **derive_multi_tf_from_1d.py**: Already reads from price_bars_1d and produces correct output. Just needs output target changed.
+- **polars_bar_operations.py**: Pure computation module, no I/O changes.
+- **All downstream consumers**: They read from _u tables, which have the same schema.
+- **dim_venues, dim_timeframe**: Dimension tables unchanged.
+
+### PK Conflict Resolution
+
+The key integration detail is that _u tables have alignment_source in their PK:
 
 ```sql
-SELECT
-    ts,
-    COUNT(*) FILTER (WHERE l2_label LIKE 'Down%') AS n_down,
-    COUNT(*) FILTER (WHERE l2_label LIKE 'Up%') AS n_up,
-    COUNT(*) AS n_total,
-    COUNT(*) FILTER (WHERE l2_label LIKE 'Down%')::float / NULLIF(COUNT(*), 0) AS pct_down
-FROM cmc_regimes
-WHERE tf = '1D' AND ts = (SELECT MAX(ts) FROM cmc_regimes WHERE tf = '1D')
-GROUP BY ts;
+-- Siloed table PK (current):
+PRIMARY KEY (id, tf, bar_seq, venue_id, timestamp)
+
+-- _u table PK:
+PRIMARY KEY (id, tf, bar_seq, venue_id, timestamp, alignment_source)
 ```
 
-If this query becomes a bottleneck (unlikely with ~100 assets), materialize it as a view. But do not create a separate table now -- YAGNI.
-
-The `fred_macro_features.macro_risk_score` column serves as the primary cross-signal aggregation point. It combines yield curve, credit spreads, and growth indicators into a single 0-to-1 score. This is sufficient for V1.
-
-### Decision 5: New Risk Gates
-
-**Recommendation: Add a "Macro Override" gate to `risk_engine.py` as Gate 1.7, after tail risk but before circuit breaker.**
-
-The existing risk engine has this gate order:
-1. Kill switch
-1.5. Tail risk (FLATTEN/REDUCE)
-1.6. Margin/liquidation check
-2. Circuit breaker
-3. Per-asset position cap
-4. Portfolio utilization cap
-5. All pass
-
-**Proposed new gate:**
-
-```
-1.   Kill switch
-1.5  Tail risk
-1.6  Margin/liquidation
-1.7  MACRO REGIME OVERRIDE (NEW)
-2.   Circuit breaker
-3.   Per-asset position cap (now macro-adjusted)
-4.   Portfolio utilization cap (now macro-adjusted)
-5.   All pass
-```
-
-Gate 1.7 reads the latest macro risk score from `fred_macro_features` and:
-- **macro_risk_score > 0.8**: Block all new buy orders (similar to tail risk FLATTEN but macro-driven)
-- **macro_risk_score > 0.6**: Halve max_position_pct and max_portfolio_pct
-- **macro_risk_score > 0.4**: Reduce gross_cap by 20%
-- **macro_risk_score <= 0.4**: Pass (no additional tightening)
-
-This is separate from the L4 tighten-only policy overlay because:
-1. L4 adjusts the per-bar regime policy in `cmc_regimes` (slow signal, changes daily)
-2. Gate 1.7 reads the live macro score at order time (fast signal, could react to intra-day FRED releases)
-
-**Implementation in `risk_engine.py`:**
+When builders write directly to _u, they must include alignment_source in their conflict columns. The `upsert_bars()` function in common_snapshot_contract.py already accepts `conflict_cols` as a parameter, so this is a configuration change, not a code change.
 
 ```python
-def _check_macro_gate(self, order_side: str) -> Optional[str]:
-    """Gate 1.7: Macro regime override."""
-    if order_side.lower() == "sell":
-        return None  # Sells always allowed (reducing exposure)
+# Current:
+upsert_bars(df, db_url=..., bars_table="price_bars_multi_tf",
+            conflict_cols=("id", "tf", "bar_seq", "venue_id", "timestamp"))
 
-    try:
-        with self._engine.connect() as conn:
-            row = conn.execute(text("""
-                SELECT macro_risk_score, stress_score
-                FROM fred_macro_features
-                WHERE date <= CURRENT_DATE
-                ORDER BY date DESC LIMIT 1
-            """)).fetchone()
-
-        if row is None:
-            return None  # No macro data -> pass
-
-        macro_score = float(row[0]) if row[0] is not None else 0.0
-
-        if macro_score > 0.8:
-            self._log_event(
-                event_type="macro_regime_blocked",
-                trigger_source="macro_regime",
-                reason=f"Macro risk score {macro_score:.3f} > 0.8 -- new buys blocked",
-            )
-            return "blocked"
-
-        if macro_score > 0.6:
-            # Not blocking, but caller should halve limits
-            return "reduce"
-
-    except Exception as exc:
-        logger.debug("Gate 1.7 macro check failed: %s -- passing", exc)
-        return None
-
-    return None
-```
-
-### Decision 6: Daily Refresh Pipeline Changes
-
-**Recommendation: Insert `macro_features` stage between `desc_stats` and `regimes` in the pipeline.**
-
-Current pipeline order (from `run_daily_refresh.py` line 2097):
-```
-bars -> EMAs -> AMAs -> desc_stats -> regimes -> features -> signals -> portfolio -> executor -> drift -> stats
-```
-
-Proposed pipeline order:
-```
-bars -> EMAs -> AMAs -> desc_stats -> fred_sync -> macro_features -> regimes -> features -> signals -> portfolio -> executor -> drift -> stats
-                                      ^^^^^^^^    ^^^^^^^^^^^^^^^
-                                      NEW STAGE    NEW STAGE
-```
-
-**Stage: `fred_sync`**
-- Runs `sync_fred_from_vm.py --incremental` (already exists)
-- Timeout: 120s (fast SSH COPY, existing TIMEOUT_EXCHANGE_PRICES = 120 is a good model)
-- Failure mode: warn-and-continue (regime pipeline can still run with stale FRED data)
-
-**Stage: `macro_features`**
-- New script: `scripts/macro/refresh_macro_features.py`
-- Reads from `fred.series_values`, computes features, writes to `fred_macro_features`
-- Computes L4 label and stores it for use by the regime refresh stage
-- Timeout: 300s (simple computation, ~39 series, ~208K rows)
-- Failure mode: warn-and-continue (regimes still work with L4=None)
-
-The regime refresh stage (`refresh_cmc_regimes.py`) then reads the latest L4 label from `fred_macro_features` once, and passes it to every asset's `compute_regimes_for_id()` call. Since macro features are asset-agnostic, the L4 label is computed ONCE and reused for all assets (no per-asset macro computation).
-
-### Decision 7: Should `integrations/economic/` Be Revived or Bypassed?
-
-**Recommendation: BYPASS. Use direct SQL reads from `fred.series_values`.**
-
-Rationale:
-1. The data is already local. `fred.series_values` has 208K rows across 39 series, synced incrementally via `sync_fred_from_vm.py`. No API calls to FRED are needed.
-2. `FredProvider` is an API client with rate limiting, circuit breaker, and caching -- infrastructure for live API calls. Macro feature computation reads historical data from a local table. These are different use cases.
-3. The existing sync pipeline (`sync_fred_from_vm.py`) handles data freshness, integrity verification, and even VM purging. It is production-tested and working.
-4. Reviving 1,766 LOC of API client code for a use case that does not need API calls creates unnecessary coupling and test surface.
-
-The `integrations/economic/` module remains deferred (not abandoned). If a future phase needs live API calls (e.g., intra-day economic releases, custom series not on the VM), it can be revived then.
-
----
-
-## New Components Needed
-
-### New Files
-
-| File | Purpose | Est. LOC |
-|------|---------|----------|
-| `src/ta_lab2/regimes/macro_labels.py` | L4 macro regime labeler | ~150 |
-| `src/ta_lab2/regimes/macro_features.py` | FRED-to-features computation (transforms, z-scores, composites) | ~300 |
-| `src/ta_lab2/scripts/macro/refresh_macro_features.py` | CLI script: read FRED, compute features, write table, compute L4 | ~200 |
-| `src/ta_lab2/scripts/macro/__init__.py` | Package init | ~1 |
-| `sql/macro/100_fred_macro_features.sql` | DDL for `fred_macro_features` table | ~80 |
-| `alembic/versions/xxx_macro_regime_tables.py` | Migration: create table + add l4_enabled column | ~60 |
-| `configs/macro_regime_policies.yaml` | L4 policy rules for resolver | ~50 |
-| `tests/test_macro_labels.py` | Unit tests for macro labeler | ~200 |
-| `tests/test_macro_features.py` | Unit tests for feature computation | ~200 |
-
-### Modified Files
-
-| File | Change | Risk |
-|------|--------|------|
-| `src/ta_lab2/regimes/resolver.py` | Add macro-specific policy patterns to DEFAULT_POLICY_TABLE | LOW -- additive only, substring matching is backwards-compatible |
-| `src/ta_lab2/scripts/regimes/refresh_cmc_regimes.py` | Load L4 label from fred_macro_features, pass to resolver | MEDIUM -- core regime pipeline, but change is minimal (add 1 query + pass L4) |
-| `src/ta_lab2/risk/risk_engine.py` | Add Gate 1.7 (macro override) | MEDIUM -- new gate in existing chain, must not break existing gates |
-| `src/ta_lab2/scripts/run_daily_refresh.py` | Add `fred_sync` and `macro_features` stages | LOW -- pattern is well-established (copy from existing stages) |
-| `src/ta_lab2/regimes/__init__.py` | Export macro_labels | LOW -- additive only |
-| `configs/regime_policies.yaml` | Add L4 macro rules | LOW -- YAML overlay, existing rules untouched |
-
----
-
-## Data Flow Diagram (To-Be)
-
-```
-    GCP VM (freddata DB)
-         |
-         | sync_fred_from_vm.py (SSH+COPY, incremental)
-         v
-    fred.series_values (39 series, 208K rows)
-    PK: (series_id, date)
-         |
-         | refresh_macro_features.py (NEW)
-         | 1. Read relevant series (yield curve, credit, M2, employment...)
-         | 2. Compute transforms (spreads, z-scores, momentum, YoY)
-         | 3. Compute composite scores (macro_risk, liquidity, growth, stress)
-         | 4. Compute L4 label from composites
-         | 5. Write to fred_macro_features
-         v
-    fred_macro_features (NEW)
-    PK: (date)
-    Cols: yield_spread_10y2y, baa_aaa_spread, m2_yoy_pct,
-          macro_risk_score, l4_macro_label, ...
-         |
-         |    +--- cmc_price_bars_multi_tf
-         |    |        |
-         |    |        v
-         |    |    label_layer_monthly/weekly/daily() (L0, L1, L2)
-         |    |        |
-         v    v        v
-    refresh_cmc_regimes.py (MODIFIED)
-         |
-         | 1. Load latest L4 from fred_macro_features (1 row, same for all assets)
-         | 2. Per asset: compute L0/L1/L2 (existing)
-         | 3. Apply hysteresis (existing)
-         | 4. resolve_policy_from_table(L0=, L1=, L2=, L3=None, L4=l4_val)
-         | 5. Write to cmc_regimes with l4_label populated
-         v
-    cmc_regimes (l4_label NOW POPULATED)
-         |
-         +-------> position_sizer.py (regime_key now includes L4 tightening)
-         +-------> regime_router.py  (l2_label unchanged, optionally add L4 dimension)
-         +-------> risk_engine.py    (Gate 1.7: reads fred_macro_features.macro_risk_score)
-         +-------> drift/attribution.py (new: macro regime delta attribution step)
+# After:
+upsert_bars(df, db_url=..., bars_table="price_bars_multi_tf_u",
+            conflict_cols=("id", "tf", "bar_seq", "venue_id", "timestamp", "alignment_source"))
 ```
 
 ---
 
-## Pipeline Ordering (Daily Refresh)
+## Build Order (Dependency-Driven)
 
+### Phase 1: Shared Utilities (No Risk)
+
+Create shared psycopg helpers and SourceSpec abstractions. No existing code modified.
+
+**Files created:**
+- `src/ta_lab2/scripts/bars/psycopg_helpers.py` (extract from 1D builders)
+- `src/ta_lab2/scripts/bars/source_spec.py` (SourceSpec dataclass)
+- `src/ta_lab2/scripts/bars/source_registry.py` (registry of CMC/TVC/HL specs)
+- `src/ta_lab2/scripts/bars/cte_builders/` (source-specific SQL CTE functions)
+  - `cmc_cte.py`
+  - `tvc_cte.py`
+  - `hl_cte.py`
+
+**Files modified:**
+- `bar_builder_config.py`: Add `alignment_source` and `source_name` fields
+
+### Phase 2: Generalized 1D Builder (Additive)
+
+Create the generic builder alongside existing builders. Both coexist.
+
+**Files created:**
+- `src/ta_lab2/scripts/bars/refresh_price_bars_1d_generic.py`
+
+**Validation:** Run generic builder for each source, compare output row-by-row against existing builder output using validate_derivation_consistency() pattern (already exists in derive_multi_tf_from_1d.py).
+
+### Phase 3: Direct-to-_u for Price Bars (One Family)
+
+Convert the 5 multi-TF price bar builders to write directly to price_bars_multi_tf_u.
+
+**Files modified:**
+- `refresh_price_bars_multi_tf.py`: Change output table, add alignment_source
+- `refresh_price_bars_multi_tf_cal_us.py`: Same
+- `refresh_price_bars_multi_tf_cal_iso.py`: Same
+- `refresh_price_bars_multi_tf_cal_anchor_us.py`: Same
+- `refresh_price_bars_multi_tf_cal_anchor_iso.py`: Same
+- `common_snapshot_contract.py`: Extend upsert_bars to handle alignment_source
+
+**Validation:** Compare _u table row counts and sample data before/after. Ensure no downstream consumer breaks.
+
+### Phase 4: Direct-to-_u for Remaining Families
+
+Apply the same pattern to EMA, AMA, and returns families.
+
+**Files modified:** 3 EMA builders, 5 AMA builders, 5 bar returns builders, 3 EMA returns builders, 5 AMA returns builders = ~21 scripts.
+
+Each change is mechanical: output table name + alignment_source column.
+
+### Phase 5: Retire Old Builders and Sync Scripts
+
+Once direct-to-_u is validated:
+
+**Files archived (moved to `scripts/_deprecated/`):**
+- `refresh_price_bars_1d.py`
+- `refresh_tvc_price_bars_1d.py`
+- `refresh_hl_price_bars_1d.py`
+- `sync_price_bars_multi_tf_u.py`
+- `sync_ema_multi_tf_u.py`
+- `sync_ama_multi_tf_u.py`
+- `sync_returns_bars_multi_tf_u.py`
+- `sync_returns_ema_multi_tf_u.py`
+- `sync_returns_ama_multi_tf_u.py`
+
+**Files updated:**
+- `run_all_bar_builders.py`: Replace three 1D entries with generic builder entries
+- `run_daily_refresh.py`: Remove any sync step references
+- `run_go_forward_daily_refresh.py`: Remove ema_u_sync step
+
+### Phase 6: Drop Siloed Tables (Optional, Deferred)
+
+After running direct-to-_u successfully for 2+ weeks:
+
+```sql
+-- Verify siloed tables are truly unused
+SELECT schemaname, relname, last_seq_scan, last_idx_scan
+FROM pg_stat_user_tables
+WHERE relname IN ('price_bars_multi_tf', 'price_bars_multi_tf_cal_us', ...)
+ORDER BY last_seq_scan DESC NULLS LAST;
+
+-- If no scans in 2 weeks, archive (rename, don't drop)
+ALTER TABLE price_bars_multi_tf RENAME TO _archive_price_bars_multi_tf;
 ```
-Stage 1:  bars              (existing, no change)
-Stage 2:  EMAs              (existing, no change)
-Stage 3:  AMAs              (existing, no change)
-Stage 4:  desc_stats        (existing, no change)
-Stage 5:  fred_sync         (NEW -- run sync_fred_from_vm.py --incremental)
-Stage 6:  macro_features    (NEW -- run refresh_macro_features.py)
-Stage 7:  regimes           (MODIFIED -- now reads L4 from fred_macro_features)
-Stage 8:  features          (existing, no change)
-Stage 9:  signals           (existing, no change)
-Stage 10: portfolio         (existing, no change)
-Stage 11: executor          (MODIFIED -- risk engine now has Gate 1.7)
-Stage 12: drift             (MODIFIED -- macro attribution step added)
-Stage 13: stats             (existing, add macro feature QC checks)
-```
 
-**Dependency constraints:**
-- Stage 5 (fred_sync) must run before Stage 6 (macro_features)
-- Stage 6 (macro_features) must run before Stage 7 (regimes)
-- Stage 7 (regimes) must run before Stage 9 (signals) -- existing constraint
-- All other ordering constraints are unchanged
-
----
-
-## Suggested Build Order
-
-### Phase 1: Foundation -- Macro Feature Table + Computation
-
-**Build:**
-1. DDL for `fred_macro_features` table (Alembic migration)
-2. `regimes/macro_features.py` -- transform FRED series into features
-3. `scripts/macro/refresh_macro_features.py` -- CLI entrypoint
-4. Tests for feature computation (unit tests with mock FRED data)
-
-**Validates:** Can we compute meaningful macro features from the existing 39 FRED series?
-
-**No downstream impact** -- nothing reads `fred_macro_features` yet.
-
-### Phase 2: Macro Labeler + L4 Integration
-
-**Build:**
-1. `regimes/macro_labels.py` -- classify features into L4 labels
-2. Modify `refresh_cmc_regimes.py` -- load L4, pass to resolver
-3. Add L4 policy rules to `configs/regime_policies.yaml`
-4. Add `fred_sync` + `macro_features` stages to `run_daily_refresh.py`
-5. Tests: L4 label propagation through resolver, policy tightening
-
-**Validates:** Does L4 tighten-only semantics work correctly? Are policy rules calibrated?
-
-**Downstream impact:** `cmc_regimes.l4_label` now populated, `size_mult`/`stop_mult`/`orders`/`gross_cap` now reflect macro tightening. Position sizer automatically picks this up.
-
-### Phase 3: Risk Gate + Observability
-
-**Build:**
-1. Gate 1.7 in `risk_engine.py` -- macro regime override
-2. `dim_risk_limits` extension for macro thresholds (configurable)
-3. Macro attribution step in `drift/attribution.py`
-4. Dashboard panel for macro regime state
-5. Telegram alerts for macro regime transitions
-
-**Validates:** Does macro risk gating work in live paper trading? Does drift attribution correctly separate macro vs micro regime effects?
-
-### Phase 4: Backtesting + Calibration
-
-**Build:**
-1. Historical macro regime backtest (apply L4 labels retroactively)
-2. Calibrate composite weights (macro_risk_score formula)
-3. Compare performance: with vs without macro regime overlay
-4. Cross-validate L4 label transitions against known macro events
-
-**Validates:** Does macro regime overlay improve risk-adjusted returns historically?
+This frees ~250M+ rows of duplicate storage across the 30 siloed tables.
 
 ---
 
 ## Anti-Patterns to Avoid
 
-### Anti-Pattern 1: Macro Features as Per-Asset Columns
+### Anti-Pattern 1: Big-Bang Migration
 
-**What:** Adding `yield_curve_slope`, `credit_spread` columns to `cmc_features` (PK: id, ts, tf).
-**Why bad:** Duplicates identical macro values across 100+ assets. Makes it unclear whether macro features are asset-specific. Breaks the feature pipeline's per-asset write pattern.
-**Instead:** Separate `fred_macro_features` table with PK `(date)`. One row per day, shared by all assets.
+**What:** Try to change all 6 families and all 3 builders in one phase.
+**Why bad:** If something breaks, the blast radius is the entire pipeline. Rollback is impossible.
+**Instead:** One family at a time, with a validation gate between each. Price bars first (most critical), then EMA, then returns, then AMA.
 
-### Anti-Pattern 2: Separate Resolver Chain for Macro
+### Anti-Pattern 2: Modifying Siloed Table PKs
 
-**What:** Creating a new `resolve_macro_policy()` function that runs in parallel with the existing resolver.
-**Why bad:** Two policies that must be reconciled. Risk of conflicting signals. Duplicates tighten-only logic.
-**Instead:** Use the existing L4 slot. The resolver already handles 5 layers in a single tighten-only chain.
+**What:** Try to add alignment_source to siloed table PKs to make them "compatible" with _u.
+**Why bad:** Siloed tables should not need alignment_source. They exist to be single-alignment. The goal is to stop using them.
+**Instead:** Leave siloed tables as-is. Only modify builder output targets.
 
-### Anti-Pattern 3: Reviving FredProvider for Local Data
+### Anti-Pattern 3: Dual-Write Transition
 
-**What:** Instantiating `FredProvider` to read data that already lives in `fred.series_values`.
-**Why bad:** API key required, rate limiting overhead, network dependency for local data reads. The API client was designed for fetching from FRED servers, not for reading from a local Postgres table.
-**Instead:** Direct SQL reads from `fred.series_values`. Simple, fast, no external dependencies.
+**What:** Have builders write to BOTH siloed and _u tables during transition.
+**Why bad:** Doubles write I/O, doubles maintenance surface, introduces subtle consistency issues if one write succeeds and the other fails.
+**Instead:** Switch output table atomically (one builder at a time). Keep sync scripts running until all builders are switched, then remove sync scripts.
 
-### Anti-Pattern 4: Real-Time Macro Regime Updates
+### Anti-Pattern 4: Abstract SourceSpec Too Early
 
-**What:** Trying to update macro regime labels intra-day based on economic releases.
-**Why bad:** FRED data is published with variable delays (employment: 1st Friday, CPI: 2-3 week lag). Intra-day updates would mostly be noise. The daily refresh cadence is appropriate.
-**Instead:** Daily macro feature computation, aligned with the daily refresh pipeline. The risk engine's Gate 1.7 can optionally read the latest score at order time for a "fast path" if needed later.
+**What:** Try to make SourceSpec handle future sources we don't have yet (e.g., Binance, Kraken candles).
+**Why bad:** Premature generalization. We don't know what future source quirks look like.
+**Instead:** Design SourceSpec for the 3 known sources. Add extensibility points (id_loader, insert_cte_builder) but don't over-engineer the interface.
 
-### Anti-Pattern 5: Over-Fitting Macro Labels to Crypto Price History
+### Anti-Pattern 5: Changing _u Table Schema
 
-**What:** Training a classifier to predict crypto regime from FRED data (supervised learning).
-**Why bad:** Crypto-FRED relationship is non-stationary and regime-dependent itself. Overfitting guaranteed with short history. Rule-based labeling with economic priors is more robust.
-**Instead:** Rule-based macro labeler with economically motivated thresholds. Validate via backtest, but do not train on crypto returns.
+**What:** Alter the _u table schema (add columns, change PKs) as part of this refactor.
+**Why bad:** _u tables are the production read path for all downstream consumers. Schema changes affect everything.
+**Instead:** _u table schema stays EXACTLY as-is. The only change is WHO writes to it (builders instead of sync scripts).
 
 ---
 
 ## Scalability Considerations
 
-| Concern | Current Scale | At Scale | Approach |
-|---------|--------------|----------|----------|
-| FRED data volume | 208K rows, 39 series | ~500K rows, 50+ series | Fine -- single table, daily append |
-| Macro feature computation | ~39 series, trivial | ~50 series, trivial | Pure pandas, <1 second |
-| L4 label per-asset | 1 label, broadcast to all | Same | L4 is global, no per-asset cost |
-| Risk gate DB read | 1 query per order | Same | Single row read, <1ms |
-| Daily refresh pipeline | +2 stages (~5 seconds) | Same | SSH COPY + pandas transforms |
+| Concern | Current | After Consolidation |
+|---------|---------|---------------------|
+| Storage | ~4.1M rows x 6 tables per family = ~24.6M duplicated rows (price bars alone) | ~4.1M rows in _u only, siloed tables archived |
+| Write I/O | Write to siloed + sync to _u = 2x writes | Write to _u only = 1x writes |
+| Pipeline latency | Sync step adds 5-15 min per family | No sync step = 5-15 min saved per family |
+| Maintenance | 6 sync scripts + 3 duplicate 1D builders | 0 sync scripts + 1 generic 1D builder |
+| Adding a venue | Copy-paste 500+ LOC 1D builder | Add a SourceSpec entry (~30 lines) |
+
+---
+
+## Risk Assessment
+
+| Risk | Severity | Probability | Mitigation |
+|------|----------|-------------|------------|
+| _u table PK collision during migration | HIGH | LOW | Siloed tables already sync to _u with ON CONFLICT DO NOTHING. Direct writes use same PK. |
+| Downstream consumer breaks | HIGH | VERY LOW | Consumers read from _u tables. _u schema is unchanged. |
+| Data loss during table archival | HIGH | LOW | Archive (rename), never drop. Verify via pg_stat before archive. |
+| Generic builder produces different output than original | MEDIUM | LOW | Row-by-row comparison using validate_derivation_consistency() |
+| State table schema incompatibility | MEDIUM | LOW | State tables already share PK (id, tf). Generic builder uses same state table. |
+| Performance regression in direct-to-_u writes | LOW | LOW | _u table has same indexes. PK includes alignment_source, so no wider conflict check. |
 
 ---
 
 ## Sources
 
-- Direct code analysis of all files listed in the Component Map section
-- `cmc_regimes` DDL: `C:/Users/asafi/Downloads/ta_lab2/sql/regimes/080_cmc_regimes.sql`
-- Resolver chain: `C:/Users/asafi/Downloads/ta_lab2/src/ta_lab2/regimes/resolver.py`, lines 124-130
-- Data budget L4 threshold: `C:/Users/asafi/Downloads/ta_lab2/src/ta_lab2/regimes/data_budget.py`, line 21
-- FRED sync pipeline: `C:/Users/asafi/Downloads/ta_lab2/src/ta_lab2/scripts/etl/sync_fred_from_vm.py`
-- Risk engine gates: `C:/Users/asafi/Downloads/ta_lab2/src/ta_lab2/risk/risk_engine.py`, lines 1-34 (docstring)
-- Daily refresh ordering: `C:/Users/asafi/Downloads/ta_lab2/src/ta_lab2/scripts/run_daily_refresh.py`, line 2097
-- FRED data status from MEMORY.md: 208K rows, 39 series, PK: series_id, date
-- Refresh script integration: `C:/Users/asafi/Downloads/ta_lab2/src/ta_lab2/scripts/regimes/refresh_cmc_regimes.py`, lines 446-454
-- Position sizer regime usage: `C:/Users/asafi/Downloads/ta_lab2/src/ta_lab2/executor/position_sizer.py`, lines 190-193
-- ML regime router: `C:/Users/asafi/Downloads/ta_lab2/src/ta_lab2/ml/regime_router.py`, lines 45-110
-- Drift attribution: `C:/Users/asafi/Downloads/ta_lab2/src/ta_lab2/drift/attribution.py`, lines 296-309
-- Policy loader: `C:/Users/asafi/Downloads/ta_lab2/src/ta_lab2/regimes/policy_loader.py`
-- Hysteresis tracker: `C:/Users/asafi/Downloads/ta_lab2/src/ta_lab2/regimes/hysteresis.py`
-- FredProvider (bypassed): `C:/Users/asafi/Downloads/ta_lab2/src/ta_lab2/integrations/economic/fred_provider.py`
+All findings based on direct source code analysis:
+
+- `src/ta_lab2/scripts/bars/base_bar_builder.py` (557 lines) - Template method base class
+- `src/ta_lab2/scripts/bars/bar_builder_config.py` (53 lines) - Configuration dataclass
+- `src/ta_lab2/scripts/bars/common_snapshot_contract.py` (1,813 lines) - Shared utilities
+- `src/ta_lab2/scripts/bars/refresh_price_bars_1d.py` (822 lines) - CMC 1D builder
+- `src/ta_lab2/scripts/bars/refresh_tvc_price_bars_1d.py` (511 lines) - TVC 1D builder
+- `src/ta_lab2/scripts/bars/refresh_hl_price_bars_1d.py` (585 lines) - HL 1D builder
+- `src/ta_lab2/scripts/bars/run_all_bar_builders.py` (537 lines) - Orchestrator
+- `src/ta_lab2/scripts/bars/sync_price_bars_multi_tf_u.py` (72 lines) - Sync to _u
+- `src/ta_lab2/scripts/bars/derive_multi_tf_from_1d.py` (807 lines) - Multi-TF derivation
+- `src/ta_lab2/scripts/sync_utils.py` (304 lines) - Generic sync utility
+- `src/ta_lab2/scripts/emas/sync_ema_multi_tf_u.py` (360 lines) - Legacy EMA sync
+- `src/ta_lab2/scripts/emas/base_ema_refresher.py` - EMA template method
+- `src/ta_lab2/scripts/amas/sync_ama_multi_tf_u.py` (97 lines) - AMA sync
+- `src/ta_lab2/scripts/returns/sync_returns_bars_multi_tf_u.py` (69 lines) - Returns sync
+- `src/ta_lab2/scripts/run_daily_refresh.py` - Daily pipeline orchestrator
+- `src/ta_lab2/scripts/pipeline/run_go_forward_daily_refresh.py` - Go-forward pipeline
