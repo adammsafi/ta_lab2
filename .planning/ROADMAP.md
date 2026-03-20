@@ -1359,7 +1359,7 @@ Full details: `.planning/milestones/v1.0.1-ROADMAP.md`
 **Milestone Goal:** Eliminate 100GB+ of duplicate data by consolidating siloed tables into _u tables, generalize the 1D bar builder for extensible data source onboarding, and clean up pipeline debt.
 
 - [x] **Phase 74: Foundation & Shared Infrastructure** - dim_data_sources registry, psycopg helpers, alignment_source constraints -- COMPLETE 2026-03-19
-- [ ] **Phase 75: Generalized 1D Bar Builder** - Single configurable builder replacing 3 source-specific scripts
+- [x] **Phase 75: Generalized 1D Bar Builder** - Single configurable builder replacing 3 source-specific scripts -- COMPLETE 2026-03-20
 - [ ] **Phase 76: Direct-to-_u Price Bars (Pilot)** - Price bars family migrated to direct _u writes
 - [ ] **Phase 77: Direct-to-_u Remaining Families** - EMA, AMA, and returns families migrated to direct _u writes
 - [ ] **Phase 78: Table Drops & Script Cleanup** - Drop 30 siloed tables, delete 6 sync scripts, fix dependent views
@@ -1395,8 +1395,8 @@ Plans:
   5. Old source-specific scripts (refresh_tvc_price_bars_1d.py, refresh_hl_price_bars_1d.py) are deleted from the codebase
 **Plans:** 2 plans
 Plans:
-- [ ] 75-01-PLAN.md -- Generalized source-aware 1D bar builder (rewrite refresh_price_bars_1d.py)
-- [ ] 75-02-PLAN.md -- Orchestrator update, old script deletion, row count parity verification
+- [x] 75-01-PLAN.md -- Generalized source-aware 1D bar builder (rewrite refresh_price_bars_1d.py)
+- [x] 75-02-PLAN.md -- Orchestrator update, old script deletion, row count parity verification
 
 ---
 

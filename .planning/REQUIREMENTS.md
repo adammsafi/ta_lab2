@@ -7,14 +7,14 @@
 
 ### Bar Builder Consolidation (BAR)
 
-- [ ] **BAR-01**: Single `refresh_price_bars_1d.py` script handles all data sources via `--source cmc|tvc|hl|all` CLI argument
+- [x] **BAR-01**: Single `refresh_price_bars_1d.py` script handles all data sources via `--source cmc|tvc|hl|all` CLI argument
 - [ ] **BAR-02**: SourceSpec registry pattern captures per-source differences as data (source table, JOINs, OHLC repair, venue_id mapping, ID loader)
-- [ ] **BAR-03**: Adding a new data source requires only a new SourceSpec entry — no new script file
-- [ ] **BAR-04**: Backfill detection works for all sources (currently CMC-only)
+- [x] **BAR-03**: Adding a new data source requires only a new SourceSpec entry — no new script file
+- [x] **BAR-04**: Backfill detection works for all sources (currently CMC-only)
 - [ ] **BAR-05**: Shared psycopg helper functions extracted from duplicated code (~600 lines deduplicated)
-- [ ] **BAR-06**: `run_all_bar_builders.py` orchestrator updated to invoke generic builder with `--source` flag
-- [ ] **BAR-07**: Old source-specific scripts (`refresh_tvc_price_bars_1d.py`, `refresh_hl_price_bars_1d.py`) deleted
-- [ ] **BAR-08**: Row counts per source match baseline before and after consolidation
+- [x] **BAR-06**: `run_all_bar_builders.py` orchestrator updated to invoke generic builder with `--source` flag
+- [x] **BAR-07**: Old source-specific scripts (`refresh_tvc_price_bars_1d.py`, `refresh_hl_price_bars_1d.py`) deleted
+- [x] **BAR-08**: Row counts per source match baseline before and after consolidation
 
 ### Direct-to-_u Migration (UTB)
 
@@ -64,14 +64,14 @@ None — this milestone is self-contained infrastructure work.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| BAR-01 | Phase 75 | Pending |
+| BAR-01 | Phase 75 | Complete |
 | BAR-02 | Phase 74 | Complete |
-| BAR-03 | Phase 75 | Pending |
-| BAR-04 | Phase 75 | Pending |
+| BAR-03 | Phase 75 | Complete |
+| BAR-04 | Phase 75 | Complete |
 | BAR-05 | Phase 74 | Complete |
-| BAR-06 | Phase 75 | Pending |
-| BAR-07 | Phase 75 | Pending |
-| BAR-08 | Phase 75 | Pending |
+| BAR-06 | Phase 75 | Complete |
+| BAR-07 | Phase 75 | Complete |
+| BAR-08 | Phase 75 | Complete |
 | UTB-01 | Phase 76 | Pending |
 | UTB-02 | Phase 77 | Pending |
 | UTB-03 | Phase 77 | Pending |
@@ -98,4 +98,4 @@ None — this milestone is self-contained infrastructure work.
 
 ---
 *Requirements defined: 2026-03-19*
-*Last updated: 2026-03-19 after roadmap creation (all 26 requirements mapped to phases 74-79)*
+*Last updated: 2026-03-20 Phase 75 complete (BAR-01, BAR-03, BAR-04, BAR-06, BAR-07, BAR-08 → Complete)*
