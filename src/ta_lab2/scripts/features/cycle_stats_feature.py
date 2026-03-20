@@ -109,8 +109,6 @@ class CycleStatsFeature(BaseFeature):
                 id,
                 {self.TS_COLUMN} AS ts,
                 venue_id,
-                venue,
-                venue_rank,
                 close
             FROM {self.SOURCE_TABLE}
             WHERE {where_sql}
@@ -158,8 +156,6 @@ class CycleStatsFeature(BaseFeature):
             "tf": "TEXT NOT NULL",
             "venue_id": "SMALLINT NOT NULL DEFAULT 1",
             "alignment_source": "TEXT NOT NULL",
-            "venue": "TEXT NOT NULL DEFAULT 'CMC_AGG'",
-            "venue_rank": "INTEGER NOT NULL DEFAULT 50",
             "tf_days": "INTEGER NOT NULL",
             "close": "DOUBLE PRECISION",
             "ath": "DOUBLE PRECISION",

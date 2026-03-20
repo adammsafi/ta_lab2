@@ -91,9 +91,9 @@ def _generate_bar_table_ddl(
 
     # Anchor tables include bar_anchor_offset in unique indexes
     if is_anchor:
-        canon_ts_cols = "id, tf, venue, bar_anchor_offset, timestamp"
+        canon_ts_cols = "id, tf, venue_id, bar_anchor_offset, timestamp"
     else:
-        canon_ts_cols = "id, tf, venue, timestamp"
+        canon_ts_cols = "id, tf, venue_id, timestamp"
 
     return f"""
 CREATE TABLE IF NOT EXISTS {fq_table} (
@@ -159,24 +159,23 @@ CREATE TABLE IF NOT EXISTS {fq_table} (
     ingested_at                 TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
 
     -- Venue tracking
-    venue                       TEXT          NOT NULL DEFAULT 'CMC_AGG',
-    venue_rank                  INTEGER       NOT NULL DEFAULT 50,
+    venue_id                    SMALLINT      NOT NULL DEFAULT 1,
 
-    PRIMARY KEY (id, tf, bar_seq, venue, timestamp)
+    PRIMARY KEY (id, tf, bar_seq, venue_id, timestamp)
 );
 
 -- Indexes for query performance
 CREATE INDEX IF NOT EXISTS ix_{table_name}_id_tf_barseq
-    ON {fq_table} (id, tf, venue, bar_seq);
+    ON {fq_table} (id, tf, venue_id, bar_seq);
 
 CREATE INDEX IF NOT EXISTS ix_{table_name}_id_tf_timeclose
-    ON {fq_table} (id, tf, venue, time_close);
+    ON {fq_table} (id, tf, venue_id, time_close);
 
 CREATE INDEX IF NOT EXISTS ix_{table_name}_id_tf_timestamp
-    ON {fq_table} (id, tf, venue, timestamp);
+    ON {fq_table} (id, tf, venue_id, timestamp);
 
 CREATE INDEX IF NOT EXISTS ix_{table_name}_tf_timestamp
-    ON {fq_table} (tf, venue, timestamp);
+    ON {fq_table} (tf, venue_id, timestamp);
 
 -- Unique constraint for canonical (non-partial) bars
 CREATE UNIQUE INDEX IF NOT EXISTS uq_{table_name}__canon_timestamp
@@ -196,12 +195,12 @@ def assert_one_row_per_local_day(
     ts_col: str = "ts",
     tz: str = "America/New_York",
     id_col: str | None = None,
-    venue_col: str = "venue",
+    venue_col: str = "venue_id",
 ) -> None:
     """
-    Enforce that base daily data has exactly 1 row per (venue, local calendar day).
+    Enforce that base daily data has exactly 1 row per (venue_id, local calendar day).
 
-    If the DataFrame has a venue column, uniqueness is checked per venue.
+    If the DataFrame has a venue_id column, uniqueness is checked per venue_id.
     This must run *before* any bar/window logic.
     """
     if df.empty:
@@ -217,7 +216,7 @@ def assert_one_row_per_local_day(
     df_check = df.copy()
     df_check["_local_day"] = ts.dt.tz_convert(tz).dt.date
 
-    # Build group columns: include venue if present
+    # Build group columns: include venue_id if present
     group_cols = []
     if id_col and id_col in df_check.columns:
         group_cols.append(id_col)
@@ -229,7 +228,7 @@ def assert_one_row_per_local_day(
     dups = sizes[sizes > 1]
     if not dups.empty:
         first_dup = dups.index[0]
-        # first_dup is a tuple of (id?, venue?, local_day)
+        # first_dup is a tuple of (id?, venue_id?, local_day)
         dup_day = first_dup[-1] if isinstance(first_dup, tuple) else first_dup
         sample = df.loc[df_check["_local_day"] == dup_day]
         if id_col and id_col in df.columns:
@@ -240,7 +239,7 @@ def assert_one_row_per_local_day(
             sample = sample.sort_values(sort_cols).head(10)
         else:
             sample = sample.sort_values(ts_col).head(10)
-        venue_note = " (per venue)" if venue_col in df.columns else ""
+        venue_note = " (per venue_id)" if venue_col in df.columns else ""
         id_note = (
             f" across ids (showing `{id_col}`)"
             if (id_col and id_col in df.columns)
@@ -415,9 +414,6 @@ REQUIRED_COL_DEFAULTS: dict[str, Any] = {
     "repaired_close": False,
     "repaired_volume": False,
     "repaired_market_cap": False,
-    # Venue tracking
-    "venue": "CMC_AGG",
-    "venue_rank": 50,
 }
 
 
@@ -744,7 +740,7 @@ def load_state(
     if with_tz:
         col_parts.append("tz")
     if with_venue:
-        col_parts.append("venue")
+        col_parts.append("venue_id")
     col_parts.extend(
         [
             "daily_min_seen",
@@ -821,8 +817,6 @@ def upsert_state(
     extra_cols = []
     if with_tz:
         extra_cols.append("tz")
-    if with_venue:
-        extra_cols.append("venue")  # venue text as data col (venue_id is PK)
 
     insert_cols = pk_cols + extra_cols + base_data_cols
     update_cols = extra_cols + base_data_cols
@@ -859,7 +853,7 @@ def make_upsert_sql(
     bars_table: str,
     cols: Sequence[str],
     *,
-    conflict_cols: Sequence[str] = ("id", "tf", "bar_seq", "venue", "timestamp"),
+    conflict_cols: Sequence[str] = ("id", "tf", "bar_seq", "venue_id", "timestamp"),
 ) -> str:
     """Generate INSERT ... ON CONFLICT ... DO UPDATE SQL."""
     insert_cols = ", ".join(cols)
@@ -932,7 +926,7 @@ def upsert_bars(
     *,
     db_url: str,
     bars_table: str,
-    conflict_cols: Sequence[str] = ("id", "tf", "bar_seq", "venue", "timestamp"),
+    conflict_cols: Sequence[str] = ("id", "tf", "bar_seq", "venue_id", "timestamp"),
     timestamp_cols: Sequence[str] | None = None,
     keep_rejects: bool = False,
     rejects_table: str | None = None,
@@ -1003,9 +997,7 @@ def upsert_bars(
         "repaired_close",
         "repaired_volume",
         "repaired_market_cap",
-        "venue",
         "venue_id",
-        "venue_rank",
         "alignment_source",
     ]
     df = df[[c for c in valid_cols if c in df.columns]]
@@ -1416,8 +1408,7 @@ def load_daily_prices_for_id(
         s.volume,
         s.marketcap AS market_cap,
         b1d.src_name,
-        b1d.ingested_at AS src_load_ts,
-        COALESCE(b1d.venue_rank, 50) AS venue_rank
+        b1d.ingested_at AS src_load_ts
       FROM {daily_table} s
       LEFT JOIN public.price_bars_1d b1d
         ON b1d.id = s.id AND b1d."timestamp" = s."timestamp"
@@ -1453,11 +1444,11 @@ def delete_bars_for_id_tf(
     *,
     id_: int,
     tf: str,
-    venue: str | None = None,
+    venue_id: int | None = None,
     alignment_source: str | None = None,
 ) -> None:
     """
-    Delete all bar snapshots for a specific (id, tf) or (id, tf, venue) combination.
+    Delete all bar snapshots for a specific (id, tf) or (id, tf, venue_id) combination.
 
     Used in full rebuild mode to clear existing bars before regeneration.
 
@@ -1466,16 +1457,16 @@ def delete_bars_for_id_tf(
         bars_table: Bar snapshots table name
         id_: Cryptocurrency ID
         tf: Timeframe string (e.g., "7d", "1w_iso")
-        venue: Optional venue filter. If None, deletes all venues for (id, tf).
+        venue_id: Optional venue_id filter. If None, deletes all venues for (id, tf).
         alignment_source: Optional alignment_source filter. When set, scopes deletes
             to a single alignment variant (e.g., "multi_tf_cal_us"). Required when
             targeting _u tables to avoid clobbering other alignment sources' data.
     """
     where = "WHERE id = :id AND tf = :tf"
     params: dict = {"id": int(id_), "tf": tf}
-    if venue is not None:
-        where += " AND venue = :venue"
-        params["venue"] = venue
+    if venue_id is not None:
+        where += " AND venue_id = :venue_id"
+        params["venue_id"] = int(venue_id)
     if alignment_source is not None:
         where += " AND alignment_source = :alignment_source"
         params["alignment_source"] = alignment_source

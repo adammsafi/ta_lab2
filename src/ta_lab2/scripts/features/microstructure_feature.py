@@ -167,7 +167,7 @@ class MicrostructureFeature(BaseFeature):
 
         Returns:
             DataFrame with columns: id, ts, open, high, low, close, volume,
-            tf, alignment_source, venue, venue_rank
+            tf, alignment_source
             Sorted by id ASC, ts ASC
         """
         where_clauses = [
@@ -200,8 +200,6 @@ class MicrostructureFeature(BaseFeature):
                 p.id,
                 p.{self.TS_COLUMN} as ts,
                 p.venue_id,
-                p.venue,
-                p.venue_rank,
                 p.open,
                 p.high,
                 p.low,
@@ -221,7 +219,7 @@ class MicrostructureFeature(BaseFeature):
         """
         Compute all microstructure features from OHLCV data.
 
-        Processes each (id, venue) group separately:
+        Processes each (id, venue_id) group separately:
         1. MICRO-01: FFD - find_min_d + frac_diff_ffd on log(close)
         2. MICRO-02: Kyle/Amihud/Hasbrouck lambdas
         3. MICRO-03: Rolling ADF on log(close) -> sadf_stat, sadf_is_explosive
@@ -232,7 +230,7 @@ class MicrostructureFeature(BaseFeature):
 
         Returns:
             DataFrame with computed microstructure columns + id, ts, tf,
-            alignment_source, venue
+            alignment_source, venue_id
         """
         if df_source.empty:
             return pd.DataFrame()
@@ -357,7 +355,6 @@ class MicrostructureFeature(BaseFeature):
             "ts": "TIMESTAMPTZ NOT NULL",
             "tf": "TEXT NOT NULL",
             "venue_id": "SMALLINT NOT NULL DEFAULT 1",
-            "venue": "TEXT NOT NULL DEFAULT 'CMC_AGG'",
             "alignment_source": "TEXT NOT NULL DEFAULT 'multi_tf'",
             "close_fracdiff": "DOUBLE PRECISION",
             "close_fracdiff_d": "DOUBLE PRECISION",

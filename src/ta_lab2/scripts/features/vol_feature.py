@@ -164,8 +164,6 @@ class VolatilityFeature(BaseFeature):
                 p.id,
                 p.{self.TS_COLUMN} as ts,
                 p.venue_id,
-                p.venue,
-                p.venue_rank,
                 p.open,
                 p.high,
                 p.low,
@@ -306,8 +304,6 @@ class VolatilityFeature(BaseFeature):
             "tf": "TEXT NOT NULL",
             "venue_id": "SMALLINT NOT NULL DEFAULT 1",
             "alignment_source": "TEXT NOT NULL",
-            "venue": "TEXT NOT NULL DEFAULT 'CMC_AGG'",
-            "venue_rank": "INTEGER NOT NULL DEFAULT 50",
             "tf_days": "INTEGER NOT NULL",
             # OHLC context
             "open": "DOUBLE PRECISION",

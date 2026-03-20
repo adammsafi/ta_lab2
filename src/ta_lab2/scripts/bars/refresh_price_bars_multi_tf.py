@@ -234,11 +234,11 @@ class MultiTFBarBuilder(BaseBarBuilder):
             with_venue=True,
         )
 
-        # State map keyed by (tf, venue)
-        state_map: dict[tuple[str, str], dict] = {}
+        # State map keyed by (tf, venue_id)
+        state_map: dict[tuple[str, int], dict] = {}
         if not state_df.empty:
             for _, row in state_df.iterrows():
-                state_map[(row["tf"], row.get("venue", "CMC_AGG"))] = row
+                state_map[(row["tf"], int(row.get("venue_id", 1)))] = row
 
         # Look up coverage from asset_data_coverage (populated by 1D builder)
         n_available = get_coverage_n_days(
@@ -259,9 +259,9 @@ class MultiTFBarBuilder(BaseBarBuilder):
                 f"(tf_days > {n_available} available days)"
             )
 
-        # Detect new timeframes (no state yet for any venue) — need full daily history
+        # Detect new timeframes (no state yet for any venue_id) — need full daily history
         has_new_tfs = any(
-            not any((tf_label, v) in state_map for v in state_map)
+            not any((tf_label, v) in state_map for v in {vid for _, vid in state_map})
             for _, tf_label in applicable_tfs
         )
         if has_new_tfs and start_ts is not None:
@@ -294,11 +294,9 @@ class MultiTFBarBuilder(BaseBarBuilder):
             if df_daily.empty:
                 continue
 
-            venue_rank = (
-                int(df_daily["venue_rank"].iloc[0])
-                if "venue_rank" in df_daily.columns
-                else 50
-            )
+            # Resolve venue text to venue_id for output-table operations
+            venue_id = self._resolve_venue_id(venue)
+
             daily_min_ts = pd.to_datetime(df_daily["ts"].min(), utc=True)
             daily_max_ts = pd.to_datetime(df_daily["ts"].max(), utc=True)
 
@@ -315,14 +313,14 @@ class MultiTFBarBuilder(BaseBarBuilder):
                         df_daily=df_daily,
                         daily_min_ts=daily_min_ts,
                         daily_max_ts=daily_max_ts,
-                        state=state_map.get((tf_label, venue)),
+                        state=state_map.get((tf_label, venue_id)),
                         venue=venue,
-                        venue_rank=venue_rank,
+                        venue_id=venue_id,
                     )
                     total_rows += rows
                 except Exception as e:
                     self.logger.error(
-                        f"ID={id_}, TF={tf_label}, venue={venue} failed: {e}",
+                        f"ID={id_}, TF={tf_label}, venue_id={venue_id} failed: {e}",
                         exc_info=True,
                     )
                     continue
@@ -339,10 +337,10 @@ class MultiTFBarBuilder(BaseBarBuilder):
         daily_max_ts: pd.Timestamp,
         state: Optional[dict],
         venue: str = "CMC_AGG",
-        venue_rank: int = 50,
+        venue_id: int = 1,
     ) -> int:
         """
-        Build bars for one (id, tf, venue) combination.
+        Build bars for one (id, tf, venue_id) combination.
 
         Handles:
         - Backfill detection
@@ -352,8 +350,8 @@ class MultiTFBarBuilder(BaseBarBuilder):
         Returns:
             Number of rows inserted/updated
         """
-        # Load last snapshot info for this venue
-        last = self._load_last_snapshot_info(id_, tf_label, venue=venue)
+        # Load last snapshot info for this venue_id
+        last = self._load_last_snapshot_info(id_, tf_label, venue_id=venue_id)
 
         # Determine if backfill is needed
         needs_rebuild = False
@@ -361,7 +359,7 @@ class MultiTFBarBuilder(BaseBarBuilder):
             daily_min_seen = pd.to_datetime(state.get("daily_min_seen"), utc=True)
             if pd.notna(daily_min_seen) and daily_min_ts < daily_min_seen:
                 self.logger.info(
-                    f"ID={id_}, TF={tf_label}, venue={venue}: Backfill detected "
+                    f"ID={id_}, TF={tf_label}, venue_id={venue_id}: Backfill detected "
                     f"({daily_min_seen} -> {daily_min_ts}), rebuilding"
                 )
                 needs_rebuild = True
@@ -369,21 +367,19 @@ class MultiTFBarBuilder(BaseBarBuilder):
         # Full rebuild path
         if needs_rebuild or last is None or self.config.full_rebuild:
             if needs_rebuild or self.config.full_rebuild:
-                self._delete_bars_and_state(id_, tf_label, venue=venue)
+                self._delete_bars_and_state(id_, tf_label, venue_id=venue_id)
 
             bars = self._build_snapshots_polars(df_daily, tf_days, tf_label)
             if bars.empty:
                 return 0
 
             # Set venue columns on output bars
-            bars["venue"] = venue
-            bars["venue_rank"] = venue_rank
-            bars["venue_id"] = bars.get("venue_id", 1)
+            bars["venue_id"] = venue_id
             bars["alignment_source"] = self.ALIGNMENT_SOURCE
 
             self._upsert_bars(bars)
             self._update_state(
-                id_, tf_label, bars, daily_min_ts, daily_max_ts, venue=venue
+                id_, tf_label, bars, daily_min_ts, daily_max_ts, venue_id=venue_id
             )
             return len(bars)
 
@@ -408,14 +404,12 @@ class MultiTFBarBuilder(BaseBarBuilder):
             return 0
 
         # Set venue columns on output bars
-        new_rows["venue"] = venue
-        new_rows["venue_rank"] = venue_rank
-        new_rows["venue_id"] = new_rows.get("venue_id", 1)
+        new_rows["venue_id"] = venue_id
         new_rows["alignment_source"] = self.ALIGNMENT_SOURCE
 
         self._upsert_bars(new_rows)
         self._update_state(
-            id_, tf_label, new_rows, daily_min_ts, daily_max_ts, venue=venue
+            id_, tf_label, new_rows, daily_min_ts, daily_max_ts, venue_id=venue_id
         )
         return len(new_rows)
 
@@ -705,9 +699,10 @@ class MultiTFBarBuilder(BaseBarBuilder):
         daily_max_ts: pd.Timestamp,
         last: dict,
         venue: str = "CMC_AGG",
+        venue_id: int = 1,
     ) -> pd.DataFrame:
         """
-        Append snapshot rows after last_time_close for one (id, tf, venue).
+        Append snapshot rows after last_time_close for one (id, tf, venue_id).
 
         Uses carry-forward optimization when strict gate passes.
         """
@@ -741,7 +736,7 @@ class MultiTFBarBuilder(BaseBarBuilder):
 
         # Load last snapshot row for current bar
         last_row = self._load_last_bar_snapshot_row(
-            id_, tf_label, cur_bar_seq, venue=venue
+            id_, tf_label, cur_bar_seq, venue_id=venue_id
         )
         if last_row is None:
             return pd.DataFrame()
@@ -1075,10 +1070,22 @@ class MultiTFBarBuilder(BaseBarBuilder):
             ).scalar()
         return int(result or 0)
 
+    def _resolve_venue_id(self, venue: str) -> int:
+        """Resolve venue text to venue_id from dim_venues."""
+        engine = get_engine(self.config.db_url)
+        with engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT venue_id FROM dim_venues WHERE venue = :v"),
+                {"v": venue},
+            ).fetchone()
+        if row:
+            return int(row[0])
+        return 1  # default to CMC_AGG
+
     def _load_last_snapshot_info(
-        self, id_: int, tf: str, venue: str = "CMC_AGG"
+        self, id_: int, tf: str, venue_id: int = 1
     ) -> dict | None:
-        """Load last snapshot info for (id, tf, venue)."""
+        """Load last snapshot info for (id, tf, venue_id)."""
         engine = get_engine(self.config.db_url)
         bars_table = self.get_output_table_name()
 
@@ -1088,17 +1095,17 @@ class MultiTFBarBuilder(BaseBarBuilder):
                     text(
                         f"""
                     WITH last AS (
-                      SELECT id, tf, venue, MAX(bar_seq) AS last_bar_seq
+                      SELECT id, tf, venue_id, MAX(bar_seq) AS last_bar_seq
                       FROM {bars_table}
-                      WHERE id = :id AND tf = :tf AND venue = :venue
+                      WHERE id = :id AND tf = :tf AND venue_id = :venue_id
                         AND alignment_source = :alignment_source
-                      GROUP BY id, tf, venue
+                      GROUP BY id, tf, venue_id
                     ),
                     last_row AS (
                       SELECT b.*
                       FROM {bars_table} b
                       JOIN last l
-                        ON b.id = l.id AND b.tf = l.tf AND b.venue = l.venue
+                        ON b.id = l.id AND b.tf = l.tf AND b.venue_id = l.venue_id
                            AND b.bar_seq = l.last_bar_seq
                       WHERE b.alignment_source = :alignment_source
                       ORDER BY b.timestamp DESC
@@ -1108,7 +1115,7 @@ class MultiTFBarBuilder(BaseBarBuilder):
                       SELECT COUNT(*)::int AS last_pos_in_bar
                       FROM {bars_table} b
                       JOIN last l
-                        ON b.id = l.id AND b.tf = l.tf AND b.venue = l.venue
+                        ON b.id = l.id AND b.tf = l.tf AND b.venue_id = l.venue_id
                            AND b.bar_seq = l.last_bar_seq
                       WHERE b.alignment_source = :alignment_source
                     )
@@ -1121,7 +1128,7 @@ class MultiTFBarBuilder(BaseBarBuilder):
                     {
                         "id": int(id_),
                         "tf": tf,
-                        "venue": venue,
+                        "venue_id": int(venue_id),
                         "alignment_source": self.ALIGNMENT_SOURCE,
                     },
                 )
@@ -1137,9 +1144,9 @@ class MultiTFBarBuilder(BaseBarBuilder):
         return d
 
     def _load_last_bar_snapshot_row(
-        self, id_: int, tf: str, bar_seq: int, venue: str = "CMC_AGG"
+        self, id_: int, tf: str, bar_seq: int, venue_id: int = 1
     ) -> dict | None:
-        """Load the latest snapshot row for a specific (bar_seq, venue)."""
+        """Load the latest snapshot row for a specific (bar_seq, venue_id)."""
         engine = get_engine(self.config.db_url)
         bars_table = self.get_output_table_name()
 
@@ -1150,7 +1157,7 @@ class MultiTFBarBuilder(BaseBarBuilder):
                         f"""
                     SELECT *
                     FROM {bars_table}
-                    WHERE id = :id AND tf = :tf AND bar_seq = :bar_seq AND venue = :venue
+                    WHERE id = :id AND tf = :tf AND bar_seq = :bar_seq AND venue_id = :venue_id
                       AND alignment_source = :alignment_source
                     ORDER BY timestamp DESC
                     LIMIT 1;
@@ -1160,7 +1167,7 @@ class MultiTFBarBuilder(BaseBarBuilder):
                         "id": int(id_),
                         "tf": tf,
                         "bar_seq": int(bar_seq),
-                        "venue": venue,
+                        "venue_id": int(venue_id),
                         "alignment_source": self.ALIGNMENT_SOURCE,
                     },
                 )
@@ -1170,15 +1177,15 @@ class MultiTFBarBuilder(BaseBarBuilder):
         return dict(row) if row else None
 
     def _delete_bars_and_state(
-        self, id_: int, tf: str, venue: str | None = None
+        self, id_: int, tf: str, venue_id: int | None = None
     ) -> None:
-        """Delete bars and state for (id, tf, venue) before rebuild."""
+        """Delete bars and state for (id, tf, venue_id) before rebuild."""
         delete_bars_for_id_tf(
             self.config.db_url,
             self.get_output_table_name(),
             id_=id_,
             tf=tf,
-            venue=venue,
+            venue_id=venue_id,
             alignment_source=self.ALIGNMENT_SOURCE,
         )
 
@@ -1186,9 +1193,9 @@ class MultiTFBarBuilder(BaseBarBuilder):
         engine = create_engine(self.config.db_url, future=True)
         params: dict = {"id": int(id_), "tf": tf}
         where = "WHERE id = :id AND tf = :tf"
-        if venue is not None:
-            where += " AND venue = :venue"
-            params["venue"] = venue
+        if venue_id is not None:
+            where += " AND venue_id = :venue_id"
+            params["venue_id"] = int(venue_id)
         q = text(f"DELETE FROM {self.get_state_table_name()} {where};")
         with engine.begin() as conn:
             conn.execute(q, params)
@@ -1218,9 +1225,9 @@ class MultiTFBarBuilder(BaseBarBuilder):
         bars: pd.DataFrame,
         daily_min_ts: pd.Timestamp,
         daily_max_ts: pd.Timestamp,
-        venue: str = "CMC_AGG",
+        venue_id: int = 1,
     ) -> None:
-        """Update state table for (id, tf, venue)."""
+        """Update state table for (id, tf, venue_id)."""
         last_bar_seq = int(bars["bar_seq"].max())
         last_time_close = pd.to_datetime(bars["timestamp"].max(), utc=True)
 
@@ -1231,7 +1238,7 @@ class MultiTFBarBuilder(BaseBarBuilder):
                 {
                     "id": int(id_),
                     "tf": tf,
-                    "venue": venue,
+                    "venue_id": int(venue_id),
                     "daily_min_seen": daily_min_ts,
                     "daily_max_seen": daily_max_ts,
                     "last_bar_seq": last_bar_seq,

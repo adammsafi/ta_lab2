@@ -106,8 +106,6 @@ class RollingExtremesFeature(BaseFeature):
                 id,
                 {self.TS_COLUMN} AS ts,
                 venue_id,
-                venue,
-                venue_rank,
                 close
             FROM {self.SOURCE_TABLE}
             WHERE {where_sql}
@@ -134,9 +132,7 @@ class RollingExtremesFeature(BaseFeature):
                 continue
 
             for win in self._windows:
-                df_win = df_id[
-                    ["id", "ts", "venue_id", "venue", "venue_rank", "close"]
-                ].copy()
+                df_win = df_id[["id", "ts", "venue_id", "close"]].copy()
                 add_rolling_extremes(df_win, window=win, close_col="close", ts_col="ts")
                 df_win["lookback_bars"] = win
                 all_results.append(df_win)
@@ -160,8 +156,6 @@ class RollingExtremesFeature(BaseFeature):
             "tf": "TEXT NOT NULL",
             "venue_id": "SMALLINT NOT NULL DEFAULT 1",
             "alignment_source": "TEXT NOT NULL",
-            "venue": "TEXT NOT NULL DEFAULT 'CMC_AGG'",
-            "venue_rank": "INTEGER NOT NULL DEFAULT 50",
             "lookback_bars": "INTEGER NOT NULL",
             "tf_days": "INTEGER NOT NULL",
             "close": "DOUBLE PRECISION",

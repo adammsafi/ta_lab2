@@ -147,8 +147,6 @@ class TAFeature(BaseFeature):
                 id,
                 {self.TS_COLUMN} AS ts,
                 venue_id,
-                venue,
-                venue_rank,
                 open,
                 high,
                 low,
@@ -239,8 +237,6 @@ class TAFeature(BaseFeature):
             "tf",
             "tf_days",
             "venue_id",
-            "venue",
-            "venue_rank",
             "close",
         ] + [
             col
@@ -252,8 +248,6 @@ class TAFeature(BaseFeature):
                 "tf",
                 "tf_days",
                 "venue_id",
-                "venue",
-                "venue_rank",
                 "close",
                 "open",
                 "high",
@@ -278,8 +272,6 @@ class TAFeature(BaseFeature):
             "tf": "TEXT NOT NULL",
             "venue_id": "SMALLINT NOT NULL DEFAULT 1",
             "alignment_source": "TEXT NOT NULL",
-            "venue": "TEXT NOT NULL DEFAULT 'CMC_AGG'",
-            "venue_rank": "INTEGER NOT NULL DEFAULT 50",
             "tf_days": "INTEGER NOT NULL",
             "close": "DOUBLE PRECISION",
         }

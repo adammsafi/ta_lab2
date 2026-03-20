@@ -54,7 +54,7 @@ def load_1d_bars_for_id(
         - id, timestamp, tf, bar_seq
         - open, high, low, close, volume
         - time_high, time_low
-        - venue, venue_id, venue_rank
+        - venue_id
         - quality flags (is_partial_start, is_partial_end, is_missing_days)
     """
     # Build WHERE clause with filters
@@ -92,12 +92,10 @@ def load_1d_bars_for_id(
             is_missing_days,
             count_days,
             count_missing_days,
-            venue,
-            venue_id,
-            venue_rank
+            venue_id
         FROM public.price_bars_1d
         WHERE {where_sql}
-        ORDER BY venue, "timestamp"
+        ORDER BY venue_id, "timestamp"
     """
     )
 
@@ -664,7 +662,7 @@ def derive_multi_tf_bars(
     Returns:
         Polars DataFrame with all derived bars, ready for upsert.
     """
-    # Load 1D bars (includes venue, venue_id, venue_rank)
+    # Load 1D bars (includes venue_id)
     df_1d = load_1d_bars_for_id(
         engine=engine,
         id=id,
@@ -674,15 +672,13 @@ def derive_multi_tf_bars(
     if df_1d.is_empty():
         return pl.DataFrame()
 
-    # Get unique venues; process each separately to avoid cross-venue aggregation
-    venues = df_1d["venue"].unique().to_list()
+    # Get unique venue_ids; process each separately to avoid cross-venue aggregation
+    venue_ids = df_1d["venue_id"].unique().to_list()
 
     all_bars = []
 
-    for venue in venues:
-        df_venue = df_1d.filter(pl.col("venue") == venue)
-        venue_id = df_venue["venue_id"].first()
-        venue_rank = df_venue["venue_rank"].first()
+    for vid in venue_ids:
+        df_venue = df_1d.filter(pl.col("venue_id") == vid)
         n_daily = len(df_venue)
 
         # Filter out TFs that require more daily bars than available
@@ -693,12 +689,12 @@ def derive_multi_tf_bars(
             logger = logging.getLogger(__name__)
             skipped = len(timeframes) - len(applicable_tfs)
             logger.info(
-                f"ID={id}, venue={venue}: Skipping {skipped} TF(s) "
+                f"ID={id}, venue_id={vid}: Skipping {skipped} TF(s) "
                 f"(need more than {n_daily} daily bar(s))"
             )
 
-        # Drop venue columns before aggregation (not needed in groupby)
-        df_venue_clean = df_venue.drop(["venue", "venue_id", "venue_rank"])
+        # Drop venue_id before aggregation (not needed in groupby)
+        df_venue_clean = df_venue.drop(["venue_id"])
 
         for tf in applicable_tfs:
             df_tf = aggregate_daily_to_timeframe(
@@ -709,11 +705,9 @@ def derive_multi_tf_bars(
             )
 
             if not df_tf.is_empty():
-                # Tag output with venue columns
+                # Tag output with venue_id
                 df_tf = df_tf.with_columns(
-                    pl.lit(venue).alias("venue"),
-                    pl.lit(venue_id).alias("venue_id"),
-                    pl.lit(venue_rank).alias("venue_rank"),
+                    pl.lit(vid).alias("venue_id"),
                 )
                 all_bars.append(df_tf)
 

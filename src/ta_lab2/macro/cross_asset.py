@@ -565,11 +565,11 @@ def compute_funding_rate_agg(
 
     # Load daily rollup funding rates (tf='1d')
     sql = text(
-        "SELECT ts::date AS date, symbol, venue, funding_rate "
+        "SELECT ts::date AS date, symbol, venue_id, funding_rate "
         "FROM funding_rates "
         "WHERE tf = '1d' "
         "AND ts::date >= :start AND ts::date <= :end "
-        "ORDER BY symbol, date, venue"
+        "ORDER BY symbol, date, venue_id"
     )
     try:
         with engine.connect() as conn:
@@ -601,7 +601,7 @@ def compute_funding_rate_agg(
     def _agg_venues(grp: pd.DataFrame) -> pd.Series:
         valid = grp.dropna(subset=["funding_rate"])
         n_venues = len(valid)
-        venues_list = sorted(valid["venue"].dropna().unique().tolist())
+        venues_list = sorted(valid["venue_id"].dropna().unique().tolist())
         avg_rate = float(valid["funding_rate"].mean()) if n_venues > 0 else None
         # vwap_funding_rate: NULL for now (requires volume data not consistently available)
         return pd.Series(

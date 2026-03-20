@@ -116,8 +116,6 @@ def _ensure_tables(engine: Engine, ret_table: str, state_table: str) -> None:
             tf        text NOT NULL,
             tf_days   integer NOT NULL,
             period    integer NOT NULL,
-            venue     text DEFAULT 'CMC_AGG',
-            venue_rank integer,
             roll      boolean NOT NULL,
 
             gap_days       integer,
@@ -333,13 +331,12 @@ _VALUE_COLS = [
 ]
 
 _INSERT_COLS = (
-    "id, venue_id, ts, tf, tf_days, period, venue, venue_rank, roll,\n"
+    "id, venue_id, ts, tf, tf_days, period, roll,\n"
     + ",\n".join(_VALUE_COLS)
     + ",\ningested_at"
 )
 _UPSERT_SET = ",\n".join(
-    f"{c} = EXCLUDED.{c}"
-    for c in ["venue_rank", "roll"] + _VALUE_COLS + ["ingested_at"]
+    f"{c} = EXCLUDED.{c}" for c in ["roll"] + _VALUE_COLS + ["ingested_at"]
 )
 
 
@@ -385,9 +382,7 @@ def _run_one_key(
                 e.period,
                 e.roll,
                 e.ema,
-                e.ema_bar,
-                COALESCE(e.venue, 'CMC_AGG') AS venue,
-                COALESCE(e.venue_rank, 50) AS venue_rank
+                e.ema_bar
             FROM {ema_table} e, seed
             WHERE e.id = :id
               AND e.tf = :tf
@@ -408,7 +403,7 @@ def _run_one_key(
         ),
         calc AS (
             SELECT
-                id, venue_id, ts, tf, tf_days, period, venue, venue_rank, roll,
+                id, venue_id, ts, tf, tf_days, period, roll,
 
                 CASE WHEN NOT roll AND prev_ts_c IS NOT NULL
                      THEN (ts::date - prev_ts_c::date)::int END AS gap_days,

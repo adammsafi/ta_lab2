@@ -51,8 +51,6 @@ _RETURNS_EXCLUDE = frozenset(
         "tf",
         "tf_days",
         "alignment_source",
-        "venue",
-        "venue_rank",
         "bar_seq",
         "pos_in_bar",
         "count_days",
@@ -73,8 +71,6 @@ _VOL_EXCLUDE = frozenset(
         "tf",
         "tf_days",
         "alignment_source",
-        "venue",
-        "venue_rank",
         "open",
         "high",
         "low",
@@ -91,8 +87,6 @@ _TA_EXCLUDE = frozenset(
         "tf",
         "tf_days",
         "alignment_source",
-        "venue",
-        "venue_rank",
         "close",
         "atr_14",
         "updated_at",
@@ -113,7 +107,7 @@ _SOURCE_DEFS = {
         "join_tmpl": (
             "LEFT JOIN public.returns_bars_multi_tf_u r"
             ' ON p.id = r.id AND p.time_close = r."timestamp"'
-            " AND p.venue = r.venue"
+            " AND p.venue_id = r.venue_id"
             " AND r.tf = '{tf}'"
             " AND r.alignment_source = '{alignment_source}'"
             " AND r.roll = FALSE"
@@ -126,7 +120,7 @@ _SOURCE_DEFS = {
         "join_tmpl": (
             "LEFT JOIN public.vol v"
             " ON p.id = v.id AND p.time_close = v.ts"
-            " AND p.venue = v.venue"
+            " AND p.venue_id = v.venue_id"
             " AND v.tf = '{tf}'"
             " AND v.alignment_source = '{alignment_source}'"
         ),
@@ -138,7 +132,7 @@ _SOURCE_DEFS = {
         "join_tmpl": (
             "LEFT JOIN public.ta t"
             " ON p.id = t.id AND p.time_close = t.ts"
-            " AND p.venue = t.venue"
+            " AND p.venue_id = t.venue_id"
             " AND t.tf = '{tf}'"
             " AND t.alignment_source = '{alignment_source}'"
         ),
@@ -453,8 +447,6 @@ class FeaturesStore:
             "ts": "p.time_close",
             "tf": f"'{tf}'",
             "alignment_source": f"'{alignment_source}'",
-            "venue": "p.venue",
-            "venue_rank": "p.venue_rank",
             "tf_days": "p.tf_days",
             "asset_class": "'CRYPTO'::text",
             "open": "p.open",

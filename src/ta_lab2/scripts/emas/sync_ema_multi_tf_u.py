@@ -171,14 +171,8 @@ def build_select_expr(
     else:
         where_sql = "WHERE ts > :wm"
 
-    e_venue = (
-        "COALESCE(venue, 'CMC_AGG')::text" if "venue" in colset else "'CMC_AGG'::text"
-    )
     e_venue_id = (
         "COALESCE(venue_id, 1)::smallint" if "venue_id" in colset else "1::smallint"
-    )
-    e_venue_rank = (
-        "COALESCE(venue_rank, 50)::int" if "venue_rank" in colset else "50::int"
     )
 
     select_sql = f"""
@@ -194,8 +188,6 @@ def build_select_expr(
       {e_ingested_at},
       {e_tf_days},
       {e_roll},
-      {e_venue},
-      {e_venue_rank},
       CAST(:alignment_source AS text)
     """
     return select_sql.strip(), where_sql
@@ -246,7 +238,6 @@ def insert_new_rows(
         id, venue_id, ts, tf, period,
         ema, ema_bar, is_partial_end,
         ingested_at, tf_days, roll,
-        venue, venue_rank,
         alignment_source
       )
       {select_sql}

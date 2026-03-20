@@ -105,10 +105,10 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
             params["end"] = end
 
         sql = f"""
-          SELECT id, "timestamp" AS ts, close, venue, venue_id, venue_rank
+          SELECT id, "timestamp" AS ts, close, venue_id
           FROM public.price_bars_1d
           WHERE {" AND ".join(where)}
-          ORDER BY id, venue, "timestamp"
+          ORDER BY id, venue_id, "timestamp"
         """
 
         with self.engine.connect() as conn:
@@ -116,7 +116,7 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
 
         if not df.empty:
             df["ts"] = pd.to_datetime(df["ts"], utc=True)
-            df = df.sort_values(["id", "venue", "ts"]).reset_index(drop=True)
+            df = df.sort_values(["id", "venue_id", "ts"]).reset_index(drop=True)
 
         logger.info(f"Loaded {len(df)} daily rows for {len(ids)} IDs")
         self._daily_data_cache = df
@@ -200,37 +200,23 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
 
         out_frames = []
 
-        # Build (id, venue) pairs from bars data
-        id_venue_pairs = bars_tf[["id", "venue"]].drop_duplicates().values.tolist()
+        # Build (id, venue_id) pairs from bars data
+        id_venue_pairs = bars_tf[["id", "venue_id"]].drop_duplicates().values.tolist()
 
-        # Build venue_rank and venue_id lookups from bars data
-        _venue_rank_map = {}
-        _venue_id_map = {}
-        if "venue_rank" in bars_tf.columns:
-            for _, row in (
-                bars_tf[["id", "venue", "venue_id", "venue_rank"]]
-                .drop_duplicates(subset=["id", "venue"])
-                .iterrows()
-            ):
-                _venue_rank_map[(int(row["id"]), row["venue"])] = int(row["venue_rank"])
-                _venue_id_map[(int(row["id"]), row["venue"])] = int(row["venue_id"])
-
-        # Process each (ID, venue) separately
-        for id_, venue in id_venue_pairs:
+        # Process each (ID, venue_id) separately
+        for id_, venue_id in id_venue_pairs:
             df_id = self._daily_data_cache[
                 (self._daily_data_cache["id"] == id_)
-                & (self._daily_data_cache["venue"] == venue)
+                & (self._daily_data_cache["venue_id"] == venue_id)
             ].copy()
             if df_id.empty:
                 continue
 
             bars_id = bars_tf[
-                (bars_tf["id"] == id_) & (bars_tf["venue"] == venue)
+                (bars_tf["id"] == id_) & (bars_tf["venue_id"] == venue_id)
             ].copy()
             if bars_id.empty:
                 continue
-
-            venue_rank = _venue_rank_map.get((int(id_), venue), 50)
 
             # Process each period
             for period in periods:
@@ -255,9 +241,7 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
                     df_out["tf"] = tf_spec.tf
                     df_out["period"] = int(period)
                     df_out["tf_days"] = tf_spec.tf_days
-                    df_out["venue"] = venue
-                    df_out["venue_id"] = int(_venue_id_map.get((int(id_), venue), 1))
-                    df_out["venue_rank"] = int(venue_rank)
+                    df_out["venue_id"] = int(venue_id)
                     out_frames.append(df_out)
 
         if not out_frames:
@@ -275,8 +259,6 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
             "tf": "TEXT NOT NULL",
             "ts": "TIMESTAMPTZ NOT NULL",
             "period": "INTEGER NOT NULL",
-            "venue": "TEXT NOT NULL DEFAULT 'CMC_AGG'",
-            "venue_rank": "INTEGER NOT NULL DEFAULT 50",
             "tf_days": "INTEGER",
             "roll": "BOOLEAN",
             "ema": "DOUBLE PRECISION",
@@ -309,12 +291,10 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
             time_close AS ts,
             close,
             is_partial_end,
-            venue,
-            venue_id,
-            venue_rank
+            venue_id
           FROM {self.bars_table}
           WHERE id = ANY(:ids)
-          ORDER BY id, venue, tf, bar_seq, time_close
+          ORDER BY id, venue_id, tf, bar_seq, time_close
         """
 
         with self.engine.connect() as conn:
@@ -323,7 +303,7 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
         if not df.empty:
             df["ts"] = pd.to_datetime(df["ts"], utc=True)
             df["is_partial_end"] = df["is_partial_end"].astype(bool)
-            df = df.sort_values(["id", "venue", "tf", "bar_seq", "ts"]).reset_index(
+            df = df.sort_values(["id", "venue_id", "tf", "bar_seq", "ts"]).reset_index(
                 drop=True
             )
 
@@ -342,7 +322,7 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
                 return pd.DataFrame()
             return (
                 self._anchor_bars_cache[self._anchor_bars_cache["tf"].isin(tfs)]
-                .sort_values(["id", "venue", "tf", "bar_seq", "ts"])
+                .sort_values(["id", "venue_id", "tf", "bar_seq", "ts"])
                 .reset_index(drop=True)
             )
 
@@ -359,13 +339,11 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
             time_close AS ts,
             close,
             is_partial_end,
-            venue,
-            venue_id,
-            venue_rank
+            venue_id
           FROM {self.bars_table}
           WHERE id = ANY(:ids)
             AND tf = ANY(:tfs)
-          ORDER BY id, venue, tf, bar_seq, time_close
+          ORDER BY id, venue_id, tf, bar_seq, time_close
         """
 
         with self.engine.connect() as conn:
@@ -374,7 +352,7 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
         if not df.empty:
             df["ts"] = pd.to_datetime(df["ts"], utc=True)
             df["is_partial_end"] = df["is_partial_end"].astype(bool)
-            df = df.sort_values(["id", "venue", "tf", "bar_seq", "ts"]).reset_index(
+            df = df.sort_values(["id", "venue_id", "tf", "bar_seq", "ts"]).reset_index(
                 drop=True
             )
 
@@ -646,7 +624,6 @@ def write_multi_timeframe_ema_cal_anchor_to_db(
     # Write to database
     conflict_action = (
         """DO UPDATE SET
-        venue_rank       = EXCLUDED.venue_rank,
         tf_days          = EXCLUDED.tf_days,
         roll             = EXCLUDED.roll,
         ema              = EXCLUDED.ema,
@@ -660,12 +637,12 @@ def write_multi_timeframe_ema_cal_anchor_to_db(
     upsert_sql = text(
         f"""
       INSERT INTO {schema}.{out_table} (
-        id, venue_id, tf, ts, period, venue, venue_rank,
+        id, venue_id, tf, ts, period,
         tf_days, roll, ema, ema_bar, is_partial_end,
         ingested_at
       )
       VALUES (
-        :id, :venue_id, :tf, :ts, :period, :venue, :venue_rank,
+        :id, :venue_id, :tf, :ts, :period,
         :tf_days, :roll, :ema, :ema_bar, :is_partial_end,
         now()
       )
