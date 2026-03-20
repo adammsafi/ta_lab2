@@ -1427,7 +1427,13 @@ Plans:
   3. All returns builder scripts (bar, EMA, AMA) write directly to their respective _u tables with correct alignment_source
   4. State tables updated or consolidated for _u-direct writes across all 5 families
   5. Row counts per alignment_source match pre-migration totals for every family
-**Plans**: TBD
+**Plans:** 5 plans
+Plans:
+- [ ] 77-01-PLAN.md -- Redirect bar returns builders to returns_bars_multi_tf_u
+- [ ] 77-02-PLAN.md -- Verify/fix EMA _u PK, redirect EMA builders to ema_multi_tf_u
+- [ ] 77-03-PLAN.md -- Redirect EMA returns builders to returns_ema_multi_tf_u
+- [ ] 77-04-PLAN.md -- Fix AMA DELETE scope, redirect AMA builders to ama_multi_tf_u
+- [ ] 77-05-PLAN.md -- Redirect AMA returns to returns_ama_multi_tf_u
 
 ---
 
