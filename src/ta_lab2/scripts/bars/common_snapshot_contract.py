@@ -1006,6 +1006,7 @@ def upsert_bars(
         "venue",
         "venue_id",
         "venue_rank",
+        "alignment_source",
     ]
     df = df[[c for c in valid_cols if c in df.columns]]
 
@@ -1453,6 +1454,7 @@ def delete_bars_for_id_tf(
     id_: int,
     tf: str,
     venue: str | None = None,
+    alignment_source: str | None = None,
 ) -> None:
     """
     Delete all bar snapshots for a specific (id, tf) or (id, tf, venue) combination.
@@ -1465,16 +1467,19 @@ def delete_bars_for_id_tf(
         id_: Cryptocurrency ID
         tf: Timeframe string (e.g., "7d", "1w_iso")
         venue: Optional venue filter. If None, deletes all venues for (id, tf).
+        alignment_source: Optional alignment_source filter. When set, scopes deletes
+            to a single alignment variant (e.g., "multi_tf_cal_us"). Required when
+            targeting _u tables to avoid clobbering other alignment sources' data.
     """
-    if venue is not None:
-        sql = text(
-            f"DELETE FROM {bars_table} WHERE id = :id AND tf = :tf AND venue = :venue;"
-        )
-    else:
-        sql = text(f"DELETE FROM {bars_table} WHERE id = :id AND tf = :tf;")
+    where = "WHERE id = :id AND tf = :tf"
     params: dict = {"id": int(id_), "tf": tf}
     if venue is not None:
+        where += " AND venue = :venue"
         params["venue"] = venue
+    if alignment_source is not None:
+        where += " AND alignment_source = :alignment_source"
+        params["alignment_source"] = alignment_source
+    sql = text(f"DELETE FROM {bars_table} {where};")
     eng = get_engine(db_url)
     with eng.begin() as conn:
         conn.execute(sql, params)
