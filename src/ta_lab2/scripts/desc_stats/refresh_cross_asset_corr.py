@@ -215,8 +215,9 @@ def _load_returns_wide(
 
     where_clause = " AND ".join(where_parts)
     sql = text(
-        f'SELECT id, "timestamp", ret_arith FROM public.{SOURCE_TABLE} '
-        f'WHERE {where_clause} ORDER BY "timestamp"'
+        f'SELECT DISTINCT ON (id, "timestamp") id, "timestamp", ret_arith '
+        f"FROM public.{SOURCE_TABLE} "
+        f'WHERE {where_clause} ORDER BY id, "timestamp", venue_id'
     )
 
     with engine.connect() as conn:
@@ -305,9 +306,9 @@ def _update_state(conn, id_a: int, id_b: int, tf: str, last_ts: pd.Timestamp) ->
     """Upsert the watermark in state table."""
     conn.execute(
         text(
-            f"INSERT INTO public.{STATE_TABLE} (id_a, id_b, tf, last_timestamp, updated_at) "
-            "VALUES (:id_a, :id_b, :tf, :last_ts, now()) "
-            "ON CONFLICT (id_a, id_b, tf) DO UPDATE "
+            f"INSERT INTO public.{STATE_TABLE} (id_a, id_b, venue_id, tf, last_timestamp, updated_at) "
+            "VALUES (:id_a, :id_b, 1, :tf, :last_ts, now()) "
+            "ON CONFLICT (id_a, id_b, venue_id, tf) DO UPDATE "
             "SET last_timestamp = EXCLUDED.last_timestamp, updated_at = now()"
         ),
         {"id_a": id_a, "id_b": id_b, "tf": tf, "last_ts": last_ts},
@@ -498,7 +499,9 @@ def _process_tf(
             tf_days = get_tf_days(tf, engine.url.render_as_string(hide_password=False))
         except Exception:
             tf_days = 1
-        lookback_days = max_window * tf_days * 2
+        lookback_days = min(
+            max_window * tf_days * 2, 100_000
+        )  # cap to avoid Timedelta overflow
         data_start_ts = global_min_wm - pd.Timedelta(days=lookback_days)
     else:
         data_start_ts = None  # Full load

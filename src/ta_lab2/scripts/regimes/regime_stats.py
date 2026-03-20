@@ -86,6 +86,7 @@ def compute_regime_stats(
     """
     out_cols = [
         "id",
+        "venue_id",
         "tf",
         "regime_key",
         "n_bars",
@@ -97,7 +98,12 @@ def compute_regime_stats(
     if regime_df.empty:
         return pd.DataFrame(columns=out_cols)
 
-    required = ["id", "ts", "tf", "regime_key"]
+    # Ensure venue_id column exists (backward compatibility)
+    if "venue_id" not in regime_df.columns:
+        regime_df = regime_df.copy()
+        regime_df["venue_id"] = 1
+
+    required = ["id", "venue_id", "ts", "tf", "regime_key"]
     missing = [c for c in required if c not in regime_df.columns]
     if missing:
         logger.warning(
@@ -141,13 +147,16 @@ def compute_regime_stats(
                 _RET_COL_CANDIDATES,
             )
 
-    # Compute total bars per (id, tf) for pct_of_history denominator
+    # Compute total bars per (id, venue_id, tf) for pct_of_history denominator
     total_bars = (
-        df.groupby(["id", "tf"], sort=False).size().rename("total_bars").reset_index()
+        df.groupby(["id", "venue_id", "tf"], sort=False)
+        .size()
+        .rename("total_bars")
+        .reset_index()
     )
 
-    # Group by (id, tf, regime_key)
-    group_keys = ["id", "tf", "regime_key"]
+    # Group by (id, venue_id, tf, regime_key)
+    group_keys = ["id", "venue_id", "tf", "regime_key"]
 
     if ret_col_used is not None and ret_col_used in df.columns:
         agg = df.groupby(group_keys, sort=False, dropna=False).agg(
@@ -170,7 +179,7 @@ def compute_regime_stats(
     stats = agg.reset_index()
 
     # Merge total_bars and compute pct_of_history
-    stats = stats.merge(total_bars, on=["id", "tf"], how="left")
+    stats = stats.merge(total_bars, on=["id", "venue_id", "tf"], how="left")
     stats["pct_of_history"] = stats["n_bars"] / stats["total_bars"]
     stats = stats.drop(columns=["total_bars"])
 
@@ -226,6 +235,13 @@ def write_stats_to_db(
             )
         tf = str(unique_tfs[0])
 
+    # Determine venue_id scope from data
+    venue_ids = (
+        sorted(stats_df["venue_id"].unique().tolist())
+        if "venue_id" in stats_df.columns
+        else [1]
+    )
+
     def _nan_to_none(val):
         if val is None:
             return None
@@ -241,6 +257,7 @@ def write_stats_to_db(
         records.append(
             {
                 "id": int(row["id"]),
+                "venue_id": int(row["venue_id"]) if "venue_id" in row.index else 1,
                 "tf": str(row["tf"]),
                 "regime_key": str(row["regime_key"]),
                 "n_bars": int(row["n_bars"]),
@@ -253,17 +270,17 @@ def write_stats_to_db(
     delete_sql = text(
         """
         DELETE FROM public.regime_stats
-        WHERE id = ANY(:ids) AND tf = :tf
+        WHERE id = ANY(:ids) AND tf = :tf AND venue_id = ANY(:venue_ids)
         """
     )
 
     insert_sql = text(
         """
         INSERT INTO public.regime_stats
-            (id, tf, regime_key, n_bars, pct_of_history, avg_ret_1d, std_ret_1d, computed_at)
+            (id, venue_id, tf, regime_key, n_bars, pct_of_history, avg_ret_1d, std_ret_1d, computed_at)
         VALUES
-            (:id, :tf, :regime_key, :n_bars, :pct_of_history, :avg_ret_1d, :std_ret_1d, now())
-        ON CONFLICT (id, tf, regime_key) DO UPDATE
+            (:id, :venue_id, :tf, :regime_key, :n_bars, :pct_of_history, :avg_ret_1d, :std_ret_1d, now())
+        ON CONFLICT (id, venue_id, tf, regime_key) DO UPDATE
             SET n_bars         = EXCLUDED.n_bars,
                 pct_of_history = EXCLUDED.pct_of_history,
                 avg_ret_1d     = EXCLUDED.avg_ret_1d,
@@ -273,7 +290,9 @@ def write_stats_to_db(
     )
 
     with engine.begin() as conn:
-        deleted = conn.execute(delete_sql, {"ids": ids, "tf": tf})
+        deleted = conn.execute(
+            delete_sql, {"ids": ids, "tf": tf, "venue_ids": venue_ids}
+        )
         logger.debug(
             "write_stats_to_db: deleted %d existing rows for ids=%s tf=%s",
             deleted.rowcount,

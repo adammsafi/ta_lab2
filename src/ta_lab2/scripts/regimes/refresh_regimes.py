@@ -154,9 +154,16 @@ def _load_proxy_weekly(
     Returns a wide DataFrame with columns: id, ts, close, close_ema_20,
     close_ema_50, close_ema_200. Used by both proxy functions.
     """
-    bars = load_bars_for_tf(engine, proxy_id, tf="1W", cal_scheme=cal_scheme)
+    bars = load_bars_for_tf(
+        engine, proxy_id, tf="1W", cal_scheme=cal_scheme, venue_id=1
+    )
     emas = load_and_pivot_emas(
-        engine, proxy_id, tf="1W", periods=[20, 50, 200], cal_scheme=cal_scheme
+        engine,
+        proxy_id,
+        tf="1W",
+        periods=[20, 50, 200],
+        cal_scheme=cal_scheme,
+        venue_id=1,
     )
     if bars.empty:
         return pd.DataFrame()
@@ -167,7 +174,7 @@ def _load_proxy_weekly(
     return merged.sort_values("ts").reset_index(drop=True)
 
 
-def _load_sadf_flags(engine: Engine, asset_id: int) -> pd.Series:
+def _load_sadf_flags(engine: Engine, asset_id: int, venue_id: int = 1) -> pd.Series:
     """Load sadf_is_explosive flags from features.
 
     Returns a Series indexed by tz-aware UTC timestamp, or an empty Series
@@ -176,12 +183,13 @@ def _load_sadf_flags(engine: Engine, asset_id: int) -> pd.Series:
     query = text("""
         SELECT ts, sadf_is_explosive
         FROM features
-        WHERE id = :id AND tf = '1D' AND sadf_is_explosive IS NOT NULL
+        WHERE id = :id AND tf = '1D' AND venue_id = :venue_id
+          AND sadf_is_explosive IS NOT NULL
         ORDER BY ts
     """)
     try:
         with engine.connect() as conn:
-            result = conn.execute(query, {"id": asset_id})
+            result = conn.execute(query, {"id": asset_id, "venue_id": venue_id})
             rows = result.fetchall()
         if not rows:
             return pd.Series(dtype=bool)
@@ -302,6 +310,7 @@ def _load_macro_regime_with_staleness_check(
 def compute_regimes_for_id(
     engine: Engine,
     asset_id: int,
+    venue_id: int = 1,
     policy_table: Optional[Mapping[str, Any]] = None,
     cal_scheme: str = "iso",
     min_bars_overrides: Optional[Dict[str, int]] = None,
@@ -353,7 +362,9 @@ def compute_regimes_for_id(
     # ------------------------------------------------------------------
     # 1. Load bars + EMAs for all TFs
     # ------------------------------------------------------------------
-    data = load_regime_input_data(engine, asset_id, cal_scheme=cal_scheme)
+    data = load_regime_input_data(
+        engine, asset_id, cal_scheme=cal_scheme, venue_id=venue_id
+    )
     monthly = data["monthly"]
     weekly = data["weekly"]
     daily = data["daily"]
@@ -366,7 +377,7 @@ def compute_regimes_for_id(
         return pd.DataFrame()
 
     # Load SADF explosive flags from features (MICRO-03 integration)
-    sadf_series = _load_sadf_flags(engine, asset_id)
+    sadf_series = _load_sadf_flags(engine, asset_id, venue_id=venue_id)
     if not sadf_series.empty:
         logger.info(
             "  SADF flags loaded: %d rows, %d explosive",
@@ -590,6 +601,7 @@ def compute_regimes_for_id(
         rows.append(
             {
                 "id": asset_id,
+                "venue_id": venue_id,
                 "ts": row_ts,
                 "tf": "1D",
                 "l0_label": l0_val,
@@ -656,16 +668,20 @@ def write_regimes_to_db(
         return 0
 
     ids = df["id"].unique().tolist()
+    venue_ids = df["venue_id"].unique().tolist() if "venue_id" in df.columns else [1]
 
     with engine.begin() as conn:
         conn.execute(
-            text("DELETE FROM public.regimes WHERE id = ANY(:ids) AND tf = :tf"),
-            {"ids": ids, "tf": tf},
+            text(
+                "DELETE FROM public.regimes WHERE id = ANY(:ids) AND tf = :tf AND venue_id = ANY(:venue_ids)"
+            ),
+            {"ids": ids, "tf": tf, "venue_ids": venue_ids},
         )
 
     # Drop columns not in the regimes schema (defensive)
     _SCHEMA_COLS = {
         "id",
+        "venue_id",
         "ts",
         "tf",
         "l0_label",
@@ -713,14 +729,24 @@ def write_regimes_to_db(
 # ---------------------------------------------------------------------------
 
 
-def _get_all_asset_ids(engine: Engine) -> list[int]:
-    """Return asset IDs with pipeline_tier = 1 (full pipeline)."""
+def _get_all_asset_ids(engine: Engine, venue_id: int = 1) -> list[int]:
+    """Return asset IDs with pipeline_tier = 1 (full pipeline) for the given venue.
+
+    Args:
+        engine: SQLAlchemy engine.
+        venue_id: Venue ID to filter by. Defaults to 1 (CMC_AGG).
+            Uses price_bars_multi_tf to find IDs that exist for this venue,
+            then intersects with dim_assets pipeline_tier = 1.
+    """
     with engine.connect() as conn:
         result = conn.execute(
             text(
-                "SELECT DISTINCT id FROM public.dim_assets "
-                "WHERE pipeline_tier = 1 ORDER BY id"
-            )
+                "SELECT DISTINCT a.id FROM public.dim_assets a "
+                "JOIN public.price_bars_multi_tf p ON a.id = p.id "
+                "WHERE a.pipeline_tier = 1 AND p.venue_id = :venue_id "
+                "ORDER BY a.id"
+            ),
+            {"venue_id": venue_id},
         )
         return [row[0] for row in result]
 
@@ -790,6 +816,12 @@ def main(argv: Optional[list[str]] = None) -> int:
         help="Process all active asset IDs from dim_assets.",
     )
 
+    parser.add_argument(
+        "--venue-id",
+        type=int,
+        default=1,
+        help="Venue ID to process (default: 1 = CMC_AGG).",
+    )
     parser.add_argument(
         "--cal-scheme",
         choices=["iso", "us"],
@@ -917,7 +949,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         asset_ids = [int(x.strip()) for x in args.ids.split(",") if x.strip()]
     else:
         logger.info("Querying all active asset IDs...")
-        asset_ids = _get_all_asset_ids(engine)
+        asset_ids = _get_all_asset_ids(engine, venue_id=args.venue_id)
 
     logger.info("Processing %d assets: %s", len(asset_ids), asset_ids[:10])
 
@@ -962,6 +994,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             regime_df = compute_regimes_for_id(
                 engine,
                 asset_id,
+                venue_id=args.venue_id,
                 policy_table=policy_table,
                 cal_scheme=args.cal_scheme,
                 min_bars_overrides=min_bars_overrides if min_bars_overrides else None,

@@ -65,6 +65,7 @@ class EMASignalGenerator:
     engine: Engine
     state_manager: SignalStateManager
     signal_version: str = "1.0"
+    venue_id: int | None = None
 
     def generate_for_ids(
         self,
@@ -306,6 +307,10 @@ class EMASignalGenerator:
         where_clauses = ["f.id = ANY(:ids)", "f.tf = '1D'"]
         params = {"ids": ids}
 
+        if self.venue_id is not None:
+            where_clauses.append("f.venue_id = :venue_id")
+            params["venue_id"] = self.venue_id
+
         if start_ts is not None:
             where_clauses.append("f.ts >= :start_ts")
             params["start_ts"] = start_ts
@@ -313,21 +318,21 @@ class EMASignalGenerator:
         where_sql = " AND ".join(where_clauses)
 
         sql_text = f"""
-            SELECT f.id, f.ts, f.close,
+            SELECT f.id, f.venue_id, f.ts, f.close,
                    e9.ema as ema_9, e10.ema as ema_10, e21.ema as ema_21,
                    e50.ema as ema_50, e200.ema as ema_200,
                    f.rsi_14, f.atr_14
             FROM public.features f
             LEFT JOIN public.ema_multi_tf_u e9
-              ON f.id = e9.id AND f.ts = e9.ts AND e9.tf = f.tf AND e9.period = 9
+              ON f.id = e9.id AND f.venue_id = e9.venue_id AND f.ts = e9.ts AND e9.tf = f.tf AND e9.period = 9
             LEFT JOIN public.ema_multi_tf_u e10
-              ON f.id = e10.id AND f.ts = e10.ts AND e10.tf = f.tf AND e10.period = 10
+              ON f.id = e10.id AND f.venue_id = e10.venue_id AND f.ts = e10.ts AND e10.tf = f.tf AND e10.period = 10
             LEFT JOIN public.ema_multi_tf_u e21
-              ON f.id = e21.id AND f.ts = e21.ts AND e21.tf = f.tf AND e21.period = 21
+              ON f.id = e21.id AND f.venue_id = e21.venue_id AND f.ts = e21.ts AND e21.tf = f.tf AND e21.period = 21
             LEFT JOIN public.ema_multi_tf_u e50
-              ON f.id = e50.id AND f.ts = e50.ts AND e50.tf = f.tf AND e50.period = 50
+              ON f.id = e50.id AND f.venue_id = e50.venue_id AND f.ts = e50.ts AND e50.tf = f.tf AND e50.period = 50
             LEFT JOIN public.ema_multi_tf_u e200
-              ON f.id = e200.id AND f.ts = e200.ts AND e200.tf = f.tf AND e200.period = 200
+              ON f.id = e200.id AND f.venue_id = e200.venue_id AND f.ts = e200.ts AND e200.tf = f.tf AND e200.period = 200
             WHERE {where_sql}
             ORDER BY f.id, f.ts
         """
@@ -429,14 +434,16 @@ class EMASignalGenerator:
         feature_hash = compute_feature_hash(df, feature_cols)
         params_hash = compute_params_hash(params)
 
-        # Group by ID for per-asset processing
-        for asset_id, group in df.groupby("id"):
+        # Group by ID and venue_id for per-asset processing
+        for (asset_id, venue_id), group in df.groupby(["id", "venue_id"]):
             # Get open positions for this asset
-            asset_open = (
-                open_positions[open_positions["id"] == asset_id]
-                if not open_positions.empty
-                else pd.DataFrame()
-            )
+            if not open_positions.empty:
+                _mask = open_positions["id"] == asset_id
+                if "venue_id" in open_positions.columns:
+                    _mask = _mask & (open_positions["venue_id"] == venue_id)
+                asset_open = open_positions[_mask]
+            else:
+                asset_open = pd.DataFrame()
 
             # Track open positions as we iterate chronologically
             open_list = (
@@ -476,6 +483,7 @@ class EMASignalGenerator:
 
                     record = {
                         "id": asset_id,
+                        "venue_id": int(venue_id),
                         "ts": ts,
                         "signal_id": signal_id,
                         "direction": direction,
@@ -511,6 +519,7 @@ class EMASignalGenerator:
                         # Create exit record
                         record = {
                             "id": asset_id,
+                            "venue_id": int(venue_id),
                             "ts": ts,
                             "signal_id": signal_id,
                             "direction": direction,
@@ -538,10 +547,9 @@ class EMASignalGenerator:
         signal_table: str,
     ) -> None:
         """
-        Write signal records to database.
+        Write signal records to database via temp-table upsert.
 
-        Uses pandas to_sql with append mode. Note: This does not handle duplicates.
-        For true idempotency, would need UPSERT logic.
+        Uses INSERT ... ON CONFLICT DO UPDATE for idempotent incremental runs.
 
         Args:
             records: DataFrame with signal records
@@ -553,11 +561,26 @@ class EMASignalGenerator:
             lambda x: json.dumps(x) if isinstance(x, dict) else x
         )
 
-        records.to_sql(
-            signal_table,
-            self.engine,
-            schema="public",
-            if_exists="append",
-            index=False,
-            method="multi",
-        )
+        pk_cols = ["id", "venue_id", "ts", "signal_id"]
+        records = records.drop_duplicates(subset=pk_cols, keep="last")
+        data_cols = [
+            c for c in records.columns if c not in pk_cols and c != "created_at"
+        ]
+        tmp = f"_tmp_{signal_table}"
+
+        with self.engine.begin() as conn:
+            conn.execute(text(f"DROP TABLE IF EXISTS {tmp}"))
+            conn.execute(
+                text(
+                    f"CREATE TEMP TABLE {tmp} (LIKE public.{signal_table} INCLUDING DEFAULTS) ON COMMIT DROP"
+                )
+            )
+            records.to_sql(tmp, conn, if_exists="append", index=False, method="multi")
+            set_clause = ", ".join(f"{c} = EXCLUDED.{c}" for c in data_cols)
+            conn.execute(
+                text(
+                    f"INSERT INTO public.{signal_table} ({', '.join(records.columns)}) "
+                    f"SELECT {', '.join(records.columns)} FROM {tmp} "
+                    f"ON CONFLICT ({', '.join(pk_cols)}) DO UPDATE SET {set_clause}"
+                )
+            )

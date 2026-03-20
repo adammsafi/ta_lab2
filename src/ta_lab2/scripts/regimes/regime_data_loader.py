@@ -52,7 +52,7 @@ DEFAULT_WEEKLY_PERIODS: list[int] = [20, 50, 200]
 DEFAULT_DAILY_PERIODS: list[int] = [20, 50, 100]
 
 #: Empty OHLCV column spec for consistent empty DataFrame shape
-_OHLCV_COLS = ["id", "ts", "open", "high", "low", "close", "volume"]
+_OHLCV_COLS = ["id", "venue_id", "ts", "open", "high", "low", "close", "volume"]
 
 
 # ---------------------------------------------------------------------------
@@ -148,6 +148,7 @@ def load_bars_for_tf(
     asset_id: int,
     tf: str,
     cal_scheme: str = "iso",
+    venue_id: int = 1,
 ) -> pd.DataFrame:
     """
     Load OHLCV price bars from DB for a single asset and timeframe.
@@ -188,26 +189,26 @@ def load_bars_for_tf(
         # Daily bars: standard multi-TF table, uses ts column directly
         sql = text(
             """
-            SELECT id, time_close AS ts, open, high, low, close, volume
+            SELECT id, venue_id, time_close AS ts, open, high, low, close, volume
             FROM public.price_bars_multi_tf
-            WHERE id = :id AND tf = '1D'
+            WHERE id = :id AND tf = '1D' AND venue_id = :venue_id
             ORDER BY time_close
         """
         )
-        params = {"id": asset_id}
+        params = {"id": asset_id, "venue_id": venue_id}
     else:
         # Weekly or monthly: calendar bar table, time_close aliased to ts
         # CRITICAL: PK uses bar_seq, not ts. time_close is the period-end timestamp.
         table_name = f"price_bars_multi_tf_cal_{cal_scheme}"
         sql = text(
             f"""
-            SELECT id, time_close AS ts, open, high, low, close, volume
+            SELECT id, venue_id, time_close AS ts, open, high, low, close, volume
             FROM public.{table_name}
-            WHERE id = :id AND tf = :tf
+            WHERE id = :id AND tf = :tf AND venue_id = :venue_id
             ORDER BY time_close
         """
         )
-        params = {"id": asset_id, "tf": tf}
+        params = {"id": asset_id, "tf": tf, "venue_id": venue_id}
 
     try:
         with engine.connect() as conn:
@@ -247,6 +248,7 @@ def load_emas_for_tf(
     tf: str,
     periods: list[int],
     cal_scheme: str = "iso",
+    venue_id: int = 1,
 ) -> pd.DataFrame:
     """
     Load raw long-format EMAs from DB for a single asset and timeframe.
@@ -298,10 +300,11 @@ def load_emas_for_tf(
               AND tf = '1D'
               AND period = ANY(:periods)
               AND alignment_source = 'multi_tf'
+              AND venue_id = :venue_id
             ORDER BY ts, period
         """
         )
-        params = {"id": asset_id, "periods": periods}
+        params = {"id": asset_id, "periods": periods, "venue_id": venue_id}
     else:
         # Weekly/monthly EMAs from calendar EMA table
         # Calendar EMA table PK: (id, tf, ts, period)
@@ -314,10 +317,11 @@ def load_emas_for_tf(
             WHERE id = :id
               AND tf = :tf
               AND period = ANY(:periods)
+              AND venue_id = :venue_id
             ORDER BY ts, period
         """
         )
-        params = {"id": asset_id, "tf": tf, "periods": periods}
+        params = {"id": asset_id, "tf": tf, "periods": periods, "venue_id": venue_id}
 
     try:
         with engine.connect() as conn:
@@ -358,6 +362,7 @@ def load_and_pivot_emas(
     periods: list[int],
     price_col: str = "close",
     cal_scheme: str = "iso",
+    venue_id: int = 1,
 ) -> pd.DataFrame:
     """
     Load EMAs from DB and pivot to wide-format in one step.
@@ -379,7 +384,9 @@ def load_and_pivot_emas(
         Ready for merging with bars and passing to labeler functions.
         Returns empty DataFrame with correct column names on failure.
     """
-    long_df = load_emas_for_tf(engine, asset_id, tf, periods, cal_scheme=cal_scheme)
+    long_df = load_emas_for_tf(
+        engine, asset_id, tf, periods, cal_scheme=cal_scheme, venue_id=venue_id
+    )
     return pivot_emas_to_wide(long_df, periods, price_col=price_col)
 
 
@@ -392,6 +399,7 @@ def load_regime_input_data(
     engine: Engine,
     asset_id: int,
     cal_scheme: str = "iso",
+    venue_id: int = 1,
 ) -> dict[str, pd.DataFrame]:
     """
     Load all 3 TF datasets for a single asset, ready for regime labeling.
@@ -439,7 +447,9 @@ def load_regime_input_data(
     # ------------------------------------------------------------------
     # Monthly (L0) -- price_bars_multi_tf_cal_{scheme} + cal EMA table
     # ------------------------------------------------------------------
-    monthly_bars = load_bars_for_tf(engine, asset_id, tf="1M", cal_scheme=cal_scheme)
+    monthly_bars = load_bars_for_tf(
+        engine, asset_id, tf="1M", cal_scheme=cal_scheme, venue_id=venue_id
+    )
     monthly_emas = load_and_pivot_emas(
         engine,
         asset_id,
@@ -447,6 +457,7 @@ def load_regime_input_data(
         periods=DEFAULT_MONTHLY_PERIODS,
         price_col="close",
         cal_scheme=cal_scheme,
+        venue_id=venue_id,
     )
 
     if not monthly_bars.empty and not monthly_emas.empty:
@@ -462,7 +473,9 @@ def load_regime_input_data(
     # ------------------------------------------------------------------
     # Weekly (L1) -- price_bars_multi_tf_cal_{scheme} + cal EMA table
     # ------------------------------------------------------------------
-    weekly_bars = load_bars_for_tf(engine, asset_id, tf="1W", cal_scheme=cal_scheme)
+    weekly_bars = load_bars_for_tf(
+        engine, asset_id, tf="1W", cal_scheme=cal_scheme, venue_id=venue_id
+    )
     weekly_emas = load_and_pivot_emas(
         engine,
         asset_id,
@@ -470,6 +483,7 @@ def load_regime_input_data(
         periods=DEFAULT_WEEKLY_PERIODS,
         price_col="close",
         cal_scheme=cal_scheme,
+        venue_id=venue_id,
     )
 
     if not weekly_bars.empty and not weekly_emas.empty:
@@ -485,7 +499,9 @@ def load_regime_input_data(
     # ------------------------------------------------------------------
     # Daily (L2) -- price_bars_multi_tf + ema_multi_tf_u
     # ------------------------------------------------------------------
-    daily_bars = load_bars_for_tf(engine, asset_id, tf="1D", cal_scheme=cal_scheme)
+    daily_bars = load_bars_for_tf(
+        engine, asset_id, tf="1D", cal_scheme=cal_scheme, venue_id=venue_id
+    )
     daily_emas = load_and_pivot_emas(
         engine,
         asset_id,
@@ -493,6 +509,7 @@ def load_regime_input_data(
         periods=DEFAULT_DAILY_PERIODS,
         price_col="close",
         cal_scheme=cal_scheme,
+        venue_id=venue_id,
     )
 
     if not daily_bars.empty and not daily_emas.empty:
@@ -530,6 +547,7 @@ def load_rolling_stats_for_asset(
     engine: Engine,
     asset_id: int,
     tf: str = "1D",
+    venue_id: int = 1,
 ) -> pd.DataFrame | None:
     """
     Load rolling descriptive statistics from asset_stats for a single asset.
@@ -560,14 +578,16 @@ def load_rolling_stats_for_asset(
         """
         SELECT ts, std_ret_30, std_ret_90, sharpe_ann_90, sharpe_ann_252, max_dd_from_ath
         FROM public.asset_stats
-        WHERE id = :id AND tf = :tf
+        WHERE id = :id AND tf = :tf AND venue_id = :venue_id
         ORDER BY ts
         """
     )
 
     try:
         with engine.connect() as conn:
-            df = pd.read_sql(sql, conn, params={"id": asset_id, "tf": tf})
+            df = pd.read_sql(
+                sql, conn, params={"id": asset_id, "tf": tf, "venue_id": venue_id}
+            )
     except Exception as exc:
         logger.debug(
             "load_rolling_stats_for_asset: query failed for id=%s tf=%s: %s",

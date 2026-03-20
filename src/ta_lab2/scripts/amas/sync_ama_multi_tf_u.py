@@ -45,12 +45,20 @@ AMA_SOURCES = [
 ]
 
 # PK of the _u table — alignment_source is part of PK
-AMA_PK_COLS = ["id", "ts", "tf", "indicator", "params_hash", "alignment_source"]
+AMA_PK_COLS = [
+    "id",
+    "venue_id",
+    "ts",
+    "tf",
+    "indicator",
+    "params_hash",
+    "alignment_source",
+]
 
 # Prefix stripped from source table name to derive alignment_source label
 # ama_multi_tf -> multi_tf
 # ama_multi_tf_cal_us -> multi_tf_cal_us
-AMA_SOURCE_PREFIX = "cmc_ama_"
+AMA_SOURCE_PREFIX = "ama_"
 
 
 # ---------------------------------------------------------------------------

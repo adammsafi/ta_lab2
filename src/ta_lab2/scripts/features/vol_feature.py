@@ -145,6 +145,10 @@ class VolatilityFeature(BaseFeature):
             "as_": self.get_alignment_source(),
         }
 
+        if self.config.venue_id is not None:
+            where_clauses.append("p.venue_id = :venue_id")
+            params["venue_id"] = self.config.venue_id
+
         if start:
             where_clauses.append(f"p.{self.TS_COLUMN} >= :start")
             params["start"] = start
@@ -159,6 +163,7 @@ class VolatilityFeature(BaseFeature):
             SELECT
                 p.id,
                 p.{self.TS_COLUMN} as ts,
+                p.venue_id,
                 p.venue,
                 p.venue_rank,
                 p.open,
@@ -170,7 +175,7 @@ class VolatilityFeature(BaseFeature):
             LEFT JOIN public.returns_bars_multi_tf_u r
                 ON p.id = r.id
                 AND p.{self.TS_COLUMN} = r."timestamp"
-                AND p.venue = r.venue
+                AND p.venue_id = r.venue_id
                 AND r.tf = :tf
                 AND r.alignment_source = :as_
                 AND r.roll = FALSE
@@ -206,10 +211,10 @@ class VolatilityFeature(BaseFeature):
         # Make a copy to avoid modifying source
         df = df_source.copy()
 
-        # Process each (id, venue) separately (volatility requires ordering)
+        # Process each (id, venue_id) separately (volatility requires ordering)
         results = []
 
-        for (id_val, venue_val), df_id in df.groupby(["id", "venue"]):
+        for (id_val, venue_id_val), df_id in df.groupby(["id", "venue_id"]):
             df_id = df_id.copy()
 
             # Sort by timestamp (required for rolling calculations)
@@ -299,6 +304,7 @@ class VolatilityFeature(BaseFeature):
             "id": "INTEGER NOT NULL",
             "ts": "TIMESTAMPTZ NOT NULL",
             "tf": "TEXT NOT NULL",
+            "venue_id": "SMALLINT NOT NULL DEFAULT 1",
             "alignment_source": "TEXT NOT NULL",
             "venue": "TEXT NOT NULL DEFAULT 'CMC_AGG'",
             "venue_rank": "INTEGER NOT NULL DEFAULT 50",

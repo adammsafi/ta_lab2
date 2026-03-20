@@ -24,8 +24,8 @@ from sqlalchemy import create_engine
 from ta_lab2.scripts.sync_utils import add_sync_cli_args, sync_sources_to_unified
 
 U_TABLE = "public.returns_bars_multi_tf_u"
-PK_COLS = ["id", "timestamp", "tf", "venue", "alignment_source"]
-SOURCE_PREFIX = "cmc_returns_bars_"
+PK_COLS = ["id", "venue_id", "timestamp", "tf", "alignment_source"]
+SOURCE_PREFIX = "returns_bars_"
 
 SOURCES = [
     "public.returns_bars_multi_tf",

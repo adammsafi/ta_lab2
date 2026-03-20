@@ -285,47 +285,71 @@ class AnchorCalendarISOBarBuilder(BaseBarBuilder):
                 anchor_mode=anchor_mode,
             )
 
-            # Upsert derived bars
-            if not bars_all.empty:
+            # Delete existing bars for this ID then insert derived bars
+            # (from_1d always does full history; avoids partial unique index conflicts)
+            if not bars_all.is_empty():
                 bars_pd = bars_all.to_pandas()
+                eng = get_engine(self.config.db_url)
+                with eng.begin() as conn:
+                    conn.execute(
+                        text(
+                            f"DELETE FROM {self.get_output_table_name()} WHERE id = :id"
+                        ),
+                        {"id": int(id_)},
+                    )
                 upsert_bars(
                     bars_pd,
                     db_url=self.config.db_url,
                     bars_table=self.get_output_table_name(),
+                    conflict_cols=("id", "tf", "bar_seq", "venue_id", "timestamp"),
                 )
                 total_rows += len(bars_pd)
 
-                # Update state
-                for spec in self.specs:
-                    spec_bars = bars_pd[bars_pd["tf"] == spec.tf]
-                    if not spec_bars.empty:
-                        last_bar_seq = int(spec_bars["bar_seq"].max())
-                        last_time_close = pd.to_datetime(
-                            spec_bars["timestamp"].max(), utc=True
-                        )
-                        daily_min_ts = pd.to_datetime(
-                            spec_bars["time_open"].min(), utc=True
-                        )
-                        daily_max_ts = pd.to_datetime(
-                            spec_bars["timestamp"].max(), utc=True
-                        )
+                # Update state per (tf, venue_id)
+                if "venue_id" in bars_pd.columns:
+                    venue_groups = bars_pd.groupby("venue_id")
+                else:
+                    bars_pd = bars_pd.assign(venue_id=1, venue="CMC_AGG")
+                    venue_groups = bars_pd.groupby("venue_id")
+                for vid, venue_bars in venue_groups:
+                    venue_name = (
+                        venue_bars["venue"].iloc[0]
+                        if "venue" in venue_bars.columns
+                        else "CMC_AGG"
+                    )
+                    for spec in self.specs:
+                        spec_bars = venue_bars[venue_bars["tf"] == spec.tf]
+                        if not spec_bars.empty:
+                            last_bar_seq = int(spec_bars["bar_seq"].max())
+                            last_time_close = pd.to_datetime(
+                                spec_bars["timestamp"].max(), utc=True
+                            )
+                            daily_min_ts = pd.to_datetime(
+                                spec_bars["time_open"].min(), utc=True
+                            )
+                            daily_max_ts = pd.to_datetime(
+                                spec_bars["timestamp"].max(), utc=True
+                            )
 
-                        upsert_state(
-                            self.config.db_url,
-                            self.get_state_table_name(),
-                            [
-                                {
-                                    "id": int(id_),
-                                    "tf": spec.tf,
-                                    "tz": self.config.tz,
-                                    "daily_min_seen": daily_min_ts,
-                                    "daily_max_seen": daily_max_ts,
-                                    "last_bar_seq": last_bar_seq,
-                                    "last_time_close": last_time_close,
-                                }
-                            ],
-                            with_tz=True,
-                        )
+                            upsert_state(
+                                self.config.db_url,
+                                self.get_state_table_name(),
+                                [
+                                    {
+                                        "id": int(id_),
+                                        "tf": spec.tf,
+                                        "venue_id": int(vid),
+                                        "venue": venue_name,
+                                        "tz": self.config.tz,
+                                        "daily_min_seen": daily_min_ts,
+                                        "daily_max_seen": daily_max_ts,
+                                        "last_bar_seq": last_bar_seq,
+                                        "last_time_close": last_time_close,
+                                    }
+                                ],
+                                with_tz=True,
+                                with_venue=True,
+                            )
 
             return total_rows
 
@@ -718,8 +742,11 @@ class AnchorCalendarISOBarBuilder(BaseBarBuilder):
         daily_min_ts: pd.Timestamp,
         daily_max_ts: pd.Timestamp,
         venue: str = "CMC_AGG",
+        venue_id: int | None = None,
     ) -> None:
-        """Update state table for (id, tf, venue)."""
+        """Update state table for (id, tf, venue_id)."""
+        if venue_id is None:
+            venue_id = self._resolve_venue_id(venue)
         last_bar_seq = int(bars["bar_seq"].max())
         last_time_close = pd.to_datetime(bars["timestamp"].max(), utc=True)
 
@@ -730,6 +757,7 @@ class AnchorCalendarISOBarBuilder(BaseBarBuilder):
                 {
                     "id": int(id_),
                     "tf": tf,
+                    "venue_id": int(venue_id),
                     "venue": venue,
                     "daily_min_seen": daily_min_ts,
                     "daily_max_seen": daily_max_ts,
@@ -741,6 +769,18 @@ class AnchorCalendarISOBarBuilder(BaseBarBuilder):
             with_tz=True,
             with_venue=True,
         )
+
+    def _resolve_venue_id(self, venue: str) -> int:
+        """Resolve venue text to venue_id from dim_venues."""
+        engine = get_engine(self.config.db_url)
+        with engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT venue_id FROM dim_venues WHERE venue = :v"),
+                {"v": venue},
+            ).fetchone()
+        if row:
+            return int(row[0])
+        return 1  # default to CMC_AGG
 
     @classmethod
     def create_argument_parser(cls) -> argparse.ArgumentParser:
@@ -782,10 +822,14 @@ class AnchorCalendarISOBarBuilder(BaseBarBuilder):
         # Resolve database URL
         db_url = resolve_db_url(args.db_url)
 
+        # When deriving from 1D bars, load IDs from price_bars_1d (all venues)
+        from_1d = getattr(args, "from_1d", False)
+        id_source_table = "public.price_bars_1d" if from_1d else args.daily_table
+
         # Resolve IDs
         ids = parse_ids(args.ids)
         if ids == "all":
-            ids = load_all_ids(db_url, args.daily_table)
+            ids = load_all_ids(db_url, id_source_table)
 
         # Load anchor specs from dim_timeframe
         specs = cls._load_anchor_specs_from_dim(db_url)

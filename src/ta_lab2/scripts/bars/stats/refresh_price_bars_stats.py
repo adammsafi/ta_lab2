@@ -192,7 +192,7 @@ WITH d AS (
             FROM _impacted_bar_keys k
             WHERE k.asset_id = b.id AND k.tf = b.tf
         )
-        GROUP BY b.id, b.tf, b."timestamp"
+        GROUP BY b.id, b.tf, b."timestamp", b.venue_id
     ) x
 )
 SELECT

@@ -120,6 +120,7 @@ class RSISignalGenerator:
     engine: Engine
     state_manager: SignalStateManager
     signal_version: str = "1.0"
+    venue_id: int | None = None
 
     def _apply_cusum_filter(
         self,
@@ -218,6 +219,10 @@ class RSISignalGenerator:
         where_clauses = ["id = ANY(:ids)", "tf = '1D'"]
         params = {"ids": ids}
 
+        if self.venue_id is not None:
+            where_clauses.append("venue_id = :venue_id")
+            params["venue_id"] = self.venue_id
+
         if start_ts is not None:
             where_clauses.append("ts >= :start_ts")
             params["start_ts"] = start_ts
@@ -226,7 +231,7 @@ class RSISignalGenerator:
 
         sql_text = f"""
             SELECT
-                id, ts, close,
+                id, venue_id, ts, close,
                 rsi_14, rsi_7, rsi_21,
                 atr_14
             FROM public.features
@@ -278,8 +283,8 @@ class RSISignalGenerator:
         """
         records = []
 
-        # Group by asset ID for stateful processing
-        for id_, group in df_features.groupby("id"):
+        # Group by asset ID and venue_id for stateful processing
+        for (id_, venue_id), group in df_features.groupby(["id", "venue_id"]):
             group = group.sort_values("ts").reset_index(drop=True)
 
             # Get entry/exit signals for this asset
@@ -312,6 +317,7 @@ class RSISignalGenerator:
                     records.append(
                         {
                             "id": int(id_),
+                            "venue_id": int(venue_id),
                             "ts": group.loc[idx, "ts"],
                             "signal_id": signal_id,
                             "direction": direction,
@@ -359,6 +365,7 @@ class RSISignalGenerator:
             return pd.DataFrame(
                 columns=[
                     "id",
+                    "venue_id",
                     "ts",
                     "signal_id",
                     "direction",
@@ -587,16 +594,30 @@ class RSISignalGenerator:
                 lambda x: json.dumps(x) if isinstance(x, dict) else x
             )
 
+            pk_cols = ["id", "venue_id", "ts", "signal_id"]
+            df_records = df_records.drop_duplicates(subset=pk_cols, keep="last")
+            data_cols = [
+                c for c in df_records.columns if c not in pk_cols and c != "created_at"
+            ]
+            tmp = f"_tmp_{signal_table}"
+
             with self.engine.begin() as conn:
-                # Use to_sql with if_exists='append' for insertion
-                # Note: This doesn't handle conflicts. For production, use upsert logic.
+                conn.execute(text(f"DROP TABLE IF EXISTS {tmp}"))
+                conn.execute(
+                    text(
+                        f"CREATE TEMP TABLE {tmp} (LIKE public.{signal_table} INCLUDING DEFAULTS) ON COMMIT DROP"
+                    )
+                )
                 df_records.to_sql(
-                    signal_table,
-                    conn,
-                    schema="public",
-                    if_exists="append",
-                    index=False,
-                    method="multi",
+                    tmp, conn, if_exists="append", index=False, method="multi"
+                )
+                set_clause = ", ".join(f"{c} = EXCLUDED.{c}" for c in data_cols)
+                conn.execute(
+                    text(
+                        f"INSERT INTO public.{signal_table} ({', '.join(df_records.columns)}) "
+                        f"SELECT {', '.join(df_records.columns)} FROM {tmp} "
+                        f"ON CONFLICT ({', '.join(pk_cols)}) DO UPDATE SET {set_clause}"
+                    )
                 )
 
             logger.info(f"Inserted {len(df_records)} records into {signal_table}")

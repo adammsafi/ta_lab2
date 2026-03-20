@@ -205,7 +205,7 @@ WITH d AS (
             FROM _impacted_feat_keys k
             WHERE k.asset_id = f.id AND k.tf = f.tf
         )
-        GROUP BY f.id, f.tf, f.ts
+        GROUP BY f.id, f.tf, f.ts, f.venue_id
     ) x
 )
 SELECT

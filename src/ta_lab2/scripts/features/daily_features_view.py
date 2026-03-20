@@ -46,6 +46,7 @@ logger = logging.getLogger(__name__)
 _RETURNS_EXCLUDE = frozenset(
     {
         "id",
+        "venue_id",
         "timestamp",
         "tf",
         "tf_days",
@@ -67,6 +68,7 @@ _RETURNS_EXCLUDE = frozenset(
 _VOL_EXCLUDE = frozenset(
     {
         "id",
+        "venue_id",
         "ts",
         "tf",
         "tf_days",
@@ -84,6 +86,7 @@ _VOL_EXCLUDE = frozenset(
 _TA_EXCLUDE = frozenset(
     {
         "id",
+        "venue_id",
         "ts",
         "tf",
         "tf_days",
@@ -290,6 +293,7 @@ class FeaturesStore:
         alignment_source: str = "multi_tf",
         start: Optional[str] = None,
         full_refresh: bool = False,
+        venue_id: int | None = None,
     ) -> int:
         """
         Refresh features for given IDs and timeframe.
@@ -329,7 +333,11 @@ class FeaturesStore:
 
         # 3. Delete existing rows in dirty window
         self._delete_dirty_rows(
-            ids, tf, alignment_source, dirty_start if not full_refresh else None
+            ids,
+            tf,
+            alignment_source,
+            dirty_start if not full_refresh else None,
+            venue_id=venue_id,
         )
 
         # 4. Insert refreshed data
@@ -340,6 +348,7 @@ class FeaturesStore:
             dirty_start.isoformat(),
             dirty_end.isoformat(),
             sources_available,
+            venue_id=venue_id,
         )
 
         with self.engine.begin() as conn:
@@ -362,10 +371,15 @@ class FeaturesStore:
         tf: str,
         alignment_source: str,
         start: Optional[pd.Timestamp] = None,
+        venue_id: int | None = None,
     ) -> int:
         """Delete existing rows in dirty window for given tf + alignment_source."""
         where_clause = "id = ANY(:ids) AND tf = :tf AND alignment_source = :as_"
         params: dict = {"ids": ids, "tf": tf, "as_": alignment_source}
+
+        if venue_id is not None:
+            where_clause += " AND venue_id = :venue_id"
+            params["venue_id"] = venue_id
 
         if start is not None:
             where_clause += " AND ts >= :start"
@@ -394,6 +408,7 @@ class FeaturesStore:
         start: str,
         end: str,
         sources_available: dict[str, bool],
+        venue_id: int | None = None,
     ) -> str:
         """
         Build the JOIN query to materialize features.
@@ -434,6 +449,7 @@ class FeaturesStore:
         # Explicit mappings for PK, OHLCV, derived columns
         explicit = {
             "id": "p.id",
+            "venue_id": "p.venue_id",
             "ts": "p.time_close",
             "tf": f"'{tf}'",
             "alignment_source": f"'{alignment_source}'",
@@ -513,11 +529,15 @@ class FeaturesStore:
                 )
 
         # WHERE clause
+        venue_filter = (
+            f"\n              AND p.venue_id = {int(venue_id)}"
+            if venue_id is not None
+            else ""
+        )
         where_clause = f"""
             WHERE p.id IN ({ids_list})
               AND p.tf = '{tf}'
-              AND p.alignment_source = '{alignment_source}'
-
+              AND p.alignment_source = '{alignment_source}'{venue_filter}
               AND p.time_close >= '{start}'
               AND p.time_close <= '{end}'
         """
@@ -565,6 +585,7 @@ def refresh_features(
     alignment_source: str = "multi_tf",
     start: Optional[str] = None,
     full_refresh: bool = False,
+    venue_id: int | None = None,
 ) -> int:
     """
     Convenience function for CLI usage.
@@ -600,6 +621,7 @@ def refresh_features(
         alignment_source=alignment_source,
         start=start,
         full_refresh=full_refresh,
+        venue_id=venue_id,
     )
 
 

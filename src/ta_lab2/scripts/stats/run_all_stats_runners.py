@@ -45,7 +45,7 @@ from ta_lab2.scripts.refresh_utils import resolve_db_url
 logger = logging.getLogger(__name__)
 
 # Timeout tiers (seconds); initial estimate, tune after observing actual runtimes
-TIMEOUT_STATS = 3600  # 1 hour -- stats runners scan large tables
+TIMEOUT_STATS = None  # no limit -- stats runners scan large tables
 
 # Stats tables queried for aggregate PASS/WARN/FAIL status
 STATS_TABLES = [

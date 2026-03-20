@@ -72,6 +72,7 @@ class ATRSignalGenerator:
     engine: Engine
     state_manager: SignalStateManager
     signal_version: str = "1.0"
+    venue_id: int | None = None
 
     def generate_for_ids(
         self,
@@ -326,6 +327,10 @@ class ATRSignalGenerator:
         where_clauses = ["id = ANY(:ids)", "tf = '1D'"]
         params = {"ids": ids}
 
+        if self.venue_id is not None:
+            where_clauses.append("venue_id = :venue_id")
+            params["venue_id"] = self.venue_id
+
         if start_ts is not None:
             where_clauses.append("ts >= :start_ts")
             params["start_ts"] = start_ts
@@ -334,7 +339,7 @@ class ATRSignalGenerator:
 
         sql_text = f"""
             SELECT
-                id, ts,
+                id, venue_id, ts,
                 open, high, low, close,
                 atr_14,
                 bb_up_20_2, bb_lo_20_2
@@ -466,20 +471,20 @@ class ATRSignalGenerator:
         # Reset when a new position opens.
         sl_already_triggered: dict[tuple, set[str]] = {}
 
-        # Process per asset
-        for id_ in df_features["id"].unique():
-            df_asset = df_features[df_features["id"] == id_].copy()
+        # Process per asset and venue
+        for (id_, venue_id_val), df_asset in df_features.groupby(["id", "venue_id"]):
             df_asset = df_asset.sort_values("ts")
 
             # Get open positions for this asset
-            asset_open = (
-                open_positions[
-                    (open_positions["id"] == id_)
-                    & (open_positions["signal_id"] == signal_id)
-                ]
-                if not open_positions.empty
-                else pd.DataFrame()
-            )
+            if not open_positions.empty:
+                _mask = (open_positions["id"] == id_) & (
+                    open_positions["signal_id"] == signal_id
+                )
+                if "venue_id" in open_positions.columns:
+                    _mask = _mask & (open_positions["venue_id"] == venue_id_val)
+                asset_open = open_positions[_mask]
+            else:
+                asset_open = pd.DataFrame()
 
             # Track position state
             position_open = not asset_open.empty
@@ -509,10 +514,14 @@ class ATRSignalGenerator:
 
                     # Capture feature snapshot
                     feature_snapshot = {
-                        "close": float(row["close"]),
-                        "high": float(row["high"]),
-                        "low": float(row["low"]),
-                        "atr": float(row["atr_14"]),
+                        "close": float(row["close"])
+                        if pd.notna(row["close"])
+                        else None,
+                        "high": float(row["high"]) if pd.notna(row["high"]) else None,
+                        "low": float(row["low"]) if pd.notna(row["low"]) else None,
+                        "atr": float(row["atr_14"])
+                        if pd.notna(row["atr_14"])
+                        else None,
                         "channel_high": float(row["channel_high"])
                         if pd.notna(row["channel_high"])
                         else None,
@@ -537,6 +546,7 @@ class ATRSignalGenerator:
                     records.append(
                         {
                             "id": int(id_),
+                            "venue_id": int(venue_id_val),
                             "ts": row["ts"],
                             "signal_id": signal_id,
                             "direction": "long",  # Breakout signals are long-only by default
@@ -570,10 +580,14 @@ class ATRSignalGenerator:
                     breakout_type = self._classify_breakout_type(row, params)
 
                     feature_snapshot = {
-                        "close": float(row["close"]),
-                        "high": float(row["high"]),
-                        "low": float(row["low"]),
-                        "atr": float(row["atr_14"]),
+                        "close": float(row["close"])
+                        if pd.notna(row["close"])
+                        else None,
+                        "high": float(row["high"]) if pd.notna(row["high"]) else None,
+                        "low": float(row["low"]) if pd.notna(row["low"]) else None,
+                        "atr": float(row["atr_14"])
+                        if pd.notna(row["atr_14"])
+                        else None,
                         "channel_high": float(row["channel_high"])
                         if pd.notna(row["channel_high"])
                         else None,
@@ -596,6 +610,7 @@ class ATRSignalGenerator:
                     records.append(
                         {
                             "id": int(id_),
+                            "venue_id": int(venue_id_val),
                             "ts": row["ts"],
                             "signal_id": signal_id,
                             "direction": "long",
@@ -649,9 +664,13 @@ class ATRSignalGenerator:
 
                         feature_snapshot = {
                             "close": current_price,
-                            "high": float(row["high"]),
-                            "low": float(row["low"]),
-                            "atr": float(row["atr_14"]),
+                            "high": float(row["high"])
+                            if pd.notna(row["high"])
+                            else None,
+                            "low": float(row["low"]) if pd.notna(row["low"]) else None,
+                            "atr": float(row["atr_14"])
+                            if pd.notna(row["atr_14"])
+                            else None,
                             "channel_high": float(row["channel_high"])
                             if pd.notna(row["channel_high"])
                             else None,
@@ -674,6 +693,7 @@ class ATRSignalGenerator:
                         records.append(
                             {
                                 "id": int(id_),
+                                "venue_id": int(venue_id_val),
                                 "ts": row["ts"],
                                 "signal_id": signal_id,
                                 "direction": "close",
@@ -707,9 +727,9 @@ class ATRSignalGenerator:
 
     def _write_signals(self, records: pd.DataFrame) -> None:
         """
-        Write signal records to signals_atr_breakout table.
+        Write signal records to signals_atr_breakout table via temp-table upsert.
 
-        Uses INSERT ... ON CONFLICT DO NOTHING for idempotency.
+        Uses INSERT ... ON CONFLICT DO UPDATE for idempotent incremental runs.
 
         Args:
             records: DataFrame with signal records
@@ -723,13 +743,27 @@ class ATRSignalGenerator:
             lambda x: json.dumps(x) if isinstance(x, dict) else x
         )
 
-        # Write to database
+        signal_table = "signals_atr_breakout"
+        pk_cols = ["id", "venue_id", "ts", "signal_id"]
+        records = records.drop_duplicates(subset=pk_cols, keep="last")
+        data_cols = [
+            c for c in records.columns if c not in pk_cols and c != "created_at"
+        ]
+        tmp = f"_tmp_{signal_table}"
+
         with self.engine.begin() as conn:
-            records.to_sql(
-                name="signals_atr_breakout",
-                con=conn,
-                schema="public",
-                if_exists="append",
-                index=False,
-                method="multi",
+            conn.execute(text(f"DROP TABLE IF EXISTS {tmp}"))
+            conn.execute(
+                text(
+                    f"CREATE TEMP TABLE {tmp} (LIKE public.{signal_table} INCLUDING DEFAULTS) ON COMMIT DROP"
+                )
+            )
+            records.to_sql(tmp, conn, if_exists="append", index=False, method="multi")
+            set_clause = ", ".join(f"{c} = EXCLUDED.{c}" for c in data_cols)
+            conn.execute(
+                text(
+                    f"INSERT INTO public.{signal_table} ({', '.join(records.columns)}) "
+                    f"SELECT {', '.join(records.columns)} FROM {tmp} "
+                    f"ON CONFLICT ({', '.join(pk_cols)}) DO UPDATE SET {set_clause}"
+                )
             )

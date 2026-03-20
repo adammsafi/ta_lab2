@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 # Columns loaded from regimes (subset relevant for signal generation)
 _REGIME_COLUMNS = [
     "id",
+    "venue_id",
     "ts",
     "regime_key",
     "size_mult",
@@ -146,7 +147,7 @@ def merge_regime_context(
     # (legacy pandas execution path), while regime_df ts is always
     # datetime64[ns, UTC]. Coerce both sides to datetime64[ns, UTC] so
     # the merge key types match regardless of how each DataFrame was loaded.
-    merge_cols = ["id", "ts"]
+    merge_cols = ["id", "venue_id", "ts"]
     feature_df = feature_df.copy()
     if feature_df["ts"].dtype == object:
         feature_df["ts"] = pd.to_datetime(feature_df["ts"], utc=True)

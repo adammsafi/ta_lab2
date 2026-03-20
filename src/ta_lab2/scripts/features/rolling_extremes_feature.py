@@ -95,18 +95,23 @@ class RollingExtremesFeature(BaseFeature):
             "as_": self.get_alignment_source(),
         }
 
+        if self.config.venue_id is not None:
+            where_clauses.append("venue_id = :venue_id")
+            params["venue_id"] = self.config.venue_id
+
         where_sql = " AND ".join(where_clauses)
 
         sql = f"""
             SELECT
                 id,
                 {self.TS_COLUMN} AS ts,
+                venue_id,
                 venue,
                 venue_rank,
                 close
             FROM {self.SOURCE_TABLE}
             WHERE {where_sql}
-            ORDER BY id, venue, ts ASC
+            ORDER BY id, venue_id, ts ASC
         """
 
         with self.engine.connect() as conn:
@@ -121,7 +126,7 @@ class RollingExtremesFeature(BaseFeature):
 
         all_results = []
 
-        for (id_val, venue_val), df_id in df_source.groupby(["id", "venue"]):
+        for (id_val, venue_id_val), df_id in df_source.groupby(["id", "venue_id"]):
             df_id = df_id.copy()
             df_id = df_id.sort_values("ts").reset_index(drop=True)
 
@@ -129,7 +134,9 @@ class RollingExtremesFeature(BaseFeature):
                 continue
 
             for win in self._windows:
-                df_win = df_id[["id", "ts", "venue", "venue_rank", "close"]].copy()
+                df_win = df_id[
+                    ["id", "ts", "venue_id", "venue", "venue_rank", "close"]
+                ].copy()
                 add_rolling_extremes(df_win, window=win, close_col="close", ts_col="ts")
                 df_win["lookback_bars"] = win
                 all_results.append(df_win)
@@ -151,6 +158,7 @@ class RollingExtremesFeature(BaseFeature):
             "id": "INTEGER NOT NULL",
             "ts": "TIMESTAMPTZ NOT NULL",
             "tf": "TEXT NOT NULL",
+            "venue_id": "SMALLINT NOT NULL DEFAULT 1",
             "alignment_source": "TEXT NOT NULL",
             "venue": "TEXT NOT NULL DEFAULT 'CMC_AGG'",
             "venue_rank": "INTEGER NOT NULL DEFAULT 50",
@@ -207,7 +215,9 @@ class RollingExtremesFeature(BaseFeature):
             df = df[keep_cols]
 
         ids = df["id"].unique().tolist()
-        venues = df["venue"].unique().tolist() if "venue" in df.columns else ["CMC_AGG"]
+        venue_ids = (
+            df["venue_id"].unique().tolist() if "venue_id" in df.columns else [1]
+        )
         tf = self.config.tf
         alignment_source = self.get_alignment_source()
         windows = df["lookback_bars"].unique().tolist()
@@ -218,14 +228,14 @@ class RollingExtremesFeature(BaseFeature):
                     f"DELETE FROM {fq_table}"
                     " WHERE id = ANY(:ids) AND tf = :tf"
                     " AND alignment_source = :as_"
-                    " AND venue = ANY(:venues)"
+                    " AND venue_id = ANY(:venue_ids)"
                     " AND lookback_bars = ANY(:windows)"
                 ),
                 {
                     "ids": ids,
                     "tf": tf,
                     "as_": alignment_source,
-                    "venues": venues,
+                    "venue_ids": venue_ids,
                     "windows": windows,
                 },
             )

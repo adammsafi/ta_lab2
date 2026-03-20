@@ -5,10 +5,11 @@ This module provides state tracking for feature calculations (returns, volatilit
 technical indicators) extending the EMA state management pattern with feature_type
 and feature_name dimensions.
 
-Unified State Schema (PRIMARY KEY: id, feature_type, feature_name):
+Unified State Schema (PRIMARY KEY: id, feature_type, feature_name, venue_id):
 - id: Asset identifier
 - feature_type: 'returns', 'vol', 'ta'
 - feature_name: 'b2t_pct', 'parkinson_20', 'rsi_14'
+- venue_id: Venue identifier (smallint, default 1 = CMC_AGG)
 - daily_min_seen, daily_max_seen: Timestamp range from source bars
 - last_ts: Latest feature timestamp
 - row_count: Number of feature rows
@@ -77,6 +78,7 @@ CREATE TABLE IF NOT EXISTS {schema}.{table} (
     id                  INTEGER         NOT NULL,
     feature_type        TEXT            NOT NULL,
     feature_name        TEXT            NOT NULL,
+    venue_id            SMALLINT        NOT NULL DEFAULT 1,
 
     -- Timestamp range (populated from feature output)
     daily_min_seen      TIMESTAMPTZ     NULL,
@@ -89,7 +91,7 @@ CREATE TABLE IF NOT EXISTS {schema}.{table} (
     -- Metadata
     updated_at          TIMESTAMPTZ     NOT NULL DEFAULT now(),
 
-    PRIMARY KEY (id, feature_type, feature_name)
+    PRIMARY KEY (id, feature_type, feature_name, venue_id)
 );
 """
 
@@ -138,6 +140,7 @@ class FeatureStateManager:
         ids: Optional[list[int]] = None,
         feature_type: Optional[str] = None,
         feature_names: Optional[list[str]] = None,
+        venue_id: Optional[int] = None,
     ) -> pd.DataFrame:
         """
         Load state from state table with optional filters.
@@ -146,10 +149,11 @@ class FeatureStateManager:
             ids: Optional list of IDs to filter
             feature_type: Optional feature type to filter ('returns', 'vol', 'ta')
             feature_names: Optional list of feature names to filter
+            venue_id: Optional venue_id to filter (smallint, default None = all)
 
         Returns:
-            DataFrame with columns: id, feature_type, feature_name, daily_min_seen,
-            daily_max_seen, last_ts, row_count, updated_at
+            DataFrame with columns: id, feature_type, feature_name, venue_id,
+            daily_min_seen, daily_max_seen, last_ts, row_count, updated_at
 
             Returns empty DataFrame if table doesn't exist or no rows match filters.
         """
@@ -169,11 +173,15 @@ class FeatureStateManager:
             where_clauses.append("feature_name = ANY(:feature_names)")
             params["feature_names"] = feature_names
 
+        if venue_id is not None:
+            where_clauses.append("venue_id = :venue_id")
+            params["venue_id"] = venue_id
+
         where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
 
         sql_text = f"""
             SELECT
-                id, feature_type, feature_name,
+                id, feature_type, feature_name, venue_id,
                 daily_min_seen, daily_max_seen, last_ts,
                 row_count,
                 updated_at
@@ -193,6 +201,7 @@ class FeatureStateManager:
                         "id",
                         "feature_type",
                         "feature_name",
+                        "venue_id",
                         "daily_min_seen",
                         "daily_max_seen",
                         "last_ts",
@@ -240,7 +249,7 @@ class FeatureStateManager:
 
         sql = f"""
         INSERT INTO {state_table_fq} (
-            id, feature_type, feature_name,
+            id, feature_type, feature_name, venue_id,
             daily_min_seen, daily_max_seen, last_ts,
             row_count,
             updated_at
@@ -249,6 +258,7 @@ class FeatureStateManager:
             {id_col} as id,
             '{feature_type}' as feature_type,
             '{feature_name}' as feature_name,
+            COALESCE(venue_id, 1) as venue_id,
             MIN({ts_col}) as daily_min_seen,
             MAX({ts_col}) as daily_max_seen,
             MAX({ts_col}) as last_ts,
@@ -256,8 +266,8 @@ class FeatureStateManager:
             now() as updated_at
         FROM {output_schema}.{output_table}
         WHERE {ts_col} IS NOT NULL
-        GROUP BY {id_col}
-        ON CONFLICT (id, feature_type, feature_name) DO UPDATE SET
+        GROUP BY {id_col}, COALESCE(venue_id, 1)
+        ON CONFLICT (id, feature_type, feature_name, venue_id) DO UPDATE SET
             daily_min_seen = EXCLUDED.daily_min_seen,
             daily_max_seen = EXCLUDED.daily_max_seen,
             last_ts = EXCLUDED.last_ts,

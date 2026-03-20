@@ -114,6 +114,7 @@ class BaseAMAFeature(ABC):
         """
         self.engine = engine
         self.config = config
+        self._bars_cache: Optional[pd.DataFrame] = None
 
     # =========================================================================
     # Abstract Methods (subclasses MUST override)
@@ -127,9 +128,10 @@ class BaseAMAFeature(ABC):
         tf: str,
         tf_days: int,
         start_ts: Optional[pd.Timestamp],
+        venue_id: int = 1,
     ) -> pd.DataFrame:
         """
-        Load bar data (close prices) for a single (asset_id, tf) slice.
+        Load bar data (close prices) for a single (asset_id, tf, venue_id) slice.
 
         Args:
             engine: SQLAlchemy engine.
@@ -137,9 +139,10 @@ class BaseAMAFeature(ABC):
             tf: Timeframe label (e.g. "1D", "7D").
             tf_days: Nominal days for this TF (from dim_timeframe).
             start_ts: Optional incremental start; None means full history.
+            venue_id: Venue identifier (FK to dim_venues). Default 1 (CMC_AGG).
 
         Returns:
-            DataFrame with at minimum: ts (tz-aware TIMESTAMPTZ), close.
+            DataFrame with at minimum: ts (tz-aware TIMESTAMPTZ), close, venue_id.
             Sorted ascending by ts.
         """
 
@@ -181,14 +184,15 @@ class BaseAMAFeature(ABC):
         tf_days: int,
         param_sets: list[AMAParamSet],
         start_ts: Optional[pd.Timestamp] = None,
+        venue_id: int = 1,
     ) -> pd.DataFrame:
         """
-        Compute AMA values + derivatives for all param_sets on one (asset_id, tf).
+        Compute AMA values + derivatives for all param_sets on one (asset_id, tf, venue_id).
 
         Flow:
         1. Load bars via _load_bars()
-        2. For each param_set: compute_ama() -> build rows with id, ts, tf, indicator,
-           params_hash, tf_days, roll, ama, er
+        2. For each param_set: compute_ama() -> build rows with id, venue_id, ts, tf,
+           indicator, params_hash, tf_days, roll, ama, er
         3. Concatenate all param_set results
         4. Call add_derivatives() to compute d1, d2, d1_roll, d2_roll
         5. Return combined DataFrame
@@ -200,17 +204,20 @@ class BaseAMAFeature(ABC):
             tf_days: Nominal days for the timeframe.
             param_sets: Which AMAParamSet instances to compute.
             start_ts: Optional incremental start timestamp (inclusive).
+            venue_id: Venue identifier (FK to dim_venues). Default 1 (CMC_AGG).
 
         Returns:
-            DataFrame with columns: id, ts, tf, indicator, params_hash, tf_days,
-            roll, ama, er, d1, d2, d1_roll, d2_roll.
+            DataFrame with columns: id, venue_id, ts, tf, indicator, params_hash,
+            tf_days, roll, ama, er, d1, d2, d1_roll, d2_roll.
             Empty DataFrame if no bars or no param_sets.
         """
         if not param_sets:
             return pd.DataFrame()
 
         # Load bars
-        bars = self._load_bars(engine, asset_id, tf, tf_days, start_ts)
+        bars = self._load_bars(
+            engine, asset_id, tf, tf_days, start_ts, venue_id=venue_id
+        )
         if bars.empty:
             logger.debug(
                 "No bars for asset_id=%s tf=%s start_ts=%s — skipping",
@@ -257,6 +264,7 @@ class BaseAMAFeature(ABC):
             df_ps = pd.DataFrame(
                 {
                     "id": asset_id,
+                    "venue_id": venue_id,
                     "ts": ts_list,
                     "tf": tf,
                     "indicator": ps.indicator,
@@ -315,20 +323,20 @@ class BaseAMAFeature(ABC):
             return df
 
         result = df.copy()
-        group_cols = ["id", "tf", "indicator", "params_hash", "roll"]
+        group_cols = ["id", "venue_id", "tf", "indicator", "params_hash", "roll"]
 
         # Sort by group then ts to guarantee temporal ordering
         result = result.sort_values(group_cols + ["ts"]).reset_index(drop=True)
 
-        # d1 and d2: within each (id, tf, indicator, params_hash, roll) group
+        # d1 and d2: within each (id, venue_id, tf, indicator, params_hash, roll) group
         result["d1"] = result.groupby(group_cols, sort=False)["ama"].diff(1)
         result["d2"] = result.groupby(group_cols, sort=False)["d1"].diff(1)
 
         # d1_roll and d2_roll: computed across ALL rows in unified timeline
-        # (id, tf, indicator, params_hash) — without roll in group key.
+        # (id, venue_id, tf, indicator, params_hash) — without roll in group key.
         # Re-sort by unified_cols + ts so canonical and interstitial rows
         # interleave chronologically before computing diffs.
-        unified_cols = ["id", "tf", "indicator", "params_hash"]
+        unified_cols = ["id", "venue_id", "tf", "indicator", "params_hash"]
         result = result.sort_values(unified_cols + ["ts"]).reset_index(drop=True)
         result["d1_roll"] = result.groupby(unified_cols, sort=False)["ama"].diff(1)
         result["d2_roll"] = result.groupby(unified_cols, sort=False)["d1_roll"].diff(1)
@@ -397,14 +405,22 @@ class BaseAMAFeature(ABC):
                 if not ids_for_tf:
                     continue
 
-                # Scoped DELETE: remove existing rows for this (ids, tf, ts>=min_ts) slice
+                # Scoped DELETE: remove existing rows for this (ids, venue_id, tf, ts>=min_ts) slice
                 # Only delete rows from min_ts onwards to preserve older history
                 # during incremental refreshes (where start_ts limits loaded bars)
                 ids_placeholder = ", ".join(str(i) for i in ids_for_tf)
                 min_ts = df_tf["ts"].min()
+                # Get distinct venue_ids in this batch
+                venue_ids_for_tf = (
+                    df_tf["venue_id"].unique().tolist()
+                    if "venue_id" in df_tf.columns
+                    else [1]
+                )
+                venue_ids_placeholder = ", ".join(str(v) for v in venue_ids_for_tf)
                 delete_sql = text(
                     f"DELETE FROM {schema}.{table} "
-                    f"WHERE id IN ({ids_placeholder}) AND tf = :tf AND ts >= :min_ts"
+                    f"WHERE id IN ({ids_placeholder}) AND venue_id IN ({venue_ids_placeholder}) "
+                    f"AND tf = :tf AND ts >= :min_ts"
                 )
                 conn.execute(delete_sql, {"tf": tf, "min_ts": min_ts})
 
@@ -478,13 +494,13 @@ class BaseAMAFeature(ABC):
         """
         Return AMA primary key columns.
 
-        AMA tables use (id, ts, tf, indicator, params_hash) — differs from EMA
-        tables which use (id, ts, tf, period).
+        AMA tables use (id, venue_id, ts, tf, indicator, params_hash) — differs
+        from EMA tables which use (id, venue_id, ts, tf, period).
 
         Returns:
             List of PK column names.
         """
-        return ["id", "ts", "tf", "indicator", "params_hash"]
+        return ["id", "venue_id", "ts", "tf", "indicator", "params_hash"]
 
     def _get_table_columns(
         self,

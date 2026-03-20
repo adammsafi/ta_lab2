@@ -27,8 +27,8 @@ from sqlalchemy import create_engine
 from ta_lab2.scripts.sync_utils import add_sync_cli_args, sync_sources_to_unified
 
 U_TABLE = "public.price_bars_multi_tf_u"
-PK_COLS = ["id", "tf", "bar_seq", "venue", "timestamp", "alignment_source"]
-SOURCE_PREFIX = "cmc_price_bars_"
+PK_COLS = ["id", "tf", "bar_seq", "venue_id", "timestamp", "alignment_source"]
+SOURCE_PREFIX = "price_bars_"
 
 SOURCES = [
     "public.price_bars_multi_tf",

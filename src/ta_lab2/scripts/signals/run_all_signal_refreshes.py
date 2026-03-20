@@ -78,6 +78,7 @@ def refresh_signal_type(
     ids: list[int],
     full_refresh: bool,
     regime_enabled: bool = True,
+    venue_id: int | None = None,
 ) -> RefreshResult:
     """
     Refresh a single signal type.
@@ -115,7 +116,7 @@ def refresh_signal_type(
         if signal_type not in generators:
             raise ValueError(f"Unknown signal type: {signal_type}")
 
-        generator = generators[signal_type](engine, state_manager)
+        generator = generators[signal_type](engine, state_manager, venue_id=venue_id)
         configs = load_active_signals(engine, signal_type)
 
         logger.info(f"  Found {len(configs)} active signal configurations")
@@ -151,6 +152,7 @@ def run_parallel_refresh(
     full_refresh: bool,
     max_workers: int = 3,
     regime_enabled: bool = True,
+    venue_id: int | None = None,
 ) -> List[RefreshResult]:
     """
     Run all signal types in parallel.
@@ -184,7 +186,13 @@ def run_parallel_refresh(
         # Submit all tasks
         futures = {
             executor.submit(
-                refresh_signal_type, engine, st, ids, full_refresh, regime_enabled
+                refresh_signal_type,
+                engine,
+                st,
+                ids,
+                full_refresh,
+                regime_enabled,
+                venue_id,
             ): st
             for st in signal_types
         }
@@ -282,24 +290,40 @@ def validate_pipeline_reproducibility(
     return all_pass
 
 
-def _get_all_asset_ids(engine) -> list[int]:
+def _get_all_asset_ids(engine, venue_id: int | None = None) -> list[int]:
     """
     Query all asset IDs from features.
+
+    Args:
+        engine: SQLAlchemy engine for database operations.
+        venue_id: If specified, filter to IDs for this venue_id.
 
     Returns:
         Sorted list of unique asset IDs
     """
-    sql = text(
+    if venue_id is not None:
+        sql = text(
+            """
+            SELECT DISTINCT id
+            FROM public.features
+            WHERE tf = '1D' AND venue_id = :venue_id
+            ORDER BY id
         """
-        SELECT DISTINCT id
-        FROM public.features
-        WHERE tf = '1D'
-        ORDER BY id
-    """
-    )
+        )
+        params = {"venue_id": venue_id}
+    else:
+        sql = text(
+            """
+            SELECT DISTINCT id
+            FROM public.features
+            WHERE tf = '1D'
+            ORDER BY id
+        """
+        )
+        params = {}
 
     with engine.connect() as conn:
-        result = conn.execute(sql)
+        result = conn.execute(sql, params)
         rows = result.fetchall()
         return [row[0] for row in rows]
 
@@ -379,6 +403,12 @@ Examples:
         action="store_true",
         help="Enable verbose (DEBUG-level) logging",
     )
+    parser.add_argument(
+        "--venue-id",
+        type=int,
+        default=None,
+        help="Filter to IDs for this venue_id.",
+    )
 
     args = parser.parse_args()
 
@@ -407,7 +437,7 @@ Examples:
         ids = args.ids
         logger.info(f"Processing {len(ids)} specified assets")
     else:
-        ids = _get_all_asset_ids(engine)
+        ids = _get_all_asset_ids(engine, venue_id=args.venue_id)
         logger.info(f"Processing all {len(ids)} assets from database")
 
     if not ids:
@@ -425,7 +455,12 @@ Examples:
         logger.info("-" * 70)
 
         results = run_parallel_refresh(
-            engine, ids, args.full_refresh, args.parallel, regime_enabled
+            engine,
+            ids,
+            args.full_refresh,
+            args.parallel,
+            regime_enabled,
+            venue_id=args.venue_id,
         )
 
         logger.info("")

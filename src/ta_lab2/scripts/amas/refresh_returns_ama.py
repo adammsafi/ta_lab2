@@ -94,7 +94,7 @@ def _print(msg: str) -> None:
 
 _INSERT_SQL = """
 INSERT INTO {dst} (
-    id, ts, tf, tf_days, indicator, params_hash, roll,
+    id, venue_id, ts, tf, tf_days, indicator, params_hash, roll,
     gap_days_roll, gap_days,
     delta1_ama_roll, delta2_ama_roll,
     ret_arith_ama_roll, delta_ret_arith_ama_roll,
@@ -105,18 +105,18 @@ INSERT INTO {dst} (
 )
 WITH pass1 AS (
     SELECT
-        id, ts, tf, tf_days, indicator, params_hash, roll, ama,
+        id, venue_id, ts, tf, tf_days, indicator, params_hash, roll, ama,
         ama - LAG(ama, 1) OVER w AS delta1,
         ama / NULLIF(LAG(ama, 1) OVER w, 0) - 1.0 AS ret_arith,
         LN(NULLIF(GREATEST(ama / NULLIF(LAG(ama, 1) OVER w, 0), 0), 0)) AS ret_log,
         EXTRACT(EPOCH FROM (ts - LAG(ts, 1) OVER w))::double precision / 86400.0 AS gap_days_raw
     FROM {src}
     {where_clause}
-    WINDOW w AS (PARTITION BY id, tf, indicator, params_hash ORDER BY ts)
+    WINDOW w AS (PARTITION BY id, venue_id, tf, indicator, params_hash ORDER BY ts)
 ),
 pass2 AS (
     SELECT
-        id, ts, tf, tf_days, indicator, params_hash, roll,
+        id, venue_id, ts, tf, tf_days, indicator, params_hash, roll,
         gap_days_raw::integer AS gap_days_roll,
         CASE WHEN roll = FALSE THEN gap_days_raw::integer END AS gap_days,
         delta1 AS delta1_ama_roll,
@@ -132,10 +132,10 @@ pass2 AS (
         CASE WHEN roll = FALSE THEN ret_log END AS ret_log_ama,
         CASE WHEN roll = FALSE THEN ret_log - LAG(ret_log, 1) OVER w END AS delta_ret_log_ama
     FROM pass1
-    WINDOW w AS (PARTITION BY id, tf, indicator, params_hash ORDER BY ts)
+    WINDOW w AS (PARTITION BY id, venue_id, tf, indicator, params_hash ORDER BY ts)
 )
 SELECT * FROM pass2
-ON CONFLICT (id, ts, tf, indicator, params_hash) DO NOTHING
+ON CONFLICT (id, venue_id, ts, tf, indicator, params_hash) DO NOTHING
 """
 
 
@@ -209,7 +209,7 @@ def _worker(args: tuple) -> dict:
 
     Returns summary dict with source, id, n_rows, elapsed.
     """
-    source_key, src, dst, asset_id, tf_filter, db_url = args
+    source_key, src, dst, asset_id, tf_filter, db_url, venue_id = args
     t0 = time.time()
 
     try:
@@ -222,6 +222,10 @@ def _worker(args: tuple) -> dict:
         else:
             where_clause = f"WHERE id = {int(asset_id)}"
             delete_where = f"WHERE id = {int(asset_id)}"
+
+        if venue_id is not None:
+            where_clause += f" AND venue_id = {int(venue_id)}"
+            delete_where += f" AND venue_id = {int(venue_id)}"
 
         insert_sql = _INSERT_SQL.format(src=src, dst=dst, where_clause=where_clause)
 
@@ -267,6 +271,7 @@ def _process_source(
     dry_run: bool,
     db_url: str,
     num_processes: int,
+    venue_id: Optional[int] = None,
 ) -> dict:
     """Process one AMA source table -> returns table mapping."""
     engine = _get_engine(db_url)
@@ -312,7 +317,7 @@ def _process_source(
 
     # Build work units: one per (source_key, id)
     work_units = [
-        (source_key, source_table, returns_table, aid, tf_filter, db_url)
+        (source_key, source_table, returns_table, aid, tf_filter, db_url, venue_id)
         for aid in asset_ids
     ]
 
@@ -424,6 +429,12 @@ def main() -> None:
         action="store_true",
         help="Print what would be processed without writing to DB.",
     )
+    parser.add_argument(
+        "--venue-id",
+        type=int,
+        default=None,
+        help="Filter to a specific venue_id (e.g., 2 for HYPERLIQUID). Default: all venues.",
+    )
 
     args = parser.parse_args()
 
@@ -476,6 +487,7 @@ def main() -> None:
             dry_run=args.dry_run,
             db_url=db_url,
             num_processes=args.num_processes,
+            venue_id=args.venue_id,
         )
         results.append(result)
 

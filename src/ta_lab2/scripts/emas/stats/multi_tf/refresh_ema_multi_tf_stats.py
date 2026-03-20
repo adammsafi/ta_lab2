@@ -248,7 +248,7 @@ WITH d AS (
             FROM _impacted_keys k
             WHERE k.asset_id = e.id AND k.tf = e.tf AND k.period = e.period
         )
-        GROUP BY e.id, e.tf, e.period, e.ts
+        GROUP BY e.id, e.tf, e.period, e.ts, e.venue_id
     ) x
 )
 SELECT

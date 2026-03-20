@@ -47,6 +47,7 @@ AMA_RETURNS_SOURCES = [
 # PK of the _u table — alignment_source is part of PK
 AMA_RETURNS_PK_COLS = [
     "id",
+    "venue_id",
     "ts",
     "tf",
     "indicator",
@@ -57,7 +58,7 @@ AMA_RETURNS_PK_COLS = [
 # Prefix stripped from source table name to derive alignment_source label
 # returns_ama_multi_tf -> multi_tf
 # returns_ama_multi_tf_cal_us -> multi_tf_cal_us
-AMA_RETURNS_SOURCE_PREFIX = "cmc_returns_ama_"
+AMA_RETURNS_SOURCE_PREFIX = "returns_ama_"
 
 
 # ---------------------------------------------------------------------------

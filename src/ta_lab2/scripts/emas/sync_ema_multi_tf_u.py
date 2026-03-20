@@ -14,8 +14,7 @@ Rules:
   - If source has ingested_at: use max(ingested_at) from _u for that alignment_source
   - Else: use max(ts) from _u for that alignment_source
 
-- Insert uses ON CONFLICT DO NOTHING on PK (id, ts, tf, period, venue):
-  (id, ts, tf, period)
+- Insert uses ON CONFLICT DO NOTHING on PK (id, venue_id, ts, tf, period)
 
 Run:
   python sync_ema_multi_tf_u.py
@@ -97,10 +96,12 @@ def get_columns(engine: Engine, full_name: str) -> List[str]:
 
 def alignment_source_from_table(full_name: str) -> str:
     _, table = split_schema_table(full_name)
-    # portion after cmc_ema_
+    # portion after ema_
     # e.g. ema_multi_tf_cal_us -> multi_tf_cal_us
     if table.startswith("cmc_ema_"):
         return table.replace("cmc_ema_", "", 1)
+    if table.startswith("ema_"):
+        return table.replace("ema_", "", 1)
     return table
 
 
@@ -173,6 +174,9 @@ def build_select_expr(
     e_venue = (
         "COALESCE(venue, 'CMC_AGG')::text" if "venue" in colset else "'CMC_AGG'::text"
     )
+    e_venue_id = (
+        "COALESCE(venue_id, 1)::smallint" if "venue_id" in colset else "1::smallint"
+    )
     e_venue_rank = (
         "COALESCE(venue_rank, 50)::int" if "venue_rank" in colset else "50::int"
     )
@@ -180,6 +184,7 @@ def build_select_expr(
     select_sql = f"""
     SELECT
       id::int,
+      {e_venue_id},
       ts,
       tf::text,
       period::int,
@@ -238,7 +243,7 @@ def insert_new_rows(
     sql = f"""
     WITH ins AS (
       INSERT INTO {U_TABLE} (
-        id, ts, tf, period,
+        id, venue_id, ts, tf, period,
         ema, ema_bar, is_partial_end,
         ingested_at, tf_days, roll,
         venue, venue_rank,
@@ -247,7 +252,7 @@ def insert_new_rows(
       {select_sql}
       FROM {src_table}
       {where_clause}
-      ON CONFLICT (id, ts, tf, period, venue) DO NOTHING
+      ON CONFLICT (id, venue_id, ts, tf, period) DO NOTHING
       RETURNING 1
     )
     SELECT COUNT(*)::bigint AS n_inserted FROM ins;

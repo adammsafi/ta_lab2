@@ -219,10 +219,10 @@ class LeadLagAnalyzer:
             name = _ASSET_ID_TO_NAME.get(asset_id, f"asset_{asset_id}")
             col_alias = f"{name}_1d_return"
             sql = text(
-                f"SELECT ts, {return_col} AS {col_alias} "
+                f'SELECT "timestamp" AS ts, {return_col} AS {col_alias} '
                 "FROM returns_bars_multi_tf "
                 "WHERE id = :id AND tf = :tf "
-                "ORDER BY ts ASC"
+                'ORDER BY "timestamp" ASC'
             )
             with self.engine.connect() as conn:
                 df = pd.read_sql(sql, conn, params={"id": asset_id, "tf": _RETURN_TF})  # type: ignore[arg-type]
@@ -237,11 +237,9 @@ class LeadLagAnalyzer:
 
             df = df.set_index("ts")
             # Normalize tz-aware timestamp to tz-naive date-level index
-            # Critical: returns_bars_multi_tf.ts is TIMESTAMP WITH TZ;
+            # Critical: returns_bars_multi_tf.timestamp is TIMESTAMP WITH TZ;
             # fred_macro_features.date is DATE (tz-naive). Normalize before join.
-            df.index = pd.to_datetime(df.index).normalize()
-            if df.index.tz is not None:
-                df.index = df.index.tz_localize(None)
+            df.index = pd.to_datetime(df.index, utc=True).normalize().tz_localize(None)
 
             frames.append(df)
             logger.info(

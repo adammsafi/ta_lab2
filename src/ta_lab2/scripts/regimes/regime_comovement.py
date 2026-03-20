@@ -67,6 +67,7 @@ def compute_comovement_records(
     daily_df: pd.DataFrame,
     tf: str = "1D",
     computed_at: Optional[datetime] = None,
+    venue_id: int = 1,
 ) -> pd.DataFrame:
     """
     Compute pairwise EMA comovement records for one asset/TF.
@@ -96,6 +97,7 @@ def compute_comovement_records(
     """
     out_cols = [
         "id",
+        "venue_id",
         "tf",
         "ema_a",
         "ema_b",
@@ -167,6 +169,7 @@ def compute_comovement_records(
         records.append(
             {
                 "id": int(asset_id),
+                "venue_id": int(venue_id),
                 "tf": tf,
                 "ema_a": ema_a,
                 "ema_b": ema_b,
@@ -231,6 +234,13 @@ def write_comovement_to_db(
             )
         tf = str(unique_tfs[0])
 
+    # Determine venue_id scope from data
+    venue_ids = (
+        sorted(comovement_df["venue_id"].unique().tolist())
+        if "venue_id" in comovement_df.columns
+        else [1]
+    )
+
     def _to_none_if_nan(val):
         if val is None:
             return None
@@ -246,6 +256,7 @@ def write_comovement_to_db(
         records.append(
             {
                 "id": int(row["id"]),
+                "venue_id": int(row["venue_id"]) if "venue_id" in row.index else 1,
                 "tf": str(row["tf"]),
                 "ema_a": str(row["ema_a"]),
                 "ema_b": str(row["ema_b"]),
@@ -263,19 +274,19 @@ def write_comovement_to_db(
     delete_sql = text(
         """
         DELETE FROM public.regime_comovement
-        WHERE id = ANY(:ids) AND tf = :tf
+        WHERE id = ANY(:ids) AND tf = :tf AND venue_id = ANY(:venue_ids)
         """
     )
 
     insert_sql = text(
         """
         INSERT INTO public.regime_comovement
-            (id, tf, ema_a, ema_b, correlation, sign_agree_rate,
+            (id, venue_id, tf, ema_a, ema_b, correlation, sign_agree_rate,
              best_lead_lag, best_lead_lag_corr, n_obs, computed_at)
         VALUES
-            (:id, :tf, :ema_a, :ema_b, :correlation, :sign_agree_rate,
+            (:id, :venue_id, :tf, :ema_a, :ema_b, :correlation, :sign_agree_rate,
              :best_lead_lag, :best_lead_lag_corr, :n_obs, :computed_at)
-        ON CONFLICT (id, tf, ema_a, ema_b, computed_at) DO UPDATE
+        ON CONFLICT (id, venue_id, tf, ema_a, ema_b, computed_at) DO UPDATE
             SET correlation       = EXCLUDED.correlation,
                 sign_agree_rate   = EXCLUDED.sign_agree_rate,
                 best_lead_lag     = EXCLUDED.best_lead_lag,
@@ -285,7 +296,9 @@ def write_comovement_to_db(
     )
 
     with engine.begin() as conn:
-        deleted = conn.execute(delete_sql, {"ids": ids, "tf": tf})
+        deleted = conn.execute(
+            delete_sql, {"ids": ids, "tf": tf, "venue_ids": venue_ids}
+        )
         logger.debug(
             "write_comovement_to_db: deleted %d existing rows for ids=%s tf=%s",
             deleted.rowcount,
@@ -316,6 +329,7 @@ def compute_and_write_comovement(
     daily_df: pd.DataFrame,
     tf: str = "1D",
     computed_at: Optional[datetime] = None,
+    venue_id: int = 1,
 ) -> int:
     """
     Compute EMA comovement statistics and write them to DB in one step.
@@ -342,6 +356,7 @@ def compute_and_write_comovement(
         daily_df=daily_df,
         tf=tf,
         computed_at=computed_at,
+        venue_id=venue_id,
     )
 
     if comovement_df.empty:

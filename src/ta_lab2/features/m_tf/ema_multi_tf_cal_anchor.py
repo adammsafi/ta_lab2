@@ -81,6 +81,7 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
         self._alpha_lookup: Optional[pd.DataFrame] = None
         self._tf_specs_cache: Optional[List[TFSpec]] = None
         self._daily_data_cache: Optional[pd.DataFrame] = None
+        self._anchor_bars_cache: Optional[pd.DataFrame] = None
 
     # =========================================================================
     # Abstract Method Implementations
@@ -104,7 +105,7 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
             params["end"] = end
 
         sql = f"""
-          SELECT id, "timestamp" AS ts, close, venue, venue_rank
+          SELECT id, "timestamp" AS ts, close, venue, venue_id, venue_rank
           FROM public.price_bars_1d
           WHERE {" AND ".join(where)}
           ORDER BY id, venue, "timestamp"
@@ -202,15 +203,17 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
         # Build (id, venue) pairs from bars data
         id_venue_pairs = bars_tf[["id", "venue"]].drop_duplicates().values.tolist()
 
-        # Build venue_rank lookup from bars data
+        # Build venue_rank and venue_id lookups from bars data
         _venue_rank_map = {}
+        _venue_id_map = {}
         if "venue_rank" in bars_tf.columns:
             for _, row in (
-                bars_tf[["id", "venue", "venue_rank"]]
+                bars_tf[["id", "venue", "venue_id", "venue_rank"]]
                 .drop_duplicates(subset=["id", "venue"])
                 .iterrows()
             ):
                 _venue_rank_map[(int(row["id"]), row["venue"])] = int(row["venue_rank"])
+                _venue_id_map[(int(row["id"]), row["venue"])] = int(row["venue_id"])
 
         # Process each (ID, venue) separately
         for id_, venue in id_venue_pairs:
@@ -253,6 +256,7 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
                     df_out["period"] = int(period)
                     df_out["tf_days"] = tf_spec.tf_days
                     df_out["venue"] = venue
+                    df_out["venue_id"] = int(_venue_id_map.get((int(id_), venue), 1))
                     df_out["venue_rank"] = int(venue_rank)
                     out_frames.append(df_out)
 
@@ -267,6 +271,7 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
         """Define output table schema for calendar anchor EMAs (lean - EMA only)."""
         return {
             "id": "INTEGER NOT NULL",
+            "venue_id": "SMALLINT NOT NULL DEFAULT 1",
             "tf": "TEXT NOT NULL",
             "ts": "TIMESTAMPTZ NOT NULL",
             "period": "INTEGER NOT NULL",
@@ -278,15 +283,70 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
             "ema_bar": "DOUBLE PRECISION",
             "is_partial_end": "BOOLEAN",
             "ingested_at": "TIMESTAMPTZ DEFAULT now()",
-            "PRIMARY KEY": "(id, tf, ts, period, venue)",
+            "PRIMARY KEY": "(id, venue_id, tf, ts, period)",
         }
 
     # =========================================================================
     # Helper Methods
     # =========================================================================
 
+    def preload_anchor_bars(self, ids: list[int]) -> None:
+        """
+        Load anchor bar snapshots for ALL TFs in a single query and cache.
+
+        Call this before the TF loop to avoid per-TF queries.
+        """
+        if not ids:
+            self._anchor_bars_cache = pd.DataFrame()
+            return
+
+        sql = f"""
+          SELECT
+            id,
+            tf,
+            tf_days,
+            bar_seq,
+            time_close AS ts,
+            close,
+            is_partial_end,
+            venue,
+            venue_id,
+            venue_rank
+          FROM {self.bars_table}
+          WHERE id = ANY(:ids)
+          ORDER BY id, venue, tf, bar_seq, time_close
+        """
+
+        with self.engine.connect() as conn:
+            df = read_sql_polars(sql, conn, params={"ids": ids})
+
+        if not df.empty:
+            df["ts"] = pd.to_datetime(df["ts"], utc=True)
+            df["is_partial_end"] = df["is_partial_end"].astype(bool)
+            df = df.sort_values(["id", "venue", "tf", "bar_seq", "ts"]).reset_index(
+                drop=True
+            )
+
+        self._anchor_bars_cache = df
+        logger.info(
+            "Preloaded anchor bars: %d rows across %d TFs",
+            len(df),
+            df["tf"].nunique() if not df.empty else 0,
+        )
+
     def _load_anchor_bars(self, ids: list[int], tfs: list[str]) -> pd.DataFrame:
-        """Load anchor bar snapshots from bars table."""
+        """Load anchor bar snapshots from bars table (uses cache if available)."""
+        # Use preloaded cache if available
+        if self._anchor_bars_cache is not None:
+            if self._anchor_bars_cache.empty:
+                return pd.DataFrame()
+            return (
+                self._anchor_bars_cache[self._anchor_bars_cache["tf"].isin(tfs)]
+                .sort_values(["id", "venue", "tf", "bar_seq", "ts"])
+                .reset_index(drop=True)
+            )
+
+        # Fallback: per-TF query (backward compat)
         if not ids or not tfs:
             return pd.DataFrame()
 
@@ -296,15 +356,16 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
             tf,
             tf_days,
             bar_seq,
-            "timestamp" AS ts,
+            time_close AS ts,
             close,
             is_partial_end,
             venue,
+            venue_id,
             venue_rank
           FROM {self.bars_table}
           WHERE id = ANY(:ids)
             AND tf = ANY(:tfs)
-          ORDER BY id, venue, tf, bar_seq, ts
+          ORDER BY id, venue, tf, bar_seq, time_close
         """
 
         with self.engine.connect() as conn:
@@ -599,16 +660,16 @@ def write_multi_timeframe_ema_cal_anchor_to_db(
     upsert_sql = text(
         f"""
       INSERT INTO {schema}.{out_table} (
-        id, tf, ts, period, venue, venue_rank,
+        id, venue_id, tf, ts, period, venue, venue_rank,
         tf_days, roll, ema, ema_bar, is_partial_end,
         ingested_at
       )
       VALUES (
-        :id, :tf, :ts, :period, :venue, :venue_rank,
+        :id, :venue_id, :tf, :ts, :period, :venue, :venue_rank,
         :tf_days, :roll, :ema, :ema_bar, :is_partial_end,
         now()
       )
-      ON CONFLICT (id, tf, ts, period, venue) {conflict_action}
+      ON CONFLICT (id, venue_id, tf, ts, period) {conflict_action}
     """
     )
 

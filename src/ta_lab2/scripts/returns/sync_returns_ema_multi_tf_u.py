@@ -28,8 +28,8 @@ from sqlalchemy import create_engine
 from ta_lab2.scripts.sync_utils import add_sync_cli_args, sync_sources_to_unified
 
 U_TABLE = "public.returns_ema_multi_tf_u"
-PK_COLS = ["id", "ts", "tf", "period", "venue", "alignment_source"]
-SOURCE_PREFIX = "cmc_returns_ema_"
+PK_COLS = ["id", "venue_id", "ts", "tf", "period", "alignment_source"]
+SOURCE_PREFIX = "returns_ema_"
 
 SOURCES = [
     "public.returns_ema_multi_tf",

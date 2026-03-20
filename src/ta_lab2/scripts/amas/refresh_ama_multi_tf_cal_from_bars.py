@@ -35,7 +35,6 @@ from __future__ import annotations
 
 import argparse
 from multiprocessing import Pool, cpu_count
-from typing import Optional
 
 from sqlalchemy import create_engine
 from sqlalchemy.pool import NullPool
@@ -148,83 +147,125 @@ def _cal_ama_worker(task: AMAWorkerTask) -> int:
             engine.dispose()
             return 0
 
+        # Discover which venue_ids exist for this asset in the bars table
+        from sqlalchemy import text as sa_text
+
+        with engine.connect() as conn:
+            venue_rows = conn.execute(
+                sa_text(
+                    f"SELECT DISTINCT venue_id FROM {task.bars_schema}.{task.bars_table}"
+                    f" WHERE id = :id ORDER BY venue_id"
+                ),
+                {"id": task.asset_id},
+            ).fetchall()
+        venue_ids = [int(r[0]) for r in venue_rows] if venue_rows else [1]
+
         total_rows = 0
+        state_updates: list[dict] = []
 
-        for tf_spec in tf_specs:
-            # Determine start_ts from state (or None for full history)
-            if task.full_rebuild:
-                start_ts = None
-            else:
-                min_watermark: Optional[pd.Timestamp] = None
-                for ps in task.param_sets:
-                    wm = state_manager.load_state(
-                        asset_id=task.asset_id,
-                        tf=tf_spec.tf,
-                        indicator=ps.indicator,
-                        params_hash=ps.params_hash,
+        # Preload ALL bars for this asset in 1 query (all TFs, all venues)
+        feature.preload_all_bars(engine, task.asset_id)
+
+        # Load ALL states for this asset in 1 query (instead of per-param-set per-TF)
+        if not task.full_rebuild:
+            all_states = state_manager.load_all_states(task.asset_id)
+            ps_keys = {(ps.indicator, ps.params_hash) for ps in task.param_sets}
+        else:
+            all_states = pd.DataFrame()
+
+        for venue_id in venue_ids:
+            for tf_spec in tf_specs:
+                # Determine start_ts from state (or None for full history)
+                if task.full_rebuild:
+                    start_ts = None
+                else:
+                    tf_states = (
+                        all_states[all_states["tf"] == tf_spec.tf]
+                        if not all_states.empty
+                        else all_states
                     )
-                    if wm is None:
-                        min_watermark = None
-                        break
-                    wm_ts = pd.Timestamp(wm)
-                    if min_watermark is None or wm_ts < min_watermark:
-                        min_watermark = wm_ts
+                    if tf_states.empty:
+                        start_ts = None
+                    else:
+                        existing = set(
+                            zip(tf_states["indicator"], tf_states["params_hash"])
+                        )
+                        if not ps_keys.issubset(existing):
+                            start_ts = None
+                        else:
+                            mask = tf_states.apply(
+                                lambda r: (r["indicator"], r["params_hash"]) in ps_keys,
+                                axis=1,
+                            )
+                            min_ts = tf_states.loc[mask, "last_canonical_ts"].min()
+                            start_ts = (
+                                pd.Timestamp(min_ts) if pd.notna(min_ts) else None
+                            )
 
-                start_ts = min_watermark
-
-            _logger.debug(
-                "asset_id=%s tf=%s scheme=%s start_ts=%s param_sets=%d",
-                task.asset_id,
-                tf_spec.tf,
-                scheme,
-                start_ts,
-                len(task.param_sets),
-            )
-
-            df = feature.compute_for_asset_tf(
-                engine=engine,
-                asset_id=task.asset_id,
-                tf=tf_spec.tf,
-                tf_days=tf_spec.tf_days,
-                param_sets=task.param_sets,
-                start_ts=start_ts,
-            )
-
-            if df.empty:
                 _logger.debug(
-                    "No AMA rows for asset_id=%s tf=%s scheme=%s — skipping write",
+                    "asset_id=%s tf=%s venue_id=%s scheme=%s start_ts=%s param_sets=%d",
                     task.asset_id,
                     tf_spec.tf,
+                    venue_id,
                     scheme,
+                    start_ts,
+                    len(task.param_sets),
                 )
-                continue
 
-            rows = feature.write_to_db(
-                engine=engine,
-                df=df,
-                schema=task.output_schema,
-                table=task.output_table,
-            )
-            total_rows += rows
-
-            # Update state watermarks per param_set
-            for ps in task.param_sets:
-                ps_mask = (df["indicator"] == ps.indicator) & (
-                    df["params_hash"] == ps.params_hash
+                df = feature.compute_for_asset_tf(
+                    engine=engine,
+                    asset_id=task.asset_id,
+                    tf=tf_spec.tf,
+                    tf_days=tf_spec.tf_days,
+                    param_sets=task.param_sets,
+                    start_ts=start_ts,
+                    venue_id=venue_id,
                 )
-                ps_df = df[ps_mask]
-                if ps_df.empty:
+
+                if df.empty:
+                    _logger.debug(
+                        "No AMA rows for asset_id=%s tf=%s venue_id=%s scheme=%s — skipping write",
+                        task.asset_id,
+                        tf_spec.tf,
+                        venue_id,
+                        scheme,
+                    )
                     continue
 
-                latest_ts = ps_df["ts"].max()
-                if pd.notna(latest_ts):
-                    state_manager.save_state(
-                        asset_id=task.asset_id,
-                        tf=tf_spec.tf,
-                        indicator=ps.indicator,
-                        params_hash=ps.params_hash,
-                        last_ts=pd.Timestamp(latest_ts).to_pydatetime(),
+                rows = feature.write_to_db(
+                    engine=engine,
+                    df=df,
+                    schema=task.output_schema,
+                    table=task.output_table,
+                )
+                total_rows += rows
+
+                # Collect state updates (batch write after all loops)
+                for ps in task.param_sets:
+                    ps_mask = (df["indicator"] == ps.indicator) & (
+                        df["params_hash"] == ps.params_hash
                     )
+                    ps_df = df[ps_mask]
+                    if ps_df.empty:
+                        continue
+
+                    latest_ts = ps_df["ts"].max()
+                    if pd.notna(latest_ts):
+                        state_updates.append(
+                            {
+                                "id": task.asset_id,
+                                "venue_id": 1,  # state tracked at default venue
+                                "tf": tf_spec.tf,
+                                "indicator": ps.indicator,
+                                "params_hash": ps.params_hash,
+                                "last_canonical_ts": pd.Timestamp(
+                                    latest_ts
+                                ).to_pydatetime(),
+                            }
+                        )
+
+        # Batch upsert all state watermarks in 1 DB call
+        state_manager.save_states_batch(state_updates)
 
         _logger.info(
             "asset_id=%s scheme=%s: wrote %d rows across %d TFs",

@@ -73,80 +73,52 @@ def _process_id_worker(task: WorkerTask) -> int:
         out_schema = task.extra_config.get("out_schema", "public")
         out_table = task.extra_config.get("out_table", "ema_multi_tf")
 
-        # For TF-level parallelism: use the feature class directly with TF filtering
-        # This avoids write_multi_timeframe_ema_to_db creating internal engines
+        # Always use the feature class path: load data once, compute all TFs, write once.
+        # This avoids the per-TF loop that creates ~122 separate DB round-trips per asset.
+        from ta_lab2.features.m_tf.base_ema_feature import EMAFeatureConfig
+        from ta_lab2.features.m_tf.ema_multi_timeframe import MultiTFEMAFeature
+        import pandas as pd
+        import numpy as np
+
+        config = EMAFeatureConfig(
+            periods=list(task.periods),
+            output_schema=out_schema,
+            output_table=out_table,
+        )
+        feature = MultiTFEMAFeature(
+            engine=engine,
+            config=config,
+            bars_schema=bars_schema,
+            bars_table=bars_table,
+            tf_subset=task.tf_subset,
+        )
+        df_daily = feature.load_source_data([task.id_], start=task.start, end=task.end)
+        if df_daily.empty:
+            engine.dispose()
+            return 0
+
+        tf_specs = feature.get_tf_specs()
         if task.tf_subset:
-            from ta_lab2.features.m_tf.base_ema_feature import EMAFeatureConfig
-            from ta_lab2.features.m_tf.ema_multi_timeframe import MultiTFEMAFeature
-            import pandas as pd
-            import numpy as np
-
-            config = EMAFeatureConfig(
-                periods=list(task.periods),
-                output_schema=out_schema,
-                output_table=out_table,
-            )
-            feature = MultiTFEMAFeature(
-                engine=engine,
-                config=config,
-                bars_schema=bars_schema,
-                bars_table=bars_table,
-                tf_subset=task.tf_subset,
-            )
-            df_daily = feature.load_source_data(
-                [task.id_], start=task.start, end=task.end
-            )
-            if df_daily.empty:
-                engine.dispose()
-                return 0
-
-            tf_specs = feature.get_tf_specs()
             tf_subset_set = set(task.tf_subset)
             tf_specs = [s for s in tf_specs if s.tf in tf_subset_set]
 
-            all_results = []
-            for tf_spec in tf_specs:
-                df_ema = feature.compute_emas_for_tf(df_daily, tf_spec, config.periods)
-                if not df_ema.empty:
-                    all_results.append(df_ema)
+        # Preload bar closes for ALL TFs in 1 query (avoids 122 per-TF queries)
+        ids = df_daily["id"].unique().tolist()
+        feature.preload_bar_closes(ids, end=task.end)
 
-            if all_results:
-                df_out = pd.concat(all_results, ignore_index=True)
-                df_out = df_out.replace({np.nan: None})
-                feature.write_to_db(df_out)
-                total_rows = len(df_out)
-            else:
-                total_rows = 0
+        all_results = []
+        for tf_spec in tf_specs:
+            df_ema = feature.compute_emas_for_tf(df_daily, tf_spec, config.periods)
+            if not df_ema.empty:
+                all_results.append(df_ema)
+
+        if all_results:
+            df_out = pd.concat(all_results, ignore_index=True)
+            df_out = df_out.replace({np.nan: None})
+            feature.write_to_db(df_out)
+            total_rows = len(df_out)
         else:
-            # Use tf_subset from extra_config, or load all
-            tfs = task.extra_config.get("tfs")
-            if not tfs:
-                tfs = list_tfs(
-                    db_url=task.db_url,
-                    alignment_type="tf_day",
-                    canonical_only=True,
-                )
-
-            # Process timeframes for this ID
             total_rows = 0
-            for tf in tfs:
-                # Special handling for 1D: use price_bars_1d (validated bars)
-                actual_bars_table = "price_bars_1d" if tf == "1D" else bars_table
-
-                n = write_multi_timeframe_ema_to_db(
-                    ids=[task.id_],
-                    start=task.start,
-                    end=task.end,
-                    ema_periods=task.periods,
-                    tf_subset=[tf],
-                    db_url=task.db_url,
-                    schema=out_schema,
-                    out_table=out_table,
-                    bars_schema=bars_schema,
-                    bars_table_tf_day=actual_bars_table,
-                )
-                total_rows += n
-                logger.debug(f"ID {task.id_}, TF {tf}: {n} rows")
 
         engine.dispose()
         logger.info(f"Completed EMA computation for id={task.id_}: {total_rows} rows")
@@ -322,7 +294,7 @@ class MultiTFEMARefresher(BaseEMARefresher):
         temp_instance = cls(temp_config, temp_state_config, engine)
 
         # Load IDs and periods using helper methods
-        ids = temp_instance.load_ids(args.ids)
+        ids = temp_instance.load_ids(args.ids, venue_id=args.venue_id)
         periods = temp_instance.load_periods(args.periods)
 
         # Create final config with loaded IDs and periods

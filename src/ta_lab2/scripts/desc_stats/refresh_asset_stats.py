@@ -188,6 +188,7 @@ class WorkerTask:
     full_rebuild: bool
     windows: List[int]
     rf: float
+    venue_id: int = 1
 
 
 def _worker(task: WorkerTask, db_url: str) -> Tuple[int, str, int, bool, str]:
@@ -222,6 +223,7 @@ def _process_one(engine: Engine, db_url: str, task: WorkerTask) -> int:
     asset_id = task.asset_id
     tf = task.tf
     windows = task.windows
+    venue_id = task.venue_id
     rf = task.rf
 
     # Use the explicit db_url (not str(engine.url) which strips the password)
@@ -237,9 +239,9 @@ def _process_one(engine: Engine, db_url: str, task: WorkerTask) -> int:
             row = conn.execute(
                 text(
                     "SELECT last_timestamp FROM public.asset_stats_state "
-                    "WHERE id = :id AND tf = :tf"
+                    "WHERE id = :id AND venue_id = :venue_id AND tf = :tf"
                 ),
-                {"id": asset_id, "tf": tf},
+                {"id": asset_id, "venue_id": venue_id, "tf": tf},
             ).fetchone()
             if row and row[0] is not None:
                 # row[0] may be a tz-aware datetime; convert to UTC safely
@@ -257,10 +259,10 @@ def _process_one(engine: Engine, db_url: str, task: WorkerTask) -> int:
         sql = text(
             'SELECT id, "timestamp" AS ts, tf, ret_arith '
             "FROM public.returns_bars_multi_tf "
-            "WHERE id = :id AND tf = :tf AND roll = FALSE "
+            "WHERE id = :id AND venue_id = :venue_id AND tf = :tf AND roll = FALSE "
             'ORDER BY "timestamp"'
         )
-        params: Dict[str, Any] = {"id": asset_id, "tf": tf}
+        params: Dict[str, Any] = {"id": asset_id, "venue_id": venue_id, "tf": tf}
     else:
         # Incremental: load from (last_ts - lookback bars) to capture the full
         # rolling window context needed for continuity.
@@ -271,12 +273,13 @@ def _process_one(engine: Engine, db_url: str, task: WorkerTask) -> int:
         sql = text(
             'SELECT id, "timestamp" AS ts, tf, ret_arith '
             "FROM public.returns_bars_multi_tf "
-            "WHERE id = :id AND tf = :tf AND roll = FALSE "
+            "WHERE id = :id AND venue_id = :venue_id AND tf = :tf AND roll = FALSE "
             "AND \"timestamp\" >= (:last_ts - CAST(:lookback_days || ' days' AS INTERVAL)) "
             'ORDER BY "timestamp"'
         )
         params = {
             "id": asset_id,
+            "venue_id": venue_id,
             "tf": tf,
             "last_ts": last_ts,
             "lookback_days": lookback_days,
@@ -319,22 +322,30 @@ def _process_one(engine: Engine, db_url: str, task: WorkerTask) -> int:
     # ------------------------------------------------------------------
     # Step 4: DELETE + INSERT (scoped to new rows)
     # ------------------------------------------------------------------
+    # Add venue_id to the DataFrame for insertion
+    write_df["venue_id"] = venue_id
+
     # Build column list from the DataFrame (matches DDL order)
-    stat_cols = [c for c in write_df.columns if c not in ("id", "ts", "tf")]
-    all_cols = ["id", "ts", "tf"] + stat_cols
+    stat_cols = [c for c in write_df.columns if c not in ("id", "venue_id", "ts", "tf")]
+    all_cols = ["id", "venue_id", "ts", "tf"] + stat_cols
     write_df = write_df[all_cols]
 
     # Replace numpy NaN with None for DB
     records = _df_to_records(write_df)
 
     with engine.begin() as conn:
-        # Scoped delete: only rows >= first_new_ts for this (id, tf)
+        # Scoped delete: only rows >= first_new_ts for this (id, venue_id, tf)
         conn.execute(
             text(
                 "DELETE FROM public.asset_stats "
-                "WHERE id = :id AND tf = :tf AND ts >= :first_ts"
+                "WHERE id = :id AND venue_id = :venue_id AND tf = :tf AND ts >= :first_ts"
             ),
-            {"id": asset_id, "tf": tf, "first_ts": first_new_ts.to_pydatetime()},
+            {
+                "id": asset_id,
+                "venue_id": venue_id,
+                "tf": tf,
+                "first_ts": first_new_ts.to_pydatetime(),
+            },
         )
 
         # Insert new rows
@@ -350,12 +361,17 @@ def _process_one(engine: Engine, db_url: str, task: WorkerTask) -> int:
         # ------------------------------------------------------------------
         conn.execute(
             text(
-                "INSERT INTO public.asset_stats_state (id, tf, last_timestamp, updated_at) "
-                "VALUES (:id, :tf, :last_ts, now()) "
-                "ON CONFLICT (id, tf) DO UPDATE "
+                "INSERT INTO public.asset_stats_state (id, venue_id, tf, last_timestamp, updated_at) "
+                "VALUES (:id, :venue_id, :tf, :last_ts, now()) "
+                "ON CONFLICT (id, venue_id, tf) DO UPDATE "
                 "SET last_timestamp = EXCLUDED.last_timestamp, updated_at = now()"
             ),
-            {"id": asset_id, "tf": tf, "last_ts": new_last_ts.to_pydatetime()},
+            {
+                "id": asset_id,
+                "venue_id": venue_id,
+                "tf": tf,
+                "last_ts": new_last_ts.to_pydatetime(),
+            },
         )
 
     return n_rows
@@ -398,7 +414,7 @@ def _get_all_asset_ids(engine: Engine) -> List[int]:
 
 def _get_all_tfs(engine: Engine) -> List[str]:
     """Return all canonical TFs from dim_timeframe, sorted by sort_order."""
-    dim = DimTimeframe.from_db(str(engine.url))
+    dim = DimTimeframe.from_db(engine.url.render_as_string(hide_password=False))
     return list(dim.list_tfs(canonical_only=True))
 
 
@@ -458,6 +474,18 @@ def main() -> None:
         default=None,
         help="Override database URL.",
     )
+    p.add_argument(
+        "--venue-id",
+        type=int,
+        default=None,
+        help="Venue ID to filter source data (default: 1 = CMC_AGG).",
+    )
+    p.add_argument(
+        "--all-venues",
+        action="store_true",
+        default=False,
+        help="Run for all venue_ids that have data in returns_bars_multi_tf.",
+    )
     args = p.parse_args()
 
     db_url = resolve_db_url(args.db_url)
@@ -492,6 +520,28 @@ def main() -> None:
         f"rf={args.rf}, full_rebuild={args.full_rebuild}, workers={args.workers}"
     )
 
+    # Resolve venue_ids and per-venue asset IDs
+    if args.all_venues:
+        engine_tmp = create_engine(db_url, future=True, poolclass=NullPool)
+        with engine_tmp.connect() as conn:
+            venue_asset_rows = conn.execute(
+                text(
+                    "SELECT DISTINCT venue_id, id FROM public.returns_bars_multi_tf "
+                    "ORDER BY venue_id, id"
+                )
+            ).fetchall()
+        engine_tmp.dispose()
+        # Group asset IDs by venue
+        venue_asset_map: Dict[int, List[int]] = {}
+        for vid, aid in venue_asset_rows:
+            venue_asset_map.setdefault(vid, []).append(aid)
+        _print(f"All venues mode: {list(venue_asset_map.keys())}")
+        for vid, aids in venue_asset_map.items():
+            _print(f"  venue {vid}: {len(aids)} assets")
+    else:
+        vid = args.venue_id if args.venue_id is not None else 1
+        venue_asset_map = {vid: asset_ids}
+
     # Build task list
     tasks: List[WorkerTask] = [
         WorkerTask(
@@ -500,8 +550,10 @@ def main() -> None:
             full_rebuild=args.full_rebuild,
             windows=windows,
             rf=args.rf,
+            venue_id=vid,
         )
-        for asset_id in asset_ids
+        for vid, aids in venue_asset_map.items()
+        for asset_id in aids
         for tf in tfs
     ]
 

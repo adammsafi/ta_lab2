@@ -100,13 +100,13 @@ _VALUE_COLS = [
 ]
 
 _INSERT_COLS = (
-    'id, "timestamp", tf, venue, venue_rank, roll,\n'
+    'id, venue_id, "timestamp", tf, venue, venue_rank, roll,\n'
     + ",\n".join(_VALUE_COLS)
     + ",\ningested_at"
 )
 _UPSERT_SET = ",\n".join(
     f"{c} = EXCLUDED.{c}"
-    for c in ["venue_rank", "roll"] + _VALUE_COLS + ["ingested_at"]
+    for c in ["venue", "venue_rank", "roll"] + _VALUE_COLS + ["ingested_at"]
 )
 
 
@@ -121,9 +121,10 @@ def _ensure_tables(engine: Engine, out_table: str, state_table: str) -> None:
         f"""
         CREATE TABLE IF NOT EXISTS {out_table} (
             id                      integer       NOT NULL,
+            venue_id                smallint      NOT NULL DEFAULT 1,
             "timestamp"             timestamptz   NOT NULL,
             tf                      text          NOT NULL,
-            venue                   text          NOT NULL DEFAULT 'aggregate',
+            venue                   text          DEFAULT 'CMC_AGG',
             venue_rank              integer,
             tf_days                 integer,
             bar_seq                 integer,
@@ -181,22 +182,22 @@ def _ensure_tables(engine: Engine, out_table: str, state_table: str) -> None:
             delta_ret_log_roll_zscore_365   double precision,
             is_outlier                  boolean,
             ingested_at             timestamptz   NOT NULL DEFAULT now(),
-            PRIMARY KEY (id, "timestamp", tf, venue)
+            PRIMARY KEY (id, "timestamp", tf, venue_id)
         );
         """
     )
     idx_sql = text(
-        f'CREATE INDEX IF NOT EXISTS ix_{tbl}_id_tf_venue_ts ON {out_table} (id, tf, venue, "timestamp");'
+        f'CREATE INDEX IF NOT EXISTS ix_{tbl}_id_tf_vid_ts ON {out_table} (id, tf, venue_id, "timestamp");'
     )
     state_sql = text(
         f"""
         CREATE TABLE IF NOT EXISTS {state_table} (
             id              integer       NOT NULL,
+            venue_id        smallint      NOT NULL DEFAULT 1,
             tf              text          NOT NULL,
-            venue           text          NOT NULL DEFAULT 'aggregate',
             last_timestamp  timestamptz,
             updated_at      timestamptz   NOT NULL DEFAULT now(),
-            PRIMARY KEY (id, tf, venue)
+            PRIMARY KEY (id, venue_id, tf)
         );
         """
     )
@@ -210,60 +211,60 @@ def _load_keys(
     engine: Engine,
     bars_table: str,
     ids: Optional[List[int]],
-) -> List[Tuple[int, str, str]]:
+) -> List[Tuple[int, str, int]]:
     if ids is None:
         sql = text(
-            f"SELECT DISTINCT id, tf, COALESCE(venue, 'aggregate') AS venue FROM {bars_table} ORDER BY 1,2,3;"
+            f"SELECT DISTINCT id, tf, venue_id FROM {bars_table} ORDER BY 1,2,3;"
         )
         with engine.begin() as cxn:
             rows = cxn.execute(sql).fetchall()
     else:
         sql = text(
-            f"SELECT DISTINCT id, tf, COALESCE(venue, 'aggregate') AS venue"
+            f"SELECT DISTINCT id, tf, venue_id"
             f" FROM {bars_table} WHERE id = ANY(:ids) ORDER BY 1,2,3;"
         )
         with engine.begin() as cxn:
             rows = cxn.execute(sql, {"ids": ids}).fetchall()
-    return [(int(r[0]), str(r[1]), str(r[2])) for r in rows]
+    return [(int(r[0]), str(r[1]), int(r[2])) for r in rows]
 
 
 def _ensure_state_rows(
-    engine: Engine, state_table: str, keys: List[Tuple[int, str, str]]
+    engine: Engine, state_table: str, keys: List[Tuple[int, str, int]]
 ) -> None:
     if not keys:
         return
     ins = text(
         f"""
-        INSERT INTO {state_table} (id, tf, venue, last_timestamp)
-        VALUES (:id, :tf, :venue, NULL)
-        ON CONFLICT (id, tf, venue) DO NOTHING;
+        INSERT INTO {state_table} (id, venue_id, tf, last_timestamp)
+        VALUES (:id, :venue_id, :tf, NULL)
+        ON CONFLICT (id, venue_id, tf) DO NOTHING;
         """
     )
     with engine.begin() as cxn:
-        for i, tf, venue in keys:
-            cxn.execute(ins, {"id": i, "tf": tf, "venue": venue})
+        for i, tf, venue_id in keys:
+            cxn.execute(ins, {"id": i, "venue_id": venue_id, "tf": tf})
 
 
 def _full_refresh(
     engine: Engine,
     out_table: str,
     state_table: str,
-    keys: List[Tuple[int, str, str]],
+    keys: List[Tuple[int, str, int]],
 ) -> None:
     if not keys:
         return
     _print(
-        f"--full-refresh: deleting existing rows for {len(keys)} (id,tf,venue) keys and resetting state."
+        f"--full-refresh: deleting existing rows for {len(keys)} (id,tf,venue_id) keys and resetting state."
     )
     del_out = text(
-        f"DELETE FROM {out_table} WHERE id = :id AND tf = :tf AND venue = :venue;"
+        f"DELETE FROM {out_table} WHERE id = :id AND tf = :tf AND venue_id = :venue_id;"
     )
     del_state = text(
-        f"DELETE FROM {state_table} WHERE id = :id AND tf = :tf AND venue = :venue;"
+        f"DELETE FROM {state_table} WHERE id = :id AND tf = :tf AND venue_id = :venue_id;"
     )
     with engine.begin() as cxn:
-        for i, tf, venue in keys:
-            params = {"id": i, "tf": tf, "venue": venue}
+        for i, tf, venue_id in keys:
+            params = {"id": i, "tf": tf, "venue_id": venue_id}
             cxn.execute(del_out, params)
             cxn.execute(del_state, params)
     _ensure_state_rows(engine, state_table, keys)
@@ -280,10 +281,10 @@ def _run_one_key(
     out_table: str,
     state_table: str,
     start: str,
-    key: Tuple[int, str, str],
-) -> Tuple[int, str, str, int]:
-    """Process one (id, tf, venue) key. Self-contained for multiprocessing."""
-    one_id, one_tf, one_venue = key
+    key: Tuple[int, str, int],
+) -> Tuple[int, str, int, int]:
+    """Process one (id, tf, venue_id) key. Self-contained for multiprocessing."""
+    one_id, one_tf, one_venue_id = key
     engine = create_engine(db_url, poolclass=NullPool, future=True)
 
     sql = text(
@@ -291,7 +292,7 @@ def _run_one_key(
         WITH st AS (
             SELECT last_timestamp
             FROM {state_table}
-            WHERE id = :id AND tf = :tf AND venue = :venue
+            WHERE id = :id AND tf = :tf AND venue_id = :venue_id
         ),
         -- Seed: go back 2 canonical (is_partial_end=FALSE) rows before last_timestamp
         -- to provide enough history for both LAG chains (including delta2).
@@ -300,7 +301,7 @@ def _run_one_key(
                 (SELECT MIN(sub.ts) FROM (
                     SELECT "timestamp" AS ts FROM {bars_table}
                     WHERE id = :id AND tf = :tf
-                      AND COALESCE(venue, 'aggregate') = :venue
+                      AND venue_id = :venue_id
                       AND is_partial_end = FALSE
                       AND "timestamp" < COALESCE((SELECT last_timestamp FROM st), CAST(:start AS timestamptz))
                     ORDER BY "timestamp" DESC
@@ -314,6 +315,7 @@ def _run_one_key(
         src AS (
             SELECT
                 b.id,
+                b.venue_id,
                 b."timestamp",
                 b.tf,
                 b.tf_days,
@@ -328,32 +330,32 @@ def _run_one_key(
                 b.time_close,
                 b.time_close_bar,
                 b.time_open_bar,
-                COALESCE(b.venue, 'aggregate') AS venue,
+                COALESCE(b.venue, 'CMC_AGG') AS venue,
                 b.venue_rank
             FROM {bars_table} b, seed
             WHERE b.id = :id
               AND b.tf = :tf
-              AND COALESCE(b.venue, 'aggregate') = :venue
+              AND b.venue_id = :venue_id
               AND b."timestamp" >= seed.seed_ts
         ),
         lagged AS (
             SELECT
                 s.*,
                 -- Unified LAG: previous row regardless of roll (for _roll columns)
-                LAG(s.close)   OVER (PARTITION BY s.venue ORDER BY s."timestamp") AS prev_close_u,
-                LAG(s.high)    OVER (PARTITION BY s.venue ORDER BY s."timestamp") AS prev_high_u,
-                LAG(s.low)     OVER (PARTITION BY s.venue ORDER BY s."timestamp") AS prev_low_u,
-                LAG(s.bar_seq) OVER (PARTITION BY s.venue ORDER BY s."timestamp") AS prev_bar_seq_u,
+                LAG(s.close)   OVER (ORDER BY s."timestamp") AS prev_close_u,
+                LAG(s.high)    OVER (ORDER BY s."timestamp") AS prev_high_u,
+                LAG(s.low)     OVER (ORDER BY s."timestamp") AS prev_low_u,
+                LAG(s.bar_seq) OVER (ORDER BY s."timestamp") AS prev_bar_seq_u,
                 -- Canonical LAG: previous row within same roll partition (for non-roll columns)
-                LAG(s.close)   OVER (PARTITION BY s.venue, s.roll ORDER BY s."timestamp") AS prev_close_c,
-                LAG(s.high)    OVER (PARTITION BY s.venue, s.roll ORDER BY s."timestamp") AS prev_high_c,
-                LAG(s.low)     OVER (PARTITION BY s.venue, s.roll ORDER BY s."timestamp") AS prev_low_c,
-                LAG(s.bar_seq) OVER (PARTITION BY s.venue, s.roll ORDER BY s."timestamp") AS prev_bar_seq_c
+                LAG(s.close)   OVER (PARTITION BY s.roll ORDER BY s."timestamp") AS prev_close_c,
+                LAG(s.high)    OVER (PARTITION BY s.roll ORDER BY s."timestamp") AS prev_high_c,
+                LAG(s.low)     OVER (PARTITION BY s.roll ORDER BY s."timestamp") AS prev_low_c,
+                LAG(s.bar_seq) OVER (PARTITION BY s.roll ORDER BY s."timestamp") AS prev_bar_seq_c
             FROM src s
         ),
         calc AS (
             SELECT
-                id, "timestamp", tf, venue, venue_rank, tf_days, bar_seq, pos_in_bar,
+                id, venue_id, "timestamp", tf, venue, venue_rank, tf_days, bar_seq, pos_in_bar,
                 count_days, count_days_remaining, roll,
                 time_close, time_close_bar, time_open_bar,
                 close, high, low,
@@ -435,24 +437,24 @@ def _run_one_key(
         calc2 AS (
             SELECT c.*,
                 -- delta2 roll
-                c.delta1_roll - LAG(c.delta1_roll) OVER (PARTITION BY c.venue ORDER BY c."timestamp") AS delta2_roll,
+                c.delta1_roll - LAG(c.delta1_roll) OVER (ORDER BY c."timestamp") AS delta2_roll,
                 -- delta2 canonical
                 CASE WHEN NOT c.roll
-                     THEN c.delta1 - LAG(c.delta1) OVER (PARTITION BY c.venue, c.roll ORDER BY c."timestamp")
+                     THEN c.delta1 - LAG(c.delta1) OVER (PARTITION BY c.roll ORDER BY c."timestamp")
                 END AS delta2,
 
                 -- delta_ret_arith roll
-                c.ret_arith_roll - LAG(c.ret_arith_roll) OVER (PARTITION BY c.venue ORDER BY c."timestamp") AS delta_ret_arith_roll,
+                c.ret_arith_roll - LAG(c.ret_arith_roll) OVER (ORDER BY c."timestamp") AS delta_ret_arith_roll,
                 -- delta_ret_arith canonical
                 CASE WHEN NOT c.roll
-                     THEN c.ret_arith - LAG(c.ret_arith) OVER (PARTITION BY c.venue, c.roll ORDER BY c."timestamp")
+                     THEN c.ret_arith - LAG(c.ret_arith) OVER (PARTITION BY c.roll ORDER BY c."timestamp")
                 END AS delta_ret_arith,
 
                 -- delta_ret_log roll
-                c.ret_log_roll - LAG(c.ret_log_roll) OVER (PARTITION BY c.venue ORDER BY c."timestamp") AS delta_ret_log_roll,
+                c.ret_log_roll - LAG(c.ret_log_roll) OVER (ORDER BY c."timestamp") AS delta_ret_log_roll,
                 -- delta_ret_log canonical
                 CASE WHEN NOT c.roll
-                     THEN c.ret_log - LAG(c.ret_log) OVER (PARTITION BY c.venue, c.roll ORDER BY c."timestamp")
+                     THEN c.ret_log - LAG(c.ret_log) OVER (PARTITION BY c.roll ORDER BY c."timestamp")
                 END AS delta_ret_log
 
             FROM calc c
@@ -468,11 +470,11 @@ def _run_one_key(
                 {_INSERT_COLS}
             )
             SELECT
-                id, "timestamp", tf, venue, venue_rank, roll,
+                id, venue_id, "timestamp", tf, venue, venue_rank, roll,
                 {",".join(_VALUE_COLS)},
                 now()
             FROM to_insert
-            ON CONFLICT (id, "timestamp", tf, venue) DO UPDATE SET
+            ON CONFLICT (id, "timestamp", tf, venue_id) DO UPDATE SET
                 {_UPSERT_SET}
             RETURNING "timestamp"
         )
@@ -480,18 +482,18 @@ def _run_one_key(
         SET
             last_timestamp = COALESCE((SELECT MAX("timestamp") FROM ins), s.last_timestamp),
             updated_at = now()
-        WHERE s.id = :id AND s.tf = :tf AND s.venue = :venue;
+        WHERE s.id = :id AND s.tf = :tf AND s.venue_id = :venue_id;
         """
     )
 
     with engine.begin() as cxn:
         result = cxn.execute(
             sql,
-            {"id": one_id, "tf": one_tf, "venue": one_venue, "start": start},
+            {"id": one_id, "tf": one_tf, "venue_id": one_venue_id, "start": start},
         )
 
     engine.dispose()
-    return (one_id, one_tf, one_venue, result.rowcount or 0)
+    return (one_id, one_tf, one_venue_id, result.rowcount or 0)
 
 
 # ---------------------------------------------------------------------------
@@ -585,14 +587,16 @@ def main() -> None:
     if args.workers > 1:
         _print(f"Running {len(keys)} keys with {args.workers} workers.")
         with Pool(processes=args.workers) as pool:
-            for one_id, one_tf, one_venue, n_rows in pool.imap_unordered(
+            for one_id, one_tf, one_venue_id, n_rows in pool.imap_unordered(
                 worker_fn, keys
             ):
-                _print(f"  ({one_id},{one_tf},{one_venue}) -> {n_rows} rows")
+                _print(f"  ({one_id},{one_tf},v{one_venue_id}) -> {n_rows} rows")
     else:
         for i, key in enumerate(keys, start=1):
-            one_id, one_tf, one_venue = key
-            _print(f"Processing key=({one_id},{one_tf},{one_venue}) ({i}/{len(keys)})")
+            one_id, one_tf, one_venue_id = key
+            _print(
+                f"Processing key=({one_id},{one_tf},v{one_venue_id}) ({i}/{len(keys)})"
+            )
             _run_one_key(
                 db_url,
                 args.bars_table,

@@ -52,12 +52,13 @@ logger = logging.getLogger(__name__)
 _STATE_TABLE_DDL = """
 CREATE TABLE IF NOT EXISTS {state_table} (
     id               INTEGER     NOT NULL,
+    venue_id         SMALLINT    NOT NULL DEFAULT 1,
     tf               TEXT        NOT NULL,
     indicator        TEXT        NOT NULL,
     params_hash      TEXT        NOT NULL,
     last_canonical_ts TIMESTAMPTZ,
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    PRIMARY KEY (id, tf, indicator, params_hash)
+    PRIMARY KEY (id, venue_id, tf, indicator, params_hash)
 );
 """
 
@@ -124,15 +125,17 @@ class AMAStateManager:
         tf: str,
         indicator: str,
         params_hash: str,
+        venue_id: int = 1,
     ) -> Optional[datetime]:
         """
-        Load the last canonical timestamp for a single (id, tf, indicator, params_hash).
+        Load the last canonical timestamp for a single (id, venue_id, tf, indicator, params_hash).
 
         Args:
             asset_id: Asset primary key.
             tf: Timeframe label (e.g. "1D").
             indicator: Indicator name (e.g. "KAMA").
             params_hash: MD5 hash of the canonical params dict.
+            venue_id: Venue identifier (FK to dim_venues). Default 1 (CMC_AGG).
 
         Returns:
             tz-aware datetime of the last canonical row, or None if no state exists.
@@ -145,6 +148,7 @@ class AMAStateManager:
             SELECT last_canonical_ts
             FROM {self.state_table}
             WHERE id = :id
+              AND venue_id = :venue_id
               AND tf = :tf
               AND indicator = :indicator
               AND params_hash = :params_hash
@@ -152,6 +156,7 @@ class AMAStateManager:
         )
         params = {
             "id": asset_id,
+            "venue_id": venue_id,
             "tf": tf,
             "indicator": indicator,
             "params_hash": params_hash,
@@ -177,30 +182,32 @@ class AMAStateManager:
             ts = ts.tz_convert("UTC")
         return ts.to_pydatetime()
 
-    def load_all_states(self, asset_id: int) -> pd.DataFrame:
+    def load_all_states(self, asset_id: int, venue_id: int = 1) -> pd.DataFrame:
         """
-        Load all state rows for a given asset.
+        Load all state rows for a given asset and venue.
 
         Useful when deciding start_ts for all (tf, indicator, params_hash)
         combinations in a bulk refresh.
 
         Args:
             asset_id: Asset primary key.
+            venue_id: Venue identifier (FK to dim_venues). Default 1 (CMC_AGG).
 
         Returns:
-            DataFrame with columns: tf, indicator, params_hash, last_canonical_ts,
-            updated_at. Empty DataFrame if no state exists or table absent.
+            DataFrame with columns: venue_id, tf, indicator, params_hash,
+            last_canonical_ts, updated_at. Empty DataFrame if no state exists or table absent.
         """
         sql = text(
             f"""
-            SELECT tf, indicator, params_hash, last_canonical_ts, updated_at
+            SELECT venue_id, tf, indicator, params_hash, last_canonical_ts, updated_at
             FROM {self.state_table}
-            WHERE id = :id
+            WHERE id = :id AND venue_id = :venue_id
             ORDER BY tf, indicator, params_hash
             """
         )
         empty = pd.DataFrame(
             columns=[
+                "venue_id",
                 "tf",
                 "indicator",
                 "params_hash",
@@ -210,7 +217,9 @@ class AMAStateManager:
         )
         try:
             with self.engine.connect() as conn:
-                return pd.read_sql(sql, conn, params={"id": asset_id})
+                return pd.read_sql(
+                    sql, conn, params={"id": asset_id, "venue_id": venue_id}
+                )
         except Exception as exc:
             logger.debug(
                 "load_all_states: could not query %s for id=%s — %s",
@@ -231,9 +240,10 @@ class AMAStateManager:
         indicator: str,
         params_hash: str,
         last_ts: datetime,
+        venue_id: int = 1,
     ) -> None:
         """
-        Upsert state for a single (id, tf, indicator, params_hash).
+        Upsert state for a single (id, venue_id, tf, indicator, params_hash).
 
         Uses ON CONFLICT DO UPDATE so multiple runs are idempotent.
 
@@ -243,20 +253,22 @@ class AMAStateManager:
             indicator: Indicator name.
             params_hash: MD5 hash of params dict.
             last_ts: Most recent canonical timestamp written to the AMA table.
+            venue_id: Venue identifier (FK to dim_venues). Default 1 (CMC_AGG).
         """
         sql = text(
             f"""
             INSERT INTO {self.state_table}
-                (id, tf, indicator, params_hash, last_canonical_ts, updated_at)
+                (id, venue_id, tf, indicator, params_hash, last_canonical_ts, updated_at)
             VALUES
-                (:id, :tf, :indicator, :params_hash, :last_canonical_ts, NOW())
-            ON CONFLICT (id, tf, indicator, params_hash) DO UPDATE SET
+                (:id, :venue_id, :tf, :indicator, :params_hash, :last_canonical_ts, NOW())
+            ON CONFLICT (id, venue_id, tf, indicator, params_hash) DO UPDATE SET
                 last_canonical_ts = EXCLUDED.last_canonical_ts,
                 updated_at        = NOW()
             """
         )
         params = {
             "id": asset_id,
+            "venue_id": venue_id,
             "tf": tf,
             "indicator": indicator,
             "params_hash": params_hash,
@@ -265,13 +277,43 @@ class AMAStateManager:
         with self.engine.begin() as conn:
             conn.execute(sql, params)
         logger.debug(
-            "save_state: %s id=%s tf=%s indicator=%s params_hash=%s last_ts=%s",
+            "save_state: %s id=%s venue_id=%s tf=%s indicator=%s params_hash=%s last_ts=%s",
             self.state_table,
             asset_id,
+            venue_id,
             tf,
             indicator,
             params_hash,
             last_ts,
+        )
+
+    def save_states_batch(self, states: list[dict]) -> None:
+        """
+        Batch upsert state rows in a single DB round-trip.
+
+        Each dict must have keys: id, venue_id, tf, indicator, params_hash,
+        last_canonical_ts.
+
+        Args:
+            states: List of state dicts to upsert.
+        """
+        if not states:
+            return
+        sql = text(
+            f"""
+            INSERT INTO {self.state_table}
+                (id, venue_id, tf, indicator, params_hash, last_canonical_ts, updated_at)
+            VALUES
+                (:id, :venue_id, :tf, :indicator, :params_hash, :last_canonical_ts, NOW())
+            ON CONFLICT (id, venue_id, tf, indicator, params_hash) DO UPDATE SET
+                last_canonical_ts = EXCLUDED.last_canonical_ts,
+                updated_at        = NOW()
+            """
+        )
+        with self.engine.begin() as conn:
+            conn.execute(sql, states)
+        logger.debug(
+            "save_states_batch: %s — %d rows upserted", self.state_table, len(states)
         )
 
     # =========================================================================
@@ -283,6 +325,7 @@ class AMAStateManager:
         asset_id: int,
         tf: Optional[str] = None,
         indicator: Optional[str] = None,
+        venue_id: Optional[int] = None,
     ) -> int:
         """
         Delete state rows for an asset (used by --full-rebuild scenarios).
@@ -291,12 +334,17 @@ class AMAStateManager:
             asset_id: Asset primary key. Always required.
             tf: Optional timeframe filter. If None, all TFs are cleared.
             indicator: Optional indicator filter. If None, all indicators are cleared.
+            venue_id: Optional venue filter. If None, all venues are cleared.
 
         Returns:
             Number of rows deleted.
         """
         where_parts = ["id = :id"]
         params: dict = {"id": asset_id}
+
+        if venue_id is not None:
+            where_parts.append("venue_id = :venue_id")
+            params["venue_id"] = venue_id
 
         if tf is not None:
             where_parts.append("tf = :tf")

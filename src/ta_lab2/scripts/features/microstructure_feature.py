@@ -181,6 +181,10 @@ class MicrostructureFeature(BaseFeature):
             "as_": self.get_alignment_source(),
         }
 
+        if self.config.venue_id is not None:
+            where_clauses.append("p.venue_id = :venue_id")
+            params["venue_id"] = self.config.venue_id
+
         if start:
             where_clauses.append(f"p.{self.TS_COLUMN} >= :start")
             params["start"] = start
@@ -195,6 +199,7 @@ class MicrostructureFeature(BaseFeature):
             SELECT
                 p.id,
                 p.{self.TS_COLUMN} as ts,
+                p.venue_id,
                 p.venue,
                 p.venue_rank,
                 p.open,
@@ -235,7 +240,7 @@ class MicrostructureFeature(BaseFeature):
         df = df_source.copy()
         results = []
 
-        for (id_val, venue_val), df_id in df.groupby(["id", "venue"]):
+        for (id_val, venue_id_val), df_id in df.groupby(["id", "venue_id"]):
             df_id = df_id.copy()
             df_id = df_id.sort_values("ts")
 
@@ -246,7 +251,7 @@ class MicrostructureFeature(BaseFeature):
             # Guard: need minimum data for any computation
             if n < 30:
                 logger.warning(
-                    f"Skipping id={id_val}, venue={venue_val}: only {n} bars (<30)"
+                    f"Skipping id={id_val}, venue_id={venue_id_val}: only {n} bars (<30)"
                 )
                 continue
 
@@ -351,6 +356,7 @@ class MicrostructureFeature(BaseFeature):
             "id": "INTEGER NOT NULL",
             "ts": "TIMESTAMPTZ NOT NULL",
             "tf": "TEXT NOT NULL",
+            "venue_id": "SMALLINT NOT NULL DEFAULT 1",
             "venue": "TEXT NOT NULL DEFAULT 'CMC_AGG'",
             "alignment_source": "TEXT NOT NULL DEFAULT 'multi_tf'",
             "close_fracdiff": "DOUBLE PRECISION",
@@ -400,7 +406,7 @@ class MicrostructureFeature(BaseFeature):
 
         Args:
             df: DataFrame with computed features (must have id, ts, tf,
-                venue, alignment_source + microstructure columns)
+                venue_id, alignment_source + microstructure columns)
 
         Returns:
             Number of rows updated
@@ -417,12 +423,12 @@ class MicrostructureFeature(BaseFeature):
             WHERE id = :id
               AND ts = :ts
               AND tf = :tf
-              AND venue = :venue
+              AND venue_id = :venue_id
               AND alignment_source = :alignment_source
         """)
 
         # Prepare rows as list of dicts for executemany
-        pk_cols = ["id", "ts", "tf", "venue", "alignment_source"]
+        pk_cols = ["id", "ts", "tf", "venue_id", "alignment_source"]
         required_cols = pk_cols + list(MICROSTRUCTURE_COLUMNS)
 
         # Filter to only required columns

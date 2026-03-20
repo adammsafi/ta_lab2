@@ -79,6 +79,7 @@ UNIFIED_STATE_SCHEMA = """
 CREATE TABLE IF NOT EXISTS {schema}.{table} (
     -- Primary key
     id                  INTEGER         NOT NULL,
+    venue_id            SMALLINT        NOT NULL DEFAULT 1,
     tf                  TEXT            NOT NULL,
     period              INTEGER         NOT NULL,
 
@@ -94,7 +95,7 @@ CREATE TABLE IF NOT EXISTS {schema}.{table} (
     -- Metadata
     updated_at          TIMESTAMPTZ     NOT NULL DEFAULT now(),
 
-    PRIMARY KEY (id, tf, period)
+    PRIMARY KEY (id, venue_id, tf, period)
 );
 """
 
@@ -177,7 +178,7 @@ class EMAStateManager:
 
         sql_text = f"""
             SELECT
-                id, tf, period,
+                id, venue_id, tf, period,
                 daily_min_seen, daily_max_seen, last_bar_seq, last_time_close,
                 last_canonical_ts,
                 updated_at
@@ -195,6 +196,7 @@ class EMAStateManager:
                 return pd.DataFrame(
                     columns=[
                         "id",
+                        "venue_id",
                         "tf",
                         "period",
                         "daily_min_seen",
@@ -256,31 +258,33 @@ class EMAStateManager:
                 -- Canonical closes (for last_canonical_ts and last_time_close)
                 SELECT
                     id,
+                    venue_id,
                     tf,
                     period,
                     MAX({ts_col}) as last_canonical_ts
                 FROM {output_schema}.{output_table}
                 {where_clause}
-                GROUP BY id, tf, period
+                GROUP BY id, venue_id, tf, period
             ),
             bar_metadata AS (
-                -- Bar metadata (daily range and bar_seq) per (id, tf)
+                -- Bar metadata (daily range and bar_seq) per (id, venue_id, tf)
                 SELECT
                     id,
+                    venue_id,
                     tf,
                     MIN(time_open) as daily_min_seen,
                     MAX("timestamp") as daily_max_seen,
                     MAX(CASE WHEN {bars_partial_filter} THEN bar_seq END) as last_bar_seq
                 FROM {bars_schema}.{bars_table}
-                GROUP BY id, tf
+                GROUP BY id, venue_id, tf
             ),
             periods_for_id_tf AS (
-                -- Get all periods for each (id, tf) from output table
-                SELECT DISTINCT id, tf, period
+                -- Get all periods for each (id, venue_id, tf) from output table
+                SELECT DISTINCT id, venue_id, tf, period
                 FROM {output_schema}.{output_table}
             )
             INSERT INTO {state_table_fq} (
-                id, tf, period,
+                id, venue_id, tf, period,
                 last_canonical_ts,
                 last_time_close,
                 daily_min_seen,
@@ -290,6 +294,7 @@ class EMAStateManager:
             )
             SELECT
                 p.id,
+                p.venue_id,
                 p.tf,
                 p.period,
                 c.last_canonical_ts,
@@ -299,9 +304,9 @@ class EMAStateManager:
                 b.last_bar_seq,
                 now() as updated_at
             FROM periods_for_id_tf p
-            JOIN canonical_ts c ON p.id = c.id AND p.tf = c.tf AND p.period = c.period
-            JOIN bar_metadata b ON p.id = b.id AND p.tf = b.tf
-            ON CONFLICT (id, tf, period) DO UPDATE SET
+            JOIN canonical_ts c ON p.id = c.id AND p.venue_id = c.venue_id AND p.tf = c.tf AND p.period = c.period
+            JOIN bar_metadata b ON p.id = b.id AND p.venue_id = b.venue_id AND p.tf = b.tf
+            ON CONFLICT (id, venue_id, tf, period) DO UPDATE SET
                 last_canonical_ts = EXCLUDED.last_canonical_ts,
                 last_time_close = EXCLUDED.last_time_close,
                 daily_min_seen = EXCLUDED.daily_min_seen,
@@ -316,27 +321,29 @@ class EMAStateManager:
                 -- Canonical closes (for last_canonical_ts and last_time_close)
                 SELECT
                     id,
+                    venue_id,
                     tf,
                     period,
                     MAX({ts_col}) as last_canonical_ts
                 FROM {output_schema}.{output_table}
                 {where_clause}
-                GROUP BY id, tf, period
+                GROUP BY id, venue_id, tf, period
             ),
             daily_range AS (
                 -- Full timestamp range (for daily_min_seen and daily_max_seen)
                 SELECT
                     id,
+                    venue_id,
                     tf,
                     period,
                     MIN({ts_col}) as daily_min_seen,
                     MAX({ts_col}) as daily_max_seen
                 FROM {output_schema}.{output_table}
                 WHERE {ts_col} IS NOT NULL
-                GROUP BY id, tf, period
+                GROUP BY id, venue_id, tf, period
             )
             INSERT INTO {state_table_fq} (
-                id, tf, period,
+                id, venue_id, tf, period,
                 last_canonical_ts,
                 last_time_close,
                 daily_min_seen,
@@ -345,6 +352,7 @@ class EMAStateManager:
             )
             SELECT
                 c.id,
+                c.venue_id,
                 c.tf,
                 c.period,
                 c.last_canonical_ts,
@@ -353,8 +361,8 @@ class EMAStateManager:
                 d.daily_max_seen,
                 now() as updated_at
             FROM canonical_ts c
-            JOIN daily_range d ON c.id = d.id AND c.tf = d.tf AND c.period = d.period
-            ON CONFLICT (id, tf, period) DO UPDATE SET
+            JOIN daily_range d ON c.id = d.id AND c.venue_id = d.venue_id AND c.tf = d.tf AND c.period = d.period
+            ON CONFLICT (id, venue_id, tf, period) DO UPDATE SET
                 last_canonical_ts = EXCLUDED.last_canonical_ts,
                 last_time_close = EXCLUDED.last_time_close,
                 daily_min_seen = EXCLUDED.daily_min_seen,
@@ -372,9 +380,10 @@ class EMAStateManager:
         ts_col = self.config.ts_column
 
         sql = f"""
-        INSERT INTO {state_table_fq} (id, tf, period, last_time_close, last_bar_seq, updated_at)
+        INSERT INTO {state_table_fq} (id, venue_id, tf, period, last_time_close, last_bar_seq, updated_at)
         SELECT
             id,
+            venue_id,
             tf,
             period,
             MAX({ts_col}) as last_time_close,
@@ -382,8 +391,8 @@ class EMAStateManager:
             now() as updated_at
         FROM {output_schema}.{output_table}
         WHERE {ts_col} IS NOT NULL
-        GROUP BY id, tf, period
-        ON CONFLICT (id, tf, period) DO UPDATE SET
+        GROUP BY id, venue_id, tf, period
+        ON CONFLICT (id, venue_id, tf, period) DO UPDATE SET
             last_time_close = EXCLUDED.last_time_close,
             last_bar_seq = EXCLUDED.last_bar_seq,
             updated_at = EXCLUDED.updated_at

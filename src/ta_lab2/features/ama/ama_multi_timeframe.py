@@ -164,6 +164,49 @@ class MultiTFAMAFeature(BaseAMAFeature):
     # Abstract Method Implementations
     # =========================================================================
 
+    def preload_all_bars(
+        self,
+        engine: Engine,
+        asset_id: int,
+        venue_id: int = 1,
+    ) -> None:
+        """
+        Load bars for ALL TFs in a single query and cache.
+
+        Call before the TF loop to avoid per-TF DB queries.
+        """
+        sql = text(
+            f"""
+            SELECT id, venue_id, "timestamp" AS ts, tf, tf_days, is_partial_end AS roll, close, is_partial_end
+            FROM {self.bars_schema}.{self.bars_table}
+            WHERE id = :id AND venue_id = :venue_id
+            ORDER BY tf, "timestamp"
+            """
+        )
+
+        try:
+            with engine.connect() as conn:
+                df = pd.read_sql(
+                    sql, conn, params={"id": asset_id, "venue_id": venue_id}
+                )
+        except Exception as exc:
+            logger.warning(
+                "preload_all_bars: failed for asset_id=%s — %s", asset_id, exc
+            )
+            self._bars_cache = pd.DataFrame()
+            return
+
+        if not df.empty:
+            df["ts"] = pd.to_datetime(df["ts"], utc=True)
+
+        self._bars_cache = df
+        logger.debug(
+            "Preloaded bars for asset_id=%s: %d rows across %d TFs",
+            asset_id,
+            len(df),
+            df["tf"].nunique() if not df.empty else 0,
+        )
+
     def _load_bars(
         self,
         engine: Engine,
@@ -171,25 +214,24 @@ class MultiTFAMAFeature(BaseAMAFeature):
         tf: str,
         tf_days: int,
         start_ts: Optional[pd.Timestamp],
+        venue_id: int = 1,
     ) -> pd.DataFrame:
         """
-        Load close prices for a single (asset_id, tf) slice from price_bars_multi_tf.
-
-        Args:
-            engine: SQLAlchemy engine.
-            asset_id: Asset primary key.
-            tf: Timeframe label (e.g. "1D", "7D").
-            tf_days: Nominal days for this TF (informational only, not used in query).
-            start_ts: Optional incremental start timestamp. If provided, only rows
-                      with ts >= start_ts are returned. Use to overlay new bars on
-                      existing AMA values using warmup from prior rows.
-
-        Returns:
-            DataFrame with columns: id, ts, tf, tf_days, roll, close, is_partial_end.
-            ts column is tz-aware (UTC). Sorted ascending by ts. Empty if no data.
+        Load close prices for a single (asset_id, tf, venue_id) slice (uses cache if available).
         """
-        where_clauses = ["id = :id", "tf = :tf"]
-        params: dict = {"id": asset_id, "tf": tf}
+        # Use preloaded cache if available
+        if self._bars_cache is not None:
+            if self._bars_cache.empty:
+                return pd.DataFrame()
+            mask = self._bars_cache["tf"] == tf
+            if start_ts is not None:
+                mask = mask & (self._bars_cache["ts"] >= start_ts)
+            df = self._bars_cache[mask].copy()
+            return df.sort_values("ts").reset_index(drop=True)
+
+        # Fallback: per-TF query
+        where_clauses = ["id = :id", "tf = :tf", "venue_id = :venue_id"]
+        params: dict = {"id": asset_id, "tf": tf, "venue_id": venue_id}
 
         if start_ts is not None:
             where_clauses.append('"timestamp" >= :start_ts')
@@ -199,7 +241,7 @@ class MultiTFAMAFeature(BaseAMAFeature):
 
         sql = text(
             f"""
-            SELECT id, "timestamp" AS ts, tf, tf_days, is_partial_end AS roll, close, is_partial_end
+            SELECT id, venue_id, "timestamp" AS ts, tf, tf_days, is_partial_end AS roll, close, is_partial_end
             FROM {self.bars_schema}.{self.bars_table}
             WHERE {where_sql}
             ORDER BY "timestamp"
@@ -218,7 +260,6 @@ class MultiTFAMAFeature(BaseAMAFeature):
         if df.empty:
             return df
 
-        # Coerce ts to tz-aware UTC (Windows pitfall: use pd.to_datetime(utc=True))
         df["ts"] = pd.to_datetime(df["ts"], utc=True)
         df = df.sort_values("ts").reset_index(drop=True)
 

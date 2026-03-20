@@ -794,7 +794,7 @@ def upsert_state(
     Upsert state rows.
 
     Primary key is (id, tf) by default.
-    If with_venue=True, PK becomes (id, tf, venue).
+    If with_venue=True, PK becomes (id, tf, venue_id).
     The with_tz parameter controls whether tz column is included in INSERT/UPDATE.
     """
     if isinstance(rows, pd.DataFrame):
@@ -808,7 +808,7 @@ def upsert_state(
 
     pk_cols = ["id", "tf"]
     if with_venue:
-        pk_cols.append("venue")
+        pk_cols.append("venue_id")
 
     # Build column lists based on with_tz
     base_data_cols = [
@@ -821,6 +821,8 @@ def upsert_state(
     extra_cols = []
     if with_tz:
         extra_cols.append("tz")
+    if with_venue:
+        extra_cols.append("venue")  # venue text as data col (venue_id is PK)
 
     insert_cols = pk_cols + extra_cols + base_data_cols
     update_cols = extra_cols + base_data_cols
@@ -1001,6 +1003,9 @@ def upsert_bars(
         "repaired_close",
         "repaired_volume",
         "repaired_market_cap",
+        "venue",
+        "venue_id",
+        "venue_rank",
     ]
     df = df[[c for c in valid_cols if c in df.columns]]
 
