@@ -1360,7 +1360,7 @@ Full details: `.planning/milestones/v1.0.1-ROADMAP.md`
 
 - [x] **Phase 74: Foundation & Shared Infrastructure** - dim_data_sources registry, psycopg helpers, alignment_source constraints -- COMPLETE 2026-03-19
 - [x] **Phase 75: Generalized 1D Bar Builder** - Single configurable builder replacing 3 source-specific scripts -- COMPLETE 2026-03-20
-- [ ] **Phase 76: Direct-to-_u Price Bars (Pilot)** - Price bars family migrated to direct _u writes
+- [x] **Phase 76: Direct-to-_u Price Bars (Pilot)** - Price bars family migrated to direct _u writes -- COMPLETE 2026-03-20
 - [ ] **Phase 77: Direct-to-_u Remaining Families** - EMA, AMA, and returns families migrated to direct _u writes
 - [ ] **Phase 78: Table Drops & Script Cleanup** - Drop 30 siloed tables, delete 6 sync scripts, fix dependent views
 - [ ] **Phase 79: Storage & Pipeline Cleanup** - NULL row pruning, VWAP integration, MCP dead route removal

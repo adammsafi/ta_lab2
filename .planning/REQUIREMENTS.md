@@ -18,14 +18,14 @@
 
 ### Direct-to-_u Migration (UTB)
 
-- [ ] **UTB-01**: All multi-TF bar builder scripts write directly to `price_bars_multi_tf_u` with correct `alignment_source`
+- [x] **UTB-01**: All multi-TF bar builder scripts write directly to `price_bars_multi_tf_u` with correct `alignment_source`
 - [ ] **UTB-02**: All EMA builder scripts write directly to `ema_multi_tf_u` with correct `alignment_source`
 - [ ] **UTB-03**: All AMA builder scripts write directly to `ama_multi_tf_u` with correct `alignment_source`
 - [ ] **UTB-04**: All bar returns scripts write directly to `returns_bars_multi_tf_u` with correct `alignment_source`
 - [ ] **UTB-05**: All EMA returns scripts write directly to `returns_ema_multi_tf_u` with correct `alignment_source`
 - [ ] **UTB-06**: All AMA returns scripts write directly to `returns_ama_multi_tf_u` with correct `alignment_source`
-- [ ] **UTB-07**: Incremental refresh with watermark tracking works correctly on _u tables
-- [ ] **UTB-08**: Row counts in _u tables match pre-migration totals (per alignment_source)
+- [x] **UTB-07**: Incremental refresh with watermark tracking works correctly on _u tables
+- [x] **UTB-08**: Row counts in _u tables match pre-migration totals (per alignment_source)
 - [ ] **UTB-09**: 30 siloed tables dropped from database
 - [ ] **UTB-10**: 6 sync scripts deleted from codebase
 - [ ] **UTB-11**: State tables updated or consolidated for _u-direct writes
@@ -72,14 +72,14 @@ None — this milestone is self-contained infrastructure work.
 | BAR-06 | Phase 75 | Complete |
 | BAR-07 | Phase 75 | Complete |
 | BAR-08 | Phase 75 | Complete |
-| UTB-01 | Phase 76 | Pending |
+| UTB-01 | Phase 76 | Complete |
 | UTB-02 | Phase 77 | Pending |
 | UTB-03 | Phase 77 | Pending |
 | UTB-04 | Phase 77 | Pending |
 | UTB-05 | Phase 77 | Pending |
 | UTB-06 | Phase 77 | Pending |
-| UTB-07 | Phase 76 | Pending |
-| UTB-08 | Phase 76 | Pending |
+| UTB-07 | Phase 76 | Complete |
+| UTB-08 | Phase 76 | Complete |
 | UTB-09 | Phase 78 | Pending |
 | UTB-10 | Phase 78 | Pending |
 | UTB-11 | Phase 77 | Pending |
@@ -98,4 +98,4 @@ None — this milestone is self-contained infrastructure work.
 
 ---
 *Requirements defined: 2026-03-19*
-*Last updated: 2026-03-20 Phase 75 complete (BAR-01, BAR-03, BAR-04, BAR-06, BAR-07, BAR-08 → Complete)*
+*Last updated: 2026-03-20 Phase 76 complete (UTB-01, UTB-07, UTB-08 → Complete)*
