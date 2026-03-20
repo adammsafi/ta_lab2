@@ -1358,7 +1358,7 @@ Full details: `.planning/milestones/v1.0.1-ROADMAP.md`
 
 **Milestone Goal:** Eliminate 100GB+ of duplicate data by consolidating siloed tables into _u tables, generalize the 1D bar builder for extensible data source onboarding, and clean up pipeline debt.
 
-- [ ] **Phase 74: Foundation & Shared Infrastructure** - SourceSpec registry, psycopg helpers, alignment_source constants
+- [ ] **Phase 74: Foundation & Shared Infrastructure** - dim_data_sources registry, psycopg helpers, alignment_source constraints
 - [ ] **Phase 75: Generalized 1D Bar Builder** - Single configurable builder replacing 3 source-specific scripts
 - [ ] **Phase 76: Direct-to-_u Price Bars (Pilot)** - Price bars family migrated to direct _u writes
 - [ ] **Phase 77: Direct-to-_u Remaining Families** - EMA, AMA, and returns families migrated to direct _u writes
@@ -1372,10 +1372,10 @@ Full details: `.planning/milestones/v1.0.1-ROADMAP.md`
 **Depends on:** Phase 73 (v1.0.1 complete)
 **Requirements:** BAR-02, BAR-05
 **Success Criteria** (what must be TRUE):
-  1. SourceSpec frozen dataclass captures per-source differences (source table, JOINs, OHLC repair flag, venue_id mapping, ID loader) for CMC, TVC, and HL
+  1. dim_data_sources dimension table captures per-source differences (source table, JOINs, OHLC repair flag, venue_id mapping, SQL templates) for CMC, TVC, and HL
   2. Shared psycopg helper functions (_connect, _exec, _fetchone, _fetchall, _normalize_db_url) extracted to a single module importable by all bar builders
   3. alignment_source values defined as shared constants with a CHECK constraint on _u tables preventing typo-driven silent failures
-  4. Source-specific CTE builder functions extracted from existing 1D builders into isolated modules referenced by the registry
+  4. SQL CTE templates extracted from existing 1D builders and stored as TEXT columns in dim_data_sources, queryable by the generalized builder
 **Plans:** 2 plans
 Plans:
 - [ ] 74-01-PLAN.md -- Extract psycopg helpers to shared db module
@@ -1385,12 +1385,12 @@ Plans:
 
 ### Phase 75: Generalized 1D Bar Builder
 **Goal:** A single 1D bar builder script handles all data sources via CLI flag, old source-specific scripts deleted
-**Depends on:** Phase 74 (SourceSpec registry, CTE builders, psycopg helpers)
+**Depends on:** Phase 74 (dim_data_sources table, SQL CTE templates, psycopg helpers)
 **Requirements:** BAR-01, BAR-03, BAR-04, BAR-06, BAR-07, BAR-08
 **Success Criteria** (what must be TRUE):
   1. Running `python -m ta_lab2.scripts.bars.refresh_price_bars_1d --source cmc` produces identical row counts and data to the old CMC-specific builder
   2. Running `--source tvc` and `--source hl` each produce identical results to their respective old builders
-  3. Adding a hypothetical new source requires only a new SourceSpec entry and CTE builder function -- no new script file
+  3. Adding a hypothetical new source requires only a new dim_data_sources row with SQL template -- no new script file
   4. Backfill detection (new historical data appearing before earliest known bar) works for all sources, not just CMC
   5. Old source-specific scripts (refresh_tvc_price_bars_1d.py, refresh_hl_price_bars_1d.py) are deleted from the codebase
 **Plans**: TBD
