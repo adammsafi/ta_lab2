@@ -61,14 +61,16 @@ SCHEME_MAP = {
     "us": {
         "feature_class": CalUSAMAFeature,
         "bars_table": "price_bars_multi_tf_cal_us",
-        "output_table": "ama_multi_tf_cal_us",
+        "output_table": "ama_multi_tf_u",
+        "alignment_source": "multi_tf_cal_us",
         "state_table": "ama_multi_tf_cal_us_state",
         "description": "US calendar-aligned AMA",
     },
     "iso": {
         "feature_class": CalISOAMAFeature,
         "bars_table": "price_bars_multi_tf_cal_iso",
-        "output_table": "ama_multi_tf_cal_iso",
+        "output_table": "ama_multi_tf_u",
+        "alignment_source": "multi_tf_cal_iso",
         "state_table": "ama_multi_tf_cal_iso_state",
         "description": "ISO calendar-aligned AMA",
     },
@@ -117,6 +119,7 @@ def _cal_ama_worker(task: AMAWorkerTask) -> int:
             param_sets=task.param_sets,
             output_schema=task.output_schema,
             output_table=task.output_table,
+            alignment_source=task.alignment_source,
         )
         feature = feature_class(
             engine=engine,
@@ -330,10 +333,10 @@ class CalAMARefresher(BaseAMARefresher):
 
     def get_description(self) -> str:
         return (
-            "Refresh calendar-aligned AMA tables (US/ISO schemes).\n\n"
+            "Refresh calendar-aligned AMA tables (US/ISO schemes) into ama_multi_tf_u.\n\n"
             "Data sources:\n"
-            "  price_bars_multi_tf_cal_us  -> ama_multi_tf_cal_us\n"
-            "  price_bars_multi_tf_cal_iso -> ama_multi_tf_cal_iso\n\n"
+            "  price_bars_multi_tf_cal_us  -> ama_multi_tf_u (alignment_source='multi_tf_cal_us')\n"
+            "  price_bars_multi_tf_cal_iso -> ama_multi_tf_u (alignment_source='multi_tf_cal_iso')\n\n"
             "Use --scheme us/iso/both to select which calendar scheme to refresh."
         )
 
@@ -433,10 +436,9 @@ class CalAMARefresher(BaseAMARefresher):
         engine = create_engine(db_url)
 
         # Resolve output and state table names
-        if scheme == "us":
-            output_table = getattr(args, "out_us", None) or scheme_cfg["output_table"]
-        else:
-            output_table = getattr(args, "out_iso", None) or scheme_cfg["output_table"]
+        # All schemes now write to ama_multi_tf_u (direct-to-_u migration)
+        output_table = scheme_cfg["output_table"]  # always "ama_multi_tf_u"
+        alignment_source = scheme_cfg["alignment_source"]
 
         output_schema = getattr(args, "out_schema", "public")
         state_table = getattr(args, "state_table", None) or scheme_cfg["state_table"]
@@ -444,10 +446,11 @@ class CalAMARefresher(BaseAMARefresher):
         bars_schema = "public"
 
         run_logger.info(
-            "Starting CalAMARefresher[%s]: output=%s.%s state=%s",
+            "Starting CalAMARefresher[%s]: output=%s.%s alignment_source=%s state=%s",
             scheme.upper(),
             output_schema,
             output_table,
+            alignment_source,
             state_table,
         )
 
@@ -550,6 +553,7 @@ class CalAMARefresher(BaseAMARefresher):
                 tf_subset=tf_subset,
                 full_rebuild=getattr(args, "full_rebuild", False),
                 extra_config={"scheme": scheme},
+                alignment_source=alignment_source,
             )
             for asset_id in ids
         ]

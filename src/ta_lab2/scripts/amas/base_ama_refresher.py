@@ -89,6 +89,7 @@ class AMAWorkerTask:
     full_rebuild: bool = False
     extra_config: dict[str, Any] = field(default_factory=dict)
     venue_id: int = 1
+    alignment_source: Optional[str] = None  # Set for _u table writes
 
 
 # =============================================================================
@@ -124,6 +125,7 @@ def _ama_worker(task: AMAWorkerTask) -> int:
             param_sets=task.param_sets,
             output_schema=task.output_schema,
             output_table=task.output_table,
+            alignment_source=task.alignment_source,
         )
         feature = MultiTFAMAFeature(
             engine=engine,
@@ -323,6 +325,14 @@ class BaseAMARefresher(ABC):
     def get_bars_schema(self) -> str:
         """Return source bars schema. Override if needed."""
         return "public"
+
+    def get_alignment_source(self) -> Optional[str]:
+        """Return alignment_source value for _u table writes.
+
+        Override in concrete refreshers that target ama_multi_tf_u.
+        Default None means targeting a siloed table (no alignment_source column).
+        """
+        return None
 
     # =========================================================================
     # CLI Entry Point
@@ -571,6 +581,7 @@ Examples:
                 tf_subset=tf_subset,
                 full_rebuild=getattr(args, "full_rebuild", False),
                 venue_id=venue_id,
+                alignment_source=self.get_alignment_source(),
             )
             for asset_id in ids
         ]

@@ -51,12 +51,17 @@ class AMAFeatureConfig:
     Attributes:
         param_sets: List of AMAParamSet instances to compute.
         output_schema: Schema for the output table (e.g. "public").
-        output_table: Output table name (e.g. "ama_multi_tf").
+        output_table: Output table name (e.g. "ama_multi_tf_u").
+        alignment_source: Set for _u table writes to scope DELETE and PK.
+            e.g. "multi_tf", "multi_tf_cal_us", "multi_tf_cal_iso",
+                 "multi_tf_cal_anchor_us", "multi_tf_cal_anchor_iso".
+            None means targeting a siloed table (no alignment_source column).
     """
 
     param_sets: list[AMAParamSet]
     output_schema: str
     output_table: str
+    alignment_source: Optional[str] = None  # Set for _u table writes
 
 
 @dataclass(frozen=True)
@@ -391,6 +396,12 @@ class BaseAMAFeature(ABC):
         if df_write.empty:
             return 0
 
+        # Stamp alignment_source on df_write after column filtering.
+        # The source DataFrame never has this column; we add it here so that
+        # to_sql() includes it in the INSERT and the ON CONFLICT logic uses it.
+        if self.config.alignment_source:
+            df_write["alignment_source"] = self.config.alignment_source
+
         unique_ids = df_write["id"].unique().tolist()
         unique_tfs = df_write["tf"].unique().tolist()
 
@@ -407,7 +418,9 @@ class BaseAMAFeature(ABC):
 
                 # Scoped DELETE: remove existing rows for this (ids, venue_id, tf, ts>=min_ts) slice
                 # Only delete rows from min_ts onwards to preserve older history
-                # during incremental refreshes (where start_ts limits loaded bars)
+                # during incremental refreshes (where start_ts limits loaded bars).
+                # CRITICAL for _u tables: scope by alignment_source to avoid wiping
+                # rows from other alignment_sources in the shared table.
                 ids_placeholder = ", ".join(str(i) for i in ids_for_tf)
                 min_ts = df_tf["ts"].min()
                 # Get distinct venue_ids in this batch
@@ -417,12 +430,28 @@ class BaseAMAFeature(ABC):
                     else [1]
                 )
                 venue_ids_placeholder = ", ".join(str(v) for v in venue_ids_for_tf)
-                delete_sql = text(
-                    f"DELETE FROM {schema}.{table} "
-                    f"WHERE id IN ({ids_placeholder}) AND venue_id IN ({venue_ids_placeholder}) "
-                    f"AND tf = :tf AND ts >= :min_ts"
-                )
-                conn.execute(delete_sql, {"tf": tf, "min_ts": min_ts})
+                if self.config.alignment_source:
+                    delete_sql = text(
+                        f"DELETE FROM {schema}.{table} "
+                        f"WHERE id IN ({ids_placeholder}) AND venue_id IN ({venue_ids_placeholder}) "
+                        f"AND tf = :tf AND ts >= :min_ts "
+                        f"AND alignment_source = :alignment_source"
+                    )
+                    conn.execute(
+                        delete_sql,
+                        {
+                            "tf": tf,
+                            "min_ts": min_ts,
+                            "alignment_source": self.config.alignment_source,
+                        },
+                    )
+                else:
+                    delete_sql = text(
+                        f"DELETE FROM {schema}.{table} "
+                        f"WHERE id IN ({ids_placeholder}) AND venue_id IN ({venue_ids_placeholder}) "
+                        f"AND tf = :tf AND ts >= :min_ts"
+                    )
+                    conn.execute(delete_sql, {"tf": tf, "min_ts": min_ts})
 
             # INSERT the full batch (all tfs) using _pg_upsert safety net
             # We use to_sql with the custom _pg_upsert method
@@ -494,13 +523,16 @@ class BaseAMAFeature(ABC):
         """
         Return AMA primary key columns.
 
-        AMA tables use (id, venue_id, ts, tf, indicator, params_hash) — differs
-        from EMA tables which use (id, venue_id, ts, tf, period).
+        Siloed tables: (id, venue_id, ts, tf, indicator, params_hash)
+        _u table:      (id, venue_id, ts, tf, indicator, params_hash, alignment_source)
 
         Returns:
             List of PK column names.
         """
-        return ["id", "venue_id", "ts", "tf", "indicator", "params_hash"]
+        cols = ["id", "venue_id", "ts", "tf", "indicator", "params_hash"]
+        if self.config.alignment_source:
+            cols.append("alignment_source")
+        return cols
 
     def _get_table_columns(
         self,
