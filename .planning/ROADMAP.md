@@ -1376,7 +1376,10 @@ Full details: `.planning/milestones/v1.0.1-ROADMAP.md`
   2. Shared psycopg helper functions (_connect, _exec, _fetchone, _fetchall, _normalize_db_url) extracted to a single module importable by all bar builders
   3. alignment_source values defined as shared constants with a CHECK constraint on _u tables preventing typo-driven silent failures
   4. Source-specific CTE builder functions extracted from existing 1D builders into isolated modules referenced by the registry
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 74-01-PLAN.md -- Extract psycopg helpers to shared db module
+- [ ] 74-02-PLAN.md -- dim_data_sources table + alignment_source CHECK constraints
 
 ---
 
