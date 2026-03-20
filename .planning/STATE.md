@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 ## Current Position
 
 Phase: 77 of 79 (Direct-to-_u Remaining Families) -- In progress
-Plan: 3 of N complete
+Plan: 4 of N complete
 Status: In progress
-Last activity: 2026-03-20 -- Completed 77-03-PLAN.md (EMA returns builders redirected to _u)
+Last activity: 2026-03-20 -- Completed 77-04-PLAN.md (AMA values builders redirected to _u)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [#######...] 55% v1.1.0
 
@@ -78,6 +78,12 @@ Recent decisions affecting current work:
 - _tables_for_scheme() returns 4-tuple including alignment_source for clean propagation through dual-scheme loop (77-03)
 - EMA returns parity confirmed: all 5 sources MATCH (48,830,818 total rows in returns_ema_multi_tf_u) (77-03)
 - sync_returns_ema_multi_tf_u.py disabled as no-op with deprecation message; Phase 78 will remove it (77-03)
+- AMAFeatureConfig.alignment_source (Optional[str]=None) gates PK extension, DELETE scope, and DataFrame stamp (77-04)
+- get_alignment_source() hook on BaseAMARefresher (default None) propagates to AMAWorkerTask and AMAFeatureConfig (77-04)
+- alignment_source stamped on df_write after column filtering in write_to_db() (source DataFrame never has this column) (77-04)
+- SCHEME_MAP alignment_source key added to cal/cal_anchor AMA scripts alongside output_table (77-04)
+- AMA parity confirmed: all 5 sources MATCH (170,447,220 total rows in ama_multi_tf_u) (77-04)
+- sync_ama_multi_tf_u.py disabled as no-op with DEPRECATED message; Phase 78 will remove it (77-04)
 
 ### Pending Todos
 
@@ -93,9 +99,9 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-03-20
-Stopped at: Completed 77-03-PLAN.md (EMA returns builders redirected to _u)
+Stopped at: Completed 77-04-PLAN.md (AMA values builders redirected to _u)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-20 (Phase 77, Plan 03 complete — EMA returns direct-to-_u migration)*
+*Last updated: 2026-03-20 (Phase 77, Plan 04 complete — AMA values direct-to-_u migration)*

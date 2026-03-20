@@ -1,0 +1,49 @@
+AMA Row Count Parity Verification
+Phase 77, Plan 04 — Direct-to-_u Migration (AMA Values)
+Date: 2026-03-20
+Tolerance: 0.5% (for ~91M-row tables)
+
+Query:
+  WITH siloed AS (
+      SELECT 'multi_tf' AS alignment_source, COUNT(*) AS n_rows FROM ama_multi_tf
+      UNION ALL
+      SELECT 'multi_tf_cal_us', COUNT(*) FROM ama_multi_tf_cal_us
+      UNION ALL
+      SELECT 'multi_tf_cal_iso', COUNT(*) FROM ama_multi_tf_cal_iso
+      UNION ALL
+      SELECT 'multi_tf_cal_anchor_us', COUNT(*) FROM ama_multi_tf_cal_anchor_us
+      UNION ALL
+      SELECT 'multi_tf_cal_anchor_iso', COUNT(*) FROM ama_multi_tf_cal_anchor_iso
+  ),
+  unified AS (
+      SELECT alignment_source, COUNT(*) AS n_rows
+      FROM ama_multi_tf_u
+      GROUP BY alignment_source
+  )
+  SELECT
+      s.alignment_source,
+      s.n_rows AS siloed_count,
+      COALESCE(u.n_rows, 0) AS unified_count,
+      COALESCE(u.n_rows, 0) - s.n_rows AS deficit,
+      CASE
+          WHEN COALESCE(u.n_rows, 0) >= s.n_rows THEN 'MATCH'
+          WHEN ABS(COALESCE(u.n_rows, 0) - s.n_rows) * 100.0 / NULLIF(s.n_rows, 0) < 0.5 THEN 'WITHIN_TOLERANCE'
+          ELSE 'DEFICIT'
+      END AS status
+  FROM siloed s
+  LEFT JOIN unified u ON s.alignment_source = u.alignment_source
+  ORDER BY s.alignment_source;
+
+Results:
+  alignment_source         siloed_count  unified_count  deficit  status
+  -----------------------  ------------  -------------  -------  ------
+  multi_tf                 58,893,192    58,893,192     0        MATCH
+  multi_tf_cal_anchor_iso  15,313,554    15,313,554     0        MATCH
+  multi_tf_cal_anchor_us   14,988,852    14,988,852     0        MATCH
+  multi_tf_cal_iso         40,625,874    40,625,874     0        MATCH
+  multi_tf_cal_us          40,625,748    40,625,748     0        MATCH
+
+  Total ama_multi_tf_u rows: 170,447,220
+
+Conclusion: ALL 5 alignment_sources show exact MATCH.
+Direct-to-_u migration for AMA values is verified complete.
