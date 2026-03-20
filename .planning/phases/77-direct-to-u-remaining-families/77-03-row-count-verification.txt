@@ -1,0 +1,48 @@
+EMA Returns Row Count Parity Verification
+==========================================
+Phase: 77-03
+Date: 2026-03-20
+Purpose: Confirm returns_ema_multi_tf_u contains same row counts as the 5 siloed tables
+
+SQL:
+----
+WITH siloed AS (
+    SELECT 'multi_tf' AS alignment_source, COUNT(*) AS n_rows FROM returns_ema_multi_tf
+    UNION ALL
+    SELECT 'multi_tf_cal_us', COUNT(*) FROM returns_ema_multi_tf_cal_us
+    UNION ALL
+    SELECT 'multi_tf_cal_iso', COUNT(*) FROM returns_ema_multi_tf_cal_iso
+    UNION ALL
+    SELECT 'multi_tf_cal_anchor_us', COUNT(*) FROM returns_ema_multi_tf_cal_anchor_us
+    UNION ALL
+    SELECT 'multi_tf_cal_anchor_iso', COUNT(*) FROM returns_ema_multi_tf_cal_anchor_iso
+),
+unified AS (
+    SELECT alignment_source, COUNT(*) AS n_rows
+    FROM returns_ema_multi_tf_u
+    GROUP BY alignment_source
+)
+SELECT
+    s.alignment_source,
+    s.n_rows AS siloed_count,
+    COALESCE(u.n_rows, 0) AS unified_count,
+    COALESCE(u.n_rows, 0) - s.n_rows AS deficit,
+    CASE WHEN COALESCE(u.n_rows, 0) >= s.n_rows THEN 'MATCH' ELSE 'DEFICIT' END AS status
+FROM siloed s
+LEFT JOIN unified u ON s.alignment_source = u.alignment_source
+ORDER BY s.alignment_source;
+
+Results:
+--------
+alignment_source               | siloed_count | unified_count | deficit | status
+--------------------------------------------------------------------------------
+multi_tf                       |     17752408 |      17752408 |       0 | MATCH
+multi_tf_cal_anchor_iso        |      7721816 |       7721816 |       0 | MATCH
+multi_tf_cal_anchor_us         |      7722643 |       7722643 |       0 | MATCH
+multi_tf_cal_iso               |      7816280 |       7816280 |       0 | MATCH
+multi_tf_cal_us                |      7817671 |       7817671 |       0 | MATCH
+--------------------------------------------------------------------------------
+TOTAL                          |     48830818 |      48830818 |       0 |
+
+Conclusion: ALL 5 alignment_sources MATCH (48,830,818 total rows).
+No backfill needed. Safe to proceed with direct-write only mode.
