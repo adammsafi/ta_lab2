@@ -42,8 +42,9 @@ from sqlalchemy.pool import NullPool
 
 
 DEFAULT_BARS_TABLE = "public.price_bars_multi_tf_cal_anchor_us"
-DEFAULT_OUT_TABLE = "public.returns_bars_multi_tf_cal_anchor_us"
+DEFAULT_OUT_TABLE = "public.returns_bars_multi_tf_u"
 DEFAULT_STATE_TABLE = "public.returns_bars_multi_tf_cal_anchor_us_state"
+ALIGNMENT_SOURCE = "multi_tf_cal_anchor_us"
 
 _PRINT_PREFIX = "ret_bars_cal_anchor_us"
 
@@ -96,13 +97,12 @@ _VALUE_COLS = [
 ]
 
 _INSERT_COLS = (
-    'id, venue_id, "timestamp", tf, venue, venue_rank, roll,\n'
+    'id, venue_id, "timestamp", tf, roll,\n'
     + ",\n".join(_VALUE_COLS)
-    + ",\ningested_at"
+    + ",\ningested_at, alignment_source"
 )
 _UPSERT_SET = ",\n".join(
-    f"{c} = EXCLUDED.{c}"
-    for c in ["venue", "venue_rank", "roll"] + _VALUE_COLS + ["ingested_at"]
+    f"{c} = EXCLUDED.{c}" for c in ["roll"] + _VALUE_COLS + ["ingested_at"]
 )
 
 
@@ -120,8 +120,6 @@ def _ensure_tables(engine: Engine, out_table: str, state_table: str) -> None:
             venue_id                smallint      NOT NULL DEFAULT 1,
             "timestamp"             timestamptz   NOT NULL,
             tf                      text          NOT NULL,
-            venue                   text          DEFAULT 'CMC_AGG',
-            venue_rank              integer,
             tf_days                 integer,
             bar_seq                 integer,
             pos_in_bar              integer,
@@ -253,16 +251,22 @@ def _full_refresh(
         f"--full-refresh: deleting existing rows for {len(keys)} (id,tf,venue_id) keys and resetting state."
     )
     del_out = text(
-        f"DELETE FROM {out_table} WHERE id = :id AND tf = :tf AND venue_id = :venue_id;"
+        f"DELETE FROM {out_table} WHERE id = :id AND tf = :tf AND venue_id = :venue_id AND alignment_source = :alignment_source;"
     )
     del_state = text(
         f"DELETE FROM {state_table} WHERE id = :id AND tf = :tf AND venue_id = :venue_id;"
     )
     with engine.begin() as cxn:
         for i, tf, venue_id in keys:
-            params = {"id": i, "tf": tf, "venue_id": venue_id}
+            params = {
+                "id": i,
+                "tf": tf,
+                "venue_id": venue_id,
+                "alignment_source": ALIGNMENT_SOURCE,
+            }
             cxn.execute(del_out, params)
-            cxn.execute(del_state, params)
+            del_state_params = {"id": i, "tf": tf, "venue_id": venue_id}
+            cxn.execute(del_state, del_state_params)
     _ensure_state_rows(engine, state_table, keys)
 
 
@@ -325,9 +329,7 @@ def _run_one_key(
                 b.low,
                 b.time_close,
                 b.time_close_bar,
-                b.time_open_bar,
-                COALESCE(b.venue, 'CMC_AGG') AS venue,
-                b.venue_rank
+                b.time_open_bar
             FROM {bars_table} b, seed
             WHERE b.id = :id
               AND b.tf = :tf
@@ -351,7 +353,7 @@ def _run_one_key(
         ),
         calc AS (
             SELECT
-                id, venue_id, "timestamp", tf, venue, venue_rank, tf_days, bar_seq, pos_in_bar,
+                id, venue_id, "timestamp", tf, tf_days, bar_seq, pos_in_bar,
                 count_days, count_days_remaining, roll,
                 time_close, time_close_bar, time_open_bar,
                 close, high, low,
@@ -466,11 +468,12 @@ def _run_one_key(
                 {_INSERT_COLS}
             )
             SELECT
-                id, venue_id, "timestamp", tf, venue, venue_rank, roll,
+                id, venue_id, "timestamp", tf, roll,
                 {",".join(_VALUE_COLS)},
-                now()
+                now(),
+                CAST(:alignment_source AS text)
             FROM to_insert
-            ON CONFLICT (id, "timestamp", tf, venue_id) DO UPDATE SET
+            ON CONFLICT (id, "timestamp", tf, venue_id, alignment_source) DO UPDATE SET
                 {_UPSERT_SET}
             RETURNING "timestamp"
         )
@@ -485,7 +488,13 @@ def _run_one_key(
     with engine.begin() as cxn:
         result = cxn.execute(
             sql,
-            {"id": one_id, "tf": one_tf, "venue_id": one_venue_id, "start": start},
+            {
+                "id": one_id,
+                "tf": one_tf,
+                "venue_id": one_venue_id,
+                "start": start,
+                "alignment_source": ALIGNMENT_SOURCE,
+            },
         )
 
     engine.dispose()
