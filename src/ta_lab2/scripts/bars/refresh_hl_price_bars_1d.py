@@ -1,26 +1,31 @@
 """
-1D Bar Builder for TradingView data.
+1D Bar Builder for Hyperliquid data.
 
-Builds daily OHLC bars from tvc_price_histories into price_bars_1d.
-Writes to the SAME output table as the CMC builder so downstream pipeline
+Builds daily OHLC bars from hyperliquid.hl_candles into price_bars_1d.
+Writes to the SAME output table as the CMC/TVC builders so downstream pipeline
 (multi-TF bars, EMAs, features, signals) works without changes.
 
-Key differences from CMC builder:
-- Source: tvc_price_histories (not cmc_price_histories7)
-- No timehigh/timelow: synthesized as timestamp (bar close)
-- No market_cap: set to NULL
-- Multi-venue: builds bars for ALL venues, ranks from dim_listings.venue_rank
-- No OHLC repair needed (no intraday timestamps to fix)
+Key differences from TVC builder:
+- Source: hyperliquid.hl_candles WHERE interval = '1d'
+- ID mapping: JOIN dim_asset_identifiers to translate hl_candles.asset_id → dim_assets.id
+- Venue: hardcode 'HYPERLIQUID', venue_rank from dim_listings
+- No market_cap: set to NULL (same as TVC)
+- No timehigh/timelow: synthesized as bar timestamp (same as TVC)
+- src_name: 'Hyperliquid'
+- Asset filtering: Only Y-marked assets from HL_YN.csv
 
 Usage:
-    python -m ta_lab2.scripts.bars.refresh_tvc_price_bars_1d --ids all --full-rebuild
-    python -m ta_lab2.scripts.bars.refresh_tvc_price_bars_1d --ids 100002 100003
-    python -m ta_lab2.scripts.bars.refresh_tvc_price_bars_1d --ids all --venue GATE
+    python -m ta_lab2.scripts.bars.refresh_hl_price_bars_1d --ids all --full-rebuild
+    python -m ta_lab2.scripts.bars.refresh_hl_price_bars_1d --ids 1,28,65
+    python -m ta_lab2.scripts.bars.refresh_hl_price_bars_1d --ids all
 """
 
 from __future__ import annotations
 
 import argparse
+import csv
+import logging
+from pathlib import Path
 from typing import Any, List, Optional
 
 from sqlalchemy.engine import Engine
@@ -38,61 +43,121 @@ from ta_lab2.db.psycopg_helpers import (
     connect,
     execute,
     fetchone,
+    fetchall,
 )
+
+logger = logging.getLogger(__name__)
+
+# Default path to HL_YN.csv (project root)
+_DEFAULT_CSV = Path(__file__).resolve().parents[4] / "HL_YN.csv"
+
+
+_HL_VENUE_ID = 2  # dim_venues: HYPERLIQUID = 2
 
 
 def _get_last_src_ts(conn, state: str, id_: int) -> Optional[str]:
     """Get last processed timestamp for incremental refresh."""
-    row = fetchone(conn, f"SELECT last_src_ts FROM {state} WHERE id = %s;", [id_])
+    row = fetchone(
+        conn,
+        f"SELECT last_src_ts FROM {state} WHERE id = %s AND venue_id = %s AND tf = '1D';",
+        [id_, _HL_VENUE_ID],
+    )
     if not row or row[0] is None:
         return None
     return str(row[0])
 
 
-def _build_insert_bars_sql(dst: str, src: str, venue_filter: str | None) -> str:
-    """
-    Build SQL CTE for TVC 1D bar computation.
+def _load_y_asset_ids(csv_path: str | Path | None = None) -> set[int]:
+    """Load Y-marked HL asset_ids from HL_YN.csv."""
+    path = Path(csv_path) if csv_path else _DEFAULT_CSV
+    if not path.exists():
+        raise FileNotFoundError(f"HL_YN.csv not found at {path}")
 
-    Simpler than CMC version:
-    - No timehigh/timelow repair (synthesized as ts)
-    - No market_cap
-    - Builds ALL venues by default (venue_filter=None)
-    - Writes venue + venue_rank columns for multi-exchange support
-    """
-    venue_clause = ""
-    if venue_filter:
-        venue_clause = f"AND s.venue = '{venue_filter}'"
+    y_ids: set[int] = set()
+    with open(path, newline="", encoding="utf-8-sig") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            if row.get("Y/N", "").strip().upper() == "Y":
+                y_ids.add(int(row["asset_id"].strip()))
+    logger.info("Loaded %d Y-marked HL asset_ids from %s", len(y_ids), path)
+    return y_ids
 
+
+def _load_hl_ids(db_url: str, csv_path: str | Path | None = None) -> list[int]:
+    """
+    Load dim_assets IDs for Y-marked HL assets.
+
+    Reads HL_YN.csv for Y asset_ids, then JOINs dim_asset_identifiers
+    WHERE id_type='HL' to translate to dim_assets.id.
+    """
+    y_asset_ids = _load_y_asset_ids(csv_path)
+    if not y_asset_ids:
+        logger.warning("No Y-marked assets found in HL_YN.csv")
+        return []
+
+    conn = connect(db_url)
+    placeholders = ",".join(["%s"] * len(y_asset_ids))
+    rows = fetchall(
+        conn,
+        f"""
+        SELECT DISTINCT dai.id
+        FROM dim_asset_identifiers dai
+        WHERE dai.id_type = 'HL'
+          AND dai.id_value::int IN ({placeholders})
+        ORDER BY dai.id
+        """,
+        list(y_asset_ids),
+    )
+    conn.close()
+
+    dim_ids = [r[0] for r in rows]
+    logger.info(
+        "Resolved %d dim_assets IDs from %d Y-marked HL asset_ids",
+        len(dim_ids),
+        len(y_asset_ids),
+    )
+    return dim_ids
+
+
+def _build_insert_bars_sql(dst: str) -> str:
+    """
+    Build SQL CTE for HL 1D bar computation.
+
+    Source: hyperliquid.hl_candles joined to dim_asset_identifiers for ID mapping.
+    Similar to TVC builder but reads from HL candles table.
+    """
     return f"""
 WITH src_filtered AS (
-  SELECT DISTINCT ON (s.id, s.venue, s.ts)
-    s.id,
-    s.venue,
-    s.ts AS "timestamp",
-    s.open,
-    s.high,
-    s.low,
-    s.close,
-    s.volume,
-    COALESCE(dl.venue_rank, 50) AS venue_rank,
-    s.source_file,
-    s.ingested_at
-  FROM {src} s
+  SELECT DISTINCT ON (dai.id, c.ts)
+    dai.id,
+    'HYPERLIQUID'::text AS venue,
+    {_HL_VENUE_ID}::smallint AS venue_id,
+    c.ts AS "timestamp",
+    c.open::double precision,
+    c.high::double precision,
+    c.low::double precision,
+    c.close::double precision,
+    c.volume::double precision,
+    COALESCE(dl.venue_rank, 50) AS venue_rank
+  FROM hyperliquid.hl_candles c
+  JOIN dim_asset_identifiers dai
+    ON dai.id_type = 'HL'
+   AND dai.id_value::int = c.asset_id
   LEFT JOIN public.dim_listings dl
-    ON dl.id = s.id AND dl.venue = s.venue
-  WHERE s.id = %s
-    {venue_clause}
-  ORDER BY s.id, s.venue, s.ts
+    ON dl.id = dai.id AND dl.venue = 'HYPERLIQUID'
+  WHERE dai.id = %s
+    AND c.interval = '1d'
+  ORDER BY dai.id, c.ts
 ),
 ranked AS (
   SELECT
     id,
     venue,
+    venue_id,
     venue_rank,
     "timestamp",
-    dense_rank() OVER (PARTITION BY id, venue ORDER BY "timestamp" ASC)::integer AS bar_seq,
-    open, high, low, close, volume,
-    source_file, ingested_at
+    dense_rank() OVER (PARTITION BY id ORDER BY "timestamp" ASC)::integer AS bar_seq,
+    open, high, low, close, volume
   FROM src_filtered
   WHERE id = %s
     AND (%s IS NULL OR "timestamp" >= %s)
@@ -102,6 +167,7 @@ final AS (
   SELECT
     id,
     venue,
+    venue_id,
     venue_rank,
     "timestamp",
     '1D'::text AS tf,
@@ -137,9 +203,7 @@ final AS (
     false::boolean AS repaired_high,
     false::boolean AS repaired_low,
 
-    'TradingView'::text AS src_name,
-    ingested_at AS src_load_ts,
-    source_file AS src_file
+    'Hyperliquid'::text AS src_name
   FROM ranked
 ),
 ins AS (
@@ -155,7 +219,7 @@ ins AS (
     count_missing_days, count_missing_days_start, count_missing_days_end, count_missing_days_interior,
     src_name, src_load_ts, src_file,
     repaired_timehigh, repaired_timelow, repaired_high, repaired_low,
-    venue, venue_rank
+    venue, venue_id, venue_rank
   )
   SELECT
     id, "timestamp",
@@ -167,9 +231,9 @@ ins AS (
     is_partial_start, is_partial_end, is_missing_days,
     tf_days, pos_in_bar, count_days, count_days_remaining,
     count_missing_days, count_missing_days_start, count_missing_days_end, count_missing_days_interior,
-    src_name, src_load_ts, src_file,
+    src_name, now() AS src_load_ts, NULL::text AS src_file,
     repaired_timehigh, repaired_timelow, repaired_high, repaired_low,
-    venue, venue_rank
+    venue, venue_id, venue_rank
   FROM final
   WHERE
     id IS NOT NULL
@@ -177,7 +241,7 @@ ins AS (
     AND open IS NOT NULL
     AND close IS NOT NULL
     AND high >= low
-  ON CONFLICT (id, tf, bar_seq, venue, "timestamp") DO UPDATE SET
+  ON CONFLICT (id, tf, bar_seq, venue_id, "timestamp") DO UPDATE SET
     time_open = EXCLUDED.time_open,
     time_close = EXCLUDED.time_close,
     time_high = EXCLUDED.time_high,
@@ -204,37 +268,21 @@ FROM ins;
 """
 
 
-def _load_tvc_ids(db_url: str) -> list[int]:
-    """Load all asset IDs that have data in tvc_price_histories."""
-    from sqlalchemy import text
-
-    engine = get_engine(db_url)
-    with engine.connect() as conn:
-        rows = conn.execute(
-            text("SELECT DISTINCT id FROM tvc_price_histories ORDER BY id")
-        ).fetchall()
-    return [r[0] for r in rows]
-
-
-class TvcOneDayBarBuilder(BaseBarBuilder):
+class HlOneDayBarBuilder(BaseBarBuilder):
     """
-    1D Bar Builder for TradingView data.
+    1D Bar Builder for Hyperliquid data.
 
-    Builds daily OHLC bars from tvc_price_histories into price_bars_1d.
-    Uses the same output table as the CMC builder so the downstream pipeline
-    works transparently for both CMC and TVC assets.
+    Builds daily OHLC bars from hyperliquid.hl_candles into price_bars_1d.
+    Uses the same output table as CMC/TVC builders so the downstream pipeline
+    works transparently for all sources.
     """
 
     STATE_TABLE = "public.price_bars_1d_state"
     OUTPUT_TABLE = "public.price_bars_1d"
-    SOURCE_TABLE = "public.tvc_price_histories"
 
-    def __init__(
-        self, config: BarBuilderConfig, engine: Engine, venue: str | None = None
-    ):
+    def __init__(self, config: BarBuilderConfig, engine: Engine):
         super().__init__(config, engine)
         self.psycopg_conn = connect(config.db_url)
-        self.venue = venue
 
     def get_state_table_name(self) -> str:
         return self.STATE_TABLE
@@ -243,10 +291,15 @@ class TvcOneDayBarBuilder(BaseBarBuilder):
         return self.OUTPUT_TABLE
 
     def get_source_query(self, id_: int, start_ts: Optional[str] = None) -> str:
-        return f"SELECT * FROM {self.SOURCE_TABLE} WHERE id = {id_}"
+        return (
+            f"SELECT * FROM hyperliquid.hl_candles c "
+            f"JOIN dim_asset_identifiers dai ON dai.id_type = 'HL' "
+            f"AND dai.id_value::int = c.asset_id "
+            f"WHERE dai.id = {id_} AND c.interval = '1d'"
+        )
 
     def ensure_state_table_exists(self) -> None:
-        """Ensure 1D state table exists (shared with CMC builder)."""
+        """Ensure 1D state table exists (shared with CMC/TVC builder)."""
         state_table = self.get_state_table_name()
         self.logger.info(f"Ensuring state table exists: {state_table}")
 
@@ -258,6 +311,7 @@ class TvcOneDayBarBuilder(BaseBarBuilder):
         ddl = f"""
         CREATE TABLE IF NOT EXISTS {fq_table} (
             id INTEGER NOT NULL,
+            venue_id SMALLINT NOT NULL DEFAULT 1,
             tf TEXT NOT NULL DEFAULT '1D',
             last_src_ts TIMESTAMPTZ,
             daily_min_seen TIMESTAMPTZ,
@@ -270,7 +324,7 @@ class TvcOneDayBarBuilder(BaseBarBuilder):
             last_repaired_timelow INTEGER NOT NULL DEFAULT 0,
             last_rejected INTEGER NOT NULL DEFAULT 0,
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            PRIMARY KEY (id, tf)
+            PRIMARY KEY (id, venue_id, tf)
         );
         """
 
@@ -291,26 +345,29 @@ class TvcOneDayBarBuilder(BaseBarBuilder):
         id_: int,
         start_ts: Optional[str] = None,
     ) -> int:
-        """Build 1D bars for one TVC asset ID."""
+        """Build 1D bars for one HL asset ID (dim_assets.id)."""
         conn = self.psycopg_conn
-        src = self.SOURCE_TABLE
         dst = self.OUTPUT_TABLE
         state = self.STATE_TABLE
 
-        # Full rebuild: delete existing bars for this ID
+        # Full rebuild: delete existing HL bars for this ID
         if self.config.full_rebuild:
             execute(
                 conn,
-                f"DELETE FROM {dst} WHERE id = %s AND tf = '1D' AND src_name = 'TradingView';",
-                [id_],
+                f"DELETE FROM {dst} WHERE id = %s AND tf = '1D' AND venue_id = %s;",
+                [id_, _HL_VENUE_ID],
             )
-            execute(conn, f"DELETE FROM {state} WHERE id = %s AND tf = '1D';", [id_])
+            execute(
+                conn,
+                f"DELETE FROM {state} WHERE id = %s AND venue_id = %s AND tf = '1D';",
+                [id_, _HL_VENUE_ID],
+            )
 
         last_src_ts = _get_last_src_ts(conn, state, id_)
         time_max = None
 
         params: List[Any] = [
-            id_,  # src_filtered WHERE id
+            id_,  # src_filtered WHERE dai.id
             id_,  # ranked WHERE id
             last_src_ts,  # >= start
             last_src_ts,
@@ -318,7 +375,7 @@ class TvcOneDayBarBuilder(BaseBarBuilder):
             time_max,
         ]
 
-        ins_sql = _build_insert_bars_sql(dst=dst, src=src, venue_filter=self.venue)
+        ins_sql = _build_insert_bars_sql(dst=dst)
         row = fetchone(conn, ins_sql, params)
 
         upserted = int(row[0]) if row and row[0] is not None else 0
@@ -328,20 +385,26 @@ class TvcOneDayBarBuilder(BaseBarBuilder):
             execute(
                 conn,
                 f"""
-                INSERT INTO {state} (id, tf, last_src_ts, last_run_ts, last_upserted)
-                VALUES (%s, '1D', %s, now(), %s)
-                ON CONFLICT (id, tf) DO UPDATE SET
+                INSERT INTO {state} (id, venue_id, tf, last_src_ts, last_run_ts, last_upserted)
+                VALUES (%s, %s, '1D', %s, now(), %s)
+                ON CONFLICT (id, venue_id, tf) DO UPDATE SET
                   last_src_ts = COALESCE(EXCLUDED.last_src_ts, {state}.last_src_ts),
                   last_run_ts = now(),
                   last_upserted = EXCLUDED.last_upserted;
                 """,
-                [id_, max_src_ts, upserted],
+                [id_, _HL_VENUE_ID, max_src_ts, upserted],
             )
 
             # Coverage tracking
             stats_row = fetchone(
                 conn,
-                f"SELECT MIN(ts), MAX(ts), COUNT(*)::bigint FROM {src} WHERE id = %s;",
+                """
+                SELECT MIN(c.ts), MAX(c.ts), COUNT(*)::bigint
+                FROM hyperliquid.hl_candles c
+                JOIN dim_asset_identifiers dai
+                  ON dai.id_type = 'HL' AND dai.id_value::int = c.asset_id
+                WHERE dai.id = %s AND c.interval = '1d';
+                """,
                 [id_],
             )
             if stats_row and stats_row[2]:
@@ -349,7 +412,7 @@ class TvcOneDayBarBuilder(BaseBarBuilder):
                     upsert_coverage(
                         self.engine,
                         id_=id_,
-                        source_table=src,
+                        source_table="hyperliquid.hl_candles",
                         granularity="1D",
                         n_rows=int(stats_row[2]),
                         n_days=int(stats_row[2]),
@@ -365,28 +428,29 @@ class TvcOneDayBarBuilder(BaseBarBuilder):
     @classmethod
     def create_argument_parser(cls) -> argparse.ArgumentParser:
         parser = cls.create_base_argument_parser(
-            description="Build 1D bars from TradingView price data.",
-            default_daily_table="public.tvc_price_histories",
+            description="Build 1D bars from Hyperliquid candle data.",
+            default_daily_table="hyperliquid.hl_candles",
             default_bars_table="public.price_bars_1d",
             default_state_table="public.price_bars_1d_state",
             include_tz=False,
         )
         parser.add_argument(
-            "--venue",
+            "--csv",
             type=str,
             default=None,
-            help="Filter to specific venue (e.g., GATE). Default: build ALL venues.",
+            help="Path to HL_YN.csv (default: project root HL_YN.csv)",
         )
         return parser
 
     @classmethod
-    def from_cli_args(cls, args: argparse.Namespace) -> "TvcOneDayBarBuilder":
+    def from_cli_args(cls, args: argparse.Namespace) -> "HlOneDayBarBuilder":
         db_url = resolve_db_url(args.db_url)
         engine = get_engine(db_url)
 
         ids_parsed = parse_ids(args.ids)
         if ids_parsed == "all":
-            ids = _load_tvc_ids(db_url)
+            csv_path = getattr(args, "csv", None)
+            ids = _load_hl_ids(db_url, csv_path)
         else:
             ids = ids_parsed
 
@@ -405,23 +469,20 @@ class TvcOneDayBarBuilder(BaseBarBuilder):
             tz=None,
         )
 
-        venue = getattr(args, "venue", None)
-        return cls(config=config, engine=engine, venue=venue)
+        return cls(config=config, engine=engine)
 
 
 def _sync_1d_to_multi_tf(db_url: str) -> None:
-    """Copy TVC 1D bars to price_bars_multi_tf for downstream pipeline."""
-    import logging
-
-    logger = logging.getLogger(__name__)
+    """Copy HL 1D bars to price_bars_multi_tf for downstream pipeline."""
+    logger.info("Syncing HL 1D bars to price_bars_multi_tf...")
     conn = connect(db_url)
     try:
         cur = conn.cursor()
         cur.execute("""
             INSERT INTO public.price_bars_multi_tf
             SELECT * FROM public.price_bars_1d
-            WHERE src_name = 'TradingView'
-            ON CONFLICT (id, tf, bar_seq, venue, "timestamp") DO UPDATE SET
+            WHERE src_name = 'Hyperliquid'
+            ON CONFLICT (id, tf, bar_seq, venue_id, "timestamp") DO UPDATE SET
                 open = EXCLUDED.open,
                 high = EXCLUDED.high,
                 low  = EXCLUDED.low,
@@ -433,16 +494,20 @@ def _sync_1d_to_multi_tf(db_url: str) -> None:
                 src_file = EXCLUDED.src_file,
                 venue_rank = EXCLUDED.venue_rank
         """)
-        logger.info("Synced TVC 1D bars to price_bars_multi_tf")
+        logger.info("Synced HL 1D bars to price_bars_multi_tf")
         cur.close()
     except Exception as e:
         logger.warning("Failed to sync 1D bars to multi_tf: %s", e)
 
 
 def main() -> None:
-    parser = TvcOneDayBarBuilder.create_argument_parser()
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+    parser = HlOneDayBarBuilder.create_argument_parser()
     args = parser.parse_args()
-    builder = TvcOneDayBarBuilder.from_cli_args(args)
+    builder = HlOneDayBarBuilder.from_cli_args(args)
     builder.run()
     _sync_1d_to_multi_tf(builder.config.db_url)
 

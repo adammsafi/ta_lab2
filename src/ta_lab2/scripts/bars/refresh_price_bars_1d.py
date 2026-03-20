@@ -37,7 +37,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
-from typing import Any, List, Optional, Sequence, Tuple
+from typing import Any, List, Optional
 
 from sqlalchemy.engine import Engine
 
@@ -51,101 +51,7 @@ from ta_lab2.scripts.bars.common_snapshot_contract import (
     ensure_coverage_table,
     upsert_coverage,
 )
-
-# Prefer psycopg v3, fall back to psycopg2
-try:
-    import psycopg  # type: ignore
-
-    PSYCOPG3 = True
-except Exception:
-    psycopg = None
-    PSYCOPG3 = False
-
-try:
-    import psycopg2  # type: ignore
-
-    PSYCOPG2 = True
-except Exception:
-    psycopg2 = None
-    PSYCOPG2 = False
-
-
-# =============================================================================
-# Database utilities (psycopg for raw SQL performance)
-# =============================================================================
-
-
-def _normalize_db_url(url: str) -> str:
-    """Remove SQLAlchemy dialect prefix for psycopg connection."""
-    if not url:
-        return url
-    for prefix in (
-        "postgresql+psycopg2://",
-        "postgresql+psycopg://",
-        "postgresql+psycopg3://",
-        "postgres+psycopg2://",
-        "postgres+psycopg://",
-        "postgres+psycopg3://",
-    ):
-        if url.startswith(prefix):
-            return "postgresql://" + url[len(prefix) :]
-    return url
-
-
-def _connect(db_url: str):
-    """Create psycopg connection (v3 preferred, v2 fallback)."""
-    url = _normalize_db_url(db_url)
-    if PSYCOPG3:
-        return psycopg.connect(url, autocommit=True)
-    if PSYCOPG2:
-        conn = psycopg2.connect(url)
-        conn.autocommit = True
-        return conn
-    raise RuntimeError("Neither psycopg (v3) nor psycopg2 is installed.")
-
-
-def _exec(conn, sql: str, params: Optional[Sequence[Any]] = None) -> None:
-    """Execute SQL statement."""
-    params = params or []
-    if PSYCOPG3:
-        with conn.cursor() as cur:
-            cur.execute(sql, params)
-            return
-    cur = conn.cursor()
-    cur.execute(sql, params)
-    cur.close()
-
-
-def _fetchall(
-    conn, sql: str, params: Optional[Sequence[Any]] = None
-) -> List[Tuple[Any, ...]]:
-    """Execute SQL and fetch all rows."""
-    params = params or []
-    if PSYCOPG3:
-        with conn.cursor() as cur:
-            cur.execute(sql, params)
-            return cur.fetchall()
-    cur = conn.cursor()
-    cur.execute(sql, params)
-    rows = cur.fetchall()
-    cur.close()
-    return rows
-
-
-def _fetchone(
-    conn, sql: str, params: Optional[Sequence[Any]] = None
-) -> Optional[Tuple[Any, ...]]:
-    """Execute SQL and fetch one row."""
-    params = params or []
-    if PSYCOPG3:
-        with conn.cursor() as cur:
-            cur.execute(sql, params)
-            return cur.fetchone()
-    cur = conn.cursor()
-    cur.execute(sql, params)
-    row = cur.fetchone()
-    cur.close()
-    return row
+from ta_lab2.db.psycopg_helpers import connect, execute, fetchone
 
 
 # =============================================================================
@@ -162,21 +68,21 @@ def _ensure_state_schema(conn, state: str) -> None:
         AND column_name = 'daily_min_seen'
     """
     table_name = state.split(".")[-1] if "." in state else state
-    row = _fetchone(conn, check_sql, [table_name])
+    row = fetchone(conn, check_sql, [table_name])
 
     if not row:
         alter_sql = f"""
             ALTER TABLE {state}
             ADD COLUMN daily_min_seen TIMESTAMPTZ;
         """
-        _exec(conn, alter_sql)
+        execute(conn, alter_sql)
 
         backfill_sql = f"""
             UPDATE {state}
             SET daily_min_seen = last_src_ts
             WHERE daily_min_seen IS NULL;
         """
-        _exec(conn, backfill_sql)
+        execute(conn, backfill_sql)
         print(f"[1D Builder] Added daily_min_seen column to {state}")
 
 
@@ -187,7 +93,7 @@ def _ensure_state_schema(conn, state: str) -> None:
 
 def _get_state(conn, state: str, id_: int) -> Optional[dict]:
     """Load full state for an id (including daily_min_seen)."""
-    row = _fetchone(
+    row = fetchone(
         conn, f"SELECT last_src_ts, daily_min_seen FROM {state} WHERE id = %s;", [id_]
     )
     if not row:
@@ -207,7 +113,7 @@ def _check_for_backfill(conn, src: str, id_: int, state_dict: Optional[dict]) ->
     if state_dict is None or state_dict.get("daily_min_seen") is None:
         return False  # No state = first run, not a backfill
 
-    row = _fetchone(
+    row = fetchone(
         conn, f"SELECT MIN(timestamp) as daily_min_ts FROM {src} WHERE id = %s;", [id_]
     )
     if row and row[0] is not None:
@@ -220,8 +126,8 @@ def _check_for_backfill(conn, src: str, id_: int, state_dict: Optional[dict]) ->
 
 def _handle_backfill(conn, dst: str, state: str, id_: int) -> None:
     """Delete bars and state for full rebuild."""
-    _exec(conn, f"DELETE FROM {dst} WHERE id = %s;", [id_])
-    _exec(conn, f"DELETE FROM {state} WHERE id = %s;", [id_])
+    execute(conn, f"DELETE FROM {dst} WHERE id = %s;", [id_])
+    execute(conn, f"DELETE FROM {state} WHERE id = %s;", [id_])
 
 
 # =============================================================================
@@ -231,7 +137,7 @@ def _handle_backfill(conn, dst: str, state: str, id_: int) -> None:
 
 def _get_last_src_ts(conn, state: str, id_: int) -> Optional[str]:
     """Get last processed timestamp for incremental refresh."""
-    row = _fetchone(conn, f"SELECT last_src_ts FROM {state} WHERE id = %s;", [id_])
+    row = fetchone(conn, f"SELECT last_src_ts FROM {state} WHERE id = %s;", [id_])
     if not row or row[0] is None:
         return None
     return str(row[0])
@@ -525,7 +431,7 @@ class OneDayBarBuilder(BaseBarBuilder):
         """Initialize 1D bar builder with psycopg connection."""
         super().__init__(config, engine)
         # Create psycopg connection for raw SQL execution
-        self.psycopg_conn = _connect(config.db_url)
+        self.psycopg_conn = connect(config.db_url)
 
     # =========================================================================
     # Abstract method implementations (required by BaseBarBuilder)
@@ -667,7 +573,7 @@ class OneDayBarBuilder(BaseBarBuilder):
 
         # Execute bar building SQL
         ins_sql = _build_insert_bars_sql(dst=dst, src=src)
-        row = _fetchone(conn, ins_sql, params)
+        row = fetchone(conn, ins_sql, params)
 
         upserted = int(row[0]) if row and row[0] is not None else 0
         rep_hi = int(row[1]) if row and row[1] is not None else 0
@@ -677,7 +583,7 @@ class OneDayBarBuilder(BaseBarBuilder):
         # Update state if any rows were processed
         if max_src_ts is not None:
             # Query MIN timestamp and COUNT from source for coverage tracking
-            stats_row = _fetchone(
+            stats_row = fetchone(
                 conn,
                 f"SELECT MIN(timestamp), MAX(timestamp), COUNT(*)::bigint FROM {src} WHERE id = %s;",
                 [id_],
@@ -688,7 +594,7 @@ class OneDayBarBuilder(BaseBarBuilder):
             daily_max_ts_cov = stats_row[1] if stats_row else None
             total_rows = int(stats_row[2]) if stats_row and stats_row[2] else 0
 
-            _exec(
+            execute(
                 conn,
                 f"""
                 INSERT INTO {state} (id, tf, last_src_ts, daily_min_seen, last_run_ts,
