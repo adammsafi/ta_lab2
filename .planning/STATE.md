@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 ## Current Position
 
 Phase: 76 of 79 (Direct-to-U Price Bars Pilot) -- In progress
-Plan: 1 of 3 complete
+Plan: 2 of 3 complete
 Status: In progress
-Last activity: 2026-03-20 -- Completed 76-01 (infrastructure: alignment_source support + state bootstrap)
+Last activity: 2026-03-20 -- Completed 76-02 (redirect all 5 price bar builders to write to price_bars_multi_tf_u)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [#####.....] 36% v1.1.0
 
@@ -58,6 +58,10 @@ Recent decisions affecting current work:
 - delete_bars_for_id_tf() accepts alignment_source param (default None) to scope deletes when targeting _u tables (76-01)
 - Cal/cal_anchor state tables have tz NOT NULL column; bootstrap hardcodes 'America/New_York' (only value in existing data) (76-01)
 - All 5 price bar state tables bootstrapped from price_bars_multi_tf_u; ON CONFLICT uses GREATEST() to advance watermarks (76-01)
+- venue_id = bars.get('venue_id', 1) unconditional pattern on all output DataFrames before upsert (76-02)
+- from_1d DELETE scoped by alignment_source to avoid wiping other variants' _u rows (76-02)
+- All 5 builders now write to price_bars_multi_tf_u with ALIGNMENT_SOURCE class constant (76-02)
+- conflict_cols=(id, tf, bar_seq, venue_id, timestamp, alignment_source) is the standard _u upsert tuple (76-02)
 
 ### Pending Todos
 
@@ -72,10 +76,10 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-03-20
-Stopped at: Completed 76-01-PLAN.md
+Last session: 2026-03-20T13:33:00Z
+Stopped at: Completed 76-02-PLAN.md
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-20 (Phase 76 Plan 01 complete)*
+*Last updated: 2026-03-20 (Phase 76 Plan 02 complete)*
