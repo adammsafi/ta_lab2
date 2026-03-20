@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 ## Current Position
 
 Phase: 77 of 79 (Direct-to-_u Remaining Families) -- In progress
-Plan: 1 of N complete
+Plan: 2 of N complete
 Status: In progress
-Last activity: 2026-03-20 -- Completed 77-01-PLAN.md (bar returns builders redirected to _u)
+Last activity: 2026-03-20 -- Completed 77-02-PLAN.md (EMA values builders redirected to _u)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [#######...] 55% v1.1.0
 
@@ -68,6 +68,11 @@ Recent decisions affecting current work:
 - del_state_params split from del_out params: state tables lack alignment_source column (77-01)
 - sync_returns_bars_multi_tf_u.py disabled as no-op with DeprecationWarning; Phase 78 will remove it (77-01)
 - Bar returns parity confirmed: all 5 sources MATCH (12,019,640 total rows in returns_bars_multi_tf_u) (77-01)
+- EMAFeatureConfig.alignment_source (Optional[str]=None) gates both PK extension and DataFrame stamp before to_sql (77-02)
+- ema_multi_tf_u PK rebuilt to include alignment_source: (id, venue_id, ts, tf, period, alignment_source) (77-02)
+- ISO backfill required: +1.7M (cal_iso) + +1.6M (cal_anchor_iso) rows to fix sync gaps before retiring sync path (77-02)
+- EMA parity confirmed: all 5 sources MATCH (55,796,615 total rows in ema_multi_tf_u) (77-02)
+- sync_ema_multi_tf_u.py disabled as no-op with DeprecationWarning; Phase 78 will remove it (77-02)
 
 ### Pending Todos
 
@@ -83,9 +88,9 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-03-20
-Stopped at: Completed 77-01-PLAN.md (bar returns builders redirected to _u)
+Stopped at: Completed 77-02-PLAN.md (EMA values builders redirected to _u)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-20 (Phase 77, Plan 01 complete — bar returns direct-to-_u migration)*
+*Last updated: 2026-03-20 (Phase 77, Plan 02 complete — EMA values direct-to-_u migration)*
