@@ -144,9 +144,11 @@ def run_bar_builders(
     # Source filtering: skip builders that don't match --source
     source = getattr(args, "source", "all")
     if source == "cmc":
-        cmd.extend(["--skip", "1d_tvc"])
+        cmd.extend(["--skip", "1d_tvc,1d_hl"])
     elif source == "tvc":
-        cmd.extend(["--skip", "1d"])
+        cmd.extend(["--skip", "1d_cmc,1d_hl"])
+    elif source == "hl":
+        cmd.extend(["--skip", "1d_cmc,1d_tvc"])
 
     if args.verbose:
         cmd.append("--verbose")
@@ -2640,11 +2642,12 @@ Examples:
     )
     p.add_argument(
         "--source",
-        choices=["cmc", "tvc", "all"],
+        choices=["cmc", "tvc", "hl", "all"],
         default="all",
         help=(
             "Data source filter for bar builders: "
-            "'cmc' = CMC 1D only, 'tvc' = TVC 1D only, 'all' = both (default: all)"
+            "'cmc' = CMC 1D only, 'tvc' = TVC 1D only, "
+            "'hl' = Hyperliquid 1D only, 'all' = all sources (default: all)"
         ),
     )
 
