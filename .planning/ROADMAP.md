@@ -1361,7 +1361,7 @@ Full details: `.planning/milestones/v1.0.1-ROADMAP.md`
 - [x] **Phase 74: Foundation & Shared Infrastructure** - dim_data_sources registry, psycopg helpers, alignment_source constraints -- COMPLETE 2026-03-19
 - [x] **Phase 75: Generalized 1D Bar Builder** - Single configurable builder replacing 3 source-specific scripts -- COMPLETE 2026-03-20
 - [x] **Phase 76: Direct-to-_u Price Bars (Pilot)** - Price bars family migrated to direct _u writes -- COMPLETE 2026-03-20
-- [ ] **Phase 77: Direct-to-_u Remaining Families** - EMA, AMA, and returns families migrated to direct _u writes
+- [x] **Phase 77: Direct-to-_u Remaining Families** - EMA, AMA, and returns families migrated to direct _u writes — COMPLETE 2026-03-20
 - [ ] **Phase 78: Table Drops & Script Cleanup** - Drop 30 siloed tables, delete 6 sync scripts, fix dependent views
 - [ ] **Phase 79: Storage & Pipeline Cleanup** - NULL row pruning, VWAP integration, MCP dead route removal
 
@@ -1429,11 +1429,11 @@ Plans:
   5. Row counts per alignment_source match pre-migration totals for every family
 **Plans:** 5 plans
 Plans:
-- [ ] 77-01-PLAN.md -- Redirect bar returns builders to returns_bars_multi_tf_u
-- [ ] 77-02-PLAN.md -- Verify/fix EMA _u PK, redirect EMA builders to ema_multi_tf_u
-- [ ] 77-03-PLAN.md -- Redirect EMA returns builders to returns_ema_multi_tf_u
-- [ ] 77-04-PLAN.md -- Fix AMA DELETE scope, redirect AMA builders to ama_multi_tf_u
-- [ ] 77-05-PLAN.md -- Redirect AMA returns to returns_ama_multi_tf_u
+- [x] 77-01-PLAN.md -- Redirect bar returns builders to returns_bars_multi_tf_u
+- [x] 77-02-PLAN.md -- Verify/fix EMA _u PK, redirect EMA builders to ema_multi_tf_u
+- [x] 77-03-PLAN.md -- Redirect EMA returns builders to returns_ema_multi_tf_u
+- [x] 77-04-PLAN.md -- Fix AMA DELETE scope, redirect AMA builders to ama_multi_tf_u
+- [x] 77-05-PLAN.md -- Redirect AMA returns to returns_ama_multi_tf_u
 
 ---
 
