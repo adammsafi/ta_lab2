@@ -5,13 +5,12 @@ refresh_returns_ema_multi_tf_cal.py
 
 Unified incremental EMA-returns builder for calendar-aligned EMA tables (US/ISO).
 
-Source tables (by scheme):
-  - US  : public.ema_multi_tf_cal_us
-  - ISO : public.ema_multi_tf_cal_iso
+Source table (both schemes):
+  - public.ema_multi_tf_u  (scoped by alignment_source)
 
-Outputs (by scheme):
-  - US  : public.returns_ema_multi_tf_cal_us
-  - ISO : public.returns_ema_multi_tf_cal_iso
+Outputs (both schemes write to same _u table, tagged by alignment_source):
+  - US  : public.returns_ema_multi_tf_u  (alignment_source='multi_tf_cal_us')
+  - ISO : public.returns_ema_multi_tf_u  (alignment_source='multi_tf_cal_iso')
 
 State (by scheme):
   - US  : public.returns_ema_multi_tf_cal_us_state
@@ -53,17 +52,21 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.pool import NullPool
 
 
-# Sources
-DEFAULT_EMA_CAL_US = "public.ema_multi_tf_cal_us"
-DEFAULT_EMA_CAL_ISO = "public.ema_multi_tf_cal_iso"
+# Source: both schemes now read from the unified _u table (scoped by alignment_source)
+DEFAULT_EMA_CAL_US = "public.ema_multi_tf_u"
+DEFAULT_EMA_CAL_ISO = "public.ema_multi_tf_u"
 
-# Unified outputs per scheme
-DEFAULT_RET_US = "public.returns_ema_multi_tf_cal_us"
-DEFAULT_RET_ISO = "public.returns_ema_multi_tf_cal_iso"
+# Output: both schemes write to the unified _u table (tagged by alignment_source)
+DEFAULT_RET_US = "public.returns_ema_multi_tf_u"
+DEFAULT_RET_ISO = "public.returns_ema_multi_tf_u"
 
-# Unified state per scheme
+# State per scheme (unchanged: state tables remain per-variant)
 DEFAULT_STATE_US = "public.returns_ema_multi_tf_cal_us_state"
 DEFAULT_STATE_ISO = "public.returns_ema_multi_tf_cal_iso_state"
+
+# Alignment sources per scheme
+ALIGNMENT_SOURCE_US = "multi_tf_cal_us"
+ALIGNMENT_SOURCE_ISO = "multi_tf_cal_iso"
 
 
 @dataclass(frozen=True)
@@ -206,31 +209,38 @@ def _load_keys(
     engine: Engine,
     ema_table: str,
     ids: Optional[List[int]],
+    alignment_source: str = ALIGNMENT_SOURCE_US,
 ) -> List[Tuple[int, str, int, int]]:
-    """Returns keys as: (id, tf, period, venue_id)."""
+    """Returns keys as: (id, tf, period, venue_id).
+    Scoped by alignment_source so that when reading from ema_multi_tf_u we
+    only enumerate keys belonging to this builder's variant.
+    """
     if ids is None:
         sql = text(
             f"""
             SELECT DISTINCT id::bigint, tf::text, period::int,
                    venue_id
             FROM {ema_table}
+            WHERE alignment_source = :alignment_source
             ORDER BY 1,2,3,4;
             """
         )
         with engine.begin() as cxn:
-            rows = cxn.execute(sql).fetchall()
+            rows = cxn.execute(sql, {"alignment_source": alignment_source}).fetchall()
     else:
         sql = text(
             f"""
                 SELECT DISTINCT id::bigint, tf::text, period::int,
                        venue_id
                 FROM {ema_table}
-                WHERE id IN :ids
+                WHERE id IN :ids AND alignment_source = :alignment_source
                 ORDER BY 1,2,3,4;
                 """
         ).bindparams(bindparam("ids", expanding=True))
         with engine.begin() as cxn:
-            rows = cxn.execute(sql, {"ids": ids}).fetchall()
+            rows = cxn.execute(
+                sql, {"ids": ids, "alignment_source": alignment_source}
+            ).fetchall()
 
     return [(int(r[0]), str(r[1]), int(r[2]), int(r[3])) for r in rows]
 
@@ -262,6 +272,7 @@ def _full_refresh(
     ret_table: str,
     state_table: str,
     keys: List[Tuple[int, str, int, int]],
+    alignment_source: str = ALIGNMENT_SOURCE_US,
 ) -> None:
     if not keys:
         return
@@ -273,7 +284,8 @@ def _full_refresh(
     del_ret = text(
         f"""
         DELETE FROM {ret_table}
-        WHERE id=:id AND tf=:tf AND period=:period AND venue_id=:venue_id;
+        WHERE id=:id AND tf=:tf AND period=:period AND venue_id=:venue_id
+          AND alignment_source=:alignment_source;
         """
     )
     del_state = text(
@@ -285,9 +297,21 @@ def _full_refresh(
 
     with engine.begin() as cxn:
         for i, tf, period, venue_id in keys:
-            params = {"id": i, "tf": tf, "period": period, "venue_id": venue_id}
-            cxn.execute(del_ret, params)
-            cxn.execute(del_state, params)
+            del_out_params = {
+                "id": i,
+                "tf": tf,
+                "period": period,
+                "venue_id": venue_id,
+                "alignment_source": alignment_source,
+            }
+            del_state_params = {
+                "id": i,
+                "tf": tf,
+                "period": period,
+                "venue_id": venue_id,
+            }
+            cxn.execute(del_ret, del_out_params)
+            cxn.execute(del_state, del_state_params)
 
     _ensure_state_rows(engine, state_table, keys)
 
@@ -333,7 +357,7 @@ _VALUE_COLS = [
 _INSERT_COLS = (
     "id, venue_id, ts, tf, tf_days, period, roll,\n"
     + ",\n".join(_VALUE_COLS)
-    + ",\ningested_at"
+    + ",\ningested_at, alignment_source"
 )
 _UPSERT_SET = ",\n".join(
     f"{c} = EXCLUDED.{c}" for c in ["roll"] + _VALUE_COLS + ["ingested_at"]
@@ -347,6 +371,7 @@ def _run_one_key(
     state_table: str,
     start: str,
     key: Tuple[int, str, int, int],
+    alignment_source: str = ALIGNMENT_SOURCE_US,
 ) -> None:
     one_id, one_tf, one_period, one_venue_id = key
 
@@ -363,6 +388,7 @@ def _run_one_key(
                     SELECT ts FROM {ema_table}
                     WHERE id = :id AND tf = :tf AND period = :period
                       AND venue_id = :venue_id
+                      AND alignment_source = :alignment_source
                       AND roll = FALSE
                       AND ts < COALESCE((SELECT last_ts FROM st), CAST(:start AS timestamptz))
                     ORDER BY ts DESC
@@ -372,6 +398,7 @@ def _run_one_key(
                 CAST(:start AS timestamptz)
             ) AS seed_ts
         ),
+        -- CRITICAL: scope by alignment_source to avoid cross-source LAG contamination
         src AS (
             SELECT
                 e.id::bigint AS id,
@@ -388,6 +415,7 @@ def _run_one_key(
               AND e.tf = :tf
               AND e.period = :period
               AND e.venue_id = :venue_id
+              AND e.alignment_source = :alignment_source
               AND e.ts >= seed.seed_ts
         ),
         lagged AS (
@@ -482,9 +510,9 @@ def _run_one_key(
                 {_INSERT_COLS}
             )
             SELECT
-                {_INSERT_COLS.replace("ingested_at", "now()")}
+                {_INSERT_COLS.replace("ingested_at", "now()").replace("alignment_source", "CAST(:alignment_source AS text)")}
             FROM to_insert
-            ON CONFLICT (id, venue_id, ts, tf, period) DO UPDATE SET
+            ON CONFLICT (id, venue_id, ts, tf, period, alignment_source) DO UPDATE SET
                 {_UPSERT_SET}
             RETURNING ts
         )
@@ -505,17 +533,20 @@ def _run_one_key(
                 "period": one_period,
                 "venue_id": one_venue_id,
                 "start": start,
+                "alignment_source": alignment_source,
             },
         )
 
 
 def _run_one_key_mp(args: tuple) -> Tuple[int, str, int, int, bool]:
     """Multiprocessing-safe wrapper. Creates own engine with NullPool."""
-    db_url, ema_table, ret_table, state_table, start, key = args
+    db_url, ema_table, ret_table, state_table, start, key, alignment_source = args
     one_id, one_tf, one_period, one_venue_id = key
     try:
         engine = create_engine(db_url, poolclass=NullPool, future=True)
-        _run_one_key(engine, ema_table, ret_table, state_table, start, key)
+        _run_one_key(
+            engine, ema_table, ret_table, state_table, start, key, alignment_source
+        )
         engine.dispose()
         return (one_id, one_tf, one_period, one_venue_id, True)
     except Exception as exc:
@@ -596,15 +627,16 @@ def main() -> None:
         ema_table = cfg.ema_us if sch == "us" else cfg.ema_iso
         ret_table = cfg.ret_us if sch == "us" else cfg.ret_iso
         state_table = cfg.state_us if sch == "us" else cfg.state_iso
+        alignment_source = ALIGNMENT_SOURCE_US if sch == "us" else ALIGNMENT_SOURCE_ISO
 
         _print(f"=== scheme={sch.upper()} ===")
-        _print(f"ema={ema_table}")
+        _print(f"ema={ema_table} (alignment_source={alignment_source})")
         _print(f"ret={ret_table}")
         _print(f"state={state_table}")
 
         _ensure_tables(engine, ret_table, state_table)
 
-        keys = _load_keys(engine, ema_table, ids)
+        keys = _load_keys(engine, ema_table, ids, alignment_source=alignment_source)
         _print(f"Resolved keys={len(keys)}")
 
         if not keys:
@@ -613,13 +645,23 @@ def main() -> None:
         _ensure_state_rows(engine, state_table, keys)
 
         if cfg.full_refresh:
-            _full_refresh(engine, ret_table, state_table, keys)
+            _full_refresh(
+                engine, ret_table, state_table, keys, alignment_source=alignment_source
+            )
 
         workers = args.workers
         if workers > 1:
             _print(f"Running {len(keys)} keys with {workers} workers.")
             mp_args = [
-                (cfg.db_url, ema_table, ret_table, state_table, cfg.start, key)
+                (
+                    cfg.db_url,
+                    ema_table,
+                    ret_table,
+                    state_table,
+                    cfg.start,
+                    key,
+                    alignment_source,
+                )
                 for key in keys
             ]
             done = 0
@@ -640,7 +682,15 @@ def main() -> None:
                 _print(
                     f"Processing key=({one_id},{one_tf},{one_period},v{one_venue_id}) ({i}/{len(keys)})"
                 )
-                _run_one_key(engine, ema_table, ret_table, state_table, cfg.start, key)
+                _run_one_key(
+                    engine,
+                    ema_table,
+                    ret_table,
+                    state_table,
+                    cfg.start,
+                    key,
+                    alignment_source=alignment_source,
+                )
 
     _print("Done.")
 

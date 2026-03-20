@@ -3,10 +3,10 @@ from __future__ import annotations
 r"""
 refresh_returns_ema_multi_tf.py
 
-Incremental EMA-returns builder from public.ema_multi_tf.
+Incremental EMA-returns builder from public.ema_multi_tf_u.
 
 Writes:
-  public.returns_ema_multi_tf
+  public.returns_ema_multi_tf_u  (alignment_source='multi_tf')
 
 State:
   public.returns_ema_multi_tf_state  (watermark per key: (id, tf, period, venue_id) -> last_ts)
@@ -42,9 +42,10 @@ from sqlalchemy import bindparam, create_engine, text
 from sqlalchemy.engine import Engine
 
 
-DEFAULT_EMA_TABLE = "public.ema_multi_tf"
-DEFAULT_OUT_TABLE = "public.returns_ema_multi_tf"
+DEFAULT_EMA_TABLE = "public.ema_multi_tf_u"
+DEFAULT_OUT_TABLE = "public.returns_ema_multi_tf_u"
 DEFAULT_STATE_TABLE = "public.returns_ema_multi_tf_state"
+ALIGNMENT_SOURCE = "multi_tf"
 
 
 @dataclass(frozen=True)
@@ -175,7 +176,10 @@ def _load_keys(
     ids: Optional[List[int]],
     venue_id: Optional[int] = None,
 ) -> List[Tuple[int, str, int, int]]:
-    """Returns keys as: (id, tf, period, venue_id)."""
+    """Returns keys as: (id, tf, period, venue_id).
+    Scoped by ALIGNMENT_SOURCE so that when reading from ema_multi_tf_u we
+    only enumerate keys that actually belong to this builder's variant.
+    """
     venue_filter = f"AND venue_id = {int(venue_id)}" if venue_id is not None else ""
     if ids is None:
         sql = text(
@@ -183,24 +187,26 @@ def _load_keys(
             SELECT DISTINCT id::bigint, tf::text, period::int,
                    venue_id
             FROM {ema_table}
-            WHERE 1=1 {venue_filter}
+            WHERE alignment_source = :alignment_source {venue_filter}
             ORDER BY 1,2,3,4;
             """
         )
         with engine.begin() as cxn:
-            rows = cxn.execute(sql).fetchall()
+            rows = cxn.execute(sql, {"alignment_source": ALIGNMENT_SOURCE}).fetchall()
     else:
         sql = text(
             f"""
                 SELECT DISTINCT id::bigint, tf::text, period::int,
                        venue_id
                 FROM {ema_table}
-                WHERE id IN :ids {venue_filter}
+                WHERE id IN :ids AND alignment_source = :alignment_source {venue_filter}
                 ORDER BY 1,2,3,4;
                 """
         ).bindparams(bindparam("ids", expanding=True))
         with engine.begin() as cxn:
-            rows = cxn.execute(sql, {"ids": ids}).fetchall()
+            rows = cxn.execute(
+                sql, {"ids": ids, "alignment_source": ALIGNMENT_SOURCE}
+            ).fetchall()
 
     return [(int(r[0]), str(r[1]), int(r[2]), int(r[3])) for r in rows]
 
@@ -242,7 +248,8 @@ def _full_refresh(
     del_out = text(
         f"""
         DELETE FROM {out_table}
-        WHERE id = :id AND tf = :tf AND period = :period AND venue_id = :venue_id;
+        WHERE id = :id AND tf = :tf AND period = :period AND venue_id = :venue_id
+          AND alignment_source = :alignment_source;
         """
     )
     del_state = text(
@@ -254,9 +261,21 @@ def _full_refresh(
 
     with engine.begin() as cxn:
         for i, tf, period, venue_id in keys:
-            params = {"id": i, "tf": tf, "period": period, "venue_id": venue_id}
-            cxn.execute(del_out, params)
-            cxn.execute(del_state, params)
+            del_out_params = {
+                "id": i,
+                "tf": tf,
+                "period": period,
+                "venue_id": venue_id,
+                "alignment_source": ALIGNMENT_SOURCE,
+            }
+            del_state_params = {
+                "id": i,
+                "tf": tf,
+                "period": period,
+                "venue_id": venue_id,
+            }
+            cxn.execute(del_out, del_out_params)
+            cxn.execute(del_state, del_state_params)
 
     _ensure_state_rows(engine, state_table, keys)
 
@@ -302,7 +321,7 @@ _VALUE_COLS = [
 _INSERT_COLS = (
     "id, venue_id, ts, tf, tf_days, period, roll,\n"
     + ",\n".join(_VALUE_COLS)
-    + ",\ningested_at"
+    + ",\ningested_at, alignment_source"
 )
 _UPSERT_SET = ",\n".join(
     f"{c} = EXCLUDED.{c}" for c in ["roll"] + _VALUE_COLS + ["ingested_at"]
@@ -329,6 +348,7 @@ def _run_one_key(
                     SELECT ts FROM {cfg.ema_table}
                     WHERE id = :id AND tf = :tf AND period = :period
                       AND venue_id = :venue_id
+                      AND alignment_source = :alignment_source
                       AND roll = FALSE
                       AND ts < COALESCE((SELECT last_ts FROM st), CAST(:start AS timestamptz))
                     ORDER BY ts DESC
@@ -339,6 +359,7 @@ def _run_one_key(
             ) AS seed_ts
         ),
         -- Pull ALL EMA rows (both roll modes) from seed point
+        -- CRITICAL: scope by alignment_source to avoid cross-source LAG contamination
         src AS (
             SELECT
                 e.id::bigint AS id,
@@ -355,6 +376,7 @@ def _run_one_key(
               AND e.tf = :tf
               AND e.period = :period
               AND e.venue_id = :venue_id
+              AND e.alignment_source = :alignment_source
               AND e.ts >= seed.seed_ts
         ),
         lagged AS (
@@ -465,9 +487,9 @@ def _run_one_key(
                 {_INSERT_COLS}
             )
             SELECT
-                {_INSERT_COLS.replace("ingested_at", "now()")}
+                {_INSERT_COLS.replace("ingested_at", "now()").replace("alignment_source", "CAST(:alignment_source AS text)")}
             FROM to_insert
-            ON CONFLICT (id, venue_id, ts, tf, period) DO UPDATE SET
+            ON CONFLICT (id, venue_id, ts, tf, period, alignment_source) DO UPDATE SET
                 {_UPSERT_SET}
             RETURNING ts
         )
@@ -488,6 +510,7 @@ def _run_one_key(
                 "period": one_period,
                 "venue_id": one_venue_id,
                 "start": cfg.start,
+                "alignment_source": ALIGNMENT_SOURCE,
             },
         )
 
