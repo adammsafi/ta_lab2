@@ -1,0 +1,25 @@
+AMA Returns Row Count Parity Verification
+Phase 77-05: AMA Returns Direct-to-_u Migration
+Date: 2026-03-20
+
+Query: Compare siloed returns tables vs returns_ama_multi_tf_u by alignment_source
+
+Results:
+alignment_source                          siloed_count   unified_count       deficit  status
+----------------------------------------  ------------  -------------  ------------  ------
+multi_tf                                    56,450,952     56,450,952             0  MATCH
+multi_tf_cal_anchor_iso                     15,313,554     15,313,554             0  MATCH
+multi_tf_cal_anchor_us                      14,988,852     14,988,852             0  MATCH
+multi_tf_cal_iso                            13,186,152     13,186,152             0  MATCH
+multi_tf_cal_us                             13,186,332     13,186,332             0  MATCH
+
+Total siloed:   113,125,842
+Total unified:  113,125,842
+
+Verdict: ALL 5 alignment_sources show exact MATCH (0 deficit)
+         Total: 113,125,842 rows in returns_ama_multi_tf_u
+         Tolerance threshold: 0.5% (not needed — all exact matches)
+
+Conclusion: AMA returns direct-to-_u migration verified. Phase 77 Wave 5 complete.
+            refresh_returns_ama.py can be retired from using siloed tables.
+            sync_returns_ama_multi_tf_u.py can be disabled as no-op.
