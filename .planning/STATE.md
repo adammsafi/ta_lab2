@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 
 ## Current Position
 
-Phase: 77 of 79 (Direct-to-_u Remaining Families) -- In progress
-Plan: 4 of N complete
-Status: In progress
-Last activity: 2026-03-20 -- Completed 77-04-PLAN.md (AMA values builders redirected to _u)
+Phase: 77 of 79 (Direct-to-_u Remaining Families) -- Phase complete
+Plan: 5 of 5 complete
+Status: Phase complete
+Last activity: 2026-03-20 -- Completed 77-05-PLAN.md (AMA returns redirected to _u; Phase 77 fully complete)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [#######...] 55% v1.1.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 346
+- Total plans completed: 347
 - Average duration: 7 min
-- Total execution time: ~28.8 hours
+- Total execution time: ~28.9 hours
 
 **Recent Trend:**
 - v0.8.0: 6 phases, 16 plans, ~1.2 hours
@@ -84,6 +84,10 @@ Recent decisions affecting current work:
 - SCHEME_MAP alignment_source key added to cal/cal_anchor AMA scripts alongside output_table (77-04)
 - AMA parity confirmed: all 5 sources MATCH (170,447,220 total rows in ama_multi_tf_u) (77-04)
 - sync_ama_multi_tf_u.py disabled as no-op with DEPRECATED message; Phase 78 will remove it (77-04)
+- TABLE_MAP 4-tuple (src, dst, state_table, alignment_source) used in refresh_returns_ama.py for _u migration (77-05)
+- AMA returns scoped by alignment_source in WHERE prevents cross-source LAG contamination from shared ama_multi_tf_u source (77-05)
+- AMA returns parity confirmed: all 5 sources MATCH (113,125,842 total rows in returns_ama_multi_tf_u) (77-05)
+- sync_returns_ama_multi_tf_u.py disabled as no-op with deprecation message; Phase 78 will remove it (77-05)
 
 ### Pending Todos
 
@@ -99,9 +103,9 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-03-20
-Stopped at: Completed 77-04-PLAN.md (AMA values builders redirected to _u)
+Stopped at: Completed 77-05-PLAN.md (Phase 77 complete — all 5 families migrated to direct-to-_u writes)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-20 (Phase 77, Plan 04 complete — AMA values direct-to-_u migration)*
+*Last updated: 2026-03-20 (Phase 77, Plan 05 complete — AMA returns direct-to-_u migration; Phase 77 fully done)*
