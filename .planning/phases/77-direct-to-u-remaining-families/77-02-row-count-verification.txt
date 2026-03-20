@@ -1,0 +1,21 @@
+EMA Row Count Parity Verification
+Generated: 2026-03-20
+Plan: 77-02
+
+Note: Initial parity check found DEFICIT in multi_tf_cal_iso (-1,731,920) and
+multi_tf_cal_anchor_iso (-1,637,309) due to incomplete prior sync runs.
+These rows were backfilled directly using INSERT...ON CONFLICT DO NOTHING
+against the new PK (id, venue_id, ts, tf, period, alignment_source).
+
+Final parity check after backfill:
+
+alignment_source                  siloed_count   unified_count    deficit   status
+-------------------------------------------------------------------------------------
+multi_tf                            24,674,715      24,674,715          0    MATCH
+multi_tf_cal_anchor_iso              7,732,616       7,732,616          0    MATCH
+multi_tf_cal_anchor_us               7,733,441       7,733,441          0    MATCH
+multi_tf_cal_iso                     7,827,227       7,827,227          0    MATCH
+multi_tf_cal_us                      7,828,616       7,828,616          0    MATCH
+TOTAL rows in _u: 55,796,615
+
+All 5 alignment_sources: MATCH
