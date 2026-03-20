@@ -1,7 +1,7 @@
 """
 test_returns_bars_schema.py
 
-Validation tests for the 5 cmc_returns_bars_* tables (wide-column, dual-LAG).
+Validation tests for the 5 returns_bars_* tables (wide-column, dual-LAG).
 Tests schema, data integrity, and referential constraints.
 
 Run:

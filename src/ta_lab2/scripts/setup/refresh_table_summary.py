@@ -70,7 +70,7 @@ RULES: list[tuple[str, str, str | None, str | None]] = [
     ("ema_multi_tf_stats", "STATS", "EMA", None),
     ("price_histories7_stats", "STATS", "PRICE", None),
     ("asset_data_coverage", "STATS", "COVERAGE", "ASSET"),
-    ("cmc_price_ranges", "STATS", "PRICE", "RANGE"),
+    ("price_ranges", "STATS", "PRICE", "RANGE"),
     ("asset_stats", "STATS", "ASSET", None),
     # State tables — returns from AMAs
     ("returns_ama_multi_tf", "STATE", "RETURN", "AMA"),
@@ -97,7 +97,7 @@ RULES: list[tuple[str, str, str | None, str | None]] = [
     # Cross-asset / correlation
     ("cross_asset_corr", "CORR", None, None),
     ("cross_asset_agg", "CORR", "AGG", None),
-    ("cmc_codependence", "CORR", "CODEP", None),
+    ("codependence", "CORR", "CODEP", None),
     # Return tables
     ("returns_ama_multi_tf", "RETURN", "AMA", None),
     ("returns_bars_multi_tf", "RETURN", "BAR", None),

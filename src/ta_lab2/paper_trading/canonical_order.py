@@ -159,7 +159,7 @@ class CanonicalOrder:
         """
         Construct a CanonicalOrder from a signal dict.
 
-        Accepts output from the cmc_signals table row or in-memory signal dicts.
+        Accepts output from the signals table row or in-memory signal dicts.
 
         Required keys (at least one of each group):
             - pair (the trading pair in "BTC/USD" format)
@@ -170,7 +170,7 @@ class CanonicalOrder:
             - order_type (default: "market")
             - limit_price
             - stop_price
-            - signal_id (int FK to cmc_signals)
+            - signal_id (int FK to signals)
             - asset_id (int FK to dim_assets)
 
         Args:

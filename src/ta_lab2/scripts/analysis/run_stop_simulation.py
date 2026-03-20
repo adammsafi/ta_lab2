@@ -60,7 +60,7 @@ _DEFAULT_STRATEGIES = [
 _DEFAULT_ASSET_IDS = [1, 2]
 
 # Signal type -> signal table mapping
-# NOTE: RSI table is signals_rsi_mean_revert (NOT cmc_signals_rsi)
+# NOTE: RSI table is signals_rsi_mean_revert (NOT signals_rsi)
 _SIGNAL_TABLE_MAP = {
     "ema_trend_17_77": "signals_ema_crossover",
     "ema_trend_21_50": "signals_ema_crossover",

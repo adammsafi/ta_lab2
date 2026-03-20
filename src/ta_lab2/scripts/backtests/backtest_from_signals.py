@@ -2,11 +2,11 @@
 Backtest engine that reads signals from database and executes via vectorbt.
 
 This module provides:
-1. Loading signals from cmc_signals_* tables
+1. Loading signals from signals_* tables
 2. Loading price data from features
 3. Running backtests via existing vbt_runner.py infrastructure
 4. Extracting comprehensive metrics from vectorbt Portfolio
-5. Saving results to cmc_backtest_* tables
+5. Saving results to backtest_* tables
 
 All backtests are reproducible via feature hashing and parameter tracking.
 """
@@ -99,7 +99,7 @@ class SignalBacktester:
     """
     Backtest engine for signals stored in database tables.
 
-    Reads signals from cmc_signals_{signal_type} tables and executes backtests
+    Reads signals from signals_{signal_type} tables and executes backtests
     using vectorbt via the existing vbt_runner.py infrastructure.
 
     Supports both clean mode (no costs) and realistic mode (with fees/slippage).
@@ -123,7 +123,7 @@ class SignalBacktester:
         """
         Load signals from database and convert to entry/exit boolean Series.
 
-        Queries closed positions from cmc_signals_{signal_type} table and converts
+        Queries closed positions from signals_{signal_type} table and converts
         them to boolean Series indexed by timestamp for vectorbt compatibility.
 
         Args:
@@ -138,7 +138,7 @@ class SignalBacktester:
             entries[ts] = True indicates entry signal at that timestamp.
             exits[ts] = True indicates exit signal at that timestamp.
         """
-        table = f"cmc_signals_{signal_type}"
+        table = f"signals_{signal_type}"
 
         sql = text(
             f"""

@@ -625,7 +625,7 @@ def _get_latest_feature_hash(
     Returns:
         Feature hash string or None if no signals found
     """
-    table = f"cmc_signals_{signal_type}"
+    table = f"signals_{signal_type}"
 
     sql = text(
         f"""

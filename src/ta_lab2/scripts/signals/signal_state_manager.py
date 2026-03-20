@@ -151,7 +151,7 @@ class SignalStateManager:
             Returns empty DataFrame if no open positions found.
         """
         # Determine signal table name from signal_type
-        signal_table = f"cmc_signals_{self.config.signal_type}"
+        signal_table = f"signals_{self.config.signal_type}"
 
         sql_text = f"""
             SELECT

@@ -57,7 +57,7 @@ def sample_signal(db_session, db_engine):
 
         try:
             result = db_session.execute(
-                sql, {"table_type": table.replace("cmc_signals_", "")}
+                sql, {"table_type": table.replace("signals_", "")}
             )
             row = result.fetchone()
 

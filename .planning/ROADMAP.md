@@ -1409,7 +1409,11 @@ Plans:
   2. Incremental refresh with watermark tracking works correctly -- state tables populated from _u table actual MAX(ts) before first direct-write run
   3. Row counts in price_bars_multi_tf_u per alignment_source match pre-migration totals from the siloed tables
   4. sync_price_bars_multi_tf_u.py is disabled (no longer invoked by orchestrator)
-**Plans**: TBD
+**Plans:** 3 plans
+Plans:
+- [ ] 76-01-PLAN.md -- Shared infra (alignment_source in upsert_bars/delete) + state table bootstrap
+- [ ] 76-02-PLAN.md -- Redirect all 5 builders to write to price_bars_multi_tf_u
+- [ ] 76-03-PLAN.md -- Disable sync script + row count verification
 
 ---
 

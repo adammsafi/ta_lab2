@@ -20,7 +20,7 @@ Parallel execution where possible:
 - features runs after all complete
 - CS norms run sequentially after features (window-function UPDATE, not insert)
 
-Note: cmc_returns is deprecated; returns now come from returns_bars_multi_tf.
+Note: returns come from returns_bars_multi_tf.
 """
 
 from __future__ import annotations
@@ -550,7 +550,7 @@ def run_all_refreshes(
             duration_co = time.time() - t0_co
 
             co_result = RefreshResult(
-                table="cmc_codependence",
+                table="codependence",
                 rows_inserted=n_pairs,
                 duration_seconds=duration_co,
                 success=True,
@@ -559,7 +559,7 @@ def run_all_refreshes(
             duration_co = time.time() - t0_co
             logger.error(f"Codependence refresh failed (tf={tf}): {e}", exc_info=True)
             co_result = RefreshResult(
-                table="cmc_codependence",
+                table="codependence",
                 rows_inserted=0,
                 duration_seconds=duration_co,
                 success=False,
@@ -761,7 +761,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--codependence",
         action="store_true",
-        help="Also refresh cmc_codependence (pairwise, ~3 min for all assets)",
+        help="Also refresh codependence (pairwise, ~3 min for all assets)",
     )
 
     # Refresh mode
@@ -1002,7 +1002,7 @@ def main() -> int:
             "features (microstructure)",
             "features",
             "features (CS norms)",
-            "cmc_codependence",
+            "codependence",
         ]:
             if table in results:
                 result = results[table]

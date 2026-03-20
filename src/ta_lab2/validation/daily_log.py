@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 # Signal table map (matches signal_reader.py SIGNAL_TABLE_MAP convention).
 _SIGNAL_TABLE_MAP: dict[str, str] = {
     "ema_crossover": "signals_ema_crossover",
-    "rsi_mean_reversion": "cmc_signals_rsi",
+    "rsi_mean_reversion": "signals_rsi",
     "atr_breakout": "signals_atr_breakout",
 }
 

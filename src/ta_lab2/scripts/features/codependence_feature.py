@@ -4,7 +4,7 @@ codependence_feature.py - Pairwise codependence computation + DB writer.
 Standalone script (NOT a BaseFeature subclass) that computes pairwise
 codependence metrics (Pearson correlation, distance correlation, mutual
 information, variation of information) for all asset pairs at a given
-timeframe. Results are written to cmc_codependence.
+timeframe. Results are written to codependence.
 
 Pattern follows refresh_regimes.py: load data, compute, write.
 Historical snapshots are preserved via computed_at in the PK.
@@ -318,10 +318,10 @@ def refresh_codependence(
 
     # 6. Write to DB (append mode - preserves history via computed_at in PK)
     if dry_run:
-        logger.info("DRY RUN: would write %d rows to cmc_codependence", n_rows)
+        logger.info("DRY RUN: would write %d rows to codependence", n_rows)
     else:
         df.to_sql(
-            "cmc_codependence",
+            "codependence",
             engine,
             schema="public",
             if_exists="append",
@@ -329,7 +329,7 @@ def refresh_codependence(
             method="multi",
             chunksize=5000,
         )
-        logger.info("refresh_codependence: wrote %d rows to cmc_codependence", n_rows)
+        logger.info("refresh_codependence: wrote %d rows to codependence", n_rows)
 
     return n_rows
 
@@ -367,7 +367,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=(
             "Compute pairwise codependence metrics (Pearson, distance correlation, "
-            "mutual information, variation of information) and write to cmc_codependence."
+            "mutual information, variation of information) and write to codependence."
         ),
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
