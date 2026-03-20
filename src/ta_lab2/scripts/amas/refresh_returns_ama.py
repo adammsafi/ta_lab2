@@ -2,21 +2,25 @@
 refresh_returns_ama.py
 
 Computes AMA return columns for all AMA value table variants and writes them
-to the corresponding returns tables using SQL window functions (LAG).
+to returns_ama_multi_tf_u with alignment_source stamped on every row.
 
-Each source table maps to its own returns table:
-    ama_multi_tf            -> returns_ama_multi_tf
-    ama_multi_tf_cal_us     -> returns_ama_multi_tf_cal_us
-    ama_multi_tf_cal_iso    -> returns_ama_multi_tf_cal_iso
-    ama_multi_tf_cal_anchor_us  -> returns_ama_multi_tf_cal_anchor_us
-    ama_multi_tf_cal_anchor_iso -> returns_ama_multi_tf_cal_anchor_iso
+All 5 variants read from ama_multi_tf_u (scoped by alignment_source) and write
+to returns_ama_multi_tf_u with alignment_source in PK, DELETE scope, and INSERT.
+
+Source->returns mappings via TABLE_MAP:
+    ama_multi_tf_u [multi_tf]            -> returns_ama_multi_tf_u
+    ama_multi_tf_u [multi_tf_cal_us]     -> returns_ama_multi_tf_u
+    ama_multi_tf_u [multi_tf_cal_iso]    -> returns_ama_multi_tf_u
+    ama_multi_tf_u [multi_tf_cal_anchor_us]  -> returns_ama_multi_tf_u
+    ama_multi_tf_u [multi_tf_cal_anchor_iso] -> returns_ama_multi_tf_u
 
 Strategy:
-    - Batched by asset id: one SQL INSERT per (source_table, id) pair
+    - Batched by asset id: one SQL INSERT per (alignment_source, id) pair
     - Each INSERT uses a 2-pass CTE with window functions for returns
+    - Source reads scoped by alignment_source (critical: prevents cross-source LAG contamination)
     - Multiprocessing across (source, id) work units (default 10 workers)
     - NullPool engines to avoid connection pooling issues in workers
-    - Each work unit: DELETE WHERE id=:id + INSERT ... SELECT with LAG()
+    - Each work unit: DELETE WHERE id=:id AND alignment_source=... + INSERT ... SELECT with LAG()
 
 Usage:
     python -m ta_lab2.scripts.amas.refresh_returns_ama --ids all --all-tfs --source all
@@ -48,34 +52,41 @@ from sqlalchemy.pool import NullPool
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Table mapping: source -> (source_table, returns_table, state_table)
+# Table mapping: source_key -> (source_table, returns_table, state_table, alignment_source)
+# All 5 variants now read from ama_multi_tf_u (scoped by alignment_source)
+# and write to returns_ama_multi_tf_u with alignment_source in PK/CONFLICT/DELETE.
 # ---------------------------------------------------------------------------
 
-TABLE_MAP: dict[str, tuple[str, str, str]] = {
+TABLE_MAP: dict[str, tuple[str, str, str, str]] = {
     "multi_tf": (
-        "public.ama_multi_tf",
-        "public.returns_ama_multi_tf",
+        "public.ama_multi_tf_u",
+        "public.returns_ama_multi_tf_u",
         "public.returns_ama_multi_tf_state",
+        "multi_tf",
     ),
     "cal_us": (
-        "public.ama_multi_tf_cal_us",
-        "public.returns_ama_multi_tf_cal_us",
+        "public.ama_multi_tf_u",
+        "public.returns_ama_multi_tf_u",
         "public.returns_ama_multi_tf_cal_us_state",
+        "multi_tf_cal_us",
     ),
     "cal_iso": (
-        "public.ama_multi_tf_cal_iso",
-        "public.returns_ama_multi_tf_cal_iso",
+        "public.ama_multi_tf_u",
+        "public.returns_ama_multi_tf_u",
         "public.returns_ama_multi_tf_cal_iso_state",
+        "multi_tf_cal_iso",
     ),
     "cal_anchor_us": (
-        "public.ama_multi_tf_cal_anchor_us",
-        "public.returns_ama_multi_tf_cal_anchor_us",
+        "public.ama_multi_tf_u",
+        "public.returns_ama_multi_tf_u",
         "public.returns_ama_multi_tf_cal_anchor_us_state",
+        "multi_tf_cal_anchor_us",
     ),
     "cal_anchor_iso": (
-        "public.ama_multi_tf_cal_anchor_iso",
-        "public.returns_ama_multi_tf_cal_anchor_iso",
+        "public.ama_multi_tf_u",
+        "public.returns_ama_multi_tf_u",
         "public.returns_ama_multi_tf_cal_anchor_iso_state",
+        "multi_tf_cal_anchor_iso",
     ),
 }
 
@@ -89,8 +100,8 @@ def _print(msg: str) -> None:
 # ---------------------------------------------------------------------------
 # SQL template: 2-pass CTE with window functions
 # ---------------------------------------------------------------------------
-# Parameters: {src}, {dst}, {where_clause}
-# The where_clause allows scoping to a single id, or id+tf, etc.
+# Parameters: {src}, {dst}, {where_clause}, {alignment_source}
+# The where_clause scopes to a single id AND alignment_source (critical).
 
 _INSERT_SQL = """
 INSERT INTO {dst} (
@@ -101,7 +112,8 @@ INSERT INTO {dst} (
     ret_log_ama_roll, delta_ret_log_ama_roll,
     delta1_ama, delta2_ama,
     ret_arith_ama, delta_ret_arith_ama,
-    ret_log_ama, delta_ret_log_ama
+    ret_log_ama, delta_ret_log_ama,
+    alignment_source
 )
 WITH pass1 AS (
     SELECT
@@ -134,8 +146,8 @@ pass2 AS (
     FROM pass1
     WINDOW w AS (PARTITION BY id, venue_id, tf, indicator, params_hash ORDER BY ts)
 )
-SELECT * FROM pass2
-ON CONFLICT (id, venue_id, ts, tf, indicator, params_hash) DO NOTHING
+SELECT *, '{alignment_source}'::text AS alignment_source FROM pass2
+ON CONFLICT (id, venue_id, ts, tf, indicator, params_hash, alignment_source) DO NOTHING
 """
 
 
@@ -170,11 +182,16 @@ def _table_exists(engine: Engine, full_table: str) -> bool:
         )
 
 
-def _resolve_ids(ids_arg: str, engine: Engine, source_table: str) -> list[int]:
+def _resolve_ids(
+    ids_arg: str, engine: Engine, source_table: str, alignment_source: str
+) -> list[int]:
     if ids_arg.strip().lower() == "all":
-        sql = text(f"SELECT DISTINCT id FROM {source_table} ORDER BY id")
+        sql = text(
+            f"SELECT DISTINCT id FROM {source_table} "
+            f"WHERE alignment_source = :as_ ORDER BY id"
+        )
         with engine.connect() as conn:
-            rows = conn.execute(sql).fetchall()
+            rows = conn.execute(sql, {"as_": alignment_source}).fetchall()
         return [int(r[0]) for r in rows]
     return [int(x.strip()) for x in ids_arg.split(",") if x.strip()]
 
@@ -184,13 +201,17 @@ def _resolve_tfs(
     all_tfs: bool,
     engine: Engine,
     source_table: str,
+    alignment_source: str,
 ) -> list[str]:
     if tf_arg:
         return [tf_arg.strip()]
     if all_tfs:
-        sql = text(f"SELECT DISTINCT tf FROM {source_table} ORDER BY tf")
+        sql = text(
+            f"SELECT DISTINCT tf FROM {source_table} "
+            f"WHERE alignment_source = :as_ ORDER BY tf"
+        )
         with engine.connect() as conn:
-            rows = conn.execute(sql).fetchall()
+            rows = conn.execute(sql, {"as_": alignment_source}).fetchall()
         return [str(r[0]) for r in rows]
     raise ValueError("Provide --tf <TF> or --all-tfs to specify timeframes.")
 
@@ -209,25 +230,45 @@ def _worker(args: tuple) -> dict:
 
     Returns summary dict with source, id, n_rows, elapsed.
     """
-    source_key, src, dst, asset_id, tf_filter, db_url, venue_id = args
+    source_key, src, dst, asset_id, tf_filter, db_url, venue_id, alignment_source = args
     t0 = time.time()
 
     try:
         engine = _get_engine(db_url)
 
-        # Build WHERE clause
+        # Build WHERE clause — always scoped by alignment_source to prevent
+        # cross-source LAG contamination (all 5 variants read from same _u table)
         if tf_filter:
-            where_clause = f"WHERE id = {int(asset_id)} AND tf = '{tf_filter}'"
-            delete_where = f"WHERE id = {int(asset_id)} AND tf = '{tf_filter}'"
+            where_clause = (
+                f"WHERE id = {int(asset_id)}"
+                f" AND alignment_source = '{alignment_source}'"
+                f" AND tf = '{tf_filter}'"
+            )
+            delete_where = (
+                f"WHERE id = {int(asset_id)}"
+                f" AND alignment_source = '{alignment_source}'"
+                f" AND tf = '{tf_filter}'"
+            )
         else:
-            where_clause = f"WHERE id = {int(asset_id)}"
-            delete_where = f"WHERE id = {int(asset_id)}"
+            where_clause = (
+                f"WHERE id = {int(asset_id)}"
+                f" AND alignment_source = '{alignment_source}'"
+            )
+            delete_where = (
+                f"WHERE id = {int(asset_id)}"
+                f" AND alignment_source = '{alignment_source}'"
+            )
 
         if venue_id is not None:
             where_clause += f" AND venue_id = {int(venue_id)}"
             delete_where += f" AND venue_id = {int(venue_id)}"
 
-        insert_sql = _INSERT_SQL.format(src=src, dst=dst, where_clause=where_clause)
+        insert_sql = _INSERT_SQL.format(
+            src=src,
+            dst=dst,
+            where_clause=where_clause,
+            alignment_source=alignment_source,
+        )
 
         with engine.begin() as conn:
             conn.execute(text("SET LOCAL work_mem = '128MB'"))
@@ -264,6 +305,7 @@ def _process_source(
     source_key: str,
     source_table: str,
     returns_table: str,
+    alignment_source: str,
     *,
     ids_arg: str,
     tf_arg: Optional[str],
@@ -273,7 +315,7 @@ def _process_source(
     num_processes: int,
     venue_id: Optional[int] = None,
 ) -> dict:
-    """Process one AMA source table -> returns table mapping."""
+    """Process one AMA alignment_source -> returns_ama_multi_tf_u mapping."""
     engine = _get_engine(db_url)
 
     if not _table_exists(engine, source_table):
@@ -281,13 +323,18 @@ def _process_source(
         return {"source": source_key, "skipped_reason": "table_missing"}
 
     with engine.connect() as conn:
-        row_count = conn.execute(text(f"SELECT COUNT(*) FROM {source_table}")).scalar()
+        row_count = conn.execute(
+            text(f"SELECT COUNT(*) FROM {source_table} WHERE alignment_source = :as_"),
+            {"as_": alignment_source},
+        ).scalar()
 
     if row_count == 0:
-        _print(f"  [{source_key}] Source {source_table} is empty -- skipping")
+        _print(
+            f"  [{source_key}] Source {source_table} [{alignment_source}] is empty -- skipping"
+        )
         return {"source": source_key, "skipped_reason": "table_empty"}
 
-    asset_ids = _resolve_ids(ids_arg, engine, source_table)
+    asset_ids = _resolve_ids(ids_arg, engine, source_table, alignment_source)
     if not asset_ids:
         _print(f"  [{source_key}] No IDs found -- skipping")
         return {"source": source_key, "skipped_reason": "no_ids"}
@@ -300,7 +347,7 @@ def _process_source(
         raise ValueError("Provide --tf <TF> or --all-tfs to specify timeframes.")
 
     _print(
-        f"  [{source_key}] {source_table} -> {returns_table}: "
+        f"  [{source_key}] {source_table}[{alignment_source}] -> {returns_table}: "
         f"{len(asset_ids)} ids, tf={'all' if not tf_filter else tf_filter}, "
         f"~{row_count:,} source rows"
     )
@@ -317,7 +364,16 @@ def _process_source(
 
     # Build work units: one per (source_key, id)
     work_units = [
-        (source_key, source_table, returns_table, aid, tf_filter, db_url, venue_id)
+        (
+            source_key,
+            source_table,
+            returns_table,
+            aid,
+            tf_filter,
+            db_url,
+            venue_id,
+            alignment_source,
+        )
         for aid in asset_ids
     ]
 
@@ -379,7 +435,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
             "Compute AMA return columns (delta1, delta2, ret_arith, ret_log + roll "
-            "variants) for all AMA value table variants using SQL window functions."
+            "variants) for all AMA value table variants using SQL window functions. "
+            "Writes to returns_ama_multi_tf_u with alignment_source stamped per row."
         )
     )
     parser.add_argument(
@@ -476,11 +533,12 @@ def main() -> None:
     results = []
 
     for source_key in sources_to_process:
-        source_table, returns_table, state_table = TABLE_MAP[source_key]
+        src, dst, state_table, alignment_source = TABLE_MAP[source_key]
         result = _process_source(
             source_key=source_key,
-            source_table=source_table,
-            returns_table=returns_table,
+            source_table=src,
+            returns_table=dst,
+            alignment_source=alignment_source,
             ids_arg=args.ids,
             tf_arg=args.tf,
             all_tfs=args.all_tfs,
