@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 
 ## Current Position
 
-Phase: 75 of 79 (Generalized 1D Bar Builder) -- Phase VERIFIED ✓
-Plan: 2 of 2 complete
-Status: Phase complete, verified 13/13 must-haves
-Last activity: 2026-03-20 -- Phase 75 verified and complete
+Phase: 76 of 79 (Direct-to-U Price Bars Pilot) -- In progress
+Plan: 1 of 3 complete
+Status: In progress
+Last activity: 2026-03-20 -- Completed 76-01 (infrastructure: alignment_source support + state bootstrap)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [#####.....] 33% v1.1.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [#####.....] 36% v1.1.0
 
 ## Performance Metrics
 
@@ -54,6 +54,10 @@ Recent decisions affecting current work:
 - NULL::timestamptz cast required in state migration INSERT when using psycopg2 without %s params (75-01)
 - Orchestrator builder name "1d" renamed to "1d_cmc"; all 1D builders point to generic script via custom_args source flag (75-02)
 - Unified 1d_ prefix handler in build_command(); --keep-rejects only for CMC; --source from custom_args dict (75-02)
+- alignment_source in valid_cols of upsert_bars() prevents silent column drop (76-01)
+- delete_bars_for_id_tf() accepts alignment_source param (default None) to scope deletes when targeting _u tables (76-01)
+- Cal/cal_anchor state tables have tz NOT NULL column; bootstrap hardcodes 'America/New_York' (only value in existing data) (76-01)
+- All 5 price bar state tables bootstrapped from price_bars_multi_tf_u; ON CONFLICT uses GREATEST() to advance watermarks (76-01)
 
 ### Pending Todos
 
@@ -69,9 +73,9 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-03-20
-Stopped at: Phase 75 verified and complete
+Stopped at: Completed 76-01-PLAN.md
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-20 (Phase 75 verified — 13/13 must-haves passed)*
+*Last updated: 2026-03-20 (Phase 76 Plan 01 complete)*
