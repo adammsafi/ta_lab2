@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 ## Current Position
 
 Phase: 77 of 79 (Direct-to-_u Remaining Families) -- In progress
-Plan: 2 of N complete
+Plan: 3 of N complete
 Status: In progress
-Last activity: 2026-03-20 -- Completed 77-02-PLAN.md (EMA values builders redirected to _u)
+Last activity: 2026-03-20 -- Completed 77-03-PLAN.md (EMA returns builders redirected to _u)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [#######...] 55% v1.1.0
 
@@ -73,6 +73,11 @@ Recent decisions affecting current work:
 - ISO backfill required: +1.7M (cal_iso) + +1.6M (cal_anchor_iso) rows to fix sync gaps before retiring sync path (77-02)
 - EMA parity confirmed: all 5 sources MATCH (55,796,615 total rows in ema_multi_tf_u) (77-02)
 - sync_ema_multi_tf_u.py disabled as no-op with DeprecationWarning; Phase 78 will remove it (77-02)
+- EMA returns builders read from ema_multi_tf_u scoped by alignment_source (critical: prevents cross-source LAG contamination) (77-03)
+- _load_keys() scoped by alignment_source when source is _u table (prevents enumerating all 5 variants' keys) (77-03)
+- _tables_for_scheme() returns 4-tuple including alignment_source for clean propagation through dual-scheme loop (77-03)
+- EMA returns parity confirmed: all 5 sources MATCH (48,830,818 total rows in returns_ema_multi_tf_u) (77-03)
+- sync_returns_ema_multi_tf_u.py disabled as no-op with deprecation message; Phase 78 will remove it (77-03)
 
 ### Pending Todos
 
@@ -88,9 +93,9 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-03-20
-Stopped at: Completed 77-02-PLAN.md (EMA values builders redirected to _u)
+Stopped at: Completed 77-03-PLAN.md (EMA returns builders redirected to _u)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-20 (Phase 77, Plan 02 complete — EMA values direct-to-_u migration)*
+*Last updated: 2026-03-20 (Phase 77, Plan 03 complete — EMA returns direct-to-_u migration)*
