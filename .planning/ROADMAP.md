@@ -1393,7 +1393,10 @@ Plans:
   3. Adding a hypothetical new source requires only a new dim_data_sources row with SQL template -- no new script file
   4. Backfill detection (new historical data appearing before earliest known bar) works for all sources, not just CMC
   5. Old source-specific scripts (refresh_tvc_price_bars_1d.py, refresh_hl_price_bars_1d.py) are deleted from the codebase
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 75-01-PLAN.md -- Generalized source-aware 1D bar builder (rewrite refresh_price_bars_1d.py)
+- [ ] 75-02-PLAN.md -- Orchestrator update, old script deletion, row count parity verification
 
 ---
 
