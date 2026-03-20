@@ -351,7 +351,9 @@ def _migrate_state_table_pk(conn, state_table: str, source_specs: list[dict]) ->
                 INSERT INTO {state_table}
                     (id, venue_id, tf, last_src_ts, daily_min_seen, last_run_ts, last_upserted,
                      last_repaired_timehigh, last_repaired_timelow, last_rejected)
-                SELECT DISTINCT dai.id, {vid}::smallint, '1D', NULL, NULL, now(), 0, 0, 0, 0
+                SELECT DISTINCT
+                    dai.id, {vid}::smallint, '1D',
+                    NULL::timestamptz, NULL::timestamptz, now(), 0, 0, 0, 0
                 FROM dim_asset_identifiers dai
                 JOIN hyperliquid.hl_candles c
                   ON dai.id_type = 'HL' AND dai.id_value::int = c.asset_id
@@ -364,7 +366,9 @@ def _migrate_state_table_pk(conn, state_table: str, source_specs: list[dict]) ->
                 INSERT INTO {state_table}
                     (id, venue_id, tf, last_src_ts, daily_min_seen, last_run_ts, last_upserted,
                      last_repaired_timehigh, last_repaired_timelow, last_rejected)
-                SELECT DISTINCT id, {vid}::smallint, '1D', NULL, NULL, now(), 0, 0, 0, 0
+                SELECT DISTINCT
+                    id, {vid}::smallint, '1D',
+                    NULL::timestamptz, NULL::timestamptz, now(), 0, 0, 0, 0
                 FROM {src_table}
                 ON CONFLICT (id, venue_id, tf) DO NOTHING
             """
@@ -690,7 +694,14 @@ class GenericOneDayBarBuilder(BaseBarBuilder):
         dst = OUTPUT_TABLE
 
         # Full rebuild: delete existing bars and state for this ID/venue
+        # Also delete by src_name to handle migration case where old data had different venue_ids
         if self.config.full_rebuild:
+            src_name_label = spec["src_name_label"]
+            execute(
+                conn,
+                f"DELETE FROM {dst} WHERE id = %s AND src_name = %s AND tf = '1D';",
+                [id_, src_name_label],
+            )
             execute(
                 conn,
                 f"DELETE FROM {dst} WHERE id = %s AND venue_id = %s AND tf = '1D';",
