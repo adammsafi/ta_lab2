@@ -212,6 +212,7 @@ class EMAStateManager:
         self,
         output_table: str,
         output_schema: str = "public",
+        alignment_source: Optional[str] = None,
     ) -> int:
         """
         Update state table from EMA output table and optionally bars table.
@@ -225,6 +226,8 @@ class EMAStateManager:
         Args:
             output_table: Name of EMA output table
             output_schema: Schema containing output table (default: "public")
+            alignment_source: When set (i.e. targeting _u table), scopes all
+                queries to this alignment_source to avoid cross-source contamination.
 
         Returns:
             Number of state rows upserted
@@ -233,17 +236,33 @@ class EMAStateManager:
             sqlalchemy.exc.SQLAlchemyError: On database errors
         """
         if self.config.use_canonical_ts:
-            return self._update_canonical_ts_mode(output_table, output_schema)
+            return self._update_canonical_ts_mode(
+                output_table, output_schema, alignment_source=alignment_source
+            )
         else:
-            return self._update_multi_tf_mode(output_table, output_schema)
+            return self._update_multi_tf_mode(
+                output_table, output_schema, alignment_source=alignment_source
+            )
 
-    def _update_canonical_ts_mode(self, output_table: str, output_schema: str) -> int:
-        """Update state using canonical timestamp logic (for cal/anchor scripts)."""
+    def _update_canonical_ts_mode(
+        self,
+        output_table: str,
+        output_schema: str,
+        alignment_source: Optional[str] = None,
+    ) -> int:
+        """Update state using canonical timestamp logic (for cal/anchor scripts).
+
+        When alignment_source is provided, all queries are scoped to that
+        alignment_source to prevent cross-source contamination in the _u table.
+        """
         ts_col = self.config.ts_column
         roll_filter = self.config.roll_filter
         where_clause = (
             f"WHERE {roll_filter}" if roll_filter else f"WHERE {ts_col} IS NOT NULL"
         )
+        # Append alignment_source filter when targeting _u table
+        if alignment_source:
+            where_clause = f"{where_clause} AND alignment_source = :alignment_source"
 
         bars_table = self.config.bars_table
         bars_schema = self.config.bars_schema
@@ -280,8 +299,10 @@ class EMAStateManager:
             ),
             periods_for_id_tf AS (
                 -- Get all periods for each (id, venue_id, tf) from output table
+                -- Scoped by alignment_source when targeting _u table
                 SELECT DISTINCT id, venue_id, tf, period
                 FROM {output_schema}.{output_table}
+                {"WHERE alignment_source = :alignment_source" if alignment_source else ""}
             )
             INSERT INTO {state_table_fq} (
                 id, venue_id, tf, period,
@@ -331,6 +352,7 @@ class EMAStateManager:
             ),
             daily_range AS (
                 -- Full timestamp range (for daily_min_seen and daily_max_seen)
+                -- Scoped by alignment_source when targeting _u table
                 SELECT
                     id,
                     venue_id,
@@ -340,6 +362,7 @@ class EMAStateManager:
                     MAX({ts_col}) as daily_max_seen
                 FROM {output_schema}.{output_table}
                 WHERE {ts_col} IS NOT NULL
+                {"AND alignment_source = :alignment_source" if alignment_source else ""}
                 GROUP BY id, venue_id, tf, period
             )
             INSERT INTO {state_table_fq} (
@@ -370,14 +393,32 @@ class EMAStateManager:
                 updated_at = EXCLUDED.updated_at
             """
 
+        params = {}
+        if alignment_source:
+            params["alignment_source"] = alignment_source
+
         with self.engine.begin() as conn:
-            result = conn.execute(text(sql))
+            result = conn.execute(text(sql), params)
             return result.rowcount
 
-    def _update_multi_tf_mode(self, output_table: str, output_schema: str) -> int:
-        """Update state using multi-tf logic (for multi_tf scripts)."""
+    def _update_multi_tf_mode(
+        self,
+        output_table: str,
+        output_schema: str,
+        alignment_source: Optional[str] = None,
+    ) -> int:
+        """Update state using multi-tf logic (for multi_tf scripts).
+
+        When alignment_source is provided, scopes the query to that
+        alignment_source to avoid cross-source contamination in the _u table.
+        """
         state_table_fq = f"{self.config.state_schema}.{self.config.state_table}"
         ts_col = self.config.ts_column
+
+        # Add alignment_source filter when targeting _u table
+        alignment_filter = (
+            "AND alignment_source = :alignment_source" if alignment_source else ""
+        )
 
         sql = f"""
         INSERT INTO {state_table_fq} (id, venue_id, tf, period, last_time_close, last_bar_seq, updated_at)
@@ -391,6 +432,7 @@ class EMAStateManager:
             now() as updated_at
         FROM {output_schema}.{output_table}
         WHERE {ts_col} IS NOT NULL
+        {alignment_filter}
         GROUP BY id, venue_id, tf, period
         ON CONFLICT (id, venue_id, tf, period) DO UPDATE SET
             last_time_close = EXCLUDED.last_time_close,
@@ -398,8 +440,12 @@ class EMAStateManager:
             updated_at = EXCLUDED.updated_at
         """
 
+        params = {}
+        if alignment_source:
+            params["alignment_source"] = alignment_source
+
         with self.engine.begin() as conn:
-            result = conn.execute(text(sql))
+            result = conn.execute(text(sql), params)
             return result.rowcount
 
     def compute_dirty_window_starts(

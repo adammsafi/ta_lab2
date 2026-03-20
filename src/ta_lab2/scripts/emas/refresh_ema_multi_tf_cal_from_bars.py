@@ -86,10 +86,12 @@ def _process_id_worker(task: WorkerTask) -> int:
         import pandas as pd
         import numpy as np
 
+        alignment_source = task.extra_config.get("alignment_source")
         config = EMAFeatureConfig(
             periods=list(task.periods),
             output_schema=schema,
             output_table=out_table,
+            alignment_source=alignment_source,
         )
         feature = CalendarEMAFeature(
             engine=engine,
@@ -243,8 +245,8 @@ class CalEMARefresher(BaseEMARefresher):
             default="public",
             help="Schema for output tables (default: public)",
         )
-        p.add_argument("--out-us", default="ema_multi_tf_cal_us")
-        p.add_argument("--out-iso", default="ema_multi_tf_cal_iso")
+        p.add_argument("--out-us", default="ema_multi_tf_u")
+        p.add_argument("--out-iso", default="ema_multi_tf_u")
         p.add_argument("--alpha-schema", default="public")
         p.add_argument("--alpha-table", default="ema_alpha_lookup")
 
@@ -317,6 +319,9 @@ class CalEMARefresher(BaseEMARefresher):
         ids = temp_instance.load_ids(args.ids, venue_id=args.venue_id)
         periods = temp_instance.load_periods(args.periods)
 
+        # alignment_source per scheme: multi_tf_cal_us or multi_tf_cal_iso
+        alignment_source = f"multi_tf_cal_{scheme}"
+
         # Create final config
         final_config = EMARefresherConfig(
             db_url=db_url,
@@ -339,6 +344,7 @@ class CalEMARefresher(BaseEMARefresher):
                 "out_table": out_table,
                 "alpha_schema": args.alpha_schema,
                 "alpha_table": args.alpha_table,
+                "alignment_source": alignment_source,
             },
         )
 

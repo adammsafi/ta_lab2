@@ -44,12 +44,15 @@ class EMAFeatureConfig:
         output_schema: Schema for output table
         output_table: Output table name
         min_obs_multiplier: Minimum observations = period * multiplier
+        alignment_source: When set, write to _u table with this alignment_source stamped.
+            Also appended to _get_pk_columns() so ON CONFLICT resolves correctly.
     """
 
     periods: list[int]
     output_schema: str
     output_table: str
     min_obs_multiplier: float = 1.0
+    alignment_source: Optional[str] = None  # Set to write to _u table
 
 
 @dataclass(frozen=True)
@@ -272,6 +275,13 @@ class BaseEMAFeature(ABC):
 
         df_write = df.copy()
 
+        # Stamp alignment_source BEFORE to_sql -- _pg_upsert uses df columns for
+        # the INSERT statement; alignment_source must be present in the DataFrame
+        # before the write so it is included in the INSERT and the ON CONFLICT
+        # on the _u table PK (which now includes alignment_source) resolves correctly.
+        if self.config.alignment_source:
+            df_write["alignment_source"] = self.config.alignment_source
+
         rows = df_write.to_sql(
             self.config.output_table,
             self.engine,
@@ -320,11 +330,20 @@ class BaseEMAFeature(ABC):
         return result.rowcount
 
     def _get_pk_columns(self) -> list[str]:
-        """Extract primary key column names from output schema definition."""
+        """Extract primary key column names from output schema definition.
+
+        When alignment_source is configured (i.e. writing to _u table), appends
+        'alignment_source' to the PK list so ON CONFLICT resolves against the
+        correct unique row in ema_multi_tf_u (PK: id, venue_id, ts, tf, period,
+        alignment_source).
+        """
         schema = self.get_output_schema()
         pk_def = schema.get("PRIMARY KEY", "")
         pk_str = pk_def.strip("()")
-        return [col.strip() for col in pk_str.split(",") if col.strip()]
+        cols = [col.strip() for col in pk_str.split(",") if col.strip()]
+        if self.config.alignment_source and "alignment_source" not in cols:
+            cols.append("alignment_source")
+        return cols
 
     # =========================================================================
     # Helper Methods

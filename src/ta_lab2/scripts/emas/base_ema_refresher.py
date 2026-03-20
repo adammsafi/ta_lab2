@@ -1060,11 +1060,14 @@ class BaseEMARefresher(ABC):
         results = orchestrator.execute(tasks)
         total_rows = sum(results)
 
-        # Update state
+        # Update state -- pass alignment_source so state queries are scoped
+        # to this variant's rows in the _u table (avoids cross-source contamination)
+        alignment_source = self.config.extra_config.get("alignment_source")
         self.logger.info("Updating state table...")
         rows_updated = self.state_manager.update_state_from_output(
             output_table=self.config.output_table,
             output_schema=self.config.output_schema,
+            alignment_source=alignment_source,
         )
         self.logger.info(f"State updated: {rows_updated} rows upserted")
 
@@ -1127,11 +1130,14 @@ class BaseEMARefresher(ABC):
         results = orchestrator.execute(tasks)
         total_rows = sum(results)
 
-        # Update state
+        # Update state -- pass alignment_source so state queries are scoped
+        # to this variant's rows in the _u table (avoids cross-source contamination)
+        alignment_source = self.config.extra_config.get("alignment_source")
         self.logger.info("Updating state table...")
         rows_updated = self.state_manager.update_state_from_output(
             output_table=self.config.output_table,
             output_schema=self.config.output_schema,
+            alignment_source=alignment_source,
         )
         self.logger.info(f"State updated: {rows_updated} rows upserted")
 

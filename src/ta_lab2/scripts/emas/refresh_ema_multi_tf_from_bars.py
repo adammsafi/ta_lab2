@@ -71,7 +71,7 @@ def _process_id_worker(task: WorkerTask) -> int:
         bars_table = task.extra_config.get("bars_table", "price_bars_multi_tf")
         bars_schema = task.extra_config.get("bars_schema", "public")
         out_schema = task.extra_config.get("out_schema", "public")
-        out_table = task.extra_config.get("out_table", "ema_multi_tf")
+        out_table = task.extra_config.get("out_table", "ema_multi_tf_u")
 
         # Always use the feature class path: load data once, compute all TFs, write once.
         # This avoids the per-TF loop that creates ~122 separate DB round-trips per asset.
@@ -80,10 +80,12 @@ def _process_id_worker(task: WorkerTask) -> int:
         import pandas as pd
         import numpy as np
 
+        alignment_source = task.extra_config.get("alignment_source", "multi_tf")
         config = EMAFeatureConfig(
             periods=list(task.periods),
             output_schema=out_schema,
             output_table=out_table,
+            alignment_source=alignment_source,
         )
         feature = MultiTFEMAFeature(
             engine=engine,
@@ -237,7 +239,7 @@ class MultiTFEMARefresher(BaseEMARefresher):
 
         # Override defaults for this script
         p.set_defaults(
-            out_table="ema_multi_tf",
+            out_table="ema_multi_tf_u",
             state_table="ema_multi_tf_state",
         )
 
@@ -319,6 +321,7 @@ class MultiTFEMARefresher(BaseEMARefresher):
                 "out_schema": args.out_schema,
                 "out_table": args.out_table,
                 "tfs": args.tfs.split(",") if args.tfs else None,
+                "alignment_source": "multi_tf",
             },
         )
 
