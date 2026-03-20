@@ -3,64 +3,33 @@ from __future__ import annotations
 """
 sync_returns_bars_multi_tf_u.py
 
-Incrementally sync bar returns from 5 source tables into:
-  public.returns_bars_multi_tf_u
+DEPRECATED - This script is a no-op and will be removed in Phase 78.
 
-alignment_source derived from table name:
-  returns_bars_multi_tf          -> multi_tf
-  returns_bars_multi_tf_cal_us   -> multi_tf_cal_us
-  ...etc
+Reason: All 5 bar returns builders (refresh_returns_bars_multi_tf*.py) now write
+directly to public.returns_bars_multi_tf_u with alignment_source stamped on every
+row. The separate sync step is no longer needed.
 
-Run:
-  python -m ta_lab2.scripts.returns.sync_returns_bars_multi_tf_u
-  python -m ta_lab2.scripts.returns.sync_returns_bars_multi_tf_u --dry-run
+Migration completed in Phase 77-01 (2026-03-20).
+
+Previously: Synced rows from 5 siloed returns tables into returns_bars_multi_tf_u.
+Now:        Each builder writes directly to _u with ALIGNMENT_SOURCE constant.
 """
 
-import argparse
-import os
-
-from sqlalchemy import create_engine
-
-from ta_lab2.scripts.sync_utils import add_sync_cli_args, sync_sources_to_unified
-
-U_TABLE = "public.returns_bars_multi_tf_u"
-PK_COLS = ["id", "venue_id", "timestamp", "tf", "alignment_source"]
-SOURCE_PREFIX = "returns_bars_"
-
-SOURCES = [
-    "public.returns_bars_multi_tf",
-    "public.returns_bars_multi_tf_cal_us",
-    "public.returns_bars_multi_tf_cal_iso",
-    "public.returns_bars_multi_tf_cal_anchor_us",
-    "public.returns_bars_multi_tf_cal_anchor_iso",
-]
+import warnings
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(
-        description="Sync bar returns tables into public.returns_bars_multi_tf_u."
+    warnings.warn(
+        "sync_returns_bars_multi_tf_u is DEPRECATED and has no effect. "
+        "All 5 bar returns builders write directly to returns_bars_multi_tf_u. "
+        "This script will be removed in Phase 78.",
+        DeprecationWarning,
+        stacklevel=2,
     )
-    add_sync_cli_args(ap)
-    args = ap.parse_args()
-
-    db_url = os.environ.get("TARGET_DB_URL")
-    if not db_url:
-        raise RuntimeError("TARGET_DB_URL env var is required.")
-    engine = create_engine(db_url, future=True)
-
-    only = (
-        set(s.strip() for s in args.only.split(",") if s.strip()) if args.only else None
-    )
-
-    sync_sources_to_unified(
-        engine=engine,
-        u_table=U_TABLE,
-        sources=SOURCES,
-        pk_cols=PK_COLS,
-        source_prefix=SOURCE_PREFIX,
-        log_prefix="ret_bars_u",
-        dry_run=args.dry_run,
-        only=only,
+    print(
+        "[ret_bars_u] DEPRECATED: This sync script is a no-op. "
+        "Builders write directly to returns_bars_multi_tf_u. "
+        "Remove from scheduler. Will be deleted in Phase 78."
     )
 
 
