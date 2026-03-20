@@ -10,6 +10,7 @@
 - v0.9.0 Research & Experimentation (Phases 35-41) - SHIPPED 2026-02-24
 - v1.0.0 V1 Closure — Paper Trading & Validation (Phases 42-63) - SHIPPED 2026-03-01
 - v1.0.1 Macro Regime Infrastructure (Phases 64-73) - SHIPPED 2026-03-03
+- v1.1.0 Pipeline Consolidation & Storage Optimization (Phases 74-79) - IN PROGRESS
 
 ## Overview
 
@@ -25,7 +26,8 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 - Phases 29-34: v0.8.0 (complete)
 - Phases 35-41: v0.9.0 (SHIPPED 2026-02-24)
 - Phases 42-63: v1.0.0 (SHIPPED 2026-03-01)
-- Phases 64-72: v1.0.1 (in progress)
+- Phases 64-73: v1.0.1 (SHIPPED 2026-03-03)
+- Phases 74-79: v1.1.0 (in progress)
 - Decimal phases (27.1, 28.1): Urgent insertions if needed
 
 <details>
@@ -1137,7 +1139,7 @@ See `.planning/milestones/v1.0.0-REQUIREMENTS.md` and `.planning/milestones/v1.0
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19 (v0.5.0) -> 20 -> ... -> 26 (v0.6.0) -> 27 -> 28 (v0.7.0) -> 29 -> ... -> 34 (v0.8.0) -> 35 -> ... -> 41 (v0.9.0) -> 42 -> ... -> 63 (v1.0.0)
+Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19 (v0.5.0) -> 20 -> ... -> 26 (v0.6.0) -> 27 -> 28 (v0.7.0) -> 29 -> ... -> 34 (v0.8.0) -> 35 -> ... -> 41 (v0.9.0) -> 42 -> ... -> 63 (v1.0.0) -> 64 -> ... -> 73 (v1.0.1) -> 74 -> ... -> 79 (v1.1.0)
 
 Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute in parallel. Phase 37 is enhanced by Phase 35 but not blocked. Phase 38 requires Phase 37. Phase 39 requires Phases 35-38. Phase 40 requires all prior v0.9.0 phases. Phase 41 has no hard dependency on Phases 35-40 (reads from existing returns tables) but is sequenced last. Phase 55 depends only on v0.9.0 (not on other v1.0.0 phases).
 
@@ -1240,6 +1242,17 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | 62. Operational Completeness | 2/2 | Complete | 2026-02-28 |
 | 63. Tech Debt Cleanup | 2/2 | Complete | 2026-03-01 |
 
+### v1.1.0 Progress
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 74. Foundation & Shared Infrastructure | 0/TBD | Not started | - |
+| 75. Generalized 1D Bar Builder | 0/TBD | Not started | - |
+| 76. Direct-to-_u Price Bars (Pilot) | 0/TBD | Not started | - |
+| 77. Direct-to-_u Remaining Families | 0/TBD | Not started | - |
+| 78. Table Drops & Script Cleanup | 0/TBD | Not started | - |
+| 79. Storage & Pipeline Cleanup | 0/TBD | Not started | - |
+
 ## Requirement Coverage
 
 ### v0.6.0 Requirements (40 total)
@@ -1301,6 +1314,23 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 
 **Coverage:** 85/85 requirements satisfied (80 primary + 5 overlap = 85 mapped, 80 unique)
 
+### v1.1.0 Requirements (26 total)
+
+| Category | Requirements | Phase | Count |
+|----------|--------------|-------|-------|
+| Bar Builder Consolidation | BAR-02, BAR-05 | Phase 74 | 2 |
+| Bar Builder Consolidation | BAR-01, BAR-03, BAR-04, BAR-06, BAR-07, BAR-08 | Phase 75 | 6 |
+| Direct-to-_u Migration | UTB-01, UTB-07, UTB-08 | Phase 76 | 3 |
+| Direct-to-_u Migration | UTB-02, UTB-03, UTB-04, UTB-05, UTB-06, UTB-11 | Phase 77 | 6 |
+| Direct-to-_u Migration | UTB-09, UTB-10, UTB-12 | Phase 78 | 3 |
+| Storage Cleanup | CLN-01, CLN-02 | Phase 79 | 2 |
+| VWAP Pipeline | VWP-01, VWP-02 | Phase 79 | 2 |
+| MCP Cleanup | MCP-01, MCP-02 | Phase 79 | 2 |
+
+**Coverage:** 26/26 requirements mapped
+
+
+
 ---
 
 
@@ -1323,6 +1353,100 @@ Full details: `.planning/milestones/v1.0.1-ROADMAP.md`
 </details>
 
 
+
+### v1.1.0 Pipeline Consolidation & Storage Optimization (In Progress)
+
+**Milestone Goal:** Eliminate 100GB+ of duplicate data by consolidating siloed tables into _u tables, generalize the 1D bar builder for extensible data source onboarding, and clean up pipeline debt.
+
+- [ ] **Phase 74: Foundation & Shared Infrastructure** - SourceSpec registry, psycopg helpers, alignment_source constants
+- [ ] **Phase 75: Generalized 1D Bar Builder** - Single configurable builder replacing 3 source-specific scripts
+- [ ] **Phase 76: Direct-to-_u Price Bars (Pilot)** - Price bars family migrated to direct _u writes
+- [ ] **Phase 77: Direct-to-_u Remaining Families** - EMA, AMA, and returns families migrated to direct _u writes
+- [ ] **Phase 78: Table Drops & Script Cleanup** - Drop 30 siloed tables, delete 6 sync scripts, fix dependent views
+- [ ] **Phase 79: Storage & Pipeline Cleanup** - NULL row pruning, VWAP integration, MCP dead route removal
+
+## v1.1.0 Phase Details
+
+### Phase 74: Foundation & Shared Infrastructure
+**Goal:** Shared constants, utilities, and registry patterns exist so all subsequent consolidation phases build on consistent foundations
+**Depends on:** Phase 73 (v1.0.1 complete)
+**Requirements:** BAR-02, BAR-05
+**Success Criteria** (what must be TRUE):
+  1. SourceSpec frozen dataclass captures per-source differences (source table, JOINs, OHLC repair flag, venue_id mapping, ID loader) for CMC, TVC, and HL
+  2. Shared psycopg helper functions (_connect, _exec, _fetchone, _fetchall, _normalize_db_url) extracted to a single module importable by all bar builders
+  3. alignment_source values defined as shared constants with a CHECK constraint on _u tables preventing typo-driven silent failures
+  4. Source-specific CTE builder functions extracted from existing 1D builders into isolated modules referenced by the registry
+**Plans**: TBD
+
+---
+
+### Phase 75: Generalized 1D Bar Builder
+**Goal:** A single 1D bar builder script handles all data sources via CLI flag, old source-specific scripts deleted
+**Depends on:** Phase 74 (SourceSpec registry, CTE builders, psycopg helpers)
+**Requirements:** BAR-01, BAR-03, BAR-04, BAR-06, BAR-07, BAR-08
+**Success Criteria** (what must be TRUE):
+  1. Running `python -m ta_lab2.scripts.bars.refresh_price_bars_1d --source cmc` produces identical row counts and data to the old CMC-specific builder
+  2. Running `--source tvc` and `--source hl` each produce identical results to their respective old builders
+  3. Adding a hypothetical new source requires only a new SourceSpec entry and CTE builder function -- no new script file
+  4. Backfill detection (new historical data appearing before earliest known bar) works for all sources, not just CMC
+  5. Old source-specific scripts (refresh_tvc_price_bars_1d.py, refresh_hl_price_bars_1d.py) are deleted from the codebase
+**Plans**: TBD
+
+---
+
+### Phase 76: Direct-to-_u Price Bars (Pilot)
+**Goal:** Price bar pipeline writes directly to price_bars_multi_tf_u, validating the pattern for all remaining families
+**Depends on:** Phase 74 (alignment_source constants)
+**Requirements:** UTB-01, UTB-07, UTB-08
+**Success Criteria** (what must be TRUE):
+  1. All 5 multi-TF price bar builders (main + 4 calendar variants) write directly to price_bars_multi_tf_u with correct alignment_source values
+  2. Incremental refresh with watermark tracking works correctly -- state tables populated from _u table actual MAX(ts) before first direct-write run
+  3. Row counts in price_bars_multi_tf_u per alignment_source match pre-migration totals from the siloed tables
+  4. sync_price_bars_multi_tf_u.py is disabled (no longer invoked by orchestrator)
+**Plans**: TBD
+
+---
+
+### Phase 77: Direct-to-_u Remaining Families
+**Goal:** All 5 remaining table families (EMA, AMA, bar returns, EMA returns, AMA returns) write directly to their _u tables
+**Depends on:** Phase 76 (pilot pattern validated)
+**Requirements:** UTB-02, UTB-03, UTB-04, UTB-05, UTB-06, UTB-11
+**Success Criteria** (what must be TRUE):
+  1. All EMA builder scripts write directly to ema_multi_tf_u with correct alignment_source
+  2. All AMA builder scripts write directly to ama_multi_tf_u with correct alignment_source
+  3. All returns builder scripts (bar, EMA, AMA) write directly to their respective _u tables with correct alignment_source
+  4. State tables updated or consolidated for _u-direct writes across all 5 families
+  5. Row counts per alignment_source match pre-migration totals for every family
+**Plans**: TBD
+
+---
+
+### Phase 78: Table Drops & Script Cleanup
+**Goal:** 30 siloed tables dropped, 6 sync scripts deleted, dependent views fixed -- storage reclaimed
+**Depends on:** Phase 76, Phase 77 (all families validated on direct-to-_u writes)
+**Requirements:** UTB-09, UTB-10, UTB-12
+**Success Criteria** (what must be TRUE):
+  1. All dependent views (corr_latest, all_emas, and any others discovered via pg_depend) inventoried and recreated pointing at _u tables before any drops
+  2. 30 siloed data tables dropped from the database
+  3. 6 sync scripts deleted from the codebase
+  4. run_all_bar_builders.py and run_daily_refresh.py updated to remove sync steps
+  5. pg_database_size() shows measurable storage reduction after VACUUM
+**Plans**: TBD
+
+---
+
+### Phase 79: Storage & Pipeline Cleanup
+**Goal:** NULL return rows pruned, VWAP pipeline integrated, MCP dead routes removed
+**Depends on:** Nothing (independent of Phases 74-78; can execute in parallel)
+**Requirements:** CLN-01, CLN-02, VWP-01, VWP-02, MCP-01, MCP-02
+**Success Criteria** (what must be TRUE):
+  1. NULL first-observation rows pruned from returns tables (rows where all return columns are NULL) and row count reduction logged
+  2. Returns scripts updated to skip first-observation inserts going forward -- no new NULL rows created
+  3. VWAP bar builder runs for all multi-venue assets automatically via --ids all and is integrated into run_all_bar_builders.py in correct execution order
+  4. Dead REST API routes (/api/v1/memory/*) removed from MCP memory server and stale client.py (ChromaDB PersistentClient) deleted
+**Plans**: TBD
+
+
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-03 (v1.0.1 milestone shipped)*
+*Last updated: 2026-03-19 (v1.1.0 milestone roadmap created)*

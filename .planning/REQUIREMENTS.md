@@ -64,38 +64,38 @@ None — this milestone is self-contained infrastructure work.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| BAR-01 | — | Pending |
-| BAR-02 | — | Pending |
-| BAR-03 | — | Pending |
-| BAR-04 | — | Pending |
-| BAR-05 | — | Pending |
-| BAR-06 | — | Pending |
-| BAR-07 | — | Pending |
-| BAR-08 | — | Pending |
-| UTB-01 | — | Pending |
-| UTB-02 | — | Pending |
-| UTB-03 | — | Pending |
-| UTB-04 | — | Pending |
-| UTB-05 | — | Pending |
-| UTB-06 | — | Pending |
-| UTB-07 | — | Pending |
-| UTB-08 | — | Pending |
-| UTB-09 | — | Pending |
-| UTB-10 | — | Pending |
-| UTB-11 | — | Pending |
-| UTB-12 | — | Pending |
-| CLN-01 | — | Pending |
-| CLN-02 | — | Pending |
-| VWP-01 | — | Pending |
-| VWP-02 | — | Pending |
-| MCP-01 | — | Pending |
-| MCP-02 | — | Pending |
+| BAR-01 | Phase 75 | Pending |
+| BAR-02 | Phase 74 | Pending |
+| BAR-03 | Phase 75 | Pending |
+| BAR-04 | Phase 75 | Pending |
+| BAR-05 | Phase 74 | Pending |
+| BAR-06 | Phase 75 | Pending |
+| BAR-07 | Phase 75 | Pending |
+| BAR-08 | Phase 75 | Pending |
+| UTB-01 | Phase 76 | Pending |
+| UTB-02 | Phase 77 | Pending |
+| UTB-03 | Phase 77 | Pending |
+| UTB-04 | Phase 77 | Pending |
+| UTB-05 | Phase 77 | Pending |
+| UTB-06 | Phase 77 | Pending |
+| UTB-07 | Phase 76 | Pending |
+| UTB-08 | Phase 76 | Pending |
+| UTB-09 | Phase 78 | Pending |
+| UTB-10 | Phase 78 | Pending |
+| UTB-11 | Phase 77 | Pending |
+| UTB-12 | Phase 78 | Pending |
+| CLN-01 | Phase 79 | Pending |
+| CLN-02 | Phase 79 | Pending |
+| VWP-01 | Phase 79 | Pending |
+| VWP-02 | Phase 79 | Pending |
+| MCP-01 | Phase 79 | Pending |
+| MCP-02 | Phase 79 | Pending |
 
 **Coverage:**
 - v1 requirements: 26 total
-- Mapped to phases: 0
-- Unmapped: 26
+- Mapped to phases: 26
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-19*
-*Last updated: 2026-03-19 after initial definition*
+*Last updated: 2026-03-19 after roadmap creation (all 26 requirements mapped to phases 74-79)*
