@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 ## Current Position
 
 Phase: 74 of 79 (Foundation & Shared Infrastructure)
-Plan: 1 of 2 complete
-Status: In progress
-Last activity: 2026-03-20 -- Completed 74-01-PLAN.md (shared psycopg_helpers module)
+Plan: 2 of 2 complete
+Status: Phase complete
+Last activity: 2026-03-20 -- Completed 74-02-PLAN.md (dim_data_sources + alignment_source CHECK constraints)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [#.........] 4% v1.1.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##........] 7% v1.1.0
 
 ## Performance Metrics
 
@@ -46,6 +46,9 @@ Recent decisions affecting current work:
 - Row count verification sufficient (no shadow-write period)
 - MCP cleanup and VWAP are small independent items
 - Raw psycopg helpers centralised in ta_lab2.db.psycopg_helpers; all new bar builders import from there (74-01)
+- dim_data_sources table stores SQL CTE templates as TEXT with Python .format() placeholders; Phase 75 builder reads from this table (74-02)
+- conflict_columns in dim_data_sources reflects current post-venue_id-migration PK: id,venue_id,tf,bar_seq,timestamp (74-02)
+- alignment_source CHECK constraints on all 6 _u tables; 5 valid values enforced at DB level (74-02)
 
 ### Pending Todos
 
@@ -60,10 +63,10 @@ None -- all research complete, HIGH confidence assessment.
 
 ## Session Continuity
 
-Last session: 2026-03-20T03:55:09Z
-Stopped at: Completed 74-01-PLAN.md (shared psycopg_helpers module + 3 bar builders rewired)
-Resume file: None -- next step is execute 74-02-PLAN.md
+Last session: 2026-03-20T04:19:31Z
+Stopped at: Completed 74-02-PLAN.md (dim_data_sources + alignment_source CHECK constraints)
+Resume file: None -- Phase 74 complete, next is Phase 75 (Generalized 1D Bar Builder)
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-20 (74-01 complete: shared psycopg_helpers module)*
+*Last updated: 2026-03-20 (74-02 complete: dim_data_sources + alignment_source CHECK constraints; Phase 74 complete)*
