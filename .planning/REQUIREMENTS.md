@@ -65,10 +65,10 @@ None — this milestone is self-contained infrastructure work.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | BAR-01 | Phase 75 | Pending |
-| BAR-02 | Phase 74 | Pending |
+| BAR-02 | Phase 74 | Complete |
 | BAR-03 | Phase 75 | Pending |
 | BAR-04 | Phase 75 | Pending |
-| BAR-05 | Phase 74 | Pending |
+| BAR-05 | Phase 74 | Complete |
 | BAR-06 | Phase 75 | Pending |
 | BAR-07 | Phase 75 | Pending |
 | BAR-08 | Phase 75 | Pending |

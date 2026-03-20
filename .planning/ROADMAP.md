@@ -1358,7 +1358,7 @@ Full details: `.planning/milestones/v1.0.1-ROADMAP.md`
 
 **Milestone Goal:** Eliminate 100GB+ of duplicate data by consolidating siloed tables into _u tables, generalize the 1D bar builder for extensible data source onboarding, and clean up pipeline debt.
 
-- [ ] **Phase 74: Foundation & Shared Infrastructure** - dim_data_sources registry, psycopg helpers, alignment_source constraints
+- [x] **Phase 74: Foundation & Shared Infrastructure** - dim_data_sources registry, psycopg helpers, alignment_source constraints -- COMPLETE 2026-03-19
 - [ ] **Phase 75: Generalized 1D Bar Builder** - Single configurable builder replacing 3 source-specific scripts
 - [ ] **Phase 76: Direct-to-_u Price Bars (Pilot)** - Price bars family migrated to direct _u writes
 - [ ] **Phase 77: Direct-to-_u Remaining Families** - EMA, AMA, and returns families migrated to direct _u writes
@@ -1373,13 +1373,13 @@ Full details: `.planning/milestones/v1.0.1-ROADMAP.md`
 **Requirements:** BAR-02, BAR-05
 **Success Criteria** (what must be TRUE):
   1. dim_data_sources dimension table captures per-source differences (source table, JOINs, OHLC repair flag, venue_id mapping, SQL templates) for CMC, TVC, and HL
-  2. Shared psycopg helper functions (_connect, _exec, _fetchone, _fetchall, _normalize_db_url) extracted to a single module importable by all bar builders
+  2. Shared psycopg helper functions (connect, execute, fetchone, fetchall, normalize_db_url) extracted to a single module importable by all bar builders
   3. alignment_source values defined as shared constants with a CHECK constraint on _u tables preventing typo-driven silent failures
   4. SQL CTE templates extracted from existing 1D builders and stored as TEXT columns in dim_data_sources, queryable by the generalized builder
 **Plans:** 2 plans
 Plans:
-- [ ] 74-01-PLAN.md -- Extract psycopg helpers to shared db module
-- [ ] 74-02-PLAN.md -- dim_data_sources table + alignment_source CHECK constraints
+- [x] 74-01-PLAN.md -- Extract psycopg helpers to shared db module
+- [x] 74-02-PLAN.md -- dim_data_sources table + alignment_source CHECK constraints
 
 ---
 
