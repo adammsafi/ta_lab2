@@ -95,7 +95,7 @@ from ta_lab2.scripts.bars.common_snapshot_contract import (
 # =============================================================================
 
 DEFAULT_DAILY_TABLE = "public.cmc_price_histories7"
-DEFAULT_BARS_TABLE = "public.price_bars_multi_tf"
+DEFAULT_BARS_TABLE = "public.price_bars_multi_tf_u"
 DEFAULT_STATE_TABLE = "public.price_bars_multi_tf_state"
 DEFAULT_TZ = "America/New_York"
 _ONE_MS = pd.Timedelta(milliseconds=1)
@@ -131,7 +131,8 @@ class MultiTFBarBuilder(BaseBarBuilder):
     """
 
     STATE_TABLE = "public.price_bars_multi_tf_state"
-    OUTPUT_TABLE = "public.price_bars_multi_tf"
+    OUTPUT_TABLE = "public.price_bars_multi_tf_u"
+    ALIGNMENT_SOURCE = "multi_tf"
 
     def __init__(
         self,
@@ -377,6 +378,8 @@ class MultiTFBarBuilder(BaseBarBuilder):
             # Set venue columns on output bars
             bars["venue"] = venue
             bars["venue_rank"] = venue_rank
+            bars["venue_id"] = bars.get("venue_id", 1)
+            bars["alignment_source"] = self.ALIGNMENT_SOURCE
 
             self._upsert_bars(bars)
             self._update_state(
@@ -407,6 +410,8 @@ class MultiTFBarBuilder(BaseBarBuilder):
         # Set venue columns on output bars
         new_rows["venue"] = venue
         new_rows["venue_rank"] = venue_rank
+        new_rows["venue_id"] = new_rows.get("venue_id", 1)
+        new_rows["alignment_source"] = self.ALIGNMENT_SOURCE
 
         self._upsert_bars(new_rows)
         self._update_state(
@@ -1086,6 +1091,7 @@ class MultiTFBarBuilder(BaseBarBuilder):
                       SELECT id, tf, venue, MAX(bar_seq) AS last_bar_seq
                       FROM {bars_table}
                       WHERE id = :id AND tf = :tf AND venue = :venue
+                        AND alignment_source = :alignment_source
                       GROUP BY id, tf, venue
                     ),
                     last_row AS (
@@ -1094,6 +1100,7 @@ class MultiTFBarBuilder(BaseBarBuilder):
                       JOIN last l
                         ON b.id = l.id AND b.tf = l.tf AND b.venue = l.venue
                            AND b.bar_seq = l.last_bar_seq
+                      WHERE b.alignment_source = :alignment_source
                       ORDER BY b.timestamp DESC
                       LIMIT 1
                     ),
@@ -1103,6 +1110,7 @@ class MultiTFBarBuilder(BaseBarBuilder):
                       JOIN last l
                         ON b.id = l.id AND b.tf = l.tf AND b.venue = l.venue
                            AND b.bar_seq = l.last_bar_seq
+                      WHERE b.alignment_source = :alignment_source
                     )
                     SELECT
                       (SELECT last_bar_seq FROM last) AS last_bar_seq,
@@ -1110,7 +1118,12 @@ class MultiTFBarBuilder(BaseBarBuilder):
                       (SELECT last_pos_in_bar FROM pos) AS last_pos_in_bar;
                     """
                     ),
-                    {"id": int(id_), "tf": tf, "venue": venue},
+                    {
+                        "id": int(id_),
+                        "tf": tf,
+                        "venue": venue,
+                        "alignment_source": self.ALIGNMENT_SOURCE,
+                    },
                 )
                 .mappings()
                 .first()
@@ -1138,11 +1151,18 @@ class MultiTFBarBuilder(BaseBarBuilder):
                     SELECT *
                     FROM {bars_table}
                     WHERE id = :id AND tf = :tf AND bar_seq = :bar_seq AND venue = :venue
+                      AND alignment_source = :alignment_source
                     ORDER BY timestamp DESC
                     LIMIT 1;
                     """
                     ),
-                    {"id": int(id_), "tf": tf, "bar_seq": int(bar_seq), "venue": venue},
+                    {
+                        "id": int(id_),
+                        "tf": tf,
+                        "bar_seq": int(bar_seq),
+                        "venue": venue,
+                        "alignment_source": self.ALIGNMENT_SOURCE,
+                    },
                 )
                 .mappings()
                 .first()
@@ -1159,6 +1179,7 @@ class MultiTFBarBuilder(BaseBarBuilder):
             id_=id_,
             tf=tf,
             venue=venue,
+            alignment_source=self.ALIGNMENT_SOURCE,
         )
 
         # Delete state
@@ -1178,6 +1199,14 @@ class MultiTFBarBuilder(BaseBarBuilder):
             bars,
             db_url=self.config.db_url,
             bars_table=self.get_output_table_name(),
+            conflict_cols=(
+                "id",
+                "tf",
+                "bar_seq",
+                "venue_id",
+                "timestamp",
+                "alignment_source",
+            ),
             keep_rejects=_KEEP_REJECTS,
             rejects_table=_REJECTS_TABLE,
         )
