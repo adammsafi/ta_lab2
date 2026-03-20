@@ -57,7 +57,7 @@ from ta_lab2.scripts.bars.derive_multi_tf_from_1d import (
 
 DEFAULT_TZ = "America/New_York"
 DEFAULT_DAILY_TABLE = "public.cmc_price_histories7"
-DEFAULT_BARS_TABLE = "public.price_bars_multi_tf_cal_anchor_iso"
+DEFAULT_BARS_TABLE = "public.price_bars_multi_tf_u"
 DEFAULT_STATE_TABLE = "public.price_bars_multi_tf_cal_anchor_iso_state"
 
 # Global reference for anchored N-week grouping (ISO Monday)
@@ -172,7 +172,8 @@ class AnchorCalendarISOBarBuilder(BaseBarBuilder):
     """
 
     STATE_TABLE = "public.price_bars_multi_tf_cal_anchor_iso_state"
-    OUTPUT_TABLE = "public.price_bars_multi_tf_cal_anchor_iso"
+    OUTPUT_TABLE = "public.price_bars_multi_tf_u"
+    ALIGNMENT_SOURCE = "multi_tf_cal_anchor_iso"
 
     def __init__(
         self,
@@ -294,14 +295,24 @@ class AnchorCalendarISOBarBuilder(BaseBarBuilder):
                     conn.execute(
                         text(
                             f"DELETE FROM {self.get_output_table_name()} WHERE id = :id"
+                            f" AND alignment_source = :alignment_source"
                         ),
-                        {"id": int(id_)},
+                        {"id": int(id_), "alignment_source": self.ALIGNMENT_SOURCE},
                     )
+                bars_pd["alignment_source"] = self.ALIGNMENT_SOURCE
+                bars_pd["venue_id"] = bars_pd.get("venue_id", 1)
                 upsert_bars(
                     bars_pd,
                     db_url=self.config.db_url,
                     bars_table=self.get_output_table_name(),
-                    conflict_cols=("id", "tf", "bar_seq", "venue_id", "timestamp"),
+                    conflict_cols=(
+                        "id",
+                        "tf",
+                        "bar_seq",
+                        "venue_id",
+                        "timestamp",
+                        "alignment_source",
+                    ),
                 )
                 total_rows += len(bars_pd)
 
@@ -490,11 +501,21 @@ class AnchorCalendarISOBarBuilder(BaseBarBuilder):
         # Set venue columns on output bars
         bars["venue"] = venue
         bars["venue_rank"] = venue_rank
+        bars["venue_id"] = bars.get("venue_id", 1)
+        bars["alignment_source"] = self.ALIGNMENT_SOURCE
 
         upsert_bars(
             bars,
             db_url=self.config.db_url,
             bars_table=self.get_output_table_name(),
+            conflict_cols=(
+                "id",
+                "tf",
+                "bar_seq",
+                "venue_id",
+                "timestamp",
+                "alignment_source",
+            ),
         )
         self._update_state(id_, spec.tf, bars, daily_min_ts, daily_max_ts, venue=venue)
         return len(bars)
@@ -674,6 +695,7 @@ class AnchorCalendarISOBarBuilder(BaseBarBuilder):
                       SELECT id, tf, venue, MAX(bar_seq) AS last_bar_seq
                       FROM {bars_table}
                       WHERE id = :id AND tf = :tf AND venue = :venue
+                        AND alignment_source = :alignment_source
                       GROUP BY id, tf, venue
                     ),
                     last_row AS (
@@ -682,6 +704,7 @@ class AnchorCalendarISOBarBuilder(BaseBarBuilder):
                       JOIN last l
                         ON b.id = l.id AND b.tf = l.tf AND b.venue = l.venue
                            AND b.bar_seq = l.last_bar_seq
+                      WHERE b.alignment_source = :alignment_source
                       ORDER BY b.timestamp DESC
                       LIMIT 1
                     ),
@@ -691,6 +714,7 @@ class AnchorCalendarISOBarBuilder(BaseBarBuilder):
                       JOIN last l
                         ON b.id = l.id AND b.tf = l.tf AND b.venue = l.venue
                            AND b.bar_seq = l.last_bar_seq
+                      WHERE b.alignment_source = :alignment_source
                     )
                     SELECT
                       (SELECT last_bar_seq FROM last) AS last_bar_seq,
@@ -698,7 +722,12 @@ class AnchorCalendarISOBarBuilder(BaseBarBuilder):
                       (SELECT last_pos_in_bar FROM pos) AS last_pos_in_bar;
                     """
                     ),
-                    {"id": int(id_), "tf": tf, "venue": venue},
+                    {
+                        "id": int(id_),
+                        "tf": tf,
+                        "venue": venue,
+                        "alignment_source": self.ALIGNMENT_SOURCE,
+                    },
                 )
                 .mappings()
                 .first()
@@ -721,6 +750,7 @@ class AnchorCalendarISOBarBuilder(BaseBarBuilder):
             id_=id_,
             tf=tf,
             venue=venue,
+            alignment_source=self.ALIGNMENT_SOURCE,
         )
 
         # Delete state
