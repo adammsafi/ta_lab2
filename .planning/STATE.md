@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 
 ## Current Position
 
-Phase: 76 of 79 (Direct-to-_u Price Bars Pilot) -- Phase VERIFIED ✓
-Plan: 3 of 3 complete
-Status: Phase complete, verified 9/9 must-haves
-Last activity: 2026-03-20 -- Phase 76 verified and complete
+Phase: 77 of 79 (Direct-to-_u Remaining Families) -- In progress
+Plan: 1 of N complete
+Status: In progress
+Last activity: 2026-03-20 -- Completed 77-01-PLAN.md (bar returns builders redirected to _u)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [######....] 50% v1.1.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [#######...] 55% v1.1.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 345
+- Total plans completed: 346
 - Average duration: 7 min
-- Total execution time: ~28.7 hours
+- Total execution time: ~28.8 hours
 
 **Recent Trend:**
 - v0.8.0: 6 phases, 16 plans, ~1.2 hours
@@ -64,6 +64,10 @@ Recent decisions affecting current work:
 - conflict_cols=(id, tf, bar_seq, venue_id, timestamp, alignment_source) is the standard _u upsert tuple (76-02)
 - sync_price_bars_multi_tf_u.py disabled as no-op; Phase 78 will remove it (76-03)
 - Row count parity confirmed: all 5 alignment_sources show exact MATCH (12,029,626 total rows) (76-03)
+- Bar returns _u migration follows identical pattern to price bars pilot (77-01)
+- del_state_params split from del_out params: state tables lack alignment_source column (77-01)
+- sync_returns_bars_multi_tf_u.py disabled as no-op with DeprecationWarning; Phase 78 will remove it (77-01)
+- Bar returns parity confirmed: all 5 sources MATCH (12,019,640 total rows in returns_bars_multi_tf_u) (77-01)
 
 ### Pending Todos
 
@@ -79,9 +83,9 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-03-20
-Stopped at: Phase 76 verified and complete
+Stopped at: Completed 77-01-PLAN.md (bar returns builders redirected to _u)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-20 (Phase 76 verified — 9/9 must-haves passed)*
+*Last updated: 2026-03-20 (Phase 77, Plan 01 complete — bar returns direct-to-_u migration)*
