@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 
 ## Current Position
 
-Phase: 74 of 79 (Foundation & Shared Infrastructure) -- VERIFIED COMPLETE
-Plan: 2 of 2 complete
-Status: Phase verified, ready for Phase 75
-Last activity: 2026-03-19 -- Phase 74 verified (5/5 must-haves passed)
+Phase: 75 of 79 (Generalized 1D Bar Builder) -- In progress
+Plan: 1 of N complete
+Status: In progress
+Last activity: 2026-03-20 -- Completed 75-01-PLAN.md (GenericOneDayBarBuilder)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##........] 7% v1.1.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [###.......] 10% v1.1.0
 
 ## Performance Metrics
 
@@ -49,6 +49,9 @@ Recent decisions affecting current work:
 - dim_data_sources table stores SQL CTE templates as TEXT with Python .format() placeholders; Phase 75 builder reads from this table (74-02)
 - conflict_columns in dim_data_sources reflects current post-venue_id-migration PK: id,venue_id,tf,bar_seq,timestamp (74-02)
 - alignment_source CHECK constraints on all 6 _u tables; 5 valid values enforced at DB level (74-02)
+- TVC bars use venue_id=11 (TVC data source) not per-exchange venue_ids; venue TEXT field still distinguishes exchanges (75-01)
+- Full-rebuild path deletes by src_name AND venue_id to handle legacy data with wrong venue_ids (75-01)
+- NULL::timestamptz cast required in state migration INSERT when using psycopg2 without %s params (75-01)
 
 ### Pending Todos
 
@@ -59,14 +62,14 @@ Recent decisions affecting current work:
 
 ### Blockers/Concerns
 
-None -- all research complete, HIGH confidence assessment.
+- Legacy TVC/HL data in price_bars_multi_tf still has old venue_ids -- sync path will warn until that data is migrated. Not blocking for Phase 75 remaining plans.
 
 ## Session Continuity
 
-Last session: 2026-03-19
-Stopped at: Phase 74 verified complete
-Resume file: None -- next step is `/gsd:plan-phase 75`
+Last session: 2026-03-20
+Stopped at: Completed 75-01-PLAN.md
+Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-19 (Phase 74 verified complete, 2 plans, 5/5 must-haves)*
+*Last updated: 2026-03-20 (Phase 75 plan 01 complete, GenericOneDayBarBuilder)*
