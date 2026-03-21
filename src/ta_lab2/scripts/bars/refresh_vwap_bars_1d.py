@@ -1,7 +1,8 @@
 """
 Build VWAP (Volume-Weighted Average Price) consolidated 1D bars.
 
-Reads per-venue 1D bars, computes VWAP across venues, writes as venue='VWAP'.
+Reads per-venue 1D bars, computes VWAP across venues, writes as venue_id=1
+(CMC_AGG slot) with src_name='VWAP' to distinguish from raw CMC data.
 
 VWAP computation per (id, timestamp):
   close_vwap = sum(close_i * volume_i) / sum(volume_i)
@@ -11,6 +12,13 @@ VWAP computation per (id, timestamp):
   volume     = sum(volume_i)    -- total volume
 
 Runs AFTER per-venue 1D bars are built, BEFORE multi-TF builder.
+
+Input exclusion: venue_id=1 (CMC_AGG) is excluded from inputs so that
+raw CMC aggregate data does not contaminate VWAP. Only venue_id >= 2
+rows (HYPERLIQUID, BATS, NASDAQ, NYSE, TVC, etc.) feed the VWAP.
+
+Output: venue_id=1, src_name='VWAP' — written into the CMC_AGG slot
+to signal this is the consolidated VWAP bar for that asset.
 
 Usage:
     python -m ta_lab2.scripts.bars.refresh_vwap_bars_1d --ids all
@@ -31,32 +39,40 @@ from ta_lab2.scripts.refresh_utils import resolve_db_url
 logger = logging.getLogger(__name__)
 
 BARS_TABLE = "public.price_bars_1d"
-EXCLUDED_VENUES = ("VWAP", "CMC_AGG")
+# venue_id=1 is CMC_AGG -- excluded from VWAP inputs so we don't mix
+# the aggregate with per-exchange bars. VWAP output is written BACK as
+# venue_id=1 with src_name='VWAP'.
+EXCLUDED_VENUE_ID = 1  # CMC_AGG
 
 
-def _build_vwap_sql(bars_table: str, excluded_venues: tuple[str, ...]) -> str:
+def _build_vwap_sql(bars_table: str, excluded_venue_id: int) -> str:
     """Build INSERT SQL for VWAP consolidated bars."""
-    exclude_list = ", ".join(f"'{v}'" for v in excluded_venues)
     return f"""
     INSERT INTO {bars_table} (
-        id, "timestamp", tf, bar_seq,
+        id, "timestamp", tf, tf_days, bar_seq,
+        pos_in_bar, count_days, count_days_remaining,
         time_open, time_close, time_high, time_low,
         time_open_bar, time_close_bar, last_ts_half_open,
         open, high, low, close, volume, market_cap,
         is_partial_start, is_partial_end, is_missing_days,
-        tf_days, pos_in_bar, count_days, count_days_remaining,
         count_missing_days, count_missing_days_start,
         count_missing_days_end, count_missing_days_interior,
         src_name, src_load_ts, src_file,
         repaired_timehigh, repaired_timelow,
         repaired_high, repaired_low,
-        venue, venue_rank
+        repaired_open, repaired_close,
+        repaired_volume, repaired_market_cap,
+        venue_id, ingested_at
     )
     SELECT
         id,
         "timestamp",
         '1D'::text AS tf,
+        1::integer AS tf_days,
         ROW_NUMBER() OVER (PARTITION BY id ORDER BY "timestamp")::integer AS bar_seq,
+        1::integer AS pos_in_bar,
+        1::integer AS count_days,
+        0::integer AS count_days_remaining,
         "timestamp" AS time_open,
         "timestamp" AS time_close,
         "timestamp" AS time_high,
@@ -73,10 +89,6 @@ def _build_vwap_sql(bars_table: str, excluded_venues: tuple[str, ...]) -> str:
         false AS is_partial_start,
         false AS is_partial_end,
         false AS is_missing_days,
-        1::integer AS tf_days,
-        1::integer AS pos_in_bar,
-        1::integer AS count_days,
-        0::integer AS count_days_remaining,
         0::integer AS count_missing_days,
         0::integer AS count_missing_days_start,
         0::integer AS count_missing_days_end,
@@ -88,15 +100,19 @@ def _build_vwap_sql(bars_table: str, excluded_venues: tuple[str, ...]) -> str:
         false AS repaired_timelow,
         false AS repaired_high,
         false AS repaired_low,
-        'VWAP'::text AS venue,
-        0::integer AS venue_rank
+        false AS repaired_open,
+        false AS repaired_close,
+        false AS repaired_volume,
+        false AS repaired_market_cap,
+        {excluded_venue_id}::smallint AS venue_id,
+        NOW() AS ingested_at
     FROM {bars_table}
-    WHERE venue NOT IN ({exclude_list})
+    WHERE venue_id != {excluded_venue_id}
       AND id = :id
       AND tf = '1D'
     GROUP BY id, "timestamp"
     HAVING COUNT(*) >= 2  -- Only consolidate when 2+ venues have data
-    ON CONFLICT (id, tf, bar_seq, venue, "timestamp") DO UPDATE SET
+    ON CONFLICT (id, tf, bar_seq, venue_id, "timestamp") DO UPDATE SET
         open = EXCLUDED.open,
         high = EXCLUDED.high,
         low  = EXCLUDED.low,
@@ -104,20 +120,19 @@ def _build_vwap_sql(bars_table: str, excluded_venues: tuple[str, ...]) -> str:
         volume = EXCLUDED.volume,
         market_cap = EXCLUDED.market_cap,
         src_load_ts = EXCLUDED.src_load_ts,
-        venue_rank = EXCLUDED.venue_rank
+        ingested_at = EXCLUDED.ingested_at
     """
 
 
 def _load_ids_with_multiple_venues(db_url: str) -> list[int]:
-    """Find IDs that have bars from 2+ non-VWAP venues."""
+    """Find IDs that have bars from 2+ non-CMC_AGG venues."""
     engine = get_engine(db_url)
-    exclude_list = ", ".join(f"'{v}'" for v in EXCLUDED_VENUES)
     sql = text(f"""
         SELECT id
         FROM {BARS_TABLE}
-        WHERE venue NOT IN ({exclude_list}) AND tf = '1D'
+        WHERE venue_id != {EXCLUDED_VENUE_ID} AND tf = '1D'
         GROUP BY id
-        HAVING COUNT(DISTINCT venue) >= 2
+        HAVING COUNT(DISTINCT venue_id) >= 2
         ORDER BY id
     """)
     with engine.connect() as conn:
@@ -128,7 +143,7 @@ def _load_ids_with_multiple_venues(db_url: str) -> list[int]:
 def build_vwap_for_id(db_url: str, id_: int) -> int:
     """Build VWAP bars for one ID. Returns number of rows upserted."""
     engine = get_engine(db_url)
-    sql = text(_build_vwap_sql(BARS_TABLE, EXCLUDED_VENUES))
+    sql = text(_build_vwap_sql(BARS_TABLE, EXCLUDED_VENUE_ID))
 
     with engine.begin() as conn:
         result = conn.execute(sql, {"id": int(id_)})
