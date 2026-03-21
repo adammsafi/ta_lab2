@@ -216,7 +216,6 @@ def build_steps(
     We pass:
     - bars scripts: --ids <ids> plus optional --full-rebuild and --parallel/--num-processes
     - EMA orchestrator: --ids <ids> --periods <periods> plus optional --full-rebuild and --parallel/--num-processes
-    - _u sync: --use-ingested-at only (no rebuild/parallel flags)
     """
     bars_dir = repo_root / "src" / "ta_lab2" / "scripts" / "bars"
     emas_dir = repo_root / "src" / "ta_lab2" / "scripts" / "emas"
@@ -259,16 +258,6 @@ def build_steps(
         Step("emas_all", emas_dir / "run_all_ema_refreshes.py", ema_argv, kind="ema")
     )
 
-    # _u sync (keep simple)
-    steps.append(
-        Step(
-            "ema_u_sync",
-            emas_dir / "sync_ema_multi_tf_u.py",
-            ["--use-ingested-at"],
-            kind="other",
-        )
-    )
-
     return steps
 
 
@@ -293,7 +282,7 @@ def main() -> None:
     ap.add_argument(
         "--bars-only",
         action="store_true",
-        help="Only run the 5 bar refresh steps; skip EMAs and _u sync.",
+        help="Only run the 5 bar refresh steps; skip EMAs.",
     )
 
     # New: rebuild / multiprocessing controls (forwarded)

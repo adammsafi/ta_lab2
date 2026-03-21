@@ -20,12 +20,8 @@ from __future__ import annotations
 
 import argparse
 import os
-import subprocess
 import sys
 from pathlib import Path
-
-# Timeout tiers (seconds); initial estimate, tune after observing actual runtimes
-TIMEOUT_SYNC = 600  # 10 minutes -- sync/setup scripts
 
 import pandas as pd
 from sqlalchemy import create_engine, text
@@ -254,31 +250,10 @@ Examples:
     _log(f"  Has alignment_source: {result['has_alignment_source']}")
     _log("=" * 60)
 
-    # Run sync if requested and table is ready
+    # --sync-after is no longer supported: sync scripts were removed in Phase 78.
     if args.sync_after and not args.dry_run:
-        if result["existed"] or result["created"]:
-            _log("Running sync script to populate from source tables...")
-            try:
-                # Run sync_ema_multi_tf_u.py
-                subprocess.run(
-                    [
-                        sys.executable,
-                        "-m",
-                        "ta_lab2.scripts.emas.sync_ema_multi_tf_u",
-                    ],
-                    check=True,
-                    cwd=Path.cwd(),
-                    timeout=TIMEOUT_SYNC,
-                )
-                _log("[OK] Sync completed successfully")
-            except subprocess.TimeoutExpired:
-                _log(f"[TIMEOUT] Sync timed out after {TIMEOUT_SYNC}s")
-                sys.exit(1)
-            except subprocess.CalledProcessError as e:
-                _log(f"[ERROR] Sync failed: {e}")
-                sys.exit(1)
-        else:
-            _log("Skipping sync - table was not created and did not exist")
+        _log("[INFO] --sync-after is a no-op: sync scripts removed in Phase 78.")
+        _log("[INFO] Builders now write directly to _u tables; no sync step needed.")
 
     sys.exit(0)
 

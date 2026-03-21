@@ -7,9 +7,7 @@ reporting:
 
   1. AMA values  -- multi_tf, cal (us+iso), cal_anchor (us+iso)
   2. AMA returns -- all sources
-  3. _u sync     -- AMA values -> ama_multi_tf_u
-  4. _u sync     -- AMA returns -> returns_ama_multi_tf_u
-  5. Z-scores    -- AMA returns tables
+  3. Z-scores    -- AMA returns tables
 
 Usage:
     # Run all stages for all assets, all TFs
@@ -118,16 +116,6 @@ POST_STEPS = [
         name="returns",
         module="ta_lab2.scripts.amas.refresh_returns_ama",
         description="AMA returns",
-    ),
-    PostStep(
-        name="sync_values",
-        module="ta_lab2.scripts.amas.sync_ama_multi_tf_u",
-        description="Sync AMA values to _u",
-    ),
-    PostStep(
-        name="sync_returns",
-        module="ta_lab2.scripts.amas.sync_returns_ama_multi_tf_u",
-        description="Sync AMA returns to _u",
     ),
     PostStep(
         name="zscores",
@@ -450,8 +438,6 @@ Pipeline stages (in order):
   cal         -- Calendar-aligned AMAs (us+iso)
   cal_anchor  -- Calendar-anchored AMAs (us+iso)
   returns     -- AMA returns for all sources
-  sync_values -- Sync AMA values -> ama_multi_tf_u
-  sync_returns-- Sync AMA returns -> returns_ama_multi_tf_u
   zscores     -- Z-scores on AMA returns tables
 
 CONNECTION NOTES: AMA refreshers use parallel workers (default: 4).
