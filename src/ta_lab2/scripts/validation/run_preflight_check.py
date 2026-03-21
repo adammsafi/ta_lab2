@@ -252,7 +252,10 @@ def _build_standard_checks() -> list[PreflightCheck]:
         # 9. BTC price bars current (< 30 hours)
         PreflightCheck(
             name="BTC price bars current (< 30h)",
-            query=("SELECT MAX(ts) FROM price_bars_multi_tf WHERE id=1 AND tf='1D'"),
+            query=(
+                "SELECT MAX(ts) FROM price_bars_multi_tf_u "
+                "WHERE id=1 AND tf='1D' AND alignment_source='multi_tf'"
+            ),
             validator=_val_stale_check("BTC 1D bar ts"),
         ),
         # 10. features current (< 30 hours)

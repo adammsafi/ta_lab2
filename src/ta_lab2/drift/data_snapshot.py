@@ -41,8 +41,9 @@ def collect_data_snapshot(
         row_bar = conn.execute(
             text(
                 "SELECT MAX(ts) AS max_ts "
-                "FROM price_bars_multi_tf "
-                "WHERE id = :asset_id AND tf = '1D'"
+                "FROM price_bars_multi_tf_u "
+                "WHERE id = :asset_id AND tf = '1D' "
+                "AND alignment_source = 'multi_tf'"
             ),
             {"asset_id": asset_id},
         ).fetchone()

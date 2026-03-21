@@ -196,10 +196,11 @@ def _macro_content(_engine, history_days, overlay_choice, show_quality):
                     SELECT
                         date_trunc('day', ts AT TIME ZONE 'UTC') AS date,
                         AVG(close) AS close
-                    FROM public.price_bars_multi_tf pb
+                    FROM public.price_bars_multi_tf_u pb
                     JOIN public.dim_assets da ON da.id = pb.id
                     WHERE da.symbol = :symbol
                       AND pb.tf = '1d'
+                      AND pb.alignment_source = 'multi_tf'
                       AND pb.ts >= NOW() - (:days_back || ' days')::interval
                     GROUP BY 1
                     ORDER BY 1

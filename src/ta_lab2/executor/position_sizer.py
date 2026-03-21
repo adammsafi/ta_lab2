@@ -378,8 +378,9 @@ class PositionSizer:
         # Fall back to daily bar close
         bar_sql = text(
             "SELECT close "
-            "FROM public.price_bars_multi_tf "
+            "FROM public.price_bars_multi_tf_u "
             "WHERE id = :asset_id AND tf = '1D' "
+            "AND alignment_source = 'multi_tf' "
             "ORDER BY ts DESC "
             "LIMIT 1"
         )
@@ -387,7 +388,7 @@ class PositionSizer:
         if row and row.close is not None:
             price = Decimal(str(row.close))
             logger.debug(
-                "get_current_price: asset_id=%s price=%s source=price_bars_multi_tf",
+                "get_current_price: asset_id=%s price=%s source=price_bars_multi_tf_u",
                 asset_id,
                 price,
             )

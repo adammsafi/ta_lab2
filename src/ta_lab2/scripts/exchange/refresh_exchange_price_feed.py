@@ -111,10 +111,11 @@ def _get_latest_bar_close(
         text(
             """
             SELECT b.close, b.ts
-            FROM public.price_bars_multi_tf b
+            FROM public.price_bars_multi_tf_u b
             JOIN public.dim_assets a ON a.id = b.id
             WHERE a.symbol = :symbol
               AND b.tf = :tf
+              AND b.alignment_source = 'multi_tf'
             ORDER BY b.ts DESC
             LIMIT 1
             """
