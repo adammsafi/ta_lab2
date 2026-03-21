@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 ## Current Position
 
 Phase: 78 of 79 (Table Drops & Script Cleanup) -- In progress
-Plan: 2 of 4 complete
+Plan: 2 of 4 complete (78-01 backfilled after 78-02)
 Status: In progress
-Last activity: 2026-03-21 -- Completed 78-02: deleted 20 deprecated scripts, removed _resync_u_tables()
+Last activity: 2026-03-21 -- Completed 78-01: all_emas view migrated to ema_multi_tf_u, 10 runtime files redirected to _u tables
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [########..] 70% v1.1.0
 
@@ -91,6 +91,9 @@ Recent decisions affecting current work:
 - --skip-resync arg removed from refresh_returns_zscore.py entirely (function gone, arg would be confusing) (78-02)
 - ensure_ema_unified_table --sync-after now logs no-op message (flag kept for backward compat; sync scripts removed) (78-02)
 - _resync_u_tables() (TRUNCATE + sync) fully removed; builders own _u table writes directly (78-02)
+- alignment_source for base table is 'multi_tf' not 'default'; all _u query filters use 'multi_tf' (78-01)
+- all_emas view recreated pointing at ema_multi_tf_u (55.8M rows); safe to DROP ema_multi_tf (78-01)
+- experiments/runner.py _ALLOWED_TABLES and _TABLES_WITH_TIMESTAMP_COL purged of siloed names (78-01)
 
 ### Pending Todos
 
@@ -106,9 +109,9 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-03-21
-Stopped at: Completed 78-02-PLAN.md — 20 scripts deleted, 4 orchestrators cleaned, _resync_u_tables() removed
+Stopped at: Completed 78-01-PLAN.md -- all_emas view migrated, 10 runtime files redirected to _u tables
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-21 (78-02 complete — 20 deprecated scripts deleted, dangerous resync function excised)*
+*Last updated: 2026-03-21 (78-01 complete — view migrated, 10 runtime files redirected to _u tables)*
