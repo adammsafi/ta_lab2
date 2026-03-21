@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 Phase: 79 of 79 IN PROGRESS (Storage Pipeline Cleanup) -- All 3 plans complete
 Plan: 3 of 3 complete (79-01, 79-02, 79-03 all done)
 Status: Phase 79 all plans complete -- pending phase verification
-Last activity: 2026-03-21 -- Completed 79-02: VWAP builder verified/fixed for venue_id schema; 0 bars for GOOGL/NVDA is correct (no timestamp overlap)
+Last activity: 2026-03-21 -- Completed 79-01: Pruned 7,180,871 NULL first-observation rows from returns_ama_multi_tf_u (-6.13%); added WHERE delta1_ama_roll IS NOT NULL filter to refresh_returns_ama.py _INSERT_SQL
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 97% v1.1.0
 
@@ -105,6 +105,7 @@ Recent decisions affecting current work:
 - Cal/cal_anchor EMA feature classes compute alignment_source = f"multi_tf_cal_{scheme.lower()}" inline at query time (not stored as attr); scheme is single source of truth (78-06)
 - EMAStateConfig.alignment_source field added; bar_metadata CTE uses effective_alignment_source = alignment_source or config.alignment_source to scope bar_seq reads from _u table (78-06)
 - EMA pipeline fully redirected to price_bars_multi_tf_u: zero siloed bar table references remain in any EMA builder, feature class, or state manager (78-06)
+- AMA returns first-observation filter: WHERE delta1_ama_roll IS NOT NULL added to _INSERT_SQL in refresh_returns_ama.py; 7,180,871 NULL rows pruned from returns_ama_multi_tf_u (117.2M -> 110.0M rows, -6.13%); CLN-01 satisfied (79-01)
 - Dead REST routes (/api/v1/memory/*) removed from memory server; they called ChromaDB (unavailable in Docker), returned HTTP 500, had zero consumers (79-03)
 - client.py (ChromaDB PersistentClient) deleted; fully replaced by Mem0+Qdrant (79-03)
 - validation.py quick_health_check() migrated to Qdrant; validate_memory_store() raises ImportError with migration note (79-03)
@@ -127,7 +128,7 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-03-21
-Stopped at: Completed 79-02-PLAN.md -- all 3 Phase 79 plans complete, pending phase verification
+Stopped at: Completed 79-01-PLAN.md -- NULL AMA returns pruned (7,180,871 rows), first-observation filter added
 Resume file: None
 
 ---
