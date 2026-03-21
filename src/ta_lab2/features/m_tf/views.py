@@ -18,11 +18,14 @@ edit this file.
 """
 
 # Multi-timeframe EMAs (includes 1D) as one tall view
+# Points at ema_multi_tf_u (unified table) so it survives the drop of siloed tables.
+# All alignment sources are included -- callers that need a specific alignment
+# should filter on alignment_source after joining.
 VIEW_ALL_EMAS_SQL = """
 CREATE OR REPLACE VIEW public.all_emas AS
 SELECT
     id, ts, tf, tf_days, period, ema, roll
-FROM public.ema_multi_tf;
+FROM public.ema_multi_tf_u;
 """
 
 
