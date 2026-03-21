@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 
 ## Current Position
 
-Phase: 78 of 79 (Table Drops & Script Cleanup) -- In progress
-Plan: 2 of 4 complete (78-01 backfilled after 78-02)
-Status: In progress
-Last activity: 2026-03-21 -- Completed 78-01: all_emas view migrated to ema_multi_tf_u, 10 runtime files redirected to _u tables
+Phase: 78 of 79 (Table Drops & Script Cleanup) -- Phase complete (3/3 plans done; plan 04 was view migration covered in 01)
+Plan: 3 of 3 complete
+Status: Phase complete
+Last activity: 2026-03-21 -- Completed 78-03: 30 siloed tables dropped, VACUUM FULL ran, DB shrank from 431 GB to 177 GB (-254 GB, -59%)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [########..] 70% v1.1.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [#########.] 78% v1.1.0
 
 ## Performance Metrics
 
@@ -94,6 +94,10 @@ Recent decisions affecting current work:
 - alignment_source for base table is 'multi_tf' not 'default'; all _u query filters use 'multi_tf' (78-01)
 - all_emas view recreated pointing at ema_multi_tf_u (55.8M rows); safe to DROP ema_multi_tf (78-01)
 - experiments/runner.py _ALLOWED_TABLES and _TABLES_WITH_TIMESTAMP_COL purged of siloed names (78-01)
+- 30 siloed-path state tables kept: all actively referenced by builder STATE_TABLE constants; dropping breaks incremental refresh (78-03)
+- State table count in DB is 50 total (not 30): extra stats/feature/signal/pipeline state tables not in RESEARCH.md enumeration; verify by name not count (78-03)
+- VACUUM FULL yielded 254 GB (-59%) vs 207 GB (-48%) estimated: compacted _u tables and other tables too (78-03)
+- DB size after Phase 78: 177 GB (was 431 GB at start of phase)
 
 ### Pending Todos
 
@@ -109,9 +113,9 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-03-21
-Stopped at: Completed 78-01-PLAN.md -- all_emas view migrated, 10 runtime files redirected to _u tables
+Stopped at: Completed 78-03-PLAN.md -- 30 siloed tables dropped, VACUUM FULL, DB 431 GB -> 177 GB
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-21 (78-01 complete — view migrated, 10 runtime files redirected to _u tables)*
+*Last updated: 2026-03-21 (78-03 complete -- 30 siloed tables dropped, VACUUM FULL, 177 GB remaining)*
