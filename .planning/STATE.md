@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 
 ## Current Position
 
-Phase: 78 of 79 (Table Drops & Script Cleanup) -- Gap closure in progress (78-04 complete)
-Plan: 4 of 6 complete (gap closure plans 04-06)
+Phase: 78 of 79 (Table Drops & Script Cleanup) -- Gap closure in progress (78-05 complete)
+Plan: 5 of 6 complete (gap closure plans 04-06)
 Status: In progress
-Last activity: 2026-03-21 -- Completed 78-04: 5 runtime files redirected to price_bars_multi_tf_u; run_all_audits.py cleaned of 14 deleted audit entries
+Last activity: 2026-03-21 -- Completed 78-05: All 5 AMA feature classes and 4 builder scripts redirected to price_bars_multi_tf_u with alignment_source filters
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [#########.] 78% v1.1.0
 
@@ -100,6 +100,8 @@ Recent decisions affecting current work:
 - DB size after Phase 78: 177 GB (was 431 GB at start of phase)
 - alignment_source='multi_tf' (not 'default') is the correct WHERE filter for base table rows in price_bars_multi_tf_u; applied consistently in all runtime queries (78-04)
 - ALL_AUDIT_SCRIPTS in run_all_audits.py trimmed to 3 scripts verified on disk; 14 deleted-script entries removed (78-04)
+- AMA feature preload_all_bars uses f-string alignment_filter injection; _load_bars uses where_clauses.append() -- both correct patterns for conditional alignment_source filtering (78-05)
+- AMA bar reads now conditional on config.alignment_source (None = reads all variants; set = scoped to one source); normal path always has alignment_source set via SCHEME_MAP (78-05)
 
 ### Pending Todos
 
@@ -115,9 +117,9 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-03-21
-Stopped at: Completed 78-04-PLAN.md -- 5 runtime files redirected to price_bars_multi_tf_u; run_all_audits.py cleaned
+Stopped at: Completed 78-05-PLAN.md -- AMA feature classes and builder scripts redirected to price_bars_multi_tf_u
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-21 (78-03 complete -- 30 siloed tables dropped, VACUUM FULL, 177 GB remaining)*
+*Last updated: 2026-03-21 (78-05 complete -- AMA layer fully redirected to price_bars_multi_tf_u with alignment_source filters)*
