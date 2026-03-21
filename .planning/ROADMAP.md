@@ -1362,7 +1362,7 @@ Full details: `.planning/milestones/v1.0.1-ROADMAP.md`
 - [x] **Phase 75: Generalized 1D Bar Builder** - Single configurable builder replacing 3 source-specific scripts -- COMPLETE 2026-03-20
 - [x] **Phase 76: Direct-to-_u Price Bars (Pilot)** - Price bars family migrated to direct _u writes -- COMPLETE 2026-03-20
 - [x] **Phase 77: Direct-to-_u Remaining Families** - EMA, AMA, and returns families migrated to direct _u writes — COMPLETE 2026-03-20
-- [ ] **Phase 78: Table Drops & Script Cleanup** - Drop 30 siloed tables, delete 6 sync scripts, fix dependent views
+- [x] **Phase 78: Table Drops & Script Cleanup** - Drop 30 siloed tables, delete 6 sync scripts, fix dependent views -- COMPLETE 2026-03-21
 - [ ] **Phase 79: Storage & Pipeline Cleanup** - NULL row pruning, VWAP integration, MCP dead route removal
 
 ## v1.1.0 Phase Details
@@ -1452,9 +1452,9 @@ Plans:
 - [x] 78-01-PLAN.md -- Migrate all_emas view + redirect runtime siloed-table references to _u
 - [x] 78-02-PLAN.md -- Delete 6 sync scripts + clean orchestrator references + remove _resync_u_tables()
 - [x] 78-03-PLAN.md -- Pre-drop parity validation + DROP 30 tables + VACUUM FULL + storage metrics
-- [ ] 78-04-PLAN.md -- Fix 5 runtime files + clean run_all_audits.py (gap closure)
-- [ ] 78-05-PLAN.md -- Redirect AMA builders/features from dropped bar tables to _u (gap closure)
-- [ ] 78-06-PLAN.md -- Redirect EMA builders/features from dropped bar tables to _u (gap closure)
+- [x] 78-04-PLAN.md -- Fix 5 runtime files + clean run_all_audits.py (gap closure)
+- [x] 78-05-PLAN.md -- Redirect AMA builders/features from dropped bar tables to _u (gap closure)
+- [x] 78-06-PLAN.md -- Redirect EMA builders/features from dropped bar tables to _u (gap closure)
 
 ---
 

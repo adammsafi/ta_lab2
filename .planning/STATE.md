@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 
 ## Current Position
 
-Phase: 78 of 79 (Table Drops & Script Cleanup) -- Gap closure complete (78-04, 78-05, 78-06 all done)
+Phase: 78 of 79 COMPLETE (Table Drops & Script Cleanup) -- Verified 14/14 must-haves
 Plan: 6 of 6 complete
-Status: Phase complete
-Last activity: 2026-03-21 -- Completed 78-06: All EMA feature classes and builder scripts redirected to price_bars_multi_tf_u; EMAStateConfig carries alignment_source for bar_metadata CTE scoping
+Status: Phase verified ✓
+Last activity: 2026-03-21 -- Phase 78 verified: 30 tables dropped (-254 GB), 20 scripts deleted, all runtime refs redirected to _u tables
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [#########.] 78% v1.1.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [#########.] 83% v1.1.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 353
+- Total plans completed: 356
 - Average duration: 7 min
 - Total execution time: ~28.9 hours
 
@@ -120,9 +120,9 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-03-21
-Stopped at: Completed 78-06-PLAN.md -- EMA feature classes and builder scripts redirected to price_bars_multi_tf_u; Phase 78 gap closure complete
+Stopped at: Phase 78 verified 14/14 -- all gap closure plans executed and verified
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-21 (78-06 complete -- EMA layer fully redirected to price_bars_multi_tf_u; Phase 78 all 6 plans done)*
+*Last updated: 2026-03-21 (Phase 78 verified 14/14 -- 30 tables dropped, 254 GB reclaimed, all runtime refs redirected)*

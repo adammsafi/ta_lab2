@@ -26,10 +26,10 @@
 - [x] **UTB-06**: All AMA returns scripts write directly to `returns_ama_multi_tf_u` with correct `alignment_source`
 - [x] **UTB-07**: Incremental refresh with watermark tracking works correctly on _u tables
 - [x] **UTB-08**: Row counts in _u tables match pre-migration totals (per alignment_source)
-- [ ] **UTB-09**: 30 siloed tables dropped from database
-- [ ] **UTB-10**: 6 sync scripts deleted from codebase
+- [x] **UTB-09**: 30 siloed tables dropped from database
+- [x] **UTB-10**: 6 sync scripts deleted from codebase
 - [x] **UTB-11**: State tables updated or consolidated for _u-direct writes
-- [ ] **UTB-12**: Dependent views (corr_latest, all_emas, etc.) inventoried and recreated if affected by drops
+- [x] **UTB-12**: Dependent views (corr_latest, all_emas, etc.) inventoried and recreated if affected by drops
 
 ### Storage Cleanup (CLN)
 
@@ -80,10 +80,10 @@ None — this milestone is self-contained infrastructure work.
 | UTB-06 | Phase 77 | Complete |
 | UTB-07 | Phase 76 | Complete |
 | UTB-08 | Phase 76 | Complete |
-| UTB-09 | Phase 78 | Pending |
-| UTB-10 | Phase 78 | Pending |
+| UTB-09 | Phase 78 | Complete |
+| UTB-10 | Phase 78 | Complete |
 | UTB-11 | Phase 77 | Complete |
-| UTB-12 | Phase 78 | Pending |
+| UTB-12 | Phase 78 | Complete |
 | CLN-01 | Phase 79 | Pending |
 | CLN-02 | Phase 79 | Pending |
 | VWP-01 | Phase 79 | Pending |
