@@ -2,9 +2,9 @@
 MultiTFAMAFeature - Concrete AMA feature subclass for multi-timeframe bars.
 
 Computes KAMA, DEMA, TEMA, HMA for all 18 parameter sets across the
-full timeframe universe from price_bars_multi_tf.
+full timeframe universe from price_bars_multi_tf_u.
 
-Data source:  price_bars_multi_tf  (canonical TF bars)
+Data source:  price_bars_multi_tf_u  (canonical TF bars, alignment_source='multi_tf')
 TF universe:  dim_timeframe             (all 109 TFs via tf_days_nominal)
 Output table: ama_multi_tf          (id, ts, tf, indicator, params_hash PK)
 
@@ -117,7 +117,7 @@ class MultiTFAMAFeature(BaseAMAFeature):
     """
     Concrete AMA feature for multi-timeframe bars.
 
-    Loads canonical TF closes from price_bars_multi_tf and computes
+    Loads canonical TF closes from price_bars_multi_tf_u and computes
     all 18 AMA parameter sets (KAMA x3, DEMA x5, TEMA x5, HMA x5) for
     each (asset_id, tf) combination.
 
@@ -135,7 +135,7 @@ class MultiTFAMAFeature(BaseAMAFeature):
         config: Optional[AMAFeatureConfig] = None,
         *,
         bars_schema: str = "public",
-        bars_table: str = "price_bars_multi_tf",
+        bars_table: str = "price_bars_multi_tf_u",
     ) -> None:
         """
         Initialise multi-TF AMA feature.
@@ -175,20 +175,24 @@ class MultiTFAMAFeature(BaseAMAFeature):
 
         Call before the TF loop to avoid per-TF DB queries.
         """
+        params: dict = {"id": asset_id, "venue_id": venue_id}
+        alignment_filter = ""
+        if self.config.alignment_source:
+            alignment_filter = "AND alignment_source = :alignment_source"
+            params["alignment_source"] = self.config.alignment_source
+
         sql = text(
             f"""
             SELECT id, venue_id, "timestamp" AS ts, tf, tf_days, is_partial_end AS roll, close, is_partial_end
             FROM {self.bars_schema}.{self.bars_table}
-            WHERE id = :id AND venue_id = :venue_id
+            WHERE id = :id AND venue_id = :venue_id {alignment_filter}
             ORDER BY tf, "timestamp"
             """
         )
 
         try:
             with engine.connect() as conn:
-                df = pd.read_sql(
-                    sql, conn, params={"id": asset_id, "venue_id": venue_id}
-                )
+                df = pd.read_sql(sql, conn, params=params)
         except Exception as exc:
             logger.warning(
                 "preload_all_bars: failed for asset_id=%s — %s", asset_id, exc

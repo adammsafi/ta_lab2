@@ -2,8 +2,8 @@
 Calendar-aligned multi-timeframe AMA feature classes.
 
 Covers two calendar schemes:
-- CalUSAMAFeature  : loads from price_bars_multi_tf_cal_us
-- CalISOAMAFeature : loads from price_bars_multi_tf_cal_iso
+- CalUSAMAFeature  : loads from price_bars_multi_tf_u (alignment_source='multi_tf_cal_us')
+- CalISOAMAFeature : loads from price_bars_multi_tf_u (alignment_source='multi_tf_cal_iso')
 
 Both extend BaseAMAFeature and write to their respective output tables:
   ama_multi_tf_cal_us
@@ -47,7 +47,7 @@ class CalUSAMAFeature(BaseAMAFeature):
     """
     AMA feature for US calendar-aligned bars.
 
-    Loads close prices from price_bars_multi_tf_cal_us.
+    Loads close prices from price_bars_multi_tf_u (alignment_source='multi_tf_cal_us').
     TF universe: calendar TFs with US scheme from dim_timeframe.
     Output table: ama_multi_tf_cal_us.
     """
@@ -58,7 +58,7 @@ class CalUSAMAFeature(BaseAMAFeature):
         config: Optional[AMAFeatureConfig] = None,
         *,
         bars_schema: str = "public",
-        bars_table: str = "price_bars_multi_tf_cal_us",
+        bars_table: str = "price_bars_multi_tf_u",
     ) -> None:
         """
         Initialise calendar US AMA feature.
@@ -89,17 +89,23 @@ class CalUSAMAFeature(BaseAMAFeature):
         self, engine: Engine, asset_id: int, venue_id: int = 1
     ) -> None:
         """Load bars for ALL TFs and venues in a single query and cache."""
+        params: dict = {"id": asset_id}
+        alignment_filter = ""
+        if self.config.alignment_source:
+            alignment_filter = "AND alignment_source = :alignment_source"
+            params["alignment_source"] = self.config.alignment_source
+
         sql = text(
             f"""
             SELECT id, venue_id, "timestamp" AS ts, tf, tf_days, is_partial_end AS roll, close, is_partial_end
             FROM {self.bars_schema}.{self.bars_table}
-            WHERE id = :id
+            WHERE id = :id {alignment_filter}
             ORDER BY venue_id, tf, "timestamp"
             """
         )
         try:
             with engine.connect() as conn:
-                df = pd.read_sql(sql, conn, params={"id": asset_id})
+                df = pd.read_sql(sql, conn, params=params)
         except Exception as exc:
             logger.warning(
                 "preload_all_bars: failed for asset_id=%s table=%s — %s",
@@ -139,6 +145,9 @@ class CalUSAMAFeature(BaseAMAFeature):
         if start_ts is not None:
             where_clauses.append('"timestamp" >= :start_ts')
             params["start_ts"] = start_ts
+        if self.config.alignment_source:
+            where_clauses.append("alignment_source = :alignment_source")
+            params["alignment_source"] = self.config.alignment_source
         where_sql = " AND ".join(where_clauses)
         sql = text(
             f"""
@@ -256,7 +265,7 @@ class CalISOAMAFeature(BaseAMAFeature):
     """
     AMA feature for ISO calendar-aligned bars.
 
-    Loads close prices from price_bars_multi_tf_cal_iso.
+    Loads close prices from price_bars_multi_tf_u (alignment_source='multi_tf_cal_iso').
     TF universe: calendar TFs with ISO scheme from dim_timeframe.
     Output table: ama_multi_tf_cal_iso.
     """
@@ -267,7 +276,7 @@ class CalISOAMAFeature(BaseAMAFeature):
         config: Optional[AMAFeatureConfig] = None,
         *,
         bars_schema: str = "public",
-        bars_table: str = "price_bars_multi_tf_cal_iso",
+        bars_table: str = "price_bars_multi_tf_u",
     ) -> None:
         """
         Initialise calendar ISO AMA feature.
@@ -298,17 +307,23 @@ class CalISOAMAFeature(BaseAMAFeature):
         self, engine: Engine, asset_id: int, venue_id: int = 1
     ) -> None:
         """Load bars for ALL TFs and venues in a single query and cache."""
+        params: dict = {"id": asset_id}
+        alignment_filter = ""
+        if self.config.alignment_source:
+            alignment_filter = "AND alignment_source = :alignment_source"
+            params["alignment_source"] = self.config.alignment_source
+
         sql = text(
             f"""
             SELECT id, venue_id, "timestamp" AS ts, tf, tf_days, is_partial_end AS roll, close, is_partial_end
             FROM {self.bars_schema}.{self.bars_table}
-            WHERE id = :id
+            WHERE id = :id {alignment_filter}
             ORDER BY venue_id, tf, "timestamp"
             """
         )
         try:
             with engine.connect() as conn:
-                df = pd.read_sql(sql, conn, params={"id": asset_id})
+                df = pd.read_sql(sql, conn, params=params)
         except Exception as exc:
             logger.warning(
                 "preload_all_bars: failed for asset_id=%s table=%s — %s",
@@ -348,6 +363,9 @@ class CalISOAMAFeature(BaseAMAFeature):
         if start_ts is not None:
             where_clauses.append('"timestamp" >= :start_ts')
             params["start_ts"] = start_ts
+        if self.config.alignment_source:
+            where_clauses.append("alignment_source = :alignment_source")
+            params["alignment_source"] = self.config.alignment_source
         where_sql = " AND ".join(where_clauses)
         sql = text(
             f"""
