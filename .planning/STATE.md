@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 
 ## Current Position
 
-Phase: 78 of 79 (Table Drops & Script Cleanup) -- Gap closure in progress (78-05 complete)
-Plan: 5 of 6 complete (gap closure plans 04-06)
-Status: In progress
-Last activity: 2026-03-21 -- Completed 78-05: All 5 AMA feature classes and 4 builder scripts redirected to price_bars_multi_tf_u with alignment_source filters
+Phase: 78 of 79 (Table Drops & Script Cleanup) -- Gap closure complete (78-04, 78-05, 78-06 all done)
+Plan: 6 of 6 complete
+Status: Phase complete
+Last activity: 2026-03-21 -- Completed 78-06: All EMA feature classes and builder scripts redirected to price_bars_multi_tf_u; EMAStateConfig carries alignment_source for bar_metadata CTE scoping
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [#########.] 78% v1.1.0
 
@@ -102,6 +102,9 @@ Recent decisions affecting current work:
 - ALL_AUDIT_SCRIPTS in run_all_audits.py trimmed to 3 scripts verified on disk; 14 deleted-script entries removed (78-04)
 - AMA feature preload_all_bars uses f-string alignment_filter injection; _load_bars uses where_clauses.append() -- both correct patterns for conditional alignment_source filtering (78-05)
 - AMA bar reads now conditional on config.alignment_source (None = reads all variants; set = scoped to one source); normal path always has alignment_source set via SCHEME_MAP (78-05)
+- Cal/cal_anchor EMA feature classes compute alignment_source = f"multi_tf_cal_{scheme.lower()}" inline at query time (not stored as attr); scheme is single source of truth (78-06)
+- EMAStateConfig.alignment_source field added; bar_metadata CTE uses effective_alignment_source = alignment_source or config.alignment_source to scope bar_seq reads from _u table (78-06)
+- EMA pipeline fully redirected to price_bars_multi_tf_u: zero siloed bar table references remain in any EMA builder, feature class, or state manager (78-06)
 
 ### Pending Todos
 
@@ -117,9 +120,9 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-03-21
-Stopped at: Completed 78-05-PLAN.md -- AMA feature classes and builder scripts redirected to price_bars_multi_tf_u
+Stopped at: Completed 78-06-PLAN.md -- EMA feature classes and builder scripts redirected to price_bars_multi_tf_u; Phase 78 gap closure complete
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-21 (78-05 complete -- AMA layer fully redirected to price_bars_multi_tf_u with alignment_source filters)*
+*Last updated: 2026-03-21 (78-06 complete -- EMA layer fully redirected to price_bars_multi_tf_u; Phase 78 all 6 plans done)*
