@@ -151,7 +151,7 @@ class CalAnchorEMARefresher(BaseEMARefresher):
     EMA refresher for calendar-anchored EMAs (US/ISO schemes).
 
     Uses:
-    - price_bars_multi_tf_cal_anchor_us or price_bars_multi_tf_cal_anchor_iso
+    - price_bars_multi_tf_u with alignment_source=multi_tf_cal_anchor_us/iso
     - Calendar-anchored timeframes
     - Separate output and state tables per scheme
     """
@@ -167,7 +167,7 @@ class CalAnchorEMARefresher(BaseEMARefresher):
     ):
         super().__init__(config, state_config, engine)
         self.scheme = scheme
-        self.bars_table = f"price_bars_multi_tf_cal_anchor_{scheme}"
+        self.bars_table = "price_bars_multi_tf_u"
         self.bars_schema = "public"
 
     # =========================================================================
@@ -269,6 +269,9 @@ class CalAnchorEMARefresher(BaseEMARefresher):
         out_table = args.out_us if scheme == "us" else args.out_iso
         state_table = f"{out_table}_state"
 
+        # alignment_source per scheme: multi_tf_cal_anchor_us or multi_tf_cal_anchor_iso
+        alignment_source = f"multi_tf_cal_anchor_{scheme}"
+
         # Create temporary instance to use helper methods
         temp_config = EMARefresherConfig(
             db_url=db_url,
@@ -294,9 +297,10 @@ class CalAnchorEMARefresher(BaseEMARefresher):
             ts_column="ts",
             roll_filter="roll = FALSE",
             use_canonical_ts=True,
-            bars_table=f"price_bars_multi_tf_cal_anchor_{scheme}",
+            bars_table="price_bars_multi_tf_u",
             bars_schema="public",
             bars_partial_filter="is_partial_end = FALSE",
+            alignment_source=alignment_source,
         )
 
         temp_instance = cls(temp_config, temp_state_config, engine, scheme)
@@ -304,9 +308,6 @@ class CalAnchorEMARefresher(BaseEMARefresher):
         # Load IDs and periods using helper methods
         ids = temp_instance.load_ids(args.ids, venue_id=args.venue_id)
         periods = temp_instance.load_periods(args.periods)
-
-        # alignment_source per scheme: multi_tf_cal_anchor_us or multi_tf_cal_anchor_iso
-        alignment_source = f"multi_tf_cal_anchor_{scheme}"
 
         # Create final config
         final_config = EMARefresherConfig(
@@ -340,9 +341,10 @@ class CalAnchorEMARefresher(BaseEMARefresher):
             ts_column="ts",
             roll_filter="roll = FALSE",
             use_canonical_ts=True,
-            bars_table=f"price_bars_multi_tf_cal_anchor_{scheme}",
+            bars_table="price_bars_multi_tf_u",
             bars_schema="public",
             bars_partial_filter="is_partial_end = FALSE",
+            alignment_source=alignment_source,
         )
 
         return cls(final_config, state_config, engine, scheme)

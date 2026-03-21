@@ -68,7 +68,7 @@ def _process_id_worker(task: WorkerTask) -> int:
         engine = create_engine(task.db_url, poolclass=NullPool, future=True)
 
         # Extract configuration
-        bars_table = task.extra_config.get("bars_table", "price_bars_multi_tf")
+        bars_table = task.extra_config.get("bars_table", "price_bars_multi_tf_u")
         bars_schema = task.extra_config.get("bars_schema", "public")
         out_schema = task.extra_config.get("out_schema", "public")
         out_table = task.extra_config.get("out_table", "ema_multi_tf_u")
@@ -142,7 +142,7 @@ class MultiTFEMARefresher(BaseEMARefresher):
 
     Uses:
     - dim_timeframe (alignment_type='tf_day', canonical_only=True) for TFs
-    - price_bars_multi_tf for tf_day canonical bars
+    - price_bars_multi_tf_u for tf_day canonical bars (alignment_source=multi_tf)
     - price_bars_1d for 1D timeframe (validated bars)
     - Parallel execution at ID level
     """
@@ -156,7 +156,7 @@ class MultiTFEMARefresher(BaseEMARefresher):
         engine,
     ):
         super().__init__(config, state_config, engine)
-        self.bars_table = config.extra_config.get("bars_table", "price_bars_multi_tf")
+        self.bars_table = config.extra_config.get("bars_table", "price_bars_multi_tf_u")
         self.bars_schema = config.extra_config.get("bars_schema", "public")
 
     # =========================================================================
@@ -244,7 +244,7 @@ class MultiTFEMARefresher(BaseEMARefresher):
         )
 
         # Script-specific arguments
-        p.add_argument("--bars-table", default="price_bars_multi_tf")
+        p.add_argument("--bars-table", default="price_bars_multi_tf_u")
         p.add_argument("--bars-schema", default="public")
         p.add_argument("--tfs", default=None)
 
@@ -291,6 +291,7 @@ class MultiTFEMARefresher(BaseEMARefresher):
             bars_table=args.bars_table,
             bars_schema=args.bars_schema,
             bars_partial_filter="is_partial_end = FALSE",
+            alignment_source="multi_tf",
         )
 
         temp_instance = cls(temp_config, temp_state_config, engine)
@@ -334,6 +335,7 @@ class MultiTFEMARefresher(BaseEMARefresher):
             bars_table=args.bars_table,
             bars_schema=args.bars_schema,
             bars_partial_filter="is_partial_end = FALSE",
+            alignment_source="multi_tf",
         )
 
         return cls(final_config, state_config, engine)

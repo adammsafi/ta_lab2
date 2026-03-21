@@ -854,7 +854,7 @@ class BaseEMARefresher(ABC):
             - "bars_schema": Source bars schema name
 
         Example:
-            {"bars_table": "price_bars_multi_tf", "bars_schema": "public"}
+            {"bars_table": "price_bars_multi_tf_u", "bars_schema": "public"}
         """
 
     @staticmethod

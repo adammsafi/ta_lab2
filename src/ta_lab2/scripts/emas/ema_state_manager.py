@@ -69,6 +69,9 @@ class EMAStateConfig:
     bars_table: Optional[str] = None
     bars_schema: str = "public"
     bars_partial_filter: str = "is_partial_end = FALSE"
+    alignment_source: Optional[str] = (
+        None  # When set, scopes bar_metadata CTE to this alignment_source
+    )
 
 
 # =============================================================================
@@ -270,7 +273,17 @@ class EMAStateManager:
 
         state_table_fq = f"{self.config.state_schema}.{self.config.state_table}"
 
+        # alignment_source from config takes precedence when set (bars_table is _u)
+        config_alignment_source = self.config.alignment_source
+        effective_alignment_source = alignment_source or config_alignment_source
+
         if bars_table:
+            # Scope bar_metadata CTE when reading from unified _u table
+            bar_alignment_filter = (
+                "AND alignment_source = :bar_alignment_source"
+                if effective_alignment_source
+                else ""
+            )
             # Read bar metadata from bars table
             sql = f"""
             WITH canonical_ts AS (
@@ -287,6 +300,7 @@ class EMAStateManager:
             ),
             bar_metadata AS (
                 -- Bar metadata (daily range and bar_seq) per (id, venue_id, tf)
+                -- Scoped by alignment_source when reading from unified _u table
                 SELECT
                     id,
                     venue_id,
@@ -295,6 +309,7 @@ class EMAStateManager:
                     MAX("timestamp") as daily_max_seen,
                     MAX(CASE WHEN {bars_partial_filter} THEN bar_seq END) as last_bar_seq
                 FROM {bars_schema}.{bars_table}
+                WHERE TRUE {bar_alignment_filter}
                 GROUP BY id, venue_id, tf
             ),
             periods_for_id_tf AS (
@@ -396,6 +411,8 @@ class EMAStateManager:
         params = {}
         if alignment_source:
             params["alignment_source"] = alignment_source
+        if effective_alignment_source:
+            params["bar_alignment_source"] = effective_alignment_source
 
         with self.engine.begin() as conn:
             result = conn.execute(text(sql), params)
