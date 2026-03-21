@@ -8,10 +8,10 @@
 ### Bar Builder Consolidation (BAR)
 
 - [x] **BAR-01**: Single `refresh_price_bars_1d.py` script handles all data sources via `--source cmc|tvc|hl|all` CLI argument
-- [ ] **BAR-02**: SourceSpec registry pattern captures per-source differences as data (source table, JOINs, OHLC repair, venue_id mapping, ID loader)
+- [x] **BAR-02**: SourceSpec registry pattern captures per-source differences as data (source table, JOINs, OHLC repair, venue_id mapping, ID loader)
 - [x] **BAR-03**: Adding a new data source requires only a new SourceSpec entry — no new script file
 - [x] **BAR-04**: Backfill detection works for all sources (currently CMC-only)
-- [ ] **BAR-05**: Shared psycopg helper functions extracted from duplicated code (~600 lines deduplicated)
+- [x] **BAR-05**: Shared psycopg helper functions extracted from duplicated code (~600 lines deduplicated)
 - [x] **BAR-06**: `run_all_bar_builders.py` orchestrator updated to invoke generic builder with `--source` flag
 - [x] **BAR-07**: Old source-specific scripts (`refresh_tvc_price_bars_1d.py`, `refresh_hl_price_bars_1d.py`) deleted
 - [x] **BAR-08**: Row counts per source match baseline before and after consolidation
