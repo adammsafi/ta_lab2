@@ -10,14 +10,16 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 
 ## Current State
 
-**Latest shipped:** v1.0.1 Macro Regime Infrastructure (2026-03-03)
-**Next milestone:** TBD -- run `/gsd:new-milestone` to plan next version
+**Latest shipped:** v1.1.0 Pipeline Consolidation & Storage Optimization (2026-03-21)
+**Current milestone:** v1.2.0 Analysis → Live Signals (planned)
+
+**v1.1.0 delivered:** Eliminated 254 GB duplicate data (-59%), consolidated 30 siloed tables into _u tables, generalized 1D bar builder with source registry, pruned 7.18M NULL rows, integrated VWAP pipeline, cleaned MCP dead routes. 6 phases, 21 plans, 26/26 requirements. DB: 431 GB → 177 GB.
 
 **v1.0.1 delivered:** FRED macro data pipeline (39 series, 208K rows) wired into regime/risk infrastructure -- 4-dimensional macro regime classifier, tighten-only L4 resolver, event risk gates (FOMC/CPI/NFP/VIX/carry/credit), cross-asset aggregation, and full observability (dashboard, Telegram alerts, drift attribution). 10 phases, 29 plans, 55/55 requirements.
 
 **v1.0.0 delivered:** Full V1 loop -- strategy bake-off, paper-trade executor, risk controls, drift guard, all research tracks answered, feature evaluation across 109 TFs, advanced ML infrastructure, operational dashboard, and V1 Results Memo. 22 phases, 104 plans, 80/80 requirements.
 
-**Cumulative stats:** 73 phases, 337 plans, 434+ files, ~113K lines
+**Cumulative stats:** 79 phases, 359 plans, 480+ files, ~113K lines
 
 ## Requirements
 
@@ -48,6 +50,15 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 - ✓ Cost optimization tiers (free CLI → subscriptions → paid API) — existing
 - ✓ Adapter architecture (Claude/ChatGPT/Gemini) — existing
 - ✓ Quota tracking design — existing
+
+### Complete (v1.1.0 Milestone)
+
+**Pipeline Consolidation & Storage Optimization** ✓
+- ✓ Generalized 1D bar builder: single `refresh_price_bars_1d.py --source cmc|tvc|hl|all` replaces 3 source-specific scripts -- v1.1.0
+- ✓ Direct-to-_u migration: all 6 table families write directly to _u tables with alignment_source discrimination -- v1.1.0
+- ✓ 30 siloed tables dropped, 6 sync scripts deleted, 254 GB storage reclaimed (431 GB → 177 GB) -- v1.1.0
+- ✓ NULL first-observation rows pruned (7.18M AMA return rows), all return scripts filter going forward -- v1.1.0
+- ✓ VWAP pipeline integrated for all multi-venue assets, MCP dead routes removed -- v1.1.0
 
 ### Complete (v1.0.1 Milestone)
 
@@ -202,5 +213,8 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 | Unified EMA table | Two separate multi-TF EMA systems (tf_day vs calendar) creates permanent inconsistency - must merge before building on top | — Pending |
 | Backtest/live parity as success criterion | System is only trustworthy if backtests use identical logic to live trading - reproducibility is mandatory | Validated — PaperExecutor verifies backtest parity |
 
+| Direct-to-_u writes, drop siloed tables | 30 siloed tables duplicate 100GB+ of data; all consumers already read from _u | Validated — 254 GB reclaimed, all 6 families migrated |
+| Generalized 1D bar builder with source registry | 3 source-specific scripts are 80% identical; adding a new source requires copying an entire file | Validated — SourceSpec pattern, BAR-03 enables config-only onboarding |
+
 ---
-*Last updated: 2026-03-03 after v1.0.1 milestone shipped*
+*Last updated: 2026-03-21 after v1.1.0 milestone shipped*

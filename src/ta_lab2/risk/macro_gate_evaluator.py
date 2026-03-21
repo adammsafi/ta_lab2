@@ -10,7 +10,7 @@ Gates:
   3. Carry gate -- REDUCE at dexjpus_daily_zscore magnitude > 2.0 with sign awareness
   4. Credit gate -- >1.5 -> 0.7, >2.5 -> 0.4 (no FLATTEN)
   5. Freshness gate -- >3 biz days = warn+reduce, >6 = disable macro
-  6. Composite score -- weighted average (0-100) persisted to cmc_macro_stress_history
+  6. Composite score -- weighted average (0-100) persisted to macro_stress_history
   7. State management with 4h cooldown to prevent oscillation
 
 Usage::
@@ -541,7 +541,7 @@ class MacroGateEvaluator:
         carry_zscore: Optional[float],
         nfci_level: Optional[float],
     ) -> tuple[str, float]:
-        """Compute composite stress score (0-100) and persist to cmc_macro_stress_history.
+        """Compute composite stress score (0-100) and persist to macro_stress_history.
 
         Weights: VIX=0.40, HY OAS=0.25, carry=0.20, NFCI=0.15.
         Score tiers: 0-25=calm(1.0), 25-50=elevated(0.8), 50-75=stressed(0.6), 75+=crisis(0.4)
@@ -615,14 +615,14 @@ class MacroGateEvaluator:
                 tier_mult = mult
                 break
 
-        # Persist to cmc_macro_stress_history
+        # Persist to macro_stress_history
         now = datetime.now(timezone.utc)
         try:
             with self._engine.begin() as conn:
                 conn.execute(
                     text(
                         """
-                        INSERT INTO public.cmc_macro_stress_history
+                        INSERT INTO public.macro_stress_history
                             (ts, composite_score, stress_tier,
                              vix_raw, hy_oas_zscore, carry_velocity_zscore,
                              nfci_level, dexjpus_zscore_raw)
@@ -906,7 +906,7 @@ class MacroGateEvaluator:
         new_state: str,
         size_mult: float,
     ) -> None:
-        """Insert to cmc_risk_events for gate state transition.
+        """Insert to risk_events for gate state transition.
 
         Args:
             gate_id: Gate identifier.
@@ -938,7 +938,7 @@ class MacroGateEvaluator:
                 conn.execute(
                     text(
                         """
-                        INSERT INTO public.cmc_risk_events
+                        INSERT INTO public.risk_events
                             (event_type, trigger_source, reason, metadata)
                         VALUES
                             (:event_type, 'macro_gate', :reason, :metadata)

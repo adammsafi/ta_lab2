@@ -4,9 +4,9 @@ codependence_feature.py - Pairwise codependence computation + DB writer.
 Standalone script (NOT a BaseFeature subclass) that computes pairwise
 codependence metrics (Pearson correlation, distance correlation, mutual
 information, variation of information) for all asset pairs at a given
-timeframe. Results are written to cmc_codependence.
+timeframe. Results are written to codependence.
 
-Pattern follows refresh_cmc_regimes.py: load data, compute, write.
+Pattern follows refresh_regimes.py: load data, compute, write.
 Historical snapshots are preserved via computed_at in the PK.
 
 Usage:
@@ -51,7 +51,7 @@ def load_return_series(
     tf: str,
     window_bars: int,
 ) -> dict[int, np.ndarray]:
-    """Load log-return series for each asset from cmc_returns_bars_multi_tf_u.
+    """Load log-return series for each asset from returns_bars_multi_tf_u.
 
     Parameters
     ----------
@@ -74,7 +74,7 @@ def load_return_series(
     min_obs = int(window_bars * 0.5)
     query = text("""
         SELECT id, "timestamp" AS ts, ret_log
-        FROM public.cmc_returns_bars_multi_tf_u
+        FROM public.returns_bars_multi_tf_u
         WHERE id = ANY(:ids)
           AND tf = :tf
           AND roll = FALSE
@@ -318,10 +318,10 @@ def refresh_codependence(
 
     # 6. Write to DB (append mode - preserves history via computed_at in PK)
     if dry_run:
-        logger.info("DRY RUN: would write %d rows to cmc_codependence", n_rows)
+        logger.info("DRY RUN: would write %d rows to codependence", n_rows)
     else:
         df.to_sql(
-            "cmc_codependence",
+            "codependence",
             engine,
             schema="public",
             if_exists="append",
@@ -329,7 +329,7 @@ def refresh_codependence(
             method="multi",
             chunksize=5000,
         )
-        logger.info("refresh_codependence: wrote %d rows to cmc_codependence", n_rows)
+        logger.info("refresh_codependence: wrote %d rows to codependence", n_rows)
 
     return n_rows
 
@@ -340,30 +340,12 @@ def refresh_codependence(
 
 
 def _get_all_asset_ids(engine: Engine) -> list[int]:
-    """Return all active asset IDs from dim_assets.
-
-    Falls back to DISTINCT id from cmc_price_bars_multi_tf if dim_assets
-    query fails.
-    """
-    try:
-        with engine.connect() as conn:
-            result = conn.execute(
-                text(
-                    "SELECT DISTINCT id FROM public.dim_assets "
-                    "WHERE is_active = TRUE ORDER BY id"
-                )
-            )
-            ids = [row[0] for row in result]
-            if ids:
-                return ids
-    except Exception as exc:
-        logger.debug("dim_assets query failed (%s), falling back to bars table", exc)
-
+    """Return asset IDs with pipeline_tier = 1 (full pipeline)."""
     with engine.connect() as conn:
         result = conn.execute(
             text(
-                "SELECT DISTINCT id FROM public.cmc_price_bars_multi_tf "
-                "WHERE tf = '1D' ORDER BY id"
+                "SELECT DISTINCT id FROM public.dim_assets "
+                "WHERE pipeline_tier = 1 ORDER BY id"
             )
         )
         return [row[0] for row in result]
@@ -385,7 +367,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=(
             "Compute pairwise codependence metrics (Pearson, distance correlation, "
-            "mutual information, variation of information) and write to cmc_codependence."
+            "mutual information, variation of information) and write to codependence."
         ),
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )

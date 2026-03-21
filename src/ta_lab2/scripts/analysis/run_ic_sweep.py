@@ -2,15 +2,15 @@
 Batch IC sweep across all assets x all TFs x all features.
 
 Evaluates TWO data sources:
-  Source A: cmc_features (bar-level features, 112 columns)
-  Source B: cmc_ama_multi_tf_u (AMA indicator columns: ama, d1, d2, d1_roll, d2_roll, er)
+  Source A: features (bar-level features, 112 columns)
+  Source B: ama_multi_tf_u (AMA indicator columns: ama, d1, d2, d1_roll, d2_roll, er)
 
-Results are persisted to cmc_ic_results using upsert semantics (overwrite=True by default).
+Results are persisted to ic_results using upsert semantics (overwrite=True by default).
 After the sweep, a feature ranking CSV is written to reports/bakeoff/feature_ic_ranking.csv
 and the top-20 features by IC-IR (horizon=1, arith) are printed to console.
 
 Usage:
-    # Full sweep (cmc_features + AMA)
+    # Full sweep (features + AMA)
     python -m ta_lab2.scripts.analysis.run_ic_sweep --all
 
     # Targeted sweep
@@ -22,7 +22,7 @@ Usage:
     # Dry run (list qualifying pairs without computing)
     python -m ta_lab2.scripts.analysis.run_ic_sweep --dry-run --min-bars 500
 
-    # Skip AMA sweep (faster iteration on cmc_features only)
+    # Skip AMA sweep (faster iteration on features only)
     python -m ta_lab2.scripts.analysis.run_ic_sweep --all --skip-ama
 """
 
@@ -57,7 +57,7 @@ logger = logging.getLogger(__name__)
 _REGIME_ASSET_IDS = frozenset([1, 1027])
 _REGIME_TF = "1D"
 
-# Extra metadata columns in cmc_features to exclude from feature discovery.
+# Extra metadata columns in features to exclude from feature discovery.
 # Includes text/categorical columns that cannot be converted to float for IC computation.
 _EXTRA_NON_FEATURE_COLS = frozenset(
     [
@@ -122,12 +122,12 @@ def _to_utc_timestamp(val) -> pd.Timestamp:
 # ---------------------------------------------------------------------------
 
 
-def _discover_cmc_features_pairs(engine, min_bars: int) -> list[tuple[int, str, int]]:
+def _discover_features_pairs(engine, min_bars: int) -> list[tuple[int, str, int]]:
     """
     Discover qualifying (asset_id, tf) pairs from asset_data_coverage.
 
     Returns list of (asset_id, tf, n_rows) tuples with n_rows >= min_bars.
-    Falls back to querying cmc_features directly if asset_data_coverage is unavailable.
+    Falls back to querying features directly if asset_data_coverage is unavailable.
     """
     # Try asset_data_coverage first
     try:
@@ -136,7 +136,7 @@ def _discover_cmc_features_pairs(engine, min_bars: int) -> list[tuple[int, str, 
                 """
                 SELECT id AS asset_id, granularity AS tf, n_rows
                 FROM public.asset_data_coverage
-                WHERE source_table = 'cmc_features'
+                WHERE source_table = 'features'
                   AND n_rows >= :min_bars
                 ORDER BY asset_id, tf
                 """
@@ -151,16 +151,16 @@ def _discover_cmc_features_pairs(engine, min_bars: int) -> list[tuple[int, str, 
             return list(zip(df["asset_id"], df["tf"], df["n_rows"]))
     except Exception as exc:
         logger.warning(
-            "asset_data_coverage query failed (%s) — falling back to direct cmc_features query",
+            "asset_data_coverage query failed (%s) — falling back to direct features query",
             exc,
         )
 
-    # Fallback: query cmc_features directly
+    # Fallback: query features directly
     with engine.connect() as conn:
         sql = text(
             """
             SELECT id AS asset_id, tf, COUNT(*) AS n_rows
-            FROM public.cmc_features
+            FROM public.features
             GROUP BY id, tf
             HAVING COUNT(*) >= :min_bars
             ORDER BY id, tf
@@ -169,7 +169,7 @@ def _discover_cmc_features_pairs(engine, min_bars: int) -> list[tuple[int, str, 
         df = pd.read_sql(sql, conn, params={"min_bars": min_bars})
 
     logger.info(
-        "cmc_features direct: found %d qualifying (asset, tf) pairs with >= %d bars",
+        "features direct: found %d qualifying (asset, tf) pairs with >= %d bars",
         len(df),
         min_bars,
     )
@@ -178,13 +178,13 @@ def _discover_cmc_features_pairs(engine, min_bars: int) -> list[tuple[int, str, 
 
 def _discover_ama_combos(engine, min_bars: int) -> list[tuple[int, str, str, str, int]]:
     """
-    Discover qualifying (asset_id, tf, indicator, params_hash) combos from cmc_ama_multi_tf_u.
+    Discover qualifying (asset_id, tf, indicator, params_hash) combos from ama_multi_tf_u.
 
     Returns list of (asset_id, tf, indicator, params_hash, n_rows) tuples.
     Returns empty list if the table does not exist.
     """
-    if not table_exists(engine, "public.cmc_ama_multi_tf_u"):
-        logger.info("cmc_ama_multi_tf_u table does not exist — skipping AMA sweep")
+    if not table_exists(engine, "public.ama_multi_tf_u"):
+        logger.info("ama_multi_tf_u table does not exist — skipping AMA sweep")
         return []
 
     try:
@@ -197,7 +197,7 @@ def _discover_ama_combos(engine, min_bars: int) -> list[tuple[int, str, str, str
                     indicator,
                     params_hash,
                     COUNT(*) AS n_rows
-                FROM public.cmc_ama_multi_tf_u
+                FROM public.ama_multi_tf_u
                 WHERE alignment_source = 'multi_tf'
                   AND roll = FALSE
                 GROUP BY id, tf, indicator, params_hash
@@ -211,7 +211,7 @@ def _discover_ama_combos(engine, min_bars: int) -> list[tuple[int, str, str, str
         return []
 
     logger.info(
-        "cmc_ama_multi_tf_u: found %d qualifying (asset, tf, indicator, params_hash) combos",
+        "ama_multi_tf_u: found %d qualifying (asset, tf, indicator, params_hash) combos",
         len(df),
     )
     return list(
@@ -228,7 +228,7 @@ def _load_features_and_close(
     conn, asset_id: int, tf: str, feature_cols: list[str]
 ) -> tuple[pd.DataFrame, pd.Series]:
     """
-    Load all feature columns + close from cmc_features for an asset-tf pair.
+    Load all feature columns + close from features for an asset-tf pair.
 
     Returns (features_df, close_series) both indexed by UTC timestamps.
     """
@@ -236,7 +236,7 @@ def _load_features_and_close(
     sql = text(
         f"""
         SELECT ts, {col_list}, close
-        FROM public.cmc_features
+        FROM public.features
         WHERE id = :asset_id AND tf = :tf
         ORDER BY ts
         """
@@ -262,8 +262,8 @@ def _load_ama_data_with_close(
     """
     Load AMA columns + close price for a specific (asset, tf, indicator, params_hash) combo.
 
-    Uses cmc_ama_multi_tf_u (alignment_source='multi_tf') for AMA values
-    and cmc_features for close price (joined on id, ts, tf).
+    Uses ama_multi_tf_u (alignment_source='multi_tf') for AMA values
+    and features for close price (joined on id, ts, tf).
 
     Returns (ama_features_df, close_series) both indexed by UTC timestamps.
     """
@@ -278,8 +278,8 @@ def _load_ama_data_with_close(
             a.d2_roll,
             a.er,
             f.close
-        FROM public.cmc_ama_multi_tf_u a
-        INNER JOIN public.cmc_features f
+        FROM public.ama_multi_tf_u a
+        INNER JOIN public.features f
             ON f.id = a.id AND f.ts = a.ts AND f.tf = a.tf
         WHERE a.id = :asset_id
           AND a.tf = :tf
@@ -571,7 +571,7 @@ def _ic_worker(task: ICWorkerTask) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def _run_cmc_features_sweep(
+def _run_features_sweep(
     engine,
     pairs: list[tuple[int, str, int]],
     feature_cols: list[str],
@@ -587,7 +587,7 @@ def _run_cmc_features_sweep(
     db_url: Optional[str] = None,
 ) -> int:
     """
-    Run IC sweep for cmc_features columns across all qualifying (asset, tf) pairs.
+    Run IC sweep for features columns across all qualifying (asset, tf) pairs.
 
     When workers > 1, dispatches work via multiprocessing.Pool.imap_unordered.
     When workers == 1, runs the existing sequential path.
@@ -603,7 +603,7 @@ def _run_cmc_features_sweep(
     ]
 
     if not filtered_pairs:
-        logger.info("cmc_features sweep: no pairs after filtering")
+        logger.info("features sweep: no pairs after filtering")
         return 0
 
     # --- Parallel path ---
@@ -655,7 +655,7 @@ def _run_cmc_features_sweep(
 
                 if n_done % 10 == 0 or n_done == len(tasks):
                     logger.info(
-                        "[cmc_features] progress: %d/%d done, %d rows written, %d errors",
+                        "[features] progress: %d/%d done, %d rows written, %d errors",
                         n_done,
                         len(tasks),
                         total_written,
@@ -663,7 +663,7 @@ def _run_cmc_features_sweep(
                     )
 
         logger.info(
-            "cmc_features sweep done (parallel): %d rows written, %d errors",
+            "features sweep done (parallel): %d rows written, %d errors",
             total_written,
             n_errors,
         )
@@ -677,7 +677,7 @@ def _run_cmc_features_sweep(
     for idx, (asset_id, tf, n_rows) in enumerate(filtered_pairs):
         pair_start = time.time()
         logger.info(
-            "[cmc_features %d/%d] asset_id=%d tf=%s n_rows=%d",
+            "[features %d/%d] asset_id=%d tf=%s n_rows=%d",
             idx + 1,
             total_pairs,
             asset_id,
@@ -825,7 +825,7 @@ def _run_cmc_features_sweep(
 
                 elapsed = time.time() - pair_start
                 logger.info(
-                    "[cmc_features] asset_id=%d tf=%s: %d IC rows written in %.1fs",
+                    "[features] asset_id=%d tf=%s: %d IC rows written in %.1fs",
                     asset_id,
                     tf,
                     n_written,
@@ -843,7 +843,7 @@ def _run_cmc_features_sweep(
             skipped_sparse += 1
 
     logger.info(
-        "cmc_features sweep done: %d rows written, %d pairs skipped/errored",
+        "features sweep done: %d rows written, %d pairs skipped/errored",
         total_written,
         skipped_sparse,
     )
@@ -862,7 +862,7 @@ def _run_ama_sweep(
     tf_filter: Optional[str] = None,
 ) -> int:
     """
-    Run IC sweep for AMA indicator columns from cmc_ama_multi_tf_u.
+    Run IC sweep for AMA indicator columns from ama_multi_tf_u.
 
     Returns total IC rows written to DB.
     """
@@ -1003,7 +1003,7 @@ def _produce_feature_ranking(
     engine, output_path: Path, top_n: int = 20
 ) -> pd.DataFrame:
     """
-    Query cmc_ic_results and produce a feature ranking by mean |IC-IR| at horizon=1 arith.
+    Query ic_results and produce a feature ranking by mean |IC-IR| at horizon=1 arith.
 
     Saves CSV to output_path and returns the full ranking DataFrame.
     """
@@ -1016,7 +1016,7 @@ def _produce_feature_ranking(
             AVG(ABS(ic_ir))         AS mean_abs_ic_ir,
             COUNT(*)                AS n_observations,
             COUNT(DISTINCT asset_id || '_' || tf) AS n_asset_tf_pairs
-        FROM public.cmc_ic_results
+        FROM public.ic_results
         WHERE horizon = 1
           AND return_type = 'arith'
           AND regime_col = 'all'
@@ -1081,8 +1081,8 @@ def main() -> int:
         prog="run_ic_sweep",
         description=(
             "Batch IC sweep across all assets x all TFs x all features.\n\n"
-            "Evaluates cmc_features columns AND AMA indicator columns from cmc_ama_multi_tf_u.\n"
-            "Results are persisted to cmc_ic_results and a ranking CSV is saved to "
+            "Evaluates features columns AND AMA indicator columns from ama_multi_tf_u.\n"
+            "Results are persisted to ic_results and a ranking CSV is saved to "
             "reports/bakeoff/feature_ic_ranking.csv."
         ),
     )
@@ -1092,7 +1092,7 @@ def main() -> int:
         "--all",
         action="store_true",
         dest="all_assets",
-        help="Full sweep: all qualifying asset-TF pairs (cmc_features + AMA).",
+        help="Full sweep: all qualifying asset-TF pairs (features + AMA).",
     )
     parser.add_argument(
         "--assets",
@@ -1155,7 +1155,7 @@ def main() -> int:
         default=False,
         help=(
             "Enable regime-conditional IC for BTC/ETH 1D "
-            "(uses cmc_regimes.l2_label -> trend_state / vol_state)."
+            "(uses regimes.l2_label -> trend_state / vol_state)."
         ),
     )
 
@@ -1165,7 +1165,7 @@ def main() -> int:
         action="store_true",
         default=False,
         dest="skip_ama",
-        help="Skip AMA table sweep (evaluates cmc_features only).",
+        help="Skip AMA table sweep (evaluates features only).",
     )
 
     # Persistence
@@ -1209,7 +1209,7 @@ def main() -> int:
         metavar="N",
         dest="workers",
         help=(
-            "Number of parallel worker processes for cmc_features sweep. "
+            "Number of parallel worker processes for features sweep. "
             "Default: 1 (sequential). Recommended: 4-8 for full sweep."
         ),
     )
@@ -1273,10 +1273,10 @@ def main() -> int:
 
     # --- Discover qualifying pairs (separate connections, each in own transaction) ---
     logger.info(
-        "Discovering qualifying cmc_features asset-TF pairs (min_bars=%d)...",
+        "Discovering qualifying features asset-TF pairs (min_bars=%d)...",
         args.min_bars,
     )
-    cmc_pairs = _discover_cmc_features_pairs(engine, args.min_bars)
+    cmc_pairs = _discover_features_pairs(engine, args.min_bars)
 
     # Apply scope filters for display / dry-run output
     asset_ids_set = set(args.asset_ids) if args.asset_ids else None
@@ -1288,25 +1288,23 @@ def main() -> int:
         and (args.tf_filter is None or tf == args.tf_filter)
     ]
 
-    logger.info(
-        "cmc_features: %d pairs qualify after scope filter", len(cmc_pairs_display)
-    )
+    logger.info("features: %d pairs qualify after scope filter", len(cmc_pairs_display))
 
     # --- Discover feature columns ---
     try:
-        all_cols = get_columns(engine, "public.cmc_features")
+        all_cols = get_columns(engine, "public.features")
         feature_cols = [
             c
             for c in all_cols
             if c not in _NON_FEATURE_COLS and c not in _EXTRA_NON_FEATURE_COLS
         ]
         logger.info(
-            "cmc_features: %d feature columns discovered (of %d total cols)",
+            "features: %d feature columns discovered (of %d total cols)",
             len(feature_cols),
             len(all_cols),
         )
     except Exception as exc:
-        logger.error("Failed to discover cmc_features columns: %s", exc)
+        logger.error("Failed to discover features columns: %s", exc)
         return 1
 
     # --- AMA combos ---
@@ -1330,7 +1328,7 @@ def main() -> int:
 
     # --- Dry run output ---
     if args.dry_run:
-        print(f"\n[DRY RUN] cmc_features qualifying pairs ({len(cmc_pairs_display)}):")
+        print(f"\n[DRY RUN] features qualifying pairs ({len(cmc_pairs_display)}):")
         for asset_id, tf, n_rows in cmc_pairs_display:
             print(f"  asset_id={asset_id} tf={tf} n_rows={n_rows}")
 
@@ -1345,19 +1343,19 @@ def main() -> int:
         sweep_elapsed = time.time() - sweep_start
         print(
             f"\n[DRY RUN complete] "
-            f"{len(cmc_pairs_display)} cmc_features pairs, "
+            f"{len(cmc_pairs_display)} features pairs, "
             f"{len(ama_combos_display) if not args.skip_ama else 'skipped'} AMA combos "
             f"({sweep_elapsed:.1f}s)"
         )
         return 0
 
-    # --- Source A: cmc_features sweep ---
+    # --- Source A: features sweep ---
     logger.info(
-        "Starting cmc_features IC sweep (%d pairs, %d feature cols)...",
+        "Starting features IC sweep (%d pairs, %d feature cols)...",
         len(cmc_pairs_display),
         len(feature_cols),
     )
-    n_written = _run_cmc_features_sweep(
+    n_written = _run_features_sweep(
         engine=engine,
         pairs=cmc_pairs,
         feature_cols=feature_cols,
@@ -1373,7 +1371,7 @@ def main() -> int:
         db_url=db_url,
     )
     total_written += n_written
-    logger.info("cmc_features sweep complete: %d IC rows written", n_written)
+    logger.info("features sweep complete: %d IC rows written", n_written)
 
     # --- Source B: AMA sweep ---
     if not args.skip_ama and ama_combos:

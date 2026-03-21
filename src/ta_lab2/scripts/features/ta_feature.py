@@ -50,14 +50,14 @@ class TAConfig(FeatureConfig):
 
     Attributes:
         feature_type: Type of feature (default: "ta")
-        output_table: Output table name (default: "cmc_ta_daily")
+        output_table: Output table name (default: "ta_daily")
         null_strategy: Null handling strategy (default: "interpolate")
         add_zscore: Whether to add z-score normalization (default: True)
         load_indicators_from_db: Load parameter sets from dim_indicators (default: True)
     """
 
     feature_type: str = "ta"
-    output_table: str = "cmc_ta"
+    output_table: str = "ta"
     null_strategy: str = "interpolate"  # Per CONTEXT.md - indicators interpolate
     add_zscore: bool = True
     load_indicators_from_db: bool = True
@@ -106,7 +106,7 @@ class TAFeature(BaseFeature):
         end: Optional[str] = None,
     ) -> pd.DataFrame:
         """
-        Load OHLCV data from cmc_price_bars_multi_tf for configured tf.
+        Load OHLCV data from price_bars_multi_tf for configured tf.
 
         Args:
             ids: List of asset IDs
@@ -128,6 +128,10 @@ class TAFeature(BaseFeature):
             "as_": self.config.alignment_source,
         }
 
+        if self.config.venue_id is not None:
+            where_clauses.append("venue_id = :venue_id")
+            params["venue_id"] = self.config.venue_id
+
         if start:
             where_clauses.append(f"{self.TS_COLUMN} >= :start")
             params["start"] = start
@@ -142,8 +146,7 @@ class TAFeature(BaseFeature):
             SELECT
                 id,
                 {self.TS_COLUMN} AS ts,
-                venue,
-                venue_rank,
+                venue_id,
                 open,
                 high,
                 low,
@@ -151,7 +154,7 @@ class TAFeature(BaseFeature):
                 volume
             FROM {self.SOURCE_TABLE}
             WHERE {where_sql}
-            ORDER BY id, venue, ts ASC
+            ORDER BY id, venue_id, ts ASC
         """
 
         sql = text(sql_text)
@@ -184,10 +187,10 @@ class TAFeature(BaseFeature):
         # Load active indicator parameters
         indicator_params = self.load_indicator_params()
 
-        # Process each (id, venue) separately
+        # Process each (id, venue_id) separately
         results = []
 
-        for (id_val, venue_val), df_id in df_source.groupby(["id", "venue"]):
+        for (id_val, venue_id_val), df_id in df_source.groupby(["id", "venue_id"]):
             df_id = df_id.copy()
 
             # Compute each active indicator
@@ -228,7 +231,14 @@ class TAFeature(BaseFeature):
         df_result["tf_days"] = self.get_tf_days()
 
         # Select output columns
-        output_cols = ["id", "ts", "tf", "tf_days", "venue", "venue_rank", "close"] + [
+        output_cols = [
+            "id",
+            "ts",
+            "tf",
+            "tf_days",
+            "venue_id",
+            "close",
+        ] + [
             col
             for col in df_result.columns
             if col
@@ -237,8 +247,7 @@ class TAFeature(BaseFeature):
                 "ts",
                 "tf",
                 "tf_days",
-                "venue",
-                "venue_rank",
+                "venue_id",
                 "close",
                 "open",
                 "high",
@@ -261,9 +270,8 @@ class TAFeature(BaseFeature):
             "id": "INTEGER NOT NULL",
             "ts": "TIMESTAMPTZ NOT NULL",
             "tf": "TEXT NOT NULL",
+            "venue_id": "SMALLINT NOT NULL DEFAULT 1",
             "alignment_source": "TEXT NOT NULL",
-            "venue": "TEXT NOT NULL DEFAULT 'CMC_AGG'",
-            "venue_rank": "INTEGER NOT NULL DEFAULT 50",
             "tf_days": "INTEGER NOT NULL",
             "close": "DOUBLE PRECISION",
         }
@@ -480,7 +488,7 @@ class TAFeature(BaseFeature):
         from ta_lab2.features.feature_utils import add_zscore as add_zscore_util
 
         if "rsi_14" in df.columns:
-            group_cols = ["id", "venue"] if "venue" in df.columns else ["id"]
+            group_cols = ["id", "venue_id"] if "venue_id" in df.columns else ["id"]
             for _, df_asset in df.groupby(group_cols):
                 idx = df_asset.index
                 add_zscore_util(

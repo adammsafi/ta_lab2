@@ -221,7 +221,7 @@ class KillSwitchExercise:
             # Count open orders
             order_row = conn.execute(
                 text(
-                    "SELECT COUNT(*) FROM cmc_orders "
+                    "SELECT COUNT(*) FROM orders "
                     "WHERE status IN ('created', 'submitted')"
                 )
             ).fetchone()
@@ -229,7 +229,7 @@ class KillSwitchExercise:
 
             # Get latest risk event timestamp
             event_row = conn.execute(
-                text("SELECT MAX(event_ts) FROM cmc_risk_events")
+                text("SELECT MAX(event_ts) FROM risk_events")
             ).fetchone()
             last_event_ts = event_row[0] if event_row else None
 
@@ -324,7 +324,7 @@ class KillSwitchExercise:
             checks_total += 1
             order_row = conn.execute(
                 text(
-                    "SELECT COUNT(*) FROM cmc_orders "
+                    "SELECT COUNT(*) FROM orders "
                     "WHERE status IN ('created', 'submitted')"
                 )
             ).fetchone()
@@ -341,7 +341,7 @@ class KillSwitchExercise:
             checks_total += 1
             event_row = conn.execute(
                 text(
-                    "SELECT event_type, reason FROM cmc_risk_events "
+                    "SELECT event_type, reason FROM risk_events "
                     "WHERE event_type = 'kill_switch_activated' "
                     "  AND reason LIKE :prefix "
                     "ORDER BY event_ts DESC LIMIT 1"
@@ -354,7 +354,7 @@ class KillSwitchExercise:
             status3c = "PASS" if check3c else "FAIL"
             event3c_reason = repr(event_row[1]) if event_row else "NOT FOUND"
             detail3c = (
-                f"3c cmc_risk_events has kill_switch_activated with 'V1 EXERCISE' "
+                f"3c risk_events has kill_switch_activated with 'V1 EXERCISE' "
                 f"reason={event3c_reason}"
             )
             print(f"  [{status3c}] {detail3c}")
@@ -535,7 +535,7 @@ class KillSwitchExercise:
             event_row = conn.execute(
                 text(
                     "SELECT event_type, trigger_source, reason "
-                    "FROM cmc_risk_events "
+                    "FROM risk_events "
                     "WHERE event_type = 'kill_switch_activated' "
                     "ORDER BY event_ts DESC LIMIT 1"
                 )

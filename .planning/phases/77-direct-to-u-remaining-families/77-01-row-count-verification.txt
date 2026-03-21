@@ -1,0 +1,39 @@
+Bar Returns Row Count Parity Verification
+Phase 77-01 - 2026-03-20
+=========================================
+
+Verification Method: Direct SQL COUNT(*) against siloed tables and
+returns_bars_multi_tf_u table partitioned by alignment_source.
+
+Siloed Table Row Counts
+-----------------------
+  multi_tf              : 3,270,402
+  multi_tf_cal_us       : 2,252,653
+  multi_tf_cal_iso      : 2,252,653
+  multi_tf_cal_anchor_us: 2,121,966
+  multi_tf_cal_anchor_iso: 2,121,966
+  TOTAL                 : 12,019,640
+
+_u Table Counts Per alignment_source
+--------------------------------------
+  multi_tf              : 3,270,402
+  multi_tf_cal_us       : 2,252,653
+  multi_tf_cal_iso      : 2,252,653
+  multi_tf_cal_anchor_us: 2,121,966
+  multi_tf_cal_anchor_iso: 2,121,966
+  TOTAL                 : 12,019,640
+
+Parity Check
+------------
+  multi_tf              : siloed=3,270,402   | _u=3,270,402   | MATCH
+  multi_tf_cal_us       : siloed=2,252,653   | _u=2,252,653   | MATCH
+  multi_tf_cal_iso      : siloed=2,252,653   | _u=2,252,653   | MATCH
+  multi_tf_cal_anchor_us: siloed=2,121,966   | _u=2,121,966   | MATCH
+  multi_tf_cal_anchor_iso: siloed=2,121,966  | _u=2,121,966   | MATCH
+
+Result: PASS - All 5 alignment_sources show exact row count MATCH.
+Total rows in returns_bars_multi_tf_u: 12,019,640
+
+Note: _u table was pre-populated by the previous sync script.
+All 5 bar returns builders now write directly to returns_bars_multi_tf_u
+with their ALIGNMENT_SOURCE stamped on every row.

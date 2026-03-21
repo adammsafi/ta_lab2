@@ -41,14 +41,14 @@ SOURCES = [
         "config": None,
     },
     {
-        "source_key": "cmc_price_bars_1d",
+        "source_key": "price_bars_1d",
         "name": "CMC 1D Price Bars",
         "source_type": "derived",
         "url": None,
         "description": "Canonical 1D OHLCV bars derived from cmc_price_histories7 with repair and validation.",
         "refresh_cadence": "daily",
-        "target_table": "cmc_price_bars_1d",
-        "run_log_table": "cmc_price_bars_1d_state",
+        "target_table": "price_bars_1d",
+        "run_log_table": "price_bars_1d_state",
         "config": None,
     },
     {

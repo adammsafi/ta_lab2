@@ -11,7 +11,7 @@ price data
 cmc_ema_daily (tf_day)
    |
    v
-cmc_ema_multi_tf (tf, period)
+ema_multi_tf (tf, period)
    |
    +--> dim_timeframe join
    |       |

@@ -53,7 +53,7 @@ def load_features(
     end: str,
 ) -> pd.DataFrame:
     """
-    Load feature rows from cmc_features for a single asset / timeframe window.
+    Load feature rows from features for a single asset / timeframe window.
 
     Args:
         engine: SQLAlchemy engine (use get_engine()).
@@ -68,7 +68,7 @@ def load_features(
     sql = text(
         """
         SELECT *
-        FROM cmc_features
+        FROM features
         WHERE id   = :id
           AND tf   = :tf
           AND ts  >= :start
@@ -95,7 +95,7 @@ def load_price_bars(
     end: str,
 ) -> pd.DataFrame:
     """
-    Load OHLCV price bars from cmc_price_bars_multi_tf.
+    Load OHLCV price bars from price_bars_multi_tf.
 
     Args:
         engine: SQLAlchemy engine (use get_engine()).
@@ -111,7 +111,7 @@ def load_price_bars(
     sql = text(
         """
         SELECT ts, open, high, low, close, volume
-        FROM cmc_price_bars_multi_tf
+        FROM price_bars_multi_tf
         WHERE id   = :id
           AND tf   = :tf
           AND ts  >= :start
@@ -138,7 +138,7 @@ def load_regimes(
     end: str,
 ) -> pd.DataFrame:
     """
-    Load regime rows from cmc_regimes for a single asset / timeframe window.
+    Load regime rows from regimes for a single asset / timeframe window.
 
     Args:
         engine: SQLAlchemy engine (use get_engine()).
@@ -154,7 +154,7 @@ def load_regimes(
     sql = text(
         """
         SELECT *
-        FROM cmc_regimes
+        FROM regimes
         WHERE id   = :id
           AND tf   = :tf
           AND ts  >= :start

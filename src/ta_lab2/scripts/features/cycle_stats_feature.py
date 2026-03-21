@@ -22,8 +22,12 @@ from typing import Optional
 import pandas as pd
 from sqlalchemy import Engine, text
 
+import logging
+
 from ta_lab2.scripts.features.base_feature import BaseFeature, FeatureConfig
 from ta_lab2.features.cycle import add_ath_cycle
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -31,7 +35,7 @@ class CycleStatsConfig(FeatureConfig):
     """Configuration for cycle stats computation."""
 
     feature_type: str = "cycle_stats"
-    output_table: str = "cmc_cycle_stats"
+    output_table: str = "cycle_stats"
     null_strategy: str = "skip"
     add_zscore: bool = False  # No z-scores on cycle metrics
 
@@ -43,16 +47,36 @@ class CycleStatsFeature(BaseFeature):
     Uses add_ath_cycle() from ta_lab2.features.cycle for core computation.
 
     Template method flow:
-    1. Load close + ts from cmc_price_bars_multi_tf_u
+    1. Load close + ts from price_bars_multi_tf_u
     2. Compute ATH, drawdown, cycle low per asset
     3. No z-scores or outlier flags (cumulative state, not windowed)
-    4. Write to cmc_cycle_stats
+    4. Write to cycle_stats
     """
 
     def __init__(self, engine: Engine, config: Optional[CycleStatsConfig] = None):
         if config is None:
             config = CycleStatsConfig()
         super().__init__(engine, config)
+
+    # -- Asset chunking to limit peak memory ---------------------------------
+    CHUNK_SIZE = 20
+
+    def compute_for_ids(
+        self,
+        ids: list[int],
+        start: Optional[str] = None,
+        end: Optional[str] = None,
+    ) -> int:
+        """Process in chunks of CHUNK_SIZE assets to limit peak memory."""
+        total = 0
+        for i in range(0, len(ids), self.CHUNK_SIZE):
+            chunk_ids = ids[i : i + self.CHUNK_SIZE]
+            logger.debug(
+                f"CycleStats chunk {i // self.CHUNK_SIZE + 1}: "
+                f"ids {chunk_ids[0]}..{chunk_ids[-1]} ({len(chunk_ids)} assets)"
+            )
+            total += super().compute_for_ids(chunk_ids, start, end)
+        return total
 
     def load_source_data(
         self,
@@ -74,18 +98,21 @@ class CycleStatsFeature(BaseFeature):
             "as_": self.get_alignment_source(),
         }
 
+        if self.config.venue_id is not None:
+            where_clauses.append("venue_id = :venue_id")
+            params["venue_id"] = self.config.venue_id
+
         where_sql = " AND ".join(where_clauses)
 
         sql = f"""
             SELECT
                 id,
                 {self.TS_COLUMN} AS ts,
-                venue,
-                venue_rank,
+                venue_id,
                 close
             FROM {self.SOURCE_TABLE}
             WHERE {where_sql}
-            ORDER BY id, venue, ts ASC
+            ORDER BY id, venue_id, ts ASC
         """
 
         with self.engine.connect() as conn:
@@ -100,7 +127,7 @@ class CycleStatsFeature(BaseFeature):
 
         results = []
 
-        for (id_val, venue_val), df_id in df_source.groupby(["id", "venue"]):
+        for (id_val, venue_id_val), df_id in df_source.groupby(["id", "venue_id"]):
             df_id = df_id.copy()
             df_id = df_id.sort_values("ts").reset_index(drop=True)
 
@@ -127,9 +154,8 @@ class CycleStatsFeature(BaseFeature):
             "id": "INTEGER NOT NULL",
             "ts": "TIMESTAMPTZ NOT NULL",
             "tf": "TEXT NOT NULL",
+            "venue_id": "SMALLINT NOT NULL DEFAULT 1",
             "alignment_source": "TEXT NOT NULL",
-            "venue": "TEXT NOT NULL DEFAULT 'CMC_AGG'",
-            "venue_rank": "INTEGER NOT NULL DEFAULT 50",
             "tf_days": "INTEGER NOT NULL",
             "close": "DOUBLE PRECISION",
             "ath": "DOUBLE PRECISION",

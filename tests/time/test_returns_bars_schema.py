@@ -1,7 +1,7 @@
 """
 test_returns_bars_schema.py
 
-Validation tests for the 5 cmc_returns_bars_* tables (wide-column, dual-LAG).
+Validation tests for the 5 returns_bars_* tables (wide-column, dual-LAG).
 Tests schema, data integrity, and referential constraints.
 
 Run:
@@ -22,11 +22,11 @@ from sqlalchemy import create_engine, text
 # ---------------------------------------------------------------------------
 
 RETURNS_TABLES = [
-    "cmc_returns_bars_multi_tf",
-    "cmc_returns_bars_multi_tf_cal_us",
-    "cmc_returns_bars_multi_tf_cal_iso",
-    "cmc_returns_bars_multi_tf_cal_anchor_us",
-    "cmc_returns_bars_multi_tf_cal_anchor_iso",
+    "returns_bars_multi_tf",
+    "returns_bars_multi_tf_cal_us",
+    "returns_bars_multi_tf_cal_iso",
+    "returns_bars_multi_tf_cal_anchor_us",
+    "returns_bars_multi_tf_cal_anchor_iso",
 ]
 
 TABLE_PK_COLS: dict[str, list[str]] = {
@@ -249,9 +249,9 @@ def test_returns_tf_in_dim_timeframe(engine, existing_tables, table):
     actual_tfs = set(tf_values)
     invalid_tfs = actual_tfs - valid_tfs
 
-    assert (
-        not invalid_tfs
-    ), f"TF values in {table} not found in dim_timeframe: {sorted(invalid_tfs)}"
+    assert not invalid_tfs, (
+        f"TF values in {table} not found in dim_timeframe: {sorted(invalid_tfs)}"
+    )
 
 
 @pytest.mark.parametrize("table", RETURNS_TABLES)

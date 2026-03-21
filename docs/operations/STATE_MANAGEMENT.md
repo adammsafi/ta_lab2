@@ -11,7 +11,7 @@ State management uses **watermarking** - tracking the last successfully processe
 
 ## State Tables
 
-### cmc_price_bars_1d_state
+### price_bars_1d_state
 
 Tracks state for 1D bar builder:
 
@@ -98,7 +98,7 @@ The unified refresh script checks bar freshness before running EMAs:
 -- Check bar freshness
 SELECT id, last_src_ts,
        EXTRACT(EPOCH FROM (now() - last_src_ts)) / 3600 as staleness_hours
-FROM cmc_price_bars_1d_state
+FROM price_bars_1d_state
 WHERE staleness_hours > threshold;
 ```
 
@@ -137,7 +137,7 @@ If bars are stale, EMAs are skipped for those IDs (or user is warned).
 
 ### Reset state for an ID
 ```sql
-DELETE FROM cmc_price_bars_1d_state WHERE id = 825;
+DELETE FROM price_bars_1d_state WHERE id = 825;
 -- Next run will do full history for ID 825
 ```
 
@@ -149,7 +149,7 @@ python run_daily_refresh.py --all --full-rebuild --ids 825
 ### Check state freshness
 ```sql
 SELECT id, last_src_ts, now() - last_src_ts as age
-FROM cmc_price_bars_1d_state
+FROM price_bars_1d_state
 ORDER BY age DESC;
 ```
 
@@ -157,7 +157,7 @@ ORDER BY age DESC;
 ```sql
 SELECT id, last_src_ts,
        EXTRACT(EPOCH FROM (now() - last_src_ts)) / 3600 as staleness_hours
-FROM cmc_price_bars_1d_state
+FROM price_bars_1d_state
 WHERE EXTRACT(EPOCH FROM (now() - last_src_ts)) / 3600 > 48
 ORDER BY staleness_hours DESC;
 ```
@@ -166,8 +166,8 @@ ORDER BY staleness_hours DESC;
 ```sql
 -- Bar state should match actual data
 SELECT s.id, s.last_src_ts, MAX(b."timestamp") as actual_max
-FROM cmc_price_bars_1d_state s
-LEFT JOIN cmc_price_bars_1d b ON s.id = b.id
+FROM price_bars_1d_state s
+LEFT JOIN price_bars_1d b ON s.id = b.id
 GROUP BY s.id, s.last_src_ts
 HAVING s.last_src_ts != MAX(b."timestamp");
 ```
@@ -175,5 +175,5 @@ HAVING s.last_src_ts != MAX(b."timestamp");
 ## See Also
 
 - [DAILY_REFRESH.md](DAILY_REFRESH.md) - Operational guide for daily refresh workflow
-- `sql/ddl/create_cmc_price_bars_1d_state.sql` - Bar state table DDL
+- `sql/ddl/create_price_bars_1d_state.sql` - Bar state table DDL
 - `sql/ddl/create_cmc_ema_refresh_state.sql` - EMA state table DDL

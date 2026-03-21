@@ -318,10 +318,10 @@ def _print_summary(results: List[StrategyResult]) -> None:
 
 
 def _get_asset_ids_from_db(engine, tf: str) -> List[int]:
-    """Discover all asset IDs that have cmc_features data for the given TF."""
+    """Discover all asset IDs that have features data for the given TF."""
     sql = text(
         """
-        SELECT DISTINCT id FROM public.cmc_features
+        SELECT DISTINCT id FROM public.features
         WHERE tf = :tf
         ORDER BY id
         """
@@ -350,7 +350,7 @@ def main() -> None:
     parser.add_argument(
         "--all-assets",
         action="store_true",
-        help="Run on all assets with cmc_features data for the given TF.",
+        help="Run on all assets with features data for the given TF.",
     )
     parser.add_argument(
         "--tf",

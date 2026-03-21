@@ -21,10 +21,10 @@ WITH idx AS (
   JOIN pg_namespace n ON n.oid = t.relnamespace
   WHERE n.nspname = 'public'
     AND t.relname IN (
-      'cmc_price_bars_multi_tf_cal_us',
-      'cmc_price_bars_multi_tf_cal_iso',
-      'cmc_price_bars_multi_tf_cal_anchor_us',
-      'cmc_price_bars_multi_tf_cal_anchor_iso'
+      'price_bars_multi_tf_cal_us',
+      'price_bars_multi_tf_cal_iso',
+      'price_bars_multi_tf_cal_anchor_us',
+      'price_bars_multi_tf_cal_anchor_iso'
     )
 )
 SELECT

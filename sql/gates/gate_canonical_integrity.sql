@@ -22,28 +22,28 @@ bars_canon_dupes AS (
           (t.id::text || '|' || t.tf || '|' || t.time_close::text) AS example_key,
           COUNT(*)::bigint AS cnt
       FROM (
-          SELECT 'public.cmc_price_bars_multi_tf' AS table_name, id, tf, time_close
-          FROM public.cmc_price_bars_multi_tf
+          SELECT 'public.price_bars_multi_tf' AS table_name, id, tf, time_close
+          FROM public.price_bars_multi_tf
           WHERE is_partial_end = FALSE
 
           UNION ALL
-          SELECT 'public.cmc_price_bars_multi_tf_cal_us', id, tf, time_close
-          FROM public.cmc_price_bars_multi_tf_cal_us
+          SELECT 'public.price_bars_multi_tf_cal_us', id, tf, time_close
+          FROM public.price_bars_multi_tf_cal_us
           WHERE is_partial_end = FALSE
 
           UNION ALL
-          SELECT 'public.cmc_price_bars_multi_tf_cal_iso', id, tf, time_close
-          FROM public.cmc_price_bars_multi_tf_cal_iso
+          SELECT 'public.price_bars_multi_tf_cal_iso', id, tf, time_close
+          FROM public.price_bars_multi_tf_cal_iso
           WHERE is_partial_end = FALSE
 
           UNION ALL
-          SELECT 'public.cmc_price_bars_multi_tf_cal_anchor_us', id, tf, time_close
-          FROM public.cmc_price_bars_multi_tf_cal_anchor_us
+          SELECT 'public.price_bars_multi_tf_cal_anchor_us', id, tf, time_close
+          FROM public.price_bars_multi_tf_cal_anchor_us
           WHERE is_partial_end = FALSE
 
           UNION ALL
-          SELECT 'public.cmc_price_bars_multi_tf_cal_anchor_iso', id, tf, time_close
-          FROM public.cmc_price_bars_multi_tf_cal_anchor_iso
+          SELECT 'public.price_bars_multi_tf_cal_anchor_iso', id, tf, time_close
+          FROM public.price_bars_multi_tf_cal_anchor_iso
           WHERE is_partial_end = FALSE
       ) t
       GROUP BY t.table_name, t.id, t.tf, t.time_close
@@ -59,28 +59,28 @@ bars_canon_null_close AS (
       COUNT(*)::bigint AS n_bad,
       MIN((t.id::text || '|' || t.tf)) AS example_key
   FROM (
-      SELECT 'public.cmc_price_bars_multi_tf' AS table_name, id, tf, time_close
-      FROM public.cmc_price_bars_multi_tf
+      SELECT 'public.price_bars_multi_tf' AS table_name, id, tf, time_close
+      FROM public.price_bars_multi_tf
       WHERE is_partial_end = FALSE
 
       UNION ALL
-      SELECT 'public.cmc_price_bars_multi_tf_cal_us', id, tf, time_close
-      FROM public.cmc_price_bars_multi_tf_cal_us
+      SELECT 'public.price_bars_multi_tf_cal_us', id, tf, time_close
+      FROM public.price_bars_multi_tf_cal_us
       WHERE is_partial_end = FALSE
 
       UNION ALL
-      SELECT 'public.cmc_price_bars_multi_tf_cal_iso', id, tf, time_close
-      FROM public.cmc_price_bars_multi_tf_cal_iso
+      SELECT 'public.price_bars_multi_tf_cal_iso', id, tf, time_close
+      FROM public.price_bars_multi_tf_cal_iso
       WHERE is_partial_end = FALSE
 
       UNION ALL
-      SELECT 'public.cmc_price_bars_multi_tf_cal_anchor_us', id, tf, time_close
-      FROM public.cmc_price_bars_multi_tf_cal_anchor_us
+      SELECT 'public.price_bars_multi_tf_cal_anchor_us', id, tf, time_close
+      FROM public.price_bars_multi_tf_cal_anchor_us
       WHERE is_partial_end = FALSE
 
       UNION ALL
-      SELECT 'public.cmc_price_bars_multi_tf_cal_anchor_iso', id, tf, time_close
-      FROM public.cmc_price_bars_multi_tf_cal_anchor_iso
+      SELECT 'public.price_bars_multi_tf_cal_anchor_iso', id, tf, time_close
+      FROM public.price_bars_multi_tf_cal_anchor_iso
       WHERE is_partial_end = FALSE
   ) t
   WHERE t.time_close IS NULL
@@ -105,28 +105,28 @@ ema_canon_dupes_non_u AS (
           (t.id::text || '|' || t.tf || '|' || t.period::text || '|' || t.ts::text) AS example_key,
           COUNT(*)::bigint AS cnt
       FROM (
-          SELECT 'public.cmc_ema_multi_tf' AS table_name, id, tf, period, ts
-          FROM public.cmc_ema_multi_tf
+          SELECT 'public.ema_multi_tf' AS table_name, id, tf, period, ts
+          FROM public.ema_multi_tf
           WHERE roll = FALSE
 
           UNION ALL
-          SELECT 'public.cmc_ema_multi_tf_cal_us', id, tf, period, ts
-          FROM public.cmc_ema_multi_tf_cal_us
+          SELECT 'public.ema_multi_tf_cal_us', id, tf, period, ts
+          FROM public.ema_multi_tf_cal_us
           WHERE roll = FALSE
 
           UNION ALL
-          SELECT 'public.cmc_ema_multi_tf_cal_iso', id, tf, period, ts
-          FROM public.cmc_ema_multi_tf_cal_iso
+          SELECT 'public.ema_multi_tf_cal_iso', id, tf, period, ts
+          FROM public.ema_multi_tf_cal_iso
           WHERE roll = FALSE
 
           UNION ALL
-          SELECT 'public.cmc_ema_multi_tf_cal_anchor_us', id, tf, period, ts
-          FROM public.cmc_ema_multi_tf_cal_anchor_us
+          SELECT 'public.ema_multi_tf_cal_anchor_us', id, tf, period, ts
+          FROM public.ema_multi_tf_cal_anchor_us
           WHERE roll = FALSE
 
           UNION ALL
-          SELECT 'public.cmc_ema_multi_tf_cal_anchor_iso', id, tf, period, ts
-          FROM public.cmc_ema_multi_tf_cal_anchor_iso
+          SELECT 'public.ema_multi_tf_cal_anchor_iso', id, tf, period, ts
+          FROM public.ema_multi_tf_cal_anchor_iso
           WHERE roll = FALSE
       ) t
       GROUP BY t.table_name, t.id, t.tf, t.period, t.ts
@@ -143,10 +143,10 @@ ema_canon_dupes_u AS (
       MIN(x.example_key) AS example_key
   FROM (
       SELECT
-          'public.cmc_ema_multi_tf_u' AS table_name,
+          'public.ema_multi_tf_u' AS table_name,
           (id::text || '|' || tf || '|' || period::text || '|' || ts::text || '|' || alignment_source) AS example_key,
           COUNT(*)::bigint AS cnt
-      FROM public.cmc_ema_multi_tf_u
+      FROM public.ema_multi_tf_u
       WHERE roll = FALSE
       GROUP BY id, tf, period, ts, alignment_source
       HAVING COUNT(*) > 1
@@ -170,24 +170,24 @@ ret_bars_dupes AS (
           (t.id::text || '|' || t.tf || '|' || t."timestamp"::text) AS example_key,
           COUNT(*)::bigint AS cnt
       FROM (
-          SELECT 'public.cmc_returns_bars_multi_tf' AS table_name, id, tf, "timestamp"
-          FROM public.cmc_returns_bars_multi_tf
+          SELECT 'public.returns_bars_multi_tf' AS table_name, id, tf, "timestamp"
+          FROM public.returns_bars_multi_tf
 
           UNION ALL
-          SELECT 'public.cmc_returns_bars_multi_tf_cal_us', id, tf, "timestamp"
-          FROM public.cmc_returns_bars_multi_tf_cal_us
+          SELECT 'public.returns_bars_multi_tf_cal_us', id, tf, "timestamp"
+          FROM public.returns_bars_multi_tf_cal_us
 
           UNION ALL
-          SELECT 'public.cmc_returns_bars_multi_tf_cal_iso', id, tf, "timestamp"
-          FROM public.cmc_returns_bars_multi_tf_cal_iso
+          SELECT 'public.returns_bars_multi_tf_cal_iso', id, tf, "timestamp"
+          FROM public.returns_bars_multi_tf_cal_iso
 
           UNION ALL
-          SELECT 'public.cmc_returns_bars_multi_tf_cal_anchor_us', id, tf, "timestamp"
-          FROM public.cmc_returns_bars_multi_tf_cal_anchor_us
+          SELECT 'public.returns_bars_multi_tf_cal_anchor_us', id, tf, "timestamp"
+          FROM public.returns_bars_multi_tf_cal_anchor_us
 
           UNION ALL
-          SELECT 'public.cmc_returns_bars_multi_tf_cal_anchor_iso', id, tf, "timestamp"
-          FROM public.cmc_returns_bars_multi_tf_cal_anchor_iso
+          SELECT 'public.returns_bars_multi_tf_cal_anchor_iso', id, tf, "timestamp"
+          FROM public.returns_bars_multi_tf_cal_anchor_iso
       ) t
       GROUP BY t.table_name, t.id, t.tf, t."timestamp"
       HAVING COUNT(*) > 1
@@ -211,24 +211,24 @@ ret_ema_dupes AS (
           (t.id::text || '|' || t.tf || '|' || t.period::text || '|' || t.ts::text) AS example_key,
           COUNT(*)::bigint AS cnt
       FROM (
-          SELECT 'public.cmc_returns_ema_multi_tf' AS table_name, id, tf, period, ts
-          FROM public.cmc_returns_ema_multi_tf
+          SELECT 'public.returns_ema_multi_tf' AS table_name, id, tf, period, ts
+          FROM public.returns_ema_multi_tf
 
           UNION ALL
-          SELECT 'public.cmc_returns_ema_multi_tf_cal_us', id, tf, period, ts
-          FROM public.cmc_returns_ema_multi_tf_cal_us
+          SELECT 'public.returns_ema_multi_tf_cal_us', id, tf, period, ts
+          FROM public.returns_ema_multi_tf_cal_us
 
           UNION ALL
-          SELECT 'public.cmc_returns_ema_multi_tf_cal_iso', id, tf, period, ts
-          FROM public.cmc_returns_ema_multi_tf_cal_iso
+          SELECT 'public.returns_ema_multi_tf_cal_iso', id, tf, period, ts
+          FROM public.returns_ema_multi_tf_cal_iso
 
           UNION ALL
-          SELECT 'public.cmc_returns_ema_multi_tf_cal_anchor_us', id, tf, period, ts
-          FROM public.cmc_returns_ema_multi_tf_cal_anchor_us
+          SELECT 'public.returns_ema_multi_tf_cal_anchor_us', id, tf, period, ts
+          FROM public.returns_ema_multi_tf_cal_anchor_us
 
           UNION ALL
-          SELECT 'public.cmc_returns_ema_multi_tf_cal_anchor_iso', id, tf, period, ts
-          FROM public.cmc_returns_ema_multi_tf_cal_anchor_iso
+          SELECT 'public.returns_ema_multi_tf_cal_anchor_iso', id, tf, period, ts
+          FROM public.returns_ema_multi_tf_cal_anchor_iso
       ) t
       GROUP BY t.table_name, t.id, t.tf, t.period, t.ts
       HAVING COUNT(*) > 1
@@ -248,10 +248,10 @@ ret_ema_u_dupes AS (
       MIN(x.example_key) AS example_key
   FROM (
       SELECT
-          'public.cmc_returns_ema_multi_tf_u' AS table_name,
+          'public.returns_ema_multi_tf_u' AS table_name,
           (id::text || '|' || tf || '|' || period::text || '|' || alignment_source || '|' || ts::text) AS example_key,
           COUNT(*)::bigint AS cnt
-      FROM public.cmc_returns_ema_multi_tf_u
+      FROM public.returns_ema_multi_tf_u
       GROUP BY id, tf, period, alignment_source, ts
       HAVING COUNT(*) > 1
   ) x

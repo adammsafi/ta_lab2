@@ -2,7 +2,7 @@
 """
 Run backtests from stored signals in database.
 
-This script loads signals from cmc_signals_* tables and executes backtests
+This script loads signals from signals_* tables and executes backtests
 using vectorbt via the SignalBacktester class.
 
 Supports:
@@ -126,7 +126,7 @@ def parse_args() -> argparse.Namespace:
     output_group.add_argument(
         "--save-results",
         action="store_true",
-        help="Store results in database (cmc_backtest_* tables)",
+        help="Store results in database (backtest_* tables)",
     )
     output_group.add_argument(
         "--output-json",

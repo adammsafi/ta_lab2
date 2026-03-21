@@ -2,7 +2,7 @@
 -- Phase 43: Exchange Integration
 --
 -- Stores spot price snapshots fetched from exchange REST APIs.
--- Compared against bar close prices from cmc_price_bars_multi_tf to detect
+-- Compared against bar close prices from price_bars_multi_tf to detect
 -- stale data or significant price divergences.
 --
 -- Authoritative migration: alembic/versions/b180d8d07a85_exchange_tables.py
@@ -30,14 +30,14 @@ CREATE TABLE IF NOT EXISTS public.exchange_price_feed (
     mid_price       NUMERIC,
     last_price      NUMERIC,
 
-    -- Most recent bar close from cmc_price_bars_multi_tf used for comparison
+    -- Most recent bar close from price_bars_multi_tf used for comparison
     bar_close       NUMERIC,
     bar_ts          TIMESTAMPTZ,
 
     -- Discrepancy: (mid_price - bar_close) / bar_close, expressed as a fraction
     discrepancy_pct NUMERIC,
 
-    -- Adaptive threshold at fetch time (scaled from cmc_asset_stats.std_ret_30)
+    -- Adaptive threshold at fetch time (scaled from asset_stats.std_ret_30)
     threshold_pct   NUMERIC,
 
     -- TRUE when ABS(discrepancy_pct) > threshold_pct

@@ -1,7 +1,7 @@
 """
 CLI to sweep stop-loss parameters (hard, trailing, time) across strategy/asset pairs.
 
-Loads price data from cmc_price_bars_multi_tf_u and entry/exit signals from the
+Loads price data from price_bars_multi_tf_u and entry/exit signals from the
 appropriate signal tables, then runs sweep_stops() for all combinations. Generates
 STOP_SIMULATION_REPORT.md, stop_heatmap.html chart, and optionally writes the
 optimal trailing stop threshold to dim_risk_limits via --write-to-db.
@@ -60,12 +60,12 @@ _DEFAULT_STRATEGIES = [
 _DEFAULT_ASSET_IDS = [1, 2]
 
 # Signal type -> signal table mapping
-# NOTE: RSI table is cmc_signals_rsi_mean_revert (NOT cmc_signals_rsi)
+# NOTE: RSI table is signals_rsi_mean_revert (NOT signals_rsi)
 _SIGNAL_TABLE_MAP = {
-    "ema_trend_17_77": "cmc_signals_ema_crossover",
-    "ema_trend_21_50": "cmc_signals_ema_crossover",
-    "rsi_mean_revert": "cmc_signals_rsi_mean_revert",
-    "breakout_atr": "cmc_signals_atr_breakout",
+    "ema_trend_17_77": "signals_ema_crossover",
+    "ema_trend_21_50": "signals_ema_crossover",
+    "rsi_mean_revert": "signals_rsi_mean_revert",
+    "breakout_atr": "signals_atr_breakout",
 }
 
 
@@ -100,7 +100,7 @@ def _fmt_threshold(stop_type: str, threshold: float) -> str:
 
 def _load_price(engine, asset_id: int) -> pd.Series:
     """
-    Load daily close prices from cmc_price_bars_multi_tf_u.
+    Load daily close prices from price_bars_multi_tf_u.
 
     Returns pd.Series with timestamp index and close values.
     The timestamp column is 'timestamp' (not 'ts') in this table.
@@ -108,7 +108,7 @@ def _load_price(engine, asset_id: int) -> pd.Series:
     sql = text(
         """
         SELECT timestamp AS ts, close
-        FROM public.cmc_price_bars_multi_tf_u
+        FROM public.price_bars_multi_tf_u
         WHERE id = :asset_id AND tf = '1D'
         ORDER BY timestamp
         """

@@ -14,7 +14,7 @@ snap AS (
     tf_days,
     time_open, time_close, time_high, time_low,
     open, high, low, close, volume, market_cap
-  FROM public.cmc_price_bars_multi_tf_snapshot_20251213
+  FROM public.price_bars_multi_tf_snapshot_20251213
 ),
 cur AS (
   SELECT
@@ -24,7 +24,7 @@ cur AS (
     tf_days,
     time_open, time_close, time_high, time_low,
     open, high, low, close, volume, market_cap
-  FROM public.cmc_price_bars_multi_tf
+  FROM public.price_bars_multi_tf
 )
 SELECT *
 FROM snap

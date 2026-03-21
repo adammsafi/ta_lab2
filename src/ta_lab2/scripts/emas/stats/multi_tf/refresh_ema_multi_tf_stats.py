@@ -3,7 +3,7 @@ from __future__ import annotations
 r"""
 refresh_ema_multi_tf_stats.py
 
-Stats runner for public.cmc_ema_multi_tf.
+Stats runner for public.ema_multi_tf.
 
 Incremental behavior:
 - Uses public.ema_multi_tf_stats_state as watermark store
@@ -11,7 +11,7 @@ Incremental behavior:
 - TF-level tests only for impacted TFs
 - Heartbeat updates updated_at even when no new data
 
-Design assumptions (public.cmc_ema_multi_tf) — SYNTHESIS:
+Design assumptions (public.ema_multi_tf) — SYNTHESIS:
 - roll=false = canonical closes for TF cadence
 - roll=true  = preview points on the daily grid between canonical closes, BUT the EMA builder
   may also emit preview points beyond the last canonical close (forward-filled ema_prev_bar).
@@ -53,7 +53,7 @@ from ta_lab2.scripts.bars.common_snapshot_contract import (
 )
 
 
-EMA_TABLE = "public.cmc_ema_multi_tf"
+EMA_TABLE = "public.ema_multi_tf"
 STATS_TABLE = "public.ema_multi_tf_stats"
 STATE_TABLE = "public.ema_multi_tf_stats_state"
 PRICE_TABLE = "public.cmc_price_histories7"
@@ -248,7 +248,7 @@ WITH d AS (
             FROM _impacted_keys k
             WHERE k.asset_id = e.id AND k.tf = e.tf AND k.period = e.period
         )
-        GROUP BY e.id, e.tf, e.period, e.ts
+        GROUP BY e.id, e.tf, e.period, e.ts, e.venue_id
     ) x
 )
 SELECT

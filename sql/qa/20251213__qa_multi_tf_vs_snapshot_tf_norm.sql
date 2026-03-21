@@ -1,7 +1,7 @@
 -- =============================================================================
 -- File: sql/qa/20251213__qa_multi_tf_vs_snapshot_tf_norm.sql
 -- Purpose:
---   Compare cmc_price_bars_multi_tf (current) vs snapshot_20251213 after applying
+--   Compare price_bars_multi_tf (current) vs snapshot_20251213 after applying
 --   a TF normalization mapping on the snapshot side.
 --
 -- Why:
@@ -20,11 +20,11 @@
 
 -- Quick peek helpers (optional)
 SELECT *
-FROM public.cmc_price_bars_multi_tf
+FROM public.price_bars_multi_tf
 LIMIT 10;
 
 SELECT *
-FROM public.cmc_price_bars_multi_tf_snapshot_20251213
+FROM public.price_bars_multi_tf_snapshot_20251213
 LIMIT 10;
 
 -- -----------------------------------------------------------------------------
@@ -46,7 +46,7 @@ snap AS (
     tf_days,
     time_open, time_close, time_high, time_low,
     open, high, low, close, volume, market_cap
-  FROM public.cmc_price_bars_multi_tf_snapshot_20251213
+  FROM public.price_bars_multi_tf_snapshot_20251213
 ),
 cur AS (
   SELECT
@@ -56,7 +56,7 @@ cur AS (
     tf_days,
     time_open, time_close, time_high, time_low,
     open, high, low, close, volume, market_cap
-  FROM public.cmc_price_bars_multi_tf
+  FROM public.price_bars_multi_tf
 )
 SELECT
   (SELECT COUNT(*) FROM snap) AS snap_rows,
@@ -81,7 +81,7 @@ snap AS (
     tf_days,
     time_open, time_close, time_high, time_low,
     open, high, low, close, volume, market_cap
-  FROM public.cmc_price_bars_multi_tf_snapshot_20251213
+  FROM public.price_bars_multi_tf_snapshot_20251213
 ),
 cur AS (
   SELECT
@@ -91,7 +91,7 @@ cur AS (
     tf_days,
     time_open, time_close, time_high, time_low,
     open, high, low, close, volume, market_cap
-  FROM public.cmc_price_bars_multi_tf
+  FROM public.price_bars_multi_tf
 )
 (
   SELECT * FROM snap
@@ -121,11 +121,11 @@ snap AS (
       WHEN '1Y_CAL'  THEN '365D'
       ELSE tf
     END AS tf_norm
-  FROM public.cmc_price_bars_multi_tf_snapshot_20251213
+  FROM public.price_bars_multi_tf_snapshot_20251213
 ),
 cur AS (
   SELECT DISTINCT tf AS tf_norm
-  FROM public.cmc_price_bars_multi_tf
+  FROM public.price_bars_multi_tf
 )
 SELECT 'in_snap_not_cur' AS side, tf_norm FROM snap
 EXCEPT
@@ -151,12 +151,12 @@ snap AS (
       ELSE tf
     END AS tf_norm,
     COUNT(*) AS n
-  FROM public.cmc_price_bars_multi_tf_snapshot_20251213
+  FROM public.price_bars_multi_tf_snapshot_20251213
   GROUP BY 1
 ),
 cur AS (
   SELECT tf AS tf_norm, COUNT(*) AS n
-  FROM public.cmc_price_bars_multi_tf
+  FROM public.price_bars_multi_tf
   GROUP BY 1
 )
 SELECT
@@ -187,7 +187,7 @@ snap AS (
     tf_days,
     time_open, time_close, time_high, time_low,
     open, high, low, close, volume, market_cap
-  FROM public.cmc_price_bars_multi_tf_snapshot_20251213
+  FROM public.price_bars_multi_tf_snapshot_20251213
 ),
 cur AS (
   SELECT
@@ -197,7 +197,7 @@ cur AS (
     tf_days,
     time_open, time_close, time_high, time_low,
     open, high, low, close, volume, market_cap
-  FROM public.cmc_price_bars_multi_tf
+  FROM public.price_bars_multi_tf
 ),
 joined AS (
   SELECT
@@ -240,7 +240,7 @@ snap AS (
     tf_days,
     time_open, time_close, time_high, time_low,
     open, high, low, close, volume, market_cap
-  FROM public.cmc_price_bars_multi_tf_snapshot_20251213
+  FROM public.price_bars_multi_tf_snapshot_20251213
 ),
 cur AS (
   SELECT
@@ -250,7 +250,7 @@ cur AS (
     tf_days,
     time_open, time_close, time_high, time_low,
     open, high, low, close, volume, market_cap
-  FROM public.cmc_price_bars_multi_tf
+  FROM public.price_bars_multi_tf
 )
 SELECT
   s.id, s.tf_norm, s.bar_seq,
@@ -301,7 +301,7 @@ snap AS (
     tf_days,
     time_open, time_close, time_high, time_low,
     open, high, low, close, volume, market_cap
-  FROM public.cmc_price_bars_multi_tf_snapshot_20251213
+  FROM public.price_bars_multi_tf_snapshot_20251213
 ),
 cur AS (
   SELECT
@@ -311,7 +311,7 @@ cur AS (
     tf_days,
     time_open, time_close, time_high, time_low,
     open, high, low, close, volume, market_cap
-  FROM public.cmc_price_bars_multi_tf
+  FROM public.price_bars_multi_tf
 ),
 bounds AS (
   SELECT

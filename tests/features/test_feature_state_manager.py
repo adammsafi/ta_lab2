@@ -24,7 +24,7 @@ class TestFeatureStateConfig(unittest.TestCase):
         config = FeatureStateConfig()
 
         assert config.state_schema == "public"
-        assert config.state_table == "cmc_feature_state"
+        assert config.state_table == "feature_state"
         assert config.feature_type == "returns"
         assert config.ts_column == "ts"
         assert config.id_column == "id"
@@ -88,14 +88,14 @@ class TestManagerInitialization(unittest.TestCase):
         """Verify __repr__ returns readable string with table info."""
         mock_engine = Mock()
         config = FeatureStateConfig(
-            state_schema="public", state_table="cmc_feature_state", feature_type="vol"
+            state_schema="public", state_table="feature_state", feature_type="vol"
         )
         manager = FeatureStateManager(mock_engine, config)
 
         repr_str = repr(manager)
 
         assert "FeatureStateManager" in repr_str
-        assert "public.cmc_feature_state" in repr_str
+        assert "public.feature_state" in repr_str
         assert "feature_type=vol" in repr_str
 
 
@@ -121,7 +121,7 @@ class TestEnsureStateTable(unittest.TestCase):
         call_args = mock_conn.execute.call_args
         sql_text = str(call_args[0][0])
         assert "CREATE TABLE IF NOT EXISTS" in sql_text
-        assert "cmc_feature_state" in sql_text
+        assert "feature_state" in sql_text
 
 
 class TestLoadState(unittest.TestCase):
@@ -333,7 +333,7 @@ class TestUpdateStateFromOutput(unittest.TestCase):
         manager = FeatureStateManager(mock_engine, config)
 
         rowcount = manager.update_state_from_output(
-            output_table="cmc_returns_daily",
+            output_table="returns_daily",
             output_schema="public",
             feature_name="b2t_pct",
         )
@@ -348,7 +348,7 @@ class TestUpdateStateFromOutput(unittest.TestCase):
         assert "INSERT INTO" in sql_text
         assert "ON CONFLICT" in sql_text
         assert "DO UPDATE SET" in sql_text
-        assert "cmc_returns_daily" in sql_text
+        assert "returns_daily" in sql_text
 
 
 class TestDirtyWindowComputation(unittest.TestCase):

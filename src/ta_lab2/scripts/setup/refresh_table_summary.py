@@ -25,33 +25,44 @@ RULES: list[tuple[str, str, str | None, str | None]] = [
     ("_stg_", "STG", None, None),
     # table_summary itself
     ("table_summary", "META", None, None),
+    # Alembic
+    ("alembic_version", "META", "ALEMBIC", None),
     # Backtest output
-    ("cmc_backtest_metrics", "BACKTEST", "METRICS", None),
-    ("cmc_backtest_runs", "BACKTEST", "RUNS", None),
-    ("cmc_backtest_trades", "BACKTEST", "TRADES", None),
+    ("backtest_metrics", "BACKTEST", "METRICS", None),
+    ("backtest_runs", "BACKTEST", "RUNS", None),
+    ("backtest_trades", "BACKTEST", "TRADES", None),
+    ("psr_results", "BACKTEST", "PSR", None),
+    ("strategy_bakeoff_results", "BACKTEST", "BAKEOFF", None),
     # Signals
-    ("cmc_signals_rsi", "SIGNAL", "RSI", None),
-    ("cmc_signals_ema", "SIGNAL", "EMA", None),
-    ("cmc_signals_atr", "SIGNAL", "ATR", None),
-    ("cmc_signal_state", "STATE", "SIGNAL", None),
+    ("signals_rsi", "SIGNAL", "RSI", None),
+    ("signals_ema", "SIGNAL", "EMA", None),
+    ("signals_atr", "SIGNAL", "ATR", None),
+    ("signal_state", "STATE", "SIGNAL", None),
     # Regime tables
-    ("cmc_regime_comovement", "REGIME", "COMOVEMENT", None),
-    ("cmc_regime_flips", "REGIME", "FLIPS", None),
-    ("cmc_regime_stats", "REGIME", "STATS", None),
-    ("cmc_regimes", "REGIME", None, None),
+    ("regime_comovement", "REGIME", "COMOVEMENT", None),
+    ("regime_flips", "REGIME", "FLIPS", None),
+    ("regime_stats", "REGIME", "STATS", None),
+    ("regimes", "REGIME", None, None),
     # QA / reject tables
     ("ema_rejects", "QA", "EMA", None),
     # Audit results
     ("audit_results", "QA", "AUDIT", None),
     # Stats state tables (before generic state)
-    ("cmc_features_stats_state", "STATE", "STATS", "FEATURE"),
+    ("features_stats_state", "STATE", "STATS", "FEATURE"),
     ("price_bars_multi_tf_stats_state", "STATE", "STATS", "BAR"),
     ("returns_ema_stats_state", "STATE", "STATS", "EMA"),
     ("ema_multi_tf_cal_anchor_stats_state", "STATE", "STATS", "EMA"),
     ("ema_multi_tf_cal_stats_state", "STATE", "STATS", "EMA"),
     ("ema_multi_tf_stats_state", "STATE", "STATS", "EMA"),
+    ("asset_stats_state", "STATE", "STATS", "ASSET"),
+    ("cross_asset_corr_state", "STATE", "CORR", None),
+    ("alternative_me_fear_greed_state", "STATE", "FEAR_GREED", None),
+    # Dim tables that store state (end with _state, so must be in STATE section)
+    ("dim_macro_gate_state", "STATE", "MACRO_GATE", None),
+    ("dim_risk_state", "STATE", "RISK", None),
+    ("macro_hysteresis_state", "STATE", "MACRO", None),
     # Stats tables
-    ("cmc_features_stats", "STATS", "FEATURE", None),
+    ("features_stats", "STATS", "FEATURE", None),
     ("price_bars_multi_tf_stats", "STATS", "BAR", None),
     ("returns_ema_stats", "STATS", "RETURN", "EMA"),
     ("ema_multi_tf_cal_anchor_stats", "STATS", "EMA", None),
@@ -59,38 +70,93 @@ RULES: list[tuple[str, str, str | None, str | None]] = [
     ("ema_multi_tf_stats", "STATS", "EMA", None),
     ("price_histories7_stats", "STATS", "PRICE", None),
     ("asset_data_coverage", "STATS", "COVERAGE", "ASSET"),
-    ("cmc_price_ranges", "STATS", "PRICE", "RANGE"),
+    ("price_ranges", "STATS", "PRICE", "RANGE"),
+    ("asset_stats", "STATS", "ASSET", None),
+    # State tables — returns from AMAs
+    ("returns_ama_multi_tf", "STATE", "RETURN", "AMA"),
     # State tables — returns from bars
-    (
-        "cmc_returns_bars_multi_tf",
-        "STATE",
-        "RETURN",
-        "BAR",
-    ),  # matched by _state suffix below
+    ("returns_bars_multi_tf", "STATE", "RETURN", "BAR"),
     # State tables — returns from EMAs
-    ("cmc_returns_ema_multi_tf", "STATE", "RETURN", "EMA"),
+    ("returns_ema_multi_tf", "STATE", "RETURN", "EMA"),
+    # State tables — AMAs
+    ("ama_multi_tf", "STATE", "AMA", None),
     # State tables — bars
-    ("cmc_price_bars_multi_tf", "STATE", "BAR", None),
-    ("cmc_price_bars_1d_state", "STATE", "BAR", None),
+    ("price_bars_multi_tf", "STATE", "BAR", None),
+    ("price_bars_1d_state", "STATE", "BAR", None),
     # State tables — EMAs
-    ("cmc_ema_multi_tf", "STATE", "EMA", None),
+    ("ema_multi_tf", "STATE", "EMA", None),
     # State tables — features/pipeline
-    ("cmc_feature_state", "STATE", "FEATURE", None),
+    ("feature_state", "STATE", "FEATURE", None),
     ("ta_lab2_pipeline_state", "STATE", "PIPELINE", None),
     # Feature tables
-    ("cmc_features", "FEATURE", None, None),
-    ("cmc_ta", "FEATURE", "TA", None),
-    ("cmc_vol", "FEATURE", "VOL", None),
-    # Return tables (before EMA/BAR to catch returns first)
-    ("cmc_returns_bars_multi_tf", "RETURN", "BAR", None),
-    ("cmc_returns_ema_multi_tf", "RETURN", "EMA", None),
+    ("features", "FEATURE", None, None),
+    ("ta", "FEATURE", "TA", None),
+    ("vol", "FEATURE", "VOL", None),
+    ("cycle_stats", "FEATURE", "CYCLE", None),
+    ("rolling_extremes", "FEATURE", "EXTREMES", None),
+    # Cross-asset / correlation
+    ("cross_asset_corr", "CORR", None, None),
+    ("cross_asset_agg", "CORR", "AGG", None),
+    ("codependence", "CORR", "CODEP", None),
+    # Return tables
+    ("returns_ama_multi_tf", "RETURN", "AMA", None),
+    ("returns_bars_multi_tf", "RETURN", "BAR", None),
+    ("returns_ema_multi_tf", "RETURN", "EMA", None),
+    # AMA tables
+    ("ama_multi_tf", "AMA", None, None),
     # EMA tables
-    ("cmc_ema_multi_tf", "EMA", None, None),
+    ("ema_multi_tf", "EMA", None, None),
     # Bar tables
-    ("cmc_price_bars_multi_tf", "BAR", None, None),
-    ("cmc_price_bars_1d", "BAR", None, None),
+    ("price_bars_multi_tf", "BAR", None, None),
+    ("price_bars_1d", "BAR", None, None),
     # Raw price data
     ("cmc_price_histories7", "PRICE", None, "BASE"),
+    ("tvc_price_histories", "PRICE", None, "BASE"),
+    # Execution / trading
+    ("orders", "EXEC", "ORDER", None),
+    ("fills", "EXEC", "FILL", None),
+    ("positions", "EXEC", "POSITION", None),
+    ("order_events", "EXEC", "EVENT", None),
+    ("order_dead_letter", "EXEC", "DLQ", None),
+    ("paper_orders", "EXEC", "PAPER", None),
+    ("executor_run_log", "EXEC", "LOG", None),
+    ("exchange_price_feed", "EXEC", "FEED", None),
+    # Risk
+    ("risk_events", "RISK", "EVENT", None),
+    ("risk_overrides", "RISK", "OVERRIDE", None),
+    # Drift
+    ("drift_metrics", "DRIFT", None, None),
+    # Hyperliquid (hyperliquid schema) — before PERP to avoid hl_funding_rates
+    # matching the generic funding_rates rule
+    ("hl_assets", "HL", "ASSET", None),
+    ("hl_candles", "HL", "CANDLE", None),
+    ("hl_funding_rates", "HL", "FUNDING", None),
+    ("hl_open_interest", "HL", "OI", None),
+    ("hl_oi_snapshots", "HL", "OI", "SNAPSHOT"),
+    ("sync_log", "HL", "SYNC", None),
+    # Perps / funding (public schema)
+    ("funding_rates", "PERP", "FUNDING", None),
+    ("funding_rate_agg", "PERP", "FUNDING", "AGG"),
+    ("margin_config", "PERP", "MARGIN", None),
+    ("perp_positions", "PERP", "POSITION", None),
+    # ML / labeling
+    ("ml_experiments", "ML", "EXPERIMENT", None),
+    ("triple_barrier_labels", "ML", "LABEL", None),
+    ("meta_label_results", "ML", "META_LABEL", None),
+    ("feature_experiments", "ML", "FEATURE_EXP", None),
+    ("ic_results", "ML", "IC", None),
+    # Portfolio
+    ("portfolio_allocations", "PORTFOLIO", None, None),
+    # Macro
+    ("macro_alert_log", "MACRO", "ALERT", None),
+    ("macro_hysteresis_state", "MACRO", "HYSTERESIS", None),
+    ("macro_lead_lag_results", "MACRO", "LEAD_LAG", None),
+    ("macro_stress_history", "MACRO", "STRESS", None),
+    ("macro_transition_probs", "MACRO", "TRANSITION", None),
+    # Market data (external sources)
+    ("alternative_me_fear_greed", "MARKET", "FEAR_GREED", None),
+    ("companiesmarketcap_assets", "MARKET", "MCAP", None),
+    ("companiesmarketcap_assets_runs", "MARKET", "MCAP", "RUNS"),
     # Reference / dimension tables
     ("dim_timeframe_period", "REF", "TIME", None),
     ("dim_timeframe", "REF", "TIME", None),
@@ -98,8 +164,19 @@ RULES: list[tuple[str, str, str | None, str | None]] = [
     ("dim_period", "REF", "TIME", None),
     ("dim_indicators", "REF", "FEATURE", None),
     ("dim_features", "REF", "FEATURE", None),
+    ("dim_feature_registry", "REF", "FEATURE", "REGISTRY"),
     ("dim_signals", "REF", "SIGNAL", None),
     ("dim_assets", "REF", "ASSET", None),
+    ("dim_asset_identifiers", "REF", "ASSET", "ID"),
+    ("dim_listings", "REF", "ASSET", "LISTING"),
+    ("dim_venues", "REF", "VENUE", None),
+    ("dim_ama_params", "REF", "AMA", None),
+    ("dim_executor_config", "REF", "EXEC", None),
+    ("dim_risk_limits", "REF", "RISK", None),
+    ("dim_risk_state", "REF", "RISK", "STATE"),
+    ("dim_macro_events", "REF", "MACRO", None),
+    ("dim_macro_gate_overrides", "REF", "MACRO", "OVERRIDE"),
+    ("dim_macro_gate_state", "REF", "MACRO", "STATE"),
     ("ema_alpha_lookup", "REF", "EMA", None),
     ("ema_alpha_lut_old", "REF", "EMA", None),
     ("cusip_ticker", "REF", "EQUITY", None),
@@ -173,9 +250,9 @@ def refresh(dry_run: bool = False) -> None:
                     WHERE c.table_schema = t.table_schema
                     AND c.table_name = t.table_name) as col_count
             FROM information_schema.tables t
-            WHERE t.table_schema = 'public'
+            WHERE t.table_schema IN ('public', 'hyperliquid')
             AND t.table_type = 'BASE TABLE'
-            ORDER BY t.table_name
+            ORDER BY t.table_schema, t.table_name
         """
             )
         ).fetchall()
@@ -188,7 +265,7 @@ def refresh(dry_run: bool = False) -> None:
             # Get row count
             try:
                 row_count = conn.execute(
-                    text(f'SELECT count(*) FROM public."{tname}"')
+                    text(f'SELECT count(*) FROM {schema}."{tname}"')
                 ).scalar()
             except Exception:
                 row_count = None

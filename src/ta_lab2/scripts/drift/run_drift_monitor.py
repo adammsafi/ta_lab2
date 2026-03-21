@@ -2,7 +2,7 @@
 """Daily drift monitor -- run parallel backtest replay and compute drift metrics.
 
 Compares paper executor P&L against backtest replays for all active strategies.
-Writes drift metrics to cmc_drift_metrics and activates drift pause when
+Writes drift metrics to drift_metrics and activates drift pause when
 threshold breaches are detected.
 
 Usage:

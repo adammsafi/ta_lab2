@@ -4,9 +4,9 @@ DB-backed regime flip detection and writing.
 
 Detects regime transitions (flips) per (id, tf) group across the composite
 regime key and individual L0/L1/L2 layer columns. Writes results to the
-``cmc_regime_flips`` table using scoped DELETE + INSERT.
+``regime_flips`` table using scoped DELETE + INSERT.
 
-Table Schema (from sql/regimes/081_cmc_regime_flips.sql):
+Table Schema (from sql/regimes/081_regime_flips.sql):
     PK: (id, ts, tf, layer)
     Columns: old_regime (TEXT NULL), new_regime (TEXT NOT NULL),
              duration_bars (INTEGER NULL), updated_at (TIMESTAMPTZ)
@@ -19,7 +19,7 @@ Layers detected:
 
 Exports:
     detect_regime_flips: Pure function, DataFrame in -> DataFrame out
-    write_flips_to_db: Write flip records to cmc_regime_flips with scoped DELETE + INSERT
+    write_flips_to_db: Write flip records to regime_flips with scoped DELETE + INSERT
 """
 
 from __future__ import annotations
@@ -72,17 +72,33 @@ def detect_regime_flips(regime_df: pd.DataFrame) -> pd.DataFrame:
         - Skips NaN regime values (missing labels are not counted as flips).
         - Returns consistent column schema even when regime_df is empty.
     """
-    out_cols = ["id", "ts", "tf", "layer", "old_regime", "new_regime", "duration_bars"]
+    out_cols = [
+        "id",
+        "venue_id",
+        "ts",
+        "tf",
+        "layer",
+        "old_regime",
+        "new_regime",
+        "duration_bars",
+    ]
 
     if regime_df.empty:
         return pd.DataFrame(columns=out_cols)
 
+    # Ensure venue_id column exists (backward compatibility)
+    if "venue_id" not in regime_df.columns:
+        regime_df = regime_df.copy()
+        regime_df["venue_id"] = 1
+
     # Ensure sorted for correct shift() behavior
-    df = regime_df.sort_values(["id", "tf", "ts"]).reset_index(drop=True)
+    df = regime_df.sort_values(["id", "venue_id", "tf", "ts"]).reset_index(drop=True)
 
     all_flips: list[pd.DataFrame] = []
 
-    for (asset_id, tf), group in df.groupby(["id", "tf"], sort=False):
+    for (asset_id, venue_id, tf), group in df.groupby(
+        ["id", "venue_id", "tf"], sort=False
+    ):
         group = group.reset_index(drop=True)
 
         for layer, col_candidates in _LAYER_COLUMN_CANDIDATES.items():
@@ -131,6 +147,7 @@ def detect_regime_flips(regime_df: pd.DataFrame) -> pd.DataFrame:
                 rows.append(
                     {
                         "id": int(asset_id),
+                        "venue_id": int(venue_id),
                         "ts": valid_group["ts"].iloc[idx],
                         "tf": tf,
                         "layer": layer,
@@ -163,7 +180,7 @@ def write_flips_to_db(
     tf: Optional[str] = None,
 ) -> int:
     """
-    Write flip records to ``cmc_regime_flips`` using scoped DELETE + INSERT.
+    Write flip records to ``regime_flips`` using scoped DELETE + INSERT.
 
     The scope is determined by ``ids`` and ``tf`` parameters. If not provided,
     they are derived from the DataFrame itself. The scoped DELETE ensures
@@ -199,12 +216,20 @@ def write_flips_to_db(
             )
         tf = str(unique_tfs[0])
 
+    # Determine venue_id scope from data
+    venue_ids = (
+        sorted(flips_df["venue_id"].unique().tolist())
+        if "venue_id" in flips_df.columns
+        else [1]
+    )
+
     # Prepare records
     records = []
     for _, row in flips_df.iterrows():
         records.append(
             {
                 "id": int(row["id"]),
+                "venue_id": int(row["venue_id"]) if "venue_id" in row.index else 1,
                 "ts": row["ts"],
                 "tf": str(row["tf"]),
                 "layer": str(row["layer"]),
@@ -220,11 +245,11 @@ def write_flips_to_db(
 
     insert_sql = text(
         """
-        INSERT INTO public.cmc_regime_flips
-            (id, ts, tf, layer, old_regime, new_regime, duration_bars, updated_at)
+        INSERT INTO public.regime_flips
+            (id, venue_id, ts, tf, layer, old_regime, new_regime, duration_bars, updated_at)
         VALUES
-            (:id, :ts, :tf, :layer, :old_regime, :new_regime, :duration_bars, now())
-        ON CONFLICT (id, ts, tf, layer) DO UPDATE
+            (:id, :venue_id, :ts, :tf, :layer, :old_regime, :new_regime, :duration_bars, now())
+        ON CONFLICT (id, venue_id, ts, tf, layer) DO UPDATE
             SET old_regime    = EXCLUDED.old_regime,
                 new_regime    = EXCLUDED.new_regime,
                 duration_bars = EXCLUDED.duration_bars,
@@ -234,13 +259,15 @@ def write_flips_to_db(
 
     delete_sql = text(
         """
-        DELETE FROM public.cmc_regime_flips
-        WHERE id = ANY(:ids) AND tf = :tf
+        DELETE FROM public.regime_flips
+        WHERE id = ANY(:ids) AND tf = :tf AND venue_id = ANY(:venue_ids)
         """
     )
 
     with engine.begin() as conn:
-        deleted = conn.execute(delete_sql, {"ids": ids, "tf": tf})
+        deleted = conn.execute(
+            delete_sql, {"ids": ids, "tf": tf, "venue_ids": venue_ids}
+        )
         logger.debug(
             "write_flips_to_db: deleted %d existing rows for ids=%s tf=%s",
             deleted.rowcount,

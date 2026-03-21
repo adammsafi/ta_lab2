@@ -84,10 +84,12 @@ class AMAWorkerTask:
     output_schema: str
     output_table: str
     bars_schema: str = "public"
-    bars_table: str = "cmc_price_bars_multi_tf"
+    bars_table: str = "price_bars_multi_tf_u"
     tf_subset: Optional[list[str]] = None
     full_rebuild: bool = False
     extra_config: dict[str, Any] = field(default_factory=dict)
+    venue_id: int = 1
+    alignment_source: Optional[str] = None  # Set for _u table writes
 
 
 # =============================================================================
@@ -123,6 +125,7 @@ def _ama_worker(task: AMAWorkerTask) -> int:
             param_sets=task.param_sets,
             output_schema=task.output_schema,
             output_table=task.output_table,
+            alignment_source=task.alignment_source,
         )
         feature = MultiTFAMAFeature(
             engine=engine,
@@ -153,31 +156,45 @@ def _ama_worker(task: AMAWorkerTask) -> int:
             return 0
 
         total_rows = 0
+        state_updates: list[dict] = []
+
+        # Preload ALL bars for this asset in 1 query (avoids per-TF DB queries)
+        feature.preload_all_bars(engine, task.asset_id, task.venue_id)
+
+        # Load ALL states for this asset in 1 query (instead of per-param-set per-TF)
+        if not task.full_rebuild:
+            all_states = state_manager.load_all_states(task.asset_id, task.venue_id)
+            ps_keys = {(ps.indicator, ps.params_hash) for ps in task.param_sets}
+        else:
+            all_states = pd.DataFrame()
 
         for tf_spec in tf_specs:
             # Determine start_ts from state (or None for full history)
             if task.full_rebuild:
                 start_ts = None
             else:
-                # Find the minimum last_canonical_ts across all param_sets for this TF
-                # This ensures we recompute any param_set that has fallen behind
-                min_watermark: Optional[pd.Timestamp] = None
-                for ps in task.param_sets:
-                    wm = state_manager.load_state(
-                        asset_id=task.asset_id,
-                        tf=tf_spec.tf,
-                        indicator=ps.indicator,
-                        params_hash=ps.params_hash,
+                tf_states = (
+                    all_states[all_states["tf"] == tf_spec.tf]
+                    if not all_states.empty
+                    else all_states
+                )
+                if tf_states.empty:
+                    start_ts = None
+                else:
+                    # Check all param_sets have state for this TF
+                    existing = set(
+                        zip(tf_states["indicator"], tf_states["params_hash"])
                     )
-                    if wm is None:
-                        # At least one param_set has no state — do full history
-                        min_watermark = None
-                        break
-                    wm_ts = pd.Timestamp(wm)
-                    if min_watermark is None or wm_ts < min_watermark:
-                        min_watermark = wm_ts
-
-                start_ts = min_watermark
+                    if not ps_keys.issubset(existing):
+                        start_ts = None  # Missing param_set → full history
+                    else:
+                        # Filter to only our param_sets and take min watermark
+                        mask = tf_states.apply(
+                            lambda r: (r["indicator"], r["params_hash"]) in ps_keys,
+                            axis=1,
+                        )
+                        min_ts = tf_states.loc[mask, "last_canonical_ts"].min()
+                        start_ts = pd.Timestamp(min_ts) if pd.notna(min_ts) else None
 
             _logger.debug(
                 "asset_id=%s tf=%s start_ts=%s param_sets=%d",
@@ -194,6 +211,7 @@ def _ama_worker(task: AMAWorkerTask) -> int:
                 tf_days=tf_spec.tf_days,
                 param_sets=task.param_sets,
                 start_ts=start_ts,
+                venue_id=task.venue_id,
             )
 
             if df.empty:
@@ -212,7 +230,7 @@ def _ama_worker(task: AMAWorkerTask) -> int:
             )
             total_rows += rows
 
-            # Update state watermarks per param_set
+            # Collect state updates (batch write after TF loop)
             for ps in task.param_sets:
                 ps_mask = (df["indicator"] == ps.indicator) & (
                     df["params_hash"] == ps.params_hash
@@ -221,16 +239,23 @@ def _ama_worker(task: AMAWorkerTask) -> int:
                 if ps_df.empty:
                     continue
 
-                # Get most recent ts for this param_set
                 latest_ts = ps_df["ts"].max()
                 if pd.notna(latest_ts):
-                    state_manager.save_state(
-                        asset_id=task.asset_id,
-                        tf=tf_spec.tf,
-                        indicator=ps.indicator,
-                        params_hash=ps.params_hash,
-                        last_ts=pd.Timestamp(latest_ts).to_pydatetime(),
+                    state_updates.append(
+                        {
+                            "id": task.asset_id,
+                            "venue_id": task.venue_id,
+                            "tf": tf_spec.tf,
+                            "indicator": ps.indicator,
+                            "params_hash": ps.params_hash,
+                            "last_canonical_ts": pd.Timestamp(
+                                latest_ts
+                            ).to_pydatetime(),
+                        }
                     )
+
+        # Batch upsert all state watermarks in 1 DB call
+        state_manager.save_states_batch(state_updates)
 
         _logger.info(
             "asset_id=%s: wrote %d rows across %d TFs",
@@ -264,16 +289,16 @@ class BaseAMARefresher(ABC):
     Usage pattern (subclass):
         class MultiTFAMARefresher(BaseAMARefresher):
             def get_default_output_table(self):
-                return "cmc_ama_multi_tf"
+                return "ama_multi_tf"
             def get_default_state_table(self):
-                return "public.cmc_ama_multi_tf_state"
+                return "public.ama_multi_tf_state"
             def get_description(self):
-                return "Refresh cmc_ama_multi_tf from multi-TF bars."
+                return "Refresh ama_multi_tf from multi-TF bars."
 
     Command line usage:
-        python -m ta_lab2.scripts.amas.refresh_cmc_ama_multi_tf --ids 1 --tf 1D
-        python -m ta_lab2.scripts.amas.refresh_cmc_ama_multi_tf --ids all --all-tfs
-        python -m ta_lab2.scripts.amas.refresh_cmc_ama_multi_tf --ids 1 --all-tfs \\
+        python -m ta_lab2.scripts.amas.refresh_ama_multi_tf --ids 1 --tf 1D
+        python -m ta_lab2.scripts.amas.refresh_ama_multi_tf --ids all --all-tfs
+        python -m ta_lab2.scripts.amas.refresh_ama_multi_tf --ids 1 --all-tfs \\
             --indicators KAMA --full-rebuild
     """
 
@@ -283,11 +308,11 @@ class BaseAMARefresher(ABC):
 
     @abstractmethod
     def get_default_output_table(self) -> str:
-        """Return default output table name (e.g. 'cmc_ama_multi_tf')."""
+        """Return default output table name (e.g. 'ama_multi_tf')."""
 
     @abstractmethod
     def get_default_state_table(self) -> str:
-        """Return default state table name (e.g. 'public.cmc_ama_multi_tf_state')."""
+        """Return default state table name (e.g. 'public.ama_multi_tf_state')."""
 
     @abstractmethod
     def get_description(self) -> str:
@@ -295,11 +320,19 @@ class BaseAMARefresher(ABC):
 
     def get_bars_table(self) -> str:
         """Return source bars table name. Override in calendar subclasses."""
-        return "cmc_price_bars_multi_tf"
+        return "price_bars_multi_tf_u"
 
     def get_bars_schema(self) -> str:
         """Return source bars schema. Override if needed."""
         return "public"
+
+    def get_alignment_source(self) -> Optional[str]:
+        """Return alignment_source value for _u table writes.
+
+        Override in concrete refreshers that target ama_multi_tf_u.
+        Default None means no alignment_source filter on bar reads (reads all variants).
+        """
+        return None
 
     # =========================================================================
     # CLI Entry Point
@@ -321,19 +354,19 @@ class BaseAMARefresher(ABC):
             epilog="""
 Examples:
   # Refresh asset 1 on 1D timeframe
-  python -m ta_lab2.scripts.amas.refresh_cmc_ama_multi_tf --ids 1 --tf 1D
+  python -m ta_lab2.scripts.amas.refresh_ama_multi_tf --ids 1 --tf 1D
 
   # Refresh all assets on all TFs (incremental by default)
-  python -m ta_lab2.scripts.amas.refresh_cmc_ama_multi_tf --ids all --all-tfs
+  python -m ta_lab2.scripts.amas.refresh_ama_multi_tf --ids all --all-tfs
 
   # KAMA only for assets 1 and 52
-  python -m ta_lab2.scripts.amas.refresh_cmc_ama_multi_tf --ids 1,52 --all-tfs --indicators KAMA
+  python -m ta_lab2.scripts.amas.refresh_ama_multi_tf --ids 1,52 --all-tfs --indicators KAMA
 
   # Full rebuild for asset 1
-  python -m ta_lab2.scripts.amas.refresh_cmc_ama_multi_tf --ids 1 --all-tfs --full-rebuild
+  python -m ta_lab2.scripts.amas.refresh_ama_multi_tf --ids 1 --all-tfs --full-rebuild
 
   # Dry run (no DB writes)
-  python -m ta_lab2.scripts.amas.refresh_cmc_ama_multi_tf --ids 1 --tf 1D --dry-run
+  python -m ta_lab2.scripts.amas.refresh_ama_multi_tf --ids 1 --tf 1D --dry-run
 """,
         )
 
@@ -349,6 +382,12 @@ Examples:
             "--ids",
             default="all",
             help="Comma-separated asset IDs (e.g. '1,52') or 'all' (default: all).",
+        )
+        p.add_argument(
+            "--venue-id",
+            type=int,
+            default=None,
+            help="Filter to IDs that have bars for this venue_id (e.g., 2 for HYPERLIQUID).",
         )
 
         # TF selection (mutually exclusive)
@@ -485,8 +524,12 @@ Examples:
         # Populate dim_ama_params (idempotent seed)
         populate_dim_ama_params(engine)
 
+        # Resolve venue_id
+        venue_id: int = getattr(args, "venue_id", None) or 1
+
         # Resolve IDs
-        ids = self._resolve_ids(args, db_url, engine, run_logger)
+        cli_venue_id = getattr(args, "venue_id", None)
+        ids = self._resolve_ids(args, db_url, engine, run_logger, venue_id=cli_venue_id)
         run_logger.info("Resolved %d asset IDs", len(ids))
 
         # Resolve param_sets (all or filtered by --indicators)
@@ -537,6 +580,8 @@ Examples:
                 bars_table=self.get_bars_table(),
                 tf_subset=tf_subset,
                 full_rebuild=getattr(args, "full_rebuild", False),
+                venue_id=venue_id,
+                alignment_source=self.get_alignment_source(),
             )
             for asset_id in ids
         ]
@@ -583,19 +628,66 @@ Examples:
         db_url: str,
         engine: Engine,
         run_logger: logging.Logger,
+        venue_id: Optional[int] = None,
     ) -> list[int]:
-        """Resolve asset IDs from --ids argument."""
+        """Resolve asset IDs from --ids argument, optionally filtered by venue_id."""
         ids_arg = getattr(args, "ids", "all").strip()
+        source_table = f"{self.get_bars_schema()}.{self.get_bars_table()}"
 
         if ids_arg.lower() == "all":
-            source_table = f"{self.get_bars_schema()}.{self.get_bars_table()}"
-            ids = load_all_ids(db_url, source_table)
-            run_logger.info("Loaded %d IDs from %s", len(ids), source_table)
+            if venue_id is not None:
+                ids = self._load_ids_for_venue(engine, source_table, venue_id)
+                run_logger.info(
+                    "Loaded %d IDs from %s for venue_id=%d",
+                    len(ids),
+                    source_table,
+                    venue_id,
+                )
+            else:
+                ids = load_all_ids(db_url, source_table)
+                run_logger.info("Loaded %d IDs from %s", len(ids), source_table)
             return ids
 
         # Comma-separated list
         ids = [int(x.strip()) for x in ids_arg.split(",") if x.strip()]
+
+        if venue_id is not None:
+            venue_ids = set(self._load_ids_for_venue(engine, source_table, venue_id))
+            before = len(ids)
+            ids = [i for i in ids if i in venue_ids]
+            run_logger.info(
+                "Filtered %d explicit IDs to %d for venue_id=%d",
+                before,
+                len(ids),
+                venue_id,
+            )
+
         return ids
+
+    def _load_ids_for_venue(
+        self,
+        engine: Engine,
+        source_table_fq: str,
+        venue_id: int,
+    ) -> list[int]:
+        """
+        Load distinct IDs from source table filtered by venue_id.
+
+        Args:
+            engine: SQLAlchemy engine.
+            source_table_fq: Fully-qualified source table (e.g., 'public.price_bars_multi_tf_u').
+            venue_id: Venue ID to filter by.
+
+        Returns:
+            Sorted list of IDs that have bars for the given venue_id.
+        """
+        sql = text(
+            f"SELECT DISTINCT id FROM {source_table_fq} "
+            f"WHERE venue_id = :venue_id ORDER BY id"
+        )
+        with engine.connect() as conn:
+            rows = conn.execute(sql, {"venue_id": venue_id}).fetchall()
+        return [int(r[0]) for r in rows]
 
     def _resolve_param_sets(
         self,

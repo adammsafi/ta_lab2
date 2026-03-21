@@ -66,12 +66,12 @@ python src/ta_lab2/scripts/bars/run_all_bar_builders.py --ids all
 ```
 
 This builds:
-- cmc_price_bars_1d (SQL-based, 7 assets × 1 TF)
-- cmc_price_bars_multi_tf (7 assets × 119 TF = 833 combos)
-- cmc_price_bars_multi_tf_cal_iso (calendar ISO)
-- cmc_price_bars_multi_tf_cal_us (calendar US)
-- cmc_price_bars_multi_tf_cal_anchor_iso (calendar anchor ISO)
-- cmc_price_bars_multi_tf_cal_anchor_us (calendar anchor US)
+- price_bars_1d (SQL-based, 7 assets × 1 TF)
+- price_bars_multi_tf (7 assets × 119 TF = 833 combos)
+- price_bars_multi_tf_cal_iso (calendar ISO)
+- price_bars_multi_tf_cal_us (calendar US)
+- price_bars_multi_tf_cal_anchor_iso (calendar anchor ISO)
+- price_bars_multi_tf_cal_anchor_us (calendar anchor US)
 
 #### Step 4: Build EMA Tables (~2 hours)
 
@@ -80,12 +80,12 @@ python src/ta_lab2/scripts/emas/run_all_ema_refreshes.py --ids all --periods all
 ```
 
 This builds:
-- cmc_ema_multi_tf (rolling EMAs)
-- cmc_ema_multi_tf_v2 (calendar EMAs)
-- cmc_ema_multi_tf_cal_iso (calendar ISO EMAs)
-- cmc_ema_multi_tf_cal_us (calendar US EMAs)
-- cmc_ema_multi_tf_cal_anchor_iso (calendar anchor ISO EMAs)
-- cmc_ema_multi_tf_cal_anchor_us (calendar anchor US EMAs)
+- ema_multi_tf (rolling EMAs)
+- ema_multi_tf_v2 (calendar EMAs)
+- ema_multi_tf_cal_iso (calendar ISO EMAs)
+- ema_multi_tf_cal_us (calendar US EMAs)
+- ema_multi_tf_cal_anchor_iso (calendar anchor ISO EMAs)
+- ema_multi_tf_cal_anchor_us (calendar anchor US EMAs)
 
 ## Verification
 
@@ -94,11 +94,11 @@ After rebuild completes, verify row counts:
 ```bash
 python -m ta_lab2.tools.dbtool query "
 SELECT
-    'cmc_price_bars_multi_tf' as table_name,
+    'price_bars_multi_tf' as table_name,
     COUNT(*) as rows,
     COUNT(DISTINCT id) as assets,
     COUNT(DISTINCT tf) as timeframes
-FROM cmc_price_bars_multi_tf
+FROM price_bars_multi_tf
 "
 ```
 
@@ -110,11 +110,11 @@ FROM cmc_price_bars_multi_tf
 ```bash
 python -m ta_lab2.tools.dbtool query "
 SELECT
-    'cmc_ema_multi_tf' as table_name,
+    'ema_multi_tf' as table_name,
     COUNT(*) as rows,
     COUNT(DISTINCT id) as assets,
     COUNT(DISTINCT period) as periods
-FROM cmc_ema_multi_tf
+FROM ema_multi_tf
 "
 ```
 
@@ -144,12 +144,12 @@ python src/ta_lab2/scripts/emas/run_all_ema_refreshes.py --ids all --periods all
 
 **Just one bar builder:**
 ```bash
-python src/ta_lab2/scripts/bars/refresh_cmc_price_bars_multi_tf.py --ids all --full-rebuild
+python src/ta_lab2/scripts/bars/refresh_price_bars_multi_tf.py --ids all --full-rebuild
 ```
 
 **Just one EMA refresher:**
 ```bash
-python src/ta_lab2/scripts/emas/refresh_cmc_ema_multi_tf.py --ids all --periods all --full-refresh
+python src/ta_lab2/scripts/emas/refresh_ema_multi_tf.py --ids all --periods all --full-refresh
 ```
 
 ## Notes

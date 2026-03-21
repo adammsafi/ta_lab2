@@ -2,15 +2,15 @@
 regime_inspect.py - DB-backed regime inspection CLI tool.
 
 Provides ad-hoc inspection of regime state for any asset, reading from the
-cmc_regimes, cmc_regime_flips, and cmc_regime_stats tables.
+regimes, regime_flips, and regime_stats tables.
 
-Default mode queries the latest regime row from cmc_regimes and prints a
+Default mode queries the latest regime row from regimes and prints a
 formatted summary of the active layers, labels, and resolved policy.
 
 Optional modes:
   --live    Compute regime on-the-fly via compute_regimes_for_id (not stored)
   --history Show last N days of regime history as a table
-  --flips   Show recent regime transitions from cmc_regime_flips
+  --flips   Show recent regime transitions from regime_flips
 
 Usage:
     python -m ta_lab2.scripts.regimes.regime_inspect --id 1
@@ -84,7 +84,7 @@ def _lookup_asset_symbol(engine, asset_id: int) -> str:
 
 def show_latest(engine, asset_id: int, tf: str, verbose: bool) -> int:
     """
-    Query and display the latest regime row from cmc_regimes.
+    Query and display the latest regime row from regimes.
 
     Returns 0 on success, 1 on error.
     """
@@ -99,7 +99,7 @@ def show_latest(engine, asset_id: int, tf: str, verbose: bool) -> int:
             feature_tier,
             regime_version_hash,
             updated_at
-        FROM public.cmc_regimes
+        FROM public.regimes
         WHERE id = :id AND tf = :tf
         ORDER BY ts DESC
         LIMIT 1
@@ -111,13 +111,13 @@ def show_latest(engine, asset_id: int, tf: str, verbose: bool) -> int:
             result = conn.execute(sql, {"id": asset_id, "tf": tf})
             row = result.fetchone()
     except Exception as exc:
-        print(f"[ERROR] Failed to query cmc_regimes: {exc}")
+        print(f"[ERROR] Failed to query regimes: {exc}")
         return 1
 
     if row is None:
         print(f"[WARNING] No regime data found for id={asset_id} tf={tf}")
         print(
-            "         Run: python -m ta_lab2.scripts.regimes.refresh_cmc_regimes --ids {asset_id}"
+            "         Run: python -m ta_lab2.scripts.regimes.refresh_regimes --ids {asset_id}"
         )
         return 1
 
@@ -182,7 +182,7 @@ def show_live(engine, asset_id: int, tf: str, verbose: bool) -> int:
 
     Returns 0 on success, 1 on error.
     """
-    from ta_lab2.scripts.regimes.refresh_cmc_regimes import compute_regimes_for_id
+    from ta_lab2.scripts.regimes.refresh_regimes import compute_regimes_for_id
 
     print(f"\n[LIVE] Computing regime for id={asset_id} tf={tf} (not stored)...")
 
@@ -227,14 +227,14 @@ def show_live(engine, asset_id: int, tf: str, verbose: bool) -> int:
 
 def show_history(engine, asset_id: int, tf: str, n_days: int, verbose: bool) -> int:
     """
-    Show last N days of regime history from cmc_regimes as a table.
+    Show last N days of regime history from regimes as a table.
 
     Returns 0 on success, 1 on error.
     """
     sql = text(
         """
         SELECT ts, regime_key, size_mult, stop_mult, orders, gross_cap
-        FROM public.cmc_regimes
+        FROM public.regimes
         WHERE id = :id AND tf = :tf
         ORDER BY ts DESC
         LIMIT :n
@@ -245,7 +245,7 @@ def show_history(engine, asset_id: int, tf: str, n_days: int, verbose: bool) -> 
         with engine.connect() as conn:
             df = pd.read_sql(sql, conn, params={"id": asset_id, "tf": tf, "n": n_days})
     except Exception as exc:
-        print(f"[ERROR] Failed to query cmc_regimes history: {exc}")
+        print(f"[ERROR] Failed to query regimes history: {exc}")
         return 1
 
     if df.empty:
@@ -303,14 +303,14 @@ def show_history(engine, asset_id: int, tf: str, n_days: int, verbose: bool) -> 
 
 def show_flips(engine, asset_id: int, tf: str, verbose: bool) -> int:
     """
-    Show recent regime transitions from cmc_regime_flips.
+    Show recent regime transitions from regime_flips.
 
     Returns 0 on success, 1 on error.
     """
     sql = text(
         """
         SELECT ts, layer, old_regime, new_regime, duration_bars
-        FROM public.cmc_regime_flips
+        FROM public.regime_flips
         WHERE id = :id AND tf = :tf
         ORDER BY ts DESC
         LIMIT 20
@@ -321,7 +321,7 @@ def show_flips(engine, asset_id: int, tf: str, verbose: bool) -> int:
         with engine.connect() as conn:
             df = pd.read_sql(sql, conn, params={"id": asset_id, "tf": tf})
     except Exception as exc:
-        print(f"[ERROR] Failed to query cmc_regime_flips: {exc}")
+        print(f"[ERROR] Failed to query regime_flips: {exc}")
         return 1
 
     if df.empty:
@@ -413,12 +413,12 @@ def main(argv: Optional[list[str]] = None) -> int:
         type=int,
         default=None,
         metavar="N",
-        help="Show last N days of regime history from cmc_regimes.",
+        help="Show last N days of regime history from regimes.",
     )
     parser.add_argument(
         "--flips",
         action="store_true",
-        help="Show recent regime transitions from cmc_regime_flips (last 20).",
+        help="Show recent regime transitions from regime_flips (last 20).",
     )
     parser.add_argument(
         "--db-url",

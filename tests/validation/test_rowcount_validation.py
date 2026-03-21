@@ -74,7 +74,7 @@ class TestStrictRowcountValidation:
         mock_conn.execute.side_effect = [mock_result1, mock_result2]
 
         issues = validator.check_rowcounts(
-            table="cmc_returns_daily",
+            table="returns_daily",
             ids=[1],
         )
 
@@ -198,7 +198,7 @@ class TestRowcountReporting:
         from ta_lab2.scripts.features.validate_features import RowcountIssue
 
         issue = RowcountIssue(
-            table="cmc_returns_daily",
+            table="returns_daily",
             id_=1,
             expected=100,
             actual=95,
@@ -206,6 +206,6 @@ class TestRowcountReporting:
         )
 
         # Message should include key info
-        assert "cmc_returns_daily" in issue.message
+        assert "returns_daily" in issue.message
         assert "95" in issue.message
         assert "100" in issue.message

@@ -26,8 +26,8 @@ You will work mostly with:
 - **`cmc_price_histories7`** table (raw daily prices in the database)
 - **EMA tables**:
   - `cmc_ema_daily`
-  - `cmc_ema_multi_tf`
-  - `cmc_ema_multi_tf_cal`
+  - `ema_multi_tf`
+  - `ema_multi_tf_cal`
 
 ---
 
@@ -265,8 +265,8 @@ If everything looks good, you can move on to updating EMAs.
 There are three EMA layers to update, and for each one you should **run its stats immediately after the refresh finishes**, before moving on to the next layer:
 
 1. **Daily EMAs:** `cmc_ema_daily`
-2. **Multi-timeframe EMAs (price-based):** `cmc_ema_multi_tf`
-3. **Multi-timeframe EMAs (calendar-aligned):** `cmc_ema_multi_tf_cal`
+2. **Multi-timeframe EMAs (price-based):** `ema_multi_tf`
+3. **Multi-timeframe EMAs (calendar-aligned):** `ema_multi_tf_cal`
 
 The recommended order is:
 
@@ -327,14 +327,14 @@ Only after the daily EMA stats look good should you move on to the multi-timefra
 
 ---
 
-### 8.2 Multi-timeframe EMAs (price-based) (`cmc_ema_multi_tf`)
+### 8.2 Multi-timeframe EMAs (price-based) (`ema_multi_tf`)
 
 #### 8.2.1 Run the multi-timeframe EMA refresh script
 
 1. Open the multi-timeframe EMA refresh script. For example:
 
    ```text
-   C:\Users\asafi\Downloads\ta_lab2\src\ta_lab2\scripts\emas\refresh_cmc_ema_multi_tf_only.py
+   C:\Users\asafi\Downloads\ta_lab2\src\ta_lab2\scripts\emas\refresh_ema_multi_tf_only.py
    ```
 
 2. Make sure the script is configured to:
@@ -344,12 +344,12 @@ Only after the daily EMA stats look good should you move on to the multi-timefra
    - Run in incremental “dirty-window” mode so that it:
 
      - Recomputes from a small window (for example, the last week or so).
-     - Upserts rows into `cmc_ema_multi_tf` for the new date range.
+     - Upserts rows into `ema_multi_tf` for the new date range.
      - Does **not** touch old history beyond that window.
 
 3. Run the script and watch the logs for each asset:
 
-   - You should see each asset listed with messages like *“extending cmc_ema_multi_tf from [last_multi_ts] through end=None”*.
+   - You should see each asset listed with messages like *“extending ema_multi_tf from [last_multi_ts] through end=None”*.
    - You should see per-asset row counts summarizing how many rows were inserted/updated.
 
 4. If anything looks off (for example, extremely large row counts or errors), stop and investigate.
@@ -384,7 +384,7 @@ Immediately after the multi-timeframe EMA refresh completes:
 
 ---
 
-### 8.3 Multi-timeframe EMAs (calendar-aligned) (`cmc_ema_multi_tf_cal`)
+### 8.3 Multi-timeframe EMAs (calendar-aligned) (`ema_multi_tf_cal`)
 
 This table uses calendar-aligned timeframes (for example, month-end, quarter-end, etc.).
 
@@ -393,7 +393,7 @@ This table uses calendar-aligned timeframes (for example, month-end, quarter-end
 1. Open the calendar multi-timeframe EMA refresh script:
 
    ```text
-   C:\Users\asafi\Downloads\ta_lab2\src\ta_lab2\scripts\emas\refresh_cmc_ema_multi_tf_cal_only.py
+   C:\Users\asafi\Downloads\ta_lab2\src\ta_lab2\scripts\emas\refresh_ema_multi_tf_cal_only.py
    ```
 
 2. Make sure it is configured for:
@@ -404,7 +404,7 @@ This table uses calendar-aligned timeframes (for example, month-end, quarter-end
 3. Run the script and confirm logs show:
 
    - The incremental dirty-window start date.
-   - Per-asset row counts upserted into `cmc_ema_multi_tf_cal`.
+   - Per-asset row counts upserted into `ema_multi_tf_cal`.
 
 #### 8.3.2 Run the calendar multi-timeframe EMA stats
 
@@ -454,8 +454,8 @@ Once all checks look good, update your operational record of how “fresh” the
    - Latest `timeclose` date for `cmc_price_histories7`
    - Latest timestamps and row counts for:
      - `cmc_ema_daily`
-     - `cmc_ema_multi_tf`
-     - `cmc_ema_multi_tf_cal`
+     - `ema_multi_tf`
+     - `ema_multi_tf_cal`
 
 4. Save the file and commit it to Git along with any updated SQL and script files.
 

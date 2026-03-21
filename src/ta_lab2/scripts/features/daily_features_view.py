@@ -1,14 +1,14 @@
 """
 FeaturesStore - Unified multi-TF bar-level feature store management.
 
-This module manages cmc_features, a materialized table joining all bar-level features:
-- cmc_price_bars_multi_tf (OHLCV, all timeframes)
-- cmc_returns_bars_multi_tf (bar returns, canonical + roll)
-- cmc_vol (volatility estimators)
-- cmc_ta (technical indicators)
+This module manages features, a materialized table joining all bar-level features:
+- price_bars_multi_tf (OHLCV, all timeframes)
+- returns_bars_multi_tf (bar returns, canonical + roll)
+- vol (volatility estimators)
+- ta (technical indicators)
 
 EMAs are NOT included (different granularity with period dimension).
-Query cmc_ema_multi_tf_u and cmc_returns_ema_multi_tf_u directly.
+Query ema_multi_tf_u and returns_ema_multi_tf_u directly.
 
 Design:
 - Dynamic column matching: DDL is the contract, JOIN builder auto-discovers columns
@@ -46,12 +46,11 @@ logger = logging.getLogger(__name__)
 _RETURNS_EXCLUDE = frozenset(
     {
         "id",
+        "venue_id",
         "timestamp",
         "tf",
         "tf_days",
         "alignment_source",
-        "venue",
-        "venue_rank",
         "bar_seq",
         "pos_in_bar",
         "count_days",
@@ -67,12 +66,11 @@ _RETURNS_EXCLUDE = frozenset(
 _VOL_EXCLUDE = frozenset(
     {
         "id",
+        "venue_id",
         "ts",
         "tf",
         "tf_days",
         "alignment_source",
-        "venue",
-        "venue_rank",
         "open",
         "high",
         "low",
@@ -84,12 +82,11 @@ _VOL_EXCLUDE = frozenset(
 _TA_EXCLUDE = frozenset(
     {
         "id",
+        "venue_id",
         "ts",
         "tf",
         "tf_days",
         "alignment_source",
-        "venue",
-        "venue_rank",
         "close",
         "atr_14",
         "updated_at",
@@ -105,12 +102,12 @@ _RENAMES = {
 # Source table definitions: alias, join condition template, exclude set.
 _SOURCE_DEFS = {
     "returns": {
-        "table": "public.cmc_returns_bars_multi_tf_u",
+        "table": "public.returns_bars_multi_tf_u",
         "alias": "r",
         "join_tmpl": (
-            "LEFT JOIN public.cmc_returns_bars_multi_tf_u r"
+            "LEFT JOIN public.returns_bars_multi_tf_u r"
             ' ON p.id = r.id AND p.time_close = r."timestamp"'
-            " AND p.venue = r.venue"
+            " AND p.venue_id = r.venue_id"
             " AND r.tf = '{tf}'"
             " AND r.alignment_source = '{alignment_source}'"
             " AND r.roll = FALSE"
@@ -118,24 +115,24 @@ _SOURCE_DEFS = {
         "exclude": _RETURNS_EXCLUDE,
     },
     "vol": {
-        "table": "public.cmc_vol",
+        "table": "public.vol",
         "alias": "v",
         "join_tmpl": (
-            "LEFT JOIN public.cmc_vol v"
+            "LEFT JOIN public.vol v"
             " ON p.id = v.id AND p.time_close = v.ts"
-            " AND p.venue = v.venue"
+            " AND p.venue_id = v.venue_id"
             " AND v.tf = '{tf}'"
             " AND v.alignment_source = '{alignment_source}'"
         ),
         "exclude": _VOL_EXCLUDE,
     },
     "ta": {
-        "table": "public.cmc_ta",
+        "table": "public.ta",
         "alias": "t",
         "join_tmpl": (
-            "LEFT JOIN public.cmc_ta t"
+            "LEFT JOIN public.ta t"
             " ON p.id = t.id AND p.time_close = t.ts"
-            " AND p.venue = t.venue"
+            " AND p.venue_id = t.venue_id"
             " AND t.tf = '{tf}'"
             " AND t.alignment_source = '{alignment_source}'"
         ),
@@ -151,7 +148,7 @@ _SOURCE_DEFS = {
 
 class FeaturesStore:
     """
-    Manages cmc_features materialized table.
+    Manages features materialized table.
 
     Refresh pattern:
     1. Check which source tables exist and have data
@@ -161,33 +158,33 @@ class FeaturesStore:
     5. Update state
 
     Source tables (dependency order):
-    1. cmc_price_bars_multi_tf (base - required)
-    2. cmc_returns_bars_multi_tf (bar returns - optional)
-    3. cmc_vol (depends on bars - optional)
-    4. cmc_ta (depends on bars - optional)
+    1. price_bars_multi_tf (base - required)
+    2. returns_bars_multi_tf (bar returns - optional)
+    3. vol (depends on bars - optional)
+    4. ta (depends on bars - optional)
     """
 
     SOURCE_TABLES = {
         "price_bars": {
-            "table": "cmc_price_bars_multi_tf_u",
+            "table": "price_bars_multi_tf_u",
             "schema": "public",
             "required": True,
             "feature_type": "price_bars",
         },
         "returns": {
-            "table": "cmc_returns_bars_multi_tf_u",
+            "table": "returns_bars_multi_tf_u",
             "schema": "public",
             "required": False,
             "feature_type": "returns",
         },
         "vol": {
-            "table": "cmc_vol",
+            "table": "vol",
             "schema": "public",
             "required": False,
             "feature_type": "vol",
         },
         "ta": {
-            "table": "cmc_ta",
+            "table": "ta",
             "schema": "public",
             "required": False,
             "feature_type": "ta",
@@ -290,9 +287,10 @@ class FeaturesStore:
         alignment_source: str = "multi_tf",
         start: Optional[str] = None,
         full_refresh: bool = False,
+        venue_id: int | None = None,
     ) -> int:
         """
-        Refresh cmc_features for given IDs and timeframe.
+        Refresh features for given IDs and timeframe.
 
         Args:
             ids: List of asset IDs to refresh
@@ -314,7 +312,7 @@ class FeaturesStore:
 
         if not sources_available.get("price_bars", False):
             logger.error(
-                "Required table cmc_price_bars_multi_tf_u not available - cannot refresh"
+                "Required table price_bars_multi_tf_u not available - cannot refresh"
             )
             return 0
 
@@ -329,7 +327,11 @@ class FeaturesStore:
 
         # 3. Delete existing rows in dirty window
         self._delete_dirty_rows(
-            ids, tf, alignment_source, dirty_start if not full_refresh else None
+            ids,
+            tf,
+            alignment_source,
+            dirty_start if not full_refresh else None,
+            venue_id=venue_id,
         )
 
         # 4. Insert refreshed data
@@ -340,6 +342,7 @@ class FeaturesStore:
             dirty_start.isoformat(),
             dirty_end.isoformat(),
             sources_available,
+            venue_id=venue_id,
         )
 
         with self.engine.begin() as conn:
@@ -347,7 +350,7 @@ class FeaturesStore:
             rows_inserted = result.rowcount
 
         logger.info(
-            f"Inserted {rows_inserted} rows into cmc_features"
+            f"Inserted {rows_inserted} rows into features"
             f" (tf={tf}, alignment_source={alignment_source})"
         )
 
@@ -362,17 +365,22 @@ class FeaturesStore:
         tf: str,
         alignment_source: str,
         start: Optional[pd.Timestamp] = None,
+        venue_id: int | None = None,
     ) -> int:
         """Delete existing rows in dirty window for given tf + alignment_source."""
         where_clause = "id = ANY(:ids) AND tf = :tf AND alignment_source = :as_"
         params: dict = {"ids": ids, "tf": tf, "as_": alignment_source}
+
+        if venue_id is not None:
+            where_clause += " AND venue_id = :venue_id"
+            params["venue_id"] = venue_id
 
         if start is not None:
             where_clause += " AND ts >= :start"
             params["start"] = start
 
         delete_sql = f"""
-            DELETE FROM public.cmc_features
+            DELETE FROM public.features
             WHERE {where_clause}
         """
 
@@ -394,17 +402,18 @@ class FeaturesStore:
         start: str,
         end: str,
         sources_available: dict[str, bool],
+        venue_id: int | None = None,
     ) -> str:
         """
         Build the JOIN query to materialize features.
 
-        Uses dynamic column matching: queries cmc_features columns from
+        Uses dynamic column matching: queries features columns from
         information_schema, then maps each to the correct source table.
         """
         ids_list = ",".join(str(id_) for id_ in ids)
 
-        # Discover target columns from cmc_features DDL
-        target_cols = get_columns(self.engine, "public.cmc_features")
+        # Discover target columns from features DDL
+        target_cols = get_columns(self.engine, "public.features")
 
         # Discover source columns for each available source
         source_col_map: dict[str, set[str]] = {}
@@ -434,11 +443,10 @@ class FeaturesStore:
         # Explicit mappings for PK, OHLCV, derived columns
         explicit = {
             "id": "p.id",
+            "venue_id": "p.venue_id",
             "ts": "p.time_close",
             "tf": f"'{tf}'",
             "alignment_source": f"'{alignment_source}'",
-            "venue": "p.venue",
-            "venue_rank": "p.venue_rank",
             "tf_days": "p.tf_days",
             "asset_class": "'CRYPTO'::text",
             "open": "p.open",
@@ -502,7 +510,7 @@ class FeaturesStore:
                 insert_cols.append(_q(col))
 
         # Build JOINs
-        from_clause = "\n            FROM public.cmc_price_bars_multi_tf_u p"
+        from_clause = "\n            FROM public.price_bars_multi_tf_u p"
         join_clauses = []
         for src_key, src_def in _SOURCE_DEFS.items():
             if sources_available.get(src_key, False):
@@ -513,18 +521,22 @@ class FeaturesStore:
                 )
 
         # WHERE clause
+        venue_filter = (
+            f"\n              AND p.venue_id = {int(venue_id)}"
+            if venue_id is not None
+            else ""
+        )
         where_clause = f"""
             WHERE p.id IN ({ids_list})
               AND p.tf = '{tf}'
-              AND p.alignment_source = '{alignment_source}'
-
+              AND p.alignment_source = '{alignment_source}'{venue_filter}
               AND p.time_close >= '{start}'
               AND p.time_close <= '{end}'
         """
 
         # Build complete query
         query = f"""
-            INSERT INTO public.cmc_features (
+            INSERT INTO public.features (
                 {", ".join(insert_cols)}
             )
             SELECT
@@ -540,7 +552,7 @@ class FeaturesStore:
         """Update state after successful refresh."""
         try:
             self.state_manager.update_state_from_output(
-                output_table="cmc_features",
+                output_table="features",
                 output_schema="public",
                 feature_name="unified",
             )
@@ -565,6 +577,7 @@ def refresh_features(
     alignment_source: str = "multi_tf",
     start: Optional[str] = None,
     full_refresh: bool = False,
+    venue_id: int | None = None,
 ) -> int:
     """
     Convenience function for CLI usage.
@@ -588,7 +601,7 @@ def refresh_features(
     config = FeatureStateConfig(
         feature_type="daily_features",
         state_schema="public",
-        state_table="cmc_feature_state",
+        state_table="feature_state",
     )
     state_manager = FeatureStateManager(engine, config)
     state_manager.ensure_state_table()
@@ -600,6 +613,7 @@ def refresh_features(
         alignment_source=alignment_source,
         start=start,
         full_refresh=full_refresh,
+        venue_id=venue_id,
     )
 
 

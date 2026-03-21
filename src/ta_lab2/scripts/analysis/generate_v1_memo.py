@@ -314,7 +314,7 @@ def load_strategy_selection() -> dict:
 
     # Try to parse feature count dynamically
     match = re.search(
-        r"(\d+)\+?\s+(?:cmc_features|features?)\s+(?:columns?|evaluated)",
+        r"(\d+)\+?\s+(?:features|features?)\s+(?:columns?|evaluated)",
         text,
         re.IGNORECASE,
     )
@@ -373,7 +373,7 @@ def _section_executive_summary(
         "",
         "- **Data layer:** CoinMarketCap API ingestion of BTC and ETH daily bars (2010–2025), "
         "109 timeframes, 4.1M price bar rows, 14.8M EMA rows across 24 normalized table families",
-        "- **Feature engine:** 112-column bar-level feature store (`cmc_features`) with returns, "
+        "- **Feature engine:** 112-column bar-level feature store (`features`) with returns, "
         "volatility, technical indicators, z-scores, and outlier flags; adaptive moving averages "
         "(KAMA, DEMA, TEMA, HMA) with multi-timeframe parity",
         "- **Research tooling:** IC evaluation with Spearman IC, rolling IC, regime breakdown; "
@@ -494,11 +494,11 @@ def _section_build_narrative(milestone_data: dict) -> str:
         "allowing downstream queries to work against a single consistent view across alignment sources.",
         "",
         "**Feature engineering — 112-column bar-level store:**",
-        "cmc_features is designed as a DDL-as-contract: the table schema defines exactly what "
+        "features is designed as a DDL-as-contract: the table schema defines exactly what "
         "columns exist, and Python auto-discovers source → target column mappings via get_columns(). "
         "This eliminates column-mismatch bugs when extending features. EMAs (which have a "
-        "period dimension) are intentionally excluded from cmc_features and queried directly from "
-        "cmc_ema_multi_tf_u via LEFT JOINs.",
+        "period dimension) are intentionally excluded from features and queried directly from "
+        "ema_multi_tf_u via LEFT JOINs.",
         "",
         "**Research tooling — leakage-free cross-validation:**",
         "PurgedKFoldSplitter implements the Lopez de Prado purged K-fold with configurable embargo "
@@ -508,7 +508,7 @@ def _section_build_narrative(milestone_data: dict) -> str:
         "promoting multiple features simultaneously.",
         "",
         "**Regime pipeline — 3-tier label resolution:**",
-        "The regime pipeline (refresh_cmc_regimes.py) runs L0-L2 labeling with a HysteresisTracker "
+        "The regime pipeline (refresh_regimes.py) runs L0-L2 labeling with a HysteresisTracker "
         "(3-bar hold for loosening, immediate accept for tightening) to prevent noisy regime flips. "
         "Signal generators accept a regime_enabled parameter for A/B testing regime-conditional "
         "behavior without code changes.",
@@ -579,7 +579,7 @@ def _section_methodology(bakeoff: dict[str, pd.DataFrame], strategy_data: dict) 
         "(multi_tf, cal_us, cal_eu, cal_asia, cal_crypto) plus a unified `_u` table. "
         "All bake-off and validation work uses the multi_tf variant at 1D timeframe.",
         "",
-        "**Feature store:** `cmc_features` table with 112 columns per (asset, date, timeframe) row:",
+        "**Feature store:** `features` table with 112 columns per (asset, date, timeframe) row:",
         "- 46 bar return columns: arithmetic/log returns, rolling averages, z-scores (30/90/365-bar)",
         "- 36 volatility columns: Parkinson, Yang-Zhang, Garman-Klass, ATR, Bollinger bands",
         "- 18 technical analysis columns: RSI-14, MACD, stochastics, OBV",
@@ -595,8 +595,8 @@ def _section_methodology(bakeoff: dict[str, pd.DataFrame], strategy_data: dict) 
         "- Flat signal: fast EMA crosses below slow EMA (death cross)",
         "- Long-only (no short positions); cash when flat",
         "- Daily bar evaluation: signal is computed at close, applied at next-bar open",
-        "- EMAs sourced directly from `cmc_ema_multi_tf_u` table via LEFT JOIN "
-        "(not stored in cmc_features, which has bar-level granularity)",
+        "- EMAs sourced directly from `ema_multi_tf_u` table via LEFT JOIN "
+        "(not stored in features, which has bar-level granularity)",
         "",
         "| Strategy | Fast EMA | Slow EMA | Lookback Ratio | V1 Gate |",
         "|----------|----------|----------|----------------|---------|",
@@ -618,7 +618,7 @@ def _section_methodology(bakeoff: dict[str, pd.DataFrame], strategy_data: dict) 
         "on the test folds.",
         "",
         "**Step 1: IC Feature Sweep**",
-        f"All {n_features} columns of `cmc_features` were evaluated for Spearman Information "
+        f"All {n_features} columns of `features` were evaluated for Spearman Information "
         "Coefficient (IC) on BTC 1D daily bars. IC measures correlation between a feature and "
         "the subsequent 1D–10D forward return, computed with purged boundaries to prevent "
         "look-ahead leakage.",
@@ -627,7 +627,7 @@ def _section_methodology(bakeoff: dict[str, pd.DataFrame], strategy_data: dict) 
         "- Outlier flags (vol_rs_126_is_outlier, bb_ma_20) dominate by IC-IR (consistency)",
         "- Bollinger band signals show consistently negative IC-IR — mean-reversion edge at 1D",
         "- Bar return series exhibit positive IC at 1D-10D horizons",
-        "- EMA crossover features not in cmc_features (evaluated via walk-forward in Step 2)",
+        "- EMA crossover features not in features (evaluated via walk-forward in Step 2)",
         "",
         "**Step 2: Walk-Forward Bake-Off (Purged K-Fold CV)**",
         f"{n_strategies} strategy variants were evaluated with Purged K-fold cross-validation:",
@@ -738,7 +738,7 @@ def load_backtest_metrics(engine) -> pd.DataFrame:
     Load aggregated walk-forward bakeoff metrics for the two selected strategies.
 
     Primary source: strategy_bakeoff_results (aggregated across folds).
-    Secondary: cmc_backtest_runs + cmc_backtest_metrics (per-run detail).
+    Secondary: backtest_runs + backtest_metrics (per-run detail).
 
     Returns empty DataFrame on any failure.
     """
@@ -795,7 +795,7 @@ def load_backtest_metrics(engine) -> pd.DataFrame:
 
 def load_backtest_detail(engine) -> pd.DataFrame:
     """
-    Load per-run backtest metrics (from cmc_backtest_metrics JOIN cmc_backtest_runs).
+    Load per-run backtest metrics (from backtest_metrics JOIN backtest_runs).
     Used to get calmar_ratio, win_rate, avg_win, avg_loss from the runs table.
 
     Returns empty DataFrame on any failure.
@@ -820,15 +820,15 @@ def load_backtest_detail(engine) -> pd.DataFrame:
                 m.avg_win,
                 m.avg_loss,
                 m.avg_holding_period_days
-            FROM public.cmc_backtest_runs r
-            JOIN public.cmc_backtest_metrics m ON m.run_id = r.run_id
+            FROM public.backtest_runs r
+            JOIN public.backtest_metrics m ON m.run_id = r.run_id
             WHERE r.signal_type = 'ema_crossover'
             ORDER BY r.run_timestamp DESC
             """
         )
         with engine.connect() as conn:
             df = pd.read_sql(sql, conn)
-        logger.info("load_backtest_detail: %d rows from cmc_backtest_metrics", len(df))
+        logger.info("load_backtest_detail: %d rows from backtest_metrics", len(df))
         return df
     except Exception as exc:
         logger.warning("load_backtest_detail failed: %s", exc)
@@ -906,7 +906,7 @@ def load_walkforward_folds(engine) -> pd.DataFrame:
 
 def load_trade_stats(engine) -> pd.DataFrame:
     """
-    Compute trade-level stats from cmc_backtest_trades JOIN cmc_backtest_runs.
+    Compute trade-level stats from backtest_trades JOIN backtest_runs.
     Returns: win_rate, avg_winner, avg_loser, avg_holding_period per strategy/asset.
 
     Returns empty DataFrame on any failure.
@@ -924,8 +924,8 @@ def load_trade_stats(engine) -> pd.DataFrame:
                 AVG(CASE WHEN t.pnl_pct > 0 THEN t.pnl_pct END) AS avg_winner,
                 AVG(CASE WHEN t.pnl_pct <= 0 THEN t.pnl_pct END) AS avg_loser,
                 AVG(t.holding_bars) AS avg_holding_bars
-            FROM public.cmc_backtest_trades t
-            JOIN public.cmc_backtest_runs r ON r.run_id = t.run_id
+            FROM public.backtest_trades t
+            JOIN public.backtest_runs r ON r.run_id = t.run_id
             WHERE r.signal_type = 'ema_crossover'
             GROUP BY r.signal_type, r.asset_id
             ORDER BY r.asset_id
@@ -933,7 +933,7 @@ def load_trade_stats(engine) -> pd.DataFrame:
         )
         with engine.connect() as conn:
             df = pd.read_sql(sql, conn)
-        logger.info("load_trade_stats: %d rows from cmc_backtest_trades", len(df))
+        logger.info("load_trade_stats: %d rows from backtest_trades", len(df))
         return df
     except Exception as exc:
         logger.warning("load_trade_stats failed: %s", exc)
@@ -956,7 +956,7 @@ def load_benchmark_returns(engine, start_date: str, end_date: str) -> pd.DataFra
                 "timestamp" AS ts,
                 id,
                 close
-            FROM public.cmc_price_bars_multi_tf_u
+            FROM public.price_bars_multi_tf_u
             WHERE id IN (1, 2)
               AND tf = '1D'
               AND "timestamp" >= CAST(:start AS TIMESTAMPTZ)
@@ -1032,7 +1032,7 @@ def load_benchmark_returns(engine, start_date: str, end_date: str) -> pd.DataFra
 
 def load_paper_metrics(engine) -> pd.DataFrame:
     """
-    Load paper trading drift metrics from cmc_drift_metrics (Phase 53).
+    Load paper trading drift metrics from drift_metrics (Phase 53).
     Returns empty DataFrame gracefully if table empty or unavailable.
     """
     try:
@@ -1047,14 +1047,14 @@ def load_paper_metrics(engine) -> pd.DataFrame:
                 replay_cumulative_pnl,
                 tracking_error_5d,
                 tracking_error_30d
-            FROM public.cmc_drift_metrics
+            FROM public.drift_metrics
             ORDER BY ts DESC
             LIMIT 1000
             """
         )
         with engine.connect() as conn:
             df = pd.read_sql(sql, conn)
-        logger.info("load_paper_metrics: %d rows from cmc_drift_metrics", len(df))
+        logger.info("load_paper_metrics: %d rows from drift_metrics", len(df))
         return df
     except Exception as exc:
         logger.warning("load_paper_metrics failed (Phase 53 data): %s", exc)
@@ -1063,7 +1063,7 @@ def load_paper_metrics(engine) -> pd.DataFrame:
 
 def load_paper_fills(engine) -> pd.DataFrame:
     """
-    Load paper trade fill data from cmc_fills (Phase 53).
+    Load paper trade fill data from fills (Phase 53).
     Returns empty DataFrame gracefully if table empty or unavailable.
     """
     try:
@@ -1072,14 +1072,14 @@ def load_paper_fills(engine) -> pd.DataFrame:
         sql = text(
             """
             SELECT *
-            FROM public.cmc_fills
+            FROM public.fills
             ORDER BY filled_at DESC
             LIMIT 500
             """
         )
         with engine.connect() as conn:
             df = pd.read_sql(sql, conn)
-        logger.info("load_paper_fills: %d rows from cmc_fills", len(df))
+        logger.info("load_paper_fills: %d rows from fills", len(df))
         return df
     except Exception as exc:
         logger.warning("load_paper_fills failed (Phase 53 data): %s", exc)
@@ -1088,7 +1088,7 @@ def load_paper_fills(engine) -> pd.DataFrame:
 
 def load_risk_events(engine) -> pd.DataFrame:
     """
-    Load risk event log from cmc_risk_events (Phase 53).
+    Load risk event log from risk_events (Phase 53).
     Returns empty DataFrame gracefully if table empty or unavailable.
     """
     try:
@@ -1097,14 +1097,14 @@ def load_risk_events(engine) -> pd.DataFrame:
         sql = text(
             """
             SELECT *
-            FROM public.cmc_risk_events
+            FROM public.risk_events
             ORDER BY event_ts DESC
             LIMIT 200
             """
         )
         with engine.connect() as conn:
             df = pd.read_sql(sql, conn)
-        logger.info("load_risk_events: %d rows from cmc_risk_events", len(df))
+        logger.info("load_risk_events: %d rows from risk_events", len(df))
         return df
     except Exception as exc:
         logger.warning("load_risk_events failed (Phase 53 data): %s", exc)
@@ -1124,7 +1124,7 @@ def _compute_stress_test_returns(engine) -> pd.DataFrame:
             sql = text(
                 """
                 SELECT "timestamp" AS ts, id, close
-                FROM public.cmc_price_bars_multi_tf_u
+                FROM public.price_bars_multi_tf_u
                 WHERE id IN (1, 2)
                   AND tf = '1D'
                   AND "timestamp" >= CAST(:start AS TIMESTAMPTZ)
@@ -1721,7 +1721,7 @@ def _section_results(
         "### 3.3 Per-Regime Breakdown",
         "",
         "Per-regime performance breakdown is not available in V1. While regime labels are computed "
-        "and stored in `cmc_regimes` (Phase 27), the walk-forward bake-off did not persist "
+        "and stored in `regimes` (Phase 27), the walk-forward bake-off did not persist "
         "per-regime fold statistics. The `strategy_bakeoff_results` table does not have a "
         "`regime_breakdown_json` column.",
         "",
@@ -1814,7 +1814,7 @@ def _section_results(
     else:
         lines += [
             "_(Benchmark return data requires DB connection. Buy-and-hold benchmarks would be computed "
-            "from `cmc_price_bars_multi_tf_u` for BTC (id=1) and ETH (id=2) at tf=1D.)_",
+            "from `price_bars_multi_tf_u` for BTC (id=1) and ETH (id=2) at tf=1D.)_",
             "",
             "**Key comparative context (from STRATEGY_SELECTION.md):**",
             "- BTC buy-hold over the full 2010-2025 period would produce enormous positive returns "
@@ -1846,7 +1846,7 @@ def _section_results(
             "10% position fraction. Results will be populated here when paper trading data is available._",
             "",
             "**What to expect when paper data is available:**",
-            "- Live paper fills from `cmc_fills` vs backtest replay fills",
+            "- Live paper fills from `fills` vs backtest replay fills",
             "- Cumulative P&L time series per config_id",
             "- Tracking error: 5-day and 30-day rolling divergence from backtest replay",
         ]
@@ -1938,7 +1938,7 @@ def _section_results(
             )
         lines.append(_format_table(headers_trades, rows_trades))
     elif not detail_df.empty:
-        # Use per-run metrics from cmc_backtest_metrics as fallback
+        # Use per-run metrics from backtest_metrics as fallback
         headers_trades = ["Metric", "ema_trend(17,77) / (21,50) avg", "Notes"]
         win_rate_avg = (
             detail_df["win_rate"].mean() if "win_rate" in detail_df.columns else None
@@ -1979,7 +1979,7 @@ def _section_results(
         lines.append(_format_table(headers_trades, rows_trades))
     else:
         lines += [
-            "_(Trade statistics from cmc_backtest_trades require DB connection.)_",
+            "_(Trade statistics from backtest_trades require DB connection.)_",
             "",
             "**Known aggregate stats from STRATEGY_SELECTION.md:**",
             "- Both strategies exhibit low turnover (~32-38 total trades over 15 years)",
@@ -2172,13 +2172,13 @@ def _section_failure_modes(
 
     if paper_df.empty:
         lines += [
-            "_Drift analysis requires paper trading data from Phase 53 (cmc_drift_metrics table). "
+            "_Drift analysis requires paper trading data from Phase 53 (drift_metrics table). "
             "Not yet available._",
             "",
             "**Drift guard is implemented** (Phase 47) with:",
             "- 5-day rolling tracking error threshold: configurable per config",
             "- 30-day rolling tracking error threshold: circuit breaker level",
-            "- Drift metrics logged daily to `cmc_drift_metrics` table",
+            "- Drift metrics logged daily to `drift_metrics` table",
             "- Alert triggers when tracking error exceeds threshold",
             "",
             "_Drift analysis will be populated here once paper trading has accumulated sufficient history._",
@@ -2206,7 +2206,7 @@ def _section_failure_modes(
             ]
         else:
             lines += [
-                "_Drift metric columns not found in cmc_drift_metrics — check Phase 53 schema._"
+                "_Drift metric columns not found in drift_metrics — check Phase 53 schema._"
             ]
     lines.append("")
 
@@ -2217,7 +2217,7 @@ def _section_failure_modes(
 
     if risk_events.empty:
         lines += [
-            "_No risk events recorded in cmc_risk_events (or table not yet available)._",
+            "_No risk events recorded in risk_events (or table not yet available)._",
             "",
             "**Risk controls implemented (Phase 53):**",
             "- **Kill switch:** Immediately flattens all positions and halts new signal generation",
@@ -2255,7 +2255,7 @@ def _section_failure_modes(
                 lines.append(_format_table(headers_re, rows_re))
         else:
             lines.append(
-                f"_{n_events} events logged. See cmc_risk_events table for full detail._"
+                f"_{n_events} events logged. See risk_events table for full detail._"
             )
     lines.append("")
 
@@ -2326,7 +2326,7 @@ def _section_research_tracks(
     track1_lines = [
         "### Track 1: Core Edge Selection (Phase 42)",
         "",
-        "**Methodology:** IC evaluation across all `cmc_features` columns on BTC 1D daily bars "
+        "**Methodology:** IC evaluation across all `features` columns on BTC 1D daily bars "
         "(Spearman IC with purged boundaries), followed by walk-forward bake-off with PurgedKFold "
         "(10 folds, 20-bar embargo). Composite scoring under 4 weighting schemes (Balanced, Risk Focus, "
         "Quality Focus, Low Cost). PSR and DSR computed for all strategies to correct Sharpe significance.",
@@ -2444,7 +2444,7 @@ def _section_research_tracks(
         "— high consistency, but low mean IC (0.02). These features are consistent but economically small.",
         "- Bollinger band signals (`bb_ma_20`, `bb_up_20_2`, `bb_lo_20_2`) show consistently negative "
         "IC-IR — a mean-reversion edge at the 1D horizon against the trend.",
-        "- EMA crossover features are not in `cmc_features` (they have period granularity); "
+        "- EMA crossover features are not in `features` (they have period granularity); "
         "their edge was captured by the walk-forward bake-off directly.",
         "- Bar return series (`ret_arith`, `ret_log`, etc.) exhibit positive IC at 1D–10D horizons, "
         "consistent with short-term momentum.",
@@ -2554,7 +2554,7 @@ def _section_research_tracks(
             "- Default override duration: 24 hours; maximum 7 days",
             "- 5 reason categories: market_condition, strategy_review, technical_issue, "
             "manual_risk_reduction, testing",
-            "- All overrides logged to `cmc_risk_overrides` with full audit trail",
+            "- All overrides logged to `risk_overrides` with full audit trail",
             "- Solo operator in V1: no approval chain required",
             "",
         ]
@@ -3051,7 +3051,7 @@ def _section_v2_roadmap(milestone_data: dict | None = None) -> str:
         "- Blocks: Priority 1, go/no-go trigger for 2+ uncorrelated strategies",
         "",
         "**Phase 59: Per-Asset Regime-Adaptive Sizing**",
-        "- Scope: Wire regime labels (cmc_regimes) into RiskEngine; "
+        "- Scope: Wire regime labels (regimes) into RiskEngine; "
         "bull regime = 1.0x sizing, sideways = 0.7x, bear = 0.3x; "
         "backtest regime-conditioned sizing vs static vol-sizing",
         f"- Estimated effort: {_est(4)}",
@@ -3107,7 +3107,7 @@ def _section_appendix(
         "",
         "| Parameter | Value |",
         "|-----------|-------|",
-        "| Feature set | All `cmc_features` columns (97 available at eval time) |",
+        "| Feature set | All `features` columns (97 available at eval time) |",
         "| Correlation method | Spearman rank (non-parametric, robust to outliers) |",
         "| IC horizon | 1-day forward return |",
         "| Purge window | 20-bar purge (same as CV embargo) |",
@@ -3160,15 +3160,15 @@ def _section_appendix(
         "",
         "| Table | Role | Approx Rows | Notes |",
         "|-------|------|-------------|-------|",
-        "| cmc_price_bars_multi_tf_u | Price bars, all assets, all TFs | 4.1M | Unified _u table |",
-        "| cmc_features | 112-column bar-level feature store | 3.7M | DDL-as-contract design |",
-        "| cmc_ema_multi_tf_u | EMA values by period | 14.8M | (id,ts,tf,period) PK |",
+        "| price_bars_multi_tf_u | Price bars, all assets, all TFs | 4.1M | Unified _u table |",
+        "| features | 112-column bar-level feature store | 3.7M | DDL-as-contract design |",
+        "| ema_multi_tf_u | EMA values by period | 14.8M | (id,ts,tf,period) PK |",
         "| strategy_bakeoff_results | Walk-forward bake-off aggregated results | ~20 rows | fold_metrics_json JSONB |",
-        "| cmc_backtest_runs | Individual backtest run metadata | ~100 rows | |",
-        "| cmc_backtest_trades | Trade-level backtest results | ~5K rows | |",
-        "| cmc_drift_metrics | Paper vs replay tracking error | Phase 53 data | Optional (--backtest-only) |",
-        "| cmc_fills | Paper trade executions | Phase 53 data | Optional |",
-        "| cmc_risk_events | Risk gate trigger log | Phase 53 data | Optional |",
+        "| backtest_runs | Individual backtest run metadata | ~100 rows | |",
+        "| backtest_trades | Trade-level backtest results | ~5K rows | |",
+        "| drift_metrics | Paper vs replay tracking error | Phase 53 data | Optional (--backtest-only) |",
+        "| fills | Paper trade executions | Phase 53 data | Optional |",
+        "| risk_events | Risk gate trigger log | Phase 53 data | Optional |",
         "",
         "**CSV artifacts:**",
         "",

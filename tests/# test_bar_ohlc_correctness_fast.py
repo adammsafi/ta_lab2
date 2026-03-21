@@ -85,12 +85,12 @@ MISSING_DAYS_POLICY = os.environ.get("BARS_TEST_MISSING_DAYS", "allow").strip().
 assert MISSING_DAYS_POLICY in {"allow", "skip", "fail"}
 
 BAR_TABLES = [
-    "public.cmc_price_bars_1d",
-    "public.cmc_price_bars_multi_tf_cal_us",
-    "public.cmc_price_bars_multi_tf_cal_iso",
-    "public.cmc_price_bars_multi_tf_cal_anchor_us",
-    "public.cmc_price_bars_multi_tf_cal_anchor_iso",
-    "public.cmc_price_bars_multi_tf",
+    "public.price_bars_1d",
+    "public.price_bars_multi_tf_cal_us",
+    "public.price_bars_multi_tf_cal_iso",
+    "public.price_bars_multi_tf_cal_anchor_us",
+    "public.price_bars_multi_tf_cal_anchor_iso",
+    "public.price_bars_multi_tf",
 ]
 
 SRC_TABLE = os.environ.get("SRC_TABLE", "public.cmc_price_histories7")

@@ -18,11 +18,20 @@ Benefits:
 
 from __future__ import annotations
 
+import re
+from datetime import date, timedelta
+
 import pandas as pd
 import polars as pl
 from sqlalchemy.engine import Engine
 from sqlalchemy import text
 from typing import Literal
+
+from ta_lab2.scripts.bars.polars_bar_operations import (
+    apply_ohlcv_cumulative_aggregations,
+    compute_extrema_timestamps_with_new_extreme_detection,
+    compute_missing_days_gaps,
+)
 
 
 def load_1d_bars_for_id(
@@ -45,6 +54,7 @@ def load_1d_bars_for_id(
         - id, timestamp, tf, bar_seq
         - open, high, low, close, volume
         - time_high, time_low
+        - venue_id
         - quality flags (is_partial_start, is_partial_end, is_missing_days)
     """
     # Build WHERE clause with filters
@@ -81,10 +91,11 @@ def load_1d_bars_for_id(
             is_partial_end,
             is_missing_days,
             count_days,
-            count_missing_days
-        FROM public.cmc_price_bars_1d
+            count_missing_days,
+            venue_id
+        FROM public.price_bars_1d
         WHERE {where_sql}
-        ORDER BY "timestamp"
+        ORDER BY venue_id, "timestamp"
     """
     )
 
@@ -116,6 +127,19 @@ def get_week_start_day(alignment: str) -> int:
         return 1  # Monday
     else:
         raise ValueError(f"Unknown calendar alignment: {alignment}")
+
+
+def _compute_bar_end_day(period_start: date, unit: str, qty: int) -> date:
+    """Return last day (inclusive) of a calendar period starting at period_start."""
+    if unit == "W":
+        return period_start + timedelta(days=7 * qty - 1)
+    if unit == "M":
+        year = period_start.year + (period_start.month - 1 + qty) // 12
+        month = (period_start.month - 1 + qty) % 12 + 1
+        return date(year, month, 1) - timedelta(days=1)
+    if unit == "Y":
+        return date(period_start.year + qty, 1, 1) - timedelta(days=1)
+    raise ValueError(f"Unsupported unit: {unit}")
 
 
 def assign_calendar_periods(
@@ -150,8 +174,6 @@ def assign_calendar_periods(
         return df_daily
 
     # Parse target_tf to determine period type
-    import re
-
     # Calendar TF patterns: 1W_CAL, 2W_CAL, 1M_CAL, 3M_CAL, 1Y_CAL, etc.
     match = re.match(r"(\d+)([WMY])_CAL", target_tf)
     if not match:
@@ -202,12 +224,18 @@ def assign_calendar_periods(
             df_with_date = df_with_date.with_columns(
                 [
                     (
-                        (pl.col("period_start_base") - epoch_date).dt.total_days()
-                        // 7
-                        // qty
-                        * qty
-                        * 7
-                        + epoch_date
+                        epoch_date
+                        + pl.duration(
+                            days=(
+                                (
+                                    pl.col("period_start_base") - epoch_date
+                                ).dt.total_days()
+                                // 7
+                                // qty
+                                * qty
+                                * 7
+                            )
+                        )
                     ).alias("period_start")
                 ]
             )
@@ -245,66 +273,159 @@ def assign_calendar_periods(
 
 def aggregate_by_calendar_period(
     df_daily: pl.DataFrame,
+    target_tf: str,
     period_col: str = "period_start",
 ) -> pl.DataFrame:
     """
-    Aggregate daily bars by calendar period.
+    Build daily snapshot rows for calendar-aligned bars.
 
-    Same OHLCV aggregation as tf_day mode, but grouped by period_col
-    instead of fixed day counts.
+    Produces ONE ROW PER DAY per bar with running cumulative OHLCV,
+    matching the direct-path builders' output format.
     """
     if df_daily.is_empty():
         return pl.DataFrame()
 
-    # Group by id and period_start, aggregate OHLCV
-    df_agg = (
-        df_daily.groupby(["id", period_col])
-        .agg(
-            [
-                # Identity
-                pl.col("tf").first(),
-                # Timestamps
-                pl.col("time_open").first(),
-                pl.col("timestamp").last().alias("time_close"),
-                # OHLCV aggregation
-                pl.col("open").first(),
-                pl.col("high").max(),
-                pl.col("low").min(),
-                pl.col("close").last(),
-                pl.col("volume").sum(),
-                pl.col("market_cap").last(),
-                # Time extrema (earliest among ties)
-                pl.col("time_high")
-                .filter(pl.col("high") == pl.col("high").max())
-                .min()
-                .alias("time_high"),
-                pl.col("time_low")
-                .filter(pl.col("low") == pl.col("low").min())
-                .min()
-                .alias("time_low"),
-                # Quality flags (OR logic)
-                pl.col("is_partial_start").max(),
-                pl.col("is_partial_end").max(),
-                pl.col("is_missing_days").max(),
-                # Counts
-                pl.col("count_days").sum(),
-                pl.col("count_missing_days").sum(),
-                # Calculate tf_days from period
-                pl.len().alias("actual_days"),
-            ]
-        )
-        .sort([period_col])
+    # Parse target_tf for unit and qty (e.g. "1M_CAL" → M, 1)
+    match = re.match(r"(\d+)([WMY])_CAL", target_tf)
+    if not match:
+        raise ValueError(f"Unsupported calendar tf: {target_tf}")
+    qty = int(match.group(1))
+    unit = match.group(2)
+
+    df = df_daily.sort(["id", period_col, "timestamp"])
+
+    # bar_seq: dense rank on period_start (per id)
+    df = df.with_columns(
+        pl.col(period_col).rank("dense").over("id").cast(pl.Int64).alias("bar_seq")
     )
 
-    # Add bar_seq
-    df_agg = df_agg.with_columns(
-        [pl.int_range(1, pl.len() + 1).over("id").cast(pl.Int64).alias("bar_seq")]
+    # pos_in_bar: cumulative count within each bar_seq
+    df = df.with_columns(
+        pl.col("bar_seq")
+        .cum_count()
+        .over(["id", "bar_seq"])
+        .cast(pl.Int64)
+        .alias("pos_in_bar"),
     )
 
-    # Rename period_start to timestamp for consistency
-    df_agg = df_agg.rename({period_col: "timestamp"})
+    # Compute bar_end_day for each unique period_start via Python calendar math
+    unique_periods = df.select(period_col).unique().to_series().to_list()
+    period_end_map = {ps: _compute_bar_end_day(ps, unit, qty) for ps in unique_periods}
+    end_df = pl.DataFrame(
+        {
+            period_col: list(period_end_map.keys()),
+            "bar_end_day": list(period_end_map.values()),
+        }
+    )
+    df = df.join(end_df, on=period_col, how="left")
 
-    return df_agg
+    # tf_days: nominal width of the calendar period
+    df = df.with_columns(
+        (
+            (pl.col("bar_end_day") - pl.col(period_col)).dt.total_days().cast(pl.Int64)
+            + 1
+        ).alias("tf_days")
+    )
+
+    # Rename columns for shared Polars helpers
+    # timestamp→ts (main timestamp), time_high→timehigh, time_low→timelow
+    # Drop original time_open (will compute snapshot-style time_open)
+    drop_cols = [c for c in ["time_open"] if c in df.columns]
+    if drop_cols:
+        df = df.drop(drop_cols)
+    df = df.rename({"timestamp": "ts", "time_high": "timehigh", "time_low": "timelow"})
+
+    # Cast timestamps to tz-naive Datetime(us) for Polars window ops
+    for col in ["ts", "timehigh", "timelow"]:
+        if col in df.columns:
+            dtype = df[col].dtype
+            if dtype != pl.Datetime("us"):
+                df = df.with_columns(pl.col(col).cast(pl.Datetime("us")).alias(col))
+
+    # Cumulative OHLCV within each bar_seq
+    df = apply_ohlcv_cumulative_aggregations(df, group_col="bar_seq")
+
+    # Extrema timestamps with new-extreme reset
+    df = compute_extrema_timestamps_with_new_extreme_detection(
+        df,
+        group_col="bar_seq",
+        ts_col="ts",
+        timehigh_col="timehigh",
+        timelow_col="timelow",
+    )
+
+    # Missing days from timestamp gaps
+    df = compute_missing_days_gaps(df, group_col="bar_seq", ts_col="ts")
+
+    # Time columns
+    df = df.with_columns(
+        [
+            # time_open: prev_ts + 1ms; first row: ts - 1day + 1ms
+            (pl.col("ts").shift(1) + pl.duration(milliseconds=1))
+            .fill_null(pl.col("ts") - pl.duration(days=1) + pl.duration(milliseconds=1))
+            .alias("time_open"),
+            # time_close = current day's timestamp
+            pl.col("ts").alias("time_close"),
+            # time_open_bar = period_start as datetime
+            pl.col(period_col).cast(pl.Datetime("us")).alias("time_open_bar"),
+            # time_close_bar = bar_end_day + 23:59:59.999
+            (
+                pl.col("bar_end_day").cast(pl.Datetime("us"))
+                + pl.duration(hours=23, minutes=59, seconds=59, milliseconds=999)
+            ).alias("time_close_bar"),
+            # last_ts_half_open = ts + 1ms
+            (pl.col("ts") + pl.duration(milliseconds=1)).alias("last_ts_half_open"),
+        ]
+    )
+
+    # Bookkeeping columns
+    df = df.with_columns(
+        [
+            pl.col("pos_in_bar").alias("count_days"),
+            (pl.col("tf_days") - pl.col("pos_in_bar"))
+            .cast(pl.Int64)
+            .alias("count_days_remaining"),
+            (pl.col("pos_in_bar") < pl.col("tf_days")).alias("is_partial_end"),
+            pl.lit(False).alias("is_partial_start"),
+            (pl.col("count_missing_days") > 0).alias("is_missing_days"),
+        ]
+    )
+
+    # Select final output columns matching snapshot schema
+    out = df.select(
+        [
+            pl.col("id"),
+            pl.lit(target_tf).alias("tf"),
+            pl.col("tf_days"),
+            pl.col("bar_seq"),
+            pl.col("time_open"),
+            pl.col("time_close"),
+            pl.col("time_high"),
+            pl.col("time_low"),
+            pl.col("time_open_bar"),
+            pl.col("time_close_bar"),
+            pl.col("open_bar").cast(pl.Float64).alias("open"),
+            pl.col("high_bar").cast(pl.Float64).alias("high"),
+            pl.col("low_bar").cast(pl.Float64).alias("low"),
+            pl.col("close_bar").cast(pl.Float64).alias("close"),
+            pl.col("vol_bar").cast(pl.Float64).alias("volume"),
+            pl.col("mc_bar").cast(pl.Float64).alias("market_cap"),
+            pl.col("ts").alias("timestamp"),
+            pl.col("last_ts_half_open"),
+            pl.col("pos_in_bar").cast(pl.Int64),
+            pl.col("is_partial_start").cast(pl.Boolean),
+            pl.col("is_partial_end").cast(pl.Boolean),
+            pl.col("count_days_remaining"),
+            pl.col("is_missing_days").cast(pl.Boolean),
+            pl.col("count_days").cast(pl.Int64),
+            pl.col("count_missing_days").cast(pl.Int64),
+            pl.lit(None).cast(pl.Date).alias("first_missing_day"),
+            pl.lit(None).cast(pl.Date).alias("last_missing_day"),
+            pl.lit("price_bars_1d").alias("src_file"),
+        ]
+    )
+
+    return out
 
 
 # Mapping of builder type to alignment configuration
@@ -365,18 +486,11 @@ def aggregate_daily_to_timeframe(
         df_with_periods = assign_calendar_periods(
             df_daily, target_tf, alignment, anchor_mode
         )
-        return aggregate_by_calendar_period(df_with_periods)
+        return aggregate_by_calendar_period(df_with_periods, target_tf=target_tf)
 
-    # tf_day mode: Fixed day-count windows
-    # Parse target_tf to get tf_days count
-    # Supports: 2D, 3D, 5D, 7D, etc.
-    # For now, just handle simple "ND" format
+    # tf_day mode: Fixed day-count windows (daily snapshot pattern)
     if target_tf == "1D":
-        # Just return as-is with updated tf column
         return df_daily.with_columns(pl.lit(target_tf).alias("tf"))
-
-    # Parse tf_days from target_tf (e.g., "2D" -> 2, "7D" -> 7)
-    import re
 
     match = re.match(r"(\d+)D", target_tf)
     if not match:
@@ -386,93 +500,144 @@ def aggregate_daily_to_timeframe(
 
     tf_days = int(match.group(1))
 
-    # Sort by timestamp
-    df_sorted = df_daily.sort("timestamp")
-
-    # Assign bar_seq based on row position (0-indexed division by tf_days)
-    df_sorted = df_sorted.with_row_count(name="_row_idx")
-    df_sorted = df_sorted.with_columns(
-        [(pl.col("_row_idx") // tf_days + 1).cast(pl.Int64).alias("bar_seq_new")]
-    )
-
-    # Aggregate by bar_seq_new
-    df_agg = (
-        df_sorted.groupby("bar_seq_new")
-        .agg(
-            [
-                # Identity
-                pl.col("id").first().alias("id"),
-                # Timestamps
-                pl.col("time_open").first().alias("time_open"),
-                pl.col("timestamp").last().alias("time_close"),
-                # OHLCV aggregation
-                pl.col("open").first().alias("open"),
-                pl.col("high").max().alias("high"),
-                pl.col("low").min().alias("low"),
-                pl.col("close").last().alias("close"),
-                pl.col("volume").sum().alias("volume"),
-                pl.col("market_cap").last().alias("market_cap"),
-                # Time extrema (earliest among ties)
-                # For high: get timestamp where high == max(high), then take min timestamp
-                pl.col("time_high")
-                .filter(pl.col("high") == pl.col("high").max())
-                .min()
-                .alias("time_high"),
-                pl.col("time_low")
-                .filter(pl.col("low") == pl.col("low").min())
-                .min()
-                .alias("time_low"),
-                # Quality flags (OR logic)
-                pl.col("is_partial_start").max().alias("is_partial_start"),
-                pl.col("is_partial_end").max().alias("is_partial_end"),
-                pl.col("is_missing_days").max().alias("is_missing_days"),
-                # Counts
-                pl.col("count_days").sum().alias("count_days"),
-                pl.col("count_missing_days").sum().alias("count_missing_days"),
-            ]
-        )
-        .sort("bar_seq_new")
-    )
-
-    # Rename bar_seq_new to bar_seq and add tf metadata
-    df_agg = df_agg.rename({"bar_seq_new": "bar_seq"})
-    df_agg = df_agg.with_columns(
+    # Sort and assign bar_seq + pos_in_bar
+    df = df_daily.sort("timestamp")
+    df = df.with_row_count(name="_row_idx")
+    df = df.with_columns(
         [
-            pl.lit(target_tf).alias("tf"),
-            pl.lit(tf_days).cast(pl.Int64).alias("tf_days"),
-            pl.col("time_close").alias(
-                "timestamp"
-            ),  # timestamp = time_close for consistency
+            (pl.col("_row_idx") // tf_days + 1).cast(pl.Int64).alias("bar_seq"),
+            (pl.col("_row_idx") % tf_days + 1).cast(pl.Int64).alias("pos_in_bar"),
+        ]
+    ).drop("_row_idx")
+
+    # Rename columns for shared helpers
+    drop_cols = [c for c in ["time_open"] if c in df.columns]
+    if drop_cols:
+        df = df.drop(drop_cols)
+    df = df.rename({"timestamp": "ts", "time_high": "timehigh", "time_low": "timelow"})
+
+    # Cast timestamps to tz-naive Datetime(us)
+    for col in ["ts", "timehigh", "timelow"]:
+        if col in df.columns:
+            dtype = df[col].dtype
+            if dtype != pl.Datetime("us"):
+                df = df.with_columns(pl.col(col).cast(pl.Datetime("us")).alias(col))
+
+    # Cumulative OHLCV
+    df = apply_ohlcv_cumulative_aggregations(df, group_col="bar_seq")
+
+    # Extrema timestamps
+    df = compute_extrema_timestamps_with_new_extreme_detection(
+        df,
+        group_col="bar_seq",
+        ts_col="ts",
+        timehigh_col="timehigh",
+        timelow_col="timelow",
+    )
+
+    # Missing days
+    df = compute_missing_days_gaps(df, group_col="bar_seq", ts_col="ts")
+
+    # Time columns
+    one_ms = pl.duration(milliseconds=1)
+    df = df.with_columns(
+        [
+            (pl.col("ts").shift(1) + one_ms)
+            .fill_null(pl.col("ts") - pl.duration(days=1) + one_ms)
+            .alias("time_open"),
+            pl.col("ts").alias("time_close"),
+            (pl.col("ts").shift(1) + one_ms)
+            .fill_null(pl.col("ts") - pl.duration(days=1) + one_ms)
+            .first()
+            .over("bar_seq")
+            .alias("time_open_bar"),
+            (
+                (pl.col("ts").shift(1) + one_ms)
+                .fill_null(pl.col("ts") - pl.duration(days=1) + one_ms)
+                .first()
+                .over("bar_seq")
+                + pl.duration(days=tf_days)
+            ).alias("time_close_bar"),
+            (pl.col("ts") + one_ms).alias("last_ts_half_open"),
         ]
     )
 
-    # Reorder columns to match expected schema
-    expected_cols = [
-        "id",
-        "tf",
-        "tf_days",
-        "bar_seq",
-        "time_open",
-        "time_close",
-        "time_high",
-        "time_low",
-        "open",
-        "high",
-        "low",
-        "close",
-        "volume",
-        "market_cap",
-        "timestamp",
-        "is_partial_start",
-        "is_partial_end",
-        "is_missing_days",
-        "count_days",
-        "count_missing_days",
-    ]
+    # Bookkeeping
+    df = df.with_columns(
+        [
+            pl.col("pos_in_bar").alias("count_days"),
+            pl.lit(tf_days).cast(pl.Int64).alias("tf_days"),
+            (tf_days - pl.col("pos_in_bar"))
+            .cast(pl.Int64)
+            .alias("count_days_remaining"),
+            (pl.col("pos_in_bar") < tf_days).alias("is_partial_end"),
+            pl.lit(False).alias("is_partial_start"),
+            (pl.col("count_missing_days") > 0).alias("is_missing_days"),
+        ]
+    )
 
-    df_result = df_agg.select([c for c in expected_cols if c in df_agg.columns])
+    # Select final columns
+    out = df.select(
+        [
+            pl.col("id"),
+            pl.lit(target_tf).alias("tf"),
+            pl.col("tf_days"),
+            pl.col("bar_seq"),
+            pl.col("time_open"),
+            pl.col("time_close"),
+            pl.col("time_high"),
+            pl.col("time_low"),
+            pl.col("time_open_bar"),
+            pl.col("time_close_bar"),
+            pl.col("open_bar").cast(pl.Float64).alias("open"),
+            pl.col("high_bar").cast(pl.Float64).alias("high"),
+            pl.col("low_bar").cast(pl.Float64).alias("low"),
+            pl.col("close_bar").cast(pl.Float64).alias("close"),
+            pl.col("vol_bar").cast(pl.Float64).alias("volume"),
+            pl.col("mc_bar").cast(pl.Float64).alias("market_cap"),
+            pl.col("ts").alias("timestamp"),
+            pl.col("last_ts_half_open"),
+            pl.col("pos_in_bar").cast(pl.Int64),
+            pl.col("is_partial_start").cast(pl.Boolean),
+            pl.col("is_partial_end").cast(pl.Boolean),
+            pl.col("count_days_remaining"),
+            pl.col("is_missing_days").cast(pl.Boolean),
+            pl.col("count_days").cast(pl.Int64),
+            pl.col("count_missing_days").cast(pl.Int64),
+            pl.lit(None).cast(pl.Date).alias("first_missing_day"),
+            pl.lit(None).cast(pl.Date).alias("last_missing_day"),
+            pl.lit("price_bars_1d").alias("src_file"),
+        ]
+    )
 
-    return df_result
+    return out
+
+
+def _min_days_for_tf(tf: str) -> int:
+    """Minimum 1D bars needed before building a bar for this TF.
+
+    Mirrors _nominal_tf_days() in the calendar builders — uses conservative
+    lower bounds so we never create e.g. a 1Y_CAL bar from 2 days of data.
+
+    Returns 1 for unrecognised formats (safe pass-through for 1D etc.).
+    """
+    # Calendar: "1W_CAL_US", "3M_CAL_ANCHOR_ISO", "1Y_CAL", etc.
+    m = re.match(r"(\d+)([WMY])_", tf)
+    if m:
+        qty, unit = int(m.group(1)), m.group(2)
+        if unit == "W":
+            return qty * 7
+        if unit == "M":
+            return qty * 28
+        if unit == "Y":
+            return qty * 365
+
+    # Rolling day-count: "2D", "7D", "14D", etc.
+    m = re.match(r"(\d+)D", tf)
+    if m:
+        return int(m.group(1))
+
+    return 1
 
 
 def derive_multi_tf_bars(
@@ -497,7 +662,7 @@ def derive_multi_tf_bars(
     Returns:
         Polars DataFrame with all derived bars, ready for upsert.
     """
-    # Load 1D bars
+    # Load 1D bars (includes venue_id)
     df_1d = load_1d_bars_for_id(
         engine=engine,
         id=id,
@@ -507,21 +672,46 @@ def derive_multi_tf_bars(
     if df_1d.is_empty():
         return pl.DataFrame()
 
-    # Derive each timeframe and collect results
+    # Get unique venue_ids; process each separately to avoid cross-venue aggregation
+    venue_ids = df_1d["venue_id"].unique().to_list()
+
     all_bars = []
 
-    for tf in timeframes:
-        df_tf = aggregate_daily_to_timeframe(
-            df_daily=df_1d,
-            target_tf=tf,
-            alignment=alignment,
-            anchor_mode=anchor_mode,
-        )
+    for vid in venue_ids:
+        df_venue = df_1d.filter(pl.col("venue_id") == vid)
+        n_daily = len(df_venue)
 
-        if not df_tf.is_empty():
-            all_bars.append(df_tf)
+        # Filter out TFs that require more daily bars than available
+        applicable_tfs = [tf for tf in timeframes if _min_days_for_tf(tf) <= n_daily]
+        if len(applicable_tfs) < len(timeframes):
+            import logging
 
-    # Concatenate all timeframes
+            logger = logging.getLogger(__name__)
+            skipped = len(timeframes) - len(applicable_tfs)
+            logger.info(
+                f"ID={id}, venue_id={vid}: Skipping {skipped} TF(s) "
+                f"(need more than {n_daily} daily bar(s))"
+            )
+
+        # Drop venue_id before aggregation (not needed in groupby)
+        df_venue_clean = df_venue.drop(["venue_id"])
+
+        for tf in applicable_tfs:
+            df_tf = aggregate_daily_to_timeframe(
+                df_daily=df_venue_clean,
+                target_tf=tf,
+                alignment=alignment,
+                anchor_mode=anchor_mode,
+            )
+
+            if not df_tf.is_empty():
+                # Tag output with venue_id
+                df_tf = df_tf.with_columns(
+                    pl.lit(vid).alias("venue_id"),
+                )
+                all_bars.append(df_tf)
+
+    # Concatenate all venues and timeframes
     if not all_bars:
         return pl.DataFrame()
 

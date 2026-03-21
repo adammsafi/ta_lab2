@@ -45,86 +45,15 @@ class AuditScript:
 
 
 # All audit scripts organized by category
+# NOTE: Bar and EMA audit scripts were removed in Phase 78 (siloed tables dropped).
+# Returns audit scripts for siloed tables (cal_iso, cal_us, cal_anchor variants)
+# were also removed. Only scripts targeting _u tables or 1D integrity remain.
 ALL_AUDIT_SCRIPTS = [
-    # Bar audits
-    AuditScript(
-        name="bar_integrity",
-        script_path="bars/audit_price_bars_integrity.py",
-        description="Bar integrity checks (OHLC, time ordering)",
-        category="bars",
-    ),
-    AuditScript(
-        name="bar_samples",
-        script_path="bars/audit_price_bars_samples.py",
-        description="Bar sample data validation",
-        category="bars",
-    ),
-    AuditScript(
-        name="bar_tables",
-        script_path="bars/audit_price_bars_tables.py",
-        description="Bar table structure and coverage",
-        category="bars",
-    ),
-    # EMA audits
-    AuditScript(
-        name="ema_integrity",
-        script_path="emas/audit_ema_integrity.py",
-        description="EMA integrity checks (NaN, infinity, bounds)",
-        category="emas",
-    ),
-    AuditScript(
-        name="ema_samples",
-        script_path="emas/audit_ema_samples.py",
-        description="EMA sample data validation",
-        category="emas",
-    ),
-    AuditScript(
-        name="ema_tables",
-        script_path="emas/audit_ema_tables.py",
-        description="EMA table structure and coverage",
-        category="emas",
-    ),
-    AuditScript(
-        name="ema_coverage",
-        script_path="emas/audit_ema_expected_coverage.py",
-        description="EMA expected coverage validation",
-        category="emas",
-    ),
     # Returns audits (bars)
     AuditScript(
         name="returns_d1",
         script_path="returns/audit_returns_d1_integrity.py",
         description="Returns integrity (1D bars)",
-        category="returns",
-    ),
-    AuditScript(
-        name="returns_bars_multi_tf",
-        script_path="returns/audit_returns_bars_multi_tf_integrity.py",
-        description="Returns integrity (multi-TF bars)",
-        category="returns",
-    ),
-    AuditScript(
-        name="returns_bars_cal_iso",
-        script_path="returns/audit_returns_bars_multi_tf_cal_iso_integrity.py",
-        description="Returns integrity (calendar ISO bars)",
-        category="returns",
-    ),
-    AuditScript(
-        name="returns_bars_cal_us",
-        script_path="returns/audit_returns_bars_multi_tf_cal_us_integrity.py",
-        description="Returns integrity (calendar US bars)",
-        category="returns",
-    ),
-    AuditScript(
-        name="returns_bars_cal_anchor_iso",
-        script_path="returns/audit_returns_bars_multi_tf_cal_anchor_iso_integrity.py",
-        description="Returns integrity (calendar anchor ISO bars)",
-        category="returns",
-    ),
-    AuditScript(
-        name="returns_bars_cal_anchor_us",
-        script_path="returns/audit_returns_bars_multi_tf_cal_anchor_us_integrity.py",
-        description="Returns integrity (calendar anchor US bars)",
         category="returns",
     ),
     # Returns audits (EMAs)
@@ -138,18 +67,6 @@ ALL_AUDIT_SCRIPTS = [
         name="returns_ema_multi_tf_u",
         script_path="returns/audit_returns_ema_multi_tf_u_integrity.py",
         description="Returns integrity (multi-TF U EMAs)",
-        category="returns",
-    ),
-    AuditScript(
-        name="returns_ema_cal",
-        script_path="returns/audit_returns_ema_multi_tf_cal_integrity.py",
-        description="Returns integrity (calendar EMAs)",
-        category="returns",
-    ),
-    AuditScript(
-        name="returns_ema_cal_anchor",
-        script_path="returns/audit_returns_ema_multi_tf_cal_anchor_integrity.py",
-        description="Returns integrity (calendar anchor EMAs)",
         category="returns",
     ),
 ]

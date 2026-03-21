@@ -627,7 +627,7 @@ def _section_ic_ranking(
         "- Bar return series (ret_arith, ret_log, delta1) exhibit meaningful positive IC at 1D-10D horizons"
     )
     lines.append(
-        "- EMA crossover indicators are NOT in cmc_features; evaluated directly through signal generator walk-forward"
+        "- EMA crossover indicators are NOT in features; evaluated directly through signal generator walk-forward"
     )
     lines.append("")
     return "\n".join(lines)
@@ -1112,7 +1112,7 @@ def _section_appendix(asset_id: int, tf: str) -> str:
         "  - breakout_atr: 3 variants (lookback 20/40, trail_atr_mult 2.0/3.0)"
     )
     lines.append("  - rsi_mean_revert: 3 variants (lower/upper threshold combinations)")
-    lines.append("- **IC sweep:** 97+ cmc_features columns evaluated on BTC 1D")
+    lines.append("- **IC sweep:** 97+ features columns evaluated on BTC 1D")
     lines.append(
         "- **Cost matrix:** 12 scenarios (4 fee/venue combos x 3 slippage levels)"
     )
@@ -1149,7 +1149,7 @@ def _section_appendix(asset_id: int, tf: str) -> str:
     lines.append("| Source | Description | Location |")
     lines.append("|--------|-------------|----------|")
     lines.append(
-        "| feature_ic_ranking.csv | IC/IC-IR for all cmc_features columns | reports/bakeoff/ |"
+        "| feature_ic_ranking.csv | IC/IC-IR for all features columns | reports/bakeoff/ |"
     )
     lines.append(
         "| composite_scores.csv | Composite scores under 4 weighting schemes | reports/bakeoff/ |"
@@ -1160,14 +1160,12 @@ def _section_appendix(asset_id: int, tf: str) -> str:
     lines.append(
         "| final_validation.csv | Full-sample backtest for selected strategies | reports/bakeoff/ |"
     )
-    lines.append(
-        "| cmc_ic_results | Raw IC results (all asset/TF pairs) | PostgreSQL DB |"
-    )
+    lines.append("| ic_results | Raw IC results (all asset/TF pairs) | PostgreSQL DB |")
     lines.append(
         "| strategy_bakeoff_results | Walk-forward metrics per fold | PostgreSQL DB |"
     )
     lines.append(
-        "| cmc_backtest_runs/trades/metrics | Individual backtest runs | PostgreSQL DB |"
+        "| backtest_runs/trades/metrics | Individual backtest runs | PostgreSQL DB |"
     )
     lines.append("| psr_results | PSR/DSR statistics per run | PostgreSQL DB |")
     lines.append("")

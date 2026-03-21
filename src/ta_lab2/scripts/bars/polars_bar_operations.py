@@ -3,11 +3,11 @@
 Polars-based bar operations for high-performance multi-timeframe bar construction.
 
 Contains 100% identical Polars operations extracted from all 5 multi-tf bar builders:
-- refresh_cmc_price_bars_multi_tf.py (modulo-based rolling)
-- refresh_cmc_price_bars_multi_tf_cal_iso.py (ISO week calendar)
-- refresh_cmc_price_bars_multi_tf_cal_us.py (US week calendar)
-- refresh_cmc_price_bars_multi_tf_cal_anchor_iso.py (ISO week anchored)
-- refresh_cmc_price_bars_multi_tf_cal_anchor_us.py (US week anchored)
+- refresh_price_bars_multi_tf.py (modulo-based rolling)
+- refresh_price_bars_multi_tf_cal_iso.py (ISO week calendar)
+- refresh_price_bars_multi_tf_cal_us.py (US week calendar)
+- refresh_price_bars_multi_tf_cal_anchor_iso.py (ISO week anchored)
+- refresh_price_bars_multi_tf_cal_anchor_us.py (US week anchored)
 
 All functions are pure, stateless, and operate on Polars DataFrames with bar_seq grouping.
 

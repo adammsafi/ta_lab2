@@ -207,7 +207,7 @@ def seed_assets(engine, discovered: list[dict], dry_run: bool = False) -> dict:
                             UPDATE dim_assets
                             SET symbol = :symbol,
                                 name = :name,
-                                data_source = COALESCE(data_source, 'CMC'),
+                                data_source = 'TVC',
                                 updated_at = NOW()
                             WHERE id = :id AND (symbol = :id_str OR symbol = :symbol)
                         """),
@@ -228,10 +228,11 @@ def seed_assets(engine, discovered: list[dict], dry_run: bool = False) -> dict:
                     conn.execute(
                         text("""
                             INSERT INTO dim_assets (id, asset_class, symbol, name, data_source)
-                            VALUES (:id, :asset_class, :symbol, :name, 'CMC')
+                            VALUES (:id, :asset_class, :symbol, :name, 'TVC')
                             ON CONFLICT (id) DO UPDATE SET
                                 symbol = EXCLUDED.symbol,
                                 name = EXCLUDED.name,
+                                data_source = 'TVC',
                                 updated_at = NOW()
                         """),
                         {

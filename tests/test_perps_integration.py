@@ -104,7 +104,7 @@ def _perp_position_row(
     avg_entry_price: float = 48000.0,
 ) -> MagicMock:
     """
-    Simulate cmc_perp_positions row.
+    Simulate perp_positions row.
 
     With empty tiers (MM=5% default):
         maintenance_margin = mark_price * quantity * 0.05 = 50000 * 1.0 * 0.05 = 2500

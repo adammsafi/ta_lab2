@@ -6,12 +6,12 @@ On promotion:
   1. Validates BH-corrected p-values at a user-supplied alpha threshold.
   2. Writes to dim_feature_registry with lifecycle='promoted'.
   3. Generates an Alembic migration stub in alembic/versions/ that adds
-     a NUMERIC nullable column to cmc_features.
+     a NUMERIC nullable column to features.
   4. Prints manual-step instructions for wiring the feature into the
-     cmc_features refresh pipeline.
+     features refresh pipeline.
 
 Deprecation is non-destructive: sets lifecycle='deprecated' in
-dim_feature_registry but does NOT remove the cmc_features column or
+dim_feature_registry but does NOT remove the features column or
 purge experiment rows.
 """
 
@@ -148,7 +148,7 @@ class FeaturePromoter:
         ----------
         ic_results_df:
             DataFrame with at least an 'ic_p_value' column. Typically
-            loaded from cmc_feature_experiments.
+            loaded from feature_experiments.
         alpha:
             BH significance threshold. Default 0.05.
         min_pass_rate:
@@ -218,7 +218,7 @@ class FeaturePromoter:
         """Promote a feature from experimental to promoted lifecycle.
 
         Steps:
-        1. Load experiment results from cmc_feature_experiments or cmc_ic_results.
+        1. Load experiment results from feature_experiments or ic_results.
         2. Apply BH gate -- raise PromotionRejectedError if it fails.
         3. Find best IC row among BH-significant results.
         4. Optionally confirm with user.
@@ -230,8 +230,8 @@ class FeaturePromoter:
         Parameters
         ----------
         feature_name:
-            Name of the feature to promote (must match cmc_feature_experiments
-            or cmc_ic_results depending on ``source``).
+            Name of the feature to promote (must match feature_experiments
+            or ic_results depending on ``source``).
         alpha:
             BH significance threshold (default 0.05).
         min_pass_rate:
@@ -241,10 +241,10 @@ class FeaturePromoter:
             for non-interactive use.
         source:
             Which table to load IC results from. One of:
-            - ``"auto"`` (default): try cmc_feature_experiments first; fall
-              back to cmc_ic_results if empty.
-            - ``"feature_experiments"``: query cmc_feature_experiments only.
-            - ``"ic_results"``: query cmc_ic_results only (for bar-level
+            - ``"auto"`` (default): try feature_experiments first; fall
+              back to ic_results if empty.
+            - ``"feature_experiments"``: query feature_experiments only.
+            - ``"ic_results"``: query ic_results only (for bar-level
               features whose IC data is written by run_ic_sweep.py).
 
         Returns
@@ -265,7 +265,7 @@ class FeaturePromoter:
             if source == "auto":
                 raise ValueError(
                     f"No experiment results found for feature '{feature_name}' "
-                    "in cmc_feature_experiments or cmc_ic_results."
+                    "in feature_experiments or ic_results."
                 )
             else:
                 raise ValueError(
@@ -337,8 +337,8 @@ class FeaturePromoter:
     def deprecate_feature(self, feature_name: str) -> None:
         """Deprecate a feature by setting lifecycle='deprecated'.
 
-        Non-destructive: does NOT remove the column from cmc_features and
-        does NOT delete rows from cmc_feature_experiments (audit trail preserved).
+        Non-destructive: does NOT remove the column from features and
+        does NOT delete rows from feature_experiments (audit trail preserved).
 
         Parameters
         ----------
@@ -359,7 +359,7 @@ class FeaturePromoter:
             )
         print(
             f"Feature '{feature_name}' deprecated. "
-            "Column remains in cmc_features but will no longer be computed."
+            "Column remains in features but will no longer be computed."
         )
 
     # ------------------------------------------------------------------
@@ -376,10 +376,10 @@ class FeaturePromoter:
         feature_name:
             Feature name to query.
         source:
-            - ``"feature_experiments"``: query cmc_feature_experiments only.
-            - ``"ic_results"``: query cmc_ic_results only.
-            - ``"auto"`` (default): try cmc_feature_experiments first; fall
-              back to cmc_ic_results if the result is empty.
+            - ``"feature_experiments"``: query feature_experiments only.
+            - ``"ic_results"``: query ic_results only.
+            - ``"auto"`` (default): try feature_experiments first; fall
+              back to ic_results if the result is empty.
 
         Returns
         -------
@@ -407,7 +407,7 @@ class FeaturePromoter:
                         ic_p_value,
                         ic_ir,
                         n_obs
-                    FROM public.cmc_feature_experiments
+                    FROM public.feature_experiments
                     WHERE feature_name = :name
                     ORDER BY horizon, asset_id, tf
                     """
@@ -421,19 +421,19 @@ class FeaturePromoter:
         if source == "feature_experiments":
             return pd.DataFrame()
 
-        # "auto" fallback: try cmc_ic_results
+        # "auto" fallback: try ic_results
         return self._load_ic_results(feature_name)
 
     def _load_ic_results(self, feature_name: str) -> pd.DataFrame:
-        """Load IC results from cmc_ic_results for a feature.
+        """Load IC results from ic_results for a feature.
 
-        Maps cmc_ic_results columns to the same names used by
-        cmc_feature_experiments so callers (check_bh_gate, promote_feature)
+        Maps ic_results columns to the same names used by
+        feature_experiments so callers (check_bh_gate, promote_feature)
         can treat either source uniformly.
 
         Column mapping
         --------------
-        cmc_ic_results.feature  -> feature_name
+        ic_results.feature  -> feature_name
         All other IC columns (asset_id, tf, horizon, return_type, regime_col,
         regime_label, ic, ic_t_stat, ic_p_value, ic_ir, n_obs) are selected
         directly -- they share identical names in both tables.
@@ -441,7 +441,7 @@ class FeaturePromoter:
         Parameters
         ----------
         feature_name:
-            Value of cmc_ic_results.feature to filter on.
+            Value of ic_results.feature to filter on.
 
         Returns
         -------
@@ -465,7 +465,7 @@ class FeaturePromoter:
                         ic_p_value,
                         ic_ir,
                         n_obs
-                    FROM public.cmc_ic_results
+                    FROM public.ic_results
                     WHERE feature = :name
                     ORDER BY horizon, asset_id, tf
                     """
@@ -592,7 +592,7 @@ class FeaturePromoter:
         Parameters
         ----------
         feature_name:
-            Name of the feature to add as a NUMERIC column to cmc_features.
+            Name of the feature to add as a NUMERIC column to features.
 
         Returns
         -------
@@ -652,17 +652,17 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    """Add promoted feature column to cmc_features."""
+    """Add promoted feature column to features."""
     op.add_column(
-        "cmc_features",
+        "features",
         sa.Column("{column_name}", sa.Numeric(), nullable=True),
         schema="public",
     )
 
 
 def downgrade() -> None:
-    """Remove promoted feature column from cmc_features."""
-    op.drop_column("cmc_features", "{column_name}", schema="public")
+    """Remove promoted feature column from features."""
+    op.drop_column("features", "{column_name}", schema="public")
 '''
 
         versions_dir = _find_alembic_versions_dir()

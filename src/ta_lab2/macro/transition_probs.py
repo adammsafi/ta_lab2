@@ -3,9 +3,9 @@
 Regime transition probability matrix builder (MREG-12).
 
 Computes static (full-history) and rolling (252-day) transition probability
-matrices from both rule-based (cmc_macro_regimes) and HMM (cmc_hmm_regimes)
+matrices from both rule-based (macro_regimes) and HMM (hmm_regimes)
 regime label sequences. Results are row-normalized (each row sums to 1.0)
-and upserted to cmc_macro_transition_probs.
+and upserted to macro_transition_probs.
 
 Key design decisions:
 - DISTINCT ON (date) in _load_hmm_regimes: expanding-window HMM refits produce
@@ -25,7 +25,7 @@ Usage:
     tpm = TransitionProbMatrix(engine)
     df = tpm.compute_all()
     rows = tpm.upsert_results(df)
-    print(f"Upserted {rows} rows to cmc_macro_transition_probs")
+    print(f"Upserted {rows} rows to macro_transition_probs")
 
     # Programmatic access
     prob = get_transition_prob(engine, "favorable", "adverse", window_type="static")
@@ -58,12 +58,12 @@ class TransitionProbMatrix:
     """Compute static and rolling regime transition probability matrices.
 
     Supports two regime sources:
-        - "rule_based": labels from cmc_macro_regimes (MacroRegimeClassifier)
-        - "hmm": labels from cmc_hmm_regimes (HMMClassifier BIC winner)
+        - "rule_based": labels from macro_regimes (MacroRegimeClassifier)
+        - "hmm": labels from hmm_regimes (HMMClassifier BIC winner)
 
     The output shape is a flat DataFrame where each row represents a single
     (from_state, to_state) cell of the transition matrix, shaped for upsert
-    into cmc_macro_transition_probs.
+    into macro_transition_probs.
     """
 
     def __init__(self, engine: Engine, rolling_window_days: int = ROLLING_WINDOW_DAYS):
@@ -73,7 +73,7 @@ class TransitionProbMatrix:
     # ── Regime label loaders ──────────────────────────────────────────────
 
     def _load_rule_based_regimes(self) -> pd.DataFrame:
-        """Load rule-based macro regime labels from cmc_macro_regimes.
+        """Load rule-based macro regime labels from macro_regimes.
 
         Returns DataFrame with 'date' index and 'macro_state' column.
         Returns empty DataFrame if table is empty or does not exist.
@@ -81,7 +81,7 @@ class TransitionProbMatrix:
         try:
             query = text(
                 "SELECT date, macro_state "
-                "FROM cmc_macro_regimes "
+                "FROM macro_regimes "
                 "WHERE profile = 'default' "
                 "ORDER BY date ASC"
             )
@@ -89,7 +89,7 @@ class TransitionProbMatrix:
                 rows = conn.execute(query).fetchall()
         except Exception as exc:  # noqa: BLE001
             logger.warning(
-                "_load_rule_based_regimes: cmc_macro_regimes unavailable (%s). "
+                "_load_rule_based_regimes: macro_regimes unavailable (%s). "
                 "Run refresh_macro_regimes.py first.",
                 exc,
             )
@@ -97,7 +97,7 @@ class TransitionProbMatrix:
 
         if not rows:
             logger.warning(
-                "_load_rule_based_regimes: cmc_macro_regimes has no 'default' profile rows. "
+                "_load_rule_based_regimes: macro_regimes has no 'default' profile rows. "
                 "Run refresh_macro_regimes.py to populate."
             )
             return pd.DataFrame()
@@ -109,7 +109,7 @@ class TransitionProbMatrix:
         return df
 
     def _load_hmm_regimes(self, n_states: int | None = None) -> pd.DataFrame:
-        """Load HMM regime labels from cmc_hmm_regimes.
+        """Load HMM regime labels from hmm_regimes.
 
         When n_states is None, uses the BIC winner rows. DISTINCT ON (date)
         is applied so that each date returns exactly one row -- the most recent
@@ -129,7 +129,7 @@ class TransitionProbMatrix:
                 # BIC winner path: latest model_run_date per date, is_bic_winner=true
                 query = text(
                     "SELECT DISTINCT ON (date) date, state_label "
-                    "FROM cmc_hmm_regimes "
+                    "FROM hmm_regimes "
                     "WHERE is_bic_winner = true "
                     "ORDER BY date, model_run_date DESC"
                 )
@@ -138,10 +138,10 @@ class TransitionProbMatrix:
                 # Explicit n_states path: most recent model_run_date for that n_states
                 query = text(
                     "SELECT DISTINCT ON (date) date, state_label "
-                    "FROM cmc_hmm_regimes "
+                    "FROM hmm_regimes "
                     "WHERE n_states = :n_states "
                     "  AND model_run_date = ("
-                    "      SELECT MAX(model_run_date) FROM cmc_hmm_regimes "
+                    "      SELECT MAX(model_run_date) FROM hmm_regimes "
                     "      WHERE n_states = :n_states"
                     "  ) "
                     "ORDER BY date"
@@ -153,7 +153,7 @@ class TransitionProbMatrix:
 
         except Exception as exc:  # noqa: BLE001
             logger.warning(
-                "_load_hmm_regimes: cmc_hmm_regimes unavailable (%s). "
+                "_load_hmm_regimes: hmm_regimes unavailable (%s). "
                 "Run refresh_macro_analytics.py --hmm-only first.",
                 exc,
             )
@@ -161,7 +161,7 @@ class TransitionProbMatrix:
 
         if not rows:
             logger.warning(
-                "_load_hmm_regimes: no %s rows found in cmc_hmm_regimes. "
+                "_load_hmm_regimes: no %s rows found in hmm_regimes. "
                 "Run refresh_macro_analytics.py --hmm-only to populate.",
                 "BIC winner" if n_states is None else f"n_states={n_states}",
             )
@@ -349,7 +349,7 @@ class TransitionProbMatrix:
 
         Returns
         -------
-        DataFrame shaped for cmc_macro_transition_probs upsert.
+        DataFrame shaped for macro_transition_probs upsert.
         """
         df = self._load_labels(regime_source)
         if df.empty:
@@ -406,7 +406,7 @@ class TransitionProbMatrix:
 
         Returns
         -------
-        DataFrame shaped for cmc_macro_transition_probs upsert.
+        DataFrame shaped for macro_transition_probs upsert.
         All rolling windows concatenated.
         """
         df = self._load_labels(regime_source)
@@ -489,7 +489,7 @@ class TransitionProbMatrix:
         Returns
         -------
         Combined DataFrame with all four combinations, shaped for
-        cmc_macro_transition_probs upsert.
+        macro_transition_probs upsert.
         """
         frames: list[pd.DataFrame] = []
         sources_processed: list[str] = []
@@ -510,7 +510,7 @@ class TransitionProbMatrix:
         if not frames:
             logger.warning(
                 "compute_all: no transition rows produced. "
-                "Ensure cmc_macro_regimes and cmc_hmm_regimes have data."
+                "Ensure macro_regimes and hmm_regimes have data."
             )
             return pd.DataFrame()
 
@@ -525,7 +525,7 @@ class TransitionProbMatrix:
     # ── DB upsert ─────────────────────────────────────────────────────────
 
     def upsert_results(self, df: pd.DataFrame) -> int:
-        """Upsert transition probability DataFrame into cmc_macro_transition_probs.
+        """Upsert transition probability DataFrame into macro_transition_probs.
 
         Uses temp table + ON CONFLICT (regime_source, window_type,
         window_end_date, from_state, to_state) DO UPDATE pattern.
@@ -585,7 +585,7 @@ class TransitionProbMatrix:
             conn.execute(
                 text(
                     "CREATE TEMP TABLE _tp_staging "
-                    "(LIKE cmc_macro_transition_probs INCLUDING DEFAULTS) "
+                    "(LIKE macro_transition_probs INCLUDING DEFAULTS) "
                     "ON COMMIT DROP"
                 )
             )
@@ -600,7 +600,7 @@ class TransitionProbMatrix:
 
             result = conn.execute(
                 text(
-                    f"INSERT INTO cmc_macro_transition_probs ({col_list}) "
+                    f"INSERT INTO macro_transition_probs ({col_list}) "
                     f"SELECT {col_list} FROM _tp_staging "
                     f"ON CONFLICT (regime_source, window_type, window_end_date, from_state, to_state) "
                     f"DO UPDATE SET {set_clause}"
@@ -639,7 +639,7 @@ def get_transition_prob(
 ) -> float | None:
     """Get transition probability for a specific regime-to-regime pair.
 
-    Queries cmc_macro_transition_probs for the probability of transitioning
+    Queries macro_transition_probs for the probability of transitioning
     from from_state to to_state under the specified regime_source and
     window_type.
 
@@ -675,7 +675,7 @@ def get_transition_prob(
     # have different date ranges (e.g. HMM starts later than rule-based).
     query = text(
         "SELECT probability "
-        "FROM cmc_macro_transition_probs "
+        "FROM macro_transition_probs "
         "WHERE regime_source = :src "
         "  AND window_type = :wt "
         "  AND from_state = :fs "
@@ -683,7 +683,7 @@ def get_transition_prob(
         "  AND window_end_date = COALESCE( "
         "        :date::date, "
         "        (SELECT MAX(window_end_date) "
-        "         FROM cmc_macro_transition_probs "
+        "         FROM macro_transition_probs "
         "         WHERE regime_source = :src AND window_type = :wt) "
         "      )"
     )
@@ -705,7 +705,7 @@ def get_transition_prob(
     except Exception as exc:  # noqa: BLE001
         logger.warning(
             "get_transition_prob: query failed (%s). "
-            "Ensure cmc_macro_transition_probs is populated.",
+            "Ensure macro_transition_probs is populated.",
             exc,
         )
         return None

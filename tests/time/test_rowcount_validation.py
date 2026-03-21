@@ -364,7 +364,7 @@ def test_validate_rowcounts_returns_dataframe():
 
     df = validate_rowcounts(
         engine=engine,
-        table="cmc_ema_multi_tf_u",
+        table="ema_multi_tf_u",
         schema="public",
         ids=[1],  # Small scope
         tfs=["1D"],  # Single TF
@@ -391,7 +391,7 @@ def test_validate_rowcounts_no_crash_on_empty():
     # Use a non-existent ID (assuming 999999 doesn't exist)
     df = validate_rowcounts(
         engine=engine,
-        table="cmc_ema_multi_tf_u",
+        table="ema_multi_tf_u",
         schema="public",
         ids=[999999],
         tfs=["1D"],

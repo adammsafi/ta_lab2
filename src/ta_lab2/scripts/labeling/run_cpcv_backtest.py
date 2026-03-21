@@ -12,8 +12,8 @@ Each OOS Sharpe is computed by:
   2. Calling make_signals() to generate fresh entries/exits on that fold
   3. Deriving a position series and computing strategy returns with transaction costs
 
-Purging uses t1_series from cmc_triple_barrier_labels to prevent lookahead leakage.
-EMA columns (ema_9, ema_21, ema_50) are pre-joined from cmc_ema_multi_tf_u BEFORE
+Purging uses t1_series from triple_barrier_labels to prevent lookahead leakage.
+EMA columns (ema_9, ema_21, ema_50) are pre-joined from ema_multi_tf_u BEFORE
 the CPCV loop to ensure every test fold slice contains the required signal columns.
 
 Usage:
@@ -181,7 +181,7 @@ def _check_preconditions(
     with engine.connect() as conn:
         label_count = conn.execute(
             text(
-                "SELECT count(*) FROM cmc_triple_barrier_labels "
+                "SELECT count(*) FROM triple_barrier_labels "
                 "WHERE asset_id = :id AND tf = :tf AND pt_multiplier = :pt "
                 "AND sl_multiplier = :sl AND vertical_bars = :vb"
             ),
@@ -212,9 +212,9 @@ def _check_preconditions(
 
 def _build_features_with_ema(engine, asset_id: int, tf: str) -> pd.DataFrame:
     """
-    Load cmc_features and pre-join pivoted EMA columns from cmc_ema_multi_tf_u.
+    Load features and pre-join pivoted EMA columns from ema_multi_tf_u.
 
-    cmc_ema_multi_tf_u has columns: id, ts, tf, period, ema, d1, d2, ...
+    ema_multi_tf_u has columns: id, ts, tf, period, ema, d1, d2, ...
     The 'period' column contains values like 9, 21, 50, 200.
     The 'ema' column contains the EMA value for that period.
 
@@ -226,21 +226,21 @@ def _build_features_with_ema(engine, asset_id: int, tf: str) -> pd.DataFrame:
     make_signals() for ema_crossover.
 
     Returns:
-        features_df: DataFrame indexed by tz-aware UTC ts with all cmc_features columns
-                     plus ema_9, ema_21, ema_50 from cmc_ema_multi_tf_u.
+        features_df: DataFrame indexed by tz-aware UTC ts with all features columns
+                     plus ema_9, ema_21, ema_50 from ema_multi_tf_u.
     """
     # 1. Load all features for this asset/tf
-    logger.info(f"Loading cmc_features for asset_id={asset_id} tf={tf} ...")
+    logger.info(f"Loading features for asset_id={asset_id} tf={tf} ...")
     with engine.connect() as conn:
         features_df = pd.read_sql(
-            text("SELECT * FROM cmc_features WHERE id = :id AND tf = :tf ORDER BY ts"),
+            text("SELECT * FROM features WHERE id = :id AND tf = :tf ORDER BY ts"),
             conn,
             params={"id": asset_id, "tf": tf},
         )
 
     if features_df.empty:
         raise ValueError(
-            f"No features found in cmc_features for asset_id={asset_id} tf={tf}. "
+            f"No features found in features for asset_id={asset_id} tf={tf}. "
             f"Run feature refresh first."
         )
 
@@ -248,18 +248,18 @@ def _build_features_with_ema(engine, asset_id: int, tf: str) -> pd.DataFrame:
     features_df["ts"] = pd.to_datetime(features_df["ts"], utc=True)
     features_df = features_df.set_index("ts").sort_index()
 
-    logger.info(f"  cmc_features: {len(features_df)} rows")
+    logger.info(f"  features: {len(features_df)} rows")
 
     # 2. Load EMA data for required periods
     ema_periods = [9, 21, 50]
     logger.info(
-        f"Loading cmc_ema_multi_tf_u for asset_id={asset_id} tf={tf} "
+        f"Loading ema_multi_tf_u for asset_id={asset_id} tf={tf} "
         f"periods={ema_periods} ..."
     )
     with engine.connect() as conn:
         ema_df = pd.read_sql(
             text(
-                "SELECT ts, period, ema FROM cmc_ema_multi_tf_u "
+                "SELECT ts, period, ema FROM ema_multi_tf_u "
                 "WHERE id = :id AND tf = :tf AND period = ANY(:periods) ORDER BY ts"
             ),
             conn,
@@ -268,7 +268,7 @@ def _build_features_with_ema(engine, asset_id: int, tf: str) -> pd.DataFrame:
 
     if ema_df.empty:
         logger.warning(
-            f"No EMA data found in cmc_ema_multi_tf_u for asset_id={asset_id} tf={tf}. "
+            f"No EMA data found in ema_multi_tf_u for asset_id={asset_id} tf={tf}. "
             f"EMA columns will be missing (ema_crossover signal will fail)."
         )
     else:
@@ -318,7 +318,7 @@ def _load_t1_series(
     with engine.connect() as conn:
         labels_df = pd.read_sql(
             text(
-                "SELECT t0, t1 FROM cmc_triple_barrier_labels "
+                "SELECT t0, t1 FROM triple_barrier_labels "
                 "WHERE asset_id = :id AND tf = :tf "
                 "AND pt_multiplier = :pt AND sl_multiplier = :sl AND vertical_bars = :vb "
                 "ORDER BY t0"

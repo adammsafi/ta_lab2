@@ -141,8 +141,8 @@ fills_sql = text(\"\"\"
                 ELSE                       -f.fill_price * f.fill_qty
             END
         ) AS daily_pnl
-    FROM cmc_fills f
-    JOIN cmc_orders o ON f.order_id = o.order_id
+    FROM fills f
+    JOIN orders o ON f.order_id = o.order_id
     WHERE f.filled_at::date BETWEEN :s AND :e
     GROUP BY f.filled_at::date
     ORDER BY f.filled_at::date
@@ -150,7 +150,7 @@ fills_sql = text(\"\"\"
 # Drift replay P&L
 drift_sql = text(\"\"\"
     SELECT metric_date, config_id, paper_cumulative_pnl
-    FROM cmc_drift_metrics
+    FROM drift_metrics
     WHERE metric_date BETWEEN :s AND :e
       AND paper_cumulative_pnl IS NOT NULL
     ORDER BY config_id, metric_date
@@ -201,9 +201,9 @@ slip_sql = text(\"\"\"
     SELECT
         ABS(f.fill_price::float - pb.open::float)
             / NULLIF(pb.open::float, 0) * 10000 AS slippage_bps
-    FROM cmc_fills f
-    JOIN cmc_orders o ON f.order_id = o.order_id
-    JOIN cmc_price_bars_multi_tf pb
+    FROM fills f
+    JOIN orders o ON f.order_id = o.order_id
+    JOIN price_bars_multi_tf pb
         ON  pb.id   = o.asset_id
         AND pb.tf   = '1D'
         AND pb.ts::date = f.filled_at::date
@@ -243,7 +243,7 @@ fig2.show()
     cell9_source = """\
 te_sql = text(\"\"\"
     SELECT metric_date, tracking_error_5d, tracking_error_30d
-    FROM cmc_drift_metrics
+    FROM drift_metrics
     WHERE metric_date BETWEEN :s AND :e
     ORDER BY metric_date
 \"\"\")

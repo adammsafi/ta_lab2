@@ -4,10 +4,10 @@ CLI script for cross-asset aggregation refresh (Phase 70, XAGG-01 through XAGG-0
 
 Orchestrates all four cross-asset signal computations in sequence:
   XAGG-01/02: BTC/ETH 30d correlation + average pairwise correlation with
-              high_corr_flag -> cmc_cross_asset_agg
-  XAGG-03:   Aggregate funding rate with 30d/90d z-scores -> cmc_funding_rate_agg
+              high_corr_flag -> cross_asset_agg
+  XAGG-03:   Aggregate funding rate with 30d/90d z-scores -> funding_rate_agg
   XAGG-04:   Crypto-macro correlation regime with sign-flip detection
-             -> crypto_macro_corr_regimes + cmc_macro_regimes.crypto_macro_corr
+             -> crypto_macro_corr_regimes + macro_regimes.crypto_macro_corr
 
 Follows the same patterns as refresh_macro_regimes.py and refresh_macro_analytics.py:
 watermark-based incremental refresh, temp table + ON CONFLICT upsert, dry-run support.
@@ -51,7 +51,7 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(
         description=(
             "Compute cross-asset aggregation signals (XAGG-01 through XAGG-04) "
-            "and upsert results to cmc_cross_asset_agg, cmc_funding_rate_agg, "
+            "and upsert results to cross_asset_agg, funding_rate_agg, "
             "and crypto_macro_corr_regimes."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -220,7 +220,7 @@ Examples:
 
                 if args.dry_run:
                     print(
-                        f"\n[DRY RUN] Would upsert {len(corr_df)} rows to cmc_cross_asset_agg"
+                        f"\n[DRY RUN] Would upsert {len(corr_df)} rows to cross_asset_agg"
                     )
                     print("\nSample output (last 5 rows):")
                     print(corr_df.tail(5).to_string())
@@ -255,7 +255,7 @@ Examples:
             if funding_df.empty:
                 print(
                     "[WARN] No funding rate data computed "
-                    "(cmc_funding_rates may not be populated?)"
+                    "(funding_rates may not be populated?)"
                 )
             else:
                 print(
@@ -266,7 +266,7 @@ Examples:
                 if args.dry_run:
                     print(
                         f"\n[DRY RUN] Would upsert {len(funding_df)} rows to "
-                        "cmc_funding_rate_agg"
+                        "funding_rate_agg"
                     )
                     print("\nSample output (last 10 rows):")
                     print(funding_df.tail(10).to_string())
@@ -322,7 +322,7 @@ Examples:
                     )
                     print(
                         f"[DRY RUN] Would update {len(macro_regime_df)} rows in "
-                        "cmc_macro_regimes.crypto_macro_corr"
+                        "macro_regimes.crypto_macro_corr"
                     )
                     print("\nSample correlation output (last 10 rows):")
                     print(macro_corr_df.tail(10).to_string())

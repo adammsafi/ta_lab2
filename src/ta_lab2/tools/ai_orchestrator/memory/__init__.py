@@ -1,14 +1,13 @@
 """Memory integration for AI orchestrator.
 
-Provides ChromaDB client, semantic search, context injection,
-incremental updates, REST API for cross-platform access,
-duplicate detection, and relationship linking.
+Provides Mem0/Qdrant-backed semantic search, context injection,
+MCP tools for cross-platform access, duplicate detection,
+and relationship linking.
 
 Quick start:
     from ta_lab2.tools.ai_orchestrator.memory import (
         search_memories,
         inject_memory_context,
-        validate_memory_store
     )
 
     # Search memories
@@ -32,11 +31,10 @@ Quick start:
     # Test queries
     result = validate_queries()
 
-Run API server:
-    uvicorn ta_lab2.tools.ai_orchestrator.memory.api:app --port 8080
+Run MCP server:
+    uvicorn ta_lab2.tools.ai_orchestrator.memory.server:app --host 0.0.0.0 --port 8080
 """
 
-from .client import MemoryClient, get_memory_client, reset_memory_client
 from .validation import (
     MemoryValidationResult,
     validate_memory_store,
@@ -65,14 +63,7 @@ from .injection import (
     build_augmented_prompt,
     estimate_context_tokens,
 )
-from .api import (
-    create_memory_api,
-    MemorySearchRequest,
-    MemorySearchResponse,
-    MemoryStatsResponse,
-    ContextInjectionRequest,
-    ContextInjectionResponse,
-)
+from .api import create_memory_api
 from .mem0_config import Mem0Config, create_mem0_config
 from .mem0_client import (
     Mem0Client,
@@ -130,10 +121,6 @@ from .query_validation import (
 )
 
 __all__ = [
-    # Client
-    "MemoryClient",
-    "get_memory_client",
-    "reset_memory_client",
     # Mem0 Integration
     "Mem0Config",
     "create_mem0_config",
@@ -181,13 +168,8 @@ __all__ = [
     "inject_memory_context",
     "build_augmented_prompt",
     "estimate_context_tokens",
-    # API
+    # API (MCP server factory)
     "create_memory_api",
-    "MemorySearchRequest",
-    "MemorySearchResponse",
-    "MemoryStatsResponse",
-    "ContextInjectionRequest",
-    "ContextInjectionResponse",
     # Indexing
     "FunctionInfo",
     "FunctionExtractor",

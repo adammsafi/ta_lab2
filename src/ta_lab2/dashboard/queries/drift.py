@@ -37,7 +37,7 @@ def load_drift_timeseries(_engine, config_id: int, days: int = 30) -> pd.DataFra
             replay_pit_cumulative_pnl,
             threshold_breach,
             drift_pct_of_threshold
-        FROM public.cmc_drift_metrics
+        FROM public.drift_metrics
         WHERE config_id = :config_id
           AND metric_date >= CURRENT_DATE - :days
         ORDER BY metric_date ASC

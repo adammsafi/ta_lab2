@@ -32,7 +32,7 @@ from ta_lab2.dashboard.queries.trading import load_open_positions
 AUTO_REFRESH_SECONDS = 900  # 15 minutes
 
 # ---------------------------------------------------------------------------
-# Known event_type values from cmc_risk_events CHECK constraint
+# Known event_type values from risk_events CHECK constraint
 # ---------------------------------------------------------------------------
 RISK_EVENT_TYPES: list[str] = [
     "kill_switch_activated",

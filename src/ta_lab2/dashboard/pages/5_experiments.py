@@ -2,7 +2,7 @@
 """
 Feature Experiments page -- Streamlit Dashboard.
 
-Displays cmc_feature_experiments results including IC scores,
+Displays feature_experiments results including IC scores,
 BH-corrected significance, and feature comparison across assets and horizons.
 
 NOTE: Do NOT call st.set_page_config() here -- it is called in the main app

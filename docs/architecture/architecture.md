@@ -105,10 +105,10 @@ Root package: `ta_lab2`
 
 **EMA Tables:**
 - `cmc_ema_daily`: Daily EMAs (1D timeframe only)
-- `cmc_ema_multi_tf`: Multi-timeframe EMAs (trading-day aligned)
-- `cmc_ema_multi_tf_cal`: Multi-timeframe EMAs (calendar-aligned)
-- `cmc_ema_multi_tf_v2`: Multi-timeframe EMAs with advanced alignment
-- `cmc_ema_multi_tf_cal_anchor`: Calendar-aligned EMAs with anchor points
+- `ema_multi_tf`: Multi-timeframe EMAs (trading-day aligned)
+- `ema_multi_tf_cal`: Multi-timeframe EMAs (calendar-aligned)
+- `ema_multi_tf_v2`: Multi-timeframe EMAs with advanced alignment
+- `ema_multi_tf_cal_anchor`: Calendar-aligned EMAs with anchor points
 
 **Primary Key Pattern:** `(id, ts, tf, period)`
 - `id`: Asset ID (foreign key to `cmc_price_histories7.id`)
@@ -119,10 +119,10 @@ Root package: `ta_lab2`
 **Columns:** `ema`, `d1`, `d2`, `d1_close`, `d2_close`, `roll`
 
 **Returns and Volatility:**
-- `cmc_returns_daily`: Bar-to-bar and multi-day returns
+- `returns_daily`: Bar-to-bar and multi-day returns
   - Primary Key: `(id, ts)`
   - Columns: `ret_1d_pct`, `ret_1d_log`, `ret_2d_pct`, ..., `ret_365d_pct`, `is_outlier`
-- `cmc_vol_daily`: Volatility estimators
+- `vol_daily`: Volatility estimators
   - Primary Key: `(id, ts)`
   - Columns: `vol_parkinson`, `vol_garman_klass`, `vol_rogers_satchell`, `vol_atr`, `is_outlier`
 
@@ -138,25 +138,25 @@ Root package: `ta_lab2`
 - Attributes: `signal_type` (VARCHAR), `signal_name` (VARCHAR), `params` (JSONB), `is_active` (BOOLEAN)
 
 **Signal Output Tables:**
-- `cmc_signals_ema_crossover`: EMA crossover signals
+- `signals_ema_crossover`: EMA crossover signals
   - Primary Key: `(id, ts, signal_id)`
   - Columns: `signal_type`, `direction`, `signal_state`, `entry_price`, `exit_price`, `feature_version_hash`, `feature_snapshot` (JSONB)
-- `cmc_signals_rsi_mean_revert`: RSI mean reversion signals (same schema)
-- `cmc_signals_atr_breakout`: ATR breakout signals (same schema + `breakout_type`, `channel_high`, `channel_low`)
+- `signals_rsi_mean_revert`: RSI mean reversion signals (same schema)
+- `signals_atr_breakout`: ATR breakout signals (same schema + `breakout_type`, `channel_high`, `channel_low`)
 
 **Backtest Tables:**
-- `cmc_backtest_runs`: Backtest metadata
+- `backtest_runs`: Backtest metadata
   - Primary Key: `run_id` (SERIAL)
   - Columns: `signal_type`, `signal_id`, `feature_version_hash`, `params_hash`, `run_date`, `total_pnl`, `sharpe_ratio`, `win_rate`
-- `cmc_backtest_trades`: Trade-level detail
+- `backtest_trades`: Trade-level detail
   - Primary Key: `(run_id, trade_id)`
-- `cmc_backtest_metrics`: Performance metrics
+- `backtest_metrics`: Performance metrics
   - Primary Key: `(run_id, metric_name)`
 
 ### State Management Tables
 
 **Pattern:** `{feature_type}_state` tables track watermarks per (id, feature_type, feature_name)
-- `cmc_ema_daily_state`, `cmc_ema_multi_tf_state`, `cmc_ema_multi_tf_cal_state`, etc.
+- `cmc_ema_daily_state`, `ema_multi_tf_state`, `ema_multi_tf_cal_state`, etc.
 - Columns: `id`, `feature_type`, `feature_name`, `watermark_ts`, `last_refresh_ts`, `refresh_status`
 
 ### Observability Tables
@@ -180,14 +180,14 @@ Root package: `ta_lab2`
 ### Views
 
 **`all_emas`**: Logical union of all EMA tables
-- Standardizes schema across `cmc_ema_daily`, `cmc_ema_multi_tf`, `cmc_ema_multi_tf_cal`
+- Standardizes schema across `cmc_ema_daily`, `ema_multi_tf`, `ema_multi_tf_cal`
 - Columns: `id`, `ts`, `tf`, `tf_days`, `period`, `ema`, `d1`, `d2`, `d1_close`, `d2_close`, `roll`
 
-**`cmc_price_with_emas`**: Daily OHLCV joined to single EMA layer
+**`price_with_emas`**: Daily OHLCV joined to single EMA layer
 - One row per (id, ts) from `cmc_price_histories7`
 - Includes: price columns + selected EMA configuration
 
-**`cmc_price_with_emas_d1d2`**: Same as above + EMA derivatives
+**`price_with_emas_d1d2`**: Same as above + EMA derivatives
 - Adds: `d1`, `d2`, `d1_close`, `d2_close`, `roll`
 
 ---
@@ -237,15 +237,15 @@ Root package: `ta_lab2`
 ```
 Stage 1: EMAs (baseline features)
   ├─ cmc_ema_daily (1D only, fast refresh)
-  ├─ cmc_ema_multi_tf (2D-365D, trading-day aligned)
-  ├─ cmc_ema_multi_tf_cal (2D-365D, calendar-aligned)
-  └─ Views: all_emas (union), cmc_price_with_emas (joined)
+  ├─ ema_multi_tf (2D-365D, trading-day aligned)
+  ├─ ema_multi_tf_cal (2D-365D, calendar-aligned)
+  └─ Views: all_emas (union), price_with_emas (joined)
 
 Stage 2: Returns (depends on price)
-  └─ cmc_returns_daily (1D to 365D lookbacks)
+  └─ returns_daily (1D to 365D lookbacks)
 
 Stage 3: Volatility (depends on price)
-  └─ cmc_vol_daily (Parkinson, Garman-Klass, Rogers-Satchell, ATR)
+  └─ vol_daily (Parkinson, Garman-Klass, Rogers-Satchell, ATR)
 
 Stage 4: TA Indicators (depends on price, EMAs)
   └─ TAFeature (RSI, MACD, Stochastic, Bollinger, ATR, ADX)
@@ -310,9 +310,9 @@ State Management Layer
   └─ SignalStateManager (position tracking, dirty windows)
 
 Output Layer
-  ├─ cmc_signals_ema_crossover
-  ├─ cmc_signals_rsi_mean_revert
-  └─ cmc_signals_atr_breakout
+  ├─ signals_ema_crossover
+  ├─ signals_rsi_mean_revert
+  └─ signals_atr_breakout
 
 Validation Layer
   └─ Feature hashing for reproducibility
@@ -645,15 +645,15 @@ Alert Layer
 
 2. Stage 1: EMAs (baseline features)
    └─ refresh_cmc_emas.py
-        ├─ Query state: cmc_ema_daily_state, cmc_ema_multi_tf_state
+        ├─ Query state: cmc_ema_daily_state, ema_multi_tf_state
         ├─ Load price: cmc_price_histories7 (from watermark - lookback)
         ├─ Compute: EMAs for periods 5, 9, 10, 21, 50, 100, 200
-        ├─ Write: cmc_ema_daily, cmc_ema_multi_tf, cmc_ema_multi_tf_cal
+        ├─ Write: cmc_ema_daily, ema_multi_tf, ema_multi_tf_cal
         └─ Update state: watermark_ts, last_refresh_ts
 
 3. Stage 2-4: Returns, Volatility, TA (parallel)
-   ├─ returns_feature.py → cmc_returns_daily
-   ├─ volatility_feature.py → cmc_vol_daily
+   ├─ returns_feature.py → returns_daily
+   ├─ volatility_feature.py → vol_daily
    └─ ta_feature.py → TAFeature (inline computation, not stored separately)
 
 4. Stage 5: Materialized feature store
@@ -678,9 +678,9 @@ Alert Layer
    └─ run_all_signal_refreshes.py
         ├─ Load config: dim_signals (WHERE is_active = TRUE)
         ├─ Generate:
-        │    ├─ ema_crossover_refresh.py → cmc_signals_ema_crossover
-        │    ├─ rsi_mean_revert_refresh.py → cmc_signals_rsi_mean_revert
-        │    └─ atr_breakout_refresh.py → cmc_signals_atr_breakout
+        │    ├─ ema_crossover_refresh.py → signals_ema_crossover
+        │    ├─ rsi_mean_revert_refresh.py → signals_rsi_mean_revert
+        │    └─ atr_breakout_refresh.py → signals_atr_breakout
         └─ Feature hashing: SHA256 for reproducibility
 
 2. Run Backtest
@@ -690,9 +690,9 @@ Alert Layer
         ├─ Vectorbt: Portfolio.from_signals()
         ├─ Metrics: Sharpe, Sortino, Calmar, VaR, CVaR, profit factor, win rate
         ├─ Write:
-        │    ├─ cmc_backtest_runs (run metadata)
-        │    ├─ cmc_backtest_trades (trade-level detail)
-        │    └─ cmc_backtest_metrics (performance metrics)
+        │    ├─ backtest_runs (run metadata)
+        │    ├─ backtest_trades (trade-level detail)
+        │    └─ backtest_metrics (performance metrics)
         └─ Validation: compare_backtest_runs() for reproducibility
 
 3. Validate Reproducibility
@@ -853,7 +853,7 @@ Alert Layer
 
 **Examples:**
 - `cmc_ema_daily_state`: Track last refresh per (id, period)
-- `cmc_returns_daily_state`: Track last refresh per (id, lookback)
+- `returns_daily_state`: Track last refresh per (id, lookback)
 - Signal state: Track open positions per (id, signal_type, signal_id)
 
 **Benefits:**

@@ -20,9 +20,9 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent
 
 # Production refresh scripts (main scripts that write EMA data)
 PRODUCTION_SCRIPTS = [
-    "src/ta_lab2/scripts/emas/refresh_cmc_ema_multi_tf_from_bars.py",
-    "src/ta_lab2/scripts/emas/refresh_cmc_ema_multi_tf_cal_from_bars.py",
-    "src/ta_lab2/scripts/emas/refresh_cmc_ema_multi_tf_cal_anchor_from_bars.py",
+    "src/ta_lab2/scripts/emas/refresh_ema_multi_tf_from_bars.py",
+    "src/ta_lab2/scripts/emas/refresh_ema_multi_tf_cal_from_bars.py",
+    "src/ta_lab2/scripts/emas/refresh_ema_multi_tf_cal_anchor_from_bars.py",
 ]
 
 
@@ -211,9 +211,9 @@ def test_state_table_referenced(script_path: str):
 
     State tables store incremental watermarks per (id, tf, period).
     Scripts should specify which state table to use, e.g.:
-    - cmc_ema_multi_tf_state
-    - cmc_ema_multi_tf_cal_us_state
-    - cmc_ema_multi_tf_cal_anchor_us_state
+    - ema_multi_tf_state
+    - ema_multi_tf_cal_us_state
+    - ema_multi_tf_cal_anchor_us_state
 
     This confirms state persistence is configured, not just imported.
     """
@@ -310,19 +310,19 @@ def test_state_usage_summary():
     total_scripts = len(results)
     coverage = (scripts_with_state / total_scripts * 100) if total_scripts > 0 else 0
 
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("EMAStateManager Adoption Summary")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
     print(f"Production scripts: {total_scripts}")
     print(f"Using EMAStateManager: {scripts_with_state}")
     print(f"Coverage: {coverage:.0f}%")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
 
     for r in results:
         status = "✓" if (r["has_import"] and r["has_usage"]) else "✗"
         print(f"  {status} {r['script']}")
 
-    print(f"{'='*70}\n")
+    print(f"{'=' * 70}\n")
 
     # Always pass - this is informational only
     assert True

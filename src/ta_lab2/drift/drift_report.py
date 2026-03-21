@@ -71,7 +71,7 @@ def _df_to_markdown(df: pd.DataFrame) -> str:
     return "\n".join([header, sep] + rows_str)
 
 
-# Attribution column names present in cmc_drift_metrics (added in Plan 47-01 DDL).
+# Attribution column names present in drift_metrics (added in Plan 47-01 DDL).
 # attr_macro_regime_delta added in Phase 72 OBSV-04 (migration e6f7a8b9c0d1).
 _ATTR_COLUMNS = [
     "attr_baseline_pnl",
@@ -90,7 +90,7 @@ class ReportGenerator:
     """
     Weekly drift report generator.
 
-    Loads drift metrics from ``cmc_drift_metrics``, generates Plotly HTML charts,
+    Loads drift metrics from ``drift_metrics``, generates Plotly HTML charts,
     and renders a Markdown report with summary tables, threshold status, and
     attribution section (when attr_* columns are populated).
 
@@ -190,7 +190,7 @@ class ReportGenerator:
 
     def _load_drift_metrics_df(self, start: date, end: date) -> pd.DataFrame:
         """
-        Load drift metrics rows from cmc_drift_metrics for a date range.
+        Load drift metrics rows from drift_metrics for a date range.
 
         Parameters
         ----------
@@ -201,13 +201,13 @@ class ReportGenerator:
 
         Returns
         -------
-        DataFrame with all cmc_drift_metrics columns, ordered by metric_date, config_id.
+        DataFrame with all drift_metrics columns, ordered by metric_date, config_id.
         Empty DataFrame when no rows are found or the table does not exist.
         """
         sql = text(
             """
             SELECT *
-            FROM public.cmc_drift_metrics
+            FROM public.drift_metrics
             WHERE metric_date BETWEEN :start AND :end
             ORDER BY metric_date, config_id
             """
@@ -379,7 +379,7 @@ class ReportGenerator:
         Parameters
         ----------
         df:
-            DataFrame containing cmc_drift_metrics rows, possibly with attr_* columns.
+            DataFrame containing drift_metrics rows, possibly with attr_* columns.
 
         Returns
         -------
@@ -625,7 +625,7 @@ class ReportGenerator:
         content = (
             f"# Drift Guard Weekly Report: {week_start} to {week_end}\n\n"
             f"> **No drift data available** for this period.\n\n"
-            f"No rows were found in `cmc_drift_metrics` between {week_start} and {week_end}.\n"
+            f"No rows were found in `drift_metrics` between {week_start} and {week_end}.\n"
             f"Run the drift monitor first:\n\n"
             f"```bash\n"
             f"python -m ta_lab2.scripts.drift.run_drift_monitor --paper-start {week_start}\n"

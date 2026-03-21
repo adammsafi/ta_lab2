@@ -54,7 +54,7 @@ class TestFeatureValidator(unittest.TestCase):
         self.engine.connect.return_value.__enter__.return_value = mock_conn
 
         issues = self.validator.check_gaps(
-            table="cmc_returns_daily",
+            table="returns_daily",
             ids=[1],
             start="2024-01-01",
             end="2024-01-03",
@@ -76,7 +76,7 @@ class TestFeatureValidator(unittest.TestCase):
         ]
 
         issues = self.validator.check_gaps(
-            table="cmc_returns_daily",
+            table="returns_daily",
             ids=[1],
             start="2024-01-01",
             end="2024-01-07",
@@ -96,7 +96,7 @@ class TestFeatureValidator(unittest.TestCase):
         ]
 
         issues = self.validator.check_gaps(
-            table="cmc_returns_daily",
+            table="returns_daily",
             ids=[1],
             start="2024-01-01",
             end="2024-01-03",
@@ -121,7 +121,7 @@ class TestFeatureValidator(unittest.TestCase):
         self.engine.connect.return_value.__enter__.return_value = mock_conn
 
         issues = self.validator.check_outliers(
-            table="cmc_returns_daily",
+            table="returns_daily",
             columns=["ret_1d_pct"],
             ids=[1],
         )
@@ -147,7 +147,7 @@ class TestFeatureValidator(unittest.TestCase):
         self.engine.connect.return_value.__enter__.return_value = mock_conn
 
         issues = self.validator.check_outliers(
-            table="cmc_vol_daily",
+            table="vol_daily",
             columns=["parkinson_vol"],
             ids=[1],
         )
@@ -172,7 +172,7 @@ class TestFeatureValidator(unittest.TestCase):
         self.engine.connect.return_value.__enter__.return_value = mock_conn
 
         issues = self.validator.check_outliers(
-            table="cmc_ta_daily",
+            table="ta_daily",
             columns=["rsi_14"],
             ids=[1],
         )
@@ -225,7 +225,7 @@ class TestFeatureValidator(unittest.TestCase):
         ]
 
         issues = self.validator.check_null_ratios(
-            table="cmc_returns_daily",
+            table="returns_daily",
             columns=["ret_1d_pct"],
             threshold=0.1,
         )
@@ -244,7 +244,7 @@ class TestFeatureValidator(unittest.TestCase):
         ]
 
         issues = self.validator.check_null_ratios(
-            table="cmc_returns_daily",
+            table="returns_daily",
             columns=["ret_1d_pct"],
             threshold=0.1,
         )
@@ -266,7 +266,7 @@ class TestFeatureValidator(unittest.TestCase):
         ]
 
         issues = self.validator.check_rowcounts(
-            table="cmc_returns_daily",
+            table="returns_daily",
             ids=[1],
         )
 
@@ -287,7 +287,7 @@ class TestFeatureValidator(unittest.TestCase):
         ]
 
         issues = self.validator.check_rowcounts(
-            table="cmc_returns_daily",
+            table="returns_daily",
             ids=[1],
         )
 

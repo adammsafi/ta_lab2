@@ -34,9 +34,9 @@ class TestRefreshOrder(unittest.TestCase):
     ):
         """Test that returns is in phase 1 (before daily_features)."""
         # Mock results
-        mock_returns.return_value = RefreshResult("cmc_returns_daily", 100, 1.0, True)
-        mock_vol.return_value = RefreshResult("cmc_vol_daily", 100, 1.0, True)
-        mock_ta.return_value = RefreshResult("cmc_ta_daily", 100, 1.0, True)
+        mock_returns.return_value = RefreshResult("returns_daily", 100, 1.0, True)
+        mock_vol.return_value = RefreshResult("vol_daily", 100, 1.0, True)
+        mock_ta.return_value = RefreshResult("ta_daily", 100, 1.0, True)
         mock_daily.return_value = RefreshResult("cmc_daily_features", 100, 1.0, True)
 
         engine = MagicMock()
@@ -63,9 +63,9 @@ class TestRefreshOrder(unittest.TestCase):
     ):
         """Test that vol can run in parallel with returns."""
         # Mock results
-        mock_returns.return_value = RefreshResult("cmc_returns_daily", 100, 1.0, True)
-        mock_vol.return_value = RefreshResult("cmc_vol_daily", 100, 1.0, True)
-        mock_ta.return_value = RefreshResult("cmc_ta_daily", 100, 1.0, True)
+        mock_returns.return_value = RefreshResult("returns_daily", 100, 1.0, True)
+        mock_vol.return_value = RefreshResult("vol_daily", 100, 1.0, True)
+        mock_ta.return_value = RefreshResult("ta_daily", 100, 1.0, True)
         mock_daily.return_value = RefreshResult("cmc_daily_features", 100, 1.0, True)
 
         engine = MagicMock()
@@ -90,9 +90,9 @@ class TestRefreshOrder(unittest.TestCase):
     ):
         """Test that daily_features runs after all others."""
         # Mock results
-        mock_returns.return_value = RefreshResult("cmc_returns_daily", 100, 1.0, True)
-        mock_vol.return_value = RefreshResult("cmc_vol_daily", 100, 1.0, True)
-        mock_ta.return_value = RefreshResult("cmc_ta_daily", 100, 1.0, True)
+        mock_returns.return_value = RefreshResult("returns_daily", 100, 1.0, True)
+        mock_vol.return_value = RefreshResult("vol_daily", 100, 1.0, True)
+        mock_ta.return_value = RefreshResult("ta_daily", 100, 1.0, True)
         mock_daily.return_value = RefreshResult("cmc_daily_features", 100, 1.0, True)
 
         engine = MagicMock()
@@ -107,9 +107,9 @@ class TestRefreshOrder(unittest.TestCase):
         mock_daily.assert_called_once()
 
         # Verify all phase 1 completed
-        self.assertIn("cmc_returns_daily", results)
-        self.assertIn("cmc_vol_daily", results)
-        self.assertIn("cmc_ta_daily", results)
+        self.assertIn("returns_daily", results)
+        self.assertIn("vol_daily", results)
+        self.assertIn("ta_daily", results)
         self.assertIn("cmc_daily_features", results)
 
 
@@ -127,14 +127,12 @@ class TestParallelExecution(unittest.TestCase):
         # Mock futures
         mock_future1 = MagicMock()
         mock_future1.result.return_value = RefreshResult(
-            "cmc_returns_daily", 100, 1.0, True
+            "returns_daily", 100, 1.0, True
         )
         mock_future2 = MagicMock()
-        mock_future2.result.return_value = RefreshResult(
-            "cmc_vol_daily", 100, 1.0, True
-        )
+        mock_future2.result.return_value = RefreshResult("vol_daily", 100, 1.0, True)
         mock_future3 = MagicMock()
-        mock_future3.result.return_value = RefreshResult("cmc_ta_daily", 100, 1.0, True)
+        mock_future3.result.return_value = RefreshResult("ta_daily", 100, 1.0, True)
 
         mock_executor.submit.side_effect = [mock_future1, mock_future2, mock_future3]
 
@@ -168,9 +166,9 @@ class TestParallelExecution(unittest.TestCase):
     def test_sequential_fallback(self, mock_returns, mock_vol, mock_ta, mock_daily):
         """Test that sequential mode works without parallelism."""
         # Mock results
-        mock_returns.return_value = RefreshResult("cmc_returns_daily", 100, 1.0, True)
-        mock_vol.return_value = RefreshResult("cmc_vol_daily", 100, 1.0, True)
-        mock_ta.return_value = RefreshResult("cmc_ta_daily", 100, 1.0, True)
+        mock_returns.return_value = RefreshResult("returns_daily", 100, 1.0, True)
+        mock_vol.return_value = RefreshResult("vol_daily", 100, 1.0, True)
+        mock_ta.return_value = RefreshResult("ta_daily", 100, 1.0, True)
         mock_daily.return_value = RefreshResult("cmc_daily_features", 100, 1.0, True)
 
         engine = MagicMock()
@@ -204,9 +202,9 @@ class TestValidationIntegration(unittest.TestCase):
     ):
         """Test that validation runs when --validate flag set."""
         # Mock results
-        mock_returns.return_value = RefreshResult("cmc_returns_daily", 100, 1.0, True)
-        mock_vol.return_value = RefreshResult("cmc_vol_daily", 100, 1.0, True)
-        mock_ta.return_value = RefreshResult("cmc_ta_daily", 100, 1.0, True)
+        mock_returns.return_value = RefreshResult("returns_daily", 100, 1.0, True)
+        mock_vol.return_value = RefreshResult("vol_daily", 100, 1.0, True)
+        mock_ta.return_value = RefreshResult("ta_daily", 100, 1.0, True)
         mock_daily.return_value = RefreshResult("cmc_daily_features", 100, 1.0, True)
 
         # Mock validation report
@@ -235,9 +233,9 @@ class TestValidationIntegration(unittest.TestCase):
     ):
         """Test that validation skipped when --no-validate flag set."""
         # Mock results
-        mock_returns.return_value = RefreshResult("cmc_returns_daily", 100, 1.0, True)
-        mock_vol.return_value = RefreshResult("cmc_vol_daily", 100, 1.0, True)
-        mock_ta.return_value = RefreshResult("cmc_ta_daily", 100, 1.0, True)
+        mock_returns.return_value = RefreshResult("returns_daily", 100, 1.0, True)
+        mock_vol.return_value = RefreshResult("vol_daily", 100, 1.0, True)
+        mock_ta.return_value = RefreshResult("ta_daily", 100, 1.0, True)
         mock_daily.return_value = RefreshResult("cmc_daily_features", 100, 1.0, True)
 
         engine = MagicMock()
@@ -264,10 +262,10 @@ class TestPartialFailures(unittest.TestCase):
         """Test that one failure doesn't stop all refreshes."""
         # Returns fails, others succeed
         mock_returns.return_value = RefreshResult(
-            "cmc_returns_daily", 0, 1.0, False, error="Test error"
+            "returns_daily", 0, 1.0, False, error="Test error"
         )
-        mock_vol.return_value = RefreshResult("cmc_vol_daily", 100, 1.0, True)
-        mock_ta.return_value = RefreshResult("cmc_ta_daily", 100, 1.0, True)
+        mock_vol.return_value = RefreshResult("vol_daily", 100, 1.0, True)
+        mock_ta.return_value = RefreshResult("ta_daily", 100, 1.0, True)
         mock_daily.return_value = RefreshResult("cmc_daily_features", 100, 1.0, True)
 
         engine = MagicMock()
@@ -285,8 +283,8 @@ class TestPartialFailures(unittest.TestCase):
         mock_daily.assert_called_once()
 
         # Results include failure
-        self.assertFalse(results["cmc_returns_daily"].success)
-        self.assertTrue(results["cmc_vol_daily"].success)
+        self.assertFalse(results["returns_daily"].success)
+        self.assertTrue(results["vol_daily"].success)
 
     @patch("ta_lab2.scripts.features.run_all_feature_refreshes.refresh_daily_features")
     @patch("ta_lab2.scripts.features.run_all_feature_refreshes.refresh_ta")
@@ -295,9 +293,9 @@ class TestPartialFailures(unittest.TestCase):
     def test_refresh_result_summary(self, mock_returns, mock_vol, mock_ta, mock_daily):
         """Test that result summary has correct counts."""
         # Mock results with varying row counts
-        mock_returns.return_value = RefreshResult("cmc_returns_daily", 100, 1.0, True)
-        mock_vol.return_value = RefreshResult("cmc_vol_daily", 200, 2.0, True)
-        mock_ta.return_value = RefreshResult("cmc_ta_daily", 150, 1.5, True)
+        mock_returns.return_value = RefreshResult("returns_daily", 100, 1.0, True)
+        mock_vol.return_value = RefreshResult("vol_daily", 200, 2.0, True)
+        mock_ta.return_value = RefreshResult("ta_daily", 150, 1.5, True)
         mock_daily.return_value = RefreshResult("cmc_daily_features", 300, 3.0, True)
 
         engine = MagicMock()

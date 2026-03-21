@@ -75,7 +75,7 @@ def _series_frequency(series_id: str) -> str:
 def load_current_macro_regime(_engine) -> pd.DataFrame:
     """Return the most recent macro regime row for the default profile.
 
-    Queries cmc_macro_regimes for the latest date where profile='default'.
+    Queries macro_regimes for the latest date where profile='default'.
 
     Columns
     -------
@@ -85,7 +85,7 @@ def load_current_macro_regime(_engine) -> pd.DataFrame:
     Returns
     -------
     pd.DataFrame
-        Single-row DataFrame.  Empty if cmc_macro_regimes has no rows.
+        Single-row DataFrame.  Empty if macro_regimes has no rows.
     """
     sql = text(
         """
@@ -97,11 +97,11 @@ def load_current_macro_regime(_engine) -> pd.DataFrame:
             carry,
             regime_key,
             macro_state
-        FROM public.cmc_macro_regimes
+        FROM public.macro_regimes
         WHERE profile = 'default'
           AND date = (
               SELECT MAX(date)
-              FROM public.cmc_macro_regimes
+              FROM public.macro_regimes
               WHERE profile = 'default'
           )
         """
@@ -147,7 +147,7 @@ def load_macro_regime_history(_engine, days: int = 365) -> pd.DataFrame:
             carry,
             regime_key,
             macro_state
-        FROM public.cmc_macro_regimes
+        FROM public.macro_regimes
         WHERE profile = 'default'
           AND date >= CURRENT_DATE - :days
         ORDER BY date ASC
@@ -337,7 +337,7 @@ def load_fred_series_quality(_engine) -> pd.DataFrame:
 def load_macro_transition_log(_engine, days: int = 90) -> pd.DataFrame:
     """Return rows where macro regime_key changed vs the previous calendar day.
 
-    Uses a self-join on cmc_macro_regimes (curr.date = prev.date - 1) to find
+    Uses a self-join on macro_regimes (curr.date = prev.date - 1) to find
     transition events.  Only rows where regime_key differs are returned.
 
     Parameters
@@ -372,8 +372,8 @@ def load_macro_transition_log(_engine, days: int = 90) -> pd.DataFrame:
             prev.liquidity           AS prev_liquidity,
             prev.risk_appetite       AS prev_risk_appetite,
             prev.carry               AS prev_carry
-        FROM public.cmc_macro_regimes curr
-        JOIN public.cmc_macro_regimes prev
+        FROM public.macro_regimes curr
+        JOIN public.macro_regimes prev
           ON prev.date    = curr.date - INTERVAL '1 day'
           AND prev.profile = curr.profile
         WHERE curr.profile   = 'default'

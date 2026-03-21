@@ -22,9 +22,9 @@ Design Pattern: Template Method
 - Reduces code duplication across 4 EMA scripts
 
 Migration: This replaces duplicated code in:
-- refresh_cmc_ema_multi_tf_from_bars.py
-- refresh_cmc_ema_multi_tf_cal_from_bars.py
-- refresh_cmc_ema_multi_tf_cal_anchor_from_bars.py
+- refresh_ema_multi_tf_from_bars.py
+- refresh_ema_multi_tf_cal_from_bars.py
+- refresh_ema_multi_tf_cal_anchor_from_bars.py
 """
 
 from __future__ import annotations
@@ -96,9 +96,9 @@ def ensure_ema_table_exists(
     Create EMA output table if it doesn't exist.
 
     Supports all EMA table types:
-    - multi_tf: cmc_ema_multi_tf (rolling EMAs from multi-TF bars)
-    - cal: cmc_ema_multi_tf_cal_iso/us (calendar-aligned EMAs)
-    - cal_anchor: cmc_ema_multi_tf_cal_anchor_iso/us (calendar-anchored EMAs)
+    - multi_tf: ema_multi_tf (rolling EMAs from multi-TF bars)
+    - cal: ema_multi_tf_cal_iso/us (calendar-aligned EMAs)
+    - cal_anchor: ema_multi_tf_cal_anchor_iso/us (calendar-anchored EMAs)
 
     Args:
         engine: SQLAlchemy engine
@@ -108,9 +108,9 @@ def ensure_ema_table_exists(
 
     Usage:
         # From a refresher:
-        ensure_ema_table_exists(self.engine, "cmc_ema_multi_tf", table_type="multi_tf")
+        ensure_ema_table_exists(self.engine, "ema_multi_tf", table_type="multi_tf")
     """
-    # Handle fully-qualified table names (e.g., "public.cmc_ema_multi_tf")
+    # Handle fully-qualified table names (e.g., "public.ema_multi_tf")
     if "." in table_name:
         schema, table_name = table_name.split(".", 1)
 
@@ -142,45 +142,51 @@ def _generate_ema_table_ddl(
         return f"""
 CREATE TABLE IF NOT EXISTS {fq_table} (
     id INTEGER NOT NULL,
+    venue_id SMALLINT NOT NULL DEFAULT 1,
     tf TEXT NOT NULL,
     ts TIMESTAMPTZ NOT NULL,
     period INTEGER NOT NULL,
+    venue TEXT NOT NULL DEFAULT 'CMC_AGG',
+    venue_rank INTEGER NOT NULL DEFAULT 50,
     tf_days INTEGER,
     roll BOOLEAN,
     ema DOUBLE PRECISION,
     ema_bar DOUBLE PRECISION,
     is_partial_end BOOLEAN,
     ingested_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    PRIMARY KEY (id, tf, ts, period)
+    PRIMARY KEY (id, venue_id, tf, ts, period)
 );
 
 -- Index for roll=true queries
 CREATE INDEX IF NOT EXISTS ix_{table_name}_roll_true_id_tf_period_ts
-    ON {fq_table} (id, tf, period, ts)
+    ON {fq_table} (id, venue_id, tf, period, ts)
     WHERE roll = TRUE;
 
 -- Unique constraint for canonical (non-roll) rows
 CREATE UNIQUE INDEX IF NOT EXISTS uq_{table_name}__canon_ts
-    ON {fq_table} (id, tf, period, ts)
+    ON {fq_table} (id, venue_id, tf, period, ts)
     WHERE roll = FALSE;
 """
 
     elif table_type in ("cal", "cal_anchor"):
         # Calendar-aligned or calendar-anchored EMAs - lean schema
-        # Both have same schema (10 columns)
+        # Both have same schema
         return f"""
 CREATE TABLE IF NOT EXISTS {fq_table} (
     id INTEGER NOT NULL,
+    venue_id SMALLINT NOT NULL DEFAULT 1,
     tf TEXT NOT NULL,
     ts TIMESTAMPTZ NOT NULL,
     period INTEGER NOT NULL,
+    venue TEXT NOT NULL DEFAULT 'CMC_AGG',
+    venue_rank INTEGER NOT NULL DEFAULT 50,
     tf_days INTEGER,
     roll BOOLEAN,
     ema DOUBLE PRECISION,
     ema_bar DOUBLE PRECISION,
     is_partial_end BOOLEAN,
     ingested_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    PRIMARY KEY (id, tf, ts, period)
+    PRIMARY KEY (id, venue_id, tf, ts, period)
 );
 
 -- Indexes for query performance
@@ -192,7 +198,7 @@ CREATE INDEX IF NOT EXISTS {table_name}_tf_ts_idx
 
 -- Unique constraint for canonical (non-roll) rows
 CREATE UNIQUE INDEX IF NOT EXISTS uq_{table_name}__canon_ts
-    ON {fq_table} (id, tf, period, ts)
+    ON {fq_table} (id, venue_id, tf, period, ts)
     WHERE roll = FALSE;
 """
 
@@ -222,7 +228,7 @@ def get_price_bounds(
         engine: SQLAlchemy engine for database operations
         id: Cryptocurrency ID
         tf: Timeframe (e.g., "1D", "7D")
-        source_table: Source bars table (e.g., "public.cmc_price_bars_multi_tf")
+        source_table: Source bars table (e.g., "public.price_bars_multi_tf_u")
         lookback_days: Number of days to look back for bounds (default: 90)
 
     Returns:
@@ -273,7 +279,7 @@ def get_statistical_bounds(
         id: Cryptocurrency ID
         tf: Timeframe (e.g., "1D", "7D")
         period: EMA period (e.g., 9, 21, 50)
-        output_table: EMA output table (e.g., "public.cmc_ema_multi_tf")
+        output_table: EMA output table (e.g., "public.ema_multi_tf")
         lookback_count: Number of recent EMA values to use (default: 100)
 
     Returns:
@@ -629,7 +635,7 @@ class BaseEMARefresher(ABC):
         Get table type for DDL generation.
 
         Subclasses should override to specify their table type:
-        - "multi_tf" for refresh_cmc_ema_multi_tf_from_bars
+        - "multi_tf" for refresh_ema_multi_tf_from_bars
         - "cal" for cal_iso and cal_us refreshers
         - "cal_anchor" for cal_anchor_iso and cal_anchor_us refreshers
 
@@ -848,7 +854,7 @@ class BaseEMARefresher(ABC):
             - "bars_schema": Source bars schema name
 
         Example:
-            {"bars_table": "cmc_price_bars_multi_tf", "bars_schema": "public"}
+            {"bars_table": "price_bars_multi_tf_u", "bars_schema": "public"}
         """
 
     @staticmethod
@@ -1054,11 +1060,14 @@ class BaseEMARefresher(ABC):
         results = orchestrator.execute(tasks)
         total_rows = sum(results)
 
-        # Update state
+        # Update state -- pass alignment_source so state queries are scoped
+        # to this variant's rows in the _u table (avoids cross-source contamination)
+        alignment_source = self.config.extra_config.get("alignment_source")
         self.logger.info("Updating state table...")
         rows_updated = self.state_manager.update_state_from_output(
             output_table=self.config.output_table,
             output_schema=self.config.output_schema,
+            alignment_source=alignment_source,
         )
         self.logger.info(f"State updated: {rows_updated} rows upserted")
 
@@ -1121,11 +1130,14 @@ class BaseEMARefresher(ABC):
         results = orchestrator.execute(tasks)
         total_rows = sum(results)
 
-        # Update state
+        # Update state -- pass alignment_source so state queries are scoped
+        # to this variant's rows in the _u table (avoids cross-source contamination)
+        alignment_source = self.config.extra_config.get("alignment_source")
         self.logger.info("Updating state table...")
         rows_updated = self.state_manager.update_state_from_output(
             output_table=self.config.output_table,
             output_schema=self.config.output_schema,
+            alignment_source=alignment_source,
         )
         self.logger.info(f"State updated: {rows_updated} rows upserted")
 
@@ -1167,16 +1179,25 @@ class BaseEMARefresher(ABC):
         self.logger.info(f"Using {len(periods)} periods from command line")
         return periods
 
-    def load_ids(self, ids_arg: str) -> list[int]:
+    def load_ids(
+        self,
+        ids_arg: str,
+        venue_id: Optional[int] = None,
+    ) -> list[int]:
         """
-        Load cryptocurrency IDs from argument.
+        Load cryptocurrency IDs from argument, optionally filtered by venue_id.
 
         Supports:
         - "all": Load all IDs from source bars table
         - "1,52,825": Comma-separated list of IDs
 
+        When venue_id is specified:
+        - For "all": only returns IDs that have bars for that venue_id
+        - For explicit IDs: filters to only those present for that venue_id
+
         Args:
             ids_arg: IDs argument from CLI
+            venue_id: Optional venue_id to filter IDs by (e.g., 2 for HYPERLIQUID)
 
         Returns:
             List of cryptocurrency IDs
@@ -1188,14 +1209,59 @@ class BaseEMARefresher(ABC):
             source_table_fq = (
                 f"{source_info['bars_schema']}.{source_info['bars_table']}"
             )
-            ids = load_all_ids(self.config.db_url, source_table_fq)
-            self.logger.info(f"Loaded {len(ids)} IDs from {source_table_fq}")
+
+            if venue_id is not None:
+                ids = self._load_ids_for_venue(source_table_fq, venue_id)
+                self.logger.info(
+                    f"Loaded {len(ids)} IDs from {source_table_fq} "
+                    f"for venue_id={venue_id}"
+                )
+            else:
+                ids = load_all_ids(self.config.db_url, source_table_fq)
+                self.logger.info(f"Loaded {len(ids)} IDs from {source_table_fq}")
             return ids
 
         # Parse comma-separated list
         ids = [int(x.strip()) for x in ids_arg.split(",") if x.strip()]
-        self.logger.info(f"Processing {len(ids)} IDs from command line")
+
+        if venue_id is not None:
+            source_info = self.get_source_table_info()
+            source_table_fq = (
+                f"{source_info['bars_schema']}.{source_info['bars_table']}"
+            )
+            venue_ids = set(self._load_ids_for_venue(source_table_fq, venue_id))
+            before = len(ids)
+            ids = [i for i in ids if i in venue_ids]
+            self.logger.info(
+                f"Filtered {before} explicit IDs to {len(ids)} for venue_id={venue_id}"
+            )
+        else:
+            self.logger.info(f"Processing {len(ids)} IDs from command line")
+
         return ids
+
+    def _load_ids_for_venue(
+        self,
+        source_table_fq: str,
+        venue_id: int,
+    ) -> list[int]:
+        """
+        Load distinct IDs from source table filtered by venue_id.
+
+        Args:
+            source_table_fq: Fully-qualified source table (e.g., 'public.price_bars_1d')
+            venue_id: Venue ID to filter by
+
+        Returns:
+            Sorted list of IDs that have bars for the given venue_id
+        """
+        sql = text(
+            f"SELECT DISTINCT id FROM {source_table_fq} "
+            f"WHERE venue_id = :venue_id ORDER BY id"
+        )
+        with self.engine.connect() as conn:
+            rows = conn.execute(sql, {"venue_id": venue_id}).fetchall()
+        return [int(r[0]) for r in rows]
 
     # =========================================================================
     # CLI Integration
@@ -1244,6 +1310,12 @@ If you see "too many clients already" errors:
             "--ids",
             default="all",
             help="Comma list of ids (e.g., 1,52) or 'all' (default).",
+        )
+        p.add_argument(
+            "--venue-id",
+            type=int,
+            default=None,
+            help="Filter to IDs that have bars for this venue_id (e.g., 2 for HYPERLIQUID).",
         )
         p.add_argument(
             "--periods",

@@ -4,7 +4,7 @@
    ============================================================ */
 
 WITH params AS (
-  SELECT 'cmc_price_bars_multi_tf_cal_us'::text AS relname   -- <-- change me
+  SELECT 'price_bars_multi_tf_cal_us'::text AS relname   -- <-- change me
 ),
 t AS (
   SELECT c.oid, n.nspname, c.relname
@@ -66,7 +66,7 @@ LEFT JOIN cons ON cons.oid = t.oid;
    ============================================================ */
 
 WITH params AS (
-  SELECT 'cmc_price_bars_multi_tf_cal_us'::text AS tablename   -- <-- change me
+  SELECT 'price_bars_multi_tf_cal_us'::text AS tablename   -- <-- change me
 )
 SELECT indexdef || ';' AS ddl
 FROM pg_indexes

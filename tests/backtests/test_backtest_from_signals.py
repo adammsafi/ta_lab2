@@ -530,9 +530,9 @@ class TestSignalBacktesterIntegration:
         Placeholder for integration tests.
 
         Real integration tests would:
-        1. Generate signals in cmc_signals_* tables
+        1. Generate signals in signals_* tables
         2. Run backtest via SignalBacktester
-        3. Verify results in cmc_backtest_* tables
+        3. Verify results in backtest_* tables
         4. Validate trade count matches signal count
         5. Verify metrics consistency
 

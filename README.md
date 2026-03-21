@@ -59,7 +59,7 @@ For detailed setup instructions, see [Deployment Guide](docs/deployment.md) and 
 
 **Key Capabilities:**
 - Multi-timeframe EMA and AMA calculations (KAMA, DEMA, TEMA, HMA) across 109 timeframes
-- Feature pipeline: returns, volatility, technical indicators, and 112-column bar-level feature store (`cmc_features`)
+- Feature pipeline: returns, volatility, technical indicators, and 112-column bar-level feature store (`features`)
 - Trading signal generation (EMA crossovers, RSI mean reversion, ATR breakouts) with regime-aware configuration
 - Vectorbt-based backtesting with walk-forward validation, PSR, and reproducibility checks
 - Paper-trade executor with exchange integration (Coinbase, Kraken) and full order/fill/position pipeline
@@ -186,16 +186,16 @@ Multi-stage feature calculation pipeline across 109 timeframes with 36 tables or
 
 **Feature Types:**
 - **EMAs**: Multi-timeframe exponential moving averages (daily, calendar, trading-day aligned)
-  - 6 tables: `cmc_ema_multi_tf` + 4 calendar variants + `cmc_ema_multi_tf_u` (unified)
+  - 6 tables: `ema_multi_tf` + 4 calendar variants + `ema_multi_tf_u` (unified)
   - Periods: 5, 9, 10, 21, 50, 100, 200
 - **AMAs**: Adaptive Moving Averages (KAMA, DEMA, TEMA, HMA) with full multi-TF parity
-  - 6 tables: `cmc_ama_multi_tf` + 4 calendar variants + `cmc_ama_multi_tf_u` (unified)
+  - 6 tables: `ama_multi_tf` + 4 calendar variants + `ama_multi_tf_u` (unified)
   - ~91M rows across all variants
 - **Returns**: Bar-to-bar returns with multi-window z-scores (`_zscore_30/90/365`)
-  - 6 tables: `cmc_returns_bars_multi_tf` + variants + unified
+  - 6 tables: `returns_bars_multi_tf` + variants + unified
 - **Volatility**: Parkinson, Garman-Klass, Rogers-Satchell estimators
 - **Technical Indicators**: RSI, MACD, Stochastic, Bollinger Bands, ATR, ADX
-- **Unified Feature Store**: `cmc_features` — 112-column bar-level feature store across all 109 TFs (~2.1M rows)
+- **Unified Feature Store**: `features` — 112-column bar-level feature store across all 109 TFs (~2.1M rows)
 
 **Pipeline Execution:**
 ```bash
@@ -221,13 +221,13 @@ Database-driven trading signal generation with position lifecycle tracking and f
 
 **Signal Types:**
 - **EMA Crossover**: Fast/slow EMA crossover signals (9/21, 21/50, 50/200)
-  - Table: `cmc_signals_ema_crossover`
+  - Table: `signals_ema_crossover`
   - Direction: LONG (fast > slow), SHORT (fast < slow)
 - **RSI Mean Reversion**: Oversold/overbought RSI signals
-  - Table: `cmc_signals_rsi_mean_revert`
+  - Table: `signals_rsi_mean_revert`
   - Thresholds: Oversold (<30), Overbought (>70)
 - **ATR Breakout**: Donchian channel + ATR expansion breakouts
-  - Table: `cmc_signals_atr_breakout`
+  - Table: `signals_atr_breakout`
   - Types: channel_break, atr_expansion, or both
 
 **Configuration:**
@@ -437,7 +437,7 @@ End-to-end paper trading pipeline from signal generation through order execution
 **Paper-Trade Executor:**
 - Signal -> order -> fill -> position pipeline with full audit trail
 - Exchange integration: Coinbase + Kraken APIs with paper order adapter
-- Order & fill store: `cmc_orders`, `cmc_fills`, `cmc_positions` with FIFO matching
+- Order & fill store: `orders`, `fills`, `positions` with FIFO matching
 - Backtest parity verification ensures paper trades match historical backtests
 - Database-driven configuration via `dim_executor_config` (strategies, sizing, initial capital)
 
@@ -475,9 +475,9 @@ Comprehensive quantitative research toolkit spanning feature evaluation, advance
 
 **IC-Based Feature Evaluation:**
 - Spearman IC, rolling IC, IC-IR, and regime breakdown across all features x 109 TFs
-- `cmc_ic_results` table with 82K+ rows of evaluation data
+- `ic_results` table with 82K+ rows of evaluation data
 - BH-corrected promotion gate with `FeaturePromoter` and `dim_feature_registry`
-- Dual-source loading: `cmc_ic_results` (bar-level) and `cmc_feature_experiments` (experiment-level)
+- Dual-source loading: `ic_results` (bar-level) and `feature_experiments` (experiment-level)
 - Batch promotion CLI: `python -m ta_lab2.scripts.experiments.batch_promote_features`
 
 **Factor Analytics:**
@@ -508,7 +508,7 @@ Comprehensive quantitative research toolkit spanning feature evaluation, advance
 - `DoubleEnsemble`: Concept drift detection with sample/feature reweighting
 - Optuna TPE hyperparameter sweep with experiment tracking
 - MDA/SFI/clustered feature importance
-- `cmc_ml_experiments` table for experiment tracking
+- `ml_experiments` table for experiment tracking
 
 **Microstructural Features:**
 - Fractional differentiation (fixed-width window FFD)

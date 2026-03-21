@@ -1,7 +1,7 @@
 """
 test_sync_ema_u.py
 
-Validation tests for sync_cmc_ema_multi_tf_u.py sync script.
+Validation tests for sync_ema_multi_tf_u.py sync script.
 Tests helper functions and sync script behavior.
 
 Run:
@@ -17,7 +17,7 @@ import pandas as pd
 import pytest
 from sqlalchemy import create_engine
 
-from ta_lab2.scripts.emas.sync_cmc_ema_multi_tf_u import (
+from ta_lab2.scripts.emas.sync_ema_multi_tf_u import (
     SOURCES,
     alignment_source_from_table,
     build_select_expr,
@@ -29,11 +29,11 @@ from ta_lab2.scripts.emas.sync_cmc_ema_multi_tf_u import (
 def test_sources_list():
     """Verify SOURCES contains 5 expected table names."""
     expected_sources = [
-        "public.cmc_ema_multi_tf",
-        "public.cmc_ema_multi_tf_cal_us",
-        "public.cmc_ema_multi_tf_cal_iso",
-        "public.cmc_ema_multi_tf_cal_anchor_us",
-        "public.cmc_ema_multi_tf_cal_anchor_iso",
+        "public.ema_multi_tf",
+        "public.ema_multi_tf_cal_us",
+        "public.ema_multi_tf_cal_iso",
+        "public.ema_multi_tf_cal_anchor_us",
+        "public.ema_multi_tf_cal_anchor_iso",
     ]
 
     assert len(SOURCES) == 5, f"Expected 5 sources, got {len(SOURCES)}"
@@ -45,11 +45,11 @@ def test_sources_list():
 def test_alignment_source_extraction():
     """Test alignment_source_from_table extracts correct suffix."""
     test_cases = [
-        ("public.cmc_ema_multi_tf", "multi_tf"),
-        ("public.cmc_ema_multi_tf_cal_us", "multi_tf_cal_us"),
-        ("public.cmc_ema_multi_tf_cal_iso", "multi_tf_cal_iso"),
-        ("public.cmc_ema_multi_tf_cal_anchor_us", "multi_tf_cal_anchor_us"),
-        ("public.cmc_ema_multi_tf_cal_anchor_iso", "multi_tf_cal_anchor_iso"),
+        ("public.ema_multi_tf", "multi_tf"),
+        ("public.ema_multi_tf_cal_us", "multi_tf_cal_us"),
+        ("public.ema_multi_tf_cal_iso", "multi_tf_cal_iso"),
+        ("public.ema_multi_tf_cal_anchor_us", "multi_tf_cal_anchor_us"),
+        ("public.ema_multi_tf_cal_anchor_iso", "multi_tf_cal_anchor_iso"),
     ]
 
     for table_name, expected_source in test_cases:
@@ -72,7 +72,7 @@ def test_get_watermark_returns_none_for_empty(mock_engine):
     mock_df = pd.DataFrame({"wm": [pd.NaT]})
 
     with patch(
-        "ta_lab2.scripts.emas.sync_cmc_ema_multi_tf_u.pd.read_sql", return_value=mock_df
+        "ta_lab2.scripts.emas.sync_ema_multi_tf_u.pd.read_sql", return_value=mock_df
     ):
         result = get_watermark(mock_engine, "multi_tf", prefer_ingested_at=False)
 
@@ -149,11 +149,11 @@ def test_table_exists_helper():
     engine = create_engine(db_url, future=True)
 
     # Test with table that should exist (unified table)
-    exists_result = table_exists(engine, "public.cmc_ema_multi_tf_u")
+    exists_result = table_exists(engine, "public.ema_multi_tf_u")
     assert isinstance(exists_result, bool), "table_exists should return bool"
 
     # Test with table that definitely doesn't exist
     not_exists_result = table_exists(engine, "public.nonexistent_table_xyz_999")
-    assert (
-        not_exists_result is False
-    ), "table_exists should return False for nonexistent table"
+    assert not_exists_result is False, (
+        "table_exists should return False for nonexistent table"
+    )

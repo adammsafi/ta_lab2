@@ -142,7 +142,7 @@ def query_distinct_executor_run_days(
 ) -> list[date]:
     """Return distinct calendar dates with a successful executor run.
 
-    A day is considered run when cmc_executor_run_log has a row with
+    A day is considered run when executor_run_log has a row with
     status IN ('success', 'no_signals').
 
     Args:
@@ -156,7 +156,7 @@ def query_distinct_executor_run_days(
     sql = text(
         """
         SELECT DISTINCT started_at::date AS run_date
-        FROM cmc_executor_run_log
+        FROM executor_run_log
         WHERE status IN ('success', 'no_signals')
           AND started_at::date BETWEEN :start_date AND :end_date
         ORDER BY run_date
@@ -176,7 +176,7 @@ def query_max_tracking_error_5d(
     start: date,
     end: date,
 ) -> float | None:
-    """Return the MAX(tracking_error_5d) from cmc_drift_metrics over the period.
+    """Return the MAX(tracking_error_5d) from drift_metrics over the period.
 
     Args:
         engine: SQLAlchemy Engine.
@@ -190,7 +190,7 @@ def query_max_tracking_error_5d(
     sql = text(
         """
         SELECT MAX(tracking_error_5d)
-        FROM cmc_drift_metrics
+        FROM drift_metrics
         WHERE metric_date BETWEEN :start_date AND :end_date
           AND tracking_error_5d IS NOT NULL
         """
@@ -214,7 +214,7 @@ def query_mean_slippage_bps(
     """Return (mean_abs_slippage_bps, n_fills) for the period.
 
     For paper trading fills:
-      - Reference price = cmc_price_bars_multi_tf.open at fill date (1D tf).
+      - Reference price = price_bars_multi_tf.open at fill date (1D tf).
       - Slippage bps = ABS(fill_price - bar_open) / bar_open * 10000.
 
     Returns (0.0, 0) when no fills exist in the period.
@@ -233,9 +233,9 @@ def query_mean_slippage_bps(
             AVG(ABS(f.fill_price::float - pb.open::float)
                 / NULLIF(pb.open::float, 0) * 10000)  AS mean_slip_bps,
             COUNT(*)                                   AS n_fills
-        FROM cmc_fills f
-        JOIN cmc_orders o ON f.order_id = o.order_id
-        JOIN cmc_price_bars_multi_tf pb
+        FROM fills f
+        JOIN orders o ON f.order_id = o.order_id
+        JOIN price_bars_multi_tf pb
             ON  pb.id   = o.asset_id
             AND pb.tf   = '1D'
             AND pb.ts::date = f.filled_at::date
@@ -277,7 +277,7 @@ def query_kill_switch_events(
     sql = text(
         """
         SELECT event_id, event_ts, event_type, trigger_source, reason, operator
-        FROM cmc_risk_events
+        FROM risk_events
         WHERE event_type LIKE 'kill_switch%'
           AND event_ts::date BETWEEN :start_date AND :end_date
           AND (reason IS NULL OR reason NOT LIKE '%V1 EXERCISE%')
@@ -325,7 +325,7 @@ def query_kill_switch_exercise_events(
     sql = text(
         """
         SELECT event_id, event_ts, event_type, trigger_source, reason, operator
-        FROM cmc_risk_events
+        FROM risk_events
         WHERE reason LIKE '%V1 EXERCISE%'
           AND event_ts::date BETWEEN :start_date AND :end_date
         ORDER BY event_ts
@@ -415,7 +415,7 @@ def build_gate_scorecard(
         status=GateStatus.PASS,
         evidence_sources=[
             "reports/bakeoff/BAKEOFF_SCORECARD.md",
-            "cmc_backtest_metrics",
+            "backtest_metrics",
         ],
     )
 
@@ -449,7 +449,7 @@ def build_gate_scorecard(
         threshold="14 calendar days, both strategies active from day 1",
         measured_value=f"{n_days} days ({day_range})",
         status=GateStatus.PASS if n_days >= 14 else GateStatus.FAIL,
-        evidence_sources=["cmc_executor_run_log"],
+        evidence_sources=["executor_run_log"],
     )
 
     # ------------------------------------------------------------------
@@ -465,7 +465,7 @@ def build_gate_scorecard(
             threshold="< 1% (5-day rolling TE vs backtest)",
             measured_value="NULL -- no fills during period, TE cannot be computed",
             status=GateStatus.CONDITIONAL,
-            evidence_sources=["cmc_drift_metrics"],
+            evidence_sources=["drift_metrics"],
             mitigation=(
                 "Sparse strategy (< 1 trade/month): 14-day window insufficient. "
                 "Extend monitoring window to 30-60 days for meaningful TE measurement."
@@ -478,7 +478,7 @@ def build_gate_scorecard(
             threshold="< 1% (5-day rolling TE vs backtest)",
             measured_value=f"{max_te:.2%} (max 5d rolling TE)",
             status=GateStatus.PASS if max_te < 0.01 else GateStatus.FAIL,
-            evidence_sources=["cmc_drift_metrics"],
+            evidence_sources=["drift_metrics"],
         )
 
     # ------------------------------------------------------------------
@@ -494,7 +494,7 @@ def build_gate_scorecard(
             threshold="< 50 bps (mean absolute)",
             measured_value="No fills -- slippage cannot be measured",
             status=GateStatus.CONDITIONAL,
-            evidence_sources=["cmc_fills", "cmc_orders"],
+            evidence_sources=["fills", "orders"],
             mitigation=(
                 "No fills in validation period. "
                 "Fill simulator config documented in dim_executor_config. "
@@ -508,7 +508,7 @@ def build_gate_scorecard(
             threshold="< 50 bps (mean absolute)",
             measured_value=f"{mean_slip_bps:.1f} bps (mean abs, N={n_fills} fills)",
             status=score_gate(mean_slip_bps, 50.0, "below"),
-            evidence_sources=["cmc_fills", "cmc_orders", "cmc_price_bars_multi_tf"],
+            evidence_sources=["fills", "orders", "price_bars_multi_tf"],
         )
 
     # ------------------------------------------------------------------
@@ -529,7 +529,7 @@ def build_gate_scorecard(
         measured_value=f"Manual: {'YES' if has_manual else 'NO'} | Auto: {'YES' if has_auto else 'NO'}",
         status=GateStatus.PASS if (has_manual and has_auto) else GateStatus.FAIL,
         evidence_sources=[
-            "cmc_risk_events",
+            "risk_events",
             "reports/validation/kill_switch_exercise/",
         ],
     )
@@ -549,9 +549,9 @@ def build_gate_scorecard(
         ),
         status=GateStatus.PASS if audit.all_signed_off else GateStatus.FAIL,
         evidence_sources=[
-            "cmc_executor_run_log",
-            "cmc_orders",
-            "cmc_fills",
+            "executor_run_log",
+            "orders",
+            "fills",
             "reports/validation/audit/",
         ],
     )

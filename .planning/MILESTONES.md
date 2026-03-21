@@ -1,5 +1,31 @@
 # Project Milestones: ta_lab2 AI-Accelerated Quant Platform
 
+## v1.1.0 Pipeline Consolidation & Storage Optimization (Shipped: 2026-03-21)
+
+**Delivered:** Eliminated 254 GB of duplicate data (-59%, 431 GB → 177 GB) by consolidating 30 siloed tables into unified _u tables with alignment_source discrimination. Generalized the 1D bar builder into a single source-registry-driven script. Pruned 7.18M NULL first-observation rows, integrated VWAP pipeline, and cleaned MCP dead routes.
+
+**Phases completed:** 74-79 (21 plans total, including 3 gap closure)
+
+**Key accomplishments:**
+- Generalized 1D bar builder: single `refresh_price_bars_1d.py --source cmc|tvc|hl|all` replaces 3 source-specific scripts; adding a new source requires only a SourceSpec entry
+- Direct-to-_u migration: all 6 table families (price bars, EMAs, AMAs, bar/EMA/AMA returns) write directly to _u tables with alignment_source discrimination
+- 30 siloed tables dropped + VACUUM FULL: 254 GB reclaimed (431 GB → 177 GB, -59%)
+- 6 sync scripts deleted, orchestrator references cleaned, _resync_u_tables() removed
+- NULL first-observation rows pruned from AMA returns (7.18M rows, -6.13%) with filters preventing future NULL inserts
+- VWAP pipeline integrated for multi-venue assets; MCP dead REST routes and stale ChromaDB client removed
+
+**Stats:**
+- 117 files changed
+- ~4,618 net lines removed (consolidation)
+- 6 phases, 21 plans
+- 3 days (2026-03-19 → 2026-03-21)
+
+**Git range:** `docs: start milestone v1.1.0` → `chore: archive v1.1.0 milestone`
+
+**What's next:** v1.2.0 Analysis → Live Signals — IC sweep analysis, GARCH volatility, signal refinement, dashboard overhaul, portfolio construction, live pipeline wiring
+
+---
+
 ## v1.0.1 Macro Regime Infrastructure (Shipped: 2026-03-03)
 
 **Delivered:** FRED macro data pipeline (39 series, 208K rows) wired into regime/risk infrastructure -- 4-dimensional macro regime classifier, tighten-only L4 resolver integration, event risk gates (FOMC/CPI/NFP/VIX/carry/credit), cross-asset aggregation, and full observability (dashboard, Telegram alerts, drift attribution).

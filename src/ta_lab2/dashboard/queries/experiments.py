@@ -14,7 +14,7 @@ from sqlalchemy import text
 
 @st.cache_data(ttl=300)
 def load_experiment_results(_engine, feature_name: str | None = None) -> pd.DataFrame:
-    """Return experiment rows from cmc_feature_experiments.
+    """Return experiment rows from feature_experiments.
 
     If feature_name is None, load all rows. Otherwise filter by feature_name.
 
@@ -40,7 +40,7 @@ def load_experiment_results(_engine, feature_name: str | None = None) -> pd.Data
                 train_start,
                 train_end,
                 computed_at
-            FROM public.cmc_feature_experiments
+            FROM public.feature_experiments
             ORDER BY feature_name, asset_id, horizon
             """
         )
@@ -64,7 +64,7 @@ def load_experiment_results(_engine, feature_name: str | None = None) -> pd.Data
                 train_start,
                 train_end,
                 computed_at
-            FROM public.cmc_feature_experiments
+            FROM public.feature_experiments
             WHERE feature_name = :feature_name
             ORDER BY feature_name, asset_id, horizon
             """
@@ -83,11 +83,11 @@ def load_experiment_results(_engine, feature_name: str | None = None) -> pd.Data
 
 @st.cache_data(ttl=300)
 def load_experiment_feature_names(_engine) -> list[str]:
-    """Return DISTINCT feature_name from cmc_feature_experiments ORDER BY feature_name."""
+    """Return DISTINCT feature_name from feature_experiments ORDER BY feature_name."""
     sql = text(
         """
         SELECT DISTINCT feature_name
-        FROM public.cmc_feature_experiments
+        FROM public.feature_experiments
         ORDER BY feature_name
         """
     )
@@ -113,7 +113,7 @@ def load_experiment_summary(_engine) -> pd.DataFrame:
             COUNT(*) FILTER (WHERE ic_p_value_bh < 0.05) AS n_significant,
             AVG(ABS(ic)) AS mean_abs_ic,
             MAX(computed_at) AS latest_run
-        FROM public.cmc_feature_experiments
+        FROM public.feature_experiments
         GROUP BY feature_name
         ORDER BY n_significant DESC, mean_abs_ic DESC
         """

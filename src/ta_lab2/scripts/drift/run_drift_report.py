@@ -111,7 +111,7 @@ Examples:
         help=(
             "Run full 6-source OAT attribution decomposition for the report period. "
             "Compute-heavy: each config runs 7 backtest replays. "
-            "This is the only way attr_* columns in cmc_drift_metrics get populated."
+            "This is the only way attr_* columns in drift_metrics get populated."
         ),
     )
 
@@ -161,7 +161,7 @@ Examples:
             attributor = DriftAttributor(engine)
 
             # Load configs with metrics for the period
-            # JOIN dim_executor_config to get signal_id (not in cmc_drift_metrics)
+            # JOIN dim_executor_config to get signal_id (not in drift_metrics)
             with engine.connect() as conn:
                 rows = conn.execute(
                     text(
@@ -169,7 +169,7 @@ Examples:
                         SELECT DISTINCT dm.config_id, dec.signal_id, dm.signal_type,
                                dm.asset_id, dm.paper_trade_count,
                                dm.paper_cumulative_pnl
-                        FROM cmc_drift_metrics dm
+                        FROM drift_metrics dm
                         JOIN dim_executor_config dec ON dec.config_id = dm.config_id
                         WHERE dm.metric_date BETWEEN :start AND :end
                           AND dm.paper_trade_count >= 10
@@ -206,7 +206,7 @@ Examples:
                             row.asset_id,
                             result.unexplained_residual,
                         )
-                        # Persist attr_* columns to cmc_drift_metrics.
+                        # Persist attr_* columns to drift_metrics.
                         # The base row must already exist from the daily DriftMonitor run.
                         # Previously run_attribution() result was discarded here,
                         # leaving attr_* columns NULL. This call fixes that gap.

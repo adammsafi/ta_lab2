@@ -3,7 +3,7 @@ CLI for Optuna TPE hyperparameter sweep on LightGBM with efficiency comparison.
 
 Uses Optuna's Tree-structured Parzen Estimator (TPE) sampler to optimise
 LightGBM hyperparameters (n_estimators, num_leaves, learning_rate,
-min_child_samples) on ``cmc_features`` data.  Optionally compares the number
+min_child_samples) on ``features`` data.  Optionally compares the number
 of TPE trials needed to reach near-optimal performance vs the equivalent full
 grid search, demonstrating efficiency gains.
 
@@ -61,7 +61,7 @@ _EXCLUDE_COLS = frozenset(
         "volume",
         "market_cap",
         "alignment_source",
-        # categorical/string columns from cmc_features (not numeric features)
+        # categorical/string columns from features (not numeric features)
         "asset_class",
         "venue",
     ]
@@ -85,7 +85,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="run_optuna_sweep",
         description=(
-            "Optuna TPE hyperparameter sweep for LightGBM on cmc_features. "
+            "Optuna TPE hyperparameter sweep for LightGBM on features. "
             "Optionally compares efficiency vs full grid search."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -153,7 +153,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--log-experiment",
         action="store_true",
-        help="Log best trial results to cmc_ml_experiments via ExperimentTracker",
+        help="Log best trial results to ml_experiments via ExperimentTracker",
     )
     parser.add_argument(
         "--verbose",
@@ -187,12 +187,12 @@ def _load_features(
     start: str,
     end: str,
 ) -> pd.DataFrame:
-    """Load cmc_features for the given asset_ids, tf, and date range."""
+    """Load features for the given asset_ids, tf, and date range."""
     ids_literal = "{" + ",".join(str(i) for i in asset_ids) + "}"
     sql = text(
         """
         SELECT *
-        FROM public.cmc_features
+        FROM public.features
         WHERE id = ANY(CAST(:ids AS INTEGER[]))
           AND tf = :tf
           AND ts BETWEEN CAST(:start AS TIMESTAMPTZ) AND CAST(:end AS TIMESTAMPTZ)
@@ -410,11 +410,11 @@ def main(argv: list[str] | None = None) -> None:
     engine = _build_engine()
 
     # --- Load features ---
-    logger.info("Loading cmc_features...")
+    logger.info("Loading features...")
     df = _load_features(engine, asset_ids, args.tf, args.start, args.end)
     if df.empty:
         logger.error(
-            "No data in cmc_features for asset_ids=%s tf=%s %s to %s. Exiting.",
+            "No data in features for asset_ids=%s tf=%s %s to %s. Exiting.",
             asset_ids,
             args.tf,
             args.start,
@@ -424,7 +424,7 @@ def main(argv: list[str] | None = None) -> None:
     logger.info("Loaded %d rows x %d columns", len(df), len(df.columns))
 
     # --- Build feature matrix ---
-    # Exclude non-numeric dtypes (cmc_features has string/datetime cols: asset_class, venue, updated_at)
+    # Exclude non-numeric dtypes (features has string/datetime cols: asset_class, venue, updated_at)
     feature_cols = [
         c
         for c in df.columns
@@ -435,7 +435,7 @@ def main(argv: list[str] | None = None) -> None:
     ]
 
     if "ret_arith" not in df.columns:
-        logger.error("ret_arith column not found in cmc_features. Cannot build labels.")
+        logger.error("ret_arith column not found in features. Cannot build labels.")
         sys.exit(1)
 
     X = df[feature_cols].copy()
@@ -505,7 +505,7 @@ def main(argv: list[str] | None = None) -> None:
 
     # --- Optional experiment logging ---
     if args.log_experiment:
-        logger.info("Logging best trial to cmc_ml_experiments...")
+        logger.info("Logging best trial to ml_experiments...")
         from ta_lab2.ml.experiment_tracker import ExperimentTracker
 
         tracker = ExperimentTracker(engine)

@@ -7,7 +7,7 @@
 -- Open this file with encoding='utf-8' on Windows.
 --
 -- Purpose: Aggregated drift summary per (config_id, asset_id, signal_type).
--- Refreshed daily after DriftMonitor writes to cmc_drift_metrics. Provides
+-- Refreshed daily after DriftMonitor writes to drift_metrics. Provides
 -- fast dashboard queries without scanning the full metrics table.
 --
 -- The unique index on (config_id, asset_id, signal_type) is REQUIRED for
@@ -49,7 +49,7 @@ SELECT
     -- Tracking error from most recent measurement row
     (
         SELECT dm2.tracking_error_5d
-        FROM public.cmc_drift_metrics dm2
+        FROM public.drift_metrics dm2
         WHERE dm2.config_id    = dm.config_id
           AND dm2.asset_id     = dm.asset_id
           AND dm2.signal_type  = dm.signal_type
@@ -57,7 +57,7 @@ SELECT
         LIMIT 1
     )                                           AS current_tracking_error_5d
 
-FROM public.cmc_drift_metrics dm
+FROM public.drift_metrics dm
 GROUP BY
     config_id,
     asset_id,

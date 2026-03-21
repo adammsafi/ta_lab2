@@ -1,5 +1,5 @@
 """
-CLI for quintile group returns analysis on cmc_features.
+CLI for quintile group returns analysis on features.
 
 Loads all assets for a given timeframe, ranks them by a factor column into
 5 cross-sectional quintiles at each timestamp, and produces a Plotly HTML
@@ -14,7 +14,7 @@ Usage:
         --factor rsi_14 --tf 1D --horizon 3 \\
         --output reports/quintile/rsi_14_1D_h3.html
 
-The factor column must exist in public.cmc_features (validated against
+The factor column must exist in public.features (validated against
 information_schema before building SQL to prevent injection).
 """
 
@@ -37,7 +37,7 @@ from ta_lab2.scripts.sync_utils import get_columns
 
 logger = logging.getLogger(__name__)
 
-# Columns in cmc_features that are identifiers/metadata — never valid factors
+# Columns in features that are identifiers/metadata — never valid factors
 _NON_FACTOR_COLS = frozenset(
     ["id", "ts", "tf", "open", "high", "low", "close", "volume", "ingested_at"]
 )
@@ -45,16 +45,16 @@ _NON_FACTOR_COLS = frozenset(
 
 def _validate_factor_col(engine, factor_col: str) -> list[str]:
     """
-    Validate that factor_col exists in cmc_features.
+    Validate that factor_col exists in features.
 
     Returns the full list of available factor columns for error messaging.
     Raises ValueError if factor_col is not found.
     """
-    available = get_columns(engine, "public.cmc_features")
+    available = get_columns(engine, "public.features")
     if factor_col not in available:
         valid_factors = sorted(c for c in available if c not in _NON_FACTOR_COLS)
         raise ValueError(
-            f"Factor column '{factor_col}' not found in public.cmc_features.\n"
+            f"Factor column '{factor_col}' not found in public.features.\n"
             f"Available factor columns ({len(valid_factors)}): {valid_factors[:20]}..."
         )
     return available
@@ -64,7 +64,7 @@ def _load_features(
     engine, tf: str, factor_col: str, close_col: str = "close"
 ) -> pd.DataFrame:
     """
-    Load all assets from cmc_features for the given tf and factor column.
+    Load all assets from features for the given tf and factor column.
 
     SQL is constructed with a pre-validated column name (validated by
     _validate_factor_col before this function is called), preventing injection.
@@ -87,7 +87,7 @@ def _load_features(
     """
     sql = text(
         f"SELECT id, ts, {factor_col}, {close_col} "
-        f"FROM public.cmc_features "
+        f"FROM public.features "
         f"WHERE tf = :tf AND {factor_col} IS NOT NULL "
         f"ORDER BY ts, id"
     )
@@ -97,7 +97,7 @@ def _load_features(
 
     if df.empty:
         logger.warning(
-            "No rows returned from cmc_features for tf='%s', factor='%s'",
+            "No rows returned from features for tf='%s', factor='%s'",
             tf,
             factor_col,
         )
@@ -123,7 +123,7 @@ def main() -> int:
         prog="run_quintile_sweep",
         description=(
             "Quintile group returns analysis for factor monotonicity testing.\n\n"
-            "Ranks all assets by a factor column from cmc_features into 5 equal-weight "
+            "Ranks all assets by a factor column from features into 5 equal-weight "
             "quintiles at each timestamp. Tracks cumulative forward returns per quintile "
             "and produces a Plotly HTML chart with Q1-Q5 lines + Q5-Q1 long-short spread.\n\n"
             "This is the gold-standard test for factor predictive power: a factor has "
@@ -138,7 +138,7 @@ def main() -> int:
         required=True,
         type=str,
         metavar="COL",
-        help="Feature column name from cmc_features (e.g. rsi_14, ret_arith, vol_30d).",
+        help="Feature column name from features (e.g. rsi_14, ret_arith, vol_30d).",
     )
 
     # Optional: timeframe
@@ -147,7 +147,7 @@ def main() -> int:
         default="1D",
         type=str,
         metavar="TF",
-        help="Timeframe filter for cmc_features (default: 1D).",
+        help="Timeframe filter for features (default: 1D).",
     )
 
     # Optional: forward return horizon
@@ -221,18 +221,16 @@ def main() -> int:
         logger.error("Factor validation failed: %s", exc)
         return 1
 
-    # --- 3. Load all assets from cmc_features ---
+    # --- 3. Load all assets from features ---
     try:
         df = _load_features(engine, args.tf, args.factor)
     except Exception as exc:
-        logger.error(
-            "Failed to load features from cmc_features: %s", exc, exc_info=True
-        )
+        logger.error("Failed to load features from features: %s", exc, exc_info=True)
         return 1
 
     if df.empty:
         logger.error(
-            "No data found in cmc_features for tf='%s' factor='%s'. Exiting.",
+            "No data found in features for tf='%s' factor='%s'. Exiting.",
             args.tf,
             args.factor,
         )

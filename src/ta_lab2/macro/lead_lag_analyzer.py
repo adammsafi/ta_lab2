@@ -4,7 +4,7 @@ Macro-to-crypto lead-lag cross-correlation analyzer (MREG-11).
 
 Scans all FRED float features against BTC and ETH daily returns across
 lags [-60, +60] days, computes Bartlett significance thresholds, and
-upserts results to cmc_macro_lead_lag_results.
+upserts results to macro_lead_lag_results.
 
 Lead-lag convention (IMPORTANT):
     col_a = macro feature (reference), col_b = asset return (shifted)
@@ -33,7 +33,7 @@ Usage:
     analyzer = LeadLagAnalyzer(engine)
     df = analyzer.scan_all()
     rows = analyzer.upsert_results(df)
-    print(f"Upserted {rows} rows to cmc_macro_lead_lag_results")
+    print(f"Upserted {rows} rows to macro_lead_lag_results")
 """
 
 from __future__ import annotations
@@ -74,7 +74,7 @@ _ASSET_ID_TO_NAME: dict[int, str] = {
     2: "eth",
 }
 
-# Daily timeframe code for cmc_returns_bars_multi_tf
+# Daily timeframe code for returns_bars_multi_tf_u
 _RETURN_TF = "1D"
 
 
@@ -116,7 +116,7 @@ class LeadLagAnalyzer:
     # ── Private helpers ───────────────────────────────────────────────────────
 
     def _discover_return_column(self) -> str:
-        """Discover the primary return column in cmc_returns_bars_multi_tf.
+        """Discover the primary return column in returns_bars_multi_tf_u.
 
         Prefers ret_cc (close-to-close return). Falls back to first ret_* column.
 
@@ -130,11 +130,11 @@ class LeadLagAnalyzer:
         ValueError
             If no ret_* columns exist in the table.
         """
-        existing_cols = _get_table_columns(self.engine, "cmc_returns_bars_multi_tf")
+        existing_cols = _get_table_columns(self.engine, "returns_bars_multi_tf_u")
         ret_cols = sorted(c for c in existing_cols if c.startswith("ret"))
         if not ret_cols:
             raise ValueError(
-                "No ret_* columns found in cmc_returns_bars_multi_tf. "
+                "No ret_* columns found in returns_bars_multi_tf_u. "
                 "Has the returns pipeline been run?"
             )
         # Prefer ret_cc (close-to-close); fall back to first available
@@ -193,7 +193,7 @@ class LeadLagAnalyzer:
     def _load_asset_returns(
         self, asset_ids: list[int] | None = None, return_col: str = "ret_cc"
     ) -> pd.DataFrame:
-        """Load daily asset returns from cmc_returns_bars_multi_tf.
+        """Load daily asset returns from returns_bars_multi_tf_u.
 
         Loads returns for each asset_id at 1D timeframe, merges on timestamp
         (normalized to date-level for alignment with macro features).
@@ -219,10 +219,10 @@ class LeadLagAnalyzer:
             name = _ASSET_ID_TO_NAME.get(asset_id, f"asset_{asset_id}")
             col_alias = f"{name}_1d_return"
             sql = text(
-                f"SELECT ts, {return_col} AS {col_alias} "
-                "FROM cmc_returns_bars_multi_tf "
-                "WHERE id = :id AND tf = :tf "
-                "ORDER BY ts ASC"
+                f'SELECT "timestamp" AS ts, {return_col} AS {col_alias} '
+                "FROM returns_bars_multi_tf_u "
+                "WHERE id = :id AND tf = :tf AND alignment_source = 'multi_tf' "
+                'ORDER BY "timestamp" ASC'
             )
             with self.engine.connect() as conn:
                 df = pd.read_sql(sql, conn, params={"id": asset_id, "tf": _RETURN_TF})  # type: ignore[arg-type]
@@ -237,11 +237,9 @@ class LeadLagAnalyzer:
 
             df = df.set_index("ts")
             # Normalize tz-aware timestamp to tz-naive date-level index
-            # Critical: cmc_returns_bars_multi_tf.ts is TIMESTAMP WITH TZ;
+            # Critical: returns_bars_multi_tf_u.timestamp is TIMESTAMP WITH TZ;
             # fred_macro_features.date is DATE (tz-naive). Normalize before join.
-            df.index = pd.to_datetime(df.index).normalize()
-            if df.index.tz is not None:
-                df.index = df.index.tz_localize(None)
+            df.index = pd.to_datetime(df.index, utc=True).normalize().tz_localize(None)
 
             frames.append(df)
             logger.info(
@@ -281,7 +279,7 @@ class LeadLagAnalyzer:
         -------
         pd.DataFrame
             One row per (macro_feature, asset_col) pair. Columns match
-            cmc_macro_lead_lag_results schema:
+            macro_lead_lag_results schema:
                 macro_feature, asset_col, computed_at, best_lag, best_corr,
                 is_significant, n_obs, lag_range_min, lag_range_max,
                 corr_by_lag_json.
@@ -449,7 +447,7 @@ class LeadLagAnalyzer:
         return df_out
 
     def upsert_results(self, df: pd.DataFrame) -> int:
-        """Upsert lead-lag results into cmc_macro_lead_lag_results.
+        """Upsert lead-lag results into macro_lead_lag_results.
 
         Uses temp table + INSERT ... ON CONFLICT (macro_feature, asset_col, computed_at)
         DO UPDATE pattern, matching project upsert conventions.
@@ -492,7 +490,7 @@ class LeadLagAnalyzer:
             conn.execute(
                 text(
                     "CREATE TEMP TABLE _lead_lag_staging "
-                    "(LIKE cmc_macro_lead_lag_results INCLUDING DEFAULTS) "
+                    "(LIKE macro_lead_lag_results INCLUDING DEFAULTS) "
                     "ON COMMIT DROP"
                 )
             )
@@ -509,7 +507,7 @@ class LeadLagAnalyzer:
             # Upsert from staging to target
             result = conn.execute(
                 text(
-                    f"INSERT INTO cmc_macro_lead_lag_results ({col_list}) "
+                    f"INSERT INTO macro_lead_lag_results ({col_list}) "
                     f"SELECT {col_list} FROM _lead_lag_staging "
                     "ON CONFLICT (macro_feature, asset_col, computed_at) DO UPDATE SET "
                     f"{set_clause}"
@@ -518,6 +516,6 @@ class LeadLagAnalyzer:
             row_count = result.rowcount
 
         logger.info(
-            "upsert_results: %d rows upserted to cmc_macro_lead_lag_results", row_count
+            "upsert_results: %d rows upserted to macro_lead_lag_results", row_count
         )
         return row_count

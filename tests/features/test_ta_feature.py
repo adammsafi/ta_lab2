@@ -35,7 +35,7 @@ class TestTAConfig(unittest.TestCase):
         config = TAConfig()
 
         self.assertEqual(config.feature_type, "ta")
-        self.assertEqual(config.output_table, "cmc_ta_daily")
+        self.assertEqual(config.output_table, "ta_daily")
         self.assertEqual(config.null_strategy, "interpolate")
         self.assertEqual(config.add_zscore, True)
         self.assertEqual(config.zscore_window, 252)

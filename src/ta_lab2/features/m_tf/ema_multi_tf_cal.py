@@ -2,7 +2,7 @@
 Calendar-aligned multi-timeframe EMA - REFACTORED to use BaseEMAFeature.
 
 Calendar EMA semantics:
-- Canonical calendar closes from cmc_price_bars_multi_tf_cal_us/iso
+- Canonical calendar closes from price_bars_multi_tf_u (alignment_source=multi_tf_cal_us/iso)
 - Timeframe universe from dim_timeframe (alignment_type='calendar')
 - Dual EMAs: ema (daily-space) and ema_bar (bar-space with preview)
 - Alpha from lookup table (ema_alpha_lookup)
@@ -49,7 +49,7 @@ class CalendarEMAFeature(BaseEMAFeature):
     Calendar-aligned EMA feature: EMAs computed on calendar TF closes.
 
     Key characteristics:
-    - Uses calendar bars tables (cal_us or cal_iso)
+    - Uses price_bars_multi_tf_u with alignment_source=multi_tf_cal_us/iso
     - Loads TFs from dim_timeframe with calendar alignment
     - Alpha from lookup table (not computed)
     - Dual EMAs: ema (daily-space) + ema_bar (bar-space with preview)
@@ -79,18 +79,16 @@ class CalendarEMAFeature(BaseEMAFeature):
         self.alpha_schema = alpha_schema
         self.alpha_table = alpha_table
 
-        # Determine bars table from scheme
-        if self.scheme == "US":
-            self.bars_table = "public.cmc_price_bars_multi_tf_cal_us"
-        elif self.scheme == "ISO":
-            self.bars_table = "public.cmc_price_bars_multi_tf_cal_iso"
-        else:
+        # Both schemes now read from the unified _u table with alignment_source filter
+        self.bars_table = "public.price_bars_multi_tf_u"
+        if self.scheme not in ("US", "ISO"):
             raise ValueError(f"Unsupported scheme: {scheme} (expected US or ISO)")
 
-        # Cache alpha lookup and TF specs
+        # Cache alpha lookup, TF specs, and canonical closes
         self._alpha_lookup: Optional[pd.DataFrame] = None
         self._tf_specs_cache: Optional[List[TFSpec]] = None
         self._daily_data_cache: Optional[pd.DataFrame] = None
+        self._canonical_closes_cache: Optional[pd.DataFrame] = None
 
     # =========================================================================
     # Abstract Method Implementations
@@ -122,11 +120,10 @@ class CalendarEMAFeature(BaseEMAFeature):
             id,
             "timestamp" AS ts,
             close,
-            venue,
-            venue_rank
-          FROM public.cmc_price_bars_1d
+            venue_id
+          FROM public.price_bars_1d
           WHERE {" AND ".join(where)}
-          ORDER BY id, venue, "timestamp"
+          ORDER BY id, venue_id, "timestamp"
         """
 
         with self.engine.connect() as conn:
@@ -134,7 +131,7 @@ class CalendarEMAFeature(BaseEMAFeature):
 
         if not df.empty:
             df["ts"] = pd.to_datetime(df["ts"], utc=True)
-            df = df.sort_values(["id", "venue", "ts"]).reset_index(drop=True)
+            df = df.sort_values(["id", "venue_id", "ts"]).reset_index(drop=True)
 
         logger.info(f"Loaded {len(df)} daily rows for {len(ids)} IDs")
         self._daily_data_cache = df
@@ -229,30 +226,20 @@ class CalendarEMAFeature(BaseEMAFeature):
         if tf_closes.empty:
             return pd.DataFrame()
 
-        # Group closes by (id, venue, tf)
+        # Group closes by (id, venue_id, tf)
         closes_g = (
-            tf_closes.groupby(["id", "venue", "tf"])["ts_close"].agg(list).to_dict()
+            tf_closes.groupby(["id", "venue_id", "tf"])["ts_close"].agg(list).to_dict()
         )
-
-        # Build venue_rank lookup from canonical closes
-        _venue_rank_map = {}
-        if "venue_rank" in tf_closes.columns:
-            for _, row in (
-                tf_closes[["id", "venue", "venue_rank"]]
-                .drop_duplicates(subset=["id", "venue"])
-                .iterrows()
-            ):
-                _venue_rank_map[(int(row["id"]), row["venue"])] = int(row["venue_rank"])
 
         out_frames = []
 
-        for (id_, venue, tf), close_list in closes_g.items():
+        for (id_, venue_id, tf), close_list in closes_g.items():
             close_list = sorted(pd.to_datetime(close_list, utc=True))
             close_set = set(close_list)
 
             df_id = self._daily_data_cache[
                 (self._daily_data_cache["id"] == id_)
-                & (self._daily_data_cache["venue"] == venue)
+                & (self._daily_data_cache["venue_id"] == venue_id)
             ].copy()
             if df_id.empty:
                 continue
@@ -336,16 +323,13 @@ class CalendarEMAFeature(BaseEMAFeature):
                 else:
                     is_partial = np.ones(n_out, dtype=bool)
 
-                venue_rank = _venue_rank_map.get((int(id_), venue), 50)
-
                 df_out = pd.DataFrame(
                     {
                         "id": int(id_),
                         "tf": tf,
                         "ts": ts_out,
                         "period": int(period),
-                        "venue": venue,
-                        "venue_rank": int(venue_rank),
+                        "venue_id": int(venue_id),
                         "tf_days": tf_spec.tf_days,
                         "roll": roll_out,
                         "ema": ema_arr,
@@ -361,8 +345,7 @@ class CalendarEMAFeature(BaseEMAFeature):
                             "tf",
                             "ts",
                             "period",
-                            "venue",
-                            "venue_rank",
+                            "venue_id",
                             "tf_days",
                             "roll",
                             "ema",
@@ -383,18 +366,17 @@ class CalendarEMAFeature(BaseEMAFeature):
         """Define output table schema for calendar EMAs (lean - EMA only)."""
         return {
             "id": "INTEGER NOT NULL",
+            "venue_id": "SMALLINT NOT NULL DEFAULT 1",
             "tf": "TEXT NOT NULL",
             "ts": "TIMESTAMPTZ NOT NULL",
             "period": "INTEGER NOT NULL",
-            "venue": "TEXT NOT NULL DEFAULT 'CMC_AGG'",
-            "venue_rank": "INTEGER NOT NULL DEFAULT 50",
             "tf_days": "INTEGER",
             "roll": "BOOLEAN",
             "ema": "DOUBLE PRECISION",
             "ema_bar": "DOUBLE PRECISION",
             "is_partial_end": "BOOLEAN",
             "ingested_at": "TIMESTAMPTZ DEFAULT now()",
-            "PRIMARY KEY": "(id, tf, ts, period, venue)",
+            "PRIMARY KEY": "(id, venue_id, tf, ts, period)",
         }
 
     # =========================================================================
@@ -426,27 +408,84 @@ class CalendarEMAFeature(BaseEMAFeature):
         self._alpha_lookup = df
         return df
 
-    def _load_canonical_closes(self, ids: list[int], tfs: list[str]) -> pd.DataFrame:
-        """Load canonical closes from bars table."""
-        if not ids or not tfs:
-            return pd.DataFrame(columns=["id", "tf", "ts_close", "venue"])
+    def preload_canonical_closes(self, ids: list[int]) -> None:
+        """
+        Load canonical closes for ALL TFs in a single query and cache.
 
+        Call this before the TF loop to avoid per-TF queries.
+        """
+        if not ids:
+            self._canonical_closes_cache = pd.DataFrame(
+                columns=["id", "tf", "ts_close", "venue_id"]
+            )
+            return
+
+        alignment_source = f"multi_tf_cal_{self.scheme.lower()}"
         sql = f"""
           SELECT
             id,
             tf,
-            "timestamp" AS ts_close,
-            venue,
-            venue_rank
+            time_close AS ts_close,
+            venue_id
+          FROM {self.bars_table}
+          WHERE id = ANY(:ids)
+            AND is_partial_end = FALSE
+            AND alignment_source = :alignment_source
+          ORDER BY id, venue_id, tf, time_close
+        """
+
+        with self.engine.connect() as conn:
+            df = read_sql_polars(
+                sql, conn, params={"ids": ids, "alignment_source": alignment_source}
+            )
+
+        if not df.empty:
+            df["id"] = df["id"].astype(int)
+            df["tf"] = df["tf"].astype(str)
+            df["ts_close"] = pd.to_datetime(df["ts_close"], utc=True)
+
+        self._canonical_closes_cache = df
+        logger.info(
+            "Preloaded canonical closes: %d rows across %d TFs",
+            len(df),
+            df["tf"].nunique() if not df.empty else 0,
+        )
+
+    def _load_canonical_closes(self, ids: list[int], tfs: list[str]) -> pd.DataFrame:
+        """Load canonical closes from bars table (uses cache if available)."""
+        # Use preloaded cache if available
+        if self._canonical_closes_cache is not None:
+            if self._canonical_closes_cache.empty:
+                return pd.DataFrame(columns=["id", "tf", "ts_close", "venue_id"])
+            return self._canonical_closes_cache[
+                self._canonical_closes_cache["tf"].isin(tfs)
+            ].reset_index(drop=True)
+
+        # Fallback: per-TF query (backward compat)
+        if not ids or not tfs:
+            return pd.DataFrame(columns=["id", "tf", "ts_close", "venue_id"])
+
+        alignment_source = f"multi_tf_cal_{self.scheme.lower()}"
+        sql = f"""
+          SELECT
+            id,
+            tf,
+            time_close AS ts_close,
+            venue_id
           FROM {self.bars_table}
           WHERE id = ANY(:ids)
             AND tf = ANY(:tfs)
             AND is_partial_end = FALSE
-          ORDER BY id, venue, tf, "timestamp"
+            AND alignment_source = :alignment_source
+          ORDER BY id, venue_id, tf, time_close
         """
 
         with self.engine.connect() as conn:
-            df = read_sql_polars(sql, conn, params={"ids": ids, "tfs": tfs})
+            df = read_sql_polars(
+                sql,
+                conn,
+                params={"ids": ids, "tfs": tfs, "alignment_source": alignment_source},
+            )
 
         if not df.empty:
             df["id"] = df["id"].astype(int)
@@ -507,7 +546,7 @@ def write_multi_timeframe_ema_cal_to_db(
 
     scheme_u = scheme.strip().upper()
     if out_table is None:
-        out_table = f"cmc_ema_multi_tf_cal_{scheme_u.lower()}"
+        out_table = f"ema_multi_tf_cal_{scheme_u.lower()}"
 
     logger.info(
         f"Computing calendar EMAs: scheme={scheme_u}, periods={len(ema_periods)}, ids={len(ids)}"
@@ -537,13 +576,15 @@ def write_multi_timeframe_ema_cal_to_db(
     tf_specs = feature.get_tf_specs()
 
     # Pre-filter: only keep TFs that have bars for the requested IDs
+    _alignment_source_cal = f"multi_tf_cal_{scheme_u.lower()}"
     with engine.connect() as conn:
         bar_tfs = (
             conn.execute(
                 text(
-                    f"SELECT DISTINCT tf FROM {feature.bars_table} WHERE id = ANY(:ids)"
+                    f"SELECT DISTINCT tf FROM {feature.bars_table}"
+                    f" WHERE id = ANY(:ids) AND alignment_source = :alignment_source"
                 ),
-                {"ids": list(ids)},
+                {"ids": list(ids), "alignment_source": _alignment_source_cal},
             )
             .scalars()
             .all()
@@ -576,7 +617,6 @@ def write_multi_timeframe_ema_cal_to_db(
     # Write to database
     conflict_action = (
         """DO UPDATE SET
-        venue_rank       = EXCLUDED.venue_rank,
         tf_days          = EXCLUDED.tf_days,
         roll             = EXCLUDED.roll,
         ema              = EXCLUDED.ema,
@@ -590,16 +630,16 @@ def write_multi_timeframe_ema_cal_to_db(
     upsert_sql = text(
         f"""
       INSERT INTO {schema}.{out_table} (
-        id, tf, ts, period, venue, venue_rank,
+        id, venue_id, tf, ts, period,
         tf_days, roll, ema, ema_bar, is_partial_end,
         ingested_at
       )
       VALUES (
-        :id, :tf, :ts, :period, :venue, :venue_rank,
+        :id, :venue_id, :tf, :ts, :period,
         :tf_days, :roll, :ema, :ema_bar, :is_partial_end,
         now()
       )
-      ON CONFLICT (id, tf, ts, period, venue) {conflict_action}
+      ON CONFLICT (id, venue_id, tf, ts, period) {conflict_action}
     """
     )
 

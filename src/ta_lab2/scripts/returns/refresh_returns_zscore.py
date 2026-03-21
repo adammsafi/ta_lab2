@@ -52,7 +52,6 @@ runfile(
 
 import argparse
 import os
-import subprocess
 import time
 from dataclasses import dataclass
 from multiprocessing import Pool
@@ -122,7 +121,7 @@ _BAR_ROLL_BASE = [
 
 _BAR_TABLES = [
     TableConfig(
-        table="public.cmc_returns_bars_multi_tf",
+        table="public.returns_bars_multi_tf",
         ts_col='"timestamp"',
         pk_cols=["id", '"timestamp"', "tf"],
         key_cols=["id", "tf"],
@@ -130,7 +129,7 @@ _BAR_TABLES = [
         roll_base_pairs=_BAR_ROLL_BASE,
     ),
     TableConfig(
-        table="public.cmc_returns_bars_multi_tf_cal_us",
+        table="public.returns_bars_multi_tf_cal_us",
         ts_col='"timestamp"',
         pk_cols=["id", '"timestamp"', "tf"],
         key_cols=["id", "tf"],
@@ -138,7 +137,7 @@ _BAR_TABLES = [
         roll_base_pairs=_BAR_ROLL_BASE,
     ),
     TableConfig(
-        table="public.cmc_returns_bars_multi_tf_cal_iso",
+        table="public.returns_bars_multi_tf_cal_iso",
         ts_col='"timestamp"',
         pk_cols=["id", '"timestamp"', "tf"],
         key_cols=["id", "tf"],
@@ -146,7 +145,7 @@ _BAR_TABLES = [
         roll_base_pairs=_BAR_ROLL_BASE,
     ),
     TableConfig(
-        table="public.cmc_returns_bars_multi_tf_cal_anchor_us",
+        table="public.returns_bars_multi_tf_cal_anchor_us",
         ts_col='"timestamp"',
         pk_cols=["id", '"timestamp"', "tf"],
         key_cols=["id", "tf"],
@@ -154,7 +153,7 @@ _BAR_TABLES = [
         roll_base_pairs=_BAR_ROLL_BASE,
     ),
     TableConfig(
-        table="public.cmc_returns_bars_multi_tf_cal_anchor_iso",
+        table="public.returns_bars_multi_tf_cal_anchor_iso",
         ts_col='"timestamp"',
         pk_cols=["id", '"timestamp"', "tf"],
         key_cols=["id", "tf"],
@@ -181,7 +180,7 @@ _EMA_ROLL_BASE = [
 
 _EMA_TABLES = [
     TableConfig(
-        table="public.cmc_returns_ema_multi_tf",
+        table="public.returns_ema_multi_tf",
         ts_col="ts",
         pk_cols=["id", "ts", "tf", "period"],
         key_cols=["id", "tf", "period"],
@@ -189,7 +188,7 @@ _EMA_TABLES = [
         roll_base_pairs=_EMA_ROLL_BASE,
     ),
     TableConfig(
-        table="public.cmc_returns_ema_multi_tf_cal_us",
+        table="public.returns_ema_multi_tf_cal_us",
         ts_col="ts",
         pk_cols=["id", "ts", "tf", "period"],
         key_cols=["id", "tf", "period"],
@@ -197,7 +196,7 @@ _EMA_TABLES = [
         roll_base_pairs=_EMA_ROLL_BASE,
     ),
     TableConfig(
-        table="public.cmc_returns_ema_multi_tf_cal_iso",
+        table="public.returns_ema_multi_tf_cal_iso",
         ts_col="ts",
         pk_cols=["id", "ts", "tf", "period"],
         key_cols=["id", "tf", "period"],
@@ -205,7 +204,7 @@ _EMA_TABLES = [
         roll_base_pairs=_EMA_ROLL_BASE,
     ),
     TableConfig(
-        table="public.cmc_returns_ema_multi_tf_cal_anchor_us",
+        table="public.returns_ema_multi_tf_cal_anchor_us",
         ts_col="ts",
         pk_cols=["id", "ts", "tf", "period"],
         key_cols=["id", "tf", "period"],
@@ -213,7 +212,7 @@ _EMA_TABLES = [
         roll_base_pairs=_EMA_ROLL_BASE,
     ),
     TableConfig(
-        table="public.cmc_returns_ema_multi_tf_cal_anchor_iso",
+        table="public.returns_ema_multi_tf_cal_anchor_iso",
         ts_col="ts",
         pk_cols=["id", "ts", "tf", "period"],
         key_cols=["id", "tf", "period"],
@@ -241,7 +240,7 @@ _AMA_ROLL_BASE = [
 
 _AMA_TABLES = [
     TableConfig(
-        table="public.cmc_returns_ama_multi_tf",
+        table="public.returns_ama_multi_tf",
         ts_col="ts",
         pk_cols=["id", "ts", "tf", "indicator", "params_hash"],
         key_cols=["id", "tf", "indicator", "params_hash"],
@@ -249,7 +248,7 @@ _AMA_TABLES = [
         roll_base_pairs=_AMA_ROLL_BASE,
     ),
     TableConfig(
-        table="public.cmc_returns_ama_multi_tf_cal_us",
+        table="public.returns_ama_multi_tf_cal_us",
         ts_col="ts",
         pk_cols=["id", "ts", "tf", "indicator", "params_hash"],
         key_cols=["id", "tf", "indicator", "params_hash"],
@@ -257,7 +256,7 @@ _AMA_TABLES = [
         roll_base_pairs=_AMA_ROLL_BASE,
     ),
     TableConfig(
-        table="public.cmc_returns_ama_multi_tf_cal_iso",
+        table="public.returns_ama_multi_tf_cal_iso",
         ts_col="ts",
         pk_cols=["id", "ts", "tf", "indicator", "params_hash"],
         key_cols=["id", "tf", "indicator", "params_hash"],
@@ -265,7 +264,7 @@ _AMA_TABLES = [
         roll_base_pairs=_AMA_ROLL_BASE,
     ),
     TableConfig(
-        table="public.cmc_returns_ama_multi_tf_cal_anchor_us",
+        table="public.returns_ama_multi_tf_cal_anchor_us",
         ts_col="ts",
         pk_cols=["id", "ts", "tf", "indicator", "params_hash"],
         key_cols=["id", "tf", "indicator", "params_hash"],
@@ -273,7 +272,7 @@ _AMA_TABLES = [
         roll_base_pairs=_AMA_ROLL_BASE,
     ),
     TableConfig(
-        table="public.cmc_returns_ama_multi_tf_cal_anchor_iso",
+        table="public.returns_ama_multi_tf_cal_anchor_iso",
         ts_col="ts",
         pk_cols=["id", "ts", "tf", "indicator", "params_hash"],
         key_cols=["id", "tf", "indicator", "params_hash"],
@@ -625,62 +624,6 @@ def _process_table(
 
 
 # ---------------------------------------------------------------------------
-# Re-sync _u tables after z-scoring source tables
-# ---------------------------------------------------------------------------
-
-# Map table family -> sync module path
-_RESYNC_MODULES = {
-    "bars": "ta_lab2.scripts.returns.sync_cmc_returns_bars_multi_tf_u",
-    "emas": "ta_lab2.scripts.returns.sync_cmc_returns_ema_multi_tf_u",
-    "amas": "ta_lab2.scripts.amas.sync_cmc_returns_ama_multi_tf_u",
-}
-
-_RESYNC_U_TABLES = {
-    "bars": "public.cmc_returns_bars_multi_tf_u",
-    "emas": "public.cmc_returns_ema_multi_tf_u",
-    "amas": "public.cmc_returns_ama_multi_tf_u",
-}
-
-
-def _resync_u_tables(db_url: str, table_family: str) -> None:
-    """Truncate and re-sync _u tables so z-scores propagate from source tables."""
-    families = list(_RESYNC_MODULES.keys()) if table_family == "all" else [table_family]
-
-    engine = _get_engine(db_url)
-    for family in families:
-        u_table = _RESYNC_U_TABLES[family]
-        module = _RESYNC_MODULES[family]
-
-        _print(f"--- Re-syncing {u_table} ---")
-
-        # Truncate _u table
-        _print(f"  Truncating {u_table}...")
-        with engine.begin() as conn:
-            conn.execute(text(f"TRUNCATE {u_table}"))
-        _print("  Truncated.")
-
-        # Run sync script as subprocess (inherits TARGET_DB_URL from env)
-        _print(f"  Running sync: python -m {module}")
-        t0 = time.time()
-        result = subprocess.run(
-            ["python", "-m", module],
-            capture_output=True,
-            text=True,
-            timeout=7200,  # 2 hour timeout
-        )
-        elapsed = time.time() - t0
-
-        # Print sync output
-        for line in result.stdout.strip().split("\n"):
-            if line.strip():
-                _print(f"  {line.strip()}")
-        if result.returncode != 0:
-            _print(f"  SYNC ERROR (exit {result.returncode}): {result.stderr[:500]}")
-        else:
-            _print(f"  Sync complete in {elapsed:.0f}s")
-
-
-# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -728,11 +671,6 @@ def main() -> None:
         default=1,
         help="Number of parallel workers per table (default: 1).",
     )
-    p.add_argument(
-        "--skip-resync",
-        action="store_true",
-        help="Skip re-syncing _u tables after z-scoring source tables.",
-    )
     args = p.parse_args()
 
     db_url = args.db_url.strip()
@@ -778,10 +716,6 @@ def main() -> None:
             full_recalc=args.full_recalc,
             workers=args.workers,
         )
-
-    # Re-sync _u tables: TRUNCATE + full re-sync from z-scored source tables
-    if not args.skip_resync:
-        _resync_u_tables(db_url, args.tables)
 
     _print(f"All done in {time.time() - t_total:.1f}s")
 

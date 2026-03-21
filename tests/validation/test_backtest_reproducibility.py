@@ -35,9 +35,9 @@ def sample_signal(db_session, db_engine):
     If no signals exist, returns None (tests will skip).
     """
     signal_tables = [
-        "cmc_signals_ema_crossover",
-        "cmc_signals_rsi_mean_revert",
-        "cmc_signals_atr_breakout",
+        "signals_ema_crossover",
+        "signals_rsi_mean_revert",
+        "signals_atr_breakout",
     ]
 
     for table in signal_tables:
@@ -57,7 +57,7 @@ def sample_signal(db_session, db_engine):
 
         try:
             result = db_session.execute(
-                sql, {"table_type": table.replace("cmc_signals_", "")}
+                sql, {"table_type": table.replace("signals_", "")}
             )
             row = result.fetchone()
 
@@ -136,9 +136,9 @@ class TestBacktestReproducibilityValidation:
                 f"Backtest not reproducible for {signal_type}/{signal_id}. "
                 f"Differences: {report.differences}"
             )
-            assert (
-                len(report.differences) == 0
-            ), f"Found {len(report.differences)} differences: {report.differences}"
+            assert len(report.differences) == 0, (
+                f"Found {len(report.differences)} differences: {report.differences}"
+            )
 
         except ValueError as e:
             # Backtest might fail if insufficient data
@@ -238,9 +238,9 @@ class TestBacktestReproducibilityValidation:
             )
 
             # Compare trade counts (exact match required)
-            assert (
-                result1.trade_count == result2.trade_count
-            ), f"Trade count not deterministic: {result1.trade_count} vs {result2.trade_count}"
+            assert result1.trade_count == result2.trade_count, (
+                f"Trade count not deterministic: {result1.trade_count} vs {result2.trade_count}"
+            )
 
         except ValueError as e:
             if "No feature data" in str(e) or "No signals" in str(e):
@@ -284,9 +284,9 @@ class TestBacktestReproducibilityValidation:
                 if val1 is None and val2 is None:
                     continue
 
-                assert (
-                    val1 is not None and val2 is not None
-                ), f"Metric '{metric_name}' missing in one run: {val1} vs {val2}"
+                assert val1 is not None and val2 is not None, (
+                    f"Metric '{metric_name}' missing in one run: {val1} vs {val2}"
+                )
 
                 # Compare with tolerance
                 diff = abs(val1 - val2)

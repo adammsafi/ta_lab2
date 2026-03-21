@@ -57,6 +57,7 @@ class FeatureConfig:
     null_strategy: str = "skip"
     add_zscore: bool = True
     zscore_window: int = 252
+    venue_id: int | None = None  # Filter source data to this venue_id (None = all)
 
 
 # =============================================================================
@@ -86,7 +87,7 @@ class BaseFeature(ABC):
     - Database writing with table creation
     """
 
-    SOURCE_TABLE = "public.cmc_price_bars_multi_tf_u"
+    SOURCE_TABLE = "public.price_bars_multi_tf_u"
     TS_COLUMN = "time_close"
 
     def __init__(self, engine: Engine, config: FeatureConfig):
@@ -352,9 +353,11 @@ class BaseFeature(ABC):
             keep_cols = [c for c in df.columns if c in table_cols]
             df = df[keep_cols]
 
-        # Scoped delete: existing rows for these (ids, tf, alignment_source, venue)
+        # Scoped delete: existing rows for these (ids, tf, alignment_source, venue_id)
         ids = df["id"].unique().tolist()
-        venues = df["venue"].unique().tolist() if "venue" in df.columns else ["CMC_AGG"]
+        venue_ids = (
+            df["venue_id"].unique().tolist() if "venue_id" in df.columns else [1]
+        )
         tf = self.config.tf
         alignment_source = self.get_alignment_source()
 
@@ -364,9 +367,9 @@ class BaseFeature(ABC):
                     f"DELETE FROM {fq_table}"
                     " WHERE id = ANY(:ids) AND tf = :tf"
                     " AND alignment_source = :as_"
-                    " AND venue = ANY(:venues)"
+                    " AND venue_id = ANY(:venue_ids)"
                 ),
-                {"ids": ids, "tf": tf, "as_": alignment_source, "venues": venues},
+                {"ids": ids, "tf": tf, "as_": alignment_source, "venue_ids": venue_ids},
             )
 
         # Insert

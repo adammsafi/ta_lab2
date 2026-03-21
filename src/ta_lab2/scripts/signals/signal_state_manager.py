@@ -18,7 +18,7 @@ Usage:
 
     config = SignalStateConfig(
         state_schema="public",
-        state_table="cmc_signal_state",
+        state_table="signal_state",
         signal_type="ema_crossover",
     )
 
@@ -30,7 +30,7 @@ Usage:
 
     # Update state after generating signals
     manager.update_state_after_generation(
-        signal_table="cmc_signals_ema_crossover",
+        signal_table="signals_ema_crossover",
         signal_id=1
     )
 """
@@ -54,14 +54,14 @@ class SignalStateConfig:
     Attributes:
         signal_type: Signal category - 'ema_crossover', 'rsi_mean_revert', 'atr_breakout' (required)
         state_schema: Schema containing state table (default: "public")
-        state_table: State table name (default: "cmc_signal_state")
+        state_table: State table name (default: "signal_state")
         ts_column: Timestamp column name in signal table (default: "ts")
         id_column: ID column name in signal table (default: "id")
     """
 
     signal_type: str  # Required: 'ema_crossover', 'rsi_mean_revert', 'atr_breakout'
     state_schema: str = "public"
-    state_table: str = "cmc_signal_state"
+    state_table: str = "signal_state"
     ts_column: str = "ts"
     id_column: str = "id"
 
@@ -74,6 +74,7 @@ STATE_TABLE_SCHEMA = """
 CREATE TABLE IF NOT EXISTS {schema}.{table} (
     -- Primary key
     id                      INTEGER         NOT NULL,
+    venue_id                SMALLINT        NOT NULL DEFAULT 1,
     signal_type             TEXT            NOT NULL,
     signal_id               INTEGER         NOT NULL,
 
@@ -85,7 +86,7 @@ CREATE TABLE IF NOT EXISTS {schema}.{table} (
     -- Metadata
     updated_at              TIMESTAMPTZ     NOT NULL DEFAULT now(),
 
-    PRIMARY KEY (id, signal_type, signal_id)
+    PRIMARY KEY (id, venue_id, signal_type, signal_id)
 );
 """
 
@@ -150,11 +151,11 @@ class SignalStateManager:
             Returns empty DataFrame if no open positions found.
         """
         # Determine signal table name from signal_type
-        signal_table = f"cmc_signals_{self.config.signal_type}"
+        signal_table = f"signals_{self.config.signal_type}"
 
         sql_text = f"""
             SELECT
-                id, signal_id, ts, direction, position_state,
+                id, venue_id, signal_id, ts, direction, position_state,
                 entry_ts, entry_price, feature_snapshot,
                 signal_version, feature_version_hash, params_hash
             FROM public.{signal_table}
@@ -176,6 +177,7 @@ class SignalStateManager:
                 return pd.DataFrame(
                     columns=[
                         "id",
+                        "venue_id",
                         "signal_id",
                         "ts",
                         "direction",
@@ -201,7 +203,7 @@ class SignalStateManager:
         signal table and upserts into state table.
 
         Args:
-            signal_table: Name of signal table (e.g., 'cmc_signals_ema_crossover')
+            signal_table: Name of signal table (e.g., 'signals_ema_crossover')
             signal_id: Signal ID from dim_signals
 
         Returns:
@@ -215,12 +217,13 @@ class SignalStateManager:
 
         sql = f"""
         INSERT INTO {state_table_fq} (
-            id, signal_type, signal_id,
+            id, venue_id, signal_type, signal_id,
             last_entry_ts, last_exit_ts, open_position_count,
             updated_at
         )
         SELECT
             id,
+            venue_id,
             '{signal_type}' as signal_type,
             signal_id,
             MAX(CASE WHEN entry_ts IS NOT NULL THEN ts END) as last_entry_ts,
@@ -229,8 +232,8 @@ class SignalStateManager:
             now() as updated_at
         FROM public.{signal_table}
         WHERE signal_id = :signal_id
-        GROUP BY id, signal_id
-        ON CONFLICT (id, signal_type, signal_id) DO UPDATE SET
+        GROUP BY id, venue_id, signal_id
+        ON CONFLICT (id, venue_id, signal_type, signal_id) DO UPDATE SET
             last_entry_ts = EXCLUDED.last_entry_ts,
             last_exit_ts = EXCLUDED.last_exit_ts,
             open_position_count = EXCLUDED.open_position_count,
@@ -260,7 +263,7 @@ class SignalStateManager:
             IDs with no state will map to None (indicating full history needed)
         """
         sql_text = f"""
-            SELECT id, last_entry_ts
+            SELECT id, venue_id, last_entry_ts
             FROM {self.config.state_schema}.{self.config.state_table}
             WHERE id = ANY(:ids)
                 AND signal_type = :signal_type

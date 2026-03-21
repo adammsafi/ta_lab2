@@ -16,7 +16,7 @@ Sign convention (standard perpetual futures):
     - Short payment: positive cash flow (add to equity)
 
 Modes:
-    - 'daily':         reads tf='1d' rows from cmc_funding_rates (pre-rolled daily sum)
+    - 'daily':         reads tf='1d' rows from funding_rates (pre-rolled daily sum)
     - 'per_settlement': reads tf IN ('1h','4h','8h') native granularity rows
 
 CRITICAL (MEMORY.md):
@@ -142,7 +142,7 @@ def load_funding_rates_for_backtest(
     mode: str = "daily",
 ) -> pd.Series:
     """
-    Load funding rates from cmc_funding_rates for a backtest window.
+    Load funding rates from funding_rates for a backtest window.
 
     Parameters
     ----------
@@ -176,7 +176,7 @@ def load_funding_rates_for_backtest(
     sql = text(
         f"""
         SELECT ts, funding_rate
-        FROM cmc_funding_rates
+        FROM funding_rates
         WHERE venue = :venue
           AND symbol = :symbol
           AND {tf_filter}
@@ -250,7 +250,7 @@ def get_funding_rate_with_fallback(
     sql_exact = text(
         """
         SELECT funding_rate
-        FROM cmc_funding_rates
+        FROM funding_rates
         WHERE venue  = :venue
           AND symbol = :symbol
           AND ts     = :ts
@@ -272,7 +272,7 @@ def get_funding_rate_with_fallback(
     sql_fallback = text(
         """
         SELECT AVG(funding_rate)
-        FROM cmc_funding_rates
+        FROM funding_rates
         WHERE symbol = :symbol
           AND tf     = :tf
           AND ts BETWEEN :ts_lo AND :ts_hi

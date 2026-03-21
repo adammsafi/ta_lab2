@@ -14,7 +14,7 @@ Interpretation:
 
 Public API:
     compute_mae_mfe     -- MAE/MFE per trade, appended as columns to trades_df
-    _load_close_prices  -- helper to load close price Series from cmc_features
+    _load_close_prices  -- helper to load close price Series from features
 
 Usage:
     from ta_lab2.analysis.mae_mfe import compute_mae_mfe, _load_close_prices
@@ -172,7 +172,7 @@ def _load_close_prices(
     tf: str = "1D",
 ) -> pd.Series:
     """
-    Load close prices from cmc_features for a single asset and timeframe.
+    Load close prices from features for a single asset and timeframe.
 
     The ``tf`` parameter is passed directly into the SQL query — it is NOT
     hardcoded. This allows callers to load intra-day or weekly close prices
@@ -183,7 +183,7 @@ def _load_close_prices(
     engine : sqlalchemy.engine.Engine
         Active SQLAlchemy engine (connection pool).
     asset_id : int
-        Asset ID (cmc_features.id).
+        Asset ID (features.id).
     start_ts : pd.Timestamp
         Start of the range to load (inclusive).
     end_ts : pd.Timestamp
@@ -207,7 +207,7 @@ def _load_close_prices(
     sql = text(
         """
         SELECT ts, close
-        FROM public.cmc_features
+        FROM public.features
         WHERE id    = :id
           AND tf    = :tf
           AND ts >= :start

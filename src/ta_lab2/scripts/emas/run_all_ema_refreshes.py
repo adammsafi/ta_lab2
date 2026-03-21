@@ -52,19 +52,19 @@ class RefresherConfig:
 ALL_REFRESHERS = [
     RefresherConfig(
         name="multi_tf",
-        script_path="refresh_cmc_ema_multi_tf_from_bars.py",
+        script_path="refresh_ema_multi_tf_from_bars.py",
         description="Multi-TF EMAs (tf_day based)",
         supports_scheme=False,
     ),
     RefresherConfig(
         name="cal",
-        script_path="refresh_cmc_ema_multi_tf_cal_from_bars.py",
+        script_path="refresh_ema_multi_tf_cal_from_bars.py",
         description="Calendar-aligned EMAs (us/iso)",
         supports_scheme=True,
     ),
     RefresherConfig(
         name="cal_anchor",
-        script_path="refresh_cmc_ema_multi_tf_cal_anchor_from_bars.py",
+        script_path="refresh_ema_multi_tf_cal_anchor_from_bars.py",
         description="Calendar-anchored EMAs",
         supports_scheme=True,
     ),
@@ -159,10 +159,10 @@ def build_command(
 
     # Build command based on refresher type
     if refresher.name == "multi_tf":
-        # refresh_cmc_ema_multi_tf_from_bars.py
+        # refresh_ema_multi_tf_from_bars.py
         cmd.extend(["--ids", ids])
-        cmd.extend(["--out-table", "cmc_ema_multi_tf"])
-        cmd.extend(["--state-table", "cmc_ema_multi_tf_state"])
+        cmd.extend(["--out-table", "ema_multi_tf"])
+        cmd.extend(["--state-table", "ema_multi_tf_state"])
         cmd.extend(["--periods", periods])
         if num_processes is not None:
             cmd.extend(["--num-processes", str(num_processes)])
@@ -170,10 +170,10 @@ def build_command(
             cmd.append("--full-refresh")
 
     elif refresher.name == "cal":
-        # refresh_cmc_ema_multi_tf_cal_from_bars.py (doesn't support --start/--end)
+        # refresh_ema_multi_tf_cal_from_bars.py (doesn't support --start/--end)
         cmd.extend(["--ids", ids])
-        cmd.extend(["--out-table", "cmc_ema_multi_tf_cal"])
-        cmd.extend(["--state-table", "cmc_ema_multi_tf_cal_state"])
+        cmd.extend(["--out-table", "ema_multi_tf_cal"])
+        cmd.extend(["--state-table", "ema_multi_tf_cal_state"])
         scheme = cal_scheme or "both"
         cmd.extend(["--scheme", scheme])
         cmd.extend(["--periods", periods])
@@ -183,10 +183,10 @@ def build_command(
             cmd.append("--full-refresh")
 
     elif refresher.name == "cal_anchor":
-        # refresh_cmc_ema_multi_tf_cal_anchor_from_bars.py (doesn't support --start/--end)
+        # refresh_ema_multi_tf_cal_anchor_from_bars.py (doesn't support --start/--end)
         cmd.extend(["--ids", ids])
-        cmd.extend(["--out-table", "cmc_ema_multi_tf_cal_anchor"])
-        cmd.extend(["--state-table", "cmc_ema_multi_tf_cal_anchor_state"])
+        cmd.extend(["--out-table", "ema_multi_tf_cal_anchor"])
+        cmd.extend(["--state-table", "ema_multi_tf_cal_anchor_state"])
         scheme = anchor_scheme or "both"
         cmd.extend(["--scheme", scheme])
         cmd.extend(["--periods", periods])
@@ -363,7 +363,7 @@ def run_validation(args) -> bool:
     try:
         df = validate_rowcounts(
             engine=engine,
-            table="cmc_ema_multi_tf_u",
+            table="ema_multi_tf_u",
             schema="public",
             ids=None,  # all
             tfs=None,  # all canonical

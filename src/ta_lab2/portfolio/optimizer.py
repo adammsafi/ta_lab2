@@ -264,7 +264,7 @@ class PortfolioOptimizer:
         """Inflate off-diagonal covariance when high_corr_flag is True in DB.
 
         When the cross-asset high-correlation regime is active (as signaled by
-        cmc_cross_asset_agg.high_corr_flag), blending the covariance matrix
+        cross_asset_agg.high_corr_flag), blending the covariance matrix
         toward a fully-correlated matrix reduces the illusory diversification
         benefit that optimizers might otherwise exploit.
 
@@ -289,7 +289,7 @@ class PortfolioOptimizer:
             logger.info("high_corr_override disabled in config; skipping.")
             return S
 
-        # Query latest high_corr_flag from cmc_cross_asset_agg
+        # Query latest high_corr_flag from cross_asset_agg
         high_corr_flag: Optional[bool] = None
         avg_pairwise_corr: Optional[float] = None
         try:
@@ -304,7 +304,7 @@ class PortfolioOptimizer:
                     row = conn.execute(
                         text(
                             "SELECT high_corr_flag, avg_pairwise_corr_30d "
-                            "FROM cmc_cross_asset_agg "
+                            "FROM cross_asset_agg "
                             "ORDER BY date DESC LIMIT 1"
                         )
                     ).fetchone()

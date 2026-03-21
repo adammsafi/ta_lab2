@@ -1,11 +1,11 @@
 """
-CLI for running MDA/SFI feature importance on cmc_features.
+CLI for running MDA/SFI feature importance on features.
 
-Loads feature data from the ``cmc_features`` table for the given asset IDs,
+Loads feature data from the ``features`` table for the given asset IDs,
 timeframe, and date range; builds binary directional labels from ``ret_arith``;
 runs Mean Decrease Accuracy (MDA) and/or Single Feature Importance (SFI) via
 purged cross-validation; prints a ranked table; optionally writes CSV and logs
-results to ``cmc_ml_experiments`` via ExperimentTracker.
+results to ``ml_experiments`` via ExperimentTracker.
 
 Usage
 -----
@@ -62,7 +62,7 @@ _EXCLUDE_COLS = frozenset(
         "market_cap",
         # alignment metadata
         "alignment_source",
-        # categorical/string columns from cmc_features (not numeric features)
+        # categorical/string columns from features (not numeric features)
         "asset_class",
         "venue",
     ]
@@ -77,7 +77,7 @@ _EXCLUDE_COLS = frozenset(
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="run_feature_importance",
-        description="Run MDA/SFI feature importance on cmc_features and log results.",
+        description="Run MDA/SFI feature importance on features and log results.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
@@ -132,7 +132,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--log-experiment",
         action="store_true",
-        help="Log results to cmc_ml_experiments via ExperimentTracker",
+        help="Log results to ml_experiments via ExperimentTracker",
     )
     parser.add_argument(
         "--verbose",
@@ -166,7 +166,7 @@ def _load_features(
     start: str,
     end: str,
 ) -> pd.DataFrame:
-    """Load cmc_features for the given asset_ids, tf, and date range.
+    """Load features for the given asset_ids, tf, and date range.
 
     Returns a DataFrame with ts as a UTC-aware DatetimeIndex.
     """
@@ -174,7 +174,7 @@ def _load_features(
     sql = text(
         """
         SELECT *
-        FROM public.cmc_features
+        FROM public.features
         WHERE id = ANY(CAST(:ids AS INTEGER[]))
           AND tf = :tf
           AND ts BETWEEN CAST(:start AS TIMESTAMPTZ) AND CAST(:end AS TIMESTAMPTZ)
@@ -289,12 +289,12 @@ def main(argv: list[str] | None = None) -> None:
     engine = _build_engine()
 
     # --- Load features ---
-    logger.info("Loading cmc_features from DB...")
+    logger.info("Loading features from DB...")
     df = _load_features(engine, asset_ids, args.tf, args.start, args.end)
 
     if df.empty:
         logger.error(
-            "No data found in cmc_features for asset_ids=%s tf=%s %s to %s. Exiting.",
+            "No data found in features for asset_ids=%s tf=%s %s to %s. Exiting.",
             asset_ids,
             args.tf,
             args.start,
@@ -306,7 +306,7 @@ def main(argv: list[str] | None = None) -> None:
 
     # --- Build feature matrix ---
     # Exclude PK columns, raw OHLCV, all-NaN columns, and non-numeric dtypes
-    # (cmc_features may contain string/datetime columns like asset_class, venue, updated_at)
+    # (features may contain string/datetime columns like asset_class, venue, updated_at)
     feature_cols = [
         c
         for c in df.columns
@@ -317,7 +317,7 @@ def main(argv: list[str] | None = None) -> None:
 
     # ret_arith must be present for labels; if it's in features remove it to avoid target leakage
     if "ret_arith" not in df.columns:
-        logger.error("ret_arith column not found in cmc_features. Cannot build labels.")
+        logger.error("ret_arith column not found in features. Cannot build labels.")
         sys.exit(1)
 
     # Remove ret_arith from features (it IS the label source)
@@ -416,7 +416,7 @@ def main(argv: list[str] | None = None) -> None:
 
     # --- Optional experiment logging ---
     if args.log_experiment:
-        logger.info("Logging experiment to cmc_ml_experiments...")
+        logger.info("Logging experiment to ml_experiments...")
         from ta_lab2.ml.experiment_tracker import ExperimentTracker
 
         tracker = ExperimentTracker(engine)

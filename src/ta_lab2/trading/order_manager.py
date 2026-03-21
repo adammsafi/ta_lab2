@@ -1,9 +1,9 @@
 """OrderManager: atomic order/fill/position writes for the OMS.
 
 All database operations use raw text() SQL with SQLAlchemy engine.begin()
-to ensure atomicity. Every fill atomically updates 4 tables (cmc_fills,
-cmc_orders, cmc_positions, cmc_order_events) or rolls back entirely.
-Failures are captured in cmc_order_dead_letter via a separate connection.
+to ensure atomicity. Every fill atomically updates 4 tables (fills,
+orders, positions, order_events) or rolls back entirely.
+Failures are captured in order_dead_letter via a separate connection.
 
 Pattern: stateless -- all methods are static. Callers pass the engine.
 """
@@ -71,7 +71,7 @@ class OrderManager:
     """Handles all order/fill/position writes for the OMS.
 
     All public methods wrap an inner _do_* method in try/except.  On failure
-    the exception is recorded in cmc_order_dead_letter (via a SEPARATE
+    the exception is recorded in order_dead_letter (via a SEPARATE
     engine.begin() connection so the dead-letter write cannot be rolled back
     by the original failure) and then re-raised to the caller.
     """
@@ -86,7 +86,7 @@ class OrderManager:
         paper_order_uuid: str,
         environment: str = "sandbox",
     ) -> str:
-        """Read a paper_orders row and create the corresponding cmc_orders row.
+        """Read a paper_orders row and create the corresponding orders row.
 
         Returns the new order_id (UUID string) on success.
         Raises ValueError if the paper order is not found.
@@ -142,11 +142,11 @@ class OrderManager:
             order_id = str(uuid.uuid4())
             qty = row.quantity if row.quantity is not None else Decimal("0")
 
-            # Insert into cmc_orders
+            # Insert into orders
             conn.execute(
                 text(
                     """
-                    INSERT INTO public.cmc_orders (
+                    INSERT INTO public.orders (
                         order_id, paper_order_uuid, signal_id, asset_id,
                         exchange, pair, side, order_type, quantity,
                         limit_price, stop_price, status, filled_qty,
@@ -185,7 +185,7 @@ class OrderManager:
             conn.execute(
                 text(
                     """
-                    INSERT INTO public.cmc_order_events (
+                    INSERT INTO public.order_events (
                         event_id, order_id, from_status, to_status, reason
                     ) VALUES (
                         :event_id, :order_id, NULL, 'created',
@@ -212,13 +212,13 @@ class OrderManager:
         """Process a fill event atomically.
 
         Atomically:
-          1. Inserts a row into cmc_fills
-          2. Updates filled_qty / remaining_qty / avg_fill_price / status on cmc_orders
-          3. Upserts the position in cmc_positions (with SELECT FOR UPDATE lock)
-          4. Inserts an audit event into cmc_order_events
+          1. Inserts a row into fills
+          2. Updates filled_qty / remaining_qty / avg_fill_price / status on orders
+          3. Upserts the position in positions (with SELECT FOR UPDATE lock)
+          4. Inserts an audit event into order_events
 
         Returns the new fill_id (UUID string) on success.
-        On any failure, writes to cmc_order_dead_letter and re-raises.
+        On any failure, writes to order_dead_letter and re-raises.
         """
         try:
             return OrderManager._do_process_fill(engine, fill_data)
@@ -258,7 +258,7 @@ class OrderManager:
                     """
                     SELECT order_id, asset_id, exchange, side, quantity,
                            filled_qty, remaining_qty, avg_fill_price, status
-                    FROM public.cmc_orders
+                    FROM public.orders
                     WHERE order_id = :order_id
                     FOR SHARE
                     """
@@ -268,7 +268,7 @@ class OrderManager:
 
             if order_row is None:
                 raise ValueError(
-                    f"cmc_orders row not found for order_id={fill_data.order_id!r}"
+                    f"orders row not found for order_id={fill_data.order_id!r}"
                 )
 
             OrderManager._validate_fill_transition(
@@ -284,7 +284,7 @@ class OrderManager:
                 text(
                     """
                     SELECT quantity, avg_cost_basis, realized_pnl
-                    FROM public.cmc_positions
+                    FROM public.positions
                     WHERE asset_id = :asset_id AND exchange = :exchange
                       AND strategy_id = :strategy_id
                     FOR UPDATE
@@ -315,7 +315,7 @@ class OrderManager:
             conn.execute(
                 text(
                     """
-                    INSERT INTO public.cmc_fills (
+                    INSERT INTO public.fills (
                         fill_id, order_id, fill_qty, fill_price, fee_amount,
                         fee_currency, side, exchange, exchange_fill_id
                         {filled_at_col}
@@ -365,7 +365,7 @@ class OrderManager:
             conn.execute(
                 text(
                     """
-                    UPDATE public.cmc_orders
+                    UPDATE public.orders
                     SET filled_qty = :filled_qty,
                         remaining_qty = :remaining_qty,
                         avg_fill_price = :avg_fill_price,
@@ -402,7 +402,7 @@ class OrderManager:
             conn.execute(
                 text(
                     """
-                    INSERT INTO public.cmc_positions (
+                    INSERT INTO public.positions (
                         asset_id, exchange, strategy_id, quantity, avg_cost_basis,
                         realized_pnl, last_fill_id, last_updated
                     ) VALUES (
@@ -434,7 +434,7 @@ class OrderManager:
             conn.execute(
                 text(
                     """
-                    INSERT INTO public.cmc_order_events (
+                    INSERT INTO public.order_events (
                         event_id, order_id, from_status, to_status, fill_id
                     ) VALUES (
                         :event_id, :order_id, :from_status, :to_status, :fill_id
@@ -470,7 +470,7 @@ class OrderManager:
         new_status: str,
         reason: Optional[str] = None,
     ) -> None:
-        """Validate and apply a status transition on a cmc_orders row.
+        """Validate and apply a status transition on a orders row.
 
         Raises ValueError if:
         - The order is not found.
@@ -481,7 +481,7 @@ class OrderManager:
             row = conn.execute(
                 text(
                     """
-                    SELECT status FROM public.cmc_orders
+                    SELECT status FROM public.orders
                     WHERE order_id = :order_id
                     FOR UPDATE
                     """
@@ -490,7 +490,7 @@ class OrderManager:
             ).fetchone()
 
             if row is None:
-                raise ValueError(f"cmc_orders row not found for order_id={order_id!r}")
+                raise ValueError(f"orders row not found for order_id={order_id!r}")
 
             current_status = row.status
             allowed = VALID_TRANSITIONS.get(current_status, [])
@@ -504,7 +504,7 @@ class OrderManager:
             conn.execute(
                 text(
                     """
-                    UPDATE public.cmc_orders
+                    UPDATE public.orders
                     SET status = :status, updated_at = now()
                     WHERE order_id = :order_id
                     """
@@ -515,7 +515,7 @@ class OrderManager:
             conn.execute(
                 text(
                     """
-                    INSERT INTO public.cmc_order_events (
+                    INSERT INTO public.order_events (
                         event_id, order_id, from_status, to_status, reason
                     ) VALUES (
                         :event_id, :order_id, :from_status, :to_status, :reason
@@ -573,7 +573,7 @@ class OrderManager:
                 conn.execute(
                     text(
                         """
-                        INSERT INTO public.cmc_order_dead_letter (
+                        INSERT INTO public.order_dead_letter (
                             dlq_id, operation_type, order_id, payload,
                             error_reason, error_stacktrace
                         ) VALUES (

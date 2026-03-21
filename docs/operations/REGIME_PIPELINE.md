@@ -12,7 +12,7 @@ python -m ta_lab2.scripts.run_daily_refresh --all --ids all
 python -m ta_lab2.scripts.run_daily_refresh --regimes --ids all
 
 # Regime refresh for a single asset
-python -m ta_lab2.scripts.regimes.refresh_cmc_regimes --ids 1
+python -m ta_lab2.scripts.regimes.refresh_regimes --ids 1
 
 # Check current regime for an asset (BTC = id 1)
 python -m ta_lab2.scripts.regimes.regime_inspect --id 1
@@ -26,8 +26,8 @@ Before running regime refresh, confirm:
    ```bash
    export TARGET_DB_URL="postgresql://user:pass@host:5432/dbname"
    ```
-2. **Bars are fresh** — `cmc_price_bars_multi_tf` must have recent data for each asset. Regimes read M/W/D bars; stale bars produce stale regimes with no error raised.
-3. **EMAs are fresh** — `cmc_ema_multi_tf_u` must be populated. EMA values are the primary input to regime labeling.
+2. **Bars are fresh** — `price_bars_multi_tf` must have recent data for each asset. Regimes read M/W/D bars; stale bars produce stale regimes with no error raised.
+3. **EMAs are fresh** — `ema_multi_tf_u` must be populated. EMA values are the primary input to regime labeling.
 4. **dim_assets populated** — Assets must be registered before refresh can run.
 
 See [DAILY_REFRESH.md](DAILY_REFRESH.md) for how to run bars and EMAs if they are out of date.
@@ -63,31 +63,31 @@ Use when you need specific flags not exposed through the orchestrator, or when d
 
 ```bash
 # All active assets
-python -m ta_lab2.scripts.regimes.refresh_cmc_regimes --all
+python -m ta_lab2.scripts.regimes.refresh_regimes --all
 
 # Specific IDs
-python -m ta_lab2.scripts.regimes.refresh_cmc_regimes --ids 1,2
+python -m ta_lab2.scripts.regimes.refresh_regimes --ids 1,2
 
 # Dry run — compute but do not write to DB
-python -m ta_lab2.scripts.regimes.refresh_cmc_regimes --ids 1 --dry-run
+python -m ta_lab2.scripts.regimes.refresh_regimes --ids 1 --dry-run
 
 # Verbose (DEBUG logging)
-python -m ta_lab2.scripts.regimes.refresh_cmc_regimes --ids 1 -v
+python -m ta_lab2.scripts.regimes.refresh_regimes --ids 1 -v
 
 # Disable hysteresis (raw labels, no smoothing)
-python -m ta_lab2.scripts.regimes.refresh_cmc_regimes --ids 1 --no-hysteresis
+python -m ta_lab2.scripts.regimes.refresh_regimes --ids 1 --no-hysteresis
 
 # Custom minimum bar thresholds
-python -m ta_lab2.scripts.regimes.refresh_cmc_regimes --ids 1 --min-bars-l0 30 --min-bars-l1 26
+python -m ta_lab2.scripts.regimes.refresh_regimes --ids 1 --min-bars-l0 30 --min-bars-l1 26
 
 # Custom policy file
-python -m ta_lab2.scripts.regimes.refresh_cmc_regimes --all --policy-file configs/my_policies.yaml
+python -m ta_lab2.scripts.regimes.refresh_regimes --all --policy-file configs/my_policies.yaml
 
 # ISO or US calendar scheme
-python -m ta_lab2.scripts.regimes.refresh_cmc_regimes --all --cal-scheme us
+python -m ta_lab2.scripts.regimes.refresh_regimes --all --cal-scheme us
 ```
 
-### All Flags for `refresh_cmc_regimes`
+### All Flags for `refresh_regimes`
 
 | Flag | Default | Purpose |
 |------|---------|---------|
@@ -108,7 +108,7 @@ python -m ta_lab2.scripts.regimes.refresh_cmc_regimes --all --cal-scheme us
 
 For each asset, the pipeline runs these 10 steps:
 
-1. **Load bars + EMAs** — Reads M/W/D timeframe bars from `cmc_price_bars_multi_tf` and EMA values from `cmc_ema_multi_tf_u` via `regime_data_loader.py`. EMAs are pivoted from long format to wide (`close_ema_9`, `close_ema_21`, etc.).
+1. **Load bars + EMAs** — Reads M/W/D timeframe bars from `price_bars_multi_tf` and EMA values from `ema_multi_tf_u` via `regime_data_loader.py`. EMAs are pivoted from long format to wide (`close_ema_9`, `close_ema_21`, etc.).
 
 2. **Assess data budget** — Determines `feature_tier` (`full` or `lite`) and which labeling layers (L0/L1/L2) have enough bars to run. Layers below threshold are disabled and either proxy-filled or left NULL.
 
@@ -126,9 +126,9 @@ For each asset, the pipeline runs these 10 steps:
 
 7. **Detect flips** — `detect_regime_flips` records every regime key transition, including the first assignment (where `old_regime=None`) for a complete audit trail.
 
-8. **Compute stats** — Aggregates per-regime statistics (bar counts, return statistics) into `cmc_regime_stats`.
+8. **Compute stats** — Aggregates per-regime statistics (bar counts, return statistics) into `regime_stats`.
 
-9. **Compute comovement** — Calculates EMA comovement metrics for the asset relative to the market. Written to `cmc_regime_comovement`; prior snapshots for the same (ids, tf) are deleted before insert.
+9. **Compute comovement** — Calculates EMA comovement metrics for the asset relative to the market. Written to `regime_comovement`; prior snapshots for the same (ids, tf) are deleted before insert.
 
 10. **Write to DB** — All 4 regime tables are written via scoped DELETE + INSERT per (id, tf). This is a full recompute with no watermark — every run replaces all data for the processed assets.
 
@@ -140,12 +140,12 @@ Four tables store regime output. All are written together on each run.
 
 | Table | Purpose | Key Columns |
 |-------|---------|-------------|
-| `cmc_regimes` | Per-bar regime labels and resolved policy. PK: (id, ts, tf) | id, ts, tf, l0_label, l1_label, l2_label, regime_key, size_mult, stop_mult, orders, gross_cap, pyramids, feature_tier, l0_enabled, l1_enabled, l2_enabled, regime_version_hash |
-| `cmc_regime_flips` | Regime transition events | id, ts, tf, layer, old_regime, new_regime, duration_bars |
-| `cmc_regime_stats` | Aggregated statistics per regime key | id, tf, regime_key, n_bars, avg_ret, std_ret |
-| `cmc_regime_comovement` | EMA comovement metrics (one snapshot per refresh) | id, tf, computed_at (part of PK), comovement metrics |
+| `regimes` | Per-bar regime labels and resolved policy. PK: (id, ts, tf) | id, ts, tf, l0_label, l1_label, l2_label, regime_key, size_mult, stop_mult, orders, gross_cap, pyramids, feature_tier, l0_enabled, l1_enabled, l2_enabled, regime_version_hash |
+| `regime_flips` | Regime transition events | id, ts, tf, layer, old_regime, new_regime, duration_bars |
+| `regime_stats` | Aggregated statistics per regime key | id, tf, regime_key, n_bars, avg_ret, std_ret |
+| `regime_comovement` | EMA comovement metrics (one snapshot per refresh) | id, tf, computed_at (part of PK), comovement metrics |
 
-DDL source files: `sql/regimes/080_cmc_regimes.sql`, `081_cmc_regime_flips.sql`, `082_cmc_regime_stats.sql`, `084_cmc_regime_comovement.sql`.
+DDL source files: `sql/regimes/080_regimes.sql`, `081_regime_flips.sql`, `082_regime_stats.sql`, `084_regime_comovement.sql`.
 
 ## Debugging with regime_inspect
 
@@ -173,7 +173,7 @@ Shows a table of the last 30 rows: Date, Regime Key, Size Mult, Stop Mult, Cap, 
 python -m ta_lab2.scripts.regimes.regime_inspect --id 1 --flips
 ```
 
-Shows the last 20 transitions from `cmc_regime_flips`: Date, Layer, Old Regime, New Regime, Bars Held (oldest-first). The first assignment appears with `old_regime=None`.
+Shows the last 20 transitions from `regime_flips`: Date, Layer, Old Regime, New Regime, Bars Held (oldest-first). The first assignment appears with `old_regime=None`.
 
 ### Live Mode — Recompute without writing
 
@@ -200,7 +200,7 @@ Run these in psql or any SQL client to confirm regime data is correct and fresh.
 ```sql
 -- 1. Check regime data is fresh (latest row per asset)
 SELECT id, MAX(ts) as latest_regime, MIN(ts) as earliest_regime, COUNT(*) as n_rows
-FROM public.cmc_regimes
+FROM public.regimes
 WHERE tf = '1D'
 GROUP BY id
 ORDER BY latest_regime DESC
@@ -208,27 +208,27 @@ LIMIT 10;
 
 -- 2. Check regime distribution for BTC (id=1)
 SELECT regime_key, COUNT(*) as n_bars, AVG(size_mult) as avg_size
-FROM public.cmc_regimes
+FROM public.regimes
 WHERE id = 1 AND tf = '1D'
 GROUP BY regime_key
 ORDER BY n_bars DESC;
 
 -- 3. Check recent regime flips (last 20 transitions)
 SELECT id, ts, layer, old_regime, new_regime, duration_bars
-FROM public.cmc_regime_flips
+FROM public.regime_flips
 WHERE tf = '1D'
 ORDER BY ts DESC
 LIMIT 20;
 
 -- 4. Check version hash consistency (all same = consistent run)
 SELECT DISTINCT regime_version_hash, COUNT(*) as n_rows
-FROM public.cmc_regimes
+FROM public.regimes
 WHERE tf = '1D'
 GROUP BY regime_version_hash;
 
 -- 5. Check how many assets have regimes
 SELECT COUNT(DISTINCT id) as n_assets_with_regimes
-FROM public.cmc_regimes
+FROM public.regimes
 WHERE tf = '1D';
 ```
 
@@ -257,7 +257,7 @@ No DB URL provided. Set TARGET_DB_URL or pass --db-url.
 No daily data for asset_id=1, returning empty
 ```
 
-- **Cause:** No 1D bars exist in `cmc_price_bars_multi_tf` for this asset ID.
+- **Cause:** No 1D bars exist in `price_bars_multi_tf` for this asset ID.
 - **Fix:** Run bars refresh first:
   ```bash
   python -m ta_lab2.scripts.run_daily_refresh --bars --ids 1
@@ -275,7 +275,7 @@ No regime data found for id=1 tf=1D
 - **Cause:** Regime refresh has never run successfully for this asset, or the run failed silently.
 - **Fix:** Run with verbose to see what happened:
   ```bash
-  python -m ta_lab2.scripts.regimes.refresh_cmc_regimes --ids 1 -v
+  python -m ta_lab2.scripts.regimes.refresh_regimes --ids 1 -v
   ```
 
 ---
@@ -306,7 +306,7 @@ Summary: 5 succeeded, 1 failed
 - **Exit code:** Non-zero when any asset errors (useful for cron alerting).
 - **Fix:** Run with `--ids [failed_id] -v` to see the specific error:
   ```bash
-  python -m ta_lab2.scripts.regimes.refresh_cmc_regimes --ids 3 -v
+  python -m ta_lab2.scripts.regimes.refresh_regimes --ids 3 -v
   ```
 
 ---
@@ -317,7 +317,7 @@ Summary: 5 succeeded, 1 failed
 - **Check:** Re-run the failed IDs individually with `-v` to isolate.
 - **Recovery:** After fixing the underlying issue, re-run just the failed IDs:
   ```bash
-  python -m ta_lab2.scripts.regimes.refresh_cmc_regimes --ids 3,7 -v
+  python -m ta_lab2.scripts.regimes.refresh_regimes --ids 3,7 -v
   ```
 
 ---
@@ -344,10 +344,10 @@ If you need to clear regime data for a specific asset before re-running:
 
 ```sql
 -- Clear all regime tables for asset id=2, timeframe 1D
-DELETE FROM public.cmc_regimes WHERE id = 2 AND tf = '1D';
-DELETE FROM public.cmc_regime_flips WHERE id = 2 AND tf = '1D';
-DELETE FROM public.cmc_regime_stats WHERE id = 2 AND tf = '1D';
-DELETE FROM public.cmc_regime_comovement WHERE id = 2 AND tf = '1D';
+DELETE FROM public.regimes WHERE id = 2 AND tf = '1D';
+DELETE FROM public.regime_flips WHERE id = 2 AND tf = '1D';
+DELETE FROM public.regime_stats WHERE id = 2 AND tf = '1D';
+DELETE FROM public.regime_comovement WHERE id = 2 AND tf = '1D';
 ```
 
 Then re-run refresh. The DELETE + INSERT pattern means re-running without the manual DELETE is equally safe — the result is the same.
@@ -379,6 +379,6 @@ All 3 signal generators accept `regime_enabled` as a parameter. The `--no-regime
 
 - [DAILY_REFRESH.md](DAILY_REFRESH.md) — How to run bars and EMA refreshes (prerequisite for regime refresh)
 - [STATE_MANAGEMENT.md](STATE_MANAGEMENT.md) — State table schemas for bars and EMAs
-- `src/ta_lab2/scripts/regimes/refresh_cmc_regimes.py` — Regime refresh script (argparse source of truth)
+- `src/ta_lab2/scripts/regimes/refresh_regimes.py` — Regime refresh script (argparse source of truth)
 - `src/ta_lab2/scripts/regimes/regime_inspect.py` — Inspect tool
 - `configs/regime_policies.yaml` — Policy lookup table for regime key -> size/stop/orders mapping

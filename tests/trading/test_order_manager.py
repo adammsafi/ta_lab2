@@ -365,7 +365,7 @@ class TestProcessFill:
         )
 
     def test_process_fill_inserts_fill_record(self):
-        """Third execute() must INSERT into cmc_fills."""
+        """Third execute() must INSERT into fills."""
         engine, conn = _make_engine()
         order = _order_row(status="submitted", remaining_qty="10")
         self._setup_conn_for_fill(conn, order=order, pos=None)
@@ -374,10 +374,10 @@ class TestProcessFill:
 
         third_call = conn.execute.call_args_list[2]
         sql_str = str(third_call[0][0])
-        assert "cmc_fills" in sql_str
+        assert "fills" in sql_str
 
     def test_process_fill_updates_order(self):
-        """Fourth execute() must UPDATE cmc_orders."""
+        """Fourth execute() must UPDATE orders."""
         engine, conn = _make_engine()
         order = _order_row(status="submitted", remaining_qty="10")
         self._setup_conn_for_fill(conn, order=order, pos=None)
@@ -386,10 +386,10 @@ class TestProcessFill:
 
         fourth_call = conn.execute.call_args_list[3]
         sql_str = str(fourth_call[0][0])
-        assert "UPDATE" in sql_str and "cmc_orders" in sql_str
+        assert "UPDATE" in sql_str and "orders" in sql_str
 
     def test_process_fill_upserts_position(self):
-        """Fifth execute() must INSERT INTO cmc_positions ... ON CONFLICT."""
+        """Fifth execute() must INSERT INTO positions ... ON CONFLICT."""
         engine, conn = _make_engine()
         order = _order_row(status="submitted", remaining_qty="10")
         self._setup_conn_for_fill(conn, order=order, pos=None)
@@ -398,11 +398,11 @@ class TestProcessFill:
 
         fifth_call = conn.execute.call_args_list[4]
         sql_str = str(fifth_call[0][0])
-        assert "cmc_positions" in sql_str
+        assert "positions" in sql_str
         assert "ON CONFLICT" in sql_str
 
     def test_process_fill_inserts_audit_event(self):
-        """Sixth execute() must INSERT into cmc_order_events."""
+        """Sixth execute() must INSERT into order_events."""
         engine, conn = _make_engine()
         order = _order_row(status="submitted", remaining_qty="10")
         self._setup_conn_for_fill(conn, order=order, pos=None)
@@ -411,7 +411,7 @@ class TestProcessFill:
 
         sixth_call = conn.execute.call_args_list[5]
         sql_str = str(sixth_call[0][0])
-        assert "cmc_order_events" in sql_str
+        assert "order_events" in sql_str
 
     def test_process_fill_exactly_six_sql_calls(self):
         """_do_process_fill must make exactly 6 execute() calls."""
@@ -450,7 +450,7 @@ class TestProcessFill:
             ),
         )
 
-        # Find the UPDATE cmc_orders call and verify status param
+        # Find the UPDATE orders call and verify status param
         update_call = conn.execute.call_args_list[3]
         params = update_call[0][1]
         assert params["status"] == "partial_fill"
@@ -655,7 +655,7 @@ class TestDeadLetter:
         engine.begin.assert_called_once()
 
     def test_dead_letter_inserts_to_correct_table(self):
-        """_write_dead_letter must INSERT into cmc_order_dead_letter."""
+        """_write_dead_letter must INSERT into order_dead_letter."""
         engine, conn = _make_engine()
         execute_mock = MagicMock()
         conn.execute.return_value = execute_mock
@@ -670,7 +670,7 @@ class TestDeadLetter:
 
         first_call = conn.execute.call_args_list[0]
         sql_str = str(first_call[0][0])
-        assert "cmc_order_dead_letter" in sql_str
+        assert "order_dead_letter" in sql_str
 
     def test_dead_letter_serializes_payload_as_json(self):
         """payload_dict must be JSON-serialized before insert."""
@@ -747,19 +747,19 @@ class TestUpdateOrderStatus:
         OrderManager.update_order_status(engine, "oid-1", "submitted")
         # Verify UPDATE was called
         calls = [str(c[0][0]) for c in conn.execute.call_args_list]
-        assert any("UPDATE" in s and "cmc_orders" in s for s in calls)
+        assert any("UPDATE" in s and "orders" in s for s in calls)
 
     def test_valid_transition_inserts_event(self):
-        """Valid transition must INSERT into cmc_order_events."""
+        """Valid transition must INSERT into order_events."""
         engine, conn = self._mock_engine_with_status("submitted")
         OrderManager.update_order_status(
             engine, "oid-1", "cancelled", reason="user cancelled"
         )
         calls = [str(c[0][0]) for c in conn.execute.call_args_list]
-        assert any("cmc_order_events" in s for s in calls)
+        assert any("order_events" in s for s in calls)
 
     def test_reason_is_passed_to_event_insert(self):
-        """Reason string must appear in the INSERT params for cmc_order_events."""
+        """Reason string must appear in the INSERT params for order_events."""
         engine, conn = self._mock_engine_with_status("submitted")
         execute_mock = MagicMock()
         execute_mock.fetchone.return_value = SimpleNamespace(status="submitted")
@@ -789,7 +789,7 @@ class TestUpdateOrderStatus:
         engine, conn = self._mock_engine_with_status("partial_fill")
         OrderManager.update_order_status(engine, "oid-1", "partial_fill")
         calls = [str(c[0][0]) for c in conn.execute.call_args_list]
-        assert any("UPDATE" in s and "cmc_orders" in s for s in calls)
+        assert any("UPDATE" in s and "orders" in s for s in calls)
 
     def test_submitted_to_expired(self):
         """submitted -> expired is valid."""
@@ -861,8 +861,8 @@ class TestPromotePaperOrder:
         assert isinstance(order_id, str)
         uuid.UUID(order_id)  # Validates UUID format
 
-    def test_promote_inserts_into_cmc_orders(self):
-        """_do_promote_paper_order must INSERT into cmc_orders."""
+    def test_promote_inserts_into_orders(self):
+        """_do_promote_paper_order must INSERT into orders."""
         engine, conn = _make_engine()
         paper_row = SimpleNamespace(
             order_uuid="paper-uuid",
@@ -885,8 +885,8 @@ class TestPromotePaperOrder:
         OrderManager._do_promote_paper_order(engine, "paper-uuid", "sandbox")
 
         all_sql = [str(c[0][0]) for c in conn.execute.call_args_list]
-        assert any("cmc_orders" in s for s in all_sql)
-        assert any("cmc_order_events" in s for s in all_sql)
+        assert any("orders" in s for s in all_sql)
+        assert any("order_events" in s for s in all_sql)
 
     def test_promote_original_exception_reraised(self):
         """If promotion fails, the original exception is re-raised after DLQ."""

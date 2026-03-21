@@ -76,10 +76,10 @@ Run these queries to confirm key tables have data:
 
 ```sql
 SELECT COUNT(*) as price_rows      FROM public.cmc_price_histories7;
-SELECT COUNT(*) as bar_rows        FROM public.cmc_price_bars_multi_tf;
-SELECT COUNT(*) as ema_rows        FROM public.cmc_ema_multi_tf_u;
-SELECT COUNT(*) as feature_rows    FROM public.cmc_features;
-SELECT COUNT(*) as regime_rows     FROM public.cmc_regimes;
+SELECT COUNT(*) as bar_rows        FROM public.price_bars_multi_tf;
+SELECT COUNT(*) as ema_rows        FROM public.ema_multi_tf_u;
+SELECT COUNT(*) as feature_rows    FROM public.features;
+SELECT COUNT(*) as regime_rows     FROM public.regimes;
 ```
 
 Cross-check row counts against your last known good values. If any table shows 0 rows unexpectedly, the backup may be partial.
@@ -162,69 +162,69 @@ psql -d ta_lab2 -f sql/lookups/030_dim_signals.sql
 **Step 6: Create price bar tables** (6 files: base + 4 calendar variants + unified)
 
 ```bash
-psql -d ta_lab2 -f sql/ddl/price_bars__cmc_price_bars_multi_tf.sql
-psql -d ta_lab2 -f sql/ddl/create_cmc_price_bars_1d_state.sql
-psql -d ta_lab2 -f sql/features/031_cmc_price_bars_multi_tf_cal_iso.sql
-psql -d ta_lab2 -f sql/features/031_cmc_price_bars_multi_tf_cal_us.sql
-psql -d ta_lab2 -f sql/features/033_cmc_price_bars_multi_tf_cal_anchor_us.sql
-psql -d ta_lab2 -f sql/features/034_cmc_price_bars_multi_tf_cal_anchor_iso.sql
-psql -d ta_lab2 -f sql/ddl/create_cmc_price_bars_multi_tf_u.sql
+psql -d ta_lab2 -f sql/ddl/price_bars__price_bars_multi_tf.sql
+psql -d ta_lab2 -f sql/ddl/create_price_bars_1d_state.sql
+psql -d ta_lab2 -f sql/features/031_price_bars_multi_tf_cal_iso.sql
+psql -d ta_lab2 -f sql/features/031_price_bars_multi_tf_cal_us.sql
+psql -d ta_lab2 -f sql/features/033_price_bars_multi_tf_cal_anchor_us.sql
+psql -d ta_lab2 -f sql/features/034_price_bars_multi_tf_cal_anchor_iso.sql
+psql -d ta_lab2 -f sql/ddl/create_price_bars_multi_tf_u.sql
 ```
 
 **Step 7: Create EMA tables**
 
 ```bash
 psql -d ta_lab2 -f sql/ddl/create_cmc_ema_refresh_state.sql
-psql -d ta_lab2 -f sql/features/030_cmc_ema_multi_tf_u_create.sql
-psql -d ta_lab2 -f sql/ddl/create_cmc_ema_multi_tf_cal_tables.sql
+psql -d ta_lab2 -f sql/features/030_ema_multi_tf_u_create.sql
+psql -d ta_lab2 -f sql/ddl/create_ema_multi_tf_cal_tables.sql
 ```
 
 **Step 8: Create returns tables** (6 files: base + 4 calendar variants + 3 unified tables)
 
 ```bash
-psql -d ta_lab2 -f sql/ddl/ddl_cmc_returns_bars_multi_tf.sql
-psql -d ta_lab2 -f sql/ddl/ddl_cmc_returns_bars_multi_tf_cal_iso.sql
-psql -d ta_lab2 -f sql/ddl/ddl_cmc_returns_bars_multi_tf_cal_us.sql
-psql -d ta_lab2 -f sql/ddl/ddl_cmc_returns_bars_multi_tf_cal_anchor_iso.sql
-psql -d ta_lab2 -f sql/ddl/ddl_cmc_returns_bars_multi_tf_cal_anchor_us.sql
-psql -d ta_lab2 -f sql/ddl/create_cmc_returns_bars_multi_tf_u.sql
-psql -d ta_lab2 -f sql/ddl/create_cmc_returns_ema_multi_tf.sql
-psql -d ta_lab2 -f sql/ddl/create_cmc_returns_ema_multi_tf_cal_unified.sql
-psql -d ta_lab2 -f sql/ddl/create_cmc_returns_ema_multi_tf_u.sql
+psql -d ta_lab2 -f sql/ddl/ddl_returns_bars_multi_tf.sql
+psql -d ta_lab2 -f sql/ddl/ddl_returns_bars_multi_tf_cal_iso.sql
+psql -d ta_lab2 -f sql/ddl/ddl_returns_bars_multi_tf_cal_us.sql
+psql -d ta_lab2 -f sql/ddl/ddl_returns_bars_multi_tf_cal_anchor_iso.sql
+psql -d ta_lab2 -f sql/ddl/ddl_returns_bars_multi_tf_cal_anchor_us.sql
+psql -d ta_lab2 -f sql/ddl/create_returns_bars_multi_tf_u.sql
+psql -d ta_lab2 -f sql/ddl/create_returns_ema_multi_tf.sql
+psql -d ta_lab2 -f sql/ddl/create_returns_ema_multi_tf_cal_unified.sql
+psql -d ta_lab2 -f sql/ddl/create_returns_ema_multi_tf_u.sql
 ```
 
-**Step 9: Create feature tables** (vol, ta, cmc_features)
+**Step 9: Create feature tables** (vol, ta, features)
 
 ```bash
-psql -d ta_lab2 -f sql/features/041_cmc_vol.sql
-psql -d ta_lab2 -f sql/features/042_cmc_ta.sql
-psql -d ta_lab2 -f sql/views/050_cmc_features.sql
+psql -d ta_lab2 -f sql/features/041_vol.sql
+psql -d ta_lab2 -f sql/features/042_ta.sql
+psql -d ta_lab2 -f sql/views/050_features.sql
 ```
 
 **Step 10: Create regime tables** (4 files)
 
 ```bash
-psql -d ta_lab2 -f sql/regimes/080_cmc_regimes.sql
-psql -d ta_lab2 -f sql/regimes/081_cmc_regime_flips.sql
-psql -d ta_lab2 -f sql/regimes/082_cmc_regime_stats.sql
-psql -d ta_lab2 -f sql/regimes/084_cmc_regime_comovement.sql
+psql -d ta_lab2 -f sql/regimes/080_regimes.sql
+psql -d ta_lab2 -f sql/regimes/081_regime_flips.sql
+psql -d ta_lab2 -f sql/regimes/082_regime_stats.sql
+psql -d ta_lab2 -f sql/regimes/084_regime_comovement.sql
 ```
 
 **Step 11: Create signal tables** (4 files: 3 signal tables + state)
 
 ```bash
-psql -d ta_lab2 -f sql/signals/060_cmc_signals_ema_crossover.sql
-psql -d ta_lab2 -f sql/signals/061_cmc_signals_rsi_mean_revert.sql
-psql -d ta_lab2 -f sql/signals/062_cmc_signals_atr_breakout.sql
-psql -d ta_lab2 -f sql/signals/063_cmc_signal_state.sql
+psql -d ta_lab2 -f sql/signals/060_signals_ema_crossover.sql
+psql -d ta_lab2 -f sql/signals/061_signals_rsi_mean_revert.sql
+psql -d ta_lab2 -f sql/signals/062_signals_atr_breakout.sql
+psql -d ta_lab2 -f sql/signals/063_signal_state.sql
 ```
 
 **Step 12: Create backtest tables** (3 files)
 
 ```bash
-psql -d ta_lab2 -f sql/backtests/070_cmc_backtest_runs.sql
-psql -d ta_lab2 -f sql/backtests/071_cmc_backtest_trades.sql
-psql -d ta_lab2 -f sql/backtests/072_cmc_backtest_metrics.sql
+psql -d ta_lab2 -f sql/backtests/070_backtest_runs.sql
+psql -d ta_lab2 -f sql/backtests/071_backtest_trades.sql
+psql -d ta_lab2 -f sql/backtests/072_backtest_metrics.sql
 ```
 
 Schema creation complete. All 24 data tables plus state and dimension tables are now ready.
@@ -282,7 +282,7 @@ python -m ta_lab2.scripts.features.run_all_feature_refreshes --all --all-tfs
 **Regimes** (depends on bars and EMAs):
 
 ```bash
-python -m ta_lab2.scripts.regimes.refresh_cmc_regimes --all -v
+python -m ta_lab2.scripts.regimes.refresh_regimes --all -v
 ```
 
 **Signals** (depends on features):
@@ -301,21 +301,21 @@ Check row counts across key tables to confirm the rebuild completed:
 
 ```sql
 SELECT
-    'cmc_price_bars_multi_tf'   as tbl, COUNT(*) as n FROM public.cmc_price_bars_multi_tf
+    'price_bars_multi_tf'   as tbl, COUNT(*) as n FROM public.price_bars_multi_tf
 UNION ALL
-SELECT 'cmc_ema_multi_tf_u',         COUNT(*) FROM public.cmc_ema_multi_tf_u
+SELECT 'ema_multi_tf_u',         COUNT(*) FROM public.ema_multi_tf_u
 UNION ALL
-SELECT 'cmc_features',               COUNT(*) FROM public.cmc_features
+SELECT 'features',               COUNT(*) FROM public.features
 UNION ALL
-SELECT 'cmc_regimes',                COUNT(*) FROM public.cmc_regimes
+SELECT 'regimes',                COUNT(*) FROM public.regimes
 UNION ALL
-SELECT 'cmc_signals_ema_crossover',  COUNT(*) FROM public.cmc_signals_ema_crossover;
+SELECT 'signals_ema_crossover',  COUNT(*) FROM public.signals_ema_crossover;
 ```
 
 Compare these counts against your expected values (e.g., prior backup counts or known totals). For reference, a full rebuild of ~100 assets produces approximately:
-- `cmc_price_bars_multi_tf`: ~4.1M rows
-- `cmc_ema_multi_tf_u`: ~14.8M rows
-- `cmc_features`: ~2.1M rows (1D TF only)
+- `price_bars_multi_tf`: ~4.1M rows
+- `ema_multi_tf_u`: ~14.8M rows
+- `features`: ~2.1M rows (1D TF only)
 
 ---
 
@@ -328,7 +328,7 @@ Compare these counts against your expected values (e.g., prior backup counts or 
 | Source data ingest (1 asset, full history) | 1-5 min | Depends on history length (ETH: ~10 years) |
 | Bars rebuild (all assets) | 1-3 hours | ~100 assets; 6 bar builders each |
 | EMA rebuild (all assets) | 1-3 hours | ~100 assets; 4 EMA refreshers each |
-| Feature rebuild (1D, all assets) | 30-60 min | Parallelized vol + ta + cmc_features |
+| Feature rebuild (1D, all assets) | 30-60 min | Parallelized vol + ta + features |
 | Regime rebuild (all assets) | 10-30 min | Fast computation (<1s per asset) |
 | Signals rebuild | 30-60 min | 3 signal generators, parallelized |
 
@@ -345,10 +345,10 @@ sql/
 ├── ddl/           -- Table creation scripts (price bars, state tables, indexes)
 ├── features/      -- Feature table DDL (ema_u, calendar bar variants, vol, ta)
 ├── lookups/       -- Dimension table seed data (dim_timeframe, dim_signals)
-├── regimes/       -- Regime table DDL (cmc_regimes, flips, stats, comovement)
+├── regimes/       -- Regime table DDL (regimes, flips, stats, comovement)
 ├── signals/       -- Signal table DDL (cmc_signals_*, dim_signals)
 ├── backtests/     -- Backtest table DDL (runs, trades, metrics)
-├── views/         -- cmc_features DDL
+├── views/         -- features DDL
 └── migration/     -- ALTER TABLE scripts for schema changes
 ```
 

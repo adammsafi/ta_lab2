@@ -37,7 +37,7 @@ class TestFeatureConfig:
         config = FeatureConfig(
             feature_type="vol",
             output_schema="features",
-            output_table="cmc_vol_daily",
+            output_table="vol_daily",
             null_strategy="forward_fill",
             add_zscore=False,
             zscore_window=63,
@@ -45,7 +45,7 @@ class TestFeatureConfig:
 
         assert config.feature_type == "vol"
         assert config.output_schema == "features"
-        assert config.output_table == "cmc_vol_daily"
+        assert config.output_table == "vol_daily"
         assert config.null_strategy == "forward_fill"
         assert config.add_zscore is False
         assert config.zscore_window == 63
@@ -167,17 +167,21 @@ class TestComputeForIdsFlow:
         feature = self.create_mock_feature()
 
         # Mock the methods to track calls
-        with patch.object(
-            feature, "load_source_data", wraps=feature.load_source_data
-        ) as mock_load, patch.object(
-            feature, "compute_features", wraps=feature.compute_features
-        ) as mock_compute, patch.object(
-            feature, "add_normalizations", wraps=feature.add_normalizations
-        ) as mock_norm, patch.object(
-            feature, "add_outlier_flags", wraps=feature.add_outlier_flags
-        ) as mock_outlier, patch.object(
-            feature, "write_to_db", return_value=2
-        ) as mock_write:
+        with (
+            patch.object(
+                feature, "load_source_data", wraps=feature.load_source_data
+            ) as mock_load,
+            patch.object(
+                feature, "compute_features", wraps=feature.compute_features
+            ) as mock_compute,
+            patch.object(
+                feature, "add_normalizations", wraps=feature.add_normalizations
+            ) as mock_norm,
+            patch.object(
+                feature, "add_outlier_flags", wraps=feature.add_outlier_flags
+            ) as mock_outlier,
+            patch.object(feature, "write_to_db", return_value=2) as mock_write,
+        ):
             result = feature.compute_for_ids([1])
 
             # Verify all methods called in order
@@ -195,9 +199,10 @@ class TestComputeForIdsFlow:
         """Test that empty source data returns 0 without further processing."""
         feature = self.create_mock_feature()
 
-        with patch.object(
-            feature, "load_source_data", return_value=pd.DataFrame()
-        ), patch.object(feature, "compute_features") as mock_compute:
+        with (
+            patch.object(feature, "load_source_data", return_value=pd.DataFrame()),
+            patch.object(feature, "compute_features") as mock_compute,
+        ):
             result = feature.compute_for_ids([1])
 
             assert result == 0
@@ -208,9 +213,10 @@ class TestComputeForIdsFlow:
         """Test that empty features after computation returns 0."""
         feature = self.create_mock_feature()
 
-        with patch.object(
-            feature, "compute_features", return_value=pd.DataFrame()
-        ), patch.object(feature, "write_to_db") as mock_write:
+        with (
+            patch.object(feature, "compute_features", return_value=pd.DataFrame()),
+            patch.object(feature, "write_to_db") as mock_write,
+        ):
             result = feature.compute_for_ids([1])
 
             assert result == 0
@@ -444,9 +450,10 @@ class TestWriteToDB:
             }
         )
 
-        with patch.object(feature, "_ensure_output_table"), patch.object(
-            pd.DataFrame, "to_sql", return_value=2
-        ) as mock_to_sql:
+        with (
+            patch.object(feature, "_ensure_output_table"),
+            patch.object(pd.DataFrame, "to_sql", return_value=2) as mock_to_sql,
+        ):
             result = feature.write_to_db(df)
 
             assert mock_to_sql.called

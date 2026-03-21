@@ -50,18 +50,28 @@ class BuilderConfig:
 # All available builders in logical execution order
 ALL_BUILDERS = [
     BuilderConfig(
-        name="1d",
-        script_path="refresh_cmc_price_bars_1d.py",
+        name="1d_cmc",
+        script_path="refresh_price_bars_1d.py",
         description="1D canonical bars from CMC (SQL-based)",
         requires_tz=False,
-        supports_full_rebuild=True,  # Uses --rebuild flag
+        supports_full_rebuild=True,
+        custom_args={"source": "cmc"},
     ),
     BuilderConfig(
         name="1d_tvc",
-        script_path="refresh_tvc_price_bars_1d.py",
+        script_path="refresh_price_bars_1d.py",
         description="1D canonical bars from TradingView",
         requires_tz=False,
         supports_full_rebuild=True,
+        custom_args={"source": "tvc"},
+    ),
+    BuilderConfig(
+        name="1d_hl",
+        script_path="refresh_price_bars_1d.py",
+        description="1D canonical bars from Hyperliquid",
+        requires_tz=False,
+        supports_full_rebuild=True,
+        custom_args={"source": "hl"},
     ),
     BuilderConfig(
         name="vwap",
@@ -72,14 +82,14 @@ ALL_BUILDERS = [
     ),
     BuilderConfig(
         name="multi_tf",
-        script_path="refresh_cmc_price_bars_multi_tf.py",
+        script_path="refresh_price_bars_multi_tf.py",
         description="Multi-timeframe rolling bars (7d, 14d, ...)",
         requires_tz=False,
         supports_full_rebuild=True,
     ),
     BuilderConfig(
         name="cal_iso",
-        script_path="refresh_cmc_price_bars_multi_tf_cal_iso.py",
+        script_path="refresh_price_bars_multi_tf_cal_iso.py",
         description="Calendar-aligned bars (ISO week, month, quarter, year)",
         requires_tz=True,
         supports_full_rebuild=True,
@@ -87,7 +97,7 @@ ALL_BUILDERS = [
     ),
     BuilderConfig(
         name="cal_us",
-        script_path="refresh_cmc_price_bars_multi_tf_cal_us.py",
+        script_path="refresh_price_bars_multi_tf_cal_us.py",
         description="Calendar-aligned bars (US week starts Sunday)",
         requires_tz=True,
         supports_full_rebuild=True,
@@ -95,7 +105,7 @@ ALL_BUILDERS = [
     ),
     BuilderConfig(
         name="cal_anchor_iso",
-        script_path="refresh_cmc_price_bars_multi_tf_cal_anchor_iso.py",
+        script_path="refresh_price_bars_multi_tf_cal_anchor_iso.py",
         description="Calendar-anchored bars with partial snapshots (ISO)",
         requires_tz=True,
         supports_full_rebuild=True,
@@ -103,7 +113,7 @@ ALL_BUILDERS = [
     ),
     BuilderConfig(
         name="cal_anchor_us",
-        script_path="refresh_cmc_price_bars_multi_tf_cal_anchor_us.py",
+        script_path="refresh_price_bars_multi_tf_cal_anchor_us.py",
         description="Calendar-anchored bars with partial snapshots (US)",
         requires_tz=True,
         supports_full_rebuild=True,
@@ -186,20 +196,18 @@ def build_command(
     cmd = [sys.executable, str(script_path)]
 
     # Common args
-    if builder.name == "1d":
-        # CMC 1D builder has different CLI structure
+    if builder.name.startswith("1d_"):
+        # All 1D builders use the same generic script with --source flag
         cmd.extend(["--db-url", db_url])
         cmd.extend(["--ids", ids])
-        if full_rebuild:
+        if full_rebuild and builder.supports_full_rebuild:
             cmd.append("--full-rebuild")
-        # 1D always uses --keep-rejects for visibility
-        cmd.append("--keep-rejects")
-    elif builder.name == "1d_tvc":
-        # TVC 1D builder
-        cmd.extend(["--db-url", db_url])
-        cmd.extend(["--ids", ids])
-        if full_rebuild:
-            cmd.append("--full-rebuild")
+        source = (builder.custom_args or {}).get("source")
+        if source:
+            cmd.extend(["--source", source])
+        # CMC uses --keep-rejects for visibility into filtered assets
+        if source == "cmc":
+            cmd.append("--keep-rejects")
     elif builder.name == "vwap":
         # VWAP consolidated bar builder
         cmd.extend(["--db-url", db_url])
@@ -376,8 +384,8 @@ Examples:
   # Run all builders with full rebuild
   python run_all_bar_builders.py --ids all --full-rebuild
 
-  # Run only 1d and multi_tf builders
-  python run_all_bar_builders.py --ids all --builders 1d,multi_tf
+  # Run only 1d_cmc and multi_tf builders
+  python run_all_bar_builders.py --ids all --builders 1d_cmc,multi_tf
 
   # Run all except cal_anchor builders
   python run_all_bar_builders.py --ids all --skip cal_anchor_iso,cal_anchor_us
@@ -389,8 +397,9 @@ Examples:
   python run_all_bar_builders.py --ids all --dry-run
 
 Available builders:
-  1d              - 1D canonical bars from CMC (SQL-based)
+  1d_cmc          - 1D canonical bars from CMC (SQL-based)
   1d_tvc          - 1D canonical bars from TradingView
+  1d_hl           - 1D canonical bars from Hyperliquid
   vwap            - VWAP consolidated bars from per-venue 1D bars
   multi_tf        - Multi-timeframe rolling bars
   cal_iso         - Calendar-aligned bars (ISO week)

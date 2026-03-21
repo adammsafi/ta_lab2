@@ -1,361 +1,423 @@
-# Technology Stack: v1.0.1 Macro Regime Infrastructure
+# Technology Stack: v1.1.0 Pipeline Consolidation & Storage Optimization
 
 **Project:** ta_lab2
-**Milestone:** v1.0.1 -- Macro Regime Infrastructure
-**Researched:** 2026-03-01
-**Overall confidence:** HIGH (existing stack verified from installed packages; new additions verified via PyPI/official docs)
+**Milestone:** v1.1.0 -- Pipeline Consolidation
+**Researched:** 2026-03-19
+**Overall confidence:** HIGH (existing stack verified from codebase; PostgreSQL migration strategies verified via official docs)
 
 ---
 
 ## Scope: What This Document Covers
 
-This STACK.md covers ONLY the technology decisions for adding macro regime infrastructure to ta_lab2. The existing validated stack (Python 3.12, PostgreSQL, SQLAlchemy 2.0, pandas 2.3, numpy 2.4, scipy 1.17, scikit-learn 1.8, polars, etc.) is NOT re-researched. See the v0.9.0 STACK.md for those decisions.
+This STACK.md covers ONLY the technology decisions for consolidating 6 table families (36 siloed tables down to 6 unified _u tables), rewriting ~30 scripts to write directly to _u tables, building a source registry for the 3 source-specific 1D bar builders (CMC, TVC, HL), and safely dropping 30 large tables (50M-91M+ rows) to reclaim 100GB+ storage.
 
-**The question:** What libraries/tools are needed to transform 39 FRED series (already in PostgreSQL) into macro regime labels that feed into the existing L0-L4 tighten-only policy resolver?
+**The question:** What stack additions or changes are needed for safe pipeline consolidation and large-table migration in PostgreSQL?
 
----
-
-## Confirmed Existing Stack (Relevant to Macro Regimes)
-
-| Package | Installed Version | Relevance |
-|---------|------------------|-----------|
-| numpy | 2.4.1 | Array math for derived series, threshold logic |
-| scipy | 1.17.0 | Already used in 14 files; z-scores, statistical tests |
-| pandas | 2.3.3 | Time-series alignment, resampling, rolling windows |
-| scikit-learn | 1.8.0 | Model infrastructure (clone, pipelines) used by RegimeRouter |
-| SQLAlchemy | 2.0+ | DB reads/writes for FRED data and regime tables |
-| PyYAML | installed | Already used by policy_loader.py for regime config |
-
-**Key insight:** The existing stack already covers 90% of what macro regime labeling needs. The derived series computation (rate spreads, yield curve slope, carry proxies) is straightforward pandas/numpy arithmetic on data already in PostgreSQL. The question is whether we need NEW libraries at all.
+**Answer: Almost nothing new.** The existing stack (Python 3.12, PostgreSQL, SQLAlchemy 2.0+, Alembic 1.18+, psycopg2, pandas, Polars) already has everything needed. This milestone is a code refactoring and data migration exercise, not a technology adoption exercise. The recommendations below focus on patterns, PostgreSQL-native strategies, and one optional dev dependency.
 
 ---
 
-## Decision 1: Regime Detection Approach
+## Confirmed Existing Stack (All Sufficient)
 
-### Question: Rule-based vs. HMM vs. Hybrid for Macro Regimes?
+| Package | Version (pyproject.toml) | Role in This Milestone |
+|---------|-------------------------|----------------------|
+| PostgreSQL | 14+ (server) | Transactional DDL for safe migrations, DROP TABLE, VACUUM |
+| SQLAlchemy | >=2.0 | Engine management, text() for raw SQL, Alembic integration |
+| Alembic | >=1.18 | Migration scripts for dropping FKs, tables, and rebuilding PKs |
+| psycopg2-binary | >=2.9 | Raw SQL execution in bar builders (performance-critical CTEs) |
+| pandas | (unpinned) | DataFrame operations in sync_utils, audit scripts |
+| Polars | >=0.19.0 | Used by derive_multi_tf_from_1d.py for aggregation |
+| PyYAML | (unpinned) | Could be used for source registry config (already installed) |
+| pytest | >=8.0 (dev) | Migration validation test suite |
+| pytest-cov | >=4.0.0 (dev) | Coverage for new tests |
 
-**Recommendation: Rule-based with threshold hysteresis. Do NOT add HMM.**
-
-**Confidence: HIGH**
-
-### Rationale
-
-The existing per-asset regime system (L0-L3) uses a purely rule-based approach: EMA stack position, ATR percentile buckets, and spread thresholds, combined through `label_trend_basic()`, `label_vol_bucket()`, and `label_liquidity_bucket()`. It has proven reliable and interpretable.
-
-Macro regime classification is an even stronger case for rule-based thresholds than per-asset regimes:
-
-1. **Domain knowledge is the signal.** Yield curve inversion (T10Y2Y < 0) is a regime boundary defined by economics, not statistics. The Fed Funds rate has discrete states (hiking, paused, cutting) observable from the data. VIX has well-established threshold bands (sub-15 = complacent, 15-25 = normal, 25-35 = elevated, 35+ = crisis). These are not latent states that need discovery -- they are known.
-
-2. **Frequency mismatch kills HMM.** FRED data is daily-to-monthly. An HMM with 3-4 states fitted on 10-20 years of monthly data has ~120-240 observations. The Baum-Welch EM algorithm needs hundreds to thousands of observations per state to converge reliably. The carry trade regime (Japan rate differential, USD/JPY vol) updates weekly at best. HMM would overfit.
-
-3. **Interpretability is non-negotiable.** The tighten-only policy resolver (`resolver.py`) maps regime keys like "Up-Normal-Normal" to position sizing rules. An HMM-derived "State 2" has no semantic meaning that maps to policy. You would need a post-hoc mapping from HMM states to policy keys anyway, which is just a threshold classifier with extra steps.
-
-4. **Consistency with existing architecture.** The L0-L4 system already has hysteresis tracking (`HysteresisTracker`), tighten-only composition (`_tighten()`), and YAML-configurable policy tables. Macro regimes as L4 inputs slot directly into this. An HMM would require a parallel inference pipeline that duplicates logic.
-
-5. **HMM adds complexity without value.** hmmlearn 0.3.3 is in "limited maintenance mode" per its PyPI page. Adding a new dependency with uncertain maintenance for marginal benefit is not justified when simple thresholds on well-understood economic indicators work.
-
-### What About HMM Later?
-
-If the project evolves to need latent state discovery (e.g., "which combinations of macro variables best predict crypto drawdowns?"), that is a Phase 2+ research question. At that point, the macro feature store built in v1.0.1 provides the input data for HMM experimentation. The rule-based labeler and HMM labeler can coexist as alternative labeling strategies, similar to how `labeling/` has both triple-barrier and trend-scanning approaches.
-
-### Alternative Considered: hmmlearn
-
-| Criterion | Rule-Based | hmmlearn HMM |
-|-----------|-----------|--------------|
-| New dependency | None | hmmlearn>=0.3.3 (limited maintenance) |
-| Data requirement | Works with any history length | Needs 500+ observations per state for stability |
-| Interpretability | Direct: "yield curve inverted" = policy X | Opaque: "State 2" needs post-hoc interpretation |
-| Integration | Direct plug into L4 resolver slot | Requires wrapper to map states to policy keys |
-| Latency | Instant (threshold comparison) | Viterbi decode pass per update |
-| Maintenance | Zero -- thresholds are economics | Requires retraining, state monitoring, drift detection |
-| Regime transition handling | Uses existing `HysteresisTracker` | Has its own transition matrix (duplicates logic) |
+**Key insight:** This milestone is infrastructure surgery on an existing system, not a greenfield build. Every tool needed is already installed and battle-tested across 290+ scripts. The risk is in the migration strategy, not in the tooling.
 
 ---
 
-## Decision 2: New Dependencies
+## Decision 1: Source Registry Pattern for 1D Bar Builders
 
-### Required: NONE for Core Macro Regimes
+### Question: How to consolidate 3 source-specific 1D builders (CMC, TVC, HL) into one generic builder?
 
-The macro regime infrastructure can be built with **zero new pip dependencies**. Here is why:
-
-| Capability | Implementation | Library |
-|-----------|---------------|---------|
-| Derived series (rate spreads, yield curve slope) | `pandas` arithmetic on `fred.series_values` | Already installed |
-| Rolling z-scores, percentiles | `pandas.rolling()` + `numpy` | Already installed |
-| VIX regime thresholds | Simple comparison operators | Already installed |
-| Carry trade proxy (rate differential, USD/JPY vol) | `pandas` arithmetic + rolling std | Already installed |
-| Macro feature store (DB tables) | `SQLAlchemy` + Alembic migration | Already installed |
-| Regime labeling | Pure Python/numpy threshold logic | Already installed |
-| YAML-configurable thresholds | `PyYAML` via existing `policy_loader.py` | Already installed |
-| Hysteresis filtering | Existing `HysteresisTracker` class | Already built |
-| L4 integration into policy resolver | Existing `resolve_policy(L4=...)` parameter | Already built |
-| Risk gate integration | Existing `RiskEngine` + `dim_risk_state` | Already built |
-
-### Optional: FOMC Calendar Data
-
-**Recommendation: Static YAML file, NOT a library dependency.**
-
-**Confidence: HIGH**
-
-FOMC meets 8 times per year on pre-announced dates. The dates are published years in advance on the Fed website. The total data is ~16 dates over 2 years. A dynamic library to scrape these dates is massive overkill.
-
-| Option | Verdict | Why |
-|--------|---------|-----|
-| FedTools (PyPI) | REJECT | Unmaintained (no release in 12+ months per Snyk health analysis), scrapes HTML which is fragile, adds dependency for 8 dates/year |
-| pandas_market_calendars | REJECT | Designed for exchange trading calendars, not economic event calendars; does not include FOMC dates |
-| Static YAML/JSON in `configs/` | USE THIS | Trivial to maintain (update once per year), zero dependency, version-controlled, deterministic |
-| FRED release calendar API | REJECT | Requires API call for data that changes once per year |
-
-**Implementation:** A `configs/fomc_calendar.yaml` file with meeting dates, statement release times, and a flag for "dot plot" meetings (March, June, September, December SEP meetings). Updated manually when the Fed publishes the next year's calendar (typically in June). The macro regime labeler reads this at startup to compute "days to next FOMC" and "FOMC blackout window" features.
-
-```yaml
-# configs/fomc_calendar.yaml
-fomc_meetings:
-  2025:
-    - date: "2025-01-29"
-      type: statement_only
-    - date: "2025-03-19"
-      type: sep  # Summary of Economic Projections (dot plot)
-    # ... etc
-  2026:
-    - date: "2026-01-28"
-      type: statement_only
-    - date: "2026-03-18"
-      type: sep
-    # ... 6 more
-```
-
----
-
-## Decision 3: Revive `integrations/economic/` or Bypass?
-
-**Recommendation: Bypass for reads. The existing module stays dormant.**
+**Recommendation: Python-native class registry using BaseBarBuilder inheritance + a dataclass-based SourceConfig registry. No new libraries needed.**
 
 **Confidence: HIGH**
 
 ### Current State
 
-The `integrations/economic/` module (FredProvider, ~1,766 LOC) was built for Phase 15 to **fetch** FRED data via the fredapi API. It has rate limiting, circuit breaker, caching, and quality validation. It is well-engineered but has zero active consumers.
+Three separate files with massive code duplication:
+- `refresh_price_bars_1d.py` (OneDayBarBuilder) -- 822 lines, reads from `cmc_price_histories7`
+- `refresh_tvc_price_bars_1d.py` (TvcOneDayBarBuilder) -- 510 lines, reads from `tvc_price_histories`
+- `refresh_hl_price_bars_1d.py` (HlOneDayBarBuilder) -- 584 lines, reads from `hyperliquid.hl_candles`
 
-### Why Bypass
+All three share: psycopg connection management, `_normalize_db_url()`, `_connect()`, `_exec()`, `_fetchone()`, `_fetchall()`, state table DDL, coverage tracking, CLI argument parsing. The only real differences are:
+1. Source table and JOIN logic (e.g., HL needs `dim_asset_identifiers` JOIN)
+2. Column mapping (e.g., TVC has no `market_cap`, HL synthesizes `time_high/time_low`)
+3. OHLC repair (CMC needs repair, TVC/HL do not)
+4. ID loading strategy (CMC from `cmc_price_histories7`, TVC from `tvc_price_histories`, HL from `HL_YN.csv` + `dim_asset_identifiers`)
 
-The FRED data is **already in PostgreSQL** (`fred.series_values`, 39 series, 208K rows). The sync pipeline (`sync_fred_from_vm.py`) handles incremental updates via SSH COPY from the GCP VM. The macro regime infrastructure needs to **read** this data, not **fetch** it from the FRED API.
-
-The correct integration point is:
-
-```python
-# Read FRED data from PostgreSQL (what macro regimes need)
-SELECT series_id, date, value
-FROM fred.series_values
-WHERE series_id IN ('DGS10', 'DGS2', 'FEDFUNDS', ...)
-ORDER BY date
-```
-
-NOT:
+### Recommended Pattern
 
 ```python
-# Fetch FRED data from API (what integrations/economic/ does)
-provider = FredProvider()
-result = provider.get_series("DGS10")
+@dataclass(frozen=True)
+class SourceConfig:
+    """Configuration for a data source in the unified 1D bar builder."""
+    source_name: str           # "CoinMarketCap", "TradingView", "Hyperliquid"
+    source_table: str          # "public.cmc_price_histories7"
+    venue_id: int              # 1 (CMC_AGG), 9 (TVC), 2 (HYPERLIQUID)
+    needs_ohlc_repair: bool    # True for CMC, False for TVC/HL
+    has_market_cap: bool       # True for CMC, False for TVC/HL
+    has_intraday_timestamps: bool  # True for CMC, False for TVC/HL
+    id_loader: Callable        # function(db_url) -> list[int]
+    source_query_builder: Callable  # function(id_, start_ts, venue_filter) -> SQL
+
+# Registry: dict keyed by source name
+SOURCE_REGISTRY: dict[str, SourceConfig] = {}
+
+def register_source(config: SourceConfig) -> None:
+    SOURCE_REGISTRY[config.source_name] = config
 ```
 
-### What Stays
+### Why This Pattern
 
-- `integrations/economic/` remains as-is (deferred, not abandoned per project convention)
-- If the project later needs to add NEW FRED series beyond the 39 already synced, the FredProvider and sync pipeline are ready
-- The `FRED_SERIES` dictionary in `types.py` is a useful reference but not consumed at runtime
+1. **Already fits BaseBarBuilder** -- The abstract class already defines `get_source_query()`, `build_bars_for_id()`, etc. The registry extends this by parameterizing what varies across sources.
+2. **No new dependencies** -- Uses `@dataclass` (stdlib), `Callable` (typing), and a plain `dict`. The existing `BarBuilderConfig` dataclass is the proven pattern.
+3. **Testable** -- Each `SourceConfig` is a frozen dataclass, easily constructed in tests without database access.
+4. **Extensible** -- Adding a new source (e.g., Binance) means adding one `SourceConfig` instance and one SQL query builder function, not a new 500-line file.
 
-### What's New
+### What NOT to Use
 
-A thin SQL reader module that queries `fred.series_values` and returns time-aligned pandas DataFrames. This is analogous to how `load_prices()` reads `cmc_price_bars_multi_tf` -- a simple query function, not a provider abstraction.
+| Library | Why Not |
+|---------|---------|
+| `autoregistry` PyPI package | Overkill for 3-5 sources. A plain dict is clearer and debuggable. |
+| Plugin directory auto-discovery | Only needed for 10+ plugins. With 3 sources, explicit registration is simpler. |
+| YAML config for source definitions | SQL query builders need to be Python callables, not declarative config. PyYAML would add indirection without benefit. |
+| Abstract factory with metaclass `__init_subclass__` | Clever but harder to grep/debug. Explicit registration is better for a team of 1. |
 
 ---
 
-## Decision 4: Database Schema Additions
+## Decision 2: Direct-Write to _u Tables (Eliminating Sync Scripts)
 
-### New Tables (via Alembic migration)
+### Question: How to rewrite ~30 scripts to write directly to _u tables instead of siloed tables?
 
-| Table | Purpose | Schema |
-|-------|---------|--------|
-| `cmc_macro_derived_series` | Computed macro indicators (rate spreads, VIX bands, carry proxy) | `(series_id TEXT, date DATE, value FLOAT, computed_at TIMESTAMPTZ)` PK: `(series_id, date)` |
-| `cmc_macro_regimes` | Macro regime labels per domain | `(date DATE, domain TEXT, label TEXT, sublabels JSONB, computed_at TIMESTAMPTZ)` PK: `(date, domain)` |
-| `cmc_macro_features` | Time-series features derived from FRED data | `(date DATE, feature_name TEXT, value FLOAT, computed_at TIMESTAMPTZ)` PK: `(date, feature_name)` |
-| `dim_macro_regime_config` | Threshold configuration for macro regime labeler | `(domain TEXT PK, config JSONB, updated_at TIMESTAMPTZ)` |
-
-### Existing Tables Used (Read-Only)
-
-| Table | Usage |
-|-------|-------|
-| `fred.series_values` | Source data for derived series computation |
-| `fred.releases` | FOMC release dates (supplementary) |
-| `cmc_regimes` | Per-asset L0-L3 labels (for cross-regime aggregation) |
-| `dim_risk_state` | Macro risk gate writes (tail_risk_state escalation) |
-| `dim_risk_limits` | Macro-driven limit adjustments |
-
-### Existing Tables Modified
-
-| Table | Change | Why |
-|-------|--------|-----|
-| `cmc_regimes` | Add `l4_label` column (nullable TEXT) | Stores the macro regime label per asset-date, fed into resolver as L4 |
-| `dim_risk_state` | Add `macro_regime_state` column (nullable TEXT) | Tracks current aggregate macro regime for risk engine reads |
-
----
-
-## Decision 5: Configuration Architecture
-
-### Recommendation: YAML config per macro regime domain
+**Recommendation: Modify each builder/refresher to write directly to the _u table with an alignment_source literal. Use the existing `ON CONFLICT DO UPDATE` upsert pattern. No new tools needed.**
 
 **Confidence: HIGH**
 
-The project already uses YAML for regime policy configuration (`configs/regime_policies.yaml` via `policy_loader.py`). Extend this pattern for macro regime thresholds.
-
-```yaml
-# configs/macro_regimes.yaml
-domains:
-  monetary_policy:
-    series:
-      fed_funds: FEDFUNDS
-      t10y2y: T10Y2Y
-      dgs2: DGS2
-      dgs10: DGS10
-    thresholds:
-      yield_curve_inverted: -0.01  # T10Y2Y below this = inverted
-      rate_hiking: 0.25  # consecutive increase in FEDFUNDS >= this
-      rate_cutting: -0.25  # consecutive decrease
-    labels: [hiking, paused, cutting, inverted]
-    hysteresis_days: 5
-
-  vix_regime:
-    series:
-      vix: VIXCLS
-    thresholds:
-      complacent: 15.0
-      normal_high: 25.0
-      elevated: 35.0
-    labels: [complacent, normal, elevated, crisis]
-    hysteresis_days: 3
-
-  carry_trade:
-    series:
-      fed_funds: FEDFUNDS
-      japan_rate: IRSTCI01JPM156N  # or BOJ policy rate proxy
-      usd_jpy_vol: null  # computed from derived series
-    thresholds:
-      spread_compressed_bps: 200  # below this = stress signal
-      vol_spike_zscore: 2.0  # JPY vol z-score above this = unwind risk
-    labels: [favorable, neutral, stress, unwind]
-    hysteresis_days: 5
-```
-
-This follows the existing pattern but extends it:
-- `policy_loader.py` loads regime-to-policy mappings (what to DO given a regime)
-- `macro_regimes.yaml` defines regime-detection thresholds (how to DETECT a regime)
-
-Both are YAML, both support hot-reload, both have in-code defaults as fallbacks.
-
----
-
-## Decision 6: What NOT to Add
-
-These are libraries or approaches I explicitly evaluated and rejected for v1.0.1.
-
-| Library/Approach | Why NOT |
-|-----------------|---------|
-| **hmmlearn** | Macro data is too low-frequency for HMM; thresholds are known from domain knowledge; adds unmaintained dependency. See Decision 1. |
-| **pomegranate** | Same reasoning as hmmlearn; faster but even more complex API. Not needed when thresholds work. |
-| **statsmodels** | Tempting for time-series decomposition (STL, ARIMA), but macro regime labeling does not need forecasting -- it needs classification of current state. Rolling z-scores via pandas/scipy cover the feature engineering. |
-| **fredapi** | Already installed as optional (`pip install ta_lab2[fred]`), but the macro regime pipeline reads from PostgreSQL, not the FRED API. No change needed. |
-| **FedTools** | Unmaintained scraper for FOMC dates. Static YAML is simpler, more reliable, and zero-dependency. |
-| **pandas_market_calendars** | Exchange trading calendars, not economic event calendars. Does not include FOMC meetings. |
-| **arch** (GARCH) | Already installed (7.2.0) but not needed. VIX is already a volatility measure -- no need to estimate conditional volatility from returns when the market's own estimate (VIX) is available as a FRED series. |
-| **ecocal** | Economic calendar scraper. Same reasoning as FedTools -- static YAML for 8 FOMC dates/year. |
-| **requests** | Already available in the environment but not needed. All data reads are from PostgreSQL. |
-
----
-
-## Recommended Stack Delta: v1.0.0 -> v1.0.1
-
-### pyproject.toml Changes
-
-**None required for core dependencies.**
-
-The macro regime infrastructure is built entirely on existing dependencies. No new entries in `[project.dependencies]` or `[project.optional-dependencies]`.
-
-### New Files (Code, Not Dependencies)
-
-| File | Purpose |
-|------|---------|
-| `src/ta_lab2/macro/__init__.py` | New package for macro regime infrastructure |
-| `src/ta_lab2/macro/derived_series.py` | Compute rate spreads, yield curve metrics, carry proxies from `fred.series_values` |
-| `src/ta_lab2/macro/feature_store.py` | Build time-series features (rolling z-scores, momentum, regime duration) |
-| `src/ta_lab2/macro/labeler.py` | Rule-based macro regime labeler (monetary policy, VIX, carry) |
-| `src/ta_lab2/macro/aggregator.py` | Cross-domain regime aggregation (composite macro regime key) |
-| `src/ta_lab2/macro/risk_gate.py` | FOMC blackout window, VIX spike, carry unwind risk gates |
-| `src/ta_lab2/macro/fred_reader.py` | Thin SQL reader for `fred.series_values` -> pandas |
-| `configs/macro_regimes.yaml` | Threshold configuration for all macro regime domains |
-| `configs/fomc_calendar.yaml` | Static FOMC meeting dates |
-| Alembic migration | Schema additions (see Decision 4) |
-| `src/ta_lab2/scripts/macro/refresh_macro_regimes.py` | Daily refresh script |
-
-### Import-Linter Implications
-
-The existing layering contract in `pyproject.toml` places `regimes` at the same level as `signals` and `analysis`. The new `macro` package should be at the same level:
+### Current Flow (6 families x 5 variants = 30 siloed writes + 6 sync scripts)
 
 ```
-ta_lab2.scripts > ta_lab2.pipelines | ta_lab2.backtests > ta_lab2.signals | ta_lab2.regimes | ta_lab2.analysis | ta_lab2.macro > ta_lab2.features | ta_lab2.tools
+Builder writes to: price_bars_multi_tf_cal_us
+                   price_bars_multi_tf_cal_iso
+                   price_bars_multi_tf_cal_anchor_us
+                   price_bars_multi_tf_cal_anchor_iso
+                   price_bars_multi_tf
+                              |
+                              v
+sync_price_bars_multi_tf_u.py ---> price_bars_multi_tf_u
+  (INSERT...ON CONFLICT DO NOTHING, watermark-based)
 ```
 
-`macro` can import from `features` and `tools` (lower layers) but NOT from `scripts`, `pipelines`, or `backtests` (higher layers). `regimes` can import from `macro` (same level, no cycle since macro does not import regimes).
+### Target Flow (same builders write directly to _u)
+
+```
+Builder writes to: price_bars_multi_tf_u
+  (with alignment_source = 'multi_tf_cal_us')
+  (ON CONFLICT (id, tf, bar_seq, venue_id, timestamp, alignment_source) DO UPDATE)
+```
+
+### What Changes Per Script
+
+Each of the ~30 builder/refresher scripts needs:
+1. **Output table**: Change from `price_bars_multi_tf_cal_us` to `price_bars_multi_tf_u`
+2. **INSERT column list**: Add `alignment_source` column with a literal value
+3. **ON CONFLICT clause**: Include `alignment_source` in the PK columns
+4. **State table**: Continue using the variant-specific state table (no change)
+
+### Stack Implications
+
+- **No new libraries.** The `ON CONFLICT DO UPDATE` upsert pattern is already used everywhere.
+- **sync_utils.py becomes obsolete.** After all builders write directly to _u, the 6 sync scripts (`sync_price_bars_multi_tf_u.py`, `sync_ema_multi_tf_u.py`, etc.) can be deleted.
+- **ingested_at watermark no longer needed for sync** (sync scripts used `MAX(ingested_at)` as watermark; direct writes eliminate this).
 
 ---
 
-## Integration Points Summary
+## Decision 3: PostgreSQL Migration Strategy for Dropping 30 Large Tables
 
-| Existing Component | How Macro Regimes Connect |
-|-------------------|--------------------------|
-| `resolver.py` L4 parameter | Macro composite regime key passed as `L4=...` to `resolve_policy()` |
-| `HysteresisTracker` | Reused for macro regime transitions (same min_bars_hold logic) |
-| `policy_loader.py` | Extended to load macro-specific policy rules from YAML |
-| `RiskEngine` gates | New macro risk gate reads `dim_risk_state.macro_regime_state` |
-| `DriftMonitor` | New drift source: "macro regime changed" attribution |
-| `RegimeRouter` | Can route by macro regime (L4) in addition to per-asset regime (L2) |
-| Daily refresh pipeline | New step: bars -> EMAs -> regimes -> **macro regimes** -> stats |
+### Question: How to safely drop 30 tables (50M-91M+ rows each) and reclaim 100GB+ disk space?
+
+**Recommendation: Alembic migration with dependency-ordered drops, preceded by validation queries. Use DROP TABLE (not TRUNCATE), which immediately reclaims disk space. No new tools needed.**
+
+**Confidence: HIGH**
+
+### PostgreSQL Behavior: DROP TABLE vs DELETE + VACUUM
+
+| Operation | Disk Reclamation | Locking | Speed |
+|-----------|-----------------|---------|-------|
+| `DROP TABLE tablename` | **Immediate** -- files removed from disk | Brief AccessExclusive lock | Seconds, regardless of row count |
+| `TRUNCATE tablename` | **Immediate** -- files removed | AccessExclusive lock | Seconds |
+| `DELETE FROM tablename` + `VACUUM FULL` | Requires VACUUM FULL for OS reclamation | VACUUM FULL: AccessExclusive lock | Hours for 50M+ rows |
+
+**DROP TABLE is the correct choice here.** Once data is verified in the _u tables, the siloed tables are dead weight. DROP TABLE removes the heap files and all associated indexes from disk immediately. There is no need for VACUUM.
+
+Source: [PostgreSQL DROP TABLE documentation](https://www.postgresql.org/docs/current/sql-droptable.html)
+
+### Dependency Order
+
+Tables must be dropped in the correct order to avoid FK constraint violations:
+
+```
+Phase 1: Drop state tables (no FKs reference them)
+  - price_bars_multi_tf_state
+  - price_bars_multi_tf_cal_us_state
+  - price_bars_multi_tf_cal_iso_state
+  - price_bars_multi_tf_cal_anchor_us_state
+  - price_bars_multi_tf_cal_anchor_iso_state
+  (repeat for EMA, AMA, returns_bars, returns_ema families)
+
+Phase 2: Drop dependent views/matviews (if any reference siloed tables)
+  - Check: SELECT * FROM pg_depend WHERE refobjid = 'tablename'::regclass
+
+Phase 3: Drop data tables
+  - price_bars_multi_tf
+  - price_bars_multi_tf_cal_us
+  - price_bars_multi_tf_cal_iso
+  - price_bars_multi_tf_cal_anchor_us
+  - price_bars_multi_tf_cal_anchor_iso
+  (repeat for all 6 families)
+```
+
+### Alembic Migration Structure
+
+```python
+# alembic/versions/xxxx_drop_siloed_tables.py
+
+def upgrade():
+    # Phase 1: Validate data exists in _u tables (fail-fast)
+    conn = op.get_bind()
+    for family in FAMILIES:
+        u_count = conn.execute(text(f"SELECT COUNT(*) FROM {family}_u")).scalar()
+        if u_count == 0:
+            raise RuntimeError(f"ABORT: {family}_u is empty, cannot drop siloed tables")
+
+    # Phase 2: Drop FKs that reference siloed tables (if any)
+    # Phase 3: Drop state tables
+    for table in STATE_TABLES:
+        op.drop_table(table)
+
+    # Phase 4: Drop data tables
+    for table in DATA_TABLES:
+        op.drop_table(table)
+
+def downgrade():
+    # Downgrade: recreate table structure (data NOT recoverable)
+    # This is a one-way migration. Document clearly.
+    raise NotImplementedError(
+        "Downgrade not supported: siloed table data was dropped. "
+        "Restore from backup if needed."
+    )
+```
+
+### Pre-Migration Validation (Run Before Alembic)
+
+A standalone validation script (not part of Alembic) that compares row counts and checksums:
+
+```sql
+-- Row count validation per (family, alignment_source)
+SELECT
+    'price_bars' AS family,
+    alignment_source,
+    COUNT(*) AS u_rows
+FROM price_bars_multi_tf_u
+GROUP BY alignment_source
+
+UNION ALL
+
+SELECT
+    'price_bars' AS family,
+    'multi_tf' AS alignment_source,
+    COUNT(*) AS siloed_rows
+FROM price_bars_multi_tf
+-- ... repeat for each siloed table
+```
+
+### Storage Estimation
+
+Based on the project's table sizes (from MEMORY.md):
+
+| Family | Siloed Table Rows | Tables | Estimated Storage |
+|--------|-------------------|--------|-------------------|
+| AMA values | ~91.3M | 5 | ~40-50 GB |
+| AMA returns | ~91.3M | 5 | ~40-50 GB |
+| EMA values | ~14.8M | 5 | ~8-10 GB |
+| EMA returns | ~16M | 5 | ~8-10 GB |
+| Price bars | ~4.1M | 5 | ~3-5 GB |
+| Bar returns | ~4.1M | 5 | ~3-5 GB |
+| **Total** | | **30 tables** | **~100-130 GB** |
+
+All this storage is immediately reclaimable via DROP TABLE.
 
 ---
 
-## Version Pinning Summary
+## Decision 4: Testing Strategy for Data Pipeline Migration
 
-No new version pins needed. For reference, the existing relevant pins:
+### Question: How to validate data integrity during and after the migration?
 
-| Package | Version | Notes |
-|---------|---------|-------|
-| numpy | >=1.24 (installed: 2.4.1) | No macro-specific constraints |
-| scipy | >=1.10 (installed: 1.17.0) | Used for z-score computation in macro features |
-| pandas | >=2.0 (installed: 2.3.3) | DatetimeIndex resampling for daily alignment |
-| PyYAML | >=5.0 (installed) | YAML config loading |
-| SQLAlchemy | >=2.0 (installed) | DB reads/writes |
-| Alembic | >=1.18 (installed) | Schema migrations |
-| scikit-learn | >=1.4 (installed: 1.8.0) | Only if HMM experimentation added later |
+**Recommendation: Three-layer validation using pytest + raw SQL. One optional new dev dependency: `pytest-alembic`.**
+
+**Confidence: HIGH**
+
+### Layer 1: Pre-Migration Validation Script (Standalone)
+
+Before running any Alembic migrations, a standalone Python script validates that _u tables contain all data from siloed tables:
+
+```python
+# Checks per family:
+# 1. Row count: SUM(siloed) == COUNT(_u)
+# 2. Aggregate checksum: SUM(close) per (id, tf) matches between siloed and _u
+# 3. Min/max timestamp coverage: no data loss at boundaries
+# 4. alignment_source completeness: all 5 variants present in _u
+```
+
+**No new libraries needed** -- uses SQLAlchemy `text()` and pandas for comparison DataFrames. This pattern already exists in `audit_price_bars_integrity.py` and `audit_price_bars_tables.py`.
+
+### Layer 2: Alembic Migration Tests (pytest-alembic)
+
+**Optional new dev dependency: `pytest-alembic>=0.12.1`**
+
+This is the only new library recommendation for this milestone. It provides:
+- `test_single_head_revision` -- Ensures migration history is linear
+- `test_upgrade` -- Runs all migrations from base to head
+- `test_model_definitions_match_ddl` -- Verifies models match DB state
+
+**Why add it:** The project already has 33 Alembic migrations. This milestone adds at least 1 more (the drop migration). `pytest-alembic` catches common mistakes like broken revision chains or missing downgrade paths. The project already uses pytest extensively.
+
+**Why it's optional:** The existing CI pipeline has an `alembic-history` job that likely covers the revision chain check. If that's sufficient, skip this.
+
+```toml
+# pyproject.toml addition (dev only)
+[project.optional-dependencies]
+dev = [
+    # ... existing ...
+    "pytest-alembic>=0.12.1",  # Optional: Alembic migration tests
+]
+```
+
+Source: [pytest-alembic on PyPI](https://pypi.org/project/pytest-alembic/) -- v0.12.1 released May 2025, supports Python >=3.9
+
+### Layer 3: Post-Migration Smoke Tests (pytest)
+
+After migration, integration tests verify the pipeline still works end-to-end:
+
+```python
+@pytest.mark.integration
+def test_bar_builder_writes_to_u_table(engine):
+    """After consolidation, bar builder should write directly to _u table."""
+    # Run builder for 1 ID, 1 TF
+    # Assert rows exist in price_bars_multi_tf_u with correct alignment_source
+    # Assert siloed table does NOT exist (post-drop)
+
+@pytest.mark.integration
+def test_downstream_reads_unaffected(engine):
+    """Features, signals, regimes all read from _u tables already."""
+    # Verify feature computation works with _u table as source
+```
+
+**No new libraries needed** -- uses existing pytest, pytest-mock, SQLAlchemy.
+
+---
+
+## Decision 5: Monitoring Table Sizes During Migration
+
+### Question: How to track storage reclamation progress?
+
+**Recommendation: PostgreSQL-native `pg_total_relation_size()` queries. No new tools.**
+
+**Confidence: HIGH**
+
+### Pre-Migration Size Capture
+
+```sql
+SELECT
+    schemaname || '.' || relname AS table_name,
+    pg_size_pretty(pg_total_relation_size(relid)) AS total_size,
+    pg_total_relation_size(relid) AS size_bytes
+FROM pg_stat_user_tables
+WHERE relname LIKE '%multi_tf%'
+   OR relname LIKE '%ema_multi_tf%'
+   OR relname LIKE '%ama_multi_tf%'
+   OR relname LIKE '%returns_%multi_tf%'
+ORDER BY pg_total_relation_size(relid) DESC;
+```
+
+### Post-Migration Verification
+
+```sql
+-- After DROP TABLE: same query should show only _u tables
+-- Total size should be ~50% of pre-migration (only _u tables remain)
+SELECT
+    pg_size_pretty(pg_database_size(current_database())) AS db_size;
+```
+
+Source: [PostgreSQL pg_total_relation_size](https://pgpedia.info/p/pg_total_relation_size.html)
+
+---
+
+## What NOT to Add (And Why)
+
+| Candidate | Why NOT |
+|-----------|---------|
+| **pg_partman** (table partitioning) | The _u tables are not large enough to need partitioning. The biggest (_u table for AMA) will be ~91M rows. PostgreSQL handles this fine with proper indexes. Partitioning adds operational complexity. |
+| **pgloader** (data migration tool) | We are not migrating data between databases. The sync scripts already moved data into _u tables. We are dropping source tables. |
+| **Great Expectations** | Overkill for this milestone. The validation needs are simple (row counts, aggregate checksums) and well-served by raw SQL + pandas. |
+| **dbt** (data build tool) | The project uses a Python-script pipeline, not a SQL-first pipeline. Introducing dbt for one milestone would create two paradigms. |
+| **Any ORM models for the siloed tables** | The project uses raw SQL for performance-critical paths. Adding SQLAlchemy ORM models for tables about to be dropped is wasted effort. |
+| **Database migration testing frameworks** (besides pytest-alembic) | `django-test-migrations` is Django-specific. Other frameworks are too heavy for this use case. |
+
+---
+
+## Installation
+
+No new core dependencies. One optional dev dependency:
+
+```bash
+# Optional: Alembic migration tests
+pip install pytest-alembic>=0.12.1
+```
+
+No changes to `pyproject.toml` core dependencies. The optional addition to dev dependencies:
+
+```toml
+# Only if pytest-alembic is adopted
+dev = [
+    # ... existing entries ...
+    "pytest-alembic>=0.12.1",
+]
+```
+
+---
+
+## Summary: Stack Delta for v1.1.0
+
+| Category | Additions | Removals |
+|----------|-----------|----------|
+| Core dependencies | **None** | None |
+| Dev dependencies | `pytest-alembic>=0.12.1` (optional) | None |
+| Python patterns | SourceConfig dataclass + registry dict | 3 duplicated builder files |
+| PostgreSQL | DROP TABLE (already available) | 30 siloed tables + 30 state tables |
+| Scripts | 1 unified builder, ~30 modified scripts | 6 sync scripts, 3 source-specific builders |
+
+**The stack is already right. The work is in the code, not in the tooling.**
 
 ---
 
 ## Sources
 
-### Verified (HIGH confidence)
-- hmmlearn PyPI page: https://pypi.org/project/hmmlearn/ (version 0.3.3, limited maintenance mode)
-- hmmlearn docs: https://hmmlearn.readthedocs.io/en/latest/api.html (GaussianHMM API)
-- FedTools PyPI page: https://pypi.org/project/Fedtools/ (no release in 12+ months)
-- FedTools Snyk health: https://snyk.io/advisor/python/fedtools (project health concerns)
-- pandas_market_calendars docs: https://pandas-market-calendars.readthedocs.io/en/latest/calendars.html (exchange calendars only)
-- Fed FOMC calendar: https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm (official dates)
-- Existing codebase: `regimes/resolver.py` L4 parameter, `regimes/hysteresis.py` HysteresisTracker, `integrations/economic/` FredProvider, `scripts/etl/sync_fred_from_vm.py`, `risk/risk_engine.py`
-
-### Research (MEDIUM confidence)
-- Macrosynergy regime classification research: https://macrosynergy.com/research/classifying-market-regimes/
-- Tree-based macro regime switching (arXiv): https://arxiv.org/html/2408.12863v1
-- QuantStart HMM regime detection: https://www.quantstart.com/articles/market-regime-detection-using-hidden-markov-models-in-qstrader/
-
-### Market Context (MEDIUM confidence)
-- Carry trade unwind mechanics and detection signals: https://www.quantvps.com/blog/yen-carry-trade-unwind-explained
-- USD/JPY carry trade risk assessment: https://www.investing.com/analysis/assessing-usdjpy-carry-trade-risks-in-a-changing-2025-monetary-landscape-200663982
-- BOJ rate normalization timeline: https://seekingalpha.com/article/4853187-boj-may-finally-trigger-yen-carry-trade-unwind
+- [PostgreSQL DROP TABLE Documentation](https://www.postgresql.org/docs/current/sql-droptable.html) -- Confirms immediate disk space reclamation
+- [PostgreSQL VACUUM Documentation](https://www.postgresql.org/docs/current/sql-vacuum.html) -- Confirms VACUUM FULL not needed for DROP TABLE
+- [PostgreSQL pg_total_relation_size](https://pgpedia.info/p/pg_total_relation_size.html) -- Table size monitoring
+- [pytest-alembic on PyPI](https://pypi.org/project/pytest-alembic/) -- v0.12.1, May 2025
+- [Alembic Operation Reference](https://alembic.sqlalchemy.org/en/latest/ops.html) -- `op.drop_table()` documentation
+- [Python Registry Pattern](https://dev.to/dentedlogic/stop-writing-giant-if-else-chains-master-the-python-registry-pattern-ldm) -- Pattern reference
+- [Data Migration Validation Best Practices](https://www.quinnox.com/blogs/data-migration-validation-best-practices/) -- Layered validation approach
+- [Data Migration Testing Guide](https://datalark.com/blog/data-migration-testing-guide) -- Row count + checksum methodology

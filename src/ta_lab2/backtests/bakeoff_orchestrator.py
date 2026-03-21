@@ -212,16 +212,16 @@ def load_strategy_data(engine: Engine, asset_id: int, tf: str) -> pd.DataFrame:
     """
     Load OHLCV + indicator data from DB for a given asset and timeframe.
 
-    Queries cmc_features for OHLCV and key indicators needed by all three
+    Queries features for OHLCV and key indicators needed by all three
     signal generators (EMA, RSI, ATR columns). Also adds EMA columns from
-    cmc_ema_multi_tf_u for periods needed by ema_trend strategy.
+    ema_multi_tf_u for periods needed by ema_trend strategy.
 
     Returns
     -------
     pd.DataFrame
         Indexed by ts (UTC-aware), columns include:
         open, high, low, close, volume, rsi_14, atr_14,
-        ema_5 through ema_200 (computed locally from close if not in cmc_features),
+        ema_5 through ema_200 (computed locally from close if not in features),
         and any available vol/ta columns.
     """
     sql = text(
@@ -235,7 +235,7 @@ def load_strategy_data(engine: Engine, asset_id: int, tf: str) -> pd.DataFrame:
             volume,
             rsi_14,
             ta_is_outlier
-        FROM public.cmc_features
+        FROM public.features
         WHERE id = :asset_id
           AND tf = :tf
         ORDER BY ts
@@ -246,7 +246,7 @@ def load_strategy_data(engine: Engine, asset_id: int, tf: str) -> pd.DataFrame:
         df = pd.read_sql(sql, conn, params={"asset_id": asset_id, "tf": tf})
 
     if df.empty:
-        logger.warning(f"No cmc_features data for asset_id={asset_id}, tf={tf}")
+        logger.warning(f"No features data for asset_id={asset_id}, tf={tf}")
         return df
 
     # Timestamp handling - use utc=True to get tz-aware
@@ -254,7 +254,7 @@ def load_strategy_data(engine: Engine, asset_id: int, tf: str) -> pd.DataFrame:
     df = df.set_index("ts").sort_index()
 
     # Add locally-computed indicators (fast, no extra DB round-trip)
-    # RSI may already exist from cmc_features; compute ATR from OHLCV locally
+    # RSI may already exist from features; compute ATR from OHLCV locally
     _add_local_indicators(df)
 
     logger.info(
@@ -280,7 +280,7 @@ def _add_local_indicators(df: pd.DataFrame) -> None:
         ).max(axis=1)
         df["atr_14"] = tr.ewm(alpha=1 / 14, adjust=False).mean()
 
-    # RSI (Wilder) -- required by rsi_mean_revert; use from cmc_features if present
+    # RSI (Wilder) -- required by rsi_mean_revert; use from features if present
     if "rsi_14" not in df.columns:
         ret = close.diff()
         up = ret.clip(lower=0.0).ewm(alpha=1 / 14, adjust=False).mean()

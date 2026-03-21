@@ -27,15 +27,15 @@ from ta_lab2.dashboard.queries.pipeline import (
 # Table family prefix map (display name -> source_table prefix)
 # ---------------------------------------------------------------------------
 TABLE_FAMILIES: dict[str, str] = {
-    "Price Bars": "cmc_price_bars",
-    "Bar Returns": "cmc_returns_bars",
-    "EMA Values": "cmc_ema",
-    "EMA Returns": "cmc_returns_ema",
-    "AMA Values": "cmc_ama",
-    "Volatility": "cmc_vol",
-    "TA Indicators": "cmc_ta",
-    "Regimes": "cmc_regime",
-    "Features": "cmc_features",
+    "Price Bars": "price_bars",
+    "Bar Returns": "returns_bars",
+    "EMA Values": "ema",
+    "EMA Returns": "returns_ema",
+    "AMA Values": "ama",
+    "Volatility": "vol",
+    "TA Indicators": "ta",
+    "Regimes": "regime",
+    "Features": "features",
 }
 
 

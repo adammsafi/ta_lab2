@@ -1,5 +1,5 @@
 select *
-from cmc_ema_multi_tf_cal
+from ema_multi_tf_cal
 where id = 1 and tf like '6M' and period = 21 and roll = false
 order by ts desc
 

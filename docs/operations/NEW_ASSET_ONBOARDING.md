@@ -22,7 +22,7 @@ python -m ta_lab2.scripts.run_daily_refresh --emas --ids 2 --verbose
 
 # 5. Compute features and regimes
 python -m ta_lab2.scripts.features.run_all_feature_refreshes --ids 2 --tf 1D
-python -m ta_lab2.scripts.regimes.refresh_cmc_regimes --ids 2 -v
+python -m ta_lab2.scripts.regimes.refresh_regimes --ids 2 -v
 
 # 6. Verify incremental refresh works
 python -m ta_lab2.scripts.run_daily_refresh --all --ids 2 --verbose
@@ -134,13 +134,13 @@ This runs all 6 bar builders in order:
 ```sql
 -- 1D bar count
 SELECT MIN(ts) as first_bar, MAX(ts) as last_bar, COUNT(*) as n_bars
-FROM public.cmc_price_bars_multi_tf
+FROM public.price_bars_multi_tf
 WHERE id = 2 AND tf = '1D';
 -- Expected: ~3000+ bars, first_bar around 2015-08-07
 
 -- Multi-TF coverage (how many timeframes have bars)
 SELECT tf, COUNT(*) as n_bars
-FROM public.cmc_price_bars_multi_tf
+FROM public.price_bars_multi_tf
 WHERE id = 2
 GROUP BY tf
 ORDER BY tf;
@@ -150,7 +150,7 @@ ORDER BY tf;
 
 ### Step 4: Compute EMAs (5-15 min)
 
-EMAs are computed from the bars built in Step 3. Each EMA variant corresponds to its bar variant. EMA data populates the unified `cmc_ema_multi_tf_u` table used by signal generators and the regime pipeline.
+EMAs are computed from the bars built in Step 3. Each EMA variant corresponds to its bar variant. EMA data populates the unified `ema_multi_tf_u` table used by signal generators and the regime pipeline.
 
 ```bash
 python -m ta_lab2.scripts.run_daily_refresh --emas --ids 2 --verbose
@@ -167,7 +167,7 @@ This runs all 4 EMA refreshers:
 ```sql
 -- EMA coverage by tf and period
 SELECT tf, period, COUNT(*) as n_rows, MAX(ts) as latest
-FROM public.cmc_ema_multi_tf_u
+FROM public.ema_multi_tf_u
 WHERE id = 2
 GROUP BY tf, period
 ORDER BY tf, period
@@ -180,7 +180,7 @@ Expected: Multiple rows per (tf, period) combination. For 1D, you should see per
 
 ### Step 5: Compute features and regimes (3-7 min)
 
-Features are bar-level indicators (volatility, TA signals, returns) stored in `cmc_features`. Regimes classify market conditions using the feature and EMA data from prior steps.
+Features are bar-level indicators (volatility, TA signals, returns) stored in `features`. Regimes classify market conditions using the feature and EMA data from prior steps.
 
 **Features (~2-5 minutes):**
 
@@ -191,14 +191,14 @@ python -m ta_lab2.scripts.features.run_all_feature_refreshes --ids 2 --tf 1D
 **Regimes (~1-2 minutes):**
 
 ```bash
-python -m ta_lab2.scripts.regimes.refresh_cmc_regimes --ids 2 -v
+python -m ta_lab2.scripts.regimes.refresh_regimes --ids 2 -v
 ```
 
 **Verify features:**
 
 ```sql
 SELECT MIN(ts) as first_ts, MAX(ts) as last_ts, COUNT(*) as n_rows
-FROM public.cmc_features
+FROM public.features
 WHERE id = 2 AND tf = '1D';
 ```
 
@@ -256,37 +256,37 @@ To decommission an asset, delete its derived data in FK-aware order, then option
 
 ```sql
 -- Derived data: backtest (FK child tables first)
-DELETE FROM public.cmc_backtest_trades WHERE run_id IN (
-    SELECT run_id FROM public.cmc_backtest_runs WHERE asset_id = 2
+DELETE FROM public.backtest_trades WHERE run_id IN (
+    SELECT run_id FROM public.backtest_runs WHERE asset_id = 2
 );
-DELETE FROM public.cmc_backtest_metrics WHERE run_id IN (
-    SELECT run_id FROM public.cmc_backtest_runs WHERE asset_id = 2
+DELETE FROM public.backtest_metrics WHERE run_id IN (
+    SELECT run_id FROM public.backtest_runs WHERE asset_id = 2
 );
-DELETE FROM public.cmc_backtest_runs WHERE asset_id = 2;
+DELETE FROM public.backtest_runs WHERE asset_id = 2;
 
 -- Derived data: signals
-DELETE FROM public.cmc_signals_ema_crossover WHERE id = 2;
-DELETE FROM public.cmc_signals_rsi_mean_revert WHERE id = 2;
-DELETE FROM public.cmc_signals_atr_breakout WHERE id = 2;
+DELETE FROM public.signals_ema_crossover WHERE id = 2;
+DELETE FROM public.signals_rsi_mean_revert WHERE id = 2;
+DELETE FROM public.signals_atr_breakout WHERE id = 2;
 
 -- Derived data: regimes
-DELETE FROM public.cmc_regimes WHERE id = 2;
-DELETE FROM public.cmc_regime_flips WHERE id = 2;
-DELETE FROM public.cmc_regime_stats WHERE id = 2;
-DELETE FROM public.cmc_regime_comovement WHERE id = 2;
+DELETE FROM public.regimes WHERE id = 2;
+DELETE FROM public.regime_flips WHERE id = 2;
+DELETE FROM public.regime_stats WHERE id = 2;
+DELETE FROM public.regime_comovement WHERE id = 2;
 
 -- Derived data: features
-DELETE FROM public.cmc_features WHERE id = 2;
-DELETE FROM public.cmc_vol WHERE id = 2;
-DELETE FROM public.cmc_ta WHERE id = 2;
+DELETE FROM public.features WHERE id = 2;
+DELETE FROM public.vol WHERE id = 2;
+DELETE FROM public.ta WHERE id = 2;
 
 -- Derived data: returns and bars (unified tables)
-DELETE FROM public.cmc_returns_bars_multi_tf_u WHERE id = 2;
-DELETE FROM public.cmc_ema_multi_tf_u WHERE id = 2;
-DELETE FROM public.cmc_price_bars_multi_tf_u WHERE id = 2;
+DELETE FROM public.returns_bars_multi_tf_u WHERE id = 2;
+DELETE FROM public.ema_multi_tf_u WHERE id = 2;
+DELETE FROM public.price_bars_multi_tf_u WHERE id = 2;
 
 -- State tables (reset so next run starts clean)
-DELETE FROM public.cmc_price_bars_1d_state WHERE id = 2;
+DELETE FROM public.price_bars_1d_state WHERE id = 2;
 DELETE FROM public.cmc_ema_refresh_state WHERE id = 2;
 
 -- Source data (only if decommissioning — this loses all raw price history)

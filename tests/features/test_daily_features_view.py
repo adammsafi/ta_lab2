@@ -214,7 +214,7 @@ class TestDailyFeaturesStore(unittest.TestCase):
 
         # Check structure
         self.assertIn("INSERT INTO public.cmc_daily_features", query)
-        self.assertIn("FROM public.cmc_price_bars_1d p", query)
+        self.assertIn("FROM public.price_bars_1d p", query)
         self.assertIn("LEFT JOIN public.dim_sessions s", query)
         self.assertIn("LEFT JOIN", query)  # Should have multiple LEFT JOINs
 
@@ -269,15 +269,13 @@ class TestDailyFeaturesStore(unittest.TestCase):
     def test_refresh_for_ids_incremental(self):
         """Test refresh_for_ids incremental mode."""
         # Mock all dependencies
-        with patch.object(
-            self.store, "check_source_tables_exist"
-        ) as mock_check, patch.object(
-            self.store, "compute_dirty_window"
-        ) as mock_window, patch.object(
-            self.store, "_delete_dirty_rows"
-        ) as mock_delete, patch.object(
-            self.store, "_build_join_query"
-        ) as mock_query, patch.object(self.store, "_update_state") as mock_update:
+        with (
+            patch.object(self.store, "check_source_tables_exist") as mock_check,
+            patch.object(self.store, "compute_dirty_window") as mock_window,
+            patch.object(self.store, "_delete_dirty_rows") as mock_delete,
+            patch.object(self.store, "_build_join_query") as mock_query,
+            patch.object(self.store, "_update_state") as mock_update,
+        ):
             mock_check.return_value = {
                 "price_bars": True,
                 "emas": True,
@@ -312,15 +310,13 @@ class TestDailyFeaturesStore(unittest.TestCase):
 
     def test_refresh_for_ids_full_refresh(self):
         """Test refresh_for_ids full refresh mode."""
-        with patch.object(
-            self.store, "check_source_tables_exist"
-        ) as mock_check, patch.object(
-            self.store, "compute_dirty_window"
-        ) as mock_window, patch.object(
-            self.store, "_delete_dirty_rows"
-        ) as mock_delete, patch.object(
-            self.store, "_build_join_query"
-        ) as mock_query, patch.object(self.store, "_update_state") as mock_update:
+        with (
+            patch.object(self.store, "check_source_tables_exist") as mock_check,
+            patch.object(self.store, "compute_dirty_window") as mock_window,
+            patch.object(self.store, "_delete_dirty_rows") as mock_delete,
+            patch.object(self.store, "_build_join_query") as mock_query,
+            patch.object(self.store, "_update_state") as mock_update,
+        ):
             mock_check.return_value = {
                 "price_bars": True,
                 "emas": False,
@@ -400,15 +396,13 @@ class TestDailyFeaturesStore(unittest.TestCase):
 
     def test_graceful_missing_source_table(self):
         """Test refresh continues when source table missing."""
-        with patch.object(
-            self.store, "check_source_tables_exist"
-        ) as mock_check, patch.object(
-            self.store, "compute_dirty_window"
-        ) as mock_window, patch.object(
-            self.store, "_delete_dirty_rows"
-        ) as mock_delete, patch.object(
-            self.store, "_build_join_query"
-        ) as mock_query, patch.object(self.store, "_update_state") as mock_update:
+        with (
+            patch.object(self.store, "check_source_tables_exist") as mock_check,
+            patch.object(self.store, "compute_dirty_window") as mock_window,
+            patch.object(self.store, "_delete_dirty_rows") as mock_delete,
+            patch.object(self.store, "_build_join_query") as mock_query,
+            patch.object(self.store, "_update_state") as mock_update,
+        ):
             # Only price_bars available
             mock_check.return_value = {
                 "price_bars": True,

@@ -51,12 +51,17 @@ class AMAFeatureConfig:
     Attributes:
         param_sets: List of AMAParamSet instances to compute.
         output_schema: Schema for the output table (e.g. "public").
-        output_table: Output table name (e.g. "cmc_ama_multi_tf").
+        output_table: Output table name (e.g. "ama_multi_tf_u").
+        alignment_source: Set for _u table writes to scope DELETE and PK.
+            e.g. "multi_tf", "multi_tf_cal_us", "multi_tf_cal_iso",
+                 "multi_tf_cal_anchor_us", "multi_tf_cal_anchor_iso".
+            None means targeting a siloed table (no alignment_source column).
     """
 
     param_sets: list[AMAParamSet]
     output_schema: str
     output_table: str
+    alignment_source: Optional[str] = None  # Set for _u table writes
 
 
 @dataclass(frozen=True)
@@ -114,6 +119,7 @@ class BaseAMAFeature(ABC):
         """
         self.engine = engine
         self.config = config
+        self._bars_cache: Optional[pd.DataFrame] = None
 
     # =========================================================================
     # Abstract Methods (subclasses MUST override)
@@ -127,9 +133,10 @@ class BaseAMAFeature(ABC):
         tf: str,
         tf_days: int,
         start_ts: Optional[pd.Timestamp],
+        venue_id: int = 1,
     ) -> pd.DataFrame:
         """
-        Load bar data (close prices) for a single (asset_id, tf) slice.
+        Load bar data (close prices) for a single (asset_id, tf, venue_id) slice.
 
         Args:
             engine: SQLAlchemy engine.
@@ -137,9 +144,10 @@ class BaseAMAFeature(ABC):
             tf: Timeframe label (e.g. "1D", "7D").
             tf_days: Nominal days for this TF (from dim_timeframe).
             start_ts: Optional incremental start; None means full history.
+            venue_id: Venue identifier (FK to dim_venues). Default 1 (CMC_AGG).
 
         Returns:
-            DataFrame with at minimum: ts (tz-aware TIMESTAMPTZ), close.
+            DataFrame with at minimum: ts (tz-aware TIMESTAMPTZ), close, venue_id.
             Sorted ascending by ts.
         """
 
@@ -166,7 +174,7 @@ class BaseAMAFeature(ABC):
         Used for logging and audit. At minimum include a "source_table" key.
 
         Returns:
-            Dict with metadata keys (e.g. {"source_table": "cmc_price_bars_multi_tf"}).
+            Dict with metadata keys (e.g. {"source_table": "price_bars_multi_tf_u"}).
         """
 
     # =========================================================================
@@ -181,14 +189,15 @@ class BaseAMAFeature(ABC):
         tf_days: int,
         param_sets: list[AMAParamSet],
         start_ts: Optional[pd.Timestamp] = None,
+        venue_id: int = 1,
     ) -> pd.DataFrame:
         """
-        Compute AMA values + derivatives for all param_sets on one (asset_id, tf).
+        Compute AMA values + derivatives for all param_sets on one (asset_id, tf, venue_id).
 
         Flow:
         1. Load bars via _load_bars()
-        2. For each param_set: compute_ama() -> build rows with id, ts, tf, indicator,
-           params_hash, tf_days, roll, ama, er
+        2. For each param_set: compute_ama() -> build rows with id, venue_id, ts, tf,
+           indicator, params_hash, tf_days, roll, ama, er
         3. Concatenate all param_set results
         4. Call add_derivatives() to compute d1, d2, d1_roll, d2_roll
         5. Return combined DataFrame
@@ -200,17 +209,20 @@ class BaseAMAFeature(ABC):
             tf_days: Nominal days for the timeframe.
             param_sets: Which AMAParamSet instances to compute.
             start_ts: Optional incremental start timestamp (inclusive).
+            venue_id: Venue identifier (FK to dim_venues). Default 1 (CMC_AGG).
 
         Returns:
-            DataFrame with columns: id, ts, tf, indicator, params_hash, tf_days,
-            roll, ama, er, d1, d2, d1_roll, d2_roll.
+            DataFrame with columns: id, venue_id, ts, tf, indicator, params_hash,
+            tf_days, roll, ama, er, d1, d2, d1_roll, d2_roll.
             Empty DataFrame if no bars or no param_sets.
         """
         if not param_sets:
             return pd.DataFrame()
 
         # Load bars
-        bars = self._load_bars(engine, asset_id, tf, tf_days, start_ts)
+        bars = self._load_bars(
+            engine, asset_id, tf, tf_days, start_ts, venue_id=venue_id
+        )
         if bars.empty:
             logger.debug(
                 "No bars for asset_id=%s tf=%s start_ts=%s — skipping",
@@ -257,12 +269,13 @@ class BaseAMAFeature(ABC):
             df_ps = pd.DataFrame(
                 {
                     "id": asset_id,
+                    "venue_id": venue_id,
                     "ts": ts_list,
                     "tf": tf,
                     "indicator": ps.indicator,
                     "params_hash": ps.params_hash,
                     "tf_days": tf_days,
-                    "roll": False,
+                    "roll": bars["roll"].tolist(),
                     "ama": ama_values.tolist(),
                     "er": er_list,
                 }
@@ -315,19 +328,23 @@ class BaseAMAFeature(ABC):
             return df
 
         result = df.copy()
-        group_cols = ["id", "tf", "indicator", "params_hash", "roll"]
+        group_cols = ["id", "venue_id", "tf", "indicator", "params_hash", "roll"]
 
         # Sort by group then ts to guarantee temporal ordering
         result = result.sort_values(group_cols + ["ts"]).reset_index(drop=True)
 
-        # d1 and d2: within each (id, tf, indicator, params_hash, roll) group
+        # d1 and d2: within each (id, venue_id, tf, indicator, params_hash, roll) group
         result["d1"] = result.groupby(group_cols, sort=False)["ama"].diff(1)
         result["d2"] = result.groupby(group_cols, sort=False)["d1"].diff(1)
 
-        # d1_roll and d2_roll: same as d1/d2 for canonical AMA rows
-        # (no intra-period roll variant exists for AMA tables)
-        result["d1_roll"] = result["d1"]
-        result["d2_roll"] = result["d2"]
+        # d1_roll and d2_roll: computed across ALL rows in unified timeline
+        # (id, venue_id, tf, indicator, params_hash) — without roll in group key.
+        # Re-sort by unified_cols + ts so canonical and interstitial rows
+        # interleave chronologically before computing diffs.
+        unified_cols = ["id", "venue_id", "tf", "indicator", "params_hash"]
+        result = result.sort_values(unified_cols + ["ts"]).reset_index(drop=True)
+        result["d1_roll"] = result.groupby(unified_cols, sort=False)["ama"].diff(1)
+        result["d2_roll"] = result.groupby(unified_cols, sort=False)["d1_roll"].diff(1)
 
         return result
 
@@ -379,6 +396,12 @@ class BaseAMAFeature(ABC):
         if df_write.empty:
             return 0
 
+        # Stamp alignment_source on df_write after column filtering.
+        # The source DataFrame never has this column; we add it here so that
+        # to_sql() includes it in the INSERT and the ON CONFLICT logic uses it.
+        if self.config.alignment_source:
+            df_write["alignment_source"] = self.config.alignment_source
+
         unique_ids = df_write["id"].unique().tolist()
         unique_tfs = df_write["tf"].unique().tolist()
 
@@ -393,16 +416,42 @@ class BaseAMAFeature(ABC):
                 if not ids_for_tf:
                     continue
 
-                # Scoped DELETE: remove existing rows for this (ids, tf, ts>=min_ts) slice
+                # Scoped DELETE: remove existing rows for this (ids, venue_id, tf, ts>=min_ts) slice
                 # Only delete rows from min_ts onwards to preserve older history
-                # during incremental refreshes (where start_ts limits loaded bars)
+                # during incremental refreshes (where start_ts limits loaded bars).
+                # CRITICAL for _u tables: scope by alignment_source to avoid wiping
+                # rows from other alignment_sources in the shared table.
                 ids_placeholder = ", ".join(str(i) for i in ids_for_tf)
                 min_ts = df_tf["ts"].min()
-                delete_sql = text(
-                    f"DELETE FROM {schema}.{table} "
-                    f"WHERE id IN ({ids_placeholder}) AND tf = :tf AND ts >= :min_ts"
+                # Get distinct venue_ids in this batch
+                venue_ids_for_tf = (
+                    df_tf["venue_id"].unique().tolist()
+                    if "venue_id" in df_tf.columns
+                    else [1]
                 )
-                conn.execute(delete_sql, {"tf": tf, "min_ts": min_ts})
+                venue_ids_placeholder = ", ".join(str(v) for v in venue_ids_for_tf)
+                if self.config.alignment_source:
+                    delete_sql = text(
+                        f"DELETE FROM {schema}.{table} "
+                        f"WHERE id IN ({ids_placeholder}) AND venue_id IN ({venue_ids_placeholder}) "
+                        f"AND tf = :tf AND ts >= :min_ts "
+                        f"AND alignment_source = :alignment_source"
+                    )
+                    conn.execute(
+                        delete_sql,
+                        {
+                            "tf": tf,
+                            "min_ts": min_ts,
+                            "alignment_source": self.config.alignment_source,
+                        },
+                    )
+                else:
+                    delete_sql = text(
+                        f"DELETE FROM {schema}.{table} "
+                        f"WHERE id IN ({ids_placeholder}) AND venue_id IN ({venue_ids_placeholder}) "
+                        f"AND tf = :tf AND ts >= :min_ts"
+                    )
+                    conn.execute(delete_sql, {"tf": tf, "min_ts": min_ts})
 
             # INSERT the full batch (all tfs) using _pg_upsert safety net
             # We use to_sql with the custom _pg_upsert method
@@ -474,13 +523,16 @@ class BaseAMAFeature(ABC):
         """
         Return AMA primary key columns.
 
-        AMA tables use (id, ts, tf, indicator, params_hash) — differs from EMA
-        tables which use (id, ts, tf, period).
+        Siloed tables: (id, venue_id, ts, tf, indicator, params_hash)
+        _u table:      (id, venue_id, ts, tf, indicator, params_hash, alignment_source)
 
         Returns:
             List of PK column names.
         """
-        return ["id", "ts", "tf", "indicator", "params_hash"]
+        cols = ["id", "venue_id", "ts", "tf", "indicator", "params_hash"]
+        if self.config.alignment_source:
+            cols.append("alignment_source")
+        return cols
 
     def _get_table_columns(
         self,

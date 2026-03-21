@@ -1,5 +1,5 @@
 """
-Regime-routed model dispatcher using cmc_regimes L2 labels.
+Regime-routed model dispatcher using regimes L2 labels.
 
 Implements the Temporal Routing Adaptor (TRA) pattern from Qlib: a router
 that selects per-regime expert sub-models at prediction time.  Each regime
@@ -8,7 +8,7 @@ a global fallback handles unseen or low-sample regimes.
 
 Architecture
 ------------
-- ``load_regimes``: SQL query on ``public.cmc_regimes`` → pd.Series of L2 labels
+- ``load_regimes``: SQL query on ``public.regimes`` → pd.Series of L2 labels
 - ``RegimeRouter``: wraps any sklearn-compatible estimator; dispatches fit/
   predict/predict_proba calls per regime with a global ``__global__`` fallback
 
@@ -49,7 +49,7 @@ def load_regimes(
     start: pd.Timestamp,
     end: pd.Timestamp,
 ) -> pd.Series:
-    """Load L2 regime labels from ``public.cmc_regimes``.
+    """Load L2 regime labels from ``public.regimes``.
 
     Parameters
     ----------
@@ -70,7 +70,7 @@ def load_regimes(
     """
     sql = """
         SELECT ts, l2_label
-        FROM public.cmc_regimes
+        FROM public.regimes
         WHERE id = :id
           AND tf = :tf
           AND ts BETWEEN :start AND :end

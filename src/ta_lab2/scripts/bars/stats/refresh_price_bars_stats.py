@@ -3,7 +3,7 @@ from __future__ import annotations
 r"""
 refresh_price_bars_stats.py
 
-Stats runner for public.cmc_price_bars_multi_tf.
+Stats runner for public.price_bars_multi_tf.
 
 Incremental behavior:
 - Uses public.price_bars_multi_tf_stats_state as watermark store
@@ -42,7 +42,7 @@ from sqlalchemy.engine import Engine
 from ta_lab2.scripts.bars.common_snapshot_contract import get_engine, resolve_db_url
 
 
-BAR_TABLE = "public.cmc_price_bars_multi_tf"
+BAR_TABLE = "public.price_bars_multi_tf"
 STATS_TABLE = "public.price_bars_multi_tf_stats"
 STATE_TABLE = "public.price_bars_multi_tf_stats_state"
 PRICE_TABLE = "public.cmc_price_histories7"
@@ -192,7 +192,7 @@ WITH d AS (
             FROM _impacted_bar_keys k
             WHERE k.asset_id = b.id AND k.tf = b.tf
         )
-        GROUP BY b.id, b.tf, b."timestamp"
+        GROUP BY b.id, b.tf, b."timestamp", b.venue_id
     ) x
 )
 SELECT
@@ -544,7 +544,7 @@ def run(engine: Engine, full_refresh: bool, log_level: str) -> None:
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Stats runner for cmc_price_bars_multi_tf")
+    p = argparse.ArgumentParser(description="Stats runner for price_bars_multi_tf")
     p.add_argument("--full-refresh", action="store_true")
     p.add_argument("--db-url")
     p.add_argument("--log-level", default="INFO")

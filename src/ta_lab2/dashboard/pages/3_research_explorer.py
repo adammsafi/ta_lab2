@@ -218,8 +218,8 @@ if not feature_ic.empty:
                 st.info("Not enough data points (need >63 bars) for rolling IC.")
         else:
             st.info(
-                f"Feature '{selected_feature}' not found in cmc_features for "
-                f"{selected_symbol} ({selected_tf}). Rolling IC requires feature data in cmc_features."
+                f"Feature '{selected_feature}' not found in features for "
+                f"{selected_symbol} ({selected_tf}). Rolling IC requires feature data in features."
             )
     except Exception as exc:
         st.warning(f"Could not compute rolling IC: {exc}")
@@ -256,7 +256,7 @@ if close_series is not None and len(close_series) > 0:
 else:
     st.info(
         f"No price data available for {selected_symbol} ({selected_tf}). "
-        "Run cmc_features refresh to populate price data."
+        "Run features refresh to populate price data."
     )
 
 # Regime timeline

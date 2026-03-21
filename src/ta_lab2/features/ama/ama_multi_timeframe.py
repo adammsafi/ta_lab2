@@ -2,14 +2,14 @@
 MultiTFAMAFeature - Concrete AMA feature subclass for multi-timeframe bars.
 
 Computes KAMA, DEMA, TEMA, HMA for all 18 parameter sets across the
-full timeframe universe from cmc_price_bars_multi_tf.
+full timeframe universe from price_bars_multi_tf_u.
 
-Data source:  cmc_price_bars_multi_tf  (canonical TF bars)
+Data source:  price_bars_multi_tf_u  (canonical TF bars, alignment_source='multi_tf')
 TF universe:  dim_timeframe             (all 109 TFs via tf_days_nominal)
-Output table: cmc_ama_multi_tf          (id, ts, tf, indicator, params_hash PK)
+Output table: ama_multi_tf          (id, ts, tf, indicator, params_hash PK)
 
 Usage (scripted):
-    python -m ta_lab2.scripts.amas.refresh_cmc_ama_multi_tf --ids 1 --tf 1D
+    python -m ta_lab2.scripts.amas.refresh_ama_multi_tf --ids 1 --tf 1D
 
 Usage (programmatic):
     from ta_lab2.features.ama.ama_multi_timeframe import MultiTFAMAFeature
@@ -19,11 +19,11 @@ Usage (programmatic):
     config = AMAFeatureConfig(
         param_sets=ALL_AMA_PARAMS,
         output_schema="public",
-        output_table="cmc_ama_multi_tf",
+        output_table="ama_multi_tf",
     )
     feature = MultiTFAMAFeature(engine, config)
     df = feature.compute_for_asset_tf(engine, asset_id=1, tf="1D", tf_days=1, param_sets=ALL_AMA_PARAMS)
-    feature.write_to_db(engine, df, schema="public", table="cmc_ama_multi_tf")
+    feature.write_to_db(engine, df, schema="public", table="ama_multi_tf")
 
 CRITICAL (Windows tz pitfall):
     Do NOT call .values on a tz-aware DatetimeIndex/Series — it strips timezone.
@@ -117,7 +117,7 @@ class MultiTFAMAFeature(BaseAMAFeature):
     """
     Concrete AMA feature for multi-timeframe bars.
 
-    Loads canonical TF closes from cmc_price_bars_multi_tf and computes
+    Loads canonical TF closes from price_bars_multi_tf_u and computes
     all 18 AMA parameter sets (KAMA x3, DEMA x5, TEMA x5, HMA x5) for
     each (asset_id, tf) combination.
 
@@ -135,7 +135,7 @@ class MultiTFAMAFeature(BaseAMAFeature):
         config: Optional[AMAFeatureConfig] = None,
         *,
         bars_schema: str = "public",
-        bars_table: str = "cmc_price_bars_multi_tf",
+        bars_table: str = "price_bars_multi_tf_u",
     ) -> None:
         """
         Initialise multi-TF AMA feature.
@@ -143,7 +143,7 @@ class MultiTFAMAFeature(BaseAMAFeature):
         Args:
             engine: SQLAlchemy engine.
             config: AMA feature configuration. Defaults to AMAFeatureConfig with
-                    ALL_AMA_PARAMS and output_table="cmc_ama_multi_tf".
+                    ALL_AMA_PARAMS and output_table="ama_multi_tf".
             bars_schema: Schema for bars source table.
             bars_table: Source bars table name.
         """
@@ -151,7 +151,7 @@ class MultiTFAMAFeature(BaseAMAFeature):
             config = AMAFeatureConfig(
                 param_sets=list(ALL_AMA_PARAMS),
                 output_schema="public",
-                output_table="cmc_ama_multi_tf",
+                output_table="ama_multi_tf",
             )
         super().__init__(engine, config)
         self.bars_schema = bars_schema
@@ -164,6 +164,53 @@ class MultiTFAMAFeature(BaseAMAFeature):
     # Abstract Method Implementations
     # =========================================================================
 
+    def preload_all_bars(
+        self,
+        engine: Engine,
+        asset_id: int,
+        venue_id: int = 1,
+    ) -> None:
+        """
+        Load bars for ALL TFs in a single query and cache.
+
+        Call before the TF loop to avoid per-TF DB queries.
+        """
+        params: dict = {"id": asset_id, "venue_id": venue_id}
+        alignment_filter = ""
+        if self.config.alignment_source:
+            alignment_filter = "AND alignment_source = :alignment_source"
+            params["alignment_source"] = self.config.alignment_source
+
+        sql = text(
+            f"""
+            SELECT id, venue_id, "timestamp" AS ts, tf, tf_days, is_partial_end AS roll, close, is_partial_end
+            FROM {self.bars_schema}.{self.bars_table}
+            WHERE id = :id AND venue_id = :venue_id {alignment_filter}
+            ORDER BY tf, "timestamp"
+            """
+        )
+
+        try:
+            with engine.connect() as conn:
+                df = pd.read_sql(sql, conn, params=params)
+        except Exception as exc:
+            logger.warning(
+                "preload_all_bars: failed for asset_id=%s — %s", asset_id, exc
+            )
+            self._bars_cache = pd.DataFrame()
+            return
+
+        if not df.empty:
+            df["ts"] = pd.to_datetime(df["ts"], utc=True)
+
+        self._bars_cache = df
+        logger.debug(
+            "Preloaded bars for asset_id=%s: %d rows across %d TFs",
+            asset_id,
+            len(df),
+            df["tf"].nunique() if not df.empty else 0,
+        )
+
     def _load_bars(
         self,
         engine: Engine,
@@ -171,25 +218,24 @@ class MultiTFAMAFeature(BaseAMAFeature):
         tf: str,
         tf_days: int,
         start_ts: Optional[pd.Timestamp],
+        venue_id: int = 1,
     ) -> pd.DataFrame:
         """
-        Load close prices for a single (asset_id, tf) slice from cmc_price_bars_multi_tf.
-
-        Args:
-            engine: SQLAlchemy engine.
-            asset_id: Asset primary key.
-            tf: Timeframe label (e.g. "1D", "7D").
-            tf_days: Nominal days for this TF (informational only, not used in query).
-            start_ts: Optional incremental start timestamp. If provided, only rows
-                      with ts >= start_ts are returned. Use to overlay new bars on
-                      existing AMA values using warmup from prior rows.
-
-        Returns:
-            DataFrame with columns: id, ts, tf, tf_days, roll, close, is_partial_end.
-            ts column is tz-aware (UTC). Sorted ascending by ts. Empty if no data.
+        Load close prices for a single (asset_id, tf, venue_id) slice (uses cache if available).
         """
-        where_clauses = ["id = :id", "tf = :tf"]
-        params: dict = {"id": asset_id, "tf": tf}
+        # Use preloaded cache if available
+        if self._bars_cache is not None:
+            if self._bars_cache.empty:
+                return pd.DataFrame()
+            mask = self._bars_cache["tf"] == tf
+            if start_ts is not None:
+                mask = mask & (self._bars_cache["ts"] >= start_ts)
+            df = self._bars_cache[mask].copy()
+            return df.sort_values("ts").reset_index(drop=True)
+
+        # Fallback: per-TF query
+        where_clauses = ["id = :id", "tf = :tf", "venue_id = :venue_id"]
+        params: dict = {"id": asset_id, "tf": tf, "venue_id": venue_id}
 
         if start_ts is not None:
             where_clauses.append('"timestamp" >= :start_ts')
@@ -199,7 +245,7 @@ class MultiTFAMAFeature(BaseAMAFeature):
 
         sql = text(
             f"""
-            SELECT id, "timestamp" AS ts, tf, tf_days, FALSE AS roll, close, is_partial_end
+            SELECT id, venue_id, "timestamp" AS ts, tf, tf_days, is_partial_end AS roll, close, is_partial_end
             FROM {self.bars_schema}.{self.bars_table}
             WHERE {where_sql}
             ORDER BY "timestamp"
@@ -218,7 +264,6 @@ class MultiTFAMAFeature(BaseAMAFeature):
         if df.empty:
             return df
 
-        # Coerce ts to tz-aware UTC (Windows pitfall: use pd.to_datetime(utc=True))
         df["ts"] = pd.to_datetime(df["ts"], utc=True)
         df = df.sort_values("ts").reset_index(drop=True)
 

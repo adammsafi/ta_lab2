@@ -31,7 +31,7 @@ class TestReturnsConfig(unittest.TestCase):
         config = ReturnsConfig()
 
         self.assertEqual(config.feature_type, "returns")
-        self.assertEqual(config.output_table, "cmc_returns_daily")
+        self.assertEqual(config.output_table, "returns_daily")
         self.assertEqual(config.null_strategy, "skip")
         self.assertEqual(config.add_zscore, True)
         self.assertEqual(config.zscore_window, 252)
@@ -85,7 +85,7 @@ class TestReturnsFeatureSourceData(unittest.TestCase):
         query_text = str(call_args[0][0])
 
         # Check query contains expected elements
-        self.assertIn("cmc_price_bars_1d", query_text)
+        self.assertIn("price_bars_1d", query_text)
         self.assertIn("id IN (1)", query_text)
         self.assertIn("\"timestamp\" >= '2024-01-01'", query_text)
         self.assertIn("\"timestamp\" <= '2024-01-03'", query_text)
@@ -426,7 +426,7 @@ class TestReturnsFeatureRepr(unittest.TestCase):
         repr_str = repr(feature)
 
         self.assertIn("ReturnsFeature", repr_str)
-        self.assertIn("cmc_returns_daily", repr_str)
+        self.assertIn("returns_daily", repr_str)
         self.assertIn("(1, 7, 30)", repr_str)
 
 

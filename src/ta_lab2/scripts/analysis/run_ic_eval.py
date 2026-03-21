@@ -2,8 +2,8 @@
 Standalone CLI for computing and persisting IC (Information Coefficient) results.
 
 Computes Spearman IC of feature columns against forward returns across horizons,
-optionally broken down by regime label (trend_state / vol_state from cmc_regimes).
-Results are persisted to cmc_ic_results with append-only (default) or upsert semantics.
+optionally broken down by regime label (trend_state / vol_state from regimes).
+Results are persisted to ic_results with append-only (default) or upsert semantics.
 
 Usage:
     # Single asset + single feature
@@ -16,12 +16,12 @@ Usage:
         --asset-id 1 --tf 1D --feature ret_arith ret_log rsi_14 \\
         --train-start 2020-01-01 --train-end 2024-01-01
 
-    # All numeric features in cmc_features for one asset
+    # All numeric features in features for one asset
     python -m ta_lab2.scripts.analysis.run_ic_eval \\
         --asset-id 1 --tf 1D --all-features \\
         --train-start 2020-01-01 --train-end 2024-01-01
 
-    # With regime breakdown (trend_state + vol_state from cmc_regimes)
+    # With regime breakdown (trend_state + vol_state from regimes)
     python -m ta_lab2.scripts.analysis.run_ic_eval \\
         --asset-id 1 --tf 1D --feature ret_arith \\
         --train-start 2020-01-01 --train-end 2024-01-01 \\
@@ -80,9 +80,9 @@ def main() -> int:
         description=(
             "Compute Spearman IC for feature columns against forward returns.\n\n"
             "For each (feature, horizon, return_type) combination, computes IC + t-stat + "
-            "p-value + IC-IR + turnover and persists results to cmc_ic_results.\n\n"
+            "p-value + IC-IR + turnover and persists results to ic_results.\n\n"
             "Supports optional regime breakdown: IC is computed separately for each "
-            "regime label (trend_state, vol_state) parsed from cmc_regimes.l2_label.\n\n"
+            "regime label (trend_state, vol_state) parsed from regimes.l2_label.\n\n"
             "Default mode is append-only (ON CONFLICT DO NOTHING). Use --overwrite to "
             "update existing rows (ON CONFLICT DO UPDATE)."
         ),
@@ -95,7 +95,7 @@ def main() -> int:
         type=int,
         metavar="INT",
         dest="asset_id",
-        help="Asset ID to evaluate (matches cmc_features.id).",
+        help="Asset ID to evaluate (matches features.id).",
     )
     parser.add_argument(
         "--tf",
@@ -128,14 +128,14 @@ def main() -> int:
         nargs="+",
         type=str,
         metavar="COL",
-        help="One or more feature column names from cmc_features.",
+        help="One or more feature column names from features.",
     )
     feature_group.add_argument(
         "--all-features",
         action="store_true",
         dest="all_features",
         help=(
-            "Score all numeric feature columns in cmc_features "
+            "Score all numeric feature columns in features "
             "(excludes id/ts/tf/close/open/high/low/volume/ingested_at)."
         ),
     )
@@ -173,7 +173,7 @@ def main() -> int:
         default=False,
         help=(
             "Enable regime breakdown: compute IC separately per trend_state and vol_state "
-            "label, loaded from cmc_regimes (l2_label parsed via split_part SQL)."
+            "label, loaded from regimes (l2_label parsed via split_part SQL)."
         ),
     )
 
@@ -189,7 +189,7 @@ def main() -> int:
         action="store_true",
         default=False,
         dest="dry_run",
-        help="Compute IC but do not write to cmc_ic_results.",
+        help="Compute IC but do not write to ic_results.",
     )
 
     # Verbosity
@@ -244,7 +244,7 @@ def main() -> int:
     with engine.begin() as conn:
         # Determine feature list
         if args.all_features:
-            all_cols = get_columns(engine, "public.cmc_features")
+            all_cols = get_columns(engine, "public.features")
             feature_list = [c for c in all_cols if c not in _NON_FEATURE_COLS]
             logger.info(
                 "--all-features: discovered %d feature columns", len(feature_list)
@@ -288,7 +288,7 @@ def main() -> int:
         for feature_col in feature_list:
             logger.debug("Evaluating feature: %s", feature_col)
             try:
-                # Load feature + close from cmc_features
+                # Load feature + close from features
                 feature_series, close_series = load_feature_series(
                     conn,
                     args.asset_id,
@@ -407,13 +407,13 @@ def main() -> int:
         # Write to DB (unless dry-run)
         if args.dry_run:
             logger.info(
-                "[dry-run] Computed %d IC rows — NOT writing to cmc_ic_results",
+                "[dry-run] Computed %d IC rows — NOT writing to ic_results",
                 len(all_rows),
             )
         elif all_rows:
             n_written = save_ic_results(conn, all_rows, overwrite=args.overwrite)
             logger.info(
-                "Wrote %d rows to cmc_ic_results (overwrite=%s)",
+                "Wrote %d rows to ic_results (overwrite=%s)",
                 n_written,
                 args.overwrite,
             )

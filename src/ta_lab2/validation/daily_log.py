@@ -37,9 +37,9 @@ logger = logging.getLogger(__name__)
 
 # Signal table map (matches signal_reader.py SIGNAL_TABLE_MAP convention).
 _SIGNAL_TABLE_MAP: dict[str, str] = {
-    "ema_crossover": "cmc_signals_ema_crossover",
-    "rsi_mean_reversion": "cmc_signals_rsi",
-    "atr_breakout": "cmc_signals_atr_breakout",
+    "ema_crossover": "signals_ema_crossover",
+    "rsi_mean_reversion": "signals_rsi",
+    "atr_breakout": "signals_atr_breakout",
 }
 
 
@@ -163,7 +163,7 @@ class DailyValidationLog:
     # ------------------------------------------------------------------
 
     def _section_pipeline_status(self, log_date: date) -> list[str]:
-        """Query cmc_executor_run_log for today's runs."""
+        """Query executor_run_log for today's runs."""
         lines: list[str] = []
         lines.append("## 1. Pipeline Status")
         lines.append("")
@@ -171,7 +171,7 @@ class DailyValidationLog:
         sql = text(
             """
             SELECT run_id, started_at, status, signals_read, orders_generated, fills_processed
-            FROM cmc_executor_run_log
+            FROM executor_run_log
             WHERE started_at::date = :log_date
             ORDER BY started_at DESC
             LIMIT 5
@@ -237,8 +237,8 @@ class DailyValidationLog:
     def _section_orders_fills(self, log_date: date) -> list[str]:
         """Query orders and fills for today with slippage calculation.
 
-        Note: cmc_orders does NOT have a strategy_id column.
-        Strategy attribution is only available via cmc_positions.
+        Note: orders does NOT have a strategy_id column.
+        Strategy attribution is only available via positions.
         """
         lines: list[str] = []
         lines.append("## 3. Orders & Fills")
@@ -254,9 +254,9 @@ class DailyValidationLog:
                 ABS(f.fill_price::float - COALESCE(pb.open::float, f.fill_price::float))
                     / NULLIF(COALESCE(pb.open::float, f.fill_price::float), 0)
                     * 10000 AS slippage_bps
-            FROM cmc_fills f
-            JOIN cmc_orders o ON f.order_id = o.order_id
-            LEFT JOIN cmc_price_bars_multi_tf pb
+            FROM fills f
+            JOIN orders o ON f.order_id = o.order_id
+            LEFT JOIN price_bars_multi_tf pb
                 ON pb.id = o.asset_id
                 AND pb.tf = '1D'
                 AND pb.ts::date = f.filled_at::date
@@ -283,7 +283,7 @@ class DailyValidationLog:
         """Query current open positions.
 
         Uses avg_cost_basis (correct column name, NOT avg_entry_price).
-        strategy_id is part of the PK on cmc_positions.
+        strategy_id is part of the PK on positions.
         """
         lines: list[str] = []
         lines.append("## 4. Current Positions")
@@ -292,7 +292,7 @@ class DailyValidationLog:
         sql = text(
             """
             SELECT asset_id, strategy_id, quantity, avg_cost_basis
-            FROM cmc_positions
+            FROM positions
             WHERE quantity != 0
             ORDER BY asset_id, strategy_id
             """
@@ -317,8 +317,8 @@ class DailyValidationLog:
     def _section_pnl(self, log_date: date, validation_start: date) -> list[str]:
         """P&L summary from fills (aggregate) plus per-strategy from positions.
 
-        Aggregate daily/cumulative P&L is computed from cmc_fills + cmc_orders
-        (which lack strategy_id).  Per-strategy realized P&L comes from cmc_positions.
+        Aggregate daily/cumulative P&L is computed from fills + orders
+        (which lack strategy_id).  Per-strategy realized P&L comes from positions.
         """
         lines: list[str] = []
         lines.append("## 5. P&L Summary")
@@ -332,8 +332,8 @@ class DailyValidationLog:
                     THEN f.fill_price * f.fill_qty
                     ELSE -f.fill_price * f.fill_qty
                 END) AS daily_pnl
-            FROM cmc_fills f
-            JOIN cmc_orders o ON f.order_id = o.order_id
+            FROM fills f
+            JOIN orders o ON f.order_id = o.order_id
             WHERE f.filled_at::date = :log_date
             """
         )
@@ -344,8 +344,8 @@ class DailyValidationLog:
                     THEN f.fill_price * f.fill_qty
                     ELSE -f.fill_price * f.fill_qty
                 END) AS cumulative_pnl
-            FROM cmc_fills f
-            JOIN cmc_orders o ON f.order_id = o.order_id
+            FROM fills f
+            JOIN orders o ON f.order_id = o.order_id
             WHERE f.filled_at::date BETWEEN :start_date AND :log_date
             """
         )
@@ -387,7 +387,7 @@ class DailyValidationLog:
         sql_strategy = text(
             """
             SELECT strategy_id, SUM(realized_pnl) AS realized_pnl
-            FROM cmc_positions
+            FROM positions
             WHERE quantity != 0
             GROUP BY strategy_id
             ORDER BY strategy_id
@@ -421,7 +421,7 @@ class DailyValidationLog:
             """
             SELECT config_id, tracking_error_5d, tracking_error_30d,
                    threshold_breach, paper_cumulative_pnl
-            FROM cmc_drift_metrics
+            FROM drift_metrics
             WHERE metric_date = :log_date
             ORDER BY config_id
             """

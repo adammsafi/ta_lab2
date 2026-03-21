@@ -43,7 +43,7 @@ class VolatilityConfig(FeatureConfig):
 
     Attributes:
         feature_type: 'vol' (volatility features)
-        output_table: 'cmc_vol_daily' (output table name)
+        output_table: 'vol_daily' (output table name)
         null_strategy: 'forward_fill' (per CONTEXT.md - vol forward fills)
         add_zscore: True (add z-score normalization)
         zscore_window: 252 (1 trading year for rolling z-score)
@@ -54,7 +54,7 @@ class VolatilityConfig(FeatureConfig):
     """
 
     feature_type: str = "vol"
-    output_table: str = "cmc_vol"
+    output_table: str = "vol"
     null_strategy: str = "forward_fill"  # Per CONTEXT.md - vol forward fills
     add_zscore: bool = True
     zscore_window: int = 252
@@ -88,12 +88,12 @@ class VolatilityFeature(BaseFeature):
     All volatility measures are annualized using sqrt(252) for trading days.
 
     Template method flow:
-    1. Load OHLC data from cmc_price_bars_1d
+    1. Load OHLC data from price_bars_1d
     2. Apply forward_fill null handling (config)
     3. Compute all volatility estimators
     4. Add z-score normalization
     5. Flag outliers
-    6. Write to cmc_vol_daily
+    6. Write to vol_daily
     """
 
     def __init__(self, engine: Engine, config: Optional[VolatilityConfig] = None):
@@ -122,8 +122,8 @@ class VolatilityFeature(BaseFeature):
         end: Optional[str] = None,
     ) -> pd.DataFrame:
         """
-        Load OHLC data from cmc_price_bars_multi_tf_u for configured tf,
-        LEFT JOINing cmc_returns_bars_multi_tf_u for pre-computed ret_log.
+        Load OHLC data from price_bars_multi_tf_u for configured tf,
+        LEFT JOINing returns_bars_multi_tf_u for pre-computed ret_log.
 
         Args:
             ids: List of asset IDs
@@ -145,6 +145,10 @@ class VolatilityFeature(BaseFeature):
             "as_": self.get_alignment_source(),
         }
 
+        if self.config.venue_id is not None:
+            where_clauses.append("p.venue_id = :venue_id")
+            params["venue_id"] = self.config.venue_id
+
         if start:
             where_clauses.append(f"p.{self.TS_COLUMN} >= :start")
             params["start"] = start
@@ -159,18 +163,17 @@ class VolatilityFeature(BaseFeature):
             SELECT
                 p.id,
                 p.{self.TS_COLUMN} as ts,
-                p.venue,
-                p.venue_rank,
+                p.venue_id,
                 p.open,
                 p.high,
                 p.low,
                 p.close,
                 r.ret_log
             FROM {self.SOURCE_TABLE} p
-            LEFT JOIN public.cmc_returns_bars_multi_tf_u r
+            LEFT JOIN public.returns_bars_multi_tf_u r
                 ON p.id = r.id
                 AND p.{self.TS_COLUMN} = r."timestamp"
-                AND p.venue = r.venue
+                AND p.venue_id = r.venue_id
                 AND r.tf = :tf
                 AND r.alignment_source = :as_
                 AND r.roll = FALSE
@@ -206,10 +209,10 @@ class VolatilityFeature(BaseFeature):
         # Make a copy to avoid modifying source
         df = df_source.copy()
 
-        # Process each (id, venue) separately (volatility requires ordering)
+        # Process each (id, venue_id) separately (volatility requires ordering)
         results = []
 
-        for (id_val, venue_val), df_id in df.groupby(["id", "venue"]):
+        for (id_val, venue_id_val), df_id in df.groupby(["id", "venue_id"]):
             df_id = df_id.copy()
 
             # Sort by timestamp (required for rolling calculations)
@@ -299,9 +302,8 @@ class VolatilityFeature(BaseFeature):
             "id": "INTEGER NOT NULL",
             "ts": "TIMESTAMPTZ NOT NULL",
             "tf": "TEXT NOT NULL",
+            "venue_id": "SMALLINT NOT NULL DEFAULT 1",
             "alignment_source": "TEXT NOT NULL",
-            "venue": "TEXT NOT NULL DEFAULT 'CMC_AGG'",
-            "venue_rank": "INTEGER NOT NULL DEFAULT 50",
             "tf_days": "INTEGER NOT NULL",
             # OHLC context
             "open": "DOUBLE PRECISION",

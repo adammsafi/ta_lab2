@@ -17,7 +17,7 @@ Usage:
 
     config = EMAStateConfig(
         state_schema="public",
-        state_table="cmc_ema_multi_tf_state",
+        state_table="ema_multi_tf_state",
         ts_column="ts",
         roll_filter="roll = FALSE",
     )
@@ -28,7 +28,7 @@ Usage:
     state_df = manager.load_state(ids=[1, 52], periods=[9, 10])
 
     manager.update_state_from_output(
-        output_table="cmc_ema_multi_tf",
+        output_table="ema_multi_tf",
         output_schema="public",
     )
 """
@@ -52,7 +52,7 @@ class EMAStateConfig:
 
     Attributes:
         state_schema: Schema containing state table (default: "public")
-        state_table: State table name (default: "cmc_ema_state")
+        state_table: State table name (default: "ema_multi_tf_state")
         ts_column: Timestamp column name in output table (default: "ts")
         roll_filter: WHERE clause for canonical rows (default: "roll = FALSE")
         use_canonical_ts: Whether to use canonical timestamp logic (default: False)
@@ -62,13 +62,16 @@ class EMAStateConfig:
     """
 
     state_schema: str = "public"
-    state_table: str = "cmc_ema_state"
+    state_table: str = "ema_multi_tf_state"
     ts_column: str = "ts"
     roll_filter: str = "roll = FALSE"
     use_canonical_ts: bool = False
     bars_table: Optional[str] = None
     bars_schema: str = "public"
     bars_partial_filter: str = "is_partial_end = FALSE"
+    alignment_source: Optional[str] = (
+        None  # When set, scopes bar_metadata CTE to this alignment_source
+    )
 
 
 # =============================================================================
@@ -79,6 +82,7 @@ UNIFIED_STATE_SCHEMA = """
 CREATE TABLE IF NOT EXISTS {schema}.{table} (
     -- Primary key
     id                  INTEGER         NOT NULL,
+    venue_id            SMALLINT        NOT NULL DEFAULT 1,
     tf                  TEXT            NOT NULL,
     period              INTEGER         NOT NULL,
 
@@ -94,7 +98,7 @@ CREATE TABLE IF NOT EXISTS {schema}.{table} (
     -- Metadata
     updated_at          TIMESTAMPTZ     NOT NULL DEFAULT now(),
 
-    PRIMARY KEY (id, tf, period)
+    PRIMARY KEY (id, venue_id, tf, period)
 );
 """
 
@@ -177,7 +181,7 @@ class EMAStateManager:
 
         sql_text = f"""
             SELECT
-                id, tf, period,
+                id, venue_id, tf, period,
                 daily_min_seen, daily_max_seen, last_bar_seq, last_time_close,
                 last_canonical_ts,
                 updated_at
@@ -195,6 +199,7 @@ class EMAStateManager:
                 return pd.DataFrame(
                     columns=[
                         "id",
+                        "venue_id",
                         "tf",
                         "period",
                         "daily_min_seen",
@@ -210,6 +215,7 @@ class EMAStateManager:
         self,
         output_table: str,
         output_schema: str = "public",
+        alignment_source: Optional[str] = None,
     ) -> int:
         """
         Update state table from EMA output table and optionally bars table.
@@ -223,6 +229,8 @@ class EMAStateManager:
         Args:
             output_table: Name of EMA output table
             output_schema: Schema containing output table (default: "public")
+            alignment_source: When set (i.e. targeting _u table), scopes all
+                queries to this alignment_source to avoid cross-source contamination.
 
         Returns:
             Number of state rows upserted
@@ -231,17 +239,33 @@ class EMAStateManager:
             sqlalchemy.exc.SQLAlchemyError: On database errors
         """
         if self.config.use_canonical_ts:
-            return self._update_canonical_ts_mode(output_table, output_schema)
+            return self._update_canonical_ts_mode(
+                output_table, output_schema, alignment_source=alignment_source
+            )
         else:
-            return self._update_multi_tf_mode(output_table, output_schema)
+            return self._update_multi_tf_mode(
+                output_table, output_schema, alignment_source=alignment_source
+            )
 
-    def _update_canonical_ts_mode(self, output_table: str, output_schema: str) -> int:
-        """Update state using canonical timestamp logic (for cal/anchor scripts)."""
+    def _update_canonical_ts_mode(
+        self,
+        output_table: str,
+        output_schema: str,
+        alignment_source: Optional[str] = None,
+    ) -> int:
+        """Update state using canonical timestamp logic (for cal/anchor scripts).
+
+        When alignment_source is provided, all queries are scoped to that
+        alignment_source to prevent cross-source contamination in the _u table.
+        """
         ts_col = self.config.ts_column
         roll_filter = self.config.roll_filter
         where_clause = (
             f"WHERE {roll_filter}" if roll_filter else f"WHERE {ts_col} IS NOT NULL"
         )
+        # Append alignment_source filter when targeting _u table
+        if alignment_source:
+            where_clause = f"{where_clause} AND alignment_source = :alignment_source"
 
         bars_table = self.config.bars_table
         bars_schema = self.config.bars_schema
@@ -249,38 +273,54 @@ class EMAStateManager:
 
         state_table_fq = f"{self.config.state_schema}.{self.config.state_table}"
 
+        # alignment_source from config takes precedence when set (bars_table is _u)
+        config_alignment_source = self.config.alignment_source
+        effective_alignment_source = alignment_source or config_alignment_source
+
         if bars_table:
+            # Scope bar_metadata CTE when reading from unified _u table
+            bar_alignment_filter = (
+                "AND alignment_source = :bar_alignment_source"
+                if effective_alignment_source
+                else ""
+            )
             # Read bar metadata from bars table
             sql = f"""
             WITH canonical_ts AS (
                 -- Canonical closes (for last_canonical_ts and last_time_close)
                 SELECT
                     id,
+                    venue_id,
                     tf,
                     period,
                     MAX({ts_col}) as last_canonical_ts
                 FROM {output_schema}.{output_table}
                 {where_clause}
-                GROUP BY id, tf, period
+                GROUP BY id, venue_id, tf, period
             ),
             bar_metadata AS (
-                -- Bar metadata (daily range and bar_seq) per (id, tf)
+                -- Bar metadata (daily range and bar_seq) per (id, venue_id, tf)
+                -- Scoped by alignment_source when reading from unified _u table
                 SELECT
                     id,
+                    venue_id,
                     tf,
                     MIN(time_open) as daily_min_seen,
                     MAX("timestamp") as daily_max_seen,
                     MAX(CASE WHEN {bars_partial_filter} THEN bar_seq END) as last_bar_seq
                 FROM {bars_schema}.{bars_table}
-                GROUP BY id, tf
+                WHERE TRUE {bar_alignment_filter}
+                GROUP BY id, venue_id, tf
             ),
             periods_for_id_tf AS (
-                -- Get all periods for each (id, tf) from output table
-                SELECT DISTINCT id, tf, period
+                -- Get all periods for each (id, venue_id, tf) from output table
+                -- Scoped by alignment_source when targeting _u table
+                SELECT DISTINCT id, venue_id, tf, period
                 FROM {output_schema}.{output_table}
+                {"WHERE alignment_source = :alignment_source" if alignment_source else ""}
             )
             INSERT INTO {state_table_fq} (
-                id, tf, period,
+                id, venue_id, tf, period,
                 last_canonical_ts,
                 last_time_close,
                 daily_min_seen,
@@ -290,6 +330,7 @@ class EMAStateManager:
             )
             SELECT
                 p.id,
+                p.venue_id,
                 p.tf,
                 p.period,
                 c.last_canonical_ts,
@@ -299,9 +340,9 @@ class EMAStateManager:
                 b.last_bar_seq,
                 now() as updated_at
             FROM periods_for_id_tf p
-            JOIN canonical_ts c ON p.id = c.id AND p.tf = c.tf AND p.period = c.period
-            JOIN bar_metadata b ON p.id = b.id AND p.tf = b.tf
-            ON CONFLICT (id, tf, period) DO UPDATE SET
+            JOIN canonical_ts c ON p.id = c.id AND p.venue_id = c.venue_id AND p.tf = c.tf AND p.period = c.period
+            JOIN bar_metadata b ON p.id = b.id AND p.venue_id = b.venue_id AND p.tf = b.tf
+            ON CONFLICT (id, venue_id, tf, period) DO UPDATE SET
                 last_canonical_ts = EXCLUDED.last_canonical_ts,
                 last_time_close = EXCLUDED.last_time_close,
                 daily_min_seen = EXCLUDED.daily_min_seen,
@@ -316,27 +357,31 @@ class EMAStateManager:
                 -- Canonical closes (for last_canonical_ts and last_time_close)
                 SELECT
                     id,
+                    venue_id,
                     tf,
                     period,
                     MAX({ts_col}) as last_canonical_ts
                 FROM {output_schema}.{output_table}
                 {where_clause}
-                GROUP BY id, tf, period
+                GROUP BY id, venue_id, tf, period
             ),
             daily_range AS (
                 -- Full timestamp range (for daily_min_seen and daily_max_seen)
+                -- Scoped by alignment_source when targeting _u table
                 SELECT
                     id,
+                    venue_id,
                     tf,
                     period,
                     MIN({ts_col}) as daily_min_seen,
                     MAX({ts_col}) as daily_max_seen
                 FROM {output_schema}.{output_table}
                 WHERE {ts_col} IS NOT NULL
-                GROUP BY id, tf, period
+                {"AND alignment_source = :alignment_source" if alignment_source else ""}
+                GROUP BY id, venue_id, tf, period
             )
             INSERT INTO {state_table_fq} (
-                id, tf, period,
+                id, venue_id, tf, period,
                 last_canonical_ts,
                 last_time_close,
                 daily_min_seen,
@@ -345,6 +390,7 @@ class EMAStateManager:
             )
             SELECT
                 c.id,
+                c.venue_id,
                 c.tf,
                 c.period,
                 c.last_canonical_ts,
@@ -353,8 +399,8 @@ class EMAStateManager:
                 d.daily_max_seen,
                 now() as updated_at
             FROM canonical_ts c
-            JOIN daily_range d ON c.id = d.id AND c.tf = d.tf AND c.period = d.period
-            ON CONFLICT (id, tf, period) DO UPDATE SET
+            JOIN daily_range d ON c.id = d.id AND c.venue_id = d.venue_id AND c.tf = d.tf AND c.period = d.period
+            ON CONFLICT (id, venue_id, tf, period) DO UPDATE SET
                 last_canonical_ts = EXCLUDED.last_canonical_ts,
                 last_time_close = EXCLUDED.last_time_close,
                 daily_min_seen = EXCLUDED.daily_min_seen,
@@ -362,19 +408,40 @@ class EMAStateManager:
                 updated_at = EXCLUDED.updated_at
             """
 
+        params = {}
+        if alignment_source:
+            params["alignment_source"] = alignment_source
+        if effective_alignment_source:
+            params["bar_alignment_source"] = effective_alignment_source
+
         with self.engine.begin() as conn:
-            result = conn.execute(text(sql))
+            result = conn.execute(text(sql), params)
             return result.rowcount
 
-    def _update_multi_tf_mode(self, output_table: str, output_schema: str) -> int:
-        """Update state using multi-tf logic (for multi_tf scripts)."""
+    def _update_multi_tf_mode(
+        self,
+        output_table: str,
+        output_schema: str,
+        alignment_source: Optional[str] = None,
+    ) -> int:
+        """Update state using multi-tf logic (for multi_tf scripts).
+
+        When alignment_source is provided, scopes the query to that
+        alignment_source to avoid cross-source contamination in the _u table.
+        """
         state_table_fq = f"{self.config.state_schema}.{self.config.state_table}"
         ts_col = self.config.ts_column
 
+        # Add alignment_source filter when targeting _u table
+        alignment_filter = (
+            "AND alignment_source = :alignment_source" if alignment_source else ""
+        )
+
         sql = f"""
-        INSERT INTO {state_table_fq} (id, tf, period, last_time_close, last_bar_seq, updated_at)
+        INSERT INTO {state_table_fq} (id, venue_id, tf, period, last_time_close, last_bar_seq, updated_at)
         SELECT
             id,
+            venue_id,
             tf,
             period,
             MAX({ts_col}) as last_time_close,
@@ -382,15 +449,20 @@ class EMAStateManager:
             now() as updated_at
         FROM {output_schema}.{output_table}
         WHERE {ts_col} IS NOT NULL
-        GROUP BY id, tf, period
-        ON CONFLICT (id, tf, period) DO UPDATE SET
+        {alignment_filter}
+        GROUP BY id, venue_id, tf, period
+        ON CONFLICT (id, venue_id, tf, period) DO UPDATE SET
             last_time_close = EXCLUDED.last_time_close,
             last_bar_seq = EXCLUDED.last_bar_seq,
             updated_at = EXCLUDED.updated_at
         """
 
+        params = {}
+        if alignment_source:
+            params["alignment_source"] = alignment_source
+
         with self.engine.begin() as conn:
-            result = conn.execute(text(sql))
+            result = conn.execute(text(sql), params)
             return result.rowcount
 
     def compute_dirty_window_starts(

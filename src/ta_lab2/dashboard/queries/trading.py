@@ -39,15 +39,15 @@ def load_open_positions(_engine) -> pd.DataFrame:
             p.last_updated,
             p.created_at AS entry_date,
             r.l2_label AS regime_label
-        FROM public.cmc_positions p
+        FROM public.positions p
         JOIN public.dim_assets a ON a.id = p.asset_id
         LEFT JOIN public.dim_executor_config ec ON ec.config_id = p.strategy_id
-        LEFT JOIN public.cmc_regimes r
+        LEFT JOIN public.regimes r
             ON r.id = p.asset_id
             AND r.tf = '1D'
             AND r.ts = (
                 SELECT MAX(ts)
-                FROM public.cmc_regimes
+                FROM public.regimes
                 WHERE id = p.asset_id
                   AND tf = '1D'
             )
@@ -85,8 +85,8 @@ def load_recent_fills(_engine, limit: int = 20) -> pd.DataFrame:
             f.fee_amount,
             o.avg_fill_price AS order_avg_price,
             o.signal_id
-        FROM public.cmc_fills f
-        JOIN public.cmc_orders o ON o.order_id = f.order_id
+        FROM public.fills f
+        JOIN public.orders o ON o.order_id = f.order_id
         JOIN public.dim_assets a ON a.id = o.asset_id
         WHERE o.exchange = 'paper'
         ORDER BY f.filled_at DESC
@@ -120,8 +120,8 @@ def load_daily_pnl_series(_engine) -> pd.DataFrame:
                     WHEN 'buy'  THEN -(f.fill_qty * f.fill_price + f.fee_amount)
                 END
             ) AS daily_realized_pnl
-        FROM public.cmc_fills f
-        JOIN public.cmc_orders o ON o.order_id = f.order_id
+        FROM public.fills f
+        JOIN public.orders o ON o.order_id = f.order_id
         WHERE o.exchange = 'paper'
         GROUP BY DATE(f.filled_at AT TIME ZONE 'UTC')
         ORDER BY trade_date ASC

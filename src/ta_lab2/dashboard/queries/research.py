@@ -60,7 +60,7 @@ def load_ic_results(_engine, asset_id: int, tf: str) -> pd.DataFrame:
             turnover,
             n_obs,
             computed_at
-        FROM public.cmc_ic_results
+        FROM public.ic_results
         WHERE asset_id = :id
           AND tf = :tf
         ORDER BY feature, horizon, return_type
@@ -83,7 +83,7 @@ def load_feature_names(_engine, asset_id: int, tf: str) -> list[str]:
     sql = text(
         """
         SELECT DISTINCT feature
-        FROM public.cmc_ic_results
+        FROM public.ic_results
         WHERE asset_id = :id
           AND tf = :tf
         ORDER BY feature
@@ -111,7 +111,7 @@ def load_feature_close_series(
     tf : str
         Timeframe string (e.g. '1D').
     feature_col : str
-        Column name from cmc_features to load (e.g. 'rsi_14').
+        Column name from features to load (e.g. 'rsi_14').
 
     Returns
     -------
@@ -122,7 +122,7 @@ def load_feature_close_series(
     if not all(c.isalnum() or c == "_" for c in feature_col) or len(feature_col) == 0:
         return None
     sql = text(
-        f"SELECT ts, {feature_col}, close FROM public.cmc_features "
+        f"SELECT ts, {feature_col}, close FROM public.features "
         f"WHERE id = :id AND tf = :tf ORDER BY ts"
     )
     with _engine.connect() as conn:
@@ -141,7 +141,7 @@ def load_regimes(_engine, asset_id: int, tf: str) -> pd.DataFrame:
     Columns: ts, l2_label, trend_state, vol_state
 
     CRITICAL: trend_state and vol_state are derived from l2_label via
-    split_part -- cmc_regimes has NO such columns natively.
+    split_part -- regimes has NO such columns natively.
     """
     sql = text(
         """
@@ -150,7 +150,7 @@ def load_regimes(_engine, asset_id: int, tf: str) -> pd.DataFrame:
             l2_label,
             split_part(l2_label, '-', 1) AS trend_state,
             split_part(l2_label, '-', 2) AS vol_state
-        FROM public.cmc_regimes
+        FROM public.regimes
         WHERE id = :id
           AND tf = :tf
         ORDER BY ts
@@ -175,7 +175,7 @@ def load_close_prices(_engine, asset_id: int, tf: str) -> pd.Series:
     sql = text(
         """
         SELECT ts, close
-        FROM public.cmc_features
+        FROM public.features
         WHERE id = :id
           AND tf = :tf
         ORDER BY ts

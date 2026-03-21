@@ -14,7 +14,7 @@
 #
 # Lifecycle states:
 #   experimental: Active candidates being scored by ExperimentRunner
-#   promoted: Passed BH gate; added to dim_feature_registry + cmc_features
+#   promoted: Passed BH gate; added to dim_feature_registry + features
 #   deprecated: No longer maintained; excluded from ExperimentRunner runs
 
 features:
@@ -30,7 +30,7 @@ features:
       mode: inline
       expression: "vol_30d / (vol_7d + 1e-10)"
     inputs:
-      - table: cmc_vol
+      - table: vol
         columns: [vol_30d, vol_7d]
     tags: [vol, ratio]
 
@@ -41,7 +41,7 @@ features:
       mode: inline
       expression: "rsi_14 - 50"
     inputs:
-      - table: cmc_ta_daily
+      - table: ta_daily
         columns: [rsi_14]
     tags: [momentum, rsi]
 
@@ -54,7 +54,7 @@ features:
     params:
       period: [5, 14, 21]
     inputs:
-      - table: cmc_price_bars_multi_tf_u
+      - table: price_bars_multi_tf_u
         columns: [close]
     tags: [sharpe, momentum]
 
@@ -65,7 +65,7 @@ features:
       mode: inline
       expression: "er"
     inputs:
-      - table: cmc_ama_multi_tf_u
+      - table: ama_multi_tf_u
         columns: [er]
         filters:
           indicator: KAMA
@@ -79,7 +79,7 @@ features:
       mode: inline
       expression: "ret_arith_ama"
     inputs:
-      - table: cmc_returns_ama_multi_tf_u
+      - table: returns_ama_multi_tf_u
         columns: [ret_arith_ama]
         filters:
           indicator: KAMA
@@ -87,8 +87,8 @@ features:
     tags: [ama, momentum, returns]
 
   # =========================================================================
-  # CATEGORY A: Canonical cmc_features columns (~76 features)
-  # All sourced from cmc_features table.
+  # CATEGORY A: Canonical features columns (~76 features)
+  # All sourced from features table.
   # Non-feature columns excluded: id, ts, tf, alignment_source, tf_days,
   #   asset_class, open, high, low, close, volume, updated_at,
   #   has_price_gap, has_outlier, gap_bars, ret_is_outlier,
@@ -101,89 +101,89 @@ features:
 
   canonical_delta1:
     lifecycle: experimental
-    description: "Canonical price delta (close - prev_close) from cmc_features"
+    description: "Canonical price delta (close - prev_close) from features"
     compute:
       mode: inline
       expression: "delta1"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [delta1]
     tags: [canonical, returns, price]
 
   canonical_delta2:
     lifecycle: experimental
-    description: "Lagged price delta (close_t-1 - close_t-2) from cmc_features"
+    description: "Lagged price delta (close_t-1 - close_t-2) from features"
     compute:
       mode: inline
       expression: "delta2"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [delta2]
     tags: [canonical, returns, price]
 
   canonical_ret_arith:
     lifecycle: experimental
-    description: "Arithmetic bar return from cmc_features"
+    description: "Arithmetic bar return from features"
     compute:
       mode: inline
       expression: "ret_arith"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [ret_arith]
     tags: [canonical, returns]
 
   canonical_delta_ret_arith:
     lifecycle: experimental
-    description: "Delta of arithmetic return (momentum of returns) from cmc_features"
+    description: "Delta of arithmetic return (momentum of returns) from features"
     compute:
       mode: inline
       expression: "delta_ret_arith"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [delta_ret_arith]
     tags: [canonical, returns, momentum]
 
   canonical_ret_log:
     lifecycle: experimental
-    description: "Log bar return from cmc_features"
+    description: "Log bar return from features"
     compute:
       mode: inline
       expression: "ret_log"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [ret_log]
     tags: [canonical, returns]
 
   canonical_delta_ret_log:
     lifecycle: experimental
-    description: "Delta of log return from cmc_features"
+    description: "Delta of log return from features"
     compute:
       mode: inline
       expression: "delta_ret_log"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [delta_ret_log]
     tags: [canonical, returns, momentum]
 
   canonical_range_pct:
     lifecycle: experimental
-    description: "Bar range as percentage of close (high-low)/close from cmc_features"
+    description: "Bar range as percentage of close (high-low)/close from features"
     compute:
       mode: inline
       expression: "range_pct"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [range_pct]
     tags: [canonical, returns, volatility]
 
   canonical_true_range_pct:
     lifecycle: experimental
-    description: "True range as percentage of close from cmc_features"
+    description: "True range as percentage of close from features"
     compute:
       mode: inline
       expression: "true_range_pct"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [true_range_pct]
     tags: [canonical, returns, volatility]
 
@@ -193,45 +193,45 @@ features:
 
   canonical_ret_arith_roll:
     lifecycle: experimental
-    description: "Roll-adjusted arithmetic return from cmc_features"
+    description: "Roll-adjusted arithmetic return from features"
     compute:
       mode: inline
       expression: "ret_arith_roll"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [ret_arith_roll]
     tags: [canonical, returns, roll]
 
   canonical_ret_log_roll:
     lifecycle: experimental
-    description: "Roll-adjusted log return from cmc_features"
+    description: "Roll-adjusted log return from features"
     compute:
       mode: inline
       expression: "ret_log_roll"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [ret_log_roll]
     tags: [canonical, returns, roll]
 
   canonical_range_pct_roll:
     lifecycle: experimental
-    description: "Roll-adjusted bar range percentage from cmc_features"
+    description: "Roll-adjusted bar range percentage from features"
     compute:
       mode: inline
       expression: "range_pct_roll"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [range_pct_roll]
     tags: [canonical, returns, roll, volatility]
 
   canonical_true_range_pct_roll:
     lifecycle: experimental
-    description: "Roll-adjusted true range percentage from cmc_features"
+    description: "Roll-adjusted true range percentage from features"
     compute:
       mode: inline
       expression: "true_range_pct_roll"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [true_range_pct_roll]
     tags: [canonical, returns, roll, volatility]
 
@@ -241,34 +241,34 @@ features:
 
   canonical_ret_arith_zscore_30:
     lifecycle: experimental
-    description: "Arithmetic return z-score (30-bar window) from cmc_features"
+    description: "Arithmetic return z-score (30-bar window) from features"
     compute:
       mode: inline
       expression: "ret_arith_zscore_30"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [ret_arith_zscore_30]
     tags: [canonical, returns, zscore]
 
   canonical_ret_log_zscore_30:
     lifecycle: experimental
-    description: "Log return z-score (30-bar window) from cmc_features"
+    description: "Log return z-score (30-bar window) from features"
     compute:
       mode: inline
       expression: "ret_log_zscore_30"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [ret_log_zscore_30]
     tags: [canonical, returns, zscore]
 
   canonical_ret_arith_roll_zscore_30:
     lifecycle: experimental
-    description: "Roll arithmetic return z-score (30-bar window) from cmc_features"
+    description: "Roll arithmetic return z-score (30-bar window) from features"
     compute:
       mode: inline
       expression: "ret_arith_roll_zscore_30"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [ret_arith_roll_zscore_30]
     tags: [canonical, returns, roll, zscore]
 
@@ -278,34 +278,34 @@ features:
 
   canonical_ret_arith_zscore_90:
     lifecycle: experimental
-    description: "Arithmetic return z-score (90-bar window) from cmc_features"
+    description: "Arithmetic return z-score (90-bar window) from features"
     compute:
       mode: inline
       expression: "ret_arith_zscore_90"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [ret_arith_zscore_90]
     tags: [canonical, returns, zscore]
 
   canonical_ret_log_zscore_90:
     lifecycle: experimental
-    description: "Log return z-score (90-bar window) from cmc_features"
+    description: "Log return z-score (90-bar window) from features"
     compute:
       mode: inline
       expression: "ret_log_zscore_90"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [ret_log_zscore_90]
     tags: [canonical, returns, zscore]
 
   canonical_ret_arith_roll_zscore_90:
     lifecycle: experimental
-    description: "Roll arithmetic return z-score (90-bar window) from cmc_features"
+    description: "Roll arithmetic return z-score (90-bar window) from features"
     compute:
       mode: inline
       expression: "ret_arith_roll_zscore_90"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [ret_arith_roll_zscore_90]
     tags: [canonical, returns, roll, zscore]
 
@@ -315,34 +315,34 @@ features:
 
   canonical_ret_arith_zscore_365:
     lifecycle: experimental
-    description: "Arithmetic return z-score (365-bar window) from cmc_features"
+    description: "Arithmetic return z-score (365-bar window) from features"
     compute:
       mode: inline
       expression: "ret_arith_zscore_365"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [ret_arith_zscore_365]
     tags: [canonical, returns, zscore]
 
   canonical_ret_log_zscore_365:
     lifecycle: experimental
-    description: "Log return z-score (365-bar window) from cmc_features"
+    description: "Log return z-score (365-bar window) from features"
     compute:
       mode: inline
       expression: "ret_log_zscore_365"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [ret_log_zscore_365]
     tags: [canonical, returns, zscore]
 
   canonical_ret_arith_roll_zscore_365:
     lifecycle: experimental
-    description: "Roll arithmetic return z-score (365-bar window) from cmc_features"
+    description: "Roll arithmetic return z-score (365-bar window) from features"
     compute:
       mode: inline
       expression: "ret_arith_roll_zscore_365"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [ret_arith_roll_zscore_365]
     tags: [canonical, returns, roll, zscore]
 
@@ -352,56 +352,56 @@ features:
 
   canonical_vol_parkinson_20:
     lifecycle: experimental
-    description: "Parkinson (1980) range-based volatility, 20-bar from cmc_features"
+    description: "Parkinson (1980) range-based volatility, 20-bar from features"
     compute:
       mode: inline
       expression: "vol_parkinson_20"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [vol_parkinson_20]
     tags: [canonical, vol, parkinson]
 
   canonical_vol_parkinson_63:
     lifecycle: experimental
-    description: "Parkinson (1980) range-based volatility, 63-bar from cmc_features"
+    description: "Parkinson (1980) range-based volatility, 63-bar from features"
     compute:
       mode: inline
       expression: "vol_parkinson_63"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [vol_parkinson_63]
     tags: [canonical, vol, parkinson]
 
   canonical_vol_parkinson_126:
     lifecycle: experimental
-    description: "Parkinson (1980) range-based volatility, 126-bar from cmc_features"
+    description: "Parkinson (1980) range-based volatility, 126-bar from features"
     compute:
       mode: inline
       expression: "vol_parkinson_126"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [vol_parkinson_126]
     tags: [canonical, vol, parkinson]
 
   canonical_vol_parkinson_20_zscore:
     lifecycle: experimental
-    description: "Parkinson 20-bar vol z-score from cmc_features"
+    description: "Parkinson 20-bar vol z-score from features"
     compute:
       mode: inline
       expression: "vol_parkinson_20_zscore"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [vol_parkinson_20_zscore]
     tags: [canonical, vol, parkinson, zscore]
 
   canonical_vol_parkinson_63_zscore:
     lifecycle: experimental
-    description: "Parkinson 63-bar vol z-score from cmc_features"
+    description: "Parkinson 63-bar vol z-score from features"
     compute:
       mode: inline
       expression: "vol_parkinson_63_zscore"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [vol_parkinson_63_zscore]
     tags: [canonical, vol, parkinson, zscore]
 
@@ -411,56 +411,56 @@ features:
 
   canonical_vol_gk_20:
     lifecycle: experimental
-    description: "Garman-Klass (1980) OHLC volatility, 20-bar from cmc_features"
+    description: "Garman-Klass (1980) OHLC volatility, 20-bar from features"
     compute:
       mode: inline
       expression: "vol_gk_20"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [vol_gk_20]
     tags: [canonical, vol, garman_klass]
 
   canonical_vol_gk_63:
     lifecycle: experimental
-    description: "Garman-Klass (1980) OHLC volatility, 63-bar from cmc_features"
+    description: "Garman-Klass (1980) OHLC volatility, 63-bar from features"
     compute:
       mode: inline
       expression: "vol_gk_63"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [vol_gk_63]
     tags: [canonical, vol, garman_klass]
 
   canonical_vol_gk_126:
     lifecycle: experimental
-    description: "Garman-Klass (1980) OHLC volatility, 126-bar from cmc_features"
+    description: "Garman-Klass (1980) OHLC volatility, 126-bar from features"
     compute:
       mode: inline
       expression: "vol_gk_126"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [vol_gk_126]
     tags: [canonical, vol, garman_klass]
 
   canonical_vol_gk_20_zscore:
     lifecycle: experimental
-    description: "Garman-Klass 20-bar vol z-score from cmc_features"
+    description: "Garman-Klass 20-bar vol z-score from features"
     compute:
       mode: inline
       expression: "vol_gk_20_zscore"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [vol_gk_20_zscore]
     tags: [canonical, vol, garman_klass, zscore]
 
   canonical_vol_gk_63_zscore:
     lifecycle: experimental
-    description: "Garman-Klass 63-bar vol z-score from cmc_features"
+    description: "Garman-Klass 63-bar vol z-score from features"
     compute:
       mode: inline
       expression: "vol_gk_63_zscore"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [vol_gk_63_zscore]
     tags: [canonical, vol, garman_klass, zscore]
 
@@ -470,45 +470,45 @@ features:
 
   canonical_vol_rs_20:
     lifecycle: experimental
-    description: "Rogers-Satchell (1991) drift-independent volatility, 20-bar from cmc_features"
+    description: "Rogers-Satchell (1991) drift-independent volatility, 20-bar from features"
     compute:
       mode: inline
       expression: "vol_rs_20"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [vol_rs_20]
     tags: [canonical, vol, rogers_satchell]
 
   canonical_vol_rs_63:
     lifecycle: experimental
-    description: "Rogers-Satchell (1991) volatility, 63-bar from cmc_features"
+    description: "Rogers-Satchell (1991) volatility, 63-bar from features"
     compute:
       mode: inline
       expression: "vol_rs_63"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [vol_rs_63]
     tags: [canonical, vol, rogers_satchell]
 
   canonical_vol_rs_126:
     lifecycle: experimental
-    description: "Rogers-Satchell (1991) volatility, 126-bar from cmc_features"
+    description: "Rogers-Satchell (1991) volatility, 126-bar from features"
     compute:
       mode: inline
       expression: "vol_rs_126"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [vol_rs_126]
     tags: [canonical, vol, rogers_satchell]
 
   canonical_vol_rs_20_zscore:
     lifecycle: experimental
-    description: "Rogers-Satchell 20-bar vol z-score from cmc_features"
+    description: "Rogers-Satchell 20-bar vol z-score from features"
     compute:
       mode: inline
       expression: "vol_rs_20_zscore"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [vol_rs_20_zscore]
     tags: [canonical, vol, rogers_satchell, zscore]
 
@@ -518,45 +518,45 @@ features:
 
   canonical_vol_log_roll_20:
     lifecycle: experimental
-    description: "Rolling historical log vol, 20-bar from cmc_features"
+    description: "Rolling historical log vol, 20-bar from features"
     compute:
       mode: inline
       expression: "vol_log_roll_20"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [vol_log_roll_20]
     tags: [canonical, vol, historical]
 
   canonical_vol_log_roll_63:
     lifecycle: experimental
-    description: "Rolling historical log vol, 63-bar from cmc_features"
+    description: "Rolling historical log vol, 63-bar from features"
     compute:
       mode: inline
       expression: "vol_log_roll_63"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [vol_log_roll_63]
     tags: [canonical, vol, historical]
 
   canonical_vol_log_roll_126:
     lifecycle: experimental
-    description: "Rolling historical log vol, 126-bar from cmc_features"
+    description: "Rolling historical log vol, 126-bar from features"
     compute:
       mode: inline
       expression: "vol_log_roll_126"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [vol_log_roll_126]
     tags: [canonical, vol, historical]
 
   canonical_atr_14:
     lifecycle: experimental
-    description: "ATR(14) Average True Range from cmc_features"
+    description: "ATR(14) Average True Range from features"
     compute:
       mode: inline
       expression: "atr_14"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [atr_14]
     tags: [canonical, vol, atr]
 
@@ -566,45 +566,45 @@ features:
 
   canonical_rsi_7:
     lifecycle: experimental
-    description: "RSI(7) from cmc_features"
+    description: "RSI(7) from features"
     compute:
       mode: inline
       expression: "rsi_7"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [rsi_7]
     tags: [canonical, ta, rsi]
 
   canonical_rsi_14:
     lifecycle: experimental
-    description: "RSI(14) from cmc_features"
+    description: "RSI(14) from features"
     compute:
       mode: inline
       expression: "rsi_14"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [rsi_14]
     tags: [canonical, ta, rsi]
 
   canonical_rsi_21:
     lifecycle: experimental
-    description: "RSI(21) from cmc_features"
+    description: "RSI(21) from features"
     compute:
       mode: inline
       expression: "rsi_21"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [rsi_21]
     tags: [canonical, ta, rsi]
 
   canonical_rsi_14_zscore:
     lifecycle: experimental
-    description: "RSI(14) z-score from cmc_features"
+    description: "RSI(14) z-score from features"
     compute:
       mode: inline
       expression: "rsi_14_zscore"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [rsi_14_zscore]
     tags: [canonical, ta, rsi, zscore]
 
@@ -614,56 +614,56 @@ features:
 
   canonical_macd_12_26:
     lifecycle: experimental
-    description: "MACD line (12/26) from cmc_features"
+    description: "MACD line (12/26) from features"
     compute:
       mode: inline
       expression: "macd_12_26"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [macd_12_26]
     tags: [canonical, ta, macd]
 
   canonical_macd_signal_9:
     lifecycle: experimental
-    description: "MACD signal line (9-period) from cmc_features"
+    description: "MACD signal line (9-period) from features"
     compute:
       mode: inline
       expression: "macd_signal_9"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [macd_signal_9]
     tags: [canonical, ta, macd]
 
   canonical_macd_hist_12_26_9:
     lifecycle: experimental
-    description: "MACD histogram (12/26/9) from cmc_features"
+    description: "MACD histogram (12/26/9) from features"
     compute:
       mode: inline
       expression: "macd_hist_12_26_9"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [macd_hist_12_26_9]
     tags: [canonical, ta, macd]
 
   canonical_macd_8_17:
     lifecycle: experimental
-    description: "MACD line fast (8/17) from cmc_features"
+    description: "MACD line fast (8/17) from features"
     compute:
       mode: inline
       expression: "macd_8_17"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [macd_8_17]
     tags: [canonical, ta, macd, fast]
 
   canonical_macd_hist_8_17_9:
     lifecycle: experimental
-    description: "MACD histogram fast (8/17/9) from cmc_features"
+    description: "MACD histogram fast (8/17/9) from features"
     compute:
       mode: inline
       expression: "macd_hist_8_17_9"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [macd_hist_8_17_9]
     tags: [canonical, ta, macd, fast]
 
@@ -673,23 +673,23 @@ features:
 
   canonical_stoch_k_14:
     lifecycle: experimental
-    description: "Stochastic %K(14) from cmc_features"
+    description: "Stochastic %K(14) from features"
     compute:
       mode: inline
       expression: "stoch_k_14"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [stoch_k_14]
     tags: [canonical, ta, stochastic]
 
   canonical_stoch_d_3:
     lifecycle: experimental
-    description: "Stochastic %D(3) smoothed from cmc_features"
+    description: "Stochastic %D(3) smoothed from features"
     compute:
       mode: inline
       expression: "stoch_d_3"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [stoch_d_3]
     tags: [canonical, ta, stochastic]
 
@@ -699,23 +699,23 @@ features:
 
   canonical_bb_width_20:
     lifecycle: experimental
-    description: "Bollinger Band width (20-period, 2-sigma) from cmc_features"
+    description: "Bollinger Band width (20-period, 2-sigma) from features"
     compute:
       mode: inline
       expression: "bb_width_20"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [bb_width_20]
     tags: [canonical, ta, bollinger]
 
   canonical_bb_pct_b_20:
     lifecycle: experimental
-    description: "Bollinger %B (close position within band) derived from cmc_features"
+    description: "Bollinger %B (close position within band) derived from features"
     compute:
       mode: inline
       expression: "(close - bb_lo_20_2) / (bb_up_20_2 - bb_lo_20_2 + 1e-10)"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [close, bb_up_20_2, bb_lo_20_2]
     tags: [canonical, ta, bollinger, derived]
 
@@ -725,18 +725,18 @@ features:
 
   canonical_adx_14:
     lifecycle: experimental
-    description: "ADX(14) trend strength from cmc_features"
+    description: "ADX(14) trend strength from features"
     compute:
       mode: inline
       expression: "adx_14"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [adx_14]
     tags: [canonical, ta, adx]
 
   # =========================================================================
   # CATEGORY B: AMA indicator variants
-  # Sourced from cmc_ama_multi_tf_u (filtered by indicator + params_hash).
+  # Sourced from ama_multi_tf_u (filtered by indicator + params_hash).
   # Naming: ama_{indicator}_{label_slug}_{column}
   #
   # AMA params_hash values (first 8 chars of MD5):
@@ -771,7 +771,7 @@ features:
       mode: inline
       expression: "ama"
     inputs:
-      - table: cmc_ama_multi_tf_u
+      - table: ama_multi_tf_u
         columns: [ama]
         filters:
           indicator: KAMA
@@ -785,7 +785,7 @@ features:
       mode: inline
       expression: "er"
     inputs:
-      - table: cmc_ama_multi_tf_u
+      - table: ama_multi_tf_u
         columns: [er]
         filters:
           indicator: KAMA
@@ -799,7 +799,7 @@ features:
       mode: inline
       expression: "ama"
     inputs:
-      - table: cmc_ama_multi_tf_u
+      - table: ama_multi_tf_u
         columns: [ama]
         filters:
           indicator: KAMA
@@ -813,7 +813,7 @@ features:
       mode: inline
       expression: "er"
     inputs:
-      - table: cmc_ama_multi_tf_u
+      - table: ama_multi_tf_u
         columns: [er]
         filters:
           indicator: KAMA
@@ -827,7 +827,7 @@ features:
       mode: inline
       expression: "ama"
     inputs:
-      - table: cmc_ama_multi_tf_u
+      - table: ama_multi_tf_u
         columns: [ama]
         filters:
           indicator: KAMA
@@ -841,7 +841,7 @@ features:
       mode: inline
       expression: "er"
     inputs:
-      - table: cmc_ama_multi_tf_u
+      - table: ama_multi_tf_u
         columns: [er]
         filters:
           indicator: KAMA
@@ -859,7 +859,7 @@ features:
       mode: inline
       expression: "ama"
     inputs:
-      - table: cmc_ama_multi_tf_u
+      - table: ama_multi_tf_u
         columns: [ama]
         filters:
           indicator: DEMA
@@ -873,7 +873,7 @@ features:
       mode: inline
       expression: "d1"
     inputs:
-      - table: cmc_ama_multi_tf_u
+      - table: ama_multi_tf_u
         columns: [d1]
         filters:
           indicator: DEMA
@@ -887,7 +887,7 @@ features:
       mode: inline
       expression: "ama"
     inputs:
-      - table: cmc_ama_multi_tf_u
+      - table: ama_multi_tf_u
         columns: [ama]
         filters:
           indicator: DEMA
@@ -901,7 +901,7 @@ features:
       mode: inline
       expression: "d1"
     inputs:
-      - table: cmc_ama_multi_tf_u
+      - table: ama_multi_tf_u
         columns: [d1]
         filters:
           indicator: DEMA
@@ -915,7 +915,7 @@ features:
       mode: inline
       expression: "ama"
     inputs:
-      - table: cmc_ama_multi_tf_u
+      - table: ama_multi_tf_u
         columns: [ama]
         filters:
           indicator: DEMA
@@ -929,7 +929,7 @@ features:
       mode: inline
       expression: "d1"
     inputs:
-      - table: cmc_ama_multi_tf_u
+      - table: ama_multi_tf_u
         columns: [d1]
         filters:
           indicator: DEMA
@@ -943,7 +943,7 @@ features:
       mode: inline
       expression: "ama"
     inputs:
-      - table: cmc_ama_multi_tf_u
+      - table: ama_multi_tf_u
         columns: [ama]
         filters:
           indicator: DEMA
@@ -957,7 +957,7 @@ features:
       mode: inline
       expression: "d1"
     inputs:
-      - table: cmc_ama_multi_tf_u
+      - table: ama_multi_tf_u
         columns: [d1]
         filters:
           indicator: DEMA
@@ -975,7 +975,7 @@ features:
       mode: inline
       expression: "ama"
     inputs:
-      - table: cmc_ama_multi_tf_u
+      - table: ama_multi_tf_u
         columns: [ama]
         filters:
           indicator: TEMA
@@ -989,7 +989,7 @@ features:
       mode: inline
       expression: "d1"
     inputs:
-      - table: cmc_ama_multi_tf_u
+      - table: ama_multi_tf_u
         columns: [d1]
         filters:
           indicator: TEMA
@@ -1003,7 +1003,7 @@ features:
       mode: inline
       expression: "ama"
     inputs:
-      - table: cmc_ama_multi_tf_u
+      - table: ama_multi_tf_u
         columns: [ama]
         filters:
           indicator: TEMA
@@ -1017,7 +1017,7 @@ features:
       mode: inline
       expression: "d1"
     inputs:
-      - table: cmc_ama_multi_tf_u
+      - table: ama_multi_tf_u
         columns: [d1]
         filters:
           indicator: TEMA
@@ -1031,7 +1031,7 @@ features:
       mode: inline
       expression: "ama"
     inputs:
-      - table: cmc_ama_multi_tf_u
+      - table: ama_multi_tf_u
         columns: [ama]
         filters:
           indicator: TEMA
@@ -1045,7 +1045,7 @@ features:
       mode: inline
       expression: "d1"
     inputs:
-      - table: cmc_ama_multi_tf_u
+      - table: ama_multi_tf_u
         columns: [d1]
         filters:
           indicator: TEMA
@@ -1059,7 +1059,7 @@ features:
       mode: inline
       expression: "ama"
     inputs:
-      - table: cmc_ama_multi_tf_u
+      - table: ama_multi_tf_u
         columns: [ama]
         filters:
           indicator: TEMA
@@ -1073,7 +1073,7 @@ features:
       mode: inline
       expression: "d1"
     inputs:
-      - table: cmc_ama_multi_tf_u
+      - table: ama_multi_tf_u
         columns: [d1]
         filters:
           indicator: TEMA
@@ -1091,7 +1091,7 @@ features:
       mode: inline
       expression: "ama"
     inputs:
-      - table: cmc_ama_multi_tf_u
+      - table: ama_multi_tf_u
         columns: [ama]
         filters:
           indicator: HMA
@@ -1105,7 +1105,7 @@ features:
       mode: inline
       expression: "d1"
     inputs:
-      - table: cmc_ama_multi_tf_u
+      - table: ama_multi_tf_u
         columns: [d1]
         filters:
           indicator: HMA
@@ -1119,7 +1119,7 @@ features:
       mode: inline
       expression: "ama"
     inputs:
-      - table: cmc_ama_multi_tf_u
+      - table: ama_multi_tf_u
         columns: [ama]
         filters:
           indicator: HMA
@@ -1133,7 +1133,7 @@ features:
       mode: inline
       expression: "d1"
     inputs:
-      - table: cmc_ama_multi_tf_u
+      - table: ama_multi_tf_u
         columns: [d1]
         filters:
           indicator: HMA
@@ -1147,7 +1147,7 @@ features:
       mode: inline
       expression: "ama"
     inputs:
-      - table: cmc_ama_multi_tf_u
+      - table: ama_multi_tf_u
         columns: [ama]
         filters:
           indicator: HMA
@@ -1161,7 +1161,7 @@ features:
       mode: inline
       expression: "d1"
     inputs:
-      - table: cmc_ama_multi_tf_u
+      - table: ama_multi_tf_u
         columns: [d1]
         filters:
           indicator: HMA
@@ -1175,7 +1175,7 @@ features:
       mode: inline
       expression: "ama"
     inputs:
-      - table: cmc_ama_multi_tf_u
+      - table: ama_multi_tf_u
         columns: [ama]
         filters:
           indicator: HMA
@@ -1189,7 +1189,7 @@ features:
       mode: inline
       expression: "d1"
     inputs:
-      - table: cmc_ama_multi_tf_u
+      - table: ama_multi_tf_u
         columns: [d1]
         filters:
           indicator: HMA
@@ -1200,14 +1200,14 @@ features:
   # CATEGORY C: EMA crossover features
   #
   # SKIPPED: ExperimentRunner._compute_feature for dotpath mode calls
-  # fn(input_df) with no kwargs support. Two inputs from cmc_ema_multi_tf_u
+  # fn(input_df) with no kwargs support. Two inputs from ema_multi_tf_u
   # with different period filters would both produce an 'ema' column, causing
   # a name collision on inner join. Additionally, a compute function that
   # loads data from DB requires a connection object not available in dotpath
   # fn(input_df) signature.
   #
   # Resolution: EMA crossovers are better implemented as inline features on
-  # cmc_features once EMA spread columns are added to that table, or as a
+  # features once EMA spread columns are added to that table, or as a
   # separate ExperimentRunner enhancement (support column renaming on multi-
   # input merge). Deferred to Phase 55-04 (ExperimentRunner enhancement).
   # =========================================================================
@@ -1223,13 +1223,13 @@ features:
       mode: inline
       expression: "(rsi_14 - rsi_14.rolling(100).quantile(0.20)) / (rsi_14.rolling(100).quantile(0.80) - rsi_14.rolling(100).quantile(0.20) + 1e-10)"
     inputs:
-      - table: cmc_ta_daily
+      - table: ta_daily
         columns: [rsi_14]
     tags: [rsi, adaptive, momentum]
 
   # =========================================================================
-  # CATEGORY E: Additional canonical cmc_features columns (unmapped set)
-  # These columns exist in cmc_features but were not included in Category A.
+  # CATEGORY E: Additional canonical features columns (unmapped set)
+  # These columns exist in features but were not included in Category A.
   # =========================================================================
 
   # -------------------------------------------------------------------------
@@ -1238,45 +1238,45 @@ features:
 
   canonical_delta1_roll:
     lifecycle: experimental
-    description: "Roll-adjusted price delta (close - prev_close) from cmc_features"
+    description: "Roll-adjusted price delta (close - prev_close) from features"
     compute:
       mode: inline
       expression: "delta1_roll"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [delta1_roll]
     tags: [canonical, returns, roll, price]
 
   canonical_delta2_roll:
     lifecycle: experimental
-    description: "Roll-adjusted lagged price delta from cmc_features"
+    description: "Roll-adjusted lagged price delta from features"
     compute:
       mode: inline
       expression: "delta2_roll"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [delta2_roll]
     tags: [canonical, returns, roll, price]
 
   canonical_delta_ret_arith_roll:
     lifecycle: experimental
-    description: "Roll-adjusted delta of arithmetic return (momentum) from cmc_features"
+    description: "Roll-adjusted delta of arithmetic return (momentum) from features"
     compute:
       mode: inline
       expression: "delta_ret_arith_roll"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [delta_ret_arith_roll]
     tags: [canonical, returns, roll, momentum]
 
   canonical_delta_ret_log_roll:
     lifecycle: experimental
-    description: "Roll-adjusted delta of log return from cmc_features"
+    description: "Roll-adjusted delta of log return from features"
     compute:
       mode: inline
       expression: "delta_ret_log_roll"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [delta_ret_log_roll]
     tags: [canonical, returns, roll, momentum]
 
@@ -1286,166 +1286,166 @@ features:
 
   canonical_delta_ret_arith_zscore_30:
     lifecycle: experimental
-    description: "Delta of arithmetic return z-score (30-bar) from cmc_features"
+    description: "Delta of arithmetic return z-score (30-bar) from features"
     compute:
       mode: inline
       expression: "delta_ret_arith_zscore_30"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [delta_ret_arith_zscore_30]
     tags: [canonical, returns, zscore, momentum]
 
   canonical_delta_ret_log_zscore_30:
     lifecycle: experimental
-    description: "Delta of log return z-score (30-bar) from cmc_features"
+    description: "Delta of log return z-score (30-bar) from features"
     compute:
       mode: inline
       expression: "delta_ret_log_zscore_30"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [delta_ret_log_zscore_30]
     tags: [canonical, returns, zscore, momentum]
 
   canonical_ret_log_roll_zscore_30:
     lifecycle: experimental
-    description: "Roll log return z-score (30-bar) from cmc_features"
+    description: "Roll log return z-score (30-bar) from features"
     compute:
       mode: inline
       expression: "ret_log_roll_zscore_30"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [ret_log_roll_zscore_30]
     tags: [canonical, returns, roll, zscore]
 
   canonical_delta_ret_arith_roll_zscore_30:
     lifecycle: experimental
-    description: "Roll delta arithmetic return z-score (30-bar) from cmc_features"
+    description: "Roll delta arithmetic return z-score (30-bar) from features"
     compute:
       mode: inline
       expression: "delta_ret_arith_roll_zscore_30"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [delta_ret_arith_roll_zscore_30]
     tags: [canonical, returns, roll, zscore, momentum]
 
   canonical_delta_ret_log_roll_zscore_30:
     lifecycle: experimental
-    description: "Roll delta log return z-score (30-bar) from cmc_features"
+    description: "Roll delta log return z-score (30-bar) from features"
     compute:
       mode: inline
       expression: "delta_ret_log_roll_zscore_30"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [delta_ret_log_roll_zscore_30]
     tags: [canonical, returns, roll, zscore, momentum]
 
   canonical_delta_ret_arith_zscore_90:
     lifecycle: experimental
-    description: "Delta of arithmetic return z-score (90-bar) from cmc_features"
+    description: "Delta of arithmetic return z-score (90-bar) from features"
     compute:
       mode: inline
       expression: "delta_ret_arith_zscore_90"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [delta_ret_arith_zscore_90]
     tags: [canonical, returns, zscore, momentum]
 
   canonical_delta_ret_log_zscore_90:
     lifecycle: experimental
-    description: "Delta of log return z-score (90-bar) from cmc_features"
+    description: "Delta of log return z-score (90-bar) from features"
     compute:
       mode: inline
       expression: "delta_ret_log_zscore_90"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [delta_ret_log_zscore_90]
     tags: [canonical, returns, zscore, momentum]
 
   canonical_ret_log_roll_zscore_90:
     lifecycle: experimental
-    description: "Roll log return z-score (90-bar) from cmc_features"
+    description: "Roll log return z-score (90-bar) from features"
     compute:
       mode: inline
       expression: "ret_log_roll_zscore_90"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [ret_log_roll_zscore_90]
     tags: [canonical, returns, roll, zscore]
 
   canonical_delta_ret_arith_roll_zscore_90:
     lifecycle: experimental
-    description: "Roll delta arithmetic return z-score (90-bar) from cmc_features"
+    description: "Roll delta arithmetic return z-score (90-bar) from features"
     compute:
       mode: inline
       expression: "delta_ret_arith_roll_zscore_90"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [delta_ret_arith_roll_zscore_90]
     tags: [canonical, returns, roll, zscore, momentum]
 
   canonical_delta_ret_log_roll_zscore_90:
     lifecycle: experimental
-    description: "Roll delta log return z-score (90-bar) from cmc_features"
+    description: "Roll delta log return z-score (90-bar) from features"
     compute:
       mode: inline
       expression: "delta_ret_log_roll_zscore_90"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [delta_ret_log_roll_zscore_90]
     tags: [canonical, returns, roll, zscore, momentum]
 
   canonical_delta_ret_arith_zscore_365:
     lifecycle: experimental
-    description: "Delta of arithmetic return z-score (365-bar) from cmc_features"
+    description: "Delta of arithmetic return z-score (365-bar) from features"
     compute:
       mode: inline
       expression: "delta_ret_arith_zscore_365"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [delta_ret_arith_zscore_365]
     tags: [canonical, returns, zscore, momentum]
 
   canonical_delta_ret_log_zscore_365:
     lifecycle: experimental
-    description: "Delta of log return z-score (365-bar) from cmc_features"
+    description: "Delta of log return z-score (365-bar) from features"
     compute:
       mode: inline
       expression: "delta_ret_log_zscore_365"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [delta_ret_log_zscore_365]
     tags: [canonical, returns, zscore, momentum]
 
   canonical_ret_log_roll_zscore_365:
     lifecycle: experimental
-    description: "Roll log return z-score (365-bar) from cmc_features"
+    description: "Roll log return z-score (365-bar) from features"
     compute:
       mode: inline
       expression: "ret_log_roll_zscore_365"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [ret_log_roll_zscore_365]
     tags: [canonical, returns, roll, zscore]
 
   canonical_delta_ret_arith_roll_zscore_365:
     lifecycle: experimental
-    description: "Roll delta arithmetic return z-score (365-bar) from cmc_features"
+    description: "Roll delta arithmetic return z-score (365-bar) from features"
     compute:
       mode: inline
       expression: "delta_ret_arith_roll_zscore_365"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [delta_ret_arith_roll_zscore_365]
     tags: [canonical, returns, roll, zscore, momentum]
 
   canonical_delta_ret_log_roll_zscore_365:
     lifecycle: experimental
-    description: "Roll delta log return z-score (365-bar) from cmc_features"
+    description: "Roll delta log return z-score (365-bar) from features"
     compute:
       mode: inline
       expression: "delta_ret_log_roll_zscore_365"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [delta_ret_log_roll_zscore_365]
     tags: [canonical, returns, roll, zscore, momentum]
 
@@ -1455,45 +1455,45 @@ features:
 
   canonical_vol_parkinson_126_zscore:
     lifecycle: experimental
-    description: "Parkinson 126-bar vol z-score from cmc_features"
+    description: "Parkinson 126-bar vol z-score from features"
     compute:
       mode: inline
       expression: "vol_parkinson_126_zscore"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [vol_parkinson_126_zscore]
     tags: [canonical, vol, parkinson, zscore]
 
   canonical_vol_gk_126_zscore:
     lifecycle: experimental
-    description: "Garman-Klass 126-bar vol z-score from cmc_features"
+    description: "Garman-Klass 126-bar vol z-score from features"
     compute:
       mode: inline
       expression: "vol_gk_126_zscore"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [vol_gk_126_zscore]
     tags: [canonical, vol, garman_klass, zscore]
 
   canonical_vol_rs_63_zscore:
     lifecycle: experimental
-    description: "Rogers-Satchell 63-bar vol z-score from cmc_features"
+    description: "Rogers-Satchell 63-bar vol z-score from features"
     compute:
       mode: inline
       expression: "vol_rs_63_zscore"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [vol_rs_63_zscore]
     tags: [canonical, vol, rogers_satchell, zscore]
 
   canonical_vol_rs_126_zscore:
     lifecycle: experimental
-    description: "Rogers-Satchell 126-bar vol z-score from cmc_features"
+    description: "Rogers-Satchell 126-bar vol z-score from features"
     compute:
       mode: inline
       expression: "vol_rs_126_zscore"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [vol_rs_126_zscore]
     tags: [canonical, vol, rogers_satchell, zscore]
 
@@ -1503,12 +1503,12 @@ features:
 
   canonical_macd_signal_9_fast:
     lifecycle: experimental
-    description: "MACD signal line fast (9-period on 8/17 MACD) from cmc_features"
+    description: "MACD signal line fast (9-period on 8/17 MACD) from features"
     compute:
       mode: inline
       expression: "macd_signal_9_fast"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [macd_signal_9_fast]
     tags: [canonical, ta, macd, fast]
 
@@ -1518,40 +1518,40 @@ features:
 
   canonical_bb_ma_20:
     lifecycle: experimental
-    description: "Bollinger Band middle MA (20-period) from cmc_features"
+    description: "Bollinger Band middle MA (20-period) from features"
     compute:
       mode: inline
       expression: "bb_ma_20"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [bb_ma_20]
     tags: [canonical, ta, bollinger]
 
   canonical_bb_up_20_2:
     lifecycle: experimental
-    description: "Bollinger Band upper (20-period, 2-sigma) from cmc_features"
+    description: "Bollinger Band upper (20-period, 2-sigma) from features"
     compute:
       mode: inline
       expression: "bb_up_20_2"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [bb_up_20_2]
     tags: [canonical, ta, bollinger]
 
   canonical_bb_lo_20_2:
     lifecycle: experimental
-    description: "Bollinger Band lower (20-period, 2-sigma) from cmc_features"
+    description: "Bollinger Band lower (20-period, 2-sigma) from features"
     compute:
       mode: inline
       expression: "bb_lo_20_2"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [bb_lo_20_2]
     tags: [canonical, ta, bollinger]
 
   # =========================================================================
-  # CATEGORY F: Derived features from cmc_features (computed inline)
-  # These use multi-column inline expressions on cmc_features.
+  # CATEGORY F: Derived features from features (computed inline)
+  # These use multi-column inline expressions on features.
   # =========================================================================
 
   canonical_vol_ratio_gk_20_63:
@@ -1561,7 +1561,7 @@ features:
       mode: inline
       expression: "vol_gk_20 / (vol_gk_63 + 1e-10)"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [vol_gk_20, vol_gk_63]
     tags: [canonical, vol, ratio, regime]
 
@@ -1572,7 +1572,7 @@ features:
       mode: inline
       expression: "vol_gk_63 / (vol_gk_126 + 1e-10)"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [vol_gk_63, vol_gk_126]
     tags: [canonical, vol, ratio, regime]
 
@@ -1583,7 +1583,7 @@ features:
       mode: inline
       expression: "vol_parkinson_20 / (vol_parkinson_63 + 1e-10)"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [vol_parkinson_20, vol_parkinson_63]
     tags: [canonical, vol, parkinson, ratio]
 
@@ -1594,40 +1594,40 @@ features:
       mode: inline
       expression: "vol_rs_20 / (vol_rs_63 + 1e-10)"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [vol_rs_20, vol_rs_63]
     tags: [canonical, vol, rogers_satchell, ratio]
 
   canonical_macd_cross_signal:
     lifecycle: experimental
-    description: "MACD line minus signal (cross direction indicator) from cmc_features"
+    description: "MACD line minus signal (cross direction indicator) from features"
     compute:
       mode: inline
       expression: "macd_12_26 - macd_signal_9"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [macd_12_26, macd_signal_9]
     tags: [canonical, ta, macd, derived]
 
   canonical_macd_fast_cross_signal:
     lifecycle: experimental
-    description: "MACD fast line minus fast signal (8/17/9) from cmc_features"
+    description: "MACD fast line minus fast signal (8/17/9) from features"
     compute:
       mode: inline
       expression: "macd_8_17 - macd_signal_9_fast"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [macd_8_17, macd_signal_9_fast]
     tags: [canonical, ta, macd, fast, derived]
 
   canonical_stoch_cross:
     lifecycle: experimental
-    description: "Stochastic %K minus %D (cross direction indicator) from cmc_features"
+    description: "Stochastic %K minus %D (cross direction indicator) from features"
     compute:
       mode: inline
       expression: "stoch_k_14 - stoch_d_3"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [stoch_k_14, stoch_d_3]
     tags: [canonical, ta, stochastic, derived]
 
@@ -1638,7 +1638,7 @@ features:
       mode: inline
       expression: "rsi_7 - rsi_21"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [rsi_7, rsi_21]
     tags: [canonical, ta, rsi, derived]
 
@@ -1649,7 +1649,7 @@ features:
       mode: inline
       expression: "ret_arith / (vol_parkinson_20 + 1e-10)"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [ret_arith, vol_parkinson_20]
     tags: [canonical, returns, vol, derived]
 
@@ -1660,7 +1660,7 @@ features:
       mode: inline
       expression: "np.log(vol_gk_20 + 1e-10)"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [vol_gk_20]
     tags: [canonical, vol, garman_klass, derived]
 
@@ -1671,7 +1671,7 @@ features:
       mode: inline
       expression: "np.log(vol_parkinson_20 + 1e-10)"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [vol_parkinson_20]
     tags: [canonical, vol, parkinson, derived]
 
@@ -1682,7 +1682,7 @@ features:
       mode: inline
       expression: "atr_14 / (close + 1e-10)"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [atr_14, close]
     tags: [canonical, vol, atr, derived]
 
@@ -1693,7 +1693,7 @@ features:
       mode: inline
       expression: "bb_width_20 / (atr_14 + 1e-10)"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [bb_width_20, atr_14]
     tags: [canonical, ta, bollinger, derived]
 
@@ -1704,7 +1704,7 @@ features:
       mode: inline
       expression: "adx_14 * (rsi_14 - 50) / 50"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [adx_14, rsi_14]
     tags: [canonical, ta, adx, rsi, derived]
 
@@ -1715,7 +1715,7 @@ features:
       mode: inline
       expression: "vol_rs_126 / (vol_rs_20 + 1e-10)"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [vol_rs_126, vol_rs_20]
     tags: [canonical, vol, rogers_satchell, ratio, reversion]
 
@@ -1726,7 +1726,7 @@ features:
       mode: inline
       expression: "ret_arith_roll_zscore_30 - ret_arith_roll_zscore_365"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [ret_arith_roll_zscore_30, ret_arith_roll_zscore_365]
     tags: [canonical, returns, roll, zscore, momentum, derived]
 
@@ -1737,7 +1737,7 @@ features:
       mode: inline
       expression: "np.log(vol_gk_20 + 1e-10) - np.log(vol_gk_126 + 1e-10)"
     inputs:
-      - table: cmc_features
+      - table: features
         columns: [vol_gk_20, vol_gk_126]
     tags: [canonical, vol, garman_klass, log, ratio, derived]
 
@@ -1756,7 +1756,7 @@ features:
       mode: expression
       expression: "EMA($close, 12) / EMA($close, 26) - 1"
     inputs:
-      - table: cmc_price_bars_multi_tf_u
+      - table: price_bars_multi_tf_u
         columns: [close]
     tags: [momentum, macd]
 
@@ -1767,7 +1767,7 @@ features:
       mode: expression
       expression: "$close / Ref($close, 5) - 1"
     inputs:
-      - table: cmc_price_bars_multi_tf_u
+      - table: price_bars_multi_tf_u
         columns: [close]
     tags: [momentum]
 
@@ -1781,7 +1781,7 @@ features:
       fast: [5, 10]
       slow: [20, 30]
     inputs:
-      - table: cmc_price_bars_multi_tf_u
+      - table: price_bars_multi_tf_u
         columns: [close]
     tags: [vol, ratio]
 
@@ -1792,7 +1792,7 @@ features:
       mode: expression
       expression: "($close - Mean($close, 20)) / (Std($close, 20) + 1e-10)"
     inputs:
-      - table: cmc_price_bars_multi_tf_u
+      - table: price_bars_multi_tf_u
         columns: [close]
     tags: [mean_reversion, zscore]
 
@@ -1803,6 +1803,6 @@ features:
       mode: expression
       expression: "Rank($close)"
     inputs:
-      - table: cmc_price_bars_multi_tf_u
+      - table: price_bars_multi_tf_u
         columns: [close]
     tags: [rank, cross_sectional]

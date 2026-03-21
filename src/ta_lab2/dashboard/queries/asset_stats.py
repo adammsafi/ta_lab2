@@ -5,8 +5,8 @@ All functions use @st.cache_data(ttl=300) and accept ``_engine`` (underscore-
 prefixed) as the first argument so st.cache_data skips hashing the engine.
 
 DB objects queried:
-  - cmc_asset_stats       : wide-format rolling stats per (id, ts, tf)
-  - cmc_corr_latest       : materialized view, latest correlation per (id_a, id_b, tf, window)
+  - asset_stats       : wide-format rolling stats per (id, ts, tf)
+  - corr_latest       : materialized view, latest correlation per (id_a, id_b, tf, window)
   - dim_assets            : id -> symbol mapping
 
 NOTE: The ``window`` column is a PostgreSQL reserved word.  All raw SQL that
@@ -63,7 +63,7 @@ def load_asset_stats_latest(_engine, tf: str = "1D") -> pd.DataFrame:
             s.ingested_at
         FROM (
             SELECT DISTINCT ON (id) *
-            FROM public.cmc_asset_stats
+            FROM public.asset_stats
             WHERE tf = :tf
             ORDER BY id, ts DESC
         ) s
@@ -86,7 +86,7 @@ def load_asset_stats_latest(_engine, tf: str = "1D") -> pd.DataFrame:
 def load_corr_latest(_engine, tf: str = "1D", window: int = 90) -> pd.DataFrame:
     """Return latest correlation values per asset pair from the materialized view.
 
-    Queries ``cmc_corr_latest`` (DISTINCT ON per pair/window, already materialized).
+    Queries ``corr_latest`` (DISTINCT ON per pair/window, already materialized).
     Joins dim_assets twice for both asset symbols.
 
     Parameters
@@ -114,7 +114,7 @@ def load_corr_latest(_engine, tf: str = "1D", window: int = 90) -> pd.DataFrame:
             c.spearman_r,
             c.spearman_p,
             c.n_obs
-        FROM public.cmc_corr_latest c
+        FROM public.corr_latest c
         JOIN public.dim_assets a ON a.id = c.id_a
         JOIN public.dim_assets b ON b.id = c.id_b
         WHERE c.tf = :tf
@@ -136,7 +136,7 @@ def load_corr_latest(_engine, tf: str = "1D", window: int = 90) -> pd.DataFrame:
 def load_asset_stats_timeseries(_engine, asset_id: int, tf: str = "1D") -> pd.DataFrame:
     """Return full time series of rolling stats for a single asset.
 
-    Returns all columns from cmc_asset_stats for the given (id, tf) combination,
+    Returns all columns from asset_stats for the given (id, tf) combination,
     sorted by ts ascending and indexed by ts.
 
     Columns (index=ts): id, tf, <all 32 window stat columns>, max_dd_from_ath,
@@ -145,7 +145,7 @@ def load_asset_stats_timeseries(_engine, asset_id: int, tf: str = "1D") -> pd.Da
     sql = text(
         """
         SELECT *
-        FROM public.cmc_asset_stats
+        FROM public.asset_stats
         WHERE id = :id
           AND tf = :tf
         ORDER BY ts

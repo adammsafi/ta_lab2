@@ -59,16 +59,16 @@ class TestTimeAlignmentValidation:
             ],
         )
 
-        assert df["tf"].notna().sum() == len(
-            df
-        ), "All rows must have tf (timeframe code)"
+        assert df["tf"].notna().sum() == len(df), (
+            "All rows must have tf (timeframe code)"
+        )
         assert df["tf_days"].notna().sum() == len(df), "All rows must have tf_days"
-        assert df["is_calendar"].notna().sum() == len(
-            df
-        ), "All rows must have is_calendar flag"
-        assert df["is_canonical"].notna().sum() == len(
-            df
-        ), "All rows must have is_canonical flag"
+        assert df["is_calendar"].notna().sum() == len(df), (
+            "All rows must have is_calendar flag"
+        )
+        assert df["is_canonical"].notna().sum() == len(df), (
+            "All rows must have is_canonical flag"
+        )
 
         print(f"✓ dim_timeframe populated: {len(rows)} timeframes")
 
@@ -121,16 +121,16 @@ class TestTimeAlignmentValidation:
         # Verify CRYPTO session exists (24/7 trading)
         crypto_sessions = df[df["asset_class"] == "CRYPTO"]
         assert len(crypto_sessions) > 0, "CRYPTO session must exist in dim_sessions"
-        assert (
-            crypto_sessions.iloc[0]["is_24h"] == True
-        ), "CRYPTO session should be marked as 24-hour trading"
+        assert crypto_sessions.iloc[0]["is_24h"], (
+            "CRYPTO session should be marked as 24-hour trading"
+        )
 
         # Verify EQUITY session exists (trading hours)
         equity_sessions = df[df["asset_class"] == "EQUITY"]
         assert len(equity_sessions) > 0, "EQUITY session must exist in dim_sessions"
-        assert (
-            equity_sessions.iloc[0]["is_24h"] == False
-        ), "EQUITY session should not be 24-hour trading"
+        assert not equity_sessions.iloc[0]["is_24h"], (
+            "EQUITY session should not be 24-hour trading"
+        )
 
         print(
             f"✓ dim_sessions populated: {len(rows)} sessions (CRYPTO: {len(crypto_sessions)}, EQUITY: {len(equity_sessions)})"
@@ -146,10 +146,10 @@ class TestTimeAlignmentValidation:
         """
         # Check each EMA table for orphan timeframes
         ema_tables = [
-            "cmc_ema_multi_tf_u",
+            "ema_multi_tf_u",
             # Add other EMA tables if they exist
-            # 'cmc_ema_multi_tf',
-            # 'cmc_ema_multi_tf_cal',
+            # 'ema_multi_tf',
+            # 'ema_multi_tf_cal',
         ]
 
         all_orphans = []
@@ -204,30 +204,30 @@ class TestTimeAlignmentValidation:
         """
         Verify calendar EMA tables only use calendar-aligned timeframes.
 
-        Calendar EMAs (e.g., cmc_ema_multi_tf_cal) should only use timeframes
+        Calendar EMAs (e.g., ema_multi_tf_cal) should only use timeframes
         where is_calendar = TRUE in dim_timeframe.
         """
-        # Check if cmc_ema_multi_tf_cal table exists
+        # Check if ema_multi_tf_cal table exists
         check_exists = text(
             """
             SELECT EXISTS (
                 SELECT 1
                 FROM information_schema.tables
                 WHERE table_schema = 'public'
-                AND table_name = 'cmc_ema_multi_tf_cal'
+                AND table_name = 'ema_multi_tf_cal'
             )
         """
         )
         table_exists = db_session.execute(check_exists).scalar()
 
         if not table_exists:
-            pytest.skip("cmc_ema_multi_tf_cal table does not exist")
+            pytest.skip("ema_multi_tf_cal table does not exist")
 
         # Query for non-calendar timeframes in calendar EMA table
         query = text(
             """
             SELECT DISTINCT e.tf, d.is_calendar
-            FROM cmc_ema_multi_tf_cal e
+            FROM ema_multi_tf_cal e
             JOIN dim_timeframe d ON e.tf = d.tf
             WHERE d.is_calendar = FALSE
         """
@@ -240,37 +240,37 @@ class TestTimeAlignmentValidation:
             f"but found {len(non_calendar_tfs)} non-calendar timeframes: {non_calendar_tfs}"
         )
 
-        print("✓ cmc_ema_multi_tf_cal uses only calendar timeframes")
+        print("✓ ema_multi_tf_cal uses only calendar timeframes")
 
     @pytest.mark.validation_gate
     def test_trading_emas_use_trading_timeframes(self, db_session):
         """
         Verify trading EMA tables only use trading-day aligned timeframes.
 
-        Trading EMAs (e.g., cmc_ema_multi_tf) should only use timeframes
+        Trading EMAs (e.g., ema_multi_tf) should only use timeframes
         where is_calendar = FALSE in dim_timeframe.
         """
-        # Check if cmc_ema_multi_tf table exists
+        # Check if ema_multi_tf table exists
         check_exists = text(
             """
             SELECT EXISTS (
                 SELECT 1
                 FROM information_schema.tables
                 WHERE table_schema = 'public'
-                AND table_name = 'cmc_ema_multi_tf'
+                AND table_name = 'ema_multi_tf'
             )
         """
         )
         table_exists = db_session.execute(check_exists).scalar()
 
         if not table_exists:
-            pytest.skip("cmc_ema_multi_tf table does not exist")
+            pytest.skip("ema_multi_tf table does not exist")
 
         # Query for calendar timeframes in trading EMA table
         query = text(
             """
             SELECT DISTINCT e.tf, d.is_calendar
-            FROM cmc_ema_multi_tf e
+            FROM ema_multi_tf e
             JOIN dim_timeframe d ON e.tf = d.tf
             WHERE d.is_calendar = TRUE
         """
@@ -283,7 +283,7 @@ class TestTimeAlignmentValidation:
             f"but found {len(calendar_tfs)} calendar timeframes: {calendar_tfs}"
         )
 
-        print("✓ cmc_ema_multi_tf uses only trading timeframes")
+        print("✓ ema_multi_tf uses only trading timeframes")
 
     @pytest.mark.validation_gate
     def test_tf_days_matches_actual_data_cadence(self, db_session):
@@ -298,21 +298,21 @@ class TestTimeAlignmentValidation:
         # Sample assets for testing (IDs 1, 2, 3)
         sample_assets = [1, 2, 3]
 
-        # Check if cmc_ema_multi_tf_u table exists
+        # Check if ema_multi_tf_u table exists
         check_exists = text(
             """
             SELECT EXISTS (
                 SELECT 1
                 FROM information_schema.tables
                 WHERE table_schema = 'public'
-                AND table_name = 'cmc_ema_multi_tf_u'
+                AND table_name = 'ema_multi_tf_u'
             )
         """
         )
         table_exists = db_session.execute(check_exists).scalar()
 
         if not table_exists:
-            pytest.skip("cmc_ema_multi_tf_u table does not exist")
+            pytest.skip("ema_multi_tf_u table does not exist")
 
         # Query sample data for specific timeframes (1D, 7D, 30D)
         test_timeframes = ["1D", "7D", "30D"]
@@ -343,7 +343,7 @@ class TestTimeAlignmentValidation:
                         id,
                         ts,
                         LAG(ts) OVER (PARTITION BY id ORDER BY ts) AS prev_ts
-                    FROM cmc_ema_multi_tf_u
+                    FROM ema_multi_tf_u
                     WHERE tf = :tf
                     AND id = ANY(:asset_ids)
                     AND period = 50  -- Use a common period

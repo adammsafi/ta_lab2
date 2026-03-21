@@ -278,9 +278,9 @@ class FeatureValidator:
 
         # 1. Gap detection for each feature table
         tables_to_check = [
-            "cmc_vol",
-            "cmc_ta",
-            "cmc_features",
+            "vol",
+            "ta",
+            "features",
         ]
 
         for table in tables_to_check:
@@ -290,8 +290,8 @@ class FeatureValidator:
 
         # 2. Outlier detection
         outlier_checks = [
-            ("cmc_vol", ["vol_parkinson_20", "vol_gk_20", "vol_rs_20"]),
-            ("cmc_ta", ["rsi_14", "macd_12_26", "bb_up_20_2"]),
+            ("vol", ["vol_parkinson_20", "vol_gk_20", "vol_rs_20"]),
+            ("ta", ["rsi_14", "macd_12_26", "bb_up_20_2"]),
         ]
 
         for table, columns in outlier_checks:
@@ -306,8 +306,8 @@ class FeatureValidator:
 
         # 4. NULL ratio checks
         null_checks = [
-            ("cmc_vol", ["vol_parkinson_20", "close"]),
-            ("cmc_ta", ["rsi_14", "close"]),
+            ("vol", ["vol_parkinson_20", "close"]),
+            ("ta", ["rsi_14", "close"]),
         ]
 
         for table, columns in null_checks:
@@ -558,10 +558,10 @@ class FeatureValidator:
         Verify cross-table relationships.
 
         Checks:
-        - cmc_returns_bars_multi_tf.ret_arith ~= (close - prev_close) / prev_close
-        - cmc_vol.close == cmc_price_bars_multi_tf.close
-        - cmc_ta.close == cmc_price_bars_multi_tf.close
-        - cmc_features has matching timestamps
+        - returns_bars_multi_tf.ret_arith ~= (close - prev_close) / prev_close
+        - vol.close == price_bars_multi_tf.close
+        - ta.close == price_bars_multi_tf.close
+        - features has matching timestamps
 
         Args:
             ids: List of asset IDs
@@ -583,7 +583,7 @@ class FeatureValidator:
                     LAG(close) OVER (PARTITION BY id ORDER BY ts) as prev_close,
                     (close - LAG(close) OVER (PARTITION BY id ORDER BY ts)) /
                     NULLIF(LAG(close) OVER (PARTITION BY id ORDER BY ts), 0) as calc_ret
-                FROM public.cmc_price_bars_1d
+                FROM public.price_bars_1d
                 WHERE id IN ({ids_str})
             ),
             mismatches AS (
@@ -594,9 +594,10 @@ class FeatureValidator:
                     r.ret_arith,
                     ABS(p.calc_ret - r.ret_arith) as diff
                 FROM price_changes p
-                JOIN public.cmc_returns_bars_multi_tf r
+                JOIN public.returns_bars_multi_tf_u r
                   ON p.id = r.id AND DATE(p.ts) = DATE(r."timestamp")
                   AND r.tf = '1D' AND r.roll = FALSE
+                  AND r.alignment_source = 'multi_tf'
                 WHERE p.calc_ret IS NOT NULL
                   AND r.ret_arith IS NOT NULL
                   AND ABS(p.calc_ret - r.ret_arith) > 0.0001  -- 0.01% tolerance
@@ -637,9 +638,10 @@ class FeatureValidator:
         check_vol_close_query = text(
             f"""
             SELECT v.id, v.ts, v.close as vol_close, b.close as bar_close
-            FROM public.cmc_vol v
-            JOIN public.cmc_price_bars_multi_tf b
+            FROM public.vol v
+            JOIN public.price_bars_multi_tf_u b
               ON v.id = b.id AND v.ts = b.time_close AND v.tf = b.tf
+              AND b.alignment_source = 'multi_tf'
             WHERE v.id IN ({ids_str})
               AND v.tf = '1D'
               AND ABS(v.close - b.close) > 0.01
@@ -675,9 +677,10 @@ class FeatureValidator:
         check_ta_close_query = text(
             f"""
             SELECT t.id, t.ts, t.close as ta_close, b.close as bar_close
-            FROM public.cmc_ta t
-            JOIN public.cmc_price_bars_multi_tf b
+            FROM public.ta t
+            JOIN public.price_bars_multi_tf_u b
               ON t.id = b.id AND t.ts = b.time_close AND t.tf = b.tf
+              AND b.alignment_source = 'multi_tf'
             WHERE t.id IN ({ids_str})
               AND t.tf = '1D'
               AND ABS(t.close - b.close) > 0.01
@@ -926,12 +929,12 @@ def validate_features(
         start_dt = datetime.now() - timedelta(days=30)
         start = start_dt.strftime("%Y-%m-%d")
 
-    # Default IDs: sample from returns table
+    # Default IDs: sample from _u table
     if ids is None:
         query = text(
             """
             SELECT DISTINCT id
-            FROM public.cmc_price_bars_multi_tf
+            FROM public.price_bars_multi_tf_u
             ORDER BY id
             LIMIT 10
         """

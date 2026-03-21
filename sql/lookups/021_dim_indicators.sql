@@ -39,4 +39,4 @@ VALUES
 ON CONFLICT (indicator_name) DO NOTHING;
 
 COMMENT ON TABLE public.dim_indicators IS
-'Technical indicator parameter definitions. Controls which indicators are computed in cmc_ta_daily.';
+'Technical indicator parameter definitions. Controls which indicators are computed in ta_daily.';

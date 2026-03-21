@@ -279,7 +279,7 @@ def main(argv: list[str] | None = None) -> int:
             elif df_tp.empty:
                 print(
                     "[WARN] Transition probs: no rows computed. "
-                    "Ensure cmc_macro_regimes and/or cmc_hmm_regimes have data."
+                    "Ensure macro_regimes and/or hmm_regimes have data."
                 )
 
             results["transition_probs"] = "success"

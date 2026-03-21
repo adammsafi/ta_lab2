@@ -4,7 +4,7 @@ MacroRegimeClassifier: Rule-based 4-dimensional macro regime labeler.
 
 Reads daily macro features from fred.fred_macro_features (Phase 65-66) and
 produces composite regime labels with hysteresis-filtered per-dimension
-classifications.  Results are upserted into cmc_macro_regimes.
+classifications.  Results are upserted into macro_regimes.
 
 Dimensions:
     1. monetary_policy -- Hiking / Holding / Cutting
@@ -18,7 +18,7 @@ Bucketed macro_state: favorable / constructive / neutral / cautious / adverse.
 
 All numeric thresholds live in configs/macro_regime_config.yaml (MREG-08).
 Named profiles (default / conservative / aggressive) allow sensitivity tuning.
-Hysteresis state persists to cmc_macro_hysteresis_state for incremental resume.
+Hysteresis state persists to macro_hysteresis_state for incremental resume.
 
 Phase 67, Plan 02.
 """
@@ -358,10 +358,10 @@ def _load_hysteresis_state(
     profile: str,
     tracker: HysteresisTracker,
 ) -> None:
-    """Load hysteresis state from cmc_macro_hysteresis_state into tracker."""
+    """Load hysteresis state from macro_hysteresis_state into tracker."""
     sql = text(
         "SELECT dimension, current_label, pending_label, pending_count "
-        "FROM cmc_macro_hysteresis_state "
+        "FROM macro_hysteresis_state "
         "WHERE profile = :profile"
     )
     try:
@@ -391,9 +391,9 @@ def _save_hysteresis_state(
     profile: str,
     tracker: HysteresisTracker,
 ) -> None:
-    """Persist hysteresis state to cmc_macro_hysteresis_state via upsert."""
+    """Persist hysteresis state to macro_hysteresis_state via upsert."""
     upsert_sql = text(
-        "INSERT INTO cmc_macro_hysteresis_state "
+        "INSERT INTO macro_hysteresis_state "
         "(profile, dimension, current_label, pending_label, pending_count, updated_at) "
         "VALUES (:profile, :dimension, :current_label, :pending_label, :pending_count, now()) "
         "ON CONFLICT (profile, dimension) DO UPDATE SET "
@@ -457,7 +457,7 @@ class MacroRegimeClassifier:
     Reads daily macro features from fred.fred_macro_features, classifies
     each day into per-dimension labels, applies hysteresis to prevent
     flapping, computes composite regime keys, and upserts results into
-    cmc_macro_regimes.
+    macro_regimes.
 
     Parameters
     ----------
@@ -560,8 +560,8 @@ class MacroRegimeClassifier:
     # ------------------------------------------------------------------
 
     def _get_watermark(self) -> Optional[str]:
-        """Get MAX(date) from cmc_macro_regimes for this profile."""
-        sql = text("SELECT MAX(date) FROM cmc_macro_regimes WHERE profile = :profile")
+        """Get MAX(date) from macro_regimes for this profile."""
+        sql = text("SELECT MAX(date) FROM macro_regimes WHERE profile = :profile")
         try:
             with self.engine.connect() as conn:
                 result = conn.execute(sql, {"profile": self.profile}).scalar()
@@ -643,7 +643,7 @@ class MacroRegimeClassifier:
     # ------------------------------------------------------------------
 
     def _upsert_regimes(self, df: pd.DataFrame) -> int:
-        """Upsert classified regime DataFrame into cmc_macro_regimes."""
+        """Upsert classified regime DataFrame into macro_regimes."""
         import datetime
 
         if df.empty:
@@ -680,7 +680,7 @@ class MacroRegimeClassifier:
             conn.execute(
                 text(
                     "CREATE TEMP TABLE _regime_staging "
-                    "(LIKE cmc_macro_regimes INCLUDING DEFAULTS) "
+                    "(LIKE macro_regimes INCLUDING DEFAULTS) "
                     "ON COMMIT DROP"
                 )
             )
@@ -693,14 +693,14 @@ class MacroRegimeClassifier:
             )
             result = conn.execute(
                 text(
-                    f"INSERT INTO cmc_macro_regimes ({cols_str}) "
+                    f"INSERT INTO macro_regimes ({cols_str}) "
                     f"SELECT {cols_str} FROM _regime_staging "
                     f"ON CONFLICT (date, profile) DO UPDATE SET {set_clause}"
                 )
             )
             row_count = result.rowcount
 
-        logger.info("Upserted %d rows into cmc_macro_regimes", row_count)
+        logger.info("Upserted %d rows into macro_regimes", row_count)
         return row_count
 
     # ------------------------------------------------------------------
@@ -726,7 +726,7 @@ class MacroRegimeClassifier:
 
         Returns
         -------
-        Number of rows upserted into cmc_macro_regimes.
+        Number of rows upserted into macro_regimes.
         """
         # Determine compute window
         if end_date is None:

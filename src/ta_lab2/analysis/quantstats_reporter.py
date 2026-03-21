@@ -116,9 +116,9 @@ def _load_btc_benchmark_returns(
     start_ts,
     end_ts,
 ) -> Optional[pd.Series]:
-    """Load daily BTC close prices from ``cmc_features`` and return pct_change.
+    """Load daily BTC close prices from ``features`` and return pct_change.
 
-    Queries the ``public.cmc_features`` table for BTC (id=1) daily bars in
+    Queries the ``public.features`` table for BTC (id=1) daily bars in
     [start_ts, end_ts] and converts close prices to arithmetic returns via
     ``pct_change().dropna()``.
 
@@ -144,7 +144,7 @@ def _load_btc_benchmark_returns(
     sql = text(
         """
         SELECT ts, close
-        FROM public.cmc_features
+        FROM public.features
         WHERE id = :btc_id
           AND tf = '1D'
           AND ts >= :start
@@ -160,7 +160,7 @@ def _load_btc_benchmark_returns(
 
     if df.empty:
         logger.warning(
-            "No BTC data found in cmc_features for range %s – %s; "
+            "No BTC data found in features for range %s – %s; "
             "benchmark will be omitted from tear sheet.",
             start_ts,
             end_ts,

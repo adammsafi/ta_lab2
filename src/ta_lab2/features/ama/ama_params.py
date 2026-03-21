@@ -5,7 +5,7 @@ Defines canonical parameter sets for all AMA indicators (KAMA, DEMA, TEMA, HMA)
 as frozen module-level constants, along with parameter hashing utilities.
 
 CRITICAL: Parameter dicts are frozen once in production. Changing dict keys changes
-the params_hash and orphans historical data in cmc_ama_multi_tf.
+the params_hash and orphans historical data in ama_multi_tf.
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ def compute_params_hash(params: dict) -> str:
     Compute stable MD5 hash of a params dict.
 
     Keys are sorted for canonicality. Returns a 32-character hex string.
-    This hash is used as a PK discriminator in cmc_ama_multi_tf — changing
+    This hash is used as a PK discriminator in ama_multi_tf — changing
     the dict structure (keys or values) changes the hash and orphans historical rows.
 
     Args:

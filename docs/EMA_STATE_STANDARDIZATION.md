@@ -53,9 +53,9 @@ All EMA scripts now use these consistent function names:
 
 ## Updated Scripts
 
-### 1. refresh_cmc_ema_multi_tf_cal_from_bars.py
-- **State table:** `cmc_ema_multi_tf_cal_us_state`, `cmc_ema_multi_tf_cal_iso_state`
-- **Bars table:** `cmc_price_bars_multi_tf_cal_us`, `cmc_price_bars_multi_tf_cal_iso`
+### 1. refresh_ema_multi_tf_cal_from_bars.py
+- **State table:** `ema_multi_tf_cal_us_state`, `ema_multi_tf_cal_iso_state`
+- **Bars table:** `price_bars_multi_tf_cal_us`, `price_bars_multi_tf_cal_iso`
 - **State columns populated (ALL):**
   - `last_canonical_ts` - MAX(ts) WHERE roll = FALSE (from output)
   - `last_time_close` - Same as last_canonical_ts (from output)
@@ -64,9 +64,9 @@ All EMA scripts now use these consistent function names:
   - `last_bar_seq` - MAX(bar_seq) WHERE is_partial_end = FALSE (from bars table)
 - **Update strategy:** Combines bars table metadata with output table timestamps
 
-### 2. refresh_cmc_ema_multi_tf_cal_anchor_from_bars.py
-- **State table:** `cmc_ema_multi_tf_cal_anchor_us_state`, `cmc_ema_multi_tf_cal_anchor_iso_state`
-- **Bars table:** `cmc_price_bars_multi_tf_cal_anchor_us`, `cmc_price_bars_multi_tf_cal_anchor_iso`
+### 2. refresh_ema_multi_tf_cal_anchor_from_bars.py
+- **State table:** `ema_multi_tf_cal_anchor_us_state`, `ema_multi_tf_cal_anchor_iso_state`
+- **Bars table:** `price_bars_multi_tf_cal_anchor_us`, `price_bars_multi_tf_cal_anchor_iso`
 - **State columns populated (ALL):**
   - `last_canonical_ts` - MAX(ts) WHERE roll_bar = FALSE (from output)
   - `last_time_close` - Same as last_canonical_ts (from output)
@@ -76,8 +76,8 @@ All EMA scripts now use these consistent function names:
 - **Update strategy:** Combines bars table metadata with output table timestamps
 - **Special handling:** Validates output schema to find correct timestamp column
 
-### 3. refresh_cmc_ema_multi_tf_from_bars.py
-- **State table:** `cmc_ema_multi_tf_state`
+### 3. refresh_ema_multi_tf_from_bars.py
+- **State table:** `ema_multi_tf_state`
 - **State columns populated:**
   - `last_time_close` - MAX(time_close) from output table
   - `last_bar_seq` - MAX(bar_seq) from output table
@@ -85,11 +85,11 @@ All EMA scripts now use these consistent function names:
   - `daily_max_seen` - From bars table (shared across periods)
   - `last_canonical_ts` - Not used by this script
 - **Update strategy:**
-  - Bar state from `cmc_price_bars_multi_tf` (per id, tf - shared across periods)
+  - Bar state from `price_bars_multi_tf` (per id, tf - shared across periods)
   - EMA state from output table (per id, tf, period)
 
-### 4. refresh_cmc_ema_multi_tf_v2.py
-- **State table:** `cmc_ema_multi_tf_v2_state` (created but not yet populated)
+### 4. refresh_ema_multi_tf_v2.py
+- **State table:** `ema_multi_tf_v2_state` (created but not yet populated)
 - **State columns:** Table created with unified schema for future use
 - **Note:** V2 refresh function handles incremental refresh internally (state update not yet implemented)
 
@@ -108,7 +108,7 @@ If you have existing state data in old schema and want to migrate:
 -- Example: Migrate multi_tf state from old (id, tf) to new (id, tf, period) schema
 -- This creates one row per period for each existing (id, tf) pair
 
-INSERT INTO public.cmc_ema_multi_tf_state_new (id, tf, period, daily_min_seen, daily_max_seen, last_bar_seq, last_time_close, updated_at)
+INSERT INTO public.ema_multi_tf_state_new (id, tf, period, daily_min_seen, daily_max_seen, last_bar_seq, last_time_close, updated_at)
 SELECT
     old.id,
     old.tf,
@@ -118,7 +118,7 @@ SELECT
     old.last_bar_seq,
     old.last_time_close,
     old.updated_at
-FROM public.cmc_ema_multi_tf_state_old old
+FROM public.ema_multi_tf_state_old old
 CROSS JOIN (SELECT DISTINCT period FROM public.ema_alpha_lookup) p
 ON CONFLICT (id, tf, period) DO NOTHING;
 ```
@@ -138,25 +138,25 @@ After standardization, verify each script works:
 
 ```bash
 # Test cal script
-python src/ta_lab2/scripts/emas/refresh_cmc_ema_multi_tf_cal_from_bars.py --ids 1 --periods 6,9 --scheme us --log-level INFO
+python src/ta_lab2/scripts/emas/refresh_ema_multi_tf_cal_from_bars.py --ids 1 --periods 6,9 --scheme us --log-level INFO
 
 # Test cal anchor script
-python src/ta_lab2/scripts/emas/refresh_cmc_ema_multi_tf_cal_anchor_from_bars.py --ids 1 --periods 6,9 --scheme us --log-level INFO
+python src/ta_lab2/scripts/emas/refresh_ema_multi_tf_cal_anchor_from_bars.py --ids 1 --periods 6,9 --scheme us --log-level INFO
 
 # Test multi_tf script
-python src/ta_lab2/scripts/emas/refresh_cmc_ema_multi_tf_from_bars.py --ids 1 --periods 6,9 --log-level INFO
+python src/ta_lab2/scripts/emas/refresh_ema_multi_tf_from_bars.py --ids 1 --periods 6,9 --log-level INFO
 
 # Test v2 script
-python src/ta_lab2/scripts/emas/refresh_cmc_ema_multi_tf_v2.py --ids 1 --periods 6,9 --log-level INFO
+python src/ta_lab2/scripts/emas/refresh_ema_multi_tf_v2.py --ids 1 --periods 6,9 --log-level INFO
 ```
 
 ## Files Modified
 
 1. **New:** `src/ta_lab2/scripts/emas/state_management.py` - Shared state management module
-2. **Updated:** `src/ta_lab2/scripts/emas/refresh_cmc_ema_multi_tf_cal_from_bars.py`
-3. **Updated:** `src/ta_lab2/scripts/emas/refresh_cmc_ema_multi_tf_cal_anchor_from_bars.py`
-4. **Updated:** `src/ta_lab2/scripts/emas/refresh_cmc_ema_multi_tf_from_bars.py`
-5. **Updated:** `src/ta_lab2/scripts/emas/refresh_cmc_ema_multi_tf_v2.py`
+2. **Updated:** `src/ta_lab2/scripts/emas/refresh_ema_multi_tf_cal_from_bars.py`
+3. **Updated:** `src/ta_lab2/scripts/emas/refresh_ema_multi_tf_cal_anchor_from_bars.py`
+4. **Updated:** `src/ta_lab2/scripts/emas/refresh_ema_multi_tf_from_bars.py`
+5. **Updated:** `src/ta_lab2/scripts/emas/refresh_ema_multi_tf_v2.py`
 
 ## Future Enhancements
 

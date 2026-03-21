@@ -7,34 +7,34 @@
 -- Tables to snapshot (each gets _snapshot_{YYYYMMDD_HHMMSS} suffix):
 --
 -- Bar tables (6 total):
---   - public.cmc_price_bars_1d
---   - public.cmc_price_bars_multi_tf
---   - public.cmc_price_bars_multi_tf_cal_iso
---   - public.cmc_price_bars_multi_tf_cal_us
---   - public.cmc_price_bars_multi_tf_cal_anchor_iso
---   - public.cmc_price_bars_multi_tf_cal_anchor_us
+--   - public.price_bars_1d
+--   - public.price_bars_multi_tf
+--   - public.price_bars_multi_tf_cal_iso
+--   - public.price_bars_multi_tf_cal_us
+--   - public.price_bars_multi_tf_cal_anchor_iso
+--   - public.price_bars_multi_tf_cal_anchor_us
 --
 -- EMA tables (6 total):
---   - public.cmc_ema_multi_tf
---   - public.cmc_ema_multi_tf_v2
---   - public.cmc_ema_multi_tf_cal_us
---   - public.cmc_ema_multi_tf_cal_iso
---   - public.cmc_ema_multi_tf_cal_anchor_us
---   - public.cmc_ema_multi_tf_cal_anchor_iso
+--   - public.ema_multi_tf
+--   - public.ema_multi_tf_v2
+--   - public.ema_multi_tf_cal_us
+--   - public.ema_multi_tf_cal_iso
+--   - public.ema_multi_tf_cal_anchor_us
+--   - public.ema_multi_tf_cal_anchor_iso
 
 -- Example snapshot creation pattern:
--- CREATE TABLE public.cmc_price_bars_1d_snapshot_20260205_143022
--- AS SELECT * FROM public.cmc_price_bars_1d;
+-- CREATE TABLE public.price_bars_1d_snapshot_20260205_143022
+-- AS SELECT * FROM public.price_bars_1d;
 
 -- Example truncate pattern (after snapshot confirmed):
--- TRUNCATE TABLE public.cmc_price_bars_1d;
+-- TRUNCATE TABLE public.price_bars_1d;
 
 -- Snapshot primary key pattern (for efficient comparison):
--- ALTER TABLE public.cmc_price_bars_1d_snapshot_20260205_143022
---   ADD CONSTRAINT cmc_price_bars_1d_snapshot_20260205_143022_pkey
+-- ALTER TABLE public.price_bars_1d_snapshot_20260205_143022
+--   ADD CONSTRAINT price_bars_1d_snapshot_20260205_143022_pkey
 --   PRIMARY KEY (id, tf, bar_seq, time_close);
 
 -- EMA table key pattern:
--- ALTER TABLE public.cmc_ema_multi_tf_snapshot_20260205_143022
---   ADD CONSTRAINT cmc_ema_multi_tf_snapshot_20260205_143022_pkey
+-- ALTER TABLE public.ema_multi_tf_snapshot_20260205_143022
+--   ADD CONSTRAINT ema_multi_tf_snapshot_20260205_143022_pkey
 --   PRIMARY KEY (id, tf, period, ts);

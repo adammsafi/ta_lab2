@@ -6,8 +6,8 @@ refresh_ema_multi_tf_cal_stats.py
 Calendar-aware EMA CAL stats using public.dim_timeframe.
 
 Targets (defaults):
-- public.cmc_ema_multi_tf_cal_us
-- public.cmc_ema_multi_tf_cal_iso
+- public.ema_multi_tf_cal_us
+- public.ema_multi_tf_cal_iso
 
 Incremental behavior:
 - Uses public.ema_multi_tf_cal_stats_state as a per-table watermark store:
@@ -39,7 +39,7 @@ Spyder runfile():
 runfile(
     r"C:\Users\asafi\Downloads\ta_lab2\src\ta_lab2\scripts\emas\stats\multi_tf_cal\refresh_ema_multi_tf_cal_stats.py",
     wdir=r"C:\Users\asafi\Downloads\ta_lab2",
-    args="--tables public.cmc_ema_multi_tf_cal_us public.cmc_ema_multi_tf_cal_iso"
+    args="--tables public.ema_multi_tf_cal_us public.ema_multi_tf_cal_iso"
 )
 """
 
@@ -875,7 +875,7 @@ def main(db_url: Optional[str] = None, tables: Optional[Iterable[str]] = None) -
     parser.add_argument(
         "--tables",
         nargs="+",
-        default=["public.cmc_ema_multi_tf_cal_us", "public.cmc_ema_multi_tf_cal_iso"],
+        default=["public.ema_multi_tf_cal_us", "public.ema_multi_tf_cal_iso"],
         help="Schema-qualified EMA tables to audit.",
     )
     parser.add_argument(

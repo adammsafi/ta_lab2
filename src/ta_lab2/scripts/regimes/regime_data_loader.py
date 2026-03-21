@@ -10,7 +10,7 @@ pivot/rename step that is the primary integration risk.
 
 Key Design Decisions:
 - Calendar bar tables use ``time_close`` (not ``ts``) -- always aliased in queries
-- Daily EMAs in cmc_ema_multi_tf_u require ``alignment_source = 'multi_tf'`` filter
+- Daily EMAs in ema_multi_tf_u require ``alignment_source = 'multi_tf'`` filter
   to prevent duplicate rows per (id, ts, tf, period)
 - Period column values are INTEGER in DB but may vary -- cast to int before renaming
   to ensure numeric sort order (20 < 50 < 200), not alphabetic ('200' < '50')
@@ -45,14 +45,14 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 #: Default EMA periods for each timeframe layer.
-#: Confirmed against DEFAULT_PERIODS in refresh_cmc_ema_multi_tf_from_bars.py
+#: Confirmed against DEFAULT_PERIODS in refresh_ema_multi_tf_from_bars.py
 #: and feature_utils.py add_ema_pack() conventions.
 DEFAULT_MONTHLY_PERIODS: list[int] = [12, 24, 48]
 DEFAULT_WEEKLY_PERIODS: list[int] = [20, 50, 200]
 DEFAULT_DAILY_PERIODS: list[int] = [20, 50, 100]
 
 #: Empty OHLCV column spec for consistent empty DataFrame shape
-_OHLCV_COLS = ["id", "ts", "open", "high", "low", "close", "volume"]
+_OHLCV_COLS = ["id", "venue_id", "ts", "open", "high", "low", "close", "volume"]
 
 
 # ---------------------------------------------------------------------------
@@ -74,7 +74,7 @@ def pivot_emas_to_wide(
 
     Args:
         ema_df: Long-format DataFrame with columns: id, ts, period, ema.
-                May come from cmc_ema_multi_tf_cal_iso/us or cmc_ema_multi_tf_u.
+                May come from ema_multi_tf_cal_iso/us or ema_multi_tf_u.
         periods: List of period values to include (e.g. [20, 50, 200]).
                  Rows with period not in this list are filtered out.
         price_col: Prefix for EMA column names. Default "close" produces
@@ -148,14 +148,16 @@ def load_bars_for_tf(
     asset_id: int,
     tf: str,
     cal_scheme: str = "iso",
+    venue_id: int = 1,
 ) -> pd.DataFrame:
     """
     Load OHLCV price bars from DB for a single asset and timeframe.
 
-    Routes to the correct table based on timeframe:
-    - Daily (``tf='1D'``): queries ``cmc_price_bars_multi_tf``
-    - Weekly/Monthly (``tf='1W'`` or ``tf='1M'``): queries the calendar bar table
-      (cmc_price_bars_multi_tf_cal_iso or _cal_us depending on cal_scheme)
+    Routes to the correct alignment_source in price_bars_multi_tf_u based on timeframe:
+    - Daily (``tf='1D'``): queries ``price_bars_multi_tf_u`` with
+      ``alignment_source = 'multi_tf'``
+    - Weekly/Monthly (``tf='1W'`` or ``tf='1M'``): queries ``price_bars_multi_tf_u``
+      with ``alignment_source = 'multi_tf_cal_{cal_scheme}'``
 
     CRITICAL: Calendar bar tables use ``time_close`` (not ``ts``) as the timestamp
     column. This function always aliases it to ``ts`` so callers receive a
@@ -185,29 +187,37 @@ def load_bars_for_tf(
         )
 
     if tf == "1D":
-        # Daily bars: standard multi-TF table, uses ts column directly
+        # Daily bars: unified _u table, filter to multi_tf alignment source
         sql = text(
             """
-            SELECT id, time_close AS ts, open, high, low, close, volume
-            FROM public.cmc_price_bars_multi_tf
-            WHERE id = :id AND tf = '1D'
+            SELECT id, venue_id, time_close AS ts, open, high, low, close, volume
+            FROM public.price_bars_multi_tf_u
+            WHERE id = :id AND tf = '1D' AND venue_id = :venue_id
+              AND alignment_source = 'multi_tf'
             ORDER BY time_close
         """
         )
-        params = {"id": asset_id}
+        params = {"id": asset_id, "venue_id": venue_id}
     else:
-        # Weekly or monthly: calendar bar table, time_close aliased to ts
-        # CRITICAL: PK uses bar_seq, not ts. time_close is the period-end timestamp.
-        table_name = f"cmc_price_bars_multi_tf_cal_{cal_scheme}"
+        # Weekly or monthly: unified _u table, filter to cal alignment source
+        # alignment_source values: 'multi_tf_cal_iso', 'multi_tf_cal_us',
+        #   'multi_tf_cal_anchor_iso', 'multi_tf_cal_anchor_us'
+        alignment = f"multi_tf_cal_{cal_scheme}"
         sql = text(
-            f"""
-            SELECT id, time_close AS ts, open, high, low, close, volume
-            FROM public.{table_name}
-            WHERE id = :id AND tf = :tf
+            """
+            SELECT id, venue_id, time_close AS ts, open, high, low, close, volume
+            FROM public.price_bars_multi_tf_u
+            WHERE id = :id AND tf = :tf AND venue_id = :venue_id
+              AND alignment_source = :alignment
             ORDER BY time_close
         """
         )
-        params = {"id": asset_id, "tf": tf}
+        params = {
+            "id": asset_id,
+            "tf": tf,
+            "venue_id": venue_id,
+            "alignment": alignment,
+        }
 
     try:
         with engine.connect() as conn:
@@ -247,17 +257,18 @@ def load_emas_for_tf(
     tf: str,
     periods: list[int],
     cal_scheme: str = "iso",
+    venue_id: int = 1,
 ) -> pd.DataFrame:
     """
     Load raw long-format EMAs from DB for a single asset and timeframe.
 
-    Routes to the correct EMA table based on timeframe:
-    - Daily (``tf='1D'``): queries ``cmc_ema_multi_tf_u`` with
+    Routes to the correct alignment_source in ema_multi_tf_u based on timeframe:
+    - Daily (``tf='1D'``): queries ``ema_multi_tf_u`` with
       ``alignment_source = 'multi_tf'`` filter to prevent duplicate rows.
-    - Weekly/Monthly (``tf='1W'`` or ``tf='1M'``): queries the calendar EMA table
-      (cmc_ema_multi_tf_cal_iso or _cal_us depending on cal_scheme).
+    - Weekly/Monthly (``tf='1W'`` or ``tf='1M'``): queries ``ema_multi_tf_u``
+      with ``alignment_source = 'multi_tf_cal_{cal_scheme}'``.
 
-    CRITICAL: ``cmc_ema_multi_tf_u`` has an ``alignment_source`` column with values
+    CRITICAL: ``ema_multi_tf_u`` has an ``alignment_source`` column with values
     like 'multi_tf', 'multi_tf_cal_us'. For daily regime EMAs, always filter to
     'multi_tf' to avoid duplicate rows per (id, ts, period).
 
@@ -286,38 +297,45 @@ def load_emas_for_tf(
         return empty_result
 
     if tf == "1D":
-        # Daily EMAs from cmc_ema_multi_tf_u
+        # Daily EMAs from ema_multi_tf_u
         # CRITICAL: Filter alignment_source = 'multi_tf' to avoid duplicates.
         # The table has alignment_source in data but NOT in PK -- without this
         # filter, pivot_table may see duplicate (id, ts, period) combinations.
         sql = text(
             """
             SELECT id, ts, period, ema
-            FROM public.cmc_ema_multi_tf_u
+            FROM public.ema_multi_tf_u
             WHERE id = :id
               AND tf = '1D'
               AND period = ANY(:periods)
               AND alignment_source = 'multi_tf'
+              AND venue_id = :venue_id
             ORDER BY ts, period
         """
         )
-        params = {"id": asset_id, "periods": periods}
+        params = {"id": asset_id, "periods": periods, "venue_id": venue_id}
     else:
-        # Weekly/monthly EMAs from calendar EMA table
-        # Calendar EMA table PK: (id, tf, ts, period)
-        # No alignment_source filter needed -- unique by PK
-        table_name = f"cmc_ema_multi_tf_cal_{cal_scheme}"
+        # Weekly/monthly EMAs from unified _u table, filter to cal alignment source
+        alignment = f"multi_tf_cal_{cal_scheme}"
         sql = text(
-            f"""
+            """
             SELECT id, ts, period, ema
-            FROM public.{table_name}
+            FROM public.ema_multi_tf_u
             WHERE id = :id
               AND tf = :tf
               AND period = ANY(:periods)
+              AND venue_id = :venue_id
+              AND alignment_source = :alignment
             ORDER BY ts, period
         """
         )
-        params = {"id": asset_id, "tf": tf, "periods": periods}
+        params = {
+            "id": asset_id,
+            "tf": tf,
+            "periods": periods,
+            "venue_id": venue_id,
+            "alignment": alignment,
+        }
 
     try:
         with engine.connect() as conn:
@@ -358,6 +376,7 @@ def load_and_pivot_emas(
     periods: list[int],
     price_col: str = "close",
     cal_scheme: str = "iso",
+    venue_id: int = 1,
 ) -> pd.DataFrame:
     """
     Load EMAs from DB and pivot to wide-format in one step.
@@ -379,7 +398,9 @@ def load_and_pivot_emas(
         Ready for merging with bars and passing to labeler functions.
         Returns empty DataFrame with correct column names on failure.
     """
-    long_df = load_emas_for_tf(engine, asset_id, tf, periods, cal_scheme=cal_scheme)
+    long_df = load_emas_for_tf(
+        engine, asset_id, tf, periods, cal_scheme=cal_scheme, venue_id=venue_id
+    )
     return pivot_emas_to_wide(long_df, periods, price_col=price_col)
 
 
@@ -392,6 +413,7 @@ def load_regime_input_data(
     engine: Engine,
     asset_id: int,
     cal_scheme: str = "iso",
+    venue_id: int = 1,
 ) -> dict[str, pd.DataFrame]:
     """
     Load all 3 TF datasets for a single asset, ready for regime labeling.
@@ -437,9 +459,11 @@ def load_regime_input_data(
     )
 
     # ------------------------------------------------------------------
-    # Monthly (L0) -- cmc_price_bars_multi_tf_cal_{scheme} + cal EMA table
+    # Monthly (L0) -- price_bars_multi_tf_cal_{scheme} + cal EMA table
     # ------------------------------------------------------------------
-    monthly_bars = load_bars_for_tf(engine, asset_id, tf="1M", cal_scheme=cal_scheme)
+    monthly_bars = load_bars_for_tf(
+        engine, asset_id, tf="1M", cal_scheme=cal_scheme, venue_id=venue_id
+    )
     monthly_emas = load_and_pivot_emas(
         engine,
         asset_id,
@@ -447,6 +471,7 @@ def load_regime_input_data(
         periods=DEFAULT_MONTHLY_PERIODS,
         price_col="close",
         cal_scheme=cal_scheme,
+        venue_id=venue_id,
     )
 
     if not monthly_bars.empty and not monthly_emas.empty:
@@ -460,9 +485,11 @@ def load_regime_input_data(
         )
 
     # ------------------------------------------------------------------
-    # Weekly (L1) -- cmc_price_bars_multi_tf_cal_{scheme} + cal EMA table
+    # Weekly (L1) -- price_bars_multi_tf_cal_{scheme} + cal EMA table
     # ------------------------------------------------------------------
-    weekly_bars = load_bars_for_tf(engine, asset_id, tf="1W", cal_scheme=cal_scheme)
+    weekly_bars = load_bars_for_tf(
+        engine, asset_id, tf="1W", cal_scheme=cal_scheme, venue_id=venue_id
+    )
     weekly_emas = load_and_pivot_emas(
         engine,
         asset_id,
@@ -470,6 +497,7 @@ def load_regime_input_data(
         periods=DEFAULT_WEEKLY_PERIODS,
         price_col="close",
         cal_scheme=cal_scheme,
+        venue_id=venue_id,
     )
 
     if not weekly_bars.empty and not weekly_emas.empty:
@@ -483,9 +511,11 @@ def load_regime_input_data(
         )
 
     # ------------------------------------------------------------------
-    # Daily (L2) -- cmc_price_bars_multi_tf + cmc_ema_multi_tf_u
+    # Daily (L2) -- price_bars_multi_tf + ema_multi_tf_u
     # ------------------------------------------------------------------
-    daily_bars = load_bars_for_tf(engine, asset_id, tf="1D", cal_scheme=cal_scheme)
+    daily_bars = load_bars_for_tf(
+        engine, asset_id, tf="1D", cal_scheme=cal_scheme, venue_id=venue_id
+    )
     daily_emas = load_and_pivot_emas(
         engine,
         asset_id,
@@ -493,6 +523,7 @@ def load_regime_input_data(
         periods=DEFAULT_DAILY_PERIODS,
         price_col="close",
         cal_scheme=cal_scheme,
+        venue_id=venue_id,
     )
 
     if not daily_bars.empty and not daily_emas.empty:
@@ -530,9 +561,10 @@ def load_rolling_stats_for_asset(
     engine: Engine,
     asset_id: int,
     tf: str = "1D",
+    venue_id: int = 1,
 ) -> pd.DataFrame | None:
     """
-    Load rolling descriptive statistics from cmc_asset_stats for a single asset.
+    Load rolling descriptive statistics from asset_stats for a single asset.
 
     Returns selected rolling stat columns (std_ret_30, std_ret_90, sharpe_ann_90,
     sharpe_ann_252, max_dd_from_ath) indexed by ts (UTC). Intended for optional
@@ -543,7 +575,7 @@ def load_rolling_stats_for_asset(
     Args:
         engine:   SQLAlchemy engine connected to PostgreSQL.
         asset_id: Integer asset ID (matches id in dim_assets).
-        tf:       Timeframe string for cmc_asset_stats (default '1D').
+        tf:       Timeframe string for asset_stats (default '1D').
 
     Returns:
         DataFrame indexed by ts (tz-aware UTC) with columns:
@@ -559,15 +591,17 @@ def load_rolling_stats_for_asset(
     sql = text(
         """
         SELECT ts, std_ret_30, std_ret_90, sharpe_ann_90, sharpe_ann_252, max_dd_from_ath
-        FROM public.cmc_asset_stats
-        WHERE id = :id AND tf = :tf
+        FROM public.asset_stats
+        WHERE id = :id AND tf = :tf AND venue_id = :venue_id
         ORDER BY ts
         """
     )
 
     try:
         with engine.connect() as conn:
-            df = pd.read_sql(sql, conn, params={"id": asset_id, "tf": tf})
+            df = pd.read_sql(
+                sql, conn, params={"id": asset_id, "tf": tf, "venue_id": venue_id}
+            )
     except Exception as exc:
         logger.debug(
             "load_rolling_stats_for_asset: query failed for id=%s tf=%s: %s",

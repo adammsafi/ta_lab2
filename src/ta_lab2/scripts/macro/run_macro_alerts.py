@@ -2,9 +2,9 @@
 
 CLI script for macro regime transition alerting.
 
-Detects dimension-level and composite regime-key changes in cmc_macro_regimes and
+Detects dimension-level and composite regime-key changes in macro_regimes and
 dispatches throttled Telegram alerts via MacroAlertManager. Logs all alert activity
-(including throttled alerts) to cmc_macro_alert_log for audit and dashboard visibility.
+(including throttled alerts) to macro_alert_log for audit and dashboard visibility.
 
 Follows the same patterns as refresh_macro_regimes.py:
 - argparse CLI with --profile, --dry-run, --verbose
@@ -42,7 +42,7 @@ def main(argv: list[str] | None = None) -> int:
     """CLI entry point for macro regime alert checking."""
     p = argparse.ArgumentParser(
         description=(
-            "Detect macro regime transitions in cmc_macro_regimes and dispatch "
+            "Detect macro regime transitions in macro_regimes and dispatch "
             "throttled Telegram alerts."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,

@@ -265,8 +265,8 @@ class ValidationReportBuilder:
                         ELSE                       -f.fill_price * f.fill_qty
                     END
                 ) AS daily_pnl
-            FROM cmc_fills f
-            JOIN cmc_orders o ON f.order_id = o.order_id
+            FROM fills f
+            JOIN orders o ON f.order_id = o.order_id
             WHERE f.filled_at::date BETWEEN :start_date AND :end_date
             GROUP BY f.filled_at::date
             ORDER BY f.filled_at::date
@@ -276,7 +276,7 @@ class ValidationReportBuilder:
         drift_sql = text(
             """
             SELECT metric_date, config_id, paper_cumulative_pnl
-            FROM cmc_drift_metrics
+            FROM drift_metrics
             WHERE metric_date BETWEEN :start_date AND :end_date
               AND paper_cumulative_pnl IS NOT NULL
             ORDER BY config_id, metric_date
@@ -372,8 +372,8 @@ class ValidationReportBuilder:
                         ELSE                       -f.fill_price * f.fill_qty
                     END
                 ) AS daily_pnl
-            FROM cmc_fills f
-            JOIN cmc_orders o ON f.order_id = o.order_id
+            FROM fills f
+            JOIN orders o ON f.order_id = o.order_id
             WHERE f.filled_at::date BETWEEN :start_date AND :end_date
             GROUP BY f.filled_at::date
             ORDER BY f.filled_at::date
@@ -433,7 +433,7 @@ class ValidationReportBuilder:
         sql = text(
             """
             SELECT metric_date, tracking_error_5d, tracking_error_30d
-            FROM cmc_drift_metrics
+            FROM drift_metrics
             WHERE metric_date BETWEEN :start_date AND :end_date
             ORDER BY metric_date
             """
@@ -506,9 +506,9 @@ class ValidationReportBuilder:
             SELECT
                 ABS(f.fill_price::float - pb.open::float)
                     / NULLIF(pb.open::float, 0) * 10000 AS slippage_bps
-            FROM cmc_fills f
-            JOIN cmc_orders o ON f.order_id = o.order_id
-            JOIN cmc_price_bars_multi_tf pb
+            FROM fills f
+            JOIN orders o ON f.order_id = o.order_id
+            JOIN price_bars_multi_tf pb
                 ON  pb.id   = o.asset_id
                 AND pb.tf   = '1D'
                 AND pb.ts::date = f.filled_at::date
@@ -565,7 +565,7 @@ class ValidationReportBuilder:
         sql = text(
             """
             SELECT event_id, event_ts, event_type, trigger_source, reason, operator
-            FROM cmc_risk_events
+            FROM risk_events
             WHERE event_type LIKE 'kill_switch%'
               AND event_ts BETWEEN :start_ts AND :end_ts
             ORDER BY event_ts
@@ -830,7 +830,7 @@ class ValidationReportBuilder:
         )
         lines.append("")
         lines.append(
-            "**Evidence source:** `cmc_executor_run_log` -- distinct successful run dates."
+            "**Evidence source:** `executor_run_log` -- distinct successful run dates."
         )
         if gate:
             lines.append("")
@@ -853,7 +853,7 @@ class ValidationReportBuilder:
             "backtest signal -- deviations indicate fill model divergence or data gaps."
         )
         lines.append("")
-        lines.append("**Evidence source:** `cmc_drift_metrics.tracking_error_5d`")
+        lines.append("**Evidence source:** `drift_metrics.tracking_error_5d`")
         if gate:
             lines.append("")
             lines.append(f"**Measured:** {gate.measured_value}")
@@ -879,9 +879,7 @@ class ValidationReportBuilder:
             "prices, this should be minimal."
         )
         lines.append("")
-        lines.append(
-            "**Evidence source:** `cmc_fills` JOIN `cmc_price_bars_multi_tf` (tf=1D)"
-        )
+        lines.append("**Evidence source:** `fills` JOIN `price_bars_multi_tf` (tf=1D)")
         if gate:
             lines.append("")
             lines.append(f"**Measured:** {gate.measured_value}")
@@ -910,7 +908,7 @@ class ValidationReportBuilder:
         )
         lines.append("")
         lines.append(
-            "**Evidence source:** `cmc_risk_events` + "
+            "**Evidence source:** `risk_events` + "
             "`reports/validation/kill_switch_exercise/`"
         )
         if gate:
@@ -937,7 +935,7 @@ class ValidationReportBuilder:
         )
         lines.append("")
         lines.append(
-            "**Evidence source:** `cmc_executor_run_log`, `cmc_orders`, `cmc_fills`, "
+            "**Evidence source:** `executor_run_log`, `orders`, `fills`, "
             "`reports/validation/audit/`"
         )
         if gate:
@@ -975,11 +973,11 @@ class ValidationReportBuilder:
     def _section_data_sources(self, start_date: date, end_date: date) -> str:
         """Query row counts from key tables and format as Markdown table."""
         tables = [
-            ("cmc_executor_run_log", "started_at::date", "Executor run log"),
-            ("cmc_fills", "filled_at::date", "Paper trade fills"),
-            ("cmc_orders", "created_at::date", "Paper trade orders"),
-            ("cmc_drift_metrics", "metric_date", "Drift monitor metrics"),
-            ("cmc_risk_events", "event_ts::date", "Risk events (incl. kill switch)"),
+            ("executor_run_log", "started_at::date", "Executor run log"),
+            ("fills", "filled_at::date", "Paper trade fills"),
+            ("orders", "created_at::date", "Paper trade orders"),
+            ("drift_metrics", "metric_date", "Drift monitor metrics"),
+            ("risk_events", "event_ts::date", "Risk events (incl. kill switch)"),
         ]
 
         lines = [

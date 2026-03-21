@@ -3,17 +3,17 @@
 Cross-Asset Aggregation compute engine for Phase 70 (XAGG-01 through XAGG-04).
 
 Computes four daily cross-asset signals:
-  XAGG-01: BTC/ETH 30d rolling Pearson correlation -> cmc_cross_asset_agg
-  XAGG-02: Average pairwise correlation with high_corr_flag -> cmc_cross_asset_agg
-  XAGG-03: Aggregate funding rate with 30d/90d z-scores -> cmc_funding_rate_agg
+  XAGG-01: BTC/ETH 30d rolling Pearson correlation -> cross_asset_agg
+  XAGG-02: Average pairwise correlation with high_corr_flag -> cross_asset_agg
+  XAGG-03: Aggregate funding rate with 30d/90d z-scores -> funding_rate_agg
   XAGG-04: Crypto-macro correlation regime with sign-flip detection
            -> crypto_macro_corr_regimes  (per asset/macro_var)
-           -> cmc_macro_regimes.crypto_macro_corr  (daily aggregate label)
+           -> macro_regimes.crypto_macro_corr  (daily aggregate label)
 
 Data sources:
-  - cmc_returns_bars_multi_tf (tf='1D', roll=FALSE, ret_arith)
+  - returns_bars_multi_tf (tf='1D', roll=FALSE, ret_arith)
   - tvc_price_histories (daily close -> simple returns)
-  - cmc_funding_rates (tf='1d', daily rollup rows)
+  - funding_rates (tf='1d', daily rollup rows)
   - fred.fred_macro_features (VIX, DXY, HY OAS, net_liquidity)
 
 All numeric thresholds live in configs/cross_asset_config.yaml.
@@ -277,17 +277,17 @@ def compute_cross_asset_corr(
     high_corr_threshold = float(ca_cfg.get("high_corr_threshold", 0.7))
     min_assets = int(ca_cfg.get("min_assets_for_avg", 3))
 
-    # Resolve date range using cmc_cross_asset_agg watermark
-    wm = get_watermark(engine, "cmc_cross_asset_agg")
+    # Resolve date range using cross_asset_agg watermark
+    wm = get_watermark(engine, "cross_asset_agg")
     start, end = _resolve_date_range(start_date, end_date, wm)
     logger.info("XAGG-01/02 compute window: %s to %s", start, end)
 
     # --- Load CMC daily returns (tf='1D', roll=FALSE) ---
     cmc_sql = text(
-        "SELECT id, ts::date AS date, ret_arith "
-        "FROM cmc_returns_bars_multi_tf "
-        "WHERE tf = '1D' AND roll = FALSE "
-        "AND ts::date >= :start AND ts::date <= :end "
+        'SELECT id, "timestamp"::date AS date, ret_arith '
+        "FROM returns_bars_multi_tf_u "
+        "WHERE tf = '1D' AND roll = FALSE AND alignment_source = 'multi_tf' "
+        'AND "timestamp"::date >= :start AND "timestamp"::date <= :end '
         "ORDER BY id, date"
     )
     try:
@@ -455,7 +455,7 @@ def compute_cross_asset_corr(
 
 
 def upsert_cross_asset_agg(engine: Engine, df: pd.DataFrame) -> int:
-    """Upsert cross-asset correlation DataFrame into cmc_cross_asset_agg.
+    """Upsert cross-asset correlation DataFrame into cross_asset_agg.
 
     Uses temp table + INSERT...ON CONFLICT(date) DO UPDATE pattern.
 
@@ -495,7 +495,7 @@ def upsert_cross_asset_agg(engine: Engine, df: pd.DataFrame) -> int:
         conn.execute(
             text(
                 "CREATE TEMP TABLE _xagg_corr_staging "
-                "(LIKE cmc_cross_asset_agg INCLUDING DEFAULTS) "
+                "(LIKE cross_asset_agg INCLUDING DEFAULTS) "
                 "ON COMMIT DROP"
             )
         )
@@ -508,14 +508,14 @@ def upsert_cross_asset_agg(engine: Engine, df: pd.DataFrame) -> int:
         )
         result = conn.execute(
             text(
-                f"INSERT INTO cmc_cross_asset_agg ({cols_str}) "
+                f"INSERT INTO cross_asset_agg ({cols_str}) "
                 f"SELECT {cols_str} FROM _xagg_corr_staging "
                 f"ON CONFLICT (date) DO UPDATE SET {set_clause}"
             )
         )
         row_count = result.rowcount
 
-    logger.info("Upserted %d rows into cmc_cross_asset_agg", row_count)
+    logger.info("Upserted %d rows into cross_asset_agg", row_count)
     return row_count
 
 
@@ -532,7 +532,7 @@ def compute_funding_rate_agg(
 ) -> pd.DataFrame:
     """Compute aggregate funding rate signal with 30d and 90d z-scores.
 
-    XAGG-03: Loads daily rollup funding rates from cmc_funding_rates (tf='1d'),
+    XAGG-03: Loads daily rollup funding rates from funding_rates (tf='1d'),
     groups by (date, symbol), computes simple average across venues, and
     computes 30d and 90d rolling z-scores per symbol.
 
@@ -558,18 +558,18 @@ def compute_funding_rate_agg(
     window_30 = int(zscore_windows[0]) if len(zscore_windows) > 0 else 30
     window_90 = int(zscore_windows[1]) if len(zscore_windows) > 1 else 90
 
-    # Resolve date range using cmc_funding_rate_agg watermark
-    wm = get_watermark(engine, "cmc_funding_rate_agg")
+    # Resolve date range using funding_rate_agg watermark
+    wm = get_watermark(engine, "funding_rate_agg")
     start, end = _resolve_date_range(start_date, end_date, wm)
     logger.info("XAGG-03 compute window: %s to %s", start, end)
 
     # Load daily rollup funding rates (tf='1d')
     sql = text(
-        "SELECT ts::date AS date, symbol, venue, funding_rate "
-        "FROM cmc_funding_rates "
+        "SELECT ts::date AS date, symbol, venue_id, funding_rate "
+        "FROM funding_rates "
         "WHERE tf = '1d' "
         "AND ts::date >= :start AND ts::date <= :end "
-        "ORDER BY symbol, date, venue"
+        "ORDER BY symbol, date, venue_id"
     )
     try:
         with engine.connect() as conn:
@@ -601,7 +601,7 @@ def compute_funding_rate_agg(
     def _agg_venues(grp: pd.DataFrame) -> pd.Series:
         valid = grp.dropna(subset=["funding_rate"])
         n_venues = len(valid)
-        venues_list = sorted(valid["venue"].dropna().unique().tolist())
+        venues_list = sorted(valid["venue_id"].dropna().unique().tolist())
         avg_rate = float(valid["funding_rate"].mean()) if n_venues > 0 else None
         # vwap_funding_rate: NULL for now (requires volume data not consistently available)
         return pd.Series(
@@ -688,7 +688,7 @@ def compute_funding_rate_agg(
 
 
 def upsert_funding_rate_agg(engine: Engine, df: pd.DataFrame) -> int:
-    """Upsert funding rate aggregate DataFrame into cmc_funding_rate_agg.
+    """Upsert funding rate aggregate DataFrame into funding_rate_agg.
 
     Uses temp table + INSERT...ON CONFLICT(date, symbol) DO UPDATE pattern.
 
@@ -730,7 +730,7 @@ def upsert_funding_rate_agg(engine: Engine, df: pd.DataFrame) -> int:
         conn.execute(
             text(
                 "CREATE TEMP TABLE _funding_agg_staging "
-                "(LIKE cmc_funding_rate_agg INCLUDING DEFAULTS) "
+                "(LIKE funding_rate_agg INCLUDING DEFAULTS) "
                 "ON COMMIT DROP"
             )
         )
@@ -743,14 +743,14 @@ def upsert_funding_rate_agg(engine: Engine, df: pd.DataFrame) -> int:
         )
         result = conn.execute(
             text(
-                f"INSERT INTO cmc_funding_rate_agg ({cols_str}) "
+                f"INSERT INTO funding_rate_agg ({cols_str}) "
                 f"SELECT {cols_str} FROM _funding_agg_staging "
                 f"ON CONFLICT (date, symbol) DO UPDATE SET {set_clause}"
             )
         )
         row_count = result.rowcount
 
-    logger.info("Upserted %d rows into cmc_funding_rate_agg", row_count)
+    logger.info("Upserted %d rows into funding_rate_agg", row_count)
     return row_count
 
 
@@ -924,10 +924,10 @@ def compute_crypto_macro_corr(
 
     # --- Load crypto daily returns (tf='1D', roll=FALSE) ---
     ret_sql = text(
-        "SELECT id, ts::date AS date, ret_arith "
-        "FROM cmc_returns_bars_multi_tf "
-        "WHERE tf = '1D' AND roll = FALSE "
-        "AND ts::date >= :start AND ts::date <= :end "
+        'SELECT id, "timestamp"::date AS date, ret_arith '
+        "FROM returns_bars_multi_tf_u "
+        "WHERE tf = '1D' AND roll = FALSE AND alignment_source = 'multi_tf' "
+        'AND "timestamp"::date >= :start AND "timestamp"::date <= :end '
         "ORDER BY id, date"
     )
     try:
@@ -1191,10 +1191,10 @@ def upsert_crypto_macro_corr(engine: Engine, df: pd.DataFrame) -> int:
 
 
 def update_macro_regime_corr(engine: Engine, df: pd.DataFrame) -> int:
-    """Update cmc_macro_regimes.crypto_macro_corr for each date in df.
+    """Update macro_regimes.crypto_macro_corr for each date in df.
 
     Performs a batch parameterized UPDATE for each (date, label) row.
-    Only updates rows where the date already exists in cmc_macro_regimes
+    Only updates rows where the date already exists in macro_regimes
     (we do not insert -- regime classifier owns that table's rows).
 
     Parameters
@@ -1212,7 +1212,7 @@ def update_macro_regime_corr(engine: Engine, df: pd.DataFrame) -> int:
         return 0
 
     update_sql = text(
-        "UPDATE cmc_macro_regimes "
+        "UPDATE macro_regimes "
         "SET crypto_macro_corr = :label, ingested_at = now() "
         "WHERE date = :date"
     )
@@ -1227,5 +1227,5 @@ def update_macro_regime_corr(engine: Engine, df: pd.DataFrame) -> int:
             result = conn.execute(update_sql, {"label": label, "date": dt})
             total_updated += result.rowcount
 
-    logger.info("Updated %d rows in cmc_macro_regimes.crypto_macro_corr", total_updated)
+    logger.info("Updated %d rows in macro_regimes.crypto_macro_corr", total_updated)
     return total_updated

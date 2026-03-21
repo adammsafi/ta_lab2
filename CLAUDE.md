@@ -56,7 +56,9 @@ docker compose -f docker/docker-compose.yml up -d
 ## Key Conventions
 
 - **Database:** PostgreSQL + SQLAlchemy. Connection via `db_config.env` or `TARGET_DB_URL`.
-- **PKs:** Data tables use `(id, ts, tf)`, EMA tables add `period`, `_u` tables add `alignment_source`.
+- **PKs:** Data tables use `(id, venue_id, ts, tf)`, EMA tables add `period`, `_u` tables add `alignment_source`.
+- **venue_id:** `dim_venues` maps SMALLINT venue_id to venue names (1=CMC_AGG, 2=HYPERLIQUID, etc.). All analytics tables include `venue_id` in their PK. Default=1 (CMC_AGG).
+- **Table names:** No `cmc_` prefix — tables are `price_bars_multi_tf`, `ema_multi_tf`, etc. Exceptions: `cmc_da_ids`, `cmc_da_info`, `cmc_exchange_map`, `cmc_exchange_info`, `cmc_price_histories7` (genuinely CMC-only).
 - **Upsert pattern:** Temp table + `ON CONFLICT DO UPDATE/NOTHING`.
 - **Large tables:** Always batch by `id` to avoid multi-hour single transactions.
 - **dim_timeframe:** Column is `tf_days_nominal` (NOT `tf_days`).

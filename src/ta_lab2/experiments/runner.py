@@ -5,7 +5,7 @@ scores them with Phase 37 compute_ic(), applies BH correction across all rows, a
 returns results with cost tracking metadata.
 
 No production tables are polluted -- feature values go into a session-scoped
-TEMP table only. Only cmc_feature_experiments is written to (and only by the CLI
+TEMP table only. Only feature_experiments is written to (and only by the CLI
 wrapper, not by ExperimentRunner itself).
 
 Public API
@@ -41,46 +41,38 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 _ALLOWED_TABLES = frozenset(
     [
-        "cmc_price_bars_multi_tf",
-        "cmc_price_bars_multi_tf_u",
-        "cmc_returns_bars_multi_tf",
-        "cmc_returns_bars_multi_tf_u",
-        "cmc_ema_multi_tf",
-        "cmc_ema_multi_tf_u",
-        "cmc_returns_ema_multi_tf",
-        "cmc_returns_ema_multi_tf_u",
-        "cmc_ama_multi_tf",
-        "cmc_ama_multi_tf_u",
-        "cmc_returns_ama_multi_tf",
-        "cmc_returns_ama_multi_tf_u",
-        "cmc_vol",
-        "cmc_ta_daily",
-        "cmc_features",
-        "cmc_regimes",
+        "price_bars_multi_tf_u",
+        "returns_bars_multi_tf_u",
+        "ema_multi_tf_u",
+        "returns_ema_multi_tf_u",
+        "ama_multi_tf_u",
+        "returns_ama_multi_tf_u",
+        "vol",
+        "ta_daily",
+        "features",
+        "regimes",
     ]
 )
 
 # Tables that do NOT have a `tf` column — filter by id + ts only.
 _TABLES_WITHOUT_TF = frozenset(
     [
-        "cmc_vol",
-        "cmc_ta_daily",
+        "vol",
+        "ta_daily",
     ]
 )
 
 # Tables that use "timestamp" (not "ts") as the time column.
-# All price bars tables use "timestamp"; EMA/vol/features tables use "ts".
+# All price bars _u tables use "timestamp"; EMA/vol/features tables use "ts".
 _TABLES_WITH_TIMESTAMP_COL = frozenset(
     [
-        "cmc_price_bars_multi_tf",
-        "cmc_price_bars_multi_tf_u",
-        "cmc_returns_bars_multi_tf",
-        "cmc_returns_bars_multi_tf_u",
+        "price_bars_multi_tf_u",
+        "returns_bars_multi_tf_u",
     ]
 )
 
 # Default close source when inputs do not include a close price
-_CLOSE_SOURCE_TABLE = "cmc_price_bars_multi_tf_u"
+_CLOSE_SOURCE_TABLE = "price_bars_multi_tf_u"
 
 
 class ExperimentRunner:
@@ -591,7 +583,7 @@ class ExperimentRunner:
         Get close price series for IC scoring.
 
         If 'close' is already in input_df (loaded from price table), return it.
-        Otherwise load from cmc_price_bars_multi_tf_u.
+        Otherwise load from price_bars_multi_tf_u.
 
         Parameters
         ----------
@@ -607,7 +599,7 @@ class ExperimentRunner:
             return input_df["close"]
 
         # Load close from default price table.
-        # cmc_price_bars_multi_tf_u uses "timestamp" (not "ts") as the time column.
+        # price_bars_multi_tf_u uses "timestamp" (not "ts") as the time column.
         sql_str = (
             f"SELECT timestamp AS ts, close FROM public.{_CLOSE_SOURCE_TABLE} "
             f"WHERE id = :id AND tf = :tf AND timestamp BETWEEN :start AND :end ORDER BY timestamp"

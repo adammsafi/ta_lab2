@@ -5,61 +5,61 @@
 -- =====================================================
 
 -- Drop Bar Tables (main + state + snapshots + backups)
-DROP TABLE IF EXISTS public.cmc_price_bars_1d CASCADE;
-DROP TABLE IF EXISTS public.cmc_price_bars_1d_state CASCADE;
-DROP TABLE IF EXISTS public.cmc_price_bars_1d_rejects CASCADE;
-DROP TABLE IF EXISTS public.cmc_price_bars_1d_snapshot_20260206_025653 CASCADE;
+DROP TABLE IF EXISTS public.price_bars_1d CASCADE;
+DROP TABLE IF EXISTS public.price_bars_1d_state CASCADE;
+DROP TABLE IF EXISTS public.price_bars_1d_rejects CASCADE;
+DROP TABLE IF EXISTS public.price_bars_1d_snapshot_20260206_025653 CASCADE;
 
-DROP TABLE IF EXISTS public.cmc_price_bars_multi_tf CASCADE;
-DROP TABLE IF EXISTS public.cmc_price_bars_multi_tf_backup CASCADE;
-DROP TABLE IF EXISTS public.cmc_price_bars_multi_tf_state CASCADE;
-DROP TABLE IF EXISTS public.cmc_price_bars_multi_tf_snapshot_20260206_025653 CASCADE;
+DROP TABLE IF EXISTS public.price_bars_multi_tf CASCADE;
+DROP TABLE IF EXISTS public.price_bars_multi_tf_backup CASCADE;
+DROP TABLE IF EXISTS public.price_bars_multi_tf_state CASCADE;
+DROP TABLE IF EXISTS public.price_bars_multi_tf_snapshot_20260206_025653 CASCADE;
 
-DROP TABLE IF EXISTS public.cmc_price_bars_multi_tf_cal_iso CASCADE;
-DROP TABLE IF EXISTS public.cmc_price_bars_multi_tf_cal_iso_state CASCADE;
-DROP TABLE IF EXISTS public.cmc_price_bars_multi_tf_cal_iso_snapshot_20260206_025653 CASCADE;
+DROP TABLE IF EXISTS public.price_bars_multi_tf_cal_iso CASCADE;
+DROP TABLE IF EXISTS public.price_bars_multi_tf_cal_iso_state CASCADE;
+DROP TABLE IF EXISTS public.price_bars_multi_tf_cal_iso_snapshot_20260206_025653 CASCADE;
 
-DROP TABLE IF EXISTS public.cmc_price_bars_multi_tf_cal_us CASCADE;
-DROP TABLE IF EXISTS public.cmc_price_bars_multi_tf_cal_us_state CASCADE;
-DROP TABLE IF EXISTS public.cmc_price_bars_multi_tf_cal_us_backup12 CASCADE;
-DROP TABLE IF EXISTS public.cmc_price_bars_multi_tf_cal_us_snapshot_20260206_025653 CASCADE;
+DROP TABLE IF EXISTS public.price_bars_multi_tf_cal_us CASCADE;
+DROP TABLE IF EXISTS public.price_bars_multi_tf_cal_us_state CASCADE;
+DROP TABLE IF EXISTS public.price_bars_multi_tf_cal_us_backup12 CASCADE;
+DROP TABLE IF EXISTS public.price_bars_multi_tf_cal_us_snapshot_20260206_025653 CASCADE;
 
-DROP TABLE IF EXISTS public.cmc_price_bars_multi_tf_cal_anchor_iso CASCADE;
-DROP TABLE IF EXISTS public.cmc_price_bars_multi_tf_cal_anchor_iso_state CASCADE;
-DROP TABLE IF EXISTS public.cmc_price_bars_multi_tf_cal_anchor_iso_snapshot_20260206_025653 CASCADE;
+DROP TABLE IF EXISTS public.price_bars_multi_tf_cal_anchor_iso CASCADE;
+DROP TABLE IF EXISTS public.price_bars_multi_tf_cal_anchor_iso_state CASCADE;
+DROP TABLE IF EXISTS public.price_bars_multi_tf_cal_anchor_iso_snapshot_20260206_025653 CASCADE;
 
-DROP TABLE IF EXISTS public.cmc_price_bars_multi_tf_cal_anchor_us CASCADE;
-DROP TABLE IF EXISTS public.cmc_price_bars_multi_tf_cal_anchor_us_state CASCADE;
-DROP TABLE IF EXISTS public.cmc_price_bars_multi_tf_cal_anchor_us_snapshot_20260206_025653 CASCADE;
+DROP TABLE IF EXISTS public.price_bars_multi_tf_cal_anchor_us CASCADE;
+DROP TABLE IF EXISTS public.price_bars_multi_tf_cal_anchor_us_state CASCADE;
+DROP TABLE IF EXISTS public.price_bars_multi_tf_cal_anchor_us_snapshot_20260206_025653 CASCADE;
 
 -- Drop EMA Tables (main + state + snapshots)
-DROP TABLE IF EXISTS public.cmc_ema_multi_tf CASCADE;
-DROP TABLE IF EXISTS public.cmc_ema_multi_tf_state CASCADE;
-DROP TABLE IF EXISTS public.cmc_ema_multi_tf_20251124_snapshot CASCADE;
-DROP TABLE IF EXISTS public.cmc_ema_multi_tf_snapshot_20260206_025653 CASCADE;
-DROP TABLE IF EXISTS public.cmc_ema_multi_tf_cal_20251124_snapshot CASCADE;
+DROP TABLE IF EXISTS public.ema_multi_tf CASCADE;
+DROP TABLE IF EXISTS public.ema_multi_tf_state CASCADE;
+DROP TABLE IF EXISTS public.ema_multi_tf_20251124_snapshot CASCADE;
+DROP TABLE IF EXISTS public.ema_multi_tf_snapshot_20260206_025653 CASCADE;
+DROP TABLE IF EXISTS public.ema_multi_tf_cal_20251124_snapshot CASCADE;
 
-DROP TABLE IF EXISTS public.cmc_ema_multi_tf_cal_iso CASCADE;
-DROP TABLE IF EXISTS public.cmc_ema_multi_tf_cal_iso_state CASCADE;
-DROP TABLE IF EXISTS public.cmc_ema_multi_tf_cal_iso_snapshot_20260206_025653 CASCADE;
+DROP TABLE IF EXISTS public.ema_multi_tf_cal_iso CASCADE;
+DROP TABLE IF EXISTS public.ema_multi_tf_cal_iso_state CASCADE;
+DROP TABLE IF EXISTS public.ema_multi_tf_cal_iso_snapshot_20260206_025653 CASCADE;
 
-DROP TABLE IF EXISTS public.cmc_ema_multi_tf_cal_us CASCADE;
-DROP TABLE IF EXISTS public.cmc_ema_multi_tf_cal_us_state CASCADE;
-DROP TABLE IF EXISTS public.cmc_ema_multi_tf_cal_us_snapshot_20260206_025653 CASCADE;
+DROP TABLE IF EXISTS public.ema_multi_tf_cal_us CASCADE;
+DROP TABLE IF EXISTS public.ema_multi_tf_cal_us_state CASCADE;
+DROP TABLE IF EXISTS public.ema_multi_tf_cal_us_snapshot_20260206_025653 CASCADE;
 
-DROP TABLE IF EXISTS public.cmc_ema_multi_tf_cal_anchor_iso CASCADE;
-DROP TABLE IF EXISTS public.cmc_ema_multi_tf_cal_anchor_iso_state CASCADE;
-DROP TABLE IF EXISTS public.cmc_ema_multi_tf_cal_anchor_iso_snapshot_20260206_025653 CASCADE;
+DROP TABLE IF EXISTS public.ema_multi_tf_cal_anchor_iso CASCADE;
+DROP TABLE IF EXISTS public.ema_multi_tf_cal_anchor_iso_state CASCADE;
+DROP TABLE IF EXISTS public.ema_multi_tf_cal_anchor_iso_snapshot_20260206_025653 CASCADE;
 
-DROP TABLE IF EXISTS public.cmc_ema_multi_tf_cal_anchor_us CASCADE;
-DROP TABLE IF EXISTS public.cmc_ema_multi_tf_cal_anchor_us_state CASCADE;
-DROP TABLE IF EXISTS public.cmc_ema_multi_tf_cal_anchor_us_snapshot_20260206_025653 CASCADE;
+DROP TABLE IF EXISTS public.ema_multi_tf_cal_anchor_us CASCADE;
+DROP TABLE IF EXISTS public.ema_multi_tf_cal_anchor_us_state CASCADE;
+DROP TABLE IF EXISTS public.ema_multi_tf_cal_anchor_us_snapshot_20260206_025653 CASCADE;
 
-DROP TABLE IF EXISTS public.cmc_ema_multi_tf_v2 CASCADE;
-DROP TABLE IF EXISTS public.cmc_ema_multi_tf_v2_state CASCADE;
-DROP TABLE IF EXISTS public.cmc_ema_multi_tf_v2_snapshot_20260206_025653 CASCADE;
+DROP TABLE IF EXISTS public.ema_multi_tf_v2 CASCADE;
+DROP TABLE IF EXISTS public.ema_multi_tf_v2_state CASCADE;
+DROP TABLE IF EXISTS public.ema_multi_tf_v2_snapshot_20260206_025653 CASCADE;
 
-DROP TABLE IF EXISTS public.cmc_ema_multi_tf_u CASCADE;
+DROP TABLE IF EXISTS public.ema_multi_tf_u CASCADE;
 DROP TABLE IF EXISTS public.cmc_ema_refresh_state CASCADE;
 
 -- Drop EMA Stats Tables (stats + stats_state + snapshots)

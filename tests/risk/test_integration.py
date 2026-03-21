@@ -55,7 +55,7 @@ def _default_limits_row():
 
 
 def _no_perp_position() -> MagicMock:
-    """Simulate cmc_perp_positions returning no active position (Gate 1.6 passes)."""
+    """Simulate perp_positions returning no active position (Gate 1.6 passes)."""
     return _make_result(fetchone=None)
 
 

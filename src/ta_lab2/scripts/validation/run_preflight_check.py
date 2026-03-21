@@ -253,42 +253,42 @@ def _build_standard_checks() -> list[PreflightCheck]:
         PreflightCheck(
             name="BTC price bars current (< 30h)",
             query=(
-                "SELECT MAX(ts) FROM cmc_price_bars_multi_tf WHERE id=1 AND tf='1D'"
+                "SELECT MAX(ts) FROM price_bars_multi_tf_u "
+                "WHERE id=1 AND tf='1D' AND alignment_source='multi_tf'"
             ),
             validator=_val_stale_check("BTC 1D bar ts"),
         ),
-        # 10. cmc_features current (< 30 hours)
+        # 10. features current (< 30 hours)
         PreflightCheck(
-            name="cmc_features current (< 30h)",
-            query="SELECT MAX(ts) FROM cmc_features WHERE id=1 AND tf='1D'",
-            validator=_val_stale_check("cmc_features 1D ts"),
+            name="features current (< 30h)",
+            query="SELECT MAX(ts) FROM features WHERE id=1 AND tf='1D'",
+            validator=_val_stale_check("features 1D ts"),
         ),
         # 11. EMA data current (< 30 hours)
         PreflightCheck(
             name="EMA data current (< 30h)",
-            query=("SELECT MAX(ts) FROM cmc_ema_multi_tf_u WHERE id=1 AND tf='1D'"),
-            validator=_val_stale_check("cmc_ema_multi_tf_u 1D ts"),
+            query=("SELECT MAX(ts) FROM ema_multi_tf_u WHERE id=1 AND tf='1D'"),
+            validator=_val_stale_check("ema_multi_tf_u 1D ts"),
         ),
         # 12. No orphaned orders (created/submitted status)
         PreflightCheck(
             name="No orphaned orders",
             query=(
-                "SELECT COUNT(*) FROM cmc_orders "
-                "WHERE status IN ('created','submitted')"
+                "SELECT COUNT(*) FROM orders WHERE status IN ('created','submitted')"
             ),
             validator=_val_count_zero("orphaned orders"),
         ),
         # 13. Executor run log accessible
         PreflightCheck(
             name="Executor run log accessible",
-            query="SELECT 1 FROM cmc_executor_run_log LIMIT 1",
-            validator=_val_accessible("cmc_executor_run_log"),
+            query="SELECT 1 FROM executor_run_log LIMIT 1",
+            validator=_val_accessible("executor_run_log"),
         ),
-        # 14. cmc_drift_metrics accessible
+        # 14. drift_metrics accessible
         PreflightCheck(
-            name="cmc_drift_metrics accessible",
-            query="SELECT 1 FROM cmc_drift_metrics LIMIT 0",
-            validator=_val_accessible("cmc_drift_metrics"),
+            name="drift_metrics accessible",
+            query="SELECT 1 FROM drift_metrics LIMIT 0",
+            validator=_val_accessible("drift_metrics"),
         ),
     ]
 

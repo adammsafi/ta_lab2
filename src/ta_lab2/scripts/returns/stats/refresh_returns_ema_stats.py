@@ -65,8 +65,8 @@ from ta_lab2.scripts.bars.common_snapshot_contract import get_engine
 
 @dataclass(frozen=True)
 class ReturnsTableConfig:
-    returns_table: str  # e.g. "public.cmc_returns_ema_multi_tf"
-    ema_source_table: str  # e.g. "public.cmc_ema_multi_tf"
+    returns_table: str  # e.g. "public.returns_ema_multi_tf"
+    ema_source_table: str  # e.g. "public.ema_multi_tf"
     label: str  # e.g. "multi_tf"
     pk_cols: tuple[str, ...]  # full PK including ts
     key_cols: tuple[str, ...]  # PK minus ts (grouping key)
@@ -75,48 +75,48 @@ class ReturnsTableConfig:
 
 ALL_CONFIGS: Dict[str, ReturnsTableConfig] = {
     "multi_tf": ReturnsTableConfig(
-        returns_table="public.cmc_returns_ema_multi_tf",
-        ema_source_table="public.cmc_ema_multi_tf",
+        returns_table="public.returns_ema_multi_tf",
+        ema_source_table="public.ema_multi_tf",
         label="multi_tf",
         pk_cols=("id", "ts", "tf", "period"),
         key_cols=("id", "tf", "period"),
         has_alignment_source=False,
     ),
     "cal_us": ReturnsTableConfig(
-        returns_table="public.cmc_returns_ema_multi_tf_cal_us",
-        ema_source_table="public.cmc_ema_multi_tf_cal_us",
+        returns_table="public.returns_ema_multi_tf_cal_us",
+        ema_source_table="public.ema_multi_tf_cal_us",
         label="cal_us",
         pk_cols=("id", "ts", "tf", "period"),
         key_cols=("id", "tf", "period"),
         has_alignment_source=False,
     ),
     "cal_iso": ReturnsTableConfig(
-        returns_table="public.cmc_returns_ema_multi_tf_cal_iso",
-        ema_source_table="public.cmc_ema_multi_tf_cal_iso",
+        returns_table="public.returns_ema_multi_tf_cal_iso",
+        ema_source_table="public.ema_multi_tf_cal_iso",
         label="cal_iso",
         pk_cols=("id", "ts", "tf", "period"),
         key_cols=("id", "tf", "period"),
         has_alignment_source=False,
     ),
     "cal_anchor_us": ReturnsTableConfig(
-        returns_table="public.cmc_returns_ema_multi_tf_cal_anchor_us",
-        ema_source_table="public.cmc_ema_multi_tf_cal_anchor_us",
+        returns_table="public.returns_ema_multi_tf_cal_anchor_us",
+        ema_source_table="public.ema_multi_tf_cal_anchor_us",
         label="cal_anchor_us",
         pk_cols=("id", "ts", "tf", "period"),
         key_cols=("id", "tf", "period"),
         has_alignment_source=False,
     ),
     "cal_anchor_iso": ReturnsTableConfig(
-        returns_table="public.cmc_returns_ema_multi_tf_cal_anchor_iso",
-        ema_source_table="public.cmc_ema_multi_tf_cal_anchor_iso",
+        returns_table="public.returns_ema_multi_tf_cal_anchor_iso",
+        ema_source_table="public.ema_multi_tf_cal_anchor_iso",
         label="cal_anchor_iso",
         pk_cols=("id", "ts", "tf", "period"),
         key_cols=("id", "tf", "period"),
         has_alignment_source=False,
     ),
     "u": ReturnsTableConfig(
-        returns_table="public.cmc_returns_ema_multi_tf_u",
-        ema_source_table="public.cmc_ema_multi_tf_u",
+        returns_table="public.returns_ema_multi_tf_u",
+        ema_source_table="public.ema_multi_tf_u",
         label="u",
         pk_cols=("id", "ts", "tf", "period", "alignment_source"),
         key_cols=("id", "tf", "period", "alignment_source"),

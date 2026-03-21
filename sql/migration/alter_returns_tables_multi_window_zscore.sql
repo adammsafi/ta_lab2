@@ -15,145 +15,145 @@ BEGIN;
 --   canonical: ret_arith_zscore, delta_ret_arith_zscore, ret_log_zscore, delta_ret_log_zscore
 --   roll:      ret_arith_roll_zscore, delta_ret_arith_roll_zscore, ret_log_roll_zscore, delta_ret_log_roll_zscore
 
--- --- cmc_returns_bars_multi_tf ---
-ALTER TABLE public.cmc_returns_bars_multi_tf RENAME COLUMN ret_arith_zscore            TO ret_arith_zscore_365;
-ALTER TABLE public.cmc_returns_bars_multi_tf RENAME COLUMN delta_ret_arith_zscore      TO delta_ret_arith_zscore_365;
-ALTER TABLE public.cmc_returns_bars_multi_tf RENAME COLUMN ret_log_zscore              TO ret_log_zscore_365;
-ALTER TABLE public.cmc_returns_bars_multi_tf RENAME COLUMN delta_ret_log_zscore        TO delta_ret_log_zscore_365;
-ALTER TABLE public.cmc_returns_bars_multi_tf RENAME COLUMN ret_arith_roll_zscore       TO ret_arith_roll_zscore_365;
-ALTER TABLE public.cmc_returns_bars_multi_tf RENAME COLUMN delta_ret_arith_roll_zscore TO delta_ret_arith_roll_zscore_365;
-ALTER TABLE public.cmc_returns_bars_multi_tf RENAME COLUMN ret_log_roll_zscore         TO ret_log_roll_zscore_365;
-ALTER TABLE public.cmc_returns_bars_multi_tf RENAME COLUMN delta_ret_log_roll_zscore   TO delta_ret_log_roll_zscore_365;
+-- --- returns_bars_multi_tf ---
+ALTER TABLE public.returns_bars_multi_tf RENAME COLUMN ret_arith_zscore            TO ret_arith_zscore_365;
+ALTER TABLE public.returns_bars_multi_tf RENAME COLUMN delta_ret_arith_zscore      TO delta_ret_arith_zscore_365;
+ALTER TABLE public.returns_bars_multi_tf RENAME COLUMN ret_log_zscore              TO ret_log_zscore_365;
+ALTER TABLE public.returns_bars_multi_tf RENAME COLUMN delta_ret_log_zscore        TO delta_ret_log_zscore_365;
+ALTER TABLE public.returns_bars_multi_tf RENAME COLUMN ret_arith_roll_zscore       TO ret_arith_roll_zscore_365;
+ALTER TABLE public.returns_bars_multi_tf RENAME COLUMN delta_ret_arith_roll_zscore TO delta_ret_arith_roll_zscore_365;
+ALTER TABLE public.returns_bars_multi_tf RENAME COLUMN ret_log_roll_zscore         TO ret_log_roll_zscore_365;
+ALTER TABLE public.returns_bars_multi_tf RENAME COLUMN delta_ret_log_roll_zscore   TO delta_ret_log_roll_zscore_365;
 
-ALTER TABLE public.cmc_returns_bars_multi_tf ADD COLUMN IF NOT EXISTS ret_arith_zscore_30             double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf ADD COLUMN IF NOT EXISTS delta_ret_arith_zscore_30       double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf ADD COLUMN IF NOT EXISTS ret_log_zscore_30               double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf ADD COLUMN IF NOT EXISTS delta_ret_log_zscore_30         double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf ADD COLUMN IF NOT EXISTS ret_arith_roll_zscore_30        double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf ADD COLUMN IF NOT EXISTS delta_ret_arith_roll_zscore_30  double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf ADD COLUMN IF NOT EXISTS ret_log_roll_zscore_30          double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf ADD COLUMN IF NOT EXISTS delta_ret_log_roll_zscore_30    double precision;
+ALTER TABLE public.returns_bars_multi_tf ADD COLUMN IF NOT EXISTS ret_arith_zscore_30             double precision;
+ALTER TABLE public.returns_bars_multi_tf ADD COLUMN IF NOT EXISTS delta_ret_arith_zscore_30       double precision;
+ALTER TABLE public.returns_bars_multi_tf ADD COLUMN IF NOT EXISTS ret_log_zscore_30               double precision;
+ALTER TABLE public.returns_bars_multi_tf ADD COLUMN IF NOT EXISTS delta_ret_log_zscore_30         double precision;
+ALTER TABLE public.returns_bars_multi_tf ADD COLUMN IF NOT EXISTS ret_arith_roll_zscore_30        double precision;
+ALTER TABLE public.returns_bars_multi_tf ADD COLUMN IF NOT EXISTS delta_ret_arith_roll_zscore_30  double precision;
+ALTER TABLE public.returns_bars_multi_tf ADD COLUMN IF NOT EXISTS ret_log_roll_zscore_30          double precision;
+ALTER TABLE public.returns_bars_multi_tf ADD COLUMN IF NOT EXISTS delta_ret_log_roll_zscore_30    double precision;
 
-ALTER TABLE public.cmc_returns_bars_multi_tf ADD COLUMN IF NOT EXISTS ret_arith_zscore_90             double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf ADD COLUMN IF NOT EXISTS delta_ret_arith_zscore_90       double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf ADD COLUMN IF NOT EXISTS ret_log_zscore_90               double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf ADD COLUMN IF NOT EXISTS delta_ret_log_zscore_90         double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf ADD COLUMN IF NOT EXISTS ret_arith_roll_zscore_90        double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf ADD COLUMN IF NOT EXISTS delta_ret_arith_roll_zscore_90  double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf ADD COLUMN IF NOT EXISTS ret_log_roll_zscore_90          double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf ADD COLUMN IF NOT EXISTS delta_ret_log_roll_zscore_90    double precision;
+ALTER TABLE public.returns_bars_multi_tf ADD COLUMN IF NOT EXISTS ret_arith_zscore_90             double precision;
+ALTER TABLE public.returns_bars_multi_tf ADD COLUMN IF NOT EXISTS delta_ret_arith_zscore_90       double precision;
+ALTER TABLE public.returns_bars_multi_tf ADD COLUMN IF NOT EXISTS ret_log_zscore_90               double precision;
+ALTER TABLE public.returns_bars_multi_tf ADD COLUMN IF NOT EXISTS delta_ret_log_zscore_90         double precision;
+ALTER TABLE public.returns_bars_multi_tf ADD COLUMN IF NOT EXISTS ret_arith_roll_zscore_90        double precision;
+ALTER TABLE public.returns_bars_multi_tf ADD COLUMN IF NOT EXISTS delta_ret_arith_roll_zscore_90  double precision;
+ALTER TABLE public.returns_bars_multi_tf ADD COLUMN IF NOT EXISTS ret_log_roll_zscore_90          double precision;
+ALTER TABLE public.returns_bars_multi_tf ADD COLUMN IF NOT EXISTS delta_ret_log_roll_zscore_90    double precision;
 
--- --- cmc_returns_bars_multi_tf_cal_us ---
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_us RENAME COLUMN ret_arith_zscore            TO ret_arith_zscore_365;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_us RENAME COLUMN delta_ret_arith_zscore      TO delta_ret_arith_zscore_365;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_us RENAME COLUMN ret_log_zscore              TO ret_log_zscore_365;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_us RENAME COLUMN delta_ret_log_zscore        TO delta_ret_log_zscore_365;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_us RENAME COLUMN ret_arith_roll_zscore       TO ret_arith_roll_zscore_365;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_us RENAME COLUMN delta_ret_arith_roll_zscore TO delta_ret_arith_roll_zscore_365;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_us RENAME COLUMN ret_log_roll_zscore         TO ret_log_roll_zscore_365;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_us RENAME COLUMN delta_ret_log_roll_zscore   TO delta_ret_log_roll_zscore_365;
+-- --- returns_bars_multi_tf_cal_us ---
+ALTER TABLE public.returns_bars_multi_tf_cal_us RENAME COLUMN ret_arith_zscore            TO ret_arith_zscore_365;
+ALTER TABLE public.returns_bars_multi_tf_cal_us RENAME COLUMN delta_ret_arith_zscore      TO delta_ret_arith_zscore_365;
+ALTER TABLE public.returns_bars_multi_tf_cal_us RENAME COLUMN ret_log_zscore              TO ret_log_zscore_365;
+ALTER TABLE public.returns_bars_multi_tf_cal_us RENAME COLUMN delta_ret_log_zscore        TO delta_ret_log_zscore_365;
+ALTER TABLE public.returns_bars_multi_tf_cal_us RENAME COLUMN ret_arith_roll_zscore       TO ret_arith_roll_zscore_365;
+ALTER TABLE public.returns_bars_multi_tf_cal_us RENAME COLUMN delta_ret_arith_roll_zscore TO delta_ret_arith_roll_zscore_365;
+ALTER TABLE public.returns_bars_multi_tf_cal_us RENAME COLUMN ret_log_roll_zscore         TO ret_log_roll_zscore_365;
+ALTER TABLE public.returns_bars_multi_tf_cal_us RENAME COLUMN delta_ret_log_roll_zscore   TO delta_ret_log_roll_zscore_365;
 
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_arith_zscore_30             double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_us ADD COLUMN IF NOT EXISTS delta_ret_arith_zscore_30       double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_log_zscore_30               double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_us ADD COLUMN IF NOT EXISTS delta_ret_log_zscore_30         double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_arith_roll_zscore_30        double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_us ADD COLUMN IF NOT EXISTS delta_ret_arith_roll_zscore_30  double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_log_roll_zscore_30          double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_us ADD COLUMN IF NOT EXISTS delta_ret_log_roll_zscore_30    double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_arith_zscore_30             double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_us ADD COLUMN IF NOT EXISTS delta_ret_arith_zscore_30       double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_log_zscore_30               double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_us ADD COLUMN IF NOT EXISTS delta_ret_log_zscore_30         double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_arith_roll_zscore_30        double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_us ADD COLUMN IF NOT EXISTS delta_ret_arith_roll_zscore_30  double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_log_roll_zscore_30          double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_us ADD COLUMN IF NOT EXISTS delta_ret_log_roll_zscore_30    double precision;
 
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_arith_zscore_90             double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_us ADD COLUMN IF NOT EXISTS delta_ret_arith_zscore_90       double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_log_zscore_90               double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_us ADD COLUMN IF NOT EXISTS delta_ret_log_zscore_90         double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_arith_roll_zscore_90        double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_us ADD COLUMN IF NOT EXISTS delta_ret_arith_roll_zscore_90  double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_log_roll_zscore_90          double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_us ADD COLUMN IF NOT EXISTS delta_ret_log_roll_zscore_90    double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_arith_zscore_90             double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_us ADD COLUMN IF NOT EXISTS delta_ret_arith_zscore_90       double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_log_zscore_90               double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_us ADD COLUMN IF NOT EXISTS delta_ret_log_zscore_90         double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_arith_roll_zscore_90        double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_us ADD COLUMN IF NOT EXISTS delta_ret_arith_roll_zscore_90  double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_log_roll_zscore_90          double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_us ADD COLUMN IF NOT EXISTS delta_ret_log_roll_zscore_90    double precision;
 
--- --- cmc_returns_bars_multi_tf_cal_iso ---
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_iso RENAME COLUMN ret_arith_zscore            TO ret_arith_zscore_365;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_iso RENAME COLUMN delta_ret_arith_zscore      TO delta_ret_arith_zscore_365;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_iso RENAME COLUMN ret_log_zscore              TO ret_log_zscore_365;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_iso RENAME COLUMN delta_ret_log_zscore        TO delta_ret_log_zscore_365;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_iso RENAME COLUMN ret_arith_roll_zscore       TO ret_arith_roll_zscore_365;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_iso RENAME COLUMN delta_ret_arith_roll_zscore TO delta_ret_arith_roll_zscore_365;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_iso RENAME COLUMN ret_log_roll_zscore         TO ret_log_roll_zscore_365;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_iso RENAME COLUMN delta_ret_log_roll_zscore   TO delta_ret_log_roll_zscore_365;
+-- --- returns_bars_multi_tf_cal_iso ---
+ALTER TABLE public.returns_bars_multi_tf_cal_iso RENAME COLUMN ret_arith_zscore            TO ret_arith_zscore_365;
+ALTER TABLE public.returns_bars_multi_tf_cal_iso RENAME COLUMN delta_ret_arith_zscore      TO delta_ret_arith_zscore_365;
+ALTER TABLE public.returns_bars_multi_tf_cal_iso RENAME COLUMN ret_log_zscore              TO ret_log_zscore_365;
+ALTER TABLE public.returns_bars_multi_tf_cal_iso RENAME COLUMN delta_ret_log_zscore        TO delta_ret_log_zscore_365;
+ALTER TABLE public.returns_bars_multi_tf_cal_iso RENAME COLUMN ret_arith_roll_zscore       TO ret_arith_roll_zscore_365;
+ALTER TABLE public.returns_bars_multi_tf_cal_iso RENAME COLUMN delta_ret_arith_roll_zscore TO delta_ret_arith_roll_zscore_365;
+ALTER TABLE public.returns_bars_multi_tf_cal_iso RENAME COLUMN ret_log_roll_zscore         TO ret_log_roll_zscore_365;
+ALTER TABLE public.returns_bars_multi_tf_cal_iso RENAME COLUMN delta_ret_log_roll_zscore   TO delta_ret_log_roll_zscore_365;
 
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_arith_zscore_30             double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS delta_ret_arith_zscore_30       double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_log_zscore_30               double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS delta_ret_log_zscore_30         double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_arith_roll_zscore_30        double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS delta_ret_arith_roll_zscore_30  double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_log_roll_zscore_30          double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS delta_ret_log_roll_zscore_30    double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_arith_zscore_30             double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS delta_ret_arith_zscore_30       double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_log_zscore_30               double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS delta_ret_log_zscore_30         double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_arith_roll_zscore_30        double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS delta_ret_arith_roll_zscore_30  double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_log_roll_zscore_30          double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS delta_ret_log_roll_zscore_30    double precision;
 
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_arith_zscore_90             double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS delta_ret_arith_zscore_90       double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_log_zscore_90               double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS delta_ret_log_zscore_90         double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_arith_roll_zscore_90        double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS delta_ret_arith_roll_zscore_90  double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_log_roll_zscore_90          double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS delta_ret_log_roll_zscore_90    double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_arith_zscore_90             double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS delta_ret_arith_zscore_90       double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_log_zscore_90               double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS delta_ret_log_zscore_90         double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_arith_roll_zscore_90        double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS delta_ret_arith_roll_zscore_90  double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_log_roll_zscore_90          double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS delta_ret_log_roll_zscore_90    double precision;
 
--- --- cmc_returns_bars_multi_tf_cal_anchor_us ---
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_us RENAME COLUMN ret_arith_zscore            TO ret_arith_zscore_365;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_us RENAME COLUMN delta_ret_arith_zscore      TO delta_ret_arith_zscore_365;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_us RENAME COLUMN ret_log_zscore              TO ret_log_zscore_365;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_us RENAME COLUMN delta_ret_log_zscore        TO delta_ret_log_zscore_365;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_us RENAME COLUMN ret_arith_roll_zscore       TO ret_arith_roll_zscore_365;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_us RENAME COLUMN delta_ret_arith_roll_zscore TO delta_ret_arith_roll_zscore_365;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_us RENAME COLUMN ret_log_roll_zscore         TO ret_log_roll_zscore_365;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_us RENAME COLUMN delta_ret_log_roll_zscore   TO delta_ret_log_roll_zscore_365;
+-- --- returns_bars_multi_tf_cal_anchor_us ---
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_us RENAME COLUMN ret_arith_zscore            TO ret_arith_zscore_365;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_us RENAME COLUMN delta_ret_arith_zscore      TO delta_ret_arith_zscore_365;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_us RENAME COLUMN ret_log_zscore              TO ret_log_zscore_365;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_us RENAME COLUMN delta_ret_log_zscore        TO delta_ret_log_zscore_365;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_us RENAME COLUMN ret_arith_roll_zscore       TO ret_arith_roll_zscore_365;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_us RENAME COLUMN delta_ret_arith_roll_zscore TO delta_ret_arith_roll_zscore_365;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_us RENAME COLUMN ret_log_roll_zscore         TO ret_log_roll_zscore_365;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_us RENAME COLUMN delta_ret_log_roll_zscore   TO delta_ret_log_roll_zscore_365;
 
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_arith_zscore_30             double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS delta_ret_arith_zscore_30       double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_log_zscore_30               double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS delta_ret_log_zscore_30         double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_arith_roll_zscore_30        double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS delta_ret_arith_roll_zscore_30  double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_log_roll_zscore_30          double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS delta_ret_log_roll_zscore_30    double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_arith_zscore_30             double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS delta_ret_arith_zscore_30       double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_log_zscore_30               double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS delta_ret_log_zscore_30         double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_arith_roll_zscore_30        double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS delta_ret_arith_roll_zscore_30  double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_log_roll_zscore_30          double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS delta_ret_log_roll_zscore_30    double precision;
 
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_arith_zscore_90             double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS delta_ret_arith_zscore_90       double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_log_zscore_90               double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS delta_ret_log_zscore_90         double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_arith_roll_zscore_90        double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS delta_ret_arith_roll_zscore_90  double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_log_roll_zscore_90          double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS delta_ret_log_roll_zscore_90    double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_arith_zscore_90             double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS delta_ret_arith_zscore_90       double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_log_zscore_90               double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS delta_ret_log_zscore_90         double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_arith_roll_zscore_90        double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS delta_ret_arith_roll_zscore_90  double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_log_roll_zscore_90          double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS delta_ret_log_roll_zscore_90    double precision;
 
--- --- cmc_returns_bars_multi_tf_cal_anchor_iso ---
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_iso RENAME COLUMN ret_arith_zscore            TO ret_arith_zscore_365;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_iso RENAME COLUMN delta_ret_arith_zscore      TO delta_ret_arith_zscore_365;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_iso RENAME COLUMN ret_log_zscore              TO ret_log_zscore_365;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_iso RENAME COLUMN delta_ret_log_zscore        TO delta_ret_log_zscore_365;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_iso RENAME COLUMN ret_arith_roll_zscore       TO ret_arith_roll_zscore_365;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_iso RENAME COLUMN delta_ret_arith_roll_zscore TO delta_ret_arith_roll_zscore_365;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_iso RENAME COLUMN ret_log_roll_zscore         TO ret_log_roll_zscore_365;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_iso RENAME COLUMN delta_ret_log_roll_zscore   TO delta_ret_log_roll_zscore_365;
+-- --- returns_bars_multi_tf_cal_anchor_iso ---
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_iso RENAME COLUMN ret_arith_zscore            TO ret_arith_zscore_365;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_iso RENAME COLUMN delta_ret_arith_zscore      TO delta_ret_arith_zscore_365;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_iso RENAME COLUMN ret_log_zscore              TO ret_log_zscore_365;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_iso RENAME COLUMN delta_ret_log_zscore        TO delta_ret_log_zscore_365;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_iso RENAME COLUMN ret_arith_roll_zscore       TO ret_arith_roll_zscore_365;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_iso RENAME COLUMN delta_ret_arith_roll_zscore TO delta_ret_arith_roll_zscore_365;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_iso RENAME COLUMN ret_log_roll_zscore         TO ret_log_roll_zscore_365;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_iso RENAME COLUMN delta_ret_log_roll_zscore   TO delta_ret_log_roll_zscore_365;
 
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_arith_zscore_30             double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS delta_ret_arith_zscore_30       double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_log_zscore_30               double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS delta_ret_log_zscore_30         double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_arith_roll_zscore_30        double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS delta_ret_arith_roll_zscore_30  double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_log_roll_zscore_30          double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS delta_ret_log_roll_zscore_30    double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_arith_zscore_30             double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS delta_ret_arith_zscore_30       double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_log_zscore_30               double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS delta_ret_log_zscore_30         double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_arith_roll_zscore_30        double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS delta_ret_arith_roll_zscore_30  double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_log_roll_zscore_30          double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS delta_ret_log_roll_zscore_30    double precision;
 
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_arith_zscore_90             double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS delta_ret_arith_zscore_90       double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_log_zscore_90               double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS delta_ret_log_zscore_90         double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_arith_roll_zscore_90        double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS delta_ret_arith_roll_zscore_90  double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_log_roll_zscore_90          double precision;
-ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS delta_ret_log_roll_zscore_90    double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_arith_zscore_90             double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS delta_ret_arith_zscore_90       double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_log_zscore_90               double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS delta_ret_log_zscore_90         double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_arith_roll_zscore_90        double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS delta_ret_arith_roll_zscore_90  double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_log_roll_zscore_90          double precision;
+ALTER TABLE public.returns_bars_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS delta_ret_log_roll_zscore_90    double precision;
 
 
 -- ============================================================
@@ -164,172 +164,172 @@ ALTER TABLE public.cmc_returns_bars_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EX
 --   canonical: ret_arith_ema_zscore, ret_arith_ema_bar_zscore, ret_log_ema_zscore, ret_log_ema_bar_zscore
 --   roll:      ret_arith_ema_roll_zscore, ret_arith_ema_bar_roll_zscore, ret_log_ema_roll_zscore, ret_log_ema_bar_roll_zscore
 
--- --- cmc_returns_ema_multi_tf ---
-ALTER TABLE public.cmc_returns_ema_multi_tf RENAME COLUMN ret_arith_ema_zscore          TO ret_arith_ema_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf RENAME COLUMN ret_arith_ema_bar_zscore      TO ret_arith_ema_bar_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf RENAME COLUMN ret_log_ema_zscore            TO ret_log_ema_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf RENAME COLUMN ret_log_ema_bar_zscore        TO ret_log_ema_bar_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf RENAME COLUMN ret_arith_ema_roll_zscore     TO ret_arith_ema_roll_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf RENAME COLUMN ret_arith_ema_bar_roll_zscore TO ret_arith_ema_bar_roll_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf RENAME COLUMN ret_log_ema_roll_zscore       TO ret_log_ema_roll_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf RENAME COLUMN ret_log_ema_bar_roll_zscore   TO ret_log_ema_bar_roll_zscore_365;
+-- --- returns_ema_multi_tf ---
+ALTER TABLE public.returns_ema_multi_tf RENAME COLUMN ret_arith_ema_zscore          TO ret_arith_ema_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf RENAME COLUMN ret_arith_ema_bar_zscore      TO ret_arith_ema_bar_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf RENAME COLUMN ret_log_ema_zscore            TO ret_log_ema_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf RENAME COLUMN ret_log_ema_bar_zscore        TO ret_log_ema_bar_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf RENAME COLUMN ret_arith_ema_roll_zscore     TO ret_arith_ema_roll_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf RENAME COLUMN ret_arith_ema_bar_roll_zscore TO ret_arith_ema_bar_roll_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf RENAME COLUMN ret_log_ema_roll_zscore       TO ret_log_ema_roll_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf RENAME COLUMN ret_log_ema_bar_roll_zscore   TO ret_log_ema_bar_roll_zscore_365;
 
-ALTER TABLE public.cmc_returns_ema_multi_tf ADD COLUMN IF NOT EXISTS ret_arith_ema_zscore_30           double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_zscore_30       double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf ADD COLUMN IF NOT EXISTS ret_log_ema_zscore_30             double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf ADD COLUMN IF NOT EXISTS ret_log_ema_bar_zscore_30         double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf ADD COLUMN IF NOT EXISTS ret_arith_ema_roll_zscore_30      double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_roll_zscore_30  double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf ADD COLUMN IF NOT EXISTS ret_log_ema_roll_zscore_30        double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf ADD COLUMN IF NOT EXISTS ret_log_ema_bar_roll_zscore_30    double precision;
+ALTER TABLE public.returns_ema_multi_tf ADD COLUMN IF NOT EXISTS ret_arith_ema_zscore_30           double precision;
+ALTER TABLE public.returns_ema_multi_tf ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_zscore_30       double precision;
+ALTER TABLE public.returns_ema_multi_tf ADD COLUMN IF NOT EXISTS ret_log_ema_zscore_30             double precision;
+ALTER TABLE public.returns_ema_multi_tf ADD COLUMN IF NOT EXISTS ret_log_ema_bar_zscore_30         double precision;
+ALTER TABLE public.returns_ema_multi_tf ADD COLUMN IF NOT EXISTS ret_arith_ema_roll_zscore_30      double precision;
+ALTER TABLE public.returns_ema_multi_tf ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_roll_zscore_30  double precision;
+ALTER TABLE public.returns_ema_multi_tf ADD COLUMN IF NOT EXISTS ret_log_ema_roll_zscore_30        double precision;
+ALTER TABLE public.returns_ema_multi_tf ADD COLUMN IF NOT EXISTS ret_log_ema_bar_roll_zscore_30    double precision;
 
-ALTER TABLE public.cmc_returns_ema_multi_tf ADD COLUMN IF NOT EXISTS ret_arith_ema_zscore_90           double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_zscore_90       double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf ADD COLUMN IF NOT EXISTS ret_log_ema_zscore_90             double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf ADD COLUMN IF NOT EXISTS ret_log_ema_bar_zscore_90         double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf ADD COLUMN IF NOT EXISTS ret_arith_ema_roll_zscore_90      double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_roll_zscore_90  double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf ADD COLUMN IF NOT EXISTS ret_log_ema_roll_zscore_90        double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf ADD COLUMN IF NOT EXISTS ret_log_ema_bar_roll_zscore_90    double precision;
+ALTER TABLE public.returns_ema_multi_tf ADD COLUMN IF NOT EXISTS ret_arith_ema_zscore_90           double precision;
+ALTER TABLE public.returns_ema_multi_tf ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_zscore_90       double precision;
+ALTER TABLE public.returns_ema_multi_tf ADD COLUMN IF NOT EXISTS ret_log_ema_zscore_90             double precision;
+ALTER TABLE public.returns_ema_multi_tf ADD COLUMN IF NOT EXISTS ret_log_ema_bar_zscore_90         double precision;
+ALTER TABLE public.returns_ema_multi_tf ADD COLUMN IF NOT EXISTS ret_arith_ema_roll_zscore_90      double precision;
+ALTER TABLE public.returns_ema_multi_tf ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_roll_zscore_90  double precision;
+ALTER TABLE public.returns_ema_multi_tf ADD COLUMN IF NOT EXISTS ret_log_ema_roll_zscore_90        double precision;
+ALTER TABLE public.returns_ema_multi_tf ADD COLUMN IF NOT EXISTS ret_log_ema_bar_roll_zscore_90    double precision;
 
--- --- cmc_returns_ema_multi_tf_u ---
-ALTER TABLE public.cmc_returns_ema_multi_tf_u RENAME COLUMN ret_arith_ema_zscore          TO ret_arith_ema_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf_u RENAME COLUMN ret_arith_ema_bar_zscore      TO ret_arith_ema_bar_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf_u RENAME COLUMN ret_log_ema_zscore            TO ret_log_ema_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf_u RENAME COLUMN ret_log_ema_bar_zscore        TO ret_log_ema_bar_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf_u RENAME COLUMN ret_arith_ema_roll_zscore     TO ret_arith_ema_roll_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf_u RENAME COLUMN ret_arith_ema_bar_roll_zscore TO ret_arith_ema_bar_roll_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf_u RENAME COLUMN ret_log_ema_roll_zscore       TO ret_log_ema_roll_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf_u RENAME COLUMN ret_log_ema_bar_roll_zscore   TO ret_log_ema_bar_roll_zscore_365;
+-- --- returns_ema_multi_tf_u ---
+ALTER TABLE public.returns_ema_multi_tf_u RENAME COLUMN ret_arith_ema_zscore          TO ret_arith_ema_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf_u RENAME COLUMN ret_arith_ema_bar_zscore      TO ret_arith_ema_bar_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf_u RENAME COLUMN ret_log_ema_zscore            TO ret_log_ema_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf_u RENAME COLUMN ret_log_ema_bar_zscore        TO ret_log_ema_bar_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf_u RENAME COLUMN ret_arith_ema_roll_zscore     TO ret_arith_ema_roll_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf_u RENAME COLUMN ret_arith_ema_bar_roll_zscore TO ret_arith_ema_bar_roll_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf_u RENAME COLUMN ret_log_ema_roll_zscore       TO ret_log_ema_roll_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf_u RENAME COLUMN ret_log_ema_bar_roll_zscore   TO ret_log_ema_bar_roll_zscore_365;
 
-ALTER TABLE public.cmc_returns_ema_multi_tf_u ADD COLUMN IF NOT EXISTS ret_arith_ema_zscore_30           double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_u ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_zscore_30       double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_u ADD COLUMN IF NOT EXISTS ret_log_ema_zscore_30             double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_u ADD COLUMN IF NOT EXISTS ret_log_ema_bar_zscore_30         double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_u ADD COLUMN IF NOT EXISTS ret_arith_ema_roll_zscore_30      double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_u ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_roll_zscore_30  double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_u ADD COLUMN IF NOT EXISTS ret_log_ema_roll_zscore_30        double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_u ADD COLUMN IF NOT EXISTS ret_log_ema_bar_roll_zscore_30    double precision;
+ALTER TABLE public.returns_ema_multi_tf_u ADD COLUMN IF NOT EXISTS ret_arith_ema_zscore_30           double precision;
+ALTER TABLE public.returns_ema_multi_tf_u ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_zscore_30       double precision;
+ALTER TABLE public.returns_ema_multi_tf_u ADD COLUMN IF NOT EXISTS ret_log_ema_zscore_30             double precision;
+ALTER TABLE public.returns_ema_multi_tf_u ADD COLUMN IF NOT EXISTS ret_log_ema_bar_zscore_30         double precision;
+ALTER TABLE public.returns_ema_multi_tf_u ADD COLUMN IF NOT EXISTS ret_arith_ema_roll_zscore_30      double precision;
+ALTER TABLE public.returns_ema_multi_tf_u ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_roll_zscore_30  double precision;
+ALTER TABLE public.returns_ema_multi_tf_u ADD COLUMN IF NOT EXISTS ret_log_ema_roll_zscore_30        double precision;
+ALTER TABLE public.returns_ema_multi_tf_u ADD COLUMN IF NOT EXISTS ret_log_ema_bar_roll_zscore_30    double precision;
 
-ALTER TABLE public.cmc_returns_ema_multi_tf_u ADD COLUMN IF NOT EXISTS ret_arith_ema_zscore_90           double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_u ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_zscore_90       double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_u ADD COLUMN IF NOT EXISTS ret_log_ema_zscore_90             double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_u ADD COLUMN IF NOT EXISTS ret_log_ema_bar_zscore_90         double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_u ADD COLUMN IF NOT EXISTS ret_arith_ema_roll_zscore_90      double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_u ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_roll_zscore_90  double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_u ADD COLUMN IF NOT EXISTS ret_log_ema_roll_zscore_90        double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_u ADD COLUMN IF NOT EXISTS ret_log_ema_bar_roll_zscore_90    double precision;
+ALTER TABLE public.returns_ema_multi_tf_u ADD COLUMN IF NOT EXISTS ret_arith_ema_zscore_90           double precision;
+ALTER TABLE public.returns_ema_multi_tf_u ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_zscore_90       double precision;
+ALTER TABLE public.returns_ema_multi_tf_u ADD COLUMN IF NOT EXISTS ret_log_ema_zscore_90             double precision;
+ALTER TABLE public.returns_ema_multi_tf_u ADD COLUMN IF NOT EXISTS ret_log_ema_bar_zscore_90         double precision;
+ALTER TABLE public.returns_ema_multi_tf_u ADD COLUMN IF NOT EXISTS ret_arith_ema_roll_zscore_90      double precision;
+ALTER TABLE public.returns_ema_multi_tf_u ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_roll_zscore_90  double precision;
+ALTER TABLE public.returns_ema_multi_tf_u ADD COLUMN IF NOT EXISTS ret_log_ema_roll_zscore_90        double precision;
+ALTER TABLE public.returns_ema_multi_tf_u ADD COLUMN IF NOT EXISTS ret_log_ema_bar_roll_zscore_90    double precision;
 
--- --- cmc_returns_ema_multi_tf_cal_us ---
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_us RENAME COLUMN ret_arith_ema_zscore          TO ret_arith_ema_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_us RENAME COLUMN ret_arith_ema_bar_zscore      TO ret_arith_ema_bar_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_us RENAME COLUMN ret_log_ema_zscore            TO ret_log_ema_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_us RENAME COLUMN ret_log_ema_bar_zscore        TO ret_log_ema_bar_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_us RENAME COLUMN ret_arith_ema_roll_zscore     TO ret_arith_ema_roll_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_us RENAME COLUMN ret_arith_ema_bar_roll_zscore TO ret_arith_ema_bar_roll_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_us RENAME COLUMN ret_log_ema_roll_zscore       TO ret_log_ema_roll_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_us RENAME COLUMN ret_log_ema_bar_roll_zscore   TO ret_log_ema_bar_roll_zscore_365;
+-- --- returns_ema_multi_tf_cal_us ---
+ALTER TABLE public.returns_ema_multi_tf_cal_us RENAME COLUMN ret_arith_ema_zscore          TO ret_arith_ema_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf_cal_us RENAME COLUMN ret_arith_ema_bar_zscore      TO ret_arith_ema_bar_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf_cal_us RENAME COLUMN ret_log_ema_zscore            TO ret_log_ema_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf_cal_us RENAME COLUMN ret_log_ema_bar_zscore        TO ret_log_ema_bar_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf_cal_us RENAME COLUMN ret_arith_ema_roll_zscore     TO ret_arith_ema_roll_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf_cal_us RENAME COLUMN ret_arith_ema_bar_roll_zscore TO ret_arith_ema_bar_roll_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf_cal_us RENAME COLUMN ret_log_ema_roll_zscore       TO ret_log_ema_roll_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf_cal_us RENAME COLUMN ret_log_ema_bar_roll_zscore   TO ret_log_ema_bar_roll_zscore_365;
 
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_arith_ema_zscore_30           double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_zscore_30       double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_log_ema_zscore_30             double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_log_ema_bar_zscore_30         double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_arith_ema_roll_zscore_30      double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_roll_zscore_30  double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_log_ema_roll_zscore_30        double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_log_ema_bar_roll_zscore_30    double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_arith_ema_zscore_30           double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_zscore_30       double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_log_ema_zscore_30             double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_log_ema_bar_zscore_30         double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_arith_ema_roll_zscore_30      double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_roll_zscore_30  double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_log_ema_roll_zscore_30        double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_log_ema_bar_roll_zscore_30    double precision;
 
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_arith_ema_zscore_90           double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_zscore_90       double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_log_ema_zscore_90             double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_log_ema_bar_zscore_90         double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_arith_ema_roll_zscore_90      double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_roll_zscore_90  double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_log_ema_roll_zscore_90        double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_log_ema_bar_roll_zscore_90    double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_arith_ema_zscore_90           double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_zscore_90       double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_log_ema_zscore_90             double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_log_ema_bar_zscore_90         double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_arith_ema_roll_zscore_90      double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_roll_zscore_90  double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_log_ema_roll_zscore_90        double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_us ADD COLUMN IF NOT EXISTS ret_log_ema_bar_roll_zscore_90    double precision;
 
--- --- cmc_returns_ema_multi_tf_cal_iso ---
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_iso RENAME COLUMN ret_arith_ema_zscore          TO ret_arith_ema_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_iso RENAME COLUMN ret_arith_ema_bar_zscore      TO ret_arith_ema_bar_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_iso RENAME COLUMN ret_log_ema_zscore            TO ret_log_ema_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_iso RENAME COLUMN ret_log_ema_bar_zscore        TO ret_log_ema_bar_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_iso RENAME COLUMN ret_arith_ema_roll_zscore     TO ret_arith_ema_roll_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_iso RENAME COLUMN ret_arith_ema_bar_roll_zscore TO ret_arith_ema_bar_roll_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_iso RENAME COLUMN ret_log_ema_roll_zscore       TO ret_log_ema_roll_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_iso RENAME COLUMN ret_log_ema_bar_roll_zscore   TO ret_log_ema_bar_roll_zscore_365;
+-- --- returns_ema_multi_tf_cal_iso ---
+ALTER TABLE public.returns_ema_multi_tf_cal_iso RENAME COLUMN ret_arith_ema_zscore          TO ret_arith_ema_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf_cal_iso RENAME COLUMN ret_arith_ema_bar_zscore      TO ret_arith_ema_bar_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf_cal_iso RENAME COLUMN ret_log_ema_zscore            TO ret_log_ema_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf_cal_iso RENAME COLUMN ret_log_ema_bar_zscore        TO ret_log_ema_bar_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf_cal_iso RENAME COLUMN ret_arith_ema_roll_zscore     TO ret_arith_ema_roll_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf_cal_iso RENAME COLUMN ret_arith_ema_bar_roll_zscore TO ret_arith_ema_bar_roll_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf_cal_iso RENAME COLUMN ret_log_ema_roll_zscore       TO ret_log_ema_roll_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf_cal_iso RENAME COLUMN ret_log_ema_bar_roll_zscore   TO ret_log_ema_bar_roll_zscore_365;
 
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_arith_ema_zscore_30           double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_zscore_30       double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_log_ema_zscore_30             double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_log_ema_bar_zscore_30         double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_arith_ema_roll_zscore_30      double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_roll_zscore_30  double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_log_ema_roll_zscore_30        double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_log_ema_bar_roll_zscore_30    double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_arith_ema_zscore_30           double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_zscore_30       double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_log_ema_zscore_30             double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_log_ema_bar_zscore_30         double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_arith_ema_roll_zscore_30      double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_roll_zscore_30  double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_log_ema_roll_zscore_30        double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_log_ema_bar_roll_zscore_30    double precision;
 
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_arith_ema_zscore_90           double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_zscore_90       double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_log_ema_zscore_90             double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_log_ema_bar_zscore_90         double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_arith_ema_roll_zscore_90      double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_roll_zscore_90  double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_log_ema_roll_zscore_90        double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_log_ema_bar_roll_zscore_90    double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_arith_ema_zscore_90           double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_zscore_90       double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_log_ema_zscore_90             double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_log_ema_bar_zscore_90         double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_arith_ema_roll_zscore_90      double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_roll_zscore_90  double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_log_ema_roll_zscore_90        double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_iso ADD COLUMN IF NOT EXISTS ret_log_ema_bar_roll_zscore_90    double precision;
 
--- --- cmc_returns_ema_multi_tf_cal_anchor_us ---
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_us RENAME COLUMN ret_arith_ema_zscore          TO ret_arith_ema_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_us RENAME COLUMN ret_arith_ema_bar_zscore      TO ret_arith_ema_bar_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_us RENAME COLUMN ret_log_ema_zscore            TO ret_log_ema_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_us RENAME COLUMN ret_log_ema_bar_zscore        TO ret_log_ema_bar_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_us RENAME COLUMN ret_arith_ema_roll_zscore     TO ret_arith_ema_roll_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_us RENAME COLUMN ret_arith_ema_bar_roll_zscore TO ret_arith_ema_bar_roll_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_us RENAME COLUMN ret_log_ema_roll_zscore       TO ret_log_ema_roll_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_us RENAME COLUMN ret_log_ema_bar_roll_zscore   TO ret_log_ema_bar_roll_zscore_365;
+-- --- returns_ema_multi_tf_cal_anchor_us ---
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_us RENAME COLUMN ret_arith_ema_zscore          TO ret_arith_ema_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_us RENAME COLUMN ret_arith_ema_bar_zscore      TO ret_arith_ema_bar_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_us RENAME COLUMN ret_log_ema_zscore            TO ret_log_ema_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_us RENAME COLUMN ret_log_ema_bar_zscore        TO ret_log_ema_bar_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_us RENAME COLUMN ret_arith_ema_roll_zscore     TO ret_arith_ema_roll_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_us RENAME COLUMN ret_arith_ema_bar_roll_zscore TO ret_arith_ema_bar_roll_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_us RENAME COLUMN ret_log_ema_roll_zscore       TO ret_log_ema_roll_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_us RENAME COLUMN ret_log_ema_bar_roll_zscore   TO ret_log_ema_bar_roll_zscore_365;
 
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_arith_ema_zscore_30           double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_zscore_30       double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_log_ema_zscore_30             double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_log_ema_bar_zscore_30         double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_arith_ema_roll_zscore_30      double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_roll_zscore_30  double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_log_ema_roll_zscore_30        double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_log_ema_bar_roll_zscore_30    double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_arith_ema_zscore_30           double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_zscore_30       double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_log_ema_zscore_30             double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_log_ema_bar_zscore_30         double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_arith_ema_roll_zscore_30      double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_roll_zscore_30  double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_log_ema_roll_zscore_30        double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_log_ema_bar_roll_zscore_30    double precision;
 
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_arith_ema_zscore_90           double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_zscore_90       double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_log_ema_zscore_90             double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_log_ema_bar_zscore_90         double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_arith_ema_roll_zscore_90      double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_roll_zscore_90  double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_log_ema_roll_zscore_90        double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_log_ema_bar_roll_zscore_90    double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_arith_ema_zscore_90           double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_zscore_90       double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_log_ema_zscore_90             double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_log_ema_bar_zscore_90         double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_arith_ema_roll_zscore_90      double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_roll_zscore_90  double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_log_ema_roll_zscore_90        double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_us ADD COLUMN IF NOT EXISTS ret_log_ema_bar_roll_zscore_90    double precision;
 
--- --- cmc_returns_ema_multi_tf_cal_anchor_iso ---
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_iso RENAME COLUMN ret_arith_ema_zscore          TO ret_arith_ema_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_iso RENAME COLUMN ret_arith_ema_bar_zscore      TO ret_arith_ema_bar_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_iso RENAME COLUMN ret_log_ema_zscore            TO ret_log_ema_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_iso RENAME COLUMN ret_log_ema_bar_zscore        TO ret_log_ema_bar_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_iso RENAME COLUMN ret_arith_ema_roll_zscore     TO ret_arith_ema_roll_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_iso RENAME COLUMN ret_arith_ema_bar_roll_zscore TO ret_arith_ema_bar_roll_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_iso RENAME COLUMN ret_log_ema_roll_zscore       TO ret_log_ema_roll_zscore_365;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_iso RENAME COLUMN ret_log_ema_bar_roll_zscore   TO ret_log_ema_bar_roll_zscore_365;
+-- --- returns_ema_multi_tf_cal_anchor_iso ---
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_iso RENAME COLUMN ret_arith_ema_zscore          TO ret_arith_ema_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_iso RENAME COLUMN ret_arith_ema_bar_zscore      TO ret_arith_ema_bar_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_iso RENAME COLUMN ret_log_ema_zscore            TO ret_log_ema_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_iso RENAME COLUMN ret_log_ema_bar_zscore        TO ret_log_ema_bar_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_iso RENAME COLUMN ret_arith_ema_roll_zscore     TO ret_arith_ema_roll_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_iso RENAME COLUMN ret_arith_ema_bar_roll_zscore TO ret_arith_ema_bar_roll_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_iso RENAME COLUMN ret_log_ema_roll_zscore       TO ret_log_ema_roll_zscore_365;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_iso RENAME COLUMN ret_log_ema_bar_roll_zscore   TO ret_log_ema_bar_roll_zscore_365;
 
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_arith_ema_zscore_30           double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_zscore_30       double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_log_ema_zscore_30             double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_log_ema_bar_zscore_30         double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_arith_ema_roll_zscore_30      double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_roll_zscore_30  double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_log_ema_roll_zscore_30        double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_log_ema_bar_roll_zscore_30    double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_arith_ema_zscore_30           double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_zscore_30       double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_log_ema_zscore_30             double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_log_ema_bar_zscore_30         double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_arith_ema_roll_zscore_30      double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_roll_zscore_30  double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_log_ema_roll_zscore_30        double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_log_ema_bar_roll_zscore_30    double precision;
 
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_arith_ema_zscore_90           double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_zscore_90       double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_log_ema_zscore_90             double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_log_ema_bar_zscore_90         double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_arith_ema_roll_zscore_90      double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_roll_zscore_90  double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_log_ema_roll_zscore_90        double precision;
-ALTER TABLE public.cmc_returns_ema_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_log_ema_bar_roll_zscore_90    double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_arith_ema_zscore_90           double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_zscore_90       double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_log_ema_zscore_90             double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_log_ema_bar_zscore_90         double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_arith_ema_roll_zscore_90      double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_arith_ema_bar_roll_zscore_90  double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_log_ema_roll_zscore_90        double precision;
+ALTER TABLE public.returns_ema_multi_tf_cal_anchor_iso ADD COLUMN IF NOT EXISTS ret_log_ema_bar_roll_zscore_90    double precision;
 
 COMMIT;

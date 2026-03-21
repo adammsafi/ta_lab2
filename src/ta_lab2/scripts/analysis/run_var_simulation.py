@@ -1,8 +1,8 @@
 """
 CLI to run VaR simulation on backtest trade returns.
 
-Loads trade-level returns from cmc_backtest_trades (with fallback to daily bar
-returns from cmc_returns_bars_multi_tf_u), runs the full VaR suite at 95% and 99%
+Loads trade-level returns from backtest_trades (with fallback to daily bar
+returns from returns_bars_multi_tf_u), runs the full VaR suite at 95% and 99%
 confidence levels, generates VAR_REPORT.md and var_comparison.html chart.
 
 Purpose: connects the var_simulator library (Phase 48 Plan 01) to real DB data
@@ -62,7 +62,7 @@ _DEFAULT_STRATEGIES = [
 _DEFAULT_ASSET_IDS = [1, 2]
 _DEFAULT_CONFIDENCE_LEVELS = [0.95, 0.99]
 
-# Signal type -> backtest signal_type mapping (exact values in cmc_backtest_runs)
+# Signal type -> backtest signal_type mapping (exact values in backtest_runs)
 _SIGNAL_TYPE_MAP = {
     "ema_trend_17_77": "ema_trend_17_77",
     "ema_trend_21_50": "ema_trend_21_50",
@@ -110,12 +110,12 @@ def _load_backtest_returns(
     Falls back to daily bar returns if no backtest trades found.
     """
     try:
-        # Column is pnl_pct (not return_pct) in cmc_backtest_trades
+        # Column is pnl_pct (not return_pct) in backtest_trades
         sql = text(
             """
             SELECT bt.pnl_pct
-            FROM public.cmc_backtest_trades bt
-            JOIN public.cmc_backtest_runs r ON bt.run_id = r.run_id
+            FROM public.backtest_trades bt
+            JOIN public.backtest_runs r ON bt.run_id = r.run_id
             WHERE r.signal_type = :signal_type
               AND r.asset_id = :asset_id
             ORDER BY bt.exit_ts
@@ -127,7 +127,7 @@ def _load_backtest_returns(
             )
     except Exception as exc:
         logger.warning(
-            "Could not query cmc_backtest_trades for %s/asset_id=%d: %s. "
+            "Could not query backtest_trades for %s/asset_id=%d: %s. "
             "Falling back to bar returns.",
             signal_type,
             asset_id,
@@ -137,7 +137,7 @@ def _load_backtest_returns(
 
     if not df.empty and len(df) >= 10:
         returns = df["pnl_pct"].dropna().values.astype(float) / 100.0
-        source = "cmc_backtest_trades"
+        source = "backtest_trades"
         logger.info(
             "Loaded %d trade returns for %s/asset_id=%d",
             len(returns),
@@ -153,11 +153,11 @@ def _load_backtest_returns(
         asset_id,
     )
     try:
-        # Timestamp column is 'timestamp' (not 'ts') in cmc_returns_bars_multi_tf_u
+        # Timestamp column is 'timestamp' (not 'ts') in returns_bars_multi_tf_u
         sql = text(
             """
             SELECT ret_arith
-            FROM public.cmc_returns_bars_multi_tf_u
+            FROM public.returns_bars_multi_tf_u
             WHERE id = :asset_id AND tf = '1D'
             ORDER BY timestamp
             """
@@ -177,7 +177,7 @@ def _load_backtest_returns(
         return np.array([]), "empty"
 
     returns = df["ret_arith"].dropna().values.astype(float)
-    source = "cmc_returns_bars_multi_tf_u"
+    source = "returns_bars_multi_tf_u"
     logger.info(
         "Loaded %d bar returns for asset_id=%d (fallback proxy)",
         len(returns),
@@ -524,7 +524,7 @@ def main(argv: list[str] | None = None) -> None:
 
     # Determine data source for report header
     # (approximate: if we got lots of obs it's likely from bar returns)
-    data_source = "cmc_backtest_trades (with bar returns fallback where needed)"
+    data_source = "backtest_trades (with bar returns fallback where needed)"
 
     # Generate report
     report_path = _build_var_report(results, data_source, args.output_dir)

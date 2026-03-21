@@ -11,7 +11,7 @@
 
 CREATE TABLE IF NOT EXISTS public.psr_results (
     result_id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    run_id              UUID NOT NULL REFERENCES public.cmc_backtest_runs(run_id) ON DELETE CASCADE,
+    run_id              UUID NOT NULL REFERENCES public.backtest_runs(run_id) ON DELETE CASCADE,
 
     -- Formula identification
     formula_version     TEXT NOT NULL,              -- e.g. 'lopez_de_prado_v1'

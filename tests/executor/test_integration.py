@@ -130,7 +130,7 @@ class TestCrossModuleCompatibility:
         from ta_lab2.executor import SIGNAL_TABLE_MAP
 
         for signal_type, table_name in SIGNAL_TABLE_MAP.items():
-            assert table_name.startswith("cmc_signals_"), (
+            assert table_name.startswith("signals_"), (
                 f"{signal_type} maps to unexpected table: {table_name}"
             )
 

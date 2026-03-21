@@ -1,0 +1,17 @@
+Row Count Verification Report
+Generated: 2026-03-20T13:38:26Z
+Database: localhost:5432/marketdata
+
+alignment_source                  siloed_count         u_count       status
+---------------------------------------------------------------------------
+multi_tf                             3,271,844       3,271,844        MATCH  [PASS]
+multi_tf_cal_anchor_iso              2,124,041       2,124,041        MATCH  [PASS]
+multi_tf_cal_anchor_us               2,124,041       2,124,041        MATCH  [PASS]
+multi_tf_cal_iso                     2,254,850       2,254,850        MATCH  [PASS]
+multi_tf_cal_us                      2,254,850       2,254,850        MATCH  [PASS]
+---------------------------------------------------------------------------
+TOTAL                               12,029,626      12,029,626
+
+Summary: 5 PASS, 0 WARN, 0 FAIL
+
+RESULT: PASS - All alignment_source rows match or _u has more rows

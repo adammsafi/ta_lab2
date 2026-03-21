@@ -1,8 +1,8 @@
 """
 AMAReturnsFeature - Computes return columns for AMA value tables.
 
-Reads AMA values from a source table (e.g. cmc_ama_multi_tf) and writes
-return columns to a corresponding returns table (e.g. cmc_returns_ama_multi_tf).
+Reads AMA values from a source table (e.g. ama_multi_tf) and writes
+return columns to a corresponding returns table (e.g. returns_ama_multi_tf).
 
 Column pattern mirrors EMA returns tables but WITHOUT the _ema_bar family:
 
@@ -30,9 +30,9 @@ Usage:
     from ta_lab2.features.ama.ama_returns import AMAReturnsFeature
 
     feature = AMAReturnsFeature(
-        source_table="public.cmc_ama_multi_tf",
-        returns_table="public.cmc_returns_ama_multi_tf",
-        state_table="public.cmc_returns_ama_multi_tf_state",
+        source_table="public.ama_multi_tf",
+        returns_table="public.returns_ama_multi_tf",
+        state_table="public.returns_ama_multi_tf_state",
     )
     feature.refresh(engine, asset_ids=[1, 52], tfs=["1D", "7D"])
 """
@@ -82,7 +82,7 @@ class AMAReturnsFeature:
     Computes AMA returns from a source AMA value table.
 
     This class reads AMA values and writes 12 return columns (+2 gap_days columns)
-    to a returns table whose schema matches create_cmc_returns_ama_multi_tf.sql.
+    to a returns table whose schema matches create_returns_ama_multi_tf.sql.
 
     The computation is grouped by (id, tf, indicator, params_hash) so that
     LAG (diff/pct_change) never crosses parameter-set boundaries.
@@ -101,9 +101,9 @@ class AMAReturnsFeature:
         Initialise AMAReturnsFeature.
 
         Args:
-            source_table: Fully-qualified source table, e.g. "public.cmc_ama_multi_tf".
-            returns_table: Fully-qualified returns table, e.g. "public.cmc_returns_ama_multi_tf".
-            state_table: Fully-qualified state table, e.g. "public.cmc_returns_ama_multi_tf_state".
+            source_table: Fully-qualified source table, e.g. "public.ama_multi_tf".
+            returns_table: Fully-qualified returns table, e.g. "public.returns_ama_multi_tf".
+            state_table: Fully-qualified state table, e.g. "public.returns_ama_multi_tf_state".
         """
         self.source_table = source_table
         self.returns_table = returns_table
@@ -118,12 +118,13 @@ class AMAReturnsFeature:
         engine: Engine,
         asset_id: int,
         tf: str,
+        venue_id: int = 1,
     ) -> pd.DataFrame:
         """
-        Compute AMA return columns for one (asset_id, tf) slice.
+        Compute AMA return columns for one (asset_id, tf, venue_id) slice.
 
-        1. Loads AMA values from source_table for the given (id, tf).
-        2. Groups by (id, tf, indicator, params_hash) for correct LAG.
+        1. Loads AMA values from source_table for the given (id, venue_id, tf).
+        2. Groups by (id, venue_id, tf, indicator, params_hash) for correct LAG.
         3. Computes roll columns on ALL rows (unified timeline by ts).
         4. Computes canonical columns on roll=FALSE rows only.
         5. Combines all groups into a single DataFrame.
@@ -132,6 +133,7 @@ class AMAReturnsFeature:
             engine: SQLAlchemy engine.
             asset_id: Asset primary key.
             tf: Timeframe label (e.g. "1D").
+            venue_id: Venue identifier (FK to dim_venues). Default 1 (CMC_AGG).
 
         Returns:
             DataFrame with PK columns + return columns. Empty if no source data.
@@ -139,20 +141,23 @@ class AMAReturnsFeature:
         # -- Load AMA values --------------------------------------------------
         sql = text(
             f"""
-            SELECT id, ts, tf, tf_days, indicator, params_hash, roll, ama
+            SELECT id, venue_id, ts, tf, tf_days, indicator, params_hash, roll, ama
             FROM {self.source_table}
-            WHERE id = :id AND tf = :tf
+            WHERE id = :id AND venue_id = :venue_id AND tf = :tf
             ORDER BY indicator, params_hash, ts
             """
         )
         with engine.connect() as conn:
-            df_src = pd.read_sql(sql, conn, params={"id": asset_id, "tf": tf})
+            df_src = pd.read_sql(
+                sql, conn, params={"id": asset_id, "venue_id": venue_id, "tf": tf}
+            )
 
         if df_src.empty:
             logger.debug(
-                "No AMA values in %s for id=%s tf=%s — skipping",
+                "No AMA values in %s for id=%s venue_id=%s tf=%s — skipping",
                 self.source_table,
                 asset_id,
+                venue_id,
                 tf,
             )
             return pd.DataFrame()
@@ -160,8 +165,8 @@ class AMAReturnsFeature:
         # Coerce ts to tz-aware UTC (Windows pitfall: use pd.to_datetime not .values)
         df_src["ts"] = pd.to_datetime(df_src["ts"], utc=True, errors="coerce")
 
-        # -- Group by (id, tf, indicator, params_hash) ------------------------
-        group_keys = ["id", "tf", "indicator", "params_hash"]
+        # -- Group by (id, venue_id, tf, indicator, params_hash) ---------------
+        group_keys = ["id", "venue_id", "tf", "indicator", "params_hash"]
         all_groups: list[pd.DataFrame] = []
 
         for group_id, group_df in df_src.groupby(group_keys, sort=False):
@@ -317,12 +322,17 @@ class AMAReturnsFeature:
             return 0
 
         asset_id = int(df_write["id"].iloc[0])
+        venue_id = (
+            int(df_write["venue_id"].iloc[0]) if "venue_id" in df_write.columns else 1
+        )
         tf = str(df_write["tf"].iloc[0])
 
         with engine.begin() as conn:
             conn.execute(
-                text(f"DELETE FROM {self.returns_table} WHERE id = :id AND tf = :tf"),
-                {"id": asset_id, "tf": tf},
+                text(
+                    f"DELETE FROM {self.returns_table} WHERE id = :id AND venue_id = :venue_id AND tf = :tf"
+                ),
+                {"id": asset_id, "venue_id": venue_id, "tf": tf},
             )
 
         # INSERT via to_sql append (ON CONFLICT DO NOTHING via method override)
@@ -362,12 +372,13 @@ class AMAReturnsFeature:
         indicator: str,
         params_hash: str,
         last_ts: datetime,
+        venue_id: int = 1,
     ) -> None:
         """
-        Upsert state row for one (id, tf, indicator, params_hash).
+        Upsert state row for one (id, venue_id, tf, indicator, params_hash).
 
-        State table DDL from create_cmc_returns_ama_multi_tf.sql:
-            PK (id, tf, indicator, params_hash)
+        State table DDL:
+            PK (id, venue_id, tf, indicator, params_hash)
         """
         # Ensure state table exists
         self._ensure_state_table(engine)
@@ -375,10 +386,10 @@ class AMAReturnsFeature:
         sql = text(
             f"""
             INSERT INTO {self.state_table}
-                (id, tf, indicator, params_hash, last_ts, updated_at)
+                (id, venue_id, tf, indicator, params_hash, last_ts, updated_at)
             VALUES
-                (:id, :tf, :indicator, :params_hash, :last_ts, NOW())
-            ON CONFLICT (id, tf, indicator, params_hash) DO UPDATE SET
+                (:id, :venue_id, :tf, :indicator, :params_hash, :last_ts, NOW())
+            ON CONFLICT (id, venue_id, tf, indicator, params_hash) DO UPDATE SET
                 last_ts    = EXCLUDED.last_ts,
                 updated_at = NOW()
             """
@@ -388,6 +399,7 @@ class AMAReturnsFeature:
                 sql,
                 {
                     "id": asset_id,
+                    "venue_id": venue_id,
                     "tf": tf,
                     "indicator": indicator,
                     "params_hash": params_hash,
@@ -401,12 +413,13 @@ class AMAReturnsFeature:
             f"""
             CREATE TABLE IF NOT EXISTS {self.state_table} (
                 id          bigint      NOT NULL,
+                venue_id    smallint    NOT NULL DEFAULT 1,
                 tf          text        NOT NULL,
                 indicator   text        NOT NULL,
                 params_hash text        NOT NULL,
                 last_ts     timestamptz,
                 updated_at  timestamptz NOT NULL DEFAULT now(),
-                PRIMARY KEY (id, tf, indicator, params_hash)
+                PRIMARY KEY (id, venue_id, tf, indicator, params_hash)
             )
             """
         )
@@ -422,6 +435,7 @@ class AMAReturnsFeature:
         engine: Engine,
         asset_ids: list[int],
         tfs: list[str],
+        venue_id: int = 1,
     ) -> None:
         """
         Compute and write AMA returns for all (asset_id, tf) combinations.
@@ -429,12 +443,13 @@ class AMAReturnsFeature:
         For each (asset_id, tf):
         1. compute_returns() -> DataFrame with 12 return columns + gap_days
         2. _write_returns()  -> scoped DELETE + INSERT into returns_table
-        3. _update_state()   -> upsert watermark per (id, tf, indicator, params_hash)
+        3. _update_state()   -> upsert watermark per (id, venue_id, tf, indicator, params_hash)
 
         Args:
             engine: SQLAlchemy engine.
             asset_ids: List of asset IDs to refresh.
             tfs: List of timeframe labels to refresh.
+            venue_id: Venue identifier (FK to dim_venues). Default 1 (CMC_AGG).
         """
         total_processed = 0
         total_rows = 0
@@ -442,11 +457,12 @@ class AMAReturnsFeature:
         for asset_id in asset_ids:
             for tf in tfs:
                 try:
-                    df = self.compute_returns(engine, asset_id, tf)
+                    df = self.compute_returns(engine, asset_id, tf, venue_id=venue_id)
                     if df.empty:
                         logger.debug(
-                            "No returns computed for id=%s tf=%s — skipping write",
+                            "No returns computed for id=%s venue_id=%s tf=%s — skipping write",
                             asset_id,
+                            venue_id,
                             tf,
                         )
                         continue
@@ -480,11 +496,13 @@ class AMAReturnsFeature:
                             indicator=str(indicator),
                             params_hash=str(params_hash),
                             last_ts=last_ts_dt,
+                            venue_id=venue_id,
                         )
 
                     logger.info(
-                        "id=%s tf=%s -> %d rows written to %s",
+                        "id=%s venue_id=%s tf=%s -> %d rows written to %s",
                         asset_id,
+                        venue_id,
                         tf,
                         n_rows,
                         self.returns_table,
@@ -492,8 +510,9 @@ class AMAReturnsFeature:
 
                 except Exception as exc:
                     logger.error(
-                        "Failed to compute/write returns for id=%s tf=%s: %s",
+                        "Failed to compute/write returns for id=%s venue_id=%s tf=%s: %s",
                         asset_id,
+                        venue_id,
                         tf,
                         exc,
                         exc_info=True,

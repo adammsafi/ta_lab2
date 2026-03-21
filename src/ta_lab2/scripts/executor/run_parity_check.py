@@ -72,7 +72,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--signal-id",
         type=int,
         required=True,
-        help="Signal ID to compare (must match cmc_backtest_runs.signal_id).",
+        help="Signal ID to compare (must match backtest_runs.signal_id).",
     )
     parser.add_argument(
         "--config-id",

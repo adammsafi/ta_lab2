@@ -2,12 +2,12 @@
 Calendar-anchor multi-timeframe AMA feature classes.
 
 Covers two calendar anchor schemes:
-- CalAnchorUSAMAFeature  : loads from cmc_price_bars_multi_tf_cal_anchor_us
-- CalAnchorISOAMAFeature : loads from cmc_price_bars_multi_tf_cal_anchor_iso
+- CalAnchorUSAMAFeature  : loads from price_bars_multi_tf_u (alignment_source='multi_tf_cal_anchor_us')
+- CalAnchorISOAMAFeature : loads from price_bars_multi_tf_u (alignment_source='multi_tf_cal_anchor_iso')
 
 Both extend BaseAMAFeature and write to their respective output tables:
-  cmc_ama_multi_tf_cal_anchor_us
-  cmc_ama_multi_tf_cal_anchor_iso
+  ama_multi_tf_cal_anchor_us
+  ama_multi_tf_cal_anchor_iso
 
 Design matches CalUSAMAFeature/CalISOAMAFeature except:
 - Source bars tables are the anchor-aligned variants
@@ -47,9 +47,9 @@ class CalAnchorUSAMAFeature(BaseAMAFeature):
     """
     AMA feature for US calendar-anchor bars.
 
-    Loads close prices from cmc_price_bars_multi_tf_cal_anchor_us.
+    Loads close prices from price_bars_multi_tf_u (alignment_source='multi_tf_cal_anchor_us').
     TF universe: calendar anchor TFs with US scheme from dim_timeframe.
-    Output table: cmc_ama_multi_tf_cal_anchor_us.
+    Output table: ama_multi_tf_cal_anchor_us.
     """
 
     def __init__(
@@ -58,7 +58,7 @@ class CalAnchorUSAMAFeature(BaseAMAFeature):
         config: Optional[AMAFeatureConfig] = None,
         *,
         bars_schema: str = "public",
-        bars_table: str = "cmc_price_bars_multi_tf_cal_anchor_us",
+        bars_table: str = "price_bars_multi_tf_u",
     ) -> None:
         """
         Initialise calendar anchor US AMA feature.
@@ -66,7 +66,7 @@ class CalAnchorUSAMAFeature(BaseAMAFeature):
         Args:
             engine: SQLAlchemy engine.
             config: AMA feature configuration. Defaults to AMAFeatureConfig with
-                    ALL_AMA_PARAMS and output_table="cmc_ama_multi_tf_cal_anchor_us".
+                    ALL_AMA_PARAMS and output_table="ama_multi_tf_cal_anchor_us".
             bars_schema: Schema for bars source table.
             bars_table: Source bars table name.
         """
@@ -74,7 +74,7 @@ class CalAnchorUSAMAFeature(BaseAMAFeature):
             config = AMAFeatureConfig(
                 param_sets=list(ALL_AMA_PARAMS),
                 output_schema="public",
-                output_table="cmc_ama_multi_tf_cal_anchor_us",
+                output_table="ama_multi_tf_cal_anchor_us",
             )
         super().__init__(engine, config)
         self.bars_schema = bars_schema
@@ -85,6 +85,40 @@ class CalAnchorUSAMAFeature(BaseAMAFeature):
     # Abstract Method Implementations
     # =========================================================================
 
+    def preload_all_bars(
+        self, engine: Engine, asset_id: int, venue_id: int = 1
+    ) -> None:
+        """Load bars for ALL TFs and venues in a single query and cache."""
+        params: dict = {"id": asset_id}
+        alignment_filter = ""
+        if self.config.alignment_source:
+            alignment_filter = "AND alignment_source = :alignment_source"
+            params["alignment_source"] = self.config.alignment_source
+
+        sql = text(
+            f"""
+            SELECT id, venue_id, "timestamp" AS ts, tf, tf_days, is_partial_end AS roll, close, is_partial_end
+            FROM {self.bars_schema}.{self.bars_table}
+            WHERE id = :id {alignment_filter}
+            ORDER BY venue_id, tf, "timestamp"
+            """
+        )
+        try:
+            with engine.connect() as conn:
+                df = pd.read_sql(sql, conn, params=params)
+        except Exception as exc:
+            logger.warning(
+                "preload_all_bars: failed for asset_id=%s table=%s — %s",
+                asset_id,
+                self.bars_table,
+                exc,
+            )
+            self._bars_cache = pd.DataFrame()
+            return
+        if not df.empty:
+            df["ts"] = pd.to_datetime(df["ts"], utc=True)
+        self._bars_cache = df
+
     def _load_bars(
         self,
         engine: Engine,
@@ -92,39 +126,37 @@ class CalAnchorUSAMAFeature(BaseAMAFeature):
         tf: str,
         tf_days: int,
         start_ts: Optional[pd.Timestamp],
+        venue_id: int = 1,
     ) -> pd.DataFrame:
-        """
-        Load close prices for a single (asset_id, tf) slice from the US calendar anchor bars table.
+        """Load close prices for a single (asset_id, tf, venue_id) slice (uses cache if available)."""
+        if self._bars_cache is not None:
+            if self._bars_cache.empty:
+                return pd.DataFrame()
+            mask = (self._bars_cache["tf"] == tf) & (
+                self._bars_cache["venue_id"] == venue_id
+            )
+            if start_ts is not None:
+                mask = mask & (self._bars_cache["ts"] >= start_ts)
+            df = self._bars_cache[mask].copy()
+            return df.sort_values("ts").reset_index(drop=True)
 
-        Args:
-            engine: SQLAlchemy engine.
-            asset_id: Asset primary key.
-            tf: Timeframe label (e.g. "1W_CAL_ANCHOR_US", "1M_CAL_ANCHOR").
-            tf_days: Nominal days for this TF (informational only, not used in query).
-            start_ts: Optional incremental start timestamp.
-
-        Returns:
-            DataFrame with columns: id, ts, tf, tf_days, roll, close, is_partial_end.
-            ts is tz-aware (UTC). Sorted ascending by ts. Empty if no data.
-        """
-        where_clauses = ["id = :id", "tf = :tf"]
-        params: dict = {"id": asset_id, "tf": tf}
-
+        where_clauses = ["id = :id", "tf = :tf", "venue_id = :venue_id"]
+        params: dict = {"id": asset_id, "tf": tf, "venue_id": venue_id}
         if start_ts is not None:
             where_clauses.append('"timestamp" >= :start_ts')
             params["start_ts"] = start_ts
-
+        if self.config.alignment_source:
+            where_clauses.append("alignment_source = :alignment_source")
+            params["alignment_source"] = self.config.alignment_source
         where_sql = " AND ".join(where_clauses)
-
         sql = text(
             f"""
-            SELECT id, "timestamp" AS ts, tf, tf_days, FALSE AS roll, close, is_partial_end
+            SELECT id, venue_id, "timestamp" AS ts, tf, tf_days, is_partial_end AS roll, close, is_partial_end
             FROM {self.bars_schema}.{self.bars_table}
             WHERE {where_sql}
             ORDER BY "timestamp"
             """
         )
-
         try:
             with engine.connect() as conn:
                 df = pd.read_sql(sql, conn, params=params)
@@ -137,14 +169,10 @@ class CalAnchorUSAMAFeature(BaseAMAFeature):
                 exc,
             )
             return pd.DataFrame()
-
         if df.empty:
             return df
-
-        # Coerce ts to tz-aware UTC (Windows pitfall: use pd.to_datetime(utc=True))
         df["ts"] = pd.to_datetime(df["ts"], utc=True)
         df = df.sort_values("ts").reset_index(drop=True)
-
         return df
 
     def _get_timeframes(self, engine: Engine) -> list[TFSpec]:
@@ -244,9 +272,9 @@ class CalAnchorISOAMAFeature(BaseAMAFeature):
     """
     AMA feature for ISO calendar-anchor bars.
 
-    Loads close prices from cmc_price_bars_multi_tf_cal_anchor_iso.
+    Loads close prices from price_bars_multi_tf_u (alignment_source='multi_tf_cal_anchor_iso').
     TF universe: calendar anchor TFs with ISO scheme from dim_timeframe.
-    Output table: cmc_ama_multi_tf_cal_anchor_iso.
+    Output table: ama_multi_tf_cal_anchor_iso.
     """
 
     def __init__(
@@ -255,7 +283,7 @@ class CalAnchorISOAMAFeature(BaseAMAFeature):
         config: Optional[AMAFeatureConfig] = None,
         *,
         bars_schema: str = "public",
-        bars_table: str = "cmc_price_bars_multi_tf_cal_anchor_iso",
+        bars_table: str = "price_bars_multi_tf_u",
     ) -> None:
         """
         Initialise calendar anchor ISO AMA feature.
@@ -263,7 +291,7 @@ class CalAnchorISOAMAFeature(BaseAMAFeature):
         Args:
             engine: SQLAlchemy engine.
             config: AMA feature configuration. Defaults to AMAFeatureConfig with
-                    ALL_AMA_PARAMS and output_table="cmc_ama_multi_tf_cal_anchor_iso".
+                    ALL_AMA_PARAMS and output_table="ama_multi_tf_cal_anchor_iso".
             bars_schema: Schema for bars source table.
             bars_table: Source bars table name.
         """
@@ -271,7 +299,7 @@ class CalAnchorISOAMAFeature(BaseAMAFeature):
             config = AMAFeatureConfig(
                 param_sets=list(ALL_AMA_PARAMS),
                 output_schema="public",
-                output_table="cmc_ama_multi_tf_cal_anchor_iso",
+                output_table="ama_multi_tf_cal_anchor_iso",
             )
         super().__init__(engine, config)
         self.bars_schema = bars_schema
@@ -282,6 +310,40 @@ class CalAnchorISOAMAFeature(BaseAMAFeature):
     # Abstract Method Implementations
     # =========================================================================
 
+    def preload_all_bars(
+        self, engine: Engine, asset_id: int, venue_id: int = 1
+    ) -> None:
+        """Load bars for ALL TFs and venues in a single query and cache."""
+        params: dict = {"id": asset_id}
+        alignment_filter = ""
+        if self.config.alignment_source:
+            alignment_filter = "AND alignment_source = :alignment_source"
+            params["alignment_source"] = self.config.alignment_source
+
+        sql = text(
+            f"""
+            SELECT id, venue_id, "timestamp" AS ts, tf, tf_days, is_partial_end AS roll, close, is_partial_end
+            FROM {self.bars_schema}.{self.bars_table}
+            WHERE id = :id {alignment_filter}
+            ORDER BY venue_id, tf, "timestamp"
+            """
+        )
+        try:
+            with engine.connect() as conn:
+                df = pd.read_sql(sql, conn, params=params)
+        except Exception as exc:
+            logger.warning(
+                "preload_all_bars: failed for asset_id=%s table=%s — %s",
+                asset_id,
+                self.bars_table,
+                exc,
+            )
+            self._bars_cache = pd.DataFrame()
+            return
+        if not df.empty:
+            df["ts"] = pd.to_datetime(df["ts"], utc=True)
+        self._bars_cache = df
+
     def _load_bars(
         self,
         engine: Engine,
@@ -289,39 +351,37 @@ class CalAnchorISOAMAFeature(BaseAMAFeature):
         tf: str,
         tf_days: int,
         start_ts: Optional[pd.Timestamp],
+        venue_id: int = 1,
     ) -> pd.DataFrame:
-        """
-        Load close prices for a single (asset_id, tf) slice from the ISO calendar anchor bars table.
+        """Load close prices for a single (asset_id, tf, venue_id) slice (uses cache if available)."""
+        if self._bars_cache is not None:
+            if self._bars_cache.empty:
+                return pd.DataFrame()
+            mask = (self._bars_cache["tf"] == tf) & (
+                self._bars_cache["venue_id"] == venue_id
+            )
+            if start_ts is not None:
+                mask = mask & (self._bars_cache["ts"] >= start_ts)
+            df = self._bars_cache[mask].copy()
+            return df.sort_values("ts").reset_index(drop=True)
 
-        Args:
-            engine: SQLAlchemy engine.
-            asset_id: Asset primary key.
-            tf: Timeframe label (e.g. "1W_CAL_ANCHOR_ISO", "1M_CAL_ANCHOR").
-            tf_days: Nominal days for this TF (informational only, not used in query).
-            start_ts: Optional incremental start timestamp.
-
-        Returns:
-            DataFrame with columns: id, ts, tf, tf_days, roll, close, is_partial_end.
-            ts is tz-aware (UTC). Sorted ascending by ts. Empty if no data.
-        """
-        where_clauses = ["id = :id", "tf = :tf"]
-        params: dict = {"id": asset_id, "tf": tf}
-
+        where_clauses = ["id = :id", "tf = :tf", "venue_id = :venue_id"]
+        params: dict = {"id": asset_id, "tf": tf, "venue_id": venue_id}
         if start_ts is not None:
             where_clauses.append('"timestamp" >= :start_ts')
             params["start_ts"] = start_ts
-
+        if self.config.alignment_source:
+            where_clauses.append("alignment_source = :alignment_source")
+            params["alignment_source"] = self.config.alignment_source
         where_sql = " AND ".join(where_clauses)
-
         sql = text(
             f"""
-            SELECT id, "timestamp" AS ts, tf, tf_days, FALSE AS roll, close, is_partial_end
+            SELECT id, venue_id, "timestamp" AS ts, tf, tf_days, is_partial_end AS roll, close, is_partial_end
             FROM {self.bars_schema}.{self.bars_table}
             WHERE {where_sql}
             ORDER BY "timestamp"
             """
         )
-
         try:
             with engine.connect() as conn:
                 df = pd.read_sql(sql, conn, params=params)
@@ -334,13 +394,10 @@ class CalAnchorISOAMAFeature(BaseAMAFeature):
                 exc,
             )
             return pd.DataFrame()
-
         if df.empty:
             return df
-
         df["ts"] = pd.to_datetime(df["ts"], utc=True)
         df = df.sort_values("ts").reset_index(drop=True)
-
         return df
 
     def _get_timeframes(self, engine: Engine) -> list[TFSpec]:

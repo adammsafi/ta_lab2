@@ -156,13 +156,13 @@ def default_bars_table_registry() -> Dict[str, TableSpec]:
     """
     Central, explicit registry. Keep this in sync with your design decision:
 
-      - cmc_price_bars_multi_tf must NOT emit *_CAL timeframes
+      - price_bars_multi_tf must NOT emit *_CAL timeframes
       - calendar semantics are reserved for *_cal* tables
     """
     return {
         # 1) TF_DAY based, NOT calendar-aligned
-        "cmc_price_bars_multi_tf": TableSpec(
-            table_name="cmc_price_bars_multi_tf",
+        "price_bars_multi_tf": TableSpec(
+            table_name="price_bars_multi_tf",
             family=TimeframeFamily.TF_DAY,
             calendar_scheme=CalendarScheme.NONE,
             partial_policy=PartialPolicy.NONE,
@@ -183,29 +183,29 @@ def default_bars_table_registry() -> Dict[str, TableSpec]:
             ),
         ),
         # 2) Calendar-aligned (US), full periods only
-        "cmc_price_bars_multi_tf_cal_us": TableSpec(
-            table_name="cmc_price_bars_multi_tf_cal_us",
+        "price_bars_multi_tf_cal_us": TableSpec(
+            table_name="price_bars_multi_tf_cal_us",
             family=TimeframeFamily.CAL,
             calendar_scheme=CalendarScheme.US,
             partial_policy=PartialPolicy.NONE,
         ),
         # 3) Calendar-aligned (ISO), full periods only
-        "cmc_price_bars_multi_tf_cal_iso": TableSpec(
-            table_name="cmc_price_bars_multi_tf_cal_iso",
+        "price_bars_multi_tf_cal_iso": TableSpec(
+            table_name="price_bars_multi_tf_cal_iso",
             family=TimeframeFamily.CAL,
             calendar_scheme=CalendarScheme.ISO,
             partial_policy=PartialPolicy.NONE,
         ),
         # 4) Calendar-anchored (US), partial at dataset edges allowed
-        "cmc_price_bars_multi_tf_cal_anchor_us": TableSpec(
-            table_name="cmc_price_bars_multi_tf_cal_anchor_us",
+        "price_bars_multi_tf_cal_anchor_us": TableSpec(
+            table_name="price_bars_multi_tf_cal_anchor_us",
             family=TimeframeFamily.CAL_ANCHOR,
             calendar_scheme=CalendarScheme.US,
             partial_policy=PartialPolicy.START_END_ALLOWED,
         ),
         # 5) Calendar-anchored (ISO), partial at dataset edges allowed
-        "cmc_price_bars_multi_tf_cal_anchor_iso": TableSpec(
-            table_name="cmc_price_bars_multi_tf_cal_anchor_iso",
+        "price_bars_multi_tf_cal_anchor_iso": TableSpec(
+            table_name="price_bars_multi_tf_cal_anchor_iso",
             family=TimeframeFamily.CAL_ANCHOR,
             calendar_scheme=CalendarScheme.ISO,
             partial_policy=PartialPolicy.START_END_ALLOWED,
@@ -311,7 +311,7 @@ def load_time_specs(
     Usage:
         store = load_time_specs(db_url=TARGET_DB_URL)
         tf_spec = store.get_tf("12M_CAL")
-        table_spec = store.get_table("cmc_price_bars_multi_tf_cal_iso")
+        table_spec = store.get_table("price_bars_multi_tf_cal_iso")
     """
     eng = engine or _make_engine(db_url)
     rows = []

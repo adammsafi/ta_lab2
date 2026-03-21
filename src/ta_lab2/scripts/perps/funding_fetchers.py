@@ -46,7 +46,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class FundingRateRow:
-    """Normalized funding rate record for cmc_funding_rates table."""
+    """Normalized funding rate record for funding_rates table."""
 
     venue: str
     """Exchange venue: 'binance', 'hyperliquid', 'bybit', 'dydx', 'aevo', 'aster', 'lighter'"""

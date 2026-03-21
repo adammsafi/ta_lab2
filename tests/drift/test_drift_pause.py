@@ -71,7 +71,7 @@ def _make_mock_engine():
 
 
 def test_activate_drift_pause_executes_sql():
-    """activate_drift_pause() should UPDATE dim_risk_state and INSERT cmc_risk_events."""
+    """activate_drift_pause() should UPDATE dim_risk_state and INSERT risk_events."""
     engine, conn = _make_mock_engine()
 
     activate_drift_pause(engine, reason="TE breach", tracking_error=0.02, config_id=1)
@@ -84,7 +84,7 @@ def test_activate_drift_pause_executes_sql():
 
     assert "UPDATE dim_risk_state" in first_call_sql
     assert "drift_paused" in first_call_sql
-    assert "INSERT INTO cmc_risk_events" in second_call_sql
+    assert "INSERT INTO risk_events" in second_call_sql
     assert "drift_pause_activated" in second_call_sql
 
 
@@ -111,7 +111,7 @@ def test_disable_drift_pause_validates_inputs():
 
 
 def test_disable_drift_pause_executes_sql():
-    """disable_drift_pause() should UPDATE dim_risk_state and INSERT cmc_risk_events."""
+    """disable_drift_pause() should UPDATE dim_risk_state and INSERT risk_events."""
     engine, conn = _make_mock_engine()
 
     disable_drift_pause(engine, reason="Manually resolved", operator="trader_1")
@@ -124,7 +124,7 @@ def test_disable_drift_pause_executes_sql():
     assert "UPDATE dim_risk_state" in first_call_sql
     assert "drift_paused" in first_call_sql
     assert "FALSE" in first_call_sql
-    assert "INSERT INTO cmc_risk_events" in second_call_sql
+    assert "INSERT INTO risk_events" in second_call_sql
     assert "drift_pause_disabled" in second_call_sql
 
 

@@ -250,7 +250,7 @@ def test_write_metrics_upsert_sql():
     conn.execute.assert_called_once()
     sql_str = str(conn.execute.call_args[0][0])
 
-    assert "INSERT INTO cmc_drift_metrics" in sql_str
+    assert "INSERT INTO drift_metrics" in sql_str
     assert "ON CONFLICT" in sql_str
     assert "DO UPDATE" in sql_str
 

@@ -1,7 +1,7 @@
 """Override manager for discretionary position overrides.
 
-Provides full CRUD operations on cmc_risk_overrides with dual audit trail:
-every action writes to both cmc_risk_overrides (state) and cmc_risk_events
+Provides full CRUD operations on risk_overrides with dual audit trail:
+every action writes to both risk_overrides (state) and risk_events
 (immutable log). Supports sticky (persists until reverted) and non-sticky
 (auto-revert after one signal cycle) modes.
 
@@ -49,7 +49,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class OverrideInfo:
-    """Snapshot of a single cmc_risk_overrides row."""
+    """Snapshot of a single risk_overrides row."""
 
     override_id: str
     asset_id: int
@@ -87,8 +87,8 @@ def _row_to_override_info(row) -> OverrideInfo:
 class OverrideManager:
     """CRUD operations for discretionary position overrides.
 
-    Every write operation touches both cmc_risk_overrides (state) and
-    cmc_risk_events (immutable audit log) in a single transaction, ensuring
+    Every write operation touches both risk_overrides (state) and
+    risk_events (immutable audit log) in a single transaction, ensuring
     the audit trail can never be out of sync with override state.
     """
 
@@ -124,7 +124,7 @@ class OverrideManager:
             result = conn.execute(
                 text(
                     """
-                    INSERT INTO public.cmc_risk_overrides
+                    INSERT INTO public.risk_overrides
                         (asset_id, strategy_id, operator, reason,
                          system_signal, override_action, sticky)
                     VALUES
@@ -148,7 +148,7 @@ class OverrideManager:
             conn.execute(
                 text(
                     """
-                    INSERT INTO public.cmc_risk_events
+                    INSERT INTO public.risk_events
                         (event_type, trigger_source, reason, operator,
                          asset_id, strategy_id, override_id)
                     VALUES
@@ -190,7 +190,7 @@ class OverrideManager:
             result = conn.execute(
                 text(
                     """
-                    UPDATE public.cmc_risk_overrides
+                    UPDATE public.risk_overrides
                     SET applied_at = now()
                     WHERE override_id = :override_id
                       AND applied_at IS NULL
@@ -209,7 +209,7 @@ class OverrideManager:
             conn.execute(
                 text(
                     """
-                    INSERT INTO public.cmc_risk_events
+                    INSERT INTO public.risk_events
                         (event_type, trigger_source, reason, override_id)
                     VALUES
                         ('override_applied', 'system',
@@ -241,7 +241,7 @@ class OverrideManager:
             result = conn.execute(
                 text(
                     """
-                    UPDATE public.cmc_risk_overrides
+                    UPDATE public.risk_overrides
                     SET reverted_at = now(),
                         revert_reason = :reason
                     WHERE override_id = :override_id
@@ -261,7 +261,7 @@ class OverrideManager:
             conn.execute(
                 text(
                     """
-                    INSERT INTO public.cmc_risk_events
+                    INSERT INTO public.risk_events
                         (event_type, trigger_source, reason, operator, override_id)
                     VALUES
                         ('override_reverted', 'manual', :reason, :operator, :override_id)
@@ -310,7 +310,7 @@ class OverrideManager:
             SELECT override_id, asset_id, strategy_id, operator, reason,
                    system_signal, override_action, sticky, created_at,
                    applied_at, reverted_at, revert_reason
-            FROM public.cmc_risk_overrides
+            FROM public.risk_overrides
             {filters}
             ORDER BY created_at DESC
             """
@@ -336,7 +336,7 @@ class OverrideManager:
             SELECT override_id, asset_id, strategy_id, operator, reason,
                    system_signal, override_action, sticky, created_at,
                    applied_at, reverted_at, revert_reason
-            FROM public.cmc_risk_overrides
+            FROM public.risk_overrides
             WHERE sticky = FALSE
               AND applied_at IS NOT NULL
               AND reverted_at IS NULL
@@ -363,7 +363,7 @@ class OverrideManager:
             SELECT override_id, asset_id, strategy_id, operator, reason,
                    system_signal, override_action, sticky, created_at,
                    applied_at, reverted_at, revert_reason
-            FROM public.cmc_risk_overrides
+            FROM public.risk_overrides
             WHERE override_id = :override_id
             """
         )

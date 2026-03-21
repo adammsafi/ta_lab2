@@ -9,11 +9,11 @@ snap AS (
       WHEN '1Y_CAL'  THEN '365D'
       ELSE tf
     END AS tf_norm
-  FROM public.cmc_price_bars_multi_tf_snapshot_20251213
+  FROM public.price_bars_multi_tf_snapshot_20251213
 ),
 cur AS (
   SELECT DISTINCT tf AS tf_norm
-  FROM public.cmc_price_bars_multi_tf
+  FROM public.price_bars_multi_tf
 )
 SELECT 'in_snap_not_cur' AS side, tf_norm FROM snap
 EXCEPT

@@ -95,7 +95,7 @@ def get_actual_rowcount(
 
     Args:
         engine: SQLAlchemy engine
-        table: Table name (e.g., 'cmc_ema_multi_tf_u')
+        table: Table name (e.g., 'ema_multi_tf_u')
         schema: Schema name (e.g., 'public')
         id_: Asset ID
         tf: Timeframe
@@ -274,8 +274,8 @@ def parse_args() -> argparse.Namespace:
 
     p.add_argument(
         "--table",
-        default="cmc_ema_multi_tf_u",
-        help="EMA table name (default: cmc_ema_multi_tf_u)",
+        default="ema_multi_tf_u",
+        help="EMA table name (default: ema_multi_tf_u)",
     )
     p.add_argument(
         "--schema",

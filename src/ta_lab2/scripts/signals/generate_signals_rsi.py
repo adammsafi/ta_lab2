@@ -1,8 +1,8 @@
 """
-RSI Signal Generator - Generate RSI mean reversion signals from cmc_features.
+RSI Signal Generator - Generate RSI mean reversion signals from features.
 
 This module provides RSI mean reversion signal generation following the existing
-rsi_mean_revert.py adapter logic. Signals are stored in cmc_signals_rsi_mean_revert
+rsi_mean_revert.py adapter logic. Signals are stored in signals_rsi_mean_revert
 with position lifecycle tracking and RSI value analytics.
 
 Key features:
@@ -105,11 +105,11 @@ def compute_adaptive_thresholds(
 @dataclass
 class RSISignalGenerator:
     """
-    Generates RSI mean reversion signals from cmc_features.
+    Generates RSI mean reversion signals from features.
 
     Leverages existing rsi_mean_revert.py adapter logic with database-driven
     threshold configuration from dim_signals. Stores signals in
-    cmc_signals_rsi_mean_revert with full position lifecycle tracking.
+    signals_rsi_mean_revert with full position lifecycle tracking.
 
     Attributes:
         engine: SQLAlchemy engine for database operations
@@ -120,6 +120,7 @@ class RSISignalGenerator:
     engine: Engine
     state_manager: SignalStateManager
     signal_version: str = "1.0"
+    venue_id: int | None = None
 
     def _apply_cusum_filter(
         self,
@@ -204,7 +205,7 @@ class RSISignalGenerator:
         start_ts: Optional[pd.Timestamp] = None,
     ) -> pd.DataFrame:
         """
-        Load feature data from cmc_features.
+        Load feature data from features.
 
         Args:
             ids: List of asset IDs to load
@@ -218,6 +219,10 @@ class RSISignalGenerator:
         where_clauses = ["id = ANY(:ids)", "tf = '1D'"]
         params = {"ids": ids}
 
+        if self.venue_id is not None:
+            where_clauses.append("venue_id = :venue_id")
+            params["venue_id"] = self.venue_id
+
         if start_ts is not None:
             where_clauses.append("ts >= :start_ts")
             params["start_ts"] = start_ts
@@ -226,10 +231,10 @@ class RSISignalGenerator:
 
         sql_text = f"""
             SELECT
-                id, ts, close,
+                id, venue_id, ts, close,
                 rsi_14, rsi_7, rsi_21,
                 atr_14
-            FROM public.cmc_features
+            FROM public.features
             WHERE {where_sql}
             ORDER BY id, ts
         """
@@ -273,13 +278,13 @@ class RSISignalGenerator:
             rsi_col: RSI column to track (default: "rsi_14")
 
         Returns:
-            DataFrame with columns matching cmc_signals_rsi_mean_revert schema
+            DataFrame with columns matching signals_rsi_mean_revert schema
             Each row represents either an open or closed position
         """
         records = []
 
-        # Group by asset ID for stateful processing
-        for id_, group in df_features.groupby("id"):
+        # Group by asset ID and venue_id for stateful processing
+        for (id_, venue_id), group in df_features.groupby(["id", "venue_id"]):
             group = group.sort_values("ts").reset_index(drop=True)
 
             # Get entry/exit signals for this asset
@@ -312,6 +317,7 @@ class RSISignalGenerator:
                     records.append(
                         {
                             "id": int(id_),
+                            "venue_id": int(venue_id),
                             "ts": group.loc[idx, "ts"],
                             "signal_id": signal_id,
                             "direction": direction,
@@ -359,6 +365,7 @@ class RSISignalGenerator:
             return pd.DataFrame(
                 columns=[
                     "id",
+                    "venue_id",
                     "ts",
                     "signal_id",
                     "direction",
@@ -422,7 +429,7 @@ class RSISignalGenerator:
 
         Raises:
             ValueError: If required parameters missing
-            KeyError: If required features not in cmc_features
+            KeyError: If required features not in features
         """
         signal_id = signal_config["signal_id"]
         params = signal_config["params"]
@@ -579,7 +586,7 @@ class RSISignalGenerator:
 
         # Write to database (unless dry run)
         if not dry_run:
-            signal_table = "cmc_signals_rsi_mean_revert"
+            signal_table = "signals_rsi_mean_revert"
 
             # Convert JSONB column to JSON strings for database insertion
             # Fix: serialize dict values to JSON string (pre-existing bug: no-op lambda)
@@ -587,16 +594,30 @@ class RSISignalGenerator:
                 lambda x: json.dumps(x) if isinstance(x, dict) else x
             )
 
+            pk_cols = ["id", "venue_id", "ts", "signal_id"]
+            df_records = df_records.drop_duplicates(subset=pk_cols, keep="last")
+            data_cols = [
+                c for c in df_records.columns if c not in pk_cols and c != "created_at"
+            ]
+            tmp = f"_tmp_{signal_table}"
+
             with self.engine.begin() as conn:
-                # Use to_sql with if_exists='append' for insertion
-                # Note: This doesn't handle conflicts. For production, use upsert logic.
+                conn.execute(text(f"DROP TABLE IF EXISTS {tmp}"))
+                conn.execute(
+                    text(
+                        f"CREATE TEMP TABLE {tmp} (LIKE public.{signal_table} INCLUDING DEFAULTS) ON COMMIT DROP"
+                    )
+                )
                 df_records.to_sql(
-                    signal_table,
-                    conn,
-                    schema="public",
-                    if_exists="append",
-                    index=False,
-                    method="multi",
+                    tmp, conn, if_exists="append", index=False, method="multi"
+                )
+                set_clause = ", ".join(f"{c} = EXCLUDED.{c}" for c in data_cols)
+                conn.execute(
+                    text(
+                        f"INSERT INTO public.{signal_table} ({', '.join(df_records.columns)}) "
+                        f"SELECT {', '.join(df_records.columns)} FROM {tmp} "
+                        f"ON CONFLICT ({', '.join(pk_cols)}) DO UPDATE SET {set_clause}"
+                    )
                 )
 
             logger.info(f"Inserted {len(df_records)} records into {signal_table}")

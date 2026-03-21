@@ -278,11 +278,14 @@ class TestReproducibility:
         mock_engine = MagicMock()
 
         # Mock: stored hash differs from current hash
-        with patch(
-            "ta_lab2.scripts.signals.validate_reproducibility._get_latest_feature_hash"
-        ) as mock_get, patch(
-            "ta_lab2.scripts.signals.validate_reproducibility._compute_current_feature_hash"
-        ) as mock_compute:
+        with (
+            patch(
+                "ta_lab2.scripts.signals.validate_reproducibility._get_latest_feature_hash"
+            ) as mock_get,
+            patch(
+                "ta_lab2.scripts.signals.validate_reproducibility._compute_current_feature_hash"
+            ) as mock_compute,
+        ):
             mock_get.return_value = "abc123"
             mock_compute.return_value = "def456"  # Different hash
 
@@ -298,11 +301,14 @@ class TestReproducibility:
         """warn mode logs warning but returns True."""
         mock_engine = MagicMock()
 
-        with patch(
-            "ta_lab2.scripts.signals.validate_reproducibility._get_latest_feature_hash"
-        ) as mock_get, patch(
-            "ta_lab2.scripts.signals.validate_reproducibility._compute_current_feature_hash"
-        ) as mock_compute:
+        with (
+            patch(
+                "ta_lab2.scripts.signals.validate_reproducibility._get_latest_feature_hash"
+            ) as mock_get,
+            patch(
+                "ta_lab2.scripts.signals.validate_reproducibility._compute_current_feature_hash"
+            ) as mock_compute,
+        ):
             mock_get.return_value = "abc123"
             mock_compute.return_value = "def456"  # Different hash
 
@@ -330,11 +336,14 @@ class TestReproducibility:
         """validate_feature_hash_current detects data changes."""
         mock_engine = MagicMock()
 
-        with patch(
-            "ta_lab2.scripts.signals.validate_reproducibility._get_latest_feature_hash"
-        ) as mock_get, patch(
-            "ta_lab2.scripts.signals.validate_reproducibility._compute_current_feature_hash"
-        ) as mock_compute:
+        with (
+            patch(
+                "ta_lab2.scripts.signals.validate_reproducibility._get_latest_feature_hash"
+            ) as mock_get,
+            patch(
+                "ta_lab2.scripts.signals.validate_reproducibility._compute_current_feature_hash"
+            ) as mock_compute,
+        ):
             mock_get.return_value = "old_hash"
             mock_compute.return_value = "new_hash"
 
@@ -346,16 +355,20 @@ class TestReproducibility:
             assert "new_hash" in msg
 
     def test_compare_backtest_runs_loads_from_db(self):
-        """compare_backtest_runs queries cmc_backtest_runs."""
+        """compare_backtest_runs queries backtest_runs."""
         mock_engine = MagicMock()
 
-        with patch(
-            "ta_lab2.scripts.signals.validate_reproducibility._load_run"
-        ) as mock_load_run, patch(
-            "ta_lab2.scripts.signals.validate_reproducibility._load_trades"
-        ) as mock_load_trades, patch(
-            "ta_lab2.scripts.signals.validate_reproducibility._load_metrics"
-        ) as mock_load_metrics:
+        with (
+            patch(
+                "ta_lab2.scripts.signals.validate_reproducibility._load_run"
+            ) as mock_load_run,
+            patch(
+                "ta_lab2.scripts.signals.validate_reproducibility._load_trades"
+            ) as mock_load_trades,
+            patch(
+                "ta_lab2.scripts.signals.validate_reproducibility._load_metrics"
+            ) as mock_load_metrics,
+        ):
             # Mock run data
             mock_load_run.side_effect = [
                 {

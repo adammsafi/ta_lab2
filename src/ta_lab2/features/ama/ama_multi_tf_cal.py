@@ -2,12 +2,12 @@
 Calendar-aligned multi-timeframe AMA feature classes.
 
 Covers two calendar schemes:
-- CalUSAMAFeature  : loads from cmc_price_bars_multi_tf_cal_us
-- CalISOAMAFeature : loads from cmc_price_bars_multi_tf_cal_iso
+- CalUSAMAFeature  : loads from price_bars_multi_tf_u (alignment_source='multi_tf_cal_us')
+- CalISOAMAFeature : loads from price_bars_multi_tf_u (alignment_source='multi_tf_cal_iso')
 
 Both extend BaseAMAFeature and write to their respective output tables:
-  cmc_ama_multi_tf_cal_us
-  cmc_ama_multi_tf_cal_iso
+  ama_multi_tf_cal_us
+  ama_multi_tf_cal_iso
 
 Design matches MultiTFAMAFeature except:
 - Source bars table is a calendar-aligned table (US or ISO scheme)
@@ -47,9 +47,9 @@ class CalUSAMAFeature(BaseAMAFeature):
     """
     AMA feature for US calendar-aligned bars.
 
-    Loads close prices from cmc_price_bars_multi_tf_cal_us.
+    Loads close prices from price_bars_multi_tf_u (alignment_source='multi_tf_cal_us').
     TF universe: calendar TFs with US scheme from dim_timeframe.
-    Output table: cmc_ama_multi_tf_cal_us.
+    Output table: ama_multi_tf_cal_us.
     """
 
     def __init__(
@@ -58,7 +58,7 @@ class CalUSAMAFeature(BaseAMAFeature):
         config: Optional[AMAFeatureConfig] = None,
         *,
         bars_schema: str = "public",
-        bars_table: str = "cmc_price_bars_multi_tf_cal_us",
+        bars_table: str = "price_bars_multi_tf_u",
     ) -> None:
         """
         Initialise calendar US AMA feature.
@@ -66,7 +66,7 @@ class CalUSAMAFeature(BaseAMAFeature):
         Args:
             engine: SQLAlchemy engine.
             config: AMA feature configuration. Defaults to AMAFeatureConfig with
-                    ALL_AMA_PARAMS and output_table="cmc_ama_multi_tf_cal_us".
+                    ALL_AMA_PARAMS and output_table="ama_multi_tf_cal_us".
             bars_schema: Schema for bars source table.
             bars_table: Source bars table name.
         """
@@ -74,7 +74,7 @@ class CalUSAMAFeature(BaseAMAFeature):
             config = AMAFeatureConfig(
                 param_sets=list(ALL_AMA_PARAMS),
                 output_schema="public",
-                output_table="cmc_ama_multi_tf_cal_us",
+                output_table="ama_multi_tf_cal_us",
             )
         super().__init__(engine, config)
         self.bars_schema = bars_schema
@@ -85,6 +85,40 @@ class CalUSAMAFeature(BaseAMAFeature):
     # Abstract Method Implementations
     # =========================================================================
 
+    def preload_all_bars(
+        self, engine: Engine, asset_id: int, venue_id: int = 1
+    ) -> None:
+        """Load bars for ALL TFs and venues in a single query and cache."""
+        params: dict = {"id": asset_id}
+        alignment_filter = ""
+        if self.config.alignment_source:
+            alignment_filter = "AND alignment_source = :alignment_source"
+            params["alignment_source"] = self.config.alignment_source
+
+        sql = text(
+            f"""
+            SELECT id, venue_id, "timestamp" AS ts, tf, tf_days, is_partial_end AS roll, close, is_partial_end
+            FROM {self.bars_schema}.{self.bars_table}
+            WHERE id = :id {alignment_filter}
+            ORDER BY venue_id, tf, "timestamp"
+            """
+        )
+        try:
+            with engine.connect() as conn:
+                df = pd.read_sql(sql, conn, params=params)
+        except Exception as exc:
+            logger.warning(
+                "preload_all_bars: failed for asset_id=%s table=%s — %s",
+                asset_id,
+                self.bars_table,
+                exc,
+            )
+            self._bars_cache = pd.DataFrame()
+            return
+        if not df.empty:
+            df["ts"] = pd.to_datetime(df["ts"], utc=True)
+        self._bars_cache = df
+
     def _load_bars(
         self,
         engine: Engine,
@@ -92,39 +126,37 @@ class CalUSAMAFeature(BaseAMAFeature):
         tf: str,
         tf_days: int,
         start_ts: Optional[pd.Timestamp],
+        venue_id: int = 1,
     ) -> pd.DataFrame:
-        """
-        Load close prices for a single (asset_id, tf) slice from the US calendar bars table.
+        """Load close prices for a single (asset_id, tf, venue_id) slice (uses cache if available)."""
+        if self._bars_cache is not None:
+            if self._bars_cache.empty:
+                return pd.DataFrame()
+            mask = (self._bars_cache["tf"] == tf) & (
+                self._bars_cache["venue_id"] == venue_id
+            )
+            if start_ts is not None:
+                mask = mask & (self._bars_cache["ts"] >= start_ts)
+            df = self._bars_cache[mask].copy()
+            return df.sort_values("ts").reset_index(drop=True)
 
-        Args:
-            engine: SQLAlchemy engine.
-            asset_id: Asset primary key.
-            tf: Timeframe label (e.g. "1W_CAL_US", "1M_CAL").
-            tf_days: Nominal days for this TF (informational only, not used in query).
-            start_ts: Optional incremental start timestamp.
-
-        Returns:
-            DataFrame with columns: id, ts, tf, tf_days, roll, close, is_partial_end.
-            ts is tz-aware (UTC). Sorted ascending by ts. Empty if no data.
-        """
-        where_clauses = ["id = :id", "tf = :tf"]
-        params: dict = {"id": asset_id, "tf": tf}
-
+        where_clauses = ["id = :id", "tf = :tf", "venue_id = :venue_id"]
+        params: dict = {"id": asset_id, "tf": tf, "venue_id": venue_id}
         if start_ts is not None:
             where_clauses.append('"timestamp" >= :start_ts')
             params["start_ts"] = start_ts
-
+        if self.config.alignment_source:
+            where_clauses.append("alignment_source = :alignment_source")
+            params["alignment_source"] = self.config.alignment_source
         where_sql = " AND ".join(where_clauses)
-
         sql = text(
             f"""
-            SELECT id, "timestamp" AS ts, tf, tf_days, FALSE AS roll, close, is_partial_end
+            SELECT id, venue_id, "timestamp" AS ts, tf, tf_days, is_partial_end AS roll, close, is_partial_end
             FROM {self.bars_schema}.{self.bars_table}
             WHERE {where_sql}
             ORDER BY "timestamp"
             """
         )
-
         try:
             with engine.connect() as conn:
                 df = pd.read_sql(sql, conn, params=params)
@@ -137,14 +169,10 @@ class CalUSAMAFeature(BaseAMAFeature):
                 exc,
             )
             return pd.DataFrame()
-
         if df.empty:
             return df
-
-        # Coerce ts to tz-aware UTC (Windows pitfall: use pd.to_datetime(utc=True))
         df["ts"] = pd.to_datetime(df["ts"], utc=True)
         df = df.sort_values("ts").reset_index(drop=True)
-
         return df
 
     def _get_timeframes(self, engine: Engine) -> list[TFSpec]:
@@ -237,9 +265,9 @@ class CalISOAMAFeature(BaseAMAFeature):
     """
     AMA feature for ISO calendar-aligned bars.
 
-    Loads close prices from cmc_price_bars_multi_tf_cal_iso.
+    Loads close prices from price_bars_multi_tf_u (alignment_source='multi_tf_cal_iso').
     TF universe: calendar TFs with ISO scheme from dim_timeframe.
-    Output table: cmc_ama_multi_tf_cal_iso.
+    Output table: ama_multi_tf_cal_iso.
     """
 
     def __init__(
@@ -248,7 +276,7 @@ class CalISOAMAFeature(BaseAMAFeature):
         config: Optional[AMAFeatureConfig] = None,
         *,
         bars_schema: str = "public",
-        bars_table: str = "cmc_price_bars_multi_tf_cal_iso",
+        bars_table: str = "price_bars_multi_tf_u",
     ) -> None:
         """
         Initialise calendar ISO AMA feature.
@@ -256,7 +284,7 @@ class CalISOAMAFeature(BaseAMAFeature):
         Args:
             engine: SQLAlchemy engine.
             config: AMA feature configuration. Defaults to AMAFeatureConfig with
-                    ALL_AMA_PARAMS and output_table="cmc_ama_multi_tf_cal_iso".
+                    ALL_AMA_PARAMS and output_table="ama_multi_tf_cal_iso".
             bars_schema: Schema for bars source table.
             bars_table: Source bars table name.
         """
@@ -264,7 +292,7 @@ class CalISOAMAFeature(BaseAMAFeature):
             config = AMAFeatureConfig(
                 param_sets=list(ALL_AMA_PARAMS),
                 output_schema="public",
-                output_table="cmc_ama_multi_tf_cal_iso",
+                output_table="ama_multi_tf_cal_iso",
             )
         super().__init__(engine, config)
         self.bars_schema = bars_schema
@@ -275,6 +303,40 @@ class CalISOAMAFeature(BaseAMAFeature):
     # Abstract Method Implementations
     # =========================================================================
 
+    def preload_all_bars(
+        self, engine: Engine, asset_id: int, venue_id: int = 1
+    ) -> None:
+        """Load bars for ALL TFs and venues in a single query and cache."""
+        params: dict = {"id": asset_id}
+        alignment_filter = ""
+        if self.config.alignment_source:
+            alignment_filter = "AND alignment_source = :alignment_source"
+            params["alignment_source"] = self.config.alignment_source
+
+        sql = text(
+            f"""
+            SELECT id, venue_id, "timestamp" AS ts, tf, tf_days, is_partial_end AS roll, close, is_partial_end
+            FROM {self.bars_schema}.{self.bars_table}
+            WHERE id = :id {alignment_filter}
+            ORDER BY venue_id, tf, "timestamp"
+            """
+        )
+        try:
+            with engine.connect() as conn:
+                df = pd.read_sql(sql, conn, params=params)
+        except Exception as exc:
+            logger.warning(
+                "preload_all_bars: failed for asset_id=%s table=%s — %s",
+                asset_id,
+                self.bars_table,
+                exc,
+            )
+            self._bars_cache = pd.DataFrame()
+            return
+        if not df.empty:
+            df["ts"] = pd.to_datetime(df["ts"], utc=True)
+        self._bars_cache = df
+
     def _load_bars(
         self,
         engine: Engine,
@@ -282,39 +344,37 @@ class CalISOAMAFeature(BaseAMAFeature):
         tf: str,
         tf_days: int,
         start_ts: Optional[pd.Timestamp],
+        venue_id: int = 1,
     ) -> pd.DataFrame:
-        """
-        Load close prices for a single (asset_id, tf) slice from the ISO calendar bars table.
+        """Load close prices for a single (asset_id, tf, venue_id) slice (uses cache if available)."""
+        if self._bars_cache is not None:
+            if self._bars_cache.empty:
+                return pd.DataFrame()
+            mask = (self._bars_cache["tf"] == tf) & (
+                self._bars_cache["venue_id"] == venue_id
+            )
+            if start_ts is not None:
+                mask = mask & (self._bars_cache["ts"] >= start_ts)
+            df = self._bars_cache[mask].copy()
+            return df.sort_values("ts").reset_index(drop=True)
 
-        Args:
-            engine: SQLAlchemy engine.
-            asset_id: Asset primary key.
-            tf: Timeframe label (e.g. "1W_CAL_ISO", "1M_CAL").
-            tf_days: Nominal days for this TF (informational only, not used in query).
-            start_ts: Optional incremental start timestamp.
-
-        Returns:
-            DataFrame with columns: id, ts, tf, tf_days, roll, close, is_partial_end.
-            ts is tz-aware (UTC). Sorted ascending by ts. Empty if no data.
-        """
-        where_clauses = ["id = :id", "tf = :tf"]
-        params: dict = {"id": asset_id, "tf": tf}
-
+        where_clauses = ["id = :id", "tf = :tf", "venue_id = :venue_id"]
+        params: dict = {"id": asset_id, "tf": tf, "venue_id": venue_id}
         if start_ts is not None:
             where_clauses.append('"timestamp" >= :start_ts')
             params["start_ts"] = start_ts
-
+        if self.config.alignment_source:
+            where_clauses.append("alignment_source = :alignment_source")
+            params["alignment_source"] = self.config.alignment_source
         where_sql = " AND ".join(where_clauses)
-
         sql = text(
             f"""
-            SELECT id, "timestamp" AS ts, tf, tf_days, FALSE AS roll, close, is_partial_end
+            SELECT id, venue_id, "timestamp" AS ts, tf, tf_days, is_partial_end AS roll, close, is_partial_end
             FROM {self.bars_schema}.{self.bars_table}
             WHERE {where_sql}
             ORDER BY "timestamp"
             """
         )
-
         try:
             with engine.connect() as conn:
                 df = pd.read_sql(sql, conn, params=params)
@@ -327,13 +387,10 @@ class CalISOAMAFeature(BaseAMAFeature):
                 exc,
             )
             return pd.DataFrame()
-
         if df.empty:
             return df
-
         df["ts"] = pd.to_datetime(df["ts"], utc=True)
         df = df.sort_values("ts").reset_index(drop=True)
-
         return df
 
     def _get_timeframes(self, engine: Engine) -> list[TFSpec]:

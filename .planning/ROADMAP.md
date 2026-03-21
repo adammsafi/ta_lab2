@@ -10,6 +10,8 @@
 - v0.9.0 Research & Experimentation (Phases 35-41) - SHIPPED 2026-02-24
 - v1.0.0 V1 Closure — Paper Trading & Validation (Phases 42-63) - SHIPPED 2026-03-01
 - v1.0.1 Macro Regime Infrastructure (Phases 64-73) - SHIPPED 2026-03-03
+- v1.1.0 Pipeline Consolidation & Storage Optimization (Phases 74-79) - SHIPPED 2026-03-21
+- v1.2.0 Analysis → Live Signals (Phases 80-88) - PLANNED
 
 ## Overview
 
@@ -25,7 +27,9 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 - Phases 29-34: v0.8.0 (complete)
 - Phases 35-41: v0.9.0 (SHIPPED 2026-02-24)
 - Phases 42-63: v1.0.0 (SHIPPED 2026-03-01)
-- Phases 64-72: v1.0.1 (in progress)
+- Phases 64-73: v1.0.1 (SHIPPED 2026-03-03)
+- Phases 74-79: v1.1.0 (SHIPPED 2026-03-21)
+- Phases 80-88: v1.2.0 (planned)
 - Decimal phases (27.1, 28.1): Urgent insertions if needed
 
 <details>
@@ -1137,7 +1141,7 @@ See `.planning/milestones/v1.0.0-REQUIREMENTS.md` and `.planning/milestones/v1.0
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19 (v0.5.0) -> 20 -> ... -> 26 (v0.6.0) -> 27 -> 28 (v0.7.0) -> 29 -> ... -> 34 (v0.8.0) -> 35 -> ... -> 41 (v0.9.0) -> 42 -> ... -> 63 (v1.0.0)
+Phases execute in numeric order: 1 -> 2 -> ... -> 10 (v0.4.0) -> 11 -> ... -> 19 (v0.5.0) -> 20 -> ... -> 26 (v0.6.0) -> 27 -> 28 (v0.7.0) -> 29 -> ... -> 34 (v0.8.0) -> 35 -> ... -> 41 (v0.9.0) -> 42 -> ... -> 63 (v1.0.0) -> 64 -> ... -> 73 (v1.0.1) -> 74 -> ... -> 79 (v1.1.0)
 
 Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute in parallel. Phase 37 is enhanced by Phase 35 but not blocked. Phase 38 requires Phase 37. Phase 39 requires Phases 35-38. Phase 40 requires all prior v0.9.0 phases. Phase 41 has no hard dependency on Phases 35-40 (reads from existing returns tables) but is sequenced last. Phase 55 depends only on v0.9.0 (not on other v1.0.0 phases).
 
@@ -1240,6 +1244,17 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | 62. Operational Completeness | 2/2 | Complete | 2026-02-28 |
 | 63. Tech Debt Cleanup | 2/2 | Complete | 2026-03-01 |
 
+### v1.1.0 Progress
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 74. Foundation & Shared Infrastructure | 0/TBD | Not started | - |
+| 75. Generalized 1D Bar Builder | 0/TBD | Not started | - |
+| 76. Direct-to-_u Price Bars (Pilot) | 0/TBD | Not started | - |
+| 77. Direct-to-_u Remaining Families | 0/TBD | Not started | - |
+| 78. Table Drops & Script Cleanup | 0/TBD | Not started | - |
+| 79. Storage & Pipeline Cleanup | 0/3 | Planned | - |
+
 ## Requirement Coverage
 
 ### v0.6.0 Requirements (40 total)
@@ -1301,6 +1316,23 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 
 **Coverage:** 85/85 requirements satisfied (80 primary + 5 overlap = 85 mapped, 80 unique)
 
+### v1.1.0 Requirements (26 total)
+
+| Category | Requirements | Phase | Count |
+|----------|--------------|-------|-------|
+| Bar Builder Consolidation | BAR-02, BAR-05 | Phase 74 | 2 |
+| Bar Builder Consolidation | BAR-01, BAR-03, BAR-04, BAR-06, BAR-07, BAR-08 | Phase 75 | 6 |
+| Direct-to-_u Migration | UTB-01, UTB-07, UTB-08 | Phase 76 | 3 |
+| Direct-to-_u Migration | UTB-02, UTB-03, UTB-04, UTB-05, UTB-06, UTB-11 | Phase 77 | 6 |
+| Direct-to-_u Migration | UTB-09, UTB-10, UTB-12 | Phase 78 | 3 |
+| Storage Cleanup | CLN-01, CLN-02 | Phase 79 | 2 |
+| VWAP Pipeline | VWP-01, VWP-02 | Phase 79 | 2 |
+| MCP Cleanup | MCP-01, MCP-02 | Phase 79 | 2 |
+
+**Coverage:** 26/26 requirements mapped
+
+
+
 ---
 
 
@@ -1323,6 +1355,163 @@ Full details: `.planning/milestones/v1.0.1-ROADMAP.md`
 </details>
 
 
+
+<details>
+<summary>v1.1.0 Pipeline Consolidation & Storage Optimization (Phases 74-79) — SHIPPED 2026-03-21</summary>
+
+- [x] **Phase 74: Foundation & Shared Infrastructure** - dim_data_sources registry, psycopg helpers, alignment_source constraints -- COMPLETE 2026-03-19
+- [x] **Phase 75: Generalized 1D Bar Builder** - Single configurable builder replacing 3 source-specific scripts -- COMPLETE 2026-03-20
+- [x] **Phase 76: Direct-to-_u Price Bars (Pilot)** - Price bars family migrated to direct _u writes -- COMPLETE 2026-03-20
+- [x] **Phase 77: Direct-to-_u Remaining Families** - EMA, AMA, and returns families migrated to direct _u writes — COMPLETE 2026-03-20
+- [x] **Phase 78: Table Drops & Script Cleanup** - Drop 30 siloed tables, delete 6 sync scripts, fix dependent views -- COMPLETE 2026-03-21
+- [x] **Phase 79: Storage & Pipeline Cleanup** - NULL row pruning, VWAP integration, MCP dead route removal -- COMPLETE 2026-03-21
+
+Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
+
+</details>
+
+
+### v1.2.0 Analysis → Live Signals (Planned)
+
+**Milestone Goal:** Shift from data collection to alpha discovery and live signal generation. Analyze IC sweep results, refine features down to a tradeable set, build GARCH volatility models, run walk-forward bake-offs, overhaul the dashboard with backtest/signal/perps views, wire the full daily pipeline from signals through paper execution, and surface everything via alerts and monitoring.
+
+- [ ] **Phase 80: IC Analysis & Feature Selection** - Analyze IC sweep, stationarity tests, feature pruning 112→~20, quintile validation
+- [ ] **Phase 81: GARCH & Conditional Volatility** - GARCH/EGARCH models, conditional vol forecasting, integration with position sizing and VaR
+- [ ] **Phase 82: Signal Refinement & Walk-Forward Bake-off** - Expression engine experiments, regime router training, walk-forward bake-off, DSR/PSR gate
+- [ ] **Phase 83: Dashboard — Backtest & Signal Pages** - Backtest results page, signal browser, OHLCV candlestick charts
+- [ ] **Phase 84: Dashboard — Perps, Portfolio & Regimes** - Hyperliquid page, portfolio allocation view, regime heatmap, AMA/EMA inspector
+- [ ] **Phase 85: Dashboard Cleanup & Polish** - Fix cache TTL slider, dynamic stats allowlist, drawdown calc, UI consistency
+- [ ] **Phase 86: Portfolio Construction Pipeline** - IC-IR → Black-Litterman views, bet sizing with GARCH vol, stop ladder tuning, paper executor dry run
+- [ ] **Phase 87: Live Pipeline & Alert Wiring** - Daily pipeline end-to-end: signals → validation → executor → drift → alerts, IC staleness monitoring
+- [ ] **Phase 88: Integration Testing & Go-Live** - End-to-end smoke tests, 1-week paper trading burn-in, runbook updates, v1.2.0 tag
+
+## v1.2.0 Phase Details
+
+### Phase 80: IC Analysis & Feature Selection
+**Goal:** Reduce the 112-feature universe to ~15-25 validated features with persistent alpha, backed by statistical rigor
+**Depends on:** IC sweep complete (ic_results table populated)
+**Success Criteria** (what must be TRUE):
+  1. IC decay analysis run for all features — features with no significant IC at any horizon flagged for removal
+  2. ADF/KPSS stationarity tests added to analysis toolkit and run on all feature series — non-stationary features documented
+  3. Ljung-Box autocorrelation test on IC series confirms alpha signal is not just serial correlation
+  4. Quintile sweep (run_quintile_sweep.py) confirms monotonic Q1→Q5 spread for surviving features
+  5. Feature importance (MDA + clustered MDA) validates IC-based ranking — concordance between IC-IR and MDA top-20
+  6. Final selected feature set documented with rationale, saved as a YAML config for downstream consumption
+**Plans**: 5 plans in 4 waves
+
+Plans:
+- [ ] 80-01-PLAN.md -- Install statsmodels dependency + dim_feature_selection Alembic migration
+- [ ] 80-02-PLAN.md -- feature_selection.py library module (stationarity, Ljung-Box, monotonicity, tier classification)
+- [ ] 80-03-PLAN.md -- run_feature_selection.py CLI orchestrator + generate configs/feature_selection.yaml
+- [ ] 80-04-PLAN.md -- run_concordance.py IC-IR vs MDA concordance analysis
+- [ ] 80-05-PLAN.md -- Feature selection review checkpoint (human verification)
+
+---
+
+### Phase 81: GARCH & Conditional Volatility
+**Goal:** Conditional volatility forecasting via GARCH family models, integrated into position sizing and risk management
+**Depends on:** Phase 80 (selected feature set, stationarity tests available)
+**Success Criteria** (what must be TRUE):
+  1. GARCH(1,1) and EGARCH models fitted per asset, stored in DB (new table: vol_forecasts or similar)
+  2. Conditional VaR using GARCH forecasts available alongside existing historical/CF VaR
+  3. Vol forecast integrated into vol_sizer.py — position sizing uses GARCH forecast when available, falls back to range estimators
+  4. Comparison report: GARCH vs Parkinson/GK/ATR accuracy (realized vol prediction error) — validates added value
+  5. Daily refresh wiring: GARCH forecasts update automatically in run_daily_refresh.py
+**Plans**: TBD
+
+---
+
+### Phase 82: Signal Refinement & Walk-Forward Bake-off
+**Goal:** Top features combined into composite signals via expression engine, validated through walk-forward bake-off with statistical gates
+**Depends on:** Phase 80 (selected features), Phase 81 (GARCH vol for cost-aware sizing)
+**Success Criteria** (what must be TRUE):
+  1. At least 3 expression engine YAML experiments defined using selected features (combinations, interactions, regime-conditional)
+  2. Regime router (TRA) trained with selected features — per-regime sub-models operational
+  3. Walk-forward bake-off (run_bakeoff.py) completed across full Kraken cost matrix (12 scenarios)
+  4. DSR > 0.95 gate applied — only strategies passing deflated Sharpe survive
+  5. Bake-off results persisted to backtest_metrics with experiment lineage
+  6. Top 1-2 strategies selected for paper trading, documented with rationale
+**Plans**: TBD
+
+---
+
+### Phase 83: Dashboard — Backtest & Signal Pages
+**Goal:** Dashboard surfaces backtest results and live signal state so the user can monitor strategy performance and signal activity without SQL
+**Depends on:** Phase 82 (backtest results to display)
+**Success Criteria** (what must be TRUE):
+  1. Backtest Results page: equity curves, PSR/DSR badges, Monte Carlo Sharpe CI band, trade table with MAE/MFE, cost breakdown per scenario
+  2. Signal Browser page: current active signals per asset/strategy, signal history timeline, signal strength/confidence, filter by strategy type
+  3. OHLCV candlestick charts replace plain close lines in Research Explorer (Plotly candlestick with EMA overlays)
+  4. All new pages follow existing query-layer pattern (queries/*.py + pages/*.py separation)
+  5. Charts have HTML download buttons consistent with existing pages
+**Plans**: TBD
+
+---
+
+### Phase 84: Dashboard — Perps, Portfolio & Regimes
+**Goal:** Dashboard covers the full trading stack — perps data, portfolio allocation, and cross-asset regime views
+**Depends on:** Nothing (can run in parallel with Phase 83)
+**Success Criteria** (what must be TRUE):
+  1. Hyperliquid page: funding rate time series, OI snapshots, candle charts for top perps, funding rate heatmap across assets
+  2. Portfolio Allocation page: current BL weights, position sizing decisions, exposure by asset/strategy, bet size history
+  3. Regime Heatmap page: cross-asset regime_comovement visualization, regime_stats summary, regime timeline for all assets (not just BTC/ETH)
+  4. AMA/EMA Inspector: per-asset efficiency ratio, d1/d2 curves, adaptive vs fixed EMA comparison chart
+  5. All pages auto-refresh via @st.fragment(run_every=900) for operational pages
+**Plans**: TBD
+
+---
+
+### Phase 85: Dashboard Cleanup & Polish
+**Goal:** Existing dashboard issues fixed, UI consistent across all pages (old + new)
+**Depends on:** Phase 83, Phase 84 (all new pages exist before polish pass)
+**Success Criteria** (what must be TRUE):
+  1. Cache TTL sidebar slider actually controls query cache TTLs (not decorative)
+  2. Stats table allowlist in pipeline.py auto-discovers from information_schema instead of hardcoded list
+  3. Drawdown calculation uses portfolio starting value, not just cumulative PnL peak
+  4. Consistent color scheme, card styling, and alert banner placement across all 14+ pages
+  5. Navigation groups in app.py updated to reflect new page categories
+**Plans**: TBD
+
+---
+
+### Phase 86: Portfolio Construction Pipeline
+**Goal:** End-to-end portfolio construction from IC scores through paper execution with GARCH-informed sizing
+**Depends on:** Phase 81 (GARCH vol), Phase 82 (bake-off winners)
+**Success Criteria** (what must be TRUE):
+  1. IC-IR scores feed Black-Litterman views automatically (not manual input)
+  2. Bet sizing uses GARCH conditional vol forecast for target-vol scaling
+  3. Stop ladder calibrated per asset using MAE/MFE analysis from bake-off trades
+  4. Paper executor dry run with refined signals produces fills matching backtest parity within tolerance
+  5. Portfolio rebalance logic documented and wired into daily pipeline
+**Plans**: TBD
+
+---
+
+### Phase 87: Live Pipeline & Alert Wiring
+**Goal:** Full daily pipeline runs autonomously: data → features → signals → validation → execution → drift → alerts
+**Depends on:** Phase 82 (refined signals), Phase 86 (portfolio construction)
+**Success Criteria** (what must be TRUE):
+  1. run_daily_refresh.py extended: bars → EMAs → features → signals → backtest validation → executor → drift check
+  2. IC staleness monitor: periodic re-sweep detects alpha decay, alerts when top features drop below IC-IR threshold
+  3. Telegram alerts tuned: regime changes, drawdown > threshold, drift pause, IC decay, new signal fires
+  4. Signal validation gate: signals that deviate >2σ from historical distribution flagged before execution
+  5. Dead-man switch: alert fires if daily pipeline hasn't completed by expected time
+**Plans**: TBD
+
+---
+
+### Phase 88: Integration Testing & Go-Live
+**Goal:** End-to-end validation confirms the full pipeline works reliably before sustained paper trading
+**Depends on:** Phase 85 (dashboard complete), Phase 87 (pipeline wired)
+**Success Criteria** (what must be TRUE):
+  1. End-to-end smoke test: fresh data ingestion → signal generation → paper fill → dashboard display — all green
+  2. 1-week paper trading burn-in with daily monitoring — no drift pauses, no kill switch triggers
+  3. Backtest parity verified: paper executor fills match backtest replay within cost tolerance
+  4. Runbooks updated for v1.2.0 pipeline (new signal flow, new dashboard pages, GARCH refresh)
+  5. v1.2.0 tagged and milestone audit complete
+**Plans**: TBD
+
+
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-03 (v1.0.1 milestone shipped)*
+*Last updated: 2026-03-21 (v1.2.0 milestone roadmap defined: phases 80-88)*

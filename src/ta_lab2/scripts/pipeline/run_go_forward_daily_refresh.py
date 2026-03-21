@@ -216,7 +216,6 @@ def build_steps(
     We pass:
     - bars scripts: --ids <ids> plus optional --full-rebuild and --parallel/--num-processes
     - EMA orchestrator: --ids <ids> --periods <periods> plus optional --full-rebuild and --parallel/--num-processes
-    - _u sync: --use-ingested-at only (no rebuild/parallel flags)
     """
     bars_dir = repo_root / "src" / "ta_lab2" / "scripts" / "bars"
     emas_dir = repo_root / "src" / "ta_lab2" / "scripts" / "emas"
@@ -224,11 +223,11 @@ def build_steps(
     # Bars
     steps: List[Step] = []
     bars_scripts = [
-        ("bars_multi_tf", "refresh_cmc_price_bars_multi_tf.py"),
-        ("bars_cal_us", "refresh_cmc_price_bars_multi_tf_cal_us.py"),
-        ("bars_cal_iso", "refresh_cmc_price_bars_multi_tf_cal_iso.py"),
-        ("bars_cal_anchor_us", "refresh_cmc_price_bars_multi_tf_cal_anchor_us.py"),
-        ("bars_cal_anchor_iso", "refresh_cmc_price_bars_multi_tf_cal_anchor_iso.py"),
+        ("bars_multi_tf", "refresh_price_bars_multi_tf.py"),
+        ("bars_cal_us", "refresh_price_bars_multi_tf_cal_us.py"),
+        ("bars_cal_iso", "refresh_price_bars_multi_tf_cal_iso.py"),
+        ("bars_cal_anchor_us", "refresh_price_bars_multi_tf_cal_anchor_us.py"),
+        ("bars_cal_anchor_iso", "refresh_price_bars_multi_tf_cal_anchor_iso.py"),
     ]
 
     for name, fname in bars_scripts:
@@ -259,16 +258,6 @@ def build_steps(
         Step("emas_all", emas_dir / "run_all_ema_refreshes.py", ema_argv, kind="ema")
     )
 
-    # _u sync (keep simple)
-    steps.append(
-        Step(
-            "ema_u_sync",
-            emas_dir / "sync_cmc_ema_multi_tf_u.py",
-            ["--use-ingested-at"],
-            kind="other",
-        )
-    )
-
     return steps
 
 
@@ -293,7 +282,7 @@ def main() -> None:
     ap.add_argument(
         "--bars-only",
         action="store_true",
-        help="Only run the 5 bar refresh steps; skip EMAs and _u sync.",
+        help="Only run the 5 bar refresh steps; skip EMAs.",
     )
 
     # New: rebuild / multiprocessing controls (forwarded)
@@ -405,11 +394,11 @@ def main() -> None:
             and not bars_full_rebuild
         ):
             bars_state_tables = {
-                "bars_multi_tf": "public.cmc_price_bars_multi_tf_state",
-                "bars_cal_us": "public.cmc_price_bars_multi_tf_cal_us_state",
-                "bars_cal_iso": "public.cmc_price_bars_multi_tf_cal_iso_state",
-                "bars_cal_anchor_us": "public.cmc_price_bars_multi_tf_cal_anchor_us_state",
-                "bars_cal_anchor_iso": "public.cmc_price_bars_multi_tf_cal_anchor_iso_state",
+                "bars_multi_tf": "public.price_bars_multi_tf_state",
+                "bars_cal_us": "public.price_bars_multi_tf_cal_us_state",
+                "bars_cal_iso": "public.price_bars_multi_tf_cal_iso_state",
+                "bars_cal_anchor_us": "public.price_bars_multi_tf_cal_anchor_us_state",
+                "bars_cal_anchor_iso": "public.price_bars_multi_tf_cal_anchor_iso_state",
             }
 
             st = bars_state_tables.get(step.name)

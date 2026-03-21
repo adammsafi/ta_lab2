@@ -2,13 +2,19 @@
 """
 Unified daily refresh orchestration script.
 
-Coordinates bars, EMAs, AMAs, desc_stats, macro features, macro regimes,
-per-asset regimes, signals, executor, drift monitor, and stats with
-state-based checking and clear visibility.
+Coordinates VM data syncs, bars, EMAs, AMAs, desc_stats, macro features,
+macro regimes, per-asset regimes, signals, executor, drift monitor, and
+stats with state-based checking and clear visibility.
 
 Usage:
-    # Full daily refresh (bars then EMAs then AMAs then desc_stats then macro then regimes then signals then executor then stats)
+    # Full daily refresh (sync VMs then bars then EMAs then AMAs then desc_stats then macro then regimes then signals then executor then stats)
     python run_daily_refresh.py --all --ids 1,52,825
+
+    # Sync VMs only (FRED + Hyperliquid)
+    python run_daily_refresh.py --sync-vms
+
+    # Full refresh without VM sync
+    python run_daily_refresh.py --all --no-sync-vms --ids all
 
     # Bars only
     python run_daily_refresh.py --bars --ids all
@@ -99,6 +105,8 @@ TIMEOUT_CROSS_ASSET_AGG = (
 )
 TIMEOUT_MACRO_GATES = 120  # 2 minutes -- gate evaluation against FRED features
 TIMEOUT_MACRO_ALERTS = 60  # 1 minute -- transition detection + Telegram send
+TIMEOUT_SYNC_FRED = 300  # 5 minutes -- SSH + psql COPY from GCP VM
+TIMEOUT_SYNC_HL = 600  # 10 minutes -- SSH + psql COPY from Singapore VM (~3M rows)
 
 
 @dataclass
@@ -136,9 +144,11 @@ def run_bar_builders(
     # Source filtering: skip builders that don't match --source
     source = getattr(args, "source", "all")
     if source == "cmc":
-        cmd.extend(["--skip", "1d_tvc"])
+        cmd.extend(["--skip", "1d_tvc,1d_hl"])
     elif source == "tvc":
-        cmd.extend(["--skip", "1d"])
+        cmd.extend(["--skip", "1d_cmc,1d_hl"])
+    elif source == "hl":
+        cmd.extend(["--skip", "1d_cmc,1d_tvc"])
 
     if args.verbose:
         cmd.append("--verbose")
@@ -614,7 +624,7 @@ def run_regime_refresher(
         ComponentResult with execution details
     """
     script_dir = Path(__file__).parent / "regimes"
-    cmd = [sys.executable, str(script_dir / "refresh_cmc_regimes.py")]
+    cmd = [sys.executable, str(script_dir / "refresh_regimes.py")]
 
     # Format IDs for regime subprocess
     if parsed_ids is None:
@@ -722,9 +732,9 @@ def run_regime_refresher(
 
 def run_feature_refresh_stage(args, db_url: str) -> ComponentResult:
     """
-    Run cmc_features refresh via subprocess.
+    Run features refresh via subprocess.
 
-    Refreshes all feature columns in cmc_features for the 1D timeframe.
+    Refreshes all feature columns in features for the 1D timeframe.
     Runs after regimes and before signals in the full pipeline.
 
     Args:
@@ -745,7 +755,7 @@ def run_feature_refresh_stage(args, db_url: str) -> ComponentResult:
     ]
 
     print(f"\n{'=' * 70}")
-    print("RUNNING FEATURE REFRESH (cmc_features)")
+    print("RUNNING FEATURE REFRESH (features)")
     print(f"{'=' * 70}")
     print(f"Command: {' '.join(cmd)}")
 
@@ -929,7 +939,7 @@ def run_portfolio_refresh_stage(args, db_url: str) -> ComponentResult:
     Run portfolio allocation refresh via subprocess.
 
     Runs PortfolioOptimizer (MV/CVaR/HRP) + optional BL + optional bet sizing
-    and persists results to cmc_portfolio_allocations.  Runs after signals and
+    and persists results to portfolio_allocations.  Runs after signals and
     before the paper executor in the full pipeline.
 
     Args:
@@ -1366,7 +1376,7 @@ def run_exchange_prices(args, db_url: str) -> ComponentResult:
     Fetches live spot prices from Coinbase and Kraken for BTC/USD and ETH/USD,
     compares against the most recent daily bar close, and writes snapshots to
     exchange_price_feed. WARNING is logged when discrepancy exceeds the adaptive
-    threshold derived from cmc_asset_stats.
+    threshold derived from asset_stats.
 
     This component is NOT included in --all. Invoke explicitly with
     --exchange-prices.
@@ -1638,6 +1648,187 @@ def print_combined_summary(results: list[tuple[str, ComponentResult]]) -> bool:
         return True
 
 
+def run_sync_fred_vm(args) -> ComponentResult:
+    """Sync FRED data from GCP VM to local fred.* schema.
+
+    Runs incremental sync via SSH + psql COPY. Should run before macro
+    features so downstream computations use the latest FRED data.
+
+    Args:
+        args: CLI arguments
+
+    Returns:
+        ComponentResult with execution details
+    """
+    cmd = [
+        sys.executable,
+        "-m",
+        "ta_lab2.scripts.etl.sync_fred_from_vm",
+    ]
+
+    if getattr(args, "dry_run", False):
+        cmd.append("--dry-run")
+
+    print(f"\n{'=' * 70}")
+    print("SYNCING FRED DATA FROM GCP VM")
+    print(f"{'=' * 70}")
+    print(f"Command: {' '.join(cmd)}")
+
+    if args.dry_run:
+        print("[DRY RUN] Would sync FRED data from GCP VM")
+        return ComponentResult(
+            component="sync_fred_vm",
+            success=True,
+            duration_sec=0.0,
+            returncode=0,
+        )
+
+    start = time.perf_counter()
+
+    try:
+        if args.verbose:
+            result = subprocess.run(cmd, check=False, timeout=TIMEOUT_SYNC_FRED)
+        else:
+            result = subprocess.run(
+                cmd,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=TIMEOUT_SYNC_FRED,
+            )
+            if result.returncode != 0:
+                print(f"\n[ERROR] FRED VM sync failed with code {result.returncode}")
+                if result.stdout:
+                    print(f"\nSTDOUT:\n{result.stdout}")
+                if result.stderr:
+                    print(f"\nSTDERR:\n{result.stderr}")
+
+        duration = time.perf_counter() - start
+
+        if result.returncode == 0:
+            print(f"\n[OK] FRED VM sync completed in {duration:.1f}s")
+            return ComponentResult(
+                component="sync_fred_vm",
+                success=True,
+                duration_sec=duration,
+                returncode=result.returncode,
+            )
+        else:
+            error_msg = f"Exited with code {result.returncode}"
+            print(f"\n[FAILED] FRED VM sync: {error_msg}")
+            return ComponentResult(
+                component="sync_fred_vm",
+                success=False,
+                duration_sec=duration,
+                returncode=result.returncode,
+                error_message=error_msg,
+            )
+
+    except subprocess.TimeoutExpired:
+        duration = time.perf_counter() - start
+        error_msg = f"Timed out after {TIMEOUT_SYNC_FRED}s"
+        print(f"\n[TIMEOUT] FRED VM sync: {error_msg}")
+        return ComponentResult(
+            component="sync_fred_vm",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+
+
+def run_sync_hl_vm(args) -> ComponentResult:
+    """Sync Hyperliquid data from Singapore VM to local hyperliquid.* schema.
+
+    Runs incremental sync of all tables (assets, candles, funding, OI)
+    via SSH + psql COPY. Should run before bars so downstream steps
+    have fresh perps data.
+
+    Args:
+        args: CLI arguments
+
+    Returns:
+        ComponentResult with execution details
+    """
+    cmd = [
+        sys.executable,
+        "-m",
+        "ta_lab2.scripts.etl.sync_hl_from_vm",
+    ]
+
+    if getattr(args, "dry_run", False):
+        cmd.append("--dry-run")
+
+    print(f"\n{'=' * 70}")
+    print("SYNCING HYPERLIQUID DATA FROM SINGAPORE VM")
+    print(f"{'=' * 70}")
+    print(f"Command: {' '.join(cmd)}")
+
+    if args.dry_run:
+        print("[DRY RUN] Would sync Hyperliquid data from Singapore VM")
+        return ComponentResult(
+            component="sync_hl_vm",
+            success=True,
+            duration_sec=0.0,
+            returncode=0,
+        )
+
+    start = time.perf_counter()
+
+    try:
+        if args.verbose:
+            result = subprocess.run(cmd, check=False, timeout=TIMEOUT_SYNC_HL)
+        else:
+            result = subprocess.run(
+                cmd,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=TIMEOUT_SYNC_HL,
+            )
+            if result.returncode != 0:
+                print(
+                    f"\n[ERROR] Hyperliquid VM sync failed with code {result.returncode}"
+                )
+                if result.stdout:
+                    print(f"\nSTDOUT:\n{result.stdout}")
+                if result.stderr:
+                    print(f"\nSTDERR:\n{result.stderr}")
+
+        duration = time.perf_counter() - start
+
+        if result.returncode == 0:
+            print(f"\n[OK] Hyperliquid VM sync completed in {duration:.1f}s")
+            return ComponentResult(
+                component="sync_hl_vm",
+                success=True,
+                duration_sec=duration,
+                returncode=result.returncode,
+            )
+        else:
+            error_msg = f"Exited with code {result.returncode}"
+            print(f"\n[FAILED] Hyperliquid VM sync: {error_msg}")
+            return ComponentResult(
+                component="sync_hl_vm",
+                success=False,
+                duration_sec=duration,
+                returncode=result.returncode,
+                error_message=error_msg,
+            )
+
+    except subprocess.TimeoutExpired:
+        duration = time.perf_counter() - start
+        error_msg = f"Timed out after {TIMEOUT_SYNC_HL}s"
+        print(f"\n[TIMEOUT] Hyperliquid VM sync: {error_msg}")
+        return ComponentResult(
+            component="sync_hl_vm",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+
+
 def run_macro_features(args) -> ComponentResult:
     """Run FRED macro feature refresh via subprocess.
 
@@ -1755,7 +1946,7 @@ def run_macro_regimes(args) -> ComponentResult:
 
     Classifies daily macro features into 4-dimensional regime labels
     (monetary_policy, liquidity, risk_appetite, carry) with hysteresis
-    and upserts results into cmc_macro_regimes.
+    and upserts results into macro_regimes.
 
     This stage runs after macro_features and before per-asset regimes
     so that downstream pipeline stages can read the global macro context.
@@ -1873,8 +2064,8 @@ def run_macro_analytics(args) -> ComponentResult:
     """Run macro analytics (HMM, lead-lag, transition probs) via subprocess.
 
     Runs after macro regimes and before per-asset regime refresh.
-    Produces secondary analytical signals in cmc_hmm_regimes,
-    cmc_macro_lead_lag_results, and cmc_macro_transition_probs.
+    Produces secondary analytical signals in hmm_regimes,
+    macro_lead_lag_results, and macro_transition_probs.
 
     Pipeline ordering: macro_features -> macro_regimes -> macro_analytics -> regimes
 
@@ -1982,7 +2173,7 @@ def run_cross_asset_agg(args) -> ComponentResult:
     """Run cross-asset aggregation (XAGG-01 through XAGG-04) via subprocess.
 
     Runs after macro analytics and before per-asset regime refresh.
-    Produces cross-asset signals in cmc_cross_asset_agg, cmc_funding_rate_agg,
+    Produces cross-asset signals in cross_asset_agg, funding_rate_agg,
     and crypto_macro_corr_regimes.
 
     Pipeline ordering:
@@ -2204,7 +2395,7 @@ def main(argv: list[str] | None = None) -> int:
     """Main entry point."""
     p = argparse.ArgumentParser(
         description=(
-            "Unified daily refresh orchestration for bars, EMAs, AMAs, "
+            "Unified daily refresh orchestration for VM syncs, bars, EMAs, AMAs, "
             "desc_stats, macro features, regimes, signals, executor, and stats."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -2262,6 +2453,16 @@ Examples:
 
     # Target selection (required)
     p.add_argument(
+        "--sync-vms",
+        action="store_true",
+        help="Sync data from VMs only (FRED from GCP + Hyperliquid from Singapore)",
+    )
+    p.add_argument(
+        "--no-sync-vms",
+        action="store_true",
+        help="Skip VM sync stage in --all mode",
+    )
+    p.add_argument(
         "--bars",
         action="store_true",
         help="Run bar builders only",
@@ -2294,7 +2495,7 @@ Examples:
     p.add_argument(
         "--macro-regimes",
         action="store_true",
-        help="Run macro regime classification only (4-dimension labeling into cmc_macro_regimes)",
+        help="Run macro regime classification only (4-dimension labeling into macro_regimes)",
     )
     p.add_argument(
         "--no-macro-regimes",
@@ -2342,7 +2543,7 @@ Examples:
     p.add_argument(
         "--features",
         action="store_true",
-        help="Run feature refresh only (cmc_features for 1D timeframe)",
+        help="Run feature refresh only (features for 1D timeframe)",
     )
     p.add_argument(
         "--no-features",
@@ -2406,8 +2607,9 @@ Examples:
         "--all",
         action="store_true",
         help=(
-            "Run bars then EMAs then AMAs then desc_stats then regimes "
-            "then features then signals then executor then stats (full refresh)"
+            "Run sync_vms then bars then EMAs then AMAs then desc_stats "
+            "then macro then regimes then features then signals then "
+            "executor then stats (full refresh)"
         ),
     )
     p.add_argument(
@@ -2440,11 +2642,12 @@ Examples:
     )
     p.add_argument(
         "--source",
-        choices=["cmc", "tvc", "all"],
+        choices=["cmc", "tvc", "hl", "all"],
         default="all",
         help=(
             "Data source filter for bar builders: "
-            "'cmc' = CMC 1D only, 'tvc' = TVC 1D only, 'all' = both (default: all)"
+            "'cmc' = CMC 1D only, 'tvc' = TVC 1D only, "
+            "'hl' = Hyperliquid 1D only, 'all' = all sources (default: all)"
         ),
     )
 
@@ -2517,7 +2720,8 @@ Examples:
         # Exchange prices is a standalone fetch -- does not combine with pipeline.
         pass
     elif not (
-        args.bars
+        args.sync_vms
+        or args.bars
         or args.emas
         or args.amas
         or args.desc_stats
@@ -2535,10 +2739,10 @@ Examples:
         or args.all
     ):
         p.error(
-            "Must specify --bars, --emas, --amas, --desc-stats, --macro, --macro-regimes, "
-            "--macro-analytics, --cross-asset-agg, --regimes, --features, --signals, "
-            "--portfolio, --execute, --drift, --stats, --all, --weekly-digest, "
-            "or --exchange-prices"
+            "Must specify --sync-vms, --bars, --emas, --amas, --desc-stats, --macro, "
+            "--macro-regimes, --macro-analytics, --cross-asset-agg, --regimes, "
+            "--features, --signals, --portfolio, --execute, --drift, --stats, "
+            "--all, --weekly-digest, or --exchange-prices"
         )
 
     # Resolve database URL
@@ -2574,6 +2778,9 @@ Examples:
         return 1
 
     # Determine what to run
+    run_sync_vms = (args.sync_vms or args.all) and not getattr(
+        args, "no_sync_vms", False
+    )
     run_bars = args.bars or args.all
     run_emas = args.emas or args.all
     run_amas = args.amas or args.all
@@ -2602,6 +2809,8 @@ Examples:
 
     # Build component description string
     components = []
+    if run_sync_vms:
+        components.append("sync_vms")
     if run_bars:
         components.append("bars")
     if run_emas:
@@ -2644,6 +2853,22 @@ Examples:
         print(f"Bar staleness threshold: {args.staleness_hours} hours")
 
     results: list[tuple[str, ComponentResult]] = []
+
+    # Sync VM data first (before any computations that depend on it)
+    # Non-blocking: sync failures don't stop the pipeline (local data is
+    # still usable, just potentially stale). Warns instead.
+    if run_sync_vms:
+        fred_result = run_sync_fred_vm(args)
+        results.append(("sync_fred_vm", fred_result))
+        if not fred_result.success:
+            print("\n[WARN] FRED VM sync failed -- continuing with existing local data")
+
+        hl_result = run_sync_hl_vm(args)
+        results.append(("sync_hl_vm", hl_result))
+        if not hl_result.success:
+            print(
+                "\n[WARN] Hyperliquid VM sync failed -- continuing with existing local data"
+            )
 
     # Run bars if requested
     if run_bars:

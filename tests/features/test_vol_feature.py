@@ -28,7 +28,7 @@ def test_vol_config_defaults():
     config = VolatilityConfig()
 
     assert config.feature_type == "vol"
-    assert config.output_table == "cmc_vol_daily"
+    assert config.output_table == "vol_daily"
     assert config.null_strategy == "forward_fill"
     assert config.add_zscore is True
     assert config.zscore_window == 252
