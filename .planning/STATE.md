@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 
 ## Current Position
 
-Phase: 78 of 79 (Table Drops & Script Cleanup) -- Phase complete (3/3 plans done; plan 04 was view migration covered in 01)
-Plan: 3 of 3 complete
-Status: Phase complete
-Last activity: 2026-03-21 -- Completed 78-03: 30 siloed tables dropped, VACUUM FULL ran, DB shrank from 431 GB to 177 GB (-254 GB, -59%)
+Phase: 78 of 79 (Table Drops & Script Cleanup) -- Gap closure in progress (78-04 complete)
+Plan: 4 of 6 complete (gap closure plans 04-06)
+Status: In progress
+Last activity: 2026-03-21 -- Completed 78-04: 5 runtime files redirected to price_bars_multi_tf_u; run_all_audits.py cleaned of 14 deleted audit entries
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [#########.] 78% v1.1.0
 
@@ -98,6 +98,8 @@ Recent decisions affecting current work:
 - State table count in DB is 50 total (not 30): extra stats/feature/signal/pipeline state tables not in RESEARCH.md enumeration; verify by name not count (78-03)
 - VACUUM FULL yielded 254 GB (-59%) vs 207 GB (-48%) estimated: compacted _u tables and other tables too (78-03)
 - DB size after Phase 78: 177 GB (was 431 GB at start of phase)
+- alignment_source='multi_tf' (not 'default') is the correct WHERE filter for base table rows in price_bars_multi_tf_u; applied consistently in all runtime queries (78-04)
+- ALL_AUDIT_SCRIPTS in run_all_audits.py trimmed to 3 scripts verified on disk; 14 deleted-script entries removed (78-04)
 
 ### Pending Todos
 
@@ -113,7 +115,7 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-03-21
-Stopped at: Completed 78-03-PLAN.md -- 30 siloed tables dropped, VACUUM FULL, DB 431 GB -> 177 GB
+Stopped at: Completed 78-04-PLAN.md -- 5 runtime files redirected to price_bars_multi_tf_u; run_all_audits.py cleaned
 Resume file: None
 
 ---
