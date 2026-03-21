@@ -1447,7 +1447,11 @@ Plans:
   3. 6 sync scripts deleted from the codebase
   4. run_all_bar_builders.py and run_daily_refresh.py updated to remove sync steps
   5. pg_database_size() shows measurable storage reduction after VACUUM
-**Plans**: TBD
+**Plans:** 3 plans
+Plans:
+- [ ] 78-01-PLAN.md -- Migrate all_emas view + redirect runtime siloed-table references to _u
+- [ ] 78-02-PLAN.md -- Delete 6 sync scripts + clean orchestrator references + remove _resync_u_tables()
+- [ ] 78-03-PLAN.md -- Pre-drop parity validation + DROP 30 tables + VACUUM FULL + storage metrics
 
 ---
 
