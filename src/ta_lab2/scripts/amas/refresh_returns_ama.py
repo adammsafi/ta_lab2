@@ -147,6 +147,7 @@ pass2 AS (
     WINDOW w AS (PARTITION BY id, venue_id, tf, indicator, params_hash ORDER BY ts)
 )
 SELECT *, '{alignment_source}'::text AS alignment_source FROM pass2
+WHERE delta1_ama_roll IS NOT NULL
 ON CONFLICT (id, venue_id, ts, tf, indicator, params_hash, alignment_source) DO NOTHING
 """
 
