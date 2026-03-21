@@ -6,8 +6,6 @@ Builds daily OHLC bars with:
 - Per-source config loaded from dim_data_sources (SQL CTE template, venue_id, etc.)
 - Unified state table PK (id, venue_id, tf)
 - Generalized backfill detection using ts_column from dim_data_sources
-- Post-build sync to price_bars_multi_tf for TVC/HL sources
-
 This is the BAR-01 / BAR-03 / BAR-04 implementation: one script for all
 sources, config-driven extensibility (new source = new dim_data_sources row),
 and backfill detection generalized to all sources.
@@ -569,50 +567,6 @@ def _load_ids_for_source(conn, spec: dict) -> list[int]:
 
 
 # =============================================================================
-# Post-build sync
-# =============================================================================
-
-
-def _sync_1d_to_multi_tf(db_url: str, src_name_label: str) -> None:
-    """Copy source 1D bars to price_bars_multi_tf for downstream pipeline.
-
-    Uses ON CONFLICT (id, tf, bar_seq, venue_id, timestamp) which is the
-    live post-migration PK for price_bars_multi_tf.
-    """
-    log.info("Syncing %s 1D bars to price_bars_multi_tf...", src_name_label)
-    conn = connect(db_url)
-    try:
-        cur = conn.cursor()
-        cur.execute(
-            """
-            INSERT INTO public.price_bars_multi_tf
-            SELECT * FROM public.price_bars_1d
-            WHERE src_name = %s
-            ON CONFLICT (id, tf, bar_seq, venue_id, "timestamp") DO UPDATE SET
-                open = EXCLUDED.open,
-                high = EXCLUDED.high,
-                low  = EXCLUDED.low,
-                close = EXCLUDED.close,
-                volume = EXCLUDED.volume,
-                market_cap = EXCLUDED.market_cap,
-                src_name = EXCLUDED.src_name,
-                src_load_ts = EXCLUDED.src_load_ts,
-                src_file = EXCLUDED.src_file,
-                venue_rank = EXCLUDED.venue_rank
-            """,
-            [src_name_label],
-        )
-        conn.commit()
-        log.info("Synced %s 1D bars to price_bars_multi_tf", src_name_label)
-        cur.close()
-    except Exception as e:
-        log.warning("Failed to sync %s 1D bars to multi_tf: %s", src_name_label, e)
-        conn.rollback()
-    finally:
-        conn.close()
-
-
-# =============================================================================
 # GenericOneDayBarBuilder
 # =============================================================================
 
@@ -981,10 +935,6 @@ def main() -> None:
             config=config, engine=engine, source_spec=spec
         )
         builder.run()
-
-        # Sync 1D to multi_tf for non-CMC sources (TVC, HL)
-        if sk != "cmc":
-            _sync_1d_to_multi_tf(db_url, spec["src_name_label"])
 
     conn.close()
 

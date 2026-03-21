@@ -52,7 +52,7 @@ class EMAStateConfig:
 
     Attributes:
         state_schema: Schema containing state table (default: "public")
-        state_table: State table name (default: "cmc_ema_state")
+        state_table: State table name (default: "ema_multi_tf_state")
         ts_column: Timestamp column name in output table (default: "ts")
         roll_filter: WHERE clause for canonical rows (default: "roll = FALSE")
         use_canonical_ts: Whether to use canonical timestamp logic (default: False)
@@ -62,7 +62,7 @@ class EMAStateConfig:
     """
 
     state_schema: str = "public"
-    state_table: str = "cmc_ema_state"
+    state_table: str = "ema_multi_tf_state"
     ts_column: str = "ts"
     roll_filter: str = "roll = FALSE"
     use_canonical_ts: bool = False

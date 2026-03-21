@@ -174,7 +174,7 @@ class BaseAMAFeature(ABC):
         Used for logging and audit. At minimum include a "source_table" key.
 
         Returns:
-            Dict with metadata keys (e.g. {"source_table": "price_bars_multi_tf"}).
+            Dict with metadata keys (e.g. {"source_table": "price_bars_multi_tf_u"}).
         """
 
     # =========================================================================

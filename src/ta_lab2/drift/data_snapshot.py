@@ -13,7 +13,7 @@ def collect_data_snapshot(
     """
     Collect the latest data timestamps for each asset across key tables.
 
-    Queries MAX(ts) from price_bars_multi_tf, features, and ema_multi_tf_u
+    Queries MAX(ts) from price_bars_multi_tf_u, features, and ema_multi_tf_u
     for each asset at the 1D timeframe. Used to record the point-in-time data state
     at paper execution time so drift replay can reconstruct what data was visible.
 

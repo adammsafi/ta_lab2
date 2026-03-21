@@ -228,7 +228,7 @@ def get_price_bounds(
         engine: SQLAlchemy engine for database operations
         id: Cryptocurrency ID
         tf: Timeframe (e.g., "1D", "7D")
-        source_table: Source bars table (e.g., "public.price_bars_multi_tf")
+        source_table: Source bars table (e.g., "public.price_bars_multi_tf_u")
         lookback_days: Number of days to look back for bounds (default: 90)
 
     Returns:

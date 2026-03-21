@@ -313,7 +313,7 @@ class PositionSizer:
         Retrieve the most recent price for an asset.
 
         Tries exchange_price_feed first (real-time). Falls back to the most recent
-        daily bar close from price_bars_multi_tf when the feed is stale (>24h)
+        daily bar close from price_bars_multi_tf_u when the feed is stale (>24h)
         or missing.
 
         Parameters
