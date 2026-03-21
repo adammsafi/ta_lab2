@@ -708,8 +708,8 @@ def load_ids(
     if all_ids:
         if venue_id is not None:
             query = text(
-                "SELECT DISTINCT id FROM public.price_bars_multi_tf "
-                "WHERE venue_id = :venue_id ORDER BY id"
+                "SELECT DISTINCT id FROM public.price_bars_multi_tf_u "
+                "WHERE venue_id = :venue_id AND alignment_source = 'multi_tf' ORDER BY id"
             )
             with engine.connect() as conn:
                 result = conn.execute(query, {"venue_id": venue_id})
@@ -741,7 +741,7 @@ def parse_args() -> argparse.Namespace:
     id_group.add_argument(
         "--all",
         action="store_true",
-        help="Process all IDs from price_bars_multi_tf",
+        help="Process all IDs from price_bars_multi_tf_u",
     )
 
     # Timeframe selection
@@ -754,7 +754,7 @@ def parse_args() -> argparse.Namespace:
     tf_group.add_argument(
         "--all-tfs",
         action="store_true",
-        help="Process all timeframes with data in price_bars_multi_tf",
+        help="Process all timeframes with data in price_bars_multi_tf_u",
     )
 
     # Codependence (optional batch step)

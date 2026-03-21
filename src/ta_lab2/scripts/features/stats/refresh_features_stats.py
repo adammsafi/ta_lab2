@@ -44,7 +44,7 @@ from ta_lab2.scripts.bars.common_snapshot_contract import get_engine, resolve_db
 FEATURE_TABLE = "public.features"
 STATS_TABLE = "public.features_stats"
 STATE_TABLE = "public.features_stats_state"
-BAR_TABLE = "public.price_bars_multi_tf"
+BAR_TABLE = "public.price_bars_multi_tf_u"
 
 # Key feature columns to check for NULLs.
 # These are the most important downstream columns.
@@ -313,6 +313,7 @@ bar_counts AS (
         b.tf,
         COUNT(*) AS n_bars
     FROM {BAR_TABLE} b
+    WHERE b.alignment_source = 'multi_tf'
     GROUP BY b.id, b.tf
 ),
 joined AS (
@@ -361,6 +362,7 @@ WITH bar_max AS (
         tf,
         MAX("timestamp") AS max_bar_ts
     FROM {BAR_TABLE}
+    WHERE alignment_source = 'multi_tf'
     GROUP BY id, tf
 ),
 feat_max AS (

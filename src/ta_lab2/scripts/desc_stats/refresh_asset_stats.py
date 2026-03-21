@@ -64,7 +64,7 @@ WINDOWS: List[int] = [30, 60, 90, 252]
 DEFAULT_RF: float = 0.0
 TABLE_NAME = "asset_stats"
 STATE_TABLE = "asset_stats_state"
-SOURCE_TABLE = "returns_bars_multi_tf"
+SOURCE_TABLE = "returns_bars_multi_tf_u"
 
 _PRINT_PREFIX = "asset_stats"
 
@@ -258,8 +258,9 @@ def _process_one(engine: Engine, db_url: str, task: WorkerTask) -> int:
         # First run or full rebuild: load all history
         sql = text(
             'SELECT id, "timestamp" AS ts, tf, ret_arith '
-            "FROM public.returns_bars_multi_tf "
+            "FROM public.returns_bars_multi_tf_u "
             "WHERE id = :id AND venue_id = :venue_id AND tf = :tf AND roll = FALSE "
+            "AND alignment_source = 'multi_tf' "
             'ORDER BY "timestamp"'
         )
         params: Dict[str, Any] = {"id": asset_id, "venue_id": venue_id, "tf": tf}
@@ -272,8 +273,9 @@ def _process_one(engine: Engine, db_url: str, task: WorkerTask) -> int:
         lookback_days = int(lookback * tf_days * 1.5)
         sql = text(
             'SELECT id, "timestamp" AS ts, tf, ret_arith '
-            "FROM public.returns_bars_multi_tf "
+            "FROM public.returns_bars_multi_tf_u "
             "WHERE id = :id AND venue_id = :venue_id AND tf = :tf AND roll = FALSE "
+            "AND alignment_source = 'multi_tf' "
             "AND \"timestamp\" >= (:last_ts - CAST(:lookback_days || ' days' AS INTERVAL)) "
             'ORDER BY "timestamp"'
         )
@@ -484,7 +486,7 @@ def main() -> None:
         "--all-venues",
         action="store_true",
         default=False,
-        help="Run for all venue_ids that have data in returns_bars_multi_tf.",
+        help="Run for all venue_ids that have data in returns_bars_multi_tf_u.",
     )
     args = p.parse_args()
 
@@ -526,7 +528,7 @@ def main() -> None:
         with engine_tmp.connect() as conn:
             venue_asset_rows = conn.execute(
                 text(
-                    "SELECT DISTINCT venue_id, id FROM public.returns_bars_multi_tf "
+                    "SELECT DISTINCT venue_id, id FROM public.returns_bars_multi_tf_u "
                     "ORDER BY venue_id, id"
                 )
             ).fetchall()

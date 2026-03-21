@@ -594,9 +594,10 @@ class FeatureValidator:
                     r.ret_arith,
                     ABS(p.calc_ret - r.ret_arith) as diff
                 FROM price_changes p
-                JOIN public.returns_bars_multi_tf r
+                JOIN public.returns_bars_multi_tf_u r
                   ON p.id = r.id AND DATE(p.ts) = DATE(r."timestamp")
                   AND r.tf = '1D' AND r.roll = FALSE
+                  AND r.alignment_source = 'multi_tf'
                 WHERE p.calc_ret IS NOT NULL
                   AND r.ret_arith IS NOT NULL
                   AND ABS(p.calc_ret - r.ret_arith) > 0.0001  -- 0.01% tolerance
@@ -638,8 +639,9 @@ class FeatureValidator:
             f"""
             SELECT v.id, v.ts, v.close as vol_close, b.close as bar_close
             FROM public.vol v
-            JOIN public.price_bars_multi_tf b
+            JOIN public.price_bars_multi_tf_u b
               ON v.id = b.id AND v.ts = b.time_close AND v.tf = b.tf
+              AND b.alignment_source = 'multi_tf'
             WHERE v.id IN ({ids_str})
               AND v.tf = '1D'
               AND ABS(v.close - b.close) > 0.01
@@ -676,8 +678,9 @@ class FeatureValidator:
             f"""
             SELECT t.id, t.ts, t.close as ta_close, b.close as bar_close
             FROM public.ta t
-            JOIN public.price_bars_multi_tf b
+            JOIN public.price_bars_multi_tf_u b
               ON t.id = b.id AND t.ts = b.time_close AND t.tf = b.tf
+              AND b.alignment_source = 'multi_tf'
             WHERE t.id IN ({ids_str})
               AND t.tf = '1D'
               AND ABS(t.close - b.close) > 0.01
@@ -926,12 +929,12 @@ def validate_features(
         start_dt = datetime.now() - timedelta(days=30)
         start = start_dt.strftime("%Y-%m-%d")
 
-    # Default IDs: sample from returns table
+    # Default IDs: sample from _u table
     if ids is None:
         query = text(
             """
             SELECT DISTINCT id
-            FROM public.price_bars_multi_tf
+            FROM public.price_bars_multi_tf_u
             ORDER BY id
             LIMIT 10
         """

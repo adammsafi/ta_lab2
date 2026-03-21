@@ -742,8 +742,9 @@ def _get_all_asset_ids(engine: Engine, venue_id: int = 1) -> list[int]:
         result = conn.execute(
             text(
                 "SELECT DISTINCT a.id FROM public.dim_assets a "
-                "JOIN public.price_bars_multi_tf p ON a.id = p.id "
+                "JOIN public.price_bars_multi_tf_u p ON a.id = p.id "
                 "WHERE a.pipeline_tier = 1 AND p.venue_id = :venue_id "
+                "AND p.alignment_source = 'multi_tf' "
                 "ORDER BY a.id"
             ),
             {"venue_id": venue_id},

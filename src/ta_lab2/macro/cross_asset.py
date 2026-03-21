@@ -285,8 +285,8 @@ def compute_cross_asset_corr(
     # --- Load CMC daily returns (tf='1D', roll=FALSE) ---
     cmc_sql = text(
         'SELECT id, "timestamp"::date AS date, ret_arith '
-        "FROM returns_bars_multi_tf "
-        "WHERE tf = '1D' AND roll = FALSE "
+        "FROM returns_bars_multi_tf_u "
+        "WHERE tf = '1D' AND roll = FALSE AND alignment_source = 'multi_tf' "
         'AND "timestamp"::date >= :start AND "timestamp"::date <= :end '
         "ORDER BY id, date"
     )
@@ -925,8 +925,8 @@ def compute_crypto_macro_corr(
     # --- Load crypto daily returns (tf='1D', roll=FALSE) ---
     ret_sql = text(
         'SELECT id, "timestamp"::date AS date, ret_arith '
-        "FROM returns_bars_multi_tf "
-        "WHERE tf = '1D' AND roll = FALSE "
+        "FROM returns_bars_multi_tf_u "
+        "WHERE tf = '1D' AND roll = FALSE AND alignment_source = 'multi_tf' "
         'AND "timestamp"::date >= :start AND "timestamp"::date <= :end '
         "ORDER BY id, date"
     )

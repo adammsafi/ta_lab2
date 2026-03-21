@@ -74,7 +74,7 @@ _ASSET_ID_TO_NAME: dict[int, str] = {
     2: "eth",
 }
 
-# Daily timeframe code for returns_bars_multi_tf
+# Daily timeframe code for returns_bars_multi_tf_u
 _RETURN_TF = "1D"
 
 
@@ -116,7 +116,7 @@ class LeadLagAnalyzer:
     # ── Private helpers ───────────────────────────────────────────────────────
 
     def _discover_return_column(self) -> str:
-        """Discover the primary return column in returns_bars_multi_tf.
+        """Discover the primary return column in returns_bars_multi_tf_u.
 
         Prefers ret_cc (close-to-close return). Falls back to first ret_* column.
 
@@ -130,11 +130,11 @@ class LeadLagAnalyzer:
         ValueError
             If no ret_* columns exist in the table.
         """
-        existing_cols = _get_table_columns(self.engine, "returns_bars_multi_tf")
+        existing_cols = _get_table_columns(self.engine, "returns_bars_multi_tf_u")
         ret_cols = sorted(c for c in existing_cols if c.startswith("ret"))
         if not ret_cols:
             raise ValueError(
-                "No ret_* columns found in returns_bars_multi_tf. "
+                "No ret_* columns found in returns_bars_multi_tf_u. "
                 "Has the returns pipeline been run?"
             )
         # Prefer ret_cc (close-to-close); fall back to first available
@@ -193,7 +193,7 @@ class LeadLagAnalyzer:
     def _load_asset_returns(
         self, asset_ids: list[int] | None = None, return_col: str = "ret_cc"
     ) -> pd.DataFrame:
-        """Load daily asset returns from returns_bars_multi_tf.
+        """Load daily asset returns from returns_bars_multi_tf_u.
 
         Loads returns for each asset_id at 1D timeframe, merges on timestamp
         (normalized to date-level for alignment with macro features).
@@ -220,8 +220,8 @@ class LeadLagAnalyzer:
             col_alias = f"{name}_1d_return"
             sql = text(
                 f'SELECT "timestamp" AS ts, {return_col} AS {col_alias} '
-                "FROM returns_bars_multi_tf "
-                "WHERE id = :id AND tf = :tf "
+                "FROM returns_bars_multi_tf_u "
+                "WHERE id = :id AND tf = :tf AND alignment_source = 'multi_tf' "
                 'ORDER BY "timestamp" ASC'
             )
             with self.engine.connect() as conn:
@@ -237,7 +237,7 @@ class LeadLagAnalyzer:
 
             df = df.set_index("ts")
             # Normalize tz-aware timestamp to tz-naive date-level index
-            # Critical: returns_bars_multi_tf.timestamp is TIMESTAMP WITH TZ;
+            # Critical: returns_bars_multi_tf_u.timestamp is TIMESTAMP WITH TZ;
             # fred_macro_features.date is DATE (tz-naive). Normalize before join.
             df.index = pd.to_datetime(df.index, utc=True).normalize().tz_localize(None)
 

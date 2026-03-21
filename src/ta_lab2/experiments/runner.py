@@ -41,17 +41,11 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 _ALLOWED_TABLES = frozenset(
     [
-        "price_bars_multi_tf",
         "price_bars_multi_tf_u",
-        "returns_bars_multi_tf",
         "returns_bars_multi_tf_u",
-        "ema_multi_tf",
         "ema_multi_tf_u",
-        "returns_ema_multi_tf",
         "returns_ema_multi_tf_u",
-        "ama_multi_tf",
         "ama_multi_tf_u",
-        "returns_ama_multi_tf",
         "returns_ama_multi_tf_u",
         "vol",
         "ta_daily",
@@ -69,12 +63,10 @@ _TABLES_WITHOUT_TF = frozenset(
 )
 
 # Tables that use "timestamp" (not "ts") as the time column.
-# All price bars tables use "timestamp"; EMA/vol/features tables use "ts".
+# All price bars _u tables use "timestamp"; EMA/vol/features tables use "ts".
 _TABLES_WITH_TIMESTAMP_COL = frozenset(
     [
-        "price_bars_multi_tf",
         "price_bars_multi_tf_u",
-        "returns_bars_multi_tf",
         "returns_bars_multi_tf_u",
     ]
 )

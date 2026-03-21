@@ -153,10 +153,11 @@ def load_bars_for_tf(
     """
     Load OHLCV price bars from DB for a single asset and timeframe.
 
-    Routes to the correct table based on timeframe:
-    - Daily (``tf='1D'``): queries ``price_bars_multi_tf``
-    - Weekly/Monthly (``tf='1W'`` or ``tf='1M'``): queries the calendar bar table
-      (price_bars_multi_tf_cal_iso or _cal_us depending on cal_scheme)
+    Routes to the correct alignment_source in price_bars_multi_tf_u based on timeframe:
+    - Daily (``tf='1D'``): queries ``price_bars_multi_tf_u`` with
+      ``alignment_source = 'multi_tf'``
+    - Weekly/Monthly (``tf='1W'`` or ``tf='1M'``): queries ``price_bars_multi_tf_u``
+      with ``alignment_source = 'multi_tf_cal_{cal_scheme}'``
 
     CRITICAL: Calendar bar tables use ``time_close`` (not ``ts``) as the timestamp
     column. This function always aliases it to ``ts`` so callers receive a
@@ -186,29 +187,37 @@ def load_bars_for_tf(
         )
 
     if tf == "1D":
-        # Daily bars: standard multi-TF table, uses ts column directly
+        # Daily bars: unified _u table, filter to multi_tf alignment source
         sql = text(
             """
             SELECT id, venue_id, time_close AS ts, open, high, low, close, volume
-            FROM public.price_bars_multi_tf
+            FROM public.price_bars_multi_tf_u
             WHERE id = :id AND tf = '1D' AND venue_id = :venue_id
+              AND alignment_source = 'multi_tf'
             ORDER BY time_close
         """
         )
         params = {"id": asset_id, "venue_id": venue_id}
     else:
-        # Weekly or monthly: calendar bar table, time_close aliased to ts
-        # CRITICAL: PK uses bar_seq, not ts. time_close is the period-end timestamp.
-        table_name = f"price_bars_multi_tf_cal_{cal_scheme}"
+        # Weekly or monthly: unified _u table, filter to cal alignment source
+        # alignment_source values: 'multi_tf_cal_iso', 'multi_tf_cal_us',
+        #   'multi_tf_cal_anchor_iso', 'multi_tf_cal_anchor_us'
+        alignment = f"multi_tf_cal_{cal_scheme}"
         sql = text(
-            f"""
+            """
             SELECT id, venue_id, time_close AS ts, open, high, low, close, volume
-            FROM public.{table_name}
+            FROM public.price_bars_multi_tf_u
             WHERE id = :id AND tf = :tf AND venue_id = :venue_id
+              AND alignment_source = :alignment
             ORDER BY time_close
         """
         )
-        params = {"id": asset_id, "tf": tf, "venue_id": venue_id}
+        params = {
+            "id": asset_id,
+            "tf": tf,
+            "venue_id": venue_id,
+            "alignment": alignment,
+        }
 
     try:
         with engine.connect() as conn:
@@ -253,11 +262,11 @@ def load_emas_for_tf(
     """
     Load raw long-format EMAs from DB for a single asset and timeframe.
 
-    Routes to the correct EMA table based on timeframe:
+    Routes to the correct alignment_source in ema_multi_tf_u based on timeframe:
     - Daily (``tf='1D'``): queries ``ema_multi_tf_u`` with
       ``alignment_source = 'multi_tf'`` filter to prevent duplicate rows.
-    - Weekly/Monthly (``tf='1W'`` or ``tf='1M'``): queries the calendar EMA table
-      (ema_multi_tf_cal_iso or _cal_us depending on cal_scheme).
+    - Weekly/Monthly (``tf='1W'`` or ``tf='1M'``): queries ``ema_multi_tf_u``
+      with ``alignment_source = 'multi_tf_cal_{cal_scheme}'``.
 
     CRITICAL: ``ema_multi_tf_u`` has an ``alignment_source`` column with values
     like 'multi_tf', 'multi_tf_cal_us'. For daily regime EMAs, always filter to
@@ -306,22 +315,27 @@ def load_emas_for_tf(
         )
         params = {"id": asset_id, "periods": periods, "venue_id": venue_id}
     else:
-        # Weekly/monthly EMAs from calendar EMA table
-        # Calendar EMA table PK: (id, tf, ts, period)
-        # No alignment_source filter needed -- unique by PK
-        table_name = f"ema_multi_tf_cal_{cal_scheme}"
+        # Weekly/monthly EMAs from unified _u table, filter to cal alignment source
+        alignment = f"multi_tf_cal_{cal_scheme}"
         sql = text(
-            f"""
+            """
             SELECT id, ts, period, ema
-            FROM public.{table_name}
+            FROM public.ema_multi_tf_u
             WHERE id = :id
               AND tf = :tf
               AND period = ANY(:periods)
               AND venue_id = :venue_id
+              AND alignment_source = :alignment
             ORDER BY ts, period
         """
         )
-        params = {"id": asset_id, "tf": tf, "periods": periods, "venue_id": venue_id}
+        params = {
+            "id": asset_id,
+            "tf": tf,
+            "periods": periods,
+            "venue_id": venue_id,
+            "alignment": alignment,
+        }
 
     try:
         with engine.connect() as conn:

@@ -52,7 +52,7 @@ from ta_lab2.time.dim_timeframe import list_tfs
 WINDOWS: List[int] = [30, 60, 90, 252]
 TABLE_NAME = "cross_asset_corr"
 STATE_TABLE = "cross_asset_corr_state"
-SOURCE_TABLE = "returns_bars_multi_tf"
+SOURCE_TABLE = "returns_bars_multi_tf_u"
 MAT_VIEW = "public.corr_latest"
 
 _PRINT_PREFIX = "cross_corr"
@@ -207,7 +207,12 @@ def _load_returns_wide(
     Note: returns_bars_multi_tf uses "timestamp" column (reserved word, must be quoted).
     """
     params: Dict = {"tf": tf, "ids": ids}
-    where_parts = ["tf = :tf", "roll = FALSE", "id = ANY(:ids)"]
+    where_parts = [
+        "tf = :tf",
+        "roll = FALSE",
+        "id = ANY(:ids)",
+        "alignment_source = 'multi_tf'",
+    ]
 
     if start_ts is not None:
         where_parts.append('"timestamp" >= :start_ts')
@@ -215,9 +220,9 @@ def _load_returns_wide(
 
     where_clause = " AND ".join(where_parts)
     sql = text(
-        f'SELECT DISTINCT ON (id, "timestamp") id, "timestamp", ret_arith '
+        f'SELECT id, "timestamp", ret_arith '
         f"FROM public.{SOURCE_TABLE} "
-        f'WHERE {where_clause} ORDER BY id, "timestamp", venue_id'
+        f'WHERE {where_clause} ORDER BY id, "timestamp"'
     )
 
     with engine.connect() as conn:
