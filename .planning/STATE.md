@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 
 ## Current Position
 
-Phase: 79 of 79 IN PROGRESS (Storage Pipeline Cleanup) -- Plan 3/3 complete
-Plan: 3 of 3 complete
-Status: Phase 79 plan 03 complete -- pending phase verification
-Last activity: 2026-03-21 -- Completed 79-03: dead REST routes removed from MCP memory server, client.py (ChromaDB) deleted
+Phase: 79 of 79 IN PROGRESS (Storage Pipeline Cleanup) -- All 3 plans complete
+Plan: 3 of 3 complete (79-01, 79-02, 79-03 all done)
+Status: Phase 79 all plans complete -- pending phase verification
+Last activity: 2026-03-21 -- Completed 79-02: VWAP builder verified/fixed for venue_id schema; 0 bars for GOOGL/NVDA is correct (no timestamp overlap)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 97% v1.1.0
 
@@ -109,6 +109,9 @@ Recent decisions affecting current work:
 - client.py (ChromaDB PersistentClient) deleted; fully replaced by Mem0+Qdrant (79-03)
 - validation.py quick_health_check() migrated to Qdrant; validate_memory_store() raises ImportError with migration note (79-03)
 - Lazy imports in deferred modules (query.py, update.py, migration.py) reference deleted client.py but won't break at import time -- only fail if called, which they aren't (79-03)
+- VWAP output stored as venue_id=1 (CMC_AGG) + src_name='VWAP'; distinguishes from raw CMC data with no dedicated VWAP venue_id needed (79-02)
+- GOOGL/NVDA have 2+ non-CMC venues but 0 VWAP bars: NASDAQ bars at 09:30, HL bars at 19:xx -- no exact timestamp overlap; HAVING COUNT(*) >= 2 per timestamp produces nothing; this is correct behavior (79-02)
+- CPOOL's 735 existing VWAP bars are stale (HL data removed); harmless, could be pruned in future cleanup (79-02)
 
 ### Pending Todos
 
@@ -124,9 +127,9 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-03-21
-Stopped at: Completed 79-03-PLAN.md -- all 3 Phase 79 plans complete, pending phase verification
+Stopped at: Completed 79-02-PLAN.md -- all 3 Phase 79 plans complete, pending phase verification
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-21 (Phase 79 plan 03 complete -- MCP memory server cleaned, ChromaDB client.py deleted)*
+*Last updated: 2026-03-21 (Phase 79 plan 02 complete -- VWAP builder verified, 79-01 still pending SUMMARY)*
