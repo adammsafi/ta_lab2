@@ -60,7 +60,7 @@ from ta_lab2.scripts.refresh_utils import resolve_db_url
 SCHEME_MAP = {
     "us": {
         "feature_class": CalUSAMAFeature,
-        "bars_table": "price_bars_multi_tf_cal_us",
+        "bars_table": "price_bars_multi_tf_u",
         "output_table": "ama_multi_tf_u",
         "alignment_source": "multi_tf_cal_us",
         "state_table": "ama_multi_tf_cal_us_state",
@@ -68,7 +68,7 @@ SCHEME_MAP = {
     },
     "iso": {
         "feature_class": CalISOAMAFeature,
-        "bars_table": "price_bars_multi_tf_cal_iso",
+        "bars_table": "price_bars_multi_tf_u",
         "output_table": "ama_multi_tf_u",
         "alignment_source": "multi_tf_cal_iso",
         "state_table": "ama_multi_tf_cal_iso_state",
@@ -335,8 +335,8 @@ class CalAMARefresher(BaseAMARefresher):
         return (
             "Refresh calendar-aligned AMA tables (US/ISO schemes) into ama_multi_tf_u.\n\n"
             "Data sources:\n"
-            "  price_bars_multi_tf_cal_us  -> ama_multi_tf_u (alignment_source='multi_tf_cal_us')\n"
-            "  price_bars_multi_tf_cal_iso -> ama_multi_tf_u (alignment_source='multi_tf_cal_iso')\n\n"
+            "  price_bars_multi_tf_u (alignment_source='multi_tf_cal_us')  -> ama_multi_tf_u\n"
+            "  price_bars_multi_tf_u (alignment_source='multi_tf_cal_iso') -> ama_multi_tf_u\n\n"
             "Use --scheme us/iso/both to select which calendar scheme to refresh."
         )
 

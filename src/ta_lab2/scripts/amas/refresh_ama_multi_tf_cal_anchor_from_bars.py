@@ -62,7 +62,7 @@ from ta_lab2.scripts.refresh_utils import resolve_db_url
 SCHEME_MAP = {
     "us": {
         "feature_class": CalAnchorUSAMAFeature,
-        "bars_table": "price_bars_multi_tf_cal_anchor_us",
+        "bars_table": "price_bars_multi_tf_u",
         "output_table": "ama_multi_tf_u",
         "alignment_source": "multi_tf_cal_anchor_us",
         "state_table": "ama_multi_tf_cal_anchor_us_state",
@@ -70,7 +70,7 @@ SCHEME_MAP = {
     },
     "iso": {
         "feature_class": CalAnchorISOAMAFeature,
-        "bars_table": "price_bars_multi_tf_cal_anchor_iso",
+        "bars_table": "price_bars_multi_tf_u",
         "output_table": "ama_multi_tf_u",
         "alignment_source": "multi_tf_cal_anchor_iso",
         "state_table": "ama_multi_tf_cal_anchor_iso_state",
@@ -339,8 +339,8 @@ class CalAnchorAMARefresher(BaseAMARefresher):
         return (
             "Refresh calendar-anchor AMA tables (US/ISO schemes) into ama_multi_tf_u.\n\n"
             "Data sources:\n"
-            "  price_bars_multi_tf_cal_anchor_us  -> ama_multi_tf_u (alignment_source='multi_tf_cal_anchor_us')\n"
-            "  price_bars_multi_tf_cal_anchor_iso -> ama_multi_tf_u (alignment_source='multi_tf_cal_anchor_iso')\n\n"
+            "  price_bars_multi_tf_u (alignment_source='multi_tf_cal_anchor_us')  -> ama_multi_tf_u\n"
+            "  price_bars_multi_tf_u (alignment_source='multi_tf_cal_anchor_iso') -> ama_multi_tf_u\n\n"
             "Use --scheme us/iso/both to select which calendar anchor scheme to refresh."
         )
 

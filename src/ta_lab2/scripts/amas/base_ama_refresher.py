@@ -84,7 +84,7 @@ class AMAWorkerTask:
     output_schema: str
     output_table: str
     bars_schema: str = "public"
-    bars_table: str = "price_bars_multi_tf"
+    bars_table: str = "price_bars_multi_tf_u"
     tf_subset: Optional[list[str]] = None
     full_rebuild: bool = False
     extra_config: dict[str, Any] = field(default_factory=dict)
@@ -320,7 +320,7 @@ class BaseAMARefresher(ABC):
 
     def get_bars_table(self) -> str:
         """Return source bars table name. Override in calendar subclasses."""
-        return "price_bars_multi_tf"
+        return "price_bars_multi_tf_u"
 
     def get_bars_schema(self) -> str:
         """Return source bars schema. Override if needed."""
@@ -330,7 +330,7 @@ class BaseAMARefresher(ABC):
         """Return alignment_source value for _u table writes.
 
         Override in concrete refreshers that target ama_multi_tf_u.
-        Default None means targeting a siloed table (no alignment_source column).
+        Default None means no alignment_source filter on bar reads (reads all variants).
         """
         return None
 
@@ -675,7 +675,7 @@ Examples:
 
         Args:
             engine: SQLAlchemy engine.
-            source_table_fq: Fully-qualified source table (e.g., 'public.price_bars_multi_tf').
+            source_table_fq: Fully-qualified source table (e.g., 'public.price_bars_multi_tf_u').
             venue_id: Venue ID to filter by.
 
         Returns:

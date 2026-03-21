@@ -2,9 +2,9 @@
 Refresh ama_multi_tf_u - Main multi-TF AMA refresh script.
 
 Computes KAMA, DEMA, TEMA, HMA for all 18 parameter sets across all
-109 timeframes from price_bars_multi_tf.
+109 timeframes from price_bars_multi_tf_u.
 
-Data source:  public.price_bars_multi_tf
+Data source:  public.price_bars_multi_tf_u  (alignment_source='multi_tf')
 State table:  public.ama_multi_tf_state
 Output table: public.ama_multi_tf_u  (alignment_source='multi_tf')
 Indicators:   KAMA x3, DEMA x5, TEMA x5, HMA x5 (18 param sets total)
@@ -59,7 +59,7 @@ class MultiTFAMARefresher(BaseAMARefresher):
     Inherits all CLI, multiprocessing, and state management logic from
     BaseAMARefresher. Overrides only table names, alignment_source, and description.
 
-    Data source: price_bars_multi_tf
+    Data source: price_bars_multi_tf_u  (alignment_source='multi_tf')
     Output:      ama_multi_tf_u  (alignment_source='multi_tf')
     State:       public.ama_multi_tf_state
     """
@@ -73,11 +73,11 @@ class MultiTFAMARefresher(BaseAMARefresher):
     def get_description(self) -> str:
         return (
             "Refresh ama_multi_tf_u (alignment_source='multi_tf') with KAMA, DEMA, "
-            "TEMA, HMA across all 109 timeframes from price_bars_multi_tf."
+            "TEMA, HMA across all 109 timeframes from price_bars_multi_tf_u."
         )
 
     def get_bars_table(self) -> str:
-        return "price_bars_multi_tf"
+        return "price_bars_multi_tf_u"
 
     def get_bars_schema(self) -> str:
         return "public"
