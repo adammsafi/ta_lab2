@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 
 ## Current Position
 
-Phase: 79 of 79 IN PROGRESS (Storage Pipeline Cleanup) -- All 3 plans complete
+Phase: 79 of 79 COMPLETE (Storage Pipeline Cleanup) -- v1.1.0 SHIPPED
 Plan: 3 of 3 complete (79-01, 79-02, 79-03 all done)
-Status: Phase 79 all plans complete -- pending phase verification
-Last activity: 2026-03-21 -- Completed 79-01: Pruned 7,180,871 NULL first-observation rows from returns_ama_multi_tf_u (-6.13%); added WHERE delta1_ama_roll IS NOT NULL filter to refresh_returns_ama.py _INSERT_SQL
+Status: Phase verified ✓ -- Milestone v1.1.0 complete
+Last activity: 2026-03-21 -- Phase 79 verified (8/8 must-haves); v1.1.0 shipped
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 97% v1.1.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 356
+- Total plans completed: 359
 - Average duration: 7 min
 - Total execution time: ~28.9 hours
 

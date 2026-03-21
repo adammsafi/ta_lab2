@@ -10,7 +10,8 @@
 - v0.9.0 Research & Experimentation (Phases 35-41) - SHIPPED 2026-02-24
 - v1.0.0 V1 Closure — Paper Trading & Validation (Phases 42-63) - SHIPPED 2026-03-01
 - v1.0.1 Macro Regime Infrastructure (Phases 64-73) - SHIPPED 2026-03-03
-- v1.1.0 Pipeline Consolidation & Storage Optimization (Phases 74-79) - IN PROGRESS
+- v1.1.0 Pipeline Consolidation & Storage Optimization (Phases 74-79) - SHIPPED 2026-03-21
+- v1.2.0 Analysis → Live Signals (Phases 80-88) - PLANNED
 
 ## Overview
 
@@ -28,6 +29,7 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 - Phases 42-63: v1.0.0 (SHIPPED 2026-03-01)
 - Phases 64-73: v1.0.1 (SHIPPED 2026-03-03)
 - Phases 74-79: v1.1.0 (in progress)
+- Phases 80-88: v1.2.0 (planned)
 - Decimal phases (27.1, 28.1): Urgent insertions if needed
 
 <details>
@@ -1363,7 +1365,7 @@ Full details: `.planning/milestones/v1.0.1-ROADMAP.md`
 - [x] **Phase 76: Direct-to-_u Price Bars (Pilot)** - Price bars family migrated to direct _u writes -- COMPLETE 2026-03-20
 - [x] **Phase 77: Direct-to-_u Remaining Families** - EMA, AMA, and returns families migrated to direct _u writes — COMPLETE 2026-03-20
 - [x] **Phase 78: Table Drops & Script Cleanup** - Drop 30 siloed tables, delete 6 sync scripts, fix dependent views -- COMPLETE 2026-03-21
-- [ ] **Phase 79: Storage & Pipeline Cleanup** - NULL row pruning, VWAP integration, MCP dead route removal
+- [x] **Phase 79: Storage & Pipeline Cleanup** - NULL row pruning, VWAP integration, MCP dead route removal -- COMPLETE 2026-03-21
 
 ## v1.1.0 Phase Details
 
@@ -1469,11 +1471,11 @@ Plans:
   4. Dead REST API routes (/api/v1/memory/*) removed from MCP memory server and stale client.py (ChromaDB PersistentClient) deleted
 **Plans**: 3 plans
 Plans:
-- [ ] 79-01-PLAN.md -- Prune NULL first-observation rows from AMA returns
-- [ ] 79-02-PLAN.md -- Validate and run VWAP for all multi-venue assets
-- [ ] 79-03-PLAN.md -- Remove dead REST routes and ChromaDB client from MCP server
+- [x] 79-01-PLAN.md -- Prune NULL first-observation rows from AMA returns
+- [x] 79-02-PLAN.md -- Validate and run VWAP for all multi-venue assets
+- [x] 79-03-PLAN.md -- Remove dead REST routes and ChromaDB client from MCP server
 
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-21 (Phase 79 planned: 3 plans in 1 wave)*
+*Last updated: 2026-03-21 (Phase 79 complete: v1.1.0 SHIPPED)*

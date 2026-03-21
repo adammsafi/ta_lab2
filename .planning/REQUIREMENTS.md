@@ -33,18 +33,18 @@
 
 ### Storage Cleanup (CLN)
 
-- [ ] **CLN-01**: NULL first-observation rows pruned from returns tables (rows where all return columns are NULL)
-- [ ] **CLN-02**: Returns scripts updated to skip first-observation inserts going forward
+- [x] **CLN-01**: NULL first-observation rows pruned from returns tables (rows where all return columns are NULL)
+- [x] **CLN-02**: Returns scripts updated to skip first-observation inserts going forward
 
 ### VWAP Pipeline (VWP)
 
-- [ ] **VWP-01**: VWAP bar builder runs for all multi-venue assets automatically (`--ids all`)
-- [ ] **VWP-02**: VWAP integrated into `run_all_bar_builders.py` in correct execution order (after per-venue 1D, before multi-TF)
+- [x] **VWP-01**: VWAP bar builder runs for all multi-venue assets automatically (`--ids all`)
+- [x] **VWP-02**: VWAP integrated into `run_all_bar_builders.py` in correct execution order (after per-venue 1D, before multi-TF)
 
 ### MCP Cleanup (MCP)
 
-- [ ] **MCP-01**: Dead REST API routes (`/api/v1/memory/*`) removed from memory server
-- [ ] **MCP-02**: Stale `client.py` (ChromaDB PersistentClient) deleted
+- [x] **MCP-01**: Dead REST API routes (`/api/v1/memory/*`) removed from memory server
+- [x] **MCP-02**: Stale `client.py` (ChromaDB PersistentClient) deleted
 
 ## Future Requirements
 
@@ -84,12 +84,12 @@ None — this milestone is self-contained infrastructure work.
 | UTB-10 | Phase 78 | Complete |
 | UTB-11 | Phase 77 | Complete |
 | UTB-12 | Phase 78 | Complete |
-| CLN-01 | Phase 79 | Pending |
-| CLN-02 | Phase 79 | Pending |
-| VWP-01 | Phase 79 | Pending |
-| VWP-02 | Phase 79 | Pending |
-| MCP-01 | Phase 79 | Pending |
-| MCP-02 | Phase 79 | Pending |
+| CLN-01 | Phase 79 | Complete |
+| CLN-02 | Phase 79 | Complete |
+| VWP-01 | Phase 79 | Complete |
+| VWP-02 | Phase 79 | Complete |
+| MCP-01 | Phase 79 | Complete |
+| MCP-02 | Phase 79 | Complete |
 
 **Coverage:**
 - v1 requirements: 26 total
@@ -98,4 +98,4 @@ None — this milestone is self-contained infrastructure work.
 
 ---
 *Requirements defined: 2026-03-19*
-*Last updated: 2026-03-20 Phase 77 complete (UTB-02, UTB-03, UTB-04, UTB-05, UTB-06, UTB-11 → Complete)*
+*Last updated: 2026-03-21 Phase 79 complete (CLN-01, CLN-02, VWP-01, VWP-02, MCP-01, MCP-02 → Complete) — all 26 requirements satisfied*
