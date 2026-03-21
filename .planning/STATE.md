@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 
 ## Current Position
 
-Phase: 77 of 79 (Direct-to-_u Remaining Families) -- Phase verified ✓
-Plan: 5 of 5 complete
-Status: Phase verified and complete
-Last activity: 2026-03-20 -- Phase 77 verified (9/9 must-haves passed); ~400M rows across 5 families confirmed
+Phase: 78 of 79 (Table Drops & Script Cleanup) -- In progress
+Plan: 2 of 4 complete
+Status: In progress
+Last activity: 2026-03-21 -- Completed 78-02: deleted 20 deprecated scripts, removed _resync_u_tables()
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [########..] 67% v1.1.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [########..] 70% v1.1.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 352
+- Total plans completed: 353
 - Average duration: 7 min
 - Total execution time: ~28.9 hours
 
@@ -88,6 +88,9 @@ Recent decisions affecting current work:
 - AMA returns scoped by alignment_source in WHERE prevents cross-source LAG contamination from shared ama_multi_tf_u source (77-05)
 - AMA returns parity confirmed: all 5 sources MATCH (113,125,842 total rows in returns_ama_multi_tf_u) (77-05)
 - sync_returns_ama_multi_tf_u.py disabled as no-op with deprecation message; Phase 78 will remove it (77-05)
+- --skip-resync arg removed from refresh_returns_zscore.py entirely (function gone, arg would be confusing) (78-02)
+- ensure_ema_unified_table --sync-after now logs no-op message (flag kept for backward compat; sync scripts removed) (78-02)
+- _resync_u_tables() (TRUNCATE + sync) fully removed; builders own _u table writes directly (78-02)
 
 ### Pending Todos
 
@@ -102,10 +105,10 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-03-20
-Stopped at: Phase 77 verified and complete — all 5 families migrated to direct-to-_u writes (~400M rows verified)
+Last session: 2026-03-21
+Stopped at: Completed 78-02-PLAN.md — 20 scripts deleted, 4 orchestrators cleaned, _resync_u_tables() removed
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-20 (Phase 77 verified ✓ — all 5 families direct-to-_u; ~400M rows parity confirmed)*
+*Last updated: 2026-03-21 (78-02 complete — 20 deprecated scripts deleted, dangerous resync function excised)*
