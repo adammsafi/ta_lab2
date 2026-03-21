@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 
 ## Current Position
 
-Phase: 78 of 79 COMPLETE (Table Drops & Script Cleanup) -- Verified 14/14 must-haves
-Plan: 6 of 6 complete
-Status: Phase verified ✓
-Last activity: 2026-03-21 -- Phase 78 verified: 30 tables dropped (-254 GB), 20 scripts deleted, all runtime refs redirected to _u tables
+Phase: 79 of 79 IN PROGRESS (Storage Pipeline Cleanup) -- Plan 3/3 complete
+Plan: 3 of 3 complete
+Status: Phase 79 plan 03 complete -- pending phase verification
+Last activity: 2026-03-21 -- Completed 79-03: dead REST routes removed from MCP memory server, client.py (ChromaDB) deleted
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [#########.] 83% v1.1.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 97% v1.1.0
 
 ## Performance Metrics
 
@@ -105,6 +105,10 @@ Recent decisions affecting current work:
 - Cal/cal_anchor EMA feature classes compute alignment_source = f"multi_tf_cal_{scheme.lower()}" inline at query time (not stored as attr); scheme is single source of truth (78-06)
 - EMAStateConfig.alignment_source field added; bar_metadata CTE uses effective_alignment_source = alignment_source or config.alignment_source to scope bar_seq reads from _u table (78-06)
 - EMA pipeline fully redirected to price_bars_multi_tf_u: zero siloed bar table references remain in any EMA builder, feature class, or state manager (78-06)
+- Dead REST routes (/api/v1/memory/*) removed from memory server; they called ChromaDB (unavailable in Docker), returned HTTP 500, had zero consumers (79-03)
+- client.py (ChromaDB PersistentClient) deleted; fully replaced by Mem0+Qdrant (79-03)
+- validation.py quick_health_check() migrated to Qdrant; validate_memory_store() raises ImportError with migration note (79-03)
+- Lazy imports in deferred modules (query.py, update.py, migration.py) reference deleted client.py but won't break at import time -- only fail if called, which they aren't (79-03)
 
 ### Pending Todos
 
@@ -120,9 +124,9 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-03-21
-Stopped at: Phase 78 verified 14/14 -- all gap closure plans executed and verified
+Stopped at: Completed 79-03-PLAN.md -- all 3 Phase 79 plans complete, pending phase verification
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-21 (Phase 78 verified 14/14 -- 30 tables dropped, 254 GB reclaimed, all runtime refs redirected)*
+*Last updated: 2026-03-21 (Phase 79 plan 03 complete -- MCP memory server cleaned, ChromaDB client.py deleted)*
