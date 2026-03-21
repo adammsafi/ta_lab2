@@ -1251,7 +1251,7 @@ Note: Within v0.9.0, Phases 35 and 36 have no inter-dependency and may execute i
 | 76. Direct-to-_u Price Bars (Pilot) | 0/TBD | Not started | - |
 | 77. Direct-to-_u Remaining Families | 0/TBD | Not started | - |
 | 78. Table Drops & Script Cleanup | 0/TBD | Not started | - |
-| 79. Storage & Pipeline Cleanup | 0/TBD | Not started | - |
+| 79. Storage & Pipeline Cleanup | 0/3 | Planned | - |
 
 ## Requirement Coverage
 
@@ -1467,9 +1467,13 @@ Plans:
   2. Returns scripts updated to skip first-observation inserts going forward -- no new NULL rows created
   3. VWAP bar builder runs for all multi-venue assets automatically via --ids all and is integrated into run_all_bar_builders.py in correct execution order
   4. Dead REST API routes (/api/v1/memory/*) removed from MCP memory server and stale client.py (ChromaDB PersistentClient) deleted
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 79-01-PLAN.md -- Prune NULL first-observation rows from AMA returns
+- [ ] 79-02-PLAN.md -- Validate and run VWAP for all multi-venue assets
+- [ ] 79-03-PLAN.md -- Remove dead REST routes and ChromaDB client from MCP server
 
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-19 (v1.1.0 milestone roadmap created)*
+*Last updated: 2026-03-21 (Phase 79 planned: 3 plans in 1 wave)*
