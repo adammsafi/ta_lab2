@@ -2,7 +2,7 @@
 Calendar-anchor multi-timeframe EMA - REFACTORED to use BaseEMAFeature.
 
 Calendar anchor EMA semantics:
-- Canonical closes from price_bars_multi_tf_cal_anchor_us/iso
+- Canonical closes from price_bars_multi_tf_u (alignment_source=multi_tf_cal_anchor_us/iso)
 - Timeframe universe from dim_timeframe (alignment_type='calendar', ANCHOR families)
 - Similar to cal but with anchored periods
 - Uses is_partial_end (not roll) column for canonical detection
@@ -70,12 +70,9 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
         self.alpha_schema = alpha_schema
         self.alpha_table = alpha_table
 
-        # Determine bars table from scheme
-        if self.scheme == "US":
-            self.bars_table = "public.price_bars_multi_tf_cal_anchor_us"
-        elif self.scheme == "ISO":
-            self.bars_table = "public.price_bars_multi_tf_cal_anchor_iso"
-        else:
+        # Both schemes now read from the unified _u table with alignment_source filter
+        self.bars_table = "public.price_bars_multi_tf_u"
+        if self.scheme not in ("US", "ISO"):
             raise ValueError(f"Unsupported scheme: {scheme}")
 
         self._alpha_lookup: Optional[pd.DataFrame] = None
@@ -282,6 +279,7 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
             self._anchor_bars_cache = pd.DataFrame()
             return
 
+        alignment_source = f"multi_tf_cal_anchor_{self.scheme.lower()}"
         sql = f"""
           SELECT
             id,
@@ -294,11 +292,14 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
             venue_id
           FROM {self.bars_table}
           WHERE id = ANY(:ids)
+            AND alignment_source = :alignment_source
           ORDER BY id, venue_id, tf, bar_seq, time_close
         """
 
         with self.engine.connect() as conn:
-            df = read_sql_polars(sql, conn, params={"ids": ids})
+            df = read_sql_polars(
+                sql, conn, params={"ids": ids, "alignment_source": alignment_source}
+            )
 
         if not df.empty:
             df["ts"] = pd.to_datetime(df["ts"], utc=True)
@@ -330,6 +331,7 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
         if not ids or not tfs:
             return pd.DataFrame()
 
+        alignment_source = f"multi_tf_cal_anchor_{self.scheme.lower()}"
         sql = f"""
           SELECT
             id,
@@ -343,11 +345,16 @@ class CalendarAnchorEMAFeature(BaseEMAFeature):
           FROM {self.bars_table}
           WHERE id = ANY(:ids)
             AND tf = ANY(:tfs)
+            AND alignment_source = :alignment_source
           ORDER BY id, venue_id, tf, bar_seq, time_close
         """
 
         with self.engine.connect() as conn:
-            df = read_sql_polars(sql, conn, params={"ids": ids, "tfs": tfs})
+            df = read_sql_polars(
+                sql,
+                conn,
+                params={"ids": ids, "tfs": tfs, "alignment_source": alignment_source},
+            )
 
         if not df.empty:
             df["ts"] = pd.to_datetime(df["ts"], utc=True)
@@ -585,13 +592,18 @@ def write_multi_timeframe_ema_cal_anchor_to_db(
     tf_specs = feature.get_tf_specs()
 
     # Pre-filter: only keep TFs that have bars for the requested IDs
+    _alignment_source_anchor = f"multi_tf_cal_anchor_{scheme_u.lower()}"
     with engine.connect() as conn:
         bar_tfs = (
             conn.execute(
                 text(
-                    f"SELECT DISTINCT tf FROM {feature.bars_table} WHERE id = ANY(:ids)"
+                    f"SELECT DISTINCT tf FROM {feature.bars_table}"
+                    f" WHERE id = ANY(:ids) AND alignment_source = :alignment_source"
                 ),
-                {"ids": list(ids)},
+                {
+                    "ids": list(ids),
+                    "alignment_source": _alignment_source_anchor,
+                },
             )
             .scalars()
             .all()

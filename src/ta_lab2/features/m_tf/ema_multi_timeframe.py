@@ -2,7 +2,7 @@
 Multi-timeframe EMA - REFACTORED to use BaseEMAFeature.
 
 Multi-TF EMA semantics:
-- Canonical closes from persisted bars (price_bars_multi_tf) OR synthetic from daily
+- Canonical closes from persisted bars (price_bars_multi_tf_u) OR synthetic from daily
 - Timeframe universe from dim_timeframe (tf_day family)
 - Preview EMAs: daily grid with EMAs between canonical closes
 - Roll flag: FALSE for canonical, TRUE for preview
@@ -50,7 +50,7 @@ class MultiTFEMAFeature(BaseEMAFeature):
     Multi-timeframe EMA feature: EMAs with preview values on daily grid.
 
     Key characteristics:
-    - Uses persisted bars from price_bars_multi_tf OR synthetic from daily
+    - Uses persisted bars from price_bars_multi_tf_u OR synthetic from daily
     - Loads TFs from dim_timeframe (tf_day family)
     - Preview EMAs between canonical closes
     - Roll flag: FALSE for canonical, TRUE for preview
@@ -62,7 +62,7 @@ class MultiTFEMAFeature(BaseEMAFeature):
         config: EMAFeatureConfig,
         *,
         bars_schema: str = "public",
-        bars_table: str = "price_bars_multi_tf",
+        bars_table: str = "price_bars_multi_tf_u",
         tf_subset: Optional[Sequence[str]] = None,
     ):
         """
@@ -435,6 +435,14 @@ class MultiTFEMAFeature(BaseEMAFeature):
         """
         end_ts = pd.to_datetime(end, utc=True) if end is not None else None
 
+        alignment_filter = ""
+        params: dict = {"ids": ids}
+        if self.config.alignment_source:
+            alignment_filter = "AND alignment_source = :alignment_source"
+            params["alignment_source"] = self.config.alignment_source
+        if end_ts is not None:
+            params["end_ts"] = end_ts
+
         sql = f"""
         SELECT
           id,
@@ -446,13 +454,10 @@ class MultiTFEMAFeature(BaseEMAFeature):
         FROM {self.bars_schema}.{self.bars_table}
         WHERE id = ANY(:ids)
           AND is_partial_end = FALSE
+          {alignment_filter}
           {"" if end_ts is None else 'AND "timestamp" <= :end_ts'}
         ORDER BY id, venue_id, tf, bar_seq
         """
-
-        params: dict = {"ids": ids}
-        if end_ts is not None:
-            params["end_ts"] = end_ts
 
         with self.engine.begin() as conn:
             df = pd.read_sql_query(text(sql), conn, params=params)
@@ -490,6 +495,14 @@ class MultiTFEMAFeature(BaseEMAFeature):
         # Fallback: per-TF query (backward compat for direct callers)
         end_ts = pd.to_datetime(end, utc=True) if end is not None else None
 
+        alignment_filter = ""
+        params: dict = {"tf": tf, "ids": ids}
+        if self.config.alignment_source:
+            alignment_filter = "AND alignment_source = :alignment_source"
+            params["alignment_source"] = self.config.alignment_source
+        if end_ts is not None:
+            params["end_ts"] = end_ts
+
         sql = f"""
         SELECT
           id,
@@ -502,13 +515,10 @@ class MultiTFEMAFeature(BaseEMAFeature):
         WHERE tf = :tf
           AND id = ANY(:ids)
           AND is_partial_end = FALSE
+          {alignment_filter}
           {"" if end_ts is None else 'AND "timestamp" <= :end_ts'}
         ORDER BY id, venue_id, bar_seq
         """
-
-        params = {"tf": tf, "ids": ids}
-        if end_ts is not None:
-            params["end_ts"] = end_ts
 
         with self.engine.begin() as conn:
             df = pd.read_sql_query(text(sql), conn, params=params)
@@ -593,7 +603,7 @@ def write_multi_timeframe_ema_to_db(
     out_table: str = "ema_multi_tf",
     update_existing: bool = True,
     bars_schema: str = "public",
-    bars_table_tf_day: str = "price_bars_multi_tf",
+    bars_table_tf_day: str = "price_bars_multi_tf_u",
 ) -> int:
     """
     Compute multi-TF EMAs and write to database (backward compatibility wrapper).

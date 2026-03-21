@@ -2,7 +2,7 @@
 Calendar-aligned multi-timeframe EMA - REFACTORED to use BaseEMAFeature.
 
 Calendar EMA semantics:
-- Canonical calendar closes from price_bars_multi_tf_cal_us/iso
+- Canonical calendar closes from price_bars_multi_tf_u (alignment_source=multi_tf_cal_us/iso)
 - Timeframe universe from dim_timeframe (alignment_type='calendar')
 - Dual EMAs: ema (daily-space) and ema_bar (bar-space with preview)
 - Alpha from lookup table (ema_alpha_lookup)
@@ -49,7 +49,7 @@ class CalendarEMAFeature(BaseEMAFeature):
     Calendar-aligned EMA feature: EMAs computed on calendar TF closes.
 
     Key characteristics:
-    - Uses calendar bars tables (cal_us or cal_iso)
+    - Uses price_bars_multi_tf_u with alignment_source=multi_tf_cal_us/iso
     - Loads TFs from dim_timeframe with calendar alignment
     - Alpha from lookup table (not computed)
     - Dual EMAs: ema (daily-space) + ema_bar (bar-space with preview)
@@ -79,12 +79,9 @@ class CalendarEMAFeature(BaseEMAFeature):
         self.alpha_schema = alpha_schema
         self.alpha_table = alpha_table
 
-        # Determine bars table from scheme
-        if self.scheme == "US":
-            self.bars_table = "public.price_bars_multi_tf_cal_us"
-        elif self.scheme == "ISO":
-            self.bars_table = "public.price_bars_multi_tf_cal_iso"
-        else:
+        # Both schemes now read from the unified _u table with alignment_source filter
+        self.bars_table = "public.price_bars_multi_tf_u"
+        if self.scheme not in ("US", "ISO"):
             raise ValueError(f"Unsupported scheme: {scheme} (expected US or ISO)")
 
         # Cache alpha lookup, TF specs, and canonical closes
@@ -423,6 +420,7 @@ class CalendarEMAFeature(BaseEMAFeature):
             )
             return
 
+        alignment_source = f"multi_tf_cal_{self.scheme.lower()}"
         sql = f"""
           SELECT
             id,
@@ -432,11 +430,14 @@ class CalendarEMAFeature(BaseEMAFeature):
           FROM {self.bars_table}
           WHERE id = ANY(:ids)
             AND is_partial_end = FALSE
+            AND alignment_source = :alignment_source
           ORDER BY id, venue_id, tf, time_close
         """
 
         with self.engine.connect() as conn:
-            df = read_sql_polars(sql, conn, params={"ids": ids})
+            df = read_sql_polars(
+                sql, conn, params={"ids": ids, "alignment_source": alignment_source}
+            )
 
         if not df.empty:
             df["id"] = df["id"].astype(int)
@@ -464,6 +465,7 @@ class CalendarEMAFeature(BaseEMAFeature):
         if not ids or not tfs:
             return pd.DataFrame(columns=["id", "tf", "ts_close", "venue_id"])
 
+        alignment_source = f"multi_tf_cal_{self.scheme.lower()}"
         sql = f"""
           SELECT
             id,
@@ -474,11 +476,16 @@ class CalendarEMAFeature(BaseEMAFeature):
           WHERE id = ANY(:ids)
             AND tf = ANY(:tfs)
             AND is_partial_end = FALSE
+            AND alignment_source = :alignment_source
           ORDER BY id, venue_id, tf, time_close
         """
 
         with self.engine.connect() as conn:
-            df = read_sql_polars(sql, conn, params={"ids": ids, "tfs": tfs})
+            df = read_sql_polars(
+                sql,
+                conn,
+                params={"ids": ids, "tfs": tfs, "alignment_source": alignment_source},
+            )
 
         if not df.empty:
             df["id"] = df["id"].astype(int)
@@ -569,13 +576,15 @@ def write_multi_timeframe_ema_cal_to_db(
     tf_specs = feature.get_tf_specs()
 
     # Pre-filter: only keep TFs that have bars for the requested IDs
+    _alignment_source_cal = f"multi_tf_cal_{scheme_u.lower()}"
     with engine.connect() as conn:
         bar_tfs = (
             conn.execute(
                 text(
-                    f"SELECT DISTINCT tf FROM {feature.bars_table} WHERE id = ANY(:ids)"
+                    f"SELECT DISTINCT tf FROM {feature.bars_table}"
+                    f" WHERE id = ANY(:ids) AND alignment_source = :alignment_source"
                 ),
-                {"ids": list(ids)},
+                {"ids": list(ids), "alignment_source": _alignment_source_cal},
             )
             .scalars()
             .all()
