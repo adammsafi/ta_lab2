@@ -294,11 +294,12 @@ def get_blended_vol(
 
     query = text(
         """
-        SELECT model_type, h1_vol
+        SELECT model_type, cond_vol
         FROM garch_forecasts_latest
         WHERE id = :asset_id
           AND venue_id = :venue_id
           AND tf = :tf
+          AND horizon = 1
         """
     )
 
@@ -323,9 +324,9 @@ def get_blended_vol(
     # Build components dict (GARCH variants only from DB)
     components: dict[str, float] = {}
     for row in rows:
-        model_type, h1_vol = row[0], row[1]
-        if model_type in config.garch_model_types and h1_vol is not None:
-            components[model_type] = float(h1_vol)
+        model_type, cond_vol = row[0], row[1]
+        if model_type in config.garch_model_types and cond_vol is not None:
+            components[model_type] = float(cond_vol)
 
     if not components:
         return None
