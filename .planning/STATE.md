@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 
 ## Current Position
 
-Phase: 81-garch-conditional-volatility (v1.2.0, 2/5 plans complete)
-Plan: 81-02 complete (GARCH scripts: state manager + daily refresh)
+Phase: 81-garch-conditional-volatility (v1.2.0, 3/5 plans complete)
+Plan: 81-03 complete (GARCH evaluator + blend weights)
 Status: In progress
-Last activity: 2026-03-22 -- Completed 81-02-PLAN.md (GARCHStateManager + refresh_garch_forecasts.py)
+Last activity: 2026-03-22 -- Completed 81-03-PLAN.md (garch_evaluator.py + garch_blend.py)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [###-------] 33% v1.2.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [####------] 40% v1.2.0
 
 ## Performance Metrics
 
@@ -29,7 +29,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 - v1.0.0: 22 phases, 104 plans, ~14.5 hours
 - v1.0.1: 10 phases, 29 plans, ~2.0 hours
 - v1.1.0: 6 phases, 21 plans, ~2.5 hours
-- v1.2.0 (in progress): Phase 80 = 5 plans (~35 min), Phase 81 plans 01-02 = 18 min
+- v1.2.0 (in progress): Phase 80 = 5 plans (~35 min), Phase 81 plans 01-03 = 24 min
 - Trend: Stable (~5-7 min/plan)
 
 *Updated after each plan completion*
@@ -41,6 +41,12 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 Decisions are logged in PROJECT.md Key Decisions table.
 
 v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
+
+**Phase 81 decisions (plan 03):**
+- QLIKE clips sigma^2 and realized^2 to 1e-16 (not individual vols to 1e-8): prevents log(0) at variance level
+- Iterative floor for blend weights: clip-then-renormalize single-pass is wrong; iterative redistribution is correct
+- get_blended_vol uses equal weights as fallback: RMSE history needs Plan 05 infrastructure; equal-weight is safe default
+- rolling_oos_evaluate step=21 (monthly): captures regime changes without excessive runtime
 
 **Phase 81 decisions (plan 02):**
 - carry-forward half-life=5 days: exponential decay on prior converged forecast when GARCH fails to converge
@@ -83,10 +89,10 @@ None active.
 
 ## Session Continuity
 
-Last session: 2026-03-22T16:53:36Z
-Stopped at: Completed 81-02-PLAN.md (GARCH scripts: state manager + daily refresh)
+Last session: 2026-03-22T16:53:51Z
+Stopped at: Completed 81-03-PLAN.md (GARCH evaluator + blend weights)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-22 (Phase 81 plan 02 complete)*
+*Last updated: 2026-03-22 (Phase 81 plan 03 complete)*
