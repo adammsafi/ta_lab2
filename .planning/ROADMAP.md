@@ -1445,7 +1445,15 @@ Plans:
   5. Bake-off results persisted to backtest_metrics with experiment lineage
   6. Top 1-2 strategies selected for paper trading, documented with rationale
   7. Per-asset feature weighting explored: do asset-specific IC-IR weights improve strategy performance vs universal weights?
-**Plans**: TBD
+**Plans**: 6 plans in 4 waves
+
+Plans:
+- [ ] 82-01-PLAN.md -- Extended AMA data loader, Hyperliquid cost matrix, experiment_name migration
+- [ ] 82-02-PLAN.md -- AMA composite signal generators (momentum, mean-reversion, regime-conditional)
+- [ ] 82-03-PLAN.md -- YAML experiments + run_bakeoff.py multi-exchange/AMA support
+- [ ] 82-04-PLAN.md -- Regime router AMA extension + per-asset IC weight helpers
+- [ ] 82-05-PLAN.md -- Full walk-forward bake-off execution (99 assets x Kraken + HL)
+- [ ] 82-06-PLAN.md -- Statistical gates, strategy selection, and bake-off report
 
 ---
 
