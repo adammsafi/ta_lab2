@@ -66,6 +66,8 @@ Conditional volatility forecasting via GARCH family models, integrated into posi
 - Per-asset GARCH variant selection (auto-select best variant per asset) — could be Phase 81 stretch or future phase
 - Intraday GARCH (sub-daily vol forecasting) — not in scope, daily/5-day horizons only
 - GARCH-in-mean (volatility as return predictor) — interesting but separate from vol forecasting for sizing
+- **Rolling vs expanding window comparison** — Phase 81 uses expanding window for OOS evaluation. Comparing rolling (fixed lookback) vs expanding windows is deferred to after initial results are available; can be added as a parameter to the evaluator in a future phase.
+- **Log vs arithmetic returns comparison** — Phase 81 uses log returns (ret_log) for all GARCH fitting. Comparing log vs arithmetic input returns is deferred; the infrastructure supports swapping the column name, but the comparison is a research exercise for after the baseline is established.
 
 </deferred>
 
