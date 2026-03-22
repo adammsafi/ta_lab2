@@ -37,10 +37,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List
 
-logger = logging.getLogger(__name__)
+from ta_lab2.tools.data_tools.analysis._ast_helpers import (
+    IGNORE_DIRS,
+    _get_dec_name,
+    _param_list_from_funcdef,
+    _safe_unparse,
+)
 
-# Directories to ignore at the repo root level (and below)
-IGNORE_DIRS = {".venv", ".venv311", ".git", "old"}
+logger = logging.getLogger(__name__)
 
 
 # ---------- Filesystem tree ----------
@@ -57,13 +61,12 @@ def print_tree(root_dir: str, prefix: str = "", file=None) -> None:
     entries = sorted(e for e in os.listdir(root_dir) if e not in IGNORE_DIRS)
     for i, entry in enumerate(entries):
         path = os.path.join(root_dir, entry)
-        connector = "└── " if i == len(entries) - 1 else "├── "
+        connector = "+-- " if i == len(entries) - 1 else "|-- "
         line = f"{prefix}{connector}{entry}"
-        print(line)
         if file:
             file.write(line + "\n")
         if os.path.isdir(path):
-            extension = "    " if i == len(entries) - 1 else "│   "
+            extension = "    " if i == len(entries) - 1 else "|   "
             print_tree(path, prefix + extension, file)
 
 
@@ -154,7 +157,11 @@ def build_structure_json(root_dir: str) -> Dict[str, Any]:
 
         for name in entries:
             child_path = os.path.join(current_path, name)
-            child_node = _dir_entry(child_path, root_abs)
+            try:
+                child_node = _dir_entry(child_path, root_abs)
+            except (ValueError, OSError) as e:
+                logger.warning(f"Skipping {child_path}: {e}")
+                continue
             node["children"].append(child_node)
             if child_node["type"] == "dir":
                 stack.append(child_node)
@@ -210,9 +217,12 @@ def save_structure_csv(root_dir: str, out_file: str) -> None:
         # File rows
         for fname in files:
             fpath = os.path.join(cur, fname)
-            stf = os.stat(fpath)
-            rel_f = os.path.relpath(fpath, root_abs).replace(os.sep, "/")
-            rows.append([rel_f, fname, "file", stf.st_size, _iso_utc(stf.st_mtime)])
+            try:
+                stf = os.stat(fpath)
+                rel_f = os.path.relpath(fpath, root_abs).replace(os.sep, "/")
+                rows.append([rel_f, fname, "file", stf.st_size, _iso_utc(stf.st_mtime)])
+            except (ValueError, OSError) as e:
+                logger.warning(f"Skipping {fpath}: {e}")
 
     with open(out_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
@@ -240,48 +250,6 @@ def _find_pkg_dir(pkg_name: str) -> str:
     if spec is None or not spec.submodule_search_locations:
         raise ImportError(f"Cannot find package {pkg_name!r}")
     return spec.submodule_search_locations[0]
-
-
-def _param_list_from_funcdef(fn: ast.FunctionDef) -> str:
-    """Build a simple parameter list string from AST (names only).
-
-    Args:
-        fn: AST FunctionDef node
-
-    Returns:
-        Parameter signature string like "(arg1, arg2, *args, **kwargs)"
-    """
-    a = fn.args
-    parts: list[str] = []
-
-    # Positional-only (Py3.8+)
-    if getattr(a, "posonlyargs", []):
-        parts += [p.arg for p in a.posonlyargs]
-        parts.append("/")  # indicates end of pos-only
-
-    # Positional / normal args
-    parts += [p.arg for p in a.args]
-
-    # Varargs
-    if a.vararg:
-        parts.append("*" + a.vararg.arg)
-    else:
-        # If there are keyword-only args but no vararg, add bare "*" marker
-        if a.kwonlyargs:
-            parts.append("*")
-
-    # Keyword-only args
-    parts += [p.arg for p in a.kwonlyargs]
-
-    # Kwargs
-    if a.kwarg:
-        parts.append("**" + a.kwarg.arg)
-
-    # Remove trailing "/" or "*" if they ended up last
-    while parts and parts[-1] in {"/", "*"}:
-        parts.pop()
-
-    return "(" + ", ".join(parts) + ")"
 
 
 def describe_package_ast(pkg_name: str) -> dict:
@@ -378,7 +346,22 @@ def emit_hybrid_markdown(
             for node in tree.body:
                 if isinstance(node, ast.ClassDef):
                     doc = (ast.get_docstring(node) or "").split("\n")[0]
-                    classes.append((node.name, doc))
+                    bases = [_safe_unparse(b) for b in node.bases]
+                    base_str = f"({', '.join(bases)})" if bases else ""
+                    method_count = sum(
+                        1
+                        for child in ast.iter_child_nodes(node)
+                        if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef))
+                    )
+                    prop_count = sum(
+                        1
+                        for child in ast.iter_child_nodes(node)
+                        if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef))
+                        and any(
+                            _get_dec_name(d) == "property" for d in child.decorator_list
+                        )
+                    )
+                    classes.append((node.name, base_str, doc, method_count, prop_count))
                 elif isinstance(node, ast.FunctionDef):
                     doc = (ast.get_docstring(node) or "").split("\n")[0]
                     sig = _param_list_from_funcdef(node)
@@ -391,9 +374,14 @@ def emit_hybrid_markdown(
 
             if classes:
                 lines.append("**Classes**")
-                for name, doc in classes:
-                    suffix = f" — {doc}" if doc else ""
-                    lines.append(f"- `{name}`{suffix}")
+                for name, base_str, doc, mc, pc in classes:
+                    label = f"`{name}{base_str}`"
+                    parts_list: list[str] = []
+                    if doc:
+                        parts_list.append(doc)
+                    parts_list.append(f"{mc} methods, {pc} properties")
+                    suffix = " — " + " | ".join(parts_list)
+                    lines.append(f"- {label}{suffix}")
                 lines.append("")
 
             if functions:
@@ -413,6 +401,7 @@ def generate_tree_structure(
     output_prefix: str = "structure",
     pkg_name: str = None,
     generate_api_map: bool = False,
+    output_dir: str = None,
 ) -> None:
     """Generate all tree structure outputs.
 
@@ -421,33 +410,36 @@ def generate_tree_structure(
         output_prefix: Prefix for output files (default: "structure")
         pkg_name: Package name for API map generation (optional)
         generate_api_map: Whether to generate API_MAP.md (requires pkg_name)
+        output_dir: Directory for output files (default: root_dir)
     """
     root_path = Path(root_dir).resolve()
+    out_path = Path(output_dir).resolve() if output_dir else root_path
+    out_path.mkdir(parents=True, exist_ok=True)
 
     # Text tree
-    structure_txt = root_path / f"{output_prefix}.txt"
+    structure_txt = out_path / f"{output_prefix}.txt"
     with open(structure_txt, "w", encoding="utf-8") as f:
         print_tree(str(root_path), file=f)
     logger.info(f"Generated {structure_txt}")
 
     # Markdown tree
-    structure_md = root_path / f"{output_prefix}.md"
+    structure_md = out_path / f"{output_prefix}.md"
     save_tree_markdown(str(root_path), str(structure_md))
 
     # JSON tree
-    structure_json = root_path / f"{output_prefix}.json"
+    structure_json = out_path / f"{output_prefix}.json"
     save_structure_json(str(root_path), str(structure_json))
 
     # CSV tree
-    structure_csv = root_path / f"{output_prefix}.csv"
+    structure_csv = out_path / f"{output_prefix}.csv"
     save_structure_csv(str(root_path), str(structure_csv))
 
     # API map (if requested)
     if generate_api_map and pkg_name:
-        api_md = root_path / "API_MAP.md"
+        api_md = out_path / "API_MAP.md"
         emit_hybrid_markdown(pkg_name, str(api_md), include_inits=True)
 
-        src_json = root_path / "src_structure.json"
+        src_json = out_path / "src_structure.json"
         info = describe_package_ast(pkg_name)
         with open(src_json, "w", encoding="utf-8") as f:
             json.dump(info, f, indent=2)
