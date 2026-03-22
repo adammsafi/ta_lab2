@@ -1442,7 +1442,7 @@ Plans:
   2. Regime router (TRA) trained with selected features — per-regime sub-models operational, using BOTH features table AND ama_multi_tf data
   3. Walk-forward bake-off (run_bakeoff.py) completed across full Kraken cost matrix (12 scenarios)
   4. DSR > 0.95 gate applied — only strategies passing deflated Sharpe survive
-  5. Bake-off results persisted to backtest_metrics with experiment lineage
+  5. Bake-off results persisted to strategy_bakeoff_results with experiment lineage
   6. Top 1-2 strategies selected for paper trading, documented with rationale
   7. Per-asset feature weighting explored: do asset-specific IC-IR weights improve strategy performance vs universal weights?
 **Plans**: 6 plans in 4 waves
