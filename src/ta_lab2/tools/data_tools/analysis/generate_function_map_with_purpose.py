@@ -398,7 +398,7 @@ def _enrich_with_llm(
         "below, write a one-line purpose summary (under 200 characters). Focus on "
         "WHAT the function does and WHY, not HOW. If the function is a test helper, "
         "say so. If it is a CLI entry point, mention what command it serves. "
-        "Return JSON with a 'functions' array."
+        'Return JSON: {"functions": [{"qualified_name": "...", "purpose": "..."}]}.'
     )
 
     # Process in batches
@@ -439,20 +439,21 @@ def _enrich_with_llm(
             data = json.loads(content)
             functions = data.get("functions", [])
 
-            # Build lookup by qualified name
-            purpose_map: dict[str, str] = {}
-            for func in functions:
-                qn = func.get("qualified_name", "")
-                purpose = func.get("purpose", "")
-                if qn and purpose:
-                    purpose_map[qn] = purpose
-
-            # Apply enrichments
-            for idx in batch_indices:
-                qn = rows[idx]["QualifiedName"]
-                if qn in purpose_map:
-                    rows[idx]["Purpose"] = purpose_map[qn]
-                    manifest["enriched"] += 1
+            # Match by position — we sent batch_indices in order, LLM returns
+            # in the same order. This is more reliable than name matching.
+            for i, idx in enumerate(batch_indices):
+                if i < len(functions):
+                    func = functions[i]
+                    # LLM may use "purpose", "summary", or "description"
+                    purpose = (
+                        func.get("purpose")
+                        or func.get("summary")
+                        or func.get("description")
+                        or ""
+                    )
+                    if purpose:
+                        rows[idx]["Purpose"] = purpose
+                        manifest["enriched"] += 1
 
         except Exception as e:
             logger.error(f"LLM enrichment batch error: {e}")
