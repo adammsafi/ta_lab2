@@ -1417,7 +1417,14 @@ Plans:
   3. Vol forecast integrated into vol_sizer.py — position sizing uses GARCH forecast when available, falls back to range estimators
   4. Comparison report: GARCH vs Parkinson/GK/ATR accuracy (realized vol prediction error) — validates added value
   5. Daily refresh wiring: GARCH forecasts update automatically in run_daily_refresh.py
-**Plans**: TBD
+**Plans**: 5 plans in 3 waves
+
+Plans:
+- [ ] 81-01-PLAN.md -- DB foundation (garch_forecasts, garch_diagnostics, matview) + core GARCH engine (arch dep)
+- [ ] 81-02-PLAN.md -- State manager + daily refresh script (refresh_garch_forecasts.py)
+- [ ] 81-03-PLAN.md -- Evaluation framework (RMSE, QLIKE, MZ R2) + inverse-RMSE blend weights
+- [ ] 81-04-PLAN.md -- vol_sizer.py GARCH blend integration + GARCH-VaR in var_simulator.py
+- [ ] 81-05-PLAN.md -- Comparison report generator + daily refresh pipeline wiring
 
 ---
 
