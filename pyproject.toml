@@ -107,9 +107,10 @@ portfolio = [
   "PyPortfolioOpt>=1.5.6",
 ]
 
-# Statistical analysis: ADF/KPSS stationarity, Ljung-Box autocorrelation, IC analysis
+# Statistical analysis: ADF/KPSS stationarity, Ljung-Box autocorrelation, IC analysis, GARCH
 analysis = [
   "statsmodels>=0.14.0",
+  "arch>=8.0.0",
 ]
 
 # Combined group for development + orchestrator + docs + economic
