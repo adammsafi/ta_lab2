@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 
 ## Current Position
 
-Phase: 80-ic-analysis-feature-selection (v1.2.0, plan 1 of 5 complete)
-Plan: 80-01 complete, 80-02 next
+Phase: 80-ic-analysis-feature-selection (v1.2.0, plan 2 of 5 complete)
+Plan: 80-02 complete, 80-03 next
 Status: In progress
-Last activity: 2026-03-22 -- Completed 80-01-PLAN.md (statsmodels + dim_feature_selection)
+Last activity: 2026-03-22 -- Completed 80-02-PLAN.md (feature_selection.py library module)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [#---------] 20% v1.2.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [##--------] 40% v1.2.0
 
 ## Performance Metrics
 
@@ -46,6 +46,13 @@ v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
 - `dim_feature_selection.quintile_monotonicity` column added (Spearman Q1-Q5 terminal returns) beyond RESEARCH.md schema
 - Stationarity enum uses uppercase strings (STATIONARY, NON_STATIONARY, AMBIGUOUS, INSUFFICIENT_DATA)
 
+**Phase 80-02 decisions:**
+- NON_STATIONARY features use 1.5x IC-IR cutoff (0.45 vs 0.3) — soft gate, not exclusion, per CONTEXT.md
+- Ljung-Box applied to IC series (not raw feature values) to detect inflated IC-IR from serial correlation
+- `compute_monotonicity_score` accepts 1-row DataFrames (terminal row has 5 quintile values for spearmanr)
+- `save_to_db` uses TRUNCATE + INSERT (snapshot table, full replace each run)
+- KPSS InterpolationWarning suppressed via `warnings.catch_warnings()` context
+
 ### Pending Todos
 
 3 pending todos -- see .planning/todos/pending/:
@@ -60,9 +67,9 @@ None active.
 ## Session Continuity
 
 Last session: 2026-03-22
-Stopped at: Completed 80-01-PLAN.md (statsmodels dep + dim_feature_selection migration)
+Stopped at: Completed 80-02-PLAN.md (feature_selection.py library module with 9 public functions)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-22 (80-01 complete)*
+*Last updated: 2026-03-22 (80-02 complete)*
