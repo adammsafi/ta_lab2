@@ -297,6 +297,7 @@ def emit_hybrid_markdown(
     out_file: str,
     ignore_dirs: Iterable[str] = (
         "__pycache__",
+        ".mypy_cache",
         "tests",
         "ta_lab2.egg-info",
         "out",

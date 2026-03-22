@@ -29,11 +29,13 @@ DEFAULT_EXCLUDE_GLOBS: List[str] = [
     "dist/**",
     ".eggs/**",
     "**/site-packages/**",
+    ".mypy_cache/**",
+    "**/.mypy_cache/**",
     "tests/**",
 ]
 
 # Directories to ignore in tree traversal
-IGNORE_DIRS = {".venv", ".venv311", ".git", "old", ".archive"}
+IGNORE_DIRS = {".venv", ".venv311", ".git", "old", ".archive", ".mypy_cache"}
 
 
 # ---------- AST node utilities ----------
