@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 
 ## Current Position
 
-Phase: 81-garch-conditional-volatility (v1.2.0, 5/5 plans complete)
-Plan: 81-05 complete (GARCH comparison report + daily refresh wiring)
-Status: Phase complete
-Last activity: 2026-03-22 -- Completed 81-05-PLAN.md (comparison report + pipeline wiring)
+Phase: 81-garch-conditional-volatility COMPLETE (v1.2.0, 5/5 plans)
+Next: Phase 82-signal-refinement-walk-forward-bakeoff
+Status: Between phases
+Last activity: 2026-03-22 -- Phase 81 verified and complete
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [####------] 40% v1.2.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [####------] 22% v1.2.0
 
 ## Performance Metrics
 
@@ -100,10 +100,10 @@ None active.
 
 ## Session Continuity
 
-Last session: 2026-03-22T17:14:20Z
-Stopped at: Completed 81-05-PLAN.md (comparison report + daily refresh wiring)
+Last session: 2026-03-22T18:00:00Z
+Stopped at: Phase 81 complete and verified (19/21 must-haves, 1 blocker fixed, 1 info acknowledged)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-22 (Phase 81 plan 05 complete -- phase complete)*
+*Last updated: 2026-03-22 (Phase 81 complete)*

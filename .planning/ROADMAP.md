@@ -1375,8 +1375,8 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 
 **Milestone Goal:** Shift from data collection to alpha discovery and live signal generation. Analyze IC sweep results, refine features down to a tradeable set, build GARCH volatility models, run walk-forward bake-offs, overhaul the dashboard with backtest/signal/perps views, wire the full daily pipeline from signals through paper execution, and surface everything via alerts and monitoring.
 
-- [ ] **Phase 80: IC Analysis & Feature Selection** - Analyze IC sweep, stationarity tests, feature pruning 112→~20, quintile validation
-- [ ] **Phase 81: GARCH & Conditional Volatility** - GARCH/EGARCH models, conditional vol forecasting, integration with position sizing and VaR
+- [x] **Phase 80: IC Analysis & Feature Selection** - Analyze IC sweep, stationarity tests, feature pruning 112→~20, quintile validation
+- [x] **Phase 81: GARCH & Conditional Volatility** - GARCH/EGARCH models, conditional vol forecasting, integration with position sizing and VaR
 - [ ] **Phase 82: Signal Refinement & Walk-Forward Bake-off** - Expression engine experiments, regime router training, walk-forward bake-off, DSR/PSR gate
 - [ ] **Phase 83: Dashboard — Backtest & Signal Pages** - Backtest results page, signal browser, OHLCV candlestick charts
 - [ ] **Phase 84: Dashboard — Perps, Portfolio & Regimes** - Hyperliquid page, portfolio allocation view, regime heatmap, AMA/EMA inspector
@@ -1420,11 +1420,11 @@ Plans:
 **Plans**: 5 plans in 3 waves
 
 Plans:
-- [ ] 81-01-PLAN.md -- DB foundation (garch_forecasts, garch_diagnostics, matview) + core GARCH engine (arch dep)
-- [ ] 81-02-PLAN.md -- State manager + daily refresh script (refresh_garch_forecasts.py)
-- [ ] 81-03-PLAN.md -- Evaluation framework (RMSE, QLIKE, MZ R2) + inverse-RMSE blend weights
-- [ ] 81-04-PLAN.md -- vol_sizer.py GARCH blend integration + GARCH-VaR in var_simulator.py
-- [ ] 81-05-PLAN.md -- Comparison report generator + daily refresh pipeline wiring
+- [x] 81-01-PLAN.md -- DB foundation (garch_forecasts, garch_diagnostics, matview) + core GARCH engine (arch dep)
+- [x] 81-02-PLAN.md -- State manager + daily refresh script (refresh_garch_forecasts.py)
+- [x] 81-03-PLAN.md -- Evaluation framework (RMSE, QLIKE, MZ R2) + inverse-RMSE blend weights
+- [x] 81-04-PLAN.md -- vol_sizer.py GARCH blend integration + GARCH-VaR in var_simulator.py
+- [x] 81-05-PLAN.md -- Comparison report generator + daily refresh pipeline wiring
 
 ---
 
