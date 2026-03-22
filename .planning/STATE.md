@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 
 ## Current Position
 
-Phase: 82-signal-refinement-walk-forward-bakeoff (v1.2.0, 2/6 plans)
-Plan: 01 and 02 of 06 complete
+Phase: 82-signal-refinement-walk-forward-bakeoff (v1.2.0, 3/6 plans)
+Plan: 01, 02, and 03 of 06 complete
 Status: In progress
-Last activity: 2026-03-22 -- Completed 82-01-PLAN.md (bakeoff data infrastructure: AMA loader, HL cost matrix, experiment_name migration)
+Last activity: 2026-03-22 -- Completed 82-03-PLAN.md (YAML experiments, --exchange/--experiments-yaml/--experiment-name CLI, AMA param grids, per-asset IC-IR weight loaders)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [#####-----] 25% v1.2.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [#######---] 37% v1.2.0
 
 ## Performance Metrics
 
@@ -47,6 +47,13 @@ v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
 - Hyperliquid slippage range 3/5/10 bps (vs Kraken 5/10/20): HL CLOB tighter spreads justify lower range
 - Separate SQL per AMA feature in load_strategy_data_with_ama(): avoids column name collisions, each feature independently debuggable
 - experiment_name VARCHAR(128) NULL default: backward-compatible; existing rows get NULL; Phase 82 runs tag with experiment names
+
+**Phase 82 decisions (plan 03):**
+- Expression signal param grid = [{holding_bars: hb}]: holding period is the only free param; expression encodes the full signal formula
+- AMA loader auto-detection: any ama_* strategy OR --experiments-yaml triggers load_strategy_data_with_ama() -- unified, no per-strategy branching
+- exchange=all concatenates both matrices into one list: orchestrator runs all 18 scenarios in single sweep
+- load_per_asset_ic_weights() in bakeoff_orchestrator.py (not run_bakeoff.py): available to Plan 05 per_asset_weight_fn without CLI changes
+- load_strategy_data_with_ama not re-imported in run_bakeoff.py: CLI delegates data loading to orchestrator via ama_features parameter
 
 **Phase 82 decisions (plan 02):**
 - fillna(0.0) for missing AMA warmup values: neutral contribution; pandas 2.x rejects fillna(method=None)
@@ -113,10 +120,10 @@ None active.
 
 ## Session Continuity
 
-Last session: 2026-03-22T19:58:30Z
-Stopped at: Completed 82-01-PLAN.md (bakeoff data infrastructure: AMA loader, HL cost matrix, experiment_name migration)
+Last session: 2026-03-22T20:09:06Z
+Stopped at: Completed 82-03-PLAN.md (YAML experiments, bakeoff CLI extension, orchestrator AMA + per-asset IC-IR weight loaders)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-22 (Phase 82 plan 01 complete)*
+*Last updated: 2026-03-22 (Phase 82 plan 03 complete)*
