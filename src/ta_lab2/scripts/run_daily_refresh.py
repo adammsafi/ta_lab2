@@ -105,6 +105,7 @@ TIMEOUT_CROSS_ASSET_AGG = (
 )
 TIMEOUT_MACRO_GATES = 120  # 2 minutes -- gate evaluation against FRED features
 TIMEOUT_MACRO_ALERTS = 60  # 1 minute -- transition detection + Telegram send
+TIMEOUT_GARCH = 1800  # 30 minutes -- GARCH fitting for 99 assets x 4 models
 TIMEOUT_SYNC_FRED = 300  # 5 minutes -- SSH + psql COPY from GCP VM
 TIMEOUT_SYNC_HL = 600  # 10 minutes -- SSH + psql COPY from Singapore VM (~3M rows)
 
@@ -827,6 +828,114 @@ def run_feature_refresh_stage(args, db_url: str) -> ComponentResult:
         print(f"\n[ERROR] Feature refresh raised exception: {error_msg}")
         return ComponentResult(
             component="features",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+
+
+def run_garch_forecasts(args, db_url: str) -> ComponentResult:
+    """
+    Run GARCH conditional volatility forecast refresh via subprocess.
+
+    Fits GARCH/GJR-GARCH/EGARCH/FIGARCH models per asset and writes forecasts
+    to garch_forecasts table.  Runs after features and before signals.
+
+    Args:
+        args: CLI arguments
+        db_url: Database URL
+
+    Returns:
+        ComponentResult with execution details
+    """
+    script_dir = Path(__file__).parent / "garch"
+    cmd = [sys.executable, str(script_dir / "refresh_garch_forecasts.py")]
+
+    # Pass through IDs and DB URL
+    cmd.extend(["--ids", getattr(args, "ids", "all")])
+    cmd.extend(["--db-url", db_url])
+
+    if getattr(args, "verbose", False):
+        cmd.append("--verbose")
+
+    print(f"\n{'=' * 70}")
+    print("RUNNING GARCH FORECAST REFRESH")
+    print(f"{'=' * 70}")
+    print(f"Command: {' '.join(cmd)}")
+
+    if getattr(args, "dry_run", False):
+        print("[DRY RUN] Would run GARCH forecast refresh")
+        return ComponentResult(
+            component="garch",
+            success=True,
+            duration_sec=0.0,
+            returncode=0,
+        )
+
+    start = time.perf_counter()
+
+    try:
+        if getattr(args, "verbose", False):
+            result = subprocess.run(cmd, check=False, timeout=TIMEOUT_GARCH)
+        else:
+            result = subprocess.run(
+                cmd,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=TIMEOUT_GARCH,
+            )
+
+            if result.returncode != 0:
+                print(
+                    f"\n[ERROR] GARCH forecast refresh failed with code {result.returncode}"
+                )
+                if result.stdout:
+                    print(f"\nSTDOUT:\n{result.stdout[-2000:]}")
+                if result.stderr:
+                    print(f"\nSTDERR:\n{result.stderr[-2000:]}")
+
+        duration = time.perf_counter() - start
+
+        if result.returncode == 0:
+            print(
+                f"\n[OK] GARCH forecast refresh completed successfully in {duration:.1f}s"
+            )
+            return ComponentResult(
+                component="garch",
+                success=True,
+                duration_sec=duration,
+                returncode=result.returncode,
+            )
+        else:
+            error_msg = f"Exited with code {result.returncode}"
+            print(f"\n[FAILED] GARCH forecast refresh failed: {error_msg}")
+            return ComponentResult(
+                component="garch",
+                success=False,
+                duration_sec=duration,
+                returncode=result.returncode,
+                error_message=error_msg,
+            )
+
+    except subprocess.TimeoutExpired:
+        duration = time.perf_counter() - start
+        error_msg = f"Timed out after {TIMEOUT_GARCH}s"
+        print(f"\n[TIMEOUT] GARCH forecast refresh: {error_msg}")
+        return ComponentResult(
+            component="garch",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+    except Exception as e:
+        duration = time.perf_counter() - start
+        error_msg = str(e)
+        print(f"\n[ERROR] GARCH forecast refresh raised exception: {error_msg}")
+        return ComponentResult(
+            component="garch",
             success=False,
             duration_sec=duration,
             returncode=-1,
@@ -2551,6 +2660,16 @@ Examples:
         help="Skip feature refresh stage in --all mode",
     )
     p.add_argument(
+        "--garch",
+        action="store_true",
+        help="Run GARCH conditional volatility forecast refresh only",
+    )
+    p.add_argument(
+        "--no-garch",
+        action="store_true",
+        help="Skip GARCH forecast stage in --all mode",
+    )
+    p.add_argument(
         "--signals",
         action="store_true",
         help="Run signal generation only (EMA crossover, RSI, ATR breakout)",
@@ -2608,8 +2727,8 @@ Examples:
         action="store_true",
         help=(
             "Run sync_vms then bars then EMAs then AMAs then desc_stats "
-            "then macro then regimes then features then signals then "
-            "executor then stats (full refresh)"
+            "then macro then regimes then features then garch then signals "
+            "then executor then stats (full refresh)"
         ),
     )
     p.add_argument(
@@ -2731,6 +2850,7 @@ Examples:
         or args.cross_asset_agg
         or args.regimes
         or args.features
+        or args.garch
         or args.signals
         or args.portfolio
         or args.execute
@@ -2741,7 +2861,7 @@ Examples:
         p.error(
             "Must specify --sync-vms, --bars, --emas, --amas, --desc-stats, --macro, "
             "--macro-regimes, --macro-analytics, --cross-asset-agg, --regimes, "
-            "--features, --signals, --portfolio, --execute, --drift, --stats, "
+            "--features, --garch, --signals, --portfolio, --execute, --drift, --stats, "
             "--all, --weekly-digest, or --exchange-prices"
         )
 
@@ -2799,6 +2919,7 @@ Examples:
     run_features = (args.features or args.all) and not getattr(
         args, "no_features", False
     )
+    run_garch = (args.garch or args.all) and not getattr(args, "no_garch", False)
     run_signals = args.signals or args.all
     run_portfolio = (args.portfolio or args.all) and not getattr(
         args, "no_portfolio", False
@@ -2831,6 +2952,8 @@ Examples:
         components.append("regimes")
     if run_features:
         components.append("features")
+    if run_garch:
+        components.append("garch")
     if run_signals:
         components.append("signals")
     if run_portfolio:
@@ -3020,6 +3143,16 @@ Examples:
 
         if not feature_result.success and not args.continue_on_error:
             print("\n[STOPPED] Feature refresh failed, stopping execution")
+            print("(Use --continue-on-error to run remaining components)")
+            return 1
+
+    # Run GARCH forecasts if requested (after features, before signals)
+    if run_garch:
+        garch_result = run_garch_forecasts(args, db_url)
+        results.append(("garch", garch_result))
+
+        if not garch_result.success and not args.continue_on_error:
+            print("\n[STOPPED] GARCH forecast refresh failed, stopping execution")
             print("(Use --continue-on-error to run remaining components)")
             return 1
 
