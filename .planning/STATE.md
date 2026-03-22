@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 ## Current Position
 
 Phase: 82-signal-refinement-walk-forward-bakeoff (v1.2.0, 2/6 plans)
-Plan: 02 of 06 complete
+Plan: 01 and 02 of 06 complete
 Status: In progress
-Last activity: 2026-03-22 -- Completed 82-02-PLAN.md (AMA signal generators + registry)
+Last activity: 2026-03-22 -- Completed 82-01-PLAN.md (bakeoff data infrastructure: AMA loader, HL cost matrix, experiment_name migration)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [#####-----] 25% v1.2.0
 
@@ -41,6 +41,12 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 Decisions are logged in PROJECT.md Key Decisions table.
 
 v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
+
+**Phase 82 decisions (plan 01):**
+- KRAKEN_COST_MATRIX moved to costs.py (proper home for cost constants); re-exported from orchestrator for zero breaking changes
+- Hyperliquid slippage range 3/5/10 bps (vs Kraken 5/10/20): HL CLOB tighter spreads justify lower range
+- Separate SQL per AMA feature in load_strategy_data_with_ama(): avoids column name collisions, each feature independently debuggable
+- experiment_name VARCHAR(128) NULL default: backward-compatible; existing rows get NULL; Phase 82 runs tag with experiment names
 
 **Phase 82 decisions (plan 02):**
 - fillna(0.0) for missing AMA warmup values: neutral contribution; pandas 2.x rejects fillna(method=None)
@@ -107,10 +113,10 @@ None active.
 
 ## Session Continuity
 
-Last session: 2026-03-22T19:55:11Z
-Stopped at: Completed 82-02-PLAN.md (AMA signal generators + registry registration)
+Last session: 2026-03-22T19:58:30Z
+Stopped at: Completed 82-01-PLAN.md (bakeoff data infrastructure: AMA loader, HL cost matrix, experiment_name migration)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-22 (Phase 82 plan 02 complete)*
+*Last updated: 2026-03-22 (Phase 82 plan 01 complete)*
