@@ -762,10 +762,28 @@ def main(argv: list[str] | None = None) -> None:
 
             # Use only top-N IC features that are available in the feature matrix
             cluster_features_list = [c for c in top_features if c in X.columns]  # type: ignore[name-defined]
+
+            # Drop constant (zero-variance) features — they produce NaN in Spearman
+            # correlation matrix and break the Ward linkage step
+            if cluster_features_list:
+                X_cluster = X[cluster_features_list]  # type: ignore[name-defined]
+                non_constant = [
+                    c for c in cluster_features_list if X_cluster[c].std() > 0
+                ]
+                if len(non_constant) < len(cluster_features_list):
+                    dropped = set(cluster_features_list) - set(non_constant)
+                    logger.warning(
+                        "Dropping %d constant features from clustering: %s",
+                        len(dropped),
+                        sorted(dropped),
+                    )
+                cluster_features_list = non_constant
+
             if len(cluster_features_list) >= 2:
                 clusters = cluster_features(
-                    X[cluster_features_list], threshold=args.cluster_threshold
-                )  # type: ignore[name-defined]
+                    X[cluster_features_list],
+                    threshold=args.cluster_threshold,  # type: ignore[name-defined]
+                )
                 cluster_summaries = _resolve_cluster_bests(clusters, top_ic)
                 logger.info(
                     "Feature clusters: %d clusters for %d features",
