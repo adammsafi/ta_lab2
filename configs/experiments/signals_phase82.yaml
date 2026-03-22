@@ -1,0 +1,131 @@
+# Phase 82 Signal Experiments
+# These define composite signals using expression engine $col syntax.
+# The DataFrame passed to evaluate_expression() has:
+#   - OHLCV columns (open, high, low, close, volume)
+#   - bar-level features (rsi_14, bb_ma_20, close_fracdiff, ret_is_outlier)
+#   - AMA features (TEMA_0fca19a1_ama, KAMA_987fc105_ama, etc.)
+# All pre-loaded by load_strategy_data_with_ama().
+#
+# IC-IR reference (Phase 80 outputs in feature_selection.yaml):
+#   TEMA_0fca19a1_ama  IC-IR=1.433
+#   DEMA_0fca19a1_ama  IC-IR=1.376
+#   KAMA_987fc105_ama  IC-IR=1.290
+#   HMA_514ffe35_ama   IC-IR=1.271
+#   TEMA_514ffe35_ama  IC-IR=1.257
+#   DEMA_514ffe35_ama  IC-IR=1.246
+#   HMA_d47fe5cc_ama   IC-IR=1.241 (approx)
+#   KAMA_de1106d5_ama  IC-IR=1.220 (approx)
+#   KAMA_8545aeed_ama  IC-IR=1.180 (approx -- slowest KAMA for crossover)
+#
+# Weight sum for momentum composite top-5: 1.433+1.290+1.271+1.257+1.376 = 6.627
+# Normalized weight for ama_momentum_weighted_top5 computed at runtime by signal fn.
+
+experiments:
+
+  # ===========================================================================
+  # ARCHETYPE 1: Momentum
+  # ===========================================================================
+
+  # ARCHETYPE 1a: IC-IR weighted composite of top-5 AMA values
+  ama_momentum_weighted_top5:
+    lifecycle: experimental
+    archetype: momentum
+    description: >
+      IC-IR weighted sum of top-5 AMA values (TEMA200, KAMA_fast, HMA_fast,
+      TEMA_fast, DEMA200). Weights are raw IC-IR values from Phase 80;
+      normalization happens at runtime inside the signal function. A 5-bar
+      EMA smoother is applied to reduce noise.
+    compute:
+      mode: expression
+      expression: >-
+        EMA(($TEMA_0fca19a1_ama * 1.433 + $KAMA_987fc105_ama * 1.290
+        + $HMA_514ffe35_ama * 1.271 + $TEMA_514ffe35_ama * 1.257
+        + $DEMA_0fca19a1_ama * 1.376) / 6.627, 5)
+    tags: [composite, momentum, ama, ic_ir_weighted, top5]
+    holding_bars: [5, 7, 10]
+
+  # ARCHETYPE 1b: Fast-minus-slow KAMA crossover
+  ama_kama_crossover:
+    lifecycle: experimental
+    archetype: momentum
+    description: >
+      Spread of fast KAMA (KAMA_987fc105, efficiency-ratio adaptive period ~10-30)
+      minus slow KAMA (KAMA_8545aeed, period ~50-200). Positive spread => momentum
+      up; negative => momentum down. Clean mean-zero signal without price scaling.
+    compute:
+      mode: expression
+      expression: "$KAMA_987fc105_ama - $KAMA_8545aeed_ama"
+    tags: [crossover, momentum, ama, kama]
+    holding_bars: [5, 7, 10]
+
+  # ===========================================================================
+  # ARCHETYPE 2: Mean-Reversion
+  # ===========================================================================
+
+  # ARCHETYPE 2a: Close vs KAMA z-score (fast KAMA as anchor)
+  ama_kama_reversion_zscore:
+    lifecycle: experimental
+    archetype: mean_reversion
+    description: >
+      Z-score of close relative to KAMA(de1106d5). When close is significantly
+      below KAMA, the z-score is strongly negative (mean-reversion long entry).
+      A 1e-10 floor prevents zero-division when price is flat.
+    compute:
+      mode: expression
+      expression: "($close - $KAMA_de1106d5_ama) / (Std($close, 20) + 1e-10)"
+    tags: [mean_reversion, zscore, ama, kama]
+    holding_bars: [7, 10, 14]
+
+  # ARCHETYPE 2b: Spread z-score using HMA as dynamic anchor
+  ama_hma_reversion_zscore:
+    lifecycle: experimental
+    archetype: mean_reversion
+    description: >
+      Z-score of the spread (close minus HMA_d47fe5cc). The standard deviation
+      is computed on the spread itself (30-bar rolling), capturing local vol
+      clustering. Negative z-score => price extended below HMA => reversion entry.
+    compute:
+      mode: expression
+      expression: >-
+        ($close - $HMA_d47fe5cc_ama)
+        / (Std($close - $HMA_d47fe5cc_ama, 30) + 1e-10)
+    tags: [mean_reversion, zscore, ama, hma]
+    holding_bars: [7, 10, 14]
+
+  # ===========================================================================
+  # ARCHETYPE 3: Regime-Conditional
+  # ===========================================================================
+
+  # ARCHETYPE 3a: DEMA momentum direction conditioned on market directional sign
+  ama_trend_direction_conditional:
+    lifecycle: experimental
+    archetype: regime_conditional
+    description: >
+      5-bar delta of DEMA_d47fe5cc multiplied by sign(close - 20-bar MA).
+      The product is positive when DEMA trend direction agrees with the medium-term
+      price direction, and negative when they disagree. This filters momentum
+      signals that run counter to the prevailing trend.
+    compute:
+      mode: expression
+      expression: >-
+        Delta($DEMA_d47fe5cc_ama, 5) * Sign($close - Mean($close, 20))
+    tags: [regime_conditional, trend, ama, dema]
+    holding_bars: [5, 7]
+
+  # ARCHETYPE 3b: Multi-AMA agreement score (consensus across TEMA, DEMA, HMA)
+  ama_multi_agreement:
+    lifecycle: experimental
+    archetype: regime_conditional
+    description: >
+      Agreement score across three AMA families: TEMA_0fca19a1, DEMA_0fca19a1,
+      HMA_514ffe35. Ranges from -1 (all disagree = strong reversal signal) to
+      +1 (all agree = strong consensus momentum signal). Near-zero values indicate
+      regime uncertainty and should produce no signal.
+    compute:
+      mode: expression
+      expression: >-
+        (Sign(Delta($TEMA_0fca19a1_ama, 5))
+        + Sign(Delta($DEMA_0fca19a1_ama, 5))
+        + Sign(Delta($HMA_514ffe35_ama, 5))) / 3
+    tags: [regime_conditional, agreement, multi_ama, consensus]
+    holding_bars: [5, 7, 10]
