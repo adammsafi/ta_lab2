@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 
 ## Current Position
 
-Phase: 81-garch-conditional-volatility COMPLETE (v1.2.0, 5/5 plans)
-Next: Phase 82-signal-refinement-walk-forward-bakeoff
-Status: Between phases
-Last activity: 2026-03-22 -- Phase 81 verified and complete
+Phase: 82-signal-refinement-walk-forward-bakeoff (v1.2.0, 2/6 plans)
+Plan: 02 of 06 complete
+Status: In progress
+Last activity: 2026-03-22 -- Completed 82-02-PLAN.md (AMA signal generators + registry)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [####------] 22% v1.2.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [#####-----] 25% v1.2.0
 
 ## Performance Metrics
 
@@ -41,6 +41,13 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 Decisions are logged in PROJECT.md Key Decisions table.
 
 v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
+
+**Phase 82 decisions (plan 02):**
+- fillna(0.0) for missing AMA warmup values: neutral contribution; pandas 2.x rejects fillna(method=None)
+- IC-IR weights stored as raw unnormalized values, normalized at call time: preserves interpretable API
+- ADX computed locally (Wilder ewm) when filter_col absent from DataFrame: signal functions are self-contained
+- Holding-bar exit uses Python counter loop, not vectorbt internals: keeps signal functions library-independent
+- AMA signal functions read df[ama_col] only, never recompute: prevents fold-boundary lookback contamination
 
 **Phase 81 decisions (plan 05):**
 - ATR-14 normalised by close: price-unit ATR / close gives fractional vol comparable to Parkinson/GK scale
@@ -100,10 +107,10 @@ None active.
 
 ## Session Continuity
 
-Last session: 2026-03-22T18:00:00Z
-Stopped at: Phase 81 complete and verified (19/21 must-haves, 1 blocker fixed, 1 info acknowledged)
+Last session: 2026-03-22T19:55:11Z
+Stopped at: Completed 82-02-PLAN.md (AMA signal generators + registry registration)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-22 (Phase 81 complete)*
+*Last updated: 2026-03-22 (Phase 82 plan 02 complete)*
