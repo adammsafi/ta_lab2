@@ -22,8 +22,20 @@ build_t1_series         - Build label-end (t1) Series for CV splitters
 load_strategy_data      - Load OHLCV + indicator data from DB for a given asset/TF
 load_strategy_data_with_ama - Extended loader that joins AMA features onto base DataFrame
 parse_active_features   - Parse feature_selection.yaml into structured feature list
+load_universal_ic_weights   - Universal IC-IR weights from feature_selection.yaml (active tier)
+load_per_asset_ic_weights   - Per-asset IC-IR weight matrix from ic_results
 run_purged_kfold_backtest - Run one strategy through purged K-fold CV
 run_cpcv_backtest       - Run one strategy through CPCV for PBO analysis
+
+BakeoffOrchestrator.run() parameters (Phase 82 additions)
+---------------------------------------------------------
+ama_features : list of dict, optional
+    When provided, load_strategy_data_with_ama() is used instead of
+    load_strategy_data() so AMA columns are available for AMA signal
+    functions and expression engine experiments.
+experiment_name : str, optional
+    Lineage tag stored in strategy_bakeoff_results.experiment_name.
+    Pass a descriptive name (e.g. "phase82-ama-v1") for result traceability.
 """
 
 from __future__ import annotations
@@ -442,6 +454,206 @@ def load_strategy_data_with_ama(
     return df
 
 
+def load_universal_ic_weights(
+    yaml_path: str = "configs/feature_selection.yaml",
+) -> dict[str, float]:
+    """
+    Load universal IC-IR weights from feature_selection.yaml (active tier).
+
+    Reads ic_ir_mean from each active feature entry, clips negatives to 0,
+    and normalizes so weights sum to 1.0.
+
+    Parameters
+    ----------
+    yaml_path : str
+        Path to feature_selection.yaml. Resolved relative to project root if
+        not absolute.
+
+    Returns
+    -------
+    dict[str, float]
+        feature_name -> normalized IC-IR weight. Sums to 1.0.
+        Empty dict if no active features or all IC-IR are <= 0.
+    """
+    active_features = parse_active_features(yaml_path)
+
+    # Build yaml config to read ic_ir_mean directly
+    if not os.path.isabs(yaml_path):
+        candidate = yaml_path
+        if not os.path.exists(candidate):
+            cwd = os.getcwd()
+            parts = cwd.replace("\\", "/").split("/")
+            for i in range(len(parts), 0, -1):
+                root = "/".join(parts[:i])
+                candidate = os.path.join(root, yaml_path)
+                if os.path.exists(candidate):
+                    break
+            else:
+                candidate = yaml_path
+    else:
+        candidate = yaml_path
+
+    with open(candidate, "r", encoding="utf-8") as fh:
+        config = yaml.safe_load(fh)
+
+    # Build name -> ic_ir_mean lookup from the raw YAML
+    ic_ir_by_name: dict[str, float] = {}
+    for entry in config.get("active", []):
+        name = entry.get("name", "")
+        ic_ir = float(entry.get("ic_ir_mean", 0.0))
+        ic_ir_by_name[name] = ic_ir
+
+    weights_raw: dict[str, float] = {}
+    for feat in active_features:
+        name = feat["name"]
+        ic_ir = ic_ir_by_name.get(name, 0.0)
+        weights_raw[name] = max(0.0, ic_ir)  # clip negative IC-IR to 0
+
+    total = sum(weights_raw.values())
+    if total <= 0.0:
+        logger.warning(
+            "load_universal_ic_weights: all IC-IR values are <= 0; "
+            "returning equal weights"
+        )
+        n = len(weights_raw)
+        return {name: 1.0 / n for name in weights_raw} if n > 0 else {}
+
+    return {name: w / total for name, w in weights_raw.items()}
+
+
+def load_per_asset_ic_weights(
+    engine: "Engine",
+    features: list[str],
+    tf: str = "1D",
+    horizon: int = 1,
+    return_type: str = "arith",
+) -> "pd.DataFrame":
+    """
+    Load per-asset IC-IR weights from ic_results.
+
+    Queries ic_results for the given features, timeframe, horizon, and
+    return_type (full-sample regime='all'), pivots to a wide DataFrame
+    (asset_id x feature_name), normalizes each row to sum to 1.0, and
+    falls back to universal IC-IR weights (from feature_selection.yaml)
+    where per-asset data is missing.
+
+    Parameters
+    ----------
+    engine : Engine
+        SQLAlchemy engine.
+    features : list[str]
+        Feature names to load IC-IR for.
+    tf : str
+        Timeframe (default "1D").
+    horizon : int
+        IC horizon (default 1, i.e., 1-bar forward return).
+    return_type : str
+        Return type used in IC calculation (default "arith").
+
+    Returns
+    -------
+    pd.DataFrame
+        Rows = asset_id (integer index), columns = feature names,
+        values = normalized IC-IR weights (sum to 1.0 per row).
+        Returns empty DataFrame if ic_results has no data.
+    """
+    if not features:
+        return pd.DataFrame()
+
+    # Build a parameterized ANY() query using a JSON array cast
+    features_literal = "{" + ",".join(f"{f}" for f in features) + "}"
+
+    sql = text(
+        """
+        SELECT asset_id,
+               feature,
+               AVG(ABS(ic_ir)) AS mean_abs_ic_ir
+        FROM public.ic_results
+        WHERE feature = ANY(CAST(:features AS TEXT[]))
+          AND tf = :tf
+          AND horizon = :horizon
+          AND return_type = :return_type
+          AND regime_col = 'all'
+          AND regime_label = 'all'
+          AND ic IS NOT NULL
+        GROUP BY asset_id, feature
+        ORDER BY asset_id, feature
+        """
+    )
+
+    with engine.connect() as conn:
+        df = pd.read_sql(
+            sql,
+            conn,
+            params={
+                "features": features_literal,
+                "tf": tf,
+                "horizon": horizon,
+                "return_type": return_type,
+            },
+        )
+
+    if df.empty:
+        logger.warning(
+            "load_per_asset_ic_weights: no ic_results rows for tf=%s horizon=%d "
+            "return_type=%s; returning empty DataFrame",
+            tf,
+            horizon,
+            return_type,
+        )
+        return pd.DataFrame()
+
+    # Pivot to wide format: asset_id x feature_name
+    pivot = df.pivot(index="asset_id", columns="feature", values="mean_abs_ic_ir")
+    pivot.columns.name = None  # remove MultiIndex label
+
+    # Fill columns missing from pivot (features with no per-asset data)
+    for feat in features:
+        if feat not in pivot.columns:
+            pivot[feat] = float("nan")
+    pivot = pivot[features]  # reorder to match requested feature order
+
+    # Load universal weights as fallback for missing per-asset data
+    universal = load_universal_ic_weights()
+    universal_series = pd.Series(
+        {feat: universal.get(feat, 0.0) for feat in features}, dtype=float
+    )
+
+    # Fill NaN cells with universal IC-IR (un-normalized; we'll normalize per row)
+    for feat in features:
+        univ_val = universal_series.get(feat, 0.0)
+        pivot[feat] = pivot[feat].fillna(univ_val)
+
+    # Clip negative IC-IR to 0
+    pivot = pivot.clip(lower=0.0)
+
+    # Normalize per row: each row sums to 1.0
+    row_sums = pivot.sum(axis=1)
+    # Where row_sum is 0 (all zeros), fall back to equal weights
+    equal_weight = 1.0 / len(features) if features else 0.0
+    for asset_id in pivot.index:
+        row_sum = row_sums[asset_id]
+        if row_sum <= 0.0:
+            logger.warning(
+                "load_per_asset_ic_weights: asset_id=%d has all-zero IC-IR; "
+                "using equal weights",
+                asset_id,
+            )
+            pivot.loc[asset_id] = equal_weight
+        else:
+            pivot.loc[asset_id] = pivot.loc[asset_id] / row_sum
+
+    logger.info(
+        "load_per_asset_ic_weights: %d assets x %d features (tf=%s horizon=%d return_type=%s)",
+        len(pivot),
+        len(features),
+        tf,
+        horizon,
+        return_type,
+    )
+    return pivot
+
+
 def _add_local_indicators(df: pd.DataFrame) -> None:
     """Add RSI, ATR, and EMA columns to df in-place (for signal generation)."""
     close = df["close"].astype(float)
@@ -797,6 +1009,8 @@ class BakeoffOrchestrator:
         strategies: Dict[str, Tuple[Callable, List[Dict[str, Any]]]],
         asset_ids: Sequence[int],
         tf: str = "1D",
+        ama_features: Optional[List[Dict[str, Any]]] = None,
+        experiment_name: Optional[str] = None,
     ) -> List[StrategyResult]:
         """
         Run the full bake-off for all strategies x assets x cost scenarios.
@@ -809,6 +1023,15 @@ class BakeoffOrchestrator:
             Asset IDs to evaluate (typically [1, 1027] for BTC/ETH).
         tf : str
             Timeframe (e.g. "1D").
+        ama_features : list of dict, optional
+            AMA feature descriptors from parse_active_features(). When provided,
+            load_strategy_data_with_ama() is used instead of load_strategy_data()
+            so AMA columns are available in the DataFrame for AMA signal functions
+            and expression engine experiments.
+        experiment_name : str, optional
+            Lineage tag stored in strategy_bakeoff_results.experiment_name.
+            Use a descriptive name such as "phase82-ama-v1" for traceability.
+            Passed through to _persist_results().
 
         Returns
         -------
@@ -819,7 +1042,13 @@ class BakeoffOrchestrator:
 
         for asset_id in asset_ids:
             logger.info(f"Loading data for asset_id={asset_id}, tf={tf}")
-            df = load_strategy_data(self.engine, asset_id, tf)
+            # Use AMA-extended loader when AMA features are requested
+            if ama_features is not None:
+                df = load_strategy_data_with_ama(
+                    self.engine, asset_id, tf, ama_features
+                )
+            else:
+                df = load_strategy_data(self.engine, asset_id, tf)
 
             if df.empty or len(df) < self.config.min_bars:
                 logger.warning(
@@ -958,7 +1187,7 @@ class BakeoffOrchestrator:
         # --- Persist results ---
         for sr in all_results:
             try:
-                self._persist_results(sr)
+                self._persist_results(sr, experiment_name=experiment_name)
             except Exception as e:
                 logger.error(
                     f"Failed to persist {sr.strategy_name}/{sr.cv_method}: {e}"

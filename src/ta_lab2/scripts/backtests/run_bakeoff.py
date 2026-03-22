@@ -22,6 +22,24 @@ Usage
     # Overwrite existing results
     python -m ta_lab2.scripts.backtests.run_bakeoff --assets 1 1027 --tf 1D --overwrite
 
+    # Hyperliquid cost matrix (6 tighter scenarios)
+    python -m ta_lab2.scripts.backtests.run_bakeoff --dry-run --assets 1 --tf 1D --exchange hyperliquid
+
+    # Both exchanges (18 scenarios: 12 Kraken + 6 HL)
+    python -m ta_lab2.scripts.backtests.run_bakeoff --dry-run --assets 1 --tf 1D --exchange all
+
+    # AMA strategies with AMA data loader
+    python -m ta_lab2.scripts.backtests.run_bakeoff --dry-run --assets 1 --tf 1D --strategies ama_momentum
+
+    # Expression engine experiments from YAML
+    python -m ta_lab2.scripts.backtests.run_bakeoff --dry-run --assets 1 --tf 1D \\
+        --experiments-yaml configs/experiments/signals_phase82.yaml
+
+    # Tag results with experiment name for lineage tracking
+    python -m ta_lab2.scripts.backtests.run_bakeoff --assets 1 1027 --tf 1D \\
+        --experiments-yaml configs/experiments/signals_phase82.yaml \\
+        --experiment-name phase82-ama-v1
+
 NOTE: Expanding-window re-optimization is DELIBERATELY DEFERRED.
 This script implements fixed-parameter walk-forward only (standard baseline).
 """
@@ -34,6 +52,7 @@ import math
 import sys
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+import yaml
 from sqlalchemy import NullPool, create_engine, text
 
 from ta_lab2.backtests.bakeoff_orchestrator import (
@@ -41,7 +60,9 @@ from ta_lab2.backtests.bakeoff_orchestrator import (
     BakeoffOrchestrator,
     StrategyResult,
     cost_scenario_label,
+    parse_active_features,
 )
+from ta_lab2.backtests.costs import COST_MATRIX_REGISTRY
 from ta_lab2.config import TARGET_DB_URL
 from ta_lab2.signals.registry import REGISTRY, get_strategy
 
@@ -131,20 +152,162 @@ _BAKEOFF_PARAM_GRIDS: Dict[str, List[Dict[str, Any]]] = {
             "max_leverage": 1.0,
         },
     ],
+    # ---------------------------------------------------------------------------
+    # Phase 82: AMA-based strategies (require AMA columns pre-loaded from DB)
+    # ---------------------------------------------------------------------------
+    "ama_momentum": [
+        {"holding_bars": 5, "threshold": 0.0},
+        {"holding_bars": 7, "threshold": 0.0},
+        {"holding_bars": 10, "threshold": 0.5},
+    ],
+    "ama_mean_reversion": [
+        {
+            "ama_col": "KAMA_de1106d5_ama",
+            "entry_zscore": -1.5,
+            "exit_zscore": 0.0,
+            "holding_bars": 10,
+        },
+        {
+            "ama_col": "KAMA_de1106d5_ama",
+            "entry_zscore": -2.0,
+            "exit_zscore": 0.0,
+            "holding_bars": 7,
+        },
+        {
+            "ama_col": "KAMA_987fc105_ama",
+            "entry_zscore": -1.5,
+            "exit_zscore": 0.0,
+            "holding_bars": 10,
+        },
+    ],
+    "ama_regime_conditional": [
+        {"adx_threshold": 20.0, "holding_bars": 7},
+        {"adx_threshold": 15.0, "holding_bars": 5},
+        {"adx_threshold": 25.0, "holding_bars": 10},
+    ],
 }
 
 # V1 hard gates for strategy selection
 V1_SHARPE_GATE = 1.0  # Minimum OOS Sharpe
 V1_MAX_DD_GATE = 0.15  # Maximum acceptable drawdown (15%)
 
+# AMA strategy names: strategies that require AMA columns pre-loaded from DB.
+# When any of these is requested, load_strategy_data_with_ama() is used.
+_AMA_STRATEGY_NAMES: frozenset[str] = frozenset(
+    {"ama_momentum", "ama_mean_reversion", "ama_regime_conditional"}
+)
+
+
+def _make_expression_signal(
+    expression: str,
+    holding_bars: int,
+) -> Callable:
+    """
+    Create a bake-off signal function from an expression engine expression.
+
+    The returned function has signature:
+        (df: pd.DataFrame, **params) -> (entries, exits, size)
+
+    Signal logic:
+        entries = expression_value > 0
+        exits   = expression_value < 0
+        size    = None (equal-weight sizing)
+
+    The expression is evaluated via evaluate_expression() against the full
+    DataFrame (which must include all $col columns referenced). The holding_bars
+    parameter is used by the bake-off orchestrator via t1_series (not enforced
+    here -- t1_series length is set externally per experiment).
+
+    Parameters
+    ----------
+    expression : str
+        Expression engine $col-syntax expression string.
+    holding_bars : int
+        Holding period in bars (informational; used to key param grids).
+
+    Returns
+    -------
+    Callable
+        Signal function for use in strategies dict.
+    """
+    from ta_lab2.ml.expression_engine import evaluate_expression
+
+    def signal_fn(
+        df: Any,
+        **params: Any,
+    ) -> Tuple[Any, Any, None]:
+        signal_series = evaluate_expression(expression, df)
+        entries = signal_series > 0
+        exits = signal_series < 0
+        return entries.fillna(False), exits.fillna(False), None
+
+    signal_fn.__name__ = f"expression_signal_hb{holding_bars}"
+    return signal_fn
+
+
+def _load_experiments_yaml(
+    yaml_path: str,
+) -> Dict[str, Tuple[Callable, List[Dict[str, Any]]]]:
+    """
+    Load expression engine experiments from YAML and build strategies dict.
+
+    Each experiment in the YAML becomes a strategy entry:
+        strategy_name -> (signal_fn, [{"holding_bars": hb} for hb in holding_bars])
+
+    Parameters
+    ----------
+    yaml_path : str
+        Path to YAML experiments file (e.g. configs/experiments/signals_phase82.yaml).
+
+    Returns
+    -------
+    dict
+        {experiment_name: (signal_fn, param_grid)} mapping ready for bake-off.
+    """
+    with open(yaml_path, encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+
+    experiments: Dict[str, Tuple[Callable, List[Dict[str, Any]]]] = {}
+    exp_dict = data.get("experiments", {})
+
+    for exp_name, exp_cfg in exp_dict.items():
+        expression = exp_cfg["compute"]["expression"]
+        holding_bars_list = exp_cfg.get("holding_bars", [5])
+
+        # Build param grid: one entry per holding period
+        param_grid = [{"holding_bars": hb} for hb in holding_bars_list]
+
+        # Create signal function for this expression
+        # Use the first holding_bars as the label for __name__
+        signal_fn = _make_expression_signal(expression, holding_bars_list[0])
+
+        experiments[exp_name] = (signal_fn, param_grid)
+        logger.info(
+            f"Loaded expression experiment '{exp_name}': "
+            f"{len(param_grid)} holding period(s) -> {holding_bars_list}"
+        )
+
+    return experiments
+
 
 def _build_strategies(
     strategy_names: Optional[List[str]] = None,
+    experiments_yaml: Optional[str] = None,
 ) -> Dict[str, Tuple[Callable, List[Dict[str, Any]]]]:
     """
     Build strategies dict: {name: (signal_fn, param_grid)}.
 
     Filters to available strategies (those in REGISTRY with a callable).
+    If experiments_yaml is provided, also loads expression engine experiments
+    from the YAML file and adds them to the strategies dict.
+
+    Parameters
+    ----------
+    strategy_names : list of str, optional
+        Strategy names to include from REGISTRY. Default: all available.
+    experiments_yaml : str, optional
+        Path to YAML experiments file (e.g. configs/experiments/signals_phase82.yaml).
+        Experiments are added to the strategies dict under their YAML name.
     """
     # Determine which strategies to run
     if strategy_names is None:
@@ -173,6 +336,14 @@ def _build_strategies(
 
         strategies[name] = (signal_fn, param_grid)
         logger.info(f"Strategy '{name}': {len(param_grid)} param set(s)")
+
+    # Load expression engine experiments from YAML (Phase 82+)
+    if experiments_yaml:
+        exp_strategies = _load_experiments_yaml(experiments_yaml)
+        strategies.update(exp_strategies)
+        logger.info(
+            f"Loaded {len(exp_strategies)} expression experiments from {experiments_yaml}"
+        )
 
     return strategies
 
@@ -382,7 +553,38 @@ def main() -> None:
     parser.add_argument(
         "--spot-only",
         action="store_true",
-        help="Run only spot cost scenarios (6 instead of 12).",
+        help="Run only spot cost scenarios (6 instead of 12). Overridden by --exchange.",
+    )
+    parser.add_argument(
+        "--exchange",
+        default="kraken",
+        choices=["kraken", "hyperliquid", "all"],
+        help=(
+            "Cost matrix exchange (default: kraken). "
+            "'hyperliquid' uses 6 tighter HL scenarios. "
+            "'all' runs both Kraken (12) and Hyperliquid (6) = 18 total scenarios."
+        ),
+    )
+
+    # Expression engine experiments
+    parser.add_argument(
+        "--experiments-yaml",
+        default=None,
+        metavar="PATH",
+        help=(
+            "Path to YAML experiments file with expression engine signal definitions "
+            "(e.g. configs/experiments/signals_phase82.yaml). "
+            "Each experiment is added to the strategies dict under its YAML name."
+        ),
+    )
+    parser.add_argument(
+        "--experiment-name",
+        default=None,
+        metavar="NAME",
+        help=(
+            "Experiment lineage tag stored in strategy_bakeoff_results.experiment_name "
+            "(e.g. 'phase82-ama-v1'). All results from this run get this tag."
+        ),
     )
 
     # Run control
@@ -439,8 +641,11 @@ def main() -> None:
         print(f"ERROR: No assets found for tf={args.tf}.", file=sys.stderr)
         sys.exit(1)
 
-    # Build strategies
-    strategies = _build_strategies(args.strategies)
+    # Build strategies (includes YAML experiments if --experiments-yaml provided)
+    strategies = _build_strategies(
+        strategy_names=args.strategies,
+        experiments_yaml=args.experiments_yaml,
+    )
     if not strategies:
         print("ERROR: No strategies available to run.", file=sys.stderr)
         sys.exit(1)
@@ -449,13 +654,48 @@ def main() -> None:
     logger.info(f"Assets: {asset_ids}")
     logger.info(f"Timeframe: {args.tf}")
 
+    # Resolve cost matrix from --exchange flag
+    # 'all' concatenates both Kraken and Hyperliquid matrices
+    if args.exchange == "all":
+        combined_matrix = list(COST_MATRIX_REGISTRY["kraken"]) + list(
+            COST_MATRIX_REGISTRY["hyperliquid"]
+        )
+        logger.info(
+            f"Exchange=all: using {len(combined_matrix)} cost scenarios "
+            f"({len(COST_MATRIX_REGISTRY['kraken'])} Kraken + "
+            f"{len(COST_MATRIX_REGISTRY['hyperliquid'])} Hyperliquid)"
+        )
+    else:
+        combined_matrix = list(COST_MATRIX_REGISTRY[args.exchange])
+        logger.info(
+            f"Exchange={args.exchange}: using {len(combined_matrix)} cost scenarios"
+        )
+
     # Build config
     config = BakeoffConfig(
         n_folds=args.n_folds,
         embargo_bars=args.embargo_bars,
+        cost_matrix=combined_matrix,
         spot_only=args.spot_only,
+        exchange=args.exchange,
         overwrite=args.overwrite,
     )
+
+    # Detect whether AMA data loader is needed:
+    # Required when any AMA strategy is requested OR experiments-yaml is provided
+    # (expression engine experiments use AMA columns from load_strategy_data_with_ama)
+    requested_strategy_names = set(strategies.keys())
+    needs_ama = bool(
+        requested_strategy_names & _AMA_STRATEGY_NAMES or args.experiments_yaml
+    )
+
+    ama_features: Optional[List[Dict[str, Any]]] = None
+    if needs_ama:
+        ama_features = parse_active_features()
+        logger.info(
+            f"AMA data loader enabled: {len(ama_features)} active features "
+            f"(AMA strategies or expression experiments detected)"
+        )
 
     # Dry run
     if args.dry_run:
@@ -470,6 +710,8 @@ def main() -> None:
         strategies=strategies,
         asset_ids=asset_ids,
         tf=args.tf,
+        ama_features=ama_features,
+        experiment_name=args.experiment_name,
     )
 
     logger.info(f"Bake-off complete: {len(results)} result rows generated")
