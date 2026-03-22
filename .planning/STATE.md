@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 
 ## Current Position
 
-Phase: 81-garch-conditional-volatility (v1.2.0, 4/5 plans complete)
-Plan: 81-04 complete (GARCH integration into vol_sizer + var_simulator)
-Status: In progress
-Last activity: 2026-03-22 -- Completed 81-04-PLAN.md (vol_sizer GARCH blend + GARCH-VaR)
+Phase: 81-garch-conditional-volatility (v1.2.0, 5/5 plans complete)
+Plan: 81-05 complete (GARCH comparison report + daily refresh wiring)
+Status: Phase complete
+Last activity: 2026-03-22 -- Completed 81-05-PLAN.md (comparison report + pipeline wiring)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [####------] 40% v1.2.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 365
+- Total plans completed: 366
 - Average duration: 7 min
-- Total execution time: ~29.6 hours
+- Total execution time: ~29.8 hours
 
 **Recent Trend:**
 - v0.8.0: 6 phases, 16 plans, ~1.2 hours
@@ -29,7 +29,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 - v1.0.0: 22 phases, 104 plans, ~14.5 hours
 - v1.0.1: 10 phases, 29 plans, ~2.0 hours
 - v1.1.0: 6 phases, 21 plans, ~2.5 hours
-- v1.2.0 (in progress): Phase 80 = 5 plans (~35 min), Phase 81 plans 01-04 = 29 min
+- v1.2.0 (in progress): Phase 80 = 5 plans (~35 min), Phase 81 plans 01-05 = 40 min
 - Trend: Stable (~5-7 min/plan)
 
 *Updated after each plan completion*
@@ -41,6 +41,12 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 Decisions are logged in PROJECT.md Key Decisions table.
 
 v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
+
+**Phase 81 decisions (plan 05):**
+- ATR-14 normalised by close: price-unit ATR / close gives fractional vol comparable to Parkinson/GK scale
+- GARCH stage after features, before signals: GARCH reads bar returns; signals may use GARCH vol for sizing
+- GARCH failure non-fatal: --continue-on-error allows pipeline to proceed to signals if GARCH fails
+- TIMEOUT_GARCH=1800s (30 min): conservative timeout for 99 assets x 4 models sequential fitting
 
 **Phase 81 decisions (plan 04):**
 - Student's t unit-variance scaling: raw quantile * sqrt((df-2)/df) so sigma_forecast maps to actual std dev
@@ -94,10 +100,10 @@ None active.
 
 ## Session Continuity
 
-Last session: 2026-03-22T17:05:45Z
-Stopped at: Completed 81-04-PLAN.md (vol_sizer GARCH blend + GARCH-VaR)
+Last session: 2026-03-22T17:14:20Z
+Stopped at: Completed 81-05-PLAN.md (comparison report + daily refresh wiring)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-22 (Phase 81 plan 04 complete)*
+*Last updated: 2026-03-22 (Phase 81 plan 05 complete -- phase complete)*
