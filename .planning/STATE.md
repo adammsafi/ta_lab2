@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 
 ## Current Position
 
-Phase: 80-ic-analysis-feature-selection (v1.2.0, plan 2 of 5 complete)
-Plan: 80-02 complete, 80-03 next
+Phase: 80-ic-analysis-feature-selection (v1.2.0, plan 3 of 5 complete)
+Plan: 80-03 complete, 80-04 next
 Status: In progress
-Last activity: 2026-03-22 -- Completed 80-02-PLAN.md (feature_selection.py library module)
+Last activity: 2026-03-22 -- Completed 80-03-PLAN.md (run_feature_selection.py CLI + configs/feature_selection.yaml)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [##--------] 40% v1.2.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [###-------] 50% v1.2.0
 
 ## Performance Metrics
 
@@ -53,6 +53,12 @@ v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
 - `save_to_db` uses TRUNCATE + INSERT (snapshot table, full replace each run)
 - KPSS InterpolationWarning suppressed via `warnings.catch_warnings()` context
 
+**Phase 80-03 decisions:**
+- IC-IR cutoff 1.0 used for feature_selection.yaml (default 0.3 gave 107 active; 1.0 gives 19 — within 15-25 goal)
+- AMA features get INSUFFICIENT_DATA for stationarity (correct: they live in ama_multi_tf_u, not features table)
+- 0 archive-tier features at cutoff 1.0 — all 205 features have IC signal (watch or better)
+- No-signal features list (SC-1) is empty — all 205 features have |IC-IR| > 0.1 at some horizon
+
 ### Pending Todos
 
 3 pending todos -- see .planning/todos/pending/:
@@ -67,9 +73,9 @@ None active.
 ## Session Continuity
 
 Last session: 2026-03-22
-Stopped at: Completed 80-02-PLAN.md (feature_selection.py library module with 9 public functions)
+Stopped at: Completed 80-03-PLAN.md (run_feature_selection.py CLI + configs/feature_selection.yaml)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-22 (80-02 complete)*
+*Last updated: 2026-03-22 (80-03 complete)*
