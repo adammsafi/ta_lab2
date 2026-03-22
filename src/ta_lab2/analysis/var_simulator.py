@@ -9,6 +9,7 @@ Methods implemented:
     parametric_var_normal  - Gaussian parametric method
     cornish_fisher_var     - Cornish-Fisher expansion (Favre & Galeano 2002)
     historical_cvar        - Expected Shortfall (mean of tail losses)
+    garch_var              - GARCH conditional VaR with Student's t (Phase 81)
 
 All functions return negative floats representing losses
 (e.g. -0.05 means a 5% loss at the specified confidence level).
@@ -28,6 +29,7 @@ import numpy as np
 from scipy.stats import kurtosis as scipy_kurtosis
 from scipy.stats import norm
 from scipy.stats import skew as scipy_skew
+from scipy.stats import t as student_t
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +41,9 @@ _CF_KURTOSIS_WARN_THRESHOLD = 8.0
 _MAX_DAILY_CAP = 0.15
 
 # Supported var_to_daily_cap method names
-_VALID_METHODS = frozenset({"historical_95", "historical_99", "cf_95", "cf_99"})
+_VALID_METHODS = frozenset(
+    {"historical_95", "historical_99", "cf_95", "cf_99", "garch_95", "garch_99"}
+)
 
 
 # ---------------------------------------------------------------------------
@@ -62,6 +66,9 @@ class VaRResult:
     skewness: float
     excess_kurtosis: float
     cf_reliable: bool  # False when abs(excess_kurtosis) > _CF_KURTOSIS_WARN_THRESHOLD
+    garch_var_value: float | None = (
+        None  # GARCH conditional VaR (None if not available)
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -197,6 +204,63 @@ def historical_cvar(
     return float(np.mean(tail))
 
 
+def garch_var(
+    sigma_forecast: float,
+    confidence: float = 0.95,
+    mu: float = 0.0,
+    dist: str = "studentst",
+    df: float = 6.0,
+) -> float:
+    """GARCH conditional VaR.
+
+    Uses the GARCH-forecasted conditional volatility to compute VaR via
+    the distribution quantile: ``VaR = mu + sigma * q_alpha``.
+
+    The default distribution is Student's t (``dist="studentst"``), which
+    better captures the fat tails typical of crypto returns.
+
+    Args:
+        sigma_forecast: Daily conditional vol from GARCH (decimal, e.g. 0.03 = 3%).
+        confidence:     Confidence level (default 0.95 for 95% VaR).
+        mu:             Expected daily return (default 0 for conservative estimate).
+        dist:           Distribution -- ``"normal"`` or ``"studentst"`` (default).
+        df:             Degrees of freedom for Student's t (default 6.0, typical
+                        for crypto).  Ignored when ``dist="normal"``.
+
+    Returns:
+        Negative float representing the loss quantile, consistent with the
+        existing VaR functions in this module.
+
+    Raises:
+        ValueError: If sigma_forecast <= 0, confidence not in (0, 1), or
+                    dist is not one of ``"normal"`` / ``"studentst"``.
+    """
+    if sigma_forecast <= 0:
+        raise ValueError(f"garch_var: sigma_forecast must be > 0, got {sigma_forecast}")
+    if not (0.0 < confidence < 1.0):
+        raise ValueError(f"garch_var: confidence must be in (0, 1), got {confidence}")
+
+    alpha = 1.0 - confidence
+
+    if dist == "normal":
+        q = float(norm.ppf(alpha))
+    elif dist == "studentst":
+        # Student's t quantile, then scale by sqrt((df-2)/df) to match
+        # unit-variance convention (so sigma_forecast maps directly to vol).
+        raw_q = float(student_t.ppf(alpha, df=df))
+        # Student's t with df dof has variance df/(df-2). Scale the
+        # quantile so that the resulting VaR corresponds to sigma_forecast
+        # being the *standard deviation*, not the t-scale parameter.
+        scale_factor = np.sqrt((df - 2.0) / df) if df > 2 else 1.0
+        q = raw_q * scale_factor
+    else:
+        raise ValueError(
+            f"garch_var: dist must be 'normal' or 'studentst', got {dist!r}"
+        )
+
+    return float(mu + q * sigma_forecast)
+
+
 # ---------------------------------------------------------------------------
 # Suite function
 # ---------------------------------------------------------------------------
@@ -207,25 +271,49 @@ def compute_var_suite(
     strategy: str,
     asset_id: int,
     confidence: float = 0.95,
+    garch_sigma: float | None = None,
+    garch_dist: str = "studentst",
+    garch_df: float = 6.0,
 ) -> VaRResult:
     """Compute the full VaR suite for a given returns series.
 
     Calls historical_var, parametric_var_normal, cornish_fisher_var, and
     historical_cvar in one shot and returns a VaRResult dataclass.
 
+    When *garch_sigma* is provided, also computes GARCH conditional VaR
+    via :func:`garch_var` and stores it in
+    :attr:`VaRResult.garch_var_value`.
+
     Args:
-        returns:    1-D array of period returns.
-        strategy:   Human-readable strategy name (e.g. "ema_trend_17_77").
-        asset_id:   Integer asset ID from dim_assets.
-        confidence: Confidence level (default 0.95).
+        returns:      1-D array of period returns.
+        strategy:     Human-readable strategy name (e.g. "ema_trend_17_77").
+        asset_id:     Integer asset ID from dim_assets.
+        confidence:   Confidence level (default 0.95).
+        garch_sigma:  Optional GARCH conditional volatility forecast (decimal).
+                      When provided, ``garch_var_value`` is populated.
+        garch_dist:   Distribution for GARCH-VaR -- ``"normal"`` or
+                      ``"studentst"`` (default).
+        garch_df:     Student's t degrees of freedom (default 6.0).
 
     Returns:
-        VaRResult populated with all four VaR metrics and distribution stats.
+        VaRResult populated with all VaR metrics and distribution stats.
+        ``garch_var_value`` is None when ``garch_sigma`` is not provided.
     """
     arr = _to_array(returns)
     s = float(scipy_skew(arr))
     k = float(scipy_kurtosis(arr, fisher=True))  # excess kurtosis
     cf_reliable = abs(k) <= _CF_KURTOSIS_WARN_THRESHOLD
+
+    garch_var_value: float | None = None
+    if garch_sigma is not None and garch_sigma > 0:
+        mu_hat = float(np.mean(arr))
+        garch_var_value = garch_var(
+            garch_sigma,
+            confidence=confidence,
+            mu=mu_hat,
+            dist=garch_dist,
+            df=garch_df,
+        )
 
     return VaRResult(
         strategy=strategy,
@@ -239,6 +327,7 @@ def compute_var_suite(
         skewness=s,
         excess_kurtosis=k,
         cf_reliable=cf_reliable,
+        garch_var_value=garch_var_value,
     )
 
 
@@ -259,9 +348,11 @@ def var_to_daily_cap(
     Args:
         var_results: List of VaRResult instances (one per strategy/asset).
         method:      Which VaR field to use. One of:
-                     "historical_95" | "historical_99" | "cf_95" | "cf_99"
+                     "historical_95" | "historical_99" | "cf_95" | "cf_99" |
+                     "garch_95" | "garch_99"
                      Note: "_99" variants require that var_results were computed
-                     with confidence=0.99.
+                     with confidence=0.99. "garch_*" variants require that
+                     garch_sigma was provided to compute_var_suite.
 
     Returns:
         Positive float: daily loss cap as a fraction (e.g. 0.05 = 5%).
@@ -280,6 +371,15 @@ def var_to_daily_cap(
 
     if method.startswith("historical"):
         values = [abs(r.historical_var) for r in var_results]
+    elif method.startswith("garch"):
+        values = [
+            abs(r.garch_var_value) for r in var_results if r.garch_var_value is not None
+        ]
+        if not values:
+            raise ValueError(
+                f"var_to_daily_cap: method is '{method}' but no results have "
+                "garch_var_value populated. Provide garch_sigma to compute_var_suite."
+            )
     else:  # cf_*
         values = [abs(r.cornish_fisher_var) for r in var_results]
 
