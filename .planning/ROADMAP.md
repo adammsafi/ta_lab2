@@ -1400,11 +1400,11 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 **Plans**: 5 plans in 4 waves
 
 Plans:
-- [ ] 80-01-PLAN.md -- Install statsmodels dependency + dim_feature_selection Alembic migration
-- [ ] 80-02-PLAN.md -- feature_selection.py library module (stationarity, Ljung-Box, monotonicity, tier classification)
-- [ ] 80-03-PLAN.md -- run_feature_selection.py CLI orchestrator + generate configs/feature_selection.yaml
-- [ ] 80-04-PLAN.md -- run_concordance.py IC-IR vs MDA concordance analysis
-- [ ] 80-05-PLAN.md -- Feature selection review checkpoint (human verification)
+- [x] 80-01-PLAN.md -- Install statsmodels dependency + dim_feature_selection Alembic migration
+- [x] 80-02-PLAN.md -- feature_selection.py library module (stationarity, Ljung-Box, monotonicity, tier classification)
+- [x] 80-03-PLAN.md -- run_feature_selection.py CLI orchestrator + generate configs/feature_selection.yaml
+- [x] 80-04-PLAN.md -- run_concordance.py IC-IR vs MDA concordance analysis
+- [x] 80-05-PLAN.md -- Feature selection review checkpoint (human verification)
 
 ---
 
@@ -1424,13 +1424,20 @@ Plans:
 ### Phase 82: Signal Refinement & Walk-Forward Bake-off
 **Goal:** Top features combined into composite signals via expression engine, validated through walk-forward bake-off with statistical gates
 **Depends on:** Phase 80 (selected features), Phase 81 (GARCH vol for cost-aware sizing)
+**Phase 80 Learnings (must address):**
+  - Active tier is 90% AMA-derived features (live in `ama_multi_tf`, NOT `features` table) — expression engine and regime router MUST load from both table families
+  - Per-asset IC-IR variation is significant — leverage `ic_results` per-asset data for asset-specific signal weighting, not just the universal YAML averages
+  - Feature selection is strategy-agnostic (ranks by IC-IR correlation with forward returns) — this phase is where strategy alignment happens (momentum vs mean-reversion vs regime-conditional)
+  - Conditional tier (160 features) contains all traditional TA features (RSI, MACD, ADX, Bollinger) — regime router should evaluate these as regime specialists
+  - Concordance between IC-IR and MDA was low (rho=0.14) due to AMA features being absent from MDA evaluation — consider MDA validation for bar-level features separately
 **Success Criteria** (what must be TRUE):
   1. At least 3 expression engine YAML experiments defined using selected features (combinations, interactions, regime-conditional)
-  2. Regime router (TRA) trained with selected features — per-regime sub-models operational
+  2. Regime router (TRA) trained with selected features — per-regime sub-models operational, using BOTH features table AND ama_multi_tf data
   3. Walk-forward bake-off (run_bakeoff.py) completed across full Kraken cost matrix (12 scenarios)
   4. DSR > 0.95 gate applied — only strategies passing deflated Sharpe survive
   5. Bake-off results persisted to backtest_metrics with experiment lineage
   6. Top 1-2 strategies selected for paper trading, documented with rationale
+  7. Per-asset feature weighting explored: do asset-specific IC-IR weights improve strategy performance vs universal weights?
 **Plans**: TBD
 
 ---
@@ -1477,8 +1484,11 @@ Plans:
 ### Phase 86: Portfolio Construction Pipeline
 **Goal:** End-to-end portfolio construction from IC scores through paper execution with GARCH-informed sizing
 **Depends on:** Phase 81 (GARCH vol), Phase 82 (bake-off winners)
+**Phase 80 Learnings (must address):**
+  - IC-IR scores vary significantly per asset — Black-Litterman views should use per-asset IC-IR from ic_results, not the universal average from feature_selection.yaml
+  - Active features are mostly AMA-derived — portfolio rebalance pipeline needs ama_multi_tf data loading alongside features table
 **Success Criteria** (what must be TRUE):
-  1. IC-IR scores feed Black-Litterman views automatically (not manual input)
+  1. IC-IR scores feed Black-Litterman views automatically — per-asset IC-IR from ic_results, not universal average
   2. Bet sizing uses GARCH conditional vol forecast for target-vol scaling
   3. Stop ladder calibrated per asset using MAE/MFE analysis from bake-off trades
   4. Paper executor dry run with refined signals produces fills matching backtest parity within tolerance
