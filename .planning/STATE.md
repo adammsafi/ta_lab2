@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 
 ## Current Position
 
-Phase: 82-signal-refinement-walk-forward-bakeoff (v1.2.0, 3/6 plans)
-Plan: 01, 02, and 03 of 06 complete
+Phase: 82-signal-refinement-walk-forward-bakeoff (v1.2.0, 4/6 plans)
+Plan: 01, 02, 03, and 04 of 06 complete
 Status: In progress
-Last activity: 2026-03-22 -- Completed 82-03-PLAN.md (YAML experiments, --exchange/--experiments-yaml/--experiment-name CLI, AMA param grids, per-asset IC-IR weight loaders)
+Last activity: 2026-03-22 -- Completed 82-04-PLAN.md (regime router AMA feature loading, conditional features, IC-IR weight helpers)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [#######---] 37% v1.2.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [########--] 50% v1.2.0
 
 ## Performance Metrics
 
@@ -47,6 +47,14 @@ v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
 - Hyperliquid slippage range 3/5/10 bps (vs Kraken 5/10/20): HL CLOB tighter spreads justify lower range
 - Separate SQL per AMA feature in load_strategy_data_with_ama(): avoids column name collisions, each feature independently debuggable
 - experiment_name VARCHAR(128) NULL default: backward-compatible; existing rows get NULL; Phase 82 runs tag with experiment names
+
+**Phase 82 decisions (plan 04):**
+- AMA features loaded per-asset then merged by (id, ts): consistent with Plan 01 pattern; avoids SQL column collisions
+- Conditional features excluded from global model X, added only to X_for_router: regime specialists use broader feature set
+- NaN rows dropped AFTER AMA join: AMA warmup shorter than features table history; left-join then dropna preserves all post-warmup bars
+- load_per_asset_ic_weights() uses asset_id column (confirmed from dashboard/queries/research.py)
+- Universal IC-IR as fallback in per-asset weights: missing per-asset data filled with yaml ic_ir_mean before normalization
+- ROADMAP criterion 2 satisfied: RegimeRouter.fit() called per CV fold with 20 active features; per-regime sub-models operational
 
 **Phase 82 decisions (plan 03):**
 - Expression signal param grid = [{holding_bars: hb}]: holding period is the only free param; expression encodes the full signal formula
@@ -120,10 +128,10 @@ None active.
 
 ## Session Continuity
 
-Last session: 2026-03-22T20:09:06Z
-Stopped at: Completed 82-03-PLAN.md (YAML experiments, bakeoff CLI extension, orchestrator AMA + per-asset IC-IR weight loaders)
+Last session: 2026-03-22T20:12:15Z
+Stopped at: Completed 82-04-PLAN.md (regime router AMA feature loading, conditional features, IC-IR weight helpers)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-22 (Phase 82 plan 03 complete)*
+*Last updated: 2026-03-22 (Phase 82 plan 04 complete)*
