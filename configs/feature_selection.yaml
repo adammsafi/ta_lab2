@@ -117,6 +117,15 @@ active:
   rationale: 'Active: IC-IR=1.222, pass_rate=0.96, INSUFFICIENT_DATA, no LB flag,
     monotonicity=0.000'
   stationarity: INSUFFICIENT_DATA
+- ic_ir_mean: 1.2203
+  ljung_box_flag: true
+  mean_abs_ic: 0.052
+  monotonicity: 0.8
+  name: bb_ma_20
+  pass_rate: 0.8551
+  rationale: 'Active (promoted): IC-IR=1.220, pass_rate=0.86, NON_STATIONARY (expected
+    for MA), soft gate override per user review'
+  stationarity: NON_STATIONARY
 - ic_ir_mean: 1.2147
   ljung_box_flag: false
   mean_abs_ic: 0.0508
@@ -1618,23 +1627,13 @@ conditional:
 metadata:
   generated_at: '2026-03-22T03:24:27.776854'
   ic_ir_cutoff: 1.0
-  n_features_active: 19
+  n_features_active: 20
   n_features_archive: 0
   n_features_conditional: 160
   n_features_total: 205
-  n_features_watch: 26
+  n_features_watch: 25
   no_signal_features: []
 watch:
-- ic_ir_mean: 1.2203
-  ljung_box_flag: true
-  mean_abs_ic: 0.052
-  monotonicity: 0.8
-  name: bb_ma_20
-  pass_rate: 0.8551
-  rationale: 'Watch: IC-IR=1.220, pass_rate=0.86, NON_STATIONARY, LB-flagged (serial
-    correlation), monotonicity=0.800; weak signal (IC-IR shortfall=-0.220 vs cutoff=1.0,
-    pass_rate below threshold)'
-  stationarity: NON_STATIONARY
 - ic_ir_mean: 0.3757
   ljung_box_flag: false
   mean_abs_ic: 0.1152
