@@ -14,14 +14,16 @@ NOTE on expanding-window re-optimization:
 
 Exports
 -------
-BakeoffConfig       - Configuration dataclass for a bake-off run
-StrategyResult      - Per-strategy result (aggregated across folds)
-BakeoffOrchestrator - Main orchestrator class with .run() entry point
-cost_scenario_label - Convert CostModel to descriptive label string
-build_t1_series     - Build label-end (t1) Series for CV splitters
-load_strategy_data  - Load OHLCV + indicator data from DB for a given asset/TF
+BakeoffConfig           - Configuration dataclass for a bake-off run
+StrategyResult          - Per-strategy result (aggregated across folds)
+BakeoffOrchestrator     - Main orchestrator class with .run() entry point
+cost_scenario_label     - Convert CostModel to descriptive label string
+build_t1_series         - Build label-end (t1) Series for CV splitters
+load_strategy_data      - Load OHLCV + indicator data from DB for a given asset/TF
+load_strategy_data_with_ama - Extended loader that joins AMA features onto base DataFrame
+parse_active_features   - Parse feature_selection.yaml into structured feature list
 run_purged_kfold_backtest - Run one strategy through purged K-fold CV
-run_cpcv_backtest   - Run one strategy through CPCV for PBO analysis
+run_cpcv_backtest       - Run one strategy through CPCV for PBO analysis
 """
 
 from __future__ import annotations
@@ -29,16 +31,23 @@ from __future__ import annotations
 import json
 import logging
 import math
+import os
 import warnings
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
+import yaml
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
-from ta_lab2.backtests.costs import CostModel
+from ta_lab2.backtests.costs import (  # noqa: F401 -- re-exported for callers
+    COST_MATRIX_REGISTRY,
+    HYPERLIQUID_COST_MATRIX,
+    KRAKEN_COST_MATRIX,
+    CostModel,
+)
 from ta_lab2.backtests.cv import CPCVSplitter, PurgedKFoldSplitter
 from ta_lab2.backtests.psr import compute_dsr, compute_psr
 
@@ -48,49 +57,6 @@ except ImportError:  # pragma: no cover
     vbt = None  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# Kraken cost matrix: 6 spot + 6 perps = 12 scenarios
-# Spot:  maker 0.16% (16 bps) x 3 slippage + taker 0.26% (26 bps) x 3 slippage
-# Perps: same fees + funding 0.01%/8h = 0.03% per day (3 bps/day) x 6 fee/slip combos
-# ---------------------------------------------------------------------------
-_SLIPPAGE_LEVELS = [5.0, 10.0, 20.0]  # bps
-_SPOT_MAKER_FEE_BPS = 16.0  # Kraken spot maker fee: 0.16% = 16 bps
-_SPOT_TAKER_FEE_BPS = 26.0  # Kraken spot taker fee: 0.26% = 26 bps
-_PERPS_MAKER_FEE_BPS = 2.0  # Kraken perps maker fee: 0.02% = 2 bps
-_PERPS_TAKER_FEE_BPS = 5.0  # Kraken perps taker fee: 0.05% = 5 bps
-_PERPS_FUNDING_BPS_DAY = 3.0  # 0.01%/8h * 3 = 0.03%/day = 3 bps/day
-
-KRAKEN_COST_MATRIX: List[CostModel] = (
-    [
-        # Spot maker scenarios (3): maker 16 bps x slippage 5/10/20
-        CostModel(fee_bps=_SPOT_MAKER_FEE_BPS, slippage_bps=slip, funding_bps_day=0.0)
-        for slip in _SLIPPAGE_LEVELS
-    ]
-    + [
-        # Spot taker scenarios (3): taker 26 bps x slippage 5/10/20
-        CostModel(fee_bps=_SPOT_TAKER_FEE_BPS, slippage_bps=slip, funding_bps_day=0.0)
-        for slip in _SLIPPAGE_LEVELS
-    ]
-    + [
-        # Perps maker scenarios (3): maker 2 bps + funding x slippage 5/10/20
-        CostModel(
-            fee_bps=_PERPS_MAKER_FEE_BPS,
-            slippage_bps=slip,
-            funding_bps_day=_PERPS_FUNDING_BPS_DAY,
-        )
-        for slip in _SLIPPAGE_LEVELS
-    ]
-    + [
-        # Perps taker scenarios (3): taker 5 bps + funding x slippage 5/10/20
-        CostModel(
-            fee_bps=_PERPS_TAKER_FEE_BPS,
-            slippage_bps=slip,
-            funding_bps_day=_PERPS_FUNDING_BPS_DAY,
-        )
-        for slip in _SLIPPAGE_LEVELS
-    ]
-)
 
 
 # ---------------------------------------------------------------------------
@@ -112,6 +78,9 @@ class BakeoffConfig:
     cost_matrix: List[CostModel] = field(default_factory=lambda: KRAKEN_COST_MATRIX)
     spot_only: bool = False  # if True, only run 6 spot scenarios
 
+    # Exchange selection (overrides cost_matrix when set)
+    exchange: str = "kraken"  # registry key: "kraken" or "hyperliquid"
+
     # Data settings
     price_col: str = "close"
     min_bars: int = 300  # minimum bars required to run walk-forward
@@ -123,6 +92,35 @@ class BakeoffConfig:
         if self.spot_only:
             return [c for c in self.cost_matrix if c.funding_bps_day == 0.0]
         return self.cost_matrix
+
+
+def get_cost_matrix_for_exchange(exchange: str) -> List[CostModel]:
+    """
+    Look up cost matrix from COST_MATRIX_REGISTRY by exchange name.
+
+    Parameters
+    ----------
+    exchange : str
+        Exchange name (e.g. "kraken", "hyperliquid"). Case-insensitive.
+
+    Returns
+    -------
+    List[CostModel]
+        Cost matrix for the requested exchange.
+
+    Raises
+    ------
+    KeyError
+        If the exchange is not found in COST_MATRIX_REGISTRY.
+    """
+    key = exchange.lower()
+    if key not in COST_MATRIX_REGISTRY:
+        available = list(COST_MATRIX_REGISTRY.keys())
+        raise KeyError(
+            f"Exchange '{exchange}' not found in COST_MATRIX_REGISTRY. "
+            f"Available: {available}"
+        )
+    return COST_MATRIX_REGISTRY[key]
 
 
 @dataclass
@@ -260,6 +258,186 @@ def load_strategy_data(engine: Engine, asset_id: int, tf: str) -> pd.DataFrame:
     logger.info(
         f"Loaded {len(df)} bars for asset_id={asset_id}, tf={tf}, "
         f"range={df.index[0].date()}..{df.index[-1].date()}"
+    )
+    return df
+
+
+def parse_active_features(
+    yaml_path: str = "configs/feature_selection.yaml",
+) -> List[Dict[str, Any]]:
+    """
+    Parse active tier features from feature_selection.yaml.
+
+    Returns a list of dicts with keys:
+      - name: feature column name (e.g. "TEMA_0fca19a1_ama")
+      - indicator: indicator type (e.g. "TEMA")
+      - params_hash: 8-char hex hash (e.g. "0fca19a1")
+      - source: "ama_multi_tf_u" for _ama features, "features" for bar-level features
+
+    AMA feature naming convention: {INDICATOR}_{PARAMS_HASH}_ama
+    Bar-level features: ret_is_outlier, bb_ma_20, close_fracdiff (live in features table)
+    """
+    # Resolve path relative to working directory or project root
+    if not os.path.isabs(yaml_path):
+        # Try cwd first, then search upward for configs/
+        candidate = yaml_path
+        if not os.path.exists(candidate):
+            # Walk up to find project root with configs/ dir
+            cwd = os.getcwd()
+            parts = cwd.replace("\\", "/").split("/")
+            for i in range(len(parts), 0, -1):
+                root = "/".join(parts[:i])
+                candidate = os.path.join(root, yaml_path)
+                if os.path.exists(candidate):
+                    break
+            else:
+                candidate = yaml_path  # fallback, will raise FileNotFoundError
+
+    with open(candidate, "r", encoding="utf-8") as fh:
+        config = yaml.safe_load(fh)
+
+    active_entries = config.get("active", [])
+    features = []
+
+    for entry in active_entries:
+        name = entry["name"]
+
+        if name.endswith("_ama"):
+            # AMA feature: {INDICATOR}_{PARAMS_HASH}_ama
+            # Strip the trailing _ama suffix, then split on _ to get indicator + hash
+            body = name[:-4]  # remove "_ama"
+            # params_hash is always 8 hex chars; indicator is everything before the last _
+            last_underscore = body.rfind("_")
+            if last_underscore == -1:
+                logger.warning(f"Cannot parse AMA feature name: {name}; skipping")
+                continue
+            indicator = body[:last_underscore]
+            params_hash = body[last_underscore + 1 :]
+            features.append(
+                {
+                    "name": name,
+                    "indicator": indicator,
+                    "params_hash": params_hash,
+                    "source": "ama_multi_tf_u",
+                }
+            )
+        else:
+            # Bar-level feature: lives in the features table
+            features.append(
+                {
+                    "name": name,
+                    "indicator": name,
+                    "params_hash": "",
+                    "source": "features",
+                }
+            )
+
+    return features
+
+
+def load_strategy_data_with_ama(
+    engine: Engine,
+    asset_id: int,
+    tf: str,
+    ama_features: Optional[List[Dict[str, Any]]] = None,
+    yaml_path: str = "configs/feature_selection.yaml",
+) -> pd.DataFrame:
+    """
+    Load OHLCV + indicator data + AMA-derived features from DB.
+
+    Extends load_strategy_data() by joining AMA features from ama_multi_tf_u
+    onto the base DataFrame. Bar-level features (ret_is_outlier, bb_ma_20,
+    close_fracdiff) are already loaded by the base function from the features
+    table.
+
+    Parameters
+    ----------
+    engine : Engine
+        SQLAlchemy engine.
+    asset_id : int
+        Asset ID (e.g. 1 for BTC).
+    tf : str
+        Timeframe (e.g. "1D").
+    ama_features : list of dict, optional
+        Feature descriptors with keys: name, indicator, params_hash, source.
+        If None, calls parse_active_features(yaml_path) to load from YAML.
+    yaml_path : str
+        Path to feature_selection.yaml (used only if ama_features is None).
+
+    Returns
+    -------
+    pd.DataFrame
+        Indexed by ts (UTC-aware). Contains all OHLCV + local indicators +
+        active AMA features joined on ts index.
+    """
+    if ama_features is None:
+        ama_features = parse_active_features(yaml_path)
+
+    # Load base OHLCV + bar-level indicators
+    df = load_strategy_data(engine, asset_id, tf)
+
+    if df.empty:
+        return df
+
+    # Join each AMA feature from ama_multi_tf_u
+    ama_only = [f for f in ama_features if f["source"] == "ama_multi_tf_u"]
+
+    for feat in ama_only:
+        feat_name = feat["name"]
+        indicator = feat["indicator"]
+        params_hash_prefix = feat["params_hash"][:8]
+
+        sql = text(
+            """
+            SELECT ts, ama AS feature_val
+            FROM public.ama_multi_tf_u
+            WHERE id = :asset_id
+              AND venue_id = 1
+              AND tf = :tf
+              AND indicator = :indicator
+              AND LEFT(params_hash, 8) = :params_hash
+            ORDER BY ts
+            """
+        )
+
+        with engine.connect() as conn:
+            feat_df = pd.read_sql(
+                sql,
+                conn,
+                params={
+                    "asset_id": asset_id,
+                    "tf": tf,
+                    "indicator": indicator,
+                    "params_hash": params_hash_prefix,
+                },
+            )
+
+        if feat_df.empty:
+            logger.warning(
+                f"No AMA data for feature '{feat_name}' "
+                f"(asset_id={asset_id}, tf={tf}, indicator={indicator}, "
+                f"params_hash={params_hash_prefix})"
+            )
+            df[feat_name] = float("nan")
+            continue
+
+        # Apply MEMORY.md gotcha: use pd.to_datetime with utc=True for tz-aware index
+        feat_df["ts"] = pd.to_datetime(feat_df["ts"], utc=True)
+        feat_df = feat_df.set_index("ts")["feature_val"].rename(feat_name)
+
+        # Left-join onto base DataFrame (preserves all base rows)
+        df = df.join(feat_df, how="left")
+
+        logger.debug(
+            f"Joined AMA feature '{feat_name}': {feat_df.notna().sum()} non-null values"
+        )
+
+    n_ama = len(ama_only)
+    n_bar = len([f for f in ama_features if f["source"] == "features"])
+    logger.info(
+        f"load_strategy_data_with_ama: asset_id={asset_id}, tf={tf}, "
+        f"{n_ama} AMA features + {n_bar} bar-level features joined, "
+        f"total columns={len(df.columns)}"
     )
     return df
 
@@ -825,8 +1003,21 @@ class BakeoffOrchestrator:
             )
             return result.fetchone() is not None
 
-    def _persist_results(self, sr: StrategyResult) -> None:
-        """Persist a StrategyResult to strategy_bakeoff_results."""
+    def _persist_results(
+        self, sr: StrategyResult, experiment_name: Optional[str] = None
+    ) -> None:
+        """
+        Persist a StrategyResult to strategy_bakeoff_results.
+
+        Parameters
+        ----------
+        sr : StrategyResult
+            Aggregated bake-off result to persist.
+        experiment_name : str, optional
+            Experiment lineage tag (e.g. "phase82-ema-v1"). Stored in
+            strategy_bakeoff_results.experiment_name for lineage tracking.
+            When None, inserts NULL.
+        """
         params_json = json.dumps(sr.params, sort_keys=True)
 
         # Build fold_metrics_json
@@ -854,7 +1045,8 @@ class BakeoffOrchestrator:
                 n_folds, embargo_bars,
                 sharpe_mean, sharpe_std, max_drawdown_mean, max_drawdown_worst,
                 total_return_mean, cagr_mean, trade_count_total, turnover,
-                psr, dsr, psr_n_obs, pbo_prob, fold_metrics_json
+                psr, dsr, psr_n_obs, pbo_prob, fold_metrics_json,
+                experiment_name
             )
             VALUES (
                 :strategy_name, :asset_id, :tf,
@@ -863,7 +1055,8 @@ class BakeoffOrchestrator:
                 :sharpe_mean, :sharpe_std, :max_drawdown_mean, :max_drawdown_worst,
                 :total_return_mean, :cagr_mean, :trade_count_total, :turnover,
                 :psr, :dsr, :psr_n_obs, :pbo_prob,
-                CAST(:fold_metrics_json AS jsonb)
+                CAST(:fold_metrics_json AS jsonb),
+                :experiment_name
             )
             ON CONFLICT (strategy_name, asset_id, tf, params_json, cost_scenario, cv_method)
             DO UPDATE SET
@@ -882,6 +1075,7 @@ class BakeoffOrchestrator:
                 psr_n_obs = EXCLUDED.psr_n_obs,
                 pbo_prob = EXCLUDED.pbo_prob,
                 fold_metrics_json = EXCLUDED.fold_metrics_json,
+                experiment_name = EXCLUDED.experiment_name,
                 computed_at = now()
             """
         )
@@ -911,6 +1105,7 @@ class BakeoffOrchestrator:
                     "psr_n_obs": _to_python(sr.psr_n_obs),
                     "pbo_prob": _to_python(sr.pbo_prob),
                     "fold_metrics_json": fold_metrics_json,
+                    "experiment_name": experiment_name,
                 },
             )
 
