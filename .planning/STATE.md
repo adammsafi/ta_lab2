@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 
 ## Current Position
 
-Phase: 83-dashboard-backtest-signal-pages (v1.2.0, 4/5 plans)
-Plan: 4 of 5 complete
-Status: In progress
-Last activity: 2026-03-23 -- Completed 83-04-PLAN.md (Asset Hub page + OHLCV candlestick upgrade in Research Explorer)
+Phase: 83-dashboard-backtest-signal-pages (v1.2.0, COMPLETE)
+Plan: 5 of 5 complete
+Status: Complete
+Last activity: 2026-03-23 -- Completed Phase 83 (all 5 plans, verified)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [########--] 52% v1.2.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [########--] 56% v1.2.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 372
+- Total plans completed: 377
 - Average duration: 7 min
-- Total execution time: ~29.8 hours
+- Total execution time: ~30.2 hours
 
 **Recent Trend:**
 - v0.8.0: 6 phases, 16 plans, ~1.2 hours
@@ -29,7 +29,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 - v1.0.0: 22 phases, 104 plans, ~14.5 hours
 - v1.0.1: 10 phases, 29 plans, ~2.0 hours
 - v1.1.0: 6 phases, 21 plans, ~2.5 hours
-- v1.2.0 (in progress): Phase 80 = 5 plans (~35 min), Phase 81 = 5 plans (~40 min), Phase 82 = 6 plans (~7h incl execution), Phase 83 plans 01+02+03+04 = 20 min
+- v1.2.0 (in progress): Phase 80 = 5 plans (~35 min), Phase 81 = 5 plans (~40 min), Phase 82 = 6 plans (~7h incl execution), Phase 83 = 5 plans (~25 min)
 - Trend: Stable (~5-7 min/plan)
 
 *Updated after each plan completion*
@@ -55,12 +55,16 @@ v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
 - Equity sparklines in Strategy-First load fold_metrics for top 3 assets only (3 DB queries per expander when opened)
 - ruff-format pre-commit hook reformatted file on first commit; re-staged and committed clean (standard pattern)
 
+**Phase 83 decisions (plan 05):**
+- 4 sidebar groups (Overview, Analysis, Operations, Monitor): replaced 6 organic groups with logical structure
+- Asset Hub listed first in Analysis group as primary entry point
+- Verifier fix: added s.feature_snapshot and s.regime_key to _SIGNAL_COLUMNS and load_closed_signals_for_strategy queries
+
 **Phase 83 decisions (plan 03):**
 - compute_signal_strength: base=20 + EMA separation (0-30) + RSI extremity (0-30) + ATR magnitude (0-20); all .get() access
 - Sidebar outside fragment, passed as arguments: prevents Streamlit widget-inside-fragment error
 - go.Heatmap: encode direction to numeric (long=1, short=-1, none=0) with custom colorscale (red/dark-gray/green)
 - Cards view capped at 30 signals with informational caption to avoid render overload
-- feature_snapshot absent from signals query -- signal_strength defaults to 50 when column missing from DataFrame
 
 **Phase 83 decisions (plan 01):**
 - ttl=3600 for bakeoff data (rarely regenerated), ttl=300 for signal data (updates during daily refresh)
@@ -157,10 +161,10 @@ None active.
 
 ## Session Continuity
 
-Last session: 2026-03-23T13:52:45Z
-Stopped at: Completed 83-04-PLAN.md (Asset Hub page + OHLCV candlestick upgrade in Research Explorer)
+Last session: 2026-03-23T15:00:00Z
+Stopped at: Completed Phase 83 (all 5 plans, verified)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-23 (Phase 83 plan 04 complete)*
+*Last updated: 2026-03-23 (Phase 83 complete)*
