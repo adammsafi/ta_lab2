@@ -208,51 +208,29 @@ _AMA_STRATEGY_NAMES: frozenset[str] = frozenset(
 )
 
 
-def _make_expression_signal(
-    expression: str,
-    holding_bars: int,
-) -> Callable:
+class _ExpressionSignal:
+    """Picklable signal function for expression engine experiments.
+
+    Replaces the closure-based ``_make_expression_signal`` so that the signal
+    function can be serialised by ``multiprocessing`` when ``--workers > 1``.
     """
-    Create a bake-off signal function from an expression engine expression.
 
-    The returned function has signature:
-        (df: pd.DataFrame, **params) -> (entries, exits, size)
+    def __init__(self, expression: str, holding_bars: int) -> None:
+        self.expression = expression
+        self.holding_bars = holding_bars
+        self.__name__ = f"expression_signal_hb{holding_bars}"
 
-    Signal logic:
-        entries = expression_value > 0
-        exits   = expression_value < 0
-        size    = None (equal-weight sizing)
-
-    The expression is evaluated via evaluate_expression() against the full
-    DataFrame (which must include all $col columns referenced). The holding_bars
-    parameter is used by the bake-off orchestrator via t1_series (not enforced
-    here -- t1_series length is set externally per experiment).
-
-    Parameters
-    ----------
-    expression : str
-        Expression engine $col-syntax expression string.
-    holding_bars : int
-        Holding period in bars (informational; used to key param grids).
-
-    Returns
-    -------
-    Callable
-        Signal function for use in strategies dict.
-    """
-    from ta_lab2.ml.expression_engine import evaluate_expression
-
-    def signal_fn(
+    def __call__(
+        self,
         df: Any,
         **params: Any,
     ) -> Tuple[Any, Any, None]:
-        signal_series = evaluate_expression(expression, df)
+        from ta_lab2.ml.expression_engine import evaluate_expression
+
+        signal_series = evaluate_expression(self.expression, df)
         entries = signal_series > 0
         exits = signal_series < 0
         return entries.fillna(False), exits.fillna(False), None
-
-    signal_fn.__name__ = f"expression_signal_hb{holding_bars}"
-    return signal_fn
 
 
 def _load_experiments_yaml(
@@ -287,9 +265,9 @@ def _load_experiments_yaml(
         # Build param grid: one entry per holding period
         param_grid = [{"holding_bars": hb} for hb in holding_bars_list]
 
-        # Create signal function for this expression
+        # Create picklable signal function for this expression
         # Use the first holding_bars as the label for __name__
-        signal_fn = _make_expression_signal(expression, holding_bars_list[0])
+        signal_fn = _ExpressionSignal(expression, holding_bars_list[0])
 
         experiments[exp_name] = (signal_fn, param_grid)
         logger.info(
@@ -672,6 +650,7 @@ def _run_phase82_bakeoff(engine: Any, args: Any) -> None:
         spot_only=args.spot_only,
         exchange=args.exchange,
         overwrite=args.overwrite,
+        cpcv_top_n=getattr(args, "cpcv_top_n", 0),
     )
 
     # --- Dry run: show combination count and exit ---
@@ -713,6 +692,7 @@ def _run_phase82_bakeoff(engine: Any, args: Any) -> None:
                 tf=args.tf,
                 ama_features=ama_features,
                 experiment_name=args.experiment_name,
+                workers=getattr(args, "workers", 1),
             )
             all_results.extend(results)
     else:
@@ -723,6 +703,7 @@ def _run_phase82_bakeoff(engine: Any, args: Any) -> None:
             tf=args.tf,
             ama_features=ama_features,
             experiment_name=args.experiment_name,
+            workers=getattr(args, "workers", 1),
         )
 
     logger.info(f"Bake-off complete: {len(all_results)} result rows generated")
@@ -986,6 +967,22 @@ def main() -> None:
         "--overwrite",
         action="store_true",
         help="Overwrite existing results in strategy_bakeoff_results.",
+    )
+
+    # Performance
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="Parallel worker processes (default: 1 = sequential). "
+        "Each worker creates its own DB connection via NullPool.",
+    )
+    parser.add_argument(
+        "--cpcv-top-n",
+        type=int,
+        default=0,
+        help="Run CPCV only on top N param sets by PKF Sharpe "
+        "(0=all, -1=skip CPCV entirely).",
     )
 
     # Logging
