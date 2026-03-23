@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 
 ## Current Position
 
-Phase: 82-signal-refinement-walk-forward-bakeoff (v1.2.0, 6/6 plans) COMPLETE
-Plan: All 6 plans complete
-Status: Complete
-Last activity: 2026-03-23 -- Completed 82-06-PLAN.md (strategy selection with statistical gates, 687 survivors from 76K results)
+Phase: 83-dashboard-backtest-signal-pages (v1.2.0, 1/5 plans)
+Plan: 1 of 5 complete
+Status: In progress
+Last activity: 2026-03-23 -- Completed 83-01-PLAN.md (query foundation + chart builders for backtest/signal pages)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [########--] 50% v1.2.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [########--] 52% v1.2.0
 
 ## Performance Metrics
 
@@ -29,7 +29,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 - v1.0.0: 22 phases, 104 plans, ~14.5 hours
 - v1.0.1: 10 phases, 29 plans, ~2.0 hours
 - v1.1.0: 6 phases, 21 plans, ~2.5 hours
-- v1.2.0 (in progress): Phase 80 = 5 plans (~35 min), Phase 81 = 5 plans (~40 min), Phase 82 = 6 plans (~7h incl execution)
+- v1.2.0 (in progress): Phase 80 = 5 plans (~35 min), Phase 81 = 5 plans (~40 min), Phase 82 = 6 plans (~7h incl execution), Phase 83 plan 01 = 7 min
 - Trend: Stable (~5-7 min/plan)
 
 *Updated after each plan completion*
@@ -41,6 +41,15 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 Decisions are logged in PROJECT.md Key Decisions table.
 
 v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
+
+**Phase 83 decisions (plan 01):**
+- ttl=3600 for bakeoff data (rarely regenerated), ttl=300 for signal data (updates during daily refresh)
+- fold_metrics_json is JSONB -- psycopg2 auto-deserializes to Python list; do NOT json.loads() the result
+- _SIGNAL_COLUMNS constant ensures all 3 UNION ALL sub-SELECTs have identical schemas
+- AMA strategy names (ama_*) route to signals_ema_crossover (AMA bakeoff reuses EMA signal lifecycle tracking)
+- make_interval(days => :days) for parameterized interval in signal history queries (prevents injection)
+- build_signal_timeline_chart: horizontal bars via go.Bar orientation=h with base=[entry_ts]
+- build_equity_sparkline: additive cumulative sum of fold total_return (not compound return) -- adequate for sparkline
 
 **Phase 82 decisions (plan 01):**
 - KRAKEN_COST_MATRIX moved to costs.py (proper home for cost constants); re-exported from orchestrator for zero breaking changes
@@ -128,8 +137,8 @@ None active.
 
 ## Session Continuity
 
-Last session: 2026-03-23T08:00:00Z
-Stopped at: Completed Phase 82 (all 6 plans, 76K bakeoff results, 9 surviving strategies)
+Last session: 2026-03-23T13:44:30Z
+Stopped at: Completed 83-01-PLAN.md (query layers + chart builders for Phase 83 dashboard pages)
 Resume file: None
 
 ---
