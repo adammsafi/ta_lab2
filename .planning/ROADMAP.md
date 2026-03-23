@@ -11,7 +11,7 @@
 - v1.0.0 V1 Closure — Paper Trading & Validation (Phases 42-63) - SHIPPED 2026-03-01
 - v1.0.1 Macro Regime Infrastructure (Phases 64-73) - SHIPPED 2026-03-03
 - v1.1.0 Pipeline Consolidation & Storage Optimization (Phases 74-79) - SHIPPED 2026-03-21
-- v1.2.0 Analysis → Live Signals (Phases 80-88) - PLANNED
+- v1.2.0 Analysis → Live Signals (Phases 80-92) - PLANNED
 
 ## Overview
 
@@ -29,7 +29,7 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 - Phases 42-63: v1.0.0 (SHIPPED 2026-03-01)
 - Phases 64-73: v1.0.1 (SHIPPED 2026-03-03)
 - Phases 74-79: v1.1.0 (SHIPPED 2026-03-21)
-- Phases 80-88: v1.2.0 (planned)
+- Phases 80-92: v1.2.0 (planned)
 - Decimal phases (27.1, 28.1): Urgent insertions if needed
 
 <details>
@@ -1384,6 +1384,10 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 - [ ] **Phase 86: Portfolio Construction Pipeline** - IC-IR → Black-Litterman views, bet sizing with GARCH vol, stop ladder tuning, paper executor dry run
 - [ ] **Phase 87: Live Pipeline & Alert Wiring** - Daily pipeline end-to-end: signals → validation → executor → drift → alerts, IC staleness monitoring
 - [ ] **Phase 88: Integration Testing & Go-Live** - End-to-end smoke tests, 1-week paper trading burn-in, runbook updates, v1.2.0 tag
+- [ ] **Phase 89: CTF Schema & Dimension Table** - Alembic migration for dim_ctf_indicators + ctf tables, seed indicators from ta/vol/returns/features, create ctf_config.yaml
+- [ ] **Phase 90: CTF Core Computation Module** - CTFFeature class: batch indicator loading, merge_asof alignment, slope/divergence/agreement/crossover composites, scoped DELETE+INSERT writes
+- [ ] **Phase 91: CTF CLI & Pipeline Integration** - refresh_ctf.py CLI script, Phase 1b integration into run_all_feature_refreshes.py, incremental refresh support
+- [ ] **Phase 92: CTF IC Analysis & Feature Selection** - load_ctf_features() pivot loader, IC analysis on CTF features, compare vs AMA features, prune config to high-IC combinations
 
 ## v1.2.0 Phase Details
 
@@ -1552,5 +1556,68 @@ Plans:
 
 
 ---
+
+### Phase 89: CTF Schema & Dimension Table
+**Goal:** Establish the database foundation for cross-timeframe feature infrastructure — dimension table, fact table, seed data, and declarative YAML config
+**Depends on:** Phase 80 (feature selection results inform initial indicator set)
+**Success Criteria** (what must be TRUE):
+  1. `dim_ctf_indicators` table created with SMALLINT PK, indicator_name, source_table, source_column, is_directional, is_active columns
+  2. Seeded with ~20+ indicators from ta (MACD, RSI, ADX, BB, Stoch, ATR), vol (Parkinson, GK, RS, log_vol), returns (ret_arith, ret_log), features (fracdiff, sadf_stat)
+  3. `ctf` fact table created with PK (id, venue_id, ts, base_tf, ref_tf, indicator_id, alignment_source), value columns (ref_value, base_value, slope, divergence, agreement, crossover), FK to dim_ctf_indicators and dim_venues
+  4. Indexes: ix_ctf_lookup (id, base_tf, ref_tf, indicator_id, ts) and ix_ctf_indicator (indicator_id, base_tf)
+  5. `configs/ctf_config.yaml` created with tf_pairs, indicators by source table, composite parameters (slope_window=5, divergence_zscore_window=63)
+  6. Alembic migration passes `alembic upgrade head` cleanly
+**Plans:** 1 plan
+Plans:
+- [ ] 89-01-PLAN.md -- Alembic migration (dim_ctf_indicators + ctf tables + seed) + ctf_config.yaml
+
+---
+
+### Phase 90: CTF Core Computation Module
+**Goal:** Build the generic cross-timeframe computation engine that loads indicators from any source table, aligns across timeframes, and computes composites
+**Depends on:** Phase 89 (schema + config must exist)
+**Success Criteria** (what must be TRUE):
+  1. `src/ta_lab2/features/cross_timeframe.py` with CTFConfig dataclass and CTFFeature class
+  2. `_load_indicators_batch()` loads ALL indicators from a source table in one query (not N queries per indicator)
+  3. `_align_timeframes()` uses `pd.merge_asof(direction='backward')`, reusing `build_alignment_frame()` from regimes/comovement.py
+  4. `_compute_slope()` uses vectorized rolling polyfit over configurable slope_window
+  5. `_compute_divergence()` computes (base - ref) / rolling_std with configurable z-score window
+  6. `_compute_agreement()` and `_compute_crossover()` respect `is_directional` flag from dim_ctf_indicators
+  7. `compute_for_ids()` orchestrates load → align → compute → write for all configured (base_tf, ref_tf, indicator) combinations
+  8. Write uses scoped DELETE + INSERT pattern matching existing BaseFeature convention
+  9. Manual test: `CTFFeature.compute_for_ids([1])` for BTC at 1D→7D produces correct rows in ctf table
+**Plans**: TBD
+
+---
+
+### Phase 91: CTF CLI & Pipeline Integration
+**Goal:** Wire CTF computation into the daily refresh pipeline with a standalone CLI script and Phase 1b integration
+**Depends on:** Phase 90 (core module must work)
+**Success Criteria** (what must be TRUE):
+  1. `src/ta_lab2/scripts/features/refresh_ctf.py` CLI with --ids, --all, --base-tf, --ref-tfs, --indicators, --full-refresh flags
+  2. `python -m ta_lab2.scripts.features.refresh_ctf --ids 1 --base-tf 1D` completes successfully
+  3. `python -m ta_lab2.scripts.features.refresh_ctf --all --base-tf 1D` processes all 109 assets
+  4. Phase 1b added to `run_all_feature_refreshes.py`: runs after vol/ta (Phase 1), before features materialization (Phase 2)
+  5. `python -m ta_lab2.scripts.features.run_all_feature_refreshes --ids 1 --tf 1D` logs CTF phase completion
+  6. Incremental refresh: re-run only computes new dates (watermark-based skip)
+  7. Disk usage within expected range (~11 GB for initial config of 20 indicators × 11 TF pairs)
+**Plans**: TBD
+
+---
+
+### Phase 92: CTF IC Analysis & Feature Selection
+**Goal:** Score CTF features through the existing IC pipeline, identify which cross-timeframe indicators have genuine predictive power, and prune config to high-IC combinations
+**Depends on:** Phase 91 (CTF data must be populated), Phase 80 (IC analysis tools)
+**Success Criteria** (what must be TRUE):
+  1. `load_ctf_features()` pivot function in cross_timeframe.py: loads normalized ctf rows, pivots to wide format (one column per indicator×ref_tf×composite), returns DataFrame compatible with batch_compute_ic()
+  2. IC analysis completed for all CTF features on BTC (id=1) at 1D base_tf
+  3. Multi-asset IC analysis across top 10 assets by data coverage
+  4. CTF features classified through existing feature_selection.py tier system (active/conditional/watch/archive)
+  5. Comparison report: CTF feature IC-IR vs AMA feature IC-IR — quantifies whether CTF adds non-redundant alpha
+  6. ctf_config.yaml pruned to retain only high-IC indicator×ref_tf combinations (save disk)
+  7. Results persisted to dim_feature_selection alongside existing Phase 80 entries
+**Plans**: TBD
+
+---
 *Created: 2025-01-22*
-*Last updated: 2026-03-21 (v1.2.0 milestone roadmap defined: phases 80-88)*
+*Last updated: 2026-03-23 (CTF infrastructure phases 89-92 added)*
