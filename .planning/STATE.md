@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 ## Current Position
 
 Phase: 84-dashboard-perps-portfolio-regimes (v1.2.0, In Progress)
-Plan: 1 of 5 complete
+Plan: 4 of 5 complete
 Status: In progress
-Last activity: 2026-03-23 -- Completed 84-01 (Hyperliquid Perps dashboard page)
+Last activity: 2026-03-23 -- Completed 84-04 (Portfolio Allocation placeholder page)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [########--] 58% v1.2.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [########--] 61% v1.2.0
 
 ## Performance Metrics
 
@@ -42,6 +42,13 @@ Decisions are logged in PROJECT.md Key Decisions table.
 
 v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
 
+**Phase 84 decisions (plan 02):**
+- trend_state derived via split_part(l2_label, '-', 1) in SQL: regimes table has no trend_state column
+- REGIME_BAR_COLORS from charts.py used to build _HEATMAP_COLORSCALE: consistent color constants across dashboard
+- regime_comovement displayed as st.dataframe only (NOT network graph): only 21 rows (7 assets x 3 EMA pairs), infeasible as network
+- Weekly binning for heatmap x-axis (mode per symbol/week): reduces noise vs daily while preserving trend visibility
+- ruff-format reformatted page on first commit (long line): re-staged and committed clean (standard pattern)
+
 **Phase 84 decisions (plan 01):**
 - hl_open_interest (82K rows, Coinalyze) for OI time series; hl_oi_snapshots has only 3 timestamps (2026-03-11) -- not a time series
 - interval='1d' only for hl_candles candle chart; interval='1h' covers only 3 days for most assets
@@ -49,6 +56,12 @@ v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
 - make_subplots(shared_xaxes=True, rows=2) for candle+OI stacked layout; conditional has_oi check for 1-row vs 2-row
 - perp_options dict passed as argument into @st.fragment to avoid re-loading inside auto-refresh cycle
 - cross-schema SQL pattern: always prefix HL tables with hyperliquid.* -- hl_assets.asset_id != public.dim_assets.id
+
+**Phase 84 decisions (plan 04):**
+- Placeholder page pattern: st.info() banner + TODO(Phase-XX) comments + get_engine import (noqa: F401) reserved for future wiring
+- strategy_colors dict removed (F841 ruff violation): stacked bar uses Plotly default colorwheel instead
+- Risk tier thresholds: <60% used = green, 60-85% = yellow, >=85% = red (standard risk budget convention)
+- noqa: F401 on get_engine import preserves Phase 86 DB integration hook without triggering unused import lint
 
 **Phase 83 decisions (plan 04):**
 - ema aliased as ema_value in load_ema_overlays: matches build_candlestick_chart expected column without modifying charts.py
@@ -169,8 +182,8 @@ None active.
 
 ## Session Continuity
 
-Last session: 2026-03-23T16:37:11Z
-Stopped at: Completed 84-01-PLAN.md (Hyperliquid Perps dashboard page)
+Last session: 2026-03-23T16:38:20Z
+Stopped at: Completed 84-02-PLAN.md (Regime Heatmap page)
 Resume file: None
 
 ---
