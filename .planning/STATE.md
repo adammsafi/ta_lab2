@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 
 ## Current Position
 
-Phase: 89-ctf-schema-dimension-table (v1.2.0, In Progress) [parallel with 84]
+Phase: 89-ctf-schema-dimension-table (v1.2.0, Complete) [parallel with 84]
 Plan: 1 of 1 complete (01 done)
-Status: In progress (Phase 84 also in progress in parallel)
-Last activity: 2026-03-23 -- Completed 89-01 (CTF schema: dim_ctf_indicators + ctf tables + ctf_config.yaml)
+Status: Complete (verified 6/6 must-haves). Phase 84 still in progress in parallel.
+Last activity: 2026-03-23 -- Phase 89 complete (CTF schema: dim_ctf_indicators + ctf tables + ctf_config.yaml)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [########--] 61% v1.2.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 377
+- Total plans completed: 378
 - Average duration: 7 min
 - Total execution time: ~30.2 hours
 
