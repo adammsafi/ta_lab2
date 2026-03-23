@@ -23,6 +23,13 @@ from ta_lab2.dashboard.queries.risk import load_risk_state
 st.header("Dashboard Home")
 st.caption("Pipeline health + research highlights at a glance")
 
+# Engine init (Phase 83/84 pattern)
+try:
+    engine = get_engine()
+except Exception as exc:
+    st.error(f"Database connection failed: {exc}")
+    st.stop()
+
 # ---------------------------------------------------------------------------
 # Two-column layout: Pipeline Health (left) | Research Highlights (right)
 # ---------------------------------------------------------------------------
@@ -36,7 +43,6 @@ with col_left:
 
     # -- Freshness metrics ---------------------------------------------------
     try:
-        engine = get_engine()
         freshness_df = load_table_freshness(engine)
 
         if freshness_df.empty:
@@ -65,7 +71,6 @@ with col_left:
 
     # -- Stats pass rate -----------------------------------------------------
     try:
-        engine = get_engine()
         stats_data = load_stats_status(engine)
 
         total_pass = sum(v.get("PASS", 0) for v in stats_data.values())
@@ -86,8 +91,6 @@ with col_right:
     st.subheader("Top IC Scores")
 
     try:
-        engine = get_engine()
-
         # Use BTC (asset_id=1) for IC scores -- most representative asset
         asset_id = 1
 
@@ -119,7 +122,6 @@ st.divider()
 st.subheader("Operational Health")
 
 try:
-    engine = get_engine()
     risk_state = load_risk_state(engine)
 
     now_utc = datetime.now(timezone.utc)
