@@ -1505,12 +1505,12 @@ Plans:
 **Goal:** Existing dashboard issues fixed, UI consistent across all pages (old + new)
 **Depends on:** Phase 83, Phase 84 (all new pages exist before polish pass)
 **Success Criteria** (what must be TRUE):
-  1. Cache TTL sidebar slider actually controls query cache TTLs (not decorative)
+  1. Decorative cache TTL slider removed from sidebar, replaced with factual cache tier caption and Refresh button (Streamlit @st.cache_data TTL is a static decorator — dynamic control is not feasible)
   2. Stats table allowlist in pipeline.py auto-discovers from information_schema instead of hardcoded list
   3. Drawdown calculation uses portfolio starting value, not just cumulative PnL peak
-  4. Consistent color scheme, card styling, and alert banner placement across all 14+ pages
-  5. Navigation groups in app.py updated to reflect new page categories
-**Plans:** 2 plans
+  4. Older pages (landing, pipeline monitor) aligned to Phase 83/84 engine-init and layout patterns; Phase 83/84 pages already consistent
+  5. Navigation groups in app.py reorganized to separate Research, Markets, Operations, and Monitor
+**Plans:** 2 plans in 1 wave
 Plans:
 - [ ] 85-01-PLAN.md -- Backend query fixes (cache TTL slider, stats auto-discovery, drawdown calculation)
 - [ ] 85-02-PLAN.md -- Page consistency (engine init consolidation, stats row counts, drawdown KPI dollars)
