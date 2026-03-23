@@ -670,31 +670,50 @@ def _run_phase82_bakeoff(engine: Any, args: Any) -> None:
     logger.info("Starting bake-off execution...")
     orchestrator = BakeoffOrchestrator(engine=engine, config=config)
 
-    # For each asset, optionally inject per-asset weighted strategy variant
-    if per_asset_weight_matrix is not None:
-        # Run asset by asset so we can inject per-asset weights
-        _mom_fn, _mom_grid = strategies["ama_momentum"]
-        for asset_id in asset_ids:
-            asset_strategies = dict(strategies)
-            if asset_id in per_asset_weight_matrix.index:
-                asset_weights = per_asset_weight_matrix.loc[asset_id].tolist()
-                perasset_fn = _make_weighted_ama_momentum(asset_weights)
-                asset_strategies["ama_momentum_perasset"] = (perasset_fn, _mom_grid)
-            else:
-                logger.debug(
-                    f"No per-asset weights for asset_id={asset_id}; "
-                    f"skipping ama_momentum_perasset for this asset"
-                )
+    workers = getattr(args, "workers", 1)
 
-            results = orchestrator.run(
-                strategies=asset_strategies,
-                asset_ids=[asset_id],
+    if per_asset_weight_matrix is not None:
+        _mom_fn, _mom_grid = strategies["ama_momentum"]
+
+        if workers > 1:
+            # Parallel path: pass weight matrix to orchestrator; workers
+            # inject their own per-asset weighted strategy variant.
+            all_results = orchestrator.run(
+                strategies=strategies,
+                asset_ids=asset_ids,
                 tf=args.tf,
                 ama_features=ama_features,
                 experiment_name=args.experiment_name,
-                workers=getattr(args, "workers", 1),
+                workers=workers,
+                per_asset_weight_matrix=per_asset_weight_matrix,
+                perasset_param_grid=_mom_grid,
             )
-            all_results.extend(results)
+        else:
+            # Sequential path: inject per-asset weights per asset
+            for asset_id in asset_ids:
+                asset_strategies = dict(strategies)
+                if asset_id in per_asset_weight_matrix.index:
+                    asset_weights = per_asset_weight_matrix.loc[asset_id].tolist()
+                    perasset_fn = _make_weighted_ama_momentum(asset_weights)
+                    asset_strategies["ama_momentum_perasset"] = (
+                        perasset_fn,
+                        _mom_grid,
+                    )
+                else:
+                    logger.debug(
+                        f"No per-asset weights for asset_id={asset_id}; "
+                        f"skipping ama_momentum_perasset for this asset"
+                    )
+
+                results = orchestrator.run(
+                    strategies=asset_strategies,
+                    asset_ids=[asset_id],
+                    tf=args.tf,
+                    ama_features=ama_features,
+                    experiment_name=args.experiment_name,
+                    workers=1,
+                )
+                all_results.extend(results)
     else:
         # Standard path: run all assets at once
         all_results = orchestrator.run(
@@ -703,7 +722,7 @@ def _run_phase82_bakeoff(engine: Any, args: Any) -> None:
             tf=args.tf,
             ama_features=ama_features,
             experiment_name=args.experiment_name,
-            workers=getattr(args, "workers", 1),
+            workers=workers,
         )
 
     logger.info(f"Bake-off complete: {len(all_results)} result rows generated")

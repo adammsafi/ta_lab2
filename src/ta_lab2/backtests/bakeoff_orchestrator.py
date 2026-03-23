@@ -154,6 +154,8 @@ class BakeoffAssetTask:
     ama_features: Optional[List[Dict[str, Any]]]
     experiment_name: Optional[str]
     existing_keys: set
+    perasset_weights: Optional[List[float]] = None
+    perasset_param_grid: Optional[List[Dict[str, Any]]] = None
 
 
 def _bakeoff_asset_worker(task: BakeoffAssetTask) -> List[Dict[str, Any]]:
@@ -188,7 +190,18 @@ def _bakeoff_asset_worker(task: BakeoffAssetTask) -> List[Dict[str, Any]]:
         t1_series = build_t1_series(df.index, holding_bars=1)
         all_results: List[StrategyResult] = []
 
-        for strategy_name, (signal_fn, param_grid) in task.strategies.items():
+        # Inject per-asset weighted strategy variant if weights provided
+        strategies = dict(task.strategies)
+        if task.perasset_weights is not None and task.perasset_param_grid is not None:
+            from functools import partial
+
+            from ta_lab2.signals.ama_composite import ama_momentum_signal
+
+            fn = partial(ama_momentum_signal, weights=task.perasset_weights)
+            fn.__name__ = "ama_momentum_perasset"  # type: ignore[attr-defined]
+            strategies["ama_momentum_perasset"] = (fn, task.perasset_param_grid)
+
+        for strategy_name, (signal_fn, param_grid) in strategies.items():
             logger.info(
                 f"Worker asset_id={task.asset_id}: '{strategy_name}' "
                 f"{len(param_grid)} params x {len(config.get_cost_matrix())} costs"
@@ -1240,6 +1253,8 @@ class BakeoffOrchestrator:
         ama_features: Optional[List[Dict[str, Any]]] = None,
         experiment_name: Optional[str] = None,
         workers: int = 1,
+        per_asset_weight_matrix: Optional[Any] = None,
+        perasset_param_grid: Optional[List[Dict[str, Any]]] = None,
     ) -> List[StrategyResult]:
         """
         Run the full bake-off for all strategies x assets x cost scenarios.
@@ -1264,6 +1279,12 @@ class BakeoffOrchestrator:
         workers : int
             Number of parallel worker processes (default 1 = sequential).
             Each worker creates its own NullPool engine for DB access.
+        per_asset_weight_matrix : pd.DataFrame, optional
+            Per-asset IC-IR weight matrix (rows=asset_id, cols=features).
+            When provided with workers > 1, each worker injects its own
+            per-asset weighted ama_momentum_perasset strategy variant.
+        perasset_param_grid : list of dict, optional
+            Param grid for the perasset strategy variant.
 
         Returns
         -------
@@ -1274,7 +1295,14 @@ class BakeoffOrchestrator:
         """
         if workers > 1:
             return self._run_parallel(
-                strategies, asset_ids, tf, ama_features, experiment_name, workers
+                strategies,
+                asset_ids,
+                tf,
+                ama_features,
+                experiment_name,
+                workers,
+                per_asset_weight_matrix=per_asset_weight_matrix,
+                perasset_param_grid=perasset_param_grid,
             )
 
         all_results: List[StrategyResult] = []
@@ -1498,6 +1526,8 @@ class BakeoffOrchestrator:
         ama_features: Optional[List[Dict[str, Any]]],
         experiment_name: Optional[str],
         workers: int,
+        per_asset_weight_matrix: Optional[Any] = None,
+        perasset_param_grid: Optional[List[Dict[str, Any]]] = None,
     ) -> List[StrategyResult]:
         """Run bake-off with multiprocessing across assets.
 
@@ -1527,19 +1557,29 @@ class BakeoffOrchestrator:
             for aid in asset_ids:
                 all_existing[aid] = self._batch_existing_keys(aid, tf)
 
-        tasks = [
-            BakeoffAssetTask(
-                asset_id=aid,
-                db_url=db_url,
-                strategies=strategies,
-                tf=tf,
-                config_dict=config_dict,
-                ama_features=ama_features,
-                experiment_name=experiment_name,
-                existing_keys=all_existing.get(aid, set()),
+        tasks = []
+        for aid in asset_ids:
+            # Per-asset weights: extract this asset's row as a list
+            pw = None
+            if (
+                per_asset_weight_matrix is not None
+                and aid in per_asset_weight_matrix.index
+            ):
+                pw = per_asset_weight_matrix.loc[aid].tolist()
+            tasks.append(
+                BakeoffAssetTask(
+                    asset_id=aid,
+                    db_url=db_url,
+                    strategies=strategies,
+                    tf=tf,
+                    config_dict=config_dict,
+                    ama_features=ama_features,
+                    experiment_name=experiment_name,
+                    existing_keys=all_existing.get(aid, set()),
+                    perasset_weights=pw,
+                    perasset_param_grid=perasset_param_grid,
+                )
             )
-            for aid in asset_ids
-        ]
 
         logger.info(f"Launching {workers} workers for {len(tasks)} assets")
 
