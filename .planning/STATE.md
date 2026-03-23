@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 
 ## Current Position
 
-Phase: 90-ctf-core-computation-module (v1.2.0, In progress)
-Plan: 1 of 2 complete (01 done)
-Status: In progress
-Last activity: 2026-03-23 -- Completed 90-01-PLAN.md (CTFConfig + CTFFeature data loading/alignment foundation)
+Phase: 90-ctf-core-computation-module (v1.2.0, Phase complete)
+Plan: 2 of 2 complete (01 done, 02 done)
+Status: Phase complete
+Last activity: 2026-03-23 -- Completed 90-02-PLAN.md (CTF computation engine: slope/divergence/agreement/crossover + orchestrator + 1.75M rows for BTC)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [########--] 62% v1.2.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 379
+- Total plans completed: 380
 - Average duration: 7 min
-- Total execution time: ~30.3 hours
+- Total execution time: ~30.9 hours
 
 **Recent Trend:**
 - v0.8.0: 6 phases, 16 plans, ~1.2 hours
@@ -63,9 +63,15 @@ v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
 - computed_at (not updated_at) in ctf table: derived fact table semantics vs incremental measurement
 - ta/vol tables have venue_id as column-only (not in PK): Phase 90 CTF joins must use (id, ts, tf, alignment_source) only
 
+**Phase 90 decisions (plan 02):**
+- ALL 4 source tables require venue_id filter (plan 01 was incomplete: returns_bars_multi_tf_u also has multiple venues in PK)
+- Series.astype(float) before numpy computation: DB NULLs arrive as Python None which breaks .diff()/np.sign()
+- min_periods = min(window, max(5, window//3)): cap min_periods to not exceed window
+- Per-indicator _write_to_db calls (not batched): clean scope per indicator_id, no cross-indicator contamination
+
 **Phase 90 decisions (plan 01):**
 - ta/vol/features ALL have venue_id in PK (confirmed via information_schema in 90-01; Phase 89 research "column-only" note was incorrect/stale)
-- Only features table gets AND venue_id = :venue_id in WHERE; ta/vol filtering by alignment_source is sufficient
+- Only features table gets AND venue_id = :venue_id in WHERE; ta/vol filtering by alignment_source is sufficient (CORRECTED in plan 02: all tables need it)
 - numpy imported with noqa: F401 in cross_timeframe.py: reserved for plan 02 composite computations (slope, divergence)
 - build_alignment_frame imported from ta_lab2.regimes.comovement -- not reimplemented in features module
 
@@ -202,10 +208,10 @@ None active.
 
 ## Session Continuity
 
-Last session: 2026-03-23T20:02:37Z
-Stopped at: Completed 90-01-PLAN.md (CTFConfig + CTFFeature data loading/alignment foundation)
+Last session: 2026-03-23T20:44:54Z
+Stopped at: Completed 90-02-PLAN.md (CTF computation engine: 4 composites + orchestrator + 1.75M rows for BTC)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-23 (Phase 90, Plan 1 complete)*
+*Last updated: 2026-03-23 (Phase 90, Plan 2 complete)*
