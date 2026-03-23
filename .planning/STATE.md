@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 
 ## Current Position
 
-Phase: 84-dashboard-perps-portfolio-regimes (v1.2.0, In Progress)
-Plan: 4 of 5 complete (01, 02, 03, 04 done; 05 pending)
-Status: In progress
-Last activity: 2026-03-23 -- Completed 84-03 (AMA/EMA Inspector page + queries/ama.py)
+Phase: 89-ctf-schema-dimension-table (v1.2.0, In Progress) [parallel with 84]
+Plan: 1 of 1 complete (01 done)
+Status: In progress (Phase 84 also in progress in parallel)
+Last activity: 2026-03-23 -- Completed 89-01 (CTF schema: dim_ctf_indicators + ctf tables + ctf_config.yaml)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [########--] 61% v1.2.0
 
@@ -56,6 +56,12 @@ v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
 - regime_comovement displayed as st.dataframe only (NOT network graph): only 21 rows (7 assets x 3 EMA pairs), infeasible as network
 - Weekly binning for heatmap x-axis (mode per symbol/week): reduces noise vs daily while preserving trend visibility
 - ruff-format reformatted page on first commit (long line): re-staged and committed clean (standard pattern)
+
+**Phase 89 decisions (plan 01):**
+- down_revision=440fdfb3e8e1 (not i3j4k5l6m7n8 as research stated -- research predates the 440fdfb3e8e1 migration)
+- ctf returns YAML section uses nested indicators: key with source_table + roll_filter metadata; avoids YAML scalar/list ambiguity
+- computed_at (not updated_at) in ctf table: derived fact table semantics vs incremental measurement
+- ta/vol tables have venue_id as column-only (not in PK): Phase 90 CTF joins must use (id, ts, tf, alignment_source) only
 
 **Phase 84 decisions (plan 01):**
 - hl_open_interest (82K rows, Coinalyze) for OI time series; hl_oi_snapshots has only 3 timestamps (2026-03-11) -- not a time series
@@ -190,10 +196,10 @@ None active.
 
 ## Session Continuity
 
-Last session: 2026-03-23T16:39:06Z
-Stopped at: Completed 84-03-PLAN.md (AMA/EMA Inspector page + queries/ama.py)
+Last session: 2026-03-23T18:59:48Z
+Stopped at: Completed 89-01-PLAN.md (CTF schema: dim_ctf_indicators + ctf + ctf_config.yaml)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-23 (Phase 84, Plan 3 complete)*
+*Last updated: 2026-03-23 (Phase 89, Plan 1 complete)*
