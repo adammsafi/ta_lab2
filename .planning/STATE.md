@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 
 ## Current Position
 
-Phase: 83-dashboard-backtest-signal-pages (v1.2.0, COMPLETE)
-Plan: 5 of 5 complete
-Status: Complete
-Last activity: 2026-03-23 -- Completed Phase 83 (all 5 plans, verified)
+Phase: 84-dashboard-perps-portfolio-regimes (v1.2.0, In Progress)
+Plan: 1 of 5 complete
+Status: In progress
+Last activity: 2026-03-23 -- Completed 84-01 (Hyperliquid Perps dashboard page)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [########--] 56% v1.2.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [########--] 58% v1.2.0
 
 ## Performance Metrics
 
@@ -41,6 +41,14 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 Decisions are logged in PROJECT.md Key Decisions table.
 
 v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
+
+**Phase 84 decisions (plan 01):**
+- hl_open_interest (82K rows, Coinalyze) for OI time series; hl_oi_snapshots has only 3 timestamps (2026-03-11) -- not a time series
+- interval='1d' only for hl_candles candle chart; interval='1h' covers only 3 days for most assets
+- load_hl_perp_list ttl=3600 (dimension data); data query functions ttl=900
+- make_subplots(shared_xaxes=True, rows=2) for candle+OI stacked layout; conditional has_oi check for 1-row vs 2-row
+- perp_options dict passed as argument into @st.fragment to avoid re-loading inside auto-refresh cycle
+- cross-schema SQL pattern: always prefix HL tables with hyperliquid.* -- hl_assets.asset_id != public.dim_assets.id
 
 **Phase 83 decisions (plan 04):**
 - ema aliased as ema_value in load_ema_overlays: matches build_candlestick_chart expected column without modifying charts.py
@@ -161,10 +169,10 @@ None active.
 
 ## Session Continuity
 
-Last session: 2026-03-23T15:00:00Z
-Stopped at: Completed Phase 83 (all 5 plans, verified)
+Last session: 2026-03-23T16:37:11Z
+Stopped at: Completed 84-01-PLAN.md (Hyperliquid Perps dashboard page)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-23 (Phase 83 complete)*
+*Last updated: 2026-03-23 (Phase 84, Plan 1 complete)*
