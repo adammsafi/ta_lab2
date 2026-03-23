@@ -1466,7 +1466,14 @@ Plans:
   3. OHLCV candlestick charts replace plain close lines in Research Explorer (Plotly candlestick with EMA overlays)
   4. All new pages follow existing query-layer pattern (queries/*.py + pages/*.py separation)
   5. Charts have HTML download buttons consistent with existing pages
-**Plans**: TBD
+**Plans**: 5 plans in 3 waves
+
+Plans:
+- [ ] 83-01-PLAN.md -- Query layers (backtest + signals) and chart builders (candlestick, sparkline, timeline)
+- [ ] 83-02-PLAN.md -- Backtest Results page (3 views, cost matrix, Monte Carlo CI, sparklines)
+- [ ] 83-03-PLAN.md -- Signal Browser page (3 views, heatmap, history timeline, signal strength)
+- [ ] 83-04-PLAN.md -- Asset Hub page + OHLCV candlestick upgrade to Research Explorer
+- [ ] 83-05-PLAN.md -- Sidebar reorganization + navigation wiring + human verification
 
 ---
 
