@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 ## Current Position
 
 Phase: 91-ctf-cli-pipeline-integration (v1.2.0, In Progress)
-Plan: 1 of 3 complete (01 done)
-Status: In progress. ctf_state table created; YAML expanded to 6 base TFs; tqdm added.
-Last activity: 2026-03-23 -- Completed 91-01-PLAN.md (2/2 tasks, all verifications passed)
+Plan: 2 of 3 complete (01+02 done)
+Status: In progress. refresh_ctf.py CLI created and verified; ctf_state watermarks operational.
+Last activity: 2026-03-23 -- Completed 91-02-PLAN.md (2/2 tasks, all verifications passed)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [########--] 65% v1.2.0
 
@@ -74,6 +74,13 @@ v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
 - load_stats_tables not imported at page level: load_stats_status calls it internally; Rows (24h) = sum(PASS+WARN+FAIL) -- no additional query needed
 - drawdown_usd backward-compat guard: falls back to 0.0 if column absent (cache not yet refreshed post-Plan 01 deploy)
 - Engine init pattern now consistent across all 17 dashboard pages: single module-level try/except get_engine() + st.stop()
+
+**Phase 91 decisions (plan 02):**
+- Incremental skip at per-asset level (not per-scope): MIN(ctf_state.updated_at) >= MAX(ctf.computed_at) check; simpler than per-indicator skip while still effective
+- base_tf/ref_tf filtering uses temp YAML file: load base YAML, filter timeframe_pairs in-memory, dump to tempfile, pass to CTFConfig(yaml_path=...)
+- indicator_filter patches feature._dim_indicators directly after _load_dim_ctf_indicators() call
+- _post_update_ctf_state aggregates from ctf table post-compute: GROUP BY base_tf/ref_tf/indicator_id to get MAX(ts)/COUNT(*), then upserts ctf_state
+- --full-refresh deletes ALL ctf rows for IDs (not scoped by TF filter) before rebuilding
 
 **Phase 91 decisions (plan 01):**
 - ctf_state PK omits ts (unlike ctf fact table): state table tracks one row per scope; ts in PK would require one row per timestamp
@@ -232,8 +239,8 @@ None active.
 
 ## Session Continuity
 
-Last session: 2026-03-23T22:19:31Z
-Stopped at: Completed 91-01-PLAN.md (CTF prerequisites: ctf_state migration + YAML expansion + tqdm)
+Last session: 2026-03-23T23:10:00Z
+Stopped at: Completed 91-02-PLAN.md (CTF standalone CLI: refresh_ctf.py with multiprocessing, tqdm, incremental state)
 Resume file: None
 
 ---
