@@ -72,7 +72,7 @@ if not _default_multi:
     _default_multi = perp_symbols[:3] if len(perp_symbols) >= 3 else perp_symbols
 
 # ---------------------------------------------------------------------------
-# Sidebar controls (OUTSIDE @st.fragment -- widgets cannot be inside a fragment)
+# Sidebar controls (global filters only)
 # ---------------------------------------------------------------------------
 
 with st.sidebar:
@@ -96,22 +96,24 @@ with st.sidebar:
         key="perps_top_n_heatmap",
     )
 
-    st.divider()
+# ---------------------------------------------------------------------------
+# Inline asset selectors (OUTSIDE @st.fragment -- widgets cannot be inside)
+# ---------------------------------------------------------------------------
 
-    # Single-asset funding selector
-    st.subheader("Single Asset Funding")
+_sel_col1, _sel_col2, _sel_col3 = st.columns(3)
+
+with _sel_col1:
     single_symbol = st.selectbox(
-        "Perp asset",
+        "Funding Rate Asset",
         perp_symbols,
         index=_btc_idx,
         key="perps_single_symbol",
     )
     single_asset_id = perp_options[single_symbol]
 
-    # Multi-asset overlay selector (up to 5)
-    st.subheader("Multi-Asset Comparison")
+with _sel_col2:
     multi_symbols = st.multiselect(
-        "Select up to 5 perps",
+        "Multi-Asset Comparison",
         perp_symbols,
         default=_default_multi,
         max_selections=5,
@@ -119,15 +121,16 @@ with st.sidebar:
     )
     multi_asset_ids = [perp_options[s] for s in multi_symbols]
 
-    # Candle chart asset selector
-    st.subheader("Candle Chart")
+with _sel_col3:
     candle_symbol = st.selectbox(
-        "Perp asset (candles)",
+        "Candle Chart Asset",
         perp_symbols,
         index=_btc_idx,
         key="perps_candle_symbol",
     )
     candle_asset_id = perp_options[candle_symbol]
+
+st.divider()
 
 
 # ---------------------------------------------------------------------------
