@@ -11,17 +11,27 @@ import pandas as pd
 import streamlit as st
 from sqlalchemy import text
 
-# ---------------------------------------------------------------------------
-# Allowlist of stats table names -- never derived from user input
-# ---------------------------------------------------------------------------
-_STATS_TABLES = [
-    "price_bars_multi_tf_stats",
-    "ema_multi_tf_stats",
-    "ema_multi_tf_cal_stats",
-    "ema_multi_tf_cal_anchor_stats",
-    "returns_ema_stats",
-    "features_stats",
-]
+
+@st.cache_data(ttl=300)
+def load_stats_tables(_engine) -> list[str]:
+    """Auto-discover stats tables that have a 'status' column."""
+    sql = text(
+        r"""
+        SELECT t.table_name
+        FROM information_schema.tables t
+        JOIN information_schema.columns c
+            ON c.table_schema = t.table_schema
+            AND c.table_name = t.table_name
+            AND c.column_name = 'status'
+        WHERE t.table_schema = 'public'
+          AND t.table_name LIKE '%\_stats'
+          AND t.table_type = 'BASE TABLE'
+        ORDER BY t.table_name
+        """
+    )
+    with _engine.connect() as conn:
+        rows = conn.execute(sql).fetchall()
+    return [row[0] for row in rows]
 
 
 @st.cache_data(ttl=300)
@@ -58,14 +68,23 @@ def load_table_freshness(_engine) -> pd.DataFrame:
 
 
 @st.cache_data(ttl=300)
-def load_stats_status(_engine) -> dict[str, dict[str, int]]:
+def load_stats_status(
+    _engine, stats_tables: tuple[str, ...] | None = None
+) -> dict[str, dict[str, int]]:
     """Return status counts per stats table for the last 24 hours.
 
     Returns: {table_name: {status_value: count, ...}, ...}
+
+    Args:
+        _engine: SQLAlchemy engine (underscore-prefix skips cache hashing).
+        stats_tables: Optional tuple of table names. If None, auto-discovers
+            via load_stats_tables(). Must be a tuple for st.cache_data hashability.
     """
+    if stats_tables is None:
+        stats_tables = tuple(load_stats_tables(_engine))
     result: dict[str, dict[str, int]] = {}
-    for table in _STATS_TABLES:
-        # Table name is from allowlist -- safe from injection
+    for table in stats_tables:
+        # Table name is from auto-discovered allowlist -- safe from injection
         sql = text(
             f"""
             SELECT status, COUNT(*) AS n
@@ -123,14 +142,24 @@ def load_asset_coverage(_engine) -> pd.DataFrame:
 
 
 @st.cache_data(ttl=300)
-def load_alert_history(_engine, days: int = 7) -> pd.DataFrame:
+def load_alert_history(
+    _engine, days: int = 7, stats_tables: tuple[str, ...] | None = None
+) -> pd.DataFrame:
     """Return recent FAIL/WARN rows from all stats tables.
 
     Columns: stats_table, status, checked_at, check_name (nullable)
+
+    Args:
+        _engine: SQLAlchemy engine (underscore-prefix skips cache hashing).
+        days: Number of days of history to return.
+        stats_tables: Optional tuple of table names. If None, auto-discovers
+            via load_stats_tables(). Must be a tuple for st.cache_data hashability.
     """
+    if stats_tables is None:
+        stats_tables = tuple(load_stats_tables(_engine))
     frames: list[pd.DataFrame] = []
 
-    for table in _STATS_TABLES:
+    for table in stats_tables:
         # Table name is from allowlist -- safe from injection
         sql_with_check_name = text(
             f"""

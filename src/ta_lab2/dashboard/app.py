@@ -21,19 +21,11 @@ with st.sidebar:
     st.title("ta_lab2")
     st.caption("Analysis + Operations + Monitoring")
     st.divider()
-    st.slider(
-        "Cache TTL (s)",
-        min_value=30,
-        max_value=3600,
-        value=300,
-        step=30,
-        key="cache_ttl_display",
-    )
     if st.button("Refresh Now", type="primary"):
         st.cache_data.clear()
         st.rerun()
+    st.caption("Cache tiers: Live 2min | Pipeline 5min | Research 60min")
     st.divider()
-    st.caption("Cache TTL: 300s (fixed). Use Refresh to clear.")
 
 # ---------------------------------------------------------------------------
 # Multipage navigation
@@ -46,7 +38,7 @@ pages = {
             icon=":material/home:",
         ),
     ],
-    "Analysis": [
+    "Research": [
         st.Page(
             "pages/13_asset_hub.py",
             title="Asset Hub",
@@ -77,6 +69,8 @@ pages = {
             title="Asset Statistics",
             icon=":material/bar_chart:",
         ),
+    ],
+    "Markets": [
         st.Page(
             "pages/14_perps.py",
             title="Perps",
