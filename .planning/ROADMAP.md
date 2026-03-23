@@ -1587,7 +1587,11 @@ Plans:
   7. `compute_for_ids()` orchestrates load → align → compute → write for all configured (base_tf, ref_tf, indicator) combinations
   8. Write uses scoped DELETE + INSERT pattern matching existing BaseFeature convention
   9. Manual test: `CTFFeature.compute_for_ids([1])` for BTC at 1D→7D produces correct rows in ctf table
-**Plans**: TBD
+**Plans**: 2 plans in 2 waves
+
+Plans:
+- [ ] 90-01-PLAN.md -- CTFConfig dataclass, YAML/dim loading, batch indicator loading, timeframe alignment
+- [ ] 90-02-PLAN.md -- Composite computations (slope/divergence/agreement/crossover), orchestrator, write, integration test
 
 ---
 
