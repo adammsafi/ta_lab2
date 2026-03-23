@@ -53,6 +53,18 @@ except ImportError:
         "Run Plan 56-06 to create the module."
     )
 
+# CTF import is optional — script may not exist in older deployments.
+try:
+    from ta_lab2.scripts.features.refresh_ctf import (
+        refresh_ctf_step as _refresh_ctf_step,
+    )
+
+    _CTF_AVAILABLE = True
+except ImportError:
+    _CTF_AVAILABLE = False
+    logger = logging.getLogger(__name__)
+    logger.warning("refresh_ctf not found; CTF cross-timeframe step will be skipped.")
+
 logger = logging.getLogger(__name__)
 
 
@@ -510,6 +522,30 @@ def run_all_refreshes(
         )
     else:
         logger.error(f"  {micro_result.table} (tf={tf}): FAILED - {micro_result.error}")
+
+    # Phase 2c: Cross-timeframe features (reads from ta, vol, returns_u, features)
+    # Non-fatal: log warning and continue if CTF fails
+    if _CTF_AVAILABLE:
+        logger.info("Phase 2c: Running CTF features (cross-timeframe)")
+        ctf_result = _refresh_ctf_step(
+            engine,
+            ids=ids,
+            tf=tf,
+            venue_id=venue_id or 1,
+        )
+        results[ctf_result.table] = ctf_result
+
+        if ctf_result.success:
+            logger.info(
+                f"  {ctf_result.table} (tf={tf}): {ctf_result.rows_inserted} rows"
+                f" in {ctf_result.duration_seconds:.1f}s"
+            )
+        else:
+            logger.warning(
+                f"  {ctf_result.table} (tf={tf}): FAILED - {ctf_result.error}"
+            )
+    else:
+        logger.info("Phase 2c: Skipping CTF features (module not available)")
 
     # Phase 3: Cross-sectional normalization (depends on features)
     # MUST run sequentially after features — window functions read the
@@ -1001,6 +1037,7 @@ def main() -> int:
             "rolling_extremes",
             "features (microstructure)",
             "features",
+            "ctf",
             "features (CS norms)",
             "codependence",
         ]:
