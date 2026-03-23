@@ -2,18 +2,25 @@
 """
 Cross-Timeframe (CTF) feature computation engine.
 
-Phase 90, Plan 01: Data loading and alignment foundation.
+Phase 90: Complete CTF engine with data loading, alignment, and computation.
 
 This module provides:
   - CTFConfig: frozen dataclass for computation parameters
-  - CTFFeature: class with data loading and alignment methods
+  - CTFFeature: class with all loading, alignment, computation, and write methods
       - _load_ctf_config: load configs/ctf_config.yaml
       - _load_dim_ctf_indicators: query dim_ctf_indicators for active indicators
       - _load_indicators_batch: batch-load all indicator columns from a source table
       - _align_timeframes: align base and reference timeframe DataFrames via merge_asof
       - _get_table_columns: introspect ctf fact table columns
+      - _write_to_db: scoped DELETE + to_sql INSERT into public.ctf
+      - _compute_one_source: per (base_tf, ref_tf, source_table, indicator) computation
+      - compute_for_ids: top-level orchestrator over all YAML combos
 
-Plan 02 will add: slope, divergence, agreement, crossover composites, orchestrator, write logic.
+Module-level helpers (vectorized rolling computations):
+  - _compute_slope: rolling polyfit slope
+  - _compute_divergence: (base - ref) / rolling_std z-score
+  - _compute_agreement: rolling fraction of sign-matching bars
+  - _compute_crossover: sign-change detection for directional indicators
 """
 
 from __future__ import annotations
@@ -23,7 +30,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-import numpy as np  # noqa: F401 (available for plan 02 composite computations)
+import numpy as np
 import pandas as pd
 from sqlalchemy import Engine, create_engine, text
 
@@ -50,6 +57,160 @@ except ImportError:  # pragma: no cover
 from ta_lab2.regimes.comovement import build_alignment_frame
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Module-level computation helpers
+# ---------------------------------------------------------------------------
+
+
+def _compute_slope(series: pd.Series, window: int) -> pd.Series:
+    """Compute vectorized rolling OLS slope via polyfit (raw=True for speed).
+
+    Follows the expression_engine.py _slope pattern. Uses a fixed x-array
+    (0..window-1) to avoid recomputing per window.
+
+    Parameters
+    ----------
+    series:
+        Time-ordered series of values to compute slope over.
+    window:
+        Number of bars in the rolling window (slope_window from composite_params).
+
+    Returns
+    -------
+    pd.Series of the same index, containing the rolling slope at each point.
+    NaN for positions without sufficient data (< 2 bars).
+    """
+    series = series.astype(float)
+    n = int(window)
+    x = np.arange(n, dtype=float)
+    x_mean = x.mean()
+    x_denom = ((x - x_mean) ** 2).sum()
+
+    def _apply(arr: np.ndarray) -> float:
+        if len(arr) < n:
+            xi = np.arange(len(arr), dtype=float)
+            xi_mean = xi.mean()
+            xi_denom = ((xi - xi_mean) ** 2).sum()
+            if xi_denom == 0:
+                return float("nan")
+            return float(np.dot(arr - arr.mean(), xi - xi_mean) / xi_denom)
+        y_mean = arr.mean()
+        return float(np.dot(arr - y_mean, x - x_mean) / x_denom)
+
+    return series.rolling(window=n, min_periods=2).apply(_apply, raw=True)
+
+
+def _compute_divergence(
+    base_series: pd.Series,
+    ref_series: pd.Series,
+    window: int,
+) -> pd.Series:
+    """Compute divergence as (base - ref) / rolling_std z-score.
+
+    Parameters
+    ----------
+    base_series:
+        Values from the base (finer) timeframe.
+    ref_series:
+        Values from the reference (coarser) timeframe, aligned to base index.
+    window:
+        Rolling window for the standard deviation denominator
+        (divergence_zscore_window from composite_params).
+
+    Returns
+    -------
+    pd.Series of z-scored divergence. NaN when std is near zero.
+    """
+    base_f = base_series.astype(float)
+    ref_f = ref_series.astype(float)
+    diff = base_f - ref_f
+    std = base_f.rolling(window=window, min_periods=window // 2).std()
+    return diff / std.where(std > 1e-12, other=np.nan)
+
+
+def _compute_agreement(
+    base_series: pd.Series,
+    ref_series: pd.Series,
+    is_directional: bool,
+    window: int = 20,
+) -> pd.Series:
+    """Compute rolling fraction of sign-matching bars.
+
+    For directional indicators (e.g. MACD, returns): fraction of bars where
+    base and ref share the same sign (both positive or both negative).
+
+    For non-directional indicators (e.g. RSI, vol): fraction of bars where
+    base and ref move in the same direction (both increasing or both decreasing).
+
+    Parameters
+    ----------
+    base_series:
+        Values from the base timeframe.
+    ref_series:
+        Values from the reference timeframe.
+    is_directional:
+        True for directional indicators (compare sign of value).
+        False for non-directional indicators (compare sign of diff/change).
+    window:
+        Rolling window for fraction computation. Defaults to 20.
+
+    Returns
+    -------
+    pd.Series in [0.0, 1.0], where 1.0 means all bars in window agreed.
+    """
+    # Ensure float dtype so None/NaN arithmetic works correctly
+    base_f = base_series.astype(float)
+    ref_f = ref_series.astype(float)
+
+    if is_directional:
+        # Both positive or both negative
+        agree = (np.sign(base_f) * np.sign(ref_f)) > 0
+    else:
+        # Both moving in the same direction
+        agree = (np.sign(base_f.diff()) * np.sign(ref_f.diff())) > 0
+
+    min_periods = min(window, max(5, window // 3))
+    return agree.astype(float).rolling(window=window, min_periods=min_periods).mean()
+
+
+def _compute_crossover(
+    base_series: pd.Series,
+    ref_series: pd.Series,
+    is_directional: bool,
+) -> pd.Series:
+    """Detect sign-change crossovers between base and reference series.
+
+    Only meaningful for directional indicators. Non-directional returns NaN.
+
+    Parameters
+    ----------
+    base_series:
+        Values from the base timeframe.
+    ref_series:
+        Values from the reference timeframe.
+    is_directional:
+        True for directional indicators. False returns all-NaN series.
+
+    Returns
+    -------
+    pd.Series with values:
+        +1.0  = base crossed above ref (bullish crossover)
+        -1.0  = base crossed below ref (bearish crossover)
+         0.0  = no crossover this bar
+        NaN   = non-directional indicator or insufficient history
+    """
+    if not is_directional:
+        return pd.Series(np.nan, index=base_series.index)
+
+    base_f = base_series.astype(float)
+    ref_f = ref_series.astype(float)
+    prev_above = base_f.shift(1) > ref_f.shift(1)
+    curr_above = base_f > ref_f
+    crossed_up = (~prev_above) & curr_above
+    crossed_dn = prev_above & (~curr_above)
+    return crossed_up.astype(float) - crossed_dn.astype(float)
 
 
 # ---------------------------------------------------------------------------
@@ -84,8 +245,8 @@ class CTFConfig:
 class CTFFeature:
     """Cross-Timeframe feature computation engine.
 
-    Responsible for data loading and timeframe alignment.
-    Composite computations (slope, divergence, agreement, crossover) are in plan 02.
+    Orchestrates data loading, timeframe alignment, composite computation,
+    and DB writes for the public.ctf fact table.
 
     Parameters
     ----------
@@ -214,9 +375,9 @@ class CTFFeature:
         - returns_bars_multi_tf_u: ts column is ``"timestamp"`` (quoted reserved word),
           aliased as ``ts``. Requires ``AND roll = FALSE`` filter.
         - ta, vol, features: ts column is ``ts``.
-        - features: has venue_id in WHERE (AND venue_id = :venue_id).
-        - ta and vol: venue_id is a column (present in table) but no additional
-          venue_id WHERE filter needed beyond alignment_source.
+        - ALL tables have venue_id in their PK; filtering by venue_id is always applied
+          to avoid duplicate ts rows when multiple venues are present
+          (e.g. CMC_AGG venue_id=1 + Hyperliquid venue_id=2).
 
         Parameters
         ----------
@@ -256,9 +417,9 @@ class CTFFeature:
         if is_returns:
             where_parts.append("roll = FALSE")
 
-        # features table has venue_id in WHERE
-        if source_table == "features":
-            where_parts.append("venue_id = :venue_id")
+        # All source tables have venue_id in PK — filter to avoid duplicate ts rows
+        # when multiple venues are present (e.g. CMC_AGG venue_id=1 + Hyperliquid venue_id=2)
+        where_parts.append("venue_id = :venue_id")
 
         if extra_filter:
             where_parts.append(extra_filter)
@@ -281,9 +442,8 @@ class CTFFeature:
             "ids": ids,
             "tf": tf,
             "as_": self.config.alignment_source,
+            "venue_id": self.config.venue_id,
         }
-        if source_table == "features":
-            params["venue_id"] = self.config.venue_id
 
         with self.engine.connect() as conn:
             df = pd.read_sql(text(sql_str), conn, params=params)
@@ -405,3 +565,297 @@ class CTFFeature:
             self._table_columns = set()
 
         return self._table_columns
+
+    # -----------------------------------------------------------------------
+    # DB write
+    # -----------------------------------------------------------------------
+
+    def _write_to_db(
+        self,
+        df: pd.DataFrame,
+        base_tf: str,
+        ref_tf: str,
+        indicator_ids: list[int],
+    ) -> int:
+        """Write CTF computation results to public.ctf using scoped DELETE + INSERT.
+
+        The DELETE scope is: (id, venue_id, base_tf, ref_tf, indicator_id, alignment_source).
+        This ensures idempotent re-runs without duplicates.
+
+        Parameters
+        ----------
+        df:
+            DataFrame with CTF result rows. Must include all PK + value columns.
+        base_tf:
+            Base timeframe string (e.g. '1D').
+        ref_tf:
+            Reference timeframe string (e.g. '7D').
+        indicator_ids:
+            List of indicator_ids present in df (used in DELETE scope).
+
+        Returns
+        -------
+        Number of rows written (0 if df is empty).
+        """
+        if df.empty:
+            return 0
+
+        # Filter df to only columns that exist in the ctf table
+        table_cols = self._get_table_columns()
+        df_cols = [c for c in df.columns if c in table_cols]
+        df = df[df_cols].copy()
+
+        # Extract unique IDs from the DataFrame
+        ids = df["id"].unique().tolist()
+
+        delete_sql = text(
+            """
+            DELETE FROM public.ctf
+            WHERE id = ANY(:ids)
+              AND venue_id = :venue_id
+              AND base_tf = :base_tf
+              AND ref_tf = :ref_tf
+              AND indicator_id = ANY(:iids)
+              AND alignment_source = :as_
+            """
+        )
+
+        with self.engine.begin() as conn:
+            conn.execute(
+                delete_sql,
+                {
+                    "ids": ids,
+                    "venue_id": self.config.venue_id,
+                    "base_tf": base_tf,
+                    "ref_tf": ref_tf,
+                    "iids": indicator_ids,
+                    "as_": self.config.alignment_source,
+                },
+            )
+
+        # INSERT via to_sql (append mode after DELETE)
+        df.to_sql(
+            "ctf",
+            self.engine,
+            schema="public",
+            if_exists="append",
+            index=False,
+            method="multi",
+            chunksize=10000,
+        )
+
+        rows_written = len(df)
+        logger.info(
+            "_write_to_db: base_tf=%s ref_tf=%s indicators=%s rows=%d",
+            base_tf,
+            ref_tf,
+            indicator_ids,
+            rows_written,
+        )
+        return rows_written
+
+    # -----------------------------------------------------------------------
+    # Per-source computation
+    # -----------------------------------------------------------------------
+
+    def _compute_one_source(
+        self,
+        ids: list[int],
+        base_tf: str,
+        ref_tf: str,
+        source_table: str,
+        source_indicators: list[dict],
+        yaml_config: dict,
+    ) -> int:
+        """Compute CTF features for one (base_tf, ref_tf, source_table) combination.
+
+        For each active indicator in source_indicators:
+          1. Loads base and ref timeframe data
+          2. Aligns via merge_asof
+          3. Computes slope, divergence, agreement, crossover per asset
+          4. Writes to DB via _write_to_db
+
+        Parameters
+        ----------
+        ids:
+            Asset IDs to process.
+        base_tf:
+            Base (finer) timeframe string.
+        ref_tf:
+            Reference (coarser) timeframe string.
+        source_table:
+            Source table name (e.g. 'ta', 'vol', 'returns_bars_multi_tf_u', 'features').
+        source_indicators:
+            List of indicator dicts from dim_ctf_indicators for this source_table.
+        yaml_config:
+            Full YAML config dict (for composite_params).
+
+        Returns
+        -------
+        Total rows written across all indicators.
+        """
+        # Read composite parameters
+        composite_params = yaml_config.get("composite_params", {})
+        slope_window: int = int(composite_params.get("slope_window", 5))
+        divergence_zscore_window: int = int(
+            composite_params.get("divergence_zscore_window", 63)
+        )
+
+        # Collect all source columns (batch load once per tf)
+        columns = [ind["source_column"] for ind in source_indicators]
+
+        # Load base and ref data (roll=FALSE is handled inside _load_indicators_batch
+        # for returns_bars_multi_tf_u — no extra_filter needed here)
+        base_df = self._load_indicators_batch(ids, source_table, columns, base_tf)
+        ref_df = self._load_indicators_batch(ids, source_table, columns, ref_tf)
+
+        if base_df.empty or ref_df.empty:
+            logger.warning(
+                "_compute_one_source: no data for source=%s base_tf=%s ref_tf=%s "
+                "(base_rows=%d ref_rows=%d)",
+                source_table,
+                base_tf,
+                ref_tf,
+                len(base_df),
+                len(ref_df),
+            )
+            return 0
+
+        total_rows = 0
+        computed_at = pd.Timestamp.now("UTC")
+
+        for ind in source_indicators:
+            source_col = ind["source_column"]
+            is_dir = bool(ind["is_directional"])
+            indicator_id = int(ind["indicator_id"])
+
+            # Align the two timeframes for this indicator column
+            aligned = self._align_timeframes(
+                base_df[["id", "ts", source_col]],
+                ref_df[["id", "ts", source_col]],
+                source_col,
+            )
+
+            if aligned.empty:
+                logger.debug(
+                    "_compute_one_source: empty aligned for indicator=%s base_tf=%s ref_tf=%s",
+                    source_col,
+                    base_tf,
+                    ref_tf,
+                )
+                continue
+
+            # Per-asset computation to avoid cross-asset contamination
+            asset_frames: list[pd.DataFrame] = []
+            for asset_id in aligned["id"].unique():
+                df_a = aligned[aligned["id"] == asset_id].copy()
+
+                df_a["slope"] = _compute_slope(df_a["base_value"], slope_window)
+                df_a["divergence"] = _compute_divergence(
+                    df_a["base_value"], df_a["ref_value"], divergence_zscore_window
+                )
+                df_a["agreement"] = _compute_agreement(
+                    df_a["base_value"], df_a["ref_value"], is_dir
+                )
+                df_a["crossover"] = _compute_crossover(
+                    df_a["base_value"], df_a["ref_value"], is_dir
+                )
+                asset_frames.append(df_a)
+
+            if not asset_frames:
+                continue
+
+            ind_df = pd.concat(asset_frames, ignore_index=True)
+
+            # Add CTF PK and metadata columns
+            ind_df["venue_id"] = self.config.venue_id
+            ind_df["base_tf"] = base_tf
+            ind_df["ref_tf"] = ref_tf
+            ind_df["indicator_id"] = indicator_id
+            ind_df["alignment_source"] = self.config.alignment_source
+            ind_df["computed_at"] = computed_at
+
+            # base_value and ref_value are already present from _align_timeframes
+            rows = self._write_to_db(ind_df, base_tf, ref_tf, [indicator_id])
+            total_rows += rows
+
+            logger.debug(
+                "_compute_one_source: indicator=%s base_tf=%s ref_tf=%s rows=%d",
+                source_col,
+                base_tf,
+                ref_tf,
+                rows,
+            )
+
+        return total_rows
+
+    # -----------------------------------------------------------------------
+    # Top-level orchestrator
+    # -----------------------------------------------------------------------
+
+    def compute_for_ids(self, ids: list[int]) -> int:
+        """Orchestrate CTF feature computation for all configured combos.
+
+        Iterates over all (base_tf, ref_tf) pairs from the YAML config and
+        all source tables from dim_ctf_indicators, computing and writing
+        slope, divergence, agreement, and crossover features.
+
+        Parameters
+        ----------
+        ids:
+            List of asset IDs (public.dim_assets.id) to compute features for.
+
+        Returns
+        -------
+        Total rows written to public.ctf.
+        """
+        yaml_cfg = self._load_ctf_config()
+        indicators = self._load_dim_ctf_indicators()
+
+        if not indicators:
+            logger.warning("compute_for_ids: no active CTF indicators found")
+            return 0
+
+        # Group indicators by source_table
+        by_source: dict[str, list[dict]] = {}
+        for ind in indicators:
+            by_source.setdefault(ind["source_table"], []).append(ind)
+
+        # Full yaml_cfg (including composite_params) is passed to _compute_one_source.
+        # source_table-to-yaml-section mapping is not needed here: _compute_one_source
+        # reads composite_params directly from yaml_cfg and roll=FALSE is handled
+        # automatically inside _load_indicators_batch for returns_bars_multi_tf_u.
+
+        total_rows = 0
+        timeframe_pairs = yaml_cfg.get("timeframe_pairs", [])
+
+        for tf_pair in timeframe_pairs:
+            base_tf: str = tf_pair["base_tf"]
+            ref_tfs: list[str] = tf_pair.get("ref_tfs", [])
+
+            for ref_tf in ref_tfs:
+                for source_table, source_inds in by_source.items():
+                    logger.info(
+                        "compute_for_ids: base_tf=%s ref_tf=%s source=%s indicators=%d ids=%d",
+                        base_tf,
+                        ref_tf,
+                        source_table,
+                        len(source_inds),
+                        len(ids),
+                    )
+                    rows = self._compute_one_source(
+                        ids,
+                        base_tf,
+                        ref_tf,
+                        source_table,
+                        source_inds,
+                        yaml_cfg,
+                    )
+                    total_rows += rows
+
+        logger.info(
+            "compute_for_ids: complete. total_rows=%d ids=%s",
+            total_rows,
+            ids,
+        )
+        return total_rows
