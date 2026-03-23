@@ -1,0 +1,95 @@
+# Cross-Timeframe (CTF) Feature Configuration
+# Phase 89: Declarative config for CTF indicator computation.
+# Changing values here changes behavior without code changes.
+
+timeframe_pairs:
+  - base_tf: "1D"
+    ref_tfs: ["7D", "14D", "30D", "90D", "180D", "365D"]
+  - base_tf: "7D"
+    ref_tfs: ["30D", "90D", "180D", "365D"]
+  - base_tf: "14D"
+    ref_tfs: ["90D", "180D", "365D"]
+  - base_tf: "30D"
+    ref_tfs: ["180D", "365D"]
+
+indicators:
+  ta:
+    - name: rsi_14
+      column: rsi_14
+      is_directional: false
+    - name: rsi_7
+      column: rsi_7
+      is_directional: false
+    - name: rsi_21
+      column: rsi_21
+      is_directional: false
+    - name: macd_12_26
+      column: macd_12_26
+      is_directional: true
+    - name: macd_hist_12_26_9
+      column: macd_hist_12_26_9
+      is_directional: true
+    - name: macd_8_17
+      column: macd_8_17
+      is_directional: true
+    - name: macd_hist_8_17_9
+      column: macd_hist_8_17_9
+      is_directional: true
+    - name: adx_14
+      column: adx_14
+      is_directional: false
+    - name: bb_width_20
+      column: bb_width_20
+      is_directional: false
+    - name: stoch_k_14
+      column: stoch_k_14
+      is_directional: false
+    - name: atr_14
+      column: atr_14
+      is_directional: false
+
+  vol:
+    - name: vol_parkinson_20
+      column: vol_parkinson_20
+      is_directional: false
+    - name: vol_gk_20
+      column: vol_gk_20
+      is_directional: false
+    - name: vol_rs_20
+      column: vol_rs_20
+      is_directional: false
+    - name: vol_log_roll_20
+      column: vol_log_roll_20
+      is_directional: false
+    - name: vol_parkinson_63
+      column: vol_parkinson_63
+      is_directional: false
+    - name: vol_gk_63
+      column: vol_gk_63
+      is_directional: false
+    - name: vol_log_roll_63
+      column: vol_log_roll_63
+      is_directional: false
+
+  returns:
+    source_table: returns_bars_multi_tf_u
+    roll_filter: false
+    indicators:
+      - name: ret_arith
+        column: ret_arith
+        is_directional: true
+      - name: ret_log
+        column: ret_log
+        is_directional: true
+
+  features:
+    - name: close_fracdiff
+      column: close_fracdiff
+      is_directional: true
+    - name: sadf_stat
+      column: sadf_stat
+      is_directional: false
+
+composite_params:
+  slope_window: 5               # Bars for slope regression
+  divergence_zscore_window: 63  # Bars for z-score normalization of divergence
