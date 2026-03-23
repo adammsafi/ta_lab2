@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 
 ## Current Position
 
-Phase: 91-ctf-cli-pipeline-integration (v1.2.0, In Progress)
-Plan: 2 of 3 complete (01+02 done)
-Status: In progress. refresh_ctf.py CLI created and verified; ctf_state watermarks operational.
-Last activity: 2026-03-23 -- Completed 91-02-PLAN.md (2/2 tasks, all verifications passed)
+Phase: 91-ctf-cli-pipeline-integration (v1.2.0, Phase complete)
+Plan: 3 of 3 complete (01+02+03 done)
+Status: Phase complete. CTF integrated into daily pipeline as Phase 2c; all 5 roadmap success criteria satisfied.
+Last activity: 2026-03-23 -- Completed 91-03-PLAN.md (2/2 tasks, all verifications passed)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [########--] 65% v1.2.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 388
+- Total plans completed: 389
 - Average duration: 7 min
 - Total execution time: ~30.9 hours
 
@@ -74,6 +74,12 @@ v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
 - load_stats_tables not imported at page level: load_stats_status calls it internally; Rows (24h) = sum(PASS+WARN+FAIL) -- no additional query needed
 - drawdown_usd backward-compat guard: falls back to 0.0 if column absent (cache not yet refreshed post-Plan 01 deploy)
 - Engine init pattern now consistent across all 17 dashboard pages: single module-level try/except get_engine() + st.stop()
+
+**Phase 91 decisions (plan 03):**
+- CTF placed as Phase 2c between microstructure (2b) and CS norms (3): CTF reads from ta/vol/returns_u/features, must follow all three
+- venue_id or 1 passed to refresh_ctf_step: ensures int (not None) for function that defaults to int=1
+- Non-fatal step pattern: CTF failure logs warning (not error), pipeline continues to Phase 3 regardless
+- ruff-format reformatted CTF import block on first commit (standard pattern); re-staged and committed clean
 
 **Phase 91 decisions (plan 02):**
 - Incremental skip at per-asset level (not per-scope): MIN(ctf_state.updated_at) >= MAX(ctf.computed_at) check; simpler than per-indicator skip while still effective
@@ -239,8 +245,8 @@ None active.
 
 ## Session Continuity
 
-Last session: 2026-03-23T23:10:00Z
-Stopped at: Completed 91-02-PLAN.md (CTF standalone CLI: refresh_ctf.py with multiprocessing, tqdm, incremental state)
+Last session: 2026-03-23T23:31:33Z
+Stopped at: Completed 91-03-PLAN.md (CTF Phase 2c integration: run_all_feature_refreshes.py pipeline wiring)
 Resume file: None
 
 ---
