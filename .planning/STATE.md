@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 
 ## Current Position
 
-Phase: 84-dashboard-perps-portfolio-regimes (v1.2.0, Complete)
-Plan: 5 of 5 complete (01-05 done)
-Status: Complete (verified 17/17 must-haves). 4 new dashboard pages: Perps, Portfolio, Regime Heatmap, AMA Inspector.
-Last activity: 2026-03-23 -- Phase 84 complete (dashboard pages + human-verified UX fixes)
+Phase: 85-dashboard-cleanup-polish (v1.2.0, In Progress)
+Plan: 1 of 2 complete (01 done)
+Status: In progress. Backend fixes: sidebar, stats auto-discovery, drawdown, nav groups.
+Last activity: 2026-03-23 -- Completed 85-01-PLAN.md (3/3 tasks, all verifications passed)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [########--] 62% v1.2.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 385
+- Total plans completed: 386
 - Average duration: 7 min
 - Total execution time: ~30.9 hours
 
@@ -41,6 +41,12 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 Decisions are logged in PROJECT.md Key Decisions table.
 
 v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
+
+**Phase 85 decisions (plan 01):**
+- stats auto-discovery: information_schema JOIN on status column + LIKE '%\_stats' (raw string) -- excludes asset_stats (no status col) and watermark tables
+- drawdown denominator is starting_capital (constant) not peak_equity (starts at 0) -- load_starting_capital() queries dim_executor_config with 100k fallback
+- stats_tables param is tuple[str, ...] | None -- st.cache_data cannot hash lists; callers must use tuple()
+- Analysis nav group split into Research (6 pages) + Markets (4 pages) -- Phase 84 pages get logical home in Markets
 
 **Phase 84 decisions (plan 05):**
 - dim_assets.symbol stores CMC IDs (e.g., "1" for Bitcoin) -- all dashboard queries must JOIN cmc_da_info for real tickers via COALESCE(ci.symbol, da.symbol)
@@ -215,8 +221,8 @@ None active.
 
 ## Session Continuity
 
-Last session: 2026-03-23T23:30:00Z
-Stopped at: Completed Phase 84 (dashboard perps/portfolio/regimes — 5 plans, 17/17 verified, human-approved)
+Last session: 2026-03-23T21:58:44Z
+Stopped at: Completed 85-01-PLAN.md (dashboard backend fixes: sidebar, stats, drawdown, nav)
 Resume file: None
 
 ---
