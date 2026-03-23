@@ -182,8 +182,8 @@ None active.
 
 ## Session Continuity
 
-Last session: 2026-03-23T16:38:20Z
-Stopped at: Completed 84-02-PLAN.md (Regime Heatmap page)
+Last session: 2026-03-23T16:38:38Z
+Stopped at: Completed 84-04-PLAN.md (Portfolio Allocation placeholder page)
 Resume file: None
 
 ---
