@@ -10,16 +10,16 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 ## Current Position
 
 Phase: 85-dashboard-cleanup-polish (v1.2.0, In Progress)
-Plan: 1 of 2 complete (01 done)
-Status: In progress. Backend fixes: sidebar, stats auto-discovery, drawdown, nav groups.
-Last activity: 2026-03-23 -- Completed 85-01-PLAN.md (3/3 tasks, all verifications passed)
+Plan: 2 of 2 complete (01-02 done)
+Status: Phase complete. Engine init consolidated; drawdown KPI shows % and $ amounts.
+Last activity: 2026-03-23 -- Completed 85-02-PLAN.md (2/2 tasks, all verifications passed)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [########--] 62% v1.2.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 386
+- Total plans completed: 387
 - Average duration: 7 min
 - Total execution time: ~30.9 hours
 
@@ -69,6 +69,11 @@ v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
 - regime_comovement displayed as st.dataframe only (NOT network graph): only 21 rows (7 assets x 3 EMA pairs), infeasible as network
 - Weekly binning for heatmap x-axis (mode per symbol/week): reduces noise vs daily while preserving trend visibility
 - ruff-format reformatted page on first commit (long line): re-staged and committed clean (standard pattern)
+
+**Phase 85 decisions (plan 02):**
+- load_stats_tables not imported at page level: load_stats_status calls it internally; Rows (24h) = sum(PASS+WARN+FAIL) -- no additional query needed
+- drawdown_usd backward-compat guard: falls back to 0.0 if column absent (cache not yet refreshed post-Plan 01 deploy)
+- Engine init pattern now consistent across all 17 dashboard pages: single module-level try/except get_engine() + st.stop()
 
 **Phase 89 decisions (plan 01):**
 - down_revision=440fdfb3e8e1 (not i3j4k5l6m7n8 as research stated -- research predates the 440fdfb3e8e1 migration)
@@ -221,8 +226,8 @@ None active.
 
 ## Session Continuity
 
-Last session: 2026-03-23T21:58:44Z
-Stopped at: Completed 85-01-PLAN.md (dashboard backend fixes: sidebar, stats, drawdown, nav)
+Last session: 2026-03-23T22:09:34Z
+Stopped at: Completed 85-02-PLAN.md (dashboard cleanup: engine init consolidation + drawdown KPI)
 Resume file: None
 
 ---
