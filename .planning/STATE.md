@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 
 ## Current Position
 
-Phase: 89-ctf-schema-dimension-table (v1.2.0, Complete) [parallel with 84]
-Plan: 1 of 1 complete (01 done)
-Status: Complete (verified 6/6 must-haves). Phase 84 still in progress in parallel.
-Last activity: 2026-03-23 -- Phase 89 complete (CTF schema: dim_ctf_indicators + ctf tables + ctf_config.yaml)
+Phase: 90-ctf-core-computation-module (v1.2.0, In progress)
+Plan: 1 of 2 complete (01 done)
+Status: In progress
+Last activity: 2026-03-23 -- Completed 90-01-PLAN.md (CTFConfig + CTFFeature data loading/alignment foundation)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [########--] 61% v1.2.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [########--] 62% v1.2.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 378
+- Total plans completed: 379
 - Average duration: 7 min
-- Total execution time: ~30.2 hours
+- Total execution time: ~30.3 hours
 
 **Recent Trend:**
 - v0.8.0: 6 phases, 16 plans, ~1.2 hours
@@ -62,6 +62,12 @@ v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
 - ctf returns YAML section uses nested indicators: key with source_table + roll_filter metadata; avoids YAML scalar/list ambiguity
 - computed_at (not updated_at) in ctf table: derived fact table semantics vs incremental measurement
 - ta/vol tables have venue_id as column-only (not in PK): Phase 90 CTF joins must use (id, ts, tf, alignment_source) only
+
+**Phase 90 decisions (plan 01):**
+- ta/vol/features ALL have venue_id in PK (confirmed via information_schema in 90-01; Phase 89 research "column-only" note was incorrect/stale)
+- Only features table gets AND venue_id = :venue_id in WHERE; ta/vol filtering by alignment_source is sufficient
+- numpy imported with noqa: F401 in cross_timeframe.py: reserved for plan 02 composite computations (slope, divergence)
+- build_alignment_frame imported from ta_lab2.regimes.comovement -- not reimplemented in features module
 
 **Phase 84 decisions (plan 01):**
 - hl_open_interest (82K rows, Coinalyze) for OI time series; hl_oi_snapshots has only 3 timestamps (2026-03-11) -- not a time series
@@ -196,10 +202,10 @@ None active.
 
 ## Session Continuity
 
-Last session: 2026-03-23T18:59:48Z
-Stopped at: Completed 89-01-PLAN.md (CTF schema: dim_ctf_indicators + ctf + ctf_config.yaml)
+Last session: 2026-03-23T20:02:37Z
+Stopped at: Completed 90-01-PLAN.md (CTFConfig + CTFFeature data loading/alignment foundation)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-23 (Phase 89, Plan 1 complete)*
+*Last updated: 2026-03-23 (Phase 90, Plan 1 complete)*
