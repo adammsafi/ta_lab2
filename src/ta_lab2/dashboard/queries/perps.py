@@ -112,7 +112,7 @@ def load_hl_funding_heatmap(
               LIMIT :top_n
           )
         GROUP BY f.asset_id, a.symbol, DATE(f.ts AT TIME ZONE 'UTC')
-        ORDER BY a.day_ntl_vlm DESC, date
+        ORDER BY MAX(a.day_ntl_vlm) DESC, date
     """)
     with _engine.connect() as conn:
         df = pd.read_sql(sql, conn, params={"days_back": days_back, "top_n": top_n})

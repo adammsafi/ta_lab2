@@ -210,9 +210,7 @@ def _portfolio_content(
             margin=dict(t=10, b=10, l=10, r=10),
         )
         st.plotly_chart(fig_treemap, use_container_width=True, key="portfolio_treemap")
-        chart_download_button(
-            fig_treemap, "portfolio_treemap.html", key="portfolio_treemap_dl"
-        )
+        chart_download_button(fig_treemap, "Download Treemap", "portfolio_treemap.html")
 
     else:  # Stacked Bar
         fig_bar = go.Figure()
@@ -246,7 +244,7 @@ def _portfolio_content(
         )
         st.plotly_chart(fig_bar, use_container_width=True, key="portfolio_stacked_bar")
         chart_download_button(
-            fig_bar, "portfolio_stacked_bar.html", key="portfolio_stacked_bar_dl"
+            fig_bar, "Download Stacked Bar", "portfolio_stacked_bar.html"
         )
 
     # -----------------------------------------------------------------------
@@ -297,7 +295,7 @@ def _portfolio_content(
         )
         st.plotly_chart(fig_area, use_container_width=True, key="portfolio_area_chart")
         chart_download_button(
-            fig_area, "portfolio_weight_history.html", key="portfolio_area_dl"
+            fig_area, "Download Weight History", "portfolio_weight_history.html"
         )
 
     else:  # Table

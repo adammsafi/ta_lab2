@@ -88,6 +88,7 @@ if not tf_list:
 # Build asset lookup
 asset_options = dict(zip(assets_df["symbol"], assets_df["id"]))
 symbol_list = list(asset_options.keys())
+_btc_idx = symbol_list.index("BTC") if "BTC" in symbol_list else 0
 
 # Default tf index
 default_tf_idx = tf_list.index("1D") if "1D" in tf_list else 0
@@ -110,7 +111,7 @@ with st.sidebar:
     selected_symbol = st.selectbox(
         "Asset",
         symbol_list,
-        index=0,
+        index=_btc_idx,
         key="ama_asset",
     )
     selected_id = asset_options[selected_symbol]

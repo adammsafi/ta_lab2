@@ -147,7 +147,7 @@ def _build_heatmap_figure(
 
     # Bin timestamps to weekly for readability
     df = regime_df.copy()
-    df["week"] = df["ts"].dt.to_period("W").dt.start_time
+    df["week"] = df["ts"].dt.tz_localize(None).dt.to_period("W").dt.start_time
     # Take the most common trend_state per (symbol, week)
     mode_df = (
         df.groupby(["symbol", "week"])["trend_state"]

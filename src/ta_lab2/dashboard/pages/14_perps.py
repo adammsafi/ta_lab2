@@ -66,6 +66,10 @@ perp_options: dict[str, int] = dict(
     zip(perp_list_df["symbol"], perp_list_df["asset_id"])
 )
 perp_symbols = list(perp_options.keys())
+_btc_idx = perp_symbols.index("BTC") if "BTC" in perp_symbols else 0
+_default_multi = [s for s in ["BTC", "ETH", "SOL"] if s in perp_symbols]
+if not _default_multi:
+    _default_multi = perp_symbols[:3] if len(perp_symbols) >= 3 else perp_symbols
 
 # ---------------------------------------------------------------------------
 # Sidebar controls (OUTSIDE @st.fragment -- widgets cannot be inside a fragment)
@@ -99,7 +103,7 @@ with st.sidebar:
     single_symbol = st.selectbox(
         "Perp asset",
         perp_symbols,
-        index=0,
+        index=_btc_idx,
         key="perps_single_symbol",
     )
     single_asset_id = perp_options[single_symbol]
@@ -109,7 +113,7 @@ with st.sidebar:
     multi_symbols = st.multiselect(
         "Select up to 5 perps",
         perp_symbols,
-        default=perp_symbols[:3] if len(perp_symbols) >= 3 else perp_symbols,
+        default=_default_multi,
         max_selections=5,
         key="perps_multi_symbols",
     )
@@ -120,7 +124,7 @@ with st.sidebar:
     candle_symbol = st.selectbox(
         "Perp asset (candles)",
         perp_symbols,
-        index=0,
+        index=_btc_idx,
         key="perps_candle_symbol",
     )
     candle_asset_id = perp_options[candle_symbol]
@@ -196,6 +200,20 @@ def _perps_content(
                 display_df["mark_price"] = display_df["mark_px"].apply(
                     lambda v: f"${float(v):,.2f}" if v is not None else "N/A"
                 )
+            if "open_interest" in display_df.columns:
+                display_df["oi_base"] = display_df["open_interest"].apply(
+                    lambda v: f"{float(v):,.2f}" if v is not None else "N/A"
+                )
+            if (
+                "open_interest" in display_df.columns
+                and "mark_px" in display_df.columns
+            ):
+                display_df["oi_usd"] = display_df.apply(
+                    lambda r: f"${float(r['open_interest']) * float(r['mark_px']):,.0f}"
+                    if r["open_interest"] is not None and r["mark_px"] is not None
+                    else "N/A",
+                    axis=1,
+                )
 
             show_cols = [
                 c
@@ -203,7 +221,8 @@ def _perps_content(
                     "symbol",
                     "volume_24h",
                     "funding_rate",
-                    "open_interest",
+                    "oi_base",
+                    "oi_usd",
                     "mark_price",
                     "max_leverage",
                 ]

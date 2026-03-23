@@ -52,7 +52,7 @@ def load_table_freshness(_engine) -> pd.DataFrame:
     df["latest_data_ts"] = pd.to_datetime(df["latest_data_ts"], utc=True)
     df["last_refresh"] = pd.to_datetime(df["last_refresh"], utc=True)
     df["staleness_hours"] = (
-        pd.Timestamp.utcnow().tz_localize("UTC") - df["last_refresh"]
+        pd.Timestamp.now("UTC") - df["last_refresh"]
     ).dt.total_seconds() / 3600
     return df
 
@@ -117,7 +117,7 @@ def load_asset_coverage(_engine) -> pd.DataFrame:
     df["last_ts"] = pd.to_datetime(df["last_ts"], utc=True)
     df["updated_at"] = pd.to_datetime(df["updated_at"], utc=True)
     df["staleness_hours"] = (
-        pd.Timestamp.utcnow().tz_localize("UTC") - df["updated_at"]
+        pd.Timestamp.now("UTC") - df["updated_at"]
     ).dt.total_seconds() / 3600
     return df
 
