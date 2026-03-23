@@ -1385,7 +1385,7 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 - [ ] **Phase 87: Live Pipeline & Alert Wiring** - Daily pipeline end-to-end: signals → validation → executor → drift → alerts, IC staleness monitoring
 - [ ] **Phase 88: Integration Testing & Go-Live** - End-to-end smoke tests, 1-week paper trading burn-in, runbook updates, v1.2.0 tag
 - [x] **Phase 89: CTF Schema & Dimension Table** - Alembic migration for dim_ctf_indicators + ctf tables, seed indicators from ta/vol/returns/features, create ctf_config.yaml
-- [ ] **Phase 90: CTF Core Computation Module** - CTFFeature class: batch indicator loading, merge_asof alignment, slope/divergence/agreement/crossover composites, scoped DELETE+INSERT writes
+- [x] **Phase 90: CTF Core Computation Module** - CTFFeature class: batch indicator loading, merge_asof alignment, slope/divergence/agreement/crossover composites, scoped DELETE+INSERT writes
 - [ ] **Phase 91: CTF CLI & Pipeline Integration** - refresh_ctf.py CLI script, Phase 1b integration into run_all_feature_refreshes.py, incremental refresh support
 - [ ] **Phase 92: CTF IC Analysis & Feature Selection** - load_ctf_features() pivot loader, IC analysis on CTF features, compare vs AMA features, prune config to high-IC combinations
 
@@ -1590,8 +1590,8 @@ Plans:
 **Plans**: 2 plans in 2 waves
 
 Plans:
-- [ ] 90-01-PLAN.md -- CTFConfig dataclass, YAML/dim loading, batch indicator loading, timeframe alignment
-- [ ] 90-02-PLAN.md -- Composite computations (slope/divergence/agreement/crossover), orchestrator, write, integration test
+- [x] 90-01-PLAN.md -- CTFConfig dataclass, YAML/dim loading, batch indicator loading, timeframe alignment
+- [x] 90-02-PLAN.md -- Composite computations (slope/divergence/agreement/crossover), orchestrator, write, integration test
 
 ---
 

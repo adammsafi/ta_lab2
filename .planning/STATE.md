@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 
 ## Current Position
 
-Phase: 90-ctf-core-computation-module (v1.2.0, Phase complete)
-Plan: 2 of 2 complete (01 done, 02 done)
-Status: Phase complete
-Last activity: 2026-03-23 -- Completed 90-02-PLAN.md (CTF computation engine: slope/divergence/agreement/crossover + orchestrator + 1.75M rows for BTC)
+Phase: 90-ctf-core-computation-module (v1.2.0, Complete)
+Plan: 2 of 2 complete (01, 02 done)
+Status: Complete (verified 12/12 must-haves). 1,755,512 CTF rows computed for BTC (id=1).
+Last activity: 2026-03-23 -- Phase 90 complete (CTF computation engine: 4 composites + orchestrator + write)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [########--] 62% v1.2.0
 
