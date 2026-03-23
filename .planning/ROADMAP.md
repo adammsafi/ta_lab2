@@ -1386,7 +1386,7 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 - [ ] **Phase 88: Integration Testing & Go-Live** - End-to-end smoke tests, 1-week paper trading burn-in, runbook updates, v1.2.0 tag
 - [x] **Phase 89: CTF Schema & Dimension Table** - Alembic migration for dim_ctf_indicators + ctf tables, seed indicators from ta/vol/returns/features, create ctf_config.yaml
 - [x] **Phase 90: CTF Core Computation Module** - CTFFeature class: batch indicator loading, merge_asof alignment, slope/divergence/agreement/crossover composites, scoped DELETE+INSERT writes
-- [ ] **Phase 91: CTF CLI & Pipeline Integration** - refresh_ctf.py CLI script, Phase 1b integration into run_all_feature_refreshes.py, incremental refresh support
+- [ ] **Phase 91: CTF CLI & Pipeline Integration** - refresh_ctf.py CLI script, Phase 2c integration into run_all_feature_refreshes.py, incremental refresh support
 - [ ] **Phase 92: CTF IC Analysis & Feature Selection** - load_ctf_features() pivot loader, IC analysis on CTF features, compare vs AMA features, prune config to high-IC combinations
 
 ## v1.2.0 Phase Details
@@ -1608,20 +1608,22 @@ Plans:
 ---
 
 ### Phase 91: CTF CLI & Pipeline Integration
-**Goal:** Wire CTF computation into the daily refresh pipeline with a standalone CLI script and Phase 1b integration
+**Goal:** Wire CTF computation into the daily refresh pipeline with a standalone CLI script, Phase 2c integration, multiprocessing workers, and incremental refresh via ctf_state table
 **Depends on:** Phase 90 (core module must work)
 **Success Criteria** (what must be TRUE):
-  1. `src/ta_lab2/scripts/features/refresh_ctf.py` CLI with --ids, --all, --base-tf, --ref-tfs, --indicators, --full-refresh flags
+  1. `src/ta_lab2/scripts/features/refresh_ctf.py` CLI with --ids, --all, --base-tf, --ref-tfs, --indicators, --full-refresh, --workers, --dry-run flags
   2. `python -m ta_lab2.scripts.features.refresh_ctf --ids 1 --base-tf 1D` completes successfully
-  3. `python -m ta_lab2.scripts.features.refresh_ctf --all --base-tf 1D` processes all 109 assets
-  4. Phase 1b added to `run_all_feature_refreshes.py`: runs after vol/ta (Phase 1), before features materialization (Phase 2)
+  3. `python -m ta_lab2.scripts.features.refresh_ctf --all --base-tf 1D` processes all 109 assets with parallel workers
+  4. Phase 2c added to `run_all_feature_refreshes.py`: runs after microstructure (Phase 2b), before CS norms (Phase 3)
   5. `python -m ta_lab2.scripts.features.run_all_feature_refreshes --ids 1 --tf 1D` logs CTF phase completion
-  6. Incremental refresh: re-run only computes new dates (watermark-based skip)
-  7. Disk usage within expected range (~11 GB for initial config of 20 indicators × 11 TF pairs)
-**Plans:** 2 plans
+  6. Incremental refresh: re-run only computes new dates (watermark-based skip via ctf_state)
+  7. ctf_config.yaml expanded to 6 base TFs (2D, 3D added)
+**Plans:** 3 plans in 3 waves
+
 Plans:
-- [ ] 85-01-PLAN.md -- Backend query fixes (cache TTL slider, stats auto-discovery, drawdown calculation)
-- [ ] 85-02-PLAN.md -- Page consistency (engine init consolidation, stats row counts, drawdown KPI dollars)
+- [ ] 91-01-PLAN.md -- Alembic migration for ctf_state table, YAML expansion (2D/3D), tqdm dependency
+- [ ] 91-02-PLAN.md -- Standalone CLI refresh_ctf.py with multiprocessing, tqdm, incremental state, all CLI flags
+- [ ] 91-03-PLAN.md -- Phase 2c pipeline integration into run_all_feature_refreshes.py
 
 ---
 
