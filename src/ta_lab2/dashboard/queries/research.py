@@ -190,3 +190,76 @@ def load_close_prices(_engine, asset_id: int, tf: str) -> pd.Series:
     df["ts"] = pd.to_datetime(df["ts"], utc=True)
     df = df.set_index("ts")
     return df["close"]
+
+
+@st.cache_data(ttl=300)
+def load_ohlcv_features(_engine, asset_id: int, tf: str) -> pd.DataFrame:
+    """Return OHLCV + RSI-14 data for candlestick chart rendering.
+
+    Columns: ts (UTC datetime), open, high, low, close, volume, rsi_14
+
+    The rsi_14 column enables the RSI subplot in build_candlestick_chart.
+    Returns an empty DataFrame if no rows are found.
+    """
+    sql = text(
+        """
+        SELECT ts, open, high, low, close, volume, rsi_14
+        FROM public.features
+        WHERE id = :id
+          AND tf = :tf
+        ORDER BY ts
+        """
+    )
+    with _engine.connect() as conn:
+        df = pd.read_sql(sql, conn, params={"id": asset_id, "tf": tf})
+
+    if df.empty:
+        return df
+
+    df["ts"] = pd.to_datetime(df["ts"], utc=True)
+    return df
+
+
+@st.cache_data(ttl=300)
+def load_ema_overlays(
+    _engine,
+    asset_id: int,
+    tf: str,
+    periods: list[int] | None = None,
+) -> pd.DataFrame:
+    """Return EMA values for chart overlay rendering.
+
+    Columns: ts (UTC datetime), period (int), ema_value (float)
+
+    Each unique period gets its own overlay line in build_candlestick_chart.
+    If periods is None, all available periods are returned.
+    Returns an empty DataFrame if no rows are found.
+
+    CRITICAL: ema_multi_tf_u uses alignment_source='multi_tf' as the
+    canonical source. The EMA value column is `ema` -- aliased here as
+    ema_value to match build_candlestick_chart's expected column name.
+    """
+    base_sql = (
+        "SELECT ts, period, ema AS ema_value"
+        " FROM public.ema_multi_tf_u"
+        " WHERE id = :id"
+        "   AND tf = :tf"
+        "   AND alignment_source = 'multi_tf'"
+    )
+    params: dict = {"id": asset_id, "tf": tf}
+
+    if periods:
+        base_sql += " AND period = ANY(:periods)"
+        params["periods"] = periods
+
+    base_sql += " ORDER BY period, ts"
+
+    sql = text(base_sql)
+    with _engine.connect() as conn:
+        df = pd.read_sql(sql, conn, params=params)
+
+    if df.empty:
+        return df
+
+    df["ts"] = pd.to_datetime(df["ts"], utc=True)
+    return df
