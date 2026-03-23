@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 ## Current Position
 
 Phase: 84-dashboard-perps-portfolio-regimes (v1.2.0, In Progress)
-Plan: 4 of 5 complete
+Plan: 4 of 5 complete (01, 02, 03, 04 done; 05 pending)
 Status: In progress
-Last activity: 2026-03-23 -- Completed 84-04 (Portfolio Allocation placeholder page)
+Last activity: 2026-03-23 -- Completed 84-03 (AMA/EMA Inspector page + queries/ama.py)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [########--] 61% v1.2.0
 
@@ -41,6 +41,14 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 Decisions are logged in PROJECT.md Key Decisions table.
 
 v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
+
+**Phase 84 decisions (plan 03):**
+- load_ama_params_catalogue ttl=3600 (dim data, 18 rows, rarely changes)
+- load_ama_curves filters roll=false + alignment_source='multi_tf': avoids scanning 170M row ama_multi_tf_u table
+- er column rendered only for KAMA (NULL for DEMA/HMA/TEMA by design -- not a missing-data issue)
+- load_ema_for_comparison uses ema column (not aliased as ema_value): direct column access in AMA Inspector vs build_candlestick_chart compat alias in load_ema_overlays
+- Cross-asset comparison: yaxis2 overlaying='y' side='right' for dual price-normalized chart
+- ruff-format reformatted both files on first commit (multi-arg function calls): re-staged and committed clean (standard pattern)
 
 **Phase 84 decisions (plan 02):**
 - trend_state derived via split_part(l2_label, '-', 1) in SQL: regimes table has no trend_state column
@@ -182,10 +190,10 @@ None active.
 
 ## Session Continuity
 
-Last session: 2026-03-23T16:38:38Z
-Stopped at: Completed 84-04-PLAN.md (Portfolio Allocation placeholder page)
+Last session: 2026-03-23T16:39:06Z
+Stopped at: Completed 84-03-PLAN.md (AMA/EMA Inspector page + queries/ama.py)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-23 (Phase 84, Plan 1 complete)*
+*Last updated: 2026-03-23 (Phase 84, Plan 3 complete)*
