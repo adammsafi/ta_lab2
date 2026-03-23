@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 
 ## Current Position
 
-Phase: 85-dashboard-cleanup-polish (v1.2.0, In Progress)
-Plan: 2 of 2 complete (01-02 done)
-Status: Phase complete. Engine init consolidated; drawdown KPI shows % and $ amounts.
-Last activity: 2026-03-23 -- Completed 85-02-PLAN.md (2/2 tasks, all verifications passed)
+Phase: 91-ctf-cli-pipeline-integration (v1.2.0, In Progress)
+Plan: 1 of 3 complete (01 done)
+Status: In progress. ctf_state table created; YAML expanded to 6 base TFs; tqdm added.
+Last activity: 2026-03-23 -- Completed 91-01-PLAN.md (2/2 tasks, all verifications passed)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [########--] 62% v1.2.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [########--] 65% v1.2.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 387
+- Total plans completed: 388
 - Average duration: 7 min
 - Total execution time: ~30.9 hours
 
@@ -74,6 +74,12 @@ v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
 - load_stats_tables not imported at page level: load_stats_status calls it internally; Rows (24h) = sum(PASS+WARN+FAIL) -- no additional query needed
 - drawdown_usd backward-compat guard: falls back to 0.0 if column absent (cache not yet refreshed post-Plan 01 deploy)
 - Engine init pattern now consistent across all 17 dashboard pages: single module-level try/except get_engine() + st.stop()
+
+**Phase 91 decisions (plan 01):**
+- ctf_state PK omits ts (unlike ctf fact table): state table tracks one row per scope; ts in PK would require one row per timestamp
+- 2D and 3D get same ref_tfs as 1D (7D through 365D): short base TFs benefit from widest reference windows
+- tqdm added to core deps (not optional group): CLI progress bars are standard UX for long-running scripts
+- down_revision=j4k5l6m7n8o9 verified via alembic history before writing migration file
 
 **Phase 89 decisions (plan 01):**
 - down_revision=440fdfb3e8e1 (not i3j4k5l6m7n8 as research stated -- research predates the 440fdfb3e8e1 migration)
@@ -226,8 +232,8 @@ None active.
 
 ## Session Continuity
 
-Last session: 2026-03-23T22:09:34Z
-Stopped at: Completed 85-02-PLAN.md (dashboard cleanup: engine init consolidation + drawdown KPI)
+Last session: 2026-03-23T22:19:31Z
+Stopped at: Completed 91-01-PLAN.md (CTF prerequisites: ctf_state migration + YAML expansion + tqdm)
 Resume file: None
 
 ---
