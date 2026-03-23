@@ -15,19 +15,21 @@ import streamlit as st
 
 from ta_lab2.analysis.ic import compute_rolling_ic
 from ta_lab2.dashboard.charts import (
+    build_candlestick_chart,
     build_ic_decay_chart,
-    build_rolling_ic_chart,
-    build_regime_price_chart,
     build_regime_timeline,
+    build_rolling_ic_chart,
     chart_download_button,
 )
 from ta_lab2.dashboard.db import get_engine
 from ta_lab2.dashboard.queries.research import (
     load_asset_list,
     load_close_prices,
+    load_ema_overlays,
     load_feature_close_series,
     load_feature_names,
     load_ic_results,
+    load_ohlcv_features,
     load_regimes,
     load_tf_list,
 )
@@ -233,18 +235,41 @@ else:
 st.divider()
 st.subheader("Regime Analysis")
 
+# EMA overlay controls
+selected_ema_periods = st.multiselect(
+    "EMA Overlays",
+    [9, 21, 50, 200],
+    default=[21, 50],
+    key="ema_overlay_periods",
+)
+
 try:
     regimes_df = load_regimes(engine, selected_id, selected_tf)
+    ohlcv_df = load_ohlcv_features(engine, selected_id, selected_tf)
+    # Keep close_series load for backward-compatible fallback only
     close_series = load_close_prices(engine, selected_id, selected_tf)
 except Exception as exc:
     st.error(f"Error loading regime/price data: {exc}")
     regimes_df = None
+    ohlcv_df = None
     close_series = None
 
-# Price chart with regime overlay
-if close_series is not None and len(close_series) > 0:
+# Price chart: OHLCV candlestick with EMA overlays and regime vrect bands
+if ohlcv_df is not None and len(ohlcv_df) > 0:
     try:
-        fig_price = build_regime_price_chart(close_series, regimes_df)
+        ema_df = None
+        if selected_ema_periods:
+            ema_df = load_ema_overlays(
+                engine, selected_id, selected_tf, periods=selected_ema_periods
+            )
+            if ema_df is not None and ema_df.empty:
+                ema_df = None
+        fig_price = build_candlestick_chart(
+            ohlcv_df,
+            ema_df=ema_df,
+            regimes_df=regimes_df,
+            title=f"{selected_symbol} ({selected_tf})",
+        )
         st.plotly_chart(fig_price, theme=None, key="regime_price")
         chart_download_button(
             fig_price,
