@@ -19,7 +19,8 @@ dependencies = [
   "numpy",
   "SQLAlchemy>=2.0",
   "psycopg2-binary>=2.9",
-  "matplotlib>=3.8"
+  "matplotlib>=3.8",
+  "tqdm>=4.60"
 ]
 
 [project.scripts]

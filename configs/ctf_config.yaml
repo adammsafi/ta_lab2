@@ -5,6 +5,10 @@
 timeframe_pairs:
   - base_tf: "1D"
     ref_tfs: ["7D", "14D", "30D", "90D", "180D", "365D"]
+  - base_tf: "2D"
+    ref_tfs: ["7D", "14D", "30D", "90D", "180D", "365D"]
+  - base_tf: "3D"
+    ref_tfs: ["7D", "14D", "30D", "90D", "180D", "365D"]
   - base_tf: "7D"
     ref_tfs: ["30D", "90D", "180D", "365D"]
   - base_tf: "14D"
