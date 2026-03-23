@@ -1386,7 +1386,7 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 - [ ] **Phase 88: Integration Testing & Go-Live** - End-to-end smoke tests, 1-week paper trading burn-in, runbook updates, v1.2.0 tag
 - [x] **Phase 89: CTF Schema & Dimension Table** - Alembic migration for dim_ctf_indicators + ctf tables, seed indicators from ta/vol/returns/features, create ctf_config.yaml
 - [x] **Phase 90: CTF Core Computation Module** - CTFFeature class: batch indicator loading, merge_asof alignment, slope/divergence/agreement/crossover composites, scoped DELETE+INSERT writes
-- [ ] **Phase 91: CTF CLI & Pipeline Integration** - refresh_ctf.py CLI script, Phase 2c integration into run_all_feature_refreshes.py, incremental refresh support
+- [x] **Phase 91: CTF CLI & Pipeline Integration** - refresh_ctf.py CLI script, Phase 2c integration into run_all_feature_refreshes.py, incremental refresh support
 - [ ] **Phase 92: CTF IC Analysis & Feature Selection** - load_ctf_features() pivot loader, IC analysis on CTF features, compare vs AMA features, prune config to high-IC combinations
 
 ## v1.2.0 Phase Details
@@ -1621,9 +1621,9 @@ Plans:
 **Plans:** 3 plans in 3 waves
 
 Plans:
-- [ ] 91-01-PLAN.md -- Alembic migration for ctf_state table, YAML expansion (2D/3D), tqdm dependency
-- [ ] 91-02-PLAN.md -- Standalone CLI refresh_ctf.py with multiprocessing, tqdm, incremental state, all CLI flags
-- [ ] 91-03-PLAN.md -- Phase 2c pipeline integration into run_all_feature_refreshes.py
+- [x] 91-01-PLAN.md -- Alembic migration for ctf_state table, YAML expansion (2D/3D), tqdm dependency
+- [x] 91-02-PLAN.md -- Standalone CLI refresh_ctf.py with multiprocessing, tqdm, incremental state, all CLI flags
+- [x] 91-03-PLAN.md -- Phase 2c pipeline integration into run_all_feature_refreshes.py
 
 ---
 
