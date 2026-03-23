@@ -29,7 +29,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 - v1.0.0: 22 phases, 104 plans, ~14.5 hours
 - v1.0.1: 10 phases, 29 plans, ~2.0 hours
 - v1.1.0: 6 phases, 21 plans, ~2.5 hours
-- v1.2.0 (in progress): Phase 80 = 5 plans (~35 min), Phase 81 = 5 plans (~40 min), Phase 82 = 6 plans (~7h incl execution), Phase 83 plans 01+03 = 13 min
+- v1.2.0 (in progress): Phase 80 = 5 plans (~35 min), Phase 81 = 5 plans (~40 min), Phase 82 = 6 plans (~7h incl execution), Phase 83 plans 01+02+03 = 16 min
 - Trend: Stable (~5-7 min/plan)
 
 *Updated after each plan completion*
@@ -41,6 +41,13 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 Decisions are logged in PROJECT.md Key Decisions table.
 
 v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
+
+**Phase 83 decisions (plan 02):**
+- numpy.random.default_rng(42) for reproducible MC bootstrap CI -- consistent seed prevents UI flicker on re-run
+- MAE/MFE stored as decimal fractions; multiplied by 100 in display layer for % presentation with format="%.2f%%"
+- cost_matrix pivot: cost_df.set_index('cost_scenario')[metric_cols].T puts scenarios as columns -- natural comparison
+- Equity sparklines in Strategy-First load fold_metrics for top 3 assets only (3 DB queries per expander when opened)
+- ruff-format pre-commit hook reformatted file on first commit; re-staged and committed clean (standard pattern)
 
 **Phase 83 decisions (plan 03):**
 - compute_signal_strength: base=20 + EMA separation (0-30) + RSI extremity (0-30) + ATR magnitude (0-20); all .get() access
@@ -144,10 +151,10 @@ None active.
 
 ## Session Continuity
 
-Last session: 2026-03-23T13:54:00Z
-Stopped at: Completed 83-03-PLAN.md (Signal Browser page -- 3 active views, signal strength, history timeline)
+Last session: 2026-03-23T13:51:00Z
+Stopped at: Completed 83-02-PLAN.md (Backtest Results page -- leaderboard, strategy/asset views, cost matrix, MC CI, MAE/MFE)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-23 (Phase 83 plan 03 complete)*
+*Last updated: 2026-03-23 (Phase 83 plan 02 retroactively completed)*
