@@ -1510,7 +1510,10 @@ Plans:
   3. Drawdown calculation uses portfolio starting value, not just cumulative PnL peak
   4. Consistent color scheme, card styling, and alert banner placement across all 14+ pages
   5. Navigation groups in app.py updated to reflect new page categories
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 85-01-PLAN.md -- Backend query fixes (cache TTL slider, stats auto-discovery, drawdown calculation)
+- [ ] 85-02-PLAN.md -- Page consistency (engine init consolidation, stats row counts, drawdown KPI dollars)
 
 ---
 
@@ -1526,7 +1529,10 @@ Plans:
   3. Stop ladder calibrated per asset using MAE/MFE analysis from bake-off trades
   4. Paper executor dry run with refined signals produces fills matching backtest parity within tolerance
   5. Portfolio rebalance logic documented and wired into daily pipeline
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 85-01-PLAN.md -- Backend query fixes (cache TTL slider, stats auto-discovery, drawdown calculation)
+- [ ] 85-02-PLAN.md -- Page consistency (engine init consolidation, stats row counts, drawdown KPI dollars)
 
 ---
 
@@ -1539,7 +1545,10 @@ Plans:
   3. Telegram alerts tuned: regime changes, drawdown > threshold, drift pause, IC decay, new signal fires
   4. Signal validation gate: signals that deviate >2σ from historical distribution flagged before execution
   5. Dead-man switch: alert fires if daily pipeline hasn't completed by expected time
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 85-01-PLAN.md -- Backend query fixes (cache TTL slider, stats auto-discovery, drawdown calculation)
+- [ ] 85-02-PLAN.md -- Page consistency (engine init consolidation, stats row counts, drawdown KPI dollars)
 
 ---
 
@@ -1552,7 +1561,10 @@ Plans:
   3. Backtest parity verified: paper executor fills match backtest replay within cost tolerance
   4. Runbooks updated for v1.2.0 pipeline (new signal flow, new dashboard pages, GARCH refresh)
   5. v1.2.0 tagged and milestone audit complete
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 85-01-PLAN.md -- Backend query fixes (cache TTL slider, stats auto-discovery, drawdown calculation)
+- [ ] 85-02-PLAN.md -- Page consistency (engine init consolidation, stats row counts, drawdown KPI dollars)
 
 
 ---
@@ -1606,7 +1618,10 @@ Plans:
   5. `python -m ta_lab2.scripts.features.run_all_feature_refreshes --ids 1 --tf 1D` logs CTF phase completion
   6. Incremental refresh: re-run only computes new dates (watermark-based skip)
   7. Disk usage within expected range (~11 GB for initial config of 20 indicators × 11 TF pairs)
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 85-01-PLAN.md -- Backend query fixes (cache TTL slider, stats auto-discovery, drawdown calculation)
+- [ ] 85-02-PLAN.md -- Page consistency (engine init consolidation, stats row counts, drawdown KPI dollars)
 
 ---
 
@@ -1621,7 +1636,10 @@ Plans:
   5. Comparison report: CTF feature IC-IR vs AMA feature IC-IR — quantifies whether CTF adds non-redundant alpha
   6. ctf_config.yaml pruned to retain only high-IC indicator×ref_tf combinations (save disk)
   7. Results persisted to dim_feature_selection alongside existing Phase 80 entries
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 85-01-PLAN.md -- Backend query fixes (cache TTL slider, stats auto-discovery, drawdown calculation)
+- [ ] 85-02-PLAN.md -- Page consistency (engine init consolidation, stats row counts, drawdown KPI dollars)
 
 ---
 *Created: 2025-01-22*
