@@ -166,7 +166,7 @@ def _perps_content(
             cols = st.columns(3)
             for i, (col, row) in enumerate(zip(cols, top3.itertuples())):
                 vol_str = (
-                    f"${row.day_ntl_vlm / 1e6:.1f}M"
+                    f"${row.day_ntl_vlm / 1e6:,.1f}M"
                     if row.day_ntl_vlm is not None and row.day_ntl_vlm >= 1e6
                     else f"${row.day_ntl_vlm:,.0f}"
                     if row.day_ntl_vlm is not None

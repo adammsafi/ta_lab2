@@ -16,9 +16,21 @@ from sqlalchemy import text
 def load_asset_list(_engine) -> pd.DataFrame:
     """Return all assets ordered by symbol.
 
+    Joins cmc_da_info for proper ticker symbols (dim_assets.symbol stores CMC
+    IDs like '1' for Bitcoin).  Falls back to dim_assets.symbol for non-CMC
+    assets (e.g. AAPL, HYPE).
+
     Columns: id, symbol
     """
-    sql = text("SELECT id, symbol FROM public.dim_assets ORDER BY symbol")
+    sql = text(
+        """
+        SELECT da.id,
+               COALESCE(ci.symbol, da.symbol) AS symbol
+        FROM public.dim_assets da
+        LEFT JOIN public.cmc_da_info ci ON ci.id = da.id
+        ORDER BY COALESCE(ci.symbol, da.symbol)
+        """
+    )
     with _engine.connect() as conn:
         df = pd.read_sql(sql, conn)
     return df

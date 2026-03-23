@@ -34,13 +34,14 @@ def load_regime_all_assets(
     sql = text(
         """
         SELECT r.id,
-               da.symbol,
+               COALESCE(ci.symbol, da.symbol) AS symbol,
                r.ts,
                split_part(r.l2_label, '-', 1) AS trend_state,
                split_part(r.l2_label, '-', 2) AS vol_state,
                r.regime_key
         FROM public.regimes r
         JOIN public.dim_assets da ON da.id = r.id
+        LEFT JOIN public.cmc_da_info ci ON ci.id = r.id
         WHERE r.tf = :tf
           AND r.ts >= NOW() - (:days_back || ' days')::interval
         ORDER BY r.id, r.ts
@@ -68,13 +69,14 @@ def load_regime_stats_summary(
     sql = text(
         """
         SELECT rs.id,
-               da.symbol,
+               COALESCE(ci.symbol, da.symbol) AS symbol,
                rs.regime_key,
                rs.n_bars,
                rs.pct_of_history,
                rs.avg_ret_1d
         FROM public.regime_stats rs
         JOIN public.dim_assets da ON da.id = rs.id
+        LEFT JOIN public.cmc_da_info ci ON ci.id = rs.id
         WHERE rs.tf = :tf
         ORDER BY rs.id, rs.n_bars DESC
         """
@@ -97,13 +99,14 @@ def load_regime_flips_recent(
     sql = text(
         """
         SELECT rf.id,
-               da.symbol,
+               COALESCE(ci.symbol, da.symbol) AS symbol,
                rf.ts,
                rf.old_regime,
                rf.new_regime,
                rf.duration_bars
         FROM public.regime_flips rf
         JOIN public.dim_assets da ON da.id = rf.id
+        LEFT JOIN public.cmc_da_info ci ON ci.id = rf.id
         WHERE rf.tf = :tf
         ORDER BY rf.ts DESC
         LIMIT :limit
@@ -133,7 +136,7 @@ def load_regime_comovement(
     sql = text(
         """
         SELECT rc.id,
-               da.symbol,
+               COALESCE(ci.symbol, da.symbol) AS symbol,
                rc.ema_a,
                rc.ema_b,
                rc.correlation,
@@ -142,6 +145,7 @@ def load_regime_comovement(
                rc.n_obs
         FROM public.regime_comovement rc
         JOIN public.dim_assets da ON da.id = rc.id
+        LEFT JOIN public.cmc_da_info ci ON ci.id = rc.id
         WHERE rc.tf = :tf
         ORDER BY rc.id, rc.ema_a, rc.ema_b
         """
