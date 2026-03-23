@@ -1380,7 +1380,7 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 - [x] **Phase 82: Signal Refinement & Walk-Forward Bake-off** - Expression engine experiments, regime router training, walk-forward bake-off, DSR/PSR gate
 - [x] **Phase 83: Dashboard — Backtest & Signal Pages** - Backtest results page, signal browser, OHLCV candlestick charts
 - [x] **Phase 84: Dashboard — Perps, Portfolio & Regimes** - Hyperliquid page, portfolio allocation view, regime heatmap, AMA/EMA inspector
-- [ ] **Phase 85: Dashboard Cleanup & Polish** - Fix cache TTL slider, dynamic stats allowlist, drawdown calc, UI consistency
+- [x] **Phase 85: Dashboard Cleanup & Polish** - Fix cache TTL slider, dynamic stats allowlist, drawdown calc, UI consistency
 - [ ] **Phase 86: Portfolio Construction Pipeline** - IC-IR → Black-Litterman views, bet sizing with GARCH vol, stop ladder tuning, paper executor dry run
 - [ ] **Phase 87: Live Pipeline & Alert Wiring** - Daily pipeline end-to-end: signals → validation → executor → drift → alerts, IC staleness monitoring
 - [ ] **Phase 88: Integration Testing & Go-Live** - End-to-end smoke tests, 1-week paper trading burn-in, runbook updates, v1.2.0 tag
@@ -1512,8 +1512,8 @@ Plans:
   5. Navigation groups in app.py reorganized to separate Research, Markets, Operations, and Monitor
 **Plans:** 2 plans in 1 wave
 Plans:
-- [ ] 85-01-PLAN.md -- Backend query fixes (cache TTL slider, stats auto-discovery, drawdown calculation)
-- [ ] 85-02-PLAN.md -- Page consistency (engine init consolidation, stats row counts, drawdown KPI dollars)
+- [x] 85-01-PLAN.md -- Backend query fixes (cache TTL slider, stats auto-discovery, drawdown calculation)
+- [x] 85-02-PLAN.md -- Page consistency (engine init consolidation, stats row counts, drawdown KPI dollars)
 
 ---
 
