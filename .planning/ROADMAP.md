@@ -1378,7 +1378,7 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 - [x] **Phase 80: IC Analysis & Feature Selection** - Analyze IC sweep, stationarity tests, feature pruning 112→~20, quintile validation
 - [x] **Phase 81: GARCH & Conditional Volatility** - GARCH/EGARCH models, conditional vol forecasting, integration with position sizing and VaR
 - [x] **Phase 82: Signal Refinement & Walk-Forward Bake-off** - Expression engine experiments, regime router training, walk-forward bake-off, DSR/PSR gate
-- [ ] **Phase 83: Dashboard — Backtest & Signal Pages** - Backtest results page, signal browser, OHLCV candlestick charts
+- [x] **Phase 83: Dashboard — Backtest & Signal Pages** - Backtest results page, signal browser, OHLCV candlestick charts
 - [ ] **Phase 84: Dashboard — Perps, Portfolio & Regimes** - Hyperliquid page, portfolio allocation view, regime heatmap, AMA/EMA inspector
 - [ ] **Phase 85: Dashboard Cleanup & Polish** - Fix cache TTL slider, dynamic stats allowlist, drawdown calc, UI consistency
 - [ ] **Phase 86: Portfolio Construction Pipeline** - IC-IR → Black-Litterman views, bet sizing with GARCH vol, stop ladder tuning, paper executor dry run
@@ -1486,7 +1486,14 @@ Plans:
   3. Regime Heatmap page: cross-asset regime_comovement visualization, regime_stats summary, regime timeline for all assets (not just BTC/ETH)
   4. AMA/EMA Inspector: per-asset efficiency ratio, d1/d2 curves, adaptive vs fixed EMA comparison chart
   5. All pages auto-refresh via @st.fragment(run_every=900) for operational pages
-**Plans**: TBD
+**Plans**: 5 plans in 2 waves
+
+Plans:
+- [ ] 84-01-PLAN.md -- Hyperliquid Perps query layer + page
+- [ ] 84-02-PLAN.md -- Regime Heatmap query layer + page
+- [ ] 84-03-PLAN.md -- AMA/EMA Inspector query layer + page
+- [ ] 84-04-PLAN.md -- Portfolio Allocation placeholder page
+- [ ] 84-05-PLAN.md -- App registration + verification
 
 ---
 
