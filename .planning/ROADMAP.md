@@ -1377,7 +1377,7 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 
 - [x] **Phase 80: IC Analysis & Feature Selection** - Analyze IC sweep, stationarity tests, feature pruning 112→~20, quintile validation
 - [x] **Phase 81: GARCH & Conditional Volatility** - GARCH/EGARCH models, conditional vol forecasting, integration with position sizing and VaR
-- [ ] **Phase 82: Signal Refinement & Walk-Forward Bake-off** - Expression engine experiments, regime router training, walk-forward bake-off, DSR/PSR gate
+- [x] **Phase 82: Signal Refinement & Walk-Forward Bake-off** - Expression engine experiments, regime router training, walk-forward bake-off, DSR/PSR gate
 - [ ] **Phase 83: Dashboard — Backtest & Signal Pages** - Backtest results page, signal browser, OHLCV candlestick charts
 - [ ] **Phase 84: Dashboard — Perps, Portfolio & Regimes** - Hyperliquid page, portfolio allocation view, regime heatmap, AMA/EMA inspector
 - [ ] **Phase 85: Dashboard Cleanup & Polish** - Fix cache TTL slider, dynamic stats allowlist, drawdown calc, UI consistency
@@ -1448,12 +1448,12 @@ Plans:
 **Plans**: 6 plans in 4 waves
 
 Plans:
-- [ ] 82-01-PLAN.md -- Extended AMA data loader, Hyperliquid cost matrix, experiment_name migration
-- [ ] 82-02-PLAN.md -- AMA composite signal generators (momentum, mean-reversion, regime-conditional)
-- [ ] 82-03-PLAN.md -- YAML experiments + run_bakeoff.py multi-exchange/AMA support
-- [ ] 82-04-PLAN.md -- Regime router AMA extension + per-asset IC weight helpers
-- [ ] 82-05-PLAN.md -- Full walk-forward bake-off execution (99 assets x Kraken + HL)
-- [ ] 82-06-PLAN.md -- Statistical gates, strategy selection, and bake-off report
+- [x] 82-01-PLAN.md -- Extended AMA data loader, Hyperliquid cost matrix, experiment_name migration
+- [x] 82-02-PLAN.md -- AMA composite signal generators (momentum, mean-reversion, regime-conditional)
+- [x] 82-03-PLAN.md -- YAML experiments + run_bakeoff.py multi-exchange/AMA support
+- [x] 82-04-PLAN.md -- Regime router AMA extension + per-asset IC weight helpers
+- [x] 82-05-PLAN.md -- Full walk-forward bake-off execution (109 assets x Kraken + HL + expression)
+- [x] 82-06-PLAN.md -- Statistical gates, strategy selection, and bake-off report
 
 ---
 

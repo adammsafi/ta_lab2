@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 
 ## Current Position
 
-Phase: 82-signal-refinement-walk-forward-bakeoff (v1.2.0, 4/6 plans)
-Plan: 01, 02, 03, and 04 of 06 complete
-Status: In progress
-Last activity: 2026-03-22 -- Completed 82-04-PLAN.md (regime router AMA feature loading, conditional features, IC-IR weight helpers)
+Phase: 82-signal-refinement-walk-forward-bakeoff (v1.2.0, 6/6 plans) COMPLETE
+Plan: All 6 plans complete
+Status: Complete
+Last activity: 2026-03-23 -- Completed 82-06-PLAN.md (strategy selection with statistical gates, 687 survivors from 76K results)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [########--] 50% v1.2.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 366
+- Total plans completed: 372
 - Average duration: 7 min
 - Total execution time: ~29.8 hours
 
@@ -29,7 +29,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 - v1.0.0: 22 phases, 104 plans, ~14.5 hours
 - v1.0.1: 10 phases, 29 plans, ~2.0 hours
 - v1.1.0: 6 phases, 21 plans, ~2.5 hours
-- v1.2.0 (in progress): Phase 80 = 5 plans (~35 min), Phase 81 plans 01-05 = 40 min
+- v1.2.0 (in progress): Phase 80 = 5 plans (~35 min), Phase 81 = 5 plans (~40 min), Phase 82 = 6 plans (~7h incl execution)
 - Trend: Stable (~5-7 min/plan)
 
 *Updated after each plan completion*
@@ -128,10 +128,10 @@ None active.
 
 ## Session Continuity
 
-Last session: 2026-03-22T20:12:15Z
-Stopped at: Completed 82-04-PLAN.md (regime router AMA feature loading, conditional features, IC-IR weight helpers)
+Last session: 2026-03-23T08:00:00Z
+Stopped at: Completed Phase 82 (all 6 plans, 76K bakeoff results, 9 surviving strategies)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-22 (Phase 82 plan 04 complete)*
+*Last updated: 2026-03-23 (Phase 82 complete)*
