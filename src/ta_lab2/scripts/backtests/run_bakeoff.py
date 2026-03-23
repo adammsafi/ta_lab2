@@ -387,6 +387,13 @@ def _print_dry_run(
     print()
 
 
+def _get(sr: Any, attr: str, default: Any = None) -> Any:
+    """Get attribute from StrategyResult or dict (parallel mode returns dicts)."""
+    if isinstance(sr, dict):
+        return sr.get(attr, default)
+    return getattr(sr, attr, default)
+
+
 def _print_summary(results: List[StrategyResult]) -> None:
     """Print post-run summary of OOS metrics per strategy."""
     if not results:
@@ -398,80 +405,119 @@ def _print_summary(results: List[StrategyResult]) -> None:
     # Group by strategy name + cv_method, pick best Sharpe param set
     from collections import defaultdict
 
-    by_strategy_cv: Dict[Tuple, List[StrategyResult]] = defaultdict(list)
+    by_strategy_cv: Dict[Tuple, list] = defaultdict(list)
     for sr in results:
-        key = (sr.strategy_name, sr.cv_method, sr.asset_id)
+        key = (_get(sr, "strategy_name"), _get(sr, "cv_method"), _get(sr, "asset_id"))
         by_strategy_cv[key].append(sr)
 
-    print(
-        f"{'Strategy':<20} {'CV':<16} {'Asset':>7} {'Sharpe':>8} {'MaxDD':>8} {'PSR':>6} {'DSR':>6} {'Gate':>6}"
-    )
-    print("-" * 85)
+    # Detect parallel mode (dicts have limited fields)
+    is_parallel = isinstance(results[0], dict)
 
-    for (strategy_name, cv_method, asset_id), srs in sorted(by_strategy_cv.items()):
-        # Best params by Sharpe
-        valid = [
-            sr
-            for sr in srs
-            if not (isinstance(sr.sharpe_mean, float) and math.isnan(sr.sharpe_mean))
-        ]
-        if not valid:
-            continue
+    if is_parallel:
+        # Parallel summary: sharpe only (full metrics are in DB)
+        print(f"{'Strategy':<30} {'CV':<16} {'Assets':>7} {'Avg Sharpe':>11}")
+        print("-" * 70)
 
-        best = max(valid, key=lambda x: x.sharpe_mean)
-        sharpe = best.sharpe_mean
-        max_dd = best.max_drawdown_worst
-        psr = best.psr
-        dsr = best.dsr
+        # Aggregate by (strategy, cv_method)
+        by_strat: Dict[Tuple, list] = defaultdict(list)
+        for sr in results:
+            key = (_get(sr, "strategy_name"), _get(sr, "cv_method"))
+            sharpe = _get(sr, "sharpe_mean", float("nan"))
+            if not (isinstance(sharpe, float) and math.isnan(sharpe)):
+                by_strat[key].append(sharpe)
 
-        # V1 gate check
-        passes_sharpe = sharpe >= V1_SHARPE_GATE
-        passes_dd = abs(max_dd) <= V1_MAX_DD_GATE
-        gate = "PASS" if (passes_sharpe and passes_dd) else "FAIL"
+        for (strategy_name, cv_method), sharpes in sorted(by_strat.items()):
+            if not sharpes:
+                continue
+            avg_sharpe = sum(sharpes) / len(sharpes)
+            n_assets = len(sharpes)
+            print(
+                f"{strategy_name:<30} {cv_method:<16} {n_assets:>7} {avg_sharpe:>11.3f}"
+            )
 
-        psr_str = (
-            f"{psr:.3f}"
-            if not (isinstance(psr, float) and math.isnan(psr))
-            else "  NaN"
-        )
-        dsr_str = (
-            f"{dsr:.3f}"
-            if not (isinstance(dsr, float) and math.isnan(dsr))
-            else "  NaN"
-        )
-
+        n_unique_assets = len({_get(sr, "asset_id") for sr in results})
+        print(f"\nTotal: {len(results)} results across {n_unique_assets} assets")
         print(
-            f"{strategy_name:<20} {cv_method:<16} {asset_id:>7} "
-            f"{sharpe:>8.3f} {max_dd:>8.3f} {psr_str:>6} {dsr_str:>6} {gate:>6}"
+            "(Full metrics including PSR/DSR/MaxDD available in strategy_bakeoff_results)"
         )
-
-    # V1 gate summary
-    print()
-    passed = []
-    for (strategy_name, cv_method, asset_id), srs in by_strategy_cv.items():
-        if cv_method != "purged_kfold":
-            continue
-        valid = [
-            sr
-            for sr in srs
-            if not (isinstance(sr.sharpe_mean, float) and math.isnan(sr.sharpe_mean))
-        ]
-        if not valid:
-            continue
-        best = max(valid, key=lambda x: x.sharpe_mean)
-        if (
-            best.sharpe_mean >= V1_SHARPE_GATE
-            and abs(best.max_drawdown_worst) <= V1_MAX_DD_GATE
-        ):
-            passed.append((strategy_name, asset_id, best.sharpe_mean))
-
-    print(f"V1 Gate (Sharpe >= {V1_SHARPE_GATE}, MaxDD <= {V1_MAX_DD_GATE:.0%}):")
-    if passed:
-        for strategy_name, asset_id, sharpe in sorted(passed, key=lambda x: -x[2]):
-            print(f"  PASS: {strategy_name} (asset_id={asset_id}, sharpe={sharpe:.3f})")
     else:
-        print("  No strategies passed V1 gate on purged_kfold OOS metrics.")
-        print("  Consider ensemble/blending of top signals (per CONTEXT.md).")
+        # Sequential summary: full metrics
+        print(
+            f"{'Strategy':<20} {'CV':<16} {'Asset':>7} {'Sharpe':>8} "
+            f"{'MaxDD':>8} {'PSR':>6} {'DSR':>6} {'Gate':>6}"
+        )
+        print("-" * 85)
+
+        for (strategy_name, cv_method, asset_id), srs in sorted(by_strategy_cv.items()):
+            valid = [
+                sr
+                for sr in srs
+                if not (
+                    isinstance(_get(sr, "sharpe_mean"), float)
+                    and math.isnan(_get(sr, "sharpe_mean"))
+                )
+            ]
+            if not valid:
+                continue
+
+            best = max(valid, key=lambda x: _get(x, "sharpe_mean"))
+            sharpe = _get(best, "sharpe_mean")
+            max_dd = _get(best, "max_drawdown_worst", 0.0)
+            psr = _get(best, "psr", float("nan"))
+            dsr = _get(best, "dsr", float("nan"))
+
+            passes_sharpe = sharpe >= V1_SHARPE_GATE
+            passes_dd = abs(max_dd) <= V1_MAX_DD_GATE
+            gate = "PASS" if (passes_sharpe and passes_dd) else "FAIL"
+
+            psr_str = (
+                f"{psr:.3f}"
+                if not (isinstance(psr, float) and math.isnan(psr))
+                else "  NaN"
+            )
+            dsr_str = (
+                f"{dsr:.3f}"
+                if not (isinstance(dsr, float) and math.isnan(dsr))
+                else "  NaN"
+            )
+
+            print(
+                f"{strategy_name:<20} {cv_method:<16} {asset_id:>7} "
+                f"{sharpe:>8.3f} {max_dd:>8.3f} {psr_str:>6} {dsr_str:>6} {gate:>6}"
+            )
+
+        # V1 gate summary
+        print()
+        passed = []
+        for (strategy_name, cv_method, asset_id), srs in by_strategy_cv.items():
+            if cv_method != "purged_kfold":
+                continue
+            valid = [
+                sr
+                for sr in srs
+                if not (
+                    isinstance(_get(sr, "sharpe_mean"), float)
+                    and math.isnan(_get(sr, "sharpe_mean"))
+                )
+            ]
+            if not valid:
+                continue
+            best = max(valid, key=lambda x: _get(x, "sharpe_mean"))
+            if (
+                _get(best, "sharpe_mean") >= V1_SHARPE_GATE
+                and abs(_get(best, "max_drawdown_worst", 0.0)) <= V1_MAX_DD_GATE
+            ):
+                passed.append((strategy_name, asset_id, _get(best, "sharpe_mean")))
+
+        print(f"V1 Gate (Sharpe >= {V1_SHARPE_GATE}, MaxDD <= {V1_MAX_DD_GATE:.0%}):")
+        if passed:
+            for strategy_name, asset_id, sharpe in sorted(passed, key=lambda x: -x[2]):
+                print(
+                    f"  PASS: {strategy_name} (asset_id={asset_id}, sharpe={sharpe:.3f})"
+                )
+        else:
+            print("  No strategies passed V1 gate on purged_kfold OOS metrics.")
+            print("  Consider ensemble/blending of top signals (per CONTEXT.md).")
 
     print()
 
