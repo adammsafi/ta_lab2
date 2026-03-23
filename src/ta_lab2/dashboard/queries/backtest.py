@@ -326,6 +326,7 @@ def load_closed_signals_for_strategy(
             s.exit_price,
             s.exit_ts,
             s.pnl_pct,
+            s.regime_key,
             s.created_at,
             da.symbol
         FROM public.{table} s

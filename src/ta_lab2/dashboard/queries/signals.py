@@ -44,6 +44,8 @@ _SIGNAL_COLUMNS = """
     s.exit_price,
     s.exit_ts,
     s.pnl_pct,
+    s.feature_snapshot,
+    s.regime_key,
     s.created_at,
     da.symbol,
     ds.signal_type,
