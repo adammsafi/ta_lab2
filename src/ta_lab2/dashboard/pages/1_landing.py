@@ -17,7 +17,7 @@ import streamlit as st
 from ta_lab2.dashboard.db import get_engine
 from ta_lab2.dashboard.queries.executor import load_executor_run_log
 from ta_lab2.dashboard.queries.pipeline import load_stats_status, load_table_freshness
-from ta_lab2.dashboard.queries.research import load_asset_list, load_ic_results
+from ta_lab2.dashboard.queries.research import load_ic_results
 from ta_lab2.dashboard.queries.risk import load_risk_state
 
 st.header("Dashboard Home")
@@ -46,9 +46,9 @@ with col_left:
 
             latest_refresh_ts = freshness_df["last_refresh"].max()
             if hasattr(latest_refresh_ts, "strftime"):
-                latest_refresh_str = latest_refresh_ts.strftime("%Y-%m-%d %H:%M UTC")
+                latest_refresh_str = latest_refresh_ts.strftime("%m-%d %H:%M")
             else:
-                latest_refresh_str = str(latest_refresh_ts)
+                latest_refresh_str = str(latest_refresh_ts)[:11]
 
             avg_staleness = freshness_df["staleness_hours"].mean()
             avg_staleness_str = (
@@ -87,12 +87,9 @@ with col_right:
 
     try:
         engine = get_engine()
-        asset_df = load_asset_list(engine)
 
-        if asset_df.empty:
-            asset_id = 1  # BTC fallback
-        else:
-            asset_id = int(asset_df.iloc[0]["id"])
+        # Use BTC (asset_id=1) for IC scores -- most representative asset
+        asset_id = 1
 
         ic_df = load_ic_results(engine, asset_id=asset_id, tf="1D")
 
