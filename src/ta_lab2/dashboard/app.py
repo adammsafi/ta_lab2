@@ -77,6 +77,26 @@ pages = {
             title="Asset Statistics",
             icon=":material/bar_chart:",
         ),
+        st.Page(
+            "pages/14_perps.py",
+            title="Perps",
+            icon=":material/currency_exchange:",
+        ),
+        st.Page(
+            "pages/15_portfolio.py",
+            title="Portfolio",
+            icon=":material/account_balance:",
+        ),
+        st.Page(
+            "pages/16_regime_heatmap.py",
+            title="Regime Heatmap",
+            icon=":material/grid_view:",
+        ),
+        st.Page(
+            "pages/17_ama_inspector.py",
+            title="AMA Inspector",
+            icon=":material/ssid_chart:",
+        ),
     ],
     "Operations": [
         st.Page(
