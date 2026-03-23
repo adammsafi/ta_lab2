@@ -1379,7 +1379,7 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 - [x] **Phase 81: GARCH & Conditional Volatility** - GARCH/EGARCH models, conditional vol forecasting, integration with position sizing and VaR
 - [x] **Phase 82: Signal Refinement & Walk-Forward Bake-off** - Expression engine experiments, regime router training, walk-forward bake-off, DSR/PSR gate
 - [x] **Phase 83: Dashboard — Backtest & Signal Pages** - Backtest results page, signal browser, OHLCV candlestick charts
-- [ ] **Phase 84: Dashboard — Perps, Portfolio & Regimes** - Hyperliquid page, portfolio allocation view, regime heatmap, AMA/EMA inspector
+- [x] **Phase 84: Dashboard — Perps, Portfolio & Regimes** - Hyperliquid page, portfolio allocation view, regime heatmap, AMA/EMA inspector
 - [ ] **Phase 85: Dashboard Cleanup & Polish** - Fix cache TTL slider, dynamic stats allowlist, drawdown calc, UI consistency
 - [ ] **Phase 86: Portfolio Construction Pipeline** - IC-IR → Black-Litterman views, bet sizing with GARCH vol, stop ladder tuning, paper executor dry run
 - [ ] **Phase 87: Live Pipeline & Alert Wiring** - Daily pipeline end-to-end: signals → validation → executor → drift → alerts, IC staleness monitoring

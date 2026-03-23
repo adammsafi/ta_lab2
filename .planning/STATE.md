@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 
 ## Current Position
 
-Phase: 90-ctf-core-computation-module (v1.2.0, Complete)
-Plan: 2 of 2 complete (01, 02 done)
-Status: Complete (verified 12/12 must-haves). 1,755,512 CTF rows computed for BTC (id=1).
-Last activity: 2026-03-23 -- Phase 90 complete (CTF computation engine: 4 composites + orchestrator + write)
+Phase: 84-dashboard-perps-portfolio-regimes (v1.2.0, Complete)
+Plan: 5 of 5 complete (01-05 done)
+Status: Complete (verified 17/17 must-haves). 4 new dashboard pages: Perps, Portfolio, Regime Heatmap, AMA Inspector.
+Last activity: 2026-03-23 -- Phase 84 complete (dashboard pages + human-verified UX fixes)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [########--] 62% v1.2.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 380
+- Total plans completed: 385
 - Average duration: 7 min
 - Total execution time: ~30.9 hours
 
@@ -29,7 +29,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 - v1.0.0: 22 phases, 104 plans, ~14.5 hours
 - v1.0.1: 10 phases, 29 plans, ~2.0 hours
 - v1.1.0: 6 phases, 21 plans, ~2.5 hours
-- v1.2.0 (in progress): Phase 80 = 5 plans (~35 min), Phase 81 = 5 plans (~40 min), Phase 82 = 6 plans (~7h incl execution), Phase 83 = 5 plans (~25 min)
+- v1.2.0 (in progress): Phase 80 = 5 plans (~35 min), Phase 81 = 5 plans (~40 min), Phase 82 = 6 plans (~7h incl execution), Phase 83 = 5 plans (~25 min), Phase 84 = 5 plans (~50 min)
 - Trend: Stable (~5-7 min/plan)
 
 *Updated after each plan completion*
@@ -41,6 +41,13 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 Decisions are logged in PROJECT.md Key Decisions table.
 
 v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
+
+**Phase 84 decisions (plan 05):**
+- dim_assets.symbol stores CMC IDs (e.g., "1" for Bitcoin) -- all dashboard queries must JOIN cmc_da_info for real tickers via COALESCE(ci.symbol, da.symbol)
+- Perps page uses 3 separate @st.fragment functions (top perps, funding+heatmap, candles) so selectors can be placed between sections
+- EMA comovement limited to 7 assets (21 rows) by design in regime_comovement table -- not a bug
+- IC results landing widget hardcodes BTC (asset_id=1) as most representative asset
+- pd.Timestamp.now("UTC") replaces deprecated utcnow().tz_localize("UTC") in pipeline queries
 
 **Phase 84 decisions (plan 03):**
 - load_ama_params_catalogue ttl=3600 (dim data, 18 rows, rarely changes)
@@ -208,10 +215,10 @@ None active.
 
 ## Session Continuity
 
-Last session: 2026-03-23T20:44:54Z
-Stopped at: Completed 90-02-PLAN.md (CTF computation engine: 4 composites + orchestrator + 1.75M rows for BTC)
+Last session: 2026-03-23T23:30:00Z
+Stopped at: Completed Phase 84 (dashboard perps/portfolio/regimes — 5 plans, 17/17 verified, human-approved)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-23 (Phase 90, Plan 2 complete)*
+*Last updated: 2026-03-23 (Phase 84, Plan 5 complete)*
