@@ -103,12 +103,34 @@ def load_recent_fills(_engine, limit: int = 20) -> pd.DataFrame:
     return df
 
 
+@st.cache_data(ttl=3600)
+def load_starting_capital(_engine) -> float:
+    """Fetch total starting capital from active executor configs.
+
+    Returns the SUM of initial_capital for active configs, with a
+    fallback of 100,000.0 if no configs exist or all are NULL.
+    """
+    sql = text(
+        """
+        SELECT COALESCE(SUM(initial_capital), 100000.0) AS starting_capital
+        FROM public.dim_executor_config
+        WHERE is_active = TRUE
+          AND initial_capital IS NOT NULL
+        """
+    )
+    with _engine.connect() as conn:
+        row = conn.execute(sql).fetchone()
+    if row is None:
+        return 100_000.0
+    return float(row[0])
+
+
 @st.cache_data(ttl=300)
 def load_daily_pnl_series(_engine) -> pd.DataFrame:
-    """Return daily realized P&L aggregated from paper fills with equity curve columns.
+    """Return daily realized P&L with equity curve and corrected drawdown.
 
-    Columns: trade_date, daily_realized_pnl, cumulative_pnl, peak_equity,
-             drawdown_pct
+    Columns: trade_date, daily_realized_pnl, cumulative_pnl, equity,
+             peak_equity, drawdown_pct, drawdown_usd
     """
     sql = text(
         """
@@ -135,8 +157,13 @@ def load_daily_pnl_series(_engine) -> pd.DataFrame:
 
     df["trade_date"] = pd.to_datetime(df["trade_date"])
     df["cumulative_pnl"] = df["daily_realized_pnl"].cumsum()
-    df["peak_equity"] = df["cumulative_pnl"].cummax()
-    df["drawdown_pct"] = (df["cumulative_pnl"] - df["peak_equity"]) / df[
-        "peak_equity"
-    ].where(df["peak_equity"] != 0, 1)
+
+    # Corrected drawdown: use starting capital as base so denominator is
+    # never zero (cumulative_pnl starts at 0 on the first day).
+    starting_capital = load_starting_capital(_engine)
+    df["equity"] = starting_capital + df["cumulative_pnl"]
+    df["peak_equity"] = df["equity"].cummax()
+    df["drawdown_pct"] = (df["equity"] - df["peak_equity"]) / starting_capital
+    df["drawdown_usd"] = df["equity"] - df["peak_equity"]
+
     return df
