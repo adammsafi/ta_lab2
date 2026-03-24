@@ -10,13 +10,13 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 ## Current Position
 
 Phase: 88-integration-testing-go-live (v1.2.0, IN PROGRESS)
-Plan: 02 of N complete (Plans 01+02 complete)
-Status: In progress. Plan 01: smoke test + parity threshold. Plan 02: daily burn-in report.
-Last activity: 2026-03-24 -- Phase 88 plan 01 complete
+Plan: 03 of N complete (Plans 01+02+03 complete)
+Status: In progress. Plan 01: smoke test + parity threshold. Plan 02: daily burn-in report. Plan 03: operations manual + CHANGELOG + v1.2.0-REQUIREMENTS.md.
+Last activity: 2026-03-24 -- Phase 88 plan 03 complete
 
 Note: Phase 92 plan 04 paused at checkpoint (Task 5 human-verify).
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [########--] 80% v1.2.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [#########-] 85% v1.2.0
 
 ## Performance Metrics
 
@@ -51,6 +51,13 @@ v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
 - executor/drift use accessibility-only checks -- paper trading tables may have no rows yet
 - pnl_correlation_threshold=0.99 preserved as default -- no behavior change when flag omitted
 - threshold stored in report dict ('pnl_correlation_threshold' key) and displayed in format_report alongside P&L Correlation line
+
+**Phase 88 decisions (plan 03):**
+- Incremental additions only -- existing sections untouched, v1.2.0 content added as labelled subsections (4.9a, 4.9b, 7.1a)
+- Stage numbering updated in Part 2 diagram from 15 to 21 with explicit "(v1.2.0)" labels on new stages
+- Burn-in protocol in section 7.1a: 7-day, STOP only on kill switch / drift pause (not on poor PnL or GARCH failures)
+- Gate 1 v1.2.0 additions: smoke test + parity r >= 0.90 + GARCH stability check (< 3 consecutive convergence failures)
+- 19 requirements in v1.2.0-REQUIREMENTS.md: REQ-01 through REQ-19 with SQL/CLI verification and traceability
 
 **Phase 88 decisions (plan 02):**
 - positions.realized_pnl attempted first for PnL; falls back to COUNT(DISTINCT asset_id) from orders if column absent -- avoids schema-variation crash
@@ -348,7 +355,7 @@ None active.
 ## Session Continuity
 
 Last session: 2026-03-24
-Stopped at: Phase 88 plan 02 complete (daily burn-in report script created)
+Stopped at: Phase 88 plan 03 complete (operations manual updated, CHANGELOG + v1.2.0-REQUIREMENTS.md created)
 Resume file: None
 
 ---
