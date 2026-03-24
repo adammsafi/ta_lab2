@@ -1639,11 +1639,13 @@ Plans:
   5. Comparison report: CTF feature IC-IR vs AMA feature IC-IR — quantifies whether CTF adds non-redundant alpha
   6. ctf_config.yaml pruned to retain only high-IC indicator×ref_tf combinations (save disk)
   7. Results persisted to dim_feature_selection alongside existing Phase 80 entries
-**Plans:** 2 plans
+**Plans:** 3 plans in 3 waves
+
 Plans:
-- [ ] 85-01-PLAN.md -- Backend query fixes (cache TTL slider, stats auto-discovery, drawdown calculation)
-- [ ] 85-02-PLAN.md -- Page consistency (engine init consolidation, stats row counts, drawdown KPI dollars)
+- [ ] 92-01-PLAN.md -- load_ctf_features() pivot loader + dim_ctf_feature_selection Alembic migration
+- [ ] 92-02-PLAN.md -- run_ctf_ic_sweep.py: batch IC computation for all CTF features across all assets and base TFs
+- [ ] 92-03-PLAN.md -- run_ctf_feature_selection.py: tier classification, AMA comparison report, config pruning, DB persistence
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-23 (CTF infrastructure phases 89-92 added)*
+*Last updated: 2026-03-23 (Phase 92 planned: 3 plans in 3 waves)*
