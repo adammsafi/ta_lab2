@@ -28,6 +28,7 @@ from typing import Optional
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
+from ta_lab2.analysis.garch_blend import get_blended_vol
 from ta_lab2.executor.fill_simulator import FillSimulator, FillSimulatorConfig
 from ta_lab2.executor.position_sizer import (
     ExecutorConfig,
@@ -489,12 +490,37 @@ class PaperExecutor:
             conn, config.config_id, config.initial_capital
         )
 
+        # --- GARCH vol for target_vol sizing ---
+        garch_vol = None
+        if getattr(config, "target_annual_vol", None):
+            try:
+                blend_result = get_blended_vol(
+                    asset_id=asset_id,
+                    venue_id=1,  # CMC_AGG default
+                    tf="1D",
+                    engine=self.engine,
+                )
+                if blend_result is not None:
+                    garch_vol = blend_result["blended_vol"]
+                    self.logger.debug(
+                        "_process_asset_signal: asset_id=%d garch_vol=%.6f",
+                        asset_id,
+                        garch_vol,
+                    )
+            except Exception as exc:  # noqa: BLE001
+                self.logger.warning(
+                    "_process_asset_signal: get_blended_vol failed for asset_id=%d: %s",
+                    asset_id,
+                    exc,
+                )
+
         # --- target position ---
         target_qty = PositionSizer.compute_target_position(
             latest_signal=signal,
             portfolio_value=portfolio_value,
             current_price=current_price,
             config=config,
+            garch_vol=garch_vol,
         )
 
         # --- L4 gross_cap scaling (BEFORE RiskEngine gate) ---

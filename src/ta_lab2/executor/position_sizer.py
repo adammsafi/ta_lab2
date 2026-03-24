@@ -1,10 +1,13 @@
 """
 PositionSizer - Convert signals into target positions with configurable sizing modes.
 
-Supports three sizing modes:
+Supports four sizing modes:
   - fixed_fraction: constant fraction of portfolio value
   - regime_adjusted: fraction scaled by current market regime
   - signal_strength: fraction scaled by signal confidence
+  - target_vol: fraction scaled so portfolio vol targets a configured annualized vol.
+      Uses GARCH blended conditional vol (passed via garch_vol kwarg by caller).
+      Falls back to fixed_fraction when GARCH vol is unavailable or not configured.
 
 All arithmetic uses decimal.Decimal for precision.
 
@@ -75,6 +78,10 @@ class ExecutorConfig:
         High-water mark from the previous execution; None on first run.
     initial_capital : Decimal
         Starting portfolio value used when no positions exist yet.
+    target_annual_vol : float or None
+        Target annualized volatility fraction (e.g. 0.80 = 80% annual vol target).
+        Used when sizing_mode='target_vol'. When None or 0, target_vol falls back
+        to fixed_fraction. Maps to dim_executor_config.target_annual_vol column.
     """
 
     config_id: int
@@ -89,6 +96,7 @@ class ExecutorConfig:
     cadence_hours: float
     last_processed_signal_ts: datetime | None
     initial_capital: Decimal = field(default_factory=lambda: Decimal("100000"))
+    target_annual_vol: float | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -103,9 +111,12 @@ def compute_target_position(
     config: ExecutorConfig,
     regime_label: str | None = None,
     signal_confidence: float = 1.0,
+    **kwargs: Any,
 ) -> Decimal:
     """
-    Convenience wrapper — delegates to PositionSizer.compute_target_position.
+    Convenience wrapper -- delegates to PositionSizer.compute_target_position.
+
+    Accepts **kwargs (e.g. garch_vol) and passes them through to the static method.
     """
     return PositionSizer.compute_target_position(
         latest_signal=latest_signal,
@@ -114,6 +125,7 @@ def compute_target_position(
         config=config,
         regime_label=regime_label,
         signal_confidence=signal_confidence,
+        **kwargs,
     )
 
 
@@ -150,6 +162,7 @@ class PositionSizer:
         config: ExecutorConfig,
         regime_label: str | None = None,
         signal_confidence: float = 1.0,
+        **kwargs: Any,
     ) -> Decimal:
         """
         Compute the target position quantity (in asset units).
@@ -168,6 +181,14 @@ class PositionSizer:
             Current market regime key (used when sizing_mode='regime_adjusted').
         signal_confidence : float
             Signal confidence score 0.0-1.0 (used when sizing_mode='signal_strength').
+        **kwargs : Any
+            Additional keyword arguments passed from the caller.
+            garch_vol : float | None
+                GARCH blended daily conditional vol (decimal, e.g. 0.02 = 2% daily vol).
+                Used when sizing_mode='target_vol'. Passed by paper_executor via
+                get_blended_vol(). MUST be a daily vol -- annualized internally via
+                sqrt(252) before computing the vol scalar.
+                If None or not provided, target_vol falls back to fixed_fraction.
 
         Returns
         -------
@@ -197,7 +218,39 @@ class PositionSizer:
             confidence = max(Decimal(str(signal_confidence)), Decimal("0.10"))
             fraction = fraction * confidence
 
-        # else: fixed_fraction — no adjustment
+        elif sizing_mode == "target_vol":
+            # Scale position fraction so realized portfolio vol targets config.target_annual_vol.
+            # CRITICAL: garch_vol is daily decimal vol; annualize via sqrt(252) before
+            # computing the scalar. Forgetting annualization causes ~15x oversizing.
+            target_ann_vol = getattr(config, "target_annual_vol", None)
+            garch_vol = kwargs.get("garch_vol")
+
+            if target_ann_vol and target_ann_vol > 0 and garch_vol:
+                # Annualize daily GARCH vol: daily_vol * sqrt(252)
+                current_ann_vol = float(garch_vol) * (252**0.5)
+                if current_ann_vol > 1e-6:
+                    vol_scalar = float(target_ann_vol) / current_ann_vol
+                    fraction = Decimal(str(config.position_fraction)) * Decimal(
+                        str(vol_scalar)
+                    )
+                else:
+                    # Near-zero vol: fallback to fixed_fraction
+                    fraction = Decimal(str(config.position_fraction))
+                    logger.warning(
+                        "compute_target_position: target_vol -- current_ann_vol near "
+                        "zero (%.8f), using fixed_fraction",
+                        current_ann_vol,
+                    )
+            else:
+                # Fallback: no GARCH vol available or target not configured
+                fraction = Decimal(str(config.position_fraction))
+                if target_ann_vol and not garch_vol:
+                    logger.info(
+                        "compute_target_position: target_vol -- no garch_vol provided, "
+                        "falling back to fixed_fraction"
+                    )
+
+        # else: fixed_fraction -- no adjustment
 
         # Hard cap
         if fraction > max_fraction:
