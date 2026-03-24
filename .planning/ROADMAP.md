@@ -1546,10 +1546,12 @@ Plans:
   3. Telegram alerts tuned: regime changes, drawdown > threshold, drift pause, IC decay, new signal fires
   4. Signal validation gate: signals that deviate >2σ from historical distribution flagged before execution
   5. Dead-man switch: alert fires if daily pipeline hasn't completed by expected time
-**Plans:** 2 plans
+**Plans:** 4 plans
 Plans:
-- [ ] 85-01-PLAN.md -- Backend query fixes (cache TTL slider, stats auto-discovery, drawdown calculation)
-- [ ] 85-02-PLAN.md -- Page consistency (engine init consolidation, stats row counts, drawdown KPI dollars)
+- [ ] 87-01-PLAN.md -- Alembic migration (4 tables) + IC staleness monitor (multi-window IC-IR decay detection)
+- [ ] 87-02-PLAN.md -- Signal validation gate (count anomaly + crowded signal detection, hard execution block)
+- [ ] 87-03-PLAN.md -- Pipeline orchestration (--from-stage, dead-man switch, pipeline_run_log, completion alerts)
+- [ ] 87-04-PLAN.md -- BL weight override wiring (dim_ic_weight_overrides into portfolio refresh)
 
 ---
 
