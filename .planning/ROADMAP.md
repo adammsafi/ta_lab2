@@ -1638,7 +1638,7 @@ Plans:
   4. CTF features classified through existing feature_selection.py tier system (active/conditional/watch/archive)
   5. Comparison report: CTF feature IC-IR vs AMA feature IC-IR — quantifies whether CTF adds non-redundant alpha
   6. ctf_config.yaml pruned to retain only high-IC indicator×ref_tf combinations (save disk)
-  7. Results persisted to dim_feature_selection alongside existing Phase 80 entries
+  7. Results persisted to separate dim_ctf_feature_selection table (keeps CTF analysis independent from Phase 80 entries, per CONTEXT.md decision)
 **Plans:** 3 plans in 3 waves
 
 Plans:
