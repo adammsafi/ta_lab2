@@ -118,7 +118,7 @@ composite_params:
   slope_window: 5
   divergence_zscore_window: 63
 _pruning_metadata:
-  generated_at: '2026-03-24T02:49:53.694848'
+  generated_at: '2026-03-24T11:52:36.248596'
   pruned_ref_tfs_count: 0
   source: run_ctf_feature_selection.py
   note: All 6 base_tfs retained per Phase 92 context decision.
