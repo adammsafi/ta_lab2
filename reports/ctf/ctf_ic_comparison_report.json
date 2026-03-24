@@ -1,0 +1,267 @@
+{
+  "generated_at": "2026-03-24T02:49:51.620168",
+  "ic_ir_cutoff": 0.5,
+  "ctf_summary": {
+    "n_features": 96,
+    "tier_counts": {
+      "active": 7,
+      "conditional": 3,
+      "watch": 56,
+      "archive": 30
+    },
+    "top_ic_ir": 1.2947805268660244,
+    "mean_ic_ir": 0.2107993596592431
+  },
+  "ama_summary": {
+    "n_features": 205,
+    "top_ic_ir": 1.6512388134168245,
+    "active_rate_at_0_3": 0.5902439024390244
+  },
+  "redundancy": {
+    "spearman_rho": 0.19226717300047766,
+    "n_matched_pairs": 54,
+    "verdict": "LOW redundancy"
+  },
+  "top_ctf_features": [
+    {
+      "rank": 1,
+      "feature": "macd_hist_8_17_9_7d_agreement",
+      "mean_abs_ic_ir": 1.2947805268660244,
+      "mean_abs_ic": 0.008013249143564754,
+      "pass_rate": 1.0,
+      "tier": "active"
+    },
+    {
+      "rank": 2,
+      "feature": "macd_hist_12_26_9_7d_agreement",
+      "mean_abs_ic_ir": 1.2947805268660244,
+      "mean_abs_ic": 0.008013249143564754,
+      "pass_rate": 1.0,
+      "tier": "active"
+    },
+    {
+      "rank": 3,
+      "feature": "macd_12_26_7d_agreement",
+      "mean_abs_ic_ir": 1.2947805268660244,
+      "mean_abs_ic": 0.008013249143564754,
+      "pass_rate": 1.0,
+      "tier": "active"
+    },
+    {
+      "rank": 4,
+      "feature": "macd_8_17_7d_agreement",
+      "mean_abs_ic_ir": 1.2947805268660244,
+      "mean_abs_ic": 0.008013249143564754,
+      "pass_rate": 1.0,
+      "tier": "active"
+    },
+    {
+      "rank": 5,
+      "feature": "close_fracdiff_7d_ref_value",
+      "mean_abs_ic_ir": 0.7265129205051,
+      "mean_abs_ic": 0.04379736973431067,
+      "pass_rate": 1.0,
+      "tier": "active"
+    },
+    {
+      "rank": 6,
+      "feature": "close_fracdiff_7d_base_value",
+      "mean_abs_ic_ir": 0.7265129205051,
+      "mean_abs_ic": 0.04379736973431067,
+      "pass_rate": 1.0,
+      "tier": "active"
+    },
+    {
+      "rank": 7,
+      "feature": "sadf_stat_7d_agreement",
+      "mean_abs_ic_ir": 0.5169972855344936,
+      "mean_abs_ic": 0.005395506543877816,
+      "pass_rate": 0.5,
+      "tier": "active"
+    },
+    {
+      "rank": 8,
+      "feature": "bb_width_20_7d_base_value",
+      "mean_abs_ic_ir": 0.36116512155668273,
+      "mean_abs_ic": 0.05445106448973924,
+      "pass_rate": 0.0,
+      "tier": "watch"
+    },
+    {
+      "rank": 9,
+      "feature": "bb_width_20_7d_ref_value",
+      "mean_abs_ic_ir": 0.36116512155668273,
+      "mean_abs_ic": 0.05445106448973924,
+      "pass_rate": 0.0,
+      "tier": "watch"
+    },
+    {
+      "rank": 10,
+      "feature": "bb_width_20_7d_agreement",
+      "mean_abs_ic_ir": 0.3307612285854823,
+      "mean_abs_ic": 0.006101164547910995,
+      "pass_rate": 0.0,
+      "tier": "watch"
+    },
+    {
+      "rank": 11,
+      "feature": "vol_log_roll_20_7d_slope",
+      "mean_abs_ic_ir": 0.32083293638584715,
+      "mean_abs_ic": 0.04370399318076224,
+      "pass_rate": 0.0,
+      "tier": "watch"
+    },
+    {
+      "rank": 12,
+      "feature": "rsi_7_7d_agreement",
+      "mean_abs_ic_ir": 0.3100613899031852,
+      "mean_abs_ic": 0.016637147679043215,
+      "pass_rate": 0.5,
+      "tier": "conditional"
+    },
+    {
+      "rank": 13,
+      "feature": "rsi_21_7d_agreement",
+      "mean_abs_ic_ir": 0.3100613899031852,
+      "mean_abs_ic": 0.016637147679043215,
+      "pass_rate": 0.5,
+      "tier": "conditional"
+    },
+    {
+      "rank": 14,
+      "feature": "rsi_14_7d_agreement",
+      "mean_abs_ic_ir": 0.3100613899031852,
+      "mean_abs_ic": 0.016637147679043215,
+      "pass_rate": 0.5,
+      "tier": "conditional"
+    },
+    {
+      "rank": 15,
+      "feature": "bb_width_20_7d_slope",
+      "mean_abs_ic_ir": 0.30427388640865605,
+      "mean_abs_ic": 0.040976697304460144,
+      "pass_rate": 0.0,
+      "tier": "watch"
+    },
+    {
+      "rank": 16,
+      "feature": "close_fracdiff_7d_agreement",
+      "mean_abs_ic_ir": 0.29886878075235634,
+      "mean_abs_ic": 0.005857598430538509,
+      "pass_rate": 0.0,
+      "tier": "watch"
+    },
+    {
+      "rank": 17,
+      "feature": "vol_parkinson_20_7d_slope",
+      "mean_abs_ic_ir": 0.2806733870454479,
+      "mean_abs_ic": 0.035218278490058805,
+      "pass_rate": 0.0,
+      "tier": "watch"
+    },
+    {
+      "rank": 18,
+      "feature": "ret_arith_7d_base_value",
+      "mean_abs_ic_ir": 0.2555941797573168,
+      "mean_abs_ic": 0.011356759782253445,
+      "pass_rate": 0.0,
+      "tier": "watch"
+    },
+    {
+      "rank": 19,
+      "feature": "ret_log_7d_base_value",
+      "mean_abs_ic_ir": 0.2555941797573168,
+      "mean_abs_ic": 0.011356759782253445,
+      "pass_rate": 0.0,
+      "tier": "watch"
+    },
+    {
+      "rank": 20,
+      "feature": "vol_gk_63_7d_ref_value",
+      "mean_abs_ic_ir": 0.2518739547375475,
+      "mean_abs_ic": 0.03420468782320324,
+      "pass_rate": 0.0,
+      "tier": "watch"
+    },
+    {
+      "rank": 21,
+      "feature": "atr_14_7d_slope",
+      "mean_abs_ic_ir": 0.2458908929443171,
+      "mean_abs_ic": 0.04799359855600392,
+      "pass_rate": 0.0,
+      "tier": "watch"
+    },
+    {
+      "rank": 22,
+      "feature": "vol_gk_20_7d_slope",
+      "mean_abs_ic_ir": 0.2454390388573834,
+      "mean_abs_ic": 0.0254054998577687,
+      "pass_rate": 0.0,
+      "tier": "watch"
+    },
+    {
+      "rank": 23,
+      "feature": "ret_arith_7d_slope",
+      "mean_abs_ic_ir": 0.22067608498706884,
+      "mean_abs_ic": 0.021205679783226024,
+      "pass_rate": 0.0,
+      "tier": "watch"
+    },
+    {
+      "rank": 24,
+      "feature": "adx_14_7d_base_value",
+      "mean_abs_ic_ir": 0.21938598937521564,
+      "mean_abs_ic": 0.038299764015965104,
+      "pass_rate": 0.0,
+      "tier": "watch"
+    },
+    {
+      "rank": 25,
+      "feature": "ret_log_7d_slope",
+      "mean_abs_ic_ir": 0.2192747638581356,
+      "mean_abs_ic": 0.021632180683240097,
+      "pass_rate": 0.0,
+      "tier": "watch"
+    },
+    {
+      "rank": 26,
+      "feature": "macd_12_26_7d_ref_value",
+      "mean_abs_ic_ir": 0.20786760009540434,
+      "mean_abs_ic": 0.02927047658207915,
+      "pass_rate": 0.0,
+      "tier": "watch"
+    },
+    {
+      "rank": 27,
+      "feature": "macd_12_26_7d_base_value",
+      "mean_abs_ic_ir": 0.20786760009540434,
+      "mean_abs_ic": 0.02927047658207915,
+      "pass_rate": 0.0,
+      "tier": "watch"
+    },
+    {
+      "rank": 28,
+      "feature": "vol_gk_63_7d_base_value",
+      "mean_abs_ic_ir": 0.19795889767369332,
+      "mean_abs_ic": 0.03304240313345179,
+      "pass_rate": 0.0,
+      "tier": "watch"
+    },
+    {
+      "rank": 29,
+      "feature": "sadf_stat_7d_ref_value",
+      "mean_abs_ic_ir": 0.19520297494041555,
+      "mean_abs_ic": 0.04903929988515244,
+      "pass_rate": 0.0,
+      "tier": "watch"
+    },
+    {
+      "rank": 30,
+      "feature": "sadf_stat_7d_base_value",
+      "mean_abs_ic_ir": 0.19520297494041555,
+      "mean_abs_ic": 0.04903929988515244,
+      "pass_rate": 0.0,
+      "tier": "watch"
+    }
+  ]
+}
