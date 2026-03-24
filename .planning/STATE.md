@@ -75,6 +75,12 @@ v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
 - drawdown_usd backward-compat guard: falls back to 0.0 if column absent (cache not yet refreshed post-Plan 01 deploy)
 - Engine init pattern now consistent across all 17 dashboard pages: single module-level try/except get_engine() + st.stop()
 
+**Phase 86 decisions (plan 01):**
+- Revision ID m7n8o9p0q1r2 used (l6m7n8o9p0q1 already taken by dim_ctf_feature_selection from Phase 89/CTF); down_revision=l6m7n8o9p0q1 is correct current head
+- strategy column in stop_calibrations uses dim_signals.strategy_type via JOIN, falls back to signal_id::TEXT when unavailable
+- equal-weight sl_sizes=[0.33,0.33,0.34] and tp_sizes=[0.50,0.50] for 3-tier SL and 2-tier TP
+- from_db_calibrations() graceful fallback: DB query failure returns unmodified ladder (global YAML defaults apply); never raises
+
 **Phase 92 decisions (plan 01):**
 - load_ctf_features uses vectorized pivot (melt+pivot_table), not iterrows -- matches batch_compute_ic input expectations at scale
 - dim_ctf_feature_selection separate from dim_feature_selection (Phase 80) -- CTF composites differ; avoids schema interference
@@ -252,8 +258,8 @@ None active.
 
 ## Session Continuity
 
-Last session: 2026-03-24T02:24:15Z
-Stopped at: Completed 92-01-PLAN.md (CTF pivot loader + dim_ctf_feature_selection migration)
+Last session: 2026-03-24T02:30:24Z
+Stopped at: Completed 86-01-PLAN.md (stop_calibrations migration, MAE/MFE calibration module, calibrate_stops CLI, StopLadder.from_db_calibrations())
 Resume file: None
 
 ---
