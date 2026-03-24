@@ -214,6 +214,177 @@ def _compute_crossover(
 
 
 # ---------------------------------------------------------------------------
+# CTF pivot loader
+# ---------------------------------------------------------------------------
+
+
+def load_ctf_features(
+    conn,
+    asset_id: int,
+    base_tf: str,
+    train_start: pd.Timestamp,
+    train_end: pd.Timestamp,
+    *,
+    ref_tfs: Optional[list[str]] = None,
+    indicator_names: Optional[list[str]] = None,
+    alignment_source: str = "multi_tf",
+    venue_id: int = 1,
+) -> pd.DataFrame:
+    """Load CTF features from public.ctf and reshape to wide-format DataFrame.
+
+    Queries the ctf fact table joined with dim_ctf_indicators, then pivots from
+    the normalized long format (one row per indicator x ref_tf x timestamp) into
+    a wide format suitable for batch_compute_ic().
+
+    Column naming: ``{indicator_name}_{ref_tf_lower}_{composite}``
+    Example: ``rsi_14_7d_slope``, ``macd_30d_divergence``
+
+    Parameters
+    ----------
+    conn:
+        SQLAlchemy connection (Engine.connect() context or raw connection).
+    asset_id:
+        Asset ID (public.dim_assets.id).
+    base_tf:
+        Base timeframe string (e.g. '1D', '7D').
+    train_start:
+        Start of training window (inclusive). Timezone-aware UTC.
+    train_end:
+        End of training window (inclusive). Timezone-aware UTC.
+    ref_tfs:
+        Optional list of reference timeframe strings to filter (e.g. ['7D', '30D']).
+        If None, all reference timeframes are returned.
+    indicator_names:
+        Optional list of indicator names to filter (e.g. ['rsi_14', 'macd']).
+        If None, all active indicators are returned.
+    alignment_source:
+        Alignment source filter (default: 'multi_tf').
+    venue_id:
+        Venue ID filter (default: 1 = CMC_AGG).
+
+    Returns
+    -------
+    pd.DataFrame with:
+        - DatetimeIndex named 'ts' that is tz-aware UTC
+        - One column per (indicator_name, ref_tf, composite) combination
+        - Columns named {indicator_name}_{ref_tf_lower}_{composite}
+        - All-NaN columns dropped (e.g. crossover for non-directional indicators)
+        - Empty DataFrame if no rows match the query
+    """
+    # ------------------------------------------------------------------
+    # Build SQL query
+    # ------------------------------------------------------------------
+    where_parts = [
+        "c.id = :asset_id",
+        "c.base_tf = :base_tf",
+        "c.ts >= :train_start",
+        "c.ts <= :train_end",
+        "c.alignment_source = :alignment_source",
+        "c.venue_id = :venue_id",
+    ]
+    params: dict = {
+        "asset_id": asset_id,
+        "base_tf": base_tf,
+        "train_start": train_start,
+        "train_end": train_end,
+        "alignment_source": alignment_source,
+        "venue_id": venue_id,
+    }
+
+    if ref_tfs is not None:
+        where_parts.append("c.ref_tf = ANY(:ref_tfs)")
+        params["ref_tfs"] = ref_tfs
+
+    if indicator_names is not None:
+        where_parts.append("d.indicator_name = ANY(:indicator_names)")
+        params["indicator_names"] = indicator_names
+
+    where_clause = " AND ".join(where_parts)
+
+    sql_str = f"""
+        SELECT
+            c.ts,
+            d.indicator_name,
+            c.ref_tf,
+            c.ref_value,
+            c.base_value,
+            c.slope,
+            c.divergence,
+            c.agreement,
+            c.crossover
+        FROM public.ctf c
+        JOIN public.dim_ctf_indicators d ON d.indicator_id = c.indicator_id
+        WHERE {where_clause}
+        ORDER BY c.ts
+    """
+
+    df = pd.read_sql(text(sql_str), conn, params=params)
+
+    # ------------------------------------------------------------------
+    # Return empty DataFrame early if no data
+    # ------------------------------------------------------------------
+    if df.empty:
+        logger.debug(
+            "load_ctf_features: no rows for asset_id=%d base_tf=%s train=%s..%s",
+            asset_id,
+            base_tf,
+            train_start,
+            train_end,
+        )
+        return pd.DataFrame()
+
+    # ------------------------------------------------------------------
+    # CRITICAL: ensure ts is tz-aware UTC (Windows tz-naive fix)
+    # ------------------------------------------------------------------
+    df["ts"] = pd.to_datetime(df["ts"], utc=True)
+
+    # ------------------------------------------------------------------
+    # Vectorized pivot: long -> wide
+    # ------------------------------------------------------------------
+    df["ref_tf_lower"] = df["ref_tf"].str.lower()
+    df["col_base"] = df["indicator_name"] + "_" + df["ref_tf_lower"]
+
+    composite_cols = [
+        "ref_value",
+        "base_value",
+        "slope",
+        "divergence",
+        "agreement",
+        "crossover",
+    ]
+    melted = df.melt(
+        id_vars=["ts", "col_base"],
+        value_vars=composite_cols,
+        var_name="composite",
+        value_name="val",
+    )
+    melted["feature_col"] = melted["col_base"] + "_" + melted["composite"]
+
+    wide = melted.pivot_table(
+        index="ts",
+        columns="feature_col",
+        values="val",
+        aggfunc="first",
+    )
+    wide.columns.name = None
+    wide.index.name = "ts"
+
+    # ------------------------------------------------------------------
+    # Drop all-NaN columns (e.g. crossover for non-directional indicators)
+    # ------------------------------------------------------------------
+    wide = wide.dropna(axis=1, how="all")
+
+    logger.debug(
+        "load_ctf_features: asset_id=%d base_tf=%s rows=%d cols=%d",
+        asset_id,
+        base_tf,
+        len(wide),
+        len(wide.columns),
+    )
+    return wide
+
+
+# ---------------------------------------------------------------------------
 # CTFConfig
 # ---------------------------------------------------------------------------
 
