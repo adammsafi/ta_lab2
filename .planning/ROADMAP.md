@@ -1383,7 +1383,7 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 - [x] **Phase 85: Dashboard Cleanup & Polish** - Fix cache TTL slider, dynamic stats allowlist, drawdown calc, UI consistency
 - [x] **Phase 86: Portfolio Construction Pipeline** - IC-IR → Black-Litterman views, bet sizing with GARCH vol, stop ladder tuning, paper executor dry run
 - [x] **Phase 87: Live Pipeline & Alert Wiring** - Daily pipeline end-to-end: signals → validation → executor → drift → alerts, IC staleness monitoring
-- [ ] **Phase 88: Integration Testing & Go-Live** - End-to-end smoke tests, 1-week paper trading burn-in, runbook updates, v1.2.0 tag
+- [x] **Phase 88: Integration Testing & Go-Live** - End-to-end smoke tests, 1-week paper trading burn-in, runbook updates, v1.2.0 tag
 - [x] **Phase 89: CTF Schema & Dimension Table** - Alembic migration for dim_ctf_indicators + ctf tables, seed indicators from ta/vol/returns/features, create ctf_config.yaml
 - [x] **Phase 90: CTF Core Computation Module** - CTFFeature class: batch indicator loading, merge_asof alignment, slope/divergence/agreement/crossover composites, scoped DELETE+INSERT writes
 - [x] **Phase 91: CTF CLI & Pipeline Integration** - refresh_ctf.py CLI script, Phase 2c integration into run_all_feature_refreshes.py, incremental refresh support
