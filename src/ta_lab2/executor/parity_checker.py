@@ -11,6 +11,9 @@ Usage:
                            start_date='2024-01-01', end_date='2024-12-31',
                            slippage_mode='zero')
     print(checker.format_report(report))
+
+Phase 88 burn-in: use pnl_correlation_threshold=0.90 (softer gate) via
+the --pnl-correlation-threshold flag in run_parity_check.py.
 """
 
 from __future__ import annotations
@@ -55,6 +58,7 @@ class ParityChecker:
         start_date: str,
         end_date: str,
         slippage_mode: str = "zero",
+        pnl_correlation_threshold: float = 0.99,
     ) -> dict:
         """
         Run parity check and return a report dict.
@@ -71,6 +75,9 @@ class ParityChecker:
             Inclusive end date string (e.g. '2024-12-31').
         slippage_mode:
             One of 'zero', 'fixed', 'lognormal'.
+        pnl_correlation_threshold:
+            Minimum P&L correlation for PASS in fixed/lognormal modes.
+            Default: 0.99.  Phase 88 burn-in uses 0.90.
 
         Returns
         -------
@@ -78,7 +85,7 @@ class ParityChecker:
             config_id, signal_id, date_range, slippage_mode,
             backtest_trade_count, executor_fill_count, trade_count_match,
             max_price_divergence_bps, pnl_correlation, tracking_error_pct,
-            parity_pass.
+            pnl_correlation_threshold, parity_pass.
         """
         bt_trades = self._load_backtest_trades(signal_id, start_date, end_date)
         exec_fills = self._load_executor_fills(signal_id, start_date, end_date)
@@ -94,6 +101,7 @@ class ParityChecker:
             "max_price_divergence_bps": None,
             "pnl_correlation": None,
             "tracking_error_pct": None,
+            "pnl_correlation_threshold": pnl_correlation_threshold,
             "parity_pass": False,
         }
 
@@ -111,7 +119,9 @@ class ParityChecker:
             report = self._compute_price_divergence(report, bt_trades, exec_fills)
             report = self._compute_pnl_correlation(report, bt_trades, exec_fills)
 
-        report["parity_pass"] = self._evaluate_parity(report, slippage_mode)
+        report["parity_pass"] = self._evaluate_parity(
+            report, slippage_mode, pnl_correlation_threshold
+        )
         return report
 
     def format_report(self, report: dict) -> str:
@@ -144,6 +154,7 @@ class ParityChecker:
             "",
             f"Max Price Div:    {div_str}",
             f"P&L Correlation:  {corr_str}",
+            f"P&L Threshold:    {report.get('pnl_correlation_threshold', 0.99):.2f}",
             f"Tracking Error:   {tracking_str}",
             "",
             f"RESULT:           {result_label}",
@@ -288,8 +299,24 @@ class ParityChecker:
     # Parity evaluation
     # ------------------------------------------------------------------
 
-    def _evaluate_parity(self, report: dict, slippage_mode: str) -> bool:
-        """Apply mode-specific parity tolerance rules."""
+    def _evaluate_parity(
+        self,
+        report: dict,
+        slippage_mode: str,
+        pnl_correlation_threshold: float = 0.99,
+    ) -> bool:
+        """Apply mode-specific parity tolerance rules.
+
+        Parameters
+        ----------
+        report:
+            Parity report dict with computed metrics.
+        slippage_mode:
+            One of 'zero', 'fixed', 'lognormal'.
+        pnl_correlation_threshold:
+            Minimum P&L correlation for PASS in fixed/lognormal modes.
+            Default: 0.99.  Phase 88 burn-in uses 0.90.
+        """
         if slippage_mode == "zero":
             # Strict: count must match AND max divergence < 1 bps
             count_ok = report.get("trade_count_match", False)
@@ -298,9 +325,9 @@ class ParityChecker:
             return bool(count_ok and div_ok)
 
         elif slippage_mode in ("fixed", "lognormal"):
-            # Statistical: correlation must be >= 0.99
+            # Statistical: correlation must be >= caller-provided threshold
             corr = report.get("pnl_correlation")
-            return corr is not None and corr >= 0.99
+            return corr is not None and corr >= pnl_correlation_threshold
 
         else:
             logger.warning(

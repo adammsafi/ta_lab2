@@ -18,6 +18,11 @@ Usage:
     python -m ta_lab2.scripts.executor.run_parity_check \\
         --bakeoff-winners --start 2024-01-01 --end 2025-01-01
 
+    # Phase 88 burn-in: softer correlation gate (0.90)
+    python -m ta_lab2.scripts.executor.run_parity_check \\
+        --bakeoff-winners --start 2024-01-01 --end 2025-01-01 \\
+        --pnl-correlation-threshold 0.90
+
 Exit codes:
     0  Parity check PASSED
     1  Parity check FAILED (or error)
@@ -232,8 +237,18 @@ def _build_parser() -> argparse.ArgumentParser:
         choices=["zero", "fixed", "lognormal"],
         help=(
             "Expected slippage mode. 'zero' requires exact fill price match "
-            "(<1 bps); 'fixed'/'lognormal' requires P&L correlation >= 0.99. "
+            "(<1 bps); 'fixed'/'lognormal' requires P&L correlation >= threshold. "
             "Default: zero (or 'fixed' when --bakeoff-winners is used)."
+        ),
+    )
+    parser.add_argument(
+        "--pnl-correlation-threshold",
+        type=float,
+        default=0.99,
+        metavar="FLOAT",
+        help=(
+            "Minimum P&L correlation for PASS in fixed/lognormal modes. "
+            "Default: 0.99. Phase 88 burn-in uses 0.90."
         ),
     )
     parser.add_argument(
@@ -356,6 +371,7 @@ def main() -> int:
                     start_date=args.start,
                     end_date=args.end,
                     slippage_mode=slippage_mode,
+                    pnl_correlation_threshold=args.pnl_correlation_threshold,
                 )
             except Exception as exc:
                 logger.exception(
@@ -413,6 +429,7 @@ def main() -> int:
             start_date=args.start,
             end_date=args.end,
             slippage_mode=args.slippage_mode,
+            pnl_correlation_threshold=args.pnl_correlation_threshold,
         )
     except Exception as exc:
         logger.exception("Parity check failed with error")
