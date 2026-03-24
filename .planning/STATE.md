@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 ## Current Position
 
 Phase: 88-integration-testing-go-live (v1.2.0, IN PROGRESS)
-Plan: 02 of N complete
-Status: In progress. Plan 02 complete: daily burn-in report CLI created.
-Last activity: 2026-03-24 -- Phase 88 plan 02 complete
+Plan: 02 of N complete (Plans 01+02 complete)
+Status: In progress. Plan 01: smoke test + parity threshold. Plan 02: daily burn-in report.
+Last activity: 2026-03-24 -- Phase 88 plan 01 complete
 
 Note: Phase 92 plan 04 paused at checkpoint (Task 5 human-verify).
 
@@ -43,6 +43,14 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 Decisions are logged in PROJECT.md Key Decisions table.
 
 v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
+
+**Phase 88 decisions (plan 01):**
+- smoke_test IDs: BTC(1), ETH(52), USDT(825), XRP(5426) as default test assets; --ids flag allows override at runtime
+- 26 total checks: 4 Step0 + 4 bars + 3 emas + 3 features + 2 garch + 2 signals + 2 stop_calibrations + 2 portfolio + 2 executor + 2 drift
+- garch/stop_calibrations/portfolio use table-has-rows (not recency) checks -- valid on burn-in Day 1 before all stages have run
+- executor/drift use accessibility-only checks -- paper trading tables may have no rows yet
+- pnl_correlation_threshold=0.99 preserved as default -- no behavior change when flag omitted
+- threshold stored in report dict ('pnl_correlation_threshold' key) and displayed in format_report alongside P&L Correlation line
 
 **Phase 88 decisions (plan 02):**
 - positions.realized_pnl attempted first for PnL; falls back to COUNT(DISTINCT asset_id) from orders if column absent -- avoids schema-variation crash
