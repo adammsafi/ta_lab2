@@ -1529,10 +1529,11 @@ Plans:
   3. Stop ladder calibrated per asset using MAE/MFE analysis from bake-off trades
   4. Paper executor dry run with refined signals produces fills matching backtest parity within tolerance
   5. Portfolio rebalance logic documented and wired into daily pipeline
-**Plans:** 2 plans
+**Plans:** 3 plans in 2 waves
 Plans:
-- [ ] 85-01-PLAN.md -- Backend query fixes (cache TTL slider, stats auto-discovery, drawdown calculation)
-- [ ] 85-02-PLAN.md -- Page consistency (engine init consolidation, stats row counts, drawdown KPI dollars)
+- [ ] 86-01-PLAN.md -- Alembic migration (stop_calibrations + target_annual_vol) + stop calibration module + CLI
+- [ ] 86-02-PLAN.md -- Per-asset IC-IR in BL views + GARCH target-vol sizing mode in PositionSizer
+- [ ] 86-03-PLAN.md -- Daily pipeline wiring (calibrate_stops stage) + parity check bake-off winner support
 
 ---
 
