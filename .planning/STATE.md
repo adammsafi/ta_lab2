@@ -9,10 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 
 ## Current Position
 
-Phase: 92-ctf-ic-analysis-feature-selection (v1.2.0, In progress)
-Plan: 04 auto tasks complete; stopped at Task 5 checkpoint awaiting human verification
-Status: Gap closure plan 04 tasks 1-4 complete. Awaiting human approval at checkpoint before 92-VERIFICATION update.
-Last activity: 2026-03-24 -- Completed 92-04 tasks 1-4 (CTF full-universe pipeline gap closure)
+Phase: 87-live-pipeline-alert-wiring (v1.2.0, In progress -- executing out of sequence)
+Plan: 02 of 4 complete
+Status: Plan 02 complete. SignalAnomalyGate implemented and committed.
+Last activity: 2026-03-24 -- Completed 87-02 (Signal Anomaly Gate implementation)
+
+Note: Phase 92 plan 04 paused at checkpoint (Task 5 human-verify). Phase 87 being executed now.
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [########--] 80% v1.2.0
 
@@ -41,6 +43,14 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 Decisions are logged in PROJECT.md Key Decisions table.
 
 v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
+
+**Phase 87 decisions (plan 02):**
+- Baseline uses DATE(ts) < CURRENT_DATE (not NOW() - INTERVAL): prevents partial-day count from inflating rolling mean and triggering false z-score alerts
+- signals_rsi table missing from DB: handled as graceful warning+continue; gate continues to other tables
+- std clamped to max(std, 1e-6): prevents ZeroDivisionError when all baseline days have identical counts
+- Clean (non-anomaly) checks also logged to signal_anomaly_log: complete audit trail for every gate run
+- Local _resolve_db_url and _get_engine helpers: avoids circular import from common_snapshot_contract in scripts.bars
+- Exit code 2 for blocked signals (hard gate); exit code 0 = clean; exit code 1 = script error
 
 **Phase 92 decisions (plan 04):**
 - CMC_AGG universe has 7 assets total -- plan assumed ~158 but price_bars_multi_tf_u venue_id=1 has exactly 7 distinct IDs; full-universe run IS 7 assets
@@ -298,8 +308,8 @@ None active.
 ## Session Continuity
 
 Last session: 2026-03-24
-Stopped at: Completed 92-04 tasks 1-4 (CTF full-universe gap closure). Paused at Task 5 checkpoint:human-verify.
-Resume file: None (checkpoint awaits human approval; fresh continuation agent will update 92-VERIFICATION.md)
+Stopped at: Completed 87-02-PLAN.md (SignalAnomalyGate -- signal validation pre-execution gate)
+Resume file: None
 
 ---
 *Created: 2025-01-22*
