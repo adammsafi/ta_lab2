@@ -1639,13 +1639,14 @@ Plans:
   5. Comparison report: CTF feature IC-IR vs AMA feature IC-IR — quantifies whether CTF adds non-redundant alpha
   6. ctf_config.yaml pruned to retain only high-IC indicator×ref_tf combinations (save disk)
   7. Results persisted to separate dim_ctf_feature_selection table (keeps CTF analysis independent from Phase 80 entries, per CONTEXT.md decision)
-**Plans:** 3 plans in 3 waves
+**Plans:** 4 plans in 4 waves (3 original + 1 gap closure)
 
 Plans:
-- [ ] 92-01-PLAN.md -- load_ctf_features() pivot loader + dim_ctf_feature_selection Alembic migration
-- [ ] 92-02-PLAN.md -- run_ctf_ic_sweep.py: batch IC computation for all CTF features across all assets and base TFs
-- [ ] 92-03-PLAN.md -- run_ctf_feature_selection.py: tier classification, AMA comparison report, config pruning, DB persistence
+- [x] 92-01-PLAN.md -- load_ctf_features() pivot loader + dim_ctf_feature_selection Alembic migration
+- [x] 92-02-PLAN.md -- run_ctf_ic_sweep.py: batch IC computation for all CTF features across all assets and base TFs
+- [x] 92-03-PLAN.md -- run_ctf_feature_selection.py: tier classification, AMA comparison report, config pruning, DB persistence
+- [ ] 92-04-PLAN.md -- Gap closure: full-universe CTF refresh + IC sweep + feature selection re-run
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-23 (Phase 92 planned: 3 plans in 3 waves)*
+*Last updated: 2026-03-24 (Phase 92 gap closure: plan 04 added)*
