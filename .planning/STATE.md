@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 
 ## Current Position
 
-Phase: 87-live-pipeline-alert-wiring (v1.2.0, In progress -- executing out of sequence)
-Plan: 01 complete; 02 complete; 03 complete; 04 complete (SUMMARY created 2026-03-24)
-Status: All 4 plans complete. Foundation tables (87-01), signal anomaly gate (87-02), pipeline orchestration wiring (87-03), IC weight override wiring (87-04) implemented.
-Last activity: 2026-03-24 -- Completed 87-03 (pipeline orchestration wiring: STAGE_ORDER, --from-stage, dead-man switch, run logging)
+Phase: 87-live-pipeline-alert-wiring (v1.2.0, COMPLETE -- verified 16/16 must-haves)
+Plan: All 4 plans complete
+Status: Phase verified. Pipeline orchestration, IC staleness, signal gate, BL weight overrides all wired.
+Last activity: 2026-03-24 -- Phase 87 complete
 
-Note: Phase 92 plan 04 paused at checkpoint (Task 5 human-verify). Phase 87 being executed now.
+Note: Phase 92 plan 04 paused at checkpoint (Task 5 human-verify).
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [########--] 80% v1.2.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 398
+- Total plans completed: 402
 - Average duration: 7 min
 - Total execution time: ~30.9 hours
 
@@ -31,7 +31,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 - v1.0.0: 22 phases, 104 plans, ~14.5 hours
 - v1.0.1: 10 phases, 29 plans, ~2.0 hours
 - v1.1.0: 6 phases, 21 plans, ~2.5 hours
-- v1.2.0 (in progress): Phase 80 = 5 plans (~35 min), Phase 81 = 5 plans (~40 min), Phase 82 = 6 plans (~7h incl execution), Phase 83 = 5 plans (~25 min), Phase 84 = 5 plans (~50 min), Phase 86 = 3 plans (~18 min)
+- v1.2.0 (in progress): Phase 80 = 5 plans (~35 min), Phase 81 = 5 plans (~40 min), Phase 82 = 6 plans (~7h incl execution), Phase 83 = 5 plans (~25 min), Phase 84 = 5 plans (~50 min), Phase 86 = 3 plans (~18 min), Phase 87 = 4 plans (~19 min)
 - Trend: Stable (~5-7 min/plan)
 
 *Updated after each plan completion*
@@ -333,9 +333,9 @@ None active.
 ## Session Continuity
 
 Last session: 2026-03-24
-Stopped at: Completed 87-03-PLAN.md (STAGE_ORDER, --from-stage, signal gate, IC staleness, dead-man switch, pipeline run logging wired into run_daily_refresh.py)
+Stopped at: Phase 87 complete (all 4 plans verified 16/16)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-24 (Phase 87, Plan 01 complete)*
+*Last updated: 2026-03-24 (Phase 87 complete)*

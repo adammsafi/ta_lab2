@@ -1382,7 +1382,7 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 - [x] **Phase 84: Dashboard — Perps, Portfolio & Regimes** - Hyperliquid page, portfolio allocation view, regime heatmap, AMA/EMA inspector
 - [x] **Phase 85: Dashboard Cleanup & Polish** - Fix cache TTL slider, dynamic stats allowlist, drawdown calc, UI consistency
 - [x] **Phase 86: Portfolio Construction Pipeline** - IC-IR → Black-Litterman views, bet sizing with GARCH vol, stop ladder tuning, paper executor dry run
-- [ ] **Phase 87: Live Pipeline & Alert Wiring** - Daily pipeline end-to-end: signals → validation → executor → drift → alerts, IC staleness monitoring
+- [x] **Phase 87: Live Pipeline & Alert Wiring** - Daily pipeline end-to-end: signals → validation → executor → drift → alerts, IC staleness monitoring
 - [ ] **Phase 88: Integration Testing & Go-Live** - End-to-end smoke tests, 1-week paper trading burn-in, runbook updates, v1.2.0 tag
 - [x] **Phase 89: CTF Schema & Dimension Table** - Alembic migration for dim_ctf_indicators + ctf tables, seed indicators from ta/vol/returns/features, create ctf_config.yaml
 - [x] **Phase 90: CTF Core Computation Module** - CTFFeature class: batch indicator loading, merge_asof alignment, slope/divergence/agreement/crossover composites, scoped DELETE+INSERT writes
@@ -1548,10 +1548,10 @@ Plans:
   5. Dead-man switch: alert fires if daily pipeline hasn't completed by expected time
 **Plans:** 4 plans
 Plans:
-- [ ] 87-01-PLAN.md -- Alembic migration (4 tables) + IC staleness monitor (multi-window IC-IR decay detection)
-- [ ] 87-02-PLAN.md -- Signal validation gate (count anomaly + crowded signal detection, hard execution block)
-- [ ] 87-03-PLAN.md -- Pipeline orchestration (--from-stage, dead-man switch, pipeline_run_log, completion alerts)
-- [ ] 87-04-PLAN.md -- BL weight override wiring (dim_ic_weight_overrides into portfolio refresh)
+- [x] 87-01-PLAN.md -- Alembic migration (4 tables) + IC staleness monitor (multi-window IC-IR decay detection)
+- [x] 87-02-PLAN.md -- Signal validation gate (count anomaly + crowded signal detection, hard execution block)
+- [x] 87-03-PLAN.md -- Pipeline orchestration (--from-stage, dead-man switch, pipeline_run_log, completion alerts)
+- [x] 87-04-PLAN.md -- BL weight override wiring (dim_ic_weight_overrides into portfolio refresh)
 
 ---
 
