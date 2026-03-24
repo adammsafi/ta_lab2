@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 ## Current Position
 
 Phase: 87-live-pipeline-alert-wiring (v1.2.0, In progress -- executing out of sequence)
-Plan: 01 complete; 02 complete; 03 pending; 04 complete (SUMMARY created 2026-03-24)
-Status: Plans 01+02+04 complete. Foundation tables (87-01), signal anomaly gate (87-02), IC weight override wiring (87-04) implemented. Plan 03 (dead-man switch) pending.
-Last activity: 2026-03-24 -- Completed 87-04 (IC weight overrides wired into portfolio refresh)
+Plan: 01 complete; 02 complete; 03 complete; 04 complete (SUMMARY created 2026-03-24)
+Status: All 4 plans complete. Foundation tables (87-01), signal anomaly gate (87-02), pipeline orchestration wiring (87-03), IC weight override wiring (87-04) implemented.
+Last activity: 2026-03-24 -- Completed 87-03 (pipeline orchestration wiring: STAGE_ORDER, --from-stage, dead-man switch, run logging)
 
 Note: Phase 92 plan 04 paused at checkpoint (Task 5 human-verify). Phase 87 being executed now.
 
@@ -67,6 +67,15 @@ v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
 - Clean (non-anomaly) checks also logged to signal_anomaly_log: complete audit trail for every gate run
 - Local _resolve_db_url and _get_engine helpers: avoids circular import from common_snapshot_contract in scripts.bars
 - Exit code 2 for blocked signals (hard gate); exit code 0 = clean; exit code 1 = script error
+
+**Phase 87 decisions (plan 03):**
+- run_signal_gate = args.all and not no_signal_gate: Phase 87 stages active only in --all mode; standalone --signals runs do not trigger the gate
+- signal_gate_blocked does NOT return 1 immediately: pipeline continues to drift, stats, and completion alert -- daily digest always fires even on blocked runs
+- Explicit if-statement chain for --from-stage skip (not locals() mutation): Python locals() is read-only for assignment; explicit per-variable pattern is correct
+- CAST(:stages AS JSONB) in _complete_pipeline_run: psycopg2 sends json.dumps(stages) as str; PostgreSQL needs explicit CAST to store as JSONB
+- run_ic_staleness_check_stage function name (with _stage suffix): avoids collision with run_ic_staleness boolean in main()
+- pipeline_alerts component unconditionally in components list: always shown in --all runs output regardless of dry-run state
+- Lazy imports in DB helper functions: avoids top-level import overhead; helpers gracefully degrade on import failure
 
 **Phase 92 decisions (plan 04):**
 - CMC_AGG universe has 7 assets total -- plan assumed ~158 but price_bars_multi_tf_u venue_id=1 has exactly 7 distinct IDs; full-universe run IS 7 assets
@@ -324,7 +333,7 @@ None active.
 ## Session Continuity
 
 Last session: 2026-03-24
-Stopped at: Completed 87-04-PLAN.md (IC weight overrides wired into portfolio refresh)
+Stopped at: Completed 87-03-PLAN.md (STAGE_ORDER, --from-stage, signal gate, IC staleness, dead-man switch, pipeline run logging wired into run_daily_refresh.py)
 Resume file: None
 
 ---
