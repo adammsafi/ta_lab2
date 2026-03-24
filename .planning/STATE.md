@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 
 ## Current Position
 
-Phase: 92-ctf-ic-analysis-feature-selection (v1.2.0, In progress)
-Plan: 2 of 3 complete (01+02 done)
-Status: In progress. Plan 02 complete: run_ctf_ic_sweep.py + save_ic_results alignment_source fix + 1808 CTF IC rows persisted.
-Last activity: 2026-03-24 -- Completed 92-02-PLAN.md
+Phase: 86-portfolio-construction-pipeline (v1.2.0, Phase complete)
+Plan: 3 of 3 complete (01+02+03 done)
+Status: Phase complete. Plan 03 complete: calibrate_stops pipeline stage wired (signals->calibrate_stops->portfolio->executor->drift->stats) + parity check --bakeoff-winners auto-discovery.
+Last activity: 2026-03-24 -- Completed 86-03-PLAN.md
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [########--] 65% v1.2.0
 
@@ -74,6 +74,14 @@ v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
 - load_stats_tables not imported at page level: load_stats_status calls it internally; Rows (24h) = sum(PASS+WARN+FAIL) -- no additional query needed
 - drawdown_usd backward-compat guard: falls back to 0.0 if column absent (cache not yet refreshed post-Plan 01 deploy)
 - Engine init pattern now consistent across all 17 dashboard pages: single module-level try/except get_engine() + st.stop()
+
+**Phase 86 decisions (plan 03):**
+- TIMEOUT_CALIBRATE_STOPS=300 (5 min): iterates over asset x strategy combos, mostly SQL reads
+- calibrate_stops is non-fatal: warns+continues with --continue-on-error; hard-stops otherwise (matches GARCH Phase 81 pattern)
+- _STRATEGY_SIGNAL_MAP: ama_momentum/ama_mean_reversion/ama_regime_conditional -> ema_crossover (Phase 83 decision)
+- CPCV cv_method first for bakeoff winner discovery; PKF as fallback
+- slippage_mode=fixed auto-applied when --bakeoff-winners (historical replay has fill price diffs)
+- backtest_trades linkage gap logged as WARN (expected: Phase 82 results in strategy_bakeoff_results, not backtest_runs)
 
 **Phase 86 decisions (plan 02):**
 - Per-asset IC-IR path: _per_asset_composite() reindexes ic_ir_matrix to signal_scores shape; missing assets get column-mean fallback; IC-IR clipped to >=0
@@ -273,8 +281,8 @@ None active.
 
 ## Session Continuity
 
-Last session: 2026-03-24T02:37:09Z
-Stopped at: Completed 92-02-PLAN.md (run_ctf_ic_sweep.py + save_ic_results fix + 1808 CTF IC rows)
+Last session: 2026-03-24T02:44:08Z
+Stopped at: Completed 86-03-PLAN.md (calibrate_stops pipeline stage, parity check --bakeoff-winners auto-discovery)
 Resume file: None
 
 ---
