@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 
 ## Current Position
 
-Phase: 92-ctf-ic-analysis-feature-selection (v1.2.0, Phase complete)
+Phase: 86-portfolio-construction-pipeline (v1.2.0, Phase complete)
 Plan: 3 of 3 complete (01+02+03 done)
-Status: Phase complete. Plan 03 complete: run_ctf_feature_selection.py + dim_ctf_feature_selection (96 rows) + ctf_config_pruned.yaml + comparison report (rho=0.19, LOW redundancy).
-Last activity: 2026-03-24 -- Completed 92-03-PLAN.md
+Status: Phase complete. All 3 plans executed: stop calibration pipeline (01), IC-IR BL + GARCH sizing (02), pipeline wiring + parity check (03). Verified 14/14 must-haves.
+Last activity: 2026-03-24 -- Completed 86-VERIFICATION.md (passed)
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [##########] 70% v1.2.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [########--] 80% v1.2.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 395
+- Total plans completed: 398
 - Average duration: 7 min
 - Total execution time: ~30.9 hours
 
@@ -29,7 +29,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 - v1.0.0: 22 phases, 104 plans, ~14.5 hours
 - v1.0.1: 10 phases, 29 plans, ~2.0 hours
 - v1.1.0: 6 phases, 21 plans, ~2.5 hours
-- v1.2.0 (in progress): Phase 80 = 5 plans (~35 min), Phase 81 = 5 plans (~40 min), Phase 82 = 6 plans (~7h incl execution), Phase 83 = 5 plans (~25 min), Phase 84 = 5 plans (~50 min)
+- v1.2.0 (in progress): Phase 80 = 5 plans (~35 min), Phase 81 = 5 plans (~40 min), Phase 82 = 6 plans (~7h incl execution), Phase 83 = 5 plans (~25 min), Phase 84 = 5 plans (~50 min), Phase 86 = 3 plans (~18 min)
 - Trend: Stable (~5-7 min/plan)
 
 *Updated after each plan completion*
@@ -290,8 +290,8 @@ None active.
 
 ## Session Continuity
 
-Last session: 2026-03-24T02:51:30Z
-Stopped at: Completed 92-03-PLAN.md (run_ctf_feature_selection.py + dim_ctf_feature_selection + comparison report)
+Last session: 2026-03-24
+Stopped at: Completed Phase 86 (portfolio-construction-pipeline) -- 3 plans, 9 commits, 14/14 verified
 Resume file: None
 
 ---

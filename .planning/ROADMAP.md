@@ -1381,13 +1381,13 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 - [x] **Phase 83: Dashboard — Backtest & Signal Pages** - Backtest results page, signal browser, OHLCV candlestick charts
 - [x] **Phase 84: Dashboard — Perps, Portfolio & Regimes** - Hyperliquid page, portfolio allocation view, regime heatmap, AMA/EMA inspector
 - [x] **Phase 85: Dashboard Cleanup & Polish** - Fix cache TTL slider, dynamic stats allowlist, drawdown calc, UI consistency
-- [ ] **Phase 86: Portfolio Construction Pipeline** - IC-IR → Black-Litterman views, bet sizing with GARCH vol, stop ladder tuning, paper executor dry run
+- [x] **Phase 86: Portfolio Construction Pipeline** - IC-IR → Black-Litterman views, bet sizing with GARCH vol, stop ladder tuning, paper executor dry run
 - [ ] **Phase 87: Live Pipeline & Alert Wiring** - Daily pipeline end-to-end: signals → validation → executor → drift → alerts, IC staleness monitoring
 - [ ] **Phase 88: Integration Testing & Go-Live** - End-to-end smoke tests, 1-week paper trading burn-in, runbook updates, v1.2.0 tag
 - [x] **Phase 89: CTF Schema & Dimension Table** - Alembic migration for dim_ctf_indicators + ctf tables, seed indicators from ta/vol/returns/features, create ctf_config.yaml
 - [x] **Phase 90: CTF Core Computation Module** - CTFFeature class: batch indicator loading, merge_asof alignment, slope/divergence/agreement/crossover composites, scoped DELETE+INSERT writes
 - [x] **Phase 91: CTF CLI & Pipeline Integration** - refresh_ctf.py CLI script, Phase 2c integration into run_all_feature_refreshes.py, incremental refresh support
-- [ ] **Phase 92: CTF IC Analysis & Feature Selection** - load_ctf_features() pivot loader, IC analysis on CTF features, compare vs AMA features, prune config to high-IC combinations
+- [x] **Phase 92: CTF IC Analysis & Feature Selection** - load_ctf_features() pivot loader, IC analysis on CTF features, compare vs AMA features, prune config to high-IC combinations
 
 ## v1.2.0 Phase Details
 
@@ -1531,9 +1531,9 @@ Plans:
   5. Portfolio rebalance logic documented and wired into daily pipeline
 **Plans:** 3 plans in 2 waves
 Plans:
-- [ ] 86-01-PLAN.md -- Alembic migration (stop_calibrations + target_annual_vol) + stop calibration module + CLI
-- [ ] 86-02-PLAN.md -- Per-asset IC-IR in BL views + GARCH target-vol sizing mode in PositionSizer
-- [ ] 86-03-PLAN.md -- Daily pipeline wiring (calibrate_stops stage) + parity check bake-off winner support
+- [x] 86-01-PLAN.md -- Alembic migration (stop_calibrations + target_annual_vol) + stop calibration module + CLI
+- [x] 86-02-PLAN.md -- Per-asset IC-IR in BL views + GARCH target-vol sizing mode in PositionSizer
+- [x] 86-03-PLAN.md -- Daily pipeline wiring (calibrate_stops stage) + parity check bake-off winner support
 
 ---
 
