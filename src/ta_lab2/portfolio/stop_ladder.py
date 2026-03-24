@@ -24,7 +24,10 @@ from __future__ import annotations
 
 import logging
 from copy import deepcopy
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from sqlalchemy.engine import Engine
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +115,135 @@ class StopLadder:
             len(self._defaults["sl_stops"]),
             len(self._defaults["tp_stops"]),
         )
+
+    # ------------------------------------------------------------------
+    # DB-seeded constructor
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def from_db_calibrations(
+        cls,
+        engine: Engine,
+        config: dict | None = None,
+    ) -> StopLadder:
+        """Construct a StopLadder with per-asset overrides from stop_calibrations.
+
+        Queries all rows from public.stop_calibrations and injects them into
+        the ladder's _per_asset dict using the "{id}:{strategy}" combined key
+        format (most-specific layer, overrides all others for that combination).
+
+        Stop levels from the DB:
+          sl_stops = [sl_p25, sl_p50, sl_p75]  -- tight to wide (3 tiers)
+          tp_stops = [tp_p50, tp_p75]           -- conservative to aggressive (2 tiers)
+          sl_sizes = [0.33, 0.33, 0.34]         -- equal weight across SL tiers
+          tp_sizes = [0.50, 0.50]               -- equal weight across TP tiers
+
+        Assets not present in stop_calibrations fall back to global defaults
+        from portfolio.yaml (the normal StopLadder behavior).
+
+        Parameters
+        ----------
+        engine : sqlalchemy.engine.Engine
+            Active SQLAlchemy engine. Use NullPool for batch scripts.
+        config : dict, optional
+            Full portfolio config dict. If None, loads from portfolio.yaml.
+
+        Returns
+        -------
+        StopLadder
+            Ladder instance with DB-calibrated per-asset-strategy overrides merged in.
+        """
+        from sqlalchemy import text
+
+        ladder = cls(config=config)
+
+        sql = text(
+            """
+            SELECT id, strategy, sl_p25, sl_p50, sl_p75, tp_p50, tp_p75
+            FROM public.stop_calibrations
+            ORDER BY id, strategy
+            """
+        )
+
+        try:
+            with engine.connect() as conn:
+                rows = conn.execute(sql).fetchall()
+        except Exception as exc:
+            logger.warning(
+                "StopLadder.from_db_calibrations: DB query failed -- "
+                "returning ladder with no DB overrides: %s",
+                exc,
+            )
+            return ladder
+
+        loaded = 0
+        for row in rows:
+            asset_id, strategy, sl_p25, sl_p50, sl_p75, tp_p50, tp_p75 = (
+                row[0],
+                row[1],
+                row[2],
+                row[3],
+                row[4],
+                row[5],
+                row[6],
+            )
+
+            # Build the combined key used by get_tiers() layer 4
+            combined_key = f"{asset_id}:{strategy}"
+
+            # Validate that we have the needed values before building the override
+            sl_stops = [float(v) for v in (sl_p25, sl_p50, sl_p75) if v is not None]
+            tp_stops = [float(v) for v in (tp_p50, tp_p75) if v is not None]
+
+            if not sl_stops or not tp_stops:
+                logger.debug(
+                    "StopLadder.from_db_calibrations: skipping key=%s -- "
+                    "missing sl or tp values",
+                    combined_key,
+                )
+                continue
+
+            # Equal-weight sizing: 3 SL tiers, 2 TP tiers
+            if len(sl_stops) == 3:
+                sl_sizes = [0.33, 0.33, 0.34]
+            else:
+                # Fallback for partial rows: equal weight
+                n = len(sl_stops)
+                base = round(1.0 / n, 4)
+                sl_sizes = [base] * (n - 1) + [round(1.0 - base * (n - 1), 4)]
+
+            if len(tp_stops) == 2:
+                tp_sizes = [0.50, 0.50]
+            else:
+                n = len(tp_stops)
+                base = round(1.0 / n, 4)
+                tp_sizes = [base] * (n - 1) + [round(1.0 - base * (n - 1), 4)]
+
+            override: dict[str, Any] = {
+                "sl_stops": sl_stops,
+                "tp_stops": tp_stops,
+                "sl_sizes": sl_sizes,
+                "tp_sizes": tp_sizes,
+            }
+
+            try:
+                _validate_tiers(override, f"stop_calibrations[{combined_key}]")
+            except ValueError as exc:
+                logger.warning(
+                    "StopLadder.from_db_calibrations: invalid tiers for key=%s: %s",
+                    combined_key,
+                    exc,
+                )
+                continue
+
+            ladder._per_asset[combined_key] = override
+            loaded += 1
+
+        logger.info(
+            "StopLadder.from_db_calibrations: loaded %d per-asset-strategy overrides",
+            loaded,
+        )
+        return ladder
 
     # ------------------------------------------------------------------
     # Tier resolution
