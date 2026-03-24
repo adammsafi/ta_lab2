@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 
 ## Current Position
 
-Phase: 86-portfolio-construction-pipeline (v1.2.0, In progress)
+Phase: 92-ctf-ic-analysis-feature-selection (v1.2.0, In progress)
 Plan: 2 of 3 complete (01+02 done)
-Status: In progress. Plan 02 complete: per-asset IC-IR BL dispatch + GARCH target-vol sizing mode live.
-Last activity: 2026-03-24 -- Completed 86-02-PLAN.md
+Status: In progress. Plan 02 complete: run_ctf_ic_sweep.py + save_ic_results alignment_source fix + 1808 CTF IC rows persisted.
+Last activity: 2026-03-24 -- Completed 92-02-PLAN.md
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [########--] 65% v1.2.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 391
+- Total plans completed: 392
 - Average duration: 7 min
 - Total execution time: ~30.9 hours
 
@@ -88,6 +88,13 @@ v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
 - strategy column in stop_calibrations uses dim_signals.strategy_type via JOIN, falls back to signal_id::TEXT when unavailable
 - equal-weight sl_sizes=[0.33,0.33,0.34] and tp_sizes=[0.50,0.50] for 3-tier SL and 2-tier TP
 - from_db_calibrations() graceful fallback: DB query failure returns unmodified ladder (global YAML defaults apply); never raises
+
+**Phase 92 decisions (plan 02):**
+- venue_id=1 filter in _load_close_for_asset: features PK includes venue_id; without filter, multiple venues produce duplicate ts rows causing batch_compute_ic reindex failure
+- save_ic_results ON CONFLICT fix: uq_ic_results_key unique index has 11 columns including alignment_source; old save_ic_results used 9 columns causing InvalidColumnReference; fix added alignment_source to INSERT + ON CONFLICT, defaults to 'multi_tf'
+- CTF sweep horizons [1, 5, 10, 21] matching CONTEXT.md Phase 80 forward return horizons
+- tf in ic_results = base_tf (not ref_tf): base_tf is the trading timeframe; ref_tf is embedded in feature name (rsi_14_7d_slope)
+- Only 2 CTF pairs available (BTC+XRP 1D): Phase 91 CTF refresh run for 2 assets only; full coverage requires run_ctf_refresh --all before Plan 03
 
 **Phase 92 decisions (plan 01):**
 - load_ctf_features uses vectorized pivot (melt+pivot_table), not iterrows -- matches batch_compute_ic input expectations at scale
@@ -266,8 +273,8 @@ None active.
 
 ## Session Continuity
 
-Last session: 2026-03-24T07:34:18Z
-Stopped at: Completed 86-02-PLAN.md (per-asset IC-IR BL dispatch, target_vol sizing mode, paper_executor GARCH wiring)
+Last session: 2026-03-24T02:37:09Z
+Stopped at: Completed 92-02-PLAN.md (run_ctf_ic_sweep.py + save_ic_results fix + 1808 CTF IC rows)
 Resume file: None
 
 ---
