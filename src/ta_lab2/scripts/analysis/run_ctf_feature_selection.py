@@ -654,6 +654,8 @@ def _build_comparison_report(
     ama_ranking: pd.DataFrame,
     tier_assignments: dict[str, str],
     ic_ir_cutoff: float,
+    n_assets: int = 0,
+    ref_tfs: list[str] | None = None,
 ) -> tuple[str, dict]:
     """
     Generate CTF vs AMA comparison report (markdown + JSON).
@@ -877,9 +879,11 @@ def _build_comparison_report(
         lines.append(
             "**Recommendation:** CTF features in watch/archive only -- monitor in future sweeps."
         )
-        lines.append(
-            "Current coverage limited to 2 assets (BTC+XRP 1D). Re-run after full --all sweep."
-        )
+        if n_assets < 10:
+            lines.append(
+                f"Current coverage limited to {n_assets} asset(s). "
+                "Re-run after full --all sweep for more complete analysis."
+            )
 
     lines += [
         "",
@@ -888,9 +892,8 @@ def _build_comparison_report(
         "## 6. Data Coverage Note",
         "",
         f"CTF IC sweep ran on {len(ctf_ranking)} CTF features across available (asset, base_tf) pairs.",
-        "Current coverage: 2 assets (BTC id=1, XRP id=1027) at base_tf=1D, ref_tf=7D only.",
-        "Full coverage requires running `python -m ta_lab2.scripts.analysis.run_ctf_ic_sweep --all`",
-        "after completing a full CTF feature refresh (`python -m ta_lab2.scripts.etl.run_ctf_refresh --all`).",
+        f"Current coverage: {n_assets} asset(s) across ref_tfs: "
+        f"{', '.join(sorted(ref_tfs)) if ref_tfs else 'unknown'}.",
         "",
     ]
 
@@ -1373,11 +1376,41 @@ def main() -> int:  # noqa: C901
         horizon=args.horizon,
         return_type=args.return_type,
     )
+
+    # Query actual IC coverage for dynamic report text
+    ctf_feature_list = list(ctf_features) if ctf_features else []
+    with engine.connect() as _cov_conn:
+        n_assets_covered: int = (
+            _cov_conn.execute(
+                text(
+                    "SELECT COUNT(DISTINCT asset_id) FROM ic_results"
+                    " WHERE feature = ANY(:ctf_features)"
+                ),
+                {"ctf_features": ctf_feature_list},
+            ).scalar()
+            or 0
+        )
+        ref_tfs_covered: list[str] = [
+            r[0]
+            for r in _cov_conn.execute(
+                text(
+                    "SELECT DISTINCT substring(feature FROM '.*_([0-9]+[dD])_[^_]+$')"
+                    " FROM ic_results"
+                    " WHERE feature = ANY(:ctf_features)"
+                    " AND substring(feature FROM '.*_([0-9]+[dD])_[^_]+$') IS NOT NULL"
+                ),
+                {"ctf_features": ctf_feature_list},
+            ).fetchall()
+            if r[0] is not None
+        ]
+
     md_report, json_report = _build_comparison_report(
         ctf_ranking=ctf_ranking,
         ama_ranking=ama_ranking,
         tier_assignments=tier_assignments,
         ic_ir_cutoff=args.ic_ir_cutoff,
+        n_assets=n_assets_covered,
+        ref_tfs=ref_tfs_covered,
     )
     logger.info("Step 5: Comparison report built (%d chars markdown)", len(md_report))
 
