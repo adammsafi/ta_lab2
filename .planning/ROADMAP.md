@@ -1564,10 +1564,11 @@ Plans:
   3. Backtest parity verified: paper executor fills match backtest replay within cost tolerance
   4. Runbooks updated for v1.2.0 pipeline (new signal flow, new dashboard pages, GARCH refresh)
   5. v1.2.0 tagged and milestone audit complete
-**Plans:** 2 plans
+**Plans:** 3 plans
 Plans:
-- [ ] 85-01-PLAN.md -- Backend query fixes (cache TTL slider, stats auto-discovery, drawdown calculation)
-- [ ] 85-02-PLAN.md -- Page consistency (engine init consolidation, stats row counts, drawdown KPI dollars)
+- [ ] 88-01-PLAN.md -- Smoke test script + parity checker threshold extension
+- [ ] 88-02-PLAN.md -- Daily burn-in status report with Telegram delivery
+- [ ] 88-03-PLAN.md -- Operations manual updates, CHANGELOG, v1.2.0 requirements doc
 
 
 ---
