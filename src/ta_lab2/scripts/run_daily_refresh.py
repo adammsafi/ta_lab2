@@ -86,6 +86,9 @@ TIMEOUT_DESC_STATS = 3600  # 1 hour -- asset stats + correlation computation
 TIMEOUT_REGIMES = 1800  # 30 minutes -- regime refresher
 TIMEOUT_FEATURES = 1800  # 30 minutes -- feature refresh for all assets at 1D
 TIMEOUT_SIGNALS = 1800  # 30 minutes -- signal generation for all types
+TIMEOUT_CALIBRATE_STOPS = (
+    300  # 5 minutes -- iterates over asset x strategy combos, mostly SQL reads
+)
 TIMEOUT_PORTFOLIO = 600  # 10 minutes -- portfolio optimizer runs all three methods
 TIMEOUT_EXECUTOR = (
     300  # 5 minutes -- daily executor is fast (2 strategies, ~100 assets)
@@ -1036,6 +1039,114 @@ def run_signal_refreshes(args, db_url: str) -> ComponentResult:
         print(f"\n[ERROR] Signal generation raised exception: {error_msg}")
         return ComponentResult(
             component="signals",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+
+
+def run_calibrate_stops_stage(args, db_url: str) -> ComponentResult:
+    """
+    Run stop calibration via subprocess.
+
+    Iterates over asset x strategy combinations and writes per-asset calibrated
+    stop/take-profit ladders to stop_calibrations.  Runs after signals and
+    before the portfolio refresh in the full pipeline.  Non-fatal: failure logs
+    a warning and the pipeline continues to portfolio refresh.
+
+    Args:
+        args: CLI arguments
+        db_url: Database URL
+
+    Returns:
+        ComponentResult with execution details
+    """
+    cmd = [
+        sys.executable,
+        "-m",
+        "ta_lab2.scripts.portfolio.calibrate_stops",
+        "--ids",
+        "all",
+    ]
+    if getattr(args, "dry_run", False):
+        cmd.append("--dry-run")
+    if getattr(args, "verbose", False):
+        cmd.append("--verbose")
+
+    print(f"\n{'=' * 70}")
+    print("RUNNING STOP CALIBRATION")
+    print(f"{'=' * 70}")
+    print(f"Command: {' '.join(cmd)}")
+
+    if getattr(args, "dry_run", False):
+        print("[DRY RUN] Would execute stop calibration")
+        return ComponentResult(
+            component="calibrate_stops",
+            success=True,
+            duration_sec=0.0,
+            returncode=0,
+        )
+
+    start_t = time.perf_counter()
+
+    try:
+        if getattr(args, "verbose", False):
+            result = subprocess.run(cmd, check=False, timeout=TIMEOUT_CALIBRATE_STOPS)
+        else:
+            result = subprocess.run(
+                cmd,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=TIMEOUT_CALIBRATE_STOPS,
+            )
+
+            if result.returncode != 0:
+                print(f"\n[ERROR] Stop calibration failed (code {result.returncode})")
+                if result.stdout:
+                    print(f"\nSTDOUT:\n{result.stdout[-2000:]}")
+                if result.stderr:
+                    print(f"\nSTDERR:\n{result.stderr[-2000:]}")
+
+        duration = time.perf_counter() - start_t
+
+        if result.returncode == 0:
+            print(f"\n[OK] Stop calibration completed in {duration:.1f}s")
+            return ComponentResult(
+                component="calibrate_stops",
+                success=True,
+                duration_sec=duration,
+                returncode=result.returncode,
+            )
+        else:
+            error_msg = f"Exited with code {result.returncode}"
+            print(f"\n[FAILED] Stop calibration failed: {error_msg}")
+            return ComponentResult(
+                component="calibrate_stops",
+                success=False,
+                duration_sec=duration,
+                returncode=result.returncode,
+                error_message=error_msg,
+            )
+
+    except subprocess.TimeoutExpired:
+        duration = time.perf_counter() - start_t
+        error_msg = f"Timed out after {TIMEOUT_CALIBRATE_STOPS}s"
+        print(f"\n[TIMEOUT] Stop calibration: {error_msg}")
+        return ComponentResult(
+            component="calibrate_stops",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+    except Exception as e:
+        duration = time.perf_counter() - start_t
+        error_msg = str(e)
+        print(f"\n[ERROR] Stop calibration raised exception: {error_msg}")
+        return ComponentResult(
+            component="calibrate_stops",
             success=False,
             duration_sec=duration,
             returncode=-1,
@@ -2675,6 +2786,19 @@ Examples:
         help="Run signal generation only (EMA crossover, RSI, ATR breakout)",
     )
     p.add_argument(
+        "--calibrate-stops",
+        action="store_true",
+        help=(
+            "Run stop calibration only (per-asset SL/TP ladders from "
+            "ATR-based statistics). Runs after signals, before portfolio."
+        ),
+    )
+    p.add_argument(
+        "--no-calibrate-stops",
+        action="store_true",
+        help="Skip stop calibration stage in --all mode",
+    )
+    p.add_argument(
         "--portfolio",
         action="store_true",
         help="Run portfolio allocation refresh only (MV/CVaR/HRP + optional BL + bet sizing)",
@@ -2728,7 +2852,8 @@ Examples:
         help=(
             "Run sync_vms then bars then EMAs then AMAs then desc_stats "
             "then macro then regimes then features then garch then signals "
-            "then executor then stats (full refresh)"
+            "then calibrate_stops then portfolio then executor then drift "
+            "then stats (full refresh)"
         ),
     )
     p.add_argument(
@@ -2852,6 +2977,7 @@ Examples:
         or args.features
         or args.garch
         or args.signals
+        or args.calibrate_stops
         or args.portfolio
         or args.execute
         or args.drift
@@ -2861,8 +2987,8 @@ Examples:
         p.error(
             "Must specify --sync-vms, --bars, --emas, --amas, --desc-stats, --macro, "
             "--macro-regimes, --macro-analytics, --cross-asset-agg, --regimes, "
-            "--features, --garch, --signals, --portfolio, --execute, --drift, --stats, "
-            "--all, --weekly-digest, or --exchange-prices"
+            "--features, --garch, --signals, --calibrate-stops, --portfolio, "
+            "--execute, --drift, --stats, --all, --weekly-digest, or --exchange-prices"
         )
 
     # Resolve database URL
@@ -2921,6 +3047,9 @@ Examples:
     )
     run_garch = (args.garch or args.all) and not getattr(args, "no_garch", False)
     run_signals = args.signals or args.all
+    run_calibrate_stops = (args.calibrate_stops or args.all) and not getattr(
+        args, "no_calibrate_stops", False
+    )
     run_portfolio = (args.portfolio or args.all) and not getattr(
         args, "no_portfolio", False
     )
@@ -2956,6 +3085,8 @@ Examples:
         components.append("garch")
     if run_signals:
         components.append("signals")
+    if run_calibrate_stops:
+        components.append("calibrate_stops")
     if run_portfolio:
         components.append("portfolio")
     if run_executor:
@@ -3166,9 +3297,22 @@ Examples:
             print("(Use --continue-on-error to run remaining components)")
             return 1
 
-    # Run portfolio allocation refresh if requested (after signals, before executor)
+    # Run stop calibration if requested (after signals, before portfolio)
+    # Non-fatal: failure logs a warning and pipeline continues to portfolio refresh
+    if run_calibrate_stops:
+        calibrate_result = run_calibrate_stops_stage(args, db_url)
+        results.append(("calibrate_stops", calibrate_result))
+
+        if not calibrate_result.success and not args.continue_on_error:
+            print("\n[STOPPED] Stop calibration failed, stopping execution")
+            print("(Use --continue-on-error to run remaining components)")
+            return 1
+        elif not calibrate_result.success:
+            print("\n[WARN] Stop calibration failed -- continuing to portfolio refresh")
+
+    # Run portfolio allocation refresh if requested (after calibrate_stops, before executor)
     # Pipeline order: bars -> EMAs -> AMAs -> desc_stats -> regimes -> features
-    #                 -> signals -> portfolio -> executor -> drift -> stats
+    #                 -> signals -> calibrate_stops -> portfolio -> executor -> drift -> stats
     if run_portfolio:
         portfolio_result = run_portfolio_refresh_stage(args, db_url)
         results.append(("portfolio", portfolio_result))
