@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 
 ## Current Position
 
-Phase: 92-ctf-ic-analysis-feature-selection (v1.2.0, In progress)
-Plan: 1 of 3 complete (01 done)
-Status: In progress. Plan 01 complete: load_ctf_features() pivot loader + dim_ctf_feature_selection table deployed.
-Last activity: 2026-03-24 -- Completed 92-01-PLAN.md
+Phase: 86-portfolio-construction-pipeline (v1.2.0, In progress)
+Plan: 2 of 3 complete (01+02 done)
+Status: In progress. Plan 02 complete: per-asset IC-IR BL dispatch + GARCH target-vol sizing mode live.
+Last activity: 2026-03-24 -- Completed 86-02-PLAN.md
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [########--] 65% v1.2.0
 
@@ -74,6 +74,14 @@ v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
 - load_stats_tables not imported at page level: load_stats_status calls it internally; Rows (24h) = sum(PASS+WARN+FAIL) -- no additional query needed
 - drawdown_usd backward-compat guard: falls back to 0.0 if column absent (cache not yet refreshed post-Plan 01 deploy)
 - Engine init pattern now consistent across all 17 dashboard pages: single module-level try/except get_engine() + st.stop()
+
+**Phase 86 decisions (plan 02):**
+- Per-asset IC-IR path: _per_asset_composite() reindexes ic_ir_matrix to signal_scores shape; missing assets get column-mean fallback; IC-IR clipped to >=0
+- Single cross-sectional z-score for DataFrame path (not per-asset): avoids degenerate scores when a single asset's composite is constant
+- garch_vol NOT imported in position_sizer.py: passed as **kwargs by paper_executor, no circular dependency
+- GARCH daily vol annualized via sqrt(252) in target_vol branch: forgetting annualization causes ~15x oversizing (research pitfall 2)
+- Uniform signal_scores=1.0 for Phase 86: IC-IR differences alone drive view heterogeneity; TODO(Phase 87) for real feature-based scores
+- BL fallback to prior-only: when ic_results is empty for given TF, ic_ir=Series({'rsi': 0.0}) triggers empty views -> prior-only EfficientFrontier
 
 **Phase 86 decisions (plan 01):**
 - Revision ID m7n8o9p0q1r2 used (l6m7n8o9p0q1 already taken by dim_ctf_feature_selection from Phase 89/CTF); down_revision=l6m7n8o9p0q1 is correct current head
@@ -258,8 +266,8 @@ None active.
 
 ## Session Continuity
 
-Last session: 2026-03-24T02:30:24Z
-Stopped at: Completed 86-01-PLAN.md (stop_calibrations migration, MAE/MFE calibration module, calibrate_stops CLI, StopLadder.from_db_calibrations())
+Last session: 2026-03-24T07:34:18Z
+Stopped at: Completed 86-02-PLAN.md (per-asset IC-IR BL dispatch, target_vol sizing mode, paper_executor GARCH wiring)
 Resume file: None
 
 ---
