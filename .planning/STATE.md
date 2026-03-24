@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 
 ## Current Position
 
-Phase: 87-live-pipeline-alert-wiring (v1.2.0, COMPLETE -- verified 16/16 must-haves)
-Plan: All 4 plans complete
-Status: Phase verified. Pipeline orchestration, IC staleness, signal gate, BL weight overrides all wired.
-Last activity: 2026-03-24 -- Phase 87 complete
+Phase: 88-integration-testing-go-live (v1.2.0, IN PROGRESS)
+Plan: 02 of N complete
+Status: In progress. Plan 02 complete: daily burn-in report CLI created.
+Last activity: 2026-03-24 -- Phase 88 plan 02 complete
 
 Note: Phase 92 plan 04 paused at checkpoint (Task 5 human-verify).
 
@@ -43,6 +43,13 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 Decisions are logged in PROJECT.md Key Decisions table.
 
 v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
+
+**Phase 88 decisions (plan 02):**
+- positions.realized_pnl attempted first for PnL; falls back to COUNT(DISTINCT asset_id) from orders if column absent -- avoids schema-variation crash
+- Tracking error > 5% threshold for WARNING verdict (matches Phase 88 CONTEXT burn-in tolerance)
+- trading_state = 'halted' maps to kill switch active (no kill_switch_active column in dim_risk_state)
+- Each of 8 query sections independently wrapped in try/except; partial failures yield UNAVAILABLE not script failure
+- Telegram import inside no_telegram guard block to avoid import-time side effects
 
 **Phase 87 decisions (plan 01):**
 - down_revision=m7n8o9p0q1r2 (Phase 86 head); verified via alembic history before writing migration
@@ -333,7 +340,7 @@ None active.
 ## Session Continuity
 
 Last session: 2026-03-24
-Stopped at: Phase 87 complete (all 4 plans verified 16/16)
+Stopped at: Phase 88 plan 02 complete (daily burn-in report script created)
 Resume file: None
 
 ---
