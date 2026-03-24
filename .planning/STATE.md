@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 ## Current Position
 
 Phase: 87-live-pipeline-alert-wiring (v1.2.0, In progress -- executing out of sequence)
-Plan: 01 complete (SUMMARY created 2026-03-24); 02 complete; 03-04 pending
-Status: Plans 01+02 complete. Foundation tables + IC staleness monitor (87-01) and signal anomaly gate (87-02) implemented.
-Last activity: 2026-03-24 -- Completed 87-01 (Alembic migration + ICStalenessMonitor)
+Plan: 01 complete; 02 complete; 03 pending; 04 complete (SUMMARY created 2026-03-24)
+Status: Plans 01+02+04 complete. Foundation tables (87-01), signal anomaly gate (87-02), IC weight override wiring (87-04) implemented. Plan 03 (dead-man switch) pending.
+Last activity: 2026-03-24 -- Completed 87-04 (IC weight overrides wired into portfolio refresh)
 
 Note: Phase 92 plan 04 paused at checkpoint (Task 5 human-verify). Phase 87 being executed now.
 
@@ -53,6 +53,12 @@ v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
 - Path(__file__).parents[4] / 'configs': 4 levels up from scripts/analysis/ reaches project root (parents[5] was wrong -- one level above project)
 - ICStalenessMonitor returns 0/1/2: enables pipeline stage runner to gate on decay presence
 - pipeline_alert_log as unified throttle log: all Phase 87 alert types use same table with alert_type/alert_key discriminator
+
+**Phase 87 decisions (plan 04):**
+- Global-only overrides (asset_id=None) applied uniformly to all ic_ir_matrix rows: per-asset override path exists in apply_ic_weight_overrides() but DataFrame wiring uses global keys only (Phase 87 ICStalenessMonitor writes feature-level not asset-level overrides)
+- ic_overrides loaded once before ic_ir_matrix block: single DB round-trip in BL branch; no-op when overrides dict is empty
+- Copy-on-write for ic_ir_matrix: .copy() only when applied_cols is non-empty; avoids unnecessary memory allocation in common case
+- OperationalError + ProgrammingError both caught: covers table-not-exist (migration-pending) and connection-level failures
 
 **Phase 87 decisions (plan 02):**
 - Baseline uses DATE(ts) < CURRENT_DATE (not NOW() - INTERVAL): prevents partial-day count from inflating rolling mean and triggering false z-score alerts
@@ -318,7 +324,7 @@ None active.
 ## Session Continuity
 
 Last session: 2026-03-24
-Stopped at: Completed 87-01-PLAN.md (Alembic migration n8o9p0q1r2s3 + ICStalenessMonitor)
+Stopped at: Completed 87-04-PLAN.md (IC weight overrides wired into portfolio refresh)
 Resume file: None
 
 ---
