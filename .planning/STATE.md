@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 
 ## Current Position
 
-Phase: 86-portfolio-construction-pipeline (v1.2.0, Phase complete)
-Plan: 3 of 3 complete (01+02+03 done)
-Status: Phase complete. All 3 plans executed: stop calibration pipeline (01), IC-IR BL + GARCH sizing (02), pipeline wiring + parity check (03). Verified 14/14 must-haves.
-Last activity: 2026-03-24 -- Completed 86-VERIFICATION.md (passed)
+Phase: 92-ctf-ic-analysis-feature-selection (v1.2.0, In progress)
+Plan: 04 auto tasks complete; stopped at Task 5 checkpoint awaiting human verification
+Status: Gap closure plan 04 tasks 1-4 complete. Awaiting human approval at checkpoint before 92-VERIFICATION update.
+Last activity: 2026-03-24 -- Completed 92-04 tasks 1-4 (CTF full-universe pipeline gap closure)
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [########--] 80% v1.2.0
 
@@ -41,6 +41,13 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 Decisions are logged in PROJECT.md Key Decisions table.
 
 v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
+
+**Phase 92 decisions (plan 04):**
+- CMC_AGG universe has 7 assets total -- plan assumed ~158 but price_bars_multi_tf_u venue_id=1 has exactly 7 distinct IDs; full-universe run IS 7 assets
+- 6 of 7 assets got CTF IC results -- asset 32196 (361 price bars 1D) lacks sufficient forward return history; IC sweep handled gracefully
+- pruned_ref_tfs_count=0 is IC-informed when all 6 ref_tfs (7D,14D,30D,90D,180D,365D) appear in ic_results -- not a gap, retention justified
+- n_assets < 10 guard in coverage note: warning only shown when coverage is genuinely thin; 6 assets shows count without warning
+- ctf_feature_list = list(ctf_features): safely converts set/list to list for ANY(:ctf_features) psycopg2 binding
 
 **Phase 85 decisions (plan 01):**
 - stats auto-discovery: information_schema JOIN on status column + LIKE '%\_stats' (raw string) -- excludes asset_stats (no status col) and watermark tables
@@ -291,9 +298,9 @@ None active.
 ## Session Continuity
 
 Last session: 2026-03-24
-Stopped at: Completed Phase 86 (portfolio-construction-pipeline) -- 3 plans, 9 commits, 14/14 verified
-Resume file: None
+Stopped at: Completed 92-04 tasks 1-4 (CTF full-universe gap closure). Paused at Task 5 checkpoint:human-verify.
+Resume file: None (checkpoint awaits human approval; fresh continuation agent will update 92-VERIFICATION.md)
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-23 (Phase 84, Plan 5 complete)*
+*Last updated: 2026-03-24 (Phase 92, Plan 04 checkpoint reached)*
