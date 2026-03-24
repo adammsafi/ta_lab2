@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 
 ## Current Position
 
-Phase: 91-ctf-cli-pipeline-integration (v1.2.0, Phase complete)
-Plan: 3 of 3 complete (01+02+03 done)
-Status: Phase complete. CTF integrated into daily pipeline as Phase 2c; all 5 roadmap success criteria satisfied. Verification passed 14/14 must-haves.
-Last activity: 2026-03-23 -- Phase 91 verified (14/14 must-haves passed)
+Phase: 92-ctf-ic-analysis-feature-selection (v1.2.0, In progress)
+Plan: 1 of 3 complete (01 done)
+Status: In progress. Plan 01 complete: load_ctf_features() pivot loader + dim_ctf_feature_selection table deployed.
+Last activity: 2026-03-24 -- Completed 92-01-PLAN.md
 
 Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [########--] 65% v1.2.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 390
+- Total plans completed: 391
 - Average duration: 7 min
 - Total execution time: ~30.9 hours
 
@@ -74,6 +74,13 @@ v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
 - load_stats_tables not imported at page level: load_stats_status calls it internally; Rows (24h) = sum(PASS+WARN+FAIL) -- no additional query needed
 - drawdown_usd backward-compat guard: falls back to 0.0 if column absent (cache not yet refreshed post-Plan 01 deploy)
 - Engine init pattern now consistent across all 17 dashboard pages: single module-level try/except get_engine() + st.stop()
+
+**Phase 92 decisions (plan 01):**
+- load_ctf_features uses vectorized pivot (melt+pivot_table), not iterrows -- matches batch_compute_ic input expectations at scale
+- dim_ctf_feature_selection separate from dim_feature_selection (Phase 80) -- CTF composites differ; avoids schema interference
+- ref_tf_lower via str.lower() in Python layer (not SQL LOWER()) -- consistent with vectorized transformation chain
+- dropna(axis=1, how='all') drops crossover for non-directional indicators -- all-NaN by design in _compute_crossover
+- conn parameter (not engine) for load_ctf_features -- caller controls connection lifecycle for batched queries
 
 **Phase 91 decisions (plan 03):**
 - CTF placed as Phase 2c between microstructure (2b) and CS norms (3): CTF reads from ta/vol/returns_u/features, must follow all three
@@ -245,8 +252,8 @@ None active.
 
 ## Session Continuity
 
-Last session: 2026-03-23T23:31:33Z
-Stopped at: Completed 91-03-PLAN.md (CTF Phase 2c integration: run_all_feature_refreshes.py pipeline wiring)
+Last session: 2026-03-24T02:24:15Z
+Stopped at: Completed 92-01-PLAN.md (CTF pivot loader + dim_ctf_feature_selection migration)
 Resume file: None
 
 ---
