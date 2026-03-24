@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 
 ## Current Position
 
-Phase: 86-portfolio-construction-pipeline (v1.2.0, Phase complete)
+Phase: 92-ctf-ic-analysis-feature-selection (v1.2.0, Phase complete)
 Plan: 3 of 3 complete (01+02+03 done)
-Status: Phase complete. Plan 03 complete: calibrate_stops pipeline stage wired (signals->calibrate_stops->portfolio->executor->drift->stats) + parity check --bakeoff-winners auto-discovery.
-Last activity: 2026-03-24 -- Completed 86-03-PLAN.md
+Status: Phase complete. Plan 03 complete: run_ctf_feature_selection.py + dim_ctf_feature_selection (96 rows) + ctf_config_pruned.yaml + comparison report (rho=0.19, LOW redundancy).
+Last activity: 2026-03-24 -- Completed 92-03-PLAN.md
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [########--] 65% v1.2.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [##########] 70% v1.2.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 392
+- Total plans completed: 395
 - Average duration: 7 min
 - Total execution time: ~30.9 hours
 
@@ -96,6 +96,15 @@ v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
 - strategy column in stop_calibrations uses dim_signals.strategy_type via JOIN, falls back to signal_id::TEXT when unavailable
 - equal-weight sl_sizes=[0.33,0.33,0.34] and tp_sizes=[0.50,0.50] for 3-tier SL and 2-tier TP
 - from_db_calibrations() graceful fallback: DB query failure returns unmodified ladder (global YAML defaults apply); never raises
+
+**Phase 92 decisions (plan 03):**
+- ic_ir_cutoff=0.5 for CTF active tier (vs 1.0 for Phase 80 AMA) -- CTF has limited 2-asset coverage, lower bar appropriate
+- save_ctf_to_db() uses ON CONFLICT upsert -- does NOT truncate dim_feature_selection (Phase 80 table); separate tables
+- pruned config retains all 6 base_tfs regardless of archive status -- per Phase 92 context decision
+- 0 ref_tfs pruned from config because only 7D ref_tf data in ic_results -- other ref_tfs absent from limited CTF sweep
+- CTF vs AMA redundancy: Spearman rho=0.19 (LOW) -- CTF features provide different signal from AMA
+- reports/ dir gitignored -- git add -f for comparison reports as persistent project artifacts
+- Top active CTF features: macd_*_7d_agreement (IC-IR=1.29) and close_fracdiff_7d (IC-IR=0.73) vs AMA best IC-IR=1.65
 
 **Phase 92 decisions (plan 02):**
 - venue_id=1 filter in _load_close_for_asset: features PK includes venue_id; without filter, multiple venues produce duplicate ts rows causing batch_compute_ic reindex failure
@@ -281,8 +290,8 @@ None active.
 
 ## Session Continuity
 
-Last session: 2026-03-24T02:44:08Z
-Stopped at: Completed 86-03-PLAN.md (calibrate_stops pipeline stage, parity check --bakeoff-winners auto-discovery)
+Last session: 2026-03-24T02:51:30Z
+Stopped at: Completed 92-03-PLAN.md (run_ctf_feature_selection.py + dim_ctf_feature_selection + comparison report)
 Resume file: None
 
 ---
