@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 ## Current Position
 
 Phase: 87-live-pipeline-alert-wiring (v1.2.0, In progress -- executing out of sequence)
-Plan: 02 of 4 complete
-Status: Plan 02 complete. SignalAnomalyGate implemented and committed.
-Last activity: 2026-03-24 -- Completed 87-02 (Signal Anomaly Gate implementation)
+Plan: 01 complete (SUMMARY created 2026-03-24); 02 complete; 03-04 pending
+Status: Plans 01+02 complete. Foundation tables + IC staleness monitor (87-01) and signal anomaly gate (87-02) implemented.
+Last activity: 2026-03-24 -- Completed 87-01 (Alembic migration + ICStalenessMonitor)
 
 Note: Phase 92 plan 04 paused at checkpoint (Task 5 human-verify). Phase 87 being executed now.
 
@@ -43,6 +43,16 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 Decisions are logged in PROJECT.md Key Decisions table.
 
 v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
+
+**Phase 87 decisions (plan 01):**
+- down_revision=m7n8o9p0q1r2 (Phase 86 head); verified via alembic history before writing migration
+- dim_ic_weight_overrides UNIQUE INDEX on (feature, COALESCE(asset_id, -1)): handles nullable asset_id uniqueness correctly in PostgreSQL
+- ON CONFLICT ON CONSTRAINT uq_ic_weight_overrides DO NOTHING: prevents compound weight halving on repeated daily runs
+- NaN guard in _is_decaying(): insufficient data (NaN IC-IR) must NOT trigger decay flag; skips gracefully
+- AMA features skip gracefully: columns (TEMA_*, DEMA_*, etc.) live in ama_multi_tf not features; information_schema check prevents SQL errors
+- Path(__file__).parents[4] / 'configs': 4 levels up from scripts/analysis/ reaches project root (parents[5] was wrong -- one level above project)
+- ICStalenessMonitor returns 0/1/2: enables pipeline stage runner to gate on decay presence
+- pipeline_alert_log as unified throttle log: all Phase 87 alert types use same table with alert_type/alert_key discriminator
 
 **Phase 87 decisions (plan 02):**
 - Baseline uses DATE(ts) < CURRENT_DATE (not NOW() - INTERVAL): prevents partial-day count from inflating rolling mean and triggering false z-score alerts
@@ -308,9 +318,9 @@ None active.
 ## Session Continuity
 
 Last session: 2026-03-24
-Stopped at: Completed 87-02-PLAN.md (SignalAnomalyGate -- signal validation pre-execution gate)
+Stopped at: Completed 87-01-PLAN.md (Alembic migration n8o9p0q1r2s3 + ICStalenessMonitor)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-24 (Phase 92, Plan 04 checkpoint reached)*
+*Last updated: 2026-03-24 (Phase 87, Plan 01 complete)*
