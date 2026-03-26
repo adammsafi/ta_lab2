@@ -173,14 +173,17 @@ def _cal_anchor_ama_worker(task: AMAWorkerTask) -> int:
         # Preload ALL bars for this asset in 1 query (all TFs, all venues)
         feature.preload_all_bars(engine, task.asset_id)
 
-        # Load ALL states for this asset in 1 query (instead of per-param-set per-TF)
-        if not task.full_rebuild:
-            all_states = state_manager.load_all_states(task.asset_id)
-            ps_keys = {(ps.indicator, ps.params_hash) for ps in task.param_sets}
-        else:
-            all_states = pd.DataFrame()
+        # Pre-compute param set keys (venue-independent)
+        ps_keys = {(ps.indicator, ps.params_hash) for ps in task.param_sets}
 
         for venue_id in venue_ids:
+            # Load states per-venue so each venue has independent watermarks
+            if not task.full_rebuild:
+                all_states = state_manager.load_all_states(
+                    task.asset_id, venue_id=venue_id
+                )
+            else:
+                all_states = pd.DataFrame()
             for tf_spec in tf_specs:
                 # Determine start_ts from state (or None for full history)
                 if task.full_rebuild:
@@ -261,7 +264,7 @@ def _cal_anchor_ama_worker(task: AMAWorkerTask) -> int:
                         state_updates.append(
                             {
                                 "id": task.asset_id,
-                                "venue_id": 1,  # state tracked at default venue
+                                "venue_id": venue_id,
                                 "tf": tf_spec.tf,
                                 "indicator": ps.indicator,
                                 "params_hash": ps.params_hash,
