@@ -27,6 +27,7 @@ from typing import Any, Optional
 
 import pandas as pd
 from sqlalchemy import create_engine, text
+from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.pool import NullPool
 
 logger = logging.getLogger(__name__)
@@ -248,6 +249,89 @@ def _load_regime(regime_arg: Optional[str], engine) -> Optional[str]:
         )
 
     return None
+
+
+# ---------------------------------------------------------------------------
+# IC weight overrides
+# ---------------------------------------------------------------------------
+
+
+def load_ic_weight_overrides(engine) -> dict:
+    """
+    Load active IC weight override multipliers from dim_ic_weight_overrides.
+
+    Returns dict of (feature, asset_id) -> multiplier.
+    asset_id=None means override applies to all assets for that feature.
+
+    Excludes:
+    - Cleared overrides (cleared_at IS NOT NULL)
+    - Expired overrides (expires_at IS NOT NULL AND expires_at < now())
+
+    Handles gracefully when dim_ic_weight_overrides table does not exist
+    (migration pending).
+    """
+    sql = text(
+        """
+        SELECT feature, asset_id, multiplier
+        FROM dim_ic_weight_overrides
+        WHERE cleared_at IS NULL
+          AND (expires_at IS NULL OR expires_at > now())
+        """
+    )
+    overrides: dict = {}
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(sql).fetchall()
+        for row in rows:
+            mapping = dict(row._mapping)
+            key = (mapping["feature"], mapping["asset_id"])
+            overrides[key] = float(mapping["multiplier"])
+        if overrides:
+            logger.info("Loaded %d active IC weight overrides", len(overrides))
+        else:
+            logger.info("Loaded 0 active IC weight overrides")
+    except (OperationalError, ProgrammingError) as exc:
+        logger.warning(
+            "dim_ic_weight_overrides not accessible (migration pending?): %s", exc
+        )
+    except Exception as exc:
+        logger.error("Failed to load IC weight overrides: %s", exc)
+    return overrides
+
+
+def apply_ic_weight_overrides(
+    ic_weights,
+    overrides: dict,
+    asset_id: Optional[int] = None,
+):
+    """
+    Apply IC weight override multipliers to feature weights.
+
+    For each feature in ic_weights:
+    1. Check for asset-specific override (feature, asset_id)
+    2. Fall back to global override (feature, None)
+    3. Default multiplier = 1.0 (no change)
+
+    Accepts both dict[str, float] and pd.Series inputs.
+    Returns modified copy (does not mutate input).
+    """
+    if not overrides:
+        return ic_weights
+
+    is_series = isinstance(ic_weights, pd.Series)
+    result = dict(ic_weights)
+
+    for feature in list(result.keys()):
+        # Asset-specific override takes precedence over global
+        multiplier = overrides.get((feature, asset_id))
+        if multiplier is None:
+            # Fall back to global override (asset_id=None)
+            multiplier = overrides.get((feature, None), 1.0)
+        result[feature] = result[feature] * multiplier
+
+    if is_series:
+        return pd.Series(result)
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -517,13 +601,98 @@ def run_refresh(
     bl_weights: Optional[dict] = None
     if use_bl:
         try:
-            # Build minimal signal scores and IC-IR (zeroes when not available from DB)
-            # This allows BL to run with prior-only when no live signal data is present.
-            base_vol = prices.pct_change().std() * (252 / tf_days) ** 0.5
-            signal_scores = pd.DataFrame(
-                0.0, index=list(prices.columns), columns=["rsi"]
+            from ta_lab2.backtests.bakeoff_orchestrator import (  # noqa: PLC0415
+                load_per_asset_ic_weights,
+                parse_active_features,
             )
-            ic_ir = pd.Series({"rsi": 0.0})
+
+            base_vol = prices.pct_change().std() * (252 / tf_days) ** 0.5
+
+            # Load active feature names from feature_selection.yaml
+            try:
+                active_features = parse_active_features()
+                feature_names = [f["name"] for f in active_features]
+            except Exception as exc:
+                logger.debug(
+                    "Could not parse active features (%s); using empty list.", exc
+                )
+                feature_names = []
+
+            # Load IC weight overrides from dim_ic_weight_overrides (Phase 87).
+            # Loaded once; applied per-asset inside the ic_ir_matrix block below.
+            ic_overrides = load_ic_weight_overrides(engine)
+
+            # Load per-asset IC-IR matrix from ic_results (Phase 80 requirement).
+            ic_ir_matrix: Optional[pd.DataFrame] = None
+            if feature_names:
+                try:
+                    ic_ir_matrix = load_per_asset_ic_weights(
+                        engine=engine,
+                        features=feature_names,
+                        tf=tf,
+                        horizon=1,
+                        return_type="arith",
+                    )
+                except Exception as exc:
+                    logger.debug(
+                        "load_per_asset_ic_weights failed (%s); will use prior-only path.",
+                        exc,
+                    )
+
+            if ic_ir_matrix is None or ic_ir_matrix.empty:
+                logger.warning(
+                    "BL: no per-asset IC-IR data available (ic_results may be empty for tf=%s). "
+                    "Falling through to prior-only BL run.",
+                    tf,
+                )
+                # Fallback: prior-only stub (zero IC-IR -> build_views returns empty -> prior only)
+                signal_scores = pd.DataFrame(
+                    0.0, index=list(prices.columns), columns=["rsi"]
+                )
+                ic_ir: pd.Series | pd.DataFrame = pd.Series({"rsi": 0.0})
+            else:
+                # Real per-asset IC-IR loaded from ic_results.
+                # Apply IC weight overrides (Phase 87): per-feature multipliers from
+                # dim_ic_weight_overrides reduce BL view strength for decayed features.
+                if ic_overrides:
+                    # Apply overrides column-wise (each column = one feature).
+                    # For per-asset overrides: apply the row's asset_id specifically.
+                    # For global overrides (asset_id=None): apply to all rows.
+                    # We apply global-only overrides uniformly across the matrix columns.
+                    col_multipliers = {}
+                    for feat in ic_ir_matrix.columns:
+                        # Global override (asset_id=None) applies uniformly
+                        m = ic_overrides.get((feat, None), 1.0)
+                        col_multipliers[feat] = m
+                    applied_cols = [f for f, m in col_multipliers.items() if m != 1.0]
+                    if applied_cols:
+                        ic_ir_matrix = ic_ir_matrix.copy()
+                        for feat, mult in col_multipliers.items():
+                            if mult != 1.0:
+                                ic_ir_matrix[feat] = ic_ir_matrix[feat] * mult
+                        logger.info(
+                            "Applied IC weight overrides to %d feature(s): %s",
+                            len(applied_cols),
+                            applied_cols,
+                        )
+
+                # Use uniform signal_scores (1.0) so all features contribute equally;
+                # per-asset IC-IR differences alone drive view heterogeneity.
+                # TODO(Phase 87): Wire real feature values as signal_scores from
+                #   features table + ama_multi_tf_u for fully live signal-weighted BL.
+                ic_ir = ic_ir_matrix  # pd.DataFrame path in BLAllocationBuilder
+                signal_scores = pd.DataFrame(
+                    1.0,
+                    index=list(prices.columns),
+                    columns=ic_ir_matrix.columns,
+                )
+                logger.info(
+                    "BL: loaded per-asset IC-IR for %d assets x %d features (tf=%s). "
+                    "Using uniform signal_scores=1.0 (Phase 87 will add real signal values).",
+                    len(ic_ir_matrix),
+                    len(ic_ir_matrix.columns),
+                    tf,
+                )
 
             bl_builder = BLAllocationBuilder(config=config)
             bl_result = bl_builder.run(

@@ -11,7 +11,7 @@
 - v1.0.0 V1 Closure — Paper Trading & Validation (Phases 42-63) - SHIPPED 2026-03-01
 - v1.0.1 Macro Regime Infrastructure (Phases 64-73) - SHIPPED 2026-03-03
 - v1.1.0 Pipeline Consolidation & Storage Optimization (Phases 74-79) - SHIPPED 2026-03-21
-- v1.2.0 Analysis → Live Signals (Phases 80-88) - PLANNED
+- v1.2.0 Analysis → Live Signals (Phases 80-92) - PLANNED
 
 ## Overview
 
@@ -29,7 +29,7 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 - Phases 42-63: v1.0.0 (SHIPPED 2026-03-01)
 - Phases 64-73: v1.0.1 (SHIPPED 2026-03-03)
 - Phases 74-79: v1.1.0 (SHIPPED 2026-03-21)
-- Phases 80-88: v1.2.0 (planned)
+- Phases 80-92: v1.2.0 (planned)
 - Decimal phases (27.1, 28.1): Urgent insertions if needed
 
 <details>
@@ -1375,15 +1375,19 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 
 **Milestone Goal:** Shift from data collection to alpha discovery and live signal generation. Analyze IC sweep results, refine features down to a tradeable set, build GARCH volatility models, run walk-forward bake-offs, overhaul the dashboard with backtest/signal/perps views, wire the full daily pipeline from signals through paper execution, and surface everything via alerts and monitoring.
 
-- [ ] **Phase 80: IC Analysis & Feature Selection** - Analyze IC sweep, stationarity tests, feature pruning 112→~20, quintile validation
-- [ ] **Phase 81: GARCH & Conditional Volatility** - GARCH/EGARCH models, conditional vol forecasting, integration with position sizing and VaR
-- [ ] **Phase 82: Signal Refinement & Walk-Forward Bake-off** - Expression engine experiments, regime router training, walk-forward bake-off, DSR/PSR gate
-- [ ] **Phase 83: Dashboard — Backtest & Signal Pages** - Backtest results page, signal browser, OHLCV candlestick charts
-- [ ] **Phase 84: Dashboard — Perps, Portfolio & Regimes** - Hyperliquid page, portfolio allocation view, regime heatmap, AMA/EMA inspector
-- [ ] **Phase 85: Dashboard Cleanup & Polish** - Fix cache TTL slider, dynamic stats allowlist, drawdown calc, UI consistency
-- [ ] **Phase 86: Portfolio Construction Pipeline** - IC-IR → Black-Litterman views, bet sizing with GARCH vol, stop ladder tuning, paper executor dry run
-- [ ] **Phase 87: Live Pipeline & Alert Wiring** - Daily pipeline end-to-end: signals → validation → executor → drift → alerts, IC staleness monitoring
-- [ ] **Phase 88: Integration Testing & Go-Live** - End-to-end smoke tests, 1-week paper trading burn-in, runbook updates, v1.2.0 tag
+- [x] **Phase 80: IC Analysis & Feature Selection** - Analyze IC sweep, stationarity tests, feature pruning 112→~20, quintile validation
+- [x] **Phase 81: GARCH & Conditional Volatility** - GARCH/EGARCH models, conditional vol forecasting, integration with position sizing and VaR
+- [x] **Phase 82: Signal Refinement & Walk-Forward Bake-off** - Expression engine experiments, regime router training, walk-forward bake-off, DSR/PSR gate
+- [x] **Phase 83: Dashboard — Backtest & Signal Pages** - Backtest results page, signal browser, OHLCV candlestick charts
+- [x] **Phase 84: Dashboard — Perps, Portfolio & Regimes** - Hyperliquid page, portfolio allocation view, regime heatmap, AMA/EMA inspector
+- [x] **Phase 85: Dashboard Cleanup & Polish** - Fix cache TTL slider, dynamic stats allowlist, drawdown calc, UI consistency
+- [x] **Phase 86: Portfolio Construction Pipeline** - IC-IR → Black-Litterman views, bet sizing with GARCH vol, stop ladder tuning, paper executor dry run
+- [x] **Phase 87: Live Pipeline & Alert Wiring** - Daily pipeline end-to-end: signals → validation → executor → drift → alerts, IC staleness monitoring
+- [x] **Phase 88: Integration Testing & Go-Live** - End-to-end smoke tests, 1-week paper trading burn-in, runbook updates, v1.2.0 tag
+- [x] **Phase 89: CTF Schema & Dimension Table** - Alembic migration for dim_ctf_indicators + ctf tables, seed indicators from ta/vol/returns/features, create ctf_config.yaml
+- [x] **Phase 90: CTF Core Computation Module** - CTFFeature class: batch indicator loading, merge_asof alignment, slope/divergence/agreement/crossover composites, scoped DELETE+INSERT writes
+- [x] **Phase 91: CTF CLI & Pipeline Integration** - refresh_ctf.py CLI script, Phase 2c integration into run_all_feature_refreshes.py, incremental refresh support
+- [x] **Phase 92: CTF IC Analysis & Feature Selection** - load_ctf_features() pivot loader, IC analysis on CTF features, compare vs AMA features, prune config to high-IC combinations
 
 ## v1.2.0 Phase Details
 
@@ -1400,11 +1404,11 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 **Plans**: 5 plans in 4 waves
 
 Plans:
-- [ ] 80-01-PLAN.md -- Install statsmodels dependency + dim_feature_selection Alembic migration
-- [ ] 80-02-PLAN.md -- feature_selection.py library module (stationarity, Ljung-Box, monotonicity, tier classification)
-- [ ] 80-03-PLAN.md -- run_feature_selection.py CLI orchestrator + generate configs/feature_selection.yaml
-- [ ] 80-04-PLAN.md -- run_concordance.py IC-IR vs MDA concordance analysis
-- [ ] 80-05-PLAN.md -- Feature selection review checkpoint (human verification)
+- [x] 80-01-PLAN.md -- Install statsmodels dependency + dim_feature_selection Alembic migration
+- [x] 80-02-PLAN.md -- feature_selection.py library module (stationarity, Ljung-Box, monotonicity, tier classification)
+- [x] 80-03-PLAN.md -- run_feature_selection.py CLI orchestrator + generate configs/feature_selection.yaml
+- [x] 80-04-PLAN.md -- run_concordance.py IC-IR vs MDA concordance analysis
+- [x] 80-05-PLAN.md -- Feature selection review checkpoint (human verification)
 
 ---
 
@@ -1417,21 +1421,43 @@ Plans:
   3. Vol forecast integrated into vol_sizer.py — position sizing uses GARCH forecast when available, falls back to range estimators
   4. Comparison report: GARCH vs Parkinson/GK/ATR accuracy (realized vol prediction error) — validates added value
   5. Daily refresh wiring: GARCH forecasts update automatically in run_daily_refresh.py
-**Plans**: TBD
+**Plans**: 5 plans in 3 waves
+
+Plans:
+- [x] 81-01-PLAN.md -- DB foundation (garch_forecasts, garch_diagnostics, matview) + core GARCH engine (arch dep)
+- [x] 81-02-PLAN.md -- State manager + daily refresh script (refresh_garch_forecasts.py)
+- [x] 81-03-PLAN.md -- Evaluation framework (RMSE, QLIKE, MZ R2) + inverse-RMSE blend weights
+- [x] 81-04-PLAN.md -- vol_sizer.py GARCH blend integration + GARCH-VaR in var_simulator.py
+- [x] 81-05-PLAN.md -- Comparison report generator + daily refresh pipeline wiring
 
 ---
 
 ### Phase 82: Signal Refinement & Walk-Forward Bake-off
 **Goal:** Top features combined into composite signals via expression engine, validated through walk-forward bake-off with statistical gates
 **Depends on:** Phase 80 (selected features), Phase 81 (GARCH vol for cost-aware sizing)
+**Phase 80 Learnings (must address):**
+  - Active tier is 90% AMA-derived features (live in `ama_multi_tf`, NOT `features` table) — expression engine and regime router MUST load from both table families
+  - Per-asset IC-IR variation is significant — leverage `ic_results` per-asset data for asset-specific signal weighting, not just the universal YAML averages
+  - Feature selection is strategy-agnostic (ranks by IC-IR correlation with forward returns) — this phase is where strategy alignment happens (momentum vs mean-reversion vs regime-conditional)
+  - Conditional tier (160 features) contains all traditional TA features (RSI, MACD, ADX, Bollinger) — regime router should evaluate these as regime specialists
+  - Concordance between IC-IR and MDA was low (rho=0.14) due to AMA features being absent from MDA evaluation — consider MDA validation for bar-level features separately
 **Success Criteria** (what must be TRUE):
   1. At least 3 expression engine YAML experiments defined using selected features (combinations, interactions, regime-conditional)
-  2. Regime router (TRA) trained with selected features — per-regime sub-models operational
+  2. Regime router (TRA) trained with selected features — per-regime sub-models operational, using BOTH features table AND ama_multi_tf data
   3. Walk-forward bake-off (run_bakeoff.py) completed across full Kraken cost matrix (12 scenarios)
   4. DSR > 0.95 gate applied — only strategies passing deflated Sharpe survive
-  5. Bake-off results persisted to backtest_metrics with experiment lineage
+  5. Bake-off results persisted to strategy_bakeoff_results with experiment lineage
   6. Top 1-2 strategies selected for paper trading, documented with rationale
-**Plans**: TBD
+  7. Per-asset feature weighting explored: do asset-specific IC-IR weights improve strategy performance vs universal weights?
+**Plans**: 6 plans in 4 waves
+
+Plans:
+- [x] 82-01-PLAN.md -- Extended AMA data loader, Hyperliquid cost matrix, experiment_name migration
+- [x] 82-02-PLAN.md -- AMA composite signal generators (momentum, mean-reversion, regime-conditional)
+- [x] 82-03-PLAN.md -- YAML experiments + run_bakeoff.py multi-exchange/AMA support
+- [x] 82-04-PLAN.md -- Regime router AMA extension + per-asset IC weight helpers
+- [x] 82-05-PLAN.md -- Full walk-forward bake-off execution (109 assets x Kraken + HL + expression)
+- [x] 82-06-PLAN.md -- Statistical gates, strategy selection, and bake-off report
 
 ---
 
@@ -1444,7 +1470,14 @@ Plans:
   3. OHLCV candlestick charts replace plain close lines in Research Explorer (Plotly candlestick with EMA overlays)
   4. All new pages follow existing query-layer pattern (queries/*.py + pages/*.py separation)
   5. Charts have HTML download buttons consistent with existing pages
-**Plans**: TBD
+**Plans**: 5 plans in 3 waves (COMPLETE)
+
+Plans:
+- [x] 83-01-PLAN.md -- Query layers (backtest + signals) and chart builders (candlestick, sparkline, timeline)
+- [x] 83-02-PLAN.md -- Backtest Results page (3 views, cost matrix, Monte Carlo CI, sparklines)
+- [x] 83-03-PLAN.md -- Signal Browser page (3 views, heatmap, history timeline, signal strength)
+- [x] 83-04-PLAN.md -- Asset Hub page + OHLCV candlestick upgrade to Research Explorer
+- [x] 83-05-PLAN.md -- Sidebar reorganization + navigation wiring + human verification
 
 ---
 
@@ -1457,7 +1490,14 @@ Plans:
   3. Regime Heatmap page: cross-asset regime_comovement visualization, regime_stats summary, regime timeline for all assets (not just BTC/ETH)
   4. AMA/EMA Inspector: per-asset efficiency ratio, d1/d2 curves, adaptive vs fixed EMA comparison chart
   5. All pages auto-refresh via @st.fragment(run_every=900) for operational pages
-**Plans**: TBD
+**Plans**: 5 plans in 2 waves
+
+Plans:
+- [ ] 84-01-PLAN.md -- Hyperliquid Perps query layer + page
+- [ ] 84-02-PLAN.md -- Regime Heatmap query layer + page
+- [ ] 84-03-PLAN.md -- AMA/EMA Inspector query layer + page
+- [ ] 84-04-PLAN.md -- Portfolio Allocation placeholder page
+- [ ] 84-05-PLAN.md -- App registration + verification
 
 ---
 
@@ -1465,25 +1505,35 @@ Plans:
 **Goal:** Existing dashboard issues fixed, UI consistent across all pages (old + new)
 **Depends on:** Phase 83, Phase 84 (all new pages exist before polish pass)
 **Success Criteria** (what must be TRUE):
-  1. Cache TTL sidebar slider actually controls query cache TTLs (not decorative)
+  1. Decorative cache TTL slider removed from sidebar, replaced with factual cache tier caption and Refresh button (Streamlit @st.cache_data TTL is a static decorator — dynamic control is not feasible)
   2. Stats table allowlist in pipeline.py auto-discovers from information_schema instead of hardcoded list
   3. Drawdown calculation uses portfolio starting value, not just cumulative PnL peak
-  4. Consistent color scheme, card styling, and alert banner placement across all 14+ pages
-  5. Navigation groups in app.py updated to reflect new page categories
-**Plans**: TBD
+  4. Older pages (landing, pipeline monitor) aligned to Phase 83/84 engine-init and layout patterns; Phase 83/84 pages already consistent
+  5. Navigation groups in app.py reorganized to separate Research, Markets, Operations, and Monitor
+**Plans:** 2 plans in 1 wave
+Plans:
+- [x] 85-01-PLAN.md -- Backend query fixes (cache TTL slider, stats auto-discovery, drawdown calculation)
+- [x] 85-02-PLAN.md -- Page consistency (engine init consolidation, stats row counts, drawdown KPI dollars)
 
 ---
 
 ### Phase 86: Portfolio Construction Pipeline
 **Goal:** End-to-end portfolio construction from IC scores through paper execution with GARCH-informed sizing
 **Depends on:** Phase 81 (GARCH vol), Phase 82 (bake-off winners)
+**Phase 80 Learnings (must address):**
+  - IC-IR scores vary significantly per asset — Black-Litterman views should use per-asset IC-IR from ic_results, not the universal average from feature_selection.yaml
+  - Active features are mostly AMA-derived — portfolio rebalance pipeline needs ama_multi_tf data loading alongside features table
 **Success Criteria** (what must be TRUE):
-  1. IC-IR scores feed Black-Litterman views automatically (not manual input)
+  1. IC-IR scores feed Black-Litterman views automatically — per-asset IC-IR from ic_results, not universal average
   2. Bet sizing uses GARCH conditional vol forecast for target-vol scaling
   3. Stop ladder calibrated per asset using MAE/MFE analysis from bake-off trades
   4. Paper executor dry run with refined signals produces fills matching backtest parity within tolerance
   5. Portfolio rebalance logic documented and wired into daily pipeline
-**Plans**: TBD
+**Plans:** 3 plans in 2 waves
+Plans:
+- [x] 86-01-PLAN.md -- Alembic migration (stop_calibrations + target_annual_vol) + stop calibration module + CLI
+- [x] 86-02-PLAN.md -- Per-asset IC-IR in BL views + GARCH target-vol sizing mode in PositionSizer
+- [x] 86-03-PLAN.md -- Daily pipeline wiring (calibrate_stops stage) + parity check bake-off winner support
 
 ---
 
@@ -1496,7 +1546,12 @@ Plans:
   3. Telegram alerts tuned: regime changes, drawdown > threshold, drift pause, IC decay, new signal fires
   4. Signal validation gate: signals that deviate >2σ from historical distribution flagged before execution
   5. Dead-man switch: alert fires if daily pipeline hasn't completed by expected time
-**Plans**: TBD
+**Plans:** 4 plans
+Plans:
+- [x] 87-01-PLAN.md -- Alembic migration (4 tables) + IC staleness monitor (multi-window IC-IR decay detection)
+- [x] 87-02-PLAN.md -- Signal validation gate (count anomaly + crowded signal detection, hard execution block)
+- [x] 87-03-PLAN.md -- Pipeline orchestration (--from-stage, dead-man switch, pipeline_run_log, completion alerts)
+- [x] 87-04-PLAN.md -- BL weight override wiring (dim_ic_weight_overrides into portfolio refresh)
 
 ---
 
@@ -1509,9 +1564,92 @@ Plans:
   3. Backtest parity verified: paper executor fills match backtest replay within cost tolerance
   4. Runbooks updated for v1.2.0 pipeline (new signal flow, new dashboard pages, GARCH refresh)
   5. v1.2.0 tagged and milestone audit complete
-**Plans**: TBD
+**Plans:** 3 plans
+Plans:
+- [ ] 88-01-PLAN.md -- Smoke test script + parity checker threshold extension
+- [ ] 88-02-PLAN.md -- Daily burn-in status report with Telegram delivery
+- [ ] 88-03-PLAN.md -- Operations manual updates, CHANGELOG, v1.2.0 requirements doc
 
 
 ---
+
+### Phase 89: CTF Schema & Dimension Table
+**Goal:** Establish the database foundation for cross-timeframe feature infrastructure — dimension table, fact table, seed data, and declarative YAML config
+**Depends on:** Phase 80 (feature selection results inform initial indicator set)
+**Success Criteria** (what must be TRUE):
+  1. `dim_ctf_indicators` table created with SMALLINT PK, indicator_name, source_table, source_column, is_directional, is_active columns
+  2. Seeded with ~20+ indicators from ta (MACD, RSI, ADX, BB, Stoch, ATR), vol (Parkinson, GK, RS, log_vol), returns (ret_arith, ret_log), features (fracdiff, sadf_stat)
+  3. `ctf` fact table created with PK (id, venue_id, ts, base_tf, ref_tf, indicator_id, alignment_source), value columns (ref_value, base_value, slope, divergence, agreement, crossover), FK to dim_ctf_indicators and dim_venues
+  4. Indexes: ix_ctf_lookup (id, base_tf, ref_tf, indicator_id, ts) and ix_ctf_indicator (indicator_id, base_tf)
+  5. `configs/ctf_config.yaml` created with tf_pairs, indicators by source table, composite parameters (slope_window=5, divergence_zscore_window=63)
+  6. Alembic migration passes `alembic upgrade head` cleanly
+**Plans:** 1 plan in 1 wave
+
+Plans:
+- [x] 89-01-PLAN.md -- Alembic migration (dim_ctf_indicators + ctf tables + seed) + ctf_config.yaml
+
+---
+
+### Phase 90: CTF Core Computation Module
+**Goal:** Build the generic cross-timeframe computation engine that loads indicators from any source table, aligns across timeframes, and computes composites
+**Depends on:** Phase 89 (schema + config must exist)
+**Success Criteria** (what must be TRUE):
+  1. `src/ta_lab2/features/cross_timeframe.py` with CTFConfig dataclass and CTFFeature class
+  2. `_load_indicators_batch()` loads ALL indicators from a source table in one query (not N queries per indicator)
+  3. `_align_timeframes()` uses `pd.merge_asof(direction='backward')`, reusing `build_alignment_frame()` from regimes/comovement.py
+  4. `_compute_slope()` uses vectorized rolling polyfit over configurable slope_window
+  5. `_compute_divergence()` computes (base - ref) / rolling_std with configurable z-score window
+  6. `_compute_agreement()` and `_compute_crossover()` respect `is_directional` flag from dim_ctf_indicators
+  7. `compute_for_ids()` orchestrates load → align → compute → write for all configured (base_tf, ref_tf, indicator) combinations
+  8. Write uses scoped DELETE + INSERT pattern matching existing BaseFeature convention
+  9. Manual test: `CTFFeature.compute_for_ids([1])` for BTC at 1D→7D produces correct rows in ctf table
+**Plans**: 2 plans in 2 waves
+
+Plans:
+- [x] 90-01-PLAN.md -- CTFConfig dataclass, YAML/dim loading, batch indicator loading, timeframe alignment
+- [x] 90-02-PLAN.md -- Composite computations (slope/divergence/agreement/crossover), orchestrator, write, integration test
+
+---
+
+### Phase 91: CTF CLI & Pipeline Integration
+**Goal:** Wire CTF computation into the daily refresh pipeline with a standalone CLI script, Phase 2c integration, multiprocessing workers, and incremental refresh via ctf_state table
+**Depends on:** Phase 90 (core module must work)
+**Success Criteria** (what must be TRUE):
+  1. `src/ta_lab2/scripts/features/refresh_ctf.py` CLI with --ids, --all, --base-tf, --ref-tfs, --indicators, --full-refresh, --workers, --dry-run flags
+  2. `python -m ta_lab2.scripts.features.refresh_ctf --ids 1 --base-tf 1D` completes successfully
+  3. `python -m ta_lab2.scripts.features.refresh_ctf --all --base-tf 1D` processes all 109 assets with parallel workers
+  4. Phase 2c added to `run_all_feature_refreshes.py`: runs after microstructure (Phase 2b), before CS norms (Phase 3)
+  5. `python -m ta_lab2.scripts.features.run_all_feature_refreshes --ids 1 --tf 1D` logs CTF phase completion
+  6. Incremental refresh: re-run only computes new dates (watermark-based skip via ctf_state)
+  7. ctf_config.yaml expanded to 6 base TFs (2D, 3D added)
+**Plans:** 3 plans in 3 waves
+
+Plans:
+- [x] 91-01-PLAN.md -- Alembic migration for ctf_state table, YAML expansion (2D/3D), tqdm dependency
+- [x] 91-02-PLAN.md -- Standalone CLI refresh_ctf.py with multiprocessing, tqdm, incremental state, all CLI flags
+- [x] 91-03-PLAN.md -- Phase 2c pipeline integration into run_all_feature_refreshes.py
+
+---
+
+### Phase 92: CTF IC Analysis & Feature Selection
+**Goal:** Score CTF features through the existing IC pipeline, identify which cross-timeframe indicators have genuine predictive power, and prune config to high-IC combinations
+**Depends on:** Phase 91 (CTF data must be populated), Phase 80 (IC analysis tools)
+**Success Criteria** (what must be TRUE):
+  1. `load_ctf_features()` pivot function in cross_timeframe.py: loads normalized ctf rows, pivots to wide format (one column per indicator×ref_tf×composite), returns DataFrame compatible with batch_compute_ic()
+  2. IC analysis completed for all CTF features on BTC (id=1) at 1D base_tf
+  3. Multi-asset IC analysis across top 10 assets by data coverage
+  4. CTF features classified through existing feature_selection.py tier system (active/conditional/watch/archive)
+  5. Comparison report: CTF feature IC-IR vs AMA feature IC-IR — quantifies whether CTF adds non-redundant alpha
+  6. ctf_config.yaml pruned to retain only high-IC indicator×ref_tf combinations (save disk)
+  7. Results persisted to separate dim_ctf_feature_selection table (keeps CTF analysis independent from Phase 80 entries, per CONTEXT.md decision)
+**Plans:** 4 plans in 4 waves (3 original + 1 gap closure)
+
+Plans:
+- [x] 92-01-PLAN.md -- load_ctf_features() pivot loader + dim_ctf_feature_selection Alembic migration
+- [x] 92-02-PLAN.md -- run_ctf_ic_sweep.py: batch IC computation for all CTF features across all assets and base TFs
+- [x] 92-03-PLAN.md -- run_ctf_feature_selection.py: tier classification, AMA comparison report, config pruning, DB persistence
+- [ ] 92-04-PLAN.md -- Gap closure: full-universe CTF refresh + IC sweep + feature selection re-run
+
+---
 *Created: 2025-01-22*
-*Last updated: 2026-03-21 (v1.2.0 milestone roadmap defined: phases 80-88)*
+*Last updated: 2026-03-24 (Phase 92 gap closure: plan 04 added)*

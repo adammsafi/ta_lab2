@@ -94,7 +94,7 @@ from ta_lab2.scripts.bars.common_snapshot_contract import (
 # Constants
 # =============================================================================
 
-DEFAULT_DAILY_TABLE = "public.cmc_price_histories7"
+DEFAULT_DAILY_TABLE = "public.price_bars_1d"
 DEFAULT_BARS_TABLE = "public.price_bars_multi_tf_u"
 DEFAULT_STATE_TABLE = "public.price_bars_multi_tf_state"
 DEFAULT_TZ = "America/New_York"
@@ -184,19 +184,26 @@ class MultiTFBarBuilder(BaseBarBuilder):
             SQL query string to load daily price data
         """
         # Use the standard daily price loader query structure
+        _is_bars_1d = "price_bars_1d" in self.config.daily_table
+        if _is_bars_1d:
+            cols = "id, venue_id, timestamp as ts, open, high, low, close, volume, market_cap, time_high AS timehigh, time_low AS timelow"
+            tf_filter = "AND tf = '1D'"
+        else:
+            cols = "id, timestamp as ts, open, high, low, close, volume, market_cap, timehigh, timelow"
+            tf_filter = ""
         if start_ts:
             return f"""
-                SELECT id, timestamp as ts, open, high, low, close, volume, market_cap, timehigh, timelow
+                SELECT {cols}
                 FROM {self.config.daily_table}
-                WHERE id = {id_}
+                WHERE id = {id_} {tf_filter}
                   AND timestamp >= '{start_ts}'
                 ORDER BY timestamp;
             """
         else:
             return f"""
-                SELECT id, timestamp as ts, open, high, low, close, volume, market_cap, timehigh, timelow
+                SELECT {cols}
                 FROM {self.config.daily_table}
-                WHERE id = {id_}
+                WHERE id = {id_} {tf_filter}
                 ORDER BY timestamp;
             """
 
@@ -282,20 +289,34 @@ class MultiTFBarBuilder(BaseBarBuilder):
             self.logger.info(f"ID={id_}: No daily data found")
             return 0
 
-        # Get unique venues
-        venues = df_all["venue"].unique() if "venue" in df_all.columns else ["CMC_AGG"]
+        # Get unique venues — prefer venue_id column (price_bars_1d), fall back to text
+        if "venue_id" in df_all.columns:
+            venue_ids = sorted(df_all["venue_id"].unique())
+        else:
+            venue_ids = [1]  # cmc_price_histories7 → CMC_AGG
 
-        for venue in venues:
-            if "venue" in df_all.columns:
-                df_daily = df_all[df_all["venue"] == venue].copy()
+        # Apply venue_ids filter from CLI (--venue-ids)
+        _filter_vids = (
+            self.config.extra_config.get("venue_ids")
+            if self.config.extra_config
+            else None
+        )
+        if _filter_vids:
+            venue_ids = [v for v in venue_ids if v in _filter_vids]
+
+        for venue_id in venue_ids:
+            if "venue_id" in df_all.columns:
+                df_daily = df_all[df_all["venue_id"] == venue_id].copy()
             else:
                 df_daily = df_all.copy()
 
             if df_daily.empty:
                 continue
 
-            # Resolve venue text to venue_id for output-table operations
-            venue_id = self._resolve_venue_id(venue)
+            # Resolve venue text for logging
+            venue = (
+                df_daily["venue"].iloc[0] if "venue" in df_daily.columns else "CMC_AGG"
+            )
 
             daily_min_ts = pd.to_datetime(df_daily["ts"].min(), utc=True)
             daily_max_ts = pd.to_datetime(df_daily["ts"].max(), utc=True)
@@ -398,6 +419,7 @@ class MultiTFBarBuilder(BaseBarBuilder):
             daily_max_ts=daily_max_ts,
             last=last,
             venue=venue,
+            venue_id=venue_id,
         )
 
         if new_rows.empty:
@@ -430,6 +452,13 @@ class MultiTFBarBuilder(BaseBarBuilder):
         )
 
         # Multi-TF specific arguments
+        parser.add_argument(
+            "--venue-ids",
+            nargs="+",
+            type=int,
+            default=None,
+            help="Filter to specific venue_id(s). Default: all venues in source table.",
+        )
         parser.add_argument(
             "--include-non-canonical",
             action="store_true",
@@ -465,7 +494,20 @@ class MultiTFBarBuilder(BaseBarBuilder):
         # Resolve IDs
         ids = parse_ids(args.ids)
         if ids == "all":
-            ids = load_all_ids(db_url, args.daily_table)
+            # When filtering by venue_ids, only load IDs that exist in those venues
+            venue_ids_filter = getattr(args, "venue_ids", None)
+            if venue_ids_filter and "price_bars_1d" in args.daily_table:
+                eng = get_engine(db_url)
+                vids = ",".join(str(v) for v in venue_ids_filter)
+                with eng.connect() as conn:
+                    rows = conn.execute(
+                        text(
+                            f"SELECT DISTINCT id FROM {args.daily_table} WHERE tf = '1D' AND venue_id IN ({vids}) ORDER BY 1"
+                        )
+                    ).fetchall()
+                ids = [int(r[0]) for r in rows]
+            else:
+                ids = load_all_ids(db_url, args.daily_table)
 
         # Load timeframes from dim_timeframe
         timeframes = cls._load_timeframes_from_dim(
@@ -500,6 +542,7 @@ class MultiTFBarBuilder(BaseBarBuilder):
             rejects_table=args.rejects_table if args.keep_rejects else None,
             num_processes=resolve_num_processes(args.num_processes),
             log_level=getattr(args, "log_level", "INFO"),
+            extra_config={"venue_ids": getattr(args, "venue_ids", None)},
         )
 
         return cls(config=config, engine=engine, timeframes=timeframes)
@@ -725,7 +768,7 @@ class MultiTFBarBuilder(BaseBarBuilder):
             daily_table=self.config.daily_table,
             id_=id_,
             ts_start=ts_start,
-            venue=venue,
+            venue_id=venue_id,
         )
 
         if df_new.empty:
@@ -1062,10 +1105,15 @@ class MultiTFBarBuilder(BaseBarBuilder):
 
     def _count_total_daily_rows(self, id_: int) -> int:
         """Count total daily rows for an ID in the source table."""
+        tf_filter = (
+            "AND tf = '1D'" if "price_bars_1d" in self.config.daily_table else ""
+        )
         engine = get_engine(self.config.db_url)
         with engine.connect() as conn:
             result = conn.execute(
-                text(f"SELECT COUNT(*) FROM {self.config.daily_table} WHERE id = :id"),
+                text(
+                    f"SELECT COUNT(*) FROM {self.config.daily_table} WHERE id = :id {tf_filter}"
+                ),
                 {"id": int(id_)},
             ).scalar()
         return int(result or 0)

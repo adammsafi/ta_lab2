@@ -209,20 +209,26 @@ def _load_keys(
     engine: Engine,
     bars_table: str,
     ids: Optional[List[int]],
+    alignment_source: Optional[str] = None,
+    venue_ids: Optional[List[int]] = None,
 ) -> List[Tuple[int, str, int]]:
-    if ids is None:
-        sql = text(
-            f"SELECT DISTINCT id, tf, venue_id FROM {bars_table} ORDER BY 1,2,3;"
-        )
-        with engine.begin() as cxn:
-            rows = cxn.execute(sql).fetchall()
-    else:
-        sql = text(
-            f"SELECT DISTINCT id, tf, venue_id"
-            f" FROM {bars_table} WHERE id = ANY(:ids) ORDER BY 1,2,3;"
-        )
-        with engine.begin() as cxn:
-            rows = cxn.execute(sql, {"ids": ids}).fetchall()
+    where_parts: list[str] = []
+    params: dict = {}
+    if ids is not None:
+        where_parts.append("id = ANY(:ids)")
+        params["ids"] = ids
+    if alignment_source is not None:
+        where_parts.append("alignment_source = :alignment_source")
+        params["alignment_source"] = alignment_source
+    if venue_ids is not None:
+        where_parts.append("venue_id = ANY(:venue_ids)")
+        params["venue_ids"] = venue_ids
+    where = ("WHERE " + " AND ".join(where_parts)) if where_parts else ""
+    sql = text(
+        f"SELECT DISTINCT id, tf, venue_id FROM {bars_table} {where} ORDER BY 1,2,3;"
+    )
+    with engine.begin() as cxn:
+        rows = cxn.execute(sql, params).fetchall()
     return [(int(r[0]), str(r[1]), int(r[2])) for r in rows]
 
 
@@ -286,10 +292,19 @@ def _run_one_key(
     state_table: str,
     start: str,
     key: Tuple[int, str, int],
+    src_alignment_source: Optional[str] = None,
 ) -> Tuple[int, str, int, int]:
     """Process one (id, tf, venue_id) key. Self-contained for multiprocessing."""
     one_id, one_tf, one_venue_id = key
     engine = create_engine(db_url, poolclass=NullPool, future=True)
+
+    # When reading from a _u table, filter by alignment_source to avoid mixing
+    _as_filter = (
+        "AND b.alignment_source = :src_alignment_source" if src_alignment_source else ""
+    )
+    _as_filter_bare = (
+        "AND alignment_source = :src_alignment_source" if src_alignment_source else ""
+    )
 
     sql = text(
         f"""
@@ -306,6 +321,7 @@ def _run_one_key(
                     SELECT "timestamp" AS ts FROM {bars_table}
                     WHERE id = :id AND tf = :tf
                       AND venue_id = :venue_id
+                      {_as_filter_bare}
                       AND is_partial_end = FALSE
                       AND "timestamp" < COALESCE((SELECT last_timestamp FROM st), CAST(:start AS timestamptz))
                     ORDER BY "timestamp" DESC
@@ -338,6 +354,7 @@ def _run_one_key(
             WHERE b.id = :id
               AND b.tf = :tf
               AND b.venue_id = :venue_id
+              {_as_filter}
               AND b."timestamp" >= seed.seed_ts
         ),
         lagged AS (
@@ -489,16 +506,20 @@ def _run_one_key(
         """
     )
 
+    params = {
+        "id": one_id,
+        "tf": one_tf,
+        "venue_id": one_venue_id,
+        "start": start,
+        "alignment_source": ALIGNMENT_SOURCE,
+    }
+    if src_alignment_source:
+        params["src_alignment_source"] = src_alignment_source
+
     with engine.begin() as cxn:
         result = cxn.execute(
             sql,
-            {
-                "id": one_id,
-                "tf": one_tf,
-                "venue_id": one_venue_id,
-                "start": start,
-                "alignment_source": ALIGNMENT_SOURCE,
-            },
+            params,
         )
 
     engine.dispose()
@@ -548,12 +569,31 @@ def main() -> None:
         default=1,
         help="Number of parallel workers (default 1 = sequential).",
     )
+    p.add_argument(
+        "--venue-ids",
+        type=lambda s: [int(x) for x in s.split(",")],
+        default=None,
+        help="Comma-separated venue IDs to filter (e.g. '2' or '2,3').",
+    )
+    p.add_argument(
+        "--src-alignment-source",
+        default=None,
+        help="Filter source bars by alignment_source (for _u tables).",
+    )
     args = p.parse_args()
 
     db_url = args.db_url.strip()
     if not db_url:
         raise SystemExit(
             "ERROR: Missing DB URL. Provide --db-url or set TARGET_DB_URL."
+        )
+
+    # Auto-detect: if source table is a _u table, default alignment_source filter
+    src_as = args.src_alignment_source
+    if src_as is None and args.bars_table.rstrip('"').endswith("_u"):
+        src_as = ALIGNMENT_SOURCE
+        _print(
+            f"Auto-detected _u source table, filtering by alignment_source='{src_as}'"
         )
 
     _print(
@@ -567,11 +607,18 @@ def main() -> None:
 
     _ensure_tables(engine, args.out_table, args.state_table)
 
-    keys = _load_keys(engine, args.bars_table, ids)
+    keys = _load_keys(
+        engine,
+        args.bars_table,
+        ids,
+        alignment_source=src_as,
+        venue_ids=args.venue_ids,
+    )
     _print(
         f"Runner config: ids={args.ids}, start={args.start}, "
         f"bars={args.bars_table}, out={args.out_table}, state={args.state_table}, "
-        f"full_refresh={args.full_refresh}, workers={args.workers}"
+        f"full_refresh={args.full_refresh}, workers={args.workers}, "
+        f"venue_ids={args.venue_ids}, src_alignment_source={src_as}"
     )
     _print(f"Resolved keys={len(keys)}")
 
@@ -591,6 +638,7 @@ def main() -> None:
         args.out_table,
         args.state_table,
         args.start,
+        src_alignment_source=src_as,
     )
 
     if args.workers > 1:
@@ -613,6 +661,7 @@ def main() -> None:
                 args.state_table,
                 args.start,
                 key,
+                src_alignment_source=src_as,
             )
 
     _print("Done.")

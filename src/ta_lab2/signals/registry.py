@@ -38,6 +38,17 @@ try:
 except Exception:  # pragma: no cover
     breakout_atr_signal = None
 
+try:
+    from .ama_composite import (  # optional (Phase 82)
+        ama_momentum_signal,
+        ama_mean_reversion_signal,
+        ama_regime_conditional_signal,
+    )
+except Exception:  # pragma: no cover
+    ama_momentum_signal = None  # type: ignore[assignment]
+    ama_mean_reversion_signal = None  # type: ignore[assignment]
+    ama_regime_conditional_signal = None  # type: ignore[assignment]
+
 
 # ---------------------------------------------------------------------------
 # Backward-compatible core: simple name->callable registry
@@ -48,6 +59,17 @@ REGISTRY: Dict[str, Callable[..., Tuple[pd.Series, pd.Series, Optional[pd.Series
     **({"rsi_mean_revert": rsi_mean_revert_signal} if rsi_mean_revert_signal else {}),
     **({"macd_crossover": macd_crossover_signal} if macd_crossover_signal else {}),
     **({"breakout_atr": breakout_atr_signal} if breakout_atr_signal else {}),
+    **({"ama_momentum": ama_momentum_signal} if ama_momentum_signal else {}),
+    **(
+        {"ama_mean_reversion": ama_mean_reversion_signal}
+        if ama_mean_reversion_signal
+        else {}
+    ),
+    **(
+        {"ama_regime_conditional": ama_regime_conditional_signal}
+        if ama_regime_conditional_signal
+        else {}
+    ),
 }
 
 
@@ -189,6 +211,26 @@ def ensure_for(name: str, df: pd.DataFrame, params: Dict[str, Any]) -> None:
             _ensure_atr(df, n_atr)
         _ensure_close(df)
 
+    elif name == "ama_momentum" and ama_momentum_signal:
+        # AMA columns are pre-loaded by load_strategy_data_with_ama().
+        # No local computation needed; ensure close is present for context.
+        _ensure_close(df)
+
+    elif name == "ama_mean_reversion" and ama_mean_reversion_signal:
+        # AMA columns are pre-loaded. Ensure the price column exists.
+        price_col = params.get("price_col", "close")
+        if price_col == "close":
+            _ensure_close(df)
+
+    elif name == "ama_regime_conditional" and ama_regime_conditional_signal:
+        # AMA trend column is pre-loaded.
+        # If ADX column is missing, ensure_for computes it via _ensure_atr pattern.
+        filter_col = params.get("filter_col", "adx_14")
+        if filter_col not in df.columns:
+            # ADX will be computed locally inside the signal function from OHLC.
+            # We just ensure ATR is available (reuses Wilder TR logic).
+            _ensure_atr(df, 14)
+
     else:
         # Unknown or unavailable strategy: no-op to stay non-breaking for callers that ignore ensure
         pass
@@ -252,5 +294,29 @@ def grid_for(name: str) -> List[Dict[str, Any]]:
         return [
             # {"lookback": 20, "atr_col": "atr_14", "atr_min_pct": 0.01, ...}
         ]
+
+    if name == "ama_momentum" and ama_momentum_signal:
+        # 3x2 grid: holding_bars x threshold
+        out: List[Dict[str, Any]] = []
+        for hb in (5, 7, 10):
+            for thr in (0.0, 0.5):
+                out.append({"holding_bars": hb, "threshold": thr})
+        return out
+
+    if name == "ama_mean_reversion" and ama_mean_reversion_signal:
+        # 2x3 grid: ama_col x entry_zscore
+        out: List[Dict[str, Any]] = []
+        for ama_col in ("KAMA_de1106d5_ama", "KAMA_987fc105_ama"):
+            for entry_z in (-1.0, -1.5, -2.0):
+                out.append({"ama_col": ama_col, "entry_zscore": entry_z})
+        return out
+
+    if name == "ama_regime_conditional" and ama_regime_conditional_signal:
+        # 3x2 grid: adx_threshold x holding_bars
+        out: List[Dict[str, Any]] = []
+        for adx_thr in (15.0, 20.0, 25.0):
+            for hb in (5, 7, 10):
+                out.append({"adx_threshold": adx_thr, "holding_bars": hb})
+        return out
 
     raise KeyError(f"No default grid for strategy '{name}'")

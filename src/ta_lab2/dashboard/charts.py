@@ -1112,3 +1112,458 @@ def chart_download_button(
         file_name=filename,
         mime="text/html",
     )
+
+
+# ---------------------------------------------------------------------------
+# Backtest and signal chart builders
+# ---------------------------------------------------------------------------
+
+
+def build_candlestick_chart(
+    ohlcv_df: pd.DataFrame,
+    ema_df: pd.DataFrame | None = None,
+    regimes_df: pd.DataFrame | None = None,
+    title: str = "",
+) -> go.Figure:
+    """
+    Build an interactive OHLCV candlestick chart with optional overlays.
+
+    Layout (shared x-axis):
+      Row 1 (60%): Candlestick + EMA overlays + regime vrect bands
+      Row 2 (20%): Volume bars
+      Row 3 (20%): RSI-14 subplot (if rsi_14 column present)
+
+    Parameters
+    ----------
+    ohlcv_df : pd.DataFrame
+        OHLCV data with columns: ts (datetime), open, high, low, close, volume.
+        Optionally includes rsi_14 for the RSI subplot.
+        Use .tolist() on ts to avoid tz-aware datetime pitfall (MEMORY.md).
+    ema_df : pd.DataFrame or None
+        EMA data with columns: ts (datetime), period (int), ema_value (float).
+        Each unique period gets its own line overlay on row 1.
+    regimes_df : pd.DataFrame or None
+        Regime data with columns: ts (datetime), trend_state (str).
+        Consecutive rows with the same trend_state are grouped into vrect bands.
+    title : str
+        Chart title. Default empty string.
+
+    Returns
+    -------
+    go.Figure
+        3-row Plotly figure with plotly_dark template, height=600.
+    """
+    fig = make_subplots(
+        rows=3,
+        cols=1,
+        shared_xaxes=True,
+        row_heights=[0.60, 0.20, 0.20],
+        vertical_spacing=0.03,
+    )
+
+    # Handle empty input
+    if ohlcv_df is None or ohlcv_df.empty:
+        fig.add_annotation(
+            text="No OHLCV data available",
+            xref="paper",
+            yref="paper",
+            x=0.5,
+            y=0.5,
+            showarrow=False,
+            font={"size": 16},
+        )
+        fig.update_layout(
+            template="plotly_dark",
+            title=title or "Candlestick Chart",
+            height=600,
+        )
+        return fig
+
+    # Ensure ts is a column, not the index
+    if "ts" not in ohlcv_df.columns:
+        ohlcv_work = ohlcv_df.reset_index()
+        if "ts" not in ohlcv_work.columns:
+            ohlcv_work = ohlcv_work.rename(columns={ohlcv_work.columns[0]: "ts"})
+    else:
+        ohlcv_work = ohlcv_df.copy()
+
+    ohlcv_work = ohlcv_work.sort_values("ts").reset_index(drop=True)
+
+    # CRITICAL: .tolist() avoids tz-aware datetime .values pitfall (MEMORY.md)
+    x_ts = ohlcv_work["ts"].tolist()
+
+    # ── Row 1: Candlestick ────────────────────────────────────────────────
+    fig.add_trace(
+        go.Candlestick(
+            x=x_ts,
+            open=ohlcv_work["open"],
+            high=ohlcv_work["high"],
+            low=ohlcv_work["low"],
+            close=ohlcv_work["close"],
+            name="OHLCV",
+            increasing_line_color="rgb(0,200,100)",
+            decreasing_line_color="rgb(220,50,50)",
+            increasing_fillcolor="rgb(0,200,100)",
+            decreasing_fillcolor="rgb(220,50,50)",
+        ),
+        row=1,
+        col=1,
+    )
+
+    # ── Row 1: EMA overlays ───────────────────────────────────────────────
+    if ema_df is not None and not ema_df.empty:
+        # Normalize ts to column
+        if "ts" not in ema_df.columns:
+            ema_work = ema_df.reset_index()
+            if "ts" not in ema_work.columns:
+                ema_work = ema_work.rename(columns={ema_work.columns[0]: "ts"})
+        else:
+            ema_work = ema_df.copy()
+
+        # EMA line colors cycle through a fixed palette
+        _ema_colors = [
+            "rgb(255,165,0)",  # orange
+            "rgb(100,149,237)",  # cornflower blue
+            "rgb(255,105,180)",  # hot pink
+            "rgb(144,238,144)",  # light green
+            "rgb(255,215,0)",  # gold
+        ]
+
+        if "period" in ema_work.columns:
+            periods = sorted(ema_work["period"].unique())
+            for i, period in enumerate(periods):
+                period_df = ema_work[ema_work["period"] == period].sort_values("ts")
+                color = _ema_colors[i % len(_ema_colors)]
+                fig.add_trace(
+                    go.Scatter(
+                        x=period_df["ts"].tolist(),
+                        y=period_df["ema_value"]
+                        if "ema_value" in period_df.columns
+                        else period_df.iloc[:, -1],
+                        mode="lines",
+                        name=f"EMA-{period}",
+                        line={"color": color, "width": 1.2},
+                    ),
+                    row=1,
+                    col=1,
+                )
+
+    # ── Row 1: Regime vrect bands ─────────────────────────────────────────
+    if regimes_df is not None and not regimes_df.empty:
+        # Normalize ts to column
+        if "ts" not in regimes_df.columns:
+            regimes_work = regimes_df.reset_index()
+            if "ts" not in regimes_work.columns:
+                regimes_work = regimes_work.rename(
+                    columns={regimes_work.columns[0]: "ts"}
+                )
+        else:
+            regimes_work = regimes_df.copy()
+
+        regimes_work = regimes_work.sort_values("ts").reset_index(drop=True)
+
+        # Group consecutive rows with the same trend_state into bands
+        if "trend_state" in regimes_work.columns and len(ohlcv_work) > 0:
+            last_price_ts = ohlcv_work["ts"].iloc[-1]
+
+            for i, row in regimes_work.iterrows():
+                start_ts = row["ts"]
+                trend_state = str(row.get("trend_state", "Sideways"))
+
+                if i + 1 < len(regimes_work):
+                    end_ts = regimes_work.loc[i + 1, "ts"]
+                else:
+                    end_ts = last_price_ts
+
+                color = REGIME_COLORS.get(trend_state, REGIME_COLORS["Sideways"])
+
+                fig.add_vrect(
+                    x0=start_ts,
+                    x1=end_ts,
+                    fillcolor=color,
+                    opacity=1,
+                    layer="below",
+                    line_width=0,
+                    row=1,  # type: ignore[arg-type]
+                    col=1,
+                )
+
+    # ── Row 2: Volume bars ────────────────────────────────────────────────
+    if "volume" in ohlcv_work.columns:
+        # Color volume bars green/red based on close vs open
+        vol_colors = [
+            "rgb(0,200,100)" if c >= o else "rgb(220,50,50)"
+            for c, o in zip(ohlcv_work["close"], ohlcv_work["open"])
+        ]
+        fig.add_trace(
+            go.Bar(
+                x=x_ts,
+                y=ohlcv_work["volume"],
+                name="Volume",
+                marker={"color": vol_colors},
+                showlegend=False,
+            ),
+            row=2,
+            col=1,
+        )
+
+    # ── Row 3: RSI-14 subplot ─────────────────────────────────────────────
+    if "rsi_14" in ohlcv_work.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=x_ts,
+                y=ohlcv_work["rsi_14"],
+                mode="lines",
+                name="RSI-14",
+                line={"color": "rgb(255,165,0)", "width": 1.2},
+            ),
+            row=3,
+            col=1,
+        )
+        # Overbought / oversold reference lines
+        fig.add_hline(
+            y=70,
+            line_dash="dash",
+            line_color="rgba(220,50,50,0.6)",
+            line_width=1,
+            row=3,
+            col=1,
+        )  # type: ignore[arg-type]
+        fig.add_hline(
+            y=30,
+            line_dash="dash",
+            line_color="rgba(0,200,100,0.6)",
+            line_width=1,
+            row=3,
+            col=1,
+        )  # type: ignore[arg-type]
+
+    # ── Layout ────────────────────────────────────────────────────────────
+    fig.update_xaxes(rangeslider_visible=False)
+    fig.update_yaxes(title_text="Price", row=1, col=1)
+    fig.update_yaxes(title_text="Volume", row=2, col=1)
+    fig.update_yaxes(title_text="RSI", row=3, col=1, range=[0, 100])
+
+    fig.update_layout(
+        template="plotly_dark",
+        title=title or "Candlestick",
+        height=600,
+        showlegend=True,
+    )
+
+    return fig
+
+
+def build_equity_sparkline(
+    fold_metrics: list[dict],
+    height: int = 150,
+) -> go.Figure:
+    """
+    Build a compact cumulative return sparkline from bakeoff fold metrics.
+
+    Plots each fold's total_return as a cumulative equity curve.
+
+    Parameters
+    ----------
+    fold_metrics : list[dict]
+        Deserialized fold_metrics_json from strategy_bakeoff_results.
+        Each dict is expected to contain at least a 'total_return' key.
+        If empty or None, returns a placeholder figure.
+    height : int
+        Figure height in pixels. Default 150 for compact sparkline.
+
+    Returns
+    -------
+    go.Figure
+        Plotly figure with plotly_dark template and no margins.
+    """
+    fig = go.Figure()
+
+    if not fold_metrics:
+        fig.add_annotation(
+            text="No fold data",
+            xref="paper",
+            yref="paper",
+            x=0.5,
+            y=0.5,
+            showarrow=False,
+            font={"size": 12, "color": "rgb(150,150,150)"},
+        )
+        fig.update_layout(
+            template="plotly_dark",
+            height=height,
+            margin={"l": 0, "r": 0, "t": 0, "b": 0},
+            showlegend=False,
+        )
+        return fig
+
+    # Build cumulative equity from fold total_return values
+    cumulative: list[float] = [0.0]
+    fold_labels: list[str] = ["Start"]
+    running = 0.0
+
+    for i, fold in enumerate(fold_metrics):
+        ret = fold.get("total_return", 0.0)
+        if ret is None:
+            ret = 0.0
+        running += float(ret)
+        cumulative.append(running)
+        fold_labels.append(f"Fold {i + 1}")
+
+    # Color based on final return
+    final_return = cumulative[-1]
+    line_color = "rgb(0,200,100)" if final_return >= 0 else "rgb(220,50,50)"
+
+    fig.add_trace(
+        go.Scatter(
+            x=fold_labels,
+            y=cumulative,
+            mode="lines+markers",
+            name="Cumulative Return",
+            line={"color": line_color, "width": 1.5},
+            marker={"size": 4},
+        )
+    )
+
+    # Add zero reference line
+    fig.add_hline(
+        y=0,
+        line_dash="dot",
+        line_color="rgba(150,150,150,0.5)",
+        line_width=1,
+    )
+
+    fig.update_layout(
+        template="plotly_dark",
+        height=height,
+        margin={"l": 0, "r": 0, "t": 0, "b": 0},
+        showlegend=False,
+        yaxis_title="Cumul. Return",
+    )
+
+    return fig
+
+
+def build_signal_timeline_chart(
+    history_df: pd.DataFrame,
+    title: str = "Signal History",
+) -> go.Figure:
+    """
+    Build a horizontal bar chart showing signal on/off periods over time.
+
+    Each bar spans from entry_ts to exit_ts (or now if position is still open).
+    Bars are colored by direction: long=green, short=red.
+
+    Parameters
+    ----------
+    history_df : pd.DataFrame
+        Output of load_signal_history() with columns: symbol, signal_name,
+        direction, entry_ts, exit_ts, position_state, pnl_pct.
+        ts columns should be tz-aware UTC datetimes.
+    title : str
+        Chart title. Default "Signal History".
+
+    Returns
+    -------
+    go.Figure
+        Plotly figure with plotly_dark template, height=400.
+    """
+
+    fig = go.Figure()
+
+    if history_df is None or history_df.empty:
+        fig.add_annotation(
+            text="No signal history available",
+            xref="paper",
+            yref="paper",
+            x=0.5,
+            y=0.5,
+            showarrow=False,
+            font={"size": 16},
+        )
+        fig.update_layout(
+            template="plotly_dark",
+            title=title,
+            height=400,
+        )
+        return fig
+
+    now_utc = pd.Timestamp.now(tz="UTC")
+
+    # Build y-axis labels: "SYMBOL | signal_name"
+    def _row_label(row: pd.Series) -> str:
+        symbol = str(row.get("symbol", row.get("id", "?")))
+        sig_name = str(row.get("signal_name", row.get("signal_id", "")))
+        return f"{symbol} | {sig_name}"
+
+    _direction_colors: dict[str, str] = {
+        "long": "rgb(0,200,100)",
+        "short": "rgb(220,50,50)",
+        "flat": "rgb(150,150,150)",
+    }
+
+    for _, row in history_df.iterrows():
+        entry_ts = row.get("entry_ts")
+        exit_ts = row.get("exit_ts")
+        position_state = str(row.get("position_state", "closed"))
+        direction = str(row.get("direction", "flat")).lower()
+        pnl_pct = row.get("pnl_pct")
+
+        # Use now for open positions without exit_ts
+        if (
+            exit_ts is None
+            or (hasattr(exit_ts, "isnull") and exit_ts.isnull())
+            or (isinstance(exit_ts, float) and pd.isna(exit_ts))
+        ):
+            exit_ts = now_utc
+
+        if entry_ts is None or (isinstance(entry_ts, float) and pd.isna(entry_ts)):
+            continue
+
+        label = _row_label(row)
+        color = _direction_colors.get(direction, _direction_colors["flat"])
+
+        pnl_text = (
+            f"{float(pnl_pct):.2f}%"
+            if pnl_pct is not None
+            and not (isinstance(pnl_pct, float) and pd.isna(pnl_pct))
+            else "Open"
+        )
+        hover_text = (
+            f"Symbol: {row.get('symbol', '?')}<br>"
+            f"Signal: {row.get('signal_name', '?')}<br>"
+            f"Direction: {direction}<br>"
+            f"Entry: {entry_ts}<br>"
+            f"Exit: {exit_ts if position_state == 'closed' else 'Open'}<br>"
+            f"PnL: {pnl_text}"
+        )
+
+        fig.add_trace(
+            go.Bar(
+                x=[pd.Timestamp(exit_ts) - pd.Timestamp(entry_ts)],
+                y=[label],
+                base=[entry_ts],
+                orientation="h",
+                marker={"color": color},
+                text=pnl_text,
+                textposition="inside",
+                hovertext=hover_text,
+                hoverinfo="text",
+                showlegend=False,
+                name=direction,
+            )
+        )
+
+    fig.update_layout(
+        template="plotly_dark",
+        title=title,
+        height=max(400, 30 * len(history_df) + 80),
+        barmode="overlay",
+        xaxis={
+            "type": "date",
+            "title": "Date",
+        },
+        yaxis={"title": "Asset | Signal"},
+    )
+
+    return fig

@@ -19,21 +19,13 @@ st.set_page_config(
 # ---------------------------------------------------------------------------
 with st.sidebar:
     st.title("ta_lab2")
-    st.caption("Pipeline Monitor + Operations + Research + Experiments")
+    st.caption("Analysis + Operations + Monitoring")
     st.divider()
-    st.slider(
-        "Cache TTL (s)",
-        min_value=30,
-        max_value=3600,
-        value=300,
-        step=30,
-        key="cache_ttl_display",
-    )
     if st.button("Refresh Now", type="primary"):
         st.cache_data.clear()
         st.rerun()
+    st.caption("Cache tiers: Live 2min | Pipeline 5min | Research 60min")
     st.divider()
-    st.caption("Cache TTL: 300s (fixed). Use Refresh to clear.")
 
 # ---------------------------------------------------------------------------
 # Multipage navigation
@@ -44,7 +36,61 @@ pages = {
             "pages/1_landing.py",
             title="Dashboard Home",
             icon=":material/home:",
-        )
+        ),
+    ],
+    "Research": [
+        st.Page(
+            "pages/13_asset_hub.py",
+            title="Asset Hub",
+            icon=":material/hub:",
+        ),
+        st.Page(
+            "pages/11_backtest_results.py",
+            title="Backtest Results",
+            icon=":material/analytics:",
+        ),
+        st.Page(
+            "pages/12_signal_browser.py",
+            title="Signal Browser",
+            icon=":material/signal_cellular_alt:",
+        ),
+        st.Page(
+            "pages/3_research_explorer.py",
+            title="Research Explorer",
+            icon=":material/science:",
+        ),
+        st.Page(
+            "pages/5_experiments.py",
+            title="Feature Experiments",
+            icon=":material/experiment:",
+        ),
+        st.Page(
+            "pages/4_asset_stats.py",
+            title="Asset Statistics",
+            icon=":material/bar_chart:",
+        ),
+    ],
+    "Markets": [
+        st.Page(
+            "pages/14_perps.py",
+            title="Perps",
+            icon=":material/currency_exchange:",
+        ),
+        st.Page(
+            "pages/15_portfolio.py",
+            title="Portfolio",
+            icon=":material/account_balance:",
+        ),
+        st.Page(
+            "pages/16_regime_heatmap.py",
+            title="Regime Heatmap",
+            icon=":material/grid_view:",
+        ),
+        st.Page(
+            "pages/17_ama_inspector.py",
+            title="AMA Inspector",
+            icon=":material/ssid_chart:",
+        ),
     ],
     "Operations": [
         st.Page(
@@ -78,28 +124,7 @@ pages = {
             "pages/2_pipeline_monitor.py",
             title="Pipeline Monitor",
             icon=":material/monitoring:",
-        )
-    ],
-    "Research": [
-        st.Page(
-            "pages/3_research_explorer.py",
-            title="Research Explorer",
-            icon=":material/science:",
-        )
-    ],
-    "Analytics": [
-        st.Page(
-            "pages/4_asset_stats.py",
-            title="Asset Statistics & Correlation",
-            icon=":material/bar_chart:",
-        )
-    ],
-    "Experiments": [
-        st.Page(
-            "pages/5_experiments.py",
-            title="Feature Experiments",
-            icon=":material/experiment:",
-        )
+        ),
     ],
 }
 

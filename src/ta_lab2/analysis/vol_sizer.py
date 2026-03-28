@@ -4,18 +4,23 @@ Vol-sizing library for tail-risk backtests (Phase 49, TAIL-01).
 
 Provides:
 - compute_vol_sized_position: ATR-based position sizing
-- compute_realized_vol_position: realized-vol (rolling std) position sizing
-- run_vol_sized_backtest: vectorbt wrapper with integrated vol-sizing at entry
+- compute_realized_vol_position: realized-vol (rolling std) position sizing,
+  with optional GARCH blend support (Phase 81)
+- run_vol_sized_backtest: vectorbt wrapper with integrated vol-sizing at entry,
+  with optional per-bar GARCH blend support (Phase 81)
 - worst_n_day_returns: tail-risk characterization (flat dict of worst-N-day means)
 - compute_comparison_metrics: comprehensive flat metrics dict from a vbt.Portfolio
 """
 
 from __future__ import annotations
 
+import logging
 from typing import Dict, List, Optional
 
 import numpy as np
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 try:
     import vectorbt as vbt  # type: ignore[import]
@@ -79,9 +84,21 @@ def compute_realized_vol_position(
     init_cash: float,
     risk_budget: float,
     max_position_pct: float = 0.30,
+    garch_vol: float | None = None,
+    garch_mode: str = "sizing_only",
+    blend_weight: float = 1.0,
 ) -> float:
     """
     Compute realized-vol-based position in units.
+
+    When *garch_vol* is provided and *garch_mode* is ``"sizing_only"`` or
+    ``"sizing_and_limits"``, an effective volatility is computed as a blend
+    of the GARCH conditional forecast and the rolling standard deviation::
+
+        effective_vol = blend_weight * garch_vol + (1 - blend_weight) * rolling_std
+
+    In ``"advisory"`` mode the GARCH vol is logged for comparison but does
+    **not** affect the position size (rolling_std is used as-is).
 
     Parameters
     ----------
@@ -95,15 +112,43 @@ def compute_realized_vol_position(
         Fraction of NAV to risk per trade (e.g. 0.01 = 1%).
     max_position_pct:
         Maximum fraction of NAV that can be in this position (default 30%).
+    garch_vol:
+        Optional GARCH conditional volatility forecast (decimal, e.g. 0.03 = 3%).
+        When None, behaviour is identical to the pre-GARCH implementation.
+    garch_mode:
+        How the GARCH vol influences sizing.  One of:
+        - ``"sizing_only"``       -- blend affects position size only.
+        - ``"sizing_and_limits"`` -- blend affects position size and risk limits.
+        - ``"advisory"``          -- log the GARCH vol but do not use it for sizing.
+    blend_weight:
+        Weight on the GARCH estimate in [0.0, 1.0].  0 = pure rolling,
+        1 = pure GARCH.  Default 1.0.
 
     Returns
     -------
     float
         Position size in asset units. Returns 0.0 for invalid inputs.
     """
-    if rolling_std <= 0:
+    # Determine effective volatility
+    if garch_vol is not None and garch_mode in ("sizing_only", "sizing_and_limits"):
+        effective_vol = blend_weight * garch_vol + (1.0 - blend_weight) * rolling_std
+        if effective_vol <= 0:
+            return 0.0
+    else:
+        # No GARCH or advisory mode -- fall back to rolling_std
+        if garch_vol is not None and garch_mode == "advisory":
+            logger.debug(
+                "compute_realized_vol_position advisory: "
+                "garch_vol=%.6f vs rolling_std=%.6f (ratio=%.2f)",
+                garch_vol,
+                rolling_std,
+                garch_vol / rolling_std if rolling_std > 0 else float("inf"),
+            )
+        effective_vol = rolling_std
+
+    if effective_vol <= 0:
         return 0.0
-    position_pct = min(risk_budget / rolling_std, max_position_pct)
+    position_pct = min(risk_budget / effective_vol, max_position_pct)
     position_units = position_pct * init_cash / close
     return float(position_units)
 
@@ -124,6 +169,9 @@ def run_vol_sized_backtest(
     init_cash: float = 1000.0,
     fee_bps: float = 16.0,
     sl_stop: Optional[float] = None,
+    garch_vol_series: Optional[pd.Series] = None,
+    garch_mode: str = "sizing_only",
+    garch_blend_weight: float = 1.0,
 ) -> "vbt.Portfolio":
     """
     Run a vectorbt backtest with vol-sized position at each entry bar.
@@ -152,6 +200,16 @@ def run_vol_sized_backtest(
         One-way trading fee in basis points (default 16 bps = 0.16%).
     sl_stop:
         Stop-loss fraction from entry price (e.g. 0.05 = 5% stop). None = disabled.
+    garch_vol_series:
+        Optional per-bar GARCH conditional vol forecast (decimal, aligned to
+        price index).  When provided, each bar's effective vol is blended as
+        ``garch_blend_weight * garch_vol + (1 - garch_blend_weight) * vol_pct``.
+        Bars where garch_vol_series is NaN fall back to vol_pct unblended.
+    garch_mode:
+        How GARCH vol influences sizing.  One of ``"sizing_only"`` (default),
+        ``"sizing_and_limits"``, or ``"advisory"`` (log only, no blend).
+    garch_blend_weight:
+        Weight on the GARCH estimate in [0.0, 1.0].  Default 1.0.
 
     Returns
     -------
@@ -177,8 +235,27 @@ def run_vol_sized_backtest(
     # Clamp to avoid division by zero or negative vol
     vol_pct_safe = vol_pct.clip(lower=1e-8)
 
+    # Blend with GARCH vol when available and not in advisory mode
+    effective_vol = vol_pct_safe.values.copy()
+    if garch_vol_series is not None and garch_mode in (
+        "sizing_only",
+        "sizing_and_limits",
+    ):
+        garch_vals = garch_vol_series.reindex(vol_pct_safe.index).values
+        has_garch = ~np.isnan(garch_vals) & (garch_vals > 0)
+        effective_vol[has_garch] = (
+            garch_blend_weight * garch_vals[has_garch]
+            + (1.0 - garch_blend_weight) * vol_pct_safe.values[has_garch]
+        )
+        # Safety: ensure blended vol stays positive
+        effective_vol = np.maximum(effective_vol, 1e-8)
+    elif garch_vol_series is not None and garch_mode == "advisory":
+        logger.debug(
+            "run_vol_sized_backtest: advisory mode -- GARCH vol logged, not applied"
+        )
+
     # Compute per-bar position sizes (in asset units) -- raw
-    raw_position_pct = np.minimum(risk_budget / vol_pct_safe.values, max_position_pct)
+    raw_position_pct = np.minimum(risk_budget / effective_vol, max_position_pct)
     position_units = raw_position_pct * init_cash / price.values
 
     # Only entry bars get a size; NaN elsewhere (vbt uses NaN as "keep position")

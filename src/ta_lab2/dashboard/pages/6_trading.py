@@ -157,13 +157,21 @@ def _trading_content(_engine, show_per_strategy: bool) -> None:  # noqa: ANN001
     try:
         if _pnl_series is not None and not _pnl_series.empty:
             _peak = float(_pnl_series["peak_equity"].max())
-            _current_dd = float(_pnl_series["drawdown_pct"].iloc[-1])
-            _max_dd = float(_pnl_series["drawdown_pct"].min())
+            _current_dd_pct = float(_pnl_series["drawdown_pct"].iloc[-1])
+            _max_dd_pct = float(_pnl_series["drawdown_pct"].min())
 
-            d1, d2, d3 = st.columns(3)
+            if "drawdown_usd" in _pnl_series.columns:
+                _current_dd_usd = float(_pnl_series["drawdown_usd"].iloc[-1])
+                _max_dd_usd = float(_pnl_series["drawdown_usd"].min())
+            else:
+                _current_dd_usd = 0.0
+                _max_dd_usd = 0.0
+
+            d1, d2, d3, d4 = st.columns(4)
             d1.metric("Peak Equity", f"${_peak:,.2f}")
-            d2.metric("Current Drawdown", f"{_current_dd:.1%}")
-            d3.metric("Max Historical Drawdown", f"{_max_dd:.1%}")
+            d2.metric("Current Drawdown", f"{_current_dd_pct:.1%}")
+            d3.metric("Current DD ($)", f"${_current_dd_usd:,.2f}")
+            d4.metric("Max Drawdown", f"{_max_dd_pct:.1%} (${_max_dd_usd:,.2f})")
 
     except Exception as exc:  # noqa: BLE001
         st.warning(f"Could not compute drawdown KPIs: {exc}")

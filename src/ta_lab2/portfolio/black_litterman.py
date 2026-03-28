@@ -6,13 +6,20 @@ to produce posterior expected returns (bl_returns) and a posterior covariance
 (bl_cov).  The posterior feeds PyPortfolioOpt's EfficientFrontier for max_sharpe
 or min_volatility optimization.
 
+Supports two IC-IR input modes in run() / signals_to_mu() / build_views():
+  - pd.Series (legacy): universal IC-IR per signal type, index=signal_type.
+  - pd.DataFrame (per-asset): IC-IR matrix, index=asset_id, columns=feature_names.
+    When a DataFrame is provided, per-asset IC-IR weighting is applied so each
+    asset's view is driven by its own IC-IR row. Cross-sectional z-scoring is
+    performed once across ALL assets (not per-asset) to avoid degenerate scores.
+
 ASCII-only file -- no UTF-8 box-drawing characters.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import Optional, Union
 
 import pandas as pd
 
@@ -34,6 +41,15 @@ class BLAllocationBuilder:
     1. signals_to_mu()  -- IC-IR weighted composite -> cross-sectional z-score -> return scale
     2. build_views()    -- signal scores + IC-IR -> absolute views + view confidences
     3. run()            -- market cap prior + views -> posterior weights via EfficientFrontier
+
+    IC-IR input modes (ic_ir parameter)
+    ------------------------------------
+    pd.Series  (legacy)  : Universal IC-IR per signal type (index=signal_type).
+                           Each signal type receives the same IC-IR weight for all assets.
+    pd.DataFrame (new)   : Per-asset IC-IR matrix (index=asset_id, columns=feature_names).
+                           Each asset uses its own IC-IR row to weight signal_scores columns.
+                           Cross-sectional z-scoring is applied once across all assets.
+                           Missing assets fall back to column means; missing columns to 0.
 
     Configuration (portfolio.yaml -> black_litterman section)
     ----------------------------------------------------------
@@ -63,13 +79,76 @@ class BLAllocationBuilder:
         self.max_position_pct: float = float(opt_cfg.get("max_position_pct", 0.15))
 
     # ------------------------------------------------------------------
+    # Private helpers
+    # ------------------------------------------------------------------
+
+    def _per_asset_composite(
+        self,
+        signal_scores: pd.DataFrame,
+        ic_ir_matrix: pd.DataFrame,
+    ) -> tuple[pd.Series, pd.Series]:
+        """
+        Compute per-asset IC-IR weighted composite and per-asset mean confidence.
+
+        For each asset in signal_scores.index, weight its signal_scores row by its
+        own IC-IR row from ic_ir_matrix. The resulting composite captures heterogeneous
+        per-asset signal importance without calling BL once per asset.
+
+        Alignment rules:
+        - ic_ir_matrix columns are reindexed to signal_scores.columns (missing -> 0).
+        - ic_ir_matrix rows are reindexed to signal_scores.index; missing assets receive
+          the column-wise mean of the (aligned) ic_ir_matrix as fallback.
+        - All IC-IR values are clipped to >= 0 before weighting.
+
+        Parameters
+        ----------
+        signal_scores : pd.DataFrame
+            Index = asset_id, columns = feature/signal names, values = scores.
+        ic_ir_matrix : pd.DataFrame
+            Index = asset_id, columns = feature/signal names, values = IC-IR.
+
+        Returns
+        -------
+        tuple[pd.Series, pd.Series]
+            composite : Series[asset_id -> weighted score sum]  (NOT yet z-scored)
+            mean_ir   : Series[asset_id -> mean IC-IR for the asset] (used for confidence)
+        """
+        # Align columns: reindex to match signal_scores.columns; fill missing with 0
+        ir_aligned = ic_ir_matrix.reindex(columns=signal_scores.columns).fillna(0.0)
+
+        # Compute column means on the aligned matrix for fallback rows
+        col_means = ir_aligned.mean(axis=0)
+
+        # Align rows: reindex to signal_scores.index; fill missing assets with col_means
+        ir_aligned = ir_aligned.reindex(index=signal_scores.index)
+        missing_assets = ir_aligned.index[ir_aligned.isnull().all(axis=1)]
+        if len(missing_assets) > 0:
+            logger.debug(
+                "_per_asset_composite: %d assets missing from ic_ir_matrix; "
+                "using column-mean fallback.",
+                len(missing_assets),
+            )
+            ir_aligned.loc[missing_assets] = col_means.values
+
+        # Clip IC-IR to >= 0 (negative IC-IR = noisy signal, ignore)
+        ir_aligned = ir_aligned.clip(lower=0.0)
+
+        # Per-asset weighted composite: elementwise multiply then row-sum
+        composite = (signal_scores * ir_aligned).sum(axis=1)
+
+        # Per-asset mean IC-IR (used as confidence basis in build_views)
+        mean_ir = ir_aligned.mean(axis=1)
+
+        return composite, mean_ir
+
+    # ------------------------------------------------------------------
     # Public helpers
     # ------------------------------------------------------------------
 
     def signals_to_mu(
         self,
         signal_scores: pd.DataFrame,
-        ic_ir: pd.Series,
+        ic_ir: Union[pd.Series, pd.DataFrame],
         base_vol: pd.Series,
     ) -> pd.Series:
         """
@@ -80,8 +159,10 @@ class BLAllocationBuilder:
         signal_scores : pd.DataFrame
             Index = asset_id, columns = signal types (e.g. 'rsi', 'ema_cross').
             Values are raw signal scores (e.g. in [-1, 1] or [0, 1]).
-        ic_ir : pd.Series
-            Index = signal_type, values = rolling IC-IR for each signal.
+        ic_ir : pd.Series or pd.DataFrame
+            pd.Series (legacy): index = signal_type, values = rolling IC-IR per signal.
+            pd.DataFrame (per-asset): index = asset_id, columns = feature names,
+                values = per-asset IC-IR. Each asset uses its own IC-IR row.
         base_vol : pd.Series
             Index = asset_id, values = annualized volatility per asset.
 
@@ -90,6 +171,26 @@ class BLAllocationBuilder:
         pd.Series
             Index = asset_id.  Expected return estimates at return scale.
         """
+        if isinstance(ic_ir, pd.DataFrame):
+            # Per-asset IC-IR path: use _per_asset_composite for weighted scores.
+            composite, _ = self._per_asset_composite(signal_scores, ic_ir)
+
+            # Cross-sectional z-score (single call across ALL assets).
+            std = composite.std()
+            if std < 1e-8:
+                logger.warning(
+                    "signals_to_mu (per-asset): composite scores are constant; "
+                    "returning zero expected returns."
+                )
+                return pd.Series(0.0, index=signal_scores.index)
+            z = (composite - composite.mean()) / std
+
+            # Scale to return space via annualized vol (10% of vol = max alpha).
+            vol_aligned = base_vol.reindex(signal_scores.index).fillna(base_vol.mean())
+            return z * vol_aligned * 0.1
+
+        # Legacy pd.Series path (unchanged).
+
         # Step 1: clip IC-IR to >= 0 (negative IC-IR = noisy signal, ignore).
         ic_ir_clipped = ic_ir.clip(lower=0)
         total = ic_ir_clipped.sum()
@@ -127,20 +228,21 @@ class BLAllocationBuilder:
     def build_views(
         self,
         signal_scores: pd.DataFrame,
-        ic_ir: pd.Series,
+        ic_ir: Union[pd.Series, pd.DataFrame],
     ) -> tuple[dict, list]:
         """
         Build absolute views dict and view confidence list for BlackLittermanModel.
-
-        Views that have IC-IR <= _MIN_IC_IR_FOR_VIEW are excluded.
-        View confidences are normalized to [min_view_confidence, max_view_confidence].
 
         Parameters
         ----------
         signal_scores : pd.DataFrame
             Index = asset_id, columns = signal types.
-        ic_ir : pd.Series
-            Index = signal_type, rolling IC-IR per signal.
+        ic_ir : pd.Series or pd.DataFrame
+            pd.Series (legacy): index = signal_type, rolling IC-IR per signal.
+                Views that have IC-IR <= _MIN_IC_IR_FOR_VIEW are excluded.
+            pd.DataFrame (per-asset): index = asset_id, columns = feature names.
+                Per-asset IC-IR weighted composite is computed via _per_asset_composite.
+                View confidences are derived from per-asset mean IC-IR.
 
         Returns
         -------
@@ -149,6 +251,49 @@ class BLAllocationBuilder:
             absolute_views  : dict[asset_id -> expected_return_float]
             view_confidences: list[float] ordered the same as absolute_views.keys()
         """
+        if isinstance(ic_ir, pd.DataFrame):
+            # Per-asset IC-IR path.
+            composite, mean_ir = self._per_asset_composite(signal_scores, ic_ir)
+
+            # Cross-sectional z-score (single call for all assets).
+            std = composite.std()
+            if std < 1e-8:
+                composite_norm = composite * 0.0
+            else:
+                composite_norm = (composite - composite.mean()) / std
+
+            absolute_views = composite_norm.to_dict()
+
+            if not absolute_views:
+                logger.warning(
+                    "build_views (per-asset): signal_scores is empty; returning empty views."
+                )
+                return {}, []
+
+            # Per-asset confidence from mean_ir: min-max scale to [min_conf, max_conf].
+            conf_range = self.max_view_confidence - self.min_view_confidence
+            ir_min, ir_max = float(mean_ir.min()), float(mean_ir.max())
+
+            if ir_max - ir_min < 1e-8:
+                # All mean IC-IR values identical: assign midpoint confidence uniformly.
+                mid_conf = (self.min_view_confidence + self.max_view_confidence) / 2.0
+                asset_confidences = {asset: mid_conf for asset in absolute_views}
+            else:
+                asset_confidences = {
+                    asset: float(
+                        self.min_view_confidence
+                        + (mean_ir.get(asset, ir_min) - ir_min)
+                        / (ir_max - ir_min)
+                        * conf_range
+                    )
+                    for asset in absolute_views
+                }
+
+            view_confidences = [asset_confidences[asset] for asset in absolute_views]
+            return absolute_views, view_confidences
+
+        # Legacy pd.Series path (unchanged).
+
         # Filter to signals with IC-IR above threshold.
         qualified = ic_ir[ic_ir > self._MIN_IC_IR_FOR_VIEW]
 
@@ -217,7 +362,7 @@ class BLAllocationBuilder:
         prices: pd.DataFrame,
         market_caps: pd.Series,
         signal_scores: pd.DataFrame,
-        ic_ir: pd.Series,
+        ic_ir: Union[pd.Series, pd.DataFrame],
         base_vol: pd.Series,
         S: Optional[pd.DataFrame] = None,
         tf: str = "1D",
@@ -233,8 +378,12 @@ class BLAllocationBuilder:
             asset -> latest market cap at the same timestamp for all assets.
         signal_scores : pd.DataFrame
             asset x signal_type score matrix.
-        ic_ir : pd.Series
-            signal_type -> rolling IC-IR.
+        ic_ir : pd.Series or pd.DataFrame
+            pd.Series (legacy): signal_type -> rolling IC-IR. Universal per-signal weight.
+            pd.DataFrame (per-asset): index=asset_id, columns=feature_names.
+                Each asset's views are weighted by its own IC-IR row from this matrix.
+                Missing assets fall back to column means; missing columns default to 0.
+                Cross-sectional z-scoring is applied once across all assets.
         base_vol : pd.Series
             asset -> annualized volatility.
         S : pd.DataFrame or None
@@ -287,7 +436,12 @@ class BLAllocationBuilder:
 
         # Step 3: Build views from signal scores.
         scores_aligned = signal_scores.reindex(common_assets)
-        ic_ir_clean = ic_ir.dropna()
+        if isinstance(ic_ir, pd.DataFrame):
+            # Per-asset path: pass DataFrame directly (build_views handles alignment).
+            ic_ir_clean: Union[pd.Series, pd.DataFrame] = ic_ir.dropna(how="all")
+        else:
+            # Legacy Series path: drop NaN entries before building views.
+            ic_ir_clean = ic_ir.dropna()
         absolute_views, view_confidences = self.build_views(scores_aligned, ic_ir_clean)
 
         # Step 4: If no views pass the threshold, optimize on prior returns directly.

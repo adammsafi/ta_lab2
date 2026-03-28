@@ -36,10 +36,13 @@ runfile(
 import argparse
 import os
 from dataclasses import dataclass
+from functools import partial
+from multiprocessing import Pool
 from typing import List, Optional, Tuple
 
 from sqlalchemy import bindparam, create_engine, text
 from sqlalchemy.engine import Engine
+from sqlalchemy.pool import NullPool
 
 
 DEFAULT_EMA_TABLE = "public.ema_multi_tf_u"
@@ -328,6 +331,29 @@ _UPSERT_SET = ",\n".join(
 )
 
 
+def _run_one_key_mp(
+    db_url: str,
+    ema_table: str,
+    out_table: str,
+    state_table: str,
+    start: str,
+    key: Tuple[int, str, int, int],
+) -> Tuple[int, str, int, int]:
+    """Multiprocessing-safe wrapper: creates own engine with NullPool."""
+    cfg = RunnerConfig(
+        db_url=db_url,
+        ema_table=ema_table,
+        out_table=out_table,
+        state_table=state_table,
+        start=start,
+        full_refresh=False,
+    )
+    engine = create_engine(db_url, poolclass=NullPool, future=True)
+    _run_one_key(engine, cfg, key)
+    engine.dispose()
+    return key
+
+
 def _run_one_key(
     engine: Engine, cfg: RunnerConfig, key: Tuple[int, str, int, int]
 ) -> None:
@@ -546,6 +572,12 @@ def main() -> None:
         default=None,
         help="Filter to a specific venue_id (e.g. 2 for HL). Default: all venues.",
     )
+    p.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="Number of parallel workers (default 1 = sequential).",
+    )
 
     args = p.parse_args()
 
@@ -591,12 +623,28 @@ def main() -> None:
     if cfg.full_refresh:
         _full_refresh(engine, cfg.out_table, cfg.state_table, keys)
 
-    for i, key in enumerate(keys, start=1):
-        one_id, one_tf, one_period, one_venue_id = key
-        _print(
-            f"Processing key=({one_id},{one_tf},{one_period},v{one_venue_id}) ({i}/{len(keys)})"
+    if args.workers > 1:
+        _print(f"Running {len(keys)} keys with {args.workers} workers.")
+        worker_fn = partial(
+            _run_one_key_mp,
+            cfg.db_url,
+            cfg.ema_table,
+            cfg.out_table,
+            cfg.state_table,
+            cfg.start,
         )
-        _run_one_key(engine, cfg, key)
+        with Pool(processes=args.workers, maxtasksperchild=1) as pool:
+            for one_id, one_tf, one_period, one_venue_id in pool.imap_unordered(
+                worker_fn, keys
+            ):
+                _print(f"  ({one_id},{one_tf},{one_period},v{one_venue_id})")
+    else:
+        for i, key in enumerate(keys, start=1):
+            one_id, one_tf, one_period, one_venue_id = key
+            _print(
+                f"Processing key=({one_id},{one_tf},{one_period},v{one_venue_id}) ({i}/{len(keys)})"
+            )
+            _run_one_key(engine, cfg, key)
 
     _print("Done.")
 

@@ -3,7 +3,7 @@ Pipeline Monitor page.
 
 Displays 4 sections:
   1. Data Freshness -- traffic light badges + expandable table families
-  2. Stats Runner Status -- PASS/WARN/FAIL counts per stats table
+  2. Stats Runner Status -- PASS/WARN/FAIL counts per stats table + row count
   3. Asset Coverage Grid -- pivot matrix (symbol x table family)
   4. Alert History -- recent FAIL/WARN from stats tables
 
@@ -52,13 +52,19 @@ def _traffic_light(staleness_hours: float | None) -> str:
 
 st.header("Pipeline Monitor")
 
+# Engine init (Phase 83/84 pattern)
+try:
+    engine = get_engine()
+except Exception as exc:
+    st.error(f"Database connection failed: {exc}")
+    st.stop()
+
 # ===========================================================================
 # Section 1: Data Freshness
 # ===========================================================================
 st.subheader("Data Freshness")
 
 try:
-    engine = get_engine()
     freshness_df = load_table_freshness(engine)
 
     if freshness_df.empty:
@@ -104,7 +110,6 @@ st.divider()
 st.subheader("Stats Runner Status")
 
 try:
-    engine = get_engine()
     stats_data = load_stats_status(engine)
 
     non_empty = {k: v for k, v in stats_data.items() if v}
@@ -122,13 +127,14 @@ try:
                 total_pass = counts.get("PASS", 0)
                 total_warn = counts.get("WARN", 0)
                 total_fail = counts.get("FAIL", 0)
+                total_rows = total_pass + total_warn + total_fail
 
                 # Clean display name (strip leading "cmc_" or suffix "_stats")
                 display_name = table_name.replace("_stats", "").replace("cmc_", "")
 
                 with col:
                     st.markdown(f"**{display_name}**")
-                    sub1, sub2, sub3 = st.columns(3)
+                    sub1, sub2, sub3, sub4 = st.columns(4)
                     sub1.metric("PASS", total_pass)
                     sub2.metric("WARN", total_warn)
                     sub3.metric(
@@ -137,6 +143,7 @@ try:
                         delta=-total_fail if total_fail > 0 else None,
                         delta_color="inverse",
                     )
+                    sub4.metric("Rows (24h)", total_rows)
 
 except Exception as exc:  # noqa: BLE001
     st.error(f"Failed to load Stats Runner Status: {exc}")
@@ -149,7 +156,6 @@ st.divider()
 st.subheader("Asset Coverage")
 
 try:
-    engine = get_engine()
     coverage_df = load_asset_coverage(engine)
 
     if coverage_df.empty:
@@ -195,7 +201,6 @@ st.divider()
 st.subheader("Recent Alerts")
 
 try:
-    engine = get_engine()
     alerts_df = load_alert_history(engine)
 
     if alerts_df.empty:
@@ -222,7 +227,6 @@ st.divider()
 st.subheader("FRED Data Freshness")
 
 try:
-    engine = get_engine()
     fred_freshness = load_fred_freshness(engine)
 
     if fred_freshness.empty:

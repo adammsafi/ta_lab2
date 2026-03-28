@@ -56,7 +56,7 @@ from ta_lab2.scripts.bars.derive_multi_tf_from_1d import (
 # =============================================================================
 
 DEFAULT_TZ = "America/New_York"
-DEFAULT_DAILY_TABLE = "public.cmc_price_histories7"
+DEFAULT_DAILY_TABLE = "public.price_bars_1d"
 DEFAULT_BARS_TABLE = "public.price_bars_multi_tf_u"
 DEFAULT_STATE_TABLE = "public.price_bars_multi_tf_cal_anchor_us_state"
 

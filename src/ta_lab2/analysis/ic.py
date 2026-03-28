@@ -1148,14 +1148,14 @@ def save_ic_results(conn, rows: list[dict], *, overwrite: bool = False) -> int:
                 (asset_id, tf, feature, horizon, horizon_days, return_type,
                  regime_col, regime_label, train_start, train_end,
                  ic, ic_t_stat, ic_p_value, ic_ir, ic_ir_t_stat, turnover, n_obs,
-                 rank_ic)
+                 rank_ic, alignment_source)
             VALUES
                 (:asset_id, :tf, :feature, :horizon, :horizon_days, :return_type,
                  :regime_col, :regime_label, :train_start, :train_end,
                  :ic, :ic_t_stat, :ic_p_value, :ic_ir, :ic_ir_t_stat, :turnover, :n_obs,
-                 :rank_ic)
+                 :rank_ic, :alignment_source)
             ON CONFLICT (asset_id, tf, feature, horizon, return_type,
-                         regime_col, regime_label, train_start, train_end)
+                         regime_col, regime_label, train_start, train_end, alignment_source)
             DO UPDATE SET
                 ic            = EXCLUDED.ic,
                 ic_t_stat     = EXCLUDED.ic_t_stat,
@@ -1176,14 +1176,14 @@ def save_ic_results(conn, rows: list[dict], *, overwrite: bool = False) -> int:
                 (asset_id, tf, feature, horizon, horizon_days, return_type,
                  regime_col, regime_label, train_start, train_end,
                  ic, ic_t_stat, ic_p_value, ic_ir, ic_ir_t_stat, turnover, n_obs,
-                 rank_ic)
+                 rank_ic, alignment_source)
             VALUES
                 (:asset_id, :tf, :feature, :horizon, :horizon_days, :return_type,
                  :regime_col, :regime_label, :train_start, :train_end,
                  :ic, :ic_t_stat, :ic_p_value, :ic_ir, :ic_ir_t_stat, :turnover, :n_obs,
-                 :rank_ic)
+                 :rank_ic, :alignment_source)
             ON CONFLICT (asset_id, tf, feature, horizon, return_type,
-                         regime_col, regime_label, train_start, train_end)
+                         regime_col, regime_label, train_start, train_end, alignment_source)
             DO NOTHING
             """
         )
@@ -1210,6 +1210,8 @@ def save_ic_results(conn, rows: list[dict], *, overwrite: bool = False) -> int:
             "n_obs": _to_python(row.get("n_obs")),
             # rank_ic defaults to ic value (Spearman IC == Rank IC by definition)
             "rank_ic": _to_python(row.get("rank_ic", row.get("ic"))),
+            # alignment_source defaults to 'multi_tf' (table DEFAULT) when not specified
+            "alignment_source": _to_python(row.get("alignment_source", "multi_tf")),
         }
         for row in rows
     ]

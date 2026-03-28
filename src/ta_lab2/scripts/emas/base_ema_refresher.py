@@ -114,6 +114,18 @@ def ensure_ema_table_exists(
     if "." in table_name:
         schema, table_name = table_name.split(".", 1)
 
+    # Skip DDL if table already exists (avoids index conflicts with existing data)
+    with engine.connect() as conn:
+        exists = conn.execute(
+            text(
+                "SELECT 1 FROM information_schema.tables "
+                "WHERE table_schema = :schema AND table_name = :tbl"
+            ),
+            {"schema": schema, "tbl": table_name},
+        ).fetchone()
+    if exists:
+        return
+
     ddl = _generate_ema_table_ddl(table_name, table_type=table_type, schema=schema)
 
     with engine.begin() as conn:

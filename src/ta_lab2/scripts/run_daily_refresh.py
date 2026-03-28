@@ -86,6 +86,9 @@ TIMEOUT_DESC_STATS = 3600  # 1 hour -- asset stats + correlation computation
 TIMEOUT_REGIMES = 1800  # 30 minutes -- regime refresher
 TIMEOUT_FEATURES = 1800  # 30 minutes -- feature refresh for all assets at 1D
 TIMEOUT_SIGNALS = 1800  # 30 minutes -- signal generation for all types
+TIMEOUT_CALIBRATE_STOPS = (
+    300  # 5 minutes -- iterates over asset x strategy combos, mostly SQL reads
+)
 TIMEOUT_PORTFOLIO = 600  # 10 minutes -- portfolio optimizer runs all three methods
 TIMEOUT_EXECUTOR = (
     300  # 5 minutes -- daily executor is fast (2 strategies, ~100 assets)
@@ -105,8 +108,40 @@ TIMEOUT_CROSS_ASSET_AGG = (
 )
 TIMEOUT_MACRO_GATES = 120  # 2 minutes -- gate evaluation against FRED features
 TIMEOUT_MACRO_ALERTS = 60  # 1 minute -- transition detection + Telegram send
+TIMEOUT_GARCH = 1800  # 30 minutes -- GARCH fitting for 99 assets x 4 models
 TIMEOUT_SYNC_FRED = 300  # 5 minutes -- SSH + psql COPY from GCP VM
 TIMEOUT_SYNC_HL = 600  # 10 minutes -- SSH + psql COPY from Singapore VM (~3M rows)
+TIMEOUT_SIGNAL_GATE = 120  # 2 minutes -- signal count queries are fast
+TIMEOUT_IC_STALENESS = 300  # 5 minutes -- IC computation for ~10 features x 2 assets
+TIMEOUT_PIPELINE_ALERT = 60  # 1 minute -- Telegram send only
+
+# Canonical pipeline stage ordering -- used by --from-stage to skip prior stages.
+# New Phase 87 stages: signal_validation_gate, ic_staleness_check, pipeline_alerts.
+STAGE_ORDER = [
+    "sync_vms",
+    "bars",
+    "emas",
+    "amas",
+    "desc_stats",
+    "macro_features",
+    "macro_regimes",
+    "macro_analytics",
+    "cross_asset_agg",
+    "macro_gates",
+    "macro_alerts",
+    "regimes",
+    "features",
+    "garch",
+    "signals",
+    "signal_validation_gate",  # Phase 87
+    "ic_staleness_check",  # Phase 87
+    "calibrate_stops",
+    "portfolio",
+    "executor",
+    "drift_monitor",
+    "pipeline_alerts",  # Phase 87
+    "stats",
+]
 
 
 @dataclass
@@ -834,6 +869,114 @@ def run_feature_refresh_stage(args, db_url: str) -> ComponentResult:
         )
 
 
+def run_garch_forecasts(args, db_url: str) -> ComponentResult:
+    """
+    Run GARCH conditional volatility forecast refresh via subprocess.
+
+    Fits GARCH/GJR-GARCH/EGARCH/FIGARCH models per asset and writes forecasts
+    to garch_forecasts table.  Runs after features and before signals.
+
+    Args:
+        args: CLI arguments
+        db_url: Database URL
+
+    Returns:
+        ComponentResult with execution details
+    """
+    script_dir = Path(__file__).parent / "garch"
+    cmd = [sys.executable, str(script_dir / "refresh_garch_forecasts.py")]
+
+    # Pass through IDs and DB URL
+    cmd.extend(["--ids", getattr(args, "ids", "all")])
+    cmd.extend(["--db-url", db_url])
+
+    if getattr(args, "verbose", False):
+        cmd.append("--verbose")
+
+    print(f"\n{'=' * 70}")
+    print("RUNNING GARCH FORECAST REFRESH")
+    print(f"{'=' * 70}")
+    print(f"Command: {' '.join(cmd)}")
+
+    if getattr(args, "dry_run", False):
+        print("[DRY RUN] Would run GARCH forecast refresh")
+        return ComponentResult(
+            component="garch",
+            success=True,
+            duration_sec=0.0,
+            returncode=0,
+        )
+
+    start = time.perf_counter()
+
+    try:
+        if getattr(args, "verbose", False):
+            result = subprocess.run(cmd, check=False, timeout=TIMEOUT_GARCH)
+        else:
+            result = subprocess.run(
+                cmd,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=TIMEOUT_GARCH,
+            )
+
+            if result.returncode != 0:
+                print(
+                    f"\n[ERROR] GARCH forecast refresh failed with code {result.returncode}"
+                )
+                if result.stdout:
+                    print(f"\nSTDOUT:\n{result.stdout[-2000:]}")
+                if result.stderr:
+                    print(f"\nSTDERR:\n{result.stderr[-2000:]}")
+
+        duration = time.perf_counter() - start
+
+        if result.returncode == 0:
+            print(
+                f"\n[OK] GARCH forecast refresh completed successfully in {duration:.1f}s"
+            )
+            return ComponentResult(
+                component="garch",
+                success=True,
+                duration_sec=duration,
+                returncode=result.returncode,
+            )
+        else:
+            error_msg = f"Exited with code {result.returncode}"
+            print(f"\n[FAILED] GARCH forecast refresh failed: {error_msg}")
+            return ComponentResult(
+                component="garch",
+                success=False,
+                duration_sec=duration,
+                returncode=result.returncode,
+                error_message=error_msg,
+            )
+
+    except subprocess.TimeoutExpired:
+        duration = time.perf_counter() - start
+        error_msg = f"Timed out after {TIMEOUT_GARCH}s"
+        print(f"\n[TIMEOUT] GARCH forecast refresh: {error_msg}")
+        return ComponentResult(
+            component="garch",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+    except Exception as e:
+        duration = time.perf_counter() - start
+        error_msg = str(e)
+        print(f"\n[ERROR] GARCH forecast refresh raised exception: {error_msg}")
+        return ComponentResult(
+            component="garch",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+
+
 def run_signal_refreshes(args, db_url: str) -> ComponentResult:
     """
     Run signal generation via subprocess.
@@ -927,6 +1070,114 @@ def run_signal_refreshes(args, db_url: str) -> ComponentResult:
         print(f"\n[ERROR] Signal generation raised exception: {error_msg}")
         return ComponentResult(
             component="signals",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+
+
+def run_calibrate_stops_stage(args, db_url: str) -> ComponentResult:
+    """
+    Run stop calibration via subprocess.
+
+    Iterates over asset x strategy combinations and writes per-asset calibrated
+    stop/take-profit ladders to stop_calibrations.  Runs after signals and
+    before the portfolio refresh in the full pipeline.  Non-fatal: failure logs
+    a warning and the pipeline continues to portfolio refresh.
+
+    Args:
+        args: CLI arguments
+        db_url: Database URL
+
+    Returns:
+        ComponentResult with execution details
+    """
+    cmd = [
+        sys.executable,
+        "-m",
+        "ta_lab2.scripts.portfolio.calibrate_stops",
+        "--ids",
+        "all",
+    ]
+    if getattr(args, "dry_run", False):
+        cmd.append("--dry-run")
+    if getattr(args, "verbose", False):
+        cmd.append("--verbose")
+
+    print(f"\n{'=' * 70}")
+    print("RUNNING STOP CALIBRATION")
+    print(f"{'=' * 70}")
+    print(f"Command: {' '.join(cmd)}")
+
+    if getattr(args, "dry_run", False):
+        print("[DRY RUN] Would execute stop calibration")
+        return ComponentResult(
+            component="calibrate_stops",
+            success=True,
+            duration_sec=0.0,
+            returncode=0,
+        )
+
+    start_t = time.perf_counter()
+
+    try:
+        if getattr(args, "verbose", False):
+            result = subprocess.run(cmd, check=False, timeout=TIMEOUT_CALIBRATE_STOPS)
+        else:
+            result = subprocess.run(
+                cmd,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=TIMEOUT_CALIBRATE_STOPS,
+            )
+
+            if result.returncode != 0:
+                print(f"\n[ERROR] Stop calibration failed (code {result.returncode})")
+                if result.stdout:
+                    print(f"\nSTDOUT:\n{result.stdout[-2000:]}")
+                if result.stderr:
+                    print(f"\nSTDERR:\n{result.stderr[-2000:]}")
+
+        duration = time.perf_counter() - start_t
+
+        if result.returncode == 0:
+            print(f"\n[OK] Stop calibration completed in {duration:.1f}s")
+            return ComponentResult(
+                component="calibrate_stops",
+                success=True,
+                duration_sec=duration,
+                returncode=result.returncode,
+            )
+        else:
+            error_msg = f"Exited with code {result.returncode}"
+            print(f"\n[FAILED] Stop calibration failed: {error_msg}")
+            return ComponentResult(
+                component="calibrate_stops",
+                success=False,
+                duration_sec=duration,
+                returncode=result.returncode,
+                error_message=error_msg,
+            )
+
+    except subprocess.TimeoutExpired:
+        duration = time.perf_counter() - start_t
+        error_msg = f"Timed out after {TIMEOUT_CALIBRATE_STOPS}s"
+        print(f"\n[TIMEOUT] Stop calibration: {error_msg}")
+        return ComponentResult(
+            component="calibrate_stops",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+    except Exception as e:
+        duration = time.perf_counter() - start_t
+        error_msg = str(e)
+        print(f"\n[ERROR] Stop calibration raised exception: {error_msg}")
+        return ComponentResult(
+            component="calibrate_stops",
             success=False,
             duration_sec=duration,
             returncode=-1,
@@ -2391,6 +2642,506 @@ def run_macro_alerts(args) -> ComponentResult:
         )
 
 
+# ---------------------------------------------------------------------------
+# Phase 87 stage runners: signal_validation_gate, ic_staleness_check,
+# run_pipeline_completion_alert
+# ---------------------------------------------------------------------------
+
+
+def run_signal_validation_gate(args, db_url: str) -> ComponentResult:
+    """Run the signal anomaly gate via subprocess.
+
+    Returns a failed ComponentResult (success=False) when the gate detects
+    anomalies (exit code 2).  The executor stage checks this flag and skips
+    execution when blocked.
+    """
+    print("\n--- Signal Validation Gate ---")
+    start = time.perf_counter()
+    cmd = [
+        sys.executable,
+        "-m",
+        "ta_lab2.scripts.signals.validate_signal_anomalies",
+        "--db-url",
+        db_url,
+    ]
+    if getattr(args, "dry_run", False):
+        cmd.append("--dry-run")
+    if getattr(args, "verbose", False):
+        cmd.append("--verbose")
+
+    try:
+        result = subprocess.run(
+            cmd,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=TIMEOUT_SIGNAL_GATE,
+        )
+        duration = time.perf_counter() - start
+
+        if result.returncode == 0:
+            print(f"  Signal gate: all signals clean ({duration:.1f}s)")
+            return ComponentResult(
+                component="signal_validation_gate",
+                success=True,
+                duration_sec=duration,
+                returncode=result.returncode,
+            )
+        elif result.returncode == 2:
+            print(
+                f"  Signal gate: anomalies detected -- executor will be BLOCKED ({duration:.1f}s)"
+            )
+            return ComponentResult(
+                component="signal_validation_gate",
+                success=False,
+                duration_sec=duration,
+                returncode=result.returncode,
+                error_message="Signal anomalies detected",
+            )
+        else:
+            print(f"  Signal gate: exit code {result.returncode} ({duration:.1f}s)")
+            return ComponentResult(
+                component="signal_validation_gate",
+                success=False,
+                duration_sec=duration,
+                returncode=result.returncode,
+                error_message=f"Exited with code {result.returncode}",
+            )
+    except subprocess.TimeoutExpired:
+        duration = time.perf_counter() - start
+        error_msg = f"Timed out after {TIMEOUT_SIGNAL_GATE}s"
+        print(f"\n[TIMEOUT] Signal validation gate: {error_msg}")
+        return ComponentResult(
+            component="signal_validation_gate",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+    except Exception as e:
+        duration = time.perf_counter() - start
+        error_msg = str(e)
+        print(f"\n[ERROR] Signal validation gate raised exception: {error_msg}")
+        return ComponentResult(
+            component="signal_validation_gate",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+
+
+def run_ic_staleness_check_stage(args, db_url: str) -> ComponentResult:
+    """Run the IC staleness monitor via subprocess.
+
+    Non-blocking: return code 2 (decay detected) is treated as a warning
+    and logged, but the pipeline continues to executor and stats.
+    """
+    print("\n--- IC Staleness Check ---")
+    start = time.perf_counter()
+    cmd = [
+        sys.executable,
+        "-m",
+        "ta_lab2.scripts.analysis.run_ic_staleness_check",
+        "--db-url",
+        db_url,
+    ]
+    if getattr(args, "dry_run", False):
+        cmd.append("--dry-run")
+    if getattr(args, "verbose", False):
+        cmd.append("--verbose")
+    # Pass --ids if specified (non-default)
+    ids_val = getattr(args, "ids", None)
+    if ids_val and ids_val != "all":
+        cmd.extend(["--ids", ids_val])
+
+    try:
+        result = subprocess.run(
+            cmd,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=TIMEOUT_IC_STALENESS,
+        )
+        duration = time.perf_counter() - start
+
+        if result.returncode == 0:
+            print(f"  IC staleness: no decay detected ({duration:.1f}s)")
+            return ComponentResult(
+                component="ic_staleness_check",
+                success=True,
+                duration_sec=duration,
+                returncode=result.returncode,
+            )
+        elif result.returncode == 2:
+            print(
+                f"  IC staleness: decay detected -- check dim_ic_weight_overrides ({duration:.1f}s)"
+            )
+            return ComponentResult(
+                component="ic_staleness_check",
+                success=False,
+                duration_sec=duration,
+                returncode=result.returncode,
+                error_message="IC decay detected",
+            )
+        else:
+            print(f"  IC staleness: exit code {result.returncode} ({duration:.1f}s)")
+            return ComponentResult(
+                component="ic_staleness_check",
+                success=False,
+                duration_sec=duration,
+                returncode=result.returncode,
+                error_message=f"Exited with code {result.returncode}",
+            )
+    except subprocess.TimeoutExpired:
+        duration = time.perf_counter() - start
+        error_msg = f"Timed out after {TIMEOUT_IC_STALENESS}s"
+        print(f"\n[TIMEOUT] IC staleness check: {error_msg}")
+        return ComponentResult(
+            component="ic_staleness_check",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+    except Exception as e:
+        duration = time.perf_counter() - start
+        error_msg = str(e)
+        print(f"\n[ERROR] IC staleness check raised exception: {error_msg}")
+        return ComponentResult(
+            component="ic_staleness_check",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+
+
+def run_pipeline_completion_alert(
+    args, db_url: str, results: list[tuple[str, ComponentResult]]
+) -> ComponentResult:
+    """Send a daily pipeline digest alert via Telegram.
+
+    Non-blocking: alert failures are logged but never stop the pipeline.
+    Throttled to one alert per 20 hours via pipeline_alert_log.
+    """
+    start = time.perf_counter()
+    _ALERT_TYPE = "pipeline_complete"
+    _ALERT_KEY = "daily"
+    _COOLDOWN_HOURS = 20
+
+    # Build digest
+    successful = [name for name, r in results if r.success]
+    failed_items = [(name, r) for name, r in results if not r.success]
+    total_duration = sum(r.duration_sec for _, r in results)
+    severity = "info" if not failed_items else "warning"
+
+    lines = [
+        f"Pipeline complete: {len(successful)}/{len(results)} stages OK",
+        f"Total duration: {total_duration:.0f}s",
+    ]
+    if failed_items:
+        lines.append("Failed stages:")
+        for name, r in failed_items:
+            err = f" ({r.error_message})" if r.error_message else ""
+            lines.append(f"  - {name}{err}")
+    message = "\n".join(lines)
+
+    if getattr(args, "dry_run", False):
+        print(f"\n[DRY RUN] Would send pipeline completion alert ({severity})")
+        duration = time.perf_counter() - start
+        return ComponentResult(
+            component="pipeline_alerts",
+            success=True,
+            duration_sec=duration,
+            returncode=0,
+        )
+
+    try:
+        # Lazy import to avoid hard dependency when running dry-run / tests
+        from sqlalchemy import create_engine, text
+        from sqlalchemy.exc import OperationalError, ProgrammingError
+
+        from ta_lab2.notifications import telegram
+
+        engine = create_engine(db_url)
+
+        # Check throttle
+        throttled = False
+        try:
+            with engine.connect() as conn:
+                row = conn.execute(
+                    text("""
+                        SELECT 1 FROM pipeline_alert_log
+                        WHERE alert_type = :atype
+                          AND alert_key = :akey
+                          AND sent_at > NOW() - (INTERVAL '1 hour' * :hours)
+                          AND throttled = FALSE
+                        LIMIT 1
+                    """),
+                    {
+                        "atype": _ALERT_TYPE,
+                        "akey": _ALERT_KEY,
+                        "hours": _COOLDOWN_HOURS,
+                    },
+                ).fetchone()
+                throttled = row is not None
+        except (OperationalError, ProgrammingError):
+            pass  # Table may not exist yet -- proceed without throttle check
+
+        sent = False
+        if not throttled:
+            if telegram.is_configured():
+                title = "Daily Pipeline Complete"
+                try:
+                    sent = telegram.send_alert(title, message, severity=severity)
+                except Exception as exc:
+                    print(f"  [WARN] Telegram send failed: {exc}")
+            else:
+                print("  [INFO] Telegram not configured -- skipping completion alert")
+
+        # Log to pipeline_alert_log
+        try:
+            with engine.begin() as conn:
+                conn.execute(
+                    text("""
+                        INSERT INTO pipeline_alert_log
+                            (alert_type, alert_key, severity, message_preview, throttled)
+                        VALUES (:atype, :akey, :sev, :preview, :throttled)
+                    """),
+                    {
+                        "atype": _ALERT_TYPE,
+                        "akey": _ALERT_KEY,
+                        "sev": severity,
+                        "preview": message[:500],
+                        "throttled": throttled,
+                    },
+                )
+        except (OperationalError, ProgrammingError) as exc:
+            print(f"  [WARN] Could not log to pipeline_alert_log: {exc}")
+
+        engine.dispose()
+
+        status = "throttled" if throttled else ("sent" if sent else "skipped")
+        duration = time.perf_counter() - start
+        print(f"  Pipeline completion alert: {status} ({duration:.1f}s)")
+        return ComponentResult(
+            component="pipeline_alerts",
+            success=True,
+            duration_sec=duration,
+            returncode=0,
+        )
+
+    except Exception as e:
+        duration = time.perf_counter() - start
+        print(f"\n[WARN] Pipeline completion alert failed (non-blocking): {e}")
+        return ComponentResult(
+            component="pipeline_alerts",
+            success=True,  # Non-blocking -- always succeeds
+            duration_sec=duration,
+            returncode=0,
+        )
+
+
+# ---------------------------------------------------------------------------
+# Phase 87 pipeline_run_log helpers
+# ---------------------------------------------------------------------------
+
+
+def _start_pipeline_run(db_url: str) -> str | None:
+    """Insert a pipeline_run_log row with status='running'. Return the UUID run_id.
+
+    Returns None on DB error (table may not exist if migration is pending).
+    """
+    try:
+        from sqlalchemy import create_engine, text
+        from sqlalchemy.exc import OperationalError, ProgrammingError
+
+        engine = create_engine(db_url)
+        with engine.begin() as conn:
+            row = conn.execute(
+                text(
+                    "INSERT INTO pipeline_run_log (status) VALUES ('running') "
+                    "RETURNING run_id"
+                )
+            ).fetchone()
+        engine.dispose()
+        return str(row[0]) if row else None
+    except (OperationalError, ProgrammingError) as exc:
+        print(
+            f"[WARN] Could not start pipeline_run_log row (migration pending?): {exc}"
+        )
+        return None
+    except Exception as exc:
+        print(f"[WARN] pipeline_run_log insert error: {exc}")
+        return None
+
+
+def _complete_pipeline_run(
+    db_url: str,
+    run_id: str,
+    status: str,
+    stages: list[str],
+    duration: float,
+    error_msg: str | None,
+) -> None:
+    """Update the pipeline_run_log row with completion details."""
+    import json
+
+    try:
+        from sqlalchemy import create_engine, text
+        from sqlalchemy.exc import OperationalError, ProgrammingError
+
+        engine = create_engine(db_url)
+        with engine.begin() as conn:
+            conn.execute(
+                text("""
+                    UPDATE pipeline_run_log
+                    SET completed_at        = now(),
+                        status              = :status,
+                        stages_completed    = CAST(:stages AS JSONB),
+                        total_duration_sec  = :duration,
+                        error_message       = :error
+                    WHERE run_id = CAST(:run_id AS UUID)
+                """),
+                {
+                    "run_id": run_id,
+                    "status": status,
+                    "stages": json.dumps(stages),
+                    "duration": duration,
+                    "error": error_msg,
+                },
+            )
+        engine.dispose()
+    except (OperationalError, ProgrammingError) as exc:
+        print(f"[WARN] Could not update pipeline_run_log (migration pending?): {exc}")
+    except Exception as exc:
+        print(f"[WARN] pipeline_run_log update error: {exc}")
+
+
+def _check_dead_man(db_url: str) -> bool:
+    """Return True if yesterday's pipeline run is MISSING (dead-man should fire).
+
+    Returns False when pipeline_run_log has 0 rows (first run) to avoid
+    a false-positive alert on initial deployment.
+    """
+    try:
+        from sqlalchemy import create_engine, text
+        from sqlalchemy.exc import OperationalError, ProgrammingError
+
+        engine = create_engine(db_url)
+        with engine.connect() as conn:
+            # First, check if table has ANY rows at all
+            count_row = conn.execute(
+                text("SELECT COUNT(*) FROM pipeline_run_log")
+            ).fetchone()
+            if count_row and count_row[0] == 0:
+                engine.dispose()
+                return False  # First ever run -- no false alarm
+
+            # Check if yesterday's run completed
+            row = conn.execute(
+                text("""
+                    SELECT 1
+                    FROM pipeline_run_log
+                    WHERE DATE(completed_at AT TIME ZONE 'UTC')
+                          = CURRENT_DATE - INTERVAL '1 day'
+                      AND status = 'complete'
+                    LIMIT 1
+                """)
+            ).fetchone()
+        engine.dispose()
+        return row is None  # True = no completed run yesterday
+    except (OperationalError, ProgrammingError) as exc:
+        print(f"[WARN] Could not check pipeline_run_log for dead-man switch: {exc}")
+        return False
+    except Exception as exc:
+        print(f"[WARN] Dead-man switch check error: {exc}")
+        return False
+
+
+def _fire_dead_man_alert(db_url: str) -> None:
+    """Send a CRITICAL dead-man switch alert (12h cooldown) via Telegram."""
+    _ALERT_TYPE = "dead_man_switch"
+    _ALERT_KEY = "daily"
+    _COOLDOWN_HOURS = 12
+
+    try:
+        from sqlalchemy import create_engine, text
+        from sqlalchemy.exc import OperationalError, ProgrammingError
+
+        from ta_lab2.notifications import telegram
+
+        engine = create_engine(db_url)
+
+        # Check throttle
+        throttled = False
+        try:
+            with engine.connect() as conn:
+                row = conn.execute(
+                    text("""
+                        SELECT 1 FROM pipeline_alert_log
+                        WHERE alert_type = :atype
+                          AND alert_key = :akey
+                          AND sent_at > NOW() - (INTERVAL '1 hour' * :hours)
+                          AND throttled = FALSE
+                        LIMIT 1
+                    """),
+                    {
+                        "atype": _ALERT_TYPE,
+                        "akey": _ALERT_KEY,
+                        "hours": _COOLDOWN_HOURS,
+                    },
+                ).fetchone()
+                throttled = row is not None
+        except (OperationalError, ProgrammingError):
+            pass  # Table may not exist yet
+
+        sent = False
+        if not throttled:
+            if telegram.is_configured():
+                try:
+                    sent = telegram.send_alert(
+                        "Dead-Man Switch",
+                        "Yesterday's pipeline run did not complete! "
+                        "Check pipeline_run_log for details.",
+                        severity="critical",
+                    )
+                except Exception as exc:
+                    print(f"  [WARN] Dead-man Telegram send failed: {exc}")
+            else:
+                print("  [WARN] Dead-man switch fired but Telegram not configured")
+        else:
+            print("  [INFO] Dead-man alert throttled (within 12h cooldown)")
+
+        # Log to pipeline_alert_log
+        try:
+            with engine.begin() as conn:
+                conn.execute(
+                    text("""
+                        INSERT INTO pipeline_alert_log
+                            (alert_type, alert_key, severity, message_preview, throttled)
+                        VALUES (:atype, :akey, 'critical',
+                                'Dead-man switch fired: yesterday pipeline incomplete',
+                                :throttled)
+                    """),
+                    {"atype": _ALERT_TYPE, "akey": _ALERT_KEY, "throttled": throttled},
+                )
+        except (OperationalError, ProgrammingError) as exc:
+            print(f"  [WARN] Could not log dead-man alert: {exc}")
+
+        engine.dispose()
+        status_msg = (
+            "throttled"
+            if throttled
+            else ("sent" if sent else "skipped (Telegram unconfigured)")
+        )
+        print(f"  [CRITICAL] Dead-man switch: {status_msg}")
+
+    except Exception as exc:
+        print(f"[WARN] Dead-man switch alert error (non-blocking): {exc}")
+
+
 def main(argv: list[str] | None = None) -> int:
     """Main entry point."""
     p = argparse.ArgumentParser(
@@ -2551,9 +3302,32 @@ Examples:
         help="Skip feature refresh stage in --all mode",
     )
     p.add_argument(
+        "--garch",
+        action="store_true",
+        help="Run GARCH conditional volatility forecast refresh only",
+    )
+    p.add_argument(
+        "--no-garch",
+        action="store_true",
+        help="Skip GARCH forecast stage in --all mode",
+    )
+    p.add_argument(
         "--signals",
         action="store_true",
         help="Run signal generation only (EMA crossover, RSI, ATR breakout)",
+    )
+    p.add_argument(
+        "--calibrate-stops",
+        action="store_true",
+        help=(
+            "Run stop calibration only (per-asset SL/TP ladders from "
+            "ATR-based statistics). Runs after signals, before portfolio."
+        ),
+    )
+    p.add_argument(
+        "--no-calibrate-stops",
+        action="store_true",
+        help="Skip stop calibration stage in --all mode",
     )
     p.add_argument(
         "--portfolio",
@@ -2608,8 +3382,9 @@ Examples:
         action="store_true",
         help=(
             "Run sync_vms then bars then EMAs then AMAs then desc_stats "
-            "then macro then regimes then features then signals then "
-            "executor then stats (full refresh)"
+            "then macro then regimes then features then garch then signals "
+            "then calibrate_stops then portfolio then executor then drift "
+            "then stats (full refresh)"
         ),
     )
     p.add_argument(
@@ -2709,7 +3484,35 @@ Examples:
         help="Suppress Telegram delivery for weekly digest (passed through to weekly_digest subprocess)",
     )
 
+    # Phase 87: re-run / skip options
+    p.add_argument(
+        "--from-stage",
+        metavar="STAGE",
+        default=None,
+        choices=STAGE_ORDER,
+        help=(
+            "Resume pipeline from STAGE (skips all stages before it). "
+            "Implicitly enables --all. Use for re-runs after failures. "
+            "Available stages: " + ", ".join(STAGE_ORDER)
+        ),
+    )
+    p.add_argument(
+        "--no-signal-gate",
+        action="store_true",
+        help="Skip signal validation gate in --all mode",
+    )
+    p.add_argument(
+        "--no-ic-staleness",
+        action="store_true",
+        help="Skip IC staleness check in --all mode",
+    )
+
     args = p.parse_args(argv)
+
+    # --from-stage implicitly enables --all and sets starting point
+    from_stage = getattr(args, "from_stage", None)
+    if from_stage:
+        args.all = True  # --from-stage implicitly enables --all
 
     # Validation: require explicit target
     if args.weekly_digest:
@@ -2731,18 +3534,22 @@ Examples:
         or args.cross_asset_agg
         or args.regimes
         or args.features
+        or args.garch
         or args.signals
+        or args.calibrate_stops
         or args.portfolio
         or args.execute
         or args.drift
         or args.stats
         or args.all
+        or from_stage
     ):
         p.error(
             "Must specify --sync-vms, --bars, --emas, --amas, --desc-stats, --macro, "
             "--macro-regimes, --macro-analytics, --cross-asset-agg, --regimes, "
-            "--features, --signals, --portfolio, --execute, --drift, --stats, "
-            "--all, --weekly-digest, or --exchange-prices"
+            "--features, --garch, --signals, --calibrate-stops, --portfolio, "
+            "--execute, --drift, --stats, --all, --from-stage STAGE, "
+            "--weekly-digest, or --exchange-prices"
         )
 
     # Resolve database URL
@@ -2799,13 +3606,66 @@ Examples:
     run_features = (args.features or args.all) and not getattr(
         args, "no_features", False
     )
+    run_garch = (args.garch or args.all) and not getattr(args, "no_garch", False)
     run_signals = args.signals or args.all
+    # Phase 87: signal validation gate and IC staleness (--all only, skippable)
+    run_signal_gate = args.all and not getattr(args, "no_signal_gate", False)
+    run_ic_staleness = args.all and not getattr(args, "no_ic_staleness", False)
+    run_calibrate_stops = (args.calibrate_stops or args.all) and not getattr(
+        args, "no_calibrate_stops", False
+    )
     run_portfolio = (args.portfolio or args.all) and not getattr(
         args, "no_portfolio", False
     )
     run_executor = (args.execute or args.all) and not getattr(args, "no_execute", False)
     run_drift = (args.drift or args.all) and not getattr(args, "no_drift", False)
     run_stats = args.stats or args.all
+
+    # Apply --from-stage: skip all stages that come before the named stage.
+    # Uses explicit if-statements (not locals()) for reliable variable mutation.
+    if from_stage:
+        skip_idx = STAGE_ORDER.index(from_stage)
+        skip_stages = set(STAGE_ORDER[:skip_idx])
+        if "sync_vms" in skip_stages:
+            run_sync_vms = False
+        if "bars" in skip_stages:
+            run_bars = False
+        if "emas" in skip_stages:
+            run_emas = False
+        if "amas" in skip_stages:
+            run_amas = False
+        if "desc_stats" in skip_stages:
+            run_desc_stats = False
+        if "macro_features" in skip_stages:
+            run_macro = False
+        if "macro_regimes" in skip_stages:
+            run_macro_regimes_flag = False
+        if "macro_analytics" in skip_stages:
+            run_macro_analytics_flag = False
+        if "cross_asset_agg" in skip_stages:
+            run_cross_asset_agg_flag = False
+        if "regimes" in skip_stages:
+            run_regimes = False
+        if "features" in skip_stages:
+            run_features = False
+        if "garch" in skip_stages:
+            run_garch = False
+        if "signals" in skip_stages:
+            run_signals = False
+        if "signal_validation_gate" in skip_stages:
+            run_signal_gate = False
+        if "ic_staleness_check" in skip_stages:
+            run_ic_staleness = False
+        if "calibrate_stops" in skip_stages:
+            run_calibrate_stops = False
+        if "portfolio" in skip_stages:
+            run_portfolio = False
+        if "executor" in skip_stages:
+            run_executor = False
+        if "drift_monitor" in skip_stages:
+            run_drift = False
+        if "stats" in skip_stages:
+            run_stats = False
 
     # Build component description string
     components = []
@@ -2831,14 +3691,23 @@ Examples:
         components.append("regimes")
     if run_features:
         components.append("features")
+    if run_garch:
+        components.append("garch")
     if run_signals:
         components.append("signals")
+    if run_signal_gate:
+        components.append("signal_validation_gate")
+    if run_ic_staleness:
+        components.append("ic_staleness_check")
+    if run_calibrate_stops:
+        components.append("calibrate_stops")
     if run_portfolio:
         components.append("portfolio")
     if run_executor:
         components.append("executor")
     if run_drift and getattr(args, "paper_start", None):
         components.append("drift_monitor")
+    components.append("pipeline_alerts")  # Always shown in --all runs
     if run_stats:
         components.append("stats")
     components_str = " + ".join(components)
@@ -2849,10 +3718,24 @@ Examples:
     print(f"\nComponents: {components_str}")
     print(f"IDs: {args.ids}")
     print(f"Continue on error: {args.continue_on_error}")
+    if from_stage:
+        print(f"Resuming from stage: {from_stage}")
     if run_emas and not args.skip_stale_check:
         print(f"Bar staleness threshold: {args.staleness_hours} hours")
 
     results: list[tuple[str, ComponentResult]] = []
+
+    # Phase 87: pipeline run logging and dead-man switch
+    pipeline_run_id = None
+    pipeline_start_time = time.perf_counter()
+    if not args.dry_run:
+        pipeline_run_id = _start_pipeline_run(db_url)
+        # Dead-man switch: alert if yesterday's run is missing
+        if _check_dead_man(db_url):
+            print(
+                "\n[CRITICAL] Dead-man switch: yesterday's pipeline run did not complete!"
+            )
+            _fire_dead_man_alert(db_url)
 
     # Sync VM data first (before any computations that depend on it)
     # Non-blocking: sync failures don't stop the pipeline (local data is
@@ -3023,6 +3906,16 @@ Examples:
             print("(Use --continue-on-error to run remaining components)")
             return 1
 
+    # Run GARCH forecasts if requested (after features, before signals)
+    if run_garch:
+        garch_result = run_garch_forecasts(args, db_url)
+        results.append(("garch", garch_result))
+
+        if not garch_result.success and not args.continue_on_error:
+            print("\n[STOPPED] GARCH forecast refresh failed, stopping execution")
+            print("(Use --continue-on-error to run remaining components)")
+            return 1
+
     # Run signal generation if requested (after features, before executor)
     if run_signals:
         signal_result = run_signal_refreshes(args, db_url)
@@ -3033,9 +3926,46 @@ Examples:
             print("(Use --continue-on-error to run remaining components)")
             return 1
 
-    # Run portfolio allocation refresh if requested (after signals, before executor)
+    # Phase 87: Signal validation gate -- runs AFTER signals, BEFORE executor.
+    # BLOCKING: if gate detects anomalies (rc=2), executor is skipped.
+    signal_gate_blocked = False
+    if run_signal_gate:
+        gate_result = run_signal_validation_gate(args, db_url)
+        results.append(("signal_validation_gate", gate_result))
+        if not gate_result.success:
+            signal_gate_blocked = True
+            print(
+                "\n[GATE] Signal validation gate BLOCKED execution -- anomalies detected"
+            )
+            print("[GATE] Signals held back from executor. Review signal_anomaly_log.")
+
+    # Phase 87: IC staleness check -- runs after signal gate, non-blocking.
+    # IC decay findings are logged to dim_ic_weight_overrides but pipeline continues.
+    if run_ic_staleness:
+        ic_result = run_ic_staleness_check_stage(args, db_url)
+        results.append(("ic_staleness_check", ic_result))
+        if not ic_result.success:
+            print(
+                "\n[WARN] IC staleness check detected decay -- check dim_ic_weight_overrides"
+            )
+
+    # Run stop calibration if requested (after signals, before portfolio)
+    # Non-fatal: failure logs a warning and pipeline continues to portfolio refresh
+    if run_calibrate_stops:
+        calibrate_result = run_calibrate_stops_stage(args, db_url)
+        results.append(("calibrate_stops", calibrate_result))
+
+        if not calibrate_result.success and not args.continue_on_error:
+            print("\n[STOPPED] Stop calibration failed, stopping execution")
+            print("(Use --continue-on-error to run remaining components)")
+            return 1
+        elif not calibrate_result.success:
+            print("\n[WARN] Stop calibration failed -- continuing to portfolio refresh")
+
+    # Run portfolio allocation refresh if requested (after calibrate_stops, before executor)
     # Pipeline order: bars -> EMAs -> AMAs -> desc_stats -> regimes -> features
-    #                 -> signals -> portfolio -> executor -> drift -> stats
+    #                 -> signals -> signal_gate -> ic_staleness -> calibrate_stops
+    #                 -> portfolio -> executor -> drift -> pipeline_alerts -> stats
     if run_portfolio:
         portfolio_result = run_portfolio_refresh_stage(args, db_url)
         results.append(("portfolio", portfolio_result))
@@ -3046,14 +3976,35 @@ Examples:
             return 1
 
     # Run paper executor if requested (after signals, before stats)
+    # Phase 87: executor is gated by signal_gate_blocked flag.
     if run_executor:
-        executor_result = run_paper_executor_stage(args, db_url)
-        results.append(("executor", executor_result))
+        if signal_gate_blocked:
+            print("\n[GATE] Skipping executor -- signal validation gate blocked")
+            results.append(
+                (
+                    "executor",
+                    ComponentResult(
+                        component="executor",
+                        success=False,
+                        duration_sec=0.0,
+                        returncode=2,
+                        error_message="Blocked by signal validation gate",
+                    ),
+                )
+            )
+            if not args.continue_on_error:
+                print(
+                    "(Signal gate block is treated as pipeline stop; use --continue-on-error to override)"
+                )
+                # Do not return 1 here -- complete remaining stages (drift, stats, alerts)
+        else:
+            executor_result = run_paper_executor_stage(args, db_url)
+            results.append(("executor", executor_result))
 
-        if not executor_result.success and not args.continue_on_error:
-            print("\n[STOPPED] Paper executor failed, stopping execution")
-            print("(Use --continue-on-error to run remaining components)")
-            return 1
+            if not executor_result.success and not args.continue_on_error:
+                print("\n[STOPPED] Paper executor failed, stopping execution")
+                print("(Use --continue-on-error to run remaining components)")
+                return 1
 
     # Run drift monitor if requested (after executor, before stats)
     # --paper-start is OPTIONAL: if not provided, drift stage is silently skipped
@@ -3092,9 +4043,39 @@ Examples:
             # Don't check continue_on_error -- stats FAIL is always terminal
             return 1
 
+    # Phase 87: Pipeline completion alert -- after stats, before summary.
+    # Sends daily digest via Telegram (INFO if all green, WARNING if any failures).
+    # Non-blocking: failure to send alert never stops the pipeline.
+    if not args.dry_run and results:
+        alert_result = run_pipeline_completion_alert(args, db_url, results)
+        results.append(("pipeline_alerts", alert_result))
+
     # Print combined summary
     if not args.dry_run:
         all_success = print_combined_summary(results)
+
+        # Phase 87: Update pipeline_run_log with completion details
+        if pipeline_run_id:
+            stages_completed = [name for name, r in results if r.success]
+            total_duration = time.perf_counter() - pipeline_start_time
+            overall_status = "complete" if all_success else "failed"
+            error_msg: str | None = (
+                "; ".join(
+                    f"{name}: {r.error_message}"
+                    for name, r in results
+                    if not r.success and r.error_message
+                )
+                or None
+            )
+            _complete_pipeline_run(
+                db_url,
+                pipeline_run_id,
+                overall_status,
+                stages_completed,
+                total_duration,
+                error_msg,
+            )
+
         return 0 if all_success else 1
     else:
         print(f"\n[DRY RUN] Would have executed {len(results)} component(s)")

@@ -14,14 +14,28 @@ NOTE on expanding-window re-optimization:
 
 Exports
 -------
-BakeoffConfig       - Configuration dataclass for a bake-off run
-StrategyResult      - Per-strategy result (aggregated across folds)
-BakeoffOrchestrator - Main orchestrator class with .run() entry point
-cost_scenario_label - Convert CostModel to descriptive label string
-build_t1_series     - Build label-end (t1) Series for CV splitters
-load_strategy_data  - Load OHLCV + indicator data from DB for a given asset/TF
+BakeoffConfig           - Configuration dataclass for a bake-off run
+StrategyResult          - Per-strategy result (aggregated across folds)
+BakeoffOrchestrator     - Main orchestrator class with .run() entry point
+cost_scenario_label     - Convert CostModel to descriptive label string
+build_t1_series         - Build label-end (t1) Series for CV splitters
+load_strategy_data      - Load OHLCV + indicator data from DB for a given asset/TF
+load_strategy_data_with_ama - Extended loader that joins AMA features onto base DataFrame
+parse_active_features   - Parse feature_selection.yaml into structured feature list
+load_universal_ic_weights   - Universal IC-IR weights from feature_selection.yaml (active tier)
+load_per_asset_ic_weights   - Per-asset IC-IR weight matrix from ic_results
 run_purged_kfold_backtest - Run one strategy through purged K-fold CV
-run_cpcv_backtest   - Run one strategy through CPCV for PBO analysis
+run_cpcv_backtest       - Run one strategy through CPCV for PBO analysis
+
+BakeoffOrchestrator.run() parameters (Phase 82 additions)
+---------------------------------------------------------
+ama_features : list of dict, optional
+    When provided, load_strategy_data_with_ama() is used instead of
+    load_strategy_data() so AMA columns are available for AMA signal
+    functions and expression engine experiments.
+experiment_name : str, optional
+    Lineage tag stored in strategy_bakeoff_results.experiment_name.
+    Pass a descriptive name (e.g. "phase82-ama-v1") for result traceability.
 """
 
 from __future__ import annotations
@@ -29,16 +43,24 @@ from __future__ import annotations
 import json
 import logging
 import math
+import multiprocessing
+import os
 import warnings
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
+import yaml
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
-from ta_lab2.backtests.costs import CostModel
+from ta_lab2.backtests.costs import (  # noqa: F401 -- re-exported for callers
+    COST_MATRIX_REGISTRY,
+    HYPERLIQUID_COST_MATRIX,
+    KRAKEN_COST_MATRIX,
+    CostModel,
+)
 from ta_lab2.backtests.cv import CPCVSplitter, PurgedKFoldSplitter
 from ta_lab2.backtests.psr import compute_dsr, compute_psr
 
@@ -48,49 +70,6 @@ except ImportError:  # pragma: no cover
     vbt = None  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# Kraken cost matrix: 6 spot + 6 perps = 12 scenarios
-# Spot:  maker 0.16% (16 bps) x 3 slippage + taker 0.26% (26 bps) x 3 slippage
-# Perps: same fees + funding 0.01%/8h = 0.03% per day (3 bps/day) x 6 fee/slip combos
-# ---------------------------------------------------------------------------
-_SLIPPAGE_LEVELS = [5.0, 10.0, 20.0]  # bps
-_SPOT_MAKER_FEE_BPS = 16.0  # Kraken spot maker fee: 0.16% = 16 bps
-_SPOT_TAKER_FEE_BPS = 26.0  # Kraken spot taker fee: 0.26% = 26 bps
-_PERPS_MAKER_FEE_BPS = 2.0  # Kraken perps maker fee: 0.02% = 2 bps
-_PERPS_TAKER_FEE_BPS = 5.0  # Kraken perps taker fee: 0.05% = 5 bps
-_PERPS_FUNDING_BPS_DAY = 3.0  # 0.01%/8h * 3 = 0.03%/day = 3 bps/day
-
-KRAKEN_COST_MATRIX: List[CostModel] = (
-    [
-        # Spot maker scenarios (3): maker 16 bps x slippage 5/10/20
-        CostModel(fee_bps=_SPOT_MAKER_FEE_BPS, slippage_bps=slip, funding_bps_day=0.0)
-        for slip in _SLIPPAGE_LEVELS
-    ]
-    + [
-        # Spot taker scenarios (3): taker 26 bps x slippage 5/10/20
-        CostModel(fee_bps=_SPOT_TAKER_FEE_BPS, slippage_bps=slip, funding_bps_day=0.0)
-        for slip in _SLIPPAGE_LEVELS
-    ]
-    + [
-        # Perps maker scenarios (3): maker 2 bps + funding x slippage 5/10/20
-        CostModel(
-            fee_bps=_PERPS_MAKER_FEE_BPS,
-            slippage_bps=slip,
-            funding_bps_day=_PERPS_FUNDING_BPS_DAY,
-        )
-        for slip in _SLIPPAGE_LEVELS
-    ]
-    + [
-        # Perps taker scenarios (3): taker 5 bps + funding x slippage 5/10/20
-        CostModel(
-            fee_bps=_PERPS_TAKER_FEE_BPS,
-            slippage_bps=slip,
-            funding_bps_day=_PERPS_FUNDING_BPS_DAY,
-        )
-        for slip in _SLIPPAGE_LEVELS
-    ]
-)
 
 
 # ---------------------------------------------------------------------------
@@ -112,6 +91,9 @@ class BakeoffConfig:
     cost_matrix: List[CostModel] = field(default_factory=lambda: KRAKEN_COST_MATRIX)
     spot_only: bool = False  # if True, only run 6 spot scenarios
 
+    # Exchange selection (overrides cost_matrix when set)
+    exchange: str = "kraken"  # registry key: "kraken" or "hyperliquid"
+
     # Data settings
     price_col: str = "close"
     min_bars: int = 300  # minimum bars required to run walk-forward
@@ -119,10 +101,269 @@ class BakeoffConfig:
     # Deduplication
     overwrite: bool = False  # if False, skip already-computed rows
 
+    # CPCV control: 0=run all, -1=skip CPCV, N=top N params by PKF sharpe
+    cpcv_top_n: int = 0
+
     def get_cost_matrix(self) -> List[CostModel]:
         if self.spot_only:
             return [c for c in self.cost_matrix if c.funding_bps_day == 0.0]
         return self.cost_matrix
+
+
+def get_cost_matrix_for_exchange(exchange: str) -> List[CostModel]:
+    """
+    Look up cost matrix from COST_MATRIX_REGISTRY by exchange name.
+
+    Parameters
+    ----------
+    exchange : str
+        Exchange name (e.g. "kraken", "hyperliquid"). Case-insensitive.
+
+    Returns
+    -------
+    List[CostModel]
+        Cost matrix for the requested exchange.
+
+    Raises
+    ------
+    KeyError
+        If the exchange is not found in COST_MATRIX_REGISTRY.
+    """
+    key = exchange.lower()
+    if key not in COST_MATRIX_REGISTRY:
+        available = list(COST_MATRIX_REGISTRY.keys())
+        raise KeyError(
+            f"Exchange '{exchange}' not found in COST_MATRIX_REGISTRY. "
+            f"Available: {available}"
+        )
+    return COST_MATRIX_REGISTRY[key]
+
+
+@dataclass
+class BakeoffAssetTask:
+    """All data needed by one worker process to run backtests for a single asset.
+
+    All fields must be picklable for multiprocessing.
+    """
+
+    asset_id: int
+    db_url: str
+    strategies: Dict[str, Tuple[Any, List[Dict[str, Any]]]]
+    tf: str
+    config_dict: Dict[str, Any]
+    ama_features: Optional[List[Dict[str, Any]]]
+    experiment_name: Optional[str]
+    existing_keys: set
+    perasset_weights: Optional[List[float]] = None
+    perasset_param_grid: Optional[List[Dict[str, Any]]] = None
+
+
+def _bakeoff_asset_worker(task: BakeoffAssetTask) -> List[Dict[str, Any]]:
+    """Process one asset through all strategies/params/costs.
+
+    Module-level function for multiprocessing pickling. Creates its own
+    NullPool engine per process, runs all backtests, computes DSR, persists
+    results to DB, and returns summary dicts.
+    """
+    from sqlalchemy import create_engine
+    from sqlalchemy.pool import NullPool
+
+    engine = create_engine(task.db_url, poolclass=NullPool)
+    config = BakeoffConfig(**task.config_dict)
+
+    try:
+        # Load data once for this asset
+        if task.ama_features is not None:
+            df = load_strategy_data_with_ama(
+                engine, task.asset_id, task.tf, task.ama_features
+            )
+        else:
+            df = load_strategy_data(engine, task.asset_id, task.tf)
+
+        if df.empty or len(df) < config.min_bars:
+            logger.warning(
+                f"Worker: insufficient data for asset_id={task.asset_id}, "
+                f"tf={task.tf} ({len(df)} bars). Skipping."
+            )
+            return []
+
+        t1_series = build_t1_series(df.index, holding_bars=1)
+        all_results: List[StrategyResult] = []
+
+        # Inject per-asset weighted strategy variant if weights provided
+        strategies = dict(task.strategies)
+        if task.perasset_weights is not None and task.perasset_param_grid is not None:
+            from functools import partial
+
+            from ta_lab2.signals.ama_composite import ama_momentum_signal
+
+            fn = partial(ama_momentum_signal, weights=task.perasset_weights)
+            fn.__name__ = "ama_momentum_perasset"  # type: ignore[attr-defined]
+            strategies["ama_momentum_perasset"] = (fn, task.perasset_param_grid)
+
+        for strategy_name, (signal_fn, param_grid) in strategies.items():
+            logger.info(
+                f"Worker asset_id={task.asset_id}: '{strategy_name}' "
+                f"{len(param_grid)} params x {len(config.get_cost_matrix())} costs"
+            )
+
+            pkf_collected: list = []
+            for params in param_grid:
+                for cost in config.get_cost_matrix():
+                    scenario_label = cost_scenario_label(cost)
+                    params_json = json.dumps(params, sort_keys=True)
+
+                    pkf_key = (
+                        strategy_name,
+                        params_json,
+                        scenario_label,
+                        "purged_kfold",
+                    )
+                    if task.existing_keys and pkf_key in task.existing_keys:
+                        continue
+
+                    try:
+                        pkf_result = run_purged_kfold_backtest(
+                            df, signal_fn, params, t1_series, cost, config
+                        )
+                    except Exception as e:
+                        logger.error(
+                            f"  Worker asset_id={task.asset_id}: pkf failed "
+                            f"{strategy_name}/{scenario_label}: {e}"
+                        )
+                        continue
+
+                    pkf_result["dsr"] = float("nan")
+                    pkf_sr = StrategyResult(
+                        strategy_name=strategy_name,
+                        asset_id=task.asset_id,
+                        tf=task.tf,
+                        params=params,
+                        cost_scenario=scenario_label,
+                        cv_method="purged_kfold",
+                        n_folds=config.n_folds,
+                        embargo_bars=config.embargo_bars,
+                        fold_metrics=pkf_result["fold_metrics"],
+                        sharpe_mean=pkf_result["sharpe_mean"],
+                        sharpe_std=pkf_result["sharpe_std"],
+                        max_drawdown_mean=pkf_result["max_drawdown_mean"],
+                        max_drawdown_worst=pkf_result["max_drawdown_worst"],
+                        total_return_mean=pkf_result["total_return_mean"],
+                        cagr_mean=pkf_result["cagr_mean"],
+                        trade_count_total=pkf_result["trade_count_total"],
+                        turnover=pkf_result["turnover"],
+                        psr=pkf_result["psr"],
+                        dsr=float("nan"),
+                        psr_n_obs=pkf_result["psr_n_obs"],
+                        pbo_prob=pkf_result["pbo_prob"],
+                    )
+                    all_results.append(pkf_sr)
+                    pkf_collected.append(
+                        (params, params_json, cost, scenario_label, pkf_sr)
+                    )
+
+            # CPCV phase
+            cpcv_top_n = config.cpcv_top_n
+            if cpcv_top_n == -1:
+                continue
+
+            cpcv_candidates: set = set()
+            if cpcv_top_n > 0 and pkf_collected:
+                from collections import defaultdict
+                from statistics import mean as _mean
+
+                param_sharpes: dict = defaultdict(list)
+                for _, pj, _, _, sr in pkf_collected:
+                    param_sharpes[pj].append(sr.sharpe_mean)
+                ranked = sorted(
+                    param_sharpes,
+                    key=lambda k: _mean(param_sharpes[k]),
+                    reverse=True,
+                )
+                cpcv_candidates = set(ranked[:cpcv_top_n])
+
+            for params, params_json, cost, scenario_label, _ in pkf_collected:
+                if cpcv_top_n > 0 and params_json not in cpcv_candidates:
+                    continue
+
+                cpcv_key = (
+                    strategy_name,
+                    params_json,
+                    scenario_label,
+                    "cpcv",
+                )
+                if task.existing_keys and cpcv_key in task.existing_keys:
+                    continue
+
+                try:
+                    cpcv_result = run_cpcv_backtest(
+                        df, signal_fn, params, t1_series, cost, config
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"  Worker asset_id={task.asset_id}: cpcv failed "
+                        f"{strategy_name}/{scenario_label}: {e}"
+                    )
+                    continue
+
+                if cpcv_result is not None:
+                    cpcv_result["dsr"] = float("nan")
+                    cpcv_sr = StrategyResult(
+                        strategy_name=strategy_name,
+                        asset_id=task.asset_id,
+                        tf=task.tf,
+                        params=params,
+                        cost_scenario=scenario_label,
+                        cv_method="cpcv",
+                        n_folds=splitter_n_splits(config),
+                        embargo_bars=config.embargo_bars,
+                        fold_metrics=cpcv_result["fold_metrics"],
+                        sharpe_mean=cpcv_result["sharpe_mean"],
+                        sharpe_std=cpcv_result["sharpe_std"],
+                        max_drawdown_mean=cpcv_result["max_drawdown_mean"],
+                        max_drawdown_worst=cpcv_result["max_drawdown_worst"],
+                        total_return_mean=cpcv_result["total_return_mean"],
+                        cagr_mean=cpcv_result["cagr_mean"],
+                        trade_count_total=cpcv_result["trade_count_total"],
+                        turnover=cpcv_result["turnover"],
+                        psr=cpcv_result["psr"],
+                        dsr=float("nan"),
+                        psr_n_obs=cpcv_result["psr_n_obs"],
+                        pbo_prob=cpcv_result.get("pbo_prob", float("nan")),
+                    )
+                    all_results.append(cpcv_sr)
+
+        # Compute DSR within this worker (all strategies for this asset)
+        _compute_and_attach_dsr(all_results)
+
+        # Persist results from this worker
+        orchestrator = BakeoffOrchestrator(engine, config)
+        for sr in all_results:
+            try:
+                orchestrator._persist_results(sr, experiment_name=task.experiment_name)
+            except Exception as e:
+                logger.error(
+                    f"Worker asset_id={task.asset_id}: persist failed "
+                    f"{sr.strategy_name}/{sr.cv_method}: {e}"
+                )
+
+        n_results = len(all_results)
+        logger.info(f"Worker asset_id={task.asset_id}: completed {n_results} results")
+        return [
+            {
+                "asset_id": sr.asset_id,
+                "strategy_name": sr.strategy_name,
+                "cv_method": sr.cv_method,
+                "sharpe_mean": sr.sharpe_mean,
+            }
+            for sr in all_results
+        ]
+
+    except Exception as e:
+        logger.error(f"Worker asset_id={task.asset_id}: unhandled error: {e}")
+        return []
+    finally:
+        engine.dispose()
 
 
 @dataclass
@@ -262,6 +503,396 @@ def load_strategy_data(engine: Engine, asset_id: int, tf: str) -> pd.DataFrame:
         f"range={df.index[0].date()}..{df.index[-1].date()}"
     )
     return df
+
+
+def parse_active_features(
+    yaml_path: str = "configs/feature_selection.yaml",
+) -> List[Dict[str, Any]]:
+    """
+    Parse active tier features from feature_selection.yaml.
+
+    Returns a list of dicts with keys:
+      - name: feature column name (e.g. "TEMA_0fca19a1_ama")
+      - indicator: indicator type (e.g. "TEMA")
+      - params_hash: 8-char hex hash (e.g. "0fca19a1")
+      - source: "ama_multi_tf_u" for _ama features, "features" for bar-level features
+
+    AMA feature naming convention: {INDICATOR}_{PARAMS_HASH}_ama
+    Bar-level features: ret_is_outlier, bb_ma_20, close_fracdiff (live in features table)
+    """
+    # Resolve path relative to working directory or project root
+    if not os.path.isabs(yaml_path):
+        # Try cwd first, then search upward for configs/
+        candidate = yaml_path
+        if not os.path.exists(candidate):
+            # Walk up to find project root with configs/ dir
+            cwd = os.getcwd()
+            parts = cwd.replace("\\", "/").split("/")
+            for i in range(len(parts), 0, -1):
+                root = "/".join(parts[:i])
+                candidate = os.path.join(root, yaml_path)
+                if os.path.exists(candidate):
+                    break
+            else:
+                candidate = yaml_path  # fallback, will raise FileNotFoundError
+
+    with open(candidate, "r", encoding="utf-8") as fh:
+        config = yaml.safe_load(fh)
+
+    active_entries = config.get("active", [])
+    features = []
+
+    for entry in active_entries:
+        name = entry["name"]
+
+        if name.endswith("_ama"):
+            # AMA feature: {INDICATOR}_{PARAMS_HASH}_ama
+            # Strip the trailing _ama suffix, then split on _ to get indicator + hash
+            body = name[:-4]  # remove "_ama"
+            # params_hash is always 8 hex chars; indicator is everything before the last _
+            last_underscore = body.rfind("_")
+            if last_underscore == -1:
+                logger.warning(f"Cannot parse AMA feature name: {name}; skipping")
+                continue
+            indicator = body[:last_underscore]
+            params_hash = body[last_underscore + 1 :]
+            features.append(
+                {
+                    "name": name,
+                    "indicator": indicator,
+                    "params_hash": params_hash,
+                    "source": "ama_multi_tf_u",
+                }
+            )
+        else:
+            # Bar-level feature: lives in the features table
+            features.append(
+                {
+                    "name": name,
+                    "indicator": name,
+                    "params_hash": "",
+                    "source": "features",
+                }
+            )
+
+    return features
+
+
+def load_strategy_data_with_ama(
+    engine: Engine,
+    asset_id: int,
+    tf: str,
+    ama_features: Optional[List[Dict[str, Any]]] = None,
+    yaml_path: str = "configs/feature_selection.yaml",
+) -> pd.DataFrame:
+    """
+    Load OHLCV + indicator data + AMA-derived features from DB.
+
+    Extends load_strategy_data() by joining AMA features from ama_multi_tf_u
+    onto the base DataFrame. Bar-level features (ret_is_outlier, bb_ma_20,
+    close_fracdiff) are already loaded by the base function from the features
+    table.
+
+    Parameters
+    ----------
+    engine : Engine
+        SQLAlchemy engine.
+    asset_id : int
+        Asset ID (e.g. 1 for BTC).
+    tf : str
+        Timeframe (e.g. "1D").
+    ama_features : list of dict, optional
+        Feature descriptors with keys: name, indicator, params_hash, source.
+        If None, calls parse_active_features(yaml_path) to load from YAML.
+    yaml_path : str
+        Path to feature_selection.yaml (used only if ama_features is None).
+
+    Returns
+    -------
+    pd.DataFrame
+        Indexed by ts (UTC-aware). Contains all OHLCV + local indicators +
+        active AMA features joined on ts index.
+    """
+    if ama_features is None:
+        ama_features = parse_active_features(yaml_path)
+
+    # Load base OHLCV + bar-level indicators
+    df = load_strategy_data(engine, asset_id, tf)
+
+    if df.empty:
+        return df
+
+    # Join AMA features from ama_multi_tf_u in a single batch query
+    ama_only = [f for f in ama_features if f["source"] == "ama_multi_tf_u"]
+
+    if ama_only:
+        # Build (indicator, params_hash_prefix) pairs for IN clause
+        pairs = [(f["indicator"], f["params_hash"][:8]) for f in ama_only]
+        # Map (indicator, hash_prefix) -> feature_name for pivot
+        pair_to_name = {
+            (f["indicator"], f["params_hash"][:8]): f["name"] for f in ama_only
+        }
+
+        # Build VALUES list for the filter
+        values_parts = []
+        bind_params: dict = {"asset_id": asset_id, "tf": tf}
+        for i, (ind, ph) in enumerate(pairs):
+            bind_params[f"ind_{i}"] = ind
+            bind_params[f"ph_{i}"] = ph
+            values_parts.append(f"(:ind_{i}, :ph_{i})")
+        values_clause = ", ".join(values_parts)
+
+        sql = text(
+            f"""
+            SELECT ts, indicator, LEFT(params_hash, 8) AS ph, ama
+            FROM public.ama_multi_tf_u
+            WHERE id = :asset_id
+              AND venue_id = 1
+              AND tf = :tf
+              AND (indicator, LEFT(params_hash, 8)) IN ({values_clause})
+            ORDER BY ts
+            """
+        )
+
+        with engine.connect() as conn:
+            batch_df = pd.read_sql(sql, conn, params=bind_params)
+
+        if not batch_df.empty:
+            batch_df["ts"] = pd.to_datetime(batch_df["ts"], utc=True)
+            # Pivot: each (indicator, ph) pair becomes a column
+            for (ind, ph), feat_name in pair_to_name.items():
+                mask = (batch_df["indicator"] == ind) & (batch_df["ph"] == ph)
+                feat_slice = batch_df.loc[mask, ["ts", "ama"]].copy()
+                if feat_slice.empty:
+                    logger.warning(
+                        f"No AMA data for feature '{feat_name}' "
+                        f"(asset_id={asset_id}, tf={tf}, indicator={ind}, "
+                        f"params_hash={ph})"
+                    )
+                    df[feat_name] = float("nan")
+                    continue
+                feat_series = feat_slice.set_index("ts")["ama"].rename(feat_name)
+                df = df.join(feat_series, how="left")
+                logger.debug(
+                    f"Joined AMA feature '{feat_name}': "
+                    f"{feat_series.notna().sum()} non-null values"
+                )
+        else:
+            logger.warning(
+                f"No AMA data returned for asset_id={asset_id}, tf={tf} "
+                f"({len(ama_only)} features requested)"
+            )
+            for f in ama_only:
+                df[f["name"]] = float("nan")
+
+    n_ama = len(ama_only)
+    n_bar = len([f for f in ama_features if f["source"] == "features"])
+    logger.info(
+        f"load_strategy_data_with_ama: asset_id={asset_id}, tf={tf}, "
+        f"{n_ama} AMA features + {n_bar} bar-level features joined, "
+        f"total columns={len(df.columns)}"
+    )
+    return df
+
+
+def load_universal_ic_weights(
+    yaml_path: str = "configs/feature_selection.yaml",
+) -> dict[str, float]:
+    """
+    Load universal IC-IR weights from feature_selection.yaml (active tier).
+
+    Reads ic_ir_mean from each active feature entry, clips negatives to 0,
+    and normalizes so weights sum to 1.0.
+
+    Parameters
+    ----------
+    yaml_path : str
+        Path to feature_selection.yaml. Resolved relative to project root if
+        not absolute.
+
+    Returns
+    -------
+    dict[str, float]
+        feature_name -> normalized IC-IR weight. Sums to 1.0.
+        Empty dict if no active features or all IC-IR are <= 0.
+    """
+    active_features = parse_active_features(yaml_path)
+
+    # Build yaml config to read ic_ir_mean directly
+    if not os.path.isabs(yaml_path):
+        candidate = yaml_path
+        if not os.path.exists(candidate):
+            cwd = os.getcwd()
+            parts = cwd.replace("\\", "/").split("/")
+            for i in range(len(parts), 0, -1):
+                root = "/".join(parts[:i])
+                candidate = os.path.join(root, yaml_path)
+                if os.path.exists(candidate):
+                    break
+            else:
+                candidate = yaml_path
+    else:
+        candidate = yaml_path
+
+    with open(candidate, "r", encoding="utf-8") as fh:
+        config = yaml.safe_load(fh)
+
+    # Build name -> ic_ir_mean lookup from the raw YAML
+    ic_ir_by_name: dict[str, float] = {}
+    for entry in config.get("active", []):
+        name = entry.get("name", "")
+        ic_ir = float(entry.get("ic_ir_mean", 0.0))
+        ic_ir_by_name[name] = ic_ir
+
+    weights_raw: dict[str, float] = {}
+    for feat in active_features:
+        name = feat["name"]
+        ic_ir = ic_ir_by_name.get(name, 0.0)
+        weights_raw[name] = max(0.0, ic_ir)  # clip negative IC-IR to 0
+
+    total = sum(weights_raw.values())
+    if total <= 0.0:
+        logger.warning(
+            "load_universal_ic_weights: all IC-IR values are <= 0; "
+            "returning equal weights"
+        )
+        n = len(weights_raw)
+        return {name: 1.0 / n for name in weights_raw} if n > 0 else {}
+
+    return {name: w / total for name, w in weights_raw.items()}
+
+
+def load_per_asset_ic_weights(
+    engine: "Engine",
+    features: list[str],
+    tf: str = "1D",
+    horizon: int = 1,
+    return_type: str = "arith",
+) -> "pd.DataFrame":
+    """
+    Load per-asset IC-IR weights from ic_results.
+
+    Queries ic_results for the given features, timeframe, horizon, and
+    return_type (full-sample regime='all'), pivots to a wide DataFrame
+    (asset_id x feature_name), normalizes each row to sum to 1.0, and
+    falls back to universal IC-IR weights (from feature_selection.yaml)
+    where per-asset data is missing.
+
+    Parameters
+    ----------
+    engine : Engine
+        SQLAlchemy engine.
+    features : list[str]
+        Feature names to load IC-IR for.
+    tf : str
+        Timeframe (default "1D").
+    horizon : int
+        IC horizon (default 1, i.e., 1-bar forward return).
+    return_type : str
+        Return type used in IC calculation (default "arith").
+
+    Returns
+    -------
+    pd.DataFrame
+        Rows = asset_id (integer index), columns = feature names,
+        values = normalized IC-IR weights (sum to 1.0 per row).
+        Returns empty DataFrame if ic_results has no data.
+    """
+    if not features:
+        return pd.DataFrame()
+
+    # Build a parameterized ANY() query using a JSON array cast
+    features_literal = "{" + ",".join(f"{f}" for f in features) + "}"
+
+    sql = text(
+        """
+        SELECT asset_id,
+               feature,
+               AVG(ABS(ic_ir)) AS mean_abs_ic_ir
+        FROM public.ic_results
+        WHERE feature = ANY(CAST(:features AS TEXT[]))
+          AND tf = :tf
+          AND horizon = :horizon
+          AND return_type = :return_type
+          AND regime_col = 'all'
+          AND regime_label = 'all'
+          AND ic IS NOT NULL
+        GROUP BY asset_id, feature
+        ORDER BY asset_id, feature
+        """
+    )
+
+    with engine.connect() as conn:
+        df = pd.read_sql(
+            sql,
+            conn,
+            params={
+                "features": features_literal,
+                "tf": tf,
+                "horizon": horizon,
+                "return_type": return_type,
+            },
+        )
+
+    if df.empty:
+        logger.warning(
+            "load_per_asset_ic_weights: no ic_results rows for tf=%s horizon=%d "
+            "return_type=%s; returning empty DataFrame",
+            tf,
+            horizon,
+            return_type,
+        )
+        return pd.DataFrame()
+
+    # Pivot to wide format: asset_id x feature_name
+    pivot = df.pivot(index="asset_id", columns="feature", values="mean_abs_ic_ir")
+    pivot.columns.name = None  # remove MultiIndex label
+
+    # Fill columns missing from pivot (features with no per-asset data)
+    for feat in features:
+        if feat not in pivot.columns:
+            pivot[feat] = float("nan")
+    pivot = pivot[features]  # reorder to match requested feature order
+
+    # Load universal weights as fallback for missing per-asset data
+    universal = load_universal_ic_weights()
+    universal_series = pd.Series(
+        {feat: universal.get(feat, 0.0) for feat in features}, dtype=float
+    )
+
+    # Fill NaN cells with universal IC-IR (un-normalized; we'll normalize per row)
+    for feat in features:
+        univ_val = universal_series.get(feat, 0.0)
+        pivot[feat] = pivot[feat].fillna(univ_val)
+
+    # Clip negative IC-IR to 0
+    pivot = pivot.clip(lower=0.0)
+
+    # Normalize per row: each row sums to 1.0
+    row_sums = pivot.sum(axis=1)
+    # Where row_sum is 0 (all zeros), fall back to equal weights
+    equal_weight = 1.0 / len(features) if features else 0.0
+    for asset_id in pivot.index:
+        row_sum = row_sums[asset_id]
+        if row_sum <= 0.0:
+            logger.warning(
+                "load_per_asset_ic_weights: asset_id=%d has all-zero IC-IR; "
+                "using equal weights",
+                asset_id,
+            )
+            pivot.loc[asset_id] = equal_weight
+        else:
+            pivot.loc[asset_id] = pivot.loc[asset_id] / row_sum
+
+    logger.info(
+        "load_per_asset_ic_weights: %d assets x %d features (tf=%s horizon=%d return_type=%s)",
+        len(pivot),
+        len(features),
+        tf,
+        horizon,
+        return_type,
+    )
+    return pivot
 
 
 def _add_local_indicators(df: pd.DataFrame) -> None:
@@ -619,6 +1250,11 @@ class BakeoffOrchestrator:
         strategies: Dict[str, Tuple[Callable, List[Dict[str, Any]]]],
         asset_ids: Sequence[int],
         tf: str = "1D",
+        ama_features: Optional[List[Dict[str, Any]]] = None,
+        experiment_name: Optional[str] = None,
+        workers: int = 1,
+        per_asset_weight_matrix: Optional[Any] = None,
+        perasset_param_grid: Optional[List[Dict[str, Any]]] = None,
     ) -> List[StrategyResult]:
         """
         Run the full bake-off for all strategies x assets x cost scenarios.
@@ -631,17 +1267,55 @@ class BakeoffOrchestrator:
             Asset IDs to evaluate (typically [1, 1027] for BTC/ETH).
         tf : str
             Timeframe (e.g. "1D").
+        ama_features : list of dict, optional
+            AMA feature descriptors from parse_active_features(). When provided,
+            load_strategy_data_with_ama() is used instead of load_strategy_data()
+            so AMA columns are available in the DataFrame for AMA signal functions
+            and expression engine experiments.
+        experiment_name : str, optional
+            Lineage tag stored in strategy_bakeoff_results.experiment_name.
+            Use a descriptive name such as "phase82-ama-v1" for traceability.
+            Passed through to _persist_results().
+        workers : int
+            Number of parallel worker processes (default 1 = sequential).
+            Each worker creates its own NullPool engine for DB access.
+        per_asset_weight_matrix : pd.DataFrame, optional
+            Per-asset IC-IR weight matrix (rows=asset_id, cols=features).
+            When provided with workers > 1, each worker injects its own
+            per-asset weighted ama_momentum_perasset strategy variant.
+        perasset_param_grid : list of dict, optional
+            Param grid for the perasset strategy variant.
 
         Returns
         -------
         List[StrategyResult]
             One result per (strategy x asset x params x cost_scenario x cv_method).
+            In parallel mode, results are persisted by workers; returned list
+            contains summary dicts instead of full StrategyResult objects.
         """
+        if workers > 1:
+            return self._run_parallel(
+                strategies,
+                asset_ids,
+                tf,
+                ama_features,
+                experiment_name,
+                workers,
+                per_asset_weight_matrix=per_asset_weight_matrix,
+                perasset_param_grid=perasset_param_grid,
+            )
+
         all_results: List[StrategyResult] = []
 
         for asset_id in asset_ids:
             logger.info(f"Loading data for asset_id={asset_id}, tf={tf}")
-            df = load_strategy_data(self.engine, asset_id, tf)
+            # Use AMA-extended loader when AMA features are requested
+            if ama_features is not None:
+                df = load_strategy_data_with_ama(
+                    self.engine, asset_id, tf, ama_features
+                )
+            else:
+                df = load_strategy_data(self.engine, asset_id, tf)
 
             if df.empty or len(df) < self.config.min_bars:
                 logger.warning(
@@ -652,30 +1326,36 @@ class BakeoffOrchestrator:
 
             t1_series = build_t1_series(df.index, holding_bars=1)
 
+            # Batch-load existing keys for dedup (1 query per asset vs N per tuple)
+            existing_keys: set = set()
+            if not self.config.overwrite:
+                existing_keys = self._batch_existing_keys(asset_id, tf)
+
             for strategy_name, (signal_fn, param_grid) in strategies.items():
                 logger.info(
                     f"Strategy '{strategy_name}' on asset_id={asset_id}, tf={tf}: "
                     f"{len(param_grid)} param set(s) x {len(self.config.get_cost_matrix())} cost scenarios"
                 )
 
+                # --- Phase 1: Run all PKF backtests ---
+                pkf_collected: list = []
                 for params in param_grid:
                     for cost in self.config.get_cost_matrix():
                         scenario_label = cost_scenario_label(cost)
+                        params_json = json.dumps(params, sort_keys=True)
 
-                        # Skip if already computed (unless overwrite=True)
-                        if not self.config.overwrite:
-                            if self._row_exists(
-                                strategy_name,
-                                asset_id,
-                                tf,
-                                params,
-                                scenario_label,
-                                "purged_kfold",
-                            ):
-                                logger.debug(
-                                    f"  Skipping {strategy_name}/{scenario_label}/purged_kfold (exists)"
-                                )
-                                continue
+                        # Batch dedup check (O(1) set lookup)
+                        pkf_key = (
+                            strategy_name,
+                            params_json,
+                            scenario_label,
+                            "purged_kfold",
+                        )
+                        if existing_keys and pkf_key in existing_keys:
+                            logger.debug(
+                                f"  Skipping {strategy_name}/{scenario_label}/purged_kfold (exists)"
+                            )
+                            continue
 
                         # --- Purged K-fold ---
                         logger.info(
@@ -691,8 +1371,6 @@ class BakeoffOrchestrator:
                             )
                             continue
 
-                        # Collect all Sharpe estimates across strategies for DSR
-                        # (will be updated after all strategies run for a given asset/tf/cost)
                         pkf_result["dsr"] = float("nan")  # placeholder
 
                         pkf_sr = StrategyResult(
@@ -718,61 +1396,92 @@ class BakeoffOrchestrator:
                             psr_n_obs=pkf_result["psr_n_obs"],
                             pbo_prob=pkf_result["pbo_prob"],
                         )
-
-                        # --- CPCV ---
-                        cpcv_exists = self._row_exists(
-                            strategy_name, asset_id, tf, params, scenario_label, "cpcv"
-                        )
-                        if not self.config.overwrite and cpcv_exists:
-                            logger.debug(
-                                f"  Skipping {strategy_name}/{scenario_label}/cpcv (exists)"
-                            )
-                            cpcv_sr = None
-                        else:
-                            logger.info(f"  cpcv: {strategy_name} / {scenario_label}")
-                            try:
-                                cpcv_result = run_cpcv_backtest(
-                                    df, signal_fn, params, t1_series, cost, self.config
-                                )
-                            except Exception as e:
-                                logger.error(
-                                    f"  cpcv failed for {strategy_name}/{scenario_label}: {e}"
-                                )
-                                cpcv_result = None
-
-                            if cpcv_result is not None:
-                                cpcv_result["dsr"] = float("nan")
-                                cpcv_sr = StrategyResult(
-                                    strategy_name=strategy_name,
-                                    asset_id=asset_id,
-                                    tf=tf,
-                                    params=params,
-                                    cost_scenario=scenario_label,
-                                    cv_method="cpcv",
-                                    n_folds=splitter_n_splits(self.config),
-                                    embargo_bars=self.config.embargo_bars,
-                                    fold_metrics=cpcv_result["fold_metrics"],
-                                    sharpe_mean=cpcv_result["sharpe_mean"],
-                                    sharpe_std=cpcv_result["sharpe_std"],
-                                    max_drawdown_mean=cpcv_result["max_drawdown_mean"],
-                                    max_drawdown_worst=cpcv_result[
-                                        "max_drawdown_worst"
-                                    ],
-                                    total_return_mean=cpcv_result["total_return_mean"],
-                                    cagr_mean=cpcv_result["cagr_mean"],
-                                    trade_count_total=cpcv_result["trade_count_total"],
-                                    turnover=cpcv_result["turnover"],
-                                    psr=cpcv_result["psr"],
-                                    dsr=cpcv_result.get("dsr", float("nan")),
-                                    psr_n_obs=cpcv_result["psr_n_obs"],
-                                    pbo_prob=cpcv_result.get("pbo_prob", float("nan")),
-                                )
-                            else:
-                                cpcv_sr = None
-
                         all_results.append(pkf_sr)
-                        if cpcv_sr is not None:
-                            all_results.append(cpcv_sr)
+                        pkf_collected.append(
+                            (params, params_json, cost, scenario_label, pkf_sr)
+                        )
+
+                # --- Phase 2: Run CPCV selectively ---
+                cpcv_top_n = self.config.cpcv_top_n
+                if cpcv_top_n == -1:
+                    # Skip CPCV entirely
+                    continue
+
+                # Determine which params get CPCV
+                cpcv_candidates = set()
+                if cpcv_top_n > 0 and pkf_collected:
+                    # Rank params by mean PKF sharpe across cost scenarios
+                    from collections import defaultdict
+                    from statistics import mean as _mean
+
+                    param_sharpes: dict = defaultdict(list)
+                    for _, pj, _, _, sr in pkf_collected:
+                        param_sharpes[pj].append(sr.sharpe_mean)
+                    ranked = sorted(
+                        param_sharpes,
+                        key=lambda k: _mean(param_sharpes[k]),
+                        reverse=True,
+                    )
+                    cpcv_candidates = set(ranked[:cpcv_top_n])
+                    logger.info(
+                        f"  CPCV top-{cpcv_top_n}: running CPCV for "
+                        f"{len(cpcv_candidates)}/{len(param_sharpes)} param sets"
+                    )
+
+                for params, params_json, cost, scenario_label, _ in pkf_collected:
+                    # Filter to top-N params when cpcv_top_n > 0
+                    if cpcv_top_n > 0 and params_json not in cpcv_candidates:
+                        continue
+
+                    cpcv_key = (
+                        strategy_name,
+                        params_json,
+                        scenario_label,
+                        "cpcv",
+                    )
+                    if existing_keys and cpcv_key in existing_keys:
+                        logger.debug(
+                            f"  Skipping {strategy_name}/{scenario_label}/cpcv (exists)"
+                        )
+                        continue
+
+                    logger.info(f"  cpcv: {strategy_name} / {scenario_label}")
+                    try:
+                        cpcv_result = run_cpcv_backtest(
+                            df, signal_fn, params, t1_series, cost, self.config
+                        )
+                    except Exception as e:
+                        logger.error(
+                            f"  cpcv failed for {strategy_name}/{scenario_label}: {e}"
+                        )
+                        continue
+
+                    if cpcv_result is not None:
+                        cpcv_result["dsr"] = float("nan")
+                        cpcv_sr = StrategyResult(
+                            strategy_name=strategy_name,
+                            asset_id=asset_id,
+                            tf=tf,
+                            params=params,
+                            cost_scenario=scenario_label,
+                            cv_method="cpcv",
+                            n_folds=splitter_n_splits(self.config),
+                            embargo_bars=self.config.embargo_bars,
+                            fold_metrics=cpcv_result["fold_metrics"],
+                            sharpe_mean=cpcv_result["sharpe_mean"],
+                            sharpe_std=cpcv_result["sharpe_std"],
+                            max_drawdown_mean=cpcv_result["max_drawdown_mean"],
+                            max_drawdown_worst=cpcv_result["max_drawdown_worst"],
+                            total_return_mean=cpcv_result["total_return_mean"],
+                            cagr_mean=cpcv_result["cagr_mean"],
+                            trade_count_total=cpcv_result["trade_count_total"],
+                            turnover=cpcv_result["turnover"],
+                            psr=cpcv_result["psr"],
+                            dsr=cpcv_result.get("dsr", float("nan")),
+                            psr_n_obs=cpcv_result["psr_n_obs"],
+                            pbo_prob=cpcv_result.get("pbo_prob", float("nan")),
+                        )
+                        all_results.append(cpcv_sr)
 
         # --- Compute DSR across all strategies for the same asset/tf/cost combo ---
         _compute_and_attach_dsr(all_results)
@@ -780,7 +1489,7 @@ class BakeoffOrchestrator:
         # --- Persist results ---
         for sr in all_results:
             try:
-                self._persist_results(sr)
+                self._persist_results(sr, experiment_name=experiment_name)
             except Exception as e:
                 logger.error(
                     f"Failed to persist {sr.strategy_name}/{sr.cv_method}: {e}"
@@ -788,45 +1497,125 @@ class BakeoffOrchestrator:
 
         return all_results
 
-    def _row_exists(
+    def _batch_existing_keys(
         self,
-        strategy_name: str,
         asset_id: int,
         tf: str,
-        params: Dict[str, Any],
-        cost_scenario: str,
-        cv_method: str,
-    ) -> bool:
-        """Check if a result row already exists in strategy_bakeoff_results."""
-        params_json = json.dumps(params, sort_keys=True)
+    ) -> set:
+        """Load all existing result keys for (asset_id, tf) in one query.
+
+        Returns a set of (strategy_name, params_json_text, cost_scenario,
+        cv_method) tuples for O(1) membership checks.
+        """
         sql = text(
             """
-            SELECT 1 FROM public.strategy_bakeoff_results
-            WHERE strategy_name = :strategy_name
-              AND asset_id = :asset_id
-              AND tf = :tf
-              AND params_json = CAST(:params_json AS jsonb)
-              AND cost_scenario = :cost_scenario
-              AND cv_method = :cv_method
-            LIMIT 1
+            SELECT strategy_name, params_json::text, cost_scenario, cv_method
+            FROM public.strategy_bakeoff_results
+            WHERE asset_id = :asset_id AND tf = :tf
             """
         )
         with self.engine.connect() as conn:
-            result = conn.execute(
-                sql,
-                {
-                    "strategy_name": strategy_name,
-                    "asset_id": asset_id,
-                    "tf": tf,
-                    "params_json": params_json,
-                    "cost_scenario": cost_scenario,
-                    "cv_method": cv_method,
-                },
-            )
-            return result.fetchone() is not None
+            rows = conn.execute(sql, {"asset_id": asset_id, "tf": tf}).fetchall()
+        return {(r[0], r[1], r[2], r[3]) for r in rows}
 
-    def _persist_results(self, sr: StrategyResult) -> None:
-        """Persist a StrategyResult to strategy_bakeoff_results."""
+    def _run_parallel(
+        self,
+        strategies: Dict[str, Tuple[Callable, List[Dict[str, Any]]]],
+        asset_ids: Sequence[int],
+        tf: str,
+        ama_features: Optional[List[Dict[str, Any]]],
+        experiment_name: Optional[str],
+        workers: int,
+        per_asset_weight_matrix: Optional[Any] = None,
+        perasset_param_grid: Optional[List[Dict[str, Any]]] = None,
+    ) -> List[StrategyResult]:
+        """Run bake-off with multiprocessing across assets.
+
+        Each worker gets one asset and runs all strategies/params/costs
+        for that asset, then persists results to DB directly.
+        """
+        db_url = str(self.engine.url.render_as_string(hide_password=False))
+
+        # Serialize config (exclude non-picklable cost_matrix objects)
+        config_dict = {
+            "n_folds": self.config.n_folds,
+            "embargo_bars": self.config.embargo_bars,
+            "cpcv_n_test_splits": self.config.cpcv_n_test_splits,
+            "freq_per_year": self.config.freq_per_year,
+            "cost_matrix": self.config.cost_matrix,
+            "spot_only": self.config.spot_only,
+            "exchange": self.config.exchange,
+            "price_col": self.config.price_col,
+            "min_bars": self.config.min_bars,
+            "overwrite": self.config.overwrite,
+            "cpcv_top_n": self.config.cpcv_top_n,
+        }
+
+        # Pre-load existing keys for all assets (batch, not per-asset)
+        all_existing: Dict[int, set] = {}
+        if not self.config.overwrite:
+            for aid in asset_ids:
+                all_existing[aid] = self._batch_existing_keys(aid, tf)
+
+        tasks = []
+        for aid in asset_ids:
+            # Per-asset weights: extract this asset's row as a list
+            pw = None
+            if (
+                per_asset_weight_matrix is not None
+                and aid in per_asset_weight_matrix.index
+            ):
+                pw = per_asset_weight_matrix.loc[aid].tolist()
+            tasks.append(
+                BakeoffAssetTask(
+                    asset_id=aid,
+                    db_url=db_url,
+                    strategies=strategies,
+                    tf=tf,
+                    config_dict=config_dict,
+                    ama_features=ama_features,
+                    experiment_name=experiment_name,
+                    existing_keys=all_existing.get(aid, set()),
+                    perasset_weights=pw,
+                    perasset_param_grid=perasset_param_grid,
+                )
+            )
+
+        logger.info(f"Launching {workers} workers for {len(tasks)} assets")
+
+        # Use maxtasksperchild=1 on Windows (project convention)
+        with multiprocessing.Pool(processes=workers, maxtasksperchild=1) as pool:
+            summaries = []
+            for result_list in pool.imap_unordered(_bakeoff_asset_worker, tasks):
+                summaries.extend(result_list)
+                completed = len({s["asset_id"] for s in summaries})
+                logger.info(
+                    f"Progress: {completed}/{len(tasks)} assets complete, "
+                    f"{len(summaries)} total results"
+                )
+
+        logger.info(
+            f"Parallel bake-off complete: {len(summaries)} results "
+            f"from {len(tasks)} assets"
+        )
+        # Results are already persisted by workers; return summaries
+        return summaries  # type: ignore[return-value]
+
+    def _persist_results(
+        self, sr: StrategyResult, experiment_name: Optional[str] = None
+    ) -> None:
+        """
+        Persist a StrategyResult to strategy_bakeoff_results.
+
+        Parameters
+        ----------
+        sr : StrategyResult
+            Aggregated bake-off result to persist.
+        experiment_name : str, optional
+            Experiment lineage tag (e.g. "phase82-ema-v1"). Stored in
+            strategy_bakeoff_results.experiment_name for lineage tracking.
+            When None, inserts NULL.
+        """
         params_json = json.dumps(sr.params, sort_keys=True)
 
         # Build fold_metrics_json
@@ -854,7 +1643,8 @@ class BakeoffOrchestrator:
                 n_folds, embargo_bars,
                 sharpe_mean, sharpe_std, max_drawdown_mean, max_drawdown_worst,
                 total_return_mean, cagr_mean, trade_count_total, turnover,
-                psr, dsr, psr_n_obs, pbo_prob, fold_metrics_json
+                psr, dsr, psr_n_obs, pbo_prob, fold_metrics_json,
+                experiment_name
             )
             VALUES (
                 :strategy_name, :asset_id, :tf,
@@ -863,7 +1653,8 @@ class BakeoffOrchestrator:
                 :sharpe_mean, :sharpe_std, :max_drawdown_mean, :max_drawdown_worst,
                 :total_return_mean, :cagr_mean, :trade_count_total, :turnover,
                 :psr, :dsr, :psr_n_obs, :pbo_prob,
-                CAST(:fold_metrics_json AS jsonb)
+                CAST(:fold_metrics_json AS jsonb),
+                :experiment_name
             )
             ON CONFLICT (strategy_name, asset_id, tf, params_json, cost_scenario, cv_method)
             DO UPDATE SET
@@ -882,6 +1673,7 @@ class BakeoffOrchestrator:
                 psr_n_obs = EXCLUDED.psr_n_obs,
                 pbo_prob = EXCLUDED.pbo_prob,
                 fold_metrics_json = EXCLUDED.fold_metrics_json,
+                experiment_name = EXCLUDED.experiment_name,
                 computed_at = now()
             """
         )
@@ -911,6 +1703,7 @@ class BakeoffOrchestrator:
                     "psr_n_obs": _to_python(sr.psr_n_obs),
                     "pbo_prob": _to_python(sr.pbo_prob),
                     "fold_metrics_json": fold_metrics_json,
+                    "experiment_name": experiment_name,
                 },
             )
 

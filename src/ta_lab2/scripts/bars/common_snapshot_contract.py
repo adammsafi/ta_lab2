@@ -62,6 +62,18 @@ def ensure_bar_table_exists(
     if "." in table_name:
         schema, table_name = table_name.split(".", 1)
 
+    # Check if table already exists — skip DDL if so (avoids index conflicts)
+    with engine.connect() as conn:
+        exists = conn.execute(
+            text(
+                "SELECT 1 FROM information_schema.tables "
+                "WHERE table_schema = :schema AND table_name = :tbl"
+            ),
+            {"schema": schema, "tbl": table_name},
+        ).fetchone()
+    if exists:
+        return
+
     ddl = _generate_bar_table_ddl(table_name, table_type=table_type, schema=schema)
 
     with engine.begin() as conn:
@@ -1356,17 +1368,21 @@ def load_daily_prices_for_id(
     id_: int,
     ts_start: pd.Timestamp | None = None,
     tz: str = "America/New_York",
-    venue: str | None = None,
+    venue_id: int | None = None,
 ) -> pd.DataFrame:
     """
     Load daily OHLCV rows for a single id from the daily table.
 
     - If ts_start is provided, only loads rows with timestamp >= ts_start
-    - If venue is provided, filters to that specific venue
-    - If venue is None, returns all venues (caller must handle)
+    - If venue_id is provided, filters to that specific venue
+    - If venue_id is None, returns all venues (caller must handle)
     - Returns rows ordered ascending by timestamp
     - Normalizes to include a 'ts' column (tz-aware UTC)
     - Enforces 1-row-per-(venue, local-day) invariant
+
+    Supports two source table formats:
+    - price_bars_1d: has venue_id, time_high, time_low, market_cap, src_name
+    - cmc_price_histories7: no venue columns, timehigh, timelow, marketcap
 
     IDENTICAL across all 5 bar builders - extracted to eliminate duplication.
 
@@ -1376,47 +1392,82 @@ def load_daily_prices_for_id(
         id_: Cryptocurrency ID
         ts_start: Optional start timestamp (only load rows >= this)
         tz: Timezone for local day validation (default: America/New_York)
-        venue: Optional venue filter (None = all venues)
+        venue_id: Optional venue_id filter (None = all venues)
 
     Returns:
-        DataFrame with daily OHLCV data, ts column in UTC
+        DataFrame with daily OHLCV data, ts column in UTC.
+        Always includes 'venue' (text) and 'venue_id' (int) columns.
     """
+    _is_bars_1d = "price_bars_1d" in daily_table
+
     where_parts = ["s.id = :id"]
     params: dict = {"id": int(id_)}
 
-    if venue is not None:
-        where_parts.append("s.venue = :venue")
-        params["venue"] = venue
+    if _is_bars_1d:
+        # price_bars_1d: filter to tf='1D' rows, use native venue_id
+        where_parts.append("s.tf = '1D'")
+        if venue_id is not None:
+            where_parts.append("s.venue_id = :venue_id")
+            params["venue_id"] = int(venue_id)
+    # cmc_price_histories7: no venue column, all rows are CMC_AGG
+
     if ts_start is not None:
         where_parts.append('s."timestamp" >= :ts_start')
         params["ts_start"] = ts_start
 
     where = "WHERE " + " AND ".join(where_parts)
 
-    sql = text(
-        f"""
-      SELECT
-        s.id,
-        s.venue,
-        s."timestamp" AS ts,
-        s.timehigh,
-        s.timelow,
-        s.open,
-        s.high,
-        s.low,
-        s.close,
-        s.volume,
-        s.marketcap AS market_cap,
-        b1d.src_name,
-        b1d.ingested_at AS src_load_ts
-      FROM {daily_table} s
-      LEFT JOIN public.price_bars_1d b1d
-        ON b1d.id = s.id AND b1d."timestamp" = s."timestamp"
-           AND b1d.venue = s.venue
-      {where}
-      ORDER BY s.venue, s."timestamp";
-    """
-    )
+    if _is_bars_1d:
+        sql = text(
+            f"""
+          SELECT
+            s.id,
+            s.venue_id,
+            v.venue,
+            s."timestamp" AS ts,
+            s.time_high  AS timehigh,
+            s.time_low   AS timelow,
+            s.open,
+            s.high,
+            s.low,
+            s.close,
+            s.volume,
+            s.market_cap,
+            s.src_name,
+            s.src_load_ts
+          FROM {daily_table} s
+          LEFT JOIN public.dim_venues v ON v.venue_id = s.venue_id
+          {where}
+          ORDER BY s.venue_id, s."timestamp";
+        """
+        )
+    else:
+        # cmc_price_histories7 path: no venue column, JOIN price_bars_1d for src info
+        sql = text(
+            f"""
+          SELECT
+            s.id,
+            1::smallint AS venue_id,
+            'CMC_AGG'   AS venue,
+            s."timestamp" AS ts,
+            s.timehigh,
+            s.timelow,
+            s.open,
+            s.high,
+            s.low,
+            s.close,
+            s.volume,
+            s.marketcap AS market_cap,
+            b1d.src_name,
+            b1d.ingested_at AS src_load_ts
+          FROM {daily_table} s
+          LEFT JOIN public.price_bars_1d b1d
+            ON b1d.id = s.id AND b1d."timestamp" = s."timestamp"
+               AND b1d.venue_id = 1 AND b1d.tf = '1D'
+          {where}
+          ORDER BY s."timestamp";
+        """
+        )
 
     eng = get_engine(db_url)
     with eng.connect() as conn:

@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - Unreleased
+
+### Added
+- **Feature Selection (Phase 80)**: IC-IR analysis of 107 candidate features; 20 promoted to active tier (IC-IR >= 1.0); AMA features dominate active tier (18/20); per-asset IC-IR variation analysis; concordance IC-IR vs MDA (rho=0.14); `dim_feature_selection` with quintile_monotonicity column; NON_STATIONARY features use 1.5x IC-IR cutoff (soft gate)
+- **GARCH Volatility (Phase 81)**: 4-variant GARCH engine (GARCH, EGARCH, GJR-GARCH, FIGARCH); Student's t distribution for crypto heavy tails; blend forecasting with RMSE-weighted model selection; carry-forward fallback with 5-day exponential decay; `garch_forecasts` and `garch_diagnostics` tables; FIGARCH requires 200+ observations for fitting
+- **Strategy Bake-Off (Phase 82)**: Multi-strategy evaluation with AMA features (KAMA, DEMA, TEMA, HMA); per-asset IC-IR weighting for Black-Litterman views; Hyperliquid cost scenarios (3/5/10 bps) vs Kraken (5/10/20 bps); CPCV and PKF cross-validation; `strategy_bakeoff_results` table; expression-based signal param grid
+- **Dashboard Research Pages (Phase 83)**: Strategy-first view with bakeoff results; signal monitor with direction/strength heatmap; asset hub with candlestick charts and EMA overlays; regime overlays on charts; sidebar reorganized into 4 logical groups (Overview, Analysis, Operations, Monitor)
+- **Dashboard Market Pages (Phase 84)**: Hyperliquid perps page with OI time series (hl_open_interest) and candles; AMA inspector with cross-asset comparison; regime dashboard with comovement; IC results landing widget; placeholder pages for Portfolio and Risk Tier
+- **Dashboard Operations Pages (Phase 85)**: Stats monitoring with pass/warn/fail counts; drawdown tracking against starting_capital; operational health view with pipeline status; auto-discovery of stats tables via information_schema
+- **Portfolio Pipeline (Phase 86)**: Stop calibration from MAE/MFE analysis (3-tier stop ladder, 2-tier TP); `stop_calibrations` table; Black-Litterman portfolio allocation with MV/CVaR/HRP methods; `portfolio_allocations` table; parity checker `--bakeoff-winners` mode (auto-discover strategies from strategy_bakeoff_results); GARCH vol integration into position sizing (sqrt(252) annualization)
+- **Pipeline Alert Wiring (Phase 87)**: IC staleness monitor (returns 0/1/2 gate code); signal anomaly gate with z-score baseline check (exit 2 = blocked); `pipeline_run_log` dead-man switch (run audit per stage); Telegram alert integration for kill switch, drift pause, and IC decay; `pipeline_alert_log` unified throttle table; `signal_anomaly_log` audit table
+- **Integration Testing (Phase 88)**: End-to-end smoke test CLI (`scripts/integration/smoke_test.py`, 26 checks across 9 stages); daily burn-in report CLI (`scripts/integration/daily_burn_in_report.py`, 8-metric ON TRACK/WARNING/STOP verdict); parity checker `--pnl-correlation-threshold` flag (default 0.99, burn-in uses 0.90); 7-day burn-in protocol documented
+- **CTF Schema (Phase 89)**: Cross-timeframe feature dimension table (`dim_ctf_indicators`); fact table (`ctf`) with base_tf x ref_tf x indicator structure; `ctf_state` watermark table; YAML config with base_tfs (1D, 2D, 3D), ref_tfs (7D through 365D), and 9 indicator families
+- **CTF Computation (Phase 90)**: Slope (linear regression coefficient), divergence (base vs ref difference), z-score (rolling normalization), agreement composites (directional alignment across timeframes); all computed from existing ta/vol/returns/features source tables
+- **CTF Pipeline (Phase 91)**: Incremental refresh with ctf_state watermark tracking; `refresh_ctf_step` integrated as Phase 2c in `run_all_feature_refreshes` (after microstructure, before CS norms); `--full-refresh` deletes and rebuilds ctf rows; CTF failure is non-fatal (pipeline continues)
+- **CTF Feature Selection (Phase 92)**: IC sweep for CTF features using same batch_compute_ic engine as Phase 80; `dim_ctf_feature_selection` table (active/watch/archive tiers, ic_ir_cutoff=0.5); CTF vs AMA redundancy check (Spearman rho=0.19, low -- CTF provides different signal); top features: macd_*_7d_agreement (IC-IR=1.29), close_fracdiff_7d (IC-IR=0.73)
+
+### Changed
+- Daily refresh pipeline expanded from 15 to 21 stages: added GARCH (Stage 11), Stop Calibration (Stage 13), Portfolio Allocation (Stage 14), IC Staleness Monitor, Signal Anomaly Gate, Pipeline Run Log, and completion alerts
+- Parity checker now accepts configurable `--pnl-correlation-threshold` flag (default 0.99 preserved; burn-in phase uses 0.90)
+- Operations manual updated for v1.2.0 pipeline: Part 2 (21-stage DAG, GARCH/stop/portfolio docs), Part 4 (parity threshold + signal anomaly gate), Part 7 (burn-in protocol + updated Gate 1 criteria)
+- Dashboard reorganized into Analysis (Research + Markets) and Operations navigation groups; 4 sidebar groups (Overview, Analysis, Operations, Monitor)
+- `run_all_feature_refreshes` extended with CTF computation as Phase 2c stage
+
 ## [1.0.0] - 2026-03-01
 
 ### Added
@@ -177,7 +201,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Regime detection framework
 - Basic EMA calculations
 
-[Unreleased]: https://github.com/adammsafi/ta_lab2/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/adammsafi/ta_lab2/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/adammsafi/ta_lab2/compare/v1.0.0...v1.2.0
 [1.0.0]: https://github.com/adammsafi/ta_lab2/compare/v0.9.0...v1.0.0
 [0.9.0]: https://github.com/adammsafi/ta_lab2/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/adammsafi/ta_lab2/compare/v0.7.0...v0.8.0
