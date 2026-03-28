@@ -35,7 +35,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
 
-DEFAULT_DAILY_TABLE = "public.cmc_price_histories7"
+DEFAULT_DAILY_TABLE = "public.price_bars_1d"
 DEFAULT_OUT_TABLE = "public.cmc_returns_d1"
 DEFAULT_STATE_TABLE = "public.cmc_returns_d1_state"
 
