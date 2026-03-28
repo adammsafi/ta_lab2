@@ -24,6 +24,9 @@ Usage:
 
     # Skip AMA sweep (faster iteration on features only)
     python -m ta_lab2.scripts.analysis.run_ic_sweep --all --skip-ama
+
+    # AMA-only sweep (skip features)
+    python -m ta_lab2.scripts.analysis.run_ic_sweep --all --ama-only
 """
 
 from __future__ import annotations
@@ -96,6 +99,28 @@ class ICWorkerTask:
     tf_days_nominal: int
     overwrite: bool
     regime: bool
+
+
+@dataclass(frozen=True)
+class AMAWorkerTask:
+    """
+    Task for a single AMA IC sweep worker process.
+
+    Frozen dataclass with only picklable types (no engine/connection objects).
+    Each worker creates its own NullPool engine from db_url.
+    """
+
+    asset_id: int
+    tf: str
+    indicator: str
+    params_hash: str
+    n_rows: int
+    db_url: str
+    horizons: tuple  # tuple[int, ...]
+    return_types: tuple  # tuple[str, ...]
+    rolling_window: int
+    tf_days_nominal: int
+    overwrite: bool
 
 
 # ---------------------------------------------------------------------------
@@ -566,6 +591,144 @@ def _ic_worker(task: ICWorkerTask) -> dict:
             engine.dispose()
 
 
+def _ama_ic_worker(task: AMAWorkerTask) -> dict:
+    """
+    Worker function for parallel AMA IC sweep.
+
+    Called by multiprocessing.Pool.imap_unordered(). Must be module-level
+    for pickling to work on Windows (spawn start method).
+
+    Creates its own engine with NullPool to prevent connection pooling
+    issues across processes.
+
+    Returns dict with {asset_id, tf, indicator, params_hash, n_written, elapsed, error}.
+    """
+    _logger = logging.getLogger(
+        f"ama_worker.{task.asset_id}.{task.tf}.{task.indicator}"
+    )
+    combo_start = time.time()
+    engine = None
+    try:
+        engine = create_engine(task.db_url, poolclass=NullPool)
+        horizons = list(task.horizons)
+        return_types = list(task.return_types)
+
+        with engine.begin() as conn:
+            ama_df, close_series = _load_ama_data_with_close(
+                conn, task.asset_id, task.tf, task.indicator, task.params_hash
+            )
+
+            if ama_df.empty or close_series.empty:
+                _logger.warning(
+                    "No AMA data for asset_id=%d tf=%s %s/%s — skipping",
+                    task.asset_id,
+                    task.tf,
+                    task.indicator,
+                    task.params_hash[:8],
+                )
+                return {
+                    "asset_id": task.asset_id,
+                    "tf": task.tf,
+                    "indicator": task.indicator,
+                    "params_hash": task.params_hash,
+                    "n_written": 0,
+                    "elapsed": time.time() - combo_start,
+                    "error": None,
+                }
+
+            train_start = ama_df.index.min()
+            train_end = ama_df.index.max()
+
+            valid_feature_cols = [c for c in ama_df.columns if ama_df[c].notna().any()]
+            if not valid_feature_cols:
+                return {
+                    "asset_id": task.asset_id,
+                    "tf": task.tf,
+                    "indicator": task.indicator,
+                    "params_hash": task.params_hash,
+                    "n_written": 0,
+                    "elapsed": time.time() - combo_start,
+                    "error": None,
+                }
+
+            ic_df = batch_compute_ic(
+                ama_df,
+                close_series,
+                train_start,
+                train_end,
+                feature_cols=valid_feature_cols,
+                horizons=horizons,
+                return_types=return_types,
+                rolling_window=task.rolling_window,
+                tf_days_nominal=task.tf_days_nominal,
+            )
+
+            all_ic_rows: list[dict] = []
+            if not ic_df.empty:
+                if "regime_col" not in ic_df.columns:
+                    ic_df["regime_col"] = "all"
+                if "regime_label" not in ic_df.columns:
+                    ic_df["regime_label"] = "all"
+                all_ic_rows.extend(
+                    _rows_from_ic_df(
+                        ic_df,
+                        task.asset_id,
+                        task.tf,
+                        train_start,
+                        train_end,
+                        task.tf_days_nominal,
+                    )
+                )
+
+            n_written = 0
+            if all_ic_rows:
+                n_written = save_ic_results(conn, all_ic_rows, overwrite=task.overwrite)
+
+            elapsed = time.time() - combo_start
+            _logger.info(
+                "asset_id=%d tf=%s %s/%s: %d IC rows in %.1fs",
+                task.asset_id,
+                task.tf,
+                task.indicator,
+                task.params_hash[:8],
+                n_written,
+                elapsed,
+            )
+            return {
+                "asset_id": task.asset_id,
+                "tf": task.tf,
+                "indicator": task.indicator,
+                "params_hash": task.params_hash,
+                "n_written": n_written,
+                "elapsed": elapsed,
+                "error": None,
+            }
+
+    except Exception as exc:
+        elapsed = time.time() - combo_start
+        _logger.error(
+            "Failed asset_id=%d tf=%s %s/%s: %s",
+            task.asset_id,
+            task.tf,
+            task.indicator,
+            task.params_hash[:8],
+            exc,
+            exc_info=True,
+        )
+        return {
+            "asset_id": task.asset_id,
+            "tf": task.tf,
+            "indicator": task.indicator,
+            "params_hash": task.params_hash,
+            "n_written": 0,
+            "elapsed": elapsed,
+            "error": str(exc),
+        }
+    finally:
+        if engine is not None:
+            engine.dispose()
+
+
 # ---------------------------------------------------------------------------
 # Main sweep functions
 # ---------------------------------------------------------------------------
@@ -860,28 +1023,106 @@ def _run_ama_sweep(
     overwrite: bool,
     asset_ids_filter: Optional[list[int]] = None,
     tf_filter: Optional[str] = None,
+    workers: int = 1,
+    db_url: Optional[str] = None,
 ) -> int:
     """
     Run IC sweep for AMA indicator columns from ama_multi_tf_u.
 
+    When workers > 1, dispatches work via multiprocessing.Pool.imap_unordered.
+    When workers == 1, runs the existing sequential path.
+
     Returns total IC rows written to DB.
     """
+    # Pre-filter combos
+    filter_set = set(asset_ids_filter) if asset_ids_filter is not None else None
+    filtered_combos = [
+        (aid, tf, ind, ph, n)
+        for aid, tf, ind, ph, n in combos
+        if (filter_set is None or aid in filter_set)
+        and (tf_filter is None or tf == tf_filter)
+    ]
+
+    if not filtered_combos:
+        logger.info("AMA sweep: no combos after filtering")
+        return 0
+
+    # --- Parallel path ---
+    if workers > 1 and len(filtered_combos) > 1:
+        if db_url is None:
+            raise ValueError(
+                "db_url is required for parallel AMA dispatch (workers > 1)"
+            )
+
+        tasks = []
+        for asset_id, tf, indicator, params_hash, n_rows in filtered_combos:
+            try:
+                tf_days_nominal = dim.tf_days(tf)
+            except (KeyError, AttributeError):
+                tf_days_nominal = 1
+
+            tasks.append(
+                AMAWorkerTask(
+                    asset_id=asset_id,
+                    tf=tf,
+                    indicator=indicator,
+                    params_hash=params_hash,
+                    n_rows=n_rows,
+                    db_url=db_url,
+                    horizons=tuple(horizons),
+                    return_types=tuple(return_types),
+                    rolling_window=rolling_window,
+                    tf_days_nominal=tf_days_nominal,
+                    overwrite=overwrite,
+                )
+            )
+
+        n_workers = min(workers, len(tasks))
+        logger.info(
+            "AMA parallel dispatch: %d tasks across %d workers",
+            len(tasks),
+            n_workers,
+        )
+
+        total_written = 0
+        n_done = 0
+        n_errors = 0
+
+        with Pool(processes=n_workers, maxtasksperchild=1) as p:
+            for result in p.imap_unordered(_ama_ic_worker, tasks):
+                n_done += 1
+                total_written += result["n_written"]
+                if result["error"]:
+                    n_errors += 1
+                if n_done % 100 == 0 or n_done == len(tasks):
+                    logger.info(
+                        "AMA progress: %d/%d done, %d rows written, %d errors",
+                        n_done,
+                        len(tasks),
+                        total_written,
+                        n_errors,
+                    )
+
+        logger.info(
+            "AMA sweep done (parallel): %d rows written, %d errors",
+            total_written,
+            n_errors,
+        )
+        return total_written
+
+    # --- Sequential path (workers == 1) ---
     total_written = 0
-    total_combos = len(combos)
+    total_combos_count = len(filtered_combos)
     skipped = 0
 
-    for idx, (asset_id, tf, indicator, params_hash, n_rows) in enumerate(combos):
-        # Apply optional filters
-        if asset_ids_filter is not None and asset_id not in set(asset_ids_filter):
-            continue
-        if tf_filter is not None and tf != tf_filter:
-            continue
-
+    for idx, (asset_id, tf, indicator, params_hash, n_rows) in enumerate(
+        filtered_combos
+    ):
         combo_start = time.time()
         logger.info(
             "[AMA %d/%d] asset_id=%d tf=%s indicator=%s params_hash=%s n_rows=%d",
             idx + 1,
-            total_combos,
+            total_combos_count,
             asset_id,
             tf,
             indicator,
@@ -1167,6 +1408,13 @@ def main() -> int:
         dest="skip_ama",
         help="Skip AMA table sweep (evaluates features only).",
     )
+    parser.add_argument(
+        "--ama-only",
+        action="store_true",
+        default=False,
+        dest="ama_only",
+        help="Skip features sweep (evaluates AMA only).",
+    )
 
     # Persistence
     parser.add_argument(
@@ -1209,7 +1457,7 @@ def main() -> int:
         metavar="N",
         dest="workers",
         help=(
-            "Number of parallel worker processes for features sweep. "
+            "Number of parallel worker processes for features and AMA sweeps. "
             "Default: 1 (sequential). Recommended: 4-8 for full sweep."
         ),
     )
@@ -1224,6 +1472,9 @@ def main() -> int:
     )
 
     args = parser.parse_args()
+
+    if args.skip_ama and args.ama_only:
+        parser.error("--skip-ama and --ama-only are mutually exclusive")
 
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
@@ -1272,40 +1523,47 @@ def main() -> int:
     total_written = 0
 
     # --- Discover qualifying pairs (separate connections, each in own transaction) ---
-    logger.info(
-        "Discovering qualifying features asset-TF pairs (min_bars=%d)...",
-        args.min_bars,
-    )
-    cmc_pairs = _discover_features_pairs(engine, args.min_bars)
-
-    # Apply scope filters for display / dry-run output
     asset_ids_set = set(args.asset_ids) if args.asset_ids else None
+    cmc_pairs: list[tuple[int, str, int]] = []
+    cmc_pairs_display: list[tuple[int, str, int]] = []
+    feature_cols: list[str] = []
 
-    cmc_pairs_display = [
-        (aid, tf, n)
-        for aid, tf, n in cmc_pairs
-        if (asset_ids_set is None or aid in asset_ids_set)
-        and (args.tf_filter is None or tf == args.tf_filter)
-    ]
-
-    logger.info("features: %d pairs qualify after scope filter", len(cmc_pairs_display))
-
-    # --- Discover feature columns ---
-    try:
-        all_cols = get_columns(engine, "public.features")
-        feature_cols = [
-            c
-            for c in all_cols
-            if c not in _NON_FEATURE_COLS and c not in _EXTRA_NON_FEATURE_COLS
-        ]
+    if not args.ama_only:
         logger.info(
-            "features: %d feature columns discovered (of %d total cols)",
-            len(feature_cols),
-            len(all_cols),
+            "Discovering qualifying features asset-TF pairs (min_bars=%d)...",
+            args.min_bars,
         )
-    except Exception as exc:
-        logger.error("Failed to discover features columns: %s", exc)
-        return 1
+        cmc_pairs = _discover_features_pairs(engine, args.min_bars)
+
+        cmc_pairs_display = [
+            (aid, tf, n)
+            for aid, tf, n in cmc_pairs
+            if (asset_ids_set is None or aid in asset_ids_set)
+            and (args.tf_filter is None or tf == args.tf_filter)
+        ]
+
+        logger.info(
+            "features: %d pairs qualify after scope filter", len(cmc_pairs_display)
+        )
+
+        # --- Discover feature columns ---
+        try:
+            all_cols = get_columns(engine, "public.features")
+            feature_cols = [
+                c
+                for c in all_cols
+                if c not in _NON_FEATURE_COLS and c not in _EXTRA_NON_FEATURE_COLS
+            ]
+            logger.info(
+                "features: %d feature columns discovered (of %d total cols)",
+                len(feature_cols),
+                len(all_cols),
+            )
+        except Exception as exc:
+            logger.error("Failed to discover features columns: %s", exc)
+            return 1
+    else:
+        logger.info("--ama-only: skipping features discovery")
 
     # --- AMA combos ---
     ama_combos: list[tuple[int, str, str, str, int]] = []
@@ -1328,9 +1586,10 @@ def main() -> int:
 
     # --- Dry run output ---
     if args.dry_run:
-        print(f"\n[DRY RUN] features qualifying pairs ({len(cmc_pairs_display)}):")
-        for asset_id, tf, n_rows in cmc_pairs_display:
-            print(f"  asset_id={asset_id} tf={tf} n_rows={n_rows}")
+        if not args.ama_only:
+            print(f"\n[DRY RUN] features qualifying pairs ({len(cmc_pairs_display)}):")
+            for asset_id, tf, n_rows in cmc_pairs_display:
+                print(f"  asset_id={asset_id} tf={tf} n_rows={n_rows}")
 
         if not args.skip_ama:
             print(f"\n[DRY RUN] AMA qualifying combos ({len(ama_combos_display)}):")
@@ -1340,38 +1599,43 @@ def main() -> int:
                     f"params_hash={params_hash[:8]} n_rows={n_rows}"
                 )
 
+        feat_label = "skipped" if args.ama_only else str(len(cmc_pairs_display))
+        ama_label = "skipped" if args.skip_ama else str(len(ama_combos_display))
         sweep_elapsed = time.time() - sweep_start
         print(
             f"\n[DRY RUN complete] "
-            f"{len(cmc_pairs_display)} features pairs, "
-            f"{len(ama_combos_display) if not args.skip_ama else 'skipped'} AMA combos "
+            f"{feat_label} features pairs, "
+            f"{ama_label} AMA combos "
             f"({sweep_elapsed:.1f}s)"
         )
         return 0
 
     # --- Source A: features sweep ---
-    logger.info(
-        "Starting features IC sweep (%d pairs, %d feature cols)...",
-        len(cmc_pairs_display),
-        len(feature_cols),
-    )
-    n_written = _run_features_sweep(
-        engine=engine,
-        pairs=cmc_pairs,
-        feature_cols=feature_cols,
-        dim=dim,
-        horizons=args.horizons,
-        return_types=args.return_types,
-        rolling_window=args.rolling_window,
-        overwrite=args.overwrite,
-        regime=args.regime,
-        asset_ids_filter=args.asset_ids,
-        tf_filter=args.tf_filter,
-        workers=args.workers,
-        db_url=db_url,
-    )
-    total_written += n_written
-    logger.info("features sweep complete: %d IC rows written", n_written)
+    if not args.ama_only:
+        logger.info(
+            "Starting features IC sweep (%d pairs, %d feature cols)...",
+            len(cmc_pairs_display),
+            len(feature_cols),
+        )
+        n_written = _run_features_sweep(
+            engine=engine,
+            pairs=cmc_pairs,
+            feature_cols=feature_cols,
+            dim=dim,
+            horizons=args.horizons,
+            return_types=args.return_types,
+            rolling_window=args.rolling_window,
+            overwrite=args.overwrite,
+            regime=args.regime,
+            asset_ids_filter=args.asset_ids,
+            tf_filter=args.tf_filter,
+            workers=args.workers,
+            db_url=db_url,
+        )
+        total_written += n_written
+        logger.info("features sweep complete: %d IC rows written", n_written)
+    else:
+        logger.info("--ama-only: features sweep skipped")
 
     # --- Source B: AMA sweep ---
     if not args.skip_ama and ama_combos:
@@ -1386,6 +1650,8 @@ def main() -> int:
             overwrite=args.overwrite,
             asset_ids_filter=args.asset_ids,
             tf_filter=args.tf_filter,
+            workers=args.workers,
+            db_url=db_url,
         )
         total_written += n_written
         logger.info("AMA sweep complete: %d IC rows written", n_written)
