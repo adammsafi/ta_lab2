@@ -11,7 +11,7 @@
 - v1.0.0 V1 Closure — Paper Trading & Validation (Phases 42-63) - SHIPPED 2026-03-01
 - v1.0.1 Macro Regime Infrastructure (Phases 64-73) - SHIPPED 2026-03-03
 - v1.1.0 Pipeline Consolidation & Storage Optimization (Phases 74-79) - SHIPPED 2026-03-21
-- v1.2.0 Analysis → Live Signals (Phases 80-92) - PLANNED
+- v1.2.0 Analysis → Live Signals (Phases 80-95) - PLANNED
 
 ## Overview
 
@@ -29,7 +29,7 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 - Phases 42-63: v1.0.0 (SHIPPED 2026-03-01)
 - Phases 64-73: v1.0.1 (SHIPPED 2026-03-03)
 - Phases 74-79: v1.1.0 (SHIPPED 2026-03-21)
-- Phases 80-92: v1.2.0 (planned)
+- Phases 80-95: v1.2.0 (planned)
 - Decimal phases (27.1, 28.1): Urgent insertions if needed
 
 <details>
@@ -1649,6 +1649,53 @@ Plans:
 - [x] 92-02-PLAN.md -- run_ctf_ic_sweep.py: batch IC computation for all CTF features across all assets and base TFs
 - [x] 92-03-PLAN.md -- run_ctf_feature_selection.py: tier classification, AMA comparison report, config pruning, DB persistence
 - [ ] 92-04-PLAN.md -- Gap closure: full-universe CTF refresh + IC sweep + feature selection re-run
+
+---
+
+### Phase 93: Fix Integration Breaks
+**Goal:** Fix the two highest-priority integration breaks from v1.2.0 audit: smoke test GARCH column bug (REQ-15) and parity check strategy coverage (3/9 → 9/9)
+**Depends on:** Phase 88 (smoke test and parity check scripts exist)
+**Gap Closure:** Closes REQ-15 (at risk), Break 1 (HIGH), Break 3 (MEDIUM) from v1.2.0 audit
+**Success Criteria** (what must be TRUE):
+  1. Smoke test GARCH stage queries use `id` (not `asset_id`) — no ProgrammingError on BTC/ETH/USDT/XRP
+  2. `python -m ta_lab2.scripts.integration.smoke_test` passes all 26 checks including GARCH stage
+  3. `_STRATEGY_SIGNAL_MAP` in parity check covers all 9 bakeoff winner strategies
+  4. `python -m ta_lab2.scripts.executor.run_parity_check` attempts parity for all 9 strategies (not just 3)
+
+Plans:
+- [ ] 93-01-PLAN.md -- Fix GARCH column bug + expand _STRATEGY_SIGNAL_MAP
+
+---
+
+### Phase 94: Wire Portfolio Dashboard to Live Data
+**Goal:** Replace mock numpy.random data in portfolio dashboard page with live portfolio_allocations from Phase 86 pipeline
+**Depends on:** Phase 86 (portfolio_allocations table populated), Phase 85 (dashboard infrastructure)
+**Gap Closure:** Closes Break 2 (MEDIUM) from v1.2.0 audit
+**Success Criteria** (what must be TRUE):
+  1. `15_portfolio.py` queries `portfolio_allocations` table via get_engine (no mock data)
+  2. Page renders live MV weights, asset allocation breakdown, and allocation history
+  3. Graceful fallback when portfolio_allocations is empty (informational message, not crash)
+  4. Dashboard page loads without error in Streamlit
+
+Plans:
+- [ ] 94-01-PLAN.md -- Wire portfolio_allocations query, replace mock data, add graceful fallback
+
+---
+
+### Phase 95: AMA-Aware IC Staleness & Real Signal Scores
+**Goal:** Make IC staleness monitor cover all 20 active features (including 18 AMA features in ama_multi_tf_u) and replace uniform signal_scores=1.0 with IC-weighted scores from feature values
+**Depends on:** Phase 87 (IC staleness infrastructure), Phase 86 (signal_scores consumer)
+**Gap Closure:** Closes Break 4 (MEDIUM) and Phase 86 tech debt (signal_scores uniform) from v1.2.0 audit
+**Success Criteria** (what must be TRUE):
+  1. IC staleness monitor loads AMA features from ama_multi_tf_u (not just features table)
+  2. ICStalenessMonitor.run() checks all 20 active features (not just 2)
+  3. BL weight-halving mechanism triggers correctly for decaying AMA features
+  4. signal_scores computed from per-asset IC-IR weights (not uniform 1.0)
+  5. Paper executor receives non-uniform signal_scores for BL view construction
+
+Plans:
+- [ ] 95-01-PLAN.md -- AMA-aware IC staleness data loader
+- [ ] 95-02-PLAN.md -- Real signal_scores from IC-IR weights, wire to paper executor
 
 ---
 *Created: 2025-01-22*
