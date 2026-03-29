@@ -179,6 +179,137 @@ def _load_price_matrix(asset_ids: list[int], tf: str, engine) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 
 
+def _load_signal_scores(
+    engine,
+    asset_ids: list[int],
+    active_features: list[dict],
+    tf: str,
+    venue_id: int = 1,
+) -> pd.DataFrame:
+    """
+    Load latest per-asset feature values for Black-Litterman signal_scores.
+
+    For bar-level features (source="features"): DISTINCT ON query from features table.
+    For AMA features (source="ama_multi_tf_u"): DISTINCT ON query using d1 column.
+
+    Returns DataFrame with index=asset_ids, columns=feature_names.
+    Missing values filled with 0.0 (neutral signal).
+    """
+    feature_names = [f["name"] for f in active_features]
+    result = pd.DataFrame(float("nan"), index=asset_ids, columns=feature_names)
+
+    if not active_features or not asset_ids:
+        return result.fillna(0.0)
+
+    # Pre-validate bar-level feature columns once
+    bar_features = [f for f in active_features if f["source"] == "features"]
+    valid_bar_cols: set[str] = set()
+    if bar_features:
+        try:
+            with engine.connect() as conn:
+                rows = conn.execute(
+                    text(
+                        "SELECT column_name FROM information_schema.columns "
+                        "WHERE table_schema = 'public' AND table_name = 'features'"
+                    )
+                ).fetchall()
+            valid_bar_cols = {r[0] for r in rows}
+        except Exception as exc:
+            logger.debug("Could not query features columns: %s", exc)
+
+    success_count = 0
+    fail_count = 0
+
+    for feat in active_features:
+        fname = feat["name"]
+        source = feat["source"]
+
+        try:
+            if source == "features":
+                col = fname
+                if col not in valid_bar_cols:
+                    logger.debug(
+                        "signal_scores: column %r not in features table, skipping.",
+                        col,
+                    )
+                    fail_count += 1
+                    continue
+                q = text(
+                    f"SELECT DISTINCT ON (f.id) f.id AS asset_id, "
+                    f'f."{col}" AS val '
+                    f"FROM public.features f "
+                    f"WHERE f.id = ANY(:ids) AND f.tf = :tf "
+                    f"AND f.venue_id = :venue_id "
+                    f"ORDER BY f.id, f.ts DESC"
+                )
+                with engine.connect() as conn:
+                    rows = conn.execute(
+                        q, {"ids": list(asset_ids), "tf": tf, "venue_id": venue_id}
+                    ).fetchall()
+
+            elif source == "ama_multi_tf_u":
+                indicator = feat["indicator"]
+                params_hash = feat["params_hash"]
+                q = text(
+                    "SELECT DISTINCT ON (a.id) a.id AS asset_id, a.d1 AS val "
+                    "FROM public.ama_multi_tf_u a "
+                    "WHERE a.id = ANY(:ids) "
+                    "AND a.tf = :tf "
+                    "AND a.venue_id = :venue_id "
+                    "AND a.indicator = :indicator "
+                    "AND LEFT(a.params_hash, 8) = :params_hash "
+                    "AND a.alignment_source = 'multi_tf' "
+                    "AND a.roll = FALSE "
+                    "ORDER BY a.id, a.ts DESC"
+                )
+                with engine.connect() as conn:
+                    rows = conn.execute(
+                        q,
+                        {
+                            "ids": list(asset_ids),
+                            "tf": tf,
+                            "venue_id": venue_id,
+                            "indicator": indicator,
+                            "params_hash": params_hash,
+                        },
+                    ).fetchall()
+            else:
+                logger.debug(
+                    "signal_scores: unknown source %r for feature %r, skipping.",
+                    source,
+                    fname,
+                )
+                fail_count += 1
+                continue
+
+            # Fill results
+            for row in rows:
+                mapping = dict(row._mapping)
+                aid = int(mapping["asset_id"])
+                val = mapping["val"]
+                if aid in result.index and val is not None:
+                    result.at[aid, fname] = float(val)
+            success_count += 1
+
+        except Exception as exc:
+            logger.debug(
+                "signal_scores: failed to load feature %r (%s): %s",
+                fname,
+                source,
+                exc,
+            )
+            fail_count += 1
+
+    logger.info(
+        "signal_scores: loaded %d/%d features successfully (%d failed).",
+        success_count,
+        len(active_features),
+        fail_count,
+    )
+
+    return result.fillna(0.0)
+
+
 def _load_market_caps(asset_ids: list[int], engine) -> pd.Series:
     """
     Load latest market cap (market_cap_usd) from the most recent 1D bar per asset.
@@ -676,23 +807,52 @@ def run_refresh(
                             applied_cols,
                         )
 
-                # Use uniform signal_scores (1.0) so all features contribute equally;
-                # per-asset IC-IR differences alone drive view heterogeneity.
-                # TODO(Phase 87): Wire real feature values as signal_scores from
-                #   features table + ama_multi_tf_u for fully live signal-weighted BL.
                 ic_ir = ic_ir_matrix  # pd.DataFrame path in BLAllocationBuilder
-                signal_scores = pd.DataFrame(
-                    1.0,
-                    index=list(prices.columns),
-                    columns=ic_ir_matrix.columns,
-                )
-                logger.info(
-                    "BL: loaded per-asset IC-IR for %d assets x %d features (tf=%s). "
-                    "Using uniform signal_scores=1.0 (Phase 87 will add real signal values).",
-                    len(ic_ir_matrix),
-                    len(ic_ir_matrix.columns),
-                    tf,
-                )
+
+                # Load real feature values as signal_scores (Phase 95).
+                try:
+                    signal_scores = _load_signal_scores(
+                        engine=engine,
+                        asset_ids=list(prices.columns),
+                        active_features=active_features,
+                        tf=tf,
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "BL: _load_signal_scores() failed (%s); "
+                        "falling back to uniform signal_scores=1.0.",
+                        exc,
+                    )
+                    signal_scores = pd.DataFrame(
+                        1.0,
+                        index=list(prices.columns),
+                        columns=ic_ir_matrix.columns,
+                    )
+
+                # Align columns with ic_ir_matrix (only features in both).
+                common_features = [
+                    c for c in ic_ir_matrix.columns if c in signal_scores.columns
+                ]
+                if not common_features:
+                    logger.warning(
+                        "BL: no common features between ic_ir_matrix and "
+                        "signal_scores. Falling back to uniform signal_scores=1.0."
+                    )
+                    signal_scores = pd.DataFrame(
+                        1.0,
+                        index=list(prices.columns),
+                        columns=ic_ir_matrix.columns,
+                    )
+                else:
+                    signal_scores = signal_scores[common_features]
+                    ic_ir = ic_ir_matrix[common_features]
+                    logger.info(
+                        "BL: loaded real signal_scores for %d assets x "
+                        "%d features (tf=%s).",
+                        len(signal_scores),
+                        len(common_features),
+                        tf,
+                    )
 
             bl_builder = BLAllocationBuilder(config=config)
             bl_result = bl_builder.run(
