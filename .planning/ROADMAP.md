@@ -1678,7 +1678,7 @@ Plans:
   4. Dashboard page loads without error in Streamlit
 
 Plans:
-- [ ] 94-01-PLAN.md -- Wire portfolio_allocations query, replace mock data, add graceful fallback
+- [x] 94-01-PLAN.md -- Wire portfolio_allocations query, replace mock data, add graceful fallback
 
 ---
 
