@@ -11,7 +11,7 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 ## Current State
 
 **Latest shipped:** v1.2.0 Analysis → Live Signals (2026-03-29)
-**Current milestone:** v1.3.0 (planning)
+**Current milestone:** v1.3.0 Operational Activation & Research Expansion
 
 **v1.2.0 delivered:** IC-based feature selection (20 active from 112), GARCH conditional volatility (4 model families), walk-forward bake-off (9 strategies, 2 exchanges), 17 Streamlit dashboard pages, live pipeline wiring (signal gates, IC staleness, BL portfolio construction with real signal scores), CTF infrastructure (73.9M rows). 16 phases, 52 plans, 19/19 requirements. Gap closure: all 4 integration breaks resolved.
 
@@ -188,14 +188,56 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 - ✓ Pass all three validation layers (time alignment, data consistency, backtest reproducibility)
 - ✓ Tag release v0.4.0
 
+### Active (v1.3.0)
+
+**Operational Activation** — make built infrastructure actually run
+- [ ] Seed dim_executor_config with active strategies from bakeoff winners
+- [ ] Wire signal generators into daily refresh pipeline
+- [ ] Schedule/auto-run paper executor
+- [ ] Portfolio construction operational end-to-end (BL → position sizing → orders)
+- [ ] Backtest-to-live parity tracking (measure live vs backtest Sharpe gap)
+- [ ] PnL attribution (alpha vs long-crypto bias)
+
+**Backtest Expansion** — scale from 2 runs to hundreds of thousands
+- [ ] Multiprocessing backtest orchestrator (resume-safe, batched)
+- [ ] Trade-level backfill for existing bakeoff strategies (~113K runs)
+- [ ] Monte Carlo confidence intervals on every run
+- [ ] CTF feature-based signal generation + backtest
+- [ ] Expanded parameter grids for existing signals
+- [ ] Backtest results reporting dashboards
+
+**CTF Research Expansion** — turn CTF infrastructure into tradeable signals
+- [ ] Graduate top CTF features to production pipeline (feature_selection.yaml)
+- [ ] Asset-specific feature selection (per-asset tier in dim_feature_selection)
+- [ ] Cross-asset CTF composites (market-wide sentiment, relative-value)
+- [ ] Lead-lag IC matrix (does Asset A's CTF predict Asset B's returns?)
+
+**Macro Expansion** — FRED equity indices
+- [ ] SP500/NASDAQ/DJIA/Russell 2000 in macro feature layer
+- [ ] Derived features (returns, vol, drawdown, MA ratios)
+- [ ] Crypto-equity correlation and risk-on/risk-off signals
+
+**ML Research** — nonlinear signal combination
+- [ ] LightGBM cross-sectional rank predictor (extend double_ensemble.py)
+- [ ] SHAP interaction analysis for feature pair discovery
+- [ ] Meta-label confidence filter (XGBoost on triple_barrier_labels)
+
+**Tech Debt Cleanup**
+- [ ] Phase 81: orphaned blend_vol_simple() in garch_blend.py
+- [ ] Phase 82: missing VERIFICATION.md
+- [ ] Phase 92: stale VERIFICATION.md
+- [ ] Phase 92: dim_ctf_feature_selection no downstream consumers (by design, deferred)
+
 ### Out of Scope
 
-- Live trading execution — no order routing, position management, or real capital deployment
+- Live trading with real capital — paper trading only until live Sharpe within 70% of backtest Sharpe
 - Derivatives (perps/options) — spot only until risk controls proven
-- ML/AI features — classical technical analysis only (ML in Year 2-3)
 - Cloud deployment — local/VM only for v1
-- Multi-venue expansion — CoinMarketCap data only for now
+- Multi-venue expansion beyond existing (CMC + HL + TVC already integrated)
 - External capital — proprietary trading only (fund/MA in Year 5+)
+- Transformer/deep learning models — deferred until P1-P3 ML proven profitable + GPU budget
+- Order flow / L2 book data — premature per strategic review
+- Funding rate arbitrage — different strategy class (delta-neutral)
 
 ## Context
 
@@ -230,4 +272,4 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 | Generalized 1D bar builder with source registry | 3 source-specific scripts are 80% identical; adding a new source requires copying an entire file | Validated — SourceSpec pattern, BAR-03 enables config-only onboarding |
 
 ---
-*Last updated: 2026-03-29 after v1.2.0 milestone shipped*
+*Last updated: 2026-03-29 after v1.3.0 milestone started*
