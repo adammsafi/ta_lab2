@@ -9,21 +9,21 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 
 ## Current Position
 
-Phase: 93-fix-integration-breaks (v1.2.0, COMPLETE)
+Phase: 94-wire-portfolio-dashboard (v1.2.0, COMPLETE)
 Plan: 01 of 01 complete
-Status: Complete. Fixed GARCH column bug in smoke_test.py and expanded parity check strategy map from 3 to 7 entries with fallback.
-Last activity: 2026-03-28 -- Phase 93 complete
+Status: Complete. Portfolio dashboard wired to live portfolio_allocations data, replacing all mock data.
+Last activity: 2026-03-28 -- Phase 94 complete
 
 Note: Phase 92 plan 04 paused at checkpoint (Task 5 human-verify).
 
-Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [#########-] 88% v1.2.0
+Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100% v0.6.0 | [##########] 100% v0.7.0 | [##########] 100% v0.8.0 | [##########] 100% v0.9.0 | [##########] 100% v1.0.0 | [##########] 100% v1.0.1 | [##########] 100% v1.1.0 | [#########-] 89% v1.2.0
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 403
+- Total plans completed: 404
 - Average duration: 7 min
-- Total execution time: ~30.9 hours
+- Total execution time: ~31.0 hours
 
 **Recent Trend:**
 - v0.8.0: 6 phases, 16 plans, ~1.2 hours
@@ -31,7 +31,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 - v1.0.0: 22 phases, 104 plans, ~14.5 hours
 - v1.0.1: 10 phases, 29 plans, ~2.0 hours
 - v1.1.0: 6 phases, 21 plans, ~2.5 hours
-- v1.2.0 (in progress): Phase 80 = 5 plans (~35 min), Phase 81 = 5 plans (~40 min), Phase 82 = 6 plans (~7h incl execution), Phase 83 = 5 plans (~25 min), Phase 84 = 5 plans (~50 min), Phase 86 = 3 plans (~18 min), Phase 87 = 4 plans (~19 min), Phase 88 = 3 plans (~20 min), Phase 93 = 1 plan (~2 min)
+- v1.2.0 (in progress): Phase 80 = 5 plans (~35 min), Phase 81 = 5 plans (~40 min), Phase 82 = 6 plans (~7h incl execution), Phase 83 = 5 plans (~25 min), Phase 84 = 5 plans (~50 min), Phase 86 = 3 plans (~18 min), Phase 87 = 4 plans (~19 min), Phase 88 = 3 plans (~20 min), Phase 93 = 1 plan (~2 min), Phase 94 = 1 plan (~4 min)
 - Trend: Stable (~5-7 min/plan)
 
 *Updated after each plan completion*
@@ -43,6 +43,11 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 Decisions are logged in PROJECT.md Key Decisions table.
 
 v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
+
+**Phase 94 decisions (plan 01):**
+- COALESCE(cmc_da_info.symbol, dim_assets.symbol) for ticker resolution in portfolio queries (matches regimes.py pattern)
+- Flat treemap layout (no strategy parents) since portfolio_allocations has no strategy column
+- Portfolio metrics panel replaces risk budget progress bars (NAV, asset count, optimizer, condition number)
 
 **Phase 93 decisions (plan 01):**
 - 7 explicit strategy-signal mappings in _STRATEGY_SIGNAL_MAP + fallback for unmapped strategies
@@ -358,10 +363,10 @@ None active.
 
 ## Session Continuity
 
-Last session: 2026-03-24
-Stopped at: Phase 88 complete (14/14 must-haves verified)
+Last session: 2026-03-28
+Stopped at: Phase 94 complete (portfolio dashboard wired to live data)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-24 (Phase 87 complete)*
+*Last updated: 2026-03-28 (Phase 94 complete)*
