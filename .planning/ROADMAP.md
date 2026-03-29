@@ -1694,8 +1694,8 @@ Plans:
   5. Paper executor receives non-uniform signal_scores for BL view construction
 
 Plans:
-- [ ] 95-01-PLAN.md -- AMA-aware IC staleness data loader
-- [ ] 95-02-PLAN.md -- Real signal_scores from IC-IR weights, wire to paper executor
+- [x] 95-01-PLAN.md -- AMA-aware IC staleness data loader
+- [x] 95-02-PLAN.md -- Real signal_scores from IC-IR weights, wire to paper executor
 
 ---
 *Created: 2025-01-22*
