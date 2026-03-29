@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 
 ## Current Position
 
-Phase: 94-wire-portfolio-dashboard (v1.2.0, COMPLETE)
-Plan: 01 of 01 complete
-Status: Complete. Portfolio dashboard wired to live portfolio_allocations data, replacing all mock data.
-Last activity: 2026-03-28 -- Phase 94 complete
+Phase: 95-ama-ic-staleness-signal-scores (v1.2.0, COMPLETE)
+Plan: 02 of 02 complete
+Status: Complete. Real per-asset signal_scores from features + ama_multi_tf_u.d1 replace uniform 1.0 in BL path.
+Last activity: 2026-03-28 -- Completed 95-02-PLAN.md
 
 Note: Phase 92 plan 04 paused at checkpoint (Task 5 human-verify).
 
@@ -21,9 +21,9 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 404
+- Total plans completed: 406
 - Average duration: 7 min
-- Total execution time: ~31.0 hours
+- Total execution time: ~31.2 hours
 
 **Recent Trend:**
 - v0.8.0: 6 phases, 16 plans, ~1.2 hours
@@ -31,7 +31,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 - v1.0.0: 22 phases, 104 plans, ~14.5 hours
 - v1.0.1: 10 phases, 29 plans, ~2.0 hours
 - v1.1.0: 6 phases, 21 plans, ~2.5 hours
-- v1.2.0 (in progress): Phase 80 = 5 plans (~35 min), Phase 81 = 5 plans (~40 min), Phase 82 = 6 plans (~7h incl execution), Phase 83 = 5 plans (~25 min), Phase 84 = 5 plans (~50 min), Phase 86 = 3 plans (~18 min), Phase 87 = 4 plans (~19 min), Phase 88 = 3 plans (~20 min), Phase 93 = 1 plan (~2 min), Phase 94 = 1 plan (~4 min)
+- v1.2.0 (in progress): Phase 80 = 5 plans (~35 min), Phase 81 = 5 plans (~40 min), Phase 82 = 6 plans (~7h incl execution), Phase 83 = 5 plans (~25 min), Phase 84 = 5 plans (~50 min), Phase 86 = 3 plans (~18 min), Phase 87 = 4 plans (~19 min), Phase 88 = 3 plans (~20 min), Phase 93 = 1 plan (~2 min), Phase 94 = 1 plan (~4 min), Phase 95 = 2 plans (~10 min), Phase 95 = 1 plan (~4 min)
 - Trend: Stable (~5-7 min/plan)
 
 *Updated after each plan completion*
@@ -43,6 +43,18 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 Decisions are logged in PROJECT.md Key Decisions table.
 
 v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
+
+**Phase 95 decisions (plan 01):**
+- Reuse parse_active_features() from bakeoff_orchestrator (single source of truth for AMA naming convention parsing)
+- Separate _load_ama_feature() helper for ama_multi_tf_u query logic (clean branch separation in _load_close_and_feature)
+- 17 AMA + 3 bar-level = 20 total active features (plan estimated 18 AMA + 2 bar-level; actual counts from feature_selection.yaml)
+
+**Phase 95 decisions (plan 02):**
+- d1 (first derivative) from ama_multi_tf_u used as AMA signal value -- stationary momentum signal per research recommendation
+- Missing feature values filled with 0.0 (neutral signal) rather than dropping assets
+- Column alignment via common_features intersection between signal_scores and ic_ir_matrix
+- Per-feature try/except in _load_signal_scores so one DB failure does not break all features
+- information_schema column validation before dynamic SQL column reference for bar-level features
 
 **Phase 94 decisions (plan 01):**
 - COALESCE(cmc_da_info.symbol, dim_assets.symbol) for ticker resolution in portfolio queries (matches regimes.py pattern)
@@ -364,9 +376,9 @@ None active.
 ## Session Continuity
 
 Last session: 2026-03-28
-Stopped at: Phase 94 complete (portfolio dashboard wired to live data)
+Stopped at: Phase 95 complete (real signal_scores in BL path)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-28 (Phase 94 complete)*
+*Last updated: 2026-03-28 (Phase 95 complete)*
