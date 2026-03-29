@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 
 ## Current Position
 
-Phase: 88-integration-testing-go-live (v1.2.0, COMPLETE)
-Plan: 03 of 03 complete
-Status: Complete. All 3 plans executed: smoke test + parity threshold, daily burn-in report, operations manual + CHANGELOG + v1.2.0-REQUIREMENTS.md. Verified 14/14 must-haves.
-Last activity: 2026-03-24 -- Phase 88 complete
+Phase: 93-fix-integration-breaks (v1.2.0, COMPLETE)
+Plan: 01 of 01 complete
+Status: Complete. Fixed GARCH column bug in smoke_test.py and expanded parity check strategy map from 3 to 7 entries with fallback.
+Last activity: 2026-03-28 -- Phase 93 complete
 
 Note: Phase 92 plan 04 paused at checkpoint (Task 5 human-verify).
 
@@ -21,7 +21,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 402
+- Total plans completed: 403
 - Average duration: 7 min
 - Total execution time: ~30.9 hours
 
@@ -31,7 +31,7 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 - v1.0.0: 22 phases, 104 plans, ~14.5 hours
 - v1.0.1: 10 phases, 29 plans, ~2.0 hours
 - v1.1.0: 6 phases, 21 plans, ~2.5 hours
-- v1.2.0 (in progress): Phase 80 = 5 plans (~35 min), Phase 81 = 5 plans (~40 min), Phase 82 = 6 plans (~7h incl execution), Phase 83 = 5 plans (~25 min), Phase 84 = 5 plans (~50 min), Phase 86 = 3 plans (~18 min), Phase 87 = 4 plans (~19 min), Phase 88 = 3 plans (~20 min)
+- v1.2.0 (in progress): Phase 80 = 5 plans (~35 min), Phase 81 = 5 plans (~40 min), Phase 82 = 6 plans (~7h incl execution), Phase 83 = 5 plans (~25 min), Phase 84 = 5 plans (~50 min), Phase 86 = 3 plans (~18 min), Phase 87 = 4 plans (~19 min), Phase 88 = 3 plans (~20 min), Phase 93 = 1 plan (~2 min)
 - Trend: Stable (~5-7 min/plan)
 
 *Updated after each plan completion*
@@ -43,6 +43,10 @@ Progress: [##########] 100% v0.4.0 | [##########] 100% v0.5.0 | [##########] 100
 Decisions are logged in PROJECT.md Key Decisions table.
 
 v1.1.0 decisions archived to `.planning/milestones/v1.1.0-ROADMAP.md`.
+
+**Phase 93 decisions (plan 01):**
+- 7 explicit strategy-signal mappings in _STRATEGY_SIGNAL_MAP + fallback for unmapped strategies
+- Fallback uses strategy_name as signal_type with info-level log (not warning); WARNING reserved for actual signal_row lookup failures
 
 **Phase 88 decisions (plan 01):**
 - smoke_test IDs: BTC(1), ETH(52), USDT(825), XRP(5426) as default test assets; --ids flag allows override at runtime
