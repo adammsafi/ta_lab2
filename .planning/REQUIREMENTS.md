@@ -80,38 +80,38 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| OPS-01 | — | Pending |
-| OPS-02 | — | Pending |
-| OPS-03 | — | Pending |
-| OPS-04 | — | Pending |
-| OPS-05 | — | Pending |
-| OPS-06 | — | Pending |
-| BT-01 | — | Pending |
-| BT-02 | — | Pending |
-| BT-03 | — | Pending |
-| BT-04 | — | Pending |
-| BT-05 | — | Pending |
-| BT-06 | — | Pending |
-| BT-07 | — | Pending |
-| CTF-01 | — | Pending |
-| CTF-02 | — | Pending |
-| CTF-03 | — | Pending |
-| CTF-04 | — | Pending |
-| MACRO-01 | — | Pending |
-| MACRO-02 | — | Pending |
-| ML-01 | — | Pending |
-| ML-02 | — | Pending |
-| ML-03 | — | Pending |
-| DEBT-01 | — | Pending |
-| DEBT-02 | — | Pending |
-| DEBT-03 | — | Pending |
-| DEBT-04 | — | Pending |
+| OPS-01 | Phase 96 | Pending |
+| OPS-02 | Phase 96 | Pending |
+| OPS-03 | Phase 96 | Pending |
+| OPS-04 | Phase 96 | Pending |
+| OPS-05 | Phase 96 | Pending |
+| OPS-06 | Phase 96 | Pending |
+| BT-01 | Phase 99 | Pending |
+| BT-02 | Phase 99 | Pending |
+| BT-03 | Phase 99 | Pending |
+| BT-04 | Phase 99 | Pending |
+| BT-05 | Phase 99 | Pending |
+| BT-06 | Phase 99 | Pending |
+| BT-07 | Phase 99 | Pending |
+| CTF-01 | Phase 98 | Pending |
+| CTF-02 | Phase 98 | Pending |
+| CTF-03 | Phase 98 | Pending |
+| CTF-04 | Phase 98 | Pending |
+| MACRO-01 | Phase 97 | Pending |
+| MACRO-02 | Phase 97 | Pending |
+| ML-01 | Phase 100 | Pending |
+| ML-02 | Phase 100 | Pending |
+| ML-03 | Phase 100 | Pending |
+| DEBT-01 | Phase 101 | Pending |
+| DEBT-02 | Phase 101 | Pending |
+| DEBT-03 | Phase 101 | Pending |
+| DEBT-04 | Phase 101 | Pending |
 
 **Coverage:**
 - v1.3.0 requirements: 26 total
-- Mapped to phases: 0
-- Unmapped: 26 (pending roadmap creation)
+- Mapped to phases: 26
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-29*
-*Last updated: 2026-03-29 after initial definition*
+*Last updated: 2026-03-29 — traceability mapped after roadmap creation*

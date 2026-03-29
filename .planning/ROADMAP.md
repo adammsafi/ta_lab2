@@ -12,6 +12,7 @@
 - v1.0.1 Macro Regime Infrastructure (Phases 64-73) - SHIPPED 2026-03-03
 - v1.1.0 Pipeline Consolidation & Storage Optimization (Phases 74-79) - SHIPPED 2026-03-21
 - v1.2.0 Analysis → Live Signals (Phases 80-95) - SHIPPED 2026-03-29
+- v1.3.0 Operational Activation & Research Expansion (Phases 96-101) - IN PROGRESS
 
 ## Overview
 
@@ -30,6 +31,7 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 - Phases 64-73: v1.0.1 (SHIPPED 2026-03-03)
 - Phases 74-79: v1.1.0 (SHIPPED 2026-03-21)
 - Phases 80-95: v1.2.0 (SHIPPED 2026-03-29)
+- Phases 96-101: v1.3.0 (IN PROGRESS)
 - Decimal phases (27.1, 28.1): Urgent insertions if needed
 
 <details>
@@ -1393,5 +1395,158 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 
 </details>
 
+
+### v1.3.0 Operational Activation & Research Expansion (In Progress)
+
+**Milestone Goal:** Make the built infrastructure actually run — activate paper trading, scale backtests to 460K+ runs, graduate CTF research features, expand macro coverage, and add ML signal combination.
+
+- [ ] **Phase 96: Executor Activation** - Seed strategies, wire signals into daily refresh, launch Task Scheduler, activate real IC-weighted BL, track live parity, add PnL attribution
+- [ ] **Phase 97: FRED Macro Expansion** - Add SP500/NASDAQ/DJIA to macro feature layer, rolling BTC-equity correlation, risk-on/off signals
+- [ ] **Phase 98: CTF Feature Graduation** - Materialize top CTF features into features table, asset-specific selection tier, cross-asset composites, lead-lag IC matrix
+- [ ] **Phase 99: Backtest Scaling** - Resume-safe mass backtest orchestrator, partitioned trades table, 113K+ core runs, MC bands, CTF signal backtests, expanded grids, leaderboard dashboard
+- [ ] **Phase 100: ML Signal Combination** - LGBMRanker cross-sectional predictor, SHAP interaction analysis, XGBoost meta-label confidence filter
+- [ ] **Phase 101: Tech Debt Cleanup** - Remove orphaned export, create Phase 82/92 VERIFICATION.md, document CTF downstream consumers
+
+---
+
+### Phase 96: Executor Activation
+**Goal:** Paper executor runs live daily, generating real fills from IC-weighted signal scores with parity tracking and PnL attribution.
+**Depends on:** v1.2.0 complete (Phase 95 — real signal_scores exist, BL pipeline built)
+**Requirements:** OPS-01, OPS-02, OPS-03, OPS-04, OPS-05, OPS-06
+**Success Criteria** (what must be TRUE):
+  1. `SELECT COUNT(*) FROM dim_executor_config WHERE is_active = true` returns 3 or more rows with strategy names matching bakeoff winners and cadence_hours=36
+  2. `python -m ta_lab2.scripts.run_daily_refresh --all` executes a signals stage that writes to `signals_*` tables; re-running the same day does not create duplicate fills (stale-signal guard active)
+  3. Windows Task Scheduler fires the daily refresh at a fixed time and `fills` table gains new rows within 24 hours of first run; executor run log shows no silent no-ops
+  4. `portfolio_allocations` rows use signal_score values from `signals_*` (not hardcoded 1.0) as BL views; running the BL optimizer with and without real scores produces different weights
+  5. A parity report script logs `live_sharpe / backtest_sharpe` per active strategy to the executor run log or a dedicated parity table; the ratio is readable from SQL
+  6. A PnL attribution script produces a report separating beta-adjusted alpha from long-crypto bias, runnable as a standalone CLI
+**Plans:** TBD
+
+Plans:
+- [ ] 96-01: Seed dim_executor_config with 3 bakeoff winners + verify signals stage in daily refresh
+- [ ] 96-02: Windows Task Scheduler setup + stale-signal guard verification + burn-in run
+- [ ] 96-03: Wire real IC-weighted signal scores into BL views + parity tracker script
+- [ ] 96-04: PnL attribution report (beta-adjusted alpha vs long-crypto bias)
+
+---
+
+### Phase 97: FRED Macro Expansion
+**Goal:** SP500, NASDAQ Composite, and DJIA are tracked in the macro feature layer with derived features and rolling BTC-equity correlation signals.
+**Depends on:** Phase 96 (v1.3.0 started; self-contained, no hard dependency on Phase 96 output)
+**Requirements:** MACRO-01, MACRO-02
+**Success Criteria** (what must be TRUE):
+  1. `fred_reader.py` SERIES_TO_LOAD includes SP500, NASDAQCOM, and DJIA; `SELECT DISTINCT series_id FROM fred.series_values` returns all three after a sync run
+  2. Derived features (returns, volatility, drawdown, MA ratios) for each equity index are computed and stored in `macro_features` table alongside existing FRED features
+  3. `cross_asset.py` computes rolling BTC-SPX and BTC-NASDAQ correlation at 30/60/90-day windows and stores results in `cross_asset_corr`
+  4. A risk-on/risk-off divergence signal fires when BTC-SPX rolling correlation crosses a configurable threshold, logged to the macro feature table or a signal table
+**Plans:** TBD
+
+Plans:
+- [ ] 97-01: Add SP500/NASDAQ/DJIA to fred_reader.py + derived features (returns, vol, drawdown, MA ratios)
+- [ ] 97-02: Rolling BTC-equity correlation + equity vol vs VIX + risk-on/off divergence signals
+
+---
+
+### Phase 98: CTF Feature Graduation
+**Goal:** Top CTF features are materialized in the main features table and usable by downstream consumers (BL, signals, ML), with asset-specific selection, cross-asset composites, and lead-lag analysis.
+**Depends on:** Phase 96 (executor running; CTF features feed BL optimizer in OPS-04)
+**Requirements:** CTF-01, CTF-02, CTF-03, CTF-04
+**Success Criteria** (what must be TRUE):
+  1. `refresh_ctf_promoted.py` runs without errors and writes 15-20 CTF feature columns into the `features` table; `feature_selection.yaml` lists each promoted feature with its IC threshold and source CTF config
+  2. `dim_feature_selection` contains rows with `tier = 'asset_specific'` for CTF features that pass per-asset IC but fail cross-asset consensus; a query by asset_id returns a different feature set than the global tier
+  3. A cross-asset CTF composite script produces market-wide sentiment, relative-value, and leader-follower aggregate columns stored in `features` or a dedicated composite table, runnable via CLI
+  4. A lead-lag IC matrix script outputs a DataFrame showing whether Asset A's CTF features predict Asset B's next-bar returns at horizons [1, 3, 5]; results persisted to a `lead_lag_ic` table or CSV report
+**Plans:** TBD
+
+Plans:
+- [ ] 98-01: ETL bridge refresh_ctf_promoted.py — materialize top 15-20 CTF features into features table + feature_selection.yaml registration
+- [ ] 98-02: Asset-specific selection tier in dim_feature_selection for per-asset IC winners
+- [ ] 98-03: Cross-asset CTF composite signals (market sentiment, relative-value, leader-follower)
+- [ ] 98-04: Lead-lag IC matrix script (Granger causality via CTF, persisted results)
+
+---
+
+### Phase 99: Backtest Scaling
+**Goal:** A resume-safe orchestrator runs 460K+ backtest runs with Monte Carlo bands, CTF threshold signals, and expanded parameter grids; results visible in a strategy leaderboard dashboard.
+**Depends on:** Phase 98 (CTF features in features table required for BT-05 CTF signal backtests)
+**Requirements:** BT-01, BT-02, BT-03, BT-04, BT-05, BT-06, BT-07
+**Success Criteria** (what must be TRUE):
+  1. `run_mass_backtest.py` can be interrupted and restarted without re-running completed combinations; a state table records `(strategy, asset, params_hash, tf, cost, status)` and `--resume` flag skips completed rows
+  2. `backtest_trades` is partitioned by `strategy_name` before the mass run begins; the partition DDL migration applies cleanly via Alembic
+  3. `SELECT COUNT(DISTINCT strategy_name || asset_id || params_hash || tf || cost_bps) FROM backtest_runs` reaches at least 113K after the core bakeoff strategies complete
+  4. Every `backtest_metrics` row has non-null `mc_sharpe_lo`, `mc_sharpe_hi`, and `mc_sharpe_median` computed from 1,000 bootstrap samples of trade-level P&L
+  5. CTF threshold signals are registered in `signals/registry.py` and `run_mass_backtest.py` includes them in the sweep; at least one CTF signal type produces backtest results in `backtest_runs`
+  6. Parameter grids for EMA crossover, RSI mean-reversion, and ATR breakout signals include at least 3x more combinations than the current bakeoff grids (documented in grid config YAML)
+  7. The Streamlit dashboard has a Strategy Leaderboard page showing Sharpe with MC confidence bands, PBO heatmap, and feature-to-signal lineage; accessible via the existing app navigation
+**Plans:** TBD
+
+Plans:
+- [ ] 99-01: Alembic migration for backtest_trades partitioning + mass_backtest_state table
+- [ ] 99-02: run_mass_backtest.py orchestrator with resume logic and state tracking
+- [ ] 99-03: Core bakeoff run (~113K combinations) with MC band population
+- [ ] 99-04: CTF threshold signal registration + CTF signal backtest sweep
+- [ ] 99-05: Expanded parameter grids for 6 core signals
+- [ ] 99-06: Strategy leaderboard dashboard page (MC bands, PBO heatmap, lineage)
+
+---
+
+### Phase 100: ML Signal Combination
+**Goal:** Three ML layers (cross-sectional ranker, feature interaction analysis, meta-label filter) are trained, validated, and wired into the signal pipeline.
+**Depends on:** Phase 98 (CTF features in features table), Phase 99 (backtest infra and trade labels available)
+**Requirements:** ML-01, ML-02, ML-03
+**Success Criteria** (what must be TRUE):
+  1. An LGBMRanker model is trained on CTF+AMA features to predict cross-sectional asset rank; purged CV produces an OOS NDCG or Spearman IC score that is documented and stored in `ml_experiments`
+  2. SHAP TreeExplainer interaction values identify the top 5 feature pairs for the LGBMRanker; a summary report or chart is produced and at least one finding feeds back into `feature_selection.yaml` or `dim_feature_selection`
+  3. An XGBoost meta-label model is trained on `triple_barrier_labels` to predict trade confidence; integrating it as a pre-executor filter (configurable threshold) reduces trade count while maintaining or improving the risk-adjusted return in backtests
+**Plans:** TBD
+
+Plans:
+- [ ] 100-01: LGBMRanker cross-sectional ranker — install lightgbm, train on CTF+AMA features, purged CV, log to ml_experiments
+- [ ] 100-02: SHAP interaction analysis — top feature pairs, report, feedback into feature selection
+- [ ] 100-03: XGBoost meta-label filter — train on triple_barrier_labels, wire pre-executor threshold, backtest impact measurement
+
+---
+
+### Phase 101: Tech Debt Cleanup
+**Goal:** Four low-severity tech debt items from the v1.2.0 milestone audit are closed — orphaned export removed, two VERIFICATION.md files created, CTF downstream consumer status documented.
+**Depends on:** Phase 98 (CTF-01 completed — needed to accurately document CTF downstream consumers in DEBT-04)
+**Requirements:** DEBT-01, DEBT-02, DEBT-03, DEBT-04
+**Success Criteria** (what must be TRUE):
+  1. `blend_vol_simple()` in `garch_blend.py` is either wired to a caller or removed; `grep -r "blend_vol_simple"` returns zero results (removed) or exactly one caller (wired)
+  2. `.planning/phases/82-signal-refinement/VERIFICATION.md` exists and synthesizes the 6 existing plan summaries into a single phase-level verification document
+  3. `.planning/phases/92-ctf-ic-analysis/VERIFICATION.md` is updated to reflect the 7 manually-closed gaps with evidence pointers
+  4. A comment or doc entry in `dim_ctf_feature_selection` (or the CTF config) explains that downstream consumers are added via CTF-01 (`refresh_ctf_promoted.py`) — by design, not an oversight
+**Plans:** TBD
+
+Plans:
+- [ ] 101-01: Remove/wire blend_vol_simple + create Phase 82 VERIFICATION.md + update Phase 92 VERIFICATION.md
+- [ ] 101-02: Document dim_ctf_feature_selection downstream consumer status
+
+---
+
+### v1.3.0 Progress
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 96. Executor Activation | 0/TBD | Not started | - |
+| 97. FRED Macro Expansion | 0/TBD | Not started | - |
+| 98. CTF Feature Graduation | 0/TBD | Not started | - |
+| 99. Backtest Scaling | 0/TBD | Not started | - |
+| 100. ML Signal Combination | 0/TBD | Not started | - |
+| 101. Tech Debt Cleanup | 0/TBD | Not started | - |
+
+### v1.3.0 Requirement Coverage
+
+| Category | Requirements | Phase | Count |
+|----------|--------------|-------|-------|
+| Operational Activation | OPS-01, OPS-02, OPS-03, OPS-04, OPS-05, OPS-06 | Phase 96 | 6 |
+| Macro Expansion | MACRO-01, MACRO-02 | Phase 97 | 2 |
+| CTF Research Expansion | CTF-01, CTF-02, CTF-03, CTF-04 | Phase 98 | 4 |
+| Backtest Expansion | BT-01, BT-02, BT-03, BT-04, BT-05, BT-06, BT-07 | Phase 99 | 7 |
+| ML Signal Combination | ML-01, ML-02, ML-03 | Phase 100 | 3 |
+| Tech Debt Cleanup | DEBT-01, DEBT-02, DEBT-03, DEBT-04 | Phase 101 | 4 |
+
+**Coverage:** 26/26 requirements mapped
+
 *Created: 2025-01-22*
-*Last updated: 2026-03-29 (v1.2.0 shipped)*
+*Last updated: 2026-03-29 (v1.3.0 roadmap created, Phases 96-101)*
