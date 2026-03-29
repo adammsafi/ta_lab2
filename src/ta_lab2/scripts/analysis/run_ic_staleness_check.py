@@ -27,11 +27,9 @@ import argparse
 import logging
 import math
 import sys
-from pathlib import Path
 from typing import Optional
 
 import pandas as pd
-import yaml
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.pool import NullPool
@@ -50,66 +48,42 @@ IC_IR_STALENESS_THRESHOLD = 0.7  # Below this in short+medium = decay
 IC_IR_ACTIVE_CUTOFF = 1.0  # Phase 80 active-tier cutoff (reference only)
 WINDOWS: dict[str, int] = {"short": 30, "medium": 63, "long": 126}
 COOLDOWN_HOURS_IC_DECAY = 24  # Telegram alert cooldown for ic_decay events
-MAX_ACTIVE_FEATURES = 10  # Limit to top N by IC-IR mean to reduce runtime
+MAX_ACTIVE_FEATURES = 20  # Limit to top N by IC-IR mean to reduce runtime
 DEFAULT_ASSET_IDS = [1, 1027]  # BTC (id=1), ETH (id=1027)
 TIMEOUT_STALENESS = 300  # 5 minutes
-
-_FEATURE_SELECTION_YAML = (
-    Path(__file__).parents[4] / "configs" / "feature_selection.yaml"
-)
 
 # ---------------------------------------------------------------------------
 # Data loading helpers
 # ---------------------------------------------------------------------------
 
 
-def _load_active_features(yaml_path: Path) -> list[str]:
-    """
-    Load the top-N active features from configs/feature_selection.yaml.
-
-    Returns a list of feature name strings, limited to MAX_ACTIVE_FEATURES
-    by IC-IR mean (YAML is pre-sorted descending by ic_ir_mean).
-    """
-    if not yaml_path.exists():
-        logger.error("feature_selection.yaml not found at %s", yaml_path)
-        return []
-
-    try:
-        with open(yaml_path, encoding="utf-8") as fh:
-            cfg = yaml.safe_load(fh)
-    except Exception as exc:
-        logger.error("Failed to load feature_selection.yaml: %s", exc)
-        return []
-
-    active_entries = cfg.get("active", [])
-    if not active_entries:
-        logger.warning("No active features found in feature_selection.yaml")
-        return []
-
-    # YAML is already sorted descending by ic_ir_mean; take top N
-    features = [e["name"] for e in active_entries[:MAX_ACTIVE_FEATURES] if "name" in e]
-    logger.info(
-        "Loaded %d active features (top %d)", len(features), MAX_ACTIVE_FEATURES
-    )
-    return features
-
-
 def _load_close_and_feature(
     conn,
     asset_id: int,
-    feature_name: str,
+    feature_info: dict,
     tf: str = "1D",
     venue_id: int = 1,
 ) -> tuple[pd.Series, pd.Series] | None:
     """
     Load (feature_series, close_series) for the given asset, feature, and tf.
 
+    Branches on feature_info["source"]:
+      - "features": bar-level feature column in the features table
+      - "ama_multi_tf_u": AMA value from ama_multi_tf_u joined with features.close
+
     Both series are indexed by UTC-aware timestamps.
     Returns None if the feature column does not exist or data is empty.
 
-    venue_id filter is required: features table has venue_id in PK; without
-    it, multiple venues produce duplicate ts rows causing rolling failures.
+    venue_id filter is required: features/ama tables have venue_id in PK;
+    without it, multiple venues produce duplicate ts rows causing rolling failures.
     """
+    feature_name = feature_info["name"]
+    source = feature_info.get("source", "features")
+
+    if source == "ama_multi_tf_u":
+        return _load_ama_feature(conn, asset_id, feature_info, tf, venue_id)
+
+    # --- Branch A: bar-level feature from features table ---
     # Verify column exists in features table
     try:
         col_check = conn.execute(
@@ -167,6 +141,84 @@ def _load_close_and_feature(
     df = df.set_index("ts").sort_index()
 
     return df[feature_name].astype(float), df["close"].astype(float)
+
+
+def _load_ama_feature(
+    conn,
+    asset_id: int,
+    feature_info: dict,
+    tf: str = "1D",
+    venue_id: int = 1,
+) -> tuple[pd.Series, pd.Series] | None:
+    """
+    Load AMA feature value + close from ama_multi_tf_u joined with features.
+
+    CRITICAL filters: alignment_source='multi_tf', roll=FALSE, venue_id.
+    Missing any of these causes duplicate rows that break rolling IC computation.
+    """
+    feature_name = feature_info["name"]
+    indicator = feature_info["indicator"]
+    params_hash = feature_info["params_hash"]
+
+    sql = text("""
+        SELECT a.ts, a.ama AS feature_value, f.close
+        FROM public.ama_multi_tf_u a
+        INNER JOIN public.features f
+            ON f.id = a.id AND f.ts = a.ts AND f.tf = a.tf AND f.venue_id = a.venue_id
+        WHERE a.id = :asset_id
+          AND a.venue_id = :venue_id
+          AND a.tf = :tf
+          AND a.indicator = :indicator
+          AND LEFT(a.params_hash, 8) = :params_hash
+          AND a.alignment_source = 'multi_tf'
+          AND a.roll = FALSE
+        ORDER BY a.ts
+    """)
+
+    try:
+        df = pd.read_sql(
+            sql,
+            conn,
+            params={
+                "asset_id": asset_id,
+                "venue_id": venue_id,
+                "tf": tf,
+                "indicator": indicator,
+                "params_hash": params_hash,
+            },
+        )
+    except Exception as exc:
+        logger.warning(
+            "Failed to load AMA feature '%s' for asset_id=%d: %s",
+            feature_name,
+            asset_id,
+            exc,
+        )
+        return None
+
+    if df.empty:
+        logger.debug(
+            "No data for AMA feature='%s' (indicator=%s, hash=%s) asset_id=%d tf=%s -- skipping",
+            feature_name,
+            indicator,
+            params_hash,
+            asset_id,
+            tf,
+        )
+        return None
+
+    # CRITICAL: fix mixed-tz-offset object dtype from pd.read_sql on Windows
+    df["ts"] = pd.to_datetime(df["ts"], utc=True)
+    df = df.set_index("ts").sort_index()
+
+    logger.debug(
+        "Loaded AMA feature='%s' from ama_multi_tf_u: %d rows (asset_id=%d)",
+        feature_name,
+        len(df),
+        asset_id,
+    )
+
+    return df["feature_value"].astype(float), df["close"].astype(float)
 
 
 # ---------------------------------------------------------------------------
@@ -537,14 +589,26 @@ class ICStalenessMonitor:
             0 -- no decay detected
             2 -- one or more (feature, asset) pairs are decaying
         """
-        features = _load_active_features(_FEATURE_SELECTION_YAML)
-        if not features:
+        try:
+            from ta_lab2.backtests.bakeoff_orchestrator import parse_active_features
+
+            active_features = parse_active_features()
+        except Exception as exc:
+            logger.error("Failed to parse active features: %s", exc)
+            return 1
+
+        active_features = active_features[:MAX_ACTIVE_FEATURES]
+        if not active_features:
             logger.error("No active features loaded -- cannot run staleness check")
             return 1
 
+        ama_count = sum(1 for f in active_features if f["source"] == "ama_multi_tf_u")
+        bar_count = len(active_features) - ama_count
         logger.info(
-            "ICStalenessMonitor: checking %d features x %d assets",
-            len(features),
+            "ICStalenessMonitor: checking %d features (%d AMA, %d bar-level) x %d assets",
+            len(active_features),
+            ama_count,
+            bar_count,
             len(self._asset_ids),
         )
 
@@ -554,8 +618,8 @@ class ICStalenessMonitor:
             logger.info("--- Checking asset_id=%d ---", asset_id)
             try:
                 with self._engine.connect() as conn:
-                    for feature_name in features:
-                        result = self._check_one(conn, feature_name, asset_id)
+                    for feature_info in active_features:
+                        result = self._check_one(conn, feature_info, asset_id)
                         if result:
                             any_decay = True
             except Exception as exc:
@@ -571,14 +635,19 @@ class ICStalenessMonitor:
         logger.info("ICStalenessMonitor: no decay detected across all checked features")
         return 0
 
-    def _check_one(self, conn, feature_name: str, asset_id: int) -> bool:
+    def _check_one(self, conn, feature_info: dict, asset_id: int) -> bool:
         """
         Check one (feature, asset) pair.
+
+        Args:
+            feature_info: dict with keys name, indicator, params_hash, source.
+            asset_id: asset to check.
 
         Returns True if decay detected (and override/alert dispatched).
         Returns False if no decay, insufficient data, or feature not found.
         """
-        data = _load_close_and_feature(conn, asset_id, feature_name, tf=self._tf)
+        feature_name = feature_info["name"]
+        data = _load_close_and_feature(conn, asset_id, feature_info, tf=self._tf)
         if data is None:
             logger.debug(
                 "Skipping feature='%s' asset_id=%d -- no data", feature_name, asset_id
