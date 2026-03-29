@@ -1,5 +1,31 @@
 # Project Milestones: ta_lab2 AI-Accelerated Quant Platform
 
+## v1.2.0 Analysis → Live Signals (Shipped: 2026-03-29)
+
+**Delivered:** IC-based feature selection (20 active from 112 candidates), GARCH conditional volatility (4 model families), walk-forward strategy bake-off (9 strategies, 2 exchanges), 17 Streamlit dashboard pages, live pipeline wiring (signal gates, IC staleness, BL portfolio construction), and cross-timeframe feature infrastructure (73.9M rows).
+
+**Phases completed:** 80-95 (52 plans total, including 3 gap closure phases)
+
+**Key accomplishments:**
+- IC-based feature selection: 20 active features from 112 candidates (IC-IR >= 1.0, AMA features dominate 18/20)
+- GARCH conditional volatility: 4 model families (GARCH/EGARCH/GJR/FIGARCH), carry-forward fallback, VaR/CVaR suite
+- Walk-forward strategy bake-off: 9 strategies, 2 exchanges (Kraken + Hyperliquid), per-asset IC-IR weighting
+- 17 Streamlit dashboard pages: strategy-first, signal monitor, asset hub, HL perps, AMA inspector, portfolio (live data)
+- Live pipeline wiring: signal anomaly gates, IC staleness monitoring (20/20 features), BL portfolio construction with real signal scores
+- CTF infrastructure: cross-timeframe features (73.9M rows), IC analysis, feature selection (131 active, 52 conditional)
+
+**Stats:**
+- 81 files changed, +25,257 / -1,272 lines
+- 650 Python files, ~255K lines total
+- 16 phases, 52 plans
+- 8 days (2026-03-22 → 2026-03-29)
+
+**Git range:** `docs(81): create phase plan` → `docs(audit): v1.2.0 re-audit passed`
+
+**What's next:** v1.3.0 (TBD — operational burn-in, ML research, or multi-venue expansion)
+
+---
+
 ## v1.1.0 Pipeline Consolidation & Storage Optimization (Shipped: 2026-03-21)
 
 **Delivered:** Eliminated 254 GB of duplicate data (-59%, 431 GB → 177 GB) by consolidating 30 siloed tables into unified _u tables with alignment_source discrimination. Generalized the 1D bar builder into a single source-registry-driven script. Pruned 7.18M NULL first-observation rows, integrated VWAP pipeline, and cleaned MCP dead routes.

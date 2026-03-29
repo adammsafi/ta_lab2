@@ -10,8 +10,10 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 
 ## Current State
 
-**Latest shipped:** v1.1.0 Pipeline Consolidation & Storage Optimization (2026-03-21)
-**Current milestone:** v1.2.0 Analysis → Live Signals (planned)
+**Latest shipped:** v1.2.0 Analysis → Live Signals (2026-03-29)
+**Current milestone:** v1.3.0 (planning)
+
+**v1.2.0 delivered:** IC-based feature selection (20 active from 112), GARCH conditional volatility (4 model families), walk-forward bake-off (9 strategies, 2 exchanges), 17 Streamlit dashboard pages, live pipeline wiring (signal gates, IC staleness, BL portfolio construction with real signal scores), CTF infrastructure (73.9M rows). 16 phases, 52 plans, 19/19 requirements. Gap closure: all 4 integration breaks resolved.
 
 **v1.1.0 delivered:** Eliminated 254 GB duplicate data (-59%), consolidated 30 siloed tables into _u tables, generalized 1D bar builder with source registry, pruned 7.18M NULL rows, integrated VWAP pipeline, cleaned MCP dead routes. 6 phases, 21 plans, 26/26 requirements. DB: 431 GB → 177 GB.
 
@@ -19,7 +21,7 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 
 **v1.0.0 delivered:** Full V1 loop -- strategy bake-off, paper-trade executor, risk controls, drift guard, all research tracks answered, feature evaluation across 109 TFs, advanced ML infrastructure, operational dashboard, and V1 Results Memo. 22 phases, 104 plans, 80/80 requirements.
 
-**Cumulative stats:** 79 phases, 359 plans, 480+ files, ~113K lines
+**Cumulative stats:** 95 phases, 411 plans, 650+ files, ~255K lines
 
 ## Requirements
 
@@ -50,6 +52,17 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 - ✓ Cost optimization tiers (free CLI → subscriptions → paid API) — existing
 - ✓ Adapter architecture (Claude/ChatGPT/Gemini) — existing
 - ✓ Quota tracking design — existing
+
+### Complete (v1.2.0 Milestone)
+
+**Analysis → Live Signals** ✓
+- ✓ IC-based feature selection: 20 active features from 112 candidates (IC-IR >= 1.0, AMA features dominate 18/20) -- v1.2.0
+- ✓ GARCH conditional volatility: 4 model families, carry-forward fallback, VaR/CVaR suite -- v1.2.0
+- ✓ Walk-forward strategy bake-off: 9 strategies, 2 exchanges, per-asset IC-IR weighting -- v1.2.0
+- ✓ 17 Streamlit dashboard pages: strategy-first, signal monitor, asset hub, HL perps, AMA inspector, portfolio -- v1.2.0
+- ✓ Live pipeline wiring: signal anomaly gates, IC staleness monitoring (20/20 features), BL portfolio construction with real signal scores -- v1.2.0
+- ✓ CTF infrastructure: cross-timeframe features (73.9M rows), IC analysis, feature selection -- v1.2.0
+- ✓ Integration testing: smoke tests, burn-in protocol, operations manual, gap closure (Phases 93-95) -- v1.2.0
 
 ### Complete (v1.1.0 Milestone)
 
@@ -217,4 +230,4 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 | Generalized 1D bar builder with source registry | 3 source-specific scripts are 80% identical; adding a new source requires copying an entire file | Validated — SourceSpec pattern, BAR-03 enables config-only onboarding |
 
 ---
-*Last updated: 2026-03-21 after v1.1.0 milestone shipped*
+*Last updated: 2026-03-29 after v1.2.0 milestone shipped*
