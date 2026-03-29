@@ -1,365 +1,457 @@
-# Technology Stack: v1.1.0 Pipeline Consolidation & Storage Optimization
+# Technology Stack: v1.3.0 Operational Activation & Research Expansion
 
 **Project:** ta_lab2
-**Milestone:** v1.1.0 -- Pipeline Consolidation
-**Researched:** 2026-03-19
-**Overall confidence:** HIGH (existing stack verified from codebase; PostgreSQL migration strategies verified via official docs)
+**Milestone:** v1.3.0 — Operational Activation & Research Expansion
+**Researched:** 2026-03-29
+**Overall confidence:** HIGH (existing stack verified from codebase; new library versions verified via PyPI/official docs)
 
 ---
 
 ## Scope: What This Document Covers
 
-This STACK.md covers ONLY the technology decisions for consolidating 6 table families (36 siloed tables down to 6 unified _u tables), rewriting ~30 scripts to write directly to _u tables, building a source registry for the 3 source-specific 1D bar builders (CMC, TVC, HL), and safely dropping 30 large tables (50M-91M+ rows) to reclaim 100GB+ storage.
+v1.3.0 adds five new capability domains to a platform that is "built and idling":
 
-**The question:** What stack additions or changes are needed for safe pipeline consolidation and large-table migration in PostgreSQL?
+1. **Operational Activation**: Scheduling paper executor, signal pipeline automation, parity tracking
+2. **Massive Backtest Scaling**: 460K+ runs, 20-40M trades, resume-safe multiprocessing, Monte Carlo (113M+ bootstrap samples)
+3. **ML Signal Combination**: LightGBM rank predictor (cross-sectional), SHAP values, XGBoost meta-label filter
+4. **CTF Research Expansion**: Graduating CTF features to production, cross-asset composites, lead-lag analysis
+5. **FRED Macro Expansion**: Adding SP500/NASDAQ Composite/DJIA/NASDAQ-100 equity indices to existing FRED pipeline
 
-**Answer: Almost nothing new.** The existing stack (Python 3.12, PostgreSQL, SQLAlchemy 2.0+, Alembic 1.18+, psycopg2, pandas, Polars) already has everything needed. This milestone is a code refactoring and data migration exercise, not a technology adoption exercise. The recommendations below focus on patterns, PostgreSQL-native strategies, and one optional dev dependency.
+**The guiding question:** What additions, if any, are needed to the existing stack for these five domains?
 
----
-
-## Confirmed Existing Stack (All Sufficient)
-
-| Package | Version (pyproject.toml) | Role in This Milestone |
-|---------|-------------------------|----------------------|
-| PostgreSQL | 14+ (server) | Transactional DDL for safe migrations, DROP TABLE, VACUUM |
-| SQLAlchemy | >=2.0 | Engine management, text() for raw SQL, Alembic integration |
-| Alembic | >=1.18 | Migration scripts for dropping FKs, tables, and rebuilding PKs |
-| psycopg2-binary | >=2.9 | Raw SQL execution in bar builders (performance-critical CTEs) |
-| pandas | (unpinned) | DataFrame operations in sync_utils, audit scripts |
-| Polars | >=0.19.0 | Used by derive_multi_tf_from_1d.py for aggregation |
-| PyYAML | (unpinned) | Could be used for source registry config (already installed) |
-| pytest | >=8.0 (dev) | Migration validation test suite |
-| pytest-cov | >=4.0.0 (dev) | Coverage for new tests |
-
-**Key insight:** This milestone is infrastructure surgery on an existing system, not a greenfield build. Every tool needed is already installed and battle-tested across 290+ scripts. The risk is in the migration strategy, not in the tooling.
+**Answer summary:** Three targeted additions. Everything else is already installed. The platform's core stack (Python 3.12, PostgreSQL, SQLAlchemy, pandas, numpy, vectorbt, LightGBM, scikit-learn, multiprocessing) already covers the vast majority of what v1.3.0 requires. The three gaps are: SHAP for model interpretability, XGBoost for meta-label filtering, and a scheduling harness for operational automation.
 
 ---
 
-## Decision 1: Source Registry Pattern for 1D Bar Builders
+## Confirmed Existing Stack (No Changes Needed)
 
-### Question: How to consolidate 3 source-specific 1D builders (CMC, TVC, HL) into one generic builder?
+These packages are installed and battle-tested across 290+ scripts. Do not re-evaluate.
 
-**Recommendation: Python-native class registry using BaseBarBuilder inheritance + a dataclass-based SourceConfig registry. No new libraries needed.**
+| Package | Installed Version | v1.3.0 Role |
+|---------|------------------|-------------|
+| Python | 3.12 | Runtime |
+| PostgreSQL | 14+ | All persistence |
+| SQLAlchemy | 2.0.48 | Engine, raw SQL, Alembic |
+| Alembic | 1.18.4 | Schema migrations |
+| psycopg2-binary | 2.9.11 | Performance-critical raw SQL |
+| pandas | 3.0.1 | DataFrame operations throughout |
+| numpy | 2.4.3 | Numerical computation |
+| scipy | 1.15.3 (venv311) | Monte Carlo, statistical tests |
+| scikit-learn | 1.7.2 (venv311) | MetaLabeler (RandomForest), feature importance |
+| vectorbt | 0.28.1 (venv311) | Backtest engine for all 460K+ runs |
+| LightGBM | 4.6.0 | Already installed; used by double_ensemble.py |
+| joblib | 1.5.3 (venv311) | Parallel loops, memory caching |
+| schedule | 1.2.2 | Already installed; used for task scheduling |
+| statsmodels | 0.14.0+ | ADF/KPSS stationarity (existing) |
+| arch | 7.2.0 (venv311) | GARCH volatility (existing) |
+| hmmlearn | 0.3.3+ | HMM regime classifier (existing) |
+| optuna | (installed) | Hyperparameter sweep (existing) |
+| PyYAML | 6.0.3 | Config files, experiment YAML |
+| Streamlit | 1.44.0 (venv311) | Dashboard (17 pages) |
+| fredapi | 0.5.2 | FRED API for equity index series |
+| multiprocessing | stdlib | Bakeoff orchestrator, bar builders |
 
-**Confidence: HIGH**
+**Verified from:** `.venv/Scripts/pip list`, `.venv311/Scripts/pip list`, `pyproject.toml`, `requirements-311.txt`
 
-### Current State
+---
 
-Three separate files with massive code duplication:
-- `refresh_price_bars_1d.py` (OneDayBarBuilder) -- 822 lines, reads from `cmc_price_histories7`
-- `refresh_tvc_price_bars_1d.py` (TvcOneDayBarBuilder) -- 510 lines, reads from `tvc_price_histories`
-- `refresh_hl_price_bars_1d.py` (HlOneDayBarBuilder) -- 584 lines, reads from `hyperliquid.hl_candles`
+## Decision 1: SHAP for LightGBM/XGBoost Interpretability
 
-All three share: psycopg connection management, `_normalize_db_url()`, `_connect()`, `_exec()`, `_fetchone()`, `_fetchall()`, state table DDL, coverage tracking, CLI argument parsing. The only real differences are:
-1. Source table and JOIN logic (e.g., HL needs `dim_asset_identifiers` JOIN)
-2. Column mapping (e.g., TVC has no `market_cap`, HL synthesizes `time_high/time_low`)
-3. OHLC repair (CMC needs repair, TVC/HL do not)
-4. ID loading strategy (CMC from `cmc_price_histories7`, TVC from `tvc_price_histories`, HL from `HL_YN.csv` + `dim_asset_identifiers`)
+**Question:** What library should provide SHAP values for the ML signal combination module?
 
-### Recommended Pattern
+**Recommendation: `shap>=0.51.0`**
+
+**Confidence: HIGH** (verified via PyPI, shap.readthedocs.io/en/latest/release_notes.html)
+
+### Rationale
+
+The ML signal combination work requires explaining why the LGBMRanker scores assets the way it does — which features (AMA slopes, CTF divergences, VIX regime, yield curve) are driving predictions. SHAP is the standard tool for this.
+
+Key verified facts:
+- **Current version: 0.51.0**, released March 4, 2026. Confirmed pandas 3.0 compatibility fixes are in this release. This matters because the project uses pandas 3.0.1.
+- **Requires Python >=3.11.** The project runs Python 3.12 — compatible.
+- **Tree SHAP** (fast C++ implementation) works natively with LightGBM 4.6.0 and XGBoost 3.x. No compatibility gap.
+- **Zero friction integration:** `shap.Explainer(model)` accepts fitted `LGBMRanker` and `XGBClassifier` directly.
+
+### How It Integrates
+
+The existing `ml/feature_importance.py` implements MDA (Mean Decrease Accuracy), SFI, and Clustered FI via permutation — all sklearn-style. SHAP is a complementary, faster approach that works at inference time (not just training time). The planned usage:
 
 ```python
-@dataclass(frozen=True)
-class SourceConfig:
-    """Configuration for a data source in the unified 1D bar builder."""
-    source_name: str           # "CoinMarketCap", "TradingView", "Hyperliquid"
-    source_table: str          # "public.cmc_price_histories7"
-    venue_id: int              # 1 (CMC_AGG), 9 (TVC), 2 (HYPERLIQUID)
-    needs_ohlc_repair: bool    # True for CMC, False for TVC/HL
-    has_market_cap: bool       # True for CMC, False for TVC/HL
-    has_intraday_timestamps: bool  # True for CMC, False for TVC/HL
-    id_loader: Callable        # function(db_url) -> list[int]
-    source_query_builder: Callable  # function(id_, start_ts, venue_filter) -> SQL
+import shap
 
-# Registry: dict keyed by source name
-SOURCE_REGISTRY: dict[str, SourceConfig] = {}
-
-def register_source(config: SourceConfig) -> None:
-    SOURCE_REGISTRY[config.source_name] = config
+explainer = shap.TreeExplainer(lgbm_ranker)
+shap_values = explainer.shap_values(X_cross_section)
+# Result: per-asset, per-feature attribution for each cross-sectional prediction
 ```
 
-### Why This Pattern
-
-1. **Already fits BaseBarBuilder** -- The abstract class already defines `get_source_query()`, `build_bars_for_id()`, etc. The registry extends this by parameterizing what varies across sources.
-2. **No new dependencies** -- Uses `@dataclass` (stdlib), `Callable` (typing), and a plain `dict`. The existing `BarBuilderConfig` dataclass is the proven pattern.
-3. **Testable** -- Each `SourceConfig` is a frozen dataclass, easily constructed in tests without database access.
-4. **Extensible** -- Adding a new source (e.g., Binance) means adding one `SourceConfig` instance and one SQL query builder function, not a new 500-line file.
+This is additive to the existing feature importance infrastructure, not a replacement.
 
 ### What NOT to Use
 
-| Library | Why Not |
-|---------|---------|
-| `autoregistry` PyPI package | Overkill for 3-5 sources. A plain dict is clearer and debuggable. |
-| Plugin directory auto-discovery | Only needed for 10+ plugins. With 3 sources, explicit registration is simpler. |
-| YAML config for source definitions | SQL query builders need to be Python callables, not declarative config. PyYAML would add indirection without benefit. |
-| Abstract factory with metaclass `__init_subclass__` | Clever but harder to grep/debug. Explicit registration is better for a team of 1. |
+| Alternative | Why Not |
+|------------|---------|
+| `lime` | Slower, less accurate for tree models than TreeSHAP |
+| `eli5` | Lower maintenance, less precise for gradient boosting |
+| sklearn `permutation_importance` | Already in `feature_importance.py` for MDA; SHAP adds complementary local explanations |
 
----
+### Installation
 
-## Decision 2: Direct-Write to _u Tables (Eliminating Sync Scripts)
-
-### Question: How to rewrite ~30 scripts to write directly to _u tables instead of siloed tables?
-
-**Recommendation: Modify each builder/refresher to write directly to the _u table with an alignment_source literal. Use the existing `ON CONFLICT DO UPDATE` upsert pattern. No new tools needed.**
-
-**Confidence: HIGH**
-
-### Current Flow (6 families x 5 variants = 30 siloed writes + 6 sync scripts)
-
-```
-Builder writes to: price_bars_multi_tf_cal_us
-                   price_bars_multi_tf_cal_iso
-                   price_bars_multi_tf_cal_anchor_us
-                   price_bars_multi_tf_cal_anchor_iso
-                   price_bars_multi_tf
-                              |
-                              v
-sync_price_bars_multi_tf_u.py ---> price_bars_multi_tf_u
-  (INSERT...ON CONFLICT DO NOTHING, watermark-based)
+```bash
+pip install "shap>=0.51.0"
 ```
 
-### Target Flow (same builders write directly to _u)
-
-```
-Builder writes to: price_bars_multi_tf_u
-  (with alignment_source = 'multi_tf_cal_us')
-  (ON CONFLICT (id, tf, bar_seq, venue_id, timestamp, alignment_source) DO UPDATE)
-```
-
-### What Changes Per Script
-
-Each of the ~30 builder/refresher scripts needs:
-1. **Output table**: Change from `price_bars_multi_tf_cal_us` to `price_bars_multi_tf_u`
-2. **INSERT column list**: Add `alignment_source` column with a literal value
-3. **ON CONFLICT clause**: Include `alignment_source` in the PK columns
-4. **State table**: Continue using the variant-specific state table (no change)
-
-### Stack Implications
-
-- **No new libraries.** The `ON CONFLICT DO UPDATE` upsert pattern is already used everywhere.
-- **sync_utils.py becomes obsolete.** After all builders write directly to _u, the 6 sync scripts (`sync_price_bars_multi_tf_u.py`, `sync_ema_multi_tf_u.py`, etc.) can be deleted.
-- **ingested_at watermark no longer needed for sync** (sync scripts used `MAX(ingested_at)` as watermark; direct writes eliminate this).
-
----
-
-## Decision 3: PostgreSQL Migration Strategy for Dropping 30 Large Tables
-
-### Question: How to safely drop 30 tables (50M-91M+ rows each) and reclaim 100GB+ disk space?
-
-**Recommendation: Alembic migration with dependency-ordered drops, preceded by validation queries. Use DROP TABLE (not TRUNCATE), which immediately reclaims disk space. No new tools needed.**
-
-**Confidence: HIGH**
-
-### PostgreSQL Behavior: DROP TABLE vs DELETE + VACUUM
-
-| Operation | Disk Reclamation | Locking | Speed |
-|-----------|-----------------|---------|-------|
-| `DROP TABLE tablename` | **Immediate** -- files removed from disk | Brief AccessExclusive lock | Seconds, regardless of row count |
-| `TRUNCATE tablename` | **Immediate** -- files removed | AccessExclusive lock | Seconds |
-| `DELETE FROM tablename` + `VACUUM FULL` | Requires VACUUM FULL for OS reclamation | VACUUM FULL: AccessExclusive lock | Hours for 50M+ rows |
-
-**DROP TABLE is the correct choice here.** Once data is verified in the _u tables, the siloed tables are dead weight. DROP TABLE removes the heap files and all associated indexes from disk immediately. There is no need for VACUUM.
-
-Source: [PostgreSQL DROP TABLE documentation](https://www.postgresql.org/docs/current/sql-droptable.html)
-
-### Dependency Order
-
-Tables must be dropped in the correct order to avoid FK constraint violations:
-
-```
-Phase 1: Drop state tables (no FKs reference them)
-  - price_bars_multi_tf_state
-  - price_bars_multi_tf_cal_us_state
-  - price_bars_multi_tf_cal_iso_state
-  - price_bars_multi_tf_cal_anchor_us_state
-  - price_bars_multi_tf_cal_anchor_iso_state
-  (repeat for EMA, AMA, returns_bars, returns_ema families)
-
-Phase 2: Drop dependent views/matviews (if any reference siloed tables)
-  - Check: SELECT * FROM pg_depend WHERE refobjid = 'tablename'::regclass
-
-Phase 3: Drop data tables
-  - price_bars_multi_tf
-  - price_bars_multi_tf_cal_us
-  - price_bars_multi_tf_cal_iso
-  - price_bars_multi_tf_cal_anchor_us
-  - price_bars_multi_tf_cal_anchor_iso
-  (repeat for all 6 families)
-```
-
-### Alembic Migration Structure
-
-```python
-# alembic/versions/xxxx_drop_siloed_tables.py
-
-def upgrade():
-    # Phase 1: Validate data exists in _u tables (fail-fast)
-    conn = op.get_bind()
-    for family in FAMILIES:
-        u_count = conn.execute(text(f"SELECT COUNT(*) FROM {family}_u")).scalar()
-        if u_count == 0:
-            raise RuntimeError(f"ABORT: {family}_u is empty, cannot drop siloed tables")
-
-    # Phase 2: Drop FKs that reference siloed tables (if any)
-    # Phase 3: Drop state tables
-    for table in STATE_TABLES:
-        op.drop_table(table)
-
-    # Phase 4: Drop data tables
-    for table in DATA_TABLES:
-        op.drop_table(table)
-
-def downgrade():
-    # Downgrade: recreate table structure (data NOT recoverable)
-    # This is a one-way migration. Document clearly.
-    raise NotImplementedError(
-        "Downgrade not supported: siloed table data was dropped. "
-        "Restore from backup if needed."
-    )
-```
-
-### Pre-Migration Validation (Run Before Alembic)
-
-A standalone validation script (not part of Alembic) that compares row counts and checksums:
-
-```sql
--- Row count validation per (family, alignment_source)
-SELECT
-    'price_bars' AS family,
-    alignment_source,
-    COUNT(*) AS u_rows
-FROM price_bars_multi_tf_u
-GROUP BY alignment_source
-
-UNION ALL
-
-SELECT
-    'price_bars' AS family,
-    'multi_tf' AS alignment_source,
-    COUNT(*) AS siloed_rows
-FROM price_bars_multi_tf
--- ... repeat for each siloed table
-```
-
-### Storage Estimation
-
-Based on the project's table sizes (from MEMORY.md):
-
-| Family | Siloed Table Rows | Tables | Estimated Storage |
-|--------|-------------------|--------|-------------------|
-| AMA values | ~91.3M | 5 | ~40-50 GB |
-| AMA returns | ~91.3M | 5 | ~40-50 GB |
-| EMA values | ~14.8M | 5 | ~8-10 GB |
-| EMA returns | ~16M | 5 | ~8-10 GB |
-| Price bars | ~4.1M | 5 | ~3-5 GB |
-| Bar returns | ~4.1M | 5 | ~3-5 GB |
-| **Total** | | **30 tables** | **~100-130 GB** |
-
-All this storage is immediately reclaimable via DROP TABLE.
-
----
-
-## Decision 4: Testing Strategy for Data Pipeline Migration
-
-### Question: How to validate data integrity during and after the migration?
-
-**Recommendation: Three-layer validation using pytest + raw SQL. One optional new dev dependency: `pytest-alembic`.**
-
-**Confidence: HIGH**
-
-### Layer 1: Pre-Migration Validation Script (Standalone)
-
-Before running any Alembic migrations, a standalone Python script validates that _u tables contain all data from siloed tables:
-
-```python
-# Checks per family:
-# 1. Row count: SUM(siloed) == COUNT(_u)
-# 2. Aggregate checksum: SUM(close) per (id, tf) matches between siloed and _u
-# 3. Min/max timestamp coverage: no data loss at boundaries
-# 4. alignment_source completeness: all 5 variants present in _u
-```
-
-**No new libraries needed** -- uses SQLAlchemy `text()` and pandas for comparison DataFrames. This pattern already exists in `audit_price_bars_integrity.py` and `audit_price_bars_tables.py`.
-
-### Layer 2: Alembic Migration Tests (pytest-alembic)
-
-**Optional new dev dependency: `pytest-alembic>=0.12.1`**
-
-This is the only new library recommendation for this milestone. It provides:
-- `test_single_head_revision` -- Ensures migration history is linear
-- `test_upgrade` -- Runs all migrations from base to head
-- `test_model_definitions_match_ddl` -- Verifies models match DB state
-
-**Why add it:** The project already has 33 Alembic migrations. This milestone adds at least 1 more (the drop migration). `pytest-alembic` catches common mistakes like broken revision chains or missing downgrade paths. The project already uses pytest extensively.
-
-**Why it's optional:** The existing CI pipeline has an `alembic-history` job that likely covers the revision chain check. If that's sufficient, skip this.
+Add to `pyproject.toml`:
 
 ```toml
-# pyproject.toml addition (dev only)
 [project.optional-dependencies]
-dev = [
-    # ... existing ...
-    "pytest-alembic>=0.12.1",  # Optional: Alembic migration tests
+ml = [
+    "shap>=0.51.0",
 ]
 ```
 
-Source: [pytest-alembic on PyPI](https://pypi.org/project/pytest-alembic/) -- v0.12.1 released May 2025, supports Python >=3.9
-
-### Layer 3: Post-Migration Smoke Tests (pytest)
-
-After migration, integration tests verify the pipeline still works end-to-end:
-
-```python
-@pytest.mark.integration
-def test_bar_builder_writes_to_u_table(engine):
-    """After consolidation, bar builder should write directly to _u table."""
-    # Run builder for 1 ID, 1 TF
-    # Assert rows exist in price_bars_multi_tf_u with correct alignment_source
-    # Assert siloed table does NOT exist (post-drop)
-
-@pytest.mark.integration
-def test_downstream_reads_unaffected(engine):
-    """Features, signals, regimes all read from _u tables already."""
-    # Verify feature computation works with _u table as source
-```
-
-**No new libraries needed** -- uses existing pytest, pytest-mock, SQLAlchemy.
+Source: [shap on PyPI](https://pypi.org/project/shap/) — v0.51.0 released 2026-03-04
 
 ---
 
-## Decision 5: Monitoring Table Sizes During Migration
+## Decision 2: XGBoost for Meta-Label Filter
 
-### Question: How to track storage reclamation progress?
+**Question:** Should the meta-label filter use the existing scikit-learn `RandomForestClassifier` (in `meta_labeler.py`) or switch to XGBoost?
 
-**Recommendation: PostgreSQL-native `pg_total_relation_size()` queries. No new tools.**
+**Recommendation: Add `xgboost>=3.2.0` as a new optional dependency. Keep `RandomForestClassifier` as the existing path.**
 
-**Confidence: HIGH**
+**Confidence: HIGH** (verified via PyPI xgboost page — v3.2.0 released 2026-02-10)
 
-### Pre-Migration Size Capture
+### Rationale
 
-```sql
-SELECT
-    schemaname || '.' || relname AS table_name,
-    pg_size_pretty(pg_total_relation_size(relid)) AS total_size,
-    pg_total_relation_size(relid) AS size_bytes
-FROM pg_stat_user_tables
-WHERE relname LIKE '%multi_tf%'
-   OR relname LIKE '%ema_multi_tf%'
-   OR relname LIKE '%ama_multi_tf%'
-   OR relname LIKE '%returns_%multi_tf%'
-ORDER BY pg_total_relation_size(relid) DESC;
+The existing `meta_labeler.py` uses `RandomForestClassifier` with `balanced_subsample`. XGBoost is proposed for a parallel meta-label pipeline because:
+
+1. **Gradient boosting consistently outperforms random forests** on tabular financial features (this is why LightGBM was already chosen for `double_ensemble.py`).
+2. **SHAP values integrate natively** with XGBoost — the same `shap.TreeExplainer` approach works for both the LGBMRanker and XGBClassifier models.
+3. **Monotone constraints** available in XGBoost 3.x — useful for encoding prior knowledge (e.g., "higher VIX should increase meta-label uncertainty").
+
+Key verified facts:
+- **Current version: 3.2.0**, released February 10, 2026. Requires Python >=3.10.
+- **Available as `xgboost-cpu`** for minimal footprint (no GPU), which suits a Windows research machine.
+- **Windows-first support**: XGBoost 3.x has full Windows prebuilt wheels.
+
+### Integration Point
+
+A new `XGBMetaLabeler` class sits alongside the existing `MetaLabeler`:
+
+```python
+# Proposed: ml/xgb_meta_labeler.py
+from xgboost import XGBClassifier
+
+class XGBMetaLabeler:
+    """XGBoost meta-labeler for binary trade-success filtering.
+    Complements MetaLabeler (RandomForest) for A/B comparison.
+    """
+    def __init__(self, n_estimators=200, learning_rate=0.05, ...):
+        self.model = XGBClassifier(
+            n_estimators=n_estimators,
+            learning_rate=learning_rate,
+            scale_pos_weight=...,   # handles class imbalance
+            use_label_encoder=False,
+            eval_metric="logloss",
+        )
 ```
 
-### Post-Migration Verification
+The `triple_barrier_labels` and `meta_label_results` tables already exist. No schema changes needed for the XGBoost path.
 
-```sql
--- After DROP TABLE: same query should show only _u tables
--- Total size should be ~50% of pre-migration (only _u tables remain)
-SELECT
-    pg_size_pretty(pg_database_size(current_database())) AS db_size;
+### What NOT to Use
+
+| Alternative | Why Not |
+|------------|---------|
+| CatBoost | Slower training, less ecosystem integration with SHAP than XGBoost |
+| LightGBM for meta-labeling | Already used in double_ensemble.py — using XGBoost here enables a genuine A/B comparison between two gradient boosting frameworks |
+| Neural networks (sklearn MLPClassifier) | Overkill for 10-100K training samples; interpretability gap |
+
+### Installation
+
+```bash
+pip install "xgboost>=3.2.0"
 ```
 
-Source: [PostgreSQL pg_total_relation_size](https://pgpedia.info/p/pg_total_relation_size.html)
+Add to `pyproject.toml`:
+
+```toml
+[project.optional-dependencies]
+ml = [
+    "shap>=0.51.0",
+    "xgboost>=3.2.0",
+]
+```
+
+Source: [xgboost on PyPI](https://pypi.org/project/xgboost/) — v3.2.0 released 2026-02-10
+
+---
+
+## Decision 3: Scheduling — Use Existing `schedule` Library (Already Installed)
+
+**Question:** What scheduler should automate the paper executor, signal pipeline, and daily refresh?
+
+**Recommendation: Use the already-installed `schedule 1.2.2`. No new libraries needed.**
+
+**Confidence: HIGH** (schedule v1.2.2 verified installed in both venvs; APScheduler v4.0 verified alpha-only)
+
+### Current State
+
+`schedule==1.2.2` is already installed in both `.venv` and `.venv311`. The `run_daily_refresh.py` script already orchestrates the full pipeline (VM sync → bars → EMAs → AMAs → regimes → signals → executor → drift). What is missing is not a scheduler library — it is:
+
+1. **`dim_executor_config` is empty**: No active strategy configurations → executor has nothing to run
+2. **No always-on runner**: `run_daily_refresh.py` exists but is not invoked automatically
+
+### Recommended Approach
+
+**Windows Task Scheduler + `run_daily_refresh.py`** — not a Python scheduler daemon.
+
+The operational activation work is not a scheduling problem; it is a configuration problem. The correct sequence:
+
+```
+Step 1: Seed dim_executor_config (one-time DB seed)
+Step 2: Wire signals → executor (confirm flow works in manual run)
+Step 3: Register run_daily_refresh.py in Windows Task Scheduler
+        trigger: daily at market close + 15min (e.g., 23:15 UTC)
+        action: python -m ta_lab2.scripts.run_daily_refresh --all --ids all
+```
+
+Windows Task Scheduler (built into Windows 11) runs scripts persistently without a Python daemon process, survives reboots, and has no library dependencies. This is the correct tool for a single-machine research platform.
+
+### Why Not APScheduler
+
+- APScheduler 3.11.2 is the current stable release (December 22, 2025). Version 4.0 is still alpha (`4.0.0a6`) as of April 2025 — NOT production-ready.
+- APScheduler runs inside a Python process. If the process crashes (a real risk with 460K+ backtest runs), the schedule dies. Windows Task Scheduler runs externally and restarts on reboot.
+- The project already has `schedule` installed. APScheduler would be a second scheduler library with no benefit.
+
+### For the Signal Freshness Loop
+
+If a lightweight in-process heartbeat is needed (e.g., a 5-minute signal freshness check), `schedule 1.2.2` is already available:
+
+```python
+import schedule
+import time
+
+schedule.every(5).minutes.do(check_signal_freshness)
+
+while True:
+    schedule.run_pending()
+    time.sleep(60)
+```
+
+This pattern is appropriate for a development/research context. For production, this loop runs inside a supervised process (a Windows Service or Task Scheduler task).
+
+Source: [schedule docs](https://schedule.readthedocs.io/) — v1.2.0 is latest documented stable, v1.2.2 installed
+
+---
+
+## Decision 4: Massive Backtest Scaling — No New Libraries
+
+**Question:** What stack is needed for 460K+ backtest runs, 20-40M trades, resume-safe execution, and 113M+ Monte Carlo bootstrap samples?
+
+**Recommendation: Existing stack (vectorbt 0.28.1 + multiprocessing + joblib 1.5.3 + numpy 2.4.3). No new libraries.**
+
+**Confidence: HIGH** (verified installed; pattern documented in bakeoff_orchestrator.py and MultiprocessingOrchestrator)
+
+### Scale Analysis
+
+| Operation | Volume | Tooling |
+|-----------|--------|---------|
+| Backtest parameter combinations | 460K+ runs | vectorbt parameter grid (in-memory) |
+| Simulated trades | 20-40M trades | vectorbt Portfolio, stored in backtest_trades |
+| Monte Carlo bootstrap samples | 113M+ | numpy `Generator.integers()` with vectorized sampling |
+| Parallel workers | Up to 8 CPUs | Python `multiprocessing.Pool` + `NullPool` pattern |
+
+### Resume-Safety Pattern (No New Libraries)
+
+The project's established pattern for large jobs:
+
+```python
+# Pattern: state map filtering (already in MultiprocessingOrchestrator)
+# Skip combinations that already have results in backtest_runs
+completed = set(engine.execute("SELECT (asset_id, tf, strategy, cost_scenario)
+                                 FROM strategy_bakeoff_results
+                                 WHERE experiment_name = :exp").fetchall())
+tasks = [t for t in all_tasks if (t.asset_id, t.tf, t.strategy, t.cost) not in completed]
+```
+
+This is already how the bar builders work (`state_map` optimization). The same pattern applies to the bakeoff orchestrator. **No checkpoint library needed** — PostgreSQL IS the checkpoint store.
+
+### Monte Carlo Scaling
+
+The existing `monte_carlo.py` uses `numpy.random.default_rng()` for reproducible bootstrap. For 113M samples, the bottleneck is memory layout, not the library:
+
+```python
+# Vectorized bootstrap — existing pattern, just more samples
+rng = np.random.default_rng(seed)
+indices = rng.integers(0, n_trades, size=(n_samples, n_trades))  # shape: (10K, 11.3K)
+bootstrapped = pnl_array[indices]   # numpy fancy indexing — no Python loop
+sharpes = bootstrapped.mean(axis=1) / bootstrapped.std(axis=1, ddof=1) * sqrt(365)
+```
+
+For 113M samples (10K bootstrap × 11.3K trades), numpy 2.4.3 handles this with ~900MB memory. Acceptable on a 16GB+ research machine.
+
+### Windows Multiprocessing Constraints
+
+The existing conventions remain:
+- `NullPool` for all DB engines in subprocess workers (prevents connection leaks)
+- `maxtasksperchild=1` when memory growth is a risk (AMA builders)
+- `maxtasksperchild=50` for lighter tasks (bakeoff workers)
+- `spawn` start method (Windows default — no `fork`)
+
+No changes to these conventions for v1.3.0.
+
+### joblib vs multiprocessing
+
+`joblib 1.5.3` (installed) is available for its `Memory` caching feature — useful if intermediate bakeoff results need disk caching between runs. However, the existing `multiprocessing.Pool` in `MultiprocessingOrchestrator` is the primary parallel mechanism and should not be replaced. Use `joblib.Memory` only if caching intermediate computations proves beneficial.
+
+---
+
+## Decision 5: LightGBM Rank Predictor — Use Existing LightGBM (LGBMRanker API)
+
+**Question:** Does the cross-sectional rank predictor require a new library or LightGBM upgrade?
+
+**Recommendation: Use existing `LightGBM 4.6.0` with `LGBMRanker`. No upgrade needed.**
+
+**Confidence: HIGH** (LGBMRanker verified in LightGBM 4.6.0 official docs: lightgbm.readthedocs.io/en/stable)
+
+### LGBMRanker in LightGBM 4.6.0
+
+`LGBMRanker` is available in LightGBM 4.6.0 (the installed version). The API is stable and has been present since 3.x. The required pattern:
+
+```python
+from lightgbm import LGBMRanker
+
+ranker = LGBMRanker(
+    objective="lambdarank",
+    n_estimators=300,
+    learning_rate=0.05,
+    num_leaves=31,
+    min_child_samples=20,
+    verbose=-1,
+)
+
+# Cross-sectional ranking: group = number of assets per date
+groups = cross_section_df.groupby("ts").size().values  # e.g., [213, 213, 213, ...]
+
+ranker.fit(
+    X_train,
+    y_rank_train,       # rank labels (0=worst, N=best)
+    group=groups,
+)
+
+scores = ranker.predict(X_today)   # continuous score per asset, cross-sectionally comparable
+```
+
+The `group` parameter tells LGBMRanker the query (date) boundaries. For daily cross-sections with ~213 assets, this works without any library changes.
+
+### NDCG as Optimization Target
+
+`LGBMRanker` defaults to NDCG optimization. For signal combination (rank assets by forward return prediction), NDCG is appropriate — it rewards correctly ordering the top decile.
+
+### Integration with Existing Code
+
+The existing `ml/expression_engine.py` has `Rank()` as an operator, but that computes cross-sectional ranks as features. The LGBMRanker is a level up: it learns to combine features into a final ranking, replacing a hand-crafted composite IC score.
+
+---
+
+## Decision 6: CTF Research Expansion — No New Libraries
+
+**Question:** What stack is needed for graduating CTF features to production, cross-asset composites, and lead-lag analysis?
+
+**Recommendation: Existing stack. No additions needed.**
+
+**Confidence: HIGH** (all CTF code already uses numpy, pandas, scipy, SQLAlchemy)
+
+### Verified Existing CTF Stack
+
+The `features/cross_timeframe.py` module is already written (Phase 90). It uses:
+- `numpy.polyfit` for rolling slope computation
+- `pandas.merge_asof` for timeframe alignment
+- `scipy` (indirectly via statsmodels correlations in `macro/lead_lag_analyzer.py`)
+- SQLAlchemy `text()` for DB reads/writes
+
+Graduating CTF to production means: running `refresh_ctf.py` on schedule, merging CTF columns into the feature matrix for bakeoff, and adding CTF columns to the IC sweep. All of these use existing infrastructure.
+
+The `macro/lead_lag_analyzer.py` is already implemented (Phase 70). Cross-asset composites use `macro/cross_asset.py`. No new libraries needed.
+
+---
+
+## Decision 7: FRED Macro Expansion (SP500/NASDAQ) — `fredapi` Already Covers It
+
+**Question:** What is needed to add SP500/NASDAQCOM/DJIA/NASDAQ100 equity indices to the FRED pipeline?
+
+**Recommendation: Use existing `fredapi 0.5.2`. The series IDs are valid FRED series. No new libraries needed.**
+
+**Confidence: HIGH** (FRED series IDs verified directly at fred.stlouisfed.org; fredapi 0.5.2 already handles these)
+
+### Verified FRED Series IDs
+
+| Series | FRED ID | Frequency | History |
+|--------|---------|-----------|---------|
+| S&P 500 | `SP500` | Daily (market close) | 10 years only (S&P licensing limitation) |
+| NASDAQ Composite | `NASDAQCOM` | Daily (market close) | Full history from 1971-02-05 |
+| Dow Jones Industrial Average | `DJIA` | Daily (market close) | 10 years only (S&P/Dow Jones licensing) |
+| NASDAQ-100 | `NASDAQ100` | Daily (market close) | Full history from 1986-01-02 |
+| Russell 2000 | N/A | N/A | REMOVED from FRED in October 2019 |
+
+**CRITICAL:** Russell 2000 is NOT available on FRED. FTSE Russell withdrew all 36 series from FRED in October 2019. If Russell 2000 exposure is needed, use `yfinance` with ticker `^RUT`. However, for the macro feature pipeline, the other four indices provide adequate equity regime coverage.
+
+**CRITICAL:** SP500 and DJIA are limited to 10 years of daily history by licensing agreement with S&P Dow Jones Indices. For a project with data going back to 2013+, this means SP500 will have a gap before ~2016. The existing forward-fill logic in `macro/forward_fill.py` already handles this gracefully.
+
+### What's Already Partially Done
+
+The `macro/forward_fill.py` already has `SP500`, `NASDAQCOM`, `DJIA`, and `NASDAQ100` in the `FFILL_LIMITS` dict (lines 71-74) — they were pre-wired but not yet added to:
+1. `fred_reader.py` SERIES_TO_LOAD list
+2. `feature_computer.py` _RENAME_MAP
+3. The VM's GCP FRED collection scripts (where the data is fetched from FRED API)
+4. The `fred.fred_macro_features` DB schema (Alembic migration needed)
+
+The work is code changes to existing files, not new library adoption.
+
+### yfinance as Fallback (Optional, Not Recommended)
+
+`yfinance 0.2.53` is installed in `.venv311` (confirmed in `requirements-311.txt`). It can fetch `^GSPC`, `^IXIC`, `^DJI`, `^NDX`, `^RUT`. This provides a fallback for the SP500/DJIA 10-year window limitation.
+
+**However:** Do NOT use yfinance as the primary source for equity indices in the FRED pipeline. The existing pipeline syncs from the GCP VM (which uses fredapi). Mixing data sources for the same series creates provenance complexity. Use `fredapi` for FRED series. If the 10-year SP500 window is insufficient, note the limitation in the feature documentation and accept it — crypto strategies are unlikely to require equity data before 2016.
+
+---
+
+## Summary: Stack Delta for v1.3.0
+
+| Category | Additions | Removals |
+|----------|-----------|----------|
+| Core dependencies | **None** | None |
+| New optional group `ml` | `shap>=0.51.0`, `xgboost>=3.2.0` | None |
+| Scheduling | None (use Windows Task Scheduler + existing `schedule 1.2.2`) | None |
+| Backtest scaling | None (vectorbt + multiprocessing + numpy already sufficient) | None |
+| LGBMRanker | None (LightGBM 4.6.0 `LGBMRanker` already available) | None |
+| CTF research | None (numpy + pandas + scipy already used) | None |
+| FRED equity indices | None (fredapi 0.5.2 already covers SP500/NASDAQ series) | None |
+
+**Net new libraries: 2** (`shap`, `xgboost`). Both are targeted additions for specific capability gaps, not exploratory adoption.
+
+---
+
+## Recommended pyproject.toml Changes
+
+```toml
+# Add this new optional group:
+[project.optional-dependencies]
+ml = [
+    "shap>=0.51.0",      # SHAP values for LGBMRanker and XGBClassifier interpretability
+    "xgboost>=3.2.0",    # XGBoost meta-label filter (complements LightGBM in double_ensemble.py)
+]
+
+# Update the 'all' group to include ml:
+all = [
+    # ... existing entries ...
+    "shap>=0.51.0",
+    "xgboost>=3.2.0",
+]
+```
+
+No changes to core `dependencies` block. These remain optional because the platform runs without them — the existing `MetaLabeler` (RandomForest) and `feature_importance.py` (MDA/SFI) continue to work.
 
 ---
 
@@ -367,57 +459,66 @@ Source: [PostgreSQL pg_total_relation_size](https://pgpedia.info/p/pg_total_rela
 
 | Candidate | Why NOT |
 |-----------|---------|
-| **pg_partman** (table partitioning) | The _u tables are not large enough to need partitioning. The biggest (_u table for AMA) will be ~91M rows. PostgreSQL handles this fine with proper indexes. Partitioning adds operational complexity. |
-| **pgloader** (data migration tool) | We are not migrating data between databases. The sync scripts already moved data into _u tables. We are dropping source tables. |
-| **Great Expectations** | Overkill for this milestone. The validation needs are simple (row counts, aggregate checksums) and well-served by raw SQL + pandas. |
-| **dbt** (data build tool) | The project uses a Python-script pipeline, not a SQL-first pipeline. Introducing dbt for one milestone would create two paradigms. |
-| **Any ORM models for the siloed tables** | The project uses raw SQL for performance-critical paths. Adding SQLAlchemy ORM models for tables about to be dropped is wasted effort. |
-| **Database migration testing frameworks** (besides pytest-alembic) | `django-test-migrations` is Django-specific. Other frameworks are too heavy for this use case. |
+| **APScheduler** | v4.0 is alpha-only; v3.11.2 would duplicate `schedule 1.2.2` already installed; Windows Task Scheduler is more robust for this use case |
+| **Celery** | Distributed task queue designed for multi-machine deployments; this is a single-machine research platform; massive overkill |
+| **Prefect / Airflow / Luigi** | Full workflow orchestration systems; `run_daily_refresh.py` already orchestrates the pipeline as a Python script |
+| **Ray** | Distributed computing for multi-machine parallelism; overkill; `multiprocessing.Pool` handles 460K runs within a single machine |
+| **Dask** | Lazy evaluation and distributed DataFrames; pandas 3.0 + numpy 2.4 is sufficient; Dask adds operational complexity |
+| **pandas-datareader** | Only needed for FRED data; `fredapi` already covers the required equity index series (`SP500`, `NASDAQCOM`, `DJIA`, `NASDAQ100`) |
+| **yfinance (as primary FRED replacement)** | Would create dual-source provenance for the same time series; acceptable only as a Russell 2000 fallback |
+| **CatBoost** | Third gradient boosting framework; LightGBM + XGBoost already provides a valid A/B comparison |
+| **PyTorch / TensorFlow** | No deep learning capability is planned for v1.3.0; gradient boosting is sufficient for the feature counts involved (100-300 features) |
+| **Great Expectations / dbt** | Data quality and SQL-first pipeline frameworks; overkill given the existing audit scripts and SQLAlchemy patterns |
+| **pytest-alembic** | Recommended in v1.1.0 STACK.md as an optional dev addition; still optional for v1.3.0 |
 
 ---
 
-## Installation
+## Integration Notes for Phase Authors
 
-No new core dependencies. One optional dev dependency:
+### ML Signal Combination (SHAP + XGBoost)
 
-```bash
-# Optional: Alembic migration tests
-pip install pytest-alembic>=0.12.1
+The lazy import pattern from `double_ensemble.py` should be replicated:
+
+```python
+# In any new ML module using XGBoost or SHAP:
+try:
+    import xgboost as xgb
+    import shap
+except ImportError:  # pragma: no cover
+    xgb = None
+    shap = None
 ```
 
-No changes to `pyproject.toml` core dependencies. The optional addition to dev dependencies:
+This keeps the module importable in CI environments that don't install the `ml` extras.
 
-```toml
-# Only if pytest-alembic is adopted
-dev = [
-    # ... existing entries ...
-    "pytest-alembic>=0.12.1",
-]
-```
+### Massive Backtest Scaling
 
----
+The `MultiprocessingOrchestrator` in `orchestration/multiprocessing_orchestrator.py` is the correct abstraction for 460K+ runs. Do not create a new parallel mechanism. Extend the existing orchestrator's `config` dataclass (`OrchestratorConfig`) if additional configuration is needed (e.g., chunk size for resume-safety).
 
-## Summary: Stack Delta for v1.1.0
+### FRED Equity Indices
 
-| Category | Additions | Removals |
-|----------|-----------|----------|
-| Core dependencies | **None** | None |
-| Dev dependencies | `pytest-alembic>=0.12.1` (optional) | None |
-| Python patterns | SourceConfig dataclass + registry dict | 3 duplicated builder files |
-| PostgreSQL | DROP TABLE (already available) | 30 siloed tables + 30 state tables |
-| Scripts | 1 unified builder, ~30 modified scripts | 6 sync scripts, 3 source-specific builders |
+The pipeline to add SP500/NASDAQCOM/DJIA/NASDAQ100 requires changes to four existing files only:
+1. `macro/fred_reader.py` — add to `SERIES_TO_LOAD`
+2. `macro/feature_computer.py` — add to `_RENAME_MAP` and compute derived features (momentum, volatility)
+3. `scripts/etl/sync_fred_from_vm.py` (or the GCP VM collection script) — ensure series are collected
+4. One Alembic migration — add columns to `fred.fred_macro_features`
 
-**The stack is already right. The work is in the code, not in the tooling.**
+Do NOT create a separate equity index pipeline. The FRED macro pipeline already handles forward-filling, provenance tracking, and DB upserts. These indices belong in the same `fred.fred_macro_features` table.
 
 ---
 
 ## Sources
 
-- [PostgreSQL DROP TABLE Documentation](https://www.postgresql.org/docs/current/sql-droptable.html) -- Confirms immediate disk space reclamation
-- [PostgreSQL VACUUM Documentation](https://www.postgresql.org/docs/current/sql-vacuum.html) -- Confirms VACUUM FULL not needed for DROP TABLE
-- [PostgreSQL pg_total_relation_size](https://pgpedia.info/p/pg_total_relation_size.html) -- Table size monitoring
-- [pytest-alembic on PyPI](https://pypi.org/project/pytest-alembic/) -- v0.12.1, May 2025
-- [Alembic Operation Reference](https://alembic.sqlalchemy.org/en/latest/ops.html) -- `op.drop_table()` documentation
-- [Python Registry Pattern](https://dev.to/dentedlogic/stop-writing-giant-if-else-chains-master-the-python-registry-pattern-ldm) -- Pattern reference
-- [Data Migration Validation Best Practices](https://www.quinnox.com/blogs/data-migration-validation-best-practices/) -- Layered validation approach
-- [Data Migration Testing Guide](https://datalark.com/blog/data-migration-testing-guide) -- Row count + checksum methodology
+- [shap on PyPI](https://pypi.org/project/shap/) — v0.51.0 confirmed March 4, 2026
+- [SHAP release notes](https://shap.readthedocs.io/en/latest/release_notes.html) — v0.51.0: pandas 3.0 compatibility, XGBoost compatibility
+- [xgboost on PyPI](https://pypi.org/project/xgboost/) — v3.2.0 confirmed February 10, 2026
+- [XGBoost installation guide](https://xgboost.readthedocs.io/en/stable/install.html) — Python >=3.10, Windows wheels available
+- [APScheduler on PyPI](https://pypi.org/project/APScheduler/) — stable 3.11.2 (December 2025); 4.0 still alpha
+- [LightGBM LGBMRanker docs](https://lightgbm.readthedocs.io/en/stable/pythonapi/lightgbm.LGBMRanker.html) — confirmed in 4.6.0 stable
+- [joblib on PyPI](https://pypi.org/project/joblib/) — v1.5.3 released December 15, 2025
+- [FRED SP500 series](https://fred.stlouisfed.org/series/SP500) — 10-year daily window; licensing limitation confirmed
+- [FRED NASDAQCOM series](https://fred.stlouisfed.org/series/NASDAQCOM) — full history from 1971
+- [FRED NASDAQ100 series](https://fred.stlouisfed.org/series/NASDAQ100) — full history from 1986
+- [FRED Russell 2000 removal notice](https://fred.stlouisfed.org/series/RU2000VTR) — confirmed removed October 2019
+- [yfinance on PyPI](https://pypi.org/project/yfinance/) — v1.2.0 released February 16, 2026 (reference only, not recommended as primary source)
+- [schedule library docs](https://schedule.readthedocs.io/) — v1.2.0 stable; v1.2.2 installed in this project

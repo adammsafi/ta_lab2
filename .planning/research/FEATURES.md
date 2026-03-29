@@ -1,480 +1,1174 @@
-# Feature Landscape: Pipeline Consolidation & Storage Optimization
+# Feature Landscape: v1.3.0 Operational Activation & Research Expansion
 
-**Domain:** Infrastructure consolidation for quantitative trading data pipeline
-**Researched:** 2026-03-19
-**Confidence:** HIGH (all findings derived from direct codebase analysis)
+**Domain:** Operational activation + research scaling for an existing quant trading platform
+**Researched:** 2026-03-29
+**Confidence:** HIGH (primary source: codebase direct analysis; supported by web research)
 
 ## Scope
 
-This document maps the feature landscape for consolidating ta_lab2's data pipeline:
+This document maps the feature landscape for v1.3.0 across five capability areas:
 
-1. **1D Bar Builder Consolidation** -- 3 source-specific builders (CMC: 822 LOC, TVC: 511 LOC, HL: 585 LOC) into a generalized builder with source registry
-2. **_u Table Direct-Write Migration** -- Eliminate 30 siloed tables (6 families x 5 variants) by writing directly to unified `_u` tables
-3. **Sync Script Elimination** -- Remove 6 sync-to-_u scripts (771 LOC total) that become unnecessary
+1. **Operational Activation** — Wiring signal generation, paper executor, and portfolio
+   into a reliably automated daily loop
+2. **Massive Backtest Scaling** — From 2 trade-level runs to 460K+, with Monte Carlo on every run
+3. **ML Signal Combination** — LightGBM rank prediction, SHAP feature selection,
+   XGBoost meta-label filtering
+4. **CTF Graduation** — Promoting CTF research features into the live production pipeline
+5. **FRED Equity Indices** — Adding SP500/NASDAQ/DJIA/R2K to the macro pipeline
 
-### Current Scale
-
-| Category | Count | Lines |
-|----------|-------|-------|
-| 1D bar builders (source-specific) | 3 | 1,915 |
-| Multi-TF bar builders (siloed) | 5 | 5,303 |
-| Return builders (siloed) | 4 | 2,428 |
-| Sync-to-_u scripts | 6 | 771 |
-| EMA builders (siloed) | 3 | ~2,000 est. |
-| AMA builders (siloed) | 3 | ~2,000 est. |
-| **Total consolidation surface** | **24** | **~14,400** |
+**What is already built and NOT scope here:**
+The paper executor, signal generators, BL portfolio construction, risk engine, GARCH
+volatility, CTF infrastructure, and FRED macro pipeline all exist. This research
+documents what features each capability NEEDS to work at scale, what makes it
+production-grade, and what traps to avoid.
 
 ---
 
-## Table Stakes
+## Area 1: Operational Activation
 
-Features the consolidated pipeline MUST have. Missing any of these means the consolidation is unsafe or incomplete.
+### What "Paper Trading at Scale" Actually Means
 
-### TS-1: Source Registry with Declarative Configuration
+The executor exists and is wired into `run_daily_refresh.py` (`--execute` stage). Signal
+generators also exist (`refresh_signals_ema_crossover`, `refresh_signals_rsi_mean_revert`,
+`refresh_signals_atr_breakout`). The gap: signals are generated but the executor is not
+running on a schedule, and no one is watching the pipeline health.
 
-**Why Expected:** The 3 existing 1D builders differ in exactly 5 dimensions: source table/JOINs, OHLC repair eligibility, backfill detection, venue_id mapping, and post-build hooks. A registry makes these differences explicit and declarative rather than duplicated across 3 files.
-
-**Complexity:** Medium
-
-**What It Looks Like:**
-
-```python
-@dataclass(frozen=True)
-class SourceConfig:
-    """Declarative config for one data source."""
-    name: str                          # e.g. "CMC", "TVC", "Hyperliquid"
-    source_table: str                  # e.g. "public.cmc_price_histories7"
-    source_schema: str                 # JOINs needed to reach OHLCV
-    venue_id: int                      # dim_venues FK (1=CMC_AGG, 2=HL, 9=TVC)
-    venue_name: str                    # e.g. "HYPERLIQUID"
-    id_resolution: IdResolution        # how to map source IDs to dim_assets.id
-    ohlc_repair: bool                  # CMC has timehigh/timelow repair; TVC/HL do not
-    backfill_detection: bool           # CMC tracks daily_min_seen; TVC/HL do not
-    has_market_cap: bool               # CMC has marketcap; TVC/HL do not
-    post_build_hooks: list[Callable]   # e.g. _sync_1d_to_multi_tf for TVC/HL
-    asset_filter: AssetFilter | None   # e.g. HL_YN.csv filter, None for CMC/TVC
-```
-
-**Dependencies:** Requires dim_venues, dim_asset_identifiers, dim_listings to exist.
-
-**Evidence from codebase:** Each builder currently hardcodes these 5 dimensions. The differences are well-defined and stable:
-- CMC reads `cmc_price_histories7` directly (no JOIN), has 6-CTE OHLC repair, tracks `daily_min_seen`
-- TVC reads `tvc_price_histories` via `dim_listings` JOIN, no repair, no backfill detection
-- HL reads `hyperliquid.hl_candles` via `dim_asset_identifiers` + `dim_listings` JOIN, no repair, filters via `HL_YN.csv`
-
-### TS-2: Preserved Source-Specific SQL Generation
-
-**Why Expected:** The OHLC repair logic (lines 253-496 of `refresh_price_bars_1d.py`) is CMC-specific and critical for data quality. The TVC/HL builders legitimately skip it. The consolidation must preserve these source-specific SQL paths, not force a one-size-fits-all query.
-
-**Complexity:** Low (these already exist; the task is not losing them)
-
-**What It Looks Like:** The registry's `SourceConfig` determines which SQL template to use. CMC gets the 6-CTE repair pipeline. TVC/HL get simpler SELECTs with GREATEST/LEAST for OHLCV invariants. The generalized builder delegates SQL generation to a `build_insert_sql(source_config) -> str` function that dispatches on config flags.
-
-**Dependencies:** None beyond current code.
-
-**Risk:** Accidentally unifying the SQL when sources genuinely need different CTEs. The temptation to "simplify" by making one query serve all sources would break CMC's timehigh/timelow repair and HL's cross-schema JOIN.
-
-### TS-3: Venue-Aware State Table
-
-**Why Expected:** The three builders currently use incompatible state table schemas. CMC uses PK `(id, tf)`, while HL uses PK `(id, venue_id, tf)`. The consolidated builder needs a single state table that handles multi-venue state.
-
-**Complexity:** Medium
-
-**Current state table schemas (incompatible):**
-
-| Builder | State Table PK | Has venue_id | Has daily_min_seen |
-|---------|---------------|--------------|-------------------|
-| CMC 1D | `(id, tf)` | No | Yes |
-| TVC 1D | `(id, tf)` (shared with CMC!) | No | No |
-| HL 1D | `(id, venue_id, tf)` | Yes | No |
-
-**What It Looks Like:** A single state table with PK `(id, venue_id, tf)` where `venue_id` defaults to 1 (CMC_AGG). Existing CMC/TVC state rows migrate by adding `venue_id=1`. Backfill detection columns (`daily_min_seen`) become optional per source registry config.
-
-**Dependencies:** Must not break CMC/TVC which currently share the same state table.
-
-**Risk:** CMC and TVC currently share `price_bars_1d_state` with PK `(id, tf)`. Adding `venue_id` to the PK requires an ALTER TABLE + data migration. This must happen before the consolidated builder runs.
-
-### TS-4: alignment_source Tag for Direct _u Writes
-
-**Why Expected:** The current _u tables use `alignment_source` (e.g. "multi_tf", "multi_tf_cal_us") to distinguish which pipeline produced each row. Direct-write builders must set this tag at write time, not in a separate sync step.
-
-**Complexity:** Low
-
-**What It Looks Like:** The `alignment_source` value is derived from the builder configuration, added to the output DataFrame/SQL before upsert. The existing `upsert_bars()` function in `common_snapshot_contract.py` already handles column lists dynamically.
-
-**Dependencies:** The `alignment_source` column must exist in target tables (it already does in all _u tables).
-
-**Evidence from codebase:** `sync_utils.py` line 68: `alignment_source_from_table()` derives the tag from table name. In the consolidated pipeline, this becomes a builder config property instead.
-
-### TS-5: Idempotent Upsert with Correct PK for _u Tables
-
-**Why Expected:** _u tables have a different PK than siloed tables -- they include `alignment_source`. The direct-write path must use the correct ON CONFLICT target.
-
-**Complexity:** Low
-
-**Current PKs across families:**
-
-| Family | Siloed PK | _u Table PK (adds alignment_source) |
-|--------|-----------|--------------------------------------|
-| Price Bars | `(id, tf, bar_seq, venue_id, timestamp)` | + `alignment_source` |
-| Bar Returns | `(id, venue_id, timestamp, tf)` | + `alignment_source` |
-| EMA Values | `(id, venue_id, ts, tf, period)` | + `alignment_source` |
-| EMA Returns | similar | + `alignment_source` |
-| AMA Values | similar | + `alignment_source` |
-| AMA Returns | similar | + `alignment_source` |
-
-**What It Looks Like:** Each builder's `upsert_bars()` call specifies `conflict_cols` matching the _u table PK. This is already parameterized in `common_snapshot_contract.py` line 860.
-
-### TS-6: Backward-Compatible CLI Interface
-
-**Why Expected:** `run_all_bar_builders.py` orchestrates 9 builders via subprocess with specific CLI signatures. `run_daily_refresh.py` calls these in a defined order. The consolidated builder must maintain CLI compatibility or update the orchestrators.
-
-**Complexity:** Medium
-
-**Recommendation:** Thin wrapper scripts that instantiate the generalized builder with the right registry config. Each existing script becomes a 10-line wrapper:
-
-```python
-# refresh_price_bars_1d.py (wrapper, preserves CLI contract)
-from ta_lab2.scripts.bars.generalized_1d_builder import Generalized1DBarBuilder
-from ta_lab2.scripts.bars.source_registry import CMC_SOURCE
-
-if __name__ == "__main__":
-    Generalized1DBarBuilder.main(source_config=CMC_SOURCE)
-```
-
-This approach is safer than a `--source` flag because `run_all_bar_builders.py` calls builders by script path (line 194: `script_dir / builder.script_path`).
-
-**Dependencies:** `run_all_bar_builders.py`, `run_daily_refresh.py` both call builders by script path.
-
-### TS-7: Incremental Refresh Preserved (No Full Rebuild Required)
-
-**Why Expected:** The pipeline runs daily. Incremental refresh is the default mode, rebuilding only new data since the last watermark. This MUST work identically in the consolidated pipeline.
-
-**Complexity:** Low (already implemented in BaseBarBuilder)
-
-**What It Looks Like:** The `_run_incremental()` method in `BaseBarBuilder` already handles this via state table lookback. The consolidated builder inherits this behavior unchanged.
-
-**Dependencies:** State table must be consistent (see TS-3).
-
-### TS-8: Coverage Tracking
-
-**Why Expected:** All three 1D builders upsert to `asset_data_coverage` after building bars. This metadata table tracks n_rows, n_days, first_ts, last_ts per (id, source_table, granularity). Downstream analytics depend on it.
-
-**Complexity:** Low
-
-**Evidence from codebase:** `upsert_coverage()` is called in all three builders identically. The consolidated builder does the same via the shared `common_snapshot_contract.py` helper.
+Operational activation means the daily loop runs automatically, alerts when broken, and
+has enough observability to know if signals stopped flowing before positions are taken.
 
 ---
 
-## Differentiators
+### Table Stakes — Operational Activation
 
-Features that improve the pipeline beyond its current state. Not expected, but high-value.
+#### OA-TS-1: Automated Daily Schedule (Mandatory)
 
-### D-1: Single-Pass Multi-Source Build
+**Why Expected:** A signal-to-fill pipeline that requires manual invocation is not operational.
+The executor reads signal freshness and raises `StaleSignalError` if signals exceed `cadence_hours`.
+Without a scheduler, this fires on every manual run after a missed day.
 
-**Value Proposition:** Currently, running all 3 sources requires 3 separate invocations (3 process startups, 3 state table reads). A consolidated builder could run all sources in a single invocation with shared DB connections.
-
-**Complexity:** Medium
+**Complexity:** Low
 
 **What It Looks Like:**
+The existing `run_daily_refresh.py --all` covers the full pipeline in the correct STAGE_ORDER
+(signals → signal_validation_gate → calibrate_stops → portfolio → executor). Schedule this
+once daily via Windows Task Scheduler, cron, or systemd timer. Nothing new to build — the
+scheduler is the missing piece.
 
+**Critical constraint:** Executor runs AFTER signals stage. If signals stage fails, executor
+must not run on stale data. The existing `ComponentResult.success` check in
+`run_daily_refresh.py` handles this: if any stage returns `success=False`, downstream stages
+stop unless `--continue-on-error` is passed.
+
+**Dependencies:** None — this is a scheduler configuration task, not a code task.
+
+---
+
+#### OA-TS-2: Signal Freshness Guard Behavior at Scale (Mandatory)
+
+**Why Expected:** `SignalReader.check_signal_freshness()` raises `StaleSignalError` when
+`age_hours > cadence_hours` and `last_watermark_ts IS NOT NULL`. This is correct behavior,
+but needs tuning for production: cadence_hours in `dim_executor_config` must match the actual
+signal generation cadence (currently 24h for daily signals).
+
+**Complexity:** Low
+
+**What It Looks Like:** Each row in `dim_executor_config` has `cadence_hours`. For daily
+signals, set `cadence_hours = 36` to allow a 12-hour buffer for late runs without triggering
+false stale alerts. For weekly signals, `cadence_hours = 192` (8 days). Stale signals trigger
+Telegram alert via `_try_telegram_alert()` — this path is already wired.
+
+**Evidence from codebase:** `executor/paper_executor.py` lines 161-174 handle StaleSignalError
+by sending Telegram alert and writing `status="stale_signal"` to `executor_run_log`. The
+infrastructure is complete; only `cadence_hours` values need calibration.
+
+---
+
+#### OA-TS-3: Run Log Monitoring (Mandatory)
+
+**Why Expected:** A production executor must produce an auditable trail. The
+`executor_run_log` table exists and is written on every run. Monitoring means
+querying this table and alerting when `status != 'success'`.
+
+**Complexity:** Low
+
+**What It Looks Like:**
+```sql
+-- Detect executor failures in the last 48h
+SELECT config_ids, status, error_message, finished_at
+FROM executor_run_log
+WHERE finished_at > now() - interval '48 hours'
+  AND status NOT IN ('success', 'no_signals')
+ORDER BY finished_at DESC;
+```
+The existing `pipeline_alerts` stage in `run_daily_refresh.py` is the right hook for this.
+The `pipeline_run_log` table from Phase 87 captures stage-level success/failure.
+
+**Dependencies:** `pipeline_run_log` table (Phase 87, already built in v1.2.0).
+
+---
+
+#### OA-TS-4: dim_executor_config Populated for All Active Strategies (Mandatory)
+
+**Why Expected:** The executor reads `dim_executor_config WHERE is_active = TRUE`. If
+this table has zero active rows, the executor logs "no active executor configs found"
+and returns `status = "no_configs"` — a silent no-op. The executor appears to run but
+does nothing.
+
+**Complexity:** Low
+
+**What It Looks Like:** Each signal type (ema_crossover, rsi_mean_revert, atr_breakout)
+needs at least one active row in `dim_executor_config` with `is_active = TRUE` and
+correct `signal_type`, `signal_id`, and `cadence_hours`. The `seed_executor_config.py`
+script handles this.
+
+**Evidence from codebase:** `executor/paper_executor.py` line 121: early return on empty
+configs. `scripts/executor/seed_executor_config.py` exists for seeding.
+
+---
+
+#### OA-TS-5: Position Isolation by strategy_id (Mandatory)
+
+**Why Expected:** The executor supports multiple strategies simultaneously. Each strategy
+must have isolated positions — EMA crossover should not see RSI mean revert's position
+when computing delta. `OrderManager.process_fill()` takes `strategy_id` for this purpose.
+
+**Complexity:** Low
+
+**What It Looks Like:** `positions` table has `strategy_id` column. Each
+`dim_executor_config` row gets a unique `config_id` which becomes `strategy_id` in fills.
+The `_process_asset_signal()` method queries:
+```sql
+SELECT quantity FROM positions
+WHERE asset_id = :asset_id AND exchange = :exchange AND strategy_id = :strategy_id
+```
+This is already implemented. Operational risk: seeding two configs with the same
+`signal_id` would result in duplicate order generation for the same signal.
+
+---
+
+#### OA-TS-6: Parity Checker Runs After Burn-In (Mandatory)
+
+**Why Expected:** The parity checker (`parity_checker.py`) correlates paper executor PnL
+with backtest replay PnL. If correlation drops below threshold, it indicates the executor
+is not following the strategy as backtested — a critical operational alarm.
+
+**Complexity:** Low (already built; needs to be scheduled)
+
+**What It Looks Like:** Run weekly or after significant drawdown:
 ```bash
-# Current: 3 separate invocations
-python -m ta_lab2.scripts.bars.refresh_price_bars_1d --ids all
-python -m ta_lab2.scripts.bars.refresh_tvc_price_bars_1d --ids all
-python -m ta_lab2.scripts.bars.refresh_hl_price_bars_1d --ids all
-
-# Consolidated: single invocation
-python -m ta_lab2.scripts.bars.refresh_price_bars_1d --source all --ids all
-# or select specific sources:
-python -m ta_lab2.scripts.bars.refresh_price_bars_1d --source CMC,HL --ids all
+python -m ta_lab2.scripts.executor.run_parity_check \
+  --bakeoff-winners \
+  --start 2025-01-01 --end 2025-12-31 \
+  --pnl-correlation-threshold 0.90
 ```
-
-**When to Build:** Phase 2 (after basic consolidation works). Not required for MVP.
-
-### D-2: Automatic Post-Build Hooks
-
-**Value Proposition:** TVC and HL builders currently have a manual `_sync_1d_to_multi_tf()` call after `builder.run()`. This is fragile -- if the sync fails, 1D bars exist but are invisible to the multi-TF pipeline. A hook system makes this automatic and retry-safe.
-
-**Complexity:** Low
-
-**What It Looks Like:** The source registry includes `post_build_hooks: list[Callable]`. After `build_bars_for_id()` succeeds, hooks run in order.
-
-**Evidence from codebase:**
-- `refresh_tvc_price_bars_1d.py` line 506: `_sync_1d_to_multi_tf(builder.config.db_url)` called after `builder.run()`
-- `refresh_hl_price_bars_1d.py` line 580: `_sync_1d_to_multi_tf(builder.config.db_url)` called after `builder.run()`
-
-Both are called outside the builder's transaction scope. If they fail, 1D bars exist but multi-TF pipeline does not see them until next sync.
-
-### D-3: _u Migration Validation Framework
-
-**Value Proposition:** When migrating from siloed-then-sync to direct-_u-write, you need to prove the new path produces identical results. `derive_multi_tf_from_1d.py` already has `validate_derivation_consistency()` (lines 738-807). Extending this pattern to validate _u migration provides safety.
-
-**Complexity:** Medium
-
-**What It Looks Like:**
-
-```python
-def validate_u_migration(
-    engine: Engine,
-    siloed_table: str,
-    u_table: str,
-    alignment_source: str,
-    sample_ids: list[int],
-    tolerance: float = 1e-10,
-) -> tuple[bool, list[str]]:
-    """Compare siloed table rows vs _u table rows for same alignment_source."""
-```
-
-Run during migration phase for each family. Once validated, flip write target.
-
-**Dependencies:** Both siloed and _u tables must exist simultaneously during migration.
-
-### D-4: Eliminate Duplicated psycopg Utilities
-
-**Value Proposition:** Each of the 3 builders duplicates `_normalize_db_url()`, `_connect()`, `_exec()`, `_fetchone()`, `_fetchall()` -- 5 functions x 3 files = 15 duplicate function definitions, ~180 lines of identical code.
-
-**Complexity:** Low
-
-**What It Looks Like:** Extract to `ta_lab2.scripts.bars.psycopg_utils` module. Each builder imports instead of redefining.
-
-**Evidence from codebase:**
-- `refresh_price_bars_1d.py` lines 78-148: 5 utility functions
-- `refresh_tvc_price_bars_1d.py` lines 56-100: same 5 functions (slightly simplified)
-- `refresh_hl_price_bars_1d.py` lines 66-120: same 5 functions
-
-### D-5: Unified Conflict Resolution Column Set
-
-**Value Proposition:** The three builders have slightly different ON CONFLICT column sets because the PK evolved incrementally:
-- CMC: `ON CONFLICT (id, tf, bar_seq, "timestamp")` -- no venue in PK
-- TVC: `ON CONFLICT (id, tf, bar_seq, venue, "timestamp")` -- venue as TEXT
-- HL: `ON CONFLICT (id, tf, bar_seq, venue_id, "timestamp")` -- venue_id as SMALLINT
-
-This inconsistency is a latent correctness issue. The consolidated builder uses a single, correct conflict target.
-
-**Complexity:** Low (but requires careful PK analysis)
-
-**Risk:** The `price_bars_1d` table DDL (in `common_snapshot_contract.py` line 165) defines PK as `(id, tf, bar_seq, venue, timestamp)` using TEXT venue. But HL writes `venue_id` as SMALLINT. This mismatch must be resolved -- likely by standardizing to `venue_id` across all sources, matching the PK migration already underway on the `refactor/strip-cmc-prefix-add-venue-id` branch.
-
-### D-6: Source-Aware Backfill Detection (Generalized)
-
-**Value Proposition:** Currently only CMC has backfill detection (tracks `daily_min_seen`, rebuilds if MIN(timestamp) decreases). TVC and HL lack this. A generalized builder could offer opt-in backfill detection for any source.
-
-**Complexity:** Medium
-
-**What It Looks Like:** The `backfill_detection: bool` flag in the source registry enables/disables the backfill check per source. When enabled, the same `_check_for_backfill()` logic from CMC applies to any source.
-
-**When to Build:** Phase 2. TVC and HL sources are less likely to have historical backfills, but future sources might.
-
-### D-7: Shadow-Write Migration Pattern
-
-**Value Proposition:** Instead of a hard cutover from siloed to _u, implement shadow writing: builders write to BOTH siloed and _u tables during a transition period. Once validation confirms parity (D-3), stop writing to siloed tables.
-
-**Complexity:** Medium
-
-**What It Looks Like:**
-
-```python
-class MigrationWriteMode(Enum):
-    SILOED_ONLY = "siloed"        # Current behavior
-    SHADOW = "shadow"             # Write to both siloed + _u
-    UNIFIED_ONLY = "unified"      # Target state (post-migration)
-```
-
-The mode is configurable per family, per environment. Shadow mode doubles write load but ensures safe migration with rollback capability.
-
-**When to Build:** Essential for the _u migration phase. Without this, migration is a risky big-bang cutover.
-
-### D-8: Dead Table Cleanup Registry
-
-**Value Proposition:** After migration, 30 siloed tables and 6 sync scripts become dead weight. A cleanup registry tracks which tables are deprecated, when they were last written to, and whether any consumers still read them.
-
-**Complexity:** Low
-
-**What It Looks Like:** A `dim_table_lifecycle` table or YAML config that marks tables as ACTIVE, SHADOW, DEPRECATED, or ARCHIVED. The daily refresh orchestrator warns if deprecated tables are still referenced.
+Exit code 1 = correlation below threshold but script ran. Alert if exit code 1.
 
 ---
 
-## Anti-Features
+### Differentiators — Operational Activation
 
-Things to deliberately NOT build during this consolidation. Common over-engineering traps.
+#### OA-D-1: Multi-Strategy Dashboard View (High Value)
 
-### AF-1: Generic ORM-Based Bar Builder
+**Value Proposition:** 17 Streamlit pages exist but no single view shows "all active
+strategies, current positions, today's signals, last executor run status" in one glance.
+An operator view that renders in under 5 seconds is the first thing needed when the daily
+run completes.
 
-**Why Avoid:** The 1D builders use raw psycopg + SQL CTEs for performance. CMC's bar building is a single 500-line SQL CTE that does bar_seq assignment, OHLC repair, invariant enforcement, and upsert in one round-trip. Replacing this with ORM-based Python logic would be 5-10x slower and lose atomicity.
+**Complexity:** Medium
 
-**What to Do Instead:** Keep SQL CTEs per source. The consolidation unifies Python scaffolding (CLI, state, logging), not the SQL core.
+**What It Looks Like:**
+```
+| Strategy    | Signals Today | Orders | Fills | Status     | Last Run    |
+|-------------|---------------|--------|-------|------------|-------------|
+| ema_trend   | 12 assets     | 3      | 3     | SUCCESS     | 2026-03-29  |
+| rsi_revert  | 8 assets      | 1      | 1     | SUCCESS     | 2026-03-29  |
+| atr_break   | 0 assets      | 0      | 0     | NO_SIGNALS  | 2026-03-29  |
+```
+Sources: `executor_run_log` + `positions` + `signals_*` tables.
 
-**Evidence:** `refresh_price_bars_1d.py` lines 253-496 is a single CTE that runs in ~1 second per asset. A Python-side row-by-row equivalent would take 10-30 seconds.
+---
 
-### AF-2: Real-Time / Streaming Bar Builder
+#### OA-D-2: Burn-In Progress Tracker (High Value)
 
-**Why Avoid:** The pipeline is daily-batch. Adding real-time capability requires a fundamentally different architecture (message queues, streaming state, exactly-once delivery). This is out of scope for v1.1.0 consolidation.
+**Value Proposition:** `daily_burn_in_report.py` from Phase 88 exists but is run manually.
+An automated weekly burn-in report appended to the dashboard makes the "ON TRACK / WARNING /
+STOP" verdict visible without manual invocation.
 
-**What to Do Instead:** Keep batch mode. If real-time is needed later, it would be a separate system.
+**Complexity:** Low
 
-### AF-3: Auto-Discovery of New Sources
+---
 
-**Why Avoid:** Tempting to build a system that auto-discovers new source tables and registers them. But each source has unique SQL (JOINs, column mappings, repair logic). Auto-discovery cannot derive these.
+#### OA-D-3: Cadence-Aware Stale Signal Escalation (Medium Value)
 
-**What to Do Instead:** Manual registry. Adding a new source means adding one `SourceConfig` entry with its SQL template. This is a 10-minute task, not a daily operation.
+**Value Proposition:** Currently, stale signals always fire `StaleSignalError` (hard stop).
+For strategies with known data gaps (weekends, holidays), a grace-period escalation would
+log WARNING for <48h staleness and only ERROR after that.
 
-### AF-4: Parallel Multi-Source ID Processing
+**Complexity:** Medium
 
-**Why Avoid:** Running CMC, TVC, and HL builders concurrently for the same asset ID could cause write conflicts on `price_bars_1d` (same output table, same PK). The current sequential-per-source approach is safe.
+---
 
-**What to Do Instead:** Sources run sequentially (CMC, then TVC, then HL). Within each source, IDs can run in parallel (existing `--num-processes` flag).
+### Anti-Features — Operational Activation
 
-### AF-5: Dynamic Schema Evolution for _u Tables
+#### OA-AF-1: Live Exchange Order Placement
 
-**Why Avoid:** Tempting to build a system that automatically adds columns to _u tables when source schemas change. But schema changes require careful thought about defaults, NULL handling, and downstream consumers.
+**Why Avoid:** The executor is deliberately a PAPER executor. Connecting it to a live
+exchange order book (Coinbase/Kraken production API) before 4+ weeks of paper burn-in
+data and parity correlation >= 0.90 is premature. Risk: a bad signal or bug causes real
+financial loss.
 
-**What to Do Instead:** Schema changes are explicit Alembic migrations. The `_build_column_mapping()` in `sync_utils.py` already handles missing columns by inserting NULL.
+**What to Do Instead:** Complete the burn-in protocol. Gate live trading on explicit
+parity check passing.
 
-### AF-6: Materialized View Replacement for _u
+---
 
-**Why Avoid:** A materialized view that UNIONs all 5 siloed tables would "look like" a _u table but have terrible performance (full refresh on every REFRESH). The current approach (INSERT ON CONFLICT DO NOTHING with ingested_at watermark) is incrementally maintainable.
+#### OA-AF-2: Per-Minute Signal Cadence
 
-**What to Do Instead:** Direct writes to _u tables with alignment_source tag.
+**Why Avoid:** The bar pipeline is daily-batch. Running the executor more frequently than
+the bar cadence just re-processes already-processed signals (watermark prevents duplicates)
+but adds complexity and load.
 
-### AF-7: Over-Abstracting the 6 Table Families
+**What to Do Instead:** Keep executor cadence matched to signal cadence (daily = 1x/day).
 
-**Why Avoid:** Price bars, EMA values, EMA returns, AMA values, AMA returns, and bar returns have similar pipeline structure but different semantics (different PKs, different column sets, different computation logic). Over-abstracting into a single "DataFamily" class that handles all 6 loses domain clarity.
+---
 
-**What to Do Instead:** Handle each family's _u migration independently. Share the `sync_utils.py` pattern and the shadow-write mechanism, but keep family-specific upsert logic.
+## Area 2: Massive Backtest Scaling
 
-### AF-8: Premature Siloed Table Deletion
+### What 460K Runs Actually Requires
 
-**Why Avoid:** Dropping 30 tables before confirming all downstream consumers (features, signals, regimes, backtests) have migrated to reading from _u tables is catastrophic. Some consumers may still query siloed tables directly.
+Current state: 78K aggregate bakeoff rows (aggregate metrics, no trade-level detail),
+2 trade-level runs in `backtest_runs`, zero Monte Carlo. Target: ~460K trade-level runs
+with Monte Carlo confidence intervals on every run.
 
-**What to Do Instead:** The migration has 3 explicit stages: (1) shadow-write, (2) redirect consumers, (3) deprecate siloed tables after a retention period with zero-read confirmation.
+The challenge is not algorithmic — the infrastructure exists. The challenge is:
+(a) resume-safe orchestration so partial runs can restart without duplicating work,
+(b) storage that does not become unqueryable at 20-40M trade rows,
+(c) pruning logic to skip hopeless parameter combos early.
+
+---
+
+### Table Stakes — Backtest Scaling
+
+#### BS-TS-1: Resume-Safe State Table (Mandatory)
+
+**Why Expected:** At 460K runs with ~30s each, the total compute is ~3,800 CPU-hours.
+Multiprocessing reduces wall time but crashes are inevitable. Without resume safety,
+a crash at run 300K means restarting from 0.
+
+**Complexity:** Medium
+
+**What It Looks Like:** A state table tracking completion:
+```sql
+CREATE TABLE backtest_run_state (
+    params_hash TEXT NOT NULL,
+    asset_id INT NOT NULL,
+    strategy_name TEXT NOT NULL,
+    tf TEXT NOT NULL,
+    cost_scenario TEXT NOT NULL,
+    status TEXT NOT NULL, -- 'pending', 'running', 'complete', 'failed'
+    completed_at TIMESTAMPTZ,
+    PRIMARY KEY (params_hash, asset_id, strategy_name, tf, cost_scenario)
+);
+```
+Orchestrator queries `WHERE status = 'pending'` to find work. On completion, `UPDATE status =
+'complete'`. On restart, already-complete combos are skipped.
+
+**Evidence from codebase:** `run_bakeoff.py` has `--overwrite` flag but no state table —
+skip-if-exists logic checks `strategy_bakeoff_results` directly. For 460K runs, this
+query becomes slow. A dedicated state table is faster and safer.
+
+---
+
+#### BS-TS-2: backtest_trades Table Partitioned by strategy_name (Mandatory)
+
+**Why Expected:** At 20-40M trade rows, a single unpartitioned `backtest_trades` table
+becomes slow for queries like "show all trades for strategy X" or "compute drawdown for
+run Y." PostgreSQL's range/list partitioning keeps each strategy's data co-located.
+
+**Complexity:** Medium
+
+**What It Looks Like:**
+```sql
+-- List partitioning by strategy (13 strategies = 13 partitions)
+CREATE TABLE backtest_trades (
+    run_id UUID,
+    strategy_name TEXT NOT NULL,
+    asset_id INT NOT NULL,
+    entry_ts TIMESTAMPTZ,
+    exit_ts TIMESTAMPTZ,
+    entry_price NUMERIC,
+    exit_price NUMERIC,
+    qty NUMERIC,
+    pnl NUMERIC
+) PARTITION BY LIST (strategy_name);
+
+CREATE TABLE backtest_trades_ema_trend
+    PARTITION OF backtest_trades FOR VALUES IN ('ema_trend');
+-- ... repeat for each strategy
+```
+Queries filtered by `strategy_name` touch only one partition.
+
+**Evidence from codebase planning:** The pending todo notes "At 20-40M trades,
+backtest_trades will be ~10-20 GB. Partition by strategy_name or asset_id?"
+Answer: strategy_name. Strategy is the most common query filter (leaderboard,
+overfitting analysis). asset_id partitioning would produce 109 partitions
+with uneven sizes (BTC has far more data than small caps).
+
+---
+
+#### BS-TS-3: Monte Carlo on Every Run (Mandatory)
+
+**Why Expected:** `backtest_metrics` already has `mc_sharpe_lo`, `mc_sharpe_hi`,
+`mc_sharpe_median` columns — all NULL. These are the primary outputs of a Monte Carlo
+run. A backtest result without Monte Carlo confidence intervals is an incomplete result.
+
+**Complexity:** Medium
+
+**What It Looks Like:** After each backtest completes, call:
+```python
+mc_result = monte_carlo_trades(
+    trades_df=trades,
+    n_simulations=1000,
+    metric='sharpe',
+    seed=42
+)
+# Store percentiles: mc_sharpe_lo=5th, mc_sharpe_median=50th, mc_sharpe_hi=95th
+```
+`analysis/monte_carlo.py` already implements `monte_carlo_trades()` and
+`monte_carlo_returns()`. The integration step is calling it inside
+`bakeoff_orchestrator.py` and persisting the result.
+
+**Evidence from codebase:** `backtests/metrics.py` defines the `backtest_metrics` schema
+with these columns. `analysis/monte_carlo.py` exists. The wiring call is missing.
+
+---
+
+#### BS-TS-4: Multiprocessing Orchestrator with NullPool (Mandatory)
+
+**Why Expected:** Single-process sequential execution of 460K runs at ~30s each =
+~159 days wall time. Multiprocessing with 8 workers = ~20 days. With 16 workers on VM
+= ~10 days. NullPool is required on Windows to avoid SQLAlchemy connection-pool
+corruption across processes.
+
+**Complexity:** Medium
+
+**What It Looks Like:**
+```python
+# Existing pattern from MEMORY.md:
+# Workers: NullPool for multiprocessing, maxtasksperchild=1 on Windows
+with multiprocessing.Pool(
+    processes=n_workers,
+    maxtasksperchild=1  # critical on Windows
+) as pool:
+    pool.map(run_single_backtest, work_items)
+```
+Each worker creates its own engine with `NullPool`. The `params_hash` uniquely identifies
+each work item so duplicates are impossible.
+
+**Evidence from codebase:** `bakeoff_orchestrator.py` already uses multiprocessing:
+`multiprocessing.Pool` with `maxtasksperchild=1` at line ~240. The new orchestrator
+(`run_mass_backtest.py`) should follow this exact pattern.
+
+---
+
+#### BS-TS-5: Early Stopping / Pruning Logic (Mandatory at 460K Scale)
+
+**Why Expected:** Running all 460K combos to completion before knowing which are
+viable is wasteful. Standard practice in large-scale backtesting: compute fold-1
+Sharpe, skip the combo if it is below a floor (e.g., < -0.5) before running all folds.
+
+**Complexity:** Low
+
+**What It Looks Like:**
+```python
+# After fold 1 completes
+fold1_sharpe = compute_fold1_sharpe(trades_fold1)
+if fold1_sharpe < PRUNE_FLOOR:
+    log.info("Pruning combo %s: fold1_sharpe=%.2f", params_hash, fold1_sharpe)
+    mark_state("pruned", params_hash=params_hash, ...)
+    continue  # skip remaining folds
+```
+Typical floor: -0.5 Sharpe. At 460K combos, pruning 50% after fold-1 halves
+compute time with negligible loss of good strategies.
+
+---
+
+#### BS-TS-6: Feature-to-Signal Lineage Tracking (Mandatory for CTF Signals)
+
+**Why Expected:** When CTF features become signals, traceability requires knowing which
+IC-scored feature produced which backtest result. Without lineage, you cannot answer
+"did the feature that scored IC-IR=1.19 produce good backtests?"
+
+**Complexity:** Low
+
+**What It Looks Like:** Store `feature_name` and `feature_tier` (from
+`dim_ctf_feature_selection`) in `strategy_bakeoff_results.experiment_name` or a
+dedicated `feature_lineage` column. The `--experiment-name` flag in `run_bakeoff.py`
+already supports this for human-readable tags; make it structured.
+
+**Dependencies:** CTF graduation (Area 4) produces the feature list; backtest scaling
+consumes it.
+
+---
+
+### Differentiators — Backtest Scaling
+
+#### BS-D-1: Strategy Leaderboard Dashboard Page (High Value)
+
+**Value Proposition:** At 460K runs, the question "which strategy is best" becomes
+answerable with statistical confidence. A leaderboard ranked by MC-adjusted Sharpe
+(50th percentile) with PBO scores makes the evidence visible.
+
+**Complexity:** Medium
+
+**What It Looks Like:**
+```
+| Strategy          | Median Sharpe | Sharpe P5 | Max DD | PBO  | n_runs |
+|-------------------|---------------|-----------|--------|------|--------|
+| ama_momentum      | 1.42          | 0.87      | 12%    | 0.23 | 34,800 |
+| ema_trend         | 1.21          | 0.71      | 14%    | 0.31 | 34,800 |
+| ctf_threshold_001 | 1.18          | 0.65      | 18%    | 0.28 | 18,000 |
+```
+Sources: `backtest_metrics` + `strategy_bakeoff_results`. The existing
+`dashboard/pages/11_backtest_results.py` is the starting point.
+
+---
+
+#### BS-D-2: PBO Heatmap (Medium Value)
+
+**Value Proposition:** Probability of Backtest Overfitting (from CPCV) is computed per
+strategy but not visualized. A strategy-x-timeframe PBO heatmap quickly shows which
+strategies are robust vs overfit across TFs.
+
+**Complexity:** Medium
+
+---
+
+#### BS-D-3: VM Execution (High Value for Speed)
+
+**Value Proposition:** The Oracle Singapore VM (Hyperliquid sync VM) has available
+compute. Running the mass backtest there enables 24/7 grinding without tying up local
+resources.
+
+**Complexity:** High (requires VM-side Python env, DB tunnel, result sync)
+
+**When to Build:** After local multiprocessing is proven stable. Phase 4 of VM strategy.
+
+---
+
+### Anti-Features — Backtest Scaling
+
+#### BS-AF-1: Real-Time Streaming Backtest
+
+**Why Avoid:** The vectorbt-based pipeline is batch. Adding streaming (tick-by-tick
+real-time) changes the entire execution model and is not needed for strategy selection.
+
+---
+
+#### BS-AF-2: Storing Full Trade-Level Data for All 460K Runs Indefinitely
+
+**Why Avoid:** At 460M MC samples + 40M trades, unconstrained storage growth becomes
+unmanageable. Set a retention policy: keep trade-level detail only for runs with
+`mc_sharpe_50th >= 0.5` (viable strategies). Archive or drop others.
+
+**What to Do Instead:** Retain aggregate metrics (`strategy_bakeoff_results`,
+`backtest_metrics`) for all runs. Keep `backtest_trades` only for the top-N
+strategies by Sharpe after each batch.
+
+---
+
+#### BS-AF-3: Expanding-Window Re-Optimization in First Pass
+
+**Why Avoid:** `bakeoff_orchestrator.py` explicitly notes: "Expanding-window
+re-optimization is DELIBERATELY DEFERRED." Fixed-parameter walk-forward is the
+correct baseline. Adding re-optimization multiplies compute by N_folds and adds
+a new hyperparameter (re-optimization window).
+
+**What to Do Instead:** Run fixed-parameter first. Add re-optimization in a follow-on
+phase if fixed-parameter results are inconclusive.
+
+---
+
+## Area 3: ML Signal Combination
+
+### What ML Signal Combination Actually Requires
+
+The existing ML stack: `double_ensemble.py` (LightGBM sliding-window), `regime_router.py`
+(per-regime sub-models), `feature_importance.py` (MDA/SFI/clustered FI). What is missing
+is the downstream connection: using these models to generate actual trading signals that the
+executor processes, rather than just producing research outputs.
+
+---
+
+### Table Stakes — ML Signal Combination
+
+#### ML-TS-1: Cross-Sectional Rank Target Construction (Mandatory)
+
+**Why Expected:** LightGBM predicting forward returns directly is worse than predicting
+cross-sectional ranks. Rank targets are more stationary, remove market-wide return bias,
+and produce better IC when used as signals. This is standard practice in factor investing.
+
+**Complexity:** Medium
+
+**What It Looks Like:**
+```python
+# For each timestamp, rank assets by forward_return, normalize to [-1, 1]
+y_rank = df.groupby('ts')['forward_ret_5d'].rank(pct=True)
+y_rank = 2 * y_rank - 1  # scale to [-1, 1]
+```
+The `analysis/ic.py` module already computes `compute_forward_returns()`. Cross-sectional
+ranking is a preprocessing step before model training.
+
+**Dependencies:** Requires multiple assets to have feature data at the same timestamps.
+The `features` table (112 columns) provides this.
+
+---
+
+#### ML-TS-2: SHAP Feature Selection Replacing MDA (Mandatory for Interpretability)
+
+**Why Expected:** The existing `feature_importance.py` uses MDA (permutation importance),
+which is correct but slow (requires N_repeats model fits). SHAP values from a single
+fitted LightGBM model give comparable ranking with zero additional fits and per-prediction
+explanations.
+
+**Complexity:** Medium
+
+**What It Looks Like:**
+```python
+import shap
+explainer = shap.TreeExplainer(lgbm_model)
+shap_values = explainer.shap_values(X_test)
+feature_importance = pd.Series(
+    np.abs(shap_values).mean(axis=0),
+    index=X_test.columns
+).sort_values(ascending=False)
+```
+SHAP feature importance is additive (satisfies efficiency axiom), game-theoretically
+grounded, and works with LightGBM natively via `TreeExplainer` (no model re-fitting).
+
+**Evidence from codebase:** `shap` is referenced as a known library in the codebase
+(grep finds it in `features/microstructure.py` and `backtests/cv.py`). LightGBM is
+already the model family in `double_ensemble.py`.
+
+---
+
+#### ML-TS-3: Signal Output Table for ML Predictions (Mandatory)
+
+**Why Expected:** The executor reads from `signals_ema_crossover`, `signals_rsi_mean_revert`,
+`signals_atr_breakout` via `SIGNAL_TABLE_MAP`. An ML-generated signal needs its own table
+with the same schema for the executor to consume it. Without a registered table, the ML
+model produces predictions that live nowhere.
+
+**Complexity:** Medium
+
+**What It Looks Like:**
+```python
+# New entry in executor/signal_reader.py:
+SIGNAL_TABLE_MAP: dict[str, str] = {
+    "ema_crossover": "signals_ema_crossover",
+    "rsi_mean_revert": "signals_rsi_mean_revert",
+    "atr_breakout": "signals_atr_breakout",
+    "lgbm_rank": "signals_lgbm_rank",      # NEW
+    "xgb_meta": "signals_xgb_meta_label",  # NEW
+}
+```
+Schema must match: `id, ts, signal_id, direction, position_state, entry_price,
+entry_ts, exit_price, exit_ts, feature_snapshot, params_hash, executor_processed_at`.
+
+**Dependencies:** Requires Alembic migration to create new signal tables.
+
+---
+
+#### ML-TS-4: Purged Time-Series Cross-Validation (Mandatory — Already Exists)
+
+**Why Expected:** Standard ML cross-validation causes lookahead bias in time series
+because train/test splits can bleed information across the embargo gap. The existing
+`PurgedKFoldSplitter` and `CPCVSplitter` in `backtests/cv.py` solve this — they must
+be used for all ML training.
+
+**Complexity:** Low (already implemented)
+
+**What It Looks Like:**
+```python
+# Existing pattern — must not be bypassed for ML training:
+splitter = PurgedKFoldSplitter(n_splits=5, embargo_gap=5)
+for train_idx, test_idx in splitter.split(X, t1_series=t1):
+    model.fit(X.iloc[train_idx], y.iloc[train_idx])
+    preds[test_idx] = model.predict_proba(X.iloc[test_idx])[:, 1]
+```
+
+**Critical risk:** Using `sklearn.model_selection.KFold` instead of `PurgedKFoldSplitter`
+will produce artificially inflated IC/Sharpe for ML signals due to train/test leakage.
+
+---
+
+#### ML-TS-5: Meta-Label Filtering (Mandatory for XGBoost)
+
+**Why Expected:** Meta-labeling (Lopez de Prado, 2018 Chapter 3) trains a secondary
+classifier to predict whether a primary signal's trade will be profitable. The primary
+signal (e.g., EMA crossover) generates trade entries; the meta-labeler filters to only
+take high-confidence ones.
+
+**Complexity:** High
+
+**What It Looks Like:**
+```python
+# Phase 1: Primary signal generates trade entries
+primary_signals = ema_crossover_signals(bars)
+
+# Phase 2: Meta-labeler trained on primary signal outcomes
+X_meta = features.loc[primary_signals.index]
+y_meta = (primary_signal_returns > 0).astype(int)  # binary: was trade profitable?
+xgb_meta = XGBClassifier(...)
+xgb_meta.fit(X_meta_train, y_meta_train)
+
+# Phase 3: At prediction time, only take signals where meta-labeler > threshold
+meta_proba = xgb_meta.predict_proba(X_meta_live)[:, 1]
+filtered = primary_signals[meta_proba > 0.6]  # confidence threshold
+```
+`scripts/labeling/run_meta_labeling.py` exists. `meta_label_results` table exists.
+The missing piece: using the trained meta-labeler to filter live signals in the executor.
+
+**Evidence from codebase:** `triple_barrier_labels` table populated, `ml_experiments`
+table exists. The `run_meta_labeling.py` script runs offline — it is not wired to
+executor-time filtering.
+
+---
+
+### Differentiators — ML Signal Combination
+
+#### ML-D-1: Regime-Conditional ML Models (High Value)
+
+**Value Proposition:** `regime_router.py` dispatches different sub-models per L2 regime
+(Up/Down/Sideways). Training a LightGBM ranker separately for each regime and then
+combining with the regime classifier could materially improve IC during trending vs mean-
+reversion regimes.
+
+**Complexity:** High
+
+**Dependencies:** Requires stable regime labels (already built) + sufficient per-regime
+training samples (at least 60 bars per regime instance).
+
+---
+
+#### ML-D-2: Optuna Hyperparameter Optimization for ML Signals (Medium Value)
+
+**Value Proposition:** `run_optuna_sweep.py` exists but uses manually defined search
+spaces. For LightGBM ranker, Optuna can optimize `num_leaves`, `learning_rate`,
+`n_estimators`, `embargo_gap` jointly, with the Sharpe ratio of OOS predictions as
+objective.
+
+**Complexity:** Medium
+
+---
+
+### Anti-Features — ML Signal Combination
+
+#### ML-AF-1: Deep Learning for Signal Generation
+
+**Why Avoid:** LSTM/Transformer models require far more data than available (4.1M bars
+across 109 assets sounds large, but per-asset 1D series are only ~1,500 bars).
+LightGBM on engineered features is empirically superior for tabular financial data at
+this scale.
+
+**What to Do Instead:** Use LightGBM with SHAP-selected features. Add deep learning
+only if and when per-asset data exceeds 5,000+ bars.
+
+---
+
+#### ML-AF-2: Online Learning / Model Drift Adaptation
+
+**Why Avoid:** Updating model weights in real-time as new data arrives requires careful
+handling of lookahead bias and concept drift. The double_ensemble sliding-window approach
+already handles concept drift at batch time. Online learning adds complexity without
+clear benefit at daily cadence.
+
+**What to Do Instead:** Retrain double_ensemble weekly or on regime change.
+
+---
+
+#### ML-AF-3: Ensemble of 10+ Models
+
+**Why Avoid:** Adding more models beyond {LightGBM ranker, XGBoost meta-labeler}
+without first validating that each component adds independent alpha is cargo-culting.
+Ensembles of correlated models add complexity without reducing variance.
+
+**What to Do Instead:** Measure incremental IC contribution of each model independently
+before combining.
+
+---
+
+## Area 4: CTF Graduation
+
+### What "CTF Graduation" Actually Requires
+
+Phase 92 confirmed: 131 active features in `dim_ctf_feature_selection`, IC-IR up to
+1.19, rho=0.19 non-redundant vs AMA. The CTF table has 73.9M rows. The gap: the live
+pipeline reads from `dim_feature_selection` (20 features from Phase 80) and
+`feature_selection.yaml`. CTF features are not in either.
+
+Graduation means promoting a curated subset of CTF features so they flow through
+signal generation, IC staleness monitoring, and BL portfolio weights.
+
+---
+
+### Table Stakes — CTF Graduation
+
+#### CTF-TS-1: Promote Top 10-20 CTF Features to dim_feature_selection (Mandatory)
+
+**Why Expected:** The production pipeline reads `dim_feature_selection`. Features not in
+this table are invisible to signal generators, IC staleness monitor, and portfolio
+construction. Promotion is the registry update that makes CTF features first-class.
+
+**Complexity:** Low
+
+**What It Looks Like:**
+```sql
+-- Promote top CTF features by IC-IR to dim_feature_selection with tier='active'
+INSERT INTO dim_feature_selection (feature_name, tier, ic_ir, source, promoted_at)
+SELECT feature_name, 'active', ic_ir, 'ctf', now()
+FROM dim_ctf_feature_selection
+WHERE tier = 'active'
+ORDER BY ic_ir DESC
+LIMIT 20
+ON CONFLICT (feature_name) DO UPDATE
+  SET tier = EXCLUDED.tier, ic_ir = EXCLUDED.ic_ir, promoted_at = EXCLUDED.promoted_at;
+```
+
+**Constraint:** Do not promote all 131 CTF active features at once. Start with top 10-20
+to avoid overwhelming the BL portfolio model with correlated inputs.
+
+---
+
+#### CTF-TS-2: CTF Features Materialized into features Table (Mandatory)
+
+**Why Expected:** Signal generators (`generate_signals_ema.py`, etc.) read from the
+`features` table (112 columns, bar-level). CTF features live in the `ctf` table with a
+different schema (base_tf, ref_tf columns). Signal generators cannot JOIN `ctf` inline
+without refactoring their SQL.
+
+**Complexity:** Medium
+
+**What It Looks Like:** Either:
+- **Option A (Recommended):** Add promoted CTF feature columns to `features` table via
+  Alembic migration + refresh script that populates them from `ctf` JOIN.
+- **Option B:** Create a materialized view `features_extended` that UNIONs `features` +
+  pivoted `ctf` columns. Simpler but less performant for write operations.
+
+Option A keeps the pipeline's single-table read pattern intact. Option B adds query
+complexity everywhere `features_extended` is used instead of `features`.
+
+**Evidence from codebase:** `features` table has 112 columns (established in Phase 80).
+CTF table has (id, base_tf, ref_tf, ts, ...) schema. The JOIN requires pivoting
+CTF feature columns by (base_tf, ref_tf) pair into named columns.
+
+---
+
+#### CTF-TS-3: feature_selection.yaml Updated with CTF Entries (Mandatory)
+
+**Why Expected:** `bakeoff_orchestrator.py` uses `parse_active_features()` which reads
+`feature_selection.yaml`. The IC staleness monitor (`run_ic_staleness_check.py`) reads
+from this YAML too. Features absent from the YAML are not included in bakeoff or
+staleness checks.
+
+**Complexity:** Low
+
+**What It Looks Like:**
+```yaml
+features:
+  # ... existing 20 AMA/EMA features ...
+
+  # CTF graduated features (Phase 93)
+  - name: macd_hist_7d_slope
+    source: ctf
+    base_tf: 1D
+    ref_tf: 7D
+    tier: active
+    ic_ir: 1.19
+    promoted_at: "2026-03-29"
+  - name: rsi_7d_divergence
+    source: ctf
+    base_tf: 1D
+    ref_tf: 7D
+    tier: active
+    ic_ir: 1.05
+    promoted_at: "2026-03-29"
+```
+
+---
+
+#### CTF-TS-4: IC Staleness Monitor Covers CTF Features (Mandatory)
+
+**Why Expected:** The IC staleness monitor from Phase 87 tracks the 20 Phase 80
+features. Promoted CTF features must also be monitored — if a CTF feature's IC decays
+(e.g., because the ref_tf data stops updating), signals relying on it become noise.
+
+**Complexity:** Low (hook into existing monitor infrastructure)
+
+---
+
+#### CTF-TS-5: Asset-Specific CTF Feature Selection (Mandatory for Per-Asset Routing)
+
+**Why Expected:** The pending todo documents this: features highly predictive for BTC
+may fail cross-asset consensus. An `asset_specific` tier in `dim_feature_selection`
+allows per-asset feature routing so signal generators can use BTC-specific features
+for BTC without forcing them onto all assets.
+
+**Complexity:** High
+
+**What It Looks Like:** New column `asset_id` (nullable) in `dim_feature_selection`.
+`asset_id IS NULL` = universal feature. `asset_id = 1` = BTC-only feature. Signal
+generators query:
+```sql
+SELECT feature_name FROM dim_feature_selection
+WHERE tier IN ('active', 'asset_specific')
+  AND (asset_id IS NULL OR asset_id = :target_asset_id)
+```
+
+---
+
+### Differentiators — CTF Graduation
+
+#### CTF-D-1: Cross-Asset CTF Composite Features (High Value)
+
+**Value Proposition:** Market-wide composites (average RSI slope across top-N assets)
+and relative-value features (BTC/ETH CTF divergence) capture market sentiment and
+leader-follower dynamics not available from single-asset features.
+
+**Complexity:** High
+
+**Dependencies:** 150 HL assets with CTF data (confirmed in pending todo).
+
+---
+
+#### CTF-D-2: Lead-Lag IC Matrix (Medium Value)
+
+**Value Proposition:** BTC's CTF features often lead altcoin returns by 1-3 days. A
+Granger causality matrix across CTF features would identify the strongest predictive
+leads, enabling systematic cross-asset signal generation.
+
+**Complexity:** High
+
+---
+
+### Anti-Features — CTF Graduation
+
+#### CTF-AF-1: Graduating All 131 Active CTF Features at Once
+
+**Why Avoid:** 131 CTF features are highly correlated with each other (they are all
+cross-timeframe variants of the same base indicators). Adding all 131 to the BL portfolio
+model would swamp the 20 existing features and produce a near-singular covariance matrix.
+
+**What to Do Instead:** Promote top 10-20 features by IC-IR with a correlation cap
+(max pairwise Spearman |r| < 0.6 among promoted features).
+
+---
+
+#### CTF-AF-2: Promoting CTF Features Before Materialization Into features Table
+
+**Why Avoid:** Adding features to `dim_feature_selection` and `feature_selection.yaml`
+before the data is physically available in the `features` table causes signal generators
+to fail with "column not found" errors.
+
+**Sequencing required:** (1) Alembic migration adds columns → (2) Refresh script populates
+data → (3) Registry (dim_feature_selection + YAML) updated → (4) Signal generators tested.
+
+---
+
+## Area 5: FRED Equity Indices
+
+### What Adding Equity Indices to FRED Pipeline Actually Requires
+
+The macro pipeline already handles 39 FRED series. Adding SP500/NASDAQ/DJIA/R2K is a
+data + feature extension, not an architectural change. The decision (documented in
+`.planning/todos/pending/2026-03-28-fred-equity-indices-macro-pipeline.md`) is to keep
+these in the macro layer (not the bar pipeline) because they are daily closes only.
+
+---
+
+### Table Stakes — FRED Equity Indices
+
+#### FE-TS-1: Four FRED Series in SERIES_TO_LOAD (Mandatory)
+
+**Why Expected:** `fred_reader.py` loads from `SERIES_TO_LOAD`. Adding the four series
+IDs makes them flow through the existing `load_series_wide()` → `forward_fill.py` →
+`feature_computer.py` pipeline automatically.
+
+**Complexity:** Low
+
+**What It Looks Like (FRED series IDs):**
+| Index | FRED Series ID | Frequency |
+|-------|----------------|-----------|
+| S&P 500 | `SP500` | Daily |
+| NASDAQ Composite | `NASDAQCOM` | Daily |
+| Dow Jones Industrial Average | `DJIA` | Daily |
+| Russell 2000 | `RUT` (via FRED) | Daily |
+
+Note: FRED S&P 500 access requires St. Louis Fed agreement (available, 10 years history).
+FRED has confirmed these are accessible via the standard API.
+
+**Dependency check:** `fred.series_values` on GCP VM must have these series populated.
+If not collected yet, VM collection script must be updated first.
+
+---
+
+#### FE-TS-2: Derived Features in feature_computer.py (Mandatory)
+
+**Why Expected:** Raw index levels are not predictive. Standard derived features are:
+returns (1d, 5d, 20d), realized volatility (20d rolling), drawdown from running max,
+and MA ratios (price vs 50d/200d). These are the same features computed for FRED rate
+and dollar series — the pattern is established.
+
+**Complexity:** Low
+
+**What It Looks Like:** Follow the exact pattern of existing FRED features:
+```python
+# In feature_computer.py, after loading sp500 series:
+df['sp500_ret_1d'] = df['SP500'].pct_change(1)
+df['sp500_ret_5d'] = df['SP500'].pct_change(5)
+df['sp500_ret_20d'] = df['SP500'].pct_change(20)
+df['sp500_vol_20d'] = df['sp500_ret_1d'].rolling(20).std() * np.sqrt(252)
+df['sp500_drawdown'] = df['SP500'] / df['SP500'].rolling(252).max() - 1
+df['sp500_ma50_ratio'] = df['SP500'] / df['SP500'].rolling(50).mean() - 1
+df['sp500_ma200_ratio'] = df['SP500'] / df['SP500'].rolling(200).mean() - 1
+```
+
+---
+
+#### FE-TS-3: Rolling Crypto-Equity Correlations in cross_asset.py (Mandatory)
+
+**Why Expected:** The primary value of equity indices in a crypto platform is the
+correlation signal. BTC-SPX rolling 30d correlation is a recognized risk-on/risk-off
+indicator. VIX spikes above 25 precede crypto sell-offs with high reliability.
+
+**Complexity:** Low (cross_asset.py already has correlation infrastructure)
+
+**What It Looks Like:**
+```python
+# Rolling BTC-SPX 30d correlation
+df['btc_spx_corr_30d'] = df['btc_ret_1d'].rolling(30).corr(df['sp500_ret_1d'])
+df['btc_nasdaq_corr_30d'] = df['btc_ret_1d'].rolling(30).corr(df['nasdaq_ret_1d'])
+
+# Risk-on/risk-off divergence signal
+# Positive divergence (crypto up, equity down) = crypto-specific risk
+df['crypto_equity_divergence'] = df['btc_ret_5d'] - df['sp500_ret_5d']
+```
+
+---
+
+#### FE-TS-4: Alembic Migration for New Columns in fred_macro_features (Mandatory)
+
+**Why Expected:** `fred.fred_macro_features` is a schema-enforced table. Adding 20+
+new columns (7 per index * 4 indexes = ~28 columns) without a migration will crash the
+feature_computer's INSERT.
+
+**Complexity:** Low
+
+---
+
+#### FE-TS-5: Forward-Fill Limits for Equity Index Data (Mandatory)
+
+**Why Expected:** Equity indices do not trade on weekends or US holidays. `forward_fill.py`
+has configurable `ffill_limits` per series — these must be set to avoid forward-filling
+equity data across more than 3 business days (holiday maximum). Without this limit,
+a 3-day weekend propagates Friday's close into Tuesday without warning.
+
+**Complexity:** Low
+
+**Evidence from codebase:** `.planning/todos/pending/2026-03-28-fred-equity-indices-macro-pipeline.md`
+notes: "forward_fill.py ffill limits already added." This is a reminder to verify
+limit is set appropriately (suggest ffill_limit=5 calendar days = ~3 trading days).
+
+---
+
+### Differentiators — FRED Equity Indices
+
+#### FE-D-1: Equity Drawdown as Macro Regime Dimension (High Value)
+
+**Value Proposition:** The 4-dimension macro regime classifier uses monetary policy,
+liquidity, risk appetite, and carry. Adding an equity drawdown dimension (SPX < -10%
+= bear market) would make the L4 regime label more sensitive to equity stress events
+that precede crypto volatility.
+
+**Complexity:** Medium
+
+---
+
+#### FE-D-2: Golden/Death Cross Detection as Event Gate (Medium Value)
+
+**Value Proposition:** SPX 50d/200d MA crossover (golden cross = bullish, death cross =
+bearish) is a widely-tracked institutional signal. Adding it as a macro gate condition
+(reduce sizing when SPX death cross active) integrates standard equity technical analysis
+into the crypto risk framework.
+
+**Complexity:** Low
+
+---
+
+### Anti-Features — FRED Equity Indices
+
+#### FE-AF-1: Treating Equity Indices as Tradeable Assets
+
+**Why Avoid:** Equity indices are macro context signals only. They are not cryptos,
+have no venue_id in dim_venues, no OHLCV, and no valid risk/executor paths. Adding
+them to the bar pipeline or position sizing would corrupt the trading pipeline.
+
+**What to Do Instead:** Keep in `fred.fred_macro_features` table. No entry in
+dim_assets, no bar tables, no executor config.
+
+---
+
+#### FE-AF-2: Real-Time Equity Index Feeds
+
+**Why Avoid:** The macro pipeline is daily-batch (FRED data is end-of-day). Adding
+intraday equity index feeds would require a different data source (not FRED), new
+infrastructure, and handling gaps during trading hours. Complexity far exceeds the
+marginal value over daily closes.
+
+**What to Do Instead:** Keep daily resolution. Monitor `sp500_ret_1d` and
+`sp500_vol_20d` from FRED's end-of-day data.
 
 ---
 
 ## Feature Dependencies
 
 ```
-TS-1 (Source Registry)
-  |
-  +---> TS-2 (Source-Specific SQL)
-  |
-  +---> TS-3 (Venue-Aware State) ---> TS-7 (Incremental Refresh)
-  |
-  +---> TS-6 (CLI Compatibility)
-  |
-  +---> D-1 (Multi-Source Single Pass)  [optional, Phase 2]
-  |
-  +---> D-2 (Post-Build Hooks)         [optional, Phase 2]
+Operational Activation
+  OA-TS-1 (Scheduler)
+    |
+    +---> signals stage runs before executor stage (existing STAGE_ORDER)
+    |
+    +---> OA-TS-2 (cadence_hours tuning)
+    |
+    +---> OA-TS-3 (run log monitoring)
+    |
+    +---> OA-TS-4 (dim_executor_config populated)
 
-TS-4 (alignment_source Tag)
-  |
-  +---> TS-5 (Correct _u PK)
-  |
-  +---> D-7 (Shadow-Write Migration)   [Phase 2]
+CTF Graduation (prerequisite for Backtest Scaling)
+  CTF-TS-1 (Promote to dim_feature_selection)
+    |
+    +---> CTF-TS-2 (Materialize into features table)  [must precede TS-1]
+    |
+    +---> CTF-TS-3 (Update feature_selection.yaml)    [must precede TS-1]
+    |
+    +---> CTF-TS-4 (IC staleness coverage)
+    |
+    +---> BS-TS-6 (Feature-to-signal lineage)
 
-D-4 (Dedupe psycopg utils)  [standalone, no dependencies]
+Backtest Scaling
+  BS-TS-5 (Multiprocessing orchestrator)  [Phase 5 in todo — build first]
+    |
+    +---> BS-TS-1 (Resume-safe state table)
+    |
+    +---> BS-TS-2 (backtest_trades partitioning)
+    |
+    +---> BS-TS-3 (Monte Carlo on every run)
+    |
+    +---> BS-TS-4 (Early stopping)
 
-D-3 (Validation Framework)
-  |
-  +---> D-7 (Shadow-Write) ---> D-8 (Dead Table Cleanup)  [Phase 3]
+ML Signal Combination
+  ML-TS-1 (Cross-sectional rank target)
+    |
+    +---> ML-TS-4 (PurgedKFold — already built)
+    |
+    +---> ML-TS-2 (SHAP feature selection)
+    |
+    +---> ML-TS-3 (Signal output table)  [Alembic migration]
+    |
+    +---> ML-TS-5 (Meta-label filtering)  [depends on ML-TS-3]
+
+FRED Equity Indices
+  FE-TS-1 (VM series collection check)
+    |
+    +---> FE-TS-4 (Alembic migration)
+    |
+    +---> FE-TS-2 (Derived features in feature_computer)
+    |
+    +---> FE-TS-3 (Rolling correlations in cross_asset)
+    |
+    +---> FE-TS-5 (ffill limits)
 ```
 
 ---
 
-## MVP Recommendation
+## MVP Recommendation Per Area
 
-### Phase 1: Foundation (1D Bar Builder Consolidation)
+### Operational Activation MVP (Minimal effort, immediate value)
 
-Build these in order:
+1. **OA-TS-1**: Configure daily scheduler (Windows Task Scheduler or cron)
+2. **OA-TS-2**: Calibrate `cadence_hours` in `dim_executor_config` to 36h
+3. **OA-TS-4**: Verify/seed `dim_executor_config` for all 3 signal types
+4. **OA-TS-3**: Weekly SQL query on `executor_run_log` (manual initially)
 
-1. **D-4**: Extract duplicated psycopg utilities to shared module (Low effort, immediate savings: ~180 lines)
-2. **TS-1**: Build source registry with declarative config for CMC, TVC, HL
-3. **TS-2**: Preserve source-specific SQL CTEs as registry-referenced templates
-4. **TS-3**: Migrate state table to venue-aware PK `(id, venue_id, tf)`
-5. **TS-8**: Coverage tracking in consolidated builder
-6. **TS-6**: Thin wrapper scripts for backward compatibility
-7. **D-5**: Unified conflict resolution column set
+Defer: OA-D-1 (multi-strategy dashboard), OA-D-2 (burn-in tracker), OA-D-3 (grace period)
 
-**Outcome:** 3 builders (1,915 LOC) become 1 generalized builder (~600 LOC) + 3 wrapper scripts (~30 LOC) + registry (~100 LOC). Net reduction: ~1,100 LOC.
+### Backtest Scaling MVP (Most value from Phase 5 first)
 
-### Phase 2: _u Direct Write Migration
+1. **BS-TS-1**: Build `backtest_run_state` table + orchestrator that reads it
+2. **BS-TS-4**: Multiprocessing with NullPool (follow existing bakeoff_orchestrator pattern)
+3. **BS-TS-3**: Wire `monte_carlo_trades()` into backtest run — 3 new columns per run
+4. **BS-TS-5**: Early stopping at fold-1 Sharpe < -0.5
+5. **BS-TS-2**: Partition `backtest_trades` by `strategy_name` (do before data volume grows)
 
-1. **TS-4**: Add alignment_source tag to builder output
-2. **TS-5**: Configure correct _u table PKs for upsert
-3. **D-7**: Shadow-write mode (write to both siloed and _u simultaneously)
-4. **D-3**: Validation framework to compare siloed vs _u output
-5. Validate shadow-write parity per family, per sample of IDs
+Defer: BS-D-1 (leaderboard), BS-D-2 (PBO heatmap), BS-D-3 (VM execution)
 
-**Outcome:** Builders write to _u directly. Siloed tables still receive writes during shadow period for rollback safety.
+### ML Signal Combination MVP (Start with LightGBM rank, then meta-label)
 
-### Phase 3: Cutover & Cleanup
+1. **ML-TS-1**: Cross-sectional rank target construction
+2. **ML-TS-4**: Use existing PurgedKFoldSplitter (non-negotiable)
+3. **ML-TS-2**: SHAP feature importance to select top 15 features for model
+4. **ML-TS-3**: Create `signals_lgbm_rank` table + register in SIGNAL_TABLE_MAP
 
-1. Confirm all downstream consumers read from _u tables
-2. Flip write mode to `UNIFIED_ONLY`
-3. Remove 6 sync scripts (771 LOC)
-4. **D-8**: Mark 30 siloed tables as DEPRECATED
-5. Archive siloed tables after a configured retention period (suggest 30 days)
+Defer: ML-TS-5 (meta-label filtering), ML-D-1 (regime-conditional), ML-D-2 (Optuna)
 
-**Outcome:** 30 tables eliminated, 6 sync scripts removed, storage halved for pipeline tables.
+### CTF Graduation MVP (Materialize first, promote second)
 
-### Defer to Post-Consolidation
+1. **CTF-TS-2**: Materialize top 20 CTF features into `features` table columns
+2. **CTF-TS-1**: Promote to `dim_feature_selection`
+3. **CTF-TS-3**: Add to `feature_selection.yaml`
+4. **CTF-TS-4**: Extend IC staleness monitor to cover CTF features
 
-- **D-1** (Multi-source single pass): Nice optimization, not blocking
-- **D-6** (Generalized backfill detection for TVC/HL): Not needed yet
-- **D-2** (Post-build hooks): Current manual `_sync_1d_to_multi_tf` is adequate
+Defer: CTF-TS-5 (asset-specific tier), CTF-D-1 (cross-asset composites), CTF-D-2 (lead-lag matrix)
 
----
+### FRED Equity Indices MVP (Entirely additive, low risk)
 
-## Quantified Impact
+1. **FE-TS-1**: Verify GCP VM has SP500/NASDAQCOM/DJIA series; add if missing
+2. **FE-TS-4**: Alembic migration for new columns
+3. **FE-TS-2**: Add derived features in `feature_computer.py`
+4. **FE-TS-3**: Add rolling correlations in `cross_asset.py`
+5. **FE-TS-5**: Set ffill_limit=5 for equity series
 
-### LOC Reduction
-
-| Target | Current | After | Savings |
-|--------|---------|-------|---------|
-| 1D bar builders | 1,915 | ~730 | ~1,185 |
-| Duplicated psycopg utils | ~180 (3x60) | ~60 (1x) | ~120 |
-| Sync-to-_u scripts | 771 | 0 | 771 |
-| **Total Phase 1+3** | **~2,866** | **~790** | **~2,076** |
-
-### Table Count Reduction
-
-| Current | After | Reduction |
-|---------|-------|-----------|
-| 30 siloed tables + 6 _u tables = 36 | 6 _u tables | 30 tables dropped |
-
-### Storage Impact
-
-The 30 siloed tables are near-exact duplicates of _u table data (sync scripts use `ON CONFLICT DO NOTHING` to copy rows). With ~230M total rows across all 6 families, the siloed tables duplicate approximately half the pipeline storage. Elimination saves disk and vacuum overhead.
-
-### Operational Simplification
-
-| Metric | Current | After |
-|--------|---------|-------|
-| 1D builder scripts to maintain | 3 (separate codebases) | 1 (+ 3 thin wrappers) |
-| Daily sync operations | 6 (one per _u family) | 0 |
-| State table schemas | 3 (incompatible PKs) | 1 (unified) |
-| ON CONFLICT variants in 1D builders | 3 (different PK cols) | 1 (standard) |
-| Risk of sync failure leaving stale _u data | Ongoing | Eliminated |
+Defer: FE-D-1 (equity drawdown regime dimension), FE-D-2 (golden/death cross gate)
 
 ---
 
 ## Sources
 
-All findings derived from direct codebase analysis of the following files:
+**Codebase analysis (HIGH confidence):**
+- `src/ta_lab2/executor/paper_executor.py` — full signal-to-fill pipeline
+- `src/ta_lab2/executor/signal_reader.py` — watermark, stale guard, SIGNAL_TABLE_MAP
+- `src/ta_lab2/scripts/run_daily_refresh.py` — STAGE_ORDER, timeout tiers
+- `src/ta_lab2/backtests/bakeoff_orchestrator.py` — fixed-parameter WF, multiprocessing
+- `src/ta_lab2/ml/double_ensemble.py` — LightGBM sliding-window
+- `src/ta_lab2/ml/feature_importance.py` — MDA/SFI/clustered FI
+- `src/ta_lab2/macro/fred_reader.py` — SERIES_TO_LOAD, existing 39 series
+- `src/ta_lab2/features/cross_timeframe.py` — CTF feature schema
+- `src/ta_lab2/scripts/analysis/run_ctf_feature_selection.py` — tier classification
+- `.planning/todos/pending/2026-03-29-massive-backtest-monte-carlo-expansion.md`
+- `.planning/todos/pending/2026-03-28-ctf-production-integration.md`
+- `.planning/todos/pending/2026-03-28-fred-equity-indices-macro-pipeline.md`
+- `.planning/milestones/v1.2.0-REQUIREMENTS.md`
+- `.planning/MILESTONES.md`
 
-- `src/ta_lab2/scripts/bars/base_bar_builder.py` (557 lines) -- Template Method pattern for bar builders
-- `src/ta_lab2/scripts/bars/refresh_price_bars_1d.py` (822 lines) -- CMC 1D builder with OHLC repair
-- `src/ta_lab2/scripts/bars/refresh_tvc_price_bars_1d.py` (511 lines) -- TVC 1D builder
-- `src/ta_lab2/scripts/bars/refresh_hl_price_bars_1d.py` (585 lines) -- HL 1D builder
-- `src/ta_lab2/scripts/bars/common_snapshot_contract.py` (1,813 lines) -- Shared utilities
-- `src/ta_lab2/scripts/bars/bar_builder_config.py` (53 lines) -- Config dataclass
-- `src/ta_lab2/scripts/bars/derive_multi_tf_from_1d.py` (807 lines) -- 1D-to-multi-TF derivation
-- `src/ta_lab2/scripts/bars/run_all_bar_builders.py` (537 lines) -- Builder orchestrator
-- `src/ta_lab2/scripts/bars/sync_price_bars_multi_tf_u.py` (71 lines) -- Price bars sync
-- `src/ta_lab2/scripts/sync_utils.py` (304 lines) -- Generic sync utilities
-- `src/ta_lab2/scripts/emas/sync_ema_multi_tf_u.py` (359 lines) -- EMA sync (older pattern)
-- `src/ta_lab2/scripts/emas/ema_state_manager.py` -- State management pattern
-- `src/ta_lab2/scripts/bars/refresh_price_bars_multi_tf.py` (1,237 lines) -- Multi-TF builder
-- `src/ta_lab2/scripts/returns/sync_returns_bars_multi_tf_u.py` (68 lines) -- Returns sync
-- `src/ta_lab2/scripts/amas/sync_ama_multi_tf_u.py` (96 lines) -- AMA sync
-- `src/ta_lab2/scripts/amas/sync_returns_ama_multi_tf_u.py` (105 lines) -- AMA returns sync
+**Web research (MEDIUM confidence — verified against codebase patterns):**
+- Monte Carlo bootstrap: 1,000 samples is standard; 5th/95th percentile confidence bands
+  are the convention. Consistent with `backtest_metrics.mc_sharpe_lo/hi` schema.
+- SHAP + LightGBM: `TreeExplainer` is the correct approach for gradient boosting models.
+  Consistent with LightGBM 4.6.0 usage in `double_ensemble.py`.
+- Cross-sectional rank targets: Standard practice in factor investing, confirmed by
+  industry literature. IC computation in `analysis/ic.py` aligns with this pattern.
+- Crypto-equity correlation: BTC-SPX positive correlation since 2020 confirmed by
+  multiple sources; VIX > 25 as crypto sell-off predictor is consistent with existing
+  macro event gate framework.
+- PostgreSQL partitioning: List partitioning by strategy_name for trade tables is a
+  standard pattern for high-volume query workloads.

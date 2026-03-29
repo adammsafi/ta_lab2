@@ -1,648 +1,683 @@
-# Architecture Patterns: Pipeline Consolidation & Storage Optimization
+# Architecture Patterns: v1.3.0 Operational Activation & Research Expansion
 
-**Domain:** Infrastructure refactoring for quant trading platform (ta_lab2 v1.1.0)
-**Researched:** 2026-03-19
-**Confidence:** HIGH (based on direct source code analysis of all 1D builders, sync scripts, base classes, and orchestration pipeline)
+**Domain:** Python quant trading platform integration and scaling
+**Researched:** 2026-03-29
+**Confidence:** HIGH (all findings from direct source code analysis)
+
+---
 
 ## Executive Summary
 
-The v1.1.0 pipeline consolidation addresses two structural inefficiencies in the current architecture:
+v1.3.0 addresses six categories of work across a platform where the infrastructure
+is built but components run in isolation. The central challenge is not new code --
+it is wiring together existing pieces that were built in separate phases and never
+connected end-to-end.
 
-1. **Three separate 1D bar builders** (CMC, TVC, HL) that share 80%+ identical code but diverge in source queries, ID resolution, and venue handling
-2. **Six families of 5 siloed tables + 1 _u table** where sync scripts copy data from siloed tables to unified tables using watermark-based INSERT...ON CONFLICT DO NOTHING
+The `run_daily_refresh.py` pipeline already has all stage slots defined
+(`signals`, `signal_validation_gate`, `calibrate_stops`, `portfolio`, `executor`).
+The blocker for each is a single missing configuration or connection:
 
-The consolidation strategy has two orthogonal work streams:
-- **Generalized 1D Bar Builder**: Replace three 1D builder scripts with one configurable builder driven by a SourceSpec registry
-- **Direct-to-_u Writes**: Eliminate siloed intermediate tables and sync scripts by having builders write directly to _u tables with alignment_source
+- Executor is silent because `dim_executor_config` has configs seeded but signals
+  do not flow through `signals_ema_crossover` to the executor reliably
+- Black-Litterman views are real (Phase 95 fixed uniform 1.0) but CTF features are
+  absent from `feature_selection.yaml`
+- Backtest infrastructure ran 78K aggregate bakeoff rows but zero Monte Carlo;
+  `backtest_metrics.mc_sharpe_lo/hi/median` are all NULL
+- FRED macro pipeline has 18 series defined in `SERIES_TO_LOAD` but equity indices
+  (SP500, NASDAQ, DJIA, Russell 2000) are not wired
 
-Both changes integrate cleanly with the existing BaseBarBuilder template method pattern and common_snapshot_contract utilities.
-
----
-
-## Current Architecture (BEFORE)
-
-### Component Map
-
-```
-Source Tables                    1D Builders                Output
-================               ===========                ======
-cmc_price_histories7  -------> OneDayBarBuilder --------> price_bars_1d
-tvc_price_histories   -------> TvcOneDayBarBuilder ----->     |
-hyperliquid.hl_candles ------> HlOneDayBarBuilder ------>     |
-                                                              v
-                                                     price_bars_multi_tf
-                                                     price_bars_multi_tf_cal_us
-                                                     price_bars_multi_tf_cal_iso
-                                                     price_bars_multi_tf_cal_anchor_us
-                                                     price_bars_multi_tf_cal_anchor_iso
-                                                              |
-                                                    sync_price_bars_multi_tf_u.py
-                                                              |
-                                                              v
-                                                     price_bars_multi_tf_u
-                                                     (alignment_source column)
-```
-
-This same pattern repeats for 5 more families (ema, ama, returns_bars, returns_ema, returns_ama) = 6 families total, each with 5 siloed + 1 _u table = 36 tables.
-
-### Current Data Flow (Price Bars)
-
-```
-Step 1: 1D Bar Building
-  refresh_price_bars_1d.py         (CMC -> price_bars_1d, venue=CMC_AGG)
-  refresh_tvc_price_bars_1d.py     (TVC -> price_bars_1d, venue=TVC_*)
-  refresh_hl_price_bars_1d.py      (HL  -> price_bars_1d, venue=HYPERLIQUID)
-    + _sync_1d_to_multi_tf()       (copies 1D rows to price_bars_multi_tf)
-
-Step 2: Multi-TF Derivation
-  refresh_price_bars_multi_tf.py         -> price_bars_multi_tf
-  refresh_price_bars_multi_tf_cal_us.py  -> price_bars_multi_tf_cal_us
-  refresh_price_bars_multi_tf_cal_iso.py -> price_bars_multi_tf_cal_iso
-  refresh_price_bars_multi_tf_cal_anchor_us.py  -> price_bars_multi_tf_cal_anchor_us
-  refresh_price_bars_multi_tf_cal_anchor_iso.py -> price_bars_multi_tf_cal_anchor_iso
-
-Step 3: Sync to _u
-  sync_price_bars_multi_tf_u.py  (INSERT...SELECT...ON CONFLICT DO NOTHING)
-    - Reads from 5 siloed tables
-    - Adds alignment_source column
-    - Watermark-based incremental via ingested_at
-
-Step 4: Downstream (reads from _u only)
-  EMA builders read from price_bars_multi_tf_u
-  Returns builders read from price_bars_multi_tf_u
-  Feature scripts read from price_bars_multi_tf_u
-```
-
-### Current Code Duplication
-
-**Across 1D Builders (1,905 lines total):**
-
-| Component | CMC (822 LOC) | TVC (511 LOC) | HL (585 LOC) | Shared? |
-|-----------|:---:|:---:|:---:|---------|
-| psycopg helpers (_connect, _exec, _fetchone, _fetchall) | Yes | Yes | Yes | Copy-pasted |
-| _normalize_db_url() | Yes | Yes | Yes | Copy-pasted |
-| _get_last_src_ts() | Yes | Yes | Yes | Copy-pasted |
-| ensure_state_table_exists() DDL | Yes | Yes | Yes | Similar DDL |
-| _build_insert_bars_sql() | Yes | Yes | Yes | 80% similar SQL CTEs |
-| build_bars_for_id() | Yes | Yes | Yes | 70% similar logic |
-| _sync_1d_to_multi_tf() | No | Yes | Yes | Copy-pasted |
-| from_cli_args() | Yes | Yes | Yes | Similar pattern |
-| Source query structure | Unique | Unique | Unique | **Different** |
-| ID resolution | parse_ids | _load_tvc_ids | _load_hl_ids | **Different** |
-| Venue handling | Implicit CMC_AGG | Multi-venue | Hardcoded HL | **Different** |
-| OHLC repair | Complex CTE | Simple clamp | Simple clamp | **Different** |
-
-**The 3 axes of variation** are: (a) source query, (b) ID resolution, (c) venue/repair logic.
-
-**Across 6 Sync Scripts (total ~600 LOC):**
-
-| Script | Family | Pattern |
-|--------|--------|---------|
-| sync_price_bars_multi_tf_u.py | Bars | sync_utils.sync_sources_to_unified() |
-| sync_ema_multi_tf_u.py | EMA | Custom (predates sync_utils) |
-| sync_ama_multi_tf_u.py | AMA | sync_utils.sync_sources_to_unified() |
-| sync_returns_bars_multi_tf_u.py | Bar returns | sync_utils.sync_sources_to_unified() |
-| sync_returns_ema_multi_tf_u.py | EMA returns | sync_utils.sync_sources_to_unified() |
-| sync_returns_ama_multi_tf_u.py | AMA returns | sync_utils.sync_sources_to_unified() |
-
-Five of six already use the generic sync_utils; the EMA sync is a legacy implementation that should be migrated.
+This document maps each category to specific integration points and build order.
 
 ---
 
-## Recommended Architecture (AFTER)
+## Component Map: Current State
 
-### 1. SourceSpec Registry Pattern
+```
+                       VM SYNC
+                      /      \
+               FRED VM      HL VM
+                  |              |
+           fred.series_values  hyperliquid.*
+                  |
+                  v
+    run_daily_refresh.py orchestrates via subprocess:
 
-A `SourceSpec` dataclass encapsulates the three axes of variation between 1D builders:
-
-```python
-# src/ta_lab2/scripts/bars/source_spec.py
-
-from __future__ import annotations
-from dataclasses import dataclass, field
-from typing import Callable, Optional
-
-@dataclass(frozen=True)
-class SourceSpec:
-    """
-    Declarative specification for a 1D bar data source.
-
-    Encapsulates the three axes of variation:
-    1. Source query (how to read raw data)
-    2. ID resolution (how to determine which IDs to process)
-    3. Venue/repair semantics (how to handle source-specific quirks)
-    """
-
-    # Identity
-    name: str                              # e.g., "CMC", "TVC", "HYPERLIQUID"
-    venue_id: int                          # dim_venues FK (1=CMC_AGG, 2=HL, etc.)
-    venue_label: str                       # Written to venue column
-    src_name: str                          # Written to src_name column
-
-    # Source table
-    source_table: str                      # e.g., "public.cmc_price_histories7"
-
-    # SQL template for the INSERT CTE
-    # Must accept: %s for id, %s for start_ts, %s for end_ts
-    # Must produce columns: id, timestamp, open, high, low, close, volume,
-    #   market_cap, venue, venue_id, venue_rank, bar_seq, tf, src_name, ...
-    insert_cte_builder: Callable[[str, str], str]
-
-    # ID resolution
-    id_loader: Callable[[str], list[int]]  # db_url -> list of IDs
-
-    # Venue
-    default_venue_rank: int = 50
-
-    # Repair
-    needs_ohlc_repair: bool = True         # CMC: True (has timehigh/timelow issues)
-    needs_timehigh_timelow: bool = True    # TVC/HL: False (synthesize from ts)
-
-    # Coverage tracking
-    coverage_source_table: str = ""        # For asset_data_coverage upserts
-    coverage_granularity: str = "1D"
-
-    # Backfill detection
-    supports_backfill_detection: bool = True  # CMC: True, others: False initially
+    sync_vms
+      -> bars
+         -> emas
+            -> amas
+               -> desc_stats
+               -> macro_features (fred_reader -> feature_computer -> fred.fred_macro_features)
+                  -> macro_regimes (regime_classifier -> macro_regime_labels)
+                     -> macro_analytics (hmm_classifier, lead_lag_analyzer)
+                        -> cross_asset_agg (cross_asset.py -> cross_asset_agg, funding_rate_agg)
+                           -> macro_gates
+                              -> macro_alerts
+               -> regimes (refresh_regimes.py -> regimes table)
+                  -> features (run_all_feature_refreshes.py -> features table)
+                     -> garch (refresh_garch_forecasts.py -> garch_forecasts)
+                        -> signals (run_all_signal_refreshes.py -> signals_ema_crossover,
+                                    signals_rsi_mean_revert, signals_atr_breakout)
+                           -> signal_validation_gate
+                              -> ic_staleness_check
+                                 -> calibrate_stops (calibrate_stops.py -> stop_calibrations)
+                                    -> portfolio (refresh_portfolio_allocations.py
+                                                  -> portfolio_allocations)
+                                       -> executor (run_paper_executor.py
+                                                    reads dim_executor_config WHERE is_active=TRUE
+                                                    reads signals_ema_crossover WHERE executor_processed_at IS NULL
+                                                    writes paper_orders, orders, fills, positions)
+                                          -> drift_monitor
+                                             -> pipeline_alerts
+                                                -> stats
 ```
 
-**Registry of known sources:**
+**Key observation:** The pipeline orchestrator exists and is complete. Every stage
+is wired. The gaps are in the DATA flowing through existing stages.
 
+---
+
+## Integration Point Analysis: Each of the Six Categories
+
+### 1. Operational Activation
+
+The executor depends on two preconditions being met simultaneously:
+
+**Precondition A: dim_executor_config must have active rows**
+
+`PaperExecutor._load_active_configs()` queries:
+```sql
+SELECT * FROM public.dim_executor_config WHERE is_active = TRUE ORDER BY config_id
+```
+
+The seed script `scripts/executor/seed_executor_config.py` loads
+`configs/executor_config_seed.yaml`, resolves `signal_name -> signal_id` from
+`dim_signals`, and inserts via `ON CONFLICT (config_name) DO NOTHING`. The YAML
+already contains two strategies: `ema_trend_17_77_paper_v1` and
+`ema_trend_21_50_paper_v1`. The seed must have been run (or will need to be run)
+for configs to appear with `is_active=TRUE`.
+
+**Precondition B: signals must have unprocessed rows**
+
+`SignalReader` reads:
+```sql
+WHERE executor_processed_at IS NULL AND ts > :watermark
+```
+
+from the table mapped by `SIGNAL_TABLE_MAP[signal_type]`:
 ```python
-# src/ta_lab2/scripts/bars/source_registry.py
-
-SOURCE_SPECS: dict[str, SourceSpec] = {
-    "CMC": SourceSpec(
-        name="CMC",
-        venue_id=1,
-        venue_label="CMC_AGG",
-        src_name="CoinMarketCap",
-        source_table="public.cmc_price_histories7",
-        insert_cte_builder=build_cmc_insert_cte,
-        id_loader=load_cmc_ids,
-        needs_ohlc_repair=True,
-        needs_timehigh_timelow=True,
-        coverage_source_table="public.cmc_price_histories7",
-        supports_backfill_detection=True,
-    ),
-    "TVC": SourceSpec(
-        name="TVC",
-        venue_id=9,
-        venue_label="TVC",  # Per-venue from dim_listings
-        src_name="TradingView",
-        source_table="public.tvc_price_histories",
-        insert_cte_builder=build_tvc_insert_cte,
-        id_loader=load_tvc_ids,
-        needs_ohlc_repair=False,
-        needs_timehigh_timelow=False,
-        coverage_source_table="public.tvc_price_histories",
-        supports_backfill_detection=False,
-    ),
-    "HYPERLIQUID": SourceSpec(
-        name="HYPERLIQUID",
-        venue_id=2,
-        venue_label="HYPERLIQUID",
-        src_name="Hyperliquid",
-        source_table="hyperliquid.hl_candles",
-        insert_cte_builder=build_hl_insert_cte,
-        id_loader=load_hl_ids,
-        needs_ohlc_repair=False,
-        needs_timehigh_timelow=False,
-        coverage_source_table="hyperliquid.hl_candles",
-        supports_backfill_detection=False,
-    ),
+SIGNAL_TABLE_MAP = {
+    "ema_crossover": "signals_ema_crossover",
+    "rsi_mean_revert": "signals_rsi_mean_revert",
+    "atr_breakout": "signals_atr_breakout",
 }
 ```
 
-**Why a registry and not just CLI args?** Because the CTE SQL for each source is fundamentally different (JOIN structure, column mappings, repair logic). A registry maps source name to its full behavior specification, making the builder truly generic while keeping source-specific SQL isolated.
+AMA signals (ama_momentum, ama_mean_reversion, ama_regime_conditional) are in
+`signals/registry.py` but have NO entry in `SIGNAL_TABLE_MAP` and NO
+corresponding DB table (`signals_ama_momentum` does not exist). They are
+bakeoff-only: used inside `bakeoff_orchestrator.py` as in-memory signal functions,
+never persisted to a signals table. This is the hard boundary between research
+(bakeoff) and production (executor).
 
-### 2. Generalized 1D Bar Builder
+**Precondition C: dim_executor_config.signal_id must match a valid dim_signals row**
 
-```python
-# src/ta_lab2/scripts/bars/refresh_price_bars_1d_generic.py
+`seed_executor_config.py` resolves signal names at seed time. If `dim_signals`
+does not have `ema_17_77_long` or `ema_21_50_long`, the seed skips them with
+`skipped_no_signal` count. A pre-seed validation step is needed.
 
-class GenericOneDayBarBuilder(BaseBarBuilder):
-    """
-    Single 1D bar builder that handles all data sources via SourceSpec.
+**New components needed for ops activation:**
+- `configs/executor_config_seed.yaml` -- exists, needs verification
+- A validation script to confirm `dim_signals` has the required rows before seeding
+- `run_daily_refresh.py --execute` flag must not be suppressed by `--no-execute`
+  (it is already not suppressed by default -- `--no-execute` is the override)
 
-    Replaces: refresh_price_bars_1d.py, refresh_tvc_price_bars_1d.py,
-              refresh_hl_price_bars_1d.py
-
-    Usage:
-        python -m ta_lab2.scripts.bars.refresh_price_bars_1d --source CMC --ids all
-        python -m ta_lab2.scripts.bars.refresh_price_bars_1d --source TVC --ids all
-        python -m ta_lab2.scripts.bars.refresh_price_bars_1d --source HYPERLIQUID --ids all
-        python -m ta_lab2.scripts.bars.refresh_price_bars_1d --source all --ids all
-    """
-
-    def __init__(self, config: BarBuilderConfig, engine: Engine, spec: SourceSpec):
-        super().__init__(config, engine)
-        self.spec = spec
-        self.psycopg_conn = _connect(config.db_url)  # Shared helper, not copy-pasted
-
-    def get_state_table_name(self) -> str:
-        return "public.price_bars_1d_state"
-
-    def get_output_table_name(self) -> str:
-        return "public.price_bars_1d"
-
-    def build_bars_for_id(self, id_: int, start_ts=None) -> int:
-        # Common flow:
-        # 1. Check backfill (if spec.supports_backfill_detection)
-        # 2. Get last_src_ts from state
-        # 3. Build and execute CTE via spec.insert_cte_builder
-        # 4. Update state
-        # 5. Update coverage
-        ...
-```
-
-### 3. Direct-to-_u Write Architecture
-
-**Core idea:** Instead of writing to 5 siloed tables then syncing, write directly to the _u table with alignment_source set at write time.
-
-```
-BEFORE (3-step):
-  Builder writes to -> price_bars_multi_tf_cal_us
-  Sync copies to    -> price_bars_multi_tf_u (alignment_source='multi_tf_cal_us')
-
-AFTER (1-step):
-  Builder writes directly to -> price_bars_multi_tf_u (alignment_source='multi_tf_cal_us')
-```
-
-**This affects these builder families:**
-
-| Family | # Builders | # Sync Scripts | Write Target Change |
-|--------|-----------|----------------|---------------------|
-| Price bars | 5 multi-TF | 1 | price_bars_multi_tf_* -> price_bars_multi_tf_u |
-| EMA values | 3 | 1 | ema_multi_tf_* -> ema_multi_tf_u |
-| AMA values | 5 | 1 | ama_multi_tf_* -> ama_multi_tf_u |
-| Bar returns | 5 | 1 | returns_bars_multi_tf_* -> returns_bars_multi_tf_u |
-| EMA returns | 3 | 1 | returns_ema_multi_tf_* -> returns_ema_multi_tf_u |
-| AMA returns | 5 | 1 | returns_ama_multi_tf_* -> returns_ama_multi_tf_u |
-| **Total** | **26 builders** | **6 sync scripts** | |
-
-**Modified components:**
-
-Each builder needs one change: its output table name changes and it sets alignment_source on each row.
-
-```python
-# In base class or config:
-class BarBuilderConfig:
-    ...
-    alignment_source: str | None = None   # NEW: if set, write directly to _u table
-
-# In upsert_bars():
-if config.alignment_source:
-    # Add alignment_source column to output DataFrame
-    df["alignment_source"] = config.alignment_source
-    # Use _u table PK for conflict resolution
-    conflict_cols = PK_COLS_U  # includes alignment_source
-```
-
-### 4. Component Boundary Diagram
-
-```
-+-------------------------------------------------------------------+
-|                    SourceSpec Registry                              |
-|  CMC: { source_table, insert_cte, id_loader, repair_flags }       |
-|  TVC: { source_table, insert_cte, id_loader, repair_flags }       |
-|  HL:  { source_table, insert_cte, id_loader, repair_flags }       |
-+-------------------------------------------------------------------+
-          |
-          v
-+-------------------------------------------------------------------+
-|            GenericOneDayBarBuilder (BaseBarBuilder)                 |
-|  - Accepts SourceSpec via constructor                               |
-|  - Delegates SQL generation to spec.insert_cte_builder             |
-|  - Handles state, backfill, coverage uniformly                     |
-+-------------------------------------------------------------------+
-          |
-          v
-+-------------------------------------------------------------------+
-|                     price_bars_1d                                   |
-|  (all sources write here, venue/venue_id distinguishes)            |
-+-------------------------------------------------------------------+
-          |
-          v
-+-------------------------------------------------------------------+
-|  Multi-TF Builders (5 variants)                                    |
-|  - Read from price_bars_1d                                         |
-|  - Each writes DIRECTLY to price_bars_multi_tf_u                   |
-|    with alignment_source = 'multi_tf' | 'cal_us' | etc.           |
-+-------------------------------------------------------------------+
-          |
-          v
-+-------------------------------------------------------------------+
-|  Downstream (EMA, AMA, Returns, Features, Signals, Regimes)       |
-|  - All read from _u tables (no change needed)                      |
-+-------------------------------------------------------------------+
-```
-
-### 5. Shared psycopg Utilities
-
-Extract the duplicated psycopg helpers into a shared module:
-
-```python
-# src/ta_lab2/scripts/bars/psycopg_helpers.py
-
-def normalize_db_url(url: str) -> str: ...
-def connect(db_url: str): ...
-def exec_sql(conn, sql: str, params=None) -> None: ...
-def fetchone(conn, sql: str, params=None): ...
-def fetchall(conn, sql: str, params=None): ...
-```
-
-This eliminates ~120 lines of identical copy-pasted code across the three 1D builders.
+**What is already wired:**
+- `run_daily_refresh.py` calls `run_paper_executor_stage()` which invokes
+  `ta_lab2.scripts.executor.run_paper_executor --db-url $DB_URL`
+- `PaperExecutor.run()` is complete: loads L4 macro regime, iterates active configs,
+  calls `SignalReader.read_unprocessed()`, generates `CanonicalOrder`, logs to
+  `paper_orders`, promotes to `orders`, simulates fill via `FillSimulator`,
+  updates `positions`, marks signals as processed, writes to `executor_run_log`
+- `RiskEngine` and `MacroGateEvaluator` are integrated into `PaperExecutor.__init__`
 
 ---
 
-## Detailed Data Flow (AFTER)
+### 2. Backtest Scaling
 
-### 1D Bar Building (After)
+**Current state (from todo 2026-03-29):**
+- Bakeoff: 78,698 rows in `strategy_bakeoff_results` (aggregate metrics only)
+- Trade-level: 2 rows in `backtest_runs`, corresponding `backtest_trades`
+- Monte Carlo: `backtest_metrics.mc_sharpe_lo/hi/median` all NULL
+- `monte_carlo_trades()` in `analysis/monte_carlo.py` is fully implemented
+
+**How bakeoff persists results vs trade-level backtests:**
+
+The bakeoff (BakeoffOrchestrator) stores aggregate OOS metrics in
+`strategy_bakeoff_results` (sharpe_mean, sharpe_std, max_drawdown_mean, dsr, etc.).
+It does NOT generate individual trade records.
+
+Trade-level backtests go through `btpy_runner.py` / `vbt_runner.py` which use
+vectorbt to run the full strategy, then persist:
+- `backtest_runs` (one row per strategy/asset/param/cost combination)
+- `backtest_trades` (one row per trade, FK to backtest_runs)
+- `backtest_metrics` (one row per run, includes mc_sharpe columns)
+
+Monte Carlo attaches to `backtest_metrics` rows by calling
+`monte_carlo_trades(df_trades)` from `analysis/monte_carlo.py`. This function is
+imported in `run_monte_carlo.py` but has never been called in batch for all rows.
+
+**New components needed:**
+
+1. `scripts/analysis/run_mass_backtest.py` -- parallel orchestrator that:
+   - Partitions work as `(asset, strategy)` chunks
+   - Uses `NullPool + maxtasksperchild=1` (Windows multiprocessing requirement)
+   - Tracks completed combos in a DB state table (resume-safe)
+   - Calls `bakeoff_orchestrator._bakeoff_asset_worker()` with trade-level output flag
+
+2. Extension to `bakeoff_orchestrator.py`: optional `persist_trades=True` flag
+   that routes through `vbt_runner.py` to populate `backtest_runs/trades`
+
+3. MC fill script: after each trade-level run, call `monte_carlo_trades()` and
+   upsert result into `backtest_metrics`
+
+4. For CTF signals: new `signals/ctf_threshold.py` with generic threshold signal
+   (long/short when feature z-score crosses configurable threshold), plus
+   registration in `signals/registry.py`
+
+**Storage concern:** 20-40M trade rows at ~200 bytes each = 4-8 GB. Need
+partition strategy (by strategy_name or asset_id) before exceeding 10 GB.
+
+---
+
+### 3. ML Signal Combination
+
+**Current state:**
+
+`ml/double_ensemble.py` (DoubleEnsemble) and `ml/regime_router.py` are implemented.
+`scripts/ml/run_double_ensemble.py` CLI exists. The ML scripts are research-only:
+they load from `features` table, train models, evaluate via purged CV, print
+comparison table -- but write nothing to a signals table.
+
+`BLAllocationBuilder` in `portfolio/black_litterman.py` accepts `signal_scores` as
+a `pd.DataFrame` (index=asset_id, columns=feature_names). Phase 95 wired this to
+real AMA feature values from `ama_multi_tf_u.d1`. The current signal_scores are
+AMA momentum scores, not ML model outputs.
+
+**Gap:** No path from ML model predictions to:
+- A `signals_*` table (for executor)
+- `signal_scores` in the portfolio allocation (for BL views)
+
+**New components needed:**
+
+1. `signals/ml_composite.py`: signal generator that loads a trained model,
+   generates daily long/short scores per asset, applies threshold logic, returns
+   standard signal tuple `(entries, exits, size)` compatible with the registry
+
+2. `signals_ml_composite` DB table with schema matching other signal tables
+   (id, venue_id, ts, tf, signal_id, signal_value, executor_processed_at, etc.)
+
+3. `SIGNAL_TABLE_MAP` update in `executor/signal_reader.py`:
+   ```python
+   "ml_composite": "signals_ml_composite",
+   ```
+
+4. `dim_executor_config` row for the ML strategy (add to
+   `executor_config_seed.yaml`)
+
+5. For BL integration: a function `_load_ml_signal_scores()` in
+   `scripts/portfolio/refresh_portfolio_allocations.py` that queries
+   `signals_ml_composite` for latest values and shapes them into the
+   `(asset_id, feature_name)` DataFrame expected by BLAllocationBuilder
+
+The DoubleEnsemble model itself needs to be serialized (pickle/joblib) and stored
+somewhere accessible at daily refresh time -- this is the main new infrastructure
+piece.
+
+---
+
+### 4. CTF Graduation
+
+**Current state:**
+
+`dim_ctf_feature_selection` has 131 active features (IC-IR up to 1.19, correlation
+with AMA features is 0.19 -- non-redundant). The table has no downstream consumers.
+
+The signal/portfolio/execution pipeline reads from two sources:
+- `feature_selection.yaml` (20 AMA features, IC-IR >= 1.0)
+- `dim_feature_selection` (same 20 features, the DB version)
+
+CTF features live in the `ctf` table (73.9M rows) computed by `cross_timeframe.py`.
+They are NOT in the `features` table.
+
+**The integration chain to close:**
 
 ```
-Source Tables                    Generic 1D Builder            Output
-================               ==================            ======
-cmc_price_histories7  --+
-                        |
-tvc_price_histories   --+--> GenericOneDayBarBuilder -----> price_bars_1d
-                        |    (--source CMC|TVC|HL|all)      (all venues coexist)
-hyperliquid.hl_candles -+
+dim_ctf_feature_selection (131 active)
+    -> filter top 10-20 by IC-IR + pass rate
+    -> ctf table (feature values at daily resolution)
+    -> write to features table as new columns
+       OR create a joined view that merges features + ctf columns
+    -> add promoted names to feature_selection.yaml
+    -> ICStalenessMonitor picks them up (run_ic_staleness_check reads feature_selection.yaml)
+    -> BLAllocationBuilder.run() uses them as signal_scores
+    -> bakeoff picks them up via parse_active_features()
 ```
 
-### Multi-TF Derivation (After)
+**Key integration point -- how feature_selection.yaml drives consumers:**
+
+`parse_active_features()` in `bakeoff_orchestrator.py` reads the YAML and returns
+the list of feature names with IC-IR weights. This function is used by:
+- `run_bakeoff.py` -- loads AMA feature columns from `ama_multi_tf_u`
+- `scripts/portfolio/refresh_portfolio_allocations.py` -- builds IC-IR weight matrix
+- `scripts/analysis/run_ic_staleness_check.py` -- monitors feature freshness
+- `scripts/ml/run_regime_routing.py` -- loads features for regime model
+
+Adding CTF features to `feature_selection.yaml` automatically propagates to all
+four consumers. The only new wiring needed is ensuring the feature values are
+accessible in a queryable form at daily refresh time.
+
+**Two materialization options:**
+
+Option A (simpler): Add CTF feature columns to the `features` table via a new
+refresh step. The `features` table is written by
+`scripts/features/run_all_feature_refreshes.py`. Adding CTF columns requires a
+new refresh function that joins `ctf` by `(id, venue_id, ts, tf)`.
+
+Option B (lighter): Create a view `features_extended` that LEFT JOINs `features`
+with `ctf` on `(id, venue_id, ts, tf)`. Downstream consumers that query `features`
+would need to be pointed at the view.
+
+Option A is recommended: it fits the existing upsert pattern, does not introduce
+a view dependency, and keeps all feature data co-located.
+
+**New components needed:**
+
+1. `scripts/analysis/promote_ctf_features.py`: reads `dim_ctf_feature_selection`,
+   selects top N by IC-IR, writes promoted names + metadata to
+   `feature_selection.yaml` (appends to active list)
+
+2. `scripts/features/refresh_ctf_promoted.py`: reads promoted feature names,
+   queries `ctf` table, upserts values into `features` table as new columns
+   (follows same scoped DELETE + INSERT per batch pattern as other feature refreshers)
+
+3. Alembic migration: add promoted CTF column names to `features` DDL (or use
+   a flexible schema approach with dynamic column addition)
+
+4. `run_all_feature_refreshes.py` update: add `refresh_ctf_promoted` as a step
+   after the existing CTF step in the pipeline
+
+5. `run_daily_refresh.py` has no changes needed -- `features` stage already runs
+   `run_all_feature_refreshes.py --all --tf 1D`
+
+---
+
+### 5. FRED Macro Expansion
+
+**Current state:**
+
+`fred_reader.py` has `SERIES_TO_LOAD` with 18 series (Phases 65-66). The pipeline
+is: `load_series_wide()` -> `forward_fill_with_limits()` ->
+`compute_derived_features()` -> `compute_derived_features_66()` -> upsert into
+`fred.fred_macro_features`.
+
+`cross_asset.py` reads from `fred.fred_macro_features` for VIX, DXY, HY OAS,
+net_liquidity when computing crypto-macro correlations.
+
+**FRED equity indices (from todo 2026-03-28):**
+
+Four new FRED series (SP500, NASDAQ Composite, DJIA, Russell 2000) need to be
+added. The decision was Option B: macro layer only (not the full OHLCV bar
+pipeline). The implementation is straightforward:
+
+1. Add 4 series IDs to `SERIES_TO_LOAD` in `fred_reader.py`
+2. Add 4 entries to `_RENAME_MAP` in `feature_computer.py`
+3. Add derived features in `compute_derived_features_66()` or a new
+   `compute_derived_features_67()` function: 1d/5d/20d returns, 20d realized vol,
+   running drawdown, MA ratios (50d/200d)
+4. Wire into `cross_asset.py`: rolling BTC-SPX, BTC-NASDAQ correlations
+5. Alembic migration: new columns in `fred.fred_macro_features`
+
+**Prerequisites:** The four FRED series must be synced from the GCP VM. Check
+`fred.series_values` for their presence before adding to `SERIES_TO_LOAD`.
+
+**No new scripts needed.** The existing `refresh_macro_features.py` already calls
+`compute_macro_features(engine)` which calls the full chain. Adding series to
+`SERIES_TO_LOAD` automatically includes them on next incremental refresh.
+
+The 400-day `WARMUP_DAYS` in `refresh_macro_features.py` is sufficient for the
+new MA ratio features (200-day MA requires 200 days, warmup covers it).
+
+---
+
+### 6. Tech Debt Cleanup
+
+From the v1.2.0 milestone audit:
+
+1. `blend_vol_simple()` in `garch_blend.py` is exported but has no external
+   callers. The vol sizer uses inline blending. Remove or mark as internal.
+
+2. Phase 82 has no `VERIFICATION.md`. Six phase summaries exist but no
+   consolidated verification file. Create it from existing summaries.
+
+3. Phase 92 `VERIFICATION.md` is stale -- gaps were closed in Phase 93 but
+   the verification file was not updated. Update to reflect closed state.
+
+These are all documentation changes with no runtime impact.
+
+---
+
+## Data Flow Changes for v1.3.0
+
+### Current Daily Pipeline (v1.2.0)
 
 ```
-price_bars_1d
-    |
-    +---> refresh_price_bars_multi_tf.py --------> price_bars_multi_tf_u
-    |     (alignment_source='multi_tf')            (direct write)
-    |
-    +---> refresh_price_bars_multi_tf_cal_us.py -> price_bars_multi_tf_u
-    |     (alignment_source='multi_tf_cal_us')     (direct write)
-    |
-    +---> refresh_price_bars_multi_tf_cal_iso.py -> price_bars_multi_tf_u
-    |     (alignment_source='multi_tf_cal_iso')     (direct write)
-    |
-    +---> ...anchor_us.py -----------------------> price_bars_multi_tf_u
-    |     (alignment_source='multi_tf_cal_anchor_us')
-    |
-    +---> ...anchor_iso.py ----------------------> price_bars_multi_tf_u
-          (alignment_source='multi_tf_cal_anchor_iso')
-
-No sync step needed. Siloed tables become unused.
+sync_vms -> bars -> emas -> amas -> desc_stats ->
+macro_features -> macro_regimes -> macro_analytics ->
+cross_asset_agg -> macro_gates -> macro_alerts ->
+regimes -> features -> garch -> signals ->
+signal_validation_gate -> ic_staleness_check ->
+calibrate_stops -> portfolio -> executor ->
+drift_monitor -> pipeline_alerts -> stats
 ```
 
-### Full Pipeline (After)
+All stages exist. `executor` runs but produces no fills because
+`dim_executor_config` is unseeded or signals are missing.
+
+### v1.3.0 Data Flow Additions
 
 ```
-run_all_bar_builders.py
-  |
-  +-- GenericOneDayBarBuilder --source CMC --ids all
-  +-- GenericOneDayBarBuilder --source TVC --ids all
-  +-- GenericOneDayBarBuilder --source HL  --ids all
-  +-- VWAP builder (unchanged)
-  +-- refresh_price_bars_multi_tf.py (writes to _u)
-  +-- refresh_price_bars_multi_tf_cal_us.py (writes to _u)
-  +-- refresh_price_bars_multi_tf_cal_iso.py (writes to _u)
-  +-- refresh_price_bars_multi_tf_cal_anchor_us.py (writes to _u)
-  +-- refresh_price_bars_multi_tf_cal_anchor_iso.py (writes to _u)
-  |
-  [NO sync_price_bars_multi_tf_u.py step]
-  |
-  v
-run_all_ema_refreshes.py (reads from price_bars_multi_tf_u -- unchanged)
-  +-- refresh_ema_multi_tf_from_bars.py (writes to ema_multi_tf_u)
-  +-- ...
-  |
-  [NO sync_ema_multi_tf_u.py step]
+ADDED: features stage now includes refresh_ctf_promoted step
+       (CTF graduation)
+
+ADDED: After signals, signals_ml_composite table populated
+       by new ML signal generator
+       (ML signal combination)
+
+MODIFIED: portfolio stage - signal_scores includes CTF features
+           (CTF graduation affects BL views)
+
+ADDED: macro_features now computes equity index features
+       (FRED expansion -- no new stage, extends existing stage)
+
+MAINTAINED: executor stage now actually processes signals
+             (ops activation -- config seeding, not code changes)
 ```
 
 ---
 
-## Integration Points
+## Component Boundaries
 
-### What Changes
+| Component | Status | Change for v1.3.0 |
+|-----------|--------|-------------------|
+| `run_daily_refresh.py` | Exists, complete | No changes needed |
+| `executor/paper_executor.py` | Exists, complete | No changes needed |
+| `executor/signal_reader.py` | Exists, needs update | Add `ml_composite` to SIGNAL_TABLE_MAP |
+| `configs/executor_config_seed.yaml` | Exists, needs ML config | Add AMA + ML strategy entries |
+| `signals/ama_composite.py` | Research only (bakeoff) | Wrap into DB-persisting generator |
+| `signals/registry.py` | Exists | Add ctf_threshold, ml_composite entries |
+| `backtests/bakeoff_orchestrator.py` | Exists | Add `persist_trades=True` path |
+| `analysis/monte_carlo.py` | Exists, never batched | Wire into mass backtest orchestrator |
+| `macro/fred_reader.py` | Exists, 18 series | Add 4 equity index series to SERIES_TO_LOAD |
+| `macro/feature_computer.py` | Exists | Add equity index derived features |
+| `macro/cross_asset.py` | Exists | Add BTC-SPX/BTC-NASDAQ rolling correlations |
+| `features/cross_timeframe.py` | Exists | No changes needed |
+| `configs/feature_selection.yaml` | 20 AMA features | Add top CTF features after promotion |
+| `portfolio/black_litterman.py` | Exists, complete | No changes needed |
 
-| Component | Change | Risk |
-|-----------|--------|------|
-| `refresh_price_bars_1d.py` | Replaced by generic builder | LOW -- preserves exact same SQL CTEs |
-| `refresh_tvc_price_bars_1d.py` | Replaced by generic builder | LOW |
-| `refresh_hl_price_bars_1d.py` | Replaced by generic builder | LOW |
-| `refresh_price_bars_multi_tf.py` | Output table changes to _u | MEDIUM -- PK conflict cols change |
-| `refresh_price_bars_multi_tf_cal_*.py` (4 scripts) | Output table changes to _u | MEDIUM -- PK conflict cols change |
-| `sync_price_bars_multi_tf_u.py` | Deprecated/deleted | LOW -- just stops running |
-| `sync_ema_multi_tf_u.py` | Deprecated/deleted | LOW |
-| `sync_ama_multi_tf_u.py` | Deprecated/deleted | LOW |
-| `sync_returns_bars_multi_tf_u.py` | Deprecated/deleted | LOW |
-| `sync_returns_ema_multi_tf_u.py` | Deprecated/deleted | LOW |
-| `sync_returns_ama_multi_tf_u.py` | Deprecated/deleted | LOW |
-| `run_all_bar_builders.py` | Update builder list | LOW |
-| `run_daily_refresh.py` | Remove sync steps (if present) | LOW |
-| `common_snapshot_contract.py` | Add alignment_source support to upsert_bars | LOW |
-| `bar_builder_config.py` | Add alignment_source field | LOW |
-| `base_bar_builder.py` | No changes needed | NONE |
-| Downstream consumers | No changes (read from _u) | NONE |
+**New components:**
 
-### What Does NOT Change
-
-- **BaseBarBuilder**: Template method pattern is unchanged. All abstract methods remain the same.
-- **common_snapshot_contract**: Core utilities (enforce_ohlc_sanity, upsert_bars, state helpers) stay the same. alignment_source is additive.
-- **derive_multi_tf_from_1d.py**: Already reads from price_bars_1d and produces correct output. Just needs output target changed.
-- **polars_bar_operations.py**: Pure computation module, no I/O changes.
-- **All downstream consumers**: They read from _u tables, which have the same schema.
-- **dim_venues, dim_timeframe**: Dimension tables unchanged.
-
-### PK Conflict Resolution
-
-The key integration detail is that _u tables have alignment_source in their PK:
-
-```sql
--- Siloed table PK (current):
-PRIMARY KEY (id, tf, bar_seq, venue_id, timestamp)
-
--- _u table PK:
-PRIMARY KEY (id, tf, bar_seq, venue_id, timestamp, alignment_source)
-```
-
-When builders write directly to _u, they must include alignment_source in their conflict columns. The `upsert_bars()` function in common_snapshot_contract.py already accepts `conflict_cols` as a parameter, so this is a configuration change, not a code change.
-
-```python
-# Current:
-upsert_bars(df, db_url=..., bars_table="price_bars_multi_tf",
-            conflict_cols=("id", "tf", "bar_seq", "venue_id", "timestamp"))
-
-# After:
-upsert_bars(df, db_url=..., bars_table="price_bars_multi_tf_u",
-            conflict_cols=("id", "tf", "bar_seq", "venue_id", "timestamp", "alignment_source"))
-```
+| Component | Purpose | Depends On |
+|-----------|---------|------------|
+| `scripts/analysis/run_mass_backtest.py` | Parallel backtest orchestrator, resume-safe | `bakeoff_orchestrator.py`, `NullPool+maxtasksperchild` |
+| `signals/ctf_threshold.py` | Generic CTF feature threshold signal | `ctf` table, `signals/registry.py` |
+| `signals/ml_composite.py` | ML model output as daily signal | trained model artifact, `features` table |
+| `signals_ml_composite` DB table | Persisted ML signals | Alembic migration |
+| `scripts/analysis/promote_ctf_features.py` | CTF feature -> feature_selection.yaml | `dim_ctf_feature_selection`, `feature_selection.yaml` |
+| `scripts/features/refresh_ctf_promoted.py` | CTF feature values -> features table | `ctf` table, new columns in `features` DDL |
 
 ---
 
 ## Build Order (Dependency-Driven)
 
-### Phase 1: Shared Utilities (No Risk)
+The ordering below is driven by dependencies: what must exist before what can be
+built or validated.
 
-Create shared psycopg helpers and SourceSpec abstractions. No existing code modified.
+### Step 1: Ops Activation (Days 1-3)
 
-**Files created:**
-- `src/ta_lab2/scripts/bars/psycopg_helpers.py` (extract from 1D builders)
-- `src/ta_lab2/scripts/bars/source_spec.py` (SourceSpec dataclass)
-- `src/ta_lab2/scripts/bars/source_registry.py` (registry of CMC/TVC/HL specs)
-- `src/ta_lab2/scripts/bars/cte_builders/` (source-specific SQL CTE functions)
-  - `cmc_cte.py`
-  - `tvc_cte.py`
-  - `hl_cte.py`
+**Why first:** Validates the end-to-end pipeline immediately. Produces live paper
+fills that downstream monitoring (drift, dashboard) can display. No new code
+required -- only configuration.
 
-**Files modified:**
-- `bar_builder_config.py`: Add `alignment_source` and `source_name` fields
+1. Validate `dim_signals` has the two required signal names (`ema_17_77_long`,
+   `ema_21_50_long`). If missing, identify why signal generation did not register
+   them.
+2. Run `python -m ta_lab2.scripts.executor.seed_executor_config` -- seeds
+   `dim_executor_config` from `executor_config_seed.yaml` idempotently.
+3. Run one daily refresh with `--all` and verify executor stage produces fills.
+4. Confirm `executor_run_log` has a row with `status=success`.
 
-### Phase 2: Generalized 1D Builder (Additive)
+### Step 2: FRED Macro Expansion (Days 3-5)
 
-Create the generic builder alongside existing builders. Both coexist.
+**Why second:** Self-contained. Only touches `fred_reader.py`,
+`feature_computer.py`, `cross_asset.py`, and one Alembic migration. No dependency
+on other v1.3.0 work. Delivers value immediately in next daily refresh.
 
-**Files created:**
-- `src/ta_lab2/scripts/bars/refresh_price_bars_1d_generic.py`
+1. Check whether SP500/NASDAQ/DJIA/Russell 2000 series are in
+   `fred.series_values`. If not, add them to the GCP VM collection list and wait
+   for next VM sync before proceeding.
+2. Add series to `SERIES_TO_LOAD` and `_RENAME_MAP`.
+3. Add derived feature functions in `feature_computer.py`.
+4. Write Alembic migration for new columns in `fred.fred_macro_features`.
+5. Run `refresh_macro_features.py --full` to backfill from 2000-01-01.
+6. Add BTC-SPX/NASDAQ correlations in `cross_asset.py`.
 
-**Validation:** Run generic builder for each source, compare output row-by-row against existing builder output using validate_derivation_consistency() pattern (already exists in derive_multi_tf_from_1d.py).
+### Step 3: CTF Graduation (Days 5-10)
 
-### Phase 3: Direct-to-_u for Price Bars (One Family)
+**Why third:** Unlocks better BL views (CTF features in signal_scores) and feeds
+CTF signals into the backtest scaling work. Requires one Alembic migration before
+the bakeoff work can use CTF signals.
 
-Convert the 5 multi-TF price bar builders to write directly to price_bars_multi_tf_u.
+1. Run `promote_ctf_features.py` to select top 15 CTF features from
+   `dim_ctf_feature_selection` (IC-IR >= 1.0, pass_rate >= 0.5) and append to
+   `feature_selection.yaml`.
+2. Write Alembic migration to add promoted CTF column names to `features` DDL.
+3. Implement `refresh_ctf_promoted.py` (scoped DELETE + INSERT from `ctf` table).
+4. Add `refresh_ctf_promoted` step to `run_all_feature_refreshes.py`.
+5. Validate: run daily refresh, confirm `features` table has CTF columns, confirm
+   ICStalenessMonitor tracks them, confirm BL `signal_scores` includes them.
 
-**Files modified:**
-- `refresh_price_bars_multi_tf.py`: Change output table, add alignment_source
-- `refresh_price_bars_multi_tf_cal_us.py`: Same
-- `refresh_price_bars_multi_tf_cal_iso.py`: Same
-- `refresh_price_bars_multi_tf_cal_anchor_us.py`: Same
-- `refresh_price_bars_multi_tf_cal_anchor_iso.py`: Same
-- `common_snapshot_contract.py`: Extend upsert_bars to handle alignment_source
+### Step 4: Backtest Scaling Infrastructure (Days 5-10, parallel with Step 3)
 
-**Validation:** Compare _u table row counts and sample data before/after. Ensure no downstream consumer breaks.
+**Why can start in parallel:** The mass backtest orchestrator and trade-level
+backfill do not depend on CTF graduation. CTF signals are Phase 3 of the todo
+and come after the orchestrator is built.
 
-### Phase 4: Direct-to-_u for Remaining Families
+1. Implement resume-safe state table (tracks completed `(asset, strategy,
+   params_hash)` combos) -- DB table, not file.
+2. Implement `run_mass_backtest.py` with `NullPool + maxtasksperchild=1` and
+   `(asset, strategy)` chunking.
+3. Add `persist_trades=True` path in `bakeoff_orchestrator.py` that routes
+   through `vbt_runner.py`.
+4. Wire `monte_carlo_trades()` call after each trade-level run -- updates
+   `backtest_metrics.mc_sharpe_lo/hi/median`.
+5. Run initial backfill: 13 existing strategies x 109 assets.
+6. After CTF graduation (Step 3): implement `signals/ctf_threshold.py` and run
+   CTF signal backtest sweep.
 
-Apply the same pattern to EMA, AMA, and returns families.
+### Step 5: ML Signal Combination (Days 10-15)
 
-**Files modified:** 3 EMA builders, 5 AMA builders, 5 bar returns builders, 3 EMA returns builders, 5 AMA returns builders = ~21 scripts.
+**Why last:** Depends on backtest scaling infrastructure (Step 4) to evaluate
+ML signals, and optionally on CTF features (Step 3) as ML inputs.
 
-Each change is mechanical: output table name + alignment_source column.
+1. Train DoubleEnsemble on `features` table data (optionally including CTF columns
+   after Step 3).
+2. Serialize trained model to disk or DB artifact store.
+3. Implement `signals/ml_composite.py` as a daily signal generator that loads the
+   model and writes predictions to `signals_ml_composite` table.
+4. Write Alembic migration for `signals_ml_composite` table.
+5. Add `ml_composite` to `SIGNAL_TABLE_MAP` in `executor/signal_reader.py`.
+6. Add ML strategy config to `executor_config_seed.yaml` and re-run seed.
+7. Backtest the ML signal through `run_mass_backtest.py` before live paper trading.
 
-### Phase 5: Retire Old Builders and Sync Scripts
+### Step 6: Tech Debt Cleanup (Day 15, final)
 
-Once direct-to-_u is validated:
-
-**Files archived (moved to `scripts/_deprecated/`):**
-- `refresh_price_bars_1d.py`
-- `refresh_tvc_price_bars_1d.py`
-- `refresh_hl_price_bars_1d.py`
-- `sync_price_bars_multi_tf_u.py`
-- `sync_ema_multi_tf_u.py`
-- `sync_ama_multi_tf_u.py`
-- `sync_returns_bars_multi_tf_u.py`
-- `sync_returns_ema_multi_tf_u.py`
-- `sync_returns_ama_multi_tf_u.py`
-
-**Files updated:**
-- `run_all_bar_builders.py`: Replace three 1D entries with generic builder entries
-- `run_daily_refresh.py`: Remove any sync step references
-- `run_go_forward_daily_refresh.py`: Remove ema_u_sync step
-
-### Phase 6: Drop Siloed Tables (Optional, Deferred)
-
-After running direct-to-_u successfully for 2+ weeks:
-
-```sql
--- Verify siloed tables are truly unused
-SELECT schemaname, relname, last_seq_scan, last_idx_scan
-FROM pg_stat_user_tables
-WHERE relname IN ('price_bars_multi_tf', 'price_bars_multi_tf_cal_us', ...)
-ORDER BY last_seq_scan DESC NULLS LAST;
-
--- If no scans in 2 weeks, archive (rename, don't drop)
-ALTER TABLE price_bars_multi_tf RENAME TO _archive_price_bars_multi_tf;
-```
-
-This frees ~250M+ rows of duplicate storage across the 30 siloed tables.
+1. Remove or mark `blend_vol_simple()` as internal in `garch_blend.py`.
+2. Create Phase 82 `VERIFICATION.md` from existing summaries.
+3. Update Phase 92 `VERIFICATION.md` to reflect closed gaps.
 
 ---
 
-## Anti-Patterns to Avoid
+## Critical Integration Points
 
-### Anti-Pattern 1: Big-Bang Migration
+These are the exact lines of code / config that are the connective tissue between
+existing components:
 
-**What:** Try to change all 6 families and all 3 builders in one phase.
-**Why bad:** If something breaks, the blast radius is the entire pipeline. Rollback is impossible.
-**Instead:** One family at a time, with a validation gate between each. Price bars first (most critical), then EMA, then returns, then AMA.
+### 1. dim_executor_config -> PaperExecutor
 
-### Anti-Pattern 2: Modifying Siloed Table PKs
+```python
+# executor/paper_executor.py line 204-217
+# Query: SELECT * FROM public.dim_executor_config WHERE is_active = TRUE
+# If 0 rows -> PaperExecutor.run() returns {"status": "no_configs", ...}
+# Seeded by: configs/executor_config_seed.yaml via seed_executor_config.py
+```
 
-**What:** Try to add alignment_source to siloed table PKs to make them "compatible" with _u.
-**Why bad:** Siloed tables should not need alignment_source. They exist to be single-alignment. The goal is to stop using them.
-**Instead:** Leave siloed tables as-is. Only modify builder output targets.
+### 2. feature_selection.yaml -> Four Consumers
 
-### Anti-Pattern 3: Dual-Write Transition
+```python
+# bakeoff_orchestrator.py: parse_active_features()
+# Reads configs/feature_selection.yaml -> returns list of {name, ic_ir_mean, ...}
+# Used by:
+#   run_bakeoff.py (AMA feature loading)
+#   refresh_portfolio_allocations.py (IC-IR weight matrix)
+#   run_ic_staleness_check.py (feature monitoring)
+#   run_regime_routing.py (ML feature loading)
+```
 
-**What:** Have builders write to BOTH siloed and _u tables during transition.
-**Why bad:** Doubles write I/O, doubles maintenance surface, introduces subtle consistency issues if one write succeeds and the other fails.
-**Instead:** Switch output table atomically (one builder at a time). Keep sync scripts running until all builders are switched, then remove sync scripts.
+### 3. SIGNAL_TABLE_MAP -> Signal Routing
 
-### Anti-Pattern 4: Abstract SourceSpec Too Early
+```python
+# executor/signal_reader.py line 37-41
+SIGNAL_TABLE_MAP = {
+    "ema_crossover": "signals_ema_crossover",
+    "rsi_mean_revert": "signals_rsi_mean_revert",
+    "atr_breakout": "signals_atr_breakout",
+    # AMA signals intentionally absent -- bakeoff only, no DB persistence
+    # ML composite: add here when signals_ml_composite table exists
+}
+```
 
-**What:** Try to make SourceSpec handle future sources we don't have yet (e.g., Binance, Kraken candles).
-**Why bad:** Premature generalization. We don't know what future source quirks look like.
-**Instead:** Design SourceSpec for the 3 known sources. Add extensibility points (id_loader, insert_cte_builder) but don't over-engineer the interface.
+### 4. MC columns -> backtest_metrics
 
-### Anti-Pattern 5: Changing _u Table Schema
+```python
+# analysis/monte_carlo.py: monte_carlo_trades(df_trades)
+# Returns: {"mc_sharpe_lo": float, "mc_sharpe_hi": float, "mc_sharpe_median": float, ...}
+# Target: public.backtest_metrics.mc_sharpe_lo / mc_sharpe_hi / mc_sharpe_median
+# Currently: all NULL (monte_carlo_trades never called in batch)
+```
 
-**What:** Alter the _u table schema (add columns, change PKs) as part of this refactor.
-**Why bad:** _u tables are the production read path for all downstream consumers. Schema changes affect everything.
-**Instead:** _u table schema stays EXACTLY as-is. The only change is WHO writes to it (builders instead of sync scripts).
+### 5. SERIES_TO_LOAD -> FRED pipeline
+
+```python
+# macro/fred_reader.py line 27-58
+SERIES_TO_LOAD: list[str] = [...]  # 18 series
+# Adding 4 equity index series here triggers automatic inclusion in:
+#   load_series_wide()
+#   forward_fill_with_limits()
+#   compute_macro_features() if _RENAME_MAP updated
+```
+
+### 6. ctf table -> features table (missing link for CTF graduation)
+
+```python
+# ctf table: (id, venue_id, ts, tf, indicator_id, base_tf, ref_tf, ...composites...)
+# features table: (id, venue_id, ts, tf, ...feature_columns...)
+# Gap: no ETL from ctf to features
+# Bridge needed: refresh_ctf_promoted.py
+#   SELECT id, venue_id, ts, tf, composite_value AS promoted_feature_name
+#   FROM ctf WHERE indicator_id IN (promoted_indicator_ids)
+#   -> scoped DELETE + INSERT into features
+```
+
+---
+
+## Architecture Anti-Patterns to Avoid
+
+### Anti-Pattern 1: Creating a New Orchestrator
+
+Do not build a separate scheduling system for v1.3.0 tasks. `run_daily_refresh.py`
+already has all the stage slots and subprocess patterns. Add stages there, not as
+a new parallel scheduling system.
+
+### Anti-Pattern 2: Making AMA Signals a Persistent Table Prematurely
+
+AMA signals (ama_momentum, ama_mean_reversion, ama_regime_conditional) are
+currently bakeoff-only. Their signal quality over the full asset universe and
+across production cost scenarios has not been validated in the same way EMA signals
+were. Before creating a `signals_ama_momentum` table and adding AMA signals to the
+executor, run them through the mass backtest infrastructure (Step 4) to confirm
+they pass the same gates the EMA strategies passed in Phase 42.
+
+### Anti-Pattern 3: Altering the _u Table Schema for CTF
+
+Do not add CTF columns to `ama_multi_tf_u` or `price_bars_multi_tf_u`. CTF features
+belong in the `features` table (bar-level feature store). The _u tables are for
+aligned price/indicator data, not derived features.
+
+### Anti-Pattern 4: Using a File-Based State for Mass Backtest
+
+The mass backtest orchestrator must use a DB table (not a CSV or JSON file) to
+track completed combos. File-based state does not survive process kills and is
+not queryable for progress monitoring.
+
+### Anti-Pattern 5: Expanding ML Model Training in the Daily Pipeline
+
+The DoubleEnsemble training loop is hours-long. It must run as a separate offline
+job (scheduled weekly or on-demand), not in the daily pipeline. The daily pipeline
+only runs inference (predict from serialized model -> write signals to DB).
 
 ---
 
 ## Scalability Considerations
 
-| Concern | Current | After Consolidation |
-|---------|---------|---------------------|
-| Storage | ~4.1M rows x 6 tables per family = ~24.6M duplicated rows (price bars alone) | ~4.1M rows in _u only, siloed tables archived |
-| Write I/O | Write to siloed + sync to _u = 2x writes | Write to _u only = 1x writes |
-| Pipeline latency | Sync step adds 5-15 min per family | No sync step = 5-15 min saved per family |
-| Maintenance | 6 sync scripts + 3 duplicate 1D builders | 0 sync scripts + 1 generic 1D builder |
-| Adding a venue | Copy-paste 500+ LOC 1D builder | Add a SourceSpec entry (~30 lines) |
-
----
-
-## Risk Assessment
-
-| Risk | Severity | Probability | Mitigation |
-|------|----------|-------------|------------|
-| _u table PK collision during migration | HIGH | LOW | Siloed tables already sync to _u with ON CONFLICT DO NOTHING. Direct writes use same PK. |
-| Downstream consumer breaks | HIGH | VERY LOW | Consumers read from _u tables. _u schema is unchanged. |
-| Data loss during table archival | HIGH | LOW | Archive (rename), never drop. Verify via pg_stat before archive. |
-| Generic builder produces different output than original | MEDIUM | LOW | Row-by-row comparison using validate_derivation_consistency() |
-| State table schema incompatibility | MEDIUM | LOW | State tables already share PK (id, tf). Generic builder uses same state table. |
-| Performance regression in direct-to-_u writes | LOW | LOW | _u table has same indexes. PK includes alignment_source, so no wider conflict check. |
+| Concern | v1.2.0 State | v1.3.0 Change | Mitigation |
+|---------|-------------|---------------|------------|
+| backtest_trades volume | 2 rows | 20-40M rows target | Partition by strategy_name or asset_id |
+| features table width | ~112 columns | +15 CTF columns | Alembic migration, monitor query plan |
+| fred.fred_macro_features width | ~50 columns | +20 equity index columns | Alembic migration |
+| signals_ml_composite volume | 0 rows | ~100 assets x daily = 36K/year | Small, no concern |
+| Mass backtest runtime | N/A | 460K runs estimated | NullPool + maxtasksperchild=1, batch by asset |
+| GARCH timeout | 1800s in pipeline | Unchanged | Already wired, acceptable |
 
 ---
 
 ## Sources
 
-All findings based on direct source code analysis:
+All findings from direct source code analysis:
 
-- `src/ta_lab2/scripts/bars/base_bar_builder.py` (557 lines) - Template method base class
-- `src/ta_lab2/scripts/bars/bar_builder_config.py` (53 lines) - Configuration dataclass
-- `src/ta_lab2/scripts/bars/common_snapshot_contract.py` (1,813 lines) - Shared utilities
-- `src/ta_lab2/scripts/bars/refresh_price_bars_1d.py` (822 lines) - CMC 1D builder
-- `src/ta_lab2/scripts/bars/refresh_tvc_price_bars_1d.py` (511 lines) - TVC 1D builder
-- `src/ta_lab2/scripts/bars/refresh_hl_price_bars_1d.py` (585 lines) - HL 1D builder
-- `src/ta_lab2/scripts/bars/run_all_bar_builders.py` (537 lines) - Orchestrator
-- `src/ta_lab2/scripts/bars/sync_price_bars_multi_tf_u.py` (72 lines) - Sync to _u
-- `src/ta_lab2/scripts/bars/derive_multi_tf_from_1d.py` (807 lines) - Multi-TF derivation
-- `src/ta_lab2/scripts/sync_utils.py` (304 lines) - Generic sync utility
-- `src/ta_lab2/scripts/emas/sync_ema_multi_tf_u.py` (360 lines) - Legacy EMA sync
-- `src/ta_lab2/scripts/emas/base_ema_refresher.py` - EMA template method
-- `src/ta_lab2/scripts/amas/sync_ama_multi_tf_u.py` (97 lines) - AMA sync
-- `src/ta_lab2/scripts/returns/sync_returns_bars_multi_tf_u.py` (69 lines) - Returns sync
-- `src/ta_lab2/scripts/run_daily_refresh.py` - Daily pipeline orchestrator
-- `src/ta_lab2/scripts/pipeline/run_go_forward_daily_refresh.py` - Go-forward pipeline
+- `src/ta_lab2/scripts/run_daily_refresh.py` -- STAGE_ORDER (line 120-143), all
+  subprocess wrappers
+- `src/ta_lab2/executor/paper_executor.py` -- `_load_active_configs()` query,
+  execution flow
+- `src/ta_lab2/executor/signal_reader.py` -- `SIGNAL_TABLE_MAP` (lines 37-41)
+- `src/ta_lab2/scripts/executor/seed_executor_config.py` -- seed mechanics,
+  signal_name resolution
+- `configs/executor_config_seed.yaml` -- two EMA strategies, signal_name refs
+- `src/ta_lab2/backtests/bakeoff_orchestrator.py` -- bakeoff vs trade-level
+  distinction, `parse_active_features()`
+- `src/ta_lab2/analysis/monte_carlo.py` -- `monte_carlo_trades()` return shape,
+  mc_sharpe keys
+- `src/ta_lab2/macro/fred_reader.py` -- `SERIES_TO_LOAD` (18 series)
+- `src/ta_lab2/macro/feature_computer.py` -- `_RENAME_MAP`, `compute_derived_features_66()`
+- `src/ta_lab2/macro/cross_asset.py` -- reads `fred.fred_macro_features`
+- `src/ta_lab2/portfolio/black_litterman.py` -- `signal_scores` DataFrame interface
+- `src/ta_lab2/scripts/portfolio/refresh_portfolio_allocations.py` -- uniform 1.0
+  fallback (lines 822-830), `_load_signal_scores()` real path (line 814)
+- `src/ta_lab2/signals/registry.py` -- `REGISTRY` entries, AMA signal imports
+- `src/ta_lab2/signals/ama_composite.py` -- confirms bakeoff-only design
+- `configs/feature_selection.yaml` -- 20 active AMA features
+- `.planning/todos/pending/2026-03-28-ctf-production-integration.md`
+- `.planning/todos/pending/2026-03-29-massive-backtest-monte-carlo-expansion.md`
+- `.planning/todos/pending/2026-03-28-fred-equity-indices-macro-pipeline.md`
+- `.planning/milestones/v1.2.0-MILESTONE-AUDIT.md` -- integration wiring map,
+  tech debt items
