@@ -1663,7 +1663,7 @@ Plans:
   4. `python -m ta_lab2.scripts.executor.run_parity_check` attempts parity for all 9 strategies (not just 3)
 
 Plans:
-- [ ] 93-01-PLAN.md -- Fix GARCH column bug + expand _STRATEGY_SIGNAL_MAP
+- [x] 93-01-PLAN.md -- Fix GARCH column bug + expand _STRATEGY_SIGNAL_MAP
 
 ---
 
