@@ -1,15 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-Portfolio Allocation page -- Black-Litterman weights, position sizing, exposure.
+Portfolio Allocation page -- optimizer weights, position sizing, exposure.
 
-Displays a placeholder layout with mock data demonstrating the intended final
-structure. All data is generated inline as reproducible mock data. Live data
-will replace mocks after Phase 86 (Portfolio Construction Pipeline) is complete.
-
-Sections:
+Queries the portfolio_allocations table for live allocation data and renders:
   1. Current Allocation -- treemap or stacked bar toggle
   2. Weight History     -- stacked area chart or table toggle
-  3. Position Sizing    -- bet sizes + risk budget utilization
+  3. Position Sizing    -- bet sizes + portfolio metrics
   4. Exposure Summary   -- full allocation table
 
 NOTE: Do NOT call st.set_page_config() here -- only in the main app entry point.
@@ -20,59 +16,38 @@ from __future__ import annotations
 
 import datetime
 
-import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
 from ta_lab2.dashboard.charts import chart_download_button
-from ta_lab2.dashboard.db import get_engine  # noqa: F401  # reserved for Phase 86
+from ta_lab2.dashboard.db import get_engine
+from ta_lab2.dashboard.queries.portfolio import (
+    load_allocation_history,
+    load_available_optimizers,
+    load_latest_allocations,
+)
+from ta_lab2.dashboard.queries.trading import load_starting_capital
 
 AUTO_REFRESH_SECONDS = 900
 
 # ---------------------------------------------------------------------------
-# Assets and strategies
+# Database connection
 # ---------------------------------------------------------------------------
 
-_ASSETS: list[str] = [
-    "BTC",
-    "ETH",
-    "SOL",
-    "AVAX",
-    "LINK",
-    "DOT",
-    "UNI",
-    "AAVE",
-    "MATIC",
-    "ARB",
-]
-
-_STRATEGIES: list[str] = ["momentum", "mean_reversion", "trend_following"]
-
-# Asset -> strategy mapping (used for grouping)
-_ASSET_STRATEGY: dict[str, str] = {
-    "BTC": "trend_following",
-    "ETH": "trend_following",
-    "SOL": "momentum",
-    "AVAX": "momentum",
-    "LINK": "momentum",
-    "DOT": "mean_reversion",
-    "UNI": "mean_reversion",
-    "AAVE": "mean_reversion",
-    "MATIC": "trend_following",
-    "ARB": "momentum",
-}
+try:
+    engine = get_engine()
+except Exception as exc:
+    st.error(f"Database connection failed: {exc}")
+    st.stop()
 
 # ---------------------------------------------------------------------------
 # Page header (outside fragment -- always visible)
 # ---------------------------------------------------------------------------
 
 st.header("Portfolio Allocation")
-st.caption("Black-Litterman weights, position sizing, and exposure")
-st.info(
-    "This page uses mock data. Live portfolio data will be available after "
-    "Phase 86 (Portfolio Construction Pipeline) is complete.",
-    icon=":material/construction:",
+st.caption(
+    "Optimizer weights, position sizing, and exposure from portfolio_allocations"
 )
 
 # ---------------------------------------------------------------------------
@@ -88,93 +63,59 @@ with st.sidebar:
         key="portfolio_as_of_date",
     )
 
-    strategy_filter = st.multiselect(
-        "Strategies",
-        options=_STRATEGIES,
-        default=_STRATEGIES,
-        key="portfolio_strategy_filter",
+    optimizers = load_available_optimizers(engine)
+    if not optimizers:
+        st.info(
+            "No portfolio allocations found. Run the portfolio allocation "
+            "refresh to populate data:\n\n"
+            "`python -m ta_lab2.scripts.portfolio.refresh_portfolio_allocations "
+            "--ids all --tf 1D`"
+        )
+        st.stop()
+
+    selected_optimizer = st.selectbox(
+        "Optimizer",
+        options=optimizers,
+        index=optimizers.index("hrp") if "hrp" in optimizers else 0,
+        key="portfolio_optimizer",
     )
 
 
 # ---------------------------------------------------------------------------
-# Fragment: mock data generation + rendering (auto-refreshes every 15 min)
+# Fragment: live data rendering (auto-refreshes every 15 min)
 # ---------------------------------------------------------------------------
 
 
 @st.fragment(run_every=AUTO_REFRESH_SECONDS)
 def _portfolio_content(
+    _engine,
     as_of_date: datetime.date,
-    strategy_filter: list[str],
+    selected_optimizer: str,
 ) -> None:
     """Render all Portfolio Allocation page sections. Refreshes every 15 minutes."""
 
     # -----------------------------------------------------------------------
-    # Mock data generation
-    # TODO(Phase-86): Replace with load_bl_weights(engine)
+    # Load live data
     # -----------------------------------------------------------------------
 
-    rng = np.random.default_rng(42)
+    alloc_df = load_latest_allocations(_engine, optimizer=selected_optimizer)
 
-    # Current BL weights (realistic allocation)
-    raw_weights = np.array([35.0, 25.0, 10.0, 6.0, 5.0, 4.5, 4.0, 4.0, 3.5, 3.0])
-    # Small perturbation to simulate live weights
-    weight_pct = raw_weights + rng.normal(0, 0.3, len(_ASSETS))
-    weight_pct = np.maximum(weight_pct, 0.5)
-    weight_pct = weight_pct / weight_pct.sum() * 100.0
-
-    # Position sizing mock data
-    # TODO(Phase-86): Replace with load_position_sizing(engine)
-    portfolio_nav = 100_000.0
-    bet_size_usd = weight_pct / 100.0 * portfolio_nav
-    risk_budget_pct = np.array([8.0, 7.0, 5.0, 4.0, 4.0, 3.5, 3.0, 3.0, 2.5, 2.0])
-    risk_used_pct = risk_budget_pct * (0.7 + rng.random(len(_ASSETS)) * 0.3)
-    max_position_pct = np.array([40.0, 30.0, 15.0, 10.0, 10.0, 8.0, 7.0, 7.0, 6.0, 5.0])
-
-    # Risk tier labels
-    risk_tier_colors = []
-    for rp in risk_used_pct / risk_budget_pct:
-        if rp < 0.6:
-            risk_tier_colors.append("rgba(0, 200, 100, 0.8)")  # green = low risk
-        elif rp < 0.85:
-            risk_tier_colors.append("rgba(255, 193, 7, 0.8)")  # yellow = medium
-        else:
-            risk_tier_colors.append("rgba(220, 50, 50, 0.8)")  # red = high
-
-    # Weight history (30-day daily snapshots with random walk)
-    # TODO(Phase-86): Replace with load_weight_history(engine, days=30)
-    n_days = 30
-    dates = pd.date_range(end=pd.Timestamp(as_of_date), periods=n_days, freq="D")
-    weight_history = np.zeros((n_days, len(_ASSETS)))
-    weight_history[0] = weight_pct
-    for day_idx in range(1, n_days):
-        delta = rng.normal(0, 0.5, len(_ASSETS))
-        w = weight_history[day_idx - 1] + delta
-        w = np.maximum(w, 0.5)
-        weight_history[day_idx] = w / w.sum() * 100.0
-    # Reverse so index 0 = oldest, index -1 = most recent
-    weight_history = weight_history[::-1]
-
-    # Build allocation dataframe
-    allocation_df = pd.DataFrame(
-        {
-            "asset": _ASSETS,
-            "strategy": [_ASSET_STRATEGY[a] for a in _ASSETS],
-            "weight_pct": weight_pct,
-            "bet_size_usd": bet_size_usd,
-            "risk_budget_pct": risk_budget_pct,
-            "risk_used_pct": risk_used_pct,
-            "max_position_pct": max_position_pct,
-        }
-    )
-
-    # Apply strategy filter
-    if strategy_filter:
-        allocation_df = allocation_df[allocation_df["strategy"].isin(strategy_filter)]
-    else:
-        st.warning(
-            "No strategies selected. Enable at least one strategy in the sidebar."
+    if alloc_df.empty:
+        st.info(
+            "No portfolio allocations found. Run:\n\n"
+            "`python -m ta_lab2.scripts.portfolio.refresh_portfolio_allocations "
+            "--ids all --tf 1D`"
         )
         return
+
+    alloc_df["weight_pct"] = alloc_df["weight"] * 100.0
+
+    # Portfolio NAV from executor config, fallback to 100k
+    portfolio_nav = load_starting_capital(_engine)
+    if portfolio_nav == 0:
+        portfolio_nav = 100_000.0
+
+    alloc_df["bet_size_usd"] = alloc_df["weight"] * portfolio_nav
 
     # -----------------------------------------------------------------------
     # Section 1: Current Allocation
@@ -190,14 +131,24 @@ def _portfolio_content(
     )
 
     if view_toggle == "Treemap":
-        # go.Treemap: labels=asset, values=weight_pct, parents=strategy
+        # Flat treemap: each asset is a root-level tile
+        hover_parts = []
+        for _, row in alloc_df.iterrows():
+            regime = row.get("regime_label") or "N/A"
+            hover_parts.append(
+                f"<b>{row['symbol']}</b><br>"
+                f"Weight: {row['weight_pct']:.2f}%<br>"
+                f"Regime: {regime}"
+            )
+
         fig_treemap = go.Figure(
             go.Treemap(
-                labels=allocation_df["asset"].tolist(),
-                values=allocation_df["weight_pct"].tolist(),
-                parents=allocation_df["strategy"].tolist(),
+                labels=alloc_df["symbol"].tolist(),
+                values=alloc_df["weight_pct"].tolist(),
+                parents=[""] * len(alloc_df),
                 texttemplate="%{label}<br>%{value:.1f}%",
-                hovertemplate="<b>%{label}</b><br>Weight: %{value:.2f}%<br>Strategy: %{parent}<extra></extra>",
+                hovertext=hover_parts,
+                hoverinfo="text",
                 marker=dict(
                     colorscale="Greens",
                     colorbar=dict(title="Weight %"),
@@ -214,18 +165,17 @@ def _portfolio_content(
 
     else:  # Stacked Bar
         fig_bar = go.Figure()
-        for asset_row in allocation_df.itertuples():
+        for row in alloc_df.itertuples():
             fig_bar.add_trace(
                 go.Bar(
-                    name=asset_row.asset,
-                    x=[asset_row.strategy],
-                    y=[asset_row.weight_pct],
-                    text=f"{asset_row.asset}<br>{asset_row.weight_pct:.1f}%",
+                    name=row.symbol,
+                    x=["Portfolio"],
+                    y=[row.weight_pct],
+                    text=f"{row.symbol}<br>{row.weight_pct:.1f}%",
                     textposition="inside",
                     hovertemplate=(
-                        f"<b>{asset_row.asset}</b><br>"
-                        f"Strategy: {asset_row.strategy}<br>"
-                        f"Weight: {asset_row.weight_pct:.2f}%"
+                        f"<b>{row.symbol}</b><br>"
+                        f"Weight: {row.weight_pct:.2f}%"
                         "<extra></extra>"
                     ),
                 )
@@ -234,7 +184,7 @@ def _portfolio_content(
             barmode="stack",
             template="plotly_dark",
             height=400,
-            xaxis_title="Strategy",
+            xaxis_title="",
             yaxis_title="Weight (%)",
             showlegend=True,
             legend=dict(
@@ -260,28 +210,28 @@ def _portfolio_content(
         key="portfolio_history_toggle",
     )
 
-    # Filter history columns to strategy_filter assets
-    filtered_assets = allocation_df["asset"].tolist()
-    asset_indices = [_ASSETS.index(a) for a in filtered_assets if a in _ASSETS]
-    filtered_history = weight_history[:, asset_indices]
+    history_df = load_allocation_history(_engine, optimizer=selected_optimizer, days=30)
 
-    if history_toggle == "Area Chart":
+    if history_df.empty:
+        st.info("No allocation history available yet.")
+    elif history_toggle == "Area Chart":
         fig_area = go.Figure()
-        cumulative_y = np.zeros(n_days)
-        for col_idx, asset in enumerate(filtered_assets):
-            asset_weights = filtered_history[:, col_idx]
+        for symbol in history_df.columns:
             fig_area.add_trace(
                 go.Scatter(
-                    x=dates.tolist(),
-                    y=(cumulative_y + asset_weights).tolist(),
+                    x=history_df.index.tolist(),
+                    y=(history_df[symbol] * 100.0).tolist(),
                     mode="lines",
-                    name=asset,
+                    name=symbol,
                     stackgroup="weights",
-                    hovertemplate=f"<b>{asset}</b><br>Date: %{{x|%Y-%m-%d}}<br>Weight: %{{y:.2f}}%<extra></extra>",
-                    fill="tonexty" if col_idx > 0 else "tozeroy",
+                    hovertemplate=(
+                        f"<b>{symbol}</b><br>"
+                        "Date: %{x|%Y-%m-%d}<br>"
+                        "Weight: %{y:.2f}%"
+                        "<extra></extra>"
+                    ),
                 )
             )
-            cumulative_y = cumulative_y + asset_weights
         fig_area.update_layout(
             template="plotly_dark",
             height=380,
@@ -297,14 +247,14 @@ def _portfolio_content(
         chart_download_button(
             fig_area, "Download Weight History", "portfolio_weight_history.html"
         )
-
     else:  # Table
-        history_dict: dict[str, object] = {"date": dates.strftime("%Y-%m-%d").tolist()}
-        for col_idx, asset in enumerate(filtered_assets):
-            history_dict[asset] = [f"{w:.1f}%" for w in filtered_history[:, col_idx]]
-        history_display_df = pd.DataFrame(history_dict)
+        table_df = history_df.copy()
+        table_df.index = table_df.index.strftime("%Y-%m-%d")
+        table_df.index.name = "Date"
+        for col in table_df.columns:
+            table_df[col] = table_df[col].map(lambda v: f"{v * 100:.1f}%")
         st.dataframe(
-            history_display_df,
+            table_df.reset_index(),
             use_container_width=True,
             height=350,
             key="portfolio_history_table",
@@ -321,32 +271,13 @@ def _portfolio_content(
     with col_left:
         st.markdown("**Bet Size per Asset (USD)**")
 
-        # Hover rationale based on strategy
-        hover_texts = []
-        for row in allocation_df.itertuples():
-            ic_ir = 0.75 + (row.weight_pct / 100.0) * 2.0
-            hover_texts.append(
-                f"<b>{row.asset}</b><br>"
-                f"Strategy: {row.strategy}<br>"
-                f"Bet: ${row.bet_size_usd:,.0f}<br>"
-                f"Rationale: {row.strategy.replace('_', ' ').title()} "
-                f"allocation based on IC-IR={ic_ir:.2f}"
-            )
-
-        # Bar colors from risk tier
-        bar_colors_for_filtered = []
-        for asset in filtered_assets:
-            orig_idx = _ASSETS.index(asset)
-            bar_colors_for_filtered.append(risk_tier_colors[orig_idx])
-
         fig_bets = go.Figure(
             go.Bar(
-                x=allocation_df["bet_size_usd"].tolist(),
-                y=allocation_df["asset"].tolist(),
+                x=alloc_df["bet_size_usd"].tolist(),
+                y=alloc_df["symbol"].tolist(),
                 orientation="h",
-                marker_color=bar_colors_for_filtered,
-                hovertemplate="%{customdata}<extra></extra>",
-                customdata=hover_texts,
+                marker_color="rgba(0, 200, 100, 0.8)",
+                hovertemplate=("<b>%{y}</b><br>Bet: $%{x:,.0f}<extra></extra>"),
             )
         )
         fig_bets.update_layout(
@@ -360,42 +291,25 @@ def _portfolio_content(
         st.plotly_chart(fig_bets, use_container_width=True, key="portfolio_bet_sizes")
 
     with col_right:
-        st.markdown("**Risk Budget Utilization**")
+        st.markdown("**Portfolio Metrics**")
 
-        total_budget_used = float(allocation_df["risk_used_pct"].sum())
-        total_budget = float(allocation_df["risk_budget_pct"].sum())
-        utilization_pct = (
-            total_budget_used / total_budget * 100.0 if total_budget > 0 else 0.0
-        )
-
-        # Summary metric
-        color_class = (
-            "normal"
-            if utilization_pct < 60
-            else "off"
-            if utilization_pct < 85
-            else "inverse"
-        )
         st.metric(
-            "Total Risk Budget Used",
-            f"{utilization_pct:.1f}%",
-            delta=f"{utilization_pct - 75:.1f}pp vs 75% target",
-            delta_color=color_class,
-            help="Percentage of total risk budget currently allocated",
+            "Portfolio NAV",
+            f"${portfolio_nav:,.0f}",
+            help="Total starting capital from active executor configs",
         )
+        st.metric("Assets Allocated", len(alloc_df))
+        st.metric("Optimizer", selected_optimizer.upper())
 
-        # Per-asset risk budget progress bars
-        for row in allocation_df.itertuples():
-            used_frac = (
-                float(row.risk_used_pct) / float(row.risk_budget_pct)
-                if row.risk_budget_pct > 0
-                else 0.0
+        # Condition number (diagnostic from covariance matrix)
+        cond = alloc_df["condition_number"].dropna()
+        if not cond.empty:
+            st.metric(
+                "Condition Number",
+                f"{cond.iloc[0]:.1f}",
+                help="Lower is better (< 100 ideal). "
+                "Measures covariance matrix stability.",
             )
-            used_frac = min(used_frac, 1.0)
-            st.write(
-                f"**{row.asset}** ({row.risk_used_pct:.1f}% / {row.risk_budget_pct:.1f}%)"
-            )
-            st.progress(used_frac, text=f"{used_frac * 100:.0f}% of budget")
 
     # -----------------------------------------------------------------------
     # Section 4: Exposure Summary
@@ -403,48 +317,41 @@ def _portfolio_content(
 
     st.subheader("Exposure Summary")
 
-    # TODO(Phase-86): Replace with live positions from load_live_positions(engine)
-    summary_df = allocation_df[
-        [
-            "asset",
-            "strategy",
-            "weight_pct",
-            "bet_size_usd",
-            "risk_budget_pct",
-            "max_position_pct",
-        ]
-    ].copy()
-    summary_df["weight_pct"] = summary_df["weight_pct"].map(lambda v: f"{v:.1f}%")
-    summary_df["bet_size_usd"] = summary_df["bet_size_usd"].map(lambda v: f"${v:,.0f}")
-    summary_df["risk_budget_pct"] = summary_df["risk_budget_pct"].map(
-        lambda v: f"{v:.1f}%"
-    )
-    summary_df["max_position_pct"] = summary_df["max_position_pct"].map(
-        lambda v: f"{v:.1f}%"
-    )
-    summary_df.columns = [
-        "Asset",
-        "Strategy",
-        "Weight %",
-        "Bet Size USD",
-        "Risk Budget %",
-        "Max Position %",
-    ]
+    summary_df = alloc_df[["symbol", "weight_pct", "bet_size_usd"]].copy()
+
+    # Add final weight column if available
+    if "final_weight" in alloc_df.columns and alloc_df["final_weight"].notna().any():
+        summary_df["final_weight_pct"] = alloc_df["final_weight"] * 100.0
+
+    # Add regime label if available
+    if "regime_label" in alloc_df.columns and alloc_df["regime_label"].notna().any():
+        summary_df["regime"] = alloc_df["regime_label"]
+
+    # Format for display
+    fmt_df = pd.DataFrame()
+    fmt_df["Symbol"] = summary_df["symbol"]
+    fmt_df["Weight %"] = summary_df["weight_pct"].map(lambda v: f"{v:.1f}%")
+    fmt_df["Bet Size USD"] = summary_df["bet_size_usd"].map(lambda v: f"${v:,.0f}")
+    if "final_weight_pct" in summary_df.columns:
+        fmt_df["Final Weight %"] = summary_df["final_weight_pct"].map(
+            lambda v: f"{v:.1f}%"
+        )
+    if "regime" in summary_df.columns:
+        fmt_df["Regime"] = summary_df["regime"]
 
     # Totals row
-    totals = pd.DataFrame(
-        [
-            {
-                "Asset": "TOTAL",
-                "Strategy": "--",
-                "Weight %": f"{allocation_df['weight_pct'].sum():.1f}%",
-                "Bet Size USD": f"${allocation_df['bet_size_usd'].sum():,.0f}",
-                "Risk Budget %": f"{allocation_df['risk_budget_pct'].sum():.1f}%",
-                "Max Position %": "--",
-            }
-        ]
-    )
-    display_df = pd.concat([summary_df, totals], ignore_index=True)
+    totals_dict: dict[str, str] = {
+        "Symbol": "TOTAL",
+        "Weight %": f"{alloc_df['weight_pct'].sum():.1f}%",
+        "Bet Size USD": f"${alloc_df['bet_size_usd'].sum():,.0f}",
+    }
+    if "Final Weight %" in fmt_df.columns and "final_weight_pct" in summary_df.columns:
+        totals_dict["Final Weight %"] = f"{summary_df['final_weight_pct'].sum():.1f}%"
+    if "Regime" in fmt_df.columns:
+        totals_dict["Regime"] = "--"
+
+    totals = pd.DataFrame([totals_dict])
+    display_df = pd.concat([fmt_df, totals], ignore_index=True)
 
     st.dataframe(
         display_df,
@@ -459,6 +366,7 @@ def _portfolio_content(
 # ---------------------------------------------------------------------------
 
 _portfolio_content(
+    _engine=engine,
     as_of_date=as_of_date,
-    strategy_filter=strategy_filter,
+    selected_optimizer=selected_optimizer,
 )
