@@ -981,7 +981,9 @@ def run_signal_refreshes(args, db_url: str) -> ComponentResult:
     """
     Run signal generation via subprocess.
 
-    Generates EMA crossover, RSI, and ATR breakout signals for all assets.
+    Generates all 7 signal types (EMA crossover, RSI mean-revert, ATR breakout,
+    MACD crossover in Batch 1; AMA momentum, AMA mean-reversion, AMA regime-
+    conditional in Batch 2) for all assets.
     Runs after regimes (regime-aware signal generation) and before the executor.
 
     Args:
