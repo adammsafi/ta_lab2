@@ -1,13 +1,16 @@
 """
 PositionSizer - Convert signals into target positions with configurable sizing modes.
 
-Supports four sizing modes:
+Supports five sizing modes:
   - fixed_fraction: constant fraction of portfolio value
   - regime_adjusted: fraction scaled by current market regime
   - signal_strength: fraction scaled by signal confidence
   - target_vol: fraction scaled so portfolio vol targets a configured annualized vol.
       Uses GARCH blended conditional vol (passed via garch_vol kwarg by caller).
       Falls back to fixed_fraction when GARCH vol is unavailable or not configured.
+  - bl_weight: fraction taken from the most recent Black-Litterman optimizer output
+      in portfolio_allocations. Returns 0 (flat) when BL de-selects the asset.
+      Falls back to fixed_fraction when conn/asset_id are not provided.
 
 All arithmetic uses decimal.Decimal for precision.
 
@@ -64,7 +67,7 @@ class ExecutorConfig:
     exchange : str
         Exchange identifier (e.g. 'paper', 'binance').
     sizing_mode : str
-        One of 'fixed_fraction', 'regime_adjusted', 'signal_strength'.
+        One of 'fixed_fraction', 'regime_adjusted', 'signal_strength', 'bl_weight'.
     position_fraction : float
         Base fraction of portfolio to allocate per position (0.0 – 1.0).
     max_position_fraction : float
@@ -189,6 +192,11 @@ class PositionSizer:
                 get_blended_vol(). MUST be a daily vol -- annualized internally via
                 sqrt(252) before computing the vol scalar.
                 If None or not provided, target_vol falls back to fixed_fraction.
+            conn : sqlalchemy connection | None
+                Active DB connection. Required for sizing_mode='bl_weight' to look
+                up the most recent BL weight from portfolio_allocations.
+            asset_id : int | None
+                Asset identifier. Required for sizing_mode='bl_weight'.
 
         Returns
         -------
@@ -249,6 +257,44 @@ class PositionSizer:
                         "compute_target_position: target_vol -- no garch_vol provided, "
                         "falling back to fixed_fraction"
                     )
+
+        elif sizing_mode == "bl_weight":
+            # Look up the most recent BL weight from portfolio_allocations.
+            # Caller MUST pass conn and asset_id via kwargs (paper_executor does this).
+            # When BL de-selects an asset (weight=0 or no row), return 0 immediately
+            # so the executor closes any open position rather than holding stale sizing.
+            conn = kwargs.get("conn")
+            asset_id = kwargs.get("asset_id")
+            if conn is not None and asset_id is not None:
+                bl_sql = text(
+                    "SELECT COALESCE(final_weight, weight) AS bl_weight "
+                    "FROM public.portfolio_allocations "
+                    "WHERE asset_id = :asset_id AND optimizer = 'bl' "
+                    "ORDER BY ts DESC LIMIT 1"
+                )
+                row = conn.execute(bl_sql, {"asset_id": asset_id}).fetchone()
+                if row and row.bl_weight is not None and float(row.bl_weight) > 0:
+                    fraction = Decimal(str(row.bl_weight))
+                    logger.debug(
+                        "compute_target_position: bl_weight=%.6f for asset_id=%s",
+                        float(fraction),
+                        asset_id,
+                    )
+                else:
+                    # BL de-selected or no BL row: close position (return 0)
+                    logger.info(
+                        "compute_target_position: bl_weight=0 or missing for "
+                        "asset_id=%s, returning flat",
+                        asset_id,
+                    )
+                    return Decimal("0")
+            else:
+                # No connection provided: fall back to fixed_fraction
+                logger.warning(
+                    "compute_target_position: bl_weight mode but conn/asset_id not "
+                    "provided, falling back to fixed_fraction"
+                )
+                # fraction already set to config.position_fraction above
 
         # else: fixed_fraction -- no adjustment
 

@@ -521,6 +521,8 @@ class PaperExecutor:
             current_price=current_price,
             config=config,
             garch_vol=garch_vol,
+            conn=conn,  # needed for bl_weight BL lookup
+            asset_id=asset_id,  # needed for bl_weight BL lookup
         )
 
         # --- L4 gross_cap scaling (BEFORE RiskEngine gate) ---
