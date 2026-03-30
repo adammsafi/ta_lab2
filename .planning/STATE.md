@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 ## Current Position
 
 Phase: 96 of 101 (Executor Activation)
-Plan: 1 of 4 complete
+Plan: 3 of 4 complete
 Status: In progress
-Last activity: 2026-03-30 — Completed 96-01-PLAN.md (schema foundation)
+Last activity: 2026-03-30 — Completed 96-03-PLAN.md (config expansion + BL weight sizing)
 
-Progress: [##########] 100% v1.2.0 | [█░░░░░░░░░] 4% v1.3.0 (1/26 plans)
+Progress: [##########] 100% v1.2.0 | [███░░░░░░░] 12% v1.3.0 (3/26 plans)
 
 ## Performance Metrics
 
@@ -54,6 +54,12 @@ Phase 96-01 decisions:
 - Single migration file for all Phase 96 changes: ensures all-or-nothing atomicity
 - executor_processed_at must exist in all new signal tables before executor starts (replay guard)
 
+Phase 96-03 decisions:
+- All 8 executor configs use sizing_mode='bl_weight' with position_fraction=0.10 as fallback
+- bl_weight returns Decimal('0') (flat/close) when BL de-selects asset -- executor closes open position
+- seed_watermarks() sets last_processed_signal_ts=MAX(ts) for active configs with NULL watermark (prevents historical replay)
+- 6 new signal configs (RSI, ATR, MACD, 3 AMA) will be skipped at seed time until their dim_signals entries exist
+
 ### Pending Todos
 
 7 pending todos resolved into v1.3.0 phases:
@@ -77,9 +83,9 @@ Phase 96-01 decisions:
 ## Session Continuity
 
 Last session: 2026-03-30
-Stopped at: Completed 96-01-PLAN.md (schema foundation — migration applied, SIGNAL_TABLE_MAP updated)
+Stopped at: Completed 96-03-PLAN.md (config expansion + BL weight sizing)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-30 (96-01 schema foundation complete)*
+*Last updated: 2026-03-30 (96-03 config expansion + BL weight sizing complete)*
