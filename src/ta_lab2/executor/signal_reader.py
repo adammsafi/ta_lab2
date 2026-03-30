@@ -38,6 +38,10 @@ SIGNAL_TABLE_MAP: dict[str, str] = {
     "ema_crossover": "signals_ema_crossover",
     "rsi_mean_revert": "signals_rsi_mean_revert",
     "atr_breakout": "signals_atr_breakout",
+    "macd_crossover": "signals_macd_crossover",
+    "ama_momentum": "signals_ama_momentum",
+    "ama_mean_reversion": "signals_ama_mean_reversion",
+    "ama_regime_conditional": "signals_ama_regime_conditional",
 }
 
 # Set of valid table names (used for validation / injection prevention)
