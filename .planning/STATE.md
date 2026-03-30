@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 ## Current Position
 
 Phase: 96 of 101 (Executor Activation)
-Plan: — (not yet planned)
-Status: Ready to plan
-Last activity: 2026-03-29 — v1.3.0 roadmap created (Phases 96-101)
+Plan: 1 of 4 complete
+Status: In progress
+Last activity: 2026-03-30 — Completed 96-01-PLAN.md (schema foundation)
 
-Progress: [##########] 100% v1.2.0 | [░░░░░░░░░░] 0% v1.3.0
+Progress: [##########] 100% v1.2.0 | [█░░░░░░░░░] 4% v1.3.0 (1/26 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 411
+- Total plans completed: 412
 - Average duration: 7 min
-- Total execution time: ~31.7 hours
+- Total execution time: ~31.8 hours
 
 **Recent Trend:**
 - v0.9.0: 8 phases, 35 plans, ~4.0 hours
@@ -49,6 +49,11 @@ v1.3.0 key decisions:
 - Phase 100 (ML) last of research — depends on CTF features (CTF-01) and backtest infra (BT-01/BT-02)
 - Phase 101 (Tech Debt) final — documentation only, no runtime impact
 
+Phase 96-01 decisions:
+- Seed dim_signals IN the Alembic migration (not in seeder script): seed_executor_config.py resolves signal_name -> signal_id from dim_signals; missing rows cause silent config skips
+- Single migration file for all Phase 96 changes: ensures all-or-nothing atomicity
+- executor_processed_at must exist in all new signal tables before executor starts (replay guard)
+
 ### Pending Todos
 
 7 pending todos resolved into v1.3.0 phases:
@@ -64,16 +69,17 @@ v1.3.0 key decisions:
 
 - Phase 96 pitfall: executor silent no-op if dim_executor_config empty — seed FIRST, verify fills exist before burn-in
 - Phase 96 pitfall: signal replay risk if historical signals not marked processed before executor starts
+- Phase 96-01 RESOLVED: dim_signals seeded in migration (4 new rows with JSONB params) — no silent skips for new signal types
 - Phase 99 pitfall: DSR under-deflation at 460K runs (N so large it inflates PSR) — document known limitation
 - Phase 99 pitfall: Windows Pool hang with multiprocessing — use NullPool + maxtasksperchild=1
 - Phase 100 dependency: ML-01/ML-02/ML-03 require CTF features in features table (Phase 98 must complete first)
 
 ## Session Continuity
 
-Last session: 2026-03-29
-Stopped at: Roadmap created for v1.3.0 (Phases 96-101, 26/26 requirements mapped)
+Last session: 2026-03-30
+Stopped at: Completed 96-01-PLAN.md (schema foundation — migration applied, SIGNAL_TABLE_MAP updated)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-29 (v1.3.0 roadmap created)*
+*Last updated: 2026-03-30 (96-01 schema foundation complete)*
