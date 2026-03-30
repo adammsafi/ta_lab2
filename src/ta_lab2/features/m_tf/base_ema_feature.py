@@ -255,11 +255,10 @@ class BaseEMAFeature(ABC):
 
     def write_to_db(self, df: pd.DataFrame) -> int:
         """
-        Write EMA results to database with upsert logic.
+        Write EMA results to database with batch upsert via temp table + COPY.
 
-        Uses PostgreSQL INSERT ... ON CONFLICT DO UPDATE to safely
-        handle rows that already exist (e.g., during incremental refresh
-        where EMA computation must include full history for correctness).
+        Uses temp table → COPY FROM → INSERT...SELECT...ON CONFLICT for fast
+        bulk upserts against large target tables (ema_multi_tf_u has 55M+ rows).
 
         Args:
             df: DataFrame with EMA results
@@ -275,59 +274,62 @@ class BaseEMAFeature(ABC):
 
         df_write = df.copy()
 
-        # Stamp alignment_source BEFORE to_sql -- _pg_upsert uses df columns for
-        # the INSERT statement; alignment_source must be present in the DataFrame
-        # before the write so it is included in the INSERT and the ON CONFLICT
-        # on the _u table PK (which now includes alignment_source) resolves correctly.
+        # Stamp alignment_source before write
         if self.config.alignment_source:
             df_write["alignment_source"] = self.config.alignment_source
 
-        rows = df_write.to_sql(
-            self.config.output_table,
-            self.engine,
-            schema=self.config.output_schema,
-            if_exists="append",
-            index=False,
-            method=self._pg_upsert,
-            chunksize=10000,
-        )
-
-        return int(rows) if rows else len(df_write)
-
-    def _pg_upsert(self, pd_table, conn, keys, data_iter):
-        """
-        Custom insert method for pandas to_sql: INSERT ... ON CONFLICT DO UPDATE.
-
-        Args:
-            pd_table: pandas SQLTable object
-            conn: SQLAlchemy connection (within transaction)
-            keys: list of column names
-            data_iter: iterator of row tuples
-
-        Returns:
-            Number of rows affected
-        """
-        from sqlalchemy.dialects.postgresql import insert as pg_insert
-
-        data = [dict(zip(keys, row)) for row in data_iter]
-        if not data:
-            return 0
-
-        stmt = pg_insert(pd_table.table).values(data)
-
+        target = f"{self.config.output_schema}.{self.config.output_table}"
         pk_cols = self._get_pk_columns()
-        update_dict = {key: stmt.excluded[key] for key in keys if key not in pk_cols}
+        all_cols = list(df_write.columns)
+        update_cols = [c for c in all_cols if c not in pk_cols]
 
-        if update_dict:
-            upsert_stmt = stmt.on_conflict_do_update(
-                index_elements=pk_cols,
-                set_=update_dict,
+        # Use raw psycopg2 connection for COPY performance
+        raw_conn = self.engine.raw_connection()
+        try:
+            cur = raw_conn.cursor()
+
+            # 1. Create temp table matching target schema
+            cur.execute(f"""
+                CREATE TEMP TABLE _ema_staging (LIKE {target} INCLUDING DEFAULTS)
+                ON COMMIT DROP
+            """)
+
+            # 2. COPY DataFrame into temp table via CSV buffer
+            import io
+            buf = io.StringIO()
+            df_write.to_csv(buf, index=False, header=False, na_rep="\\N")
+            buf.seek(0)
+            col_list = ", ".join(all_cols)
+            cur.copy_expert(
+                f"COPY _ema_staging ({col_list}) FROM STDIN WITH (FORMAT csv, NULL '\\N')",
+                buf,
             )
-        else:
-            upsert_stmt = stmt.on_conflict_do_nothing(index_elements=pk_cols)
 
-        result = conn.execute(upsert_stmt)
-        return result.rowcount
+            # 3. Batch upsert from staging → target
+            if update_cols:
+                set_clause = ", ".join(f"{c} = EXCLUDED.{c}" for c in update_cols)
+                cur.execute(f"""
+                    INSERT INTO {target} ({col_list})
+                    SELECT {col_list} FROM _ema_staging
+                    ON CONFLICT ({", ".join(pk_cols)}) DO UPDATE SET
+                        {set_clause}
+                """)
+            else:
+                cur.execute(f"""
+                    INSERT INTO {target} ({col_list})
+                    SELECT {col_list} FROM _ema_staging
+                    ON CONFLICT ({", ".join(pk_cols)}) DO NOTHING
+                """)
+
+            n_rows = cur.rowcount
+            raw_conn.commit()
+        except Exception:
+            raw_conn.rollback()
+            raise
+        finally:
+            raw_conn.close()
+
+        return n_rows if n_rows >= 0 else len(df_write)
 
     def _get_pk_columns(self) -> list[str]:
         """Extract primary key column names from output schema definition.

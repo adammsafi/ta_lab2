@@ -54,6 +54,11 @@ Phase 96-01 decisions:
 - Single migration file for all Phase 96 changes: ensures all-or-nothing atomicity
 - executor_processed_at must exist in all new signal tables before executor starts (replay guard)
 
+Phase 96-02 decisions:
+- Self-contained _compute_macd in macd_crossover.py (not imported from registry) to avoid circular import: registry.py try/except silently sets macd_crossover_signal=None if circular import detected
+- AMASignalGenerator loads from ama_multi_tf_u with DISTINCT ON deduplication (alignment_source='multi_tf', roll=FALSE)
+- BATCH_1_TYPES/BATCH_2_TYPES exposed at module level in run_all_signal_refreshes for external reference
+
 Phase 96-03 decisions:
 - All 8 executor configs use sizing_mode='bl_weight' with position_fraction=0.10 as fallback
 - bl_weight returns Decimal('0') (flat/close) when BL de-selects asset -- executor closes open position

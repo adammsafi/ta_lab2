@@ -41,7 +41,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.pool import NullPool
 
 
-DEFAULT_BARS_TABLE = "public.price_bars_multi_tf"
+DEFAULT_BARS_TABLE = "public.price_bars_multi_tf_u"
 DEFAULT_OUT_TABLE = "public.returns_bars_multi_tf_u"
 DEFAULT_STATE_TABLE = "public.returns_bars_multi_tf_state"
 ALIGNMENT_SOURCE = "multi_tf"

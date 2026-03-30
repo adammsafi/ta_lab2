@@ -46,6 +46,7 @@ from __future__ import annotations
 
 import argparse
 import re
+from datetime import timedelta
 from typing import Optional
 
 import numpy as np
@@ -412,18 +413,36 @@ class MultiTFBarBuilder(BaseBarBuilder):
             # No new data
             return 0
 
-        new_rows = self._append_incremental_rows(
-            id_=id_,
-            tf_days=tf_days,
-            tf_label=tf_label,
-            daily_max_ts=daily_max_ts,
-            last=last,
-            venue=venue,
-            venue_id=venue_id,
-        )
-
-        if new_rows.empty:
+        # NOTE: _append_incremental_rows has API mismatches with current
+        # common_snapshot_contract (CarryForwardInputs, compute_missing_days_diagnostics,
+        # apply_carry_forward signatures). Fall back to full-rebuild path until fixed.
+        # TODO: Rewrite _append_incremental_rows to match current contract API.
+        bars = self._build_snapshots_polars(df_daily, tf_days, tf_label)
+        if bars.empty:
             return 0
+
+        bars["venue_id"] = venue_id
+        bars["alignment_source"] = self.ALIGNMENT_SOURCE
+
+        self._upsert_bars(bars)
+        self._update_state(
+            id_, tf_label, bars, daily_min_ts, daily_max_ts, venue_id=venue_id
+        )
+        return len(bars)
+
+        # --- DISABLED: broken incremental append path ---
+        # new_rows = self._append_incremental_rows(
+        #     id_=id_,
+        #     tf_days=tf_days,
+        #     tf_label=tf_label,
+        #     daily_max_ts=daily_max_ts,
+        #     last=last,
+        #     venue=venue,
+        #     venue_id=venue_id,
+        # )
+        #
+        # if new_rows.empty:
+        #     return 0
 
         # Set venue columns on output bars
         new_rows["venue_id"] = venue_id
@@ -820,11 +839,12 @@ class MultiTFBarBuilder(BaseBarBuilder):
             prev_snapshot_day_local = prev_time_close.tz_convert(DEFAULT_TZ).date()
             missing_days_tail_ok = (
                 snapshot_day_local
-                == (prev_snapshot_day_local + pd.Timedelta(days=1)).date()
+                == prev_snapshot_day_local + timedelta(days=1)
             )
 
             inp = CarryForwardInputs(
-                prev_snapshot_day_local=prev_snapshot_day_local,
+                last_snapshot_day_local=prev_snapshot_day_local,
+                today_local=snapshot_day_local,
                 snapshot_day_local=snapshot_day_local,
                 same_bar_identity=True,
                 missing_days_tail_ok=bool(missing_days_tail_ok),
@@ -837,7 +857,7 @@ class MultiTFBarBuilder(BaseBarBuilder):
             miss_diag = compute_missing_days_diagnostics(
                 bar_start_day_local=cur_bar_start_day_local,
                 snapshot_day_local=snapshot_day_local,
-                observed_local_days=cur_bar_local_days,
+                observed_days_local=cur_bar_local_days,
             )
 
             # Use carry-forward optimization when gate passes

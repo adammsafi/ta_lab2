@@ -226,7 +226,13 @@ def _worker(args: tuple) -> dict:
     """
     Process one (source_key, asset_id) work unit.
 
-    Scoped DELETE + INSERT using SQL window functions.
+    Incremental INSERT using SQL window functions with ON CONFLICT DO NOTHING.
+    Reads source rows from the watermark seed point (1 row before last processed ts)
+    so LAG() computes correctly for the first new row. Only new rows are inserted
+    (ON CONFLICT DO NOTHING handles overlap with existing data).
+
+    Falls back to full rebuild (DELETE + INSERT) when no watermark exists.
+
     Each call gets its own NullPool engine (safe for multiprocessing).
 
     Returns summary dict with source, id, n_rows, elapsed.
@@ -237,32 +243,44 @@ def _worker(args: tuple) -> dict:
     try:
         engine = _get_engine(db_url)
 
-        # Build WHERE clause — always scoped by alignment_source to prevent
+        # Build base scope — always scoped by alignment_source to prevent
         # cross-source LAG contamination (all 5 variants read from same _u table)
+        scope = (
+            f"id = {int(asset_id)}"
+            f" AND alignment_source = '{alignment_source}'"
+        )
         if tf_filter:
+            scope += f" AND tf = '{tf_filter}'"
+        if venue_id is not None:
+            scope += f" AND venue_id = {int(venue_id)}"
+
+        # Look up watermark: max ts in the returns table for this scope
+        with engine.connect() as conn:
+            wm_row = conn.execute(
+                text(f"SELECT max(ts) FROM {dst} WHERE {scope}")
+            ).fetchone()
+        watermark = wm_row[0] if wm_row and wm_row[0] else None
+
+        if watermark is not None:
+            # Incremental: read from 1 seed row before watermark for LAG context.
+            # The seed row ensures LAG() computes delta1/ret correctly for the
+            # first new row. ON CONFLICT DO NOTHING skips rows already in dst.
+            # We use a subquery to find the seed ts: max(ts) < watermark per partition.
             where_clause = (
-                f"WHERE id = {int(asset_id)}"
-                f" AND alignment_source = '{alignment_source}'"
-                f" AND tf = '{tf_filter}'"
-            )
-            delete_where = (
-                f"WHERE id = {int(asset_id)}"
-                f" AND alignment_source = '{alignment_source}'"
-                f" AND tf = '{tf_filter}'"
+                f"WHERE {scope}"
+                f" AND ts >= ("
+                f"   SELECT COALESCE(max(s.ts), '1970-01-01'::timestamptz)"
+                f"   FROM {src} s"
+                f"   WHERE s.id = {int(asset_id)}"
+                f"     AND s.alignment_source = '{alignment_source}'"
+                f"     AND s.ts < '{watermark}'"
+                + (f"     AND s.tf = '{tf_filter}'" if tf_filter else "")
+                + (f"     AND s.venue_id = {int(venue_id)}" if venue_id is not None else "")
+                + f" )"
             )
         else:
-            where_clause = (
-                f"WHERE id = {int(asset_id)}"
-                f" AND alignment_source = '{alignment_source}'"
-            )
-            delete_where = (
-                f"WHERE id = {int(asset_id)}"
-                f" AND alignment_source = '{alignment_source}'"
-            )
-
-        if venue_id is not None:
-            where_clause += f" AND venue_id = {int(venue_id)}"
-            delete_where += f" AND venue_id = {int(venue_id)}"
+            # No watermark: full build (first run for this id/source)
+            where_clause = f"WHERE {scope}"
 
         insert_sql = _INSERT_SQL.format(
             src=src,
@@ -273,7 +291,9 @@ def _worker(args: tuple) -> dict:
 
         with engine.begin() as conn:
             conn.execute(text("SET LOCAL work_mem = '128MB'"))
-            conn.execute(text(f"DELETE FROM {dst} {delete_where}"))
+            if watermark is None:
+                # First run: delete any stale data, then full insert
+                conn.execute(text(f"DELETE FROM {dst} WHERE {scope}"))
             result = conn.execute(text(insert_sql))
             n_rows = result.rowcount
 
