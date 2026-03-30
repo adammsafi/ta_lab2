@@ -9,6 +9,7 @@ dim_executor_config using ON CONFLICT DO NOTHING (idempotent).
 Usage:
     python -m ta_lab2.scripts.executor.seed_executor_config
     python -m ta_lab2.scripts.executor.seed_executor_config --config path/to/config.yaml
+    python -m ta_lab2.scripts.executor.seed_executor_config --seed-watermarks
 """
 
 from __future__ import annotations
@@ -185,6 +186,88 @@ def seed_configs(db_url: str, seed_file: Path) -> dict:
     return summary
 
 
+def seed_watermarks(db_url: str) -> dict:
+    """
+    Set last_processed_signal_ts = MAX(ts) for active configs with NULL watermark.
+
+    Prevents historical signal replay on first executor run. Only updates
+    configs where last_processed_signal_ts IS NULL (safe to re-run on configs
+    that already have a watermark).
+
+    Returns a summary dict with keys: watermarks_set, already_set, no_signals.
+    """
+    from ta_lab2.executor.signal_reader import SIGNAL_TABLE_MAP  # noqa: PLC0415
+
+    engine = create_engine(db_url, poolclass=NullPool)
+    summary = {"watermarks_set": 0, "already_set": 0, "no_signals": 0}
+
+    try:
+        with engine.begin() as conn:
+            # Load all active configs (with and without watermarks)
+            rows = conn.execute(
+                text(
+                    "SELECT config_id, config_name, signal_type, signal_id, "
+                    "last_processed_signal_ts "
+                    "FROM public.dim_executor_config WHERE is_active = TRUE"
+                )
+            ).fetchall()
+
+            for row in rows:
+                if row.last_processed_signal_ts is not None:
+                    print(
+                        f"[SKIP] config_id={row.config_id} ({row.config_name}) "
+                        f"already has watermark={row.last_processed_signal_ts}"
+                    )
+                    summary["already_set"] += 1
+                    continue
+
+                signal_table = SIGNAL_TABLE_MAP.get(row.signal_type)
+                if not signal_table:
+                    print(
+                        f"[SKIP] Unknown signal_type '{row.signal_type}' "
+                        f"for config_id={row.config_id} ({row.config_name})"
+                    )
+                    summary["no_signals"] += 1
+                    continue
+
+                # Get MAX(ts) from signal table for this signal_id
+                # signal_table comes from SIGNAL_TABLE_MAP (hardcoded dict),
+                # so f-string interpolation is safe from SQL injection.
+                max_ts_row = conn.execute(
+                    text(
+                        f"SELECT MAX(ts) AS max_ts FROM public.{signal_table} "  # noqa: S608
+                        "WHERE signal_id = :signal_id"
+                    ),
+                    {"signal_id": row.signal_id},
+                ).fetchone()
+
+                if max_ts_row and max_ts_row.max_ts is not None:
+                    conn.execute(
+                        text(
+                            "UPDATE public.dim_executor_config "
+                            "SET last_processed_signal_ts = :max_ts "
+                            "WHERE config_id = :config_id"
+                        ),
+                        {"max_ts": max_ts_row.max_ts, "config_id": row.config_id},
+                    )
+                    print(
+                        f"[OK] Watermark set for config_id={row.config_id} "
+                        f"({row.config_name}): {max_ts_row.max_ts}"
+                    )
+                    summary["watermarks_set"] += 1
+                else:
+                    print(
+                        f"[INFO] No signals yet for config_id={row.config_id} "
+                        f"({row.config_name}) in {signal_table} -- watermark not set"
+                    )
+                    summary["no_signals"] += 1
+
+    finally:
+        engine.dispose()
+
+    return summary
+
+
 def main(argv: list[str] | None = None) -> int:
     """Main entry point for seed executor config CLI."""
     p = argparse.ArgumentParser(
@@ -201,6 +284,12 @@ Examples:
 
   # Seed from custom path
   python -m ta_lab2.scripts.executor.seed_executor_config --config /path/to/seed.yaml
+
+  # Seed configs AND set watermarks to prevent historical replay
+  python -m ta_lab2.scripts.executor.seed_executor_config --seed-watermarks
+
+  # Set watermarks only (no YAML seeding)
+  python -m ta_lab2.scripts.executor.seed_executor_config --watermarks-only
         """,
     )
 
@@ -214,6 +303,22 @@ Examples:
         "--db-url",
         help="Database URL (default: from config/env via resolve_db_url)",
     )
+    p.add_argument(
+        "--seed-watermarks",
+        action="store_true",
+        default=False,
+        help=(
+            "After seeding configs, set last_processed_signal_ts = MAX(ts) for "
+            "active configs with NULL watermark. Prevents historical signal replay "
+            "on first executor run."
+        ),
+    )
+    p.add_argument(
+        "--watermarks-only",
+        action="store_true",
+        default=False,
+        help="Only run watermark seeding; skip YAML config seeding.",
+    )
 
     args = p.parse_args(argv)
 
@@ -224,24 +329,42 @@ Examples:
         print(f"[ERROR] {exc}", file=sys.stderr)
         return 1
 
-    seed_file = Path(args.config)
+    # --- Config seeding ---
+    if not args.watermarks_only:
+        seed_file = Path(args.config)
+        print(f"Seeding executor configs from: {seed_file}")
 
-    print(f"Seeding executor configs from: {seed_file}")
+        try:
+            summary = seed_configs(db_url, seed_file)
+        except FileNotFoundError as exc:
+            print(f"[ERROR] {exc}", file=sys.stderr)
+            return 1
+        except Exception as exc:  # noqa: BLE001
+            print(f"[ERROR] Seed failed: {exc}", file=sys.stderr)
+            return 1
 
-    try:
-        summary = seed_configs(db_url, seed_file)
-    except FileNotFoundError as exc:
-        print(f"[ERROR] {exc}", file=sys.stderr)
-        return 1
-    except Exception as exc:  # noqa: BLE001
-        print(f"[ERROR] Seed failed: {exc}", file=sys.stderr)
-        return 1
+        print(
+            f"\nSeed complete: {summary['seeded']} seeded, "
+            f"{summary['already_existed']} already existed, "
+            f"{summary['skipped_no_signal']} skipped (signal not found)"
+        )
 
-    print(
-        f"\nSeed complete: {summary['seeded']} seeded, "
-        f"{summary['already_existed']} already existed, "
-        f"{summary['skipped_no_signal']} skipped (signal not found)"
-    )
+    # --- Watermark seeding ---
+    if args.seed_watermarks or args.watermarks_only:
+        print("\nSeeding watermarks (setting last_processed_signal_ts = MAX(ts))...")
+
+        try:
+            wm_summary = seed_watermarks(db_url)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[ERROR] Watermark seed failed: {exc}", file=sys.stderr)
+            return 1
+
+        print(
+            f"\nWatermark seed complete: {wm_summary['watermarks_set']} set, "
+            f"{wm_summary['already_set']} already set, "
+            f"{wm_summary['no_signals']} skipped (no signals or unknown type)"
+        )
+
     return 0
 
 

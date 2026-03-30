@@ -1,19 +1,33 @@
 # configs/executor_config_seed.yaml
 # ---------------------------------------------------------------------------
 # V1 paper trade executor strategy configurations.
-# These are the two strategies selected from the Phase 42 bakeoff:
-#   - ema_trend_17_77: robust top-1 in 4/4 weighting schemes
-#   - ema_trend_21_50: robust top-2 in 3/4 weighting schemes
+# 8 configs covering 7 signal types:
+#   - 2 EMA crossover variants (ema_trend_17_77, ema_trend_9_21) -- Phase 42 bakeoff
+#   - 1 RSI mean revert
+#   - 1 ATR breakout
+#   - 1 MACD crossover
+#   - 3 AMA (momentum, mean reversion, regime conditional)
 #
 # Deployment note (Phase 42-04 decision):
-#   Both strategies fail the MaxDD <= 15% gate due to structural crypto bear
+#   EMA strategies fail the MaxDD <= 15% gate due to structural crypto bear
 #   market drawdowns (70-75% worst fold). Deploy at 10% position_fraction
 #   (not 50% backtest size) + circuit breaker at 15% portfolio DD (Phase 46).
 #
+# Sizing mode (Phase 96-03 decision):
+#   All configs use sizing_mode='bl_weight' -- Black-Litterman portfolio
+#   optimization weights decide per-asset sizing. position_fraction is a
+#   fallback used when BL has no output for an asset.
+#
+# Signal name dependency:
+#   signal_name values must exist in dim_signals BEFORE seeding. The EMA
+#   entries were seeded by the Phase 96-01 migration. RSI, ATR, MACD, and
+#   AMA signal names will be skipped with a WARNING if dim_signals rows do
+#   not yet exist -- seed dim_signals first (see Phase 96-01 migration).
+#
 # Usage:
-#   These values are loaded by the executor bootstrap script to INSERT rows
-#   into dim_executor_config (on conflict do nothing = idempotent).
-#   See src/ta_lab2/executor/bootstrap_configs.py (Phase 45-03).
+#   python -m ta_lab2.scripts.executor.seed_executor_config
+#   python -m ta_lab2.scripts.executor.seed_executor_config --seed-watermarks
+#   See src/ta_lab2/scripts/executor/seed_executor_config.py for full docs.
 # ---------------------------------------------------------------------------
 
 executor_configs:
@@ -26,8 +40,8 @@ executor_configs:
     environment: sandbox
 
     # Position sizing
-    sizing_mode: fixed_fraction
-    position_fraction: 0.10             # 10% of portfolio per position (V1 reduced sizing)
+    sizing_mode: bl_weight
+    position_fraction: 0.10             # fallback if BL has no weight for this asset
     max_position_fraction: 0.20         # hard cap at 20%
 
     # Fill simulation
@@ -60,8 +74,8 @@ executor_configs:
     environment: sandbox
 
     # Position sizing
-    sizing_mode: fixed_fraction
-    position_fraction: 0.10             # 10% of portfolio per position (V1 reduced sizing)
+    sizing_mode: bl_weight
+    position_fraction: 0.10             # fallback if BL has no weight for this asset
     max_position_fraction: 0.20         # hard cap at 20%
 
     # Fill simulation
@@ -84,3 +98,171 @@ executor_configs:
       Robust top-2 strategy: ranked top-2 in 3/4 weighting schemes. Full-sample
       Sharpe 1.647, OOS mean Sharpe 1.397. MaxDD worst fold -70% (structural
       crypto bear). Deployed at reduced 10% sizing per Phase 42-04 decision.
+
+  # RSI mean revert
+  - config_name: rsi_mean_revert_14_paper_v1
+    signal_type: rsi_mean_revert
+    signal_name: rsi_14_mean_revert     # must exist in dim_signals
+    is_active: true
+    exchange: paper
+    environment: sandbox
+
+    # Position sizing
+    sizing_mode: bl_weight
+    position_fraction: 0.10             # fallback if BL unavailable
+    max_position_fraction: 0.20
+
+    # Fill simulation
+    fill_price_mode: next_bar_open
+    slippage_mode: lognormal
+    slippage_base_bps: 3.0
+    slippage_noise_sigma: 0.5
+    volume_impact_factor: 0.1
+
+    # Execution quality simulation
+    rejection_rate: 0.0
+    partial_fill_rate: 0.0
+    execution_delay_bars: 0
+
+    # Scheduling
+    cadence_hours: 36.0                 # runs every 1.5 days
+
+  # ATR breakout
+  - config_name: breakout_atr_14_paper_v1
+    signal_type: atr_breakout
+    signal_name: atr_breakout_14        # must exist in dim_signals
+    is_active: true
+    exchange: paper
+    environment: sandbox
+
+    # Position sizing
+    sizing_mode: bl_weight
+    position_fraction: 0.10
+    max_position_fraction: 0.20
+
+    # Fill simulation
+    fill_price_mode: next_bar_open
+    slippage_mode: lognormal
+    slippage_base_bps: 3.0
+    slippage_noise_sigma: 0.5
+    volume_impact_factor: 0.1
+
+    # Execution quality simulation
+    rejection_rate: 0.0
+    partial_fill_rate: 0.0
+    execution_delay_bars: 0
+
+    # Scheduling
+    cadence_hours: 36.0
+
+  # MACD crossover
+  - config_name: macd_crossover_12_26_paper_v1
+    signal_type: macd_crossover
+    signal_name: macd_12_26_9_long      # must exist in dim_signals
+    is_active: true
+    exchange: paper
+    environment: sandbox
+
+    # Position sizing
+    sizing_mode: bl_weight
+    position_fraction: 0.10
+    max_position_fraction: 0.20
+
+    # Fill simulation
+    fill_price_mode: next_bar_open
+    slippage_mode: lognormal
+    slippage_base_bps: 3.0
+    slippage_noise_sigma: 0.5
+    volume_impact_factor: 0.1
+
+    # Execution quality simulation
+    rejection_rate: 0.0
+    partial_fill_rate: 0.0
+    execution_delay_bars: 0
+
+    # Scheduling
+    cadence_hours: 36.0
+
+  # AMA momentum
+  - config_name: ama_momentum_paper_v1
+    signal_type: ama_momentum
+    signal_name: ama_momentum_v1        # must exist in dim_signals
+    is_active: true
+    exchange: paper
+    environment: sandbox
+
+    # Position sizing
+    sizing_mode: bl_weight
+    position_fraction: 0.10
+    max_position_fraction: 0.20
+
+    # Fill simulation
+    fill_price_mode: next_bar_open
+    slippage_mode: lognormal
+    slippage_base_bps: 3.0
+    slippage_noise_sigma: 0.5
+    volume_impact_factor: 0.1
+
+    # Execution quality simulation
+    rejection_rate: 0.0
+    partial_fill_rate: 0.0
+    execution_delay_bars: 0
+
+    # Scheduling
+    cadence_hours: 48.0                 # AMA runs slower than EMA/RSI/ATR
+
+  # AMA mean reversion
+  - config_name: ama_mean_reversion_paper_v1
+    signal_type: ama_mean_reversion
+    signal_name: ama_mean_reversion_v1  # must exist in dim_signals
+    is_active: true
+    exchange: paper
+    environment: sandbox
+
+    # Position sizing
+    sizing_mode: bl_weight
+    position_fraction: 0.10
+    max_position_fraction: 0.20
+
+    # Fill simulation
+    fill_price_mode: next_bar_open
+    slippage_mode: lognormal
+    slippage_base_bps: 3.0
+    slippage_noise_sigma: 0.5
+    volume_impact_factor: 0.1
+
+    # Execution quality simulation
+    rejection_rate: 0.0
+    partial_fill_rate: 0.0
+    execution_delay_bars: 0
+
+    # Scheduling
+    cadence_hours: 48.0
+
+  # AMA regime conditional
+  - config_name: ama_regime_conditional_paper_v1
+    signal_type: ama_regime_conditional
+    signal_name: ama_regime_conditional_v1  # must exist in dim_signals
+    is_active: true
+    exchange: paper
+    environment: sandbox
+
+    # Position sizing
+    sizing_mode: bl_weight
+    position_fraction: 0.10
+    max_position_fraction: 0.20
+
+    # Fill simulation
+    fill_price_mode: next_bar_open
+    slippage_mode: lognormal
+    slippage_base_bps: 3.0
+    slippage_noise_sigma: 0.5
+    volume_impact_factor: 0.1
+
+    # Execution quality simulation
+    rejection_rate: 0.0
+    partial_fill_rate: 0.0
+    execution_delay_bars: 0
+
+    # Scheduling
+    cadence_hours: 48.0
