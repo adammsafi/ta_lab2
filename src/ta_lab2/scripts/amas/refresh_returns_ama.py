@@ -245,10 +245,7 @@ def _worker(args: tuple) -> dict:
 
         # Build base scope — always scoped by alignment_source to prevent
         # cross-source LAG contamination (all 5 variants read from same _u table)
-        scope = (
-            f"id = {int(asset_id)}"
-            f" AND alignment_source = '{alignment_source}'"
-        )
+        scope = f"id = {int(asset_id)} AND alignment_source = '{alignment_source}'"
         if tf_filter:
             scope += f" AND tf = '{tf_filter}'"
         if venue_id is not None:
@@ -275,8 +272,12 @@ def _worker(args: tuple) -> dict:
                 f"     AND s.alignment_source = '{alignment_source}'"
                 f"     AND s.ts < '{watermark}'"
                 + (f"     AND s.tf = '{tf_filter}'" if tf_filter else "")
-                + (f"     AND s.venue_id = {int(venue_id)}" if venue_id is not None else "")
-                + f" )"
+                + (
+                    f"     AND s.venue_id = {int(venue_id)}"
+                    if venue_id is not None
+                    else ""
+                )
+                + " )"
             )
         else:
             # No watermark: full build (first run for this id/source)

@@ -78,9 +78,13 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Sync price_bars_1d into price_bars_multi_tf_u"
     )
-    parser.add_argument("--ids", default="all", help="Asset IDs (comma-separated or 'all')")
+    parser.add_argument(
+        "--ids", default="all", help="Asset IDs (comma-separated or 'all')"
+    )
     parser.add_argument("--db-url", default=None, help="Database URL override")
-    parser.add_argument("--dry-run", action="store_true", help="Report only, don't sync")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Report only, don't sync"
+    )
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -104,12 +108,16 @@ def main() -> int:
         with engine.connect() as conn:
             count_sql = f"SELECT count(*) FROM price_bars_1d {where_clause}"
             n = conn.execute(text(count_sql)).scalar()
-        log.info("[DRY RUN] Would sync %d rows from price_bars_1d → price_bars_multi_tf_u", n)
+        log.info(
+            "[DRY RUN] Would sync %d rows from price_bars_1d → price_bars_multi_tf_u", n
+        )
         return 0
 
     with engine.begin() as conn:
         r = conn.execute(text(sql))
-        log.info("Synced %d rows from price_bars_1d → price_bars_multi_tf_u", r.rowcount)
+        log.info(
+            "Synced %d rows from price_bars_1d → price_bars_multi_tf_u", r.rowcount
+        )
 
     return 0
 

@@ -431,28 +431,10 @@ class MultiTFBarBuilder(BaseBarBuilder):
         return len(bars)
 
         # --- DISABLED: broken incremental append path ---
-        # new_rows = self._append_incremental_rows(
-        #     id_=id_,
-        #     tf_days=tf_days,
-        #     tf_label=tf_label,
-        #     daily_max_ts=daily_max_ts,
-        #     last=last,
-        #     venue=venue,
-        #     venue_id=venue_id,
-        # )
-        #
-        # if new_rows.empty:
-        #     return 0
-
-        # Set venue columns on output bars
-        new_rows["venue_id"] = venue_id
-        new_rows["alignment_source"] = self.ALIGNMENT_SOURCE
-
-        self._upsert_bars(new_rows)
-        self._update_state(
-            id_, tf_label, new_rows, daily_min_ts, daily_max_ts, venue_id=venue_id
-        )
-        return len(new_rows)
+        # _append_incremental_rows has API mismatches with current
+        # common_snapshot_contract (CarryForwardInputs, compute_missing_days_diagnostics,
+        # apply_carry_forward signatures). Fallback to full Polars rebuild above
+        # handles this case. TODO: Rewrite _append_incremental_rows to match current API.
 
     @classmethod
     def create_argument_parser(cls) -> argparse.ArgumentParser:
@@ -838,8 +820,7 @@ class MultiTFBarBuilder(BaseBarBuilder):
             # Strict tail continuity for carry-forward gate
             prev_snapshot_day_local = prev_time_close.tz_convert(DEFAULT_TZ).date()
             missing_days_tail_ok = (
-                snapshot_day_local
-                == prev_snapshot_day_local + timedelta(days=1)
+                snapshot_day_local == prev_snapshot_day_local + timedelta(days=1)
             )
 
             inp = CarryForwardInputs(

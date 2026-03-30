@@ -296,6 +296,7 @@ class BaseEMAFeature(ABC):
 
             # 2. COPY DataFrame into temp table via CSV buffer
             import io
+
             buf = io.StringIO()
             df_write.to_csv(buf, index=False, header=False, na_rep="\\N")
             buf.seek(0)
