@@ -80,12 +80,12 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| OPS-01 | Phase 96 | Pending |
-| OPS-02 | Phase 96 | Pending |
-| OPS-03 | Phase 96 | Pending |
-| OPS-04 | Phase 96 | Pending |
-| OPS-05 | Phase 96 | Pending |
-| OPS-06 | Phase 96 | Pending |
+| OPS-01 | Phase 96 | Complete |
+| OPS-02 | Phase 96 | Complete |
+| OPS-03 | Phase 96 | Complete |
+| OPS-04 | Phase 96 | Complete |
+| OPS-05 | Phase 96 | Complete |
+| OPS-06 | Phase 96 | Complete |
 | BT-01 | Phase 99 | Pending |
 | BT-02 | Phase 99 | Pending |
 | BT-03 | Phase 99 | Pending |

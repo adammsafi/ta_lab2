@@ -1400,7 +1400,7 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 
 **Milestone Goal:** Make the built infrastructure actually run — activate paper trading, scale backtests to 460K+ runs, graduate CTF research features, expand macro coverage, and add ML signal combination.
 
-- [ ] **Phase 96: Executor Activation** - Seed strategies, wire signals into daily refresh, launch Task Scheduler, activate real IC-weighted BL, track live parity, add PnL attribution
+- [x] **Phase 96: Executor Activation** - Seed strategies, wire signals into daily refresh, activate real IC-weighted BL, track live parity, add PnL attribution — COMPLETE 2026-03-30
 - [ ] **Phase 97: FRED Macro Expansion** - Add SP500/NASDAQ/DJIA to macro feature layer, rolling BTC-equity correlation, risk-on/off signals
 - [ ] **Phase 98: CTF Feature Graduation** - Materialize top CTF features into features table, asset-specific selection tier, cross-asset composites, lead-lag IC matrix
 - [ ] **Phase 99: Backtest Scaling** - Resume-safe mass backtest orchestrator, partitioned trades table, 113K+ core runs, MC bands, CTF signal backtests, expanded grids, leaderboard dashboard
@@ -1423,10 +1423,10 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 **Plans:** 4 plans in 3 waves
 
 Plans:
-- [ ] 96-01-PLAN.md -- Alembic migration (4 signal tables, CHECK constraints, strategy_parity, pnl_attribution) + SIGNAL_TABLE_MAP update
-- [ ] 96-02-PLAN.md -- MACD/AMA signal generators + two-batch signal refresh refactor
-- [ ] 96-03-PLAN.md -- Seed YAML expansion (7 strategies) + watermark seed + BL sizing mode in executor
-- [ ] 96-04-PLAN.md -- Strategy parity report CLI + PnL attribution report CLI
+- [x] 96-01-PLAN.md -- Alembic migration (4 signal tables, CHECK constraints, strategy_parity, pnl_attribution) + SIGNAL_TABLE_MAP update
+- [x] 96-02-PLAN.md -- MACD/AMA signal generators + two-batch signal refresh refactor
+- [x] 96-03-PLAN.md -- Seed YAML expansion (7 strategies) + watermark seed + BL sizing mode in executor
+- [x] 96-04-PLAN.md -- Strategy parity report CLI + PnL attribution report CLI
 
 ---
 
