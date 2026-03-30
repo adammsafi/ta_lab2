@@ -10,16 +10,16 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 ## Current Position
 
 Phase: 96 of 101 (Executor Activation)
-Plan: 3 of 4 complete
-Status: In progress
-Last activity: 2026-03-30 — Completed 96-03-PLAN.md (config expansion + BL weight sizing)
+Plan: 4 of 4 complete
+Status: Phase complete
+Last activity: 2026-03-30 — Completed 96-04-PLAN.md (parity report + PnL attribution CLIs)
 
-Progress: [##########] 100% v1.2.0 | [███░░░░░░░] 12% v1.3.0 (3/26 plans)
+Progress: [##########] 100% v1.2.0 | [████░░░░░░] 15% v1.3.0 (4/26 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 412
+- Total plans completed: 413
 - Average duration: 7 min
 - Total execution time: ~31.8 hours
 
@@ -65,6 +65,13 @@ Phase 96-03 decisions:
 - seed_watermarks() sets last_processed_signal_ts=MAX(ts) for active configs with NULL watermark (prevents historical replay)
 - 6 new signal configs (RSI, ATR, MACD, 3 AMA) will be skipped at seed time until their dim_signals entries exist
 
+Phase 96-04 decisions:
+- AVG(sharpe_mean) cross-asset aggregate from strategy_bakeoff_results (not per-asset rows which are noisy)
+- orders.signal_id (not strategy_id which does not exist) is the correct join key to filter fills per strategy
+- regex re.sub(r'_paper_v\d+$', '', config_name) extracts strategy_name for bakeoff lookup
+- BTC (asset_id=1) as benchmark for all current asset classes; extensible to SPX for Phase 97 equity class
+- Minimum sample thresholds: fill Sharpe >= 2 round-trips; MTM Sharpe >= 5 days; below threshold returns NULL not zero
+
 ### Pending Todos
 
 7 pending todos resolved into v1.3.0 phases:
@@ -88,9 +95,9 @@ Phase 96-03 decisions:
 ## Session Continuity
 
 Last session: 2026-03-30
-Stopped at: Completed 96-03-PLAN.md (config expansion + BL weight sizing)
+Stopped at: Completed 96-04-PLAN.md (parity report + PnL attribution CLIs) — Phase 96 COMPLETE
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-30 (96-03 config expansion + BL weight sizing complete)*
+*Last updated: 2026-03-30 (96-04 parity report + PnL attribution CLIs complete; Phase 96 COMPLETE)*
