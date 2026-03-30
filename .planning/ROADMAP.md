@@ -1410,23 +1410,23 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 ---
 
 ### Phase 96: Executor Activation
-**Goal:** Paper executor runs live daily, generating real fills from IC-weighted signal scores with parity tracking and PnL attribution.
-**Depends on:** v1.2.0 complete (Phase 95 — real signal_scores exist, BL pipeline built)
+**Goal:** Paper executor runs live daily for all 7 signal generators, using BL output weights for sizing, with parity tracking and PnL attribution.
+**Depends on:** v1.2.0 complete (Phase 95 -- real signal_scores exist, BL pipeline built)
 **Requirements:** OPS-01, OPS-02, OPS-03, OPS-04, OPS-05, OPS-06
 **Success Criteria** (what must be TRUE):
-  1. `SELECT COUNT(*) FROM dim_executor_config WHERE is_active = true` returns 3 or more rows with strategy names matching bakeoff winners and cadence_hours=36
-  2. `python -m ta_lab2.scripts.run_daily_refresh --all` executes a signals stage that writes to `signals_*` tables; re-running the same day does not create duplicate fills (stale-signal guard active)
-  3. Windows Task Scheduler fires the daily refresh at a fixed time and `fills` table gains new rows within 24 hours of first run; executor run log shows no silent no-ops
-  4. `portfolio_allocations` rows use signal_score values from `signals_*` (not hardcoded 1.0) as BL views; running the BL optimizer with and without real scores produces different weights
-  5. A parity report script logs `live_sharpe / backtest_sharpe` per active strategy to the executor run log or a dedicated parity table; the ratio is readable from SQL
-  6. A PnL attribution script produces a report separating beta-adjusted alpha from long-crypto bias, runnable as a standalone CLI
-**Plans:** TBD
+  1. `SELECT COUNT(*) FROM dim_executor_config WHERE is_active = true` returns 7+ rows covering all signal types with per-strategy cadence_hours
+  2. `python -m ta_lab2.scripts.run_daily_refresh --all` signals stage runs 7 types in two batches (Batch 1: EMA/RSI/ATR/MACD, Batch 2: 3 AMA types); re-running does not create duplicate fills
+  3. Executor runs manually (user-triggered after data load); fills table gains new rows; executor_run_log shows no silent no-ops (0-fill detection active)
+  4. `portfolio_allocations` BL weights are read by executor via `sizing_mode='bl_weight'` in PositionSizer; zero/missing BL weight = close position
+  5. A parity report script logs `live_sharpe / backtest_sharpe` per active strategy to a dedicated `strategy_parity` table; ratio readable from SQL
+  6. A PnL attribution script separates alpha from multi-asset-class beta (crypto=BTC, perp=underlying), runnable as standalone CLI with results in `pnl_attribution` table
+**Plans:** 4 plans in 3 waves
 
 Plans:
-- [ ] 96-01: Seed dim_executor_config with 3 bakeoff winners + verify signals stage in daily refresh
-- [ ] 96-02: Windows Task Scheduler setup + stale-signal guard verification + burn-in run
-- [ ] 96-03: Wire real IC-weighted signal scores into BL views + parity tracker script
-- [ ] 96-04: PnL attribution report (beta-adjusted alpha vs long-crypto bias)
+- [ ] 96-01-PLAN.md -- Alembic migration (4 signal tables, CHECK constraints, strategy_parity, pnl_attribution) + SIGNAL_TABLE_MAP update
+- [ ] 96-02-PLAN.md -- MACD/AMA signal generators + two-batch signal refresh refactor
+- [ ] 96-03-PLAN.md -- Seed YAML expansion (7 strategies) + watermark seed + BL sizing mode in executor
+- [ ] 96-04-PLAN.md -- Strategy parity report CLI + PnL attribution report CLI
 
 ---
 
@@ -1528,7 +1528,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 96. Executor Activation | 0/TBD | Not started | - |
+| 96. Executor Activation | 0/4 | Planned | - |
 | 97. FRED Macro Expansion | 0/TBD | Not started | - |
 | 98. CTF Feature Graduation | 0/TBD | Not started | - |
 | 99. Backtest Scaling | 0/TBD | Not started | - |
