@@ -55,6 +55,10 @@ SERIES_TO_LOAD: list[str] = [
     "DFEDTARL",  # Fed Funds target lower bound (daily)
     # FRED-15: CPI proxy
     "CPIAUCSL",  # CPI All Items (monthly)
+    # -- Phase 97 additions: US equity indices (daily, business days only) --
+    "SP500",  # S&P 500 Index (daily)
+    "NASDAQCOM",  # NASDAQ Composite Index (daily)
+    "DJIA",  # Dow Jones Industrial Average (daily)
 ]
 
 
@@ -71,7 +75,7 @@ def load_series_wide(
     engine:
         SQLAlchemy engine connected to the marketdata database.
     series_ids:
-        FRED series IDs to load. Defaults to SERIES_TO_LOAD (18 series: 11 Phase 65 + 7 Phase 66).
+        FRED series IDs to load. Defaults to SERIES_TO_LOAD (21 series: 11 Phase 65 + 7 Phase 66 + 3 Phase 97).
     start_date:
         Optional lower bound on observation date (inclusive), e.g. "2015-01-01".
         If None, loads from the earliest available date.

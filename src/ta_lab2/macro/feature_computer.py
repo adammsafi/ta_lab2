@@ -34,7 +34,7 @@ from ta_lab2.macro.fred_reader import SERIES_TO_LOAD, load_series_wide
 logger = logging.getLogger(__name__)
 
 # ── Lowercase rename map: FRED ID -> DB column name ───────────────────────
-# All 18 raw series columns in fred.fred_macro_features use lowercase names.
+# All 21 raw series columns in fred.fred_macro_features use lowercase names.
 _RENAME_MAP: dict[str, str] = {
     # Phase 65: 11 original series
     "WALCL": "walcl",
@@ -56,6 +56,10 @@ _RENAME_MAP: dict[str, str] = {
     "DFEDTARU": "dfedtaru",
     "DFEDTARL": "dfedtarl",
     "CPIAUCSL": "cpiaucsl",
+    # Phase 97: US equity indices
+    "SP500": "sp500",
+    "NASDAQCOM": "nasdaqcom",
+    "DJIA": "djia",
 }
 
 # ── VIX regime thresholds (consensus values per research) ──────────────────
