@@ -50,6 +50,11 @@ pages = {
             icon=":material/analytics:",
         ),
         st.Page(
+            "pages/18_strategy_leaderboard.py",
+            title="Strategy Leaderboard",
+            icon=":material/leaderboard:",
+        ),
+        st.Page(
             "pages/12_signal_browser.py",
             title="Signal Browser",
             icon=":material/signal_cellular_alt:",
