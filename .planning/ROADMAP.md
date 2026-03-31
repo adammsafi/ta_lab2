@@ -12,7 +12,7 @@
 - v1.0.1 Macro Regime Infrastructure (Phases 64-73) - SHIPPED 2026-03-03
 - v1.1.0 Pipeline Consolidation & Storage Optimization (Phases 74-79) - SHIPPED 2026-03-21
 - v1.2.0 Analysis → Live Signals (Phases 80-95) - SHIPPED 2026-03-29
-- v1.3.0 Operational Activation & Research Expansion (Phases 96-106) - IN PROGRESS
+- v1.3.0 Operational Activation & Research Expansion (Phases 96-107) - IN PROGRESS
 
 ## Overview
 
@@ -31,7 +31,7 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 - Phases 64-73: v1.0.1 (SHIPPED 2026-03-03)
 - Phases 74-79: v1.1.0 (SHIPPED 2026-03-21)
 - Phases 80-95: v1.2.0 (SHIPPED 2026-03-29)
-- Phases 96-106: v1.3.0 (IN PROGRESS)
+- Phases 96-107: v1.3.0 (IN PROGRESS)
 - Decimal phases (27.1, 28.1): Urgent insertions if needed
 
 <details>
@@ -1411,6 +1411,7 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 - [ ] **Phase 104: Crypto-Native Indicators** - Venue-agnostic normalized input layer for OI/funding/volume, derive OI momentum, OI-price divergence, funding rate z-score, Force Index, liquidation pressure proxy
 - [ ] **Phase 105: Parameter Optimization** - Systematic parameter sweep (grid + Optuna) for surviving indicators, plateau preference, rolling stability test, DSR over full search space
 - [ ] **Phase 106: Custom Composite Indicators** - Proprietary indicators (AMA ER as regime signal, OI-divergence × CTF agreement, funding-adjusted momentum, cross-asset lead-lag), strictest validation tier
+- [ ] **Phase 107: Pipeline Operations Dashboard** - Streamlit ops page: real-time stage monitor with progress bars, run history, trigger/kill buttons, pipeline_stage_log table for per-stage DB persistence
 
 ---
 
@@ -1458,7 +1459,7 @@ Plans:
 **Requirements:** CTF-01, CTF-02, CTF-03, CTF-04
 **Success Criteria** (what must be TRUE):
   1. `refresh_ctf_promoted.py` runs without errors and writes 15-20 CTF feature columns into the `features` table; `feature_selection.yaml` lists each promoted feature with its IC threshold and source CTF config
-  2. `dim_feature_selection` contains rows with `tier = 'asset_specific'` for CTF features that pass per-asset IC but fail cross-asset consensus; a query by asset_id returns a different feature set than the global tier
+  2. `dim_feature_selection_asset` contains rows with `tier = 'asset_specific'` for CTF features that pass per-asset IC but fail cross-asset consensus; a query by asset_id returns a different (superset) feature set than the global tier; `dim_feature_selection` is NOT touched or truncated
   3. A cross-asset CTF composite script produces market-wide sentiment, relative-value, and leader-follower aggregate columns stored in `features` or a dedicated composite table, runnable via CLI
   4. A lead-lag IC matrix script outputs a DataFrame showing whether Asset A's CTF features predict Asset B's next-bar returns at horizons [1, 3, 5]; results persisted to a `lead_lag_ic` table or CSV report
 **Plans:** 4 plans

@@ -42,6 +42,14 @@
 - [ ] **ML-02**: SHAP TreeExplainer interaction analysis identifying top feature pairs, results feeding into feature selection refinement
 - [ ] **ML-03**: XGBoost meta-label confidence filter trained on `triple_barrier_labels`, filtering low-confidence trades before executor with configurable threshold
 
+### Pipeline Operations Dashboard
+
+- [ ] **DASH-01**: `pipeline_stage_log` table with per-stage start/end/status/rows written during every `--all` run
+- [ ] **DASH-02**: Streamlit active run monitor page with real-time stage progress bars, auto-refresh 90s
+- [ ] **DASH-03**: Run history panel showing last 10 runs with per-stage timing breakdown
+- [ ] **DASH-04**: Trigger panel with "Run Full Refresh", "Run From Stage", and quick-action buttons
+- [ ] **DASH-05**: Kill button that stops pipeline between stages via file-based kill switch
+
 ### Tech Debt Cleanup
 
 - [ ] **DEBT-01**: `blend_vol_simple()` orphaned export in `garch_blend.py` removed or wired to caller
@@ -106,10 +114,15 @@
 | DEBT-02 | Phase 101 | Pending |
 | DEBT-03 | Phase 101 | Pending |
 | DEBT-04 | Phase 101 | Pending |
+| DASH-01 | Phase 107 | Pending |
+| DASH-02 | Phase 107 | Pending |
+| DASH-03 | Phase 107 | Pending |
+| DASH-04 | Phase 107 | Pending |
+| DASH-05 | Phase 107 | Pending |
 
 **Coverage:**
-- v1.3.0 requirements: 26 total
-- Mapped to phases: 26
+- v1.3.0 requirements: 31 total (26 original + 5 DASH)
+- Mapped to phases: 31
 - Unmapped: 0
 
 ---
