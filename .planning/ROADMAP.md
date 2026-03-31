@@ -1484,15 +1484,14 @@ Plans:
   5. CTF threshold signals are registered in `signals/registry.py` and `run_mass_backtest.py` includes them in the sweep; at least one CTF signal type produces backtest results in `backtest_runs`
   6. Parameter grids for EMA crossover, RSI mean-reversion, and ATR breakout signals include at least 3x more combinations than the current bakeoff grids (documented in grid config YAML)
   7. The Streamlit dashboard has a Strategy Leaderboard page showing Sharpe with MC confidence bands, PBO heatmap, and feature-to-signal lineage; accessible via the existing app navigation
-**Plans:** 4 plans
+**Plans:** 5 plans
 
 Plans:
-- [ ] 99-01: Alembic migration for backtest_trades partitioning + mass_backtest_state table
-- [ ] 99-02: run_mass_backtest.py orchestrator with resume logic and state tracking
-- [ ] 99-03: Core bakeoff run (~113K combinations) with MC band population
-- [ ] 99-04: CTF threshold signal registration + CTF signal backtest sweep
-- [ ] 99-05: Expanded parameter grids for 6 core signals
-- [ ] 99-06: Strategy leaderboard dashboard page (MC bands, PBO heatmap, lineage)
+- [ ] 99-01-PLAN.md -- Alembic migration: mass_backtest_state table + backtest_trades partitioning
+- [ ] 99-02-PLAN.md -- CTF threshold signal adapter + expanded parameter grids YAML
+- [ ] 99-03-PLAN.md -- run_mass_backtest.py orchestrator + CTF data loader + MC backfill script
+- [ ] 99-04-PLAN.md -- Strategy Leaderboard dashboard page (MC bands, PBO heatmap, lineage)
+- [ ] 99-05-PLAN.md -- Core bakeoff execution run + verification
 
 ---
 
