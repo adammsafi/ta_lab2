@@ -114,6 +114,12 @@ Phase 98-04 decisions:
 - Sequential default (--workers=1): tractable for 7 assets in 15 min; --workers N for larger universes
 - Valid p-value filter before BH: rows with n_obs < 30 have NaN p-value, excluded from correction array but written to DB
 
+Phase 99-01 decisions:
+- FK deliberately dropped on partitioned backtest_trades: PostgreSQL partitioned tables do not support row-level FK; join via run_id at query time
+- Default partition created for 'unknown' and future strategy names not in initial 8-partition list
+- mc_sharpe_* go on strategy_bakeoff_results (not backtest_metrics): bakeoff pipeline is the writer; c3d4e5f6a1b2 backtest_metrics columns untouched
+- run_claude.py added to .gitignore: pre-existing root file triggered always_run no-root-py-files hook; moved temporarily during commit
+
 Phase 99-02 decisions:
 - ctf_threshold uses **params dict extraction (not keyword-only args) to match registry YAML-driven call convention
 - holding_bars=0 disables time-based exit in ctf_threshold (consistent with ama_composite pattern)
