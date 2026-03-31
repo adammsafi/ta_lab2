@@ -1522,7 +1522,7 @@ Plans:
   2. `.planning/phases/82-signal-refinement/VERIFICATION.md` exists and synthesizes the 6 existing plan summaries into a single phase-level verification document
   3. `.planning/phases/92-ctf-ic-analysis/VERIFICATION.md` is updated to reflect the 7 manually-closed gaps with evidence pointers
   4. A comment or doc entry in `dim_ctf_feature_selection` (or the CTF config) explains that downstream consumers are added via CTF-01 (`refresh_ctf_promoted.py`) — by design, not an oversight
-**Plans:** 3 plans
+**Plans:** 2 plans
 
 Plans:
 - [ ] 101-01: Remove/wire blend_vol_simple + create Phase 82 VERIFICATION.md + update Phase 92 VERIFICATION.md
