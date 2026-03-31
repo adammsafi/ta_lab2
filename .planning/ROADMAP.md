@@ -1463,7 +1463,7 @@ Plans:
   2. `dim_feature_selection_asset` contains rows with `tier = 'asset_specific'` for CTF features that pass per-asset IC but fail cross-asset consensus; a query by asset_id returns a different (superset) feature set than the global tier; `dim_feature_selection` is NOT touched or truncated
   3. A cross-asset CTF composite script produces market-wide sentiment, relative-value, and leader-follower aggregate columns stored in `features` or a dedicated composite table, runnable via CLI
   4. A lead-lag IC matrix script outputs a DataFrame showing whether Asset A's CTF features predict Asset B's next-bar returns at horizons [1, 3, 5]; results persisted to a `lead_lag_ic` table or CSV report
-**Plans:** 4 plans
+**Plans:** 3 plans
 
 Plans:
 - [x] 98-01-PLAN.md -- Alembic migration (all Phase 98 schema) + refresh_ctf_promoted.py ETL bridge + feature_selection.yaml
@@ -1504,7 +1504,7 @@ Plans:
   1. An LGBMRanker model is trained on CTF+AMA features to predict cross-sectional asset rank; purged CV produces an OOS NDCG or Spearman IC score that is documented and stored in `ml_experiments`
   2. SHAP TreeExplainer interaction values identify the top 5 feature pairs for the LGBMRanker; a summary report or chart is produced and at least one finding feeds back into `feature_selection.yaml` or `dim_feature_selection`
   3. An XGBoost meta-label model is trained on `triple_barrier_labels` to predict trade confidence; integrating it as a pre-executor filter (configurable threshold) reduces trade count while maintaining or improving the risk-adjusted return in backtests
-**Plans:** 4 plans
+**Plans:** 3 plans
 
 Plans:
 - [ ] 100-01: LGBMRanker cross-sectional ranker — install lightgbm, train on CTF+AMA features, purged CV, log to ml_experiments
@@ -1522,7 +1522,7 @@ Plans:
   2. `.planning/phases/82-signal-refinement/VERIFICATION.md` exists and synthesizes the 6 existing plan summaries into a single phase-level verification document
   3. `.planning/phases/92-ctf-ic-analysis/VERIFICATION.md` is updated to reflect the 7 manually-closed gaps with evidence pointers
   4. A comment or doc entry in `dim_ctf_feature_selection` (or the CTF config) explains that downstream consumers are added via CTF-01 (`refresh_ctf_promoted.py`) — by design, not an oversight
-**Plans:** 4 plans
+**Plans:** 3 plans
 
 Plans:
 - [ ] 101-01: Remove/wire blend_vol_simple + create Phase 82 VERIFICATION.md + update Phase 92 VERIFICATION.md
@@ -1540,7 +1540,7 @@ Plans:
   3. A `haircut_sharpe()` function implements Harvey & Liu (2015) adjustment that penalizes observed Sharpe based on the total number of indicators ever tested; reads from the trial registry
   4. A `trial_registry` table (Alembic migration) logs every indicator × parameterization × timeframe × asset combination tested, with timestamp, IC, p-value, and pass/fail status; `SELECT COUNT(*) FROM trial_registry` is never zero after any IC sweep runs
   5. A `block_bootstrap_ic()` function preserves autocorrelation structure via block bootstrap (configurable block size) when testing IC significance; produces confidence intervals that are wider than naive i.i.d. bootstrap for autocorrelated series
-**Plans:** 4 plans
+**Plans:** 3 plans
 
 Plans:
 - [ ] 102-01: Alembic migration for trial_registry table + permutation IC test + FDR control functions
@@ -1557,7 +1557,7 @@ Plans:
   1. `indicators.py` (or a new `indicators_extended.py`) exports at least 20 new indicator functions covering: Ichimoku Cloud (tenkan/kijun/senkou/chikou), Williams %R, Keltner Channels, CCI, Elder Ray (bull/bear power), Force Index, VWAP, Chaikin Money Flow, Chaikin Oscillator, Hurst exponent, VIDYA, FRAMA, Aroon, Trix, Ultimate Oscillator, Vortex Indicator, Ease of Movement, Mass Index, KST Oscillator, Coppock Curve
   2. Every new indicator has a corresponding entry in `trial_registry` after the IC sweep; `SELECT COUNT(DISTINCT indicator_name) FROM trial_registry WHERE phase = 103` returns 20+
   3. Indicators that pass FDR control at 5% are added to `dim_feature_registry` with `is_active = true`; rejects are logged with `is_active = false` and their IC/p-values preserved for audit
-**Plans:** 4 plans
+**Plans:** 3 plans
 
 Plans:
 - [ ] 103-01: Implement first batch of indicators (Ichimoku, Williams %R, Keltner, CCI, Elder Ray, Force Index, VWAP, Chaikin MF, Chaikin Osc, Hurst)
@@ -1575,7 +1575,7 @@ Plans:
   2. At least 8 crypto-native indicator functions are implemented: OI momentum (rate of change), OI-price divergence (z-score), funding rate z-score, funding rate momentum, volume-OI regime classifier (Kaufman Ch.12 matrix), Force Index (Elder), OI concentration ratio, liquidation pressure proxy (extreme funding + rising OI)
   3. All crypto-native indicators have trial_registry entries; survivors pass FDR at 5% and are promoted to `dim_feature_registry` with `source_type = 'crypto_native'`
   4. The normalized layer handles missing venue data gracefully (venue not yet onboarded returns empty DataFrame, not an error); tested with at least one mock venue
-**Plans:** 4 plans
+**Plans:** 3 plans
 
 Plans:
 - [ ] 104-01: Venue-agnostic normalized input layer + mapper for Hyperliquid tables
@@ -1593,7 +1593,7 @@ Plans:
   2. A `plateau_score()` function measures the width of the IC-positive region around the optimal parameter set (e.g., fraction of neighboring parameters within 80% of peak IC); parameters are selected from the broadest plateau, not the sharpest peak
   3. A `rolling_stability_test()` runs the optimal parameter set on 5+ non-overlapping time windows and rejects parameters where IC sign flips in >1 window or IC coefficient of variation exceeds a threshold
   4. DSR is computed over the full parameter search space (total N = all parameter combinations tested for that indicator), not just the winning parameter; the DSR-adjusted Sharpe is stored alongside the raw Sharpe in trial_registry
-**Plans:** 4 plans
+**Plans:** 3 plans
 
 Plans:
 - [ ] 105-01: Parameter sweep framework (grid + Optuna modes) with trial_registry integration and sweep_id grouping
@@ -1610,7 +1610,7 @@ Plans:
   1. At least 6 custom composite indicators are implemented: AMA efficiency ratio as regime signal (Kaufman insight), OI-divergence × CTF agreement interaction, funding-adjusted momentum (momentum penalized by extreme funding), cross-asset lead-lag composite (Asset A's CTF predicts Asset B), TF alignment score (count of agreeing timeframes as meta-feature), volume-regime gated trend (trend signal suppressed when volume-OI says congestion)
   2. Each composite is validated with the full battery: permutation IC test (p < 0.05), FDR control across all composites, CPCV with purge+embargo, AND a held-out time period (most recent 20% of data) never used during development
   3. Composites that pass all four validation layers are promoted to `dim_feature_registry` with `source_type = 'proprietary'` and documented with their construction logic; at least 2 composites survive the full gauntlet
-**Plans:** 4 plans
+**Plans:** 3 plans
 
 Plans:
 - [ ] 106-01: Implement composite indicators (AMA ER regime, OI×CTF interaction, funding-adjusted momentum, lead-lag composite, TF alignment score, volume-regime gated trend)
