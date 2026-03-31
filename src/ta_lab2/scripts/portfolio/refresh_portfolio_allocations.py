@@ -148,6 +148,7 @@ def _load_price_matrix(asset_ids: list[int], tf: str, engine) -> pd.DataFrame:
         "SELECT id, timestamp, close "
         "FROM price_bars_multi_tf_u "
         "WHERE tf = :tf AND id = ANY(:ids) "
+        "AND venue_id = 1 AND alignment_source = 'multi_tf' "
         "ORDER BY timestamp"
     )
     with engine.connect() as conn:
