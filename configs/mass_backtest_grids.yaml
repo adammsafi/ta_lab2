@@ -1,0 +1,237 @@
+# configs/mass_backtest_grids.yaml
+# ---------------------------------------------------------------------------
+# Phase 99: Mass Backtest Expanded Parameter Grids
+# ---------------------------------------------------------------------------
+# Purpose:
+#   BT-06 requires at least 3x more param combinations per strategy than the
+#   baseline _BAKEOFF_PARAM_GRIDS in run_bakeoff.py, enabling robust OOS
+#   distribution estimation, PSR/DSR deflation at scale, and Monte Carlo
+#   permutation significance testing.
+#
+# Baseline (from run_bakeoff.py _BAKEOFF_PARAM_GRIDS):
+#   ema_trend:            4 combos
+#   rsi_mean_revert:      3 combos
+#   breakout_atr:         3 combos
+#   macd_crossover:       3 combos (from registry.py grid_for)
+#   ama_momentum:         3 combos
+#   ama_mean_reversion:   3 combos
+#   ama_regime_conditional: 3 combos
+#
+# Expanded targets (>= 3x):
+#   ema_trend:              20 combos (5.0x)
+#   rsi_mean_revert:        20 combos (6.7x)
+#   breakout_atr:           12 combos (4.0x)
+#   macd_crossover:         12 combos (4.0x)
+#   ama_momentum:           12 combos (4.0x)
+#   ama_mean_reversion:     12 combos (4.0x)
+#   ama_regime_conditional: 12 combos (4.0x)
+#   ctf_threshold:          18 combos (new)
+#
+# Total: 118 param sets
+#
+# Usage:
+#   python -m ta_lab2.scripts.backtests.run_mass_backtest \
+#       --grids-yaml configs/mass_backtest_grids.yaml \
+#       --tf 1D --assets 1 1027
+# ---------------------------------------------------------------------------
+
+ema_trend:
+  # 5.0x expansion from baseline (4 -> 20 combos)
+  # Covers fast/slow pairs across short, medium, and long horizons
+  # All params match ema_trend.make_signals() signature
+  params:
+    # Short-term momentum (fast < 15)
+    - {fast_ema: "ema_5",  slow_ema: "ema_21"}
+    - {fast_ema: "ema_5",  slow_ema: "ema_50"}
+    - {fast_ema: "ema_8",  slow_ema: "ema_21"}
+    - {fast_ema: "ema_8",  slow_ema: "ema_50"}
+    # Medium-term crossover (classic range)
+    - {fast_ema: "ema_10", slow_ema: "ema_50"}
+    - {fast_ema: "ema_10", slow_ema: "ema_100"}
+    - {fast_ema: "ema_12", slow_ema: "ema_50"}
+    - {fast_ema: "ema_12", slow_ema: "ema_100"}
+    - {fast_ema: "ema_17", slow_ema: "ema_77"}
+    - {fast_ema: "ema_21", slow_ema: "ema_50"}
+    - {fast_ema: "ema_21", slow_ema: "ema_100"}
+    - {fast_ema: "ema_21", slow_ema: "ema_200"}
+    # Slow crossover (trend-following)
+    - {fast_ema: "ema_30", slow_ema: "ema_100"}
+    - {fast_ema: "ema_30", slow_ema: "ema_150"}
+    - {fast_ema: "ema_30", slow_ema: "ema_200"}
+    - {fast_ema: "ema_50", slow_ema: "ema_150"}
+    - {fast_ema: "ema_50", slow_ema: "ema_200"}
+    # Golden cross / death cross variants
+    - {fast_ema: "ema_21", slow_ema: "ema_77"}
+    - {fast_ema: "ema_34", slow_ema: "ema_144"}
+    - {fast_ema: "ema_55", slow_ema: "ema_200"}
+
+rsi_mean_revert:
+  # 6.7x expansion from baseline (3 -> 20 combos)
+  # Crosses rsi periods, oversold/overbought levels, and confirm_cross modes
+  # All params match rsi_mean_revert.make_signals() signature
+  params:
+    # RSI-7: fast/sensitive (crypto-appropriate)
+    - {rsi_col: "rsi_7",  lower: 25.0, upper: 65.0, confirm_cross: true,  allow_shorts: false, atr_col: "atr_14", risk_pct: 0.5, atr_mult_stop: 1.5, max_leverage: 1.0}
+    - {rsi_col: "rsi_7",  lower: 30.0, upper: 70.0, confirm_cross: true,  allow_shorts: false, atr_col: "atr_14", risk_pct: 0.5, atr_mult_stop: 1.5, max_leverage: 1.0}
+    - {rsi_col: "rsi_7",  lower: 20.0, upper: 60.0, confirm_cross: false, allow_shorts: false, atr_col: "atr_14", risk_pct: 0.5, atr_mult_stop: 2.0, max_leverage: 1.0}
+    - {rsi_col: "rsi_7",  lower: 25.0, upper: 75.0, confirm_cross: false, allow_shorts: false, atr_col: "atr_14", risk_pct: 0.5, atr_mult_stop: 1.5, max_leverage: 1.0}
+    # RSI-14: standard period (baseline range)
+    - {rsi_col: "rsi_14", lower: 25.0, upper: 65.0, confirm_cross: true,  allow_shorts: false, atr_col: "atr_14", risk_pct: 0.5, atr_mult_stop: 1.5, max_leverage: 1.0}
+    - {rsi_col: "rsi_14", lower: 30.0, upper: 70.0, confirm_cross: true,  allow_shorts: false, atr_col: "atr_14", risk_pct: 0.5, atr_mult_stop: 1.5, max_leverage: 1.0}
+    - {rsi_col: "rsi_14", lower: 35.0, upper: 75.0, confirm_cross: true,  allow_shorts: false, atr_col: "atr_14", risk_pct: 0.5, atr_mult_stop: 1.5, max_leverage: 1.0}
+    - {rsi_col: "rsi_14", lower: 20.0, upper: 60.0, confirm_cross: true,  allow_shorts: false, atr_col: "atr_14", risk_pct: 0.5, atr_mult_stop: 2.0, max_leverage: 1.0}
+    - {rsi_col: "rsi_14", lower: 30.0, upper: 70.0, confirm_cross: false, allow_shorts: false, atr_col: "atr_14", risk_pct: 0.5, atr_mult_stop: 1.5, max_leverage: 1.0}
+    - {rsi_col: "rsi_14", lower: 25.0, upper: 65.0, confirm_cross: true,  allow_shorts: false, atr_col: "atr_14", risk_pct: 1.0, atr_mult_stop: 2.0, max_leverage: 1.0}
+    # RSI-21: slower, more filtered signals
+    - {rsi_col: "rsi_21", lower: 30.0, upper: 70.0, confirm_cross: true,  allow_shorts: false, atr_col: "atr_14", risk_pct: 0.5, atr_mult_stop: 1.5, max_leverage: 1.0}
+    - {rsi_col: "rsi_21", lower: 25.0, upper: 65.0, confirm_cross: true,  allow_shorts: false, atr_col: "atr_14", risk_pct: 0.5, atr_mult_stop: 1.5, max_leverage: 1.0}
+    - {rsi_col: "rsi_21", lower: 35.0, upper: 75.0, confirm_cross: true,  allow_shorts: false, atr_col: "atr_14", risk_pct: 0.5, atr_mult_stop: 2.0, max_leverage: 1.0}
+    - {rsi_col: "rsi_21", lower: 20.0, upper: 60.0, confirm_cross: false, allow_shorts: false, atr_col: "atr_14", risk_pct: 0.5, atr_mult_stop: 1.5, max_leverage: 1.0}
+    # Higher risk tolerance
+    - {rsi_col: "rsi_14", lower: 30.0, upper: 70.0, confirm_cross: true,  allow_shorts: false, atr_col: "atr_14", risk_pct: 1.0, atr_mult_stop: 1.5, max_leverage: 1.5}
+    - {rsi_col: "rsi_14", lower: 25.0, upper: 65.0, confirm_cross: true,  allow_shorts: false, atr_col: "atr_14", risk_pct: 1.0, atr_mult_stop: 1.5, max_leverage: 1.5}
+    # Lower ATR multiplier (tighter stops)
+    - {rsi_col: "rsi_14", lower: 30.0, upper: 70.0, confirm_cross: true,  allow_shorts: false, atr_col: "atr_14", risk_pct: 0.5, atr_mult_stop: 1.0, max_leverage: 1.0}
+    - {rsi_col: "rsi_7",  lower: 30.0, upper: 70.0, confirm_cross: true,  allow_shorts: false, atr_col: "atr_14", risk_pct: 0.5, atr_mult_stop: 1.0, max_leverage: 1.0}
+    # Wider bands for trend-heavy regimes
+    - {rsi_col: "rsi_14", lower: 20.0, upper: 80.0, confirm_cross: true,  allow_shorts: false, atr_col: "atr_14", risk_pct: 0.5, atr_mult_stop: 1.5, max_leverage: 1.0}
+    - {rsi_col: "rsi_21", lower: 20.0, upper: 80.0, confirm_cross: true,  allow_shorts: false, atr_col: "atr_14", risk_pct: 0.5, atr_mult_stop: 1.5, max_leverage: 1.0}
+
+breakout_atr:
+  # 4.0x expansion from baseline (3 -> 12 combos)
+  # Crosses lookback period, trail multiplier, and exit mode
+  # All params match breakout_atr.make_signals() signature
+  params:
+    # Lookback 10 (short Donchian channel)
+    - {lookback: 10, atr_col: "atr_14", confirm_close: true,  exit_on_channel_crossback: true,  use_trailing_atr_stop: true, trail_atr_mult: 2.0, risk_pct: 0.5, max_leverage: 1.0}
+    - {lookback: 10, atr_col: "atr_14", confirm_close: true,  exit_on_channel_crossback: true,  use_trailing_atr_stop: true, trail_atr_mult: 3.0, risk_pct: 0.5, max_leverage: 1.0}
+    # Lookback 20 (baseline range)
+    - {lookback: 20, atr_col: "atr_14", confirm_close: true,  exit_on_channel_crossback: true,  use_trailing_atr_stop: true, trail_atr_mult: 1.5, risk_pct: 0.5, max_leverage: 1.0}
+    - {lookback: 20, atr_col: "atr_14", confirm_close: true,  exit_on_channel_crossback: true,  use_trailing_atr_stop: true, trail_atr_mult: 2.0, risk_pct: 0.5, max_leverage: 1.0}
+    - {lookback: 20, atr_col: "atr_14", confirm_close: true,  exit_on_channel_crossback: true,  use_trailing_atr_stop: true, trail_atr_mult: 3.0, risk_pct: 0.5, max_leverage: 1.0}
+    - {lookback: 20, atr_col: "atr_14", confirm_close: false, exit_on_channel_crossback: true,  use_trailing_atr_stop: true, trail_atr_mult: 2.0, risk_pct: 0.5, max_leverage: 1.0}
+    # Lookback 30 (medium)
+    - {lookback: 30, atr_col: "atr_14", confirm_close: true,  exit_on_channel_crossback: true,  use_trailing_atr_stop: true, trail_atr_mult: 2.0, risk_pct: 0.5, max_leverage: 1.0}
+    - {lookback: 30, atr_col: "atr_14", confirm_close: true,  exit_on_channel_crossback: true,  use_trailing_atr_stop: true, trail_atr_mult: 3.0, risk_pct: 0.5, max_leverage: 1.0}
+    # Lookback 40 (baseline long)
+    - {lookback: 40, atr_col: "atr_14", confirm_close: true,  exit_on_channel_crossback: true,  use_trailing_atr_stop: true, trail_atr_mult: 2.0, risk_pct: 0.5, max_leverage: 1.0}
+    - {lookback: 40, atr_col: "atr_14", confirm_close: true,  exit_on_channel_crossback: true,  use_trailing_atr_stop: true, trail_atr_mult: 3.0, risk_pct: 0.5, max_leverage: 1.0}
+    # Lookback 60 (long-term breakout)
+    - {lookback: 60, atr_col: "atr_14", confirm_close: true,  exit_on_channel_crossback: true,  use_trailing_atr_stop: true, trail_atr_mult: 2.0, risk_pct: 0.5, max_leverage: 1.0}
+    - {lookback: 60, atr_col: "atr_14", confirm_close: true,  exit_on_channel_crossback: false, use_trailing_atr_stop: true, trail_atr_mult: 2.0, risk_pct: 0.5, max_leverage: 1.0}
+
+macd_crossover:
+  # 4.0x expansion from baseline (3 -> 12 combos)
+  # Crosses fast, slow, signal periods across standard and crypto-appropriate ranges
+  # All params match macd_crossover.make_signals() signature
+  params:
+    # Standard MACD variants
+    - {fast: 8,  slow: 17, signal: 9,  direction: "long"}
+    - {fast: 12, slow: 26, signal: 9,  direction: "long"}
+    - {fast: 19, slow: 39, signal: 9,  direction: "long"}
+    # Fast MACD (short-term momentum)
+    - {fast: 5,  slow: 13, signal: 5,  direction: "long"}
+    - {fast: 5,  slow: 21, signal: 8,  direction: "long"}
+    - {fast: 8,  slow: 21, signal: 9,  direction: "long"}
+    # Slow MACD (longer-term trend)
+    - {fast: 12, slow: 26, signal: 9,  direction: "long"}
+    - {fast: 26, slow: 52, signal: 9,  direction: "long"}
+    - {fast: 26, slow: 52, signal: 18, direction: "long"}
+    # Wider signal windows
+    - {fast: 12, slow: 26, signal: 13, direction: "long"}
+    - {fast: 19, slow: 39, signal: 13, direction: "long"}
+    # Tighter signal window
+    - {fast: 8,  slow: 21, signal: 5,  direction: "long"}
+
+ama_momentum:
+  # 4.0x expansion from baseline (3 -> 12 combos)
+  # Crosses holding_bars x threshold x zscore_window
+  # All params match ama_composite.ama_momentum_signal() signature
+  params:
+    # Short holding (5 bars) x threshold sweep
+    - {holding_bars: 5,  threshold: 0.0, zscore_window: 20}
+    - {holding_bars: 5,  threshold: 0.5, zscore_window: 20}
+    - {holding_bars: 5,  threshold: 0.0, zscore_window: 30}
+    # Medium holding (7 bars) x threshold sweep
+    - {holding_bars: 7,  threshold: 0.0, zscore_window: 20}
+    - {holding_bars: 7,  threshold: 0.5, zscore_window: 20}
+    - {holding_bars: 7,  threshold: 0.0, zscore_window: 30}
+    - {holding_bars: 7,  threshold: 0.5, zscore_window: 30}
+    # Long holding (10 bars) x threshold sweep
+    - {holding_bars: 10, threshold: 0.0, zscore_window: 20}
+    - {holding_bars: 10, threshold: 0.5, zscore_window: 20}
+    - {holding_bars: 10, threshold: 0.0, zscore_window: 30}
+    # Extended holding (14 bars)
+    - {holding_bars: 14, threshold: 0.0, zscore_window: 20}
+    - {holding_bars: 14, threshold: 0.5, zscore_window: 30}
+
+ama_mean_reversion:
+  # 4.0x expansion from baseline (3 -> 12 combos)
+  # Crosses ama_col x entry_zscore x holding_bars
+  # All params match ama_composite.ama_mean_reversion_signal() signature
+  params:
+    # KAMA fast (de1106d5) - baseline primary
+    - {ama_col: "KAMA_de1106d5_ama", entry_zscore: -1.0, exit_zscore: 0.0, holding_bars: 7,  zscore_window: 20}
+    - {ama_col: "KAMA_de1106d5_ama", entry_zscore: -1.5, exit_zscore: 0.0, holding_bars: 10, zscore_window: 20}
+    - {ama_col: "KAMA_de1106d5_ama", entry_zscore: -2.0, exit_zscore: 0.0, holding_bars: 7,  zscore_window: 20}
+    - {ama_col: "KAMA_de1106d5_ama", entry_zscore: -1.5, exit_zscore: 0.0, holding_bars: 7,  zscore_window: 30}
+    # KAMA medium (987fc105)
+    - {ama_col: "KAMA_987fc105_ama", entry_zscore: -1.0, exit_zscore: 0.0, holding_bars: 7,  zscore_window: 20}
+    - {ama_col: "KAMA_987fc105_ama", entry_zscore: -1.5, exit_zscore: 0.0, holding_bars: 10, zscore_window: 20}
+    - {ama_col: "KAMA_987fc105_ama", entry_zscore: -2.0, exit_zscore: 0.0, holding_bars: 7,  zscore_window: 20}
+    - {ama_col: "KAMA_987fc105_ama", entry_zscore: -1.5, exit_zscore: 0.0, holding_bars: 14, zscore_window: 30}
+    # TEMA (0fca19a1) - highest IC-IR from Phase 80
+    - {ama_col: "TEMA_0fca19a1_ama", entry_zscore: -1.0, exit_zscore: 0.0, holding_bars: 7,  zscore_window: 20}
+    - {ama_col: "TEMA_0fca19a1_ama", entry_zscore: -1.5, exit_zscore: 0.0, holding_bars: 10, zscore_window: 20}
+    # HMA (514ffe35)
+    - {ama_col: "HMA_514ffe35_ama",  entry_zscore: -1.0, exit_zscore: 0.0, holding_bars: 7,  zscore_window: 20}
+    - {ama_col: "HMA_514ffe35_ama",  entry_zscore: -1.5, exit_zscore: 0.0, holding_bars: 10, zscore_window: 20}
+
+ama_regime_conditional:
+  # 4.0x expansion from baseline (3 -> 12 combos)
+  # Crosses adx_threshold x holding_bars x trend_col
+  # All params match ama_composite.ama_regime_conditional_signal() signature
+  params:
+    # DEMA primary (d47fe5cc)
+    - {trend_col: "DEMA_d47fe5cc_ama", adx_threshold: 15.0, holding_bars: 5,  filter_col: "adx_14"}
+    - {trend_col: "DEMA_d47fe5cc_ama", adx_threshold: 20.0, holding_bars: 7,  filter_col: "adx_14"}
+    - {trend_col: "DEMA_d47fe5cc_ama", adx_threshold: 25.0, holding_bars: 10, filter_col: "adx_14"}
+    - {trend_col: "DEMA_d47fe5cc_ama", adx_threshold: 20.0, holding_bars: 5,  filter_col: "adx_14"}
+    - {trend_col: "DEMA_d47fe5cc_ama", adx_threshold: 15.0, holding_bars: 10, filter_col: "adx_14"}
+    - {trend_col: "DEMA_d47fe5cc_ama", adx_threshold: 30.0, holding_bars: 7,  filter_col: "adx_14"}
+    # TEMA primary (0fca19a1) - highest IC-IR
+    - {trend_col: "TEMA_0fca19a1_ama", adx_threshold: 15.0, holding_bars: 5,  filter_col: "adx_14"}
+    - {trend_col: "TEMA_0fca19a1_ama", adx_threshold: 20.0, holding_bars: 7,  filter_col: "adx_14"}
+    - {trend_col: "TEMA_0fca19a1_ama", adx_threshold: 25.0, holding_bars: 10, filter_col: "adx_14"}
+    # KAMA (987fc105)
+    - {trend_col: "KAMA_987fc105_ama", adx_threshold: 20.0, holding_bars: 7,  filter_col: "adx_14"}
+    - {trend_col: "KAMA_987fc105_ama", adx_threshold: 25.0, holding_bars: 10, filter_col: "adx_14"}
+    - {trend_col: "KAMA_987fc105_ama", adx_threshold: 15.0, holding_bars: 5,  filter_col: "adx_14"}
+
+ctf_threshold:
+  # 18 combos (new signal type, Phase 99)
+  # CTF (Cross-Timeframe Feature) threshold-crossing signals
+  # Uses IC-promoted features from dim_feature_selection (Phase 98)
+  # All params match ctf_threshold.make_signals() signature
+  params:
+    # ret_arith_365d_divergence (top IC feature from Phase 92 sweep)
+    - {feature_col: "ret_arith_365d_divergence", entry_threshold:  0.0, exit_threshold:  0.0, direction: "long",  holding_bars: 7}
+    - {feature_col: "ret_arith_365d_divergence", entry_threshold:  0.5, exit_threshold: -0.5, direction: "long",  holding_bars: 7}
+    - {feature_col: "ret_arith_365d_divergence", entry_threshold: -0.5, exit_threshold:  0.5, direction: "short", holding_bars: 7}
+    - {feature_col: "ret_arith_365d_divergence", entry_threshold:  0.0, exit_threshold:  0.0, direction: "long",  holding_bars: 14}
+    - {feature_col: "ret_arith_365d_divergence", entry_threshold:  0.5, exit_threshold: -0.5, direction: "long",  holding_bars: 14}
+    - {feature_col: "ret_arith_365d_divergence", entry_threshold: -0.5, exit_threshold:  0.5, direction: "short", holding_bars: 14}
+    # vol_ratio_30d (volatility regime signal)
+    - {feature_col: "vol_ratio_30d",             entry_threshold:  0.0, exit_threshold:  0.0, direction: "long",  holding_bars: 7}
+    - {feature_col: "vol_ratio_30d",             entry_threshold:  0.5, exit_threshold: -0.5, direction: "long",  holding_bars: 7}
+    - {feature_col: "vol_ratio_30d",             entry_threshold: -0.5, exit_threshold:  0.5, direction: "short", holding_bars: 7}
+    - {feature_col: "vol_ratio_30d",             entry_threshold:  0.0, exit_threshold:  0.0, direction: "long",  holding_bars: 14}
+    - {feature_col: "vol_ratio_30d",             entry_threshold:  0.5, exit_threshold: -0.5, direction: "long",  holding_bars: 14}
+    - {feature_col: "vol_ratio_30d",             entry_threshold: -0.5, exit_threshold:  0.5, direction: "short", holding_bars: 14}
+    # ema_cross_score (multi-timeframe EMA alignment score)
+    - {feature_col: "ema_cross_score",           entry_threshold:  0.0, exit_threshold:  0.0, direction: "long",  holding_bars: 5}
+    - {feature_col: "ema_cross_score",           entry_threshold:  0.5, exit_threshold: -0.5, direction: "long",  holding_bars: 5}
+    - {feature_col: "ema_cross_score",           entry_threshold: -0.5, exit_threshold:  0.5, direction: "short", holding_bars: 5}
+    - {feature_col: "ema_cross_score",           entry_threshold:  0.0, exit_threshold:  0.0, direction: "long",  holding_bars: 10}
+    - {feature_col: "ema_cross_score",           entry_threshold:  0.5, exit_threshold: -0.5, direction: "long",  holding_bars: 10}
+    - {feature_col: "ema_cross_score",           entry_threshold: -0.5, exit_threshold:  0.5, direction: "short", holding_bars: 10}
