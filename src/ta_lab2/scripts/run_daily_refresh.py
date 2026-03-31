@@ -114,6 +114,9 @@ TIMEOUT_MACRO_ALERTS = 60  # 1 minute -- transition detection + Telegram send
 TIMEOUT_GARCH = 1800  # 30 minutes -- GARCH fitting for 99 assets x 4 models
 TIMEOUT_SYNC_FRED = 300  # 5 minutes -- SSH + psql COPY from GCP VM
 TIMEOUT_SYNC_HL = 600  # 10 minutes -- SSH + psql COPY from Singapore VM (~3M rows)
+TIMEOUT_SYNC_CMC = (
+    300  # 5 minutes -- SSH + psql COPY for 7 CMC assets from Singapore VM
+)
 TIMEOUT_SIGNAL_GATE = 120  # 2 minutes -- signal count queries are fast
 TIMEOUT_IC_STALENESS = 300  # 5 minutes -- IC computation for ~10 features x 2 assets
 TIMEOUT_PIPELINE_ALERT = 60  # 1 minute -- Telegram send only
@@ -2204,6 +2207,95 @@ def run_sync_hl_vm(args) -> ComponentResult:
         )
 
 
+def run_sync_cmc_vm(args) -> ComponentResult:
+    """Sync CMC price histories from Singapore VM to local cmc_price_histories7.
+
+    Runs incremental sync of 7 CMC assets (BTC, ETH, SOL, XRP, BNB, LINK, HYPE)
+    via SSH + psql COPY. Should run before bars so 1D builder sees fresh CMC data.
+
+    Args:
+        args: CLI arguments
+
+    Returns:
+        ComponentResult with execution details
+    """
+    cmd = [
+        sys.executable,
+        "-m",
+        "ta_lab2.scripts.etl.sync_cmc_from_vm",
+    ]
+
+    if getattr(args, "dry_run", False):
+        cmd.append("--dry-run")
+
+    print(f"\n{'=' * 70}")
+    print("SYNCING CMC PRICE DATA FROM SINGAPORE VM")
+    print(f"{'=' * 70}")
+    print(f"Command: {' '.join(cmd)}")
+
+    if args.dry_run:
+        print("[DRY RUN] Would sync CMC price data from Singapore VM")
+        return ComponentResult(
+            component="sync_cmc_vm",
+            success=True,
+            duration_sec=0.0,
+            returncode=0,
+        )
+
+    start = time.perf_counter()
+
+    try:
+        if args.verbose:
+            result = subprocess.run(cmd, check=False, timeout=TIMEOUT_SYNC_CMC)
+        else:
+            result = subprocess.run(
+                cmd,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=TIMEOUT_SYNC_CMC,
+            )
+            if result.returncode != 0:
+                print(f"\n[ERROR] CMC VM sync failed with code {result.returncode}")
+                if result.stdout:
+                    print(f"\nSTDOUT:\n{result.stdout}")
+                if result.stderr:
+                    print(f"\nSTDERR:\n{result.stderr}")
+
+        duration = time.perf_counter() - start
+
+        if result.returncode == 0:
+            print(f"\n[OK] CMC VM sync completed in {duration:.1f}s")
+            return ComponentResult(
+                component="sync_cmc_vm",
+                success=True,
+                duration_sec=duration,
+                returncode=result.returncode,
+            )
+        else:
+            error_msg = f"Exited with code {result.returncode}"
+            print(f"\n[FAILED] CMC VM sync: {error_msg}")
+            return ComponentResult(
+                component="sync_cmc_vm",
+                success=False,
+                duration_sec=duration,
+                returncode=result.returncode,
+                error_message=error_msg,
+            )
+
+    except subprocess.TimeoutExpired:
+        duration = time.perf_counter() - start
+        error_msg = f"Timed out after {TIMEOUT_SYNC_CMC}s"
+        print(f"\n[TIMEOUT] CMC VM sync: {error_msg}")
+        return ComponentResult(
+            component="sync_cmc_vm",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+
+
 def run_macro_features(args) -> ComponentResult:
     """Run FRED macro feature refresh via subprocess.
 
@@ -3891,6 +3983,11 @@ Examples:
             print(
                 "\n[WARN] Hyperliquid VM sync failed -- continuing with existing local data"
             )
+
+        cmc_result = run_sync_cmc_vm(args)
+        results.append(("sync_cmc_vm", cmc_result))
+        if not cmc_result.success:
+            print("\n[WARN] CMC VM sync failed -- continuing with existing local data")
 
     # Run bars if requested
     if run_bars:
