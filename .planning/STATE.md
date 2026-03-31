@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 
 ## Current Position
 
-Phase: 98 of 106 (CTF Feature Graduation) — Plan 02 complete
-Next: Phase 98 Plan 03 (cross-asset CTF composites)
-Status: In progress (Plans 98-01 and 98-02 complete)
-Last activity: 2026-03-31 — Completed 98-02-PLAN.md (per-asset CTF feature selection)
+Phase: 98 of 106 (CTF Feature Graduation) — Plan 04 complete
+Next: Phase 99 (Backtest Expansion) or Phase 98 Plan 03 if incomplete
+Status: In progress (Plans 98-01, 98-02, 98-04 complete; 98-03 parallel)
+Last activity: 2026-03-31 — Completed 98-04-PLAN.md (CTF lead-lag IC matrix)
 
-Progress: [##########] 100% v1.2.0 | [████░░░░░░] 31% v1.3.0 (8/26 plans, 2/6 phases)
+Progress: [##########] 100% v1.2.0 | [████░░░░░░] 35% v1.3.0 (9/26 plans, 2/6 phases)
 
 ## Performance Metrics
 
@@ -99,6 +99,13 @@ Phase 98-02 decisions:
 - All 98 assets have CTF IC data; all 98 have asset-specific additions (53-164 per asset, 10,716 total rows)
 - dim_feature_selection verified unchanged at 205 rows before and after run (no TRUNCATE damage)
 
+Phase 98-04 decisions:
+- Pre-load-then-iterate: all CTF DataFrames and forward returns cached in memory dicts before inner loop -- 15 min vs hours
+- Single global BH correction: collect all p-values then multipletests once (correct global FDR control, not per-pair)
+- reports/ is gitignored: CSV report is local artifact; lead_lag_ic table is authoritative
+- Sequential default (--workers=1): tractable for 7 assets in 15 min; --workers N for larger universes
+- Valid p-value filter before BH: rows with n_obs < 30 have NaN p-value, excluded from correction array but written to DB
+
 ### Pending Todos
 
 7 pending todos resolved into v1.3.0 phases:
@@ -123,9 +130,9 @@ Phase 98-02 decisions:
 ## Session Continuity
 
 Last session: 2026-03-31
-Stopped at: Phase 98 Plan 02 COMPLETE. Next: Phase 98 Plan 03 (cross-asset CTF composites).
+Stopped at: Phase 98 Plan 04 COMPLETE. Next: Phase 98 Plan 03 (cross-asset CTF composites) or Phase 99.
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-31 (Phase 98-02 complete: per-asset CTF feature selection)*
+*Last updated: 2026-03-31 (Phase 98-04 complete: CTF lead-lag IC matrix -- 48,204 rows, 5,087 significant pairs)*
