@@ -12,7 +12,7 @@
 - v1.0.1 Macro Regime Infrastructure (Phases 64-73) - SHIPPED 2026-03-03
 - v1.1.0 Pipeline Consolidation & Storage Optimization (Phases 74-79) - SHIPPED 2026-03-21
 - v1.2.0 Analysis → Live Signals (Phases 80-95) - SHIPPED 2026-03-29
-- v1.3.0 Operational Activation & Research Expansion (Phases 96-107) - IN PROGRESS
+- v1.3.0 Operational Activation & Research Expansion (Phases 96-108) - IN PROGRESS
 
 ## Overview
 
@@ -31,7 +31,7 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 - Phases 64-73: v1.0.1 (SHIPPED 2026-03-03)
 - Phases 74-79: v1.1.0 (SHIPPED 2026-03-21)
 - Phases 80-95: v1.2.0 (SHIPPED 2026-03-29)
-- Phases 96-107: v1.3.0 (IN PROGRESS)
+- Phases 96-108: v1.3.0 (IN PROGRESS)
 - Decimal phases (27.1, 28.1): Urgent insertions if needed
 
 <details>
@@ -1412,6 +1412,7 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 - [ ] **Phase 105: Parameter Optimization** - Systematic parameter sweep (grid + Optuna) for surviving indicators, plateau preference, rolling stability test, DSR over full search space
 - [ ] **Phase 106: Custom Composite Indicators** - Proprietary indicators (AMA ER as regime signal, OI-divergence × CTF agreement, funding-adjusted momentum, cross-asset lead-lag), strictest validation tier
 - [ ] **Phase 107: Pipeline Operations Dashboard** - Streamlit ops page: real-time stage monitor with progress bars, run history, trigger/kill buttons, pipeline_stage_log table for per-stage DB persistence
+- [ ] **Phase 108: Pipeline Batch Performance** - Replace 5.7M per-key SQL queries with per-ID batch operations using PARTITION BY. EMA returns (2M→492 queries), AMA returns, bar returns, EMA fast-path. Target: 5hr→1.5hr incremental
 
 ---
 

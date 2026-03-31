@@ -50,6 +50,14 @@
 - [ ] **DASH-04**: Trigger panel with "Run Full Refresh", "Run From Stage", and quick-action buttons
 - [ ] **DASH-05**: Kill button that stops pipeline between stages via file-based kill switch
 
+### Pipeline Batch Performance
+
+- [ ] **PERF-01**: EMA returns batch — replace 2M per-key queries with per-ID batch SQL using PARTITION BY (tf, period, venue_id)
+- [ ] **PERF-02**: EMA fast-path — use recursive `ema_new = close * alpha + ema_prev * (1-alpha)` for recent watermarks instead of full recompute
+- [ ] **PERF-03**: AMA returns batch — per-ID batch SQL instead of per-(alignment_source, id) loop
+- [ ] **PERF-04**: Bar returns batch — per-ID batch SQL instead of per-(id, tf, venue) loop
+- [ ] **PERF-05**: Full incremental `--all` pipeline completes in < 2 hours (currently 5-6 hours)
+
 ### Tech Debt Cleanup
 
 - [ ] **DEBT-01**: `blend_vol_simple()` orphaned export in `garch_blend.py` removed or wired to caller
@@ -119,10 +127,15 @@
 | DASH-03 | Phase 107 | Pending |
 | DASH-04 | Phase 107 | Pending |
 | DASH-05 | Phase 107 | Pending |
+| PERF-01 | Phase 108 | Pending |
+| PERF-02 | Phase 108 | Pending |
+| PERF-03 | Phase 108 | Pending |
+| PERF-04 | Phase 108 | Pending |
+| PERF-05 | Phase 108 | Pending |
 
 **Coverage:**
-- v1.3.0 requirements: 31 total (26 original + 5 DASH)
-- Mapped to phases: 31
+- v1.3.0 requirements: 36 total (26 original + 5 DASH + 5 PERF)
+- Mapped to phases: 36
 - Unmapped: 0
 
 ---
