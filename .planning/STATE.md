@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 
 ## Current Position
 
-Phase: 98 of 106 COMPLETE (CTF Feature Graduation) — verified 2026-03-31
-Next: Phase 99 (Backtest Scaling)
-Status: Phase 98 verified, ready for Phase 99
-Last activity: 2026-03-31 — Phase 98 verified (4/4 must-haves passed)
+Phase: 99 of 106 IN PROGRESS (Backtest Scaling) — Plan 02 complete
+Next: Phase 99 Plan 03 (run_mass_backtest.py script)
+Status: Plan 99-02 complete — CTF signal adapter registered, expanded YAML grids created
+Last activity: 2026-03-31 — Completed 99-02-PLAN.md (CTF signal + param grids)
 
-Progress: [##########] 100% v1.2.0 | [██████░░░░] 38% v1.3.0 (10/26 plans, 3/6 phases)
+Progress: [##########] 100% v1.2.0 | [███████░░░] 42% v1.3.0 (11/26 plans, 3/6 phases)
 
 ## Performance Metrics
 
@@ -114,6 +114,12 @@ Phase 98-04 decisions:
 - Sequential default (--workers=1): tractable for 7 assets in 15 min; --workers N for larger universes
 - Valid p-value filter before BH: rows with n_obs < 30 have NaN p-value, excluded from correction array but written to DB
 
+Phase 99-02 decisions:
+- ctf_threshold uses **params dict extraction (not keyword-only args) to match registry YAML-driven call convention
+- holding_bars=0 disables time-based exit in ctf_threshold (consistent with ama_composite pattern)
+- YAML grid structure: strategy_name.params list of flat dicts -- compatible with simple yaml.safe_load() + iteration
+- macd_crossover baseline for 3x comparison is registry.py grid_for() return of 3 (not _BAKEOFF_PARAM_GRIDS which lacks it)
+
 ### Pending Todos
 
 7 pending todos resolved into v1.3.0 phases:
@@ -138,7 +144,7 @@ Phase 98-04 decisions:
 ## Session Continuity
 
 Last session: 2026-03-31
-Stopped at: Phase 98 COMPLETE (verified 4/4). Next: Phase 99 Backtest Scaling.
+Stopped at: Completed 99-02-PLAN.md (CTF signal adapter + expanded param grids). Next: 99-03.
 Resume file: None
 
 ---
