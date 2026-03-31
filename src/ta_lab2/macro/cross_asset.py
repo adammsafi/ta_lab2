@@ -47,8 +47,9 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 # Warmup window: how many days before watermark to include for rolling warmup.
-# Must cover the longest rolling window in config (90d z-score) + margin.
-WARMUP_DAYS = 120
+# Must cover the longest rolling window in config (180d corr window) + 30d margin.
+# Phase 97: increased from 120 to 210 to accommodate 180d correlation window.
+WARMUP_DAYS = 210
 
 # Default full-history start date for --full / no-watermark runs
 FULL_HISTORY_START = "2020-01-01"
@@ -152,6 +153,35 @@ def _sanitize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         except Exception:  # noqa: BLE001
             pass
     return df
+
+
+# ---------------------------------------------------------------------------
+# Rolling z-score helper
+# ---------------------------------------------------------------------------
+
+
+def _rolling_zscore_series(
+    series: pd.Series, window: int, min_fill_pct: float = 0.80
+) -> pd.Series:
+    """Rolling z-score for a Series (same logic as feature_computer._rolling_zscore).
+
+    Parameters
+    ----------
+    series:
+        Input time series.
+    window:
+        Rolling window size.
+    min_fill_pct:
+        Minimum fill fraction; rows with fewer observations than this are NaN.
+
+    Returns
+    -------
+    pd.Series of rolling z-scores (same index as input).
+    """
+    min_periods = max(1, int(min_fill_pct * window))
+    roll_mean = series.rolling(window, min_periods=min_periods).mean()
+    roll_std = series.rolling(window, min_periods=min_periods).std()
+    return (series - roll_mean) / roll_std
 
 
 # ---------------------------------------------------------------------------
@@ -790,6 +820,12 @@ def send_sign_flip_alerts(sign_flip_df: pd.DataFrame, config: Dict[str, Any]) ->
     if flip_df.empty:
         return 0
 
+    # Filter to window=60 only to avoid alert spam from multi-window rows (Phase 97)
+    if "window" in flip_df.columns:
+        flip_df = flip_df[flip_df["window"] == 60]
+        if flip_df.empty:
+            return 0
+
     # Import Telegram module with graceful fallback
     try:
         from ta_lab2.notifications.telegram import is_configured, send_alert
@@ -943,6 +979,28 @@ def compute_crypto_macro_corr(
 
     ret_df["date"] = pd.to_datetime(ret_df["date"], utc=True).dt.date
 
+    # Filter to tier-1 assets only (Phase 97 requirement)
+    try:
+        with engine.connect() as conn:
+            tier1_ids = [
+                row[0]
+                for row in conn.execute(
+                    text("SELECT DISTINCT id FROM dim_assets WHERE pipeline_tier = 1")
+                ).fetchall()
+            ]
+        if tier1_ids:
+            before_count = ret_df["id"].nunique()
+            ret_df = ret_df[ret_df["id"].isin(tier1_ids)]
+            logger.info(
+                "XAGG-04: filtered to %d tier-1 assets (was %d)",
+                ret_df["id"].nunique(),
+                before_count,
+            )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "Could not load tier-1 asset filter (continuing with all assets): %s", exc
+        )
+
     # --- Load macro features ---
     macro_cols_needed = list(macro_var_columns.values())
     macro_cols_str = ", ".join(macro_cols_needed)
@@ -1062,6 +1120,7 @@ def compute_crypto_macro_corr(
                         "date": dt.date() if hasattr(dt, "date") else dt,
                         "asset_id": int(asset_id),
                         "macro_var": var_label,
+                        "window": corr_window,
                         "corr_60d": corr_val,
                         "prev_corr_60d": prev_val,
                         "sign_flip_flag": flip,
@@ -1120,6 +1179,322 @@ def compute_crypto_macro_corr(
 
 
 # ---------------------------------------------------------------------------
+# XAGG-05: BTC-equity multi-window rolling correlation
+# ---------------------------------------------------------------------------
+
+
+def compute_btc_equity_corr(
+    engine: Engine,
+    config: Dict[str, Any],
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+) -> pd.DataFrame:
+    """Compute multi-window rolling BTC-equity correlation with vol regime and divergence.
+
+    Phase 97 MACRO-02: For each equity index (SP500, NASDAQCOM, DJIA) and each
+    correlation window (30d, 60d, 90d, 180d):
+      1. Compute rolling Pearson correlation between BTC daily returns and equity daily returns
+      2. Classify equity vol regime (calm/elevated/crisis) from realized vol
+      3. Cross-validate vs VIX regime (vix_agreement_flag)
+      4. Compute divergence signal (dual-method: vol z-score spread + corr regime shift)
+
+    IMPORTANT: Equity returns are computed as .diff() on raw SP500/NASDAQCOM/DJIA level
+    from fred_macro_features (matching the existing vix/dxy pattern in XAGG-04).
+    Realized vol uses .pct_change() on equity levels for correct annualization.
+
+    Parameters
+    ----------
+    engine:
+        SQLAlchemy engine connected to the marketdata database.
+    config:
+        Cross-asset config dict (must have 'btc_equity' key).
+    start_date:
+        Optional override start date (ISO format). If None, uses watermark.
+    end_date:
+        Optional override end date (ISO format). If None, uses today.
+
+    Returns
+    -------
+    pd.DataFrame with columns: date, asset_id, macro_var, window, corr_60d,
+        prev_corr_60d, sign_flip_flag, corr_regime, equity_vol_regime,
+        vix_agreement_flag, realized_vol_z, vix_z, vol_spread, divergence_zscore,
+        divergence_flag
+    """
+    be_cfg = config.get("btc_equity", {})
+    corr_windows: List[int] = be_cfg.get("corr_windows", [30, 60, 90, 180])
+    equity_vars: Dict[str, str] = be_cfg.get(
+        "equity_macro_vars",
+        {"SP500": "sp500", "NASDAQCOM": "nasdaqcom"},
+    )
+    vol_thresholds: Dict[str, Any] = be_cfg.get(
+        "vol_regime_thresholds",
+        {"calm_upper": 15.0, "elevated_upper": 25.0},
+    )
+    div_zscore_threshold = float(be_cfg.get("divergence_zscore_threshold", 2.0))
+    sign_flip_threshold = float(
+        config.get("crypto_macro", {}).get("sign_flip_threshold", 0.3)
+    )
+
+    calm_upper = float(vol_thresholds.get("calm_upper", 15.0))
+    elevated_upper = float(vol_thresholds.get("elevated_upper", 25.0))
+
+    # Resolve date range using crypto_macro_corr_regimes watermark
+    wm = get_watermark(engine, "crypto_macro_corr_regimes")
+    start, end = _resolve_date_range(start_date, end_date, wm)
+    logger.info("BTC-equity corr compute window: %s to %s", start, end)
+
+    # --- Load BTC daily returns ---
+    # Filter to venue_id=1 (CMC_AGG) to avoid duplicate rows from multi-venue tables.
+    btc_id, _ = _lookup_btc_eth_ids(engine)
+    ret_sql = text(
+        'SELECT "timestamp"::date AS date, ret_arith '
+        "FROM returns_bars_multi_tf_u "
+        "WHERE tf = '1D' AND roll = FALSE AND alignment_source = 'multi_tf' "
+        "AND id = :btc_id AND venue_id = 1 "
+        'AND "timestamp"::date >= :start AND "timestamp"::date <= :end '
+        "ORDER BY date"
+    )
+    with engine.connect() as conn:
+        btc_df = pd.read_sql(
+            ret_sql, conn, params={"btc_id": btc_id, "start": start, "end": end}
+        )
+
+    if btc_df.empty:
+        logger.warning("No BTC return data for BTC-equity corr")
+        return pd.DataFrame()
+
+    btc_df["date"] = pd.to_datetime(btc_df["date"], utc=True).dt.date
+    btc_returns = btc_df.set_index("date")["ret_arith"].sort_index()
+    btc_returns.index = pd.DatetimeIndex(btc_returns.index)
+
+    # --- Load equity index raw levels + VIX from fred_macro_features ---
+    equity_cols = list(equity_vars.values())
+    cols_needed = equity_cols + ["vixcls"]
+    cols_str = ", ".join(cols_needed)
+    macro_sql = text(
+        f"SELECT date, {cols_str} "  # noqa: S608
+        "FROM fred.fred_macro_features "
+        "WHERE date >= :start AND date <= :end "
+        "ORDER BY date"
+    )
+    with engine.connect() as conn:
+        macro_df = pd.read_sql(macro_sql, conn, params={"start": start, "end": end})
+
+    if macro_df.empty:
+        logger.warning("No macro features for BTC-equity corr")
+        return pd.DataFrame()
+
+    macro_df["date"] = pd.to_datetime(macro_df["date"]).dt.date
+    macro_df = macro_df.set_index("date").sort_index()
+    macro_df.index = pd.DatetimeIndex(macro_df.index)
+
+    # --- Compute equity daily changes (use .diff() on raw level, matching vix/dxy pattern) ---
+    equity_changes: Dict[str, pd.Series] = {}
+    for var_label, col_name in equity_vars.items():
+        if col_name in macro_df.columns:
+            equity_changes[var_label] = macro_df[col_name].astype(float).diff()
+        else:
+            logger.warning(
+                "Equity column %s not found in fred_macro_features; skipping %s",
+                col_name,
+                var_label,
+            )
+
+    if not equity_changes:
+        logger.warning("No equity columns found for BTC-equity corr")
+        return pd.DataFrame()
+
+    vix_series: Optional[pd.Series] = (
+        macro_df["vixcls"].astype(float) if "vixcls" in macro_df.columns else None
+    )
+
+    # --- Align BTC returns to combined date range ---
+    all_index = btc_returns.index.union(macro_df.index)
+    btc_aligned = btc_returns.reindex(all_index)
+
+    # --- Compute multi-window correlations ---
+    all_rows: List[Dict[str, Any]] = []
+
+    for var_label, equity_change in equity_changes.items():
+        col_name = equity_vars[var_label]
+        equity_aligned = equity_change.reindex(all_index)
+
+        # Realized vol of equity for vol regime classification (21d rolling, annualized)
+        # Use pct_change() on raw levels (not .diff()) for proper vol scaling
+        if col_name in macro_df.columns:
+            equity_daily_ret = (
+                macro_df[col_name].astype(float).pct_change(fill_method=None)
+            )
+            equity_daily_ret_aligned = equity_daily_ret.reindex(all_index)
+            realized_vol_21d = (
+                equity_daily_ret_aligned.rolling(21, min_periods=17).std()
+                * (252**0.5)
+                * 100.0
+            )
+        else:
+            realized_vol_21d = pd.Series(float("nan"), index=all_index)
+
+        # VIX aligned for cross-validation
+        vix_aligned = (
+            vix_series.reindex(all_index)
+            if vix_series is not None
+            else pd.Series(float("nan"), index=all_index)
+        )
+
+        for window in corr_windows:
+            # Rolling Pearson correlation
+            roll_corr = btc_aligned.rolling(
+                window=window, min_periods=max(10, int(window * 0.5))
+            ).corr(equity_aligned)
+
+            prev_corr = roll_corr.shift(1)
+
+            # Convert to plain numpy arrays indexed by position for scalar access
+            roll_corr_vals = roll_corr.values
+            prev_corr_vals = prev_corr.values
+            rv_vals = realized_vol_21d.reindex(all_index).values
+            vix_vals = vix_aligned.reindex(all_index).values
+
+            for i, dt in enumerate(all_index):
+                corr_val = _to_python(roll_corr_vals[i])
+                if corr_val is None:
+                    continue
+
+                prev_val = _to_python(prev_corr_vals[i])
+                rv = _to_python(rv_vals[i])
+                vix_val = _to_python(vix_vals[i])
+
+                # Sign-flip detection
+                flip = False
+                if prev_val is not None:
+                    went_pos = (
+                        prev_val < -sign_flip_threshold
+                        and corr_val > sign_flip_threshold
+                    )
+                    went_neg = (
+                        prev_val > sign_flip_threshold
+                        and corr_val < -sign_flip_threshold
+                    )
+                    flip = went_pos or went_neg
+
+                # Correlation regime
+                if flip:
+                    regime = "flipping"
+                elif abs(corr_val) > sign_flip_threshold:
+                    regime = "correlated"
+                else:
+                    regime = "decorrelated"
+
+                # Equity vol regime (from 21d realized vol)
+                if rv is not None:
+                    if rv <= calm_upper:
+                        eq_vol_regime: Optional[str] = "calm"
+                    elif rv <= elevated_upper:
+                        eq_vol_regime = "elevated"
+                    else:
+                        eq_vol_regime = "crisis"
+                else:
+                    eq_vol_regime = None
+
+                # VIX-derived regime for cross-validation
+                vix_regime_val: Optional[str] = None
+                if vix_val is not None:
+                    if vix_val <= calm_upper:
+                        vix_regime_val = "calm"
+                    elif vix_val <= elevated_upper:
+                        vix_regime_val = "elevated"
+                    else:
+                        vix_regime_val = "crisis"
+
+                # VIX agreement flag: equity vol regime matches VIX-derived regime
+                vix_agreement: Optional[bool] = None
+                if eq_vol_regime is not None and vix_regime_val is not None:
+                    vix_agreement = eq_vol_regime == vix_regime_val
+
+                # Z-scores and divergence computed post-hoc (vectorized below)
+                all_rows.append(
+                    {
+                        "date": dt.date() if hasattr(dt, "date") else dt,
+                        "asset_id": btc_id,
+                        "macro_var": var_label,
+                        "window": window,
+                        "corr_60d": corr_val,  # Keep column name as-is (research finding #8)
+                        "prev_corr_60d": prev_val,
+                        "sign_flip_flag": flip,
+                        "corr_regime": regime,
+                        "equity_vol_regime": eq_vol_regime,
+                        "vix_agreement_flag": vix_agreement,
+                        "realized_vol_z": None,  # Filled below
+                        "vix_z": None,  # Filled below
+                        "vol_spread": None,  # Filled below
+                        "divergence_zscore": None,  # Filled below
+                        "divergence_flag": None,  # Filled below
+                    }
+                )
+
+    if not all_rows:
+        logger.warning("No BTC-equity correlation rows computed")
+        return pd.DataFrame()
+
+    result_df = pd.DataFrame(all_rows)
+
+    # --- Post-hoc vectorized computation of z-scores and divergence ---
+    # More efficient than per-row computation in the inner loop above.
+    for var_label in equity_changes:
+        col_name = equity_vars[var_label]
+        for window in corr_windows:
+            mask = (result_df["macro_var"] == var_label) & (
+                result_df["window"] == window
+            )
+            subset = result_df.loc[mask].copy().sort_values("date")
+
+            if subset.empty:
+                continue
+
+            dates = pd.DatetimeIndex(pd.to_datetime(subset["date"]))
+
+            # Realized vol z-score (63d rolling)
+            if col_name in macro_df.columns:
+                eq_ret = macro_df[col_name].astype(float).pct_change(fill_method=None)
+                rv_series = (
+                    eq_ret.rolling(21, min_periods=17).std() * (252**0.5) * 100.0
+                )
+                rv_aligned = rv_series.reindex(dates)
+                rv_z_series = _rolling_zscore_series(rv_aligned, 63)
+                result_df.loc[mask, "realized_vol_z"] = rv_z_series.values
+
+            # VIX z-score (63d rolling)
+            if vix_series is not None:
+                vix_aligned_sub = vix_series.reindex(dates)
+                vix_z_series = _rolling_zscore_series(vix_aligned_sub, 63)
+                result_df.loc[mask, "vix_z"] = vix_z_series.values
+
+                # Vol spread = realized_vol_z - vix_z
+                rv_z_vals = result_df.loc[mask, "realized_vol_z"].astype(float)
+                vix_z_vals = result_df.loc[mask, "vix_z"].astype(float)
+                vol_spread = rv_z_vals.values - vix_z_vals.values
+                result_df.loc[mask, "vol_spread"] = vol_spread
+
+                # Divergence z-score: rolling z-score of the vol_spread itself (63d)
+                vol_spread_series = pd.Series(vol_spread, index=range(len(vol_spread)))
+                div_z = _rolling_zscore_series(vol_spread_series, 63)
+                result_df.loc[mask, "divergence_zscore"] = div_z.values
+
+                # Divergence flag: |divergence_zscore| > threshold
+                result_df.loc[mask, "divergence_flag"] = (
+                    div_z.abs() > div_zscore_threshold
+                ).values
+
+    logger.info(
+        "BTC-equity corr: %d rows for %d equity vars x %d windows",
+        len(result_df),
+        len(equity_changes),
+        len(corr_windows),
+    )
+    return result_df
+
+
+# ---------------------------------------------------------------------------
 # XAGG-04 upserts
 # ---------------------------------------------------------------------------
 
@@ -1127,15 +1502,21 @@ def compute_crypto_macro_corr(
 def upsert_crypto_macro_corr(engine: Engine, df: pd.DataFrame) -> int:
     """Upsert crypto-macro correlation DataFrame into crypto_macro_corr_regimes.
 
-    Uses temp table + INSERT...ON CONFLICT(date, asset_id, macro_var) DO UPDATE.
+    Uses temp table + INSERT...ON CONFLICT(date, asset_id, macro_var, window) DO UPDATE.
+
+    Phase 97 update: window is now part of the PK. All 8 new columns (window,
+    equity_vol_regime, vix_agreement_flag, realized_vol_z, vix_z, vol_spread,
+    divergence_zscore, divergence_flag) are included when present in df.
 
     Parameters
     ----------
     engine:
         SQLAlchemy engine.
     df:
-        DataFrame with columns: date, asset_id, macro_var, corr_60d,
-        prev_corr_60d, sign_flip_flag, corr_regime.
+        DataFrame with columns: date, asset_id, macro_var, window, corr_60d,
+        prev_corr_60d, sign_flip_flag, corr_regime, and optionally:
+        equity_vol_regime, vix_agreement_flag, realized_vol_z, vix_z, vol_spread,
+        divergence_zscore, divergence_flag.
 
     Returns
     -------
@@ -1145,21 +1526,43 @@ def upsert_crypto_macro_corr(engine: Engine, df: pd.DataFrame) -> int:
         return 0
 
     df = df.copy()
+
+    # Backward compatibility: if no window column (old XAGG-04 call path), default to 60.
+    if "window" not in df.columns:
+        df["window"] = 60
+
     df = _sanitize_dataframe(df)
 
     col_list = [
         "date",
         "asset_id",
         "macro_var",
+        "window",
         "corr_60d",
         "prev_corr_60d",
         "sign_flip_flag",
         "corr_regime",
+        "equity_vol_regime",
+        "vix_agreement_flag",
+        "realized_vol_z",
+        "vix_z",
+        "vol_spread",
+        "divergence_zscore",
+        "divergence_flag",
     ]
     col_list = [c for c in col_list if c in df.columns]
-    cols_str = ", ".join(col_list)
-    update_cols = [c for c in col_list if c not in ("date", "asset_id", "macro_var")]
-    set_clause = ", ".join(f"{c} = EXCLUDED.{c}" for c in update_cols)
+    # 'window' is a PostgreSQL reserved word -- must be double-quoted in SQL.
+    # Build quoted column string for SQL but keep unquoted names for DataFrame access.
+    _reserved = {"window"}
+
+    def _q(name: str) -> str:
+        return f'"{name}"' if name in _reserved else name
+
+    cols_str = ", ".join(_q(c) for c in col_list)
+    update_cols = [
+        c for c in col_list if c not in ("date", "asset_id", "macro_var", "window")
+    ]
+    set_clause = ", ".join(f"{_q(c)} = EXCLUDED.{_q(c)}" for c in update_cols)
     set_clause += ", ingested_at = now()"
 
     with engine.begin() as conn:
@@ -1181,7 +1584,7 @@ def upsert_crypto_macro_corr(engine: Engine, df: pd.DataFrame) -> int:
             text(
                 f"INSERT INTO crypto_macro_corr_regimes ({cols_str}) "
                 f"SELECT {cols_str} FROM _crypto_macro_corr_staging "
-                f"ON CONFLICT (date, asset_id, macro_var) DO UPDATE SET {set_clause}"
+                f'ON CONFLICT (date, asset_id, macro_var, "window") DO UPDATE SET {set_clause}'
             )
         )
         row_count = result.rowcount

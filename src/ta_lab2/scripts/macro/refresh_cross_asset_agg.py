@@ -33,6 +33,7 @@ import time
 
 from ta_lab2.io import get_engine
 from ta_lab2.macro.cross_asset import (
+    compute_btc_equity_corr,
     compute_cross_asset_corr,
     compute_crypto_macro_corr,
     compute_funding_rate_agg,
@@ -342,8 +343,73 @@ Examples:
             print(f"[ERROR] XAGG-04 failed after {elapsed:.1f}s: {exc}")
             logger.exception("XAGG-04 raised an exception")
             any_failure = True
+
+        # -------------------------------------------------------------------
+        # XAGG-05: BTC-equity multi-window correlation (Phase 97)
+        # -------------------------------------------------------------------
+        if "btc_equity" in config and not any_failure:
+            print(f"\n{'-' * 70}")
+            print("XAGG-05: BTC-Equity Multi-Window Correlation (30/60/90/180d)")
+            print(f"{'-' * 70}")
+            t0 = time.perf_counter()
+            try:
+                btc_equity_df = compute_btc_equity_corr(
+                    engine, config, start_date=start_date, end_date=end_date
+                )
+                elapsed = time.perf_counter() - t0
+
+                if btc_equity_df.empty:
+                    print(
+                        "[WARN] No BTC-equity correlation data computed "
+                        "(BTC returns or equity macro data not available?)"
+                    )
+                else:
+                    n_windows = (
+                        btc_equity_df["window"].nunique()
+                        if "window" in btc_equity_df.columns
+                        else "?"
+                    )
+                    n_vars = btc_equity_df["macro_var"].nunique()
+                    print(
+                        f"[INFO] Computed {len(btc_equity_df)} rows for "
+                        f"{n_vars} equity vars x {n_windows} windows"
+                    )
+
+                    if args.dry_run:
+                        print(
+                            f"\n[DRY RUN] Would upsert {len(btc_equity_df)} rows to "
+                            "crypto_macro_corr_regimes"
+                        )
+                        print("\nSample output (last 10 rows):")
+                        print(
+                            btc_equity_df[
+                                [
+                                    "date",
+                                    "macro_var",
+                                    "window",
+                                    "corr_60d",
+                                    "equity_vol_regime",
+                                    "divergence_flag",
+                                ]
+                            ]
+                            .tail(10)
+                            .to_string()
+                        )
+                    else:
+                        n_eq = upsert_crypto_macro_corr(engine, btc_equity_df)
+                        print(
+                            f"[OK] XAGG-05 complete: {n_eq} BTC-equity corr rows "
+                            f"upserted in {elapsed:.1f}s"
+                        )
+
+            except Exception as exc:
+                elapsed = time.perf_counter() - t0
+                print(f"[ERROR] XAGG-05 failed after {elapsed:.1f}s: {exc}")
+                logger.exception("XAGG-05 raised an exception")
+                any_failure = True
+
     else:
-        print("\n[SKIP] XAGG-04 crypto-macro correlation (--skip-macro-corr)")
+        print("\n[SKIP] XAGG-04/05 crypto-macro correlation (--skip-macro-corr)")
 
     # -----------------------------------------------------------------------
     # Summary
