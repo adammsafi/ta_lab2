@@ -503,14 +503,22 @@ class EMAStateManager:
                 result[id_] = default_ts
                 continue
 
-            # Get minimum timestamp for this ID across all (tf, period) combinations
+            # Use the MAXIMUM watermark (most recent) across all (tf, period) combos.
+            # The old code used min(), which meant loading 15+ years of data even
+            # when only 4 new daily rows exist — because some very long TFs (7300D)
+            # had ancient watermarks. Using max() means we load from the most recent
+            # watermark. To ensure EMA warm-up correctness for all periods, we
+            # subtract a lookback of 2x the largest period (default 365*2 = 730 days).
             ts_series = pd.to_datetime(id_state[ts_col], errors="coerce")
             ts_series = ts_series.dropna()
 
             if ts_series.empty:
                 result[id_] = default_ts
             else:
-                result[id_] = ts_series.min()
+                max_ts = ts_series.max()
+                # Lookback: 2x largest period ensures EMA warm-up even for period=365
+                lookback = pd.Timedelta(days=730)
+                result[id_] = max_ts - lookback
 
         return result
 
