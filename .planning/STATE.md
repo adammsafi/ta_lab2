@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 
 ## Current Position
 
-Phase: 99 of 106 IN PROGRESS (Backtest Scaling) — Plan 04 complete
-Next: Phase 99 Plan 05 (backfill_mc_bands.py) or next queued plan
-Status: Plan 99-04 complete — Strategy Leaderboard dashboard page created with MC bands, PBO heatmap, CTF lineage
-Last activity: 2026-03-31 — Completed 99-04-PLAN.md (Strategy Leaderboard dashboard)
+Phase: 99 of 106 IN PROGRESS (Backtest Scaling) — Plans 01-04 complete
+Next: Phase 99 Plan 05 (data quality validation) or next queued plan
+Status: Plan 99-03 complete — BakeoffOrchestrator extended with data_loader_fn; run_mass_backtest.py + backfill_mc_bands.py created
+Last activity: 2026-03-31 — Completed 99-03-PLAN.md (orchestrator extensions + mass backtest scripts)
 
 Progress: [##########] 100% v1.2.0 | [████████░░] 46% v1.3.0 (12/26 plans, 3/6 phases)
 
@@ -126,6 +126,13 @@ Phase 99-02 decisions:
 - YAML grid structure: strategy_name.params list of flat dicts -- compatible with simple yaml.safe_load() + iteration
 - macd_crossover baseline for 3x comparison is registry.py grid_for() return of 3 (not _BAKEOFF_PARAM_GRIDS which lacks it)
 
+Phase 99-03 decisions:
+- data_loader_fn used in sequential mode (workers=1); data_loader_type/kwargs used in parallel mode to avoid pickle failures with partial()
+- BakeoffAssetTask.data_loader_type='ctf' reconstructs load_strategy_data_with_ctf() inside worker; avoids cross-process partial() pickle issues
+- mass_backtest_state tracks at (strategy, asset, params_hash) level; cost_bps=0.0 sentinel for 'all costs for this params combo'
+- Pre-flight check in backfill_mc_bands.py raises RuntimeError with migration guidance if mc_sharpe_lo/hi/median columns absent
+- load_strategy_data_with_ctf() validates columns via information_schema.columns before SELECT to avoid KeyError on absent CTF cols
+
 Phase 99-04 decisions:
 - ci_source column computed in load_leaderboard_with_mc() at query level (not display level): all callers get the correct source indicator
 - IC join in load_ctf_lineage() wrapped in try/except: missing ic_results data before CTF runs complete should not crash the lineage tab
@@ -156,9 +163,9 @@ Phase 99-04 decisions:
 ## Session Continuity
 
 Last session: 2026-03-31
-Stopped at: Completed 99-04-PLAN.md (Strategy Leaderboard dashboard page). Next: 99-05 or next queued plan.
+Stopped at: Completed 99-03-PLAN.md (BakeoffOrchestrator extension + run_mass_backtest.py + backfill_mc_bands.py). Next: 99-04 or 99-05.
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-31 (Phase 99-04 complete: Strategy Leaderboard dashboard)*
+*Last updated: 2026-03-31 (Phase 99-03 complete: mass backtest orchestrator + MC bands backfill)*
