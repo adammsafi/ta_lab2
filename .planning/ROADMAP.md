@@ -12,7 +12,7 @@
 - v1.0.1 Macro Regime Infrastructure (Phases 64-73) - SHIPPED 2026-03-03
 - v1.1.0 Pipeline Consolidation & Storage Optimization (Phases 74-79) - SHIPPED 2026-03-21
 - v1.2.0 Analysis → Live Signals (Phases 80-95) - SHIPPED 2026-03-29
-- v1.3.0 Operational Activation & Research Expansion (Phases 96-101) - IN PROGRESS
+- v1.3.0 Operational Activation & Research Expansion (Phases 96-106) - IN PROGRESS
 
 ## Overview
 
@@ -31,7 +31,7 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 - Phases 64-73: v1.0.1 (SHIPPED 2026-03-03)
 - Phases 74-79: v1.1.0 (SHIPPED 2026-03-21)
 - Phases 80-95: v1.2.0 (SHIPPED 2026-03-29)
-- Phases 96-101: v1.3.0 (IN PROGRESS)
+- Phases 96-106: v1.3.0 (IN PROGRESS)
 - Decimal phases (27.1, 28.1): Urgent insertions if needed
 
 <details>
@@ -1398,7 +1398,7 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 
 ### v1.3.0 Operational Activation & Research Expansion (In Progress)
 
-**Milestone Goal:** Make the built infrastructure actually run — activate paper trading, scale backtests to 460K+ runs, graduate CTF research features, expand macro coverage, and add ML signal combination.
+**Milestone Goal:** Make the built infrastructure actually run — activate paper trading, scale backtests to 460K+ runs, graduate CTF research features, expand macro coverage, add ML signal combination, and build a statistically rigorous indicator R&D pipeline covering traditional TA expansion, crypto-native indicators, parameter optimization, and custom composite development.
 
 - [x] **Phase 96: Executor Activation** - Seed strategies, wire signals into daily refresh, activate real IC-weighted BL, track live parity, add PnL attribution — COMPLETE 2026-03-30
 - [ ] **Phase 97: FRED Macro Expansion** - Add SP500/NASDAQ/DJIA to macro feature layer, rolling BTC-equity correlation, risk-on/off signals
@@ -1406,6 +1406,11 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 - [ ] **Phase 99: Backtest Scaling** - Resume-safe mass backtest orchestrator, partitioned trades table, 113K+ core runs, MC bands, CTF signal backtests, expanded grids, leaderboard dashboard
 - [ ] **Phase 100: ML Signal Combination** - LGBMRanker cross-sectional predictor, SHAP interaction analysis, XGBoost meta-label confidence filter
 - [ ] **Phase 101: Tech Debt Cleanup** - Remove orphaned export, create Phase 82/92 VERIFICATION.md, document CTF downstream consumers
+- [ ] **Phase 102: Indicator Research Framework** - Permutation IC test, FDR control, haircut Sharpe, trial registry, block bootstrap — the testing harness for all indicator R&D
+- [ ] **Phase 103: Traditional TA Expansion** - Add 20-30 well-known indicators (Ichimoku, Williams %R, Keltner, CCI, Elder Ray, Force Index, VWAP, VIDYA, FRAMA, etc.), IC sweep through Phase 102 harness
+- [ ] **Phase 104: Crypto-Native Indicators** - Venue-agnostic normalized input layer for OI/funding/volume, derive OI momentum, OI-price divergence, funding rate z-score, Force Index, liquidation pressure proxy
+- [ ] **Phase 105: Parameter Optimization** - Systematic parameter sweep (grid + Optuna) for surviving indicators, plateau preference, rolling stability test, DSR over full search space
+- [ ] **Phase 106: Custom Composite Indicators** - Proprietary indicators (AMA ER as regime signal, OI-divergence × CTF agreement, funding-adjusted momentum, cross-asset lead-lag), strictest validation tier
 
 ---
 
@@ -1439,11 +1444,11 @@ Plans:
   2. Derived features (returns, volatility, drawdown, MA ratios) for each equity index are computed and stored in `macro_features` table alongside existing FRED features
   3. `cross_asset.py` computes rolling BTC-SPX and BTC-NASDAQ correlation at 30/60/90-day windows and stores results in `cross_asset_corr`
   4. A risk-on/risk-off divergence signal fires when BTC-SPX rolling correlation crosses a configurable threshold, logged to the macro feature table or a signal table
-**Plans:** TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 97-01: Add SP500/NASDAQ/DJIA to fred_reader.py + derived features (returns, vol, drawdown, MA ratios)
-- [ ] 97-02: Rolling BTC-equity correlation + equity vol vs VIX + risk-on/off divergence signals
+- [ ] 97-01-PLAN.md -- FRED reader + feature computer + migration: SP500/NASDAQCOM/DJIA with 27 derived columns
+- [ ] 97-02-PLAN.md -- Multi-window BTC-equity correlation + vol regime + VIX cross-validation + divergence signals
 
 ---
 
@@ -1524,16 +1529,109 @@ Plans:
 
 ---
 
+### Phase 102: Indicator Research Framework
+**Goal:** Build a statistically rigorous testing harness for indicator discovery that controls for multiple comparisons, before testing any new indicators.
+**Depends on:** Phase 98 (IC sweep infrastructure, feature_selection pipeline)
+**Requirements:** IND-01, IND-02, IND-03, IND-04, IND-05
+**Success Criteria** (what must be TRUE):
+  1. A `permutation_ic_test()` function shuffles forward returns N times (default 1,000), computes IC on each shuffle, and returns empirical p-value; an indicator's IC must exceed the 95th percentile of the null distribution to be considered significant
+  2. A `fdr_control()` function implements Benjamini-Hochberg across a batch of indicator IC results and returns the subset that passes at a configurable FDR threshold (default 5%); tested with synthetic data where known-null indicators are correctly rejected
+  3. A `haircut_sharpe()` function implements Harvey & Liu (2015) adjustment that penalizes observed Sharpe based on the total number of indicators ever tested; reads from the trial registry
+  4. A `trial_registry` table (Alembic migration) logs every indicator × parameterization × timeframe × asset combination tested, with timestamp, IC, p-value, and pass/fail status; `SELECT COUNT(*) FROM trial_registry` is never zero after any IC sweep runs
+  5. A `block_bootstrap_ic()` function preserves autocorrelation structure via block bootstrap (configurable block size) when testing IC significance; produces confidence intervals that are wider than naive i.i.d. bootstrap for autocorrelated series
+**Plans:** TBD
+
+Plans:
+- [ ] 102-01: Alembic migration for trial_registry table + permutation IC test + FDR control functions
+- [ ] 102-02: Haircut Sharpe (Harvey & Liu 2015) + block bootstrap IC + integration with existing IC sweep scripts
+- [ ] 102-03: Wire trial registry logging into run_ic_sweep.py and run_ctf_ic_sweep.py + validation tests
+
+---
+
+### Phase 103: Traditional TA Expansion
+**Goal:** Add 20-30 well-known technical indicators to the indicator library, run each through the Phase 102 harness, and promote survivors to the features table.
+**Depends on:** Phase 102 (research framework must exist before testing)
+**Requirements:** IND-06, IND-07, IND-08
+**Success Criteria** (what must be TRUE):
+  1. `indicators.py` (or a new `indicators_extended.py`) exports at least 20 new indicator functions covering: Ichimoku Cloud (tenkan/kijun/senkou/chikou), Williams %R, Keltner Channels, CCI, Elder Ray (bull/bear power), Force Index, VWAP, Chaikin Money Flow, Chaikin Oscillator, Hurst exponent, VIDYA, FRAMA, Aroon, Trix, Ultimate Oscillator, Vortex Indicator, Ease of Movement, Mass Index, KST Oscillator, Coppock Curve
+  2. Every new indicator has a corresponding entry in `trial_registry` after the IC sweep; `SELECT COUNT(DISTINCT indicator_name) FROM trial_registry WHERE phase = 103` returns 20+
+  3. Indicators that pass FDR control at 5% are added to `dim_feature_registry` with `is_active = true`; rejects are logged with `is_active = false` and their IC/p-values preserved for audit
+**Plans:** TBD
+
+Plans:
+- [ ] 103-01: Implement first batch of indicators (Ichimoku, Williams %R, Keltner, CCI, Elder Ray, Force Index, VWAP, Chaikin MF, Chaikin Osc, Hurst)
+- [ ] 103-02: Implement second batch (VIDYA, FRAMA, Aroon, Trix, Ultimate Osc, Vortex, Ease of Movement, Mass Index, KST, Coppock)
+- [ ] 103-03: Full IC sweep of all new indicators through Phase 102 harness, promote survivors, log rejects
+
+---
+
+### Phase 104: Crypto-Native Indicators
+**Goal:** Build a venue-agnostic normalized input layer for OI/funding/volume data and derive crypto-specific indicators, validated through the Phase 102 harness.
+**Depends on:** Phase 102 (research framework), Phase 103 (indicator patterns established)
+**Requirements:** IND-09, IND-10, IND-11, IND-12
+**Success Criteria** (what must be TRUE):
+  1. A normalized input layer (views or ETL functions) maps venue-specific tables (`hl_open_interest`, `hl_funding_rates`, `hl_candles`, future `bybit_*`/`binance_*`) into a unified schema: `(asset_id, venue_id, ts, oi, funding_rate, volume, close)` — adding a new venue requires only a new mapper, not indicator code changes
+  2. At least 8 crypto-native indicator functions are implemented: OI momentum (rate of change), OI-price divergence (z-score), funding rate z-score, funding rate momentum, volume-OI regime classifier (Kaufman Ch.12 matrix), Force Index (Elder), OI concentration ratio, liquidation pressure proxy (extreme funding + rising OI)
+  3. All crypto-native indicators have trial_registry entries; survivors pass FDR at 5% and are promoted to `dim_feature_registry` with `source_type = 'crypto_native'`
+  4. The normalized layer handles missing venue data gracefully (venue not yet onboarded returns empty DataFrame, not an error); tested with at least one mock venue
+**Plans:** TBD
+
+Plans:
+- [ ] 104-01: Venue-agnostic normalized input layer + mapper for Hyperliquid tables
+- [ ] 104-02: Implement crypto-native indicators (OI momentum, OI-price divergence, funding z-score, funding momentum, volume-OI regime, Force Index, OI concentration, liquidation pressure)
+- [ ] 104-03: IC sweep through Phase 102 harness, promote survivors, log rejects
+
+---
+
+### Phase 105: Parameter Optimization
+**Goal:** Systematic parameter sweep for all indicators that survived Phases 103-104, using overfitting-aware methods that prefer broad plateaus over sharp peaks.
+**Depends on:** Phase 103, Phase 104 (surviving indicators to optimize)
+**Requirements:** IND-13, IND-14, IND-15
+**Success Criteria** (what must be TRUE):
+  1. A parameter sweep framework runs grid search or Optuna Bayesian search over each surviving indicator's parameter space; results stored in `trial_registry` with `sweep_id` grouping all parameter variants of the same indicator
+  2. A `plateau_score()` function measures the width of the IC-positive region around the optimal parameter set (e.g., fraction of neighboring parameters within 80% of peak IC); parameters are selected from the broadest plateau, not the sharpest peak
+  3. A `rolling_stability_test()` runs the optimal parameter set on 5+ non-overlapping time windows and rejects parameters where IC sign flips in >1 window or IC coefficient of variation exceeds a threshold
+  4. DSR is computed over the full parameter search space (total N = all parameter combinations tested for that indicator), not just the winning parameter; the DSR-adjusted Sharpe is stored alongside the raw Sharpe in trial_registry
+**Plans:** TBD
+
+Plans:
+- [ ] 105-01: Parameter sweep framework (grid + Optuna modes) with trial_registry integration and sweep_id grouping
+- [ ] 105-02: Plateau scoring + rolling stability test + DSR over full search space
+- [ ] 105-03: Execute parameter sweeps for Phase 103-104 survivors, select final parameterizations
+
+---
+
+### Phase 106: Custom Composite Indicators
+**Goal:** Develop proprietary composite indicators that combine multiple signal sources into novel features not available off-the-shelf, validated under the strictest testing regime (full CPCV + permutation + FDR + held-out validation).
+**Depends on:** Phase 105 (optimized base indicators available as building blocks)
+**Requirements:** IND-16, IND-17, IND-18
+**Success Criteria** (what must be TRUE):
+  1. At least 6 custom composite indicators are implemented: AMA efficiency ratio as regime signal (Kaufman insight), OI-divergence × CTF agreement interaction, funding-adjusted momentum (momentum penalized by extreme funding), cross-asset lead-lag composite (Asset A's CTF predicts Asset B), TF alignment score (count of agreeing timeframes as meta-feature), volume-regime gated trend (trend signal suppressed when volume-OI says congestion)
+  2. Each composite is validated with the full battery: permutation IC test (p < 0.05), FDR control across all composites, CPCV with purge+embargo, AND a held-out time period (most recent 20% of data) never used during development
+  3. Composites that pass all four validation layers are promoted to `dim_feature_registry` with `source_type = 'proprietary'` and documented with their construction logic; at least 2 composites survive the full gauntlet
+**Plans:** TBD
+
+Plans:
+- [ ] 106-01: Implement composite indicators (AMA ER regime, OI×CTF interaction, funding-adjusted momentum, lead-lag composite, TF alignment score, volume-regime gated trend)
+- [ ] 106-02: Full validation gauntlet (permutation + FDR + CPCV + held-out) and promotion of survivors
+
+---
+
 ### v1.3.0 Progress
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 96. Executor Activation | 0/4 | Planned | - |
+| 96. Executor Activation | 4/4 | Complete | 2026-03-30 |
 | 97. FRED Macro Expansion | 0/TBD | Not started | - |
 | 98. CTF Feature Graduation | 0/TBD | Not started | - |
 | 99. Backtest Scaling | 0/TBD | Not started | - |
 | 100. ML Signal Combination | 0/TBD | Not started | - |
 | 101. Tech Debt Cleanup | 0/TBD | Not started | - |
+| 102. Indicator Research Framework | 0/TBD | Not started | - |
+| 103. Traditional TA Expansion | 0/TBD | Not started | - |
+| 104. Crypto-Native Indicators | 0/TBD | Not started | - |
+| 105. Parameter Optimization | 0/TBD | Not started | - |
+| 106. Custom Composite Indicators | 0/TBD | Not started | - |
 
 ### v1.3.0 Requirement Coverage
 
@@ -1545,8 +1643,13 @@ Plans:
 | Backtest Expansion | BT-01, BT-02, BT-03, BT-04, BT-05, BT-06, BT-07 | Phase 99 | 7 |
 | ML Signal Combination | ML-01, ML-02, ML-03 | Phase 100 | 3 |
 | Tech Debt Cleanup | DEBT-01, DEBT-02, DEBT-03, DEBT-04 | Phase 101 | 4 |
+| Indicator Research Framework | IND-01, IND-02, IND-03, IND-04, IND-05 | Phase 102 | 5 |
+| Traditional TA Expansion | IND-06, IND-07, IND-08 | Phase 103 | 3 |
+| Crypto-Native Indicators | IND-09, IND-10, IND-11, IND-12 | Phase 104 | 4 |
+| Parameter Optimization | IND-13, IND-14, IND-15 | Phase 105 | 3 |
+| Custom Composites | IND-16, IND-17, IND-18 | Phase 106 | 3 |
 
-**Coverage:** 26/26 requirements mapped
+**Coverage:** 44/44 requirements mapped
 
 *Created: 2025-01-22*
-*Last updated: 2026-03-29 (v1.3.0 roadmap created, Phases 96-101)*
+*Last updated: 2026-03-30 (Phases 102-106 added: Indicator R&D pipeline — research framework, TA expansion, crypto-native indicators, parameter optimization, custom composites)*
