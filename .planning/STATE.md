@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 
 ## Current Position
 
-Phase: 99 of 106 IN PROGRESS (Backtest Scaling) — Plan 02 complete
-Next: Phase 99 Plan 03 (run_mass_backtest.py script)
-Status: Plan 99-02 complete — CTF signal adapter registered, expanded YAML grids created
-Last activity: 2026-03-31 — Completed 99-02-PLAN.md (CTF signal + param grids)
+Phase: 99 of 106 IN PROGRESS (Backtest Scaling) — Plan 04 complete
+Next: Phase 99 Plan 05 (backfill_mc_bands.py) or next queued plan
+Status: Plan 99-04 complete — Strategy Leaderboard dashboard page created with MC bands, PBO heatmap, CTF lineage
+Last activity: 2026-03-31 — Completed 99-04-PLAN.md (Strategy Leaderboard dashboard)
 
-Progress: [##########] 100% v1.2.0 | [███████░░░] 42% v1.3.0 (11/26 plans, 3/6 phases)
+Progress: [##########] 100% v1.2.0 | [████████░░] 46% v1.3.0 (12/26 plans, 3/6 phases)
 
 ## Performance Metrics
 
@@ -126,6 +126,12 @@ Phase 99-02 decisions:
 - YAML grid structure: strategy_name.params list of flat dicts -- compatible with simple yaml.safe_load() + iteration
 - macd_crossover baseline for 3x comparison is registry.py grid_for() return of 3 (not _BAKEOFF_PARAM_GRIDS which lacks it)
 
+Phase 99-04 decisions:
+- ci_source column computed in load_leaderboard_with_mc() at query level (not display level): all callers get the correct source indicator
+- IC join in load_ctf_lineage() wrapped in try/except: missing ic_results data before CTF runs complete should not crash the lineage tab
+- PBO heatmap always uses cv_method='cpcv' regardless of sidebar selection: PBO is only meaningful from CPCV runs
+- load_pbo_heatmap_data() uses groupby().mean() before unstack(): collapses multiple param combos per (strategy, asset) to a single representative PBO value
+
 ### Pending Todos
 
 7 pending todos resolved into v1.3.0 phases:
@@ -150,9 +156,9 @@ Phase 99-02 decisions:
 ## Session Continuity
 
 Last session: 2026-03-31
-Stopped at: Completed 99-02-PLAN.md (CTF signal adapter + expanded param grids). Next: 99-03.
+Stopped at: Completed 99-04-PLAN.md (Strategy Leaderboard dashboard page). Next: 99-05 or next queued plan.
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-31 (Phase 98 verified and complete)*
+*Last updated: 2026-03-31 (Phase 99-04 complete: Strategy Leaderboard dashboard)*
