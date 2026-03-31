@@ -93,8 +93,7 @@ def build_asset_stats_command(
         cmd.extend(["--workers", str(workers)])
     if db_url:
         cmd.extend(["--db-url", db_url])
-    if verbose:
-        cmd.append("--verbose")
+    # Note: --verbose is NOT passed to sub-scripts (not all accept it).
 
     return cmd
 
@@ -134,8 +133,7 @@ def build_correlation_command(
         cmd.extend(["--workers", str(workers)])
     if db_url:
         cmd.extend(["--db-url", db_url])
-    if verbose:
-        cmd.append("--verbose")
+    # Note: --verbose is NOT passed to sub-scripts (not all accept it).
 
     return cmd
 
