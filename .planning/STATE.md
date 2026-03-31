@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 
 ## Current Position
 
-Phase: 98 of 106 (CTF Feature Graduation) — Plan 01 complete
-Next: Phase 98 Plan 02 (asset-specific CTF feature selection)
-Status: In progress (Plan 98-01 complete)
-Last activity: 2026-03-31 — Completed 98-01-PLAN.md (schema migration + ETL bridge)
+Phase: 98 of 106 (CTF Feature Graduation) — Plan 02 complete
+Next: Phase 98 Plan 03 (cross-asset CTF composites)
+Status: In progress (Plans 98-01 and 98-02 complete)
+Last activity: 2026-03-31 — Completed 98-02-PLAN.md (per-asset CTF feature selection)
 
-Progress: [##########] 100% v1.2.0 | [████░░░░░░] 27% v1.3.0 (7/26 plans, 2/6 phases)
+Progress: [##########] 100% v1.2.0 | [████░░░░░░] 31% v1.3.0 (8/26 plans, 2/6 phases)
 
 ## Performance Metrics
 
@@ -92,6 +92,13 @@ Phase 98-01 decisions:
 - Pre-flight check (information_schema.columns) raises RuntimeError if migration not applied before write
 - base_tf in YAML is placeholder '1D' -- promoted feature set same for all base_tfs (IC computed cross-asset)
 
+Phase 98-02 decisions:
+- Per-asset IC uses ABS(ic) > threshold (single asset value, not PERCENTILE_CONT) -- correct for single-asset evaluation
+- Asset-specific additions = per_asset_passing - global_features; only write additions not already in global tier
+- Write only asset-specific rows to dim_feature_selection_asset; superset is logical construct at query time
+- All 98 assets have CTF IC data; all 98 have asset-specific additions (53-164 per asset, 10,716 total rows)
+- dim_feature_selection verified unchanged at 205 rows before and after run (no TRUNCATE damage)
+
 ### Pending Todos
 
 7 pending todos resolved into v1.3.0 phases:
@@ -116,9 +123,9 @@ Phase 98-01 decisions:
 ## Session Continuity
 
 Last session: 2026-03-31
-Stopped at: Phase 98 Plan 01 COMPLETE. Next: Phase 98 Plan 02 (asset-specific CTF feature selection).
+Stopped at: Phase 98 Plan 02 COMPLETE. Next: Phase 98 Plan 03 (cross-asset CTF composites).
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-31 (Phase 98-01 complete: CTF schema migration + ETL bridge)*
+*Last updated: 2026-03-31 (Phase 98-02 complete: per-asset CTF feature selection)*
