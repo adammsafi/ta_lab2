@@ -33,8 +33,8 @@
 
 ### Macro Expansion
 
-- [ ] **MACRO-01**: SP500, NASDAQ Composite, and DJIA added to FRED macro feature layer (`fred_reader.py` SERIES_TO_LOAD) with derived features (returns, vol, drawdown, MA ratios)
-- [ ] **MACRO-02**: Rolling BTC-SPX and BTC-NASDAQ correlation computed in `cross_asset.py`, equity vol regime vs VIX cross-validation, risk-on/risk-off divergence signals
+- [x] **MACRO-01**: SP500, NASDAQ Composite, and DJIA added to FRED macro feature layer (`fred_reader.py` SERIES_TO_LOAD) with derived features (returns, vol, drawdown, MA ratios)
+- [x] **MACRO-02**: Rolling BTC-SPX and BTC-NASDAQ correlation computed in `cross_asset.py`, equity vol regime vs VIX cross-validation, risk-on/risk-off divergence signals
 
 ### ML Signal Combination
 
@@ -97,8 +97,8 @@
 | CTF-02 | Phase 98 | Pending |
 | CTF-03 | Phase 98 | Pending |
 | CTF-04 | Phase 98 | Pending |
-| MACRO-01 | Phase 97 | Pending |
-| MACRO-02 | Phase 97 | Pending |
+| MACRO-01 | Phase 97 | Complete |
+| MACRO-02 | Phase 97 | Complete |
 | ML-01 | Phase 100 | Pending |
 | ML-02 | Phase 100 | Pending |
 | ML-03 | Phase 100 | Pending |

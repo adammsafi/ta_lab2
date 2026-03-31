@@ -1401,7 +1401,7 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 **Milestone Goal:** Make the built infrastructure actually run — activate paper trading, scale backtests to 460K+ runs, graduate CTF research features, expand macro coverage, add ML signal combination, and build a statistically rigorous indicator R&D pipeline covering traditional TA expansion, crypto-native indicators, parameter optimization, and custom composite development.
 
 - [x] **Phase 96: Executor Activation** - Seed strategies, wire signals into daily refresh, activate real IC-weighted BL, track live parity, add PnL attribution — COMPLETE 2026-03-30
-- [ ] **Phase 97: FRED Macro Expansion** - Add SP500/NASDAQ/DJIA to macro feature layer, rolling BTC-equity correlation, risk-on/off signals
+- [x] **Phase 97: FRED Macro Expansion** - Add SP500/NASDAQ/DJIA to macro feature layer, rolling BTC-equity correlation, risk-on/off signals — COMPLETE 2026-03-31
 - [ ] **Phase 98: CTF Feature Graduation** - Materialize top CTF features into features table, asset-specific selection tier, cross-asset composites, lead-lag IC matrix
 - [ ] **Phase 99: Backtest Scaling** - Resume-safe mass backtest orchestrator, partitioned trades table, 113K+ core runs, MC bands, CTF signal backtests, expanded grids, leaderboard dashboard
 - [ ] **Phase 100: ML Signal Combination** - LGBMRanker cross-sectional predictor, SHAP interaction analysis, XGBoost meta-label confidence filter
@@ -1442,13 +1442,13 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. `fred_reader.py` SERIES_TO_LOAD includes SP500, NASDAQCOM, and DJIA; `SELECT DISTINCT series_id FROM fred.series_values` returns all three after a sync run
   2. Derived features (returns, volatility, drawdown, MA ratios) for each equity index are computed and stored in `macro_features` table alongside existing FRED features
-  3. `cross_asset.py` computes rolling BTC-SPX and BTC-NASDAQ correlation at 30/60/90-day windows and stores results in `cross_asset_corr`
+  3. `cross_asset.py` computes rolling BTC-SPX and BTC-NASDAQ correlation at 30/60/90/180-day windows and stores results in `crypto_macro_corr_regimes`
   4. A risk-on/risk-off divergence signal fires when BTC-SPX rolling correlation crosses a configurable threshold, logged to the macro feature table or a signal table
 **Plans:** 2 plans
 
 Plans:
-- [ ] 97-01-PLAN.md -- FRED reader + feature computer + migration: SP500/NASDAQCOM/DJIA with 27 derived columns
-- [ ] 97-02-PLAN.md -- Multi-window BTC-equity correlation + vol regime + VIX cross-validation + divergence signals
+- [x] 97-01-PLAN.md -- FRED reader + feature computer + migration: SP500/NASDAQCOM/DJIA with 27 derived columns
+- [x] 97-02-PLAN.md -- Multi-window BTC-equity correlation + vol regime + VIX cross-validation + divergence signals
 
 ---
 
