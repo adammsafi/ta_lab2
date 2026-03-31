@@ -82,6 +82,9 @@ from ta_lab2.scripts.refresh_utils import (
 TIMEOUT_BARS = 7200  # 2 hours -- bar builders can be slow for full rebuilds
 TIMEOUT_EMAS = 3600  # 1 hour -- EMA refreshers
 TIMEOUT_AMAS = 3600  # 1 hour -- AMA refreshers
+TIMEOUT_RETURNS_BARS = 1800  # 30 minutes -- bar returns (incremental, per-id SQL LAG)
+TIMEOUT_RETURNS_EMA = 1800  # 30 minutes -- EMA returns (incremental, per-key watermark)
+TIMEOUT_RETURNS_AMA = 3600  # 1 hour -- AMA returns (incremental, 5 alignment sources)
 TIMEOUT_DESC_STATS = 3600  # 1 hour -- asset stats + correlation computation
 TIMEOUT_REGIMES = 1800  # 30 minutes -- regime refresher
 TIMEOUT_FEATURES = 7200  # 2 hours -- feature refresh for 492 assets at 1D (vol/ta/ctf phases, ~101min observed)
@@ -120,8 +123,11 @@ TIMEOUT_PIPELINE_ALERT = 60  # 1 minute -- Telegram send only
 STAGE_ORDER = [
     "sync_vms",
     "bars",
+    "returns_bars",
     "emas",
+    "returns_ema",
     "amas",
+    "returns_ama",
     "desc_stats",
     "macro_features",
     "macro_regimes",
@@ -512,6 +518,122 @@ def run_ama_refreshers(
             returncode=-1,
             error_message=error_msg,
         )
+
+
+def _run_returns_subprocess(
+    component_name: str,
+    cmd: list[str],
+    timeout: int,
+    args,
+) -> ComponentResult:
+    """Generic subprocess runner for returns refresh stages."""
+    print(f"\n{'=' * 70}")
+    print(f"RUNNING {component_name.upper()}")
+    print(f"{'=' * 70}")
+    print(f"Command: {' '.join(cmd)}")
+
+    if args.dry_run:
+        print(f"[DRY RUN] Would execute {component_name}")
+        return ComponentResult(
+            component=component_name, success=True, duration_sec=0.0, returncode=0
+        )
+
+    import time as _time
+
+    start = _time.perf_counter()
+    try:
+        if args.verbose:
+            result = subprocess.run(cmd, check=False, timeout=timeout)
+        else:
+            result = subprocess.run(
+                cmd, check=False, capture_output=True, text=True, timeout=timeout
+            )
+            if result.returncode != 0:
+                print(
+                    f"\n[ERROR] {component_name} failed with code {result.returncode}"
+                )
+                if result.stdout:
+                    print(f"\nSTDOUT (last 500 chars):\n{result.stdout[-500:]}")
+                if result.stderr:
+                    print(f"\nSTDERR (last 500 chars):\n{result.stderr[-500:]}")
+
+        duration = _time.perf_counter() - start
+        if result.returncode == 0:
+            print(f"\n[OK] {component_name} completed successfully in {duration:.1f}s")
+            return ComponentResult(
+                component=component_name,
+                success=True,
+                duration_sec=duration,
+                returncode=0,
+            )
+        else:
+            error_msg = f"Exited with code {result.returncode}"
+            print(f"\n[FAILED] {component_name} failed: {error_msg}")
+            return ComponentResult(
+                component=component_name,
+                success=False,
+                duration_sec=duration,
+                returncode=result.returncode,
+                error_message=error_msg,
+            )
+    except subprocess.TimeoutExpired:
+        duration = _time.perf_counter() - start
+        error_msg = f"Timed out after {timeout}s"
+        print(f"\n[TIMEOUT] {component_name}: {error_msg}")
+        return ComponentResult(
+            component=component_name,
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+
+
+def run_returns_bars(args, db_url: str) -> ComponentResult:
+    """Run bar returns refresh via subprocess."""
+    cmd = [
+        sys.executable,
+        "-m",
+        "ta_lab2.scripts.returns.refresh_returns_bars_multi_tf",
+        "--ids",
+        args.ids,
+        "--db-url",
+        db_url,
+    ]
+    if args.num_processes:
+        cmd.extend(["--workers", str(args.num_processes)])
+    return _run_returns_subprocess("bar returns", cmd, TIMEOUT_RETURNS_BARS, args)
+
+
+def run_returns_ema(args, db_url: str) -> ComponentResult:
+    """Run EMA returns refresh via subprocess."""
+    cmd = [
+        sys.executable,
+        "-m",
+        "ta_lab2.scripts.returns.refresh_returns_ema_multi_tf",
+        "--ids",
+        args.ids,
+    ]
+    if args.num_processes:
+        cmd.extend(["--workers", str(args.num_processes)])
+    return _run_returns_subprocess("EMA returns", cmd, TIMEOUT_RETURNS_EMA, args)
+
+
+def run_returns_ama(args, db_url: str) -> ComponentResult:
+    """Run AMA returns refresh via subprocess."""
+    cmd = [
+        sys.executable,
+        "-m",
+        "ta_lab2.scripts.amas.refresh_returns_ama",
+        "--ids",
+        args.ids,
+        "--all-tfs",
+        "--source",
+        "all",
+    ]
+    if args.num_processes:
+        cmd.extend(["-n", str(args.num_processes)])
+    return _run_returns_subprocess("AMA returns", cmd, TIMEOUT_RETURNS_AMA, args)
 
 
 def run_desc_stats_refresher(
@@ -3591,8 +3713,11 @@ Examples:
         args, "no_sync_vms", False
     )
     run_bars = args.bars or args.all
+    run_returns_bars_flag = args.all  # Returns run automatically in --all mode
     run_emas = args.emas or args.all
+    run_returns_ema_flag = args.all
     run_amas = args.amas or args.all
+    run_returns_ama_flag = args.all
     run_desc_stats = args.desc_stats or args.all
     run_macro = (args.macro or args.all) and not getattr(args, "no_macro", False)
     run_macro_regimes_flag = (args.macro_regimes or args.all) and not getattr(
@@ -3632,10 +3757,16 @@ Examples:
             run_sync_vms = False
         if "bars" in skip_stages:
             run_bars = False
+        if "returns_bars" in skip_stages:
+            run_returns_bars_flag = False
         if "emas" in skip_stages:
             run_emas = False
+        if "returns_ema" in skip_stages:
+            run_returns_ema_flag = False
         if "amas" in skip_stages:
             run_amas = False
+        if "returns_ama" in skip_stages:
+            run_returns_ama_flag = False
         if "desc_stats" in skip_stages:
             run_desc_stats = False
         if "macro_features" in skip_stages:
@@ -3675,10 +3806,16 @@ Examples:
         components.append("sync_vms")
     if run_bars:
         components.append("bars")
+    if run_returns_bars_flag:
+        components.append("returns_bars")
     if run_emas:
         components.append("EMAs")
+    if run_returns_ema_flag:
+        components.append("returns_ema")
     if run_amas:
         components.append("AMAs")
+    if run_returns_ama_flag:
+        components.append("returns_ama")
     if run_desc_stats:
         components.append("desc_stats")
     if run_macro:
@@ -3765,6 +3902,14 @@ Examples:
             print("(Use --continue-on-error to run remaining components)")
             return 1
 
+    # Run bar returns if requested (after bars, before EMAs)
+    if run_returns_bars_flag:
+        ret_bars_result = run_returns_bars(args, db_url)
+        results.append(("returns_bars", ret_bars_result))
+        if not ret_bars_result.success and not args.continue_on_error:
+            print("\n[STOPPED] Bar returns failed, stopping execution")
+            return 1
+
     # Run EMAs if requested
     if run_emas:
         # Check bar freshness first (unless --skip-stale-check)
@@ -3808,6 +3953,14 @@ Examples:
             print("(Use --continue-on-error to run remaining components)")
             return 1
 
+    # Run EMA returns if requested (after EMAs, before AMAs)
+    if run_returns_ema_flag:
+        ret_ema_result = run_returns_ema(args, db_url)
+        results.append(("returns_ema", ret_ema_result))
+        if not ret_ema_result.success and not args.continue_on_error:
+            print("\n[STOPPED] EMA returns failed, stopping execution")
+            return 1
+
     # Run AMAs if requested (after EMAs, before regimes)
     if run_amas:
         # Use same IDs as EMAs when running --all (fresh bar IDs); otherwise use parsed_ids
@@ -3818,6 +3971,14 @@ Examples:
         if not ama_result.success and not args.continue_on_error:
             print("\n[STOPPED] AMA refreshers failed, stopping execution")
             print("(Use --continue-on-error to run remaining components)")
+            return 1
+
+    # Run AMA returns if requested (after AMAs, before desc_stats)
+    if run_returns_ama_flag:
+        ret_ama_result = run_returns_ama(args, db_url)
+        results.append(("returns_ama", ret_ama_result))
+        if not ret_ama_result.success and not args.continue_on_error:
+            print("\n[STOPPED] AMA returns failed, stopping execution")
             return 1
 
     # Run desc stats if requested (after AMAs, before macro and regimes)
