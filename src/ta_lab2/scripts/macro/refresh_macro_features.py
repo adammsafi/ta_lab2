@@ -83,6 +83,38 @@ _FEATURE_GROUPS = [
     ),
     ("FRED-14 carry_momentum", ["carry_momentum"]),
     ("FRED-15 cpi_proxy", ["cpi_surprise_proxy"]),
+    (
+        "Phase97 equity_indices",
+        [
+            "sp500",
+            "nasdaqcom",
+            "djia",
+            "sp500_ret_1d",
+            "sp500_ret_5d",
+            "sp500_ret_21d",
+            "sp500_ret_63d",
+            "sp500_vol_21d",
+            "sp500_drawdown_pct",
+            "sp500_ma_ratio_50_200d",
+            "sp500_zscore_252d",
+            "nasdaqcom_ret_1d",
+            "nasdaqcom_ret_5d",
+            "nasdaqcom_ret_21d",
+            "nasdaqcom_ret_63d",
+            "nasdaqcom_vol_21d",
+            "nasdaqcom_drawdown_pct",
+            "nasdaqcom_ma_ratio_50_200d",
+            "nasdaqcom_zscore_252d",
+            "djia_ret_1d",
+            "djia_ret_5d",
+            "djia_ret_21d",
+            "djia_ret_63d",
+            "djia_vol_21d",
+            "djia_drawdown_pct",
+            "djia_ma_ratio_50_200d",
+            "djia_zscore_252d",
+        ],
+    ),
 ]
 
 # Critical columns for staleness check (recent rows should not be all-NaN)
@@ -91,6 +123,7 @@ _STALENESS_CHECK_COLS = [
     "nfci_level",
     "dexjpus_level",
     "fed_regime_structure",
+    "sp500",  # Phase 97
 ]
 
 

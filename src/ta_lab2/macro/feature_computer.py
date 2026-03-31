@@ -389,6 +389,82 @@ def compute_derived_features_66(df: pd.DataFrame) -> pd.DataFrame:
     return result
 
 
+# -- Phase 97: Per-series equity index derived features ----------------
+
+# Series that get the generic per-series derived feature set (Phase 97)
+_EQUITY_INDEX_SERIES = ["SP500", "NASDAQCOM", "DJIA"]
+
+
+def compute_per_series_features_97(df: pd.DataFrame) -> pd.DataFrame:
+    """Compute generic derived features for each equity index series.
+
+    For each series in _EQUITY_INDEX_SERIES, computes 8 derived columns:
+      {prefix}_ret_1d     - 1-day return (pct_change(1) * 100.0)
+      {prefix}_ret_5d     - 5-day return (pct_change(5) * 100.0)
+      {prefix}_ret_21d    - 21-day return (pct_change(21) * 100.0)
+      {prefix}_ret_63d    - 63-day return (pct_change(63) * 100.0)
+      {prefix}_vol_21d    - 21-day rolling volatility of daily returns
+      {prefix}_drawdown_pct  - Drawdown from rolling max (negative values)
+      {prefix}_ma_ratio_50_200d - 50d MA / 200d MA ratio
+      {prefix}_zscore_252d - 252-day rolling z-score (using existing _rolling_zscore)
+
+    Called AFTER compute_derived_features_66(). Raw FRED series are still
+    uppercase at this point (rename happens later).
+
+    PATTERN: Uses .pct_change(N) * 100.0 and min_periods = 0.8 * window,
+    matching DEXJPUS precedent from compute_derived_features_66().
+    """
+    result = df.copy()
+
+    for series_id in _EQUITY_INDEX_SERIES:
+        if series_id not in result.columns:
+            logger.warning(
+                "Equity index %s not in DataFrame columns -- skipping derived features. "
+                "Ensure %s is in SERIES_TO_LOAD and fred.series_values has data.",
+                series_id,
+                series_id,
+            )
+            # Write NaN placeholders for all 8 derived columns
+            prefix = series_id.lower()
+            for suffix in [
+                "ret_1d",
+                "ret_5d",
+                "ret_21d",
+                "ret_63d",
+                "vol_21d",
+                "drawdown_pct",
+                "ma_ratio_50_200d",
+                "zscore_252d",
+            ]:
+                result[f"{prefix}_{suffix}"] = float("nan")
+            continue
+
+        raw = result[series_id]
+        prefix = series_id.lower()
+
+        # Returns: pct_change(N) * 100.0, matching DEXJPUS pattern
+        for window in [1, 5, 21, 63]:
+            result[f"{prefix}_ret_{window}d"] = raw.pct_change(window) * 100.0
+
+        # Volatility: 21-day rolling std of daily returns
+        daily_ret = raw.pct_change(1) * 100.0
+        result[f"{prefix}_vol_21d"] = daily_ret.rolling(21, min_periods=17).std()
+
+        # Drawdown: current level / rolling max - 1 (negative values)
+        rolling_max = raw.rolling(252, min_periods=1).max()
+        result[f"{prefix}_drawdown_pct"] = ((raw / rolling_max) - 1.0) * 100.0
+
+        # MA ratio: 50d MA / 200d MA
+        ma50 = raw.rolling(50, min_periods=40).mean()
+        ma200 = raw.rolling(200, min_periods=160).mean()
+        result[f"{prefix}_ma_ratio_50_200d"] = ma50 / ma200
+
+        # Z-score: 252-day rolling z-score (reuse existing _rolling_zscore helper)
+        result[f"{prefix}_zscore_252d"] = _rolling_zscore(raw, 252)
+
+    return result
+
+
 def compute_macro_features(
     engine: Engine,
     start_date: str | None = None,
@@ -471,6 +547,9 @@ def compute_macro_features(
     # net_liquidity and us_jp_rate_spread from Phase 65.
     df_derived = compute_derived_features_66(df_derived)
 
+    # ── Step 3c: Compute Phase 97 equity index derived features ──────────
+    df_derived = compute_per_series_features_97(df_derived)
+
     # ── Step 4: Rename uppercase FRED IDs to lowercase DB column names ────
     df_derived = df_derived.rename(columns=_RENAME_MAP)
 
@@ -532,6 +611,32 @@ def compute_macro_features(
         "cpi_surprise_proxy",
         "target_mid",
         "target_spread",
+        # Phase 97: Equity index derived features (24 columns)
+        # Note: raw sp500/nasdaqcom/djia are already in list(_RENAME_MAP.values()) above
+        "sp500_ret_1d",
+        "sp500_ret_5d",
+        "sp500_ret_21d",
+        "sp500_ret_63d",
+        "sp500_vol_21d",
+        "sp500_drawdown_pct",
+        "sp500_ma_ratio_50_200d",
+        "sp500_zscore_252d",
+        "nasdaqcom_ret_1d",
+        "nasdaqcom_ret_5d",
+        "nasdaqcom_ret_21d",
+        "nasdaqcom_ret_63d",
+        "nasdaqcom_vol_21d",
+        "nasdaqcom_drawdown_pct",
+        "nasdaqcom_ma_ratio_50_200d",
+        "nasdaqcom_zscore_252d",
+        "djia_ret_1d",
+        "djia_ret_5d",
+        "djia_ret_21d",
+        "djia_ret_63d",
+        "djia_vol_21d",
+        "djia_drawdown_pct",
+        "djia_ma_ratio_50_200d",
+        "djia_zscore_252d",
         # Provenance columns
         "source_freq_walcl",
         "source_freq_wtregen",
