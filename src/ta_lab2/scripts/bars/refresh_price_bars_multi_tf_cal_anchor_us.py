@@ -470,25 +470,79 @@ class AnchorCalendarUSBarBuilder(BaseBarBuilder):
         """
         Build bars for one (id, spec, venue_id) combination.
 
-        Anchor bars always do a full rebuild (delete + rebuild) because
-        anchor window logic requires the full history for correct cumulative snapshots.
+        Uses incremental approach when state exists: only rebuilds from the
+        anchor window containing the last watermark onward. Falls back to full
+        rebuild for first run or backfill detection.
 
         Returns:
             Number of rows inserted/updated
         """
+        tz = self.config.tz or DEFAULT_TZ
+
+        # Check if we can do incremental
+        needs_full = self.config.full_rebuild or state is None
+        if not needs_full and state is not None:
+            daily_min_seen = pd.to_datetime(state.get("daily_min_seen"), utc=True)
+            if pd.notna(daily_min_seen) and daily_min_ts < daily_min_seen:
+                needs_full = True  # Backfill detected
+
+        if not needs_full and state is not None:
+            last_time_close = pd.to_datetime(state.get("last_time_close"), utc=True)
+            if pd.notna(last_time_close) and daily_max_ts <= last_time_close:
+                return 0  # No new data
+
+            # Incremental: rebuild from the anchor window containing last_time_close
+            last_local = last_time_close.tz_convert(tz).date()
+            window_start, _ = _anchor_window_for_day(last_local, spec.n, spec.unit)
+            window_start_ts = pd.Timestamp(window_start, tz=tz).tz_convert("UTC")
+
+            df_incremental = df_daily[df_daily["ts"] >= window_start_ts].copy()
+            if df_incremental.empty:
+                return 0
+
+            bars = self._build_anchor_bars_simplified(
+                df_incremental, spec=spec, id_=id_, tz=tz
+            )
+            if bars.empty:
+                return 0
+
+            # Fix bar_seq: offset by last known bar_seq minus 1
+            last_bar_seq = int(state.get("last_bar_seq", 0))
+            if last_bar_seq > 0:
+                bars["bar_seq"] = bars["bar_seq"] + last_bar_seq - 1
+
+            bars["venue_id"] = venue_id
+            bars["alignment_source"] = self.ALIGNMENT_SOURCE
+
+            upsert_bars(
+                bars,
+                db_url=self.config.db_url,
+                bars_table=self.get_output_table_name(),
+                conflict_cols=(
+                    "id",
+                    "tf",
+                    "bar_seq",
+                    "venue_id",
+                    "timestamp",
+                    "alignment_source",
+                ),
+            )
+            self._update_state(
+                id_, spec.tf, bars, daily_min_ts, daily_max_ts, venue_id=venue_id
+            )
+            return len(bars)
+
+        # Full rebuild path (first run, backfill, or --full-rebuild)
         self.logger.info(
             f"ID={id_}, TF={spec.tf}, venue_id={venue_id}: Building anchor bars (full rebuild)"
         )
         self._delete_bars_and_state(id_, spec.tf, venue_id=venue_id)
 
-        bars = self._build_anchor_bars_simplified(
-            df_daily, spec=spec, id_=id_, tz=self.config.tz or DEFAULT_TZ
-        )
+        bars = self._build_anchor_bars_simplified(df_daily, spec=spec, id_=id_, tz=tz)
 
         if bars.empty:
             return 0
 
-        # Set venue columns on output bars
         bars["venue_id"] = venue_id
         bars["alignment_source"] = self.ALIGNMENT_SOURCE
 
