@@ -189,6 +189,9 @@ class WorkerTask:
     windows: List[int]
     rf: float
     venue_id: int = 1
+    preloaded_last_ts: Optional[str] = (
+        None  # Pre-fetched watermark (avoids per-worker query)
+    )
 
 
 def _worker(task: WorkerTask, db_url: str) -> Tuple[int, str, int, bool, str]:
@@ -231,25 +234,31 @@ def _process_one(engine: Engine, db_url: str, task: WorkerTask) -> int:
     lookback = max(windows)  # bars before watermark needed for continuity
 
     # ------------------------------------------------------------------
-    # Step 1: Read watermark
+    # Step 1: Read watermark (use preloaded value if available)
     # ------------------------------------------------------------------
     last_ts: Optional[pd.Timestamp] = None
     if not task.full_rebuild:
-        with engine.connect() as conn:
-            row = conn.execute(
-                text(
-                    "SELECT last_timestamp FROM public.asset_stats_state "
-                    "WHERE id = :id AND venue_id = :venue_id AND tf = :tf"
-                ),
-                {"id": asset_id, "venue_id": venue_id, "tf": tf},
-            ).fetchone()
-            if row and row[0] is not None:
-                # row[0] may be a tz-aware datetime; convert to UTC safely
-                _raw_ts = pd.Timestamp(row[0])
-                if _raw_ts.tzinfo is None:
-                    last_ts = _raw_ts.tz_localize("UTC")
-                else:
-                    last_ts = _raw_ts.tz_convert("UTC")
+        if task.preloaded_last_ts is not None:
+            _raw_ts = pd.Timestamp(task.preloaded_last_ts)
+            if _raw_ts.tzinfo is None:
+                last_ts = _raw_ts.tz_localize("UTC")
+            else:
+                last_ts = _raw_ts.tz_convert("UTC")
+        else:
+            with engine.connect() as conn:
+                row = conn.execute(
+                    text(
+                        "SELECT last_timestamp FROM public.asset_stats_state "
+                        "WHERE id = :id AND venue_id = :venue_id AND tf = :tf"
+                    ),
+                    {"id": asset_id, "venue_id": venue_id, "tf": tf},
+                ).fetchone()
+                if row and row[0] is not None:
+                    _raw_ts = pd.Timestamp(row[0])
+                    if _raw_ts.tzinfo is None:
+                        last_ts = _raw_ts.tz_localize("UTC")
+                    else:
+                        last_ts = _raw_ts.tz_convert("UTC")
 
     # ------------------------------------------------------------------
     # Step 2: Load returns
@@ -544,20 +553,69 @@ def main() -> None:
         vid = args.venue_id if args.venue_id is not None else 1
         venue_asset_map = {vid: asset_ids}
 
-    # Build task list
-    tasks: List[WorkerTask] = [
-        WorkerTask(
-            asset_id=asset_id,
-            tf=tf,
-            full_rebuild=args.full_rebuild,
-            windows=windows,
-            rf=args.rf,
-            venue_id=vid,
+    # Preload all watermarks + source max timestamps in 2 queries
+    # (avoids 30K+ per-worker queries and skips up-to-date tasks entirely)
+    watermarks: Dict[Tuple[int, int, str], str] = {}
+    source_max_ts: Dict[Tuple[int, int, str], str] = {}
+    skip_count = 0
+    if not args.full_rebuild:
+        engine_wm = create_engine(db_url, future=True, poolclass=NullPool)
+        with engine_wm.connect() as conn:
+            wm_rows = conn.execute(
+                text(
+                    "SELECT id, venue_id, tf, last_timestamp "
+                    "FROM public.asset_stats_state "
+                    "WHERE last_timestamp IS NOT NULL"
+                )
+            ).fetchall()
+            for row in wm_rows:
+                watermarks[(int(row[0]), int(row[1]), str(row[2]))] = str(row[3])
+
+            # Source max timestamps per (id, venue_id, tf)
+            src_rows = conn.execute(
+                text(
+                    'SELECT id, venue_id, tf, max("timestamp") '
+                    "FROM public.returns_bars_multi_tf_u "
+                    "WHERE roll = FALSE AND alignment_source = 'multi_tf' "
+                    "GROUP BY id, venue_id, tf"
+                )
+            ).fetchall()
+            for row in src_rows:
+                source_max_ts[(int(row[0]), int(row[1]), str(row[2]))] = str(row[3])
+        engine_wm.dispose()
+        _print(
+            f"Preloaded {len(watermarks)} watermarks, {len(source_max_ts)} source max timestamps"
         )
-        for vid, aids in venue_asset_map.items()
-        for asset_id in aids
-        for tf in tfs
-    ]
+
+    # Build task list, skipping tasks where source hasn't changed since last run
+    tasks: List[WorkerTask] = []
+    for vid, aids in venue_asset_map.items():
+        for asset_id in aids:
+            for tf in tfs:
+                key = (asset_id, vid, tf)
+                wm = watermarks.get(key)
+                src_max = source_max_ts.get(key)
+
+                # Skip if watermark exists and source hasn't advanced past it
+                if not args.full_rebuild and wm and src_max and src_max <= wm:
+                    skip_count += 1
+                    continue
+
+                tasks.append(
+                    WorkerTask(
+                        asset_id=asset_id,
+                        tf=tf,
+                        full_rebuild=args.full_rebuild,
+                        windows=windows,
+                        rf=args.rf,
+                        venue_id=vid,
+                        preloaded_last_ts=wm,
+                    )
+                )
+    if skip_count:
+        _print(
+            f"Skipped {skip_count} up-to-date tasks (source unchanged since watermark)"
+        )
 
     _print(f"Total tasks: {len(tasks)}")
 
