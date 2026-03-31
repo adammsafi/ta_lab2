@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 
 ## Current Position
 
-Phase: 96 of 101 COMPLETE (Executor Activation) — verified 2026-03-30
-Next: Phase 97 (FRED Macro Expansion)
-Status: Phase 96 verified, ready for Phase 97
-Last activity: 2026-03-30 — Phase 96 verified (6/6 must-haves passed)
+Phase: 97 of 101 IN PROGRESS (FRED Macro Expansion)
+Plan: 1 of 2 complete in Phase 97
+Status: Phase 97-01 complete; ready for Phase 97-02
+Last activity: 2026-03-31 — Completed 97-01-PLAN.md (equity index features)
 
-Progress: [##########] 100% v1.2.0 | [████░░░░░░] 15% v1.3.0 (4/26 plans, 1/6 phases)
+Progress: [##########] 100% v1.2.0 | [████░░░░░░] 19% v1.3.0 (5/26 plans, 1/6 phases)
 
 ## Performance Metrics
 
@@ -65,6 +65,11 @@ Phase 96-03 decisions:
 - seed_watermarks() sets last_processed_signal_ts=MAX(ts) for active configs with NULL watermark (prevents historical replay)
 - 6 new signal configs (RSI, ATR, MACD, 3 AMA) will be skipped at seed time until their dim_signals entries exist
 
+Phase 97-01 decisions:
+- db_columns allowlist must NOT duplicate raw columns already in list(_RENAME_MAP.values()); only add derived columns explicitly to avoid duplicate DataFrame columns
+- _EQUITY_INDEX_SERIES loop pattern: add new equity indices by extending the list, not copy-pasting feature blocks
+- forward_fill.py FFILL_LIMITS already had SP500/NASDAQCOM/DJIA at limit=5 before this plan; SERIES_TO_LOAD was the gap
+
 Phase 96-04 decisions:
 - AVG(sharpe_mean) cross-asset aggregate from strategy_bakeoff_results (not per-asset rows which are noisy)
 - orders.signal_id (not strategy_id which does not exist) is the correct join key to filter fills per strategy
@@ -94,10 +99,10 @@ Phase 96-04 decisions:
 
 ## Session Continuity
 
-Last session: 2026-03-30
-Stopped at: Phase 96 COMPLETE (verified 6/6). Next: Phase 97 FRED Macro Expansion.
+Last session: 2026-03-31
+Stopped at: Phase 97 Plan 01 COMPLETE (97-01-SUMMARY.md written). Next: Phase 97-02 (equity-crypto divergence features).
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-30 (Phase 96 verified and complete)*
+*Last updated: 2026-03-31 (Phase 97-01 complete)*
