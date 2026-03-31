@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 
 ## Current Position
 
-Phase: 97 of 101 IN PROGRESS (FRED Macro Expansion)
-Plan: 1 of 2 complete in Phase 97
-Status: Phase 97-01 complete; ready for Phase 97-02
-Last activity: 2026-03-31 — Completed 97-01-PLAN.md (equity index features)
+Phase: 97 of 101 COMPLETE (FRED Macro Expansion)
+Plan: 2 of 2 complete in Phase 97
+Status: Phase 97 fully complete; ready for Phase 98
+Last activity: 2026-03-31 — Completed 97-02-PLAN.md (multi-window BTC-equity correlation)
 
-Progress: [##########] 100% v1.2.0 | [████░░░░░░] 19% v1.3.0 (5/26 plans, 1/6 phases)
+Progress: [##########] 100% v1.2.0 | [████░░░░░░] 23% v1.3.0 (6/26 plans, 2/6 phases)
 
 ## Performance Metrics
 
@@ -70,6 +70,13 @@ Phase 97-01 decisions:
 - _EQUITY_INDEX_SERIES loop pattern: add new equity indices by extending the list, not copy-pasting feature blocks
 - forward_fill.py FFILL_LIMITS already had SP500/NASDAQCOM/DJIA at limit=5 before this plan; SERIES_TO_LOAD was the gap
 
+Phase 97-02 decisions:
+- 'window' double-quoted in all SQL: PostgreSQL reserved word; _q() helper wraps it in INSERT/SELECT/ON CONFLICT clauses
+- venue_id=1 filter on BTC returns: returns_bars_multi_tf_u has one row per (id, venue_id, date); without filter duplicates cause all-NaN rolling corr
+- Backward-compat default window=60 in upsert: old XAGG-04 callers without window column get 60 injected automatically
+- Sign-flip alerts filtered to window=60: 4 windows x 3 vars would 12x alert volume without this gate
+- .values[i] with enumerate() instead of .get(dt): avoids Series-return from DatetimeIndex on union of daily/business-day calendars
+
 Phase 96-04 decisions:
 - AVG(sharpe_mean) cross-asset aggregate from strategy_bakeoff_results (not per-asset rows which are noisy)
 - orders.signal_id (not strategy_id which does not exist) is the correct join key to filter fills per strategy
@@ -100,9 +107,9 @@ Phase 96-04 decisions:
 ## Session Continuity
 
 Last session: 2026-03-31
-Stopped at: Phase 97 Plan 01 COMPLETE (97-01-SUMMARY.md written). Next: Phase 97-02 (equity-crypto divergence features).
+Stopped at: Phase 97 Plan 02 COMPLETE (97-02-SUMMARY.md written). Phase 97 fully done. Next: Phase 98 (CTF Graduation).
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-31 (Phase 97-01 complete)*
+*Last updated: 2026-03-31 (Phase 97-02 complete — Phase 97 done)*
