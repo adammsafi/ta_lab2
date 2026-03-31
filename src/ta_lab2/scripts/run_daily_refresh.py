@@ -84,9 +84,7 @@ TIMEOUT_EMAS = 3600  # 1 hour -- EMA refreshers
 TIMEOUT_AMAS = 3600  # 1 hour -- AMA refreshers
 TIMEOUT_DESC_STATS = 3600  # 1 hour -- asset stats + correlation computation
 TIMEOUT_REGIMES = 1800  # 30 minutes -- regime refresher
-TIMEOUT_FEATURES = (
-    5400  # 90 minutes -- feature refresh for 492 assets at 1D (vol/ta/ctf phases)
-)
+TIMEOUT_FEATURES = 7200  # 2 hours -- feature refresh for 492 assets at 1D (vol/ta/ctf phases, ~101min observed)
 TIMEOUT_SIGNALS = 1800  # 30 minutes -- signal generation for all types
 TIMEOUT_CALIBRATE_STOPS = (
     300  # 5 minutes -- iterates over asset x strategy combos, mostly SQL reads
