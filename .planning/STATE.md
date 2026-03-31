@@ -5,21 +5,21 @@
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 97: FRED Macro Expansion
+**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 98: CTF Feature Graduation
 
 ## Current Position
 
-Phase: 97 of 106 COMPLETE (FRED Macro Expansion) — verified 2026-03-31
-Next: Phase 98 (CTF Feature Graduation)
-Status: Phase 97 verified, ready for Phase 98
-Last activity: 2026-03-31 — Phase 97 verified (4/4 must-haves passed)
+Phase: 98 of 106 (CTF Feature Graduation) — Plan 01 complete
+Next: Phase 98 Plan 02 (asset-specific CTF feature selection)
+Status: In progress (Plan 98-01 complete)
+Last activity: 2026-03-31 — Completed 98-01-PLAN.md (schema migration + ETL bridge)
 
-Progress: [##########] 100% v1.2.0 | [████░░░░░░] 23% v1.3.0 (6/26 plans, 2/6 phases)
+Progress: [##########] 100% v1.2.0 | [████░░░░░░] 27% v1.3.0 (7/26 plans, 2/6 phases)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 417
+- Total plans completed: 418
 - Average duration: 7 min
 - Total execution time: ~32.6 hours
 
@@ -84,6 +84,14 @@ Phase 96-04 decisions:
 - BTC (asset_id=1) as benchmark for all current asset classes; extensible to SPX for Phase 97 equity class
 - Minimum sample thresholds: fill Sharpe >= 2 round-trips; MTM Sharpe >= 5 days; below threshold returns NULL not zero
 
+Phase 98-01 decisions:
+- 401 CTF features promoted via IC > 0.02 cross-asset median (PERCENTILE_CONT(0.5)) -- no artificial cap
+- UPDATE pattern (not DELETE+INSERT) preserves other features columns -- same as microstructure_feature.py
+- Dynamic IC query in Alembic migration: columns discovered at runtime from ic_results, idempotency guard via information_schema
+- dim_feature_selection_asset separate from dim_feature_selection to avoid TRUNCATE hazard
+- Pre-flight check (information_schema.columns) raises RuntimeError if migration not applied before write
+- base_tf in YAML is placeholder '1D' -- promoted feature set same for all base_tfs (IC computed cross-asset)
+
 ### Pending Todos
 
 7 pending todos resolved into v1.3.0 phases:
@@ -103,13 +111,14 @@ Phase 96-04 decisions:
 - Phase 99 pitfall: DSR under-deflation at 460K runs (N so large it inflates PSR) — document known limitation
 - Phase 99 pitfall: Windows Pool hang with multiprocessing — use NullPool + maxtasksperchild=1
 - Phase 100 dependency: ML-01/ML-02/ML-03 require CTF features in features table (Phase 98 must complete first)
+- Phase 98-01 NOTE: refresh_ctf_promoted.py 1D refresh takes ~13 minutes (row-by-row UPDATE with 401 cols). Acceptable for periodic refresh; full all-base_tfs run ~60 min.
 
 ## Session Continuity
 
 Last session: 2026-03-31
-Stopped at: Phase 97 COMPLETE (verified 4/4). Next: Phase 98 CTF Feature Graduation.
+Stopped at: Phase 98 Plan 01 COMPLETE. Next: Phase 98 Plan 02 (asset-specific CTF feature selection).
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-31 (Phase 97 verified and complete)*
+*Last updated: 2026-03-31 (Phase 98-01 complete: CTF schema migration + ETL bridge)*
