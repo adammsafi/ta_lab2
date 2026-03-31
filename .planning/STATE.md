@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 
 ## Current Position
 
-Phase: 98 of 106 (CTF Feature Graduation) — Plan 04 complete
-Next: Phase 99 (Backtest Expansion) or Phase 98 Plan 03 if incomplete
-Status: In progress (Plans 98-01, 98-02, 98-04 complete; 98-03 parallel)
-Last activity: 2026-03-31 — Completed 98-04-PLAN.md (CTF lead-lag IC matrix)
+Phase: 98 of 106 (CTF Feature Graduation) — ALL 4 PLANS COMPLETE
+Next: Phase 99 (Backtest Expansion)
+Status: Phase 98 complete (Plans 98-01, 98-02, 98-03, 98-04 all complete)
+Last activity: 2026-03-31 — Completed 98-03-PLAN.md (cross-asset CTF composites, 8.07M rows)
 
-Progress: [##########] 100% v1.2.0 | [████░░░░░░] 35% v1.3.0 (9/26 plans, 2/6 phases)
+Progress: [##########] 100% v1.2.0 | [████░░░░░░] 38% v1.3.0 (10/26 plans, 3/6 phases)
 
 ## Performance Metrics
 
@@ -99,6 +99,14 @@ Phase 98-02 decisions:
 - All 98 assets have CTF IC data; all 98 have asset-specific additions (53-164 per asset, 10,716 total rows)
 - dim_feature_selection verified unchanged at 205 rows before and after run (no TRUNCATE damage)
 
+Phase 98-03 decisions:
+- Vectorized pivots over row iteration: pivot.mean(axis=1), pivot.notna().sum(axis=1) replaces row-level Python loops
+- Chunked 50K-row persistence: avoids large single transactions; 1.43M rows = 29 chunks @ 20s; 6.41M rows = 129 chunks
+- Relative value uses per-asset composite_name (relative_value_{feat}_{asset_id}) to preserve unique PK in ctf_composites
+- PCA sign correction: dominant_sign = np.sign(loadings[abs(loadings).argmax()]) ensures consistent direction across re-runs
+- Materialization to features skipped: cross-asset aggregates don't map to per-asset rows (single feature column per ts, not per asset)
+- Leader-follower uses full-history window leader score at last_ts; not rolling per-timestamp (would require O(n^2) rolling corr)
+
 Phase 98-04 decisions:
 - Pre-load-then-iterate: all CTF DataFrames and forward returns cached in memory dicts before inner loop -- 15 min vs hours
 - Single global BH correction: collect all p-values then multipletests once (correct global FDR control, not per-pair)
@@ -130,9 +138,9 @@ Phase 98-04 decisions:
 ## Session Continuity
 
 Last session: 2026-03-31
-Stopped at: Phase 98 Plan 04 COMPLETE. Next: Phase 98 Plan 03 (cross-asset CTF composites) or Phase 99.
+Stopped at: Phase 98 Plan 03 COMPLETE. Phase 98 fully done (all 4 plans). Next: Phase 99 (Backtest Expansion).
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-31 (Phase 98-04 complete: CTF lead-lag IC matrix -- 48,204 rows, 5,087 significant pairs)*
+*Last updated: 2026-03-31 (Phase 98-03 complete: cross-asset CTF composites -- 8.07M rows, 4 methods in ctf_composites)*
