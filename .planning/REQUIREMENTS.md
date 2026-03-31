@@ -26,10 +26,10 @@
 
 ### CTF Research Expansion
 
-- [ ] **CTF-01**: Top 15-20 CTF features materialized as columns in `features` table via ETL bridge (`refresh_ctf_promoted.py`), registered in `feature_selection.yaml`
-- [ ] **CTF-02**: Asset-specific feature selection tier in `dim_feature_selection` for features with strong per-asset IC but failing cross-asset consensus
-- [ ] **CTF-03**: Cross-asset CTF composite signals computed (market-wide sentiment, relative-value, leader-follower aggregates)
-- [ ] **CTF-04**: Lead-lag IC matrix analyzing whether Asset A's CTF features predict Asset B's returns (Granger causality via CTF)
+- [x] **CTF-01**: Top 15-20 CTF features materialized as columns in `features` table via ETL bridge (`refresh_ctf_promoted.py`), registered in `feature_selection.yaml`
+- [x] **CTF-02**: Asset-specific feature selection tier in `dim_feature_selection` for features with strong per-asset IC but failing cross-asset consensus
+- [x] **CTF-03**: Cross-asset CTF composite signals computed (market-wide sentiment, relative-value, leader-follower aggregates)
+- [x] **CTF-04**: Lead-lag IC matrix analyzing whether Asset A's CTF features predict Asset B's returns (Granger causality via CTF)
 
 ### Macro Expansion
 
@@ -101,10 +101,10 @@
 | BT-05 | Phase 99 | Pending |
 | BT-06 | Phase 99 | Pending |
 | BT-07 | Phase 99 | Pending |
-| CTF-01 | Phase 98 | Pending |
-| CTF-02 | Phase 98 | Pending |
-| CTF-03 | Phase 98 | Pending |
-| CTF-04 | Phase 98 | Pending |
+| CTF-01 | Phase 98 | Complete |
+| CTF-02 | Phase 98 | Complete |
+| CTF-03 | Phase 98 | Complete |
+| CTF-04 | Phase 98 | Complete |
 | MACRO-01 | Phase 97 | Complete |
 | MACRO-02 | Phase 97 | Complete |
 | ML-01 | Phase 100 | Pending |

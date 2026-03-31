@@ -1402,7 +1402,7 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 
 - [x] **Phase 96: Executor Activation** - Seed strategies, wire signals into daily refresh, activate real IC-weighted BL, track live parity, add PnL attribution — COMPLETE 2026-03-30
 - [x] **Phase 97: FRED Macro Expansion** - Add SP500/NASDAQ/DJIA to macro feature layer, rolling BTC-equity correlation, risk-on/off signals — COMPLETE 2026-03-31
-- [ ] **Phase 98: CTF Feature Graduation** - Materialize top CTF features into features table, asset-specific selection tier, cross-asset composites, lead-lag IC matrix
+- [x] **Phase 98: CTF Feature Graduation** - Materialize top CTF features into features table, asset-specific selection tier, cross-asset composites, lead-lag IC matrix — COMPLETE 2026-03-31
 - [ ] **Phase 99: Backtest Scaling** - Resume-safe mass backtest orchestrator, partitioned trades table, 113K+ core runs, MC bands, CTF signal backtests, expanded grids, leaderboard dashboard
 - [ ] **Phase 100: ML Signal Combination** - LGBMRanker cross-sectional predictor, SHAP interaction analysis, XGBoost meta-label confidence filter
 - [ ] **Phase 101: Tech Debt Cleanup** - Remove orphaned export, create Phase 82/92 VERIFICATION.md, document CTF downstream consumers
@@ -1465,10 +1465,10 @@ Plans:
 **Plans:** 4 plans
 
 Plans:
-- [ ] 98-01-PLAN.md -- Alembic migration (all Phase 98 schema) + refresh_ctf_promoted.py ETL bridge + feature_selection.yaml
-- [ ] 98-02-PLAN.md -- Asset-specific CTF feature selection in dim_feature_selection_asset
-- [ ] 98-03-PLAN.md -- Cross-asset CTF composites (sentiment mean+PCA, relative-value z-score, leader-follower)
-- [ ] 98-04-PLAN.md -- Lead-lag IC matrix (all-vs-all Spearman IC, BH FDR, DB+CSV persistence)
+- [x] 98-01-PLAN.md -- Alembic migration (all Phase 98 schema) + refresh_ctf_promoted.py ETL bridge + feature_selection.yaml
+- [x] 98-02-PLAN.md -- Asset-specific CTF feature selection in dim_feature_selection_asset
+- [x] 98-03-PLAN.md -- Cross-asset CTF composites (sentiment mean+PCA, relative-value z-score, leader-follower)
+- [x] 98-04-PLAN.md -- Lead-lag IC matrix (all-vs-all Spearman IC, BH FDR, DB+CSV persistence)
 
 ---
 
