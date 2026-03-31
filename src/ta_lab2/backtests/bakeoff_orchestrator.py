@@ -21,6 +21,7 @@ cost_scenario_label     - Convert CostModel to descriptive label string
 build_t1_series         - Build label-end (t1) Series for CV splitters
 load_strategy_data      - Load OHLCV + indicator data from DB for a given asset/TF
 load_strategy_data_with_ama - Extended loader that joins AMA features onto base DataFrame
+load_strategy_data_with_ctf - Extended loader that joins CTF feature columns onto base DataFrame
 parse_active_features   - Parse feature_selection.yaml into structured feature list
 load_universal_ic_weights   - Universal IC-IR weights from feature_selection.yaml (active tier)
 load_per_asset_ic_weights   - Per-asset IC-IR weight matrix from ic_results
@@ -36,6 +37,21 @@ ama_features : list of dict, optional
 experiment_name : str, optional
     Lineage tag stored in strategy_bakeoff_results.experiment_name.
     Pass a descriptive name (e.g. "phase82-ama-v1") for result traceability.
+
+BakeoffOrchestrator.run() parameters (Phase 99 additions)
+---------------------------------------------------------
+data_loader_fn : callable, optional
+    Custom data loader function with signature (engine, asset_id, tf) -> DataFrame.
+    When provided, this overrides the default load_strategy_data() and ama_features
+    logic. Use this for CTF strategies that need custom columns loaded.
+    Example: functools.partial(load_strategy_data_with_ctf, ctf_cols=["ret_arith_365d_divergence"])
+data_loader_type : str, optional
+    Serializable descriptor for parallel workers (e.g. "ctf"). When set, workers
+    reconstruct the loader from data_loader_type + data_loader_kwargs instead of
+    trying to pickle a callable. Ignored when workers=1.
+data_loader_kwargs : dict, optional
+    Keyword arguments for reconstructing the loader in workers. For "ctf" type,
+    must include "ctf_cols" key.
 """
 
 from __future__ import annotations
@@ -156,6 +172,11 @@ class BakeoffAssetTask:
     existing_keys: set
     perasset_weights: Optional[List[float]] = None
     perasset_param_grid: Optional[List[Dict[str, Any]]] = None
+    # Phase 99: serializable data loader descriptor for parallel workers
+    # Instead of pickling a callable, pass a type string + kwargs.
+    # Supported types: "ctf" -> load_strategy_data_with_ctf(engine, asset_id, tf, **kwargs)
+    data_loader_type: Optional[str] = None
+    data_loader_kwargs: Optional[Dict[str, Any]] = None
 
 
 def _bakeoff_asset_worker(task: BakeoffAssetTask) -> List[Dict[str, Any]]:
@@ -172,8 +193,21 @@ def _bakeoff_asset_worker(task: BakeoffAssetTask) -> List[Dict[str, Any]]:
     config = BakeoffConfig(**task.config_dict)
 
     try:
-        # Load data once for this asset
-        if task.ama_features is not None:
+        # Load data once for this asset.
+        # Priority: data_loader_type (Phase 99 CTF path) > ama_features > default
+        if task.data_loader_type is not None:
+            kwargs = task.data_loader_kwargs or {}
+            if task.data_loader_type == "ctf":
+                df = load_strategy_data_with_ctf(
+                    engine, task.asset_id, task.tf, **kwargs
+                )
+            else:
+                logger.warning(
+                    f"Worker: unknown data_loader_type '{task.data_loader_type}'; "
+                    f"falling back to default loader"
+                )
+                df = load_strategy_data(engine, task.asset_id, task.tf)
+        elif task.ama_features is not None:
             df = load_strategy_data_with_ama(
                 engine, task.asset_id, task.tf, task.ama_features
             )
@@ -691,6 +725,111 @@ def load_strategy_data_with_ama(
         f"load_strategy_data_with_ama: asset_id={asset_id}, tf={tf}, "
         f"{n_ama} AMA features + {n_bar} bar-level features joined, "
         f"total columns={len(df.columns)}"
+    )
+    return df
+
+
+def load_strategy_data_with_ctf(
+    engine: Engine,
+    asset_id: int,
+    tf: str,
+    ctf_cols: List[str],
+) -> pd.DataFrame:
+    """
+    Load OHLCV + indicator data + CTF features from DB.
+
+    Extends load_strategy_data() by including CTF feature columns from the
+    features table. CTF columns were promoted to features by Phase 98.
+
+    Parameters
+    ----------
+    engine : Engine
+    asset_id : int
+    tf : str
+    ctf_cols : list of str
+        CTF column names to load (e.g. ["ret_arith_365d_divergence", "adx_14_365d_ref_value"]).
+        Only columns that exist in the features table are loaded; missing columns are
+        silently skipped with a warning.
+
+    Returns
+    -------
+    pd.DataFrame
+        Indexed by ts (UTC-aware). Contains all OHLCV + local indicators + CTF columns.
+    """
+    # Load base OHLCV + bar-level indicators
+    df = load_strategy_data(engine, asset_id, tf)
+
+    if df.empty or not ctf_cols:
+        return df
+
+    # Verify which CTF columns actually exist in the features table
+    valid_cols_sql = text(
+        """
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'features'
+          AND column_name = ANY(:ctf_cols)
+        ORDER BY column_name
+        """
+    )
+    with engine.connect() as conn:
+        result = conn.execute(
+            valid_cols_sql,
+            {"ctf_cols": list(ctf_cols)},
+        )
+        valid_cols = [row[0] for row in result.fetchall()]
+
+    missing = set(ctf_cols) - set(valid_cols)
+    if missing:
+        logger.warning(
+            f"load_strategy_data_with_ctf: CTF columns not in features table "
+            f"(will be skipped): {sorted(missing)}"
+        )
+
+    if not valid_cols:
+        logger.warning(
+            f"load_strategy_data_with_ctf: no valid CTF columns found for "
+            f"asset_id={asset_id}, tf={tf}; returning base DataFrame"
+        )
+        return df
+
+    # Build SQL to load the valid CTF columns
+    col_list = ", ".join(f'"{c}"' for c in valid_cols)
+    ctf_sql = text(
+        f"""
+        SELECT ts, {col_list}
+        FROM public.features
+        WHERE id = :asset_id
+          AND tf = :tf
+        ORDER BY ts
+        """
+    )
+
+    with engine.connect() as conn:
+        ctf_df = pd.read_sql(ctf_sql, conn, params={"asset_id": asset_id, "tf": tf})
+
+    if ctf_df.empty:
+        logger.warning(
+            f"load_strategy_data_with_ctf: no CTF data returned for "
+            f"asset_id={asset_id}, tf={tf}"
+        )
+        return df
+
+    ctf_df["ts"] = pd.to_datetime(ctf_df["ts"], utc=True)
+    ctf_df = ctf_df.set_index("ts")
+
+    # Left-join CTF columns onto base DataFrame by ts index
+    for col in valid_cols:
+        if col in ctf_df.columns:
+            df[col] = ctf_df[col]
+            logger.debug(
+                f"Joined CTF feature '{col}': {df[col].notna().sum()} non-null values"
+            )
+
+    logger.info(
+        f"load_strategy_data_with_ctf: asset_id={asset_id}, tf={tf}, "
+        f"{len(valid_cols)} CTF features joined, total columns={len(df.columns)}"
     )
     return df
 
@@ -1255,6 +1394,9 @@ class BakeoffOrchestrator:
         workers: int = 1,
         per_asset_weight_matrix: Optional[Any] = None,
         perasset_param_grid: Optional[List[Dict[str, Any]]] = None,
+        data_loader_fn: Optional[Callable[[Engine, int, str], pd.DataFrame]] = None,
+        data_loader_type: Optional[str] = None,
+        data_loader_kwargs: Optional[Dict[str, Any]] = None,
     ) -> List[StrategyResult]:
         """
         Run the full bake-off for all strategies x assets x cost scenarios.
@@ -1285,6 +1427,20 @@ class BakeoffOrchestrator:
             per-asset weighted ama_momentum_perasset strategy variant.
         perasset_param_grid : list of dict, optional
             Param grid for the perasset strategy variant.
+        data_loader_fn : callable, optional
+            Custom data loader function with signature (engine, asset_id, tf) -> DataFrame.
+            When provided, this overrides ama_features and the default load_strategy_data().
+            Use this for CTF strategies that need custom columns loaded.
+            Example: functools.partial(load_strategy_data_with_ctf, ctf_cols=["ret_arith_365d_divergence"])
+            In sequential mode (workers=1), the callable is used directly.
+            In parallel mode (workers > 1), use data_loader_type + data_loader_kwargs instead
+            for picklable worker serialization (data_loader_fn is ignored in parallel mode).
+        data_loader_type : str, optional
+            Serializable descriptor for parallel workers (e.g. "ctf"). Takes precedence over
+            data_loader_fn in parallel mode. Supported values: "ctf".
+        data_loader_kwargs : dict, optional
+            Keyword arguments for reconstructing the loader in parallel workers.
+            For "ctf" type, must include "ctf_cols" key (list of CTF column names).
 
         Returns
         -------
@@ -1303,14 +1459,18 @@ class BakeoffOrchestrator:
                 workers,
                 per_asset_weight_matrix=per_asset_weight_matrix,
                 perasset_param_grid=perasset_param_grid,
+                data_loader_type=data_loader_type,
+                data_loader_kwargs=data_loader_kwargs,
             )
 
         all_results: List[StrategyResult] = []
 
         for asset_id in asset_ids:
             logger.info(f"Loading data for asset_id={asset_id}, tf={tf}")
-            # Use AMA-extended loader when AMA features are requested
-            if ama_features is not None:
+            # Priority: data_loader_fn (Phase 99) > ama_features > default
+            if data_loader_fn is not None:
+                df = data_loader_fn(self.engine, asset_id, tf)
+            elif ama_features is not None:
                 df = load_strategy_data_with_ama(
                     self.engine, asset_id, tf, ama_features
                 )
@@ -1528,6 +1688,8 @@ class BakeoffOrchestrator:
         workers: int,
         per_asset_weight_matrix: Optional[Any] = None,
         perasset_param_grid: Optional[List[Dict[str, Any]]] = None,
+        data_loader_type: Optional[str] = None,
+        data_loader_kwargs: Optional[Dict[str, Any]] = None,
     ) -> List[StrategyResult]:
         """Run bake-off with multiprocessing across assets.
 
@@ -1578,6 +1740,8 @@ class BakeoffOrchestrator:
                     existing_keys=all_existing.get(aid, set()),
                     perasset_weights=pw,
                     perasset_param_grid=perasset_param_grid,
+                    data_loader_type=data_loader_type,
+                    data_loader_kwargs=data_loader_kwargs,
                 )
             )
 
