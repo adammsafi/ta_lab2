@@ -85,7 +85,7 @@ def _load_returns(
     query = text(
         """
         SELECT ts, ret_log
-        FROM returns_bars_multi_tf
+        FROM returns_bars_multi_tf_u
         WHERE id = :id AND venue_id = :venue_id AND tf = :tf
           AND roll = FALSE
         ORDER BY ts
@@ -166,7 +166,7 @@ def _get_asset_ids(engine: Any, ids_arg: str, venue_id: int) -> list[int]:
     if ids_arg.strip().lower() == "all":
         query = text(
             """
-            SELECT DISTINCT id FROM returns_bars_multi_tf
+            SELECT DISTINCT id FROM returns_bars_multi_tf_u
             WHERE venue_id = :venue_id AND tf = '1d'
             ORDER BY id
             """
