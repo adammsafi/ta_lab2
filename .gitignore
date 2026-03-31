@@ -130,6 +130,7 @@ yarn-error.log*
 # =========================
 db_config.env
 openai_config.env
+tg_config.env
 
 # =========================
 # Local dev logs / scratch
@@ -199,3 +200,5 @@ old/
 **/similarity_report.json
 **/*_report.json
 **/*_analysis.json
+run_claude.cmd
+run_claude.py
