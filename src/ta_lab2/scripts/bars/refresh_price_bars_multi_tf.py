@@ -47,7 +47,8 @@ from __future__ import annotations
 import argparse
 import re
 from datetime import timedelta
-from typing import Optional
+from collections.abc import Mapping
+from typing import Any, Optional
 
 import numpy as np
 import pandas as pd
@@ -413,28 +414,28 @@ class MultiTFBarBuilder(BaseBarBuilder):
             # No new data
             return 0
 
-        # NOTE: _append_incremental_rows has API mismatches with current
-        # common_snapshot_contract (CarryForwardInputs, compute_missing_days_diagnostics,
-        # apply_carry_forward signatures). Fall back to full-rebuild path until fixed.
-        # TODO: Rewrite _append_incremental_rows to match current contract API.
-        bars = self._build_snapshots_polars(df_daily, tf_days, tf_label)
-        if bars.empty:
+        new_rows = self._append_incremental_rows(
+            id_=id_,
+            tf_days=tf_days,
+            tf_label=tf_label,
+            daily_max_ts=daily_max_ts,
+            last=last,
+            venue=venue,
+            venue_id=venue_id,
+        )
+
+        if new_rows.empty:
             return 0
 
-        bars["venue_id"] = venue_id
-        bars["alignment_source"] = self.ALIGNMENT_SOURCE
+        # Set venue columns on output bars
+        new_rows["venue_id"] = venue_id
+        new_rows["alignment_source"] = self.ALIGNMENT_SOURCE
 
-        self._upsert_bars(bars)
+        self._upsert_bars(new_rows)
         self._update_state(
-            id_, tf_label, bars, daily_min_ts, daily_max_ts, venue_id=venue_id
+            id_, tf_label, new_rows, daily_min_ts, daily_max_ts, venue_id=venue_id
         )
-        return len(bars)
-
-        # --- DISABLED: broken incremental append path ---
-        # _append_incremental_rows has API mismatches with current
-        # common_snapshot_contract (CarryForwardInputs, compute_missing_days_diagnostics,
-        # apply_carry_forward signatures). Fallback to full Polars rebuild above
-        # handles this case. TODO: Rewrite _append_incremental_rows to match current API.
+        return len(new_rows)
 
     @classmethod
     def create_argument_parser(cls) -> argparse.ArgumentParser:
@@ -843,26 +844,68 @@ class MultiTFBarBuilder(BaseBarBuilder):
 
             # Use carry-forward optimization when gate passes
             if can_carry_forward(inp):
+
+                def _update_window_fields(out: dict, daily: Mapping[str, Any]) -> None:
+                    """Update per-bar OHLC aggregates with today's daily row."""
+                    today_high = float(daily.get("high", float("nan")))
+                    today_low = float(daily.get("low", float("nan")))
+                    today_vol = float(daily.get("volume", 0) or 0)
+                    today_mktcap = daily.get("market_cap")
+
+                    # High watermark
+                    prev_high = float(out.get("high", float("nan")))
+                    if pd.notna(today_high) and (
+                        pd.isna(prev_high) or today_high > prev_high
+                    ):
+                        out["high"] = today_high
+                        th = daily.get("timehigh")
+                        out["time_high"] = (
+                            pd.to_datetime(th, utc=True)
+                            if pd.notna(th)
+                            else pd.to_datetime(daily.get("ts"), utc=True)
+                        )
+
+                    # Low watermark
+                    prev_low = float(out.get("low", float("nan")))
+                    if pd.notna(today_low) and (
+                        pd.isna(prev_low) or today_low < prev_low
+                    ):
+                        out["low"] = today_low
+                        tl = daily.get("timelow")
+                        out["time_low"] = (
+                            pd.to_datetime(tl, utc=True)
+                            if pd.notna(tl)
+                            else pd.to_datetime(daily.get("ts"), utc=True)
+                        )
+
+                    # Volume accumulation
+                    prev_vol = float(out.get("volume", 0) or 0)
+                    out["volume"] = prev_vol + today_vol
+
+                    # Market cap (take latest)
+                    if today_mktcap is not None and pd.notna(today_mktcap):
+                        out["market_cap"] = float(today_mktcap)
+
+                    # Missing days diagnostics
+                    for k, v in miss_diag.items():
+                        out[k] = v
+
+                # Build new_daily_row with bookkeeping fields for the contract
+                daily_row = d.to_dict()
+                daily_row["timestamp"] = day_ts
+                daily_row["last_ts_half_open"] = day_ts + _ONE_MS
+                daily_row["pos_in_bar"] = int(cur_pos)
+                daily_row["is_partial_end"] = bool(is_partial_end)
+                daily_row["is_partial_start"] = False
+                daily_row["count_days_remaining"] = int(count_days_remaining)
+
                 out_row = apply_carry_forward(
-                    prev_snapshot=prev_snapshot,
-                    today_daily_row=d.to_dict(),
-                    today_ts_utc=day_ts,
-                    today_timehigh_utc=(
-                        pd.to_datetime(d["timehigh"], utc=True)
-                        if pd.notna(d["timehigh"])
-                        else None
-                    ),
-                    today_timelow_utc=(
-                        pd.to_datetime(d["timelow"], utc=True)
-                        if pd.notna(d["timelow"])
-                        else None
-                    ),
-                    missing_diag=miss_diag,
-                    pos_in_bar=int(cur_pos),
-                    is_partial_end=bool(is_partial_end),
+                    prev_snapshot,
+                    new_daily_row=daily_row,
+                    update_window_fields=_update_window_fields,
                 )
 
-                # Builder-owned fields
+                # Builder-owned fields (identity + bar structure)
                 out_row["id"] = int(id_)
                 out_row["tf"] = tf_label
                 out_row["tf_days"] = int(tf_days)
@@ -880,9 +923,6 @@ class MultiTFBarBuilder(BaseBarBuilder):
                 out_row["src_load_ts"] = d.get("src_load_ts")
                 out_row["src_file"] = "price_bars_1d"
 
-                out_row = (
-                    normalize_output_schema(pd.DataFrame([out_row])).iloc[0].to_dict()
-                )
                 new_rows.append(out_row)
 
                 prev_snapshot = dict(out_row)
