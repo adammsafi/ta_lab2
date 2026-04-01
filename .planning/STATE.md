@@ -5,26 +5,27 @@
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 105 IN PROGRESS (Parameter Optimization — Plans 01+02+03 complete)
+**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 111 IN PROGRESS (Feature Polars Migration — Plan 01 complete)
 
 ## Current Position
 
-Phase: 105 COMPLETE (Parameter Optimization) — 3/3 plans, verified (4/4 must-haves)
-Also: Phase 110 IN PROGRESS (Feature Parallel Sub-Phases) — 1/1 plans complete
+Phase: 111 IN PROGRESS (Feature Polars Migration) — 1/N plans complete
+Also: Phase 110 COMPLETE (Feature Parallel Sub-Phases) — 1/1 plans complete
 Also: Phase 109 COMPLETE (Feature Skip-Unchanged) — 2/2 plans complete
+Also: Phase 105 COMPLETE (Parameter Optimization) — 3/3 plans complete
 Also: Phase 104 COMPLETE (Crypto-Native Indicators) — 3/3 plans complete
 Also: Phase 100 IN PROGRESS (ML Signal Combination) — Plans 01+02 complete (2/3 plans)
 Also: Phase 108 COMPLETE (Pipeline Batch Performance) — 5 plans, all complete
 Also: Phase 103 COMPLETE (Traditional TA Expansion) — 3/3 plans complete
-Status: Plan 105-03 complete — run_param_sweep.py CLI with 22-indicator PARAM_SPACE_REGISTRY, FDR survivor discovery, --dry-run, full sweep orchestration
-Last activity: 2026-04-01 — Completed 105-03-PLAN.md
+Status: Plan 111-01 complete — use_polars flag, polars_feature_ops.py, cycle_stats + rolling_extremes migrated, regression verified (max diff = 0.0)
+Last activity: 2026-04-01 — Completed 111-01-PLAN.md
 
-Progress: [##########] 100% v1.2.0 | [█████████░] 90% v1.3.0 (27/28 plans, 8/6 phases)
+Progress: [##########] 100% v1.2.0 | [█████████░] 90% v1.3.0 (28/29 plans, 8/6 phases)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 424
+- Total plans completed: 425
 - Average duration: 7 min
 - Total execution time: ~32.6 hours
 
@@ -311,12 +312,20 @@ Phase 110-01 decisions:
 - Microstructure remains in Wave 2b (not moved to Wave 1): hard dependency on features_store INSERTs must be preserved
 - Phase 3b (codependence) log label left as-is: plan only specified Phase 1/2/2c/3 logger calls; optional off-path step
 
+Phase 111-01 decisions:
+- polars_sorted_groupby: sort once with polars then pandas groupby(sort=False) -- eliminates per-group sort inside apply_fn, numba kernels unchanged
+- use_polars=False default: zero behavior change for existing callers; opt-in at config level per sub-phase
+- timestamp normalization as explicit step: polars cannot represent tz-aware pandas datetimes; strip before pl.from_pandas(), restore after .to_pandas()
+- CS norms is pure SQL (PARTITION BY window functions): confirmed no-op for polars migration, no Python loop to migrate
+- boolean column XOR in compare_feature_outputs: numpy cannot subtract bool arrays; use ^ operator and count mismatches instead
+- HAVE_POLARS constant: try/except at module import level; pl=None fallback for environments without polars installed
+
 ## Session Continuity
 
 Last session: 2026-04-01
-Stopped at: Completed 105-03-PLAN.md
+Stopped at: Completed 111-01-PLAN.md
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-04-01 (Phase 110-01 complete: Wave 1 parallelized to 4 threads, --workers CLI flag, budget guard, Wave N log labels)*
+*Last updated: 2026-04-01 (Phase 111-01 complete: use_polars flag, polars_feature_ops.py, cycle_stats + rolling_extremes migrated, max diff=0.0 on production data)*
