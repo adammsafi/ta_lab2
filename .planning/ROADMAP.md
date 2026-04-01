@@ -1406,7 +1406,7 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 - [x] **Phase 99: Backtest Scaling** - Resume-safe mass backtest orchestrator, partitioned trades table, 113K+ core runs, MC bands, CTF signal backtests, expanded grids, leaderboard dashboard — COMPLETE 2026-04-01
 - [ ] **Phase 100: ML Signal Combination** - LGBMRanker cross-sectional predictor, SHAP interaction analysis, XGBoost meta-label confidence filter
 - [x] **Phase 101: Tech Debt Cleanup** - Remove orphaned export, create Phase 82/92 VERIFICATION.md, document CTF downstream consumers — COMPLETE 2026-04-01
-- [ ] **Phase 102: Indicator Research Framework** - Permutation IC test, FDR control, haircut Sharpe, trial registry, block bootstrap — the testing harness for all indicator R&D
+- [x] **Phase 102: Indicator Research Framework** - Permutation IC test, FDR control, haircut Sharpe, trial registry, block bootstrap — the testing harness for all indicator R&D — COMPLETE 2026-04-01
 - [ ] **Phase 103: Traditional TA Expansion** - Add 20-30 well-known indicators (Ichimoku, Williams %R, Keltner, CCI, Elder Ray, Force Index, VWAP, VIDYA, FRAMA, etc.), IC sweep through Phase 102 harness
 - [ ] **Phase 104: Crypto-Native Indicators** - Venue-agnostic normalized input layer for OI/funding/volume, derive OI momentum, OI-price divergence, funding rate z-score, Force Index, liquidation pressure proxy
 - [ ] **Phase 105: Parameter Optimization** - Systematic parameter sweep (grid + Optuna) for surviving indicators, plateau preference, rolling stability test, DSR over full search space
@@ -1561,9 +1561,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 102-01: Alembic migration for trial_registry table + permutation IC test + FDR control functions
-- [ ] 102-02: Haircut Sharpe (Harvey & Liu 2015) + block bootstrap IC + integration with existing IC sweep scripts
-- [ ] 102-03: Wire trial registry logging into run_ic_sweep.py and run_ctf_ic_sweep.py + validation tests
+- [x] 102-01: Alembic migration for trial_registry table + permutation IC test + FDR control functions
+- [x] 102-02: Haircut Sharpe (Harvey & Liu 2015) + block bootstrap IC + integration with existing IC sweep scripts
+- [x] 102-03: Wire trial registry logging into run_ic_sweep.py and run_ctf_ic_sweep.py + validation tests
 
 ---
 
