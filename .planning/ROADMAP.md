@@ -1628,7 +1628,7 @@ Plans:
 | 99. Backtest Scaling | 0/TBD | Not started | - |
 | 100. ML Signal Combination | 0/TBD | Not started | - |
 | 101. Tech Debt Cleanup | 0/TBD | Not started | - |
-| 102. Indicator Research Framework | 0/TBD | Not started | - |
+| 102. Indicator Research Framework | 0/3 | Not started | - |
 | 103. Traditional TA Expansion | 0/TBD | Not started | - |
 | 104. Crypto-Native Indicators | 0/TBD | Not started | - |
 | 105. Parameter Optimization | 0/TBD | Not started | - |
