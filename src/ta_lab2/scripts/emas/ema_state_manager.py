@@ -34,6 +34,7 @@ Usage:
 """
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Optional
 import pandas as pd
 from sqlalchemy import text
@@ -521,6 +522,179 @@ class EMAStateManager:
                 result[id_] = max_ts - lookback
 
         return result
+
+    def is_watermark_recent(
+        self,
+        id_: int,
+        threshold_days: int = 7,
+        venue_id: int = 1,
+    ) -> bool:
+        """
+        Check whether the minimum watermark across all (tf, period) keys for
+        this ID is within threshold_days of now.
+
+        Returns True  → fast-path is safe (watermark is fresh)
+        Returns False → full recompute needed (watermark is stale or missing)
+
+        Args:
+            id_: Cryptocurrency ID
+            threshold_days: Maximum age in days to consider "recent" (default 7)
+            venue_id: Venue ID to scope the state check (default 1 = CMC_AGG)
+        """
+        sql = text(
+            f"""
+            SELECT MIN(last_canonical_ts) AS min_ts
+            FROM {self.config.state_schema}.{self.config.state_table}
+            WHERE id = :id
+              AND venue_id = :venue_id
+            """
+        )
+        try:
+            with self.engine.connect() as conn:
+                row = conn.execute(sql, {"id": id_, "venue_id": venue_id}).fetchone()
+        except Exception:
+            # State table doesn't exist yet → full recompute
+            return False
+
+        if row is None or row[0] is None:
+            return False
+
+        min_ts = row[0]
+        # Normalize to tz-aware if needed
+        if hasattr(min_ts, "tzinfo") and min_ts.tzinfo is None:
+            min_ts = min_ts.replace(tzinfo=timezone.utc)
+
+        now = datetime.now(tz=timezone.utc)
+        age_days = (now - min_ts).total_seconds() / 86400.0
+        return age_days < threshold_days
+
+    def load_last_ema_values(
+        self,
+        id_: int,
+        periods: list[int],
+        venue_id: int = 1,
+        output_table: Optional[str] = None,
+        output_schema: Optional[str] = None,
+    ) -> pd.DataFrame:
+        """
+        Load the most recent canonical EMA row per (tf, period) for a given asset.
+
+        Returns a DataFrame with columns: tf, period, ts, ema, ema_bar, roll
+        One row per (tf, period) — the last canonical (roll=FALSE) EMA value.
+        The caller uses this as the seed for forward EMA computation.
+
+        Args:
+            id_: Cryptocurrency ID
+            periods: List of EMA periods to load (e.g. [9, 21, 50, 200])
+            venue_id: Venue ID (default 1 = CMC_AGG)
+            output_table: EMA output table name (falls back to "ema_multi_tf_u")
+            output_schema: Schema for output table (falls back to state_schema)
+        """
+        tbl = output_table or "ema_multi_tf_u"
+        schema = output_schema or self.config.state_schema
+        fq = f"{schema}.{tbl}"
+
+        sql = text(
+            f"""
+            SELECT DISTINCT ON (tf, period)
+                tf,
+                period,
+                ts,
+                ema,
+                ema_bar,
+                roll
+            FROM {fq}
+            WHERE id = :id
+              AND venue_id = :venue_id
+              AND period = ANY(:periods)
+              AND roll = FALSE
+            ORDER BY tf, period, ts DESC
+            """
+        )
+
+        try:
+            with self.engine.connect() as conn:
+                df = pd.read_sql(
+                    sql,
+                    conn,
+                    params={"id": id_, "venue_id": venue_id, "periods": periods},
+                )
+            return df
+        except Exception:
+            return pd.DataFrame(
+                columns=["tf", "period", "ts", "ema", "ema_bar", "roll"]
+            )
+
+    def load_recent_bars(
+        self,
+        id_: int,
+        since_ts: pd.Timestamp,
+        venue_id: int = 1,
+        bars_table: str = "price_bars_1d",
+        bars_schema: str = "public",
+    ) -> pd.DataFrame:
+        """
+        Load daily OHLCV bars for an asset newer than since_ts.
+
+        This replaces the full-history load (which loads from watermark - 730d)
+        when the fast-path is active.  Only the closes *after* the last known
+        EMA timestamp are needed for forward computation.
+
+        Source table is price_bars_1d (the daily bar table used as the
+        canonical source for EMA computation — see MultiTFEMAFeature.load_source_data).
+
+        Args:
+            id_: Cryptocurrency ID
+            since_ts: Load bars with ts >= since_ts (the last EMA timestamp)
+            venue_id: Venue ID filter (default 1 = CMC_AGG)
+            bars_table: Daily bars table name (default "price_bars_1d")
+            bars_schema: Schema for bars table (default "public")
+        """
+        fq = f"{bars_schema}.{bars_table}"
+
+        sql = text(
+            f"""
+            SELECT
+                id,
+                venue_id,
+                timestamp AS ts,
+                open,
+                high,
+                low,
+                close,
+                volume
+            FROM {fq}
+            WHERE id = :id
+              AND venue_id = :venue_id
+              AND timestamp >= :since_ts
+            ORDER BY id, venue_id, timestamp
+            """
+        )
+
+        try:
+            with self.engine.connect() as conn:
+                df = pd.read_sql(
+                    sql,
+                    conn,
+                    params={"id": id_, "venue_id": venue_id, "since_ts": since_ts},
+                )
+            # Ensure ts is tz-aware UTC
+            if not df.empty and "ts" in df.columns:
+                df["ts"] = pd.to_datetime(df["ts"], utc=True)
+            return df
+        except Exception:
+            return pd.DataFrame(
+                columns=[
+                    "id",
+                    "venue_id",
+                    "ts",
+                    "open",
+                    "high",
+                    "low",
+                    "close",
+                    "volume",
+                ]
+            )
 
     def __repr__(self) -> str:
         return (
