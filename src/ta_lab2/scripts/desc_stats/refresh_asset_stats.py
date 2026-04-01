@@ -572,14 +572,21 @@ def main() -> None:
                 watermarks[(int(row[0]), int(row[1]), str(row[2]))] = str(row[3])
 
             # Source max timestamps per (id, venue_id, tf)
-            src_rows = conn.execute(
-                text(
-                    'SELECT id, venue_id, tf, max("timestamp") '
-                    "FROM public.returns_bars_multi_tf_u "
-                    "WHERE roll = FALSE AND alignment_source = 'multi_tf' "
-                    "GROUP BY id, venue_id, tf"
-                )
-            ).fetchall()
+            # Only query for IDs we'll actually process (not full table scan)
+            all_ids = [aid for aids in venue_asset_map.values() for aid in aids]
+            if all_ids:
+                src_rows = conn.execute(
+                    text(
+                        'SELECT id, venue_id, tf, max("timestamp") '
+                        "FROM public.returns_bars_multi_tf_u "
+                        "WHERE roll = FALSE AND alignment_source = 'multi_tf' "
+                        "AND id = ANY(:ids) "
+                        "GROUP BY id, venue_id, tf"
+                    ),
+                    {"ids": all_ids},
+                ).fetchall()
+            else:
+                src_rows = []
             for row in src_rows:
                 source_max_ts[(int(row[0]), int(row[1]), str(row[2]))] = str(row[3])
         engine_wm.dispose()
