@@ -226,6 +226,15 @@ Phase 109-01 decisions:
 - compute_changed_ids returns 3-tuple (changed_ids, unchanged_ids, bar_watermarks): bar_watermarks passed through to avoid redundant query in _update_feature_refresh_state
 - total_rows_written in _update_feature_refresh_state is batch total (not per-asset): sufficient for monitoring
 
+Phase 100-03 decisions:
+- Alembic revision w6x7y8z9a0b1 chains from v5w6x7y8z9a0 (actual head at time of execution); plan spec was stale
+- t1_series.index = DatetimeIndex(t0) required for PurgedKFoldSplitter: integer index caused datetime/int TypeError on fold boundary comparison
+- train_start/train_end use sentinel dates "2000-01-01"/"2099-12-31": cross-asset training has no single date range; "N/A" caused TIMESTAMPTZ parse error in ExperimentTracker
+- meta_filter_enabled=FALSE default ensures zero behavior change for existing executor configs -- must be explicitly enabled
+- xgboost lazy-imported in _init_meta_filter() inside method scope: optional dependency, no ImportError at module load time
+- skipped_meta_filter counted in skipped_no_delta for run log (consistent skip semantics)
+- Rule 1 bug fixed: v5w6x7y8z9a0 migration had :params::jsonb syntax error; fixed to CAST(:params AS jsonb)
+
 Phase 103-03 decisions:
 - Shell out to run_all_feature_refreshes (--ta --all-tfs) instead of importing TAFeature: reuses all existing batching/parallelism, avoids managing second engine
 - Direct SQL to load features (SELECT ts, <cols>, close) scoped to Phase 103 columns: avoids loading all 112+ feature columns into memory
@@ -235,9 +244,9 @@ Phase 103-03 decisions:
 ## Session Continuity
 
 Last session: 2026-04-01
-Stopped at: Completed 109-01-PLAN.md
+Stopped at: Completed 100-03-PLAN.md (also 109-01-PLAN.md per prior session)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-04-01 (Phase 109-01 complete: feature_refresh_state table + 4 watermark helpers; Plan 02 wires into run_all_refreshes)*
+*Last updated: 2026-04-01 (Phase 100-03 complete: XGBoost meta-label filter + executor gate; also 109-01 per prior session)*
