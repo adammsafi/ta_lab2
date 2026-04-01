@@ -5,20 +5,21 @@
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 105 IN PROGRESS (Parameter Optimization — Plans 01+02 complete)
+**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 110 IN PROGRESS (Feature Parallel Sub-Phases — Plan 01 complete)
 
 ## Current Position
 
-Phase: 105 IN PROGRESS (Parameter Optimization) — 2/N plans complete
+Phase: 110 IN PROGRESS (Feature Parallel Sub-Phases) — 1/1 plans complete
+Also: Phase 105 IN PROGRESS (Parameter Optimization) — 2/N plans complete
 Also: Phase 109 COMPLETE (Feature Skip-Unchanged) — 2/2 plans complete
 Also: Phase 104 COMPLETE (Crypto-Native Indicators) — 3/3 plans complete
 Also: Phase 100 IN PROGRESS (ML Signal Combination) — Plans 01+02 complete (2/3 plans)
 Also: Phase 108 COMPLETE (Pipeline Batch Performance) — 5 plans, all complete
 Also: Phase 103 COMPLETE (Traditional TA Expansion) — 3/3 plans complete
-Status: Plan 105-02 complete — plateau_score, rolling_stability_test, compute_dsr_over_sweep, select_best_from_sweep added to param_optimizer.py
-Last activity: 2026-04-01 — Completed 105-02-PLAN.md
+Status: Plan 110-01 complete — Wave 1 parallelized to 4 threads, --workers CLI flag, tf_workers*wave1_workers budget guard, Wave N log labels
+Last activity: 2026-04-01 — Completed 110-01-PLAN.md
 
-Progress: [##########] 100% v1.2.0 | [█████████░] 89% v1.3.0 (25/27 plans, 8/6 phases)
+Progress: [##########] 100% v1.2.0 | [█████████░] 90% v1.3.0 (26/27 plans, 8/6 phases)
 
 ## Performance Metrics
 
@@ -295,12 +296,18 @@ Phase 105-02 decisions:
 - DB UPDATE in select_best_from_sweep wrapped in try/except: registry failure must not abort returned selection result
 - compute_rolling_ic and compute_dsr imported at module level (not lazily): lightweight, no circular import risk
 
+Phase 110-01 decisions:
+- wave1_workers threaded as tuple element (not kwargs) in _run_single_tf args_tuple: consistent with existing positional tuple pattern
+- Clamp wave1_workers = min(wave1_workers, len(phase1_tasks)) inside run_all_refreshes(): prevents over-provisioning, self-correcting
+- Microstructure remains in Wave 2b (not moved to Wave 1): hard dependency on features_store INSERTs must be preserved
+- Phase 3b (codependence) log label left as-is: plan only specified Phase 1/2/2c/3 logger calls; optional off-path step
+
 ## Session Continuity
 
 Last session: 2026-04-01
-Stopped at: Completed 105-02-PLAN.md
+Stopped at: Completed 110-01-PLAN.md
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-04-01 (Phase 105-02 complete: plateau_score, rolling_stability_test, compute_dsr_over_sweep, select_best_from_sweep added to param_optimizer.py)*
+*Last updated: 2026-04-01 (Phase 110-01 complete: Wave 1 parallelized to 4 threads, --workers CLI flag, budget guard, Wave N log labels)*
