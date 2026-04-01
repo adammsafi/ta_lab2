@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 
 ## Current Position
 
-Phase: 102 of 111 (Indicator Research Framework) — In progress (1/N plans complete)
-Next: 102-02 (permutation sweep pipeline)
-Status: 102-01 COMPLETE — trial_registry created (757K rows), permutation_ic_test/fdr_control/log_trials_to_registry implemented
-Last activity: 2026-04-01 — Completed 102-01-PLAN.md
+Phase: 102 of 111 (Indicator Research Framework) — In progress (3/N plans complete)
+Next: 102-04 (if any) or next phase
+Status: 102-03 COMPLETE — IC sweep scripts auto-log to trial_registry; classify_feature_tier has perm_p_value gate
+Last activity: 2026-04-01 — Completed 102-03-PLAN.md
 
 Progress: [##########] 100% v1.2.0 | [█████████░] 64% v1.3.0 (17/26 plans, 5/6 phases)
 
@@ -206,12 +206,19 @@ Phase 102-01 decisions:
 - Migration chains from t4u5v6w7x8y9 (actual head) not s3t4u5v6w7x8 as specified: Phase 107 added t4u5v6w7x8y9 after Phase 99
 - multiple_testing.py functions appended not rewriting: file already contained haircut_sharpe, block_bootstrap_ic, get_trial_count from 102-02
 
+Phase 102-03 decisions:
+- log_trials_to_registry placed inside if all_ic_rows block: no-op when sweep produces no rows (save_ic_results not called, neither is log_trials_to_registry)
+- try/except wraps all 4 log_trials_to_registry call sites: IC sweep integrity preserved if registry fails (warnings logged, sweep continues)
+- perm_p_value gate applied after IC-IR classification as a downgrade-only override — existing IC-IR logic determines base tier, then perm gate can only lower it
+- Early-return tier pattern refactored to tier-variable pattern to enable post-classification gate application cleanly
+- perm_p_value < 0.05 passes the gate with no constraint — consistent with standard 5% significance threshold
+
 ## Session Continuity
 
 Last session: 2026-04-01
-Stopped at: Completed 102-01-PLAN.md
+Stopped at: Completed 102-03-PLAN.md
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-04-01 (Phase 102-02 complete: haircut_sharpe, haircut_ic_ir, block_bootstrap_ic added to multiple_testing.py)*
+*Last updated: 2026-04-01 (Phase 102-03 complete: IC sweep scripts auto-log to trial_registry; classify_feature_tier has perm_p_value gate)*
