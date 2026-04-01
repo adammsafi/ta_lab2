@@ -158,21 +158,36 @@ class CrossSectionalRanker:
         # ------------------------------------------------------------------
         # Step 1: discover which feature columns to load
         # ------------------------------------------------------------------
-        col_sql = text(
+        # Source 1: CTF active features from dim_ctf_feature_selection
+        # (Phase 92 / 98 populates this table; tier='active' = IC-passing CTF features)
+        ctf_col_sql = text(
             """
             SELECT DISTINCT feature_name
-            FROM public.dim_feature_selection
+            FROM public.dim_ctf_feature_selection
             WHERE tier = 'active'
-               OR source = 'ctf_ic_promoted'
             ORDER BY feature_name
             """
         )
         with engine.connect() as conn:
-            selected_rows = conn.execute(col_sql).fetchall()
+            ctf_rows = conn.execute(ctf_col_sql).fetchall()
+        ctf_features = [r[0] for r in ctf_rows]
 
-        selected_features = [r[0] for r in selected_rows]
+        # Source 2: General active-tier features from dim_feature_selection
+        # (dim_feature_selection has no 'source' column; query tier='active' only)
+        base_col_sql = text(
+            """
+            SELECT DISTINCT feature_name
+            FROM public.dim_feature_selection
+            WHERE tier = 'active'
+            ORDER BY feature_name
+            """
+        )
+        with engine.connect() as conn:
+            base_rows = conn.execute(base_col_sql).fetchall()
+        base_features = [r[0] for r in base_rows]
 
-        # Also include AMA features: query information_schema for *_ama columns
+        # Source 3: AMA-style hash columns in the features table
+        # (columns ending in _ama, e.g. TEMA_abc123_ama)
         ama_col_sql = text(
             """
             SELECT column_name
@@ -185,18 +200,20 @@ class CrossSectionalRanker:
         )
         with engine.connect() as conn:
             ama_rows = conn.execute(ama_col_sql).fetchall()
-
         ama_features = [r[0] for r in ama_rows]
 
-        # Union: selected features + AMA features, deduped, sorted
-        all_feature_cols = sorted(set(selected_features) | set(ama_features))
+        # Union: CTF + base active + AMA features, deduped, sorted
+        all_feature_cols = sorted(
+            set(ctf_features) | set(base_features) | set(ama_features)
+        )
 
         if not all_feature_cols:
             logger.warning(
-                "No features found in dim_feature_selection or AMA columns. "
-                "Check that Phase 98 (CTF promotion) has been run."
+                "No features found in dim_ctf_feature_selection, dim_feature_selection, "
+                "or AMA columns in features table. "
+                "Check that Phase 92/98 (CTF promotion) has been run."
             )
-            # Fall back to loading all numeric feature columns
+            # Fall back to loading all feature columns from the table
             all_feature_cols = []
 
         # ------------------------------------------------------------------
@@ -261,41 +278,44 @@ class CrossSectionalRanker:
         feat_df = feat_df.rename(columns={"id": "asset_id"})
 
         # ------------------------------------------------------------------
-        # Step 3: load forward returns (shift -1 within each asset)
+        # Step 3: compute forward returns
         # ------------------------------------------------------------------
-        returns_sql = text(
-            """
-            SELECT id AS asset_id, ts, ret_arith
-            FROM public.returns_bars_multi_tf
-            WHERE tf = :tf
-              AND venue_id = :venue_id
-            ORDER BY asset_id, ts
-            """
-        )
-        with engine.connect() as conn:
-            ret_df = pd.read_sql(
-                returns_sql,
-                conn,
-                params={"tf": tf, "venue_id": venue_id},
+        # The features table includes ret_arith (current-bar arith return).
+        # Forward return = next-bar ret_arith, computed by shifting -1 per asset.
+        if "ret_arith" not in feat_df.columns:
+            # ret_arith not in selected columns; load it separately
+            ret_only_sql = text(
+                """
+                SELECT id AS asset_id, ts, ret_arith
+                FROM public.features
+                WHERE tf = :tf
+                  AND venue_id = :venue_id
+                ORDER BY id, ts
+                """
             )
-
-        if ret_df.empty:
-            logger.warning("returns_bars_multi_tf returned 0 rows for tf=%s", tf)
-            return pd.DataFrame()
-
-        ret_df["ts"] = pd.to_datetime(ret_df["ts"], utc=True)
-
-        # Forward return: for each asset, shift ret_arith by -1
-        ret_df = ret_df.sort_values(["asset_id", "ts"])
-        ret_df["forward_return"] = ret_df.groupby("asset_id")["ret_arith"].shift(-1)
-
-        # Keep only ts + forward_return for join
-        ret_df = ret_df[["asset_id", "ts", "forward_return"]]
-
-        # ------------------------------------------------------------------
-        # Step 4: merge features with forward returns
-        # ------------------------------------------------------------------
-        merged = feat_df.merge(ret_df, on=["asset_id", "ts"], how="inner")
+            with engine.connect() as conn:
+                ret_only = pd.read_sql(
+                    ret_only_sql,
+                    conn,
+                    params={"tf": tf, "venue_id": venue_id},
+                )
+            if ret_only.empty:
+                logger.warning("features.ret_arith returned 0 rows for tf=%s", tf)
+                return pd.DataFrame()
+            ret_only["ts"] = pd.to_datetime(ret_only["ts"], utc=True)
+            ret_only = ret_only.sort_values(["asset_id", "ts"])
+            ret_only["forward_return"] = ret_only.groupby("asset_id")[
+                "ret_arith"
+            ].shift(-1)
+            ret_only = ret_only[["asset_id", "ts", "forward_return"]]
+            merged = feat_df.merge(ret_only, on=["asset_id", "ts"], how="inner")
+        else:
+            # ret_arith already loaded — shift to get forward return
+            feat_df = feat_df.sort_values(["asset_id", "ts"])
+            feat_df["forward_return"] = feat_df.groupby("asset_id")["ret_arith"].shift(
+                -1
+            )
+            merged = feat_df
 
         # Drop rows where forward_return is NaN (last bar per asset)
         n_before = len(merged)
@@ -350,10 +370,12 @@ class CrossSectionalRanker:
 
     @staticmethod
     def _build_rank_target(df: pd.DataFrame) -> pd.Series:
-        """Build percentile rank target from forward_return within each timestamp.
+        """Build integer rank target from forward_return within each timestamp.
 
-        For each timestamp cross-section, ranks assets by forward_return using
-        percentile rank in [0, 1].  Higher rank = better return.
+        LGBMRanker requires integer labels (relevance grades >= 0).
+        For each timestamp cross-section, assets are ranked by forward_return
+        as integer ordinal ranks (0 = worst, n-1 = best) using method='first'
+        to avoid ties.
 
         Parameters
         ----------
@@ -362,10 +384,12 @@ class CrossSectionalRanker:
 
         Returns
         -------
-        pd.Series
-            Percentile ranks aligned to df.index.
+        pd.Series of int
+            Integer ranks [0, n_assets-1] aligned to df.index.
         """
-        return df.groupby("ts")["forward_return"].rank(pct=True)
+        # rank(method='first') gives integer ordinal ranks 1..n, subtract 1 for 0-based
+        ranks = df.groupby("ts")["forward_return"].rank(method="first", ascending=True)
+        return (ranks - 1).astype(int)
 
     # ------------------------------------------------------------------
     # Feature column extraction
@@ -417,30 +441,40 @@ class CrossSectionalRanker:
         """
         lgb = _import_lgbm()
 
-        # Sort by timestamp to ensure temporal order
-        df = df.sort_values("ts").reset_index(drop=True)
+        # Sort by timestamp then asset_id for stable temporal + group order.
+        df = df.sort_values(["ts", "asset_id"]).reset_index(drop=True)
 
         feature_cols = self._get_feature_cols(df)
         self.feature_names_ = feature_cols
 
-        X = df[feature_cols].values
+        # Cast to float64 so Python None values become np.nan (not object dtype)
+        X = df[feature_cols].astype(float).values
+        # y = integer rank labels for LGBMRanker training
         y = self._build_rank_target(df).values
+        # y_ret = actual forward returns for IC evaluation
+        y_ret = df["forward_return"].values
 
-        # Build t1_series for purged CV:
-        # Index = row-level timestamps (one per row, not unique per timestamp),
-        # Values = same timestamps + 1 period (label ends at next bar start).
-        # PurgedKFoldSplitter needs a monotonically increasing index.
-        # We index by integer position but use the ts values for purging.
-        ts_arr = df["ts"].values
-        # Use unique timestamps to build the series (index = position in sorted order)
-        # Actually PurgedKFoldSplitter works on the full panel rows —
-        # use row timestamps as index (sorted), values = ts + 1 bar (approx 1 day)
-        ts_series_idx = pd.to_datetime(ts_arr, utc=True)
-        # Label end = next timestamp (approximate with 1D offset for safety)
-        t1_values = ts_series_idx + pd.Timedelta(days=1)
-        t1_series = pd.Series(t1_values, index=ts_series_idx)
-        # Ensure monotonically increasing index (sort by ts)
-        t1_series = t1_series.sort_index()
+        # Build t1_series for purged CV on unique timestamps.
+        # PurgedKFoldSplitter requires a monotonically increasing index.
+        # For a panel dataset (multiple assets per timestamp) we operate on
+        # unique time periods.  The splitter returns period-level indices;
+        # we then expand them back to row-level indices via the period->rows map.
+        # MEMORY.md: Series.values strips tz from UTC-aware datetimes.
+        # Use .tolist() to preserve tz-aware Timestamps so PurgedKFoldSplitter
+        # comparisons are tz-consistent (t1_complement <= test_start_ts).
+        unique_ts_s = df["ts"].drop_duplicates().sort_values().reset_index(drop=True)
+        unique_ts_list = unique_ts_s.tolist()  # list of tz-aware Timestamps
+        t1_index = pd.DatetimeIndex(unique_ts_list)
+        t1_vals = pd.DatetimeIndex([t + pd.Timedelta(days=1) for t in unique_ts_list])
+        t1_series = pd.Series(t1_vals, index=t1_index)
+
+        # Map ts -> row positions for period->row expansion
+        ts_to_row_indices: dict = {}
+        for pos, ts_val in enumerate(df["ts"]):
+            ts_to_row_indices.setdefault(ts_val, []).append(pos)
+
+        # Period list for splitter (tz-aware Timestamps)
+        period_arr = unique_ts_list
 
         splitter = PurgedKFoldSplitter(
             n_splits=n_splits,
@@ -451,18 +485,33 @@ class CrossSectionalRanker:
         fold_ics: list[float] = []
         fold_ndcgs: list[float] = []
 
-        for fold_idx, (train_idx, test_idx) in enumerate(splitter.split(X)):
-            if len(train_idx) < 2 or len(test_idx) < 2:
+        for fold_idx, (train_period_idx, test_period_idx) in enumerate(
+            splitter.split(period_arr)
+        ):
+            # Expand period indices -> row indices
+            if len(train_period_idx) == 0 or len(test_period_idx) == 0:
+                logger.warning("Fold %d: empty period index, skipping", fold_idx)
+                continue
+
+            train_row_idx = np.concatenate(
+                [ts_to_row_indices[period_arr[i]] for i in train_period_idx]
+            ).astype(np.intp)
+            test_row_idx = np.concatenate(
+                [ts_to_row_indices[period_arr[i]] for i in test_period_idx]
+            ).astype(np.intp)
+
+            if len(train_row_idx) < 2 or len(test_row_idx) < 2:
                 logger.warning("Fold %d: too few samples, skipping", fold_idx)
                 continue
 
-            X_train = X[train_idx]
-            y_train = y[train_idx]
-            X_test = X[test_idx]
-            y_test = y[test_idx]
+            X_train = X[train_row_idx]
+            y_train = y[train_row_idx]
+            X_test = X[test_row_idx]
+            y_test = y[test_row_idx]
+            y_ret_test = y_ret[test_row_idx]
 
-            ts_train = df["ts"].iloc[train_idx]
-            ts_test = df["ts"].iloc[test_idx]
+            ts_train = df["ts"].iloc[train_row_idx]
+            ts_test = df["ts"].iloc[test_row_idx]
 
             # CRITICAL: recompute group sizes from this fold's training subset
             group_train = self._build_group_array(ts_train)
@@ -494,7 +543,8 @@ class CrossSectionalRanker:
             period_ndcgs = []
             for ts_val in ts_test.unique():
                 mask = (ts_test == ts_val).values
-                y_true_p = y_test[mask]
+                y_rank_p = y_test[mask]  # integer ranks
+                y_true_p = y_ret_test[mask]  # actual forward returns
                 y_pred_p = y_pred[mask]
 
                 if len(y_true_p) < 2:
@@ -507,7 +557,7 @@ class CrossSectionalRanker:
                 # NDCG requires 2D arrays
                 try:
                     ndcg_val = ndcg_score(
-                        [y_true_p],
+                        [y_rank_p.astype(float)],
                         [y_pred_p],
                     )
                     period_ndcgs.append(float(ndcg_val))
@@ -524,8 +574,8 @@ class CrossSectionalRanker:
                 fold_idx,
                 fold_ic,
                 fold_ndcg,
-                len(train_idx),
-                len(test_idx),
+                len(train_row_idx),
+                len(test_row_idx),
             )
 
             # Keep last fold model for downstream SHAP (Plan 100-02)
