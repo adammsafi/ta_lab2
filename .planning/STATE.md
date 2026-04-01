@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 
 ## Current Position
 
-Phase: 108 of 108 IN PROGRESS (Pipeline Batch Performance) — Plans 01-03 complete
-Next: Phase 108 Plan 04 (bar returns batch)
-Status: Plan 108-03 complete — AMA returns optimized: bulk watermark preload + source-advance skip + batched worker dispatch
-Last activity: 2026-04-01 — Completed 108-03-PLAN.md (bulk _bulk_load_watermarks, source-advance skip, _BATCH_SIZE=15 batched workers)
+Phase: 108 of 108 IN PROGRESS (Pipeline Batch Performance) — Plans 01-04 complete
+Next: Phase 108 Plan 05
+Status: Plan 108-01 complete — All 3 EMA returns scripts rewritten to per-ID batch SQL with PARTITION BY (2M keys -> 492 IDs)
+Last activity: 2026-04-01 — Completed 108-01-PLAN.md (EMA returns batch rewrite: multi_tf + cal + cal_anchor)
 
 Progress: [##########] 100% v1.2.0 | [████████░░] 46% v1.3.0 (12/26 plans, 3/6 phases)
 
@@ -160,6 +160,13 @@ Phase 99-04 decisions:
 - Phase 100 dependency: ML-01/ML-02/ML-03 require CTF features in features table (Phase 98 must complete first)
 - Phase 98-01 NOTE: refresh_ctf_promoted.py 1D refresh takes ~13 minutes (row-by-row UPDATE with 401 cols). Acceptable for periodic refresh; full all-base_tfs run ~60 min.
 
+Phase 108-01 decisions:
+- PARTITION BY (tf, period, venue_id) for unified LAG, PARTITION BY (tf, period, venue_id, roll) for canonical LAG — preserves exact per-key semantics when iterating all combos in one CTE
+- Global min watermark as seed anchor: min() across all keys for the ID; NULL if any key lacks watermark (full history required)
+- LEFT JOIN state table for per-key to_insert filter: cleaner than VALUES clause, single indexed lookup per (tf, period, venue_id) row
+- Bulk state update: INSERT...SELECT GROUP BY with GREATEST(): one upsert per combo vs one UPDATE per key
+- Pre-ruff-format before staging: prevents pre-commit stash/restore failure when unstaged changes exist in other files
+
 Phase 108-02 decisions:
 - Fast-path threshold = 7 days: watermarks older than 7 days trigger full recompute; configurable via --fast-path-threshold-days
 - Virtual seed row pattern: when daily grid starts after seed_ts (common daily incremental case), prepend virtual row with seed_ema_bar, run compute_dual_ema_numpy, drop index 0 from output
@@ -182,4 +189,4 @@ Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-04-01 (Phase 108-03 complete: AMA returns bulk watermark preload + source-advance skip + _BATCH_SIZE=15 batched workers)*
+*Last updated: 2026-04-01 (Phase 108-01 complete: EMA returns multi_tf + cal + cal_anchor rewritten to per-ID batch SQL with PARTITION BY)*
