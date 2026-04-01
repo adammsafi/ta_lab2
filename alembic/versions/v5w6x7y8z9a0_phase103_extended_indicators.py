@@ -42,7 +42,11 @@ depends_on = None
 _INDICATOR_ROWS = [
     ("ichimoku", "ichimoku_9_26_52", '{"tenkan": 9, "kijun": 26, "senkou_b": 52}'),
     ("willr", "willr_14", '{"window": 14}'),
-    ("keltner", "keltner_20_10", '{"ema_period": 20, "atr_period": 10, "multiplier": 2.0}'),
+    (
+        "keltner",
+        "keltner_20_10",
+        '{"ema_period": 20, "atr_period": 10, "multiplier": 2.0}',
+    ),
     ("cci", "cci_20", '{"window": 20}'),
     ("elder_ray", "elder_ray_13", '{"period": 13}'),
     ("force_index", "force_index_13", '{"smooth": 13}'),
@@ -58,8 +62,12 @@ _INDICATOR_ROWS = [
     ("vortex", "vortex_14", '{"window": 14}'),
     ("emv", "emv_14", '{"window": 14}'),
     ("mass_index", "mass_idx_25", '{"ema_period": 9, "sum_period": 25}'),
-    ("kst", "kst_default", '{}'),
-    ("coppock", "coppock_default", '{"roc_long": 14, "roc_short": 11, "wma_period": 10}'),
+    ("kst", "kst_default", "{}"),
+    (
+        "coppock",
+        "coppock_default",
+        '{"roc_long": 14, "roc_short": 11, "wma_period": 10}',
+    ),
 ]
 
 # indicator_name values for downgrade DELETE
@@ -181,8 +189,4 @@ def downgrade() -> None:
 
     # Drop columns from ta table
     for col_name in _NEW_COLUMNS:
-        conn.execute(
-            text(
-                f"ALTER TABLE public.ta DROP COLUMN IF EXISTS {col_name}"
-            )
-        )
+        conn.execute(text(f"ALTER TABLE public.ta DROP COLUMN IF EXISTS {col_name}"))
