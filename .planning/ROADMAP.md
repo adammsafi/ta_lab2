@@ -1408,7 +1408,7 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 - [x] **Phase 101: Tech Debt Cleanup** - Remove orphaned export, create Phase 82/92 VERIFICATION.md, document CTF downstream consumers — COMPLETE 2026-04-01
 - [x] **Phase 102: Indicator Research Framework** - Permutation IC test, FDR control, haircut Sharpe, trial registry, block bootstrap — the testing harness for all indicator R&D — COMPLETE 2026-04-01
 - [x] **Phase 103: Traditional TA Expansion** - Add 20-30 well-known indicators (Ichimoku, Williams %R, Keltner, CCI, Elder Ray, Force Index, VWAP, VIDYA, FRAMA, etc.), IC sweep through Phase 102 harness — COMPLETE 2026-04-01
-- [ ] **Phase 104: Crypto-Native Indicators** - Venue-agnostic normalized input layer for OI/funding/volume, derive OI momentum, OI-price divergence, funding rate z-score, Force Index, liquidation pressure proxy
+- [x] **Phase 104: Crypto-Native Indicators** - Venue-agnostic normalized input layer for OI/funding/volume, derive OI momentum, OI-price divergence, funding rate z-score, Force Index, liquidation pressure proxy — COMPLETE 2026-04-01
 - [ ] **Phase 105: Parameter Optimization** - Systematic parameter sweep (grid + Optuna) for surviving indicators, plateau preference, rolling stability test, DSR over full search space
 - [ ] **Phase 106: Custom Composite Indicators** - Proprietary indicators (AMA ER as regime signal, OI-divergence × CTF agreement, funding-adjusted momentum, cross-asset lead-lag), strictest validation tier
 - [x] **Phase 107: Pipeline Operations Dashboard** - Streamlit ops page: real-time stage monitor with progress bars, run history, trigger/kill buttons, pipeline_stage_log table for per-stage DB persistence — COMPLETE 2026-04-01
@@ -1596,9 +1596,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 104-01: Venue-agnostic normalized input layer + mapper for Hyperliquid tables
-- [ ] 104-02: Implement crypto-native indicators (OI momentum, OI-price divergence, funding z-score, funding momentum, volume-OI regime, Force Index, OI concentration, liquidation pressure)
-- [ ] 104-03: IC sweep through Phase 102 harness, promote survivors, log rejects
+- [x] 104-01: Venue-agnostic normalized input layer + mapper for Hyperliquid tables
+- [x] 104-02: Implement crypto-native indicators (OI momentum, OI-price divergence, funding z-score, funding momentum, volume-OI regime, Force Index, OI concentration, liquidation pressure)
+- [x] 104-03: IC sweep through Phase 102 harness, promote survivors, log rejects
 
 ---
 
