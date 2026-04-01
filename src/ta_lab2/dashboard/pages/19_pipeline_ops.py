@@ -125,14 +125,16 @@ def _active_run_monitor(_engine) -> None:
     else:
         elapsed_str = "N/A"
 
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Run ID", str(run_id)[:8] + "...")
+    col1, col2, col3 = st.columns([2, 1, 1])
+    col1.markdown(f"**Run ID**  \n`{run_id}`")
     col2.metric("Started", started_str)
     col3.metric("Elapsed", elapsed_str)
 
     # -----------------------------------------------------------------------
     # Overall progress bar
     # -----------------------------------------------------------------------
+
+    total_count = len(STAGE_ORDER)
 
     if not stages_df.empty:
         completed_stages = stages_df[stages_df["status"] == "complete"][
@@ -156,86 +158,41 @@ def _active_run_monitor(_engine) -> None:
             elif stage in completed_stages:
                 completed_count += 1
 
-        total_count = len(STAGE_ORDER)
         progress_frac = completed_count / total_count if total_count > 0 else 0.0
+        pct = int(progress_frac * 100)
+
+        # ETA: use average duration of completed stages to estimate remaining
+        eta_str = ""
+        completed_durations = stages_df.loc[
+            stages_df["status"] == "complete", "duration_sec"
+        ].dropna()
+        if len(completed_durations) > 0 and completed_count < total_count:
+            avg_sec = float(completed_durations.mean())
+            remaining = total_count - completed_count
+            eta_sec = int(avg_sec * remaining)
+            eta_str = f" — ETA ~{eta_sec // 60}m {eta_sec % 60:02d}s"
+
         st.progress(
             progress_frac,
-            text=f"Pipeline: {completed_count}/{total_count} stages complete",
+            text=f"Pipeline: {completed_count}/{total_count} stages ({pct}%){eta_str}",
         )
     else:
-        st.progress(0.0, text="Pipeline: 0/{} stages complete".format(len(STAGE_ORDER)))
+        # No stage rows — pre-instrumentation run or just started
+        st.info(
+            "Pipeline is running but no stage data available. "
+            "This run was started before stage logging was enabled, "
+            "or is still initializing."
+        )
 
     # -----------------------------------------------------------------------
     # Per-stage status list
     # -----------------------------------------------------------------------
 
-    st.markdown("**Stage Status:**")
-
-    STATUS_ICONS = {
-        "complete": ":green_circle:",
-        "running": ":orange_circle:",
-        "failed": ":red_circle:",
-        "pending": ":white_circle:",
-    }
-
-    for stage in STAGE_ORDER:
-        if stage == "sync_vms":
-            # Resolve from sub-stages
-            sub_rows = stages_df[stages_df["stage_name"].isin(SYNC_SUB_STAGES)]
-            if sub_rows.empty:
-                icon = STATUS_ICONS["pending"]
-                status_label = "pending"
-            else:
-                statuses = set(sub_rows["status"].tolist())
-                if "failed" in statuses:
-                    icon = STATUS_ICONS["failed"]
-                    status_label = "failed"
-                elif "running" in statuses:
-                    icon = STATUS_ICONS["running"]
-                    status_label = "running"
-                elif all(r == "complete" for r in sub_rows["status"].tolist()) and len(
-                    sub_rows
-                ) == len(SYNC_SUB_STAGES):
-                    icon = STATUS_ICONS["complete"]
-                    status_label = "complete"
-                else:
-                    icon = STATUS_ICONS["running"]
-                    status_label = "running"
-
-            st.markdown(f"{icon} **sync_vms** — {status_label}")
-
-            # Indented sub-stages
-            for sub in SYNC_SUB_STAGES:
-                sub_match = stages_df[stages_df["stage_name"] == sub]
-                if sub_match.empty:
-                    sub_icon = STATUS_ICONS["pending"]
-                    sub_status = "pending"
-                else:
-                    sub_status = sub_match.iloc[0]["status"]
-                    sub_icon = STATUS_ICONS.get(sub_status, STATUS_ICONS["pending"])
-                st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;{sub_icon} {sub} — {sub_status}")
-
-        else:
-            stage_match = stages_df[stages_df["stage_name"] == stage]
-            if stage_match.empty:
-                icon = STATUS_ICONS["pending"]
-                status_label = "pending"
-            else:
-                status_label = stage_match.iloc[0]["status"]
-                icon = STATUS_ICONS.get(status_label, STATUS_ICONS["pending"])
-
-            # Show duration if available
-            duration_sec = None
-            if not stage_match.empty:
-                dur = stage_match.iloc[0].get("duration_sec")
-                if dur is not None and not pd.isna(dur):
-                    duration_sec = float(dur)
-
-            if duration_sec is not None:
-                dur_str = f"{int(duration_sec // 60)}m {int(duration_sec % 60)}s"
-                st.markdown(f"{icon} **{stage}** — {status_label} ({dur_str})")
-            else:
-                st.markdown(f"{icon} **{stage}** — {status_label}")
+    # Only show per-stage breakdown if we have stage data
+    if stages_df.empty:
+        st.caption("Per-stage breakdown will appear on the next instrumented run.")
+    else:
+        _render_stage_list(stages_df)
 
     # -----------------------------------------------------------------------
     # Kill button
@@ -253,6 +210,82 @@ def _active_run_monitor(_engine) -> None:
             st.error(f"Failed to create kill file: {exc}")
 
     st.caption("Auto-refreshes every 90 seconds")
+
+
+# ---------------------------------------------------------------------------
+# Helper: per-stage status rendering
+# ---------------------------------------------------------------------------
+
+_STATUS_ICONS = {
+    "complete": ":green_circle:",
+    "running": ":orange_circle:",
+    "failed": ":red_circle:",
+    "pending": ":white_circle:",
+}
+
+
+def _render_stage_list(stages_df: pd.DataFrame) -> None:
+    """Render per-stage status list from pipeline_stage_log data."""
+    st.markdown("**Stage Status:**")
+
+    for stage in STAGE_ORDER:
+        if stage == "sync_vms":
+            # Resolve from sub-stages
+            sub_rows = stages_df[stages_df["stage_name"].isin(SYNC_SUB_STAGES)]
+            if sub_rows.empty:
+                icon = _STATUS_ICONS["pending"]
+                status_label = "pending"
+            else:
+                statuses = set(sub_rows["status"].tolist())
+                if "failed" in statuses:
+                    icon = _STATUS_ICONS["failed"]
+                    status_label = "failed"
+                elif "running" in statuses:
+                    icon = _STATUS_ICONS["running"]
+                    status_label = "running"
+                elif all(r == "complete" for r in sub_rows["status"].tolist()) and len(
+                    sub_rows
+                ) == len(SYNC_SUB_STAGES):
+                    icon = _STATUS_ICONS["complete"]
+                    status_label = "complete"
+                else:
+                    icon = _STATUS_ICONS["running"]
+                    status_label = "running"
+
+            st.markdown(f"{icon} **sync_vms** — {status_label}")
+
+            # Indented sub-stages
+            for sub in SYNC_SUB_STAGES:
+                sub_match = stages_df[stages_df["stage_name"] == sub]
+                if sub_match.empty:
+                    sub_icon = _STATUS_ICONS["pending"]
+                    sub_status = "pending"
+                else:
+                    sub_status = sub_match.iloc[0]["status"]
+                    sub_icon = _STATUS_ICONS.get(sub_status, _STATUS_ICONS["pending"])
+                st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;{sub_icon} {sub} — {sub_status}")
+
+        else:
+            stage_match = stages_df[stages_df["stage_name"] == stage]
+            if stage_match.empty:
+                icon = _STATUS_ICONS["pending"]
+                status_label = "pending"
+            else:
+                status_label = stage_match.iloc[0]["status"]
+                icon = _STATUS_ICONS.get(status_label, _STATUS_ICONS["pending"])
+
+            # Show duration if available
+            duration_sec = None
+            if not stage_match.empty:
+                dur = stage_match.iloc[0].get("duration_sec")
+                if dur is not None and not pd.isna(dur):
+                    duration_sec = float(dur)
+
+            if duration_sec is not None:
+                dur_str = f"{int(duration_sec // 60)}m {int(duration_sec % 60)}s"
+                st.markdown(f"{icon} **{stage}** — {status_label} ({dur_str})")
+            else:
+                st.markdown(f"{icon} **{stage}** — {status_label}")
 
 
 _active_run_monitor(engine)
