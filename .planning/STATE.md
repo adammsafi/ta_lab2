@@ -10,12 +10,12 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 ## Current Position
 
 Phase: 109 of 111 IN PROGRESS (Feature Skip-Unchanged) — 1/2 plans complete
-Also: Phase 104 IN PROGRESS (Crypto-Native Indicators) — 1/3 plans complete
+Also: Phase 104 IN PROGRESS (Crypto-Native Indicators) — 2/3 plans complete
 Also: Phase 100 IN PROGRESS (ML Signal Combination) — Plan 01 complete (1/3 plans)
 Also: Phase 108 COMPLETE (Pipeline Batch Performance) — 5 plans, all complete
 Also: Phase 103 COMPLETE (Traditional TA Expansion) — 3/3 plans complete
-Status: Plan 100-01 complete — LGBMRanker cross-sectional ranker trained; Mean IC=0.0217, IC-IR=0.74, NDCG=0.81
-Last activity: 2026-04-01 — Completed 100-01-PLAN.md (also: 104-01-PLAN.md)
+Status: Plan 104-02 complete — 8 derivatives indicator functions + DerivativesFeature writing 2374 rows to public.features
+Last activity: 2026-04-01 — Completed 104-02-PLAN.md
 
 Progress: [##########] 100% v1.2.0 | [█████████░] 82% v1.3.0 (22/26 plans, 6/6 phases)
 
@@ -259,10 +259,17 @@ Phase 104-01 decisions:
 - mark_px from hl_oi_snapshots via DISTINCT ON (asset_id, day) ORDER BY ts DESC: latest intraday snapshot per day
 - down_revision = u5v6w7x8y9z0 (actual head): phases 100, 102, 103, 109 added migrations after 107; use actual head per project precedent
 
+Phase 104-02 decisions:
+- Per-asset groupby sorts by ts before indicator compute: rolling window correctness requires temporal ordering
+- oi_concentration_ratio on full sorted frame (ts, id): cross-asset groupby(ts).transform requires all assets at same ts
+- _ensure_output_table overridden to skip CREATE TABLE: public.features is Alembic-managed; pre-flight info_schema check instead
+- pct_change(fill_method=None): suppresses FutureWarning from deprecated default; Rule 1 auto-fix
+- vol_oi_regime uses pd.array(..., dtype='Int64'): nullable integer; first bar is pd.NA (diff produces NaN)
+
 ## Session Continuity
 
 Last session: 2026-04-01
-Stopped at: Completed 100-01-PLAN.md (also: 104-01-PLAN.md)
+Stopped at: Completed 104-02-PLAN.md
 Resume file: None
 
 ---
