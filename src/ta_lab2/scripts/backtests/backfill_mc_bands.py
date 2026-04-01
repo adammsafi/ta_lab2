@@ -66,12 +66,9 @@ def _bootstrap_fold_sharpes(
     n_folds = len(sharpes)
     sharpe_arr = np.array(sharpes, dtype=float)
 
-    boot_means = np.array(
-        [
-            rng.choice(sharpe_arr, size=n_folds, replace=True).mean()
-            for _ in range(n_samples)
-        ]
-    )
+    # Vectorized: draw all bootstrap samples at once (n_samples x n_folds)
+    indices = rng.integers(0, n_folds, size=(n_samples, n_folds))
+    boot_means = sharpe_arr[indices].mean(axis=1)
 
     mc_lo = float(np.percentile(boot_means, 5))
     mc_hi = float(np.percentile(boot_means, 95))
@@ -166,7 +163,7 @@ def backfill_mc_bands(
         logger.info("No rows need backfill. Exiting.")
         return
 
-    # --- Load all rows to process ---
+    # --- Process in streaming batches (no full fetchall) ---
     select_sql = text(
         """
         SELECT id, fold_metrics_json
@@ -176,82 +173,93 @@ def backfill_mc_bands(
         ORDER BY id
         """
     )
-    with engine.connect() as conn:
-        rows = conn.execute(select_sql).fetchall()
 
-    logger.info(f"Processing {len(rows)} rows in batches of {batch_size}...")
+    logger.info(f"Processing ~{null_count} rows in batches of {batch_size}...")
 
-    # --- Process in batches ---
     updates: List[Tuple[int, Optional[float], Optional[float], Optional[float]]] = []
     n_processed = 0
     n_skipped = 0
     n_committed = 0
+    import time
 
-    for row in rows:
-        row_id = row[0]
-        fold_metrics_raw = row[1]
+    t0 = time.time()
 
-        # Parse fold_metrics_json
-        try:
-            if isinstance(fold_metrics_raw, str):
-                fold_metrics = json.loads(fold_metrics_raw)
-            else:
-                fold_metrics = fold_metrics_raw  # already a dict/list from JSONB
-        except (json.JSONDecodeError, TypeError) as exc:
-            logger.warning(f"Row {row_id}: failed to parse fold_metrics_json: {exc}")
-            n_skipped += 1
-            continue
+    with engine.connect() as conn:
+        result = conn.execution_options(stream_results=True).execute(select_sql)
+        for row in result:
+            row_id = row[0]
+            fold_metrics_raw = row[1]
 
-        if not isinstance(fold_metrics, list):
-            logger.warning(f"Row {row_id}: fold_metrics_json is not a list; skipping")
-            n_skipped += 1
-            continue
-
-        # Extract valid fold-level Sharpe values
-        sharpes: List[float] = []
-        for fm in fold_metrics:
-            if not isinstance(fm, dict):
-                continue
-            sharpe_val = fm.get("sharpe")
-            if sharpe_val is None:
-                continue
+            # Parse fold_metrics_json
             try:
-                s = float(sharpe_val)
-            except (TypeError, ValueError):
+                if isinstance(fold_metrics_raw, str):
+                    fold_metrics = json.loads(fold_metrics_raw)
+                else:
+                    fold_metrics = fold_metrics_raw  # already a dict/list from JSONB
+            except (json.JSONDecodeError, TypeError) as exc:
+                logger.warning(
+                    f"Row {row_id}: failed to parse fold_metrics_json: {exc}"
+                )
+                n_skipped += 1
                 continue
-            if not math.isnan(s) and not math.isinf(s):
-                sharpes.append(s)
 
-        # Skip rows with fewer than 3 valid fold Sharpes
-        if len(sharpes) < 3:
-            logger.debug(
-                f"Row {row_id}: only {len(sharpes)} valid fold Sharpes "
-                f"(need >= 3); skipping"
-            )
-            n_skipped += 1
-            continue
+            if not isinstance(fold_metrics, list):
+                logger.warning(
+                    f"Row {row_id}: fold_metrics_json is not a list; skipping"
+                )
+                n_skipped += 1
+                continue
 
-        # Bootstrap
-        try:
-            mc_lo, mc_hi, mc_median = _bootstrap_fold_sharpes(
-                sharpes, n_samples=n_samples
-            )
-        except Exception as exc:
-            logger.warning(f"Row {row_id}: bootstrap failed: {exc}")
-            n_skipped += 1
-            continue
+            # Extract valid fold-level Sharpe values
+            sharpes: List[float] = []
+            for fm in fold_metrics:
+                if not isinstance(fm, dict):
+                    continue
+                sharpe_val = fm.get("sharpe")
+                if sharpe_val is None:
+                    continue
+                try:
+                    s = float(sharpe_val)
+                except (TypeError, ValueError):
+                    continue
+                if not math.isnan(s) and not math.isinf(s):
+                    sharpes.append(s)
 
-        updates.append((row_id, mc_lo, mc_hi, mc_median))
-        n_processed += 1
+            # Skip rows with fewer than 3 valid fold Sharpes
+            if len(sharpes) < 3:
+                logger.debug(
+                    f"Row {row_id}: only {len(sharpes)} valid fold Sharpes "
+                    f"(need >= 3); skipping"
+                )
+                n_skipped += 1
+                continue
 
-        # Commit batch
-        if len(updates) >= batch_size:
-            _commit_batch(engine, updates)
-            n_committed += len(updates)
-            logger.info(
-                f"Progress: {n_committed}/{len(rows)} processed, {n_skipped} skipped"
-            )
-            updates = []
+            # Bootstrap
+            try:
+                mc_lo, mc_hi, mc_median = _bootstrap_fold_sharpes(
+                    sharpes, n_samples=n_samples
+                )
+            except Exception as exc:
+                logger.warning(f"Row {row_id}: bootstrap failed: {exc}")
+                n_skipped += 1
+                continue
+
+            updates.append((row_id, mc_lo, mc_hi, mc_median))
+            n_processed += 1
+
+            # Commit batch
+            if len(updates) >= batch_size:
+                _commit_batch(engine, updates)
+                n_committed += len(updates)
+                elapsed = time.time() - t0
+                rate = n_committed / elapsed if elapsed > 0 else 0
+                eta = (null_count - n_committed) / rate if rate > 0 else 0
+                logger.info(
+                    f"Progress: {n_committed:,}/{null_count:,} "
+                    f"({100 * n_committed / null_count:.1f}%) "
+                    f"| {rate:.0f} rows/s | ETA {eta / 60:.1f}m"
+                )
+                updates = []
 
     # Commit remaining
     if updates:
