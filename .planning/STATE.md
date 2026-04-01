@@ -5,12 +5,12 @@
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 106 IN PROGRESS (Custom Composite Indicators — Plan 01 complete)
+**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 111 IN PROGRESS (Feature Polars Migration — Plan 02 complete)
 
 ## Current Position
 
-Phase: 106 IN PROGRESS (Custom Composite Indicators) — 1/3 plans complete
-Also: Phase 111 IN PROGRESS (Feature Polars Migration) — 1/N plans complete
+Phase: 111 IN PROGRESS (Feature Polars Migration) — 2/N plans complete
+Also: Phase 106 IN PROGRESS (Custom Composite Indicators) — 1/3 plans complete
 Also: Phase 110 COMPLETE (Feature Parallel Sub-Phases) — 1/1 plans complete
 Also: Phase 109 COMPLETE (Feature Skip-Unchanged) — 2/2 plans complete
 Also: Phase 105 COMPLETE (Parameter Optimization) — 3/3 plans complete
@@ -18,10 +18,10 @@ Also: Phase 104 COMPLETE (Crypto-Native Indicators) — 3/3 plans complete
 Also: Phase 100 IN PROGRESS (ML Signal Combination) — Plans 01+02 complete (2/3 plans)
 Also: Phase 108 COMPLETE (Pipeline Batch Performance) — 5 plans, all complete
 Also: Phase 103 COMPLETE (Traditional TA Expansion) — 3/3 plans complete
-Status: Plan 106-01 complete — Alembic migration z9a0b1c2d3e4 (6 FLOAT cols + source_type), composite_indicators.py with 6 formulas + ALL_COMPOSITES registry
-Last activity: 2026-04-01 — Completed 106-01-PLAN.md
+Status: Plan 111-02 complete — polars-native vol functions (Parkinson/GK/RS/ATR/rolling-log-vol), VolatilityFeature polars path, ATR NaN-divergence fix (ignore_nulls=True), all 13 vol columns < 1e-10 vs pandas
+Last activity: 2026-04-01 — Completed 111-02-PLAN.md
 
-Progress: [##########] 100% v1.2.0 | [█████████░] 90% v1.3.0 (29/30 plans, 8/6 phases)
+Progress: [##########] 100% v1.2.0 | [█████████░] 90% v1.3.0 (30/31 plans, 8/6 phases)
 
 ## Performance Metrics
 
@@ -321,6 +321,11 @@ Phase 111-01 decisions:
 - boolean column XOR in compare_feature_outputs: numpy cannot subtract bool arrays; use ^ operator and count mismatches instead
 - HAVE_POLARS constant: try/except at module import level; pl=None fallback for environments without polars installed
 
+Phase 111-02 decisions:
+- ATR divergence fix: pl.when(prev_close.is_null()).then(None).otherwise(max_horizontal(...)) + ewm_mean(ignore_nulls=True) -- fill_nan(None) alone insufficient; ignore_nulls=True makes polars EWM skip null row matching pandas ewm NaN-skip
+- polars log: (pl.col(a)/pl.col(b)).log(base=np.e) for natural log -- polars has no shorthand .ln() method
+- HAVE_POLARS guard in vol.py separate from polars_feature_ops.HAVE_POLARS -- each standalone module owns its own import guard
+
 Phase 106-01 decisions:
 - Revision ID z9a0b1c2d3e4 chains from y8z9a0b1c2d3 (Phase 105 actual head); plan spec listed u5v6w7x8y9z0 -- use actual alembic heads per established precedent
 - DO $$ BLOCK for CHECK constraint idempotency: avoids hardcoding auto-generated constraint name
@@ -332,7 +337,7 @@ Phase 106-01 decisions:
 ## Session Continuity
 
 Last session: 2026-04-01
-Stopped at: Completed 106-01-PLAN.md
+Stopped at: Completed 111-02-PLAN.md
 Resume file: None
 
 ---
