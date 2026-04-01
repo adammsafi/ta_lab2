@@ -5,11 +5,12 @@
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 111 IN PROGRESS (Feature Polars Migration — Plan 01 complete)
+**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 106 IN PROGRESS (Custom Composite Indicators — Plan 01 complete)
 
 ## Current Position
 
-Phase: 111 IN PROGRESS (Feature Polars Migration) — 1/N plans complete
+Phase: 106 IN PROGRESS (Custom Composite Indicators) — 1/3 plans complete
+Also: Phase 111 IN PROGRESS (Feature Polars Migration) — 1/N plans complete
 Also: Phase 110 COMPLETE (Feature Parallel Sub-Phases) — 1/1 plans complete
 Also: Phase 109 COMPLETE (Feature Skip-Unchanged) — 2/2 plans complete
 Also: Phase 105 COMPLETE (Parameter Optimization) — 3/3 plans complete
@@ -17,15 +18,15 @@ Also: Phase 104 COMPLETE (Crypto-Native Indicators) — 3/3 plans complete
 Also: Phase 100 IN PROGRESS (ML Signal Combination) — Plans 01+02 complete (2/3 plans)
 Also: Phase 108 COMPLETE (Pipeline Batch Performance) — 5 plans, all complete
 Also: Phase 103 COMPLETE (Traditional TA Expansion) — 3/3 plans complete
-Status: Plan 111-01 complete — use_polars flag, polars_feature_ops.py, cycle_stats + rolling_extremes migrated, regression verified (max diff = 0.0)
-Last activity: 2026-04-01 — Completed 111-01-PLAN.md
+Status: Plan 106-01 complete — Alembic migration z9a0b1c2d3e4 (6 FLOAT cols + source_type), composite_indicators.py with 6 formulas + ALL_COMPOSITES registry
+Last activity: 2026-04-01 — Completed 106-01-PLAN.md
 
-Progress: [##########] 100% v1.2.0 | [█████████░] 90% v1.3.0 (28/29 plans, 8/6 phases)
+Progress: [##########] 100% v1.2.0 | [█████████░] 90% v1.3.0 (29/30 plans, 8/6 phases)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 425
+- Total plans completed: 426
 - Average duration: 7 min
 - Total execution time: ~32.6 hours
 
@@ -320,12 +321,20 @@ Phase 111-01 decisions:
 - boolean column XOR in compare_feature_outputs: numpy cannot subtract bool arrays; use ^ operator and count mismatches instead
 - HAVE_POLARS constant: try/except at module import level; pl=None fallback for environments without polars installed
 
+Phase 106-01 decisions:
+- Revision ID z9a0b1c2d3e4 chains from y8z9a0b1c2d3 (Phase 105 actual head); plan spec listed u5v6w7x8y9z0 -- use actual alembic heads per established precedent
+- DO $$ BLOCK for CHECK constraint idempotency: avoids hardcoding auto-generated constraint name
+- CTF agreement defaults to 1.0 when absent in OI divergence composite: preserves signal with neutral gate (no zeroing)
+- tanh volume gate rescaled to [0,1] in volume_regime_gated_trend: trend is dampened in low-vol, never sign-flipped
+- Lead-lag composite queries asset_b_id=target_asset_id (follower), asset_a_id=predictor: matches lead_lag_ic Phase 98-04 schema
+- ALL_COMPOSITES assertion at module load: registry/COMPOSITE_NAMES mismatch raises AssertionError immediately (fail-fast)
+
 ## Session Continuity
 
 Last session: 2026-04-01
-Stopped at: Completed 111-01-PLAN.md
+Stopped at: Completed 106-01-PLAN.md
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-04-01 (Phase 111-01 complete: use_polars flag, polars_feature_ops.py, cycle_stats + rolling_extremes migrated, max diff=0.0 on production data)*
+*Last updated: 2026-04-01 (Phase 106-01 complete: Alembic migration z9a0b1c2d3e4 + composite_indicators.py with 6 formulas + ALL_COMPOSITES registry)*
