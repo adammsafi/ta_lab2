@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 
 ## Current Position
 
-Phase: 108 of 108 IN PROGRESS (Pipeline Batch Performance) — Plans 01-04 complete
-Next: Phase 108 complete or next queued plan
-Status: Plan 108-04 complete — Bar returns rewritten to per-ID batch SQL with PARTITION BY; 120K keys -> 492 IDs
-Last activity: 2026-04-01 — Completed 108-04-PLAN.md (bar returns batch rewrite: PARTITION BY tf, venue_id)
+Phase: 107 of 108 IN PROGRESS (Pipeline Operations Dashboard) — Plan 01 complete
+Next: Phase 107 Plan 02 (Streamlit ops dashboard page)
+Status: Plan 107-01 complete — pipeline_stage_log table + kill switch instrumentation in run_daily_refresh.py
+Last activity: 2026-04-01 — Completed 107-01-PLAN.md (stage logging + kill switch)
 
-Progress: [##########] 100% v1.2.0 | [████████░░] 46% v1.3.0 (12/26 plans, 3/6 phases)
+Progress: [##########] 100% v1.2.0 | [████████░░] 50% v1.3.0 (13/26 plans, 3/6 phases)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 421
+- Total plans completed: 422
 - Average duration: 7 min
 - Total execution time: ~32.6 hours
 
@@ -139,6 +139,12 @@ Phase 99-04 decisions:
 - PBO heatmap always uses cv_method='cpcv' regardless of sidebar selection: PBO is only meaningful from CPCV runs
 - load_pbo_heatmap_data() uses groupby().mean() before unstack(): collapses multiple param combos per (strategy, asset) to a single representative PBO value
 
+Phase 107-01 decisions:
+- DO $$ DECLARE in migration to look up CHECK constraint name dynamically: avoids hardcoding auto-generated name
+- Kill switch exits code 2 (not 1): distinguishes intentional kill from stage failure; dashboard can show 'killed' status
+- _maybe_kill deletes .pipeline_kill after acting: prevents stale file re-triggering on next run
+- KILL_SWITCH_FILE at repo root (4 parent-hops from script): one path shared by orchestrator and future dashboard
+
 Phase 108-04 decisions:
 - Watermark VALUES CTE uses literal embedding (not bound params): PostgreSQL VALUES type inference fails with bound params causing 'record = integer' type mismatch
 - _build_wm_cte rows must NOT have outer parens: VALUES (a,b,c),(d,e,f) not VALUES ((a,b,c),(d,e,f))
@@ -190,7 +196,7 @@ Phase 108-03 decisions:
 ## Session Continuity
 
 Last session: 2026-04-01
-Stopped at: Completed 108-04-PLAN.md (bar returns batch: PARTITION BY tf/venue_id, 120K keys -> 492 IDs, data verified). Phase 108 complete.
+Stopped at: Completed 107-01-PLAN.md (pipeline_stage_log + kill switch instrumentation in run_daily_refresh.py)
 Resume file: None
 
 ---
