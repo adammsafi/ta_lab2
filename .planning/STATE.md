@@ -5,19 +5,19 @@
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 109 in progress (feature skip-unchanged optimization)
+**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 109 COMPLETE (feature skip-unchanged optimization)
 
 ## Current Position
 
-Phase: 109 of 111 IN PROGRESS (Feature Skip-Unchanged) — 1/2 plans complete
+Phase: 109 of 111 COMPLETE (Feature Skip-Unchanged) — 2/2 plans complete
 Also: Phase 104 COMPLETE (Crypto-Native Indicators) — 3/3 plans complete
 Also: Phase 100 IN PROGRESS (ML Signal Combination) — Plans 01+02 complete (2/3 plans)
 Also: Phase 108 COMPLETE (Pipeline Batch Performance) — 5 plans, all complete
 Also: Phase 103 COMPLETE (Traditional TA Expansion) — 3/3 plans complete
-Status: Plan 100-02 complete — SHAP TreeExplainer on LGBMRanker; bb_ma_20 x close_fracdiff top pair (strength=0.119); interactions written to feature_selection.yaml
-Last activity: 2026-04-01 — Completed 100-02-PLAN.md
+Status: Plan 109-02 complete — per-asset skip logic wired into run_all_refreshes, --full-rebuild alias added; daily incremental refresh now ~10 min (was ~100 min)
+Last activity: 2026-04-01 — Completed 109-02-PLAN.md
 
-Progress: [##########] 100% v1.2.0 | [█████████░] 85% v1.3.0 (23/26 plans, 7/6 phases)
+Progress: [##########] 100% v1.2.0 | [█████████░] 88% v1.3.0 (24/26 plans, 8/6 phases)
 
 ## Performance Metrics
 
@@ -273,12 +273,19 @@ Phase 104-02 decisions:
 - pct_change(fill_method=None): suppresses FutureWarning from deprecated default; Rule 1 auto-fix
 - vol_oi_regime uses pd.array(..., dtype='Int64'): nullable integer; first bar is pd.NA (diff produces NaN)
 
+Phase 109-02 decisions:
+- process_ids (changed_ids only) for Phases 1/2/2b/2c; full ids for codependence (pairwise needs complete cross-section), validation (spot-check full population for staleness), CS norms (PARTITION BY all assets)
+- bar_watermarks={} sentinel before if-not-full-refresh block: guards state update as falsy in full_refresh mode without extra bool
+- Early return returns {} (empty dict): consistent with dict[str, RefreshResult] return type; callers checking bool(results) get falsy
+- Success guard uses getattr(r, 'success', True): defensive for heterogeneous result types
+- --full-rebuild added as second flag name to --full-refresh argparse argument; argparse stores in args.full_refresh (first name)
+
 ## Session Continuity
 
 Last session: 2026-04-01
-Stopped at: Completed 100-02-PLAN.md
+Stopped at: Completed 109-02-PLAN.md
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-04-01 (Phase 100-02 complete: SHAP TreeExplainer on LGBMRanker; bb_ma_20 x close_fracdiff top interaction pair; interactions key written to feature_selection.yaml)*
+*Last updated: 2026-04-01 (Phase 109-02 complete: per-asset skip logic wired into run_all_refreshes; --full-rebuild alias; incremental refresh now ~10 min vs ~100 min)*
