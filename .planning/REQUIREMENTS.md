@@ -79,10 +79,10 @@
 
 ### Tech Debt Cleanup
 
-- [ ] **DEBT-01**: `blend_vol_simple()` orphaned export in `garch_blend.py` removed or wired to caller
-- [ ] **DEBT-02**: Phase 82 `VERIFICATION.md` created from existing 6 summaries
-- [ ] **DEBT-03**: Phase 92 `VERIFICATION.md` updated to reflect manually-closed gaps
-- [ ] **DEBT-04**: `dim_ctf_feature_selection` downstream consumer status documented (by design — research table, consumers added via CTF-01)
+- [x] **DEBT-01**: `blend_vol_simple()` orphaned export in `garch_blend.py` removed or wired to caller
+- [x] **DEBT-02**: Phase 82 `VERIFICATION.md` created from existing 6 summaries
+- [x] **DEBT-03**: Phase 92 `VERIFICATION.md` updated to reflect manually-closed gaps
+- [x] **DEBT-04**: `dim_ctf_feature_selection` downstream consumer status documented (by design — research table, consumers added via CTF-01)
 
 ## Future Requirements (v1.4.0+)
 
@@ -137,10 +137,10 @@
 | ML-01 | Phase 100 | Pending |
 | ML-02 | Phase 100 | Pending |
 | ML-03 | Phase 100 | Pending |
-| DEBT-01 | Phase 101 | Pending |
-| DEBT-02 | Phase 101 | Pending |
-| DEBT-03 | Phase 101 | Pending |
-| DEBT-04 | Phase 101 | Pending |
+| DEBT-01 | Phase 101 | Complete |
+| DEBT-02 | Phase 101 | Complete |
+| DEBT-03 | Phase 101 | Complete |
+| DEBT-04 | Phase 101 | Complete |
 | DASH-01 | Phase 107 | Complete |
 | DASH-02 | Phase 107 | Complete |
 | DASH-03 | Phase 107 | Complete |

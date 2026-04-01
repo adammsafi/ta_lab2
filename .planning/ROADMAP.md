@@ -1405,7 +1405,7 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 - [x] **Phase 98: CTF Feature Graduation** - Materialize top CTF features into features table, asset-specific selection tier, cross-asset composites, lead-lag IC matrix — COMPLETE 2026-03-31
 - [ ] **Phase 99: Backtest Scaling** - Resume-safe mass backtest orchestrator, partitioned trades table, 113K+ core runs, MC bands, CTF signal backtests, expanded grids, leaderboard dashboard
 - [ ] **Phase 100: ML Signal Combination** - LGBMRanker cross-sectional predictor, SHAP interaction analysis, XGBoost meta-label confidence filter
-- [ ] **Phase 101: Tech Debt Cleanup** - Remove orphaned export, create Phase 82/92 VERIFICATION.md, document CTF downstream consumers
+- [x] **Phase 101: Tech Debt Cleanup** - Remove orphaned export, create Phase 82/92 VERIFICATION.md, document CTF downstream consumers — COMPLETE 2026-04-01
 - [ ] **Phase 102: Indicator Research Framework** - Permutation IC test, FDR control, haircut Sharpe, trial registry, block bootstrap — the testing harness for all indicator R&D
 - [ ] **Phase 103: Traditional TA Expansion** - Add 20-30 well-known indicators (Ichimoku, Williams %R, Keltner, CCI, Elder Ray, Force Index, VWAP, VIDYA, FRAMA, etc.), IC sweep through Phase 102 harness
 - [ ] **Phase 104: Crypto-Native Indicators** - Venue-agnostic normalized input layer for OI/funding/volume, derive OI momentum, OI-price divergence, funding rate z-score, Force Index, liquidation pressure proxy
@@ -1543,8 +1543,8 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 101-01: Remove/wire blend_vol_simple + create Phase 82 VERIFICATION.md + update Phase 92 VERIFICATION.md
-- [ ] 101-02: Document dim_ctf_feature_selection downstream consumer status
+- [x] 101-01: Remove/wire blend_vol_simple + create Phase 82 VERIFICATION.md + update Phase 92 VERIFICATION.md
+- [x] 101-02: Document dim_ctf_feature_selection downstream consumer status
 
 ---
 
