@@ -23,6 +23,7 @@ from sqlalchemy import create_engine, pool, text
 from sqlalchemy.pool import NullPool
 
 from ta_lab2.analysis.ic import batch_compute_ic, save_ic_results
+from ta_lab2.analysis.multiple_testing import log_trials_to_registry
 from ta_lab2.features.cross_timeframe import load_ctf_features
 from ta_lab2.scripts.refresh_utils import resolve_db_url
 from ta_lab2.time.dim_timeframe import DimTimeframe
@@ -404,6 +405,15 @@ def _ctf_ic_worker(task: CTFICWorkerTask) -> dict:
             n_written = 0
             if ic_rows:
                 n_written = save_ic_results(conn, ic_rows, overwrite=task.overwrite)
+                try:
+                    n_logged = log_trials_to_registry(
+                        conn, ic_rows, source_table="ic_results"
+                    )
+                    _logger.debug("Logged %d trials to trial_registry", n_logged)
+                except Exception:
+                    _logger.warning(
+                        "Failed to log trials to trial_registry", exc_info=True
+                    )
 
             elapsed = time.time() - pair_start
             _logger.info(
