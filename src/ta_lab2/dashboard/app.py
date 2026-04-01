@@ -119,6 +119,11 @@ pages = {
             icon=":material/play_circle:",
         ),
         st.Page(
+            "pages/19_pipeline_ops.py",
+            title="Pipeline Ops",
+            icon=":material/manage_history:",
+        ),
+        st.Page(
             "pages/10_macro.py",
             title="Macro",
             icon=":material/public:",
