@@ -68,6 +68,15 @@ def compare_feature_outputs(
         if col.endswith("_ts") or col == "ts":
             continue
 
+        if df_p[col].dtype == bool or pd.api.types.is_bool_dtype(df_p[col]):
+            # Boolean: use XOR to find disagreements, treat count as max_diff
+            mismatch_count = int((df_p[col].values ^ df_q[col].values).sum())
+            diffs[col] = float(mismatch_count)
+            assert mismatch_count == 0, (
+                f"Column '{col}': {mismatch_count} boolean mismatches"
+            )
+            continue
+
         max_diff = float(np.abs(df_p[col].values - df_q[col].values).max())
         diffs[col] = max_diff
         assert max_diff <= float_tol, (

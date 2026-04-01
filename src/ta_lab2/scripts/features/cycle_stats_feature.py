@@ -26,6 +26,7 @@ import logging
 
 from ta_lab2.scripts.features.base_feature import BaseFeature, FeatureConfig
 from ta_lab2.features.cycle import add_ath_cycle
+from ta_lab2.features.polars_feature_ops import polars_sorted_groupby
 
 logger = logging.getLogger(__name__)
 
@@ -125,22 +126,34 @@ class CycleStatsFeature(BaseFeature):
         if df_source.empty:
             return pd.DataFrame()
 
-        results = []
-
-        for (id_val, venue_id_val), df_id in df_source.groupby(["id", "venue_id"]):
-            df_id = df_id.copy()
-            df_id = df_id.sort_values("ts").reset_index(drop=True)
-
+        def _compute_single_group(df_id: pd.DataFrame) -> pd.DataFrame:
+            df_id = df_id.reset_index(drop=True)
             if len(df_id) < 1:
-                continue
-
+                return pd.DataFrame()
             add_ath_cycle(df_id, close_col="close", ts_col="ts")
-            results.append(df_id)
+            return df_id
 
-        if not results:
+        if self.config.use_polars:
+            df_features = polars_sorted_groupby(
+                df_source, ["id", "venue_id"], "ts", _compute_single_group
+            )
+        else:
+            results = []
+            for (id_val, venue_id_val), df_id in df_source.groupby(["id", "venue_id"]):
+                df_id = df_id.copy()
+                df_id = df_id.sort_values("ts").reset_index(drop=True)
+                if len(df_id) < 1:
+                    continue
+                add_ath_cycle(df_id, close_col="close", ts_col="ts")
+                results.append(df_id)
+
+            if not results:
+                return pd.DataFrame()
+
+            df_features = pd.concat(results, ignore_index=True)
+
+        if df_features.empty:
             return pd.DataFrame()
-
-        df_features = pd.concat(results, ignore_index=True)
 
         # Add tf metadata
         df_features["tf"] = self.config.tf

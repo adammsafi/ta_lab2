@@ -28,6 +28,7 @@ from sqlalchemy import Engine, text
 
 from ta_lab2.scripts.features.base_feature import BaseFeature, FeatureConfig
 from ta_lab2.features.cycle import add_rolling_extremes
+from ta_lab2.features.polars_feature_ops import polars_sorted_groupby
 
 
 # Target durations in days -> converted to bars per TF
@@ -122,25 +123,48 @@ class RollingExtremesFeature(BaseFeature):
         if df_source.empty or not self._windows:
             return pd.DataFrame()
 
-        all_results = []
+        windows = self._windows  # capture for closure
 
-        for (id_val, venue_id_val), df_id in df_source.groupby(["id", "venue_id"]):
-            df_id = df_id.copy()
-            df_id = df_id.sort_values("ts").reset_index(drop=True)
-
+        def _compute_single_group(df_id: pd.DataFrame) -> pd.DataFrame:
+            df_id = df_id.reset_index(drop=True)
             if len(df_id) < MIN_WINDOW_BARS:
-                continue
-
-            for win in self._windows:
+                return pd.DataFrame()
+            group_results = []
+            for win in windows:
                 df_win = df_id[["id", "ts", "venue_id", "close"]].copy()
                 add_rolling_extremes(df_win, window=win, close_col="close", ts_col="ts")
                 df_win["lookback_bars"] = win
-                all_results.append(df_win)
+                group_results.append(df_win)
+            if not group_results:
+                return pd.DataFrame()
+            return pd.concat(group_results, ignore_index=True)
 
-        if not all_results:
+        if self.config.use_polars:
+            df_features = polars_sorted_groupby(
+                df_source, ["id", "venue_id"], "ts", _compute_single_group
+            )
+        else:
+            all_results = []
+            for (id_val, venue_id_val), df_id in df_source.groupby(["id", "venue_id"]):
+                df_id = df_id.copy()
+                df_id = df_id.sort_values("ts").reset_index(drop=True)
+                if len(df_id) < MIN_WINDOW_BARS:
+                    continue
+                for win in self._windows:
+                    df_win = df_id[["id", "ts", "venue_id", "close"]].copy()
+                    add_rolling_extremes(
+                        df_win, window=win, close_col="close", ts_col="ts"
+                    )
+                    df_win["lookback_bars"] = win
+                    all_results.append(df_win)
+
+            if not all_results:
+                return pd.DataFrame()
+
+            df_features = pd.concat(all_results, ignore_index=True)
+
+        if df_features.empty:
             return pd.DataFrame()
-
-        df_features = pd.concat(all_results, ignore_index=True)
 
         # Add tf metadata
         df_features["tf"] = self.config.tf
