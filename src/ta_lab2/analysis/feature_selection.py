@@ -410,6 +410,7 @@ def classify_feature_tier(
     pass_rate: float,
     stationarity: str,
     regime_ic: Optional[pd.DataFrame] = None,
+    perm_p_value: Optional[float] = None,
     ic_ir_cutoff: float = 0.3,
 ) -> str:
     """
@@ -425,6 +426,14 @@ def classify_feature_tier(
     non-stationary features need stronger IC evidence (1.5x cutoff) to
     qualify as active. They are NOT auto-excluded.
 
+    Permutation p-value gating (Phase 102 CONTEXT.md decisions):
+    When perm_p_value is provided, it applies a downgrade gate AFTER the
+    IC-IR tier is computed. The gate can only downgrade tiers, never upgrade.
+    - perm_p_value >= 0.15: force tier to 'archive' (strong evidence of no signal)
+    - perm_p_value in [0.05, 0.15): cap tier at 'watch' maximum (marginal evidence)
+    - perm_p_value < 0.05: no additional constraint (passes permutation gate)
+    - perm_p_value is None: existing logic unchanged (backward compatible)
+
     Parameters
     ----------
     ic_ir_mean : float
@@ -437,6 +446,10 @@ def classify_feature_tier(
     regime_ic : pd.DataFrame or None
         Regime-specific IC DataFrame from load_regime_ic(). Used to
         detect regime specialists. None treated as no regime data.
+    perm_p_value : float or None
+        Permutation test p-value. When provided, gates tier assignment by
+        statistical evidence. None means permutation test has not been run
+        for this feature (backward compatible — existing logic unchanged).
     ic_ir_cutoff : float
         Base IC-IR threshold for active tier. Default 0.3.
 
@@ -460,34 +473,45 @@ def classify_feature_tier(
     # --- ACTIVE ---
     # Meets or exceeds the (possibly elevated) IC-IR cutoff AND has adequate pass_rate
     if ic_ir_mean >= effective_cutoff and pass_rate >= 0.30:
-        return "active"
+        tier = "active"
 
     # --- CONDITIONAL ---
     # Two paths to conditional:
-    # (a) Regime specialist: strong IC in at least one specific regime
-    has_regime_strength = False
-    if (
-        regime_ic is not None
-        and len(regime_ic) > 0
-        and "mean_abs_ic_ir" in regime_ic.columns
+    elif (
+        # (a) Regime specialist: strong IC in at least one specific regime
+        (
+            regime_ic is not None
+            and len(regime_ic) > 0
+            and "mean_abs_ic_ir" in regime_ic.columns
+            and float(regime_ic["mean_abs_ic_ir"].max()) >= ic_ir_cutoff
+        )
+        # (b) Borderline universal: IC-IR between 0.15 and cutoff with decent pass_rate
+        or (0.15 <= ic_ir_mean < ic_ir_cutoff and pass_rate >= 0.20)
     ):
-        best_regime_ic = float(regime_ic["mean_abs_ic_ir"].max())
-        has_regime_strength = best_regime_ic >= ic_ir_cutoff
-
-    if has_regime_strength:
-        return "conditional"
-
-    # (b) Borderline universal: IC-IR between 0.15 and cutoff with decent pass_rate
-    if 0.15 <= ic_ir_mean < ic_ir_cutoff and pass_rate >= 0.20:
-        return "conditional"
+        tier = "conditional"
 
     # --- WATCH ---
     # Some signal but not strong enough for conditional
-    if ic_ir_mean >= 0.10:
-        return "watch"
+    elif ic_ir_mean >= 0.10:
+        tier = "watch"
 
     # --- ARCHIVE ---
-    return "archive"
+    else:
+        tier = "archive"
+
+    # --- PERMUTATION P-VALUE GATE ---
+    # Applied after IC-IR classification. Can only downgrade tiers, never upgrade.
+    if perm_p_value is not None:
+        if perm_p_value >= 0.15:
+            # Strong evidence of no signal — force to archive
+            tier = "archive"
+        elif perm_p_value >= 0.05:
+            # Marginal evidence — cap at watch
+            if tier in ("active", "conditional"):
+                tier = "watch"
+        # perm_p_value < 0.05: passes permutation gate, no constraint
+
+    return tier
 
 
 # ---------------------------------------------------------------------------
