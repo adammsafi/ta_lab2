@@ -10,14 +10,14 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 ## Current Position
 
 Phase: 109 of 111 IN PROGRESS (Feature Skip-Unchanged) — 1/2 plans complete
-Also: Phase 104 IN PROGRESS (Crypto-Native Indicators) — 2/3 plans complete
-Also: Phase 100 IN PROGRESS (ML Signal Combination) — Plan 01 complete (1/3 plans)
+Also: Phase 104 COMPLETE (Crypto-Native Indicators) — 3/3 plans complete
+Also: Phase 100 IN PROGRESS (ML Signal Combination) — Plans 01+02 complete (2/3 plans)
 Also: Phase 108 COMPLETE (Pipeline Batch Performance) — 5 plans, all complete
 Also: Phase 103 COMPLETE (Traditional TA Expansion) — 3/3 plans complete
-Status: Plan 104-02 complete — 8 derivatives indicator functions + DerivativesFeature writing 2374 rows to public.features
-Last activity: 2026-04-01 — Completed 104-02-PLAN.md
+Status: Plan 100-02 complete — SHAP TreeExplainer on LGBMRanker; bb_ma_20 x close_fracdiff top pair (strength=0.119); interactions written to feature_selection.yaml
+Last activity: 2026-04-01 — Completed 100-02-PLAN.md
 
-Progress: [##########] 100% v1.2.0 | [█████████░] 82% v1.3.0 (22/26 plans, 6/6 phases)
+Progress: [##########] 100% v1.2.0 | [█████████░] 85% v1.3.0 (23/26 plans, 7/6 phases)
 
 ## Performance Metrics
 
@@ -269,9 +269,9 @@ Phase 104-02 decisions:
 ## Session Continuity
 
 Last session: 2026-04-01
-Stopped at: Completed 104-02-PLAN.md
+Stopped at: Completed 104-03-PLAN.md
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-04-01 (Phase 104-01 complete: HyperliquidAdapter + MockAdapter + 8-column migration for derivatives indicators)*
+*Last updated: 2026-04-01 (Phase 104-03 complete: IC sweep script for 8 derivatives indicators, FDR at 5%, dim_feature_registry promotion/rejection)*
