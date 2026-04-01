@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 108: Pipeline Batch Performance
+**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 108 complete, Phase 103 in progress
 
 ## Current Position
 
-Phase: 103 of 111 IN PROGRESS (Traditional TA Expansion) — Plan 01 complete (1/? plans)
-Next: Phase 103 Plan 02 (registry integration)
-Status: Plan 103-01 complete — 20 new indicator functions in indicators_extended.py
-Last activity: 2026-04-01 — Completed 103-01-PLAN.md
+Phase: 108 of 111 COMPLETE (Pipeline Batch Performance) — 5 plans, all complete
+Also: Phase 103 IN PROGRESS (Traditional TA Expansion) — Plan 01 complete
+Status: Phase 108 complete — EMA/AMA/bar returns batch SQL, EMA fast-path, integration validated
+Last activity: 2026-04-01 — Phase 108 approved, full pipeline validated end-to-end
 
 Progress: [##########] 100% v1.2.0 | [█████████░] 67% v1.3.0 (18/26 plans, 5/6 phases)
 

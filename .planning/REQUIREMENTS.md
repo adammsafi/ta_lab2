@@ -146,11 +146,11 @@
 | DASH-03 | Phase 107 | Complete |
 | DASH-04 | Phase 107 | Complete |
 | DASH-05 | Phase 107 | Complete |
-| PERF-01 | Phase 108 | Pending |
-| PERF-02 | Phase 108 | Pending |
-| PERF-03 | Phase 108 | Pending |
-| PERF-04 | Phase 108 | Pending |
-| PERF-05 | Phase 108 | Pending |
+| PERF-01 | Phase 108 | Complete |
+| PERF-02 | Phase 108 | Complete |
+| PERF-03 | Phase 108 | Complete |
+| PERF-04 | Phase 108 | Complete |
+| PERF-05 | Phase 108 | Complete |
 | FEAT-01 | Phase 109 | Pending |
 | FEAT-02 | Phase 109 | Pending |
 | FEAT-03 | Phase 109 | Pending |
