@@ -14,13 +14,13 @@ Source->returns mappings via TABLE_MAP:
     ama_multi_tf_u [multi_tf_cal_anchor_us]  -> returns_ama_multi_tf_u
     ama_multi_tf_u [multi_tf_cal_anchor_iso] -> returns_ama_multi_tf_u
 
-Strategy:
-    - Batched by asset id: one SQL INSERT per (alignment_source, id) pair
-    - Each INSERT uses a 2-pass CTE with window functions for returns
-    - Source reads scoped by alignment_source (critical: prevents cross-source LAG contamination)
-    - Multiprocessing across (source, id) work units (default 10 workers)
-    - NullPool engines to avoid connection pooling issues in workers
-    - Each work unit: DELETE WHERE id=:id AND alignment_source=... + INSERT ... SELECT with LAG()
+Strategy (optimized v2 - batch per-ID with bulk watermark preload):
+    - Bulk watermark preload: one query loads MAX(ts) for ALL IDs before dispatch
+    - Source-advance skip: IDs where src_max_ts <= watermark_ts are skipped (no new data)
+    - Batched workers: _BATCH_SIZE IDs per worker call to amortize engine creation
+    - SET work_mem per transaction (not per connection probe)
+    - Each worker creates ONE NullPool engine, processes N IDs sequentially, then disposes
+    - ON CONFLICT DO NOTHING for idempotent upserts
 
 Usage:
     python -m ta_lab2.scripts.amas.refresh_returns_ama --ids all --all-tfs --source all
@@ -91,6 +91,9 @@ TABLE_MAP: dict[str, tuple[str, str, str, str]] = {
 }
 
 _PRINT_PREFIX = "refresh_returns_ama"
+
+# Number of IDs to process per worker call (amortizes engine creation overhead)
+_BATCH_SIZE = 15
 
 
 def _print(msg: str) -> None:
@@ -217,105 +220,189 @@ def _resolve_tfs(
     raise ValueError("Provide --tf <TF> or --all-tfs to specify timeframes.")
 
 
+def _bulk_load_watermarks(
+    engine: Engine,
+    dst: str,
+    alignment_source: str,
+    asset_ids: list[int],
+    venue_id: Optional[int],
+) -> dict[int, object]:
+    """Load MAX(ts) from the returns table for all IDs in one query.
+
+    Returns a dict mapping asset_id -> max_ts (or None if no rows for that ID).
+    Eliminates per-ID watermark queries (~2,460 queries -> 1 per source).
+    """
+    venue_clause = f" AND venue_id = {int(venue_id)}" if venue_id is not None else ""
+    id_list = ",".join(str(i) for i in asset_ids)
+    sql = text(
+        f"SELECT id, MAX(ts) AS last_ts"
+        f" FROM {dst}"
+        f" WHERE alignment_source = :as_{venue_clause}"
+        f"   AND id IN ({id_list})"
+        f" GROUP BY id"
+    )
+    with engine.connect() as conn:
+        rows = conn.execute(sql, {"as_": alignment_source}).fetchall()
+    return {int(r[0]): r[1] for r in rows}
+
+
+def _bulk_load_source_max_ts(
+    engine: Engine,
+    src: str,
+    alignment_source: str,
+    asset_ids: list[int],
+    venue_id: Optional[int],
+) -> dict[int, object]:
+    """Load MAX(ts) from the source AMA table for all IDs in one query.
+
+    Returns a dict mapping asset_id -> src_max_ts.
+    Used to skip IDs where src_max_ts <= watermark_ts (no new data).
+    """
+    venue_clause = f" AND venue_id = {int(venue_id)}" if venue_id is not None else ""
+    id_list = ",".join(str(i) for i in asset_ids)
+    sql = text(
+        f"SELECT id, MAX(ts) AS src_max_ts"
+        f" FROM {src}"
+        f" WHERE alignment_source = :as_{venue_clause}"
+        f"   AND id IN ({id_list})"
+        f" GROUP BY id"
+    )
+    with engine.connect() as conn:
+        rows = conn.execute(sql, {"as_": alignment_source}).fetchall()
+    return {int(r[0]): r[1] for r in rows}
+
+
 # ---------------------------------------------------------------------------
 # Worker function for multiprocessing
 # ---------------------------------------------------------------------------
 
 
-def _worker(args: tuple) -> dict:
+def _worker(args: tuple) -> list[dict]:
     """
-    Process one (source_key, asset_id) work unit.
+    Process a batch of asset IDs for one source.
 
-    Incremental INSERT using SQL window functions with ON CONFLICT DO NOTHING.
-    Reads source rows from the watermark seed point (1 row before last processed ts)
-    so LAG() computes correctly for the first new row. Only new rows are inserted
-    (ON CONFLICT DO NOTHING handles overlap with existing data).
+    Each call creates ONE NullPool engine and processes all IDs in the batch
+    sequentially, amortizing engine creation overhead (~_BATCH_SIZE IDs per engine).
 
-    Falls back to full rebuild (DELETE + INSERT) when no watermark exists.
+    Watermarks are pre-loaded by _process_source (bulk query) and passed in via
+    id_watermark_pairs, so no per-ID watermark queries are issued here.
 
-    Each call gets its own NullPool engine (safe for multiprocessing).
+    For each ID:
+    - Incremental INSERT: reads from seed row before watermark, ON CONFLICT DO NOTHING
+    - Full rebuild (DELETE + INSERT) when no watermark exists (first run)
 
-    Returns summary dict with source, id, n_rows, elapsed.
+    Returns a list of result dicts (one per ID) with source, id, n_rows, elapsed.
     """
-    source_key, src, dst, asset_id, tf_filter, db_url, venue_id, alignment_source = args
-    t0 = time.time()
+    (
+        source_key,
+        src,
+        dst,
+        id_watermark_pairs,  # list of (asset_id, watermark_ts_or_None)
+        tf_filter,
+        db_url,
+        venue_id,
+        alignment_source,
+    ) = args
+
+    results: list[dict] = []
+    engine = None
 
     try:
         engine = _get_engine(db_url)
 
-        # Build base scope — always scoped by alignment_source to prevent
-        # cross-source LAG contamination (all 5 variants read from same _u table)
-        scope = f"id = {int(asset_id)} AND alignment_source = '{alignment_source}'"
-        if tf_filter:
-            scope += f" AND tf = '{tf_filter}'"
-        if venue_id is not None:
-            scope += f" AND venue_id = {int(venue_id)}"
-
-        # Look up watermark: max ts in the returns table for this scope
-        with engine.connect() as conn:
-            wm_row = conn.execute(
-                text(f"SELECT max(ts) FROM {dst} WHERE {scope}")
-            ).fetchone()
-        watermark = wm_row[0] if wm_row and wm_row[0] else None
-
-        if watermark is not None:
-            # Incremental: read from 1 seed row before watermark for LAG context.
-            # The seed row ensures LAG() computes delta1/ret correctly for the
-            # first new row. ON CONFLICT DO NOTHING skips rows already in dst.
-            # We use a subquery to find the seed ts: max(ts) < watermark per partition.
-            where_clause = (
-                f"WHERE {scope}"
-                f" AND ts >= ("
-                f"   SELECT COALESCE(max(s.ts), '1970-01-01'::timestamptz)"
-                f"   FROM {src} s"
-                f"   WHERE s.id = {int(asset_id)}"
-                f"     AND s.alignment_source = '{alignment_source}'"
-                f"     AND s.ts < '{watermark}'"
-                + (f"     AND s.tf = '{tf_filter}'" if tf_filter else "")
-                + (
-                    f"     AND s.venue_id = {int(venue_id)}"
-                    if venue_id is not None
-                    else ""
+        for asset_id, watermark in id_watermark_pairs:
+            t0 = time.time()
+            try:
+                # Build base scope — always scoped by alignment_source to prevent
+                # cross-source LAG contamination (all 5 variants read from same _u table)
+                scope = (
+                    f"id = {int(asset_id)} AND alignment_source = '{alignment_source}'"
                 )
-                + " )"
+                if tf_filter:
+                    scope += f" AND tf = '{tf_filter}'"
+                if venue_id is not None:
+                    scope += f" AND venue_id = {int(venue_id)}"
+
+                if watermark is not None:
+                    # Incremental: read from 1 seed row before watermark for LAG context.
+                    # The seed row ensures LAG() computes delta1/ret correctly for the
+                    # first new row. ON CONFLICT DO NOTHING skips rows already in dst.
+                    # We use a subquery to find the seed ts: max(ts) < watermark per partition.
+                    where_clause = (
+                        f"WHERE {scope}"
+                        f" AND ts >= ("
+                        f"   SELECT COALESCE(max(s.ts), '1970-01-01'::timestamptz)"
+                        f"   FROM {src} s"
+                        f"   WHERE s.id = {int(asset_id)}"
+                        f"     AND s.alignment_source = '{alignment_source}'"
+                        f"     AND s.ts < '{watermark}'"
+                        + (f"     AND s.tf = '{tf_filter}'" if tf_filter else "")
+                        + (
+                            f"     AND s.venue_id = {int(venue_id)}"
+                            if venue_id is not None
+                            else ""
+                        )
+                        + " )"
+                    )
+                else:
+                    # No watermark: full build (first run for this id/source)
+                    where_clause = f"WHERE {scope}"
+
+                insert_sql = _INSERT_SQL.format(
+                    src=src,
+                    dst=dst,
+                    where_clause=where_clause,
+                    alignment_source=alignment_source,
+                )
+
+                with engine.begin() as conn:
+                    conn.execute(text("SET LOCAL work_mem = '128MB'"))
+                    if watermark is None:
+                        # First run: delete any stale data, then full insert
+                        conn.execute(text(f"DELETE FROM {dst} WHERE {scope}"))
+                    result = conn.execute(text(insert_sql))
+                    n_rows = result.rowcount
+
+                elapsed = time.time() - t0
+                results.append(
+                    {
+                        "source": source_key,
+                        "id": asset_id,
+                        "n_rows": n_rows,
+                        "elapsed": elapsed,
+                        "error": None,
+                    }
+                )
+
+            except Exception as exc:
+                elapsed = time.time() - t0
+                results.append(
+                    {
+                        "source": source_key,
+                        "id": asset_id,
+                        "n_rows": 0,
+                        "elapsed": elapsed,
+                        "error": str(exc),
+                    }
+                )
+
+    except Exception as outer_exc:
+        # Engine creation failed — report all IDs in batch as errors
+        for asset_id, _ in id_watermark_pairs:
+            results.append(
+                {
+                    "source": source_key,
+                    "id": asset_id,
+                    "n_rows": 0,
+                    "elapsed": 0.0,
+                    "error": f"engine error: {outer_exc}",
+                }
             )
-        else:
-            # No watermark: full build (first run for this id/source)
-            where_clause = f"WHERE {scope}"
+    finally:
+        if engine is not None:
+            engine.dispose()
 
-        insert_sql = _INSERT_SQL.format(
-            src=src,
-            dst=dst,
-            where_clause=where_clause,
-            alignment_source=alignment_source,
-        )
-
-        with engine.begin() as conn:
-            conn.execute(text("SET LOCAL work_mem = '128MB'"))
-            if watermark is None:
-                # First run: delete any stale data, then full insert
-                conn.execute(text(f"DELETE FROM {dst} WHERE {scope}"))
-            result = conn.execute(text(insert_sql))
-            n_rows = result.rowcount
-
-        elapsed = time.time() - t0
-        return {
-            "source": source_key,
-            "id": asset_id,
-            "n_rows": n_rows,
-            "elapsed": elapsed,
-            "error": None,
-        }
-
-    except Exception as exc:
-        elapsed = time.time() - t0
-        return {
-            "source": source_key,
-            "id": asset_id,
-            "n_rows": 0,
-            "elapsed": elapsed,
-            "error": str(exc),
-        }
+    return results
 
 
 # ---------------------------------------------------------------------------
@@ -375,7 +462,7 @@ def _process_source(
     )
 
     if dry_run:
-        _print(f"  [{source_key}] DRY-RUN -- would process {len(asset_ids)} work units")
+        _print(f"  [{source_key}] DRY-RUN -- would process {len(asset_ids)} IDs")
         return {
             "source": source_key,
             "n_ids": len(asset_ids),
@@ -384,64 +471,121 @@ def _process_source(
             "dry_run": True,
         }
 
-    # Build work units: one per (source_key, id)
+    # ------------------------------------------------------------------
+    # Bulk watermark preload: one query for all IDs (avoids per-ID queries)
+    # ------------------------------------------------------------------
+    _print(f"  [{source_key}] Loading watermarks for {len(asset_ids)} IDs...")
+    watermarks = _bulk_load_watermarks(
+        engine, returns_table, alignment_source, asset_ids, venue_id
+    )
+    _print(f"  [{source_key}] Watermarks loaded ({len(watermarks)} existing)")
+
+    # ------------------------------------------------------------------
+    # Source-advance check: skip IDs where no new source data exists
+    # ------------------------------------------------------------------
+    _print(f"  [{source_key}] Checking source max_ts for skip optimization...")
+    src_max_ts = _bulk_load_source_max_ts(
+        engine, source_table, alignment_source, asset_ids, venue_id
+    )
+
+    active_ids: list[int] = []
+    skipped_ids: list[int] = []
+    for aid in asset_ids:
+        wm = watermarks.get(aid)
+        smax = src_max_ts.get(aid)
+        if wm is not None and smax is not None and smax <= wm:
+            skipped_ids.append(aid)
+        else:
+            active_ids.append(aid)
+
+    if skipped_ids:
+        _print(
+            f"  [{source_key}] Skipping {len(skipped_ids)} IDs (no new source data); "
+            f"{len(active_ids)} IDs to process"
+        )
+    else:
+        _print(f"  [{source_key}] All {len(active_ids)} IDs have new source data")
+
+    if not active_ids:
+        _print(f"  [{source_key}] Nothing to do -- all IDs up to date")
+        return {
+            "source": source_key,
+            "n_ids": len(asset_ids),
+            "n_skipped": len(skipped_ids),
+            "n_rows": 0,
+            "elapsed": 0.0,
+        }
+
+    # ------------------------------------------------------------------
+    # Build batched work units: _BATCH_SIZE IDs per worker call to amortize
+    # engine creation overhead (was: 1 engine per ID)
+    # ------------------------------------------------------------------
+    id_wm_pairs = [(aid, watermarks.get(aid)) for aid in active_ids]
+
+    def _chunks(lst: list, n: int):
+        for i in range(0, len(lst), n):
+            yield lst[i : i + n]
+
     work_units = [
         (
             source_key,
             source_table,
             returns_table,
-            aid,
+            batch,
             tf_filter,
             db_url,
             venue_id,
             alignment_source,
         )
-        for aid in asset_ids
+        for batch in _chunks(id_wm_pairs, _BATCH_SIZE)
     ]
+
+    _print(
+        f"  [{source_key}] Dispatching {len(active_ids)} IDs in "
+        f"{len(work_units)} batches (batch_size={_BATCH_SIZE}), "
+        f"workers={min(num_processes, len(work_units))}"
+    )
 
     t0 = time.time()
     total_rows = 0
     errors = []
 
+    def _handle_result(result: dict) -> None:
+        nonlocal total_rows
+        total_rows += result["n_rows"]
+        if result["error"]:
+            errors.append(result)
+            _print(f"  [{source_key}] id={result['id']} ERROR: {result['error']}")
+        else:
+            _print(
+                f"  [{source_key}] id={result['id']}: "
+                f"{result['n_rows']:,} rows in {result['elapsed']:.1f}s"
+            )
+
     # Use multiprocessing for >1 worker, sequential for 1
     effective_workers = min(num_processes, len(work_units))
     if effective_workers > 1:
         with Pool(processes=effective_workers, maxtasksperchild=1) as pool:
-            for result in pool.imap_unordered(_worker, work_units):
-                total_rows += result["n_rows"]
-                if result["error"]:
-                    errors.append(result)
-                    _print(
-                        f"  [{source_key}] id={result['id']} ERROR: {result['error']}"
-                    )
-                else:
-                    _print(
-                        f"  [{source_key}] id={result['id']}: "
-                        f"{result['n_rows']:,} rows in {result['elapsed']:.1f}s"
-                    )
+            for batch_results in pool.imap_unordered(_worker, work_units):
+                for result in batch_results:
+                    _handle_result(result)
     else:
         for wu in work_units:
-            result = _worker(wu)
-            total_rows += result["n_rows"]
-            if result["error"]:
-                errors.append(result)
-                _print(f"  [{source_key}] id={result['id']} ERROR: {result['error']}")
-            else:
-                _print(
-                    f"  [{source_key}] id={result['id']}: "
-                    f"{result['n_rows']:,} rows in {result['elapsed']:.1f}s"
-                )
+            for result in _worker(wu):
+                _handle_result(result)
 
     elapsed = time.time() - t0
     _print(
         f"  [{source_key}] Done: {total_rows:,} rows, "
-        f"{len(asset_ids)} ids, {elapsed:.1f}s"
+        f"{len(active_ids)} ids ({len(skipped_ids)} skipped), {elapsed:.1f}s"
         + (f", {len(errors)} errors" if errors else "")
     )
 
     return {
         "source": source_key,
         "n_ids": len(asset_ids),
+        "n_active": len(active_ids),
+        "n_skipped": len(skipped_ids),
         "n_rows": total_rows,
         "elapsed": elapsed,
         "errors": errors,
