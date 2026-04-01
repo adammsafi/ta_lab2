@@ -11,12 +11,13 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 
 Phase: 109 of 111 IN PROGRESS (Feature Skip-Unchanged) — 1/2 plans complete
 Also: Phase 104 IN PROGRESS (Crypto-Native Indicators) — 1/3 plans complete
+Also: Phase 100 IN PROGRESS (ML Signal Combination) — Plan 01 complete (1/3 plans)
 Also: Phase 108 COMPLETE (Pipeline Batch Performance) — 5 plans, all complete
 Also: Phase 103 COMPLETE (Traditional TA Expansion) — 3/3 plans complete
-Status: Plan 104-01 complete — HyperliquidAdapter + MockAdapter + 8-column migration ready
-Last activity: 2026-04-01 — Completed 104-01-PLAN.md
+Status: Plan 100-01 complete — LGBMRanker cross-sectional ranker trained; Mean IC=0.0217, IC-IR=0.74, NDCG=0.81
+Last activity: 2026-04-01 — Completed 100-01-PLAN.md (also: 104-01-PLAN.md)
 
-Progress: [##########] 100% v1.2.0 | [█████████░] 80% v1.3.0 (21/26 plans, 6/6 phases)
+Progress: [##########] 100% v1.2.0 | [█████████░] 82% v1.3.0 (22/26 plans, 6/6 phases)
 
 ## Performance Metrics
 
@@ -221,6 +222,14 @@ Phase 103-02 decisions:
 - ichimoku get_feature_columns uses hardcoded string list: output col names are param-independent (always ichimoku_tenkan/kijun/span_a/span_b/chikou)
 - mass_index column name uses mass_idx_{sum_period} matching indicators_extended default out_col pattern
 
+Phase 100-01 decisions:
+- dim_ctf_feature_selection (not dim_feature_selection.source) is the correct table for CTF features: dim_feature_selection has no source column; Phase 92 populates dim_ctf_feature_selection
+- ret_arith from features table used for forward returns: returns_bars_multi_tf base table does not exist (only _u and _state variants); shift ret_arith -1 per asset within features table
+- LGBMRanker labels must be integer: _build_rank_target returns rank(method='first',ascending=True)-1 not pct rank; LGBMRanker fatal error on float 0.5
+- Panel CV on unique timestamps: t1_series built via unique_ts.tolist() -> DatetimeIndex; split at period level; expand to rows via ts->rows dict
+- MEMORY.md tz fix in panel CV: Series.tolist() preserves UTC Timestamps; Series.values strips tz causing tz-naive vs tz-aware TypeError in PurgedKFoldSplitter comparison
+- IC evaluation uses actual forward_return (Spearman corr against float returns); NDCG uses integer rank as relevance grade
+
 Phase 109-01 decisions:
 - down_revision = w6x7y8z9a0b1 (actual head): plan specified t4u5v6w7x8y9 but phases 100, 102, 103 added migrations after 107; use actual head per established precedent
 - No venue_id in feature_refresh_state PK: features use venue_id=1 only; can be added via follow-up migration if multi-venue support added
@@ -253,7 +262,7 @@ Phase 104-01 decisions:
 ## Session Continuity
 
 Last session: 2026-04-01
-Stopped at: Completed 104-01-PLAN.md
+Stopped at: Completed 100-01-PLAN.md (also: 104-01-PLAN.md)
 Resume file: None
 
 ---
