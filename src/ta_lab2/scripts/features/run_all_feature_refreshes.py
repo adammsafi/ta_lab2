@@ -8,17 +8,20 @@ Usage:
     python -m ta_lab2.scripts.features.run_all_feature_refreshes --all --all-tfs
     python -m ta_lab2.scripts.features.run_all_feature_refreshes --validate
     python -m ta_lab2.scripts.features.run_all_feature_refreshes --sequential
+    python -m ta_lab2.scripts.features.run_all_feature_refreshes --all --workers 4
 
-Refresh order (respects dependencies):
-1. vol (depends on price_bars_multi_tf)
-2. ta (depends on price_bars_multi_tf)
-3. features (depends on 1-2 + EMAs + bar returns)
-4. features CS norms (depends on features having up-to-date ret_arith/rsi_14/vol columns)
+Wave structure (respects dependencies):
+- Wave 1: vol, ta, cycle_stats, rolling_extremes -- all independent, run in parallel
+          (use --workers N to control thread count, default 4)
+- Wave 2: features (unified view) -- depends on Wave 1 (reads vol, ta, returns)
+- Wave 2b: microstructure UPDATE -- depends on Wave 2 (UPDATEs existing features rows)
+- Wave 3: CTF cross-timeframe features -- depends on Wave 2b
+- Wave 4: CS norms -- depends on Wave 2b (window-function UPDATE over all assets)
 
-Parallel execution where possible:
-- vol, ta can run in parallel (same dependency)
-- features runs after all complete
-- CS norms run sequentially after features (window-function UPDATE, not insert)
+Parallelism controls:
+- --workers N    : Wave 1 sub-phase thread count (default 4, max 4)
+- --tf-workers N : TF-level process parallelism (default 1)
+- --sequential   : Run Wave 1 tasks sequentially (debugging escape hatch)
 
 Note: returns come from returns_bars_multi_tf.
 """
@@ -424,6 +427,7 @@ def run_all_refreshes(
     codependence: bool = False,
     venue_id: int | None = None,
     skip_cs_norms: bool = False,
+    wave1_workers: int = 4,
 ) -> dict[str, RefreshResult]:
     """Refresh all feature tables for a single (tf, alignment_source)."""
     results = {}
@@ -465,10 +469,16 @@ def run_all_refreshes(
         ("rolling_extremes", refresh_rolling_extremes),
     ]
 
-    if parallel:
-        logger.info("Phase 1: Running vol/ta in parallel")
+    # Clamp wave1_workers: never more workers than tasks
+    wave1_workers = min(wave1_workers, len(phase1_tasks))
 
-        with ThreadPoolExecutor(max_workers=3) as executor:
+    if parallel:
+        logger.info(
+            "Wave 1: Running vol/ta/cycle_stats/rolling_extremes in parallel (%d workers)",
+            wave1_workers,
+        )
+
+        with ThreadPoolExecutor(max_workers=wave1_workers) as executor:
             future_to_name = {}
             for name, refresh_fn in phase1_tasks:
                 future = executor.submit(
@@ -496,7 +506,7 @@ def run_all_refreshes(
                     logger.error(f"  {result.table} (tf={tf}): FAILED - {result.error}")
 
     else:
-        logger.info("Phase 1: Running vol/ta sequentially")
+        logger.info("Wave 1: Running vol/ta/cycle_stats/rolling_extremes sequentially")
 
         for name, refresh_fn in phase1_tasks:
             result = refresh_fn(
@@ -512,7 +522,7 @@ def run_all_refreshes(
                 logger.error(f"  {result.table} (tf={tf}): FAILED - {result.error}")
 
     # Phase 2: Features store (depends on phase 1)
-    logger.info("Phase 2: Running features (unified view)")
+    logger.info("Wave 2: Running features (unified view) -- depends on Wave 1")
 
     result = refresh_features_store(
         engine, process_ids, start, end, tf, alignment_source, venue_id=venue_id
@@ -529,7 +539,7 @@ def run_all_refreshes(
     # Phase 2b: Microstructure UPDATE (supplemental columns on features rows)
     # MUST run after Phase 2 — microstructure does UPDATE on existing rows,
     # so the base rows from features must exist first.
-    logger.info("Phase 2b: Running microstructure feature UPDATE on features")
+    logger.info("Wave 2b: Running microstructure UPDATE -- depends on Wave 2")
 
     micro_result = refresh_microstructure(
         engine, process_ids, start, end, tf, alignment_source, venue_id=venue_id
@@ -548,7 +558,9 @@ def run_all_refreshes(
     # Non-fatal: log warning and continue if CTF fails.
     # CTF has its own _should_skip_asset logic internally; no double-skip issue.
     if _CTF_AVAILABLE:
-        logger.info("Phase 2c: Running CTF features (cross-timeframe)")
+        logger.info(
+            "Wave 3: Running CTF features (cross-timeframe) -- depends on Wave 2b"
+        )
         ctf_result = _refresh_ctf_step(
             engine,
             ids=process_ids,
@@ -567,7 +579,7 @@ def run_all_refreshes(
                 f"  {ctf_result.table} (tf={tf}): FAILED - {ctf_result.error}"
             )
     else:
-        logger.info("Phase 2c: Skipping CTF features (module not available)")
+        logger.info("Wave 3: Skipping CTF features (module not available)")
 
     # Phase 3: Cross-sectional normalization (depends on features)
     # MUST run sequentially after features — window functions read the
@@ -575,7 +587,7 @@ def run_all_refreshes(
     # NOTE: CS norms use PARTITION BY (ts, tf) over ALL assets — cannot be
     # scoped to changed_ids.  Always pass tf only (no ids argument).
     if skip_cs_norms:
-        logger.info("Phase 3: Skipping CS norms (--no-cs-norms)")
+        logger.info("Wave 4: Skipping CS norms (--no-cs-norms)")
         cs_result = RefreshResult(
             table="features (CS norms)",
             rows_inserted=0,
@@ -584,7 +596,7 @@ def run_all_refreshes(
             error="skipped",
         )
     else:
-        logger.info("Phase 3: Refreshing cross-sectional normalizations (CS norms)")
+        logger.info("Wave 4: Refreshing cross-sectional normalizations (CS norms)")
         cs_result = refresh_cs_norms_step(engine, tf=tf)
     results[cs_result.table] = cs_result
 
@@ -867,6 +879,7 @@ def _run_single_tf(args_tuple):
         codependence,
         venue_id,
         skip_cs_norms,
+        wave1_workers,
     ) = args_tuple
 
     from sqlalchemy import create_engine
@@ -889,6 +902,7 @@ def _run_single_tf(args_tuple):
             codependence=codependence,
             venue_id=venue_id,
             skip_cs_norms=skip_cs_norms,
+            wave1_workers=wave1_workers,
         )
         return (tf, alignment_source, results)
     except Exception as e:
@@ -1032,6 +1046,15 @@ def parse_args() -> argparse.Namespace:
         help="Number of parallel TF workers (default: 1 = sequential). Max ~4.",
     )
 
+    # Wave 1 sub-phase parallelism
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=4,
+        dest="wave1_workers",
+        help="Number of parallel workers for Wave 1 sub-phases (vol/ta/cycle_stats/rolling_extremes). Default 4, max 4.",
+    )
+
     # CS norms
     parser.add_argument(
         "--no-cs-norms",
@@ -1066,6 +1089,18 @@ def main() -> int:
     if not TARGET_DB_URL:
         logger.error("TARGET_DB_URL not set")
         return 1
+
+    # Worker budget guard: warn when tf_workers * wave1_workers > 8
+    if args.tf_workers > 1:
+        total_workers = args.tf_workers * args.wave1_workers
+        if total_workers > 8:
+            logger.warning(
+                "Total concurrent workers=%d (tf_workers=%d x wave1_workers=%d) may cause "
+                "memory pressure with large asset sets. Consider reducing --tf-workers or --workers.",
+                total_workers,
+                args.tf_workers,
+                args.wave1_workers,
+            )
 
     engine = get_engine(TARGET_DB_URL)
 
@@ -1131,6 +1166,7 @@ def main() -> int:
                 getattr(args, "codependence", False),
                 args.venue_id,
                 getattr(args, "no_cs_norms", False),
+                args.wave1_workers,
             )
             for tf, as_ in tf_alignments
         ]
@@ -1186,6 +1222,7 @@ def main() -> int:
                     codependence=getattr(args, "codependence", False),
                     venue_id=args.venue_id,
                     skip_cs_norms=getattr(args, "no_cs_norms", False),
+                    wave1_workers=args.wave1_workers,
                 )
                 all_results[(tf, alignment_source)] = results
             except Exception as e:
