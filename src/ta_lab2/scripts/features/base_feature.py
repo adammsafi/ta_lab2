@@ -58,6 +58,7 @@ class FeatureConfig:
     add_zscore: bool = True
     zscore_window: int = 252
     venue_id: int | None = None  # Filter source data to this venue_id (None = all)
+    use_polars: bool = False  # Use polars-accelerated path for groupby loops
 
 
 # =============================================================================
