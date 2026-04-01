@@ -16,13 +16,13 @@
 
 ### Backtest Expansion
 
-- [ ] **BT-01**: Resume-safe mass backtest orchestrator (`run_mass_backtest.py`) with state table tracking `(strategy, asset, params_hash, tf, cost)` completion status
-- [ ] **BT-02**: `backtest_trades` table partitioned by strategy_name before scaling (pre-emptive for 20-40M rows)
-- [ ] **BT-03**: Trade-level results populated for all existing bakeoff strategies (13 strategies x top assets x 16 costs = ~113K runs) in `backtest_runs`/`backtest_trades`
-- [ ] **BT-04**: `backtest_metrics.mc_sharpe_lo/hi/median` populated via `monte_carlo_trades()` for every run (1,000 bootstrap samples each)
-- [ ] **BT-05**: CTF threshold signals registered in `signals/registry.py`, backtested across top IC-scoring CTF features (~230K runs)
-- [ ] **BT-06**: Expanded parameter grids for 6 core signals (full factorial EMA periods, RSI windows, ATR lookbacks)
-- [ ] **BT-07**: Strategy leaderboard dashboard page with MC confidence bands, feature-to-signal lineage, and PBO heatmap
+- [x] **BT-01**: Resume-safe mass backtest orchestrator (`run_mass_backtest.py`) with state table tracking `(strategy, asset, params_hash, tf, cost)` completion status
+- [x] **BT-02**: `backtest_trades` table partitioned by strategy_name before scaling (pre-emptive for 20-40M rows)
+- [x] **BT-03**: Trade-level results populated for all existing bakeoff strategies (13 strategies x top assets x 16 costs = ~113K runs) in `backtest_runs`/`backtest_trades`
+- [x] **BT-04**: `backtest_metrics.mc_sharpe_lo/hi/median` populated via `monte_carlo_trades()` for every run (1,000 bootstrap samples each)
+- [x] **BT-05**: CTF threshold signals registered in `signals/registry.py`, backtested across top IC-scoring CTF features (~230K runs)
+- [x] **BT-06**: Expanded parameter grids for 6 core signals (full factorial EMA periods, RSI windows, ATR lookbacks)
+- [x] **BT-07**: Strategy leaderboard dashboard page with MC confidence bands, feature-to-signal lineage, and PBO heatmap
 
 ### CTF Research Expansion
 
@@ -121,13 +121,13 @@
 | OPS-04 | Phase 96 | Complete |
 | OPS-05 | Phase 96 | Complete |
 | OPS-06 | Phase 96 | Complete |
-| BT-01 | Phase 99 | Pending |
-| BT-02 | Phase 99 | Pending |
-| BT-03 | Phase 99 | Pending |
-| BT-04 | Phase 99 | Pending |
-| BT-05 | Phase 99 | Pending |
-| BT-06 | Phase 99 | Pending |
-| BT-07 | Phase 99 | Pending |
+| BT-01 | Phase 99 | Complete |
+| BT-02 | Phase 99 | Complete |
+| BT-03 | Phase 99 | Complete |
+| BT-04 | Phase 99 | Complete |
+| BT-05 | Phase 99 | Complete |
+| BT-06 | Phase 99 | Complete |
+| BT-07 | Phase 99 | Complete |
 | CTF-01 | Phase 98 | Complete |
 | CTF-02 | Phase 98 | Complete |
 | CTF-03 | Phase 98 | Complete |

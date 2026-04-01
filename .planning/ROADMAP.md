@@ -1403,7 +1403,7 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 - [x] **Phase 96: Executor Activation** - Seed strategies, wire signals into daily refresh, activate real IC-weighted BL, track live parity, add PnL attribution — COMPLETE 2026-03-30
 - [x] **Phase 97: FRED Macro Expansion** - Add SP500/NASDAQ/DJIA to macro feature layer, rolling BTC-equity correlation, risk-on/off signals — COMPLETE 2026-03-31
 - [x] **Phase 98: CTF Feature Graduation** - Materialize top CTF features into features table, asset-specific selection tier, cross-asset composites, lead-lag IC matrix — COMPLETE 2026-03-31
-- [ ] **Phase 99: Backtest Scaling** - Resume-safe mass backtest orchestrator, partitioned trades table, 113K+ core runs, MC bands, CTF signal backtests, expanded grids, leaderboard dashboard
+- [x] **Phase 99: Backtest Scaling** - Resume-safe mass backtest orchestrator, partitioned trades table, 113K+ core runs, MC bands, CTF signal backtests, expanded grids, leaderboard dashboard — COMPLETE 2026-04-01
 - [ ] **Phase 100: ML Signal Combination** - LGBMRanker cross-sectional predictor, SHAP interaction analysis, XGBoost meta-label confidence filter
 - [x] **Phase 101: Tech Debt Cleanup** - Remove orphaned export, create Phase 82/92 VERIFICATION.md, document CTF downstream consumers — COMPLETE 2026-04-01
 - [ ] **Phase 102: Indicator Research Framework** - Permutation IC test, FDR control, haircut Sharpe, trial registry, block bootstrap — the testing harness for all indicator R&D
@@ -1506,11 +1506,11 @@ Plans:
 **Plans:** 5 plans
 
 Plans:
-- [ ] 99-01-PLAN.md -- Alembic migration: mass_backtest_state table + backtest_trades partitioning
-- [ ] 99-02-PLAN.md -- CTF threshold signal adapter + expanded parameter grids YAML
-- [ ] 99-03-PLAN.md -- run_mass_backtest.py orchestrator + CTF data loader + MC backfill script
-- [ ] 99-04-PLAN.md -- Strategy Leaderboard dashboard page (MC bands, PBO heatmap, lineage)
-- [ ] 99-05-PLAN.md -- Core bakeoff execution run + verification
+- [x] 99-01-PLAN.md -- Alembic migration: mass_backtest_state table + backtest_trades partitioning
+- [x] 99-02-PLAN.md -- CTF threshold signal adapter + expanded parameter grids YAML
+- [x] 99-03-PLAN.md -- run_mass_backtest.py orchestrator + CTF data loader + MC backfill script
+- [x] 99-04-PLAN.md -- Strategy Leaderboard dashboard page (MC bands, PBO heatmap, lineage)
+- [x] 99-05-PLAN.md -- Core bakeoff execution run + verification
 
 ---
 
