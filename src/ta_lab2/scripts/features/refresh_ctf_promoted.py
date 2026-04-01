@@ -5,6 +5,28 @@ Materializes top CTF (cross-timeframe) features into the main features table
 so that downstream consumers (BL optimizer, signals, ML) can access them via
 the standard features query path.
 
+Design note -- dim_ctf_feature_selection consumer pattern (CTF-01 / DEBT-04):
+  ``dim_ctf_feature_selection`` is a research/selection table populated by
+  ``run_ctf_feature_selection.py`` (Phase 98-02).  It classifies every CTF
+  feature into one of four tiers: active, conditional, watch, or archive.
+
+  THIS SCRIPT is the sole downstream consumer of the "active" tier.  It reads
+  active-tier features (via IC-based discovery against ``ic_results``, which
+  mirrors the active-tier criteria) and writes their computed values into the
+  main ``features`` table so that the rest of the pipeline (BL optimizer,
+  signals, ML) can access them through the standard features query path.
+
+  The absence of other direct SQL consumers of ``dim_ctf_feature_selection``
+  is BY DESIGN -- it is a research gate, not a runtime lookup table.  Its
+  purpose is to record tier classification decisions for auditability and to
+  drive config pruning (``ctf_config_pruned.yaml``).  The actual feature
+  values flow through this promotion script into the ``features`` table.
+
+  This pattern mirrors ``dim_feature_selection`` (Phase 80) which similarly
+  serves as a research gate: tier assignments are recorded in the dimension
+  table, but promoted feature values are written into ``features`` by a
+  dedicated refresh script.
+
 Strategy:
   1. Pre-flight: verify Alembic migration has been run (columns exist).
   2. Discover promoted features: query ic_results for CTF features passing
