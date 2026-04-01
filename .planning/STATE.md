@@ -5,11 +5,11 @@
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 111 IN PROGRESS (Feature Polars Migration — Plan 03 complete)
+**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 111 IN PROGRESS (Feature Polars Migration — Plan 04 complete)
 
 ## Current Position
 
-Phase: 111 IN PROGRESS (Feature Polars Migration) — 3/N plans complete
+Phase: 111 IN PROGRESS (Feature Polars Migration) — 4/N plans complete
 Also: Phase 106 IN PROGRESS (Custom Composite Indicators) — 1/3 plans complete
 Also: Phase 110 COMPLETE (Feature Parallel Sub-Phases) — 1/1 plans complete
 Also: Phase 109 COMPLETE (Feature Skip-Unchanged) — 2/2 plans complete
@@ -18,8 +18,8 @@ Also: Phase 104 COMPLETE (Crypto-Native Indicators) — 3/3 plans complete
 Also: Phase 100 IN PROGRESS (ML Signal Combination) — Plans 01+02 complete (2/3 plans)
 Also: Phase 108 COMPLETE (Pipeline Batch Performance) — 5 plans, all complete
 Also: Phase 103 COMPLETE (Traditional TA Expansion) — 3/3 plans complete
-Status: Plan 111-03 complete — 6 polars-native indicator functions (RSI/MACD/Stoch/BB/ATR/ADX), TAFeature polars path, pre-existing RSI/ATR/ADX period alias bug fixed, all 16 TA columns < 1e-10 vs corrected pandas
-Last activity: 2026-04-01 — Completed 111-03-PLAN.md
+Status: Plan 111-04 complete — MicrostructureFeature polars outer loop, --use-polars flag wired to all 5 computation sub-phases, daily_features_view confirmed no-op
+Last activity: 2026-04-01 — Completed 111-04-PLAN.md
 
 Progress: [##########] 100% v1.2.0 | [█████████░] 90% v1.3.0 (31/32 plans, 8/6 phases)
 
@@ -332,6 +332,12 @@ Phase 111-03 decisions:
 - Rule 1 bug fix: _compute_rsi/atr/adx used period= keyword; rsi/atr/adx only apply alias when window=None, so window=14 default was always used. Fixed to window=period.
 - Intermediate column dunder naming (__col__): prevents collision with user columns; all cleaned up before return
 
+Phase 111-04 decisions:
+- _compute_micro_single_group as bound method (not closure): accesses self.micro_config for 5 config values; bound method is cleaner and directly testable
+- daily_features_view.py confirmed no-op: pure SQL INSERT INTO features SELECT ... JOIN price_bars/returns/vol/ta; no Python groupby loops to migrate
+- _run_single_tf tuple extended with use_polars at position 10: positional tuple for pickle-safe multiprocessing; both construction and unpacking updated together
+- getattr(args, 'use_polars', False) safe access: defensive pattern consistent with existing codependence/no_cs_norms access in orchestrator
+
 Phase 106-01 decisions:
 - Revision ID z9a0b1c2d3e4 chains from y8z9a0b1c2d3 (Phase 105 actual head); plan spec listed u5v6w7x8y9z0 -- use actual alembic heads per established precedent
 - DO $$ BLOCK for CHECK constraint idempotency: avoids hardcoding auto-generated constraint name
@@ -343,7 +349,7 @@ Phase 106-01 decisions:
 ## Session Continuity
 
 Last session: 2026-04-01
-Stopped at: Completed 111-03-PLAN.md
+Stopped at: Completed 111-04-PLAN.md
 Resume file: None
 
 ---
