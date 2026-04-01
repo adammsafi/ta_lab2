@@ -1412,6 +1412,7 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 - [ ] **Phase 105: Parameter Optimization** - Systematic parameter sweep (grid + Optuna) for surviving indicators, plateau preference, rolling stability test, DSR over full search space
 - [ ] **Phase 106: Custom Composite Indicators** - Proprietary indicators (AMA ER as regime signal, OI-divergence Ã— CTF agreement, funding-adjusted momentum, cross-asset lead-lag), strictest validation tier
 - [ ] **Phase 107: Pipeline Operations Dashboard** - Streamlit ops page: real-time stage monitor with progress bars, run history, trigger/kill buttons, pipeline_stage_log table for per-stage DB persistence
+**Plans:** 2 plans
 - [ ] **Phase 108: Pipeline Batch Performance** - Replace 5.7M per-key SQL queries with per-ID batch operations using PARTITION BY. EMA returns (2Mâ†’492 queries), AMA returns, bar returns, EMA fast-path. Target: 5hrâ†’1.5hr incremental
 **Plans:** 5 plans
 
@@ -1561,9 +1562,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 103-01-PLAN.md — Implement all 20 indicator functions in indicators_extended.py (Ichimoku, Williams %R, Keltner, CCI, Elder Ray, Force Index, VWAP, CMF, Chaikin Osc, Hurst, VIDYA, FRAMA, Aroon, Trix, Ultimate Osc, Vortex, EMV, Mass Index, KST, Coppock)
-- [ ] 103-02-PLAN.md — Wire into TAFeature pipeline: Alembic migration seeding dim_indicators + extending compute_features dispatch
-- [ ] 103-03-PLAN.md — IC sweep through Phase 102 harness, FDR control at 5%, promote survivors, log rejects
+- [ ] 103-01-PLAN.md ï¿½ Implement all 20 indicator functions in indicators_extended.py (Ichimoku, Williams %R, Keltner, CCI, Elder Ray, Force Index, VWAP, CMF, Chaikin Osc, Hurst, VIDYA, FRAMA, Aroon, Trix, Ultimate Osc, Vortex, EMV, Mass Index, KST, Coppock)
+- [ ] 103-02-PLAN.md ï¿½ Wire into TAFeature pipeline: Alembic migration seeding dim_indicators + extending compute_features dispatch
+- [ ] 103-03-PLAN.md ï¿½ IC sweep through Phase 102 harness, FDR control at 5%, promote survivors, log rejects
 
 ---
 
@@ -1619,6 +1620,25 @@ Plans:
 
 ---
 
+### Phase 107: Pipeline Operations Dashboard
+**Goal:** Streamlit ops page with real-time stage monitor, run history, trigger/kill buttons, and pipeline_stage_log table for per-stage DB persistence.
+**Depends on:** Phase 87 (pipeline_run_log exists), run_daily_refresh.py infrastructure
+**Requirements:** DASH-01, DASH-02, DASH-03, DASH-04, DASH-05
+**Success Criteria** (what must be TRUE):
+  1. `pipeline_stage_log` table exists with per-stage start/end/status/rows columns, FK to pipeline_run_log
+  2. `run_daily_refresh.py --all` writes pipeline_stage_log rows as it runs each stage (25 stages in STAGE_ORDER)
+  3. Streamlit page shows active run with real-time progress bars, auto-refreshing every 90s via @st.fragment
+  4. Run history panel shows last 10 runs with per-stage timing breakdown
+  5. Trigger panel with "Run Full Refresh" and "Run From Stage" buttons using subprocess.Popen (DETACHED_PROCESS on Windows)
+  6. Kill button creates .pipeline_kill sentinel file; run_daily_refresh.py checks between stages and stops gracefully
+**Plans:** 2 plans in 2 waves
+
+Plans:
+- [ ] 107-01-PLAN.md -- Alembic migration (pipeline_stage_log + killed status) + run_daily_refresh.py instrumentation (stage logging + kill switch)
+- [ ] 107-02-PLAN.md -- Streamlit page 19 (active monitor + trigger panel + run history) + queries module + app.py registration
+
+---
+
 ### Phase 108: Pipeline Batch Performance
 **Goal:** Eliminate per-key SQL queries across the pipeline. Replace individual queries per (id, tf, period, venue_id) with batch SQL operations using PARTITION BY. Add EMA fast-path for recent watermarks.
 **Depends on:** None (independent performance optimization)
@@ -1655,7 +1675,7 @@ Plans:
 | 104. Crypto-Native Indicators | 0/TBD | Not started | - |
 | 105. Parameter Optimization | 0/TBD | Not started | - |
 | 106. Custom Composite Indicators | 0/TBD | Not started | - |
-| 107. Pipeline Operations Dashboard | 0/TBD | Not started | - |
+| 107. Pipeline Operations Dashboard | 0/2 | Planned | - |
 | 108. Pipeline Batch Performance | 0/5 | Not started | - |
 
 ### v1.3.0 Requirement Coverage
@@ -1674,8 +1694,9 @@ Plans:
 | Parameter Optimization | IND-13, IND-14, IND-15 | Phase 105 | 3 |
 | Custom Composites | IND-16, IND-17, IND-18 | Phase 106 | 3 |
 | Pipeline Performance | PERF-01, PERF-02, PERF-03, PERF-04, PERF-05 | Phase 108 | 5 |
+| Pipeline Ops Dashboard | DASH-01, DASH-02, DASH-03, DASH-04, DASH-05 | Phase 107 | 5 |
 
-**Coverage:** 49/49 requirements mapped
+**Coverage:** 54/54 requirements mapped
 
 *Created: 2025-01-22*
 *Last updated: 2026-03-30 (Phases 102-106 added: Indicator R&D pipeline â€” research framework, TA expansion, crypto-native indicators, parameter optimization, custom composites)*
