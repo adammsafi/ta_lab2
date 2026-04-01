@@ -938,7 +938,13 @@ class TAFeature(BaseFeature):
         """Compute Mass Index."""
         ema_period = params.get("ema_period", 9)
         sum_period = params.get("sum_period", 25)
-        indx.mass_index(df, ema_period=ema_period, sum_period=sum_period, inplace=True)
+        indx.mass_index(
+            df,
+            ema_period=ema_period,
+            sum_period=sum_period,
+            out_col=f"mass_idx_{sum_period}",
+            inplace=True,
+        )
         return df
 
     def _compute_kst(self, df: pd.DataFrame, params: dict) -> pd.DataFrame:
