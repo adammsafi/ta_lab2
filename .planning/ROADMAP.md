@@ -1561,9 +1561,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 103-01: Implement first batch of indicators (Ichimoku, Williams %R, Keltner, CCI, Elder Ray, Force Index, VWAP, Chaikin MF, Chaikin Osc, Hurst)
-- [ ] 103-02: Implement second batch (VIDYA, FRAMA, Aroon, Trix, Ultimate Osc, Vortex, Ease of Movement, Mass Index, KST, Coppock)
-- [ ] 103-03: Full IC sweep of all new indicators through Phase 102 harness, promote survivors, log rejects
+- [ ] 103-01-PLAN.md — Implement all 20 indicator functions in indicators_extended.py (Ichimoku, Williams %R, Keltner, CCI, Elder Ray, Force Index, VWAP, CMF, Chaikin Osc, Hurst, VIDYA, FRAMA, Aroon, Trix, Ultimate Osc, Vortex, EMV, Mass Index, KST, Coppock)
+- [ ] 103-02-PLAN.md — Wire into TAFeature pipeline: Alembic migration seeding dim_indicators + extending compute_features dispatch
+- [ ] 103-03-PLAN.md — IC sweep through Phase 102 harness, FDR control at 5%, promote survivors, log rejects
 
 ---
 
