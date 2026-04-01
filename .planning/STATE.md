@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 
 ## Current Position
 
-Phase: 107 of 108 IN PROGRESS (Pipeline Operations Dashboard) — Plan 01 complete
-Next: Phase 107 Plan 02 (Streamlit ops dashboard page)
-Status: Plan 107-01 complete — pipeline_stage_log table + kill switch instrumentation in run_daily_refresh.py
-Last activity: 2026-04-01 — Completed 107-01-PLAN.md (stage logging + kill switch)
+Phase: 107 of 108 IN PROGRESS (Pipeline Operations Dashboard) — Plan 02 at checkpoint
+Next: Phase 107 Plan 02 checkpoint — human verification of Pipeline Ops page in Streamlit
+Status: Plan 107-02 Task 1 complete — query module + page 19 + app.py update committed fd3d705c; awaiting human-verify checkpoint
+Last activity: 2026-04-01 — Completed 107-02 Task 1 (pipeline_ops.py query module + 19_pipeline_ops.py + app.py)
 
 Progress: [##########] 100% v1.2.0 | [████████░░] 50% v1.3.0 (13/26 plans, 3/6 phases)
 
@@ -196,8 +196,8 @@ Phase 108-03 decisions:
 ## Session Continuity
 
 Last session: 2026-04-01
-Stopped at: Completed 107-01-PLAN.md (pipeline_stage_log + kill switch instrumentation in run_daily_refresh.py)
-Resume file: None
+Stopped at: 107-02 Task 1 committed (fd3d705c) — at checkpoint:human-verify for Pipeline Ops page
+Resume file: .planning/phases/107-pipeline-operations-dashboard/107-02-PLAN.md (Task 2 checkpoint)
 
 ---
 *Created: 2025-01-22*
