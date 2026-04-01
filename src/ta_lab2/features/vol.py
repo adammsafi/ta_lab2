@@ -3,6 +3,14 @@ import numpy as np
 import pandas as pd
 from typing import Sequence, Iterable, Literal
 
+try:
+    import polars as pl
+
+    HAVE_POLARS = True
+except ImportError:  # pragma: no cover
+    pl = None  # type: ignore[assignment]
+    HAVE_POLARS = False
+
 # =========================================================
 # ---- Core Volatility Estimators (single-bar + rolling) ---
 # =========================================================
@@ -323,3 +331,260 @@ def add_volatility_features(
     )
 
     return df
+
+
+# =========================================================
+# === Polars Variants =====================================
+# =========================================================
+# All functions below operate on a single-group pl.DataFrame
+# (already sorted by ts) and return a pl.DataFrame with new
+# columns appended.  Each function is a pure-polars equivalent
+# of its pandas counterpart above.
+
+
+def add_parkinson_vol_polars(
+    lf: "pl.DataFrame",  # type: ignore[name-defined]
+    high_col: str = "high",
+    low_col: str = "low",
+    windows: Sequence[int] = (20, 63, 126),
+    annualize: bool = True,
+    periods_per_year: int = 252,
+) -> "pl.DataFrame":  # type: ignore[name-defined]
+    """Parkinson (1980) range-based volatility — polars-native.
+
+    Output column names match pandas: ``vol_parkinson_{w}``.
+
+    Args:
+        lf: Single-group polars DataFrame sorted by ts.
+        high_col: High price column name.
+        low_col: Low price column name.
+        windows: Rolling windows (bars).
+        annualize: Annualize the result.
+        periods_per_year: Annualization factor.
+
+    Returns:
+        lf with ``vol_parkinson_{w}`` columns appended.
+    """
+    coef = 1.0 / (4.0 * np.log(2.0))
+    ann_factor = np.sqrt(periods_per_year) if annualize else 1.0
+
+    # hl_sq = ln(h/lo)^2
+    hl_sq = (pl.col(high_col) / pl.col(low_col)).log(base=np.e).pow(2).mul(coef)
+
+    new_cols = []
+    for w in windows:
+        expr = (
+            hl_sq.rolling_mean(window_size=w, min_samples=w)
+            .sqrt()
+            .mul(ann_factor)
+            .alias(f"vol_parkinson_{w}")
+        )
+        new_cols.append(expr)
+
+    return lf.with_columns(new_cols)
+
+
+def add_garman_klass_vol_polars(
+    lf: "pl.DataFrame",  # type: ignore[name-defined]
+    open_col: str = "open",
+    high_col: str = "high",
+    low_col: str = "low",
+    close_col: str = "close",
+    windows: Sequence[int] = (20, 63, 126),
+    annualize: bool = True,
+    periods_per_year: int = 252,
+) -> "pl.DataFrame":  # type: ignore[name-defined]
+    """Garman–Klass (1980) volatility estimator — polars-native.
+
+    Output column names: ``vol_gk_{w}``.
+
+    Args:
+        lf: Single-group polars DataFrame sorted by ts.
+        open_col: Open price column name.
+        high_col: High price column name.
+        low_col: Low price column name.
+        close_col: Close price column name.
+        windows: Rolling windows (bars).
+        annualize: Annualize the result.
+        periods_per_year: Annualization factor.
+
+    Returns:
+        lf with ``vol_gk_{w}`` columns appended.
+    """
+    coef_gk = 2.0 * np.log(2.0) - 1.0
+    ann_factor = np.sqrt(periods_per_year) if annualize else 1.0
+
+    # rs = 0.5 * ln(h/lo)^2 - (2*ln(2)-1) * ln(c/o)^2
+    rs_expr = pl.lit(0.5) * (pl.col(high_col) / pl.col(low_col)).log(base=np.e).pow(
+        2
+    ) - pl.lit(coef_gk) * (pl.col(close_col) / pl.col(open_col)).log(base=np.e).pow(2)
+
+    new_cols = []
+    for w in windows:
+        expr = (
+            rs_expr.rolling_mean(window_size=w, min_samples=w)
+            .sqrt()
+            .mul(ann_factor)
+            .alias(f"vol_gk_{w}")
+        )
+        new_cols.append(expr)
+
+    return lf.with_columns(new_cols)
+
+
+def add_rogers_satchell_vol_polars(
+    lf: "pl.DataFrame",  # type: ignore[name-defined]
+    open_col: str = "open",
+    high_col: str = "high",
+    low_col: str = "low",
+    close_col: str = "close",
+    windows: Sequence[int] = (20, 63, 126),
+    annualize: bool = True,
+    periods_per_year: int = 252,
+) -> "pl.DataFrame":  # type: ignore[name-defined]
+    """Rogers–Satchell (1991) volatility estimator — polars-native.
+
+    Output column names: ``vol_rs_{w}``.
+
+    Args:
+        lf: Single-group polars DataFrame sorted by ts.
+        open_col: Open price column name.
+        high_col: High price column name.
+        low_col: Low price column name.
+        close_col: Close price column name.
+        windows: Rolling windows (bars).
+        annualize: Annualize the result.
+        periods_per_year: Annualization factor.
+
+    Returns:
+        lf with ``vol_rs_{w}`` columns appended.
+    """
+    ann_factor = np.sqrt(periods_per_year) if annualize else 1.0
+
+    # rs = ln(h/c)*ln(h/o) + ln(lo/c)*ln(lo/o)
+    rs_expr = (pl.col(high_col) / pl.col(close_col)).log(base=np.e) * (
+        pl.col(high_col) / pl.col(open_col)
+    ).log(base=np.e) + (pl.col(low_col) / pl.col(close_col)).log(base=np.e) * (
+        pl.col(low_col) / pl.col(open_col)
+    ).log(base=np.e)
+
+    new_cols = []
+    for w in windows:
+        expr = (
+            rs_expr.rolling_mean(window_size=w, min_samples=w)
+            .sqrt()
+            .mul(ann_factor)
+            .alias(f"vol_rs_{w}")
+        )
+        new_cols.append(expr)
+
+    return lf.with_columns(new_cols)
+
+
+def add_atr_polars(
+    lf: "pl.DataFrame",  # type: ignore[name-defined]
+    period: int = 14,
+    open_col: str = "open",
+    high_col: str = "high",
+    low_col: str = "low",
+    close_col: str = "close",
+) -> "pl.DataFrame":  # type: ignore[name-defined]
+    """Average True Range (Wilder) — polars-native.
+
+    CRITICAL ATR DIVERGENCE FIX:
+    Pandas ``ewm`` skips NaN values.  The TR at row 0 is NaN (prev_close is
+    NaN from shift).  In polars, ``max_horizontal`` ignores nulls and would
+    return ``h - lo`` for row 0, producing a different starting value for the
+    EWM recursion.  Fix:
+
+    1. Use ``pl.when(prev_close.is_null()).then(None).otherwise(tr)`` so
+       TR is null (not a real value) on row 0 — matching pandas NaN.
+    2. Chain ``.ewm_mean(ignore_nulls=True)`` so the EWM recursion skips
+       the null row, matching pandas behavior exactly.
+
+    Output column: ``atr_{period}``.
+
+    Args:
+        lf: Single-group polars DataFrame sorted by ts.
+        period: ATR smoothing period (Wilder alpha = 1/period).
+        open_col: Unused (kept for API symmetry with pandas version).
+        high_col: High price column name.
+        low_col: Low price column name.
+        close_col: Close price column name.
+
+    Returns:
+        lf with ``atr_{period}`` column appended.
+    """
+    prev_close = pl.col(close_col).shift(1)
+
+    # TR = max(h-lo, |h-prev_close|, |lo-prev_close|)
+    # Null when prev_close is null (row 0) — matches pandas np.maximum with NaN
+    tr_expr = (
+        pl.when(prev_close.is_null())
+        .then(None)
+        .otherwise(
+            pl.max_horizontal(
+                (pl.col(high_col) - pl.col(low_col)),
+                (pl.col(high_col) - prev_close).abs(),
+                (pl.col(low_col) - prev_close).abs(),
+            )
+        )
+    )
+
+    atr_expr = tr_expr.ewm_mean(
+        alpha=1.0 / period, adjust=False, min_samples=1, ignore_nulls=True
+    ).alias(f"atr_{period}")
+
+    return lf.with_columns([atr_expr])
+
+
+def add_rolling_vol_from_returns_polars(
+    lf: "pl.DataFrame",  # type: ignore[name-defined]
+    close_col: str = "close",
+    windows: Sequence[int] = (20, 63, 126),
+    annualize: bool = True,
+    periods_per_year: int = 252,
+    ddof: int = 0,
+    prefix: str = "vol",
+    returns_col: str | None = None,
+) -> "pl.DataFrame":  # type: ignore[name-defined]
+    """Rolling log-return standard deviation — polars-native.
+
+    If ``returns_col`` is provided and exists in ``lf``, use it directly as
+    log returns.  Otherwise compute ``ln(close / prev_close)`` from
+    ``close_col``.
+
+    Output column names: ``{prefix}_log_roll_{w}``.
+
+    Args:
+        lf: Single-group polars DataFrame sorted by ts.
+        close_col: Close price column name (used when returns_col absent).
+        windows: Rolling windows (bars).
+        annualize: Annualize the result.
+        periods_per_year: Annualization factor.
+        ddof: Degrees of freedom for std (0 = population std, 1 = sample std).
+        prefix: Prefix for output column names.
+        returns_col: Optional pre-computed log-return column name.
+
+    Returns:
+        lf with ``{prefix}_log_roll_{w}`` columns appended.
+    """
+    ann_factor = np.sqrt(periods_per_year) if annualize else 1.0
+
+    # Resolve log-returns source
+    col_names = lf.columns
+    if returns_col and returns_col in col_names:
+        r_log = pl.col(returns_col)
+    else:
+        r_log = (pl.col(close_col) / pl.col(close_col).shift(1)).log(base=np.e)
+
+    new_cols = []
+    for w in windows:
+        expr = (
+            r_log.rolling_std(window_size=w, min_samples=w, ddof=ddof)
+            .mul(ann_factor)
+            .alias(f"{prefix}_log_roll_{w}")
+        )
+        new_cols.append(expr)
+
+    return lf.with_columns(new_cols)
