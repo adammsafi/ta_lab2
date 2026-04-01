@@ -134,9 +134,9 @@
 | CTF-04 | Phase 98 | Complete |
 | MACRO-01 | Phase 97 | Complete |
 | MACRO-02 | Phase 97 | Complete |
-| ML-01 | Phase 100 | Pending |
-| ML-02 | Phase 100 | Pending |
-| ML-03 | Phase 100 | Pending |
+| ML-01 | Phase 100 | Complete |
+| ML-02 | Phase 100 | Complete |
+| ML-03 | Phase 100 | Complete |
 | DEBT-01 | Phase 101 | Complete |
 | DEBT-02 | Phase 101 | Complete |
 | DEBT-03 | Phase 101 | Complete |
