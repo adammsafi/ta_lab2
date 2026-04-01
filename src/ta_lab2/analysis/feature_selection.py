@@ -526,6 +526,7 @@ def build_feature_selection_config(
     monotonicity_scores: dict,
     regime_ic_map: dict,
     ic_ir_cutoff: float = 0.3,
+    perm_p_value_map: Optional[dict[str, float]] = None,
 ) -> dict:
     """
     Build the complete feature selection config dict from IC analysis results.
@@ -582,11 +583,14 @@ def build_feature_selection_config(
 
         regime_ic = regime_ic_map.get(feature, pd.DataFrame())
 
+        perm_p = perm_p_value_map.get(feature) if perm_p_value_map is not None else None
+
         tier = classify_feature_tier(
             ic_ir_mean=ic_ir_mean,
             pass_rate=pass_rate,
             stationarity=stationarity,
             regime_ic=regime_ic if len(regime_ic) > 0 else None,
+            perm_p_value=perm_p,
             ic_ir_cutoff=ic_ir_cutoff,
         )
 
