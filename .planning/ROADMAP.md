@@ -1414,7 +1414,7 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 - [x] **Phase 107: Pipeline Operations Dashboard** - Streamlit ops page: real-time stage monitor with progress bars, run history, trigger/kill buttons, pipeline_stage_log table for per-stage DB persistence — COMPLETE 2026-04-01
 - [x] **Phase 108: Pipeline Batch Performance** - Replace 5.7M per-key SQL queries with per-ID batch operations using PARTITION BY. EMA returns (2M→492 queries), AMA returns, bar returns, EMA fast-path. Target: 5hr→1.5hr incremental
 - [x] **Phase 109: Feature Skip-Unchanged** - Watermark state table for features, skip assets with no new bar data. Target: 100min→10min for daily incremental
-- [ ] **Phase 110: Feature Parallel Sub-Phases** - Group independent feature sub-phases into parallel waves. Target: 100min→60min for full recompute
+- [x] **Phase 110: Feature Parallel Sub-Phases** - Group independent feature sub-phases into parallel waves. Target: 100min→60min for full recompute
 **Plans:** 1 plan
 
 Plans:

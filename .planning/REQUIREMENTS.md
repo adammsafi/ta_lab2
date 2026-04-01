@@ -154,8 +154,8 @@
 | FEAT-01 | Phase 109 | Complete |
 | FEAT-02 | Phase 109 | Complete |
 | FEAT-03 | Phase 109 | Complete |
-| FEAT-04 | Phase 110 | Pending |
-| FEAT-05 | Phase 110 | Pending |
+| FEAT-04 | Phase 110 | Complete |
+| FEAT-05 | Phase 110 | Complete |
 | FEAT-06 | Phase 111 | Pending |
 | FEAT-07 | Phase 111 | Pending |
 | FEAT-08 | Phase 111 | Pending |
