@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 99: Backtest Scaling
+**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 108: Pipeline Batch Performance
 
 ## Current Position
 
-Phase: 99 of 106 IN PROGRESS (Backtest Scaling) — Plans 01-04 complete
-Next: Phase 99 Plan 05 (data quality validation) or next queued plan
-Status: Plan 99-03 complete — BakeoffOrchestrator extended with data_loader_fn; run_mass_backtest.py + backfill_mc_bands.py created
-Last activity: 2026-03-31 — Completed 99-03-PLAN.md (orchestrator extensions + mass backtest scripts)
+Phase: 108 of 108 IN PROGRESS (Pipeline Batch Performance) — Plans 01-02 complete
+Next: Phase 108 Plan 03 (AMA returns batch)
+Status: Plan 108-02 complete — EMA multi_tf fast-path: load last EMA seed + new bars only, compute forward recursively
+Last activity: 2026-04-01 — Completed 108-02-PLAN.md (EMA fast-path: is_watermark_recent + load_last_ema_values + _compute_fast_path_emas)
 
 Progress: [##########] 100% v1.2.0 | [████████░░] 46% v1.3.0 (12/26 plans, 3/6 phases)
 
@@ -160,12 +160,19 @@ Phase 99-04 decisions:
 - Phase 100 dependency: ML-01/ML-02/ML-03 require CTF features in features table (Phase 98 must complete first)
 - Phase 98-01 NOTE: refresh_ctf_promoted.py 1D refresh takes ~13 minutes (row-by-row UPDATE with 401 cols). Acceptable for periodic refresh; full all-base_tfs run ~60 min.
 
+Phase 108-02 decisions:
+- Fast-path threshold = 7 days: watermarks older than 7 days trigger full recompute; configurable via --fast-path-threshold-days
+- Virtual seed row pattern: when daily grid starts after seed_ts (common daily incremental case), prepend virtual row with seed_ema_bar, run compute_dual_ema_numpy, drop index 0 from output
+- load_recent_bars() uses price_bars_1d (not cmc_price_histories7): matches MultiTFEMAFeature.load_source_data() actual source
+- --full-refresh implicitly sets no_fast_path=True: full-recompute semantics honored
+- state_table passed through extra_config to worker: worker creates own EMAStateManager using correct state table name
+
 ## Session Continuity
 
-Last session: 2026-03-31
-Stopped at: Completed 99-03-PLAN.md (BakeoffOrchestrator extension + run_mass_backtest.py + backfill_mc_bands.py). Next: 99-04 or 99-05.
+Last session: 2026-04-01
+Stopped at: Completed 108-02-PLAN.md (EMA multi_tf fast-path: load last EMA seed + new bars, compute forward recursively). Next: 108-03 (AMA returns batch).
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-03-31 (Phase 99-03 complete: mass backtest orchestrator + MC bands backfill)*
+*Last updated: 2026-04-01 (Phase 108-02 complete: EMA fast-path via is_watermark_recent + seeded dual EMA forward computation)*
