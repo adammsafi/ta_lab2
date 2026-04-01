@@ -10,10 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 ## Current Position
 
 Phase: 109 of 111 IN PROGRESS (Feature Skip-Unchanged) — 1/2 plans complete
+Also: Phase 104 IN PROGRESS (Crypto-Native Indicators) — 1/3 plans complete
 Also: Phase 108 COMPLETE (Pipeline Batch Performance) — 5 plans, all complete
 Also: Phase 103 COMPLETE (Traditional TA Expansion) — 3/3 plans complete
-Status: Plan 109-01 complete — feature_refresh_state table + 4 watermark helpers ready
-Last activity: 2026-04-01 — Completed 109-01-PLAN.md
+Status: Plan 104-01 complete — HyperliquidAdapter + MockAdapter + 8-column migration ready
+Last activity: 2026-04-01 — Completed 104-01-PLAN.md
 
 Progress: [##########] 100% v1.2.0 | [█████████░] 80% v1.3.0 (21/26 plans, 6/6 phases)
 
@@ -241,12 +242,20 @@ Phase 103-03 decisions:
 - FDR uses MIN(ic_p_value) per indicator: most lenient cross-asset aggregation gives highest statistical power for indicator discovery
 - trial_registry.indicator_name stores feature column names (e.g. 'willr_14'): validate_coverage() checks by _PHASE103_FEATURE_COLS list not indicator names
 
+Phase 104-01 decisions:
+- dim_listings JOIN (not cmc_da_ids): resolves HL asset_id -> CMC id using ticker_on_venue=symbol AND venue='HYPERLIQUID'; mirrors seed_hl_assets.py approach
+- km assets excluded via asset_id < 20000 filter: km perps (indices, commodities, FX, equities) have no CMC id; consistent with seed_hl_assets.py reclassification
+- COALESCE(hl_candles.close_oi, hl_open_interest.close) for OI: candles are primary (daily), hl_open_interest provides gap fill for NULL OI days
+- funding_rate aggregated via SUM not AVG: hourly funding compounds per day; SUM preserves daily economic interpretation
+- mark_px from hl_oi_snapshots via DISTINCT ON (asset_id, day) ORDER BY ts DESC: latest intraday snapshot per day
+- down_revision = u5v6w7x8y9z0 (actual head): phases 100, 102, 103, 109 added migrations after 107; use actual head per project precedent
+
 ## Session Continuity
 
 Last session: 2026-04-01
-Stopped at: Completed 100-03-PLAN.md (also 109-01-PLAN.md per prior session)
+Stopped at: Completed 104-01-PLAN.md
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-04-01 (Phase 100-03 complete: XGBoost meta-label filter + executor gate; also 109-01 per prior session)*
+*Last updated: 2026-04-01 (Phase 104-01 complete: HyperliquidAdapter + MockAdapter + 8-column migration for derivatives indicators)*
