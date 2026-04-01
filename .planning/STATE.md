@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 ## Current Position
 
 Phase: 108 of 111 COMPLETE (Pipeline Batch Performance) — 5 plans, all complete
-Also: Phase 103 IN PROGRESS (Traditional TA Expansion) — Plan 02 complete (2/? plans)
-Status: Plan 103-02 complete — Alembic migration seeds 20 dim_indicators rows, TAFeature extended with 20 indicator dispatchers
-Last activity: 2026-04-01 — Completed 103-02-PLAN.md
+Also: Phase 103 COMPLETE (Traditional TA Expansion) — 3/3 plans complete
+Status: Plan 103-03 complete — run_phase103_ic.py IC sweep + FDR + promotion pipeline ready
+Last activity: 2026-04-01 — Completed 103-03-PLAN.md
 
-Progress: [##########] 100% v1.2.0 | [█████████░] 68% v1.3.0 (19/26 plans, 5/6 phases)
+Progress: [##########] 100% v1.2.0 | [█████████░] 72% v1.3.0 (20/26 plans, 6/6 phases)
 
 ## Performance Metrics
 
@@ -219,12 +219,18 @@ Phase 103-02 decisions:
 - ichimoku get_feature_columns uses hardcoded string list: output col names are param-independent (always ichimoku_tenkan/kijun/span_a/span_b/chikou)
 - mass_index column name uses mass_idx_{sum_period} matching indicators_extended default out_col pattern
 
+Phase 103-03 decisions:
+- Shell out to run_all_feature_refreshes (--ta --all-tfs) instead of importing TAFeature: reuses all existing batching/parallelism, avoids managing second engine
+- Direct SQL to load features (SELECT ts, <cols>, close) scoped to Phase 103 columns: avoids loading all 112+ feature columns into memory
+- FDR uses MIN(ic_p_value) per indicator: most lenient cross-asset aggregation gives highest statistical power for indicator discovery
+- trial_registry.indicator_name stores feature column names (e.g. 'willr_14'): validate_coverage() checks by _PHASE103_FEATURE_COLS list not indicator names
+
 ## Session Continuity
 
 Last session: 2026-04-01
-Stopped at: Completed 103-02-PLAN.md
+Stopped at: Completed 103-03-PLAN.md
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-04-01 (Phase 102-03 complete: IC sweep scripts auto-log to trial_registry; classify_feature_tier has perm_p_value gate)*
+*Last updated: 2026-04-01 (Phase 103-03 complete: run_phase103_ic.py IC sweep + FDR + promotion pipeline; Phase 103 all 3 plans done)*
