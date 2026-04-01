@@ -1409,7 +1409,7 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 - [x] **Phase 102: Indicator Research Framework** - Permutation IC test, FDR control, haircut Sharpe, trial registry, block bootstrap — the testing harness for all indicator R&D — COMPLETE 2026-04-01
 - [x] **Phase 103: Traditional TA Expansion** - Add 20-30 well-known indicators (Ichimoku, Williams %R, Keltner, CCI, Elder Ray, Force Index, VWAP, VIDYA, FRAMA, etc.), IC sweep through Phase 102 harness — COMPLETE 2026-04-01
 - [x] **Phase 104: Crypto-Native Indicators** - Venue-agnostic normalized input layer for OI/funding/volume, derive OI momentum, OI-price divergence, funding rate z-score, Force Index, liquidation pressure proxy — COMPLETE 2026-04-01
-- [ ] **Phase 105: Parameter Optimization** - Systematic parameter sweep (grid + Optuna) for surviving indicators, plateau preference, rolling stability test, DSR over full search space
+- [x] **Phase 105: Parameter Optimization** - Systematic parameter sweep (grid + Optuna) for surviving indicators, plateau preference, rolling stability test, DSR over full search space — COMPLETE 2026-04-01
 - [ ] **Phase 106: Custom Composite Indicators** - Proprietary indicators (AMA ER as regime signal, OI-divergence × CTF agreement, funding-adjusted momentum, cross-asset lead-lag), strictest validation tier
 - [x] **Phase 107: Pipeline Operations Dashboard** - Streamlit ops page: real-time stage monitor with progress bars, run history, trigger/kill buttons, pipeline_stage_log table for per-stage DB persistence — COMPLETE 2026-04-01
 - [x] **Phase 108: Pipeline Batch Performance** - Replace 5.7M per-key SQL queries with per-ID batch operations using PARTITION BY. EMA returns (2M→492 queries), AMA returns, bar returns, EMA fast-path. Target: 5hr→1.5hr incremental
@@ -1614,9 +1614,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 105-01: Parameter sweep framework (grid + Optuna modes) with trial_registry integration and sweep_id grouping
-- [ ] 105-02: Plateau scoring + rolling stability test + DSR over full search space
-- [ ] 105-03: Execute parameter sweeps for Phase 103-104 survivors, select final parameterizations
+- [x] 105-01: Parameter sweep framework (grid + Optuna modes) with trial_registry integration and sweep_id grouping
+- [x] 105-02: Plateau scoring + rolling stability test + DSR over full search space
+- [x] 105-03: Execute parameter sweeps for Phase 103-104 survivors, select final parameterizations
 
 ---
 
