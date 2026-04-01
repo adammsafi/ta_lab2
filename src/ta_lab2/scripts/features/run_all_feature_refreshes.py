@@ -100,16 +100,20 @@ def refresh_vol(
     tf: str = "1D",
     alignment_source: str = "multi_tf",
     venue_id: int | None = None,
+    use_polars: bool = False,
 ) -> RefreshResult:
     """Refresh vol table for given tf + alignment_source."""
-    from ta_lab2.scripts.features.vol_feature import VolatilityFeature, VolatilityConfig
+    from ta_lab2.scripts.features.vol_feature import VolatilityConfig, VolatilityFeature
 
     table = "vol"
     t0 = time.time()
 
     try:
         config = VolatilityConfig(
-            tf=tf, alignment_source=alignment_source, venue_id=venue_id
+            tf=tf,
+            alignment_source=alignment_source,
+            venue_id=venue_id,
+            use_polars=use_polars,
         )
         feature = VolatilityFeature(engine, config)
         rows_written = feature.compute_for_ids(ids=ids, start=start, end=end)
@@ -142,15 +146,21 @@ def refresh_ta(
     tf: str = "1D",
     alignment_source: str = "multi_tf",
     venue_id: int | None = None,
+    use_polars: bool = False,
 ) -> RefreshResult:
     """Refresh ta table for given tf + alignment_source."""
-    from ta_lab2.scripts.features.ta_feature import TAFeature, TAConfig
+    from ta_lab2.scripts.features.ta_feature import TAConfig, TAFeature
 
     table = "ta"
     t0 = time.time()
 
     try:
-        config = TAConfig(tf=tf, alignment_source=alignment_source, venue_id=venue_id)
+        config = TAConfig(
+            tf=tf,
+            alignment_source=alignment_source,
+            venue_id=venue_id,
+            use_polars=use_polars,
+        )
         feature = TAFeature(engine, config)
         rows_written = feature.compute_for_ids(ids=ids, start=start, end=end)
         duration = time.time() - t0
@@ -182,11 +192,12 @@ def refresh_cycle_stats(
     tf: str = "1D",
     alignment_source: str = "multi_tf",
     venue_id: int | None = None,
+    use_polars: bool = False,
 ) -> RefreshResult:
     """Refresh cycle_stats table for given tf + alignment_source."""
     from ta_lab2.scripts.features.cycle_stats_feature import (
-        CycleStatsFeature,
         CycleStatsConfig,
+        CycleStatsFeature,
     )
 
     table = "cycle_stats"
@@ -194,7 +205,10 @@ def refresh_cycle_stats(
 
     try:
         config = CycleStatsConfig(
-            tf=tf, alignment_source=alignment_source, venue_id=venue_id
+            tf=tf,
+            alignment_source=alignment_source,
+            venue_id=venue_id,
+            use_polars=use_polars,
         )
         feature = CycleStatsFeature(engine, config)
         rows_written = feature.compute_for_ids(ids=ids, start=start, end=end)
@@ -227,11 +241,12 @@ def refresh_rolling_extremes(
     tf: str = "1D",
     alignment_source: str = "multi_tf",
     venue_id: int | None = None,
+    use_polars: bool = False,
 ) -> RefreshResult:
     """Refresh rolling_extremes table for given tf + alignment_source."""
     from ta_lab2.scripts.features.rolling_extremes_feature import (
-        RollingExtremesFeature,
         RollingExtremesConfig,
+        RollingExtremesFeature,
     )
 
     table = "rolling_extremes"
@@ -239,7 +254,10 @@ def refresh_rolling_extremes(
 
     try:
         config = RollingExtremesConfig(
-            tf=tf, alignment_source=alignment_source, venue_id=venue_id
+            tf=tf,
+            alignment_source=alignment_source,
+            venue_id=venue_id,
+            use_polars=use_polars,
         )
         feature = RollingExtremesFeature(engine, config)
         rows_written = feature.compute_for_ids(ids=ids, start=start, end=end)
@@ -272,11 +290,12 @@ def refresh_microstructure(
     tf: str = "1D",
     alignment_source: str = "multi_tf",
     venue_id: int | None = None,
+    use_polars: bool = False,
 ) -> RefreshResult:
     """Refresh microstructure columns in features for given tf."""
     from ta_lab2.scripts.features.microstructure_feature import (
-        MicrostructureFeature,
         MicrostructureConfig,
+        MicrostructureFeature,
     )
 
     table = "features (microstructure)"
@@ -284,7 +303,10 @@ def refresh_microstructure(
 
     try:
         config = MicrostructureConfig(
-            tf=tf, alignment_source=alignment_source, venue_id=venue_id
+            tf=tf,
+            alignment_source=alignment_source,
+            venue_id=venue_id,
+            use_polars=use_polars,
         )
         feature = MicrostructureFeature(engine, config)
         rows_written = feature.compute_for_ids(ids=ids, start=start, end=end)
@@ -428,6 +450,7 @@ def run_all_refreshes(
     venue_id: int | None = None,
     skip_cs_norms: bool = False,
     wave1_workers: int = 4,
+    use_polars: bool = False,
 ) -> dict[str, RefreshResult]:
     """Refresh all feature tables for a single (tf, alignment_source)."""
     results = {}
@@ -439,6 +462,7 @@ def run_all_refreshes(
         f" tf={tf}, alignment_source={alignment_source}"
     )
     logger.info(f"Mode: {'full' if full_refresh else 'incremental'}")
+    logger.info(f"Polars acceleration: {'enabled' if use_polars else 'disabled'}")
 
     # Per-asset skip check (incremental mode only)
     bar_watermarks = {}
@@ -490,6 +514,7 @@ def run_all_refreshes(
                     tf,
                     alignment_source,
                     venue_id=venue_id,
+                    use_polars=use_polars,
                 )
                 future_to_name[future] = name
 
@@ -510,7 +535,14 @@ def run_all_refreshes(
 
         for name, refresh_fn in phase1_tasks:
             result = refresh_fn(
-                engine, process_ids, start, end, tf, alignment_source, venue_id=venue_id
+                engine,
+                process_ids,
+                start,
+                end,
+                tf,
+                alignment_source,
+                venue_id=venue_id,
+                use_polars=use_polars,
             )
             results[result.table] = result
 
@@ -542,7 +574,14 @@ def run_all_refreshes(
     logger.info("Wave 2b: Running microstructure UPDATE -- depends on Wave 2")
 
     micro_result = refresh_microstructure(
-        engine, process_ids, start, end, tf, alignment_source, venue_id=venue_id
+        engine,
+        process_ids,
+        start,
+        end,
+        tf,
+        alignment_source,
+        venue_id=venue_id,
+        use_polars=use_polars,
     )
     results[micro_result.table] = micro_result
 
@@ -880,6 +919,7 @@ def _run_single_tf(args_tuple):
         venue_id,
         skip_cs_norms,
         wave1_workers,
+        use_polars,
     ) = args_tuple
 
     from sqlalchemy import create_engine
@@ -903,6 +943,7 @@ def _run_single_tf(args_tuple):
             venue_id=venue_id,
             skip_cs_norms=skip_cs_norms,
             wave1_workers=wave1_workers,
+            use_polars=use_polars,
         )
         return (tf, alignment_source, results)
     except Exception as e:
@@ -1063,6 +1104,19 @@ def parse_args() -> argparse.Namespace:
         help="Skip cross-sectional normalization step (slow on large tables).",
     )
 
+    # Polars acceleration
+    parser.add_argument(
+        "--use-polars",
+        action="store_true",
+        default=False,
+        help=(
+            "Use polars acceleration for feature computation "
+            "(faster sort + rolling ops). Propagated to vol, ta, microstructure, "
+            "cycle_stats, and rolling_extremes sub-phases. CS norms and unified "
+            "assembly (daily_features_view) are pure SQL and are unaffected."
+        ),
+    )
+
     # Logging
     parser.add_argument(
         "--log-level",
@@ -1085,6 +1139,10 @@ def main() -> int:
     )
 
     logger.info("Starting feature refresh pipeline")
+    logger.info(
+        "Polars acceleration: %s",
+        "enabled" if getattr(args, "use_polars", False) else "disabled",
+    )
 
     if not TARGET_DB_URL:
         logger.error("TARGET_DB_URL not set")
@@ -1167,6 +1225,7 @@ def main() -> int:
                 args.venue_id,
                 getattr(args, "no_cs_norms", False),
                 args.wave1_workers,
+                getattr(args, "use_polars", False),
             )
             for tf, as_ in tf_alignments
         ]
@@ -1223,6 +1282,7 @@ def main() -> int:
                     venue_id=args.venue_id,
                     skip_cs_norms=getattr(args, "no_cs_norms", False),
                     wave1_workers=args.wave1_workers,
+                    use_polars=getattr(args, "use_polars", False),
                 )
                 all_results[(tf, alignment_source)] = results
             except Exception as e:
