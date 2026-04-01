@@ -95,7 +95,7 @@ def oi_momentum(
             return df
         return result
 
-    result = df[oi_col].pct_change(window)
+    result = df[oi_col].pct_change(window, fill_method=None)
     return _return(df, result, out_col, inplace=inplace)
 
 
@@ -143,8 +143,8 @@ def oi_price_divergence(
             return df
         return result
 
-    oi_change = df[oi_col].pct_change(1)
-    px_change = df[close_col].pct_change(1)
+    oi_change = df[oi_col].pct_change(1, fill_method=None)
+    px_change = df[close_col].pct_change(1, fill_method=None)
     divergence = oi_change - px_change
     result = _rolling_zscore(divergence, window)
     return _return(df, result, out_col, inplace=inplace)
