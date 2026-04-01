@@ -141,11 +141,11 @@
 | DEBT-02 | Phase 101 | Pending |
 | DEBT-03 | Phase 101 | Pending |
 | DEBT-04 | Phase 101 | Pending |
-| DASH-01 | Phase 107 | Pending |
-| DASH-02 | Phase 107 | Pending |
-| DASH-03 | Phase 107 | Pending |
-| DASH-04 | Phase 107 | Pending |
-| DASH-05 | Phase 107 | Pending |
+| DASH-01 | Phase 107 | Complete |
+| DASH-02 | Phase 107 | Complete |
+| DASH-03 | Phase 107 | Complete |
+| DASH-04 | Phase 107 | Complete |
+| DASH-05 | Phase 107 | Complete |
 | PERF-01 | Phase 108 | Pending |
 | PERF-02 | Phase 108 | Pending |
 | PERF-03 | Phase 108 | Pending |

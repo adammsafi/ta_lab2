@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 
 ## Current Position
 
-Phase: 107 of 108 IN PROGRESS (Pipeline Operations Dashboard) — Plan 02 at checkpoint
-Next: Phase 107 Plan 02 checkpoint — human verification of Pipeline Ops page in Streamlit
-Status: Plan 107-02 Task 1 complete — query module + page 19 + app.py update committed fd3d705c; awaiting human-verify checkpoint
-Last activity: 2026-04-01 — Completed 107-02 Task 1 (pipeline_ops.py query module + 19_pipeline_ops.py + app.py)
+Phase: 107 of 108 COMPLETE (Pipeline Operations Dashboard) — Both plans complete, checkpoint approved
+Next: Phase verification or next unplanned phase
+Status: Plan 107-02 checkpoint approved — UX fixes committed (run ID sizing, pre-instrumentation handling, ETA)
+Last activity: 2026-04-01 — Completed 107-02 with checkpoint feedback (full UUID, ETA, pre-instrumentation info message)
 
-Progress: [##########] 100% v1.2.0 | [████████░░] 50% v1.3.0 (13/26 plans, 3/6 phases)
+Progress: [##########] 100% v1.2.0 | [█████████░] 54% v1.3.0 (14/26 plans, 4/6 phases)
 
 ## Performance Metrics
 

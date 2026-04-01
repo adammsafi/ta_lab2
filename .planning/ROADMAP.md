@@ -1411,8 +1411,7 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 - [ ] **Phase 104: Crypto-Native Indicators** - Venue-agnostic normalized input layer for OI/funding/volume, derive OI momentum, OI-price divergence, funding rate z-score, Force Index, liquidation pressure proxy
 - [ ] **Phase 105: Parameter Optimization** - Systematic parameter sweep (grid + Optuna) for surviving indicators, plateau preference, rolling stability test, DSR over full search space
 - [ ] **Phase 106: Custom Composite Indicators** - Proprietary indicators (AMA ER as regime signal, OI-divergence × CTF agreement, funding-adjusted momentum, cross-asset lead-lag), strictest validation tier
-- [ ] **Phase 107: Pipeline Operations Dashboard** - Streamlit ops page: real-time stage monitor with progress bars, run history, trigger/kill buttons, pipeline_stage_log table for per-stage DB persistence
-**Plans:** 2 plans
+- [x] **Phase 107: Pipeline Operations Dashboard** - Streamlit ops page: real-time stage monitor with progress bars, run history, trigger/kill buttons, pipeline_stage_log table for per-stage DB persistence — COMPLETE 2026-04-01
 - [ ] **Phase 108: Pipeline Batch Performance** - Replace 5.7M per-key SQL queries with per-ID batch operations using PARTITION BY. EMA returns (2M→492 queries), AMA returns, bar returns, EMA fast-path. Target: 5hr→1.5hr incremental
 - [ ] **Phase 109: Feature Skip-Unchanged** - Watermark state table for features, skip assets with no new bar data. Target: 100min→10min for daily incremental
 - [ ] **Phase 110: Feature Parallel Sub-Phases** - Group independent feature sub-phases into parallel waves. Target: 100min→60min for full recompute
@@ -1722,7 +1721,7 @@ Plans:
 | 104. Crypto-Native Indicators | 0/TBD | Not started | - |
 | 105. Parameter Optimization | 0/TBD | Not started | - |
 | 106. Custom Composite Indicators | 0/TBD | Not started | - |
-| 107. Pipeline Operations Dashboard | 0/2 | Planned | - |
+| 107. Pipeline Operations Dashboard | 2/2 | Complete | 2026-04-01 |
 | 108. Pipeline Batch Performance | 0/5 | Not started | - |
 | 109. Pipeline Architecture Separation | 0/TBD | Not started | - |
 | 110. VM Execution Deployment | 0/TBD | Not started | - |
