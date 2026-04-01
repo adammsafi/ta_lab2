@@ -421,3 +421,341 @@ def block_bootstrap_ic(
         "n_boot": len(boot_ics),
         "n_obs": n_obs,
     }
+
+
+# ---------------------------------------------------------------------------
+# permutation_ic_test  (Phase 102-01)
+# ---------------------------------------------------------------------------
+
+_ALIGNMENT_SOURCE_TO_VENUE_ID: dict[str, int] = {
+    "multi_tf": 1,
+    "multi_tf_cal_anchor_iso": 1,
+    "multi_tf_cal_anchor_us": 1,
+    "multi_tf_cal_iso": 1,
+    "multi_tf_cal_us": 1,
+}
+_DEFAULT_VENUE_ID = 1
+
+
+def _to_python(value: Any) -> Any:
+    """Convert numpy scalar to Python native type for DB binding."""
+    if hasattr(value, "item"):
+        return value.item()
+    return value
+
+
+def permutation_ic_test(
+    feature: "np.ndarray | list[float]",
+    fwd_returns: "np.ndarray | list[float]",
+    n_perms: int = 10_000,
+    seed: int = 42,
+) -> dict[str, Any]:
+    """Empirical significance test for Spearman IC via permutation null distribution.
+
+    Computes the fraction of null-distribution |IC| values (from shuffled forward
+    returns) that are >= the observed |IC|. This gives an empirical p-value that
+    makes no parametric assumptions about IC's sampling distribution.
+
+    The null hypothesis is IC = 0 (no predictive power). A small p-value (e.g.,
+    < 0.05) rejects the null and supports the indicator having real signal.
+
+    Parameters
+    ----------
+    feature : array-like
+        Feature values (predictor). NaN values are dropped pairwise.
+    fwd_returns : array-like
+        Forward return values (response). NaN values are dropped pairwise.
+    n_perms : int
+        Number of permutations for the null distribution. Default 10,000.
+    seed : int
+        Random seed for reproducibility. Default 42.
+
+    Returns
+    -------
+    dict with keys:
+        ic_obs        -- observed Spearman IC (float)
+        p_value       -- fraction of null |IC| >= observed |IC| (float in [0, 1])
+        percentile_95 -- 95th percentile of null |IC| distribution (float)
+        passes        -- bool: |ic_obs| >= percentile_95 (True = significant)
+        n_perms       -- actual number of permutations run (int)
+        n_obs         -- number of valid (non-NaN) observations used (int)
+
+    Notes
+    -----
+    Edge case: if n_obs < 20, returns passes=False with p_value=1.0 and
+    ic_obs=NaN. This threshold ensures we don't report significance on
+    statistically meaningless tiny samples.
+    """
+    x = np.asarray(feature, dtype=float)
+    y = np.asarray(fwd_returns, dtype=float)
+
+    # Pairwise NaN mask
+    valid = np.isfinite(x) & np.isfinite(y)
+    x_clean = x[valid]
+    y_clean = y[valid]
+    n_obs = int(valid.sum())
+
+    # Edge case: too few observations
+    if n_obs < 20:
+        logger.debug(
+            "permutation_ic_test: only %d valid observations (< 20) -- returning passes=False",
+            n_obs,
+        )
+        return {
+            "ic_obs": float("nan"),
+            "p_value": 1.0,
+            "percentile_95": float("nan"),
+            "passes": False,
+            "n_perms": 0,
+            "n_obs": n_obs,
+        }
+
+    # Observed IC
+    result = spearmanr(x_clean, y_clean)
+    ic_obs = float(result.statistic)
+    abs_ic_obs = abs(ic_obs)
+
+    # Null distribution via permutation
+    rng = np.random.default_rng(seed)
+    null_abs_ics = np.empty(n_perms, dtype=float)
+    for i in range(n_perms):
+        y_shuffled = rng.permutation(y_clean)
+        null_result = spearmanr(x_clean, y_shuffled)
+        null_abs_ics[i] = abs(float(null_result.statistic))
+
+    # Empirical p-value: fraction of null |IC| >= observed |IC|
+    p_value = float(np.mean(null_abs_ics >= abs_ic_obs))
+
+    # 95th percentile of null distribution (significance threshold)
+    percentile_95 = float(np.percentile(null_abs_ics, 95))
+
+    passes = abs_ic_obs >= percentile_95
+
+    logger.debug(
+        "permutation_ic_test: n_obs=%d, ic_obs=%.4f, p_value=%.4f, pct95=%.4f, passes=%s",
+        n_obs,
+        ic_obs,
+        p_value,
+        percentile_95,
+        passes,
+    )
+
+    return {
+        "ic_obs": ic_obs,
+        "p_value": p_value,
+        "percentile_95": percentile_95,
+        "passes": bool(passes),
+        "n_perms": n_perms,
+        "n_obs": n_obs,
+    }
+
+
+# ---------------------------------------------------------------------------
+# fdr_control  (Phase 102-01)
+# ---------------------------------------------------------------------------
+
+
+def fdr_control(
+    p_values: "list[float] | np.ndarray",
+    alpha: float = 0.05,
+) -> dict[str, Any]:
+    """Benjamini-Hochberg FDR correction for a batch of independent p-values.
+
+    Wraps statsmodels.stats.multitest.fdrcorrection with the 'indep' method
+    (Benjamini-Hochberg 1995 for independent tests). Controls the expected
+    fraction of false positives among rejected hypotheses at level alpha.
+
+    Parameters
+    ----------
+    p_values : array-like
+        Raw p-values from individual tests (e.g., permutation_ic_test p_value).
+    alpha : float
+        FDR control level. Default 0.05 (5% false discovery rate).
+
+    Returns
+    -------
+    dict with keys:
+        rejected    -- bool numpy array, True = hypothesis rejected (significant)
+        p_adjusted  -- float numpy array of BH-adjusted p-values
+        n_rejected  -- number of hypotheses rejected (int)
+        alpha       -- FDR level used (float)
+
+    Notes
+    -----
+    Edge case: empty p_values returns empty arrays and n_rejected=0.
+    The caller is responsible for aligning rejected/p_adjusted with the
+    original p_values array (by index).
+    """
+    from statsmodels.stats.multitest import fdrcorrection  # noqa: PLC0415
+
+    p_arr = np.asarray(p_values, dtype=float)
+
+    if p_arr.size == 0:
+        logger.debug("fdr_control: empty p_values array -- returning empty result")
+        return {
+            "rejected": np.array([], dtype=bool),
+            "p_adjusted": np.array([], dtype=float),
+            "n_rejected": 0,
+            "alpha": alpha,
+        }
+
+    rejected, p_adjusted = fdrcorrection(p_arr, alpha=alpha, method="indep")
+    n_rejected = int(rejected.sum())
+
+    logger.debug(
+        "fdr_control: %d/%d hypotheses rejected at FDR alpha=%.3f",
+        n_rejected,
+        len(p_arr),
+        alpha,
+    )
+
+    return {
+        "rejected": rejected,
+        "p_adjusted": p_adjusted,
+        "n_rejected": n_rejected,
+        "alpha": alpha,
+    }
+
+
+# ---------------------------------------------------------------------------
+# log_trials_to_registry  (Phase 102-01)
+# ---------------------------------------------------------------------------
+
+
+def log_trials_to_registry(
+    conn: Any,
+    ic_rows: list[dict[str, Any]],
+    source_table: str = "ic_results",
+) -> int:
+    """Upsert IC sweep results to trial_registry.
+
+    Maps ic_row dicts (same format as save_ic_results in ic.py) to
+    trial_registry columns. Only inserts rows where horizon=1 AND
+    return_type='arith' (permutation testing scope reduction per research).
+
+    On conflict (same indicator/param_set/tf/asset_id/venue_id/horizon/return_type),
+    updates only ic_observed, ic_p_value, sweep_ts, n_obs. NEVER overwrites:
+    - perm_p_value   (filled by separate permutation run)
+    - fdr_p_adjusted (filled by batch FDR run)
+    - passes_fdr     (filled by batch FDR run)
+    - bb_ci_lo       (filled by block bootstrap)
+    - bb_ci_hi       (filled by block bootstrap)
+    - bb_block_len   (filled by block bootstrap)
+    - haircut_ic_ir  (filled by IC-IR haircut computation)
+
+    This preserves expensive statistical computations across IC sweep re-runs.
+
+    Parameters
+    ----------
+    conn : SQLAlchemy connection
+        Active database connection (within a transaction or autocommit).
+    ic_rows : list[dict]
+        IC result rows. Expected keys (matching ic.py save_ic_results format):
+            feature, tf, asset_id, horizon, return_type,
+            ic, ic_p_value, n_obs, alignment_source (optional)
+        Optional key: param_set (default '')
+    source_table : str
+        Source label written to trial_registry.source_table. Default 'ic_results'.
+
+    Returns
+    -------
+    int
+        Number of rows upserted.
+
+    Notes
+    -----
+    Uses executemany pattern consistent with project upsert conventions.
+    Filters to horizon=1 AND return_type='arith' before building param list.
+    """
+    from sqlalchemy import text as _text  # noqa: PLC0415
+
+    if not ic_rows:
+        return 0
+
+    # Filter to permutation scope: horizon=1, return_type='arith'
+    filtered = [
+        r
+        for r in ic_rows
+        if _to_python(r.get("horizon", 1)) == 1
+        and str(r.get("return_type", "arith")) == "arith"
+    ]
+
+    if not filtered:
+        logger.debug(
+            "log_trials_to_registry: 0 rows pass horizon=1 + return_type='arith' filter"
+        )
+        return 0
+
+    # Build param list
+    param_list = []
+    for row in filtered:
+        alignment_source = str(row.get("alignment_source", "multi_tf"))
+        venue_id = _ALIGNMENT_SOURCE_TO_VENUE_ID.get(
+            alignment_source, _DEFAULT_VENUE_ID
+        )
+        param_list.append(
+            {
+                "indicator_name": _to_python(row.get("feature", "")),
+                "param_set": _to_python(row.get("param_set", "")),
+                "tf": _to_python(row.get("tf", "")),
+                "asset_id": _to_python(row.get("asset_id")),
+                "venue_id": venue_id,
+                "horizon": int(_to_python(row.get("horizon", 1))),
+                "return_type": str(_to_python(row.get("return_type", "arith"))),
+                "ic_observed": _to_python(row.get("ic")),
+                "ic_p_value": _to_python(row.get("ic_p_value")),
+                "n_obs": _to_python(row.get("n_obs")),
+                "source_table": source_table,
+            }
+        )
+
+    # Upsert: update only IC sweep columns; preserve all expensive stat columns
+    upsert_sql = _text(
+        """
+        INSERT INTO public.trial_registry (
+            indicator_name,
+            param_set,
+            tf,
+            asset_id,
+            venue_id,
+            horizon,
+            return_type,
+            ic_observed,
+            ic_p_value,
+            n_obs,
+            source_table,
+            sweep_ts
+        )
+        VALUES (
+            :indicator_name,
+            :param_set,
+            :tf,
+            :asset_id,
+            :venue_id,
+            :horizon,
+            :return_type,
+            :ic_observed,
+            :ic_p_value,
+            :n_obs,
+            :source_table,
+            now()
+        )
+        ON CONFLICT (indicator_name, param_set, tf, asset_id, venue_id, horizon, return_type)
+        DO UPDATE SET
+            ic_observed  = EXCLUDED.ic_observed,
+            ic_p_value   = EXCLUDED.ic_p_value,
+            sweep_ts     = EXCLUDED.sweep_ts,
+            n_obs        = EXCLUDED.n_obs
+        """
+    )
+
+    conn.execute(upsert_sql, param_list)
+    n_rows = len(param_list)
+
+    logger.info(
+        "log_trials_to_registry: upserted %d rows to trial_registry (source=%s)",
+        n_rows,
+        source_table,
+    )
+
+    return n_rows
