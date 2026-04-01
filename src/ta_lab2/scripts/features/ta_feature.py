@@ -41,6 +41,17 @@ from ta_lab2.features.indicators import (
     bollinger,
     atr,
     adx,
+    rsi_polars,
+    macd_polars,
+    stoch_kd_polars,
+    bollinger_polars,
+    atr_polars,
+    adx_polars,
+)
+from ta_lab2.features.polars_feature_ops import (
+    polars_sorted_groupby,
+    pandas_to_polars_df,
+    polars_to_pandas_df,
 )
 
 
@@ -181,6 +192,10 @@ class TAFeature(BaseFeature):
            - Call corresponding indicators.py function
            - Add columns to result
 
+        When use_polars=True: only the 6 core indicators (rsi, macd, stoch, bb,
+        atr, adx) are computed via the polars path.  Phase 103 extended indicators
+        fall through to the same pandas helpers as before.
+
         Args:
             df_source: Source data with OHLCV (null handling already applied)
 
@@ -190,87 +205,256 @@ class TAFeature(BaseFeature):
         if df_source.empty:
             return pd.DataFrame()
 
-        # Load active indicator parameters
+        # Load active indicator parameters (cached after first call)
         indicator_params = self.load_indicator_params()
 
-        # Process each (id, venue_id) separately
-        results = []
+        if self.config.use_polars:
+            # ------------------------------------------------------------------
+            # Polars-accelerated path for core 6 indicators
+            # ------------------------------------------------------------------
+            # Capture indicator_params before defining closure to avoid late-binding
+            _indicator_params = indicator_params
 
-        for (id_val, venue_id_val), df_id in df_source.groupby(["id", "venue_id"]):
-            df_id = df_id.copy()
+            def _compute_ta_single_group(df_id: pd.DataFrame) -> pd.DataFrame:
+                """Compute TA indicators for one (id, venue_id) group via polars."""
+                # Convert to polars for core indicators
+                pl_df = pandas_to_polars_df(df_id)
 
-            # Compute each active indicator
-            for ind in indicator_params:
-                ind_type = ind["indicator_type"]
-                ind_name = ind["indicator_name"]
-                params = ind["params"]
+                for ind in _indicator_params:
+                    ind_type = ind["indicator_type"]
+                    ind_name = ind["indicator_name"]
+                    params = ind["params"]
 
-                try:
-                    if ind_type == "rsi":
-                        self._compute_rsi(df_id, params)
-                    elif ind_type == "macd":
-                        self._compute_macd(df_id, params)
-                    elif ind_type == "stoch":
-                        self._compute_stoch(df_id, params)
-                    elif ind_type == "bb":
-                        self._compute_bollinger(df_id, params)
-                    elif ind_type == "atr":
-                        self._compute_atr(df_id, params)
-                    elif ind_type == "adx":
-                        self._compute_adx(df_id, params)
-                    # --- Phase 103 extended indicators ---
-                    elif ind_type == "ichimoku":
-                        self._compute_ichimoku(df_id, params)
-                    elif ind_type == "willr":
-                        self._compute_willr(df_id, params)
-                    elif ind_type == "keltner":
-                        self._compute_keltner(df_id, params)
-                    elif ind_type == "cci":
-                        self._compute_cci(df_id, params)
-                    elif ind_type == "elder_ray":
-                        self._compute_elder_ray(df_id, params)
-                    elif ind_type == "force_index":
-                        self._compute_force_index(df_id, params)
-                    elif ind_type == "vwap":
-                        self._compute_vwap(df_id, params)
-                    elif ind_type == "cmf":
-                        self._compute_cmf(df_id, params)
-                    elif ind_type == "chaikin_osc":
-                        self._compute_chaikin_osc(df_id, params)
-                    elif ind_type == "hurst":
-                        self._compute_hurst(df_id, params)
-                    elif ind_type == "vidya":
-                        self._compute_vidya(df_id, params)
-                    elif ind_type == "frama":
-                        self._compute_frama(df_id, params)
-                    elif ind_type == "aroon":
-                        self._compute_aroon(df_id, params)
-                    elif ind_type == "trix":
-                        self._compute_trix(df_id, params)
-                    elif ind_type == "ultimate_osc":
-                        self._compute_ultimate_osc(df_id, params)
-                    elif ind_type == "vortex":
-                        self._compute_vortex(df_id, params)
-                    elif ind_type == "emv":
-                        self._compute_emv(df_id, params)
-                    elif ind_type == "mass_index":
-                        self._compute_mass_index(df_id, params)
-                    elif ind_type == "kst":
-                        self._compute_kst(df_id, params)
-                    elif ind_type == "coppock":
-                        self._compute_coppock(df_id, params)
-                except Exception as e:
-                    # Log error but continue with other indicators
-                    print(f"Warning: Failed to compute {ind_name} for id={id_val}: {e}")
-                    continue
+                    try:
+                        if ind_type == "rsi":
+                            period = params.get("period", 14)
+                            pl_df = rsi_polars(
+                                pl_df,
+                                period=period,
+                                price_col="close",
+                                out_col=f"rsi_{period}",
+                            )
 
-            results.append(df_id)
+                        elif ind_type == "macd":
+                            fast = params.get("fast", 12)
+                            slow = params.get("slow", 26)
+                            signal = params.get("signal", 9)
+                            out_cols_m = (
+                                f"macd_{fast}_{slow}",
+                                f"macd_signal_{signal}",
+                                f"macd_hist_{fast}_{slow}_{signal}",
+                            )
+                            pl_df = macd_polars(
+                                pl_df,
+                                fast=fast,
+                                slow=slow,
+                                signal=signal,
+                                price_col="close",
+                                out_cols=out_cols_m,
+                            )
 
-        if not results:
-            return pd.DataFrame()
+                        elif ind_type == "stoch":
+                            k = params.get("k", 14)
+                            d = params.get("d", 3)
+                            out_cols_s = (f"stoch_k_{k}", f"stoch_d_{d}")
+                            pl_df = stoch_kd_polars(
+                                pl_df,
+                                k=k,
+                                d=d,
+                                out_cols=out_cols_s,
+                            )
 
-        # Combine all IDs
-        df_result = pd.concat(results, ignore_index=True)
+                        elif ind_type == "bb":
+                            window = params.get("window", 20)
+                            n_sigma = params.get("n_sigma", 2.0)
+                            sigma_str = (
+                                str(int(n_sigma))
+                                if n_sigma == int(n_sigma)
+                                else str(n_sigma)
+                            )
+                            out_cols_b = (
+                                f"bb_ma_{window}",
+                                f"bb_up_{window}_{sigma_str}",
+                                f"bb_lo_{window}_{sigma_str}",
+                                f"bb_width_{window}",
+                            )
+                            pl_df = bollinger_polars(
+                                pl_df,
+                                window=window,
+                                price_col="close",
+                                n_sigma=n_sigma,
+                                out_cols=out_cols_b,
+                            )
+
+                        elif ind_type == "atr":
+                            period = params.get("period", 14)
+                            pl_df = atr_polars(
+                                pl_df,
+                                period=period,
+                                out_col=f"atr_{period}",
+                            )
+
+                        elif ind_type == "adx":
+                            period = params.get("period", 14)
+                            pl_df = adx_polars(
+                                pl_df,
+                                period=period,
+                                out_col=f"adx_{period}",
+                            )
+
+                        else:
+                            # Phase 103 extended indicators: fall back to pandas
+                            # Convert back to pandas, apply, convert forward again
+                            df_tmp = polars_to_pandas_df(pl_df)
+                            id_val_inner = (
+                                df_tmp["id"].iloc[0] if "id" in df_tmp.columns else "?"
+                            )
+                            try:
+                                if ind_type == "ichimoku":
+                                    self._compute_ichimoku(df_tmp, params)
+                                elif ind_type == "willr":
+                                    self._compute_willr(df_tmp, params)
+                                elif ind_type == "keltner":
+                                    self._compute_keltner(df_tmp, params)
+                                elif ind_type == "cci":
+                                    self._compute_cci(df_tmp, params)
+                                elif ind_type == "elder_ray":
+                                    self._compute_elder_ray(df_tmp, params)
+                                elif ind_type == "force_index":
+                                    self._compute_force_index(df_tmp, params)
+                                elif ind_type == "vwap":
+                                    self._compute_vwap(df_tmp, params)
+                                elif ind_type == "cmf":
+                                    self._compute_cmf(df_tmp, params)
+                                elif ind_type == "chaikin_osc":
+                                    self._compute_chaikin_osc(df_tmp, params)
+                                elif ind_type == "hurst":
+                                    self._compute_hurst(df_tmp, params)
+                                elif ind_type == "vidya":
+                                    self._compute_vidya(df_tmp, params)
+                                elif ind_type == "frama":
+                                    self._compute_frama(df_tmp, params)
+                                elif ind_type == "aroon":
+                                    self._compute_aroon(df_tmp, params)
+                                elif ind_type == "trix":
+                                    self._compute_trix(df_tmp, params)
+                                elif ind_type == "ultimate_osc":
+                                    self._compute_ultimate_osc(df_tmp, params)
+                                elif ind_type == "vortex":
+                                    self._compute_vortex(df_tmp, params)
+                                elif ind_type == "emv":
+                                    self._compute_emv(df_tmp, params)
+                                elif ind_type == "mass_index":
+                                    self._compute_mass_index(df_tmp, params)
+                                elif ind_type == "kst":
+                                    self._compute_kst(df_tmp, params)
+                                elif ind_type == "coppock":
+                                    self._compute_coppock(df_tmp, params)
+                            except Exception as e_inner:
+                                print(
+                                    f"Warning: Failed to compute {ind_name} "
+                                    f"for id={id_val_inner}: {e_inner}"
+                                )
+                            # Re-sync pl_df from updated df_tmp
+                            pl_df = pandas_to_polars_df(df_tmp)
+
+                    except Exception as e:
+                        id_val_inner = "?"
+                        print(
+                            f"Warning: Failed to compute {ind_name} "
+                            f"for id={id_val_inner}: {e}"
+                        )
+                        continue
+
+                return polars_to_pandas_df(pl_df)
+
+            df_result = polars_sorted_groupby(
+                df_source, ["id", "venue_id"], "ts", _compute_ta_single_group
+            )
+
+        else:
+            # ------------------------------------------------------------------
+            # Pandas path (unchanged)
+            # ------------------------------------------------------------------
+            results = []
+
+            for (id_val, venue_id_val), df_id in df_source.groupby(["id", "venue_id"]):
+                df_id = df_id.copy()
+
+                # Compute each active indicator
+                for ind in indicator_params:
+                    ind_type = ind["indicator_type"]
+                    ind_name = ind["indicator_name"]
+                    params = ind["params"]
+
+                    try:
+                        if ind_type == "rsi":
+                            self._compute_rsi(df_id, params)
+                        elif ind_type == "macd":
+                            self._compute_macd(df_id, params)
+                        elif ind_type == "stoch":
+                            self._compute_stoch(df_id, params)
+                        elif ind_type == "bb":
+                            self._compute_bollinger(df_id, params)
+                        elif ind_type == "atr":
+                            self._compute_atr(df_id, params)
+                        elif ind_type == "adx":
+                            self._compute_adx(df_id, params)
+                        # --- Phase 103 extended indicators ---
+                        elif ind_type == "ichimoku":
+                            self._compute_ichimoku(df_id, params)
+                        elif ind_type == "willr":
+                            self._compute_willr(df_id, params)
+                        elif ind_type == "keltner":
+                            self._compute_keltner(df_id, params)
+                        elif ind_type == "cci":
+                            self._compute_cci(df_id, params)
+                        elif ind_type == "elder_ray":
+                            self._compute_elder_ray(df_id, params)
+                        elif ind_type == "force_index":
+                            self._compute_force_index(df_id, params)
+                        elif ind_type == "vwap":
+                            self._compute_vwap(df_id, params)
+                        elif ind_type == "cmf":
+                            self._compute_cmf(df_id, params)
+                        elif ind_type == "chaikin_osc":
+                            self._compute_chaikin_osc(df_id, params)
+                        elif ind_type == "hurst":
+                            self._compute_hurst(df_id, params)
+                        elif ind_type == "vidya":
+                            self._compute_vidya(df_id, params)
+                        elif ind_type == "frama":
+                            self._compute_frama(df_id, params)
+                        elif ind_type == "aroon":
+                            self._compute_aroon(df_id, params)
+                        elif ind_type == "trix":
+                            self._compute_trix(df_id, params)
+                        elif ind_type == "ultimate_osc":
+                            self._compute_ultimate_osc(df_id, params)
+                        elif ind_type == "vortex":
+                            self._compute_vortex(df_id, params)
+                        elif ind_type == "emv":
+                            self._compute_emv(df_id, params)
+                        elif ind_type == "mass_index":
+                            self._compute_mass_index(df_id, params)
+                        elif ind_type == "kst":
+                            self._compute_kst(df_id, params)
+                        elif ind_type == "coppock":
+                            self._compute_coppock(df_id, params)
+                    except Exception as e:
+                        # Log error but continue with other indicators
+                        print(
+                            f"Warning: Failed to compute {ind_name} for id={id_val}: {e}"
+                        )
+                        continue
+
+                results.append(df_id)
+
+            if not results:
+                return pd.DataFrame()
+
+            # Combine all IDs
+            df_result = pd.concat(results, ignore_index=True)
 
         # Add tf, alignment_source, and tf_days columns
         df_result["tf"] = self.config.tf
@@ -710,7 +894,9 @@ class TAFeature(BaseFeature):
         """
         period = params.get("period", 14)
         out_col = f"rsi_{period}"
-        rsi(df, period=period, out_col=out_col, inplace=True)
+        # Use window= (not period=) to avoid alias logic that only triggers when
+        # window is None. Passing period= alone leaves window=14 (default).
+        rsi(df, window=period, out_col=out_col, inplace=True)
         return df
 
     def _compute_macd(self, df: pd.DataFrame, params: dict) -> pd.DataFrame:
@@ -793,7 +979,8 @@ class TAFeature(BaseFeature):
             DataFrame with ATR column added (inplace)
         """
         period = params.get("period", 14)
-        atr(df, period=period, inplace=True)
+        # Use window= (not period=) — same alias fix as _compute_rsi
+        atr(df, window=period, inplace=True)
         return df
 
     def _compute_adx(self, df: pd.DataFrame, params: dict) -> pd.DataFrame:
@@ -808,7 +995,8 @@ class TAFeature(BaseFeature):
             DataFrame with ADX column added (inplace)
         """
         period = params.get("period", 14)
-        adx(df, period=period, inplace=True)
+        # Use window= (not period=) — same alias fix as _compute_rsi
+        adx(df, window=period, inplace=True)
         return df
 
     # =========================================================================
