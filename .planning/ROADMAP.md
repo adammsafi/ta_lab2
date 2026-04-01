@@ -1413,6 +1413,7 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 - [ ] **Phase 106: Custom Composite Indicators** - Proprietary indicators (AMA ER as regime signal, OI-divergence × CTF agreement, funding-adjusted momentum, cross-asset lead-lag), strictest validation tier
 - [ ] **Phase 107: Pipeline Operations Dashboard** - Streamlit ops page: real-time stage monitor with progress bars, run history, trigger/kill buttons, pipeline_stage_log table for per-stage DB persistence
 - [ ] **Phase 108: Pipeline Batch Performance** - Replace 5.7M per-key SQL queries with per-ID batch operations using PARTITION BY. EMA returns (2M→492 queries), AMA returns, bar returns, EMA fast-path. Target: 5hr→1.5hr incremental
+**Plans:** 5 plans
 
 ---
 
@@ -1618,6 +1619,27 @@ Plans:
 
 ---
 
+### Phase 108: Pipeline Batch Performance
+**Goal:** Eliminate per-key SQL queries across the pipeline. Replace individual queries per (id, tf, period, venue_id) with batch SQL operations using PARTITION BY. Add EMA fast-path for recent watermarks.
+**Depends on:** None (independent performance optimization)
+**Requirements:** PERF-01, PERF-02, PERF-03, PERF-04, PERF-05
+**Success Criteria** (what must be TRUE):
+  1. Full --all incremental pipeline completes in < 2 hours (currently 5-6 hours)
+  2. EMA returns scripts iterate ~492 IDs (not 2M+ keys) with PARTITION BY batch SQL
+  3. EMA fast-path skips 15-year history reload for recent watermarks
+  4. AMA and bar returns use per-ID batch SQL
+  5. All returns tables have identical data before and after optimization
+**Plans:** 5 plans in 2 waves
+
+Plans:
+- [ ] 108-01-PLAN.md -- EMA returns batch (3 scripts: multi_tf, cal, cal_anchor)
+- [ ] 108-02-PLAN.md -- EMA fast-path (recent watermark -> recursive forward compute)
+- [ ] 108-03-PLAN.md -- AMA returns batch (bulk watermark + source-advance skip)
+- [ ] 108-04-PLAN.md -- Bar returns batch (per-ID with PARTITION BY tf, venue_id)
+- [ ] 108-05-PLAN.md -- Integration validation (full pipeline timing + data correctness)
+
+---
+
 ### v1.3.0 Progress
 
 | Phase | Plans Complete | Status | Completed |
@@ -1633,6 +1655,8 @@ Plans:
 | 104. Crypto-Native Indicators | 0/TBD | Not started | - |
 | 105. Parameter Optimization | 0/TBD | Not started | - |
 | 106. Custom Composite Indicators | 0/TBD | Not started | - |
+| 107. Pipeline Operations Dashboard | 0/TBD | Not started | - |
+| 108. Pipeline Batch Performance | 0/5 | Not started | - |
 
 ### v1.3.0 Requirement Coverage
 
@@ -1649,8 +1673,9 @@ Plans:
 | Crypto-Native Indicators | IND-09, IND-10, IND-11, IND-12 | Phase 104 | 4 |
 | Parameter Optimization | IND-13, IND-14, IND-15 | Phase 105 | 3 |
 | Custom Composites | IND-16, IND-17, IND-18 | Phase 106 | 3 |
+| Pipeline Performance | PERF-01, PERF-02, PERF-03, PERF-04, PERF-05 | Phase 108 | 5 |
 
-**Coverage:** 44/44 requirements mapped
+**Coverage:** 49/49 requirements mapped
 
 *Created: 2025-01-22*
 *Last updated: 2026-03-30 (Phases 102-106 added: Indicator R&D pipeline — research framework, TA expansion, crypto-native indicators, parameter optimization, custom composites)*
