@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 ## Current Position
 
 Phase: 108 of 108 IN PROGRESS (Pipeline Batch Performance) — Plans 01-04 complete
-Next: Phase 108 Plan 05
-Status: Plan 108-01 complete — All 3 EMA returns scripts rewritten to per-ID batch SQL with PARTITION BY (2M keys -> 492 IDs)
-Last activity: 2026-04-01 — Completed 108-01-PLAN.md (EMA returns batch rewrite: multi_tf + cal + cal_anchor)
+Next: Phase 108 complete or next queued plan
+Status: Plan 108-04 complete — Bar returns rewritten to per-ID batch SQL with PARTITION BY; 120K keys -> 492 IDs
+Last activity: 2026-04-01 — Completed 108-04-PLAN.md (bar returns batch rewrite: PARTITION BY tf, venue_id)
 
 Progress: [##########] 100% v1.2.0 | [████████░░] 46% v1.3.0 (12/26 plans, 3/6 phases)
 
@@ -139,6 +139,12 @@ Phase 99-04 decisions:
 - PBO heatmap always uses cv_method='cpcv' regardless of sidebar selection: PBO is only meaningful from CPCV runs
 - load_pbo_heatmap_data() uses groupby().mean() before unstack(): collapses multiple param combos per (strategy, asset) to a single representative PBO value
 
+Phase 108-04 decisions:
+- Watermark VALUES CTE uses literal embedding (not bound params): PostgreSQL VALUES type inference fails with bound params causing 'record = integer' type mismatch
+- _build_wm_cte rows must NOT have outer parens: VALUES (a,b,c),(d,e,f) not VALUES ((a,b,c),(d,e,f))
+- Empty watermarks sentinel CTE (WHERE FALSE): LEFT JOIN produces all-NULL rows -> all rows pass watermark filter (correct for first run)
+- _run_one_id_mp returns Tuple[int,int] = (id_, signal) so caller can log which ID completed not just ordinal
+
 ### Pending Todos
 
 7 pending todos resolved into v1.3.0 phases:
@@ -184,7 +190,7 @@ Phase 108-03 decisions:
 ## Session Continuity
 
 Last session: 2026-04-01
-Stopped at: Completed 108-03-PLAN.md (AMA returns: bulk watermark preload + source-advance skip + batched workers). Next: 108-04 (bar returns batch).
+Stopped at: Completed 108-04-PLAN.md (bar returns batch: PARTITION BY tf/venue_id, 120K keys -> 492 IDs, data verified). Phase 108 complete.
 Resume file: None
 
 ---
