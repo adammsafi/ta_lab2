@@ -5,7 +5,7 @@
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 108 complete, Phase 103 in progress
+**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 109 in progress (feature skip-unchanged optimization)
 
 ## Current Position
 
@@ -220,6 +220,12 @@ Phase 103-02 decisions:
 - ichimoku get_feature_columns uses hardcoded string list: output col names are param-independent (always ichimoku_tenkan/kijun/span_a/span_b/chikou)
 - mass_index column name uses mass_idx_{sum_period} matching indicators_extended default out_col pattern
 
+Phase 109-01 decisions:
+- down_revision = w6x7y8z9a0b1 (actual head): plan specified t4u5v6w7x8y9 but phases 100, 102, 103 added migrations after 107; use actual head per established precedent
+- No venue_id in feature_refresh_state PK: features use venue_id=1 only; can be added via follow-up migration if multi-venue support added
+- compute_changed_ids returns 3-tuple (changed_ids, unchanged_ids, bar_watermarks): bar_watermarks passed through to avoid redundant query in _update_feature_refresh_state
+- total_rows_written in _update_feature_refresh_state is batch total (not per-asset): sufficient for monitoring
+
 Phase 103-03 decisions:
 - Shell out to run_all_feature_refreshes (--ta --all-tfs) instead of importing TAFeature: reuses all existing batching/parallelism, avoids managing second engine
 - Direct SQL to load features (SELECT ts, <cols>, close) scoped to Phase 103 columns: avoids loading all 112+ feature columns into memory
@@ -234,4 +240,4 @@ Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-04-01 (Phase 103-03 complete: run_phase103_ic.py IC sweep + FDR + promotion pipeline; Phase 103 all 3 plans done)*
+*Last updated: 2026-04-01 (Phase 109-01 complete: feature_refresh_state table + 4 watermark helpers; Plan 02 wires into run_all_refreshes)*
