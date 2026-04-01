@@ -150,7 +150,7 @@ def upgrade() -> None:
                 INSERT INTO public.dim_indicators
                     (indicator_type, indicator_name, params, is_active)
                 VALUES
-                    (:ind_type, :ind_name, :params::jsonb, TRUE)
+                    (:ind_type, :ind_name, CAST(:params AS jsonb), TRUE)
                 ON CONFLICT (indicator_name) DO UPDATE
                     SET is_active = TRUE,
                         params    = EXCLUDED.params
