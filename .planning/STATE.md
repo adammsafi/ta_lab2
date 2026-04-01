@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 
 ## Current Position
 
-Phase: 108 of 108 IN PROGRESS (Pipeline Batch Performance) — Plans 01-02 complete
-Next: Phase 108 Plan 03 (AMA returns batch)
-Status: Plan 108-02 complete — EMA multi_tf fast-path: load last EMA seed + new bars only, compute forward recursively
-Last activity: 2026-04-01 — Completed 108-02-PLAN.md (EMA fast-path: is_watermark_recent + load_last_ema_values + _compute_fast_path_emas)
+Phase: 108 of 108 IN PROGRESS (Pipeline Batch Performance) — Plans 01-03 complete
+Next: Phase 108 Plan 04 (bar returns batch)
+Status: Plan 108-03 complete — AMA returns optimized: bulk watermark preload + source-advance skip + batched worker dispatch
+Last activity: 2026-04-01 — Completed 108-03-PLAN.md (bulk _bulk_load_watermarks, source-advance skip, _BATCH_SIZE=15 batched workers)
 
 Progress: [##########] 100% v1.2.0 | [████████░░] 46% v1.3.0 (12/26 plans, 3/6 phases)
 
@@ -167,12 +167,19 @@ Phase 108-02 decisions:
 - --full-refresh implicitly sets no_fast_path=True: full-recompute semantics honored
 - state_table passed through extra_config to worker: worker creates own EMAStateManager using correct state table name
 
+Phase 108-03 decisions:
+- _BATCH_SIZE=15: amortizes NullPool engine creation across ~15 IDs per engine (was 1 engine per ID)
+- Bulk preload done in _process_source (coordinator), not workers: watermarks passed as data args to keep workers stateless and picklable
+- Source-advance skip: smax <= wm means no new data, skip entirely; on incremental runs most IDs will be skipped
+- _worker returns list[dict] (not dict): caller iterates batch_results from pool.imap_unordered
+- SET LOCAL work_mem per engine.begin() transaction preserved: correct scope; connection-level SET would not carry to begin() blocks
+
 ## Session Continuity
 
 Last session: 2026-04-01
-Stopped at: Completed 108-02-PLAN.md (EMA multi_tf fast-path: load last EMA seed + new bars, compute forward recursively). Next: 108-03 (AMA returns batch).
+Stopped at: Completed 108-03-PLAN.md (AMA returns: bulk watermark preload + source-advance skip + batched workers). Next: 108-04 (bar returns batch).
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-04-01 (Phase 108-02 complete: EMA fast-path via is_watermark_recent + seeded dual EMA forward computation)*
+*Last updated: 2026-04-01 (Phase 108-03 complete: AMA returns bulk watermark preload + source-advance skip + _BATCH_SIZE=15 batched workers)*
