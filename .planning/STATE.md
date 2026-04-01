@@ -5,18 +5,18 @@
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 105 IN PROGRESS (Parameter Optimization — Plan 01 complete)
+**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 105 IN PROGRESS (Parameter Optimization — Plans 01+02 complete)
 
 ## Current Position
 
-Phase: 105 IN PROGRESS (Parameter Optimization) — 1/N plans complete
+Phase: 105 IN PROGRESS (Parameter Optimization) — 2/N plans complete
 Also: Phase 109 COMPLETE (Feature Skip-Unchanged) — 2/2 plans complete
 Also: Phase 104 COMPLETE (Crypto-Native Indicators) — 3/3 plans complete
 Also: Phase 100 IN PROGRESS (ML Signal Combination) — Plans 01+02 complete (2/3 plans)
 Also: Phase 108 COMPLETE (Pipeline Batch Performance) — 5 plans, all complete
 Also: Phase 103 COMPLETE (Traditional TA Expansion) — 3/3 plans complete
-Status: Plan 105-01 complete — sweep columns migration + param_optimizer.py with IC-based Optuna sweep (GridSampler/TPESampler)
-Last activity: 2026-04-01 — Completed 105-01-PLAN.md
+Status: Plan 105-02 complete — plateau_score, rolling_stability_test, compute_dsr_over_sweep, select_best_from_sweep added to param_optimizer.py
+Last activity: 2026-04-01 — Completed 105-02-PLAN.md
 
 Progress: [##########] 100% v1.2.0 | [█████████░] 89% v1.3.0 (25/27 plans, 8/6 phases)
 
@@ -287,12 +287,20 @@ Phase 105-01 decisions:
 - TrialPruned for feature_fn exceptions (constraint violations); NaN return for insufficient observations (< min_obs=50)
 - Boundary masking: fwd_ret set NaN where feat.index > train_end - tf_days_nominal days to prevent lookahead leakage at train window boundary
 
+Phase 105-02 decisions:
+- plateau_score returns 0.0 when best_ic <= 0: negative-IC peaks have no meaningful positive neighborhood to measure
+- rolling_stability_test uses np.array_split (equal row splits) not date-based splits: robust to irregular bar frequencies across windows
+- compute_dsr_over_sweep falls back to n_trials approximate mode when no valid ICs: defensive against all-NaN sweep results
+- select_best_from_sweep slices to train window before stability/DSR: prevents out-of-window data leaking into computations
+- DB UPDATE in select_best_from_sweep wrapped in try/except: registry failure must not abort returned selection result
+- compute_rolling_ic and compute_dsr imported at module level (not lazily): lightweight, no circular import risk
+
 ## Session Continuity
 
 Last session: 2026-04-01
-Stopped at: Completed 105-01-PLAN.md
+Stopped at: Completed 105-02-PLAN.md
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-04-01 (Phase 105-01 complete: sweep columns migration y8z9a0b1c2d3 + param_optimizer.py with IC-based Optuna GridSampler/TPESampler sweep)*
+*Last updated: 2026-04-01 (Phase 105-02 complete: plateau_score, rolling_stability_test, compute_dsr_over_sweep, select_best_from_sweep added to param_optimizer.py)*
