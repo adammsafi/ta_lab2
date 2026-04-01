@@ -3235,6 +3235,99 @@ def _complete_pipeline_run(
         print(f"[WARN] pipeline_run_log update error: {exc}")
 
 
+def _log_stage_start(db_url: str, run_id: str | None, stage_name: str) -> str | None:
+    """Insert pipeline_stage_log row with status='running'. Return stage_log_id UUID."""
+    if run_id is None:
+        return None
+    try:
+        from sqlalchemy import create_engine, text
+
+        engine = create_engine(db_url)
+        with engine.begin() as conn:
+            row = conn.execute(
+                text(
+                    "INSERT INTO pipeline_stage_log (run_id, stage_name, status) "
+                    "VALUES (CAST(:run_id AS UUID), :stage, 'running') "
+                    "RETURNING stage_log_id"
+                ),
+                {"run_id": run_id, "stage": stage_name},
+            ).fetchone()
+        engine.dispose()
+        return str(row[0]) if row else None
+    except Exception as exc:
+        print(f"[WARN] pipeline_stage_log insert failed: {exc}")
+        return None
+
+
+def _log_stage_complete(
+    db_url: str,
+    stage_log_id: str | None,
+    success: bool,
+    duration_sec: float,
+    error_msg: str | None,
+) -> None:
+    """Update pipeline_stage_log row with outcome."""
+    if stage_log_id is None:
+        return
+    status = "complete" if success else "failed"
+    try:
+        from sqlalchemy import create_engine, text
+
+        engine = create_engine(db_url)
+        with engine.begin() as conn:
+            conn.execute(
+                text("""
+                    UPDATE pipeline_stage_log
+                    SET completed_at   = now(),
+                        status         = :status,
+                        duration_sec   = :dur,
+                        error_message  = :err
+                    WHERE stage_log_id = CAST(:id AS UUID)
+                """),
+                {
+                    "status": status,
+                    "dur": duration_sec,
+                    "err": error_msg,
+                    "id": stage_log_id,
+                },
+            )
+        engine.dispose()
+    except Exception as exc:
+        print(f"[WARN] pipeline_stage_log update failed: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# Phase 107 kill switch
+# ---------------------------------------------------------------------------
+
+KILL_SWITCH_FILE = Path(__file__).parent.parent.parent.parent / ".pipeline_kill"
+
+
+def _check_pipeline_kill_switch() -> bool:
+    """Return True if kill switch file exists."""
+    return KILL_SWITCH_FILE.exists()
+
+
+def _maybe_kill(
+    db_url: str,
+    pipeline_run_id: str | None,
+    results: list,
+    pipeline_start_time: float,
+) -> bool:
+    """Check kill switch. If triggered, finalize run and return True."""
+    if not _check_pipeline_kill_switch():
+        return False
+    print("[KILL SWITCH] Pipeline kill file detected -- stopping after this stage")
+    if pipeline_run_id:
+        stages_completed = [name for name, r in results if r.success]
+        total_duration = time.perf_counter() - pipeline_start_time
+        _complete_pipeline_run(
+            db_url, pipeline_run_id, "killed", stages_completed, total_duration, None
+        )
+    KILL_SWITCH_FILE.unlink(missing_ok=True)
+    return True
+
+
 def _check_dead_man(db_url: str) -> bool:
     """Return True if yesterday's pipeline run is MISSING (dead-man should fire).
 
@@ -3961,6 +4054,8 @@ Examples:
     pipeline_start_time = time.perf_counter()
     if not args.dry_run:
         pipeline_run_id = _start_pipeline_run(db_url)
+        # Phase 107: remove any stale kill switch from a previous run
+        KILL_SWITCH_FILE.unlink(missing_ok=True)
         # Dead-man switch: alert if yesterday's run is missing
         if _check_dead_man(db_url):
             print(
@@ -3972,40 +4067,90 @@ Examples:
     # Non-blocking: sync failures don't stop the pipeline (local data is
     # still usable, just potentially stale). Warns instead.
     if run_sync_vms:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "sync_fred_vm")
         fred_result = run_sync_fred_vm(args)
         results.append(("sync_fred_vm", fred_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            fred_result.success,
+            fred_result.duration_sec,
+            fred_result.error_message,
+        )
         if not fred_result.success:
             print("\n[WARN] FRED VM sync failed -- continuing with existing local data")
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
+        _slid = _log_stage_start(db_url, pipeline_run_id, "sync_hl_vm")
         hl_result = run_sync_hl_vm(args)
         results.append(("sync_hl_vm", hl_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            hl_result.success,
+            hl_result.duration_sec,
+            hl_result.error_message,
+        )
         if not hl_result.success:
             print(
                 "\n[WARN] Hyperliquid VM sync failed -- continuing with existing local data"
             )
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
+        _slid = _log_stage_start(db_url, pipeline_run_id, "sync_cmc_vm")
         cmc_result = run_sync_cmc_vm(args)
         results.append(("sync_cmc_vm", cmc_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            cmc_result.success,
+            cmc_result.duration_sec,
+            cmc_result.error_message,
+        )
         if not cmc_result.success:
             print("\n[WARN] CMC VM sync failed -- continuing with existing local data")
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Run bars if requested
     if run_bars:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "bars")
         bar_result = run_bar_builders(args, db_url, parsed_ids)
         results.append(("bars", bar_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            bar_result.success,
+            bar_result.duration_sec,
+            bar_result.error_message,
+        )
 
         if not bar_result.success and not args.continue_on_error:
             print("\n[STOPPED] Bar builders failed, stopping execution")
             print("(Use --continue-on-error to run remaining components)")
             return 1
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Run bar returns if requested (after bars, before EMAs)
     if run_returns_bars_flag:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "returns_bars")
         ret_bars_result = run_returns_bars(args, db_url)
         results.append(("returns_bars", ret_bars_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            ret_bars_result.success,
+            ret_bars_result.duration_sec,
+            ret_bars_result.error_message,
+        )
         if not ret_bars_result.success and not args.continue_on_error:
             print("\n[STOPPED] Bar returns failed, stopping execution")
             return 1
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Run EMAs if requested
     if run_emas:
@@ -4042,178 +4187,356 @@ Examples:
         elif run_bars:
             print("\n[INFO] Skipping bar freshness check (bars just refreshed)")
 
+        _slid = _log_stage_start(db_url, pipeline_run_id, "emas")
         ema_result = run_ema_refreshers(args, db_url, ids_for_emas)
         results.append(("emas", ema_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            ema_result.success,
+            ema_result.duration_sec,
+            ema_result.error_message,
+        )
 
         if not ema_result.success and not args.continue_on_error:
             print("\n[STOPPED] EMA refreshers failed, stopping execution")
             print("(Use --continue-on-error to run remaining components)")
             return 1
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Run EMA returns if requested (after EMAs, before AMAs)
     if run_returns_ema_flag:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "returns_ema")
         ret_ema_result = run_returns_ema(args, db_url)
         results.append(("returns_ema", ret_ema_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            ret_ema_result.success,
+            ret_ema_result.duration_sec,
+            ret_ema_result.error_message,
+        )
         if not ret_ema_result.success and not args.continue_on_error:
             print("\n[STOPPED] EMA returns failed, stopping execution")
             return 1
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Run AMAs if requested (after EMAs, before regimes)
     if run_amas:
         # Use same IDs as EMAs when running --all (fresh bar IDs); otherwise use parsed_ids
         ids_for_amas = ids_for_emas if run_emas else parsed_ids
+        _slid = _log_stage_start(db_url, pipeline_run_id, "amas")
         ama_result = run_ama_refreshers(args, db_url, ids_for_amas)
         results.append(("amas", ama_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            ama_result.success,
+            ama_result.duration_sec,
+            ama_result.error_message,
+        )
 
         if not ama_result.success and not args.continue_on_error:
             print("\n[STOPPED] AMA refreshers failed, stopping execution")
             print("(Use --continue-on-error to run remaining components)")
             return 1
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Run AMA returns if requested (after AMAs, before desc_stats)
     if run_returns_ama_flag:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "returns_ama")
         ret_ama_result = run_returns_ama(args, db_url)
         results.append(("returns_ama", ret_ama_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            ret_ama_result.success,
+            ret_ama_result.duration_sec,
+            ret_ama_result.error_message,
+        )
         if not ret_ama_result.success and not args.continue_on_error:
             print("\n[STOPPED] AMA returns failed, stopping execution")
             return 1
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Run desc stats if requested (after AMAs, before macro and regimes)
     if run_desc_stats:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "desc_stats")
         desc_result = run_desc_stats_refresher(args, db_url, parsed_ids)
         results.append(("desc_stats", desc_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            desc_result.success,
+            desc_result.duration_sec,
+            desc_result.error_message,
+        )
 
         if not desc_result.success and not args.continue_on_error:
             print("\n[STOPPED] Desc stats failed, stopping execution")
             print("(Use --continue-on-error to run remaining components)")
             return 1
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Run FRED macro features if requested (after desc_stats, before regimes)
     # Macro features read from fred.series_values (FRED raw data) -- independent of
     # bars/EMAs/AMAs. Placed here so downstream regime classifiers (Phase 67 L4)
     # can read macro context during regime computation.
     if run_macro:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "macro_features")
         macro_result = run_macro_features(args)
         results.append(("macro_features", macro_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            macro_result.success,
+            macro_result.duration_sec,
+            macro_result.error_message,
+        )
 
         if not macro_result.success and not args.continue_on_error:
             print("\n[STOPPED] Macro feature refresh failed, stopping execution")
             print("(Use --continue-on-error to run remaining components)")
             return 1
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Run macro regime classification if requested (after macro_features, before per-asset regimes)
     # Pipeline ordering: macro_features -> macro_regimes -> regimes (MREG-09)
     if run_macro_regimes_flag:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "macro_regimes")
         macro_regimes_result = run_macro_regimes(args)
         results.append(("macro_regimes", macro_regimes_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            macro_regimes_result.success,
+            macro_regimes_result.duration_sec,
+            macro_regimes_result.error_message,
+        )
 
         if not macro_regimes_result.success and not args.continue_on_error:
             print("\n[STOPPED] Macro regime classification failed, stopping execution")
             print("(Use --continue-on-error to run remaining components)")
             return 1
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Run macro analytics if requested (after macro_regimes, before per-asset regimes)
     # Pipeline ordering: macro_features -> macro_regimes -> macro_analytics -> regimes (MREG-12)
     if run_macro_analytics_flag:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "macro_analytics")
         macro_analytics_result = run_macro_analytics(args)
         results.append(("macro_analytics", macro_analytics_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            macro_analytics_result.success,
+            macro_analytics_result.duration_sec,
+            macro_analytics_result.error_message,
+        )
 
         if not macro_analytics_result.success and not args.continue_on_error:
             print("\n[STOPPED] Macro analytics failed, stopping execution")
             print("(Use --continue-on-error to run remaining components)")
             return 1
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Run cross-asset aggregation if requested (after macro_analytics, before per-asset regimes)
     # Pipeline ordering: macro_analytics -> cross_asset_agg -> regimes (XAGG Phase 70)
     if run_cross_asset_agg_flag:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "cross_asset_agg")
         cross_asset_result = run_cross_asset_agg(args)
         results.append(("cross_asset_agg", cross_asset_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            cross_asset_result.success,
+            cross_asset_result.duration_sec,
+            cross_asset_result.error_message,
+        )
 
         if not cross_asset_result.success and not args.continue_on_error:
             print("\n[STOPPED] Cross-asset aggregation failed, stopping execution")
             print("(Use --continue-on-error to run remaining components)")
             return 1
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Run macro gate evaluation after macro_regimes (Phase 73 gap closure)
     # Non-blocking: gate failures don't stop the pipeline
     if run_macro_regimes_flag:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "macro_gates")
         gate_result = run_evaluate_macro_gates(args)
         results.append(("macro_gates", gate_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            gate_result.success,
+            gate_result.duration_sec,
+            gate_result.error_message,
+        )
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Run macro regime transition alerts after macro_regimes (Phase 73 gap closure)
     # Non-blocking: alert failures don't stop the pipeline
     if run_macro_regimes_flag:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "macro_alerts")
         alert_result = run_macro_alerts(args)
         results.append(("macro_alerts", alert_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            alert_result.success,
+            alert_result.duration_sec,
+            alert_result.error_message,
+        )
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Run regimes if requested (after bars, EMAs, AMAs, desc_stats, macro, and macro_regimes)
     if run_regimes:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "regimes")
         regime_result = run_regime_refresher(args, db_url, parsed_ids)
         results.append(("regimes", regime_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            regime_result.success,
+            regime_result.duration_sec,
+            regime_result.error_message,
+        )
 
         if not regime_result.success and not args.continue_on_error:
             print("\n[STOPPED] Regime refresher failed, stopping execution")
             print("(Use --continue-on-error to run remaining components)")
             return 1
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Run feature refresh if requested (after regimes, before signals)
     if run_features:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "features")
         feature_result = run_feature_refresh_stage(args, db_url)
         results.append(("features", feature_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            feature_result.success,
+            feature_result.duration_sec,
+            feature_result.error_message,
+        )
 
         if not feature_result.success and not args.continue_on_error:
             print("\n[STOPPED] Feature refresh failed, stopping execution")
             print("(Use --continue-on-error to run remaining components)")
             return 1
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Run GARCH forecasts if requested (after features, before signals)
     if run_garch:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "garch")
         garch_result = run_garch_forecasts(args, db_url)
         results.append(("garch", garch_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            garch_result.success,
+            garch_result.duration_sec,
+            garch_result.error_message,
+        )
 
         if not garch_result.success and not args.continue_on_error:
             print("\n[STOPPED] GARCH forecast refresh failed, stopping execution")
             print("(Use --continue-on-error to run remaining components)")
             return 1
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Run signal generation if requested (after features, before executor)
     if run_signals:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "signals")
         signal_result = run_signal_refreshes(args, db_url)
         results.append(("signals", signal_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            signal_result.success,
+            signal_result.duration_sec,
+            signal_result.error_message,
+        )
 
         if not signal_result.success and not args.continue_on_error:
             print("\n[STOPPED] Signal generation failed, stopping execution")
             print("(Use --continue-on-error to run remaining components)")
             return 1
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Phase 87: Signal validation gate -- runs AFTER signals, BEFORE executor.
     # BLOCKING: if gate detects anomalies (rc=2), executor is skipped.
     signal_gate_blocked = False
     if run_signal_gate:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "signal_validation_gate")
         gate_result = run_signal_validation_gate(args, db_url)
         results.append(("signal_validation_gate", gate_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            gate_result.success,
+            gate_result.duration_sec,
+            gate_result.error_message,
+        )
         if not gate_result.success:
             signal_gate_blocked = True
             print(
                 "\n[GATE] Signal validation gate BLOCKED execution -- anomalies detected"
             )
             print("[GATE] Signals held back from executor. Review signal_anomaly_log.")
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Phase 87: IC staleness check -- runs after signal gate, non-blocking.
     # IC decay findings are logged to dim_ic_weight_overrides but pipeline continues.
     if run_ic_staleness:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "ic_staleness_check")
         ic_result = run_ic_staleness_check_stage(args, db_url)
         results.append(("ic_staleness_check", ic_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            ic_result.success,
+            ic_result.duration_sec,
+            ic_result.error_message,
+        )
         if not ic_result.success:
             print(
                 "\n[WARN] IC staleness check detected decay -- check dim_ic_weight_overrides"
             )
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Run stop calibration if requested (after signals, before portfolio)
     # Non-fatal: failure logs a warning and pipeline continues to portfolio refresh
     if run_calibrate_stops:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "calibrate_stops")
         calibrate_result = run_calibrate_stops_stage(args, db_url)
         results.append(("calibrate_stops", calibrate_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            calibrate_result.success,
+            calibrate_result.duration_sec,
+            calibrate_result.error_message,
+        )
 
         if not calibrate_result.success and not args.continue_on_error:
             print("\n[STOPPED] Stop calibration failed, stopping execution")
@@ -4221,19 +4544,31 @@ Examples:
             return 1
         elif not calibrate_result.success:
             print("\n[WARN] Stop calibration failed -- continuing to portfolio refresh")
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Run portfolio allocation refresh if requested (after calibrate_stops, before executor)
     # Pipeline order: bars -> EMAs -> AMAs -> desc_stats -> regimes -> features
     #                 -> signals -> signal_gate -> ic_staleness -> calibrate_stops
     #                 -> portfolio -> executor -> drift -> pipeline_alerts -> stats
     if run_portfolio:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "portfolio")
         portfolio_result = run_portfolio_refresh_stage(args, db_url)
         results.append(("portfolio", portfolio_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            portfolio_result.success,
+            portfolio_result.duration_sec,
+            portfolio_result.error_message,
+        )
 
         if not portfolio_result.success and not args.continue_on_error:
             print("\n[STOPPED] Portfolio allocation refresh failed, stopping execution")
             print("(Use --continue-on-error to run remaining components)")
             return 1
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Run paper executor if requested (after signals, before stats)
     # Phase 87: executor is gated by signal_gate_blocked flag.
@@ -4258,13 +4593,23 @@ Examples:
                 )
                 # Do not return 1 here -- complete remaining stages (drift, stats, alerts)
         else:
+            _slid = _log_stage_start(db_url, pipeline_run_id, "executor")
             executor_result = run_paper_executor_stage(args, db_url)
             results.append(("executor", executor_result))
+            _log_stage_complete(
+                db_url,
+                _slid,
+                executor_result.success,
+                executor_result.duration_sec,
+                executor_result.error_message,
+            )
 
             if not executor_result.success and not args.continue_on_error:
                 print("\n[STOPPED] Paper executor failed, stopping execution")
                 print("(Use --continue-on-error to run remaining components)")
                 return 1
+            if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+                return 2
 
     # Run drift monitor if requested (after executor, before stats)
     # --paper-start is OPTIONAL: if not provided, drift stage is silently skipped
@@ -4272,13 +4617,23 @@ Examples:
     # requiring --paper-start every time.
     paper_start = getattr(args, "paper_start", None)
     if run_drift and paper_start:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "drift_monitor")
         drift_result = run_drift_monitor_stage(args, db_url)
         results.append(("drift_monitor", drift_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            drift_result.success,
+            drift_result.duration_sec,
+            drift_result.error_message,
+        )
 
         if not drift_result.success and not args.continue_on_error:
             print("\n[STOPPED] Drift monitor failed, stopping execution")
             print("(Use --continue-on-error to run remaining components)")
             return 1
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
     elif run_drift and not paper_start:
         print()
         print("[WARN] Drift monitoring SKIPPED: --paper-start not provided")
@@ -4291,8 +4646,16 @@ Examples:
 
     # Run stats if requested (final stage -- after bars, EMAs, regimes, executor)
     if run_stats:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "stats")
         stats_result = run_stats_runners(args, db_url)
         results.append(("stats", stats_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            stats_result.success,
+            stats_result.duration_sec,
+            stats_result.error_message,
+        )
 
         # Pipeline gate: stats FAIL means data quality issues
         if not stats_result.success:
@@ -4307,8 +4670,16 @@ Examples:
     # Sends daily digest via Telegram (INFO if all green, WARNING if any failures).
     # Non-blocking: failure to send alert never stops the pipeline.
     if not args.dry_run and results:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "pipeline_alerts")
         alert_result = run_pipeline_completion_alert(args, db_url, results)
         results.append(("pipeline_alerts", alert_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            alert_result.success,
+            alert_result.duration_sec,
+            alert_result.error_message,
+        )
 
     # Print combined summary
     if not args.dry_run:

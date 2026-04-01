@@ -202,3 +202,6 @@ old/
 **/*_analysis.json
 run_claude.cmd
 run_claude.py
+
+# Phase 107: pipeline kill switch file (created externally to stop a running pipeline)
+.pipeline_kill
