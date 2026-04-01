@@ -246,13 +246,21 @@ class MetaLabelFilter:
             )
 
         # -- Step 5: build X, y, t1_series --
+        # Drop rows where t1 is NaT -- PurgedKFoldSplitter requires finite timestamps
+        joined = joined.dropna(subset=["t1"]).copy()
+
+        # Sort by t0 (label-start) so PurgedKFoldSplitter index is monotonically increasing
+        joined = joined.sort_values("t0").reset_index(drop=True)
+
         # Binary target: y=1 if bin > 0 (profit target hit), y=0 otherwise
         y = (joined["bin"] > 0).astype(int)
         y.name = "meta_label"
         y.index = range(len(y))
 
+        # t1_series index = t0 timestamps (label-start), values = t1 (label-end)
+        # PurgedKFoldSplitter uses index as fold boundary timestamps.
         t1_series = joined["t1"].copy()
-        t1_series.index = range(len(t1_series))
+        t1_series.index = pd.DatetimeIndex(joined["t0"].values).tz_localize("UTC")
 
         X = joined[use_cols].copy()
         X.index = range(len(X))
@@ -264,7 +272,13 @@ class MetaLabelFilter:
         valid_mask = X.notna().all(axis=1) & y.notna()
         X = X.loc[valid_mask].reset_index(drop=True)
         y = y.loc[valid_mask].reset_index(drop=True)
-        t1_series = t1_series.loc[valid_mask].reset_index(drop=True)
+        # Re-align t1_series to same integer positions after valid_mask filter
+        t1_series = t1_series.iloc[valid_mask.values].reset_index(drop=True)
+        # Set t0 timestamps as the index for PurgedKFoldSplitter (must be monotonic)
+        t0_index = pd.DatetimeIndex(
+            joined.loc[valid_mask.values, "t0"].values
+        ).tz_localize("UTC")
+        t1_series.index = t0_index
 
         self._feature_names = list(X.columns)
 
@@ -614,10 +628,12 @@ class MetaLabelFilter:
             },
             feature_set=feature_names,
             cv_method="purged_kfold",
-            train_start="N/A",
-            train_end="N/A",
+            # train_start/train_end use sentinel timestamps (cross-asset training,
+            # actual range spans all triple_barrier_labels rows)
+            train_start="2000-01-01",
+            train_end="2099-12-31",
             asset_ids=[],
-            tf="N/A",
+            tf="1D",
             oos_accuracy=mean_acc,
             oos_sharpe=mean_auc,  # AUC-ROC used as quality metric proxy
             oos_precision=mean_prec,

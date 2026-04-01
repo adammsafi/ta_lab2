@@ -82,6 +82,63 @@ class PaperExecutor:
         )
         self.logger = logging.getLogger(__name__)
 
+        # --- meta-label confidence filter (lazy init) ---
+        # Loaded only when at least one active config has meta_filter_enabled=TRUE
+        # and meta_filter_model_path set.  Disabled by default; safe to add.
+        self._meta_filter: Optional[object] = None
+        self._meta_filter_feature_names: list[str] = []
+        self._init_meta_filter()
+
+    # ------------------------------------------------------------------
+    # Meta-filter initialisation
+    # ------------------------------------------------------------------
+
+    def _init_meta_filter(self) -> None:
+        """Check dim_executor_config for any active meta_filter_enabled=TRUE row.
+
+        If found and meta_filter_model_path is set, load the XGBoost model.
+        Silently skips if xgboost is not installed (filter disabled).
+        Never raises -- failures are logged as warnings.
+        """
+        try:
+            with self.engine.connect() as conn:
+                row = conn.execute(
+                    text(
+                        """
+                        SELECT meta_filter_model_path
+                        FROM public.dim_executor_config
+                        WHERE is_active = TRUE
+                          AND meta_filter_enabled = TRUE
+                          AND meta_filter_model_path IS NOT NULL
+                        LIMIT 1
+                        """
+                    )
+                ).fetchone()
+
+            if row is None:
+                self.logger.debug("PaperExecutor: meta-filter disabled for all configs")
+                return
+
+            model_path = row.meta_filter_model_path
+            self.logger.info(
+                "PaperExecutor: meta-filter enabled; loading model from %s", model_path
+            )
+            # Lazy import -- xgboost optional
+            from ta_lab2.ml.meta_filter import MetaLabelFilter  # noqa: PLC0415
+
+            flt = MetaLabelFilter(self.engine)
+            flt.load_model(model_path)
+            self._meta_filter = flt
+            self._meta_filter_feature_names = flt._feature_names
+            self.logger.info(
+                "PaperExecutor: meta-filter model loaded (%d features)",
+                len(self._meta_filter_feature_names),
+            )
+        except Exception as exc:  # noqa: BLE001
+            self.logger.warning(
+                "PaperExecutor: meta-filter init failed: %s -- filter disabled", exc
+            )
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -406,7 +463,7 @@ class PaperExecutor:
                     config=config,
                     dry_run=dry_run,
                 )
-                if result.get("skipped_no_delta"):
+                if result.get("skipped_no_delta") or result.get("skipped_meta_filter"):
                     counts["skipped_no_delta"] += 1
                 elif result.get("rejected"):
                     counts["skipped_rejected"] += 1
@@ -510,6 +567,42 @@ class PaperExecutor:
             except Exception as exc:  # noqa: BLE001
                 self.logger.warning(
                     "_process_asset_signal: get_blended_vol failed for asset_id=%d: %s",
+                    asset_id,
+                    exc,
+                )
+
+        # --- meta-label confidence filter ---
+        # Runs AFTER price/portfolio lookups, BEFORE position sizing.
+        # Disabled by default (meta_filter_enabled=FALSE in dim_executor_config).
+        if (
+            getattr(config, "meta_filter_enabled", False)
+            and self._meta_filter is not None
+        ):
+            try:
+                features = self._load_meta_features(conn, asset_id, signal)
+                if features is not None:
+                    confidence = self._meta_filter.predict_confidence(features)[0]  # type: ignore[union-attr]
+                    threshold = float(getattr(config, "meta_filter_threshold", 0.5))
+                    if confidence < threshold:
+                        self.logger.info(
+                            "_process_asset_signal: meta-filter SKIP asset_id=%d "
+                            "confidence=%.4f < threshold=%.4f",
+                            asset_id,
+                            confidence,
+                            threshold,
+                        )
+                        return {"skipped_meta_filter": True}
+                    self.logger.info(
+                        "_process_asset_signal: meta-filter PASS asset_id=%d "
+                        "confidence=%.4f >= threshold=%.4f",
+                        asset_id,
+                        confidence,
+                        threshold,
+                    )
+            except Exception as exc:  # noqa: BLE001
+                self.logger.warning(
+                    "_process_asset_signal: meta-filter error for asset_id=%d: %s, "
+                    "proceeding without filter",
                     asset_id,
                     exc,
                 )
@@ -792,3 +885,84 @@ class PaperExecutor:
                 exc,
                 message,
             )
+
+    # ------------------------------------------------------------------
+    # Meta-filter feature loading
+    # ------------------------------------------------------------------
+
+    def _load_meta_features(
+        self, conn, asset_id: int, signal: dict
+    ) -> Optional[object]:
+        """Load point-in-time features for a single asset at signal timestamp.
+
+        Queries the ``features`` table for the row matching (asset_id, tf='1D',
+        ts=signal timestamp).  Returns a single-row DataFrame aligned to the
+        feature columns the meta-filter model was trained on.
+
+        Returns None if no features are found (graceful degradation -- the
+        caller proceeds without meta-filter screening).
+
+        Parameters
+        ----------
+        conn :
+            Active SQLAlchemy connection.
+        asset_id : int
+            Asset identifier.
+        signal : dict
+            Signal dict containing 'ts' (the signal timestamp).
+
+        Returns
+        -------
+        pd.DataFrame or None
+            Single-row DataFrame with model feature columns, or None.
+        """
+        import pandas as pd  # noqa: PLC0415
+
+        if not self._meta_filter_feature_names:
+            return None
+
+        signal_ts = signal.get("ts")
+        if signal_ts is None:
+            self.logger.debug(
+                "_load_meta_features: signal has no ts for asset_id=%d", asset_id
+            )
+            return None
+
+        # Build SELECT with only the feature columns the model knows about
+        cols_sql = ", ".join(f'"{c}"' for c in self._meta_filter_feature_names)
+
+        try:
+            row = conn.execute(
+                text(
+                    f"""
+                    SELECT {cols_sql}
+                    FROM public.features
+                    WHERE id = :asset_id
+                      AND tf = '1D'
+                      AND ts = :ts
+                    LIMIT 1
+                    """
+                ),
+                {"asset_id": asset_id, "ts": signal_ts},
+            ).fetchone()
+        except Exception as exc:  # noqa: BLE001
+            self.logger.debug(
+                "_load_meta_features: query failed for asset_id=%d: %s", asset_id, exc
+            )
+            return None
+
+        if row is None:
+            self.logger.debug(
+                "_load_meta_features: no features row for asset_id=%d ts=%s",
+                asset_id,
+                signal_ts,
+            )
+            return None
+
+        feat_dict = {col: val for col, val in zip(self._meta_filter_feature_names, row)}
+        features_df = pd.DataFrame([feat_dict])
+
+        # Drop any column that is None/NaN -- model may not need all columns
+        features_df = features_df.fillna(0.0)
+
+        return features_df
