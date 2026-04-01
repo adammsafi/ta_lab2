@@ -28,6 +28,16 @@ from ta_lab2.features.vol import (
     add_rogers_satchell_vol,
     add_atr,
     add_rolling_vol_from_returns_batch,
+    add_parkinson_vol_polars,
+    add_garman_klass_vol_polars,
+    add_rogers_satchell_vol_polars,
+    add_atr_polars,
+    add_rolling_vol_from_returns_polars,
+)
+from ta_lab2.features.polars_feature_ops import (
+    polars_sorted_groupby,
+    pandas_to_polars_df,
+    polars_to_pandas_df,
 )
 
 
@@ -209,80 +219,162 @@ class VolatilityFeature(BaseFeature):
         # Make a copy to avoid modifying source
         df = df_source.copy()
 
-        # Process each (id, venue_id) separately (volatility requires ordering)
-        results = []
+        if self.config.use_polars:
+            # ------------------------------------------------------------------
+            # Polars-accelerated path
+            # ------------------------------------------------------------------
+            # Capture config values for closure (avoids self reference in closure)
+            _estimators = self.vol_config.estimators
+            _windows = self.vol_config.vol_windows
+            _ppy = self._periods_per_year
+            _atr_period = self.vol_config.atr_period
 
-        for (id_val, venue_id_val), df_id in df.groupby(["id", "venue_id"]):
-            df_id = df_id.copy()
+            def _compute_vol_single_group(df_id: pd.DataFrame) -> pd.DataFrame:
+                """Compute vol for one (id, venue_id) group via polars."""
+                pl_df = pandas_to_polars_df(df_id)
 
-            # Sort by timestamp (required for rolling calculations)
-            df_id = df_id.sort_values("ts")
+                # 1. Parkinson
+                if "parkinson" in _estimators:
+                    pl_df = add_parkinson_vol_polars(
+                        pl_df,
+                        high_col="high",
+                        low_col="low",
+                        windows=_windows,
+                        annualize=True,
+                        periods_per_year=_ppy,
+                    )
 
-            # 1. Parkinson volatility (range-based)
-            if "parkinson" in self.vol_config.estimators:
-                add_parkinson_vol(
-                    df_id,
-                    high_col="high",
-                    low_col="low",
-                    windows=self.vol_config.vol_windows,
-                    annualize=True,
-                    periods_per_year=self._periods_per_year,
-                )
+                # 2. Garman-Klass
+                if "gk" in _estimators:
+                    pl_df = add_garman_klass_vol_polars(
+                        pl_df,
+                        open_col="open",
+                        high_col="high",
+                        low_col="low",
+                        close_col="close",
+                        windows=_windows,
+                        annualize=True,
+                        periods_per_year=_ppy,
+                    )
 
-            # 2. Garman-Klass volatility (OHLC-based)
-            if "gk" in self.vol_config.estimators:
-                add_garman_klass_vol(
-                    df_id,
+                # 3. Rogers-Satchell
+                if "rs" in _estimators:
+                    pl_df = add_rogers_satchell_vol_polars(
+                        pl_df,
+                        open_col="open",
+                        high_col="high",
+                        low_col="low",
+                        close_col="close",
+                        windows=_windows,
+                        annualize=True,
+                        periods_per_year=_ppy,
+                    )
+
+                # 4. ATR (with fill_nan fix for NaN divergence)
+                pl_df = add_atr_polars(
+                    pl_df,
+                    period=_atr_period,
                     open_col="open",
                     high_col="high",
                     low_col="low",
                     close_col="close",
-                    windows=self.vol_config.vol_windows,
-                    annualize=True,
-                    periods_per_year=self._periods_per_year,
                 )
 
-            # 3. Rogers-Satchell volatility (drift-independent)
-            if "rs" in self.vol_config.estimators:
-                add_rogers_satchell_vol(
+                # 5. Rolling log-vol (use ret_log if available)
+                pl_df = add_rolling_vol_from_returns_polars(
+                    pl_df,
+                    close_col="close",
+                    windows=_windows,
+                    annualize=True,
+                    periods_per_year=_ppy,
+                    ddof=0,
+                    prefix="vol",
+                    returns_col="ret_log",
+                )
+
+                return polars_to_pandas_df(pl_df)
+
+            df_features = polars_sorted_groupby(
+                df, ["id", "venue_id"], "ts", _compute_vol_single_group
+            )
+
+        else:
+            # ------------------------------------------------------------------
+            # Pandas path (unchanged)
+            # ------------------------------------------------------------------
+            results = []
+
+            for (id_val, venue_id_val), df_id in df.groupby(["id", "venue_id"]):
+                df_id = df_id.copy()
+
+                # Sort by timestamp (required for rolling calculations)
+                df_id = df_id.sort_values("ts")
+
+                # 1. Parkinson volatility (range-based)
+                if "parkinson" in self.vol_config.estimators:
+                    add_parkinson_vol(
+                        df_id,
+                        high_col="high",
+                        low_col="low",
+                        windows=self.vol_config.vol_windows,
+                        annualize=True,
+                        periods_per_year=self._periods_per_year,
+                    )
+
+                # 2. Garman-Klass volatility (OHLC-based)
+                if "gk" in self.vol_config.estimators:
+                    add_garman_klass_vol(
+                        df_id,
+                        open_col="open",
+                        high_col="high",
+                        low_col="low",
+                        close_col="close",
+                        windows=self.vol_config.vol_windows,
+                        annualize=True,
+                        periods_per_year=self._periods_per_year,
+                    )
+
+                # 3. Rogers-Satchell volatility (drift-independent)
+                if "rs" in self.vol_config.estimators:
+                    add_rogers_satchell_vol(
+                        df_id,
+                        open_col="open",
+                        high_col="high",
+                        low_col="low",
+                        close_col="close",
+                        windows=self.vol_config.vol_windows,
+                        annualize=True,
+                        periods_per_year=self._periods_per_year,
+                    )
+
+                # 4. ATR (Average True Range)
+                add_atr(
                     df_id,
+                    period=self.vol_config.atr_period,
                     open_col="open",
                     high_col="high",
                     low_col="low",
                     close_col="close",
-                    windows=self.vol_config.vol_windows,
-                    annualize=True,
-                    periods_per_year=self._periods_per_year,
                 )
 
-            # 4. ATR (Average True Range)
-            add_atr(
-                df_id,
-                period=self.vol_config.atr_period,
-                open_col="open",
-                high_col="high",
-                low_col="low",
-                close_col="close",
-            )
+                # 5. Rolling historical volatility from log returns
+                #    Use pre-computed ret_log from returns _u table when available
+                add_rolling_vol_from_returns_batch(
+                    df_id,
+                    close_col="close",
+                    windows=self.vol_config.vol_windows,
+                    types="log",
+                    annualize=True,
+                    periods_per_year=self._periods_per_year,
+                    ddof=0,
+                    prefix="vol",
+                    returns_col="ret_log",
+                )
 
-            # 5. Rolling historical volatility from log returns
-            #    Use pre-computed ret_log from returns _u table when available
-            add_rolling_vol_from_returns_batch(
-                df_id,
-                close_col="close",
-                windows=self.vol_config.vol_windows,
-                types="log",
-                annualize=True,
-                periods_per_year=self._periods_per_year,
-                ddof=0,
-                prefix="vol",
-                returns_col="ret_log",
-            )
+                results.append(df_id)
 
-            results.append(df_id)
-
-        # Combine all IDs
-        df_features = pd.concat(results, ignore_index=True)
+            # Combine all IDs
+            df_features = pd.concat(results, ignore_index=True)
 
         # Add tf, alignment_source, and tf_days columns
         df_features["tf"] = self.config.tf
