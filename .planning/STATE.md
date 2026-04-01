@@ -9,12 +9,13 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 
 ## Current Position
 
-Phase: 108 of 111 COMPLETE (Pipeline Batch Performance) — 5 plans, all complete
+Phase: 109 of 111 IN PROGRESS (Feature Skip-Unchanged) — 1/2 plans complete
+Also: Phase 108 COMPLETE (Pipeline Batch Performance) — 5 plans, all complete
 Also: Phase 103 COMPLETE (Traditional TA Expansion) — 3/3 plans complete
-Status: Plan 103-03 complete — run_phase103_ic.py IC sweep + FDR + promotion pipeline ready
-Last activity: 2026-04-01 — Completed 103-03-PLAN.md
+Status: Plan 109-01 complete — feature_refresh_state table + 4 watermark helpers ready
+Last activity: 2026-04-01 — Completed 109-01-PLAN.md
 
-Progress: [##########] 100% v1.2.0 | [█████████░] 72% v1.3.0 (20/26 plans, 6/6 phases)
+Progress: [##########] 100% v1.2.0 | [█████████░] 80% v1.3.0 (21/26 plans, 6/6 phases)
 
 ## Performance Metrics
 
@@ -228,7 +229,7 @@ Phase 103-03 decisions:
 ## Session Continuity
 
 Last session: 2026-04-01
-Stopped at: Completed 103-03-PLAN.md
+Stopped at: Completed 109-01-PLAN.md
 Resume file: None
 
 ---

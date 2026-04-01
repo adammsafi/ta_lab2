@@ -1407,7 +1407,7 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 - [ ] **Phase 100: ML Signal Combination** - LGBMRanker cross-sectional predictor, SHAP interaction analysis, XGBoost meta-label confidence filter
 - [x] **Phase 101: Tech Debt Cleanup** - Remove orphaned export, create Phase 82/92 VERIFICATION.md, document CTF downstream consumers — COMPLETE 2026-04-01
 - [x] **Phase 102: Indicator Research Framework** - Permutation IC test, FDR control, haircut Sharpe, trial registry, block bootstrap — the testing harness for all indicator R&D — COMPLETE 2026-04-01
-- [ ] **Phase 103: Traditional TA Expansion** - Add 20-30 well-known indicators (Ichimoku, Williams %R, Keltner, CCI, Elder Ray, Force Index, VWAP, VIDYA, FRAMA, etc.), IC sweep through Phase 102 harness
+- [x] **Phase 103: Traditional TA Expansion** - Add 20-30 well-known indicators (Ichimoku, Williams %R, Keltner, CCI, Elder Ray, Force Index, VWAP, VIDYA, FRAMA, etc.), IC sweep through Phase 102 harness — COMPLETE 2026-04-01
 - [ ] **Phase 104: Crypto-Native Indicators** - Venue-agnostic normalized input layer for OI/funding/volume, derive OI momentum, OI-price divergence, funding rate z-score, Force Index, liquidation pressure proxy
 - [ ] **Phase 105: Parameter Optimization** - Systematic parameter sweep (grid + Optuna) for surviving indicators, plateau preference, rolling stability test, DSR over full search space
 - [ ] **Phase 106: Custom Composite Indicators** - Proprietary indicators (AMA ER as regime signal, OI-divergence × CTF agreement, funding-adjusted momentum, cross-asset lead-lag), strictest validation tier
@@ -1578,9 +1578,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 103-01-PLAN.md � Implement all 20 indicator functions in indicators_extended.py (Ichimoku, Williams %R, Keltner, CCI, Elder Ray, Force Index, VWAP, CMF, Chaikin Osc, Hurst, VIDYA, FRAMA, Aroon, Trix, Ultimate Osc, Vortex, EMV, Mass Index, KST, Coppock)
-- [ ] 103-02-PLAN.md � Wire into TAFeature pipeline: Alembic migration seeding dim_indicators + extending compute_features dispatch
-- [ ] 103-03-PLAN.md � IC sweep through Phase 102 harness, FDR control at 5%, promote survivors, log rejects
+- [x] 103-01-PLAN.md — Implement all 20 indicator functions in indicators_extended.py
+- [x] 103-02-PLAN.md — Wire into TAFeature pipeline: Alembic migration seeding dim_indicators + extending compute_features dispatch
+- [x] 103-03-PLAN.md — IC sweep through Phase 102 harness, FDR control at 5%, promote survivors, log rejects
 
 ---
 
