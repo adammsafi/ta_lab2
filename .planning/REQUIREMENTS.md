@@ -58,6 +58,25 @@
 - [ ] **PERF-04**: Bar returns batch — per-ID batch SQL instead of per-(id, tf, venue) loop
 - [ ] **PERF-05**: Full incremental `--all` pipeline completes in < 2 hours (currently 5-6 hours)
 
+### Feature Skip-Unchanged
+
+- [ ] **FEAT-01**: `feature_refresh_state` table created (alembic migration) with PK (id, tf, alignment_source)
+- [ ] **FEAT-02**: Feature refresh skips assets with no new bar data (daily refresh processes ~10 assets, not 492)
+- [ ] **FEAT-03**: `--full-rebuild` bypasses skip logic; log shows "Skipping N unchanged assets"
+
+### Feature Parallel Sub-Phases
+
+- [ ] **FEAT-04**: Independent feature sub-phases grouped into parallel waves (vol+ta+cycle+micro in Wave 1)
+- [ ] **FEAT-05**: Total feature full-recompute time < 70 min (currently ~100 min)
+
+### Feature Polars Migration
+
+- [ ] **FEAT-06**: All 8 feature sub-phases have polars implementations with `--use-polars` / `--use-pandas` flags
+- [ ] **FEAT-07**: IC-IR regression < 1% for test assets (id=1, 1027, 5426) on every sub-phase migration
+- [ ] **FEAT-08**: Zero signal flips on test assets after full migration (signal count and direction match)
+- [ ] **FEAT-09**: Backtest Sharpe regression < 5% for bakeoff strategies after migration
+- [ ] **FEAT-10**: Feature full-recompute time < 30 min with polars
+
 ### Tech Debt Cleanup
 
 - [ ] **DEBT-01**: `blend_vol_simple()` orphaned export in `garch_blend.py` removed or wired to caller
@@ -132,10 +151,20 @@
 | PERF-03 | Phase 108 | Pending |
 | PERF-04 | Phase 108 | Pending |
 | PERF-05 | Phase 108 | Pending |
+| FEAT-01 | Phase 109 | Pending |
+| FEAT-02 | Phase 109 | Pending |
+| FEAT-03 | Phase 109 | Pending |
+| FEAT-04 | Phase 110 | Pending |
+| FEAT-05 | Phase 110 | Pending |
+| FEAT-06 | Phase 111 | Pending |
+| FEAT-07 | Phase 111 | Pending |
+| FEAT-08 | Phase 111 | Pending |
+| FEAT-09 | Phase 111 | Pending |
+| FEAT-10 | Phase 111 | Pending |
 
 **Coverage:**
-- v1.3.0 requirements: 36 total (26 original + 5 DASH + 5 PERF)
-- Mapped to phases: 36
+- v1.3.0 requirements: 46 total (26 original + 5 DASH + 5 PERF + 10 FEAT)
+- Mapped to phases: 46
 - Unmapped: 0
 
 ---

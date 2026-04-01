@@ -12,7 +12,7 @@
 - v1.0.1 Macro Regime Infrastructure (Phases 64-73) - SHIPPED 2026-03-03
 - v1.1.0 Pipeline Consolidation & Storage Optimization (Phases 74-79) - SHIPPED 2026-03-21
 - v1.2.0 Analysis → Live Signals (Phases 80-95) - SHIPPED 2026-03-29
-- v1.3.0 Operational Activation & Research Expansion (Phases 96-108) - IN PROGRESS
+- v1.3.0 Operational Activation & Research Expansion (Phases 96-111) - IN PROGRESS
 
 ## Overview
 
@@ -31,7 +31,7 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 - Phases 64-73: v1.0.1 (SHIPPED 2026-03-03)
 - Phases 74-79: v1.1.0 (SHIPPED 2026-03-21)
 - Phases 80-95: v1.2.0 (SHIPPED 2026-03-29)
-- Phases 96-108: v1.3.0 (IN PROGRESS)
+- Phases 96-111: v1.3.0 (IN PROGRESS)
 - Decimal phases (27.1, 28.1): Urgent insertions if needed
 
 <details>
@@ -1414,7 +1414,13 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 - [ ] **Phase 107: Pipeline Operations Dashboard** - Streamlit ops page: real-time stage monitor with progress bars, run history, trigger/kill buttons, pipeline_stage_log table for per-stage DB persistence
 **Plans:** 2 plans
 - [ ] **Phase 108: Pipeline Batch Performance** - Replace 5.7M per-key SQL queries with per-ID batch operations using PARTITION BY. EMA returns (2M→492 queries), AMA returns, bar returns, EMA fast-path. Target: 5hr→1.5hr incremental
+- [ ] **Phase 109: Feature Skip-Unchanged** - Watermark state table for features, skip assets with no new bar data. Target: 100min→10min for daily incremental
+- [ ] **Phase 110: Feature Parallel Sub-Phases** - Group independent feature sub-phases into parallel waves. Target: 100min→60min for full recompute
+- [ ] **Phase 111: Feature Polars Migration** - Migrate feature sub-phases from pandas to polars with per-sub-phase regression testing (IC<1%, signals=0 flips, Sharpe<5%). Target: 60min→25min
 **Plans:** 5 plans
+- [ ] **Phase 109: Pipeline Architecture Separation** - Split monolithic run_daily_refresh into 4 distinct pipelines (Data, Research, Validation, Execution) with clear boundaries, triggers, and deployment topology (local vs VM)
+- [ ] **Phase 110: VM Execution Deployment** - PostgreSQL on Oracle VM with execution tables, sync_features_to_vm + sync_results_to_local scripts, real-time WebSocket price feeds (HL/Kraken), executor as systemd service
+- [ ] **Phase 111: Hosted Dashboard** - nginx reverse proxy + Let's Encrypt SSL on Oracle VM, Streamlit deployment, sync_dashboard_to_vm script, basic auth, mobile-accessible
 
 ---
 
@@ -1660,6 +1666,47 @@ Plans:
 
 ---
 
+### Phase 109: Pipeline Architecture Separation
+**Goal:** Split the monolithic run_daily_refresh.py into 4 distinct pipelines with clear boundaries, triggers, and deployment topology. Define what runs locally vs on the Oracle VM, and how pipelines hand off to each other.
+**Depends on:** Phase 107 (ops dashboard provides monitoring UI), Phase 108 (batch performance — pipelines should be fast before separating)
+**Requirements:** PIPE-01, PIPE-02, PIPE-03, PIPE-04
+**Success Criteria** (what must be TRUE):
+  1. Four distinct entry points exist: `run_data_pipeline`, `run_research_pipeline`, `run_validation_pipeline`, `run_execution_pipeline` — each independently invocable
+  2. Data pipeline (bars→EMAs→AMAs→features→regimes) runs as a standalone script with clear input/output contracts; can run locally on-demand or on VM via cron
+  3. Research pipeline (IC sweeps, feature selection, MC sims, CV sensitivity) is separated from daily refresh — never triggered by cron, only manual/ad-hoc
+  4. Validation pipeline (backtest verification, PBO, strategy scoring, leaderboard refresh) triggers after research produces new candidates — consumes research output, produces validated rankings
+  5. Execution pipeline (signals→portfolio→orders→fills→drift) can run on Oracle VM with minimal data transfer — only needs strategy configs + latest features, not full history
+  6. Pipeline handoff contracts documented: what tables/artifacts each pipeline reads and writes
+
+---
+
+### Phase 110: VM Execution Deployment
+**Goal:** Deploy the execution pipeline on the Oracle Singapore VM so it can run 24/7 independently of the local PC. Real-time price feeds for order management (fills, stops, take profits), daily feature sync from local, results sync back.
+**Depends on:** Phase 109 (pipeline separation — execution pipeline must exist as standalone), Phase 96 (executor activation — paper executor must work)
+**Requirements:** DEPLOY-01, DEPLOY-02, DEPLOY-03, DEPLOY-04
+**Success Criteria** (what must be TRUE):
+  1. Small PostgreSQL on Oracle VM holds execution-relevant tables: features_latest, strategy_configs, risk_limits, positions, orders, fills, order_events (~1-2 GB)
+  2. `sync_features_to_vm` script pushes latest feature snapshot from local DB to VM daily (pre-computed features, not raw bars)
+  3. `sync_results_to_local` script pulls fills, positions, PnL, drift metrics from VM back to local DB for research/dashboard
+  4. Real-time WebSocket price feed (Hyperliquid at minimum) provides sub-second prices for order management — fill detection, stop loss monitoring, take profit execution
+  5. Executor runs as a systemd service on VM, auto-restarts on failure, logs to journald
+  6. Paper trading operates for 7+ days without manual intervention (beyond daily feature sync)
+
+---
+
+### Phase 111: Hosted Dashboard
+**Goal:** Host the Streamlit dashboard on the Oracle VM behind nginx + SSL so it's accessible from any device (mobile, VM, local PC) without requiring the local PC to be on.
+**Depends on:** Phase 110 (VM has execution data), Phase 107 (ops dashboard exists)
+**Requirements:** DASH-06, DASH-07, DASH-08
+**Success Criteria** (what must be TRUE):
+  1. nginx reverse proxy with Let's Encrypt SSL certificate serves Streamlit on HTTPS
+  2. `sync_dashboard_to_vm` script pushes dashboard-relevant tables (strategy_bakeoff_results, backtest_metrics, regime_stats, etc.) from local to VM
+  3. Basic auth or token-based access control prevents unauthorized access
+  4. Dashboard loads and renders correctly on mobile browser (responsive layout verified)
+  5. Execution-related pages (PnL, positions, orders, drift) query VM-local data with <2s page load
+
+---
+
 ### v1.3.0 Progress
 
 | Phase | Plans Complete | Status | Completed |
@@ -1677,6 +1724,9 @@ Plans:
 | 106. Custom Composite Indicators | 0/TBD | Not started | - |
 | 107. Pipeline Operations Dashboard | 0/2 | Planned | - |
 | 108. Pipeline Batch Performance | 0/5 | Not started | - |
+| 109. Pipeline Architecture Separation | 0/TBD | Not started | - |
+| 110. VM Execution Deployment | 0/TBD | Not started | - |
+| 111. Hosted Dashboard | 0/TBD | Not started | - |
 
 ### v1.3.0 Requirement Coverage
 
