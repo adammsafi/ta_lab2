@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 
 ## Current Position
 
-Phase: 101 of 108 (Tech Debt Cleanup) — Phase complete (2/2 plans)
-Next: Next unplanned phase or phase verification
-Status: Plan 101-01 complete — DEBT-01/02/03 closed (blend_vol_simple removed, 82-VERIFICATION created, 92-VERIFICATION updated)
-Last activity: 2026-04-01 — Completed 101-01-PLAN.md
+Phase: 102 of 108 (Indicator Research Framework) — In progress (1/3 plans via 102-02)
+Next: 102-03 (once both 102-01 and 102-02 complete)
+Status: Plan 102-02 complete — haircut_sharpe, haircut_ic_ir, get_trial_count, block_bootstrap_ic added to multiple_testing.py
+Last activity: 2026-04-01 — Completed 102-02-PLAN.md
 
-Progress: [##########] 100% v1.2.0 | [█████████░] 62% v1.3.0 (16/26 plans, 5/6 phases)
+Progress: [##########] 100% v1.2.0 | [█████████░] 64% v1.3.0 (17/26 plans, 5/6 phases)
 
 ## Performance Metrics
 
@@ -193,12 +193,18 @@ Phase 108-03 decisions:
 - _worker returns list[dict] (not dict): caller iterates batch_results from pool.imap_unordered
 - SET LOCAL work_mem per engine.begin() transaction preserved: correct scope; connection-level SET would not carry to begin() blocks
 
+Phase 102-02 decisions:
+- Block bootstrap pair indexing: apply bs.index to both feat_clean and ret_clean jointly (not returns-only); bootstrapping only returns destroys feature/return alignment and produces CIs near zero
+- arch 8.0.0 optimal_block_length() column: "stationary" (not "b_sb" from older versions); documented in module docstring
+- haircut_ic_ir conn=None guard: when conn is None, get_trial_count() returns 0 and n_trials=0 edge case returns no-penalty result; enables pure-computation use in notebooks
+- Bonferroni HL method applies identically to IC-IR as to Sharpe (both are t-stat / sqrt(n) structures)
+
 ## Session Continuity
 
 Last session: 2026-04-01
-Stopped at: Completed 101-02-PLAN.md
+Stopped at: Completed 102-02-PLAN.md
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-04-01 (Phase 101-02 complete: DEBT-04 dim_ctf_feature_selection consumer design documented)*
+*Last updated: 2026-04-01 (Phase 102-02 complete: haircut_sharpe, haircut_ic_ir, block_bootstrap_ic added to multiple_testing.py)*
