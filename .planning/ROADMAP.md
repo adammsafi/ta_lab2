@@ -1415,6 +1415,10 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 - [ ] **Phase 108: Pipeline Batch Performance** - Replace 5.7M per-key SQL queries with per-ID batch operations using PARTITION BY. EMA returns (2M→492 queries), AMA returns, bar returns, EMA fast-path. Target: 5hr→1.5hr incremental
 - [ ] **Phase 109: Feature Skip-Unchanged** - Watermark state table for features, skip assets with no new bar data. Target: 100min→10min for daily incremental
 - [ ] **Phase 110: Feature Parallel Sub-Phases** - Group independent feature sub-phases into parallel waves. Target: 100min→60min for full recompute
+**Plans:** 1 plan
+
+Plans:
+- [ ] 110-01-PLAN.md -- Wave 1 parallelism (max_workers 3->4), --workers CLI flag, budget guard, wave logging
 - [ ] **Phase 111: Feature Polars Migration** - Migrate feature sub-phases from pandas to polars with per-sub-phase regression testing (IC<1%, signals=0 flips, Sharpe<5%). Target: 60min→25min
 **Plans:** 5 plans in 3 waves
 
