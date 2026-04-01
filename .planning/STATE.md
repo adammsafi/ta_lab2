@@ -5,21 +5,21 @@
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 110 IN PROGRESS (Feature Parallel Sub-Phases — Plan 01 complete)
+**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 105 IN PROGRESS (Parameter Optimization — Plans 01+02+03 complete)
 
 ## Current Position
 
-Phase: 110 IN PROGRESS (Feature Parallel Sub-Phases) — 1/1 plans complete
-Also: Phase 105 IN PROGRESS (Parameter Optimization) — 2/N plans complete
+Phase: 105 IN PROGRESS (Parameter Optimization) — 3/N plans complete
+Also: Phase 110 IN PROGRESS (Feature Parallel Sub-Phases) — 1/1 plans complete
 Also: Phase 109 COMPLETE (Feature Skip-Unchanged) — 2/2 plans complete
 Also: Phase 104 COMPLETE (Crypto-Native Indicators) — 3/3 plans complete
 Also: Phase 100 IN PROGRESS (ML Signal Combination) — Plans 01+02 complete (2/3 plans)
 Also: Phase 108 COMPLETE (Pipeline Batch Performance) — 5 plans, all complete
 Also: Phase 103 COMPLETE (Traditional TA Expansion) — 3/3 plans complete
-Status: Plan 110-01 complete — Wave 1 parallelized to 4 threads, --workers CLI flag, tf_workers*wave1_workers budget guard, Wave N log labels
-Last activity: 2026-04-01 — Completed 110-01-PLAN.md
+Status: Plan 105-03 complete — run_param_sweep.py CLI with 22-indicator PARAM_SPACE_REGISTRY, FDR survivor discovery, --dry-run, full sweep orchestration
+Last activity: 2026-04-01 — Completed 105-03-PLAN.md
 
-Progress: [##########] 100% v1.2.0 | [█████████░] 90% v1.3.0 (26/27 plans, 8/6 phases)
+Progress: [##########] 100% v1.2.0 | [█████████░] 90% v1.3.0 (27/28 plans, 8/6 phases)
 
 ## Performance Metrics
 
@@ -296,6 +296,15 @@ Phase 105-02 decisions:
 - DB UPDATE in select_best_from_sweep wrapped in try/except: registry failure must not abort returned selection result
 - compute_rolling_ic and compute_dsr imported at module level (not lazily): lightweight, no circular import risk
 
+Phase 105-03 decisions:
+- stoch_kd param names are 'k' and 'd' (not 'k_period'/'d_period' as plan suggested): verified against actual signature
+- elder_ray param name is 'period' (not 'ema_period'): EMA span parameter
+- force_index param name is 'smooth' (not 'smooth_period'): EMA period
+- Crypto-native indicators with empty param_space_def skip sweep loop via _crypto_native flag: prevents grid_size=0 and skips placeholder entries
+- Both tasks committed in single commit: same file, written atomically to avoid half-baked intermediate state
+- train_end = max(ts) - tf_days_nominal days: consistent with _make_ic_objective boundary masking in param_optimizer.py
+- fwd_ret = ret_arith.shift(-1): forward returns shifted by 1 bar from returns_bars_multi_tf_u
+
 Phase 110-01 decisions:
 - wave1_workers threaded as tuple element (not kwargs) in _run_single_tf args_tuple: consistent with existing positional tuple pattern
 - Clamp wave1_workers = min(wave1_workers, len(phase1_tasks)) inside run_all_refreshes(): prevents over-provisioning, self-correcting
@@ -305,7 +314,7 @@ Phase 110-01 decisions:
 ## Session Continuity
 
 Last session: 2026-04-01
-Stopped at: Completed 110-01-PLAN.md
+Stopped at: Completed 105-03-PLAN.md
 Resume file: None
 
 ---
