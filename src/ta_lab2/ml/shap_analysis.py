@@ -497,13 +497,16 @@ class RankerShapAnalyzer:
                 # Update notes for feature_b — note its interaction with feature_a
                 note_b = f"SHAP interaction partner: {feat_a}"
 
+                # NOTE: Use %% for literal % in SQLAlchemy text() with psycopg2;
+                # single % would be interpreted as a format placeholder.
+                # dim_feature_selection uses 'rationale' not 'notes' column.
                 update_sql = text(
                     """
                     UPDATE public.dim_feature_selection
-                    SET notes = CASE
-                        WHEN notes IS NULL THEN :note
-                        WHEN notes NOT LIKE '%SHAP interaction%' THEN notes || '; ' || :note
-                        ELSE notes
+                    SET rationale = CASE
+                        WHEN rationale IS NULL THEN :note
+                        WHEN rationale NOT LIKE '%%SHAP interaction%%' THEN rationale || '; ' || :note
+                        ELSE rationale
                     END
                     WHERE feature_name = :feature_name
                     """

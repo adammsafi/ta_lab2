@@ -625,7 +625,10 @@ class CrossSectionalRanker:
         feature_cols = self._get_feature_cols(df)
         self.feature_names_ = feature_cols
 
-        X = df[feature_cols].values
+        # Cast to float64 so Python None values become np.nan (not object dtype).
+        # Without this, np.nanmedian raises TypeError when object columns
+        # contain Python None instead of np.nan.
+        X = df[feature_cols].astype(float).values
         y = self._build_rank_target(df).values
         group = self._build_group_array(df["ts"])
 

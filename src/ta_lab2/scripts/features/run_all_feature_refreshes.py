@@ -436,6 +436,27 @@ def run_all_refreshes(
     )
     logger.info(f"Mode: {'full' if full_refresh else 'incremental'}")
 
+    # Per-asset skip check (incremental mode only)
+    bar_watermarks = {}
+    if not full_refresh:
+        changed_ids, unchanged_ids, bar_watermarks = compute_changed_ids(
+            engine, ids, tf, alignment_source
+        )
+        if unchanged_ids:
+            logger.info(
+                "Skipping %d unchanged assets (no new bars since last refresh, tf=%s)",
+                len(unchanged_ids),
+                tf,
+            )
+        if not changed_ids:
+            logger.info(
+                "All %d assets up-to-date for tf=%s, nothing to refresh", len(ids), tf
+            )
+            return {}
+        process_ids = changed_ids
+    else:
+        process_ids = ids
+
     # Phase 1: Vol, TA, Cycle Stats, Rolling Extremes (can run in parallel)
     phase1_tasks = [
         ("vol", refresh_vol),
@@ -453,7 +474,7 @@ def run_all_refreshes(
                 future = executor.submit(
                     refresh_fn,
                     engine,
-                    ids,
+                    process_ids,
                     start,
                     end,
                     tf,
@@ -479,7 +500,7 @@ def run_all_refreshes(
 
         for name, refresh_fn in phase1_tasks:
             result = refresh_fn(
-                engine, ids, start, end, tf, alignment_source, venue_id=venue_id
+                engine, process_ids, start, end, tf, alignment_source, venue_id=venue_id
             )
             results[result.table] = result
 
@@ -494,7 +515,7 @@ def run_all_refreshes(
     logger.info("Phase 2: Running features (unified view)")
 
     result = refresh_features_store(
-        engine, ids, start, end, tf, alignment_source, venue_id=venue_id
+        engine, process_ids, start, end, tf, alignment_source, venue_id=venue_id
     )
     results[result.table] = result
 
@@ -511,7 +532,7 @@ def run_all_refreshes(
     logger.info("Phase 2b: Running microstructure feature UPDATE on features")
 
     micro_result = refresh_microstructure(
-        engine, ids, start, end, tf, alignment_source, venue_id=venue_id
+        engine, process_ids, start, end, tf, alignment_source, venue_id=venue_id
     )
     results[micro_result.table] = micro_result
 
@@ -524,12 +545,13 @@ def run_all_refreshes(
         logger.error(f"  {micro_result.table} (tf={tf}): FAILED - {micro_result.error}")
 
     # Phase 2c: Cross-timeframe features (reads from ta, vol, returns_u, features)
-    # Non-fatal: log warning and continue if CTF fails
+    # Non-fatal: log warning and continue if CTF fails.
+    # CTF has its own _should_skip_asset logic internally; no double-skip issue.
     if _CTF_AVAILABLE:
         logger.info("Phase 2c: Running CTF features (cross-timeframe)")
         ctf_result = _refresh_ctf_step(
             engine,
-            ids=ids,
+            ids=process_ids,
             tf=tf,
             venue_id=venue_id or 1,
         )
@@ -550,6 +572,8 @@ def run_all_refreshes(
     # Phase 3: Cross-sectional normalization (depends on features)
     # MUST run sequentially after features — window functions read the
     # freshly-written ret_arith / rsi_14 / vol_parkinson_20 values.
+    # NOTE: CS norms use PARTITION BY (ts, tf) over ALL assets — cannot be
+    # scoped to changed_ids.  Always pass tf only (no ids argument).
     if skip_cs_norms:
         logger.info("Phase 3: Skipping CS norms (--no-cs-norms)")
         cs_result = RefreshResult(
@@ -573,6 +597,8 @@ def run_all_refreshes(
         logger.error(f"  {cs_result.table} (tf={tf}): FAILED - {cs_result.error}")
 
     # Phase 3b: Codependence (optional, pairwise metrics — ~3 min for all assets)
+    # NOTE: Codependence computes pairwise metrics across ALL assets.  Must use
+    # the full `ids` set (not process_ids) for meaningful cross-section coverage.
     if codependence:
         logger.info("Phase 3b: Running codependence refresh (pairwise metrics)")
 
@@ -613,6 +639,8 @@ def run_all_refreshes(
             logger.error(f"  {co_result.table} (tf={tf}): FAILED - {co_result.error}")
 
     # Phase 4: Validation (if requested)
+    # NOTE: Validation samples from ALL ids (not process_ids) to spot-check the
+    # full population including unchanged assets for staleness or corruption.
     if validate:
         logger.info("Phase 4: Running validation")
 
@@ -632,6 +660,32 @@ def run_all_refreshes(
 
         except Exception as e:
             logger.error(f"  Validation failed with error: {e}", exc_info=True)
+
+    # Update feature_refresh_state only if all sub-phases succeeded
+    if not full_refresh and bar_watermarks:
+        all_succeeded = all(getattr(r, "success", True) for r in results.values())
+        if all_succeeded:
+            total_rows = sum(getattr(r, "rows_inserted", 0) for r in results.values())
+            _update_feature_refresh_state(
+                engine,
+                process_ids,
+                tf,
+                alignment_source,
+                bar_watermarks,
+                total_rows,
+            )
+            logger.info(
+                "Updated feature_refresh_state for %d assets (tf=%s)",
+                len(process_ids),
+                tf,
+            )
+        else:
+            failed = [
+                r.table
+                for r in results.values()
+                if hasattr(r, "success") and not r.success
+            ]
+            logger.warning("Skipping state update -- sub-phases failed: %s", failed)
 
     return results
 
@@ -929,8 +983,9 @@ def parse_args() -> argparse.Namespace:
     # Refresh mode
     parser.add_argument(
         "--full-refresh",
+        "--full-rebuild",
         action="store_true",
-        help="Full refresh (recompute all rows)",
+        help="Full refresh (recompute all rows, bypass per-asset skip)",
     )
 
     # Validation
