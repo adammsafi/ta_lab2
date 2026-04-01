@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 ## Current Position
 
 Phase: 108 of 111 COMPLETE (Pipeline Batch Performance) — 5 plans, all complete
-Also: Phase 103 IN PROGRESS (Traditional TA Expansion) — Plan 01 complete
-Status: Phase 108 complete — EMA/AMA/bar returns batch SQL, EMA fast-path, integration validated
-Last activity: 2026-04-01 — Phase 108 approved, full pipeline validated end-to-end
+Also: Phase 103 IN PROGRESS (Traditional TA Expansion) — Plan 02 complete (2/? plans)
+Status: Plan 103-02 complete — Alembic migration seeds 20 dim_indicators rows, TAFeature extended with 20 indicator dispatchers
+Last activity: 2026-04-01 — Completed 103-02-PLAN.md
 
-Progress: [##########] 100% v1.2.0 | [█████████░] 67% v1.3.0 (18/26 plans, 5/6 phases)
+Progress: [##########] 100% v1.2.0 | [█████████░] 68% v1.3.0 (19/26 plans, 5/6 phases)
 
 ## Performance Metrics
 
@@ -213,10 +213,16 @@ Phase 102-03 decisions:
 - Early-return tier pattern refactored to tier-variable pattern to enable post-classification gate application cleanly
 - perm_p_value < 0.05 passes the gate with no constraint — consistent with standard 5% significance threshold
 
+Phase 103-02 decisions:
+- chaikin_osc output column fixed to 'chaikin_osc' (not chaikin_osc_3_10): matches schema DDL and migration column name
+- coppock output column fixed to 'coppock' (not coppock_10): matches schema DDL and migration column name
+- ichimoku get_feature_columns uses hardcoded string list: output col names are param-independent (always ichimoku_tenkan/kijun/span_a/span_b/chikou)
+- mass_index column name uses mass_idx_{sum_period} matching indicators_extended default out_col pattern
+
 ## Session Continuity
 
 Last session: 2026-04-01
-Stopped at: Completed 102-03-PLAN.md
+Stopped at: Completed 103-02-PLAN.md
 Resume file: None
 
 ---
