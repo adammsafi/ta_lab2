@@ -629,12 +629,13 @@ def main() -> None:
     parser.add_argument(
         "--exchange",
         default="all",
-        choices=["kraken", "hyperliquid", "all"],
+        choices=["kraken", "hyperliquid", "lean", "all"],
         help=(
             "Cost matrix exchange (default: all). "
             "'kraken' uses 12 Kraken scenarios. "
             "'hyperliquid' uses 6 HL scenarios. "
-            "'all' runs both (18 total)."
+            "'lean' uses 3 representative costs (fast screening). "
+            "'all' runs both kraken+hyperliquid (18 total)."
         ),
     )
 
