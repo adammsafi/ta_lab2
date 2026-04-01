@@ -251,6 +251,13 @@ Phase 103-03 decisions:
 - FDR uses MIN(ic_p_value) per indicator: most lenient cross-asset aggregation gives highest statistical power for indicator discovery
 - trial_registry.indicator_name stores feature column names (e.g. 'willr_14'): validate_coverage() checks by _PHASE103_FEATURE_COLS list not indicator names
 
+Phase 100-02 decisions:
+- ranker.py train_full() lacked astype(float) on X: object-dtype columns with Python None caused np.nanmedian TypeError; fix: .astype(float).values
+- LIKE clause in SQLAlchemy text() requires %% for literal %: single % treated as psycopg2 format placeholder causing ProgrammingError
+- dim_feature_selection uses 'rationale' column not 'notes': discovered via information_schema query at execution time
+- top_interaction_pairs uses upper triangle only to avoid double-counting symmetric interaction matrix
+- YAML write on Windows requires newline='\n': default CRLF mode causes mixed line ending failures in pre-commit
+
 Phase 104-01 decisions:
 - dim_listings JOIN (not cmc_da_ids): resolves HL asset_id -> CMC id using ticker_on_venue=symbol AND venue='HYPERLIQUID'; mirrors seed_hl_assets.py approach
 - km assets excluded via asset_id < 20000 filter: km perps (indices, commodities, FX, equities) have no CMC id; consistent with seed_hl_assets.py reclassification
@@ -269,9 +276,9 @@ Phase 104-02 decisions:
 ## Session Continuity
 
 Last session: 2026-04-01
-Stopped at: Completed 104-03-PLAN.md
+Stopped at: Completed 100-02-PLAN.md
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-04-01 (Phase 104-03 complete: IC sweep script for 8 derivatives indicators, FDR at 5%, dim_feature_registry promotion/rejection)*
+*Last updated: 2026-04-01 (Phase 100-02 complete: SHAP TreeExplainer on LGBMRanker; bb_ma_20 x close_fracdiff top interaction pair; interactions key written to feature_selection.yaml)*
