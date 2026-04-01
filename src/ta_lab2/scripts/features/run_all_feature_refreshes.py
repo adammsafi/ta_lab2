@@ -31,7 +31,7 @@ import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Optional
 
 from sqlalchemy import text
 
@@ -669,6 +669,132 @@ def _should_skip_tf(engine, tf: str, alignment_source: str) -> bool:
     if feature_ts is None:
         return False  # Never computed, must run
     return feature_ts >= source_ts  # Skip if features are newer than source
+
+
+# =============================================================================
+# State management (per-asset skip)
+# =============================================================================
+
+
+def _load_bar_watermarks(
+    engine, ids: list[int], tf: str, alignment_source: str
+) -> dict[int, Any]:
+    """Fetch MAX(ingested_at) per id from price_bars_multi_tf_u.
+
+    Returns dict: id -> max_ingested_at (or absent if no bars for that id).
+    """
+    sql = text("""
+        SELECT id, MAX(ingested_at) AS max_ingested_at
+        FROM public.price_bars_multi_tf_u
+        WHERE id = ANY(:ids)
+          AND tf = :tf
+          AND alignment_source = :as_
+        GROUP BY id
+    """)
+    with engine.connect() as conn:
+        rows = conn.execute(
+            sql, {"ids": ids, "tf": tf, "as_": alignment_source}
+        ).fetchall()
+    return {row[0]: row[1] for row in rows}
+
+
+def _load_feature_state(
+    engine, ids: list[int], tf: str, alignment_source: str
+) -> dict[int, Any]:
+    """Fetch last_bar_ts per id from feature_refresh_state.
+
+    Returns dict: id -> last_bar_ts (or absent if no state row).
+    Returns empty dict if feature_refresh_state does not yet exist.
+    """
+    sql = text("""
+        SELECT id, last_bar_ts
+        FROM public.feature_refresh_state
+        WHERE id = ANY(:ids)
+          AND tf = :tf
+          AND alignment_source = :as_
+    """)
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(
+                sql, {"ids": ids, "tf": tf, "as_": alignment_source}
+            ).fetchall()
+        return {row[0]: row[1] for row in rows}
+    except Exception:
+        return {}  # table not yet created -- treat all ids as changed
+
+
+def compute_changed_ids(
+    engine, ids: list[int], tf: str, alignment_source: str
+) -> tuple[list[int], list[int], dict[int, Any]]:
+    """Split ids into (changed_ids, unchanged_ids, bar_watermarks).
+
+    changed_ids:   source bars have new ingested_at since last feature refresh
+    unchanged_ids: no new bars, safe to skip entirely
+    bar_watermarks: dict[id -> max_ingested_at] from price_bars_multi_tf_u;
+                    passed through so callers can feed it to
+                    _update_feature_refresh_state without a redundant query.
+    """
+    bar_wm = _load_bar_watermarks(engine, ids, tf, alignment_source)
+    state_wm = _load_feature_state(engine, ids, tf, alignment_source)
+
+    changed: list[int] = []
+    unchanged: list[int] = []
+    for id_ in ids:
+        source_ts = bar_wm.get(id_)
+        feature_ts = state_wm.get(id_)
+        if source_ts is None:
+            unchanged.append(id_)  # no bar data at all -- nothing to compute
+        elif feature_ts is None:
+            changed.append(id_)  # never computed before -- must run
+        elif source_ts > feature_ts:
+            changed.append(id_)  # new bars arrived since last refresh
+        else:
+            unchanged.append(id_)  # feature_ts >= source_ts -- up to date
+
+    return changed, unchanged, bar_wm
+
+
+def _update_feature_refresh_state(
+    engine,
+    changed_ids: list[int],
+    tf: str,
+    alignment_source: str,
+    bar_watermarks: dict[int, Any],
+    total_rows_written: int,
+) -> None:
+    """Upsert feature_refresh_state for successfully refreshed assets.
+
+    total_rows_written is the sum across all sub-phases for the entire
+    changed_ids batch (not per-asset).  Stored as an approximate monitor
+    metric; exact per-asset counts are not tracked at this level.
+    """
+    sql = text("""
+        INSERT INTO public.feature_refresh_state
+            (id, tf, alignment_source, last_bar_ts, last_refresh_ts,
+             rows_written, updated_at)
+        VALUES
+            (:id, :tf, :as_, :last_bar_ts,
+             NOW() AT TIME ZONE 'UTC', :rows_written,
+             NOW() AT TIME ZONE 'UTC')
+        ON CONFLICT (id, tf, alignment_source) DO UPDATE SET
+            last_bar_ts     = EXCLUDED.last_bar_ts,
+            last_refresh_ts = EXCLUDED.last_refresh_ts,
+            rows_written    = EXCLUDED.rows_written,
+            updated_at      = EXCLUDED.updated_at
+    """)
+    for id_ in changed_ids:
+        last_bar_ts = bar_watermarks.get(id_)
+        with engine.begin() as conn:
+            conn.execute(
+                sql,
+                {
+                    "id": id_,
+                    "tf": tf,
+                    "as_": alignment_source,
+                    "last_bar_ts": last_bar_ts,
+                    "rows_written": total_rows_written,
+                },
+            )
 
 
 def _run_single_tf(args_tuple):
