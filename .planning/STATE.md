@@ -5,19 +5,20 @@
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 109 COMPLETE (feature skip-unchanged optimization)
+**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 105 IN PROGRESS (Parameter Optimization — Plan 01 complete)
 
 ## Current Position
 
-Phase: 109 of 111 COMPLETE (Feature Skip-Unchanged) — 2/2 plans complete
+Phase: 105 IN PROGRESS (Parameter Optimization) — 1/N plans complete
+Also: Phase 109 COMPLETE (Feature Skip-Unchanged) — 2/2 plans complete
 Also: Phase 104 COMPLETE (Crypto-Native Indicators) — 3/3 plans complete
 Also: Phase 100 IN PROGRESS (ML Signal Combination) — Plans 01+02 complete (2/3 plans)
 Also: Phase 108 COMPLETE (Pipeline Batch Performance) — 5 plans, all complete
 Also: Phase 103 COMPLETE (Traditional TA Expansion) — 3/3 plans complete
-Status: Plan 109-02 complete — per-asset skip logic wired into run_all_refreshes, --full-rebuild alias added; daily incremental refresh now ~10 min (was ~100 min)
-Last activity: 2026-04-01 — Completed 109-02-PLAN.md
+Status: Plan 105-01 complete — sweep columns migration + param_optimizer.py with IC-based Optuna sweep (GridSampler/TPESampler)
+Last activity: 2026-04-01 — Completed 105-01-PLAN.md
 
-Progress: [##########] 100% v1.2.0 | [█████████░] 88% v1.3.0 (24/26 plans, 8/6 phases)
+Progress: [##########] 100% v1.2.0 | [█████████░] 89% v1.3.0 (25/27 plans, 8/6 phases)
 
 ## Performance Metrics
 
@@ -280,12 +281,18 @@ Phase 109-02 decisions:
 - Success guard uses getattr(r, 'success', True): defensive for heterogeneous result types
 - --full-rebuild added as second flag name to --full-refresh argparse argument; argparse stores in args.full_refresh (first name)
 
+Phase 105-01 decisions:
+- Revision ID y8z9a0b1c2d3 (not t4u5v6w7x8y9 from plan): plan spec was stale -- t4u5v6w7x8y9 used by phase107; use actual HEAD per established precedent
+- GridSampler uses list(range(low, high+1)) for int params: np.arange returns numpy scalars that fail GridSampler type checks
+- TrialPruned for feature_fn exceptions (constraint violations); NaN return for insufficient observations (< min_obs=50)
+- Boundary masking: fwd_ret set NaN where feat.index > train_end - tf_days_nominal days to prevent lookahead leakage at train window boundary
+
 ## Session Continuity
 
 Last session: 2026-04-01
-Stopped at: Completed 109-02-PLAN.md
+Stopped at: Completed 105-01-PLAN.md
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-04-01 (Phase 109-02 complete: per-asset skip logic wired into run_all_refreshes; --full-rebuild alias; incremental refresh now ~10 min vs ~100 min)*
+*Last updated: 2026-04-01 (Phase 105-01 complete: sweep columns migration y8z9a0b1c2d3 + param_optimizer.py with IC-based Optuna GridSampler/TPESampler sweep)*
