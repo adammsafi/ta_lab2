@@ -5,11 +5,11 @@
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 111 IN PROGRESS (Feature Polars Migration — Plan 02 complete)
+**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 111 IN PROGRESS (Feature Polars Migration — Plan 03 complete)
 
 ## Current Position
 
-Phase: 111 IN PROGRESS (Feature Polars Migration) — 2/N plans complete
+Phase: 111 IN PROGRESS (Feature Polars Migration) — 3/N plans complete
 Also: Phase 106 IN PROGRESS (Custom Composite Indicators) — 1/3 plans complete
 Also: Phase 110 COMPLETE (Feature Parallel Sub-Phases) — 1/1 plans complete
 Also: Phase 109 COMPLETE (Feature Skip-Unchanged) — 2/2 plans complete
@@ -18,10 +18,10 @@ Also: Phase 104 COMPLETE (Crypto-Native Indicators) — 3/3 plans complete
 Also: Phase 100 IN PROGRESS (ML Signal Combination) — Plans 01+02 complete (2/3 plans)
 Also: Phase 108 COMPLETE (Pipeline Batch Performance) — 5 plans, all complete
 Also: Phase 103 COMPLETE (Traditional TA Expansion) — 3/3 plans complete
-Status: Plan 111-02 complete — polars-native vol functions (Parkinson/GK/RS/ATR/rolling-log-vol), VolatilityFeature polars path, ATR NaN-divergence fix (ignore_nulls=True), all 13 vol columns < 1e-10 vs pandas
-Last activity: 2026-04-01 — Completed 111-02-PLAN.md
+Status: Plan 111-03 complete — 6 polars-native indicator functions (RSI/MACD/Stoch/BB/ATR/ADX), TAFeature polars path, pre-existing RSI/ATR/ADX period alias bug fixed, all 16 TA columns < 1e-10 vs corrected pandas
+Last activity: 2026-04-01 — Completed 111-03-PLAN.md
 
-Progress: [##########] 100% v1.2.0 | [█████████░] 90% v1.3.0 (30/31 plans, 8/6 phases)
+Progress: [##########] 100% v1.2.0 | [█████████░] 90% v1.3.0 (31/32 plans, 8/6 phases)
 
 ## Performance Metrics
 
@@ -326,6 +326,12 @@ Phase 111-02 decisions:
 - polars log: (pl.col(a)/pl.col(b)).log(base=np.e) for natural log -- polars has no shorthand .ln() method
 - HAVE_POLARS guard in vol.py separate from polars_feature_ops.HAVE_POLARS -- each standalone module owns its own import guard
 
+Phase 111-03 decisions:
+- atr_polars uses rolling_mean not ewm_mean: indicators.py atr() uses rolling().mean(); different from vol.py add_atr (Wilder EWM). Both patterns now available.
+- Phase 103 extended indicators stay pandas in polars path: convert-apply-convert avoids rewriting 20+ complex indicators; only 6 core indicators migrated
+- Rule 1 bug fix: _compute_rsi/atr/adx used period= keyword; rsi/atr/adx only apply alias when window=None, so window=14 default was always used. Fixed to window=period.
+- Intermediate column dunder naming (__col__): prevents collision with user columns; all cleaned up before return
+
 Phase 106-01 decisions:
 - Revision ID z9a0b1c2d3e4 chains from y8z9a0b1c2d3 (Phase 105 actual head); plan spec listed u5v6w7x8y9z0 -- use actual alembic heads per established precedent
 - DO $$ BLOCK for CHECK constraint idempotency: avoids hardcoding auto-generated constraint name
@@ -337,9 +343,9 @@ Phase 106-01 decisions:
 ## Session Continuity
 
 Last session: 2026-04-01
-Stopped at: Completed 111-02-PLAN.md
+Stopped at: Completed 111-03-PLAN.md
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-04-01 (Phase 106-01 complete: Alembic migration z9a0b1c2d3e4 + composite_indicators.py with 6 formulas + ALL_COMPOSITES registry)*
+*Last updated: 2026-04-01 (Phase 111-03 complete: 6 polars indicator functions, TAFeature polars path, RSI/ATR/ADX period alias bug fixed)*
