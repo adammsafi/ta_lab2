@@ -1416,10 +1416,17 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 - [ ] **Phase 109: Feature Skip-Unchanged** - Watermark state table for features, skip assets with no new bar data. Target: 100min→10min for daily incremental
 - [ ] **Phase 110: Feature Parallel Sub-Phases** - Group independent feature sub-phases into parallel waves. Target: 100min→60min for full recompute
 - [ ] **Phase 111: Feature Polars Migration** - Migrate feature sub-phases from pandas to polars with per-sub-phase regression testing (IC<1%, signals=0 flips, Sharpe<5%). Target: 60min→25min
-**Plans:** 5 plans
-- [ ] **Phase 109: Pipeline Architecture Separation** - Split monolithic run_daily_refresh into 4 distinct pipelines (Data, Research, Validation, Execution) with clear boundaries, triggers, and deployment topology (local vs VM)
-- [ ] **Phase 110: VM Execution Deployment** - PostgreSQL on Oracle VM with execution tables, sync_features_to_vm + sync_results_to_local scripts, real-time WebSocket price feeds (HL/Kraken), executor as systemd service
-- [ ] **Phase 111: Hosted Dashboard** - nginx reverse proxy + Let's Encrypt SSL on Oracle VM, Streamlit deployment, sync_dashboard_to_vm script, basic auth, mobile-accessible
+**Plans:** 5 plans in 3 waves
+
+Plans:
+- [ ] 111-01-PLAN.md -- Infrastructure (use_polars flag, polars_feature_ops.py, regression harness) + cycle_stats + rolling_extremes migration
+- [ ] 111-02-PLAN.md -- Vol sub-phase polars migration (Parkinson, GK, RS, ATR, rolling log-vol)
+- [ ] 111-03-PLAN.md -- TA sub-phase polars migration (RSI, MACD, Stochastic, Bollinger, ATR, ADX)
+- [ ] 111-04-PLAN.md -- Microstructure polars outer loop + orchestrator --use-polars flag
+- [ ] 111-05-PLAN.md -- CTF polars migration (join_asof) + full regression suite (IC, signals, backtest)
+- [ ] **Phase 112: Pipeline Architecture Separation** - Split monolithic run_daily_refresh into 4 distinct pipelines (Data, Research, Validation, Execution) with clear boundaries, triggers, and deployment topology (local vs VM)
+- [ ] **Phase 113: VM Execution Deployment** - PostgreSQL on Oracle VM with execution tables, sync_features_to_vm + sync_results_to_local scripts, real-time WebSocket price feeds (HL/Kraken), executor as systemd service
+- [ ] **Phase 114: Hosted Dashboard** - nginx reverse proxy + Let's Encrypt SSL on Oracle VM, Streamlit deployment, sync_dashboard_to_vm script, basic auth, mobile-accessible
 
 ---
 
@@ -1665,7 +1672,7 @@ Plans:
 
 ---
 
-### Phase 109: Pipeline Architecture Separation
+### Phase 112: Pipeline Architecture Separation
 **Goal:** Split the monolithic run_daily_refresh.py into 4 distinct pipelines with clear boundaries, triggers, and deployment topology. Define what runs locally vs on the Oracle VM, and how pipelines hand off to each other.
 **Depends on:** Phase 107 (ops dashboard provides monitoring UI), Phase 108 (batch performance — pipelines should be fast before separating)
 **Requirements:** PIPE-01, PIPE-02, PIPE-03, PIPE-04
@@ -1679,9 +1686,9 @@ Plans:
 
 ---
 
-### Phase 110: VM Execution Deployment
+### Phase 113: VM Execution Deployment
 **Goal:** Deploy the execution pipeline on the Oracle Singapore VM so it can run 24/7 independently of the local PC. Real-time price feeds for order management (fills, stops, take profits), daily feature sync from local, results sync back.
-**Depends on:** Phase 109 (pipeline separation — execution pipeline must exist as standalone), Phase 96 (executor activation — paper executor must work)
+**Depends on:** Phase 112 (pipeline separation — execution pipeline must exist as standalone), Phase 96 (executor activation — paper executor must work)
 **Requirements:** DEPLOY-01, DEPLOY-02, DEPLOY-03, DEPLOY-04
 **Success Criteria** (what must be TRUE):
   1. Small PostgreSQL on Oracle VM holds execution-relevant tables: features_latest, strategy_configs, risk_limits, positions, orders, fills, order_events (~1-2 GB)
@@ -1693,9 +1700,9 @@ Plans:
 
 ---
 
-### Phase 111: Hosted Dashboard
+### Phase 114: Hosted Dashboard
 **Goal:** Host the Streamlit dashboard on the Oracle VM behind nginx + SSL so it's accessible from any device (mobile, VM, local PC) without requiring the local PC to be on.
-**Depends on:** Phase 110 (VM has execution data), Phase 107 (ops dashboard exists)
+**Depends on:** Phase 113 (VM has execution data), Phase 107 (ops dashboard exists)
 **Requirements:** DASH-06, DASH-07, DASH-08
 **Success Criteria** (what must be TRUE):
   1. nginx reverse proxy with Let's Encrypt SSL certificate serves Streamlit on HTTPS
