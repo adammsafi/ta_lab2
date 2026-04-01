@@ -54,7 +54,17 @@ try:
 except ImportError:  # pragma: no cover
     yaml = None  # type: ignore[assignment]
 
+from ta_lab2.features.polars_feature_ops import (
+    HAVE_POLARS,
+    normalize_timestamps_for_polars,
+    restore_timestamps_from_polars,
+)
 from ta_lab2.regimes.comovement import build_alignment_frame
+
+try:
+    import polars as pl  # type: ignore[import]
+except ImportError:  # pragma: no cover
+    pl = None  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
 
@@ -211,6 +221,91 @@ def _compute_crossover(
     crossed_up = (~prev_above) & curr_above
     crossed_dn = prev_above & (~curr_above)
     return crossed_up.astype(float) - crossed_dn.astype(float)
+
+
+# ---------------------------------------------------------------------------
+# Polars join_asof helper (timezone-safe)
+# ---------------------------------------------------------------------------
+
+
+def _align_timeframes_polars(
+    base_df: pd.DataFrame,
+    ref_df: pd.DataFrame,
+    source_col: str,
+) -> pd.DataFrame:
+    """Align base and reference timeframe DataFrames using polars join_asof.
+
+    Mirrors the pandas merge_asof path but uses polars for the join.
+    Handles timezone stripping/restoring around the polars boundary.
+
+    Critical requirements for polars join_asof:
+    - Both DataFrames must be sorted by the ``on`` column ascending.
+    - Both datetime columns must have the same dtype -- tz-aware pandas UTC
+      becomes polars Datetime('us', 'UTC') which differs from Datetime('us');
+      we strip UTC before conversion and restore after.
+    - ``by=`` must match dtype exactly in both frames.
+
+    Parameters
+    ----------
+    base_df:
+        DataFrame with columns [id, ts, <source_col>] for the base timeframe.
+    ref_df:
+        DataFrame with columns [id, ts, <source_col>] for the reference timeframe.
+    source_col:
+        Name of the indicator column present in both DataFrames.
+
+    Returns
+    -------
+    pd.DataFrame with columns: [id, ts, base_value, ref_value]
+    Empty DataFrame if no aligned rows exist.
+    """
+    if not HAVE_POLARS or pl is None:
+        raise RuntimeError(
+            "_align_timeframes_polars called but polars is not available"
+        )
+
+    # Strip UTC from ts before polars conversion (critical: tz-aware != tz-naive in polars)
+    base_clean = normalize_timestamps_for_polars(base_df, "ts")
+    ref_clean = normalize_timestamps_for_polars(ref_df, "ts")
+
+    # Ensure sorted by ts ascending per asset (polars join_asof requires sorted join key)
+    base_clean = base_clean.sort_values(["id", "ts"]).reset_index(drop=True)
+    ref_clean = ref_clean.sort_values(["id", "ts"]).reset_index(drop=True)
+
+    # Convert to polars
+    pl_base = pl.from_pandas(base_clean[["id", "ts", source_col]])
+    pl_ref = pl.from_pandas(ref_clean[["id", "ts", source_col]])
+
+    # Rename ref source_col to avoid collision after join
+    ref_col = f"{source_col}_ref"
+    pl_ref = pl_ref.rename({source_col: ref_col})
+
+    # polars join_asof: backward strategy = most recent ref row at or before each base ts
+    # by="id" groups the join per asset (equivalent to per-asset merge_asof loop)
+    pl_joined = pl_base.sort("ts").join_asof(
+        pl_ref.sort("ts"),
+        on="ts",
+        by="id",
+        strategy="backward",
+    )
+
+    # Convert back to pandas and restore UTC on ts
+    result = pl_joined.to_pandas()
+    result = restore_timestamps_from_polars(result, "ts")
+
+    # Rename to canonical output columns
+    result = result.rename(
+        columns={
+            source_col: "base_value",
+            ref_col: "ref_value",
+        }
+    )
+
+    # Keep only canonical columns (drop extra polars artifacts if any)
+    out_cols = [
+        c for c in ["id", "ts", "base_value", "ref_value"] if c in result.columns
+    ]
+    return result[out_cols].reset_index(drop=True)
 
 
 # ---------------------------------------------------------------------------
@@ -401,11 +496,16 @@ class CTFConfig:
         The venue_id to filter on for tables that have it in the WHERE clause (default: 1 = CMC_AGG).
     yaml_path:
         Optional explicit path to CTF config YAML. None = default configs/ctf_config.yaml.
+    use_polars:
+        If True, use polars join_asof for timeframe alignment (faster for large DataFrames).
+        Falls back to pandas merge_asof if polars is not installed.
+        Default: False (zero behavior change for existing callers).
     """
 
     alignment_source: str = "multi_tf"
     venue_id: int = 1
     yaml_path: Optional[str] = None
+    use_polars: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -644,8 +744,12 @@ class CTFFeature:
     ) -> pd.DataFrame:
         """Align base and reference timeframe DataFrames using backward merge_asof.
 
-        For each unique asset_id in base_df, aligns the base timeframe rows with
-        the most recent reference timeframe row via build_alignment_frame().
+        When self.config.use_polars is True and polars is available, delegates to
+        _align_timeframes_polars() which uses polars join_asof with ``by="id"``
+        for a vectorized cross-asset join (no per-asset Python loop).
+
+        When use_polars is False or polars is unavailable, falls back to the
+        original per-asset pandas merge_asof loop via build_alignment_frame().
 
         Parameters
         ----------
@@ -662,6 +766,20 @@ class CTFFeature:
         where base_value = source_col value from base_df
         and   ref_value  = most recent source_col value from ref_df at or before ts.
         """
+        # Polars path: vectorized join_asof with timezone handling
+        if self.config.use_polars and HAVE_POLARS:
+            try:
+                result = _align_timeframes_polars(base_df, ref_df, source_col)
+                logger.debug("_align_timeframes (polars): aligned_rows=%d", len(result))
+                return result
+            except Exception as e:
+                logger.warning(
+                    "_align_timeframes polars path failed (%s), falling back to pandas",
+                    e,
+                )
+                # Fall through to pandas path below
+
+        # Pandas path: per-asset merge_asof loop (original implementation)
         aligned_frames: list[pd.DataFrame] = []
 
         for asset_id in base_df["id"].unique():

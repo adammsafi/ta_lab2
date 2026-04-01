@@ -605,6 +605,7 @@ def run_all_refreshes(
             ids=process_ids,
             tf=tf,
             venue_id=venue_id or 1,
+            use_polars=use_polars,
         )
         results[ctf_result.table] = ctf_result
 
@@ -1112,7 +1113,7 @@ def parse_args() -> argparse.Namespace:
         help=(
             "Use polars acceleration for feature computation "
             "(faster sort + rolling ops). Propagated to vol, ta, microstructure, "
-            "cycle_stats, and rolling_extremes sub-phases. CS norms and unified "
+            "cycle_stats, rolling_extremes, and ctf sub-phases. CS norms and unified "
             "assembly (daily_features_view) are pure SQL and are unaffected."
         ),
     )
