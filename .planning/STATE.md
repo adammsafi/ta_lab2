@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 
 ## Current Position
 
-Phase: 102 of 111 (Indicator Research Framework) — In progress (1/3 plans via 102-02)
-Next: 102-03 (once both 102-01 and 102-02 complete)
-Status: Phase 99 (Backtest Scaling) COMPLETE — 177,847 1D results, 214K MC bands, all 8 strategies ranked
-Last activity: 2026-04-01 — Completed Phase 99 (all 5 plans)
+Phase: 102 of 111 (Indicator Research Framework) — In progress (1/N plans complete)
+Next: 102-02 (permutation sweep pipeline)
+Status: 102-01 COMPLETE — trial_registry created (757K rows), permutation_ic_test/fdr_control/log_trials_to_registry implemented
+Last activity: 2026-04-01 — Completed 102-01-PLAN.md
 
 Progress: [##########] 100% v1.2.0 | [█████████░] 64% v1.3.0 (17/26 plans, 5/6 phases)
 
@@ -199,10 +199,17 @@ Phase 102-02 decisions:
 - haircut_ic_ir conn=None guard: when conn is None, get_trial_count() returns 0 and n_trials=0 edge case returns no-penalty result; enables pure-computation use in notebooks
 - Bonferroni HL method applies identically to IC-IR as to Sharpe (both are t-stat / sqrt(n) structures)
 
+Phase 102-01 decisions:
+- tf column in trial_registry uses VARCHAR(32) not VARCHAR(16): actual tf values reach 18 chars ('10W_CAL_ANCHOR_ISO') -- fixed Rule 1 bug during execution
+- Backfill filters to horizon=1 AND return_type='arith' only: permutation scope reduction; 757K rows from 10.6M ic_results source
+- ON CONFLICT preserves perm_p_value, fdr_p_adjusted, passes_fdr, bb_ci columns, haircut_ic_ir: expensive computations must survive IC re-sweeps
+- Migration chains from t4u5v6w7x8y9 (actual head) not s3t4u5v6w7x8 as specified: Phase 107 added t4u5v6w7x8y9 after Phase 99
+- multiple_testing.py functions appended not rewriting: file already contained haircut_sharpe, block_bootstrap_ic, get_trial_count from 102-02
+
 ## Session Continuity
 
 Last session: 2026-04-01
-Stopped at: Phase 99 complete, Phase 102 in progress (102-02 done)
+Stopped at: Completed 102-01-PLAN.md
 Resume file: None
 
 ---
