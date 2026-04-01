@@ -103,6 +103,12 @@ macro_analytics = [
   "hmmlearn>=0.3.3",
 ]
 
+# ML ranking and explainability (Phase 100)
+ml_ranking = [
+  "xgboost>=3.2.0",
+  "shap>=0.51.0",
+]
+
 # Portfolio construction and optimization
 portfolio = [
   "PyPortfolioOpt>=1.5.6",
