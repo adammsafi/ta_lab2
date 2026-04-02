@@ -23,7 +23,7 @@ import json
 import logging
 import uuid
 from decimal import Decimal
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
@@ -46,6 +46,9 @@ from ta_lab2.risk.macro_gate_evaluator import MacroGateEvaluator
 from ta_lab2.risk.risk_engine import RiskEngine
 from ta_lab2.trading.order_manager import FillData, OrderManager
 
+if TYPE_CHECKING:
+    from ta_lab2.executor.price_cache import PriceCache
+
 logger = logging.getLogger(__name__)
 
 # Minimum order delta threshold -- deltas smaller than this are skipped.
@@ -66,15 +69,35 @@ class PaperExecutor:
     ----------
     engine : sqlalchemy.engine.Engine
         Database engine. Used for all DB reads and writes.
+    vm_mode : bool
+        When True, enables VM-specific behaviour: passes vm_mode=True to
+        PositionSizer so that the 5-tier VM-aware price fallback chain
+        (PriceCache -> exchange_price_feed -> hl_assets -> hl_candles) is used
+        instead of the 2-tier local chain.  Default False (no behaviour change
+        for existing callers).
+    price_cache : PriceCache | None
+        Shared WebSocket price cache.  When provided together with vm_mode=True,
+        live tick prices are used as Tier 1 in the price fallback chain.
+        Default None (ignored unless vm_mode=True).
 
     Usage
     -----
-    executor = PaperExecutor(engine)
+    executor = PaperExecutor(engine)                       # local mode (unchanged)
+    executor = PaperExecutor(engine, vm_mode=True,         # VM mode
+                             price_cache=price_cache)
     summary = executor.run(dry_run=False)
     """
 
-    def __init__(self, engine: Engine) -> None:
+    def __init__(
+        self,
+        engine: Engine,
+        vm_mode: bool = False,
+        price_cache: "PriceCache | None" = None,
+    ) -> None:
         self.engine = engine
+        self.vm_mode = vm_mode
+        self.price_cache = price_cache
+        self._sizer = PositionSizer(price_cache=price_cache, vm_mode=vm_mode)
         self.signal_reader = SignalReader(engine)
         self._macro_gate_evaluator = MacroGateEvaluator(engine)
         self.risk_engine = RiskEngine(
@@ -535,8 +558,13 @@ class PaperExecutor:
         order_generated, fill_processed.
         """
         # --- price and portfolio value ---
+        # In vm_mode use the instance-level 5-tier chain (PriceCache -> HL tables).
+        # In local mode use the original static 2-tier chain (unchanged behaviour).
         try:
-            current_price = PositionSizer.get_current_price(conn, asset_id)
+            if self.vm_mode:
+                current_price = self._sizer.get_price(conn, asset_id)
+            else:
+                current_price = PositionSizer.get_current_price(conn, asset_id)
         except ValueError:
             self.logger.warning(
                 "_process_asset_signal: no price for asset_id=%d, skipping", asset_id
