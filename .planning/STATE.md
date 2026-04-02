@@ -5,11 +5,12 @@
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v1.4.0 — Phase 113 COMPLETE (VM Execution Deployment, 7/7 plans, human-verify APPROVED). Executor live on Oracle Singapore VM.
+**Current focus:** v1.4.0 — Phase 114 In-Progress (Hosted Dashboard, 1/5 plans complete). VM deployment artifacts ready.
 
 ## Current Position
 
-Phase: 113 COMPLETE (VM Execution Deployment) — 7/7 plans complete, human-verify APPROVED
+Phase: 114 In-Progress (Hosted Dashboard) — plan 02/05 complete
+Also: Phase 113 COMPLETE (VM Execution Deployment) — 7/7 plans complete, human-verify APPROVED
 Also: Phase 112 COMPLETE (Pipeline Architecture Separation) — 5/5 plans, verified (9/9 must-haves)
 Also: Phase 100 COMPLETE (ML Signal Combination) — 3/3 plans complete
 Also: Phase 106 COMPLETE (Custom Composite Indicators) — 3/3 plans complete
@@ -21,10 +22,10 @@ Also: Phase 104 COMPLETE (Crypto-Native Indicators) — 3/3 plans complete
 Also: Phase 108 COMPLETE (Pipeline Batch Performance) — 5 plans complete
 Also: Phase 103 COMPLETE (Traditional TA Expansion) — 3/3 plans complete
 Also: Phase 107 COMPLETE (Pipeline Operations Dashboard) — 2/2 plans complete
-Status: Phase 113 COMPLETE — executor running as active (running) on Oracle Singapore VM (PID 945320), 536 HL symbols priced, StopMonitor active, signal loop polling every 30s
-Last activity: 2026-04-02 — Completed 113-07-PLAN.md (human-verify APPROVED: ta-executor.service live on VM)
+Status: Phase 114 In-Progress — 114-02 COMPLETE (VM bootstrap script, streamlit.service, streamlit_config.toml in deploy/vm/)
+Last activity: 2026-04-01 — Completed 114-02-PLAN.md (VM deployment artifacts: setup_dashboard_env.sh, streamlit.service, streamlit_config.toml)
 
-Progress: [##########] 100% v1.2.0 | [██████████] 100% v1.3.0 (32/32 plans, 9/6 phases) | v1.4.0: Phase 113 COMPLETE (7/7 plans)
+Progress: [##########] 100% v1.2.0 | [██████████] 100% v1.3.0 (32/32 plans, 9/6 phases) | v1.4.0: Phase 113 COMPLETE, Phase 114 In-Progress (1/5 plans)
 
 ## Performance Metrics
 
@@ -429,12 +430,18 @@ Phase 113-06 decisions:
 - Crash-loop detection via /tmp/executor_starts.json: persists across Python restarts, cleared on VM reboot (appropriate for ops scope)
 - Staleness check every 5 min with 2 min HL threshold: matches HL allMids push frequency (sub-second); 2 min gap means genuine connection loss
 
+Phase 114-02 decisions:
+- No [dashboard] extras group in pyproject.toml: install streamlit>=1.32, psycopg2-binary, plotly, altair explicitly in setup script (not via pip install -e .[dashboard])
+- Alembic upgrade head primary, pg_dump --schema-only documented as fallback: avoids risk of overwriting live HL data; fallback comment in script covers legacy-table edge case
+- db_config.env points to hluser/hlpass on VM PostgreSQL (same instance as HL collector): dashboard is read-only; sharing credentials acceptable for now
+- SCRIPT_DIR resolution in setup_dashboard_env.sh: all co-located deploy artifacts resolved relative to script path so deploy/vm/ can be rsynced as a unit
+
 ## Session Continuity
 
-Last session: 2026-04-02
-Stopped at: Completed 113-06-PLAN.md (executor service entry point + PaperExecutor vm_mode + requirements.txt)
+Last session: 2026-04-01
+Stopped at: Completed 114-02-PLAN.md (VM dashboard deployment artifacts: setup_dashboard_env.sh, streamlit.service, streamlit_config.toml)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-04-02 (Phase 113-06 complete: executor_service.py VM entry point + PaperExecutor vm_mode + requirements.txt)*
+*Last updated: 2026-04-01 (Phase 114-02 complete: VM deployment artifacts for hosted Streamlit dashboard)*
