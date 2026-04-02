@@ -5,11 +5,11 @@
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 112 IN PROGRESS (Pipeline Architecture Separation — Plan 01 done)
+**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 112 IN PROGRESS (Pipeline Architecture Separation — Plans 01+02 done)
 
 ## Current Position
 
-Phase: 112 IN PROGRESS (Pipeline Architecture Separation) — 1/5 plans complete
+Phase: 112 IN PROGRESS (Pipeline Architecture Separation) — 2/5 plans complete
 Also: Phase 106 COMPLETE (Custom Composite Indicators) — 3/3 plans complete
 Also: Phase 111 COMPLETE (Feature Polars Migration) — 5/5 plans complete
 Also: Phase 110 COMPLETE (Feature Parallel Sub-Phases) — 1/1 plans complete
@@ -19,8 +19,8 @@ Also: Phase 104 COMPLETE (Crypto-Native Indicators) — 3/3 plans complete
 Also: Phase 100 IN PROGRESS (ML Signal Combination) — Plans 01+02 complete (2/3 plans)
 Also: Phase 108 COMPLETE (Pipeline Batch Performance) — 5 plans, all complete
 Also: Phase 103 COMPLETE (Traditional TA Expansion) — 3/3 plans complete
-Status: Plan 112-01 complete — pipeline_utils.py extracted, Alembic migration b1c2d3e4f5a6 adds pipeline_name to pipeline_run_log/pipeline_stage_log
-Last activity: 2026-04-01 — Completed 112-01-PLAN.md
+Status: Plan 112-02 complete — run_data_pipeline.py (5 stages) and run_features_pipeline.py (12 stages) created as standalone entry points
+Last activity: 2026-04-01 — Completed 112-02-PLAN.md
 
 Progress: [##########] 100% v1.2.0 | [██████████] 100% v1.3.0 (32/32 plans, 9/6 phases)
 
@@ -371,12 +371,18 @@ Phase 112-01 decisions:
 - _start_pipeline_run backward-compat fallback: tries INSERT with pipeline_name first, falls back to legacy INSERT on OperationalError/ProgrammingError for pre-migration deployments
 - _check_dead_man pipeline_name=None default: existing Phase 87 call sites unchanged; new callers pass pipeline_name='daily' for scoped check
 
+Phase 112-02 decisions:
+- VM sync stages non-blocking in run_data_pipeline.py: failures print [WARN] and continue -- matches monolith behavior, local data stays usable if VMs unreachable
+- ids_for_emas carried through to AMAs: ids_for_amas = ids_for_emas if _should_run("emas", from_stage) else parsed_ids -- fresh-bar filter propagates to both EMA+AMA stages
+- _should_run() helper uses _STAGE_ORDER index comparison: clean O(1) check for --from-stage without if/elif chains across 12 stages
+- --chain via subprocess.run(): next pipeline launched as subprocess (not direct call) for log isolation and returncode propagation
+
 ## Session Continuity
 
 Last session: 2026-04-01
-Stopped at: Completed 112-01-PLAN.md (Phase 112 Plan 01 of 5)
+Stopped at: Completed 112-02-PLAN.md (Phase 112 Plan 02 of 5)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-04-01 (Phase 112-01 complete: pipeline_utils.py extracted from run_daily_refresh.py, migration b1c2d3e4f5a6 adds pipeline_name)*
+*Last updated: 2026-04-01 (Phase 112-02 complete: run_data_pipeline.py + run_features_pipeline.py as standalone entry points)*
