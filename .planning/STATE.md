@@ -5,11 +5,12 @@
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v1.4.0 — Phase 112 COMPLETE (Pipeline Architecture Separation), Phase 100 COMPLETE (ML Signal Combination)
+**Current focus:** v1.4.0 — Phase 113 IN PROGRESS (VM Execution Deployment, 1/7 plans)
 
 ## Current Position
 
-Phase: 112 COMPLETE (Pipeline Architecture Separation) — 5/5 plans, verified (9/9 must-haves)
+Phase: 113 IN PROGRESS (VM Execution Deployment) — 1/7 plans complete
+Also: Phase 112 COMPLETE (Pipeline Architecture Separation) — 5/5 plans, verified (9/9 must-haves)
 Also: Phase 100 COMPLETE (ML Signal Combination) — 3/3 plans complete
 Also: Phase 106 COMPLETE (Custom Composite Indicators) — 3/3 plans complete
 Also: Phase 111 COMPLETE (Feature Polars Migration) — 5/5 plans complete
@@ -20,10 +21,10 @@ Also: Phase 104 COMPLETE (Crypto-Native Indicators) — 3/3 plans complete
 Also: Phase 108 COMPLETE (Pipeline Batch Performance) — 5 plans complete
 Also: Phase 103 COMPLETE (Traditional TA Expansion) — 3/3 plans complete
 Also: Phase 107 COMPLETE (Pipeline Operations Dashboard) — 2/2 plans complete
-Status: Phase 112 verified — 5 pipeline scripts, pipeline_utils.py, sync_signals_to_vm, run_full_chain, PIPELINE_CONTRACTS.md
-Last activity: 2026-04-02 — Phase 112 verification passed (9/9)
+Status: Phase 113-01 complete — vm_table_list.txt (25 tables), create_vm_tables.sh (pg_dump + SSH + dimension seeding)
+Last activity: 2026-04-02 — Completed 113-01-PLAN.md (VM table setup script)
 
-Progress: [##########] 100% v1.2.0 | [██████████] 100% v1.3.0 (32/32 plans, 9/6 phases)
+Progress: [##########] 100% v1.2.0 | [██████████] 100% v1.3.0 (32/32 plans, 9/6 phases) | v1.4.0: 1/7 Phase 113 plans
 
 ## Performance Metrics
 
@@ -393,12 +394,18 @@ Phase 112-04 decisions:
 - Signal tables: incremental by ts watermark; config/dim tables: full-replace (TRUNCATE + COPY all) -- small stateless tables
 - Telegram alert on chain halt is best-effort wrapped in try/except -- never crashes chain script
 
+Phase 113-01 decisions:
+- No Alembic on VM: pg_dump --schema-only guarantees DDL matches local including indexes/constraints; no migration history to maintain on VM
+- Python inline in bash for FK stripping: sed/awk cannot reliably handle multi-line ALTER TABLE statements; short Python via heredoc handles correctly
+- exchange_price_feed CHECK constraint patched post-dump: 'hyperliquid' injected into ARRAY[...] or IN (...) pattern at DDL post-process time; applied on every re-run
+- Temp-table + ON CONFLICT DO NOTHING for dimension seeding: direct COPY to tables with unique constraints would fail on re-run; staging pattern makes script idempotent
+
 ## Session Continuity
 
 Last session: 2026-04-02
-Stopped at: Completed 112-04-PLAN.md (Phase 112 Plan 04 of 5)
+Stopped at: Completed 113-01-PLAN.md (VM table setup: vm_table_list.txt + create_vm_tables.sh)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-04-02 (Phase 112-04 complete: sync_signals_to_vm.py, run_full_chain.py, run_daily_refresh.py deprecation)*
+*Last updated: 2026-04-02 (Phase 113-01 complete: vm_table_list.txt, create_vm_tables.sh, DDL extraction + VM seeding script)*
