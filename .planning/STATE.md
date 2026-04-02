@@ -5,11 +5,11 @@
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 106 IN PROGRESS (Custom Composite Indicators — Plan 02 complete)
+**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 106 COMPLETE (Custom Composite Indicators — all 3 plans done)
 
 ## Current Position
 
-Phase: 106 IN PROGRESS (Custom Composite Indicators) — 2/3 plans complete
+Phase: 106 COMPLETE (Custom Composite Indicators) — 3/3 plans complete
 Also: Phase 111 COMPLETE (Feature Polars Migration) — 5/5 plans complete
 Also: Phase 110 COMPLETE (Feature Parallel Sub-Phases) — 1/1 plans complete
 Also: Phase 109 COMPLETE (Feature Skip-Unchanged) — 2/2 plans complete
@@ -18,8 +18,8 @@ Also: Phase 104 COMPLETE (Crypto-Native Indicators) — 3/3 plans complete
 Also: Phase 100 IN PROGRESS (ML Signal Combination) — Plans 01+02 complete (2/3 plans)
 Also: Phase 108 COMPLETE (Pipeline Batch Performance) — 5 plans, all complete
 Also: Phase 103 COMPLETE (Traditional TA Expansion) — 3/3 plans complete
-Status: Plan 106-02 complete — run_composite_refresh.py orchestrator + tf_alignment_score timestamp bug fix; 22280 rows written for tf_alignment_score (7 assets)
-Last activity: 2026-04-01 — Completed 106-02-PLAN.md
+Status: Plan 106-03 complete — 4-layer validation gauntlet (permutation IC + FDR + CPCV + held-out); tf_alignment_score failed held-out sign flip; 0 promotions on local DB; COMPOSITES.md created
+Last activity: 2026-04-02 — Completed 106-03-PLAN.md
 
 Progress: [##########] 100% v1.2.0 | [██████████] 100% v1.3.0 (32/32 plans, 9/6 phases)
 
@@ -359,12 +359,18 @@ Phase 106-02 decisions:
 - tf_alignment_score resample bug fix: resample('1D').last() snapped CTF 23:59:59.999 UTC timestamps to midnight, causing UPDATE to match 0 features rows; fixed by using natural CTF index (no resample) since all pairs share same timestamp convention
 - LOW COVERAGE flag not raised for HL composites (oi_divergence, funding_adjusted_momentum): expected < 100% coverage; composites in _NEEDS_CMC_SYMBOL set are suppressed from LOW COVERAGE warning
 
+Phase 106-03 decisions:
+- 0 composites promoted is the intellectually honest result: tf_alignment_score passed permutation+FDR+CPCV but failed held-out (sign flip: training IC=+0.030 vs held-out IC=-0.008 in 2022-2025 bear/recovery regime)
+- insufficient_data vs failed distinction preserved: 5/6 composites have p=1.0 sentinel for FDR but status='insufficient_data' (missing base tables locally, not formula failures)
+- Synthetic 1D timeline for pooled CPCV: CPCVSplitter needs monotonic DatetimeIndex; pooling training data across 7 assets breaks chronological order; synthetic 1D date range used (CPCV uses positional splits, not calendar purge)
+- Option C threshold is exclusive (>0.03): tf_alignment_score IC=0.0300 fails abs(ic)>0.03 correctly; plan specifies greater-than, not greater-than-or-equal
+
 ## Session Continuity
 
-Last session: 2026-04-01
-Stopped at: Completed 106-02-PLAN.md
+Last session: 2026-04-02
+Stopped at: Completed 106-03-PLAN.md (Phase 106 COMPLETE)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-04-01 (Phase 106-02 complete: run_composite_refresh.py + tf_alignment_score timestamp bug fix; 22280 rows written)*
+*Last updated: 2026-04-02 (Phase 106-03 complete: 4-layer validation gauntlet, COMPOSITES.md, 0 promotions on local DB)*
