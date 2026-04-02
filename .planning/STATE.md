@@ -5,11 +5,11 @@
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v1.4.0 — Phase 113 IN PROGRESS (VM Execution Deployment, 2/7 plans)
+**Current focus:** v1.4.0 — Phase 113 IN PROGRESS (VM Execution Deployment, 4/7 plans)
 
 ## Current Position
 
-Phase: 113 IN PROGRESS (VM Execution Deployment) — 2/7 plans complete
+Phase: 113 IN PROGRESS (VM Execution Deployment) — 4/7 plans complete
 Also: Phase 112 COMPLETE (Pipeline Architecture Separation) — 5/5 plans, verified (9/9 must-haves)
 Also: Phase 100 COMPLETE (ML Signal Combination) — 3/3 plans complete
 Also: Phase 106 COMPLETE (Custom Composite Indicators) — 3/3 plans complete
@@ -21,10 +21,10 @@ Also: Phase 104 COMPLETE (Crypto-Native Indicators) — 3/3 plans complete
 Also: Phase 108 COMPLETE (Pipeline Batch Performance) — 5 plans complete
 Also: Phase 103 COMPLETE (Traditional TA Expansion) — 3/3 plans complete
 Also: Phase 107 COMPLETE (Pipeline Operations Dashboard) — 2/2 plans complete
-Status: Phase 113-02 complete — PriceCache (thread-safe, Decimal, staleness), ws_feeds.py (HL/Kraken/Coinbase daemon threads)
-Last activity: 2026-04-02 — Completed 113-02-PLAN.md (WebSocket price feed infrastructure)
+Status: Phase 113-04 complete — sync_results_from_vm.py (9 execution tables, watermark-based incremental pull)
+Last activity: 2026-04-02 — Completed 113-04-PLAN.md (VM→local execution state sync)
 
-Progress: [##########] 100% v1.2.0 | [██████████] 100% v1.3.0 (32/32 plans, 9/6 phases) | v1.4.0: 2/7 Phase 113 plans
+Progress: [##########] 100% v1.2.0 | [██████████] 100% v1.3.0 (32/32 plans, 9/6 phases) | v1.4.0: 4/7 Phase 113 plans
 
 ## Performance Metrics
 
@@ -407,12 +407,19 @@ Phase 113-02 decisions:
 - WS callbacks wrapped in try/except: parse errors in one message must not kill the feed thread
 - Coinbase subscribe sent immediately after connect before any reads: enforces 5s subscribe requirement per RESEARCH.md Pitfall 6
 
+Phase 113-04 decisions:
+- sync_results_watermarks: per-table watermark store (not hyperliquid.sync_log) — keeps execution sync state separate from HL data pipeline logs
+- positions and executor_run_log use DO UPDATE (mutable rows); orders/fills/events use DO NOTHING (append-only)
+- dim_risk_state uses TRUNCATE+COPY full-replace: small, stateless config table; must mirror VM exactly
+- Watermark advances to VM MAX(wm_col) after each successful table pull (not last-row ts) — handles out-of-order VM inserts correctly
+- Per-table error isolation: exception in one table logged to stderr, sync continues to next table
+
 ## Session Continuity
 
 Last session: 2026-04-02
-Stopped at: Completed 113-02-PLAN.md (WebSocket price feed infrastructure: price_cache.py + ws_feeds.py)
+Stopped at: Completed 113-04-PLAN.md (VM→local execution state sync: sync_results_from_vm.py, 9 tables)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-04-02 (Phase 113-02 complete: PriceCache thread-safe price store, WebSocket feed managers for HL/Kraken/Coinbase)*
+*Last updated: 2026-04-02 (Phase 113-04 complete: sync_results_from_vm.py pulling orders/fills/positions/paper_orders/executor_run_log/drift_metrics/risk_events/order_events/dim_risk_state from VM)*
