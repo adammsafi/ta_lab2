@@ -209,8 +209,8 @@ def build_value_command(
     if full_rebuild:
         cmd.append("--full-rebuild")
 
-    if verbose:
-        cmd.append("--verbose")
+    # Note: --verbose is NOT passed to sub-scripts (not all accept it).
+    # Verbose output is controlled at the orchestrator level via stream_output.
 
     if db_url:
         cmd.extend(["--db-url", db_url])
@@ -261,8 +261,7 @@ def build_post_command(
     if step.extra_args:
         cmd.extend(step.extra_args)
 
-    if verbose:
-        cmd.append("--verbose")
+    # Note: --verbose is NOT passed to sub-scripts (not all accept it).
 
     if db_url:
         cmd.extend(["--db-url", db_url])

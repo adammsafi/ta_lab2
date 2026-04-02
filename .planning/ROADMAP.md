@@ -11,7 +11,8 @@
 - v1.0.0 V1 Closure — Paper Trading & Validation (Phases 42-63) - SHIPPED 2026-03-01
 - v1.0.1 Macro Regime Infrastructure (Phases 64-73) - SHIPPED 2026-03-03
 - v1.1.0 Pipeline Consolidation & Storage Optimization (Phases 74-79) - SHIPPED 2026-03-21
-- v1.2.0 Analysis → Live Signals (Phases 80-92) - PLANNED
+- v1.2.0 Analysis → Live Signals (Phases 80-95) - SHIPPED 2026-03-29
+- v1.3.0 Operational Activation & Research Expansion (Phases 96-114) - SHIPPED 2026-04-02
 
 ## Overview
 
@@ -29,7 +30,8 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 - Phases 42-63: v1.0.0 (SHIPPED 2026-03-01)
 - Phases 64-73: v1.0.1 (SHIPPED 2026-03-03)
 - Phases 74-79: v1.1.0 (SHIPPED 2026-03-21)
-- Phases 80-92: v1.2.0 (planned)
+- Phases 80-95: v1.2.0 (SHIPPED 2026-03-29)
+- Phases 96-114: v1.3.0 (SHIPPED 2026-04-02)
 - Decimal phases (27.1, 28.1): Urgent insertions if needed
 
 <details>
@@ -1371,285 +1373,430 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 </details>
 
 
-### v1.2.0 Analysis → Live Signals (Planned)
+<details>
+<summary>v1.2.0 Analysis → Live Signals (Phases 80-95) - SHIPPED 2026-03-29</summary>
 
-**Milestone Goal:** Shift from data collection to alpha discovery and live signal generation. Analyze IC sweep results, refine features down to a tradeable set, build GARCH volatility models, run walk-forward bake-offs, overhaul the dashboard with backtest/signal/perps views, wire the full daily pipeline from signals through paper execution, and surface everything via alerts and monitoring.
+- [x] **Phase 80: IC Analysis & Feature Selection** - 20 active features from 112 candidates
+- [x] **Phase 81: GARCH & Conditional Volatility** - 4 model families, VaR/CVaR suite
+- [x] **Phase 82: Signal Refinement & Walk-Forward Bake-off** - 9 strategies, 2 exchanges
+- [x] **Phase 83: Dashboard — Backtest & Signal Pages** - Strategy-first, signal monitor, asset hub
+- [x] **Phase 84: Dashboard — Perps, Portfolio & Regimes** - HL perps, AMA inspector, regime heatmap
+- [x] **Phase 85: Dashboard Cleanup & Polish** - Stats allowlist, drawdown calc, UI consistency
+- [x] **Phase 86: Portfolio Construction Pipeline** - BL/MV/HRP/CVaR, stop ladder, paper executor
+- [x] **Phase 87: Live Pipeline & Alert Wiring** - Signal gates, IC staleness, pipeline alerts
+- [x] **Phase 88: Integration Testing & Go-Live** - Smoke tests, burn-in, operations manual
+- [x] **Phase 89: CTF Schema & Dimension Table** - Alembic migration, ctf_config.yaml
+- [x] **Phase 90: CTF Core Computation Module** - CTFFeature class, composite computations
+- [x] **Phase 91: CTF CLI & Pipeline Integration** - refresh_ctf.py, Phase 2c integration
+- [x] **Phase 92: CTF IC Analysis & Feature Selection** - CTF IC sweep, feature selection, config pruning
+- [x] **Phase 93: Fix Integration Breaks** - GARCH column bug, parity check coverage
+- [x] **Phase 94: Wire Portfolio Dashboard** - Live portfolio_allocations, optimizer selector
+- [x] **Phase 95: AMA-Aware IC Staleness & Signal Scores** - 20/20 features, real signal_scores
 
-- [x] **Phase 80: IC Analysis & Feature Selection** - Analyze IC sweep, stationarity tests, feature pruning 112→~20, quintile validation
-- [x] **Phase 81: GARCH & Conditional Volatility** - GARCH/EGARCH models, conditional vol forecasting, integration with position sizing and VaR
-- [x] **Phase 82: Signal Refinement & Walk-Forward Bake-off** - Expression engine experiments, regime router training, walk-forward bake-off, DSR/PSR gate
-- [x] **Phase 83: Dashboard — Backtest & Signal Pages** - Backtest results page, signal browser, OHLCV candlestick charts
-- [x] **Phase 84: Dashboard — Perps, Portfolio & Regimes** - Hyperliquid page, portfolio allocation view, regime heatmap, AMA/EMA inspector
-- [x] **Phase 85: Dashboard Cleanup & Polish** - Fix cache TTL slider, dynamic stats allowlist, drawdown calc, UI consistency
-- [x] **Phase 86: Portfolio Construction Pipeline** - IC-IR → Black-Litterman views, bet sizing with GARCH vol, stop ladder tuning, paper executor dry run
-- [x] **Phase 87: Live Pipeline & Alert Wiring** - Daily pipeline end-to-end: signals → validation → executor → drift → alerts, IC staleness monitoring
-- [x] **Phase 88: Integration Testing & Go-Live** - End-to-end smoke tests, 1-week paper trading burn-in, runbook updates, v1.2.0 tag
-- [x] **Phase 89: CTF Schema & Dimension Table** - Alembic migration for dim_ctf_indicators + ctf tables, seed indicators from ta/vol/returns/features, create ctf_config.yaml
-- [x] **Phase 90: CTF Core Computation Module** - CTFFeature class: batch indicator loading, merge_asof alignment, slope/divergence/agreement/crossover composites, scoped DELETE+INSERT writes
-- [x] **Phase 91: CTF CLI & Pipeline Integration** - refresh_ctf.py CLI script, Phase 2c integration into run_all_feature_refreshes.py, incremental refresh support
-- [x] **Phase 92: CTF IC Analysis & Feature Selection** - load_ctf_features() pivot loader, IC analysis on CTF features, compare vs AMA features, prune config to high-IC combinations
+</details>
 
-## v1.2.0 Phase Details
 
-### Phase 80: IC Analysis & Feature Selection
-**Goal:** Reduce the 112-feature universe to ~15-25 validated features with persistent alpha, backed by statistical rigor
-**Depends on:** IC sweep complete (ic_results table populated)
-**Success Criteria** (what must be TRUE):
-  1. IC decay analysis run for all features — features with no significant IC at any horizon flagged for removal
-  2. ADF/KPSS stationarity tests added to analysis toolkit and run on all feature series — non-stationary features documented
-  3. Ljung-Box autocorrelation test on IC series confirms alpha signal is not just serial correlation
-  4. Quintile sweep (run_quintile_sweep.py) confirms monotonic Q1→Q5 spread for surviving features
-  5. Feature importance (MDA + clustered MDA) validates IC-based ranking — concordance between IC-IR and MDA top-20
-  6. Final selected feature set documented with rationale, saved as a YAML config for downstream consumption
-**Plans**: 5 plans in 4 waves
+<details>
+<summary>v1.3.0 Operational Activation & Research Expansion (Phases 96-114) - SHIPPED 2026-04-02</summary>
+
+
+**Milestone Goal:** Make the built infrastructure actually run — activate paper trading, scale backtests to 460K+ runs, graduate CTF research features, expand macro coverage, add ML signal combination, and build a statistically rigorous indicator R&D pipeline covering traditional TA expansion, crypto-native indicators, parameter optimization, and custom composite development.
+
+- [x] **Phase 96: Executor Activation** - Seed strategies, wire signals into daily refresh, activate real IC-weighted BL, track live parity, add PnL attribution — COMPLETE 2026-03-30
+- [x] **Phase 97: FRED Macro Expansion** - Add SP500/NASDAQ/DJIA to macro feature layer, rolling BTC-equity correlation, risk-on/off signals — COMPLETE 2026-03-31
+- [x] **Phase 98: CTF Feature Graduation** - Materialize top CTF features into features table, asset-specific selection tier, cross-asset composites, lead-lag IC matrix — COMPLETE 2026-03-31
+- [x] **Phase 99: Backtest Scaling** - Resume-safe mass backtest orchestrator, partitioned trades table, 113K+ core runs, MC bands, CTF signal backtests, expanded grids, leaderboard dashboard — COMPLETE 2026-04-01
+- [x] **Phase 100: ML Signal Combination** - LGBMRanker cross-sectional predictor, SHAP interaction analysis, XGBoost meta-label confidence filter — COMPLETE 2026-04-01
+- [x] **Phase 101: Tech Debt Cleanup** - Remove orphaned export, create Phase 82/92 VERIFICATION.md, document CTF downstream consumers — COMPLETE 2026-04-01
+- [x] **Phase 102: Indicator Research Framework** - Permutation IC test, FDR control, haircut Sharpe, trial registry, block bootstrap — the testing harness for all indicator R&D — COMPLETE 2026-04-01
+- [x] **Phase 103: Traditional TA Expansion** - Add 20-30 well-known indicators (Ichimoku, Williams %R, Keltner, CCI, Elder Ray, Force Index, VWAP, VIDYA, FRAMA, etc.), IC sweep through Phase 102 harness — COMPLETE 2026-04-01
+- [x] **Phase 104: Crypto-Native Indicators** - Venue-agnostic normalized input layer for OI/funding/volume, derive OI momentum, OI-price divergence, funding rate z-score, Force Index, liquidation pressure proxy — COMPLETE 2026-04-01
+- [x] **Phase 105: Parameter Optimization** - Systematic parameter sweep (grid + Optuna) for surviving indicators, plateau preference, rolling stability test, DSR over full search space — COMPLETE 2026-04-01
+- [x] **Phase 106: Custom Composite Indicators** - Proprietary indicators (AMA ER as regime signal, OI-divergence × CTF agreement, funding-adjusted momentum, cross-asset lead-lag), strictest validation tier — COMPLETE 2026-04-02
+- [x] **Phase 107: Pipeline Operations Dashboard** - Streamlit ops page: real-time stage monitor with progress bars, run history, trigger/kill buttons, pipeline_stage_log table for per-stage DB persistence — COMPLETE 2026-04-01
+- [x] **Phase 108: Pipeline Batch Performance** - Replace 5.7M per-key SQL queries with per-ID batch operations using PARTITION BY. EMA returns (2M→492 queries), AMA returns, bar returns, EMA fast-path. Target: 5hr→1.5hr incremental
+- [x] **Phase 109: Feature Skip-Unchanged** - Watermark state table for features, skip assets with no new bar data. Target: 100min→10min for daily incremental
+- [x] **Phase 110: Feature Parallel Sub-Phases** - Group independent feature sub-phases into parallel waves. Target: 100min→60min for full recompute
+**Plans:** 1 plan
 
 Plans:
-- [x] 80-01-PLAN.md -- Install statsmodels dependency + dim_feature_selection Alembic migration
-- [x] 80-02-PLAN.md -- feature_selection.py library module (stationarity, Ljung-Box, monotonicity, tier classification)
-- [x] 80-03-PLAN.md -- run_feature_selection.py CLI orchestrator + generate configs/feature_selection.yaml
-- [x] 80-04-PLAN.md -- run_concordance.py IC-IR vs MDA concordance analysis
-- [x] 80-05-PLAN.md -- Feature selection review checkpoint (human verification)
+- [ ] 110-01-PLAN.md -- Wave 1 parallelism (max_workers 3->4), --workers CLI flag, budget guard, wave logging
+- [x] **Phase 111: Feature Polars Migration** - Migrate feature sub-phases from pandas to polars with per-sub-phase regression testing (IC<1%, signals=0 flips, Sharpe<5%). Target: 60min→25min
+**Plans:** 5 plans in 3 waves
+
+Plans:
+- [ ] 111-01-PLAN.md -- Infrastructure (use_polars flag, polars_feature_ops.py, regression harness) + cycle_stats + rolling_extremes migration
+- [ ] 111-02-PLAN.md -- Vol sub-phase polars migration (Parkinson, GK, RS, ATR, rolling log-vol)
+- [ ] 111-03-PLAN.md -- TA sub-phase polars migration (RSI, MACD, Stochastic, Bollinger, ATR, ADX)
+- [ ] 111-04-PLAN.md -- Microstructure polars outer loop + orchestrator --use-polars flag
+- [ ] 111-05-PLAN.md -- CTF polars migration (join_asof) + full regression suite (IC, signals, backtest)
+- [x] **Phase 112: Pipeline Architecture Separation** - Split monolithic run_daily_refresh into 5 distinct pipelines (Data, Features, Signals, Execution, Monitoring) with clear boundaries, triggers, and deployment topology — COMPLETE 2026-04-02
+**Plans:** 5 plans
+Plans:
+- [ ] 112-01-PLAN.md -- Extract pipeline_utils.py + Alembic migration (pipeline_name column)
+- [ ] 112-02-PLAN.md -- Data and Features pipeline scripts
+- [ ] 112-03-PLAN.md -- Signals, Execution, and Monitoring pipeline scripts
+- [ ] 112-04-PLAN.md -- sync_signals_to_vm + full chain wrapper + backward-compat wrapper
+- [ ] 112-05-PLAN.md -- Pipeline handoff contracts documentation + verification
+- [ ] **Phase 113: VM Execution Deployment** - PostgreSQL on Oracle VM with execution tables, sync_signals_to_vm + sync_results_from_vm scripts, real-time WebSocket price feeds (HL/Kraken/Coinbase), executor as systemd service
+**Plans:** 7 plans in 4 waves
+
+Plans:
+- [ ] 113-01-PLAN.md -- VM PostgreSQL table setup (DDL extraction + dimension seeding)
+- [ ] 113-02-PLAN.md -- PriceCache + WebSocket feeds (HL/Kraken/Coinbase)
+- [ ] 113-03-PLAN.md -- Signal push + config sync (local to VM)
+- [ ] 113-04-PLAN.md -- Results pull (VM to local)
+- [ ] 113-05-PLAN.md -- Stop/TP monitor + position sizer VM fallback
+- [ ] 113-06-PLAN.md -- Executor service entry point + requirements
+- [ ] 113-07-PLAN.md -- Systemd unit + deploy scripts + verification
+- [x] **Phase 114: Hosted Dashboard** - nginx reverse proxy + Let's Encrypt SSL on Oracle VM, Streamlit deployment, sync_dashboard_to_vm script, basic auth, mobile-accessible — COMPLETE 2026-04-02
 
 ---
 
-### Phase 81: GARCH & Conditional Volatility
-**Goal:** Conditional volatility forecasting via GARCH family models, integrated into position sizing and risk management
-**Depends on:** Phase 80 (selected feature set, stationarity tests available)
+### Phase 96: Executor Activation
+**Goal:** Paper executor runs live daily for all 7 signal generators, using BL output weights for sizing, with parity tracking and PnL attribution.
+**Depends on:** v1.2.0 complete (Phase 95 -- real signal_scores exist, BL pipeline built)
+**Requirements:** OPS-01, OPS-02, OPS-03, OPS-04, OPS-05, OPS-06
 **Success Criteria** (what must be TRUE):
-  1. GARCH(1,1) and EGARCH models fitted per asset, stored in DB (new table: vol_forecasts or similar)
-  2. Conditional VaR using GARCH forecasts available alongside existing historical/CF VaR
-  3. Vol forecast integrated into vol_sizer.py — position sizing uses GARCH forecast when available, falls back to range estimators
-  4. Comparison report: GARCH vs Parkinson/GK/ATR accuracy (realized vol prediction error) — validates added value
-  5. Daily refresh wiring: GARCH forecasts update automatically in run_daily_refresh.py
-**Plans**: 5 plans in 3 waves
+  1. `SELECT COUNT(*) FROM dim_executor_config WHERE is_active = true` returns 7+ rows covering all signal types with per-strategy cadence_hours
+  2. `python -m ta_lab2.scripts.run_daily_refresh --all` signals stage runs 7 types in two batches (Batch 1: EMA/RSI/ATR/MACD, Batch 2: 3 AMA types); re-running does not create duplicate fills
+  3. Executor runs manually (user-triggered after data load); fills table gains new rows; executor_run_log shows no silent no-ops (0-fill detection active)
+  4. `portfolio_allocations` BL weights are read by executor via `sizing_mode='bl_weight'` in PositionSizer; zero/missing BL weight = close position
+  5. A parity report script logs `live_sharpe / backtest_sharpe` per active strategy to a dedicated `strategy_parity` table; ratio readable from SQL
+  6. A PnL attribution script separates alpha from multi-asset-class beta (crypto=BTC, perp=underlying), runnable as standalone CLI with results in `pnl_attribution` table
+**Plans:** 4 plans in 3 waves
 
 Plans:
-- [x] 81-01-PLAN.md -- DB foundation (garch_forecasts, garch_diagnostics, matview) + core GARCH engine (arch dep)
-- [x] 81-02-PLAN.md -- State manager + daily refresh script (refresh_garch_forecasts.py)
-- [x] 81-03-PLAN.md -- Evaluation framework (RMSE, QLIKE, MZ R2) + inverse-RMSE blend weights
-- [x] 81-04-PLAN.md -- vol_sizer.py GARCH blend integration + GARCH-VaR in var_simulator.py
-- [x] 81-05-PLAN.md -- Comparison report generator + daily refresh pipeline wiring
+- [x] 96-01-PLAN.md -- Alembic migration (4 signal tables, CHECK constraints, strategy_parity, pnl_attribution) + SIGNAL_TABLE_MAP update
+- [x] 96-02-PLAN.md -- MACD/AMA signal generators + two-batch signal refresh refactor
+- [x] 96-03-PLAN.md -- Seed YAML expansion (7 strategies) + watermark seed + BL sizing mode in executor
+- [x] 96-04-PLAN.md -- Strategy parity report CLI + PnL attribution report CLI
 
 ---
 
-### Phase 82: Signal Refinement & Walk-Forward Bake-off
-**Goal:** Top features combined into composite signals via expression engine, validated through walk-forward bake-off with statistical gates
-**Depends on:** Phase 80 (selected features), Phase 81 (GARCH vol for cost-aware sizing)
-**Phase 80 Learnings (must address):**
-  - Active tier is 90% AMA-derived features (live in `ama_multi_tf`, NOT `features` table) — expression engine and regime router MUST load from both table families
-  - Per-asset IC-IR variation is significant — leverage `ic_results` per-asset data for asset-specific signal weighting, not just the universal YAML averages
-  - Feature selection is strategy-agnostic (ranks by IC-IR correlation with forward returns) — this phase is where strategy alignment happens (momentum vs mean-reversion vs regime-conditional)
-  - Conditional tier (160 features) contains all traditional TA features (RSI, MACD, ADX, Bollinger) — regime router should evaluate these as regime specialists
-  - Concordance between IC-IR and MDA was low (rho=0.14) due to AMA features being absent from MDA evaluation — consider MDA validation for bar-level features separately
+### Phase 97: FRED Macro Expansion
+**Goal:** SP500, NASDAQ Composite, and DJIA are tracked in the macro feature layer with derived features and rolling BTC-equity correlation signals.
+**Depends on:** Phase 96 (v1.3.0 started; self-contained, no hard dependency on Phase 96 output)
+**Requirements:** MACRO-01, MACRO-02
 **Success Criteria** (what must be TRUE):
-  1. At least 3 expression engine YAML experiments defined using selected features (combinations, interactions, regime-conditional)
-  2. Regime router (TRA) trained with selected features — per-regime sub-models operational, using BOTH features table AND ama_multi_tf data
-  3. Walk-forward bake-off (run_bakeoff.py) completed across full Kraken cost matrix (12 scenarios)
-  4. DSR > 0.95 gate applied — only strategies passing deflated Sharpe survive
-  5. Bake-off results persisted to strategy_bakeoff_results with experiment lineage
-  6. Top 1-2 strategies selected for paper trading, documented with rationale
-  7. Per-asset feature weighting explored: do asset-specific IC-IR weights improve strategy performance vs universal weights?
-**Plans**: 6 plans in 4 waves
+  1. `fred_reader.py` SERIES_TO_LOAD includes SP500, NASDAQCOM, and DJIA; `SELECT DISTINCT series_id FROM fred.series_values` returns all three after a sync run
+  2. Derived features (returns, volatility, drawdown, MA ratios) for each equity index are computed and stored in `macro_features` table alongside existing FRED features
+  3. `cross_asset.py` computes rolling BTC-SPX and BTC-NASDAQ correlation at 30/60/90/180-day windows and stores results in `crypto_macro_corr_regimes`
+  4. A risk-on/risk-off divergence signal fires when BTC-SPX rolling correlation crosses a configurable threshold, logged to the macro feature table or a signal table
+**Plans:** 2 plans
 
 Plans:
-- [x] 82-01-PLAN.md -- Extended AMA data loader, Hyperliquid cost matrix, experiment_name migration
-- [x] 82-02-PLAN.md -- AMA composite signal generators (momentum, mean-reversion, regime-conditional)
-- [x] 82-03-PLAN.md -- YAML experiments + run_bakeoff.py multi-exchange/AMA support
-- [x] 82-04-PLAN.md -- Regime router AMA extension + per-asset IC weight helpers
-- [x] 82-05-PLAN.md -- Full walk-forward bake-off execution (109 assets x Kraken + HL + expression)
-- [x] 82-06-PLAN.md -- Statistical gates, strategy selection, and bake-off report
+- [x] 97-01-PLAN.md -- FRED reader + feature computer + migration: SP500/NASDAQCOM/DJIA with 27 derived columns
+- [x] 97-02-PLAN.md -- Multi-window BTC-equity correlation + vol regime + VIX cross-validation + divergence signals
 
 ---
 
-### Phase 83: Dashboard — Backtest & Signal Pages
-**Goal:** Dashboard surfaces backtest results and live signal state so the user can monitor strategy performance and signal activity without SQL
-**Depends on:** Phase 82 (backtest results to display)
+### Phase 98: CTF Feature Graduation
+**Goal:** Top CTF features are materialized in the main features table and usable by downstream consumers (BL, signals, ML), with asset-specific selection, cross-asset composites, and lead-lag analysis.
+**Depends on:** Phase 96 (executor running; CTF features feed BL optimizer in OPS-04)
+**Requirements:** CTF-01, CTF-02, CTF-03, CTF-04
 **Success Criteria** (what must be TRUE):
-  1. Backtest Results page: equity curves, PSR/DSR badges, Monte Carlo Sharpe CI band, trade table with MAE/MFE, cost breakdown per scenario
-  2. Signal Browser page: current active signals per asset/strategy, signal history timeline, signal strength/confidence, filter by strategy type
-  3. OHLCV candlestick charts replace plain close lines in Research Explorer (Plotly candlestick with EMA overlays)
-  4. All new pages follow existing query-layer pattern (queries/*.py + pages/*.py separation)
-  5. Charts have HTML download buttons consistent with existing pages
-**Plans**: 5 plans in 3 waves (COMPLETE)
-
-Plans:
-- [x] 83-01-PLAN.md -- Query layers (backtest + signals) and chart builders (candlestick, sparkline, timeline)
-- [x] 83-02-PLAN.md -- Backtest Results page (3 views, cost matrix, Monte Carlo CI, sparklines)
-- [x] 83-03-PLAN.md -- Signal Browser page (3 views, heatmap, history timeline, signal strength)
-- [x] 83-04-PLAN.md -- Asset Hub page + OHLCV candlestick upgrade to Research Explorer
-- [x] 83-05-PLAN.md -- Sidebar reorganization + navigation wiring + human verification
-
----
-
-### Phase 84: Dashboard — Perps, Portfolio & Regimes
-**Goal:** Dashboard covers the full trading stack — perps data, portfolio allocation, and cross-asset regime views
-**Depends on:** Nothing (can run in parallel with Phase 83)
-**Success Criteria** (what must be TRUE):
-  1. Hyperliquid page: funding rate time series, OI snapshots, candle charts for top perps, funding rate heatmap across assets
-  2. Portfolio Allocation page: current BL weights, position sizing decisions, exposure by asset/strategy, bet size history
-  3. Regime Heatmap page: cross-asset regime_comovement visualization, regime_stats summary, regime timeline for all assets (not just BTC/ETH)
-  4. AMA/EMA Inspector: per-asset efficiency ratio, d1/d2 curves, adaptive vs fixed EMA comparison chart
-  5. All pages auto-refresh via @st.fragment(run_every=900) for operational pages
-**Plans**: 5 plans in 2 waves
-
-Plans:
-- [ ] 84-01-PLAN.md -- Hyperliquid Perps query layer + page
-- [ ] 84-02-PLAN.md -- Regime Heatmap query layer + page
-- [ ] 84-03-PLAN.md -- AMA/EMA Inspector query layer + page
-- [ ] 84-04-PLAN.md -- Portfolio Allocation placeholder page
-- [ ] 84-05-PLAN.md -- App registration + verification
-
----
-
-### Phase 85: Dashboard Cleanup & Polish
-**Goal:** Existing dashboard issues fixed, UI consistent across all pages (old + new)
-**Depends on:** Phase 83, Phase 84 (all new pages exist before polish pass)
-**Success Criteria** (what must be TRUE):
-  1. Decorative cache TTL slider removed from sidebar, replaced with factual cache tier caption and Refresh button (Streamlit @st.cache_data TTL is a static decorator — dynamic control is not feasible)
-  2. Stats table allowlist in pipeline.py auto-discovers from information_schema instead of hardcoded list
-  3. Drawdown calculation uses portfolio starting value, not just cumulative PnL peak
-  4. Older pages (landing, pipeline monitor) aligned to Phase 83/84 engine-init and layout patterns; Phase 83/84 pages already consistent
-  5. Navigation groups in app.py reorganized to separate Research, Markets, Operations, and Monitor
-**Plans:** 2 plans in 1 wave
-Plans:
-- [x] 85-01-PLAN.md -- Backend query fixes (cache TTL slider, stats auto-discovery, drawdown calculation)
-- [x] 85-02-PLAN.md -- Page consistency (engine init consolidation, stats row counts, drawdown KPI dollars)
-
----
-
-### Phase 86: Portfolio Construction Pipeline
-**Goal:** End-to-end portfolio construction from IC scores through paper execution with GARCH-informed sizing
-**Depends on:** Phase 81 (GARCH vol), Phase 82 (bake-off winners)
-**Phase 80 Learnings (must address):**
-  - IC-IR scores vary significantly per asset — Black-Litterman views should use per-asset IC-IR from ic_results, not the universal average from feature_selection.yaml
-  - Active features are mostly AMA-derived — portfolio rebalance pipeline needs ama_multi_tf data loading alongside features table
-**Success Criteria** (what must be TRUE):
-  1. IC-IR scores feed Black-Litterman views automatically — per-asset IC-IR from ic_results, not universal average
-  2. Bet sizing uses GARCH conditional vol forecast for target-vol scaling
-  3. Stop ladder calibrated per asset using MAE/MFE analysis from bake-off trades
-  4. Paper executor dry run with refined signals produces fills matching backtest parity within tolerance
-  5. Portfolio rebalance logic documented and wired into daily pipeline
-**Plans:** 3 plans in 2 waves
-Plans:
-- [x] 86-01-PLAN.md -- Alembic migration (stop_calibrations + target_annual_vol) + stop calibration module + CLI
-- [x] 86-02-PLAN.md -- Per-asset IC-IR in BL views + GARCH target-vol sizing mode in PositionSizer
-- [x] 86-03-PLAN.md -- Daily pipeline wiring (calibrate_stops stage) + parity check bake-off winner support
-
----
-
-### Phase 87: Live Pipeline & Alert Wiring
-**Goal:** Full daily pipeline runs autonomously: data → features → signals → validation → execution → drift → alerts
-**Depends on:** Phase 82 (refined signals), Phase 86 (portfolio construction)
-**Success Criteria** (what must be TRUE):
-  1. run_daily_refresh.py extended: bars → EMAs → features → signals → backtest validation → executor → drift check
-  2. IC staleness monitor: periodic re-sweep detects alpha decay, alerts when top features drop below IC-IR threshold
-  3. Telegram alerts tuned: regime changes, drawdown > threshold, drift pause, IC decay, new signal fires
-  4. Signal validation gate: signals that deviate >2σ from historical distribution flagged before execution
-  5. Dead-man switch: alert fires if daily pipeline hasn't completed by expected time
-**Plans:** 4 plans
-Plans:
-- [x] 87-01-PLAN.md -- Alembic migration (4 tables) + IC staleness monitor (multi-window IC-IR decay detection)
-- [x] 87-02-PLAN.md -- Signal validation gate (count anomaly + crowded signal detection, hard execution block)
-- [x] 87-03-PLAN.md -- Pipeline orchestration (--from-stage, dead-man switch, pipeline_run_log, completion alerts)
-- [x] 87-04-PLAN.md -- BL weight override wiring (dim_ic_weight_overrides into portfolio refresh)
-
----
-
-### Phase 88: Integration Testing & Go-Live
-**Goal:** End-to-end validation confirms the full pipeline works reliably before sustained paper trading
-**Depends on:** Phase 85 (dashboard complete), Phase 87 (pipeline wired)
-**Success Criteria** (what must be TRUE):
-  1. End-to-end smoke test: fresh data ingestion → signal generation → paper fill → dashboard display — all green
-  2. 1-week paper trading burn-in with daily monitoring — no drift pauses, no kill switch triggers
-  3. Backtest parity verified: paper executor fills match backtest replay within cost tolerance
-  4. Runbooks updated for v1.2.0 pipeline (new signal flow, new dashboard pages, GARCH refresh)
-  5. v1.2.0 tagged and milestone audit complete
+  1. `refresh_ctf_promoted.py` runs without errors and writes 15-20 CTF feature columns into the `features` table; `feature_selection.yaml` lists each promoted feature with its IC threshold and source CTF config
+  2. `dim_feature_selection_asset` contains rows with `tier = 'asset_specific'` for CTF features that pass per-asset IC but fail cross-asset consensus; a query by asset_id returns a different (superset) feature set than the global tier; `dim_feature_selection` is NOT touched or truncated
+  3. A cross-asset CTF composite script produces market-wide sentiment, relative-value, and leader-follower aggregate columns stored in `features` or a dedicated composite table, runnable via CLI
+  4. A lead-lag IC matrix script outputs a DataFrame showing whether Asset A's CTF features predict Asset B's next-bar returns at horizons [1, 3, 5]; results persisted to a `lead_lag_ic` table or CSV report
 **Plans:** 3 plans
-Plans:
-- [ ] 88-01-PLAN.md -- Smoke test script + parity checker threshold extension
-- [ ] 88-02-PLAN.md -- Daily burn-in status report with Telegram delivery
-- [ ] 88-03-PLAN.md -- Operations manual updates, CHANGELOG, v1.2.0 requirements doc
 
+Plans:
+- [x] 98-01-PLAN.md -- Alembic migration (all Phase 98 schema) + refresh_ctf_promoted.py ETL bridge + feature_selection.yaml
+- [x] 98-02-PLAN.md -- Asset-specific CTF feature selection in dim_feature_selection_asset
+- [x] 98-03-PLAN.md -- Cross-asset CTF composites (sentiment mean+PCA, relative-value z-score, leader-follower)
+- [x] 98-04-PLAN.md -- Lead-lag IC matrix (all-vs-all Spearman IC, BH FDR, DB+CSV persistence)
 
 ---
 
-### Phase 89: CTF Schema & Dimension Table
-**Goal:** Establish the database foundation for cross-timeframe feature infrastructure — dimension table, fact table, seed data, and declarative YAML config
-**Depends on:** Phase 80 (feature selection results inform initial indicator set)
+### Phase 99: Backtest Scaling
+**Goal:** A resume-safe orchestrator runs 460K+ backtest runs with Monte Carlo bands, CTF threshold signals, and expanded parameter grids; results visible in a strategy leaderboard dashboard.
+**Depends on:** Phase 98 (CTF features in features table required for BT-05 CTF signal backtests)
+**Requirements:** BT-01, BT-02, BT-03, BT-04, BT-05, BT-06, BT-07
 **Success Criteria** (what must be TRUE):
-  1. `dim_ctf_indicators` table created with SMALLINT PK, indicator_name, source_table, source_column, is_directional, is_active columns
-  2. Seeded with ~20+ indicators from ta (MACD, RSI, ADX, BB, Stoch, ATR), vol (Parkinson, GK, RS, log_vol), returns (ret_arith, ret_log), features (fracdiff, sadf_stat)
-  3. `ctf` fact table created with PK (id, venue_id, ts, base_tf, ref_tf, indicator_id, alignment_source), value columns (ref_value, base_value, slope, divergence, agreement, crossover), FK to dim_ctf_indicators and dim_venues
-  4. Indexes: ix_ctf_lookup (id, base_tf, ref_tf, indicator_id, ts) and ix_ctf_indicator (indicator_id, base_tf)
-  5. `configs/ctf_config.yaml` created with tf_pairs, indicators by source table, composite parameters (slope_window=5, divergence_zscore_window=63)
-  6. Alembic migration passes `alembic upgrade head` cleanly
-**Plans:** 1 plan in 1 wave
+  1. `run_mass_backtest.py` can be interrupted and restarted without re-running completed combinations; a state table records `(strategy, asset, params_hash, tf, cost, status)` and `--resume` flag skips completed rows
+  2. `backtest_trades` is partitioned by `strategy_name` before the mass run begins; the partition DDL migration applies cleanly via Alembic
+  3. `SELECT COUNT(DISTINCT strategy_name || asset_id || params_hash || tf || cost_bps) FROM backtest_runs` reaches at least 113K after the core bakeoff strategies complete
+  4. Every `backtest_metrics` row has non-null `mc_sharpe_lo`, `mc_sharpe_hi`, and `mc_sharpe_median` computed from 1,000 bootstrap samples of trade-level P&L
+  5. CTF threshold signals are registered in `signals/registry.py` and `run_mass_backtest.py` includes them in the sweep; at least one CTF signal type produces backtest results in `backtest_runs`
+  6. Parameter grids for EMA crossover, RSI mean-reversion, and ATR breakout signals include at least 3x more combinations than the current bakeoff grids (documented in grid config YAML)
+  7. The Streamlit dashboard has a Strategy Leaderboard page showing Sharpe with MC confidence bands, PBO heatmap, and feature-to-signal lineage; accessible via the existing app navigation
+**Plans:** 5 plans
 
 Plans:
-- [x] 89-01-PLAN.md -- Alembic migration (dim_ctf_indicators + ctf tables + seed) + ctf_config.yaml
+- [x] 99-01-PLAN.md -- Alembic migration: mass_backtest_state table + backtest_trades partitioning
+- [x] 99-02-PLAN.md -- CTF threshold signal adapter + expanded parameter grids YAML
+- [x] 99-03-PLAN.md -- run_mass_backtest.py orchestrator + CTF data loader + MC backfill script
+- [x] 99-04-PLAN.md -- Strategy Leaderboard dashboard page (MC bands, PBO heatmap, lineage)
+- [x] 99-05-PLAN.md -- Core bakeoff execution run + verification
 
 ---
 
-### Phase 90: CTF Core Computation Module
-**Goal:** Build the generic cross-timeframe computation engine that loads indicators from any source table, aligns across timeframes, and computes composites
-**Depends on:** Phase 89 (schema + config must exist)
+### Phase 100: ML Signal Combination
+**Goal:** Three ML layers (cross-sectional ranker, feature interaction analysis, meta-label filter) are trained, validated, and wired into the signal pipeline.
+**Depends on:** Phase 98 (CTF features in features table), Phase 99 (backtest infra and trade labels available)
+**Requirements:** ML-01, ML-02, ML-03
 **Success Criteria** (what must be TRUE):
-  1. `src/ta_lab2/features/cross_timeframe.py` with CTFConfig dataclass and CTFFeature class
-  2. `_load_indicators_batch()` loads ALL indicators from a source table in one query (not N queries per indicator)
-  3. `_align_timeframes()` uses `pd.merge_asof(direction='backward')`, reusing `build_alignment_frame()` from regimes/comovement.py
-  4. `_compute_slope()` uses vectorized rolling polyfit over configurable slope_window
-  5. `_compute_divergence()` computes (base - ref) / rolling_std with configurable z-score window
-  6. `_compute_agreement()` and `_compute_crossover()` respect `is_directional` flag from dim_ctf_indicators
-  7. `compute_for_ids()` orchestrates load → align → compute → write for all configured (base_tf, ref_tf, indicator) combinations
-  8. Write uses scoped DELETE + INSERT pattern matching existing BaseFeature convention
-  9. Manual test: `CTFFeature.compute_for_ids([1])` for BTC at 1D→7D produces correct rows in ctf table
-**Plans**: 2 plans in 2 waves
+  1. An LGBMRanker model is trained on CTF+AMA features to predict cross-sectional asset rank; purged CV produces an OOS NDCG or Spearman IC score that is documented and stored in `ml_experiments`
+  2. SHAP TreeExplainer interaction values identify the top 5 feature pairs for the LGBMRanker; a summary report or chart is produced and at least one finding feeds back into `feature_selection.yaml` or `dim_feature_selection`
+  3. An XGBoost meta-label model is trained on `triple_barrier_labels` to predict trade confidence; integrating it as a pre-executor filter (configurable threshold) reduces trade count while maintaining or improving the risk-adjusted return in backtests
+**Plans:** 3 plans
 
 Plans:
-- [x] 90-01-PLAN.md -- CTFConfig dataclass, YAML/dim loading, batch indicator loading, timeframe alignment
-- [x] 90-02-PLAN.md -- Composite computations (slope/divergence/agreement/crossover), orchestrator, write, integration test
+- [ ] 100-01: LGBMRanker cross-sectional ranker — install lightgbm, train on CTF+AMA features, purged CV, log to ml_experiments
+- [ ] 100-02: SHAP interaction analysis — top feature pairs, report, feedback into feature selection
+- [ ] 100-03: XGBoost meta-label filter — train on triple_barrier_labels, wire pre-executor threshold, backtest impact measurement
 
 ---
 
-### Phase 91: CTF CLI & Pipeline Integration
-**Goal:** Wire CTF computation into the daily refresh pipeline with a standalone CLI script, Phase 2c integration, multiprocessing workers, and incremental refresh via ctf_state table
-**Depends on:** Phase 90 (core module must work)
+### Phase 101: Tech Debt Cleanup
+**Goal:** Four low-severity tech debt items from the v1.2.0 milestone audit are closed — orphaned export removed, two VERIFICATION.md files created, CTF downstream consumer status documented.
+**Depends on:** Phase 98 (CTF-01 completed — needed to accurately document CTF downstream consumers in DEBT-04)
+**Requirements:** DEBT-01, DEBT-02, DEBT-03, DEBT-04
 **Success Criteria** (what must be TRUE):
-  1. `src/ta_lab2/scripts/features/refresh_ctf.py` CLI with --ids, --all, --base-tf, --ref-tfs, --indicators, --full-refresh, --workers, --dry-run flags
-  2. `python -m ta_lab2.scripts.features.refresh_ctf --ids 1 --base-tf 1D` completes successfully
-  3. `python -m ta_lab2.scripts.features.refresh_ctf --all --base-tf 1D` processes all 109 assets with parallel workers
-  4. Phase 2c added to `run_all_feature_refreshes.py`: runs after microstructure (Phase 2b), before CS norms (Phase 3)
-  5. `python -m ta_lab2.scripts.features.run_all_feature_refreshes --ids 1 --tf 1D` logs CTF phase completion
-  6. Incremental refresh: re-run only computes new dates (watermark-based skip via ctf_state)
-  7. ctf_config.yaml expanded to 6 base TFs (2D, 3D added)
-**Plans:** 3 plans in 3 waves
+  1. `blend_vol_simple()` in `garch_blend.py` is either wired to a caller or removed; `grep -r "blend_vol_simple"` returns zero results (removed) or exactly one caller (wired)
+  2. `.planning/phases/82-signal-refinement/VERIFICATION.md` exists and synthesizes the 6 existing plan summaries into a single phase-level verification document
+  3. `.planning/phases/92-ctf-ic-analysis/VERIFICATION.md` is updated to reflect the 7 manually-closed gaps with evidence pointers
+  4. A comment or doc entry in `dim_ctf_feature_selection` (or the CTF config) explains that downstream consumers are added via CTF-01 (`refresh_ctf_promoted.py`) — by design, not an oversight
+**Plans:** 2 plans
 
 Plans:
-- [x] 91-01-PLAN.md -- Alembic migration for ctf_state table, YAML expansion (2D/3D), tqdm dependency
-- [x] 91-02-PLAN.md -- Standalone CLI refresh_ctf.py with multiprocessing, tqdm, incremental state, all CLI flags
-- [x] 91-03-PLAN.md -- Phase 2c pipeline integration into run_all_feature_refreshes.py
+- [x] 101-01: Remove/wire blend_vol_simple + create Phase 82 VERIFICATION.md + update Phase 92 VERIFICATION.md
+- [x] 101-02: Document dim_ctf_feature_selection downstream consumer status
 
 ---
 
-### Phase 92: CTF IC Analysis & Feature Selection
-**Goal:** Score CTF features through the existing IC pipeline, identify which cross-timeframe indicators have genuine predictive power, and prune config to high-IC combinations
-**Depends on:** Phase 91 (CTF data must be populated), Phase 80 (IC analysis tools)
+### Phase 102: Indicator Research Framework
+**Goal:** Build a statistically rigorous testing harness for indicator discovery that controls for multiple comparisons, before testing any new indicators.
+**Depends on:** Phase 98 (IC sweep infrastructure, feature_selection pipeline)
+**Requirements:** IND-01, IND-02, IND-03, IND-04, IND-05
 **Success Criteria** (what must be TRUE):
-  1. `load_ctf_features()` pivot function in cross_timeframe.py: loads normalized ctf rows, pivots to wide format (one column per indicator×ref_tf×composite), returns DataFrame compatible with batch_compute_ic()
-  2. IC analysis completed for all CTF features on BTC (id=1) at 1D base_tf
-  3. Multi-asset IC analysis across top 10 assets by data coverage
-  4. CTF features classified through existing feature_selection.py tier system (active/conditional/watch/archive)
-  5. Comparison report: CTF feature IC-IR vs AMA feature IC-IR — quantifies whether CTF adds non-redundant alpha
-  6. ctf_config.yaml pruned to retain only high-IC indicator×ref_tf combinations (save disk)
-  7. Results persisted to separate dim_ctf_feature_selection table (keeps CTF analysis independent from Phase 80 entries, per CONTEXT.md decision)
-**Plans:** 4 plans in 4 waves (3 original + 1 gap closure)
+  1. A `permutation_ic_test()` function shuffles forward returns N times (default 1,000), computes IC on each shuffle, and returns empirical p-value; an indicator's IC must exceed the 95th percentile of the null distribution to be considered significant
+  2. A `fdr_control()` function implements Benjamini-Hochberg across a batch of indicator IC results and returns the subset that passes at a configurable FDR threshold (default 5%); tested with synthetic data where known-null indicators are correctly rejected
+  3. A `haircut_sharpe()` function implements Harvey & Liu (2015) adjustment that penalizes observed Sharpe based on the total number of indicators ever tested; reads from the trial registry
+  4. A `trial_registry` table (Alembic migration) logs every indicator × parameterization × timeframe × asset combination tested, with timestamp, IC, p-value, and pass/fail status; `SELECT COUNT(*) FROM trial_registry` is never zero after any IC sweep runs
+  5. A `block_bootstrap_ic()` function preserves autocorrelation structure via block bootstrap (configurable block size) when testing IC significance; produces confidence intervals that are wider than naive i.i.d. bootstrap for autocorrelated series
+**Plans:** 3 plans
 
 Plans:
-- [x] 92-01-PLAN.md -- load_ctf_features() pivot loader + dim_ctf_feature_selection Alembic migration
-- [x] 92-02-PLAN.md -- run_ctf_ic_sweep.py: batch IC computation for all CTF features across all assets and base TFs
-- [x] 92-03-PLAN.md -- run_ctf_feature_selection.py: tier classification, AMA comparison report, config pruning, DB persistence
-- [ ] 92-04-PLAN.md -- Gap closure: full-universe CTF refresh + IC sweep + feature selection re-run
+- [x] 102-01: Alembic migration for trial_registry table + permutation IC test + FDR control functions
+- [x] 102-02: Haircut Sharpe (Harvey & Liu 2015) + block bootstrap IC + integration with existing IC sweep scripts
+- [x] 102-03: Wire trial registry logging into run_ic_sweep.py and run_ctf_ic_sweep.py + validation tests
 
 ---
+
+### Phase 103: Traditional TA Expansion
+**Goal:** Add 20-30 well-known technical indicators to the indicator library, run each through the Phase 102 harness, and promote survivors to the features table.
+**Depends on:** Phase 102 (research framework must exist before testing)
+**Requirements:** IND-06, IND-07, IND-08
+**Success Criteria** (what must be TRUE):
+  1. `indicators.py` (or a new `indicators_extended.py`) exports at least 20 new indicator functions covering: Ichimoku Cloud (tenkan/kijun/senkou/chikou), Williams %R, Keltner Channels, CCI, Elder Ray (bull/bear power), Force Index, VWAP, Chaikin Money Flow, Chaikin Oscillator, Hurst exponent, VIDYA, FRAMA, Aroon, Trix, Ultimate Oscillator, Vortex Indicator, Ease of Movement, Mass Index, KST Oscillator, Coppock Curve
+  2. Every new indicator has a corresponding entry in `trial_registry` after the IC sweep; `SELECT COUNT(DISTINCT indicator_name) FROM trial_registry WHERE phase = 103` returns 20+
+  3. Indicators that pass FDR control at 5% are added to `dim_feature_registry` with `is_active = true`; rejects are logged with `is_active = false` and their IC/p-values preserved for audit
+**Plans:** 3 plans
+
+Plans:
+- [x] 103-01-PLAN.md — Implement all 20 indicator functions in indicators_extended.py
+- [x] 103-02-PLAN.md — Wire into TAFeature pipeline: Alembic migration seeding dim_indicators + extending compute_features dispatch
+- [x] 103-03-PLAN.md — IC sweep through Phase 102 harness, FDR control at 5%, promote survivors, log rejects
+
+---
+
+### Phase 104: Crypto-Native Indicators
+**Goal:** Build a venue-agnostic normalized input layer for OI/funding/volume data and derive crypto-specific indicators, validated through the Phase 102 harness.
+**Depends on:** Phase 102 (research framework), Phase 103 (indicator patterns established)
+**Requirements:** IND-09, IND-10, IND-11, IND-12
+**Success Criteria** (what must be TRUE):
+  1. A normalized input layer (views or ETL functions) maps venue-specific tables (`hl_open_interest`, `hl_funding_rates`, `hl_candles`, future `bybit_*`/`binance_*`) into a unified schema: `(asset_id, venue_id, ts, oi, funding_rate, volume, close)` — adding a new venue requires only a new mapper, not indicator code changes
+  2. At least 8 crypto-native indicator functions are implemented: OI momentum (rate of change), OI-price divergence (z-score), funding rate z-score, funding rate momentum, volume-OI regime classifier (Kaufman Ch.12 matrix), Force Index (Elder), OI concentration ratio, liquidation pressure proxy (extreme funding + rising OI)
+  3. All crypto-native indicators have trial_registry entries; survivors pass FDR at 5% and are promoted to `dim_feature_registry` with `source_type = 'crypto_native'`
+  4. The normalized layer handles missing venue data gracefully (venue not yet onboarded returns empty DataFrame, not an error); tested with at least one mock venue
+**Plans:** 3 plans
+
+Plans:
+- [x] 104-01: Venue-agnostic normalized input layer + mapper for Hyperliquid tables
+- [x] 104-02: Implement crypto-native indicators (OI momentum, OI-price divergence, funding z-score, funding momentum, volume-OI regime, Force Index, OI concentration, liquidation pressure)
+- [x] 104-03: IC sweep through Phase 102 harness, promote survivors, log rejects
+
+---
+
+### Phase 105: Parameter Optimization
+**Goal:** Systematic parameter sweep for all indicators that survived Phases 103-104, using overfitting-aware methods that prefer broad plateaus over sharp peaks.
+**Depends on:** Phase 103, Phase 104 (surviving indicators to optimize)
+**Requirements:** IND-13, IND-14, IND-15
+**Success Criteria** (what must be TRUE):
+  1. A parameter sweep framework runs grid search or Optuna Bayesian search over each surviving indicator's parameter space; results stored in `trial_registry` with `sweep_id` grouping all parameter variants of the same indicator
+  2. A `plateau_score()` function measures the width of the IC-positive region around the optimal parameter set (e.g., fraction of neighboring parameters within 80% of peak IC); parameters are selected from the broadest plateau, not the sharpest peak
+  3. A `rolling_stability_test()` runs the optimal parameter set on 5+ non-overlapping time windows and rejects parameters where IC sign flips in >1 window or IC coefficient of variation exceeds a threshold
+  4. DSR is computed over the full parameter search space (total N = all parameter combinations tested for that indicator), not just the winning parameter; the DSR-adjusted Sharpe is stored alongside the raw Sharpe in trial_registry
+**Plans:** 3 plans
+
+Plans:
+- [x] 105-01: Parameter sweep framework (grid + Optuna modes) with trial_registry integration and sweep_id grouping
+- [x] 105-02: Plateau scoring + rolling stability test + DSR over full search space
+- [x] 105-03: Execute parameter sweeps for Phase 103-104 survivors, select final parameterizations
+
+---
+
+### Phase 106: Custom Composite Indicators
+**Goal:** Develop proprietary composite indicators that combine multiple signal sources into novel features not available off-the-shelf, validated under the strictest testing regime (full CPCV + permutation + FDR + held-out validation).
+**Depends on:** Phase 105 (optimized base indicators available as building blocks)
+**Requirements:** IND-16, IND-17, IND-18
+**Success Criteria** (what must be TRUE):
+  1. At least 6 custom composite indicators are implemented: AMA efficiency ratio as regime signal (Kaufman insight), OI-divergence × CTF agreement interaction, funding-adjusted momentum (momentum penalized by extreme funding), cross-asset lead-lag composite (Asset A's CTF predicts Asset B), TF alignment score (count of agreeing timeframes as meta-feature), volume-regime gated trend (trend signal suppressed when volume-OI says congestion)
+  2. Each composite is validated with the full battery: permutation IC test (p < 0.05), FDR control across all composites, CPCV with purge+embargo, AND a held-out time period (most recent 20% of data) never used during development
+  3. Composites that pass all four validation layers are promoted to `dim_feature_registry` with `source_type = 'proprietary'` and documented with their construction logic; at least 2 composites survive the full gauntlet
+**Plans:** 3 plans
+
+Plans:
+- [x] 106-01: Implement composite indicators (AMA ER regime, OI×CTF interaction, funding-adjusted momentum, lead-lag composite, TF alignment score, volume-regime gated trend)
+- [x] 106-02: Composite refresh orchestrator + run for all assets
+- [x] 106-03: Full validation gauntlet (permutation + FDR + CPCV + held-out) + COMPOSITES.md documentation
+
+---
+
+### Phase 107: Pipeline Operations Dashboard
+**Goal:** Streamlit ops page with real-time stage monitor, run history, trigger/kill buttons, and pipeline_stage_log table for per-stage DB persistence.
+**Depends on:** Phase 87 (pipeline_run_log exists), run_daily_refresh.py infrastructure
+**Requirements:** DASH-01, DASH-02, DASH-03, DASH-04, DASH-05
+**Success Criteria** (what must be TRUE):
+  1. `pipeline_stage_log` table exists with per-stage start/end/status/rows columns, FK to pipeline_run_log
+  2. `run_daily_refresh.py --all` writes pipeline_stage_log rows as it runs each stage (25 stages in STAGE_ORDER)
+  3. Streamlit page shows active run with real-time progress bars, auto-refreshing every 90s via @st.fragment
+  4. Run history panel shows last 10 runs with per-stage timing breakdown
+  5. Trigger panel with "Run Full Refresh" and "Run From Stage" buttons using subprocess.Popen (DETACHED_PROCESS on Windows)
+  6. Kill button creates .pipeline_kill sentinel file; run_daily_refresh.py checks between stages and stops gracefully
+**Plans:** 2 plans in 2 waves
+
+Plans:
+- [ ] 107-01-PLAN.md -- Alembic migration (pipeline_stage_log + killed status) + run_daily_refresh.py instrumentation (stage logging + kill switch)
+- [ ] 107-02-PLAN.md -- Streamlit page 19 (active monitor + trigger panel + run history) + queries module + app.py registration
+
+---
+
+### Phase 108: Pipeline Batch Performance
+**Goal:** Eliminate per-key SQL queries across the pipeline. Replace individual queries per (id, tf, period, venue_id) with batch SQL operations using PARTITION BY. Add EMA fast-path for recent watermarks.
+**Depends on:** None (independent performance optimization)
+**Requirements:** PERF-01, PERF-02, PERF-03, PERF-04, PERF-05
+**Success Criteria** (what must be TRUE):
+  1. Full --all incremental pipeline completes in < 2 hours (currently 5-6 hours)
+  2. EMA returns scripts iterate ~492 IDs (not 2M+ keys) with PARTITION BY batch SQL
+  3. EMA fast-path skips 15-year history reload for recent watermarks
+  4. AMA and bar returns use per-ID batch SQL
+  5. All returns tables have identical data before and after optimization
+**Plans:** 5 plans in 2 waves
+
+Plans:
+- [ ] 108-01-PLAN.md -- EMA returns batch (3 scripts: multi_tf, cal, cal_anchor)
+- [ ] 108-02-PLAN.md -- EMA fast-path (recent watermark -> recursive forward compute)
+- [ ] 108-03-PLAN.md -- AMA returns batch (bulk watermark + source-advance skip)
+- [ ] 108-04-PLAN.md -- Bar returns batch (per-ID with PARTITION BY tf, venue_id)
+- [ ] 108-05-PLAN.md -- Integration validation (full pipeline timing + data correctness)
+
+---
+
+### Phase 112: Pipeline Architecture Separation
+**Goal:** Split the monolithic run_daily_refresh.py into 5 distinct pipelines (Data, Features, Signals, Execution, Monitoring) with clear boundaries, triggers, and deployment topology.
+**Depends on:** Phase 107 (ops dashboard provides monitoring UI), Phase 108 (batch performance)
+**Requirements:** PIPE-01, PIPE-02, PIPE-03, PIPE-04
+**Success Criteria** (what must be TRUE):
+  1. Five distinct entry points exist: `run_data_pipeline`, `run_features_pipeline`, `run_signals_pipeline`, `run_execution_pipeline`, `run_monitoring_pipeline` -- each independently invocable
+  2. Data pipeline (sync VMs, bars, returns_bars) runs as standalone with clear input/output contracts
+  3. Research pipeline already separate (IC sweeps, feature selection are ad-hoc scripts, not part of any pipeline)
+  4. Execution pipeline (calibrate_stops, portfolio, executor) supports polling loop for VM deployment
+  5. Monitoring pipeline (drift, alerts, stats) runs independently on timer cadence
+  6. Pipeline handoff contracts documented: what tables/artifacts each pipeline reads and writes
+
+---
+
+### Phase 113: VM Execution Deployment
+**Goal:** Deploy the execution pipeline on the Oracle Singapore VM so it can run 24/7 independently of the local PC. Real-time WebSocket price feeds (HL/Kraken/Coinbase) for stop/TP execution, daily signal sync from local, results sync back.
+**Depends on:** Phase 112 (pipeline separation — execution pipeline must exist as standalone), Phase 96 (executor activation — paper executor must work)
+**Requirements:** DEPLOY-01, DEPLOY-02, DEPLOY-03, DEPLOY-04
+**Success Criteria** (what must be TRUE):
+  1. Small PostgreSQL on Oracle VM holds ~25 execution-relevant tables: signals, execution, config, monitoring, dimensions, portfolio
+  2. `sync_signals_to_vm` script pushes signals from local DB to VM after daily refresh (signals, not features)
+  3. `sync_results_from_vm` script pulls fills, positions, drift metrics, risk events from VM back to local DB for research/dashboard
+  4. Real-time WebSocket price feeds (Hyperliquid + Kraken + Coinbase) provide sub-second prices for stop/TP monitoring and fill simulation
+  5. Executor runs as a systemd service on VM, auto-restarts on failure with crash-loop protection, logs to journald
+  6. Paper trading operates for 7+ days without manual intervention (beyond daily signal sync)
+**Plans**: 7 plans in 4 waves
+
+Plans:
+- [ ] 113-01-PLAN.md -- VM PostgreSQL table setup (DDL extraction + dimension seeding)
+- [ ] 113-02-PLAN.md -- PriceCache + WebSocket feeds (HL/Kraken/Coinbase)
+- [ ] 113-03-PLAN.md -- Signal push + config sync (local to VM)
+- [ ] 113-04-PLAN.md -- Results pull (VM to local)
+- [ ] 113-05-PLAN.md -- Stop/TP monitor + position sizer VM fallback
+- [ ] 113-06-PLAN.md -- Executor service entry point + requirements
+- [ ] 113-07-PLAN.md -- Systemd unit + deploy scripts + verification
+
+---
+
+### Phase 114: Hosted Dashboard
+**Goal:** Host the Streamlit dashboard on the Oracle VM behind nginx + SSL so it's accessible from any device (mobile, VM, local PC) without requiring the local PC to be on.
+**Depends on:** Phase 113 (VM has execution data), Phase 107 (ops dashboard exists)
+**Requirements:** DASH-06, DASH-07, DASH-08
+**Success Criteria** (what must be TRUE):
+  1. nginx reverse proxy with Let's Encrypt SSL certificate serves Streamlit on HTTPS
+  2. `sync_dashboard_to_vm` script pushes dashboard-relevant tables (strategy_bakeoff_results, backtest_metrics, regime_stats, etc.) from local to VM
+  3. Basic auth or token-based access control prevents unauthorized access
+  4. Dashboard loads and renders correctly on mobile browser (responsive layout verified)
+  5. Execution-related pages (PnL, positions, orders, drift) query VM-local data with <2s page load
+
+**Plans:** 5 plans in 3 waves
+
+Plans:
+- [x] 114-01-PLAN.md -- sync_dashboard_to_vm.py data push script (local to VM)
+- [x] 114-02-PLAN.md -- VM environment setup (venv, DB schema, systemd Streamlit service)
+- [x] 114-03-PLAN.md -- nginx reverse proxy + Let's Encrypt SSL + basic auth
+- [x] 114-04-PLAN.md -- Mobile responsive CSS + refresh button
+- [x] 114-05-PLAN.md -- Master deploy script + end-to-end verification
+---
+
+### v1.3.0 Progress
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 96. Executor Activation | 4/4 | Complete | 2026-03-30 |
+| 97. FRED Macro Expansion | 0/TBD | Not started | - |
+| 98. CTF Feature Graduation | 0/TBD | Not started | - |
+| 99. Backtest Scaling | 0/TBD | Not started | - |
+| 100. ML Signal Combination | 3/3 | Complete | 2026-04-01 |
+| 101. Tech Debt Cleanup | 0/TBD | Not started | - |
+| 102. Indicator Research Framework | 0/3 | Not started | - |
+| 103. Traditional TA Expansion | 0/TBD | Not started | - |
+| 104. Crypto-Native Indicators | 0/TBD | Not started | - |
+| 105. Parameter Optimization | 0/TBD | Not started | - |
+| 106. Custom Composite Indicators | 0/TBD | Not started | - |
+| 107. Pipeline Operations Dashboard | 2/2 | Complete | 2026-04-01 |
+| 108. Pipeline Batch Performance | 0/5 | Not started | - |
+| 109. Pipeline Architecture Separation | 0/TBD | Not started | - |
+| 110. VM Execution Deployment | 0/TBD | Not started | - |
+| 111. Hosted Dashboard | 0/TBD | Not started | - |
+
+### v1.3.0 Requirement Coverage
+
+| Category | Requirements | Phase | Count |
+|----------|--------------|-------|-------|
+| Operational Activation | OPS-01, OPS-02, OPS-03, OPS-04, OPS-05, OPS-06 | Phase 96 | 6 |
+| Macro Expansion | MACRO-01, MACRO-02 | Phase 97 | 2 |
+| CTF Research Expansion | CTF-01, CTF-02, CTF-03, CTF-04 | Phase 98 | 4 |
+| Backtest Expansion | BT-01, BT-02, BT-03, BT-04, BT-05, BT-06, BT-07 | Phase 99 | 7 |
+| ML Signal Combination | ML-01, ML-02, ML-03 | Phase 100 | 3 |
+| Tech Debt Cleanup | DEBT-01, DEBT-02, DEBT-03, DEBT-04 | Phase 101 | 4 |
+| Indicator Research Framework | IND-01, IND-02, IND-03, IND-04, IND-05 | Phase 102 | 5 |
+| Traditional TA Expansion | IND-06, IND-07, IND-08 | Phase 103 | 3 |
+| Crypto-Native Indicators | IND-09, IND-10, IND-11, IND-12 | Phase 104 | 4 |
+| Parameter Optimization | IND-13, IND-14, IND-15 | Phase 105 | 3 |
+| Custom Composites | IND-16, IND-17, IND-18 | Phase 106 | 3 |
+| Pipeline Performance | PERF-01, PERF-02, PERF-03, PERF-04, PERF-05 | Phase 108 | 5 |
+| Pipeline Ops Dashboard | DASH-01, DASH-02, DASH-03, DASH-04, DASH-05 | Phase 107 | 5 |
+
+**Coverage:** 54/54 requirements mapped
+
+</details>
+
 *Created: 2025-01-22*
-*Last updated: 2026-03-24 (Phase 92 gap closure: plan 04 added)*
+*Last updated: 2026-04-02 (v1.3.0 SHIPPED — 19 phases, 67 plans, Phases 96-114)*

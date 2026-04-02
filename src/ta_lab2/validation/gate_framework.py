@@ -214,7 +214,7 @@ def query_mean_slippage_bps(
     """Return (mean_abs_slippage_bps, n_fills) for the period.
 
     For paper trading fills:
-      - Reference price = price_bars_multi_tf.open at fill date (1D tf).
+      - Reference price = price_bars_multi_tf_u.open at fill date (1D tf).
       - Slippage bps = ABS(fill_price - bar_open) / bar_open * 10000.
 
     Returns (0.0, 0) when no fills exist in the period.
@@ -235,9 +235,11 @@ def query_mean_slippage_bps(
             COUNT(*)                                   AS n_fills
         FROM fills f
         JOIN orders o ON f.order_id = o.order_id
-        JOIN price_bars_multi_tf pb
+        JOIN price_bars_multi_tf_u pb
             ON  pb.id   = o.asset_id
             AND pb.tf   = '1D'
+            AND pb.venue_id = 1
+            AND pb.alignment_source = 'multi_tf'
             AND pb.ts::date = f.filled_at::date
         WHERE f.filled_at::date BETWEEN :start_date AND :end_date
         """
@@ -508,7 +510,7 @@ def build_gate_scorecard(
             threshold="< 50 bps (mean absolute)",
             measured_value=f"{mean_slip_bps:.1f} bps (mean abs, N={n_fills} fills)",
             status=score_gate(mean_slip_bps, 50.0, "below"),
-            evidence_sources=["fills", "orders", "price_bars_multi_tf"],
+            evidence_sources=["fills", "orders", "price_bars_multi_tf_u"],
         )
 
     # ------------------------------------------------------------------

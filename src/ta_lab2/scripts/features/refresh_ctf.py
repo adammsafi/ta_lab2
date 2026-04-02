@@ -55,6 +55,7 @@ class CTFWorkerTask:
     ref_tf_filter: Optional[list[str]]  # None = all from YAML
     indicator_filter: Optional[list[str]]  # None = all active
     dry_run: bool
+    use_polars: bool = False
 
 
 @dataclass
@@ -339,6 +340,7 @@ def _ctf_worker(task: CTFWorkerTask) -> dict:
             alignment_source=task.alignment_source,
             venue_id=task.venue_id,
             yaml_path=effective_yaml_path,
+            use_polars=task.use_polars,
         )
         feature = CTFFeature(config=config, engine=engine)
 
@@ -625,6 +627,18 @@ def parse_args() -> argparse.Namespace:
         help="Venue ID to process (default: 1 = CMC_AGG).",
     )
 
+    # Polars acceleration
+    parser.add_argument(
+        "--use-polars",
+        action="store_true",
+        default=False,
+        help=(
+            "Use polars join_asof for timeframe alignment (faster). "
+            "Strips UTC from timestamps before join and restores after. "
+            "Falls back to pandas merge_asof if polars is not installed."
+        ),
+    )
+
     # Logging
     parser.add_argument(
         "--log-level",
@@ -649,6 +663,7 @@ def refresh_ctf_step(
     workers: Optional[int] = None,
     alignment_source: str = "multi_tf",
     dry_run: bool = False,
+    use_polars: bool = False,
 ) -> RefreshResult:
     """Run CTF refresh as a pipeline step.
 
@@ -671,6 +686,9 @@ def refresh_ctf_step(
         Source alignment filter.
     dry_run:
         If True, report without writing.
+    use_polars:
+        If True, use polars join_asof for timeframe alignment (faster).
+        Passed to CTFConfig via CTFWorkerTask. Default: False.
 
     Returns
     -------
@@ -691,6 +709,7 @@ def refresh_ctf_step(
             ref_tf_filter=None,
             indicator_filter=None,
             dry_run=dry_run,
+            use_polars=use_polars,
         )
         for asset_id in ids
     ]
@@ -841,6 +860,8 @@ def main() -> int:
 
     # Build task list (one task per asset)
     db_url = str(TARGET_DB_URL)
+    use_polars = getattr(args, "use_polars", False)
+    logger.info("Polars acceleration: %s", "enabled" if use_polars else "disabled")
     tasks = [
         CTFWorkerTask(
             asset_id=asset_id,
@@ -852,6 +873,7 @@ def main() -> int:
             ref_tf_filter=args.ref_tfs,
             indicator_filter=args.indicators,
             dry_run=args.dry_run,
+            use_polars=use_polars,
         )
         for asset_id in ids
     ]

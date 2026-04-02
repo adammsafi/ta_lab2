@@ -86,7 +86,7 @@ def _generate_notebook(
     cell1_source = f"""\
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
-from ta_lab2.db.config import resolve_db_url
+from ta_lab2.scripts.refresh_utils import resolve_db_url
 from IPython.display import display
 import pandas as pd
 import plotly.graph_objects as go
@@ -394,7 +394,7 @@ def main(argv: list[str] | None = None) -> int:
         from sqlalchemy import create_engine
         from sqlalchemy.pool import NullPool
 
-        from ta_lab2.db.config import resolve_db_url
+        from ta_lab2.scripts.refresh_utils import resolve_db_url
 
         db_url = args.db_url or resolve_db_url()
         engine = create_engine(db_url, poolclass=NullPool)

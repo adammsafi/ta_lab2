@@ -429,7 +429,7 @@ class AuditChecker:
         sql = text(
             """
             SELECT id, MAX(ts) AS latest_ts
-            FROM price_bars_multi_tf
+            FROM price_bars_multi_tf_u
             WHERE tf = '1D'
             GROUP BY id
             HAVING MAX(ts) < now() - interval '28 hours'

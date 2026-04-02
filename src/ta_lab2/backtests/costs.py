@@ -96,9 +96,27 @@ HYPERLIQUID_COST_MATRIX: List[CostModel] = [
 ]
 
 # ---------------------------------------------------------------------------
+# Lean cost matrix: 3 representative costs spanning the full range
+# For fast screening (Pass 1) before deep 18-cost analysis (Pass 2)
+# ---------------------------------------------------------------------------
+LEAN_COST_MATRIX: List[CostModel] = [
+    # Low cost: HL maker + tight spread (7.41 bps total)
+    CostModel(
+        fee_bps=_HL_MAKER_FEE_BPS,
+        slippage_bps=3.0,
+        funding_bps_day=_HL_FUNDING_BPS_DAY,
+    ),
+    # Mid cost: Kraken spot maker + medium slip (26 bps total)
+    CostModel(fee_bps=_SPOT_MAKER_FEE_BPS, slippage_bps=10.0, funding_bps_day=0.0),
+    # High cost: Kraken spot taker + wide slip (46 bps total)
+    CostModel(fee_bps=_SPOT_TAKER_FEE_BPS, slippage_bps=20.0, funding_bps_day=0.0),
+]
+
+# ---------------------------------------------------------------------------
 # Registry: maps exchange name -> cost matrix for multi-exchange bake-offs
 # ---------------------------------------------------------------------------
 COST_MATRIX_REGISTRY: Dict[str, List[CostModel]] = {
     "kraken": KRAKEN_COST_MATRIX,
     "hyperliquid": HYPERLIQUID_COST_MATRIX,
+    "lean": LEAN_COST_MATRIX,
 }

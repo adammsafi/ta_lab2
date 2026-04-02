@@ -81,6 +81,13 @@ ALL_BUILDERS = [
         supports_full_rebuild=False,
     ),
     BuilderConfig(
+        name="sync_1d_to_u",
+        script_path="sync_1d_to_multi_tf_u.py",
+        description="Sync 1D bars into price_bars_multi_tf_u (upstream of EMAs)",
+        requires_tz=False,
+        supports_full_rebuild=False,
+    ),
+    BuilderConfig(
         name="multi_tf",
         script_path="refresh_price_bars_multi_tf.py",
         description="Multi-timeframe rolling bars (7d, 14d, ...)",

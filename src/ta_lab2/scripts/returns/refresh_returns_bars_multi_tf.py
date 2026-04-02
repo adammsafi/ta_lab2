@@ -5,22 +5,26 @@ refresh_returns_bars_multi_tf.py
 
 Incremental bar returns builder (wide-column, dual-LAG) from bar snapshots.
 
-Source:  public.price_bars_multi_tf
-Writes:  public.returns_bars_multi_tf
-State:   public.returns_bars_multi_tf_state  (watermark per (id, tf): last_timestamp)
+Source:  public.price_bars_multi_tf_u
+Writes:  public.returns_bars_multi_tf_u
+State:   public.returns_bars_multi_tf_state  (watermark per (id, venue_id, tf): last_timestamp)
 
 Semantics:
   - Processes BOTH roll=TRUE (snapshot/rolling) and roll=FALSE (bar boundary) rows
     in a unified timeline ordered by "timestamp".
   - _roll columns: unified LAG (previous row regardless of roll). Populated on ALL rows.
-  - Canonical columns (no suffix): partitioned LAG within roll=FALSE partition. NULL on roll=TRUE rows.
+  - Canonical columns (no suffix): partitioned LAG within roll=FALSE partition. NULL on roll=TRUE.
   - gap_bars = bar_seq - prev_bar_seq (canonical partition only, NULL on roll=TRUE)
   - range = high - low, range_pct = (high - low) / close
-  - true_range = GREATEST(high-low, |high-prev_close|, |low-prev_close|),
-    true_range_pct = true_range / close
-  - PK: (id, "timestamp", tf, venue); roll is a regular boolean column.
-  - Incremental: inserts rows where "timestamp" > last_timestamp per (id,tf)
-    seeds 2 canonical rows before watermark for delta2 history.
+  - true_range = GREATEST(high-low, |high-prev_close|, |low-prev_close|)
+  - PK: (id, "timestamp", tf, venue_id); roll is a regular boolean column.
+
+Batch architecture (v2):
+  - Iterates over IDs (~492) instead of (id, tf, venue_id) keys (~120K).
+  - One SQL CTE per ID computes returns for ALL (tf, venue_id) combos using
+    PARTITION BY (tf, venue_id) in all LAG window functions.
+  - Per-key watermarks loaded in bulk and injected via a VALUES CTE.
+  - Source-advance skip: IDs with no new rows are skipped before SQL execution.
 
 Run (Spyder):
 runfile(
@@ -32,16 +36,17 @@ runfile(
 
 import argparse
 import os
+from dataclasses import dataclass
 from functools import partial
 from multiprocessing import Pool
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.pool import NullPool
 
 
-DEFAULT_BARS_TABLE = "public.price_bars_multi_tf"
+DEFAULT_BARS_TABLE = "public.price_bars_multi_tf_u"
 DEFAULT_OUT_TABLE = "public.returns_bars_multi_tf_u"
 DEFAULT_STATE_TABLE = "public.returns_bars_multi_tf_state"
 ALIGNMENT_SOURCE = "multi_tf"
@@ -93,11 +98,7 @@ _VALUE_COLS = [
     "range_pct",
     "true_range",
     "true_range_pct",
-    # NOTE: z-score columns (ret_arith_zscore_30/90/365, etc.) and is_outlier
-    # are NOT computed here. They are populated by the standalone post-processor:
-    #   refresh_returns_zscore.py
-    # Including them here would cause "column does not exist" errors in the
-    # INSERT ... SELECT CTE (which only computes base returns/deltas/ranges).
+    # NOTE: z-score columns and is_outlier populated by refresh_returns_zscore.py
 ]
 
 _INSERT_COLS = (
@@ -185,7 +186,8 @@ def _ensure_tables(engine: Engine, out_table: str, state_table: str) -> None:
         """
     )
     idx_sql = text(
-        f'CREATE INDEX IF NOT EXISTS ix_{tbl}_id_tf_vid_ts ON {out_table} (id, tf, venue_id, "timestamp");'
+        f"CREATE INDEX IF NOT EXISTS ix_{tbl}_id_tf_vid_ts"
+        f' ON {out_table} (id, tf, venue_id, "timestamp");'
     )
     state_sql = text(
         f"""
@@ -205,15 +207,16 @@ def _ensure_tables(engine: Engine, out_table: str, state_table: str) -> None:
         cxn.execute(state_sql)
 
 
-def _load_keys(
+def _load_ids(
     engine: Engine,
     bars_table: str,
     ids: Optional[List[int]],
     alignment_source: Optional[str] = None,
     venue_ids: Optional[List[int]] = None,
-) -> List[Tuple[int, str, int]]:
+) -> List[int]:
+    """Return distinct IDs from the source bars table."""
     where_parts: list[str] = []
-    params: dict = {}
+    params: dict[str, Any] = {}
     if ids is not None:
         where_parts.append("id = ANY(:ids)")
         params["ids"] = ids
@@ -224,306 +227,364 @@ def _load_keys(
         where_parts.append("venue_id = ANY(:venue_ids)")
         params["venue_ids"] = venue_ids
     where = ("WHERE " + " AND ".join(where_parts)) if where_parts else ""
-    sql = text(
-        f"SELECT DISTINCT id, tf, venue_id FROM {bars_table} {where} ORDER BY 1,2,3;"
-    )
+    sql = text(f"SELECT DISTINCT id FROM {bars_table} {where} ORDER BY 1;")
     with engine.begin() as cxn:
         rows = cxn.execute(sql, params).fetchall()
-    return [(int(r[0]), str(r[1]), int(r[2])) for r in rows]
+    return [int(r[0]) for r in rows]
 
 
-def _ensure_state_rows(
-    engine: Engine, state_table: str, keys: List[Tuple[int, str, int]]
+def _load_watermarks(
+    engine: Engine,
+    state_table: str,
+    id_: int,
+) -> Dict[Tuple[str, int], Any]:
+    """Bulk-load all (tf, venue_id) -> last_timestamp entries for one ID."""
+    sql = text(f"SELECT tf, venue_id, last_timestamp FROM {state_table} WHERE id = :id")
+    with engine.begin() as cxn:
+        rows = cxn.execute(sql, {"id": id_}).fetchall()
+    return {(str(r[0]), int(r[1])): r[2] for r in rows}
+
+
+def _ensure_state_rows_for_id(
+    engine: Engine,
+    state_table: str,
+    bars_table: str,
+    id_: int,
+    alignment_source: Optional[str],
+    venue_ids: Optional[List[int]],
 ) -> None:
-    if not keys:
-        return
-    ins = text(
+    """Batch-insert NULL state rows for all (tf, venue_id) combos of one ID."""
+    where_parts = ["id = :id"]
+    params: dict[str, Any] = {"id": id_}
+    if alignment_source is not None:
+        where_parts.append("alignment_source = :as_filter")
+        params["as_filter"] = alignment_source
+    if venue_ids is not None:
+        where_parts.append("venue_id = ANY(:venue_ids)")
+        params["venue_ids"] = venue_ids
+    where = " AND ".join(where_parts)
+    sql = text(
         f"""
         INSERT INTO {state_table} (id, venue_id, tf, last_timestamp)
-        VALUES (:id, :venue_id, :tf, NULL)
+        SELECT DISTINCT id, venue_id, tf, NULL::timestamptz
+        FROM {bars_table}
+        WHERE {where}
         ON CONFLICT (id, venue_id, tf) DO NOTHING;
         """
     )
     with engine.begin() as cxn:
-        for i, tf, venue_id in keys:
-            cxn.execute(ins, {"id": i, "venue_id": venue_id, "tf": tf})
+        cxn.execute(sql, params)
 
 
-def _full_refresh(
+def _full_refresh_id(
     engine: Engine,
     out_table: str,
     state_table: str,
-    keys: List[Tuple[int, str, int]],
+    id_: int,
+    venue_ids: Optional[List[int]],
 ) -> None:
-    if not keys:
-        return
-    _print(
-        f"--full-refresh: deleting existing rows for {len(keys)} (id,tf,venue_id) keys and resetting state."
-    )
-    del_out = text(
-        f"DELETE FROM {out_table} WHERE id = :id AND tf = :tf AND venue_id = :venue_id AND alignment_source = :alignment_source;"
-    )
-    del_state = text(
-        f"DELETE FROM {state_table} WHERE id = :id AND tf = :tf AND venue_id = :venue_id;"
-    )
+    """Delete output rows and state entries for one ID."""
+    venue_filter = ""
+    del_out_params: dict[str, Any] = {
+        "id": id_,
+        "alignment_source": ALIGNMENT_SOURCE,
+    }
+    del_state_params: dict[str, Any] = {"id": id_}
+    if venue_ids is not None:
+        venue_filter = "AND venue_id = ANY(:venue_ids)"
+        del_out_params["venue_ids"] = venue_ids
+        del_state_params["venue_ids"] = venue_ids
     with engine.begin() as cxn:
-        for i, tf, venue_id in keys:
-            params = {
-                "id": i,
-                "tf": tf,
-                "venue_id": venue_id,
-                "alignment_source": ALIGNMENT_SOURCE,
-            }
-            cxn.execute(del_out, params)
-            del_state_params = {"id": i, "tf": tf, "venue_id": venue_id}
-            cxn.execute(del_state, del_state_params)
-    _ensure_state_rows(engine, state_table, keys)
+        cxn.execute(
+            text(
+                f"DELETE FROM {out_table} WHERE id = :id {venue_filter}"
+                " AND alignment_source = :alignment_source;"
+            ),
+            del_out_params,
+        )
+        cxn.execute(
+            text(f"DELETE FROM {state_table} WHERE id = :id {venue_filter};"),
+            del_state_params,
+        )
 
 
 # ---------------------------------------------------------------------------
-# Core: process one (id, tf) key
+# RunnerConfig + batch core
 # ---------------------------------------------------------------------------
 
 
-def _run_one_key(
+@dataclass(frozen=True)
+class RunnerConfig:
+    db_url: str
+    bars_table: str
+    out_table: str
+    state_table: str
+    start: str
+    src_alignment_source: Optional[str]
+    venue_ids: Optional[List[int]]
+
+
+def _build_wm_cte(id_: int, watermarks: Dict[Tuple[str, int], Any]) -> str:
+    """Build watermark VALUES CTE string for embedding in batch SQL."""
+    if not watermarks:
+        return (
+            "wm (id, tf, venue_id, last_timestamp) AS ("
+            " SELECT NULL::integer, NULL::text, NULL::smallint, NULL::timestamptz"
+            " WHERE FALSE),"
+        )
+    rows = []
+    for (tf, vid), ts in watermarks.items():
+        ts_expr = f"'{ts}'::timestamptz" if ts is not None else "NULL::timestamptz"
+        rows.append(f"({id_!r}::integer, {tf!r}::text, {vid!r}::smallint, {ts_expr})")
+    wm_rows = ",\n            ".join(rows)
+    return (
+        f"wm (id, tf, venue_id, last_timestamp) AS (\n"
+        f"            VALUES\n"
+        f"            {wm_rows}\n"
+        f"        ),"
+    )
+
+
+def _run_one_id(cfg: RunnerConfig, engine: Engine, id_: int) -> int:
+    """Process all (tf, venue_id) combos for one ID in a single SQL CTE.
+
+    Returns 1 if processed, 0 if skipped (no new source data).
+    """
+    # 1. Bulk-load watermarks
+    watermarks = _load_watermarks(engine, cfg.state_table, id_)
+
+    min_last_ts = None
+    if watermarks:
+        non_null = [v for v in watermarks.values() if v is not None]
+        if non_null:
+            min_last_ts = min(non_null)
+
+    _as_filter = (
+        "AND alignment_source = :src_alignment_source"
+        if cfg.src_alignment_source
+        else ""
+    )
+    _venue_filter = (
+        "AND venue_id = ANY(:venue_ids)" if cfg.venue_ids is not None else ""
+    )
+
+    # 2. Source-advance skip
+    if min_last_ts is not None:
+        skip_params: dict[str, Any] = {"id": id_, "min_last_ts": min_last_ts}
+        if cfg.src_alignment_source:
+            skip_params["src_alignment_source"] = cfg.src_alignment_source
+        if cfg.venue_ids is not None:
+            skip_params["venue_ids"] = cfg.venue_ids
+        with engine.begin() as cxn:
+            has_new = cxn.execute(
+                text(
+                    f"SELECT 1 FROM {cfg.bars_table} WHERE id = :id"
+                    f' AND "timestamp" > :min_last_ts {_as_filter} {_venue_filter}'
+                    f" LIMIT 1"
+                ),
+                skip_params,
+            ).fetchone()
+        if not has_new:
+            return 0
+
+    # 3. Watermark VALUES CTE
+    wm_cte = _build_wm_cte(id_, watermarks)
+
+    # 4. Main batch SQL
+    sql_text = f"""
+    WITH
+    {wm_cte}
+    min_wm AS (SELECT MIN(last_timestamp) AS min_ts FROM wm WHERE id = :id),
+    seed AS (
+        SELECT COALESCE(
+            (SELECT MIN(sub.ts) FROM (
+                SELECT "timestamp" AS ts FROM {cfg.bars_table}
+                WHERE id = :id AND is_partial_end = FALSE {_as_filter}
+                  AND "timestamp" < COALESCE((SELECT min_ts FROM min_wm), CAST(:start AS timestamptz))
+                ORDER BY "timestamp" DESC LIMIT 2
+            ) sub),
+            (SELECT min_ts FROM min_wm),
+            CAST(:start AS timestamptz)
+        ) AS seed_ts
+    ),
+    src AS (
+        SELECT
+            b.id, b.venue_id, b."timestamp", b.tf, b.tf_days,
+            b.bar_seq, b.pos_in_bar, b.count_days, b.count_days_remaining,
+            b.is_partial_end AS roll, b.close, b.high, b.low,
+            b.time_close, b.time_close_bar, b.time_open_bar
+        FROM {cfg.bars_table} b, seed
+        WHERE b.id = :id {_as_filter} {_venue_filter}
+          AND b."timestamp" >= seed.seed_ts
+    ),
+    lagged AS (
+        SELECT s.*,
+            -- Unified LAG: PARTITION BY (tf, venue_id) -- cross-roll transitions
+            LAG(s.close)   OVER (PARTITION BY s.tf, s.venue_id ORDER BY s."timestamp") AS prev_close_u,
+            LAG(s.high)    OVER (PARTITION BY s.tf, s.venue_id ORDER BY s."timestamp") AS prev_high_u,
+            LAG(s.low)     OVER (PARTITION BY s.tf, s.venue_id ORDER BY s."timestamp") AS prev_low_u,
+            LAG(s.bar_seq) OVER (PARTITION BY s.tf, s.venue_id ORDER BY s."timestamp") AS prev_bar_seq_u,
+            -- Canonical LAG: PARTITION BY (tf, venue_id, roll) -- within-roll transitions
+            LAG(s.close)   OVER (PARTITION BY s.tf, s.venue_id, s.roll ORDER BY s."timestamp") AS prev_close_c,
+            LAG(s.high)    OVER (PARTITION BY s.tf, s.venue_id, s.roll ORDER BY s."timestamp") AS prev_high_c,
+            LAG(s.low)     OVER (PARTITION BY s.tf, s.venue_id, s.roll ORDER BY s."timestamp") AS prev_low_c,
+            LAG(s.bar_seq) OVER (PARTITION BY s.tf, s.venue_id, s.roll ORDER BY s."timestamp") AS prev_bar_seq_c
+        FROM src s
+    ),
+    calc AS (
+        SELECT
+            id, venue_id, "timestamp", tf, tf_days, bar_seq, pos_in_bar,
+            count_days, count_days_remaining, roll,
+            time_close, time_close_bar, time_open_bar,
+            close, high, low,
+            prev_close_u, prev_high_u, prev_low_u, prev_bar_seq_u,
+            prev_close_c, prev_high_c, prev_low_c, prev_bar_seq_c,
+            -- gap_bars: canonical only
+            CASE WHEN NOT roll AND prev_bar_seq_c IS NOT NULL
+                 THEN bar_seq - prev_bar_seq_c END AS gap_bars,
+            -- delta1
+            CASE WHEN prev_close_u IS NOT NULL
+                 THEN close - prev_close_u END AS delta1_roll,
+            CASE WHEN NOT roll AND prev_close_c IS NOT NULL
+                 THEN close - prev_close_c END AS delta1,
+            -- ret_arith
+            CASE WHEN prev_close_u IS NOT NULL AND prev_close_u != 0
+                 THEN (close / prev_close_u) - 1 END AS ret_arith_roll,
+            CASE WHEN NOT roll AND prev_close_c IS NOT NULL AND prev_close_c != 0
+                 THEN (close / prev_close_c) - 1 END AS ret_arith,
+            -- ret_log
+            CASE WHEN prev_close_u IS NOT NULL AND prev_close_u > 0 AND close > 0
+                 THEN LN(close / prev_close_u) END AS ret_log_roll,
+            CASE WHEN NOT roll AND prev_close_c IS NOT NULL AND prev_close_c > 0 AND close > 0
+                 THEN LN(close / prev_close_c) END AS ret_log,
+            -- range
+            CASE WHEN prev_close_u IS NOT NULL
+                 THEN high - low END AS range_roll,
+            CASE WHEN NOT roll AND prev_close_c IS NOT NULL
+                 THEN high - low END AS "range",
+            -- range_pct
+            CASE WHEN prev_close_u IS NOT NULL AND close != 0
+                 THEN (high - low) / close END AS range_pct_roll,
+            CASE WHEN NOT roll AND prev_close_c IS NOT NULL AND close != 0
+                 THEN (high - low) / close END AS range_pct,
+            -- true_range
+            CASE WHEN prev_close_u IS NOT NULL
+                 THEN GREATEST(high - low, ABS(high - prev_close_u), ABS(low - prev_close_u))
+                 END AS true_range_roll,
+            CASE WHEN NOT roll AND prev_close_c IS NOT NULL
+                 THEN GREATEST(high - low, ABS(high - prev_close_c), ABS(low - prev_close_c))
+                 END AS true_range,
+            -- true_range_pct
+            CASE WHEN prev_close_u IS NOT NULL AND close != 0
+                 THEN GREATEST(high - low, ABS(high - prev_close_u), ABS(low - prev_close_u)) / close
+                 END AS true_range_pct_roll,
+            CASE WHEN NOT roll AND prev_close_c IS NOT NULL AND close != 0
+                 THEN GREATEST(high - low, ABS(high - prev_close_c), ABS(low - prev_close_c)) / close
+                 END AS true_range_pct
+        FROM lagged
+        WHERE prev_close_u IS NOT NULL
+    ),
+    calc2 AS (
+        SELECT c.*,
+            -- delta2 roll: PARTITION BY (tf, venue_id)
+            c.delta1_roll - LAG(c.delta1_roll)
+                OVER (PARTITION BY c.tf, c.venue_id ORDER BY c."timestamp") AS delta2_roll,
+            -- delta2 canonical: PARTITION BY (tf, venue_id, roll)
+            CASE WHEN NOT c.roll
+                 THEN c.delta1 - LAG(c.delta1)
+                     OVER (PARTITION BY c.tf, c.venue_id, c.roll ORDER BY c."timestamp")
+            END AS delta2,
+            -- delta_ret_arith roll
+            c.ret_arith_roll - LAG(c.ret_arith_roll)
+                OVER (PARTITION BY c.tf, c.venue_id ORDER BY c."timestamp") AS delta_ret_arith_roll,
+            -- delta_ret_arith canonical
+            CASE WHEN NOT c.roll
+                 THEN c.ret_arith - LAG(c.ret_arith)
+                     OVER (PARTITION BY c.tf, c.venue_id, c.roll ORDER BY c."timestamp")
+            END AS delta_ret_arith,
+            -- delta_ret_log roll
+            c.ret_log_roll - LAG(c.ret_log_roll)
+                OVER (PARTITION BY c.tf, c.venue_id ORDER BY c."timestamp") AS delta_ret_log_roll,
+            -- delta_ret_log canonical
+            CASE WHEN NOT c.roll
+                 THEN c.ret_log - LAG(c.ret_log)
+                     OVER (PARTITION BY c.tf, c.venue_id, c.roll ORDER BY c."timestamp")
+            END AS delta_ret_log
+        FROM calc c
+    ),
+    -- Per-key watermark filter: only rows newer than their last_timestamp
+    to_insert AS (
+        SELECT c2.*
+        FROM calc2 c2
+        LEFT JOIN wm ON wm.id = c2.id AND wm.tf = c2.tf AND wm.venue_id = c2.venue_id
+        WHERE (wm.last_timestamp IS NULL) OR (c2."timestamp" > wm.last_timestamp)
+    ),
+    ins AS (
+        INSERT INTO {cfg.out_table} (
+            {_INSERT_COLS}
+        )
+        SELECT
+            id, venue_id, "timestamp", tf, roll,
+            {",".join(_VALUE_COLS)},
+            now(),
+            CAST(:alignment_source AS text)
+        FROM to_insert
+        ON CONFLICT (id, "timestamp", tf, venue_id, alignment_source) DO UPDATE SET
+            {_UPSERT_SET}
+        RETURNING id, tf, venue_id, "timestamp"
+    )
+    -- Bulk state update for this ID
+    INSERT INTO {cfg.state_table} (id, venue_id, tf, last_timestamp, updated_at)
+    SELECT id, venue_id, tf, MAX("timestamp"), now()
+    FROM ins
+    GROUP BY id, venue_id, tf
+    ON CONFLICT (id, venue_id, tf) DO UPDATE SET
+        last_timestamp = GREATEST(EXCLUDED.last_timestamp, {cfg.state_table}.last_timestamp),
+        updated_at = now();
+    """
+
+    params: dict[str, Any] = {
+        "id": id_,
+        "start": cfg.start,
+        "alignment_source": ALIGNMENT_SOURCE,
+    }
+    if cfg.src_alignment_source:
+        params["src_alignment_source"] = cfg.src_alignment_source
+    if cfg.venue_ids is not None:
+        params["venue_ids"] = cfg.venue_ids
+
+    with engine.begin() as cxn:
+        cxn.execute(text(sql_text), params)
+
+    return 1
+
+
+def _run_one_id_mp(
     db_url: str,
     bars_table: str,
     out_table: str,
     state_table: str,
     start: str,
-    key: Tuple[int, str, int],
-    src_alignment_source: Optional[str] = None,
-) -> Tuple[int, str, int, int]:
-    """Process one (id, tf, venue_id) key. Self-contained for multiprocessing."""
-    one_id, one_tf, one_venue_id = key
+    src_alignment_source: Optional[str],
+    venue_ids: Optional[List[int]],
+    id_: int,
+) -> Tuple[int, int]:
+    """Multiprocessing-safe wrapper. Returns (id_, signal)."""
+    cfg = RunnerConfig(
+        db_url=db_url,
+        bars_table=bars_table,
+        out_table=out_table,
+        state_table=state_table,
+        start=start,
+        src_alignment_source=src_alignment_source,
+        venue_ids=venue_ids,
+    )
     engine = create_engine(db_url, poolclass=NullPool, future=True)
-
-    # When reading from a _u table, filter by alignment_source to avoid mixing
-    _as_filter = (
-        "AND b.alignment_source = :src_alignment_source" if src_alignment_source else ""
-    )
-    _as_filter_bare = (
-        "AND alignment_source = :src_alignment_source" if src_alignment_source else ""
-    )
-
-    sql = text(
-        f"""
-        WITH st AS (
-            SELECT last_timestamp
-            FROM {state_table}
-            WHERE id = :id AND tf = :tf AND venue_id = :venue_id
-        ),
-        -- Seed: go back 2 canonical (is_partial_end=FALSE) rows before last_timestamp
-        -- to provide enough history for both LAG chains (including delta2).
-        seed AS (
-            SELECT COALESCE(
-                (SELECT MIN(sub.ts) FROM (
-                    SELECT "timestamp" AS ts FROM {bars_table}
-                    WHERE id = :id AND tf = :tf
-                      AND venue_id = :venue_id
-                      {_as_filter_bare}
-                      AND is_partial_end = FALSE
-                      AND "timestamp" < COALESCE((SELECT last_timestamp FROM st), CAST(:start AS timestamptz))
-                    ORDER BY "timestamp" DESC
-                    LIMIT 2
-                ) sub),
-                (SELECT last_timestamp FROM st),
-                CAST(:start AS timestamptz)
-            ) AS seed_ts
-        ),
-        -- Pull ALL rows (both canonical and snapshot) from seed point
-        src AS (
-            SELECT
-                b.id,
-                b.venue_id,
-                b."timestamp",
-                b.tf,
-                b.tf_days,
-                b.bar_seq,
-                b.pos_in_bar,
-                b.count_days,
-                b.count_days_remaining,
-                b.is_partial_end AS roll,
-                b.close,
-                b.high,
-                b.low,
-                b.time_close,
-                b.time_close_bar,
-                b.time_open_bar
-            FROM {bars_table} b, seed
-            WHERE b.id = :id
-              AND b.tf = :tf
-              AND b.venue_id = :venue_id
-              {_as_filter}
-              AND b."timestamp" >= seed.seed_ts
-        ),
-        lagged AS (
-            SELECT
-                s.*,
-                -- Unified LAG: previous row regardless of roll (for _roll columns)
-                LAG(s.close)   OVER (ORDER BY s."timestamp") AS prev_close_u,
-                LAG(s.high)    OVER (ORDER BY s."timestamp") AS prev_high_u,
-                LAG(s.low)     OVER (ORDER BY s."timestamp") AS prev_low_u,
-                LAG(s.bar_seq) OVER (ORDER BY s."timestamp") AS prev_bar_seq_u,
-                -- Canonical LAG: previous row within same roll partition (for non-roll columns)
-                LAG(s.close)   OVER (PARTITION BY s.roll ORDER BY s."timestamp") AS prev_close_c,
-                LAG(s.high)    OVER (PARTITION BY s.roll ORDER BY s."timestamp") AS prev_high_c,
-                LAG(s.low)     OVER (PARTITION BY s.roll ORDER BY s."timestamp") AS prev_low_c,
-                LAG(s.bar_seq) OVER (PARTITION BY s.roll ORDER BY s."timestamp") AS prev_bar_seq_c
-            FROM src s
-        ),
-        calc AS (
-            SELECT
-                id, venue_id, "timestamp", tf, tf_days, bar_seq, pos_in_bar,
-                count_days, count_days_remaining, roll,
-                time_close, time_close_bar, time_open_bar,
-                close, high, low,
-                prev_close_u, prev_high_u, prev_low_u, prev_bar_seq_u,
-                prev_close_c, prev_high_c, prev_low_c, prev_bar_seq_c,
-
-                -- gap_bars (canonical partition only)
-                CASE WHEN NOT roll AND prev_bar_seq_c IS NOT NULL
-                     THEN bar_seq - prev_bar_seq_c END AS gap_bars,
-
-                -- delta1 roll
-                CASE WHEN prev_close_u IS NOT NULL
-                     THEN close - prev_close_u END AS delta1_roll,
-                -- delta1 canonical
-                CASE WHEN NOT roll AND prev_close_c IS NOT NULL
-                     THEN close - prev_close_c END AS delta1,
-
-                -- ret_arith roll
-                CASE WHEN prev_close_u IS NOT NULL AND prev_close_u != 0
-                     THEN (close / prev_close_u) - 1 END AS ret_arith_roll,
-                -- ret_arith canonical
-                CASE WHEN NOT roll AND prev_close_c IS NOT NULL AND prev_close_c != 0
-                     THEN (close / prev_close_c) - 1 END AS ret_arith,
-
-                -- ret_log roll
-                CASE WHEN prev_close_u IS NOT NULL AND prev_close_u > 0 AND close > 0
-                     THEN LN(close / prev_close_u) END AS ret_log_roll,
-                -- ret_log canonical
-                CASE WHEN NOT roll AND prev_close_c IS NOT NULL AND prev_close_c > 0 AND close > 0
-                     THEN LN(close / prev_close_c) END AS ret_log,
-
-                -- range roll (uses current row's high/low)
-                CASE WHEN prev_close_u IS NOT NULL
-                     THEN high - low END AS range_roll,
-                -- range canonical
-                CASE WHEN NOT roll AND prev_close_c IS NOT NULL
-                     THEN high - low END AS range,
-
-                -- range_pct roll
-                CASE WHEN prev_close_u IS NOT NULL AND close != 0
-                     THEN (high - low) / close END AS range_pct_roll,
-                -- range_pct canonical
-                CASE WHEN NOT roll AND prev_close_c IS NOT NULL AND close != 0
-                     THEN (high - low) / close END AS range_pct,
-
-                -- true_range roll
-                CASE WHEN prev_close_u IS NOT NULL
-                     THEN GREATEST(
-                         high - low,
-                         ABS(high - prev_close_u),
-                         ABS(low - prev_close_u)
-                     ) END AS true_range_roll,
-                -- true_range canonical
-                CASE WHEN NOT roll AND prev_close_c IS NOT NULL
-                     THEN GREATEST(
-                         high - low,
-                         ABS(high - prev_close_c),
-                         ABS(low - prev_close_c)
-                     ) END AS true_range,
-
-                -- true_range_pct roll
-                CASE WHEN prev_close_u IS NOT NULL AND close != 0
-                     THEN GREATEST(
-                         high - low,
-                         ABS(high - prev_close_u),
-                         ABS(low - prev_close_u)
-                     ) / close END AS true_range_pct_roll,
-                -- true_range_pct canonical
-                CASE WHEN NOT roll AND prev_close_c IS NOT NULL AND close != 0
-                     THEN GREATEST(
-                         high - low,
-                         ABS(high - prev_close_c),
-                         ABS(low - prev_close_c)
-                     ) / close END AS true_range_pct
-
-            FROM lagged
-            WHERE prev_close_u IS NOT NULL
-        ),
-        calc2 AS (
-            SELECT c.*,
-                -- delta2 roll
-                c.delta1_roll - LAG(c.delta1_roll) OVER (ORDER BY c."timestamp") AS delta2_roll,
-                -- delta2 canonical
-                CASE WHEN NOT c.roll
-                     THEN c.delta1 - LAG(c.delta1) OVER (PARTITION BY c.roll ORDER BY c."timestamp")
-                END AS delta2,
-
-                -- delta_ret_arith roll
-                c.ret_arith_roll - LAG(c.ret_arith_roll) OVER (ORDER BY c."timestamp") AS delta_ret_arith_roll,
-                -- delta_ret_arith canonical
-                CASE WHEN NOT c.roll
-                     THEN c.ret_arith - LAG(c.ret_arith) OVER (PARTITION BY c.roll ORDER BY c."timestamp")
-                END AS delta_ret_arith,
-
-                -- delta_ret_log roll
-                c.ret_log_roll - LAG(c.ret_log_roll) OVER (ORDER BY c."timestamp") AS delta_ret_log_roll,
-                -- delta_ret_log canonical
-                CASE WHEN NOT c.roll
-                     THEN c.ret_log - LAG(c.ret_log) OVER (PARTITION BY c.roll ORDER BY c."timestamp")
-                END AS delta_ret_log
-
-            FROM calc c
-        ),
-        to_insert AS (
-            SELECT c2.*
-            FROM calc2 c2
-            CROSS JOIN st
-            WHERE (st.last_timestamp IS NULL) OR (c2."timestamp" > st.last_timestamp)
-        ),
-        ins AS (
-            INSERT INTO {out_table} (
-                {_INSERT_COLS}
-            )
-            SELECT
-                id, venue_id, "timestamp", tf, roll,
-                {",".join(_VALUE_COLS)},
-                now(),
-                CAST(:alignment_source AS text)
-            FROM to_insert
-            ON CONFLICT (id, "timestamp", tf, venue_id, alignment_source) DO UPDATE SET
-                {_UPSERT_SET}
-            RETURNING "timestamp"
-        )
-        UPDATE {state_table} s
-        SET
-            last_timestamp = COALESCE((SELECT MAX("timestamp") FROM ins), s.last_timestamp),
-            updated_at = now()
-        WHERE s.id = :id AND s.tf = :tf AND s.venue_id = :venue_id;
-        """
-    )
-
-    params = {
-        "id": one_id,
-        "tf": one_tf,
-        "venue_id": one_venue_id,
-        "start": start,
-        "alignment_source": ALIGNMENT_SOURCE,
-    }
-    if src_alignment_source:
-        params["src_alignment_source"] = src_alignment_source
-
-    with engine.begin() as cxn:
-        result = cxn.execute(
-            sql,
-            params,
-        )
-
-    engine.dispose()
-    return (one_id, one_tf, one_venue_id, result.rowcount or 0)
+    try:
+        n = _run_one_id(cfg, engine, id_)
+        return (id_, n)
+    finally:
+        engine.dispose()
 
 
 # ---------------------------------------------------------------------------
@@ -542,44 +603,20 @@ def main() -> None:
     p = argparse.ArgumentParser(
         description="Incremental bar returns builder (wide-column, dual-LAG) from bar snapshots."
     )
-    p.add_argument(
-        "--db-url",
-        default=os.getenv("TARGET_DB_URL", ""),
-        help="Postgres DB URL (or set TARGET_DB_URL).",
-    )
+    p.add_argument("--db-url", default=os.getenv("TARGET_DB_URL", ""))
     p.add_argument("--ids", default="all", help="Comma-separated ids, or 'all'.")
-    p.add_argument(
-        "--start", default="2010-01-01", help="Start timestamp for full history runs."
-    )
-    p.add_argument(
-        "--bars-table", default=DEFAULT_BARS_TABLE, help="Source bars table."
-    )
-    p.add_argument(
-        "--out-table", default=DEFAULT_OUT_TABLE, help="Output returns table."
-    )
-    p.add_argument("--state-table", default=DEFAULT_STATE_TABLE, help="State table.")
-    p.add_argument(
-        "--full-refresh",
-        action="store_true",
-        help="Recompute history for selected keys from --start.",
-    )
-    p.add_argument(
-        "--workers",
-        type=int,
-        default=1,
-        help="Number of parallel workers (default 1 = sequential).",
-    )
+    p.add_argument("--start", default="2010-01-01")
+    p.add_argument("--bars-table", default=DEFAULT_BARS_TABLE)
+    p.add_argument("--out-table", default=DEFAULT_OUT_TABLE)
+    p.add_argument("--state-table", default=DEFAULT_STATE_TABLE)
+    p.add_argument("--full-refresh", action="store_true")
+    p.add_argument("--workers", type=int, default=1)
     p.add_argument(
         "--venue-ids",
         type=lambda s: [int(x) for x in s.split(",")],
         default=None,
-        help="Comma-separated venue IDs to filter (e.g. '2' or '2,3').",
     )
-    p.add_argument(
-        "--src-alignment-source",
-        default=None,
-        help="Filter source bars by alignment_source (for _u tables).",
-    )
+    p.add_argument("--src-alignment-source", default=None)
     args = p.parse_args()
 
     db_url = args.db_url.strip()
@@ -588,7 +625,6 @@ def main() -> None:
             "ERROR: Missing DB URL. Provide --db-url or set TARGET_DB_URL."
         )
 
-    # Auto-detect: if source table is a _u table, default alignment_source filter
     src_as = args.src_alignment_source
     if src_as is None and args.bars_table.rstrip('"').endswith("_u"):
         src_as = ALIGNMENT_SOURCE
@@ -607,7 +643,7 @@ def main() -> None:
 
     _ensure_tables(engine, args.out_table, args.state_table)
 
-    keys = _load_keys(
+    id_list = _load_ids(
         engine,
         args.bars_table,
         ids,
@@ -620,49 +656,71 @@ def main() -> None:
         f"full_refresh={args.full_refresh}, workers={args.workers}, "
         f"venue_ids={args.venue_ids}, src_alignment_source={src_as}"
     )
-    _print(f"Resolved keys={len(keys)}")
+    _print(f"Resolved IDs={len(id_list)}")
 
-    if not keys:
-        _print("No keys found. Done.")
+    if not id_list:
+        _print("No IDs found. Done.")
         return
 
-    _ensure_state_rows(engine, args.state_table, keys)
-
-    if args.full_refresh:
-        _full_refresh(engine, args.out_table, args.state_table, keys)
-
-    worker_fn = partial(
-        _run_one_key,
-        db_url,
-        args.bars_table,
-        args.out_table,
-        args.state_table,
-        args.start,
+    cfg = RunnerConfig(
+        db_url=db_url,
+        bars_table=args.bars_table,
+        out_table=args.out_table,
+        state_table=args.state_table,
+        start=args.start,
         src_alignment_source=src_as,
+        venue_ids=args.venue_ids,
     )
 
-    if args.workers > 1:
-        _print(f"Running {len(keys)} keys with {args.workers} workers.")
-        with Pool(processes=args.workers) as pool:
-            for one_id, one_tf, one_venue_id, n_rows in pool.imap_unordered(
-                worker_fn, keys
-            ):
-                _print(f"  ({one_id},{one_tf},v{one_venue_id}) -> {n_rows} rows")
-    else:
-        for i, key in enumerate(keys, start=1):
-            one_id, one_tf, one_venue_id = key
-            _print(
-                f"Processing key=({one_id},{one_tf},v{one_venue_id}) ({i}/{len(keys)})"
+    for id_ in id_list:
+        _ensure_state_rows_for_id(
+            engine,
+            args.state_table,
+            args.bars_table,
+            id_,
+            alignment_source=src_as,
+            venue_ids=args.venue_ids,
+        )
+
+    if args.full_refresh:
+        _print(
+            f"--full-refresh: deleting rows for {len(id_list)} IDs and resetting state."
+        )
+        for id_ in id_list:
+            _full_refresh_id(
+                engine, args.out_table, args.state_table, id_, args.venue_ids
             )
-            _run_one_key(
-                db_url,
-                args.bars_table,
-                args.out_table,
+        for id_ in id_list:
+            _ensure_state_rows_for_id(
+                engine,
                 args.state_table,
-                args.start,
-                key,
-                src_alignment_source=src_as,
+                args.bars_table,
+                id_,
+                alignment_source=src_as,
+                venue_ids=args.venue_ids,
             )
+
+    if args.workers > 1:
+        _print(f"Running {len(id_list)} IDs with {args.workers} workers.")
+        worker_fn = partial(
+            _run_one_id_mp,
+            db_url,
+            args.bars_table,
+            args.out_table,
+            args.state_table,
+            args.start,
+            src_as,
+            args.venue_ids,
+        )
+        with Pool(processes=args.workers, maxtasksperchild=1) as pool:
+            for i, (done_id, _) in enumerate(
+                pool.imap_unordered(worker_fn, id_list), start=1
+            ):
+                _print(f"  ID {done_id} done ({i}/{len(id_list)})")
+    else:
+        for i, id_ in enumerate(id_list, start=1):
+            _print(f"Processing id={id_} ({i}/{len(id_list)})")
+            _run_one_id(cfg, engine, id_)
 
     _print("Done.")
 

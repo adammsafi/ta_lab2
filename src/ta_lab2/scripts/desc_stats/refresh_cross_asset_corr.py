@@ -212,6 +212,10 @@ def _load_returns_wide(
         "roll = FALSE",
         "id = ANY(:ids)",
         "alignment_source = 'multi_tf'",
+        # Use venue_id = 1 (CMC_AGG) as primary to avoid duplicate rows when
+        # an asset has returns from multiple venues (e.g. CMC_AGG + HYPERLIQUID).
+        # Without this, pivot() fails with "Index contains duplicate entries".
+        "venue_id = 1",
     ]
 
     if start_ts is not None:

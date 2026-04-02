@@ -82,7 +82,7 @@ def _load_asset_ids(engine: Engine, venue_id: int) -> list[int]:
     """Return all distinct asset IDs present in returns_bars_multi_tf for venue_id."""
     sql = text("""
         SELECT DISTINCT id
-        FROM public.returns_bars_multi_tf
+        FROM public.returns_bars_multi_tf_u
         WHERE venue_id = :venue_id
         ORDER BY id
     """)
@@ -102,14 +102,14 @@ def _load_returns(
     Returns DataFrame with columns: ts (tz-aware), ret_log.
     """
     sql = text("""
-        SELECT ts, ret_log
-        FROM public.returns_bars_multi_tf
+        SELECT "timestamp" AS ts, ret_log
+        FROM public.returns_bars_multi_tf_u
         WHERE id = :id
           AND venue_id = :venue_id
           AND tf = :tf
           AND roll = FALSE
           AND ret_log IS NOT NULL
-        ORDER BY ts ASC
+        ORDER BY "timestamp" ASC
     """)
     with engine.connect() as conn:
         df = pd.read_sql(

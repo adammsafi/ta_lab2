@@ -50,6 +50,7 @@ from ta_lab2.analysis.ic import (
     load_regimes_for_asset,
     save_ic_results,
 )
+from ta_lab2.analysis.multiple_testing import log_trials_to_registry
 from ta_lab2.scripts.refresh_utils import resolve_db_url
 from ta_lab2.scripts.sync_utils import get_columns, table_exists
 from ta_lab2.time.dim_timeframe import DimTimeframe
@@ -557,6 +558,15 @@ def _ic_worker(task: ICWorkerTask) -> dict:
             n_written = 0
             if all_ic_rows:
                 n_written = save_ic_results(conn, all_ic_rows, overwrite=task.overwrite)
+                try:
+                    n_logged = log_trials_to_registry(
+                        conn, all_ic_rows, source_table="ic_results"
+                    )
+                    _logger.debug("Logged %d trials to trial_registry", n_logged)
+                except Exception:
+                    _logger.warning(
+                        "Failed to log trials to trial_registry", exc_info=True
+                    )
 
             elapsed = time.time() - pair_start
             _logger.info(
@@ -683,6 +693,15 @@ def _ama_ic_worker(task: AMAWorkerTask) -> dict:
             n_written = 0
             if all_ic_rows:
                 n_written = save_ic_results(conn, all_ic_rows, overwrite=task.overwrite)
+                try:
+                    n_logged = log_trials_to_registry(
+                        conn, all_ic_rows, source_table="ic_results"
+                    )
+                    _logger.debug("Logged %d trials to trial_registry", n_logged)
+                except Exception:
+                    _logger.warning(
+                        "Failed to log trials to trial_registry", exc_info=True
+                    )
 
             elapsed = time.time() - combo_start
             _logger.info(
@@ -985,6 +1004,15 @@ def _run_features_sweep(
                 if all_ic_rows:
                     n_written = save_ic_results(conn, all_ic_rows, overwrite=overwrite)
                     total_written += n_written
+                    try:
+                        n_logged = log_trials_to_registry(
+                            conn, all_ic_rows, source_table="ic_results"
+                        )
+                        logger.debug("Logged %d trials to trial_registry", n_logged)
+                    except Exception:
+                        logger.warning(
+                            "Failed to log trials to trial_registry", exc_info=True
+                        )
 
                 elapsed = time.time() - pair_start
                 logger.info(
@@ -1203,6 +1231,15 @@ def _run_ama_sweep(
                 if all_ic_rows:
                     n_written = save_ic_results(conn, all_ic_rows, overwrite=overwrite)
                     total_written += n_written
+                    try:
+                        n_logged = log_trials_to_registry(
+                            conn, all_ic_rows, source_table="ic_results"
+                        )
+                        logger.debug("Logged %d trials to trial_registry", n_logged)
+                    except Exception:
+                        logger.warning(
+                            "Failed to log trials to trial_registry", exc_info=True
+                        )
 
                 elapsed = time.time() - combo_start
                 logger.info(

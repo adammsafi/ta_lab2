@@ -39,3 +39,20 @@ portfolio_override:
 
 telegram:
   sign_flip_alerts: true        # Send Telegram alert on crypto-macro sign flip
+
+btc_equity:
+  corr_windows: [30, 60, 90, 180]           # Rolling correlation windows (calendar days)
+  equity_macro_vars:                          # Equity indices from fred_macro_features
+    SP500: sp500                              # S&P 500 (macro_var label -> column name)
+    NASDAQCOM: nasdaqcom                      # NASDAQ Composite
+    DJIA: djia                                # DJIA (optional, for completeness)
+  # NOTE: Equity indices (SP500, NASDAQCOM, DJIA) are handled EXCLUSIVELY by
+  # compute_btc_equity_corr() via this btc_equity config section. They are NOT
+  # added to crypto_macro.macro_var_columns, which is only for FRED macro series
+  # (VIX, DXY, rates, etc.) processed by compute_crypto_macro_corr().
+  vol_regime_thresholds:
+    calm_upper: 15.0                          # Annualized realized vol <= 15% = calm
+    elevated_upper: 25.0                      # 15% < vol <= 25% = elevated
+                                              # > 25% = crisis
+  divergence_zscore_threshold: 2.0            # |divergence_zscore| > 2.0 -> divergence_flag = True
+  divergence_corr_flip_window: 60             # Correlation window used for regime-shift divergence method

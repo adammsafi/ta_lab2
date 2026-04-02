@@ -8,17 +8,20 @@ Usage:
     python -m ta_lab2.scripts.features.run_all_feature_refreshes --all --all-tfs
     python -m ta_lab2.scripts.features.run_all_feature_refreshes --validate
     python -m ta_lab2.scripts.features.run_all_feature_refreshes --sequential
+    python -m ta_lab2.scripts.features.run_all_feature_refreshes --all --workers 4
 
-Refresh order (respects dependencies):
-1. vol (depends on price_bars_multi_tf)
-2. ta (depends on price_bars_multi_tf)
-3. features (depends on 1-2 + EMAs + bar returns)
-4. features CS norms (depends on features having up-to-date ret_arith/rsi_14/vol columns)
+Wave structure (respects dependencies):
+- Wave 1: vol, ta, cycle_stats, rolling_extremes -- all independent, run in parallel
+          (use --workers N to control thread count, default 4)
+- Wave 2: features (unified view) -- depends on Wave 1 (reads vol, ta, returns)
+- Wave 2b: microstructure UPDATE -- depends on Wave 2 (UPDATEs existing features rows)
+- Wave 3: CTF cross-timeframe features -- depends on Wave 2b
+- Wave 4: CS norms -- depends on Wave 2b (window-function UPDATE over all assets)
 
-Parallel execution where possible:
-- vol, ta can run in parallel (same dependency)
-- features runs after all complete
-- CS norms run sequentially after features (window-function UPDATE, not insert)
+Parallelism controls:
+- --workers N    : Wave 1 sub-phase thread count (default 4, max 4)
+- --tf-workers N : TF-level process parallelism (default 1)
+- --sequential   : Run Wave 1 tasks sequentially (debugging escape hatch)
 
 Note: returns come from returns_bars_multi_tf.
 """
@@ -31,7 +34,7 @@ import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Optional
 
 from sqlalchemy import text
 
@@ -97,16 +100,20 @@ def refresh_vol(
     tf: str = "1D",
     alignment_source: str = "multi_tf",
     venue_id: int | None = None,
+    use_polars: bool = False,
 ) -> RefreshResult:
     """Refresh vol table for given tf + alignment_source."""
-    from ta_lab2.scripts.features.vol_feature import VolatilityFeature, VolatilityConfig
+    from ta_lab2.scripts.features.vol_feature import VolatilityConfig, VolatilityFeature
 
     table = "vol"
     t0 = time.time()
 
     try:
         config = VolatilityConfig(
-            tf=tf, alignment_source=alignment_source, venue_id=venue_id
+            tf=tf,
+            alignment_source=alignment_source,
+            venue_id=venue_id,
+            use_polars=use_polars,
         )
         feature = VolatilityFeature(engine, config)
         rows_written = feature.compute_for_ids(ids=ids, start=start, end=end)
@@ -139,15 +146,21 @@ def refresh_ta(
     tf: str = "1D",
     alignment_source: str = "multi_tf",
     venue_id: int | None = None,
+    use_polars: bool = False,
 ) -> RefreshResult:
     """Refresh ta table for given tf + alignment_source."""
-    from ta_lab2.scripts.features.ta_feature import TAFeature, TAConfig
+    from ta_lab2.scripts.features.ta_feature import TAConfig, TAFeature
 
     table = "ta"
     t0 = time.time()
 
     try:
-        config = TAConfig(tf=tf, alignment_source=alignment_source, venue_id=venue_id)
+        config = TAConfig(
+            tf=tf,
+            alignment_source=alignment_source,
+            venue_id=venue_id,
+            use_polars=use_polars,
+        )
         feature = TAFeature(engine, config)
         rows_written = feature.compute_for_ids(ids=ids, start=start, end=end)
         duration = time.time() - t0
@@ -179,11 +192,12 @@ def refresh_cycle_stats(
     tf: str = "1D",
     alignment_source: str = "multi_tf",
     venue_id: int | None = None,
+    use_polars: bool = False,
 ) -> RefreshResult:
     """Refresh cycle_stats table for given tf + alignment_source."""
     from ta_lab2.scripts.features.cycle_stats_feature import (
-        CycleStatsFeature,
         CycleStatsConfig,
+        CycleStatsFeature,
     )
 
     table = "cycle_stats"
@@ -191,7 +205,10 @@ def refresh_cycle_stats(
 
     try:
         config = CycleStatsConfig(
-            tf=tf, alignment_source=alignment_source, venue_id=venue_id
+            tf=tf,
+            alignment_source=alignment_source,
+            venue_id=venue_id,
+            use_polars=use_polars,
         )
         feature = CycleStatsFeature(engine, config)
         rows_written = feature.compute_for_ids(ids=ids, start=start, end=end)
@@ -224,11 +241,12 @@ def refresh_rolling_extremes(
     tf: str = "1D",
     alignment_source: str = "multi_tf",
     venue_id: int | None = None,
+    use_polars: bool = False,
 ) -> RefreshResult:
     """Refresh rolling_extremes table for given tf + alignment_source."""
     from ta_lab2.scripts.features.rolling_extremes_feature import (
-        RollingExtremesFeature,
         RollingExtremesConfig,
+        RollingExtremesFeature,
     )
 
     table = "rolling_extremes"
@@ -236,7 +254,10 @@ def refresh_rolling_extremes(
 
     try:
         config = RollingExtremesConfig(
-            tf=tf, alignment_source=alignment_source, venue_id=venue_id
+            tf=tf,
+            alignment_source=alignment_source,
+            venue_id=venue_id,
+            use_polars=use_polars,
         )
         feature = RollingExtremesFeature(engine, config)
         rows_written = feature.compute_for_ids(ids=ids, start=start, end=end)
@@ -269,11 +290,12 @@ def refresh_microstructure(
     tf: str = "1D",
     alignment_source: str = "multi_tf",
     venue_id: int | None = None,
+    use_polars: bool = False,
 ) -> RefreshResult:
     """Refresh microstructure columns in features for given tf."""
     from ta_lab2.scripts.features.microstructure_feature import (
-        MicrostructureFeature,
         MicrostructureConfig,
+        MicrostructureFeature,
     )
 
     table = "features (microstructure)"
@@ -281,7 +303,10 @@ def refresh_microstructure(
 
     try:
         config = MicrostructureConfig(
-            tf=tf, alignment_source=alignment_source, venue_id=venue_id
+            tf=tf,
+            alignment_source=alignment_source,
+            venue_id=venue_id,
+            use_polars=use_polars,
         )
         feature = MicrostructureFeature(engine, config)
         rows_written = feature.compute_for_ids(ids=ids, start=start, end=end)
@@ -424,6 +449,8 @@ def run_all_refreshes(
     codependence: bool = False,
     venue_id: int | None = None,
     skip_cs_norms: bool = False,
+    wave1_workers: int = 4,
+    use_polars: bool = False,
 ) -> dict[str, RefreshResult]:
     """Refresh all feature tables for a single (tf, alignment_source)."""
     results = {}
@@ -435,6 +462,28 @@ def run_all_refreshes(
         f" tf={tf}, alignment_source={alignment_source}"
     )
     logger.info(f"Mode: {'full' if full_refresh else 'incremental'}")
+    logger.info(f"Polars acceleration: {'enabled' if use_polars else 'disabled'}")
+
+    # Per-asset skip check (incremental mode only)
+    bar_watermarks = {}
+    if not full_refresh:
+        changed_ids, unchanged_ids, bar_watermarks = compute_changed_ids(
+            engine, ids, tf, alignment_source
+        )
+        if unchanged_ids:
+            logger.info(
+                "Skipping %d unchanged assets (no new bars since last refresh, tf=%s)",
+                len(unchanged_ids),
+                tf,
+            )
+        if not changed_ids:
+            logger.info(
+                "All %d assets up-to-date for tf=%s, nothing to refresh", len(ids), tf
+            )
+            return {}
+        process_ids = changed_ids
+    else:
+        process_ids = ids
 
     # Phase 1: Vol, TA, Cycle Stats, Rolling Extremes (can run in parallel)
     phase1_tasks = [
@@ -444,21 +493,28 @@ def run_all_refreshes(
         ("rolling_extremes", refresh_rolling_extremes),
     ]
 
-    if parallel:
-        logger.info("Phase 1: Running vol/ta in parallel")
+    # Clamp wave1_workers: never more workers than tasks
+    wave1_workers = min(wave1_workers, len(phase1_tasks))
 
-        with ThreadPoolExecutor(max_workers=3) as executor:
+    if parallel:
+        logger.info(
+            "Wave 1: Running vol/ta/cycle_stats/rolling_extremes in parallel (%d workers)",
+            wave1_workers,
+        )
+
+        with ThreadPoolExecutor(max_workers=wave1_workers) as executor:
             future_to_name = {}
             for name, refresh_fn in phase1_tasks:
                 future = executor.submit(
                     refresh_fn,
                     engine,
-                    ids,
+                    process_ids,
                     start,
                     end,
                     tf,
                     alignment_source,
                     venue_id=venue_id,
+                    use_polars=use_polars,
                 )
                 future_to_name[future] = name
 
@@ -475,11 +531,18 @@ def run_all_refreshes(
                     logger.error(f"  {result.table} (tf={tf}): FAILED - {result.error}")
 
     else:
-        logger.info("Phase 1: Running vol/ta sequentially")
+        logger.info("Wave 1: Running vol/ta/cycle_stats/rolling_extremes sequentially")
 
         for name, refresh_fn in phase1_tasks:
             result = refresh_fn(
-                engine, ids, start, end, tf, alignment_source, venue_id=venue_id
+                engine,
+                process_ids,
+                start,
+                end,
+                tf,
+                alignment_source,
+                venue_id=venue_id,
+                use_polars=use_polars,
             )
             results[result.table] = result
 
@@ -491,10 +554,10 @@ def run_all_refreshes(
                 logger.error(f"  {result.table} (tf={tf}): FAILED - {result.error}")
 
     # Phase 2: Features store (depends on phase 1)
-    logger.info("Phase 2: Running features (unified view)")
+    logger.info("Wave 2: Running features (unified view) -- depends on Wave 1")
 
     result = refresh_features_store(
-        engine, ids, start, end, tf, alignment_source, venue_id=venue_id
+        engine, process_ids, start, end, tf, alignment_source, venue_id=venue_id
     )
     results[result.table] = result
 
@@ -508,10 +571,17 @@ def run_all_refreshes(
     # Phase 2b: Microstructure UPDATE (supplemental columns on features rows)
     # MUST run after Phase 2 — microstructure does UPDATE on existing rows,
     # so the base rows from features must exist first.
-    logger.info("Phase 2b: Running microstructure feature UPDATE on features")
+    logger.info("Wave 2b: Running microstructure UPDATE -- depends on Wave 2")
 
     micro_result = refresh_microstructure(
-        engine, ids, start, end, tf, alignment_source, venue_id=venue_id
+        engine,
+        process_ids,
+        start,
+        end,
+        tf,
+        alignment_source,
+        venue_id=venue_id,
+        use_polars=use_polars,
     )
     results[micro_result.table] = micro_result
 
@@ -524,14 +594,18 @@ def run_all_refreshes(
         logger.error(f"  {micro_result.table} (tf={tf}): FAILED - {micro_result.error}")
 
     # Phase 2c: Cross-timeframe features (reads from ta, vol, returns_u, features)
-    # Non-fatal: log warning and continue if CTF fails
+    # Non-fatal: log warning and continue if CTF fails.
+    # CTF has its own _should_skip_asset logic internally; no double-skip issue.
     if _CTF_AVAILABLE:
-        logger.info("Phase 2c: Running CTF features (cross-timeframe)")
+        logger.info(
+            "Wave 3: Running CTF features (cross-timeframe) -- depends on Wave 2b"
+        )
         ctf_result = _refresh_ctf_step(
             engine,
-            ids=ids,
+            ids=process_ids,
             tf=tf,
             venue_id=venue_id or 1,
+            use_polars=use_polars,
         )
         results[ctf_result.table] = ctf_result
 
@@ -545,13 +619,15 @@ def run_all_refreshes(
                 f"  {ctf_result.table} (tf={tf}): FAILED - {ctf_result.error}"
             )
     else:
-        logger.info("Phase 2c: Skipping CTF features (module not available)")
+        logger.info("Wave 3: Skipping CTF features (module not available)")
 
     # Phase 3: Cross-sectional normalization (depends on features)
     # MUST run sequentially after features — window functions read the
     # freshly-written ret_arith / rsi_14 / vol_parkinson_20 values.
+    # NOTE: CS norms use PARTITION BY (ts, tf) over ALL assets — cannot be
+    # scoped to changed_ids.  Always pass tf only (no ids argument).
     if skip_cs_norms:
-        logger.info("Phase 3: Skipping CS norms (--no-cs-norms)")
+        logger.info("Wave 4: Skipping CS norms (--no-cs-norms)")
         cs_result = RefreshResult(
             table="features (CS norms)",
             rows_inserted=0,
@@ -560,7 +636,7 @@ def run_all_refreshes(
             error="skipped",
         )
     else:
-        logger.info("Phase 3: Refreshing cross-sectional normalizations (CS norms)")
+        logger.info("Wave 4: Refreshing cross-sectional normalizations (CS norms)")
         cs_result = refresh_cs_norms_step(engine, tf=tf)
     results[cs_result.table] = cs_result
 
@@ -573,6 +649,8 @@ def run_all_refreshes(
         logger.error(f"  {cs_result.table} (tf={tf}): FAILED - {cs_result.error}")
 
     # Phase 3b: Codependence (optional, pairwise metrics — ~3 min for all assets)
+    # NOTE: Codependence computes pairwise metrics across ALL assets.  Must use
+    # the full `ids` set (not process_ids) for meaningful cross-section coverage.
     if codependence:
         logger.info("Phase 3b: Running codependence refresh (pairwise metrics)")
 
@@ -613,6 +691,8 @@ def run_all_refreshes(
             logger.error(f"  {co_result.table} (tf={tf}): FAILED - {co_result.error}")
 
     # Phase 4: Validation (if requested)
+    # NOTE: Validation samples from ALL ids (not process_ids) to spot-check the
+    # full population including unchanged assets for staleness or corruption.
     if validate:
         logger.info("Phase 4: Running validation")
 
@@ -632,6 +712,32 @@ def run_all_refreshes(
 
         except Exception as e:
             logger.error(f"  Validation failed with error: {e}", exc_info=True)
+
+    # Update feature_refresh_state only if all sub-phases succeeded
+    if not full_refresh and bar_watermarks:
+        all_succeeded = all(getattr(r, "success", True) for r in results.values())
+        if all_succeeded:
+            total_rows = sum(getattr(r, "rows_inserted", 0) for r in results.values())
+            _update_feature_refresh_state(
+                engine,
+                process_ids,
+                tf,
+                alignment_source,
+                bar_watermarks,
+                total_rows,
+            )
+            logger.info(
+                "Updated feature_refresh_state for %d assets (tf=%s)",
+                len(process_ids),
+                tf,
+            )
+        else:
+            failed = [
+                r.table
+                for r in results.values()
+                if hasattr(r, "success") and not r.success
+            ]
+            logger.warning("Skipping state update -- sub-phases failed: %s", failed)
 
     return results
 
@@ -671,6 +777,132 @@ def _should_skip_tf(engine, tf: str, alignment_source: str) -> bool:
     return feature_ts >= source_ts  # Skip if features are newer than source
 
 
+# =============================================================================
+# State management (per-asset skip)
+# =============================================================================
+
+
+def _load_bar_watermarks(
+    engine, ids: list[int], tf: str, alignment_source: str
+) -> dict[int, Any]:
+    """Fetch MAX(ingested_at) per id from price_bars_multi_tf_u.
+
+    Returns dict: id -> max_ingested_at (or absent if no bars for that id).
+    """
+    sql = text("""
+        SELECT id, MAX(ingested_at) AS max_ingested_at
+        FROM public.price_bars_multi_tf_u
+        WHERE id = ANY(:ids)
+          AND tf = :tf
+          AND alignment_source = :as_
+        GROUP BY id
+    """)
+    with engine.connect() as conn:
+        rows = conn.execute(
+            sql, {"ids": ids, "tf": tf, "as_": alignment_source}
+        ).fetchall()
+    return {row[0]: row[1] for row in rows}
+
+
+def _load_feature_state(
+    engine, ids: list[int], tf: str, alignment_source: str
+) -> dict[int, Any]:
+    """Fetch last_bar_ts per id from feature_refresh_state.
+
+    Returns dict: id -> last_bar_ts (or absent if no state row).
+    Returns empty dict if feature_refresh_state does not yet exist.
+    """
+    sql = text("""
+        SELECT id, last_bar_ts
+        FROM public.feature_refresh_state
+        WHERE id = ANY(:ids)
+          AND tf = :tf
+          AND alignment_source = :as_
+    """)
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(
+                sql, {"ids": ids, "tf": tf, "as_": alignment_source}
+            ).fetchall()
+        return {row[0]: row[1] for row in rows}
+    except Exception:
+        return {}  # table not yet created -- treat all ids as changed
+
+
+def compute_changed_ids(
+    engine, ids: list[int], tf: str, alignment_source: str
+) -> tuple[list[int], list[int], dict[int, Any]]:
+    """Split ids into (changed_ids, unchanged_ids, bar_watermarks).
+
+    changed_ids:   source bars have new ingested_at since last feature refresh
+    unchanged_ids: no new bars, safe to skip entirely
+    bar_watermarks: dict[id -> max_ingested_at] from price_bars_multi_tf_u;
+                    passed through so callers can feed it to
+                    _update_feature_refresh_state without a redundant query.
+    """
+    bar_wm = _load_bar_watermarks(engine, ids, tf, alignment_source)
+    state_wm = _load_feature_state(engine, ids, tf, alignment_source)
+
+    changed: list[int] = []
+    unchanged: list[int] = []
+    for id_ in ids:
+        source_ts = bar_wm.get(id_)
+        feature_ts = state_wm.get(id_)
+        if source_ts is None:
+            unchanged.append(id_)  # no bar data at all -- nothing to compute
+        elif feature_ts is None:
+            changed.append(id_)  # never computed before -- must run
+        elif source_ts > feature_ts:
+            changed.append(id_)  # new bars arrived since last refresh
+        else:
+            unchanged.append(id_)  # feature_ts >= source_ts -- up to date
+
+    return changed, unchanged, bar_wm
+
+
+def _update_feature_refresh_state(
+    engine,
+    changed_ids: list[int],
+    tf: str,
+    alignment_source: str,
+    bar_watermarks: dict[int, Any],
+    total_rows_written: int,
+) -> None:
+    """Upsert feature_refresh_state for successfully refreshed assets.
+
+    total_rows_written is the sum across all sub-phases for the entire
+    changed_ids batch (not per-asset).  Stored as an approximate monitor
+    metric; exact per-asset counts are not tracked at this level.
+    """
+    sql = text("""
+        INSERT INTO public.feature_refresh_state
+            (id, tf, alignment_source, last_bar_ts, last_refresh_ts,
+             rows_written, updated_at)
+        VALUES
+            (:id, :tf, :as_, :last_bar_ts,
+             NOW() AT TIME ZONE 'UTC', :rows_written,
+             NOW() AT TIME ZONE 'UTC')
+        ON CONFLICT (id, tf, alignment_source) DO UPDATE SET
+            last_bar_ts     = EXCLUDED.last_bar_ts,
+            last_refresh_ts = EXCLUDED.last_refresh_ts,
+            rows_written    = EXCLUDED.rows_written,
+            updated_at      = EXCLUDED.updated_at
+    """)
+    for id_ in changed_ids:
+        last_bar_ts = bar_watermarks.get(id_)
+        with engine.begin() as conn:
+            conn.execute(
+                sql,
+                {
+                    "id": id_,
+                    "tf": tf,
+                    "as_": alignment_source,
+                    "last_bar_ts": last_bar_ts,
+                    "rows_written": total_rows_written,
+                },
+            )
+
+
 def _run_single_tf(args_tuple):
     """Worker: process one (tf, alignment_source) in a child process.
 
@@ -687,6 +919,8 @@ def _run_single_tf(args_tuple):
         codependence,
         venue_id,
         skip_cs_norms,
+        wave1_workers,
+        use_polars,
     ) = args_tuple
 
     from sqlalchemy import create_engine
@@ -709,6 +943,8 @@ def _run_single_tf(args_tuple):
             codependence=codependence,
             venue_id=venue_id,
             skip_cs_norms=skip_cs_norms,
+            wave1_workers=wave1_workers,
+            use_polars=use_polars,
         )
         return (tf, alignment_source, results)
     except Exception as e:
@@ -803,8 +1039,9 @@ def parse_args() -> argparse.Namespace:
     # Refresh mode
     parser.add_argument(
         "--full-refresh",
+        "--full-rebuild",
         action="store_true",
-        help="Full refresh (recompute all rows)",
+        help="Full refresh (recompute all rows, bypass per-asset skip)",
     )
 
     # Validation
@@ -851,12 +1088,34 @@ def parse_args() -> argparse.Namespace:
         help="Number of parallel TF workers (default: 1 = sequential). Max ~4.",
     )
 
+    # Wave 1 sub-phase parallelism
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=4,
+        dest="wave1_workers",
+        help="Number of parallel workers for Wave 1 sub-phases (vol/ta/cycle_stats/rolling_extremes). Default 4, max 4.",
+    )
+
     # CS norms
     parser.add_argument(
         "--no-cs-norms",
         action="store_true",
         default=False,
         help="Skip cross-sectional normalization step (slow on large tables).",
+    )
+
+    # Polars acceleration
+    parser.add_argument(
+        "--use-polars",
+        action="store_true",
+        default=False,
+        help=(
+            "Use polars acceleration for feature computation "
+            "(faster sort + rolling ops). Propagated to vol, ta, microstructure, "
+            "cycle_stats, rolling_extremes, and ctf sub-phases. CS norms and unified "
+            "assembly (daily_features_view) are pure SQL and are unaffected."
+        ),
     )
 
     # Logging
@@ -881,10 +1140,26 @@ def main() -> int:
     )
 
     logger.info("Starting feature refresh pipeline")
+    logger.info(
+        "Polars acceleration: %s",
+        "enabled" if getattr(args, "use_polars", False) else "disabled",
+    )
 
     if not TARGET_DB_URL:
         logger.error("TARGET_DB_URL not set")
         return 1
+
+    # Worker budget guard: warn when tf_workers * wave1_workers > 8
+    if args.tf_workers > 1:
+        total_workers = args.tf_workers * args.wave1_workers
+        if total_workers > 8:
+            logger.warning(
+                "Total concurrent workers=%d (tf_workers=%d x wave1_workers=%d) may cause "
+                "memory pressure with large asset sets. Consider reducing --tf-workers or --workers.",
+                total_workers,
+                args.tf_workers,
+                args.wave1_workers,
+            )
 
     engine = get_engine(TARGET_DB_URL)
 
@@ -950,6 +1225,8 @@ def main() -> int:
                 getattr(args, "codependence", False),
                 args.venue_id,
                 getattr(args, "no_cs_norms", False),
+                args.wave1_workers,
+                getattr(args, "use_polars", False),
             )
             for tf, as_ in tf_alignments
         ]
@@ -1005,6 +1282,8 @@ def main() -> int:
                     codependence=getattr(args, "codependence", False),
                     venue_id=args.venue_id,
                     skip_cs_norms=getattr(args, "no_cs_norms", False),
+                    wave1_workers=args.wave1_workers,
+                    use_polars=getattr(args, "use_polars", False),
                 )
                 all_results[(tf, alignment_source)] = results
             except Exception as e:

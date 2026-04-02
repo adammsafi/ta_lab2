@@ -611,25 +611,32 @@ class CalendarUSBarBuilder(BaseBarBuilder):
             )
             return len(bars)
 
-        # Incremental append
-        # For calendar bars, incremental is complex (requires calendar boundary logic)
-        # For simplicity in this refactoring, we'll rebuild on new data
-        # (The original implementation has complex incremental logic that can be added back if needed)
+        # Incremental: only rebuild from the last completed bar boundary onward.
+        # Filter daily data to rows after last_time_close, then rebuild only
+        # those bars. Existing historical bars are left untouched.
+        df_incremental = df_daily[df_daily["ts"] > last_time_close].copy()
 
-        self.logger.info(
-            f"ID={id_}, TF={spec.tf}, venue_id={venue_id}: New data detected, rebuilding for now"
-        )
-        self._delete_bars_and_state(id_, spec.tf, venue_id=venue_id)
+        if df_incremental.empty:
+            return 0
+
+        # Also include the bar containing last_time_close (for partial bar update)
+        # by extending back to the start of that bar's calendar period.
+        tz = self.config.tz or DEFAULT_TZ
+        last_local = last_time_close.tz_convert(tz).date()
+        bar_start = _compute_anchor_start(last_local, spec.unit)
+        bar_start_ts = pd.Timestamp(bar_start, tz=tz).tz_convert("UTC")
+        df_incremental = df_daily[df_daily["ts"] >= bar_start_ts].copy()
+
         bars = self._build_snapshots_full_history_polars(
-            df_daily, spec=spec, tz=self.config.tz or DEFAULT_TZ
+            df_incremental, spec=spec, tz=tz
         )
         if bars.empty:
             return 0
 
-        # Set venue columns on output bars
         bars["venue_id"] = venue_id
         bars["alignment_source"] = self.ALIGNMENT_SOURCE
 
+        # Upsert only the new/updated bars (no DELETE of historical bars)
         upsert_bars(
             bars,
             db_url=self.config.db_url,

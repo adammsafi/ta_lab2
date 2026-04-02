@@ -33,6 +33,13 @@ Semantics:
       but pulls ts >= seed_ts to seed prev values for the first new row
   - History recomputed only with --full-refresh
 
+Batch architecture (v2):
+  - Iterates over distinct IDs (~492) instead of per-(id,tf,period,venue_id) keys (~668K each).
+  - One SQL CTE per ID computes returns for ALL (tf, period, venue_id) combos using
+    PARTITION BY (tf, period, venue_id) in all LAG window functions.
+  - Bulk watermark preload: all watermarks for an ID loaded in one query.
+  - Source-advance skip: IDs with no new EMA data are skipped entirely.
+
 Run (Spyder):
 runfile(
   r"C:\Users\asafi\Downloads\ta_lab2\src\ta_lab2\scripts\returns\refresh_returns_ema_multi_tf_cal.py",
@@ -45,7 +52,7 @@ import argparse
 import os
 from dataclasses import dataclass
 from multiprocessing import Pool
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from sqlalchemy import bindparam, create_engine, text
 from sqlalchemy.engine import Engine
@@ -205,24 +212,20 @@ def _ensure_tables(engine: Engine, ret_table: str, state_table: str) -> None:
         cxn.execute(state_sql)
 
 
-def _load_keys(
+def _load_ids(
     engine: Engine,
     ema_table: str,
     ids: Optional[List[int]],
     alignment_source: str = ALIGNMENT_SOURCE_US,
-) -> List[Tuple[int, str, int, int]]:
-    """Returns keys as: (id, tf, period, venue_id).
-    Scoped by alignment_source so that when reading from ema_multi_tf_u we
-    only enumerate keys belonging to this builder's variant.
-    """
+) -> List[int]:
+    """Return distinct asset IDs from the source EMA table scoped by alignment_source."""
     if ids is None:
         sql = text(
             f"""
-            SELECT DISTINCT id::bigint, tf::text, period::int,
-                   venue_id
+            SELECT DISTINCT id::bigint
             FROM {ema_table}
             WHERE alignment_source = :alignment_source
-            ORDER BY 1,2,3,4;
+            ORDER BY 1;
             """
         )
         with engine.begin() as cxn:
@@ -230,90 +233,78 @@ def _load_keys(
     else:
         sql = text(
             f"""
-                SELECT DISTINCT id::bigint, tf::text, period::int,
-                       venue_id
-                FROM {ema_table}
-                WHERE id IN :ids AND alignment_source = :alignment_source
-                ORDER BY 1,2,3,4;
-                """
+            SELECT DISTINCT id::bigint
+            FROM {ema_table}
+            WHERE id IN :ids AND alignment_source = :alignment_source
+            ORDER BY 1;
+            """
         ).bindparams(bindparam("ids", expanding=True))
         with engine.begin() as cxn:
             rows = cxn.execute(
                 sql, {"ids": ids, "alignment_source": alignment_source}
             ).fetchall()
 
-    return [(int(r[0]), str(r[1]), int(r[2]), int(r[3])) for r in rows]
+    return [int(r[0]) for r in rows]
 
 
-def _ensure_state_rows(
+def _load_watermarks(
+    engine: Engine, state_table: str, id_: int
+) -> Dict[Tuple[str, int, int], object]:
+    """Load ALL watermark rows for a given ID in one query.
+
+    Returns dict keyed by (tf, period, venue_id) -> last_ts (may be None).
+    """
+    sql = text(
+        f"""
+        SELECT tf, period, venue_id, last_ts
+        FROM {state_table}
+        WHERE id = :id
+        """
+    )
+    with engine.begin() as cxn:
+        rows = cxn.execute(sql, {"id": id_}).fetchall()
+    return {(str(r[0]), int(r[1]), int(r[2])): r[3] for r in rows}
+
+
+def _ensure_state_rows_for_id(
     engine: Engine,
+    ema_table: str,
     state_table: str,
-    keys: List[Tuple[int, str, int, int]],
+    id_: int,
+    alignment_source: str = ALIGNMENT_SOURCE_US,
 ) -> None:
-    if not keys:
-        return
-
+    """Ensure state rows exist for all (tf, period, venue_id) combos for this ID."""
     ins = text(
         f"""
         INSERT INTO {state_table} (id, venue_id, tf, period, last_ts)
-        VALUES (:id, :venue_id, :tf, :period, NULL)
+        SELECT DISTINCT :id, venue_id, tf, period, NULL
+        FROM {ema_table}
+        WHERE id = :id AND alignment_source = :alignment_source
         ON CONFLICT (id, venue_id, tf, period) DO NOTHING;
         """
     )
     with engine.begin() as cxn:
-        for i, tf, period, venue_id in keys:
-            cxn.execute(
-                ins, {"id": i, "venue_id": venue_id, "tf": tf, "period": period}
-            )
+        cxn.execute(ins, {"id": id_, "alignment_source": alignment_source})
 
 
-def _full_refresh(
+def _full_refresh_id(
     engine: Engine,
     ret_table: str,
     state_table: str,
-    keys: List[Tuple[int, str, int, int]],
+    id_: int,
     alignment_source: str = ALIGNMENT_SOURCE_US,
 ) -> None:
-    if not keys:
-        return
-
-    _print(
-        f"--full-refresh: deleting existing rows for {len(keys)} keys and resetting state."
-    )
-
-    del_ret = text(
-        f"""
-        DELETE FROM {ret_table}
-        WHERE id=:id AND tf=:tf AND period=:period AND venue_id=:venue_id
-          AND alignment_source=:alignment_source;
-        """
-    )
-    del_state = text(
-        f"""
-        DELETE FROM {state_table}
-        WHERE id=:id AND tf=:tf AND period=:period AND venue_id=:venue_id;
-        """
-    )
-
+    """Delete all output rows and state for this ID (scoped to alignment_source)."""
+    _print(f"--full-refresh: deleting output + state for id={id_} ({alignment_source})")
     with engine.begin() as cxn:
-        for i, tf, period, venue_id in keys:
-            del_out_params = {
-                "id": i,
-                "tf": tf,
-                "period": period,
-                "venue_id": venue_id,
-                "alignment_source": alignment_source,
-            }
-            del_state_params = {
-                "id": i,
-                "tf": tf,
-                "period": period,
-                "venue_id": venue_id,
-            }
-            cxn.execute(del_ret, del_out_params)
-            cxn.execute(del_state, del_state_params)
-
-    _ensure_state_rows(engine, state_table, keys)
+        cxn.execute(
+            text(f"DELETE FROM {ret_table} WHERE id = :id AND alignment_source = :as"),
+            {"id": id_, "as": alignment_source},
+        )
+        cxn.execute(
+            text(f"DELETE FROM {state_table} WHERE id = :id"),
+            {"id": id_},
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -364,41 +355,98 @@ _UPSERT_SET = ",\n".join(
 )
 
 
-def _run_one_key(
+def _run_one_id_mp(args: tuple) -> Tuple[int, bool]:
+    """Multiprocessing-safe wrapper. Creates own engine with NullPool."""
+    db_url, ema_table, ret_table, state_table, start, id_, alignment_source = args
+    try:
+        engine = create_engine(db_url, poolclass=NullPool, future=True)
+        _run_one_id(
+            engine, ema_table, ret_table, state_table, start, id_, alignment_source
+        )
+        engine.dispose()
+        return (id_, True)
+    except Exception as exc:
+        _print(f"FAILED id={id_} ({alignment_source}): {exc}")
+        return (id_, False)
+
+
+def _run_one_id(
     engine: Engine,
     ema_table: str,
     ret_table: str,
     state_table: str,
     start: str,
-    key: Tuple[int, str, int, int],
+    id_: int,
     alignment_source: str = ALIGNMENT_SOURCE_US,
 ) -> None:
-    one_id, one_tf, one_period, one_venue_id = key
+    """Process all (tf, period, venue_id) combos for one asset ID in a single SQL CTE.
 
+    SQL semantics preserved exactly:
+    - Unified LAG (prev_*_u): LAG across ALL roll values within same (tf, period, venue_id)
+    - Canonical LAG (prev_*_c): LAG within same roll partition AND same (tf, period, venue_id)
+    - delta2 and delta_ret second-pass LAGs also PARTITION BY (tf, period, venue_id)
+    - alignment_source filter on source reads prevents cross-source LAG contamination
+    """
+    # ------------------------------------------------------------------
+    # 1. Load all watermarks for this ID in one query
+    # ------------------------------------------------------------------
+    watermarks = _load_watermarks(engine, state_table, id_)
+
+    # Compute global min last_ts as seed anchor.
+    # If any key has NULL watermark, min_last_ts = None (full history needed).
+    min_last_ts = None
+    if watermarks:
+        wm_values = list(watermarks.values())
+        if all(v is not None for v in wm_values):
+            min_last_ts = min(wm_values)
+
+    # ------------------------------------------------------------------
+    # 2. Source-advance skip: check if there is any new EMA data
+    # ------------------------------------------------------------------
+    if min_last_ts is not None:
+        check_sql = text(
+            f"""
+            SELECT 1 FROM {ema_table}
+            WHERE id = :id AND alignment_source = :alignment_source
+              AND ts > :min_last_ts
+            LIMIT 1
+            """
+        )
+        with engine.begin() as cxn:
+            has_new = cxn.execute(
+                check_sql,
+                {
+                    "id": id_,
+                    "alignment_source": alignment_source,
+                    "min_last_ts": min_last_ts,
+                },
+            ).fetchone()
+        if has_new is None:
+            return  # no new data for any key, skip entirely
+
+    # ------------------------------------------------------------------
+    # 3. Batch SQL: one CTE handles ALL (tf, period, venue_id) combos.
+    # ------------------------------------------------------------------
     sql = text(
         f"""
-        WITH st AS (
-            SELECT last_ts
-            FROM {state_table}
-            WHERE id = :id AND tf = :tf AND period = :period AND venue_id = :venue_id
-        ),
+        WITH
+        -- Seed: go back 2 canonical (roll=False) rows before global min watermark.
         seed AS (
             SELECT COALESCE(
                 (SELECT MIN(sub.ts) FROM (
                     SELECT ts FROM {ema_table}
-                    WHERE id = :id AND tf = :tf AND period = :period
-                      AND venue_id = :venue_id
+                    WHERE id = :id
                       AND alignment_source = :alignment_source
                       AND roll = FALSE
-                      AND ts < COALESCE((SELECT last_ts FROM st), CAST(:start AS timestamptz))
+                      AND ts < COALESCE(CAST(:global_wm AS timestamptz), CAST(:start AS timestamptz))
                     ORDER BY ts DESC
                     LIMIT 2
                 ) sub),
-                (SELECT last_ts FROM st),
+                CAST(:global_wm AS timestamptz),
                 CAST(:start AS timestamptz)
             ) AS seed_ts
         ),
-        -- CRITICAL: scope by alignment_source to avoid cross-source LAG contamination
+        -- CRITICAL: alignment_source filter prevents cross-source LAG contamination.
         src AS (
             SELECT
                 e.id::bigint AS id,
@@ -412,21 +460,22 @@ def _run_one_key(
                 e.ema_bar
             FROM {ema_table} e, seed
             WHERE e.id = :id
-              AND e.tf = :tf
-              AND e.period = :period
-              AND e.venue_id = :venue_id
               AND e.alignment_source = :alignment_source
               AND e.ts >= seed.seed_ts
         ),
         lagged AS (
             SELECT
                 s.*,
-                LAG(s.ts)      OVER (ORDER BY s.ts) AS prev_ts_u,
-                LAG(s.ema)     OVER (ORDER BY s.ts) AS prev_ema_u,
-                LAG(s.ema_bar) OVER (ORDER BY s.ts) AS prev_ema_bar_u,
-                LAG(s.ts)      OVER (PARTITION BY s.roll ORDER BY s.ts) AS prev_ts_c,
-                LAG(s.ema)     OVER (PARTITION BY s.roll ORDER BY s.ts) AS prev_ema_c,
-                LAG(s.ema_bar) OVER (PARTITION BY s.roll ORDER BY s.ts) AS prev_ema_bar_c
+                -- Unified LAG: previous row within same (tf, period, venue_id) timeline,
+                -- regardless of roll. Used for _roll columns.
+                LAG(s.ts)      OVER (PARTITION BY s.tf, s.period, s.venue_id ORDER BY s.ts) AS prev_ts_u,
+                LAG(s.ema)     OVER (PARTITION BY s.tf, s.period, s.venue_id ORDER BY s.ts) AS prev_ema_u,
+                LAG(s.ema_bar) OVER (PARTITION BY s.tf, s.period, s.venue_id ORDER BY s.ts) AS prev_ema_bar_u,
+                -- Canonical LAG: previous row within same (tf, period, venue_id) AND same roll.
+                -- Used for non-roll columns.
+                LAG(s.ts)      OVER (PARTITION BY s.tf, s.period, s.venue_id, s.roll ORDER BY s.ts) AS prev_ts_c,
+                LAG(s.ema)     OVER (PARTITION BY s.tf, s.period, s.venue_id, s.roll ORDER BY s.ts) AS prev_ema_c,
+                LAG(s.ema_bar) OVER (PARTITION BY s.tf, s.period, s.venue_id, s.roll ORDER BY s.ts) AS prev_ema_bar_c
             FROM src s
         ),
         calc AS (
@@ -470,39 +519,50 @@ def _run_one_key(
         ),
         calc2 AS (
             SELECT c.*,
+                -- delta2 canonical (PARTITION BY tf, period, venue_id, roll)
                 CASE WHEN NOT c.roll
-                     THEN c.delta1_ema - LAG(c.delta1_ema) OVER (PARTITION BY c.roll ORDER BY c.ts)
+                     THEN c.delta1_ema - LAG(c.delta1_ema) OVER (PARTITION BY c.tf, c.period, c.venue_id, c.roll ORDER BY c.ts)
                 END AS delta2_ema,
                 CASE WHEN NOT c.roll
-                     THEN c.delta1_ema_bar - LAG(c.delta1_ema_bar) OVER (PARTITION BY c.roll ORDER BY c.ts)
+                     THEN c.delta1_ema_bar - LAG(c.delta1_ema_bar) OVER (PARTITION BY c.tf, c.period, c.venue_id, c.roll ORDER BY c.ts)
                 END AS delta2_ema_bar,
-                c.delta1_ema_roll - LAG(c.delta1_ema_roll) OVER (ORDER BY c.ts) AS delta2_ema_roll,
-                c.delta1_ema_bar_roll - LAG(c.delta1_ema_bar_roll) OVER (ORDER BY c.ts) AS delta2_ema_bar_roll,
+                -- delta2 roll (PARTITION BY tf, period, venue_id)
+                c.delta1_ema_roll - LAG(c.delta1_ema_roll) OVER (PARTITION BY c.tf, c.period, c.venue_id ORDER BY c.ts) AS delta2_ema_roll,
+                c.delta1_ema_bar_roll - LAG(c.delta1_ema_bar_roll) OVER (PARTITION BY c.tf, c.period, c.venue_id ORDER BY c.ts) AS delta2_ema_bar_roll,
 
+                -- delta_ret_arith canonical
                 CASE WHEN NOT c.roll
-                     THEN c.ret_arith_ema - LAG(c.ret_arith_ema) OVER (PARTITION BY c.roll ORDER BY c.ts)
+                     THEN c.ret_arith_ema - LAG(c.ret_arith_ema) OVER (PARTITION BY c.tf, c.period, c.venue_id, c.roll ORDER BY c.ts)
                 END AS delta_ret_arith_ema,
                 CASE WHEN NOT c.roll
-                     THEN c.ret_arith_ema_bar - LAG(c.ret_arith_ema_bar) OVER (PARTITION BY c.roll ORDER BY c.ts)
+                     THEN c.ret_arith_ema_bar - LAG(c.ret_arith_ema_bar) OVER (PARTITION BY c.tf, c.period, c.venue_id, c.roll ORDER BY c.ts)
                 END AS delta_ret_arith_ema_bar,
-                c.ret_arith_ema_roll - LAG(c.ret_arith_ema_roll) OVER (ORDER BY c.ts) AS delta_ret_arith_ema_roll,
-                c.ret_arith_ema_bar_roll - LAG(c.ret_arith_ema_bar_roll) OVER (ORDER BY c.ts) AS delta_ret_arith_ema_bar_roll,
+                -- delta_ret_arith roll
+                c.ret_arith_ema_roll - LAG(c.ret_arith_ema_roll) OVER (PARTITION BY c.tf, c.period, c.venue_id ORDER BY c.ts) AS delta_ret_arith_ema_roll,
+                c.ret_arith_ema_bar_roll - LAG(c.ret_arith_ema_bar_roll) OVER (PARTITION BY c.tf, c.period, c.venue_id ORDER BY c.ts) AS delta_ret_arith_ema_bar_roll,
 
+                -- delta_ret_log canonical
                 CASE WHEN NOT c.roll
-                     THEN c.ret_log_ema - LAG(c.ret_log_ema) OVER (PARTITION BY c.roll ORDER BY c.ts)
+                     THEN c.ret_log_ema - LAG(c.ret_log_ema) OVER (PARTITION BY c.tf, c.period, c.venue_id, c.roll ORDER BY c.ts)
                 END AS delta_ret_log_ema,
                 CASE WHEN NOT c.roll
-                     THEN c.ret_log_ema_bar - LAG(c.ret_log_ema_bar) OVER (PARTITION BY c.roll ORDER BY c.ts)
+                     THEN c.ret_log_ema_bar - LAG(c.ret_log_ema_bar) OVER (PARTITION BY c.tf, c.period, c.venue_id, c.roll ORDER BY c.ts)
                 END AS delta_ret_log_ema_bar,
-                c.ret_log_ema_roll - LAG(c.ret_log_ema_roll) OVER (ORDER BY c.ts) AS delta_ret_log_ema_roll,
-                c.ret_log_ema_bar_roll - LAG(c.ret_log_ema_bar_roll) OVER (ORDER BY c.ts) AS delta_ret_log_ema_bar_roll
+                -- delta_ret_log roll
+                c.ret_log_ema_roll - LAG(c.ret_log_ema_roll) OVER (PARTITION BY c.tf, c.period, c.venue_id ORDER BY c.ts) AS delta_ret_log_ema_roll,
+                c.ret_log_ema_bar_roll - LAG(c.ret_log_ema_bar_roll) OVER (PARTITION BY c.tf, c.period, c.venue_id ORDER BY c.ts) AS delta_ret_log_ema_bar_roll
 
             FROM calc c
         ),
+        -- Per-key watermark filter: LEFT JOIN to state table for per-key filtering.
         to_insert AS (
             SELECT c2.*
             FROM calc2 c2
-            CROSS JOIN st
+            LEFT JOIN {state_table} st
+                ON st.id = c2.id
+               AND st.tf = c2.tf
+               AND st.period = c2.period
+               AND st.venue_id = c2.venue_id
             WHERE (st.last_ts IS NULL) OR (c2.ts > st.last_ts)
         ),
         ins AS (
@@ -514,13 +574,16 @@ def _run_one_key(
             FROM to_insert
             ON CONFLICT (id, venue_id, ts, tf, period, alignment_source) DO UPDATE SET
                 {_UPSERT_SET}
-            RETURNING ts
+            RETURNING id, tf, period, venue_id, ts
         )
-        UPDATE {state_table} s
-        SET
-            last_ts = COALESCE((SELECT MAX(ts) FROM ins), s.last_ts),
-            updated_at = now()
-        WHERE s.id = :id AND s.tf = :tf AND s.period = :period AND s.venue_id = :venue_id;
+        -- Bulk state update: one upsert per (tf, period, venue_id) combo touched
+        INSERT INTO {state_table} (id, tf, period, venue_id, last_ts, updated_at)
+        SELECT id, tf, period, venue_id, MAX(ts), now()
+        FROM ins
+        GROUP BY id, tf, period, venue_id
+        ON CONFLICT (id, venue_id, tf, period) DO UPDATE SET
+            last_ts = GREATEST(EXCLUDED.last_ts, {state_table}.last_ts),
+            updated_at = now();
         """
     )
 
@@ -528,35 +591,17 @@ def _run_one_key(
         cxn.execute(
             sql,
             {
-                "id": one_id,
-                "tf": one_tf,
-                "period": one_period,
-                "venue_id": one_venue_id,
+                "id": id_,
+                "global_wm": min_last_ts,
                 "start": start,
                 "alignment_source": alignment_source,
             },
         )
 
 
-def _run_one_key_mp(args: tuple) -> Tuple[int, str, int, int, bool]:
-    """Multiprocessing-safe wrapper. Creates own engine with NullPool."""
-    db_url, ema_table, ret_table, state_table, start, key, alignment_source = args
-    one_id, one_tf, one_period, one_venue_id = key
-    try:
-        engine = create_engine(db_url, poolclass=NullPool, future=True)
-        _run_one_key(
-            engine, ema_table, ret_table, state_table, start, key, alignment_source
-        )
-        engine.dispose()
-        return (one_id, one_tf, one_period, one_venue_id, True)
-    except Exception as exc:
-        _print(f"FAILED key=({one_id},{one_tf},{one_period},v{one_venue_id}): {exc}")
-        return (one_id, one_tf, one_period, one_venue_id, False)
-
-
 def main() -> None:
     p = argparse.ArgumentParser(
-        description="Unified EMA returns builder for CAL US/ISO (unified timeline with _roll columns)."
+        description="Unified EMA returns builder for CAL US/ISO (batch per-ID with PARTITION BY)."
     )
     p.add_argument(
         "--db-url",
@@ -571,7 +616,7 @@ def main() -> None:
     p.add_argument(
         "--full-refresh",
         action="store_true",
-        help="Recompute history for selected keys from --start.",
+        help="Recompute history for selected IDs from --start.",
     )
     p.add_argument(
         "--workers",
@@ -636,22 +681,34 @@ def main() -> None:
 
         _ensure_tables(engine, ret_table, state_table)
 
-        keys = _load_keys(engine, ema_table, ids, alignment_source=alignment_source)
-        _print(f"Resolved keys={len(keys)}")
+        asset_ids = _load_ids(engine, ema_table, ids, alignment_source=alignment_source)
+        _print(f"Resolved ids={len(asset_ids)}")
 
-        if not keys:
+        if not asset_ids:
             continue
 
-        _ensure_state_rows(engine, state_table, keys)
-
         if cfg.full_refresh:
-            _full_refresh(
-                engine, ret_table, state_table, keys, alignment_source=alignment_source
+            _print(
+                f"--full-refresh: resetting {len(asset_ids)} IDs for scheme={sch.upper()}."
+            )
+            for id_ in asset_ids:
+                _full_refresh_id(
+                    engine,
+                    ret_table,
+                    state_table,
+                    id_,
+                    alignment_source=alignment_source,
+                )
+
+        # Ensure state rows exist for all (tf, period, venue_id) combos per ID
+        for id_ in asset_ids:
+            _ensure_state_rows_for_id(
+                engine, ema_table, state_table, id_, alignment_source=alignment_source
             )
 
         workers = args.workers
         if workers > 1:
-            _print(f"Running {len(keys)} keys with {workers} workers.")
+            _print(f"Running {len(asset_ids)} IDs with {workers} workers.")
             mp_args = [
                 (
                     cfg.db_url,
@@ -659,36 +716,31 @@ def main() -> None:
                     ret_table,
                     state_table,
                     cfg.start,
-                    key,
+                    id_,
                     alignment_source,
                 )
-                for key in keys
+                for id_ in asset_ids
             ]
             done = 0
             failed = 0
-            with Pool(processes=workers, maxtasksperchild=50) as pool:
-                for one_id, one_tf, one_period, one_venue_id, ok in pool.imap_unordered(
-                    _run_one_key_mp, mp_args
-                ):
+            with Pool(processes=workers, maxtasksperchild=1) as pool:
+                for _done_id, ok in pool.imap_unordered(_run_one_id_mp, mp_args):
                     done += 1
                     if not ok:
                         failed += 1
-                    if done % 200 == 0 or done == len(keys):
-                        _print(f"  progress: {done}/{len(keys)} ({failed} failed)")
-            _print(f"Scheme {sch.upper()} done: {done} keys, {failed} failed.")
+                    if done % 50 == 0 or done == len(asset_ids):
+                        _print(f"  progress: {done}/{len(asset_ids)} ({failed} failed)")
+            _print(f"Scheme {sch.upper()} done: {done} IDs, {failed} failed.")
         else:
-            for i, key in enumerate(keys, start=1):
-                one_id, one_tf, one_period, one_venue_id = key
-                _print(
-                    f"Processing key=({one_id},{one_tf},{one_period},v{one_venue_id}) ({i}/{len(keys)})"
-                )
-                _run_one_key(
+            for i, id_ in enumerate(asset_ids, start=1):
+                _print(f"Processing id={id_} ({i}/{len(asset_ids)})")
+                _run_one_id(
                     engine,
                     ema_table,
                     ret_table,
                     state_table,
                     cfg.start,
-                    key,
+                    id_,
                     alignment_source=alignment_source,
                 )
 

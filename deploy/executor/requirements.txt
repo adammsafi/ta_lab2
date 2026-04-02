@@ -1,0 +1,21 @@
+# VM Executor requirements — minimal subset for production execution.
+# Install ta_lab2 itself separately:
+#   pip install -e /path/to/ta_lab2
+#
+# No research, backtesting, dashboard, or ML dependencies are included here.
+# This keeps the VM footprint small and startup fast.
+
+# Database
+sqlalchemy>=2.0
+psycopg2-binary>=2.9
+
+# WebSocket feeds
+hyperliquid-python-sdk
+websockets>=16.0
+
+# Numeric
+numpy>=1.24
+pandas>=2.0
+
+# HTTP (used by HL SDK and notification helpers)
+requests>=2.28

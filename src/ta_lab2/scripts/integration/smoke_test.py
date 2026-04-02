@@ -353,16 +353,14 @@ def _build_garch_checks() -> list[SmokeCheck]:
             name="[garch] BTC has recent GARCH forecast",
             query=(
                 "SELECT COUNT(*) FROM garch_forecasts "
-                "WHERE asset_id=1 "
+                "WHERE id=1 "
                 "AND created_at >= NOW() - INTERVAL '48 hours'"
             ),
             validator=_val_count_gte(1, "recent BTC GARCH forecasts"),
         ),
         SmokeCheck(
             name="[garch] garch_forecasts_latest BTC cond_vol in range",
-            query=(
-                "SELECT cond_vol FROM garch_forecasts_latest WHERE asset_id=1 LIMIT 1"
-            ),
+            query=("SELECT cond_vol FROM garch_forecasts_latest WHERE id=1 LIMIT 1"),
             validator=_val_range("BTC cond_vol", 0.0, 5.0),
         ),
     ]

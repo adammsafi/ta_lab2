@@ -862,6 +862,31 @@ def main() -> int:
         )
 
     # -----------------------------------------------------------------------
+    # Step 5b: Load permutation p-values from trial_registry (if available)
+    # -----------------------------------------------------------------------
+    perm_p_value_map: dict[str, float] | None = None
+    try:
+        perm_df = pd.read_sql(
+            text(
+                "SELECT indicator_name, perm_p_value FROM trial_registry "
+                "WHERE perm_p_value IS NOT NULL AND tf = :tf AND horizon = 1 "
+                "AND return_type = 'arith'"
+            ),
+            engine,
+            params={"tf": args.tf},
+        )
+        if len(perm_df) > 0:
+            perm_p_value_map = dict(
+                zip(perm_df["indicator_name"], perm_df["perm_p_value"])
+            )
+            logger.info(
+                "Loaded %d permutation p-values from trial_registry",
+                len(perm_p_value_map),
+            )
+    except Exception:
+        logger.debug("trial_registry not available, skipping perm_p_value gate")
+
+    # -----------------------------------------------------------------------
     # Step 6: Build config
     # -----------------------------------------------------------------------
     logger.info("Step 6: Building feature selection config...")
@@ -874,6 +899,7 @@ def main() -> int:
         monotonicity_scores=monotonicity_scores,
         regime_ic_map=regime_ic_map,
         ic_ir_cutoff=args.ic_ir_cutoff,
+        perm_p_value_map=perm_p_value_map,
     )
 
     # Add no-signal features to metadata (SC-1 coverage)

@@ -50,6 +50,10 @@ _STRATEGY_SIGNAL_MAP: dict[str, str] = {
     "ama_momentum": "ema_crossover",
     "ama_mean_reversion": "ema_crossover",
     "ama_regime_conditional": "ema_crossover",
+    "ema_trend": "ema_crossover",
+    "macd_crossover": "ema_crossover",
+    "rsi_mean_revert": "rsi_mean_revert",
+    "breakout_atr": "atr_breakout",
 }
 
 
@@ -147,11 +151,12 @@ def _discover_bakeoff_winners(engine: Engine) -> list[dict]:
 
             signal_type = _STRATEGY_SIGNAL_MAP.get(strategy_name)
             if signal_type is None:
-                logger.warning(
-                    "No signal_type mapping for strategy=%s -- skipping",
+                # Fallback: try strategy_name as signal_type directly
+                signal_type = strategy_name
+                logger.info(
+                    "No explicit mapping for strategy=%s -- trying as signal_type",
                     strategy_name,
                 )
-                continue
 
             # Cache lookup to avoid duplicate queries for the same signal_type
             if signal_type not in signal_id_cache:

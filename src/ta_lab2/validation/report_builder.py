@@ -508,9 +508,11 @@ class ValidationReportBuilder:
                     / NULLIF(pb.open::float, 0) * 10000 AS slippage_bps
             FROM fills f
             JOIN orders o ON f.order_id = o.order_id
-            JOIN price_bars_multi_tf pb
+            JOIN price_bars_multi_tf_u pb
                 ON  pb.id   = o.asset_id
                 AND pb.tf   = '1D'
+            AND pb.venue_id = 1
+            AND pb.alignment_source = 'multi_tf'
                 AND pb.ts::date = f.filled_at::date
             WHERE f.filled_at::date BETWEEN :start_date AND :end_date
               AND pb.open IS NOT NULL
@@ -879,7 +881,7 @@ class ValidationReportBuilder:
             "prices, this should be minimal."
         )
         lines.append("")
-        lines.append("**Evidence source:** `fills` JOIN `price_bars_multi_tf` (tf=1D)")
+        lines.append("**Evidence source:** `fills` JOIN `price_bars_multi_tf_u` (tf=1D)")
         if gate:
             lines.append("")
             lines.append(f"**Measured:** {gate.measured_value}")

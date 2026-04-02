@@ -49,6 +49,13 @@ except Exception:  # pragma: no cover
     ama_mean_reversion_signal = None  # type: ignore[assignment]
     ama_regime_conditional_signal = None  # type: ignore[assignment]
 
+try:
+    from .ctf_threshold import (
+        make_signals as ctf_threshold_signal,
+    )  # optional (Phase 99)
+except Exception:  # pragma: no cover
+    ctf_threshold_signal = None  # type: ignore[assignment]
+
 
 # ---------------------------------------------------------------------------
 # Backward-compatible core: simple name->callable registry
@@ -70,6 +77,7 @@ REGISTRY: Dict[str, Callable[..., Tuple[pd.Series, pd.Series, Optional[pd.Series
         if ama_regime_conditional_signal
         else {}
     ),
+    **({"ctf_threshold": ctf_threshold_signal} if ctf_threshold_signal else {}),
 }
 
 
@@ -231,6 +239,11 @@ def ensure_for(name: str, df: pd.DataFrame, params: Dict[str, Any]) -> None:
             # We just ensure ATR is available (reuses Wilder TR logic).
             _ensure_atr(df, 14)
 
+    elif name == "ctf_threshold" and ctf_threshold_signal:
+        # CTF feature columns are pre-loaded from dim_feature_selection / features table.
+        # No local computation needed; ensure close is present for context.
+        _ensure_close(df)
+
     else:
         # Unknown or unavailable strategy: no-op to stay non-breaking for callers that ignore ensure
         pass
@@ -317,6 +330,28 @@ def grid_for(name: str) -> List[Dict[str, Any]]:
         for adx_thr in (15.0, 20.0, 25.0):
             for hb in (5, 7, 10):
                 out.append({"adx_threshold": adx_thr, "holding_bars": hb})
+        return out
+
+    if name == "ctf_threshold" and ctf_threshold_signal:
+        # 3x3x2 grid: top CTF features x entry_threshold x direction
+        # Features by IC rank from Phase 92 analysis
+        out: List[Dict[str, Any]] = []
+        for feat in (
+            "ret_arith_365d_divergence",
+            "vol_ratio_30d",
+            "ema_cross_score",
+        ):
+            for thr in (-0.5, 0.0, 0.5):
+                for direction in ("long", "short"):
+                    out.append(
+                        {
+                            "feature_col": feat,
+                            "entry_threshold": thr,
+                            "exit_threshold": -thr,
+                            "direction": direction,
+                            "holding_bars": 7,
+                        }
+                    )
         return out
 
     raise KeyError(f"No default grid for strategy '{name}'")

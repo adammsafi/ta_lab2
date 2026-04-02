@@ -1,6 +1,16 @@
 #!/usr/bin/env python
 """
-Unified daily refresh orchestration script.
+Unified daily refresh orchestration script (LEGACY).
+
+Prefer the new pipeline scripts for independent operation:
+    python -m ta_lab2.scripts.pipelines.run_data_pipeline --ids all
+    python -m ta_lab2.scripts.pipelines.run_features_pipeline --ids all
+    python -m ta_lab2.scripts.pipelines.run_signals_pipeline
+    python -m ta_lab2.scripts.pipelines.run_execution_pipeline
+    python -m ta_lab2.scripts.pipelines.run_monitoring_pipeline
+    python -m ta_lab2.scripts.pipelines.run_full_chain --ids all
+
+This script is maintained for backward compatibility.
 
 Coordinates VM data syncs, bars, EMAs, AMAs, desc_stats, macro features,
 macro regimes, per-asset regimes, signals, executor, drift monitor, and
@@ -68,91 +78,56 @@ import argparse
 import subprocess
 import sys
 import time
-from dataclasses import dataclass
 from pathlib import Path
 
 from ta_lab2.scripts.alembic_utils import check_migration_status
+from ta_lab2.scripts.pipeline_utils import (
+    KILL_SWITCH_FILE,
+    STAGE_ORDER,
+    TIMEOUT_AMAS,
+    TIMEOUT_BARS,
+    TIMEOUT_CALIBRATE_STOPS,
+    TIMEOUT_CROSS_ASSET_AGG,
+    TIMEOUT_DESC_STATS,
+    TIMEOUT_DRIFT,
+    TIMEOUT_EMAS,
+    TIMEOUT_EXCHANGE_PRICES,
+    TIMEOUT_EXECUTOR,
+    TIMEOUT_FEATURES,
+    TIMEOUT_GARCH,
+    TIMEOUT_IC_STALENESS,
+    TIMEOUT_MACRO,
+    TIMEOUT_MACRO_ALERTS,
+    TIMEOUT_MACRO_ANALYTICS,
+    TIMEOUT_MACRO_GATES,
+    TIMEOUT_MACRO_REGIMES,
+    TIMEOUT_PORTFOLIO,
+    TIMEOUT_REGIMES,
+    TIMEOUT_RETURNS_AMA,
+    TIMEOUT_RETURNS_BARS,
+    TIMEOUT_RETURNS_EMA,
+    TIMEOUT_SIGNAL_GATE,
+    TIMEOUT_SIGNALS,
+    TIMEOUT_STATS,
+    TIMEOUT_SYNC_CMC,
+    TIMEOUT_SYNC_FRED,
+    TIMEOUT_SYNC_HL,
+    ComponentResult,
+    _check_dead_man,
+    _complete_pipeline_run,
+    _fire_dead_man_alert,
+    _log_stage_complete,
+    _log_stage_start,
+    _maybe_kill,
+    _start_pipeline_run,
+    print_combined_summary,
+    run_pipeline_completion_alert,
+)
 from ta_lab2.scripts.refresh_utils import (
     get_fresh_ids,
     parse_ids,
     resolve_db_url,
 )
-
-# Timeout tiers (seconds); initial estimate, tune after observing actual runtimes
-TIMEOUT_BARS = 7200  # 2 hours -- bar builders can be slow for full rebuilds
-TIMEOUT_EMAS = 3600  # 1 hour -- EMA refreshers
-TIMEOUT_AMAS = 3600  # 1 hour -- AMA refreshers
-TIMEOUT_DESC_STATS = 3600  # 1 hour -- asset stats + correlation computation
-TIMEOUT_REGIMES = 1800  # 30 minutes -- regime refresher
-TIMEOUT_FEATURES = 1800  # 30 minutes -- feature refresh for all assets at 1D
-TIMEOUT_SIGNALS = 1800  # 30 minutes -- signal generation for all types
-TIMEOUT_CALIBRATE_STOPS = (
-    300  # 5 minutes -- iterates over asset x strategy combos, mostly SQL reads
-)
-TIMEOUT_PORTFOLIO = 600  # 10 minutes -- portfolio optimizer runs all three methods
-TIMEOUT_EXECUTOR = (
-    300  # 5 minutes -- daily executor is fast (2 strategies, ~100 assets)
-)
-TIMEOUT_STATS = 3600  # 1 hour -- stats runners scan large tables
-TIMEOUT_EXCHANGE_PRICES = 120  # 2 minutes -- live price fetches from exchanges
-TIMEOUT_DRIFT = 600  # 10 minutes -- drift runs replays which involve backtest execution
-TIMEOUT_MACRO = 300  # 5 minutes -- small FRED dataset, fast computation
-TIMEOUT_MACRO_REGIMES = (
-    300  # 5 minutes -- 4-dimension classification over FRED features
-)
-TIMEOUT_MACRO_ANALYTICS = (
-    900  # 15 minutes -- HMM fitting can be slow (10 restarts x 2-3 state models)
-)
-TIMEOUT_CROSS_ASSET_AGG = (
-    600  # 10 minutes -- rolling correlations across all assets + funding z-scores
-)
-TIMEOUT_MACRO_GATES = 120  # 2 minutes -- gate evaluation against FRED features
-TIMEOUT_MACRO_ALERTS = 60  # 1 minute -- transition detection + Telegram send
-TIMEOUT_GARCH = 1800  # 30 minutes -- GARCH fitting for 99 assets x 4 models
-TIMEOUT_SYNC_FRED = 300  # 5 minutes -- SSH + psql COPY from GCP VM
-TIMEOUT_SYNC_HL = 600  # 10 minutes -- SSH + psql COPY from Singapore VM (~3M rows)
-TIMEOUT_SIGNAL_GATE = 120  # 2 minutes -- signal count queries are fast
-TIMEOUT_IC_STALENESS = 300  # 5 minutes -- IC computation for ~10 features x 2 assets
-TIMEOUT_PIPELINE_ALERT = 60  # 1 minute -- Telegram send only
-
-# Canonical pipeline stage ordering -- used by --from-stage to skip prior stages.
-# New Phase 87 stages: signal_validation_gate, ic_staleness_check, pipeline_alerts.
-STAGE_ORDER = [
-    "sync_vms",
-    "bars",
-    "emas",
-    "amas",
-    "desc_stats",
-    "macro_features",
-    "macro_regimes",
-    "macro_analytics",
-    "cross_asset_agg",
-    "macro_gates",
-    "macro_alerts",
-    "regimes",
-    "features",
-    "garch",
-    "signals",
-    "signal_validation_gate",  # Phase 87
-    "ic_staleness_check",  # Phase 87
-    "calibrate_stops",
-    "portfolio",
-    "executor",
-    "drift_monitor",
-    "pipeline_alerts",  # Phase 87
-    "stats",
-]
-
-
-@dataclass
-class ComponentResult:
-    """Result of running a component (bars or EMAs)."""
-
-    component: str
-    success: bool
-    duration_sec: float
-    returncode: int
-    error_message: str | None = None
 
 
 def run_bar_builders(
@@ -512,6 +487,122 @@ def run_ama_refreshers(
             returncode=-1,
             error_message=error_msg,
         )
+
+
+def _run_returns_subprocess(
+    component_name: str,
+    cmd: list[str],
+    timeout: int,
+    args,
+) -> ComponentResult:
+    """Generic subprocess runner for returns refresh stages."""
+    print(f"\n{'=' * 70}")
+    print(f"RUNNING {component_name.upper()}")
+    print(f"{'=' * 70}")
+    print(f"Command: {' '.join(cmd)}")
+
+    if args.dry_run:
+        print(f"[DRY RUN] Would execute {component_name}")
+        return ComponentResult(
+            component=component_name, success=True, duration_sec=0.0, returncode=0
+        )
+
+    import time as _time
+
+    start = _time.perf_counter()
+    try:
+        if args.verbose:
+            result = subprocess.run(cmd, check=False, timeout=timeout)
+        else:
+            result = subprocess.run(
+                cmd, check=False, capture_output=True, text=True, timeout=timeout
+            )
+            if result.returncode != 0:
+                print(
+                    f"\n[ERROR] {component_name} failed with code {result.returncode}"
+                )
+                if result.stdout:
+                    print(f"\nSTDOUT (last 500 chars):\n{result.stdout[-500:]}")
+                if result.stderr:
+                    print(f"\nSTDERR (last 500 chars):\n{result.stderr[-500:]}")
+
+        duration = _time.perf_counter() - start
+        if result.returncode == 0:
+            print(f"\n[OK] {component_name} completed successfully in {duration:.1f}s")
+            return ComponentResult(
+                component=component_name,
+                success=True,
+                duration_sec=duration,
+                returncode=0,
+            )
+        else:
+            error_msg = f"Exited with code {result.returncode}"
+            print(f"\n[FAILED] {component_name} failed: {error_msg}")
+            return ComponentResult(
+                component=component_name,
+                success=False,
+                duration_sec=duration,
+                returncode=result.returncode,
+                error_message=error_msg,
+            )
+    except subprocess.TimeoutExpired:
+        duration = _time.perf_counter() - start
+        error_msg = f"Timed out after {timeout}s"
+        print(f"\n[TIMEOUT] {component_name}: {error_msg}")
+        return ComponentResult(
+            component=component_name,
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+
+
+def run_returns_bars(args, db_url: str) -> ComponentResult:
+    """Run bar returns refresh via subprocess."""
+    cmd = [
+        sys.executable,
+        "-m",
+        "ta_lab2.scripts.returns.refresh_returns_bars_multi_tf",
+        "--ids",
+        args.ids,
+        "--db-url",
+        db_url,
+    ]
+    if args.num_processes:
+        cmd.extend(["--workers", str(args.num_processes)])
+    return _run_returns_subprocess("bar returns", cmd, TIMEOUT_RETURNS_BARS, args)
+
+
+def run_returns_ema(args, db_url: str) -> ComponentResult:
+    """Run EMA returns refresh via subprocess."""
+    cmd = [
+        sys.executable,
+        "-m",
+        "ta_lab2.scripts.returns.refresh_returns_ema_multi_tf",
+        "--ids",
+        args.ids,
+    ]
+    if args.num_processes:
+        cmd.extend(["--workers", str(args.num_processes)])
+    return _run_returns_subprocess("EMA returns", cmd, TIMEOUT_RETURNS_EMA, args)
+
+
+def run_returns_ama(args, db_url: str) -> ComponentResult:
+    """Run AMA returns refresh via subprocess."""
+    cmd = [
+        sys.executable,
+        "-m",
+        "ta_lab2.scripts.amas.refresh_returns_ama",
+        "--ids",
+        args.ids,
+        "--all-tfs",
+        "--source",
+        "all",
+    ]
+    if args.num_processes:
+        cmd.extend(["-n", str(args.num_processes)])
+    return _run_returns_subprocess("AMA returns", cmd, TIMEOUT_RETURNS_AMA, args)
 
 
 def run_desc_stats_refresher(
@@ -981,7 +1072,9 @@ def run_signal_refreshes(args, db_url: str) -> ComponentResult:
     """
     Run signal generation via subprocess.
 
-    Generates EMA crossover, RSI, and ATR breakout signals for all assets.
+    Generates all 7 signal types (EMA crossover, RSI mean-revert, ATR breakout,
+    MACD crossover in Batch 1; AMA momentum, AMA mean-reversion, AMA regime-
+    conditional in Batch 2) for all assets.
     Runs after regimes (regime-aware signal generation) and before the executor.
 
     Args:
@@ -1853,52 +1946,6 @@ def run_weekly_digest(args, db_url: str) -> ComponentResult:
         )
 
 
-def print_combined_summary(results: list[tuple[str, ComponentResult]]) -> bool:
-    """
-    Print combined execution summary.
-
-    Args:
-        results: List of (component_name, result) tuples
-
-    Returns:
-        True if all components succeeded, False otherwise
-    """
-    print(f"\n{'=' * 70}")
-    print("DAILY REFRESH SUMMARY")
-    print(f"{'=' * 70}")
-
-    total_duration = sum(r.duration_sec for _, r in results)
-    successful = [r for _, r in results if r.success]
-    failed = [r for _, r in results if not r.success]
-
-    print(f"\nTotal components: {len(results)}")
-    print(f"Successful: {len(successful)}")
-    print(f"Failed: {len(failed)}")
-    print(f"Total time: {total_duration:.1f}s")
-
-    if successful:
-        print("\n[OK] Successful components:")
-        for name, r in results:
-            if r.success:
-                print(f"  - {name}: {r.duration_sec:.1f}s")
-
-    if failed:
-        print("\n[FAILED] Failed components:")
-        for name, r in results:
-            if not r.success:
-                error_info = f" ({r.error_message})" if r.error_message else ""
-                print(f"  - {name}: {r.duration_sec:.1f}s{error_info}")
-
-    print(f"\n{'=' * 70}")
-
-    if failed:
-        print(f"\n[WARNING] {len(failed)} component(s) failed!")
-        return False
-    else:
-        print("\n[OK] All components completed successfully!")
-        return True
-
-
 def run_sync_fred_vm(args) -> ComponentResult:
     """Sync FRED data from GCP VM to local fred.* schema.
 
@@ -2073,6 +2120,95 @@ def run_sync_hl_vm(args) -> ComponentResult:
         print(f"\n[TIMEOUT] Hyperliquid VM sync: {error_msg}")
         return ComponentResult(
             component="sync_hl_vm",
+            success=False,
+            duration_sec=duration,
+            returncode=-1,
+            error_message=error_msg,
+        )
+
+
+def run_sync_cmc_vm(args) -> ComponentResult:
+    """Sync CMC price histories from Singapore VM to local cmc_price_histories7.
+
+    Runs incremental sync of 7 CMC assets (BTC, ETH, SOL, XRP, BNB, LINK, HYPE)
+    via SSH + psql COPY. Should run before bars so 1D builder sees fresh CMC data.
+
+    Args:
+        args: CLI arguments
+
+    Returns:
+        ComponentResult with execution details
+    """
+    cmd = [
+        sys.executable,
+        "-m",
+        "ta_lab2.scripts.etl.sync_cmc_from_vm",
+    ]
+
+    if getattr(args, "dry_run", False):
+        cmd.append("--dry-run")
+
+    print(f"\n{'=' * 70}")
+    print("SYNCING CMC PRICE DATA FROM SINGAPORE VM")
+    print(f"{'=' * 70}")
+    print(f"Command: {' '.join(cmd)}")
+
+    if args.dry_run:
+        print("[DRY RUN] Would sync CMC price data from Singapore VM")
+        return ComponentResult(
+            component="sync_cmc_vm",
+            success=True,
+            duration_sec=0.0,
+            returncode=0,
+        )
+
+    start = time.perf_counter()
+
+    try:
+        if args.verbose:
+            result = subprocess.run(cmd, check=False, timeout=TIMEOUT_SYNC_CMC)
+        else:
+            result = subprocess.run(
+                cmd,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=TIMEOUT_SYNC_CMC,
+            )
+            if result.returncode != 0:
+                print(f"\n[ERROR] CMC VM sync failed with code {result.returncode}")
+                if result.stdout:
+                    print(f"\nSTDOUT:\n{result.stdout}")
+                if result.stderr:
+                    print(f"\nSTDERR:\n{result.stderr}")
+
+        duration = time.perf_counter() - start
+
+        if result.returncode == 0:
+            print(f"\n[OK] CMC VM sync completed in {duration:.1f}s")
+            return ComponentResult(
+                component="sync_cmc_vm",
+                success=True,
+                duration_sec=duration,
+                returncode=result.returncode,
+            )
+        else:
+            error_msg = f"Exited with code {result.returncode}"
+            print(f"\n[FAILED] CMC VM sync: {error_msg}")
+            return ComponentResult(
+                component="sync_cmc_vm",
+                success=False,
+                duration_sec=duration,
+                returncode=result.returncode,
+                error_message=error_msg,
+            )
+
+    except subprocess.TimeoutExpired:
+        duration = time.perf_counter() - start
+        error_msg = f"Timed out after {TIMEOUT_SYNC_CMC}s"
+        print(f"\n[TIMEOUT] CMC VM sync: {error_msg}")
+        return ComponentResult(
+            component="sync_cmc_vm",
             success=False,
             duration_sec=duration,
             returncode=-1,
@@ -2817,331 +2953,6 @@ def run_ic_staleness_check_stage(args, db_url: str) -> ComponentResult:
         )
 
 
-def run_pipeline_completion_alert(
-    args, db_url: str, results: list[tuple[str, ComponentResult]]
-) -> ComponentResult:
-    """Send a daily pipeline digest alert via Telegram.
-
-    Non-blocking: alert failures are logged but never stop the pipeline.
-    Throttled to one alert per 20 hours via pipeline_alert_log.
-    """
-    start = time.perf_counter()
-    _ALERT_TYPE = "pipeline_complete"
-    _ALERT_KEY = "daily"
-    _COOLDOWN_HOURS = 20
-
-    # Build digest
-    successful = [name for name, r in results if r.success]
-    failed_items = [(name, r) for name, r in results if not r.success]
-    total_duration = sum(r.duration_sec for _, r in results)
-    severity = "info" if not failed_items else "warning"
-
-    lines = [
-        f"Pipeline complete: {len(successful)}/{len(results)} stages OK",
-        f"Total duration: {total_duration:.0f}s",
-    ]
-    if failed_items:
-        lines.append("Failed stages:")
-        for name, r in failed_items:
-            err = f" ({r.error_message})" if r.error_message else ""
-            lines.append(f"  - {name}{err}")
-    message = "\n".join(lines)
-
-    if getattr(args, "dry_run", False):
-        print(f"\n[DRY RUN] Would send pipeline completion alert ({severity})")
-        duration = time.perf_counter() - start
-        return ComponentResult(
-            component="pipeline_alerts",
-            success=True,
-            duration_sec=duration,
-            returncode=0,
-        )
-
-    try:
-        # Lazy import to avoid hard dependency when running dry-run / tests
-        from sqlalchemy import create_engine, text
-        from sqlalchemy.exc import OperationalError, ProgrammingError
-
-        from ta_lab2.notifications import telegram
-
-        engine = create_engine(db_url)
-
-        # Check throttle
-        throttled = False
-        try:
-            with engine.connect() as conn:
-                row = conn.execute(
-                    text("""
-                        SELECT 1 FROM pipeline_alert_log
-                        WHERE alert_type = :atype
-                          AND alert_key = :akey
-                          AND sent_at > NOW() - (INTERVAL '1 hour' * :hours)
-                          AND throttled = FALSE
-                        LIMIT 1
-                    """),
-                    {
-                        "atype": _ALERT_TYPE,
-                        "akey": _ALERT_KEY,
-                        "hours": _COOLDOWN_HOURS,
-                    },
-                ).fetchone()
-                throttled = row is not None
-        except (OperationalError, ProgrammingError):
-            pass  # Table may not exist yet -- proceed without throttle check
-
-        sent = False
-        if not throttled:
-            if telegram.is_configured():
-                title = "Daily Pipeline Complete"
-                try:
-                    sent = telegram.send_alert(title, message, severity=severity)
-                except Exception as exc:
-                    print(f"  [WARN] Telegram send failed: {exc}")
-            else:
-                print("  [INFO] Telegram not configured -- skipping completion alert")
-
-        # Log to pipeline_alert_log
-        try:
-            with engine.begin() as conn:
-                conn.execute(
-                    text("""
-                        INSERT INTO pipeline_alert_log
-                            (alert_type, alert_key, severity, message_preview, throttled)
-                        VALUES (:atype, :akey, :sev, :preview, :throttled)
-                    """),
-                    {
-                        "atype": _ALERT_TYPE,
-                        "akey": _ALERT_KEY,
-                        "sev": severity,
-                        "preview": message[:500],
-                        "throttled": throttled,
-                    },
-                )
-        except (OperationalError, ProgrammingError) as exc:
-            print(f"  [WARN] Could not log to pipeline_alert_log: {exc}")
-
-        engine.dispose()
-
-        status = "throttled" if throttled else ("sent" if sent else "skipped")
-        duration = time.perf_counter() - start
-        print(f"  Pipeline completion alert: {status} ({duration:.1f}s)")
-        return ComponentResult(
-            component="pipeline_alerts",
-            success=True,
-            duration_sec=duration,
-            returncode=0,
-        )
-
-    except Exception as e:
-        duration = time.perf_counter() - start
-        print(f"\n[WARN] Pipeline completion alert failed (non-blocking): {e}")
-        return ComponentResult(
-            component="pipeline_alerts",
-            success=True,  # Non-blocking -- always succeeds
-            duration_sec=duration,
-            returncode=0,
-        )
-
-
-# ---------------------------------------------------------------------------
-# Phase 87 pipeline_run_log helpers
-# ---------------------------------------------------------------------------
-
-
-def _start_pipeline_run(db_url: str) -> str | None:
-    """Insert a pipeline_run_log row with status='running'. Return the UUID run_id.
-
-    Returns None on DB error (table may not exist if migration is pending).
-    """
-    try:
-        from sqlalchemy import create_engine, text
-        from sqlalchemy.exc import OperationalError, ProgrammingError
-
-        engine = create_engine(db_url)
-        with engine.begin() as conn:
-            row = conn.execute(
-                text(
-                    "INSERT INTO pipeline_run_log (status) VALUES ('running') "
-                    "RETURNING run_id"
-                )
-            ).fetchone()
-        engine.dispose()
-        return str(row[0]) if row else None
-    except (OperationalError, ProgrammingError) as exc:
-        print(
-            f"[WARN] Could not start pipeline_run_log row (migration pending?): {exc}"
-        )
-        return None
-    except Exception as exc:
-        print(f"[WARN] pipeline_run_log insert error: {exc}")
-        return None
-
-
-def _complete_pipeline_run(
-    db_url: str,
-    run_id: str,
-    status: str,
-    stages: list[str],
-    duration: float,
-    error_msg: str | None,
-) -> None:
-    """Update the pipeline_run_log row with completion details."""
-    import json
-
-    try:
-        from sqlalchemy import create_engine, text
-        from sqlalchemy.exc import OperationalError, ProgrammingError
-
-        engine = create_engine(db_url)
-        with engine.begin() as conn:
-            conn.execute(
-                text("""
-                    UPDATE pipeline_run_log
-                    SET completed_at        = now(),
-                        status              = :status,
-                        stages_completed    = CAST(:stages AS JSONB),
-                        total_duration_sec  = :duration,
-                        error_message       = :error
-                    WHERE run_id = CAST(:run_id AS UUID)
-                """),
-                {
-                    "run_id": run_id,
-                    "status": status,
-                    "stages": json.dumps(stages),
-                    "duration": duration,
-                    "error": error_msg,
-                },
-            )
-        engine.dispose()
-    except (OperationalError, ProgrammingError) as exc:
-        print(f"[WARN] Could not update pipeline_run_log (migration pending?): {exc}")
-    except Exception as exc:
-        print(f"[WARN] pipeline_run_log update error: {exc}")
-
-
-def _check_dead_man(db_url: str) -> bool:
-    """Return True if yesterday's pipeline run is MISSING (dead-man should fire).
-
-    Returns False when pipeline_run_log has 0 rows (first run) to avoid
-    a false-positive alert on initial deployment.
-    """
-    try:
-        from sqlalchemy import create_engine, text
-        from sqlalchemy.exc import OperationalError, ProgrammingError
-
-        engine = create_engine(db_url)
-        with engine.connect() as conn:
-            # First, check if table has ANY rows at all
-            count_row = conn.execute(
-                text("SELECT COUNT(*) FROM pipeline_run_log")
-            ).fetchone()
-            if count_row and count_row[0] == 0:
-                engine.dispose()
-                return False  # First ever run -- no false alarm
-
-            # Check if yesterday's run completed
-            row = conn.execute(
-                text("""
-                    SELECT 1
-                    FROM pipeline_run_log
-                    WHERE DATE(completed_at AT TIME ZONE 'UTC')
-                          = CURRENT_DATE - INTERVAL '1 day'
-                      AND status = 'complete'
-                    LIMIT 1
-                """)
-            ).fetchone()
-        engine.dispose()
-        return row is None  # True = no completed run yesterday
-    except (OperationalError, ProgrammingError) as exc:
-        print(f"[WARN] Could not check pipeline_run_log for dead-man switch: {exc}")
-        return False
-    except Exception as exc:
-        print(f"[WARN] Dead-man switch check error: {exc}")
-        return False
-
-
-def _fire_dead_man_alert(db_url: str) -> None:
-    """Send a CRITICAL dead-man switch alert (12h cooldown) via Telegram."""
-    _ALERT_TYPE = "dead_man_switch"
-    _ALERT_KEY = "daily"
-    _COOLDOWN_HOURS = 12
-
-    try:
-        from sqlalchemy import create_engine, text
-        from sqlalchemy.exc import OperationalError, ProgrammingError
-
-        from ta_lab2.notifications import telegram
-
-        engine = create_engine(db_url)
-
-        # Check throttle
-        throttled = False
-        try:
-            with engine.connect() as conn:
-                row = conn.execute(
-                    text("""
-                        SELECT 1 FROM pipeline_alert_log
-                        WHERE alert_type = :atype
-                          AND alert_key = :akey
-                          AND sent_at > NOW() - (INTERVAL '1 hour' * :hours)
-                          AND throttled = FALSE
-                        LIMIT 1
-                    """),
-                    {
-                        "atype": _ALERT_TYPE,
-                        "akey": _ALERT_KEY,
-                        "hours": _COOLDOWN_HOURS,
-                    },
-                ).fetchone()
-                throttled = row is not None
-        except (OperationalError, ProgrammingError):
-            pass  # Table may not exist yet
-
-        sent = False
-        if not throttled:
-            if telegram.is_configured():
-                try:
-                    sent = telegram.send_alert(
-                        "Dead-Man Switch",
-                        "Yesterday's pipeline run did not complete! "
-                        "Check pipeline_run_log for details.",
-                        severity="critical",
-                    )
-                except Exception as exc:
-                    print(f"  [WARN] Dead-man Telegram send failed: {exc}")
-            else:
-                print("  [WARN] Dead-man switch fired but Telegram not configured")
-        else:
-            print("  [INFO] Dead-man alert throttled (within 12h cooldown)")
-
-        # Log to pipeline_alert_log
-        try:
-            with engine.begin() as conn:
-                conn.execute(
-                    text("""
-                        INSERT INTO pipeline_alert_log
-                            (alert_type, alert_key, severity, message_preview, throttled)
-                        VALUES (:atype, :akey, 'critical',
-                                'Dead-man switch fired: yesterday pipeline incomplete',
-                                :throttled)
-                    """),
-                    {"atype": _ALERT_TYPE, "akey": _ALERT_KEY, "throttled": throttled},
-                )
-        except (OperationalError, ProgrammingError) as exc:
-            print(f"  [WARN] Could not log dead-man alert: {exc}")
-
-        engine.dispose()
-        status_msg = (
-            "throttled"
-            if throttled
-            else ("sent" if sent else "skipped (Telegram unconfigured)")
-        )
-        print(f"  [CRITICAL] Dead-man switch: {status_msg}")
-
-    except Exception as exc:
-        print(f"[WARN] Dead-man switch alert error (non-blocking): {exc}")
-
-
 def main(argv: list[str] | None = None) -> int:
     """Main entry point."""
     p = argparse.ArgumentParser(
@@ -3584,13 +3395,25 @@ Examples:
         print(f"[ERROR] {e}")
         return 1
 
+    # Deprecation notice for --all (use run_full_chain instead)
+    if args.all:
+        print(
+            "\n[NOTICE] run_daily_refresh.py --all is deprecated.\n"
+            "         Use: python -m ta_lab2.scripts.pipelines.run_full_chain --ids <ids>\n"
+            "         Individual pipelines: run_data_pipeline, run_features_pipeline,"
+            " run_signals_pipeline\n"
+        )
+
     # Determine what to run
     run_sync_vms = (args.sync_vms or args.all) and not getattr(
         args, "no_sync_vms", False
     )
     run_bars = args.bars or args.all
+    run_returns_bars_flag = args.all  # Returns run automatically in --all mode
     run_emas = args.emas or args.all
+    run_returns_ema_flag = args.all
     run_amas = args.amas or args.all
+    run_returns_ama_flag = args.all
     run_desc_stats = args.desc_stats or args.all
     run_macro = (args.macro or args.all) and not getattr(args, "no_macro", False)
     run_macro_regimes_flag = (args.macro_regimes or args.all) and not getattr(
@@ -3630,10 +3453,16 @@ Examples:
             run_sync_vms = False
         if "bars" in skip_stages:
             run_bars = False
+        if "returns_bars" in skip_stages:
+            run_returns_bars_flag = False
         if "emas" in skip_stages:
             run_emas = False
+        if "returns_ema" in skip_stages:
+            run_returns_ema_flag = False
         if "amas" in skip_stages:
             run_amas = False
+        if "returns_ama" in skip_stages:
+            run_returns_ama_flag = False
         if "desc_stats" in skip_stages:
             run_desc_stats = False
         if "macro_features" in skip_stages:
@@ -3673,10 +3502,16 @@ Examples:
         components.append("sync_vms")
     if run_bars:
         components.append("bars")
+    if run_returns_bars_flag:
+        components.append("returns_bars")
     if run_emas:
         components.append("EMAs")
+    if run_returns_ema_flag:
+        components.append("returns_ema")
     if run_amas:
         components.append("AMAs")
+    if run_returns_ama_flag:
+        components.append("returns_ama")
     if run_desc_stats:
         components.append("desc_stats")
     if run_macro:
@@ -3730,6 +3565,8 @@ Examples:
     pipeline_start_time = time.perf_counter()
     if not args.dry_run:
         pipeline_run_id = _start_pipeline_run(db_url)
+        # Phase 107: remove any stale kill switch from a previous run
+        KILL_SWITCH_FILE.unlink(missing_ok=True)
         # Dead-man switch: alert if yesterday's run is missing
         if _check_dead_man(db_url):
             print(
@@ -3741,27 +3578,90 @@ Examples:
     # Non-blocking: sync failures don't stop the pipeline (local data is
     # still usable, just potentially stale). Warns instead.
     if run_sync_vms:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "sync_fred_vm")
         fred_result = run_sync_fred_vm(args)
         results.append(("sync_fred_vm", fred_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            fred_result.success,
+            fred_result.duration_sec,
+            fred_result.error_message,
+        )
         if not fred_result.success:
             print("\n[WARN] FRED VM sync failed -- continuing with existing local data")
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
+        _slid = _log_stage_start(db_url, pipeline_run_id, "sync_hl_vm")
         hl_result = run_sync_hl_vm(args)
         results.append(("sync_hl_vm", hl_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            hl_result.success,
+            hl_result.duration_sec,
+            hl_result.error_message,
+        )
         if not hl_result.success:
             print(
                 "\n[WARN] Hyperliquid VM sync failed -- continuing with existing local data"
             )
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
+
+        _slid = _log_stage_start(db_url, pipeline_run_id, "sync_cmc_vm")
+        cmc_result = run_sync_cmc_vm(args)
+        results.append(("sync_cmc_vm", cmc_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            cmc_result.success,
+            cmc_result.duration_sec,
+            cmc_result.error_message,
+        )
+        if not cmc_result.success:
+            print("\n[WARN] CMC VM sync failed -- continuing with existing local data")
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Run bars if requested
     if run_bars:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "bars")
         bar_result = run_bar_builders(args, db_url, parsed_ids)
         results.append(("bars", bar_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            bar_result.success,
+            bar_result.duration_sec,
+            bar_result.error_message,
+        )
 
         if not bar_result.success and not args.continue_on_error:
             print("\n[STOPPED] Bar builders failed, stopping execution")
             print("(Use --continue-on-error to run remaining components)")
             return 1
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
+
+    # Run bar returns if requested (after bars, before EMAs)
+    if run_returns_bars_flag:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "returns_bars")
+        ret_bars_result = run_returns_bars(args, db_url)
+        results.append(("returns_bars", ret_bars_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            ret_bars_result.success,
+            ret_bars_result.duration_sec,
+            ret_bars_result.error_message,
+        )
+        if not ret_bars_result.success and not args.continue_on_error:
+            print("\n[STOPPED] Bar returns failed, stopping execution")
+            return 1
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Run EMAs if requested
     if run_emas:
@@ -3798,162 +3698,367 @@ Examples:
         elif run_bars:
             print("\n[INFO] Skipping bar freshness check (bars just refreshed)")
 
+        _slid = _log_stage_start(db_url, pipeline_run_id, "emas")
         ema_result = run_ema_refreshers(args, db_url, ids_for_emas)
         results.append(("emas", ema_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            ema_result.success,
+            ema_result.duration_sec,
+            ema_result.error_message,
+        )
 
         if not ema_result.success and not args.continue_on_error:
             print("\n[STOPPED] EMA refreshers failed, stopping execution")
             print("(Use --continue-on-error to run remaining components)")
             return 1
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
+
+    # Run EMA returns if requested (after EMAs, before AMAs)
+    if run_returns_ema_flag:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "returns_ema")
+        ret_ema_result = run_returns_ema(args, db_url)
+        results.append(("returns_ema", ret_ema_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            ret_ema_result.success,
+            ret_ema_result.duration_sec,
+            ret_ema_result.error_message,
+        )
+        if not ret_ema_result.success and not args.continue_on_error:
+            print("\n[STOPPED] EMA returns failed, stopping execution")
+            return 1
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Run AMAs if requested (after EMAs, before regimes)
     if run_amas:
         # Use same IDs as EMAs when running --all (fresh bar IDs); otherwise use parsed_ids
         ids_for_amas = ids_for_emas if run_emas else parsed_ids
+        _slid = _log_stage_start(db_url, pipeline_run_id, "amas")
         ama_result = run_ama_refreshers(args, db_url, ids_for_amas)
         results.append(("amas", ama_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            ama_result.success,
+            ama_result.duration_sec,
+            ama_result.error_message,
+        )
 
         if not ama_result.success and not args.continue_on_error:
             print("\n[STOPPED] AMA refreshers failed, stopping execution")
             print("(Use --continue-on-error to run remaining components)")
             return 1
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
+
+    # Run AMA returns if requested (after AMAs, before desc_stats)
+    if run_returns_ama_flag:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "returns_ama")
+        ret_ama_result = run_returns_ama(args, db_url)
+        results.append(("returns_ama", ret_ama_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            ret_ama_result.success,
+            ret_ama_result.duration_sec,
+            ret_ama_result.error_message,
+        )
+        if not ret_ama_result.success and not args.continue_on_error:
+            print("\n[STOPPED] AMA returns failed, stopping execution")
+            return 1
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Run desc stats if requested (after AMAs, before macro and regimes)
     if run_desc_stats:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "desc_stats")
         desc_result = run_desc_stats_refresher(args, db_url, parsed_ids)
         results.append(("desc_stats", desc_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            desc_result.success,
+            desc_result.duration_sec,
+            desc_result.error_message,
+        )
 
         if not desc_result.success and not args.continue_on_error:
             print("\n[STOPPED] Desc stats failed, stopping execution")
             print("(Use --continue-on-error to run remaining components)")
             return 1
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Run FRED macro features if requested (after desc_stats, before regimes)
     # Macro features read from fred.series_values (FRED raw data) -- independent of
     # bars/EMAs/AMAs. Placed here so downstream regime classifiers (Phase 67 L4)
     # can read macro context during regime computation.
     if run_macro:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "macro_features")
         macro_result = run_macro_features(args)
         results.append(("macro_features", macro_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            macro_result.success,
+            macro_result.duration_sec,
+            macro_result.error_message,
+        )
 
         if not macro_result.success and not args.continue_on_error:
             print("\n[STOPPED] Macro feature refresh failed, stopping execution")
             print("(Use --continue-on-error to run remaining components)")
             return 1
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Run macro regime classification if requested (after macro_features, before per-asset regimes)
     # Pipeline ordering: macro_features -> macro_regimes -> regimes (MREG-09)
     if run_macro_regimes_flag:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "macro_regimes")
         macro_regimes_result = run_macro_regimes(args)
         results.append(("macro_regimes", macro_regimes_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            macro_regimes_result.success,
+            macro_regimes_result.duration_sec,
+            macro_regimes_result.error_message,
+        )
 
         if not macro_regimes_result.success and not args.continue_on_error:
             print("\n[STOPPED] Macro regime classification failed, stopping execution")
             print("(Use --continue-on-error to run remaining components)")
             return 1
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Run macro analytics if requested (after macro_regimes, before per-asset regimes)
     # Pipeline ordering: macro_features -> macro_regimes -> macro_analytics -> regimes (MREG-12)
     if run_macro_analytics_flag:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "macro_analytics")
         macro_analytics_result = run_macro_analytics(args)
         results.append(("macro_analytics", macro_analytics_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            macro_analytics_result.success,
+            macro_analytics_result.duration_sec,
+            macro_analytics_result.error_message,
+        )
 
         if not macro_analytics_result.success and not args.continue_on_error:
             print("\n[STOPPED] Macro analytics failed, stopping execution")
             print("(Use --continue-on-error to run remaining components)")
             return 1
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Run cross-asset aggregation if requested (after macro_analytics, before per-asset regimes)
     # Pipeline ordering: macro_analytics -> cross_asset_agg -> regimes (XAGG Phase 70)
     if run_cross_asset_agg_flag:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "cross_asset_agg")
         cross_asset_result = run_cross_asset_agg(args)
         results.append(("cross_asset_agg", cross_asset_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            cross_asset_result.success,
+            cross_asset_result.duration_sec,
+            cross_asset_result.error_message,
+        )
 
         if not cross_asset_result.success and not args.continue_on_error:
             print("\n[STOPPED] Cross-asset aggregation failed, stopping execution")
             print("(Use --continue-on-error to run remaining components)")
             return 1
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Run macro gate evaluation after macro_regimes (Phase 73 gap closure)
     # Non-blocking: gate failures don't stop the pipeline
     if run_macro_regimes_flag:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "macro_gates")
         gate_result = run_evaluate_macro_gates(args)
         results.append(("macro_gates", gate_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            gate_result.success,
+            gate_result.duration_sec,
+            gate_result.error_message,
+        )
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Run macro regime transition alerts after macro_regimes (Phase 73 gap closure)
     # Non-blocking: alert failures don't stop the pipeline
     if run_macro_regimes_flag:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "macro_alerts")
         alert_result = run_macro_alerts(args)
         results.append(("macro_alerts", alert_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            alert_result.success,
+            alert_result.duration_sec,
+            alert_result.error_message,
+        )
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Run regimes if requested (after bars, EMAs, AMAs, desc_stats, macro, and macro_regimes)
     if run_regimes:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "regimes")
         regime_result = run_regime_refresher(args, db_url, parsed_ids)
         results.append(("regimes", regime_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            regime_result.success,
+            regime_result.duration_sec,
+            regime_result.error_message,
+        )
 
         if not regime_result.success and not args.continue_on_error:
             print("\n[STOPPED] Regime refresher failed, stopping execution")
             print("(Use --continue-on-error to run remaining components)")
             return 1
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Run feature refresh if requested (after regimes, before signals)
     if run_features:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "features")
         feature_result = run_feature_refresh_stage(args, db_url)
         results.append(("features", feature_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            feature_result.success,
+            feature_result.duration_sec,
+            feature_result.error_message,
+        )
 
         if not feature_result.success and not args.continue_on_error:
             print("\n[STOPPED] Feature refresh failed, stopping execution")
             print("(Use --continue-on-error to run remaining components)")
             return 1
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Run GARCH forecasts if requested (after features, before signals)
     if run_garch:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "garch")
         garch_result = run_garch_forecasts(args, db_url)
         results.append(("garch", garch_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            garch_result.success,
+            garch_result.duration_sec,
+            garch_result.error_message,
+        )
 
         if not garch_result.success and not args.continue_on_error:
             print("\n[STOPPED] GARCH forecast refresh failed, stopping execution")
             print("(Use --continue-on-error to run remaining components)")
             return 1
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Run signal generation if requested (after features, before executor)
     if run_signals:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "signals")
         signal_result = run_signal_refreshes(args, db_url)
         results.append(("signals", signal_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            signal_result.success,
+            signal_result.duration_sec,
+            signal_result.error_message,
+        )
 
         if not signal_result.success and not args.continue_on_error:
             print("\n[STOPPED] Signal generation failed, stopping execution")
             print("(Use --continue-on-error to run remaining components)")
             return 1
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
+
+        # Push fresh signals to Oracle VM for executor consumption (non-blocking)
+        if signal_result.success and not args.dry_run:
+            try:
+                from ta_lab2.scripts.etl.sync_signals_to_vm import sync_signals
+
+                print("\n[SYNC] Pushing signals to VM...")
+                sync_signals(dry_run=False)
+                print("[SYNC] Signal push to VM complete")
+            except Exception as exc:
+                print(f"\n[WARN] Signal push to VM failed: {exc}")
 
     # Phase 87: Signal validation gate -- runs AFTER signals, BEFORE executor.
     # BLOCKING: if gate detects anomalies (rc=2), executor is skipped.
     signal_gate_blocked = False
     if run_signal_gate:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "signal_validation_gate")
         gate_result = run_signal_validation_gate(args, db_url)
         results.append(("signal_validation_gate", gate_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            gate_result.success,
+            gate_result.duration_sec,
+            gate_result.error_message,
+        )
         if not gate_result.success:
             signal_gate_blocked = True
             print(
                 "\n[GATE] Signal validation gate BLOCKED execution -- anomalies detected"
             )
             print("[GATE] Signals held back from executor. Review signal_anomaly_log.")
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Phase 87: IC staleness check -- runs after signal gate, non-blocking.
     # IC decay findings are logged to dim_ic_weight_overrides but pipeline continues.
     if run_ic_staleness:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "ic_staleness_check")
         ic_result = run_ic_staleness_check_stage(args, db_url)
         results.append(("ic_staleness_check", ic_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            ic_result.success,
+            ic_result.duration_sec,
+            ic_result.error_message,
+        )
         if not ic_result.success:
             print(
                 "\n[WARN] IC staleness check detected decay -- check dim_ic_weight_overrides"
             )
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Run stop calibration if requested (after signals, before portfolio)
     # Non-fatal: failure logs a warning and pipeline continues to portfolio refresh
     if run_calibrate_stops:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "calibrate_stops")
         calibrate_result = run_calibrate_stops_stage(args, db_url)
         results.append(("calibrate_stops", calibrate_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            calibrate_result.success,
+            calibrate_result.duration_sec,
+            calibrate_result.error_message,
+        )
 
         if not calibrate_result.success and not args.continue_on_error:
             print("\n[STOPPED] Stop calibration failed, stopping execution")
@@ -3961,19 +4066,31 @@ Examples:
             return 1
         elif not calibrate_result.success:
             print("\n[WARN] Stop calibration failed -- continuing to portfolio refresh")
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Run portfolio allocation refresh if requested (after calibrate_stops, before executor)
     # Pipeline order: bars -> EMAs -> AMAs -> desc_stats -> regimes -> features
     #                 -> signals -> signal_gate -> ic_staleness -> calibrate_stops
     #                 -> portfolio -> executor -> drift -> pipeline_alerts -> stats
     if run_portfolio:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "portfolio")
         portfolio_result = run_portfolio_refresh_stage(args, db_url)
         results.append(("portfolio", portfolio_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            portfolio_result.success,
+            portfolio_result.duration_sec,
+            portfolio_result.error_message,
+        )
 
         if not portfolio_result.success and not args.continue_on_error:
             print("\n[STOPPED] Portfolio allocation refresh failed, stopping execution")
             print("(Use --continue-on-error to run remaining components)")
             return 1
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
 
     # Run paper executor if requested (after signals, before stats)
     # Phase 87: executor is gated by signal_gate_blocked flag.
@@ -3998,13 +4115,23 @@ Examples:
                 )
                 # Do not return 1 here -- complete remaining stages (drift, stats, alerts)
         else:
+            _slid = _log_stage_start(db_url, pipeline_run_id, "executor")
             executor_result = run_paper_executor_stage(args, db_url)
             results.append(("executor", executor_result))
+            _log_stage_complete(
+                db_url,
+                _slid,
+                executor_result.success,
+                executor_result.duration_sec,
+                executor_result.error_message,
+            )
 
             if not executor_result.success and not args.continue_on_error:
                 print("\n[STOPPED] Paper executor failed, stopping execution")
                 print("(Use --continue-on-error to run remaining components)")
                 return 1
+            if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+                return 2
 
     # Run drift monitor if requested (after executor, before stats)
     # --paper-start is OPTIONAL: if not provided, drift stage is silently skipped
@@ -4012,13 +4139,23 @@ Examples:
     # requiring --paper-start every time.
     paper_start = getattr(args, "paper_start", None)
     if run_drift and paper_start:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "drift_monitor")
         drift_result = run_drift_monitor_stage(args, db_url)
         results.append(("drift_monitor", drift_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            drift_result.success,
+            drift_result.duration_sec,
+            drift_result.error_message,
+        )
 
         if not drift_result.success and not args.continue_on_error:
             print("\n[STOPPED] Drift monitor failed, stopping execution")
             print("(Use --continue-on-error to run remaining components)")
             return 1
+        if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
+            return 2
     elif run_drift and not paper_start:
         print()
         print("[WARN] Drift monitoring SKIPPED: --paper-start not provided")
@@ -4031,8 +4168,16 @@ Examples:
 
     # Run stats if requested (final stage -- after bars, EMAs, regimes, executor)
     if run_stats:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "stats")
         stats_result = run_stats_runners(args, db_url)
         results.append(("stats", stats_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            stats_result.success,
+            stats_result.duration_sec,
+            stats_result.error_message,
+        )
 
         # Pipeline gate: stats FAIL means data quality issues
         if not stats_result.success:
@@ -4047,8 +4192,16 @@ Examples:
     # Sends daily digest via Telegram (INFO if all green, WARNING if any failures).
     # Non-blocking: failure to send alert never stops the pipeline.
     if not args.dry_run and results:
+        _slid = _log_stage_start(db_url, pipeline_run_id, "pipeline_alerts")
         alert_result = run_pipeline_completion_alert(args, db_url, results)
         results.append(("pipeline_alerts", alert_result))
+        _log_stage_complete(
+            db_url,
+            _slid,
+            alert_result.success,
+            alert_result.duration_sec,
+            alert_result.error_message,
+        )
 
     # Print combined summary
     if not args.dry_run:

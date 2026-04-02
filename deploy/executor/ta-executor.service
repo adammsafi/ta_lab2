@@ -1,0 +1,22 @@
+[Unit]
+Description=TA Lab2 Paper Executor
+After=network-online.target postgresql.service
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/executor
+EnvironmentFile=/home/ubuntu/executor/.env
+ExecStart=/home/ubuntu/executor/venv/bin/python executor_service.py
+Restart=on-failure
+RestartSec=30
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ta-executor
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

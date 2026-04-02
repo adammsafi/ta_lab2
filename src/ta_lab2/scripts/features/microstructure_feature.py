@@ -215,6 +215,113 @@ class MicrostructureFeature(BaseFeature):
 
         return df
 
+    def _compute_micro_single_group(self, df_id: pd.DataFrame) -> pd.DataFrame:
+        """
+        Compute microstructure features for a single (id, venue_id) group.
+
+        Called by both the pandas loop path and the polars_sorted_groupby path.
+        The group is expected to be sorted by ts already; this function does NOT
+        re-sort.  Numba/numpy kernels operate on numpy arrays extracted from the
+        group and are UNCHANGED by the polars migration.
+
+        Args:
+            df_id: Single-group DataFrame (already sorted by ts, copy).
+
+        Returns:
+            df_id with microstructure columns appended, or empty DataFrame if
+            fewer than 30 bars (guard condition).
+        """
+        id_val = df_id["id"].iloc[0] if "id" in df_id.columns else "?"
+        venue_id_val = df_id["venue_id"].iloc[0] if "venue_id" in df_id.columns else "?"
+
+        close = df_id["close"].values.astype(np.float64)
+        volume = df_id["volume"].values.astype(np.float64)
+        n = len(close)
+
+        # Guard: need minimum data for any computation
+        if n < 30:
+            logger.warning(
+                f"Skipping id={id_val}, venue_id={venue_id_val}: only {n} bars (<30)"
+            )
+            return pd.DataFrame()
+
+        log_close = np.log(np.maximum(close, 1e-12))
+
+        # -----------------------------------------------------------------
+        # MICRO-01: Fractional Differentiation
+        # -----------------------------------------------------------------
+        try:
+            d_opt = find_min_d(close)
+            ffd_series = frac_diff_ffd(
+                log_close,
+                d=d_opt,
+                threshold=self.micro_config.ffd_threshold,
+            )
+        except Exception as exc:
+            logger.warning(f"FFD failed for id={id_val}: {exc}")
+            d_opt = np.nan
+            ffd_series = np.full(n, np.nan)
+
+        df_id["close_fracdiff"] = ffd_series
+        df_id["close_fracdiff_d"] = d_opt
+
+        # -----------------------------------------------------------------
+        # MICRO-02: Liquidity Impact Measures
+        # -----------------------------------------------------------------
+        window = self.micro_config.liquidity_window
+        try:
+            df_id["kyle_lambda"] = kyle_lambda(close, volume, window=window)
+        except Exception as exc:
+            logger.warning(f"kyle_lambda failed for id={id_val}: {exc}")
+            df_id["kyle_lambda"] = np.nan
+
+        try:
+            df_id["amihud_lambda"] = amihud_lambda(close, volume, window=window)
+        except Exception as exc:
+            logger.warning(f"amihud_lambda failed for id={id_val}: {exc}")
+            df_id["amihud_lambda"] = np.nan
+
+        try:
+            df_id["hasbrouck_lambda"] = hasbrouck_lambda(close, volume, window=window)
+        except Exception as exc:
+            logger.warning(f"hasbrouck_lambda failed for id={id_val}: {exc}")
+            df_id["hasbrouck_lambda"] = np.nan
+
+        # -----------------------------------------------------------------
+        # MICRO-03: Rolling ADF / SADF Proxy
+        # -----------------------------------------------------------------
+        try:
+            adf_vals = rolling_adf(log_close, window=self.micro_config.adf_window)
+            df_id["sadf_stat"] = adf_vals
+            df_id["sadf_is_explosive"] = adf_vals > 1.5
+        except Exception as exc:
+            logger.warning(f"rolling_adf failed for id={id_val}: {exc}")
+            df_id["sadf_stat"] = np.nan
+            df_id["sadf_is_explosive"] = False
+
+        # -----------------------------------------------------------------
+        # MICRO-04: Entropy Features
+        # -----------------------------------------------------------------
+        # Compute log returns for entropy (entropy must use returns, not levels)
+        log_returns = np.empty(n, dtype=np.float64)
+        log_returns[0] = np.nan
+        log_returns[1:] = log_close[1:] - log_close[:-1]
+
+        try:
+            shannon_vals, lz_vals = rolling_entropy(
+                log_returns,
+                window=self.micro_config.entropy_window,
+                n_bins=self.micro_config.entropy_bins,
+            )
+            df_id["entropy_shannon"] = shannon_vals
+            df_id["entropy_lz"] = lz_vals
+        except Exception as exc:
+            logger.warning(f"rolling_entropy failed for id={id_val}: {exc}")
+            df_id["entropy_shannon"] = np.nan
+            df_id["entropy_lz"] = np.nan
+
+        return df_id
+
     def compute_features(self, df_source: pd.DataFrame) -> pd.DataFrame:
         """
         Compute all microstructure features from OHLCV data.
@@ -224,6 +331,12 @@ class MicrostructureFeature(BaseFeature):
         2. MICRO-02: Kyle/Amihud/Hasbrouck lambdas
         3. MICRO-03: Rolling ADF on log(close) -> sadf_stat, sadf_is_explosive
         4. MICRO-04: Shannon + LZ entropy on log returns
+
+        When use_polars=True: outer sort delegated to polars via
+        polars_sorted_groupby; numba/numpy kernels inside
+        _compute_micro_single_group are UNCHANGED.
+
+        When use_polars=False: existing pandas groupby loop.
 
         Args:
             df_source: Source OHLCV data (with nulls handled)
@@ -236,106 +349,32 @@ class MicrostructureFeature(BaseFeature):
             return pd.DataFrame()
 
         df = df_source.copy()
-        results = []
 
-        for (id_val, venue_id_val), df_id in df.groupby(["id", "venue_id"]):
-            df_id = df_id.copy()
-            df_id = df_id.sort_values("ts")
+        if self.config.use_polars:
+            from ta_lab2.features.polars_feature_ops import polars_sorted_groupby
 
-            close = df_id["close"].values.astype(np.float64)
-            volume = df_id["volume"].values.astype(np.float64)
-            n = len(close)
+            df_features = polars_sorted_groupby(
+                df,
+                group_cols=["id", "venue_id"],
+                sort_col="ts",
+                apply_fn=self._compute_micro_single_group,
+            )
+        else:
+            results = []
+            for (id_val, venue_id_val), df_id in df.groupby(["id", "venue_id"]):
+                df_id = df_id.copy()
+                df_id = df_id.sort_values("ts")
+                result = self._compute_micro_single_group(df_id)
+                if result is not None and not result.empty:
+                    results.append(result)
 
-            # Guard: need minimum data for any computation
-            if n < 30:
-                logger.warning(
-                    f"Skipping id={id_val}, venue_id={venue_id_val}: only {n} bars (<30)"
-                )
-                continue
+            if not results:
+                return pd.DataFrame()
 
-            log_close = np.log(np.maximum(close, 1e-12))
+            df_features = pd.concat(results, ignore_index=True)
 
-            # -----------------------------------------------------------------
-            # MICRO-01: Fractional Differentiation
-            # -----------------------------------------------------------------
-            try:
-                d_opt = find_min_d(close)
-                ffd_series = frac_diff_ffd(
-                    log_close,
-                    d=d_opt,
-                    threshold=self.micro_config.ffd_threshold,
-                )
-            except Exception as exc:
-                logger.warning(f"FFD failed for id={id_val}: {exc}")
-                d_opt = np.nan
-                ffd_series = np.full(n, np.nan)
-
-            df_id["close_fracdiff"] = ffd_series
-            df_id["close_fracdiff_d"] = d_opt
-
-            # -----------------------------------------------------------------
-            # MICRO-02: Liquidity Impact Measures
-            # -----------------------------------------------------------------
-            window = self.micro_config.liquidity_window
-            try:
-                df_id["kyle_lambda"] = kyle_lambda(close, volume, window=window)
-            except Exception as exc:
-                logger.warning(f"kyle_lambda failed for id={id_val}: {exc}")
-                df_id["kyle_lambda"] = np.nan
-
-            try:
-                df_id["amihud_lambda"] = amihud_lambda(close, volume, window=window)
-            except Exception as exc:
-                logger.warning(f"amihud_lambda failed for id={id_val}: {exc}")
-                df_id["amihud_lambda"] = np.nan
-
-            try:
-                df_id["hasbrouck_lambda"] = hasbrouck_lambda(
-                    close, volume, window=window
-                )
-            except Exception as exc:
-                logger.warning(f"hasbrouck_lambda failed for id={id_val}: {exc}")
-                df_id["hasbrouck_lambda"] = np.nan
-
-            # -----------------------------------------------------------------
-            # MICRO-03: Rolling ADF / SADF Proxy
-            # -----------------------------------------------------------------
-            try:
-                adf_vals = rolling_adf(log_close, window=self.micro_config.adf_window)
-                df_id["sadf_stat"] = adf_vals
-                df_id["sadf_is_explosive"] = adf_vals > 1.5
-            except Exception as exc:
-                logger.warning(f"rolling_adf failed for id={id_val}: {exc}")
-                df_id["sadf_stat"] = np.nan
-                df_id["sadf_is_explosive"] = False
-
-            # -----------------------------------------------------------------
-            # MICRO-04: Entropy Features
-            # -----------------------------------------------------------------
-            # Compute log returns for entropy (entropy must use returns, not levels)
-            log_returns = np.empty(n, dtype=np.float64)
-            log_returns[0] = np.nan
-            log_returns[1:] = log_close[1:] - log_close[:-1]
-
-            try:
-                shannon_vals, lz_vals = rolling_entropy(
-                    log_returns,
-                    window=self.micro_config.entropy_window,
-                    n_bins=self.micro_config.entropy_bins,
-                )
-                df_id["entropy_shannon"] = shannon_vals
-                df_id["entropy_lz"] = lz_vals
-            except Exception as exc:
-                logger.warning(f"rolling_entropy failed for id={id_val}: {exc}")
-                df_id["entropy_shannon"] = np.nan
-                df_id["entropy_lz"] = np.nan
-
-            results.append(df_id)
-
-        if not results:
+        if df_features.empty:
             return pd.DataFrame()
-
-        df_features = pd.concat(results, ignore_index=True)
 
         # Add tf, alignment_source columns
         df_features["tf"] = self.config.tf
@@ -558,6 +597,14 @@ Feature columns written:
         help="Alignment source (default: multi_tf)",
     )
 
+    # Polars acceleration
+    parser.add_argument(
+        "--use-polars",
+        action="store_true",
+        default=False,
+        help="Use polars for outer groupby loop (faster sort)",
+    )
+
     # Logging
     parser.add_argument(
         "--log-level",
@@ -601,6 +648,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         config = MicrostructureConfig(
             tf=args.tf,
             alignment_source=args.alignment_source,
+            use_polars=args.use_polars,
         )
         feature = MicrostructureFeature(engine, config)
         logger.info(f"Initialized: {feature}")

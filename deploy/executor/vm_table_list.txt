@@ -1,0 +1,47 @@
+# Canonical list of tables to create on the Oracle Singapore VM.
+# One table name per line. Lines starting with # are comments and are ignored.
+# DO NOT include heavy analytics tables (price_bars_multi_tf, features, etc.)
+# -- those stay local only.
+#
+# Total: 25 tables across 8 categories.
+
+# ── Signal tables (7) ──────────────────────────────────────────────────────
+signals_ema_crossover
+signals_rsi_mean_revert
+signals_atr_breakout
+signals_macd_crossover
+signals_ama_momentum
+signals_ama_mean_reversion
+signals_ama_regime_conditional
+
+# ── Execution tables (5) ───────────────────────────────────────────────────
+orders
+fills
+positions
+paper_orders
+executor_run_log
+
+# ── Config tables (3) ─────────────────────────────────────────────────────
+dim_executor_config
+dim_risk_limits
+dim_risk_state
+
+# ── Monitoring tables (2) ─────────────────────────────────────────────────
+drift_metrics
+risk_events
+
+# ── Price feed (1) ────────────────────────────────────────────────────────
+exchange_price_feed
+
+# ── Dimension tables (4) ──────────────────────────────────────────────────
+dim_timeframe
+dim_venues
+dim_signals
+dim_sessions
+
+# ── Portfolio (1) ─────────────────────────────────────────────────────────
+portfolio_allocations
+
+# ── Order lifecycle (2) ───────────────────────────────────────────────────
+order_events
+order_dead_letter

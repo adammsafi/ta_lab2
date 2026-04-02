@@ -10,13 +10,11 @@ Exports:
     compute_blend_weights   - Inverse-RMSE weights with min-weight floor
     compute_trailing_rmse   - Per-estimator RMSE over trailing window
     get_blended_vol         - DB-aware blended vol lookup (garch_forecasts_latest)
-    blend_vol_simple        - Two-input inline blend for vol_sizer.py
-
 Design:
-    Pure computation functions (compute_blend_weights, blend_vol_simple) have no
-    DB dependency. DB-aware functions (get_blended_vol, compute_trailing_rmse)
-    accept a SQLAlchemy Engine as their first argument, matching the project
-    pattern used elsewhere in the analysis and scripts packages.
+    Pure computation functions (compute_blend_weights) have no DB dependency.
+    DB-aware functions (get_blended_vol, compute_trailing_rmse) accept a
+    SQLAlchemy Engine as their first argument, matching the project pattern
+    used elsewhere in the analysis and scripts packages.
 
 Reference:
     Bates, J.M. & Granger, C.W.J. (1969). The combination of forecasts.
@@ -345,60 +343,3 @@ def get_blended_vol(
         "components": components,
         "mode": config.mode,
     }
-
-
-# ---------------------------------------------------------------------------
-# Simple two-input blend (for inline use in vol_sizer.py)
-# ---------------------------------------------------------------------------
-
-
-def blend_vol_simple(
-    garch_vol: float,
-    range_vol: float,
-    garch_weight: float,
-) -> float:
-    """Blend GARCH and range-based vol estimates with a fixed weight.
-
-    Simple two-input weighted average:
-        blended = garch_weight * garch_vol + (1 - garch_weight) * range_vol
-
-    Parameters
-    ----------
-    garch_vol:
-        GARCH conditional volatility estimate (decimal, > 0).
-    range_vol:
-        Range-based volatility estimate (Parkinson/GK/ATR; decimal, > 0).
-    garch_weight:
-        Weight on the GARCH estimate in [0.0, 1.0]. Weight on range_vol
-        is ``1 - garch_weight``.
-
-    Returns
-    -------
-    float
-        Blended volatility estimate. Returns ``range_vol`` unchanged if
-        either input is non-positive. Returns ``garch_vol`` unchanged if
-        ``garch_weight`` is 1.0.
-
-    Raises
-    ------
-    ValueError
-        If garch_weight is outside [0.0, 1.0].
-    """
-    if not (0.0 <= garch_weight <= 1.0):
-        raise ValueError(f"garch_weight must be in [0.0, 1.0], got {garch_weight}")
-
-    if garch_vol <= 0 or range_vol <= 0:
-        # Degrade gracefully: use whichever input is valid
-        if range_vol > 0:
-            return float(range_vol)
-        if garch_vol > 0:
-            return float(garch_vol)
-        # Both non-positive -- should not occur in practice
-        logger.warning(
-            "blend_vol_simple: both inputs non-positive (garch_vol=%s, range_vol=%s)",
-            garch_vol,
-            range_vol,
-        )
-        return float(range_vol)
-
-    return float(garch_weight * garch_vol + (1.0 - garch_weight) * range_vol)

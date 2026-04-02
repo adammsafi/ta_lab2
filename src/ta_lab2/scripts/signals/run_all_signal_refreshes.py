@@ -1,12 +1,15 @@
 #!/usr/bin/env python
 """
-Orchestrated signal generation pipeline.
+Orchestrated signal generation pipeline — 7 signal types in two sequential batches.
 
-Runs all signal types (EMA crossover, RSI mean revert, ATR breakout) in parallel,
-then validates reproducibility of backtest results.
+Two-batch architecture:
+- Batch 1 (parallel): EMA crossover, RSI mean-revert, ATR breakout, MACD crossover
+  (no dependency on pre-computed AMA values — safe to run any time)
+- Batch 2 (parallel): AMA momentum, AMA mean-reversion, AMA regime-conditional
+  (MUST run after AMA values are refreshed — reads from ama_multi_tf_u)
 
 This script provides the complete signal refresh workflow:
-1. Phase 1: Signal generation (parallel execution of all 3 types)
+1. Phase 1: Signal generation (Batch 1 then Batch 2)
 2. Phase 2: Reproducibility validation (verify backtest determinism)
 
 Usage:
@@ -40,6 +43,8 @@ from ta_lab2.scripts.signals import (
 from ta_lab2.scripts.signals.generate_signals_ema import EMASignalGenerator
 from ta_lab2.scripts.signals.generate_signals_rsi import RSISignalGenerator
 from ta_lab2.scripts.signals.generate_signals_atr import ATRSignalGenerator
+from ta_lab2.scripts.signals.generate_signals_macd import MACDSignalGenerator
+from ta_lab2.scripts.signals.generate_signals_ama import AMASignalGenerator
 from ta_lab2.scripts.signals.validate_reproducibility import (
     validate_backtest_reproducibility,
 )
@@ -47,6 +52,12 @@ from ta_lab2.scripts.backtests import SignalBacktester
 from ta_lab2.backtests.costs import CostModel
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Batch constants — order within each batch does not matter (parallel)
+# ---------------------------------------------------------------------------
+BATCH_1_TYPES = ["ema_crossover", "rsi_mean_revert", "atr_breakout", "macd_crossover"]
+BATCH_2_TYPES = ["ama_momentum", "ama_mean_reversion", "ama_regime_conditional"]
 
 
 @dataclass
@@ -72,6 +83,47 @@ class RefreshResult:
         )
 
 
+def _make_generator(signal_type: str, engine, state_manager, venue_id):
+    """
+    Instantiate the correct generator for *signal_type*.
+
+    AMA subtypes share AMASignalGenerator but set the signal_subtype field.
+
+    Args:
+        signal_type: One of the 7 supported signal types.
+        engine: SQLAlchemy engine.
+        state_manager: SignalStateManager instance.
+        venue_id: Optional venue filter.
+
+    Returns:
+        Instantiated generator object.
+
+    Raises:
+        ValueError: If signal_type is not recognised.
+    """
+    batch_1_generators = {
+        "ema_crossover": EMASignalGenerator,
+        "rsi_mean_revert": RSISignalGenerator,
+        "atr_breakout": ATRSignalGenerator,
+        "macd_crossover": MACDSignalGenerator,
+    }
+
+    if signal_type in batch_1_generators:
+        cls = batch_1_generators[signal_type]
+        return cls(engine, state_manager, venue_id=venue_id)
+
+    ama_subtypes = {"ama_momentum", "ama_mean_reversion", "ama_regime_conditional"}
+    if signal_type in ama_subtypes:
+        return AMASignalGenerator(
+            engine=engine,
+            state_manager=state_manager,
+            signal_subtype=signal_type,
+            venue_id=venue_id,
+        )
+
+    raise ValueError(f"Unknown signal type: {signal_type}")
+
+
 def refresh_signal_type(
     engine,
     signal_type: str,
@@ -88,10 +140,11 @@ def refresh_signal_type(
 
     Args:
         engine: SQLAlchemy engine for database operations
-        signal_type: 'ema_crossover', 'rsi_mean_revert', or 'atr_breakout'
+        signal_type: One of the 7 supported signal type names
         ids: List of asset IDs to process
         full_refresh: If True, regenerate all signals. If False, incremental.
         regime_enabled: If True, load and attach regime context to signals.
+        venue_id: Optional venue filter.
 
     Returns:
         RefreshResult with success status and metrics
@@ -106,17 +159,7 @@ def refresh_signal_type(
         state_manager = SignalStateManager(engine, config)
         state_manager.ensure_state_table()
 
-        # Select generator based on type
-        generators = {
-            "ema_crossover": EMASignalGenerator,
-            "rsi_mean_revert": RSISignalGenerator,
-            "atr_breakout": ATRSignalGenerator,
-        }
-
-        if signal_type not in generators:
-            raise ValueError(f"Unknown signal type: {signal_type}")
-
-        generator = generators[signal_type](engine, state_manager, venue_id=venue_id)
+        generator = _make_generator(signal_type, engine, state_manager, venue_id)
         configs = load_active_signals(engine, signal_type)
 
         logger.info(f"  Found {len(configs)} active signal configurations")
@@ -133,7 +176,7 @@ def refresh_signal_type(
 
         duration = (datetime.now() - start).total_seconds()
         logger.info(
-            f"✓ {signal_type} complete: {total_signals} signals in {duration:.1f}s"
+            f"  {signal_type} complete: {total_signals} signals in {duration:.1f}s"
         )
 
         return RefreshResult(signal_type, total_signals, duration, True)
@@ -141,7 +184,7 @@ def refresh_signal_type(
     except Exception as e:
         duration = (datetime.now() - start).total_seconds()
         logger.error(
-            f"✗ {signal_type} FAILED after {duration:.1f}s: {e}", exc_info=True
+            f"  {signal_type} FAILED after {duration:.1f}s: {e}", exc_info=True
         )
         return RefreshResult(signal_type, 0, duration, False, str(e))
 
@@ -153,30 +196,34 @@ def run_parallel_refresh(
     max_workers: int = 3,
     regime_enabled: bool = True,
     venue_id: int | None = None,
+    signal_types: list[str] | None = None,
 ) -> List[RefreshResult]:
     """
-    Run all signal types in parallel.
+    Run a batch of signal types in parallel.
 
-    Partial failure handling: Each signal type runs independently in a separate
-    thread. One failure does not stop the others. This is the default behavior.
-
-    Use --fail-fast flag in CLI to change this behavior and exit immediately
-    on first failure.
+    Partial failure handling: each signal type runs independently in a separate
+    thread.  One failure does not stop the others.
 
     Args:
         engine: SQLAlchemy engine for database operations
         ids: List of asset IDs to process
         full_refresh: If True, regenerate all signals
-        max_workers: Maximum concurrent threads (default 3 = one per signal type)
+        max_workers: Maximum concurrent threads (default: 3)
         regime_enabled: If True, load and attach regime context to signals.
+        venue_id: Optional venue filter.
+        signal_types: List of signal types to refresh.  Defaults to BATCH_1_TYPES
+            for backward compatibility.
 
     Returns:
         List of RefreshResult for each signal type
     """
-    signal_types = ["ema_crossover", "rsi_mean_revert", "atr_breakout"]
+    if signal_types is None:
+        signal_types = BATCH_1_TYPES  # backward-compat default
+
     results = []
 
-    logger.info(f"Starting parallel refresh of {len(signal_types)} signal types...")
+    logger.info(f"Starting parallel refresh of {len(signal_types)} signal type(s)...")
+    logger.info(f"  Types: {signal_types}")
     logger.info(f"  Max workers: {max_workers}")
     logger.info(f"  Full refresh: {full_refresh}")
     logger.info(f"  Regime enabled: {regime_enabled}")
@@ -220,7 +267,7 @@ def validate_pipeline_reproducibility(
     sample_end: pd.Timestamp,
 ) -> bool:
     """
-    Validate reproducibility for all signal types.
+    Validate reproducibility for all 7 signal types.
 
     Uses a sample asset and date range for validation. Runs backtest twice
     for each signal type and verifies identical results.
@@ -244,7 +291,8 @@ def validate_pipeline_reproducibility(
     all_pass = True
     validation_count = 0
 
-    for signal_type in ["ema_crossover", "rsi_mean_revert", "atr_breakout"]:
+    all_signal_types = BATCH_1_TYPES + BATCH_2_TYPES
+    for signal_type in all_signal_types:
         configs = load_active_signals(engine, signal_type)
 
         if not configs:
@@ -270,15 +318,15 @@ def validate_pipeline_reproducibility(
                 )
 
                 if not report.is_reproducible:
-                    logger.error(f"    ✗ FAILED: {signal_type}/{signal_name}")
+                    logger.error(f"    FAILED: {signal_type}/{signal_name}")
                     for diff in report.differences:
                         logger.error(f"      - {diff}")
                     all_pass = False
                 else:
-                    logger.info(f"    ✓ OK: {signal_type}/{signal_name}")
+                    logger.info(f"    OK: {signal_type}/{signal_name}")
 
             except Exception as e:
-                logger.error(f"    ✗ ERROR: {signal_type}/{signal_name}: {e}")
+                logger.error(f"    ERROR: {signal_type}/{signal_name}: {e}")
                 all_pass = False
 
     if validation_count == 0:
@@ -332,14 +380,18 @@ def main():
     """
     Main entry point for orchestrated signal pipeline.
 
-    Parses CLI arguments, runs signal generation (Phase 1), and optionally
-    validates reproducibility (Phase 2).
+    Parses CLI arguments, runs signal generation in two batches (Batch 1:
+    EMA/RSI/ATR/MACD in parallel, Batch 2: AMA types in parallel after
+    Batch 1 completes), and optionally validates reproducibility.
 
     Returns:
         Exit code: 0 on success, 1 on failure
     """
     parser = argparse.ArgumentParser(
-        description="Orchestrated signal generation pipeline with reproducibility validation",
+        description=(
+            "Orchestrated signal generation pipeline — "
+            "7 signal types in two sequential batches"
+        ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -421,7 +473,7 @@ Examples:
     )
 
     logger.info("=" * 70)
-    logger.info("Orchestrated Signal Pipeline")
+    logger.info("Orchestrated Signal Pipeline (7 signal types, 2 batches)")
     logger.info("=" * 70)
 
     # Check for database URL
@@ -450,28 +502,60 @@ Examples:
         if not regime_enabled:
             logger.info("Regime context DISABLED (--no-regime): A/B comparison mode")
 
+        # ---- Batch 1: EMA, RSI, ATR, MACD (no AMA dependency) ----
         logger.info("")
-        logger.info("PHASE 1: Signal Generation")
+        logger.info("PHASE 1 / BATCH 1: EMA, RSI, ATR, MACD signal generation")
         logger.info("-" * 70)
 
-        results = run_parallel_refresh(
+        batch1_results = run_parallel_refresh(
             engine,
             ids,
             args.full_refresh,
             args.parallel,
             regime_enabled,
             venue_id=args.venue_id,
+            signal_types=BATCH_1_TYPES,
         )
 
         logger.info("")
-        logger.info("Phase 1 Results:")
-        for r in results:
-            status_symbol = "✓" if r.success else "✗"
-            logger.info(f"  {status_symbol} {r}")
+        logger.info("Batch 1 Results:")
+        for r in batch1_results:
+            status_symbol = "OK" if r.success else "FAIL"
+            logger.info(f"  [{status_symbol}] {r}")
 
-        # Check for failures
-        failed = [r for r in results if not r.success]
-        succeeded = [r for r in results if r.success]
+        batch1_failed = [r for r in batch1_results if not r.success]
+        if batch1_failed and args.fail_fast:
+            logger.error("--fail-fast enabled, exiting after Batch 1 failures")
+            for r in batch1_failed:
+                logger.error(f"  FAILED: {r.signal_type} - {r.error}")
+            return 1
+
+        # ---- Batch 2: AMA momentum/mean-reversion/regime-conditional ----
+        logger.info("")
+        logger.info("PHASE 1 / BATCH 2: AMA signal generation")
+        logger.info("-" * 70)
+        logger.info("  (Requires fresh AMA values in ama_multi_tf_u)")
+
+        batch2_results = run_parallel_refresh(
+            engine,
+            ids,
+            args.full_refresh,
+            args.parallel,
+            regime_enabled,
+            venue_id=args.venue_id,
+            signal_types=BATCH_2_TYPES,
+        )
+
+        logger.info("")
+        logger.info("Batch 2 Results:")
+        for r in batch2_results:
+            status_symbol = "OK" if r.success else "FAIL"
+            logger.info(f"  [{status_symbol}] {r}")
+
+        # Combined failure reporting
+        all_results = batch1_results + batch2_results
+        failed = [r for r in all_results if not r.success]
+        succeeded = [r for r in all_results if r.success]
 
         if failed:
             logger.warning("")
@@ -511,9 +595,9 @@ Examples:
 
         logger.info("")
         if validation_passed:
-            logger.info("✓ Reproducibility validation PASSED")
+            logger.info("Reproducibility validation PASSED")
         else:
-            logger.error("✗ Reproducibility validation FAILED")
+            logger.error("Reproducibility validation FAILED")
             logger.error("Some backtests produced different results on reruns")
             return 1
 

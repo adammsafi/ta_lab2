@@ -256,7 +256,7 @@ class DailyValidationLog:
                     * 10000 AS slippage_bps
             FROM fills f
             JOIN orders o ON f.order_id = o.order_id
-            LEFT JOIN price_bars_multi_tf pb
+            LEFT JOIN price_bars_multi_tf_u pb
                 ON pb.id = o.asset_id
                 AND pb.tf = '1D'
                 AND pb.ts::date = f.filled_at::date

@@ -2,6 +2,14 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+try:
+    import polars as pl
+
+    HAVE_POLARS = True
+except ImportError:  # pragma: no cover
+    pl = None  # type: ignore[assignment]
+    HAVE_POLARS = False
+
 __all__ = [
     "rsi",
     "macd",
@@ -11,6 +19,14 @@ __all__ = [
     "adx",
     "obv",
     "mfi",
+    # Polars variants
+    "HAVE_POLARS",
+    "rsi_polars",
+    "macd_polars",
+    "stoch_kd_polars",
+    "bollinger_polars",
+    "atr_polars",
+    "adx_polars",
 ]
 
 
@@ -379,3 +395,399 @@ def mfi(
 
     out = (100.0 - (100.0 / (1.0 + mr))).astype(float)
     return _return(obj, out, out_col, inplace=inplace)
+
+
+# =============================================================================
+# === Polars Variants =========================================================
+# =============================================================================
+# All functions below operate on a single-group pl.DataFrame (pre-sorted by ts)
+# and return a pl.DataFrame with new columns appended.  Each function is a
+# pure-polars equivalent of its pandas counterpart above.
+#
+# CRITICAL NOTES:
+# - ALL rolling calls use min_samples= (NOT min_periods=). Renamed in polars 1.21+.
+# - polars ewm_mean supports span= parameter directly (polars 1.36.1+).
+# - For RSI Wilder smoothing: alpha=1/period. For MACD standard EMA: span=.
+# - ATR uses rolling_mean (NOT ewm_mean) — matches indicators.py atr() which uses
+#   rolling().mean(). This differs from vol.py add_atr_polars (which uses ewm).
+# =============================================================================
+
+
+def rsi_polars(
+    pl_df: "pl.DataFrame",  # type: ignore[name-defined]
+    period: int = 14,
+    price_col: str = "close",
+    out_col: str | None = None,
+) -> "pl.DataFrame":  # type: ignore[name-defined]
+    """RSI (Wilder smoothing) — polars-native.
+
+    Uses alpha=1/period (Wilder EMA), matching the pandas rsi() function exactly.
+    Verified exact match against pandas rsi() via synthetic unit tests.
+
+    Args:
+        pl_df: Single-group polars DataFrame sorted by ts.
+        period: RSI look-back period (default 14).
+        price_col: Close price column name.
+        out_col: Output column name; defaults to ``rsi_{period}``.
+
+    Returns:
+        pl_df with ``rsi_{period}`` column appended.
+    """
+    if out_col is None:
+        out_col = f"rsi_{period}"
+
+    delta = pl.col(price_col).diff()
+    gain = delta.clip(lower_bound=0.0)
+    loss = (-delta).clip(lower_bound=0.0)
+
+    avg_gain = gain.ewm_mean(alpha=1.0 / period, adjust=False, min_samples=1)
+    avg_loss = loss.ewm_mean(alpha=1.0 / period, adjust=False, min_samples=1)
+
+    # Replace zero avg_loss with null to avoid inf (matching pandas .replace(0, np.nan))
+    avg_loss_safe = pl.when(avg_loss == 0.0).then(None).otherwise(avg_loss)
+    rs = avg_gain / avg_loss_safe
+    rsi_expr = (pl.lit(100.0) - pl.lit(100.0) / (pl.lit(1.0) + rs)).alias(out_col)
+
+    return pl_df.with_columns([rsi_expr])
+
+
+def macd_polars(
+    pl_df: "pl.DataFrame",  # type: ignore[name-defined]
+    fast: int = 12,
+    slow: int = 26,
+    signal: int = 9,
+    price_col: str = "close",
+    out_cols: tuple | None = None,
+) -> "pl.DataFrame":  # type: ignore[name-defined]
+    """MACD (12/26/9 by default) — polars-native.
+
+    Uses span= parameter for EMA (polars 1.36.1+), matching pandas ewm(span=).
+    Verified exact match against pandas macd() via synthetic unit tests.
+
+    Args:
+        pl_df: Single-group polars DataFrame sorted by ts.
+        fast: Fast EMA span (default 12).
+        slow: Slow EMA span (default 26).
+        signal: Signal line EMA span (default 9).
+        price_col: Close price column name.
+        out_cols: Tuple of 3 output column names; defaults to
+                  (macd_{fast}_{slow}, macd_signal_{signal}, macd_hist_{fast}_{slow}_{signal}).
+
+    Returns:
+        pl_df with 3 MACD columns appended.
+    """
+    if out_cols is None:
+        out_cols = (
+            f"macd_{fast}_{slow}",
+            f"macd_signal_{signal}",
+            f"macd_hist_{fast}_{slow}_{signal}",
+        )
+
+    # Intermediate column names (won't clash with existing columns)
+    _fast_col = "__macd_ema_fast__"
+    _slow_col = "__macd_ema_slow__"
+    _macd_col = "__macd_line__"
+
+    ema_fast_expr = pl.col(price_col).ewm_mean(span=fast, adjust=False).alias(_fast_col)
+    ema_slow_expr = pl.col(price_col).ewm_mean(span=slow, adjust=False).alias(_slow_col)
+
+    pl_df = pl_df.with_columns([ema_fast_expr, ema_slow_expr])
+
+    macd_line_expr = (pl.col(_fast_col) - pl.col(_slow_col)).alias(_macd_col)
+    pl_df = pl_df.with_columns([macd_line_expr])
+
+    signal_line_expr = (
+        pl.col(_macd_col).ewm_mean(span=signal, adjust=False).alias(out_cols[1])
+    )
+    pl_df = pl_df.with_columns([signal_line_expr])
+
+    # Build final columns
+    macd_out = pl.col(_macd_col).alias(out_cols[0])
+    hist_out = (pl.col(_macd_col) - pl.col(out_cols[1])).alias(out_cols[2])
+    pl_df = pl_df.with_columns([macd_out, hist_out])
+
+    # Drop intermediate columns
+    pl_df = pl_df.drop([_fast_col, _slow_col, _macd_col])
+
+    return pl_df
+
+
+def stoch_kd_polars(
+    pl_df: "pl.DataFrame",  # type: ignore[name-defined]
+    k: int = 14,
+    d: int = 3,
+    high_col: str = "high",
+    low_col: str = "low",
+    close_col: str = "close",
+    out_cols: tuple | None = None,
+) -> "pl.DataFrame":  # type: ignore[name-defined]
+    """Stochastic %K/%D — polars-native.
+
+    Args:
+        pl_df: Single-group polars DataFrame sorted by ts.
+        k: %K look-back period (default 14).
+        d: %D smoothing period (default 3).
+        high_col: High price column name.
+        low_col: Low price column name.
+        close_col: Close price column name.
+        out_cols: Tuple of 2 output column names; defaults to
+                  (stoch_k_{k}, stoch_d_{d}).
+
+    Returns:
+        pl_df with stoch_k and stoch_d columns appended.
+    """
+    if out_cols is None:
+        out_cols = (f"stoch_k_{k}", f"stoch_d_{d}")
+
+    _k_col = "__stoch_k__"
+
+    lowest = pl.col(low_col).rolling_min(window_size=k, min_samples=k)
+    highest = pl.col(high_col).rolling_max(window_size=k, min_samples=k)
+
+    # Avoid division by zero: replace (highest - lowest) == 0 with null
+    denom = pl.when(highest - lowest == 0.0).then(None).otherwise(highest - lowest)
+    k_line = (pl.lit(100.0) * (pl.col(close_col) - lowest) / denom).alias(_k_col)
+
+    pl_df = pl_df.with_columns([k_line])
+
+    d_line = (
+        pl.col(_k_col).rolling_mean(window_size=d, min_samples=d).alias(out_cols[1])
+    )
+    k_out = pl.col(_k_col).alias(out_cols[0])
+    pl_df = pl_df.with_columns([k_out, d_line])
+
+    pl_df = pl_df.drop([_k_col])
+
+    return pl_df
+
+
+def bollinger_polars(
+    pl_df: "pl.DataFrame",  # type: ignore[name-defined]
+    window: int = 20,
+    price_col: str = "close",
+    n_sigma: float = 2.0,
+    out_cols: tuple | None = None,
+) -> "pl.DataFrame":  # type: ignore[name-defined]
+    """Bollinger Bands — polars-native.
+
+    Args:
+        pl_df: Single-group polars DataFrame sorted by ts.
+        window: Rolling window (default 20).
+        price_col: Close price column name.
+        n_sigma: Band width in standard deviations (default 2.0).
+        out_cols: Tuple of 4 output column names; defaults to
+                  (bb_ma_{window}, bb_up_{window}_{n_sigma}, bb_lo_{window}_{n_sigma},
+                   bb_width_{window}).
+
+    Returns:
+        pl_df with 4 Bollinger columns appended.
+    """
+    if out_cols is None:
+        sigma_str = str(int(n_sigma)) if n_sigma == int(n_sigma) else str(n_sigma)
+        out_cols = (
+            f"bb_ma_{window}",
+            f"bb_up_{window}_{sigma_str}",
+            f"bb_lo_{window}_{sigma_str}",
+            f"bb_width_{window}",
+        )
+
+    _ma_col = "__bb_ma__"
+    _std_col = "__bb_std__"
+
+    ma_expr = (
+        pl.col(price_col)
+        .rolling_mean(window_size=window, min_samples=window)
+        .alias(_ma_col)
+    )
+    std_expr = (
+        pl.col(price_col)
+        .rolling_std(window_size=window, min_samples=window)
+        .alias(_std_col)
+    )
+
+    pl_df = pl_df.with_columns([ma_expr, std_expr])
+
+    upper = (pl.col(_ma_col) + pl.lit(n_sigma) * pl.col(_std_col)).alias(out_cols[1])
+    lower = (pl.col(_ma_col) - pl.lit(n_sigma) * pl.col(_std_col)).alias(out_cols[2])
+    pl_df = pl_df.with_columns([upper, lower])
+
+    # bw = (upper - lower) / ma — avoid division by zero
+    ma_safe = pl.when(pl.col(_ma_col) == 0.0).then(None).otherwise(pl.col(_ma_col))
+    bw = ((pl.col(out_cols[1]) - pl.col(out_cols[2])) / ma_safe).alias(out_cols[3])
+    ma_out = pl.col(_ma_col).alias(out_cols[0])
+    pl_df = pl_df.with_columns([ma_out, bw])
+
+    pl_df = pl_df.drop([_ma_col, _std_col])
+
+    return pl_df
+
+
+def atr_polars(
+    pl_df: "pl.DataFrame",  # type: ignore[name-defined]
+    period: int = 14,
+    high_col: str = "high",
+    low_col: str = "low",
+    close_col: str = "close",
+    out_col: str | None = None,
+) -> "pl.DataFrame":  # type: ignore[name-defined]
+    """Average True Range (simple rolling mean of TR) — polars-native.
+
+    IMPORTANT: This matches indicators.py atr() which uses rolling().mean().
+    It does NOT use EWM/Wilder smoothing.  This is distinct from vol.py
+    add_atr_polars (which uses Wilder EWM for a different use case).
+
+    Because TR at row 0 is undefined (prev_close is null), we set TR to null
+    at row 0 so rolling_mean skips it — matching pandas behavior where
+    np.maximum with NaN propagates NaN.
+
+    Args:
+        pl_df: Single-group polars DataFrame sorted by ts.
+        period: ATR rolling window (default 14).
+        high_col: High price column name.
+        low_col: Low price column name.
+        close_col: Close price column name.
+        out_col: Output column name; defaults to ``atr_{period}``.
+
+    Returns:
+        pl_df with ``atr_{period}`` column appended.
+    """
+    if out_col is None:
+        out_col = f"atr_{period}"
+
+    prev_close = pl.col(close_col).shift(1)
+
+    # TR = max(h-lo, |h-prev_close|, |lo-prev_close|)
+    # Null when prev_close is null (row 0) — matches pandas np.maximum with NaN
+    tr_expr = (
+        pl.when(prev_close.is_null())
+        .then(None)
+        .otherwise(
+            pl.max_horizontal(
+                (pl.col(high_col) - pl.col(low_col)),
+                (pl.col(high_col) - prev_close).abs(),
+                (pl.col(low_col) - prev_close).abs(),
+            )
+        )
+    )
+
+    atr_expr = tr_expr.rolling_mean(window_size=period, min_samples=period).alias(
+        out_col
+    )
+
+    return pl_df.with_columns([atr_expr])
+
+
+def adx_polars(
+    pl_df: "pl.DataFrame",  # type: ignore[name-defined]
+    period: int = 14,
+    high_col: str = "high",
+    low_col: str = "low",
+    close_col: str = "close",
+    out_col: str | None = None,
+) -> "pl.DataFrame":  # type: ignore[name-defined]
+    """ADX (Average Directional Index) — polars-native.
+
+    Uses pl.when/otherwise for conditional DM logic matching np.where in
+    the pandas adx() function.  TR uses rolling_mean (not EWM).
+
+    Args:
+        pl_df: Single-group polars DataFrame sorted by ts.
+        period: ADX period (default 14).
+        high_col: High price column name.
+        low_col: Low price column name.
+        close_col: Close price column name.
+        out_col: Output column name; defaults to ``adx_{period}``.
+
+    Returns:
+        pl_df with ``adx_{period}`` column appended.
+    """
+    if out_col is None:
+        out_col = f"adx_{period}"
+
+    # Directional movement
+    up = pl.col(high_col).diff()
+    dn = -(pl.col(low_col).diff())
+
+    plus_dm = pl.when((up > dn) & (up > pl.lit(0.0))).then(up).otherwise(pl.lit(0.0))
+    minus_dm = pl.when((dn > up) & (dn > pl.lit(0.0))).then(dn).otherwise(pl.lit(0.0))
+
+    # True range (null on row 0, matching pandas np.maximum with NaN)
+    prev_close = pl.col(close_col).shift(1)
+    tr_expr = (
+        pl.when(prev_close.is_null())
+        .then(None)
+        .otherwise(
+            pl.max_horizontal(
+                (pl.col(high_col) - pl.col(low_col)),
+                (pl.col(high_col) - prev_close).abs(),
+                (pl.col(low_col) - prev_close).abs(),
+            )
+        )
+    )
+
+    # Intermediate column names
+    _tr_col = "__adx_tr__"
+    _atr_col = "__adx_atr__"
+    _plus_dm_col = "__adx_plus_dm__"
+    _minus_dm_col = "__adx_minus_dm__"
+    _plus_di_col = "__adx_plus_di__"
+    _minus_di_col = "__adx_minus_di__"
+    _dx_col = "__adx_dx__"
+
+    pl_df = pl_df.with_columns(
+        [
+            tr_expr.alias(_tr_col),
+            plus_dm.alias(_plus_dm_col),
+            minus_dm.alias(_minus_dm_col),
+        ]
+    )
+
+    atr_ = pl.col(_tr_col).rolling_mean(window_size=period, min_samples=period)
+    pl_df = pl_df.with_columns([atr_.alias(_atr_col)])
+
+    # +DI and -DI
+    atr_safe = pl.when(pl.col(_atr_col) == 0.0).then(None).otherwise(pl.col(_atr_col))
+    plus_di_expr = (
+        pl.lit(100.0)
+        * pl.col(_plus_dm_col).rolling_sum(window_size=period, min_samples=period)
+        / atr_safe
+    ).alias(_plus_di_col)
+    minus_di_expr = (
+        pl.lit(100.0)
+        * pl.col(_minus_dm_col).rolling_sum(window_size=period, min_samples=period)
+        / atr_safe
+    ).alias(_minus_di_col)
+    pl_df = pl_df.with_columns([plus_di_expr, minus_di_expr])
+
+    # DX = |+DI - -DI| / (+DI + -DI) * 100
+    di_sum = pl.col(_plus_di_col) + pl.col(_minus_di_col)
+    di_sum_safe = pl.when(di_sum == 0.0).then(None).otherwise(di_sum)
+    dx_expr = (
+        (pl.col(_plus_di_col) - pl.col(_minus_di_col)).abs()
+        / di_sum_safe
+        * pl.lit(100.0)
+    ).alias(_dx_col)
+    pl_df = pl_df.with_columns([dx_expr])
+
+    # ADX = rolling mean of DX
+    adx_expr = (
+        pl.col(_dx_col)
+        .rolling_mean(window_size=period, min_samples=period)
+        .alias(out_col)
+    )
+    pl_df = pl_df.with_columns([adx_expr])
+
+    # Drop all intermediate columns
+    pl_df = pl_df.drop(
+        [
+            _tr_col,
+            _atr_col,
+            _plus_dm_col,
+            _minus_dm_col,
+            _plus_di_col,
+            _minus_di_col,
+            _dx_col,
+        ]
+    )
+
+    return pl_df
