@@ -5,11 +5,11 @@
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 112 IN PROGRESS (Pipeline Architecture Separation — Plans 01-03 done)
+**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 112 IN PROGRESS (Pipeline Architecture Separation — Plans 01-04 done)
 
 ## Current Position
 
-Phase: 112 IN PROGRESS (Pipeline Architecture Separation) — 3/5 plans complete
+Phase: 112 IN PROGRESS (Pipeline Architecture Separation) — 4/5 plans complete
 Also: Phase 106 COMPLETE (Custom Composite Indicators) — 3/3 plans complete
 Also: Phase 111 COMPLETE (Feature Polars Migration) — 5/5 plans complete
 Also: Phase 110 COMPLETE (Feature Parallel Sub-Phases) — 1/1 plans complete
@@ -19,8 +19,8 @@ Also: Phase 104 COMPLETE (Crypto-Native Indicators) — 3/3 plans complete
 Also: Phase 100 IN PROGRESS (ML Signal Combination) — Plans 01+02 complete (2/3 plans)
 Also: Phase 108 COMPLETE (Pipeline Batch Performance) — 5 plans, all complete
 Also: Phase 103 COMPLETE (Traditional TA Expansion) — 3/3 plans complete
-Status: Plan 112-03 complete — run_signals_pipeline.py, run_execution_pipeline.py, run_monitoring_pipeline.py created
-Last activity: 2026-04-02 — Completed 112-03-PLAN.md
+Status: Plan 112-04 complete — sync_signals_to_vm.py, run_full_chain.py, run_daily_refresh.py deprecation notice
+Last activity: 2026-04-02 — Completed 112-04-PLAN.md
 
 Progress: [##########] 100% v1.2.0 | [██████████] 100% v1.3.0 (32/32 plans, 9/6 phases)
 
@@ -385,12 +385,19 @@ Phase 112-03 decisions:
 - drift_monitor silently skipped (not errored) when --paper-start absent: matching run_daily_refresh.py Phase 87 behavior
 - pipeline_run_id guard (if pipeline_run_id:) before _complete_pipeline_run calls: prevents UUID cast error on empty string in dry-run mode
 
+Phase 112-04 decisions:
+- VM DB is hyperliquid (same as sync_hl_from_vm.py) -- execution tables created in Phase 113; missing VM tables handled gracefully (print + continue)
+- sync_signals_to_vm --dry-run works WITHOUT VM connectivity: reads local watermarks only, never opens SSH connection
+- sync_signals_to_vm failure is non-fatal in run_full_chain: local pipeline complete; VM sync is best-effort
+- Signal tables: incremental by ts watermark; config/dim tables: full-replace (TRUNCATE + COPY all) -- small stateless tables
+- Telegram alert on chain halt is best-effort wrapped in try/except -- never crashes chain script
+
 ## Session Continuity
 
 Last session: 2026-04-02
-Stopped at: Completed 112-03-PLAN.md (Phase 112 Plan 03 of 5)
+Stopped at: Completed 112-04-PLAN.md (Phase 112 Plan 04 of 5)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-04-02 (Phase 112-03 complete: run_signals_pipeline.py, run_execution_pipeline.py, run_monitoring_pipeline.py created)*
+*Last updated: 2026-04-02 (Phase 112-04 complete: sync_signals_to_vm.py, run_full_chain.py, run_daily_refresh.py deprecation)*
