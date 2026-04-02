@@ -1,6 +1,16 @@
 #!/usr/bin/env python
 """
-Unified daily refresh orchestration script.
+Unified daily refresh orchestration script (LEGACY).
+
+Prefer the new pipeline scripts for independent operation:
+    python -m ta_lab2.scripts.pipelines.run_data_pipeline --ids all
+    python -m ta_lab2.scripts.pipelines.run_features_pipeline --ids all
+    python -m ta_lab2.scripts.pipelines.run_signals_pipeline
+    python -m ta_lab2.scripts.pipelines.run_execution_pipeline
+    python -m ta_lab2.scripts.pipelines.run_monitoring_pipeline
+    python -m ta_lab2.scripts.pipelines.run_full_chain --ids all
+
+This script is maintained for backward compatibility.
 
 Coordinates VM data syncs, bars, EMAs, AMAs, desc_stats, macro features,
 macro regimes, per-asset regimes, signals, executor, drift monitor, and
@@ -3384,6 +3394,15 @@ Examples:
     except ValueError as e:
         print(f"[ERROR] {e}")
         return 1
+
+    # Deprecation notice for --all (use run_full_chain instead)
+    if args.all:
+        print(
+            "\n[NOTICE] run_daily_refresh.py --all is deprecated.\n"
+            "         Use: python -m ta_lab2.scripts.pipelines.run_full_chain --ids <ids>\n"
+            "         Individual pipelines: run_data_pipeline, run_features_pipeline,"
+            " run_signals_pipeline\n"
+        )
 
     # Determine what to run
     run_sync_vms = (args.sync_vms or args.all) and not getattr(
