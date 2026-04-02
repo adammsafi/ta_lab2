@@ -1419,7 +1419,7 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 
 Plans:
 - [ ] 110-01-PLAN.md -- Wave 1 parallelism (max_workers 3->4), --workers CLI flag, budget guard, wave logging
-- [ ] **Phase 111: Feature Polars Migration** - Migrate feature sub-phases from pandas to polars with per-sub-phase regression testing (IC<1%, signals=0 flips, Sharpe<5%). Target: 60min→25min
+- [x] **Phase 111: Feature Polars Migration** - Migrate feature sub-phases from pandas to polars with per-sub-phase regression testing (IC<1%, signals=0 flips, Sharpe<5%). Target: 60min→25min
 **Plans:** 5 plans in 3 waves
 
 Plans:
