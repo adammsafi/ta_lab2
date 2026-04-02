@@ -1723,6 +1723,14 @@ Plans:
   4. Dashboard loads and renders correctly on mobile browser (responsive layout verified)
   5. Execution-related pages (PnL, positions, orders, drift) query VM-local data with <2s page load
 
+**Plans:** 5 plans in 3 waves
+
+Plans:
+- [ ] 114-01-PLAN.md -- sync_dashboard_to_vm.py data push script (local to VM)
+- [ ] 114-02-PLAN.md -- VM environment setup (venv, DB schema, systemd Streamlit service)
+- [ ] 114-03-PLAN.md -- nginx reverse proxy + Let's Encrypt SSL + basic auth
+- [ ] 114-04-PLAN.md -- Mobile responsive CSS + refresh button
+- [ ] 114-05-PLAN.md -- Master deploy script + end-to-end verification
 ---
 
 ### v1.3.0 Progress
