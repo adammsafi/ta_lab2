@@ -50,24 +50,27 @@ completed: 2026-04-02
 
 # Phase 113 Plan 07: VM Deployment Scripts Summary
 
-**systemd unit (StartLimitBurst=5 in [Unit]), VM setup script (venv + editable ta_lab2 install + .env), and one-command local deploy script (SCP + SSH) completing the Oracle VM executor deployment package**
+**systemd unit (StartLimitBurst=5 in [Unit]), VM setup script (venv + editable ta_lab2 install + .env), and one-command local deploy script (SCP + SSH) — verified running on Oracle Singapore VM with HL WebSocket priced 536 symbols, StopMonitor active, signal loop polling every 30s**
 
 ## Performance
 
-- **Duration:** 5 min
+- **Duration:** ~15 min (including human verification)
 - **Started:** 2026-04-02T04:33:50Z
-- **Completed:** 2026-04-02T04:38:50Z
-- **Tasks:** 1 of 2 (Task 2 is human-verify checkpoint)
+- **Completed:** 2026-04-02T04:48:00Z
+- **Tasks:** 2 (Task 1 auto + Task 2 human-verify checkpoint, approved)
 - **Files created:** 3
 
 ## Accomplishments
 - Systemd unit `ta-executor.service` with correct crash-loop guard (`StartLimitBurst=5`/`StartLimitIntervalSec=300` in `[Unit]`), `Restart=on-failure`, `RestartSec=30`, `SyslogIdentifier=ta-executor`
 - VM setup script `setup_vm.sh` following `deploy/tvc/setup_vm.sh` pattern — creates venv, installs `requirements.txt`, editable installs `ta_lab2` source, writes `.env` with `EXECUTOR_DB_URL` + Telegram creds, installs + enables systemd service
 - Local deploy script `deploy.sh` — SCP executor files and `src/ta_lab2/` source tree to VM, then SSH run `setup_vm.sh`; prints clear next-steps for table creation, signal sync, config push, service start, and log verification
+- Human verification APPROVED: executor running as `active (running)` (PID 945320), HL WebSocket connected with 536 symbols priced in <1s, PriceCache warm at startup, StopMonitor daemon thread running (1s poll), signal loop polling every 30s (reports "no active configs" correctly since `dim_executor_config` was empty), crash-loop tracking 1/5 starts
 
 ## Task Commits
 
 1. **Task 1: Create systemd unit, setup script, and deploy script** - `d02858de` (feat)
+
+**Plan metadata (pre-verification):** `a1a1c9bc` (docs: complete deploy scripts plan — paused at human-verify checkpoint)
 
 ## Files Created/Modified
 - `deploy/executor/ta-executor.service` - systemd unit for 24/7 executor service
@@ -86,39 +89,38 @@ None - plan executed exactly as written.
 
 ## Issues Encountered
 
-None.
+Two minor non-blocking items observed during verification (tracked as todos, not blockers):
+1. `dim_assets` table name may differ on VM — executor logs noted this; not breaking since executor falls back gracefully
+2. `dim_executor_config` was empty at verification time — executor correctly reports "no active configs" and polls; configs can be seeded separately
+
+## Verification Results (Human-Verified, APPROVED)
+
+```
+systemctl status: active (running), PID 945320
+HL WebSocket: connected, 536 symbols priced in <1s
+PriceCache: 536 symbols cached at startup
+StopMonitor: daemon thread running (1s poll)
+Signal loop: polling every 30s, "no active configs" (dim_executor_config empty — expected)
+Crash-loop tracking: 1/5 starts
+```
 
 ## User Setup Required
 
-**Manual deployment steps required after this plan:**
+None - deployment is complete and executor is running. To seed executor configs and activate trading:
 
 ```bash
-# 1. Deploy to VM
-bash deploy/executor/deploy.sh
-
-# 2. Create executor tables on VM
-bash deploy/executor/create_vm_tables.sh
-
-# 3. Push signals from local to VM
-python -m ta_lab2.scripts.etl.sync_signals_to_vm --full
-
-# 4. Push executor config to VM
+# Push executor config from local to VM
 python -m ta_lab2.scripts.etl.sync_config_to_vm
 
-# 5. Start executor service
-SSH_KEY=~/Downloads/oracle_sg_keys/ssh-key-2026-03-10.key
-ssh -i $SSH_KEY ubuntu@161.118.209.59 "sudo systemctl start ta-executor"
-
-# 6. Verify running
-ssh -i $SSH_KEY ubuntu@161.118.209.59 "sudo systemctl status ta-executor"
-ssh -i $SSH_KEY ubuntu@161.118.209.59 "journalctl -u ta-executor --no-pager -n 50"
+# Push signals (if needed after config seeding)
+python -m ta_lab2.scripts.etl.sync_signals_to_vm --full
 ```
 
 ## Next Phase Readiness
-- Phase 113 deploy package is complete — all 7 artifacts exist in `deploy/executor/`
-- Human verification (Task 2 checkpoint) is the only remaining step for Phase 113
-- After verification approval, Phase 113 VERIFICATION.md can be completed
+- Phase 113 is COMPLETE — executor is live on Oracle Singapore VM as a 24/7 systemd service
+- Phase 113 VERIFICATION.md can now be completed
 - Phase 114 (hosted dashboard) can reference this deploy pattern for VM hosting
+- To activate live trading: seed `dim_executor_config` entries on the VM and push signal data
 
 ---
 *Phase: 113-vm-execution-deployment*
