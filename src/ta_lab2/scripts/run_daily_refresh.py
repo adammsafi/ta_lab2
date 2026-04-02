@@ -3992,6 +3992,17 @@ Examples:
         if _maybe_kill(db_url, pipeline_run_id, results, pipeline_start_time):
             return 2
 
+        # Push fresh signals to Oracle VM for executor consumption (non-blocking)
+        if signal_result.success and not args.dry_run:
+            try:
+                from ta_lab2.scripts.etl.sync_signals_to_vm import sync_signals
+
+                print("\n[SYNC] Pushing signals to VM...")
+                sync_signals(dry_run=False)
+                print("[SYNC] Signal push to VM complete")
+            except Exception as exc:
+                print(f"\n[WARN] Signal push to VM failed: {exc}")
+
     # Phase 87: Signal validation gate -- runs AFTER signals, BEFORE executor.
     # BLOCKING: if gate detects anomalies (rc=2), executor is skipped.
     signal_gate_blocked = False
