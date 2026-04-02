@@ -5,11 +5,11 @@
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v1.4.0 — Phase 114 In-Progress (Hosted Dashboard, 2/5 plans complete). sync_dashboard_to_vm.py + VM bootstrap scripts ready.
+**Current focus:** v1.4.0 — Phase 114 In-Progress (Hosted Dashboard, 4/5 plans complete). Plans 01-04 done; mobile CSS + VM sync indicator live.
 
 ## Current Position
 
-Phase: 114 In-Progress (Hosted Dashboard) — plans 01+02/05 complete
+Phase: 114 In-Progress (Hosted Dashboard) — plans 01+02+03+04/05 complete
 Also: Phase 113 COMPLETE (VM Execution Deployment) — 7/7 plans complete, human-verify APPROVED
 Also: Phase 112 COMPLETE (Pipeline Architecture Separation) — 5/5 plans, verified (9/9 must-haves)
 Also: Phase 100 COMPLETE (ML Signal Combination) — 3/3 plans complete
@@ -22,10 +22,10 @@ Also: Phase 104 COMPLETE (Crypto-Native Indicators) — 3/3 plans complete
 Also: Phase 108 COMPLETE (Pipeline Batch Performance) — 5 plans complete
 Also: Phase 103 COMPLETE (Traditional TA Expansion) — 3/3 plans complete
 Also: Phase 107 COMPLETE (Pipeline Operations Dashboard) — 2/2 plans complete
-Status: Phase 114 In-Progress — 114-01 COMPLETE (sync_dashboard_to_vm.py, 37 tables, full-replace + incremental watermark); 114-02 COMPLETE (VM bootstrap: setup_dashboard_env.sh, streamlit.service, streamlit_config.toml)
-Last activity: 2026-04-02 — Completed 114-01-PLAN.md (sync_dashboard_to_vm.py: local->VM push for 37 dashboard tables)
+Status: Phase 114 In-Progress — 114-01 COMPLETE (sync_dashboard_to_vm.py); 114-02 COMPLETE (VM bootstrap); 114-03 COMPLETE (nginx reverse proxy); 114-04 COMPLETE (mobile CSS + VM sync indicator)
+Last activity: 2026-04-01 — Completed 114-04-PLAN.md (mobile.py inject_mobile_css(), app.py VM sync indicator)
 
-Progress: [##########] 100% v1.2.0 | [██████████] 100% v1.3.0 (32/32 plans, 9/6 phases) | v1.4.0: Phase 113 COMPLETE, Phase 114 In-Progress (2/5 plans)
+Progress: [##########] 100% v1.2.0 | [██████████] 100% v1.3.0 (32/32 plans, 9/6 phases) | v1.4.0: Phase 113 COMPLETE, Phase 114 In-Progress (4/5 plans)
 
 ## Performance Metrics
 
