@@ -1410,7 +1410,7 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 - [x] **Phase 103: Traditional TA Expansion** - Add 20-30 well-known indicators (Ichimoku, Williams %R, Keltner, CCI, Elder Ray, Force Index, VWAP, VIDYA, FRAMA, etc.), IC sweep through Phase 102 harness — COMPLETE 2026-04-01
 - [x] **Phase 104: Crypto-Native Indicators** - Venue-agnostic normalized input layer for OI/funding/volume, derive OI momentum, OI-price divergence, funding rate z-score, Force Index, liquidation pressure proxy — COMPLETE 2026-04-01
 - [x] **Phase 105: Parameter Optimization** - Systematic parameter sweep (grid + Optuna) for surviving indicators, plateau preference, rolling stability test, DSR over full search space — COMPLETE 2026-04-01
-- [ ] **Phase 106: Custom Composite Indicators** - Proprietary indicators (AMA ER as regime signal, OI-divergence × CTF agreement, funding-adjusted momentum, cross-asset lead-lag), strictest validation tier
+- [x] **Phase 106: Custom Composite Indicators** - Proprietary indicators (AMA ER as regime signal, OI-divergence × CTF agreement, funding-adjusted momentum, cross-asset lead-lag), strictest validation tier — COMPLETE 2026-04-02
 - [x] **Phase 107: Pipeline Operations Dashboard** - Streamlit ops page: real-time stage monitor with progress bars, run history, trigger/kill buttons, pipeline_stage_log table for per-stage DB persistence — COMPLETE 2026-04-01
 - [x] **Phase 108: Pipeline Batch Performance** - Replace 5.7M per-key SQL queries with per-ID batch operations using PARTITION BY. EMA returns (2M→492 queries), AMA returns, bar returns, EMA fast-path. Target: 5hr→1.5hr incremental
 - [x] **Phase 109: Feature Skip-Unchanged** - Watermark state table for features, skip assets with no new bar data. Target: 100min→10min for daily incremental
@@ -1631,8 +1631,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 106-01: Implement composite indicators (AMA ER regime, OI×CTF interaction, funding-adjusted momentum, lead-lag composite, TF alignment score, volume-regime gated trend)
-- [ ] 106-02: Full validation gauntlet (permutation + FDR + CPCV + held-out) and promotion of survivors
+- [x] 106-01: Implement composite indicators (AMA ER regime, OI×CTF interaction, funding-adjusted momentum, lead-lag composite, TF alignment score, volume-regime gated trend)
+- [x] 106-02: Composite refresh orchestrator + run for all assets
+- [x] 106-03: Full validation gauntlet (permutation + FDR + CPCV + held-out) + COMPOSITES.md documentation
 
 ---
 
