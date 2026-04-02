@@ -54,22 +54,22 @@ class TableSpec(NamedTuple):
 
 
 # Signal tables: incremental by ts watermark
+# Must match SIGNAL_TABLE_MAP in ta_lab2.executor.signal_reader
 _SIGNAL_TABLES: list[TableSpec] = [
     TableSpec("signals_ema_crossover", ts_col="ts"),
-    TableSpec("signals_rsi", ts_col="ts"),
+    TableSpec("signals_rsi_mean_revert", ts_col="ts"),
     TableSpec("signals_atr_breakout", ts_col="ts"),
     TableSpec("signals_macd_crossover", ts_col="ts"),
     TableSpec("signals_ama_momentum", ts_col="ts"),
     TableSpec("signals_ama_mean_reversion", ts_col="ts"),
     TableSpec("signals_ama_regime_conditional", ts_col="ts"),
-    TableSpec("portfolio_allocations", ts_col="ts"),
 ]
 
 # Config tables: small, stateless → full replace
 _CONFIG_TABLES: list[TableSpec] = [
     TableSpec("dim_executor_config", ts_col=None, full_replace=True),
-    TableSpec("strategy_parity", ts_col=None, full_replace=True),
-    TableSpec("risk_overrides", ts_col=None, full_replace=True),
+    TableSpec("dim_risk_limits", ts_col=None, full_replace=True),
+    TableSpec("dim_risk_state", ts_col=None, full_replace=True),
 ]
 
 ALL_TABLES: list[TableSpec] = _SIGNAL_TABLES + _CONFIG_TABLES
@@ -304,6 +304,72 @@ def get_dry_run_report(engine) -> list[dict]:
                 }
             )
     return report
+
+
+def sync_signals(
+    *,
+    dry_run: bool = False,
+    full: bool = False,
+    table: str | None = None,
+    sync_config: bool = True,
+) -> None:
+    """Programmatic entry-point for use by run_daily_refresh.py and other callers.
+
+    Pushes signal tables (and optionally config tables) from local to the VM.
+    Errors per-table are isolated; a summary is printed but exceptions are NOT raised
+    unless all tables fail.
+
+    Parameters
+    ----------
+    dry_run:
+        Print local counts only; no VM connectivity required.
+    full:
+        Ignore VM watermarks; push all local rows.
+    table:
+        Full table name (e.g. ``"signals_ema_crossover"``). None = all signal tables.
+    sync_config:
+        When True (default), also push config tables after signal tables.
+        Set False to push signals only.
+    """
+    engine = get_engine()
+
+    if dry_run:
+        report = get_dry_run_report(engine)
+        if table:
+            report = [r for r in report if r["table"] == table]
+        for r in report:
+            wm = r["watermark"] or "n/a"
+            print(
+                f"  {r['table']:<40}  rows={r['local_rows']:>8,}  "
+                f"wm={wm:<32}  mode={r['sync_mode']}  [{r['status']}]"
+            )
+        return
+
+    # Determine tables to push
+    if table:
+        specs = [s for s in ALL_TABLES if s.name == table]
+    else:
+        specs = list(_SIGNAL_TABLES)
+        if sync_config:
+            specs += list(_CONFIG_TABLES)
+
+    total_rows = 0
+    tables_failed: list[str] = []
+
+    for spec in specs:
+        try:
+            if spec.full_replace:
+                rows = sync_table_full_replace(engine, spec)
+            else:
+                rows = sync_table_incremental(engine, spec, full=full)
+            total_rows += rows
+        except Exception as e:
+            print(f"  [ERROR] {spec.name}: {e}", file=sys.stderr)
+            tables_failed.append(spec.name)
+
+    print(f"[signals-sync] {total_rows:,} rows pushed ({len(tables_failed)} failures)")
+    if tables_failed:
+        print(f"  Failed: {', '.join(tables_failed)}", file=sys.stderr)
 
 
 def main(argv: list[str] | None = None) -> int:
