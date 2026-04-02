@@ -34,7 +34,31 @@ esac
 # ---------------------------------------------------------------------------
 VM_HOST=161.118.209.59
 VM_USER=ubuntu
-SSH_KEY=~/Downloads/oracle_sg_keys/ssh-key-2026-03-10.key
+# Resolve SSH key: try multiple paths (Git Bash, WSL, env var, $HOME)
+_WIN_KEY="/mnt/c/Users/asafi/Downloads/oracle_sg_keys/ssh-key-2026-03-10.key"
+_WSL_KEY="$HOME/.ssh/oracle_sg_vm.key"
+_GITBASH_KEY="/c/Users/asafi/Downloads/oracle_sg_keys/ssh-key-2026-03-10.key"
+
+if [[ -n "${SSH_KEY:-}" && -f "$SSH_KEY" ]]; then
+  : # SSH_KEY already set via env var
+elif [[ -f "$_WSL_KEY" ]]; then
+  SSH_KEY="$_WSL_KEY"
+elif [[ -f "$_WIN_KEY" ]]; then
+  # WSL mounts Windows files as 0777; SSH rejects that. Copy to WSL with safe perms.
+  echo "Copying SSH key to WSL home with correct permissions..."
+  mkdir -p "$HOME/.ssh"
+  cp "$_WIN_KEY" "$_WSL_KEY"
+  chmod 600 "$_WSL_KEY"
+  SSH_KEY="$_WSL_KEY"
+elif [[ -f "$_GITBASH_KEY" ]]; then
+  SSH_KEY="$_GITBASH_KEY"
+elif [[ -f "$HOME/Downloads/oracle_sg_keys/ssh-key-2026-03-10.key" ]]; then
+  SSH_KEY="$HOME/Downloads/oracle_sg_keys/ssh-key-2026-03-10.key"
+else
+  echo "ERROR: SSH key not found. Set SSH_KEY env var before running."
+  echo "  export SSH_KEY=/path/to/ssh-key-2026-03-10.key"
+  exit 1
+fi
 REMOTE_DIR=/opt/ta_lab2
 
 SSH_OPTS="-i $SSH_KEY -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15"
@@ -48,36 +72,52 @@ ok()   { echo "  [OK] $*"; }
 fail() { echo "  [FAIL] $*" >&2; exit 1; }
 
 ssh_vm()  { ssh $SSH_OPTS "${VM_USER}@${VM_HOST}" "$@"; }
-rsync_vm() { rsync -avz --progress -e "ssh $SSH_OPTS" "$@"; }
+scp_vm()  { scp $SSH_OPTS "$@"; }
 
 # ---------------------------------------------------------------------------
-# Step 1: Rsync codebase to VM
+# Step 1: Build wheel + SCP to VM (fast single-file transfer)
 # ---------------------------------------------------------------------------
 if ! $DATA_ONLY; then
-  step "Step 1: Rsync codebase to VM (${VM_USER}@${VM_HOST}:${REMOTE_DIR}/src/)"
-  rsync_vm --delete \
-    --exclude '.git' \
-    --exclude '__pycache__' \
-    --exclude '.planning' \
-    --exclude 'node_modules' \
-    --exclude '.mypy_cache' \
-    --exclude '.ruff_cache' \
-    --exclude '.pytest_cache' \
-    --exclude '*.egg-info' \
-    --exclude 'dist/' \
-    --exclude 'build/' \
-    --exclude '.env' \
-    --exclude 'db_config.env' \
-    ./ "${VM_USER}@${VM_HOST}:${REMOTE_DIR}/src/"
-  ok "Codebase synced"
+  step "Step 0: Ensure remote directory exists"
+  ssh_vm "sudo mkdir -p ${REMOTE_DIR}/deploy && sudo chown -R ${VM_USER}:${VM_USER} ${REMOTE_DIR}"
+  ok "Remote directory ready"
+
+  step "Step 1: Build wheel and SCP to VM"
+  # Try multiple Python paths (WSL, Git Bash, system)
+  PYTHON=""
+  for p in python3 python \
+    "/mnt/c/Program Files/Python312/python.exe" \
+    "/c/Program Files/Python312/python.exe" \
+    "/mnt/c/Users/asafi/AppData/Local/Programs/Python/Python312/python.exe"; do
+    if "$p" -m build --version &>/dev/null; then PYTHON="$p"; break; fi
+  done
+  if [[ -z "$PYTHON" ]]; then
+    echo "ERROR: No python with 'build' module found. Run: pip install build"; exit 1
+  fi
+  log "Using: $PYTHON"
+  "$PYTHON" -m build --wheel --outdir dist/ || { fail "Wheel build failed"; }
+  WHEEL=$(ls -t dist/ta_lab2-*.whl 2>/dev/null | head -1)
+  if [ -z "$WHEEL" ]; then
+    fail "No wheel found in dist/"
+  fi
+  log "Built: $WHEEL"
+  scp_vm "$WHEEL" "${VM_USER}@${VM_HOST}:${REMOTE_DIR}/"
+  ok "Wheel uploaded"
+
+  # Install wheel on VM
+  ssh_vm "${REMOTE_DIR}/venv/bin/pip install --force-reinstall ${REMOTE_DIR}/$(basename $WHEEL) 2>/dev/null" || \
+    log "Wheel install will happen during setup_dashboard_env.sh"
 
   # ---------------------------------------------------------------------------
-  # Step 2: Rsync deploy scripts
+  # Step 2: SCP deploy scripts to VM
   # ---------------------------------------------------------------------------
-  step "Step 2: Rsync deploy scripts to VM (${REMOTE_DIR}/deploy/)"
-  ssh_vm "sudo mkdir -p ${REMOTE_DIR}/deploy && sudo chown ${VM_USER}:${VM_USER} ${REMOTE_DIR}/deploy"
-  rsync_vm \
-    deploy/vm/ "${VM_USER}@${VM_HOST}:${REMOTE_DIR}/deploy/"
+  step "Step 2: SCP deploy scripts to VM (${REMOTE_DIR}/deploy/)"
+  scp_vm deploy/vm/setup_dashboard_env.sh \
+         deploy/vm/setup_nginx_ssl.sh \
+         deploy/vm/nginx_streamlit.conf \
+         deploy/vm/streamlit.service \
+         deploy/vm/streamlit_config.toml \
+         "${VM_USER}@${VM_HOST}:${REMOTE_DIR}/deploy/"
   ok "Deploy scripts synced"
 fi
 
@@ -102,7 +142,7 @@ fi
 # ---------------------------------------------------------------------------
 if ! $CODE_ONLY; then
   step "Step 5: Push data to VM (sync_dashboard_to_vm --full)"
-  python -m ta_lab2.scripts.etl.sync_dashboard_to_vm --full
+  "$PYTHON" -m ta_lab2.scripts.etl.sync_dashboard_to_vm --full
   ok "Dashboard data pushed to VM"
 fi
 

@@ -70,14 +70,20 @@ fi
 # pyproject.toml has no [dashboard] extras group, so we install the base
 # package plus streamlit and psycopg2 explicitly.
 # ---------------------------------------------------------------------------
-log "Installing ta_lab2 from ${SRC_DIR}..."
-if [[ ! -d "${SRC_DIR}" ]]; then
-    die "Source directory ${SRC_DIR} does not exist. Rsync code first:\n  rsync -avz --exclude '__pycache__' --exclude '*.pyc' \\\n    -e 'ssh -i ~/.ssh/oracle_sg_key' . ubuntu@161.118.209.59:${SRC_DIR}/"
-fi
-
+log "Installing ta_lab2..."
 "${VENV_DIR}/bin/pip" install --upgrade pip setuptools wheel
-# Install ta_lab2 base package
-"${VENV_DIR}/bin/pip" install -e "${SRC_DIR}"
+
+# Install from wheel if available (deploy_dashboard.sh uploads it), else fallback to editable src
+WHEEL=$(ls -t "${INSTALL_DIR}"/ta_lab2-*.whl 2>/dev/null | head -1)
+if [[ -n "$WHEEL" ]]; then
+    log "Installing from wheel: $WHEEL"
+    "${VENV_DIR}/bin/pip" install --force-reinstall "$WHEEL"
+elif [[ -d "${SRC_DIR}" ]]; then
+    log "No wheel found, installing from source: ${SRC_DIR}"
+    "${VENV_DIR}/bin/pip" install -e "${SRC_DIR}"
+else
+    die "No wheel in ${INSTALL_DIR} and no source in ${SRC_DIR}. Run deploy_dashboard.sh first."
+fi
 # Install dashboard runtime dependencies (not in a named extras group)
 "${VENV_DIR}/bin/pip" install \
     streamlit>=1.32 \

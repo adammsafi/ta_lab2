@@ -18,9 +18,9 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import io
 import subprocess
 import sys
-import tempfile
 import time
 from datetime import datetime
 from pathlib import Path
@@ -69,44 +69,38 @@ FULL_REPLACE_TABLES: list[str] = [
 # (table_name, watermark_col, conflict_cols, batch_by_id)
 INCREMENTAL_TABLES: list[tuple[str, str, list[str], bool]] = [
     # Research tables
-    ("strategy_bakeoff_results", "updated_at", ["id"], False),
-    ("ic_results", "ingested_at", ["id"], False),
-    ("feature_experiments", "created_at", ["id"], False),
-    ("regimes", "ingested_at", ["id", "venue_id", "ts", "tf"], False),
-    ("regime_flips", "ingested_at", ["id", "venue_id", "ts", "tf"], False),
-    ("regime_stats", "ingested_at", ["id", "venue_id", "tf"], False),
-    ("regime_comovement", "ingested_at", ["id1", "id2", "venue_id", "tf", "ts"], False),
-    ("macro_regimes", "ingested_at", ["ts"], False),
+    ("strategy_bakeoff_results", "computed_at", ["id"], False),
+    ("ic_results", "computed_at", ["id"], False),
+    ("regimes", "updated_at", ["id", "venue_id", "ts", "tf"], False),
+    ("regime_flips", "updated_at", ["id", "venue_id", "ts", "tf"], False),
+    ("regime_stats", "updated_at", ["id", "venue_id", "tf"], False),
+    ("regime_comovement", "updated_at", ["id1", "id2", "venue_id", "tf", "ts"], False),
+    ("macro_regimes", "ts", ["ts"], False),
     ("portfolio_allocations", "created_at", ["id"], False),
-    ("asset_stats", "ingested_at", ["id", "venue_id"], False),
+    ("asset_stats", "updated_at", ["id", "venue_id"], False),
     # Large table — batch by id
-    ("features", "ingested_at", ["id", "venue_id", "ts", "tf"], True),
+    ("features", "updated_at", ["id", "venue_id", "ts", "tf"], True),
     # Signal tables
-    ("signals_ema_crossover", "ingested_at", ["id", "venue_id", "ts", "tf"], False),
-    ("signals_rsi_mean_revert", "ingested_at", ["id", "venue_id", "ts", "tf"], False),
-    ("signals_atr_breakout", "ingested_at", ["id", "venue_id", "ts", "tf"], False),
-    ("signals_macd_crossover", "ingested_at", ["id", "venue_id", "ts", "tf"], False),
-    ("signals_ama_momentum", "ingested_at", ["id", "venue_id", "ts", "tf"], False),
-    (
-        "signals_ama_mean_reversion",
-        "ingested_at",
-        ["id", "venue_id", "ts", "tf"],
-        False,
-    ),
+    ("signals_ema_crossover", "created_at", ["id", "venue_id", "ts", "tf"], False),
+    ("signals_rsi_mean_revert", "created_at", ["id", "venue_id", "ts", "tf"], False),
+    ("signals_atr_breakout", "created_at", ["id", "venue_id", "ts", "tf"], False),
+    ("signals_macd_crossover", "created_at", ["id", "venue_id", "ts", "tf"], False),
+    ("signals_ama_momentum", "created_at", ["id", "venue_id", "ts", "tf"], False),
+    ("signals_ama_mean_reversion", "created_at", ["id", "venue_id", "ts", "tf"], False),
     (
         "signals_ama_regime_conditional",
-        "ingested_at",
+        "created_at",
         ["id", "venue_id", "ts", "tf"],
         False,
     ),
     # Operations tables
-    ("positions", "updated_at", ["id"], False),
-    ("fills", "ingested_at", ["id"], False),
+    ("positions", "created_at", ["id"], False),
+    ("fills", "created_at", ["id"], False),
     ("orders", "updated_at", ["id"], False),
     ("executor_run_log", "started_at", ["id"], False),
     ("pipeline_run_log", "started_at", ["run_id"], False),
     ("pipeline_stage_log", "started_at", ["run_id", "stage"], False),
-    ("drift_metrics", "ts", ["id", "venue_id", "ts"], False),
+    ("drift_metrics", "created_at", ["id", "venue_id", "ts"], False),
     ("risk_events", "event_ts", ["id"], False),
 ]
 
@@ -135,7 +129,9 @@ def _vm_psql(sql: str, timeout: int = 60) -> str:
         f"PGPASSWORD={VM_DB_PASS} psql -h 127.0.0.1 -U {VM_DB_USER} "
         f'-d {VM_DB} -t -A -c "{sql}"'
     )
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    result = subprocess.run(
+        cmd, capture_output=True, text=True, encoding="utf-8", timeout=timeout
+    )
     if result.returncode != 0:
         raise RuntimeError(f"SSH psql failed: {result.stderr}")
     return result.stdout.strip()
@@ -152,6 +148,7 @@ def _vm_psql_stdin(sql: str, csv_data: str, timeout: int = 600) -> None:
         input=csv_data,
         capture_output=True,
         text=True,
+        encoding="utf-8",
         timeout=timeout,
     )
     if result.returncode != 0:
@@ -239,16 +236,9 @@ def _local_copy_to_csv(
     raw_conn = engine.raw_connection()
     try:
         cur = raw_conn.cursor()
-        with tempfile.NamedTemporaryFile(
-            mode="w+", suffix=".csv", delete=False, encoding="utf-8"
-        ) as f:
-            cur.copy_expert(copy_sql, f)
-            tmp_path = f.name
-
-        with open(tmp_path, "r", encoding="utf-8") as f:
-            data = f.read()
-        Path(tmp_path).unlink(missing_ok=True)
-        return data
+        buf = io.BytesIO()
+        cur.copy_expert(copy_sql, buf)
+        return buf.getvalue().decode("utf-8")
     finally:
         raw_conn.close()
 
@@ -287,7 +277,7 @@ def _sync_full_replace(
     n_rows = len([line for line in csv_data.split("\n") if line.strip()])
 
     # TRUNCATE + COPY on VM (single transaction via pipeline)
-    _vm_psql(f"TRUNCATE TABLE {table_name}")
+    _vm_psql(f"TRUNCATE TABLE {table_name} CASCADE")
     copy_cmd = f"COPY {table_name} ({col_sql}) FROM STDIN WITH CSV"
     _vm_psql_stdin(copy_cmd, csv_data)
 
@@ -408,10 +398,10 @@ def _vm_upsert_csv(
     update_cols = [c for c in columns if c not in conflict_cols]
     set_clause = ", ".join(f'"{c}" = EXCLUDED."{c}"' for c in update_cols)
 
-    # Create staging table, load CSV, upsert, drop
+    # Use a regular table (not TEMP) so it persists across psql calls
     setup_sql = (
         f"DROP TABLE IF EXISTS {staging}; "
-        f"CREATE TEMP TABLE {staging} (LIKE {table_name} INCLUDING DEFAULTS);"
+        f"CREATE TABLE {staging} (LIKE {table_name} INCLUDING DEFAULTS);"
     )
     copy_cmd = f"COPY {staging} ({col_sql}) FROM STDIN WITH CSV"
     upsert_sql = (

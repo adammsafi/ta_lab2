@@ -77,14 +77,18 @@ create_htpasswd() {
 
     info "Creating basic auth credentials..."
     echo ""
-    read -rp "Enter dashboard username: " AUTH_USER
+    echo "============================================================"
+    echo "  ACTION REQUIRED: Create dashboard login credentials"
+    echo "============================================================"
+    echo ""
+    read -rp ">>> Enter dashboard username: " AUTH_USER
     [[ -n "$AUTH_USER" ]] || die "Username cannot be empty"
 
-    read -rsp "Enter dashboard password: " AUTH_PASS
+    read -rsp ">>> Enter dashboard password: " AUTH_PASS
     echo ""
     [[ -n "$AUTH_PASS" ]] || die "Password cannot be empty"
 
-    read -rsp "Confirm password: " AUTH_PASS2
+    read -rsp ">>> Confirm password: " AUTH_PASS2
     echo ""
     [[ "$AUTH_PASS" == "$AUTH_PASS2" ]] || die "Passwords do not match"
 
@@ -105,8 +109,52 @@ install_nginx_config() {
 
     [[ -f "$NGINX_CONF_SRC" ]] || die "nginx_streamlit.conf not found at $NGINX_CONF_SRC"
 
-    # Replace DOMAIN_PLACEHOLDER with the actual domain
-    sed "s/DOMAIN_PLACEHOLDER/$DOMAIN/g" "$NGINX_CONF_SRC" > "$NGINX_SITE_DEST"
+    # Remove default site to avoid conflicts
+    if [[ -L "$NGINX_DEFAULT_LINK" ]]; then
+        rm "$NGINX_DEFAULT_LINK"
+        success "Removed default nginx site"
+    fi
+
+    # Create certbot webroot directory for ACME challenge
+    mkdir -p "$CERTBOT_WEBROOT"
+
+    local cert_dir="/etc/letsencrypt/live/$DOMAIN"
+    if [[ -d "$cert_dir" ]]; then
+        # Certs exist — install full SSL config directly
+        info "SSL certs already exist, installing full config"
+        sed "s/DOMAIN_PLACEHOLDER/$DOMAIN/g" "$NGINX_CONF_SRC" > "$NGINX_SITE_DEST"
+    else
+        # No certs yet — install HTTP-only config so certbot can run
+        info "No SSL certs yet — installing temporary HTTP-only config for certbot"
+        cat > "$NGINX_SITE_DEST" <<HTTPCONF
+server {
+    listen 80;
+    server_name $DOMAIN;
+
+    auth_basic "ta_lab2 Dashboard";
+    auth_basic_user_file $HTPASSWD_FILE;
+
+    location /.well-known/acme-challenge/ {
+        auth_basic off;
+        root $CERTBOT_WEBROOT;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:8501;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_buffering off;
+        proxy_read_timeout 86400;
+        proxy_send_timeout 86400;
+    }
+}
+HTTPCONF
+    fi
     success "Wrote $NGINX_SITE_DEST (domain=$DOMAIN)"
 
     # Create symlink in sites-enabled
@@ -117,21 +165,11 @@ install_nginx_config() {
         success "Symlink $NGINX_SITE_LINK already exists"
     fi
 
-    # Remove default site to avoid conflicts
-    if [[ -L "$NGINX_DEFAULT_LINK" ]]; then
-        rm "$NGINX_DEFAULT_LINK"
-        success "Removed default nginx site"
-    fi
-
-    # Create certbot webroot directory for ACME challenge
-    mkdir -p "$CERTBOT_WEBROOT"
-
-    # Validate nginx config
+    # Validate and reload nginx
     info "Testing nginx configuration..."
-    # Temporarily allow HTTP-only config to validate (certs may not exist yet)
-    nginx -t 2>&1 || {
-        warn "nginx -t failed (SSL certs may not exist yet — this is expected before certbot runs)"
-    }
+    nginx -t 2>&1 || die "nginx -t failed — check $NGINX_SITE_DEST"
+    systemctl reload nginx 2>/dev/null || systemctl start nginx
+    success "nginx running with HTTP config"
 }
 
 # ---------------------------------------------------------------------------
@@ -206,16 +244,22 @@ obtain_ssl_cert() {
 
     info "Obtaining Let's Encrypt SSL certificate for $DOMAIN..."
 
-    # certbot --nginx modifies the nginx config to add SSL directives.
-    # Our config already has the cert paths as placeholders — certbot will
-    # populate /etc/letsencrypt/live/$DOMAIN/ with the actual certs.
-    if certbot --nginx \
+    # Use --webroot mode: nginx serves HTTP on port 80, certbot places challenge
+    # files in the webroot. After cert is obtained, we install the full SSL config.
+    if certbot certonly --webroot \
+        -w "$CERTBOT_WEBROOT" \
         -d "$DOMAIN" \
         --non-interactive \
         --agree-tos \
-        --email "admin@$DOMAIN" \
-        --redirect; then
+        --email "admin@$DOMAIN"; then
         success "SSL certificate obtained for $DOMAIN"
+
+        # Now install the full SSL config (certs exist)
+        info "Installing full SSL nginx config..."
+        sed "s/DOMAIN_PLACEHOLDER/$DOMAIN/g" "$NGINX_CONF_SRC" > "$NGINX_SITE_DEST"
+        nginx -t 2>&1 || die "Full SSL nginx config failed validation"
+        systemctl reload nginx
+        success "nginx now serving HTTPS for $DOMAIN"
     else
         echo ""
         warn "certbot failed — this usually means:"
