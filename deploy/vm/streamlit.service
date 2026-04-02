@@ -1,0 +1,23 @@
+[Unit]
+Description=ta_lab2 Streamlit Dashboard
+After=postgresql.service network.target
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/ta_lab2/src/src/ta_lab2/dashboard
+EnvironmentFile=/opt/ta_lab2/db_config.env
+ExecStart=/opt/ta_lab2/venv/bin/streamlit run app.py \
+    --server.address 127.0.0.1 \
+    --server.port 8501 \
+    --server.headless true
+Restart=always
+RestartSec=5
+# Give up after 5 rapid restarts within 60s to avoid thundering herd
+StartLimitInterval=60
+StartLimitBurst=5
+
+[Install]
+WantedBy=multi-user.target

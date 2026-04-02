@@ -1,0 +1,21 @@
+# Streamlit server config for VM deployment behind nginx reverse proxy.
+#
+# enableCORS = false       — required when nginx handles CORS headers
+# enableXsrfProtection = false — required for nginx WebSocket proxy to work
+#   (Streamlit's built-in XSRF cookie conflicts with nginx proxying)
+# address = "127.0.0.1"   — NEVER "0.0.0.0"; nginx handles external access
+
+[server]
+enableCORS = false
+enableXsrfProtection = false
+headless = true
+address = "127.0.0.1"
+port = 8501
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+# Optional: uncomment to set a custom theme
+# base = "dark"
+# primaryColor = "#1f77b4"
