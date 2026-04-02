@@ -5,11 +5,11 @@
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v1.4.0 — Phase 113 IN PROGRESS (VM Execution Deployment, 4/7 plans)
+**Current focus:** v1.4.0 — Phase 113 IN PROGRESS (VM Execution Deployment, 5/7 plans)
 
 ## Current Position
 
-Phase: 113 IN PROGRESS (VM Execution Deployment) — 4/7 plans complete
+Phase: 113 IN PROGRESS (VM Execution Deployment) — 5/7 plans complete
 Also: Phase 112 COMPLETE (Pipeline Architecture Separation) — 5/5 plans, verified (9/9 must-haves)
 Also: Phase 100 COMPLETE (ML Signal Combination) — 3/3 plans complete
 Also: Phase 106 COMPLETE (Custom Composite Indicators) — 3/3 plans complete
@@ -21,10 +21,10 @@ Also: Phase 104 COMPLETE (Crypto-Native Indicators) — 3/3 plans complete
 Also: Phase 108 COMPLETE (Pipeline Batch Performance) — 5 plans complete
 Also: Phase 103 COMPLETE (Traditional TA Expansion) — 3/3 plans complete
 Also: Phase 107 COMPLETE (Pipeline Operations Dashboard) — 2/2 plans complete
-Status: Phase 113-04 complete — sync_results_from_vm.py (9 execution tables, watermark-based incremental pull)
-Last activity: 2026-04-02 — Completed 113-04-PLAN.md (VM→local execution state sync)
+Status: Phase 113-05 complete — StopMonitor (stop/TP daemon thread) + PositionSizer.get_price() VM-aware 5-tier chain
+Last activity: 2026-04-02 — Completed 113-05-PLAN.md (stop/TP monitor + VM-aware position sizer price fallback)
 
-Progress: [##########] 100% v1.2.0 | [██████████] 100% v1.3.0 (32/32 plans, 9/6 phases) | v1.4.0: 4/7 Phase 113 plans
+Progress: [##########] 100% v1.2.0 | [██████████] 100% v1.3.0 (32/32 plans, 9/6 phases) | v1.4.0: 5/7 Phase 113 plans
 
 ## Performance Metrics
 
@@ -414,12 +414,21 @@ Phase 113-04 decisions:
 - Watermark advances to VM MAX(wm_col) after each successful table pull (not last-row ts) — handles out-of-order VM inserts correctly
 - Per-table error isolation: exception in one table logged to stderr, sync continues to next table
 
+Phase 113-05 decisions:
+- StopMonitor queries orders JOIN positions (not positions alone): stop_price/tp_price live on orders; positions table has no such columns
+- orders.limit_price AS tp_price: TP targets stored as limit orders with limit_price; no separate tp_price column in schema
+- 10s position cache TTL: balances DB load vs responsiveness for at most dozens of positions
+- pending_triggers set prevents double-trigger within a single scan cycle (RLock-protected)
+- PositionSizer static get_current_price() preserved unchanged; new get_price() instance method added alongside
+- vm_mode=False default: zero behavior change for all existing callers
+- dim_listings join for HL tiers: CMC asset_id -> HL symbol resolution consistent with derivatives_input.py pattern
+
 ## Session Continuity
 
 Last session: 2026-04-02
-Stopped at: Completed 113-04-PLAN.md (VM→local execution state sync: sync_results_from_vm.py, 9 tables)
+Stopped at: Completed 113-05-PLAN.md (stop/TP monitor + VM-aware position sizer price fallback)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-04-02 (Phase 113-04 complete: sync_results_from_vm.py pulling orders/fills/positions/paper_orders/executor_run_log/drift_metrics/risk_events/order_events/dim_risk_state from VM)*
+*Last updated: 2026-04-02 (Phase 113-05 complete: StopMonitor daemon thread + PositionSizer 5-tier VM price fallback)*
