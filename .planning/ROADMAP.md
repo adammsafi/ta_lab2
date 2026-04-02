@@ -1447,7 +1447,7 @@ Plans:
 - [ ] 113-05-PLAN.md -- Stop/TP monitor + position sizer VM fallback
 - [ ] 113-06-PLAN.md -- Executor service entry point + requirements
 - [ ] 113-07-PLAN.md -- Systemd unit + deploy scripts + verification
-- [ ] **Phase 114: Hosted Dashboard** - nginx reverse proxy + Let's Encrypt SSL on Oracle VM, Streamlit deployment, sync_dashboard_to_vm script, basic auth, mobile-accessible
+- [x] **Phase 114: Hosted Dashboard** - nginx reverse proxy + Let's Encrypt SSL on Oracle VM, Streamlit deployment, sync_dashboard_to_vm script, basic auth, mobile-accessible — COMPLETE 2026-04-02
 
 ---
 
@@ -1746,11 +1746,11 @@ Plans:
 **Plans:** 5 plans in 3 waves
 
 Plans:
-- [ ] 114-01-PLAN.md -- sync_dashboard_to_vm.py data push script (local to VM)
-- [ ] 114-02-PLAN.md -- VM environment setup (venv, DB schema, systemd Streamlit service)
-- [ ] 114-03-PLAN.md -- nginx reverse proxy + Let's Encrypt SSL + basic auth
-- [ ] 114-04-PLAN.md -- Mobile responsive CSS + refresh button
-- [ ] 114-05-PLAN.md -- Master deploy script + end-to-end verification
+- [x] 114-01-PLAN.md -- sync_dashboard_to_vm.py data push script (local to VM)
+- [x] 114-02-PLAN.md -- VM environment setup (venv, DB schema, systemd Streamlit service)
+- [x] 114-03-PLAN.md -- nginx reverse proxy + Let's Encrypt SSL + basic auth
+- [x] 114-04-PLAN.md -- Mobile responsive CSS + refresh button
+- [x] 114-05-PLAN.md -- Master deploy script + end-to-end verification
 ---
 
 ### v1.3.0 Progress
