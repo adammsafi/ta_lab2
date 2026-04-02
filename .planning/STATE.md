@@ -5,12 +5,12 @@
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 111 COMPLETE (Feature Polars Migration — all 5 plans done)
+**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 106 IN PROGRESS (Custom Composite Indicators — Plan 02 complete)
 
 ## Current Position
 
-Phase: 111 COMPLETE (Feature Polars Migration) — 5/5 plans complete
-Also: Phase 106 IN PROGRESS (Custom Composite Indicators) — 1/3 plans complete
+Phase: 106 IN PROGRESS (Custom Composite Indicators) — 2/3 plans complete
+Also: Phase 111 COMPLETE (Feature Polars Migration) — 5/5 plans complete
 Also: Phase 110 COMPLETE (Feature Parallel Sub-Phases) — 1/1 plans complete
 Also: Phase 109 COMPLETE (Feature Skip-Unchanged) — 2/2 plans complete
 Also: Phase 105 COMPLETE (Parameter Optimization) — 3/3 plans complete
@@ -18,8 +18,8 @@ Also: Phase 104 COMPLETE (Crypto-Native Indicators) — 3/3 plans complete
 Also: Phase 100 IN PROGRESS (ML Signal Combination) — Plans 01+02 complete (2/3 plans)
 Also: Phase 108 COMPLETE (Pipeline Batch Performance) — 5 plans, all complete
 Also: Phase 103 COMPLETE (Traditional TA Expansion) — 3/3 plans complete
-Status: Plan 111-05 complete — CTF polars join_asof migration, full 20-test regression suite (FEAT-06/07/08/09/10 validated), Phase 111 COMPLETE
-Last activity: 2026-04-01 — Completed 111-05-PLAN.md
+Status: Plan 106-02 complete — run_composite_refresh.py orchestrator + tf_alignment_score timestamp bug fix; 22280 rows written for tf_alignment_score (7 assets)
+Last activity: 2026-04-01 — Completed 106-02-PLAN.md
 
 Progress: [##########] 100% v1.2.0 | [██████████] 100% v1.3.0 (32/32 plans, 9/6 phases)
 
@@ -353,12 +353,18 @@ Phase 106-01 decisions:
 - Lead-lag composite queries asset_b_id=target_asset_id (follower), asset_a_id=predictor: matches lead_lag_ic Phase 98-04 schema
 - ALL_COMPOSITES assertion at module load: registry/COMPOSITE_NAMES mismatch raises AssertionError immediately (fail-fast)
 
+Phase 106-02 decisions:
+- Per-composite fresh connection: each composite gets engine.connect() to isolate aborted-txn state; one missing-table error (ama_multi_tf absent locally) would otherwise cascade to block all subsequent composites in same connection
+- Temp-table bulk UPDATE (ON COMMIT DELETE ROWS): single UPDATE features FROM _tmp_composite vs N row-by-row UPDATEs; no DELETE+INSERT (would destroy other feature columns)
+- tf_alignment_score resample bug fix: resample('1D').last() snapped CTF 23:59:59.999 UTC timestamps to midnight, causing UPDATE to match 0 features rows; fixed by using natural CTF index (no resample) since all pairs share same timestamp convention
+- LOW COVERAGE flag not raised for HL composites (oi_divergence, funding_adjusted_momentum): expected < 100% coverage; composites in _NEEDS_CMC_SYMBOL set are suppressed from LOW COVERAGE warning
+
 ## Session Continuity
 
 Last session: 2026-04-01
-Stopped at: Completed 111-05-PLAN.md (Phase 111 COMPLETE)
+Stopped at: Completed 106-02-PLAN.md
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-04-01 (Phase 111-03 complete: 6 polars indicator functions, TAFeature polars path, RSI/ATR/ADX period alias bug fixed)*
+*Last updated: 2026-04-01 (Phase 106-02 complete: run_composite_refresh.py + tf_alignment_score timestamp bug fix; 22280 rows written)*
