@@ -5,11 +5,11 @@
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 111 IN PROGRESS (Feature Polars Migration — Plan 04 complete)
+**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 111 COMPLETE (Feature Polars Migration — all 5 plans done)
 
 ## Current Position
 
-Phase: 111 IN PROGRESS (Feature Polars Migration) — 4/N plans complete
+Phase: 111 COMPLETE (Feature Polars Migration) — 5/5 plans complete
 Also: Phase 106 IN PROGRESS (Custom Composite Indicators) — 1/3 plans complete
 Also: Phase 110 COMPLETE (Feature Parallel Sub-Phases) — 1/1 plans complete
 Also: Phase 109 COMPLETE (Feature Skip-Unchanged) — 2/2 plans complete
@@ -18,15 +18,15 @@ Also: Phase 104 COMPLETE (Crypto-Native Indicators) — 3/3 plans complete
 Also: Phase 100 IN PROGRESS (ML Signal Combination) — Plans 01+02 complete (2/3 plans)
 Also: Phase 108 COMPLETE (Pipeline Batch Performance) — 5 plans, all complete
 Also: Phase 103 COMPLETE (Traditional TA Expansion) — 3/3 plans complete
-Status: Plan 111-04 complete — MicrostructureFeature polars outer loop, --use-polars flag wired to all 5 computation sub-phases, daily_features_view confirmed no-op
-Last activity: 2026-04-01 — Completed 111-04-PLAN.md
+Status: Plan 111-05 complete — CTF polars join_asof migration, full 20-test regression suite (FEAT-06/07/08/09/10 validated), Phase 111 COMPLETE
+Last activity: 2026-04-01 — Completed 111-05-PLAN.md
 
-Progress: [##########] 100% v1.2.0 | [█████████░] 90% v1.3.0 (31/32 plans, 8/6 phases)
+Progress: [##########] 100% v1.2.0 | [██████████] 100% v1.3.0 (32/32 plans, 9/6 phases)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 426
+- Total plans completed: 427
 - Average duration: 7 min
 - Total execution time: ~32.6 hours
 
@@ -338,6 +338,13 @@ Phase 111-04 decisions:
 - _run_single_tf tuple extended with use_polars at position 10: positional tuple for pickle-safe multiprocessing; both construction and unpacking updated together
 - getattr(args, 'use_polars', False) safe access: defensive pattern consistent with existing codependence/no_cs_norms access in orchestrator
 
+Phase 111-05 decisions:
+- join_asof strategy='backward': matches pandas merge_asof default direction; vectorized across all assets via by='id'; max diff = 0.0 vs pandas
+- strip-UTC-before-join: polars Datetime('us','UTC') != Datetime('us'); join fails on dtype mismatch; normalize_timestamps_for_polars strips UTC before conversion
+- CTFConfig.use_polars frozen dataclass field: consistent with other sub-phase configs; zero behavior change for existing callers
+- NaN position mismatch tolerance 0.1%: source data has venue_id=1/2 duplicate timestamps; polars/pandas sort tie-rows differently causing 2 isolated EWM NaN shifts out of ~5000 rows; not a polars migration bug
+- Graceful fallback: CTFFeature._align_timeframes() catches polars exceptions, logs warning, falls back to pandas merge_asof
+
 Phase 106-01 decisions:
 - Revision ID z9a0b1c2d3e4 chains from y8z9a0b1c2d3 (Phase 105 actual head); plan spec listed u5v6w7x8y9z0 -- use actual alembic heads per established precedent
 - DO $$ BLOCK for CHECK constraint idempotency: avoids hardcoding auto-generated constraint name
@@ -349,7 +356,7 @@ Phase 106-01 decisions:
 ## Session Continuity
 
 Last session: 2026-04-01
-Stopped at: Completed 111-04-PLAN.md
+Stopped at: Completed 111-05-PLAN.md (Phase 111 COMPLETE)
 Resume file: None
 
 ---
