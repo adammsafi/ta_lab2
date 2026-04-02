@@ -742,8 +742,100 @@ class TestPerformanceBenchmark:
             f"\n  speedup: {speedup:.2f}x"
         )
 
-        # Must complete without error (timing is informational)
-        assert polars_time >= 0, "polars path must complete"
+        # Polars path must be at least as fast as pandas (allow 20% margin for noise)
+        assert speedup >= 0.8, (
+            f"polars path slower than expected: {speedup:.2f}x "
+            f"(pandas={pandas_time:.3f}s polars={polars_time:.3f}s)"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Backtest Sharpe regression (FEAT-09, synthetic)
+# ---------------------------------------------------------------------------
+
+
+class TestBacktestSharpeRegression:
+    """FEAT-09: Sharpe ratio from polars-computed features must be within 5%
+    of pandas-computed features for the same strategy."""
+
+    def test_backtest_sharpe_regression(self) -> None:
+        """ATR breakout strategy Sharpe: polars path within 5% of pandas path.
+
+        Computes vol features (ATR) via both paths, generates ATR breakout
+        signals, computes daily strategy returns, and compares annualized
+        Sharpe ratios. A >5% divergence indicates the polars migration
+        introduced meaningful numerical differences that affect trading signals.
+        """
+        from ta_lab2.features.polars_feature_ops import polars_sorted_groupby
+        from ta_lab2.features.vol import add_atr
+
+        bars = _make_synthetic_bars(n_assets=3, n_bars=500, seed=123)
+
+        def _apply_atr(grp: pd.DataFrame) -> pd.DataFrame:
+            return add_atr(grp.copy())
+
+        # Pandas path
+        pandas_frames = []
+        for asset_id in sorted(bars["id"].unique()):
+            grp = bars[bars["id"] == asset_id].sort_values("ts").copy()
+            pandas_frames.append(_apply_atr(grp))
+        df_pandas = pd.concat(pandas_frames, ignore_index=True)
+
+        # Polars path
+        df_polars = polars_sorted_groupby(bars, ["id"], "ts", _apply_atr)
+
+        # Find ATR column
+        atr_col = next((c for c in df_pandas.columns if "atr" in c.lower()), None)
+        if atr_col is None:
+            pytest.skip("ATR column not found in vol output")
+
+        def _compute_strategy_sharpe(df: pd.DataFrame) -> float:
+            """Simple ATR breakout strategy: long when close > SMA(20) + ATR."""
+            sharpes = []
+            for asset_id in sorted(df["id"].unique()):
+                asset = df[df["id"] == asset_id].sort_values("ts").copy()
+                sma = asset["close"].rolling(20).mean()
+                atr = asset[atr_col]
+                signal = (asset["close"] > sma + atr).astype(float)
+                # Strategy returns: signal * next-day return
+                fwd_ret = asset["close"].pct_change().shift(-1)
+                strat_ret = signal * fwd_ret
+                strat_ret = strat_ret.dropna()
+                if len(strat_ret) < 30:
+                    continue
+                ann_sharpe = (
+                    float(strat_ret.mean() / strat_ret.std() * np.sqrt(252))
+                    if strat_ret.std() > 0
+                    else 0.0
+                )
+                sharpes.append(ann_sharpe)
+            return float(np.mean(sharpes)) if sharpes else 0.0
+
+        sharpe_pandas = _compute_strategy_sharpe(
+            df_pandas.sort_values(["id", "ts"]).reset_index(drop=True)
+        )
+        sharpe_polars = _compute_strategy_sharpe(
+            df_polars.sort_values(["id", "ts"]).reset_index(drop=True)
+        )
+
+        print(
+            f"\nBacktest Sharpe regression:"
+            f"\n  pandas Sharpe: {sharpe_pandas:.4f}"
+            f"\n  polars Sharpe: {sharpe_polars:.4f}"
+        )
+
+        # Sharpe values must be identical (synthetic data, same computation)
+        if abs(sharpe_pandas) < 1e-6:
+            # Near-zero Sharpe: check absolute difference instead
+            assert abs(sharpe_pandas - sharpe_polars) < 0.01, (
+                f"Sharpe absolute diff {abs(sharpe_pandas - sharpe_polars):.4f} >= 0.01"
+            )
+        else:
+            rel_diff = abs(sharpe_pandas - sharpe_polars) / abs(sharpe_pandas)
+            assert rel_diff < 0.05, (
+                f"Sharpe relative diff {rel_diff:.2%} >= 5% "
+                f"(pandas={sharpe_pandas:.4f} polars={sharpe_polars:.4f})"
+            )
 
 
 # ---------------------------------------------------------------------------
