@@ -5,22 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 112 IN PROGRESS (Pipeline Architecture Separation — Plans 01-04 done)
+**Current focus:** v1.4.0 — Phase 112 COMPLETE (Pipeline Architecture Separation), Phase 100 COMPLETE (ML Signal Combination)
 
 ## Current Position
 
-Phase: 112 IN PROGRESS (Pipeline Architecture Separation) — 4/5 plans complete
+Phase: 112 COMPLETE (Pipeline Architecture Separation) — 5/5 plans, verified (9/9 must-haves)
+Also: Phase 100 COMPLETE (ML Signal Combination) — 3/3 plans complete
 Also: Phase 106 COMPLETE (Custom Composite Indicators) — 3/3 plans complete
 Also: Phase 111 COMPLETE (Feature Polars Migration) — 5/5 plans complete
 Also: Phase 110 COMPLETE (Feature Parallel Sub-Phases) — 1/1 plans complete
 Also: Phase 109 COMPLETE (Feature Skip-Unchanged) — 2/2 plans complete
 Also: Phase 105 COMPLETE (Parameter Optimization) — 3/3 plans complete
 Also: Phase 104 COMPLETE (Crypto-Native Indicators) — 3/3 plans complete
-Also: Phase 100 IN PROGRESS (ML Signal Combination) — Plans 01+02 complete (2/3 plans)
-Also: Phase 108 COMPLETE (Pipeline Batch Performance) — 5 plans, all complete
+Also: Phase 108 COMPLETE (Pipeline Batch Performance) — 5 plans complete
 Also: Phase 103 COMPLETE (Traditional TA Expansion) — 3/3 plans complete
-Status: Plan 112-04 complete — sync_signals_to_vm.py, run_full_chain.py, run_daily_refresh.py deprecation notice
-Last activity: 2026-04-02 — Completed 112-04-PLAN.md
+Also: Phase 107 COMPLETE (Pipeline Operations Dashboard) — 2/2 plans complete
+Status: Phase 112 verified — 5 pipeline scripts, pipeline_utils.py, sync_signals_to_vm, run_full_chain, PIPELINE_CONTRACTS.md
+Last activity: 2026-04-02 — Phase 112 verification passed (9/9)
 
 Progress: [##########] 100% v1.2.0 | [██████████] 100% v1.3.0 (32/32 plans, 9/6 phases)
 
