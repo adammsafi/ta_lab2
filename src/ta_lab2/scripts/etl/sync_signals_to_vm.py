@@ -153,11 +153,16 @@ def _local_export_csv(
         select_sql = f"SELECT * FROM {table}"
 
     try:
-        with engine.raw_connection() as raw:
+        raw = engine.raw_connection()
+        try:
             cur = raw.cursor()
             buf = io.StringIO()
             cur.copy_expert(f"COPY ({select_sql}) TO STDOUT WITH CSV HEADER", buf)
             return buf.getvalue()
+        finally:
+            raw.close()
+    except RuntimeError:
+        raise
     except Exception as e:
         raise RuntimeError(f"Local CSV export from {table} failed: {e}") from e
 

@@ -35,15 +35,18 @@ scp $SCP_OPTS \
     deploy/executor/create_vm_tables.sh \
     $VM_USER@$VM_HOST:$VM_DIR/
 
-# ── 3. SCP ta_lab2 source tree (for editable pip install) ────────────
-echo "[3/4] Copying ta_lab2 source..."
-ssh $SSH_OPTS $VM_USER@$VM_HOST "mkdir -p $VM_DIR/ta_lab2_src"
-scp $SCP_OPTS \
-    pyproject.toml \
-    $VM_USER@$VM_HOST:$VM_DIR/ta_lab2_src/
-scp $SCP_OPTS -r \
-    src/ta_lab2/ \
-    $VM_USER@$VM_HOST:$VM_DIR/ta_lab2_src/src/
+# ── 3. Build wheel locally and SCP it (single file, no research artifacts) ─
+echo "[3/4] Building and copying ta_lab2 wheel..."
+python -m build --wheel --outdir dist/ 2>/dev/null || \
+    "/c/Program Files/Python312/python.exe" -m build --wheel --outdir dist/ 2>/dev/null || \
+    { echo "ERROR: 'python -m build' failed. Install: pip install build"; exit 1; }
+WHEEL=$(ls -t dist/ta_lab2-*.whl 2>/dev/null | head -1)
+if [ -z "$WHEEL" ]; then
+    echo "ERROR: No wheel found in dist/"
+    exit 1
+fi
+echo "  Built: $WHEEL"
+scp $SCP_OPTS "$WHEEL" $VM_USER@$VM_HOST:$VM_DIR/
 
 # ── 4. Run VM-side setup ──────────────────────────────────────────────
 echo "[4/4] Running VM setup..."

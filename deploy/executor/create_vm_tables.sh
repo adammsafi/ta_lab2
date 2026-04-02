@@ -30,6 +30,12 @@ TABLE_LIST="${SCRIPT_DIR}/vm_table_list.txt"
 TMPDIR_WORK=$(mktemp -d)
 trap 'rm -rf "${TMPDIR_WORK}"' EXIT
 
+# Add PostgreSQL bin to PATH (Windows: pg_dump.exe needs explicit path)
+PG_BIN=$(dirname "$(ls "/c/Program Files/PostgreSQL/"*/bin/pg_dump.exe 2>/dev/null | head -1)" 2>/dev/null || true)
+if [ -n "${PG_BIN}" ] && [ -d "${PG_BIN}" ]; then
+    export PATH="${PG_BIN}:$PATH"
+fi
+
 # ── VM connection details ──────────────────────────────────────────────────
 SSH_KEY="${HOME}/Downloads/oracle_sg_keys/ssh-key-2026-03-10.key"
 VM_HOST="161.118.209.59"
@@ -49,7 +55,7 @@ SSH_OPTS=(
 # ── Load local DB credentials ─────────────────────────────────────────────
 if [ -f "${REPO_ROOT}/db_config.env" ]; then
     # shellcheck disable=SC1091
-    set -a; source "${REPO_ROOT}/db_config.env"; set +a
+    set -a; source <(tr -d '\r' < "${REPO_ROOT}/db_config.env"); set +a
 fi
 
 if [ -z "${MARKETDATA_DB_URL:-}" ]; then
@@ -58,12 +64,14 @@ if [ -z "${MARKETDATA_DB_URL:-}" ]; then
 fi
 
 # Parse components from MARKETDATA_DB_URL for pg_dump and psql
-# Format: postgresql://user:pass@host:port/dbname
-LOCAL_DB_USER=$(echo "${MARKETDATA_DB_URL}" | sed -E 's|postgresql://([^:]+):.*|\1|')
-LOCAL_DB_PASS=$(echo "${MARKETDATA_DB_URL}" | sed -E 's|postgresql://[^:]+:([^@]+)@.*|\1|')
-LOCAL_DB_HOST=$(echo "${MARKETDATA_DB_URL}" | sed -E 's|postgresql://[^@]+@([^:/]+).*|\1|')
-LOCAL_DB_PORT=$(echo "${MARKETDATA_DB_URL}" | sed -E 's|postgresql://[^@]+@[^:]+:([0-9]+)/.*|\1|')
-LOCAL_DB_NAME=$(echo "${MARKETDATA_DB_URL}" | sed -E 's|postgresql://[^/]+/([^?]+).*|\1|')
+# Format: postgresql+psycopg2://user:pass@host:port/dbname
+# Strip the SQLAlchemy driver prefix first
+_DB_URL=$(echo "${MARKETDATA_DB_URL}" | sed -E 's|postgresql\+[^:]+://|postgresql://|')
+LOCAL_DB_USER=$(echo "${_DB_URL}" | sed -E 's|postgresql://([^:]+):.*|\1|')
+LOCAL_DB_PASS=$(echo "${_DB_URL}" | sed -E 's|postgresql://[^:]+:([^@]+)@.*|\1|')
+LOCAL_DB_HOST=$(echo "${_DB_URL}" | sed -E 's|postgresql://[^@]+@([^:/]+).*|\1|')
+LOCAL_DB_PORT=$(echo "${_DB_URL}" | sed -E 's|postgresql://[^@]+@[^:]+:([0-9]+)/.*|\1|')
+LOCAL_DB_NAME=$(echo "${_DB_URL}" | sed -E 's|postgresql://[^/]+/([^?]+).*|\1|')
 
 echo "=== Executor VM Table Setup ==="
 echo "Local DB: ${LOCAL_DB_USER}@${LOCAL_DB_HOST}:${LOCAL_DB_PORT}/${LOCAL_DB_NAME}"
@@ -111,7 +119,19 @@ DDL_PROCESSED="${TMPDIR_WORK}/ddl_processed.sql"
 # Build a list of VM table names as a regex alternation for FK stripping
 VM_TABLES_REGEX=$(IFS='|'; echo "${TABLES[*]}")
 
-python3 - "${DDL_RAW}" "${DDL_PROCESSED}" "${VM_TABLES_REGEX}" <<'PYEOF'
+# Find a real Python (Windows App Execution Aliases are stubs that print errors)
+PYTHON_CMD=""
+for _p in "/c/Program Files/Python312/python.exe" \
+          "/c/Program Files/Python311/python.exe" \
+          "/c/Users/${USERNAME:-${USER:-nobody}}/AppData/Local/Programs/Python/Python312/python.exe" \
+          "/c/Users/${USERNAME:-${USER:-nobody}}/AppData/Local/Programs/Python/Python311/python.exe"; do
+    if [ -x "$_p" ]; then PYTHON_CMD="$_p"; break; fi
+done
+# Fallback for Linux/Mac
+if [ -z "$PYTHON_CMD" ]; then
+    PYTHON_CMD=$(which python3 2>/dev/null || which python 2>/dev/null || echo python3)
+fi
+"${PYTHON_CMD}" - "${DDL_RAW}" "${DDL_PROCESSED}" "${VM_TABLES_REGEX}" <<'PYEOF'
 import sys
 import re
 

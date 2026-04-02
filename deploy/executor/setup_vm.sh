@@ -34,12 +34,19 @@ pip install --upgrade pip
 echo "Installing requirements..."
 pip install -r requirements.txt
 
-# ── 4. Install ta_lab2 source package (editable install) ─────────────
-if [ -d /home/ubuntu/executor/ta_lab2_src ]; then
-    echo "Installing ta_lab2 package..."
-    pip install -e /home/ubuntu/executor/ta_lab2_src/
+# ── 4. Install ta_lab2 package from wheel ────────────────────────────
+WHEEL=$(ls -t /home/ubuntu/executor/ta_lab2-*.whl 2>/dev/null | head -1)
+if [ -n "$WHEEL" ]; then
+    echo "Installing ta_lab2 from wheel: $(basename $WHEEL)"
+    pip install --force-reinstall "$WHEEL"
 else
-    echo "WARNING: ta_lab2_src/ not found — re-run deploy.sh to copy source"
+    # Fallback: editable install from source (if deploy.sh sent source tree)
+    if [ -d /home/ubuntu/executor/ta_lab2_src ]; then
+        echo "Installing ta_lab2 from source (editable)..."
+        pip install -e /home/ubuntu/executor/ta_lab2_src/
+    else
+        echo "WARNING: No .whl or ta_lab2_src/ found — re-run deploy.sh"
+    fi
 fi
 
 # ── 5. Environment variables ──────────────────────────────────────────
