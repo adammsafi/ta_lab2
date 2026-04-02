@@ -5,7 +5,11 @@ Run with:
     streamlit run src/ta_lab2/dashboard/app.py
 """
 
+import os
+
 import streamlit as st
+
+from ta_lab2.dashboard.mobile import inject_mobile_css
 
 # MUST be the first Streamlit call -- never call set_page_config elsewhere
 st.set_page_config(
@@ -13,6 +17,9 @@ st.set_page_config(
     page_icon=":bar_chart:",
     layout="wide",
 )
+
+# Inject responsive mobile CSS (must come after set_page_config)
+inject_mobile_css()
 
 # ---------------------------------------------------------------------------
 # Shared sidebar (runs on every rerun)
@@ -26,6 +33,37 @@ with st.sidebar:
         st.rerun()
     st.caption("Cache tiers: Live 2min | Pipeline 5min | Research 60min")
     st.divider()
+
+    # VM-only: show last data sync timestamp and instructions
+    if os.environ.get("DASHBOARD_ENV") == "vm":
+        st.subheader("Data Sync")
+        last_synced: str | None = None
+        try:
+            from ta_lab2.dashboard.db import get_engine
+
+            with get_engine().connect() as conn:
+                from sqlalchemy import text
+
+                row = conn.execute(
+                    text(
+                        "SELECT MAX(synced_at) FROM hyperliquid.sync_log"
+                        " WHERE source = 'dashboard_sync'"
+                    )
+                ).fetchone()
+                if row and row[0] is not None:
+                    last_synced = str(row[0])
+        except Exception:
+            pass
+
+        if last_synced:
+            st.info(f"Last synced: {last_synced}")
+        else:
+            st.info("Never synced")
+        st.caption(
+            "To push data from local PC, run:\n"
+            "`python -m ta_lab2.scripts.etl.sync_dashboard_to_vm`"
+        )
+        st.divider()
 
 # ---------------------------------------------------------------------------
 # Multipage navigation
