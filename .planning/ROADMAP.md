@@ -1436,7 +1436,17 @@ Plans:
 - [ ] 112-03-PLAN.md -- Signals, Execution, and Monitoring pipeline scripts
 - [ ] 112-04-PLAN.md -- sync_signals_to_vm + full chain wrapper + backward-compat wrapper
 - [ ] 112-05-PLAN.md -- Pipeline handoff contracts documentation + verification
-- [ ] **Phase 113: VM Execution Deployment** - PostgreSQL on Oracle VM with execution tables, sync_features_to_vm + sync_results_to_local scripts, real-time WebSocket price feeds (HL/Kraken), executor as systemd service
+- [ ] **Phase 113: VM Execution Deployment** - PostgreSQL on Oracle VM with execution tables, sync_signals_to_vm + sync_results_from_vm scripts, real-time WebSocket price feeds (HL/Kraken/Coinbase), executor as systemd service
+**Plans:** 7 plans in 4 waves
+
+Plans:
+- [ ] 113-01-PLAN.md -- VM PostgreSQL table setup (DDL extraction + dimension seeding)
+- [ ] 113-02-PLAN.md -- PriceCache + WebSocket feeds (HL/Kraken/Coinbase)
+- [ ] 113-03-PLAN.md -- Signal push + config sync (local to VM)
+- [ ] 113-04-PLAN.md -- Results pull (VM to local)
+- [ ] 113-05-PLAN.md -- Stop/TP monitor + position sizer VM fallback
+- [ ] 113-06-PLAN.md -- Executor service entry point + requirements
+- [ ] 113-07-PLAN.md -- Systemd unit + deploy scripts + verification
 - [ ] **Phase 114: Hosted Dashboard** - nginx reverse proxy + Let's Encrypt SSL on Oracle VM, Streamlit deployment, sync_dashboard_to_vm script, basic auth, mobile-accessible
 
 ---
@@ -1699,16 +1709,26 @@ Plans:
 ---
 
 ### Phase 113: VM Execution Deployment
-**Goal:** Deploy the execution pipeline on the Oracle Singapore VM so it can run 24/7 independently of the local PC. Real-time price feeds for order management (fills, stops, take profits), daily feature sync from local, results sync back.
+**Goal:** Deploy the execution pipeline on the Oracle Singapore VM so it can run 24/7 independently of the local PC. Real-time WebSocket price feeds (HL/Kraken/Coinbase) for stop/TP execution, daily signal sync from local, results sync back.
 **Depends on:** Phase 112 (pipeline separation — execution pipeline must exist as standalone), Phase 96 (executor activation — paper executor must work)
 **Requirements:** DEPLOY-01, DEPLOY-02, DEPLOY-03, DEPLOY-04
 **Success Criteria** (what must be TRUE):
-  1. Small PostgreSQL on Oracle VM holds execution-relevant tables: features_latest, strategy_configs, risk_limits, positions, orders, fills, order_events (~1-2 GB)
-  2. `sync_features_to_vm` script pushes latest feature snapshot from local DB to VM daily (pre-computed features, not raw bars)
-  3. `sync_results_to_local` script pulls fills, positions, PnL, drift metrics from VM back to local DB for research/dashboard
-  4. Real-time WebSocket price feed (Hyperliquid at minimum) provides sub-second prices for order management — fill detection, stop loss monitoring, take profit execution
-  5. Executor runs as a systemd service on VM, auto-restarts on failure, logs to journald
-  6. Paper trading operates for 7+ days without manual intervention (beyond daily feature sync)
+  1. Small PostgreSQL on Oracle VM holds ~25 execution-relevant tables: signals, execution, config, monitoring, dimensions, portfolio
+  2. `sync_signals_to_vm` script pushes signals from local DB to VM after daily refresh (signals, not features)
+  3. `sync_results_from_vm` script pulls fills, positions, drift metrics, risk events from VM back to local DB for research/dashboard
+  4. Real-time WebSocket price feeds (Hyperliquid + Kraken + Coinbase) provide sub-second prices for stop/TP monitoring and fill simulation
+  5. Executor runs as a systemd service on VM, auto-restarts on failure with crash-loop protection, logs to journald
+  6. Paper trading operates for 7+ days without manual intervention (beyond daily signal sync)
+**Plans**: 7 plans in 4 waves
+
+Plans:
+- [ ] 113-01-PLAN.md -- VM PostgreSQL table setup (DDL extraction + dimension seeding)
+- [ ] 113-02-PLAN.md -- PriceCache + WebSocket feeds (HL/Kraken/Coinbase)
+- [ ] 113-03-PLAN.md -- Signal push + config sync (local to VM)
+- [ ] 113-04-PLAN.md -- Results pull (VM to local)
+- [ ] 113-05-PLAN.md -- Stop/TP monitor + position sizer VM fallback
+- [ ] 113-06-PLAN.md -- Executor service entry point + requirements
+- [ ] 113-07-PLAN.md -- Systemd unit + deploy scripts + verification
 
 ---
 
