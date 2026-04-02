@@ -1034,13 +1034,11 @@ def compute_tf_alignment_score(
                 venue_id,
             )
 
-        # Resample all to daily for consistent alignment, then average.
-        daily_frames = []
-        for s in available:
-            d = s.resample("1D").last().ffill()
-            daily_frames.append(d)
-
-        combined = pd.concat(daily_frames, axis=1)
+        # Align all CTF pairs on their natural index (no resample).
+        # All CTF series share the same timestamp convention (23:59:59.999 UTC)
+        # so a simple concat+mean works without date-snapping.  Resampling to
+        # midnight would break the UPDATE match against features rows.
+        combined = pd.concat(available, axis=1)
         mean_agr = combined.mean(axis=1, skipna=True)
         result = (mean_agr - 0.5).rename(out_name)
         return result
