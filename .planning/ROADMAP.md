@@ -12,7 +12,7 @@
 - v1.0.1 Macro Regime Infrastructure (Phases 64-73) - SHIPPED 2026-03-03
 - v1.1.0 Pipeline Consolidation & Storage Optimization (Phases 74-79) - SHIPPED 2026-03-21
 - v1.2.0 Analysis → Live Signals (Phases 80-95) - SHIPPED 2026-03-29
-- v1.3.0 Operational Activation & Research Expansion (Phases 96-111) - IN PROGRESS
+- v1.3.0 Operational Activation & Research Expansion (Phases 96-114) - SHIPPED 2026-04-02
 
 ## Overview
 
@@ -31,7 +31,7 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 - Phases 64-73: v1.0.1 (SHIPPED 2026-03-03)
 - Phases 74-79: v1.1.0 (SHIPPED 2026-03-21)
 - Phases 80-95: v1.2.0 (SHIPPED 2026-03-29)
-- Phases 96-111: v1.3.0 (IN PROGRESS)
+- Phases 96-114: v1.3.0 (SHIPPED 2026-04-02)
 - Decimal phases (27.1, 28.1): Urgent insertions if needed
 
 <details>
@@ -1396,7 +1396,9 @@ Full details: `.planning/milestones/v1.1.0-ROADMAP.md`
 </details>
 
 
-### v1.3.0 Operational Activation & Research Expansion (In Progress)
+<details>
+<summary>v1.3.0 Operational Activation & Research Expansion (Phases 96-114) - SHIPPED 2026-04-02</summary>
+
 
 **Milestone Goal:** Make the built infrastructure actually run — activate paper trading, scale backtests to 460K+ runs, graduate CTF research features, expand macro coverage, add ML signal combination, and build a statistically rigorous indicator R&D pipeline covering traditional TA expansion, crypto-native indicators, parameter optimization, and custom composite development.
 
@@ -1794,5 +1796,7 @@ Plans:
 
 **Coverage:** 54/54 requirements mapped
 
+</details>
+
 *Created: 2025-01-22*
-*Last updated: 2026-03-30 (Phases 102-106 added: Indicator R&D pipeline — research framework, TA expansion, crypto-native indicators, parameter optimization, custom composites)*
+*Last updated: 2026-04-02 (v1.3.0 SHIPPED — 19 phases, 67 plans, Phases 96-114)*

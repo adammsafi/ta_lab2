@@ -10,8 +10,8 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 
 ## Current State
 
-**Latest shipped:** v1.2.0 Analysis → Live Signals (2026-03-29)
-**Current milestone:** v1.3.0 Operational Activation & Research Expansion
+**Latest shipped:** v1.3.0 Operational Activation & Research Expansion (2026-04-02)
+**Current milestone:** Planning next milestone
 
 **v1.2.0 delivered:** IC-based feature selection (20 active from 112), GARCH conditional volatility (4 model families), walk-forward bake-off (9 strategies, 2 exchanges), 17 Streamlit dashboard pages, live pipeline wiring (signal gates, IC staleness, BL portfolio construction with real signal scores), CTF infrastructure (73.9M rows). 16 phases, 52 plans, 19/19 requirements. Gap closure: all 4 integration breaks resolved.
 
@@ -21,7 +21,9 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 
 **v1.0.0 delivered:** Full V1 loop -- strategy bake-off, paper-trade executor, risk controls, drift guard, all research tracks answered, feature evaluation across 109 TFs, advanced ML infrastructure, operational dashboard, and V1 Results Memo. 22 phases, 104 plans, 80/80 requirements.
 
-**Cumulative stats:** 95 phases, 411 plans, 650+ files, ~255K lines
+**v1.3.0 delivered:** Paper executor on VM (systemd + WebSocket), 28 new indicators with statistical harness (trial_registry, permutation IC, FDR, haircut Sharpe, block bootstrap), parameter optimization (plateau scoring, rolling stability, DSR), pipeline 3x faster (batch SQL + skip-unchanged + polars), 5-pipeline architecture, hosted dashboard at https://pacificbit.io. 19 phases, 67 plans, 46/46 requirements.
+
+**Cumulative stats:** 114 phases, ~430 plans, 705+ files, ~58K lines (src/)
 
 ## Requirements
 
@@ -272,4 +274,4 @@ Build trustworthy quant trading infrastructure 3x faster by creating AI coordina
 | Generalized 1D bar builder with source registry | 3 source-specific scripts are 80% identical; adding a new source requires copying an entire file | Validated — SourceSpec pattern, BAR-03 enables config-only onboarding |
 
 ---
-*Last updated: 2026-03-29 after v1.3.0 milestone started*
+*Last updated: 2026-04-02 after v1.3.0 shipped*

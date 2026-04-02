@@ -1,5 +1,29 @@
 # Project Milestones: ta_lab2 AI-Accelerated Quant Platform
 
+## v1.3.0 Operational Activation & Research Expansion (Shipped: 2026-04-02)
+
+**Delivered:** Paper executor live on Oracle VM with WebSocket price feeds, 28 new indicators (20 traditional TA + 8 crypto-native) with statistical validation harness (permutation IC, FDR, haircut Sharpe, block bootstrap), parameter optimization with plateau scoring, pipeline 3x faster (5hr→1.5hr), 5-pipeline architecture separation, and hosted dashboard at https://pacificbit.io with SSL + basic auth.
+
+**Phases completed:** 96-114 (67 plans total)
+
+**Key accomplishments:**
+- Paper executor live on VM — signal → order → fill pipeline as systemd service with WebSocket price feeds, crash-loop detection, Telegram alerts
+- Statistical indicator research harness — trial_registry (757K rows), permutation IC, FDR, haircut Sharpe (Harvey & Liu 2015), block bootstrap, parameter optimization with plateau scoring
+- 28 new indicators — 20 traditional TA (Ichimoku, Williams %R, Keltner, CCI, Elder Ray, Force Index, VWAP, etc.) + 8 crypto-native derivatives (OI momentum, funding z-score, liquidation pressure, etc.)
+- Pipeline 3x faster — batch SQL (5hr→1.5hr), skip-unchanged (100min→10min), parallel sub-phases, polars migration
+- 5-pipeline architecture — monolithic run_daily_refresh split into Data, Features, Signals, Execution, Monitoring
+- Dashboard live at https://pacificbit.io — nginx + Let's Encrypt SSL, basic auth, mobile responsive
+
+**Stats:**
+- 322 files changed, +78,502 / -2,100 lines
+- 705 Python files, ~58K lines (src/)
+- 19 phases, 67 plans
+- 3 days (2026-03-30 → 2026-04-02)
+
+**Git range:** `8c9d1911` → `3c922f2a`
+
+---
+
 ## v1.2.0 Analysis → Live Signals (Shipped: 2026-03-29)
 
 **Delivered:** IC-based feature selection (20 active from 112 candidates), GARCH conditional volatility (4 model families), walk-forward strategy bake-off (9 strategies, 2 exchanges), 17 Streamlit dashboard pages, live pipeline wiring (signal gates, IC staleness, BL portfolio construction), and cross-timeframe feature infrastructure (73.9M rows).
