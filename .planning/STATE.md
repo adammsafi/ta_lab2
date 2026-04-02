@@ -5,11 +5,12 @@
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** Build trustworthy quant trading infrastructure 3x faster through AI coordination with persistent memory
-**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 106 COMPLETE (Custom Composite Indicators — all 3 plans done)
+**Current focus:** v1.3.0 Operational Activation & Research Expansion — Phase 112 IN PROGRESS (Pipeline Architecture Separation — Plan 01 done)
 
 ## Current Position
 
-Phase: 106 COMPLETE (Custom Composite Indicators) — 3/3 plans complete
+Phase: 112 IN PROGRESS (Pipeline Architecture Separation) — 1/5 plans complete
+Also: Phase 106 COMPLETE (Custom Composite Indicators) — 3/3 plans complete
 Also: Phase 111 COMPLETE (Feature Polars Migration) — 5/5 plans complete
 Also: Phase 110 COMPLETE (Feature Parallel Sub-Phases) — 1/1 plans complete
 Also: Phase 109 COMPLETE (Feature Skip-Unchanged) — 2/2 plans complete
@@ -18,15 +19,15 @@ Also: Phase 104 COMPLETE (Crypto-Native Indicators) — 3/3 plans complete
 Also: Phase 100 IN PROGRESS (ML Signal Combination) — Plans 01+02 complete (2/3 plans)
 Also: Phase 108 COMPLETE (Pipeline Batch Performance) — 5 plans, all complete
 Also: Phase 103 COMPLETE (Traditional TA Expansion) — 3/3 plans complete
-Status: Plan 106-03 complete — 4-layer validation gauntlet (permutation IC + FDR + CPCV + held-out); tf_alignment_score failed held-out sign flip; 0 promotions on local DB; COMPOSITES.md created
-Last activity: 2026-04-02 — Completed 106-03-PLAN.md
+Status: Plan 112-01 complete — pipeline_utils.py extracted, Alembic migration b1c2d3e4f5a6 adds pipeline_name to pipeline_run_log/pipeline_stage_log
+Last activity: 2026-04-01 — Completed 112-01-PLAN.md
 
 Progress: [##########] 100% v1.2.0 | [██████████] 100% v1.3.0 (32/32 plans, 9/6 phases)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 427
+- Total plans completed: 428
 - Average duration: 7 min
 - Total execution time: ~32.6 hours
 
@@ -365,12 +366,17 @@ Phase 106-03 decisions:
 - Synthetic 1D timeline for pooled CPCV: CPCVSplitter needs monotonic DatetimeIndex; pooling training data across 7 assets breaks chronological order; synthetic 1D date range used (CPCV uses positional splits, not calendar purge)
 - Option C threshold is exclusive (>0.03): tf_alignment_score IC=0.0300 fails abs(ic)>0.03 correctly; plan specifies greater-than, not greater-than-or-equal
 
+Phase 112-01 decisions:
+- Revision ID b1c2d3e4f5a6 used instead of plan-specified a0b1c2d3e4f5: a0b1c2d3e4f5 already taken by strip_cmc_prefix_add_venue_id on this branch; use actual alembic heads per established precedent
+- _start_pipeline_run backward-compat fallback: tries INSERT with pipeline_name first, falls back to legacy INSERT on OperationalError/ProgrammingError for pre-migration deployments
+- _check_dead_man pipeline_name=None default: existing Phase 87 call sites unchanged; new callers pass pipeline_name='daily' for scoped check
+
 ## Session Continuity
 
-Last session: 2026-04-02
-Stopped at: Completed 106-03-PLAN.md (Phase 106 COMPLETE)
+Last session: 2026-04-01
+Stopped at: Completed 112-01-PLAN.md (Phase 112 Plan 01 of 5)
 Resume file: None
 
 ---
 *Created: 2025-01-22*
-*Last updated: 2026-04-02 (Phase 106-03 complete: 4-layer validation gauntlet, COMPOSITES.md, 0 promotions on local DB)*
+*Last updated: 2026-04-01 (Phase 112-01 complete: pipeline_utils.py extracted from run_daily_refresh.py, migration b1c2d3e4f5a6 adds pipeline_name)*
