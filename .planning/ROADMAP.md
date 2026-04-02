@@ -1428,7 +1428,14 @@ Plans:
 - [ ] 111-03-PLAN.md -- TA sub-phase polars migration (RSI, MACD, Stochastic, Bollinger, ATR, ADX)
 - [ ] 111-04-PLAN.md -- Microstructure polars outer loop + orchestrator --use-polars flag
 - [ ] 111-05-PLAN.md -- CTF polars migration (join_asof) + full regression suite (IC, signals, backtest)
-- [ ] **Phase 112: Pipeline Architecture Separation** - Split monolithic run_daily_refresh into 4 distinct pipelines (Data, Research, Validation, Execution) with clear boundaries, triggers, and deployment topology (local vs VM)
+- [ ] **Phase 112: Pipeline Architecture Separation** - Split monolithic run_daily_refresh into 5 distinct pipelines (Data, Features, Signals, Execution, Monitoring) with clear boundaries, triggers, and deployment topology
+**Plans:** 5 plans
+Plans:
+- [ ] 112-01-PLAN.md -- Extract pipeline_utils.py + Alembic migration (pipeline_name column)
+- [ ] 112-02-PLAN.md -- Data and Features pipeline scripts
+- [ ] 112-03-PLAN.md -- Signals, Execution, and Monitoring pipeline scripts
+- [ ] 112-04-PLAN.md -- sync_signals_to_vm + full chain wrapper + backward-compat wrapper
+- [ ] 112-05-PLAN.md -- Pipeline handoff contracts documentation + verification
 - [ ] **Phase 113: VM Execution Deployment** - PostgreSQL on Oracle VM with execution tables, sync_features_to_vm + sync_results_to_local scripts, real-time WebSocket price feeds (HL/Kraken), executor as systemd service
 - [ ] **Phase 114: Hosted Dashboard** - nginx reverse proxy + Let's Encrypt SSL on Oracle VM, Streamlit deployment, sync_dashboard_to_vm script, basic auth, mobile-accessible
 
@@ -1678,15 +1685,15 @@ Plans:
 ---
 
 ### Phase 112: Pipeline Architecture Separation
-**Goal:** Split the monolithic run_daily_refresh.py into 4 distinct pipelines with clear boundaries, triggers, and deployment topology. Define what runs locally vs on the Oracle VM, and how pipelines hand off to each other.
-**Depends on:** Phase 107 (ops dashboard provides monitoring UI), Phase 108 (batch performance — pipelines should be fast before separating)
+**Goal:** Split the monolithic run_daily_refresh.py into 5 distinct pipelines (Data, Features, Signals, Execution, Monitoring) with clear boundaries, triggers, and deployment topology.
+**Depends on:** Phase 107 (ops dashboard provides monitoring UI), Phase 108 (batch performance)
 **Requirements:** PIPE-01, PIPE-02, PIPE-03, PIPE-04
 **Success Criteria** (what must be TRUE):
-  1. Four distinct entry points exist: `run_data_pipeline`, `run_research_pipeline`, `run_validation_pipeline`, `run_execution_pipeline` — each independently invocable
-  2. Data pipeline (bars→EMAs→AMAs→features→regimes) runs as a standalone script with clear input/output contracts; can run locally on-demand or on VM via cron
-  3. Research pipeline (IC sweeps, feature selection, MC sims, CV sensitivity) is separated from daily refresh — never triggered by cron, only manual/ad-hoc
-  4. Validation pipeline (backtest verification, PBO, strategy scoring, leaderboard refresh) triggers after research produces new candidates — consumes research output, produces validated rankings
-  5. Execution pipeline (signals→portfolio→orders→fills→drift) can run on Oracle VM with minimal data transfer — only needs strategy configs + latest features, not full history
+  1. Five distinct entry points exist: `run_data_pipeline`, `run_features_pipeline`, `run_signals_pipeline`, `run_execution_pipeline`, `run_monitoring_pipeline` -- each independently invocable
+  2. Data pipeline (sync VMs, bars, returns_bars) runs as standalone with clear input/output contracts
+  3. Research pipeline already separate (IC sweeps, feature selection are ad-hoc scripts, not part of any pipeline)
+  4. Execution pipeline (calibrate_stops, portfolio, executor) supports polling loop for VM deployment
+  5. Monitoring pipeline (drift, alerts, stats) runs independently on timer cadence
   6. Pipeline handoff contracts documented: what tables/artifacts each pipeline reads and writes
 
 ---
